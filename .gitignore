@@ -2,6 +2,21 @@
 *.a
 *.so
 *.so.*
+*.in
+*.Plo
+*.swp
+.libs
+autom4te.cache/*
+config.*
+configure
+ar-lib
+Makefile
+libtool
+missing
+compile
+depcomp
+install-sh
+stamp-h1
 
 # CMake files
 /CMakeCache.txt
