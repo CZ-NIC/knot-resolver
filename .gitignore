@@ -2,10 +2,13 @@
 *.a
 *.so
 *.so.*
+*.lo
+*.la
 *.in
 *.Plo
 *.swp
 .libs
+.deps
 autom4te.cache/*
 config.*
 configure

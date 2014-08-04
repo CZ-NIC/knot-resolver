@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Parse options
+BASEDIR="."
+eval set -- `getopt b: "$@"`
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-b) BASEDIR="$2"; shift;;
+		--) shift; break;;
+	esac
+	shift
+done
+
+# Process tests
+while [ $# -gt 0 ]; do
+	${BASEDIR}/$1
+	shift
+done

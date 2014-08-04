@@ -29,15 +29,20 @@ LT_INIT
 # Use pkg-config
 PKG_PROG_PKG_CONFIG
 
+# Check for dependencies
+AM_CHECK_CMOCKA
+AM_CHECK_LIBUV
+
 # Check headers
 AC_CHECK_HEADERS([stdlib.h],,, [AC_INCLUDES_DEFAULT])
 
 # Search libraries
-AC_SEARCH_LIBS([socket], [socket])
+AC_SEARCH_LIBS([knot_rrset_clear], [knot])
 
 # Config files
 AC_CONFIG_FILES([Makefile
 		 lib/Makefile
+		 tests/Makefile
 		 ])
 
 # Output
