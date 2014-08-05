@@ -17,5 +17,5 @@ limitations under the License.
 
 #include "context.h"
 
-int kresolve_resolve(struct kresolve_ctx* ctx, struct kresolve_result* result,
+int kr_resolve(struct kr_context* ctx, struct kr_result* result,
                      const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);

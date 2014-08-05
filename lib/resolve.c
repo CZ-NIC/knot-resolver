@@ -8,60 +8,63 @@
 
 /* TODO: temporary */
 #include <libknot/rrset-dump.h>
+#include <common/print.h>
 
-int kresolve_resolve(struct kresolve_ctx* ctx, struct kresolve_result* result,
+int kr_resolve(struct kr_context* ctx, struct kr_result* result,
                      const knot_dname_t *qname, uint16_t qclass, uint16_t qtype)
 {
 	/* TODO: how to load all the layers? no API support yet */
-	struct knot_requestor req;
-	memset(result, 0, sizeof(struct kresolve_result));
-	result->qname = qname;
-	result->qclass = qclass;
-	result->qtype = qtype;
-	result->rcode = KNOT_RCODE_SERVFAIL;
+	ctx->sname = knot_dname_copy(qname, ctx->mm);
+	ctx->sclass = qclass;
+	ctx->stype = qtype;
+	kr_result_init(ctx, result);
 
-	/* TODO: layer logic, where to? do one iteration step now */
-	struct layer_iterate_param param;
+	struct layer_param param;
 	param.ctx = ctx;
 	param.result = result;
-	knot_requestor_init(&req, LAYER_ITERATE, ctx->mm);
 
 	/* TODO: read root hints. */
-	struct sockaddr_in root = uv_ip4_addr("198.41.0.4", 53);
-	result->ns.name = NULL;
-	memcpy(&result->ns.addr, &root, sizeof(root));
+	struct sockaddr_in root_addr = uv_ip4_addr("198.41.0.4", 53);
+	kr_slist_add(ctx, knot_dname_copy((const uint8_t *)"", NULL), (struct sockaddr *)&root_addr);
 
 	/* Resolve. */
-	ctx->state = NS_PROC_MORE;
+	struct knot_requestor req;
+	knot_requestor_init(&req, LAYER_ITERATE, ctx->mm);
 	struct timeval tv = { 5, 0 };
-	while (ctx->state == NS_PROC_MORE) {
-		printf("execing\n");
-		/* Create name resolution result structure and prepare first query. */
-		knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MIN_PKTSIZE, ctx->mm);
-		if (query == NULL) {
-			return -1;
-		}
-		knot_pkt_put_question(query, qname, qclass, qtype);
-		/* Check if the next address is valid. */
-		struct knot_request *tx = knot_requestor_make(&req, &result->ns.addr, NULL, query);
+	struct kr_ns *ns = NULL;
+	struct knot_request *tx = NULL;
+	int watchdog = 0;
+	while(ctx->state != NS_PROC_DONE) {
+		ns = kr_slist_top(ctx);
+		tx = knot_requestor_make(&req, (const struct sockaddr *)&ns->addr,
+		                         NULL, NULL);
 		knot_requestor_enqueue(&req, tx, &param);
 		knot_requestor_exec(&req, &tv);
-		printf("exec'd\n");
+
+		/* TODO: restart if sname != originating */
+		if (qname != ctx->sname) {
+			printf("we didn't resolve the cname target...yet\n");
+		}
+
+		/* TODO: safety check, remove */
+		assert(++watchdog < 10);
 	}
 	knot_requestor_clear(&req);
 
 	char *qnamestr = knot_dname_to_str(qname);
-	char *cnamestr = knot_dname_to_str(result->cname);
+	char *cnamestr = knot_dname_to_str(ctx->sname);
 	printf("resolution of %s -> %s\n", qnamestr, cnamestr);
 	free(qnamestr); free(cnamestr);
-	printf("rcode = %d (%u RR)\n", result->rcode, result->count);
+	printf("rcode = %d (%u RR)\n", knot_wire_get_rcode(result->ans->wire), result->ans->rrset_count);
 	char strbuf[4096] = {0}; int buflen = sizeof(strbuf);
 	knot_dump_style_t style = {0};
-	for (unsigned i = 0; i < result->count; ++i) {
-		int r = knot_rrset_txt_dump(result->data[i], strbuf, buflen, &style);
+	for (unsigned i = 0; i < result->ans->rrset_count; ++i) {
+		int r = knot_rrset_txt_dump(&result->ans->rr[i], strbuf, buflen, &style);
 		if (r > 0) buflen -= r;
 	}
-	printf("%s\n", strbuf);
+	printf("%s", strbuf);
+	printf("queries: %u\n", result->nr_queries);
+	printf("rtt %.02f msecs\n", time_diff(&result->t_start, &result->t_end));
 
 	return 0;
 }
