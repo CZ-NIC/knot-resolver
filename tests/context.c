@@ -11,9 +11,9 @@ static void tests_ctx_create(void **state)
 {
 	mm_ctx_t mm;
 	mm_ctx_init(&mm);
-	struct kresolve_ctx ctx;
-	assert_int_equal(kresolve_ctx_init(&ctx, &mm), 0);
-	assert_int_equal(kresolve_ctx_close(&ctx), 0);
+	struct kr_context ctx;
+	assert_int_equal(kr_context_init(&ctx, &mm), 0);
+	assert_int_equal(kr_context_close(&ctx), 0);
 }
 
 int main(void)
