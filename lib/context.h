@@ -19,31 +19,47 @@ limitations under the License.
 #include <libknot/mempattern.h>
 #include <libknot/packet/pkt.h>
 
+#warning TODO: this is private define
+#include <common/lists.h>
+#include <common/sockaddr.h>
+
+/*! \brief Name server information. */
+struct kr_ns {
+	node_t node;
+	knot_dname_t *name;
+	struct sockaddr_storage addr;
+	unsigned mean_rtt;
+	unsigned closeness;
+};
+
 /*! \brief Name resolution result. */
-struct kresolve_result {
-	/* Nameserver. */
-	struct {
-		const knot_dname_t *name;
-		struct sockaddr_storage addr;
-	} ns;
-	/* Query */
-	const knot_dname_t *qname;
-	uint16_t qtype;
-	uint16_t qclass;
-	/* Result */
+struct kr_result {
 	const knot_dname_t *cname;
-	uint16_t rcode;
-	knot_rrset_t *data[32];
-	unsigned count;
+	knot_pkt_t *ans;
 	unsigned flags;
+	struct timeval t_start, t_end;
+	unsigned nr_queries;
 };
 
 /*! \brief Name resolution context. */
-struct kresolve_ctx {
+struct kr_context
+{
+	const knot_dname_t *sname;
+	uint16_t stype;
+	uint16_t sclass;
+	uint16_t next_id;
+	list_t slist;
 	mm_ctx_t *mm;
 	unsigned state;
 	unsigned options;
 };
 
-int kresolve_ctx_init(struct kresolve_ctx *ctx, mm_ctx_t *mm);
-int kresolve_ctx_close(struct kresolve_ctx *ctx);
+int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm);
+int kr_context_close(struct kr_context *ctx);
+
+int kr_result_init(struct kr_context *ctx, struct kr_result *result);
+int kr_result_clear(struct kr_result *result);
+
+int kr_slist_add(struct kr_context *ctx, const knot_dname_t *name, const struct sockaddr *addr);
+struct kr_ns *kr_slist_top(struct kr_context *ctx);
+int kr_slist_pop(struct kr_context *ctx);
