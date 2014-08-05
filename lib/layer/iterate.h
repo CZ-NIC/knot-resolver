@@ -15,17 +15,8 @@ limitations under the License.
 
 #pragma once
 
-#include <libknot/processing/process.h>
-#include "lib/context.h"
+#include "lib/layer.h"
 
 /* Processing module implementation. */
 const knot_process_module_t *layer_iterate_module(void);
 #define LAYER_ITERATE layer_iterate_module()
-
-/*!
- * \brief Processing module parameters.
- */
-struct layer_iterate_param {
-	struct kresolve_ctx *ctx;
-	struct kresolve_result *result;
-};
