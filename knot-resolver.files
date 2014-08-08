@@ -1,3 +1,8 @@
+daemon/layer/query.c
+daemon/layer/query.h
+daemon/main.c
+daemon/worker.c
+daemon/worker.h
 include/kgetdns.h
 lib/layer/iterate.c
 lib/layer/iterate.h
@@ -5,8 +10,8 @@ lib/layer/static.c
 lib/layer/static.h
 lib/context.c
 lib/context.h
+lib/layer.h
 lib/resolve.c
 lib/resolve.h
 tests/context.c
 tests/resolve.c
-lib/layer.h

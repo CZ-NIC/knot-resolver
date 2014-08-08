@@ -42,6 +42,7 @@ AC_SEARCH_LIBS([knot_rrset_clear], [knot])
 # Config files
 AC_CONFIG_FILES([Makefile
 		 lib/Makefile
+		 daemon/Makefile
 		 tests/Makefile
 		 ])
 
