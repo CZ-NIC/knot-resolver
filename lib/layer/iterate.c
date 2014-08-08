@@ -56,19 +56,21 @@ static int glue_record(knot_pkt_t *pkt, const knot_dname_t *dp, struct sockaddr 
 	return 0;
 }
 
-static int evaluate_dp(const knot_dname_t *dp, knot_pkt_t *pkt, struct layer_param *param)
+static int evaluate_dp(const knot_rrset_t *dp, knot_pkt_t *pkt, struct layer_param *param)
 {
 	struct kr_context *resolve = param->ctx;
 
 	/* Check if there's a glue for the record. */
 	struct sockaddr_storage ss;
-	int ret = glue_record(pkt, dp, (struct sockaddr *)&ss);
+	const knot_dname_t *dp_name = knot_ns_name(&dp->rrs, 0);
+	int ret = glue_record(pkt, dp_name, (struct sockaddr *)&ss);
 	if (ret != 0) {
+		/* TODO: lookup delegation if not provided in additionals */
 		return -1;
 	}
 
 	/* Add delegation to the SLIST. */
-	kr_slist_add(resolve, dp, (struct sockaddr *)&ss);
+	kr_slist_add(resolve, dp->owner, (struct sockaddr *)&ss);
 
 	return 0;
 }
@@ -78,11 +80,7 @@ static int resolve_nonauth(knot_pkt_t *pkt, struct layer_param *param)
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
 		if (ns->rr[i].type == KNOT_RRTYPE_NS) {
-			const knot_dname_t *dp = knot_ns_name(&ns->rr[i].rrs, 0);
-			int ret = evaluate_dp(dp, pkt, param);
-			if (ret != 0) {
-				return NS_PROC_FAIL;
-			}
+			evaluate_dp(&ns->rr[i], pkt, param);
 		}
 	}
 
