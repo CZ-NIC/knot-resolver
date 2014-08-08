@@ -87,14 +87,19 @@ static int resolve_nonauth(knot_pkt_t *pkt, struct layer_param *param)
 	return NS_PROC_DONE;
 }
 
-static void resolve_cname(const knot_rrset_t *rr, struct layer_param *param)
+static void follow_cname_chain(const knot_rrset_t *rr, struct layer_param *param)
 {
 	struct kr_context *resolve = param->ctx;
+	struct kr_result *result = param->result;
 
 	/* Follow chain from SNAME. */
-	if (knot_dname_is_equal(rr->owner, resolve->sname)) {
-		resolve->state = NS_PROC_MORE;
-		resolve->sname = knot_dname_copy(knot_cname_name(&rr->rrs), resolve->mm);
+	if (knot_dname_is_equal(rr->owner, result->cname)) {
+		if (rr->type == KNOT_RRTYPE_CNAME) {
+			result->cname = knot_cname_name(&rr->rrs);
+		} else {
+			/* Terminate CNAME chain. */
+			result->cname = resolve->sname;
+		}
 	}
 }
 
@@ -109,6 +114,7 @@ static int resolve_auth(knot_pkt_t *pkt, struct layer_param *param)
 
 	/* Add results to the final packet. */
 	/* TODO: API call */
+	result->cname = resolve->sname;
 	knot_pkt_begin(ans, KNOT_ANSWER);
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
@@ -119,10 +125,16 @@ static int resolve_auth(knot_pkt_t *pkt, struct layer_param *param)
 			return NS_PROC_FAIL;
 		}
 		/* Check canonical name. */
-		/* TODO: these may not come in order, more thorough check is needed */
-		if (rr->type == KNOT_RRTYPE_CNAME) {
-			resolve_cname(rr, param);
-		}
+		/* TODO: these may not come in order, queueing is needed. */
+		follow_cname_chain(rr, param);
+	}
+
+	/* Follow canonical name as next SNAME. */
+	if (result->cname != resolve->sname) {
+		/* Reset name server scoring for new SNAME. */
+		resolve->sname = result->cname;
+		resolve->state = NS_PROC_MORE;
+		return NS_PROC_DONE;
 	}
 
 	/* Finished for the original SNAME. */
