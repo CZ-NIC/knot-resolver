@@ -49,17 +49,20 @@ struct kr_context
 	uint16_t sclass;
 	uint16_t next_id;
 	list_t slist;
-	mm_ctx_t *mm;
+	mm_ctx_t *pool;
 	unsigned state;
 	unsigned options;
 };
 
 int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm);
-int kr_context_close(struct kr_context *ctx);
+int kr_context_reset(struct kr_context *ctx);
+int kr_context_deinit(struct kr_context *ctx);
 
 int kr_result_init(struct kr_context *ctx, struct kr_result *result);
-int kr_result_clear(struct kr_result *result);
+int kr_result_deinit(struct kr_result *result);
 
+int kr_slist_init(struct kr_context *ctx);
 int kr_slist_add(struct kr_context *ctx, const knot_dname_t *name, const struct sockaddr *addr);
 struct kr_ns *kr_slist_top(struct kr_context *ctx);
+int kr_slist_sort(struct kr_context *ctx);
 int kr_slist_pop(struct kr_context *ctx);
