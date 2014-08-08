@@ -13,7 +13,7 @@ static void tests_ctx_create(void **state)
 	mm_ctx_init(&mm);
 	struct kr_context ctx;
 	assert_int_equal(kr_context_init(&ctx, &mm), 0);
-	assert_int_equal(kr_context_close(&ctx), 0);
+	assert_int_equal(kr_context_deinit(&ctx), 0);
 }
 
 int main(void)

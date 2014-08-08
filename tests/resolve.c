@@ -17,7 +17,7 @@ void test_resolve_sync(void **state)
 	const knot_dname_t *qname = (const uint8_t *)"\x06""dnssec""\x02""cz";
 	int ret = kr_resolve(&ctx, &res, qname, KNOT_CLASS_IN, KNOT_RRTYPE_A);
 	assert_int_equal(ret, 0);
-	kr_context_close(&ctx);
+	kr_result_deinit(&res);
 }
 
 int main(void)
