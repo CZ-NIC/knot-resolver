@@ -18,6 +18,10 @@ void test_resolve_sync(void **state)
 	int ret = kr_resolve(&ctx, &res, qname, KNOT_CLASS_IN, KNOT_RRTYPE_A);
 	assert_int_equal(ret, 0);
 	kr_result_deinit(&res);
+	qname = (const uint8_t *)"\x04""mail""\x07""vavrusa""\x03""com";
+	ret = kr_resolve(&ctx, &res, qname, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	assert_int_equal(ret, 0);
+	kr_context_deinit(&ctx);
 }
 
 int main(void)
