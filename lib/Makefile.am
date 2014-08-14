@@ -11,4 +11,6 @@ libknotresolve_la_SOURCES =		\
 	context.h 		\
 	context.c 		\
 	resolve.h 		\
-	resolve.c
+	resolve.c		\
+	nslist.c		\
+	nslist.h

@@ -17,20 +17,11 @@ limitations under the License.
 
 #include <stdint.h>
 #include <libknot/mempattern.h>
-#include <libknot/packet/pkt.h>
 
 #warning TODO: this is private define
-#include <common/lists.h>
 #include <common/sockaddr.h>
 
-/*! \brief Name server information. */
-struct kr_ns {
-	node_t node;
-	knot_dname_t *name;
-	struct sockaddr_storage addr;
-	unsigned mean_rtt;
-	unsigned closeness;
-};
+#include "lib/nslist.h"
 
 /*! \brief Name resolution result. */
 struct kr_result {
@@ -60,10 +51,3 @@ int kr_context_deinit(struct kr_context *ctx);
 
 int kr_result_init(struct kr_context *ctx, struct kr_result *result);
 int kr_result_deinit(struct kr_result *result);
-
-int kr_slist_init(struct kr_context *ctx);
-int kr_slist_clear(struct kr_context *ctx);
-int kr_slist_add(struct kr_context *ctx, const knot_dname_t *name, const struct sockaddr *addr);
-struct kr_ns *kr_slist_top(struct kr_context *ctx);
-int kr_slist_sort(struct kr_context *ctx);
-int kr_slist_pop(struct kr_context *ctx);
