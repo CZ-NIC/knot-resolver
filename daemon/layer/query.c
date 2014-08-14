@@ -16,19 +16,16 @@ limitations under the License.
 #include "daemon/layer/query.h"
 #include "lib/resolve.h"
 
-/* State-less single resolution iteration step, not needed. */
-static int reset(knot_process_t *ctx)  { return NS_PROC_MORE; }
-static int finish(knot_process_t *ctx) { return NS_PROC_NOOP; }
-static int begin(knot_process_t *ctx, void *module_param)
+static int begin(knot_layer_t *ctx, void *module_param)
 {
 	ctx->data = module_param;
 	return NS_PROC_MORE;
 }
 
-static int input_query(knot_pkt_t *pkt, knot_process_t *ctx)
+static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct layer_param *param = ctx->data;
+	struct kr_layer_param *param = ctx->data;
 
 	/* Check if at least header is parsed. */
 	if (pkt->parsed < pkt->size) {
@@ -62,23 +59,17 @@ static int input_query(knot_pkt_t *pkt, knot_process_t *ctx)
 	}
 }
 
-static int output(knot_pkt_t *pkt, knot_process_t *ctx)
-{
-	/* \note Output is returned indirectly via resolution result. */
-	return NS_PROC_NOOP;
-}
-
 /*! \brief Module implementation. */
-static const knot_process_module_t LAYER_QUERY_MODULE = {
+static const knot_layer_api_t LAYER_QUERY_MODULE = {
 	&begin,
-	&reset,
-	&finish,
+	NULL,
+	NULL,
 	&input_query,
-	&output,
-	&knot_process_noop  /* No error processing. */
+	NULL,
+	NULL
 };
 
-const knot_process_module_t *layer_query_module(void)
+const knot_layer_api_t *layer_query_module(void)
 {
 	return &LAYER_QUERY_MODULE;
 }

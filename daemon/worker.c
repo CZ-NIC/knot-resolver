@@ -6,11 +6,17 @@
 #include "daemon/worker.h"
 #include "daemon/layer/query.h"
 
-static void worker_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
+static void buf_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	struct worker_ctx *worker = handle->data;
 	buf->base = mm_alloc(worker->pool, suggested_size);
 	buf->len = suggested_size;
+}
+
+static void buf_free(uv_handle_t* handle, const uv_buf_t* buf)
+{
+	struct worker_ctx *worker = handle->data;
+	mm_free(worker->pool, buf->base);
 }
 
 static void worker_send(uv_udp_t *handle, knot_pkt_t *answer, const struct sockaddr *addr)
@@ -26,21 +32,23 @@ static void worker_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	assert(ctx->pool);
 
 	if (nread < KNOT_WIRE_HEADER_SIZE) {
+		buf_free((uv_handle_t *)handle, buf);
 		return;
 	}
 
 	struct kr_result result;
 
 	/* Create query processing context. */
-	struct layer_param param;
+	struct kr_layer_param param;
 	param.ctx = &ctx->resolve;
 	param.result = &result;
 
 	/* Process query packet. */
-	knot_process_t proc = {0};
-	memcpy(&proc.mm, ctx->pool, sizeof(mm_ctx_t));
-	knot_process_begin(&proc, &param, LAYER_QUERY);
-	int state = knot_process_in((uint8_t *)buf->base, nread, &proc);
+	knot_layer_t proc;
+	memset(&proc, 0, sizeof(knot_layer_t));
+	proc.mm = ctx->pool;
+	knot_process_begin(&proc, LAYER_QUERY, &param);
+	int state = knot_process_in(&proc, (uint8_t *)buf->base, nread);
 	if (state & (NS_PROC_DONE|NS_PROC_FAIL)) {
 		worker_send(handle, result.ans, addr);
 	}
@@ -49,6 +57,8 @@ static void worker_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	knot_process_finish(&proc);
 	kr_result_deinit(&result);
 	kr_context_reset(&ctx->resolve);
+
+	buf_free((uv_handle_t *)handle, buf);
 }
 
 void worker_init(struct worker_ctx *worker, mm_ctx_t *mm)
@@ -68,7 +78,7 @@ void worker_start(uv_udp_t *handle, struct worker_ctx *worker)
 {
 
 	handle->data = worker;
-	uv_udp_recv_start(handle, &worker_alloc, &worker_recv);
+	uv_udp_recv_start(handle, &buf_alloc, &worker_recv);
 }
 
 void worker_stop(uv_udp_t *handle)

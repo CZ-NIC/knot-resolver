@@ -41,11 +41,43 @@ do { \
 	printf("[%s] at %s (soa %s) ", _qstr, _astr, _soastr); \
 	printf(s); \
 	printf("\n"); \
+	free(_qstr); \
+	free(_soastr); \
 } while(0)
 #else
 static void print_result(struct kr_result *result) {}
 #define print_step
 #endif
+
+static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
+{
+	struct timeval timeout = { 5, 0 };
+
+	/* Sort preference list to the SNAME and pick a NS. */
+	kr_slist_sort(ctx);
+	struct kr_ns *ns = kr_slist_top(ctx);
+	if (ns == NULL) {
+		ctx->state = NS_PROC_FAIL;
+		return;
+	}
+
+	print_step("iterating");
+
+	/* Build query. */
+	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, requestor->mm);
+
+	/* Resolve. */
+	struct knot_request *tx = knot_request_make(requestor->mm,
+	                         (const struct sockaddr *)&ns->addr,
+	                         NULL, query, 0);
+	knot_requestor_enqueue(requestor, tx);
+	int ret = knot_requestor_exec(requestor, &timeout);
+	/* TODO: soft remove, retry later */
+	if (ret != 0) {
+		print_step("server failure %d", ret);
+		kr_slist_pop(ctx);
+	}
+}
 
 int kr_resolve(struct kr_context* ctx, struct kr_result* result,
                const knot_dname_t *qname, uint16_t qclass, uint16_t qtype)
@@ -54,42 +86,29 @@ int kr_resolve(struct kr_context* ctx, struct kr_result* result,
 		return -1;
 	}
 
+	/* Initialize context. */
 	ctx->sname = qname;
 	ctx->sclass = qclass;
 	ctx->stype = qtype;
 	ctx->state = NS_PROC_MORE;
+	ctx->query = NULL;
 	kr_result_init(ctx, result);
 
-	struct layer_param param;
+	struct kr_layer_param param;
 	param.ctx = ctx;
 	param.result = result;
 
-	/* TODO: how to load all the layers? no API support yet */
-	struct timeval timeout = { 5, 0 };
+	/* Initialize requestor and overlay. */
 	struct knot_requestor requestor;
-	knot_requestor_init(&requestor, LAYER_ITERATE, ctx->pool);
+	knot_requestor_init(&requestor, ctx->pool);
+	knot_requestor_overlay(&requestor, LAYER_STATIC, &param);
+	knot_requestor_overlay(&requestor, LAYER_ITERATE, &param);
 
 	while(ctx->state != NS_PROC_DONE) {
-		/* Sort preference list to the SNAME and pick a NS. */
-		kr_slist_sort(ctx);
-		struct kr_ns *ns = kr_slist_top(ctx);
-
-		print_step("iterating");
-
-		/* Resolve. */
-		struct knot_request *tx = knot_requestor_make(&requestor,
-		                         (const struct sockaddr *)&ns->addr,
-		                         NULL, NULL, 0);
-		knot_requestor_enqueue(&requestor, tx, &param);
-		int ret = knot_requestor_exec(&requestor, &timeout);
-		/* TODO: soft remove, retry later */
-		if (ret != 0) {
-			print_step("server failure %d", ret);
-			kr_slist_pop(ctx);
-		}
+		iterate(&requestor, ctx);
 	}
 
-	print_step(" ---> done");
+	/* Clean up. */
 
 	knot_requestor_clear(&requestor);
 

@@ -44,10 +44,10 @@ struct kr_result {
 /*! \brief Name resolution context. */
 struct kr_context
 {
+	const knot_pkt_t *query;
 	const knot_dname_t *sname;
 	uint16_t stype;
 	uint16_t sclass;
-	uint16_t next_id;
 	list_t slist;
 	mm_ctx_t *pool;
 	unsigned state;
@@ -62,6 +62,7 @@ int kr_result_init(struct kr_context *ctx, struct kr_result *result);
 int kr_result_deinit(struct kr_result *result);
 
 int kr_slist_init(struct kr_context *ctx);
+int kr_slist_clear(struct kr_context *ctx);
 int kr_slist_add(struct kr_context *ctx, const knot_dname_t *name, const struct sockaddr *addr);
 struct kr_ns *kr_slist_top(struct kr_context *ctx);
 int kr_slist_sort(struct kr_context *ctx);

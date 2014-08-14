@@ -4,31 +4,6 @@
 #include <common/sockaddr.h>
 #include "context.h"
 
-/* \brief Root hint descriptor. */
-struct hint_info {
-	const char *name;
-	const char *addr;
-	const char *zone;
-};
-
-/* Initialize with SBELT name servers. */
-#define HINT_COUNT 13
-static const struct hint_info SBELT[HINT_COUNT] = {
-        { "a.root-servers.net.", "198.41.0.4", "." },
-        { "b.root-servers.net.", "192.228.79.201", "." },
-        { "c.root-servers.net.", "192.33.4.12", "." },
-        { "d.root-servers.net.", "199.7.91.13", "." },
-        { "e.root-servers.net.", "192.203.230.10", "." },
-        { "f.root-servers.net.", "192.5.5.241", "." },
-        { "g.root-servers.net.", "192.112.36.4", "." },
-        { "h.root-servers.net.", "128.63.2.53", "." },
-        { "i.root-servers.net.", "192.36.148.17", "." },
-        { "j.root-servers.net.", "192.58.128.30", "." },
-        { "k.root-servers.net.", "193.0.14.129", "." },
-        { "l.root-servers.net.", "199.7.83.42", "." },
-        { "m.root-servers.net.", "202.12.27.33", "." }
-};
-
 /* TODO: debug, remove */
 #ifndef NDEBUG
 static void print_slist(struct kr_context *ctx)
@@ -116,16 +91,14 @@ int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
 	memset(ctx, 0, sizeof(struct kr_context));
 
 	ctx->pool = mm;
-	init_list(&ctx->slist);
-	kr_context_reset(ctx);
+	kr_slist_init(ctx);
 
 	return 0;
 }
 
 int kr_context_reset(struct kr_context *ctx)
 {
-	while(kr_slist_pop(ctx) == 0);
-
+	kr_slist_clear(ctx);
 	kr_slist_init(ctx);
 
 	return 0;
@@ -133,7 +106,8 @@ int kr_context_reset(struct kr_context *ctx)
 
 int kr_context_deinit(struct kr_context *ctx)
 {
-	/* TODO: free slist, pending queries. */
+	kr_slist_clear(ctx);
+
 	return -1;
 }
 
@@ -165,14 +139,15 @@ int kr_result_deinit(struct kr_result *result)
 
 int kr_slist_init(struct kr_context *ctx)
 {
-	int ret = 0;
-	struct sockaddr_storage ss;
-	for (unsigned i = 0; i < HINT_COUNT; ++i) {
-		ret = sockaddr_set(&ss, AF_INET, SBELT[i].addr, 53);
-		assert(ret == 0);
-		kr_slist_add(ctx, knot_dname_from_str(SBELT[i].zone),
-		             (struct sockaddr *)&ss);
-	}
+	init_list(&ctx->slist);
+
+	return 0;
+}
+
+int kr_slist_clear(struct kr_context *ctx)
+{
+	while(kr_slist_pop(ctx) == 0)
+		;
 
 	return 0;
 }
@@ -219,6 +194,7 @@ int kr_slist_pop(struct kr_context *ctx)
 	if (top == NULL) {
 		return -1;
 	}
+
 
 	remove_ns(ctx->pool, top);
 

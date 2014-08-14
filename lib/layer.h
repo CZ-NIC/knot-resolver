@@ -21,7 +21,7 @@ limitations under the License.
 /*!
  * \brief Processing module parameters.
  */
-struct layer_param {
+struct kr_layer_param {
 	struct kr_context *ctx;
 	struct kr_result *result;
 };

@@ -18,5 +18,5 @@ limitations under the License.
 #include "lib/layer.h"
 
 /* Processing module implementation. */
-const knot_process_module_t *layer_query_module(void);
+const knot_layer_api_t *layer_query_module(void);
 #define LAYER_QUERY layer_query_module()

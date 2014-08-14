@@ -56,7 +56,7 @@ static int glue_record(knot_pkt_t *pkt, const knot_dname_t *dp, struct sockaddr 
 	return 0;
 }
 
-static int evaluate_dp(const knot_rrset_t *dp, knot_pkt_t *pkt, struct layer_param *param)
+static int evaluate_dp(const knot_rrset_t *dp, knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	struct kr_context *resolve = param->ctx;
 
@@ -75,7 +75,7 @@ static int evaluate_dp(const knot_rrset_t *dp, knot_pkt_t *pkt, struct layer_par
 	return 0;
 }
 
-static int resolve_nonauth(knot_pkt_t *pkt, struct layer_param *param)
+static int resolve_nonauth(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
@@ -87,7 +87,7 @@ static int resolve_nonauth(knot_pkt_t *pkt, struct layer_param *param)
 	return NS_PROC_DONE;
 }
 
-static void follow_cname_chain(const knot_rrset_t *rr, struct layer_param *param)
+static void follow_cname_chain(const knot_rrset_t *rr, struct kr_layer_param *param)
 {
 	struct kr_context *resolve = param->ctx;
 	struct kr_result *result = param->result;
@@ -103,7 +103,7 @@ static void follow_cname_chain(const knot_rrset_t *rr, struct layer_param *param
 	}
 }
 
-static int resolve_auth(knot_pkt_t *pkt, struct layer_param *param)
+static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	struct kr_context *resolve = param->ctx;
 	struct kr_result *result = param->result;
@@ -118,15 +118,23 @@ static int resolve_auth(knot_pkt_t *pkt, struct layer_param *param)
 	knot_pkt_begin(ans, KNOT_ANSWER);
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
-		const knot_rrset_t *rr = &an->rr[i];
-		int ret = knot_pkt_put(ans, COMPR_HINT_NONE, rr, 0);
+		knot_rrset_t *rr = knot_rrset_copy(&an->rr[i], &ans->mm);
+		if (rr == NULL) {
+			return NS_PROC_FAIL;
+		}
+		int ret = knot_pkt_put(ans, COMPR_HINT_NONE, rr, KNOT_PF_FREE);
 		if (ret != 0) {
+			knot_rrset_free(&rr, &ans->mm);
 			knot_wire_set_tc(ans->wire);
 			return NS_PROC_FAIL;
 		}
+
 		/* Check canonical name. */
 		/* TODO: these may not come in order, queueing is needed. */
 		follow_cname_chain(rr, param);
+		/* Free just the allocated container. */
+		mm_free(&ans->mm, rr);
+
 	}
 
 	/* Follow canonical name as next SNAME. */
@@ -147,7 +155,7 @@ static int resolve_auth(knot_pkt_t *pkt, struct layer_param *param)
 }
 
 /*! \brief Error handling, RFC1034 5.3.3, 4d. */
-static int resolve_error(knot_pkt_t *pkt, struct layer_param *param)
+static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	return NS_PROC_FAIL;
 }
@@ -155,31 +163,53 @@ static int resolve_error(knot_pkt_t *pkt, struct layer_param *param)
 /*! \brief Answer is paired to query. */
 static bool is_answer_to_query(const knot_pkt_t *answer, struct kr_context *resolve)
 {
-	return resolve->next_id == knot_wire_get_id(answer->wire) &&
+	return knot_wire_get_id(resolve->query->wire) == knot_wire_get_id(answer->wire) &&
 	       resolve->sclass  == knot_pkt_qclass(answer) &&
 	       resolve->stype   == knot_pkt_qtype(answer) &&
 	       knot_dname_is_equal(resolve->sname, knot_pkt_qname(answer));
 }
 
 /* State-less single resolution iteration step, not needed. */
-static int reset(knot_process_t *ctx)  { return NS_PROC_MORE; }
-static int finish(knot_process_t *ctx) { return NS_PROC_NOOP; }
+static int reset(knot_layer_t *ctx)  { return NS_PROC_FULL; }
+static int finish(knot_layer_t *ctx) { return NS_PROC_NOOP; }
 
 /* Set resolution context and parameters. */
-static int begin(knot_process_t *ctx, void *module_param)
+static int begin(knot_layer_t *ctx, void *module_param)
 {
 	ctx->data = module_param;
-	return NS_PROC_FULL;
+	return reset(ctx);
+}
+
+static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
+{
+	assert(pkt && ctx);
+	struct kr_layer_param *param = ctx->data;
+	struct kr_context* resolve = param->ctx;
+
+	resolve->query = pkt;
+	knot_pkt_clear(pkt);
+
+	int ret = knot_pkt_put_question(pkt, resolve->sname, resolve->sclass, resolve->stype);
+	if (ret != KNOT_EOK) {
+		assert(0);
+		return NS_PROC_FAIL;
+	}
+
+	knot_wire_set_id(pkt->wire, knot_random_uint16_t());
+
+	/* Query complete, expect answer. */
+	return NS_PROC_MORE;
+
 }
 
 /*! \brief Resolve input query or continue resolution with followups.
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
  */
-static int resolve(knot_pkt_t *pkt, knot_process_t *ctx)
+static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct layer_param *param = ctx->data;
+	struct kr_layer_param *param = ctx->data;
 
 	/* Check for packet processing errors first. */
 	if (pkt->parsed < pkt->size) {
@@ -208,34 +238,17 @@ static int resolve(knot_pkt_t *pkt, knot_process_t *ctx)
 	return resolve_auth(pkt, param);
 }
 
-static int issue(knot_pkt_t *pkt, knot_process_t *ctx)
-{
-	assert(pkt && ctx);
-	struct layer_param *param = ctx->data;
-	struct kr_context *resolve = param->ctx;
-	struct kr_result *result = param->result;
-
-	knot_pkt_clear(pkt);
-	knot_pkt_put_question(pkt, resolve->sname, resolve->sclass, resolve->stype);
-	knot_wire_set_id(pkt->wire, knot_random_uint16_t());
-
-	resolve->next_id = knot_wire_get_id(pkt->wire);
-	result->nr_queries += 1;
-
-	return NS_PROC_MORE;
-}
-
 /*! \brief Module implementation. */
-static const knot_process_module_t LAYER_ITERATE_MODULE = {
+static const knot_layer_api_t LAYER_ITERATE_MODULE = {
 	&begin,
 	&reset,
 	&finish,
 	&resolve,
-	&issue,
-	&knot_process_noop  /* No error processing. */
+	&prepare_query,
+	NULL
 };
 
-const knot_process_module_t *layer_iterate_module(void)
+const knot_layer_api_t *layer_iterate_module(void)
 {
 	return &LAYER_ITERATE_MODULE;
 }
