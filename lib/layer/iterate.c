@@ -60,17 +60,28 @@ static int evaluate_dp(const knot_rrset_t *dp, knot_pkt_t *pkt, struct kr_layer_
 {
 	struct kr_context *resolve = param->ctx;
 
-	/* Check if there's a glue for the record. */
-	struct sockaddr_storage ss;
-	const knot_dname_t *dp_name = knot_ns_name(&dp->rrs, 0);
-	int ret = glue_record(pkt, dp_name, (struct sockaddr *)&ss);
-	if (ret != 0) {
-		/* TODO: lookup delegation if not provided in additionals */
+	/* Fetch delegation point. */
+	list_t *dplist = kr_delegmap_get(&resolve->dp_map, dp->owner);
+	if (dplist == NULL) {
 		return -1;
 	}
 
-	/* Add delegation to the SLIST. */
-	kr_slist_add(resolve, dp->owner, (struct sockaddr *)&ss);
+	const knot_dname_t *dp_name = knot_ns_name(&dp->rrs, 0);
+	struct kr_delegpt *ns_new = kr_delegpt_create(dp_name, resolve->dp_map.pool);
+
+	/* Check if there's a glue for the record. */
+	int ret = glue_record(pkt, dp_name, (struct sockaddr *)&ns_new->addr);
+	if (ret != 0) {
+		/* TODO: API for duplicates? */
+		ns_new->flags |= DP_LAME;
+		/* TODO: resolve. */
+		kr_delegpt_add(dplist, ns_new);
+		return -1;
+	}
+
+	/* Add name server. */
+	ns_new->flags |= DP_RESOLVED;
+	kr_delegpt_add(dplist, ns_new);
 
 	return 0;
 }

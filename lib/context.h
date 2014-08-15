@@ -21,7 +21,7 @@ limitations under the License.
 #warning TODO: this is private define
 #include <common/sockaddr.h>
 
-#include "lib/nslist.h"
+#include "lib/delegpt.h"
 
 /*! \brief Name resolution result. */
 struct kr_result {
@@ -39,7 +39,7 @@ struct kr_context
 	const knot_dname_t *sname;
 	uint16_t stype;
 	uint16_t sclass;
-	list_t slist;
+	struct kr_delegmap dp_map;
 	mm_ctx_t *pool;
 	unsigned state;
 	unsigned options;

@@ -15,5 +15,5 @@ lib/resolve.c
 lib/resolve.h
 tests/context.c
 tests/resolve.c
-lib/nslist.h
-lib/nslist.c
+lib/delegpt.h
+lib/delegpt.c

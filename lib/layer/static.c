@@ -14,6 +14,7 @@ limitations under the License.
 */
 
 #include "lib/layer/static.h"
+#include "lib/delegpt.h"
 
 /* \brief Root hint descriptor. */
 struct hint_info {
@@ -42,7 +43,7 @@ static const struct hint_info SBELT[HINT_COUNT] = {
 
 static int reset(knot_layer_t *ctx)
 {
-	printf("loading sbelt\n");
+	/* TODO: sync cache, cleanup */
 
 	return ctx->state;
 }
@@ -54,11 +55,19 @@ static int begin(knot_layer_t *ctx, void *param)
 	struct kr_context *resolve = ((struct kr_layer_param *)param)->ctx;
 	assert(resolve);
 
+	list_t *dp = kr_delegmap_get(&resolve->dp_map, U8(""));
+	if (dp == NULL) {
+		return ctx->state;
+	}
+
 	/* Initialize static root hints. */
-	struct sockaddr_storage ss;
 	for (unsigned i = 0; i < HINT_COUNT; ++i) {
-		sockaddr_set(&ss, AF_INET, SBELT[i].addr, 53);
-		kr_slist_add(resolve, U8(""), (struct sockaddr *)&ss);
+		struct kr_delegpt *ns = kr_delegpt_create(SBELT[i].name, resolve->dp_map.pool);
+		if (ns != NULL) {
+			sockaddr_set(&ns->addr, AF_INET, SBELT[i].addr, 53);
+			ns->flags |= DP_RESOLVED;
+			kr_delegpt_add(dp, ns);
+		}
 	}
 
 	return ctx->state;

@@ -9,22 +9,19 @@ int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
 	memset(ctx, 0, sizeof(struct kr_context));
 
 	ctx->pool = mm;
-	kr_slist_init(ctx);
+	kr_delegmap_init(&ctx->dp_map, mm);
 
 	return 0;
 }
 
 int kr_context_reset(struct kr_context *ctx)
 {
-	kr_slist_clear(ctx);
-	kr_slist_init(ctx);
-
 	return 0;
 }
 
 int kr_context_deinit(struct kr_context *ctx)
 {
-	kr_slist_clear(ctx);
+	kr_delegmap_deinit(&ctx->dp_map);
 
 	return -1;
 }
