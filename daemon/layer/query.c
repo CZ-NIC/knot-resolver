@@ -29,13 +29,11 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Check if at least header is parsed. */
 	if (pkt->parsed < pkt->size) {
-		knot_pkt_free(&pkt);
 		return NS_PROC_FAIL;
 	}
 
 	/* Accept only queries. */
 	if (knot_wire_get_qr(pkt->wire)) {
-		knot_pkt_free(&pkt);
 		return NS_PROC_NOOP; /* Ignore. */
 	}
 
@@ -48,9 +46,6 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Set correct message ID. */
 	knot_pkt_t *answer = param->result->ans;
 	knot_wire_set_id(answer->wire, knot_wire_get_id(pkt->wire));
-
-	/* Free query and finish. */
-	knot_pkt_free(&pkt);
 
 	if (ret != 0) {
 		return NS_PROC_FAIL;

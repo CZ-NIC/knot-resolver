@@ -67,7 +67,7 @@ static int evaluate_dp(const knot_rrset_t *dp, knot_pkt_t *pkt, struct kr_layer_
 	}
 
 	const knot_dname_t *dp_name = knot_ns_name(&dp->rrs, 0);
-	struct kr_delegpt *ns_new = kr_delegpt_create(dp_name, resolve->dp_map.pool);
+	struct kr_ns *ns_new = kr_ns_create(dp_name, resolve->dp_map.pool);
 
 	/* Check if there's a glue for the record. */
 	int ret = glue_record(pkt, dp_name, (struct sockaddr *)&ns_new->addr);
@@ -75,13 +75,13 @@ static int evaluate_dp(const knot_rrset_t *dp, knot_pkt_t *pkt, struct kr_layer_
 		/* TODO: API for duplicates? */
 		ns_new->flags |= DP_LAME;
 		/* TODO: resolve. */
-		kr_delegpt_add(dplist, ns_new);
+		kr_ns_append(dplist, ns_new);
 		return -1;
 	}
 
 	/* Add name server. */
 	ns_new->flags |= DP_RESOLVED;
-	kr_delegpt_add(dplist, ns_new);
+	kr_ns_append(dplist, ns_new);
 
 	return 0;
 }

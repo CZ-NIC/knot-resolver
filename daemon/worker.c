@@ -47,18 +47,22 @@ static void worker_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	knot_layer_t proc;
 	memset(&proc, 0, sizeof(knot_layer_t));
 	proc.mm = ctx->pool;
-	knot_process_begin(&proc, LAYER_QUERY, &param);
-	int state = knot_process_in(&proc, (uint8_t *)buf->base, nread);
+	knot_layer_begin(&proc, LAYER_QUERY, &param);
+
+	knot_pkt_t *query = knot_pkt_new((uint8_t *)buf->base, nread, ctx->pool);
+	knot_pkt_parse(query, 0);
+	int state = knot_layer_in(&proc, query);
 	if (state & (NS_PROC_DONE|NS_PROC_FAIL)) {
 		worker_send(handle, result.ans, addr);
 	}
 
 	/* Cleanup. */
-	knot_process_finish(&proc);
+	knot_layer_finish(&proc);
 	kr_result_deinit(&result);
 	kr_context_reset(&ctx->resolve);
 
 	buf_free((uv_handle_t *)handle, buf);
+	knot_pkt_free(&query);
 }
 
 void worker_init(struct worker_ctx *worker, mm_ctx_t *mm)

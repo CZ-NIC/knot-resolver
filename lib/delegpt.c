@@ -1,7 +1,7 @@
 #include "lib/delegpt.h"
 #include <common/mempool.h>
 
-static void delegpt_free(struct kr_delegpt *dp, mm_ctx_t *mm)
+static void delegpt_free(struct kr_ns *dp, mm_ctx_t *mm)
 {
 	mm_free(mm, dp->name);
 	mm_free(mm, dp);
@@ -70,22 +70,27 @@ list_t *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name)
 	return *val;
 }
 
-struct kr_delegpt *kr_delegpt_create(const knot_dname_t *name, mm_ctx_t *mm)
+struct kr_ns *kr_ns_create(const knot_dname_t *name, mm_ctx_t *mm)
 {
-	struct kr_delegpt *dp = mm_alloc(mm, sizeof(struct kr_delegpt));
-	memset(dp, 0, sizeof(struct kr_delegpt));
-	dp->name = knot_dname_copy(name, mm);
-	dp->flags = DP_LAME;
-	return dp;
+	struct kr_ns *ns = mm_alloc(mm, sizeof(struct kr_ns));
+	memset(ns, 0, sizeof(struct kr_ns));
+	ns->name = knot_dname_copy(name, mm);
+	ns->flags = DP_LAME;
+	return ns;
 }
 
-void kr_delegpt_add(list_t *list, struct kr_delegpt *dp)
+void kr_ns_append(list_t *list, struct kr_ns *ns)
 {
-	add_tail(list, (node_t *)dp);
+	add_tail(list, (node_t *)ns);
 }
 
-void kr_delegpt_remove(struct kr_delegpt *dp, mm_ctx_t *mm)
+void kr_ns_remove(struct kr_ns *ns, mm_ctx_t *mm)
 {
-	rem_node((node_t *)dp);
-	delegpt_free(dp, mm);
+	rem_node((node_t *)ns);
+	delegpt_free(ns, mm);
+}
+
+int kr_ns_resolve(struct kr_ns *ns)
+{
+	return -1;
 }

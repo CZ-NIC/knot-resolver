@@ -22,16 +22,16 @@ limitations under the License.
 #include <common/sockaddr.h>
 #include <common/trie/hat-trie.h>
 
-/*! \brief Delegation point flag. */
-enum kr_deleg_flag {
+/*! \brief Name server flag. */
+enum kr_ns_flag {
 	DP_LAME = 0,
 	DP_RESOLVED
 };
 
 struct kr_context;
 
-/*! \brief Delegation point. */
-struct kr_delegpt {
+/*! \brief Name server. */
+struct kr_ns {
 	node_t node;
 	knot_dname_t *name;
 	struct sockaddr_storage addr;
@@ -55,7 +55,7 @@ list_t *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name);
  *       choose next and move DPs from the other half for next sweep.
  */
 
-struct kr_delegpt *kr_delegpt_create(const knot_dname_t *name, mm_ctx_t *mm);
-void kr_delegpt_add(list_t *list, struct kr_delegpt *dp);
-void kr_delegpt_remove(struct kr_delegpt *dp, mm_ctx_t *mm);
-int kr_delegpt_resolve(struct kr_delegpt *dp);
+struct kr_ns *kr_ns_create(const knot_dname_t *name, mm_ctx_t *mm);
+void kr_ns_append(list_t *list, struct kr_ns *ns);
+void kr_ns_remove(struct kr_ns *ns, mm_ctx_t *mm);
+int kr_ns_resolve(struct kr_ns *ns);

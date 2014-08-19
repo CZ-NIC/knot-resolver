@@ -62,11 +62,11 @@ static int begin(knot_layer_t *ctx, void *param)
 
 	/* Initialize static root hints. */
 	for (unsigned i = 0; i < HINT_COUNT; ++i) {
-		struct kr_delegpt *ns = kr_delegpt_create(SBELT[i].name, resolve->dp_map.pool);
+		struct kr_ns *ns = kr_ns_create(SBELT[i].name, resolve->dp_map.pool);
 		if (ns != NULL) {
 			sockaddr_set(&ns->addr, AF_INET, SBELT[i].addr, 53);
 			ns->flags |= DP_RESOLVED;
-			kr_delegpt_add(dp, ns);
+			kr_ns_append(dp, ns);
 		}
 	}
 

@@ -44,7 +44,7 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 		return;
 	}
 
-	struct kr_delegpt *ns = NULL;
+	struct kr_ns *ns = NULL;
 	WALK_LIST(ns, *dp) {
 		if (ns->flags & DP_RESOLVED) {
 			break;
