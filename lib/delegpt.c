@@ -70,27 +70,42 @@ list_t *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name)
 	return *val;
 }
 
-struct kr_ns *kr_ns_create(const knot_dname_t *name, mm_ctx_t *mm)
+struct kr_ns *kr_ns_get(list_t *list, const knot_dname_t *name, mm_ctx_t *mm)
 {
-	struct kr_ns *ns = mm_alloc(mm, sizeof(struct kr_ns));
+	/* Check for duplicates. */
+	struct kr_ns *ns = kr_ns_find(list, name);
+	if (ns != NULL) {
+		return ns;
+	}
+
+	ns = mm_alloc(mm, sizeof(struct kr_ns));
+	if (ns == NULL) {
+		return NULL;
+	}
+
 	memset(ns, 0, sizeof(struct kr_ns));
 	ns->name = knot_dname_copy(name, mm);
 	ns->flags = DP_LAME;
+
+	add_tail(list, (node_t *)ns);
+
 	return ns;
 }
 
-void kr_ns_append(list_t *list, struct kr_ns *ns)
+struct kr_ns *kr_ns_find(list_t *list, const knot_dname_t *name)
 {
-	add_tail(list, (node_t *)ns);
+	struct kr_ns *ns = NULL;
+	WALK_LIST(ns, *list) {
+		if (knot_dname_is_equal(ns->name, name)) {
+			return ns;
+		}
+	}
+
+	return NULL;
 }
 
 void kr_ns_remove(struct kr_ns *ns, mm_ctx_t *mm)
 {
 	rem_node((node_t *)ns);
 	delegpt_free(ns, mm);
-}
-
-int kr_ns_resolve(struct kr_ns *ns)
-{
-	return -1;
 }

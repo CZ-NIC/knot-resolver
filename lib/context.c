@@ -3,12 +3,15 @@
 
 #include <common/sockaddr.h>
 #include "lib/context.h"
+#include "lib/rplan.h"
 
 int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
 {
 	memset(ctx, 0, sizeof(struct kr_context));
 
 	ctx->pool = mm;
+
+	kr_rplan_init(&ctx->rplan, mm);
 	kr_delegmap_init(&ctx->dp_map, mm);
 
 	return 0;
@@ -16,6 +19,12 @@ int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
 
 int kr_context_reset(struct kr_context *ctx)
 {
+	ctx->state = 0;
+	ctx->resolved_qry = NULL;
+	ctx->current_ns = NULL;
+	ctx->query = NULL;
+	kr_rplan_clear(&ctx->rplan);
+
 	return 0;
 }
 
@@ -35,7 +44,12 @@ int kr_result_init(struct kr_context *ctx, struct kr_result *result)
 		return -1;
 	}
 
-	knot_pkt_put_question(ans, ctx->sname, ctx->sclass, ctx->stype);
+	struct kr_query *qry = kr_rplan_next(&ctx->rplan);
+	if (qry == NULL) {
+		return -1;
+	}
+
+	knot_pkt_put_question(ans, qry->sname, qry->sclass, qry->stype);
 	knot_wire_set_rcode(ans->wire, KNOT_RCODE_SERVFAIL);
 	knot_wire_set_qr(ans->wire);
 

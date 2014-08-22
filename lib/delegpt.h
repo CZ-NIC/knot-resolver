@@ -16,16 +16,15 @@ limitations under the License.
 #pragma once
 
 #include <libknot/packet/pkt.h>
-
-#warning TODO: this is private define
 #include <common/lists.h>
 #include <common/sockaddr.h>
 #include <common/trie/hat-trie.h>
 
 /*! \brief Name server flag. */
 enum kr_ns_flag {
-	DP_LAME = 0,
-	DP_RESOLVED
+	DP_LAME     = 0,
+	DP_PENDING  = 1 << 0,
+	DP_RESOLVED = 1 << 1
 };
 
 struct kr_context;
@@ -55,7 +54,6 @@ list_t *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name);
  *       choose next and move DPs from the other half for next sweep.
  */
 
-struct kr_ns *kr_ns_create(const knot_dname_t *name, mm_ctx_t *mm);
-void kr_ns_append(list_t *list, struct kr_ns *ns);
+struct kr_ns *kr_ns_get(list_t *list, const knot_dname_t *name, mm_ctx_t *mm);
+struct kr_ns *kr_ns_find(list_t *list, const knot_dname_t *name);
 void kr_ns_remove(struct kr_ns *ns, mm_ctx_t *mm);
-int kr_ns_resolve(struct kr_ns *ns);

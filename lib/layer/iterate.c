@@ -22,6 +22,7 @@ limitations under the License.
 #include <libknot/dnssec/random.h>
 
 #include "lib/layer/iterate.h"
+#include "lib/rplan.h"
 
 static int glue_record(knot_pkt_t *pkt, const knot_dname_t *dp, struct sockaddr *sa)
 {
@@ -56,32 +57,32 @@ static int glue_record(knot_pkt_t *pkt, const knot_dname_t *dp, struct sockaddr 
 	return 0;
 }
 
-static int evaluate_dp(const knot_rrset_t *dp, knot_pkt_t *pkt, struct kr_layer_param *param)
+static int inspect_dp(const knot_rrset_t *ns_rr, knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	struct kr_context *resolve = param->ctx;
 
 	/* Fetch delegation point. */
-	list_t *dplist = kr_delegmap_get(&resolve->dp_map, dp->owner);
-	if (dplist == NULL) {
+	list_t *dp = kr_delegmap_get(&resolve->dp_map, ns_rr->owner);
+	if (dp == NULL) {
 		return -1;
 	}
 
-	const knot_dname_t *dp_name = knot_ns_name(&dp->rrs, 0);
-	struct kr_ns *ns_new = kr_ns_create(dp_name, resolve->dp_map.pool);
+	const knot_dname_t *ns_name = knot_ns_name(&ns_rr->rrs, 0);
+	struct kr_ns *ns = kr_ns_get(dp, ns_name, resolve->dp_map.pool);
+
+	/* Update only unresolved NSs. */
+	/* TODO: cache expiration */
+	if (ns->flags & DP_RESOLVED) {
+		return 0;
+	}
 
 	/* Check if there's a glue for the record. */
-	int ret = glue_record(pkt, dp_name, (struct sockaddr *)&ns_new->addr);
-	if (ret != 0) {
-		/* TODO: API for duplicates? */
-		ns_new->flags |= DP_LAME;
-		/* TODO: resolve. */
-		kr_ns_append(dplist, ns_new);
-		return -1;
+	int ret = glue_record(pkt, ns_name, (struct sockaddr *)&ns->addr);
+	if (ret == 0) {
+		ns->flags = DP_RESOLVED;
+	} else {
+		ns->flags = DP_LAME;
 	}
-
-	/* Add name server. */
-	ns_new->flags |= DP_RESOLVED;
-	kr_ns_append(dplist, ns_new);
 
 	return 0;
 }
@@ -91,27 +92,83 @@ static int resolve_nonauth(knot_pkt_t *pkt, struct kr_layer_param *param)
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
 		if (ns->rr[i].type == KNOT_RRTYPE_NS) {
-			evaluate_dp(&ns->rr[i], pkt, param);
+			inspect_dp(&ns->rr[i], pkt, param);
 		}
 	}
 
 	return NS_PROC_DONE;
 }
 
-static void follow_cname_chain(const knot_rrset_t *rr, struct kr_layer_param *param)
+static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *rr,
+                               struct kr_layer_param *param)
 {
 	struct kr_context *resolve = param->ctx;
-	struct kr_result *result = param->result;
+	struct kr_query *cur = kr_rplan_next(&resolve->rplan);
+	assert(cur);
 
 	/* Follow chain from SNAME. */
-	if (knot_dname_is_equal(rr->owner, result->cname)) {
+	if (knot_dname_is_equal(rr->owner, *cname)) {
 		if (rr->type == KNOT_RRTYPE_CNAME) {
-			result->cname = knot_cname_name(&rr->rrs);
+			*cname = knot_cname_name(&rr->rrs);
 		} else {
 			/* Terminate CNAME chain. */
-			result->cname = resolve->sname;
+			*cname = cur->sname;
 		}
 	}
+}
+
+/*! \brief Result updates the original query. */
+static int update_query(struct kr_query *qry, struct kr_result *result, const knot_rrset_t *rr)
+{
+	knot_pkt_t *ans = result->ans;
+	knot_rrset_t *rr_copy = knot_rrset_copy(rr, &ans->mm);
+	if (rr_copy == NULL) {
+		return -1;
+	}
+
+	/* Write copied RR to the result packet. */
+	int ret = knot_pkt_put(ans, COMPR_HINT_NONE, rr_copy, KNOT_PF_FREE);
+	if (ret != 0) {
+		knot_rrset_free(&rr_copy, &ans->mm);
+		knot_wire_set_tc(ans->wire);
+	}
+
+	/* Free just the allocated container. */
+	mm_free(&ans->mm, rr_copy);
+
+	return ret;
+}
+
+/*! \brief Result updates a delegation point. */
+static int update_deleg(struct kr_query *qry, struct kr_result *result, const knot_rrset_t *rr)
+{
+	struct kr_ns *ns = qry->ext;
+
+	if (ns->flags & DP_RESOLVED) {
+		return 0;
+	}
+
+	if (!knot_dname_is_equal(ns->name, rr->owner)) {
+		return 0;
+	}
+
+	/* Fetch address. */
+	switch(rr->type) {
+	case KNOT_RRTYPE_A:
+		knot_a_addr(&rr->rrs, 0, (struct sockaddr_in *)&ns->addr);
+		break;
+	case KNOT_RRTYPE_AAAA:
+		knot_aaaa_addr(&rr->rrs, 0, (struct sockaddr_in6 *)&ns->addr);
+		break;
+	default:
+		return 0; /* Ignore unsupported RR type. */
+	}
+
+	/* Mark NS as resolved. */
+	sockaddr_port_set(&ns->addr, 53);
+	ns->flags = DP_RESOLVED;
+
+	return 0;
 }
 
 static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
@@ -119,48 +176,46 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 	struct kr_context *resolve = param->ctx;
 	struct kr_result *result = param->result;
 	knot_pkt_t *ans = result->ans;
+	struct kr_query *cur = kr_rplan_next(&resolve->rplan);
+	if (cur == NULL) {
+		return NS_PROC_FAIL;
+	}
 
 	/* Store flags. */
 	knot_wire_set_rcode(ans->wire, knot_wire_get_rcode(pkt->wire));
 
-	/* Add results to the final packet. */
-	/* TODO: API call */
-	result->cname = resolve->sname;
-	knot_pkt_begin(ans, KNOT_ANSWER);
+	const knot_dname_t *cname = cur->sname;
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
-		knot_rrset_t *rr = knot_rrset_copy(&an->rr[i], &ans->mm);
-		if (rr == NULL) {
-			return NS_PROC_FAIL;
+
+		/* RR callbacks per query type. */
+		int ret = -1;
+		switch(cur->flags) {
+		case RESOLVE_QUERY: ret = update_query(cur, result, &an->rr[i]); break;
+		case RESOLVE_DELEG: ret = update_deleg(cur, result, &an->rr[i]); break;
+		default: assert(0); break;
 		}
-		int ret = knot_pkt_put(ans, COMPR_HINT_NONE, rr, KNOT_PF_FREE);
+
+		/* Check output. */
 		if (ret != 0) {
-			knot_rrset_free(&rr, &ans->mm);
-			knot_wire_set_tc(ans->wire);
 			return NS_PROC_FAIL;
 		}
 
 		/* Check canonical name. */
-		/* TODO: these may not come in order, queueing is needed. */
-		follow_cname_chain(rr, param);
-		/* Free just the allocated container. */
-		mm_free(&ans->mm, rr);
-
+		follow_cname_chain(&cname, &an->rr[i], param);
 	}
 
 	/* Follow canonical name as next SNAME. */
-	if (result->cname != resolve->sname) {
-		/* Reset name server scoring for new SNAME. */
-		resolve->sname = result->cname;
-		resolve->state = NS_PROC_MORE;
-		return NS_PROC_DONE;
+	if (cname != cur->sname) {
+		struct kr_query *next = kr_rplan_push(&resolve->rplan, cname,
+		                                      cur->stype, cur->sclass);
+		if (next == NULL) {
+			return NS_PROC_FAIL;
+		}
 	}
 
-	/* Finished for the original SNAME. */
-	resolve->state = NS_PROC_DONE;
-
-	/* Store stats. */
-	gettimeofday(&result->t_end, NULL);
+	/* Resolved current SNAME. */
+	resolve->resolved_qry = cur;
 
 	return NS_PROC_DONE;
 }
@@ -174,10 +229,15 @@ static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param)
 /*! \brief Answer is paired to query. */
 static bool is_answer_to_query(const knot_pkt_t *answer, struct kr_context *resolve)
 {
+	struct kr_query *expect = kr_rplan_next(&resolve->rplan);
+	if (expect == NULL) {
+		return -1;
+	}
+
 	return knot_wire_get_id(resolve->query->wire) == knot_wire_get_id(answer->wire) &&
-	       resolve->sclass  == knot_pkt_qclass(answer) &&
-	       resolve->stype   == knot_pkt_qtype(answer) &&
-	       knot_dname_is_equal(resolve->sname, knot_pkt_qname(answer));
+	       expect->sclass  == knot_pkt_qclass(answer) &&
+	       expect->stype   == knot_pkt_qtype(answer) &&
+	       knot_dname_is_equal(expect->sname, knot_pkt_qname(answer));
 }
 
 /* State-less single resolution iteration step, not needed. */
@@ -196,13 +256,15 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_layer_param *param = ctx->data;
 	struct kr_context* resolve = param->ctx;
+	struct kr_query *next = kr_rplan_next(&resolve->rplan);
+	if (next == NULL) {
+		return -1;
+	}
 
-	resolve->query = pkt;
 	knot_pkt_clear(pkt);
 
-	int ret = knot_pkt_put_question(pkt, resolve->sname, resolve->sclass, resolve->stype);
+	int ret = knot_pkt_put_question(pkt, next->sname, next->sclass, next->stype);
 	if (ret != KNOT_EOK) {
-		assert(0);
 		return NS_PROC_FAIL;
 	}
 
@@ -210,7 +272,6 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Query complete, expect answer. */
 	return NS_PROC_MORE;
-
 }
 
 /*! \brief Resolve input query or continue resolution with followups.

@@ -17,15 +17,13 @@ limitations under the License.
 
 #include <stdint.h>
 #include <libknot/mempattern.h>
-
-#warning TODO: this is private define
 #include <common/sockaddr.h>
 
 #include "lib/delegpt.h"
+#include "lib/rplan.h"
 
 /*! \brief Name resolution result. */
 struct kr_result {
-	const knot_dname_t *cname;
 	knot_pkt_t *ans;
 	unsigned flags;
 	struct timeval t_start, t_end;
@@ -35,10 +33,10 @@ struct kr_result {
 /*! \brief Name resolution context. */
 struct kr_context
 {
+	struct kr_ns *current_ns;
+	struct kr_query *resolved_qry;
 	const knot_pkt_t *query;
-	const knot_dname_t *sname;
-	uint16_t stype;
-	uint16_t sclass;
+	struct kr_rplan rplan;
 	struct kr_delegmap dp_map;
 	mm_ctx_t *pool;
 	unsigned state;

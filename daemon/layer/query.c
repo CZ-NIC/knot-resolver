@@ -16,10 +16,15 @@ limitations under the License.
 #include "daemon/layer/query.h"
 #include "lib/resolve.h"
 
+static int reset(knot_layer_t *ctx)
+{
+	return NS_PROC_MORE;
+}
+
 static int begin(knot_layer_t *ctx, void *module_param)
 {
 	ctx->data = module_param;
-	return NS_PROC_MORE;
+	return reset(ctx);
 }
 
 static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -58,7 +63,7 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 static const knot_layer_api_t LAYER_QUERY_MODULE = {
 	&begin,
 	NULL,
-	NULL,
+	&reset,
 	&input_query,
 	NULL,
 	NULL

@@ -2,60 +2,62 @@
 #include <uv.h>
 
 #include <libknot/processing/requestor.h>
+#include <libknot/descriptor.h>
 #include "lib/resolve.h"
 #include "lib/layer/iterate.h"
 #include "lib/layer/static.h"
+#include "lib/layer/stats.h"
 
-/* TODO: temporary */
-#include <libknot/rrset-dump.h>
-#include <common/print.h>
-
-static void print_result(struct kr_result *result)
+static int resolve_ns(struct kr_context *resolve, struct kr_ns *ns)
 {
-#ifndef NDEBUG
-	char *qnamestr = knot_dname_to_str(knot_pkt_qname(result->ans));
-	char *cnamestr = knot_dname_to_str(result->cname);
-	printf("resolution of %s -> %s\n", qnamestr, cnamestr);
-	free(qnamestr); free(cnamestr);
-
-	printf("rcode = %d (%u RR)\n", knot_wire_get_rcode(result->ans->wire), result->ans->rrset_count);
-	char strbuf[4096] = {0};
-	int buflen = sizeof(strbuf);
-	knot_dump_style_t style = {0};
-	for (unsigned i = 0; i < result->ans->rrset_count; ++i) {
-		int r = knot_rrset_txt_dump(&result->ans->rr[i], strbuf, buflen, &style);
-		if (r > 0) buflen -= r;
+	/* Create an address query. */
+	struct kr_query *qry = kr_rplan_push(&resolve->rplan, ns->name,
+	                                     KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	if (qry == NULL) {
+		return -1;
 	}
 
-	printf("%s", strbuf);
-	printf("queries: %u\n", result->nr_queries);
-	printf("rtt %.02f msecs\n", time_diff(&result->t_start, &result->t_end));
-#endif
+	/* Resolve as delegation. */
+	qry->flags  = RESOLVE_DELEG;
+	qry->ext    = ns;
+
+	/* Mark as resolving. */
+	ns->flags |= DP_PENDING;
+
+	return 0;
 }
 
 static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 {
 	struct timeval timeout = { 5, 0 };
+	const struct kr_query *next = kr_rplan_next(&ctx->rplan);
+	assert(next);
 
 	/* Find closest delegation point. */
-	list_t *dp = kr_delegmap_find(&ctx->dp_map, ctx->sname);
+	list_t *dp = kr_delegmap_find(&ctx->dp_map, next->sname);
 	if (dp == NULL) {
 		ctx->state = NS_PROC_FAIL;
 		return;
 	}
 
-	struct kr_ns *ns = NULL;
-	WALK_LIST(ns, *dp) {
-		if (ns->flags & DP_RESOLVED) {
-			break;
+	struct kr_ns *ns = HEAD(*dp);
+	if (!(ns->flags & DP_RESOLVED)) {
+
+		/* Dependency loop or inaccessible resolvers, give up. */
+		if (ns->flags & DP_PENDING) {
+			ctx->state = NS_PROC_FAIL;
+			return;
 		}
-		/* TODO: validity */
+
+		resolve_ns(ctx, ns);
+		return;
 	}
 
-	assert(ns->flags & DP_RESOLVED);
-
-	/* Build query. */
+	/* Update context. */
 	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, requestor->mm);
+	ctx->current_ns = ns;
+	ctx->query = query;
+	ctx->resolved_qry = NULL;
 
 	/* Resolve. */
 	struct knot_request *tx = knot_request_make(requestor->mm,
@@ -64,10 +66,20 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 	knot_requestor_enqueue(requestor, tx);
 	int ret = knot_requestor_exec(requestor, &timeout);
 	if (ret != 0) {
-		/* Move to the tail, and disable. */
-		rem_node((node_t *)ns);
-		add_tail(dp, (node_t *)ns);
-		ns->flags = DP_LAME;
+		kr_ns_remove(ns, ctx->dp_map.pool);
+	}
+
+	/* Pop resolved query. */
+	if (ctx->resolved_qry) {
+		kr_rplan_pop(&ctx->rplan, ctx->resolved_qry);
+		ctx->resolved_qry = NULL;
+	}
+
+	/* Continue resolution if has more queries planned. */
+	if (kr_rplan_next(&ctx->rplan) == NULL) {
+		ctx->state = NS_PROC_DONE;
+	} else {
+		ctx->state = NS_PROC_MORE;
 	}
 }
 
@@ -79,11 +91,8 @@ int kr_resolve(struct kr_context* ctx, struct kr_result* result,
 	}
 
 	/* Initialize context. */
-	ctx->sname = qname;
-	ctx->sclass = qclass;
-	ctx->stype = qtype;
 	ctx->state = NS_PROC_MORE;
-	ctx->query = NULL;
+	kr_rplan_push(&ctx->rplan, qname, qclass, qtype);
 	kr_result_init(ctx, result);
 
 	struct kr_layer_param param;
@@ -101,8 +110,6 @@ int kr_resolve(struct kr_context* ctx, struct kr_result* result,
 
 	/* Clean up. */
 	knot_requestor_clear(&requestor);
-
-	print_result(result);
 
 	return 0;
 }
