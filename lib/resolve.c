@@ -104,6 +104,7 @@ int kr_resolve(struct kr_context* ctx, struct kr_result* result,
 	knot_requestor_init(&requestor, ctx->pool);
 	knot_requestor_overlay(&requestor, LAYER_STATIC, &param);
 	knot_requestor_overlay(&requestor, LAYER_ITERATE, &param);
+	knot_requestor_overlay(&requestor, LAYER_STATS, &param);
 	while(ctx->state & (NS_PROC_MORE|NS_PROC_FULL)) {
 		iterate(&requestor, ctx);
 	}

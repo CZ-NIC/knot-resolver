@@ -19,3 +19,5 @@ lib/delegpt.h
 lib/delegpt.c
 lib/rplan.h
 lib/rplan.c
+lib/layer/stats.h
+lib/layer/stats.c

@@ -7,6 +7,8 @@ libknotresolve_la_SOURCES =		\
 	layer/iterate.c	\
 	layer/static.h	\
 	layer/static.c	\
+	layer/stats.h	\
+	layer/stats.c	\
 	layer.h			\
 	context.h 		\
 	context.c 		\
