@@ -17,3 +17,5 @@ tests/context.c
 tests/resolve.c
 lib/delegpt.h
 lib/delegpt.c
+lib/rplan.h
+lib/rplan.c

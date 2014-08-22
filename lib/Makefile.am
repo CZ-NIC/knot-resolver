@@ -14,3 +14,5 @@ libknotresolve_la_SOURCES =		\
 	resolve.c		\
 	delegpt.c		\
 	delegpt.h
+	rplan.h			\
+	rplan.c
