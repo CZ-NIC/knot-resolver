@@ -20,6 +20,44 @@ limitations under the License.
 
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[stats] " fmt, ## __VA_ARGS__)
 
+static void update_ns_preference(struct kr_ns *ns, struct kr_ns *next)
+{
+	assert(ns);
+	assert(next);
+
+	/* Push down if next has better score. */
+	if (next->stat.M < ns->stat.M) {
+		rem_node(&ns->node);
+		insert_node(&ns->node, &next->node);
+	}
+}
+
+static void update_ns_preference_list(struct kr_ns *cur)
+{
+	assert(cur);
+	struct kr_ns *next = (struct kr_ns *)cur->node.next;
+
+	/* O(n), walk the list (shouldn't be too large). */
+	/* TODO: cut on first swap? random swaps? */
+	while (next->node.next != NULL) {
+		update_ns_preference(cur, next);
+		cur  = next;
+		next = (struct kr_ns *)cur->node.next;
+	}
+}
+
+static void update_stats(struct kr_ns *ns, double rtt)
+{
+	/* Knuth, TAOCP, p.232 (Welford running variance/mean). */
+	double d_mean = (rtt - ns->stat.M);
+	ns->stat.n += 1;
+	ns->stat.M += d_mean / ns->stat.n;
+	ns->stat.S += d_mean * (rtt - ns->stat.M);
+
+	/* Update NS position in preference list. */
+	update_ns_preference_list(ns);
+}
+
 static int begin(knot_layer_t *ctx, void *param)
 {
 	ctx->data = param;
@@ -38,7 +76,7 @@ static int finish(knot_layer_t *ctx)
 
 	DEBUG_MSG("rcode: %d (%u RRs)\n", knot_wire_get_rcode(result->ans->wire), result->ans->rrset_count);
 	DEBUG_MSG("queries: %u\n", result->nr_queries);
-	DEBUG_MSG("total time: %.02f msecs\n", time_diff(&result->t_start, &result->t_end));
+	DEBUG_MSG("total time: %u msecs\n", result->total_rtt);
 #endif
 
 	return ctx->state;
@@ -51,6 +89,9 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	result->nr_queries += 1;
 
+	/* Store stats. */
+	gettimeofday(&result->t_start, NULL);
+
 	return ctx->state;
 }
 
@@ -60,19 +101,27 @@ static int answer(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_layer_param *param = ctx->data;
 	struct kr_context* resolve = param->ctx;
 	struct kr_result *result = param->result;
+	struct kr_ns *ns = resolve->current_ns;
 
 	/* Store stats. */
 	gettimeofday(&result->t_end, NULL);
 
+	/* Update NS statistics. */
+	double rtt = time_diff(&result->t_start, &result->t_end);
+	if (rtt > 0.0) {
+		update_stats(ns, rtt);
+		result->total_rtt += rtt;
+	}
+
 #ifndef NDEBUG
-	char *ns_name = knot_dname_to_str(resolve->current_ns->name);
+	char *ns_name = knot_dname_to_str(ns->name);
 	char pad[16];
 	memset(pad, '-', sizeof(pad));
 	pad[MIN(sizeof(pad) - 1, list_size(&resolve->rplan.q) * 2)] = '\0';
-	DEBUG_MSG("#%s %s ... RC=%d, AA=%d, cumulative time: %.02f msecs\n",
+	DEBUG_MSG("#%s %s ... RC=%d, AA=%d, RTT: %.02f msecs\n",
 	          pad, ns_name, knot_wire_get_rcode(pkt->wire),
 	          knot_wire_get_aa(pkt->wire) != 0,
-	          time_diff(&result->t_start, &result->t_end));
+	          rtt);
 	free(ns_name);
 #endif
 

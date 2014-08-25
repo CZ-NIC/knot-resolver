@@ -4,6 +4,7 @@
 #include <libknot/processing/requestor.h>
 #include <libknot/descriptor.h>
 #include "lib/resolve.h"
+#include "lib/defines.h"
 #include "lib/layer/iterate.h"
 #include "lib/layer/static.h"
 #include "lib/layer/stats.h"
@@ -29,7 +30,7 @@ static int resolve_ns(struct kr_context *resolve, struct kr_ns *ns)
 
 static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 {
-	struct timeval timeout = { 5, 0 };
+	struct timeval timeout = { KR_CONN_RTT_MAX / 1000, 0 };
 	const struct kr_query *next = kr_rplan_next(&ctx->rplan);
 	assert(next);
 
@@ -66,7 +67,8 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 	knot_requestor_enqueue(requestor, tx);
 	int ret = knot_requestor_exec(requestor, &timeout);
 	if (ret != 0) {
-		kr_ns_remove(ns, ctx->dp_map.pool);
+		/* Resolution failed, invalidate current resolver. */
+		kr_ns_invalidate(ns);
 	}
 
 	/* Pop resolved query. */

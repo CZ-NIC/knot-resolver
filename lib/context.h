@@ -27,6 +27,7 @@ struct kr_result {
 	knot_pkt_t *ans;
 	unsigned flags;
 	struct timeval t_start, t_end;
+	unsigned total_rtt;
 	unsigned nr_queries;
 };
 

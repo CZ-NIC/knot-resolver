@@ -35,7 +35,10 @@ struct kr_ns {
 	knot_dname_t *name;
 	struct sockaddr_storage addr;
 	unsigned valid_until;
-	unsigned mean_rtt;
+	struct {
+		double M, S; /* Mean, Variance S/n */
+		unsigned n;
+	} stat;
 	unsigned flags;
 };
 
@@ -56,4 +59,6 @@ list_t *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name);
 
 struct kr_ns *kr_ns_get(list_t *list, const knot_dname_t *name, mm_ctx_t *mm);
 struct kr_ns *kr_ns_find(list_t *list, const knot_dname_t *name);
+void kr_ns_invalidate(struct kr_ns *ns);
 void kr_ns_remove(struct kr_ns *ns, mm_ctx_t *mm);
+

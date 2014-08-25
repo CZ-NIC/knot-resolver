@@ -54,7 +54,6 @@ int kr_result_init(struct kr_context *ctx, struct kr_result *result)
 	knot_wire_set_qr(ans->wire);
 
 	result->ans = ans;
-	gettimeofday(&result->t_start, NULL);
 
 	return 0;
 }

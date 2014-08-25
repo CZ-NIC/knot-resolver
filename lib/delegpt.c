@@ -1,4 +1,5 @@
 #include "lib/delegpt.h"
+#include "lib/defines.h"
 #include <common/mempool.h>
 
 static void delegpt_free(struct kr_ns *dp, mm_ctx_t *mm)
@@ -102,6 +103,22 @@ struct kr_ns *kr_ns_find(list_t *list, const knot_dname_t *name)
 	}
 
 	return NULL;
+}
+
+void kr_ns_invalidate(struct kr_ns *ns)
+{
+	/* Slow start. */
+	ns->flags = DP_LAME;
+	ns->stat.M = KR_CONN_RTT_MAX;
+	ns->stat.S = 0;
+	ns->stat.n = 1;
+
+	/* Move to the end of the preference list. */
+	node_t *next = ns->node.next;
+	if (next->next) {
+		rem_node(&ns->node);
+		insert_node(&ns->node, next);
+	}
 }
 
 void kr_ns_remove(struct kr_ns *ns, mm_ctx_t *mm)
