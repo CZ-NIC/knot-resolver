@@ -171,6 +171,20 @@ static int update_deleg(struct kr_query *qry, struct kr_result *result, const kn
 	return 0;
 }
 
+static int update_result(struct kr_query *cur, struct kr_result *result, const knot_rrset_t *rr)
+{
+	int ret = -1;
+
+	/* RR callbacks per query type. */
+	switch(cur->flags) {
+	case RESOLVE_QUERY: ret = update_query(cur, result, rr); break;
+	case RESOLVE_DELEG: ret = update_deleg(cur, result, rr); break;
+	default: assert(0); break;
+	}
+
+	return ret;
+}
+
 static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	struct kr_context *resolve = param->ctx;
@@ -189,17 +203,13 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 	for (unsigned i = 0; i < an->count; ++i) {
 
 		/* RR callbacks per query type. */
-		int ret = -1;
-		switch(cur->flags) {
-		case RESOLVE_QUERY: ret = update_query(cur, result, &an->rr[i]); break;
-		case RESOLVE_DELEG: ret = update_deleg(cur, result, &an->rr[i]); break;
-		default: assert(0); break;
-		}
-
-		/* Check output. */
+		int ret = update_result(cur, result, &an->rr[i]);
 		if (ret != 0) {
 			return NS_PROC_FAIL;
 		}
+
+		/* Update cache. */
+		kr_cache_insert(resolve->cache, &an->rr[i], 0);
 
 		/* Check canonical name. */
 		follow_cname_chain(&cname, &an->rr[i], param);
@@ -255,11 +265,27 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
 	struct kr_layer_param *param = ctx->data;
-	struct kr_context* resolve = param->ctx;
+	struct kr_context *resolve = param->ctx;
+	struct kr_result *result = param->result;
 	struct kr_query *next = kr_rplan_next(&resolve->rplan);
 	if (next == NULL) {
 		return -1;
 	}
+
+	/* TODO: hacked cache */
+	knot_rrset_t cached_reply;
+	knot_rrset_init(&cached_reply, next->sname, next->stype, next->sclass);
+	if (kr_cache_query(resolve->cache, &cached_reply, resolve->pool) == 0) {
+		/* Solve this from cache. */
+		update_result(next, result, &cached_reply);
+		knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
+
+		/* Resolved current SNAME. */
+		knot_wire_set_rcode(result->ans->wire, KNOT_RCODE_NOERROR);
+		resolve->resolved_qry = next;
+		return NS_PROC_DONE;
+	}
+	knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
 
 	knot_pkt_clear(pkt);
 
