@@ -22,3 +22,5 @@ lib/rplan.c
 lib/layer/stats.h
 lib/layer/stats.c
 lib/defines.h
+lib/cache.h
+lib/cache.c

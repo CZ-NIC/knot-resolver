@@ -21,6 +21,7 @@ limitations under the License.
 
 #include "lib/delegpt.h"
 #include "lib/rplan.h"
+#include "lib/cache.h"
 
 /*! \brief Name resolution result. */
 struct kr_result {
@@ -39,6 +40,7 @@ struct kr_context
 	const knot_pkt_t *query;
 	struct kr_rplan rplan;
 	struct kr_delegmap dp_map;
+	struct kr_cache *cache;
 	mm_ctx_t *pool;
 	unsigned state;
 	unsigned options;

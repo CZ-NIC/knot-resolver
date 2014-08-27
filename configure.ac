@@ -38,6 +38,7 @@ AC_CHECK_HEADERS([stdlib.h],,, [AC_INCLUDES_DEFAULT])
 
 # Search libraries
 AC_SEARCH_LIBS([knot_rrset_clear], [knot])
+AC_SEARCH_LIBS([mdb_env_open], [lmdb])
 
 # Config files
 AC_CONFIG_FILES([Makefile

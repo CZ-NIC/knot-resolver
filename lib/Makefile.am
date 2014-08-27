@@ -17,4 +17,6 @@ libknotresolve_la_SOURCES =		\
 	delegpt.h		\
 	delegpt.c		\
 	rplan.h			\
-	rplan.c
+	rplan.c			\
+	cache.h			\
+	cache.c

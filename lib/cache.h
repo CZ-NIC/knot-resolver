@@ -15,12 +15,13 @@ limitations under the License.
 
 #pragma once
 
-/*
- * Connection limits.
- */
-#define KR_CONN_RTT_MAX 10000
+#include <libknot/rrset.h>
 
-/*
- * Timers.
- */
-#define KR_TTL_GRACE  ((KR_CONN_RTT_MAX) / 1000) /* TTL expire grace period. */
+struct kr_cache;
+
+struct kr_cache *kr_cache_open(const char *handle, unsigned flags, mm_ctx_t *mm);
+void kr_cache_close(struct kr_cache *cache);
+
+int kr_cache_query(struct kr_cache *cache, knot_rrset_t *rr, mm_ctx_t *mm);
+int kr_cache_insert(struct kr_cache *cache, const knot_rrset_t *rr, unsigned flags);
+int kr_cache_remove(struct kr_cache *cache, const knot_rrset_t *rr);

@@ -14,6 +14,8 @@ int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
 	kr_rplan_init(&ctx->rplan, mm);
 	kr_delegmap_init(&ctx->dp_map, mm);
 
+	ctx->cache = kr_cache_open("/tmp/kresolved", 0, mm);
+
 	return 0;
 }
 
@@ -31,6 +33,7 @@ int kr_context_reset(struct kr_context *ctx)
 int kr_context_deinit(struct kr_context *ctx)
 {
 	kr_delegmap_deinit(&ctx->dp_map);
+	kr_cache_close(ctx->cache);
 
 	return -1;
 }
