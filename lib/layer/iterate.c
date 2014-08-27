@@ -208,7 +208,7 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 	/* Follow canonical name as next SNAME. */
 	if (cname != cur->sname) {
 		struct kr_query *next = kr_rplan_push(&resolve->rplan, cname,
-		                                      cur->stype, cur->sclass);
+		                                      cur->sclass, cur->stype);
 		if (next == NULL) {
 			return NS_PROC_FAIL;
 		}

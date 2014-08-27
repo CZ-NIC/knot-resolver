@@ -40,8 +40,8 @@ struct kr_rplan {
 void kr_rplan_init(struct kr_rplan *rplan, mm_ctx_t *pool);
 void kr_rplan_clear(struct kr_rplan *rplan);
 
-struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name,
-                               uint16_t type, uint16_t cls);
+struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name, uint16_t cls,
+                               uint16_t type);
 int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry);
 struct kr_query *kr_rplan_next(struct kr_rplan *rplan);
 

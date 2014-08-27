@@ -42,7 +42,7 @@ void kr_rplan_clear(struct kr_rplan *rplan)
 }
 
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name,
-                               uint16_t type, uint16_t cls)
+                               uint16_t cls, uint16_t type)
 {
 	struct kr_query *qry =  query_create(rplan->pool, name);
 	if (qry == NULL) {
