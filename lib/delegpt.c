@@ -2,17 +2,27 @@
 #include "lib/defines.h"
 #include <common/mempool.h>
 
-static void delegpt_free(struct kr_ns *dp, mm_ctx_t *mm)
+static void ns_free(struct kr_ns *ns, mm_ctx_t *mm)
 {
-	mm_free(mm, dp->name);
-	mm_free(mm, dp);
+	mm_free(mm, ns->name);
+	mm_free(mm, ns);
+}
+
+static void nslist_free(list_t *list, mm_ctx_t *mm)
+{
+	struct kr_ns *ns = NULL, *next = NULL;
+	WALK_LIST_DELSAFE(ns, next, *list) {
+		ns_free(ns, mm);
+	}
+	mm_free(mm, list);
 }
 
 static void delegmap_clear(struct kr_delegmap *map)
 {
 	hattrie_iter_t *i = hattrie_iter_begin(map->trie, false);
 	while(!hattrie_iter_finished(i)) {
-		delegpt_free(*hattrie_iter_val(i), map->pool);
+		list_t *nslist = *hattrie_iter_val(i);
+		nslist_free(nslist, map->pool);
 		hattrie_iter_next(i);
 	}
 	hattrie_iter_free(i);
@@ -124,5 +134,5 @@ void kr_ns_invalidate(struct kr_ns *ns)
 void kr_ns_remove(struct kr_ns *ns, mm_ctx_t *mm)
 {
 	rem_node((node_t *)ns);
-	delegpt_free(ns, mm);
+	ns_free(ns, mm);
 }
