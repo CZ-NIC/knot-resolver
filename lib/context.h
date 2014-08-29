@@ -30,6 +30,7 @@ struct kr_result {
 	struct timeval t_start, t_end;
 	unsigned total_rtt;
 	unsigned nr_queries;
+	struct kr_txn *txn;
 };
 
 /*! \brief Name resolution context. */

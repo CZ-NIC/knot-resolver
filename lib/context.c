@@ -42,6 +42,8 @@ int kr_result_init(struct kr_context *ctx, struct kr_result *result)
 {
 	memset(result, 0, sizeof(struct kr_result));
 
+	/* Initialize answer packet. */
+
 	knot_pkt_t *ans = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, ctx->pool);
 	if (ans == NULL) {
 		return -1;
@@ -49,6 +51,7 @@ int kr_result_init(struct kr_context *ctx, struct kr_result *result)
 
 	struct kr_query *qry = kr_rplan_next(&ctx->rplan);
 	if (qry == NULL) {
+		knot_pkt_free(&ans);
 		return -1;
 	}
 
@@ -58,12 +61,20 @@ int kr_result_init(struct kr_context *ctx, struct kr_result *result)
 
 	result->ans = ans;
 
+	/* Start cache transaction. */
+	result->txn = kr_cache_txn_begin(ctx->cache, NULL, ctx->pool);
+	if (result->txn == NULL) {
+		knot_pkt_free(&ans);
+		return -1;
+	}
+
 	return 0;
 }
 
 int kr_result_deinit(struct kr_result *result)
 {
 	knot_pkt_free(&result->ans);
+	kr_cache_txn_commit(result->txn);
 
 	return 0;
 }

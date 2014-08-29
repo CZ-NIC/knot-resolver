@@ -18,10 +18,15 @@ limitations under the License.
 #include <libknot/rrset.h>
 
 struct kr_cache;
+struct kr_txn;
 
 struct kr_cache *kr_cache_open(const char *handle, unsigned flags, mm_ctx_t *mm);
 void kr_cache_close(struct kr_cache *cache);
 
-int kr_cache_query(struct kr_cache *cache, knot_rrset_t *rr, mm_ctx_t *mm);
-int kr_cache_insert(struct kr_cache *cache, const knot_rrset_t *rr, unsigned flags);
-int kr_cache_remove(struct kr_cache *cache, const knot_rrset_t *rr);
+struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent, mm_ctx_t *mm);
+int kr_cache_txn_commit(struct kr_txn *txn);
+void kr_cache_txn_abort(struct kr_txn *txn);
+
+int kr_cache_query(struct kr_txn *txn, knot_rrset_t *rr);
+int kr_cache_insert(struct kr_txn *txn, const knot_rrset_t *rr, unsigned flags);
+int kr_cache_remove(struct kr_txn *txn, const knot_rrset_t *rr);

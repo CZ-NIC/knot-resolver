@@ -209,7 +209,7 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 		}
 
 		/* Update cache. */
-		kr_cache_insert(resolve->cache, &an->rr[i], 0);
+		kr_cache_insert(result->txn, &an->rr[i], 0);
 
 		/* Check canonical name. */
 		follow_cname_chain(&cname, &an->rr[i], param);
@@ -275,7 +275,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* TODO: hacked cache */
 	knot_rrset_t cached_reply;
 	knot_rrset_init(&cached_reply, next->sname, next->stype, next->sclass);
-	if (kr_cache_query(resolve->cache, &cached_reply, resolve->pool) == 0) {
+	if (kr_cache_query(result->txn, &cached_reply) == 0) {
 		/* Solve this from cache. */
 		update_result(next, result, &cached_reply);
 		knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
