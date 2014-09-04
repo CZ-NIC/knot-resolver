@@ -21,10 +21,20 @@ int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
 
 int kr_context_reset(struct kr_context *ctx)
 {
+	/* Finalize transactions. */
+	if (ctx->txn.write) {
+		kr_cache_txn_commit(ctx->txn.write);
+	}
+	if (ctx->txn.read) {
+		kr_cache_txn_abort(ctx->txn.read);
+	}
+
 	ctx->state = 0;
 	ctx->resolved_qry = NULL;
 	ctx->current_ns = NULL;
 	ctx->query = NULL;
+	ctx->txn.read = NULL;
+	ctx->txn.write = NULL;
 	kr_rplan_clear(&ctx->rplan);
 
 	return 0;
@@ -38,12 +48,29 @@ int kr_context_deinit(struct kr_context *ctx)
 	return -1;
 }
 
+struct kr_txn *kr_context_txn_acquire(struct kr_context *ctx, unsigned flags)
+{
+	struct kr_txn **txn = &ctx->txn.write;
+	if (flags & KR_CACHE_RDONLY) {
+		txn = &ctx->txn.read;	
+	}
+
+	if (*txn != NULL) {
+		return *txn;
+	}
+
+	return *txn = kr_cache_txn_begin(ctx->cache, NULL, flags, ctx->pool);
+}
+
+void kr_context_txn_release(struct kr_txn *txn)
+{
+}
+
 int kr_result_init(struct kr_context *ctx, struct kr_result *result)
 {
 	memset(result, 0, sizeof(struct kr_result));
 
 	/* Initialize answer packet. */
-
 	knot_pkt_t *ans = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, ctx->pool);
 	if (ans == NULL) {
 		return -1;
@@ -61,20 +88,12 @@ int kr_result_init(struct kr_context *ctx, struct kr_result *result)
 
 	result->ans = ans;
 
-	/* Start cache transaction. */
-	result->txn = kr_cache_txn_begin(ctx->cache, NULL, ctx->pool);
-	if (result->txn == NULL) {
-		knot_pkt_free(&ans);
-		return -1;
-	}
-
 	return 0;
 }
 
 int kr_result_deinit(struct kr_result *result)
 {
 	knot_pkt_free(&result->ans);
-	kr_cache_txn_commit(result->txn);
 
 	return 0;
 }

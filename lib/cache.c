@@ -20,6 +20,7 @@ struct kr_cache
 struct kr_txn
 {
 	MDB_dbi dbi;
+	unsigned flags;
 	MDB_txn *txn;
 	MDB_txn *parent;
 	mm_ctx_t *mm;
@@ -233,7 +234,7 @@ void kr_cache_close(struct kr_cache *cache)
 	mm_free(cache->pool, cache);
 }
 
-struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent, mm_ctx_t *mm)
+struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent, unsigned flags, mm_ctx_t *mm)
 {
 	struct kr_txn *txn = mm_alloc(mm, sizeof(struct kr_txn));
 	if (txn == NULL) {
@@ -247,7 +248,13 @@ struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent,
 		txn->parent = parent->txn;
 	}
 
-	int ret = mdb_txn_begin(cache->env, txn->parent, 0, &txn->txn);
+	unsigned mdb_flags = 0;
+	txn->flags = flags;
+	if (flags & KR_CACHE_RDONLY) {
+	   mdb_flags |= MDB_RDONLY;
+	}	   
+
+	int ret = mdb_txn_begin(cache->env, txn->parent, mdb_flags, &txn->txn);
 	if (ret != 0) {
 		mm_free(mm, txn);
 		return NULL;
@@ -256,7 +263,7 @@ struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent,
 #ifndef NDEBUG
 	MDB_stat stat;
 	mdb_stat(txn->txn, txn->dbi, &stat);
-	DEBUG_MSG("TX_BEGIN, %zu entries\n", stat.ms_entries);
+	DEBUG_MSG("TX_BEGIN, flags=%u, %zu entries\n", flags, stat.ms_entries);
 #endif
 
 	return txn;

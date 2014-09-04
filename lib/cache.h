@@ -17,13 +17,18 @@ limitations under the License.
 
 #include <libknot/rrset.h>
 
+enum kr_cache_flag {
+	KR_CACHE_NOFLAG = 0,
+	KR_CACHE_RDONLY = 1 << 0
+};
+
 struct kr_cache;
 struct kr_txn;
 
 struct kr_cache *kr_cache_open(const char *handle, unsigned flags, mm_ctx_t *mm);
 void kr_cache_close(struct kr_cache *cache);
 
-struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent, mm_ctx_t *mm);
+struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent, unsigned flags, mm_ctx_t *mm);
 int kr_cache_txn_commit(struct kr_txn *txn);
 void kr_cache_txn_abort(struct kr_txn *txn);
 

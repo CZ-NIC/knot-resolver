@@ -30,7 +30,6 @@ struct kr_result {
 	struct timeval t_start, t_end;
 	unsigned total_rtt;
 	unsigned nr_queries;
-	struct kr_txn *txn;
 };
 
 /*! \brief Name resolution context. */
@@ -42,6 +41,10 @@ struct kr_context
 	struct kr_rplan rplan;
 	struct kr_delegmap dp_map;
 	struct kr_cache *cache;
+	struct {
+		struct kr_txn *read;
+		struct kr_txn *write;
+	} txn;
 	mm_ctx_t *pool;
 	unsigned state;
 	unsigned options;
@@ -50,6 +53,8 @@ struct kr_context
 int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm);
 int kr_context_reset(struct kr_context *ctx);
 int kr_context_deinit(struct kr_context *ctx);
+struct kr_txn *kr_context_txn_acquire(struct kr_context *ctx, unsigned flags);
+void kr_context_txn_release(struct kr_txn *txn);
 
 int kr_result_init(struct kr_context *ctx, struct kr_result *result);
 int kr_result_deinit(struct kr_result *result);

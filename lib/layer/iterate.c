@@ -209,7 +209,9 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 		}
 
 		/* Update cache. */
-		kr_cache_insert(result->txn, &an->rr[i], 0);
+		struct kr_txn *txn = kr_context_txn_acquire(resolve, 0);
+		kr_cache_insert(txn, &an->rr[i], 0);
+		kr_context_txn_release(txn);
 
 		/* Check canonical name. */
 		follow_cname_chain(&cname, &an->rr[i], param);
@@ -272,10 +274,11 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return -1;
 	}
 
-	/* TODO: hacked cache */
+	struct kr_txn *txn = kr_context_txn_acquire(resolve, KR_CACHE_RDONLY);
 	knot_rrset_t cached_reply;
 	knot_rrset_init(&cached_reply, next->sname, next->stype, next->sclass);
-	if (kr_cache_query(result->txn, &cached_reply) == 0) {
+
+	if (kr_cache_query(txn, &cached_reply) == 0) {
 		/* Solve this from cache. */
 		update_result(next, result, &cached_reply);
 		knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
@@ -283,9 +286,11 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		/* Resolved current SNAME. */
 		knot_wire_set_rcode(result->ans->wire, KNOT_RCODE_NOERROR);
 		resolve->resolved_qry = next;
+		kr_context_txn_release(txn);
 		return NS_PROC_DONE;
 	}
 	knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
+	kr_context_txn_release(txn);
 
 	knot_pkt_clear(pkt);
 
