@@ -1,4 +1,10 @@
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+
 #include <uv.h>
+
+#include <common/sockaddr.h>
 #include "lib/resolve.h"
 #include "worker.h"
 
@@ -8,8 +14,69 @@ void signal_handler(uv_signal_t *handle, int signum)
 	uv_signal_stop(handle);
 }
 
-int main(void)
+static void help(void)
 {
+	printf("Usage: %sd [parameters]\n",
+	       PACKAGE_NAME);
+	printf("\nParameters:\n"
+	       " -a, --addr=[addr]   Server address (default localhost#53).\n"
+	       " -V, --version       Print version of the server.\n"
+	       " -h, --help          Print help and usage.\n");
+}
+
+static int set_addr(struct sockaddr_storage *ss, char *addr)
+{
+	char *port = strchr(addr, '#');
+	if (port) {
+		sockaddr_port_set(ss, atoi(port + 1));
+		*port = '\0';
+	}
+	
+	int family = AF_INET;
+	if (strchr(addr, ':')) {
+		family = AF_INET6;
+	}
+	
+	return sockaddr_set(ss, family, addr, sockaddr_port(ss));
+}
+
+int main(int argc, char **argv)
+{
+	
+	struct sockaddr_storage addr;
+	sockaddr_set(&addr, AF_INET, "127.0.0.1", 53);
+
+	/* Long options. */
+	int c = 0, li = 0, ret = 0;
+	struct option opts[] = {
+		{"addr", required_argument, 0, 'a'},
+		{"version",   no_argument,  0, 'V'},
+		{"help",      no_argument,  0, 'h'},
+		{0, 0, 0, 0}
+	};
+	while ((c = getopt_long(argc, argv, "a:Vh", opts, &li)) != -1) {
+		switch (c)
+		{
+		case 'a':
+			ret = set_addr(&addr, optarg);
+			if (ret != 0) {
+				fprintf(stderr, "Address '%s': %s\n", optarg, knot_strerror(ret));
+				return EXIT_FAILURE;
+			}
+			break;
+		case 'V':
+			printf("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
+			return EXIT_SUCCESS;
+		case 'h':
+		case '?':
+			help();
+			return EXIT_SUCCESS;
+		default:
+			help();
+			return EXIT_FAILURE;
+		}
+	}
+
 	mm_ctx_t mm;
 	mm_ctx_init(&mm);
 
@@ -21,13 +88,10 @@ int main(void)
 	uv_signal_start(&sigint, signal_handler, SIGINT);
 
 	/* Bind to sockets. */
-	/* TODO: list of sockets, configurable loops. */
 	uv_udp_t udp_sock;
 	memset(&udp_sock, 0, sizeof(uv_udp_t));
-	struct sockaddr_in anyaddr;
-	uv_ip4_addr("0.0.0.0", 3535, &anyaddr);
 	uv_udp_init(loop, &udp_sock);
-	uv_udp_bind(&udp_sock, (struct sockaddr *)&anyaddr, 0);
+	uv_udp_bind(&udp_sock, (struct sockaddr *)&addr, 0);
 
 	/* Start a worker. */
 	struct worker_ctx worker;
@@ -35,7 +99,7 @@ int main(void)
 	worker_start(&udp_sock, &worker);
 
 	/* Run the event loop. */
-	int ret = uv_run(loop, UV_RUN_DEFAULT);
+	ret = uv_run(loop, UV_RUN_DEFAULT);
 
 	/* Cleanup. */
 	worker_stop(&udp_sock);
