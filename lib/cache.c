@@ -2,7 +2,7 @@
 #include <time.h>
 
 #include <lmdb.h>
-#include <libknot/mempattern.h>
+#include <common/mempattern.h>
 #include <libknot/descriptor.h>
 
 #include "lib/cache.h"
@@ -133,7 +133,7 @@ static int pack_entry(MDB_cursor *cur, const knot_dname_t *name, uint16_t type,
 	MDB_val key = pack_key(name);
 	MDB_val data = { datalen, buf };
 
-	return mdb_cursor_put(cur, &key, &data, MDB_APPENDDUP);
+	return mdb_cursor_put(cur, &key, &data, 0);
 }
 
 static int pack_list(MDB_cursor *cur, const knot_rrset_t *rr)
@@ -151,9 +151,9 @@ static int pack_list(MDB_cursor *cur, const knot_rrset_t *rr)
 	}
 
 #ifndef NDEBUG
-	char *owner = knot_dname_to_str(rr->owner);
+	char owner[KNOT_DNAME_MAXLEN] = { '\0' };
+	knot_dname_to_str(owner, rr->owner, sizeof(owner) - 1);
 	DEBUG_MSG("STORE RR '%s' TYPE %u, %u RDATA => %s\n", owner, rr->type, rr->rrs.rr_count, mdb_strerror(ret));
-	free(owner);
 #endif
 
 	return ret;
@@ -196,9 +196,9 @@ static int unpack_list(MDB_cursor *cur, knot_rrset_t *rr, mm_ctx_t *mm)
 	}
 
 #ifndef NDEBUG
-	char *owner = knot_dname_to_str(rr->owner);
+	char owner[KNOT_DNAME_MAXLEN] = { '\0' };
+	knot_dname_to_str(owner, rr->owner, sizeof(owner) - 1);
 	DEBUG_MSG("LOAD RR '%s' TYPE %u => %u RECORDS\n", owner, rr->type, rr->rrs.rr_count);
-	free(owner);
 #endif
 
 	/* Update TTL for all records. */
@@ -236,6 +236,8 @@ void kr_cache_close(struct kr_cache *cache)
 
 struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent, unsigned flags, mm_ctx_t *mm)
 {
+	assert(cache);
+	
 	struct kr_txn *txn = mm_alloc(mm, sizeof(struct kr_txn));
 	if (txn == NULL) {
 		return NULL;
@@ -342,9 +344,9 @@ int kr_cache_remove(struct kr_txn *txn, const knot_rrset_t *rr)
 		    knot_rdataset_member(&rr->rrs, PACKED_RDATA(data.mv_data), false)) {
 			mdb_cursor_del(cursor, 0);
 #ifndef NDEBUG
-			char *owner = knot_dname_to_str(rr->owner);
+			char owner[KNOT_DNAME_MAXLEN] = { '\0' };
+			knot_dname_to_str(owner, rr->owner, sizeof(owner) - 1);
 			DEBUG_MSG("DEL RR '%s' TYPE %u (%p)\n", owner, rr->type, PACKED_RDATA(data.mv_data));
-			free(owner);
 #endif
 		}
 	}

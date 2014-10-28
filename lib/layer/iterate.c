@@ -96,7 +96,7 @@ static int resolve_nonauth(knot_pkt_t *pkt, struct kr_layer_param *param)
 		}
 	}
 
-	return NS_PROC_DONE;
+	return KNOT_NS_PROC_DONE;
 }
 
 static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *rr,
@@ -127,7 +127,7 @@ static int update_query(struct kr_query *qry, struct kr_result *result, const kn
 	}
 
 	/* Write copied RR to the result packet. */
-	int ret = knot_pkt_put(ans, COMPR_HINT_NONE, rr_copy, KNOT_PF_FREE);
+	int ret = knot_pkt_put(ans, KNOT_COMPR_HINT_NONE, rr_copy, KNOT_PF_FREE);
 	if (ret != 0) {
 		knot_rrset_free(&rr_copy, &ans->mm);
 		knot_wire_set_tc(ans->wire);
@@ -192,7 +192,7 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 	knot_pkt_t *ans = result->ans;
 	struct kr_query *cur = kr_rplan_next(&resolve->rplan);
 	if (cur == NULL) {
-		return NS_PROC_FAIL;
+		return KNOT_NS_PROC_FAIL;
 	}
 
 	/* Store flags. */
@@ -205,7 +205,7 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 		/* RR callbacks per query type. */
 		int ret = update_result(cur, result, &an->rr[i]);
 		if (ret != 0) {
-			return NS_PROC_FAIL;
+			return KNOT_NS_PROC_FAIL;
 		}
 
 		/* Update cache. */
@@ -222,20 +222,20 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 		struct kr_query *next = kr_rplan_push(&resolve->rplan, cname,
 		                                      cur->sclass, cur->stype);
 		if (next == NULL) {
-			return NS_PROC_FAIL;
+			return KNOT_NS_PROC_FAIL;
 		}
 	}
 
 	/* Resolved current SNAME. */
 	resolve->resolved_qry = cur;
 
-	return NS_PROC_DONE;
+	return KNOT_NS_PROC_DONE;
 }
 
 /*! \brief Error handling, RFC1034 5.3.3, 4d. */
 static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	return NS_PROC_FAIL;
+	return KNOT_NS_PROC_FAIL;
 }
 
 /*! \brief Answer is paired to query. */
@@ -253,8 +253,8 @@ static bool is_answer_to_query(const knot_pkt_t *answer, struct kr_context *reso
 }
 
 /* State-less single resolution iteration step, not needed. */
-static int reset(knot_layer_t *ctx)  { return NS_PROC_FULL; }
-static int finish(knot_layer_t *ctx) { return NS_PROC_NOOP; }
+static int reset(knot_layer_t *ctx)  { return KNOT_NS_PROC_FULL; }
+static int finish(knot_layer_t *ctx) { return KNOT_NS_PROC_NOOP; }
 
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -287,7 +287,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		knot_wire_set_rcode(result->ans->wire, KNOT_RCODE_NOERROR);
 		resolve->resolved_qry = next;
 		kr_context_txn_release(txn);
-		return NS_PROC_DONE;
+		return KNOT_NS_PROC_DONE;
 	}
 	knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
 	kr_context_txn_release(txn);
@@ -296,13 +296,13 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	int ret = knot_pkt_put_question(pkt, next->sname, next->sclass, next->stype);
 	if (ret != KNOT_EOK) {
-		return NS_PROC_FAIL;
+		return KNOT_NS_PROC_FAIL;
 	}
 
 	knot_wire_set_id(pkt->wire, knot_random_uint16_t());
 
 	/* Query complete, expect answer. */
-	return NS_PROC_MORE;
+	return KNOT_NS_PROC_MORE;
 }
 
 /*! \brief Resolve input query or continue resolution with followups.

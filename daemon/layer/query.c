@@ -18,7 +18,7 @@ limitations under the License.
 
 static int reset(knot_layer_t *ctx)
 {
-	return NS_PROC_MORE;
+	return KNOT_NS_PROC_MORE;
 }
 
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -34,12 +34,12 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Check if at least header is parsed. */
 	if (pkt->parsed < pkt->size) {
-		return NS_PROC_FAIL;
+		return KNOT_NS_PROC_FAIL;
 	}
 
 	/* Accept only queries. */
 	if (knot_wire_get_qr(pkt->wire)) {
-		return NS_PROC_NOOP; /* Ignore. */
+		return KNOT_NS_PROC_NOOP; /* Ignore. */
 	}
 
 	/* Prepare for query processing. */
@@ -53,9 +53,9 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	knot_wire_set_id(answer->wire, knot_wire_get_id(pkt->wire));
 
 	if (ret != 0) {
-		return NS_PROC_FAIL;
+		return KNOT_NS_PROC_FAIL;
 	} else {
-		return NS_PROC_DONE;
+		return KNOT_NS_PROC_DONE;
 	}
 }
 

@@ -37,7 +37,7 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 	/* Find closest delegation point. */
 	list_t *dp = kr_delegmap_find(&ctx->dp_map, next->sname);
 	if (dp == NULL) {
-		ctx->state = NS_PROC_FAIL;
+		ctx->state = KNOT_NS_PROC_FAIL;
 		return;
 	}
 
@@ -46,7 +46,7 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 
 		/* Dependency loop or inaccessible resolvers, give up. */
 		if (ns->flags & DP_PENDING) {
-			ctx->state = NS_PROC_FAIL;
+			ctx->state = KNOT_NS_PROC_FAIL;
 			return;
 		}
 
@@ -79,9 +79,9 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 
 	/* Continue resolution if has more queries planned. */
 	if (kr_rplan_next(&ctx->rplan) == NULL) {
-		ctx->state = NS_PROC_DONE;
+		ctx->state = KNOT_NS_PROC_DONE;
 	} else {
-		ctx->state = NS_PROC_MORE;
+		ctx->state = KNOT_NS_PROC_MORE;
 	}
 }
 
@@ -93,7 +93,7 @@ int kr_resolve(struct kr_context* ctx, struct kr_result* result,
 	}
 
 	/* Initialize context. */
-	ctx->state = NS_PROC_MORE;
+	ctx->state = KNOT_NS_PROC_MORE;
 	kr_rplan_push(&ctx->rplan, qname, qclass, qtype);
 	kr_result_init(ctx, result);
 
@@ -107,7 +107,7 @@ int kr_resolve(struct kr_context* ctx, struct kr_result* result,
 	knot_requestor_overlay(&requestor, LAYER_STATIC, &param);
 	knot_requestor_overlay(&requestor, LAYER_ITERATE, &param);
 	knot_requestor_overlay(&requestor, LAYER_STATS, &param);
-	while(ctx->state & (NS_PROC_MORE|NS_PROC_FULL)) {
+	while(ctx->state & (KNOT_NS_PROC_MORE|KNOT_NS_PROC_FULL)) {
 		iterate(&requestor, ctx);
 	}
 

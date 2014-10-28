@@ -17,7 +17,7 @@ limitations under the License.
 
 #include <uv.h>
 
-#include <libknot/mempattern.h>
+#include <common/mempattern.h>
 #include "lib/resolve.h"
 
 struct worker_ctx {

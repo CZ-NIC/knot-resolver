@@ -1,7 +1,7 @@
 #include <uv.h>
 
 #include <libknot/packet/pkt.h>
-#include <libknot/packet/net.h>
+#include <common/net.h>
 
 #include "daemon/worker.h"
 #include "daemon/layer/query.h"
@@ -52,7 +52,7 @@ static void worker_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	knot_pkt_t *query = knot_pkt_new((uint8_t *)buf->base, nread, ctx->pool);
 	knot_pkt_parse(query, 0);
 	int state = knot_layer_in(&proc, query);
-	if (state & (NS_PROC_DONE|NS_PROC_FAIL)) {
+	if (state & (KNOT_NS_PROC_DONE|KNOT_NS_PROC_FAIL)) {
 		worker_send(handle, result.ans, addr);
 	}
 

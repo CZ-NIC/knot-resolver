@@ -70,10 +70,9 @@ static int finish(knot_layer_t *ctx)
 	struct kr_result *result = param->result;
 
 #ifndef NDEBUG
-	char *qnamestr = knot_dname_to_str(knot_pkt_qname(result->ans));
+	char qnamestr[KNOT_DNAME_MAXLEN] = { '\0' };
+	knot_dname_to_str(qnamestr, knot_pkt_qname(result->ans), sizeof(qnamestr) - 1);
 	DEBUG_MSG("resolution of %s\n", qnamestr);
-	free(qnamestr);
-
 	DEBUG_MSG("rcode: %d (%u RRs)\n", knot_wire_get_rcode(result->ans->wire), result->ans->rrset_count);
 	DEBUG_MSG("queries: %u\n", result->nr_queries);
 	DEBUG_MSG("total time: %u msecs\n", result->total_rtt);
@@ -114,15 +113,18 @@ static int answer(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 #ifndef NDEBUG
-	char *ns_name = knot_dname_to_str(ns->name);
+	char ns_name[KNOT_DNAME_MAXLEN] = { '\0' };
+	knot_dname_to_str(ns_name, ns->name, sizeof(ns_name) - 1);
 	char pad[16];
 	memset(pad, '-', sizeof(pad));
-	pad[MIN(sizeof(pad) - 1, list_size(&resolve->rplan.q) * 2)] = '\0';
+	int pad_len = list_size(&resolve->rplan.q) * 2;
+	if (pad_len > sizeof(pad) - 1) {
+		pad_len = sizeof(pad) - 1;
+	}
 	DEBUG_MSG("#%s %s ... RC=%d, AA=%d, RTT: %.02f msecs\n",
 	          pad, ns_name, knot_wire_get_rcode(pkt->wire),
 	          knot_wire_get_aa(pkt->wire) != 0,
 	          rtt);
-	free(ns_name);
 #endif
 
 	return ctx->state;
