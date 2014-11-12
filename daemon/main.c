@@ -4,7 +4,7 @@
 
 #include <uv.h>
 
-#include <common/sockaddr.h>
+#include <libknot/internal/sockaddr.h>
 #include "lib/resolve.h"
 #include "worker.h"
 

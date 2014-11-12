@@ -2,7 +2,7 @@
 #include <time.h>
 
 #include <lmdb.h>
-#include <common/mempattern.h>
+#include <libknot/internal/mempattern.h>
 #include <libknot/descriptor.h>
 
 #include "lib/cache.h"

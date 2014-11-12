@@ -16,8 +16,9 @@ limitations under the License.
 #pragma once
 
 #include <stdint.h>
-#include <common/mempattern.h>
-#include <common/sockaddr.h>
+
+#include <libknot/internal/mempattern.h>
+#include <libknot/internal/sockaddr.h>
 
 #include "lib/delegpt.h"
 #include "lib/rplan.h"

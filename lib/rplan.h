@@ -16,7 +16,7 @@ limitations under the License.
 #pragma once
 
 #include <libknot/dname.h>
-#include <common/lists.h>
+#include <libknot/internal/lists.h>
 
 enum {
 	RESOLVE_QUERY = 0 << 0,

@@ -1,6 +1,6 @@
 #include "lib/delegpt.h"
 #include "lib/defines.h"
-#include <common/mempool.h>
+#include <libknot/internal/mempool.h>
 
 static void ns_free(struct kr_ns *ns, mm_ctx_t *mm)
 {

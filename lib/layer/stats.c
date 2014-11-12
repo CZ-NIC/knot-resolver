@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include <common/print.h>
+#include <libknot/internal/print.h>
 
 #include "lib/layer/stats.h"
 #include "lib/rplan.h"

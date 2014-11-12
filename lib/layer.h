@@ -16,6 +16,7 @@ limitations under the License.
 #pragma once
 
 #include <libknot/processing/layer.h>
+
 #include "lib/context.h"
 
 /*!

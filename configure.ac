@@ -30,13 +30,10 @@ LT_INIT
 PKG_PROG_PKG_CONFIG
 
 # Check for dependencies
-AM_CHECK_CMOCKA
-AM_CHECK_LIBUV
+PKG_CHECK_MODULES([libuv], [libuv])
+PKG_CHECK_MODULES([libknot], [libknot])
 
-# Check headers
-AC_CHECK_HEADERS([stdlib.h],,, [AC_INCLUDES_DEFAULT])
-
-# Search libraries
+# Search other libraries
 AC_SEARCH_LIBS([mdb_env_open], [lmdb])
 
 # Config files
@@ -53,9 +50,8 @@ AC_MSG_RESULT([
 
     Target:   $host_os $host_cpu
     Compiler: ${CC}
-    CFlags:   ${CFLAGS} ${CPPFLAGS}
-    LDFlags:  ${LDFLAGS}
-    Libs:     ${LIBS}
+    CFlags:   ${CFLAGS} ${CPPFLAGS} ${libuv_CFLAGS} ${libknot_CFLAGS}
+    LDFlags:  ${LDFLAGS} ${libuv_LIBS} ${libknot_LIBS}
 
   Continue with 'make' command
 ])

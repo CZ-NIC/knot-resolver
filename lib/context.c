@@ -1,7 +1,7 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <common/sockaddr.h>
+#include <libknot/internal/sockaddr.h>
 #include "lib/context.h"
 #include "lib/rplan.h"
 

@@ -1,8 +1,10 @@
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
-	-I$(top_srcdir)/lib
+	-I$(top_srcdir)/lib \
+	$(libuv_CFLAGS) \
+	$(libknot_CFLAGS)
 
-sbin_PROGRAMS = kresolved 
+sbin_PROGRAMS = kresolved
 
 kresolved_SOURCES =					\
 	layer/query.h					\
@@ -12,6 +14,4 @@ kresolved_SOURCES =					\
 	main.c
 
 # sbin programs
-kresolved_LDADD = $(top_builddir)/lib/libknotresolve.la \
-					$(KNOT_LIBS) \
-					$(libuv_LIBS)
+kresolved_LDADD = $(top_builddir)/lib/libknotresolve.la

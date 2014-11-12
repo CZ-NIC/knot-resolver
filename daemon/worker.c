@@ -1,7 +1,7 @@
 #include <uv.h>
 
 #include <libknot/packet/pkt.h>
-#include <common/net.h>
+#include <libknot/internal/net.h>
 
 #include "daemon/worker.h"
 #include "daemon/layer/query.h"

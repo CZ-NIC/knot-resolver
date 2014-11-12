@@ -20,3 +20,6 @@ libknotresolve_la_SOURCES =		\
 	rplan.c			\
 	cache.h			\
 	cache.c
+
+libknotresolve_la_CPPFLAGS = $(AM_CPPFLAGS) $(libknot_CFLAGS) $(libuv_CFLAGS)
+libknotresolve_la_LDFLAGS  = $(AM_LDFLAGS) $(libknot_LIBS) $(libuv_LIBS)

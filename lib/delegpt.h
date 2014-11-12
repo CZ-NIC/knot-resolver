@@ -16,9 +16,9 @@ limitations under the License.
 #pragma once
 
 #include <libknot/packet/pkt.h>
-#include <common/lists.h>
-#include <common/sockaddr.h>
-#include <common/trie/hat-trie.h>
+#include <libknot/internal/lists.h>
+#include <libknot/internal/sockaddr.h>
+#include <libknot/internal/trie/hat-trie.h>
 
 /*! \brief Name server flag. */
 enum kr_ns_flag {
