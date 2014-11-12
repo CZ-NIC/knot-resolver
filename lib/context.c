@@ -16,7 +16,7 @@ int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
 
 	ctx->cache = kr_cache_open("/tmp/kresolved", 0, mm);
 	if (ctx->cache == NULL) {
-		fprintf(stderr, "Cache directory '/tmp/kresolved' not exists.\n");
+		fprintf(stderr, "Cache directory '/tmp/kresolved' not exists, exitting.\n");
 		assert(ctx->cache);
 	}
 

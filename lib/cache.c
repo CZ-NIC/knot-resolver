@@ -1,5 +1,8 @@
 #include <assert.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
 
 #include <lmdb.h>
 #include <libknot/internal/mempattern.h>
@@ -28,12 +31,23 @@ struct kr_txn
 
 /*                       MDB access                                           */
 
+static int create_env_dir(const char *path)
+{
+    return mkdir(path, 0770);
+}
+
 static int dbase_open(struct kr_cache *cache, const char *handle)
 {
 	int ret = mdb_env_create(&cache->env);
 	if (ret != 0) {
 		return ret;
 	}
+
+    ret = create_env_dir(handle);
+    if (ret != 0) {
+        mdb_env_close(cache->env);
+        return ret;
+    }
 
 	ret = mdb_env_open(cache->env, handle, 0, 0644);
 	if (ret != 0) {
