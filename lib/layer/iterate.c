@@ -24,6 +24,8 @@ limitations under the License.
 #include "lib/layer/iterate.h"
 #include "lib/rplan.h"
 
+#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[qiter] " fmt, ## __VA_ARGS__)
+
 static int glue_record(knot_pkt_t *pkt, const knot_dname_t *dp, struct sockaddr *sa)
 {
 	/* TODO: API call for find() */
@@ -100,9 +102,8 @@ static int resolve_nonauth(knot_pkt_t *pkt, struct kr_layer_param *param)
 }
 
 static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *rr,
-                               struct kr_layer_param *param)
+                               struct kr_context *resolve)
 {
-	struct kr_context *resolve = param->ctx;
 	struct kr_query *cur = kr_rplan_next(&resolve->rplan);
 	assert(cur);
 
@@ -214,7 +215,7 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 		kr_context_txn_release(txn);
 
 		/* Check canonical name. */
-		follow_cname_chain(&cname, &an->rr[i], param);
+		follow_cname_chain(&cname, &an->rr[i], resolve);
 	}
 
 	/* Follow canonical name as next SNAME. */
@@ -263,6 +264,46 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return reset(ctx);
 }
 
+static int prepare_query_cache(struct kr_context *resolve, struct kr_result *result, struct kr_query *next)
+{
+	int state = KNOT_NS_PROC_MORE;
+	knot_rrset_t cached_reply;
+	knot_rrset_init(&cached_reply, next->sname, next->stype, next->sclass);
+
+	struct kr_txn *txn = kr_context_txn_acquire(resolve, KR_CACHE_RDONLY);
+
+	/* Try to find a CNAME/DNAME chain first. */
+	bool found_hit = true;
+	cached_reply.type = KNOT_RRTYPE_CNAME;
+	if (kr_cache_query(txn, &cached_reply) != 0) {
+		cached_reply.type = next->stype;
+		if (kr_cache_query(txn, &cached_reply) != 0) {
+			found_hit = false;
+		}
+	}
+
+	/* Solve this from cache. */
+	if (found_hit) {
+		update_result(next, result, &cached_reply);
+		knot_wire_set_rcode(result->ans->wire, KNOT_RCODE_NOERROR);
+		resolve->resolved_qry = next;
+		state = KNOT_NS_PROC_DONE;
+
+		/* Follow the CNAME chain. */
+		if (cached_reply.type == KNOT_RRTYPE_CNAME) {
+			const knot_dname_t *cname = next->sname;
+			follow_cname_chain(&cname, &cached_reply, resolve);
+			if (kr_rplan_push(&resolve->rplan, cname,next->sclass, next->stype) == NULL) {
+				return KNOT_NS_PROC_FAIL;
+			}
+		}
+	}
+	kr_context_txn_release(txn);
+
+	knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
+	return state;
+}
+
 static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
@@ -274,26 +315,14 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return -1;
 	}
 
-	struct kr_txn *txn = kr_context_txn_acquire(resolve, KR_CACHE_RDONLY);
-	knot_rrset_t cached_reply;
-	knot_rrset_init(&cached_reply, next->sname, next->stype, next->sclass);
-
-	if (kr_cache_query(txn, &cached_reply) == 0) {
-		/* Solve this from cache. */
-		update_result(next, result, &cached_reply);
-		knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
-
-		/* Resolved current SNAME. */
-		knot_wire_set_rcode(result->ans->wire, KNOT_RCODE_NOERROR);
-		resolve->resolved_qry = next;
-		kr_context_txn_release(txn);
-		return KNOT_NS_PROC_DONE;
+	/* Attempt to satisfy query form the cache. */
+	int state = prepare_query_cache(resolve, result, next);
+	if (state != KNOT_NS_PROC_MORE) {
+		return state;
 	}
-	knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
-	kr_context_txn_release(txn);
 
+	/* Form a query for the authoritative. */
 	knot_pkt_clear(pkt);
-
 	int ret = knot_pkt_put_question(pkt, next->sname, next->sclass, next->stype);
 	if (ret != KNOT_EOK) {
 		return KNOT_NS_PROC_FAIL;
@@ -302,6 +331,9 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	knot_wire_set_id(pkt->wire, knot_random_uint16_t());
 
 	/* Query complete, expect answer. */
+	char query_str[KNOT_DNAME_MAXLEN];
+	knot_dname_to_str(query_str, next->sname, sizeof(query_str));
+	DEBUG_MSG("issued query for '%s/RRTYPE=%d'\n", query_str, next->stype);
 	return KNOT_NS_PROC_MORE;
 }
 
