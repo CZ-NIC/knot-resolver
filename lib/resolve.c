@@ -9,6 +9,8 @@
 #include "lib/layer/static.h"
 #include "lib/layer/stats.h"
 
+#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[reslv] " fmt, ## __VA_ARGS__)
+
 static int resolve_ns(struct kr_context *resolve, struct kr_ns *ns)
 {
 	/* Create an address query. */
@@ -30,6 +32,7 @@ static int resolve_ns(struct kr_context *resolve, struct kr_ns *ns)
 
 static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 {
+	char ns_name_str[KNOT_DNAME_MAXLEN];
 	struct timeval timeout = { KR_CONN_RTT_MAX / 1000, 0 };
 	const struct kr_query *next = kr_rplan_next(&ctx->rplan);
 	assert(next);
@@ -37,6 +40,7 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 	/* Find closest delegation point. */
 	list_t *dp = kr_delegmap_find(&ctx->dp_map, next->sname);
 	if (dp == NULL) {
+		DEBUG_MSG("no other delegations found, giving up\n");
 		ctx->state = KNOT_NS_PROC_FAIL;
 		return;
 	}
@@ -46,7 +50,8 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 
 		/* Dependency loop or inaccessible resolvers, give up. */
 		if (ns->flags & DP_PENDING) {
-			ctx->state = KNOT_NS_PROC_FAIL;
+			DEBUG_MSG("dependency loop / inaccessible resolver\n");
+			kr_ns_invalidate(ns);
 			return;
 		}
 
@@ -69,6 +74,8 @@ static void iterate(struct knot_requestor *requestor, struct kr_context* ctx)
 	if (ret != 0) {
 		/* Resolution failed, invalidate current resolver. */
 		kr_ns_invalidate(ns);
+		knot_dname_to_str(ns_name_str, ns->name, sizeof(ns_name_str));
+		DEBUG_MSG("resolution failed with %s\n", ns_name_str);
 	}
 
 	/* Pop resolved query. */
