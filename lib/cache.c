@@ -31,9 +31,9 @@ struct kr_txn
 
 /*                       MDB access                                           */
 
-static int create_env_dir(const char *path)
+static void create_env_dir(const char *path)
 {
-    return mkdir(path, 0770);
+	(void) mkdir(path, 0770);
 }
 
 static int dbase_open(struct kr_cache *cache, const char *handle)
@@ -43,11 +43,7 @@ static int dbase_open(struct kr_cache *cache, const char *handle)
 		return ret;
 	}
 
-    ret = create_env_dir(handle);
-    if (ret != 0) {
-        mdb_env_close(cache->env);
-        return ret;
-    }
+	create_env_dir(handle);
 
 	ret = mdb_env_open(cache->env, handle, 0, 0644);
 	if (ret != 0) {
