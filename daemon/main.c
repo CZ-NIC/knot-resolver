@@ -95,7 +95,7 @@ int main(int argc, char **argv)
 	uv_udp_init(loop, &udp_sock);
 	ret = uv_udp_bind(&udp_sock, (struct sockaddr *)&addr, 0);
 	if (ret == 0) {
-		fprintf(stdout, "[system] listening on '%s'\n", addr_str);
+		printf("[system] listening on '%s'\n", addr_str);
 	} else {
 		fprintf(stderr, "[system] failed to bind to '%s'\n", addr_str);
 		return EXIT_FAILURE;

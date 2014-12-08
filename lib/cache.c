@@ -72,7 +72,7 @@ static int dbase_open(struct kr_cache *cache, const char *handle)
 		return ret;
 	}
 
-	DEBUG_MSG("OPEN '%s'\n", handle);
+	DEBUG_MSG("open '%s'\n", handle);
 	return 0;
 }
 
@@ -80,7 +80,7 @@ static void dbase_close(struct kr_cache *cache)
 {
 	mdb_close(cache->env, cache->dbi);
 	mdb_env_close(cache->env);
-	DEBUG_MSG("CLOSE\n");
+	DEBUG_MSG("close\n");
 }
 
 /*                       data access                                          */
