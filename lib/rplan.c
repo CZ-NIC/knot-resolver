@@ -2,6 +2,8 @@
 
 #include "lib/rplan.h"
 
+#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[rplan] " fmt, ## __VA_ARGS__)
+
 static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 {
 	struct kr_query *qry = mm_alloc(pool, sizeof(struct kr_query));
@@ -54,6 +56,14 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name,
 	qry->flags = RESOLVE_QUERY;
 
 	add_head(&rplan->q, &qry->node);
+
+#ifndef NDEBUG
+	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
+	knot_dname_to_str(name_str, name, sizeof(name_str));
+	knot_rrtype_to_string(type, type_str, sizeof(type_str));
+	DEBUG_MSG("plan '%s' type '%s'\n", name_str, type_str);
+#endif
+
 	return qry;
 }
 
