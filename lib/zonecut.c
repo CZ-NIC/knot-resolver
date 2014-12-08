@@ -1,4 +1,4 @@
-#include "lib/delegpt.h"
+#include "lib/zonecut.h"
 #include "lib/defines.h"
 #include <libknot/internal/mempool.h>
 
@@ -17,7 +17,7 @@ static void nslist_free(list_t *list, mm_ctx_t *mm)
 	mm_free(mm, list);
 }
 
-static void delegmap_clear(struct kr_delegmap *map)
+static void zonecut_clear(struct kr_zonecut_map *map)
 {
 	hattrie_iter_t *i = hattrie_iter_begin(map->trie, false);
 	while(!hattrie_iter_finished(i)) {
@@ -31,7 +31,7 @@ static void delegmap_clear(struct kr_delegmap *map)
 }
 
 
-int kr_delegmap_init(struct kr_delegmap *map, mm_ctx_t *mm)
+int kr_zonecut_init(struct kr_zonecut_map *map, mm_ctx_t *mm)
 {
 	map->pool = mm;
 	map->trie = hattrie_create_n(TRIE_BUCKET_SIZE, mm);
@@ -40,7 +40,7 @@ int kr_delegmap_init(struct kr_delegmap *map, mm_ctx_t *mm)
 	}
 
 	/* Initialize root entry. */
-	struct kr_zonecut *root = kr_delegmap_get(map, (const knot_dname_t*)"\0");
+	struct kr_zonecut *root = kr_zonecut_get(map, (const knot_dname_t*)"\0");
 	if (root == NULL) {
 		hattrie_free(map->trie);
 		return KNOT_ENOMEM;
@@ -49,35 +49,35 @@ int kr_delegmap_init(struct kr_delegmap *map, mm_ctx_t *mm)
 	return KNOT_EOK;
 }
 
-void kr_delegmap_deinit(struct kr_delegmap *map)
+void kr_zonecut_deinit(struct kr_zonecut_map *map)
 {
-	delegmap_clear(map);
+	zonecut_clear(map);
 	hattrie_free(map->trie);
 }
 
-struct kr_zonecut *kr_delegmap_get(struct kr_delegmap *map, const knot_dname_t *name)
+struct kr_zonecut *kr_zonecut_get(struct kr_zonecut_map *map, const knot_dname_t *name)
 {
 	value_t *val = hattrie_get(map->trie, (const char *)name, knot_dname_size(name));
 	if (*val == NULL) {
-		struct kr_zonecut *dp = mm_alloc(map->pool, sizeof(struct kr_zonecut));
-		if (dp == NULL) {
+		struct kr_zonecut *cut = mm_alloc(map->pool, sizeof(struct kr_zonecut));
+		if (cut == NULL) {
 			return NULL;
 		}
 
-		dp->name = knot_dname_copy(name, map->pool);
-		if (dp->name == NULL) {
-			mm_free(map->pool, dp);
+		cut->name = knot_dname_copy(name, map->pool);
+		if (cut->name == NULL) {
+			mm_free(map->pool, cut);
 			return NULL;
 		}
 
-		init_list(&dp->nslist);
-		*val = dp;
+		init_list(&cut->nslist);
+		*val = cut;
 	}
 
 	return *val;
 }
 
-struct kr_zonecut *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name)
+struct kr_zonecut *kr_zonecut_find(struct kr_zonecut_map *map, const knot_dname_t *name)
 {
 	value_t *val = NULL;
 	while(val == NULL) {

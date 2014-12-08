@@ -20,7 +20,7 @@ limitations under the License.
 #include <libknot/internal/mempattern.h>
 #include <libknot/internal/sockaddr.h>
 
-#include "lib/delegpt.h"
+#include "lib/zonecut.h"
 #include "lib/rplan.h"
 #include "lib/cache.h"
 
@@ -40,7 +40,7 @@ struct kr_context
 	struct kr_query *resolved_qry;
 	const knot_pkt_t *query;
 	struct kr_rplan rplan;
-	struct kr_delegmap dp_map;
+	struct kr_zonecut_map dp_map;
 	struct kr_cache *cache;
 	struct {
 		struct kr_txn *read;

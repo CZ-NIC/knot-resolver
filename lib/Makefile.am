@@ -14,8 +14,8 @@ libknotresolve_la_SOURCES =		\
 	context.c 		\
 	resolve.h 		\
 	resolve.c		\
-	delegpt.h		\
-	delegpt.c		\
+	zonecut.h		\
+	zonecut.c		\
 	rplan.h			\
 	rplan.c			\
 	cache.h			\

@@ -15,8 +15,8 @@ lib/resolve.c
 lib/resolve.h
 tests/context.c
 tests/resolve.c
-lib/delegpt.h
-lib/delegpt.c
+lib/zonecut.h
+lib/zonecut.c
 lib/rplan.h
 lib/rplan.c
 lib/layer/stats.h

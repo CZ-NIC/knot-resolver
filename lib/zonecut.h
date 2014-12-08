@@ -37,15 +37,15 @@ struct kr_zonecut {
 	knot_dname_t *name;
 };
 
-struct kr_delegmap {
+struct kr_zonecut_map {
 	mm_ctx_t *pool;
 	hattrie_t *trie;
 };
 
-int kr_delegmap_init(struct kr_delegmap *map, mm_ctx_t *mm);
-void kr_delegmap_deinit(struct kr_delegmap *map);
-struct kr_zonecut *kr_delegmap_get(struct kr_delegmap *map, const knot_dname_t *name);
-struct kr_zonecut *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name);
+int kr_zonecut_init(struct kr_zonecut_map *map, mm_ctx_t *mm);
+void kr_zonecut_deinit(struct kr_zonecut_map *map);
+struct kr_zonecut *kr_zonecut_get(struct kr_zonecut_map *map, const knot_dname_t *name);
+struct kr_zonecut *kr_zonecut_find(struct kr_zonecut_map *map, const knot_dname_t *name);
 
 /* TODO: find out how to do expire/refresh efficiently, maybe a sweep point and
  *       evaluate only DPs with validity before or around the sweep point, then
