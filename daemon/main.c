@@ -88,10 +88,18 @@ int main(int argc, char **argv)
 	uv_signal_start(&sigint, signal_handler, SIGINT);
 
 	/* Bind to sockets. */
+	char addr_str[SOCKADDR_STRLEN] = {'\0'};
+	sockaddr_tostr(&addr, addr_str, sizeof(addr_str));
 	uv_udp_t udp_sock;
 	memset(&udp_sock, 0, sizeof(uv_udp_t));
 	uv_udp_init(loop, &udp_sock);
-	uv_udp_bind(&udp_sock, (struct sockaddr *)&addr, 0);
+	ret = uv_udp_bind(&udp_sock, (struct sockaddr *)&addr, 0);
+	if (ret == 0) {
+		fprintf(stdout, "[system] listening on '%s'\n", addr_str);
+	} else {
+		fprintf(stderr, "[system] failed to bind to '%s'\n", addr_str);
+		return EXIT_FAILURE;
+	}
 
 	/* Start a worker. */
 	struct worker_ctx worker;
