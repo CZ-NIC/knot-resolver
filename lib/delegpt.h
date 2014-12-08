@@ -20,26 +20,21 @@ limitations under the License.
 #include <libknot/internal/sockaddr.h>
 #include <libknot/internal/trie/hat-trie.h>
 
-/*! \brief Name server flag. */
-enum kr_ns_flag {
-	DP_LAME     = 0,
-	DP_PENDING  = 1 << 0,
-	DP_RESOLVED = 1 << 1
-};
-
 struct kr_context;
 
 /*! \brief Name server. */
 struct kr_ns {
 	node_t node;
 	knot_dname_t *name;
-	struct sockaddr_storage addr;
-	unsigned valid_until;
 	struct {
 		double M, S; /* Mean, Variance S/n */
 		unsigned n;
 	} stat;
-	unsigned flags;
+};
+
+struct kr_zonecut {
+	list_t nslist;
+	knot_dname_t *name;
 };
 
 struct kr_delegmap {
@@ -49,16 +44,15 @@ struct kr_delegmap {
 
 int kr_delegmap_init(struct kr_delegmap *map, mm_ctx_t *mm);
 void kr_delegmap_deinit(struct kr_delegmap *map);
-list_t *kr_delegmap_get(struct kr_delegmap *map, const knot_dname_t *name);
-list_t *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name);
+struct kr_zonecut *kr_delegmap_get(struct kr_delegmap *map, const knot_dname_t *name);
+struct kr_zonecut *kr_delegmap_find(struct kr_delegmap *map, const knot_dname_t *name);
 
 /* TODO: find out how to do expire/refresh efficiently, maybe a sweep point and
  *       evaluate only DPs with validity before or around the sweep point, then
  *       choose next and move DPs from the other half for next sweep.
  */
 
+struct kr_ns *kr_ns_first(list_t *list);
 struct kr_ns *kr_ns_get(list_t *list, const knot_dname_t *name, mm_ctx_t *mm);
 struct kr_ns *kr_ns_find(list_t *list, const knot_dname_t *name);
-void kr_ns_invalidate(struct kr_ns *ns);
-void kr_ns_remove(struct kr_ns *ns, mm_ctx_t *mm);
-
+void kr_ns_del(list_t *list, struct kr_ns *ns, mm_ctx_t *mm);
