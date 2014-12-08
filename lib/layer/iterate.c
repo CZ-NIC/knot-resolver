@@ -17,7 +17,6 @@ limitations under the License.
 
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
-#include <libknot/rrtype/aaaa.h>
 #include <libknot/processing/requestor.h>
 #include <libknot/dnssec/random.h>
 
@@ -26,75 +25,101 @@ limitations under the License.
 
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[qiter] " fmt, ## __VA_ARGS__)
 
-static int glue_record(knot_pkt_t *pkt, const knot_dname_t *dp, struct sockaddr *sa)
+static int cache_glue_rrs(knot_pkt_t *pkt, const knot_dname_t *ns_name, struct kr_context *resolve)
 {
-	/* TODO: API call for find() */
-	const knot_rrset_t *glue_rr = NULL;
+	int nr_stored = 0;
+	struct kr_txn *txn = kr_context_txn_acquire(resolve, 0);
+
 	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
 	for (unsigned i = 0; i < ar->count; ++i) {
-		if (knot_dname_is_equal(dp, ar->rr[i].owner)) {
-			glue_rr = &ar->rr[i];
-			break;
+		if (!knot_dname_is_equal(ns_name, ar->rr[i].owner)) {
+			continue;
 		}
+		if (kr_cache_insert(txn, &ar->rr[i], 0) != KNOT_EOK) {
+			continue;
+		}
+
+		nr_stored += 1;
 	}
 
-	/* Delegation, without glue record. */
-	if (glue_rr == NULL) {
-		return -1;
-	}
-
-	/* Retrieve an address from glue record. */
-	switch(glue_rr->type) {
-	case KNOT_RRTYPE_A:
-		knot_a_addr(&glue_rr->rrs, 0, (struct sockaddr_in *)sa);
-		break;
-	case KNOT_RRTYPE_AAAA:
-		knot_aaaa_addr(&glue_rr->rrs, 0, (struct sockaddr_in6 *)sa);
-		break;
-	default:
-		return -1;
-	}
-
-	sockaddr_port_set((struct sockaddr_storage *)sa, 53);
-	return 0;
+	kr_context_txn_release(txn);
+	return nr_stored;
 }
 
-static int inspect_dp(const knot_rrset_t *ns_rr, knot_pkt_t *pkt, struct kr_layer_param *param)
+static int plan_ns_resolution(struct kr_context *resolve, const knot_dname_t *ns_name)
 {
-	struct kr_context *resolve = param->ctx;
+#define TYPE_COUNT 2
+	static const uint16_t type_list[TYPE_COUNT] = { KNOT_RRTYPE_A, KNOT_RRTYPE_AAAA };
 
-	/* Fetch delegation point. */
-	list_t *dp = kr_delegmap_get(&resolve->dp_map, ns_rr->owner);
+	struct kr_txn *txn = kr_context_txn_acquire(resolve, KR_CACHE_RDONLY);
+	knot_rrset_t cached_reply;
+	knot_rrset_init(&cached_reply, (knot_dname_t *)ns_name, 0, KNOT_CLASS_IN);
+
+	for (unsigned i = 0; i < TYPE_COUNT; ++i) {
+
+		/* Check if type exists. */
+		cached_reply.type = type_list[i];
+		if (kr_cache_query(txn, &cached_reply) == 0) {
+			knot_rdataset_clear(&cached_reply.rrs, resolve->pool);
+			continue;
+		}
+
+		/* Plan query. */
+		struct kr_query *qry = kr_rplan_push(&resolve->rplan, ns_name,
+						     KNOT_CLASS_IN, type_list[i]);
+		if (qry == NULL) {
+			return KNOT_ENOMEM;
+		}
+		qry->flags  = RESOLVE_DELEG;
+
+	}
+
+	kr_context_txn_release(txn);
+
+	return KNOT_EOK;
+#undef TYPE_COUNT
+}
+
+static int inspect_authority_ns(const knot_rrset_t *ns_rr, knot_pkt_t *pkt, struct kr_context *resolve)
+{
+	/* Authority MUST be at/below the authority of the nameserver, otherwise
+	 * possible cache injection attempt. */
+	struct kr_zonecut *authority = resolve->zone_cut;
+	if (!knot_dname_in(authority->name, ns_rr->owner)) {
+		return KNOT_EMALF;
+	}
+
+	/* Fetch closest delegation point. */
+	struct kr_zonecut *dp = kr_zonecut_get(&resolve->dp_map, ns_rr->owner);
 	if (dp == NULL) {
-		return -1;
+		return KNOT_ENOMEM;
 	}
 
+	/* Create nameserver for this zone cut. */
 	const knot_dname_t *ns_name = knot_ns_name(&ns_rr->rrs, 0);
-	struct kr_ns *ns = kr_ns_get(dp, ns_name, resolve->dp_map.pool);
-
-	/* Update only unresolved NSs. */
-	/* TODO: cache expiration */
-	if (ns->flags & DP_RESOLVED) {
-		return 0;
+	struct kr_ns *ns = kr_ns_get(&dp->nslist, ns_name, resolve->dp_map.pool);
+	if (ns == NULL) {
+		return KNOT_ENOMEM;
 	}
 
-	/* Check if there's a glue for the record. */
-	int ret = glue_record(pkt, ns_name, (struct sockaddr *)&ns->addr);
-	if (ret == 0) {
-		ns->flags = DP_RESOLVED;
-	} else {
-		ns->flags = DP_LAME;
+	/* Cache glue records. */
+	if (cache_glue_rrs(pkt, ns_name, resolve) < 1) {
+		/* No glue record, attempt to resolve the nameserver */
+		return plan_ns_resolution(resolve, ns_name);
 	}
 
-	return 0;
+	return KNOT_EOK;
 }
 
 static int resolve_nonauth(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
-		if (ns->rr[i].type == KNOT_RRTYPE_NS) {
-			inspect_dp(&ns->rr[i], pkt, param);
+		if (ns->rr[i].type != KNOT_RRTYPE_NS) {
+			continue;
+		}
+		if (inspect_authority_ns(&ns->rr[i], pkt, param->ctx) != KNOT_EOK) {
+			return KNOT_NS_PROC_FAIL;
 		}
 	}
 
@@ -119,8 +144,9 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
 }
 
 /*! \brief Result updates the original query. */
-static int update_query(struct kr_query *qry, struct kr_result *result, const knot_rrset_t *rr)
+static int update_query(knot_pkt_t *pkt, struct kr_layer_param *param, const knot_rrset_t *rr)
 {
+	struct kr_result *result = param->result;
 	knot_pkt_t *ans = result->ans;
 	knot_rrset_t *rr_copy = knot_rrset_copy(rr, &ans->mm);
 	if (rr_copy == NULL) {
@@ -141,45 +167,23 @@ static int update_query(struct kr_query *qry, struct kr_result *result, const kn
 }
 
 /*! \brief Result updates a delegation point. */
-static int update_deleg(struct kr_query *qry, struct kr_result *result, const knot_rrset_t *rr)
+static int update_deleg(knot_pkt_t *pkt, struct kr_layer_param *param, const knot_rrset_t *rr)
 {
-	struct kr_ns *ns = qry->ext;
-
-	if (ns->flags & DP_RESOLVED) {
-		return 0;
+	if (rr->type != KNOT_RRTYPE_NS) {
+		return KNOT_EOK;
 	}
 
-	if (!knot_dname_is_equal(ns->name, rr->owner)) {
-		return 0;
-	}
-
-	/* Fetch address. */
-	switch(rr->type) {
-	case KNOT_RRTYPE_A:
-		knot_a_addr(&rr->rrs, 0, (struct sockaddr_in *)&ns->addr);
-		break;
-	case KNOT_RRTYPE_AAAA:
-		knot_aaaa_addr(&rr->rrs, 0, (struct sockaddr_in6 *)&ns->addr);
-		break;
-	default:
-		return 0; /* Ignore unsupported RR type. */
-	}
-
-	/* Mark NS as resolved. */
-	sockaddr_port_set(&ns->addr, 53);
-	ns->flags = DP_RESOLVED;
-
-	return 0;
+	return inspect_authority_ns(rr, pkt, param->ctx);
 }
 
-static int update_result(struct kr_query *cur, struct kr_result *result, const knot_rrset_t *rr)
+static int update_result(knot_pkt_t *pkt, struct kr_query *cur, struct kr_layer_param *param, const knot_rrset_t *rr)
 {
-	int ret = -1;
+	int ret = KNOT_ERROR;
 
 	/* RR callbacks per query type. */
 	switch(cur->flags) {
-	case RESOLVE_QUERY: ret = update_query(cur, result, rr); break;
-	case RESOLVE_DELEG: ret = update_deleg(cur, result, rr); break;
+	case RESOLVE_QUERY: ret = update_query(pkt, param, rr); break;
+	case RESOLVE_DELEG: ret = update_deleg(pkt, param, rr); break;
 	default: assert(0); break;
 	}
 
@@ -204,8 +208,8 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 	for (unsigned i = 0; i < an->count; ++i) {
 
 		/* RR callbacks per query type. */
-		int ret = update_result(cur, result, &an->rr[i]);
-		if (ret != 0) {
+		int ret = update_result(pkt, cur, param, &an->rr[i]);
+		if (ret != KNOT_EOK) {
 			return KNOT_NS_PROC_FAIL;
 		}
 
@@ -264,12 +268,13 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return reset(ctx);
 }
 
-static int prepare_query_cache(struct kr_context *resolve, struct kr_result *result, struct kr_query *next)
+static int prepare_query_cache(struct kr_query *next, struct kr_layer_param *param)
 {
 	int state = KNOT_NS_PROC_MORE;
 	knot_rrset_t cached_reply;
 	knot_rrset_init(&cached_reply, next->sname, next->stype, next->sclass);
 
+	struct kr_context *resolve = param->ctx;
 	struct kr_txn *txn = kr_context_txn_acquire(resolve, KR_CACHE_RDONLY);
 
 	/* Try to find a CNAME/DNAME chain first. */
@@ -284,8 +289,8 @@ static int prepare_query_cache(struct kr_context *resolve, struct kr_result *res
 
 	/* Solve this from cache. */
 	if (found_hit) {
-		update_result(next, result, &cached_reply);
-		knot_wire_set_rcode(result->ans->wire, KNOT_RCODE_NOERROR);
+		update_result(param->result->ans, next, param, &cached_reply);
+		knot_wire_set_rcode(param->result->ans->wire, KNOT_RCODE_NOERROR);
 		resolve->resolved_qry = next;
 		state = KNOT_NS_PROC_DONE;
 
@@ -312,11 +317,11 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_result *result = param->result;
 	struct kr_query *next = kr_rplan_next(&resolve->rplan);
 	if (next == NULL) {
-		return -1;
+		return KNOT_NS_PROC_FAIL;
 	}
 
 	/* Attempt to satisfy query form the cache. */
-	int state = prepare_query_cache(resolve, result, next);
+	int state = prepare_query_cache(next, param);
 	if (state != KNOT_NS_PROC_MORE) {
 		return state;
 	}
@@ -330,10 +335,15 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	knot_wire_set_id(pkt->wire, knot_random_uint16_t());
 
-	/* Query complete, expect answer. */
-	char query_str[KNOT_DNAME_MAXLEN];
+	/* Query built, expect answer. */
+#ifndef NDEBUG
+	char query_str[KNOT_DNAME_MAXLEN], type_str[16];
+	knot_rrtype_to_string(next->stype, type_str, sizeof(type_str));
 	knot_dname_to_str(query_str, next->sname, sizeof(query_str));
-	DEBUG_MSG("issued query for '%s/RRTYPE=%d'\n", query_str, next->stype);
+	DEBUG_MSG("query send '%s' type '%s'\n", query_str, type_str);
+#endif
+
+	result->nr_queries += 1;
 	return KNOT_NS_PROC_MORE;
 }
 

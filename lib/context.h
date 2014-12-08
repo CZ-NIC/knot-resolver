@@ -37,6 +37,7 @@ struct kr_result {
 struct kr_context
 {
 	struct kr_ns *current_ns;
+	struct kr_zonecut *zone_cut;
 	struct kr_query *resolved_qry;
 	const knot_pkt_t *query;
 	struct kr_rplan rplan;
@@ -54,6 +55,7 @@ struct kr_context
 int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm);
 int kr_context_reset(struct kr_context *ctx);
 int kr_context_deinit(struct kr_context *ctx);
+
 struct kr_txn *kr_context_txn_acquire(struct kr_context *ctx, unsigned flags);
 void kr_context_txn_release(struct kr_txn *txn);
 int kr_context_txn_commit(struct kr_context *ctx);
