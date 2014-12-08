@@ -12,6 +12,8 @@
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[reslv] " fmt, ## __VA_ARGS__)
 
 static int resolve_ns(struct kr_context *resolve, struct kr_ns *ns)
+/* Defines */
+#define ITER_LIMIT 50
 {
 	/* Create an address query. */
 	struct kr_query *qry = kr_rplan_push(&resolve->rplan, ns->name,
@@ -114,12 +116,23 @@ int kr_resolve(struct kr_context* ctx, struct kr_result* result,
 	knot_requestor_overlay(&requestor, LAYER_STATIC, &param);
 	knot_requestor_overlay(&requestor, LAYER_ITERATE, &param);
 	knot_requestor_overlay(&requestor, LAYER_STATS, &param);
+	unsigned iter_count = 0;
 	while(ctx->state & (KNOT_NS_PROC_MORE|KNOT_NS_PROC_FULL)) {
 		iterate(&requestor, ctx);
+		if (++iter_count > ITER_LIMIT) {
+			DEBUG_MSG("iteration limit %d reached => SERVFAIL\n", ITER_LIMIT);
+			ctx->state = KNOT_NS_PROC_FAIL;
+		}
 	}
 
 	/* Clean up. */
 	knot_requestor_clear(&requestor);
 
-	return 0;
+	/* Set RCODE on internal failure. */
+	if (ctx->state != KNOT_NS_PROC_DONE) {
+		knot_wire_set_rcode(result->ans->wire, KNOT_RCODE_SERVFAIL);
+		return KNOT_ERROR;
+	}
+
+	return KNOT_EOK;
 }

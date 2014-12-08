@@ -52,7 +52,7 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	knot_pkt_t *answer = param->result->ans;
 	knot_wire_set_id(answer->wire, knot_wire_get_id(pkt->wire));
 
-	if (ret != 0) {
+	if (ret != KNOT_EOK) {
 		return KNOT_NS_PROC_FAIL;
 	} else {
 		return KNOT_NS_PROC_DONE;
