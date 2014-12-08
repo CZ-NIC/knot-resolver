@@ -39,7 +39,7 @@ static void update_ns_preference_list(struct kr_ns *cur)
 
 	/* O(n), walk the list (shouldn't be too large). */
 	/* TODO: cut on first swap? random swaps? */
-	while (next->node.next != NULL) {
+	while (next && next->node.next != NULL) {
 		update_ns_preference(cur, next);
 		cur  = next;
 		next = (struct kr_ns *)cur->node.next;
@@ -86,8 +86,6 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_layer_param *param = ctx->data;
 	struct kr_result *result = param->result;
 
-	result->nr_queries += 1;
-
 	/* Store stats. */
 	gettimeofday(&result->t_start, NULL);
 
@@ -114,17 +112,10 @@ static int answer(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 #ifndef NDEBUG
 	char ns_name[KNOT_DNAME_MAXLEN] = { '\0' };
-	knot_dname_to_str(ns_name, ns->name, sizeof(ns_name) - 1);
-	char pad[16];
-	memset(pad, '-', sizeof(pad));
-	int pad_len = list_size(&resolve->rplan.q) * 2;
-	if (pad_len > sizeof(pad) - 1) {
-		pad_len = sizeof(pad) - 1;
-	}
-	DEBUG_MSG("#%s %s ... RC=%d, AA=%d, RTT: %.02f msecs\n",
-	          pad, ns_name, knot_wire_get_rcode(pkt->wire),
-	          knot_wire_get_aa(pkt->wire) != 0,
-	          rtt);
+	knot_dname_to_str(ns_name, ns->name, sizeof(ns_name));
+	DEBUG_MSG("answer from '%s' RC=%d, AA=%d, RTT: %.02f msecs\n",
+	          ns_name, knot_wire_get_rcode(pkt->wire),
+	          knot_wire_get_aa(pkt->wire) != 0, rtt);
 #endif
 
 	return ctx->state;
