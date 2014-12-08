@@ -56,6 +56,7 @@ int kr_context_reset(struct kr_context *ctx);
 int kr_context_deinit(struct kr_context *ctx);
 struct kr_txn *kr_context_txn_acquire(struct kr_context *ctx, unsigned flags);
 void kr_context_txn_release(struct kr_txn *txn);
+int kr_context_txn_commit(struct kr_context *ctx);
 
 int kr_result_init(struct kr_context *ctx, struct kr_result *result);
 int kr_result_deinit(struct kr_result *result);

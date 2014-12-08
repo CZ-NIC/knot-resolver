@@ -26,11 +26,9 @@ int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
 int kr_context_reset(struct kr_context *ctx)
 {
 	/* Finalize transactions. */
-	if (ctx->txn.write) {
-		kr_cache_txn_commit(ctx->txn.write);
-	}
-	if (ctx->txn.read) {
-		kr_cache_txn_abort(ctx->txn.read);
+	int ret = kr_context_txn_commit(ctx);
+	if (ret != KNOT_EOK) {
+		return ret;
 	}
 
 	ctx->state = 0;
@@ -41,7 +39,7 @@ int kr_context_reset(struct kr_context *ctx)
 	ctx->txn.write = NULL;
 	kr_rplan_clear(&ctx->rplan);
 
-	return 0;
+	return KNOT_EOK;
 }
 
 int kr_context_deinit(struct kr_context *ctx)
@@ -49,14 +47,14 @@ int kr_context_deinit(struct kr_context *ctx)
 	kr_delegmap_deinit(&ctx->dp_map);
 	kr_cache_close(ctx->cache);
 
-	return -1;
+	return KNOT_EOK;
 }
 
 struct kr_txn *kr_context_txn_acquire(struct kr_context *ctx, unsigned flags)
 {
 	struct kr_txn **txn = &ctx->txn.write;
 	if (flags & KR_CACHE_RDONLY) {
-		txn = &ctx->txn.read;	
+		txn = &ctx->txn.read;
 	}
 
 	if (*txn != NULL) {
@@ -68,6 +66,25 @@ struct kr_txn *kr_context_txn_acquire(struct kr_context *ctx, unsigned flags)
 
 void kr_context_txn_release(struct kr_txn *txn)
 {
+	/*! \note Transactions are reused and commited on checkpoints only. */
+}
+
+int kr_context_txn_commit(struct kr_context *ctx)
+{
+	if (ctx == NULL) {
+		return KNOT_EINVAL;
+	}
+
+	int ret = KNOT_EOK;
+	if (ctx->txn.write) {
+		ret = kr_cache_txn_commit(ctx->txn.write);
+	}
+	if (ctx->txn.read) {
+		kr_cache_txn_abort(ctx->txn.read);
+	}
+
+	ctx->txn.read = ctx->txn.write = NULL;
+	return ret;
 }
 
 int kr_result_init(struct kr_context *ctx, struct kr_result *result)
