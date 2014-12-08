@@ -6,6 +6,7 @@
 
 #include <lmdb.h>
 #include <libknot/internal/mempattern.h>
+#include <libknot/errcode.h>
 #include <libknot/descriptor.h>
 
 #include "lib/cache.h"
@@ -119,14 +120,18 @@ static int del_entry(MDB_cursor *cur)
 	mdb_cursor_count(cur, &rr_count);
 
 	/* Remove key if last entry. */
-	int ret = 0;
+	int ret = MDB_SUCCESS;
 	if (rr_count == 1) {
 		ret = mdb_cursor_del(cur, MDB_NODUPDATA);
 	} else {
 		ret = mdb_cursor_del(cur, 0);
 	}
 
-	return ret;
+	if (ret == MDB_SUCCESS) {
+		return KNOT_EOK;
+	}
+
+	return KNOT_ERROR;
 }
 
 static int pack_entry(MDB_cursor *cur, const knot_dname_t *name, uint16_t type,
@@ -143,27 +148,34 @@ static int pack_entry(MDB_cursor *cur, const knot_dname_t *name, uint16_t type,
 	MDB_val key = pack_key(name);
 	MDB_val data = { datalen, buf };
 
-	return mdb_cursor_put(cur, &key, &data, 0);
+	int ret = mdb_cursor_put(cur, &key, &data, 0);
+	if (ret != MDB_SUCCESS) {
+		DEBUG_MSG("cache insert failed => %s\n", mdb_strerror(ret));
+		return KNOT_ERROR;
+	}
+
+	return KNOT_EOK;
 }
 
 static int pack_list(MDB_cursor *cur, const knot_rrset_t *rr)
 {
 	uint32_t expire = time(NULL) + knot_rrset_ttl(rr);
 
-	int ret = 0;
+	int ret = KNOT_EOK;
 	const knot_rdataset_t *rrs = &rr->rrs;
 	for (uint16_t i = 0; i < rrs->rr_count; i++) {
 		knot_rdata_t *rd = knot_rdataset_at(rrs, i);
 		ret = pack_entry(cur, rr->owner, rr->type, rd, expire);
-		if (ret != 0) {
+		if (ret != KNOT_EOK) {
 			break;
 		}
 	}
 
 #ifndef NDEBUG
-	char owner[KNOT_DNAME_MAXLEN] = { '\0' };
-	knot_dname_to_str(owner, rr->owner, sizeof(owner) - 1);
-	DEBUG_MSG("STORE RR '%s' TYPE %u, %u RDATA => %s\n", owner, rr->type, rr->rrs.rr_count, mdb_strerror(ret));
+	char owner[KNOT_DNAME_MAXLEN], type_str[16];
+	knot_dname_to_str(owner, rr->owner, sizeof(owner));
+	knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
+	DEBUG_MSG("store '%s' type '%s' => %s\n", owner, type_str, knot_strerror(ret));
 #endif
 
 	return ret;
@@ -174,7 +186,7 @@ static int unpack_entry(MDB_cursor *cur, knot_rrset_t *rr, MDB_val *data, uint32
 	knot_rdata_t *rd = PACKED_RDATA(data->mv_data);
 	uint16_t rr_type = PACKED_RRTYPE(data->mv_data);
 	if (rr_type != rr->type) {
-		return 0;
+		return KNOT_EOK;
 	}
 
 	/* Check if TTL expired (with negative grace period). */
@@ -196,20 +208,19 @@ static int unpack_list(MDB_cursor *cur, knot_rrset_t *rr, mm_ctx_t *mm)
 	int ret = mdb_cursor_get(cur, &key, &data, MDB_SET_KEY);
 
 	/* Unpack, and find chained duplicates. */
-	while (ret == 0) {
+	while (ret == MDB_SUCCESS) {
 		ret = unpack_entry(cur, rr, &data, now, mm);
-		if (ret != 0) {
+		if (ret != KNOT_EOK) {
 			return ret;
 		}
 
 		ret = mdb_cursor_get(cur, &key, &data, MDB_NEXT_DUP);
 	}
 
-#ifndef NDEBUG
-	char owner[KNOT_DNAME_MAXLEN] = { '\0' };
-	knot_dname_to_str(owner, rr->owner, sizeof(owner) - 1);
-	DEBUG_MSG("LOAD RR '%s' TYPE %u => %u RECORDS\n", owner, rr->type, rr->rrs.rr_count);
-#endif
+	/* No results. */
+	if (knot_rrset_empty(rr)) {
+		return KNOT_ENOENT;
+	}
 
 	/* Update TTL for all records. */
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
@@ -217,7 +228,14 @@ static int unpack_list(MDB_cursor *cur, knot_rrset_t *rr, mm_ctx_t *mm)
 		knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - now);
 	}
 
-	return 0;
+#ifndef NDEBUG
+	char owner[KNOT_DNAME_MAXLEN], type_str[16];
+	knot_dname_to_str(owner, rr->owner, sizeof(owner));
+	knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
+	DEBUG_MSG("load '%s' type '%s' => %u records\n", owner, type_str, rr->rrs.rr_count);
+#endif
+
+	return KNOT_EOK;
 }
 
 struct kr_cache *kr_cache_open(const char *handle, unsigned flags, mm_ctx_t *mm)
@@ -263,8 +281,8 @@ struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent,
 	unsigned mdb_flags = 0;
 	txn->flags = flags;
 	if (flags & KR_CACHE_RDONLY) {
-	   mdb_flags |= MDB_RDONLY;
-	}	   
+		mdb_flags |= MDB_RDONLY;
+	}
 
 	int ret = mdb_txn_begin(cache->env, txn->parent, mdb_flags, &txn->txn);
 	if (ret != 0) {
@@ -272,38 +290,25 @@ struct kr_txn *kr_cache_txn_begin(struct kr_cache *cache, struct kr_txn *parent,
 		return NULL;
 	}
 
-#ifndef NDEBUG
-	MDB_stat stat;
-	mdb_stat(txn->txn, txn->dbi, &stat);
-	DEBUG_MSG("TX_BEGIN, flags=%u, %zu entries\n", flags, stat.ms_entries);
-#endif
-
 	return txn;
 }
 
 int kr_cache_txn_commit(struct kr_txn *txn)
 {
+	int ret = mdb_txn_commit(txn->txn);
 
 #ifndef NDEBUG
 	MDB_stat stat;
 	mdb_stat(txn->txn, txn->dbi, &stat);
-	DEBUG_MSG("TX_COMMIT, %zu entries\n", stat.ms_entries);
+	DEBUG_MSG("commit, %zu entries\n", stat.ms_entries);
 #endif
 
-	int ret = mdb_txn_commit(txn->txn);
 	mm_free(txn->mm, txn);
 	return ret;
 }
 
 void kr_cache_txn_abort(struct kr_txn *txn)
 {
-
-#ifndef NDEBUG
-	MDB_stat stat;
-	mdb_stat(txn->txn, txn->dbi, &stat);
-	DEBUG_MSG("TX_ABORT, %zu entries\n", stat.ms_entries);
-#endif
-
 	mdb_txn_abort(txn->txn);
 	mm_free(txn->mm, txn);
 }
@@ -312,13 +317,10 @@ int kr_cache_query(struct kr_txn *txn, knot_rrset_t *rr)
 {
 	MDB_cursor *cursor = cursor_acquire(txn);
 	if (cursor == NULL) {
-		return -1;
+		return KNOT_ENOMEM;
 	}
 
 	int ret = unpack_list(cursor, rr, txn->mm);
-	if (knot_rrset_empty(rr)) {
-		ret = -1;
-	}
 
 	cursor_release(cursor);
 	return ret;
@@ -328,7 +330,7 @@ int kr_cache_insert(struct kr_txn *txn, const knot_rrset_t *rr, unsigned flags)
 {
 	MDB_cursor *cursor = cursor_acquire(txn);
 	if (cursor == NULL) {
-	                return -1;
+		return KNOT_ERROR;
 	}
 
 	/* TODO: cache eviction if full */
@@ -353,11 +355,7 @@ int kr_cache_remove(struct kr_txn *txn, const knot_rrset_t *rr)
 		if (PACKED_RRTYPE(data.mv_data) == rr->type &&
 		    knot_rdataset_member(&rr->rrs, PACKED_RDATA(data.mv_data), false)) {
 			mdb_cursor_del(cursor, 0);
-#ifndef NDEBUG
-			char owner[KNOT_DNAME_MAXLEN] = { '\0' };
-			knot_dname_to_str(owner, rr->owner, sizeof(owner) - 1);
-			DEBUG_MSG("DEL RR '%s' TYPE %u (%p)\n", owner, rr->type, PACKED_RDATA(data.mv_data));
-#endif
+
 		}
 	}
 
