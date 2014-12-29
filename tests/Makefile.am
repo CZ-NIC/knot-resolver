@@ -7,8 +7,8 @@ LDADD = \
 	$(cmocka_LIBS)
 
 check_PROGRAMS = \
-	context \
-	resolve
+	test_context \
+	test_resolve
 
 check-compile-only: $(check_PROGRAMS)
 

@@ -1,145 +1,111 @@
+#include <libknot/dnssec/random.h>
+#include <libknot/descriptor.h>
+#include <libknot/rrtype/rdname.h>
+#include <libknot/packet/wire.h>
+
 #include "lib/zonecut.h"
 #include "lib/defines.h"
-#include <libknot/internal/mempool.h>
+#include "lib/rplan.h"
 
-static void ns_free(struct kr_ns *ns, mm_ctx_t *mm)
+#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[z-cut] " fmt, ## __VA_ARGS__)
+
+/* \brief Root hint descriptor. */
+struct hint_info {
+	const knot_dname_t *name;
+	const char *addr;
+};
+
+/* Initialize with SBELT name servers. */
+#define U8(x) (const uint8_t *)(x)
+#define HINT_COUNT 13
+static const struct hint_info SBELT[HINT_COUNT] = {
+        { U8("\x01""a""\x0c""root-servers""\x03""net"), "198.41.0.4" },
+        { U8("\x01""b""\x0c""root-servers""\x03""net"), "192.228.79.201" },
+        { U8("\x01""c""\x0c""root-servers""\x03""net"), "192.33.4.12" },
+        { U8("\x01""d""\x0c""root-servers""\x03""net"), "199.7.91.13" },
+        { U8("\x01""e""\x0c""root-servers""\x03""net"), "192.203.230.10" },
+        { U8("\x01""f""\x0c""root-servers""\x03""net"), "192.5.5.241" },
+        { U8("\x01""g""\x0c""root-servers""\x03""net"), "192.112.36.4" },
+        { U8("\x01""h""\x0c""root-servers""\x03""net"), "128.63.2.53" },
+        { U8("\x01""i""\x0c""root-servers""\x03""net"), "192.36.148.17" },
+        { U8("\x01""j""\x0c""root-servers""\x03""net"), "192.58.128.30" },
+        { U8("\x01""k""\x0c""root-servers""\x03""net"), "193.0.14.129" },
+        { U8("\x01""l""\x0c""root-servers""\x03""net"), "199.7.83.42" },
+        { U8("\x01""m""\x0c""root-servers""\x03""net"), "202.12.27.33" }
+};
+
+/*! \brief Fetch best NS for zone cut. */
+static const knot_dname_t *fetch_ns(const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
 {
-	mm_free(mm, ns->name);
-	mm_free(mm, ns);
-}
+	knot_rrset_t cached_rr;
+	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
 
-static void nslist_free(list_t *list, mm_ctx_t *mm)
-{
-	struct kr_ns *ns = NULL, *next = NULL;
-	WALK_LIST_DELSAFE(ns, next, *list) {
-		ns_free(ns, mm);
-	}
-	mm_free(mm, list);
-}
-
-static void zonecut_clear(struct kr_zonecut_map *map)
-{
-	hattrie_iter_t *i = hattrie_iter_begin(map->trie, false);
-	while(!hattrie_iter_finished(i)) {
-		struct kr_zonecut *zonecut = *hattrie_iter_val(i);
-		nslist_free(&zonecut->nslist, map->pool);
-		mm_free(map->pool, zonecut->name);
-		hattrie_iter_next(i);
-	}
-	hattrie_iter_free(i);
-	hattrie_clear(map->trie);
-}
-
-
-int kr_zonecut_init(struct kr_zonecut_map *map, mm_ctx_t *mm)
-{
-	map->pool = mm;
-	map->trie = hattrie_create_n(TRIE_BUCKET_SIZE, mm);
-	if (map->trie == NULL) {
-		return KNOT_ENOMEM;
-	}
-
-	/* Initialize root entry. */
-	struct kr_zonecut *root = kr_zonecut_get(map, (const knot_dname_t*)"\0");
-	if (root == NULL) {
-		hattrie_free(map->trie);
-		return KNOT_ENOMEM;
-	}
-
-	return KNOT_EOK;
-}
-
-void kr_zonecut_deinit(struct kr_zonecut_map *map)
-{
-	zonecut_clear(map);
-	hattrie_free(map->trie);
-}
-
-struct kr_zonecut *kr_zonecut_get(struct kr_zonecut_map *map, const knot_dname_t *name)
-{
-	value_t *val = hattrie_get(map->trie, (const char *)name, knot_dname_size(name));
-	if (*val == NULL) {
-		struct kr_zonecut *cut = mm_alloc(map->pool, sizeof(struct kr_zonecut));
-		if (cut == NULL) {
-			return NULL;
-		}
-
-		cut->name = knot_dname_copy(name, map->pool);
-		if (cut->name == NULL) {
-			mm_free(map->pool, cut);
-			return NULL;
-		}
-
-		init_list(&cut->nslist);
-		*val = cut;
-	}
-
-	return *val;
-}
-
-struct kr_zonecut *kr_zonecut_find(struct kr_zonecut_map *map, const knot_dname_t *name)
-{
-	value_t *val = NULL;
-	while(val == NULL) {
-		val = hattrie_tryget(map->trie, (const char *)name, knot_dname_size(name));
-		if (val == NULL || EMPTY_LIST(*((list_t *)*val))) {
-			/* Root delegation, may be empty. */
-			if (*name == '\0') {
-				return *val;
-			}
-			/* Look up parent. */
-			name = knot_wire_next_label(name, NULL);
-			val = NULL;
-		}
-	}
-
-	return *val;
-}
-
-struct kr_ns *kr_ns_first(list_t *list)
-{
-	if (EMPTY_LIST(*list)) {
-		return NULL;
-	}
-
-	return HEAD(*list);
-}
-
-struct kr_ns *kr_ns_get(list_t *list, const knot_dname_t *name, mm_ctx_t *mm)
-{
-	/* Check for duplicates. */
-	struct kr_ns *ns = kr_ns_find(list, name);
-	if (ns != NULL) {
-		return ns;
-	}
-
-	ns = mm_alloc(mm, sizeof(struct kr_ns));
-	if (ns == NULL) {
-		return NULL;
-	}
-
-	memset(ns, 0, sizeof(struct kr_ns));
-	ns->name = knot_dname_copy(name, mm);
-
-	add_tail(list, (node_t *)ns);
-
-	return ns;
-}
-
-struct kr_ns *kr_ns_find(list_t *list, const knot_dname_t *name)
-{
-	struct kr_ns *ns = NULL;
-	WALK_LIST(ns, *list) {
-		if (knot_dname_is_equal(ns->name, name)) {
-			return ns;
-		}
+	if (kr_cache_query(txn, &cached_rr, &timestamp) == KNOT_EOK) {
+		return knot_ns_name(&cached_rr.rrs, 0);
 	}
 
 	return NULL;
 }
 
-void kr_ns_del(list_t *list, struct kr_ns *ns, mm_ctx_t *mm)
+/*! \brief Set zone cut to '.' and choose a random root nameserver from the SBELT. */
+static int set_sbelt_zone_cut(struct kr_zonecut *cut)
 {
-	rem_node(&ns->node);
-	ns_free(ns, mm);
+	const unsigned hint_id = knot_random_uint16_t() % HINT_COUNT;
+	const struct hint_info *hint = &SBELT[hint_id];
+
+	kr_set_zone_cut(cut, KR_DNAME_ROOT, hint->name);
+
+	/* Prefetch address. */
+	return sockaddr_set(&cut->addr, AF_INET, hint->addr, 53);
+}
+
+int kr_set_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, const knot_dname_t *ns)
+{
+	if (cut == NULL || name == NULL) {
+		return KNOT_EINVAL;
+	}
+
+	/* Set current NS and zone cut. */
+	knot_dname_to_wire(cut->name, name, KNOT_DNAME_MAXLEN);
+	knot_dname_to_wire(cut->ns, ns, KNOT_DNAME_MAXLEN);
+
+	/* Invalidate address. */
+	cut->addr.ss_family = AF_UNSPEC;
+
+	char zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN];
+	knot_dname_to_str(ns_str, cut->ns, sizeof(ns_str));
+	knot_dname_to_str(zonecut_str, cut->name, sizeof(zonecut_str));
+	DEBUG_MSG("zone cut set '%s' ns '%s'\n", zonecut_str, ns_str);
+
+	return KNOT_EOK;
+}
+
+int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
+{
+	if (cut == NULL || name == NULL) {
+		return KNOT_EINVAL;
+	}
+
+	/* No cache, start with SBELT. */
+	if (txn == NULL) {
+		return set_sbelt_zone_cut(cut);
+	}
+
+	/* Start at QNAME. */
+	const knot_dname_t *ns_name = NULL;
+	while (name[0] != '\0') {
+		ns_name = fetch_ns(name, txn, timestamp);
+		if (ns_name != NULL) {
+			break;
+		}
+		/* Subtract label from QNAME. */
+		name = knot_wire_next_label(name, NULL);
+	}
+
+	/* Name server not found, start with SBELT. */
+	if (ns_name == NULL) {
+		return set_sbelt_zone_cut(cut);
+	}
+
+	return kr_set_zone_cut(cut, name, ns_name);
 }

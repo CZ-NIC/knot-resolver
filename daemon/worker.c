@@ -2,6 +2,7 @@
 
 #include <libknot/packet/pkt.h>
 #include <libknot/internal/net.h>
+#include <libknot/errcode.h>
 
 #include "daemon/worker.h"
 #include "daemon/layer/query.h"
@@ -28,41 +29,45 @@ static void worker_send(uv_udp_t *handle, knot_pkt_t *answer, const struct socka
 static void worker_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
                         const struct sockaddr *addr, unsigned flags)
 {
-	struct worker_ctx *ctx = handle->data;
-	assert(ctx->pool);
+	struct worker_ctx *worker = handle->data;
+	assert(worker->pool);
 
 	if (nread < KNOT_WIRE_HEADER_SIZE) {
 		buf_free((uv_handle_t *)handle, buf);
 		return;
 	}
 
-	struct kr_result result;
-
-	/* Create query processing context. */
-	struct kr_layer_param param;
-	param.ctx = &ctx->resolve;
-	param.result = &result;
+	/* Parse query packet. */
+	knot_pkt_t *query = knot_pkt_new((uint8_t *)buf->base, nread, worker->pool);
+	int ret = knot_pkt_parse(query, 0);
+	if (ret != KNOT_EOK) {
+		knot_pkt_free(&query);
+		buf_free((uv_handle_t *)handle, buf);
+		return; /* Ignore malformed query. */
+	}
 
 	/* Process query packet. */
 	knot_layer_t proc;
 	memset(&proc, 0, sizeof(knot_layer_t));
-	proc.mm = ctx->pool;
-	knot_layer_begin(&proc, LAYER_QUERY, &param);
-
-	knot_pkt_t *query = knot_pkt_new((uint8_t *)buf->base, nread, ctx->pool);
-	knot_pkt_parse(query, 0);
+	proc.mm = worker->pool;
+	knot_layer_begin(&proc, LAYER_QUERY, &worker->resolve);
 	int state = knot_layer_in(&proc, query);
-	if (state & (KNOT_NS_PROC_DONE|KNOT_NS_PROC_FAIL)) {
-		worker_send(handle, result.ans, addr);
+
+	/* Build an answer. */
+	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->pool);
+	while (state == KNOT_NS_PROC_FULL) {
+		knot_pkt_init_response(answer, query);
+		state = knot_layer_out(&proc, answer);
+		if (answer->size > 0) {
+			worker_send(handle, answer, addr);
+		}
 	}
 
 	/* Cleanup. */
 	knot_layer_finish(&proc);
-	kr_result_deinit(&result);
-	kr_context_reset(&ctx->resolve);
-
 	buf_free((uv_handle_t *)handle, buf);
 	knot_pkt_free(&query);
+	knot_pkt_free(&answer);
 }
 
 void worker_init(struct worker_ctx *worker, mm_ctx_t *mm)

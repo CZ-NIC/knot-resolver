@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include <libknot/errcode.h>
+
 #include "daemon/layer/query.h"
 #include "lib/resolve.h"
 
@@ -30,7 +32,6 @@ static int begin(knot_layer_t *ctx, void *module_param)
 static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct kr_layer_param *param = ctx->data;
 
 	/* Check if at least header is parsed. */
 	if (pkt->parsed < pkt->size) {
@@ -42,21 +43,24 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_NS_PROC_NOOP; /* Ignore. */
 	}
 
+	return KNOT_NS_PROC_FULL;
+}
+
+static int output_answer(knot_layer_t *ctx, knot_pkt_t *pkt)
+{
+	assert(pkt && ctx);
+
 	/* Prepare for query processing. */
-	int ret = kr_resolve(param->ctx, param->result,
+	int ret = kr_resolve(ctx->data, pkt,
 	                     knot_pkt_qname(pkt),
 	                     knot_pkt_qclass(pkt),
 	                     knot_pkt_qtype(pkt));
 
-	/* Set correct message ID. */
-	knot_pkt_t *answer = param->result->ans;
-	knot_wire_set_id(answer->wire, knot_wire_get_id(pkt->wire));
-
 	if (ret != KNOT_EOK) {
 		return KNOT_NS_PROC_FAIL;
-	} else {
-		return KNOT_NS_PROC_DONE;
 	}
+
+	return KNOT_NS_PROC_DONE;
 }
 
 /*! \brief Module implementation. */
@@ -65,7 +69,7 @@ static const knot_layer_api_t LAYER_QUERY_MODULE = {
 	NULL,
 	&reset,
 	&input_query,
-	NULL,
+	&output_answer,
 	NULL
 };
 

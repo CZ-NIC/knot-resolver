@@ -15,44 +15,38 @@ limitations under the License.
 
 #pragma once
 
-#include <libknot/packet/pkt.h>
-#include <libknot/internal/lists.h>
+#include <libknot/dname.h>
+#include <libknot/rrset.h>
 #include <libknot/internal/sockaddr.h>
-#include <libknot/internal/trie/hat-trie.h>
+#include <libknot/internal/namedb/namedb.h>
 
-struct kr_context;
+struct kr_rplan;
 
-/*! \brief Name server. */
-struct kr_ns {
-	node_t node;
-	knot_dname_t *name;
-	struct {
-		double M, S; /* Mean, Variance S/n */
-		unsigned n;
-	} stat;
-};
-
+/*!
+ * \brief Current zone cut representation.
+*/
 struct kr_zonecut {
-	list_t nslist;
-	knot_dname_t *name;
+	knot_dname_t name[KNOT_DNAME_MAXLEN]; /*!< Current zone cut */
+	knot_dname_t ns[KNOT_DNAME_MAXLEN];   /*!< Authoritative NS */
+	struct sockaddr_storage addr;         /*!< Authoritative NS address. */
 };
 
-struct kr_zonecut_map {
-	mm_ctx_t *pool;
-	hattrie_t *trie;
-};
-
-int kr_zonecut_init(struct kr_zonecut_map *map, mm_ctx_t *mm);
-void kr_zonecut_deinit(struct kr_zonecut_map *map);
-struct kr_zonecut *kr_zonecut_get(struct kr_zonecut_map *map, const knot_dname_t *name);
-struct kr_zonecut *kr_zonecut_find(struct kr_zonecut_map *map, const knot_dname_t *name);
-
-/* TODO: find out how to do expire/refresh efficiently, maybe a sweep point and
- *       evaluate only DPs with validity before or around the sweep point, then
- *       choose next and move DPs from the other half for next sweep.
+/*!
+ * \brief Set zone cut to given name and name server.
+ * \note Name server address is blanked.
+ * \param cut zone cut to be set
+ * \param name zone cut name
+ * \param ns   zone cut nameserver
+ * \return KNOT_E*
  */
+int kr_set_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, const knot_dname_t *ns);
 
-struct kr_ns *kr_ns_first(list_t *list);
-struct kr_ns *kr_ns_get(list_t *list, const knot_dname_t *name, mm_ctx_t *mm);
-struct kr_ns *kr_ns_find(list_t *list, const knot_dname_t *name);
-void kr_ns_del(list_t *list, struct kr_ns *ns, mm_ctx_t *mm);
+/*!
+ * \brief Find the closest enclosing zone cut/nameserver from the cache.
+ * \param cut zone cut to be set
+ * \param name zone cut name
+ * \param txn cache transaction
+ * \param timestamp transaction timestamp
+ * \return KNOT_E*
+ */
+int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp);

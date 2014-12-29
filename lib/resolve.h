@@ -15,7 +15,18 @@ limitations under the License.
 
 #pragma once
 
+#include <libknot/packet/pkt.h>
 #include "context.h"
 
-int kr_resolve(struct kr_context* ctx, struct kr_result* result,
+/*!
+ * \brief Resolve an input query and produce a packet with an answer.
+ * \note The function doesn't change the packet question or message ID.
+ * \param ctx resolution context
+ * \param answer answer packet to be written
+ * \param qname resolved query name
+ * \param qclass resolved query class
+ * \param qtype resolved query type
+ * \return KNOT_E*
+ */
+int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
                const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);

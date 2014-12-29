@@ -15,6 +15,10 @@ limitations under the License.
 
 #pragma once
 
+#include <libknot/errcode.h>
+#include <libknot/dname.h>
+#include <libknot/rrset.h>
+
 /*
  * Connection limits.
  */
@@ -24,3 +28,9 @@ limitations under the License.
  * Timers.
  */
 #define KR_TTL_GRACE  ((KR_CONN_RTT_MAX) / 1000) /* TTL expire grace period. */
+
+/*
+ * Defines.
+ */
+#define KR_DNS_PORT   53
+#define KR_DNAME_ROOT ((const knot_dname_t*)"")

@@ -15,50 +15,38 @@ limitations under the License.
 
 #pragma once
 
-#include <stdint.h>
-
 #include <libknot/internal/mempattern.h>
-#include <libknot/internal/sockaddr.h>
+#include <libknot/internal/lists.h>
 
-#include "lib/zonecut.h"
-#include "lib/rplan.h"
 #include "lib/cache.h"
 
-/*! \brief Name resolution result. */
-struct kr_result {
-	knot_pkt_t *ans;
-	unsigned flags;
-	struct timeval t_start, t_end;
-	unsigned total_rtt;
-	unsigned nr_queries;
-};
-
-/*! \brief Name resolution context. */
+/*!
+ * \brief Name resolution context.
+ *
+ * Resolution context provides basic services like cache, configuration and options.
+ *
+ * \note This structure is persistent between name resolutions and may
+ *       be shared between threads.
+ */
 struct kr_context
 {
-	struct kr_ns *current_ns;
-	struct kr_zonecut *zone_cut;
-	struct kr_query *resolved_qry;
-	const knot_pkt_t *query;
-	struct kr_rplan rplan;
-	struct kr_zonecut_map dp_map;
 	struct kr_cache *cache;
-	struct {
-		struct kr_txn *read;
-		struct kr_txn *write;
-	} txn;
-	mm_ctx_t *pool;
-	unsigned state;
+	list_t layers;
 	unsigned options;
+	mm_ctx_t *pool;
 };
 
+/*!
+ * \brief Initialize query resolution context.
+ * \param ctx context to be initialized
+ * \param mm memory context
+ * \return KNOT_E*
+ */
 int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm);
-int kr_context_reset(struct kr_context *ctx);
+
+/*!
+ * \brief Deinitialize query resolution context.
+ * \param ctx context to be deinitialized
+ * \return KNOT_E*
+ */
 int kr_context_deinit(struct kr_context *ctx);
-
-struct kr_txn *kr_context_txn_acquire(struct kr_context *ctx, unsigned flags);
-void kr_context_txn_release(struct kr_txn *txn);
-int kr_context_txn_commit(struct kr_context *ctx);
-
-int kr_result_init(struct kr_context *ctx, struct kr_result *result);
-int kr_result_deinit(struct kr_result *result);

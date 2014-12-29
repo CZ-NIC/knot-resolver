@@ -16,13 +16,18 @@ limitations under the License.
 #pragma once
 
 #include <libknot/processing/layer.h>
+#include <libknot/packet/pkt.h>
 
 #include "lib/context.h"
+#include "lib/rplan.h"
 
 /*!
  * \brief Processing module parameters.
+ *
+ * \note These parameters are passed to each processing layer.
  */
 struct kr_layer_param {
 	struct kr_context *ctx;
-	struct kr_result *result;
+	struct kr_rplan *rplan;
+	knot_pkt_t *answer;
 };
