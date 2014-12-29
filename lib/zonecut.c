@@ -4,7 +4,7 @@
 #include <libknot/packet/wire.h>
 
 #include "lib/zonecut.h"
-#include "lib/defines.h"
+#include "lib/utils.h"
 #include "lib/rplan.h"
 
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[z-cut] " fmt, ## __VA_ARGS__)
@@ -34,17 +34,35 @@ static const struct hint_info SBELT[HINT_COUNT] = {
         { U8("\x01""m""\x0c""root-servers""\x03""net"), "202.12.27.33" }
 };
 
+/*! \brief Fetch address record for nameserver. */
+static int prefetch_ns_addr(struct kr_zonecut *cut, knot_rrset_t *cached_rr, namedb_txn_t *txn, uint32_t timestamp)
+{
+	/* Fetch nameserver address from cache. */
+	cached_rr->type = KNOT_RRTYPE_A;
+	if (kr_cache_query(txn, cached_rr, &timestamp) != KNOT_EOK) {
+		cached_rr->type = KNOT_RRTYPE_AAAA;
+		if (kr_cache_query(txn, cached_rr, &timestamp) != KNOT_EOK) {
+			return KNOT_ENOENT;
+		}
+	}
+
+	return kr_rrset_to_addr(&cut->addr, cached_rr);
+}
+
 /*! \brief Fetch best NS for zone cut. */
-static const knot_dname_t *fetch_ns(const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
+static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
 {
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-
-	if (kr_cache_query(txn, &cached_rr, &timestamp) == KNOT_EOK) {
-		return knot_ns_name(&cached_rr.rrs, 0);
+	int ret = kr_cache_query(txn, &cached_rr, &timestamp);
+	if (ret == KNOT_EOK) {
+		/* Accept only if has address records cached. */
+		kr_set_zone_cut(cut, name, knot_ns_name(&cached_rr.rrs, 0));
+		knot_rrset_init(&cached_rr, cut->ns, 0, KNOT_CLASS_IN);
+		ret = prefetch_ns_addr(cut, &cached_rr, txn, timestamp);
 	}
 
-	return NULL;
+	return ret;
 }
 
 /*! \brief Set zone cut to '.' and choose a random root nameserver from the SBELT. */
@@ -86,26 +104,24 @@ int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_tx
 		return KNOT_EINVAL;
 	}
 
+
 	/* No cache, start with SBELT. */
 	if (txn == NULL) {
 		return set_sbelt_zone_cut(cut);
 	}
 
 	/* Start at QNAME. */
-	const knot_dname_t *ns_name = NULL;
-	while (name[0] != '\0') {
-		ns_name = fetch_ns(name, txn, timestamp);
-		if (ns_name != NULL) {
-			break;
+	while (true) {
+		if (fetch_ns(cut, name, txn, timestamp) == KNOT_EOK) {
+			return KNOT_EOK;
 		}
 		/* Subtract label from QNAME. */
+		if (name[0] == '\0') {
+			break;
+		}
 		name = knot_wire_next_label(name, NULL);
 	}
 
 	/* Name server not found, start with SBELT. */
-	if (ns_name == NULL) {
-		return set_sbelt_zone_cut(cut);
-	}
-
-	return kr_set_zone_cut(cut, name, ns_name);
+	return set_sbelt_zone_cut(cut);
 }

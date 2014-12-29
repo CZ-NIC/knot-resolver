@@ -73,7 +73,7 @@ static int query_cache_zonecut(struct kr_zonecut *cut, namedb_txn_t *txn, knot_r
 
 	switch(cache_rr->type) {
 	case KNOT_RRTYPE_NS:
-		return kr_set_zone_cut(cut, cache_rr->owner, knot_ns_name(&cache_rr->rrs, 0));
+		return kr_find_zone_cut(cut, cache_rr->owner, txn, timestamp);
 	case KNOT_RRTYPE_A:
 	case KNOT_RRTYPE_AAAA:
 		return kr_rrset_to_addr(&cut->addr, cache_rr);
@@ -112,14 +112,13 @@ static int query_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	cache_rr.type = KNOT_RRTYPE_CNAME;
 	ret = query_cache_append(param->answer, txn, &cache_rr, timestamp);
 	if (ret == KNOT_EOK) {
-		/* Terminate if the STYPE was CNAME as well, otherwise follow. */
-		kr_rplan_pop(param->rplan, cur);
 		if (cur->stype != KNOT_RRTYPE_CNAME) {
 			const knot_dname_t *cname = knot_cname_name(&cache_rr.rrs);
 			if (kr_rplan_push(param->rplan, cname, cur->sclass, cur->stype) == NULL) {
 				return KNOT_NS_PROC_FAIL;
 			}
 		}
+		kr_rplan_pop(param->rplan, cur);
 		return KNOT_NS_PROC_DONE;
 	}
 
@@ -163,22 +162,38 @@ static int merge_in_section(knot_rrset_t *cache_rr, const knot_pktsection_t *sec
 /*! \brief Cache direct answer. */
 static int update_cache_answer(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
-	/* Cache only positive answers. */
-	if (knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
-		return KNOT_EOK;
-	}
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+	knot_dname_t name_buf[KNOT_DNAME_MAXLEN];
+	knot_dname_to_wire(name_buf, knot_pkt_qname(pkt), sizeof(name_buf));
 
 	/* Cache only direct answer. */
 	knot_rrset_t cache_rr;
-	knot_rrset_init(&cache_rr, (knot_dname_t *)knot_pkt_qname(pkt), knot_pkt_qtype(pkt), knot_pkt_qclass(pkt));
-
-	int ret = merge_in_section(&cache_rr, knot_pkt_section(pkt, KNOT_ANSWER), 0, pool);
+	knot_rrset_init(&cache_rr, name_buf, KNOT_RRTYPE_CNAME, knot_pkt_qclass(pkt));
+	int ret = merge_in_section(&cache_rr, an, 0, pool);
 	if (ret != KNOT_EOK) {
 		return ret;
 	}
 
-	/* Cache the merged RRSet (may fail) */
-	(void) kr_cache_insert(txn, &cache_rr, timestamp);
+	/* Cache CNAME chain. */
+	while(cache_rr.rrs.rr_count > 0) {
+		/* Cache the merged RRSet (may fail) */
+		(void) kr_cache_insert(txn, &cache_rr, timestamp);
+		/* Follow the chain */
+		knot_dname_to_wire(name_buf, knot_ns_name(&cache_rr.rrs, 0), sizeof(name_buf));
+		knot_rdataset_clear(&cache_rr.rrs, pool);
+		ret = merge_in_section(&cache_rr, an, 0, pool);
+		if (ret != KNOT_EOK) {
+			return ret;
+		}
+	}
+
+	/* Now there may be a terminal record. */
+	cache_rr.type = knot_pkt_qtype(pkt);
+	knot_rdataset_clear(&cache_rr.rrs, pool);
+	ret = merge_in_section(&cache_rr, an, 0, pool);
+	if (ret == KNOT_EOK) {
+		kr_cache_insert(txn, &cache_rr, timestamp);
+	}
 
 	return ret;
 }
@@ -218,6 +233,11 @@ static int update_cache_authority(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *
 
 static void update_cache_pkt(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
+	/* Cache only positive answers. */
+	if (knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
+		return;
+	}
+
 	/* If authoritative, cache answer for current query. */
 	if (knot_wire_get_aa(pkt->wire)) {
 		update_cache_answer(pkt, txn, pool, timestamp);

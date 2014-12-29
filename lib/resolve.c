@@ -18,41 +18,6 @@
 /* Defines */
 #define ITER_LIMIT 50
 
-/*! \brief Fetch address record for nameserver. */
-static int prefetch_ns_addr(struct kr_rplan *rplan, const struct timeval *now)
-{
-	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, NAMEDB_RDONLY);
-	struct kr_zonecut *cut = &rplan->zone_cut;
-
-	knot_rrset_t cached_rr;
-	knot_rrset_init(&cached_rr, (knot_dname_t *)cut->name, KNOT_RRTYPE_A, KNOT_CLASS_IN);
-
-	/* Fetch nameserver address from cache. */
-	uint32_t timestamp = now->tv_sec;
-	if (kr_cache_query(txn, &cached_rr, &timestamp) != KNOT_EOK) {
-		cached_rr.type = KNOT_RRTYPE_AAAA;
-		if (kr_cache_query(txn, &cached_rr, &timestamp) != KNOT_EOK) {
-			return KNOT_ENOENT;
-		}
-	}
-
-	/* Update nameserver address if found. */
-	return kr_rrset_to_addr(&cut->addr, &cached_rr);
-}
-
-/*! \brief Plan NS address resolution. */
-static int plan_ns_addr_fetch(struct kr_rplan *rplan)
-{
-	/* TODO: implement rplan states to iteratively scan for A and then AAAA */
-	(void) kr_rplan_push(rplan, rplan->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
-	(void) kr_rplan_push(rplan, rplan->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
-
-	/* Reset zone cut for current query. */
-	struct kr_query *last = kr_rplan_last(rplan);
-	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, NAMEDB_RDONLY);
-	return kr_find_zone_cut(&rplan->zone_cut, KR_DNAME_ROOT, txn, last->timestamp.tv_sec);
-}
-
 /*! \brief Invalidate current NS in cache. */
 static int invalidate_ns(struct kr_rplan *rplan, const struct kr_query *qry)
 {
@@ -80,13 +45,9 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	struct kr_rplan *rplan = param->rplan;
 	const struct kr_query *cur = kr_rplan_current(rplan);
 
-	/* Retrieve address for current zone cut. */
+	/* Invalid address for current zone cut. */
 	if (rplan->zone_cut.addr.ss_family == AF_UNSPEC) {
-		ret = prefetch_ns_addr(rplan, &cur->timestamp);
-		if (ret != KNOT_EOK) {
-			plan_ns_addr_fetch(rplan);
-			return KNOT_EOK;
-		}
+		return invalidate_ns(rplan, cur);
 	}
 
 	char name_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN], type_str[16];
