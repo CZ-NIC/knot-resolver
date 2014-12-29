@@ -5,6 +5,8 @@ lib_LTLIBRARIES = libknotresolve.la
 libknotresolve_la_SOURCES =		\
 	layer/iterate.h	\
 	layer/iterate.c	\
+	layer/itercache.h	\
+	layer/itercache.c	\
 	layer/static.h	\
 	layer/static.c	\
 	layer/stats.h	\

@@ -8,6 +8,7 @@
 #include "lib/resolve.h"
 #include "lib/defines.h"
 #include "lib/utils.h"
+#include "lib/layer/itercache.h"
 #include "lib/layer/iterate.h"
 #include "lib/layer/static.h"
 #include "lib/layer/stats.h"
@@ -138,6 +139,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	struct knot_requestor requestor;
 	knot_requestor_init(&requestor, ctx->pool);
 	knot_requestor_overlay(&requestor, LAYER_STATIC, &param);
+	knot_requestor_overlay(&requestor, LAYER_ITERCACHE, &param);
 	knot_requestor_overlay(&requestor, LAYER_ITERATE, &param);
 	knot_requestor_overlay(&requestor, LAYER_STATS, &param);
 
