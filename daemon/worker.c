@@ -23,6 +23,9 @@
 #include "daemon/worker.h"
 #include "daemon/layer/query.h"
 
+/* Defines */
+#define CACHE_DEFAULT_SIZE 10*1024*1024
+
 static void buf_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	struct worker_ctx *worker = handle->data;
@@ -86,12 +89,26 @@ static void worker_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	knot_pkt_free(&answer);
 }
 
-void worker_init(struct worker_ctx *worker, mm_ctx_t *mm)
+int worker_init(struct worker_ctx *worker, mm_ctx_t *mm)
 {
 	memset(worker, 0, sizeof(struct worker_ctx));
 	worker->pool = mm;
 
-	kr_context_init(&worker->resolve, mm);
+	/* Open resolution context */
+	int ret = kr_context_init(&worker->resolve, mm);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	/* Open resolution context cache */
+	worker->resolve.cache = kr_cache_open("/tmp/kresolved", mm, CACHE_DEFAULT_SIZE);
+	if (worker->resolve.cache == NULL) {
+		fprintf(stderr, "Cache directory '/tmp/kresolved' not exists, exitting.\n");
+		kr_context_deinit(&worker->resolve);
+		return KNOT_ERROR;
+	}
+
+	return KNOT_EOK;
 }
 
 void worker_deinit(struct worker_ctx *worker)

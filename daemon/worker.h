@@ -26,7 +26,7 @@ struct worker_ctx {
 	mm_ctx_t *pool;
 };
 
-void worker_init(struct worker_ctx *worker, mm_ctx_t *mm);
+int worker_init(struct worker_ctx *worker, mm_ctx_t *mm);
 void worker_deinit(struct worker_ctx *worker);
 void worker_start(uv_udp_t *req, struct worker_ctx *worker);
 void worker_stop(uv_udp_t *req);
