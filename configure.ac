@@ -32,6 +32,7 @@ PKG_PROG_PKG_CONFIG
 # Check for dependencies
 PKG_CHECK_MODULES([libuv], [libuv])
 PKG_CHECK_MODULES([libknot], [libknot])
+PKG_CHECK_MODULES([cmocka], [cmocka], AC_CONFIG_FILES([tests/Makefile]))
 
 # Search other libraries
 AC_SEARCH_LIBS([mdb_env_open], [lmdb])
@@ -40,8 +41,8 @@ AC_SEARCH_LIBS([mdb_env_open], [lmdb])
 AC_CONFIG_FILES([Makefile
 		 lib/Makefile
 		 daemon/Makefile
-		 tests/Makefile
 		 ])
+
 
 # Output
 AC_OUTPUT
