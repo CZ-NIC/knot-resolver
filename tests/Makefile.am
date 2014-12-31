@@ -7,6 +7,7 @@ LDADD = \
 	$(cmocka_LIBS)
 
 check_PROGRAMS = \
+	test_cache \
 	test_context \
 	test_resolve
 

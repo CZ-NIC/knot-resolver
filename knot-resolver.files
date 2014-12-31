@@ -26,9 +26,11 @@ lib/resolve.c
 lib/resolve.h
 lib/rplan.c
 lib/rplan.h
+lib/utils.h
 lib/zonecut.c
 lib/zonecut.h
 tests/Makefile.am
+tests/test.h
+tests/test_cache.c
 tests/test_context.c
 tests/test_resolve.c
-lib/utils.h
