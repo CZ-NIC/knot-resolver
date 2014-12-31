@@ -33,9 +33,10 @@ struct kr_cache_rrset
  * \brief Open/create persistent cache in given path.
  * \param handle Path to existing directory where the DB should be created.
  * \param mm Memory context.
+ * \param maxsize Maximum database size (bytes)
  * \return database instance or NULL
  */
-namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm);
+namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize);
 
 /*!
  * \brief Close persistent cache.
@@ -94,3 +95,19 @@ int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestam
  * \return KNOT_E*
  */
 int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr);
+
+/*!
+ * \brief Clear all items from the cache.
+ * \param txn transaction instance
+ * \return KNOT_E*
+ */
+int kr_cache_clear(namedb_txn_t *txn);
+
+/*!
+ * \brief Clear aged items from the database.
+ * \param txn transaction instance
+ * \param timestamp current time
+ * \return KNOT_E*
+ */
+int kr_cache_prune(namedb_txn_t *txn, uint32_t timestamp);
+
