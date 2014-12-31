@@ -227,9 +227,7 @@ static int update_cache_authority(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *
 	}
 
 	/* Cache the merged RRSet (may fail) */
-	(void) kr_cache_insert(txn, &cache_rr, timestamp);
-
-	return ret;
+	return kr_cache_insert(txn, &cache_rr, timestamp);
 }
 
 static void update_cache_pkt(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
@@ -240,11 +238,17 @@ static void update_cache_pkt(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool,
 	}
 
 	/* If authoritative, cache answer for current query. */
+	int ret = KNOT_EOK;
 	if (knot_wire_get_aa(pkt->wire)) {
-		update_cache_answer(pkt, txn, pool, timestamp);
+		ret = update_cache_answer(pkt, txn, pool, timestamp);
 	} else {
 		/* Cache authority records, but not glue. */
-		update_cache_authority(pkt, txn, pool, timestamp);
+		ret = update_cache_authority(pkt, txn, pool, timestamp);
+	}
+
+	/* Cache full, do what we must. */
+	if (ret == KNOT_ESPACE) {
+		kr_cache_clear(txn);
 	}
 }
 
@@ -265,15 +269,9 @@ static int update_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Couldn't acquire cache, ignore. */
 	}
 
-	/* Create memory pool for merging RRSets. */
-	mm_ctx_t pool;
-	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
-
 	/* Selectively cache records from the packet. */
-	update_cache_pkt(pkt, txn, &pool, timestamp);
+	update_cache_pkt(pkt, txn, param->rplan->pool, timestamp);
 
-	/* Cleanup. */
-	mp_delete(pool.ctx);
 	return ctx->state;
 }
 
