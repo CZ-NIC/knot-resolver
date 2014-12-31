@@ -104,8 +104,8 @@ int kr_cache_query(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
 		rr->rrs.rr_count = found_rr->count;
 		rr->rrs.data = found_rr->data;
 
-		/* No time constraint */
-		if (timestamp == NULL || *timestamp < found_rr->timestamp) {
+		/* No time constraint or current timestamp */
+		if (timestamp == NULL || *timestamp <= found_rr->timestamp) {
 			return KNOT_EOK;
 		}
 
