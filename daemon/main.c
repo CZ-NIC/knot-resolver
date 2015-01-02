@@ -126,6 +126,7 @@ int main(int argc, char **argv)
 	worker_start(&udp_sock, &worker);
 
 	/* Run the event loop. */
+	fflush(stdout);
 	ret = uv_run(loop, UV_RUN_DEFAULT);
 
 	/* Cleanup. */
