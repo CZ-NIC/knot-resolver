@@ -33,10 +33,9 @@ void signal_handler(uv_signal_t *handle, int signum)
 	exit(1);
 }
 
-static void help(void)
+static void help(int argc, char *argv[])
 {
-	printf("Usage: %sd [parameters]\n",
-	       PACKAGE_NAME);
+	printf("Usage: %s [parameters]\n", argv[0]);
 	printf("\nParameters:\n"
 	       " -a, --addr=[addr]   Server address (default localhost#53).\n"
 	       " -V, --version       Print version of the server.\n"
@@ -88,10 +87,10 @@ int main(int argc, char **argv)
 			return EXIT_SUCCESS;
 		case 'h':
 		case '?':
-			help();
+			help(argc, argv);
 			return EXIT_SUCCESS;
 		default:
-			help();
+			help(argc, argv);
 			return EXIT_FAILURE;
 		}
 	}
