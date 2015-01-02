@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 
 	/* Bind to sockets. */
 	char addr_str[SOCKADDR_STRLEN] = {'\0'};
-	sockaddr_tostr(&addr, addr_str, sizeof(addr_str));
+	sockaddr_tostr(addr_str, sizeof(addr_str), &addr);
 	uv_udp_t udp_sock;
 	memset(&udp_sock, 0, sizeof(uv_udp_t));
 	uv_udp_init(loop, &udp_sock);
