@@ -14,4 +14,4 @@ kresolved_SOURCES =					\
 	main.c
 
 # sbin programs
-kresolved_LDADD = $(top_builddir)/lib/libknotresolve.la
+kresolved_LDADD = $(top_builddir)/lib/libknotresolve.la $(libuv_LIBS) $(libknot_LIBS)

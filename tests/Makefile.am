@@ -4,6 +4,8 @@ AM_CPPFLAGS = \
 
 LDADD = \
 	$(top_builddir)/lib/libknotresolve.la \
+	$(libuv_LIBS) \
+	$(libknot_LIBS) \
 	$(cmocka_LIBS)
 
 check_PROGRAMS = \
