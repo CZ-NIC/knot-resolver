@@ -16,7 +16,9 @@
 
 #pragma once
 
-#define _XOPEN_SOURCE 500
+#define _BSD_SOURCE
+
+#include <stdlib.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
