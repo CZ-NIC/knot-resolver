@@ -14,9 +14,9 @@ apt-get install -q -y \
 libcmocka-dev; \
 git clone https://gitlab.labs.nic.cz/knot/resolver.git /src/knot-resolver; \
 cd /src/knot-resolver; \
-autoreconf -if && ./configure && make && make check && make install && ldconfig; \
+autoreconf -if && ./configure && make && make check && make install && ldconfig && \
 # Trim down the image
-apt-get clean; \
+apt-get clean && \
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /src/knot-resolver
 
 # Select entrypoint
