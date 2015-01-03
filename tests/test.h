@@ -16,10 +16,6 @@
 
 #pragma once
 
-#ifdef __linux__
-#define _XOPEN_SOURCE 500
-#endif
-
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -27,7 +23,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <ftw.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <cmocka.h>
 
@@ -42,15 +38,25 @@ static inline void test_mm_ctx_init(mm_ctx_t *mm)
 	mm_ctx_init(mm);
 }
 
-static inline int _remove_file(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
-{
-	return remove(fpath);
-}
-
 /*! \brief Recursively delete directory. */
 static inline int test_tmpdir_remove(const char *path)
 {
-	return nftw(path, _remove_file, 64, FTW_DEPTH | FTW_PHYS);
+	char buf[512];
+	struct dirent *ent = NULL;
+	DIR *dir = opendir(path);
+	if (dir == NULL) {
+		return KNOT_ERROR;
+	}
+	while ((ent = readdir(dir)) != NULL) {
+		/* Skip special dirs (this presumes no files begin with '.') */
+		if (ent->d_name[0] == '.') {
+			continue;
+		}
+		sprintf(buf, "%s/%s", path, ent->d_name);
+		remove(buf);
+	}
+	remove(path);
+	return KNOT_EOK;
 }
 
 /*! \brief Create temporary directory. */
