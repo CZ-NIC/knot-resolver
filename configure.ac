@@ -30,7 +30,7 @@ LT_INIT
 PKG_PROG_PKG_CONFIG
 
 # Check for dependencies
-AC_CHECK_FUNCS([nftw])
+AC_CHECK_FUNCS([nftw, mkdtemp])
 PKG_CHECK_MODULES([libuv], [libuv])
 PKG_CHECK_MODULES([libknot], [libknot])
 PKG_CHECK_MODULES([cmocka], [cmocka], AC_CONFIG_FILES([tests/Makefile]))

@@ -5,6 +5,10 @@ daemon/Makefile.am
 daemon/layer/query.c
 daemon/layer/query.h
 daemon/main.c
+daemon/tcp.c
+daemon/tcp.h
+daemon/udp.c
+daemon/udp.h
 daemon/worker.c
 daemon/worker.h
 lib/Makefile.am

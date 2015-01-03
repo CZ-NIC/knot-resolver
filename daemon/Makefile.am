@@ -9,6 +9,10 @@ sbin_PROGRAMS = kresolved
 kresolved_SOURCES =					\
 	layer/query.h					\
 	layer/query.c					\
+	udp.h							\
+	udp.c							\
+	tcp.h							\
+	tcp.c							\
 	worker.h						\
 	worker.c						\
 	main.c

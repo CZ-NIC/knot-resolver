@@ -24,7 +24,8 @@
 #include <libknot/errcode.h>
 
 #include "lib/resolve.h"
-#include "worker.h"
+#include "daemon/udp.h"
+#include "daemon/tcp.h"
 
 void signal_handler(uv_signal_t *handle, int signum)
 {
@@ -105,31 +106,37 @@ int main(int argc, char **argv)
 	uv_signal_init(loop, &sigint);
 	uv_signal_start(&sigint, signal_handler, SIGINT);
 
+	/* Create a worker. */
+	struct worker_ctx worker;
+	worker_init(&worker, &mm);
+
 	/* Bind to sockets. */
 	char addr_str[SOCKADDR_STRLEN] = {'\0'};
 	sockaddr_tostr(addr_str, sizeof(addr_str), &addr);
 	uv_udp_t udp_sock;
-	memset(&udp_sock, 0, sizeof(uv_udp_t));
 	uv_udp_init(loop, &udp_sock);
-	ret = uv_udp_bind(&udp_sock, (struct sockaddr *)&addr, 0);
-	if (ret == 0) {
-		printf("[system] listening on '%s'\n", addr_str);
-	} else {
-		fprintf(stderr, "[system] failed to bind to '%s'\n", addr_str);
-		return EXIT_FAILURE;
+	uv_tcp_t tcp_sock;
+	uv_tcp_init(loop, &tcp_sock);
+	printf("[system] listening on '%s/UDP'\n", addr_str);
+	ret = udp_bind((uv_handle_t *)&udp_sock, &worker, (struct sockaddr *)&addr);
+	if (ret == KNOT_EOK) {
+		printf("[system] listening on '%s/TCP'\n", addr_str);
+		ret = tcp_bind((uv_handle_t *)&tcp_sock, &worker, (struct sockaddr *)&addr);
 	}
 
-	/* Start a worker. */
-	struct worker_ctx worker;
-	worker_init(&worker, &mm);
-	worker_start(&udp_sock, &worker);
-
-	/* Run the event loop. */
-	fflush(stdout);
-	ret = uv_run(loop, UV_RUN_DEFAULT);
+	/* Check results */
+	if (ret != KNOT_EOK) {
+		fprintf(stderr, "[system] bind to '%s' %s\n", addr_str, knot_strerror(ret));
+		ret = EXIT_FAILURE;
+	} else {
+		/* Run the event loop. */
+		fflush(stdout);
+		ret = uv_run(loop, UV_RUN_DEFAULT);
+	}
 
 	/* Cleanup. */
-	worker_stop(&udp_sock);
+	udp_unbind((uv_handle_t *)&udp_sock);
+	tcp_unbind((uv_handle_t *)&tcp_sock);
 	worker_deinit(&worker);
 
 	return ret;
