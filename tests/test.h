@@ -16,7 +16,9 @@
 
 #pragma once
 
-#define _BSD_SOURCE
+#ifdef __linux__
+#define _XOPEN_SOURCE 500
+#endif
 
 #include <stdlib.h>
 #include <stdarg.h>
