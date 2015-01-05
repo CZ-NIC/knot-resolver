@@ -120,7 +120,6 @@ int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_tx
 		return KNOT_EINVAL;
 	}
 
-
 	/* No cache, start with SBELT. */
 	if (txn == NULL) {
 		return set_sbelt_zone_cut(cut);

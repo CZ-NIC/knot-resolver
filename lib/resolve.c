@@ -66,13 +66,6 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 		return invalidate_ns(rplan, cur);
 	}
 
-	char name_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN], type_str[16];
-	knot_dname_to_str(ns_str, rplan->zone_cut.ns, sizeof(ns_str));
-	knot_dname_to_str(zonecut_str, rplan->zone_cut.name, sizeof(zonecut_str));
-	knot_dname_to_str(name_str, cur->sname, sizeof(name_str));
-	knot_rrtype_to_string(cur->stype, type_str, sizeof(type_str));
-	DEBUG_MSG("resolve '%s %s' zone cut '%s' nameserver '%s'\n", name_str, type_str, zonecut_str, ns_str);
-
 	/* Prepare query resolution. */
 	struct sockaddr *ns_addr = (struct sockaddr *)&rplan->zone_cut.addr;
 	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, requestor->mm);

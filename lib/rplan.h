@@ -24,6 +24,11 @@
 #include "lib/context.h"
 #include "lib/zonecut.h"
 
+/* Query flags */
+enum {
+	QUERY_NO_MINIMIZE = 1 << 0 /*!< Don't minimize QNAME. */
+};
+
 /*!
  * \brief Single query representation.
  */
