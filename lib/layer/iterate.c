@@ -344,6 +344,16 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		DEBUG_MSG("ignoring mismatching response\n");
 		return KNOT_NS_PROC_MORE;
 	}
+	
+	/* Truncated response. */
+	if (knot_wire_get_tc(pkt->wire)) {
+		DEBUG_MSG("truncated response, failover to TCP\n");
+		struct kr_query *cur = kr_rplan_current(param->rplan);
+		if (cur) {
+			cur->flags |= QUERY_TCP;
+		}
+		return KNOT_NS_PROC_DONE;
+	}
 
 	/* TODO: classify response type
 	 * 1. authoritative, noerror/nxdomain

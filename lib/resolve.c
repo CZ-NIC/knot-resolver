@@ -59,22 +59,28 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	int ret = KNOT_EOK;
 	struct timeval timeout = { KR_CONN_RTT_MAX / 1000, 0 };
 	struct kr_rplan *rplan = param->rplan;
-	const struct kr_query *cur = kr_rplan_current(rplan);
+	struct kr_query *cur = kr_rplan_current(rplan);
 
 	/* Invalid address for current zone cut. */
-	if (rplan->zone_cut.addr.ss_family == AF_UNSPEC) {
+	if (sockaddr_len((struct sockaddr *)&rplan->zone_cut.addr) < 1) {
 		return invalidate_ns(rplan, cur);
 	}
 
 	/* Prepare query resolution. */
+	int mode = (cur->flags & QUERY_TCP) ? 0 : KNOT_RQ_UDP;
 	struct sockaddr *ns_addr = (struct sockaddr *)&rplan->zone_cut.addr;
 	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, requestor->mm);
-	struct knot_request *tx = knot_request_make(requestor->mm, ns_addr, NULL, query, 0);
+	struct knot_request *tx = knot_request_make(requestor->mm, ns_addr, NULL, query, mode);
 	knot_requestor_enqueue(requestor, tx);
 
 	/* Resolve and check status. */
 	ret = knot_requestor_exec(requestor, &timeout);
 	if (ret != KNOT_EOK) {
+		/* Network error, retry over TCP. */
+		if (ret != KNOT_LAYER_ERROR && !(cur->flags & QUERY_TCP)) {
+			cur->flags |= QUERY_TCP;
+			return iterate(requestor, param);
+		}
 		/* Resolution failed, invalidate current NS. */
 		ret = invalidate_ns(rplan, cur);
 	}
