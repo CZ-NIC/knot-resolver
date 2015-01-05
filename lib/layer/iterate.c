@@ -296,6 +296,20 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	cur->id = knot_random_uint16_t();
 	knot_wire_set_id(pkt->wire, cur->id);
+	
+	/* Declare EDNS0 support. */
+	knot_rrset_t opt_rr;
+	ret = knot_edns_init(&opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
+	if (ret != KNOT_EOK) {
+		return KNOT_NS_PROC_FAIL;
+	}
+
+	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
+	ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &opt_rr, KNOT_PF_FREE);
+	if (ret != KNOT_EOK) {
+		knot_rrset_clear(&opt_rr, &pkt->mm);
+		return KNOT_NS_PROC_FAIL;
+	}
 
 #ifndef NDEBUG
 	char name_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN], type_str[16];

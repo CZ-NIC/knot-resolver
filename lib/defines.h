@@ -35,3 +35,5 @@
  */
 #define KR_DNS_PORT   53
 #define KR_DNAME_ROOT ((const knot_dname_t*)"")
+#define KR_EDNS_VERSION 0
+#define KR_EDNS_PAYLOAD 4096
