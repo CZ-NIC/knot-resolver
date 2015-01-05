@@ -56,13 +56,14 @@ static int set_zone_cut(struct kr_rplan *rplan, knot_pkt_t *pkt, const knot_rrse
 		/* Find address in the additionals (optional). */
 		int ret = glue_ns_addr(pkt, &rplan->zone_cut.addr, ns_name, type_list[i]);
 		if (ret == KNOT_EOK) {
-			break;
+			return KNOT_EOK;
 		}
 	}
 
-	/* Query for address records to get it in the cache. */
-	(void) kr_rplan_push(rplan, rplan->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
-	(void) kr_rplan_push(rplan, rplan->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+	/* Query for address records (if not glue). */
+	for (unsigned i = 0; i < sizeof(type_list)/sizeof(uint16_t); ++i) {
+		(void) kr_rplan_push(rplan, rplan->zone_cut.ns, KNOT_CLASS_IN, type_list[i]);
+	}
 
 	return KNOT_EOK;
 }

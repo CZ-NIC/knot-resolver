@@ -104,7 +104,7 @@ int kr_cache_query(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
 		knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
 		char type_str[16];
 		knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
-		DEBUG_MSG("query '%s %s' => %u RRs\n", name_str, type_str, found_rr->count);
+		DEBUG_MSG("read '%s %s' => %u RRs\n", name_str, type_str, found_rr->count);
 #endif
 		/* Assign data and return success. */
 		rr->rrs.rr_count = found_rr->count;
@@ -149,7 +149,7 @@ int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestam
 	knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
 	char type_str[16];
 	knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
-	DEBUG_MSG("insert '%s %s' => %u RRs (key=%zuB,data=%zuB)\n", name_str, type_str, rr->rrs.rr_count, key.len, val.len);
+	DEBUG_MSG("write '%s %s' => %u RRs (key=%zuB,data=%zuB)\n", name_str, type_str, rr->rrs.rr_count, key.len, val.len);
 #endif
 
 	int ret = db_api->insert(txn, &key, &val, 0);
