@@ -68,18 +68,6 @@ static int set_zone_cut(struct kr_rplan *rplan, knot_pkt_t *pkt, const knot_rrse
 	return KNOT_EOK;
 }
 
-static int inspect_ns(const knot_rrset_t *ns_rr, knot_pkt_t *pkt, struct kr_layer_param *param)
-{
-	/* Authority MUST be at/below the authority of the nameserver, otherwise
-	 * possible cache injection attempt. */
-	if (!knot_dname_in(param->rplan->zone_cut.name, ns_rr->owner)) {
-		DEBUG_MSG("NS in query outside of its authority => rejecting\n");
-		return KNOT_EMALF;
-	}
-
-	return KNOT_EOK;
-}
-
 static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *rr,
                                struct kr_query *cur)
 {
@@ -114,32 +102,42 @@ static int update_answer(knot_pkt_t *answer, const knot_rrset_t *rr)
 	return KNOT_EOK;
 }
 
-static void update_zone_cut(struct kr_rplan *rplan, const knot_rrset_t *rr)
+static int update_zone_cut(knot_pkt_t *pkt, struct kr_rplan *rplan, const knot_rrset_t *rr)
 {
+	int ret = KNOT_EOK;
+
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		if (knot_dname_is_equal(rplan->zone_cut.ns, rr->owner)) {
-			kr_rrset_to_addr(&rplan->zone_cut.addr, rr);
+			ret = kr_rrset_to_addr(&rplan->zone_cut.addr, rr);
+		}
+	} else if (rr->type == KNOT_RRTYPE_NS) {
+		/* Authority MUST be at/below the authority of the nameserver, otherwise
+		 * possible cache injection attempt. */
+		if (!knot_dname_in(rplan->zone_cut.name, rr->owner)) {
+			DEBUG_MSG("NS in query outside of its authority => rejecting\n");
+			return KNOT_EMALF;
+		}
+		/* Set the first nameserver address, rest will be cached. */
+		if (!knot_dname_is_equal(rr->owner, rplan->zone_cut.name)) {
+			ret = set_zone_cut(rplan, pkt, rr);
 		}
 	}
+
+	return ret;
 }
 
 static int resolve_referral(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	bool have_first_ns = false;
+	/* Update current zone cut from NS records. */
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type != KNOT_RRTYPE_NS) {
 			continue;
 		}
-		/* Check each nameserver. */
-		if (inspect_ns(rr, pkt, param) != KNOT_EOK) {
+		int ret = update_zone_cut(pkt, param->rplan, rr);
+		if (ret != KNOT_EOK) {
 			return KNOT_NS_PROC_FAIL;
-		}
-		/* Resolve the first nameserver address, rest will be cached. */
-		if (!have_first_ns) {
-			set_zone_cut(param->rplan, pkt, rr);
-			have_first_ns = true;
 		}
 	}
 
@@ -168,20 +166,22 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 	}
 
 	/* Is relevant for original query? */
-	bool update_orig_answer = (cur == kr_rplan_last(param->rplan) && !is_minimized);
-
+	bool update_orig_answer = (cur == kr_rplan_last(param->rplan));
+	
+	/* Process answer records. */
 	const knot_dname_t *cname = cur->sname;
-	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
 
 		/* Update original answer or current zone cut. */
-		if (update_orig_answer) {
+		if (update_orig_answer && knot_pkt_qtype(pkt) == cur->stype) {
 			if (update_answer(answer, rr) != KNOT_EOK) {
 				return KNOT_NS_PROC_FAIL;
 			}
 		} else {
-			update_zone_cut(param->rplan, rr);
+			if (update_zone_cut(pkt, param->rplan, rr) != KNOT_EOK) {
+				return KNOT_NS_PROC_FAIL;
+			}
 		}
 
 		/* Check canonical name. */
@@ -196,13 +196,20 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 			return KNOT_NS_PROC_FAIL;
 		}
 	}
+	
+	kr_rplan_pop(param->rplan, cur);
 
 	/* Authoritative answer to original response => DONE. */
 	if (update_orig_answer) {
 		knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
+	} else {
+		/* Side-lookup, update authority. */
+		/* TODO: store zone-cut in query for side lookups */
+		cur = kr_rplan_current(param->rplan);
+		namedb_txn_t *txn = kr_rplan_txn_acquire(param->rplan, NAMEDB_RDONLY);
+		kr_find_zone_cut(&param->rplan->zone_cut, cur->sname, txn, cur->timestamp.tv_sec);
 	}
 
-	kr_rplan_pop(param->rplan, cur);
 	return KNOT_NS_PROC_DONE;
 }
 
