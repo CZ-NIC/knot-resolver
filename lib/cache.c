@@ -172,6 +172,14 @@ int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr)
 	size_t key_len = cache_key(keybuf, rr->owner, rr->type);
 	namedb_val_t key = { keybuf, key_len };
 
+#ifndef NDEBUG
+	char name_str[KNOT_DNAME_MAXLEN];
+	knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
+	char type_str[16];
+	knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
+	DEBUG_MSG("del  '%s %s'\n", name_str, type_str);
+#endif
+
 	/* TODO: selective deletion by RRSet subtraction */
 
 	return db_api->del(txn, &key);
