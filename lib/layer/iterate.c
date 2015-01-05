@@ -154,10 +154,15 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 		return KNOT_NS_PROC_FAIL;
 	}
 
-	/* Authoritative response for min QNAME => disable and retry */
-	bool is_minimized = (knot_pkt_qtype(pkt) != cur->stype &&
-	                     !knot_dname_is_equal(knot_pkt_qname(pkt), cur->sname));
-	if (is_minimized && knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NOERROR) {
+	/* Authoritative response for minimized QNAME.
+	 * NODATA   => may be empty non-terminal, retry (found zone cut)
+	 * NOERROR  => found zone cut, retry
+	 * NXDOMAIN => parent is zone cut, terminate
+	 */
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+	bool is_minimized = (!knot_dname_is_equal(knot_pkt_qname(pkt), cur->sname));
+	bool is_noerror = (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NOERROR);
+	if (is_minimized && is_noerror && an->count == 0) {
 		cur->flags |= QUERY_NO_MINIMIZE;
 		return KNOT_NS_PROC_DONE;
 	}
@@ -208,16 +213,26 @@ static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param, int errc
 	return KNOT_NS_PROC_FAIL;
 }
 
-/*! \brief Return minimized QNAME for current zone cut. */
-static const knot_dname_t *minimized_qname(struct kr_query *query, struct kr_zonecut *cut)
+/*! \brief Return minimized QNAME/QTYPE for current zone cut. */
+static const knot_dname_t *minimized_qname(struct kr_query *query, struct kr_zonecut *cut, uint16_t *qtype)
 {
-	/* Minimize name to contain current zone cut + 1 label. */
+	/* Minimization disabled. */
 	const knot_dname_t *qname = query->sname;
+	if (query->flags & QUERY_NO_MINIMIZE) {
+		return qname;
+	}
+
+	/* Minimize name to contain current zone cut + 1 label. */
 	int cut_labels = knot_dname_labels(cut->name, NULL);
 	int qname_labels = knot_dname_labels(qname, NULL);
 	while(qname_labels > cut_labels + 1) {
 		qname = knot_wire_next_label(qname, NULL);
 		qname_labels -= 1;
+	}
+
+	/* Hide QTYPE if minimized. */
+	if (qname != query->sname) {
+		*qtype = KNOT_RRTYPE_NS;
 	}
 
 	return qname;
@@ -231,19 +246,13 @@ static bool is_answer_to_query(const knot_pkt_t *answer, struct kr_rplan *rplan)
 		return -1;
 	}
 
-	uint16_t expect_qtype = expect->stype;
-	const knot_dname_t *expect_qname = expect->sname;
-	if (!expect->flags & QUERY_NO_MINIMIZE) {
-		expect_qname = minimized_qname(expect, &rplan->zone_cut);
-		if (expect_qname != expect->sname) {
-			expect_qtype = KNOT_RRTYPE_NS;
-		}
-	}
+	uint16_t qtype = expect->stype;
+	const knot_dname_t *qname = minimized_qname(expect, &rplan->zone_cut, &qtype);
 
 	return expect->id      == knot_wire_get_id(answer->wire) &&
 	       expect->sclass  == knot_pkt_qclass(answer) &&
-	       expect_qtype    == knot_pkt_qtype(answer) &&
-	       knot_dname_is_equal(expect_qname, knot_pkt_qname(answer));
+	       qtype           == knot_pkt_qtype(answer) &&
+	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
 
 /* State-less single resolution iteration step, not needed. */
@@ -268,14 +277,8 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Minimize QNAME (if possible). */
 	struct kr_zonecut *zone_cut = &param->rplan->zone_cut;
-	const knot_dname_t *qname = cur->sname;
 	uint16_t qtype = cur->stype;
-	if (!(cur->flags & QUERY_NO_MINIMIZE)) {
-		qname = minimized_qname(cur, zone_cut);
-		if (qname != cur->sname) {
-			qtype = KNOT_RRTYPE_NS;
-		}
-	}
+	const knot_dname_t *qname = minimized_qname(cur, zone_cut, &qtype);
 
 	/* Form a query for the authoritative. */
 	knot_pkt_clear(pkt);
