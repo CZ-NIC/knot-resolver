@@ -160,7 +160,7 @@ static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	bool is_minimized = (!knot_dname_is_equal(knot_pkt_qname(pkt), cur->sname));
 	bool is_noerror = (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NOERROR);
-	if (is_minimized && is_noerror && an->count == 0) {
+	if (is_minimized && is_noerror) {
 		cur->flags |= QUERY_NO_MINIMIZE;
 		return KNOT_NS_PROC_DONE;
 	}
