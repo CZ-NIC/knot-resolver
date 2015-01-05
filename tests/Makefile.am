@@ -1,3 +1,5 @@
+if BUILD_TESTS
+
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_srcdir)/lib
@@ -17,3 +19,5 @@ check-compile-only: $(check_PROGRAMS)
 
 check-local: $(check_PROGRAMS)
 	$(top_builddir)/tests/runtests -b $(top_builddir)/tests $(check_PROGRAMS)
+
+endif

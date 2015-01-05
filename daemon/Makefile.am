@@ -1,10 +1,10 @@
+if BUILD_DAEMON
+
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_srcdir)/lib \
 	$(libuv_CFLAGS) \
 	$(libknot_CFLAGS)
-
-sbin_PROGRAMS = kresolved
 
 kresolved_SOURCES =					\
 	layer/query.h					\
@@ -18,4 +18,7 @@ kresolved_SOURCES =					\
 	main.c
 
 # sbin programs
+sbin_PROGRAMS = kresolved
 kresolved_LDADD = $(top_builddir)/lib/libknotresolve.la $(libuv_LIBS) $(libknot_LIBS)
+
+endif

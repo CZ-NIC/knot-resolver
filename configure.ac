@@ -31,29 +31,32 @@ PKG_PROG_PKG_CONFIG
 
 # Check for dependencies
 AC_CHECK_FUNCS([nftw, mkdtemp])
-PKG_CHECK_MODULES([libuv], [libuv])
 PKG_CHECK_MODULES([libknot], [libknot])
-PKG_CHECK_MODULES([cmocka], [cmocka], AC_CONFIG_FILES([tests/Makefile]))
+PKG_CHECK_MODULES([libuv], [libuv], [build_daemon=yes], [build_daemon=no])
+PKG_CHECK_MODULES([cmocka], [cmocka], [build_tests=yes], [build_tests=no])
+AM_CONDITIONAL([BUILD_TESTS], [test "$build_tests" == "yes"])
+AM_CONDITIONAL([BUILD_DAEMON], [test "$build_daemon" == "yes"])
 
 # Search other libraries
 AC_SEARCH_LIBS([mdb_env_open], [lmdb])
 
 # Config files
-AC_CONFIG_FILES([Makefile
-		 lib/Makefile
-		 daemon/Makefile
-		 ])
-
+AC_CONFIG_FILES([Makefile lib/Makefile tests/Makefile daemon/Makefile])
 
 # Output
 AC_OUTPUT
 AC_MSG_RESULT([
   $PACKAGE $VERSION
 
-    Target:   $host_os $host_cpu
-    Compiler: ${CC}
-    CFlags:   ${CFLAGS} ${CPPFLAGS} ${libuv_CFLAGS} ${libknot_CFLAGS}
-    LDFlags:  ${LDFLAGS} ${libuv_LIBS} ${libknot_LIBS}
+    Target:       $host_os $host_cpu
+    Compiler:     ${CC}
+    CFlags:       ${CFLAGS} ${CPPFLAGS} ${libuv_CFLAGS} ${libknot_CFLAGS}
+    LDFlags:      ${LDFLAGS} ${libuv_LIBS} ${libknot_LIBS}
+
+    Features:
+    ---------
+    Build tests:  ${build_tests}
+    Build daemon: ${build_daemon}   
 
   Continue with 'make' command
 ])
