@@ -44,7 +44,7 @@ static int invalidate_ns(struct kr_rplan *rplan, const struct kr_query *qry)
 
 	/* TODO: selective removal */
 	knot_rrset_t removed_rr;
-	knot_rrset_init(&removed_rr, rplan->zone_cut.ns, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
+	knot_rrset_init(&removed_rr, rplan->zone_cut.name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
 	(void) kr_cache_remove(txn, &removed_rr);
 
 	/* Find new zone cut / nameserver */
