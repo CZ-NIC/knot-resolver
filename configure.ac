@@ -3,7 +3,7 @@ AC_PREREQ(2.60)
 # Version/identifiers
 m4_define([VERSION_MAJOR],[0])
 m4_define([VERSION_MINOR],[0])
-m4_define([VERSION_MICRO],[1])
+m4_define([VERSION_MICRO],[2])
 AC_INIT(knot-resolver, m4_defn([VERSION_MAJOR]).m4_defn([VERSION_MINOR]).m4_defn([VERSION_MICRO]), knot-dns@lists.nic.cz, knot-resolver)
 AM_INIT_AUTOMAKE([gnits subdir-objects dist-xz -Wall -Werror])
 AM_SILENT_RULES([yes])
@@ -21,9 +21,7 @@ CFLAGS="$CFLAGS -Wall -Werror=format-security"
 # Checks for programs.
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR]) # call AM_PROG_AR only if available
 
-# Initialize libtool
-AC_DISABLE_STATIC
-AC_PROG_LIBTOOL
+# Linker
 LT_INIT
 
 # Use pkg-config
@@ -34,7 +32,14 @@ AC_CHECK_FUNCS([nftw, mkdtemp])
 PKG_CHECK_MODULES([libknot], [libknot])
 PKG_CHECK_MODULES([libuv], [libuv], [build_daemon=yes], [build_daemon=no])
 PKG_CHECK_MODULES([cmocka], [cmocka], [build_tests=yes], [build_tests=no])
+
+# Check for python (integration tests)
+AX_PYTHON_DEVEL([>= '2.5.0'])
+if test "x$PYTHON" != x ; then build_integration=yes; else build_integration=no; fi
+
+# Set up conditionals
 AM_CONDITIONAL([BUILD_TESTS], [test "$build_tests" == "yes"])
+AM_CONDITIONAL([BUILD_INTEGRATION], [test "$build_integration" == "yes"])
 AM_CONDITIONAL([BUILD_DAEMON], [test "$build_daemon" == "yes"])
 
 # Search other libraries
@@ -55,7 +60,7 @@ AC_MSG_RESULT([
 
     Features:
     ---------
-    Build tests:  ${build_tests}
+    Build tests:  ${build_tests} (integration ${build_integration})
     Build daemon: ${build_daemon}   
 
   Continue with 'make' command

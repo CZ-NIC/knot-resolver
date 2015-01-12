@@ -31,7 +31,6 @@ const char *global_env;
 /* Test cache open */
 static void test_open(void **state)
 {
-	printf("OPENSDFDSFSDFSFSDFSDF\n");
 	*state = kr_cache_open(global_env, &global_mm, CACHE_SIZE);
 	assert_non_null(*state);
 }

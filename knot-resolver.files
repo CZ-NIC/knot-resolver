@@ -37,4 +37,5 @@ tests/Makefile.am
 tests/test.h
 tests/test_cache.c
 tests/test_context.c
+tests/test_integration.c
 tests/test_resolve.c
