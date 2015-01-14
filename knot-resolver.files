@@ -34,8 +34,10 @@ lib/utils.h
 lib/zonecut.c
 lib/zonecut.h
 tests/Makefile.am
+tests/pydnstest/scenario.py
 tests/test.h
 tests/test_cache.c
 tests/test_context.c
 tests/test_integration.c
+tests/test_integration.py
 tests/test_resolve.c

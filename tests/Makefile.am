@@ -48,6 +48,9 @@ clean-local:
 	@for soname in `echo | $(EGREP) "^dlname=" $(noinst_LTLIBRARIES) | $(SED) -e "s|^dlname='\(.*\)'|\1|"`; do  \
 		test -L $(abs_builddir)/$$soname && rm -f $(abs_builddir)/$$soname || true; \
 	done
+else
+
+check-local-integration:
 
 endif
 

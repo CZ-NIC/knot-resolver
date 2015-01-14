@@ -34,8 +34,12 @@ PKG_CHECK_MODULES([libuv], [libuv], [build_daemon=yes], [build_daemon=no])
 PKG_CHECK_MODULES([cmocka], [cmocka], [build_tests=yes], [build_tests=no])
 
 # Check for python (integration tests)
-AX_PYTHON_DEVEL([>= '2.5.0'])
-if test "x$PYTHON" != x ; then build_integration=yes; else build_integration=no; fi
+AC_ARG_ENABLE([integration-tests],
+	      AS_HELP_STRING([--enable-integration-tests], [enable integration tests (require Python devel), default: no]),
+	      [build_integration=yes], [build_integration=no])
+if test "x${build_integration}" == "xyes"; then
+	AX_PYTHON_DEVEL([>= '2.5'])
+fi
 
 # Set up conditionals
 AM_CONDITIONAL([BUILD_TESTS], [test "$build_tests" == "yes"])
