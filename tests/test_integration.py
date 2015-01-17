@@ -1,53 +1,90 @@
 #!/usr/bin/env python
 import sys, os, fileinput
-import _test_integration
+from pydnstest import scenario
+import _test_integration as mock_ctx
 
+def get_next(file_in):
+    while True:
+        line = file_in.readline()
+        if len(line) == 0:
+            return False
+        tokens = ' '.join(line.strip().split()).split()
+        if len(tokens) == 0:
+            continue # Skip empty lines
+        op = tokens.pop(0)
+        if op.startswith(';') or op.startswith('#'):
+            continue # Skip comments
+        return op, tokens
 
-def parse_entry(line, file_in):
+def parse_entry(op, args, file_in):
     """ Parse entry definition. """
-    print line.split(' ')
-    for line in iter(lambda: file_in.readline(), ''):
-        if line.startswith('ENTRY_END'):
+    out = scenario.Entry()
+    for op, args in iter(lambda: get_next(file_in), False):
+        if op == 'ENTRY_END':
             break
+        elif op == 'REPLY':
+            out.set_reply(args)
+        elif op == 'MATCH':
+            out.set_match(args)
+        elif op == 'ADJUST':
+            out.set_adjust(args)
+        elif op == 'SECTION':
+            out.begin_section(args[0])
+        else:
+            out.add_record(op, args)
+    return out
 
 
-def parse_step(line, file_in):
+def parse_step(op, args, file_in):
     """ Parse range definition. """
-    print line.split(' ')
+    if len(args) < 2:
+        raise Exception('expected STEP <id> <type>')
+    out = scenario.Step(args[0], args[1])
+    op, args = get_next(file_in)
+    # Optional data
+    if op == 'ENTRY_BEGIN':
+        out.add(parse_entry(op, args, file_in))
+    else:
+        raise Exception('expected "ENTRY_BEGIN"')
+    return out
 
 
-def parse_range(line, file_in):
+def parse_range(op, args, file_in):
     """ Parse range definition. """
-    print line.split(' ')
-    for line in iter(lambda: file_in.readline(), ''):
-        if line.startswith('ENTRY_BEGIN'):
-            parse_entry(line, file_in)
-        if line.startswith('RANGE_END'):
+    if len(args) < 2:
+        raise Exception('expected RANGE_BEGIN <from> <to>')
+    out = scenario.Range(int(args[0]), int(args[1]))
+    for op, args in iter(lambda: get_next(file_in), False):
+        if op == 'ADDRESS':
+            out.address = args[0]
+        elif op == 'ENTRY_BEGIN':
+            out.add(parse_entry(op, args, file_in))
+        elif op == 'RANGE_END':
             break
+    return out
 
 
-def parse_scenario(line, file_in):
+def parse_scenario(op, args, file_in):
     """ Parse scenario definition. """
-    print line.split(' ')
-    for line in iter(lambda: file_in.readline(), ''):
-        if line.startswith('SCENARIO_END'):
+    out = scenario.Scenario(args[0])
+    for op, args in iter(lambda: get_next(file_in), False):
+        if op == 'SCENARIO_END':
             break
-        if line.startswith('RANGE_BEGIN'):
-            parse_range(line, file_in)
-        if line.startswith('STEP'):
-            parse_step(line, file_in)
-
+        if op == 'RANGE_BEGIN':
+            out.ranges.append(parse_range(op, args, file_in))
+        if op == 'STEP':
+            out.steps.append(parse_step(op, args, file_in))
+    return out
 
 def parse_file(file_in):
-    """ Parse and play scenario from a file. """
+    """ Parse scenario from a file. """
     try:
-        for line in iter(lambda: file_in.readline(), ''):
-            if line.startswith('SCENARIO_BEGIN'):
-                return parse_scenario(line, file_in)
+        for op, args in iter(lambda: get_next(file_in), False):
+            if op == 'SCENARIO_BEGIN':
+                return parse_scenario(op, args, file_in)
         raise Exception("IGNORE (missing scenario)")
     except Exception as e:
         raise Exception('line %d: %s' % (file_in.lineno(), str(e)))
-
 
 def parse_object(path):
     """ Recursively scan file/directory for scenarios. """
@@ -55,14 +92,20 @@ def parse_object(path):
         for e in os.listdir(path):
             parse_object(os.path.join(path, e))
     elif os.path.isfile(path):
-        file_in = fileinput.input(path)
-        try:
-            parse_file(file_in)
-            print('%s OK' % os.path.basename(path))
-        except Exception as e:
-            print('%s %s' % (os.path.basename(path), str(e)))
-        file_in.close()
+        play_object(path)
 
+def play_object(path):
+    """ Play scenario from a file object. """
+    file_in = fileinput.input(path)
+    mock_ctx.init()
+    try:
+        scenario = parse_file(file_in)
+        scenario.play(mock_ctx)
+        print('%s OK' % os.path.basename(path))
+    except Exception as e:
+        print('%s %s' % (os.path.basename(path), str(e)))
+    mock_ctx.deinit()
+    file_in.close()
 
 if __name__ == '__main__':
     for arg in sys.argv[1:]:
