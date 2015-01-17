@@ -12,6 +12,8 @@ libkresolve_static_la_SOURCES =		\
 	layer/stats.h	\
 	layer/stats.c	\
 	layer.h			\
+	utils.h 		\
+	utils.c 		\
 	context.h 		\
 	context.c 		\
 	resolve.h 		\

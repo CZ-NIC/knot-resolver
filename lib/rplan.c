@@ -23,6 +23,7 @@
 #include "lib/rplan.h"
 #include "lib/context.h"
 #include "lib/cache.h"
+#include "lib/utils.h"
 
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[rplan] " fmt, ## __VA_ARGS__)
 
