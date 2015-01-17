@@ -28,7 +28,7 @@ LT_INIT
 PKG_PROG_PKG_CONFIG
 
 # Check for dependencies
-AC_CHECK_FUNCS([opendir, mkdtemp, gettimeofday, time])
+AC_CHECK_FUNCS([opendir mkdtemp gettimeofday time])
 PKG_CHECK_MODULES([libknot], [libknot])
 PKG_CHECK_MODULES([libuv], [libuv], [build_daemon=yes], [build_daemon=no])
 PKG_CHECK_MODULES([cmocka], [cmocka], [build_tests=yes], [build_tests=no])

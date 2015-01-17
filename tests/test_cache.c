@@ -15,6 +15,7 @@
  */
 
 #include "tests/test.h"
+#include <cmocka.h>
 
 #include <libknot/internal/mempool.h>
 #include "lib/cache.h"

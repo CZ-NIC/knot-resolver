@@ -46,12 +46,9 @@ static PyObject* init(PyObject* self, PyObject* args)
 	test_mm_ctx_init(&global_mm);
 	kr_context_init(&global_context, &global_mm);
 	global_tmpdir = test_tmpdir_create();
+	assert(global_tmpdir);
 	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, CACHE_SIZE);
-	if (global_context.cache == NULL) {
-		test_tmpdir_remove(global_tmpdir);
-		kr_context_deinit(&global_context);
-		return NULL;
-	}
+	assert(global_context.cache);
 
 	return Py_BuildValue("s", PACKAGE_STRING " (integration tests)");
 }
@@ -146,12 +143,8 @@ PyMODINIT_FUNC init_test_integration(void)
 
 int __wrap_gettimeofday(struct timeval *tv, struct timezone *tz)
 {
-	if (_mock_fd < 0) {
-		gettimeofday(tv, tz);
-	} else {
-		memcpy(tv, &_mock_time, sizeof(struct timeval));
-	}
 	fprintf(stderr, "gettimeofday = %ld\n", tv->tv_sec);
+	memcpy(tv, &_mock_time, sizeof(struct timeval));
 	return 0;
 }
 
@@ -160,11 +153,7 @@ int net_unbound_socket(int type, const struct sockaddr_storage *ss)
 	char addr_str[SOCKADDR_STRLEN];
 	sockaddr_tostr(addr_str, sizeof(addr_str), ss);
 	fprintf(stderr, "%s (%d, %s)\n", __func__, type, addr_str);
-	if (_mock_fd < 0) {
-		return net_unbound_socket(type, ss);
-	} else {
-		return _mock_fd;
-	}
+	return _mock_fd;
 }
 
 int net_bound_socket(int type, const struct sockaddr_storage *ss)
@@ -172,11 +161,7 @@ int net_bound_socket(int type, const struct sockaddr_storage *ss)
 	char addr_str[SOCKADDR_STRLEN];
 	sockaddr_tostr(addr_str, sizeof(addr_str), ss);
 	fprintf(stderr, "%s (%d, %s)\n", __func__, type, addr_str);
-	if (_mock_fd < 0) {
-		return net_bound_socket(type, ss);
-	} else {
-		return _mock_fd;
-	}
+	return _mock_fd;
 }
 
 int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
@@ -186,19 +171,11 @@ int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
 	sockaddr_tostr(dst_addr_str, sizeof(dst_addr_str), dst_addr);
 	sockaddr_tostr(src_addr_str, sizeof(src_addr_str), src_addr);
 	fprintf(stderr, "%s (%d, %s, %s, %u)\n", __func__, type, dst_addr_str, src_addr_str, flags);
-	if (_mock_fd < 0) {
-		return net_connected_socket(type, dst_addr, src_addr, flags);
-	} else {
-		return _mock_fd;
-	}
+	return _mock_fd;
 }
 
 int net_is_connected(int fd)
 {
 	fprintf(stderr, "%s (%d)\n", __func__, fd);
-	if (fd < 0) {
-		return false;
-	} else {
-		return net_is_connected(fd);
-	}
+	return true;
 }

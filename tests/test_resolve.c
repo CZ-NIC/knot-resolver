@@ -15,6 +15,8 @@
  */
 
 #include "tests/test.h"
+#include <cmocka.h>
+
 #include "lib/resolve.h"
 
 static void test_resolve_nullparams(void **state)
