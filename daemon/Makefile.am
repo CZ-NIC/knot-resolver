@@ -19,6 +19,6 @@ kresolved_SOURCES =					\
 
 # sbin programs
 sbin_PROGRAMS = kresolved
-kresolved_LDADD = $(top_builddir)/lib/libknotresolve.la $(libuv_LIBS) $(libknot_LIBS)
+kresolved_LDADD = $(top_builddir)/lib/libkresolve.la $(libuv_LIBS) $(libknot_LIBS)
 
 endif

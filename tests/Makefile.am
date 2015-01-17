@@ -8,7 +8,7 @@ AM_CPPFLAGS = \
 	$(cmocka_CFLAGS)
 
 LDADD = \
-	$(top_builddir)/lib/libknotresolve.la \
+	$(top_builddir)/lib/libkresolve_static.la \
 	$(libknot_LIBS) \
 	$(cmocka_LIBS)
 
@@ -28,12 +28,11 @@ endif
 # Integration tests
 if BUILD_INTEGRATION
 
-noinst_LTLIBRARIES = _test_integration.la
+check_LTLIBRARIES = _test_integration.la
 _test_integration_la_SOURCES = test_integration.c
 _test_integration_la_CPPFLAGS = $(PYTHON_CPPFLAGS) $(AM_CPPFLAGS)
-_test_integration_la_LDFLAGS = -rpath $(abs_builddir) -module -export-dynamic -shared -avoid-version \
-                               --wrap=gettimeofday $(PYTHON_LDFLAGS)
-_test_integration_la_LIBADD = $(LDADD)
+_test_integration_la_LDFLAGS = -rpath $(abs_builddir) -module -shared -avoid-version --wrap=gettimeofday
+_test_integration_la_LIBADD = $(top_builddir)/lib/libkresolve_static.la $(libknot_LIBS) $(PYTHON_LIBS)
 
 convenience-link: $(noinst_LTLIBRARIES)
 	@for soname in `echo | $(EGREP) "^dlname=" $(noinst_LTLIBRARIES) | $(SED) -e "s|^dlname='\(.*\)'|\1|"`; do  \
@@ -42,7 +41,7 @@ convenience-link: $(noinst_LTLIBRARIES)
 
 check-local-integration: convenience-link
 	@echo "---- Executing integration tests ----"
-	@$(LIBTOOL) --mode=execute -dlopen $(top_builddir)/lib/libknotresolve.la ./test_integration.py testdata
+	echo ./test_integration.py testdata
 
 clean-local:
 	@for soname in `echo | $(EGREP) "^dlname=" $(noinst_LTLIBRARIES) | $(SED) -e "s|^dlname='\(.*\)'|\1|"`; do  \
