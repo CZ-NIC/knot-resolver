@@ -37,10 +37,14 @@ int _mock_fd;                     /* Mocked endpoint for recursive queries */
 
 static PyObject* init(PyObject* self, PyObject* args)
 {
+	/* Initialize mock variables */
+	memset(&_mock_time, 0, sizeof(struct timeval));
+	_mock_fd = -1;
+
+	/* Initialize resolution context */
 	#define CACHE_SIZE 100*1024
 	test_mm_ctx_init(&global_mm);
 	kr_context_init(&global_context, &global_mm);
-
 	global_tmpdir = test_tmpdir_create();
 	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, CACHE_SIZE);
 	if (global_context.cache == NULL) {
@@ -58,10 +62,10 @@ static PyObject* deinit(PyObject* self, PyObject* args)
 		return NULL;
 	}
 
-	kr_cache_close(global_context.cache);
 	kr_context_deinit(&global_context);
 	test_tmpdir_remove(global_tmpdir);
 	global_tmpdir = NULL;
+	_mock_fd = -1;
 
 	return Py_BuildValue("");
 }
@@ -142,7 +146,12 @@ PyMODINIT_FUNC init_test_integration(void)
 
 int __wrap_gettimeofday(struct timeval *tv, struct timezone *tz)
 {
-	memcpy(tv, &_mock_time, sizeof(struct timeval));
+	if (_mock_fd < 0) {
+		gettimeofday(tv, tz);
+	} else {
+		memcpy(tv, &_mock_time, sizeof(struct timeval));
+	}
+	fprintf(stderr, "gettimeofday = %ld\n", tv->tv_sec);
 	return 0;
 }
 
@@ -151,7 +160,11 @@ int net_unbound_socket(int type, const struct sockaddr_storage *ss)
 	char addr_str[SOCKADDR_STRLEN];
 	sockaddr_tostr(addr_str, sizeof(addr_str), ss);
 	fprintf(stderr, "%s (%d, %s)\n", __func__, type, addr_str);
-	return _mock_fd;
+	if (_mock_fd < 0) {
+		return net_unbound_socket(type, ss);
+	} else {
+		return _mock_fd;
+	}
 }
 
 int net_bound_socket(int type, const struct sockaddr_storage *ss)
@@ -159,7 +172,11 @@ int net_bound_socket(int type, const struct sockaddr_storage *ss)
 	char addr_str[SOCKADDR_STRLEN];
 	sockaddr_tostr(addr_str, sizeof(addr_str), ss);
 	fprintf(stderr, "%s (%d, %s)\n", __func__, type, addr_str);
-	return _mock_fd;
+	if (_mock_fd < 0) {
+		return net_bound_socket(type, ss);
+	} else {
+		return _mock_fd;
+	}
 }
 
 int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
@@ -169,11 +186,19 @@ int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
 	sockaddr_tostr(dst_addr_str, sizeof(dst_addr_str), dst_addr);
 	sockaddr_tostr(src_addr_str, sizeof(src_addr_str), src_addr);
 	fprintf(stderr, "%s (%d, %s, %s, %u)\n", __func__, type, dst_addr_str, src_addr_str, flags);
-	return _mock_fd;
+	if (_mock_fd < 0) {
+		return net_connected_socket(type, dst_addr, src_addr, flags);
+	} else {
+		return _mock_fd;
+	}
 }
 
 int net_is_connected(int fd)
 {
 	fprintf(stderr, "%s (%d)\n", __func__, fd);
-	return true;
+	if (fd < 0) {
+		return false;
+	} else {
+		return net_is_connected(fd);
+	}
 }
