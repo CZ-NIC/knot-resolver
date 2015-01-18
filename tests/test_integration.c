@@ -25,11 +25,11 @@
 /*
  * Globals
  */
-mm_ctx_t global_mm;               /* Test memory context */
-struct kr_context global_context; /* Resolution context */
-const char *global_tmpdir = NULL; /* Temporary directory */
-struct timeval _mock_time;        /* Mocked system time */
-int _mock_fd;                     /* Mocked endpoint for recursive queries */
+static mm_ctx_t global_mm;               /* Test memory context */
+static struct kr_context global_context; /* Resolution context */
+static const char *global_tmpdir = NULL; /* Temporary directory */
+static struct timeval _mock_time;        /* Mocked system time */
+static PyObject *mock_server  = NULL;   /* Mocked endpoint for recursive queries */
 
 /*
  * PyModule implementation.
@@ -39,7 +39,7 @@ static PyObject* init(PyObject* self, PyObject* args)
 {
 	/* Initialize mock variables */
 	memset(&_mock_time, 0, sizeof(struct timeval));
-	_mock_fd = -1;
+	mock_server = NULL;
 
 	/* Initialize resolution context */
 	#define CACHE_SIZE 100*1024
@@ -62,7 +62,10 @@ static PyObject* deinit(PyObject* self, PyObject* args)
 	kr_context_deinit(&global_context);
 	test_tmpdir_remove(global_tmpdir);
 	global_tmpdir = NULL;
-	_mock_fd = -1;
+	if (mock_server) {
+		Py_XDECREF(mock_server);
+		mock_server = NULL;
+	}
 
 	return Py_BuildValue("");
 }
@@ -111,19 +114,19 @@ static PyObject* set_time(PyObject *self, PyObject *args)
 	return Py_BuildValue("");
 }
 
-static PyObject* set_endpoint(PyObject *self, PyObject *args)
+static PyObject* set_server(PyObject *self, PyObject *args)
 {
-	PyObject *arg_socket = NULL;
-	if (!PyArg_ParseTuple(args, "O", &arg_socket)) {
+	/* Get client socket getter method. */
+	PyObject *arg_client = NULL;
+	if (!PyArg_ParseTuple(args, "O", &arg_client)) {
 		return NULL;
 	}
 
-	int fd = PyObject_AsFileDescriptor(arg_socket);
-	if (fd < 0) {
-		return NULL;
-	}
+	/* Swap the server implementation. */
+	Py_XINCREF(arg_client);
+	Py_XDECREF(mock_server);
+	mock_server = arg_client;
 
-	_mock_fd = fd;
 	return Py_BuildValue("");
 }
 
@@ -132,7 +135,7 @@ static PyMethodDef module_methods[] = {
     {"deinit", deinit, METH_VARARGS, "Clean up resolution context."},
     {"resolve", resolve, METH_VARARGS, "Resolve query."},
     {"set_time", set_time, METH_VARARGS, "Set mock system time."},
-    {"set_endpoint", set_endpoint, METH_VARARGS, "Set endpoint for recursive queries."},
+    {"set_server", set_server, METH_VARARGS, "Set fake server object."},
     {NULL, NULL, 0, NULL}
 };
 
@@ -153,21 +156,20 @@ int __wrap_gettimeofday(struct timeval *tv, struct timezone *tz)
 	return 0;
 }
 
-int net_unbound_socket(int type, const struct sockaddr_storage *ss)
+int udp_recv_msg(int fd, uint8_t *buf, size_t len, struct sockaddr *addr)
 {
-	char addr_str[SOCKADDR_STRLEN];
-	sockaddr_tostr(addr_str, sizeof(addr_str), ss);
-	fprintf(stderr, "%s (%d, %s)\n", __func__, type, addr_str);
-	return _mock_fd;
+	/* Force TCP, as we're tunelling. */
+	return tcp_recv_msg(fd, buf, len, NULL);
 }
 
-int net_bound_socket(int type, const struct sockaddr_storage *ss)
+
+int udp_send_msg(int fd, const uint8_t *msg, size_t msglen,
+                 const struct sockaddr *addr)
 {
-	char addr_str[SOCKADDR_STRLEN];
-	sockaddr_tostr(addr_str, sizeof(addr_str), ss);
-	fprintf(stderr, "%s (%d, %s)\n", __func__, type, addr_str);
-	return _mock_fd;
+	/* Force TCP, as we're tunelling. */
+	return tcp_send_msg(fd, msg, msglen);
 }
+
 
 int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
                          const struct sockaddr_storage *src_addr, unsigned flags)
@@ -176,7 +178,15 @@ int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
 	sockaddr_tostr(dst_addr_str, sizeof(dst_addr_str), dst_addr);
 	sockaddr_tostr(src_addr_str, sizeof(src_addr_str), src_addr);
 	fprintf(stderr, "%s (%d, %s, %s, %u)\n", __func__, type, dst_addr_str, src_addr_str, flags);
-	return _mock_fd;
+
+	PyObject *result = PyObject_CallMethod(mock_server, "client", "");
+	if (result == NULL) {
+		return -1;
+	}
+
+	int fd = dup(PyObject_AsFileDescriptor(result));
+	Py_DECREF(result);
+	return fd;
 }
 
 int net_is_connected(int fd)

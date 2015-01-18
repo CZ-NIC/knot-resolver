@@ -126,21 +126,17 @@ def play_object(path):
     server = testserver.TestServer(scenario)
     server.start()
     mock_ctx.init()
-    client = None
+    mock_ctx.set_server(server)
     try:
         if TEST_DEBUG > 0:
             print('--- server listening at %s ---' % str(server.server.server_address))
             print('--- scenario parsed, any key to continue ---')
             sys.stdin.readline()
-        client = server.client()
-        mock_ctx.set_endpoint(client)
         scenario.play(mock_ctx)
         print('%s OK' % os.path.basename(path))
     except Exception as e:
         print('%s %s' % (os.path.basename(path), str(e)))
     finally:
-        if client is not None:
-            client.close()
         server.stop()
         mock_ctx.deinit()
 
