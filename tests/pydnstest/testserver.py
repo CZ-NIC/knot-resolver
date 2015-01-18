@@ -48,7 +48,9 @@ class TestServer:
             response = self.scenario.reply(query)
         if response:
             send_message(client, response)
-        return True
+            return True
+        else:
+            return False
 
     def start(self):
         """ Asynchronous start, returns immediately. """
@@ -78,7 +80,6 @@ class TestServer:
         """ Stop socket server operation. """
         self.is_active = False
         if self.thread is not None:
-            print 'waiting to stop'
             self.thread.join()
             self.thread = None
         if self.sock_type == socket.AF_UNIX:
@@ -89,40 +90,50 @@ class TestServer:
     def client(self):
         """ Return connected client. """
         sock = socket.socket(self.sock_type, socket.SOCK_STREAM)
-        sock.connect(self.address())
+        sock.connect(self.sock.getsockname())
         return sock
 
     def address(self):
         """ Return bound address. """
-        return self.sock.getsockname()
+        address = self.sock.getsockname()
+        if self.sock_type == socket.AF_UNIX:
+            address = (address, 0)
+        return address
 
+def module_test():
+    """ Module self-test code. """
+    result = 0
+    server = TestServer(None)
+    client = server.client()
+    server.start()
+    try:
+        query = dns.message.make_query('.', dns.rdatatype.NS)
+        send_message(client, query)
+        answer = recv_message(client)
+        if answer is None:
+            raise Exception('no answer received')
+        if not query.is_response(answer):
+            raise Exception('not a mirror response')
+        print('[ OK ] testserver')
+    except Exception as e:
+        print('[FAIL] testserver %s' % str(e))
+        result = 1
+    finally:
+        client.close()
+        server.stop()
+        return result
 
 if __name__ == '__main__':
 
+    # Self-test code
     if '--test' in sys.argv:
-        server = TestServer(None)
-        client = server.client()
-        server.start()
-        try:
-            query = dns.message.make_query('.', dns.rdatatype.NS)
-            send_message(client, query)
-            answer = recv_message(client)
-            if answer is None:
-                raise Exception('no answer received')
-            if not query.is_response(answer):
-                raise Exception('not a mirror response')
-            print('[ OK ] testserver')
-        except Exception as e:
-            print('[FAIL] testserver %s' % str(e))
-        finally:
-            client.close()
-            server.stop()
+        sys.exit(module_test())
 
-    else:
-        server = TestServer(None, socket.AF_INET, '127.0.0.1')
-        print('mirror server running at %s' % str(server.address()))
-        try:
-            server.run()
-        except KeyboardInterrupt:
-            pass
-        server.stop()
+    # Mirror server
+    server = TestServer(None, socket.AF_INET, '127.0.0.1')
+    print('mirror server running at %s' % str(server.address()))
+    try:
+        server.run()
+    except KeyboardInterrupt:
+         pass
+    server.stop()

@@ -140,7 +140,28 @@ def play_object(path):
         server.stop()
         mock_ctx.deinit()
 
+def module_test():
+    """ Module self-test code. """
+    result = 0
+    server = testserver.TestServer(None)
+    server.start()
+    mock_ctx.set_server(server)
+    try:
+        mock_ctx.test_connect()
+        print('[ OK ] test connection')
+    except Exception as e:
+        print('[FAIL] test connection: %s' % str(e))
+        result = 1
+    finally:
+        server.stop()
+        return result
 
 if __name__ == '__main__':
+
+    # Self-test code
+    if '--test' in sys.argv:
+        sys.exit(module_test())
+
+    # Process path
     for arg in sys.argv[1:]:
         parse_object(arg)

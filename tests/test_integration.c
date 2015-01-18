@@ -130,12 +130,53 @@ static PyObject* set_server(PyObject *self, PyObject *args)
 	return Py_BuildValue("");
 }
 
+static PyObject* test_connect(PyObject *self, PyObject *args)
+{
+	/* Fetch a new client */
+	PyObject *result = PyObject_CallMethod(mock_server, "client", "");
+	if (result == NULL) {
+		return NULL;
+	}
+
+	int ret = 0;
+	bool test_passed = true;
+	int sock = dup(PyObject_AsFileDescriptor(result));
+	knot_pkt_t *query = NULL, *reply = NULL;
+
+	/* Send and receive a query. */
+	query = knot_pkt_new(NULL, 512, NULL);
+	knot_pkt_put_question(query, (const uint8_t *)"", KNOT_CLASS_IN, KNOT_RRTYPE_NS);
+	ret = tcp_send_msg(sock, query->wire, query->size);
+	if (ret != query->size) {
+		test_passed = false;
+		goto finish;
+	}
+
+	reply = knot_pkt_new(NULL, 512, NULL);
+	ret = tcp_recv_msg(sock, reply->wire, reply->max_size, NULL); 
+	if (ret <= 0) {
+		test_passed = false;
+		goto finish;
+	}
+
+finish:
+	Py_DECREF(result);
+	knot_pkt_free(&query);
+	knot_pkt_free(&reply);
+	if (test_passed) {
+		return Py_BuildValue("");
+	} else {
+		return NULL;
+	}
+}
+
 static PyMethodDef module_methods[] = {
     {"init", init, METH_VARARGS, "Initialize resolution context."},
     {"deinit", deinit, METH_VARARGS, "Clean up resolution context."},
     {"resolve", resolve, METH_VARARGS, "Resolve query."},
     {"set_time", set_time, METH_VARARGS, "Set mock system time."},
     {"set_server", set_server, METH_VARARGS, "Set fake server object."},
+	{"test_connect", test_connect, METH_VARARGS, "Test server connection."},
     {NULL, NULL, 0, NULL}
 };
 
@@ -156,17 +197,46 @@ int __wrap_gettimeofday(struct timeval *tv, struct timezone *tz)
 	return 0;
 }
 
+int tcp_recv_msg(int fd, uint8_t *buf, size_t len, struct timeval *timeout)
+{
+	/* Unlock GIL and attempt to receive message. */
+	uint16_t msg_len = 0;
+	int rcvd = 0;
+	Py_BEGIN_ALLOW_THREADS
+	rcvd = read(fd, (char *)&msg_len, sizeof(msg_len));
+	if (rcvd == sizeof(msg_len)) {
+		msg_len = htons(msg_len);
+		rcvd = read(fd, buf, msg_len);
+	}
+	Py_END_ALLOW_THREADS
+	return rcvd;
+}
+
 int udp_recv_msg(int fd, uint8_t *buf, size_t len, struct sockaddr *addr)
 {
-	/* Force TCP, as we're tunelling. */
+	/* Tunnel via TCP. */
 	return tcp_recv_msg(fd, buf, len, NULL);
 }
 
 
+int tcp_send_msg(int fd, const uint8_t *msg, size_t len)
+{
+	/* Unlock GIL and attempt to send message over. */
+	uint16_t msg_len = htons(len);
+	int sent = 0;
+	Py_BEGIN_ALLOW_THREADS
+	sent = write(fd, (char *)&msg_len, sizeof(msg_len));
+	if (sent == sizeof(msg_len)) {
+		sent = write(fd, msg, len);
+	}
+	Py_END_ALLOW_THREADS
+	return sent;
+}
+
 int udp_send_msg(int fd, const uint8_t *msg, size_t msglen,
                  const struct sockaddr *addr)
 {
-	/* Force TCP, as we're tunelling. */
+	/* Tunnel via TCP. */
 	return tcp_send_msg(fd, msg, msglen);
 }
 
@@ -184,6 +254,7 @@ int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
 		return -1;
 	}
 
+	/* Refcount decrement is going to close the fd, dup() it */
 	int fd = dup(PyObject_AsFileDescriptor(result));
 	Py_DECREF(result);
 	return fd;
