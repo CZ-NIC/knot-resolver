@@ -113,7 +113,12 @@ static PyObject* set_time(PyObject *self, PyObject *args)
 
 static PyObject* set_endpoint(PyObject *self, PyObject *args)
 {
-	int fd = PyObject_AsFileDescriptor(args);
+	PyObject *arg_socket = NULL;
+	if (!PyArg_ParseTuple(args, "O", &arg_socket)) {
+		return NULL;
+	}
+
+	int fd = PyObject_AsFileDescriptor(arg_socket);
 	if (fd < 0) {
 		return NULL;
 	}
