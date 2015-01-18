@@ -1,20 +1,28 @@
 #!/usr/bin/env python
 import sys, os, fileinput
-from pydnstest import scenario
+from pydnstest import scenario, testserver
 import _test_integration as mock_ctx
 
+# Test debugging
+TEST_DEBUG = 0
+if 'TEST_DEBUG' in os.environ:
+    TEST_DEBUG = int(os.environ['TEST_DEBUG'])
+
+
 def get_next(file_in):
+    """ Return next token from the input stream. """
     while True:
         line = file_in.readline()
         if len(line) == 0:
             return False
         tokens = ' '.join(line.strip().split()).split()
         if len(tokens) == 0:
-            continue # Skip empty lines
+            continue  # Skip empty lines
         op = tokens.pop(0)
         if op.startswith(';') or op.startswith('#'):
-            continue # Skip comments
+            continue  # Skip comments
         return op, tokens
+
 
 def parse_entry(op, args, file_in):
     """ Parse entry definition. """
@@ -39,7 +47,10 @@ def parse_step(op, args, file_in):
     """ Parse range definition. """
     if len(args) < 2:
         raise Exception('expected STEP <id> <type>')
-    out = scenario.Step(args[0], args[1])
+    extra_args = []
+    if len(args) > 2:
+        extra_args = args[2:]
+    out = scenario.Step(args[0], args[1], extra_args)
     op, args = get_next(file_in)
     # Optional data
     if op == 'ENTRY_BEGIN':
@@ -76,6 +87,7 @@ def parse_scenario(op, args, file_in):
             out.steps.append(parse_step(op, args, file_in))
     return out
 
+
 def parse_file(file_in):
     """ Parse scenario from a file. """
     try:
@@ -86,6 +98,7 @@ def parse_file(file_in):
     except Exception as e:
         raise Exception('line %d: %s' % (file_in.lineno(), str(e)))
 
+
 def parse_object(path):
     """ Recursively scan file/directory for scenarios. """
     if os.path.isdir(path):
@@ -94,18 +107,43 @@ def parse_object(path):
     elif os.path.isfile(path):
         play_object(path)
 
+
 def play_object(path):
     """ Play scenario from a file object. """
+
+    # Parse scenario
     file_in = fileinput.input(path)
-    mock_ctx.init()
+    scenario = None
     try:
         scenario = parse_file(file_in)
+    except Exception as e:
+        print('%s %s' % (os.path.basename(path), str(e)))
+    file_in.close()
+    if scenario is None:
+        return
+
+    # Play scenario
+    server = testserver.TestServer(scenario)
+    server.start()
+    mock_ctx.init()
+    client = None
+    try:
+        if TEST_DEBUG > 0:
+            print('--- server listening at %s ---' % str(server.server.server_address))
+            print('--- scenario parsed, any key to continue ---')
+            sys.stdin.readline()
+        client = server.client()
+        mock_ctx.set_endpoint(client)
         scenario.play(mock_ctx)
         print('%s OK' % os.path.basename(path))
     except Exception as e:
         print('%s %s' % (os.path.basename(path), str(e)))
-    mock_ctx.deinit()
-    file_in.close()
+    finally:
+        if client is not None:
+            client.close()
+        server.stop()
+        mock_ctx.deinit()
+
 
 if __name__ == '__main__':
     for arg in sys.argv[1:]:
