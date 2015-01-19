@@ -122,7 +122,7 @@ class Entry:
         else:
             return dns.rrset.from_text(owner, ttl, rdclass, rdtype)
 
-    def __compare_rrs(self, name, expected, got):
+    def __compare_rrs(self, expected, got):
         """ Compare lists of RR sets, throw exception if different. """
         for rr in expected:
             if rr not in got:
