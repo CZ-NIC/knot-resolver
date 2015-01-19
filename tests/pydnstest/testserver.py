@@ -124,16 +124,17 @@ def test_sendrecv():
 if __name__ == '__main__':
 
     # Self-test code
-    if '--test' in sys.argv:
-        test = test.Test()
-        test.add('testserver/sendrecv', test_sendrecv)
-        sys.exit(test.run())
+    test = test.Test()
+    test.add('testserver/sendrecv', test_sendrecv)
+    if test.run() != 0:
+        sys.exit(1)
 
     # Mirror server
     server = TestServer(None, socket.AF_INET, '127.0.0.1')
-    print('mirror server running at %s' % str(server.address()))
+    print('[==========] Mirror server running at %s' % str(server.address()))
     try:
         server.run()
     except KeyboardInterrupt:
-         pass
+        print('[==========] Shutdown.')
+        pass
     server.stop()

@@ -14,6 +14,8 @@ class Test:
         """ Run planned tests. """
         planned = len(self.tests)
         passed = 0
+        if planned == 0:
+            return
 
         print('[==========] Running %d test(s).' % planned)
         for name, test_callback, args in self.tests:
@@ -25,6 +27,8 @@ class Test:
             except Exception as e:
                 print('[     FAIL ] %s (%s)' % (name, str(e)))
 
+        # Clear test set
+        self.tests = []
         print('[==========] %d test(s) run.' % planned)
         if passed == planned:
             print('[  PASSED  ] %d test(s).' % passed)

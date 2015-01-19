@@ -150,16 +150,15 @@ def test_ipc(*args):
 
 if __name__ == '__main__':
 
+    # Self-tests first
     test = test.Test()
-
-    # Self-test code
-    if '--test' in sys.argv:
-        test.add('integration/ipc', test_ipc)
+    test.add('integration/ipc', test_ipc)
+    if test.run() != 0:
+        sys.exit(1)
     else:
         # Scan for scenarios
         for arg in sys.argv[1:]:
             objects = find_objects(arg)
             for path in objects:
                 test.add(path, play_object, path)
-
-    sys.exit(test.run())
+        sys.exit(test.run())
