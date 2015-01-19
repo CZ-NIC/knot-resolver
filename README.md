@@ -11,7 +11,7 @@ If the libuv with a version at least 1.0 is not present on your system,
 compile and install the sources code from the Git repository.
 
 ```
-$ git clone https://github.com/joyent/libuv.git
+$ git clone https://github.com/libuv/libuv.git
 $ cd libuv
 $ ./autogen.sh
 $ make && make install
