@@ -94,6 +94,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name,
 
 	qry->sclass = cls;
 	qry->stype = type;
+	qry->flags = rplan->context->options;
 	gettimeofday(&qry->timestamp, NULL);
 
 	add_tail(&rplan->pending, &qry->node);

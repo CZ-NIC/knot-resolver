@@ -20,6 +20,7 @@
 #include <libknot/internal/net.h>
 
 #include "tests/test.h"
+#include "lib/rplan.h"
 #include "lib/resolve.h"
 
 /*
@@ -49,6 +50,9 @@ static PyObject* init(PyObject* self, PyObject* args)
 	assert(global_tmpdir);
 	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, CACHE_SIZE);
 	assert(global_context.cache);
+
+	/* Test context options. */
+	global_context.options = QUERY_TCP | QUERY_NO_MINIMIZE;
 
 	return Py_BuildValue("s", PACKAGE_STRING " (integration tests)");
 }
