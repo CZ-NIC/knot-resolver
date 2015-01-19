@@ -17,6 +17,7 @@ class Entry:
         """ Initialize data entry. """
         self.match_fields = None
         self.adjust_fields = None
+        self.origin = '.'
         self.message = dns.message.Message()
 
     def match_part(self, code, msg):
@@ -104,6 +105,8 @@ class Entry:
 
     def __rr_from_str(self, owner, args):
         """ Parse RR from tokenized string. """
+        if not owner.endswith('.'):
+            owner += self.origin
         ttl = self.default_ttl
         rdclass = self.default_cls
         try:
