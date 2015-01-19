@@ -238,6 +238,10 @@ class Scenario:
         step_id = 0
         if self.current_step is not None:
             step_id = self.current_step.id
+        # Unknown address, select any match
+        # TODO: workaround until the server supports stub zones
+        if address not in [rng.address for rng in self.ranges]:
+            address = None
         # Find current valid query response range
         for rng in self.ranges:
             if rng.eligible(step_id, address):
