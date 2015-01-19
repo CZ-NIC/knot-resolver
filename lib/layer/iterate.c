@@ -120,6 +120,9 @@ static int update_zone_cut(knot_pkt_t *pkt, struct kr_rplan *rplan, const knot_r
 		/* Set the first nameserver address, rest will be cached. */
 		if (!knot_dname_is_equal(rr->owner, rplan->zone_cut.name)) {
 			ret = set_zone_cut(rplan, pkt, rr);
+		} else {
+			/* Zone cut not updated, referral loop. */
+			ret = KNOT_EINVAL;
 		}
 	}
 
@@ -136,12 +139,18 @@ static int resolve_referral(knot_pkt_t *pkt, struct kr_layer_param *param)
 			continue;
 		}
 		int ret = update_zone_cut(pkt, param->rplan, rr);
-		if (ret != KNOT_EOK) {
-			return KNOT_NS_PROC_FAIL;
+		if (ret == KNOT_EOK) {
+			return KNOT_NS_PROC_DONE;
 		}
 	}
 
-	return KNOT_NS_PROC_DONE;
+	/* Dead end, either bogus or loop referral. */
+	struct kr_query *cur = kr_rplan_current(param->rplan);
+	if (cur != NULL) {
+		kr_rplan_pop(param->rplan, cur);
+	}
+
+	return KNOT_NS_PROC_FAIL;
 }
 
 static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
