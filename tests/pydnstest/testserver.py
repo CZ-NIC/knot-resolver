@@ -66,7 +66,7 @@ class TestServer:
         self.is_active = True
         clients = [self.sock]
         while self.is_active and len(clients):
-            to_read, _, to_error = select.select(clients, [], clients, 0.5)
+            to_read, _, to_error = select.select(clients, [], clients, 0.1)
             for sock in to_read:
                 if sock == self.sock:
                     clients.append(sock.accept()[0])
