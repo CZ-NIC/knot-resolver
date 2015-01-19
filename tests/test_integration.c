@@ -137,14 +137,15 @@ static PyObject* set_server(PyObject *self, PyObject *args)
 static PyObject* test_connect(PyObject *self, PyObject *args)
 {
 	/* Fetch a new client */
-	PyObject *result = PyObject_CallMethod(mock_server, "client", "");
-	if (result == NULL) {
+	struct sockaddr_storage addr;
+	sockaddr_set(&addr, AF_INET, "127.0.0.1", 0);
+	int sock = net_connected_socket(SOCK_STREAM, &addr, NULL, 0);
+	if (sock < 0) {
 		return NULL;
 	}
 
 	int ret = 0;
 	bool test_passed = true;
-	int sock = dup(PyObject_AsFileDescriptor(result));
 	knot_pkt_t *query = NULL, *reply = NULL;
 
 	/* Send and receive a query. */
@@ -164,7 +165,7 @@ static PyObject* test_connect(PyObject *self, PyObject *args)
 	}
 
 finish:
-	Py_DECREF(result);
+	close(sock);
 	knot_pkt_free(&query);
 	knot_pkt_free(&reply);
 	if (test_passed) {
@@ -248,12 +249,10 @@ int udp_send_msg(int fd, const uint8_t *msg, size_t msglen,
 int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
                          const struct sockaddr_storage *src_addr, unsigned flags)
 {
-	char dst_addr_str[SOCKADDR_STRLEN], src_addr_str[SOCKADDR_STRLEN];
-	sockaddr_tostr(dst_addr_str, sizeof(dst_addr_str), dst_addr);
-	sockaddr_tostr(src_addr_str, sizeof(src_addr_str), src_addr);
-	fprintf(stderr, "%s (%d, %s, %s, %u)\n", __func__, type, dst_addr_str, src_addr_str, flags);
+	char addr_str[SOCKADDR_STRLEN];
+	sockaddr_tostr(addr_str, sizeof(addr_str), dst_addr);
 
-	PyObject *result = PyObject_CallMethod(mock_server, "client", "");
+	PyObject *result = PyObject_CallMethod(mock_server, "client", "s", addr_str);
 	if (result == NULL) {
 		return -1;
 	}

@@ -5,7 +5,7 @@ import dns.rcode
 
 class Entry:
     """
-    Data entry represents prescripted message and extra metadata, notably match criteria and reply adjustments.
+    Data entry represents scripted message and extra metadata, notably match criteria and reply adjustments.
     """
 
     # Globals
@@ -20,7 +20,7 @@ class Entry:
         self.message = dns.message.Message()
 
     def match_part(self, code, msg):
-        """ Compare prescripted reply to given message using single criteria. """
+        """ Compare scripted reply to given message using single criteria. """
         if code not in self.match_fields and 'all' not in self.match_fields:
             return True
         expected = self.message
@@ -44,7 +44,7 @@ class Entry:
             raise Exception('unknown match request "%s"' % code)
 
     def match(self, msg):
-        """ Compare prescripted reply to given message based on match criteria. """
+        """ Compare scripted reply to given message based on match criteria. """
         match_fields = self.match_fields
         if 'all' in match_fields:
             match_fields = ('flags', 'question', 'answer', 'authority', 'additional')
@@ -59,7 +59,7 @@ class Entry:
         self.match_fields = fields
 
     def adjust_reply(self, query):
-        """ Copy prescripted reply and adjust to received query. """
+        """ Copy scripted reply and adjust to received query. """
         answer = self.message
         if 'copy_id' in self.adjust_fields:
             answer.id = query.id
@@ -141,18 +141,25 @@ class Entry:
 
 class Range:
     """
-    Range represents a set of prescripted queries valid for given step range.
+    Range represents a set of scripted queries valid for given step range.
     """
 
     def __init__(self, a, b):
         """ Initialize reply range. """
         self.a = a
         self.b = b
+        self.address = None
         self.stored = []
 
     def add(self, entry):
-        """ Append a prescripted response to the range"""
+        """ Append a scripted response to the range"""
         self.stored.append(entry)
+
+    def eligible(self, id, address):
+        """ Return true if this range is eligible for fetching reply. """
+        if self.a <= id <= self.b:
+            return None in (self.address, address) or (self.address == address)
+        return False
 
     def reply(self, query):
         """ Find matching response to given query. """
@@ -226,14 +233,14 @@ class Scenario:
         self.steps = []
         self.current_step = None
 
-    def reply(self, query):
+    def reply(self, query, address = None):
         """ Attempt to find a range reply for a query. """
-        id = 0
+        step_id = 0
         if self.current_step is not None:
-            id = self.current_step.id
+            step_id = self.current_step.id
         # Find current valid query response range
         for rng in self.ranges:
-            if id >= rng.a and id <= rng.b:
+            if rng.eligible(step_id, address):
                 return rng.reply(query)
 
     def play(self, ctx):

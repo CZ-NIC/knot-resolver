@@ -16,12 +16,13 @@ def send_message(stream, message):
     stream.send(struct.pack('!H', len(message)) + message)
 
 class TestServer:
-    """ This simulates TCP DNS server returning prescripted or mirror DNS responses. """
+    """ This simulates TCP DNS server returning scripted or mirror DNS responses. """
 
     def __init__(self, scenario, type = socket.AF_UNIX, address = '.test_server.sock', port = 0):
         """ Initialize server instance. """
         self.is_active = False
         self.thread = None
+        self.client_address = None
         self.sock = socket.socket(type, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if type == socket.AF_UNIX:
@@ -46,7 +47,7 @@ class TestServer:
             return False
         response = dns.message.make_response(query)
         if self.scenario is not None:
-            response = self.scenario.reply(query)
+            response = self.scenario.reply(query, self.client_address)
         if response:
             send_message(client, response)
             return True
@@ -69,7 +70,8 @@ class TestServer:
             to_read, _, to_error = select.select(clients, [], clients, 0.1)
             for sock in to_read:
                 if sock == self.sock:
-                    clients.append(sock.accept()[0])
+                    client_sock, _ = sock.accept()
+                    clients.append(client_sock)
                 else:
                     if not self.handle(sock):
                         to_error.append(sock)
@@ -88,8 +90,9 @@ class TestServer:
             if os.path.exists(address):
                 os.remove(address)
 
-    def client(self):
+    def client(self, dst_address = None):
         """ Return connected client. """
+        self.client_address = dst_address
         sock = socket.socket(self.sock_type, socket.SOCK_STREAM)
         sock.connect(self.sock.getsockname())
         return sock
