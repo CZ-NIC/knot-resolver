@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys, os, fileinput
-from pydnstest import scenario, testserver
+from pydnstest import scenario, testserver, test
 import _test_integration as mock_ctx
 
 # Test debugging
@@ -99,13 +99,15 @@ def parse_file(file_in):
         raise Exception('line %d: %s' % (file_in.lineno(), str(e)))
 
 
-def parse_object(path):
+def find_objects(path):
     """ Recursively scan file/directory for scenarios. """
+    result = []
     if os.path.isdir(path):
         for e in os.listdir(path):
-            parse_object(os.path.join(path, e))
+            result += find_objects(os.path.join(path, e))
     elif os.path.isfile(path):
-        play_object(path)
+        result.append(path)
+    return result
 
 
 def play_object(path):
@@ -116,52 +118,48 @@ def play_object(path):
     scenario = None
     try:
         scenario = parse_file(file_in)
-    except Exception as e:
-        print('%s %s' % (os.path.basename(path), str(e)))
-    file_in.close()
-    if scenario is None:
-        return
+    finally:
+        file_in.close()
 
     # Play scenario
     server = testserver.TestServer(scenario)
     server.start()
     mock_ctx.init()
-    mock_ctx.set_server(server)
     try:
+        mock_ctx.set_server(server)
         if TEST_DEBUG > 0:
-            print('--- server listening at %s ---' % str(server.server.server_address))
+            print('--- server listening at %s ---' % str(server.address()))
             print('--- scenario parsed, any key to continue ---')
             sys.stdin.readline()
         scenario.play(mock_ctx)
-        print('%s OK' % os.path.basename(path))
-    except Exception as e:
-        print('%s %s' % (os.path.basename(path), str(e)))
     finally:
         server.stop()
         mock_ctx.deinit()
 
-def module_test():
+def test_ipc(*args):
+    for arg in args:
+        print arg
     """ Module self-test code. """
-    result = 0
     server = testserver.TestServer(None)
     server.start()
     mock_ctx.set_server(server)
     try:
         mock_ctx.test_connect()
-        print('[ OK ] test connection')
-    except Exception as e:
-        print('[FAIL] test connection: %s' % str(e))
-        result = 1
     finally:
         server.stop()
-        return result
 
 if __name__ == '__main__':
 
+    test = test.Test()
+
     # Self-test code
     if '--test' in sys.argv:
-        sys.exit(module_test())
+        test.add('integration/ipc', test_ipc)
+    else:
+        # Scan for scenarios
+        for arg in sys.argv[1:]:
+            objects = find_objects(arg)
+            for path in objects:
+                test.add(path, play_object, path)
 
-    # Process path
-    for arg in sys.argv[1:]:
-        parse_object(arg)
+    sys.exit(test.run())

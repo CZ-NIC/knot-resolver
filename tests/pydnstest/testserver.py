@@ -1,5 +1,6 @@
 import select, socket, threading, struct, sys, os
 import dns.message
+import test
 
 def recv_message(stream):
     """ Receive DNS/TCP message. """
@@ -100,9 +101,8 @@ class TestServer:
             address = (address, 0)
         return address
 
-def module_test():
+def test_sendrecv():
     """ Module self-test code. """
-    result = 0
     server = TestServer(None)
     client = server.client()
     server.start()
@@ -114,20 +114,17 @@ def module_test():
             raise Exception('no answer received')
         if not query.is_response(answer):
             raise Exception('not a mirror response')
-        print('[ OK ] testserver')
-    except Exception as e:
-        print('[FAIL] testserver %s' % str(e))
-        result = 1
     finally:
         client.close()
         server.stop()
-        return result
 
 if __name__ == '__main__':
 
     # Self-test code
     if '--test' in sys.argv:
-        sys.exit(module_test())
+        test = test.Test()
+        test.add('testserver/sendrecv', test_sendrecv)
+        sys.exit(test.run())
 
     # Mirror server
     server = TestServer(None, socket.AF_INET, '127.0.0.1')

@@ -1,4 +1,3 @@
-import traceback
 import dns.message
 import dns.rrset
 import dns.rcode
@@ -53,7 +52,7 @@ class Entry:
             try:
                 self.match_part(code, msg)
             except Exception as e:
-                raise Exception("when matching %s: %s" % (code, str(e)))
+                raise Exception("%s: %s" % (code, str(e)))
 
     def set_match(self, fields):
         """ Set conditions for message comparison [all, flags, question, answer, authority, additional] """
@@ -100,7 +99,7 @@ class Entry:
         elif self.section == 'ADDITIONAL':
             self.message.additional.append(rr)
         else:
-            raise Exception('attempted to add record in section %s' % self.section)
+            raise Exception('bad section %s' % self.section)
 
 
     def __rr_from_str(self, owner, args):
@@ -192,8 +191,7 @@ class Step:
         elif self.type == 'TIME_PASSES':
             return self.__time_passes(ctx)
         else:
-            print('%d %s (%d entries) => NOOP' % (self.id, self.type, len(self.data)))
-            return None
+            raise Exception('step %s unsupported' % self.type)
 
     def __check_answer(self, ctx):
         """ Compare answer from previously resolved query. """
@@ -249,6 +247,6 @@ class Scenario:
                 self.current_step = step
                 step.play(ctx)
         except Exception as e:
-            raise Exception('on step #%d "%s": %s\n%s' % (step.id, step.type, str(e), traceback.format_exc()))
+            raise Exception('step #%d %s' % (step.id, str(e)))
 
 
