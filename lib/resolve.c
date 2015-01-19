@@ -92,7 +92,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
                const knot_dname_t *qname, uint16_t qclass, uint16_t qtype)
 {
 	if (ctx == NULL || answer == NULL || qname == NULL) {
-		return KNOT_ENOENT;
+		return KNOT_EINVAL;
 	}
 
 	/* Initialize context. */

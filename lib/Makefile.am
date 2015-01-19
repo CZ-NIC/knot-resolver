@@ -1,8 +1,8 @@
-SUBDIRS = .
-
-lib_LTLIBRARIES = libknotresolve.la
-
-libknotresolve_la_SOURCES =		\
+# Static version of the library
+noinst_LTLIBRARIES = libkresolve_static.la
+libkresolve_static_la_CPPFLAGS = $(AM_CPPFLAGS) $(libknot_CFLAGS) $(libuv_CFLAGS)
+libkresolve_static_la_LDFLAGS  = $(AM_LDFLAGS) $(libknot_LIBS) $(libuv_LIBS)
+libkresolve_static_la_SOURCES =		\
 	layer/iterate.h	\
 	layer/iterate.c	\
 	layer/itercache.h	\
@@ -12,6 +12,8 @@ libknotresolve_la_SOURCES =		\
 	layer/stats.h	\
 	layer/stats.c	\
 	layer.h			\
+	utils.h 		\
+	utils.c 		\
 	context.h 		\
 	context.c 		\
 	resolve.h 		\
@@ -23,5 +25,7 @@ libknotresolve_la_SOURCES =		\
 	cache.h			\
 	cache.c
 
-libknotresolve_la_CPPFLAGS = $(AM_CPPFLAGS) $(libknot_CFLAGS) $(libuv_CFLAGS)
-libknotresolve_la_LDFLAGS  = $(AM_LDFLAGS) $(libknot_LIBS) $(libuv_LIBS)
+# Shared version (to be installed)
+lib_LTLIBRARIES = libkresolve.la
+libkresolve_la_SOURCES = 
+libkresolve_la_LIBADD = libkresolve_static.la

@@ -15,19 +15,29 @@
  */
 
 #include "tests/test.h"
+#include <cmocka.h>
 
-#include <libknot/descriptor.h>
 #include "lib/resolve.h"
 
-void test_resolve_sync(void **state)
+static void test_resolve_nullparams(void **state)
 {
-	/* \todo CMocka should provide responses here. */
+	int ret = KNOT_EOK;
+
+	/* NULL parameter check */
+	void *non_null = (void *)0xDEADBEEF;
+	ret = kr_resolve(NULL, non_null, non_null, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY);
+	assert_int_equal(ret, KNOT_EINVAL);
+	ret = kr_resolve(non_null, NULL, non_null, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY);
+	assert_int_equal(ret, KNOT_EINVAL);
+	ret = kr_resolve(non_null, non_null, NULL, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY);
+	assert_int_equal(ret, KNOT_EINVAL);
 }
 
 int main(void)
 {
 	const UnitTest tests[] = {
-	        unit_test(test_resolve_sync),
+	        /* Parameter sanity checks */
+	        unit_test(test_resolve_nullparams)
 	};
 
 	return run_tests(tests);

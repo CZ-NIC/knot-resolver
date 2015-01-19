@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <unistd.h>
-#include <cmocka.h>
 
 #include <libknot/internal/mempattern.h>
 #include <libknot/descriptor.h>
@@ -62,7 +61,8 @@ static inline int test_tmpdir_remove(const char *path)
 /*! \brief Create temporary directory. */
 static inline const char* test_tmpdir_create(void)
 {
-	static char env_path[64] = "./tmpXXXXXX";
+	static char env_path[64];
+	strcpy(env_path, "./tmpXXXXXX");
 	return mkdtemp(env_path);
 }
 

@@ -14,7 +14,7 @@ SOURCES = [
 
     # sources
     "lib/*.c", "lib/*.h", "lib/layer/*.h", "lib/layer/*.c",
-    "tests/*.c", "tests/*.h",
+    "tests/*.c", "tests/*.h", "tests/*.py",
     "daemon/*.c", "daemon/*.h", "daemon/layer/*.c", "daemon/layer/*.h"
 ]
 
