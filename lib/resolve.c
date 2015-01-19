@@ -132,6 +132,10 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 
 	knot_requestor_clear(&requestor);
 
+	/* Check flags. */
+	knot_wire_clear_aa(answer->wire);
+	knot_wire_set_ra(answer->wire);
+
 	/* Resolution success, commit cache transaction. */
 	if (ret == KNOT_EOK) {
 		kr_rplan_txn_commit(&rplan);
