@@ -21,32 +21,30 @@
 #include <libknot/rrtype/rdname.h>
 
 #include "lib/layer/static.h"
+#include "lib/layer/iterate.h"
 #include "lib/utils.h"
 
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[cache] " fmt, ## __VA_ARGS__)
 
-static int begin(knot_layer_t *ctx, void *module_param)
+typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
+
+static int update_parent(const knot_rrset_t *rr, unsigned drift, struct kr_layer_param *param)
 {
-	ctx->data = module_param;
-	return ctx->state;
+	return rr_update_parent(rr, param);
 }
 
-static int read_cache_append(knot_pkt_t *answer, namedb_txn_t *txn, knot_rrset_t *cache_rr, uint32_t timestamp)
+static int update_answer(const knot_rrset_t *rr, unsigned drift, struct kr_layer_param *param)
 {
-	unsigned drift = timestamp;
-
-	/* Query cache and keep drift between RRSet origin and now. */
-	if (kr_cache_query(txn, cache_rr, &drift) != KNOT_EOK) {
-		return KNOT_ENOENT;
-	}
+	knot_pkt_t *answer = param->answer;
 
 	/* Make RRSet copy. */
 	knot_rrset_t rr_copy;
-	knot_rrset_init(&rr_copy, knot_dname_copy(cache_rr->owner, &answer->mm), cache_rr->type, cache_rr->rclass);
-	int ret = knot_rdataset_copy(&rr_copy.rrs, &cache_rr->rrs, &answer->mm);
+	knot_rrset_init(&rr_copy, NULL, rr->type, rr->rclass);
+	rr_copy.owner = knot_dname_copy(rr->owner, &answer->mm);
+	int ret = knot_rdataset_copy(&rr_copy.rrs, &rr->rrs, &answer->mm);
 	if (ret != KNOT_EOK) {
 		knot_rrset_clear(&rr_copy, &answer->mm);
-		return ret;
+		return KNOT_NS_PROC_FAIL;
 	}
 
 	/* Adjust the TTL of the records. */
@@ -62,25 +60,24 @@ static int read_cache_append(knot_pkt_t *answer, namedb_txn_t *txn, knot_rrset_t
 		knot_wire_set_tc(answer->wire);
 	}
 
-	return KNOT_EOK;
+	return KNOT_NS_PROC_DONE;
 }
 
-static int read_cache_zonecut(struct kr_zonecut *cut, namedb_txn_t *txn, knot_rrset_t *cache_rr, uint32_t timestamp)
+static int read_cache_rr(namedb_txn_t *txn, knot_rrset_t *cache_rr, uint32_t timestamp,
+                         rr_callback_t cb, struct kr_layer_param *param)
 {
 	/* Query cache for requested record */
 	if (kr_cache_query(txn, cache_rr, &timestamp) != KNOT_EOK) {
-		return KNOT_ENOENT;
+		return KNOT_NS_PROC_NOOP;
 	}
 
-	switch(cache_rr->type) {
-	case KNOT_RRTYPE_NS:
-		return kr_find_zone_cut(cut, cache_rr->owner, txn, timestamp);
-	case KNOT_RRTYPE_A:
-	case KNOT_RRTYPE_AAAA:
-		return kr_rrset_to_addr(&cut->addr, cache_rr);
-	default:
-		return KNOT_ENOENT;
-	}
+	return cb(cache_rr, timestamp, param);
+}
+
+static int begin(knot_layer_t *ctx, void *module_param)
+{
+	ctx->data = module_param;
+	return ctx->state;
 }
 
 static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -92,41 +89,35 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	int ret = KNOT_EOK;
-	knot_rrset_t cache_rr;
-	knot_rrset_init(&cache_rr, cur->sname, cur->stype, cur->sclass);
 	namedb_txn_t *txn = kr_rplan_txn_acquire(param->rplan, NAMEDB_RDONLY);
 	uint32_t timestamp = cur->timestamp.tv_sec;
+	knot_rrset_t cache_rr;
+	knot_rrset_init(&cache_rr, cur->sname, cur->stype, cur->sclass);
 
-	/* Check if updating current zone cut. */
-	if (cur != kr_rplan_last(param->rplan)) {
-		ret = read_cache_zonecut(&cur->zone_cut, txn, &cache_rr, timestamp);
-		if (ret == KNOT_EOK) {
-			kr_rplan_pop(param->rplan, cur);
-			return KNOT_NS_PROC_DONE;
-		}
-
-		return ctx->state;
+	/* Check if updating parent zone cut. */
+	rr_callback_t callback = &update_parent;
+	if (cur->parent == NULL) {
+		callback = &update_answer;
 	}
 
-	/* Try to find a CNAME/DNAME chain first. */
+	/* Try to find expected record first. */
+	int state = read_cache_rr(txn, &cache_rr, timestamp, callback, param);
+	if (state == KNOT_NS_PROC_DONE) {
+		kr_rplan_pop(param->rplan, cur);
+		return state;
+	}
+
+	/* Check if CNAME chain exists. */
 	cache_rr.type = KNOT_RRTYPE_CNAME;
-	ret = read_cache_append(param->answer, txn, &cache_rr, timestamp);
-	if (ret == KNOT_EOK) {
+	state = read_cache_rr(txn, &cache_rr, timestamp, callback, param);
+	if (state != KNOT_NS_PROC_NOOP) {
 		if (cur->stype != KNOT_RRTYPE_CNAME) {
 			const knot_dname_t *cname = knot_cname_name(&cache_rr.rrs);
-			if (kr_rplan_push(param->rplan, cname, cur->sclass, cur->stype) == NULL) {
+			if (kr_rplan_push(param->rplan, cur->parent, cname, cur->sclass, cur->stype) == NULL) {
 				return KNOT_NS_PROC_FAIL;
 			}
 		}
-		kr_rplan_pop(param->rplan, cur);
-		return KNOT_NS_PROC_DONE;
-	}
 
-	/* Try to find expected record then. */
-	cache_rr.type = cur->stype;
-	ret = read_cache_append(param->answer, txn, &cache_rr, timestamp);
-	if (ret == KNOT_EOK) {
 		kr_rplan_pop(param->rplan, cur);
 		return KNOT_NS_PROC_DONE;
 	}
@@ -165,6 +156,13 @@ static int merge_in_section(knot_rrset_t *cache_rr, const knot_pktsection_t *sec
 /*! \brief Cache direct answer. */
 static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
+	/* Check if already cached. */
+	knot_rrset_t query_rr;
+	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
+	if (kr_cache_query(txn, &query_rr, &timestamp) == KNOT_EOK) {
+		return KNOT_EOK;
+	}
+
 	/* Cache CNAME chain. */
 	int ret = KNOT_EOK;
 	uint16_t orig_rrtype = rr->type;
@@ -239,16 +237,16 @@ static int write_cache_authority(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *p
 static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_layer_param *param = ctx->data;
-	struct kr_query *last_query = kr_rplan_last(param->rplan);
+	struct kr_query *query = kr_rplan_current(param->rplan);
 
-	/* Don't cache anything if failed / no query. */
-	if (ctx->state == KNOT_NS_PROC_FAIL || last_query == NULL) {
+	/* Don't cache anything if failed. */
+	if (query == NULL || ctx->state == KNOT_NS_PROC_FAIL) {
 		return ctx->state;
 	}
 
 	/* Open write transaction */
 	mm_ctx_t *pool = param->rplan->pool;
-	uint32_t timestamp = last_query->timestamp.tv_sec;
+	uint32_t timestamp = query->timestamp.tv_sec;
 	namedb_txn_t *txn = kr_rplan_txn_acquire(param->rplan, 0);
 	if (txn == NULL) {
 		return ctx->state; /* Couldn't acquire cache, ignore. */

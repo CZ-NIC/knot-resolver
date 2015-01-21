@@ -35,6 +35,7 @@ enum {
  */
 struct kr_query {
 	node_t node;
+	struct kr_query *parent;
 	struct kr_zonecut zone_cut;
 	struct timeval timestamp;
 	knot_dname_t *sname;
@@ -102,12 +103,14 @@ int kr_rplan_txn_commit(struct kr_rplan *rplan);
  * \brief Push a query to the top of the resolution plan.
  * \note This means that this query takes precedence before all pending queries.
  * \param rplan plan instance
+ * \param parent query parent (or NULL)
  * \param name resolved name
  * \param cls  resolved class
  * \param type resolved type
  * \return query instance or NULL
  */
-struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name, uint16_t cls, uint16_t type);
+struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
+                               const knot_dname_t *name, uint16_t cls, uint16_t type);
 
 /*!
  * \brief Pop existing query from the resolution plan.
@@ -124,10 +127,3 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry);
  * \return query instance or NULL if empty
  */
 struct kr_query *kr_rplan_current(struct kr_rplan *rplan);
-
-/*!
- * \brief Last resolved query instance (i.e. first enqueued)
- * \param rplan plan instance
- * \return query instance or NULL if empty
- */
-struct kr_query *kr_rplan_last(struct kr_rplan *rplan);

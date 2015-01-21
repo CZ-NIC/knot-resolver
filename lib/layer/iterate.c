@@ -84,6 +84,10 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
 
 static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 {
+	if (rr == NULL || query == NULL) {
+		return KNOT_NS_PROC_MORE; /* Ignore */
+	}
+
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		if (knot_dname_is_equal(query->zone_cut.ns, rr->owner)) {
 			int ret = kr_rrset_to_addr(&query->zone_cut.addr, rr);
@@ -96,13 +100,18 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 	return KNOT_NS_PROC_MORE;
 }
 
-static int update_parent(const knot_rrset_t *rr, struct kr_layer_param *param)
+static int update_glue(const knot_rrset_t *rr, struct kr_layer_param *param)
 {
-	return update_nsaddr(rr, kr_rplan_last(param->rplan));
+	return update_nsaddr(rr, kr_rplan_current(param->rplan));
 }
 
-/*! \brief Result updates the original query response. */
-static int update_answer(const knot_rrset_t *rr, struct kr_layer_param *param)
+int rr_update_parent(const knot_rrset_t *rr, struct kr_layer_param *param)
+{
+	struct kr_query *query = kr_rplan_current(param->rplan);
+	return update_nsaddr(rr, query->parent);
+}
+
+int rr_update_answer(const knot_rrset_t *rr, struct kr_layer_param *param)
 {
 	knot_pkt_t *answer = param->answer;
 	knot_rrset_t *rr_copy = knot_rrset_copy(rr, &answer->mm);
@@ -122,10 +131,10 @@ static int update_answer(const knot_rrset_t *rr, struct kr_layer_param *param)
 	mm_free(&answer->mm, rr_copy);
 
 	/* Update parent query as well. */
-	return update_parent(rr, param);
+	return rr_update_parent(rr, param);
 }
 
-static int update_nameserver(const knot_rrset_t *rr, struct kr_layer_param *param)
+int rr_update_nameserver(const knot_rrset_t *rr, struct kr_layer_param *param)
 {
 	struct kr_query *query = kr_rplan_current(param->rplan);
 	const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, 0);
@@ -147,11 +156,6 @@ static int update_nameserver(const knot_rrset_t *rr, struct kr_layer_param *para
 	return KNOT_NS_PROC_DONE;
 }
 
-static int update_glue(const knot_rrset_t *rr, struct kr_layer_param *param)
-{
-	return update_nsaddr(rr, kr_rplan_current(param->rplan));
-}
-
 static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	int state = KNOT_NS_PROC_MORE;
@@ -169,7 +173,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 			continue;
 		}
 
-		state = update_nameserver(rr, param);
+		state = rr_update_nameserver(rr, param);
 		if (state != KNOT_NS_PROC_MORE) {
 			break;
 		}
@@ -193,8 +197,8 @@ static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
 	}
 
 	/* Glue not found => resolve NS address. */
-	(void) kr_rplan_push(param->rplan, query->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
-	(void) kr_rplan_push(param->rplan, query->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	(void) kr_rplan_push(param->rplan, query, query->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+	(void) kr_rplan_push(param->rplan, query, query->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
 
 	return KNOT_NS_PROC_DONE;
 }
@@ -216,11 +220,10 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	}
 
 	/* Does this answer update the final response? */
-	struct kr_query *parent_query = kr_rplan_last(param->rplan);
-	rr_callback_t callback = &update_parent;
-	if (query == parent_query) {
+	rr_callback_t callback = &rr_update_parent;
+	if (query->parent == NULL) {
 		knot_wire_set_rcode(param->answer->wire, knot_wire_get_rcode(pkt->wire));
-		callback = &update_answer;
+		callback = &rr_update_answer;
 	}
 
 	/* Process answer section records. */
@@ -235,13 +238,13 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 		follow_cname_chain(&cname, rr, query);
 	}
 
-	/* This is either declares AA or not, either way it resolves current query. */
-	kr_rplan_pop(param->rplan, query);
-
 	/* Follow canonical name as next SNAME. */
 	if (cname != query->sname) {
-		(void) kr_rplan_push(param->rplan, cname, query->sclass, query->stype);
+		(void) kr_rplan_push(param->rplan, query->parent, cname, query->sclass, query->stype);
 	}
+
+	/* This is either declares AA or not, either way it resolves current query. */
+	kr_rplan_pop(param->rplan, query);
 
 	return KNOT_NS_PROC_DONE;
 }

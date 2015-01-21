@@ -144,7 +144,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	param.answer = answer;
 
 	/* Push query to resolution plan. */
-	struct kr_query *qry = kr_rplan_push(&rplan, qname, qclass, qtype);
+	struct kr_query *qry = kr_rplan_push(&rplan, NULL, qname, qclass, qtype);
 	if (qry != NULL) {
 		ret = resolve_iterative(&param, &rplan_pool);
 	} else {
