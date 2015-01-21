@@ -17,5 +17,7 @@ int kr_rrset_to_addr(struct sockaddr_storage *ss, const knot_rrset_t *rr)
 		return KNOT_EINVAL;
 	}
 
+	sockaddr_port_set(ss, KR_DNS_PORT);
+
 	return KNOT_EOK;
 }
