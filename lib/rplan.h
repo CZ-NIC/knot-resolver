@@ -35,6 +35,7 @@ enum {
  */
 struct kr_query {
 	node_t node;
+	struct kr_zonecut zone_cut;
 	struct timeval timestamp;
 	knot_dname_t *sname;
 	uint16_t stype;
@@ -51,8 +52,6 @@ struct kr_query {
  * It also keeps a notion of current zone cut.
  */
 struct kr_rplan {
-	unsigned state;              /*!< Query resolution state. */
-	struct kr_zonecut zone_cut;
 	unsigned txn_flags;          /*!< Current transaction flags. */
 	namedb_txn_t txn;            /*!< Current transaction (may be r/o). */
 	list_t pending;              /*!< List of pending queries. */

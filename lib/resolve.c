@@ -35,7 +35,7 @@
 #define ITER_LIMIT 50
 
 /*! \brief Invalidate current NS in cache. */
-static int invalidate_ns(struct kr_rplan *rplan, const struct kr_query *qry)
+static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
 	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, 0);
 	if (txn == NULL) {
@@ -44,11 +44,11 @@ static int invalidate_ns(struct kr_rplan *rplan, const struct kr_query *qry)
 
 	/* TODO: selective removal */
 	knot_rrset_t removed_rr;
-	knot_rrset_init(&removed_rr, rplan->zone_cut.name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
+	knot_rrset_init(&removed_rr, qry->zone_cut.name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
 	(void) kr_cache_remove(txn, &removed_rr);
 
 	/* Find new zone cut / nameserver */
-	kr_find_zone_cut(&rplan->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
+	kr_find_zone_cut(&qry->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
 
 	/* Continue with querying */
 	return KNOT_EOK;
@@ -62,13 +62,13 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	struct kr_query *cur = kr_rplan_current(rplan);
 
 	/* Invalid address for current zone cut. */
-	if (sockaddr_len((struct sockaddr *)&rplan->zone_cut.addr) < 1) {
+	if (sockaddr_len((struct sockaddr *)&cur->zone_cut.addr) < 1) {
 		return invalidate_ns(rplan, cur);
 	}
 
 	/* Prepare query resolution. */
 	int mode = (cur->flags & QUERY_TCP) ? 0 : KNOT_RQ_UDP;
-	struct sockaddr *ns_addr = (struct sockaddr *)&rplan->zone_cut.addr;
+	struct sockaddr *ns_addr = (struct sockaddr *)&cur->zone_cut.addr;
 	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, requestor->mm);
 	struct knot_request *tx = knot_request_make(requestor->mm, ns_addr, NULL, query, mode);
 	knot_requestor_enqueue(requestor, tx);
@@ -104,7 +104,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	/* Push query to resolve plan and set initial zone cut. */
 	struct kr_query *qry = kr_rplan_push(&rplan, qname, qclass, qtype);
 	namedb_txn_t *txn = kr_rplan_txn_acquire(&rplan, NAMEDB_RDONLY);
-	kr_find_zone_cut(&rplan.zone_cut, qname, txn, qry->timestamp.tv_sec);
+	kr_find_zone_cut(&qry->zone_cut, qname, txn, qry->timestamp.tv_sec);
 
 	struct kr_layer_param param;
 	param.ctx = ctx;

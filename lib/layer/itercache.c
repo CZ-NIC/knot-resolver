@@ -100,7 +100,7 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Check if updating current zone cut. */
 	if (cur != kr_rplan_last(param->rplan)) {
-		ret = read_cache_zonecut(&param->rplan->zone_cut, txn, &cache_rr, timestamp);
+		ret = read_cache_zonecut(&cur->zone_cut, txn, &cache_rr, timestamp);
 		if (ret == KNOT_EOK) {
 			kr_rplan_pop(param->rplan, cur);
 			return KNOT_NS_PROC_DONE;

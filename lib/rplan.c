@@ -54,7 +54,6 @@ void kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t 
 {
 	memset(rplan, 0, sizeof(struct kr_rplan));
 
-	rplan->state = KNOT_NS_PROC_MORE;
 	rplan->pool = pool;
 	rplan->context = context;
 	init_list(&rplan->pending);
