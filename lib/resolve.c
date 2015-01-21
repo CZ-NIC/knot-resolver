@@ -76,6 +76,11 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	/* Resolve and check status. */
 	ret = knot_requestor_exec(requestor, &timeout);
 	if (ret != KNOT_EOK) {
+		/* Check if any query is left. */
+		cur = kr_rplan_current(rplan);
+		if (cur == NULL) {
+			return ret;
+		}
 		/* Network error, retry over TCP. */
 		if (ret != KNOT_LAYER_ERROR && !(cur->flags & QUERY_TCP)) {
 			cur->flags |= QUERY_TCP;
@@ -106,6 +111,13 @@ static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
 		if (++iter_count > ITER_LIMIT) {
 			DEBUG_MSG("iteration limit %d reached => SERVFAIL\n", ITER_LIMIT);
 			ret = KNOT_ELIMIT;
+		}
+	}
+
+	/* Set RCODE on internal failure. */
+	if (ret != KNOT_EOK) {
+		if (knot_wire_get_rcode(param->answer->wire) == KNOT_RCODE_NOERROR) {
+			knot_wire_set_rcode(param->answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
 
@@ -140,17 +152,13 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	}
 
 	/* Check flags. */
+	knot_wire_set_qr(answer->wire);
 	knot_wire_clear_aa(answer->wire);
 	knot_wire_set_ra(answer->wire);
 
 	/* Resolution success, commit cache transaction. */
 	if (ret == KNOT_EOK) {
 		kr_rplan_txn_commit(&rplan);
-	} else {
-		/* Set RCODE on internal failure. */
-		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
-			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
-		}
 	}
 
 	/* Clean up. */
