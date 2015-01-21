@@ -95,6 +95,8 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name,
 	qry->stype = type;
 	qry->flags = rplan->context->options;
 	gettimeofday(&qry->timestamp, NULL);
+	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, NAMEDB_RDONLY);
+	kr_find_zone_cut(&qry->zone_cut, name, txn, qry->timestamp.tv_sec);
 
 	add_tail(&rplan->pending, &qry->node);
 

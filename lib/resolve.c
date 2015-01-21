@@ -88,6 +88,31 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	return ret;
 }
 
+static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
+{
+	/* Initialize requestor and overlay. */
+	struct knot_requestor requestor;
+	knot_requestor_init(&requestor, pool);
+	knot_requestor_overlay(&requestor, LAYER_STATIC, param);
+	knot_requestor_overlay(&requestor, LAYER_ITERCACHE, param);
+	knot_requestor_overlay(&requestor, LAYER_ITERATE, param);
+	knot_requestor_overlay(&requestor, LAYER_STATS, param);
+
+	/* Iteratively solve the query. */
+	int ret = KNOT_EOK;
+	unsigned iter_count = 0;
+	while((ret == KNOT_EOK) && !kr_rplan_empty(param->rplan)) {
+		ret = iterate(&requestor, param);
+		if (++iter_count > ITER_LIMIT) {
+			DEBUG_MSG("iteration limit %d reached => SERVFAIL\n", ITER_LIMIT);
+			ret = KNOT_ELIMIT;
+		}
+	}
+
+	knot_requestor_clear(&requestor);
+	return ret;
+}
+
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
                const knot_dname_t *qname, uint16_t qclass, uint16_t qtype)
 {
@@ -96,41 +121,23 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	}
 
 	/* Initialize context. */
+	int ret = KNOT_EOK;
 	mm_ctx_t rplan_pool;
 	mm_ctx_mempool(&rplan_pool, MM_DEFAULT_BLKSIZE);
 	struct kr_rplan rplan;
 	kr_rplan_init(&rplan, ctx, &rplan_pool);
-
-	/* Push query to resolve plan and set initial zone cut. */
-	struct kr_query *qry = kr_rplan_push(&rplan, qname, qclass, qtype);
-	namedb_txn_t *txn = kr_rplan_txn_acquire(&rplan, NAMEDB_RDONLY);
-	kr_find_zone_cut(&qry->zone_cut, qname, txn, qry->timestamp.tv_sec);
-
 	struct kr_layer_param param;
 	param.ctx = ctx;
 	param.rplan = &rplan;
 	param.answer = answer;
 
-	/* Initialize requestor and overlay. */
-	struct knot_requestor requestor;
-	knot_requestor_init(&requestor, ctx->pool);
-	knot_requestor_overlay(&requestor, LAYER_STATIC, &param);
-	knot_requestor_overlay(&requestor, LAYER_ITERCACHE, &param);
-	knot_requestor_overlay(&requestor, LAYER_ITERATE, &param);
-	knot_requestor_overlay(&requestor, LAYER_STATS, &param);
-
-	/* Iteratively solve the query. */
-	int ret = KNOT_EOK;
-	unsigned iter_count = 0;
-	while((ret == KNOT_EOK) && !kr_rplan_empty(&rplan)) {
-		ret = iterate(&requestor, &param);
-		if (++iter_count > ITER_LIMIT) {
-			DEBUG_MSG("iteration limit %d reached => SERVFAIL\n", ITER_LIMIT);
-			ret = KNOT_ELIMIT;
-		}
+	/* Push query to resolution plan. */
+	struct kr_query *qry = kr_rplan_push(&rplan, qname, qclass, qtype);
+	if (qry != NULL) {
+		ret = resolve_iterative(&param, &rplan_pool);
+	} else {
+		ret = KNOT_ENOMEM;
 	}
-
-	knot_requestor_clear(&requestor);
 
 	/* Check flags. */
 	knot_wire_clear_aa(answer->wire);
