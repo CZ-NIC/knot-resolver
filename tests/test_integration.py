@@ -148,11 +148,16 @@ def test_ipc(*args):
     finally:
         server.stop()
 
+def test_platform(*args):
+    if sys.platform == 'darwin':
+        raise Exception('ld -wrap is not supported on OS X')
+
 if __name__ == '__main__':
 
     # Self-tests first
     test = test.Test()
     test.add('integration/ipc', test_ipc)
+    test.add('integration/platform', test_platform)
     if test.run() != 0:
         sys.exit(1)
     else:
