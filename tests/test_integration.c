@@ -217,10 +217,10 @@ int tcp_recv_msg(int fd, uint8_t *buf, size_t len, struct timeval *timeout)
 	return rcvd;
 }
 
-int udp_recv_msg(int fd, uint8_t *buf, size_t len, struct sockaddr *addr)
+int udp_recv_msg(int fd, uint8_t *buf, size_t len, struct timeval *timeout)
 {
 	/* Tunnel via TCP. */
-	return tcp_recv_msg(fd, buf, len, NULL);
+	return tcp_recv_msg(fd, buf, len, timeout);
 }
 
 

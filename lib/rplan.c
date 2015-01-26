@@ -54,7 +54,6 @@ void kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t 
 {
 	memset(rplan, 0, sizeof(struct kr_rplan));
 
-	rplan->state = KNOT_NS_PROC_MORE;
 	rplan->pool = pool;
 	rplan->context = context;
 	init_list(&rplan->pending);
@@ -84,8 +83,8 @@ bool kr_rplan_empty(struct kr_rplan *rplan)
 	return EMPTY_LIST(rplan->pending);
 }
 
-struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name,
-                               uint16_t cls, uint16_t type)
+struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
+                               const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
 	struct kr_query *qry =  query_create(rplan->pool, name);
 	if (qry == NULL) {
@@ -97,7 +96,12 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, const knot_dname_t *name,
 	qry->flags = rplan->context->options;
 	gettimeofday(&qry->timestamp, NULL);
 
+	/* Find closest zone cut for this query. */
+	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, NAMEDB_RDONLY);
+	kr_find_zone_cut(&qry->zone_cut, name, txn, qry->timestamp.tv_sec);
+
 	add_tail(&rplan->pending, &qry->node);
+	qry->parent = parent;
 
 #ifndef NDEBUG
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
@@ -122,14 +126,6 @@ struct kr_query *kr_rplan_current(struct kr_rplan *rplan)
 		return NULL;
 	}
 	return TAIL(rplan->pending);
-}
-
-struct kr_query *kr_rplan_last(struct kr_rplan *rplan)
-{
-	if (EMPTY_LIST(rplan->pending)) {
-		return NULL;
-	}
-	return HEAD(rplan->pending);
 }
 
 namedb_txn_t *kr_rplan_txn_acquire(struct kr_rplan *rplan, unsigned flags)

@@ -28,44 +28,44 @@
 
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[qiter] " fmt, ## __VA_ARGS__)
 
-/*! \brief Fetch NS record address from additionals. */
-static int glue_ns_addr(const knot_pkt_t *pkt, struct sockaddr_storage *addr, const knot_dname_t *name, uint16_t type)
+/* Iterator often walks through packet section, this is an abstraction. */
+typedef int (*rr_callback_t)(const knot_rrset_t *, struct kr_layer_param *);
+
+/*! \brief Return minimized QNAME/QTYPE for current zone cut. */
+static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qtype)
 {
-	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
-	for (unsigned i = 0; i < ar->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
-		if (rr->type == type && knot_dname_is_equal(name, rr->owner)) {
-			return kr_rrset_to_addr(addr, rr);
-		}
+	/* Minimization disabled. */
+	const knot_dname_t *qname = query->sname;
+	if (query->flags & QUERY_NO_MINIMIZE) {
+		return qname;
 	}
 
-	return KNOT_ENOENT;
+	/* Minimize name to contain current zone cut + 1 label. */
+	int cut_labels = knot_dname_labels(query->zone_cut.name, NULL);
+	int qname_labels = knot_dname_labels(qname, NULL);
+	while(qname_labels > cut_labels + 1) {
+		qname = knot_wire_next_label(qname, NULL);
+		qname_labels -= 1;
+	}
+
+	/* Hide QTYPE if minimized. */
+	if (qname != query->sname) {
+		*qtype = KNOT_RRTYPE_NS;
+	}
+
+	return qname;
 }
 
-static int set_zone_cut(struct kr_rplan *rplan, knot_pkt_t *pkt, const knot_rrset_t *rr)
+/*! \brief Answer is paired to query. */
+static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 {
-	static const uint16_t type_list[] = { KNOT_RRTYPE_A, KNOT_RRTYPE_AAAA };
+	uint16_t qtype = query->stype;
+	const knot_dname_t *qname = minimized_qname(query, &qtype);
 
-	/* Set zone cut to given name server. */
-	const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, 0);
-	kr_set_zone_cut(&rplan->zone_cut, rr->owner, ns_name);
-
-	/* Check if we can find a valid address in glue / cache */
-	for (unsigned i = 0; i < sizeof(type_list)/sizeof(uint16_t); ++i) {
-
-		/* Find address in the additionals (optional). */
-		int ret = glue_ns_addr(pkt, &rplan->zone_cut.addr, ns_name, type_list[i]);
-		if (ret == KNOT_EOK) {
-			return KNOT_EOK;
-		}
-	}
-
-	/* Query for address records (if not glue). */
-	for (unsigned i = 0; i < sizeof(type_list)/sizeof(uint16_t); ++i) {
-		(void) kr_rplan_push(rplan, rplan->zone_cut.ns, KNOT_CLASS_IN, type_list[i]);
-	}
-
-	return KNOT_EOK;
+	return query->id      == knot_wire_get_id(answer->wire) &&
+	       query->sclass  == knot_pkt_qclass(answer) &&
+	       qtype          == knot_pkt_qtype(answer) &&
+	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
 
 static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *rr,
@@ -82,12 +82,41 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
 	}
 }
 
-/*! \brief Result updates the original query response. */
-static int update_answer(knot_pkt_t *answer, const knot_rrset_t *rr)
+static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 {
+	if (rr == NULL || query == NULL) {
+		return KNOT_NS_PROC_MORE; /* Ignore */
+	}
+
+	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
+		if (knot_dname_is_equal(query->zone_cut.ns, rr->owner)) {
+			int ret = kr_rrset_to_addr(&query->zone_cut.addr, rr);
+			if (ret == KNOT_EOK) {
+				return KNOT_NS_PROC_DONE;
+			}
+		}
+	}
+
+	return KNOT_NS_PROC_MORE;
+}
+
+static int update_glue(const knot_rrset_t *rr, struct kr_layer_param *param)
+{
+	return update_nsaddr(rr, kr_rplan_current(param->rplan));
+}
+
+int rr_update_parent(const knot_rrset_t *rr, struct kr_layer_param *param)
+{
+	struct kr_query *query = kr_rplan_current(param->rplan);
+	return update_nsaddr(rr, query->parent);
+}
+
+int rr_update_answer(const knot_rrset_t *rr, struct kr_layer_param *param)
+{
+	knot_pkt_t *answer = param->answer;
 	knot_rrset_t *rr_copy = knot_rrset_copy(rr, &answer->mm);
 	if (rr_copy == NULL) {
-		return KNOT_ENOMEM;
+		return KNOT_NS_PROC_FAIL;
 	}
 
 	/* Write copied RR to the result packet. */
@@ -95,42 +124,47 @@ static int update_answer(knot_pkt_t *answer, const knot_rrset_t *rr)
 	if (ret != KNOT_EOK) {
 		knot_rrset_free(&rr_copy, &answer->mm);
 		knot_wire_set_tc(answer->wire);
+		return KNOT_NS_PROC_DONE;
 	}
 
 	/* Free just the allocated container. */
 	mm_free(&answer->mm, rr_copy);
-	return KNOT_EOK;
+
+	/* Update parent query as well. */
+	return rr_update_parent(rr, param);
 }
 
-static int update_zone_cut(knot_pkt_t *pkt, struct kr_rplan *rplan, const knot_rrset_t *rr)
+int rr_update_nameserver(const knot_rrset_t *rr, struct kr_layer_param *param)
 {
-	int ret = KNOT_EOK;
+	struct kr_query *query = kr_rplan_current(param->rplan);
+	const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, 0);
 
-	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
-		if (knot_dname_is_equal(rplan->zone_cut.ns, rr->owner)) {
-			ret = kr_rrset_to_addr(&rplan->zone_cut.addr, rr);
-		}
-	} else if (rr->type == KNOT_RRTYPE_NS) {
-		/* Authority MUST be at/below the authority of the nameserver, otherwise
-		 * possible cache injection attempt. */
-		if (!knot_dname_in(rplan->zone_cut.name, rr->owner)) {
-			DEBUG_MSG("NS in query outside of its authority => rejecting\n");
-			return KNOT_EMALF;
-		}
-		/* Set the first nameserver address, rest will be cached. */
-		if (!knot_dname_is_equal(rr->owner, rplan->zone_cut.name)) {
-			ret = set_zone_cut(rplan, pkt, rr);
-		} else {
-			/* Zone cut not updated, referral loop. */
-			ret = KNOT_EINVAL;
-		}
+	/* Authority MUST be at/below the authority of the nameserver, otherwise
+	 * possible cache injection attempt. */
+	if (!knot_dname_in(query->zone_cut.name, rr->owner)) {
+		DEBUG_MSG("NS in query outside of its authority => rejecting\n");
+		return KNOT_NS_PROC_FAIL;
 	}
 
-	return ret;
+	/* Ignore already resolved zone cut. */
+	if (knot_dname_is_equal(rr->owner, query->zone_cut.name)) {
+		return KNOT_NS_PROC_MORE;
+	}
+
+	/* Set zone cut to given name server. */
+	kr_set_zone_cut(&query->zone_cut, rr->owner, ns_name);
+	return KNOT_NS_PROC_DONE;
 }
 
-static int resolve_referral(knot_pkt_t *pkt, struct kr_layer_param *param)
+static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
+	int state = KNOT_NS_PROC_MORE;
+
+	/* Answer declares AA, can't be referral. */
+	if (knot_wire_get_aa(pkt->wire)) {
+		return state;
+	}
+
 	/* Update current zone cut from NS records. */
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
@@ -138,86 +172,79 @@ static int resolve_referral(knot_pkt_t *pkt, struct kr_layer_param *param)
 		if (rr->type != KNOT_RRTYPE_NS) {
 			continue;
 		}
-		int ret = update_zone_cut(pkt, param->rplan, rr);
-		if (ret == KNOT_EOK) {
-			return KNOT_NS_PROC_DONE;
+
+		state = rr_update_nameserver(rr, param);
+		if (state != KNOT_NS_PROC_MORE) {
+			break;
 		}
 	}
 
-	/* Dead end, either bogus or loop referral. */
-	struct kr_query *cur = kr_rplan_current(param->rplan);
-	if (cur != NULL) {
-		kr_rplan_pop(param->rplan, cur);
-	}
-
-	return KNOT_NS_PROC_FAIL;
+	return state;
 }
 
-static int resolve_auth(knot_pkt_t *pkt, struct kr_layer_param *param)
+static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	knot_pkt_t *answer = param->answer;
-	struct kr_query *cur = kr_rplan_current(param->rplan);
-	if (cur == NULL) {
-		return KNOT_NS_PROC_FAIL;
+	struct kr_query *query = kr_rplan_current(param->rplan);
+
+	/* Attempt to find glue for current nameserver. */
+	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
+	for (unsigned i = 0; i < ar->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
+		int state = update_glue(rr, param);
+		if (state != KNOT_NS_PROC_MORE) {
+			return state;
+		}
 	}
 
-	/* Authoritative response for minimized QNAME.
+	/* Glue not found => resolve NS address. */
+	(void) kr_rplan_push(param->rplan, query, query->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+	(void) kr_rplan_push(param->rplan, query, query->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+
+	return KNOT_NS_PROC_DONE;
+}
+
+static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
+{
+	struct kr_query *query = kr_rplan_current(param->rplan);
+
+	/* Response for minimized QNAME.
 	 * NODATA   => may be empty non-terminal, retry (found zone cut)
 	 * NOERROR  => found zone cut, retry
 	 * NXDOMAIN => parent is zone cut, terminate
 	 */
-	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
-	bool is_minimized = (!knot_dname_is_equal(knot_pkt_qname(pkt), cur->sname));
+	bool is_minimized = (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname));
 	bool is_noerror = (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NOERROR);
 	if (is_minimized && is_noerror) {
-		cur->flags |= QUERY_NO_MINIMIZE;
+		query->flags |= QUERY_NO_MINIMIZE;
 		return KNOT_NS_PROC_DONE;
 	}
 
-	/* Is relevant for original query? */
-	bool update_orig_answer = (cur == kr_rplan_last(param->rplan));
-	
-	/* Process answer records. */
-	const knot_dname_t *cname = cur->sname;
+	/* Does this answer update the final response? */
+	rr_callback_t callback = &rr_update_parent;
+	if (query->parent == NULL) {
+		knot_wire_set_rcode(param->answer->wire, knot_wire_get_rcode(pkt->wire));
+		callback = &rr_update_answer;
+	}
+
+	/* Process answer section records. */
+	const knot_dname_t *cname = query->sname;
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-
-		/* Update original answer or current zone cut. */
-		if (update_orig_answer && knot_pkt_qtype(pkt) == cur->stype) {
-			if (update_answer(answer, rr) != KNOT_EOK) {
-				return KNOT_NS_PROC_FAIL;
-			}
-		} else {
-			if (update_zone_cut(pkt, param->rplan, rr) != KNOT_EOK) {
-				return KNOT_NS_PROC_FAIL;
-			}
+		int state = callback(rr, param);
+		if (state == KNOT_NS_PROC_FAIL) {
+			return state;
 		}
-
-		/* Check canonical name. */
-		follow_cname_chain(&cname, rr, cur);
+		follow_cname_chain(&cname, rr, query);
 	}
 
 	/* Follow canonical name as next SNAME. */
-	if (cname != cur->sname) {
-		struct kr_query *next = kr_rplan_push(param->rplan, cname,
-		                                      cur->sclass, cur->stype);
-		if (next == NULL) {
-			return KNOT_NS_PROC_FAIL;
-		}
+	if (cname != query->sname) {
+		(void) kr_rplan_push(param->rplan, query->parent, cname, query->sclass, query->stype);
 	}
-	
-	kr_rplan_pop(param->rplan, cur);
 
-	/* Authoritative answer to original response => DONE. */
-	if (update_orig_answer) {
-		knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
-	} else {
-		/* Side-lookup, update authority. */
-		/* TODO: store zone-cut in query for side lookups */
-		cur = kr_rplan_current(param->rplan);
-		namedb_txn_t *txn = kr_rplan_txn_acquire(param->rplan, NAMEDB_RDONLY);
-		kr_find_zone_cut(&param->rplan->zone_cut, cur->sname, txn, cur->timestamp.tv_sec);
-	}
+	/* This is either declares AA or not, either way it resolves current query. */
+	kr_rplan_pop(param->rplan, query);
 
 	return KNOT_NS_PROC_DONE;
 }
@@ -227,48 +254,6 @@ static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param, int errc
 {
 	DEBUG_MSG("resolution error => %s\n", knot_strerror(errcode));
 	return KNOT_NS_PROC_FAIL;
-}
-
-/*! \brief Return minimized QNAME/QTYPE for current zone cut. */
-static const knot_dname_t *minimized_qname(struct kr_query *query, struct kr_zonecut *cut, uint16_t *qtype)
-{
-	/* Minimization disabled. */
-	const knot_dname_t *qname = query->sname;
-	if (query->flags & QUERY_NO_MINIMIZE) {
-		return qname;
-	}
-
-	/* Minimize name to contain current zone cut + 1 label. */
-	int cut_labels = knot_dname_labels(cut->name, NULL);
-	int qname_labels = knot_dname_labels(qname, NULL);
-	while(qname_labels > cut_labels + 1) {
-		qname = knot_wire_next_label(qname, NULL);
-		qname_labels -= 1;
-	}
-
-	/* Hide QTYPE if minimized. */
-	if (qname != query->sname) {
-		*qtype = KNOT_RRTYPE_NS;
-	}
-
-	return qname;
-}
-
-/*! \brief Answer is paired to query. */
-static bool is_answer_to_query(const knot_pkt_t *answer, struct kr_rplan *rplan)
-{
-	struct kr_query *expect = kr_rplan_current(rplan);
-	if (expect == NULL) {
-		return -1;
-	}
-
-	uint16_t qtype = expect->stype;
-	const knot_dname_t *qname = minimized_qname(expect, &rplan->zone_cut, &qtype);
-
-	return expect->id      == knot_wire_get_id(answer->wire) &&
-	       expect->sclass  == knot_pkt_qclass(answer) &&
-	       qtype           == knot_pkt_qtype(answer) &&
-	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
 
 /* State-less single resolution iteration step, not needed. */
@@ -286,25 +271,24 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
 	struct kr_layer_param *param = ctx->data;
-	struct kr_query *cur = kr_rplan_current(param->rplan);
-	if (cur == NULL || ctx->state == KNOT_NS_PROC_DONE) {
+	struct kr_query *query = kr_rplan_current(param->rplan);
+	if (query == NULL || ctx->state == KNOT_NS_PROC_DONE) {
 		return ctx->state;
 	}
 
 	/* Minimize QNAME (if possible). */
-	struct kr_zonecut *zone_cut = &param->rplan->zone_cut;
-	uint16_t qtype = cur->stype;
-	const knot_dname_t *qname = minimized_qname(cur, zone_cut, &qtype);
+	uint16_t qtype = query->stype;
+	const knot_dname_t *qname = minimized_qname(query, &qtype);
 
 	/* Form a query for the authoritative. */
 	knot_pkt_clear(pkt);
-	int ret = knot_pkt_put_question(pkt, qname, cur->sclass, qtype);
+	int ret = knot_pkt_put_question(pkt, qname, query->sclass, qtype);
 	if (ret != KNOT_EOK) {
 		return KNOT_NS_PROC_FAIL;
 	}
 
-	cur->id = knot_random_uint16_t();
-	knot_wire_set_id(pkt->wire, cur->id);
+	query->id = knot_random_uint16_t();
+	knot_wire_set_id(pkt->wire, query->id);
 	
 	/* Declare EDNS0 support. */
 	knot_rrset_t opt_rr;
@@ -322,8 +306,8 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 #ifndef NDEBUG
 	char name_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN], type_str[16];
-	knot_dname_to_str(ns_str, zone_cut->ns, sizeof(ns_str));
-	knot_dname_to_str(zonecut_str, zone_cut->name, sizeof(zonecut_str));
+	knot_dname_to_str(ns_str, query->zone_cut.ns, sizeof(ns_str));
+	knot_dname_to_str(zonecut_str, query->zone_cut.name, sizeof(zonecut_str));
 	knot_dname_to_str(name_str, qname, sizeof(name_str));
 	knot_rrtype_to_string(qtype, type_str, sizeof(type_str));
 	DEBUG_MSG("query '%s %s' zone cut '%s' nameserver '%s'\n", name_str, type_str, zonecut_str, ns_str);
@@ -341,36 +325,29 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
 	struct kr_layer_param *param = ctx->data;
-	int state = ctx->state;
+	struct kr_query *query = kr_rplan_current(param->rplan);
+	if (query == NULL) {
+		return ctx->state;
+	}
 
 	/* Check for packet processing errors first. */
 	if (pkt->parsed < pkt->size) {
 		return resolve_error(pkt, param, KNOT_EMALF);
-	}
-
-	/* Is this the droid we're looking for? */
-	if (!is_answer_to_query(pkt, param->rplan)) {
+	} else if (!is_paired_to_query(pkt, query)) {
 		DEBUG_MSG("ignoring mismatching response\n");
 		return KNOT_NS_PROC_MORE;
-	}
-	
-	/* Truncated response. */
-	if (knot_wire_get_tc(pkt->wire)) {
+	} else if (knot_wire_get_tc(pkt->wire)) {
 		DEBUG_MSG("truncated response, failover to TCP\n");
 		struct kr_query *cur = kr_rplan_current(param->rplan);
 		if (cur) {
+			/* Fail if already on TCP. */
+			if (cur->flags & QUERY_TCP) {
+				return resolve_error(pkt, param, KNOT_EMALF);
+			}
 			cur->flags |= QUERY_TCP;
 		}
 		return KNOT_NS_PROC_DONE;
 	}
-
-	/* TODO: classify response type
-	 * 1. authoritative, noerror/nxdomain
-	 *     cname chain => update current sname
-	 *     qname is current ns => update ns address
-	 *     qname is tail => original query
-	 * 2. referral, update current zone cut
-	 */
 
 	/* Check response code. */
 	switch(knot_wire_get_rcode(pkt->wire)) {
@@ -381,11 +358,18 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return resolve_error(pkt, param, KNOT_ERROR);
 	}
 
-	/* Is the answer authoritative? */
-	if (knot_wire_get_aa(pkt->wire)) {
-		state = resolve_auth(pkt, param);
-	} else {
-		state = resolve_referral(pkt, param);
+	/* Resolve authority to see if it's referral or authoritative. */
+	int state = KNOT_NS_PROC_MORE;
+	state = process_authority(pkt, param);
+	switch(state) {
+	case KNOT_NS_PROC_MORE: /* Not referral, process answer. */
+		state = process_answer(pkt, param);
+		break;
+	case KNOT_NS_PROC_DONE: /* Referral, try to find glue. */
+		state = process_additional(pkt, param);
+		break;
+	default:
+		break;
 	}
 
 	return state;

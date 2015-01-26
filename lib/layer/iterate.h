@@ -21,3 +21,12 @@
 /* Processing module implementation. */
 const knot_layer_api_t *layer_iterate_module(void);
 #define LAYER_ITERATE layer_iterate_module()
+
+/*! \brief Result updates the query parent. */
+int rr_update_parent(const knot_rrset_t *rr, struct kr_layer_param *param);
+
+/*! \brief Result updates the original query response. */
+int rr_update_answer(const knot_rrset_t *rr, struct kr_layer_param *param);
+
+/*! \brief Result updates current nameserver. */
+int rr_update_nameserver(const knot_rrset_t *rr, struct kr_layer_param *param);

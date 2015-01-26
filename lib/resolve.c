@@ -35,7 +35,7 @@
 #define ITER_LIMIT 50
 
 /*! \brief Invalidate current NS in cache. */
-static int invalidate_ns(struct kr_rplan *rplan, const struct kr_query *qry)
+static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
 	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, 0);
 	if (txn == NULL) {
@@ -44,11 +44,11 @@ static int invalidate_ns(struct kr_rplan *rplan, const struct kr_query *qry)
 
 	/* TODO: selective removal */
 	knot_rrset_t removed_rr;
-	knot_rrset_init(&removed_rr, rplan->zone_cut.name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
+	knot_rrset_init(&removed_rr, qry->zone_cut.name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
 	(void) kr_cache_remove(txn, &removed_rr);
 
 	/* Find new zone cut / nameserver */
-	kr_find_zone_cut(&rplan->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
+	kr_find_zone_cut(&qry->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
 
 	/* Continue with querying */
 	return KNOT_EOK;
@@ -62,13 +62,13 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	struct kr_query *cur = kr_rplan_current(rplan);
 
 	/* Invalid address for current zone cut. */
-	if (sockaddr_len((struct sockaddr *)&rplan->zone_cut.addr) < 1) {
+	if (sockaddr_len((struct sockaddr *)&cur->zone_cut.addr) < 1) {
 		return invalidate_ns(rplan, cur);
 	}
 
 	/* Prepare query resolution. */
 	int mode = (cur->flags & QUERY_TCP) ? 0 : KNOT_RQ_UDP;
-	struct sockaddr *ns_addr = (struct sockaddr *)&rplan->zone_cut.addr;
+	struct sockaddr *ns_addr = (struct sockaddr *)&cur->zone_cut.addr;
 	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, requestor->mm);
 	struct knot_request *tx = knot_request_make(requestor->mm, ns_addr, NULL, query, mode);
 	knot_requestor_enqueue(requestor, tx);
@@ -76,6 +76,11 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	/* Resolve and check status. */
 	ret = knot_requestor_exec(requestor, &timeout);
 	if (ret != KNOT_EOK) {
+		/* Check if any query is left. */
+		cur = kr_rplan_current(rplan);
+		if (cur == NULL) {
+			return ret;
+		}
 		/* Network error, retry over TCP. */
 		if (ret != KNOT_LAYER_ERROR && !(cur->flags & QUERY_TCP)) {
 			cur->flags |= QUERY_TCP;
@@ -88,6 +93,38 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	return ret;
 }
 
+static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
+{
+	/* Initialize requestor and overlay. */
+	struct knot_requestor requestor;
+	knot_requestor_init(&requestor, pool);
+	knot_requestor_overlay(&requestor, LAYER_STATIC, param);
+	knot_requestor_overlay(&requestor, LAYER_ITERCACHE, param);
+	knot_requestor_overlay(&requestor, LAYER_ITERATE, param);
+	knot_requestor_overlay(&requestor, LAYER_STATS, param);
+
+	/* Iteratively solve the query. */
+	int ret = KNOT_EOK;
+	unsigned iter_count = 0;
+	while((ret == KNOT_EOK) && !kr_rplan_empty(param->rplan)) {
+		ret = iterate(&requestor, param);
+		if (++iter_count > ITER_LIMIT) {
+			DEBUG_MSG("iteration limit %d reached => SERVFAIL\n", ITER_LIMIT);
+			ret = KNOT_ELIMIT;
+		}
+	}
+
+	/* Set RCODE on internal failure. */
+	if (ret != KNOT_EOK) {
+		if (knot_wire_get_rcode(param->answer->wire) == KNOT_RCODE_NOERROR) {
+			knot_wire_set_rcode(param->answer->wire, KNOT_RCODE_SERVFAIL);
+		}
+	}
+
+	knot_requestor_clear(&requestor);
+	return ret;
+}
+
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
                const knot_dname_t *qname, uint16_t qclass, uint16_t qtype)
 {
@@ -96,54 +133,32 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	}
 
 	/* Initialize context. */
+	int ret = KNOT_EOK;
 	mm_ctx_t rplan_pool;
 	mm_ctx_mempool(&rplan_pool, MM_DEFAULT_BLKSIZE);
 	struct kr_rplan rplan;
 	kr_rplan_init(&rplan, ctx, &rplan_pool);
-
-	/* Push query to resolve plan and set initial zone cut. */
-	struct kr_query *qry = kr_rplan_push(&rplan, qname, qclass, qtype);
-	namedb_txn_t *txn = kr_rplan_txn_acquire(&rplan, NAMEDB_RDONLY);
-	kr_find_zone_cut(&rplan.zone_cut, qname, txn, qry->timestamp.tv_sec);
-
 	struct kr_layer_param param;
 	param.ctx = ctx;
 	param.rplan = &rplan;
 	param.answer = answer;
 
-	/* Initialize requestor and overlay. */
-	struct knot_requestor requestor;
-	knot_requestor_init(&requestor, ctx->pool);
-	knot_requestor_overlay(&requestor, LAYER_STATIC, &param);
-	knot_requestor_overlay(&requestor, LAYER_ITERCACHE, &param);
-	knot_requestor_overlay(&requestor, LAYER_ITERATE, &param);
-	knot_requestor_overlay(&requestor, LAYER_STATS, &param);
-
-	/* Iteratively solve the query. */
-	int ret = KNOT_EOK;
-	unsigned iter_count = 0;
-	while((ret == KNOT_EOK) && !kr_rplan_empty(&rplan)) {
-		ret = iterate(&requestor, &param);
-		if (++iter_count > ITER_LIMIT) {
-			DEBUG_MSG("iteration limit %d reached => SERVFAIL\n", ITER_LIMIT);
-			ret = KNOT_ELIMIT;
-		}
+	/* Push query to resolution plan. */
+	struct kr_query *qry = kr_rplan_push(&rplan, NULL, qname, qclass, qtype);
+	if (qry != NULL) {
+		ret = resolve_iterative(&param, &rplan_pool);
+	} else {
+		ret = KNOT_ENOMEM;
 	}
 
-	knot_requestor_clear(&requestor);
-
 	/* Check flags. */
+	knot_wire_set_qr(answer->wire);
 	knot_wire_clear_aa(answer->wire);
 	knot_wire_set_ra(answer->wire);
 
 	/* Resolution success, commit cache transaction. */
 	if (ret == KNOT_EOK) {
 		kr_rplan_txn_commit(&rplan);
-	} else {
-		/* Set RCODE on internal failure. */
-		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
-			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
-		}
 	}
 
 	/* Clean up. */

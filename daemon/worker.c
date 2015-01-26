@@ -89,9 +89,5 @@ int worker_exec(struct worker_ctx *worker, knot_pkt_t *answer, knot_pkt_t *query
 	/* Cleanup. */
 	knot_layer_finish(&proc);
 
-	if (state == KNOT_NS_PROC_FAIL) {
-		return KNOT_ERROR;
-	}
-
 	return KNOT_EOK;
 }
