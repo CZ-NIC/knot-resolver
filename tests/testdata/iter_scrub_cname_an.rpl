@@ -172,10 +172,10 @@ www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN CNAME next.example.com.
 next.example.com. IN A 10.20.30.40
-SECTION AUTHORITY
-example.com. IN NS ns1.example.com.
-SECTION ADDITIONAL
-ns1.example.com. IN A 168.192.2.2
+;SECTION AUTHORITY
+;example.com. IN NS ns1.example.com.
+;SECTION ADDITIONAL
+;ns1.example.com. IN A 168.192.2.2
 ENTRY_END
 
 SCENARIO_END

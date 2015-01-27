@@ -190,12 +190,12 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A 10.20.30.40
-SECTION AUTHORITY
-example.com. IN NS ns1.example.com.
-example.com. IN NS ns2.example.com.
-SECTION ADDITIONAL
-ns1.example.com. IN A 168.192.2.2
-ns2.example.com. IN A 168.192.3.3
+;SECTION AUTHORITY
+;example.com. IN NS ns1.example.com.
+;example.com. IN NS ns2.example.com.
+;SECTION ADDITIONAL
+;ns1.example.com. IN A 168.192.2.2
+;ns2.example.com. IN A 168.192.3.3
 ENTRY_END
 
 SCENARIO_END

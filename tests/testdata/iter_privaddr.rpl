@@ -198,10 +198,10 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	192.20.30.40
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.		IN 	A	1.2.3.4
 ENTRY_END
 
 ; IPv4 address is scrubbed
@@ -276,10 +276,10 @@ toss.example.com. IN A
 SECTION ANSWER
 ; toss.example.com. IN A	10.20.30.40
 toss.example.com. IN A	1.2.3.4
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.		IN 	A	1.2.3.4
 ENTRY_END
 
 SCENARIO_END

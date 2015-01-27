@@ -207,8 +207,8 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.net.
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.net.
 ; scrubbed off
 ;SECTION ADDITIONAL
 ;ns.example.net 	IN A 	1.2.3.44

@@ -180,10 +180,10 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com. 	IN A 	1.2.3.55
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com. 	IN A 	1.2.3.55
 ENTRY_END
 
 ; now that the bad child NS record is in cache, ask something else.
@@ -202,10 +202,10 @@ SECTION QUESTION
 mail.example.com. IN A
 SECTION ANSWER
 mail.example.com. IN A	10.20.30.20
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com. 	IN A 	1.2.3.55
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com. 	IN A 	1.2.3.55
 ENTRY_END
 
 ; test cache of parent data
@@ -224,10 +224,10 @@ SECTION QUESTION
 ftp.example.com. IN A
 SECTION ANSWER
 ftp.example.com. IN A	10.20.30.10
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com. 	IN A 	1.2.3.55
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com. 	IN A 	1.2.3.55
 ENTRY_END
 
 SCENARIO_END

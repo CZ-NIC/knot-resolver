@@ -218,8 +218,8 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.org.
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.org.
 ENTRY_END
 
 ; perhaps some messages are still pending - allow those to resolve.
@@ -239,8 +239,8 @@ SECTION QUESTION
 mail.example.com. IN A
 SECTION ANSWER
 mail.example.com. IN A	10.20.30.50
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.org.
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.org.
 ENTRY_END
 
 SCENARIO_END

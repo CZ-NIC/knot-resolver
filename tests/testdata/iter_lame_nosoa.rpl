@@ -256,11 +256,11 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.net.
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.	IN A	1.2.3.55
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.net.
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.	IN A	1.2.3.55
 ; scrubbed off
 ;ns.example.net 	IN A 	1.2.3.44
 ENTRY_END
@@ -280,10 +280,10 @@ REPLY QR RD RA NOERROR
 SECTION QUESTION
 mail.example.com. IN A
 SECTION ANSWER
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.net.
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.net.
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
 ENTRY_END
 
 

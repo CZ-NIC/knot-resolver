@@ -200,9 +200,9 @@ SECTION QUESTION
 www.foo.com. IN A
 SECTION ANSWER
 www.foo.com. 10 IN A	10.20.30.40
-SECTION AUTHORITY
-foo.com.	3600 IN NS	ns.example.com.
-foo.com.	3600 IN NS	ns2.example.com.
+;SECTION AUTHORITY
+;foo.com.	3600 IN NS	ns.example.com.
+;foo.com.	3600 IN NS	ns2.example.com.
 ENTRY_END
 
 STEP 15 TRAFFIC
@@ -229,9 +229,9 @@ SECTION QUESTION
 www.foo.com. IN A
 SECTION ANSWER
 www.foo.com. 10 IN A	10.20.30.40
-SECTION AUTHORITY
-foo.com.	3600 IN NS	ns.example.com.
-foo.com.	3600 IN NS	ns2.example.com.
+;SECTION AUTHORITY
+;foo.com.	3600 IN NS	ns.example.com.
+;foo.com.	3600 IN NS	ns2.example.com.
 ENTRY_END
 
 SCENARIO_END

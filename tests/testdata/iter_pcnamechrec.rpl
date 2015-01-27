@@ -369,11 +369,11 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-example.com.	IN NS	ns.example.net.
-SECTION ADDITIONAL
-ns.example.com. 	IN A 	1.2.3.44
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;example.com.	IN NS	ns.example.net.
+;SECTION ADDITIONAL
+;ns.example.com. 	IN A 	1.2.3.44
 ENTRY_END
 
 ; server stops working.
@@ -393,11 +393,11 @@ SECTION QUESTION
 mail.example.com. IN A
 SECTION ANSWER
 mail.example.com. IN A	10.20.30.20
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-example.com.	IN NS	ns.example.net.
-SECTION ADDITIONAL
-ns.example.com. 	IN A 	1.2.3.44
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;example.com.	IN NS	ns.example.net.
+;SECTION ADDITIONAL
+;ns.example.com. 	IN A 	1.2.3.44
 ENTRY_END
 
 SCENARIO_END

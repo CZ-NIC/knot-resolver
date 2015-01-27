@@ -57,8 +57,8 @@ SECTION QUESTION
 proxima.lp0.eu. IN A
 SECTION ANSWER
 proxima.lp0.eu. IN A 81.2.80.65
-SECTION AUTHORITY
-lp0.eu. IN NS proxima.lp0.eu.
+;SECTION AUTHORITY
+;lp0.eu. IN NS proxima.lp0.eu.
 ENTRY_END
 
 SCENARIO_END

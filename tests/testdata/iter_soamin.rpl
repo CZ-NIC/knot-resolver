@@ -159,10 +159,10 @@ SECTION QUESTION
 example.com. IN SOA
 SECTION ANSWER
 example.com. 86400 IN SOA dns1.icann.org. hostmaster.icann.org. 2010074630 7200 3600 1209600 3600
-SECTION AUTHORITY
-example.com. 3600 IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.	3600 IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com. 3600 IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.	3600 IN 	A	1.2.3.4
 ENTRY_END
 
 ; now check them from the cache (no seconds elapsed).
@@ -199,10 +199,10 @@ SECTION QUESTION
 example.com. IN SOA
 SECTION ANSWER
 example.com. 86400 IN SOA dns1.icann.org. hostmaster.icann.org. 2010074630 7200 3600 1209600 3600
-SECTION AUTHORITY
-example.com. 3600 IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.	3600 IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com. 3600 IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.	3600 IN 	A	1.2.3.4
 ENTRY_END
 
 SCENARIO_END

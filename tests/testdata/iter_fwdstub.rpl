@@ -187,10 +187,10 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.0.0.4
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.		IN 	A	1.2.3.4
 ENTRY_END
 
 ; try to resolve from stub zone
@@ -209,10 +209,10 @@ SECTION QUESTION
 www.sub.example.com. IN A
 SECTION ANSWER
 www.sub.example.com. IN A	10.0.0.5
-SECTION AUTHORITY
-sub.example.com.	IN NS	ns.sub.example.com.
-SECTION ADDITIONAL
-ns.sub.example.com.		IN 	A	1.2.3.44
+;SECTION AUTHORITY
+;sub.example.com.	IN NS	ns.sub.example.com.
+;SECTION ADDITIONAL
+;ns.sub.example.com.		IN 	A	1.2.3.44
 ENTRY_END
 
 SCENARIO_END

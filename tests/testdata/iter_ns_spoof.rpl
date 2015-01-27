@@ -221,10 +221,10 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.		IN 	A	1.2.3.4
 ENTRY_END
 
 ; spoofed query
@@ -247,10 +247,10 @@ SECTION QUESTION
 bad123.example.com. IN A
 SECTION ANSWER
 bad123.example.com. IN A	6.6.6.6
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.		IN 	A	1.2.3.4
 ENTRY_END
 
 ; a new query 
@@ -269,10 +269,10 @@ SECTION QUESTION
 mail.example.com. IN A
 SECTION ANSWER
 mail.example.com. IN A 	10.20.30.50
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.		IN 	A	1.2.3.4
 ENTRY_END
 
 SCENARIO_END

@@ -236,10 +236,10 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. 3600 IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	3600 IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.	3600 	IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com.	3600 IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.	3600 	IN 	A	1.2.3.4
 ENTRY_END
 
 ; the domain is sold (right at this time).
@@ -263,10 +263,10 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. 1800 IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	1800 IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.	1800 	IN 	A	1.2.3.4
+;SECTION AUTHORITY
+;example.com.	1800 IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.	1800 	IN 	A	1.2.3.4
 ENTRY_END
 
 ; and ask another query
@@ -286,9 +286,9 @@ nx1.example.com. IN A
 SECTION ANSWER
 SECTION AUTHORITY
 example.com.	3600 IN SOA	a. b. 1 2 3 4 5
-example.com.	3600 IN NS	nsb.example.com.
-SECTION ADDITIONAL
-nsb.example.com.	3600 	IN 	A	1.2.3.4
+;example.com.	3600 IN NS	nsb.example.com.
+;SECTION ADDITIONAL
+;nsb.example.com.	3600 	IN 	A	1.2.3.4
 ENTRY_END
 
 STEP 62 QUERY 
@@ -307,9 +307,9 @@ nx1.example.com. IN A
 SECTION ANSWER
 SECTION AUTHORITY
 example.com.	3600 IN SOA	a. b. 1 2 3 4 5
-example.com.	1800 IN NS	nsb.example.com.
-SECTION ADDITIONAL
-nsb.example.com.	3600 	IN 	A	1.2.3.4
+;example.com.	1800 IN NS	nsb.example.com.
+;SECTION ADDITIONAL
+;nsb.example.com.	3600 	IN 	A	1.2.3.4
 ENTRY_END
 
 ; after another 1900 seconds the domain must have timed out.
@@ -331,10 +331,10 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. 3600 IN A	88.88.88.88
-SECTION AUTHORITY
-example.com.	3600 IN NS	ns.example.com.
-SECTION ADDITIONAL
-ns.example.com.	3600 	IN 	A	8.8.8.8
+;SECTION AUTHORITY
+;example.com.	3600 IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.	3600 	IN 	A	8.8.8.8
 ENTRY_END
 
 SCENARIO_END

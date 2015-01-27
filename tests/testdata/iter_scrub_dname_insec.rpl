@@ -172,10 +172,10 @@ SECTION ANSWER
 y.example.com. DNAME z.example.com.
 x.y.example.com. IN CNAME x.z.example.com.
 x.z.example.com. IN A 10.20.30.40
-SECTION AUTHORITY
-example.com. IN NS ns1.example.com.
-SECTION ADDITIONAL
-ns1.example.com. IN A 168.192.2.2
+;SECTION AUTHORITY
+;example.com. IN NS ns1.example.com.
+;SECTION ADDITIONAL
+;ns1.example.com. IN A 168.192.2.2
 ENTRY_END
 
 ; now, DNAME insecure from cache should not be used.
@@ -241,10 +241,10 @@ SECTION ANSWER
 y.example.com. DNAME z.example.com.
 other.y.example.com. IN CNAME other.z.example.com.
 other.z.example.com. IN A 50.60.70.80
-SECTION AUTHORITY
-example.com. IN NS ns1.example.com.
-SECTION ADDITIONAL
-ns1.example.com. IN A 168.192.2.2
+;SECTION AUTHORITY
+;example.com. IN NS ns1.example.com.
+;SECTION ADDITIONAL
+;ns1.example.com. IN A 168.192.2.2
 ENTRY_END
 
 SCENARIO_END

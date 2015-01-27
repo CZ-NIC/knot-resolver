@@ -207,8 +207,8 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. 100 IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	100 IN NS	ns.foo.com.
+;SECTION AUTHORITY
+;example.com.	100 IN NS	ns.foo.com.
 ; scrubbed off
 ;SECTION ADDITIONAL
 ;ns.foo.com 	IN A 	1.2.3.44
@@ -235,8 +235,8 @@ SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. 100 IN A	10.20.30.40
-SECTION AUTHORITY
-example.com.	100 IN NS	ns.foo.com.
+;SECTION AUTHORITY
+;example.com.	100 IN NS	ns.foo.com.
 ; scrubbed off
 ;SECTION ADDITIONAL
 ;ns.foo.com 	IN A 	1.2.3.44
