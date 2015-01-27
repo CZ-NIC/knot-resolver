@@ -109,7 +109,6 @@ class Entry:
         else:
             raise Exception('bad section %s' % self.section)
 
-
     def __rr_from_str(self, owner, args):
         """ Parse RR from tokenized string. """
         if not owner.endswith('.'):
@@ -203,6 +202,8 @@ class Step:
         """ Play one step from a scenario. """
         if self.type == 'QUERY':
             return self.__query(ctx)
+        elif self.type == 'CHECK_OUT_QUERY':
+             pass # Ignore
         elif self.type == 'CHECK_ANSWER':
             return self.__check_answer(ctx)
         elif self.type == 'TIME_PASSES':
