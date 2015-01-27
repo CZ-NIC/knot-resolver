@@ -19,6 +19,7 @@ class Entry:
         self.adjust_fields = None
         self.origin = '.'
         self.message = dns.message.Message()
+        self.sections = []
 
     def match_part(self, code, msg):
         """ Compare scripted reply to given message using single criteria. """
@@ -48,7 +49,7 @@ class Entry:
         """ Compare scripted reply to given message based on match criteria. """
         match_fields = self.match_fields
         if 'all' in match_fields:
-            match_fields = ('flags', 'question', 'answer', 'authority', 'additional')
+            match_fields = tuple(['flags'] + self.sections)
         for code in match_fields:
             try:
                 self.match_part(code, msg)
@@ -74,19 +75,25 @@ class Entry:
 
     def set_reply(self, fields):
         """ Set reply flags and rcode. """
+        eflags = []
         flags = []
         rcode = dns.rcode.from_text(self.default_rc)
         for code in fields:
+            if code == 'DO':
+                eflags.append(code)
+                continue
             try:
                 rcode = dns.rcode.from_text(code)
             except:
                 flags.append(code)
         self.message.flags = dns.flags.from_text(' '.join(flags))
+        self.message.ednsflags = dns.flags.edns_from_text(' '.join(eflags))
         self.message.rcode = rcode
 
     def begin_section(self, section):
         """ Begin packet section. """
         self.section = section
+        self.sections.append(section.lower())
 
     def add_record(self, owner, args):
         """ Add record to current packet section. """
@@ -110,13 +117,13 @@ class Entry:
         ttl = self.default_ttl
         rdclass = self.default_cls
         try:
-            dns.ttl.from_text(args[0])
-            ttl = args.pop(0)
+            ttl = dns.ttl.from_text(args[0])
+            args.pop(0)
         except:
             pass  # optional
         try:
-            dns.rdataclass.from_text(args[0])
-            rdclass = args.pop(0)
+            rdclass = dns.rdataclass.from_text(args[0])
+            args.pop(0)
         except:
             pass  # optional
         rdtype = args.pop(0)
