@@ -9,7 +9,7 @@ before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/fakeroot
 script:
     - autoreconf -i
-    - ./configure
+    - ./configure --enable-integration-tests
     - make
     - make check
 sudo: false
