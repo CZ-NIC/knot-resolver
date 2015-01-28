@@ -1,6 +1,7 @@
 #!/bin/sh  
 set -e
 
+CMOCKA_TAG="cmocka-0.4.1"
 PKG_CONFIG_PATH="${1}/lib/pkgconfig"
 
 if [ -z ${1} ]; then
@@ -44,6 +45,19 @@ if [ ! -e ${1}/include/libknot ]; then
 	cd ..
 fi
 
+# cmocka
+if [ ! -e ${1}/include/cmocka.h ]; then
+	wget http://git.cryptomilk.org/projects/cmocka.git/snapshot/${CMOCKA_TAG}.tar.gz
+	tar xvzf ${CMOCKA_TAG}.tar.gz
+	cd ${CMOCKA_TAG}
+	mkdir build
+	cd build
+	cmake -DCMAKE_INSTALL_PREFIX=${1} ..
+	make
+	make install
+	cd ../..
+fi
+
 # libuv
 if [ ! -e ${1}/include/uv.h ]; then
 	git clone https://github.com/libuv/libuv.git || true
@@ -53,5 +67,3 @@ if [ ! -e ${1}/include/uv.h ]; then
 	make 
 	make install
 fi
-
-ldconfig || true
