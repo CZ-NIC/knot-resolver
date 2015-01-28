@@ -5,8 +5,10 @@ env:
     global:
         - PKG_CONFIG_PATH="${HOME}/fakeroot/lib/pkgconfig"
         - LDFLAGS="-L${HOME}/fakeroot/lib"
+        - PIP_DOWNLOAD_CACHE="${HOME}/.pip-cache"
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/fakeroot
+    - pip install -r tests/pydnstest/requirements.txt
 script:
     - autoreconf -i
     - ./configure --enable-integration-tests
@@ -16,3 +18,4 @@ sudo: false
 cache:
     directories:
     - ${HOME}/fakeroot
+    - ${HOME}/.pip-cache
