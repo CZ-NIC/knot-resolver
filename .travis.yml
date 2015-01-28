@@ -1,33 +1,18 @@
 language: c
 compiler:
     - gcc
+env:
+    global:
+        - PKG_CONFIG_PATH="${HOME}/fakeroot/lib/pkgconfig"
+        - LDFLAGS="-L${HOME}/fakeroot/lib"
 before_script:
-    - sudo apt-get update -q -y
-    - sudo apt-get install -q -y
-        git-core
-        pkg-config
-        flex
-        bison
-        libssl-dev
-        liburcu-dev
-        liblmdb-dev
-        libcmocka-dev
-    - git clone -b resolver_improvements https://github.com/CZNIC-Labs/knot.git
-    - cd knot
-    - autoreconf -if
-    - ./configure
-    - make
-    - sudo make install
-    - cd ..
-    - git clone https://github.com/libuv/libuv.git
-    - cd libuv
-    - sh autogen.sh
-    - ./configure
-    - make 
-    - sudo make install
-    - sudo ldconfig
+    - ./scripts/bootstrap-depends.sh ${HOME}/fakeroot
 script:
-    - autoreconf -if
+    - autoreconf -i
     - ./configure
     - make
     - make check
+sudo: false
+cache:
+    directories:
+    - ${HOME}/fakeroot
