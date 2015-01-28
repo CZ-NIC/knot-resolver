@@ -106,7 +106,8 @@ def find_objects(path):
         for e in os.listdir(path):
             result += find_objects(os.path.join(path, e))
     elif os.path.isfile(path):
-        result.append(path)
+        if path.endswith('.rpl'):
+            result.append(path)
     return result
 
 

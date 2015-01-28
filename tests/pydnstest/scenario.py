@@ -239,7 +239,7 @@ class Step:
 class Scenario:
     def __init__(self, info):
         """ Initialize scenario with description. """
-        print '# %s' % info
+        self.info = info
         self.ranges = []
         self.steps = []
         self.current_step = None
