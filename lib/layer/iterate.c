@@ -26,7 +26,11 @@
 #include "lib/rplan.h"
 #include "lib/utils.h"
 
+#ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[qiter] " fmt, ## __VA_ARGS__)
+#else
+#define DEBUG_MSG(fmt, ...)
+#endif
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, struct kr_layer_param *);

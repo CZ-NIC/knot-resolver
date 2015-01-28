@@ -23,7 +23,11 @@
 #include "lib/utils.h"
 #include "lib/rplan.h"
 
+#ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[z-cut] " fmt, ## __VA_ARGS__)
+#else
+#define DEBUG_MSG(fmt, ...)
+#endif
 
 /* \brief Root hint descriptor. */
 struct hint_info {

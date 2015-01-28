@@ -25,7 +25,11 @@
 #include "lib/cache.h"
 #include "lib/utils.h"
 
+#ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[rplan] " fmt, ## __VA_ARGS__)
+#else
+#define DEBUG_MSG(fmt, ...)
+#endif
 
 static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 {

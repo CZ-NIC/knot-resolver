@@ -29,7 +29,12 @@
 #include "lib/cache.h"
 #include "lib/defines.h"
 
+#ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[cache] " fmt, ## __VA_ARGS__)
+#else
+#define DEBUG_MSG(fmt, ...)
+#endif
+
 #define db_api namedb_lmdb_api()
 
 namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize)

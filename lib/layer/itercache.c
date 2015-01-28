@@ -24,7 +24,11 @@
 #include "lib/layer/iterate.h"
 #include "lib/utils.h"
 
+#ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[cache] " fmt, ## __VA_ARGS__)
+#else
+#define DEBUG_MSG(fmt, ...)
+#endif
 
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
 

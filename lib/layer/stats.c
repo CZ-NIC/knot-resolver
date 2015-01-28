@@ -19,7 +19,11 @@
 #include "lib/layer/stats.h"
 #include "lib/rplan.h"
 
+#ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[stats] " fmt, ## __VA_ARGS__)
+#else
+#define DEBUG_MSG(fmt, ...)
+#endif
 
 //static void update_stats(struct kr_ns *ns, double rtt)
 //{
@@ -38,11 +42,11 @@ static int begin(knot_layer_t *ctx, void *param)
 
 static int finish(knot_layer_t *ctx)
 {
+#ifndef NDEBUG
 	struct kr_layer_param *param = ctx->data;
 	struct kr_rplan *rplan = param->rplan;
 	const knot_pkt_t *answer = param->answer;
 
-#ifndef NDEBUG
 	/* Calculate total RTT and number of queries. */
 	double total_rtt = 0.0;
 	size_t nr_queries = list_size(&rplan->resolved);
