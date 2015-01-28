@@ -26,7 +26,11 @@
 #include "lib/rplan.h"
 #include "lib/utils.h"
 
+#ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[qiter] " fmt, ## __VA_ARGS__)
+#else
+#define DEBUG_MSG(fmt, ...)
+#endif
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, struct kr_layer_param *);
@@ -63,7 +67,7 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	const knot_dname_t *qname = minimized_qname(query, &qtype);
 
 	return query->id      == knot_wire_get_id(answer->wire) &&
-	       query->sclass  == knot_pkt_qclass(answer) &&
+	       (query->sclass == KNOT_CLASS_ANY || query->sclass  == knot_pkt_qclass(answer)) &&
 	       qtype          == knot_pkt_qtype(answer) &&
 	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }

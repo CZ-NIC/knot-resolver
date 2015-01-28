@@ -6,6 +6,7 @@ env:
         - PKG_CONFIG_PATH="${HOME}/fakeroot/lib/pkgconfig"
         - LDFLAGS="-L${HOME}/fakeroot/lib"
         - PIP_DOWNLOAD_CACHE="${HOME}/.pip-cache"
+        - CFLAGS="${CFLAGS} -DNDEBUG"
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/fakeroot
     - pip install --user travis -r tests/pydnstest/requirements.txt

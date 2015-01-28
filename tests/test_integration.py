@@ -15,12 +15,13 @@ def get_next(file_in):
         line = file_in.readline()
         if len(line) == 0:
             return False
+        for csep in (';', '#'):
+            if csep in line:
+                line = line[0 : line.index(csep)]
         tokens = ' '.join(line.strip().split()).split()
         if len(tokens) == 0:
             continue  # Skip empty lines
         op = tokens.pop(0)
-        if op.startswith(';') or op.startswith('#'):
-            continue  # Skip comments
         return op, tokens
 
 
@@ -87,7 +88,6 @@ def parse_scenario(op, args, file_in):
             out.steps.append(parse_step(op, args, file_in))
     return out
 
-
 def parse_file(file_in):
     """ Parse scenario from a file. """
     try:
@@ -106,7 +106,8 @@ def find_objects(path):
         for e in os.listdir(path):
             result += find_objects(os.path.join(path, e))
     elif os.path.isfile(path):
-        result.append(path)
+        if path.endswith('.rpl'):
+            result.append(path)
     return result
 
 

@@ -1,14 +1,13 @@
 ; config options
 server:
-	target-fetch-policy: "0 0 0 0 0"
-	module-config: "iterator"
-
+	do-ip6: no
+	target-fetch-policy: "0 0 0 0 0 "
 stub-zone:
 	name: "."
 	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
 CONFIG_END
 
-SCENARIO_BEGIN Test basic iterative resolve without validator module
+SCENARIO_BEGIN Test iterator when only ip6 in dp but doip6 is no
 
 ; K.ROOT-SERVERS.NET.
 RANGE_BEGIN 0 100
@@ -60,10 +59,25 @@ REPLY QR NOERROR
 SECTION QUESTION
 www.example.com. IN A
 SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
+example.com.	IN NS	ns.bla.com.
 SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
+; not included
+;ns.bla.com.		IN 	A	1.2.3.4
+
+; and this one is useless because do-ip6 is "no"
+ns.bla.com.		IN 	AAAA	::53
 ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+ns.bla.com. IN A
+SECTION ANSWER
+ns.bla.com.		IN 	A	1.2.3.4
+ENTRY_END
+
 RANGE_END
 
 ; ns.example.com.

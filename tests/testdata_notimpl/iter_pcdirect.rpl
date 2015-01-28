@@ -7,7 +7,11 @@ stub-zone:
 	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
 CONFIG_END
 
-SCENARIO_BEGIN Test resolution with recursion for NS target.
+SCENARIO_BEGIN Test resolver with parent-child diff for direct impact
+; the trouble is resolving this right away.
+; otherwise it gets picked out of the cache.
+; i.e. on a failed lookup, pickup lame stuff from the cache.
+; the nameserver lookup may have failed but produced some (lame) addresses.
 
 ; K.ROOT-SERVERS.NET.
 RANGE_BEGIN 0 100
@@ -37,27 +41,15 @@ a.gtld-servers.net.	IN 	A	192.5.6.30
 ENTRY_END
 
 ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
+MATCH opcode subdomain
+ADJUST copy_id copy_query
 REPLY QR NOERROR
 SECTION QUESTION
-ns.example.net. IN A
+org. IN A
 SECTION AUTHORITY
-net.	IN NS	e.gtld-servers.net.
+org. IN NS a0.org.afilias-nst.org.
 SECTION ADDITIONAL
-e.gtld-servers.net.	IN 	A	192.12.94.30
-ENTRY_END
-
-ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
-REPLY QR NOERROR
-SECTION QUESTION
-ns.example.net. IN AAAA
-SECTION AUTHORITY
-net.	IN NS	e.gtld-servers.net.
-SECTION ADDITIONAL
-e.gtld-servers.net.	IN 	A	192.12.94.30
+a0.org.afilias-nst.org. IN A 199.19.56.1
 ENTRY_END
 RANGE_END
 
@@ -83,89 +75,42 @@ REPLY QR NOERROR
 SECTION QUESTION
 www.example.com. IN A
 SECTION AUTHORITY
-example.com.	IN NS	ns.example.net.
+example.com.	IN NS	ns.example.org.
 ENTRY_END
 RANGE_END
 
-; e.gtld-servers.net.
+; a0.org.afilias-nst.org.
 RANGE_BEGIN 0 100
-	ADDRESS 192.12.94.30
+	ADDRESS 199.19.56.1
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
 REPLY QR NOERROR
 SECTION QUESTION
-net. IN NS
+org. IN NS
 SECTION ANSWER
-net.	IN NS	e.gtld-servers.net.
+org. IN NS a0.org.afilias-nst.org.
 SECTION ADDITIONAL
-e.gtld-servers.net.	IN 	A	192.12.94.30
+a0.org.afilias-nst.org. IN A 199.19.56.1
 ENTRY_END
 
 ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
+MATCH opcode subdomain
+ADJUST copy_id copy_query
 REPLY QR NOERROR
 SECTION QUESTION
-ns.example.net. IN A
+example.org. IN A
 SECTION AUTHORITY
-example.net.	IN NS	ns.example.net.
+example.org.	IN NS	ns.example.org.
 SECTION ADDITIONAL
-ns.example.net.		IN 	A	1.2.3.44
-ENTRY_END
-
-ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
-REPLY QR NOERROR
-SECTION QUESTION
-ns.example.net. IN AAAA
-SECTION AUTHORITY
-example.net.	IN NS	ns.example.net.
-SECTION ADDITIONAL
-ns.example.net.		IN 	A	1.2.3.44
+; parent-side working address.
+ns.example.org. IN A 1.2.3.4
 ENTRY_END
 RANGE_END
 
-; ns.example.net.
+; ns.example.org.
 RANGE_BEGIN 0 100
-	ADDRESS 1.2.3.44
-ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
-REPLY QR NOERROR
-SECTION QUESTION
-example.net. IN NS
-SECTION ANSWER
-example.net.	IN NS	ns.example.net.
-SECTION ADDITIONAL
-ns.example.net.		IN 	A	1.2.3.44
-ENTRY_END
-
-ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
-REPLY QR NOERROR
-SECTION QUESTION
-ns.example.net. IN A
-SECTION ANSWER
-ns.example.net. IN A	1.2.3.44
-SECTION AUTHORITY
-example.net.	IN NS	ns.example.net.
-ENTRY_END
-
-ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
-REPLY QR NOERROR
-SECTION QUESTION
-ns.example.net. IN AAAA
-SECTION AUTHORITY
-example.net.	IN NS	ns.example.net.
-SECTION ADDITIONAL
-www.example.net. IN A	1.2.3.44
-ENTRY_END
-
+	ADDRESS 1.2.3.4
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
@@ -173,7 +118,7 @@ REPLY QR NOERROR
 SECTION QUESTION
 example.com. IN NS
 SECTION ANSWER
-example.com.	IN NS	ns.example.net.
+example.com.	IN NS	ns.example.org.
 ENTRY_END
 
 ENTRY_BEGIN
@@ -181,14 +126,80 @@ MATCH opcode qtype qname
 ADJUST copy_id
 REPLY QR NOERROR
 SECTION QUESTION
+example.org. IN NS
+SECTION ANSWER
+example.org.	IN NS	ns.example.org.
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA RA NOERROR
+SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
 SECTION AUTHORITY
-example.com.	IN NS	ns.example.net.
-SECTION ADDITIONAL
-ns.example.net 	IN A 	1.2.3.44
+example.com.	IN NS	ns.example.org.
 ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA RA NOERROR
+SECTION QUESTION
+mail.example.com. IN A
+SECTION ANSWER
+mail.example.com. IN A	10.20.30.50
+SECTION AUTHORITY
+example.com.	IN NS	ns.example.org.
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RA NOERROR
+SECTION QUESTION
+ns.example.org. IN A
+SECTION ANSWER
+; correct answer: ns.example.org. IN A	1.2.3.4
+SECTION AUTHORITY
+ns.example.org. IN NS 1.2.3.4.example.org.
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RA NOERROR
+SECTION QUESTION
+ns.example.org. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+ns.example.org. IN NS 1.2.3.4.example.org.
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA RA NXDOMAIN
+SECTION QUESTION
+1.2.3.4.example.org. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+example.org. IN SOA ns.example.org. root.example.org. 2009111400 14400 3600 1209600 86400
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA RA NXDOMAIN
+SECTION QUESTION
+1.2.3.4.example.org. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+example.org. IN SOA ns.example.org. root.example.org. 2009111400 14400 3600 1209600 86400
+ENTRY_END
+
 RANGE_END
 
 STEP 1 QUERY
@@ -199,7 +210,7 @@ www.example.com. IN A
 ENTRY_END
 
 ; recursion happens here.
-STEP 20 CHECK_ANSWER
+STEP 10 CHECK_ANSWER
 ENTRY_BEGIN
 MATCH all
 REPLY QR RD RA NOERROR
@@ -208,20 +219,28 @@ www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
 ;SECTION AUTHORITY
-;example.com.	IN NS	ns.example.net.
-; scrubbed off
-;SECTION ADDITIONAL
-;ns.example.net 	IN A 	1.2.3.44
+;example.com.	IN NS	ns.example.org.
 ENTRY_END
 
-; due to ordering of answer packets, this is still outstanding, remove it
-STEP 21 CHECK_OUT_QUERY
+; perhaps some messages are still pending - allow those to resolve.
+STEP 20 QUERY
 ENTRY_BEGIN
-ADJUST copy_id
-MATCH qname qtype
-REPLY QR
+REPLY RD
 SECTION QUESTION
-ns.example.net IN AAAA
+mail.example.com. IN A
+ENTRY_END
+
+; recursion happens here.
+STEP 30 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+mail.example.com. IN A
+SECTION ANSWER
+mail.example.com. IN A	10.20.30.50
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.org.
 ENTRY_END
 
 SCENARIO_END

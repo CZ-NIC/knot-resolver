@@ -5,12 +5,17 @@ server:
 stub-zone:
 	name: "."
 	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
+
+stub-zone:
+	name: "example.com"
+	stub-addr: 1.2.3.6
+	stub-prime: yes
+
 CONFIG_END
 
-SCENARIO_BEGIN Test iterative resolve with a recursion lame server.
-; The scenario has a domain with two servers, one is lame the other doesn't
-; so depending on the randomly chosen server that goes first, it may
-; select the nonlame or the lame server first.
+SCENARIO_BEGIN Test stub with stub-prime and last resort fallback
+; the last resort fallback should not activate, as the
+; configured stub must be used for this data, or its primed data.
 
 ; K.ROOT-SERVERS.NET.
 RANGE_BEGIN 0 100
@@ -28,11 +33,11 @@ K.ROOT-SERVERS.NET.	IN	A	193.0.14.129
 ENTRY_END
 
 ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
+MATCH opcode subdomain
+ADJUST copy_id copy_query
 REPLY QR NOERROR
 SECTION QUESTION
-www.example.com. IN A
+com. IN A
 SECTION AUTHORITY
 com.	IN NS	a.gtld-servers.net.
 SECTION ADDITIONAL
@@ -56,17 +61,15 @@ a.gtld-servers.net.	IN 	A	192.5.6.30
 ENTRY_END
 
 ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
+MATCH opcode subdomain
+ADJUST copy_id copy_query
 REPLY QR NOERROR
 SECTION QUESTION
-www.example.com. IN A
+example.com. IN A
 SECTION AUTHORITY
 example.com.	IN NS	ns.example.com.
-example.com.	IN NS	lame.example.com.
 SECTION ADDITIONAL
 ns.example.com.		IN 	A	1.2.3.4
-lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 RANGE_END
 
@@ -76,67 +79,160 @@ RANGE_BEGIN 0 100
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
-REPLY QR AA NOERROR
+REPLY QR NOERROR
 SECTION QUESTION
 example.com. IN NS
 SECTION ANSWER
 example.com.	IN NS	ns.example.com.
-example.com.	IN NS	lame.example.com.
 SECTION ADDITIONAL
 ns.example.com.		IN 	A	1.2.3.4
-lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
-REPLY QR AA NOERROR
+REPLY QR NOERROR
+SECTION QUESTION
+ns.example.com. IN A
+SECTION ANSWER
+ns.example.com.		IN 	A	1.2.3.4
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+ns.example.com. IN AAAA
+SECTION ANSWER
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
 SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
 SECTION AUTHORITY
 example.com.	IN NS	ns.example.com.
-example.com.	IN NS	lame.example.com.
 SECTION ADDITIONAL
 ns.example.com.		IN 	A	1.2.3.4
-lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 RANGE_END
 
-; lame.example.com.
+; the stub-prime server.
+; local authority (that fails a lot)
 RANGE_BEGIN 0 100
-	ADDRESS 1.2.3.5
+	ADDRESS 1.2.3.6
+
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
-REPLY QR RA NOERROR
+REPLY QR AA
 SECTION QUESTION
 example.com. IN NS
 SECTION ANSWER
 example.com.	IN NS	ns.example.com.
-example.com.	IN NS	lame.example.com.
 SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
-lame.example.com.		IN 	A	1.2.3.5
+ns.example.com.		IN 	A	1.2.3.7
 ENTRY_END
 
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
-REPLY QR RA NOERROR
+REPLY QR AA SERVFAIL
+SECTION QUESTION
+ns.example.com. IN A
+SECTION ANSWER
+;ns.example.com.		IN 	A	1.2.3.7
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA SERVFAIL
+SECTION QUESTION
+ns.example.com. IN AAAA
+SECTION ANSWER
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA SERVFAIL
 SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
-www.example.com. IN A	10.20.30.40
+;www.example.com. IN A	10.20.30.70
 SECTION AUTHORITY
-example.com.	IN NS	ns.example.com.
-example.com.	IN NS	lame.example.com.
 SECTION ADDITIONAL
-ns.example.com.		IN 	A	1.2.3.4
-lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 RANGE_END
+
+; the primed server
+RANGE_BEGIN 0 100
+	ADDRESS 1.2.3.7
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA
+SECTION QUESTION
+example.com. IN NS
+SECTION ANSWER
+example.com.	IN NS	ns.example.com.
+SECTION ADDITIONAL
+ns.example.com.		IN 	A	1.2.3.8
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA
+SECTION QUESTION
+ns.example.com. IN A
+SECTION ANSWER
+ns.example.com.		IN 	A	1.2.3.8
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA
+SECTION QUESTION
+ns.example.com. IN AAAA
+SECTION ANSWER
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA SERVFAIL
+SECTION QUESTION
+www.example.com. IN A
+SECTION ANSWER
+;www.example.com. IN A	10.20.30.80
+SECTION AUTHORITY
+SECTION ADDITIONAL
+ENTRY_END
+RANGE_END
+
+; crap server that the primed server refers to.
+RANGE_BEGIN 0 100
+	ADDRESS 1.2.3.8
+
+ENTRY_BEGIN
+MATCH opcode
+ADJUST copy_id copy_query
+REPLY QR SERVFAIL
+SECTION QUESTION
+example.com. IN NS
+SECTION ANSWER
+ENTRY_END
+RANGE_END
+
 
 STEP 1 QUERY
 ENTRY_BEGIN
@@ -149,17 +245,15 @@ ENTRY_END
 STEP 10 CHECK_ANSWER
 ENTRY_BEGIN
 MATCH all
-REPLY QR RD RA NOERROR
+REPLY QR RD RA SERVFAIL
 SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
-www.example.com. IN A	10.20.30.40
+;www.example.com. IN A	10.20.30.50
 ;SECTION AUTHORITY
 ;example.com.	IN NS	ns.example.com.
-;example.com.	IN NS	lame.example.com.
 ;SECTION ADDITIONAL
 ;ns.example.com.		IN 	A	1.2.3.4
-;lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 
 SCENARIO_END

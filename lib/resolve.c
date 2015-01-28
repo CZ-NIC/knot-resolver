@@ -29,7 +29,11 @@
 #include "lib/layer/static.h"
 #include "lib/layer/stats.h"
 
+#ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[reslv] " fmt, ## __VA_ARGS__)
+#else
+#define DEBUG_MSG(fmt, ...)
+#endif
 
 /* Defines */
 #define ITER_LIMIT 50

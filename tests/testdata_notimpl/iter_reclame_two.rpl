@@ -1,14 +1,15 @@
 ; config options
 server:
 	target-fetch-policy: "0 0 0 0 0"
-	module-config: "iterator"
 
 stub-zone:
 	name: "."
 	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
 CONFIG_END
 
-SCENARIO_BEGIN Test basic iterative resolve without validator module
+SCENARIO_BEGIN Test iterative resolve with two recursion lame servers.
+; both servers are recursion lame. The iterator tries both servers,
+; but they are both lame.  Then it concludes that it only has reclame.
 
 ; K.ROOT-SERVERS.NET.
 RANGE_BEGIN 0 100
@@ -26,11 +27,11 @@ K.ROOT-SERVERS.NET.	IN	A	193.0.14.129
 ENTRY_END
 
 ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
+MATCH opcode subdomain
+ADJUST copy_id copy_query
 REPLY QR NOERROR
 SECTION QUESTION
-www.example.com. IN A
+com. IN A
 SECTION AUTHORITY
 com.	IN NS	a.gtld-servers.net.
 SECTION ADDITIONAL
@@ -54,15 +55,17 @@ a.gtld-servers.net.	IN 	A	192.5.6.30
 ENTRY_END
 
 ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
+MATCH opcode subdomain
+ADJUST copy_id copy_query
 REPLY QR NOERROR
 SECTION QUESTION
-www.example.com. IN A
+example.com. IN A
 SECTION AUTHORITY
 example.com.	IN NS	ns.example.com.
+example.com.	IN NS	lame.example.com.
 SECTION ADDITIONAL
 ns.example.com.		IN 	A	1.2.3.4
+lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 RANGE_END
 
@@ -72,27 +75,83 @@ RANGE_BEGIN 0 100
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
-REPLY QR NOERROR
+REPLY QR RA NOERROR
 SECTION QUESTION
 example.com. IN NS
 SECTION ANSWER
 example.com.	IN NS	ns.example.com.
+example.com.	IN NS	lame.example.com.
 SECTION ADDITIONAL
 ns.example.com.		IN 	A	1.2.3.4
+lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
-REPLY QR NOERROR
+REPLY QR RA NOERROR
+SECTION QUESTION
+ns.example.com. IN AAAA
+SECTION ANSWER
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RA NOERROR
+SECTION QUESTION
+lame.example.com. IN AAAA
+SECTION ANSWER
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RA NOERROR
 SECTION QUESTION
 www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN A	10.20.30.40
 SECTION AUTHORITY
 example.com.	IN NS	ns.example.com.
+example.com.	IN NS	lame.example.com.
 SECTION ADDITIONAL
 ns.example.com.		IN 	A	1.2.3.4
+lame.example.com.		IN 	A	1.2.3.5
+ENTRY_END
+RANGE_END
+
+; lame.example.com.
+RANGE_BEGIN 0 100
+	ADDRESS 1.2.3.5
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RA NOERROR
+SECTION QUESTION
+example.com. IN NS
+SECTION ANSWER
+example.com.	IN NS	ns.example.com.
+example.com.	IN NS	lame.example.com.
+SECTION ADDITIONAL
+ns.example.com.		IN 	A	1.2.3.4
+lame.example.com.		IN 	A	1.2.3.5
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode 
+ADJUST copy_id copy_query
+REPLY QR RA NOERROR
+SECTION QUESTION
+www.example.com. IN A
+SECTION ANSWER
+www.example.com. IN A	10.20.30.40
+SECTION AUTHORITY
+example.com.	IN NS	ns.example.com.
+example.com.	IN NS	lame.example.com.
+SECTION ADDITIONAL
+ns.example.com.		IN 	A	1.2.3.4
+lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 RANGE_END
 
@@ -114,8 +173,10 @@ SECTION ANSWER
 www.example.com. IN A	10.20.30.40
 ;SECTION AUTHORITY
 ;example.com.	IN NS	ns.example.com.
+;example.com.	IN NS	lame.example.com.
 ;SECTION ADDITIONAL
 ;ns.example.com.		IN 	A	1.2.3.4
+;lame.example.com.		IN 	A	1.2.3.5
 ENTRY_END
 
 SCENARIO_END
