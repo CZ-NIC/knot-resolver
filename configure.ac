@@ -46,6 +46,15 @@ AM_CONDITIONAL([BUILD_TESTS], [test "$build_tests" == "yes"])
 AM_CONDITIONAL([BUILD_INTEGRATION], [test "$build_integration" == "yes"])
 AM_CONDITIONAL([BUILD_DAEMON], [test "$build_daemon" == "yes"])
 
+# Check for code coverage
+AC_ARG_ENABLE([code-coverage],
+	      AS_HELP_STRING([--enable-code-coverage], [enable code coverage, default: no]),
+	      [code_coverage=yes], [code_coverage=no])
+if test "x${code_coverage}" == "xyes"; then
+	CFLAGS="${CFLAGS} --coverage -O0 -g"
+fi
+
+
 # Search other libraries
 AC_SEARCH_LIBS([mdb_env_open], [lmdb])
 
