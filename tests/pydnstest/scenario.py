@@ -128,10 +128,11 @@ class Entry:
         except:
             pass  # optional
         rdtype = args.pop(0)
+        rr = dns.rrset.from_text(owner, ttl, rdclass, rdtype)
         if len(args) > 0:
-            return dns.rrset.from_text(owner, ttl, rdclass, rdtype, ' '.join(args))
-        else:
-            return dns.rrset.from_text(owner, ttl, rdclass, rdtype)
+            rd = dns.rdata.from_text(rr.rdclass, rr.rdtype, ' '.join(args), origin = dns.name.from_text(self.origin), relativize = False)
+            rr.add(rd)
+        return rr
 
     def __compare_rrs(self, expected, got):
         """ Compare lists of RR sets, throw exception if different. """
