@@ -20,6 +20,7 @@ check_PROGRAMS = \
 check-compile-only: $(check_PROGRAMS)
 check-local-exec: $(check_PROGRAMS)
 	@echo "---- Executing unit tests ----"
+	@cd $(top_builddir)
 	$(top_builddir)/tests/runtests -b $(top_builddir)/tests $(check_PROGRAMS)
 
 else
@@ -44,7 +45,8 @@ convenience-link: $(check_LTLIBRARIES)
 
 check-local-integration: convenience-link
 	@echo "---- Executing integration tests ----"
-	@$(abs_builddir)/test_integration.py testdata
+	@cd $(top_builddir)
+	@$(top_builddir)/tests/test_integration.py testdata
 
 clean-local:
 	@for soname in `echo | $(EGREP) "^dlname=" $(check_LTLIBRARIES) | $(SED) -e "s|^dlname='\(.*\)'|\1|"`; do  \

@@ -7,14 +7,19 @@ env:
         - LDFLAGS="-L${HOME}/fakeroot/lib"
         - PIP_DOWNLOAD_CACHE="${HOME}/.pip-cache"
         - CFLAGS="${CFLAGS} -DNDEBUG"
+        - PATH="${PATH}:${HOME}/.local/bin"
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/fakeroot
     - pip install --user travis -r tests/pydnstest/requirements.txt
+    - pip install --user travis cpp-coveralls
 script:
     - autoreconf -i
-    - ./configure --enable-integration-tests
+    - ./configure --enable-integration-tests --enable-code-coverage
     - make
     - make check
+after_script:
+    - cd lib
+    - coveralls -E include --gcov-options '\-lp'
 sudo: false
 cache:
     directories:
