@@ -196,12 +196,15 @@ class Step:
     each step has an order identifier, type and optionally data entry.
     """
 
+    require_data = ['TIME_PASSES']
+
     def __init__(self, id, type, extra_args):
         """ Initialize single scenario step. """
         self.id = int(id)
         self.type = type
         self.args = extra_args
         self.data = []
+        self.has_data = self.type not in Step.require_data
 
     def add(self, entry):
         """ Append a data entry to this step. """
@@ -241,7 +244,7 @@ class Step:
 
     def __time_passes(self, ctx):
         """ Modify system time. """
-        ctx.scenario.time = int(self.args[0])
+        ctx.scenario.time = int(self.args[1])
         ctx.set_time(ctx.scenario.time)
 
 
