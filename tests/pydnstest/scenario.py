@@ -32,6 +32,8 @@ class Entry:
             return self.__compare_val(expected.question[0].rdtype, msg.question[0].rdtype)
         elif code == 'qname':
             return self.__compare_val(expected.question[0].name, msg.question[0].name)
+        elif code == 'subdomain':
+            return self.__compare_sub(expected.question[0].name, msg.question[0].name)
         elif code == 'flags':
             return self.__compare_val(dns.flags.to_text(expected.flags), dns.flags.to_text(msg.flags))
         elif code == 'question':
@@ -145,6 +147,12 @@ class Entry:
         """ Compare values, throw exception if different. """
         if expected != got:
             raise Exception("expected '%s', got '%s'" % (expected, got))
+        return True
+
+    def __compare_sub(self, got, expected):
+        """ Check if got subdomain of expected, throw exception if different. """
+        if not expected.is_subdomain(got):
+            raise Exception("expected subdomain of '%s', got '%s'" % (expected, got))
         return True
 
 
