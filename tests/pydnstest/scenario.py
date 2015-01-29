@@ -32,6 +32,8 @@ class Entry:
             return self.__compare_val(expected.question[0].rdtype, msg.question[0].rdtype)
         elif code == 'qname':
             return self.__compare_val(expected.question[0].name, msg.question[0].name)
+        elif code == 'subdomain':
+            return self.__compare_sub(expected.question[0].name, msg.question[0].name)
         elif code == 'flags':
             return self.__compare_val(dns.flags.to_text(expected.flags), dns.flags.to_text(msg.flags))
         elif code == 'question':
@@ -126,10 +128,11 @@ class Entry:
         except:
             pass  # optional
         rdtype = args.pop(0)
+        rr = dns.rrset.from_text(owner, ttl, rdclass, rdtype)
         if len(args) > 0:
-            return dns.rrset.from_text(owner, ttl, rdclass, rdtype, ' '.join(args))
-        else:
-            return dns.rrset.from_text(owner, ttl, rdclass, rdtype)
+            rd = dns.rdata.from_text(rr.rdclass, rr.rdtype, ' '.join(args), origin = dns.name.from_text(self.origin), relativize = False)
+            rr.add(rd)
+        return rr
 
     def __compare_rrs(self, expected, got):
         """ Compare lists of RR sets, throw exception if different. """
@@ -145,6 +148,12 @@ class Entry:
         """ Compare values, throw exception if different. """
         if expected != got:
             raise Exception("expected '%s', got '%s'" % (expected, got))
+        return True
+
+    def __compare_sub(self, got, expected):
+        """ Check if got subdomain of expected, throw exception if different. """
+        if not expected.is_subdomain(got):
+            raise Exception("expected subdomain of '%s', got '%s'" % (expected, got))
         return True
 
 
@@ -187,12 +196,15 @@ class Step:
     each step has an order identifier, type and optionally data entry.
     """
 
+    require_data = ['TIME_PASSES']
+
     def __init__(self, id, type, extra_args):
         """ Initialize single scenario step. """
         self.id = int(id)
         self.type = type
         self.args = extra_args
         self.data = []
+        self.has_data = self.type not in Step.require_data
 
     def add(self, entry):
         """ Append a data entry to this step. """
@@ -232,7 +244,7 @@ class Step:
 
     def __time_passes(self, ctx):
         """ Modify system time. """
-        ctx.scenario.time = int(self.args[0])
+        ctx.scenario.time = int(self.args[1])
         ctx.set_time(ctx.scenario.time)
 
 

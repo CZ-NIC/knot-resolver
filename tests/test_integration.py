@@ -52,12 +52,12 @@ def parse_step(op, args, file_in):
     if len(args) > 2:
         extra_args = args[2:]
     out = scenario.Step(args[0], args[1], extra_args)
-    op, args = get_next(file_in)
-    # Optional data
-    if op == 'ENTRY_BEGIN':
-        out.add(parse_entry(op, args, file_in))
-    else:
-        raise Exception('expected "ENTRY_BEGIN"')
+    if out.has_data:
+        op, args = get_next(file_in)
+        if op == 'ENTRY_BEGIN':
+            out.add(parse_entry(op, args, file_in))
+        else:
+            raise Exception('expected "ENTRY_BEGIN"')
     return out
 
 
