@@ -38,6 +38,11 @@ static PyObject *mock_server  = NULL;   /* Mocked endpoint for recursive queries
 
 static PyObject* init(PyObject* self, PyObject* args)
 {
+	const char *config= NULL;
+	if (!PyArg_ParseTuple(args, "s", &config)) {
+		return NULL;
+	}
+
 	/* Initialize mock variables */
 	memset(&_mock_time, 0, sizeof(struct timeval));
 	mock_server = NULL;
@@ -52,7 +57,12 @@ static PyObject* init(PyObject* self, PyObject* args)
 	assert(global_context.cache);
 
 	/* Test context options. */
-	global_context.options = QUERY_TCP | QUERY_NO_MINIMIZE;
+	global_context.options = QUERY_TCP;
+
+	/* No configuration parsing support yet. */
+	if (strstr(config, "query-minimization: on") == NULL) {
+		global_context.options |= QUERY_NO_MINIMIZE; 
+	}
 
 	return Py_BuildValue("s", PACKAGE_STRING " (integration tests)");
 }

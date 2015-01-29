@@ -91,9 +91,17 @@ def parse_scenario(op, args, file_in):
 def parse_file(file_in):
     """ Parse scenario from a file. """
     try:
+        config = ''
+        line = file_in.readline()
+        while len(line):
+            if line.startswith('CONFIG_END'):
+                break
+            if not line.startswith(';'):
+                config += line
+            line = file_in.readline()
         for op, args in iter(lambda: get_next(file_in), False):
             if op == 'SCENARIO_BEGIN':
-                return parse_scenario(op, args, file_in)
+                return parse_scenario(op, args, file_in), config
         raise Exception("IGNORE (missing scenario)")
     except Exception as e:
         raise Exception('line %d: %s' % (file_in.lineno(), str(e)))
@@ -117,15 +125,16 @@ def play_object(path):
     # Parse scenario
     file_in = fileinput.input(path)
     scenario = None
+    config = None
     try:
-        scenario = parse_file(file_in)
+        scenario, config = parse_file(file_in)
     finally:
         file_in.close()
 
     # Play scenario
     server = testserver.TestServer(scenario)
     server.start()
-    mock_ctx.init()
+    mock_ctx.init(config)
     try:
         mock_ctx.set_server(server)
         if TEST_DEBUG > 0:
