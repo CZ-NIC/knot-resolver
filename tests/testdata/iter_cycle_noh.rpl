@@ -215,8 +215,8 @@ SECTION QUESTION
 ns.example.com. IN A
 SECTION ANSWER
 ns.example.com.	IN A 1.2.3.2
-SECTION AUTHORITY
-example.com.	IN NS	ns.example.net.
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.net.
 ; scrubbed off
 ; SECTION ADDITIONAL
 ; ns.example.net.	IN A 1.2.3.1
