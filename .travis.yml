@@ -19,7 +19,7 @@ script:
     - make check
 after_script:
     - cd lib
-    - coveralls -E include --gcov-options '\-lp'
+    - coveralls -x ".c" --gcov-options '\-lp'
 sudo: false
 cache:
     directories:
