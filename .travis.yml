@@ -13,7 +13,7 @@ before_script:
     - pip install --user travis -r tests/pydnstest/requirements.txt
     - pip install --user travis cpp-coveralls
 script:
-    - autoreconf -i
+    - ./bootstrap
     - ./configure --enable-integration-tests --enable-code-coverage
     - make
     - make check
@@ -25,3 +25,4 @@ cache:
     directories:
     - ${HOME}/fakeroot
     - ${HOME}/.pip-cache
+    - .autom4te.cache
