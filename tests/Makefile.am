@@ -13,8 +13,9 @@ LDADD = \
 if BUILD_TESTS
 
 check_PROGRAMS = \
-	test_cache \
 	test_context \
+	test_rplan \
+	test_cache \
 	test_resolve
 
 check-compile-only: $(check_PROGRAMS)

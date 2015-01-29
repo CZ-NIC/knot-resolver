@@ -33,6 +33,10 @@
 
 static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 {
+	if (name == NULL) {
+		return NULL;
+	}
+
 	struct kr_query *qry = mm_alloc(pool, sizeof(struct kr_query));
 	if (qry == NULL) {
 		return NULL;
@@ -54,18 +58,27 @@ static void query_free(mm_ctx_t *pool, struct kr_query *qry)
 	mm_free(pool, qry);
 }
 
-void kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *pool)
+int kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *pool)
 {
+	if (rplan == NULL) {
+		return KNOT_EINVAL;
+	}
+
 	memset(rplan, 0, sizeof(struct kr_rplan));
 
 	rplan->pool = pool;
 	rplan->context = context;
 	init_list(&rplan->pending);
 	init_list(&rplan->resolved);
+	return KNOT_EOK;
 }
 
 void kr_rplan_deinit(struct kr_rplan *rplan)
 {
+	if (rplan == NULL) {
+		return;
+	}
+
 	struct kr_query *qry = NULL, *next = NULL;
 	WALK_LIST_DELSAFE(qry, next, rplan->pending) {
 		query_free(rplan->pool, qry);
@@ -84,12 +97,19 @@ void kr_rplan_deinit(struct kr_rplan *rplan)
 
 bool kr_rplan_empty(struct kr_rplan *rplan)
 {
+	if (rplan == NULL) {
+		return true;
+	}
+
 	return EMPTY_LIST(rplan->pending);
 }
 
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
+	if (rplan == NULL) {
+		return NULL;
+	}
 	struct kr_query *qry =  query_create(rplan->pool, name);
 	if (qry == NULL) {
 		return NULL;
@@ -119,6 +139,10 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 
 int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 {
+	if (rplan == NULL || qry == NULL) {
+		return KNOT_EINVAL;
+	}
+
 	rem_node(&qry->node);
 	add_tail(&rplan->resolved, &qry->node);
 	return KNOT_EOK;
@@ -126,15 +150,16 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 
 struct kr_query *kr_rplan_current(struct kr_rplan *rplan)
 {
-	if (EMPTY_LIST(rplan->pending)) {
+	if (rplan == NULL || EMPTY_LIST(rplan->pending)) {
 		return NULL;
 	}
+
 	return TAIL(rplan->pending);
 }
 
 namedb_txn_t *kr_rplan_txn_acquire(struct kr_rplan *rplan, unsigned flags)
 {
-	if (rplan == NULL) {
+	if (rplan == NULL || rplan->context == NULL) {
 		return NULL;
 	}
 
@@ -162,7 +187,7 @@ namedb_txn_t *kr_rplan_txn_acquire(struct kr_rplan *rplan, unsigned flags)
 
 int kr_rplan_txn_commit(struct kr_rplan *rplan)
 {
-	if (rplan == NULL) {
+	if (rplan == NULL || rplan->context == NULL) {
 		return KNOT_EINVAL;
 	}
 

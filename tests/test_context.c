@@ -22,19 +22,23 @@
 mm_ctx_t global_mm;
 static struct kr_context global_context;
 
-/* Create resolution context */
-static void text_context_init(void **state)
+static void test_context_init(void **state)
 {
 	int ret = kr_context_init(&global_context, &global_mm);
 	assert_int_equal(ret, KNOT_EOK);
 	*state = &global_context;
 }
 
-/* Delete it */
-static void text_context_deinit(void **state)
+static void test_context_deinit(void **state)
 {
 	int ret = kr_context_deinit(*state);
 	assert_int_equal(ret, KNOT_EOK);
+}
+
+static void test_context_params(void **state)
+{
+	assert_int_equal(kr_context_init(NULL, NULL), KNOT_EINVAL);
+	assert_int_equal(kr_context_deinit(NULL), KNOT_EINVAL);
 }
 
 int main(void)
@@ -42,7 +46,8 @@ int main(void)
 	test_mm_ctx_init(&global_mm);
 
 	const UnitTest tests[] = {
-	        unit_test_teardown(text_context_init, text_context_deinit),
+		unit_test(test_context_params),
+	        unit_test_teardown(test_context_init, test_context_deinit),
 	};
 
 	return run_tests(tests);

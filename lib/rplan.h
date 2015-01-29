@@ -67,7 +67,7 @@ struct kr_rplan {
  * \param context resolution context
  * \param pool ephemeral memory pool for whole resolution
  */
-void kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *pool);
+int kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *pool);
 
 /*!
  * \brief Deinitialize resolution plan, aborting any uncommited transactions.
