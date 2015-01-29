@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+aclocal -I m4 --install
+libtoolize --copy
+autoheader
+automake --copy --add-missing
+autoconf 
