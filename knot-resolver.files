@@ -37,9 +37,12 @@ lib/zonecut.h
 tests/Makefile.am
 tests/pydnstest/__init__.py
 tests/pydnstest/scenario.py
+tests/pydnstest/test.py
+tests/pydnstest/testserver.py
 tests/test.h
 tests/test_cache.c
 tests/test_context.c
 tests/test_integration.c
 tests/test_integration.py
 tests/test_resolve.c
+tests/test_rplan.c
