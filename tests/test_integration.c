@@ -15,9 +15,6 @@
  */
 
 #include <Python.h>
-#include <libknot/descriptor.h>
-#include <libknot/packet/pkt.h>
-#include <libknot/internal/net.h>
 
 #include "tests/test.h"
 #include "lib/rplan.h"
@@ -29,8 +26,12 @@
 static mm_ctx_t global_mm;               /* Test memory context */
 static struct kr_context global_context; /* Resolution context */
 static const char *global_tmpdir = NULL; /* Temporary directory */
-static struct timeval _mock_time;        /* Mocked system time */
-static PyObject *mock_server  = NULL;   /* Mocked endpoint for recursive queries */
+
+/*
+ * Test driver global variables.
+ */
+extern struct timeval g_mock_time;        /* Mocked system time */
+extern PyObject *g_mock_server;           /* Mocked endpoint for recursive queries */
 
 /*
  * PyModule implementation.
@@ -44,8 +45,8 @@ static PyObject* init(PyObject* self, PyObject* args)
 	}
 
 	/* Initialize mock variables */
-	memset(&_mock_time, 0, sizeof(struct timeval));
-	mock_server = NULL;
+	memset(&g_mock_time, 0, sizeof(struct timeval));
+	g_mock_server = NULL;
 
 	/* Initialize resolution context */
 	#define CACHE_SIZE 100*1024
@@ -76,9 +77,9 @@ static PyObject* deinit(PyObject* self, PyObject* args)
 	kr_context_deinit(&global_context);
 	test_tmpdir_remove(global_tmpdir);
 	global_tmpdir = NULL;
-	if (mock_server) {
-		Py_XDECREF(mock_server);
-		mock_server = NULL;
+	if (g_mock_server) {
+		Py_XDECREF(g_mock_server);
+		g_mock_server = NULL;
 	}
 
 	return Py_BuildValue("");
@@ -122,8 +123,8 @@ static PyObject* set_time(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-	_mock_time.tv_sec  = arg_time;
-	_mock_time.tv_usec = 0;
+	g_mock_time.tv_sec  = arg_time;
+	g_mock_time.tv_usec = 0;
 
 	return Py_BuildValue("");
 }
@@ -138,51 +139,10 @@ static PyObject* set_server(PyObject *self, PyObject *args)
 
 	/* Swap the server implementation. */
 	Py_XINCREF(arg_client);
-	Py_XDECREF(mock_server);
-	mock_server = arg_client;
+	Py_XDECREF(g_mock_server);
+	g_mock_server = arg_client;
 
 	return Py_BuildValue("");
-}
-
-static PyObject* test_connect(PyObject *self, PyObject *args)
-{
-	/* Fetch a new client */
-	struct sockaddr_storage addr;
-	sockaddr_set(&addr, AF_INET, "127.0.0.1", 0);
-	int sock = net_connected_socket(SOCK_STREAM, &addr, NULL, 0);
-	if (sock < 0) {
-		return NULL;
-	}
-
-	int ret = 0;
-	bool test_passed = true;
-	knot_pkt_t *query = NULL, *reply = NULL;
-
-	/* Send and receive a query. */
-	query = knot_pkt_new(NULL, 512, NULL);
-	knot_pkt_put_question(query, (const uint8_t *)"", KNOT_CLASS_IN, KNOT_RRTYPE_NS);
-	ret = tcp_send_msg(sock, query->wire, query->size);
-	if (ret != query->size) {
-		test_passed = false;
-		goto finish;
-	}
-
-	reply = knot_pkt_new(NULL, 512, NULL);
-	ret = tcp_recv_msg(sock, reply->wire, reply->max_size, NULL); 
-	if (ret <= 0) {
-		test_passed = false;
-		goto finish;
-	}
-
-finish:
-	close(sock);
-	knot_pkt_free(&query);
-	knot_pkt_free(&reply);
-	if (test_passed) {
-		return Py_BuildValue("");
-	} else {
-		return NULL;
-	}
 }
 
 static PyMethodDef module_methods[] = {
@@ -191,90 +151,10 @@ static PyMethodDef module_methods[] = {
     {"resolve", resolve, METH_VARARGS, "Resolve query."},
     {"set_time", set_time, METH_VARARGS, "Set mock system time."},
     {"set_server", set_server, METH_VARARGS, "Set fake server object."},
-	{"test_connect", test_connect, METH_VARARGS, "Test server connection."},
     {NULL, NULL, 0, NULL}
 };
 
 PyMODINIT_FUNC init_test_integration(void)
 {
 	(void) Py_InitModule("_test_integration", module_methods);
-}
-
-/*
- * Mock symbol reimplementation.
- * These effectively allow to manipulate time/networking during resolution.
- */
-
-int __wrap_gettimeofday(struct timeval *tv, struct timezone *tz)
-{
-	fprintf(stderr, "gettimeofday = %ld\n", tv->tv_sec);
-	memcpy(tv, &_mock_time, sizeof(struct timeval));
-	return 0;
-}
-
-int tcp_recv_msg(int fd, uint8_t *buf, size_t len, struct timeval *timeout)
-{
-	/* Unlock GIL and attempt to receive message. */
-	uint16_t msg_len = 0;
-	int rcvd = 0;
-	Py_BEGIN_ALLOW_THREADS
-	rcvd = read(fd, (char *)&msg_len, sizeof(msg_len));
-	if (rcvd == sizeof(msg_len)) {
-		msg_len = htons(msg_len);
-		rcvd = read(fd, buf, msg_len);
-	}
-	Py_END_ALLOW_THREADS
-	return rcvd;
-}
-
-int udp_recv_msg(int fd, uint8_t *buf, size_t len, struct timeval *timeout)
-{
-	/* Tunnel via TCP. */
-	return tcp_recv_msg(fd, buf, len, timeout);
-}
-
-
-int tcp_send_msg(int fd, const uint8_t *msg, size_t len)
-{
-	/* Unlock GIL and attempt to send message over. */
-	uint16_t msg_len = htons(len);
-	int sent = 0;
-	Py_BEGIN_ALLOW_THREADS
-	sent = write(fd, (char *)&msg_len, sizeof(msg_len));
-	if (sent == sizeof(msg_len)) {
-		sent = write(fd, msg, len);
-	}
-	Py_END_ALLOW_THREADS
-	return sent;
-}
-
-int udp_send_msg(int fd, const uint8_t *msg, size_t msglen,
-                 const struct sockaddr *addr)
-{
-	/* Tunnel via TCP. */
-	return tcp_send_msg(fd, msg, msglen);
-}
-
-
-int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
-                         const struct sockaddr_storage *src_addr, unsigned flags)
-{
-	char addr_str[SOCKADDR_STRLEN];
-	sockaddr_tostr(addr_str, sizeof(addr_str), dst_addr);
-
-	PyObject *result = PyObject_CallMethod(mock_server, "client", "s", addr_str);
-	if (result == NULL) {
-		return -1;
-	}
-
-	/* Refcount decrement is going to close the fd, dup() it */
-	int fd = dup(PyObject_AsFileDescriptor(result));
-	Py_DECREF(result);
-	return fd;
-}
-
-int net_is_connected(int fd)
-{
-	fprintf(stderr, "%s (%d)\n", __func__, fd);
-	return true;
 }

@@ -10,6 +10,9 @@ AM_SILENT_RULES([yes])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
+# Platform-specific
+AM_CONDITIONAL([HOST_DARWIN], [test "${host_os}" != "${host_os/darwin/}"])
+
 # Set compiler compatibility flags
 AC_PROG_CC_C99
 AM_PROG_CC_C_O

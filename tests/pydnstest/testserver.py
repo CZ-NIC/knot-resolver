@@ -92,7 +92,8 @@ class TestServer:
 
     def client(self, dst_address = None):
         """ Return connected client. """
-        self.client_address = dst_address.split('@')[0]
+        if dst_address is not None:
+            self.client_address = dst_address.split('@')[0]
         sock = socket.socket(self.sock_type, socket.SOCK_STREAM)
         sock.connect(self.sock.getsockname())
         return sock
