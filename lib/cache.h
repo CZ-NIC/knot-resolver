@@ -70,14 +70,23 @@ int kr_cache_txn_commit(namedb_txn_t *txn);
 void kr_cache_txn_abort(namedb_txn_t *txn);
 
 /*!
- * \brief Query the cache for given RRSet (name, type, class)
+ * \brief Peek the cache for given RRSet (name, type, class)
  * \note The 'drift' is the time passed between the cache time of the RRSet and now (in seconds).
  * \param txn transaction instance
  * \param rr query RRSet (its rdataset may be changed depending on the result)
  * \param timestamp current time (will be replaced with drift if successful)
  * \return KNOT_E*
  */
-int kr_cache_query(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp);
+int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp);
+
+/*!
+ * \brief Clone read-only RRSet and adjust TTLs.
+ * \param src read-only RRSet (its rdataset may be changed depending on the result)
+ * \param drift time passed between cache time and now
+ * \param mm memory context
+ * \return materialized (or empty) RRSet
+ */
+knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm);
 
 /*!
  * \brief Insert RRSet into cache, replacing any existing data.

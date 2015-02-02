@@ -99,7 +99,7 @@ static struct kr_cache_rrset *cache_rr(namedb_txn_t *txn, const knot_dname_t *na
 	return (struct kr_cache_rrset *)val.data;
 }
 
-int kr_cache_query(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
+int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
 {
 	/* Check if the RRSet is in the cache. */
 	struct kr_cache_rrset *found_rr = cache_rr(txn, rr->owner, rr->type);
@@ -120,21 +120,50 @@ int kr_cache_query(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
 			return KNOT_EOK;
 		}
 
-		/* Check if all RRs are still valid. */
+		/* Check if at least one RR is still valid. */
 		uint32_t drift = *timestamp - found_rr->timestamp;
 		for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
 			const knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
-			if (drift >= knot_rdata_ttl(rd)) {
-				return KNOT_ENOENT;
+			if (knot_rdata_ttl(rd) > drift) {
+				*timestamp = drift;
+				return KNOT_EOK;
 			}
 		}
 
-		*timestamp = drift;
-		return KNOT_EOK;
+		return KNOT_ENOENT;
 	}
 
 	/* Not found. */
 	return KNOT_ENOENT;
+}
+
+knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm)
+{
+	/* Make RRSet copy. */
+	knot_rrset_t copy;
+	knot_rrset_init(&copy, NULL, src->type, src->rclass);
+	copy.owner = knot_dname_copy(src->owner, mm);
+	if (copy.owner == NULL) {
+		return copy;
+	}
+	
+	for (uint16_t i = 0; i < src->rrs.rr_count; ++i) {
+		knot_rdata_t *rd = knot_rdataset_at(&src->rrs, i);
+		if (knot_rdata_ttl(rd) > drift) {
+			if (knot_rdataset_add(&copy.rrs, rd, mm) != KNOT_EOK) {
+				knot_rrset_clear(&copy, mm);
+				return copy;
+			}
+		}
+	}
+	
+	/* Update TTLs. */
+	for (uint16_t i = 0; i < copy.rrs.rr_count; ++i) {
+		knot_rdata_t *rd = knot_rdataset_at(&copy.rrs, i);
+		knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
+	}
+	
+	return copy;
 }
 
 int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestamp)
