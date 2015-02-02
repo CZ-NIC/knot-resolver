@@ -22,11 +22,20 @@
 const knot_layer_api_t *layer_iterate_module(void);
 #define LAYER_ITERATE layer_iterate_module()
 
-/*! \brief Result updates the query parent. */
-int rr_update_parent(const knot_rrset_t *rr, struct kr_layer_param *param);
+/*!
+ * \brief Result updates the query parent.
+ * \note Hint is an index of chosen RR in the set.
+ */
+int rr_update_parent(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param);
 
-/*! \brief Result updates the original query response. */
-int rr_update_answer(const knot_rrset_t *rr, struct kr_layer_param *param);
+/*!
+ * \brief Result updates the original query response.
+ * \note When \a hint is KNOT_PF_FREE, RR is treated as a copy and answer takes its ownership.
+ */
+int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param);
 
-/*! \brief Result updates current nameserver. */
-int rr_update_nameserver(const knot_rrset_t *rr, struct kr_layer_param *param);
+/*!
+ * \brief Result updates current nameserver.
+ * \note Hint is an index of chosen RR in the set.
+ */
+int rr_update_nameserver(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param);

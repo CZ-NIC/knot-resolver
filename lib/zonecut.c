@@ -18,10 +18,12 @@
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/packet/wire.h>
+#include <libknot/descriptor.h>
+#include <libknot/rrtype/aaaa.h>
 
 #include "lib/zonecut.h"
-#include "lib/utils.h"
 #include "lib/rplan.h"
+#include "lib/defines.h"
 
 #ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[z-cut] " fmt, ## __VA_ARGS__)
@@ -118,6 +120,25 @@ int kr_set_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, const knot
 	return KNOT_EOK;
 }
 
+int kr_set_zone_cut_addr(struct kr_zonecut *cut, const knot_rrset_t *rr, uint16_t i)
+{
+	int ret = KNOT_EOK;
+
+	switch(rr->type) {
+	case KNOT_RRTYPE_A:
+		ret = knot_a_addr(&rr->rrs, i, (struct sockaddr_in *)&cut->addr);
+		break;
+	case KNOT_RRTYPE_AAAA:
+		ret = knot_aaaa_addr(&rr->rrs, i, (struct sockaddr_in6 *)&cut->addr);
+		break;
+	default:
+		return KNOT_EINVAL;
+	}
+
+	sockaddr_port_set(&cut->addr, KR_DNS_PORT);
+
+	return ret;
+}
 int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
 {
 	if (cut == NULL || name == NULL) {

@@ -23,7 +23,6 @@
 
 #include "lib/resolve.h"
 #include "lib/defines.h"
-#include "lib/utils.h"
 #include "lib/layer/itercache.h"
 #include "lib/layer/iterate.h"
 #include "lib/layer/static.h"

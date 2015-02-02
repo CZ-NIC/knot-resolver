@@ -22,7 +22,6 @@
 
 #include "lib/layer/static.h"
 #include "lib/layer/iterate.h"
-#include "lib/utils.h"
 
 #ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[cache] " fmt, ## __VA_ARGS__)
@@ -34,7 +33,16 @@ typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_par
 
 static int update_parent(const knot_rrset_t *rr, unsigned drift, struct kr_layer_param *param)
 {
-	return rr_update_parent(rr, param);
+	/* Find a first non-expired record. */
+	uint16_t i = 0;
+	for (; i < rr->rrs.rr_count; ++i) {
+		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
+		if (knot_rdata_ttl(rd) > drift) {
+			break;
+		}
+	}
+
+	return rr_update_parent(rr, i, param);
 }
 
 static int update_answer(const knot_rrset_t *rr, unsigned drift, struct kr_layer_param *param)
