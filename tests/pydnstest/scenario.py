@@ -1,7 +1,7 @@
 import dns.message
 import dns.rrset
 import dns.rcode
-
+import copy
 
 class Entry:
     """
@@ -64,7 +64,7 @@ class Entry:
 
     def adjust_reply(self, query):
         """ Copy scripted reply and adjust to received query. """
-        answer = self.message
+        answer = copy.deepcopy(self.message)
         if 'copy_id' in self.adjust_fields:
             answer.id = query.id
         if 'copy_query' in self.adjust_fields:
@@ -90,7 +90,7 @@ class Entry:
                 flags.append(code)
         self.message.flags = dns.flags.from_text(' '.join(flags))
         self.message.ednsflags = dns.flags.edns_from_text(' '.join(eflags))
-        self.message.rcode = rcode
+        self.message.set_rcode(rcode)
 
     def begin_section(self, section):
         """ Begin packet section. """
