@@ -23,7 +23,6 @@
 
 #include "lib/resolve.h"
 #include "lib/defines.h"
-#include "lib/utils.h"
 #include "lib/layer/itercache.h"
 #include "lib/layer/iterate.h"
 #include "lib/layer/static.h"
@@ -45,17 +44,39 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	if (txn == NULL) {
 		return KNOT_EOK;
 	}
+	
+	/* Fetch current nameserver cache. */
+	uint32_t drift = qry->timestamp.tv_sec;
+	knot_rrset_t cached;
+	knot_rrset_init(&cached, qry->zone_cut.name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
+	if (kr_cache_peek(txn, &cached, &drift) != KNOT_EOK) {
+		kr_init_zone_cut(&qry->zone_cut);
+		return KNOT_EOK;
+	}
+	cached = kr_cache_materialize(&cached, drift, rplan->pool);
+	
+	/* Find a matching RD. */
+	knot_rdataset_t to_remove;
+	knot_rdataset_init(&to_remove);
+	for (unsigned i = 0; i < cached.rrs.rr_count; ++i) {
+		knot_rdata_t *rd = knot_rdataset_at(&cached.rrs, i);
+		if (knot_dname_is_equal(knot_rdata_data(rd), qry->zone_cut.ns)) {
+			knot_rdataset_add(&to_remove, rd, rplan->pool);
+		}
+	}
+	knot_rdataset_subtract(&cached.rrs, &to_remove, rplan->pool);
+	knot_rdataset_clear(&to_remove, rplan->pool);
+	
+	/* Remove record(s) */
+	if (cached.rrs.rr_count == 0) {
+		(void) kr_cache_remove(txn, &cached);
+	} else {
+		(void) kr_cache_insert(txn, &cached, qry->timestamp.tv_sec);
+	}
+	knot_rrset_clear(&cached, rplan->pool);
 
-	/* TODO: selective removal */
-	knot_rrset_t removed_rr;
-	knot_rrset_init(&removed_rr, qry->zone_cut.name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-	(void) kr_cache_remove(txn, &removed_rr);
-
-	/* Find new zone cut / nameserver */
-	kr_find_zone_cut(&qry->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
-
-	/* Continue with querying */
-	return KNOT_EOK;
+	/* Update zone cut and continue. */
+	return kr_find_zone_cut(&qry->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
 }
 
 static int iterate(struct knot_requestor *requestor, struct kr_layer_param *param)

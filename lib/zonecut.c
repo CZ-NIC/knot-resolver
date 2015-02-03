@@ -18,10 +18,12 @@
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/packet/wire.h>
+#include <libknot/descriptor.h>
+#include <libknot/rrtype/aaaa.h>
 
 #include "lib/zonecut.h"
-#include "lib/utils.h"
 #include "lib/rplan.h"
+#include "lib/defines.h"
 
 #ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[z-cut] " fmt, ## __VA_ARGS__)
@@ -54,40 +56,12 @@ static const struct hint_info SBELT[HINT_COUNT] = {
         { U8("\x01""m""\x0c""root-servers""\x03""net"), "202.12.27.33" }
 };
 
-/*! \brief Fetch address record for nameserver. */
-static int prefetch_ns_addr(struct kr_zonecut *cut, knot_rrset_t *cached_rr, namedb_txn_t *txn, uint32_t timestamp)
+int kr_init_zone_cut(struct kr_zonecut *cut)
 {
-	/* Fetch nameserver address from cache. */
-	cached_rr->type = KNOT_RRTYPE_A;
-	if (kr_cache_query(txn, cached_rr, &timestamp) != KNOT_EOK) {
-		cached_rr->type = KNOT_RRTYPE_AAAA;
-		if (kr_cache_query(txn, cached_rr, &timestamp) != KNOT_EOK) {
-			return KNOT_ENOENT;
-		}
+	if (cut == NULL) {
+		return KNOT_EINVAL;
 	}
 
-	return kr_rrset_to_addr(&cut->addr, cached_rr);
-}
-
-/*! \brief Fetch best NS for zone cut. */
-static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
-{
-	knot_rrset_t cached_rr;
-	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-	int ret = kr_cache_query(txn, &cached_rr, &timestamp);
-	if (ret == KNOT_EOK) {
-		/* Accept only if has address records cached. */
-		kr_set_zone_cut(cut, name, knot_ns_name(&cached_rr.rrs, 0));
-		knot_rrset_init(&cached_rr, cut->ns, 0, KNOT_CLASS_IN);
-		ret = prefetch_ns_addr(cut, &cached_rr, txn, timestamp);
-	}
-
-	return ret;
-}
-
-/*! \brief Set zone cut to '.' and choose a random root nameserver from the SBELT. */
-static int set_sbelt_zone_cut(struct kr_zonecut *cut)
-{
 	const unsigned hint_id = knot_random_uint16_t() % HINT_COUNT;
 	const struct hint_info *hint = &SBELT[hint_id];
 
@@ -118,6 +92,74 @@ int kr_set_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, const knot
 	return KNOT_EOK;
 }
 
+int kr_set_zone_cut_addr(struct kr_zonecut *cut, const knot_rrset_t *rr, uint16_t i)
+{
+	int ret = KNOT_EOK;
+
+	switch(rr->type) {
+	case KNOT_RRTYPE_A:
+		ret = knot_a_addr(&rr->rrs, i, (struct sockaddr_in *)&cut->addr);
+		break;
+	case KNOT_RRTYPE_AAAA:
+		ret = knot_aaaa_addr(&rr->rrs, i, (struct sockaddr_in6 *)&cut->addr);
+		break;
+	default:
+		return KNOT_EINVAL;
+	}
+
+	sockaddr_port_set(&cut->addr, KR_DNS_PORT);
+
+	return ret;
+}
+
+/*! \brief Fetch address for zone cut. */
+static int fetch_addr(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timestamp)
+{
+	/* Fetch nameserver address from cache. */
+	knot_rrset_t cached_rr;
+	knot_rrset_init(&cached_rr, cut->ns, 0, KNOT_CLASS_IN);
+	cached_rr.type = KNOT_RRTYPE_A;
+	if (kr_cache_peek(txn, &cached_rr, &timestamp) != KNOT_EOK) {
+		cached_rr.type = KNOT_RRTYPE_AAAA;
+		if (kr_cache_peek(txn, &cached_rr, &timestamp) != KNOT_EOK) {
+			return KNOT_ENOENT;
+		}
+	}
+	/* Find first valid record. */
+	uint16_t i = 0;
+	for (; i < cached_rr.rrs.rr_count; ++i) {
+		knot_rdata_t *rd = knot_rdataset_at(&cached_rr.rrs, i);
+		if (knot_rdata_ttl(rd) > timestamp) {
+			break;
+		}
+	}
+
+	return kr_set_zone_cut_addr(cut, &cached_rr, i);
+}
+
+/*! \brief Fetch best NS for zone cut. */
+static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
+{
+	uint32_t drift = timestamp;
+	knot_rrset_t cached_rr;
+	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
+	int ret = kr_cache_peek(txn, &cached_rr, &drift);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+	
+	/* Accept only if has address records cached. */
+	for (unsigned i = 0; i < cached_rr.rrs.rr_count; ++i) {
+		kr_set_zone_cut(cut, name, knot_ns_name(&cached_rr.rrs, i));
+		ret = fetch_addr(cut, txn, timestamp);
+		if (ret == KNOT_EOK) {
+			break;
+		}
+	}
+
+	return ret;
+}
+
 int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
 {
 	if (cut == NULL || name == NULL) {
@@ -126,7 +168,7 @@ int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_tx
 
 	/* No cache, start with SBELT. */
 	if (txn == NULL) {
-		return set_sbelt_zone_cut(cut);
+		return kr_init_zone_cut(cut);
 	}
 
 	/* Start at QNAME. */
@@ -142,5 +184,5 @@ int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_tx
 	}
 
 	/* Name server not found, start with SBELT. */
-	return set_sbelt_zone_cut(cut);
+	return kr_init_zone_cut(cut);
 }

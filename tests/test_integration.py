@@ -146,28 +146,17 @@ def play_object(path):
         server.stop()
         mock_ctx.deinit()
 
-def test_ipc(*args):
-    for arg in args:
-        print arg
-    """ Module self-test code. """
-    server = testserver.TestServer(None)
-    server.start()
-    mock_ctx.set_server(server)
-    try:
-        mock_ctx.test_connect()
-    finally:
-        server.stop()
-
 def test_platform(*args):
-    if sys.platform == 'darwin':
-        raise Exception('ld -wrap is not supported on OS X')
+    if sys.platform == 'windows':
+        raise Exception('not supported at all on Windows')
+
 
 if __name__ == '__main__':
 
     # Self-tests first
     test = test.Test()
-    test.add('integration/ipc', test_ipc)
     test.add('integration/platform', test_platform)
+    test.add('testserver/sendrecv', testserver.test_sendrecv)
     if test.run() != 0:
         sys.exit(1)
     else:

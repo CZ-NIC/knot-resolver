@@ -35,6 +35,7 @@ lib/utils.h
 lib/zonecut.c
 lib/zonecut.h
 tests/Makefile.am
+tests/mock_calls.c
 tests/pydnstest/__init__.py
 tests/pydnstest/scenario.py
 tests/pydnstest/test.py

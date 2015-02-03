@@ -22,7 +22,6 @@
 
 #include "lib/layer/static.h"
 #include "lib/layer/iterate.h"
-#include "lib/utils.h"
 
 #ifndef NDEBUG
 #define DEBUG_MSG(fmt, ...) fprintf(stderr, "[cache] " fmt, ## __VA_ARGS__)
@@ -34,44 +33,36 @@ typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_par
 
 static int update_parent(const knot_rrset_t *rr, unsigned drift, struct kr_layer_param *param)
 {
-	return rr_update_parent(rr, param);
+	/* Find a first non-expired record. */
+	uint16_t i = 0;
+	for (; i < rr->rrs.rr_count; ++i) {
+		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
+		if (knot_rdata_ttl(rd) > drift) {
+			break;
+		}
+	}
+
+	return rr_update_parent(rr, i, param);
 }
 
 static int update_answer(const knot_rrset_t *rr, unsigned drift, struct kr_layer_param *param)
 {
 	knot_pkt_t *answer = param->answer;
 
-	/* Make RRSet copy. */
-	knot_rrset_t rr_copy;
-	knot_rrset_init(&rr_copy, NULL, rr->type, rr->rclass);
-	rr_copy.owner = knot_dname_copy(rr->owner, &answer->mm);
-	int ret = knot_rdataset_copy(&rr_copy.rrs, &rr->rrs, &answer->mm);
-	if (ret != KNOT_EOK) {
-		knot_rrset_clear(&rr_copy, &answer->mm);
+	/* Materialize RR set */
+	knot_rrset_t rr_copy = kr_cache_materialize(rr, drift, &answer->mm);
+	if (rr_copy.rrs.rr_count == 0) {
 		return KNOT_NS_PROC_FAIL;
 	}
-
-	/* Adjust the TTL of the records. */
-	for (unsigned i = 0; i < rr_copy.rrs.rr_count; ++i) {
-		knot_rdata_t *rd = knot_rdataset_at(&rr_copy.rrs, i);
-		knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
-	}
-
-	/* Write copied RR to the result packet. */
-	ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE, &rr_copy, KNOT_PF_FREE);
-	if (ret != KNOT_EOK) {
-		knot_rrset_clear(&rr_copy, &answer->mm);
-		knot_wire_set_tc(answer->wire);
-	}
-
-	return KNOT_NS_PROC_DONE;
+	
+	return rr_update_answer(&rr_copy, 0, param);
 }
 
 static int read_cache_rr(namedb_txn_t *txn, knot_rrset_t *cache_rr, uint32_t timestamp,
                          rr_callback_t cb, struct kr_layer_param *param)
 {
 	/* Query cache for requested record */
-	if (kr_cache_query(txn, cache_rr, &timestamp) != KNOT_EOK) {
+	if (kr_cache_peek(txn, cache_rr, &timestamp) != KNOT_EOK) {
 		return KNOT_NS_PROC_NOOP;
 	}
 
@@ -163,7 +154,7 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, na
 	/* Check if already cached. */
 	knot_rrset_t query_rr;
 	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
-	if (kr_cache_query(txn, &query_rr, &timestamp) == KNOT_EOK) {
+	if (kr_cache_peek(txn, &query_rr, &timestamp) == KNOT_EOK) {
 		return KNOT_EOK;
 	}
 

@@ -85,7 +85,7 @@ static void test_query(void **state)
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
 	namedb_txn_t *txn = test_txn_rdonly(state);
-	int query_ret = kr_cache_query(txn, &cache_rr, &timestamp);
+	int query_ret = kr_cache_peek(txn, &cache_rr, &timestamp);
 	bool rr_equal = knot_rrset_equal(&global_rr, &cache_rr, KNOT_RRSET_COMPARE_WHOLE);
 	kr_cache_txn_abort(txn);
 
@@ -101,7 +101,7 @@ static void test_query_aged(void **state)
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
 	namedb_txn_t *txn = test_txn_rdonly(state);
-	int ret = kr_cache_query(txn, &cache_rr, &timestamp);
+	int ret = kr_cache_peek(txn, &cache_rr, &timestamp);
 	assert_int_equal(ret, KNOT_ENOENT);
 }
 
