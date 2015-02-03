@@ -55,7 +55,7 @@ convenience-link: $(check_LTLIBRARIES)
 check-local-integration: convenience-link
 	@echo "---- Executing integration tests ----"
 if HOST_DARWIN
-	@DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES=$(abs_builddir)/.libs/libmock_calls.dylib $(check_cmd)
+	@DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH=$(abs_builddir)/.libs DYLD_INSERT_LIBRARIES=$(abs_builddir)/.libs/libmock_calls.dylib $(check_cmd)
 else
 	@LD_PRELOAD=$(abs_builddir)/.libs/libmock_calls.so $(check_cmd)
 endif
