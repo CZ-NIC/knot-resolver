@@ -25,7 +25,11 @@
 struct timeval g_mock_time;        /* Mocked system time */
 PyObject *g_mock_server  = NULL;   /* Mocked endpoint for recursive queries */
 
+#ifdef __APPLE__
 int gettimeofday(struct timeval *tv, void *tz)
+#else
+int gettimeofday(struct timeval *tv, struct timezone *tz)
+#endif
 {
 	memcpy(tv, &g_mock_time, sizeof(struct timeval));
 	return 0;
