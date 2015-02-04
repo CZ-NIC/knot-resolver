@@ -1,4 +1,4 @@
-FROM cznic/knot:resolver-compat
+FROM cznic/knot:latest
 MAINTAINER Marek Vavrusa <marek.vavrusa@nic.cz>
 
 # Environment
