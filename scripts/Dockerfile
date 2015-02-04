@@ -3,7 +3,8 @@ MAINTAINER Marek Vavrusa <marek.vavrusa@nic.cz>
 
 # Environment
 ENV THREADS 4
-ENV BUILD_PKGS git-core make gcc libtool autoconf pkg-config liblmdb-dev libcmocka-dev libssl-dev
+ENV BUILD_PKGS git-core make gcc libtool autoconf pkg-config libcmocka-dev libssl-dev liblmdb-dev
+ENV RUNTIME_PKGS libssl1.0.0 liblmdb0
 
 # Expose port
 EXPOSE 53
@@ -14,7 +15,7 @@ CMD ["/usr/local/sbin/kresolved", "-a", "0.0.0.0#53"]
 
 # Install dependencies and sources
 RUN apt-get -q -y update && \
-apt-get install -q -y ${BUILD_PKGS} && \
+apt-get install -q -y ${BUILD_PKGS} ${RUNTIME_PKGS} && \
 # Install libuv
 git clone https://github.com/libuv/libuv.git /libuv-src && \
 cd /libuv-src && \
