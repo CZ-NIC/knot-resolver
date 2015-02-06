@@ -37,7 +37,6 @@ fi
 if [ ! -e ${1}/include/libknot ]; then
 	git clone https://github.com/CZNIC-Labs/knot.git || true
 	cd knot
-	git checkout resolver_improvements
 	autoreconf -i
 	./configure --prefix=${1}
 	make
@@ -60,7 +59,7 @@ fi
 
 # libuv
 if [ ! -e ${1}/include/uv.h ]; then
-	git clone https://github.com/libuv/libuv.git || true
+	git clone -b v1.3.0 https://github.com/libuv/libuv.git || true
 	cd libuv
 	sh autogen.sh
 	./configure --prefix=${1}

@@ -65,7 +65,7 @@ static PyObject* init(PyObject* self, PyObject* args)
 		global_context.options |= QUERY_NO_MINIMIZE; 
 	}
 
-	return Py_BuildValue("s", PACKAGE_STRING " (integration tests)");
+	return Py_BuildValue("");
 }
 
 static PyObject* deinit(PyObject* self, PyObject* args)

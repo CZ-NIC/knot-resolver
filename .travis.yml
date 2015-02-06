@@ -3,26 +3,20 @@ compiler:
     - gcc
 env:
     global:
-        - PKG_CONFIG_PATH="${HOME}/fakeroot/lib/pkgconfig"
-        - LDFLAGS="-L${HOME}/fakeroot/lib"
         - PIP_DOWNLOAD_CACHE="${HOME}/.pip-cache"
-        - CFLAGS="${CFLAGS} -DNDEBUG"
         - PATH="${PATH}:${HOME}/.local/bin"
+        - PKG_CONFIG_PATH="${HOME}/fakeroot/lib/pkgconfig"
+        - LD_LIBRARY_PATH="${HOME}/fakeroot/lib"
+        - CFLAGS="${CFLAGS} -O0 -g -DNDEBUG"
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/fakeroot
     - pip install --user travis -r tests/pydnstest/requirements.txt
     - pip install --user travis cpp-coveralls
 script:
-    - ./bootstrap
-    - ./configure --enable-integration-tests --enable-code-coverage
-    - make
-    - make check
-after_script:
-    - cd lib
-    - coveralls -x ".c" --gcov-options '\-lp'
+    - make check COVERAGE=1 LDFLAGS="-L${HOME}/fakeroot/lib"
+    - coveralls -i lib -x ".c" --gcov-options '\-lp'
 sudo: false
 cache:
     directories:
     - ${HOME}/fakeroot
     - ${HOME}/.pip-cache
-    - .autom4te.cache
