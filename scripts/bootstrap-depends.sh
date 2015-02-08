@@ -1,68 +1,66 @@
-#!/bin/sh  
+#!/bin/bash  
 set -e
 
 CMOCKA_TAG="cmocka-0.4.1"
-PKG_CONFIG_PATH="${1}/lib/pkgconfig"
+URCU_TAG="v0.8.6"
+LIBUV_TAG="v1.3.0"
+KNOT_TAG="master"
 
-if [ -z ${1} ]; then
-	echo "$0 <fakeroot>"
-	exit 1
-fi
-
-install -d ${1}
+# prepare build env
+PREFIX=${1}; [ -z ${PREFIX} ] && PREFIX="${HOME}/.local"
+PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
+install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
+[ ! -d .depend ] && mkdir .depend; cd .depend
 
 # lmdb
-if [ ! -e ${1}/include/lmdb.h ]; then
+if [ ! -e ${PREFIX}/include/lmdb.h ]; then
 	git clone https://gitorious.org/mdb/mdb.git || true
 	cd mdb/libraries/liblmdb
-	make
-	install -d ${1}/lib ${1}/include
-	install -t ${1}/lib liblmdb.so
-	install -t ${1}/include lmdb.h
+	install -d ${PREFIX}/man/man1
+	make ${MAKEOPTS} CC="${CC}" && make install DESTDIR=${PREFIX} prefix=
 	cd ../../..
 fi
 
 # liburcu
-if [ ! -e ${1}/include/urcu.h ]; then
-	git clone git://git.urcu.so/userspace-rcu.git || true
+if [ ! -e ${PREFIX}/include/urcu.h ]; then
+	git clone -b ${URCU_TAG} git://git.urcu.so/userspace-rcu.git || true
 	cd userspace-rcu
 	./bootstrap
-	./configure --prefix=${1}
-	make
-	make install
+	./configure --prefix=${PREFIX} --disable-dependency-tracking --disable-rpath
+	( make ${MAKEOPTS} ; make install ) || true
 	cd ..
 fi
 
 # libknot
-if [ ! -e ${1}/include/libknot ]; then
-	git clone https://github.com/CZNIC-Labs/knot.git || true
+if [ ! -e ${PREFIX}/include/libknot ]; then
+	git clone -b ${KNOT_TAG} https://github.com/CZNIC-Labs/knot.git || true
 	cd knot
 	autoreconf -i
-	./configure --prefix=${1}
-	make
-	make install
+	if [ $(uname) == "Darwin" ]; then # Workaround for crypto version check on OS X
+		export libcrypto_CFLAGS="-I /usr/local/opt/openssl/include"
+		export libcrypto_LIBS="-L/usr/local/opt/openssl/lib -lcrypto"
+	fi
+	./configure --prefix=${PREFIX} --disable-fastparser --disable-dependency-tracking
+	make ${MAKEOPTS} && make install
 	cd ..
 fi
 
 # cmocka
-if [ ! -e ${1}/include/cmocka.h ]; then
-	wget http://git.cryptomilk.org/projects/cmocka.git/snapshot/${CMOCKA_TAG}.tar.gz
-	tar xvzf ${CMOCKA_TAG}.tar.gz
-	cd ${CMOCKA_TAG}
+if [ ! -e ${PREFIX}/include/cmocka.h ]; then
+	git clone -b ${CMOCKA_TAG} git://git.cryptomilk.org/projects/cmocka.git
+	cd cmocka
 	mkdir build
 	cd build
-	cmake -DCMAKE_INSTALL_PREFIX=${1} ..
-	make
-	make install
+	cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} ..
+	make ${MAKEOPTS} && make install
 	cd ../..
 fi
 
 # libuv
-if [ ! -e ${1}/include/uv.h ]; then
-	git clone -b v1.3.0 https://github.com/libuv/libuv.git || true
+if [ ! -e ${PREFIX}/include/uv.h ]; then
+	git clone -b ${LIBUV_TAG} https://github.com/libuv/libuv.git || true
 	cd libuv
 	sh autogen.sh
-	./configure --prefix=${1}
-	make 
-	make install
+	./configure --prefix=${PREFIX} --disable-dependency-tracking
+	make ${MAKEOPTS} && make install
 fi
