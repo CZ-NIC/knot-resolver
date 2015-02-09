@@ -1,2 +1,6 @@
 *.pyc
 tmp*
+test_cache
+test_context
+test_resolve
+test_rplan

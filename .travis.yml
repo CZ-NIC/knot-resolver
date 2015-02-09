@@ -1,28 +1,24 @@
 language: c
+os:
+    - linux
+    - osx
 compiler:
-    - gcc
+    - clang
 env:
     global:
-        - PKG_CONFIG_PATH="${HOME}/fakeroot/lib/pkgconfig"
-        - LDFLAGS="-L${HOME}/fakeroot/lib"
-        - PIP_DOWNLOAD_CACHE="${HOME}/.pip-cache"
-        - CFLAGS="${CFLAGS} -DNDEBUG"
         - PATH="${PATH}:${HOME}/.local/bin"
+        - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
+        - LD_LIBRARY_PATH="${HOME}/.local/lib"
+        - CFLAGS="${CFLAGS} -O0 -g -DNDEBUG"
+        - MAKEOPTS="-j2"
 before_script:
-    - ./scripts/bootstrap-depends.sh ${HOME}/fakeroot
-    - pip install --user travis -r tests/pydnstest/requirements.txt
-    - pip install --user travis cpp-coveralls
+    - ./scripts/bootstrap-depends.sh ${HOME}/.local
+    - pip install --user travis -r tests/pydnstest/requirements.txt cpp-coveralls
 script:
-    - ./bootstrap
-    - ./configure --enable-integration-tests --enable-code-coverage
-    - make
-    - make check
-after_script:
-    - cd lib
-    - coveralls -x ".c" --gcov-options '\-lp'
+    - make ${MAKEOPTS} check COVERAGE=1 LDFLAGS="-L${HOME}/.local/lib"
+    - coveralls -i lib -x ".c" --gcov-options '\-lp'
 sudo: false
 cache:
     directories:
-    - ${HOME}/fakeroot
-    - ${HOME}/.pip-cache
-    - .autom4te.cache
+    - ${HOME}/.local
+    - ${HOME}/.cache/pip
