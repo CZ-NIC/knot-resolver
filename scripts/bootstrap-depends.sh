@@ -12,6 +12,12 @@ PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
 install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
 [ ! -d .depend ] && mkdir .depend; cd .depend
 
+# platform-specific
+if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+	brew upgrade
+	brew install python
+fi
+
 # liburcu
 if [ ! -e ${PREFIX}/include/urcu.h ]; then
 	git clone -b ${URCU_TAG} git://git.urcu.so/userspace-rcu.git || true
