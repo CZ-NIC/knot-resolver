@@ -12,15 +12,6 @@ PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
 install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
 [ ! -d .depend ] && mkdir .depend; cd .depend
 
-# lmdb
-if [ ! -e ${PREFIX}/include/lmdb.h ]; then
-	git clone https://gitorious.org/mdb/mdb.git || true
-	cd mdb/libraries/liblmdb
-	install -d ${PREFIX}/man/man1
-	make ${MAKEOPTS} CC="${CC}" && make install DESTDIR=${PREFIX} prefix=
-	cd ../../..
-fi
-
 # liburcu
 if [ ! -e ${PREFIX}/include/urcu.h ]; then
 	git clone -b ${URCU_TAG} git://git.urcu.so/userspace-rcu.git || true
@@ -40,7 +31,7 @@ if [ ! -e ${PREFIX}/include/libknot ]; then
 		export libcrypto_CFLAGS="-I /usr/local/opt/openssl/include"
 		export libcrypto_LIBS="-L/usr/local/opt/openssl/lib -lcrypto"
 	fi
-	./configure --prefix=${PREFIX} --disable-fastparser --disable-dependency-tracking
+	./configure --prefix=${PREFIX} --with-lmdb=no --disable-fastparser --disable-dependency-tracking
 	make ${MAKEOPTS} && make install
 	cd ..
 fi
