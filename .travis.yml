@@ -4,19 +4,23 @@ os:
     - osx
 compiler:
     - clang
+notifications:
+    email:
+        on_success: change
+        on_failure: change
 env:
     global:
-        - PATH="${PATH}:${HOME}/.local/bin"
         - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
         - LD_LIBRARY_PATH="${HOME}/.local/lib"
+        - PATH="${PATH}:${HOME}/.local/bin"
         - CFLAGS="${CFLAGS} -O0 -g -DNDEBUG"
-        - MAKEOPTS="-j2"
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/.local
     - pip install --user travis -r tests/pydnstest/requirements.txt cpp-coveralls
 script:
-    - make ${MAKEOPTS} check COVERAGE=1 LDFLAGS="-L${HOME}/.local/lib"
-    - coveralls -i lib -x ".c" --gcov-options '\-lp'
+    - make ${MAKEOPTS} check COVERAGE=1
+after_success:
+    - test $TRAVIS_OS_NAME = linux && coveralls -i lib -x ".c" --gcov-options '\-lp'
 sudo: false
 cache:
     directories:

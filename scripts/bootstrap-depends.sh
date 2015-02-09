@@ -38,7 +38,7 @@ fi
 
 # cmocka
 if [ ! -e ${PREFIX}/include/cmocka.h ]; then
-	git clone -b ${CMOCKA_TAG} git://git.cryptomilk.org/projects/cmocka.git
+	git clone -b ${CMOCKA_TAG} git://git.cryptomilk.org/projects/cmocka.git || true
 	cd cmocka
 	mkdir build
 	cd build
