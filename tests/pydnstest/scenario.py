@@ -1,7 +1,6 @@
 import dns.message
 import dns.rrset
 import dns.rcode
-import copy
 
 class Entry:
     """
@@ -64,7 +63,7 @@ class Entry:
 
     def adjust_reply(self, query):
         """ Copy scripted reply and adjust to received query. """
-        answer = copy.deepcopy(self.message)
+        answer = dns.message.from_text(self.message.to_text())
         if 'copy_id' in self.adjust_fields:
             answer.id = query.id
         if 'copy_query' in self.adjust_fields:
