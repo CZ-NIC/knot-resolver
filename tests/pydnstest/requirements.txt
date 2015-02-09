@@ -1,1 +1,1 @@
-dnspython
+dnspython==1.11
