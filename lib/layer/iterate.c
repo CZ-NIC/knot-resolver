@@ -209,11 +209,13 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	/* Response for minimized QNAME.
 	 * NODATA   => may be empty non-terminal, retry (found zone cut)
 	 * NOERROR  => found zone cut, retry
-	 * NXDOMAIN => parent is zone cut, terminate
+	 * NXDOMAIN => parent is zone cut, retry as a workaround for bad authoritatives
 	 */
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	bool is_minimized = (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname));
-	bool is_noerror = (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NOERROR);
-	if (is_minimized && is_noerror) {
+	bool is_nodata = (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NOERROR) && !an->count;
+	bool is_nxdomain = (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN);
+	if (is_minimized && (is_nodata || is_nxdomain)) {
 		query->flags |= QUERY_NO_MINIMIZE;
 		return KNOT_NS_PROC_DONE;
 	}
@@ -227,7 +229,6 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 
 	/* Process answer section records. */
 	const knot_dname_t *cname = query->sname;
-	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
 		int state = callback(rr, 0, param);
