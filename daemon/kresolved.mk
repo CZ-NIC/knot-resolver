@@ -7,7 +7,7 @@ kresolved_SOURCES := \
 
 # Dependencies
 kresolved_DEPEND := libkresolve libknot libuv
-kresolved_LIBS := $(libkresolve_TARGET) $(libuv_LIBS) $(libknot_LIBS)
+kresolved_LIBS := $(libkresolve_TARGET) $(libknot_LIBS) $(libuv_LIBS)
 
 # Make binary
 $(eval $(call make_bin,kresolved,daemon))
