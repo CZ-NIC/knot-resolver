@@ -115,8 +115,14 @@ int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
 		rr->rrs.rr_count = found_rr->count;
 		rr->rrs.data = found_rr->data;
 
-		/* No time constraint or current timestamp */
-		if (timestamp == NULL || *timestamp <= found_rr->timestamp) {
+		/* No time constraint */
+		if (timestamp == NULL) {
+			return KNOT_EOK;
+		}
+
+		/* John Connor record cached from the future. */
+		if (*timestamp < found_rr->timestamp) {
+			*timestamp = 0;
 			return KNOT_EOK;
 		}
 
