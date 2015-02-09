@@ -8,6 +8,10 @@ notifications:
     email:
         on_success: change
         on_failure: change
+matrix:
+    fast_finish: true
+    allow_failures:
+        - os: osx
 env:
     global:
         - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
@@ -18,10 +22,14 @@ env:
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/.local
     - pip install --user travis -r tests/pydnstest/requirements.txt cpp-coveralls
+    - test $TRAVIS_OS_NAME = osx \
+      && brew update \
+      && brew install python
 script:
     - make ${MAKEOPTS} check COVERAGE=1
 after_success:
-    - test $TRAVIS_OS_NAME = linux && coveralls -i lib -x ".c" --gcov-options '\-lp'
+    - test $TRAVIS_OS_NAME = linux \
+      && coveralls -i lib -x ".c" --gcov-options '\-lp'
 sudo: false
 cache:
     directories:
