@@ -111,8 +111,9 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 			cur->flags |= QUERY_TCP;
 			return iterate(requestor, param);
 		}
-		/* Resolution failed, invalidate current NS. */
+		/* Resolution failed, invalidate current NS and reset to UDP. */
 		ret = invalidate_ns(rplan, cur);
+		cur->flags &= ~QUERY_TCP;
 	}
 
 	return ret;
