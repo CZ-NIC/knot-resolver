@@ -129,7 +129,7 @@ class Entry:
         rdtype = args.pop(0)
         rr = dns.rrset.from_text(owner, ttl, rdclass, rdtype)
         if len(args) > 0:
-            rd = dns.rdata.from_text(rr.rdclass, rr.rdtype, ' '.join(args), origin = dns.name.from_text(self.origin), relativize = False)
+            rd = dns.rdata.from_text(rr.rdclass, rr.rdtype, ' '.join(args), origin=dns.name.from_text(self.origin), relativize=False)
             rr.add(rd)
         return rr
 
@@ -219,6 +219,8 @@ class Step:
             return self.__check_answer(ctx)
         elif self.type == 'TIME_PASSES':
             return self.__time_passes(ctx)
+        elif self.type == 'REPLY':
+            pass
         else:
             raise Exception('step %s unsupported' % self.type)
 
@@ -246,7 +248,6 @@ class Step:
         ctx.scenario.time = int(self.args[1])
         ctx.set_time(ctx.scenario.time)
 
-
 class Scenario:
     def __init__(self, info):
         """ Initialize scenario with description. """
@@ -268,6 +269,17 @@ class Scenario:
         for rng in self.ranges:
             if rng.eligible(step_id, address):
                 return rng.reply(query)
+        # Find any prescripted one-shot replies
+        for step in self.steps:
+            if step.id <= step_id or step.type != 'REPLY':
+                continue
+            try:
+                candidate = step.data[0]
+                candidate.match(query)
+                step.data.remove(candidate)
+                return candidate.adjust_reply(query)
+            except:
+                pass
 
     def play(self, ctx):
         """ Play given scenario. """
@@ -281,5 +293,3 @@ class Scenario:
                 step.play(ctx)
         except Exception as e:
             raise Exception('step #%d %s' % (step.id, str(e)))
-
-

@@ -72,8 +72,8 @@ REPLY QR NOERROR
 SECTION QUESTION
 example.com. IN NS
 SECTION AUTHORITY
-example.com.	IN NS	ns.example.net.
 example.com.	IN NS	ns.example.com.
+example.com.	IN NS	ns.example.net.
 SECTION ADDITIONAL
 ns.example.com.	IN A	1.2.3.55
 ENTRY_END
@@ -238,7 +238,7 @@ RANGE_END
 ; store bad timing for one server to influence server selection
 ; 1.2.3.44 (ns.example.net) gets 900 msec.
 ; so the 376 ns.example.com is preferred.
-STEP 1 INFRA_RTT 1.2.3.44 example.net. 900
+;STEP 1 INFRA_RTT 1.2.3.44 example.net. 900
 
 STEP 10 QUERY
 ENTRY_BEGIN
