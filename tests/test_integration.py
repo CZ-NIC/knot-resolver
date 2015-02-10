@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-import sys, os, fileinput
+import sys
+import os
+import fileinput
 from pydnstest import scenario, testserver, test
 import _test_integration as mock_ctx
 
@@ -17,7 +19,7 @@ def get_next(file_in):
             return False
         for csep in (';', '#'):
             if csep in line:
-                line = line[0 : line.index(csep)]
+                line = line[0:line.index(csep)]
         tokens = ' '.join(line.strip().split()).split()
         if len(tokens) == 0:
             continue  # Skip empty lines
@@ -88,6 +90,7 @@ def parse_scenario(op, args, file_in):
             out.steps.append(parse_step(op, args, file_in))
     return out
 
+
 def parse_file(file_in):
     """ Parse scenario from a file. """
     try:
@@ -145,6 +148,7 @@ def play_object(path):
     finally:
         server.stop()
         mock_ctx.deinit()
+
 
 def test_platform(*args):
     if sys.platform == 'windows':
