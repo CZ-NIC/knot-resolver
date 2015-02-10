@@ -13,7 +13,7 @@ install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
 [ ! -d .depend ] && mkdir .depend; cd .depend
 
 # platform-specific
-DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.lzma"
+DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tgz"
 PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew install --force makedepend
@@ -21,9 +21,9 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew link --overwrite python
 	pip install --upgrade pip
 	pip install -r ${PIP_PKGS}
-	if wget "${DEPEND_CACHE}" -o cache.tar.lzma; then
+	if wget "${DEPEND_CACHE}" -o cache.tgz; then
 		echo "extracting prebuilt dependencies from ${DEPEND_CACHE}"
-		tar -x -C ${HOME} -f cache.tar.lzma || true
+		tar -x -C ${HOME} -f cache.tgz || true
 	fi
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
