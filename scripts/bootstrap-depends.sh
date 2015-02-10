@@ -13,7 +13,7 @@ install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
 [ ! -d .depend ] && mkdir .depend; cd .depend
 
 # platform-specific
-DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRRAVIS_OS_NAME}-cache.tar.lzma"
+DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.lzma"
 PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew install --force makedepend
