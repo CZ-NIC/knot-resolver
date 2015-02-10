@@ -13,9 +13,15 @@ install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
 [ ! -d .depend ] && mkdir .depend; cd .depend
 
 # platform-specific
-if [ "$TRAVIS_OS_NAME" == "osx" ]; then
-	brew upgrade
+PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
+if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew install python
+	brew link --overwrite python
+	pip install --upgrade pip
+	pip install -r ${PIP_PKGS}
+fi
+if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
+	pip install --user ${USER} -r ${PIP_PKGS}
 fi
 
 # liburcu
