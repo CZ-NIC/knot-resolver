@@ -94,7 +94,7 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	/* Prepare query resolution. */
 	int mode = (cur->flags & QUERY_TCP) ? 0 : KNOT_RQ_UDP;
 	struct sockaddr *ns_addr = (struct sockaddr *)&cur->zone_cut.addr;
-	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, requestor->mm);
+	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MIN_PKTSIZE, requestor->mm);
 	struct knot_request *tx = knot_request_make(requestor->mm, ns_addr, NULL, query, mode);
 	knot_requestor_enqueue(requestor, tx);
 
