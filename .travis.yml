@@ -19,6 +19,7 @@ env:
         - CFLAGS="${CFLAGS} -O0 -g -DNDEBUG"
         - LD_LIBRARY_PATH="${HOME}/.local/lib"
         - DYLD_LIBRARY_PATH="${HOME}/.local/lib"
+        - MAKEOPTS="-j2"
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/.local
 script:
