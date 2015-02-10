@@ -15,12 +15,11 @@ matrix:
 env:
     global:
         - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
+        - PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
+        - CFLAGS="${CFLAGS} -O0 -g -DNDEBUG"
         - LD_LIBRARY_PATH="${HOME}/.local/lib"
         - DYLD_LIBRARY_PATH="${HOME}/.local/lib"
-        - PATH="${PATH}:${HOME}/.local/bin"
-        - CFLAGS="${CFLAGS} -O0 -g -DNDEBUG"
 before_script:
-    - pip install --user travis -r tests/pydnstest/requirements.txt cpp-coveralls
     - ./scripts/bootstrap-depends.sh ${HOME}/.local
 script:
     - make ${MAKEOPTS} check COVERAGE=1
