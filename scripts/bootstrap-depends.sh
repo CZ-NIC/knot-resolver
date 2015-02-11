@@ -23,7 +23,7 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	pip install -r ${PIP_PKGS}
 	if wget "${DEPEND_CACHE}" -o cache.tgz; then
 		echo "extracting prebuilt dependencies from ${DEPEND_CACHE}"
-		tar -x -C ${HOME} -f cache.tgz || true
+		tar -x -z -C ${HOME} -f cache.tgz || true
 	fi
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
