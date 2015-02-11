@@ -25,3 +25,12 @@ compile
 depcomp
 install-sh
 stamp-h1
+aclocal.m4
+ltmain.sh
+ylwrap
+
+# CMake files
+/CMakeCache.txt
+/CMakeFiles
+/Makefile
+/cmake_install.cmake
