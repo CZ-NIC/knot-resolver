@@ -19,7 +19,7 @@
 #include <libknot/internal/mempool.h>
 #include <libknot/processing/requestor.h>
 #include <libknot/descriptor.h>
-#include <libknot/dnssec/random.h>
+#include <dnssec/random.h>
 
 #include "lib/resolve.h"
 #include "lib/defines.h"

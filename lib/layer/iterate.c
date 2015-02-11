@@ -19,7 +19,7 @@
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/processing/requestor.h>
-#include <libknot/dnssec/random.h>
+#include <dnssec/random.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
@@ -287,7 +287,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_NS_PROC_FAIL;
 	}
 
-	query->id = knot_random_uint16_t();
+	query->id = dnssec_random_uint16_t();
 	knot_wire_set_id(pkt->wire, query->id);
 	
 	/* Declare EDNS0 support. */

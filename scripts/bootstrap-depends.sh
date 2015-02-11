@@ -2,7 +2,6 @@
 set -e
 
 CMOCKA_TAG="cmocka-0.4.1"
-URCU_TAG="v0.8.6"
 LIBUV_TAG="v1.3.0"
 KNOT_TAG="master"
 
@@ -30,16 +29,6 @@ if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pip install --user ${USER} -r ${PIP_PKGS}
 fi
 
-# liburcu
-if [ ! -e ${PREFIX}/include/urcu.h ]; then
-	git clone -b ${URCU_TAG} git://git.urcu.so/userspace-rcu.git || true
-	cd userspace-rcu
-	./bootstrap
-	./configure --prefix=${PREFIX} --disable-dependency-tracking --disable-rpath
-	( make ${MAKEOPTS} ; make install ) || true
-	cd ..
-fi
-
 # libknot
 if [ ! -e ${PREFIX}/include/libknot ]; then
 	git clone -b ${KNOT_TAG} https://github.com/CZNIC-Labs/knot.git || true
@@ -49,7 +38,8 @@ if [ ! -e ${PREFIX}/include/libknot ]; then
 		export libcrypto_CFLAGS="-I /usr/local/opt/openssl/include"
 		export libcrypto_LIBS="-L/usr/local/opt/openssl/lib -lcrypto"
 	fi
-	./configure --prefix=${PREFIX} --with-lmdb=no --disable-fastparser --disable-dependency-tracking
+	./configure --prefix=${PREFIX} --with-lmdb=no --disable-fastparser --disable-dependency-tracking \
+	            --disable-daemon --disable-utilities --disable-documentation
 	make ${MAKEOPTS} && make install
 	cd ..
 fi
@@ -58,7 +48,7 @@ fi
 if [ ! -e ${PREFIX}/include/cmocka.h ]; then
 	git clone -b ${CMOCKA_TAG} git://git.cryptomilk.org/projects/cmocka.git || true
 	cd cmocka
-	mkdir build
+	mkdir build || true
 	cd build
 	cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} ..
 	make ${MAKEOPTS} && make install

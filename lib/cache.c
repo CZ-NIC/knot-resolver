@@ -22,7 +22,6 @@
 
 #include <libknot/internal/mempattern.h>
 #include <libknot/internal/namedb/namedb_lmdb.h>
-#include <libknot/dnssec/random.h>
 #include <libknot/errcode.h>
 #include <libknot/descriptor.h>
 
