@@ -36,6 +36,8 @@ PKG_CHECK_MODULES([libknot], [libknot])
 PKG_CHECK_MODULES([libuv], [libuv], [build_daemon=yes], [build_daemon=no])
 PKG_CHECK_MODULES([cmocka], [cmocka], [build_tests=yes], [build_tests=no])
 
+AC_SEARCH_LIBS([RAND_pseudo_bytes], [gnutls-openssl crypto])
+
 # Check for python (integration tests)
 AC_ARG_ENABLE([integration-tests],
 	      AS_HELP_STRING([--enable-integration-tests], [enable integration tests (require Python devel), default: no]),
