@@ -30,6 +30,11 @@
 /aclocal.m4
 /ltmain.sh
 /ylwrap
+/Makefile
+/daemon/Makefile
+/daemon/kresolved
+/lib/Makefile
+/tests/Makefile
 
 # CMake files
 /CMakeCache.txt
