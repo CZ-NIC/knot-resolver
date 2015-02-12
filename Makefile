@@ -15,6 +15,7 @@ endif
 
 # Dependencies
 $(eval $(call find_lib,libknot))
+$(eval $(call find_lib,libknot-int))
 $(eval $(call find_lib,libuv))
 $(eval $(call find_lib,cmocka))
 $(eval $(call find_python))

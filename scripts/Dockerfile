@@ -3,8 +3,8 @@ MAINTAINER Marek Vavrusa <marek.vavrusa@nic.cz>
 
 # Environment
 ENV THREADS 4
-ENV BUILD_PKGS git-core make gcc libtool autoconf pkg-config libcmocka-dev libssl-dev liblmdb-dev
-ENV RUNTIME_PKGS libssl1.0.0 liblmdb0
+ENV BUILD_PKGS git-core make gcc libtool autoconf pkg-config libcmocka-dev libgnutls28-dev liblmdb-dev libjansson-dev
+ENV RUNTIME_PKGS libgnutls28 libjansson liblmdb0
 
 # Expose port
 EXPOSE 53
