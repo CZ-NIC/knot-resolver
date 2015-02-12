@@ -25,12 +25,13 @@ export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
 export BUILD_DIR="$(pwd)/.build-depend"
 export LOG=$(pwd)/build.log
 [ ! -e ${BUILD_DIR} ] && mkdir ${BUILD_DIR}; cd ${BUILD_DIR}
-echo "building in ${BUILD_DIR} log ${LOG}" | tee ${LOG}
+echo "build: ${BUILD_DIR}"
+echo "log:   ${LOG}" | tee ${LOG}
 
 function on_failure {
 	cat ${LOG}
 }
-trap on_failure EXIT
+trap on_failure ERR
 
 function fetch_pkg {
 	if [ "${2##*.}" == git ]; then
