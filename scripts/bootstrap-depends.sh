@@ -27,6 +27,11 @@ export LOG=$(pwd)/build.log
 [ ! -e ${BUILD_DIR} ] && mkdir ${BUILD_DIR}; cd ${BUILD_DIR}
 echo "building in ${BUILD_DIR} log ${LOG}" | tee ${LOG}
 
+function on_failure {
+	cat ${LOG}
+}
+trap on_failure EXIT
+
 function fetch_pkg {
 	if [ "${2##*.}" == git ]; then
 		[ ! -e $1 ] && git clone -b $3 "$2" $1 &> /dev/null
@@ -45,7 +50,7 @@ function build_pkg {
 		if [ ! -e ./configure ]; then
 			[ -e autogen.sh ] && sh autogen.sh || autoreconf -if
 		fi
-		./configure --prefix=${PREFIX} --enable-shared --disable-static $*
+		./configure --prefix=${PREFIX} --enable-shared $*
 	fi
 	make ${MAKEOPTS}
 	make install
@@ -63,22 +68,22 @@ function pkg {
 }
 
 # gnutls + dependencies
-pkg gmp ${GMP_URL} ${GMP_TAG} include/gmp.h
+pkg gmp ${GMP_URL} ${GMP_TAG} include/gmp.h --disable-static
 pkg nettle ${NETTLE_URL} ${NETTLE_TAG} include/nettle \
 	--disable-documentation --with-lib-path=${PREFIX}/lib --with-include-path=${PREFIX}/include
 export GMP_CFLAGS="-I${PREFIX}/include"
 export GMP_LIBS="-L${PREFIX}/lib -lgmp"
 pkg gnutls ${GNUTLS_URL} ${GNUTLS_TAG} include/gnutls \
-	--disable-tests --disable-doc --disable-valgrind-tests
+	--disable-tests --disable-doc --disable-valgrind-tests --disable-static
 # jansson
-pkg jansson ${JANSSON_URL} ${JANSSON_TAG} include/jansson.h
+pkg jansson ${JANSSON_URL} ${JANSSON_TAG} include/jansson.h --disable-static
 # libknot
 pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
-	--with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
+	--disable-static --with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
 # cmocka
-pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} 
+pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 # libuv
-pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h
+pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 
 # travis-specific
 PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
