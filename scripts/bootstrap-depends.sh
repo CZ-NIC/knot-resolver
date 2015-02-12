@@ -67,6 +67,20 @@ function pkg {
 	fi
 }
 
+# travis-specific
+PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
+if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
+	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
+	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
+	brew install --force makedepend python
+	brew link --overwrite python
+	pip install --upgrade pip
+	pip install -r ${PIP_PKGS}
+fi
+if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
+	pip install --user ${USER} -r ${PIP_PKGS}
+fi
+
 # gnutls + dependencies
 pkg gmp ${GMP_URL} ${GMP_TAG} include/gmp.h --disable-static
 pkg nettle ${NETTLE_URL} ${NETTLE_TAG} include/nettle \
@@ -84,17 +98,3 @@ pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 # libuv
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
-
-# travis-specific
-PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
-if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
-	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
-	brew install --force makedepend python
-	brew link --overwrite python
-	pip install --upgrade pip
-	pip install -r ${PIP_PKGS}
-fi
-if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
-	pip install --user ${USER} -r ${PIP_PKGS}
-fi
