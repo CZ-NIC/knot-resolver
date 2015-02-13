@@ -70,6 +70,7 @@ ifeq ($$(strip $$($(1)_LIBS)),)
 else
 	HAS_$(1) := yes
 $(1):
+.PHONY: $(1)
 endif
 endef
 

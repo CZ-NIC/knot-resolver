@@ -45,7 +45,7 @@ function fetch_pkg {
 
 function build_pkg {
 	if [ -f CMakeLists.txt ]; then
-		[ -e cmake-build ] && rm -r cmake-build; mkdir cmake-build; cd cmake-build
+		[ -e cmake-build ] && rm -rf cmake-build; mkdir cmake-build; cd cmake-build
 		cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} ..
 	else
 		if [ ! -e ./configure ]; then
@@ -58,7 +58,7 @@ function build_pkg {
 }
 
 function pkg {
-	if [ ! -e ${PREFIX}/$4 ]; then
+	if [ ! -e ${PREFIX}/$4 ] && [ "${BUILD_IGNORE}" == "${BUILD_IGNORE/$1/}" ] ; then
 		cd ${BUILD_DIR}
 		echo "[x] fetching $1-$3"
 		fetch_pkg "$1-$3" "$2" $3 >> ${LOG}
@@ -99,3 +99,6 @@ pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 # libuv
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
+
+# remove on successful build
+rm -rf ${BUILD_DIR}
