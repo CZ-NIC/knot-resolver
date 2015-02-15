@@ -28,10 +28,16 @@ class Entry:
         if code == 'opcode':
             return self.__compare_val(expected.opcode(), msg.opcode())
         elif code == 'qtype':
+            if len(expected.question) == 0:
+                return True
             return self.__compare_val(expected.question[0].rdtype, msg.question[0].rdtype)
         elif code == 'qname':
+            if len(expected.question) == 0:
+                return True
             return self.__compare_val(expected.question[0].name, msg.question[0].name)
         elif code == 'subdomain':
+            if len(expected.question) == 0:
+                return True
             return self.__compare_sub(expected.question[0].name, msg.question[0].name)
         elif code == 'flags':
             return self.__compare_val(dns.flags.to_text(expected.flags), dns.flags.to_text(msg.flags))

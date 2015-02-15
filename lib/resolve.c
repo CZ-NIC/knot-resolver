@@ -18,6 +18,7 @@
 
 #include <libknot/internal/mempool.h>
 #include <libknot/processing/requestor.h>
+#include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
 #include <dnssec/random.h>
 
@@ -66,13 +67,15 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	/* Remove record(s) */
 	if (cached.rrs.rr_count == 0) {
 		(void) kr_cache_remove(txn, &cached);
+		kr_find_zone_cut(&qry->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
 	} else {
 		(void) kr_cache_insert(txn, &cached, qry->timestamp.tv_sec);
+		kr_set_zone_cut(&qry->zone_cut, cached.owner, knot_ns_name(&cached.rrs, 0));
 	}
 	knot_rrset_clear(&cached, rplan->pool);
 
 	/* Update zone cut and continue. */
-	return kr_find_zone_cut(&qry->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
+	return KNOT_EOK;
 }
 
 static int iterate(struct knot_requestor *requestor, struct kr_layer_param *param)
@@ -91,8 +94,10 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 
 	/* Invalid address for current zone cut. */
 	if (sockaddr_len((struct sockaddr *)&cur->zone_cut.addr) < 1) {
-		DEBUG_MSG("=> ns missing A/AAAA, invalidating\n");
-		return invalidate_ns(rplan, cur);
+		DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
+		(void) kr_rplan_push(rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+		(void) kr_rplan_push(rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+		return KNOT_EOK;
 	}
 
 	/* Prepare query resolution. */
