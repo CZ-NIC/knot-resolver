@@ -25,6 +25,7 @@
 #include "lib/resolve.h"
 #include "lib/rplan.h"
 #include "lib/defines.h"
+#include "lib/nsrep.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), "iter", fmt)
 
@@ -150,39 +151,76 @@ int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_para
 	return KNOT_NS_PROC_DONE;
 }
 
-int rr_update_nameserver(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param)
+static bool has_glue(const knot_dname_t *ns_name, knot_pkt_t *pkt)
+{
+	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
+	for (unsigned i = 0; i < ar->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
+		if ((rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) &&
+		   (knot_dname_is_equal(ns_name, rr->owner))) {
+		   	return true;
+		}
+	}
+	return false;
+}
+
+static int nameserver_score(const knot_rrset_t *rr, unsigned hint, knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	struct kr_query *query = kr_rplan_current(param->rplan);
 	const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, hint);
+	int score = KR_NS_VALID + 1;
 
 	/* Authority MUST be at/below the authority of the nameserver, otherwise
 	 * possible cache injection attempt. */
 	if (!knot_dname_in(query->zone_cut.name, rr->owner)) {
 		DEBUG_MSG("NS in query outside of its authority => rejecting\n");
-		return KNOT_NS_PROC_FAIL;
+		return KR_NS_INVALID;
 	}
 
 	/* Ignore already resolved zone cut. */
 	if (knot_dname_is_equal(rr->owner, query->zone_cut.name)) {
-		return KNOT_NS_PROC_MORE;
+		return KR_NS_VALID;
 	}
 
-	/* Set zone cut to given name server. */
-	kr_set_zone_cut(&query->zone_cut, rr->owner, ns_name);
-	return KNOT_NS_PROC_DONE;
+	/* Check if contains glue. */
+	if (has_glue(ns_name, pkt)) {
+		score += 1;
+	}
+
+	return score;
 }
 
 static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
+	struct kr_query *query = kr_rplan_current(param->rplan);
+	const knot_rrset_t *best_ns = NULL;
+	int best_score = 0;
+
+	/* AA, terminate resolution chain. */
+	if (knot_wire_get_aa(pkt->wire)) {
+		return KNOT_NS_PROC_MORE;
+	}
+
+	/* Elect best name server candidate. */
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
-			int state = rr_update_nameserver(rr, 0, param);
-			if (state != KNOT_NS_PROC_MORE) {
-				return state;
+			int score = nameserver_score(rr, 0, pkt, param);
+			if (score < 0) {
+				return KNOT_NS_PROC_FAIL;
+			}
+			if (score > best_score) {
+				best_ns = rr;
+				best_score = score;
 			}
 		}
+	}
+
+	/* Update name server candidate. */
+	if (best_ns != NULL) {
+		kr_set_zone_cut(&query->zone_cut, best_ns->owner, knot_ns_name(&best_ns->rrs, 0));
+		return KNOT_NS_PROC_DONE;
 	}
 
 	return KNOT_NS_PROC_MORE;
@@ -201,10 +239,6 @@ static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
 			return state;
 		}
 	}
-
-	/* Glue not found => resolve NS address. */
-	(void) kr_rplan_push(param->rplan, query, query->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
-	(void) kr_rplan_push(param->rplan, query, query->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
 
 	return KNOT_NS_PROC_DONE;
 }
