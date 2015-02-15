@@ -28,12 +28,6 @@
 #include "lib/cache.h"
 #include "lib/defines.h"
 
-#ifndef NDEBUG
-#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[cache] " fmt, ## __VA_ARGS__)
-#else
-#define DEBUG_MSG(fmt, ...)
-#endif
-
 #define db_api namedb_lmdb_api()
 
 namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize)
@@ -103,13 +97,7 @@ int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
 	/* Check if the RRSet is in the cache. */
 	struct kr_cache_rrset *found_rr = cache_rr(txn, rr->owner, rr->type);
 	if (found_rr != NULL) {
-#ifndef NDEBUG
-		char name_str[KNOT_DNAME_MAXLEN];
-		knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
-		char type_str[16];
-		knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
-		DEBUG_MSG("read '%s %s' => %u RRs\n", name_str, type_str, found_rr->count);
-#endif
+
 		/* Assign data and return success. */
 		rr->rrs.rr_count = found_rr->count;
 		rr->rrs.data = found_rr->data;
@@ -183,14 +171,6 @@ int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestam
 	namedb_val_t key = { keybuf, key_len };
 	namedb_val_t val = { NULL, sizeof(struct kr_cache_rrset) + knot_rdataset_size(&rr->rrs) };
 
-#ifndef NDEBUG
-	char name_str[KNOT_DNAME_MAXLEN];
-	knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
-	char type_str[16];
-	knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
-	DEBUG_MSG("write '%s %s' => %u RRs (key=%zuB,data=%zuB)\n", name_str, type_str, rr->rrs.rr_count, key.len, val.len);
-#endif
-
 	int ret = db_api->insert(txn, &key, &val, 0);
 	if (ret != KNOT_EOK) {
 		return ret;
@@ -210,16 +190,6 @@ int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr)
 	uint8_t keybuf[KNOT_DNAME_MAXLEN + sizeof(uint16_t)];
 	size_t key_len = cache_key(keybuf, rr->owner, rr->type);
 	namedb_val_t key = { keybuf, key_len };
-
-#ifndef NDEBUG
-	char name_str[KNOT_DNAME_MAXLEN];
-	knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
-	char type_str[16];
-	knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
-	DEBUG_MSG("del  '%s %s'\n", name_str, type_str);
-#endif
-
-	/* TODO: selective deletion by RRSet subtraction */
 
 	return db_api->del(txn, &key);
 }

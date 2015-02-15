@@ -23,11 +23,7 @@
 #include "lib/layer/static.h"
 #include "lib/layer/iterate.h"
 
-#ifndef NDEBUG
-#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[cache] " fmt, ## __VA_ARGS__)
-#else
-#define DEBUG_MSG(fmt, ...)
-#endif
+#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), " cc ",  fmt)
 
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
 
@@ -98,6 +94,7 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Try to find expected record first. */
 	int state = read_cache_rr(txn, &cache_rr, timestamp, callback, param);
 	if (state == KNOT_NS_PROC_DONE) {
+		DEBUG_MSG("=> satisfied from cache\n");
 		kr_rplan_pop(param->rplan, cur);
 		return state;
 	}
@@ -250,6 +247,7 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Cache only positive answers. */
 	/*! \todo Negative answers cache support */
 	if (knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
+		DEBUG_MSG("write NCACHE (NOTIMPL)\n");
 		return ctx->state;
 	}
 
@@ -257,9 +255,9 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = KNOT_EOK;
 	if (knot_wire_get_aa(pkt->wire)) {
 		ret = write_cache_answer(pkt, txn, pool, timestamp);
-	} else {
-		ret = write_cache_authority(pkt, txn, pool, timestamp);
 	}
+
+	ret = write_cache_authority(pkt, txn, pool, timestamp);
 
 	/* Cache full, do what we must. */
 	if (ret == KNOT_ESPACE) {

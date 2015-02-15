@@ -24,12 +24,7 @@
 #include "lib/zonecut.h"
 #include "lib/rplan.h"
 #include "lib/defines.h"
-
-#ifndef NDEBUG
-#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[z-cut] " fmt, ## __VA_ARGS__)
-#else
-#define DEBUG_MSG(fmt, ...)
-#endif
+#include "lib/layer.h"
 
 /* \brief Root hint descriptor. */
 struct hint_info {
@@ -83,11 +78,6 @@ int kr_set_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, const knot
 
 	/* Invalidate address. */
 	cut->addr.ss_family = AF_UNSPEC;
-
-	char zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN];
-	knot_dname_to_str(ns_str, cut->ns, sizeof(ns_str));
-	knot_dname_to_str(zonecut_str, cut->name, sizeof(zonecut_str));
-	DEBUG_MSG("zone cut set '%s' ns '%s'\n", zonecut_str, ns_str);
 
 	return KNOT_EOK;
 }
