@@ -26,11 +26,7 @@
 #include "lib/rplan.h"
 #include "lib/defines.h"
 
-#ifndef NDEBUG
-#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[qiter] " fmt, ## __VA_ARGS__)
-#else
-#define DEBUG_MSG(fmt, ...)
-#endif
+#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), "iter", fmt)
 
 /* Packet classification. */
 enum {
@@ -277,9 +273,8 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 }
 
 /*! \brief Error handling, RFC1034 5.3.3, 4d. */
-static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param, int errcode)
+static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	DEBUG_MSG("resolution error => %s\n", knot_strerror(errcode));
 	return KNOT_NS_PROC_FAIL;
 }
 
@@ -332,12 +327,10 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 #ifndef NDEBUG
-	char name_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN], type_str[16];
+	char zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN];
 	knot_dname_to_str(ns_str, query->zone_cut.ns, sizeof(ns_str));
 	knot_dname_to_str(zonecut_str, query->zone_cut.name, sizeof(zonecut_str));
-	knot_dname_to_str(name_str, qname, sizeof(name_str));
-	knot_rrtype_to_string(qtype, type_str, sizeof(type_str));
-	DEBUG_MSG("query '%s %s' zone cut '%s' nameserver '%s'\n", name_str, type_str, zonecut_str, ns_str);
+	DEBUG_MSG("=> querying nameserver '%s' zone cut '%s'\n", ns_str, zonecut_str);
 #endif
 
 	/* Query built, expect answer. */
@@ -359,17 +352,19 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Check for packet processing errors first. */
 	if (pkt->parsed < pkt->size) {
-		return resolve_error(pkt, param, KNOT_EMALF);
+		DEBUG_MSG("=> malformed response\n");
+		return resolve_error(pkt, param);
 	} else if (!is_paired_to_query(pkt, query)) {
-		DEBUG_MSG("ignoring mismatching response\n");
+		DEBUG_MSG("=> ignoring mismatching response\n");
 		return KNOT_NS_PROC_MORE;
 	} else if (knot_wire_get_tc(pkt->wire)) {
-		DEBUG_MSG("truncated response, failover to TCP\n");
+		DEBUG_MSG("=> truncated response, failover to TCP\n");
 		struct kr_query *cur = kr_rplan_current(param->rplan);
 		if (cur) {
 			/* Fail if already on TCP. */
 			if (cur->flags & QUERY_TCP) {
-				return resolve_error(pkt, param, KNOT_EMALF);
+				DEBUG_MSG("=> TC=1 with TCP, bailing out\n");
+				return resolve_error(pkt, param);
 			}
 			cur->flags |= QUERY_TCP;
 		}
@@ -382,7 +377,8 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
 	default:
-		return resolve_error(pkt, param, KNOT_ERROR);
+		DEBUG_MSG("=> rcode: %d\n", knot_wire_get_rcode(pkt->wire));
+		return resolve_error(pkt, param);
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
@@ -390,9 +386,11 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	state = process_authority(pkt, param);
 	switch(state) {
 	case KNOT_NS_PROC_MORE: /* Not referral, process answer. */
+		DEBUG_MSG("=> rcode: %d\n", knot_wire_get_rcode(pkt->wire));
 		state = process_answer(pkt, param);
 		break;
 	case KNOT_NS_PROC_DONE: /* Referral, try to find glue. */
+		DEBUG_MSG("=> referral response, follow\n");
 		state = process_additional(pkt, param);
 		break;
 	default:

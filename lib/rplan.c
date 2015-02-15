@@ -22,12 +22,9 @@
 #include "lib/context.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
+#include "lib/layer.h"
 
-#ifndef NDEBUG
-#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[rplan] " fmt, ## __VA_ARGS__)
-#else
-#define DEBUG_MSG(fmt, ...)
-#endif
+#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "plan",  fmt)
 
 static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 {
@@ -108,6 +105,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	if (rplan == NULL) {
 		return NULL;
 	}
+
 	struct kr_query *qry =  query_create(rplan->pool, name);
 	if (qry == NULL) {
 		return NULL;
@@ -129,7 +127,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 	knot_dname_to_str(name_str, name, sizeof(name_str));
 	knot_rrtype_to_string(type, type_str, sizeof(type_str));
-	DEBUG_MSG("plan '%s' type '%s'\n", name_str, type_str);
+	DEBUG_MSG(parent, "plan '%s' type '%s'\n", name_str, type_str);
 #endif
 
 	return qry;
