@@ -14,8 +14,8 @@ class Entry:
 
     def __init__(self):
         """ Initialize data entry. """
-        self.match_fields = None
-        self.adjust_fields = None
+        self.match_fields = ['opcode', 'qtype', 'qname']
+        self.adjust_fields = ['copy_id']
         self.origin = '.'
         self.message = dns.message.Message()
         self.sections = []
