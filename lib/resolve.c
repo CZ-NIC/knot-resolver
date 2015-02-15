@@ -28,11 +28,7 @@
 #include "lib/layer/static.h"
 #include "lib/layer/stats.h"
 
-#ifndef NDEBUG
-#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[reslv] " fmt, ## __VA_ARGS__)
-#else
-#define DEBUG_MSG(fmt, ...)
-#endif
+#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), "resl",  fmt)
 
 /* Defines */
 #define ITER_LIMIT 50
@@ -86,8 +82,16 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	struct kr_rplan *rplan = param->rplan;
 	struct kr_query *cur = kr_rplan_current(rplan);
 
+#ifndef NDEBUG
+	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
+	knot_dname_to_str(name_str, cur->sname, sizeof(name_str));
+	knot_rrtype_to_string(cur->stype, type_str, sizeof(type_str));
+	DEBUG_MSG("query '%s %s'\n", name_str, type_str);
+#endif
+
 	/* Invalid address for current zone cut. */
 	if (sockaddr_len((struct sockaddr *)&cur->zone_cut.addr) < 1) {
+		DEBUG_MSG("=> ns missing A/AAAA, invalidating\n");
 		return invalidate_ns(rplan, cur);
 	}
 
@@ -108,10 +112,12 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 		}
 		/* Network error, retry over TCP. */
 		if (ret != KNOT_LAYER_ERROR && !(cur->flags & QUERY_TCP)) {
+			DEBUG_MSG("=> ns unreachable, retrying over TCP\n");
 			cur->flags |= QUERY_TCP;
 			return iterate(requestor, param);
 		}
 		/* Resolution failed, invalidate current NS and reset to UDP. */
+		DEBUG_MSG("=> resolution failed: '%s', invalidating\n", knot_strerror(ret));
 		ret = invalidate_ns(rplan, cur);
 		cur->flags &= ~QUERY_TCP;
 	}
@@ -135,7 +141,7 @@ static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
 	while((ret == KNOT_EOK) && !kr_rplan_empty(param->rplan)) {
 		ret = iterate(&requestor, param);
 		if (++iter_count > ITER_LIMIT) {
-			DEBUG_MSG("iteration limit %d reached => SERVFAIL\n", ITER_LIMIT);
+			DEBUG_MSG("iteration limit %d reached\n", ITER_LIMIT);
 			ret = KNOT_ELIMIT;
 		}
 	}

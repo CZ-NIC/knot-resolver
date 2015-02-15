@@ -16,6 +16,8 @@
 
 #include "lib/layer/static.h"
 
+#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "hint",  fmt)
+
 static int reset(knot_layer_t *ctx)
 {
 	/* TODO: sync, cleanup after resolution */
@@ -25,9 +27,6 @@ static int reset(knot_layer_t *ctx)
 static int begin(knot_layer_t *ctx, void *param)
 {
 	ctx->data = param;
-
-	struct kr_context *resolve = ((struct kr_layer_param *)param)->ctx;
-	assert(resolve);
 
 	/* TODO: read static hosts file */
 

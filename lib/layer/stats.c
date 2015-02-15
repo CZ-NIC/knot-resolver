@@ -19,11 +19,7 @@
 #include "lib/layer/stats.h"
 #include "lib/rplan.h"
 
-#ifndef NDEBUG
-#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[stats] " fmt, ## __VA_ARGS__)
-#else
-#define DEBUG_MSG(fmt, ...)
-#endif
+#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "stat",  fmt)
 
 //static void update_stats(struct kr_ns *ns, double rtt)
 //{

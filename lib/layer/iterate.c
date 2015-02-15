@@ -26,11 +26,15 @@
 #include "lib/rplan.h"
 #include "lib/defines.h"
 
-#ifndef NDEBUG
-#define DEBUG_MSG(fmt, ...) fprintf(stderr, "[qiter] " fmt, ## __VA_ARGS__)
-#else
-#define DEBUG_MSG(fmt, ...)
-#endif
+#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), "iter", fmt)
+
+/* Packet classification. */
+enum {
+	PKT_NOERROR   = 1 << 0, /* Positive response */
+	PKT_NODATA    = 1 << 1, /* No data response */
+	PKT_NXDOMAIN  = 1 << 2, /* Negative response */
+	PKT_ERROR     = 1 << 3  /* Refused or server failure */ 
+};
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
@@ -70,6 +74,20 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	       (query->sclass == KNOT_CLASS_ANY || query->sclass  == knot_pkt_qclass(answer)) &&
 	       qtype          == knot_pkt_qtype(answer) &&
 	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
+}
+
+/*! \brief Return response class. */
+static int response_classify(knot_pkt_t *pkt)
+{
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+	switch (knot_wire_get_rcode(pkt->wire)) {
+	case KNOT_RCODE_NOERROR:
+		return (an->count == 0) ? PKT_NODATA : PKT_NOERROR;
+	case KNOT_RCODE_NXDOMAIN:
+		return PKT_NXDOMAIN;
+	default:
+		return PKT_ERROR;
+	}
 }
 
 static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *rr,
@@ -129,8 +147,7 @@ int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_para
 		return KNOT_NS_PROC_DONE;
 	}
 
-	/* Update parent query as well. */
-	return rr_update_parent(rr, hint, param);
+	return KNOT_NS_PROC_DONE;
 }
 
 int rr_update_nameserver(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param)
@@ -157,28 +174,18 @@ int rr_update_nameserver(const knot_rrset_t *rr, unsigned hint, struct kr_layer_
 
 static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	int state = KNOT_NS_PROC_MORE;
-
-	/* Answer declares AA, can't be referral. */
-	if (knot_wire_get_aa(pkt->wire)) {
-		return state;
-	}
-
-	/* Update current zone cut from NS records. */
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (rr->type != KNOT_RRTYPE_NS) {
-			continue;
-		}
-
-		state = rr_update_nameserver(rr, 0, param);
-		if (state != KNOT_NS_PROC_MORE) {
-			break;
+		if (rr->type == KNOT_RRTYPE_NS) {
+			int state = rr_update_nameserver(rr, 0, param);
+			if (state != KNOT_NS_PROC_MORE) {
+				return state;
+			}
 		}
 	}
 
-	return state;
+	return KNOT_NS_PROC_MORE;
 }
 
 static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
@@ -211,27 +218,19 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	 * NOERROR  => found zone cut, retry
 	 * NXDOMAIN => parent is zone cut, retry as a workaround for bad authoritatives
 	 */
-	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
-	bool is_minimized = (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname));
-	bool is_nodata = (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NOERROR) && !an->count;
-	bool is_nxdomain = (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN);
-	if (is_minimized && (is_nodata || is_nxdomain)) {
+	bool is_final = (query->parent == NULL);
+	int pkt_class = response_classify(pkt);
+	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) && (pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
 		query->flags |= QUERY_NO_MINIMIZE;
 		return KNOT_NS_PROC_DONE;
 	}
 
-	/* Does this answer update the final response? */
-	rr_callback_t callback = &rr_update_parent;
-	if (query->parent == NULL) {
-		knot_wire_set_rcode(param->answer->wire, knot_wire_get_rcode(pkt->wire));
-		callback = &rr_update_answer;
-	}
-
-	/* Process answer section records. */
+	/* Process answer type */
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	const knot_dname_t *cname = query->sname;
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-		int state = callback(rr, 0, param);
+		int state = is_final ?  rr_update_answer(rr, 0, param) : rr_update_parent(rr, 0, param);
 		if (state == KNOT_NS_PROC_FAIL) {
 			return state;
 		}
@@ -243,16 +242,39 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 		(void) kr_rplan_push(param->rplan, query->parent, cname, query->sclass, query->stype);
 	}
 
-	/* This is either declares AA or not, either way it resolves current query. */
+	/* Either way it resolves current query. */
 	kr_rplan_pop(param->rplan, query);
 
 	return KNOT_NS_PROC_DONE;
 }
 
-/*! \brief Error handling, RFC1034 5.3.3, 4d. */
-static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param, int errcode)
+static void finalize_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	DEBUG_MSG("resolution error => %s\n", knot_strerror(errcode));
+	knot_pkt_t *answer = param->answer;
+
+	/* Finalize header */
+	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
+
+	/* Finalize authority */
+	knot_pkt_begin(answer, KNOT_AUTHORITY);
+
+	/* Fill in SOA if negative response */
+	int pkt_class = response_classify(pkt);
+	if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		for (unsigned i = 0; i < ns->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
+			if (rr->type == KNOT_RRTYPE_SOA) {
+				rr_update_answer(rr, 0, param);
+				break;
+			}
+		}
+	}
+}
+
+/*! \brief Error handling, RFC1034 5.3.3, 4d. */
+static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param)
+{
 	return KNOT_NS_PROC_FAIL;
 }
 
@@ -305,12 +327,10 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 #ifndef NDEBUG
-	char name_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN], type_str[16];
+	char zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN];
 	knot_dname_to_str(ns_str, query->zone_cut.ns, sizeof(ns_str));
 	knot_dname_to_str(zonecut_str, query->zone_cut.name, sizeof(zonecut_str));
-	knot_dname_to_str(name_str, qname, sizeof(name_str));
-	knot_rrtype_to_string(qtype, type_str, sizeof(type_str));
-	DEBUG_MSG("query '%s %s' zone cut '%s' nameserver '%s'\n", name_str, type_str, zonecut_str, ns_str);
+	DEBUG_MSG("=> querying nameserver '%s' zone cut '%s'\n", ns_str, zonecut_str);
 #endif
 
 	/* Query built, expect answer. */
@@ -332,17 +352,19 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Check for packet processing errors first. */
 	if (pkt->parsed < pkt->size) {
-		return resolve_error(pkt, param, KNOT_EMALF);
+		DEBUG_MSG("=> malformed response\n");
+		return resolve_error(pkt, param);
 	} else if (!is_paired_to_query(pkt, query)) {
-		DEBUG_MSG("ignoring mismatching response\n");
+		DEBUG_MSG("=> ignoring mismatching response\n");
 		return KNOT_NS_PROC_MORE;
 	} else if (knot_wire_get_tc(pkt->wire)) {
-		DEBUG_MSG("truncated response, failover to TCP\n");
+		DEBUG_MSG("=> truncated response, failover to TCP\n");
 		struct kr_query *cur = kr_rplan_current(param->rplan);
 		if (cur) {
 			/* Fail if already on TCP. */
 			if (cur->flags & QUERY_TCP) {
-				return resolve_error(pkt, param, KNOT_EMALF);
+				DEBUG_MSG("=> TC=1 with TCP, bailing out\n");
+				return resolve_error(pkt, param);
 			}
 			cur->flags |= QUERY_TCP;
 		}
@@ -355,7 +377,8 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
 	default:
-		return resolve_error(pkt, param, KNOT_ERROR);
+		DEBUG_MSG("=> rcode: %d\n", knot_wire_get_rcode(pkt->wire));
+		return resolve_error(pkt, param);
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
@@ -363,13 +386,20 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	state = process_authority(pkt, param);
 	switch(state) {
 	case KNOT_NS_PROC_MORE: /* Not referral, process answer. */
+		DEBUG_MSG("=> rcode: %d\n", knot_wire_get_rcode(pkt->wire));
 		state = process_answer(pkt, param);
 		break;
 	case KNOT_NS_PROC_DONE: /* Referral, try to find glue. */
+		DEBUG_MSG("=> referral response, follow\n");
 		state = process_additional(pkt, param);
 		break;
 	default:
 		break;
+	}
+
+	/* If resolved, finalize answer. */
+	if (kr_rplan_empty(param->rplan)) {
+		finalize_answer(pkt, param);
 	}
 
 	return state;
