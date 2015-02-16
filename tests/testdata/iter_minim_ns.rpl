@@ -64,7 +64,6 @@ com.	IN NS	lame-addr.gtld-servers.net.
 com.	IN NS	a.gtld-servers.net.
 SECTION ADDITIONAL
 lame-addr.gtld-servers.net.	IN 	A	1.1.1.1
-a.gtld-servers.net.	IN 	A	1.1.1.1
 a.gtld-servers.net.	IN 	A	192.5.6.30
 ENTRY_END
 RANGE_END
@@ -92,7 +91,7 @@ ENTRY_END
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
-REPLY QR NOERROR
+REPLY QR AA NOERROR
 SECTION QUESTION
 www.example.com. IN NS
 SECTION ANSWER

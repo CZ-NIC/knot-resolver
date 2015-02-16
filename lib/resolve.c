@@ -65,17 +65,17 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	knot_rdataset_clear(&to_remove, rplan->pool);
 	
 	/* Remove record(s) */
+	int ret = KNOT_EOK;
 	if (cached.rrs.rr_count == 0) {
 		(void) kr_cache_remove(txn, &cached);
-		kr_find_zone_cut(&qry->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
+		ret = KNOT_ENOENT;
 	} else {
 		(void) kr_cache_insert(txn, &cached, qry->timestamp.tv_sec);
 		kr_set_zone_cut(&qry->zone_cut, cached.owner, knot_ns_name(&cached.rrs, 0));
 	}
-	knot_rrset_clear(&cached, rplan->pool);
 
-	/* Update zone cut and continue. */
-	return KNOT_EOK;
+	knot_rrset_clear(&cached, rplan->pool);
+	return ret;
 }
 
 static int iterate(struct knot_requestor *requestor, struct kr_layer_param *param)
@@ -123,8 +123,13 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 		}
 		/* Resolution failed, invalidate current NS and reset to UDP. */
 		DEBUG_MSG("=> resolution failed: '%s', invalidating\n", knot_strerror(ret));
-		ret = invalidate_ns(rplan, cur);
-		cur->flags &= ~QUERY_TCP;
+		if (invalidate_ns(rplan, cur) == KNOT_EOK) {
+			cur->flags &= ~QUERY_TCP;
+		} else {
+			DEBUG_MSG("=> no ns left to ask\n");
+			kr_rplan_pop(rplan, cur);
+		}
+		return KNOT_EOK;
 	}
 
 	/* Pop query if resolved. */
