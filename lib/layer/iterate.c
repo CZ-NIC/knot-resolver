@@ -228,8 +228,6 @@ static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 
 static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	struct kr_query *query = kr_rplan_current(param->rplan);
-
 	/* Attempt to find glue for current nameserver. */
 	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
 	for (unsigned i = 0; i < ar->count; ++i) {
@@ -241,6 +239,27 @@ static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
 	}
 
 	return KNOT_NS_PROC_DONE;
+}
+
+static void finalize_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
+{
+	/* Finalize header */
+	knot_pkt_t *answer = param->answer;
+	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
+
+	/* Fill in SOA if negative response */
+	knot_pkt_begin(answer, KNOT_AUTHORITY);
+	int pkt_class = response_classify(pkt);
+	if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		for (unsigned i = 0; i < ns->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
+			if (rr->type == KNOT_RRTYPE_SOA) {
+				rr_update_answer(rr, 0, param);
+				break;
+			}
+		}
+	}
 }
 
 static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
@@ -274,36 +293,15 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	/* Follow canonical name as next SNAME. */
 	if (cname != query->sname) {
 		(void) kr_rplan_push(param->rplan, query->parent, cname, query->sclass, query->stype);
+	} else {
+		if (query->parent == NULL) {
+			finalize_answer(pkt, param);
+		}
 	}
 
 	/* Either way it resolves current query. */
-	kr_rplan_pop(param->rplan, query);
-
+	query->resolved = true;
 	return KNOT_NS_PROC_DONE;
-}
-
-static void finalize_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
-{
-	knot_pkt_t *answer = param->answer;
-
-	/* Finalize header */
-	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
-
-	/* Finalize authority */
-	knot_pkt_begin(answer, KNOT_AUTHORITY);
-
-	/* Fill in SOA if negative response */
-	int pkt_class = response_classify(pkt);
-	if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
-		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
-		for (unsigned i = 0; i < ns->count; ++i) {
-			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-			if (rr->type == KNOT_RRTYPE_SOA) {
-				rr_update_answer(rr, 0, param);
-				break;
-			}
-		}
-	}
 }
 
 /*! \brief Error handling, RFC1034 5.3.3, 4d. */
@@ -380,7 +378,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_layer_param *param = ctx->data;
 	struct kr_query *query = kr_rplan_current(param->rplan);
-	if (query == NULL) {
+	if (query == NULL || query->resolved) {
 		return ctx->state;
 	}
 
@@ -429,11 +427,6 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	default:
 		break;
-	}
-
-	/* If resolved, finalize answer. */
-	if (kr_rplan_empty(param->rplan)) {
-		finalize_answer(pkt, param);
 	}
 
 	return state;

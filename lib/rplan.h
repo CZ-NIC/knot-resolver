@@ -27,7 +27,7 @@
 #include "lib/zonecut.h"
 
 /* Query flags */
-enum {
+enum kr_query_flag {
 	QUERY_NO_MINIMIZE = 1 << 0, /*!< Don't minimize QNAME. */
 	QUERY_TCP         = 1 << 1  /*!< Use TCP for this query. */
 };
@@ -41,6 +41,7 @@ struct kr_query {
 	struct kr_zonecut zone_cut;
 	struct timeval timestamp;
 	knot_dname_t *sname;
+	bool resolved;
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;

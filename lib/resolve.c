@@ -127,6 +127,11 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 		cur->flags &= ~QUERY_TCP;
 	}
 
+	/* Pop query if resolved. */
+	if (cur->resolved) {
+		kr_rplan_pop(rplan, cur);
+	}
+
 	return ret;
 }
 
