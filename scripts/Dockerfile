@@ -14,7 +14,7 @@ EXPOSE 53
 
 # Select entrypoint
 WORKDIR /root
-CMD ["/usr/local/sbin/kresolved", "-a", "0.0.0.0#53"]
+CMD ["/usr/local/sbin/kresolved"]
 
 # Install dependencies and sources
 RUN apt-get -q -y update && \
