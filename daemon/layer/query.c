@@ -44,6 +44,11 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_NS_PROC_NOOP; /* Ignore. */
 	}
 
+	/* No authoritative service. */
+	if (!knot_wire_get_rd(pkt->wire)) {
+		return KNOT_NS_PROC_FAIL;
+	}
+
 	return KNOT_NS_PROC_FULL;
 }
 
@@ -64,6 +69,12 @@ static int output_answer(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return KNOT_NS_PROC_DONE;
 }
 
+static int output_error(knot_layer_t *ctx, knot_pkt_t *pkt)
+{
+	knot_wire_set_rcode(pkt->wire, KNOT_RCODE_SERVFAIL);
+	return KNOT_NS_PROC_DONE;
+}
+
 /*! \brief Module implementation. */
 static const knot_layer_api_t LAYER_QUERY_MODULE = {
 	&begin,
@@ -71,7 +82,7 @@ static const knot_layer_api_t LAYER_QUERY_MODULE = {
 	&reset,
 	&input_query,
 	&output_answer,
-	NULL
+	&output_error
 };
 
 const knot_layer_api_t *layer_query_module(void)
