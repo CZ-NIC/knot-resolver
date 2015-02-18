@@ -77,6 +77,24 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
 
+/*! \brief Relaxed rule for AA, either AA=1 or SOA matching zone cut is required. */
+static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
+{
+	if (knot_wire_get_aa(answer->wire)) {
+		return true;
+	}
+
+	const knot_pktsection_t *ns = knot_pkt_section(answer, KNOT_AUTHORITY);
+	for (unsigned i = 0; i < ns->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
+		if (rr->type == KNOT_RRTYPE_SOA && knot_dname_is_equal(rr->owner, query->zone_cut.name)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /*! \brief Return response class. */
 static int response_classify(knot_pkt_t *pkt)
 {
@@ -107,15 +125,14 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
 
 static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, uint16_t index)
 {
-	if (rr == NULL || query == NULL) {
-		return KNOT_NS_PROC_MORE; /* Ignore */
-	}
-
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		if (knot_dname_is_equal(query->zone_cut.ns, rr->owner)) {
+			/* Set zone cut address. */
 			int ret = kr_set_zone_cut_addr(&query->zone_cut, rr, index);
 			if (ret == KNOT_EOK) {
 				return KNOT_NS_PROC_DONE;
+			} else {
+				return KNOT_NS_PROC_FAIL;
 			}
 		}
 	}
@@ -168,18 +185,23 @@ static int nameserver_score(const knot_rrset_t *rr, unsigned hint, knot_pkt_t *p
 {
 	struct kr_query *query = kr_rplan_current(param->rplan);
 	const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, hint);
-	int score = KR_NS_VALID + 1;
+	int score = kr_nsrep_score(rr->owner, param);
+	if (score < KR_NS_VALID) {
+		return score;
+	}
 
 	/* Authority MUST be at/below the authority of the nameserver, otherwise
 	 * possible cache injection attempt. */
 	if (!knot_dname_in(query->zone_cut.name, rr->owner)) {
-		DEBUG_MSG("NS in query outside of its authority => rejecting\n");
+		DEBUG_MSG("<= authority: ns outside bailiwick, rejecting\n");
 		return KR_NS_INVALID;
 	}
 
 	/* Ignore already resolved zone cut. */
 	if (knot_dname_is_equal(rr->owner, query->zone_cut.name)) {
 		return KR_NS_VALID;
+	} else {
+		score += 1;
 	}
 
 	/* Check if contains glue. */
@@ -207,7 +229,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
 			int score = nameserver_score(rr, 0, pkt, param);
-			if (score < 0) {
+			if (score < KR_NS_VALID) {
 				return KNOT_NS_PROC_FAIL;
 			}
 			if (score > best_score) {
@@ -276,6 +298,12 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) && (pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
 		query->flags |= QUERY_NO_MINIMIZE;
 		return KNOT_NS_PROC_DONE;
+	}
+
+	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
+	if (!is_authoritative(pkt, query) && (pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
+		DEBUG_MSG("<= lame response: non-auth sent negative response\n");
+		return KNOT_NS_PROC_FAIL;
 	}
 
 	/* Process answer type */
@@ -359,10 +387,11 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 #ifndef NDEBUG
-	char zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN];
+	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN];
+	knot_dname_to_str(qname_str, qname, sizeof(qname_str));
 	knot_dname_to_str(ns_str, query->zone_cut.ns, sizeof(ns_str));
 	knot_dname_to_str(zonecut_str, query->zone_cut.name, sizeof(zonecut_str));
-	DEBUG_MSG("=> querying nameserver '%s' zone cut '%s'\n", ns_str, zonecut_str);
+	DEBUG_MSG("=> querying: '%s' zone cut: '%s' m12n: '%s'\n", ns_str, zonecut_str, qname_str);
 #endif
 
 	/* Query built, expect answer. */
@@ -384,18 +413,18 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Check for packet processing errors first. */
 	if (pkt->parsed < pkt->size) {
-		DEBUG_MSG("=> malformed response\n");
+		DEBUG_MSG("<= malformed response\n");
 		return resolve_error(pkt, param);
 	} else if (!is_paired_to_query(pkt, query)) {
-		DEBUG_MSG("=> ignoring mismatching response\n");
+		DEBUG_MSG("<= ignoring mismatching response\n");
 		return KNOT_NS_PROC_MORE;
 	} else if (knot_wire_get_tc(pkt->wire)) {
-		DEBUG_MSG("=> truncated response, failover to TCP\n");
+		DEBUG_MSG("<= truncated response, failover to TCP\n");
 		struct kr_query *cur = kr_rplan_current(param->rplan);
 		if (cur) {
 			/* Fail if already on TCP. */
 			if (cur->flags & QUERY_TCP) {
-				DEBUG_MSG("=> TC=1 with TCP, bailing out\n");
+				DEBUG_MSG("<= TC=1 with TCP, bailing out\n");
 				return resolve_error(pkt, param);
 			}
 			cur->flags |= QUERY_TCP;
@@ -404,12 +433,13 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Check response code. */
+	lookup_table_t *rcode = lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
 	default:
-		DEBUG_MSG("=> rcode: %d\n", knot_wire_get_rcode(pkt->wire));
+		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_error(pkt, param);
 	}
 
@@ -418,11 +448,11 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	state = process_authority(pkt, param);
 	switch(state) {
 	case KNOT_NS_PROC_MORE: /* Not referral, process answer. */
-		DEBUG_MSG("=> rcode: %d\n", knot_wire_get_rcode(pkt->wire));
+		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		state = process_answer(pkt, param);
 		break;
 	case KNOT_NS_PROC_DONE: /* Referral, try to find glue. */
-		DEBUG_MSG("=> referral response, follow\n");
+		DEBUG_MSG("<= referral response, follow\n");
 		state = process_additional(pkt, param);
 		break;
 	default:

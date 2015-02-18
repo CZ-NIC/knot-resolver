@@ -19,7 +19,7 @@
 #include "lib/layer.h"
 
 enum kr_ns_score {
-    KR_NS_INVALID = 1,
+    KR_NS_INVALID = -1,
     KR_NS_VALID   = 0
 };
 

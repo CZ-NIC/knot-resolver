@@ -130,3 +130,8 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry);
  * \return query instance or NULL if empty
  */
 struct kr_query *kr_rplan_current(struct kr_rplan *rplan);
+
+/*!
+ * \brief Return true if resolution chain satisfies given query.
+ */
+bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type);

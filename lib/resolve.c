@@ -78,6 +78,20 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	return ret;
 }
 
+static int ns_resolve_addr(struct kr_query *cur, struct kr_layer_param *param)
+{
+	if (kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A) || 
+	    kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA)) {
+		DEBUG_MSG("=> dependency loop, bailing out\n");
+		kr_rplan_pop(param->rplan, cur);
+		return KNOT_EOK;
+	}
+
+	(void) kr_rplan_push(param->rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+	(void) kr_rplan_push(param->rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	return KNOT_EOK;
+}
+
 static int iterate(struct knot_requestor *requestor, struct kr_layer_param *param)
 {
 	int ret = KNOT_EOK;
@@ -95,9 +109,7 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	/* Invalid address for current zone cut. */
 	if (sockaddr_len((struct sockaddr *)&cur->zone_cut.addr) < 1) {
 		DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
-		(void) kr_rplan_push(rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
-		(void) kr_rplan_push(rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
-		return KNOT_EOK;
+		return ns_resolve_addr(cur, param);
 	}
 
 	/* Prepare query resolution. */
@@ -110,11 +122,6 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	/* Resolve and check status. */
 	ret = knot_requestor_exec(requestor, &timeout);
 	if (ret != KNOT_EOK) {
-		/* Check if any query is left. */
-		cur = kr_rplan_current(rplan);
-		if (cur == NULL) {
-			return ret;
-		}
 		/* Network error, retry over TCP. */
 		if (ret != KNOT_LAYER_ERROR && !(cur->flags & QUERY_TCP)) {
 			DEBUG_MSG("=> ns unreachable, retrying over TCP\n");

@@ -25,6 +25,8 @@
 #include "lib/layer.h"
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "plan",  fmt)
+#define QUERY_PROVIDES(q, name, cls, type) \
+    ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
 static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 {
@@ -102,26 +104,24 @@ bool kr_rplan_empty(struct kr_rplan *rplan)
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
-	if (rplan == NULL) {
+	if (rplan == NULL || name == NULL) {
 		return NULL;
 	}
 
-	struct kr_query *qry =  query_create(rplan->pool, name);
+	struct kr_query *qry = query_create(rplan->pool, name);
 	if (qry == NULL) {
 		return NULL;
 	}
-
 	qry->sclass = cls;
 	qry->stype = type;
 	qry->flags = rplan->context->options;
+	qry->parent = parent;
 	gettimeofday(&qry->timestamp, NULL);
+	add_tail(&rplan->pending, &qry->node);
 
 	/* Find closest zone cut for this query. */
 	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, NAMEDB_RDONLY);
 	kr_find_zone_cut(&qry->zone_cut, name, txn, qry->timestamp.tv_sec);
-
-	add_tail(&rplan->pending, &qry->node);
-	qry->parent = parent;
 
 #ifndef NDEBUG
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
@@ -129,7 +129,6 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	knot_rrtype_to_string(type, type_str, sizeof(type_str));
 	DEBUG_MSG(parent, "plan '%s' type '%s'\n", name_str, type_str);
 #endif
-
 	return qry;
 }
 
@@ -200,3 +199,13 @@ int kr_rplan_txn_commit(struct kr_rplan *rplan)
 	return ret;
 }
 
+bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type)
+{
+	while (closure != NULL) {
+		if (QUERY_PROVIDES(closure, name, cls, type)) {
+			return true;
+		}
+		closure = closure->parent;
+	}
+	return false;
+}
