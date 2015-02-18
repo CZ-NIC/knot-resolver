@@ -32,13 +32,14 @@ $ docker run -it --entrypoint=/bin/bash cznic/knot-resolver
 The Knot DNS Resolver depends on the development version of the Knot DNS library, and a reasonably recent version of `libuv`.
 Several dependencies may not be in the packages yet, the script pulls and installs all dependencies in a chroot.
 
+You can avoid rebuilding dependencies by specifying `BUILD_IGNORE` variable, see the [Dockerfile](scripts/Dockerfile)
+for example. Usually you only really need to rebuild `libknot`.
+
 ```
-$ FAKEROOT="/tmp/resolver-depends"
-$ ./scripts/build-depends.sh ${FAKEROOT} 
+$ FAKEROOT="${HOME}/.local"
+$ ./scripts/bootstrap-depends.sh ${FAKEROOT}
 $ export LDFLAGS="-L${FAKEROOT}/lib"
 $ export PKG_CONFIG_PATH="${FAKEROOT}/lib/pkgconfig"
-$ ./configure --enable-integration-tests
-$ autoreconf -if
 $ make
 $ make check
 ```
