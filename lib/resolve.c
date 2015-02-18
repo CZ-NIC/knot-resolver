@@ -18,6 +18,7 @@
 
 #include <libknot/internal/mempool.h>
 #include <libknot/processing/requestor.h>
+#include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
 #include <dnssec/random.h>
 
@@ -64,15 +65,31 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	knot_rdataset_clear(&to_remove, rplan->pool);
 	
 	/* Remove record(s) */
+	int ret = KNOT_EOK;
 	if (cached.rrs.rr_count == 0) {
 		(void) kr_cache_remove(txn, &cached);
+		ret = KNOT_ENOENT;
 	} else {
 		(void) kr_cache_insert(txn, &cached, qry->timestamp.tv_sec);
+		kr_set_zone_cut(&qry->zone_cut, cached.owner, knot_ns_name(&cached.rrs, 0));
 	}
-	knot_rrset_clear(&cached, rplan->pool);
 
-	/* Update zone cut and continue. */
-	return kr_find_zone_cut(&qry->zone_cut, qry->sname, txn, qry->timestamp.tv_sec);
+	knot_rrset_clear(&cached, rplan->pool);
+	return ret;
+}
+
+static int ns_resolve_addr(struct kr_query *cur, struct kr_layer_param *param)
+{
+	if (kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A) || 
+	    kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA)) {
+		DEBUG_MSG("=> dependency loop, bailing out\n");
+		kr_rplan_pop(param->rplan, cur);
+		return KNOT_EOK;
+	}
+
+	(void) kr_rplan_push(param->rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+	(void) kr_rplan_push(param->rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	return KNOT_EOK;
 }
 
 static int iterate(struct knot_requestor *requestor, struct kr_layer_param *param)
@@ -91,8 +108,8 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 
 	/* Invalid address for current zone cut. */
 	if (sockaddr_len((struct sockaddr *)&cur->zone_cut.addr) < 1) {
-		DEBUG_MSG("=> ns missing A/AAAA, invalidating\n");
-		return invalidate_ns(rplan, cur);
+		DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
+		return ns_resolve_addr(cur, param);
 	}
 
 	/* Prepare query resolution. */
@@ -105,11 +122,6 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	/* Resolve and check status. */
 	ret = knot_requestor_exec(requestor, &timeout);
 	if (ret != KNOT_EOK) {
-		/* Check if any query is left. */
-		cur = kr_rplan_current(rplan);
-		if (cur == NULL) {
-			return ret;
-		}
 		/* Network error, retry over TCP. */
 		if (ret != KNOT_LAYER_ERROR && !(cur->flags & QUERY_TCP)) {
 			DEBUG_MSG("=> ns unreachable, retrying over TCP\n");
@@ -118,8 +130,18 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 		}
 		/* Resolution failed, invalidate current NS and reset to UDP. */
 		DEBUG_MSG("=> resolution failed: '%s', invalidating\n", knot_strerror(ret));
-		ret = invalidate_ns(rplan, cur);
-		cur->flags &= ~QUERY_TCP;
+		if (invalidate_ns(rplan, cur) == KNOT_EOK) {
+			cur->flags &= ~QUERY_TCP;
+		} else {
+			DEBUG_MSG("=> no ns left to ask\n");
+			kr_rplan_pop(rplan, cur);
+		}
+		return KNOT_EOK;
+	}
+
+	/* Pop query if resolved. */
+	if (cur->resolved) {
+		kr_rplan_pop(rplan, cur);
 	}
 
 	return ret;

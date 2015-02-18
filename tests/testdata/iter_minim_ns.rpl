@@ -30,13 +30,40 @@ MATCH opcode qtype qname
 ADJUST copy_id
 REPLY QR NOERROR
 SECTION QUESTION
+net. IN NS
+SECTION ANSWER
+net. IN NS	K.ROOT-SERVERS.NET.
+SECTION ADDITIONAL
+K.ROOT-SERVERS.NET.	IN	A	193.0.14.129
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+gtld-servers.net. IN NS
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR AA NOERROR
+SECTION QUESTION
+a.gtld-servers.net. IN AAAA
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
 com. IN NS
 SECTION AUTHORITY
 com.	IN NS	lame-addr.gtld-servers.net.
 com.	IN NS	a.gtld-servers.net.
 SECTION ADDITIONAL
 lame-addr.gtld-servers.net.	IN 	A	1.1.1.1
-a.gtld-servers.net.	IN 	A	1.1.1.1
 a.gtld-servers.net.	IN 	A	192.5.6.30
 ENTRY_END
 RANGE_END
@@ -64,7 +91,7 @@ ENTRY_END
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
-REPLY QR NOERROR
+REPLY QR AA NOERROR
 SECTION QUESTION
 www.example.com. IN NS
 SECTION ANSWER

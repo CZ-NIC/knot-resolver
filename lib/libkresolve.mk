@@ -3,6 +3,7 @@ libkresolve_SOURCES := \
 	lib/layer/itercache.c  \
 	lib/layer/static.c     \
 	lib/layer/stats.c      \
+	lib/nsrep.c            \
 	lib/context.c          \
 	lib/resolve.c          \
 	lib/zonecut.c          \
@@ -15,6 +16,7 @@ libkresolve_HEADERS := \
 	lib/layer/static.h     \
 	lib/layer/stats.h      \
 	lib/layer.h            \
+	lib/nsrep.h            \
 	lib/context.h          \
 	lib/resolve.h          \
 	lib/zonecut.h          \

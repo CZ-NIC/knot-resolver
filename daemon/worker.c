@@ -81,7 +81,7 @@ int worker_exec(struct worker_ctx *worker, knot_pkt_t *answer, knot_pkt_t *query
 	int state = knot_layer_in(&proc, query);
 
 	/* Build an answer. */
-	if (state == KNOT_NS_PROC_FULL) {
+	if (state & (KNOT_NS_PROC_FULL|KNOT_NS_PROC_FAIL)) {
 		knot_pkt_init_response(answer, query);
 		state = knot_layer_out(&proc, answer);
 	}

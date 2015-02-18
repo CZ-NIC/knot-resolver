@@ -247,7 +247,6 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Cache only positive answers. */
 	/*! \todo Negative answers cache support */
 	if (knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
-		DEBUG_MSG("write NCACHE (NOTIMPL)\n");
 		return ctx->state;
 	}
 
