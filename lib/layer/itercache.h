@@ -19,5 +19,4 @@
 #include "lib/layer.h"
 
 /* Processing module implementation. */
-const knot_layer_api_t *layer_itercache_module(void);
-#define LAYER_ITERCACHE layer_itercache_module()
+extern const knot_layer_api_t *itercache_layer(void);

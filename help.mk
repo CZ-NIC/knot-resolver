@@ -7,6 +7,7 @@ info:
 	$(info BINDIR:     $(BINDIR))
 	$(info LIBDIR:     $(LIBDIR))
 	$(info INCLUDEDIR: $(INCLUDEDIR))
+	$(info MODULEDIR:  $(MODULEDIR))
 	$(info )
 	$(info Features)
 	$(info --------)

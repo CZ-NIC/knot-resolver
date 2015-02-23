@@ -26,6 +26,7 @@
 #include "lib/rplan.h"
 #include "lib/defines.h"
 #include "lib/nsrep.h"
+#include "lib/module.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), "iter", fmt)
 
@@ -463,16 +464,14 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /*! \brief Module implementation. */
-static const knot_layer_api_t LAYER_ITERATE_MODULE = {
-	&begin,
-	&reset,
-	&finish,
-	&resolve,
-	&prepare_query,
-	NULL
-};
-
-const knot_layer_api_t *layer_iterate_module(void)
+const knot_layer_api_t *iterate_layer(void)
 {
-	return &LAYER_ITERATE_MODULE;
+	static const knot_layer_api_t _layer = {
+		.begin = &begin,
+		.reset = &reset,
+		.finish = &finish,
+		.in = &resolve,
+		.out = &prepare_query
+	};
+	return &_layer;
 }

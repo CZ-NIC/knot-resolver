@@ -44,10 +44,15 @@ int worker_init(struct worker_ctx *worker, mm_ctx_t *mm)
 	/* Open resolution context cache */
 	worker->resolve.cache = kr_cache_open("/tmp/kresolved", mm, CACHE_DEFAULT_SIZE);
 	if (worker->resolve.cache == NULL) {
-		fprintf(stderr, "Cache directory '/tmp/kresolved' not exists, exitting.\n");
+		fprintf(stderr, "Cache directory '/tmp/kresolved' not exists, exiting.\n");
 		kr_context_deinit(&worker->resolve);
 		return KNOT_ERROR;
 	}
+
+	/* Load basic modules */
+	kr_context_register(&worker->resolve, "iterate");
+	kr_context_register(&worker->resolve, "itercache");
+	kr_context_register(&worker->resolve, "hints");
 
 	return KNOT_EOK;
 }

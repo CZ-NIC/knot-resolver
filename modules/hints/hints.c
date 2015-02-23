@@ -14,10 +14,43 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
-
+#include "lib/module.h"
 #include "lib/layer.h"
 
-/* Processing module implementation. */
-const knot_layer_api_t *layer_stats_module(void);
-#define LAYER_STATS layer_stats_module()
+#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "hint",  fmt)
+
+static int begin(knot_layer_t *ctx, void *module_param)
+{
+	ctx->data = module_param;
+	return ctx->state;
+}
+
+static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
+{
+	return ctx->state;
+}
+
+/*
+ * Module implementation.
+ */
+
+const knot_layer_api_t *hints_layer(void)
+{
+	static const knot_layer_api_t _layer = {
+		.begin = &begin,
+		.out = &query
+	};
+	return &_layer;
+}
+
+int hints_init(struct kr_module *module)
+{
+	return 0;
+}
+
+int hints_deinit(struct kr_module *module)
+{
+	return 0;
+}
+
+KR_MODULE_EXPORT(hints);

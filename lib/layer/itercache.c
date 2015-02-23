@@ -20,8 +20,8 @@
 #include <libknot/internal/mempool.h>
 #include <libknot/rrtype/rdname.h>
 
-#include "lib/layer/static.h"
 #include "lib/layer/iterate.h"
+#include "lib/module.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), " cc ",  fmt)
 
@@ -267,16 +267,13 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /*! \brief Module implementation. */
-static const knot_layer_api_t LAYER_ITERCACHE_MODULE = {
-        &begin,
-        NULL,
-        NULL,
-        &write_cache,
-        &read_cache,
-        NULL
-};
-
-const knot_layer_api_t *layer_itercache_module(void)
+const knot_layer_api_t *itercache_layer(void)
 {
-	return &LAYER_ITERCACHE_MODULE;
+	static const knot_layer_api_t _layer = {
+		.begin = &begin,
+		.in = &write_cache,
+		.out = &read_cache
+	};
+
+	return &_layer;
 }

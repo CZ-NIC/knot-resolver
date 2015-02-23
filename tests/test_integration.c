@@ -52,6 +52,8 @@ static PyObject* init(PyObject* self, PyObject* args)
 	#define CACHE_SIZE 100*1024
 	test_mm_ctx_init(&global_mm);
 	kr_context_init(&global_context, &global_mm);
+	kr_context_register(&global_context, "iterate");
+	kr_context_register(&global_context, "itercache");
 	global_tmpdir = test_tmpdir_create();
 	assert(global_tmpdir);
 	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, CACHE_SIZE);

@@ -3,6 +3,7 @@
 #
 
 tests_BIN := \
+	test_utils \
 	test_context \
 	test_rplan \
 	test_cache \
@@ -36,7 +37,7 @@ $(eval $(call make_lib,libmock_calls,tests))
 _test_integration_SOURCES := tests/test_integration.c
 _test_integration_LIBS := -Wl,-rpath,tests -Ltests -lmock_calls $(libmock_calls_LIBS)
 _test_integration_DEPEND := libmock_calls
-$(eval $(call make_module,_test_integration,tests))
+$(eval $(call make_shared,_test_integration,tests))
 
 # Preload mock library
 ifeq ($(PLATFORM),Darwin)

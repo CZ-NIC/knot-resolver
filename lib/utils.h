@@ -16,8 +16,18 @@
 
 #pragma once
 
-#include "lib/layer.h"
+/*
+ * General-purpose attributes.
+ */
+#define auto_free __attribute__((cleanup(_cleanup_free)))
+extern void _cleanup_free(char **p);
+#define auto_close __attribute__((cleanup(_cleanup_close)))
+extern void _cleanup_close(int *p);
 
-/* Processing module implementation. */
-const knot_layer_api_t *layer_static_module(void);
-#define LAYER_STATIC layer_static_module()
+/*
+ * Defines.
+ */
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof(*(x)))
+
+/*! \brief Concatenate N strings. */
+char* kr_strcatdup(unsigned n, ...);

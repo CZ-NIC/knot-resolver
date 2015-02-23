@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,36 +14,31 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lib/layer/static.h"
+#include "tests/test.h"
+#include <cmocka.h>
 
-#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "hint",  fmt)
+#include "lib/utils.h"
 
-static int reset(knot_layer_t *ctx)
+static void test_strcatdup(void **state)
 {
-	/* TODO: sync, cleanup after resolution */
-	return ctx->state;
+	auto_free char *empty_res = kr_strcatdup(0);
+	assert_null(empty_res);
+
+	auto_free char *null_res = kr_strcatdup(1, NULL);
+	assert_null(null_res);
+
+	auto_free char *nullcat_res = kr_strcatdup(2, NULL, "beef");
+	assert_string_equal(nullcat_res, "beef");
+
+	auto_free char *multi_res = kr_strcatdup(3, "need", "beef", "dead");
+	assert_string_equal(multi_res, "needbeefdead");
 }
 
-static int begin(knot_layer_t *ctx, void *param)
+int main(void)
 {
-	ctx->data = param;
+	const UnitTest tests[] = {
+		unit_test(test_strcatdup),
+	};
 
-	/* TODO: read static hosts file */
-
-	return ctx->state;
-}
-
-/*! \brief Module implementation. */
-static const knot_layer_api_t LAYER_STATIC_MODULE = {
-	&begin,
-	&reset,
-	NULL,
-	NULL,
-	NULL,
-	NULL
-};
-
-const knot_layer_api_t *layer_static_module(void)
-{
-	return &LAYER_STATIC_MODULE;
+	return run_tests(tests);
 }

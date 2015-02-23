@@ -19,6 +19,7 @@
 #include <libknot/internal/mempattern.h>
 #include <libknot/internal/lists.h>
 
+#include "lib/module.h"
 #include "lib/cache.h"
 
 /*!
@@ -31,10 +32,12 @@
  */
 struct kr_context
 {
-	struct kr_cache *cache;
-	list_t layers;
-	unsigned options;
-	mm_ctx_t *pool;
+    mm_ctx_t *pool;
+    struct kr_cache *cache;
+    struct kr_module *modules;
+    size_t mod_loaded;
+    size_t mod_reserved;
+    uint32_t options;
 };
 
 /*!
@@ -51,3 +54,11 @@ int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm);
  * \return KNOT_E*
  */
 int kr_context_deinit(struct kr_context *ctx);
+
+/*!
+ * \brief Register module to context.
+ * \param ctx context
+ * \param module_name
+ * \return KNOT_E*
+ */
+int kr_context_register(struct kr_context *ctx, const char *module_name);

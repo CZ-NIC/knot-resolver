@@ -6,13 +6,15 @@ MINOR := 04
 PREFIX := /usr/local
 BINDIR := /bin
 LIBDIR := /lib
-INCLUDEDIR = /include
+INCLUDEDIR := /include
+MODULEDIR := $(LIBDIR)/kdns_modules
 
 # Tools
 ifndef CC
 CC	:= cc
 endif
-CFLAGS	+= -std=c99 -D_GNU_SOURCE -Wall -fPIC -I$(abspath .) -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR)\""
+CFLAGS	+= -std=c99 -D_GNU_SOURCE -Wall -fPIC -I$(abspath .)
+CFLAGS  += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 RM	:= rm -f
 LN  := ln -s
 INSTALL := install
