@@ -25,16 +25,24 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <cmocka.h>
 
+#include "lib/defines.h"
 #include <libknot/internal/mempattern.h>
 #include <libknot/descriptor.h>
 #include <libknot/rrset.h>
-#include <libknot/errcode.h>
+
+/* Helpers */
+static inline void *mm_test_malloc(void *ctx, size_t n)
+{ return test_malloc(n); }
+static inline void mm_test_free(void *p)
+{ return test_free(p); }
 
 /*! \brief Memory context using CMocka allocator. */
 static inline void test_mm_ctx_init(mm_ctx_t *mm)
 {
-	mm_ctx_init(mm);
+	mm->alloc = &mm_test_malloc;
+	mm->free = &mm_test_free;
 }
 
 /*! \brief Recursively delete directory. */
@@ -44,7 +52,7 @@ static inline int test_tmpdir_remove(const char *path)
 	struct dirent *ent = NULL;
 	DIR *dir = opendir(path);
 	if (dir == NULL) {
-		return KNOT_ERROR;
+		return kr_error(errno);
 	}
 	while ((ent = readdir(dir)) != NULL) {
 		/* Skip special dirs (this presumes no files begin with '.') */
@@ -55,7 +63,7 @@ static inline int test_tmpdir_remove(const char *path)
 		remove(buf);
 	}
 	remove(path);
-	return KNOT_EOK;
+	return 0;
 }
 
 /*! \brief Create temporary directory. */
