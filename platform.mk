@@ -1,5 +1,7 @@
 # Platform-specific
 CCLD := $(CC)
+CGO := go tool cgo
+GCCGO := gccgo
 LIBEXT := .so
 MODEXT := $(LIBEXT)
 LIBTYPE := shared
@@ -83,6 +85,16 @@ define find_lib
 		$(1)_LIBS := $(shell pkg-config --libs $(1) --silence-errors)
 	endif
 	$(call have_lib,$(1))
+endef
+
+# Find binary
+define find_bin
+	ifeq ($$(strip $$($(1)_BIN)),)
+		HAS_$(1) := $(shell $(1) --version >/dev/null && echo yes || echo no)
+	else
+		HAS_$(1) := yes
+		$(1) := $$($(1)_BIN)
+	endif
 endef
 
 # Find Python 

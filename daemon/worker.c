@@ -53,6 +53,7 @@ int worker_init(struct worker_ctx *worker, mm_ctx_t *mm)
 	kr_context_register(&worker->resolve, "iterate");
 	kr_context_register(&worker->resolve, "itercache");
 	kr_context_register(&worker->resolve, "hints");
+	kr_context_register(&worker->resolve, "gostats");
 
 	return KNOT_EOK;
 }
