@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <dlfcn.h>
 
 #include "lib/defines.h"
@@ -24,11 +25,13 @@ static void *load_symbol(void *lib, const char *prefix, const char *name)
 
 static int load_library(struct kr_module *module, const char *name, const char *path)
 {
-	if (path == NULL) {
-		return kr_error(EINVAL);
+	const char *ext = library_ext();
+	auto_free char *lib_path = NULL;
+	if (path != NULL) {
+		lib_path = kr_strcatdup(4, path, "/", name, ext);
+	} else {
+		lib_path = kr_strcatdup(2, name, ext);
 	}
-
-	auto_free char *lib_path = kr_strcatdup(4, path, "/", name, library_ext());
 	if (lib_path == NULL) {
 		return kr_error(ENOMEM);
 	}
@@ -43,8 +46,16 @@ static int load_library(struct kr_module *module, const char *name, const char *
 
 int kr_module_load(struct kr_module *module, const char *name, const char *path)
 {
+	if (module == NULL || name == NULL) {
+		return kr_error(EINVAL);
+	}
+
+	/* Search for module library. */
+	memset(module, 0, sizeof(struct kr_module));
 	if (load_library(module, name, path) != 0) {
-		if (load_library(module, name, "~/.local/" MODULEDIR) != 0) {
+		/* Expand HOME env variable, as the linker may not expand it. */
+		auto_free char *local_path = kr_strcatdup(2, getenv("HOME"), "/.local" MODULEDIR);
+		if (load_library(module, name, local_path) != 0) {
 			if (load_library(module, name, PREFIX MODULEDIR) != 0) {	
 			}
 		}
