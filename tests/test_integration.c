@@ -59,9 +59,6 @@ static PyObject* init(PyObject* self, PyObject* args)
 	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, CACHE_SIZE);
 	assert(global_context.cache);
 
-	/* Test context options. */
-	global_context.options = QUERY_TCP;
-
 	/* No configuration parsing support yet. */
 	if (strstr(config, "query-minimization: on") == NULL) {
 		global_context.options |= QUERY_NO_MINIMIZE; 

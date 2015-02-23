@@ -4,7 +4,7 @@ include platform.mk
 # Targets
 all: info libkresolve modules kresolved
 install: libkresolve-install modules-install kresolved-install
-check: all tests-check
+check: all tests
 clean: libkresolve-clean modules-clean kresolved-clean tests-clean
 .PHONY: all install check clean
 

@@ -47,10 +47,10 @@ else
 endif
 
 # Targets
-.PHONY: tests-check-integration tests-check-unit tests-check tests-clean
-tests-check-integration: libmock_calls _test_integration
+.PHONY: check-integration check-unit tests tests-clean
+check-integration: libmock_calls _test_integration
 	$(call preload_libs) tests/test_integration.py tests/testdata
-tests-check-unit: $(tests_BIN)
+check-unit: $(tests_BIN)
 	tests/runtests -b tests $^	
-tests-check: tests-check-unit tests-check-integration
+tests: check-unit check-integration
 tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) libmock_calls-clean _test_integration-clean
