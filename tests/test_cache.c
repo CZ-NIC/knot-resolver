@@ -29,6 +29,20 @@ const char *global_env;
 #define CACHE_SIZE 100*1024
 #define CACHE_TTL  1
 
+/* Test invalid parameters. */
+static void test_invalid(void **state)
+{
+	assert_null(kr_cache_open(NULL, NULL, 0));
+	assert_null(kr_cache_open(global_env, NULL, 0));
+	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), KNOT_EOK);
+	assert_int_not_equal(kr_cache_txn_begin(&global_env, NULL, 0), KNOT_EOK);
+	assert_int_not_equal(kr_cache_txn_commit(NULL), KNOT_EOK);
+	assert_int_not_equal(kr_cache_peek(NULL, NULL, NULL), KNOT_EOK);
+	assert_int_not_equal(kr_cache_peek(&global_txn, NULL, NULL), KNOT_EOK);
+	assert_int_not_equal(kr_cache_insert(&global_txn, NULL, 0), KNOT_EOK);
+	assert_int_not_equal(kr_cache_insert(NULL, NULL, 0), KNOT_EOK);
+}
+
 /* Test cache open */
 static void test_open(void **state)
 {
@@ -153,6 +167,8 @@ int main(void)
 	global_env = test_tmpdir_create();
 
 	const UnitTest tests[] = {
+		/* Invalid input */
+		unit_test(test_invalid),
 	        /* Cache persistence */
 	        group_test_setup(test_open),
 	        unit_test(test_insert),
