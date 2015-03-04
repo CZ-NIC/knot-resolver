@@ -23,6 +23,11 @@ void _cleanup_close(int *p)
     if (*p > 0) close(*p);
 }
 
+void _cleanup_fclose(FILE **p)
+{
+    if (*p) fclose(*p);
+}
+
 char* kr_strcatdup(unsigned n, ...)
 {
     /* Calculate total length */

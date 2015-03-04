@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <stdio.h>
+
 /*
  * General-purpose attributes.
  */
@@ -23,6 +25,8 @@
 extern void _cleanup_free(char **p);
 #define auto_close __attribute__((cleanup(_cleanup_close)))
 extern void _cleanup_close(int *p);
+#define auto_fclose __attribute__((cleanup(_cleanup_fclose)))
+extern void _cleanup_fclose(FILE **p);
 
 /*
  * Defines.
