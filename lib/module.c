@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <dlfcn.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
@@ -19,7 +21,7 @@ static inline const char *library_ext(void)
 
 static void *load_symbol(void *lib, const char *prefix, const char *name)
 {
-	auto_free char *symbol = kr_strcatdup(3, prefix, "_", name);
+	auto_free char *symbol = kr_strcatdup(2, prefix, name);
 	return dlsym(lib, symbol);
 }
 
@@ -42,6 +44,58 @@ static int load_library(struct kr_module *module, const char *name, const char *
 	}
 
 	return kr_error(ENOENT);
+}
+
+static int bootstrap_libgo(struct kr_module *module)
+{
+	/* Check if linked against compatible libgo */
+	void (*go_check)(void) = dlsym(module->lib, "runtime_check");
+	void (*go_args)(int, void*) = dlsym(module->lib, "runtime_args");
+	void (*go_init_os)(void) = dlsym(module->lib, "runtime_osinit");
+	void (*go_init_sched)(void) = dlsym(module->lib, "runtime_schedinit");
+	void (*go_init_main)(void) = dlsym(module->lib, "__go_init_main");
+	if ((go_check && go_args && go_init_os && go_init_sched && go_init_main) == false) {
+		return kr_error(EINVAL);
+	}
+
+	/*
+	 * Bootstrap runtime - this is minimal runtime, we would need a running scheduler
+	 * and gc for coroutines and memory allocation. That would require a custom "world loop",
+	 * message passing, and either runtime sharing or module isolation.
+	 * https://github.com/gcc-mirror/gcc/blob/gcc-4_9_2-release/libgo/runtime/proc.c#L457
+	 */
+	char *fake_argv[2] = {
+		getenv("_"),
+		NULL
+	};
+	go_check();
+	go_args(1, fake_argv);
+	go_init_os();
+	go_init_sched();
+	go_init_main();
+
+	return kr_ok();
+}
+
+
+static int load_libgo(struct kr_module *module, module_api_cb **module_api)
+{
+	/* Bootstrap libgo */
+	int ret = bootstrap_libgo(module);
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* Enforced prefix for now. */
+	const char *module_prefix = "main.";
+	
+	*(void **) (module_api)      = load_symbol(module->lib, module_prefix, "Api");
+	*(void **) (&module->init)   = load_symbol(module->lib, module_prefix, "Init");
+	*(void **) (&module->deinit) = load_symbol(module->lib, module_prefix, "Deinit");
+	*(void **) (&module->config) = load_symbol(module->lib, module_prefix, "Config");
+	*(void **) (&module->layer)  = load_symbol(module->lib, module_prefix, "Layer");
+
+	return kr_ok();
 }
 
 int kr_module_load(struct kr_module *module, const char *name, const char *path)
@@ -68,20 +122,29 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 
 	/* Load all symbols. */
  	module_api_cb *module_api = NULL;
-	*(void **) (&module_api)     = load_symbol(module->lib, name, "api");
-	*(void **) (&module->init)   = load_symbol(module->lib, name, "init");
-	*(void **) (&module->deinit) = load_symbol(module->lib, name, "deinit");
-	*(void **) (&module->config) = load_symbol(module->lib, name, "config");
-	*(void **) (&module->layer)  = load_symbol(module->lib, name, "layer");
+ 	auto_free char *module_prefix = kr_strcatdup(2, name, "_");
+	*(void **) (&module_api)     = load_symbol(module->lib, module_prefix, "api");
+	*(void **) (&module->init)   = load_symbol(module->lib, module_prefix, "init");
+	*(void **) (&module->deinit) = load_symbol(module->lib, module_prefix, "deinit");
+	*(void **) (&module->config) = load_symbol(module->lib, module_prefix, "config");
+	*(void **) (&module->layer)  = load_symbol(module->lib, module_prefix, "layer");
+
+	/* Module initializer not found, attempt to load as Go shared library. */
+	if (module_api == NULL) {
+		int ret = load_libgo(module, &module_api);
+		if (ret != 0) {
+			return ret;
+		}
+	}
 
 	/* Check module API version (if declared). */
-	if (module_api && module_api() > KR_MODULE_API) {
+	if (module_api && module_api() != KR_MODULE_API) {
 		return kr_error(ENOTSUP);
 	}
 
 	/* Initialize module */
 	if (module->init) {
-		return module->init(module);
+		module->init(module);
 	}
 
 	return kr_ok();

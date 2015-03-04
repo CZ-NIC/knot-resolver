@@ -14,14 +14,16 @@ endef
 
 # Go target definition
 define go_target
-$(1): $(2)/$(1)$(LIBEXT)
-$(2)/_obj/_cgo_.o: $$($(1)_SOURCES)
-	$(INSTALL) -d $(2)/_obj
+$(1)_OBJS := $(addprefix $(2)/_obj/,_cgo_defun.o _cgo_export.o $(subst /,_,$(2))_$(1).cgo2.o)
+$(1)_GOBJS := $(addprefix $(2)/_obj/,_cgo_gotypes.go $(subst /,_,$(2))_$(1).cgo1.go)
+$(2)/_obj/_cgo_export.h: $$($(1)_SOURCES)
+	@$(INSTALL) -d $(2)/_obj
 	$(call quiet,CGO,$$^) -gccgo=true -objdir=$(2)/_obj -- $(CFLAGS) $$^
-$(2)/_obj/$(1).o: $(2)/_obj/_cgo_.o
-	$(call quiet,GCCGO,$$@) -fPIC -c $(2)/_obj/*.go
-$(2)/$(1)$(LIBEXT): $(2)/_obj/$(1).o $$($(1)_DEPEND)
-	$(call quiet,GCCGO,$$@) $(CFLAGS) -$(LIBTYPE) -fPIC -Wno-return-type -o $$@ $(2)/_obj/*.o $(2)/_obj/*.c -lgcc $$($(1)_LIBS)
+$(2)/$(1).o: $(2)/_obj/_cgo_export.h $$($(1)_GOBJS)
+	$(call quiet,GCCGO,$$@) -I$(2)/_obj -c -fPIC $$($(1)_GOBJS) -o $$@
+$(2)/$(1)$(LIBEXT): $(2)/_obj/_cgo_export.h $(2)/$(1).o $$($(1)_OBJS) $$($(1)_DEPEND)
+	$(call quiet,GCCGO,$$@) -g -fPIC -I$(2)/_obj $(2)/$(1).o $$($(1)_OBJS) -o $$@ -$(LIBTYPE) -lgcc -lgo $$($(1)_LIBS)
+$(1): $(2)/_obj/_cgo_export.h $(2)/$(1)$(LIBEXT)
 $(1)-clean:
 	$(RM) -r $(2)/_obj $(2)/$(1)$(LIBEXT)
 $(1)-install: $(2)/$(1)$(LIBEXT)
