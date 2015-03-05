@@ -42,9 +42,9 @@ $(eval $(call make_shared,_test_integration,tests))
 # Preload mock library
 insert_libs := tests/libmock_calls$(LIBEXT):modules/hints/hints$(LIBEXT)
 ifeq ($(PLATFORM),Darwin)
-	preload_libs := @DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES=$(insert_libs)
+	preload_libs := @DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="$(insert_libs)"
 else
-	preload_libs := @LD_PRELOAD=$(insert_libs)
+	preload_libs := @LD_PRELOAD="$(subst :, ,$(insert_libs))"
 endif
 
 # Targets

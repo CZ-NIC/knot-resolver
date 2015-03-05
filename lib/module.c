@@ -121,25 +121,27 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 	}
 
 	/* Load all symbols. */
- 	module_api_cb *module_api = NULL;
- 	auto_free char *module_prefix = kr_strcatdup(2, name, "_");
-	*(void **) (&module_api)     = load_symbol(module->lib, module_prefix, "api");
+ 	auto_free char *module_prefix = kr_strcatdup(2, name, "_");	
 	*(void **) (&module->init)   = load_symbol(module->lib, module_prefix, "init");
 	*(void **) (&module->deinit) = load_symbol(module->lib, module_prefix, "deinit");
 	*(void **) (&module->config) = load_symbol(module->lib, module_prefix, "config");
 	*(void **) (&module->layer)  = load_symbol(module->lib, module_prefix, "layer");
 
-	/* Module initializer not found, attempt to load as Go shared library. */
-	if (module_api == NULL) {
-		int ret = load_libgo(module, &module_api);
-		if (ret != 0) {
-			return ret;
+	/* API check for non-built-in libraries. */
+	if (module->lib != RTLD_DEFAULT) {
+		module_api_cb *module_api = NULL;
+		*(void **) (&module_api) = load_symbol(module->lib, module_prefix, "api");
+		if (module_api == NULL) {
+			int ret = load_libgo(module, &module_api);
+			if (ret != 0) {
+				return ret;
+			}
 		}
-	}
 
-	/* Check module API version (if declared). */
-	if (module_api && module_api() != KR_MODULE_API) {
-		return kr_error(ENOTSUP);
+		/* Check module API version (if declared). */
+		if (module_api && module_api() != KR_MODULE_API) {
+			return kr_error(ENOTSUP);
+		}
 	}
 
 	/* Initialize module */
