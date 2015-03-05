@@ -40,17 +40,17 @@ _test_integration_DEPEND := libmock_calls
 $(eval $(call make_shared,_test_integration,tests))
 
 # Preload mock library
-insert_libs := tests/libmock_calls$(LIBEXT):modules/hints/hints$(LIBEXT)
+preload_PATH := tests
 ifeq ($(PLATFORM),Darwin)
-	preload_libs := @DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="$(insert_libs)"
+	preload_LIBS := @DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH="$(preload_PATH):${DYLD_LIBRARY_PATH}"
 else
-	preload_libs := @LD_PRELOAD="$(subst :, ,$(insert_libs))"
+	preload_LIBS := @LD_LIBRARY_PATH="$(preload_PATH):${LD_LIBRARY_PATH}"
 endif
 
 # Targets
 .PHONY: check-integration check-unit tests tests-clean
 check-integration: libmock_calls _test_integration
-	$(call preload_libs) tests/test_integration.py tests/testdata
+	$(call preload_LIBS) tests/test_integration.py tests/testdata
 check-unit: $(tests_BIN)
 	tests/runtests -b tests $^	
 tests: check-unit check-integration
