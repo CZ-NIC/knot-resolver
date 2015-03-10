@@ -14,6 +14,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <sys/socket.h>
+#include <stdio.h>
+
 #include "tests/test.h"
 #include <cmocka.h>
 
@@ -32,6 +35,14 @@ static void test_strcatdup(void **state)
 
 	auto_free char *multi_res = kr_strcatdup(3, "need", "beef", "dead");
 	assert_string_equal(multi_res, "needbeefdead");
+
+	/* Test fails if this leaks. */
+	auto_fclose FILE* null_file = fopen("/dev/null", "r");
+	(void)(null_file);
+
+	/* Test fails if this leaks. */
+	auto_close int null_sock = socket(AF_INET, SOCK_DGRAM, 0);
+	(void)(null_sock);
 }
 
 int main(void)

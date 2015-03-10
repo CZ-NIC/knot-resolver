@@ -4,13 +4,20 @@
 
 tests_BIN := \
 	test_utils \
+	test_module \
 	test_context \
 	test_rplan \
 	test_cache \
 	test_resolve
 
+# Mock modules
+mock_cmodule_SOURCES := tests/mock_cmodule.c
+$(eval $(call make_lib,mock_cmodule,tests))
+mock_gomodule_SOURCES := tests/mock_gomodule.c
+$(eval $(call make_lib,mock_gomodule,tests))
+
 # Dependencies
-tests_DEPEND := libkresolve cmocka
+tests_DEPEND := libkresolve cmocka mock_cmodule mock_gomodule
 tests_LIBS :=  $(libkresolve_TARGET) $(libkresolve_LIBS) $(cmocka_LIBS)
 
 # Make test binaries
