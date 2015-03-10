@@ -23,22 +23,18 @@ func Api() C.uint32_t {
 }
 
 func Init(module *C.struct_kr_module) C.int {
-	fmt.Printf("go_init(%s)\n", C.GoString((*C.char)(module.data)))
 	return 0
 }
 
 func Deinit(module *C.struct_kr_module) C.int {
-	fmt.Println("go_deinit()")
 	return 0
 }
 
 func Begin(ctx *C.knot_layer_t, param unsafe.Pointer) C.int {
-	fmt.Println("go_begin()")
 	return 0
 }
 
 func Finish(ctx *C.knot_layer_t) C.int {
-	fmt.Println("go_finish()")
 	return 0
 }
 
