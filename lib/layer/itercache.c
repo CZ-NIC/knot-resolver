@@ -277,3 +277,5 @@ const knot_layer_api_t *itercache_layer(void)
 
 	return &_layer;
 }
+
+KR_MODULE_EXPORT(itercache);

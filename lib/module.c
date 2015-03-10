@@ -126,22 +126,21 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 	*(void **) (&module->deinit) = load_symbol(module->lib, module_prefix, "deinit");
 	*(void **) (&module->config) = load_symbol(module->lib, module_prefix, "config");
 	*(void **) (&module->layer)  = load_symbol(module->lib, module_prefix, "layer");
+	module_api_cb *module_api = NULL;
+	*(void **) (&module_api) = load_symbol(module->lib, module_prefix, "api");
 
-	/* API check for non-built-in libraries. */
-	if (module->lib != RTLD_DEFAULT) {
-		module_api_cb *module_api = NULL;
-		*(void **) (&module_api) = load_symbol(module->lib, module_prefix, "api");
-		if (module_api == NULL) {
-			int ret = load_libgo(module, &module_api);
-			if (ret != 0) {
-				return ret;
-			}
-		}
+	/* No API version, try loading it as Go module. */
+	if (module->lib != RTLD_DEFAULT && module_api == NULL) {
+		(void) load_libgo(module, &module_api);
+	}
 
-		/* Check module API version (if declared). */
-		if (module_api && module_api() != KR_MODULE_API) {
-			return kr_error(ENOTSUP);
-		}
+	/* Check module API version (if declared). */
+	if (module_api == NULL) {
+		kr_module_unload(module);
+		return kr_error(KNOT_ENOENT);
+	} else if (module_api() != KR_MODULE_API) {
+		kr_module_unload(module);
+		return kr_error(ENOTSUP);
 	}
 
 	/* Initialize module */
@@ -154,6 +153,10 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 
 void kr_module_unload(struct kr_module *module)
 {
+	if (module == NULL) {
+		return;
+	}
+
 	if (module->deinit) {
 		module->deinit(module);
 	}
