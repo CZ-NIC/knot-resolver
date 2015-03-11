@@ -164,4 +164,6 @@ void kr_module_unload(struct kr_module *module)
 	if (module->lib && module->lib != RTLD_DEFAULT) {
 		dlclose(module->lib);
 	}
+
+	memset(module, 0, sizeof(struct kr_module));
 }

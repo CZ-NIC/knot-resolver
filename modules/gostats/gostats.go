@@ -16,7 +16,6 @@ static inline const knot_layer_api_t *_gostats_layer(void)
 */
 import "C"
 import "unsafe"
-import "fmt"
 
 func Api() C.uint32_t {
 	return C.KR_MODULE_API
