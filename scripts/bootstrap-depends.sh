@@ -73,9 +73,9 @@ PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
 	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
-	brew install --force makedepend python
-	brew link --overwrite python
-	pip install --upgrade pip
+	brew install --force makedepend python || true
+	brew link --overwrite python || true
+	pip install --upgrade pip || true
 	pip install -r ${PIP_PKGS}
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
