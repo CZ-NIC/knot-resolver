@@ -26,7 +26,7 @@ namedb_txn_t global_txn;
 knot_rrset_t global_rr;
 const char *global_env;
 
-#define CACHE_SIZE 100*1024
+#define CACHE_SIZE 100 * 4096
 #define CACHE_TTL  1
 
 /* Test invalid parameters. */
@@ -117,6 +117,7 @@ static void test_query_aged(void **state)
 	namedb_txn_t *txn = test_txn_rdonly(state);
 	int ret = kr_cache_peek(txn, &cache_rr, &timestamp);
 	assert_int_equal(ret, KNOT_ENOENT);
+	kr_cache_txn_abort(txn);
 }
 
 /* Test cache fill */
@@ -143,8 +144,9 @@ static void test_fill(void **state)
 			txn = test_txn_write(state);
 		}
 	}
-	/* Size reached, commit may fail. */
-	(void) kr_cache_txn_commit(txn);
+
+	/* Abort last transaction (if valid) */
+	kr_cache_txn_abort(txn);
 
 	/* Expect we run out of space */
 	assert_int_equal(ret, KNOT_ESPACE);
