@@ -59,6 +59,6 @@ endif
 check-integration: libmock_calls _test_integration
 	$(call preload_LIBS) tests/test_integration.py tests/testdata
 check-unit: $(tests_BIN)
-	tests/runtests -b tests $^	
+	$(call preload_LIBS) tests/runtests -b tests $^
 tests: check-unit check-integration
 tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) libmock_calls-clean _test_integration-clean
