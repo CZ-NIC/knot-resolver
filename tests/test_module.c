@@ -19,8 +19,6 @@
 
 #include "lib/module.h"
 
-mm_ctx_t global_mm;
-
 static void test_module_params(void **state)
 {
 	struct kr_module module;
@@ -45,15 +43,13 @@ static void test_module_c(void **state)
 
 static void test_module_go(void **state)
 {
+	/* Mock Go module fails on version check. */
 	struct kr_module module;
 	assert_int_equal(kr_module_load(&module, "mock_gomodule", "tests"), kr_error(ENOTSUP));
-	kr_module_unload(&module);
 }
 
 int main(void)
 {
-	test_mm_ctx_init(&global_mm);
-
 	const UnitTest tests[] = {
 		unit_test(test_module_params),
 		unit_test(test_module_builtin),

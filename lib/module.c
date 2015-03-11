@@ -38,7 +38,9 @@ static int load_library(struct kr_module *module, const char *name, const char *
 		return kr_error(ENOMEM);
 	}
 
-	module->lib = dlopen(lib_path, RTLD_LAZY);
+	/* Workaround for buggy _fini/__attribute__((destructor)) and dlclose(),
+	 * this keeps the library mapped until the program finishes though. */
+	module->lib = dlopen(lib_path, RTLD_NOW | RTLD_NODELETE);
 	if (module->lib) {
 		return kr_ok();
 	}

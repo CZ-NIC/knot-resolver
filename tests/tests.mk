@@ -58,7 +58,7 @@ $(eval $(call make_shared,_test_integration,tests))
 
 # Targets
 .PHONY: check-integration check-unit tests tests-clean
-check-integration: check-unit libmock_calls _test_integration
+check-integration: libmock_calls _test_integration
 	$(call preload_LIBS) tests/test_integration.py tests/testdata
 check-unit: $(foreach test,$(tests_BIN),$(test)-run)
 tests: check-unit check-integration
