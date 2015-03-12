@@ -50,7 +50,7 @@ int produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 		/* This flag makes the resolver move the query
 		 * to the "resolved" list. */
 		query->resolved = true;
-		return KNOT_NS_PROC_DONE;
+		return KNOT_STATE_DONE;
 	}
 
 	/* Pass-through. */

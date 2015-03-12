@@ -48,7 +48,7 @@ static int update_answer(const knot_rrset_t *rr, unsigned drift, struct kr_layer
 	/* Materialize RR set */
 	knot_rrset_t rr_copy = kr_cache_materialize(rr, drift, &answer->mm);
 	if (rr_copy.rrs.rr_count == 0) {
-		return KNOT_NS_PROC_FAIL;
+		return KNOT_STATE_FAIL;
 	}
 	
 	return rr_update_answer(&rr_copy, 0, param);
@@ -59,7 +59,7 @@ static int read_cache_rr(namedb_txn_t *txn, knot_rrset_t *cache_rr, uint32_t tim
 {
 	/* Query cache for requested record */
 	if (kr_cache_peek(txn, cache_rr, &timestamp) != KNOT_EOK) {
-		return KNOT_NS_PROC_NOOP;
+		return KNOT_STATE_NOOP;
 	}
 
 	return cb(cache_rr, timestamp, param);
@@ -93,7 +93,7 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Try to find expected record first. */
 	int state = read_cache_rr(txn, &cache_rr, timestamp, callback, param);
-	if (state == KNOT_NS_PROC_DONE) {
+	if (state == KNOT_STATE_DONE) {
 		DEBUG_MSG("=> satisfied from cache\n");
 		cur->resolved = true;
 		return state;
@@ -102,20 +102,20 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check if CNAME chain exists. */
 	cache_rr.type = KNOT_RRTYPE_CNAME;
 	state = read_cache_rr(txn, &cache_rr, timestamp, callback, param);
-	if (state != KNOT_NS_PROC_NOOP) {
+	if (state != KNOT_STATE_NOOP) {
 		if (cur->stype != KNOT_RRTYPE_CNAME) {
 			const knot_dname_t *cname = knot_cname_name(&cache_rr.rrs);
 			if (kr_rplan_push(param->rplan, cur->parent, cname, cur->sclass, cur->stype) == NULL) {
-				return KNOT_NS_PROC_FAIL;
+				return KNOT_STATE_FAIL;
 			}
 		}
 
 		cur->resolved = true;
-		return KNOT_NS_PROC_DONE;
+		return KNOT_STATE_DONE;
 	}
 
 	/* Not resolved. */
-	return KNOT_NS_PROC_MORE;
+	return KNOT_STATE_CONSUME;
 }
 
 /*! \brief Merge-in record if same type and owner. */
@@ -232,7 +232,7 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *query = kr_rplan_current(param->rplan);
 
 	/* Don't cache anything if failed. */
-	if (query == NULL || ctx->state == KNOT_NS_PROC_FAIL) {
+	if (query == NULL || ctx->state == KNOT_STATE_FAIL) {
 		return ctx->state;
 	}
 
@@ -271,8 +271,8 @@ const knot_layer_api_t *itercache_layer(void)
 {
 	static const knot_layer_api_t _layer = {
 		.begin = &begin,
-		.in = &write_cache,
-		.out = &read_cache
+		.consume = &write_cache,
+		.produce = &read_cache
 	};
 
 	return &_layer;

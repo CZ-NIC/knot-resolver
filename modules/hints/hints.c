@@ -96,7 +96,7 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 			callback(&rr, 0, param);
 
 			cur->resolved = true;
-			return KNOT_NS_PROC_DONE;
+			return KNOT_STATE_DONE;
 		}
 	}
 
@@ -155,7 +155,7 @@ const knot_layer_api_t *hints_layer(void)
 {
 	static const knot_layer_api_t _layer = {
 		.begin = &begin,
-		.out = &query
+		.produce = &query
 	};
 	return &_layer;
 }

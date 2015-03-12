@@ -84,12 +84,12 @@ int worker_exec(struct worker_ctx *worker, knot_pkt_t *answer, knot_pkt_t *query
 	memset(&proc, 0, sizeof(knot_layer_t));
 	proc.mm = worker->pool;
 	knot_layer_begin(&proc, LAYER_QUERY, &worker->resolve);
-	int state = knot_layer_in(&proc, query);
+	int state = knot_layer_consume(&proc, query);
 
 	/* Build an answer. */
-	if (state & (KNOT_NS_PROC_FULL|KNOT_NS_PROC_FAIL)) {
+	if (state & (KNOT_STATE_PRODUCE|KNOT_STATE_FAIL)) {
 		knot_pkt_init_response(answer, query);
-		state = knot_layer_out(&proc, answer);
+		state = knot_layer_produce(&proc, answer);
 	}
 
 	/* Cleanup. */

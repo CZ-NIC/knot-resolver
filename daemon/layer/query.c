@@ -21,7 +21,7 @@
 
 static int reset(knot_layer_t *ctx)
 {
-	return KNOT_NS_PROC_MORE;
+	return KNOT_STATE_CONSUME;
 }
 
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -36,20 +36,20 @@ static int input_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Check if at least header is parsed. */
 	if (pkt->parsed < pkt->size) {
-		return KNOT_NS_PROC_FAIL;
+		return KNOT_STATE_FAIL;
 	}
 
 	/* Accept only queries. */
 	if (knot_wire_get_qr(pkt->wire)) {
-		return KNOT_NS_PROC_NOOP; /* Ignore. */
+		return KNOT_STATE_NOOP; /* Ignore. */
 	}
 
 	/* No authoritative service. */
 	if (!knot_wire_get_rd(pkt->wire)) {
-		return KNOT_NS_PROC_FAIL;
+		return KNOT_STATE_FAIL;
 	}
 
-	return KNOT_NS_PROC_FULL;
+	return KNOT_STATE_PRODUCE;
 }
 
 static int output_answer(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -63,16 +63,16 @@ static int output_answer(knot_layer_t *ctx, knot_pkt_t *pkt)
 	                     knot_pkt_qtype(pkt));
 
 	if (ret != KNOT_EOK) {
-		return KNOT_NS_PROC_FAIL;
+		return KNOT_STATE_FAIL;
 	}
 
-	return KNOT_NS_PROC_DONE;
+	return KNOT_STATE_DONE;
 }
 
 static int output_error(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	knot_wire_set_rcode(pkt->wire, KNOT_RCODE_SERVFAIL);
-	return KNOT_NS_PROC_DONE;
+	return KNOT_STATE_DONE;
 }
 
 /*! \brief Module implementation. */
