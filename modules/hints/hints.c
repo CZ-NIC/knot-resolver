@@ -79,13 +79,13 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	struct hint_pair *pair = NULL;
 	WALK_LIST(pair, g_map->list) {
-		DEBUG_MSG("scanning '%s'\n", knot_dname_to_str_alloc(pair->name));
 		if (knot_dname_is_equal(qname, pair->name)) {
 			DEBUG_MSG("found hint '%s'\n", pair->addr);
 			int addr_type = strchr(pair->addr, ':') ? AF_INET6 : AF_INET;
 			if ((addr_type == AF_INET) != (qtype == KNOT_RRTYPE_A)) {
 				continue;
 			}
+
 			knot_rrset_t rr;
 			knot_rrset_init(&rr, pair->name, qtype, KNOT_CLASS_IN);
 			struct sockaddr_storage addr;
@@ -94,7 +94,8 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 			uint8_t *raw_addr = sockaddr_raw(&addr, &addr_len);
 			knot_rrset_add_rdata(&rr, raw_addr, addr_len, 0, &param->answer->mm);
 			callback(&rr, 0, param);
-			kr_rplan_pop(param->rplan, cur);
+
+			cur->resolved = true;
 			return KNOT_NS_PROC_DONE;
 		}
 	}

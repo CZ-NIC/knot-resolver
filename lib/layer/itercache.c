@@ -95,7 +95,7 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	int state = read_cache_rr(txn, &cache_rr, timestamp, callback, param);
 	if (state == KNOT_NS_PROC_DONE) {
 		DEBUG_MSG("=> satisfied from cache\n");
-		kr_rplan_pop(param->rplan, cur);
+		cur->resolved = true;
 		return state;
 	}
 
@@ -110,7 +110,7 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 			}
 		}
 
-		kr_rplan_pop(param->rplan, cur);
+		cur->resolved = true;
 		return KNOT_NS_PROC_DONE;
 	}
 
