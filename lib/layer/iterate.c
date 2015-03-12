@@ -131,14 +131,14 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, uint16_
 			/* Set zone cut address. */
 			int ret = kr_set_zone_cut_addr(&query->zone_cut, rr, index);
 			if (ret == KNOT_EOK) {
-				return KNOT_NS_PROC_DONE;
+				return KNOT_STATE_DONE;
 			} else {
-				return KNOT_NS_PROC_FAIL;
+				return KNOT_STATE_FAIL;
 			}
 		}
 	}
 
-	return KNOT_NS_PROC_MORE;
+	return KNOT_STATE_CONSUME;
 }
 
 static int update_glue(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param)
@@ -163,10 +163,10 @@ int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_para
 			knot_rrset_clear((knot_rrset_t *)rr, &answer->mm);
 		}
 		knot_wire_set_tc(answer->wire);
-		return KNOT_NS_PROC_DONE;
+		return KNOT_STATE_DONE;
 	}
 
-	return KNOT_NS_PROC_DONE;
+	return KNOT_STATE_DONE;
 }
 
 static bool has_glue(const knot_dname_t *ns_name, knot_pkt_t *pkt)
@@ -221,7 +221,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 
 	/* AA, terminate resolution chain. */
 	if (knot_wire_get_aa(pkt->wire)) {
-		return KNOT_NS_PROC_MORE;
+		return KNOT_STATE_CONSUME;
 	}
 
 	/* Elect best name server candidate. */
@@ -231,7 +231,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 		if (rr->type == KNOT_RRTYPE_NS) {
 			int score = nameserver_score(rr, 0, pkt, param);
 			if (score < KR_NS_VALID) {
-				return KNOT_NS_PROC_FAIL;
+				return KNOT_STATE_FAIL;
 			}
 			if (score > best_score) {
 				best_ns = rr;
@@ -243,10 +243,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 	/* Update name server candidate. */
 	if (best_ns != NULL) {
 		kr_set_zone_cut(&query->zone_cut, best_ns->owner, knot_ns_name(&best_ns->rrs, 0));
-		return KNOT_NS_PROC_DONE;
+		return KNOT_STATE_DONE;
 	}
 
-	return KNOT_NS_PROC_MORE;
+	return KNOT_STATE_CONSUME;
 }
 
 static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
@@ -256,12 +256,12 @@ static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
 	for (unsigned i = 0; i < ar->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
 		int state = update_glue(rr, 0, param);
-		if (state != KNOT_NS_PROC_MORE) {
+		if (state != KNOT_STATE_CONSUME) {
 			return state;
 		}
 	}
 
-	return KNOT_NS_PROC_DONE;
+	return KNOT_STATE_DONE;
 }
 
 static void finalize_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
@@ -298,13 +298,13 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	int pkt_class = response_classify(pkt);
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) && (pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
 		query->flags |= QUERY_NO_MINIMIZE;
-		return KNOT_NS_PROC_DONE;
+		return KNOT_STATE_DONE;
 	}
 
 	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
 	if (!is_authoritative(pkt, query) && (pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
 		DEBUG_MSG("<= lame response: non-auth sent negative response\n");
-		return KNOT_NS_PROC_FAIL;
+		return KNOT_STATE_FAIL;
 	}
 
 	/* Process answer type */
@@ -313,7 +313,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
 		int state = is_final ?  rr_update_answer(rr, 0, param) : rr_update_parent(rr, 0, param);
-		if (state == KNOT_NS_PROC_FAIL) {
+		if (state == KNOT_STATE_FAIL) {
 			return state;
 		}
 		follow_cname_chain(&cname, rr, query);
@@ -330,18 +330,18 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 
 	/* Either way it resolves current query. */
 	query->resolved = true;
-	return KNOT_NS_PROC_DONE;
+	return KNOT_STATE_DONE;
 }
 
 /*! \brief Error handling, RFC1034 5.3.3, 4d. */
 static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	return KNOT_NS_PROC_FAIL;
+	return KNOT_STATE_FAIL;
 }
 
 /* State-less single resolution iteration step, not needed. */
-static int reset(knot_layer_t *ctx)  { return KNOT_NS_PROC_FULL; }
-static int finish(knot_layer_t *ctx) { return KNOT_NS_PROC_NOOP; }
+static int reset(knot_layer_t *ctx)  { return KNOT_STATE_PRODUCE; }
+static int finish(knot_layer_t *ctx) { return KNOT_STATE_NOOP; }
 
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -355,7 +355,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_layer_param *param = ctx->data;
 	struct kr_query *query = kr_rplan_current(param->rplan);
-	if (query == NULL || ctx->state == KNOT_NS_PROC_DONE) {
+	if (query == NULL || ctx->state == KNOT_STATE_DONE) {
 		return ctx->state;
 	}
 
@@ -367,7 +367,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	knot_pkt_clear(pkt);
 	int ret = knot_pkt_put_question(pkt, qname, query->sclass, qtype);
 	if (ret != KNOT_EOK) {
-		return KNOT_NS_PROC_FAIL;
+		return KNOT_STATE_FAIL;
 	}
 
 	query->id = dnssec_random_uint16_t();
@@ -377,14 +377,14 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	knot_rrset_t opt_rr;
 	ret = knot_edns_init(&opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
 	if (ret != KNOT_EOK) {
-		return KNOT_NS_PROC_FAIL;
+		return KNOT_STATE_FAIL;
 	}
 
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &opt_rr, KNOT_PF_FREE);
 	if (ret != KNOT_EOK) {
 		knot_rrset_clear(&opt_rr, &pkt->mm);
-		return KNOT_NS_PROC_FAIL;
+		return KNOT_STATE_FAIL;
 	}
 
 #ifndef NDEBUG
@@ -396,7 +396,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 #endif
 
 	/* Query built, expect answer. */
-	return KNOT_NS_PROC_MORE;
+	return KNOT_STATE_CONSUME;
 }
 
 /*! \brief Resolve input query or continue resolution with followups.
@@ -418,7 +418,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return resolve_error(pkt, param);
 	} else if (!is_paired_to_query(pkt, query)) {
 		DEBUG_MSG("<= ignoring mismatching response\n");
-		return KNOT_NS_PROC_MORE;
+		return KNOT_STATE_CONSUME;
 	} else if (knot_wire_get_tc(pkt->wire)) {
 		DEBUG_MSG("<= truncated response, failover to TCP\n");
 		struct kr_query *cur = kr_rplan_current(param->rplan);
@@ -430,7 +430,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 			}
 			cur->flags |= QUERY_TCP;
 		}
-		return KNOT_NS_PROC_DONE;
+		return KNOT_STATE_DONE;
 	}
 
 	/* Check response code. */
@@ -445,14 +445,14 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
-	int state = KNOT_NS_PROC_MORE;
+	int state = KNOT_STATE_CONSUME;
 	state = process_authority(pkt, param);
 	switch(state) {
-	case KNOT_NS_PROC_MORE: /* Not referral, process answer. */
+	case KNOT_STATE_CONSUME: /* Not referral, process answer. */
 		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		state = process_answer(pkt, param);
 		break;
-	case KNOT_NS_PROC_DONE: /* Referral, try to find glue. */
+	case KNOT_STATE_DONE: /* Referral, try to find glue. */
 		DEBUG_MSG("<= referral response, follow\n");
 		state = process_additional(pkt, param);
 		break;
@@ -470,8 +470,8 @@ const knot_layer_api_t *iterate_layer(void)
 		.begin = &begin,
 		.reset = &reset,
 		.finish = &finish,
-		.in = &resolve,
-		.out = &prepare_query
+		.consume = &resolve,
+		.produce = &prepare_query
 	};
 	return &_layer;
 }
