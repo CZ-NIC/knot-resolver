@@ -15,10 +15,14 @@
  */
 
 #include <string.h>
+#include <limits.h>
 
 #include <libknot/errcode.h>
 #include <libknot/internal/sockaddr.h>
+#include <libknot/internal/mem.h>
+
 #include "lib/context.h"
+#include "lib/defines.h"
 #include "lib/rplan.h"
 
 int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm)
@@ -43,5 +47,28 @@ int kr_context_deinit(struct kr_context *ctx)
 		kr_cache_close(ctx->cache);
 	}
 
+	for (size_t i = 0; i < ctx->mod_loaded; ++i) {
+		kr_module_unload(&ctx->modules[i]);
+	}
+
 	return KNOT_EOK;
+}
+
+int kr_context_register(struct kr_context *ctx, const char *module_name)
+{
+	size_t last = ctx->mod_loaded;
+	int ret = mreserve((char **) &ctx->modules, sizeof(struct kr_module),
+	                   last + 1, 0, &ctx->mod_reserved);
+	if (ret < 0) {
+		return kr_error(ENOMEM);
+	}
+
+	struct kr_module *mod = &ctx->modules[last];
+	ret = kr_module_load(mod, module_name, NULL);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ctx->mod_loaded += 1;
+	return kr_ok();
 }

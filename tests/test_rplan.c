@@ -18,6 +18,7 @@
 #include <cmocka.h>
 
 #include "lib/rplan.h"
+#include "lib/context.h"
 
 static void test_rplan_params(void **state)
 {
@@ -45,10 +46,27 @@ static void test_rplan_params(void **state)
 	kr_rplan_deinit(&rplan);
 }
 
+static void test_rplan_push(void **state)
+{
+	mm_ctx_t mm;
+	test_mm_ctx_init(&mm);
+	struct kr_context context;
+	kr_context_init(&context, &mm);
+	struct kr_rplan rplan;
+	kr_rplan_init(&rplan, &context, &mm);
+
+	/* Push query. */
+	assert_non_null(kr_rplan_push(&rplan, NULL, (knot_dname_t *)"", 0, 0));
+
+	kr_rplan_deinit(&rplan);
+	kr_context_deinit(&context);
+}
+
 int main(void)
 {
 	const UnitTest tests[] = {
-	        unit_test(test_rplan_params)
+	        unit_test(test_rplan_params),
+	        unit_test(test_rplan_push)
 	};
 
 	return run_tests(tests);

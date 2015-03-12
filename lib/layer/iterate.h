@@ -19,8 +19,7 @@
 #include "lib/layer.h"
 
 /* Processing module implementation. */
-const knot_layer_api_t *layer_iterate_module(void);
-#define LAYER_ITERATE layer_iterate_module()
+extern const knot_layer_api_t *iterate_layer(void);
 
 /*!
  * \brief Result updates the query parent.

@@ -50,15 +50,14 @@ static PyObject* init(PyObject* self, PyObject* args)
 
 	/* Initialize resolution context */
 	#define CACHE_SIZE 100*1024
-	test_mm_ctx_init(&global_mm);
+	mm_ctx_init(&global_mm);
 	kr_context_init(&global_context, &global_mm);
+	kr_context_register(&global_context, "iterate");
+	kr_context_register(&global_context, "itercache");
 	global_tmpdir = test_tmpdir_create();
 	assert(global_tmpdir);
 	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, CACHE_SIZE);
 	assert(global_context.cache);
-
-	/* Test context options. */
-	global_context.options = QUERY_TCP;
 
 	/* No configuration parsing support yet. */
 	if (strstr(config, "query-minimization: on") == NULL) {

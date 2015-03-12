@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,10 +14,31 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "lib/module.h"
 
-#include "lib/layer.h"
+/* Fake libgo */
 
-/* Processing module implementation. */
-const knot_layer_api_t *layer_stats_module(void);
-#define LAYER_STATS layer_stats_module()
+void runtime_check(void) {}
+void runtime_args(int argc, void *argv) {}
+void runtime_osinit(void) {}
+void runtime_schedinit(void) {}
+void __go_init_main() {}
+
+/*
+ * No module implementation.
+ */
+
+/* \note Renamed to mimick Go module. */
+#if defined(__APPLE__)
+    extern uint32_t Api(void) __asm__ ("_main.Api"); /* Mach-O */
+#elif _WIN32
+    #error DLL format is not supported for Golang modules.
+#else
+    extern uint32_t Api(void) __asm__ ("main.Api");  /* ELF */
+#endif
+
+
+uint32_t Api(void)
+{
+    return KR_MODULE_API - 1; /* Bad version */
+}

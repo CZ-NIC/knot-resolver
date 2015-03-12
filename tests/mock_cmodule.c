@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,36 +14,20 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lib/layer/static.h"
+#include "lib/module.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "hint",  fmt)
+/*
+ * Mock module implementation.
+ */
 
-static int reset(knot_layer_t *ctx)
+int mock_cmodule_init(struct kr_module *module)
 {
-	/* TODO: sync, cleanup after resolution */
-	return ctx->state;
+	return kr_ok();
 }
 
-static int begin(knot_layer_t *ctx, void *param)
+int mock_cmodule_deinit(struct kr_module *module)
 {
-	ctx->data = param;
-
-	/* TODO: read static hosts file */
-
-	return ctx->state;
+	return kr_ok();
 }
 
-/*! \brief Module implementation. */
-static const knot_layer_api_t LAYER_STATIC_MODULE = {
-	&begin,
-	&reset,
-	NULL,
-	NULL,
-	NULL,
-	NULL
-};
-
-const knot_layer_api_t *layer_static_module(void)
-{
-	return &LAYER_STATIC_MODULE;
-}
+KR_MODULE_EXPORT(mock_cmodule);

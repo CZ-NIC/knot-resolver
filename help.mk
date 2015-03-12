@@ -7,6 +7,7 @@ info:
 	$(info BINDIR:     $(BINDIR))
 	$(info LIBDIR:     $(LIBDIR))
 	$(info INCLUDEDIR: $(INCLUDEDIR))
+	$(info MODULEDIR:  $(MODULEDIR))
 	$(info )
 	$(info Features)
 	$(info --------)
@@ -15,4 +16,5 @@ info:
 	$(info [$(HAS_libuv)] daemon (libuv))
 	$(info [$(HAS_cmocka)] unit tests (libcmocka))
 	$(info [$(HAS_python)] integration tests (libpython))
+	$(info [$(HAS_gccgo)] golang modules (gccgo))
 	$(info )

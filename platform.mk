@@ -1,5 +1,7 @@
 # Platform-specific
 CCLD := $(CC)
+CGO := go tool cgo
+GCCGO := gccgo
 LIBEXT := .so
 MODEXT := $(LIBEXT)
 LIBTYPE := shared
@@ -50,7 +52,8 @@ $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 $(1)-clean:
 	$(RM) $$($(1)_OBJ) $$($(1)_DEP) $(2)/$(1)$(3)
 $(1)-install: $(2)/$(1)$(3)
-	$(INSTALL) $$^ $(PREFIX)/$(5) 
+	$(INSTALL) -d $(PREFIX)/$(5)
+	$(INSTALL) $$^ $(PREFIX)/$(5)
 ifneq ($$(strip $$($(1)_HEADERS)),)
 	$(INSTALL) -d $(PREFIX)/$(INCLUDEDIR)/$(1)
 	$(INSTALL) $$($(1)_HEADERS) $(PREFIX)/$(INCLUDEDIR)/$(1)
@@ -61,7 +64,8 @@ endef
 # Make targets (name,path)
 make_bin = $(call make_target,$(1),$(2),$(BINEXT),,$(BINDIR))
 make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR))
-make_module = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR))
+make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR))
+make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR))
 
 # Evaluate library
 define have_lib
@@ -81,6 +85,16 @@ define find_lib
 		$(1)_LIBS := $(shell pkg-config --libs $(1) --silence-errors)
 	endif
 	$(call have_lib,$(1))
+endef
+
+# Find binary
+define find_bin
+	ifeq ($$(strip $$($(1)_BIN)),)
+		HAS_$(1) := $(shell $(1) --version > /dev/null 2>&1 && echo yes || echo no)
+	else
+		HAS_$(1) := yes
+		$(1) := $$($(1)_BIN)
+	endif
 endef
 
 # Find Python 

@@ -26,8 +26,6 @@
 #include "lib/defines.h"
 #include "lib/layer/itercache.h"
 #include "lib/layer/iterate.h"
-#include "lib/layer/static.h"
-#include "lib/layer/stats.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), "resl",  fmt)
 
@@ -147,15 +145,23 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	return ret;
 }
 
+static void prepare_layers(struct knot_requestor *req, struct kr_layer_param *param)
+{
+	struct kr_context *ctx = param->ctx;
+	for (size_t i = 0; i < ctx->mod_loaded; ++i) {
+		struct kr_module *mod = &ctx->modules[i];
+		if (mod->layer) {
+			knot_requestor_overlay(req, mod->layer(), param);
+		}
+	}
+}
+
 static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
 {
-	/* Initialize requestor and overlay. */
+	/* Initialize requestor. */
 	struct knot_requestor requestor;
 	knot_requestor_init(&requestor, pool);
-	knot_requestor_overlay(&requestor, LAYER_STATIC, param);
-	knot_requestor_overlay(&requestor, LAYER_ITERCACHE, param);
-	knot_requestor_overlay(&requestor, LAYER_ITERATE, param);
-	knot_requestor_overlay(&requestor, LAYER_STATS, param);
+	prepare_layers(&requestor, param);
 
 	/* Iteratively solve the query. */
 	int ret = KNOT_EOK;

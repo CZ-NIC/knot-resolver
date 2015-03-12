@@ -32,6 +32,10 @@
 
 namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize)
 {
+	if (handle == NULL || maxsize == 0) {
+		return NULL;
+	}
+
 	struct namedb_lmdb_opts opts = NAMEDB_LMDB_OPTS_INITIALIZER;
 	opts.mapsize = maxsize;
 	opts.path = handle;
@@ -47,16 +51,26 @@ namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize)
 
 void kr_cache_close(namedb_t *cache)
 {
-	db_api->deinit(cache);
+	if (cache != NULL) {
+		db_api->deinit(cache);
+	}
 }
 
 int kr_cache_txn_begin(namedb_t *cache, namedb_txn_t *txn, unsigned flags)
 {
+	if (cache == NULL || txn == NULL) {
+		return KNOT_EINVAL;
+	}
+
 	return db_api->txn_begin(cache, txn, flags);
 }
 
 int kr_cache_txn_commit(namedb_txn_t *txn)
 {
+	if (txn == NULL) {
+		return KNOT_EINVAL;
+	}
+
 	int ret = db_api->txn_commit(txn);
 	if (ret != KNOT_EOK) {
 		kr_cache_txn_abort(txn);
@@ -66,7 +80,9 @@ int kr_cache_txn_commit(namedb_txn_t *txn)
 
 void kr_cache_txn_abort(namedb_txn_t *txn)
 {
-	return db_api->txn_abort(txn);
+	if (txn != NULL) {
+		db_api->txn_abort(txn);
+	}
 }
 
 static size_t cache_key(uint8_t *buf, const knot_dname_t *name, uint16_t type)
@@ -94,6 +110,10 @@ static struct kr_cache_rrset *cache_rr(namedb_txn_t *txn, const knot_dname_t *na
 
 int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
 {
+	if (txn == NULL || rr == NULL) {
+		return KNOT_EINVAL;
+	}
+
 	/* Check if the RRSet is in the cache. */
 	struct kr_cache_rrset *found_rr = cache_rr(txn, rr->owner, rr->type);
 	if (found_rr != NULL) {
@@ -132,6 +152,8 @@ int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp)
 
 knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm)
 {
+	assert(src);
+
 	/* Make RRSet copy. */
 	knot_rrset_t copy;
 	knot_rrset_init(&copy, NULL, src->type, src->rclass);
@@ -161,6 +183,10 @@ knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ct
 
 int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestamp)
 {
+	if (txn == NULL || rr == NULL) {
+		return KNOT_EINVAL;
+	}
+
 	/* Ignore empty records. */
 	if (knot_rrset_empty(rr)) {
 		return KNOT_EOK;
@@ -187,6 +213,10 @@ int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestam
 
 int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr)
 {
+	if (txn == NULL || rr == NULL) {
+		return KNOT_EINVAL;
+	}
+
 	uint8_t keybuf[KNOT_DNAME_MAXLEN + sizeof(uint16_t)];
 	size_t key_len = cache_key(keybuf, rr->owner, rr->type);
 	namedb_val_t key = { keybuf, key_len };
@@ -196,6 +226,10 @@ int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr)
 
 int kr_cache_clear(namedb_txn_t *txn)
 {
+	if (txn == NULL) {
+		return KNOT_EINVAL;
+	}
+
 	return db_api->clear(txn);
 }
 

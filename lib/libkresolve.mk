@@ -1,9 +1,9 @@
 libkresolve_SOURCES := \
 	lib/layer/iterate.c    \
 	lib/layer/itercache.c  \
-	lib/layer/static.c     \
-	lib/layer/stats.c      \
+	lib/utils.c            \
 	lib/nsrep.c            \
+	lib/module.c           \
 	lib/context.c          \
 	lib/resolve.c          \
 	lib/zonecut.c          \
@@ -11,12 +11,10 @@ libkresolve_SOURCES := \
 	lib/cache.c
 
 libkresolve_HEADERS := \
-	lib/layer/iterate.h    \
-	lib/layer/itercache.h  \
-	lib/layer/static.h     \
-	lib/layer/stats.h      \
 	lib/layer.h            \
+	lib/utils.h            \
 	lib/nsrep.h            \
+	lib/module.h           \
 	lib/context.h          \
 	lib/resolve.h          \
 	lib/zonecut.h          \

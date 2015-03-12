@@ -16,9 +16,17 @@
 
 #pragma once
 
+#include <errno.h>
 #include <libknot/errcode.h>
 #include <libknot/dname.h>
 #include <libknot/rrset.h>
+
+/*
+ * Error codes.
+ */
+#define kr_ok() 0
+#define kr_error(x) -abs(x)
+#define kr_strerror(x) strerror(abs(x))
 
 /*
  * Connection limits.
