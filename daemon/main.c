@@ -23,9 +23,33 @@
 #include <libknot/internal/sockaddr.h>
 #include <libknot/errcode.h>
 
+#include "lib/defines.h"
 #include "lib/resolve.h"
 #include "daemon/udp.h"
 #include "daemon/tcp.h"
+#include "daemon/cmd.h"
+
+static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
+{
+	if (stream && buf && nread > 0) {
+		/* Trim endln */
+		char *cmd = buf->base;
+		cmd[nread - 1] = '\0';
+		/* Execute */
+		int ret = cmd_exec((struct worker_ctx *)stream->data, cmd);
+		if (ret != 0) {
+			printf("ret: %s\n", kr_strerror(ret));
+		}
+	}
+
+	printf("> ");
+	fflush(stdout);
+}
+
+static void tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf) {
+    buf->len = suggested;
+    buf->base = malloc(suggested);
+}
 
 void signal_handler(uv_signal_t *handle, int signum)
 {
@@ -124,13 +148,24 @@ int main(int argc, char **argv)
 		ret = tcp_bind((uv_handle_t *)&tcp_sock, &worker, (struct sockaddr *)&addr);
 	}
 
+	/* Allocate TTY */
+	uv_pipe_t pipe;
+	uv_pipe_init(loop, &pipe, 0);
+	uv_pipe_open(&pipe, 0);
+	pipe.data = &worker;
+
 	/* Check results */
 	if (ret != KNOT_EOK) {
 		fprintf(stderr, "[system] bind to '%s' %s\n", addr_str, knot_strerror(ret));
 		ret = EXIT_FAILURE;
 	} else {
+		/* Interactive stdin */
+		if (!feof(stdin)) {
+			printf("[system] started in interactive mode, type 'help'\n");
+			tty_read(NULL, 0, NULL);
+			uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_read);
+		}
 		/* Run the event loop. */
-		fflush(stdout);
 		ret = uv_run(loop, UV_RUN_DEFAULT);
 	}
 

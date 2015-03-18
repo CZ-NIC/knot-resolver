@@ -2,6 +2,7 @@ kresolved_SOURCES := \
 	daemon/layer/query.c \
 	daemon/udp.c         \
 	daemon/tcp.c         \
+	daemon/cmd.c         \
 	daemon/worker.c      \
 	daemon/main.c
 
