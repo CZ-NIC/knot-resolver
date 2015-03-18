@@ -36,10 +36,9 @@ You can avoid rebuilding dependencies by specifying `BUILD_IGNORE` variable, see
 for example. Usually you only really need to rebuild `libknot`.
 
 ```
-$ FAKEROOT="${HOME}/.local"
-$ ./scripts/bootstrap-depends.sh ${FAKEROOT}
-$ export LDFLAGS="-L${FAKEROOT}/lib"
+$ export FAKEROOT="${HOME}/.local"
 $ export PKG_CONFIG_PATH="${FAKEROOT}/lib/pkgconfig"
+$ ./scripts/bootstrap-depends.sh ${FAKEROOT}
 $ make
 $ make check
 ```
