@@ -17,6 +17,8 @@ You can get the extra dependencies with pip:
 
 ```sh
 pip install -U Sphinx breathe
+# Alternatively
+pip -r doc/requirements.txt
 ```
 
 ### Building documentation
