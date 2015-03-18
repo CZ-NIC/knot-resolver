@@ -5,8 +5,8 @@
 
 The Knot DNS Resolver is a minimalistic caching resolver implementation. The project provides both a resolver
 library and a small daemon. Modular architecture of the library keeps the core tiny and efficient, and provides
-a state-machine like API for extensions. There are three built-in modules: *iterator*, *cache* and *stats*,
-but each module can be flipped on and off.
+a state-machine like API for extensions. There are two built-in modules: *iterator* and *cache*,
+and each module can be flipped on and off.
 
 ### Try it out?
 
@@ -52,5 +52,5 @@ right now.
 
 ```
 $ ./daemon/kresolved -h
-$ ./daemon/kresolved -a 127.0.0.1#53
+$ ./daemon/kresolved -a "127.0.0.1#53"
 ```

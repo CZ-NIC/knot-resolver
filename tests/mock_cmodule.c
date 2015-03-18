@@ -30,4 +30,4 @@ int mock_cmodule_deinit(struct kr_module *module)
 	return kr_ok();
 }
 
-KR_MODULE_EXPORT(mock_cmodule);
+KR_MODULE_EXPORT(mock_cmodule)

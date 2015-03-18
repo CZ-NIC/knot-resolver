@@ -23,42 +23,66 @@
 /*
  * Forward decls
  */
+struct kr_context;
 struct kr_module;
+struct kr_prop;
 
 /*
  * API definition.
  */
-#define KR_MODULE_API 0x20150401 /*!< API version */
 typedef uint32_t (module_api_cb)(void);
 typedef int (module_init_cb)(struct kr_module *);
 typedef int (module_deinit_cb)(struct kr_module *);
 typedef int (module_config_cb)(struct kr_module *, void *);
 typedef const knot_layer_api_t* (module_layer_cb)(void);
+typedef struct kr_prop *(module_prop_cb)(void);
 
-/*! Loaded module representation. */ 
-struct kr_module {
-    module_init_cb   *init;   /*!< Constructor */
-    module_deinit_cb *deinit; /*!< Destructor */
-    module_config_cb *config; /*!< Configuration */
-    module_layer_cb  *layer;  /*!< Layer getter */
-    void *lib;                /*!< Shared library handle or RTLD_DEFAULT */
-    void *data;               /*!< Custom data context. */
+#define KR_MODULE_API ((uint32_t) 0x20150401)
+
+/**
+ * Module property (named callable).
+ * A module property has a free-form JSON output (and optional input).
+ */
+struct kr_prop {
+    char *(*cb)(struct kr_context*,struct kr_module *,const char*);
+    const char *name;
+    const char *info;
 };
 
-/*! Load module instance into memory.
+/**
+ * Module representation.
+ */
+struct kr_module {
+    char *name;               /**< Name. */
+    module_init_cb   *init;   /**< Constructor */
+    module_deinit_cb *deinit; /**< Destructor */
+    module_config_cb *config; /**< Configuration */
+    module_layer_cb  *layer;  /**< Layer getter */
+    struct kr_prop   *props;  /**< Properties */
+    void *lib;                /**< Shared library handle or RTLD_DEFAULT */
+    void *data;               /**< Custom data context. */
+};
+
+/**
+ * Load module instance into memory.
+ * 
  * @param module module structure
  * @param name module name
  * @param path module search path
  * @return 0 or an error
  */
-int kr_module_load(struct kr_module *module, const char *name,  const char *path);
+int kr_module_load(struct kr_module *module, const char *name, const char *path);
 
-/*! Unload module instance.
+/**
+ * Unload module instance.
+ * 
  * @param module module structure
  */
 void kr_module_unload(struct kr_module *module);
 
-/*! Export module API version (place this at the end of your module).
+/**
+ * Export module API version (place this at the end of your module).
+ * 
  * @param module module name (f.e. hints)
  */
 #define KR_MODULE_EXPORT(module) \

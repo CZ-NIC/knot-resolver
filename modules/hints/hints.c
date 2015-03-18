@@ -189,4 +189,4 @@ int hints_deinit(struct kr_module *module)
 	return kr_ok();
 }
 
-KR_MODULE_EXPORT(hints);
+KR_MODULE_EXPORT(hints)

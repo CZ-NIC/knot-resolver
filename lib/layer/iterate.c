@@ -476,4 +476,4 @@ const knot_layer_api_t *iterate_layer(void)
 	return &_layer;
 }
 
-KR_MODULE_EXPORT(iterate);
+KR_MODULE_EXPORT(iterate)
