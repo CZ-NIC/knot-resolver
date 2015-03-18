@@ -32,7 +32,7 @@
 /* Defines */
 #define ITER_LIMIT 50
 
-/*! \brief Invalidate current NS in cache. */
+/** Invalidate current NS in cache. */
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
 	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, 0);

@@ -26,7 +26,7 @@
 #include "lib/defines.h"
 #include "lib/layer.h"
 
-/* \brief Root hint descriptor. */
+/* Root hint descriptor. */
 struct hint_info {
 	const knot_dname_t *name;
 	const char *addr;
@@ -102,7 +102,7 @@ int kr_set_zone_cut_addr(struct kr_zonecut *cut, const knot_rrset_t *rr, uint16_
 	return ret;
 }
 
-/*! \brief Fetch address for zone cut. */
+/** Fetch address for zone cut. */
 static int fetch_addr(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timestamp)
 {
 	/* Fetch nameserver address from cache. */
@@ -127,7 +127,7 @@ static int fetch_addr(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timest
 	return kr_set_zone_cut_addr(cut, &cached_rr, i);
 }
 
-/*! \brief Fetch best NS for zone cut. */
+/** Fetch best NS for zone cut. */
 static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
 {
 	uint32_t drift = timestamp;

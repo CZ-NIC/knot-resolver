@@ -28,7 +28,7 @@ void __go_init_main() {}
  * No module implementation.
  */
 
-/* \note Renamed to mimick Go module. */
+/* @note Renamed to mimick Go module. */
 #if defined(__APPLE__)
     extern uint32_t Api(void) __asm__ ("_main.Api"); /* Mach-O */
 #elif _WIN32
