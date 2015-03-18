@@ -90,7 +90,10 @@ endef
 # Find binary
 define find_bin
 	ifeq ($$(strip $$($(1)_BIN)),)
-		HAS_$(1) := $(shell $(1) --version > /dev/null 2>&1 && echo yes || echo no)
+		$(1)_BIN := $(shell which $(1))
+	endif
+	ifeq ($$(strip $$($(1)_BIN)),)
+		HAS_$(1) := no
 	else
 		HAS_$(1) := yes
 		$(1) := $$($(1)_BIN)

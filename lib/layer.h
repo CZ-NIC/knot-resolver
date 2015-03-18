@@ -22,10 +22,10 @@
 #include "lib/context.h"
 #include "lib/rplan.h"
 
-/*!
- * \brief Processing module parameters.
+/**
+ * Processing module parameters.
  *
- * \note These parameters are passed to each processing layer.
+ * @note These parameters are passed to each processing layer.
  */
 struct kr_layer_param {
 	struct kr_context *ctx;
@@ -33,7 +33,7 @@ struct kr_layer_param {
 	knot_pkt_t *answer;
 };
 
-/*! \internal Print a debug message related to resolution. */
+/** \internal Print a debug message related to resolution. */
 #ifndef NDEBUG
  #define QRDEBUG(query, cls, fmt, ...) do { \
     unsigned _ind = 0; \

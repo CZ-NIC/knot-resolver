@@ -23,48 +23,48 @@
 
 struct kr_rplan;
 
-/*!
- * \brief Current zone cut representation.
+/**
+ * Current zone cut representation.
 */
 struct kr_zonecut {
-	knot_dname_t name[KNOT_DNAME_MAXLEN]; /*!< Current zone cut */
-	knot_dname_t ns[KNOT_DNAME_MAXLEN];   /*!< Authoritative NS */
-	struct sockaddr_storage addr;         /*!< Authoritative NS address. */
+	knot_dname_t name[KNOT_DNAME_MAXLEN]; /**< Current zone cut */
+	knot_dname_t ns[KNOT_DNAME_MAXLEN];   /**< Authoritative NS */
+	struct sockaddr_storage addr;         /**< Authoritative NS address. */
 };
 
-/*!
- * \brief Initialize zone cut with SBELT.
- * \param cut zone cut to be set
- * \return KNOT_E*
+/**
+ * Initialize zone cut with SBELT.
+ * @param cut zone cut to be set
+ * @return KNOT_E*
  */
 int kr_init_zone_cut(struct kr_zonecut *cut);
 
-/*!
- * \brief Set zone cut to given name and name server.
- * \note Name server address is blanked.
- * \param cut zone cut to be set
- * \param name zone cut name
- * \param ns   zone cut nameserver
- * \return KNOT_E*
+/**
+ * Set zone cut to given name and name server.
+ * @note Name server address is blanked.
+ * @param cut zone cut to be set
+ * @param name zone cut name
+ * @param ns   zone cut nameserver
+ * @return KNOT_E*
  */
 int kr_set_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, const knot_dname_t *ns);
 
-/*!
- * \brief Convert A/AAAA RRs to address with DNS port.
- * \param cut zone cut to be set
- * \param rr resource record
- * \param i  index of the set address in the rr
- * \return KNOT_E*
+/**
+ * Convert A/AAAA RRs to address with DNS port.
+ * @param cut zone cut to be set
+ * @param rr resource record
+ * @param i  index of the set address in the rr
+ * @return KNOT_E*
  */
 int kr_set_zone_cut_addr(struct kr_zonecut *cut, const knot_rrset_t *rr, uint16_t i);
 
-/*!
- * \brief Find the closest enclosing zone cut/nameserver from the cache.
- * \param cut zone cut to be set
- * \param name zone cut name
- * \param txn cache transaction
- * \param timestamp transaction timestamp
- * \return KNOT_E*
+/**
+ * Find the closest enclosing zone cut/nameserver from the cache.
+ * @param cut zone cut to be set
+ * @param name zone cut name
+ * @param txn cache transaction
+ * @param timestamp transaction timestamp
+ * @return KNOT_E*
  */
 int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp);
 

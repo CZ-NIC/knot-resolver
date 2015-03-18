@@ -11,6 +11,7 @@ info:
 	$(info )
 	$(info Features)
 	$(info --------)
+	$(info [$(HAS_doxygen)] API documentation (doxygen))
 	$(info [$(HAS_libknot)] library (libknot))
 	$(info [$(HAS_libknot-int)] library (libknot-int))
 	$(info [$(HAS_libuv)] daemon (libuv))

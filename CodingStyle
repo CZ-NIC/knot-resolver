@@ -1,0 +1,5 @@
+# Style
+
+Linux kernel [coding style][lkstyle], same practices for API documentation.
+
+[lkstyle]: https://www.kernel.org/doc/Documentation/CodingStyle

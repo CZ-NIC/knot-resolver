@@ -75,7 +75,7 @@ static int output_error(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return KNOT_STATE_DONE;
 }
 
-/*! \brief Module implementation. */
+/** Module implementation. */
 static const knot_layer_api_t LAYER_QUERY_MODULE = {
 	&begin,
 	NULL,

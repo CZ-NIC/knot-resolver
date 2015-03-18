@@ -23,9 +23,9 @@ enum kr_ns_score {
     KR_NS_VALID   = 0
 };
 
-/*! \brief Return name server score (KR_NS_VALID is baseline, the higher the better).
- * \param ns evaluated NS name
- * \param param layer parameters
+/** Return name server score (KR_NS_VALID is baseline, the higher the better).
+ * @param ns evaluated NS name
+ * @param param layer parameters
  * \return enum kr_ns_score or higher positive value
  */
 int kr_nsrep_score(const knot_dname_t *ns, struct kr_layer_param *param);

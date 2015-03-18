@@ -22,12 +22,12 @@
 #include "lib/module.h"
 #include "lib/cache.h"
 
-/*!
- * \brief Name resolution context.
+/**
+ * Name resolution context.
  *
  * Resolution context provides basic services like cache, configuration and options.
  *
- * \note This structure is persistent between name resolutions and may
+ * @note This structure is persistent between name resolutions and may
  *       be shared between threads.
  */
 struct kr_context
@@ -40,25 +40,25 @@ struct kr_context
     uint32_t options;
 };
 
-/*!
- * \brief Initialize query resolution context.
- * \param ctx context to be initialized
- * \param mm memory context
+/**
+ * Initialize query resolution context.
+ * @param ctx context to be initialized
+ * @param mm memory context
  * \return KNOT_E*
  */
 int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm);
 
-/*!
- * \brief Deinitialize query resolution context.
- * \param ctx context to be deinitialized
+/**
+ * Deinitialize query resolution context.
+ * @param ctx context to be deinitialized
  * \return KNOT_E*
  */
 int kr_context_deinit(struct kr_context *ctx);
 
-/*!
- * \brief Register module to context.
- * \param ctx context
- * \param module_name
+/**
+ * Register module to context.
+ * @param ctx context
+ * @param module_name
  * \return KNOT_E*
  */
 int kr_context_register(struct kr_context *ctx, const char *module_name);

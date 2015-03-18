@@ -38,14 +38,14 @@ static inline void *mm_test_malloc(void *ctx, size_t n)
 static inline void mm_test_free(void *p)
 { return test_free(p); }
 
-/*! \brief Memory context using CMocka allocator. */
+/** Memory context using CMocka allocator. */
 static inline void test_mm_ctx_init(mm_ctx_t *mm)
 {
 	mm->alloc = &mm_test_malloc;
 	mm->free = &mm_test_free;
 }
 
-/*! \brief Recursively delete directory. */
+/** Recursively delete directory. */
 static inline int test_tmpdir_remove(const char *path)
 {
 	char buf[512];
@@ -66,7 +66,7 @@ static inline int test_tmpdir_remove(const char *path)
 	return 0;
 }
 
-/*! \brief Create temporary directory. */
+/** Create temporary directory. */
 static inline const char* test_tmpdir_create(void)
 {
 	static char env_path[64];
@@ -74,7 +74,7 @@ static inline const char* test_tmpdir_create(void)
 	return mkdtemp(env_path);
 }
 
-/*! \brief Generate random string with given length. */
+/** Generate random string with given length. */
 static inline void test_randstr(char* dst, size_t len)
 {
 	if (len == 0) {
@@ -88,8 +88,8 @@ static inline void test_randstr(char* dst, size_t len)
 	return;
 }
 
-/*! \brief Init RRSet with type TXT, random owner and random payload.
- *  \note Static memory reused, copy it if you need persistence.
+/** Init RRSet with type TXT, random owner and random payload.
+ *  @note Static memory reused, copy it if you need persistence.
  */
 static inline void test_random_rr(knot_rrset_t *rr, uint32_t ttl)
 {

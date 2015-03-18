@@ -10,9 +10,11 @@
 *.Plo
 *.swp
 *.d
+*.db
 .dirstamp
 .libs
 .deps
+_obj
 /autom4te.cache/*
 /config.log
 /config.h
@@ -30,3 +32,5 @@
 /aclocal.m4
 /ltmain.sh
 /ylwrap
+/doc/doxyxml
+/doc/html
