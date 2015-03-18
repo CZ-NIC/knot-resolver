@@ -118,7 +118,7 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return KNOT_STATE_CONSUME;
 }
 
-/*! \brief Merge-in record if same type and owner. */
+/** Merge-in record if same type and owner. */
 static int merge_cache_rr(knot_rrset_t *cache_rr, const knot_rrset_t *rr, mm_ctx_t *pool)
 {
 	if (rr->type != cache_rr->type || !knot_dname_is_equal(rr->owner, cache_rr->owner)) {
@@ -128,7 +128,7 @@ static int merge_cache_rr(knot_rrset_t *cache_rr, const knot_rrset_t *rr, mm_ctx
 	return knot_rdataset_merge(&cache_rr->rrs, &rr->rrs, pool);
 }
 
-/*! \brief Merge-in records from the same section. */
+/** Merge-in records from the same section. */
 static int merge_in_section(knot_rrset_t *cache_rr, const knot_pktsection_t *section, unsigned from, mm_ctx_t *pool)
 {
 	int ret = KNOT_EOK;
@@ -145,7 +145,7 @@ static int merge_in_section(knot_rrset_t *cache_rr, const knot_pktsection_t *sec
 	return ret;
 }
 
-/*! \brief Cache direct answer. */
+/** Cache direct answer. */
 static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
 	/* Check if already cached. */
@@ -182,7 +182,7 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, na
 	return ret;
 }
 
-/*! \brief Cache direct answer. */
+/** Cache direct answer. */
 static int write_cache_answer(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
 	knot_rrset_t cache_rr;
@@ -192,7 +192,7 @@ static int write_cache_answer(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool
 	return write_cache_rr(an, &cache_rr, txn, pool, timestamp);
 }
 
-/*! \brief Cache stub nameservers. */
+/** Cache stub nameservers. */
 static int write_cache_authority(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
 	knot_rrset_t glue_rr = { NULL, 0, 0 };
@@ -245,7 +245,7 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Cache only positive answers. */
-	/*! \todo Negative answers cache support */
+	/** \todo Negative answers cache support */
 	if (knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
 		return ctx->state;
 	}
@@ -266,7 +266,7 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return ctx->state;
 }
 
-/*! \brief Module implementation. */
+/** Module implementation. */
 const knot_layer_api_t *itercache_layer(void)
 {
 	static const knot_layer_api_t _layer = {

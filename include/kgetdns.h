@@ -25,20 +25,20 @@ enum getdns_return {
 typedef enum getdns_return getdns_return_t;
 
 enum {
-	/*! At least one response was retuned. */
+	/** At least one response was retuned. */
 	GETDNS_RESPSTATUS_GOOD,
-	/*! Query for the name yielded a negative response. */
+	/** Query for the name yielded a negative response. */
 	GETDNS_RESPSTATUS_NO_NAME,
-	/*! All queries timed out. */
+	/** All queries timed out. */
 	GETDNS_RESPSTATUS_ALL_TIMEOUT,
-	/*! At least one response was retuned, but not secured by DNSSEC. */
+	/** At least one response was retuned, but not secured by DNSSEC. */
 	GETDNS_RESPSTATUS_NO_SECURE_ANSWERS,
 };
 
 enum {
-	/*! DNS name service. */
+	/** DNS name service. */
 	GETDNS_NAMETYPE_DNS,
-	/*! WINS name service. */
+	/** WINS name service. */
 	GETDNS_NAMETYPE_WINS,
 };
 
@@ -63,25 +63,25 @@ typedef struct getdns_bindata getdns_bindata;
 struct getdns_context;
 typedef struct getdns_context getdns_context;
 
-/*!
+/**
  * Create a new resolution context with default values.
  *
- * \param[out] context      Newly created context.
- * \param[in]  set_from_os  Set some defaults from the operating system.
+ * @param[out] context      Newly created context.
+ * @param[in]  set_from_os  Set some defaults from the operating system.
  */
 getdns_return_t getdns_context_create(
 	getdns_context **context,
 	int set_from_os
 );
 
-/*!
+/**
  * Create a new resolution context using custom memory allocator with a global context.
  *
  * \see getdns_context_create
  *
- * \param malloc   Callback for \c malloc.
- * \param realloc  Callback for \c realloc (not actually used, can be NULL).
- * \param free     Callback fro \c free.
+ * @param malloc   Callback for \c malloc.
+ * @param realloc  Callback for \c realloc (not actually used, can be NULL).
+ * @param free     Callback fro \c free.
  */
 getdns_return_t getdns_context_create_with_memory_functions(
 	getdns_context **context,
@@ -91,12 +91,12 @@ getdns_return_t getdns_context_create_with_memory_functions(
 	void (*free)(void *)
 );
 
-/*!
+/**
  * Create a new resolution context using custom memory allocator with a local context.
  *
  * \see getdns_context_create_with_memory_functions
  *
- * \param userarg  Memory allocation context passed to allocation functions.
+ * @param userarg  Memory allocation context passed to allocation functions.
  */
 getdns_return_t getdns_context_create_with_extended_memory_functions(
 	getdns_context  **context,
@@ -107,13 +107,13 @@ getdns_return_t getdns_context_create_with_extended_memory_functions(
 	void (*free)(void *userarg, void *)
 );
 
-/*!
+/**
  * Destroy resolution context including all running transactions.
  *
  * Callbacks for unprocessed transactions will be called with the
  * \c callback_type parameter set to \c GETDNS_CALLBACK_CANCEL.
  *
- * \param context  Context to be destroyed.
+ * @param context  Context to be destroyed.
  */
 void getdns_context_destroy(getdns_context *context);
 
@@ -139,11 +139,11 @@ enum getdns_context_code {
 
 typedef enum getdns_context_code getdns_context_code_t;
 
-/*!
+/**
  * Set callback to notify the application when the resolution context changes.
  *
- * \param context  Resolution context.
- * \param value    Callback to be used when the context changes (use NULL to clear).
+ * @param context  Resolution context.
+ * @param value    Callback to be used when the context changes (use NULL to clear).
  *
  * \retval GETDNS_RETURN_GOOD
  * \retval GETDNS_RETURN_CONTEXT_UPDATE_FAIL
@@ -160,7 +160,7 @@ enum getdns_resolution {
 
 typedef enum getdns_resolution getdns_resolution_t;
 
-/*!
+/**
  * Set resolution type.
  *
  * \retval GETDNS_RETURN_GOOD
@@ -181,10 +181,10 @@ enum getdns_namespace {
 
 typedef enum getdns_namespace getdns_namespace_t;
 
-/*!
+/**
  * Set ordered list of namespaces that will be queried.
  *
- * \note Ignored by \c getdns_general and \c getdns_general_sync.
+ * @note Ignored by \c getdns_general and \c getdns_general_sync.
  */
 getdns_return_t getdns_context_set_namespaces(
 	getdns_context *context,
@@ -201,7 +201,7 @@ enum getdns_transport {
 
 typedef enum getdns_transport getdns_transport_t;
 
-/*!
+/**
  * Set a transport to be used for the resolutions.
  */
 getdns_return_t getdns_context_set_dns_transport(
@@ -209,10 +209,10 @@ getdns_return_t getdns_context_set_dns_transport(
 	getdns_transport_t value
 );
 
-/*!
+/**
  * Set maximum number of queries being processed.
  *
- * \param limit  Limit of outstanding queries. Zero indicates no limit.
+ * @param limit  Limit of outstanding queries. Zero indicates no limit.
  */
 getdns_return_t getdns_context_set_limit_outstanding_queries(
 	getdns_context *context,
@@ -226,7 +226,7 @@ enum getdns_redirects {
 
 typedef enum getdns_redirects getdns_redirects_t;
 
-/*!
+/**
  * Set if the CNAME and DNAME redirects should be followed.
  */
 getdns_return_t getdns_context_set_follow_redirects(
@@ -234,7 +234,7 @@ getdns_return_t getdns_context_set_follow_redirects(
 	getdns_redirects_t value
 );
 
-/*!
+/**
  * Set the servers for top-level domain lookup.
  *
  * [
@@ -258,7 +258,7 @@ enum getdns_append_name {
 
 typedef enum getdns_append_name getdns_append_name_t;
 
-/*!
+/**
  * Set a mode of appending a suffix to queried names.
  *
  * \see getdns_context_set_suffix
@@ -268,7 +268,7 @@ getdns_return_t getdns_context_set_append_name(
 	getdns_append_name_t value
 );
 
-/*!
+/**
  * Set a list of strings to be appended to queries.
  *
  * \see getdns_context_set_append_mode
@@ -278,18 +278,18 @@ getdns_return_t getdns_context_set_suffix(
 	getdns_list *value
 );
 
-/*!
+/**
  * Set DNSSEC trust anchors for queries with DNSSEC extension.
  *
- * \param context  Resolution context.
- * \param value    List of RDATA (bindata) of trusted DNSKEYs.
+ * @param context  Resolution context.
+ * @param value    List of RDATA (bindata) of trusted DNSKEYs.
  */
 getdns_return_t getdns_context_set_dnssec_trust_anchors(
 	getdns_context *context,
 	getdns_list *value
 );
 
-/*!
+/**
  * Set number of seconds of skew to allow when checking DNSSEC signatures.
  */
 getdns_return_t getdns_context_set_dnssec_allowed_skew(
@@ -297,7 +297,7 @@ getdns_return_t getdns_context_set_dnssec_allowed_skew(
 	uint32_t value
 );
 
-/*!
+/**
  * Set upstream recursive server for stub resolution mode.
  *
  * \see getdns_context_set_resolution_type
@@ -314,47 +314,47 @@ getdns_return_t getdns_context_set_upstream_recursive_servers(
 	getdns_list *upstream_list
 );
 
-/*!
+/**
  * Set EDNS maximum UDP payload size.
  *
- * \param value  Maximum payload size (512-65535, default 512).
+ * @param value  Maximum payload size (512-65535, default 512).
  */
 getdns_return_t getdns_context_set_edns_maximum_udp_payload_size(
 	getdns_context *context,
 	uint16_t value
 );
 
-/*!
+/**
  * Set EDNS extended RCODE.
  *
- * \param value  Extended RCODE (default 0).
+ * @param value  Extended RCODE (default 0).
  */
 getdns_return_t getdns_context_set_edns_extended_rcode(
 	getdns_context *context,
 	uint8_t value
 );
 
-/*!
+/**
  * Set EDNS version.
  *
- * \param value  EDNS version (default 0).
+ * @param value  EDNS version (default 0).
  */
 getdns_return_t getdns_context_set_edns_version(
 	getdns_context *context,
 	uint8_t value
 );
 
-/*!
+/**
  * Set EDNS DO (DNSSEC OK) bit.
  * 
- * \param value EDNS DO bit (0 or 1, default 0).
+ * @param value EDNS DO bit (0 or 1, default 0).
  */
 getdns_return_t getdns_context_set_edns_do_bit(
 	getdns_context *context,
 	uint8_t value
 );
 
-/*!
+/**
  * Set memory allocation functions with a global context.
  */
 getdns_return_t getdns_context_set_memory_functions(
@@ -364,7 +364,7 @@ getdns_return_t getdns_context_set_memory_functions(
 	void (*free) (void *)
 );
 
-/*!
+/**
  * Set memory allocation functions with a local context.
  */
 getdns_return_t getdns_context_set_extended_memory_functions(
@@ -375,7 +375,7 @@ getdns_return_t getdns_context_set_extended_memory_functions(
 	void (*free)(void *userarg, void *ptr)
 );
 
-/*!
+/**
  * Get information about the implementation.
  */
 getdns_dict *getdns_context_get_api_information(getdns_context *context);
@@ -574,7 +574,7 @@ getdns_return_t getdns_dict_get_int(
 
 // helper functions
 
-/*!
+/**
  * Get textual representation of a dictionary.
  *
  * \return Dictionary in printable format. Deallocate with \c free.
@@ -588,23 +588,23 @@ char *getdns_pretty_print_dict(const getdns_dict *some_dict);
 typedef uint64_t getdns_transaction_t;
 
 enum getdns_callback_type {
-	GETDNS_CALLBACK_COMPLETE, /*!< The response contains requested data. */
-	GETDNS_CALLBACK_CANCEL,   /*!< The resolution was cancelled, response is NULL. */
-	GETDNS_CALLBACK_TIMEOUT,  /*!< The resolution timed out. */
-	GETDNS_CALLBACK_ERROR,    /*!< The resolutiion failed with an error. */
+	GETDNS_CALLBACK_COMPLETE, /**< The response contains requested data. */
+	GETDNS_CALLBACK_CANCEL,   /**< The resolution was cancelled, response is NULL. */
+	GETDNS_CALLBACK_TIMEOUT,  /**< The resolution timed out. */
+	GETDNS_CALLBACK_ERROR,    /**< The resolutiion failed with an error. */
 };
 
 typedef enum getdns_callback_type getdns_callback_type_t;
 
-/*!
+/**
  * Callback function definition.
  *
- * \param context         Resolution context.
- * \param callback_type   Reason for the callback.
- * \param response        An object with a response data. The object must be
+ * @param context         Resolution context.
+ * @param callback_type   Reason for the callback.
+ * @param response        An object with a response data. The object must be
  *                        destroyed by the application (\ref getdns_dict_destroy).
- * \param userarg         User defined argument.
- * \param tranasction_id  Identifier of the transaction.
+ * @param userarg         User defined argument.
+ * @param tranasction_id  Identifier of the transaction.
  *
  */
 typedef void (*getdns_callback_t)(
@@ -615,14 +615,14 @@ typedef void (*getdns_callback_t)(
 	getdns_transaction_t transaction_id
 );
 
-/*!
+/**
  * Cancel outstanding callback.
  *
  * The cancelation will cause the resolution callback to be called with the
  * \c callback_type parameter set to \c GETDNS_CALLBACK_CANCEL.
  *
- * \param context         Resolution context.
- * \param transaction_id  Identifier of the transaction.
+ * @param context         Resolution context.
+ * @param transaction_id  Identifier of the transaction.
  *
  * \retval GETDNS_RETURN_GOOD                 The transaction was cancelled.
  * \retval GETDNS_RETURN_UNKNOWN_TRANSACTION  The transaction is invalid or
@@ -637,17 +637,17 @@ getdns_return_t getdns_cancel_callback(
  * Async Functions
  */
 
-/*!
+/**
  * Perform an asynchronous DNS resolution.
  *
- * \param[in]  context         Resolution context.
- * \param[in]  name            ASCII domain name or IP address.
- * \param[in]  request_type    RR type for the query.
- * \param[in]  extensions      Extensions for the request (can be NULL).
- * \param[in]  userarg         User data passed to callback function.
- * \param[out] transaction_id  Non-zero identifier of the transaction (can be
+ * @param[in]  context         Resolution context.
+ * @param[in]  name            ASCII domain name or IP address.
+ * @param[in]  request_type    RR type for the query.
+ * @param[in]  extensions      Extensions for the request (can be NULL).
+ * @param[in]  userarg         User data passed to callback function.
+ * @param[out] transaction_id  Non-zero identifier of the transaction (can be
  *                             NULL, set to zero on error).
- * \param[in]  callbackfn      Callback function to process the result.
+ * @param[in]  callbackfn      Callback function to process the result.
  *
  * \return Error code.
  * \retval GETDNS_RETURN_GOOD                 The call was properly formatted.
@@ -666,7 +666,7 @@ getdns_return_t getdns_general(
 	getdns_callback_t callbackfn
 );
 
-/*!
+/**
  * Perform an asynchronous hostname-to-address resolution.
  *
  * \see getdns_general
@@ -684,7 +684,7 @@ getdns_return_t getdns_address(
 	getdns_callback_t callbackfn
 );
 
-/*!
+/**
  * Perform an asynchronous address-to-hostname resolution.
  *
  * \see getdns_general
@@ -702,7 +702,7 @@ getdns_return_t getdns_hostname(
 	getdns_callback_t callbackfn
 );
 
-/*!
+/**
  * Perform an asynchronous SRV lookup.
  *
  * \see getdns_general
@@ -722,12 +722,12 @@ getdns_return_t getdns_service(
  * Synchronous API.
  */
 
-/*!
+/**
  * Perform a synchronous DNS resolution.
  *
  * \see getdns_general
  *
- * \param[out] response  Result of the resolution.
+ * @param[out] response  Result of the resolution.
  */
 getdns_return_t getdns_general_sync(
 	getdns_context *context,
@@ -737,7 +737,7 @@ getdns_return_t getdns_general_sync(
 	getdns_dict **response
 );
 
-/*!
+/**
  * Perform a synchronous hostname-to-address resolution.
  *
  * \see getdns_general_sync
@@ -750,7 +750,7 @@ getdns_return_t getdns_address_sync(
 	getdns_dict **response
 );
 
-/*!
+/**
  * Perform a synchronous address-to-hostname resolution.
  *
  * \see getdns_general_sync
@@ -763,7 +763,7 @@ getdns_return_t getdns_hostname_sync(
 	getdns_dict **response
 );
 
-/*!
+/**
  * Perform an asynchronous SRV lookup.
  *
  * \see getdns_general_sync
@@ -804,11 +804,11 @@ enum {
  * Domain name conversions.
  */
 
-/*!
+/**
  * Convert domain name from wire to presentation format.
  *
- * \param[in]  dns_name_wire_fmt  Domain name in wire format.
- * \param[out] fqdn_as_string     Domain name in presentation format (with
+ * @param[in]  dns_name_wire_fmt  Domain name in wire format.
+ * @param[out] fqdn_as_string     Domain name in presentation format (with
  *                                interior dots only, deallocate with \c free).
  */
 getdns_return_t getdns_convert_dns_name_to_fqdn(
@@ -816,11 +816,11 @@ getdns_return_t getdns_convert_dns_name_to_fqdn(
 	char **fqdn_as_string
 );
 
-/*!
+/**
  * Convert domain name from presentation to wire format.
  *
- * \param[in]  fqdn_as_string    Domain name in presentation format.
- * \param[out] dns_name_wire_fmt Domain name in wire format (deallocate with
+ * @param[in]  fqdn_as_string    Domain name in presentation format.
+ * @param[out] dns_name_wire_fmt Domain name in wire format (deallocate with
  *                               \c free).
  */
 getdns_return_t getdns_convert_fqdn_to_dns_name(
@@ -828,18 +828,18 @@ getdns_return_t getdns_convert_fqdn_to_dns_name(
 	getdns_bindata **dns_name_wire_fmt
 );
 
-/*!
+/**
  * Convert IDN label from Unicode to ASCII.
  */
 char *getdns_convert_ulabel_to_alabel(const char  *ulabel);
 
-/*!
+/**
  * Convert IDN label from ASCII to Unicode.
  */
 char *getdns_convert_alabel_to_ulabel(const char  *alabel);
 
 
-/*!
+/**
  * Convert binary IP address to nicely-formatted text representation.
  *
  * \return IP address in presentation format (deallocate with \c free).
@@ -859,7 +859,7 @@ enum {
 	GETDNS_DNSSEC_INSECURE,
 };
 
-/*!
+/**
  * Perform DNSSEC validation of given records.
  */
 getdns_return_t getdns_validate_dnssec(
@@ -868,10 +868,10 @@ getdns_return_t getdns_validate_dnssec(
 	getdns_list *trust_anchor_records
 );
 
-/*!
+/**
  * Get default root trust anchor.
  *
- * \param[out] utc_data_of_anchor  Time of obtaining the trust anchor.
+ * @param[out] utc_data_of_anchor  Time of obtaining the trust anchor.
  *
  * \return Root trust anchor, NULL if no default trust anchor exists.
  */

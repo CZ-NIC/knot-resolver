@@ -41,7 +41,7 @@ enum {
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
 
-/*! \brief Return minimized QNAME/QTYPE for current zone cut. */
+/** Return minimized QNAME/QTYPE for current zone cut. */
 static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qtype)
 {
 	/* Minimization disabled. */
@@ -66,7 +66,7 @@ static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qty
 	return qname;
 }
 
-/*! \brief Answer is paired to query. */
+/** Answer is paired to query. */
 static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 {
 	uint16_t qtype = query->stype;
@@ -78,7 +78,7 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
 
-/*! \brief Relaxed rule for AA, either AA=1 or SOA matching zone cut is required. */
+/** Relaxed rule for AA, either AA=1 or SOA matching zone cut is required. */
 static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 {
 	if (knot_wire_get_aa(answer->wire)) {
@@ -96,7 +96,7 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	return false;
 }
 
-/*! \brief Return response class. */
+/** Return response class. */
 static int response_classify(knot_pkt_t *pkt)
 {
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
@@ -333,7 +333,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	return KNOT_STATE_DONE;
 }
 
-/*! \brief Error handling, RFC1034 5.3.3, 4d. */
+/** Error handling, RFC1034 5.3.3, 4d. */
 static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
 	return KNOT_STATE_FAIL;
@@ -399,7 +399,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return KNOT_STATE_CONSUME;
 }
 
-/*! \brief Resolve input query or continue resolution with followups.
+/** Resolve input query or continue resolution with followups.
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
  */
@@ -463,7 +463,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return state;
 }
 
-/*! \brief Module implementation. */
+/** Module implementation. */
 const knot_layer_api_t *iterate_layer(void)
 {
 	static const knot_layer_api_t _layer = {

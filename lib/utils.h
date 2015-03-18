@@ -33,5 +33,5 @@ extern void _cleanup_fclose(FILE **p);
  */
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(*(x)))
 
-/*! \brief Concatenate N strings. */
+/** Concatenate N strings. */
 char* kr_strcatdup(unsigned n, ...);
