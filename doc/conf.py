@@ -4,39 +4,33 @@ import sys, os, re, subprocess
 
 # -- General configuration -----------------------------------------------------
 
-# If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
-
 if os.environ.get('READTHEDOCS', None) == 'True':
   subprocess.call('doxygen')
 
-# Add any Sphinx extension module names here, as strings. They can be extensions
-# coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.ifconfig', 'sphinx.ext.todo', 'breathe']
+# Add any Sphinx extension module names here, as strings.
+extensions = ['sphinx.ext.todo', 'breathe']
 
+# Breathe configuration
 breathe_projects = { "libkresolve": "doxyxml" }
 breathe_default_project = "libkresolve"
 breathe_domain_by_extension = {"h" : "c"}
 
 # The suffix of source filenames.
 source_suffix = '.rst'
+master_doc = 'index'
 
 # General information about the project.
 project = u'Knot DNS Resolver'
 copyright = u'2014-2015 CZ.NIC labs'
-
-# The version info for the project you're documenting, acts as replacement for
-# |version| and |release|, also used in various other places throughout the
-# built documents.
 version = { k[0][0]: k[0][1] for k in filter(None, [re.findall(r'(MAJOR|MINOR|PATCH) := ([0-9]+)',line) for line in open('../config.mk')])}
-version = '{}.{}.{}'.format(version['MAJOR'], version['MINOR'], version['PATCH'])
+version = '%s.%s.%s' % (version['MAJOR'], version['MINOR'], version['PATCH'])
 
 # The full version, including alpha/beta/rc tags.
 release = version
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = []
+exclude_patterns = ['_build']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -47,7 +41,7 @@ primary_domain = 'c'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'alabaster'
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
