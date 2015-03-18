@@ -92,6 +92,7 @@ A module is a shared library defining specific functions, here's an overview of 
 | `module_deinit()` | `Deinit()` | `int`               | `module`      | ✕          | 0       | Destructor             |
 | `module_config()` | `Config()` | `int`               | `module, key` | ✕          | 0       | Configuration callback |
 | `module_layer()`  | `Layer()`  | `knot_layer_api_t*` |               | ✕          | 0       | Returns module layer   |
+| `module_props()`  | `Props()`  | `struct kr_prop*`   |               | ✕          | 0       | Return NULL-terminated list of properties.   |
 
 The `module_` corresponds to the module name, if the module name is `hints`, then the prefix for constructor would be `hints_init()`.
 This doesn't apply for Go, as it for now always implements `main` and requires capitalized first letter in order to export its symbol.
@@ -229,6 +230,62 @@ func Layer() *C.knot_layer_api_t {
 ```
 
 See the [CGO][cgo] for more information about type conversions and interoperability between the C/Go.
+
+### Configuring modules
+
+There is a callback `module_config()` but it's NOOP for now, as the configuration is not yet implemented.
+
+### Exposing module properties
+
+A module can offer NULL-terminated list of *properties*, each property is essentially a callable with free-form JSON input/output.
+JSON was chosen as an interchangeable format that doesn't require any schema beforehand, so you can do two things - query the module properties
+from external applications or between modules (i.e. `statistics` module can query `cache` module for memory usage).
+JSON was chosen not because it's the most efficient protocol, but because it's easy to read and write and interface to outside world.
+Here's an example how a module can expose its property:
+
+```c
+static char* cached_size(struct kr_context *ctx, struct kr_module *module, const char *args)
+{
+    /* Parameters are ignored. */
+    char *result = NULL;
+    namedb_txn_t txn;
+    int ret = kr_cache_txn_begin(ctx->cache, &txn, NAMEDB_RDONLY);
+    if (ret != 0) {
+        return NULL;
+    }
+
+    /* For the sake of brevity... */
+    asprintf(&result, "{ "cache_size": %d }\n", kr_cache_count(&txn));
+
+    kr_cache_txn_abort(&txn);
+    return result;
+}
+
+struct kr_prop *cached_props(void)
+{
+	static struct kr_prop prop_list[] = {
+		/* Callback,   Name,   Description */
+		{ &cache_size, "size", "Return number of cached records.", },
+		{ NULL, NULL, NULL }
+	};
+	return prop_list;
+}
+
+KR_MODULE_EXPORT(cached)
+
+```
+
+Once you load the module, you can call the module property from the interactive console:
+
+```sh
+$ kresolved
+...
+> load cached
+> cached.cached_size
+{ "cache_size": 53 }
+```
+
+*Note* &mdash; this relies on function pointers, so the same `static inline` trick as for the `Layer()` is required for C/Go.
 
 [lib]: lib/README.md
 [processing]: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot/processing

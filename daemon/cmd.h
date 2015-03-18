@@ -14,20 +14,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lib/module.h"
+#pragma once
 
-/*
- * Mock module implementation.
- */
+#include <uv.h>
+#include "daemon/worker.h"
 
-int mock_cmodule_init(struct kr_module *module)
-{
-	return kr_ok();
-}
-
-int mock_cmodule_deinit(struct kr_module *module)
-{
-	return kr_ok();
-}
-
-KR_MODULE_EXPORT(mock_cmodule)
+int cmd_exec(struct worker_ctx *worker, char *cmd);

@@ -7,18 +7,43 @@
 #include "lib/utils.h"
 #include "lib/module.h"
 
-/*! \brief Library extension. */
-static inline const char *library_ext(void)
-{
+/** Library extension. */
 #if defined(__APPLE__)
-	return ".dylib";
+ #define LIBEXT ".dylib"
 #elif _WIN32
-	return ".lib";
+ #define LIBEXT ".lib"
 #else
-	return ".so";
-#endif	
-}
+ #define LIBEXT ".so"
+#endif
 
+/** Check ABI version, return error on mismatch. */
+#define ABI_CHECK(m, prefix, symname, required) do { \
+	if ((m)->lib != RTLD_DEFAULT) { \
+	 	module_api_cb *_api = NULL; \
+	 	*(void **) (&_api) = load_symbol((m)->lib, (prefix), (symname)); \
+	 	if (_api == NULL) { \
+	 		return kr_error(ENOENT); \
+	 	} \
+	 	if (_api() != (required)) { \
+	 		return kr_error(ENOTSUP); \
+	 	} \
+ 	}\
+ } while (0)
+
+/** Load ABI by symbol names. */ 
+#define ABI_LOAD(m, prefix, s_init, s_deinit, s_config, s_layer, s_prop) do { \
+ 	module_prop_cb *module_prop = NULL; \
+	*(void **) (&(m)->init)   = load_symbol((m)->lib, (prefix), (s_init)); \
+	*(void **) (&(m)->deinit) = load_symbol((m)->lib, (prefix), (s_deinit)); \
+	*(void **) (&(m)->config) = load_symbol((m)->lib, (prefix), (s_config)); \
+	*(void **) (&(m)->layer)  = load_symbol((m)->lib, (prefix), (s_layer)); \
+	*(void **) (&module_prop) = load_symbol((m)->lib, (prefix), (s_prop)); \
+	if (module_prop != NULL) { \
+		(m)->props = module_prop(); \
+	} \
+} while(0)
+
+/** Load prefixed symbol. */
 static void *load_symbol(void *lib, const char *prefix, const char *name)
 {
 	auto_free char *symbol = kr_strcatdup(2, prefix, name);
@@ -27,12 +52,12 @@ static void *load_symbol(void *lib, const char *prefix, const char *name)
 
 static int load_library(struct kr_module *module, const char *name, const char *path)
 {
-	const char *ext = library_ext();
+	/* Absolute or relative path (then only library search path is used). */
 	auto_free char *lib_path = NULL;
 	if (path != NULL) {
-		lib_path = kr_strcatdup(4, path, "/", name, ext);
+		lib_path = kr_strcatdup(4, path, "/", name, LIBEXT);
 	} else {
-		lib_path = kr_strcatdup(2, name, ext);
+		lib_path = kr_strcatdup(2, name, LIBEXT);
 	}
 	if (lib_path == NULL) {
 		return kr_error(ENOMEM);
@@ -48,6 +73,16 @@ static int load_library(struct kr_module *module, const char *name, const char *
 	return kr_error(ENOENT);
 }
 
+/** Load C module symbols. */
+static int load_sym_c(struct kr_module *module, uint32_t api_required)
+{
+ 	auto_free char *module_prefix = kr_strcatdup(2, module->name, "_");
+ 	ABI_CHECK(module, module_prefix, "api", api_required);
+ 	ABI_LOAD(module, module_prefix, "init", "deinit", "config", "layer", "props");
+	return kr_ok();
+}
+
+/** Bootstrap Go runtime from module. */
 static int bootstrap_libgo(struct kr_module *module)
 {
 	/* Check if linked against compatible libgo */
@@ -79,8 +114,8 @@ static int bootstrap_libgo(struct kr_module *module)
 	return kr_ok();
 }
 
-
-static int load_libgo(struct kr_module *module, module_api_cb **module_api)
+/** Load Go module symbols. */ 
+static int load_ffi_go(struct kr_module *module, uint32_t api_required)
 {
 	/* Bootstrap libgo */
 	int ret = bootstrap_libgo(module);
@@ -90,13 +125,8 @@ static int load_libgo(struct kr_module *module, module_api_cb **module_api)
 
 	/* Enforced prefix for now. */
 	const char *module_prefix = "main.";
-	
-	*(void **) (module_api)      = load_symbol(module->lib, module_prefix, "Api");
-	*(void **) (&module->init)   = load_symbol(module->lib, module_prefix, "Init");
-	*(void **) (&module->deinit) = load_symbol(module->lib, module_prefix, "Deinit");
-	*(void **) (&module->config) = load_symbol(module->lib, module_prefix, "Config");
-	*(void **) (&module->layer)  = load_symbol(module->lib, module_prefix, "Layer");
-
+	ABI_CHECK(module, module_prefix, "Api", api_required);
+	ABI_LOAD(module, module_prefix, "Init", "Deinit", "Config", "Layer", "Props");
 	return kr_ok();
 }
 
@@ -106,51 +136,40 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 		return kr_error(EINVAL);
 	}
 
-	/* Search for module library. */
+	/* Initialize. */
 	memset(module, 0, sizeof(struct kr_module));
+	module->name = strdup(name);
+	if (module->name == NULL) {
+		return kr_error(ENOMEM);
+	}
+
+	/* Search for module library, use current namespace if not found. */
 	if (load_library(module, name, path) != 0) {
 		/* Expand HOME env variable, as the linker may not expand it. */
 		auto_free char *local_path = kr_strcatdup(2, getenv("HOME"), "/.local" MODULEDIR);
 		if (load_library(module, name, local_path) != 0) {
-			if (load_library(module, name, PREFIX MODULEDIR) != 0) {	
+			if (load_library(module, name, PREFIX MODULEDIR) != 0) {
+				module->lib = RTLD_DEFAULT;	
 			}
 		}
 	}
 
-	/* It's okay if it fails, then current exec space is searched. */
-	if (module->lib == NULL) {
-		module->lib = RTLD_DEFAULT;
+	/* Try to load module ABI. */
+	int ret = load_sym_c(module, KR_MODULE_API);
+	if (ret != 0 && module->lib != RTLD_DEFAULT) {
+		ret = load_ffi_go(module, KR_MODULE_API);
 	}
 
-	/* Load all symbols. */
- 	auto_free char *module_prefix = kr_strcatdup(2, name, "_");	
-	*(void **) (&module->init)   = load_symbol(module->lib, module_prefix, "init");
-	*(void **) (&module->deinit) = load_symbol(module->lib, module_prefix, "deinit");
-	*(void **) (&module->config) = load_symbol(module->lib, module_prefix, "config");
-	*(void **) (&module->layer)  = load_symbol(module->lib, module_prefix, "layer");
-	module_api_cb *module_api = NULL;
-	*(void **) (&module_api) = load_symbol(module->lib, module_prefix, "api");
-
-	/* No API version, try loading it as Go module. */
-	if (module->lib != RTLD_DEFAULT && module_api == NULL) {
-		(void) load_libgo(module, &module_api);
+	/* Module constructor. */
+	if (ret == 0 && module->init) {
+		ret = module->init(module);
 	}
-
-	/* Check module API version (if declared). */
-	if (module_api == NULL) {
+	if (ret != 0) {
 		kr_module_unload(module);
-		return kr_error(KNOT_ENOENT);
-	} else if (module_api() != KR_MODULE_API) {
-		kr_module_unload(module);
-		return kr_error(ENOTSUP);
 	}
 
-	/* Initialize module */
-	if (module->init) {
-		module->init(module);
-	}
 
-	return kr_ok();
+	return ret;
 }
 
 void kr_module_unload(struct kr_module *module)
@@ -158,6 +177,8 @@ void kr_module_unload(struct kr_module *module)
 	if (module == NULL) {
 		return;
 	}
+
+	free(module->name);
 
 	if (module->deinit) {
 		module->deinit(module);
