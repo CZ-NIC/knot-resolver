@@ -211,7 +211,7 @@ Now we can add the implementations for the `Begin` and `Finish` functions, and f
 ```go
 func Begin(ctx *C.knot_layer_t, param unsafe.Pointer) C.int {
 	// Save the context
-	ctx->data = param
+	ctx.data = param
 	return 0
 }
 
