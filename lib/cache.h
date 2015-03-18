@@ -34,7 +34,7 @@ struct kr_cache_rrset
  * @param handle Path to existing directory where the DB should be created.
  * @param mm Memory context.
  * @param maxsize Maximum database size (bytes)
- * \return database instance or NULL
+ * @return database instance or NULL
  */
 namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize);
 
@@ -51,7 +51,7 @@ void kr_cache_close(namedb_t *cache);
  * @param cache database instance
  * @param txn transaction instance to be initialized (output)
  * @param flags transaction flags (see namedb.h in libknot)
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_cache_txn_begin(namedb_t *cache, namedb_txn_t *txn, unsigned flags);
 
@@ -59,7 +59,7 @@ int kr_cache_txn_begin(namedb_t *cache, namedb_txn_t *txn, unsigned flags);
 /**
  * Commit existing transaction.
  * @param txn transaction instance
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_cache_txn_commit(namedb_txn_t *txn);
 
@@ -75,7 +75,7 @@ void kr_cache_txn_abort(namedb_txn_t *txn);
  * @param txn transaction instance
  * @param rr query RRSet (its rdataset may be changed depending on the result)
  * @param timestamp current time (will be replaced with drift if successful)
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp);
 
@@ -84,7 +84,7 @@ int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp);
  * @param src read-only RRSet (its rdataset may be changed depending on the result)
  * @param drift time passed between cache time and now
  * @param mm memory context
- * \return materialized (or empty) RRSet
+ * @return materialized (or empty) RRSet
  */
 knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm);
 
@@ -93,7 +93,7 @@ knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ct
  * @param txn transaction instance
  * @param rr inserted RRSet
  * @param timestamp current time
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestamp);
 
@@ -101,14 +101,14 @@ int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestam
  * Remove RRSet from cache.
  * @param txn transaction instance
  * @param rr removed RRSet
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr);
 
 /**
  * Clear all items from the cache.
  * @param txn transaction instance
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_cache_clear(namedb_txn_t *txn);
 
@@ -116,7 +116,7 @@ int kr_cache_clear(namedb_txn_t *txn);
  * Clear aged items from the database.
  * @param txn transaction instance
  * @param timestamp current time
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_cache_prune(namedb_txn_t *txn, uint32_t timestamp);
 

@@ -577,7 +577,7 @@ getdns_return_t getdns_dict_get_int(
 /**
  * Get textual representation of a dictionary.
  *
- * \return Dictionary in printable format. Deallocate with \c free.
+ * @return Dictionary in printable format. Deallocate with \c free.
  */
 char *getdns_pretty_print_dict(const getdns_dict *some_dict);
 
@@ -649,7 +649,7 @@ getdns_return_t getdns_cancel_callback(
  *                             NULL, set to zero on error).
  * @param[in]  callbackfn      Callback function to process the result.
  *
- * \return Error code.
+ * @return Error code.
  * \retval GETDNS_RETURN_GOOD                 The call was properly formatted.
  * \retval GETDNS_RETURN_BAD_DOMAIN_NAME      The domain name is invalid.
  * \retval GETDNS_RETURN_BAD_CONTEXT          The context is invalid.
@@ -842,7 +842,7 @@ char *getdns_convert_alabel_to_ulabel(const char  *alabel);
 /**
  * Convert binary IP address to nicely-formatted text representation.
  *
- * \return IP address in presentation format (deallocate with \c free).
+ * @return IP address in presentation format (deallocate with \c free).
  */
 char *getdns_display_ip_address(
 	const getdns_bindata *bindata_of_ipv4_or_ipv6_address
@@ -873,6 +873,6 @@ getdns_return_t getdns_validate_dnssec(
  *
  * @param[out] utc_data_of_anchor  Time of obtaining the trust anchor.
  *
- * \return Root trust anchor, NULL if no default trust anchor exists.
+ * @return Root trust anchor, NULL if no default trust anchor exists.
  */
 getdns_list *getdns_root_trust_anchor(time_t *utc_date_of_anchor);

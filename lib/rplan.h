@@ -81,7 +81,7 @@ void kr_rplan_deinit(struct kr_rplan *rplan);
 /**
  * Return true if the resolution plan is empty (i.e. finished or initialized)
  * @param rplan plan instance
- * \return true or false
+ * @return true or false
  */
 bool kr_rplan_empty(struct kr_rplan *rplan);
 
@@ -91,14 +91,14 @@ bool kr_rplan_empty(struct kr_rplan *rplan);
  *       may be promoted to write-enabled transactions if requested, but never demoted.
  * @param rplan plan instance
  * @param flags transaction flags
- * \return transaction instance or NULL
+ * @return transaction instance or NULL
  */
 namedb_txn_t *kr_rplan_txn_acquire(struct kr_rplan *rplan, unsigned flags);
 
 /**
  * Commit any existing transaction, read-only transactions may be just aborted.
  * @param rplan plan instance
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_rplan_txn_commit(struct kr_rplan *rplan);
 
@@ -110,7 +110,7 @@ int kr_rplan_txn_commit(struct kr_rplan *rplan);
  * @param name resolved name
  * @param cls  resolved class
  * @param type resolved type
- * \return query instance or NULL
+ * @return query instance or NULL
  */
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type);
@@ -120,14 +120,14 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
  * @note Popped queries are not discarded, but moved to the resolved list.
  * @param rplan plan instance
  * @param qry resolved query
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry);
 
 /**
  * Currently resolved query (at the top).
  * @param rplan plan instance
- * \return query instance or NULL if empty
+ * @return query instance or NULL if empty
  */
 struct kr_query *kr_rplan_current(struct kr_rplan *rplan);
 

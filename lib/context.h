@@ -44,14 +44,14 @@ struct kr_context
  * Initialize query resolution context.
  * @param ctx context to be initialized
  * @param mm memory context
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_context_init(struct kr_context *ctx, mm_ctx_t *mm);
 
 /**
  * Deinitialize query resolution context.
  * @param ctx context to be deinitialized
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_context_deinit(struct kr_context *ctx);
 
@@ -59,6 +59,6 @@ int kr_context_deinit(struct kr_context *ctx);
  * Register module to context.
  * @param ctx context
  * @param module_name
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_context_register(struct kr_context *ctx, const char *module_name);

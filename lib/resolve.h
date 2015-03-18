@@ -27,7 +27,7 @@
  * @param qname resolved query name
  * @param qclass resolved query class
  * @param qtype resolved query type
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
                const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);

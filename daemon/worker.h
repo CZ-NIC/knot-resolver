@@ -33,7 +33,7 @@ struct worker_ctx {
  * Initialize worker context.
  * @param worker
  * @param mm
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int worker_init(struct worker_ctx *worker, mm_ctx_t *mm);
 
@@ -48,6 +48,6 @@ void worker_deinit(struct worker_ctx *worker);
  * @param worker
  * @param answer
  * @param query
- * \return KNOT_E*
+ * @return KNOT_E*
  */
 int worker_exec(struct worker_ctx *worker, knot_pkt_t *answer, knot_pkt_t *query);
