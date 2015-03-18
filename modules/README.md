@@ -283,7 +283,7 @@ $ kresolved
 [system] started in interactive mode, type 'help'
 > load cached
 > cached.cached_size
-{ "cache_size": 53 }
+{ "size": 53 }
 ```
 
 *Note* &mdash; this relies on function pointers, so the same `static inline` trick as for the `Layer()` is required for C/Go.
