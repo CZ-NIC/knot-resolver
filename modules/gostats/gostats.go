@@ -31,7 +31,7 @@ func Deinit(module *C.struct_kr_module) C.int {
 }
 
 func Begin(ctx *C.knot_layer_t, param unsafe.Pointer) C.int {
-	ctx->data = param
+	ctx.data = param
 	return 0
 }
 

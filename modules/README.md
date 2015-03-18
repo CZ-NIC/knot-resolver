@@ -255,7 +255,7 @@ static char* cached_size(struct kr_context *ctx, struct kr_module *module, const
     }
 
     /* For the sake of brevity... */
-    asprintf(&result, "{ "cache_size": %d }\n", kr_cache_count(&txn));
+    asprintf(&result, "{ \"size\": %d }\n", kr_cache_count(&txn));
 
     kr_cache_txn_abort(&txn);
     return result;
@@ -265,7 +265,7 @@ struct kr_prop *cached_props(void)
 {
 	static struct kr_prop prop_list[] = {
 		/* Callback,   Name,   Description */
-		{ &cache_size, "size", "Return number of cached records.", },
+		{ &cached_size, "size", "Return number of cached records.", },
 		{ NULL, NULL, NULL }
 	};
 	return prop_list;
@@ -280,6 +280,7 @@ Once you load the module, you can call the module property from the interactive 
 ```sh
 $ kresolved
 ...
+[system] started in interactive mode, type 'help'
 > load cached
 > cached.cached_size
 { "cache_size": 53 }
