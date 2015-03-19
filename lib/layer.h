@@ -16,6 +16,10 @@
 
 #pragma once
 
+/** \addtogroup modules
+ * @{ 
+ */
+
 #include <libknot/processing/layer.h>
 #include <libknot/packet/pkt.h>
 
@@ -44,3 +48,4 @@ struct kr_layer_param {
  #define QRDEBUG(query, cls, fmt, ...)
 #endif
 
+/** @} */

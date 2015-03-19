@@ -14,6 +14,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** \addtogroup nameservers
+ * @{ 
+ */
+
 #pragma once
 
 #include "lib/layer.h"
@@ -29,3 +33,5 @@ enum kr_ns_score {
  * @return enum kr_ns_score or higher positive value
  */
 int kr_nsrep_score(const knot_dname_t *ns, struct kr_layer_param *param);
+
+/** @} */

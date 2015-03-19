@@ -19,3 +19,18 @@ right now.
 	$ ./daemon/kresolved -a 127.0.0.1#53
 
 .. _libuv: https://github.com/libuv/libuv
+
+Interacting with the daemon
+---------------------------
+
+The daemon features a CLI interface if launched interactively, type ``help`` to see the list of available commands.
+You can load modules this way and use their properties to get information about statistics and such.
+
+.. code-block:: bash
+
+	$ kresolved
+	...
+	[system] started in interactive mode, type 'help'
+	> load cached
+	> cached.cached_size
+	{ "size": 53 }

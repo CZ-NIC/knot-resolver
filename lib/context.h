@@ -22,6 +22,10 @@
 #include "lib/module.h"
 #include "lib/cache.h"
 
+/** \addtogroup resolution
+ * @{ 
+ */
+
 /**
  * Name resolution context.
  *
@@ -62,3 +66,5 @@ int kr_context_deinit(struct kr_context *ctx);
  * @return KNOT_E*
  */
 int kr_context_register(struct kr_context *ctx, const char *module_name);
+
+/** @} */
