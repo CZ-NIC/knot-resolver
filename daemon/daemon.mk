@@ -12,3 +12,8 @@ kresolved_LIBS := $(libkresolve_TARGET) $(libknot_LIBS) $(libuv_LIBS)
 
 # Make binary
 $(eval $(call make_bin,kresolved,daemon))
+
+# Targets
+daemon: kresolved
+daemon-install: kresolved-install
+daemon-clean: kresolved-clean

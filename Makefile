@@ -2,10 +2,10 @@ include config.mk
 include platform.mk
 
 # Targets
-all: info libkresolve modules kresolved
-install: libkresolve-install modules-install kresolved-install
+all: info lib modules daemon
+install: lib-install modules-install daemon-install
 check: all tests
-clean: libkresolve-clean modules-clean kresolved-clean tests-clean doc-clean
+clean: lib-clean modules-clean daemon-clean tests-clean doc-clean
 doc: doc-html
 .PHONY: all install check clean doc
 
@@ -26,8 +26,8 @@ CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS)
 
 # Sub-targets
 include help.mk
-include lib/libkresolve.mk
-include daemon/kresolved.mk
+include lib/lib.mk
+include daemon/daemon.mk
 include modules/modules.mk
 include tests/tests.mk
 include doc/doc.mk
