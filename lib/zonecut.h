@@ -14,6 +14,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** \addtogroup rplan
+ * @{ 
+ */
+
 #pragma once
 
 #include <libknot/dname.h>
@@ -68,3 +72,4 @@ int kr_set_zone_cut_addr(struct kr_zonecut *cut, const knot_rrset_t *rr, uint16_
  */
 int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp);
 
+/** @} */

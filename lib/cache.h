@@ -14,6 +14,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** \addtogroup cache
+ * @{ 
+ */
 #pragma once
 
 #include <libknot/rrset.h>
@@ -120,3 +123,4 @@ int kr_cache_clear(namedb_txn_t *txn);
  */
 int kr_cache_prune(namedb_txn_t *txn, uint32_t timestamp);
 
+/** @} */

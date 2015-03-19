@@ -14,6 +14,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** \addtogroup resolution
+ * @{ 
+ */
+
 #pragma once
 
 #include <libknot/packet/pkt.h>
@@ -31,3 +35,5 @@
  */
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
                const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);
+
+/** @} */

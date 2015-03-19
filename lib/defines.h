@@ -14,6 +14,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** \addtogroup resolution
+ * @{ 
+ */
+
 #pragma once
 
 #include <errno.h>
@@ -45,3 +49,5 @@
 #define KR_DNAME_ROOT ((const knot_dname_t*)"")
 #define KR_EDNS_VERSION 0
 #define KR_EDNS_PAYLOAD 4096
+
+/** @} */
