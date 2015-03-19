@@ -29,19 +29,23 @@ the `Docker images`.
    :header: "Requirement", "Required by", "Notes"
 
    "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
+   "`pkg-config`_", "*all*", "*(build only [*]_ )*"
    "C compiler", "*all*", "*(build only)* [*]_ )"
    "libknot_ 2.0+", "*all*", "Knot DNS library."
 
 .. csv-table:: Optional requirements.
    :header: "Requirement", "Required by", "Notes"
 
-   "`pkg-config`_", "*all*", "*(build only, optional)*"
    "libuv_ 1.0+", "``daemon``", "Multiplatform I/O and services."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Python_", "``integration tests``", "For scripting tests, C header files are required (``python-dev``)"
-   "GCCGO_",  "``Go modules``", "For building Go modules, see modules documentation."
+   "GCCGO_",  "``modules/go``", "For building Go modules, see modules documentation."
+   "Doxygen_", "``documentation``", "Generating API documentation."
+   "Sphinx_", "``documentation``", "Building this HTML/PDF documentation."
+   "breathe_", "``documentation``", "Interfacing Doxygen API documentation to Sphinx HTML/PDF documentation."
 
 .. [*] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
+.. [*] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
 
 Docker image
 ~~~~~~~~~~~~
@@ -52,7 +56,7 @@ Docker images require only either Linux or a Linux VM (see boot2docker_ on OS X)
 
 	$ docker run cznic/knot-resolver
 
-See the build page https://registry.hub.docker.com/u/cznic/knot-resolver for more information and options.
+See the `Docker images`_ page for more information and options.
 You can hack on the container by changing the container entrypoint to shell like:
 
 .. code-block:: bash
@@ -78,7 +82,14 @@ Usually you only really need to rebuild `libknot`.
 	$ export BUILD_IGNORE="..." # Ignore installed dependencies
 	$ ./scripts/bootstrap-depends.sh ${FAKEROOT}
 
-Now you can build, test and install.
+The build system depends on `pkg-config`_ to find dependencies, but you can ignore it and force custom versions
+of the software by environment variables.
+
+.. code-block:: bash
+
+	$ make info libknot_CFLAGS="-I/opt/include" libknot_LIBS="-L/opt/lib -lknot -lknot-int -ldnssec"
+
+When you have all the dependencies ready, you can build, test and install.
 
 .. code-block:: bash
 
@@ -86,18 +97,21 @@ Now you can build, test and install.
 	$ make check
 	$ make install
 
-Alternatively you can build only specific parts of the project, i.e. ``library``:
+Alternatively you can build only specific parts of the project, i.e. ``library``.
 
 .. code-block:: bash
 	$ make lib
 	$ make lib-install
 
-.. _Docker images: https://registry.hub.docker.com/u/cznic/knot-resolver/
+.. _Docker images: https://registry.hub.docker.com/u/cznic/knot-resolver
 .. _libuv: https://github.com/libuv/libuv
 .. _MSVC: https://msdn.microsoft.com/en-us/vstudio/hh386302.aspx
 .. _MinGW: http://www.mingw.org/
 .. _Dockerfile: https://registry.hub.docker.com/u/cznic/knot-resolver/dockerfile/
 
+.. _Doxygen: http://www.stack.nl/~dimitri/doxygen/manual/index.html
+.. _breathe: https://github.com/michaeljones/breathe
+.. _Sphinx: http://sphinx-doc.org/
 .. _GNU Make: http://www.gnu.org/software/make/
 .. _pkg-config: http://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot
