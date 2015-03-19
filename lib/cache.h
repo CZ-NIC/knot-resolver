@@ -32,6 +32,9 @@ struct kr_cache_rrset
 	uint8_t  data[];
 };
 
+/** Used storage API for cache (default LMDB) */
+extern const namedb_api_t *(*kr_cache_storage)(void);
+
 /**
  * Open/create persistent cache in given path.
  * @param handle Path to existing directory where the DB should be created.
@@ -114,13 +117,5 @@ int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr);
  * @return KNOT_E*
  */
 int kr_cache_clear(namedb_txn_t *txn);
-
-/**
- * Clear aged items from the database.
- * @param txn transaction instance
- * @param timestamp current time
- * @return KNOT_E*
- */
-int kr_cache_prune(namedb_txn_t *txn, uint32_t timestamp);
 
 /** @} */
