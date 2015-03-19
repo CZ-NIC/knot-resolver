@@ -13,7 +13,6 @@ info:
 	$(info --------)
 	$(info [$(HAS_doxygen)] API documentation (doxygen))
 	$(info [$(HAS_libknot)] library (libknot))
-	$(info [$(HAS_libknot-int)] library (libknot-int))
 	$(info [$(HAS_libuv)] daemon (libuv))
 	$(info [$(HAS_cmocka)] unit tests (libcmocka))
 	$(info [$(HAS_python)] integration tests (libpython))
