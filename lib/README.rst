@@ -9,16 +9,15 @@ Requirements
 Overview
 --------
 
-Resolution plan
+Resolving a name
+~~~~~~~~~~~~~~~~
+
+.. note:: Migrating from ``getaddrinfo``
+
+Using cache
+~~~~~~~~~~~
+
+Loading modules
 ~~~~~~~~~~~~~~~
-
-Cache
-~~~~~
-
-Reputation
-~~~~~~~~~~
-
-Modules
-~~~~~~~
 
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot
