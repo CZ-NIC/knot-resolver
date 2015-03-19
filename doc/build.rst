@@ -24,7 +24,7 @@ Requirements
 
 The following is a list of software required to build Knot DNS Resolver from sources.
 
-.. csv-table:: Mandatory requirements.
+.. csv-table::
    :header: "Requirement", "Required by", "Notes"
 
    "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
@@ -32,9 +32,9 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "C compiler", "*all*", "*(build only)* [#]_"
    "libknot_ 2.0+", "*all*", "Knot DNS library."
 
-There are optional package that enable specific functionality in Knot DNS Resolver.
+There are also *optional* packages that enable specific functionality in Knot DNS Resolver, apart from the `libuv_` and `GCCGO`_, they are useful mainly for developers to build documentation and tests.
 
-.. csv-table:: Optional requirements.
+.. csv-table::
    :header: "Requirement", "Required by", "Notes"
 
    "libuv_ 1.0+", "``daemon``", "Multiplatform I/O and services."
