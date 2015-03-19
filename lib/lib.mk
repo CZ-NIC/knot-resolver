@@ -28,3 +28,8 @@ libkresolve_TARGET := -Wl,-rpath,lib -Llib -lkresolve
 
 # Make library
 $(eval $(call make_lib,libkresolve,lib))
+
+# Targets
+lib: libkresolve
+lib-install: libkresolve-install
+lib-clean: libkresolve-clean
