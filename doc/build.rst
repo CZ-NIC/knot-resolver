@@ -22,8 +22,7 @@ Platform considerations
 Requirements
 ------------
 
-The following is a list of software required to build Knot DNS Resolver, alternatively you can use
-the `Docker images`.
+The following is a list of software required to build Knot DNS Resolver from sources.
 
 .. csv-table:: Mandatory requirements.
    :header: "Requirement", "Required by", "Notes"
@@ -32,6 +31,8 @@ the `Docker images`.
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "C compiler", "*all*", "*(build only)* [#]_"
    "libknot_ 2.0+", "*all*", "Knot DNS library."
+
+There are optional package that enable specific functionality in Knot DNS Resolver.
 
 .. csv-table:: Optional requirements.
    :header: "Requirement", "Required by", "Notes"

@@ -10,35 +10,38 @@ you an idea about the API and the library layout.
 Name resolution
 ~~~~~~~~~~~~~~~
 
-.. doxygengroup:: resolution
-   :project: libkresolve
-
 Resolution plan
 ~~~~~~~~~~~~~~~
-
-.. doxygengroup:: rplan
-   :project: libkresolve
 
 Cache
 ~~~~~
 
-.. doxygengroup:: cache
-   :project: libkresolve
-
 Nameservers
 ~~~~~~~~~~~
-
-.. doxygengroup:: nameservers
-   :project: libkresolve
 
 Modules
 ~~~~~~~
 
-.. doxygengroup:: modules
-   :project: libkresolve
-
 Utilities
 ~~~~~~~~~
+
+API reference
+-------------
+
+.. doxygengroup:: resolution
+   :project: libkresolve
+
+.. doxygengroup:: rplan
+   :project: libkresolve
+
+.. doxygengroup:: cache
+   :project: libkresolve
+
+.. doxygengroup:: nameservers
+   :project: libkresolve
+
+.. doxygengroup:: modules
+   :project: libkresolve
 
 .. doxygengroup:: utils
    :project: libkresolve
