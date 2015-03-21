@@ -8,7 +8,7 @@ if os.environ.get('READTHEDOCS', None) == 'True':
   subprocess.call('doxygen')
 
 # Add any Sphinx extension module names here, as strings.
-extensions = ['sphinx.ext.todo', 'breathe']
+extensions = ['sphinx.ext.todo', 'sphinx.ext.viewcode', 'breathe']
 
 # Breathe configuration
 breathe_projects = { "libkresolve": "doxyxml" }
