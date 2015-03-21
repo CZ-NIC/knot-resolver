@@ -1,3 +1,5 @@
+.. _lib_index:
+
 .. include:: ../lib/README.rst
 
 Library layout
@@ -10,14 +12,22 @@ you an idea about the API and the library layout.
 Name resolution
 ~~~~~~~~~~~~~~~
 
+.. _lib_rplan:
+
 Resolution plan
 ~~~~~~~~~~~~~~~
+
+.. _lib_cache:
 
 Cache
 ~~~~~
 
+.. _lib_nameservers:
+
 Nameservers
 ~~~~~~~~~~~
+
+.. _lib_modules:
 
 Modules
 ~~~~~~~
@@ -25,11 +35,15 @@ Modules
 Utilities
 ~~~~~~~~~
 
+.. _lib_api:
+
 API reference
 -------------
 
 .. doxygengroup:: resolution
    :project: libkresolve
+
+.. _lib_api_rplan:
 
 .. doxygengroup:: rplan
    :project: libkresolve

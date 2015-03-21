@@ -39,7 +39,7 @@
  * Return number of cached records.
  *
  * Input:  N/A
- * Output: { result: [int] size }
+ * Output: { size: int }
  * 
  */
 static char* get_size(struct kr_context *ctx, struct kr_module *module, const char *args)
@@ -51,7 +51,7 @@ static char* get_size(struct kr_context *ctx, struct kr_module *module, const ch
 	namedb_txn_t txn;
 	int ret = kr_cache_txn_begin(ctx->cache, &txn, NAMEDB_RDONLY);
 	if (ret == 0) {
-		asprintf(&result, "{ \"result\": %d }", storage->count(&txn));
+		asprintf(&result, "{ \"size\": %d }", storage->count(&txn));
 		kr_cache_txn_abort(&txn);
 	}
 	
@@ -80,7 +80,7 @@ static int is_expired(struct kr_cache_rrset *rr, uint32_t drift)
  * Prune expired/invalid records.
  *
  * Input:  N/A
- * Output: { result: [int] nr_pruned }
+ * Output: { pruned: int }
  * 
  */
 static char* prune(struct kr_context *ctx, struct kr_module *module, const char *args)
@@ -116,9 +116,9 @@ static char* prune(struct kr_context *ctx, struct kr_module *module, const char 
 	/* Commit and format result. */
 	char *result = NULL;
 	if (kr_cache_txn_commit(&txn) != 0) {
-		asprintf(&result, "{ \"result\": %d, \"error\": \"%s\" }", pruned, knot_strerror(ret));
+		asprintf(&result, "{ \"pruned\": %d, \"error\": \"%s\" }", pruned, knot_strerror(ret));
 	} else {
-		asprintf(&result, "{ \"result\": %d }", pruned);
+		asprintf(&result, "{ \"pruned\": %d }", pruned);
 	}
 	
 	return result;
@@ -128,7 +128,7 @@ static char* prune(struct kr_context *ctx, struct kr_module *module, const char 
  * Clear all records.
  *
  * Input:  N/A
- * Output: { result: [bool] success }
+ * Output: { result: bool }
  * 
  */
 static char* clear(struct kr_context *ctx, struct kr_module *module, const char *args)

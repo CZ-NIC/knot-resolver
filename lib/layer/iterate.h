@@ -32,3 +32,6 @@ int rr_update_parent(const knot_rrset_t *rr, unsigned hint, struct kr_layer_para
  * @note When \a hint is KNOT_PF_FREE, RR is treated as a copy and answer takes its ownership.
  */
 int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param);
+
+/* Processing module implementation. */
+const knot_layer_api_t *iterate_layer(void);

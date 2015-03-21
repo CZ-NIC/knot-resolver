@@ -16,7 +16,7 @@
 
 #pragma once
 
-/** \addtogroup modules
+/** \addtogroup rplan
  * @{ 
  */
 
@@ -37,8 +37,8 @@ struct kr_layer_param {
 	knot_pkt_t *answer;
 };
 
-/** \internal Print a debug message related to resolution. */
 #ifndef NDEBUG
+/** @internal Print a debug message related to resolution. */
  #define QRDEBUG(query, cls, fmt, ...) do { \
     unsigned _ind = 0; \
     for (struct kr_query *q = (query); q; q = q->parent, _ind += 2); \
