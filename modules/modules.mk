@@ -1,5 +1,6 @@
 # List of built-in modules
-modules_TARGETS := hints
+modules_TARGETS := hints \
+                   cachectl
 
 # List of Golang modules
 $(eval $(call find_bin,gccgo))

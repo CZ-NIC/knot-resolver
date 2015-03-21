@@ -28,7 +28,9 @@
 #include "lib/cache.h"
 #include "lib/defines.h"
 
-#define db_api namedb_lmdb_api()
+/** Used cache storage engine (default LMDB) */
+const namedb_api_t *(*kr_cache_storage)(void) = namedb_lmdb_api;
+#define db_api kr_cache_storage()
 
 namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize)
 {
@@ -231,23 +233,4 @@ int kr_cache_clear(namedb_txn_t *txn)
 	}
 
 	return db_api->clear(txn);
-}
-
-int kr_cache_prune(namedb_txn_t *txn, uint32_t timestamp)
-{
-	/* Whole cache sweep is not feasible as we don't have a list of items sorted
-	 * by age nor any sort of LRU/MRU, completely random replace is not possible
-	 * as well.
-	 * - The LMDB also can't delete items when the MAPSIZE is reached.
-	 * - So we're probably need to iteratively scan the LMDB and prune aged
-	 *   items.
-	 * - This is not ideal, because queries won't be able to write to cache
-	 *   until at least some entry ages out.
-	 * - Idea - make poor man's LRU with two databases doing following:
-	 *   - Fill up 1, mark that it's unwritable
-	 *   - Fill up 2, mark that it's unwritable
-	 *   - Clear 1, all writes will now go in there
-	 *   - This gives us LR(written) with resolution 2
-	 */
-	return KNOT_EOK;
 }
