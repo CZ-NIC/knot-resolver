@@ -2,9 +2,15 @@ kresolved_SOURCES := \
 	daemon/layer/query.c \
 	daemon/udp.c         \
 	daemon/tcp.c         \
-	daemon/cmd.c         \
+	daemon/engine.c      \
 	daemon/worker.c      \
 	daemon/main.c
+
+# Embed resources
+daemon/engine.o: daemon/lua/init.inc
+%.inc: %.lua
+	@$(call quiet,XXD,$<) -i < $< > $@
+	@echo ', 0x00' >> $@
 
 # Dependencies
 kresolved_DEPEND := $(libkresolve)
@@ -19,4 +25,6 @@ endif
 daemon: $(kresolved)
 daemon-install: kresolved-install
 daemon-clean: kresolved-clean
+	@$(RM) daemon/lua/*.inc
+
 .PHONY: daemon daemon-install daemon-clean

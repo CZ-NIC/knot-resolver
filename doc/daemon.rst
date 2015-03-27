@@ -28,9 +28,9 @@ You can load modules this way and use their properties to get information about 
 
 .. code-block:: bash
 
-	$ kresolved
+	$ kresolved /var/run/knot-resolver
 	...
-	[system] started in interactive mode, type 'help'
-	> load cached
-	> cached.cached_size
+	[system] started in interactive mode, type 'help()'
+	> module.load('cachectl')
+	> return cachectl.size()
 	{ "size": 53 }

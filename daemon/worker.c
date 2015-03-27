@@ -18,71 +18,28 @@
 
 #include <libknot/packet/pkt.h>
 #include <libknot/internal/net.h>
-#include <libknot/errcode.h>
 
 #include "daemon/worker.h"
+#include "daemon/engine.h"
 #include "daemon/layer/query.h"
-
-/* Defines */
-#define CACHE_DEFAULT_SIZE 10*1024*1024
-
-int worker_init(struct worker_ctx *worker, mm_ctx_t *mm)
-{
-	if (worker == NULL) {
-		return KNOT_EINVAL;
-	}
-
-	memset(worker, 0, sizeof(struct worker_ctx));
-	worker->pool = mm;
-
-	/* Open resolution context */
-	int ret = kr_context_init(&worker->resolve, mm);
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
-
-	/* Open resolution context cache */
-	worker->resolve.cache = kr_cache_open("/tmp/kresolved", mm, CACHE_DEFAULT_SIZE);
-	if (worker->resolve.cache == NULL) {
-		fprintf(stderr, "Cache directory '/tmp/kresolved' not exists, exiting.\n");
-		kr_context_deinit(&worker->resolve);
-		return KNOT_ERROR;
-	}
-
-	/* Load basic modules */
-	kr_context_register(&worker->resolve, "iterate");
-	kr_context_register(&worker->resolve, "itercache");
-	kr_context_register(&worker->resolve, "hints");
-
-	return KNOT_EOK;
-}
-
-void worker_deinit(struct worker_ctx *worker)
-{
-	if (worker == NULL) {
-		return;
-	}
-
-	kr_context_deinit(&worker->resolve);
-}
 
 int worker_exec(struct worker_ctx *worker, knot_pkt_t *answer, knot_pkt_t *query)
 {
 	if (worker == NULL) {
-		return KNOT_EINVAL;
+		return kr_error(EINVAL);
 	}
 
 	/* Parse query packet. */
 	int ret = knot_pkt_parse(query, 0);
 	if (ret != KNOT_EOK) {
-		return ret; /* Ignore malformed query. */
+		return kr_error(EPROTO); /* Ignore malformed query. */
 	}
 
 	/* Process query packet. */
 	knot_layer_t proc;
 	memset(&proc, 0, sizeof(knot_layer_t));
-	proc.mm = worker->pool;
-	knot_layer_begin(&proc, LAYER_QUERY, &worker->resolve);
+	proc.mm = worker->mm;
+	knot_layer_begin(&proc, LAYER_QUERY, &worker->engine->resolver);
 	int state = knot_layer_consume(&proc, query);
 
 	/* Build an answer. */
@@ -94,5 +51,5 @@ int worker_exec(struct worker_ctx *worker, knot_pkt_t *answer, knot_pkt_t *query
 	/* Cleanup. */
 	knot_layer_finish(&proc);
 
-	return KNOT_EOK;
+	return kr_ok();
 }
