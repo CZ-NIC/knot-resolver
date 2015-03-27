@@ -31,6 +31,6 @@ You can load modules this way and use their properties to get information about 
 	$ kresolved /var/run/knot-resolver
 	...
 	[system] started in interactive mode, type 'help()'
-	> module.load('cachectl')
+	> modules.load('cachectl')
 	> return cachectl.size()
 	{ "size": 53 }

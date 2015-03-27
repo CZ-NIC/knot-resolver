@@ -9,10 +9,10 @@ Modular architecture of the library keeps the core tiny and efficient, and provi
    :maxdepth: 2
 
    build
-   daemon
    lib
-   modules
+   daemon
    config
+   modules
 
 
 Indices and tables

@@ -23,13 +23,6 @@
 #include "lib/defines.h"
 
 /*
- * Defines
- */
-
-#define CACHE_DEFAULT_PATH "/tmp/kresolved"
-#define CACHE_DEFAULT_SIZE 10*(1024*1024)
-
-/*
  * Global bindings.
  */
 
@@ -39,6 +32,11 @@ static int l_help(lua_State *L)
 	static const char *help_str = 
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
+		"modules.list()\n    list modules\n"
+		"modules.load()\n    load module\n"
+		"modules.unload()\n    unload module\n"
+		"cache.open(path, max_size)\n    open cache\n"
+		"cache.close()\n    close cache\n"
 		;
 	puts(help_str);
 	/* No results */

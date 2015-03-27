@@ -32,11 +32,12 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "C compiler", "*all*", "*(build only)* [#]_"
    "libknot_ 2.0+", "*all*", "Knot DNS library."
 
-There are also *optional* packages that enable specific functionality in Knot DNS Resolver, apart from the `libuv_` and `GCCGO`_, they are useful mainly for developers to build documentation and tests.
+There are also *optional* packages that enable specific functionality in Knot DNS Resolver, apart from the `libuv`_ and `GCCGO`_, they are useful mainly for developers to build documentation and tests.
 
 .. csv-table::
    :header: "Requirement", "Required by", "Notes"
 
+   "Lua_ 5.1+", "``daemon``", "Embeddable scripting language (LuaJIT_ is preferred)."
    "libuv_ 1.0+", "``daemon``", "Multiplatform I/O and services."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Python_", "``integration tests``", "For scripting tests, C header files are required (``python-dev``)"
