@@ -22,7 +22,7 @@ libkresolve_HEADERS := \
 	lib/cache.h
 
 # Dependencies
-libkresolve_DEPEND := libknot
+libkresolve_DEPEND := 
 libkresolve_LIBS := $(libknot_LIBS)
 libkresolve_TARGET := -Wl,-rpath,lib -Llib -lkresolve
 
@@ -30,6 +30,8 @@ libkresolve_TARGET := -Wl,-rpath,lib -Llib -lkresolve
 $(eval $(call make_lib,libkresolve,lib))
 
 # Targets
-lib: libkresolve
+lib: $(libkresolve)
 lib-install: libkresolve-install
 lib-clean: libkresolve-clean
+
+.PHONY: lib lib-install lib-clean

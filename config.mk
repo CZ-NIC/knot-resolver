@@ -11,12 +11,11 @@ INCLUDEDIR := /include
 MODULEDIR := $(LIBDIR)/kdns_modules
 
 # Tools
-ifndef CC
-CC	:= cc
-endif
+CC	?= cc
 CFLAGS	+= -std=c99 -D_GNU_SOURCE -Wall -fPIC -I$(abspath .)
 CFLAGS  += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 RM	:= rm -f
-LN  := ln -s
+LN      := ln -s
+XXD     ?= xxd
 INSTALL := install
-PYTHON := python
+PYTHON  := python

@@ -17,11 +17,23 @@ endif
 # Dependencies
 $(eval $(call find_lib,libknot))
 $(eval $(call find_lib,libuv))
+$(eval $(call find_alt,lua,luajit))
+$(eval $(call find_alt,lua,lua5.2))
+$(eval $(call find_alt,lua,lua))
 $(eval $(call find_lib,cmocka))
 $(eval $(call find_bin,doxygen))
 $(eval $(call find_bin,sphinx-build))
+$(eval $(call find_bin,gccgo))
 $(eval $(call find_python))
-CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS)
+
+# Work around luajit on OS X
+ifeq ($(PLATFORM), Darwin)
+ifneq (,$(findstring luajit, $(lua_LIBS)))
+	lua_LIBS += -pagezero_size 10000 -image_base 100000000
+endif
+endif
+
+CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS) $(lua_CFLAGS)
 
 # Sub-targets
 include help.mk

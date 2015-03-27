@@ -21,8 +21,8 @@ else
         LIBEXT := .dylib
         MODTYPE := dynamiclib
     else
-    	PLATFORM := POSIX
-		LDFLAGS += -pthread
+        PLATFORM := POSIX
+        LDFLAGS += -pthread
     endif
 endif
 
@@ -46,7 +46,7 @@ endef
 # Make target (name,path,ext,ldflags,dst)
 define make_target
 $$(eval $$(call make_objs,$(1)))
-$(1): $(2)/$(1)$(3)
+$(1) := $(2)/$(1)$(3)
 $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 	$(call quiet,CCLD,$$@) $(CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $(LDFLAGS) $$($(1)_LIBS)
 $(1)-clean:
@@ -58,7 +58,7 @@ ifneq ($$(strip $$($(1)_HEADERS)),)
 	$(INSTALL) -d $(PREFIX)/$(INCLUDEDIR)/$(1)
 	$(INSTALL) $$($(1)_HEADERS) $(PREFIX)/$(INCLUDEDIR)/$(1)
 endif
-.PHONY: $(1) $(1)-clean $(1)-install
+.PHONY: $(1)-clean $(1)-install
 endef
 
 # Make targets (name,path)
@@ -73,18 +73,25 @@ ifeq ($$(strip $$($(1)_LIBS)),)
 	HAS_$(1) := no
 else
 	HAS_$(1) := yes
-$(1):
-.PHONY: $(1)
 endif
 endef
 
 # Find library (pkg-config)
 define find_lib
 	ifeq ($$(strip $$($(1)_LIBS)),)
-		$(1)_CFLAGS := $(shell pkg-config --cflags $(1))
+		$(1)_CFLAGS := $(shell pkg-config --cflags $(1) --silence-errors)
 		$(1)_LIBS := $(shell pkg-config --libs $(1) --silence-errors)
 	endif
 	$(call have_lib,$(1))
+endef
+
+# Find library alternative (pkg-config)
+define find_alt
+ifeq ($$(strip $$($(1)_LIBS)),)
+	$(1)_CFLAGS := $(shell pkg-config --cflags $(2) --silence-errors)
+	$(1)_LIBS := $(shell pkg-config --libs $(2)  --silence-errors)
+	$(call have_lib,$(1))
+endif
 endef
 
 # Find binary
