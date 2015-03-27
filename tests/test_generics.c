@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,30 +15,37 @@
  */
 
 #include "tests/test.h"
-#include <cmocka.h>
-
-#include "lib/context.h"
+#include "lib/generic/array.h"
 
 mm_ctx_t global_mm;
-static struct kr_context global_context;
 
-static void test_context_init(void **state)
+static void test_array(void **state)
 {
-	int ret = kr_context_init(&global_context, &global_mm);
-	assert_int_equal(ret, KNOT_EOK);
-	*state = &global_context;
-}
+	int ret = 0;
+	array_t(int) arr;
+	array_init(arr);
 
-static void test_context_deinit(void **state)
-{
-	int ret = kr_context_deinit(*state);
-	assert_int_equal(ret, KNOT_EOK);
-}
+	/* Basic access */
+	assert_int_equal(arr.len, 0);
+	assert_int_equal(array_push(arr, 5), 0);
+	assert_int_equal(arr.at[0], 5);
+	array_clear(arr);
 
-static void test_context_params(void **state)
-{
-	assert_int_equal(kr_context_init(NULL, NULL), KNOT_EINVAL);
-	assert_int_equal(kr_context_deinit(NULL), KNOT_EINVAL);
+	/* Reserve capacity and fill. */
+	assert_true(array_reserve(arr, 5) >= 0);
+	for (unsigned i = 0; i < 100; ++i) {
+		ret = array_push(arr, i);
+		assert_true(ret >= 0);
+	}
+
+	/* Delete elements. */
+	array_del(arr, 0);
+	for (size_t i = arr.len; --i;) {
+		ret = array_pop(arr);
+		assert_true(ret == 0);
+	}
+
+	array_clear(arr);
 }
 
 int main(void)
@@ -46,8 +53,7 @@ int main(void)
 	test_mm_ctx_init(&global_mm);
 
 	const UnitTest tests[] = {
-		unit_test(test_context_params),
-	        unit_test_teardown(test_context_init, test_context_deinit),
+		unit_test(test_array),
 	};
 
 	return run_tests(tests);

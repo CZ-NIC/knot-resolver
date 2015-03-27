@@ -59,3 +59,7 @@ API reference
 
 .. doxygengroup:: utils
    :project: libkresolve
+
+.. _lib_generics:
+
+.. include:: ../lib/generic/README.rst

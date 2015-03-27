@@ -23,14 +23,14 @@
 static void buf_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	struct worker_ctx *worker = handle->data;
-	buf->base = mm_alloc(worker->pool, suggested_size);
+	buf->base = mm_alloc(worker->mm, suggested_size);
 	buf->len = suggested_size;
 }
 
 static void buf_free(uv_handle_t* handle, const uv_buf_t* buf)
 {
 	struct worker_ctx *worker = handle->data;
-	mm_free(worker->pool, buf->base);
+	mm_free(worker->mm, buf->base);
 }
 
 static void tcp_send(uv_handle_t *handle, const knot_pkt_t *answer)
@@ -49,10 +49,9 @@ static void tcp_send(uv_handle_t *handle, const knot_pkt_t *answer)
 static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
 	struct worker_ctx *worker = handle->data;
-	assert(worker->pool);
 
 	/* Check the incoming wire length (malformed, EOF or error). */
-	if (nread < sizeof(uint16_t)) {
+	if (nread < (ssize_t) sizeof(uint16_t)) {
 		buf_free((uv_handle_t *)handle, buf);
 		tcp_unbind((uv_handle_t *)handle);
 		free(handle);
@@ -63,8 +62,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	nread = wire_read_u16((const uint8_t *)buf->base);
 
 	/* Create packets */
-	knot_pkt_t *query = knot_pkt_new(buf->base + sizeof(uint16_t), nread, worker->pool);
-	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->pool);
+	knot_pkt_t *query = knot_pkt_new(buf->base + sizeof(uint16_t), nread, worker->mm);
+	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->mm);
 
 	/* Resolve */
 	int ret = worker_exec(worker, answer, query);

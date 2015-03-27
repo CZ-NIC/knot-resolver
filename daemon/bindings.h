@@ -14,9 +14,30 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * Bindings to engine services, see \a http://www.lua.org/manual/5.2/manual.html#luaL_newlib for the reference.
+ */
 #pragma once
 
-#include <uv.h>
-#include "daemon/worker.h"
+#include "daemon/engine.h"
 
-int cmd_exec(struct worker_ctx *worker, char *cmd);
+/**
+ * Load 'modules' package.
+ * @param  L scriptable
+ * @return   number of packages to load
+ */
+int lib_modules(lua_State *L);
+
+/**
+ * Load 'config' package.
+ * @param  L scriptable
+ * @return   number of packages to load
+ */
+int lib_config(lua_State *L);
+
+/**
+ * Load 'cache' package.
+ * @param  L scriptable
+ * @return   number of packages to load
+ */
+int lib_cache(lua_State *L);

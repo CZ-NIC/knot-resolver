@@ -21,7 +21,28 @@
 #pragma once
 
 #include <libknot/packet/pkt.h>
-#include "context.h"
+
+#include "lib/generic/array.h"
+#include "lib/module.h"
+
+/** Array of modules. */
+typedef array_t(struct kr_module) modulelist_t;
+
+/**
+ * Name resolution context.
+ *
+ * Resolution context provides basic services like cache, configuration and options.
+ *
+ * @note This structure is persistent between name resolutions and may
+ *       be shared between threads.
+ */
+struct kr_context
+{
+	mm_ctx_t *pool;
+	struct kr_cache *cache;
+	modulelist_t *modules;
+	uint32_t options;
+};
 
 /**
  * Resolve an input query and produce a packet with an answer.

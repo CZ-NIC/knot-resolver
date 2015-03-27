@@ -17,17 +17,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
-
 #include <uv.h>
-
 #include <libknot/internal/sockaddr.h>
-#include <libknot/errcode.h>
 
 #include "lib/defines.h"
 #include "lib/resolve.h"
 #include "daemon/udp.h"
 #include "daemon/tcp.h"
-#include "daemon/cmd.h"
+#include "daemon/engine.h"
+#include "daemon/bindings.h"
 
 static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
@@ -36,10 +34,7 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		char *cmd = buf->base;
 		cmd[nread - 1] = '\0';
 		/* Execute */
-		int ret = cmd_exec((struct worker_ctx *)stream->data, cmd);
-		if (ret != 0) {
-			printf("ret: %s\n", kr_strerror(ret));
-		}
+		engine_cmd((struct engine *)stream->data, cmd);
 	}
 
 	printf("> ");
@@ -47,24 +42,25 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 }
 
 static void tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf) {
-    buf->len = suggested;
-    buf->base = malloc(suggested);
+	buf->len = suggested;
+	buf->base = malloc(suggested);
 }
 
 void signal_handler(uv_signal_t *handle, int signum)
 {
 	uv_stop(uv_default_loop());
 	uv_signal_stop(handle);
-	exit(1);
 }
 
 static void help(int argc, char *argv[])
 {
-	printf("Usage: %s [parameters]\n", argv[0]);
+	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
-	       " -a, --addr=[addr]   Server address (default localhost#53).\n"
-	       " -V, --version       Print version of the server.\n"
-	       " -h, --help          Print help and usage.\n");
+	       " -a, --addr=[addr]   Server address (default: localhost#53).\n"
+	       " -v, --version       Print version of the server.\n"
+	       " -h, --help          Print help and usage.\n"
+	       "Options:\n"
+	       " [rundir]            Path to the working directory (default: .)\n");
 }
 
 static int set_addr(struct sockaddr_storage *ss, char *addr)
@@ -93,21 +89,21 @@ int main(int argc, char **argv)
 	int c = 0, li = 0, ret = 0;
 	struct option opts[] = {
 		{"addr", required_argument, 0, 'a'},
-		{"version",   no_argument,  0, 'V'},
+		{"version",   no_argument,  0, 'v'},
 		{"help",      no_argument,  0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:Vh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:vh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
 			ret = set_addr(&addr, optarg);
 			if (ret != 0) {
-				fprintf(stderr, "Address '%s': %s\n", optarg, knot_strerror(ret));
+				fprintf(stderr, "[system]: address '%s': %s\n", optarg, knot_strerror(ret));
 				return EXIT_FAILURE;
 			}
 			break;
-		case 'V':
+		case 'v':
 			printf("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
 			return EXIT_SUCCESS;
 		case 'h':
@@ -120,19 +116,43 @@ int main(int argc, char **argv)
 		}
 	}
 
-	mm_ctx_t mm;
-	mm_ctx_init(&mm);
-
-	uv_loop_t *loop = uv_default_loop();
+	/* Switch to rundir. */
+	if (optind < argc) {
+		ret = chdir(argv[optind]);
+		if (ret != 0) {
+			fprintf(stderr, "[system] rundir '%s': %s\n", argv[optind], strerror(errno));
+			return EXIT_FAILURE;
+		}
+		printf("[system] rundir '%s'\n", argv[optind]);
+    	}
 
 	/* Block signals. */
+	uv_loop_t *loop = uv_default_loop();
 	uv_signal_t sigint;
 	uv_signal_init(loop, &sigint);
 	uv_signal_start(&sigint, signal_handler, SIGINT);
 
-	/* Create a worker. */
-	struct worker_ctx worker;
-	worker_init(&worker, &mm);
+	/* Create a server engine. */
+	mm_ctx_t pool;
+	mm_ctx_mempool(&pool, 4096);
+	struct engine engine;
+	ret = engine_init(&engine, &pool);
+	if (ret != 0) {
+		fprintf(stderr, "[system] failed to initialize engine: %s\n", kr_strerror(ret));
+		return EXIT_FAILURE;
+	}
+
+	/* Load bindings */
+	engine_lualib(&engine, "modules", lib_modules);
+	engine_lualib(&engine, "config", lib_config);
+	engine_lualib(&engine, "cache",  lib_cache);
+
+	/* Create main worker. */
+	struct worker_ctx worker = {
+		.engine = &engine,
+		.loop = loop,
+		.mm = NULL
+	};
 
 	/* Bind to sockets. */
 	char addr_str[SOCKADDR_STRLEN] = {'\0'};
@@ -143,36 +163,36 @@ int main(int argc, char **argv)
 	uv_tcp_init(loop, &tcp_sock);
 	printf("[system] listening on '%s/UDP'\n", addr_str);
 	ret = udp_bind((uv_handle_t *)&udp_sock, &worker, (struct sockaddr *)&addr);
-	if (ret == KNOT_EOK) {
+	if (ret == 0) {
 		printf("[system] listening on '%s/TCP'\n", addr_str);
 		ret = tcp_bind((uv_handle_t *)&tcp_sock, &worker, (struct sockaddr *)&addr);
 	}
 
-	/* Allocate TTY */
-	uv_pipe_t pipe;
-	uv_pipe_init(loop, &pipe, 0);
-	uv_pipe_open(&pipe, 0);
-	pipe.data = &worker;
-
 	/* Check results */
-	if (ret != KNOT_EOK) {
+	if (ret != 0) {
 		fprintf(stderr, "[system] bind to '%s' %s\n", addr_str, knot_strerror(ret));
 		ret = EXIT_FAILURE;
 	} else {
+		/* Allocate TTY */
+		uv_pipe_t pipe;
+		uv_pipe_init(loop, &pipe, 0);
+		uv_pipe_open(&pipe, 0);
+		pipe.data = &engine;
+
 		/* Interactive stdin */
 		if (!feof(stdin)) {
-			printf("[system] started in interactive mode, type 'help'\n");
+			printf("[system] started in interactive mode, type 'help()'\n");
 			tty_read(NULL, 0, NULL);
 			uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_read);
 		}
 		/* Run the event loop. */
-		ret = uv_run(loop, UV_RUN_DEFAULT);
+		ret = engine_start(&engine);
 	}
 
 	/* Cleanup. */
+	fprintf(stderr, "\n[system] quitting\n");
 	udp_unbind((uv_handle_t *)&udp_sock);
 	tcp_unbind((uv_handle_t *)&tcp_sock);
-	worker_deinit(&worker);
 
 	return ret;
 }

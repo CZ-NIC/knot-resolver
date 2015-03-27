@@ -14,10 +14,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "tests/test.h"
-#include <cmocka.h>
-
 #include <libknot/internal/mempool.h>
+
+#include "tests/test.h"
 #include "lib/cache.h"
 
 

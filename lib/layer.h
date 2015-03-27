@@ -23,7 +23,7 @@
 #include <libknot/processing/layer.h>
 #include <libknot/packet/pkt.h>
 
-#include "lib/context.h"
+#include "lib/resolve.h"
 #include "lib/rplan.h"
 
 /**

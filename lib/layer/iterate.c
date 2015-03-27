@@ -434,7 +434,9 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Check response code. */
+#ifndef NDEBUG
 	lookup_table_t *rcode = lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
+#endif
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:

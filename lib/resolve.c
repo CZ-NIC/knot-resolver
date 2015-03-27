@@ -148,8 +148,8 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 static void prepare_layers(struct knot_requestor *req, struct kr_layer_param *param)
 {
 	struct kr_context *ctx = param->ctx;
-	for (size_t i = 0; i < ctx->mod_loaded; ++i) {
-		struct kr_module *mod = &ctx->modules[i];
+	for (size_t i = 0; i < ctx->modules->len; ++i) {
+		struct kr_module *mod = &ctx->modules->at[i];
 		if (mod->layer) {
 			knot_requestor_overlay(req, mod->layer(), param);
 		}

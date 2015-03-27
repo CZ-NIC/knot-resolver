@@ -250,16 +250,23 @@ A module can offer NULL-terminated list of *properties*, each property is essent
 JSON was chosen as an interchangeable format that doesn't require any schema beforehand, so you can do two things - query the module properties
 from external applications or between modules (i.e. `statistics` module can query `cache` module for memory usage).
 JSON was chosen not because it's the most efficient protocol, but because it's easy to read and write and interface to outside world.
+
+.. note:: The ``void *env`` is a generic module interface. Since we're implementing daemon modules, the pointer can be cast to ``struct engine*``.
+          This is guaranteed by the implemented API version (see `Writing a module in C`_).
+
 Here's an example how a module can expose its property:
 
 .. code-block:: c
 
-	char* get_size(struct kr_context *ctx, struct kr_module *m,
+	char* get_size(void *env, struct kr_module *m,
 	               const char *args)
 	{
+		/* Get cache from engine. */
+		struct engine *engine = env;
+		namedb_t *cache = engine->resolver.cache;
+
 		/* Open read transaction */
 		namedb_txn_t txn;
-		namedb_t *cache = ctx->cache;
 		int ret = kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY);
 		if (ret != 0) {
 			return NULL;
@@ -292,9 +299,9 @@ Once you load the module, you can call the module property from the interactive 
 
 	$ kresolved
 	...
-	[system] started in interactive mode, type 'help'
-	> load cached
-	> cached.cached_size
+	[system] started in interactive mode, type 'help()'
+	> modules.load('cached')
+	> return cached.size()
 	{ "size": 53 }
 
 *Note* |---| this relies on function pointers, so the same ``static inline`` trick as for the ``Layer()`` is required for C/Go.

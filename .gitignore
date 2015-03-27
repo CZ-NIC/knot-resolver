@@ -11,10 +11,15 @@
 *.swp
 *.d
 *.db
+*.out
+*.6
+*.log
+*.inc
 .dirstamp
 .libs
 .deps
 _obj
+tmp*
 /autom4te.cache/*
 /config.log
 /config.h
