@@ -16,9 +16,11 @@
 
 #pragma once
 
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+/*
+ * @internal These are forward decls to allow building modules with engine but without Lua.
+ */
+struct lua_State;
+typedef int (*lua_CFunction) (struct lua_State *L);
 
 #include "lib/resolve.h"
 #include "lib/generic/array.h"
@@ -27,7 +29,7 @@ struct engine {
     struct kr_context resolver;
     modulelist_t modules;
     mm_ctx_t *pool;
-    lua_State *L;
+    struct lua_State *L;
 };
 
 int engine_init(struct engine *engine, mm_ctx_t *pool);
@@ -39,4 +41,4 @@ int engine_register(struct engine *engine, const char *module);
 int engine_unregister(struct engine *engine, const char *module);
 /** Return engine light userdata. */
 void engine_lualib(struct engine *engine, const char *name, lua_CFunction lib_cb);
-struct engine *engine_luaget(lua_State *L);
+struct engine *engine_luaget(struct lua_State *L);

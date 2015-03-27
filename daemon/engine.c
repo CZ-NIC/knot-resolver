@@ -19,6 +19,7 @@
 #include <libknot/internal/mem.h>
 
 #include "daemon/engine.h"
+#include "daemon/bindings.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
 
