@@ -121,6 +121,8 @@ The project can be built with code coverage tracking using the ``COVERAGE=1`` va
 .. _MinGW: http://www.mingw.org/
 .. _Dockerfile: https://registry.hub.docker.com/u/cznic/knot-resolver/dockerfile/
 
+.. _Lua: http://www.lua.org/about.html
+.. _LuaJIT: http://luajit.org/luajit.html
 .. _GCCGO: https://golang.org/doc/install/gccgo
 .. _Doxygen: http://www.stack.nl/~dimitri/doxygen/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe

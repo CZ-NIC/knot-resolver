@@ -52,13 +52,12 @@ static int l_quit(lua_State *L)
 	return 0;
 }
 
-/** Trampoline function for modules. */
+/** Trampoline function for module properties. */
 static int l_trampoline(lua_State *L)
 {
 	const char *name = lua_tostring(L, lua_upvalueindex(1));
 	const char *property = lua_tostring(L, lua_upvalueindex(2));
 	struct engine *engine = engine_luaget(L);
-	struct kr_context *ctx = &engine->resolver;
 
 	/* Find module. */
 	for (unsigned i = 0; i < engine->modules.len; ++i) {
@@ -69,7 +68,7 @@ static int l_trampoline(lua_State *L)
 		/* Find property. */
 		for (struct kr_prop *p = module->props; p && p->name; ++p) {
 			if (strcmp(p->name, property) == 0) {
-				auto_free char *ret = p->cb(ctx, module, NULL);
+				auto_free char *ret = p->cb(engine, module, NULL);
 				lua_pushstring(L, ret);
 				return 1;
 			}
