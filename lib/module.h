@@ -27,7 +27,6 @@
 /*
  * Forward decls
  */
-struct kr_context;
 struct kr_module;
 struct kr_prop;
 
@@ -48,7 +47,7 @@ typedef struct kr_prop *(module_prop_cb)(void);
  * A module property has a free-form JSON output (and optional input).
  */
 struct kr_prop {
-    char *(*cb)(struct kr_context*,struct kr_module *,const char*);
+    char *(*cb)(void *, struct kr_module *, const char *);
     const char *name;
     const char *info;
 };

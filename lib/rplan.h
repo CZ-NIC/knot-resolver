@@ -27,7 +27,7 @@
 #include <libknot/internal/namedb/namedb.h>
 #include <libknot/internal/sockaddr.h>
 
-#include "lib/context.h"
+#include "lib/cache.h"
 #include "lib/zonecut.h"
 
 /* Query flags */

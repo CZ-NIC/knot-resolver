@@ -60,7 +60,7 @@ int kr_init_zone_cut(struct kr_zonecut *cut)
 	const unsigned hint_id = dnssec_random_uint16_t() % HINT_COUNT;
 	const struct hint_info *hint = &SBELT[hint_id];
 
-	kr_set_zone_cut(cut, KR_DNAME_ROOT, hint->name);
+	kr_set_zone_cut(cut, U8(""), hint->name);
 
 	/* Prefetch address. */
 	return sockaddr_set(&cut->addr, AF_INET, hint->addr, 53);

@@ -23,9 +23,10 @@
 /*
  * Globals
  */
-static mm_ctx_t global_mm;               /* Test memory context */
-static struct kr_context global_context; /* Resolution context */
-static const char *global_tmpdir = NULL; /* Temporary directory */
+static mm_ctx_t global_mm;                 /* Test memory context */
+static modulelist_t global_modules;        /* Array of modules. */
+static struct kr_context global_context;   /* Resolution context */
+static const char *global_tmpdir = NULL;   /* Temporary directory */
 
 /*
  * Test driver global variables.
@@ -48,15 +49,25 @@ static PyObject* init(PyObject* self, PyObject* args)
 	memset(&g_mock_time, 0, sizeof(struct timeval));
 	g_mock_server = NULL;
 
+	/* Load basic modules. */
+	array_init(global_modules);
+	int ret = array_reserve(global_modules, 2);
+	if (ret < 0) {
+		return NULL;
+	}
+	kr_module_load(&global_modules.at[0], "iterate", NULL);
+	kr_module_load(&global_modules.at[1], "itercache", NULL);
+	global_modules.len = 2;
+
 	/* Initialize resolution context */
-	#define CACHE_SIZE 100*1024
 	mm_ctx_init(&global_mm);
-	kr_context_init(&global_context, &global_mm);
-	kr_context_register(&global_context, "iterate");
-	kr_context_register(&global_context, "itercache");
+	memset(&global_context, 0, sizeof(struct kr_context));
+	global_context.pool = &global_mm;
+	global_context.modules = &global_modules;
+	
 	global_tmpdir = test_tmpdir_create();
 	assert(global_tmpdir);
-	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, CACHE_SIZE);
+	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, 100 * 4096);
 	assert(global_context.cache);
 
 	/* No configuration parsing support yet. */
@@ -73,7 +84,11 @@ static PyObject* deinit(PyObject* self, PyObject* args)
 		return NULL;
 	}
 
-	kr_context_deinit(&global_context);
+	for (size_t i = 0; i < global_modules.len; ++i) {
+		kr_module_unload(&global_modules.at[i]);
+	}
+	array_clear(global_modules);
+
 	test_tmpdir_remove(global_tmpdir);
 	global_tmpdir = NULL;
 	if (g_mock_server) {

@@ -28,7 +28,7 @@
 #include <time.h>
 
 #include "lib/module.h"
-#include "lib/context.h"
+#include "lib/resolve.h"
 #include "lib/cache.h"
 
 /*
@@ -42,9 +42,10 @@
  * Output: { size: int }
  * 
  */
-static char* get_size(struct kr_context *ctx, struct kr_module *module, const char *args)
+static char* get_size(void *env, struct kr_module *module, const char *args)
 {
 	char *result = NULL;
+	struct kr_context *ctx = env;
 	const namedb_api_t *storage = kr_cache_storage();
 
 	/* Fetch item count */
@@ -83,8 +84,9 @@ static int is_expired(struct kr_cache_rrset *rr, uint32_t drift)
  * Output: { pruned: int }
  * 
  */
-static char* prune(struct kr_context *ctx, struct kr_module *module, const char *args)
+static char* prune(void *env, struct kr_module *module, const char *args)
 {
+	struct kr_context *ctx = env;
 	const namedb_api_t *storage = kr_cache_storage();
 
 	namedb_txn_t txn;
@@ -131,8 +133,10 @@ static char* prune(struct kr_context *ctx, struct kr_module *module, const char 
  * Output: { result: bool }
  * 
  */
-static char* clear(struct kr_context *ctx, struct kr_module *module, const char *args)
+static char* clear(void *env, struct kr_module *module, const char *args)
 {
+	struct kr_context *ctx = env;
+
 	namedb_txn_t txn;
 	int ret = kr_cache_txn_begin(ctx->cache, &txn, 0);
 	if (ret != 0) {

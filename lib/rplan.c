@@ -19,7 +19,6 @@
 #include <libknot/errcode.h>
 
 #include "lib/rplan.h"
-#include "lib/context.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
 #include "lib/layer.h"

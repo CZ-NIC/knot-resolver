@@ -15,8 +15,6 @@
  */
 
 #include "tests/test.h"
-#include <cmocka.h>
-
 #include "lib/module.h"
 
 static void test_module_params(void **state)

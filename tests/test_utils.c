@@ -18,8 +18,6 @@
 #include <stdio.h>
 
 #include "tests/test.h"
-#include <cmocka.h>
-
 #include "lib/utils.h"
 
 static void test_strcatdup(void **state)
