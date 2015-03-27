@@ -26,7 +26,7 @@
  */
 struct worker_ctx {
 	struct kr_context resolve;
-	mm_ctx_t *pool;
+	mm_ctx_t *mm;
 };
 
 /**

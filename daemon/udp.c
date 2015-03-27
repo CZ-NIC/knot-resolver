@@ -22,14 +22,14 @@
 static void buf_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	struct worker_ctx *worker = handle->data;
-	buf->base = mm_alloc(worker->pool, suggested_size);
+	buf->base = mm_alloc(worker->mm, suggested_size);
 	buf->len = suggested_size;
 }
 
 static void buf_free(uv_handle_t* handle, const uv_buf_t* buf)
 {
 	struct worker_ctx *worker = handle->data;
-	mm_free(worker->pool, buf->base);
+	mm_free(worker->mm, buf->base);
 }
 
 static void udp_send(uv_udp_t *handle, knot_pkt_t *answer, const struct sockaddr *addr)
@@ -42,7 +42,6 @@ static void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
                      const struct sockaddr *addr, unsigned flags)
 {
 	struct worker_ctx *worker = handle->data;
-	assert(worker->pool);
 
 	/* Check the incoming wire length. */
 	if (nread < KNOT_WIRE_HEADER_SIZE) {
@@ -51,8 +50,8 @@ static void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	}
 
 	/* Create packets */
-	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->pool);
-	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->pool);
+	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
+	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->mm);
 
 	/* Resolve */
 	int ret = worker_exec(worker, answer, query);

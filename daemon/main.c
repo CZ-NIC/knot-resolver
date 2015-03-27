@@ -17,11 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
-
 #include <uv.h>
-
 #include <libknot/internal/sockaddr.h>
-#include <libknot/errcode.h>
 
 #include "lib/defines.h"
 #include "lib/resolve.h"
@@ -47,15 +44,14 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 }
 
 static void tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf) {
-    buf->len = suggested;
-    buf->base = malloc(suggested);
+	buf->len = suggested;
+	buf->base = malloc(suggested);
 }
 
 void signal_handler(uv_signal_t *handle, int signum)
 {
 	uv_stop(uv_default_loop());
 	uv_signal_stop(handle);
-	exit(1);
 }
 
 static void help(int argc, char *argv[])
