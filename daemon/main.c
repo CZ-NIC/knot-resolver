@@ -25,6 +25,7 @@
 #include "daemon/udp.h"
 #include "daemon/tcp.h"
 #include "daemon/engine.h"
+#include "daemon/bindings.h"
 
 static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
@@ -141,6 +142,10 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
+	/* Load bindings */
+	engine_lualib(&engine, "modules", lib_modules);
+	engine_lualib(&engine, "config", lib_config);
+	engine_lualib(&engine, "cache",  lib_cache);
 
 	/* Create main worker. */
 	struct worker_ctx worker = {

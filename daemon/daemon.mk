@@ -4,6 +4,7 @@ kresolved_SOURCES := \
 	daemon/tcp.c         \
 	daemon/engine.c      \
 	daemon/worker.c      \
+	daemon/bindings.c    \
 	daemon/main.c
 
 # Embed resources
