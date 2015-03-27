@@ -101,6 +101,6 @@
  * @return 0 on success, <0 on failure
  */
 #define array_del(array, i) \
-	(i) < (array).len ? ((array).at[i] = (array).at[--(array).len], 0) : -1
+	(i) < (array).len ? ((array).at[i] = (array).at[(array).len], (array).len -= 1, 0) : -1
 
 /** @} */
