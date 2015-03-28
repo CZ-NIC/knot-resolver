@@ -3,6 +3,7 @@
 #
 
 tests_BIN := \
+	test_critbit \
 	test_generics \
 	test_utils \
 	test_module \
