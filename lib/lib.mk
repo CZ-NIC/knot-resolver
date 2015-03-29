@@ -1,5 +1,5 @@
 libkresolve_SOURCES := \
-	lib/generic/critbit.c  \
+	lib/generic/map.c      \
 	lib/layer/iterate.c    \
 	lib/layer/itercache.c  \
 	lib/utils.c            \
@@ -12,7 +12,8 @@ libkresolve_SOURCES := \
 
 libkresolve_HEADERS := \
 	lib/generic/array.h    \
-	lib/generic/critbit.h  \
+	lib/generic/map.h      \
+	lib/generic/set.h      \
 	lib/layer.h            \
 	lib/utils.h            \
 	lib/nsrep.h            \

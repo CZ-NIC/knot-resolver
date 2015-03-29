@@ -12,7 +12,7 @@ MODULEDIR := $(LIBDIR)/kdns_modules
 
 # Tools
 CC	?= cc
-CFLAGS	+= -std=c99 -D_GNU_SOURCE -Wall -fPIC -I$(abspath .)
+CFLAGS	+= -std=c99 -D_GNU_SOURCE -Wall -fPIC -I$(abspath .) -I$(abspath lib/generic)
 CFLAGS  += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 RM	:= rm -f
 LN      := ln -s

@@ -3,8 +3,9 @@
 #
 
 tests_BIN := \
-	test_critbit \
-	test_generics \
+	test_set \
+	test_map \
+	test_array \
 	test_utils \
 	test_module \
 	test_rplan \
