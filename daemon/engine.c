@@ -27,6 +27,13 @@
  * Global bindings.
  */
 
+/** Register module callback into Lua world. */
+#define REGISTER_MODULE_CALL(L, module, cb, name) \
+	lua_pushlightuserdata((L), (module)); \
+	lua_pushlightuserdata((L), (cb)); \
+	lua_pushcclosure((L), l_trampoline, 2); \
+	lua_setfield((L), -2, (name))
+
 /** Print help and available commands. */
 static int l_help(lua_State *L)
 {
@@ -56,26 +63,23 @@ static int l_quit(lua_State *L)
 /** Trampoline function for module properties. */
 static int l_trampoline(lua_State *L)
 {
-	const char *name = lua_tostring(L, lua_upvalueindex(1));
-	const char *property = lua_tostring(L, lua_upvalueindex(2));
+	struct kr_module *module = lua_touserdata(L, lua_upvalueindex(1));
+	void* callback = lua_touserdata(L, lua_upvalueindex(2));
 	struct engine *engine = engine_luaget(L);
 
-	/* Find module. */
-	for (unsigned i = 0; i < engine->modules.len; ++i) {
-		struct kr_module *module = &engine->modules.at[i];
-		if (strcmp(module->name, name) != 0) {
-			continue;
-		}
-		/* Find property. */
-		for (struct kr_prop *p = module->props; p && p->name; ++p) {
-			if (strcmp(p->name, property) == 0) {
-				auto_free char *ret = p->cb(engine, module, NULL);
-				lua_pushstring(L, ret);
-				return 1;
-			}
-		}
-		break;
+	/* Now we only have property callback or config,
+	 * if we expand the callables, we might need a callback_type.
+	 */
+	if (callback == module->config) {
+		const char *param = lua_tostring(L, 1);
+		module->config(module, param);
+	} else {
+		kr_prop_cb *prop = (kr_prop_cb *)callback;
+		auto_free char *ret = prop(engine, module, lua_tostring(L, 1));
+		lua_pushstring(L, ret);
+		return 1;
 	}
+
 	/* No results */
 	return 0;
 }
@@ -186,6 +190,14 @@ int engine_cmd(struct engine *engine, const char *str)
 
 static int engine_loadconf(struct engine *engine)
 {
+	/* Init environment */
+	static const char l_init[] = {
+		#include "daemon/lua/init.inc"
+	};
+	if (luaL_dostring(engine->L, l_init) != 0) {
+		return kr_error(ENOEXEC);
+	}
+
 	/* Load config file */
 	int ret = 0;
 	if(access("config", F_OK ) != -1 ) {
@@ -193,7 +205,7 @@ static int engine_loadconf(struct engine *engine)
 	} else {
 		/* Load defaults */
 		static const char config_init[] = {
-			#include "daemon/lua/init.inc"
+			#include "daemon/lua/config.inc"
 		};
 		ret = luaL_dostring(engine->L, config_init);
 	}
@@ -244,11 +256,13 @@ int engine_register(struct engine *engine, const char *name)
 	/* Register properties */
 	if (module->props) {
 		lua_newtable(engine->L);
+		if (module->config != NULL) {
+			REGISTER_MODULE_CALL(engine->L, module, module->config, "config");
+		}
 		for (struct kr_prop *p = module->props; p->name; ++p) {
-			lua_pushstring(engine->L, module->name);
-			lua_pushstring(engine->L, p->name);
-			lua_pushcclosure(engine->L, l_trampoline, 2);
-			lua_setfield(engine->L, -2, p->name);
+			if (p->cb != NULL && p->name != NULL) {
+				REGISTER_MODULE_CALL(engine->L, module, p->cb, p->name);
+			}
 		}
 		lua_setglobal(engine->L, module->name);
 	}

@@ -14,6 +14,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <uv.h>
+
 #include "lib/cache.h"
 #include "daemon/bindings.h"
 
@@ -59,8 +61,19 @@ static int mod_load(lua_State *L)
 /** Unload module. */
 static int mod_unload(lua_State *L)
 {
-	lua_pushstring(L, "not implemented");
-	lua_error(L);
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n != 1 || !lua_isstring(L, 1)) {
+		lua_pushstring(L, "expected module name");
+		lua_error(L);
+	}
+	/* Unload engine module */
+	struct engine *engine = engine_luaget(L);
+	int ret = engine_unregister(engine, lua_tostring(L, 1));
+	if (ret != 0) {
+		lua_pushstring(L, kr_strerror(ret));
+		lua_error(L);
+	}
 	return 0;
 }
 
@@ -77,9 +90,91 @@ int lib_modules(lua_State *L)
 	return 1;
 }
 
-int lib_config(lua_State *L)
+/** List active endpoints. */
+static int net_list(lua_State *L)
 {
+	lua_pushstring(L, "not implemented");
+	lua_error(L);
 	return 0;
+}
+
+/** Listen on endpoint. */
+static int net_listen(lua_State *L)
+{
+	lua_pushstring(L, "not implemented");
+	lua_error(L);
+	return 0;
+}
+
+/** Close endpoint. */
+static int net_close(lua_State *L)
+{
+	lua_pushstring(L, "not implemented");
+	lua_error(L);
+	return 0;
+}
+
+/** List available interfaces.
+ * @TODO: Implement as a map {name: { addr: [], mac: "" }}
+ */
+static int net_interfaces(lua_State *L)
+{
+	/* Retrieve interface list */
+	int count = 0;
+	char buf[INET6_ADDRSTRLEN]; /* http://tools.ietf.org/html/rfc4291 */
+	uv_interface_address_t *info = NULL;
+	uv_interface_addresses(&info, &count);
+
+	/* Fill table. */
+	lua_newtable(L);
+	for (int i = count; i--; ) {
+		uv_interface_address_t iface = info[i];
+		lua_newtable(L);
+		lua_pushstring(L, iface.name);
+		lua_setfield(L, -2, "id");
+
+		/* Address */
+		buf[0] = '\0';
+		switch(iface.address.address4.sin_family) {
+		case AF_INET:
+			uv_ip4_name(&iface.address.address4, buf, sizeof(buf));
+			break;
+		case AF_INET6:
+			uv_ip6_name(&iface.address.address6, buf, sizeof(buf));
+			break;
+		}
+		lua_pushstring(L, buf);
+		lua_setfield(L, -2, "addr");
+
+		/* Hardware address. */
+		char *p = buf;
+		memset(buf, 0, sizeof(buf));
+		for (unsigned k = 0; k < sizeof(iface.phys_addr); ++k) {
+			sprintf(p, "%0x", iface.phys_addr[k] & 0xff);
+			p += 2;
+		}
+		lua_pushstring(L, buf);
+		lua_setfield(L, -2, "mac");		
+
+		/* Push table */
+		lua_rawseti(L, -2, i);
+	}
+	uv_free_interface_addresses(info, count);
+
+	return 1;
+}
+
+int lib_net(lua_State *L)
+{
+	static const luaL_Reg lib[] = {
+		{ "list",       net_list },
+		{ "listen",     net_listen },
+		{ "close",      net_close },
+		{ "interfaces", net_interfaces },
+		{ NULL, NULL }
+	};
+	register_lib(L, "net", lib);
+	return 1;
 }
 
 /** Open cache */

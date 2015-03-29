@@ -144,8 +144,8 @@ int main(int argc, char **argv)
 
 	/* Load bindings */
 	engine_lualib(&engine, "modules", lib_modules);
-	engine_lualib(&engine, "config", lib_config);
-	engine_lualib(&engine, "cache",  lib_cache);
+	engine_lualib(&engine, "net",     lib_net);
+	engine_lualib(&engine, "cache",   lib_cache);
 
 	/* Create main worker. */
 	struct worker_ctx worker = {

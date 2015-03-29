@@ -33,11 +33,11 @@
 int lib_modules(lua_State *L);
 
 /**
- * Load 'config' package.
+ * Load 'net' package.
  * @param  L scriptable
  * @return   number of packages to load
  */
-int lib_config(lua_State *L);
+int lib_net(lua_State *L);
 
 /**
  * Load 'cache' package.
