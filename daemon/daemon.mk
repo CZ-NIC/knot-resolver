@@ -8,7 +8,7 @@ kresolved_SOURCES := \
 	daemon/main.c
 
 # Embed resources
-daemon/engine.o: daemon/lua/init.inc
+daemon/engine.o: daemon/lua/init.inc daemon/lua/config.inc
 %.inc: %.lua
 	@$(call quiet,XXD,$<) -i < $< > $@
 	@echo ', 0x00' >> $@
