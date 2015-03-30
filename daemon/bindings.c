@@ -115,7 +115,6 @@ static int net_close(lua_State *L)
 }
 
 /** List available interfaces.
- * @TODO: Implement as a map {name: { addr: [], mac: "" }}
  */
 static int net_interfaces(lua_State *L)
 {
@@ -124,40 +123,45 @@ static int net_interfaces(lua_State *L)
 	char buf[INET6_ADDRSTRLEN]; /* http://tools.ietf.org/html/rfc4291 */
 	uv_interface_address_t *info = NULL;
 	uv_interface_addresses(&info, &count);
-
-	/* Fill table. */
 	lua_newtable(L);
-	for (int i = count; i--; ) {
+	for (int i = 0; i < count; ++i) {
 		uv_interface_address_t iface = info[i];
-		lua_newtable(L);
-		lua_pushstring(L, iface.name);
-		lua_setfield(L, -2, "id");
+		lua_getfield(L, -1, iface.name);
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			lua_newtable(L);
+		}
 
 		/* Address */
-		buf[0] = '\0';
-		switch(iface.address.address4.sin_family) {
-		case AF_INET:
+		lua_getfield(L, -1, "addr");
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			lua_newtable(L);
+		}
+		if (iface.address.address4.sin_family == AF_INET) {
 			uv_ip4_name(&iface.address.address4, buf, sizeof(buf));
-			break;
-		case AF_INET6:
+		} else if (iface.address.address4.sin_family == AF_INET6) {
 			uv_ip6_name(&iface.address.address6, buf, sizeof(buf));
-			break;
+		} else {
+			buf[0] = '\0';
 		}
 		lua_pushstring(L, buf);
+		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 		lua_setfield(L, -2, "addr");
 
 		/* Hardware address. */
 		char *p = buf;
 		memset(buf, 0, sizeof(buf));
 		for (unsigned k = 0; k < sizeof(iface.phys_addr); ++k) {
-			sprintf(p, "%0x", iface.phys_addr[k] & 0xff);
-			p += 2;
+			sprintf(p, "%.2x:", iface.phys_addr[k] & 0xff);
+			p += 3;
 		}
+		*(p - 1) = '\0';
 		lua_pushstring(L, buf);
 		lua_setfield(L, -2, "mac");		
 
 		/* Push table */
-		lua_rawseti(L, -2, i);
+		lua_setfield(L, -2, iface.name);
 	}
 	uv_free_interface_addresses(info, count);
 
