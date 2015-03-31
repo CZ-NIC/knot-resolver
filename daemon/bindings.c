@@ -21,7 +21,8 @@
 
 /** @internal Compatibility wrapper for Lua 5.0 - 5.2 */
 #if LUA_VERSION_NUM < 502
-#define lua_len lua_objlen
+#define lua_len(L, obj) \
+	lua_objlen((L), (obj))
 #define register_lib(L, name, lib) \
 	luaL_openlib((L), (name), (lib), 0)
 #else
@@ -147,7 +148,7 @@ static int net_interfaces(lua_State *L)
 			buf[0] = '\0';
 		}
 		lua_pushstring(L, buf);
-		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
+		lua_rawseti(L, -2, lua_len(L, -2) + 1);
 		lua_setfield(L, -2, "addr");
 
 		/* Hardware address. */
