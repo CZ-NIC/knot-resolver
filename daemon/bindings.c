@@ -21,6 +21,7 @@
 
 /** @internal Compatibility wrapper for Lua 5.0 - 5.2 */
 #if LUA_VERSION_NUM < 502
+#define lua_len lua_objlen
 #define register_lib(L, name, lib) \
 	luaL_openlib((L), (name), (lib), 0)
 #else
