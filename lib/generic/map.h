@@ -81,9 +81,13 @@ int map_del(map_t *map, const char *str);
 /*! Clears the given map */
 void map_clear(map_t *map);
 
+/*! Calls callback for all strings in map  */
+#define map_walk(map, callback, baton) \
+	map_walk_prefixed((map), "", (callback), (baton))
+
 /*! Calls callback for all strings in map with the given prefix  */
 int map_walk_prefixed(map_t *map, const char *prefix,
-	int (*callback)(const char *, void *), void *baton);
+	int (*callback)(const char *, void *, void *), void *baton);
 
 
 #ifdef __cplusplus

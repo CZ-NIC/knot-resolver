@@ -70,9 +70,13 @@ typedef int (set_walk_cb)(const char *, void *);
 #define set_clear(set) \
 	map_clear(set)
 
+/*! Calls callback for all strings in map  */
+#define set_walk(set, callback, baton) \
+	map_walk_prefixed((set), "", (callback), (baton))
+
 /*! Calls callback for all strings in set with the given prefix  */
 #define set_walk_prefixed(set, prefix, callback, baton) \
-	map_walk_prefixed((set), (prefix), (callback), baton)
+	map_walk_prefixed((set), (prefix), (callback), (baton))
 
 
 #ifdef __cplusplus

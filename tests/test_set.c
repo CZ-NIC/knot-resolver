@@ -93,11 +93,11 @@ static void test_contains(void **state)
 }
 
 /* Count number of items */
-static int count_cb(const char *s, void *n) { (*(int *)n)++; return 0; }
+static int count_cb(const char *s, void *_, void *n) { (*(int *)n)++; return 0; }
 static void test_complete(set_t *set, int n)
 {
 	int i = 0;
-	if (set_walk_prefixed(set, "", count_cb, &i) != 0) {
+	if (set_walk(set, count_cb, &i) != 0) {
 		abort();
 	}
 	if (i != n) {

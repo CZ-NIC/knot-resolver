@@ -78,7 +78,7 @@ static void cbt_traverse_delete(map_t *map, void *top)
 }
 
 static int cbt_traverse_prefixed(void *top,
-	int (*callback)(const char *, void *), void *baton)
+	int (*callback)(const char *, void *, void *), void *baton)
 {
 	uint8_t *p = top;
 	cb_data_t *x = (cb_data_t *)top;
@@ -98,7 +98,7 @@ static int cbt_traverse_prefixed(void *top,
 		return 0;
 	}
 
-	return (callback)((const char *)x->key, baton);
+	return (callback)((const char *)x->key, x->value, baton);
 }
 
 static cb_data_t *cbt_make_data(map_t *map, const uint8_t *str, size_t len, void *value)
@@ -316,7 +316,7 @@ void map_clear(map_t *map)
 
 /*! Calls callback for all strings in map with the given prefix */
 int map_walk_prefixed(map_t *map, const char *prefix,
-	int (*callback)(const char *, void *), void *baton)
+	int (*callback)(const char *, void *, void *), void *baton)
 {
 	const uint8_t *ubytes = (void *)prefix;
 	const size_t ulen = strlen(prefix);
