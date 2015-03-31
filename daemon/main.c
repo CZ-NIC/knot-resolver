@@ -22,8 +22,8 @@
 
 #include "lib/defines.h"
 #include "lib/resolve.h"
-#include "daemon/udp.h"
-#include "daemon/tcp.h"
+#include "daemon/network.h"
+#include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
 
@@ -63,27 +63,21 @@ static void help(int argc, char *argv[])
 	       " [rundir]            Path to the working directory (default: .)\n");
 }
 
-static int set_addr(struct sockaddr_storage *ss, char *addr)
+static const char *set_addr(char *addr, int *port)
 {
-	char *port = strchr(addr, '#');
-	if (port) {
-		sockaddr_port_set(ss, atoi(port + 1));
-		*port = '\0';
+	char *p = strchr(addr, '#');
+	if (p) {
+		*port = atoi(p + 1);
+		*p = '\0';
 	}
 	
-	int family = AF_INET;
-	if (strchr(addr, ':')) {
-		family = AF_INET6;
-	}
-	
-	return sockaddr_set(ss, family, addr, sockaddr_port(ss));
+	return addr;
 }
 
 int main(int argc, char **argv)
 {
-	
-	struct sockaddr_storage addr;
-	sockaddr_set(&addr, AF_INET, "127.0.0.1", 53);
+	const char *addr = "127.0.0.1";
+	int port = 53;
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
@@ -97,11 +91,7 @@ int main(int argc, char **argv)
 		switch (c)
 		{
 		case 'a':
-			ret = set_addr(&addr, optarg);
-			if (ret != 0) {
-				fprintf(stderr, "[system]: address '%s': %s\n", optarg, knot_strerror(ret));
-				return EXIT_FAILURE;
-			}
+			addr = set_addr(optarg, &port);
 			break;
 		case 'v':
 			printf("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
@@ -153,24 +143,14 @@ int main(int argc, char **argv)
 		.loop = loop,
 		.mm = NULL
 	};
+	loop->data = &worker;
 
 	/* Bind to sockets. */
-	char addr_str[SOCKADDR_STRLEN] = {'\0'};
-	sockaddr_tostr(addr_str, sizeof(addr_str), &addr);
-	uv_udp_t udp_sock;
-	uv_udp_init(loop, &udp_sock);
-	uv_tcp_t tcp_sock;
-	uv_tcp_init(loop, &tcp_sock);
-	printf("[system] listening on '%s/UDP'\n", addr_str);
-	ret = udp_bind((uv_handle_t *)&udp_sock, &worker, (struct sockaddr *)&addr);
-	if (ret == 0) {
-		printf("[system] listening on '%s/TCP'\n", addr_str);
-		ret = tcp_bind((uv_handle_t *)&tcp_sock, &worker, (struct sockaddr *)&addr);
-	}
-
-	/* Check results */
+	struct network net;
+	network_init(&net, loop);
+	ret = network_listen(&net, addr, (uint16_t)port, NET_UDP|NET_TCP);
 	if (ret != 0) {
-		fprintf(stderr, "[system] bind to '%s' %s\n", addr_str, knot_strerror(ret));
+		fprintf(stderr, "[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
 		ret = EXIT_FAILURE;
 	} else {
 		/* Allocate TTY */
@@ -181,6 +161,7 @@ int main(int argc, char **argv)
 
 		/* Interactive stdin */
 		if (!feof(stdin)) {
+			printf("[system] listening on '%s#%d'\n", addr, port);
 			printf("[system] started in interactive mode, type 'help()'\n");
 			tty_read(NULL, 0, NULL);
 			uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_read);
@@ -191,8 +172,8 @@ int main(int argc, char **argv)
 
 	/* Cleanup. */
 	fprintf(stderr, "\n[system] quitting\n");
-	udp_unbind((uv_handle_t *)&udp_sock);
-	tcp_unbind((uv_handle_t *)&tcp_sock);
+	network_deinit(&net);
+	engine_deinit(&engine);
 
 	return ret;
 }

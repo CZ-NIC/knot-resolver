@@ -1,7 +1,7 @@
 kresolved_SOURCES := \
 	daemon/layer/query.c \
-	daemon/udp.c         \
-	daemon/tcp.c         \
+	daemon/io.c          \
+	daemon/network.c     \
 	daemon/engine.c      \
 	daemon/worker.c      \
 	daemon/bindings.c    \
