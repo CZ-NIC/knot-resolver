@@ -146,9 +146,7 @@ int main(int argc, char **argv)
 	loop->data = &worker;
 
 	/* Bind to sockets. */
-	struct network net;
-	network_init(&net, loop);
-	ret = network_listen(&net, addr, (uint16_t)port, NET_UDP|NET_TCP);
+	ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
 	if (ret != 0) {
 		fprintf(stderr, "[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
 		ret = EXIT_FAILURE;
@@ -172,7 +170,6 @@ int main(int argc, char **argv)
 
 	/* Cleanup. */
 	fprintf(stderr, "\n[system] quitting\n");
-	network_deinit(&net);
 	engine_deinit(&engine);
 
 	return ret;

@@ -22,11 +22,12 @@
 struct lua_State;
 
 #include "lib/resolve.h"
-#include "lib/generic/array.h"
+#include "daemon/network.h"
 
 struct engine {
     struct kr_context resolver;
     modulelist_t modules;
+    struct network net;
     mm_ctx_t *pool;
     struct lua_State *L;
 };

@@ -138,6 +138,8 @@ int engine_init(struct engine *engine, mm_ctx_t *pool)
 	if (ret != 0) {
 		return ret;
 	}
+	/* Initialize network */
+	network_init(&engine->net, uv_default_loop());
 
 	return ret;
 }
@@ -147,6 +149,8 @@ void engine_deinit(struct engine *engine)
 	if (engine == NULL) {
 		return;
 	}
+
+	network_deinit(&engine->net);
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
