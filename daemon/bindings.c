@@ -14,11 +14,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <uv.h>
+
 #include "lib/cache.h"
 #include "daemon/bindings.h"
 
 /** @internal Compatibility wrapper for Lua 5.0 - 5.2 */
 #if LUA_VERSION_NUM < 502
+#define lua_len(L, obj) \
+	lua_objlen((L), (obj))
 #define register_lib(L, name, lib) \
 	luaL_openlib((L), (name), (lib), 0)
 #else
@@ -59,8 +63,19 @@ static int mod_load(lua_State *L)
 /** Unload module. */
 static int mod_unload(lua_State *L)
 {
-	lua_pushstring(L, "not implemented");
-	lua_error(L);
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n != 1 || !lua_isstring(L, 1)) {
+		lua_pushstring(L, "expected module name");
+		lua_error(L);
+	}
+	/* Unload engine module */
+	struct engine *engine = engine_luaget(L);
+	int ret = engine_unregister(engine, lua_tostring(L, 1));
+	if (ret != 0) {
+		lua_pushstring(L, kr_strerror(ret));
+		lua_error(L);
+	}
 	return 0;
 }
 
@@ -77,9 +92,133 @@ int lib_modules(lua_State *L)
 	return 1;
 }
 
-int lib_config(lua_State *L)
+/** Append 'addr = {port = int, udp = bool, tcp = bool}' */
+static int net_list_add(const char *key, void *val, void *ext)
 {
-	return 0;
+	lua_State *L = (lua_State *)ext;
+	endpoint_array_t *ep_array = val;
+	lua_newtable(L);
+	for (size_t i = ep_array->len; i--;) {
+		struct endpoint *ep = ep_array->at[i];
+		lua_pushinteger(L, ep->port);
+		lua_setfield(L, -2, "port");
+		lua_pushboolean(L, ep->flags & NET_UDP);
+		lua_setfield(L, -2, "udp");
+		lua_pushboolean(L, ep->flags & NET_TCP);
+		lua_setfield(L, -2, "tcp");
+	}
+	lua_setfield(L, -2, key);
+	return kr_ok();
+}
+
+/** List active endpoints. */
+static int net_list(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	lua_newtable(L);
+	map_walk(&engine->net.endpoints, net_list_add, L);
+	return 1;
+}
+
+/** Listen on endpoint. */
+static int net_listen(lua_State *L)
+{
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 2) {
+		lua_pushstring(L, "expected (string addr, int port)");
+		lua_error(L);
+	}
+
+	/* Open resolution context cache */
+	struct engine *engine = engine_luaget(L);
+	int ret = network_listen(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2), NET_TCP|NET_UDP);
+	lua_pushboolean(L, ret == 0);
+	return 1;
+}
+
+/** Close endpoint. */
+static int net_close(lua_State *L)
+{
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 2) {
+		lua_pushstring(L, "expected (string addr, int port)");
+		lua_error(L);
+	}
+
+	/* Open resolution context cache */
+	struct engine *engine = engine_luaget(L);
+	int ret = network_close(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2));
+	lua_pushboolean(L, ret == 0);
+	return 1;
+}
+
+/** List available interfaces.
+ */
+static int net_interfaces(lua_State *L)
+{
+	/* Retrieve interface list */
+	int count = 0;
+	char buf[INET6_ADDRSTRLEN]; /* http://tools.ietf.org/html/rfc4291 */
+	uv_interface_address_t *info = NULL;
+	uv_interface_addresses(&info, &count);
+	lua_newtable(L);
+	for (int i = 0; i < count; ++i) {
+		uv_interface_address_t iface = info[i];
+		lua_getfield(L, -1, iface.name);
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			lua_newtable(L);
+		}
+
+		/* Address */
+		lua_getfield(L, -1, "addr");
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			lua_newtable(L);
+		}
+		if (iface.address.address4.sin_family == AF_INET) {
+			uv_ip4_name(&iface.address.address4, buf, sizeof(buf));
+		} else if (iface.address.address4.sin_family == AF_INET6) {
+			uv_ip6_name(&iface.address.address6, buf, sizeof(buf));
+		} else {
+			buf[0] = '\0';
+		}
+		lua_pushstring(L, buf);
+		lua_rawseti(L, -2, lua_len(L, -2) + 1);
+		lua_setfield(L, -2, "addr");
+
+		/* Hardware address. */
+		char *p = buf;
+		memset(buf, 0, sizeof(buf));
+		for (unsigned k = 0; k < sizeof(iface.phys_addr); ++k) {
+			sprintf(p, "%.2x:", iface.phys_addr[k] & 0xff);
+			p += 3;
+		}
+		*(p - 1) = '\0';
+		lua_pushstring(L, buf);
+		lua_setfield(L, -2, "mac");		
+
+		/* Push table */
+		lua_setfield(L, -2, iface.name);
+	}
+	uv_free_interface_addresses(info, count);
+
+	return 1;
+}
+
+int lib_net(lua_State *L)
+{
+	static const luaL_Reg lib[] = {
+		{ "list",       net_list },
+		{ "listen",     net_listen },
+		{ "close",      net_close },
+		{ "interfaces", net_interfaces },
+		{ NULL, NULL }
+	};
+	register_lib(L, "net", lib);
+	return 1;
 }
 
 /** Open cache */

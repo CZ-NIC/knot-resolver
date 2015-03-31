@@ -24,7 +24,7 @@
  * Globals
  */
 static mm_ctx_t global_mm;                 /* Test memory context */
-static modulelist_t global_modules;        /* Array of modules. */
+static module_array_t global_modules;        /* Array of modules. */
 static struct kr_context global_context;   /* Resolution context */
 static const char *global_tmpdir = NULL;   /* Temporary directory */
 

@@ -14,34 +14,38 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
- * Bindings to engine services, see \a http://www.lua.org/manual/5.2/manual.html#luaL_newlib for the reference.
- */
 #pragma once
 
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include <uv.h>
 
-#include "daemon/engine.h"
+#include "lib/generic/array.h"
+#include "lib/generic/map.h"
 
-/**
- * Load 'modules' package.
- * @param  L scriptable
- * @return   number of packages to load
- */
-int lib_modules(lua_State *L);
+enum endpoint_flag {
+    NET_DOWN = 0 << 0,
+    NET_UDP  = 1 << 0,
+    NET_TCP  = 1 << 1
+};
 
-/**
- * Load 'net' package.
- * @param  L scriptable
- * @return   number of packages to load
- */
-int lib_net(lua_State *L);
+struct endpoint_data {
+    uv_buf_t buf;
+};
 
-/**
- * Load 'cache' package.
- * @param  L scriptable
- * @return   number of packages to load
- */
-int lib_cache(lua_State *L);
+struct endpoint {
+    uv_udp_t udp;
+    uv_tcp_t tcp;
+    uint16_t port;
+    uint16_t flags;
+};
+
+typedef array_t(struct endpoint*) endpoint_array_t;
+
+struct network {
+    uv_loop_t *loop;
+    map_t endpoints;
+};
+
+void network_init(struct network *net, uv_loop_t *loop);
+void network_deinit(struct network *net);
+int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags);
+int network_close(struct network *net, const char *addr, uint16_t port);

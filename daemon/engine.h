@@ -20,14 +20,14 @@
  * @internal These are forward decls to allow building modules with engine but without Lua.
  */
 struct lua_State;
-typedef int (*lua_CFunction) (struct lua_State *L);
 
 #include "lib/resolve.h"
-#include "lib/generic/array.h"
+#include "daemon/network.h"
 
 struct engine {
     struct kr_context resolver;
-    modulelist_t modules;
+    struct network net;
+    module_array_t modules;
     mm_ctx_t *pool;
     struct lua_State *L;
 };
@@ -40,5 +40,5 @@ void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *module);
 int engine_unregister(struct engine *engine, const char *module);
 /** Return engine light userdata. */
-void engine_lualib(struct engine *engine, const char *name, lua_CFunction lib_cb);
+void engine_lualib(struct engine *engine, const char *name, int (*lib_cb) (struct lua_State *));
 struct engine *engine_luaget(struct lua_State *L);

@@ -1,14 +1,14 @@
 kresolved_SOURCES := \
 	daemon/layer/query.c \
-	daemon/udp.c         \
-	daemon/tcp.c         \
+	daemon/io.c          \
+	daemon/network.c     \
 	daemon/engine.c      \
 	daemon/worker.c      \
 	daemon/bindings.c    \
 	daemon/main.c
 
 # Embed resources
-daemon/engine.o: daemon/lua/init.inc
+daemon/engine.o: daemon/lua/init.inc daemon/lua/config.inc
 %.inc: %.lua
 	@$(call quiet,XXD,$<) -i < $< > $@
 	@echo ', 0x00' >> $@

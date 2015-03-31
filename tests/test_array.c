@@ -29,6 +29,7 @@ static void test_array(void **state)
 	assert_int_equal(arr.len, 0);
 	assert_int_equal(array_push(arr, 5), 0);
 	assert_int_equal(arr.at[0], 5);
+	assert_int_equal(array_tail(arr), 5);
 	array_clear(arr);
 
 	/* Reserve capacity and fill. */

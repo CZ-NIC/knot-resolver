@@ -17,7 +17,9 @@
 #pragma once
 
 #include <uv.h>
-#include "worker.h"
+struct endpoint;
 
-int tcp_bind(uv_handle_t *handle, struct worker_ctx *worker, struct sockaddr *addr);
-void tcp_unbind(uv_handle_t *handle);
+int udp_bind(struct endpoint *ep, struct sockaddr *addr);
+void udp_unbind(struct endpoint *ep);
+int tcp_bind(struct endpoint *ep, struct sockaddr *addr);
+void tcp_unbind(struct endpoint *ep);

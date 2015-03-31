@@ -9,10 +9,14 @@ as long as it comes with a test case in `tests/test_generics.c`.
 Data structures
 ~~~~~~~~~~~~~~~
 
-- Dynamic arrays
+* ``array`` - a set of simple macros to make working with dynamic arrays easier.
+* ``set`` - a `Crit-bit tree`_ simple implementation (public domain) that comes with tests.
+* ``map`` - key-value map implemented on top of ``set``.
 
 API reference and examples
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. doxygengroup:: generics
    :project: libkresolve
+
+.. _`Crit-bit tree`: http://cr.yp.to/critbit.html 
