@@ -92,28 +92,66 @@ int lib_modules(lua_State *L)
 	return 1;
 }
 
+/** Append 'addr = {port = int, udp = bool, tcp = bool}' */
+static int net_list_add(const char *key, void *val, void *ext)
+{
+	lua_State *L = (lua_State *)ext;
+	endpoint_array_t *ep_array = val;
+	lua_newtable(L);
+	for (size_t i = ep_array->len; i--;) {
+		struct endpoint *ep = ep_array->at[i];
+		lua_pushinteger(L, ep->port);
+		lua_setfield(L, -2, "port");
+		lua_pushboolean(L, ep->flags & NET_UDP);
+		lua_setfield(L, -2, "udp");
+		lua_pushboolean(L, ep->flags & NET_TCP);
+		lua_setfield(L, -2, "tcp");
+	}
+	lua_setfield(L, -2, key);
+	return kr_ok();
+}
+
 /** List active endpoints. */
 static int net_list(lua_State *L)
 {
-	lua_pushstring(L, "not implemented");
-	lua_error(L);
-	return 0;
+	struct engine *engine = engine_luaget(L);
+	lua_newtable(L);
+	map_walk(&engine->net.endpoints, net_list_add, L);
+	return 1;
 }
 
 /** Listen on endpoint. */
 static int net_listen(lua_State *L)
 {
-	lua_pushstring(L, "not implemented");
-	lua_error(L);
-	return 0;
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 2) {
+		lua_pushstring(L, "expected (string addr, int port)");
+		lua_error(L);
+	}
+
+	/* Open resolution context cache */
+	struct engine *engine = engine_luaget(L);
+	int ret = network_listen(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2), NET_TCP|NET_UDP);
+	lua_pushboolean(L, ret == 0);
+	return 1;
 }
 
 /** Close endpoint. */
 static int net_close(lua_State *L)
 {
-	lua_pushstring(L, "not implemented");
-	lua_error(L);
-	return 0;
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 2) {
+		lua_pushstring(L, "expected (string addr, int port)");
+		lua_error(L);
+	}
+
+	/* Open resolution context cache */
+	struct engine *engine = engine_luaget(L);
+	int ret = network_close(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2));
+	lua_pushboolean(L, ret == 0);
+	return 1;
 }
 
 /** List available interfaces.
