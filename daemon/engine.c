@@ -277,7 +277,7 @@ int engine_register(struct engine *engine, const char *name)
 int engine_unregister(struct engine *engine, const char *name)
 {
 	/* Find matching module. */
-	modulelist_t *mod_list = &engine->modules;
+	module_array_t *mod_list = &engine->modules;
 	size_t found = mod_list->len;
 	for (size_t i = 0; i < mod_list->len; ++i) {
 		if (strcmp(mod_list->at[i].name, name) == 0) {

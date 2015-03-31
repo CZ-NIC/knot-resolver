@@ -26,7 +26,7 @@
 #include "lib/module.h"
 
 /** Array of modules. */
-typedef array_t(struct kr_module) modulelist_t;
+typedef array_t(struct kr_module) module_array_t;
 
 /**
  * Name resolution context.
@@ -40,7 +40,7 @@ struct kr_context
 {
 	mm_ctx_t *pool;
 	struct kr_cache *cache;
-	modulelist_t *modules;
+	module_array_t *modules;
 	uint32_t options;
 };
 

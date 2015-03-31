@@ -26,8 +26,8 @@ struct lua_State;
 
 struct engine {
     struct kr_context resolver;
-    modulelist_t modules;
     struct network net;
+    module_array_t modules;
     mm_ctx_t *pool;
     struct lua_State *L;
 };
