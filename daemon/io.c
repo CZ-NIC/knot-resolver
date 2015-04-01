@@ -106,7 +106,6 @@ static void tcp_unbind_handle(uv_handle_t *handle)
 {
 	uv_read_stop((uv_stream_t *)handle);
 	buf_free(handle);
-	uv_close(handle, NULL);
 }
 
 static void tcp_send(uv_handle_t *handle, const knot_pkt_t *answer)
@@ -129,7 +128,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	/* Check the incoming wire length (malformed, EOF or error). */
 	if (nread < (ssize_t) sizeof(uint16_t)) {
 		tcp_unbind_handle((uv_handle_t *)handle);
-		free(handle);
+		uv_close((uv_handle_t *)handle, (uv_close_cb) free);
 		return;
 	}
 
@@ -165,13 +164,12 @@ static void tcp_accept(uv_stream_t *master, int status)
 	uv_tcp_init(master->loop, client);
 	client->data = buf_alloc();
 	if (client->data == NULL) {
-		tcp_unbind_handle((uv_handle_t *)client);
 		free(client);
 		return;
 	}
 
 	if (uv_accept(master, (uv_stream_t*)client) != 0) {
-		tcp_unbind_handle((uv_handle_t *)client);
+		buf_free((uv_handle_t *)client);
 		free(client);
 		return;
 	}
@@ -205,4 +203,5 @@ int tcp_bind(struct endpoint *ep, struct sockaddr *addr)
 void tcp_unbind(struct endpoint *ep)
 {
 	tcp_unbind_handle((uv_handle_t *)&ep->tcp);
+	uv_close((uv_handle_t *)&ep->tcp, NULL);
 }
