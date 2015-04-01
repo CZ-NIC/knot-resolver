@@ -199,6 +199,8 @@ static int engine_loadconf(struct engine *engine)
 		#include "daemon/lua/init.inc"
 	};
 	if (luaL_dostring(engine->L, l_init) != 0) {
+		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
+		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
 
@@ -216,7 +218,7 @@ static int engine_loadconf(struct engine *engine)
 
 	/* Evaluate */
 	if (ret != 0) {
-		fprintf(stderr, "error: %s\n", lua_tostring(engine->L, -1));
+		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(EINVAL);
 	}

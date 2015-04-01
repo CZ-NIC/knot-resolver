@@ -28,5 +28,5 @@ function protect(defined)
 		end
 	})
 end
-_G = protect(getfenv(0))
-setfenv(0, _G)
+-- _G = protect(getfenv(0))
+-- setfenv(0, _G)
