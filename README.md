@@ -20,16 +20,11 @@ This is simple and doesn't require any dependencies or system modifications, jus
 $ docker run cznic/knot-resolver
 ```
 
-See the build page https://registry.hub.docker.com/u/cznic/knot-resolver for more information and options.
-You can hack on the container by changing the container entrypoint to shell like:
-
-```
-$ docker run -it --entrypoint=/bin/bash cznic/knot-resolver
-```
+See the build page [registry.hub.docker.com/u/cznic/knot-resolver](https://registry.hub.docker.com/u/cznic/knot-resolver) for more information and options.
 
 ### Building from sources 
 
-The Knot DNS Resolver depends on the development version of the Knot DNS library, and a reasonably recent version of `libuv`.
+The Knot DNS Resolver [depends][depends] on the development version of the Knot DNS library.
 Several dependencies may not be in the packages yet, the script pulls and installs all dependencies in a chroot.
 
 You can avoid rebuilding dependencies by specifying `BUILD_IGNORE` variable, see the [Dockerfile](scripts/Dockerfile)
@@ -45,11 +40,16 @@ $ make check
 
 ### Running
 
-There is a separate resolver library in the `lib` directory, and a minimalistic daemon in
-the `daemon` directory. The daemon accepts a few CLI parameters, and there's no support for configuration
-right now.
+There is a separate resolver library in the `lib` directory, and a daemon in the `daemon` directory.
 
 ```
 $ ./daemon/kresolved -h
 $ ./daemon/kresolved -a "127.0.0.1#53"
 ```
+
+### More
+
+See the documentation at [knot-resolver.readthedocs.org][doc].
+
+[depends]: http://knot-resolver.readthedocs.org/en/latest/build.html
+[doc]: http://knot-resolver.readthedocs.org/en/latest/index.html
