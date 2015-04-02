@@ -1,7 +1,7 @@
 # Knot DNS Resolver
 
 [![Build Status](https://travis-ci.org/CZ-NIC/knot-resolver.svg?branch=master)](https://travis-ci.org/CZ-NIC/knot-resolver)
-[![Coverage Status](https://coveralls.io/r/CZ-NIC/knot-resolver/badge.svg?branch=master)](https://coveralls.io/r/CZ-NIC/knot-resolver?branch=master)
+[![Coverage Status](https://coveralls.io/repos/CZ-NIC/knot-resolver/badge.svg)](https://coveralls.io/r/CZ-NIC/knot-resolver)
 
 The Knot DNS Resolver is a minimalistic caching resolver implementation. The project provides both a resolver
 library and a small daemon. Modular architecture of the library keeps the core tiny and efficient, and provides
