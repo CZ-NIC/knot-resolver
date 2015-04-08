@@ -17,6 +17,5 @@ CFLAGS  += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR)\"" -DPREFIX="\"$(PREFIX)\"" -D
 RM	:= rm -f
 LN      := ln -s
 XXD     ?= xxd
-LUAC    ?= luac
 INSTALL := install
 PYTHON  := python
