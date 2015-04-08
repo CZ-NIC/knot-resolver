@@ -192,6 +192,9 @@ int engine_cmd(struct engine *engine, const char *str)
 	return kr_ok();
 }
 
+/* Execute byte code */
+#define l_dobytecode(L, arr, len, name) \
+	(luaL_loadbuffer((L), (arr), (len), (name)) || lua_pcall((L), 0, LUA_MULTRET, 0))
 static int engine_loadconf(struct engine *engine)
 {
 	/* Init environment */
