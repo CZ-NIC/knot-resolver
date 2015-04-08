@@ -8,10 +8,9 @@ kresolved_SOURCES := \
 	daemon/main.c
 
 # Embed resources
-daemon/engine.o: daemon/lua/init.inc daemon/lua/config.inc
+daemon/engine.o: daemon/lua/sandbox.inc daemon/lua/config.inc
 %.inc: %.lua
-	@$(call quiet,XXD,$<) -i < $< > $@
-	@echo ', 0x00' >> $@
+	@$(call quiet,XXD,$<) -i - < $< > $@
 
 # Dependencies
 kresolved_DEPEND := $(libkresolve)
