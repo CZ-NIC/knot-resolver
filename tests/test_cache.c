@@ -25,8 +25,8 @@ namedb_txn_t global_txn;
 knot_rrset_t global_rr;
 const char *global_env;
 
-#define CACHE_SIZE 100 * 4096
-#define CACHE_TTL  1
+#define CACHE_SIZE 10 * 4096
+#define CACHE_TTL 2 
 
 /* Test invalid parameters. */
 static void test_invalid(void **state)
@@ -40,6 +40,9 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_peek(&global_txn, NULL, NULL), KNOT_EOK);
 	assert_int_not_equal(kr_cache_insert(&global_txn, NULL, 0), KNOT_EOK);
 	assert_int_not_equal(kr_cache_insert(NULL, NULL, 0), KNOT_EOK);
+	assert_int_not_equal(kr_cache_remove(&global_txn, NULL), KNOT_EOK);
+	assert_int_not_equal(kr_cache_remove(NULL, NULL), KNOT_EOK);
+	assert_int_not_equal(kr_cache_clear(NULL), KNOT_EOK);
 }
 
 /* Test cache open */
@@ -93,17 +96,19 @@ static void test_insert(void **state)
 static void test_query(void **state)
 {
 
-	uint32_t timestamp = 0;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
 	namedb_txn_t *txn = test_txn_rdonly(state);
-	int query_ret = kr_cache_peek(txn, &cache_rr, &timestamp);
-	bool rr_equal = knot_rrset_equal(&global_rr, &cache_rr, KNOT_RRSET_COMPARE_WHOLE);
-	kr_cache_txn_abort(txn);
 
-	assert_int_equal(query_ret, KNOT_EOK);
-	assert_true(rr_equal);
+	for (uint32_t timestamp = 0; timestamp < CACHE_TTL; ++timestamp) {
+		int query_ret = kr_cache_peek(txn, &cache_rr, &timestamp);
+		bool rr_equal = knot_rrset_equal(&global_rr, &cache_rr, KNOT_RRSET_COMPARE_WHOLE);
+		assert_int_equal(query_ret, KNOT_EOK);
+		assert_true(rr_equal);
+	}
+
+	kr_cache_txn_abort(txn);
 }
 
 /* Test cache read (simulate aged entry) */
@@ -129,7 +134,7 @@ static void test_fill(void **state)
 	for (unsigned i = 0; i < CACHE_SIZE; ++i) {
 		knot_rrset_t rr;
 		test_random_rr(&rr, CACHE_TTL);
-		ret = kr_cache_insert(txn, &rr, 0);
+		ret = kr_cache_insert(txn, &rr, CACHE_TTL - 1);
 		if (ret != KNOT_EOK) {
 			break;
 		}
