@@ -165,6 +165,16 @@ void engine_deinit(struct engine *engine)
 	kr_cache_close(engine->resolver.cache);
 }
 
+/** Execute current chunk in the sandbox */
+static int l_sandboxcall(lua_State *L)
+{
+#if LUA_VERSION_NUM >= 502
+	lua_getglobal(L, "_SANDBOX");
+	lua_setupvalue(L, -2, 1);
+#endif
+	return lua_pcall(L, 0, LUA_MULTRET, 0);
+}
+
 int engine_cmd(struct engine *engine, const char *str)
 {
 	if (engine == NULL || engine->L == NULL) {
@@ -172,7 +182,10 @@ int engine_cmd(struct engine *engine, const char *str)
 	}
 
 	/* Evaluate results */
-	int ret = luaL_dostring(engine->L, str);
+	int ret = luaL_loadstring(engine->L, str);
+	if (ret == 0) {
+		ret = l_sandboxcall(engine->L);
+	}
 
 	/* Print results. */
 	int nres = lua_gettop(engine->L);
@@ -195,13 +208,17 @@ int engine_cmd(struct engine *engine, const char *str)
 /* Execute byte code */
 #define l_dobytecode(L, arr, len, name) \
 	(luaL_loadbuffer((L), (arr), (len), (name)) || lua_pcall((L), 0, LUA_MULTRET, 0))
+/** Load file in a sandbox environment. */
+#define l_dosandboxfile(L, filename) \
+	(luaL_loadfile((L), (filename)) || l_sandboxcall((L)))
+
 static int engine_loadconf(struct engine *engine)
 {
 	/* Init environment */
-	static const char l_init[] = {
-		#include "daemon/lua/init.inc"
+	static const char sandbox_bytecode[] = {
+		#include "daemon/lua/sandbox.inc"
 	};
-	if (luaL_dostring(engine->L, l_init) != 0) {
+	if (l_dobytecode(engine->L, sandbox_bytecode, sizeof(sandbox_bytecode), "init") != 0) {
 		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
@@ -210,13 +227,13 @@ static int engine_loadconf(struct engine *engine)
 	/* Load config file */
 	int ret = 0;
 	if(access("config", F_OK ) != -1 ) {
-		ret = luaL_dofile(engine->L, "config");
+		ret = l_dosandboxfile(engine->L, "config");
 	} else {
 		/* Load defaults */
-		static const char config_init[] = {
+		static const char config_bytecode[] = {
 			#include "daemon/lua/config.inc"
 		};
-		ret = luaL_dostring(engine->L, config_init);
+		ret = l_dobytecode(engine->L, config_bytecode, sizeof(config_bytecode), "config");
 	}
 
 	/* Evaluate */

@@ -12,9 +12,9 @@ setmetatable(modules, {
 	end
 })
 
--- Some services are append-only
-function protect(defined)
-	local __protected = { ['modules'] = true }
+-- Make sandboxed environment
+function make_sandbox(defined)
+	local __protected = { modules = true, cache = true, net = true }
 	return setmetatable({}, {
 		__index = defined,
 		__newindex = function (t, k, v)
@@ -28,5 +28,10 @@ function protect(defined)
 		end
 	})
 end
--- _G = protect(getfenv(0))
--- setfenv(0, _G)
+
+if setfenv then -- Lua 5.1 and less
+	_G = make_sandbox(getfenv(0))
+	setfenv(0, _G)
+else -- Lua 5.2+
+	_SANDBOX = make_sandbox(_ENV)
+end
