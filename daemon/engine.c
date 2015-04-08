@@ -166,13 +166,13 @@ void engine_deinit(struct engine *engine)
 }
 
 /** Execute current chunk in the sandbox */
-static int l_sandboxcall(lua_State *L)
+static int l_sandboxcall(lua_State *L, int argc)
 {
 #if LUA_VERSION_NUM >= 502
 	lua_getglobal(L, "_SANDBOX");
 	lua_setupvalue(L, -2, 1);
 #endif
-	return lua_pcall(L, 0, LUA_MULTRET, 0);
+	return lua_pcall(L, argc, LUA_MULTRET, 0);
 }
 
 int engine_cmd(struct engine *engine, const char *str)
@@ -182,23 +182,11 @@ int engine_cmd(struct engine *engine, const char *str)
 	}
 
 	/* Evaluate results */
-	int ret = luaL_loadstring(engine->L, str);
-	if (ret == 0) {
-		ret = l_sandboxcall(engine->L);
-	}
-
-	/* Print results. */
-	int nres = lua_gettop(engine->L);
-	for (int i = 0; i < nres; ++i) {
-		const char *out = lua_tostring(engine->L, -1);
-		if (out != NULL) {
-			printf("%s\n", out);
-		}
-		lua_pop(engine->L, 1);
-	}
+	lua_getglobal(engine->L, "eval_cmd");
+	lua_pushstring(engine->L, str);
 
 	/* Check result. */
-	if (ret != 0) {
+	if (l_sandboxcall(engine->L, 1) != 0) {
 		return kr_error(EINVAL);
 	}
 
@@ -210,7 +198,7 @@ int engine_cmd(struct engine *engine, const char *str)
 	(luaL_loadbuffer((L), (arr), (len), (name)) || lua_pcall((L), 0, LUA_MULTRET, 0))
 /** Load file in a sandbox environment. */
 #define l_dosandboxfile(L, filename) \
-	(luaL_loadfile((L), (filename)) || l_sandboxcall((L)))
+	(luaL_loadfile((L), (filename)) || l_sandboxcall((L), 0))
 
 static int engine_loadconf(struct engine *engine)
 {
