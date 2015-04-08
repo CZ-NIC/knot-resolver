@@ -86,6 +86,7 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pip install --user ${USER} -r ${PIP_PKGS}
+	rm ${HOME}/.cache/pip/log/debug.log || true
 fi
 
 # gnutls + dependencies
