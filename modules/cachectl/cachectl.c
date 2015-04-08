@@ -54,6 +54,8 @@ static char* get_size(void *env, struct kr_module *module, const char *args)
 	if (ret == 0) {
 		asprintf(&result, "{ \"size\": %d }", storage->count(&txn));
 		kr_cache_txn_abort(&txn);
+	} else {
+		asprintf(&result, "{ \"error\": \"%s\" }", knot_strerror(ret));
 	}
 	
 	return result;
