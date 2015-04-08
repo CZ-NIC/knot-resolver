@@ -15,6 +15,8 @@ NETTLE_TAG="2.7.1"
 NETTLE_URL="https://ftp.gnu.org/gnu/nettle/nettle-${NETTLE_TAG}.tar.gz"
 GNUTLS_TAG="3.3.12"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
+LUA_TAG="5.2.3"
+LUA_URL="http://www.lua.org/ftp/lua-${LUA_TAG}.tar.gz"
 
 # prepare install prefix
 PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
@@ -47,14 +49,18 @@ function build_pkg {
 	if [ -f CMakeLists.txt ]; then
 		[ -e cmake-build ] && rm -rf cmake-build; mkdir cmake-build; cd cmake-build
 		cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} ..
-	else
+		make ${MAKEOPTS}
+		make install
+	elif [ -f configure.ac ]; then
 		if [ ! -e ./configure ]; then
 			[ -e autogen.sh ] && sh autogen.sh || autoreconf -if
 		fi
 		./configure --prefix=${PREFIX} --enable-shared $*
+		make ${MAKEOPTS}
+		make install
+	else
+		make $* ${MAKEOPTS}
 	fi
-	make ${MAKEOPTS}
-	make install
 }
 
 function pkg {
@@ -99,6 +105,21 @@ pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 # libuv
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
+# lua
+pkg lua ${LUA_URL} ${LUA_TAG} include/lua.h generic install INSTALL_TOP=${PREFIX}
+cat > ${PREFIX}/lib/pkgconfig/lua.pc << EOF
+prefix=${PREFIX}
+exec_prefix=\${prefix}
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
+
+Name: Lua
+Description: An Extensible Extension Language
+Version: ${LUA_TAG}
+Requires:
+Libs: -L\${libdir} -llua -lm
+Cflags: -I\${includedir}
+EOF
 
 # remove on successful build
 rm -rf ${BUILD_DIR}
