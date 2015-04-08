@@ -59,7 +59,7 @@ function build_pkg {
 		make ${MAKEOPTS}
 		make install
 	else
-		make $* ${MAKEOPTS}
+		make $*
 	fi
 }
 
