@@ -8,10 +8,10 @@ endif
 
 # Unit tests
 ifeq ($(HAS_cmocka), yes)
-include tests.unit.mk
+include tests/unit.mk
 # Integration tests
 ifeq ($(HAS_python), yes)
-include tests.integration.mk
+include tests/integration.mk
 endif # HAS_python
 endif # HAS_cmocka
 
