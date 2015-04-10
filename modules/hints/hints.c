@@ -35,14 +35,12 @@
 
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
 
-struct hint_map
-{
+struct hint_map {
 	list_t list;
 	mm_ctx_t pool;
 };
 
-struct hint_pair
-{
+struct hint_pair {
 	node_t n;
 	knot_dname_t *name;
 	char *addr;
