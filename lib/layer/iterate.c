@@ -35,7 +35,7 @@ enum {
 	PKT_NOERROR   = 1 << 0, /* Positive response */
 	PKT_NODATA    = 1 << 1, /* No data response */
 	PKT_NXDOMAIN  = 1 << 2, /* Negative response */
-	PKT_ERROR     = 1 << 3  /* Refused or server failure */ 
+	PKT_ERROR     = 1 << 3  /* Refused or server failure */
 };
 
 /* Iterator often walks through packet section, this is an abstraction. */
@@ -155,7 +155,7 @@ int rr_update_parent(const knot_rrset_t *rr, unsigned hint, struct kr_layer_para
 int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param)
 {
 	knot_pkt_t *answer = param->answer;
-	
+
 	/* Write copied RR to the result packet. */
 	int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE, rr, hint);
 	if (ret != KNOT_EOK) {
@@ -176,7 +176,7 @@ static bool has_glue(const knot_dname_t *ns_name, knot_pkt_t *pkt)
 		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
 		if ((rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) &&
 		   (knot_dname_is_equal(ns_name, rr->owner))) {
-		   	return true;
+			return true;
 		}
 	}
 	return false;
@@ -372,7 +372,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	query->id = dnssec_random_uint16_t();
 	knot_wire_set_id(pkt->wire, query->id);
-	
+
 	/* Declare EDNS0 support. */
 	knot_rrset_t opt_rr;
 	ret = knot_edns_init(&opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);

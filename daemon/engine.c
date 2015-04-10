@@ -37,7 +37,7 @@
 /** Print help and available commands. */
 static int l_help(lua_State *L)
 {
-	static const char *help_str = 
+	static const char *help_str =
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
 		"modules.list()\n    list modules\n"
@@ -242,7 +242,7 @@ int engine_start(struct engine *engine)
 		return ret;
 	}
 
-	return uv_run(uv_default_loop(), UV_RUN_DEFAULT);	
+	return uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 }
 
 void engine_stop(struct engine *engine)
@@ -320,7 +320,7 @@ void engine_lualib(struct engine *engine, const char *name, lua_CFunction lib_cb
 
 struct engine *engine_luaget(lua_State *L)
 {
- 	lua_getglobal(L, "__engine");
+	lua_getglobal(L, "__engine");
 	struct engine *engine = lua_touserdata(L, -1);
 	lua_pop(engine->L, 1);
 	return engine;

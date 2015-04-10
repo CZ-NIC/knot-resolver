@@ -15,7 +15,7 @@
  */
 
 /** \addtogroup utils
- * @{ 
+ * @{
  */
 
 #pragma once

@@ -39,7 +39,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	if (txn == NULL) {
 		return KNOT_EOK;
 	}
-	
+
 	/* Fetch current nameserver cache. */
 	uint32_t drift = qry->timestamp.tv_sec;
 	knot_rrset_t cached;
@@ -49,7 +49,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 		return KNOT_EOK;
 	}
 	cached = kr_cache_materialize(&cached, drift, rplan->pool);
-	
+
 	/* Find a matching RD. */
 	knot_rdataset_t to_remove;
 	knot_rdataset_init(&to_remove);
@@ -61,7 +61,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	}
 	knot_rdataset_subtract(&cached.rrs, &to_remove, rplan->pool);
 	knot_rdataset_clear(&to_remove, rplan->pool);
-	
+
 	/* Remove record(s) */
 	int ret = KNOT_EOK;
 	if (cached.rrs.rr_count == 0) {
@@ -78,7 +78,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 
 static int ns_resolve_addr(struct kr_query *cur, struct kr_layer_param *param)
 {
-	if (kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A) || 
+	if (kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A) ||
 	    kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA)) {
 		DEBUG_MSG("=> dependency loop, bailing out\n");
 		kr_rplan_pop(param->rplan, cur);

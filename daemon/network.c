@@ -161,7 +161,7 @@ int network_close(struct network *net, const char *addr, uint16_t port)
 			break;
 		}
 	}
-	
+
 	/* Collapse key if it has no endpoint. */
 	if (ep_array->len == 0) {
 		free(ep_array);

@@ -15,7 +15,7 @@
  */
 
 /** \addtogroup resolution
- * @{ 
+ * @{
  */
 
 #pragma once

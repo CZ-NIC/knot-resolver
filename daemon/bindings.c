@@ -204,7 +204,7 @@ static int net_interfaces(lua_State *L)
 		}
 		*(p - 1) = '\0';
 		lua_pushstring(L, buf);
-		lua_setfield(L, -2, "mac");		
+		lua_setfield(L, -2, "mac");
 
 		/* Push table */
 		lua_setfield(L, -2, iface.name);

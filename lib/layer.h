@@ -17,7 +17,7 @@
 #pragma once
 
 /** \addtogroup rplan
- * @{ 
+ * @{
  */
 
 #include <libknot/processing/layer.h>

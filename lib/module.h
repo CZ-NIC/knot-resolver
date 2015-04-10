@@ -15,7 +15,7 @@
  */
 
 /** \addtogroup modules
- * @{ 
+ * @{
  */
 
 #pragma once
@@ -73,7 +73,7 @@ struct kr_module {
 
 /**
  * Load module instance into memory.
- * 
+ *
  * @param module module structure
  * @param name module name
  * @param path module search path
@@ -83,14 +83,14 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 
 /**
  * Unload module instance.
- * 
+ *
  * @param module module structure
  */
 void kr_module_unload(struct kr_module *module);
 
 /**
  * Export module API version (place this at the end of your module).
- * 
+ *
  * @param module module name (f.e. hints)
  */
 #define KR_MODULE_EXPORT(module) \

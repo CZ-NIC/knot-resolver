@@ -7,14 +7,14 @@
  * Generics - A Crit-bit tree 'map' implementation.
  *
  *  @warning If the user provides a custom allocator, it must return addresses aligned to 2B boundary.
- * 
+ *
  *  Example usage:
- *  
+ *
  *      map_t map = map_make();
  *
- * 	// Custom allocator (optional)
- * 	map.malloc = &mymalloc;
- * 	map.baton  = &mymalloc_context;
+ *      // Custom allocator (optional)
+ *      map.malloc = &mymalloc;
+ *      map.baton  = &mymalloc_context;
  *
  *      // Insert keys
  *      if (map_set(&map, "princess") != 0 ||
@@ -29,7 +29,7 @@
  *      }
  *
  *      // Prefix search
- *      int i = 0; 
+ *      int i = 0;
  *      int count(const char *s, void *n) { (*(int *)n)++; return 0; }
  *      if (map_walk_prefixed(map, "princ", count, &i) == 0) {
  *          printf("%d matches\n", i);
@@ -42,9 +42,9 @@
  *
  *      // Clear the map
  *      map_clear(&map);
- * 
+ *
  * \addtogroup generics
- * @{ 
+ * @{
  */
 
 #pragma once

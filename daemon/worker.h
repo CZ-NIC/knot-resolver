@@ -31,7 +31,7 @@ struct worker_ctx {
 
 /**
  * Resolve query.
- * 
+ *
  * @param worker
  * @param answer
  * @param query

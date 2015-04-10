@@ -108,7 +108,7 @@ static cb_data_t *cbt_make_data(map_t *map, const uint8_t *str, size_t len, void
 		x->value = value;
 		memcpy(x->key, str, len);
 	}
-	return x;	
+	return x;
 }
 
 /*! Creates a new, empty critbit map */

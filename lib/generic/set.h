@@ -2,9 +2,9 @@
  * Generics - A Crit-bit set implementation.
  *
  *  @note The API is based on @fn map.h, see it for more examples.
- * 
+ *
  *  Example usage:
- *  
+ *
  *      set_t set = set_make();
  *
  *      // Insert keys
@@ -20,7 +20,7 @@
  *      }
  *
  *      // Prefix search
- *      int i = 0; 
+ *      int i = 0;
  *      int count(const char *s, void *n) { (*(int *)n)++; return 0; }
  *      if (set_walk_prefixed(set, "princ", count, &i) == 0) {
  *          printf("%d matches\n", i);
@@ -33,9 +33,9 @@
  *
  *      // Clear the set
  *      set_clear(&set);
- * 
+ *
  * \addtogroup generics
- * @{ 
+ * @{
  */
 
 #pragma once

@@ -15,7 +15,7 @@
  */
 
 /** \addtogroup cache
- * @{ 
+ * @{
  */
 #pragma once
 

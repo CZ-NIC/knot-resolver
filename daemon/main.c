@@ -70,7 +70,7 @@ static const char *set_addr(char *addr, int *port)
 		*port = atoi(p + 1);
 		*p = '\0';
 	}
-	
+
 	return addr;
 }
 
@@ -114,7 +114,7 @@ int main(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 		printf("[system] rundir '%s'\n", argv[optind]);
-    	}
+	}
 
 	/* Block signals. */
 	uv_loop_t *loop = uv_default_loop();

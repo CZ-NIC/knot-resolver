@@ -15,7 +15,7 @@
  */
 
 /** \addtogroup nameservers
- * @{ 
+ * @{
  */
 
 #pragma once

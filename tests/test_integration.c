@@ -64,7 +64,7 @@ static PyObject* init(PyObject* self, PyObject* args)
 	memset(&global_context, 0, sizeof(struct kr_context));
 	global_context.pool = &global_mm;
 	global_context.modules = &global_modules;
-	
+
 	global_tmpdir = test_tmpdir_create();
 	assert(global_tmpdir);
 	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, 100 * 4096);
@@ -72,7 +72,7 @@ static PyObject* init(PyObject* self, PyObject* args)
 
 	/* No configuration parsing support yet. */
 	if (strstr(config, "query-minimization: on") == NULL) {
-		global_context.options |= QUERY_NO_MINIMIZE; 
+		global_context.options |= QUERY_NO_MINIMIZE;
 	}
 
 	return Py_BuildValue("");

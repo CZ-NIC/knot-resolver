@@ -26,7 +26,7 @@ knot_rrset_t global_rr;
 const char *global_env;
 
 #define CACHE_SIZE 10 * 4096
-#define CACHE_TTL 2 
+#define CACHE_TTL 2
 
 /* Test invalid parameters. */
 static void test_invalid(void **state)

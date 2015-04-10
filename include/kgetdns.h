@@ -346,7 +346,7 @@ getdns_return_t getdns_context_set_edns_version(
 
 /**
  * Set EDNS DO (DNSSEC OK) bit.
- * 
+ *
  * @param value EDNS DO bit (0 or 1, default 0).
  */
 getdns_return_t getdns_context_set_edns_do_bit(

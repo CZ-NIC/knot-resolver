@@ -50,7 +50,7 @@ static int update_answer(const knot_rrset_t *rr, unsigned drift, struct kr_layer
 	if (rr_copy.rrs.rr_count == 0) {
 		return KNOT_STATE_FAIL;
 	}
-	
+
 	return rr_update_answer(&rr_copy, 0, param);
 }
 

@@ -15,7 +15,7 @@
  */
 
 /** \addtogroup resolution
- * @{ 
+ * @{
  */
 
 #pragma once
@@ -47,6 +47,6 @@
  */
 #define KR_DNS_PORT   53
 #define KR_EDNS_VERSION 0
-#define KR_EDNS_PAYLOAD 4096  
+#define KR_EDNS_PAYLOAD 4096
 
 /** @} */

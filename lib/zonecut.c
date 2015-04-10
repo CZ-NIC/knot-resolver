@@ -137,7 +137,7 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn
 	if (ret != KNOT_EOK) {
 		return ret;
 	}
-	
+
 	/* Accept only if has address records cached. */
 	for (unsigned i = 0; i < cached_rr.rrs.rr_count; ++i) {
 		kr_set_zone_cut(cut, name, knot_ns_name(&cached_rr.rrs, i));

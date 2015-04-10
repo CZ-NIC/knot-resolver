@@ -20,17 +20,17 @@
  * \note The C has no generics, so it is implemented mostly using macros.
  * Be aware of that, as direct usage of the macros in the evaluating macros
  * may lead to different expectations, i.e.
- * 
+ *
  *     MIN(array_push(arr, val))
  *
  *  May evaluate the code twice, leading to unexpected behaviour.
  *  This is a price to pay for absence of proper generics.
  *
  *  Example usage:
- *  
+ *
  *      array_t(const char*) arr;
  *      array_init(arr);
- *      
+ *
  *      // Reserve memory in advance
  *      if (array_reserve(arr, 2) < 0) {
  *          return ENOMEM;
@@ -52,9 +52,9 @@
  *
  *      // Random delete
  *      array_del(arr, 0);
- * 
+ *
  * \addtogroup generics
- * @{ 
+ * @{
  */
 
 #pragma once

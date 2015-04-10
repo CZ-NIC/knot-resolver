@@ -19,20 +19,20 @@
 /** Check ABI version, return error on mismatch. */
 #define ABI_CHECK(m, prefix, symname, required) do { \
 	if ((m)->lib != RTLD_DEFAULT) { \
-	 	module_api_cb *_api = NULL; \
-	 	*(void **) (&_api) = load_symbol((m)->lib, (prefix), (symname)); \
-	 	if (_api == NULL) { \
-	 		return kr_error(ENOENT); \
-	 	} \
-	 	if (_api() != (required)) { \
-	 		return kr_error(ENOTSUP); \
-	 	} \
- 	}\
- } while (0)
+		module_api_cb *_api = NULL; \
+		*(void **) (&_api) = load_symbol((m)->lib, (prefix), (symname)); \
+		if (_api == NULL) { \
+			return kr_error(ENOENT); \
+		} \
+		if (_api() != (required)) { \
+			return kr_error(ENOTSUP); \
+		} \
+	}\
+} while (0)
 
-/** Load ABI by symbol names. */ 
+/** Load ABI by symbol names. */
 #define ABI_LOAD(m, prefix, s_init, s_deinit, s_config, s_layer, s_prop) do { \
- 	module_prop_cb *module_prop = NULL; \
+	module_prop_cb *module_prop = NULL; \
 	*(void **) (&(m)->init)   = load_symbol((m)->lib, (prefix), (s_init)); \
 	*(void **) (&(m)->deinit) = load_symbol((m)->lib, (prefix), (s_deinit)); \
 	*(void **) (&(m)->config) = load_symbol((m)->lib, (prefix), (s_config)); \
@@ -76,9 +76,9 @@ static int load_library(struct kr_module *module, const char *name, const char *
 /** Load C module symbols. */
 static int load_sym_c(struct kr_module *module, uint32_t api_required)
 {
- 	auto_free char *module_prefix = kr_strcatdup(2, module->name, "_");
- 	ABI_CHECK(module, module_prefix, "api", api_required);
- 	ABI_LOAD(module, module_prefix, "init", "deinit", "config", "layer", "props");
+	auto_free char *module_prefix = kr_strcatdup(2, module->name, "_");
+	ABI_CHECK(module, module_prefix, "api", api_required);
+	ABI_LOAD(module, module_prefix, "init", "deinit", "config", "layer", "props");
 	return kr_ok();
 }
 
@@ -114,7 +114,7 @@ static int bootstrap_libgo(struct kr_module *module)
 	return kr_ok();
 }
 
-/** Load Go module symbols. */ 
+/** Load Go module symbols. */
 static int load_ffi_go(struct kr_module *module, uint32_t api_required)
 {
 	/* Bootstrap libgo */
@@ -149,7 +149,7 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 		auto_free char *local_path = kr_strcatdup(2, getenv("HOME"), "/.local" MODULEDIR);
 		if (load_library(module, name, local_path) != 0) {
 			if (load_library(module, name, PREFIX MODULEDIR) != 0) {
-				module->lib = RTLD_DEFAULT;	
+				module->lib = RTLD_DEFAULT;
 			}
 		}
 	}
@@ -167,7 +167,6 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 	if (ret != 0) {
 		kr_module_unload(module);
 	}
-
 
 	return ret;
 }

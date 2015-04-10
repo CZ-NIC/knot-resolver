@@ -15,7 +15,7 @@
  */
 
 /** \addtogroup rplan
- * @{ 
+ * @{
  */
 
 #pragma once

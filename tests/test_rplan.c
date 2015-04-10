@@ -30,7 +30,7 @@ static void test_rplan_params(void **state)
 	assert_null(kr_rplan_txn_acquire(NULL, 0));
 	assert_int_equal(kr_rplan_txn_commit(NULL), KNOT_EINVAL);
 	kr_rplan_deinit(NULL);
-	
+
 	/* NULL mandatory parameters */
 
 	struct kr_rplan rplan;

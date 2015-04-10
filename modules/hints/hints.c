@@ -31,7 +31,7 @@
 
 /* TODO: this is an experimental (slow) proof-of-concept,
  *       this will be rewritten with namedb API
- */ 
+ */
 
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
 
@@ -89,7 +89,7 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 			knot_rrset_t rr;
 			knot_rrset_init(&rr, pair->name, qtype, KNOT_CLASS_IN);
 			struct sockaddr_storage addr;
-			sockaddr_set(&addr, addr_type, pair->addr, 0); 
+			sockaddr_set(&addr, addr_type, pair->addr, 0);
 			size_t addr_len = 0;
 			uint8_t *raw_addr = sockaddr_raw(&addr, &addr_len);
 			knot_rrset_add_rdata(&rr, raw_addr, addr_len, 0, &param->answer->mm);
@@ -135,7 +135,7 @@ static int load_map(struct hint_map *map, FILE *fp)
 			if (pair->addr == NULL) {
 				return kr_error(ENOMEM);
 			}
-			
+
 			strcpy(pair->addr, tok);
 			add_tail(&map->list, &pair->n);
 			name_tok = strtok_r(NULL, " \t\n", &saveptr);

@@ -163,7 +163,7 @@ knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ct
 	if (copy.owner == NULL) {
 		return copy;
 	}
-	
+
 	for (uint16_t i = 0; i < src->rrs.rr_count; ++i) {
 		knot_rdata_t *rd = knot_rdataset_at(&src->rrs, i);
 		if (knot_rdata_ttl(rd) > drift) {
@@ -173,13 +173,13 @@ knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ct
 			}
 		}
 	}
-	
+
 	/* Update TTLs. */
 	for (uint16_t i = 0; i < copy.rrs.rr_count; ++i) {
 		knot_rdata_t *rd = knot_rdataset_at(&copy.rrs, i);
 		knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
 	}
-	
+
 	return copy;
 }
 
