@@ -93,6 +93,10 @@ Usually you only really need to rebuild `libknot`.
 
       $ make check libknot_CFLAGS="-I/opt/include" libknot_LIBS="-L/opt/lib -lknot -lknot-int -ldnssec"
 
+.. note:: If the dependencies lie outside of library search path, you need to add them somehow.
+   Try ``LD_LIBRARY_PATH`` on Linux/BSD, and ``DYLD_FALLBACK_LIBRARY_PATH`` on OS X. Otherwise you might
+   need to add the locations to the linker search path.
+
 When you have all the dependencies ready, you can build, test and install.
 
 .. code-block:: bash

@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/CZ-NIC/knot-resolver.svg?branch=master)](https://travis-ci.org/CZ-NIC/knot-resolver)
 [![Coverage Status](https://coveralls.io/repos/CZ-NIC/knot-resolver/badge.svg)](https://coveralls.io/r/CZ-NIC/knot-resolver)
+[![Coverity](https://scan.coverity.com/projects/3912/badge.svg)](https://scan.coverity.com/projects/3912)
+
 
 The Knot DNS Resolver is a minimalistic caching resolver implementation. The project provides both a resolver
 library and a small daemon. Modular architecture of the library keeps the core tiny and efficient, and provides
@@ -24,30 +26,17 @@ See the build page [registry.hub.docker.com/u/cznic/knot-resolver](https://regis
 
 ### Building from sources 
 
-The Knot DNS Resolver [depends][depends] on the development version of the Knot DNS library.
-Several dependencies may not be in the packages yet, the script pulls and installs all dependencies in a chroot.
-
-You can avoid rebuilding dependencies by specifying `BUILD_IGNORE` variable, see the [Dockerfile](scripts/Dockerfile)
-for example. Usually you only really need to rebuild `libknot`.
-
-```
-$ export FAKEROOT="${HOME}/.local"
-$ export PKG_CONFIG_PATH="${FAKEROOT}/lib/pkgconfig"
-$ ./scripts/bootstrap-depends.sh ${FAKEROOT}
-$ make
-$ make check
-```
+The Knot DNS Resolver [depends][depends] on the pre-release version of the Knot DNS library and other projects.
+See the [Building project][depends] documentation page for more information.
 
 ### Running
 
-There is a separate resolver library in the `lib` directory, and a daemon in the `daemon` directory.
+The project builds a resolver library in the `lib` directory, and a daemon in the `daemon` directory.
 
 ```
 $ ./daemon/kresolved -h
-$ ./daemon/kresolved -a "127.0.0.1#53"
+$ ./daemon/kresolved [working_directory]
 ```
-
-### More
 
 See the documentation at [knot-resolver.readthedocs.org][doc].
 
