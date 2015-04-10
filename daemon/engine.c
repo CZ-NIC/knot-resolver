@@ -28,11 +28,12 @@
  */
 
 /** Register module callback into Lua world. */
-#define REGISTER_MODULE_CALL(L, module, cb, name) \
+#define REGISTER_MODULE_CALL(L, module, cb, name) do { \
 	lua_pushlightuserdata((L), (module)); \
 	lua_pushlightuserdata((L), (cb)); \
 	lua_pushcclosure((L), l_trampoline, 2); \
-	lua_setfield((L), -2, (name))
+	lua_setfield((L), -2, (name)); \
+	} while (0)
 
 /** Print help and available commands. */
 static int l_help(lua_State *L)
