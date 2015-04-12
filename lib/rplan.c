@@ -87,8 +87,6 @@ void kr_rplan_deinit(struct kr_rplan *rplan)
 	if (rplan->txn.db != NULL) {
 		kr_cache_txn_abort(&rplan->txn);
 	}
-
-	kr_rplan_init(rplan, rplan->context, rplan->pool);
 }
 
 bool kr_rplan_empty(struct kr_rplan *rplan)
