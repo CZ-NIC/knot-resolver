@@ -251,7 +251,7 @@ int engine_start(struct engine *engine)
 		return ret;
 	}
 
-	return uv_run(uv_default_loop(), UV_RUN_DEFAULT);
+	return kr_ok();
 }
 
 void engine_stop(struct engine *engine)
