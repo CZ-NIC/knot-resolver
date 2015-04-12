@@ -1,5 +1,6 @@
+****************************
 Knot DNS Resolver extensions
-============================
+****************************
 
 The resolver :ref:`library <lib_index>` leverages the `processing API`_ from the libknot to separate packet processing code
 into layers. In order to keep the core library sane and coverable, there are only two built-in layers:

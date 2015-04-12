@@ -49,8 +49,8 @@ There are also *optional* packages that enable specific functionality in Knot DN
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
 
-Docker image
-~~~~~~~~~~~~
+Getting Docker image
+--------------------
 
 Docker images require only either Linux or a Linux VM (see boot2docker_ on OS X).
 
@@ -65,8 +65,10 @@ You can hack on the container by changing the container entrypoint to shell like
 
    $ docker run -it --entrypoint=/bin/bash cznic/knot-resolver
 
+.. tip:: You can build the Docker image yourself with ``docker build -t knot-resolver scripts``.
+
 Building from sources 
-~~~~~~~~~~~~~~~~~~~~~
+---------------------
 
 The Knot DNS Resolver depends on the development version of the Knot DNS library, and a reasonably recent version of `libuv`.
 Several dependencies may not be in the packages yet, the script pulls and installs all dependencies in a chroot.
@@ -93,17 +95,19 @@ Usually you only really need to rebuild `libknot`.
 
       $ make check libknot_CFLAGS="-I/opt/include" libknot_LIBS="-L/opt/lib -lknot -lknot-int -ldnssec"
 
-.. note:: If the dependencies lie outside of library search path, you need to add them somehow.
-   Try ``LD_LIBRARY_PATH`` on Linux/BSD, and ``DYLD_FALLBACK_LIBRARY_PATH`` on OS X. Otherwise you might
-   need to add the locations to the linker search path.
+.. warning:: If the dependencies lie outside of library search path, you need to add them somehow.
+   Try ``LD_LIBRARY_PATH`` on Linux/BSD, and ``DYLD_FALLBACK_LIBRARY_PATH`` on OS X.
+   Otherwise you need to add the locations to linker search path.
 
 When you have all the dependencies ready, you can build, test and install.
 
 .. code-block:: bash
 
-   $ make
+   $ make PREFIX="/usr/local"
    $ make check
    $ make install
+
+.. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path.
 
 Alternatively you can build only specific parts of the project, i.e. ``library``.
 
