@@ -267,23 +267,45 @@ int lib_net(lua_State *L)
 	return 1;
 }
 
+/** Return number of cached records. */
+static int cache_count(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	const namedb_api_t *storage = kr_cache_storage();
+
+	/* Fetch item count */
+	namedb_txn_t txn;
+	int ret = kr_cache_txn_begin(engine->resolver.cache, &txn, NAMEDB_RDONLY);
+	if (ret != 0) {
+		lua_pushstring(L, kr_strerror(ret));
+		lua_error(L);
+	}
+
+	lua_pushinteger(L, storage->count(&txn));
+	kr_cache_txn_abort(&txn);
+	return 1;
+}
+
 /** Open cache */
 static int cache_open(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2) {
-		lua_pushstring(L, "expected (string path, int size)");
+	if (n < 1) {
+		lua_pushstring(L, "expected (number max_size)");
 		lua_error(L);
 	}
 
-	/* Open resolution context cache */
+	/* Close if already open */
 	struct engine *engine = engine_luaget(L);
-	engine->resolver.cache = kr_cache_open(lua_tostring(L, 1), engine->pool, lua_tointeger(L, 2));
+	if (engine->resolver.cache != NULL) {
+		kr_cache_close(engine->resolver.cache);
+	}
+
+	/* Open resolution context cache */
+	engine->resolver.cache = kr_cache_open(".", engine->pool, lua_tointeger(L, 1));
 	if (engine->resolver.cache == NULL) {
-		lua_pushstring(L, "invalid cache directory: ");
-		lua_pushstring(L, lua_tostring(L, 1));
-		lua_concat(L, 2);
+		lua_pushstring(L, "can't open cache in rundir");
 		lua_error(L);
 	}
 
@@ -295,8 +317,9 @@ static int cache_close(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	if (engine->resolver.cache != NULL) {
-		kr_cache_close(engine->resolver.cache);
+		struct kr_cache *cache = engine->resolver.cache;
 		engine->resolver.cache = NULL;
+		kr_cache_close(cache);
 	}
 
 	lua_pushboolean(L, 1);
@@ -306,6 +329,7 @@ static int cache_close(lua_State *L)
 int lib_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
+		{ "count",  cache_count },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
 		{ NULL, NULL }
