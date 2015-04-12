@@ -41,15 +41,10 @@ static int l_help(lua_State *L)
 	static const char *help_str =
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
-		"modules.list()\n    list modules\n"
-		"modules.load()\n    load module\n"
-		"modules.unload()\n    unload module\n"
-		"cache.open(path, max_size)\n    open cache\n"
-		"cache.close()\n    close cache\n"
+		"hostname()\n    hostname\n"
 		;
-	puts(help_str);
-	/* No results */
-	return 0;
+	lua_pushstring(L, help_str);
+	return 1;
 }
 
 /** Quit current executable. */
@@ -59,6 +54,15 @@ static int l_quit(lua_State *L)
 	engine_stop(engine_luaget(L));
 	/* No results */
 	return 0;
+}
+
+/** Return hostname. */
+static int l_hostname(lua_State *L)
+{
+	char host_str[KNOT_DNAME_MAXLEN];
+	gethostname(host_str, sizeof(host_str));
+	lua_pushstring(L, host_str);
+	return 1;
 }
 
 /** Trampoline function for module properties. */
@@ -115,6 +119,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "help");
 	lua_pushcfunction(engine->L, l_quit);
 	lua_setglobal(engine->L, "quit");
+	lua_pushcfunction(engine->L, l_hostname);
+	lua_setglobal(engine->L, "hostname");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
