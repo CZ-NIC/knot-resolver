@@ -1,3 +1,26 @@
+-- Units
+kB = 1024
+MB = 1024*1024
+GB = 1024*1024
+
+-- Function aliases
+-- `env.VAR returns os.getenv(VAR)`
+env = {}
+setmetatable(env, {
+	__index = function (t, k) return os.getenv(k) end
+})
+
+-- Quick access to interfaces
+-- `net.<iface>` => `net.interfaces()[iface]`
+setmetatable(net, {
+	__index = function (t, k)
+		local v = rawget(t, k)
+		if v then return v
+		else return net.interfaces()[k]
+		end
+	end
+})
+
 -- Syntactic sugar for module loading
 -- `modules.<name> = <config>`
 setmetatable(modules, {
