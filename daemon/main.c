@@ -76,7 +76,7 @@ static const char *set_addr(char *addr, int *port)
 
 int main(int argc, char **argv)
 {
-	const char *addr = "127.0.0.1";
+	const char *addr = NULL;
 	int port = 53;
 
 	/* Long options. */
@@ -108,12 +108,16 @@ int main(int argc, char **argv)
 
 	/* Switch to rundir. */
 	if (optind < argc) {
-		ret = chdir(argv[optind]);
-		if (ret != 0) {
-			fprintf(stderr, "[system] rundir '%s': %s\n", argv[optind], strerror(errno));
+		const char *rundir = argv[optind];
+		if (access(rundir, W_OK) != 0) {
+			fprintf(stderr, "[system] rundir '%s': not writeable\n", rundir);
 			return EXIT_FAILURE;
 		}
-		printf("[system] rundir '%s'\n", argv[optind]);
+		ret = chdir(rundir);
+		if (ret != 0) {
+			fprintf(stderr, "[system] rundir '%s': %s\n", rundir, strerror(errno));
+			return EXIT_FAILURE;
+		}
 	}
 
 	/* Block signals. */
