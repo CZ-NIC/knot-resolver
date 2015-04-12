@@ -3,6 +3,7 @@
 [![Build Status](https://img.shields.io/travis/CZ-NIC/knot-resolver.svg)](https://travis-ci.org/CZ-NIC/knot-resolver)
 [![Coverage Status](https://img.shields.io/coveralls/CZ-NIC/knot-resolver.svg)](https://coveralls.io/r/CZ-NIC/knot-resolver)
 [![Coverity](https://img.shields.io/coverity/scan/3912.svg)](https://scan.coverity.com/projects/3912)
+[![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
 
 The Knot DNS Resolver is a minimalistic caching resolver implementation. The project provides both a resolver
