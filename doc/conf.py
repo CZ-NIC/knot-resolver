@@ -49,6 +49,8 @@ html_use_smartypants = True
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'apidoc'
 
+# Theme
+html_theme = 'sphinx_rtd_theme'
 
 # -- Options for LaTeX output --------------------------------------------------
 

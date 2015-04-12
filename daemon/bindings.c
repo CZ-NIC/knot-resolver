@@ -126,20 +126,61 @@ static int net_list(lua_State *L)
 	return 1;
 }
 
+/** Listen on interface address list. */
+static int net_listen_iface(lua_State *L, int port)
+{
+	/* Expand 'addr' key if exists */
+	lua_getfield(L, 1, "addr");
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+		lua_pushvalue(L, 1);
+	}
+
+	/* Bind to address list */
+	struct engine *engine = engine_luaget(L);
+	size_t count = lua_rawlen(L, -1);
+	for (size_t i = 0; i < count; ++i) {
+		lua_rawgeti(L, -1, i + 1);
+		int ret = network_listen(&engine->net, lua_tostring(L, -1),
+		                         port, NET_TCP|NET_UDP);
+		if (ret != 0) {
+			lua_pushstring(L, kr_strerror(ret));
+			lua_error(L);
+		}
+		lua_pop(L, 1);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 /** Listen on endpoint. */
 static int net_listen(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2) {
-		lua_pushstring(L, "expected (string addr, int port)");
+	int port = KR_DNS_PORT;
+	if (n > 1 && lua_isnumber(L, 2)) {
+		port = lua_tointeger(L, 2);
+	}
+
+	/* Process interface or (address, port) pair. */
+	if (lua_istable(L, 1)) {
+		return net_listen_iface(L, port);
+	} else if (n < 1 || !lua_isstring(L, 1)) {
+		lua_pushstring(L, "expected (string addr, int port = 53)");
 		lua_error(L);
 	}
 
 	/* Open resolution context cache */
 	struct engine *engine = engine_luaget(L);
-	int ret = network_listen(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2), NET_TCP|NET_UDP);
-	lua_pushboolean(L, ret == 0);
+	int ret = network_listen(&engine->net, lua_tostring(L, 1), port, NET_TCP|NET_UDP);
+	if (ret != 0) {
+		lua_pushstring(L, kr_strerror(ret));
+		lua_error(L);
+	}
+
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -160,8 +201,7 @@ static int net_close(lua_State *L)
 	return 1;
 }
 
-/** List available interfaces.
- */
+/** List available interfaces. */
 static int net_interfaces(lua_State *L)
 {
 	/* Retrieve interface list */
@@ -227,23 +267,45 @@ int lib_net(lua_State *L)
 	return 1;
 }
 
+/** Return number of cached records. */
+static int cache_count(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	const namedb_api_t *storage = kr_cache_storage();
+
+	/* Fetch item count */
+	namedb_txn_t txn;
+	int ret = kr_cache_txn_begin(engine->resolver.cache, &txn, NAMEDB_RDONLY);
+	if (ret != 0) {
+		lua_pushstring(L, kr_strerror(ret));
+		lua_error(L);
+	}
+
+	lua_pushinteger(L, storage->count(&txn));
+	kr_cache_txn_abort(&txn);
+	return 1;
+}
+
 /** Open cache */
 static int cache_open(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2) {
-		lua_pushstring(L, "expected (string path, int size)");
+	if (n < 1) {
+		lua_pushstring(L, "expected (number max_size)");
 		lua_error(L);
 	}
 
-	/* Open resolution context cache */
+	/* Close if already open */
 	struct engine *engine = engine_luaget(L);
-	engine->resolver.cache = kr_cache_open(lua_tostring(L, 1), engine->pool, lua_tointeger(L, 2));
+	if (engine->resolver.cache != NULL) {
+		kr_cache_close(engine->resolver.cache);
+	}
+
+	/* Open resolution context cache */
+	engine->resolver.cache = kr_cache_open(".", engine->pool, lua_tointeger(L, 1));
 	if (engine->resolver.cache == NULL) {
-		lua_pushstring(L, "invalid cache directory: ");
-		lua_pushstring(L, lua_tostring(L, 1));
-		lua_concat(L, 2);
+		lua_pushstring(L, "can't open cache in rundir");
 		lua_error(L);
 	}
 
@@ -255,8 +317,9 @@ static int cache_close(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	if (engine->resolver.cache != NULL) {
-		kr_cache_close(engine->resolver.cache);
+		struct kr_cache *cache = engine->resolver.cache;
 		engine->resolver.cache = NULL;
+		kr_cache_close(cache);
 	}
 
 	lua_pushboolean(L, 1);
@@ -266,6 +329,7 @@ static int cache_close(lua_State *L)
 int lib_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
+		{ "count",  cache_count },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
 		{ NULL, NULL }
