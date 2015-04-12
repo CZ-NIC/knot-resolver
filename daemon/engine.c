@@ -41,15 +41,10 @@ static int l_help(lua_State *L)
 	static const char *help_str =
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
-		"modules.list()\n    list modules\n"
-		"modules.load()\n    load module\n"
-		"modules.unload()\n    unload module\n"
-		"cache.open(path, max_size)\n    open cache\n"
-		"cache.close()\n    close cache\n"
+		"hostname()\n    hostname\n"
 		;
-	puts(help_str);
-	/* No results */
-	return 0;
+	lua_pushstring(L, help_str);
+	return 1;
 }
 
 /** Quit current executable. */
@@ -59,6 +54,15 @@ static int l_quit(lua_State *L)
 	engine_stop(engine_luaget(L));
 	/* No results */
 	return 0;
+}
+
+/** Return hostname. */
+static int l_hostname(lua_State *L)
+{
+	char host_str[KNOT_DNAME_MAXLEN];
+	gethostname(host_str, sizeof(host_str));
+	lua_pushstring(L, host_str);
+	return 1;
 }
 
 /** Trampoline function for module properties. */
@@ -115,6 +119,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "help");
 	lua_pushcfunction(engine->L, l_quit);
 	lua_setglobal(engine->L, "quit");
+	lua_pushcfunction(engine->L, l_hostname);
+	lua_setglobal(engine->L, "hostname");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
@@ -171,7 +177,7 @@ static int l_sandboxcall(lua_State *L, int argc)
 {
 #if LUA_VERSION_NUM >= 502
 	lua_getglobal(L, "_SANDBOX");
-	lua_setupvalue(L, -2, 1);
+	lua_setupvalue(L, -(2 + argc), 1);
 #endif
 	return lua_pcall(L, argc, LUA_MULTRET, 0);
 }
@@ -188,6 +194,8 @@ int engine_cmd(struct engine *engine, const char *str)
 
 	/* Check result. */
 	if (l_sandboxcall(engine->L, 1) != 0) {
+		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
+		lua_pop(engine->L, 1);
 		return kr_error(EINVAL);
 	}
 
@@ -227,7 +235,7 @@ static int engine_loadconf(struct engine *engine)
 
 	/* Evaluate */
 	if (ret != 0) {
-		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
+		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(EINVAL);
 	}
@@ -243,7 +251,7 @@ int engine_start(struct engine *engine)
 		return ret;
 	}
 
-	return uv_run(uv_default_loop(), UV_RUN_DEFAULT);
+	return kr_ok();
 }
 
 void engine_stop(struct engine *engine)

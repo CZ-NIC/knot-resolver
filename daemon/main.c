@@ -76,7 +76,7 @@ static const char *set_addr(char *addr, int *port)
 
 int main(int argc, char **argv)
 {
-	const char *addr = "127.0.0.1";
+	const char *addr = NULL;
 	int port = 53;
 
 	/* Long options. */
@@ -108,12 +108,16 @@ int main(int argc, char **argv)
 
 	/* Switch to rundir. */
 	if (optind < argc) {
-		ret = chdir(argv[optind]);
-		if (ret != 0) {
-			fprintf(stderr, "[system] rundir '%s': %s\n", argv[optind], strerror(errno));
+		const char *rundir = argv[optind];
+		if (access(rundir, W_OK) != 0) {
+			fprintf(stderr, "[system] rundir '%s': not writeable\n", rundir);
 			return EXIT_FAILURE;
 		}
-		printf("[system] rundir '%s'\n", argv[optind]);
+		ret = chdir(rundir);
+		if (ret != 0) {
+			fprintf(stderr, "[system] rundir '%s': %s\n", rundir, strerror(errno));
+			return EXIT_FAILURE;
+		}
 	}
 
 	/* Block signals. */
@@ -146,31 +150,39 @@ int main(int argc, char **argv)
 	loop->data = &worker;
 
 	/* Bind to sockets. */
-	ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
-	if (ret != 0) {
-		fprintf(stderr, "[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
-		ret = EXIT_FAILURE;
-	} else {
-		/* Allocate TTY */
-		uv_pipe_t pipe;
-		uv_pipe_init(loop, &pipe, 0);
-		uv_pipe_open(&pipe, 0);
-		pipe.data = &engine;
+	if (addr != NULL) {
+		ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
+		if (ret != 0) {
+			fprintf(stderr, "[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
+			ret = EXIT_FAILURE;
+		}
+	}
 
+	if (ret == 0) {
 		/* Interactive stdin */
+		uv_pipe_t pipe;
 		if (!feof(stdin)) {
-			printf("[system] listening on '%s#%d'\n", addr, port);
 			printf("[system] started in interactive mode, type 'help()'\n");
+			uv_pipe_init(loop, &pipe, 0);
+			uv_pipe_open(&pipe, 0);
+			pipe.data = &engine;
 			tty_read(NULL, 0, NULL);
 			uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_read);
 		}
+
 		/* Run the event loop. */
 		ret = engine_start(&engine);
+		if (ret == 0) {
+			ret = uv_run(uv_default_loop(), UV_RUN_DEFAULT);
+		}
 	}
 
 	/* Cleanup. */
 	fprintf(stderr, "\n[system] quitting\n");
 	engine_deinit(&engine);
 
+	if (ret != 0) {
+		ret = EXIT_FAILURE;
+	}
 	return ret;
 }

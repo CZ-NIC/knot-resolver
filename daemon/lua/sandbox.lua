@@ -13,7 +13,7 @@ setmetatable(modules, {
 })
 
 -- Make sandboxed environment
-function make_sandbox(defined)
+local function make_sandbox(defined)
 	local __protected = { modules = true, cache = true, net = true }
 	return setmetatable({}, {
 		__index = defined,
@@ -29,11 +29,35 @@ function make_sandbox(defined)
 	})
 end
 
+-- Compatibility sandbox
 if setfenv then -- Lua 5.1 and less
 	_G = make_sandbox(getfenv(0))
 	setfenv(0, _G)
 else -- Lua 5.2+
 	_SANDBOX = make_sandbox(_ENV)
+end
+
+-- Interactive command evaluation
+function eval_cmd(line)
+	-- Compatibility sandbox code loading
+	local function load_code(code)
+	    if getfenv then -- Lua 5.1
+	        return loadstring(code)
+	    else            -- Lua 5.2+
+	        return load(code, nil, 't', _ENV)
+	    end
+	end
+	local status, err, chunk
+	chunk, err = load_code('table_print('..line..')')
+	if err then
+		chunk, err = load_code(line)
+	end
+	if not err then
+		chunk()
+	end
+	if err then
+		print(err)
+	end
 end
 
 -- Pretty printing
@@ -56,19 +80,5 @@ function table_print (tt, indent, done)
 		end
 	else
 		io.write(tostring(tt) .. "\n")
-	end
-end
-
--- Interactive command evaluation
-function eval_cmd(line)
-	local chunk, err = loadstring('table_print('..line..')')
-	if err then
-		chunk, err = loadstring(line)
-	end
-	if not err then
-		status, err = pcall(chunk)
-	end
-	if err then
-		print(err)
 	end
 end
