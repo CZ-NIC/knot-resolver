@@ -126,20 +126,61 @@ static int net_list(lua_State *L)
 	return 1;
 }
 
+/** Listen on interface address list. */
+static int net_listen_iface(lua_State *L, int port)
+{
+	/* Expand 'addr' key if exists */
+	lua_getfield(L, 1, "addr");
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+		lua_pushvalue(L, 1);
+	}
+
+	/* Bind to address list */
+	struct engine *engine = engine_luaget(L);
+	size_t count = lua_rawlen(L, -1);
+	for (size_t i = 0; i < count; ++i) {
+		lua_rawgeti(L, -1, i + 1);
+		int ret = network_listen(&engine->net, lua_tostring(L, -1),
+		                         port, NET_TCP|NET_UDP);
+		if (ret != 0) {
+			lua_pushstring(L, kr_strerror(ret));
+			lua_error(L);
+		}
+		lua_pop(L, 1);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 /** Listen on endpoint. */
 static int net_listen(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2) {
-		lua_pushstring(L, "expected (string addr, int port)");
+	int port = KR_DNS_PORT;
+	if (n > 1 && lua_isnumber(L, 2)) {
+		port = lua_tointeger(L, 2);
+	}
+
+	/* Process interface or (address, port) pair. */
+	if (lua_istable(L, 1)) {
+		return net_listen_iface(L, port);
+	} else if (n < 1 || !lua_isstring(L, 1)) {
+		lua_pushstring(L, "expected (string addr, int port = 53)");
 		lua_error(L);
 	}
 
 	/* Open resolution context cache */
 	struct engine *engine = engine_luaget(L);
-	int ret = network_listen(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2), NET_TCP|NET_UDP);
-	lua_pushboolean(L, ret == 0);
+	int ret = network_listen(&engine->net, lua_tostring(L, 1), port, NET_TCP|NET_UDP);
+	if (ret != 0) {
+		lua_pushstring(L, kr_strerror(ret));
+		lua_error(L);
+	}
+
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -160,8 +201,7 @@ static int net_close(lua_State *L)
 	return 1;
 }
 
-/** List available interfaces.
- */
+/** List available interfaces. */
 static int net_interfaces(lua_State *L)
 {
 	/* Retrieve interface list */
