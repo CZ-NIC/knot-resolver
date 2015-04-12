@@ -34,16 +34,14 @@
 
 /** Check ABI version, return error on mismatch. */
 #define ABI_CHECK(m, prefix, symname, required) do { \
-	if ((m)->lib != RTLD_DEFAULT) { \
-		module_api_cb *_api = NULL; \
-		*(void **) (&_api) = load_symbol((m)->lib, (prefix), (symname)); \
-		if (_api == NULL) { \
-			return kr_error(ENOENT); \
-		} \
-		if (_api() != (required)) { \
-			return kr_error(ENOTSUP); \
-		} \
-	}\
+	module_api_cb *_api = NULL; \
+	*(void **) (&_api) = load_symbol((m)->lib, (prefix), (symname)); \
+	if (_api == NULL) { \
+		return kr_error(ENOENT); \
+	} \
+	if (_api() != (required)) { \
+		return kr_error(ENOTSUP); \
+	} \
 } while (0)
 
 /** Load ABI by symbol names. */
