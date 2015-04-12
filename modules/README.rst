@@ -2,90 +2,27 @@
 Knot DNS Resolver extensions
 ****************************
 
-The resolver :ref:`library <lib_index>` leverages the `processing API`_ from the libknot to separate packet processing code
-into layers. In order to keep the core library sane and coverable, there are only two built-in layers:
-the :c:func:`iterate_layer`, and the :c:func:`itercache_layer`. The resolver context however can
-load shared libraries on runtime, which allows us to build and register external modules as well.
+Writing extensions
+==================
+
+.. contents::
+   :depth: 2
+   :local:
 
 Supported languages
 -------------------
 
 Currently modules written in C are supported.
-There is also a rudimentary support for writing modules in Go |---| ⑴ the library has no native Go bindings, library is accessible using CGO_, ⑵ gc doesn't support building shared libraries, GCCGO_ is required, ⑶ no coroutines and no garbage collecting thread, as the Go code is called from C threads.
+There is also a rudimentary support for writing modules in Go |---| |(1)| the library has no native Go bindings, library is accessible using CGO_, |(2)| gc doesn't support building shared libraries, GCCGO_ is required, |(3)| no coroutines and no garbage collecting thread, as the Go code is called from C threads.
 
-There is a plan for Lua scriptables, but it's not implemented yet.
-
-Available services
-------------------
-
-*Note* |---| This is only crash-course in the library internals, see the resolver :ref:`library <lib_index>` documentation for the complete overview of the services.
-
-The library offers following services:
-
-- :ref:`Cache <lib_cache>` - MVCC cache interface for retrieving/storing resource records.
-- :ref:`Resolution plan <lib_rplan>` - Query resolution plan, a list of partial queries (with hierarchy) sent in order to satisfy original query. This contains information about the queries, nameserver choice, timing information, answer and its class.
-- :ref:`Nameservers <lib_nameservers>` - Reputation database of nameservers, this serves as an aid for nameserver choice.
-
-If you're going to publish a layer in your module, it's going to be called by the query resolution driver for each query,
-so you're going to work with :ref:`struct kr_layer_param <lib_api_rplan>` as your per-query context. This structure contains pointers to
-resolution context, resolution plan and also the final answer. You're likely to retrieve currently solved query from the query plan:
-
-.. code-block:: c
-
-	int consume(knot_layer_t *ctx, knot_pkt_t *pkt)
-	{
-		struct kr_layer_param *param = ctx->data;
-		struct kr_query *query = kr_rplan_current(param->rplan);
-	}
-
-This is only passive processing of the incoming answer. If you want to change the course of resolution, say satisfy a query from a local cache before the library issues a query to the nameserver, you can use states (see the `Static hints`_ for example).
-
-.. code-block:: c
-
-	int produce(knot_layer_t *ctx, knot_pkt_t *pkt)
-	{
-		struct kr_layer_param *param = ctx->data;
-		struct kr_query *cur = kr_rplan_current(param->rplan);
-		
-		/* Query can be satisfied locally. */
-		if (can_satisfy(cur)) {
-			/* This flag makes the resolver move the query
-			 * to the "resolved" list. */
-			query->resolved = true;
-			return KNOT_STATE_DONE;
-		}
-
-		/* Pass-through. */
-		return ctx->state;
-	}
-
-It is possible to not only act during the query resolution, but also to view the complete resolution plan afterwards.
-This is useful for analysis-type tasks, or *"on-resolution"* hooks.
-
-.. code-block:: c
-
-	int finish(knot_layer_t *ctx)
-	{
-		struct kr_layer_param *param = ctx->data;
-		struct kr_rplan *rplan = param->rplan;
-
-		/* Print the query sequence with start time. */
-		char qname_str[KNOT_DNAME_MAXLEN];
-		struct kr_query *qry = NULL
-		WALK_LIST(qry, rplan->resolved) {
-			knot_dname_to_str(qname_str, qry->sname, sizeof(qname_str));
-			printf("%s at %u\n", qname_str, qry->timestamp);
-		}
-
-		return ctx->state;
-	}
+.. note:: There is a plan for Lua scriptables, but it's not implemented yet.
 
 The anatomy of an extension
 ---------------------------
 
 A module is a shared library defining specific functions, here's an overview of the functions.
 
-*Note* |---| the :ref:`Modules <lib_modules>` header documents the module loading and API.
+*Note* |---| the :ref:`Modules <lib_api_modules>` header documents the module loading and API.
 
 .. csv-table::
    :header: "C", "Go", "Params", "Comment"
@@ -94,7 +31,7 @@ A module is a shared library defining specific functions, here's an overview of 
    "``X_init()``",    "``Init()``",   "``module``",      "Constructor"
    "``X_deinit()``",  "``Deinit()``", "``module, key``", "Destructor"
    "``X_config()``",  "``Config()``", "``module``",      "Configuration"
-   "``X_layer()``",   "``Layer()``",  "",                "Module layer"
+   "``X_layer()``",   "``Layer()``",  "",                ":ref:`Module layer <lib-layers>`"
    "``X_props()``",   "``Props()``",  "",                "NULL-terminated list of properties"
 
 .. [#] Mandatory symbol.
@@ -102,12 +39,10 @@ A module is a shared library defining specific functions, here's an overview of 
 The ``X_`` corresponds to the module name, if the module name is ``hints``, then the prefix for constructor would be ``hints_init()``.
 This doesn't apply for Go, as it for now always implements `main` and requires capitalized first letter in order to export its symbol.
 
-How does the module get loaded
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The resolution context :c:type:`struct kr_context` holds loaded modules for current context. A module can be registered with :c:func:`kr_context_register`, which triggers module constructor *immediately* after the load. Module destructor is automatically called when the resolution context closes.
-
-If the module exports a layer implementation, it is automatically discovered by :c:func:`kr_resolver` on resolution init and plugged in. The order in which the modules are registered corresponds to the call order of layers.
+.. note::
+   The resolution context :c:type:`struct kr_context` holds loaded modules for current context. A module can be registered with :c:func:`kr_context_register`, which triggers module constructor *immediately* after the load. Module destructor is automatically called when the resolution context closes.
+   
+   If the module exports a layer implementation, it is automatically discovered by :c:func:`kr_resolver` on resolution init and plugged in. The order in which the modules are registered corresponds to the call order of layers.
 
 Writing a module in C
 ---------------------
@@ -123,7 +58,7 @@ As almost all the functions are optional, the minimal module looks like this:
 
 Let's define an observer thread for the module as well. It's going to be stub for the sake of brevity,
 but you can for example create a condition, and notify the thread from query processing by declaring
-module layer (see the `Available services`_).
+module layer (see the :ref:`Writing layers <lib-layers>`).
 
 .. code-block:: c
 
@@ -244,6 +179,8 @@ Configuring modules
 
 There is a callback ``X_config()`` but it's NOOP for now, as the configuration is not yet implemented.
 
+.. _mod-properties:
+
 Exposing module properties
 --------------------------
 
@@ -286,7 +223,7 @@ Here's an example how a module can expose its property:
 	{
 		static struct kr_prop prop_list[] = {
 			/* Callback,   Name,   Description */
-			{&get_size, "size", "Return number of records."},
+			{&get_size, "get_size", "Return number of records."},
 			{NULL, NULL, NULL}
 		};
 		return prop_list;
@@ -302,14 +239,16 @@ Once you load the module, you can call the module property from the interactive 
 	...
 	[system] started in interactive mode, type 'help()'
 	> modules.load('cached')
-	> return cached.size()
+	> cached.get_size()
 	{ "size": 53 }
 
 *Note* |---| this relies on function pointers, so the same ``static inline`` trick as for the ``Layer()`` is required for C/Go.
 
-.. _`processing API`: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot/processing
 .. _`not present in Go`: http://blog.golang.org/gos-declaration-syntax
 .. _CGO: http://golang.org/cmd/cgo/
 .. _GCCGO: https://golang.org/doc/install/gccgo
 
 .. |---| unicode:: U+02014 .. em dash
+.. |(1)| unicode:: U+2474 .. (1)
+.. |(2)| unicode:: U+2475 .. (2)
+.. |(3)| unicode:: U+2476 .. (3)
