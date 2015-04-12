@@ -171,7 +171,7 @@ static int l_sandboxcall(lua_State *L, int argc)
 {
 #if LUA_VERSION_NUM >= 502
 	lua_getglobal(L, "_SANDBOX");
-	lua_setupvalue(L, -2, 1);
+	lua_setupvalue(L, -(2 + argc), 1);
 #endif
 	return lua_pcall(L, argc, LUA_MULTRET, 0);
 }
@@ -188,6 +188,8 @@ int engine_cmd(struct engine *engine, const char *str)
 
 	/* Check result. */
 	if (l_sandboxcall(engine->L, 1) != 0) {
+		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
+		lua_pop(engine->L, 1);
 		return kr_error(EINVAL);
 	}
 
@@ -227,7 +229,7 @@ static int engine_loadconf(struct engine *engine)
 
 	/* Evaluate */
 	if (ret != 0) {
-		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
+		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(EINVAL);
 	}
