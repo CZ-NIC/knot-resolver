@@ -14,7 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup resolution
+/** \addtogroup utils
  * @{
  */
 
@@ -34,6 +34,7 @@
 
 /*
  * Connection limits.
+ * @cond internal
  */
 #define KR_CONN_RTT_MAX 5000
 
@@ -48,5 +49,6 @@
 #define KR_DNS_PORT   53
 #define KR_EDNS_VERSION 0
 #define KR_EDNS_PAYLOAD 4096
+/* @endcond */
 
 /** @} */

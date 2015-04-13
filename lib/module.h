@@ -32,6 +32,7 @@ struct kr_prop;
 
 /*
  * API definition.
+ * @cond internal
  */
 typedef uint32_t (module_api_cb)(void);
 typedef int (module_init_cb)(struct kr_module *);
@@ -39,13 +40,9 @@ typedef int (module_deinit_cb)(struct kr_module *);
 typedef int (module_config_cb)(struct kr_module *, const char *);
 typedef const knot_layer_api_t* (module_layer_cb)(void);
 typedef struct kr_prop *(module_prop_cb)(void);
-
-#define KR_MODULE_API ((uint32_t) 0x20150401)
-
-/**
- * Property callback.
- */
 typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
+#define KR_MODULE_API ((uint32_t) 0x20150401)
+/* @endcond */
 
 /**
  * Module property (named callable).

@@ -258,11 +258,13 @@ Modules configuration
 
 The daemon provides an interface for dynamic loading of :ref:`daemon modules <modules-implemented>`.
 
-.. tip:: Use syntactic sugar for module loading. Declaring a variable ``modules`` equals to loading a table of modules.
+.. tip:: Use declarative interface for module loading.
 
          .. code-block:: lua
 
-		modules = { hints = {file = '/etc/hosts'} }
+		modules = {
+			hints = {file = '/etc/hosts'}
+		}
 
          Equals to:
 
@@ -294,8 +296,8 @@ Cache configuration
 ^^^^^^^^^^^^^^^^^^^
 
 The cache in Knot DNS Resolver is persistent with LMDB backend, this means that the daemon doesn't lose
-the cached data on restart or crash to avoid cold-starts. Interestingly the cache may be reused between cache
-daemons or manipulated from other processes, making for example synchronisation between load-balanced recursors possible.
+the cached data on restart or crash to avoid cold-starts. The cache may be reused between cache
+daemons or manipulated from other processes, making for example synchronised load-balanced recursors possible.
 
 .. function:: cache.open(max_size)
 

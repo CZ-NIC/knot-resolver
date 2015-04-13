@@ -24,6 +24,7 @@
 
 /*
  * General-purpose attributes.
+ * @cond internal
  */
 #define auto_free __attribute__((cleanup(_cleanup_free)))
 extern void _cleanup_free(char **p);
@@ -31,6 +32,7 @@ extern void _cleanup_free(char **p);
 extern void _cleanup_close(int *p);
 #define auto_fclose __attribute__((cleanup(_cleanup_fclose)))
 extern void _cleanup_fclose(FILE **p);
+/* @endcond */
 
 /*
  * Defines.
