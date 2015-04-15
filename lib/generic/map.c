@@ -53,12 +53,12 @@ static inline cb_node_t *ref_get_internal(uint8_t *p)
 }
 
 /* Standard memory allocation functions */
-static void *malloc_std(size_t size, void *baton) {
+static void *malloc_std(void *baton, size_t size) {
 	(void)baton; /* Prevent compiler warnings */
 	return malloc(size);
 }
 
-static void free_std(void *ptr, void *baton) {
+static void free_std(void *baton, void *ptr) {
 	(void)baton; /* Prevent compiler warnings */
 	free(ptr);
 }
@@ -71,9 +71,9 @@ static void cbt_traverse_delete(map_t *map, void *top)
 		cb_node_t *q = ref_get_internal(p);
 		cbt_traverse_delete(map, q->child[0]);
 		cbt_traverse_delete(map, q->child[1]);
-		map->free(q, map->baton);
+		map->free(map->baton, q);
 	} else {
-		map->free(p, map->baton);
+		map->free(map->baton, p);
 	}
 }
 
@@ -103,7 +103,7 @@ static int cbt_traverse_prefixed(void *top,
 
 static cb_data_t *cbt_make_data(map_t *map, const uint8_t *str, size_t len, void *value)
 {
-	cb_data_t *x = map->malloc(sizeof(cb_data_t) + len, map->baton);
+	cb_data_t *x = map->malloc(map->baton, sizeof(cb_data_t) + len);
 	if (x != NULL) {
 		x->value = value;
 		memcpy(x->key, str, len);
@@ -215,14 +215,14 @@ different_byte_found:
 	c = data->key[newbyte];
 	newdirection = (1 + (newotherbits | c)) >> 8;
 
-	newnode = map->malloc(sizeof(cb_node_t), map->baton);
+	newnode = map->malloc(map->baton, sizeof(cb_node_t));
 	if (newnode == NULL) {
 		return ENOMEM;
 	}
 
 	x = (uint8_t *)cbt_make_data(map, ubytes, ulen + 1, value);
 	if (x == NULL) {
-		map->free(newnode, map->baton);
+		map->free(map->baton, newnode);
 		return ENOMEM;
 	}
 
@@ -293,7 +293,7 @@ int map_del(map_t *map, const char *str)
 	if (strcmp(str, (const char *)data->key) != 0) {
 		return 1;
 	}
-	map->free(p, map->baton);
+	map->free(map->baton, p);
 
 	if (!whereq) {
 		map->root = NULL;
@@ -301,7 +301,7 @@ int map_del(map_t *map, const char *str)
 	}
 
 	*whereq = q->child[1 - direction];
-	map->free(q, map->baton);
+	map->free(map->baton, q);
 	return 0;
 }
 
