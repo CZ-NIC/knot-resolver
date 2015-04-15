@@ -58,8 +58,8 @@ extern "C" {
 /*! Main data structure */
 typedef struct {
 	void *root;
-	void *(*malloc)(size_t size, void *baton);
-	void (*free)(void *ptr, void *baton);
+	void *(*malloc)(void *baton, size_t size);
+	void (*free)(void *baton, void *ptr);
 	void *baton; /*! Passed to malloc() and free() */
 } map_t;
 

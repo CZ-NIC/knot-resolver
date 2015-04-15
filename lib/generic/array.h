@@ -21,7 +21,7 @@
  * Be aware of that, as direct usage of the macros in the evaluating macros
  * may lead to different expectations, i.e.
  *
- *     MIN(array_push(arr, val))
+ *     MIN(array_push(arr, val), other)
  *
  *  May evaluate the code twice, leading to unexpected behaviour.
  *  This is a price to pay for absence of proper generics.
@@ -58,9 +58,40 @@
  */
 
 #pragma once
+#include <stdlib.h>
 
-/** @todo Implement mreserve over custom memory context. */
-#include <libknot/internal/mem.h>
+/** Simplified Qt containers growth strategy. */
+static inline size_t array_next_count(size_t want)
+{
+	if (want < 2048) {
+		return (want < 20) ? want + 4 : want * 2;
+	} else {
+		return want + 2048;
+	}
+}
+
+/** @internal Incremental memory reservation */
+static inline int array_std_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+{
+	if (*have >= want) {
+		return 0;
+	}
+	/* Simplified Qt containers growth strategy */
+	size_t next_size = array_next_count(want);
+	void *mem_new = realloc(*mem, next_size * elm_size);
+	if (mem_new != NULL) {
+		*mem = mem_new;
+		*have = next_size;
+		return 0;
+	}
+	return -1;
+}
+
+/** @internal Wrapper for stdlib free. */
+static inline void array_std_free(void *baton, void *p)
+{
+	free(p);
+}
 
 /** Declare an array structure. */
 #define array_t(type) struct {type * at; size_t len; size_t cap; }
@@ -70,14 +101,20 @@
 
 /** Free and zero-initialize the array. */
 #define array_clear(array) \
-	free((array).at), array_init(array)
+	array_clear_mm(array, array_std_free, NULL)
+/** @internal Clear array with a callback. */
+#define array_clear_mm(array, free, baton) \
+	(free)((baton), (array).at), array_init(array)
 
 /**
  * Reserve capacity up to 'n' bytes.
  * @return >=0 if success
  */
 #define array_reserve(array, n) \
-	mreserve((char **) &(array).at, sizeof((array).at[0]), n, 0, &(array).cap)
+	array_reserve_mm(array, n, array_std_reserve, NULL)
+/** @internal Reserve capacity using callback. */
+#define array_reserve_mm(array, n, reserve, baton) \
+	(reserve)((baton), (char **) &(array).at, sizeof((array).at[0]), (n), &(array).cap)
 
 /**
  * Push value at the end of the array, resize it if necessary.
@@ -86,7 +123,7 @@
  */
 #define array_push(array, val) \
 	(array).len < (array).cap ? ((array).at[(array).len] = val, (array).len++) \
-		: (array_reserve(array, ((array).cap + 1) * 2) < 0 ? -1 \
+		: (array_reserve(array, ((array).cap + 1)) < 0 ? -1 \
 			: ((array).at[(array).len] = val, (array).len++))
 
 /**
