@@ -131,7 +131,7 @@ static void test_delete_all(void **state)
 }
 
 /* Fake allocator */
-static void *fake_malloc(size_t s, void *b) { return NULL; }
+static void *fake_malloc(void *b, size_t s) { return NULL; }
 static void test_allocator(void **state)
 {
 	set_t set = set_make();
