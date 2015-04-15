@@ -12,6 +12,7 @@ Data structures
 * ``array`` - a set of simple macros to make working with dynamic arrays easier.
 * ``set`` - a `Crit-bit tree`_ simple implementation (public domain) that comes with tests.
 * ``map`` - key-value map implemented on top of ``set``.
+* ``pack`` - length-prefixed list of objects (i.e. array-list).
 
 API reference and examples
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
