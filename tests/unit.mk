@@ -6,6 +6,7 @@ tests_BIN := \
 	test_set \
 	test_map \
 	test_array \
+	test_pack \
 	test_utils \
 	test_module \
 	test_rplan \
