@@ -5,24 +5,47 @@
 API reference
 =============
 
-.. doxygengroup:: resolution
-   :project: libkresolve
+.. contents::
+   :depth: 1
+   :local:
 
 .. _lib_api_rplan:
+
+Name resolution
+---------------
+
+.. doxygengroup:: resolution
+   :project: libkresolve
 
 .. doxygengroup:: rplan
    :project: libkresolve
 
+.. _lib_api_cache:
+
+Cache
+-----
+
 .. doxygengroup:: cache
    :project: libkresolve
+
+.. _lib_api_nameservers:
+
+Nameservers
+-----------
 
 .. doxygengroup:: nameservers
    :project: libkresolve
 
 .. _lib_api_modules:
 
+Modules
+-------
+
 .. doxygengroup:: modules
    :project: libkresolve
+
+Utilities
+---------
 
 .. doxygengroup:: utils
    :project: libkresolve

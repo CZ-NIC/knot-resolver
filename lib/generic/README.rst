@@ -6,18 +6,33 @@ such thing for C. It's either bloated, has poor interface, null-checking is abse
 doesn't allow custom allocation scheme. BSD-licensed (or compatible) code is allowed here,
 as long as it comes with a test case in `tests/test_generics.c`.
 
-Data structures
-~~~~~~~~~~~~~~~
+* array_ - a set of simple macros to make working with dynamic arrays easier.
+* map_ - a `Crit-bit tree`_ key-value map implementation (public domain) that comes with tests.
+* set_ - set abstraction implemented on top of ``map``.
+* pack_ - length-prefixed list of objects (i.e. array-list).
 
-* ``array`` - a set of simple macros to make working with dynamic arrays easier.
-* ``set`` - a `Crit-bit tree`_ simple implementation (public domain) that comes with tests.
-* ``map`` - key-value map implemented on top of ``set``.
-* ``pack`` - length-prefixed list of objects (i.e. array-list).
+array
+~~~~~
 
-API reference and examples
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. doxygenfile:: array.h
+   :project: libkresolve
 
-.. doxygengroup:: generics
+map
+~~~
+
+.. doxygenfile:: map.h
+   :project: libkresolve
+
+set
+~~~
+
+.. doxygenfile:: set.h
+   :project: libkresolve
+
+pack
+~~~~
+
+.. doxygenfile:: pack.h
    :project: libkresolve
 
 .. _`Crit-bit tree`: http://cr.yp.to/critbit.html 

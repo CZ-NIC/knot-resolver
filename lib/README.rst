@@ -15,31 +15,6 @@ Library layout
    :local:
 
 The library as described provides basic services for name resolution, which should cover the usage.
-The following part is for those who are planning to hack on the library or develop modules, to give
-you an idea about the API and the library layout.
-
-Name resolution
----------------
-
-.. _lib_rplan:
-
-Resolution plan
----------------
-
-.. _lib_cache:
-
-Cache
------
-
-.. _lib_nameservers:
-
-Nameservers
------------
-
-Utilities
-~~~~~~~~~
-
-.. warning:: Work in progress.
 
 Resolving a name
 ----------------
@@ -64,9 +39,9 @@ the :c:func:`iterate_layer`, and the :c:func:`itercache_layer`.
 
 The library offers following services:
 
-- :ref:`Cache <lib_cache>` - MVCC cache interface for retrieving/storing resource records.
-- :ref:`Resolution plan <lib_rplan>` - Query resolution plan, a list of partial queries (with hierarchy) sent in order to satisfy original query. This contains information about the queries, nameserver choice, timing information, answer and its class.
-- :ref:`Nameservers <lib_nameservers>` - Reputation database of nameservers, this serves as an aid for nameserver choice.
+- :ref:`Cache <lib_api_cache>` - MVCC cache interface for retrieving/storing resource records.
+- :ref:`Resolution plan <lib_api_rplan>` - Query resolution plan, a list of partial queries (with hierarchy) sent in order to satisfy original query. This contains information about the queries, nameserver choice, timing information, answer and its class.
+- :ref:`Nameservers <lib_api_nameservers>` - Reputation database of nameservers, this serves as an aid for nameserver choice.
 
 A processing layer is going to be called by the query resolution driver for each query,
 so you're going to work with :ref:`struct kr_layer_param <lib_api_rplan>` as your per-query context. This structure contains pointers to

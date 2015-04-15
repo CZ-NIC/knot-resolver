@@ -15,18 +15,21 @@
  */
 
 /**
- * Generics - simple dynamic array.
  *
- * \note The C has no generics, so it is implemented mostly using macros.
+ * @file array.h
+ * @brief A set of simple macros to make working with dynamic arrays easier.
+ *
+ * @note The C has no generics, so it is implemented mostly using macros.
  * Be aware of that, as direct usage of the macros in the evaluating macros
- * may lead to different expectations, i.e.
+ * may lead to different expectations:
  *
+ *     # Undefined behaviour
  *     MIN(array_push(arr, val), other)
  *
- *  May evaluate the code twice, leading to unexpected behaviour.
- *  This is a price to pay for absence of proper generics.
+ * May evaluate the code twice, leading to unexpected behaviour.
+ * This is a price to pay for the absence of proper generics.
  *
- *  Example usage:
+ * Example usage:
  *
  *      array_t(const char*) arr;
  *      array_init(arr);

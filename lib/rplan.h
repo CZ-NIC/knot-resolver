@@ -30,7 +30,7 @@
 #include "lib/cache.h"
 #include "lib/zonecut.h"
 
-/* Query flags */
+/** Query flags */
 enum kr_query_flag {
 	QUERY_NO_MINIMIZE = 1 << 0, /**< Don't minimize QNAME. */
 	QUERY_TCP         = 1 << 1  /**< Use TCP for this query. */

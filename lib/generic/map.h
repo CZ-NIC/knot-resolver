@@ -4,11 +4,13 @@
  */
 
 /**
- * Generics - A Crit-bit tree 'map' implementation.
  *
- *  @warning If the user provides a custom allocator, it must return addresses aligned to 2B boundary.
+ * @file map.h
+ * @brief A Crit-bit tree key-value map implementation.
  *
- *  Example usage:
+ * @warning If the user provides a custom allocator, it must return addresses aligned to 2B boundary.
+ *
+ * Example usage:
  *
  *      map_t map = map_make();
  *

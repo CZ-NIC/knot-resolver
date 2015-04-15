@@ -15,34 +15,35 @@
  */
 
 /**
- * Generics - array of lenght-prefixed packed objects
+ * @file pack.h
+ * @brief A length-prefixed list of objects, also an array list.
  * 
  * Each object is prefixed by item length, unlike array this structure 
  * permits variable-length data. It is also equivallent to forward-only list
  * backed by an array.
  *
- * @note Maximum object size is 2^16 bytes, @see pack_objlen_t
+ * @note Maximum object size is 2^16 bytes, see  ::pack_objlen_t
  *
  *  Example usage:
  *
- *     pack_t pack;
- *     pack_init(pack);
+ *      pack_t pack;
+ *      pack_init(pack);
  *
- *     // Reserve 2 objects, 6 bytes total
- *     pack_reserve(pack, 2, 4 + 2);
+ *      // Reserve 2 objects, 6 bytes total
+ *      pack_reserve(pack, 2, 4 + 2);
+ * 
+ *      // Push 2 objects
+ *      pack_obj_push(pack, U8("jedi"), 4)
+ *      pack_obj_push(pack, U8("\xbe\xef"), 2);
  *
- *     // Push 2 objects
- *     pack_obj_push(pack, U8("jedi"), 4)
- *     pack_obj_push(pack, U8("\xbe\xef"), 2);
+ *      // Iterate length-value pairs
+ *      uint8_t *it = pack_head(pack);
+ *      while (it != pack_tail(pack)) {
+ *          uint8_t *val = pack_obj_val(it);
+ *          it = pack_obj_next(it);
+ *      }
  *
- *     // Iterate length-value pairs
- *     uint8_t *it = pack_head(pack);
- *     while (it != pack_tail(pack)) {
- *         uint8_t *val = pack_obj_val(it);
- *         it = pack_obj_next(it);
- *     }
- *
- *     pack_clear(pack);
+ *      pack_clear(pack);
  *
  * \addtogroup generics
  * @{
@@ -51,6 +52,10 @@
 #include <stdint.h>
 #include <string.h>
 #include "array.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /** Packed object length type. */
 typedef uint16_t pack_objlen_t;
@@ -116,3 +121,9 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
 	pack->len += packed_len;
 	return 0;
 }
+
+#ifdef __cplusplus
+}
+#endif
+
+/** @} */
