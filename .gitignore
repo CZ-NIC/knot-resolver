@@ -39,3 +39,10 @@ tmp*
 /ylwrap
 /doc/doxyxml
 /doc/html
+/daemon/kresolved
+/tests/test_array
+/tests/test_map
+/tests/test_module
+/tests/test_pack
+/tests/test_set
+/tests/test_utils
