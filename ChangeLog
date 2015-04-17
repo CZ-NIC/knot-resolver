@@ -1,1 +1,10 @@
-NEWS
+# Change Log
+All notable changes to this project will be documented in this file.
+
+## [Unreleased][unreleased]
+### Changed
+
+- Written documentation
+- Resolver daemon with scriptable interface
+- Resolver library with basic interface
+- Pluggable modules written in C/Go
