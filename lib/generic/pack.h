@@ -43,6 +43,9 @@
  *          it = pack_obj_next(it);
  *      }
  *
+ *      // Remove object
+ *      pack_obj_del(pack, U8("jedi"), 4);
+ *
  *      pack_clear(pack);
  *
  * \addtogroup generics
@@ -80,7 +83,7 @@ typedef array_t(uint8_t) pack_t;
 	array_reserve_mm((pack), (pack).len + (sizeof(pack_objlen_t)*(objs_count) + (objs_len)), (reserve), (baton))
 /** Return pointer to first packed object. */
 #define pack_head(pack) \
-	&((pack).at[0])
+	((pack).len > 0 ? &((pack).at[0]) : NULL)
 /** Return pack end pointer. */
 #define pack_tail(pack) \
 	&((pack).at[(pack).len])
@@ -120,6 +123,26 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
 	memcpy(endp + sizeof(len), obj, len);
 	pack->len += packed_len;
 	return 0;
+}
+
+/** Delete object from the pack
+  * @return 0 on success, negative number on failure
+  */
+static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
+{
+	uint8_t *endp = pack_tail(*pack);
+	uint8_t *it = pack_head(*pack);
+	while (it != endp) {
+ 		uint8_t *val = pack_obj_val(it);
+ 		if (pack_obj_len(it) == len && memcmp(obj, val, len) == 0) {
+ 			size_t packed_len = len + sizeof(len);
+ 			memmove(it, it + packed_len, endp - it - packed_len);
+ 			pack->len -= packed_len;
+ 			return 0;
+ 		}
+ 		it = pack_obj_next(it);
+ 	}
+ 	return -1;
 }
 
 #ifdef __cplusplus
