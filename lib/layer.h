@@ -23,8 +23,10 @@
 #include <libknot/processing/layer.h>
 #include <libknot/packet/pkt.h>
 
-#include "lib/resolve.h"
-#include "lib/rplan.h"
+#include "lib/defines.h"
+
+struct kr_context;
+struct kr_rplan;
 
 /**
  * Processing module parameters.

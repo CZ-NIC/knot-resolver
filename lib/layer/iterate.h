@@ -17,6 +17,7 @@
 #pragma once
 
 #include "lib/layer.h"
+#include "lib/rplan.h"
 
 /* Processing module implementation. */
 extern const knot_layer_api_t *iterate_layer(void);

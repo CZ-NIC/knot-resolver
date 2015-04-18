@@ -27,8 +27,9 @@ static void test_pack_std(void **state)
 	pack_init(pack);
 	assert_int_equal(pack.len, 0);
 
-	/* Push without reservation. */
+	/* Push/delete without reservation. */
 	assert_int_not_equal(pack_obj_push(&pack, U8(""), 1), 0);
+	assert_int_not_equal(pack_obj_del(&pack, U8(""), 1), 0);
 
 	/* Reserve capacity and fill. */
 	assert_true(pack_reserve(pack, 10, 10 * 2) >= 0);
@@ -48,6 +49,10 @@ static void test_pack_std(void **state)
 		count += 1;
 	}
 
+	/* Delete */
+	assert_int_not_equal(pack_obj_del(&pack, U8("be"), 2), 0);
+	assert_int_equal(pack_obj_del(&pack, U8("de"), 2), 0);
+	assert_int_equal(pack.len, 9*(2+2)); /* 9 objects, length=2 */
 
 	pack_clear(pack);
 }

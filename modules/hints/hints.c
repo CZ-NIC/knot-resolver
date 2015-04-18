@@ -93,7 +93,7 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 			knot_rrset_add_rdata(&rr, raw_addr, addr_len, 0, &param->answer->mm);
 			callback(&rr, 0, param);
 
-			cur->resolved = true;
+			cur->flags |= QUERY_RESOLVED;
 			return KNOT_STATE_DONE;
 		}
 	}

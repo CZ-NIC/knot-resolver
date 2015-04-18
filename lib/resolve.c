@@ -22,8 +22,8 @@
 #include <libknot/descriptor.h>
 #include <dnssec/random.h>
 
+#include "lib/rplan.h"
 #include "lib/resolve.h"
-#include "lib/defines.h"
 #include "lib/layer/itercache.h"
 #include "lib/layer/iterate.h"
 
@@ -32,61 +32,29 @@
 /* Defines */
 #define ITER_LIMIT 50
 
-/** Invalidate current NS in cache. */
+/** Invalidate current NS/addr pair. */
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
-	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, 0);
-	if (txn == NULL) {
-		return KNOT_EOK;
-	}
-
-	/* Fetch current nameserver cache. */
-	uint32_t drift = qry->timestamp.tv_sec;
-	knot_rrset_t cached;
-	knot_rrset_init(&cached, qry->zone_cut.name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-	if (kr_cache_peek(txn, &cached, &drift) != KNOT_EOK) {
-		kr_init_zone_cut(&qry->zone_cut);
-		return KNOT_EOK;
-	}
-	cached = kr_cache_materialize(&cached, drift, rplan->pool);
-
-	/* Find a matching RD. */
-	knot_rdataset_t to_remove;
-	knot_rdataset_init(&to_remove);
-	for (unsigned i = 0; i < cached.rrs.rr_count; ++i) {
-		knot_rdata_t *rd = knot_rdataset_at(&cached.rrs, i);
-		if (knot_dname_is_equal(knot_rdata_data(rd), qry->zone_cut.ns)) {
-			knot_rdataset_add(&to_remove, rd, rplan->pool);
-		}
-	}
-	knot_rdataset_subtract(&cached.rrs, &to_remove, rplan->pool);
-	knot_rdataset_clear(&to_remove, rplan->pool);
-
-	/* Remove record(s) */
-	int ret = KNOT_EOK;
-	if (cached.rrs.rr_count == 0) {
-		(void) kr_cache_remove(txn, &cached);
-		ret = KNOT_ENOENT;
-	} else {
-		(void) kr_cache_insert(txn, &cached, qry->timestamp.tv_sec);
-		kr_set_zone_cut(&qry->zone_cut, cached.owner, knot_ns_name(&cached.rrs, 0));
-	}
-
-	knot_rrset_clear(&cached, rplan->pool);
-	return ret;
+	uint8_t *addr = kr_nsrep_inaddr(qry->ns.addr);
+	size_t addr_len = kr_nsrep_inaddr_len(qry->ns.addr);
+	knot_rdata_t rdata[knot_rdata_array_size(addr_len)];
+	knot_rdata_init(rdata, addr_len, addr, 0);
+	return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata);
 }
 
 static int ns_resolve_addr(struct kr_query *cur, struct kr_layer_param *param)
 {
-	if (kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A) ||
-	    kr_rplan_satisfies(cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA)) {
+	if (kr_rplan_satisfies(cur, cur->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_A) ||
+	    kr_rplan_satisfies(cur, cur->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA) ||
+	    cur->flags & QUERY_AWAIT_ADDR) {
 		DEBUG_MSG("=> dependency loop, bailing out\n");
 		kr_rplan_pop(param->rplan, cur);
 		return KNOT_EOK;
 	}
 
-	(void) kr_rplan_push(param->rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
-	(void) kr_rplan_push(param->rplan, cur, cur->zone_cut.ns, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	(void) kr_rplan_push(param->rplan, cur, cur->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+	(void) kr_rplan_push(param->rplan, cur, cur->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	cur->flags |= QUERY_AWAIT_ADDR;
 	return KNOT_EOK;
 }
 
@@ -104,17 +72,23 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	DEBUG_MSG("query '%s %s'\n", name_str, type_str);
 #endif
 
-	/* Invalid address for current zone cut. */
-	if (sockaddr_len((struct sockaddr *)&cur->zone_cut.addr) < 1) {
-		DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
-		return ns_resolve_addr(cur, param);
+	/* Elect best nameserver candidate. */
+	kr_nsrep_elect(&cur->ns, &cur->zone_cut.nsset);
+	if (cur->ns.score < KR_NS_VALID) {
+		DEBUG_MSG("=> no valid NS left\n");
+		kr_rplan_pop(param->rplan, cur);
+		return KNOT_EOK;
+	} else {
+		if (cur->ns.addr.ip.sa_family == AF_UNSPEC) {
+			DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
+			return ns_resolve_addr(cur, param);
+		}
 	}
 
 	/* Prepare query resolution. */
 	int mode = (cur->flags & QUERY_TCP) ? 0 : KNOT_RQ_UDP;
-	struct sockaddr *ns_addr = (struct sockaddr *)&cur->zone_cut.addr;
 	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MIN_PKTSIZE, requestor->mm);
-	struct knot_request *tx = knot_request_make(requestor->mm, ns_addr, NULL, query, mode);
+	struct knot_request *tx = knot_request_make(requestor->mm, &cur->ns.addr.ip, NULL, query, mode);
 	knot_requestor_enqueue(requestor, tx);
 
 	/* Resolve and check status. */
@@ -128,17 +102,14 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 		}
 		/* Resolution failed, invalidate current NS and reset to UDP. */
 		DEBUG_MSG("=> resolution failed: '%s', invalidating\n", knot_strerror(ret));
-		if (invalidate_ns(rplan, cur) == KNOT_EOK) {
+		if (invalidate_ns(rplan, cur) == 0) {
 			cur->flags &= ~QUERY_TCP;
-		} else {
-			DEBUG_MSG("=> no ns left to ask\n");
-			kr_rplan_pop(rplan, cur);
 		}
 		return KNOT_EOK;
 	}
 
 	/* Pop query if resolved. */
-	if (cur->resolved) {
+	if (cur->flags & QUERY_RESOLVED) {
 		kr_rplan_pop(rplan, cur);
 	}
 
@@ -158,7 +129,7 @@ static void prepare_layers(struct knot_requestor *req, struct kr_layer_param *pa
 
 static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
 {
-	/* Initialize requestor. */
+/* Initialize requestor. */
 	struct knot_requestor requestor;
 	knot_requestor_init(&requestor, pool);
 	prepare_layers(&requestor, param);
@@ -181,6 +152,7 @@ static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
 		}
 	}
 
+	DEBUG_MSG("finished: %s, mempool: %llu B\n", knot_strerror(ret), mp_total_size(pool->ctx));
 	knot_requestor_clear(&requestor);
 	return ret;
 }

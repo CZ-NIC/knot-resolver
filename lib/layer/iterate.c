@@ -127,14 +127,10 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
 static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, uint16_t index)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
-		if (knot_dname_is_equal(query->zone_cut.ns, rr->owner)) {
-			/* Set zone cut address. */
-			int ret = kr_set_zone_cut_addr(&query->zone_cut, rr, index);
-			if (ret == KNOT_EOK) {
-				return KNOT_STATE_DONE;
-			} else {
-				return KNOT_STATE_FAIL;
-			}
+		const knot_rdata_t *rdata = knot_rdataset_at(&rr->rrs, index);
+		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
 		}
 	}
 
@@ -169,99 +165,83 @@ int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_para
 	return KNOT_STATE_DONE;
 }
 
-static bool has_glue(const knot_dname_t *ns_name, knot_pkt_t *pkt)
+/** Attempt to find glue for given nameserver name (best effort). */
+static int fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_layer_param *param)
 {
+	int result = 0;
 	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
 	for (unsigned i = 0; i < ar->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
-		if ((rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) &&
-		   (knot_dname_is_equal(ns_name, rr->owner))) {
-			return true;
+		if (knot_dname_is_equal(ns, rr->owner)) {
+			(void) update_glue(rr, 0, param);
+			result += 1;
 		}
 	}
-	return false;
+	return result;
 }
 
-static int nameserver_score(const knot_rrset_t *rr, unsigned hint, knot_pkt_t *pkt, struct kr_layer_param *param)
+static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_layer_param *param)
 {
 	struct kr_query *query = kr_rplan_current(param->rplan);
-	const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, hint);
-	int score = kr_nsrep_score(rr->owner, param);
-	if (score < KR_NS_VALID) {
-		return score;
-	}
+	struct kr_zonecut *cut = &query->zone_cut;
+	int state = KNOT_STATE_CONSUME;
 
 	/* Authority MUST be at/below the authority of the nameserver, otherwise
 	 * possible cache injection attempt. */
-	if (!knot_dname_in(query->zone_cut.name, rr->owner)) {
+	if (!knot_dname_in(cut->name, rr->owner)) {
 		DEBUG_MSG("<= authority: ns outside bailiwick, rejecting\n");
-		return KR_NS_INVALID;
+		return KNOT_STATE_FAIL;
 	}
 
-	/* Ignore already resolved zone cut. */
-	if (knot_dname_is_equal(rr->owner, query->zone_cut.name)) {
-		return KR_NS_VALID;
-	} else {
-		score += 1;
+	/* Update zone cut name */
+	if (!knot_dname_is_equal(rr->owner, cut->name)) {
+		kr_zonecut_set(cut, rr->owner);
+		state = KNOT_STATE_DONE;
 	}
 
-	/* Check if contains glue. */
-	if (has_glue(ns_name, pkt)) {
-		score += 1;
+	/* Fetch glue for each NS */
+	kr_zonecut_add(cut, knot_ns_name(&rr->rrs, 0), NULL);
+	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
+		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
+		int glue_records = fetch_glue(pkt, ns_name, param);
+		/* Glue is mandatory for NS below zone */
+		if (knot_dname_in(ns_name, rr->owner) ) {
+			if (glue_records == 0) {
+				DEBUG_MSG("<= authority: missing mandatory glue, rejecting\n");
+				return KNOT_STATE_FAIL;
+			}
+		}
 	}
 
-	return score;
+	return state;
 }
 
 static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 {
-	struct kr_query *query = kr_rplan_current(param->rplan);
-	const knot_rrset_t *best_ns = NULL;
-	int best_score = 0;
+	int result = KNOT_STATE_CONSUME;
+	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
 	/* AA, terminate resolution chain. */
 	if (knot_wire_get_aa(pkt->wire)) {
 		return KNOT_STATE_CONSUME;
 	}
 
-	/* Elect best name server candidate. */
-	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
-			int score = nameserver_score(rr, 0, pkt, param);
-			if (score < KR_NS_VALID) {
-				return KNOT_STATE_FAIL;
-			}
-			if (score > best_score) {
-				best_ns = rr;
-				best_score = score;
+			int state = update_cut(pkt, rr, param);
+			switch(state) {
+			case KNOT_STATE_DONE: result = state; break;
+			case KNOT_STATE_FAIL: return state; break;
+			default:              /* continue */ break;
 			}
 		}
 	}
 
-	/* Update name server candidate. */
-	if (best_ns != NULL) {
-		kr_set_zone_cut(&query->zone_cut, best_ns->owner, knot_ns_name(&best_ns->rrs, 0));
-		return KNOT_STATE_DONE;
-	}
-
-	return KNOT_STATE_CONSUME;
-}
-
-static int process_additional(knot_pkt_t *pkt, struct kr_layer_param *param)
-{
-	/* Attempt to find glue for current nameserver. */
-	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
-	for (unsigned i = 0; i < ar->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
-		int state = update_glue(rr, 0, param);
-		if (state != KNOT_STATE_CONSUME) {
-			return state;
-		}
-	}
-
-	return KNOT_STATE_DONE;
+	/* CONSUME => Unhelpful referral.
+	 * DONE    => Zone cut updated. */
+	return result;
 }
 
 static void finalize_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
@@ -329,7 +309,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	}
 
 	/* Either way it resolves current query. */
-	query->resolved = true;
+	query->flags |= QUERY_RESOLVED;
 	return KNOT_STATE_DONE;
 }
 
@@ -388,9 +368,10 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 #ifndef NDEBUG
-	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[KNOT_DNAME_MAXLEN];
+	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN];
 	knot_dname_to_str(qname_str, qname, sizeof(qname_str));
-	knot_dname_to_str(ns_str, query->zone_cut.ns, sizeof(ns_str));
+	struct sockaddr *addr = &query->ns.addr.ip;
+	inet_ntop(addr->sa_family, kr_nsrep_inaddr(query->ns.addr), ns_str, sizeof(ns_str));
 	knot_dname_to_str(zonecut_str, query->zone_cut.name, sizeof(zonecut_str));
 	DEBUG_MSG("=> querying: '%s' zone cut: '%s' m12n: '%s'\n", ns_str, zonecut_str, qname_str);
 #endif
@@ -408,7 +389,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_layer_param *param = ctx->data;
 	struct kr_query *query = kr_rplan_current(param->rplan);
-	if (query == NULL || query->resolved) {
+	if (query == NULL || (query->flags & QUERY_RESOLVED)) {
 		return ctx->state;
 	}
 
@@ -454,9 +435,8 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		state = process_answer(pkt, param);
 		break;
-	case KNOT_STATE_DONE: /* Referral, try to find glue. */
+	case KNOT_STATE_DONE: /* Referral */
 		DEBUG_MSG("<= referral response, follow\n");
-		state = process_additional(pkt, param);
 		break;
 	default:
 		break;

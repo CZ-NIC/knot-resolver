@@ -19,6 +19,7 @@
 #include <libknot/errcode.h>
 
 #include "lib/rplan.h"
+#include "lib/resolve.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
 #include "lib/layer.h"
@@ -50,6 +51,7 @@ static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 
 static void query_free(mm_ctx_t *pool, struct kr_query *qry)
 {
+	kr_zonecut_deinit(&qry->zone_cut);
 	mm_free(pool, qry->sname);
 	mm_free(pool, qry);
 }
@@ -118,7 +120,8 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 
 	/* Find closest zone cut for this query. */
 	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, NAMEDB_RDONLY);
-	kr_find_zone_cut(&qry->zone_cut, name, txn, qry->timestamp.tv_sec);
+	kr_zonecut_init(&qry->zone_cut, name, rplan->pool);
+	kr_zonecut_find_cached(&qry->zone_cut, txn, qry->timestamp.tv_sec);
 
 #ifndef NDEBUG
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
