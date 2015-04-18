@@ -46,6 +46,7 @@ static int ns_resolve_addr(struct kr_query *cur, struct kr_layer_param *param)
 {
 	if (kr_rplan_satisfies(cur, cur->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_A) ||
 	    kr_rplan_satisfies(cur, cur->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA) ||
+	    cur->flags & QUERY_AWAIT_ADDR) {
 		DEBUG_MSG("=> dependency loop, bailing out\n");
 		kr_rplan_pop(param->rplan, cur);
 		return KNOT_EOK;
@@ -53,6 +54,7 @@ static int ns_resolve_addr(struct kr_query *cur, struct kr_layer_param *param)
 
 	(void) kr_rplan_push(param->rplan, cur, cur->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
 	(void) kr_rplan_push(param->rplan, cur, cur->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	cur->flags |= QUERY_AWAIT_ADDR;
 	return KNOT_EOK;
 }
 

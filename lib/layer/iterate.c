@@ -309,7 +309,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	}
 
 	/* Either way it resolves current query. */
-	query->resolved = true;
+	query->flags |= QUERY_RESOLVED;
 	return KNOT_STATE_DONE;
 }
 
@@ -389,7 +389,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_layer_param *param = ctx->data;
 	struct kr_query *query = kr_rplan_current(param->rplan);
-	if (query == NULL || query->resolved) {
+	if (query == NULL || (query->flags & QUERY_RESOLVED)) {
 		return ctx->state;
 	}
 
