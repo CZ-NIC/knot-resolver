@@ -57,7 +57,7 @@ int udp_recv_msg(int fd, uint8_t *buf, size_t len, struct timeval *timeout)
 }
 
 
-int tcp_send_msg(int fd, const uint8_t *msg, size_t len)
+int tcp_send_msg(int fd, const uint8_t *msg, size_t len, struct timeval *timeout)
 {
 	/* Unlock GIL and attempt to send message over. */
 	uint16_t msg_len = htons(len);
@@ -75,7 +75,7 @@ int udp_send_msg(int fd, const uint8_t *msg, size_t msglen,
                  const struct sockaddr *addr)
 {
 	/* Tunnel via TCP. */
-	return tcp_send_msg(fd, msg, msglen);
+	return tcp_send_msg(fd, msg, msglen, NULL);
 }
 
 
