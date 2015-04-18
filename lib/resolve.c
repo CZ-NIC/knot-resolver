@@ -70,10 +70,17 @@ static int iterate(struct knot_requestor *requestor, struct kr_layer_param *para
 	DEBUG_MSG("query '%s %s'\n", name_str, type_str);
 #endif
 
-	/* Invalid address for current zone cut. */
-	if (sockaddr_len((struct sockaddr *)&cur->zone_cut.addr) < 1) {
-		DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
-		return ns_resolve_addr(cur, param);
+	/* Elect best nameserver candidate. */
+	kr_nsrep_elect(&cur->ns, &cur->zone_cut.nsset);
+	if (cur->ns.score < KR_NS_VALID) {
+		DEBUG_MSG("=> no valid NS left\n");
+		kr_rplan_pop(param->rplan, cur);
+		return KNOT_EOK;
+	} else {
+		if (cur->ns.addr.ip.sa_family == AF_UNSPEC) {
+			DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
+			return ns_resolve_addr(cur, param);
+		}
 	}
 
 	/* Prepare query resolution. */
@@ -120,7 +127,7 @@ static void prepare_layers(struct knot_requestor *req, struct kr_layer_param *pa
 
 static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
 {
-	/* Initialize requestor. */
+/* Initialize requestor. */
 	struct knot_requestor requestor;
 	knot_requestor_init(&requestor, pool);
 	prepare_layers(&requestor, param);
@@ -143,6 +150,7 @@ static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
 		}
 	}
 
+	DEBUG_MSG("finished: %s, mempool: %llu B\n", knot_strerror(ret), mp_total_size(pool->ctx));
 	knot_requestor_clear(&requestor);
 	return ret;
 }
