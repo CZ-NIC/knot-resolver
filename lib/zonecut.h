@@ -20,10 +20,8 @@
 
 #pragma once
 
-#include <libknot/dname.h>
-#include <libknot/rrset.h>
-#include <libknot/internal/sockaddr.h>
-#include <libknot/internal/namedb/namedb.h>
+#include "lib/cache.h"
+#include "lib/generic/map.h"
 
 struct kr_rplan;
 
@@ -31,45 +29,73 @@ struct kr_rplan;
  * Current zone cut representation.
 */
 struct kr_zonecut {
-	knot_dname_t name[KNOT_DNAME_MAXLEN]; /**< Current zone cut */
-	knot_dname_t ns[KNOT_DNAME_MAXLEN];   /**< Authoritative NS */
-	struct sockaddr_storage addr;         /**< Authoritative NS address. */
+	knot_dname_t *name; /**< Zone cut name. */
+    mm_ctx_t *pool;     /**< Memory pool. */
+    map_t nsset;        /**< Map of nameserver => address_set. */
 };
 
 /**
- * Initialize zone cut with SBELT.
- * @param cut zone cut to be set
- * @return KNOT_E*
+ * Populate root zone cut with SBELT.
+ * @param cut zone cut
+ * @param name
+ * @param pool
+ * @return 0 or error code
  */
-int kr_init_zone_cut(struct kr_zonecut *cut);
+int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *pool);
 
 /**
- * Set zone cut to given name and name server.
- * @note Name server address is blanked.
- * @param cut zone cut to be set
- * @param name zone cut name
- * @param ns   zone cut nameserver
- * @return KNOT_E*
+ * Clear the structure and free the address set.
+ * @param cut zone cut
  */
-int kr_set_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, const knot_dname_t *ns);
+void kr_zonecut_deinit(struct kr_zonecut *cut);
 
 /**
- * Convert A/AAAA RRs to address with DNS port.
- * @param cut zone cut to be set
- * @param rr resource record
- * @param i  index of the set address in the rr
- * @return KNOT_E*
+ * Reset zone cut to given name and clear address list.
+ * @note This preserves already-allocated memory.
+ * @note This clears the address list even if the name doesn't change.
+ * @param cut  zone cut to be set
+ * @param name new zone cut name
  */
-int kr_set_zone_cut_addr(struct kr_zonecut *cut, const knot_rrset_t *rr, uint16_t i);
+void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
 
 /**
- * Find the closest enclosing zone cut/nameserver from the cache.
- * @param cut zone cut to be set
- * @param name zone cut name
- * @param txn cache transaction
+ * Add address record to the zone cut.
+ *
+ * The record will be merged with existing data,
+ * it may be either A/AAAA type.
+ *
+ * @param cut    zone cut to be populated
+ * @param ns     nameserver name
+ * @param rdata  nameserver address (as rdata)
+ * @return 0 or error code
+ */
+int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
+
+/**
+ * Delete nameserver/address pair from the zone cut.
+ * @param  cut
+ * @param  ns    name server name
+ * @param  rdata name server address
+ * @return       0 or error code
+ */
+int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
+
+/**
+ * Populate zone cut with a root zone using SBELT :rfc:`1034`
+ *
+ * @param cut zone cut to be populated
+ * @return 0 or error code
+ */
+int kr_zonecut_set_sbelt(struct kr_zonecut *cut);
+
+/**
+ * Populate zone cut address set from cache.
+ * 
+ * @param cut       zone cut to be populated
+ * @param txn       cache transaction (read)
  * @param timestamp transaction timestamp
- * @return KNOT_E*
+ * @return 0 or error code
  */
-int kr_find_zone_cut(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp);
+int kr_zonecut_find_cached(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timestamp);
 
 /** @} */

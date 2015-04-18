@@ -29,6 +29,7 @@
 
 #include "lib/cache.h"
 #include "lib/zonecut.h"
+#include "lib/nsrep.h"
 
 /** Query flags */
 enum kr_query_flag {
@@ -42,6 +43,7 @@ enum kr_query_flag {
 struct kr_query {
 	node_t node;
 	struct kr_query *parent;
+	struct kr_nsrep ns;
 	struct kr_zonecut zone_cut;
 	struct timeval timestamp;
 	knot_dname_t *sname;
