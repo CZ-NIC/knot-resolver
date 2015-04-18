@@ -32,7 +32,7 @@
  *
  *      // Prefix search
  *      int i = 0;
- *      int count(const char *s, void *n) { (*(int *)n)++; return 0; }
+ *      int count(const char *k, void *v, void *ext) { (*(int *)ext)++; return 0; }
  *      if (map_walk_prefixed(map, "princ", count, &i) == 0) {
  *          printf("%d matches\n", i);
  *      }
@@ -57,37 +57,47 @@
 extern "C" {
 #endif
 
-/*! Main data structure */
+typedef void *(*map_alloc_f)(void *, size_t);
+typedef void (*map_free_f)(void *baton, void *ptr);
+
+/** Main data structure */
 typedef struct {
 	void *root;
-	void *(*malloc)(void *baton, size_t size);
-	void (*free)(void *baton, void *ptr);
-	void *baton; /*! Passed to malloc() and free() */
+	map_alloc_f malloc;
+	map_free_f free;
+	void *baton; /** Passed to malloc() and free() */
 } map_t;
 
-/*! Creates an new, empty critbit map */
+/** Creates an new, empty critbit map */
 map_t map_make(void);
 
-/*! Returns non-zero if map contains str */
+/** Returns non-zero if map contains str */
 int map_contains(map_t *map, const char *str);
 
-/*! Returns value if map contains str */
+/** Returns value if map contains str */
 void *map_get(map_t *map, const char *str);
 
-/*! Inserts str into map, returns 0 on suceess */
+/** Inserts str into map, returns 0 on suceess */
 int map_set(map_t *map, const char *str, void *val);
 
-/*! Deletes str from the map, returns 0 on suceess */
+/** Deletes str from the map, returns 0 on suceess */
 int map_del(map_t *map, const char *str);
 
-/*! Clears the given map */
+/** Clears the given map */
 void map_clear(map_t *map);
 
-/*! Calls callback for all strings in map  */
+/**
+ * Calls callback for all strings in map
+ * See @fn map_walk_prefixed() for documentation on parameters.
+ */
 #define map_walk(map, callback, baton) \
 	map_walk_prefixed((map), "", (callback), (baton))
 
-/*! Calls callback for all strings in map with the given prefix  */
+/**
+ * Calls callback for all strings in map with the given prefix
+ * @param callback callback parameters are (key, value, baton)
+ * @param baton    passed uservalue
+ */
 int map_walk_prefixed(map_t *map, const char *prefix,
 	int (*callback)(const char *, void *, void *), void *baton);
 
