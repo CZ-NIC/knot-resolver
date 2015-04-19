@@ -115,12 +115,12 @@ static inline uint8_t *pack_obj_next(uint8_t *it)
   */
 static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
-	uint8_t *endp = pack_tail(*pack);
 	size_t packed_len = len + sizeof(len);
 	if (pack == NULL || (pack->len + packed_len) > pack->cap) {
 		return -1;
 	}
 
+	uint8_t *endp = pack_tail(*pack);
 	memcpy(endp, (char *)&len, sizeof(len));
 	memcpy(endp + sizeof(len), obj, len);
 	pack->len += packed_len;

@@ -253,7 +253,7 @@ static char* hint_get(void *env, struct kr_module *module, const char *args)
 	}
 
 	char *result = NULL;
-	asprintf(&result, "{ \"result\": [ %s ] }", hint_buf ? hint_buf : "");
+	asprintf(&result, "{ \"result\": [ %s ] }", hint_buf);
 	return result;
 }
 
