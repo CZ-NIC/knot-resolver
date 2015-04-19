@@ -4,7 +4,6 @@
  */
 
 /**
- *
  * @file map.h
  * @brief A Crit-bit tree key-value map implementation.
  *
@@ -95,6 +94,8 @@ void map_clear(map_t *map);
 
 /**
  * Calls callback for all strings in map with the given prefix
+ * @param map
+ * @param prefix   required string prefix (empty => all strings)
  * @param callback callback parameters are (key, value, baton)
  * @param baton    passed uservalue
  */
