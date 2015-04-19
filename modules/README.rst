@@ -253,8 +253,8 @@ Special properties
 If the module declares properties ``get`` or ``set``, they can be used in the Lua interpreter as
 regular tables.
 
-.. warning: This is not yet completely implemented, as the module I/O format may change to map_t a/o
-            embedded JSON tokenizer.
+.. warning:: This is not yet completely implemented, as the module I/O format may change to map_t a/o
+             embedded JSON tokenizer.
 
 .. _`not present in Go`: http://blog.golang.org/gos-declaration-syntax
 .. _CGO: http://golang.org/cmd/cgo/
