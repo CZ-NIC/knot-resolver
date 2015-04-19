@@ -22,6 +22,7 @@
 
 #include "lib/cache.h"
 #include "lib/generic/map.h"
+#include "lib/generic/pack.h"
 
 struct kr_rplan;
 
@@ -51,7 +52,6 @@ void kr_zonecut_deinit(struct kr_zonecut *cut);
 
 /**
  * Reset zone cut to given name and clear address list.
- * @note This preserves already-allocated memory.
  * @note This clears the address list even if the name doesn't change.
  * @param cut  zone cut to be set
  * @param name new zone cut name
@@ -79,6 +79,18 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
  * @return       0 or error code
  */
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
+
+/**
+ * Find nameserver address list in the zone cut.
+ *
+ * @note This can be used for membership test, a non-null pack is returned
+ *       if the nameserver name exists.
+ * 
+ * @param  cut
+ * @param  ns    name server name
+ * @return       pack of addresses or NULL
+ */
+pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns);
 
 /**
  * Populate zone cut with a root zone using SBELT :rfc:`1034`

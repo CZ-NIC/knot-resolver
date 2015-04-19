@@ -112,11 +112,10 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	}
 
 	/* Fetch/insert nameserver. */
-	const char *key = (const char *)ns;
-	pack_t *pack = map_get(&cut->nsset, key);
+	pack_t *pack = kr_zonecut_find(cut, ns);
 	if (pack == NULL) {
 		pack = mm_alloc(cut->pool, sizeof(*pack));
-		if (!pack || (map_set(&cut->nsset, key, pack) != 0)) {
+		if (!pack || (map_set(&cut->nsset, (const char *)ns, pack) != 0)) {
 			mm_free(cut->pool, pack);
 			return kr_error(ENOMEM);
 		}
@@ -143,9 +142,7 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	}
 
 	/* Find the address list. */
-	const char *key = (const char *)ns;
-	map_t *nsset = &cut->nsset;
-	pack_t *pack = map_get(nsset, key);
+	pack_t *pack = kr_zonecut_find(cut, ns);
 	if (pack == NULL) {
 		return kr_error(ENOENT);
 	}
@@ -154,11 +151,22 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	int ret = pack_obj_del(pack, knot_rdata_data(rdata), knot_rdata_rdlen(rdata));
 	if (pack->len == 0) {
 		/* No servers left, remove NS from the set. */
-		free_addr_set(key, pack, cut->pool);
-		return map_del(nsset, key);
+		free_addr_set((const char *)ns, pack, cut->pool);
+		return map_del(&cut->nsset, (const char *)ns);
 	}
 
 	return ret;
+}
+
+pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns)
+{
+	if (cut == NULL || ns == NULL) {
+		return NULL;
+	}
+
+	const char *key = (const char *)ns;
+	map_t *nsset = &cut->nsset;
+	return map_get(nsset, key);
 }
 
 int kr_zonecut_set_sbelt(struct kr_zonecut *cut)

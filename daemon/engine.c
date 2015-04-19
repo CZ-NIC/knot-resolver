@@ -259,6 +259,30 @@ void engine_stop(struct engine *engine)
 	uv_stop(uv_default_loop());
 }
 
+/** Register module properties in Lua environment */
+static int register_properties(struct engine *engine, struct kr_module *module)
+{
+	lua_newtable(engine->L);
+	if (module->config != NULL) {
+		REGISTER_MODULE_CALL(engine->L, module, module->config, "config");
+	}
+	for (struct kr_prop *p = module->props; p->name; ++p) {
+		if (p->cb != NULL && p->name != NULL) {
+			REGISTER_MODULE_CALL(engine->L, module, p->cb, p->name);
+		}
+	}
+	lua_setglobal(engine->L, module->name);
+
+	/* Register module in Lua env */
+	lua_getglobal(engine->L, "modules_register");
+	lua_getglobal(engine->L, module->name);
+	if (l_sandboxcall(engine->L, 1) != 0) {
+		lua_pop(engine->L, 1);
+	}
+
+	return kr_ok();
+}
+
 int engine_register(struct engine *engine, const char *name)
 {
 	if (engine == NULL || name == NULL) {
@@ -278,16 +302,7 @@ int engine_register(struct engine *engine, const char *name)
 
 	/* Register properties */
 	if (module->props) {
-		lua_newtable(engine->L);
-		if (module->config != NULL) {
-			REGISTER_MODULE_CALL(engine->L, module, module->config, "config");
-		}
-		for (struct kr_prop *p = module->props; p->name; ++p) {
-			if (p->cb != NULL && p->name != NULL) {
-				REGISTER_MODULE_CALL(engine->L, module, p->cb, p->name);
-			}
-		}
-		lua_setglobal(engine->L, module->name);
+		return register_properties(engine, module);
 	}
 
 	return kr_ok();

@@ -35,6 +35,25 @@ setmetatable(modules, {
 	end
 })
 
+-- Register module in Lua environment
+function modules_register(module)
+	-- Syntactic sugar for get() and set() properties
+	setmetatable(module, {
+		__index = function (t, k)
+			local  v = rawget(t, k)
+			if     v     then return v
+			elseif t.get then return t.get(k)
+			end
+		end,
+		__newindex = function (t, k, v)
+			local  old_v = rawget(t, k)
+			if not old_v and t.set then
+				t.set(k..' '..v)
+			end
+		end
+	})
+end
+
 -- Make sandboxed environment
 local function make_sandbox(defined)
 	local __protected = { modules = true, cache = true, net = true }
