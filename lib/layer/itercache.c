@@ -256,8 +256,9 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (knot_wire_get_aa(pkt->wire)) {
 		ret = write_cache_answer(pkt, txn, pool, timestamp);
 	}
-
-	ret = write_cache_authority(pkt, txn, pool, timestamp);
+	if (ret == KNOT_EOK) {
+		ret = write_cache_authority(pkt, txn, pool, timestamp);
+	}
 
 	/* Cache full, do what we must. */
 	if (ret == KNOT_ESPACE) {
