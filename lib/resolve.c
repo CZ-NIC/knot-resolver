@@ -152,7 +152,7 @@ static int resolve_iterative(struct kr_layer_param *param, mm_ctx_t *pool)
 		}
 	}
 
-	DEBUG_MSG("finished: %s, mempool: %llu B\n", knot_strerror(ret), mp_total_size(pool->ctx));
+	DEBUG_MSG("finished: %s, mempool: %zu B\n", knot_strerror(ret), (size_t) mp_total_size(pool->ctx));
 	knot_requestor_clear(&requestor);
 	return ret;
 }
