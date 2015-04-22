@@ -46,6 +46,12 @@ static void test_array(void **state)
 		assert_true(ret == 0);
 	}
 
+	/* Overfill. */
+	for (unsigned i = 0; i < 4096; ++i) {
+		ret = array_push(arr, i);
+		assert_true(ret >= 0);
+	}
+
 	array_clear(arr);
 }
 
