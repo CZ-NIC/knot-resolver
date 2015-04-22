@@ -20,24 +20,8 @@
  * @{
  */
 
-#include <libknot/processing/layer.h>
-#include <libknot/packet/pkt.h>
-
 #include "lib/defines.h"
-
-struct kr_context;
-struct kr_rplan;
-
-/**
- * Processing module parameters.
- *
- * @note These parameters are passed to each processing layer.
- */
-struct kr_layer_param {
-	struct kr_context *ctx;
-	struct kr_rplan *rplan;
-	knot_pkt_t *answer;
-};
+#include "lib/resolve.h"
 
 #ifndef NDEBUG
 /** @internal Print a debug message related to resolution. */

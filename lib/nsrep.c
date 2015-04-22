@@ -14,7 +14,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+
 #include "lib/nsrep.h"
+#include "lib/defines.h"
 #include "lib/generic/pack.h"
 
 /** @internal Macro to set address structure. */
