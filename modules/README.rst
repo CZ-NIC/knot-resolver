@@ -164,7 +164,7 @@ Now we can add the implementations for the ``Begin`` and ``Finish`` functions, a
 
 	func Finish(ctx *C.knot_layer_t) C.int {
 		// Since the context is unsafe.Pointer, we need to cast it
-		var param *C.struct_kr_layer_param = (*C.struct_kr_layer_param)(ctx.data)
+		var param *C.struct_kr_request = (*C.struct_kr_request)(ctx.data)
 		// Now we can use the C API as well
 		fmt.Printf("[go] resolved %d queries", C.list_size(&param.rplan.resolved))
 		return 0

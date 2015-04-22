@@ -26,7 +26,8 @@ knot_rrset_t global_rr;
 const char *global_env;
 
 #define CACHE_SIZE 10 * 4096
-#define CACHE_TTL 2
+#define CACHE_TTL 10
+#define CACHE_TIME 0
 
 /* Test invalid parameters. */
 static void test_invalid(void **state)
@@ -82,7 +83,7 @@ static void test_insert(void **state)
 	test_random_rr(&global_rr, CACHE_TTL);
 
 	namedb_txn_t *txn = test_txn_write(state);
-	int ret = kr_cache_insert(txn, &global_rr, 0);
+	int ret = kr_cache_insert(txn, &global_rr, CACHE_TIME);
 	if (ret == KNOT_EOK) {
 		ret = kr_cache_txn_commit(txn);
 	} else {
@@ -101,8 +102,9 @@ static void test_query(void **state)
 
 	namedb_txn_t *txn = test_txn_rdonly(state);
 
-	for (uint32_t timestamp = 0; timestamp < CACHE_TTL; ++timestamp) {
-		int query_ret = kr_cache_peek(txn, &cache_rr, &timestamp);
+	for (uint32_t timestamp = CACHE_TIME; timestamp < CACHE_TIME + CACHE_TTL; ++timestamp) {
+		uint32_t drift = timestamp;
+		int query_ret = kr_cache_peek(txn, &cache_rr, &drift);
 		bool rr_equal = knot_rrset_equal(&global_rr, &cache_rr, KNOT_RRSET_COMPARE_WHOLE);
 		assert_int_equal(query_ret, KNOT_EOK);
 		assert_true(rr_equal);
@@ -114,7 +116,7 @@ static void test_query(void **state)
 /* Test cache read (simulate aged entry) */
 static void test_query_aged(void **state)
 {
-	uint32_t timestamp = CACHE_TTL;
+	uint32_t timestamp = CACHE_TIME + CACHE_TTL;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
@@ -122,6 +124,21 @@ static void test_query_aged(void **state)
 	int ret = kr_cache_peek(txn, &cache_rr, &timestamp);
 	assert_int_equal(ret, KNOT_ENOENT);
 	kr_cache_txn_abort(txn);
+}
+
+/* Test cache removal */
+static void test_remove(void **state)
+{
+	uint32_t timestamp = CACHE_TIME;
+	knot_rrset_t cache_rr;
+	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
+
+	namedb_txn_t *txn = test_txn_write(state);
+	int ret = kr_cache_remove(txn, &cache_rr);
+	assert_int_equal(ret, KNOT_EOK);
+	ret = kr_cache_peek(txn, &cache_rr, &timestamp);
+	assert_int_equal(ret, KNOT_ENOENT);
+	kr_cache_txn_commit(txn);
 }
 
 /* Test cache fill */
@@ -181,6 +198,8 @@ int main(void)
 	        unit_test(test_query),
 	        /* Cache aging */
 	        unit_test(test_query_aged),
+	        /* Removal */
+	        unit_test(test_remove),
 	        /* Cache fill */
 	        unit_test(test_fill),
 	        unit_test(test_clear),

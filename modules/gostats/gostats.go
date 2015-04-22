@@ -36,7 +36,7 @@ func Begin(ctx *C.knot_layer_t, param unsafe.Pointer) C.int {
 }
 
 func Finish(ctx *C.knot_layer_t) C.int {
-	var param *C.struct_kr_layer_param = (*C.struct_kr_layer_param)(ctx.data)
+	var param *C.struct_kr_request = (*C.struct_kr_request)(ctx.data)
 	fmt.Printf("[gostats] resolved %d queries", C.list_size(&param.rplan.resolved))
 	return 0
 }

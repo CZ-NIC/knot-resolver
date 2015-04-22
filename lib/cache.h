@@ -14,9 +14,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup cache
- * @{
- */
 #pragma once
 
 #include <libknot/rrset.h>
@@ -117,5 +114,3 @@ int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr);
  * @return KNOT_E*
  */
 int kr_cache_clear(namedb_txn_t *txn);
-
-/** @} */

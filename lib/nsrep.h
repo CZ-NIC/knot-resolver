@@ -14,31 +14,36 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup nameservers
- * @{
- */
-
 #pragma once
 
 #include <netinet/in.h>
+#include <libknot/dname.h>
 
 #include "lib/generic/map.h"
-#include "lib/layer.h"
 
+/** 
+  * Special values for nameserver score.
+  * All positive values mean valid nameserver.
+  */
 enum kr_ns_score {
 	KR_NS_INVALID = 0,
 	KR_NS_VALID   = 1
 };
 
+/**
+ * Name server representation.
+ * Contains extra information about the name server, e.g. score
+ * or other metadata.
+ */
 struct kr_nsrep
 {
-	unsigned score;
-	const knot_dname_t *name;
+	unsigned score;                  /**< Server score */
+	const knot_dname_t *name;        /**< Server name */
 	union {
 		struct sockaddr ip;
 		struct sockaddr_in ip4;
 		struct sockaddr_in6 ip6;
-	} addr;
+	} addr;                          /**< Server address */
 };
 
 /** @internal Address bytes for given family. */
@@ -52,8 +57,6 @@ struct kr_nsrep
  * Elect best nameserver/address pair from the nsset.
  * @param  ns    updated NS representation
  * @param  nsset NS set to choose from
- * @return       0 if success (ns is updated), error otherwise
+ * @return       score, see enum kr_ns_score
  */
 int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset);
-
-/** @} */

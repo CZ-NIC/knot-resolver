@@ -19,6 +19,23 @@
 #include "lib/cache.h"
 #include "daemon/bindings.h"
 
+/** @internal Prefix error with file:line */
+static int format_error(lua_State* L, const char *err)
+{
+	lua_Debug d;
+	lua_getstack(L, 1, &d);
+	/* error message prefix */
+	lua_getinfo(L, "Sln", &d);
+	lua_pushstring(L, d.short_src);
+	lua_pushstring(L, ":");
+	lua_pushnumber(L, d.currentline);
+	lua_pushstring(L, ": error: ");
+	/* error message */
+	lua_pushstring(L, err);
+	lua_concat(L,  5);
+	return 1;
+}
+
 /** @internal Compatibility wrapper for Lua 5.0 - 5.2 */
 #if LUA_VERSION_NUM >= 502
 #define register_lib(L, name, lib) \
@@ -49,7 +66,7 @@ static int mod_load(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "expected module name");
+		lua_pushstring(L, "expected load(string name)");
 		lua_error(L);
 	}
 	/* Load engine module */
@@ -70,7 +87,7 @@ static int mod_unload(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "expected module name");
+		format_error(L, "expected unload(string name)");
 		lua_error(L);
 	}
 	/* Unload engine module */
@@ -168,7 +185,7 @@ static int net_listen(lua_State *L)
 	if (lua_istable(L, 1)) {
 		return net_listen_iface(L, port);
 	} else if (n < 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "expected (string addr, int port = 53)");
+		format_error(L, "expected listen(string addr, int port = 53)");
 		lua_error(L);
 	}
 
@@ -190,7 +207,7 @@ static int net_close(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n < 2) {
-		lua_pushstring(L, "expected (string addr, int port)");
+		format_error(L, "expected close(string addr, int port)");
 		lua_error(L);
 	}
 
@@ -291,8 +308,8 @@ static int cache_open(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 1) {
-		lua_pushstring(L, "expected (number max_size)");
+	if (n < 1 || !lua_isnumber(L, 1)) {
+		format_error(L, "expected open(number max_size)");
 		lua_error(L);
 	}
 
@@ -305,7 +322,7 @@ static int cache_open(lua_State *L)
 	/* Open resolution context cache */
 	engine->resolver.cache = kr_cache_open(".", engine->pool, lua_tointeger(L, 1));
 	if (engine->resolver.cache == NULL) {
-		lua_pushstring(L, "can't open cache in rundir");
+		format_error(L, "can't open cache in rundir");
 		lua_error(L);
 	}
 

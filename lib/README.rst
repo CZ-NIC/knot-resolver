@@ -44,15 +44,15 @@ The library offers following services:
 - :ref:`Nameservers <lib_api_nameservers>` - Reputation database of nameservers, this serves as an aid for nameserver choice.
 
 A processing layer is going to be called by the query resolution driver for each query,
-so you're going to work with :ref:`struct kr_layer_param <lib_api_rplan>` as your per-query context. This structure contains pointers to
+so you're going to work with :ref:`struct kr_request <lib_api_rplan>` as your per-query context. This structure contains pointers to
 resolution context, resolution plan and also the final answer. You're likely to retrieve currently solved query from the query plan:
 
 .. code-block:: c
 
 	int consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 	{
-		struct kr_layer_param *param = ctx->data;
-		struct kr_query *query = kr_rplan_current(param->rplan);
+		struct kr_request *request = ctx->data;
+		struct kr_query *query = kr_rplan_current(request->rplan);
 	}
 
 This is only passive processing of the incoming answer. If you want to change the course of resolution, say satisfy a query from a local cache before the library issues a query to the nameserver, you can use states (see the :ref:`Static hints <mod-hints>` for example).
@@ -61,8 +61,8 @@ This is only passive processing of the incoming answer. If you want to change th
 
 	int produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 	{
-		struct kr_layer_param *param = ctx->data;
-		struct kr_query *cur = kr_rplan_current(param->rplan);
+		struct kr_request *request = ctx->data;
+		struct kr_query *cur = kr_rplan_current(request->rplan);
 		
 		/* Query can be satisfied locally. */
 		if (can_satisfy(cur)) {
@@ -83,8 +83,8 @@ This is useful for analysis-type tasks, or *"on-resolution"* hooks.
 
 	int finish(knot_layer_t *ctx)
 	{
-		struct kr_layer_param *param = ctx->data;
-		struct kr_rplan *rplan = param->rplan;
+		struct kr_request *request = ctx->data;
+		struct kr_rplan *rplan = request->rplan;
 
 		/* Print the query sequence with start time. */
 		char qname_str[KNOT_DNAME_MAXLEN];

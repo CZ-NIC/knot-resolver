@@ -14,15 +14,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup rplan
- * @{
- */
-
 #pragma once
 
-#include "lib/cache.h"
 #include "lib/generic/map.h"
 #include "lib/generic/pack.h"
+#include "lib/cache.h"
 
 struct kr_rplan;
 
@@ -31,8 +27,8 @@ struct kr_rplan;
 */
 struct kr_zonecut {
 	knot_dname_t *name; /**< Zone cut name. */
-    mm_ctx_t *pool;     /**< Memory pool. */
-    map_t nsset;        /**< Map of nameserver => address_set. */
+	mm_ctx_t *pool;     /**< Memory pool. */
+	map_t nsset;        /**< Map of nameserver => address_set. */
 };
 
 /**
@@ -109,5 +105,3 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut);
  * @return 0 or error code
  */
 int kr_zonecut_find_cached(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timestamp);
-
-/** @} */

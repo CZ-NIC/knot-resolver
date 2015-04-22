@@ -20,8 +20,9 @@
  *
  * @note The API is based on map.h, see it for more examples.
  *
- * Example usage:
+ * # Example usage:
  *
+ * @code{.c}
  *      set_t set = set_make();
  *
  *      // Insert keys
@@ -50,6 +51,7 @@
  *
  *      // Clear the set
  *      set_clear(&set);
+ * @endcode
  *
  * \addtogroup generics
  * @{

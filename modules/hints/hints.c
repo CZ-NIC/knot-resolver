@@ -34,8 +34,8 @@
 
 /* Defaults */
 #define DEFAULT_FILE "/etc/hosts"
-#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "hint",  fmt)
-typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
+#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "hint",  fmt)
+typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
 
 /** @todo Hack until layers can store userdata. */
 static struct kr_zonecut *g_map = NULL;
@@ -46,9 +46,11 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
-static int answer_query(pack_t *addr_set, struct kr_layer_param *param)
+static int answer_query(pack_t *addr_set, struct kr_request *param)
 {
-	struct kr_query *qry = kr_rplan_current(param->rplan);
+	struct kr_query *qry = kr_rplan_current(&param->rplan);
+	assert(qry);
+
 	knot_rrset_t rr;
 	knot_rrset_init(&rr, qry->sname, qry->stype, KNOT_CLASS_IN);
 	int family_len = sizeof(struct in_addr);
@@ -75,7 +77,7 @@ static int answer_query(pack_t *addr_set, struct kr_layer_param *param)
 	callback(&rr, 0, param);
 
 	/* Finalize */
-	DEBUG_MSG("<= answered from hints\n");
+	DEBUG_MSG(qry, "<= answered from hints\n");
 	knot_rdataset_clear(&rr.rrs, NULL);
 	qry->flags |= QUERY_RESOLVED;
 	return KNOT_STATE_DONE;
@@ -84,8 +86,8 @@ static int answer_query(pack_t *addr_set, struct kr_layer_param *param)
 static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct kr_layer_param *param = ctx->data;
-	struct kr_query *qry = kr_rplan_current(param->rplan);
+	struct kr_request *param = ctx->data;
+	struct kr_query *qry = kr_rplan_current(&param->rplan);
 	if (qry->stype != KNOT_RRTYPE_A && qry->stype != KNOT_RRTYPE_AAAA) {
 		return ctx->state;
 	}
@@ -149,7 +151,7 @@ static int load_map(struct kr_zonecut *hints, FILE *fp)
 		}
 	}
 
-	DEBUG_MSG("loaded %zu hints\n", count);
+	DEBUG_MSG(NULL, "loaded %zu hints\n", count);
 	return kr_ok();
 }
 
@@ -157,10 +159,10 @@ static int load(struct kr_module *module, const char *path)
 {
 	auto_fclose FILE *fp = fopen(path, "r");
 	if (fp == NULL) {
-		DEBUG_MSG("reading '%s' failed: %s\n", path, strerror(errno));
+		DEBUG_MSG(NULL, "reading '%s' failed: %s\n", path, strerror(errno));
 		return kr_error(errno);
 	} else {
-		DEBUG_MSG("reading '%s'\n", path);
+		DEBUG_MSG(NULL, "reading '%s'\n", path);
 	}
 
 	/* Create pool and copy itself */

@@ -14,10 +14,9 @@ API reference
 Name resolution
 ---------------
 
-.. doxygengroup:: resolution
+.. doxygenfile:: resolve.h
    :project: libkresolve
-
-.. doxygengroup:: rplan
+.. doxygenfile:: rplan.h
    :project: libkresolve
 
 .. _lib_api_cache:
@@ -25,7 +24,7 @@ Name resolution
 Cache
 -----
 
-.. doxygengroup:: cache
+.. doxygenfile:: cache.h
    :project: libkresolve
 
 .. _lib_api_nameservers:
@@ -33,7 +32,9 @@ Cache
 Nameservers
 -----------
 
-.. doxygengroup:: nameservers
+.. doxygenfile:: nsrep.h
+   :project: libkresolve
+.. doxygenfile:: zonecut.h
    :project: libkresolve
 
 .. _lib_api_modules:
@@ -41,13 +42,15 @@ Nameservers
 Modules
 -------
 
-.. doxygengroup:: modules
+.. doxygenfile:: module.h
    :project: libkresolve
 
 Utilities
 ---------
 
-.. doxygengroup:: utils
+.. doxygenfile:: utils.h
+   :project: libkresolve
+.. doxygenfile:: defines.h
    :project: libkresolve
 
 .. _lib_generics:
