@@ -14,10 +14,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup nameservers
- * @{
- */
-
 #pragma once
 
 #include <netinet/in.h>
@@ -64,5 +60,3 @@ struct kr_nsrep
  * @return       score, see enum kr_ns_score
  */
 int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset);
-
-/** @} */

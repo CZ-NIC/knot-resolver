@@ -16,10 +16,6 @@
 
 #pragma once
 
-/** \addtogroup rplan
- * @{
- */
-
 #include "lib/defines.h"
 #include "lib/resolve.h"
 
@@ -33,5 +29,3 @@
 #else
  #define QRDEBUG(query, cls, fmt, ...)
 #endif
-
-/** @} */

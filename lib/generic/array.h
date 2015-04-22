@@ -23,14 +23,16 @@
  * Be aware of that, as direct usage of the macros in the evaluating macros
  * may lead to different expectations:
  *
- *     # Undefined behaviour
+ * @code{.c}
  *     MIN(array_push(arr, val), other)
+ * @endcode
  *
  * May evaluate the code twice, leading to unexpected behaviour.
  * This is a price to pay for the absence of proper generics.
  *
- * Example usage:
+ * # Example usage:
  *
+ * @code{.c}
  *      array_t(const char*) arr;
  *      array_init(arr);
  *
@@ -55,7 +57,7 @@
  *
  *      // Random delete
  *      array_del(arr, 0);
- *
+ * @endcode
  * \addtogroup generics
  * @{
  */

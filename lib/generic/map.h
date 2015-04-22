@@ -9,8 +9,9 @@
  *
  * @warning If the user provides a custom allocator, it must return addresses aligned to 2B boundary.
  *
- * Example usage:
+ * # Example usage:
  *
+ * @code{.c}
  *      map_t map = map_make();
  *
  *      // Custom allocator (optional)
@@ -43,6 +44,7 @@
  *
  *      // Clear the map
  *      map_clear(&map);
+ * @endcode
  *
  * \addtogroup generics
  * @{

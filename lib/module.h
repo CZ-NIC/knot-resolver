@@ -14,10 +14,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup modules
- * @{
- */
-
 #pragma once
 
 #include <libknot/processing/layer.h>
@@ -92,5 +88,3 @@ void kr_module_unload(struct kr_module *module);
  */
 #define KR_MODULE_EXPORT(module) \
     uint32_t module ## _api() { return KR_MODULE_API; }
-
-/** @} */

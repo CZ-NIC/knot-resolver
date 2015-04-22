@@ -24,8 +24,9 @@
  *
  * @note Maximum object size is 2^16 bytes, see  ::pack_objlen_t
  *
- *  Example usage:
+ * # Example usage:
  *
+ * @code{.c}
  *      pack_t pack;
  *      pack_init(pack);
  *
@@ -47,6 +48,7 @@
  *      pack_obj_del(pack, U8("jedi"), 4);
  *
  *      pack_clear(pack);
+ * @endcode
  *
  * \addtogroup generics
  * @{

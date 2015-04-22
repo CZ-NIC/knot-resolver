@@ -14,10 +14,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup rplan
- * @{
- */
-
 #pragma once
 
 #include "lib/generic/map.h"
@@ -109,5 +105,3 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut);
  * @return 0 or error code
  */
 int kr_zonecut_find_cached(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timestamp);
-
-/** @} */

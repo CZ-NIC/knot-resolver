@@ -14,10 +14,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup rplan
- * @{
- */
-
 #pragma once
 
 #include <sys/time.h>
@@ -141,5 +137,3 @@ struct kr_query *kr_rplan_current(struct kr_rplan *rplan);
  * Return true if resolution chain satisfies given query.
  */
 bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type);
-
-/** @} */

@@ -14,10 +14,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup utils
- * @{
- */
-
 #pragma once
 
 #include <stdio.h>
@@ -40,5 +36,3 @@ extern void _cleanup_fclose(FILE **p);
 
 /** Concatenate N strings. */
 char* kr_strcatdup(unsigned n, ...);
-
-/** @} */
