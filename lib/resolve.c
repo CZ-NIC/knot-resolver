@@ -31,9 +31,6 @@
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "resl",  fmt)
 
-/* Defines */
-#define ITER_LIMIT 50
-
 /** Invalidate current NS/addr pair. */
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
@@ -245,7 +242,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 
 	/* Different processing for network error */
 	int state = KNOT_STATE_FAIL;
-	if (packet->size == 0) {
+	if (!packet || packet->size == 0) {
 		/* Network error, retry over TCP. */
 		if (!(qry->flags & QUERY_TCP)) {
 			/** @todo This should just penalize UDP and elect next best. */
@@ -275,7 +272,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	return kr_rplan_empty(&request->rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 }
 
-int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *proto, knot_pkt_t *packet)
+int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *qry = kr_rplan_current(rplan);
@@ -329,7 +326,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *p
 
 	/* Issue dependent query to this address */
 	*dst = &qry->ns.addr.ip;
-	*proto = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
+	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return state;
 }
 

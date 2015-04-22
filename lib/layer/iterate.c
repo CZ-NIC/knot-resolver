@@ -28,7 +28,7 @@
 #include "lib/nsrep.h"
 #include "lib/module.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(param->rplan), "iter", fmt)
+#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(&req->rplan), "iter", fmt)
 
 /* Packet classification. */
 enum {
@@ -39,7 +39,7 @@ enum {
 };
 
 /* Iterator often walks through packet section, this is an abstraction. */
-typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_layer_param *);
+typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
 
 /** Return minimized QNAME/QTYPE for current zone cut. */
 static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qtype)
@@ -137,20 +137,20 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, uint16_
 	return KNOT_STATE_CONSUME;
 }
 
-static int update_glue(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param)
+static int update_glue(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
 {
-	return update_nsaddr(rr, kr_rplan_current(param->rplan), hint);
+	return update_nsaddr(rr, kr_rplan_current(&req->rplan), hint);
 }
 
-int rr_update_parent(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param)
+int rr_update_parent(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
 {
-	struct kr_query *query = kr_rplan_current(param->rplan);
-	return update_nsaddr(rr, query->parent, hint);
+	struct kr_query *qry = kr_rplan_current(&req->rplan);
+	return update_nsaddr(rr, qry->parent, hint);
 }
 
-int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_param *param)
+int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
 {
-	knot_pkt_t *answer = param->answer;
+	knot_pkt_t *answer = req->answer;
 
 	/* Write copied RR to the result packet. */
 	int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE, rr, hint);
@@ -166,23 +166,23 @@ int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_layer_para
 }
 
 /** Attempt to find glue for given nameserver name (best effort). */
-static int fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_layer_param *param)
+static int fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
 {
 	int result = 0;
 	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
 	for (unsigned i = 0; i < ar->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
 		if (knot_dname_is_equal(ns, rr->owner)) {
-			(void) update_glue(rr, 0, param);
+			(void) update_glue(rr, 0, req);
 			result += 1;
 		}
 	}
 	return result;
 }
 
-static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_layer_param *param)
+static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request *req)
 {
-	struct kr_query *query = kr_rplan_current(param->rplan);
+	struct kr_query *query = kr_rplan_current(&req->rplan);	
 	struct kr_zonecut *cut = &query->zone_cut;
 	int state = KNOT_STATE_CONSUME;
 
@@ -203,7 +203,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_layer_p
 	kr_zonecut_add(cut, knot_ns_name(&rr->rrs, 0), NULL);
 	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
-		int glue_records = fetch_glue(pkt, ns_name, param);
+		int glue_records = fetch_glue(pkt, ns_name, req);
 		/* Glue is mandatory for NS below zone */
 		if (knot_dname_in(ns_name, rr->owner) ) {
 			if (glue_records == 0) {
@@ -216,7 +216,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_layer_p
 	return state;
 }
 
-static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
+static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 {
 	int result = KNOT_STATE_CONSUME;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
@@ -230,7 +230,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
-			int state = update_cut(pkt, rr, param);
+			int state = update_cut(pkt, rr, req);
 			switch(state) {
 			case KNOT_STATE_DONE: result = state; break;
 			case KNOT_STATE_FAIL: return state; break;
@@ -244,10 +244,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_layer_param *param)
 	return result;
 }
 
-static void finalize_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
+static void finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	/* Finalize header */
-	knot_pkt_t *answer = param->answer;
+	knot_pkt_t *answer = req->answer;
 	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
 
 	/* Fill in SOA if negative response */
@@ -258,16 +258,16 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 		for (unsigned i = 0; i < ns->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 			if (rr->type == KNOT_RRTYPE_SOA) {
-				rr_update_answer(rr, 0, param);
+				rr_update_answer(rr, 0, req);
 				break;
 			}
 		}
 	}
 }
 
-static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
+static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
-	struct kr_query *query = kr_rplan_current(param->rplan);
+	struct kr_query *query = kr_rplan_current(&req->rplan);
 
 	/* Response for minimized QNAME.
 	 * NODATA   => may be empty non-terminal, retry (found zone cut)
@@ -292,7 +292,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 	const knot_dname_t *cname = query->sname;
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-		int state = is_final ?  rr_update_answer(rr, 0, param) : rr_update_parent(rr, 0, param);
+		int state = is_final ?  rr_update_answer(rr, 0, req) : rr_update_parent(rr, 0, req);
 		if (state == KNOT_STATE_FAIL) {
 			return state;
 		}
@@ -301,10 +301,10 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 
 	/* Follow canonical name as next SNAME. */
 	if (cname != query->sname) {
-		(void) kr_rplan_push(param->rplan, query->parent, cname, query->sclass, query->stype);
+		(void) kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
 	} else {
 		if (query->parent == NULL) {
-			finalize_answer(pkt, param);
+			finalize_answer(pkt, req);
 		}
 	}
 
@@ -314,7 +314,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_layer_param *param)
 }
 
 /** Error handling, RFC1034 5.3.3, 4d. */
-static int resolve_error(knot_pkt_t *pkt, struct kr_layer_param *param)
+static int resolve_error(knot_pkt_t *pkt, struct kr_request *req)
 {
 	return KNOT_STATE_FAIL;
 }
@@ -333,9 +333,10 @@ static int begin(knot_layer_t *ctx, void *module_param)
 static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct kr_layer_param *param = ctx->data;
-	struct kr_query *query = kr_rplan_current(param->rplan);
+	struct kr_request *req = ctx->data;
+	struct kr_query *query = kr_rplan_current(&req->rplan);
 	if (query == NULL || ctx->state == KNOT_STATE_DONE) {
+		assert(0);
 		return ctx->state;
 	}
 
@@ -367,15 +368,6 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_FAIL;
 	}
 
-#ifndef NDEBUG
-	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN];
-	knot_dname_to_str(qname_str, qname, sizeof(qname_str));
-	struct sockaddr *addr = &query->ns.addr.ip;
-	inet_ntop(addr->sa_family, kr_nsrep_inaddr(query->ns.addr), ns_str, sizeof(ns_str));
-	knot_dname_to_str(zonecut_str, query->zone_cut.name, sizeof(zonecut_str));
-	DEBUG_MSG("=> querying: '%s' zone cut: '%s' m12n: '%s'\n", ns_str, zonecut_str, qname_str);
-#endif
-
 	/* Query built, expect answer. */
 	return KNOT_STATE_CONSUME;
 }
@@ -387,8 +379,8 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct kr_layer_param *param = ctx->data;
-	struct kr_query *query = kr_rplan_current(param->rplan);
+	struct kr_request *req = ctx->data;
+	struct kr_query *query = kr_rplan_current(&req->rplan);
 	if (query == NULL || (query->flags & QUERY_RESOLVED)) {
 		return ctx->state;
 	}
@@ -396,20 +388,19 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first. */
 	if (pkt->parsed < pkt->size) {
 		DEBUG_MSG("<= malformed response\n");
-		return resolve_error(pkt, param);
+		return resolve_error(pkt, req);
 	} else if (!is_paired_to_query(pkt, query)) {
 		DEBUG_MSG("<= ignoring mismatching response\n");
 		return KNOT_STATE_CONSUME;
 	} else if (knot_wire_get_tc(pkt->wire)) {
 		DEBUG_MSG("<= truncated response, failover to TCP\n");
-		struct kr_query *cur = kr_rplan_current(param->rplan);
-		if (cur) {
+		if (query) {
 			/* Fail if already on TCP. */
-			if (cur->flags & QUERY_TCP) {
+			if (query->flags & QUERY_TCP) {
 				DEBUG_MSG("<= TC=1 with TCP, bailing out\n");
-				return resolve_error(pkt, param);
+				return resolve_error(pkt, req);
 			}
-			cur->flags |= QUERY_TCP;
+			query->flags |= QUERY_TCP;
 		}
 		return KNOT_STATE_DONE;
 	}
@@ -424,16 +415,16 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		break; /* OK */
 	default:
 		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_error(pkt, param);
+		return resolve_error(pkt, req);
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
 	int state = KNOT_STATE_CONSUME;
-	state = process_authority(pkt, param);
+	state = process_authority(pkt, req);
 	switch(state) {
 	case KNOT_STATE_CONSUME: /* Not referral, process answer. */
 		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		state = process_answer(pkt, param);
+		state = process_answer(pkt, req);
 		break;
 	case KNOT_STATE_DONE: /* Referral */
 		DEBUG_MSG("<= referral response, follow\n");
