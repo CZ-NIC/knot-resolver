@@ -289,6 +289,9 @@ int engine_register(struct engine *engine, const char *name)
 		return kr_error(EINVAL);
 	}
 
+	/* Make sure module is unloaded */
+	(void) engine_unregister(engine, name);
+
 	/* Load module */
 	size_t next = engine->modules.len;
 	array_reserve(engine->modules, next + 1);
@@ -324,6 +327,8 @@ int engine_unregister(struct engine *engine, const char *name)
 	if (found < mod_list->len) {
 		kr_module_unload(&mod_list->at[found]);
 		array_del(*mod_list, found);
+		lua_pushnil(engine->L);
+		lua_setglobal(engine->L, name);
 		return kr_ok();
 	}
 
