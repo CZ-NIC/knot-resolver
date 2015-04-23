@@ -25,12 +25,13 @@ setmetatable(net, {
 -- `modules.<name> = <config>`
 setmetatable(modules, {
 	__newindex = function (t,k,v)
-		modules.load(k)
-		if _G[k] then
-			local config_call = _G[k]['config']
-			if config_call and config_call[''] then
-				config_call(v)
+		if not rawget(_G, k) then
+			modules.load(k)
+			local mod = rawget(_G, k)
+			if mod and mod['config'] then
+				mod['config'](v)
 			end
+
 		end
 	end
 })
@@ -42,12 +43,12 @@ function modules_register(module)
 		__index = function (t, k)
 			local  v = rawget(t, k)
 			if     v     then return v
-			elseif t.get then return t.get(k)
+			elseif rawget(t, 'get') then return t.get(k)
 			end
 		end,
 		__newindex = function (t, k, v)
 			local  old_v = rawget(t, k)
-			if not old_v and t.set then
+			if not old_v and rawget(t, 'set') then
 				t.set(k..' '..v)
 			end
 		end
