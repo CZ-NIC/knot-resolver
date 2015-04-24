@@ -145,7 +145,7 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 
 struct kr_query *kr_rplan_current(struct kr_rplan *rplan)
 {
-	if (rplan == NULL || EMPTY_LIST(rplan->pending)) {
+	if (kr_rplan_empty(rplan)) {
 		return NULL;
 	}
 
