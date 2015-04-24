@@ -351,8 +351,8 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	}
 
 	/* Clean up. */
-	knot_overlay_reset(&request->overlay);
 	knot_overlay_deinit(&request->overlay);
+	request->overlay.state = KNOT_STATE_NOOP;
 	kr_rplan_deinit(&request->rplan);
 	return KNOT_STATE_DONE;
 }

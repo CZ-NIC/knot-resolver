@@ -27,6 +27,9 @@ struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
 	mm_ctx_t *mm;
+    struct {
+        uint8_t wire[KNOT_WIRE_MAX_PKTSIZE];
+    } bufs;
 };
 
 /**
@@ -36,6 +39,7 @@ struct worker_ctx {
  * @param handle
  * @param answer
  * @param query
+ * @param addr
  * @return 0, error code
  */
-int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *answer, knot_pkt_t *query);
+int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr* addr);

@@ -20,11 +20,8 @@
 #include <libknot/packet/pkt.h>
 
 struct endpoint;
-
-int udp_send(uv_udp_t *handle, knot_pkt_t *answer, const struct sockaddr *addr);
 int udp_bind(struct endpoint *ep, struct sockaddr *addr);
 void udp_unbind(struct endpoint *ep);
 int tcp_bind(struct endpoint *ep, struct sockaddr *addr);
 void tcp_unbind(struct endpoint *ep);
 uv_handle_t *io_create(uv_loop_t *loop, int type);
-uv_connect_t *io_connect(uv_handle_t *handle, struct sockaddr *addr, uv_connect_cb on_connect);
