@@ -56,7 +56,7 @@ static void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->mm);
 
 	/* Resolve */
-	int ret = worker_exec(worker, answer, query);
+	int ret = worker_exec(worker, (uv_handle_t *)handle, answer, query);
 	if (ret == KNOT_EOK && answer->size > 0) {
 		udp_send(handle, answer, addr);
 	}
@@ -134,7 +134,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->mm);
 
 	/* Resolve */
-	int ret = worker_exec(worker, answer, query);
+	int ret = worker_exec(worker, (uv_handle_t *)handle, answer, query);
 	if (ret == KNOT_EOK && answer->size > 0) {
 		tcp_send((uv_handle_t *)handle, answer);
 	}
@@ -192,4 +192,32 @@ void tcp_unbind(struct endpoint *ep)
 {
 	tcp_unbind_handle((uv_handle_t *)&ep->tcp);
 	uv_close((uv_handle_t *)&ep->tcp, NULL);
+}
+
+uv_handle_t *io_create(uv_loop_t *loop, int type)
+{
+	uv_handle_t *handle = NULL;
+	if (type == SOCK_DGRAM) {
+		handle = (uv_handle_t *)udp_create(loop);
+		if (handle) {
+			uv_udp_recv_start((uv_udp_t *)handle, &buf_get, &udp_recv);
+		}
+
+	} else {
+		handle = (uv_handle_t *)tcp_create(loop);
+		if (handle) {
+			uv_read_start((uv_stream_t*)handle, buf_get, tcp_recv);
+		}
+	}
+	return handle;
+}
+
+uv_connect_t *io_connect(uv_handle_t *handle, struct sockaddr *addr, uv_connect_cb on_connect)
+{
+	uv_connect_t* connect = malloc(sizeof(uv_connect_t));
+	if (uv_tcp_connect(connect, (uv_tcp_t *)handle, addr, on_connect) != 0) {
+		free(connect);
+		return NULL;
+	}
+	return connect;
 }

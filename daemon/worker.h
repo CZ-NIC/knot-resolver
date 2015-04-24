@@ -33,8 +33,9 @@ struct worker_ctx {
  * Resolve query.
  *
  * @param worker
+ * @param handle
  * @param answer
  * @param query
  * @return 0, error code
  */
-int worker_exec(struct worker_ctx *worker, knot_pkt_t *answer, knot_pkt_t *query);
+int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *answer, knot_pkt_t *query);
