@@ -23,31 +23,21 @@
 
 #define ENDPOINT_BUFSIZE 512 /**< This is an artificial limit for DNS query. */
 
-static void *buf_alloc(void)
-{
-	struct endpoint_data *data = malloc(sizeof(*data) + ENDPOINT_BUFSIZE);
-	if (data == NULL) {
-		return NULL;
-	}
-	data->buf = uv_buf_init((char *)data + sizeof(*data), ENDPOINT_BUFSIZE);
-	return data;
-}
-
 static void buf_get(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
-	struct endpoint_data *data = handle->data;
-	*buf = data->buf;
+#warning TODO: freelist from worker allocation
+	buf->base = malloc(ENDPOINT_BUFSIZE);
+	if (buf->base) {
+		buf->len = ENDPOINT_BUFSIZE;
+	} else {
+		buf->len = 0;
+	}
 }
 
-static void buf_free(uv_handle_t* handle)
-{
-	free(handle->data);
-}
-
-static void udp_send(uv_udp_t *handle, knot_pkt_t *answer, const struct sockaddr *addr)
+int udp_send(uv_udp_t *handle, knot_pkt_t *answer, const struct sockaddr *addr)
 {
 	uv_buf_t sendbuf = uv_buf_init((char *)answer->wire, answer->size);
-	uv_udp_try_send(handle, &sendbuf, 1, addr);
+	return uv_udp_try_send(handle, &sendbuf, 1, addr);
 }
 
 static void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
@@ -74,6 +64,19 @@ static void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	/* Cleanup */
 	knot_pkt_free(&query);
 	knot_pkt_free(&answer);
+	free(buf->base);
+}
+
+static uv_udp_t *udp_create(uv_loop_t *loop)
+{
+	uv_udp_t *handle = malloc(sizeof(uv_udp_t));
+	if (!handle) {
+		return handle;
+	}
+
+	uv_udp_init(loop, handle);
+
+	return handle;
 }
 
 int udp_bind(struct endpoint *ep, struct sockaddr *addr)
@@ -84,28 +87,19 @@ int udp_bind(struct endpoint *ep, struct sockaddr *addr)
 		return ret;
 	}
 
-	handle->data = buf_alloc();
-	if (handle->data == NULL) {
-		udp_unbind(ep);
-		return kr_error(ENOMEM);
-	}
-
-	uv_udp_recv_start(handle, &buf_get, &udp_recv);
-	return 0;
+	return uv_udp_recv_start(handle, &buf_get, &udp_recv);
 }
 
 void udp_unbind(struct endpoint *ep)
 {
 	uv_udp_t *handle = &ep->udp;
 	uv_udp_recv_stop(handle);
-	buf_free((uv_handle_t *)handle);
 	uv_close((uv_handle_t *)handle, NULL);
 }
 
 static void tcp_unbind_handle(uv_handle_t *handle)
 {
 	uv_read_stop((uv_stream_t *)handle);
-	buf_free(handle);
 }
 
 static void tcp_send(uv_handle_t *handle, const knot_pkt_t *answer)
@@ -148,6 +142,18 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	/* Cleanup */
 	knot_pkt_free(&query);
 	knot_pkt_free(&answer);
+	free(buf->base);
+}
+
+static uv_tcp_t *tcp_create(uv_loop_t *loop)
+{
+	uv_tcp_t *handle = malloc(sizeof(uv_tcp_t));
+	if (!handle) {
+		return handle;
+	}
+
+	uv_tcp_init(loop, handle);
+	return handle;
 }
 
 static void tcp_accept(uv_stream_t *master, int status)
@@ -156,20 +162,8 @@ static void tcp_accept(uv_stream_t *master, int status)
 		return;
 	}
 
-	uv_tcp_t *client = malloc(sizeof(uv_tcp_t));
-	if (client == NULL) {
-		return;
-	}
-
-	uv_tcp_init(master->loop, client);
-	client->data = buf_alloc();
-	if (client->data == NULL) {
-		free(client);
-		return;
-	}
-
-	if (uv_accept(master, (uv_stream_t*)client) != 0) {
-		buf_free((uv_handle_t *)client);
+	uv_tcp_t *client = tcp_create(master->loop);
+	if (!client || uv_accept(master, (uv_stream_t*)client) != 0) {
 		free(client);
 		return;
 	}
@@ -189,12 +183,6 @@ int tcp_bind(struct endpoint *ep, struct sockaddr *addr)
 	if (ret != 0) {
 		tcp_unbind(ep);
 		return ret;
-	}
-
-	handle->data = buf_alloc();
-	if (handle->data == NULL) {
-		tcp_unbind(ep);
-		return kr_error(ENOMEM);
 	}
 
 	return 0;
