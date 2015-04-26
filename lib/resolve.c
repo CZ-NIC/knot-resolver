@@ -233,7 +233,10 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	struct kr_query *qry = kr_rplan_current(rplan);
 
 	/* Empty resolution plan, push packet as the new query */
-	if (kr_rplan_empty(rplan)) {
+	if (packet && kr_rplan_empty(rplan)) {
+		if (!knot_wire_get_rd(packet->wire)) {
+			return KNOT_STATE_FAIL;
+		}
 		if (knot_pkt_init_response(request->answer, packet) != 0) {
 			return KNOT_STATE_FAIL;
 		}
