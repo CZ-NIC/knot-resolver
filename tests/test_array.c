@@ -39,6 +39,9 @@ static void test_array(void **state)
 		assert_true(ret >= 0);
 	}
 
+	/* Make sure reservation holds. */
+	assert_true(array_reserve(arr, 5) >= 0);
+
 	/* Delete elements. */
 	array_del(arr, 0);
 	for (size_t i = arr.len; --i;) {
