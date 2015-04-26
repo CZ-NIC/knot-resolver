@@ -65,7 +65,7 @@ static void update_cut_name(struct kr_zonecut *cut, const knot_dname_t *name)
 
 int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *pool)
 {
-	if (cut == NULL) {
+	if (cut == NULL || name == NULL) {
 		return kr_error(EINVAL);
 	}
 
@@ -98,7 +98,7 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
 {
-	if (cut == NULL) {
+	if (cut == NULL || name == NULL) {
 		return;
 	}
 	kr_zonecut_deinit(cut);

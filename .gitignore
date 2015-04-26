@@ -15,6 +15,7 @@
 *.6
 *.log
 *.inc
+*.mdb
 .dirstamp
 .libs
 .deps
@@ -46,3 +47,4 @@ tmp*
 /tests/test_pack
 /tests/test_set
 /tests/test_utils
+/tests/test_zonecut

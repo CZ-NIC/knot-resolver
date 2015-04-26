@@ -9,8 +9,9 @@ tests_BIN := \
 	test_pack \
 	test_utils \
 	test_module \
-	test_rplan \
 	test_cache \
+	test_zonecut \
+	test_rplan \
 	test_resolve
 
 mock_cmodule_SOURCES := tests/mock_cmodule.c
