@@ -84,11 +84,6 @@ void kr_rplan_deinit(struct kr_rplan *rplan)
 	WALK_LIST_DELSAFE(qry, next, rplan->resolved) {
 		query_free(rplan->pool, qry);
 	}
-
-	/* Abort any pending transactions. */
-	if (rplan->txn.db != NULL) {
-		kr_cache_txn_abort(&rplan->txn);
-	}
 }
 
 bool kr_rplan_empty(struct kr_rplan *rplan)
@@ -119,9 +114,14 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	add_tail(&rplan->pending, &qry->node);
 
 	/* Find closest zone cut for this query. */
-	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, NAMEDB_RDONLY);
+	namedb_txn_t txn;
 	kr_zonecut_init(&qry->zone_cut, name, rplan->pool);
-	kr_zonecut_find_cached(&qry->zone_cut, txn, qry->timestamp.tv_sec);
+	if (kr_cache_txn_begin(rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
+		kr_zonecut_set_sbelt(&qry->zone_cut);
+	} else {
+		kr_zonecut_find_cached(&qry->zone_cut, &txn, qry->timestamp.tv_sec);
+		kr_cache_txn_abort(&txn);
+	}
 
 #ifndef NDEBUG
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
@@ -150,53 +150,6 @@ struct kr_query *kr_rplan_current(struct kr_rplan *rplan)
 	}
 
 	return TAIL(rplan->pending);
-}
-
-namedb_txn_t *kr_rplan_txn_acquire(struct kr_rplan *rplan, unsigned flags)
-{
-	if (rplan == NULL || rplan->context == NULL) {
-		return NULL;
-	}
-
-	/* Discard current transaction if RDONLY, but WR is requested. */
-	if ((rplan->txn_flags & NAMEDB_RDONLY) && !(flags & NAMEDB_RDONLY)) {
-		kr_cache_txn_abort(&rplan->txn);
-		rplan->txn.db = NULL;
-	}
-
-	/* Reuse transaction if exists. */
-	if (rplan->txn.db != NULL) {
-		return &rplan->txn;
-	}
-
-	/* Transaction doesn't exist, start new one. */
-	int ret = kr_cache_txn_begin(rplan->context->cache, &rplan->txn, flags);
-	if (ret != KNOT_EOK) {
-		rplan->txn.db = NULL;
-		return NULL;
-	}
-
-	rplan->txn_flags = flags;
-	return &rplan->txn;
-}
-
-int kr_rplan_txn_commit(struct kr_rplan *rplan)
-{
-	if (rplan == NULL || rplan->context == NULL) {
-		return KNOT_EINVAL;
-	}
-
-	/* Just discard RDONLY transactions. */
-	int ret = KNOT_EOK;
-	if (rplan->txn_flags & NAMEDB_RDONLY) {
-		kr_cache_txn_abort(&rplan->txn);
-	} else {
-		/* Commit write transactions. */
-		ret = kr_cache_txn_commit(&rplan->txn);
-	}
-
-	rplan->txn.db = NULL;
-	return ret;
 }
 
 bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type)

@@ -335,14 +335,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
+#ifndef NDEBUG
 	struct kr_rplan *rplan = &request->rplan;
 	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
-
-	/* Resolution success, commit cache transaction. */
-	if (state == KNOT_STATE_DONE) {
-		kr_rplan_txn_commit(rplan);
-	} else {
-		/* Error during procesing, internal failure */
+#endif
+	/* Error during procesing, internal failure */
+	if (state != KNOT_STATE_DONE) {
 		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);

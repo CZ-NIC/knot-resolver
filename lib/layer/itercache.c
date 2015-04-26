@@ -82,7 +82,11 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, NAMEDB_RDONLY);
+	namedb_txn_t txn;
+	struct kr_cache *cache = req->ctx->cache;
+	if (kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY) != 0) {
+		return KNOT_STATE_CONSUME;
+	}
 	uint32_t timestamp = cur->timestamp.tv_sec;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, cur->sname, cur->stype, cur->sclass);
@@ -94,29 +98,33 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Try to find expected record first. */
-	int state = read_cache_rr(txn, &cache_rr, timestamp, callback, req);
+	int state = read_cache_rr(&txn, &cache_rr, timestamp, callback, req);
 	if (state == KNOT_STATE_DONE) {
 		DEBUG_MSG("=> satisfied from cache\n");
 		cur->flags |= QUERY_RESOLVED;
+		kr_cache_txn_abort(&txn);
 		return state;
 	}
 
 	/* Check if CNAME chain exists. */
 	cache_rr.type = KNOT_RRTYPE_CNAME;
-	state = read_cache_rr(txn, &cache_rr, timestamp, callback, req);
+	state = read_cache_rr(&txn, &cache_rr, timestamp, callback, req);
 	if (state != KNOT_STATE_NOOP) {
 		if (cur->stype != KNOT_RRTYPE_CNAME) {
 			const knot_dname_t *cname = knot_cname_name(&cache_rr.rrs);
 			if (kr_rplan_push(rplan, cur->parent, cname, cur->sclass, cur->stype) == NULL) {
+				kr_cache_txn_abort(&txn);
 				return KNOT_STATE_FAIL;
 			}
 		}
 
 		cur->flags |= QUERY_RESOLVED;
+		kr_cache_txn_abort(&txn);
 		return KNOT_STATE_DONE;
 	}
 
 	/* Not resolved. */
+	kr_cache_txn_abort(&txn);
 	return KNOT_STATE_CONSUME;
 }
 
@@ -239,32 +247,35 @@ static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	/* Open write transaction */
-	mm_ctx_t *pool = rplan->pool;
-	uint32_t timestamp = query->timestamp.tv_sec;
-	namedb_txn_t *txn = kr_rplan_txn_acquire(rplan, 0);
-	if (txn == NULL) {
-		return ctx->state; /* Couldn't acquire cache, ignore. */
-	}
-
 	/* Cache only positive answers. */
 	/** \todo Negative answers cache support */
 	if (knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
 		return ctx->state;
 	}
 
+	/* Open write transaction */
+	mm_ctx_t *pool = rplan->pool;
+	uint32_t timestamp = query->timestamp.tv_sec;
+	struct kr_cache *cache = req->ctx->cache;
+	namedb_txn_t txn;
+	if (kr_cache_txn_begin(cache, &txn, 0) != 0) {
+		return ctx->state; /* Couldn't acquire cache, ignore. */
+	}
+
 	/* If authoritative, cache answer for current query. */
 	int ret = KNOT_EOK;
 	if (knot_wire_get_aa(pkt->wire)) {
-		ret = write_cache_answer(pkt, txn, pool, timestamp);
+		ret = write_cache_answer(pkt, &txn, pool, timestamp);
 	}
 	if (ret == KNOT_EOK) {
-		ret = write_cache_authority(pkt, txn, pool, timestamp);
+		ret = write_cache_authority(pkt, &txn, pool, timestamp);
 	}
 
 	/* Cache full, do what we must. */
 	if (ret == KNOT_ESPACE) {
-		kr_cache_clear(txn);
+		kr_cache_clear(&txn);
+	} else {
+		kr_cache_txn_commit(&txn);
 	}
 
 	return ctx->state;
