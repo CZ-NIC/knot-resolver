@@ -54,16 +54,16 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 
+	/* UDP requests are oneshot, always close afterwards */
+	if (handle->data && !uv_is_closing((uv_handle_t *)handle)) { /* Do not free master socket */
+		uv_close((uv_handle_t *)handle, handle_free);
+	}
+
 	/* Check the incoming wire length. */
 	if (nread > KNOT_WIRE_HEADER_SIZE) {
 		knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
 		worker_exec(worker, (uv_handle_t *)handle, query, addr);
 		knot_pkt_free(&query);
-	}
-
-	/* UDP requests are oneshot, always close afterwards */
-	if (handle->data) { /* Do not free master socket */
-		uv_close((uv_handle_t *)handle, handle_free);
 	}
 }
 
@@ -82,13 +82,7 @@ int udp_bind(struct endpoint *ep, struct sockaddr *addr)
 void udp_unbind(struct endpoint *ep)
 {
 	uv_udp_t *handle = &ep->udp;
-	uv_udp_recv_stop(handle);
 	uv_close((uv_handle_t *)handle, NULL);
-}
-
-static void tcp_unbind_handle(uv_handle_t *handle)
-{
-	uv_read_stop((uv_stream_t *)handle);
 }
 
 static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
@@ -130,7 +124,7 @@ static void tcp_accept(uv_stream_t *master, int status)
 		return;
 	}
 
-	uv_read_start(client, handle_getbuf, tcp_recv);
+	io_start_read((uv_handle_t *)client);
 }
 
 int tcp_bind(struct endpoint *ep, struct sockaddr *addr)
@@ -153,7 +147,6 @@ int tcp_bind(struct endpoint *ep, struct sockaddr *addr)
 
 void tcp_unbind(struct endpoint *ep)
 {
-	tcp_unbind_handle((uv_handle_t *)&ep->tcp);
 	uv_close((uv_handle_t *)&ep->tcp, NULL);
 }
 
@@ -163,7 +156,6 @@ uv_handle_t *io_create(uv_loop_t *loop, int type)
 		uv_udp_t *handle = handle_alloc(loop, sizeof(*handle));
 		if (handle) {
 			uv_udp_init(loop, handle);
-			uv_udp_recv_start(handle, &handle_getbuf, &udp_recv);
 		}
 		return (uv_handle_t *)handle;
 	} else {
@@ -172,5 +164,23 @@ uv_handle_t *io_create(uv_loop_t *loop, int type)
 			uv_tcp_init(loop, handle);
 		}
 		return (uv_handle_t *)handle;
+	}
+}
+
+int io_start_read(uv_handle_t *handle)
+{
+	if (handle->type == UV_UDP) {
+		return uv_udp_recv_start((uv_udp_t *)handle, &handle_getbuf, &udp_recv);
+	} else {
+		return uv_read_start((uv_stream_t *)handle, &handle_getbuf, &tcp_recv);
+	}
+}
+
+int io_stop_read(uv_handle_t *handle)
+{
+	if (handle->type == UV_UDP) {
+		return uv_udp_recv_stop((uv_udp_t *)handle);
+	} else {
+		return uv_read_stop((uv_stream_t *)handle);
 	}
 }
