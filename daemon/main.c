@@ -35,6 +35,7 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		cmd[nread - 1] = '\0';
 		/* Execute */
 		engine_cmd((struct engine *)stream->data, cmd);
+		free(buf->base);
 	}
 
 	printf("> ");
