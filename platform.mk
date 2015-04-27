@@ -78,20 +78,16 @@ endef
 
 # Find library (pkg-config)
 define find_lib
-	ifeq ($$(strip $$($(1)_LIBS)),)
-		$(1)_CFLAGS := $(shell pkg-config --cflags $(1) --silence-errors)
-		$(1)_LIBS := $(shell pkg-config --libs $(1) --silence-errors)
-	endif
-	$(call have_lib,$(1))
+	$(call find_alt,$(1),$(1))
 endef
 
 # Find library alternative (pkg-config)
 define find_alt
-ifeq ($$(strip $$($(1)_LIBS)),)
-	$(1)_CFLAGS := $(shell pkg-config --cflags $(2) --silence-errors)
-	$(1)_LIBS := $(shell pkg-config --libs $(2)  --silence-errors)
+	ifeq ($$(strip $$($(1)_LIBS)),)
+		$(1)_CFLAGS := $(shell pkg-config --cflags $(2) --silence-errors)
+		$(1)_LIBS := $(shell pkg-config --libs $(2)  --silence-errors)
+	endif
 	$(call have_lib,$(1))
-endif
 endef
 
 # Find binary
