@@ -127,9 +127,9 @@ static inline void array_std_free(void *baton, void *p)
  * @return element index on success, <0 on failure
  */
 #define array_push(array, val) \
-	(array).len < (array).cap ? ((array).at[(array).len] = val, (array).len++) \
+	(int)((array).len < (array).cap ? ((array).at[(array).len] = val, (array).len++) \
 		: (array_reserve(array, ((array).cap + 1)) < 0 ? -1 \
-			: ((array).at[(array).len] = val, (array).len++))
+			: ((array).at[(array).len] = val, (array).len++)))
 
 /**
  * Pop value from the end of the array.
@@ -143,7 +143,7 @@ static inline void array_std_free(void *baton, void *p)
  * @return 0 on success, <0 on failure
  */
 #define array_del(array, i) \
-	(i) < (array).len ? ((array).len -= 1,(array).at[i] = (array).at[(array).len], 0) : -1
+	(int)((i) < (array).len ? ((array).len -= 1,(array).at[i] = (array).at[(array).len], 0) : -1)
 
 /**
  * Return last element of the array.

@@ -21,103 +21,72 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 
-#define ENDPOINT_BUFSIZE 512 /**< This is an artificial limit for DNS query. */
-
-static void *buf_alloc(void)
+static void *handle_alloc(uv_loop_t *loop, size_t size)
 {
-	struct endpoint_data *data = malloc(sizeof(*data) + ENDPOINT_BUFSIZE);
-	if (data == NULL) {
-		return NULL;
+	uv_handle_t *handle = malloc(size);
+	if (handle) {
+		memset(handle, 0, size);
 	}
-	data->buf = uv_buf_init((char *)data + sizeof(*data), ENDPOINT_BUFSIZE);
-	return data;
+	return handle;
 }
 
-static void buf_get(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
+static void handle_free(uv_handle_t *handle)
 {
-	struct endpoint_data *data = handle->data;
-	*buf = data->buf;
+	free(handle);
 }
 
-static void buf_free(uv_handle_t* handle)
+static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
-	free(handle->data);
+	/* Worker has single buffer which is reused for all incoming
+	 * datagrams / stream reads, the content of the buffer is
+	 * guaranteed to be unchanged only for the duration of
+	 * udp_read() and tcp_read().
+	 */
+	uv_loop_t *loop = handle->loop;
+	struct worker_ctx *worker = loop->data;
+	buf->base = (char *)worker->bufs.wire;
+	buf->len = sizeof(worker->bufs.wire);
 }
 
-static void udp_send(uv_udp_t *handle, knot_pkt_t *answer, const struct sockaddr *addr)
-{
-	uv_buf_t sendbuf = uv_buf_init((char *)answer->wire, answer->size);
-	uv_udp_try_send(handle, &sendbuf, 1, addr);
-}
-
-static void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
+void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	const struct sockaddr *addr, unsigned flags)
 {
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 
+	/* UDP requests are oneshot, always close afterwards */
+	if (handle->data && !uv_is_closing((uv_handle_t *)handle)) { /* Do not free master socket */
+		uv_close((uv_handle_t *)handle, handle_free);
+	}
+
 	/* Check the incoming wire length. */
-	if (nread < KNOT_WIRE_HEADER_SIZE) {
-		return;
+	if (nread > KNOT_WIRE_HEADER_SIZE) {
+		knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
+		worker_exec(worker, (uv_handle_t *)handle, query, addr);
+		knot_pkt_free(&query);
 	}
-
-	/* Create packets */
-	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
-	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->mm);
-
-	/* Resolve */
-	int ret = worker_exec(worker, answer, query);
-	if (ret == KNOT_EOK && answer->size > 0) {
-		udp_send(handle, answer, addr);
-	}
-
-	/* Cleanup */
-	knot_pkt_free(&query);
-	knot_pkt_free(&answer);
 }
 
 int udp_bind(struct endpoint *ep, struct sockaddr *addr)
 {
 	uv_udp_t *handle = &ep->udp;
-	int ret = uv_udp_bind(handle, addr, 0);
+	unsigned flags = UV_UDP_REUSEADDR;
+	if (addr->sa_family == AF_INET6) {
+		flags |= UV_UDP_IPV6ONLY;
+	}
+	int ret = uv_udp_bind(handle, addr, flags);
 	if (ret != 0) {
 		return ret;
 	}
 
-	handle->data = buf_alloc();
-	if (handle->data == NULL) {
-		udp_unbind(ep);
-		return kr_error(ENOMEM);
-	}
-
-	uv_udp_recv_start(handle, &buf_get, &udp_recv);
-	return 0;
+	handle->data = NULL;
+	return io_start_read((uv_handle_t *)handle);
 }
 
 void udp_unbind(struct endpoint *ep)
 {
 	uv_udp_t *handle = &ep->udp;
-	uv_udp_recv_stop(handle);
-	buf_free((uv_handle_t *)handle);
 	uv_close((uv_handle_t *)handle, NULL);
-}
-
-static void tcp_unbind_handle(uv_handle_t *handle)
-{
-	uv_read_stop((uv_stream_t *)handle);
-	buf_free(handle);
-}
-
-static void tcp_send(uv_handle_t *handle, const knot_pkt_t *answer)
-{
-	uint16_t pkt_size = htons(answer->size);
-	uv_buf_t buf[2];
-	buf[0].base = (char *)&pkt_size;
-	buf[0].len  = sizeof(pkt_size);
-	buf[1].base = (char *)answer->wire;
-	buf[1].len  = answer->size;
-
-	uv_try_write((uv_stream_t *)handle, buf, 2);
 }
 
 static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
@@ -125,29 +94,26 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 
-	/* Check the incoming wire length (malformed, EOF or error). */
-	if (nread < (ssize_t) sizeof(uint16_t)) {
-		tcp_unbind_handle((uv_handle_t *)handle);
-		uv_close((uv_handle_t *)handle, (uv_close_cb) free);
+	/* Check for connection close */
+	if (nread <= 0) {
+		uv_close((uv_handle_t *)handle, handle_free);
+		return;
+	} else if (nread < 2) {
+		/* Not enough bytes to read length */
 		return;
 	}
 
 	/* Set packet size */
-	nread = wire_read_u16((const uint8_t *)buf->base);
+	/** @todo This is not going to work if the packet is fragmented in the stream ! */
+	uint16_t nbytes = wire_read_u16((const uint8_t *)buf->base);
 
-	/* Create packets */
-	knot_pkt_t *query = knot_pkt_new(buf->base + sizeof(uint16_t), nread, worker->mm);
-	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, worker->mm);
-
-	/* Resolve */
-	int ret = worker_exec(worker, answer, query);
-	if (ret == KNOT_EOK && answer->size > 0) {
-		tcp_send((uv_handle_t *)handle, answer);
+	/* Check if there's enough data and execute */
+	if (nbytes + 2 < nread) {
+		return;
 	}
-
-	/* Cleanup */
+	knot_pkt_t *query = knot_pkt_new(buf->base + 2, nbytes, worker->mm);
+	worker_exec(worker, (uv_handle_t *)handle, query, NULL);
 	knot_pkt_free(&query);
-	knot_pkt_free(&answer);
 }
 
 static void tcp_accept(uv_stream_t *master, int status)
@@ -156,31 +122,23 @@ static void tcp_accept(uv_stream_t *master, int status)
 		return;
 	}
 
-	uv_tcp_t *client = malloc(sizeof(uv_tcp_t));
-	if (client == NULL) {
+	uv_stream_t *client = (uv_stream_t *)io_create(master->loop, SOCK_STREAM);
+	if (!client || uv_accept(master, client) != 0) {
+		handle_free((uv_handle_t *)client);
 		return;
 	}
 
-	uv_tcp_init(master->loop, client);
-	client->data = buf_alloc();
-	if (client->data == NULL) {
-		free(client);
-		return;
-	}
-
-	if (uv_accept(master, (uv_stream_t*)client) != 0) {
-		buf_free((uv_handle_t *)client);
-		free(client);
-		return;
-	}
-
-	uv_read_start((uv_stream_t*)client, buf_get, tcp_recv);
+	io_start_read((uv_handle_t *)client);
 }
 
 int tcp_bind(struct endpoint *ep, struct sockaddr *addr)
 {
 	uv_tcp_t *handle = &ep->tcp;
-	int ret = uv_tcp_bind(handle, addr, 0);
+	unsigned flags = UV_UDP_REUSEADDR;
+	if (addr->sa_family == AF_INET6) {
+		flags |= UV_UDP_IPV6ONLY;
+	}
+	int ret = uv_tcp_bind(handle, addr, flags);
 	if (ret != 0) {
 		return ret;
 	}
@@ -191,17 +149,46 @@ int tcp_bind(struct endpoint *ep, struct sockaddr *addr)
 		return ret;
 	}
 
-	handle->data = buf_alloc();
-	if (handle->data == NULL) {
-		tcp_unbind(ep);
-		return kr_error(ENOMEM);
-	}
-
+	handle->data = NULL;
 	return 0;
 }
 
 void tcp_unbind(struct endpoint *ep)
 {
-	tcp_unbind_handle((uv_handle_t *)&ep->tcp);
 	uv_close((uv_handle_t *)&ep->tcp, NULL);
+}
+
+uv_handle_t *io_create(uv_loop_t *loop, int type)
+{
+	if (type == SOCK_DGRAM) {
+		uv_udp_t *handle = handle_alloc(loop, sizeof(*handle));
+		if (handle) {
+			uv_udp_init(loop, handle);
+		}
+		return (uv_handle_t *)handle;
+	} else {
+		uv_tcp_t *handle = handle_alloc(loop, sizeof(*handle));
+		if (handle) {
+			uv_tcp_init(loop, handle);
+		}
+		return (uv_handle_t *)handle;
+	}
+}
+
+int io_start_read(uv_handle_t *handle)
+{
+	if (handle->type == UV_UDP) {
+		return uv_udp_recv_start((uv_udp_t *)handle, &handle_getbuf, &udp_recv);
+	} else {
+		return uv_read_start((uv_stream_t *)handle, &handle_getbuf, &tcp_recv);
+	}
+}
+
+int io_stop_read(uv_handle_t *handle)
+{
+	if (handle->type == UV_UDP) {
+		return uv_udp_recv_stop((uv_udp_t *)handle);
+	} else {
+		return uv_read_stop((uv_stream_t *)handle);
+	}
 }

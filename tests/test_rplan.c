@@ -27,8 +27,6 @@ static void test_rplan_params(void **state)
 	assert_int_equal(kr_rplan_pop(NULL, NULL), KNOT_EINVAL);
 	assert_true(kr_rplan_empty(NULL));
 	assert_null(kr_rplan_current(NULL));
-	assert_null(kr_rplan_txn_acquire(NULL, 0));
-	assert_int_equal(kr_rplan_txn_commit(NULL), KNOT_EINVAL);
 	kr_rplan_deinit(NULL);
 
 	/* NULL mandatory parameters */
@@ -39,8 +37,6 @@ static void test_rplan_params(void **state)
 	assert_int_equal(kr_rplan_pop(&rplan, NULL), KNOT_EINVAL);
 	assert_true(kr_rplan_empty(&rplan));
 	assert_null(kr_rplan_current(&rplan));
-	assert_null(kr_rplan_txn_acquire(&rplan, 0));
-	assert_int_equal(kr_rplan_txn_commit(&rplan), KNOT_EINVAL);
 	kr_rplan_deinit(&rplan);
 }
 

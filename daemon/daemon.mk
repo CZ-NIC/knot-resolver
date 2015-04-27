@@ -1,5 +1,4 @@
 kresolved_SOURCES := \
-	daemon/layer/query.c \
 	daemon/io.c          \
 	daemon/network.c     \
 	daemon/engine.c      \

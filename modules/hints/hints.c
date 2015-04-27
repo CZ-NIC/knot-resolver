@@ -186,6 +186,7 @@ static void unload(struct kr_module *module)
 {
 	struct kr_zonecut *hints = module->data;
 	if (hints) {
+		kr_zonecut_deinit(hints);
 		mp_delete(hints->pool->ctx);
 		module->data = NULL;
 	}

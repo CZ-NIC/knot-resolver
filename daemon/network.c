@@ -86,7 +86,10 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 		array_init(*ep_array);
 	}
 
-	return array_push(*ep_array, ep);
+	if (array_push(*ep_array, ep) < 0) {
+		return kr_error(ENOMEM);
+	}
+	return kr_ok();
 }
 
 /** Open endpoint protocols. */

@@ -27,10 +27,6 @@ enum endpoint_flag {
     NET_TCP  = 1 << 1
 };
 
-struct endpoint_data {
-    uv_buf_t buf;
-};
-
 struct endpoint {
     uv_udp_t udp;
     uv_tcp_t tcp;

@@ -216,7 +216,7 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 		return KNOT_STATE_FAIL;
 	}
 
-	/* Create answer packet */
+	/* Initialize answer packet */
 	knot_pkt_t *answer = request->answer;
 	knot_wire_set_qr(answer->wire);
 	knot_wire_clear_aa(answer->wire);
@@ -233,7 +233,13 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	struct kr_query *qry = kr_rplan_current(rplan);
 
 	/* Empty resolution plan, push packet as the new query */
-	if (kr_rplan_empty(&request->rplan)) {
+	if (packet && kr_rplan_empty(rplan)) {
+		if (!knot_wire_get_rd(packet->wire)) {
+			return KNOT_STATE_FAIL;
+		}
+		if (knot_pkt_init_response(request->answer, packet) != 0) {
+			return KNOT_STATE_FAIL;
+		}
 		const knot_dname_t *qname = knot_pkt_qname(packet);
 		uint16_t qclass = knot_pkt_qclass(packet);
 		uint16_t qtype = knot_pkt_qtype(packet);
@@ -332,14 +338,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
+#ifndef NDEBUG
 	struct kr_rplan *rplan = &request->rplan;
 	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
-
-	/* Resolution success, commit cache transaction. */
-	if (state == KNOT_STATE_DONE) {
-		kr_rplan_txn_commit(rplan);
-	} else {
-		/* Error during procesing, internal failure */
+#endif
+	/* Error during procesing, internal failure */
+	if (state != KNOT_STATE_DONE) {
 		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
@@ -347,8 +351,8 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	}
 
 	/* Clean up. */
-	knot_overlay_reset(&request->overlay);
 	knot_overlay_deinit(&request->overlay);
+	request->overlay.state = KNOT_STATE_NOOP;
 	kr_rplan_deinit(&request->rplan);
 	return KNOT_STATE_DONE;
 }
