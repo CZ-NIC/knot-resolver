@@ -70,13 +70,17 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 int udp_bind(struct endpoint *ep, struct sockaddr *addr)
 {
 	uv_udp_t *handle = &ep->udp;
-	int ret = uv_udp_bind(handle, addr, 0);
+	unsigned flags = UV_UDP_REUSEADDR;
+	if (addr->sa_family == AF_INET6) {
+		flags |= UV_UDP_IPV6ONLY;
+	}
+	int ret = uv_udp_bind(handle, addr, flags);
 	if (ret != 0) {
 		return ret;
 	}
 
 	handle->data = NULL;
-	return uv_udp_recv_start(handle, &handle_getbuf, &udp_recv);
+	return io_start_read((uv_handle_t *)handle);
 }
 
 void udp_unbind(struct endpoint *ep)
@@ -130,7 +134,11 @@ static void tcp_accept(uv_stream_t *master, int status)
 int tcp_bind(struct endpoint *ep, struct sockaddr *addr)
 {
 	uv_tcp_t *handle = &ep->tcp;
-	int ret = uv_tcp_bind(handle, addr, 0);
+	unsigned flags = UV_UDP_REUSEADDR;
+	if (addr->sa_family == AF_INET6) {
+		flags |= UV_UDP_IPV6ONLY;
+	}
+	int ret = uv_tcp_bind(handle, addr, flags);
 	if (ret != 0) {
 		return ret;
 	}
