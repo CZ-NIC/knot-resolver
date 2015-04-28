@@ -36,3 +36,6 @@ extern void _cleanup_fclose(FILE **p);
 
 /** Concatenate N strings. */
 char* kr_strcatdup(unsigned n, ...);
+
+/** Fill buffer with random seed. */
+int kr_randseed(char *buf, size_t buflen);

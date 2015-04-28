@@ -18,6 +18,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <sys/time.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
@@ -77,4 +79,37 @@ char* kr_strcatdup(unsigned n, ...)
 	}
 
 	return result;
+}
+
+static int seed_file(FILE *fp, char *buf, size_t buflen)
+{
+	if (!fp) {
+		return -1;
+	}
+	/* Read whole buffer even if interrupted */
+	ssize_t readb = 0;
+	while (!ferror(fp) && readb < buflen) {
+		readb += fread(buf, 1, buflen - readb, fp);
+	}
+	return 0;
+}
+
+int kr_randseed(char *buf, size_t buflen)
+{
+    /* This is adapted from Tor's crypto_seed_rng() */
+    static const char *filenames[] = {
+        "/dev/srandom", "/dev/urandom", "/dev/random", NULL
+    };
+    for (unsigned i = 0; filenames[i]; ++i) {
+        auto_fclose FILE *fp = fopen(filenames[i], "r");
+        if (seed_file(fp, buf, buflen) == 0) {
+            return 0;
+        }
+    }
+
+    /* Seed from time, this is not going to be secure. */
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    memcpy(buf, &tv, buflen < sizeof(tv) ? buflen : sizeof(tv));
+    return 0;
 }
