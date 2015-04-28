@@ -39,6 +39,6 @@ int engine_start(struct engine *engine);
 void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *module);
 int engine_unregister(struct engine *engine, const char *module);
-/** Return engine light userdata. */
 void engine_lualib(struct engine *engine, const char *name, int (*lib_cb) (struct lua_State *));
+/** Return engine light userdata. */
 struct engine *engine_luaget(struct lua_State *L);

@@ -15,7 +15,6 @@
  */
 
 #include <uv.h>
-
 #include <libknot/packet/pkt.h>
 #include <libknot/internal/net.h>
 #include <libknot/internal/mempool.h>
@@ -43,8 +42,11 @@ struct qr_task
 		} addr;
 		uv_handle_t *handle;
 	} source;
+	uint16_t iter_count;
+	uint16_t flags;
 };
 
+/* Forward decls */
 static int qr_task_step(struct qr_task *task, knot_pkt_t *packet);
 
 static int parse_query(knot_pkt_t *query)
@@ -71,6 +73,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	/* Create worker task */
 	struct engine *engine = worker->engine;
 	struct qr_task *task = mm_alloc(&pool, sizeof(*task));
+	memset(task, 0, sizeof(*task));
 	if (!task) {
 		mp_delete(pool.ctx);
 		return NULL;
@@ -98,7 +101,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	return task;
 }
 
-static void qr_task_close(uv_handle_t *handle)
+static void qr_task_free(uv_handle_t *handle)
 {
 	struct qr_task *task = handle->data;
 	mp_delete(task->req.pool.ctx);
@@ -123,9 +126,8 @@ static void qr_task_on_send(uv_req_t* req, int status)
 			if (status == 0 && task->next_handle) {
 				io_start_read(task->next_handle);
 			}
-		} else {
-			/* Finalize task */
-			uv_close((uv_handle_t *)&task->timeout, qr_task_close);
+		} else { /* Finalize task */
+			uv_close((uv_handle_t *)&task->timeout, qr_task_free);
 		}
 	}
 }
@@ -163,7 +165,6 @@ static void qr_task_on_connect(uv_connect_t *connect, int status)
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	kr_resolve_finish(&task->req, state);
-	uv_timer_stop(&task->timeout);
 	qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, task->req.answer);
 	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
 }
@@ -186,6 +187,11 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	/* We're done, no more iterations needed */
 	if (state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return qr_task_finalize(task, state);
+	}
+
+	/* Iteration limit */
+	if (++task->iter_count > KR_ITER_LIMIT) {
+		return qr_task_finalize(task, KNOT_STATE_FAIL);
 	}
 
 	/* Create connection for iterative query */
@@ -233,7 +239,6 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 	struct qr_task *task = handle->data;
 	bool is_master_socket = (!task);
 	if (is_master_socket) {
-		/* Accept only queries */
 		if (knot_wire_get_qr(query->wire)) {
 			return kr_error(EINVAL); /* Ignore. */
 		}

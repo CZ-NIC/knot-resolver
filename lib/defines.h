@@ -33,7 +33,7 @@
  * @cond internal
  */
 #define KR_CONN_RTT_MAX 5000 /* Timeout for network activity */
-#define ITER_LIMIT 50        /* Built-in iterator limit */
+#define KR_ITER_LIMIT 50        /* Built-in iterator limit */
 
 /*
  * Timers.
