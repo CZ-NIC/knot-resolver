@@ -168,8 +168,8 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	int state = kr_resolve_query(&request, qname, qclass, qtype);
 	while (state == KNOT_STATE_PRODUCE) {
 		/* Hardlimit on iterative queries */
-		if (++iter_count > ITER_LIMIT) {
-			DEBUG_MSG("iteration limit %d reached\n", ITER_LIMIT);
+		if (++iter_count > KR_ITER_LIMIT) {
+			DEBUG_MSG("iteration limit %d reached\n", KR_ITER_LIMIT);
 			state = KNOT_STATE_FAIL;
 			break;
 		}

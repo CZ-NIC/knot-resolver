@@ -276,7 +276,9 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	 */
 	bool is_final = (query->parent == NULL);
 	int pkt_class = response_classify(pkt);
-	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) && (pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
+	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) &&
+	    (pkt_class & (PKT_NOERROR|PKT_NXDOMAIN|PKT_NODATA))) {
+		DEBUG_MSG("<= found cut, retrying with non-minimized name\n");
 		query->flags |= QUERY_NO_MINIMIZE;
 		return KNOT_STATE_DONE;
 	}
@@ -301,6 +303,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 
 	/* Follow canonical name as next SNAME. */
 	if (cname != query->sname) {
+		DEBUG_MSG("<= cname chain, following\n");
 		(void) kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
 	} else {
 		if (query->parent == NULL) {

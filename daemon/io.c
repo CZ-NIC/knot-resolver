@@ -56,7 +56,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 
 	/* UDP requests are oneshot, always close afterwards */
 	if (handle->data && !uv_is_closing((uv_handle_t *)handle)) { /* Do not free master socket */
-		uv_close((uv_handle_t *)handle, handle_free);
+		io_close((uv_handle_t *)handle);
 	}
 
 	/* Check the incoming wire length. */
@@ -96,7 +96,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
 	/* Check for connection close */
 	if (nread <= 0) {
-		uv_close((uv_handle_t *)handle, handle_free);
+		io_close((uv_handle_t *)handle);
 		return;
 	} else if (nread < 2) {
 		/* Not enough bytes to read length */
@@ -173,6 +173,11 @@ uv_handle_t *io_create(uv_loop_t *loop, int type)
 		}
 		return (uv_handle_t *)handle;
 	}
+}
+
+void io_close(uv_handle_t *handle)
+{
+	uv_close(handle, (uv_close_cb) handle_free);
 }
 
 int io_start_read(uv_handle_t *handle)
