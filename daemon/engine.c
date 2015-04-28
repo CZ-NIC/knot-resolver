@@ -16,7 +16,7 @@
 
 #include <uv.h>
 #include <unistd.h>
-#include <libknot/internal/mem.h>
+#include <libknot/internal/mempattern.h>
 
 #include "daemon/engine.h"
 #include "daemon/bindings.h"

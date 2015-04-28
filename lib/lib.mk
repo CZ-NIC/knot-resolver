@@ -1,4 +1,9 @@
+ccan_EMBED := \
+	contrib/ccan/ilog/ilog.c \
+	contrib/ccan/isaac/isaac.c
+
 libkresolve_SOURCES := \
+	$(ccan_EMBED)          \
 	lib/generic/map.c      \
 	lib/layer/iterate.c    \
 	lib/layer/itercache.c  \
