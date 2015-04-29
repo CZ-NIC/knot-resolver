@@ -40,5 +40,9 @@ void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *module);
 int engine_unregister(struct engine *engine, const char *module);
 void engine_lualib(struct engine *engine, const char *name, int (*lib_cb) (struct lua_State *));
+
+/** Execute current chunk in the sandbox */
+int engine_pcall(struct lua_State *L, int argc);
+
 /** Return engine light userdata. */
 struct engine *engine_luaget(struct lua_State *L);

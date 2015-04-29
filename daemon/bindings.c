@@ -18,6 +18,7 @@
 
 #include "lib/cache.h"
 #include "daemon/bindings.h"
+#include "daemon/worker.h"
 
 /** @internal Prefix error with file:line */
 static int format_error(lua_State* L, const char *err)
@@ -66,7 +67,7 @@ static int mod_load(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "expected load(string name)");
+		lua_pushstring(L, "expected 'load(string name)'");
 		lua_error(L);
 	}
 	/* Load engine module */
@@ -87,7 +88,7 @@ static int mod_unload(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n != 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected unload(string name)");
+		format_error(L, "expected 'unload(string name)'");
 		lua_error(L);
 	}
 	/* Unload engine module */
@@ -185,7 +186,7 @@ static int net_listen(lua_State *L)
 	if (lua_istable(L, 1)) {
 		return net_listen_iface(L, port);
 	} else if (n < 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected listen(string addr, int port = 53)");
+		format_error(L, "expected 'listen(string addr, number port = 53)'");
 		lua_error(L);
 	}
 
@@ -207,7 +208,7 @@ static int net_close(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n < 2) {
-		format_error(L, "expected close(string addr, int port)");
+		format_error(L, "expected 'close(string addr, number port)'");
 		lua_error(L);
 	}
 
@@ -309,7 +310,7 @@ static int cache_open(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n < 1 || !lua_isnumber(L, 1)) {
-		format_error(L, "expected open(number max_size)");
+		format_error(L, "expected 'open(number max_size, string config = \"\")'");
 		lua_error(L);
 	}
 
@@ -353,5 +354,121 @@ int lib_cache(lua_State *L)
 	};
 
 	register_lib(L, "cache", lib);
+	return 1;
+}
+
+static void event_free(uv_timer_t *timer)
+{
+	struct worker_ctx *worker = timer->loop->data;
+	lua_State *L = worker->engine->L;
+	int ref = (intptr_t) timer->data;
+	luaL_unref(L, LUA_REGISTRYINDEX, ref);
+	free(timer);
+}
+
+static void event_callback(uv_timer_t *timer)
+{
+	struct worker_ctx *worker = timer->loop->data;
+	lua_State *L = worker->engine->L;
+
+	/* Retrieve callback and execute */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) timer->data);
+	lua_rawgeti(L, -1, 1);
+	lua_pushinteger(L, (intptr_t) timer->data);
+	engine_pcall(L, 1);
+
+	/* Free callback if not recurrent */
+	if (uv_timer_get_repeat(timer) == 0) {
+		uv_close((uv_handle_t *)timer, (uv_close_cb) event_free);
+	}
+}
+
+static int event_sched(lua_State *L, unsigned timeout, unsigned repeat)
+{
+	uv_timer_t *timer = malloc(sizeof(*timer));
+	if (!timer) {
+		format_error(L, "out of memory");
+		lua_error(L);
+	}
+
+	/* Start timer with the reference */
+	uv_loop_t *loop = uv_default_loop();
+	uv_timer_init(loop, timer);
+	int ret = uv_timer_start(timer, event_callback, timeout, repeat);
+	if (ret != 0) {
+		free(timer);
+		format_error(L, "couldn't start the event");
+		lua_error(L);
+	}
+
+	/* Save callback and timer in registry */
+	lua_newtable(L);
+	lua_pushvalue(L, 2);
+	lua_rawseti(L, -2, 1);
+	lua_pushlightuserdata(L, timer);
+	lua_rawseti(L, -2, 2);
+	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	/* Save reference to the timer */
+	timer->data = (void *) (intptr_t)ref;
+	lua_pushinteger(L, ref);
+	return 1;
+}
+
+static int event_after(lua_State *L)
+{
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2)) {
+		format_error(L, "expected 'after(number timeout, function)'");
+		lua_error(L);
+	}
+
+	return event_sched(L, lua_tonumber(L, 1), 0);
+}
+
+static int event_recurrent(lua_State *L)
+{
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2)) {
+		format_error(L, "expected 'recurrent(number interval, function)'");
+		lua_error(L);
+	}
+	return event_sched(L, 0, lua_tonumber(L, 1));
+}
+
+static int event_cancel(lua_State *L)
+{
+	int n = lua_gettop(L);
+	if (n < 1 || !lua_isnumber(L, 1)) {
+		format_error(L, "expected 'cancel(number event)'");
+		lua_error(L);
+	}
+
+	/* Fetch event if it exists */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
+	if (!lua_istable(L, -1)) {
+		format_error(L, "event not exists");
+		lua_error(L);
+	}
+
+	/* Close the timer */
+	lua_rawgeti(L, -1, 2);
+	uv_handle_t *timer = lua_touserdata(L, -1);
+	uv_close(timer, (uv_close_cb) event_free);
+	return 0;
+}
+
+int lib_event(lua_State *L)
+{
+	static const luaL_Reg lib[] = {
+		{ "after",      event_after },
+		{ "recurrent",  event_recurrent },
+		{ "cancel",     event_cancel },
+		{ NULL, NULL }
+	};
+
+	register_lib(L, "event", lib);
 	return 1;
 }

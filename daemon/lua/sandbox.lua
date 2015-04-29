@@ -2,6 +2,10 @@
 kB = 1024
 MB = 1024*1024
 GB = 1024*1024
+-- Time
+sec = 1000
+minute = 60 * sec
+hour = 60 * minute
 
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`

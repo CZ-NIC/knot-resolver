@@ -71,6 +71,10 @@ static int l_trampoline(lua_State *L)
 	struct kr_module *module = lua_touserdata(L, lua_upvalueindex(1));
 	void* callback = lua_touserdata(L, lua_upvalueindex(2));
 	struct engine *engine = engine_luaget(L);
+	if (!module) {
+		lua_pushstring(L, "module closure missing upvalue");
+		lua_error(L);
+	}
 
 	/* Now we only have property callback or config,
 	 * if we expand the callables, we might need a callback_type.
@@ -172,8 +176,7 @@ void engine_deinit(struct engine *engine)
 	kr_cache_close(engine->resolver.cache);
 }
 
-/** Execute current chunk in the sandbox */
-static int l_sandboxcall(lua_State *L, int argc)
+int engine_pcall(lua_State *L, int argc)
 {
 #if LUA_VERSION_NUM >= 502
 	lua_getglobal(L, "_SANDBOX");
@@ -193,7 +196,7 @@ int engine_cmd(struct engine *engine, const char *str)
 	lua_pushstring(engine->L, str);
 
 	/* Check result. */
-	if (l_sandboxcall(engine->L, 1) != 0) {
+	if (engine_pcall(engine->L, 1) != 0) {
 		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(EINVAL);
@@ -207,7 +210,7 @@ int engine_cmd(struct engine *engine, const char *str)
 	(luaL_loadbuffer((L), (arr), (len), (name)) || lua_pcall((L), 0, LUA_MULTRET, 0))
 /** Load file in a sandbox environment. */
 #define l_dosandboxfile(L, filename) \
-	(luaL_loadfile((L), (filename)) || l_sandboxcall((L), 0))
+	(luaL_loadfile((L), (filename)) || engine_pcall((L), 0))
 
 static int engine_loadconf(struct engine *engine)
 {
@@ -276,7 +279,7 @@ static int register_properties(struct engine *engine, struct kr_module *module)
 	/* Register module in Lua env */
 	lua_getglobal(engine->L, "modules_register");
 	lua_getglobal(engine->L, module->name);
-	if (l_sandboxcall(engine->L, 1) != 0) {
+	if (engine_pcall(engine->L, 1) != 0) {
 		lua_pop(engine->L, 1);
 	}
 
