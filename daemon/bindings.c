@@ -67,7 +67,7 @@ static int mod_load(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "expected load(string name)");
+		lua_pushstring(L, "expected 'load(string name)'");
 		lua_error(L);
 	}
 	/* Load engine module */
@@ -88,7 +88,7 @@ static int mod_unload(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n != 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected unload(string name)");
+		format_error(L, "expected 'unload(string name)'");
 		lua_error(L);
 	}
 	/* Unload engine module */
@@ -186,7 +186,7 @@ static int net_listen(lua_State *L)
 	if (lua_istable(L, 1)) {
 		return net_listen_iface(L, port);
 	} else if (n < 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected listen(string addr, int port = 53)");
+		format_error(L, "expected 'listen(string addr, number port = 53)'");
 		lua_error(L);
 	}
 
@@ -208,7 +208,7 @@ static int net_close(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n < 2) {
-		format_error(L, "expected close(string addr, int port)");
+		format_error(L, "expected 'close(string addr, number port)'");
 		lua_error(L);
 	}
 
@@ -310,7 +310,7 @@ static int cache_open(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n < 1 || !lua_isnumber(L, 1)) {
-		format_error(L, "expected open(number max_size)");
+		format_error(L, "expected 'open(number max_size, string config = \"\")'");
 		lua_error(L);
 	}
 
