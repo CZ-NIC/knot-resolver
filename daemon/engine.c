@@ -244,7 +244,7 @@ static int engine_loadconf(struct engine *engine)
 	}
 
 	/* Use module path for including Lua scripts */
-	return engine_cmd(engine, "package.path = '" MODULEDIR "/?.lua;'..package.path");
+	return engine_cmd(engine, "package.path = '" PREFIX MODULEDIR "/?.lua;'..package.path");
 }
 
 int engine_start(struct engine *engine)
