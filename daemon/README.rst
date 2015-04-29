@@ -153,19 +153,55 @@ to download cache from parent, to avoid cold-cache start.
 Events and services
 ^^^^^^^^^^^^^^^^^^^
 
-The Lua supports a concept called closures, this is extremely useful for scripting actions upon various events.
+The Lua supports a concept called closures_, this is extremely useful for scripting actions upon various events,
+say for example - prune the cache within minute after loading, publish statistics each 5 minutes and so on.
+Here's an example of an anonymous function with :func:`event.recurrent()`:
 
-.. note:: Work in progress, come back later!
+.. code-block:: lua
 
-* Timers and events
+	-- every 5 minutes
+	event.recurrent(5 * minute, function()
+		cachectl.prune()
+	end)
+
+Note that each scheduled event is identified by a number valid for the duration of the event,
+you may cancel it at any time. You can do this with anonymous functions, if you accept the event
+as a parameter, but it's not very useful as you don't have any *non-global* way to keep persistent variables.
+
+.. code-block:: lua
+
+	-- make a closure, encapsulating counter
+	function pruner()
+		local i = 0
+		-- pruning function
+		return function(e)
+			cachectl.prune()
+			-- cancel event on 5th attempt
+			i = i + 1
+			if i == 5 then
+				event.cancel(e)
+			fi
+		end
+	end
+
+	-- make recurrent event that will cancel after 5 times
+	event.recurrent(5 * minute, pruner())
+
 * File watchers
 * Data I/O
 
+.. note:: Work in progress, come back later!
+
+.. _closures: http://www.lua.org/pil/6.1.html
 
 Configuration reference
 -----------------------
 
 This is a reference for variables and functions available to both configuration file and CLI.
+
+.. contents::
+   :depth: 1
+   :local:
 
 Environment
 ^^^^^^^^^^^
@@ -318,6 +354,56 @@ daemons or manipulated from other processes, making for example synchronised loa
    :return: boolean
 
    Close the cache.
+
+
+Timers and events
+^^^^^^^^^^^^^^^^^
+
+The timer represents exactly the thing described in the examples - it allows you to execute closures after specified time,
+or event recurrent events. Time is always described in miliseconds, but there are convenient variables that you can use -
+``sec, minute, hour``. For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
+
+.. function:: event.after(time, function)
+
+   :return: event id
+
+   Execute function after the specified time has passed.
+   The first parameter of the callback is the event itself.
+
+   Example:
+
+   .. code-block:: lua
+
+	event.after(1 * minute, function() print('Hi!') end)
+
+.. function:: event.recurrent(interval, function)
+
+   :return: event id
+
+   Similar to :func:`event.after()`, periodically execute function after ``interval`` passes. 
+
+   Example:
+
+   .. code-block:: lua
+
+	msg_count = 0
+	event.recurrent(5 * sec, function(e) 
+		msg_count = msg_count + 1
+		print('Hi #'..msg_count)
+	end)
+
+.. function:: event.cancel(event_id)
+
+   Cancel running event, it has no effect on already canceled events.
+   New events may reuse the event_id, so the behaviour is undefined if the function
+   is called after another event is started.
+
+   Example:
+
+   .. code-block:: lua
+
+	e = event.after(1 * minute, function() print('Hi!') end)
+	event.cancel(e)
 
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/

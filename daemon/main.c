@@ -141,6 +141,7 @@ int main(int argc, char **argv)
 	engine_lualib(&engine, "modules", lib_modules);
 	engine_lualib(&engine, "net",     lib_net);
 	engine_lualib(&engine, "cache",   lib_cache);
+	engine_lualib(&engine, "event",   lib_event);
 
 	/* Create main worker. */
 	struct worker_ctx worker = {
