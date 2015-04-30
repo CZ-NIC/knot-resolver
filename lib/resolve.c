@@ -21,7 +21,6 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
 #include <libknot/internal/net.h>
-#include <dnssec/random.h>
 
 #include "lib/rplan.h"
 #include "lib/resolve.h"

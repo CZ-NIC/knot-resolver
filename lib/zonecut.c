@@ -14,7 +14,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <dnssec/random.h>
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/packet/wire.h>
