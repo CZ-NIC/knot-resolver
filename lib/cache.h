@@ -19,12 +19,20 @@
 #include <libknot/rrset.h>
 #include <libknot/internal/namedb/namedb.h>
 
+/** Cache entry tag */
+enum kr_cache_tag {
+	KR_CACHE_RR   = 0x01,
+	KR_CACHE_PKT  = 0x02,
+	KR_CACHE_USER = 0xF0
+};
+
 /**
- * Serialized form of the RRSet with inception timestamp.
+ * Serialized form of the RRSet with inception timestamp and maximum TTL.
  */
-struct kr_cache_rrset
+struct kr_cache_entry
 {
 	uint32_t timestamp;
+	uint32_t ttl;
 	uint16_t count;
 	uint8_t  data[];
 };
@@ -34,7 +42,7 @@ extern const namedb_api_t *(*kr_cache_storage)(void);
 
 /**
  * Open/create persistent cache in given path.
- * @param handle Path to existing directory where the DB should be created.
+ * @param handle Configuration string (e.g. path to existing directory where the DB should be created)
  * @param mm Memory context.
  * @param maxsize Maximum database size (bytes)
  * @return database instance or NULL
@@ -54,15 +62,14 @@ void kr_cache_close(namedb_t *cache);
  * @param cache database instance
  * @param txn transaction instance to be initialized (output)
  * @param flags transaction flags (see namedb.h in libknot)
- * @return KNOT_E*
+ * @return 0 or an errcode
  */
 int kr_cache_txn_begin(namedb_t *cache, namedb_txn_t *txn, unsigned flags);
-
 
 /**
  * Commit existing transaction.
  * @param txn transaction instance
- * @return KNOT_E*
+ * @return 0 or an errcode
  */
 int kr_cache_txn_commit(namedb_txn_t *txn);
 
@@ -73,14 +80,56 @@ int kr_cache_txn_commit(namedb_txn_t *txn);
 void kr_cache_txn_abort(namedb_txn_t *txn);
 
 /**
- * Peek the cache for given RRSet (name, type, class)
+ * Peek the cache for asset (name, type, tag)
+ * @note The 'drift' is the time passed between the cache time of the RRSet and now (in seconds).
+ * @param txn transaction instance
+ * @param tag  asset tag
+ * @param name asset name
+ * @param type asset type
+ * @param timestamp current time (will be replaced with drift if successful)
+ * @return cache entry or NULL
+ */
+struct kr_cache_entry *kr_cache_peek(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name,
+                                     uint16_t type, uint32_t *timestamp);
+
+/**
+ * Insert asset into cache, replacing any existing data.
+ * @param txn transaction instance
+ * @param tag  asset tag
+ * @param name asset name
+ * @param type asset type
+ * @param header filled entry header (count, ttl and timestamp)
+ * @return 0 or an errcode
+ */
+int kr_cache_insert(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
+                    struct kr_cache_entry *header, namedb_val_t data);
+
+/**
+ * Remove asset from cache.
+ * @param txn transaction instance
+ * @param tag asset tag
+ * @param name asset name
+ * @param type record type
+ * @return 0 or an errcode
+ */
+int kr_cache_remove(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name, uint16_t type);
+
+/**
+ * Clear all items from the cache.
+ * @param txn transaction instance
+ * @return 0 or an errcode
+ */
+int kr_cache_clear(namedb_txn_t *txn);
+
+/**
+ * Peek the cache for given RRSet (name, type)
  * @note The 'drift' is the time passed between the cache time of the RRSet and now (in seconds).
  * @param txn transaction instance
  * @param rr query RRSet (its rdataset may be changed depending on the result)
  * @param timestamp current time (will be replaced with drift if successful)
- * @return KNOT_E*
+ * @return 0 or an errcode
  */
-int kr_cache_peek(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp);
+int kr_cache_peek_rr(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp);
 
 /**
  * Clone read-only RRSet and adjust TTLs.
@@ -96,21 +145,6 @@ knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ct
  * @param txn transaction instance
  * @param rr inserted RRSet
  * @param timestamp current time
- * @return KNOT_E*
+ * @return 0 or an errcode
  */
-int kr_cache_insert(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestamp);
-
-/**
- * Remove RRSet from cache.
- * @param txn transaction instance
- * @param rr removed RRSet
- * @return KNOT_E*
- */
-int kr_cache_remove(namedb_txn_t *txn, const knot_rrset_t *rr);
-
-/**
- * Clear all items from the cache.
- * @param txn transaction instance
- * @return KNOT_E*
- */
-int kr_cache_clear(namedb_txn_t *txn);
+int kr_cache_insert_rr(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestamp);

@@ -193,7 +193,7 @@ static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t 
 {
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
-	if (kr_cache_peek(txn, &cached_rr, &timestamp) != 0) {
+	if (kr_cache_peek_rr(txn, &cached_rr, &timestamp) != 0) {
 		return;
 	}
 
@@ -211,7 +211,7 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-	int ret = kr_cache_peek(txn, &cached_rr, &drift);
+	int ret = kr_cache_peek_rr(txn, &cached_rr, &drift);
 	if (ret != 0) {
 		return ret;
 	}

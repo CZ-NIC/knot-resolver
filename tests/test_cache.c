@@ -32,18 +32,19 @@ const char *global_env;
 /* Test invalid parameters. */
 static void test_invalid(void **state)
 {
-	assert_null(kr_cache_open(NULL, NULL, 0));
-	assert_null(kr_cache_open(global_env, NULL, 0));
-	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), KNOT_EOK);
-	assert_int_not_equal(kr_cache_txn_begin(&global_env, NULL, 0), KNOT_EOK);
-	assert_int_not_equal(kr_cache_txn_commit(NULL), KNOT_EOK);
-	assert_int_not_equal(kr_cache_peek(NULL, NULL, NULL), KNOT_EOK);
-	assert_int_not_equal(kr_cache_peek(&global_txn, NULL, NULL), KNOT_EOK);
-	assert_int_not_equal(kr_cache_insert(&global_txn, NULL, 0), KNOT_EOK);
-	assert_int_not_equal(kr_cache_insert(NULL, NULL, 0), KNOT_EOK);
-	assert_int_not_equal(kr_cache_remove(&global_txn, NULL), KNOT_EOK);
-	assert_int_not_equal(kr_cache_remove(NULL, NULL), KNOT_EOK);
-	assert_int_not_equal(kr_cache_clear(NULL), KNOT_EOK);
+	assert_null((void *)kr_cache_open(NULL, NULL, 0));
+	assert_null((void *)kr_cache_open(global_env, NULL, 0));
+	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
+	assert_int_not_equal(kr_cache_txn_begin(&global_env, NULL, 0), 0);
+	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
+	assert_int_not_equal(kr_cache_peek_rr(NULL, NULL, NULL), 0);
+	assert_int_not_equal(kr_cache_peek_rr(&global_txn, NULL, NULL), 0);
+	assert_int_not_equal(kr_cache_insert_rr(&global_txn, NULL, 0), 0);
+	assert_int_not_equal(kr_cache_insert_rr(NULL, NULL, 0), 0);
+	assert_int_not_equal(kr_cache_remove(&global_txn, 0, NULL, 0), 0);
+	assert_int_not_equal(kr_cache_remove(&global_txn, KR_CACHE_RR, NULL, 0), 0);
+	assert_int_not_equal(kr_cache_remove(NULL, 0, NULL, 0), 0);
+	assert_int_not_equal(kr_cache_clear(NULL), 0);
 }
 
 /* Test cache open */
@@ -73,7 +74,7 @@ static namedb_txn_t *test_txn_write(void **state)
 static namedb_txn_t *test_txn_rdonly(void **state)
 {
 	assert_non_null(*state);
-	assert_int_equal(kr_cache_txn_begin(*state, &global_txn, NAMEDB_RDONLY), KNOT_EOK);
+	assert_int_equal(kr_cache_txn_begin(*state, &global_txn, NAMEDB_RDONLY), 0);
 	return &global_txn;
 }
 
@@ -83,7 +84,7 @@ static void test_insert(void **state)
 	test_random_rr(&global_rr, CACHE_TTL);
 
 	namedb_txn_t *txn = test_txn_write(state);
-	int ret = kr_cache_insert(txn, &global_rr, CACHE_TIME);
+	int ret = kr_cache_insert_rr(txn, &global_rr, CACHE_TIME);
 	if (ret == KNOT_EOK) {
 		ret = kr_cache_txn_commit(txn);
 	} else {
@@ -104,7 +105,7 @@ static void test_query(void **state)
 
 	for (uint32_t timestamp = CACHE_TIME; timestamp < CACHE_TIME + CACHE_TTL; ++timestamp) {
 		uint32_t drift = timestamp;
-		int query_ret = kr_cache_peek(txn, &cache_rr, &drift);
+		int query_ret = kr_cache_peek_rr(txn, &cache_rr, &drift);
 		bool rr_equal = knot_rrset_equal(&global_rr, &cache_rr, KNOT_RRSET_COMPARE_WHOLE);
 		assert_int_equal(query_ret, KNOT_EOK);
 		assert_true(rr_equal);
@@ -121,7 +122,7 @@ static void test_query_aged(void **state)
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
 	namedb_txn_t *txn = test_txn_rdonly(state);
-	int ret = kr_cache_peek(txn, &cache_rr, &timestamp);
+	int ret = kr_cache_peek_rr(txn, &cache_rr, &timestamp);
 	assert_int_equal(ret, KNOT_ENOENT);
 	kr_cache_txn_abort(txn);
 }
@@ -134,9 +135,9 @@ static void test_remove(void **state)
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
 	namedb_txn_t *txn = test_txn_write(state);
-	int ret = kr_cache_remove(txn, &cache_rr);
+	int ret = kr_cache_remove(txn, KR_CACHE_RR, cache_rr.owner, cache_rr.type);
 	assert_int_equal(ret, KNOT_EOK);
-	ret = kr_cache_peek(txn, &cache_rr, &timestamp);
+	ret = kr_cache_peek_rr(txn, &cache_rr, &timestamp);
 	assert_int_equal(ret, KNOT_ENOENT);
 	kr_cache_txn_commit(txn);
 }
@@ -151,7 +152,7 @@ static void test_fill(void **state)
 	for (unsigned i = 0; i < CACHE_SIZE; ++i) {
 		knot_rrset_t rr;
 		test_random_rr(&rr, CACHE_TTL);
-		ret = kr_cache_insert(txn, &rr, CACHE_TTL - 1);
+		ret = kr_cache_insert_rr(txn, &rr, CACHE_TTL - 1);
 		if (ret != KNOT_EOK) {
 			break;
 		}
