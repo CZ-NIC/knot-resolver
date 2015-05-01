@@ -15,6 +15,7 @@
  */
 
 #include <libknot/internal/mempool.h>
+#include <libknot/internal/namedb/namedb_lmdb.h>
 
 #include "tests/test.h"
 #include "lib/cache.h"
@@ -32,8 +33,6 @@ const char *global_env;
 /* Test invalid parameters. */
 static void test_invalid(void **state)
 {
-	assert_null((void *)kr_cache_open(NULL, NULL, 0));
-	assert_null((void *)kr_cache_open(global_env, NULL, 0));
 	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
 	assert_int_not_equal(kr_cache_txn_begin(&global_env, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
@@ -50,7 +49,11 @@ static void test_invalid(void **state)
 /* Test cache open */
 static void test_open(void **state)
 {
-	*state = kr_cache_open(global_env, &global_mm, CACHE_SIZE);
+	struct namedb_lmdb_opts opts;
+	memset(&opts, 0, sizeof(opts));
+	opts.path = global_env;
+	opts.mapsize = CACHE_SIZE;
+	*state = kr_cache_open(&opts, &global_mm);
 	assert_non_null(*state);
 }
 

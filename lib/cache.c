@@ -31,30 +31,19 @@
 /* Key size */
 #define KEY_SIZE (sizeof(uint8_t) + KNOT_DNAME_MAXLEN + sizeof(uint16_t))
 
-/** Used cache storage engine (default LMDB) */
+/**
+ * Used cache storage engine (default LMDB)
+ * @todo namedb_t should change so it always contains a pointer
+ *       to its API, so it can be carried around instead of keeping it in a
+ *       global variable.
+ */
 const namedb_api_t *(*kr_cache_storage)(void) = namedb_lmdb_api;
 #define db_api kr_cache_storage()
 
-/** Generic storage options */
-union storage_opts {
-	struct namedb_lmdb_opts lmdb;
-};
-
-namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize)
+namedb_t *kr_cache_open(void *opts, mm_ctx_t *mm)
 {
-	if (!handle || maxsize == 0) {
-		return NULL;
-	}
-
-	union storage_opts opts;
-	memset(&opts, 0, sizeof(opts));
-	if (db_api == namedb_lmdb_api()) {
-		opts.lmdb.mapsize = maxsize;
-		opts.lmdb.path = handle;
-	}
-
 	namedb_t *db = NULL;
-	int ret = db_api->init(&db, mm, &opts);
+	int ret = db_api->init(&db, mm, opts);
 	if (ret != 0) {
 		return NULL;
 	}

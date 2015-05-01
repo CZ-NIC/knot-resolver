@@ -72,11 +72,11 @@ static void test_get(void **state)
 	in = malloc(strlen(dict[23])+1);
 	strcpy(in, dict[23]);
 
-	assert_int_equal(map_get(tree, in), dict[23]);
-	assert_int_equal(map_get(tree, notin), NULL);
-	assert_int_equal(map_get(tree, ""), NULL);
+	assert_true(map_get(tree, in) == dict[23]);
+	assert_true(map_get(tree, notin) == NULL);
+	assert_true(map_get(tree, "") == NULL);
 	in[strlen(in)/2] = '\0';
-	assert_int_equal(map_get(tree, in), NULL);
+	assert_true(map_get(tree, in) == NULL);
 
 	free(in);
 }

@@ -37,17 +37,22 @@ struct kr_cache_entry
 	uint8_t  data[];
 };
 
-/** Used storage API for cache (default LMDB) */
+/** Used storage backend for cache (default LMDB) */
 extern const namedb_api_t *(*kr_cache_storage)(void);
 
+/** Replace used cache storage backend. */
+static inline void kr_cache_storage_set(const namedb_api_t *(*api)(void))
+{
+	kr_cache_storage = api;
+}
+
 /**
- * Open/create persistent cache in given path.
- * @param handle Configuration string (e.g. path to existing directory where the DB should be created)
+ * Open/create cache with provided storage options.
+ * @param storage_opts Storage-specific options (may be NULL for default)
  * @param mm Memory context.
- * @param maxsize Maximum database size (bytes)
  * @return database instance or NULL
  */
-namedb_t *kr_cache_open(const char *handle, mm_ctx_t *mm, size_t maxsize);
+namedb_t *kr_cache_open(void *storage_opts, mm_ctx_t *mm);
 
 /**
  * Close persistent cache.
@@ -81,7 +86,7 @@ void kr_cache_txn_abort(namedb_txn_t *txn);
 
 /**
  * Peek the cache for asset (name, type, tag)
- * @note The 'drift' is the time passed between the cache time of the RRSet and now (in seconds).
+ * @note The 'drift' is the time passed between the inception time and now (in seconds).
  * @param txn transaction instance
  * @param tag  asset tag
  * @param name asset name

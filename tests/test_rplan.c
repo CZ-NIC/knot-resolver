@@ -23,20 +23,20 @@ static void test_rplan_params(void **state)
 	/* NULL rplan */
 
 	assert_int_equal(kr_rplan_init(NULL, NULL, NULL), KNOT_EINVAL);
-	assert_null(kr_rplan_push(NULL, NULL, NULL, 0, 0));
+	assert_null((void *)kr_rplan_push(NULL, NULL, NULL, 0, 0));
 	assert_int_equal(kr_rplan_pop(NULL, NULL), KNOT_EINVAL);
-	assert_true(kr_rplan_empty(NULL));
-	assert_null(kr_rplan_current(NULL));
+	assert_true(kr_rplan_empty(NULL) == true);
+	assert_null((void *)kr_rplan_current(NULL));
 	kr_rplan_deinit(NULL);
 
 	/* NULL mandatory parameters */
 
 	struct kr_rplan rplan;
 	assert_int_equal(kr_rplan_init(&rplan, NULL, NULL), KNOT_EOK);
-	assert_null(kr_rplan_push(&rplan, NULL, NULL, 0, 0));
+	assert_null((void *)kr_rplan_push(&rplan, NULL, NULL, 0, 0));
 	assert_int_equal(kr_rplan_pop(&rplan, NULL), KNOT_EINVAL);
-	assert_true(kr_rplan_empty(&rplan));
-	assert_null(kr_rplan_current(&rplan));
+	assert_true(kr_rplan_empty(&rplan) == true);
+	assert_null((void *)kr_rplan_current(&rplan));
 	kr_rplan_deinit(&rplan);
 }
 
@@ -52,7 +52,7 @@ static void test_rplan_push(void **state)
 	kr_rplan_init(&rplan, &context, &mm);
 
 	/* Push query. */
-	assert_non_null(kr_rplan_push(&rplan, NULL, (knot_dname_t *)"", 0, 0));
+	assert_non_null((void *)kr_rplan_push(&rplan, NULL, (knot_dname_t *)"", 0, 0));
 
 	kr_rplan_deinit(&rplan);
 }

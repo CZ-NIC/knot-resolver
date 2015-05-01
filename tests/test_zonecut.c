@@ -27,8 +27,8 @@ static void test_zonecut_params(void **state)
 	kr_zonecut_set(NULL, NULL);
 	kr_zonecut_set(&cut, NULL);
 	assert_int_not_equal(kr_zonecut_add(NULL, NULL, NULL), 0);
-	assert_null(kr_zonecut_find(NULL, NULL));
-	assert_null(kr_zonecut_find(&cut, NULL));
+	assert_null((void *)kr_zonecut_find(NULL, NULL));
+	assert_null((void *)kr_zonecut_find(&cut, NULL));
 	assert_int_not_equal(kr_zonecut_set_sbelt(NULL), 0);
 	assert_int_not_equal(kr_zonecut_find_cached(NULL, NULL, 0), 0);
 }
