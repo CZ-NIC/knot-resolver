@@ -100,6 +100,7 @@ static int sendrecv(struct sockaddr *addr, int proto, const knot_pkt_t *query, k
 {
 	struct timeval timeout = { KR_CONN_RTT_MAX / 1000, 0 };
 	auto_close int fd = connected(addr, proto, &timeout);
+	resp->size = 0;
 	if (fd < 0) {
 		return fd;
 	}
@@ -127,11 +128,7 @@ static int sendrecv(struct sockaddr *addr, int proto, const knot_pkt_t *query, k
 
 	/* Parse and return */
 	resp->size = ret;
-	if (knot_pkt_parse(resp, 0) != 0) {
-		return kr_error(EBADMSG);
-	}
-
-	return kr_ok();
+	return knot_pkt_parse(resp, 0);
 }
 
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
@@ -178,7 +175,6 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 			int ret = sendrecv(addr, proto, query, resp);
 			if (ret != 0) {
 				DEBUG_MSG("sendrecv: %s\n", kr_strerror(ret));
-				resp->size = 0;
 			}
 			state = kr_resolve_consume(&request, resp);
 			knot_pkt_clear(resp);

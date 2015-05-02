@@ -345,6 +345,24 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return reset(ctx);
 }
 
+static int prepare_additionals(knot_pkt_t *pkt)
+{
+	knot_rrset_t opt_rr;
+	int ret = knot_edns_init(&opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
+	ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &opt_rr, KNOT_PF_FREE);
+	if (ret != KNOT_EOK) {
+		knot_rrset_clear(&opt_rr, &pkt->mm);
+		return ret;
+	}
+
+	return kr_ok();
+}
+
 static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
@@ -370,21 +388,26 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	knot_wire_set_id(pkt->wire, query->id);
 
 	/* Declare EDNS0 support. */
-	knot_rrset_t opt_rr;
-	ret = knot_edns_init(&opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
-	if (ret != KNOT_EOK) {
-		return KNOT_STATE_FAIL;
-	}
-
-	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-	ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &opt_rr, KNOT_PF_FREE);
-	if (ret != KNOT_EOK) {
-		knot_rrset_clear(&opt_rr, &pkt->mm);
-		return KNOT_STATE_FAIL;
+	if (!(query->flags & QUERY_SAFEMODE)) {
+		ret = prepare_additionals(pkt);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
 	}
 
 	/* Query built, expect answer. */
 	return KNOT_STATE_CONSUME;
+}
+
+static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_query *query)
+{
+	/* Work around broken auths/load balancers */
+	if (query->flags & QUERY_SAFEMODE) {
+		return resolve_error(pkt, req);
+	} else {
+		query->flags |= QUERY_SAFEMODE;
+		return KNOT_STATE_DONE;
+	}
 }
 
 /** Resolve input query or continue resolution with followups.
@@ -403,7 +426,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first. */
 	if (pkt->parsed < pkt->size) {
 		DEBUG_MSG("<= malformed response\n");
-		return resolve_error(pkt, req);
+		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
 		DEBUG_MSG("<= ignoring mismatching response\n");
 		return KNOT_STATE_CONSUME;
@@ -428,6 +451,10 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
+	case KNOT_RCODE_FORMERR:
+	case KNOT_RCODE_NOTIMPL:
+		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		return resolve_badmsg(pkt, req, query);
 	default:
 		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_error(pkt, req);
