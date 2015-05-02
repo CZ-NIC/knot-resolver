@@ -53,18 +53,9 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 {
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
-
-	/* UDP requests are oneshot, always close afterwards */
-	if (handle->data && !uv_is_closing((uv_handle_t *)handle)) { /* Do not free master socket */
-		io_close((uv_handle_t *)handle);
-	}
-
-	/* Check the incoming wire length. */
-	if (nread > KNOT_WIRE_HEADER_SIZE) {
-		knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
-		worker_exec(worker, (uv_handle_t *)handle, query, addr);
-		knot_pkt_free(&query);
-	}
+	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
+	worker_exec(worker, (uv_handle_t *)handle, query, addr);
+	knot_pkt_free(&query);
 }
 
 int udp_bind(struct endpoint *ep, struct sockaddr *addr)
@@ -94,23 +85,23 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 
-	/* Check for connection close */
-	if (nread <= 0) {
+	/* Check for originator connection close */
+	if (nread <= 0 && handle->data == 0) {
 		io_close((uv_handle_t *)handle);
 		return;
 	} else if (nread < 2) {
 		/* Not enough bytes to read length */
+		worker_exec(worker, (uv_handle_t *)handle, NULL, NULL);
 		return;
 	}
 
-	/* Set packet size */
 	/** @todo This is not going to work if the packet is fragmented in the stream ! */
 	uint16_t nbytes = wire_read_u16((const uint8_t *)buf->base);
-
-	/* Check if there's enough data and execute */
 	if (nbytes + 2 < nread) {
+		worker_exec(worker, (uv_handle_t *)handle, NULL, NULL);
 		return;
 	}
+
 	knot_pkt_t *query = knot_pkt_new(buf->base + 2, nbytes, worker->mm);
 	worker_exec(worker, (uv_handle_t *)handle, query, NULL);
 	knot_pkt_free(&query);

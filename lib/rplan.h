@@ -31,7 +31,8 @@ enum kr_query_flag {
 	QUERY_NO_MINIMIZE = 1 << 0, /**< Don't minimize QNAME. */
 	QUERY_TCP         = 1 << 1, /**< Use TCP for this query. */
 	QUERY_RESOLVED    = 1 << 2, /**< Query is resolved. */
-	QUERY_AWAIT_ADDR  = 1 << 3  /**< Query is waiting for NS address. */
+	QUERY_AWAIT_ADDR  = 1 << 3, /**< Query is waiting for NS address. */
+	QUERY_SAFEMODE    = 1 << 4  /**< Don't use fancy stuff (EDNS...) */
 };
 
 /**

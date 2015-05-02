@@ -110,9 +110,8 @@ static void qr_task_free(uv_handle_t *handle)
 static void qr_task_timeout(uv_timer_t *req)
 {
 	struct qr_task *task = req->data;
-	if (!uv_is_closing(task->next_handle)) {
+	if (task->next_handle) {
 		io_stop_read(task->next_handle);
-		uv_close(task->next_handle, (uv_close_cb) free);
 		qr_task_step(task, NULL);
 	}
 }
@@ -127,6 +126,7 @@ static void qr_task_on_send(uv_req_t* req, int status)
 				io_start_read(task->next_handle);
 			}
 		} else { /* Finalize task */
+			uv_timer_stop(&task->timeout);
 			uv_close((uv_handle_t *)&task->timeout, qr_task_free);
 		}
 	}
@@ -171,9 +171,12 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 {
-	/* Cancel timeout if active */
-	uv_timer_stop(&task->timeout);
-	task->next_handle = NULL;
+	/* Cancel timeout if active, close handle. */
+	if (task->next_handle) {
+		uv_close(task->next_handle, (uv_close_cb) free);
+		uv_timer_stop(&task->timeout);
+		task->next_handle = NULL;
+	}
 
 	/* Consume input and produce next query */
 	int sock_type = -1;
@@ -187,10 +190,7 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	/* We're done, no more iterations needed */
 	if (state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return qr_task_finalize(task, state);
-	}
-
-	/* Iteration limit */
-	if (++task->iter_count > KR_ITER_LIMIT) {
+	} else if (++task->iter_count > KR_ITER_LIMIT) {
 		return qr_task_finalize(task, KNOT_STATE_FAIL);
 	}
 
@@ -206,20 +206,17 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	if (sock_type == SOCK_STREAM) {
 		uv_connect_t *connect = &task->ioreq.connect;
 		if (uv_tcp_connect(connect, (uv_tcp_t *)task->next_handle, addr, qr_task_on_connect) != 0) {
-			uv_close(task->next_handle, (uv_close_cb) free);
 			return qr_task_step(task, NULL);
 		}
 		connect->data = task;
 	} else {
 		if (qr_task_send(task, task->next_handle, addr, next_query) != 0) {
-			uv_close(task->next_handle, (uv_close_cb) free);
 			return qr_task_step(task, NULL);
 		}
 	}
 
-	/* Start next timeout */
+	/* Start next step with timeout */
 	uv_timer_start(&task->timeout, qr_task_timeout, KR_CONN_RTT_MAX, 0);
-
 	return kr_ok();
 }
 
@@ -231,15 +228,13 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 
 	/* Parse query */
 	int ret = parse_query(query);
-	if (ret != 0) {
-		return ret;
-	}
 
 	/* Start new task on master sockets, or resume existing */
 	struct qr_task *task = handle->data;
 	bool is_master_socket = (!task);
 	if (is_master_socket) {
-		if (knot_wire_get_qr(query->wire)) {
+		/* Ignore badly formed queries or responses. */
+		if (ret != 0 || knot_wire_get_qr(query->wire)) {
 			return kr_error(EINVAL); /* Ignore. */
 		}
 		task = qr_task_create(worker, handle, addr);
