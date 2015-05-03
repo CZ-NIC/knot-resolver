@@ -42,7 +42,7 @@
  *
  * // Push basic layers
  * array_push(ctx.layers, iterate_layer);
- * array_push(ctx.layers, itercache_layer);
+ * array_push(ctx.layers, rrcache_layer);
  *
  * // Resolve "IN A cz."
  * knot_pkt_t *answer = knot_pkt_new(NULL, 65535, ctx.pool);

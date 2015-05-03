@@ -17,6 +17,8 @@
 #include <uv.h>
 #include <unistd.h>
 #include <libknot/internal/mempattern.h>
+/* #include <libknot/internal/namedb/namedb_trie.h> @todo Not supported (doesn't keep value copy) */
+#include <libknot/internal/namedb/namedb_lmdb.h>
 
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
@@ -97,6 +99,18 @@ static int l_trampoline(lua_State *L)
  * Engine API.
  */
 
+/** @internal Make lmdb options. */
+void *namedb_lmdb_mkopts(const char *conf, size_t maxsize)
+{
+	struct namedb_lmdb_opts *opts = malloc(sizeof(*opts));
+	if (opts) {
+		memset(opts, 0, sizeof(*opts));
+		opts->path = conf ? conf : ".";
+		opts->mapsize = maxsize;
+	}
+	return opts;
+}
+
 static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
@@ -104,9 +118,15 @@ static int init_resolver(struct engine *engine)
 
 	/* Load basic modules */
 	engine_register(engine, "iterate");
-	engine_register(engine, "itercache");
+	engine_register(engine, "rrcache");
+	engine_register(engine, "pktcache");
 
-	return kr_ok();
+	/* Initialize storage backends */
+	struct storage_api lmdb = {
+		"lmdb://", namedb_lmdb_api, namedb_lmdb_mkopts
+	};
+
+	return array_push(engine->storage_registry, lmdb);
 }
 
 static int init_state(struct engine *engine)
@@ -168,6 +188,7 @@ void engine_deinit(struct engine *engine)
 		kr_module_unload(&engine->modules.at[i]);
 	}
 	array_clear(engine->modules);
+	array_clear(engine->storage_registry);
 
 	if (engine->L) {
 		lua_close(engine->L);

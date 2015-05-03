@@ -32,7 +32,8 @@ enum kr_query_flag {
 	QUERY_TCP         = 1 << 1, /**< Use TCP for this query. */
 	QUERY_RESOLVED    = 1 << 2, /**< Query is resolved. */
 	QUERY_AWAIT_ADDR  = 1 << 3, /**< Query is waiting for NS address. */
-	QUERY_SAFEMODE    = 1 << 4  /**< Don't use fancy stuff (EDNS...) */
+	QUERY_SAFEMODE    = 1 << 4, /**< Don't use fancy stuff (EDNS...) */
+	QUERY_CACHED      = 1 << 5  /**< Query response is cached. */
 };
 
 /**

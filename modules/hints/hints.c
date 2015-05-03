@@ -35,7 +35,6 @@
 /* Defaults */
 #define DEFAULT_FILE "/etc/hosts"
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "hint",  fmt)
-typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
 
 /** @todo Hack until layers can store userdata. */
 static struct kr_zonecut *g_map = NULL;
@@ -46,41 +45,35 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
-static int answer_query(pack_t *addr_set, struct kr_request *param)
+static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_request *param)
 {
-	struct kr_query *qry = kr_rplan_current(&param->rplan);
-	assert(qry);
-
+	knot_dname_t *qname = knot_dname_copy(knot_pkt_qname(pkt), &pkt->mm);
+	uint16_t rrtype = knot_pkt_qtype(pkt);
+	uint16_t rrclass = knot_pkt_qclass(pkt);
 	knot_rrset_t rr;
-	knot_rrset_init(&rr, qry->sname, qry->stype, KNOT_CLASS_IN);
+	knot_rrset_init(&rr, qname, rrtype, rrclass);
 	int family_len = sizeof(struct in_addr);
 	if (rr.type == KNOT_RRTYPE_AAAA) {
 		family_len = sizeof(struct in6_addr);
 	}
 
-	/* Update addresses */
+	/* Append address records from hints */
 	uint8_t *addr = pack_head(*addr_set);
 	while (addr != pack_tail(*addr_set)) {
 		size_t len = pack_obj_len(addr);
 		void *addr_val = pack_obj_val(addr);
 		if (len == family_len) {
-			knot_rrset_add_rdata(&rr, addr_val, len, 0, NULL);
+			knot_rrset_add_rdata(&rr, addr_val, len, 0, &pkt->mm);
 		}
 		addr = pack_obj_next(addr);
 	}
 
-	/* Process callbacks */
-	rr_callback_t callback = &rr_update_parent;
-	if (!qry->parent) {
-		callback = &rr_update_answer;
+	/* Append to packet */
+	int ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &rr, KNOT_PF_FREE);
+	if (ret != 0) {
+		knot_rrset_clear(&rr, &pkt->mm);
 	}
-	callback(&rr, 0, param);
-
-	/* Finalize */
-	DEBUG_MSG(qry, "<= answered from hints\n");
-	knot_rdataset_clear(&rr.rrs, NULL);
-	qry->flags |= QUERY_RESOLVED;
-	return KNOT_STATE_DONE;
+	return ret;
 }
 
 static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -88,6 +81,9 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_request *param = ctx->data;
 	struct kr_query *qry = kr_rplan_current(&param->rplan);
+	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
+		return ctx->state;
+	}
 	if (qry->stype != KNOT_RRTYPE_A && qry->stype != KNOT_RRTYPE_AAAA) {
 		return ctx->state;
 	}
@@ -98,7 +94,15 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	return answer_query(pack, param);
+	/* Write to packet */
+	int ret = answer_query(pkt, pack, param);
+	if (ret != 0) {
+		return ctx->state;
+	}
+	DEBUG_MSG(qry, "<= answered from hints\n");
+	qry->flags |= QUERY_CACHED;	
+	knot_wire_set_qr(pkt->wire);
+	return KNOT_STATE_DONE;
 }
 
 static int parse_addr_str(struct sockaddr_storage *sa, const char *addr)

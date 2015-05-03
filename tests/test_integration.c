@@ -15,6 +15,7 @@
  */
 
 #include <Python.h>
+#include <libknot/internal/namedb/namedb_lmdb.h>
 
 #include "tests/test.h"
 #include "lib/rplan.h"
@@ -56,7 +57,7 @@ static PyObject* init(PyObject* self, PyObject* args)
 		return NULL;
 	}
 	kr_module_load(&global_modules.at[0], "iterate", NULL);
-	kr_module_load(&global_modules.at[1], "itercache", NULL);
+	kr_module_load(&global_modules.at[1], "rrcache", NULL);
 	global_modules.len = 2;
 
 	/* Initialize resolution context */
@@ -67,7 +68,11 @@ static PyObject* init(PyObject* self, PyObject* args)
 
 	global_tmpdir = test_tmpdir_create();
 	assert(global_tmpdir);
-	global_context.cache = kr_cache_open(global_tmpdir, &global_mm, 100 * 4096);
+	struct namedb_lmdb_opts opts;
+	memset(&opts, 0, sizeof(opts));
+	opts.path = global_tmpdir;
+	opts.mapsize = 100 * 4096;
+	global_context.cache = kr_cache_open(&opts, &global_mm);
 	assert(global_context.cache);
 
 	/* No configuration parsing support yet. */

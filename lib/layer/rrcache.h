@@ -19,4 +19,4 @@
 #include "lib/layer.h"
 
 /* Processing module implementation. */
-extern const knot_layer_api_t *itercache_layer(void);
+extern const knot_layer_api_t *rrcache_layer(void);

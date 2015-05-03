@@ -22,17 +22,16 @@
 /* Processing module implementation. */
 extern const knot_layer_api_t *iterate_layer(void);
 
-/**
- * Result updates the query parent.
- * @note Hint is an index of chosen RR in the set.
- */
-int rr_update_parent(const knot_rrset_t *rr, unsigned hint, struct kr_request *param);
+/* Packet classification. */
+enum {
+	PKT_NOERROR   = 1 << 0, /* Positive response */
+	PKT_NODATA    = 1 << 1, /* No data response */
+	PKT_NXDOMAIN  = 1 << 2, /* Negative response */
+	PKT_ERROR     = 1 << 3  /* Refused or server failure */
+};
 
-/**
- * Result updates the original query response.
- * @note When \a hint is KNOT_PF_FREE, RR is treated as a copy and answer takes its ownership.
- */
-int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_request *param);
+/** Classify response by type. */
+int kr_response_classify(knot_pkt_t *pkt);
 
 /* Processing module implementation. */
 const knot_layer_api_t *iterate_layer(void);

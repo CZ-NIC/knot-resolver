@@ -35,22 +35,10 @@
  * Properties.
  */
 
-/** Return boolean true if a record in the RR set is expired. */
-static int is_expired(struct kr_cache_rrset *rr, uint32_t drift)
+/** Return boolean true if a record is expired. */
+static bool is_expired(struct kr_cache_entry *entry, uint32_t drift)
 {
-	/* Initialize set. */
-	knot_rdataset_t rrs;
-	rrs.rr_count = rr->count;
-	rrs.data =  rr->data;
-
-	for (unsigned i = 0; i < rrs.rr_count; ++i) {
-		const knot_rdata_t *rd = knot_rdataset_at(&rrs, i);
-		if (knot_rdata_ttl(rd) <= drift) {
-			return 1;
-		}
-	}
-
-	return 0;
+	return entry->ttl >= drift;
 }
 
 /**
@@ -83,8 +71,8 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 			break;
 		}
 		/* Prune expired records. */
-		struct kr_cache_rrset *rr = val.data;
-		if (is_expired(rr, now - rr->timestamp)) {
+		struct kr_cache_entry *entry = val.data;
+		if (is_expired(entry, now - entry->timestamp)) {
 			storage->del(&txn, &key);
 			pruned += 1;
 		}

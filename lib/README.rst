@@ -33,7 +33,7 @@ Writing layers
 
 The resolver :ref:`library <lib_index>` leverages the `processing API`_ from the libknot to separate packet processing code
 into layers. In order to keep the core library sane and coverable, there are only two built-in layers:
-the :c:func:`iterate_layer`, and the :c:func:`itercache_layer`.
+the :c:func:`iterate_layer`, and the :c:func:`rrcache_layer`.
 
 *Note* |---| This is only crash-course in the library internals, see the resolver :ref:`library <lib_index>` documentation for the complete overview of the services.
 

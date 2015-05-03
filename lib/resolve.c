@@ -22,10 +22,9 @@
 #include <libknot/descriptor.h>
 #include <libknot/internal/net.h>
 
+#include "lib/layer.h"
 #include "lib/rplan.h"
 #include "lib/resolve.h"
-#include "lib/layer/itercache.h"
-#include "lib/layer/iterate.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "resl",  fmt)
 
@@ -131,6 +130,78 @@ static int sendrecv(struct sockaddr *addr, int proto, const knot_pkt_t *query, k
 	return knot_pkt_parse(resp, 0);
 }
 
+static int edns_put(knot_pkt_t *pkt)
+{
+	/* Reclaim reserved size. */
+	int ret = knot_pkt_reclaim(pkt, knot_edns_wire_size(pkt->opt_rr));
+	if (ret != 0) {
+		return ret;
+	}
+	/* Write to packet. */
+	assert(pkt->current == KNOT_ADDITIONAL);
+	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
+}
+
+static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template)
+{
+	/* Create empty OPT RR */
+	pkt->opt_rr = mm_alloc(&pkt->mm, sizeof(*pkt->opt_rr));
+	if (!pkt->opt_rr) {
+		return kr_error(ENOMEM);
+	}
+	int ret = knot_edns_init(pkt->opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
+	if (ret != 0) {
+		return ret;
+	}
+	/* Set DO bit if set (DNSSEC requested). */
+	if (knot_pkt_has_dnssec(template)) {
+		knot_edns_set_do(pkt->opt_rr);
+	}
+	return knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
+}
+
+static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query)
+{
+	if (!knot_wire_get_rd(query->wire)) {
+		return kr_error(ENOSYS); /* Only recursive service */
+	}
+	if (knot_pkt_init_response(answer, query) != 0) {
+		return kr_error(ENOMEM); /* Failed to initialize answer */
+	}
+	/* Handle EDNS in the query */
+	if (knot_pkt_has_edns(query)) {
+		int ret = edns_create(answer, query);
+		if (ret != 0){
+			return ret;
+		}
+	}
+	return kr_ok();
+}
+
+static int answer_finalize(knot_pkt_t *answer)
+{
+	knot_pkt_begin(answer, KNOT_ADDITIONAL);
+	if (answer->opt_rr) {
+		return edns_put(answer);
+
+	}
+	return kr_ok();
+}
+
+static int query_finalize(struct kr_request *request, knot_pkt_t *pkt)
+{
+	int ret = 0;
+	struct kr_query *qry = kr_rplan_current(&request->rplan);
+	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
+	if (!(qry->flags & QUERY_SAFEMODE)) {
+		ret = edns_create(pkt, request->answer);
+		if (ret == 0) {
+			ret = edns_put(pkt);
+		}
+	}
+	return ret;
+}
+
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
                const knot_dname_t *qname, uint16_t qclass, uint16_t qtype)
 {
@@ -141,7 +212,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	/* Create memory pool */
 	mm_ctx_t pool;
 	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
-	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MIN_PKTSIZE, &pool);
+	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, &pool);
 	knot_pkt_t *resp = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, &pool);
 	if (!query || !resp) {
 		mp_delete(pool.ctx);
@@ -155,7 +226,6 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 #ifndef NDEBUG
 	struct kr_rplan *rplan = &request.rplan; /* for DEBUG_MSG */
 #endif
-
 	/* Resolve query, iteratively */
 	int proto = 0;
 	struct sockaddr *addr = NULL;
@@ -187,7 +257,6 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	mp_delete(pool.ctx);
 	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
 }
-
 
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer)
 {
@@ -228,12 +297,10 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
-		if (!knot_wire_get_rd(packet->wire)) {
+		if (answer_prepare(request->answer, packet) != 0) {
 			return KNOT_STATE_FAIL;
 		}
-		if (knot_pkt_init_response(request->answer, packet) != 0) {
-			return KNOT_STATE_FAIL;
-		}
+		/* Start query resolution */
 		const knot_dname_t *qname = knot_pkt_qname(packet);
 		uint16_t qclass = knot_pkt_qclass(packet);
 		uint16_t qtype = knot_pkt_qtype(packet);
@@ -265,7 +332,6 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	/* Pop query if resolved. */
 	if (qry->flags & QUERY_RESOLVED) {
 		kr_rplan_pop(rplan, qry);
-
 	}
 
 	knot_overlay_reset(&request->overlay);
@@ -291,9 +357,15 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 	/* Resolve current query and produce dependent or finish */
 	int state = knot_overlay_produce(&request->overlay, packet);
+	if (state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
+		/* Produced an answer, consume it. */
+		request->overlay.state = KNOT_STATE_CONSUME;
+		state = knot_overlay_consume(&request->overlay, packet);
+	}
 	switch(state) {
 	case KNOT_STATE_FAIL: return state; break;
 	case KNOT_STATE_CONSUME: break;
+	case KNOT_STATE_DONE:
 	default: /* Current query is done */
 		knot_overlay_reset(&request->overlay);
 		kr_rplan_pop(rplan, qry);
@@ -324,7 +396,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	DEBUG_MSG("=> querying: '%s' zone cut: '%s' m12n: '%s'\n", ns_str, zonecut_str, qname_str);
 #endif
 
-	/* Issue dependent query to this address */
+	/* Prepare additional query */
+	int ret = query_finalize(request, packet);
+	if (ret != 0) {
+		return KNOT_STATE_FAIL;
+	}
 	*dst = &qry->ns.addr.ip;
 	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return state;
@@ -336,14 +412,18 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	struct kr_rplan *rplan = &request->rplan;
 	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
 #endif
+	/* Finalize answer */
+	if (answer_finalize(request->answer) != 0) {
+		state = KNOT_STATE_FAIL;
+	}
 	/* Error during procesing, internal failure */
+	knot_overlay_finish(&request->overlay);
 	if (state != KNOT_STATE_DONE) {
 		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
-
 	/* Clean up. */
 	knot_overlay_deinit(&request->overlay);
 	request->overlay.state = KNOT_STATE_NOOP;

@@ -285,6 +285,21 @@ int lib_net(lua_State *L)
 	return 1;
 }
 
+/** Return available cached backends. */
+static int cache_backends(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	storage_registry_t *registry = &engine->storage_registry;
+
+	lua_newtable(L);
+	for (unsigned i = 0; i < registry->len; ++i) {
+		struct storage_api *storage = &registry->at[i];
+		lua_pushboolean(L, storage->api() == kr_cache_storage());
+		lua_setfield(L, -2, storage->prefix);
+	}
+	return 1;
+}
+
 /** Return number of cached records. */
 static int cache_count(lua_State *L)
 {
@@ -304,6 +319,26 @@ static int cache_count(lua_State *L)
 	return 1;
 }
 
+static struct storage_api *cache_select_storage(struct engine *engine, const char **conf)
+{
+	/* Return default backend */
+	storage_registry_t *registry = &engine->storage_registry;
+	if (!*conf || !strstr(*conf, "://")) {
+		return &registry->at[0];
+	}
+
+	/* Find storage backend from config prefix */
+	for (unsigned i = 0; i < registry->len; ++i) {
+		struct storage_api *storage = &registry->at[i];
+		if (strncmp(*conf, storage->prefix, strlen(storage->prefix)) == 0) {
+			*conf += strlen(storage->prefix);
+			return storage;
+		}
+	}
+
+	return NULL;
+}
+
 /** Open cache */
 static int cache_open(lua_State *L)
 {
@@ -314,16 +349,26 @@ static int cache_open(lua_State *L)
 		lua_error(L);
 	}
 
-	/* Close if already open */
+	/* Select cache storage backend */
 	struct engine *engine = engine_luaget(L);
+	const char *conf = n > 1 ? lua_tostring(L, 2) : NULL;
+	struct storage_api *storage = cache_select_storage(engine, &conf);
+	if (!storage) {
+		format_error(L, "unsupported cache backend");
+		lua_error(L);
+	}
+	kr_cache_storage_set(storage->api);
+
+	/* Close if already open */
 	if (engine->resolver.cache != NULL) {
 		kr_cache_close(engine->resolver.cache);
 	}
-
-	/* Open resolution context cache */
-	engine->resolver.cache = kr_cache_open(".", engine->pool, lua_tointeger(L, 1));
+	/* Reopen cache */
+	void *storage_opts = storage->opts_create(conf, lua_tointeger(L, 1));
+	engine->resolver.cache = kr_cache_open(storage_opts, engine->pool);
+	free(storage_opts);
 	if (engine->resolver.cache == NULL) {
-		format_error(L, "can't open cache in rundir");
+		format_error(L, "can't open cache");
 		lua_error(L);
 	}
 
@@ -347,6 +392,7 @@ static int cache_close(lua_State *L)
 int lib_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
+		{ "backends", cache_backends },
 		{ "count",  cache_count },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
