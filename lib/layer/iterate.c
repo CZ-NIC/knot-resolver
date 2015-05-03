@@ -256,22 +256,22 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	return result;
 }
 
-static void finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
+static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_request *req)
 {
 	/* Finalize header */
 	knot_pkt_t *answer = req->answer;
 	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
 
-	/* Fill in SOA if negative response */
+	/* Fill in bailiwick records in authority */
+	struct kr_zonecut *cut = &qry->zone_cut;
 	knot_pkt_begin(answer, KNOT_AUTHORITY);
-	int pkt_class = response_classify(pkt);
+	int pkt_class = kr_response_classify(pkt);
 	if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
 		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 		for (unsigned i = 0; i < ns->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-			if (rr->type == KNOT_RRTYPE_SOA) {
+			if (knot_dname_in(cut->name, rr->owner)) {
 				rr_update_answer(rr, 0, req);
-				break;
 			}
 		}
 	}
@@ -319,7 +319,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		(void) kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
 	} else {
 		if (query->parent == NULL) {
-			finalize_answer(pkt, req);
+			finalize_answer(pkt, query, req);
 		}
 	}
 
@@ -391,7 +391,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->data;
 	struct kr_query *query = kr_rplan_current(&req->rplan);
-	if (query == NULL || (query->flags & QUERY_RESOLVED)) {
+	if (!query || (query->flags & QUERY_RESOLVED)) {
 		return ctx->state;
 	}
 
