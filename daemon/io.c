@@ -54,6 +54,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
+	query->max_size = sizeof(worker->bufs.wire);
 	worker_exec(worker, (uv_handle_t *)handle, query, addr);
 	knot_pkt_free(&query);
 }
@@ -103,6 +104,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	}
 
 	knot_pkt_t *query = knot_pkt_new(buf->base + 2, nbytes, worker->mm);
+	query->max_size = sizeof(worker->bufs.wire);
 	worker_exec(worker, (uv_handle_t *)handle, query, NULL);
 	knot_pkt_free(&query);
 }

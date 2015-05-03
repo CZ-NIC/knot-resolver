@@ -141,7 +141,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	/* Create memory pool */
 	mm_ctx_t pool;
 	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
-	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MIN_PKTSIZE, &pool);
+	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, &pool);
 	knot_pkt_t *resp = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, &pool);
 	if (!query || !resp) {
 		mp_delete(pool.ctx);

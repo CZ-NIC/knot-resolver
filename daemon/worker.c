@@ -85,7 +85,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	}
 
 	/* Create buffers */
-	knot_pkt_t *next_query = knot_pkt_new(NULL, KNOT_WIRE_MIN_PKTSIZE, &task->req.pool);
+	knot_pkt_t *next_query = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, &task->req.pool);
 	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, &task->req.pool);
 	if (!next_query || !answer) {
 		mp_delete(pool.ctx);
