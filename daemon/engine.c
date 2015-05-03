@@ -118,7 +118,7 @@ static int init_resolver(struct engine *engine)
 
 	/* Load basic modules */
 	engine_register(engine, "iterate");
-	engine_register(engine, "itercache");
+	engine_register(engine, "rrcache");
 	engine_register(engine, "pktcache");
 
 	/* Initialize storage backends */

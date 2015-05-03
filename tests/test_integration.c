@@ -57,7 +57,7 @@ static PyObject* init(PyObject* self, PyObject* args)
 		return NULL;
 	}
 	kr_module_load(&global_modules.at[0], "iterate", NULL);
-	kr_module_load(&global_modules.at[1], "itercache", NULL);
+	kr_module_load(&global_modules.at[1], "rrcache", NULL);
 	global_modules.len = 2;
 
 	/* Initialize resolution context */

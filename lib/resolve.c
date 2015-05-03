@@ -22,10 +22,9 @@
 #include <libknot/descriptor.h>
 #include <libknot/internal/net.h>
 
+#include "lib/layer.h"
 #include "lib/rplan.h"
 #include "lib/resolve.h"
-#include "lib/layer/itercache.h"
-#include "lib/layer/iterate.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "resl",  fmt)
 
