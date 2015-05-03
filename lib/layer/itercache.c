@@ -24,47 +24,7 @@
 #include "lib/cache.h"
 #include "lib/module.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " cc ",  fmt)
-
-typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
-
-static int update_parent(const knot_rrset_t *rr, unsigned drift, struct kr_request *req)
-{
-	/* Find a first non-expired record. */
-	uint16_t i = 0;
-	for (; i < rr->rrs.rr_count; ++i) {
-		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
-		if (knot_rdata_ttl(rd) > drift) {
-			break;
-		}
-	}
-
-	return rr_update_parent(rr, i, req);
-}
-
-static int update_answer(const knot_rrset_t *rr, unsigned drift, struct kr_request *req)
-{
-	knot_pkt_t *answer = req->answer;
-
-	/* Materialize RR set */
-	knot_rrset_t rr_copy = kr_cache_materialize(rr, drift, &answer->mm);
-	if (rr_copy.rrs.rr_count == 0) {
-		return KNOT_STATE_FAIL;
-	}
-
-	return rr_update_answer(&rr_copy, 0, req);
-}
-
-static int read_cache_rr(namedb_txn_t *txn, knot_rrset_t *cache_rr, uint32_t timestamp,
-                         rr_callback_t cb, struct kr_request *req)
-{
-	/* Query cache for requested record */
-	if (kr_cache_peek_rr(txn, cache_rr, &timestamp) != KNOT_EOK) {
-		return KNOT_STATE_NOOP;
-	}
-
-	return cb(cache_rr, timestamp, req);
-}
+#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " rc ",  fmt)
 
 static int begin(knot_layer_t *ctx, void *module_param)
 {
@@ -72,13 +32,45 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
-static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int loot_rr(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t *name,
+                   uint16_t rrtype, uint16_t rrclass, uint32_t timestamp)
 {
-	assert(pkt && ctx);
+	knot_rrset_t cache_rr;
+	knot_rrset_init(&cache_rr, (knot_dname_t *)name, rrtype, rrclass);
+	int ret = kr_cache_peek_rr(txn, &cache_rr, &timestamp);
+	if (ret != 0) {
+		return ret;
+	}
+	knot_rrset_t rr_copy = kr_cache_materialize(&cache_rr, timestamp, &pkt->mm);
+	if (rr_copy.rrs.rr_count == 0) {
+		return kr_error(ENOENT);
+	}
+	ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &rr_copy, KNOT_PF_FREE);
+	if (ret != 0) {
+		knot_rrset_clear(&rr_copy, &pkt->mm);
+		return ret;
+	}
+	return kr_ok();
+}
+
+static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint32_t timestamp)
+{
+	const knot_dname_t *qname = knot_pkt_qname(pkt);
+	uint16_t rrclass = knot_pkt_qclass(pkt);
+	uint16_t rrtype = knot_pkt_qtype(pkt);
+	int ret = loot_rr(txn, pkt, qname, rrtype, rrclass, timestamp);
+	if (ret == kr_error(ENOENT) && rrtype != KNOT_RRTYPE_CNAME) { /* Chase CNAME if no direct hit */
+		ret = loot_rr(txn, pkt, qname, KNOT_RRTYPE_CNAME, rrclass, timestamp);
+	}
+	return ret;
+}
+
+static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
+{
 	struct kr_request *req = ctx->data;
 	struct kr_rplan *rplan = &req->rplan;
-	struct kr_query *cur = kr_rplan_current(rplan);
-	if (cur == NULL) {
+	struct kr_query *qry = kr_rplan_current(rplan);
+	if (!qry || ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE)) {
 		return ctx->state;
 	}
 
@@ -87,45 +79,21 @@ static int read_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY) != 0) {
 		return KNOT_STATE_CONSUME;
 	}
-	uint32_t timestamp = cur->timestamp.tv_sec;
-	knot_rrset_t cache_rr;
-	knot_rrset_init(&cache_rr, cur->sname, cur->stype, cur->sclass);
 
-	/* Check if updating parent zone cut. */
-	rr_callback_t callback = &update_parent;
-	if (cur->parent == NULL) {
-		callback = &update_answer;
-	}
-
-	/* Try to find expected record first. */
-	int state = read_cache_rr(&txn, &cache_rr, timestamp, callback, req);
-	if (state == KNOT_STATE_DONE) {
+	/* Reconstruct the answer from the cache,
+	 * it may either be a CNAME chain or direct answer.
+	 * Only one step of the chain is resolved at a time.
+	 */
+	uint32_t timestamp = qry->timestamp.tv_sec;
+	int ret = loot_cache(&txn, pkt, timestamp);
+	kr_cache_txn_abort(&txn);
+	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
-		cur->flags |= QUERY_RESOLVED;
-		kr_cache_txn_abort(&txn);
-		return state;
-	}
-
-	/* Check if CNAME chain exists. */
-	cache_rr.type = KNOT_RRTYPE_CNAME;
-	state = read_cache_rr(&txn, &cache_rr, timestamp, callback, req);
-	if (state != KNOT_STATE_NOOP) {
-		if (cur->stype != KNOT_RRTYPE_CNAME) {
-			const knot_dname_t *cname = knot_cname_name(&cache_rr.rrs);
-			if (kr_rplan_push(rplan, cur->parent, cname, cur->sclass, cur->stype) == NULL) {
-				kr_cache_txn_abort(&txn);
-				return KNOT_STATE_FAIL;
-			}
-		}
-
-		cur->flags |= QUERY_RESOLVED;
-		kr_cache_txn_abort(&txn);
+		qry->flags |= QUERY_CACHED;
+		knot_wire_set_qr(pkt->wire);
 		return KNOT_STATE_DONE;
 	}
-
-	/* Not resolved. */
-	kr_cache_txn_abort(&txn);
-	return KNOT_STATE_CONSUME;
+	return ctx->state;
 }
 
 /** Merge-in record if same type and owner. */
@@ -236,20 +204,17 @@ static int write_cache_authority(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *p
 	return write_cache_rr(ns, &cache_rr, txn, pool, timestamp);
 }
 
-static int write_cache(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_rplan *rplan = &req->rplan;
 	struct kr_query *query = kr_rplan_current(rplan);
-
-	/* Don't cache anything if failed. */
-	if (query == NULL || ctx->state == KNOT_STATE_FAIL) {
+	if (!query || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state;
 	}
 
 	/* Cache only positive answers. */
-	/** \todo Negative answers cache support */
-	if (knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
+	if (query->flags & QUERY_CACHED || knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
 		return ctx->state;
 	}
 
@@ -286,8 +251,8 @@ const knot_layer_api_t *itercache_layer(void)
 {
 	static const knot_layer_api_t _layer = {
 		.begin = &begin,
-		.consume = &write_cache,
-		.produce = &read_cache
+		.produce = &peek,
+		.consume = &stash
 	};
 
 	return &_layer;

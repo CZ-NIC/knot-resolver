@@ -171,7 +171,7 @@ www.example.com. IN A
 SECTION ANSWER
 www.example.com. IN CNAME	www.next.com.
 SECTION AUTHORITY
-;next.com. 	IN SOA next.com. next.com. 2007090400 28800 7200 604800 18000
+next.com. 	IN SOA next.com. next.com. 2007090400 28800 7200 604800 18000
 SECTION ADDITIONAL
 ENTRY_END
 

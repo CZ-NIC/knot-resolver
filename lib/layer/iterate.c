@@ -30,14 +30,6 @@
 #define SEED_SIZE 256
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(&req->rplan), "iter", fmt)
 
-/* Packet classification. */
-enum {
-	PKT_NOERROR   = 1 << 0, /* Positive response */
-	PKT_NODATA    = 1 << 1, /* No data response */
-	PKT_NXDOMAIN  = 1 << 2, /* Negative response */
-	PKT_ERROR     = 1 << 3  /* Refused or server failure */
-};
-
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
 
@@ -108,8 +100,7 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	return false;
 }
 
-/** Return response class. */
-static int response_classify(knot_pkt_t *pkt)
+int kr_response_classify(knot_pkt_t *pkt)
 {
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	switch (knot_wire_get_rcode(pkt->wire)) {
@@ -287,7 +278,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	 * NXDOMAIN => parent is zone cut, retry as a workaround for bad authoritatives
 	 */
 	bool is_final = (query->parent == NULL);
-	int pkt_class = response_classify(pkt);
+	int pkt_class = kr_response_classify(pkt);
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) &&
 	    (pkt_class & (PKT_NOERROR|PKT_NXDOMAIN|PKT_NODATA))) {
 		DEBUG_MSG("<= found cut, retrying with non-minimized name\n");

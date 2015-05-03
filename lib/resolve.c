@@ -333,7 +333,6 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	/* Pop query if resolved. */
 	if (qry->flags & QUERY_RESOLVED) {
 		kr_rplan_pop(rplan, qry);
-
 	}
 
 	knot_overlay_reset(&request->overlay);
@@ -359,9 +358,15 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 	/* Resolve current query and produce dependent or finish */
 	int state = knot_overlay_produce(&request->overlay, packet);
+	if (state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
+		/* Produced an answer, consume it. */
+		request->overlay.state = KNOT_STATE_CONSUME;
+		state = knot_overlay_consume(&request->overlay, packet);
+	}
 	switch(state) {
 	case KNOT_STATE_FAIL: return state; break;
 	case KNOT_STATE_CONSUME: break;
+	case KNOT_STATE_DONE:
 	default: /* Current query is done */
 		knot_overlay_reset(&request->overlay);
 		kr_rplan_pop(rplan, qry);
