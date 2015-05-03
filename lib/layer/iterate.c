@@ -345,31 +345,12 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return reset(ctx);
 }
 
-static int prepare_additionals(knot_pkt_t *pkt)
-{
-	knot_rrset_t opt_rr;
-	int ret = knot_edns_init(&opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
-
-	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-	ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &opt_rr, KNOT_PF_FREE);
-	if (ret != KNOT_EOK) {
-		knot_rrset_clear(&opt_rr, &pkt->mm);
-		return ret;
-	}
-
-	return kr_ok();
-}
-
 static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->data;
 	struct kr_query *query = kr_rplan_current(&req->rplan);
-	if (query == NULL || ctx->state == KNOT_STATE_DONE) {
-		assert(0);
+	if (!query || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return ctx->state;
 	}
 
@@ -384,18 +365,9 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_FAIL;
 	}
 
+	/* Query built, expect answer. */
 	query->id = isaac_next_uint(&ISAAC, UINT16_MAX);
 	knot_wire_set_id(pkt->wire, query->id);
-
-	/* Declare EDNS0 support. */
-	if (!(query->flags & QUERY_SAFEMODE)) {
-		ret = prepare_additionals(pkt);
-		if (ret != 0) {
-			return KNOT_STATE_FAIL;
-		}
-	}
-
-	/* Query built, expect answer. */
 	return KNOT_STATE_CONSUME;
 }
 
