@@ -21,9 +21,10 @@
 
 /** Cache entry tag */
 enum kr_cache_tag {
-	KR_CACHE_RR   = 0x01,
-	KR_CACHE_PKT  = 0x02,
-	KR_CACHE_USER = 0xF0
+	KR_CACHE_RR   = 'R',
+	KR_CACHE_PKT  = 'P',
+	KR_CACHE_SEC  = 'S',
+	KR_CACHE_USER = 0x80
 };
 
 /**

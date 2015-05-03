@@ -7,6 +7,7 @@ libkresolve_SOURCES := \
 	lib/generic/map.c      \
 	lib/layer/iterate.c    \
 	lib/layer/itercache.c  \
+	lib/layer/pktcache.c   \
 	lib/utils.c            \
 	lib/nsrep.c            \
 	lib/module.c           \
