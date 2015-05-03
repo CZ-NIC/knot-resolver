@@ -335,7 +335,21 @@ The cache in Knot DNS Resolver is persistent with LMDB backend, this means that 
 the cached data on restart or crash to avoid cold-starts. The cache may be reused between cache
 daemons or manipulated from other processes, making for example synchronised load-balanced recursors possible.
 
-.. function:: cache.open(max_size)
+.. function:: cache.backends()
+
+   :return: map of backends
+
+   The cache supports runtime-changeable backends, using the optional :rfc:`3986` URI, where the scheme
+   represents backend protocol and the rest of the URI backend-specific configuration. By default, it
+   is a ``lmdb`` backend in working directory, i.e. ``lmdb://``.
+
+   Example output:
+
+   .. code-block:: lua
+
+   	[lmdb://] => true
+
+.. function:: cache.open(max_size[, config_uri])
 
    :param number max_size: Maximum cache size in bytes.
    :return: boolean
@@ -344,6 +358,13 @@ daemons or manipulated from other processes, making for example synchronised loa
    Note that the max_size cannot be lowered, only increased due to how cache is implemented.
 
    .. tip:: Use ``kB, MB, GB`` constants as a multiplier, e.g. ``100*MB``.
+
+   The cache supports runtime-changeable backends, see :func:`cache.backends()` for mor information and
+   default. Refer to specific documentation of specific backends for configuration string syntax.
+
+   - ``lmdb://``
+
+   As of now it only allows you to change the cache directory, e.g. ``lmdb:///tmp/cachedir``.
 
 .. function:: cache.count()
 
@@ -355,13 +376,15 @@ daemons or manipulated from other processes, making for example synchronised loa
 
    Close the cache.
 
+   .. note:: This may or may not clear the cache, depending on the used backend. See :func:`cachectl.clear()`. 
 
 Timers and events
 ^^^^^^^^^^^^^^^^^
 
-The timer represents exactly the thing described in the examples - it allows you to execute closures after specified time,
-or event recurrent events. Time is always described in miliseconds, but there are convenient variables that you can use -
-``sec, minute, hour``. For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
+The timer represents exactly the thing described in the examples - it allows you to execute closures 
+after specified time, or event recurrent events. Time is always described in milliseconds,
+but there are convenient variables that you can use - ``sec, minute, hour``.
+For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
 .. function:: event.after(time, function)
 

@@ -6,13 +6,14 @@ Module providing an interface to cache database, for inspection, manipulation an
 Properties
 ^^^^^^^^^^
 
-``prune``
-	Prune expired/invalid records.
+.. function:: cachectl.prune()
 
-	:Input:  N/A
-	:Output: ``{ pruned: int }``
-``clear``
-	Clear all cache records.
+  :return: ``{ pruned: int }``
 
- 	:Input:  N/A
- 	:Output: ``{ result: bool }``
+  Prune expired/invalid records.
+
+.. function:: cachectl.clear()
+
+  :return: ``{ result: bool }``
+
+  Clear all cache records.
