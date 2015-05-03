@@ -105,6 +105,7 @@ struct kr_cache_entry *kr_cache_peek(namedb_txn_t *txn, uint8_t tag, const knot_
  * @param name asset name
  * @param type asset type
  * @param header filled entry header (count, ttl and timestamp)
+ * @param data inserted data
  * @return 0 or an errcode
  */
 int kr_cache_insert(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,

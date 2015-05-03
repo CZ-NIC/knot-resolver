@@ -285,6 +285,21 @@ int lib_net(lua_State *L)
 	return 1;
 }
 
+/** Return available cached backends. */
+static int cache_backends(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	storage_registry_t *registry = &engine->storage_registry;
+
+	lua_newtable(L);
+	for (unsigned i = 0; i < registry->len; ++i) {
+		struct storage_api *storage = &registry->at[i];
+		lua_pushboolean(L, storage->api() == kr_cache_storage());
+		lua_setfield(L, -2, storage->prefix);
+	}
+	return 1;
+}
+
 /** Return number of cached records. */
 static int cache_count(lua_State *L)
 {
@@ -377,6 +392,7 @@ static int cache_close(lua_State *L)
 int lib_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
+		{ "backends", cache_backends },
 		{ "count",  cache_count },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
