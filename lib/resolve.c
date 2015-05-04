@@ -367,8 +367,10 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	case KNOT_STATE_CONSUME: break;
 	case KNOT_STATE_DONE:
 	default: /* Current query is done */
+		if (qry->flags & QUERY_RESOLVED) {
+			kr_rplan_pop(rplan, qry);
+		}
 		knot_overlay_reset(&request->overlay);
-		kr_rplan_pop(rplan, qry);
 		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 	}
 
