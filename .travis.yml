@@ -8,6 +8,7 @@ notifications:
     email:
         on_success: change
         on_failure: change
+    slack: knot-resolver:Pq2K9Q2DZ76Vf2jHvDKR4eoQ
 matrix:
     fast_finish: true
     allow_failures:
