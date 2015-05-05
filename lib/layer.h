@@ -24,7 +24,8 @@
  #define QRDEBUG(query, cls, fmt, ...) do { \
     unsigned _ind = 0; \
     for (struct kr_query *q = (query); q; q = q->parent, _ind += 2); \
-    fprintf(stderr, "[%s] %*s" fmt, cls, _ind, "", ##  __VA_ARGS__); \
+    fprintf(stdout, "[%s] %*s" fmt, cls, _ind, "", ##  __VA_ARGS__); \
+    fflush(stdout); \
     } while (0)
 #else
  #define QRDEBUG(query, cls, fmt, ...)
