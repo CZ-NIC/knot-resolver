@@ -27,9 +27,9 @@ struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
 	mm_ctx_t *mm;
-    struct {
-        uint8_t wire[KNOT_WIRE_MAX_PKTSIZE];
-    } bufs;
+	struct {
+		uint8_t wire[KNOT_WIRE_MAX_PKTSIZE];
+	} bufs;
 };
 
 /**

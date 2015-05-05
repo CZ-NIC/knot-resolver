@@ -104,6 +104,12 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 static void qr_task_free(uv_handle_t *handle)
 {
 	struct qr_task *task = handle->data;
+	/* Return handle to the event loop in case
+	 * it was exclusively taken by this task. */
+	if (!uv_has_ref(task->source.handle)) {
+		uv_ref(task->source.handle);
+		io_start_read(task->source.handle);
+	}
 	mp_delete(task->req.pool.ctx);
 }
 
@@ -165,7 +171,10 @@ static void qr_task_on_connect(uv_connect_t *connect, int status)
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	kr_resolve_finish(&task->req, state);
-	qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, task->req.answer);
+	int ret = qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, task->req.answer);
+	if (ret != 0) { /* Broken connection */
+		uv_close((uv_handle_t *)&task->timeout, qr_task_free);
+	}
 	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
 }
 

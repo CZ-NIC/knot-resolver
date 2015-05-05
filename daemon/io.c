@@ -105,7 +105,15 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
 	knot_pkt_t *query = knot_pkt_new(buf->base + 2, nbytes, worker->mm);
 	query->max_size = sizeof(worker->bufs.wire);
-	worker_exec(worker, (uv_handle_t *)handle, query, NULL);
+	int ret = worker_exec(worker, (uv_handle_t *)handle, query, NULL);
+	if (ret == 0) {
+		/* Push - pull, stop reading from this handle until
+		 * the task is finished. Since the handle has no track of the
+		 * pending tasks, it might be freed before the task finishes
+		 * leading various errors. */
+		uv_unref((uv_handle_t *)handle);
+		io_stop_read((uv_handle_t *)handle);
+	}
 	knot_pkt_free(&query);
 }
 
