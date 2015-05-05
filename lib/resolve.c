@@ -386,6 +386,9 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 			DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
 			knot_overlay_reset(&request->overlay);
 			return ns_resolve_addr(qry, request);
+		} else {
+			/* Address resolved, clear the flag */
+			qry->flags &= ~QUERY_AWAIT_ADDR;
 		}
 	}
 
