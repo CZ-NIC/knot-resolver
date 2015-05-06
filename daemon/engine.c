@@ -95,6 +95,59 @@ static int l_trampoline(lua_State *L)
 	return 0;
 }
 
+/** @internal Helper for retrieving the right function entrypoint. */
+static inline lua_State *l_ffi_preface(struct kr_module *module, const char *call) {
+	lua_State *L = module->lib;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
+	lua_getfield(L, -1, call);
+	lua_pushlightuserdata(L, module);
+	return L;
+}
+
+/** @internal Helper for calling the entrypoint. */
+static inline int l_ffi_call(lua_State *L) {
+	if (engine_pcall(L, 1) != 0) {
+		lua_pop(L, 1);
+		return kr_error(EIO);
+	}
+	return lua_tonumber(L, 1);
+}
+
+static int l_ffi_init(struct kr_module *module)
+{
+	lua_State *L = l_ffi_preface(module, "init");
+	return l_ffi_call(L);
+}
+
+static int l_ffi_config(struct kr_module *module, const char *conf)
+{
+	lua_State *L = l_ffi_preface(module, "config");
+	lua_pushstring(L, conf);
+	return l_ffi_call(L);
+}
+
+static int l_ffi_deinit(struct kr_module *module)
+{
+	lua_State *L = l_ffi_preface(module, "deinit");
+	int ret = l_ffi_call(L);
+	/* Unref module and unset 'lib', so the module
+	 * interface doesn't attempt to close it.
+	 */
+	luaL_unref(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
+	module->lib = NULL;
+	return ret;
+}
+
+static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
+{
+	/* lua_State *L = l_ffi_preface(module, "layer"); */
+	/** @todo Pickle access to context somewhere  */
+	/** @todo Store the returned table in the registry */
+	/** @todo Keep the reference in the api_t */
+	/** @todo Make trampoline functions for layer operations. */
+	return NULL;
+}
+
 /*
  * Engine API.
  */
@@ -284,6 +337,41 @@ void engine_stop(struct engine *engine)
 	uv_stop(uv_default_loop());
 }
 
+/** @internal Helper macro for function presence check. */
+#define REGISTER_FFI_CALL(L, attr, name, cb) do { \
+	lua_getfield((L), -1, (name)); \
+	if (!lua_isnil((L), -1)) { attr = cb; } \
+	lua_pop((L), 1); \
+	} while (0)
+
+/** Register Lua module as a FFI module */
+static int register_lua_module(struct engine *engine, struct kr_module *module, const char *name)
+{
+	/* Register module in Lua */
+	lua_State *L = engine->L;
+	lua_getglobal(L, "require");
+	lua_pushstring(L, name);
+	if (engine_pcall(L, 1) != 0) {
+		lua_pop(L, 1);
+		return kr_error(ENOENT);
+	}
+	lua_setglobal(L, name);
+	lua_getglobal(L, name);
+
+	/* Create FFI module with trampolined functions. */
+	memset(module, 0, sizeof(*module));
+	module->name = strdup(name);
+	REGISTER_FFI_CALL(L, module->init,   "init",   &l_ffi_init);
+	REGISTER_FFI_CALL(L, module->deinit, "deinit", &l_ffi_deinit);
+	REGISTER_FFI_CALL(L, module->config, "config", &l_ffi_config);
+	REGISTER_FFI_CALL(L, module->layer,  "layer",  &l_ffi_layer);
+	module->lib = L;
+	module->data = (void *)(intptr_t)luaL_ref(L, LUA_REGISTRYINDEX);
+	return module->init(module);
+}
+
+#undef REGISTER_FFI_CALL
+
 /** Register module properties in Lua environment */
 static int register_properties(struct engine *engine, struct kr_module *module)
 {
@@ -316,12 +404,15 @@ int engine_register(struct engine *engine, const char *name)
 
 	/* Make sure module is unloaded */
 	(void) engine_unregister(engine, name);
-
-	/* Load module */
+	/* Attempt to load binary module */
 	size_t next = engine->modules.len;
 	array_reserve(engine->modules, next + 1);
 	struct kr_module *module = &engine->modules.at[next];
 	int ret = kr_module_load(module, name, NULL);
+	/* Load Lua module if not a binary */
+	if (ret == kr_error(ENOENT)) {
+		ret = register_lua_module(engine, module, name);
+	}
 	if (ret != 0) {
 		return ret;
 	} else {
