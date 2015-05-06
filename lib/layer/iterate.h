@@ -19,9 +19,6 @@
 #include "lib/layer.h"
 #include "lib/rplan.h"
 
-/* Processing module implementation. */
-extern const knot_layer_api_t *iterate_layer(void);
-
 /* Packet classification. */
 enum {
 	PKT_NOERROR   = 1 << 0, /* Positive response */
@@ -34,4 +31,4 @@ enum {
 int kr_response_classify(knot_pkt_t *pkt);
 
 /* Processing module implementation. */
-const knot_layer_api_t *iterate_layer(void);
+const knot_layer_api_t *iterate_layer(struct kr_module *module);

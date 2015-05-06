@@ -442,7 +442,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /** Module implementation. */
-const knot_layer_api_t *iterate_layer(void)
+const knot_layer_api_t *iterate_layer(struct kr_module *module)
 {
 	static const knot_layer_api_t _layer = {
 		.begin = &begin,

@@ -41,6 +41,6 @@ func Finish(ctx *C.knot_layer_t) C.int {
 	return 0
 }
 
-func Layer() *C.knot_layer_api_t {
+func Layer(module *C.struct_kr_module) *C.knot_layer_api_t {
 	return C._layer()
 }

@@ -30,11 +30,11 @@ A module is a shared library defining specific functions, here's an overview of 
 .. csv-table::
    :header: "C", "Go", "Params", "Comment"
 
-   "``X_api()`` [#]_", "``Api()``",    "",                "Implemented API (``uint32_t``)"
+   "``X_api()`` [#]_", "``Api()``",   "",                "Implemented API (``uint32_t``)"
    "``X_init()``",    "``Init()``",   "``module``",      "Constructor"
    "``X_deinit()``",  "``Deinit()``", "``module, key``", "Destructor"
    "``X_config()``",  "``Config()``", "``module``",      "Configuration"
-   "``X_layer()``",   "``Layer()``",  "",                ":ref:`Module layer <lib-layers>`"
+   "``X_layer()``",   "``Layer()``",  "``module``",      ":ref:`Module layer <lib-layers>`"
    "``X_props()``",   "``Props()``",  "",                "NULL-terminated list of properties"
 
 .. [#] Mandatory symbol.
@@ -170,7 +170,7 @@ Now we can add the implementations for the ``Begin`` and ``Finish`` functions, a
 		return 0
 	}
 
-	func Layer() *C.knot_layer_api_t {
+	func Layer(module *C.struct_kr_module) *C.knot_layer_api_t {
 		// Wrapping the inline trampoline function
 		return C._layer()
 	}

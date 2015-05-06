@@ -148,7 +148,7 @@ static int stash(knot_layer_t *ctx)
 }
 
 /** Module implementation. */
-const knot_layer_api_t *pktcache_layer(void)
+const knot_layer_api_t *pktcache_layer(struct kr_module *module)
 {
 	static const knot_layer_api_t _layer = {
 		.begin   = &begin,

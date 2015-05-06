@@ -36,9 +36,6 @@
 #define DEFAULT_FILE "/etc/hosts"
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "hint",  fmt)
 
-/** @todo Hack until layers can store userdata. */
-static struct kr_zonecut *g_map = NULL;
-
 static int begin(knot_layer_t *ctx, void *module_param)
 {
 	ctx->data = module_param;
@@ -78,7 +75,6 @@ static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_request *pa
 
 static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
-	assert(pkt && ctx);
 	struct kr_request *param = ctx->data;
 	struct kr_query *qry = kr_rplan_current(&param->rplan);
 	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
@@ -89,7 +85,9 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Find a matching name */
-	pack_t *pack = kr_zonecut_find(g_map, qry->sname);
+	struct kr_module *module = ctx->api->data;
+	struct kr_zonecut *hint_map = module->data;
+	pack_t *pack = kr_zonecut_find(hint_map, qry->sname);
 	if (!pack || pack->len == 0) {
 		return ctx->state;
 	}
@@ -182,7 +180,6 @@ static int load(struct kr_module *module, const char *path)
 	struct kr_zonecut *hints = mm_alloc(pool, sizeof(*hints));
 	kr_zonecut_init(hints, (const uint8_t *)(""), pool);
 	module->data = hints;
-	g_map = hints;
 	return load_map(hints, fp);
 }
 
@@ -268,12 +265,14 @@ static char* hint_get(void *env, struct kr_module *module, const char *args)
  * Module implementation.
  */
 
-const knot_layer_api_t *hints_layer(void)
+const knot_layer_api_t *hints_layer(struct kr_module *module)
 {
-	static const knot_layer_api_t _layer = {
+	static knot_layer_api_t _layer = {
 		.begin = &begin,
-		.produce = &query
+		.produce = &query,
 	};
+	/* Store module reference */
+	_layer.data = module;
 	return &_layer;
 }
 
