@@ -27,13 +27,18 @@ static int format_error(lua_State* L, const char *err)
 	lua_getstack(L, 1, &d);
 	/* error message prefix */
 	lua_getinfo(L, "Sln", &d);
-	lua_pushstring(L, d.short_src);
-	lua_pushstring(L, ":");
-	lua_pushnumber(L, d.currentline);
-	lua_pushstring(L, ": error: ");
+	if (strncmp(d.short_src, "[", 1) != 0) {
+		lua_pushstring(L, d.short_src);
+		lua_pushstring(L, ":");
+		lua_pushnumber(L, d.currentline);
+		lua_pushstring(L, ": error: ");
+		lua_concat(L, 4);
+	} else {
+		lua_pushstring(L, "error: ");
+	}
 	/* error message */
 	lua_pushstring(L, err);
-	lua_concat(L,  5);
+	lua_concat(L,  2);
 	return 1;
 }
 
@@ -67,14 +72,14 @@ static int mod_load(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "expected 'load(string name)'");
+		format_error(L, "expected 'load(string name)'");
 		lua_error(L);
 	}
 	/* Load engine module */
 	struct engine *engine = engine_luaget(L);
 	int ret = engine_register(engine, lua_tostring(L, 1));
 	if (ret != 0) {
-		lua_pushstring(L, kr_strerror(ret));
+		format_error(L, kr_strerror(ret));
 		lua_error(L);
 	}
 
@@ -95,7 +100,7 @@ static int mod_unload(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	int ret = engine_unregister(engine, lua_tostring(L, 1));
 	if (ret != 0) {
-		lua_pushstring(L, kr_strerror(ret));
+		format_error(L, kr_strerror(ret));
 		lua_error(L);
 	}
 
@@ -162,7 +167,7 @@ static int net_listen_iface(lua_State *L, int port)
 		int ret = network_listen(&engine->net, lua_tostring(L, -1),
 		                         port, NET_TCP|NET_UDP);
 		if (ret != 0) {
-			lua_pushstring(L, kr_strerror(ret));
+			format_error(L, kr_strerror(ret));
 			lua_error(L);
 		}
 		lua_pop(L, 1);
@@ -194,7 +199,7 @@ static int net_listen(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	int ret = network_listen(&engine->net, lua_tostring(L, 1), port, NET_TCP|NET_UDP);
 	if (ret != 0) {
-		lua_pushstring(L, kr_strerror(ret));
+		format_error(L, kr_strerror(ret));
 		lua_error(L);
 	}
 
@@ -310,7 +315,7 @@ static int cache_count(lua_State *L)
 	namedb_txn_t txn;
 	int ret = kr_cache_txn_begin(engine->resolver.cache, &txn, NAMEDB_RDONLY);
 	if (ret != 0) {
-		lua_pushstring(L, kr_strerror(ret));
+		format_error(L, kr_strerror(ret));
 		lua_error(L);
 	}
 
