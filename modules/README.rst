@@ -12,34 +12,32 @@ Writing extensions
 Supported languages
 -------------------
 
-Currently modules written in C are supported.
+Currently modules written in C and Lua are supported.
 There is also a rudimentary support for writing modules in Go |---|
 (1) the library has no native Go bindings, library is accessible using CGO_,
 (2) gc doesn't support building shared libraries, GCCGO_ is required,
 (3) no coroutines and no garbage collecting thread, as the Go code is called from C threads.
 
-.. note:: There is a plan for Lua scriptables, but it's not implemented yet.
-
 The anatomy of an extension
 ---------------------------
 
-A module is a shared library defining specific functions, here's an overview of the functions.
+A module is a shared object or script defining specific functions, here's an overview.
 
 *Note* |---| the :ref:`Modules <lib_api_modules>` header documents the module loading and API.
 
 .. csv-table::
-   :header: "C", "Go", "Params", "Comment"
+   :header: "C", "Lua", "Go", "Params", "Comment"
 
-   "``X_api()`` [#]_", "``Api()``",   "",                "Implemented API (``uint32_t``)"
-   "``X_init()``",    "``Init()``",   "``module``",      "Constructor"
-   "``X_deinit()``",  "``Deinit()``", "``module, key``", "Destructor"
-   "``X_config()``",  "``Config()``", "``module``",      "Configuration"
-   "``X_layer()``",   "``Layer()``",  "``module``",      ":ref:`Module layer <lib-layers>`"
-   "``X_props()``",   "``Props()``",  "",                "NULL-terminated list of properties"
+   "``X_api()`` [#]_", "",               "``Api()``",    "",                "API version"
+   "``X_init()``",     "``X.init()``",   "``Init()``",   "``module``",      "Constructor"
+   "``X_deinit()``",   "``X.deinit()``", "``Deinit()``", "``module, key``", "Destructor"
+   "``X_config()``",   "``X.config()``", "``Config()``", "``module``",      "Configuration"
+   "``X_layer()``",    "``X.layer``",    "``Layer()``",  "``module``",      ":ref:`Module layer <lib-layers>`"
+   "``X_props()``",    "",               "``Props()``",  "",                "List of properties"
 
 .. [#] Mandatory symbol.
 
-The ``X_`` corresponds to the module name, if the module name is ``hints``, then the prefix for constructor would be ``hints_init()``.
+The ``X`` corresponds to the module name, if the module name is ``hints``, then the prefix for constructor would be ``hints_init()``.
 This doesn't apply for Go, as it for now always implements `main` and requires capitalized first letter in order to export its symbol.
 
 .. note::
@@ -100,14 +98,76 @@ module layer (see the :ref:`Writing layers <lib-layers>`).
 This example shows how a module can run in the background, this enables you to, for example, observe
 and publish data about query resolution.
 
+Writing a module in Lua
+-----------------------
+
+The probably most convenient way of writing modules is Lua since you can use already installed modules
+from system and have first-class access to the scripting engine. You can also tap to all the events, that
+the C API has access to, but keep in mind that transitioning from the C to Lua function is slower than
+the other way round.
+
+.. note:: The Lua functions retrieve an additional first parameter compared to the C counterparts - a "state".
+          There is no Lua wrapper for C structures used in the resolution context, until they're implemented
+          you can inspect the structures using the `ffi <http://luajit.org/ext_ffi.html>`_ library.
+
+The modules follow the `Lua way <http://lua-users.org/wiki/ModuleDefinition>`_, where the module interface is returned in a named table.
+
+.. code-block:: lua
+
+	--- @module Count incoming queries
+	local counter = {}
+
+	function counter.init(module)
+		counter.total = 0
+		counter.last = 0
+		counter.failed = 0
+	end
+
+	function counter.deinit(module)
+		print('counted', counter.total, 'queries')
+	end
+
+	-- @function Run the q/s counter with given interval.
+	function counter.config(conf)
+		-- We can use the scripting facilities here
+		if counter.ev then event.cancel(counter.ev)
+		event.recurrent(conf.interval, function ()
+			print(counter.total - counter.last, 'q/s')
+			counter.last = counter.total
+		end)
+	end
+
+	return counter
+
+The created module can be then loaded just like any other module, except it isn't very useful since it
+doesn't provide any layer to capture events. The Lua module can however provide a processing layer, just
+:ref:`like its C counterpart <lib-layers>`.
+
+.. code-block:: lua
+
+	-- Notice it isn't a function, but a table of functions
+	counter.layer = {
+		begin = function (state, data)
+				counter.total = counter.total + 1
+				return state
+			end,
+		finish = function (state, req)
+				-- catch KNOT_STATE_FAIL = 8, no bindings yet
+				if state == 8 then
+					counter.failed = counter.failed + 1
+				end
+				return state
+			end 
+	}
+
+Since the modules are like any other Lua modules, you can interact with them through the CLI and and any interface.
+
+.. tip:: The module can be placed anywhere in the Lua search path, in the working directory or in the MODULESDIR.
+
 Writing a module in Go
 ----------------------
 
-*Note* |---| At the moment only a limited subset of Go is supported. The reason is that the Go functions must run inside the goroutines, and *presume* the garbage collector and scheduler are running in the background.
-`GCCGO`_ compiler can build dynamic libraries, and also allow us to bootstrap basic Go runtime, including a trampoline to call Go functions.
-The problem with the ``layer()`` and callbacks is that they're called from C threads, that Go runtime has no knowledge of.
-Thus neither garbage collection or spawning routines can work. The solution could be to register C threads to Go runtime,
-or have each module to run inside its world loop and use IPC instead of callbacks |---| alas neither is implemented at the moment, but may be in the future.
+.. note:: At the moment only a limited subset of Go is supported. The reason is that the Go functions must run inside the goroutines, and *presume* the garbage collector and scheduler are running in the background. `GCCGO`_ compiler can build dynamic libraries, and also allow us to bootstrap basic Go runtime, including a trampoline to call Go functions. The problem with the ``layer()`` and callbacks is that they're called from C threads, that Go runtime has no knowledge of. Thus neither garbage collection or spawning routines can work. The solution could be to register C threads to Go runtime, or have each module to run inside its world loop and use IPC instead of callbacks |---| alas neither is implemented at the moment, but may be in the future.
 
 The Go modules also use CGO_ to interface C resolver library, and to declare layers with function pointers, which are `not present in Go`_. Each module must be the ``main`` package, here's a minimal example:
 
@@ -184,8 +244,8 @@ There is a callback ``X_config()`` but it's NOOP for now, as the configuration i
 
 .. _mod-properties:
 
-Exposing module properties
---------------------------
+Exposing C/Go module properties
+-------------------------------
 
 A module can offer NULL-terminated list of *properties*, each property is essentially a callable with free-form JSON input/output.
 JSON was chosen as an interchangeable format that doesn't require any schema beforehand, so you can do two things - query the module properties
