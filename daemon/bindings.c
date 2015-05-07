@@ -426,10 +426,13 @@ static void event_callback(uv_timer_t *timer)
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) timer->data);
 	lua_rawgeti(L, -1, 1);
 	lua_pushinteger(L, (intptr_t) timer->data);
-	engine_pcall(L, 1);
-
-	/* Free callback if not recurrent */
-	if (uv_timer_get_repeat(timer) == 0) {
+	int ret = engine_pcall(L, 1);
+	if (ret != 0) {
+		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
+		lua_pop(L, 1);
+	}
+	/* Free callback if not recurrent or an error */
+	if (ret != 0 || uv_timer_get_repeat(timer) == 0) {
 		uv_close((uv_handle_t *)timer, (uv_close_cb) event_free);
 	}
 }
