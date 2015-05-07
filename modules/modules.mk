@@ -25,10 +25,11 @@ endef
 # Lua target definition
 define lua_target
 $(1) := $(2)/$(1).lua
+$(1)-clean:
 $(1)-install: $(2)/$(1).lua
 	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
 	$(INSTALL) $$^ $(PREFIX)/$(MODULEDIR)
-.PHONY: $(1) $(1)-install
+.PHONY: $(1) $(1)-install $(1)-clean
 endef
 
 # Make Go module
