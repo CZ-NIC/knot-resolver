@@ -39,11 +39,17 @@ function ketcd.config(conf)
 	if type(conf) == 'table' then
 		for k,v in pairs(conf) do options[k] = v end
 	end
+	-- create connection
 	local cli, err = ketcd.Etcd.new(options)
 	if err then
 		error(err) 
 	end
 	ketcd.cli = cli
+	-- schedule recurrent polling
+	-- @todo: the etcd has watch() API, but this requires
+	--        coroutines on socket operations
+	if ketcd.ev then event.cancel(ketcd.ev) end
+	ketcd.ev = event.recurrent(5 * sec, ketcd.reload)
 end
 
 return ketcd
