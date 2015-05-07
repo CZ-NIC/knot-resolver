@@ -24,7 +24,7 @@ endef
 
 # Lua target definition
 define lua_target
-$(1) := $$($(1)_SOURCES)
+$(1) := $$(addprefix $(2)/,$$($(1)_SOURCES))
 $(1)-clean:
 $(1)-install: $$($(1)_SOURCES)
 	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
