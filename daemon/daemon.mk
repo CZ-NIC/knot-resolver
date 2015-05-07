@@ -4,6 +4,7 @@ kresolved_SOURCES := \
 	daemon/engine.c      \
 	daemon/worker.c      \
 	daemon/bindings.c    \
+	daemon/ffimodule.c   \
 	daemon/main.c
 
 # Embed resources
