@@ -26,7 +26,7 @@ endef
 define lua_target
 $(1) := $$(addprefix $(2)/,$$($(1)_SOURCES))
 $(1)-clean:
-$(1)-install: $$($(1)_SOURCES)
+$(1)-install: $$(addprefix $(2)/,$$($(1)_SOURCES))
 	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
 	$(INSTALL) $$^ $(PREFIX)/$(MODULEDIR)
 .PHONY: $(1) $(1)-install $(1)-clean
