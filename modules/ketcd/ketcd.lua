@@ -9,13 +9,15 @@ local function update_subtree(tree)
 			update_subtree(k.nodes)
 		else
 			local key,opt = k.key:gmatch('([^/]+)/([^/]+)$')()
-			eval_cmd(key..'='..'{'..opt..'='..k.value..'}')
+			if _G[key][opt] ~= k.value then
+				_G[key][opt] = k.value
+			end
 		end
 	end
 end
 
 -- @function reload whole configuration
-function ketcd.reload()
+local function reload()
 	local res, err = ketcd.cli:readdir('/', true)
 	if err then
 		error(err)
@@ -49,7 +51,7 @@ function ketcd.config(conf)
 	-- @todo: the etcd has watch() API, but this requires
 	--        coroutines on socket operations
 	if ketcd.ev then event.cancel(ketcd.ev) end
-	ketcd.ev = event.recurrent(5 * sec, ketcd.reload)
+	ketcd.ev = event.recurrent(5 * sec, reload)
 end
 
 return ketcd

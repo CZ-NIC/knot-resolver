@@ -3,6 +3,38 @@
 Etcd module
 -----------
 
+The module connects to Etcd peers and watches for configuration change.
+By default, the module looks for the subtree under ``/kresolved`` directory,
+but you can change this `in the configuration <https://github.com/mah0x211/lua-etcd#cli-err--etcdnew-optiontable->`_.
+
+The subtree structure corresponds to the configuration variables in the declarative style.
+
+.. code-block::
+
+	$ etcdctl set /kresolved/net/127.0.0.1 53
+	$ etcdctl set /kresolved/modules/cachectl true
+	$ etcdctl set /kresolved/cache/size 10000000
+
+Configures all listening nodes to following configuration:
+
+.. code-block:: lua
+
+	net = { '127.0.0.1' }
+	modules = { 'cachectl' }
+	cache.size = 10000000
+
+Example configuration
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+	modules = {
+		ketcd = {
+			prefix = '/kresolved',
+			peer = 'http://127.0.0.1:7001'
+		}
+	}
+
 .. warning:: Work in progress!
 
 Dependencies
