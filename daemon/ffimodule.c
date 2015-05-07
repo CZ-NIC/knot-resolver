@@ -16,10 +16,17 @@
 
 #include <uv.h>
 
+#include "daemon/engine.h"
 #include "daemon/bindings.h"
 #include "daemon/ffimodule.h"
 #include "lib/module.h"
 #include "lib/layer.h"
+
+#if LUA_VERSION_NUM >= 502
+#define l_resume(L, argc) lua_resume((L), NULL, (argc))
+#else
+#define l_resume(L, argc) lua_resume((L), (argc))
+#endif
 
 /** @internal Helper for retrieving the right function entrypoint. */
 static inline lua_State *l_ffi_preface(struct kr_module *module, const char *call) {
@@ -31,13 +38,9 @@ static inline lua_State *l_ffi_preface(struct kr_module *module, const char *cal
 }
 
 /** @internal Helper for calling the entrypoint. */
-static inline int l_ffi_resume(lua_State *L, int argc)
+static inline int l_ffi_resume(lua_State *L, bool resume, int argc)
 {
-#if LUA_VERSION_NUM >= 502
-	int status = lua_resume(L, NULL, argc);
-#else
-	int status = lua_resume(L, argc);
-#endif
+	int status = resume ? l_resume(L, argc) : engine_pcall(L, argc);
 	switch(status) {
 	case LUA_YIELD: /* Continuation */
 		return kr_error(EAGAIN);
@@ -53,7 +56,7 @@ static inline int l_ffi_resume(lua_State *L, int argc)
 static void l_ffi_resume_cb(uv_idle_t *check)
 {
 	lua_State *L = check->data;
-	int status = l_ffi_resume(L, 0);
+	int status = l_ffi_resume(L, true, 0);
 	if (status != kr_error(EAGAIN)) {
 		uv_idle_stop(check); /* Stop coroutine */
 		uv_close((uv_handle_t *)check, (uv_close_cb)free);
@@ -75,7 +78,7 @@ static int l_ffi_defer(lua_State *L)
 /** @internal Helper for calling the entrypoint. */
 static inline int l_ffi_call(lua_State *L, int argc)
 {
-	int status = l_ffi_resume(L, argc);
+	int status = l_ffi_resume(L, false, argc);
 	if (status == kr_error(EAGAIN)) {
 		return l_ffi_defer(L);
 	}
@@ -92,7 +95,7 @@ static int l_ffi_deinit(struct kr_module *module)
 {
 	lua_State *L = l_ffi_preface(module, "deinit");
 	/* @note Do not allow coroutine here. */
-	int ret = l_ffi_resume(L, 1);
+	int ret = l_ffi_resume(L, false, 1);
 	/* Free the layer API wrapper */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
 	lua_getfield(L, -1, "_layercdata");
@@ -125,21 +128,21 @@ static int l_ffi_layer_begin(knot_layer_t *ctx, void *module_param)
 	LAYER_FFI_CALL(ctx, "begin");
 	lua_pushlightuserdata(L, module_param);
 	ctx->data = module_param;
-	return l_ffi_resume(L, 2);
+	return l_ffi_resume(L, false, 2);
 }
 
 static int l_ffi_layer_reset(knot_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, "reset");
 	lua_pushlightuserdata(L, ctx->data);
-	return l_ffi_resume(L, 2);
+	return l_ffi_resume(L, false, 2);
 }
 
 static int l_ffi_layer_finish(knot_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, "finish");
 	lua_pushlightuserdata(L, ctx->data);
-	return l_ffi_resume(L, 2);
+	return l_ffi_resume(L, false, 2);
 }
 
 static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -147,7 +150,7 @@ static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 	LAYER_FFI_CALL(ctx, "consume");
 	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
-	return l_ffi_resume(L, 3);
+	return l_ffi_resume(L, false, 3);
 }
 
 static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -155,7 +158,7 @@ static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 	LAYER_FFI_CALL(ctx, "produce");
 	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
-	return l_ffi_resume(L, 3);
+	return l_ffi_resume(L, false, 3);
 }
 
 static int l_ffi_layer_fail(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -163,7 +166,7 @@ static int l_ffi_layer_fail(knot_layer_t *ctx, knot_pkt_t *pkt)
 	LAYER_FFI_CALL(ctx, "fail");
 	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
-	return l_ffi_resume(L, 3);
+	return l_ffi_resume(L, false, 3);
 }
 
 /** @internal Retrieve C layer api wrapper. */
@@ -225,7 +228,7 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	REGISTER_FFI_CALL(L, module->deinit, "deinit", &l_ffi_deinit);
 	REGISTER_FFI_CALL(L, module->layer,  "layer",  &l_ffi_layer);
 	module->data = (void *)(intptr_t)luaL_ref(L, LUA_REGISTRYINDEX);
-	module->lib = lua_newthread(L);
+	module->lib = L;
 	return module->init(module);
 }
 
