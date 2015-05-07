@@ -62,14 +62,11 @@ Configuration example
 .. code-block:: lua
 
 	-- 10MB cache
-	cache.open(10*MB)
-	-- static hints
-	modules = {
-		hints = true,
-		cachectl = true
-	}
+	cache.size = 10*MB
+	-- load some modules
+	modules = { 'hints', 'cachectl' }
 	-- interfaces
-	net.listen('127.0.0.1')
+	net = { '127.0.0.1' }
 
 Configuration syntax
 --------------------
@@ -84,10 +81,10 @@ A simple example would be to load static hints.
 .. code-block:: lua
 
 	modules = {
-		cachectl = true -- no configuration
+		'hints' -- no configuration
 	}
 
-If the module accepts accepts configuration, you can provide a table.
+If the module accepts accepts configuration, you can call the ``module.config({...})`` or provide options table.
 The syntax for table is ``{ key1 = value, key2 = value }``, and it represents the unpacked `JSON-encoded`_ string, that
 the modules use as the :ref:`input configuration <mod-properties>`.
 
@@ -95,12 +92,12 @@ the modules use as the :ref:`input configuration <mod-properties>`.
 
 	modules = {
 		cachectl = true,
-		hints = {
+		hints = { -- with configuration
 			file = '/etc/hosts'
 		}
 	}
 
-The possible simple data types are strings, integers or floats and boolean.
+The possible simple data types are: string, integer or float, and boolean.
 
 .. tip:: The configuration and CLI syntax is Lua language, with which you may already be familiar with.
          If not, you can read the `Learn Lua in 15 minutes`_ for a syntax overview. Spending just a few minutes
@@ -147,7 +144,7 @@ to download cache from parent, to avoid cold-cache start.
 			sink = ltn12.sink.file(io.open('cache.mdb', 'w'))
 		}
 		-- reopen cache with 100M limit
-		cache.open('.', 100*MB)
+		cache.open(100*MB)
 	end
 
 Events and services
@@ -306,6 +303,7 @@ The daemon provides an interface for dynamic loading of :ref:`daemon modules <mo
 
          .. code-block:: lua
 
+         	modules = { 'cachectl' }
 		modules = {
 			hints = {file = '/etc/hosts'}
 		}
@@ -315,7 +313,8 @@ The daemon provides an interface for dynamic loading of :ref:`daemon modules <mo
          .. code-block:: lua
 
 		modules.load('cachectl')
-		cachectl.config({file = '/etc/hosts'})
+		modules.load('hints')
+		hints.config({file = '/etc/hosts'})
 
 
 .. function:: modules.list()
