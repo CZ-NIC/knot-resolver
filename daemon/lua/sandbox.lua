@@ -40,6 +40,16 @@ setmetatable(modules, {
 	end
 })
 
+-- Syntactic sugar for cache
+-- `cache.{size|storage} = value`
+setmetatable(cache, {
+	__newindex = function (t,k,v)
+		if     k == 'size'    then t.open(v, rawget(t, 'storage'))
+		elseif k == 'storage' then t.open(rawget(t, 'size'), v)
+		else   rawset(t, k, v) end
+	end
+})
+
 -- Register module in Lua environment
 function modules_register(module)
 	-- Syntactic sugar for get() and set() properties

@@ -356,7 +356,9 @@ static int cache_open(lua_State *L)
 
 	/* Select cache storage backend */
 	struct engine *engine = engine_luaget(L);
+	unsigned cache_size = lua_tonumber(L, 1);
 	const char *conf = n > 1 ? lua_tostring(L, 2) : NULL;
+	const char *uri = conf;
 	struct storage_api *storage = cache_select_storage(engine, &conf);
 	if (!storage) {
 		format_error(L, "unsupported cache backend");
@@ -369,13 +371,22 @@ static int cache_open(lua_State *L)
 		kr_cache_close(engine->resolver.cache);
 	}
 	/* Reopen cache */
-	void *storage_opts = storage->opts_create(conf, lua_tointeger(L, 1));
+	void *storage_opts = storage->opts_create(conf, cache_size);
 	engine->resolver.cache = kr_cache_open(storage_opts, engine->pool);
 	free(storage_opts);
 	if (engine->resolver.cache == NULL) {
 		format_error(L, "can't open cache");
 		lua_error(L);
 	}
+
+	/* Store current configuration */
+	lua_getglobal(L, "cache");
+	lua_pushstring(L, "size");
+	lua_pushnumber(L, cache_size);
+	lua_rawset(L, -3);
+	lua_pushstring(L, "storage");
+	lua_pushstring(L, uri);
+	lua_rawset(L, -3);
 
 	lua_pushboolean(L, 1);
 	return 1;

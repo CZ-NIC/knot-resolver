@@ -106,7 +106,7 @@ void *namedb_lmdb_mkopts(const char *conf, size_t maxsize)
 	struct namedb_lmdb_opts *opts = malloc(sizeof(*opts));
 	if (opts) {
 		memset(opts, 0, sizeof(*opts));
-		opts->path = conf ? conf : ".";
+		opts->path = (conf && strlen(conf)) ? conf : ".";
 		opts->mapsize = maxsize;
 	}
 	return opts;
