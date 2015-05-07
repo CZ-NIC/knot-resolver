@@ -112,16 +112,16 @@ The possible simple data types are strings, integers or floats and boolean.
 Dynamic configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-Knowing that the the configuration is a valid Lua script enables you to write dynamic rules, and also avoid
-additional configuration templating. One example is to differentiate between internal and external
-interfaces based on environment variable.
+Knowing that the the configuration is a Lua in disguise enables you to write dynamic rules, and also avoid
+repetition and templating. This is unavoidable with static configuration, e.g. when you want to configure
+each node a little bit differently.
 
 .. code-block:: lua
 
 	if hostname() == 'hidden' then
-		net.listen(net.eth0)
+		net.listen(net.eth0, 5353)
 	else
-		net.listen(net.eth1.addr[1])
+		net = { '127.0.0.1', net.eth1.addr[1] }
 	end
 
 Another example would show how it is possible to bind to all interfaces, using iteration.
@@ -220,6 +220,14 @@ Environment
 
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
+
+For when listening on ``localhost`` just doesn't cut it.
+
+.. tip:: Use declarative interface for network.
+
+         .. code-block:: lua
+
+         	net = { '127.0.0.1', net.eth0, net.eth1.addr[1] }
 
 .. function:: net.listen(address, [port = 53])
 
