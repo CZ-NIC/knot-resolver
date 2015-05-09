@@ -11,3 +11,4 @@ Implemented modules
 
 .. include:: ../modules/hints/README.rst
 .. include:: ../modules/cachectl/README.rst
+.. include:: ../modules/ketcd/README.rst
