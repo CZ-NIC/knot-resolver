@@ -244,6 +244,7 @@ class Step:
         if len(self.data) == 0:
             raise Exception("query definition required")
         msg = self.data[0].message
+        msg.use_edns(edns = 1)
         self.answer = ctx.resolve(msg.to_wire())
         if self.answer is not None:
             self.answer = dns.message.from_wire(self.answer)
