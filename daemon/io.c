@@ -53,6 +53,11 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 {
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
+	if (nread <= 0) {
+		worker_exec(worker, (uv_handle_t *)handle, NULL, addr);
+		return;
+	}
+
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
 	query->max_size = sizeof(worker->bufs.wire);
 	worker_exec(worker, (uv_handle_t *)handle, query, addr);
