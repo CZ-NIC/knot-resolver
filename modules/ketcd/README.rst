@@ -9,7 +9,7 @@ but you can change this `in the configuration <https://github.com/mah0x211/lua-e
 
 The subtree structure corresponds to the configuration variables in the declarative style.
 
-.. code-block::
+.. code-block:: bash
 
 	$ etcdctl set /kresolved/net/127.0.0.1 53
 	$ etcdctl set /kresolved/modules/cachectl true
@@ -42,5 +42,5 @@ Dependencies
 
 * `lua-etcd <https://github.com/mah0x211/lua-etcd>`_ available in LuaRocks
 
-    $ luarocks install etcd --from=http://mah0x211.github.io/rocks/
+    ``$ luarocks install etcd --from=http://mah0x211.github.io/rocks/``
 
