@@ -23,6 +23,7 @@
 #include "lib/module.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " pc ",  fmt)
+#define DEFAULT_MAXTTL (15 * 60 * 60)
 
 static inline uint8_t get_tag(knot_pkt_t *pkt)
 {
@@ -101,7 +102,12 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 			break;
 		}
 	}
-	/* @todo Fetch TTL from NSEC* proof */
+	/* @todo Fetch TTL from NSEC* proof, min. TTL shouldn't
+	 *       be longer than proof timeout. */
+	/* @todo Configurable limit */
+	if (ttl > DEFAULT_MAXTTL) {
+		ttl = DEFAULT_MAXTTL;
+	}
 	return ttl;
 }
 
@@ -114,7 +120,7 @@ static int stash(knot_layer_t *ctx)
 	}
 	knot_pkt_t *pkt = req->answer;
 	struct kr_query *qry = TAIL(rplan->resolved);
-	if (qry->flags & QUERY_CACHED || kr_response_classify(pkt) == PKT_NOERROR) {
+	if (qry->flags & QUERY_CACHED || !(kr_response_classify(pkt) & (PKT_NODATA|PKT_NXDOMAIN))) {
 		return ctx->state; /* Cache only negative, not-cached answers. */
 	}
 	uint32_t ttl = packet_ttl(pkt);
