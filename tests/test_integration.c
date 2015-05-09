@@ -52,13 +52,14 @@ static PyObject* init(PyObject* self, PyObject* args)
 
 	/* Load basic modules. */
 	array_init(global_modules);
-	int ret = array_reserve(global_modules, 2);
+	int ret = array_reserve(global_modules, 3);
 	if (ret < 0) {
 		return NULL;
 	}
 	kr_module_load(&global_modules.at[0], "iterate", NULL);
 	kr_module_load(&global_modules.at[1], "rrcache", NULL);
-	global_modules.len = 2;
+	kr_module_load(&global_modules.at[2], "pktcache", NULL);
+	global_modules.len = 3;
 
 	/* Initialize resolution context */
 	mm_ctx_init(&global_mm);
@@ -72,6 +73,7 @@ static PyObject* init(PyObject* self, PyObject* args)
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_tmpdir;
 	opts.mapsize = 100 * 4096;
+	kr_cache_storage_set(namedb_lmdb_api);
 	global_context.cache = kr_cache_open(&opts, &global_mm);
 	assert(global_context.cache);
 
