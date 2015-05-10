@@ -23,7 +23,7 @@
 #include "lib/module.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " pc ",  fmt)
-#define DEFAULT_MAXTTL (15 * 60 * 60)
+#define DEFAULT_MAXTTL (15 * 60)
 
 static inline uint8_t get_tag(knot_pkt_t *pkt)
 {
@@ -36,11 +36,18 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
+static uint32_t limit_ttl(uint32_t ttl)
+{
+	/* @todo Configurable limit */
+	return (ttl > DEFAULT_MAXTTL) ? DEFAULT_MAXTTL : ttl;
+}
+
 static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 {
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
 		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
-		knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
+		uint32_t ttl = knot_rdata_ttl(rd);
+		knot_rdata_set_ttl(rd, ttl - drift);
 	}
 }
 
@@ -69,6 +76,7 @@ static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, uint32_t 
 	}
 
 	/* Adjust TTL in records. */
+	int ret = 0;
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
@@ -77,7 +85,7 @@ static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, uint32_t 
 		}
 	}
 
-	return kr_ok();
+	return ret;
 }
 
 static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -121,13 +129,20 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 			break;
 		}
 	}
-	/* @todo Fetch TTL from NSEC* proof, min. TTL shouldn't
-	 *       be longer than proof timeout. */
-	/* @todo Configurable limit */
-	if (ttl > DEFAULT_MAXTTL) {
-		ttl = DEFAULT_MAXTTL;
+	/* Get minimum entry TTL in the packet */
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
+				knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
+				if (knot_rdata_ttl(rd) < ttl) {
+					ttl = knot_rdata_ttl(rd);
+				}
+			}
+		}
 	}
-	return ttl;
+	return limit_ttl(ttl);
 }
 
 static int stash(knot_layer_t *ctx)
