@@ -98,6 +98,5 @@ int net_connected_socket(int type, const struct sockaddr_storage *dst_addr,
 
 int net_is_connected(int fd)
 {
-	fprintf(stderr, "%s (%d)\n", __func__, fd);
 	return true;
 }

@@ -144,7 +144,7 @@ static PyObject* set_time(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-	g_mock_time.tv_sec  = arg_time;
+	g_mock_time.tv_sec  += arg_time;
 	g_mock_time.tv_usec = 0;
 
 	return Py_BuildValue("");
