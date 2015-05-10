@@ -36,6 +36,14 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
+static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
+{
+	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
+		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
+		knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
+	}
+}
+
 static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, uint32_t timestamp)
 {
 	const knot_dname_t *qname = knot_pkt_qname(pkt);
@@ -51,13 +59,24 @@ static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, uint32_t 
 		/* Keep original header and copy cached */
 		uint8_t header[KNOT_WIRE_HEADER_SIZE];
 		memcpy(header, pkt->wire, sizeof(header));
+		/* Copy and reparse */
+		knot_pkt_clear(pkt);
 		memcpy(pkt->wire, entry->data, entry->count);
 		pkt->size = entry->count;
-		pkt->parsed = 0;
-		pkt->reserved = 0;
+		knot_pkt_parse(pkt, 0);
 		/* Restore header bits */
 		knot_wire_set_id(pkt->wire, knot_wire_get_id(header));
 	}
+
+	/* Adjust TTL in records. */
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			adjust_ttl((knot_rrset_t *)rr, timestamp);
+		}
+	}
+
 	return kr_ok();
 }
 

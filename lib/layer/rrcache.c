@@ -90,6 +90,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED;
+		pkt->parsed = pkt->size;
 		knot_wire_set_qr(pkt->wire);
 		return KNOT_STATE_DONE;
 	}
