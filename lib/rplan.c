@@ -112,16 +112,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	qry->parent = parent;
 	gettimeofday(&qry->timestamp, NULL);
 	add_tail(&rplan->pending, &qry->node);
-
-	/* Find closest zone cut for this query. */
-	namedb_txn_t txn;
 	kr_zonecut_init(&qry->zone_cut, name, rplan->pool);
-	if (kr_cache_txn_begin(rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
-		kr_zonecut_set_sbelt(&qry->zone_cut);
-	} else {
-		kr_zonecut_find_cached(&qry->zone_cut, &txn, qry->timestamp.tv_sec);
-		kr_cache_txn_abort(&txn);
-	}
 
 #ifndef NDEBUG
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];

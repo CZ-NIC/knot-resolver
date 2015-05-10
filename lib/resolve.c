@@ -49,8 +49,14 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		return KNOT_STATE_PRODUCE;
 	}
 
-	(void) kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
-	(void) kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	/* Start NS queries from root, to avoid certain cases
+	 * where a NS drops out of cache and the rest is unavailable,
+	 * this would lead to dependency loop in current zone cut.
+	 */
+	struct kr_query *next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+	kr_zonecut_set_sbelt(&next->zone_cut);
+	next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+	kr_zonecut_set_sbelt(&next->zone_cut);
 	qry->flags |= QUERY_AWAIT_ADDR;
 	return KNOT_STATE_PRODUCE;
 }
@@ -277,6 +283,15 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 	struct kr_query *qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
 	if (!qry) {
 		return KNOT_STATE_FAIL;
+	}
+
+	/* Find closest zone cut for this query. */
+	namedb_txn_t txn;
+	if (kr_cache_txn_begin(rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
+		kr_zonecut_set_sbelt(&qry->zone_cut);
+	} else {
+		kr_zonecut_find_cached(&qry->zone_cut, &txn, qry->timestamp.tv_sec);
+		kr_cache_txn_abort(&txn);
 	}
 
 	/* Initialize answer packet */
