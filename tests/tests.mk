@@ -5,7 +5,8 @@ ifeq ($(PLATFORM),Darwin)
 	                DYLD_INSERT_LIBRARIES=tests/libmock_calls.dylib \
 	                DYLD_LIBRARY_PATH="$(preload_PATH):${DYLD_LIBRARY_PATH}"
 else
-	preload_LIBS := @LD_LIBRARY_PATH="$(preload_PATH):${LD_LIBRARY_PATH}"
+	preload_LIBS := @LD_LIBRARY_PATH="$(preload_PATH):${LD_LIBRARY_PATH}" \
+	                LD_PRELOAD=tests/libmock_calls.so
 endif
 
 # Unit tests
