@@ -15,7 +15,13 @@ _test_integration_DEPEND := $(libmock_calls)
 $(eval $(call make_shared,_test_integration,tests))
 
 # Targets
+ifeq ($(PLATFORM),Darwin)
+	preload_syms := DYLD_INSERT_LIBRARIES=tests/libmock_calls.dylib
+else
+	preload_syms := LD_PRELOAD=tests/libmock_cals.so
+endif
+
 check-integration: $(libmock_calls) $(_test_integration)
-	$(call preload_LIBS) tests/test_integration.py tests/testdata
+	$(call preload_LIBS) $(preload_syms) tests/test_integration.py tests/testdata
 
 .PHONY: check-integration

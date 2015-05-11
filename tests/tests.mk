@@ -2,11 +2,9 @@
 preload_PATH := tests
 ifeq ($(PLATFORM),Darwin)
 	preload_LIBS := @DYLD_FORCE_FLAT_NAMESPACE=1 \
-	                DYLD_INSERT_LIBRARIES=tests/libmock_calls.dylib \
 	                DYLD_LIBRARY_PATH="$(preload_PATH):${DYLD_LIBRARY_PATH}"
 else
-	preload_LIBS := @LD_LIBRARY_PATH="$(preload_PATH):${LD_LIBRARY_PATH}" \
-	                LD_PRELOAD=tests/libmock_calls.so
+	preload_LIBS := @LD_LIBRARY_PATH="$(preload_PATH):${LD_LIBRARY_PATH}"
 endif
 
 # Unit tests
