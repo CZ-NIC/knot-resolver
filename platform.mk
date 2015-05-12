@@ -22,7 +22,7 @@ else
         MODTYPE := dynamiclib
     else
         PLATFORM := POSIX
-        LDFLAGS += -pthread
+        LDFLAGS += -pthread -ldl
     endif
 endif
 
