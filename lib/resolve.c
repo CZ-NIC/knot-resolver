@@ -347,6 +347,8 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	/* Pop query if resolved. */
 	if (qry->flags & QUERY_RESOLVED) {
 		kr_rplan_pop(rplan, qry);
+	} else { /* Clear query flags for next attempt */
+		qry->flags &= ~QUERY_CACHED;
 	}
 
 	knot_overlay_reset(&request->overlay);
