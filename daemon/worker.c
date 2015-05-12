@@ -117,6 +117,7 @@ static void qr_task_timeout(uv_timer_t *req)
 {
 	struct qr_task *task = req->data;
 	if (task->next_handle) {
+		uv_cancel((uv_req_t *)&task->ioreq);
 		io_stop_read(task->next_handle);
 		qr_task_step(task, NULL);
 	}
@@ -182,7 +183,9 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 {
 	/* Cancel timeout if active, close handle. */
 	if (task->next_handle) {
-		uv_close(task->next_handle, (uv_close_cb) free);
+		if (!uv_is_closing(task->next_handle)) {
+			uv_close(task->next_handle, (uv_close_cb) free);
+		}
 		uv_timer_stop(&task->timeout);
 		task->next_handle = NULL;
 	}
@@ -214,10 +217,10 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	task->next_handle->data = task;
 	if (sock_type == SOCK_STREAM) {
 		uv_connect_t *connect = &task->ioreq.connect;
+		connect->data = task;
 		if (uv_tcp_connect(connect, (uv_tcp_t *)task->next_handle, addr, qr_task_on_connect) != 0) {
 			return qr_task_step(task, NULL);
 		}
-		connect->data = task;
 	} else {
 		if (qr_task_send(task, task->next_handle, addr, next_query) != 0) {
 			return qr_task_step(task, NULL);
