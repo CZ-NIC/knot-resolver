@@ -3,7 +3,7 @@ set -e
 
 CMOCKA_TAG="cmocka-0.4.1"
 CMOCKA_URL="git://git.cryptomilk.org/projects/cmocka.git"
-LIBUV_TAG="v1.3.0"
+LIBUV_TAG="v1.5.0"
 LIBUV_URL="https://github.com/libuv/libuv.git"
 KNOT_TAG="master"
 KNOT_URL="https://github.com/CZ-NIC/knot.git"
