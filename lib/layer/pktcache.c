@@ -24,6 +24,7 @@
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " pc ",  fmt)
 #define DEFAULT_MAXTTL (15 * 60)
+#define DEFAULT_NOTTL (5) /* Short-time "no data" retention to avoid bursts */
 
 static inline uint8_t get_tag(knot_pkt_t *pkt)
 {
@@ -47,7 +48,9 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
 		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
 		uint32_t ttl = knot_rdata_ttl(rd);
-		knot_rdata_set_ttl(rd, ttl - drift);
+		if (ttl >= drift) {
+			knot_rdata_set_ttl(rd, ttl - drift);
+		}
 	}
 }
 
@@ -96,6 +99,9 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return ctx->state;
 	}
+	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
+		return ctx->state; /* Only IN class */
+	}
 
 	/* Fetch packet from cache */
 	namedb_txn_t txn;
@@ -119,7 +125,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 static uint32_t packet_ttl(knot_pkt_t *pkt)
 {
-	uint32_t ttl = 0;
+	uint32_t ttl = DEFAULT_NOTTL;
 	/* Fetch SOA from authority. */
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
@@ -134,6 +140,10 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			/* Skip OPT and TSIG */
+			if (rr->type == KNOT_RRTYPE_OPT || rr->type == KNOT_RRTYPE_TSIG) {
+				continue;
+			}
 			for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
 				knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
 				if (knot_rdata_ttl(rd) < ttl) {
@@ -149,12 +159,16 @@ static int stash(knot_layer_t *ctx)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_rplan *rplan = &req->rplan;
-	if (EMPTY_LIST(rplan->resolved) || ctx->state == KNOT_STATE_FAIL) {
+	if (EMPTY_LIST(rplan->resolved) || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state; /* Don't cache anything if failed. */
 	}
-	knot_pkt_t *pkt = req->answer;
 	struct kr_query *qry = TAIL(rplan->resolved);
-	if (qry->flags & QUERY_CACHED || !(kr_response_classify(pkt) & (PKT_NODATA|PKT_NXDOMAIN))) {
+	knot_pkt_t *pkt = req->answer;
+	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
+		return ctx->state; /* Only IN class */
+	}
+	int pkt_class = kr_response_classify(pkt);
+	if (qry->flags & QUERY_CACHED || !(pkt_class & (PKT_NODATA|PKT_NXDOMAIN))) {
 		return ctx->state; /* Cache only negative, not-cached answers. */
 	}
 	uint32_t ttl = packet_ttl(pkt);
