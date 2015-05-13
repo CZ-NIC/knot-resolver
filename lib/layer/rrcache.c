@@ -240,6 +240,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Cache full, do what we must. */
 	if (ret == KNOT_ESPACE) {
 		kr_cache_clear(&txn);
+		kr_cache_txn_commit(&txn);
 	} else {
 		kr_cache_txn_commit(&txn);
 	}
