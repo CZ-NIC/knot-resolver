@@ -54,10 +54,9 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 	}
 }
 
-static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, uint32_t timestamp)
+static int loot_cache_set(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, const knot_dname_t *qname,
+                          uint16_t rrtype, uint32_t timestamp)
 {
-	const knot_dname_t *qname = knot_pkt_qname(pkt);
-	uint16_t rrtype = knot_pkt_qtype(pkt);
 	struct kr_cache_entry *entry;
 	entry = kr_cache_peek(txn, tag, qname, rrtype, &timestamp);
 	if (!entry) { /* Not in the cache */
@@ -91,6 +90,24 @@ static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, uint32_t 
 	return ret;
 }
 
+static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, struct kr_query *qry, uint8_t tag)
+{
+	uint32_t timestamp = qry->timestamp.tv_sec;
+	/* Try direct match first */
+	const knot_dname_t *qname = qry->sname;
+	uint16_t rrtype = qry->stype;
+	int ret = loot_cache_set(txn, pkt, tag, qname, rrtype, timestamp);
+	if (ret == kr_error(ENOENT)) {
+		/* Try minimized name second */
+		qname = knot_pkt_qname(pkt);
+		rrtype = knot_pkt_qtype(pkt);
+		if (!knot_dname_is_equal(qname, qry->sname)) {
+			ret = loot_cache_set(txn, pkt, tag, qname, rrtype, timestamp);
+		}
+	}
+	return ret;
+}
+
 static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
@@ -109,8 +126,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY) != 0) {
 		return ctx->state;
 	}
-	uint32_t timestamp = qry->timestamp.tv_sec;
-	if (loot_cache(&txn, pkt, get_tag(req->answer), timestamp) != 0) {
+	if (loot_cache(&txn, pkt, qry, get_tag(req->answer)) != 0) {
 		kr_cache_txn_abort(&txn);
 		return ctx->state;
 	}
