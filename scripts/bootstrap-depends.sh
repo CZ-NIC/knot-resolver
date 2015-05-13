@@ -46,16 +46,16 @@ function fetch_pkg {
 }
 
 function build_pkg {
-	if [ -f CMakeLists.txt ]; then
-		[ -e cmake-build ] && rm -rf cmake-build; mkdir cmake-build; cd cmake-build
-		cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} ..
-		make ${MAKEOPTS}
-		make install
-	elif [ -f configure.ac ]; then
+	if [ -f configure.ac ]; then
 		if [ ! -e ./configure ]; then
 			[ -e autogen.sh ] && sh autogen.sh || autoreconf -if
 		fi
 		./configure --prefix=${PREFIX} --enable-shared $*
+		make ${MAKEOPTS}
+		make install
+	elif [ -f CMakeLists.txt ]; then
+		[ -e cmake-build ] && rm -rf cmake-build; mkdir cmake-build; cd cmake-build
+		cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} ..
 		make ${MAKEOPTS}
 		make install
 	else
