@@ -123,9 +123,8 @@ static void qr_task_timeout(uv_timer_t *req)
 	}
 }
 
-static void qr_task_on_send(uv_req_t* req, int status)
+static int qr_task_on_send(struct qr_task *task, int status)
 {
-	struct qr_task *task = req->data;
 	if (task) {
 		/* Start reading answer */
 		if (task->req.overlay.state != KNOT_STATE_NOOP) {
@@ -137,34 +136,31 @@ static void qr_task_on_send(uv_req_t* req, int status)
 			uv_close((uv_handle_t *)&task->timeout, qr_task_free);
 		}
 	}
+	return status;
 }
 
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
 {
+	int ret = 0;
 	if (handle->type == UV_UDP) {
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
-		uv_udp_send_t *req = &task->ioreq.udp_send;
-		req->data = task;
-		return uv_udp_send(req, (uv_udp_t *)handle, &buf, 1, addr, (uv_udp_send_cb)qr_task_on_send);
+		ret = uv_udp_try_send((uv_udp_t *)handle, &buf, 1, addr);
 	} else {
 		uint16_t pkt_size = htons(pkt->size);
 		uv_buf_t buf[2] = {
 			{ (char *)&pkt_size, sizeof(pkt_size) },
 			{ (char *)pkt->wire, pkt->size }
 		};
-		uv_write_t *req = &task->ioreq.tcp_send;
-		req->data = task;
-		return uv_write(req, (uv_stream_t *)handle, buf, 2, (uv_write_cb)qr_task_on_send);
+		ret = uv_try_write((uv_stream_t *)handle, buf, 2);
 	}
+	return qr_task_on_send(task, (ret >= 0) ? 0 : -1);
 }
 
 static void qr_task_on_connect(uv_connect_t *connect, int status)
 {
 	uv_stream_t *handle = connect->handle;
 	struct qr_task *task = connect->data;
-	if (status != 0) { /* Failed to connect */
-		qr_task_step(task, NULL);
-	} else {
+	if (status == 0) { /* Failed to connect */
 		qr_task_send(task, (uv_handle_t *)handle, NULL, task->next_query);
 	}
 }
@@ -172,10 +168,7 @@ static void qr_task_on_connect(uv_connect_t *connect, int status)
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	kr_resolve_finish(&task->req, state);
-	int ret = qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, task->req.answer);
-	if (ret != 0) { /* Broken connection */
-		uv_close((uv_handle_t *)&task->timeout, qr_task_free);
-	}
+	(void) qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, task->req.answer);
 	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
 }
 
