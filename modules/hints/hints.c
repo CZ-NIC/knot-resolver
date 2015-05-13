@@ -42,11 +42,15 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
-static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_request *param)
+static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_query *qry)
 {
-	knot_dname_t *qname = knot_dname_copy(knot_pkt_qname(pkt), &pkt->mm);
-	uint16_t rrtype = knot_pkt_qtype(pkt);
-	uint16_t rrclass = knot_pkt_qclass(pkt);
+	uint16_t rrtype = qry->stype;
+	uint16_t rrclass = qry->sclass;
+	if (rrtype != KNOT_RRTYPE_A && rrtype != KNOT_RRTYPE_AAAA) {
+		return kr_error(ENOENT);
+	}
+
+	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
 	knot_rrset_t rr;
 	knot_rrset_init(&rr, qname, rrtype, rrclass);
 	int family_len = sizeof(struct in_addr);
@@ -80,9 +84,6 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return ctx->state;
 	}
-	if (qry->stype != KNOT_RRTYPE_A && qry->stype != KNOT_RRTYPE_AAAA) {
-		return ctx->state;
-	}
 
 	/* Find a matching name */
 	struct kr_module *module = ctx->api->data;
@@ -93,12 +94,13 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Write to packet */
-	int ret = answer_query(pkt, pack, param);
+	int ret = answer_query(pkt, pack, qry);
 	if (ret != 0) {
 		return ctx->state;
 	}
 	DEBUG_MSG(qry, "<= answered from hints\n");
-	qry->flags |= QUERY_CACHED;	
+	qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
+	pkt->parsed = pkt->size;
 	knot_wire_set_qr(pkt->wire);
 	return KNOT_STATE_DONE;
 }
