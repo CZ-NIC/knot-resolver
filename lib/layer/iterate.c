@@ -50,7 +50,7 @@ static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qty
 {
 	/* Minimization disabled. */
 	const knot_dname_t *qname = query->sname;
-	if (query->flags & QUERY_NO_MINIMIZE) {
+	if (query->flags & (QUERY_NO_MINIMIZE|QUERY_CACHED)) {
 		return qname;
 	}
 
@@ -75,11 +75,11 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 {
 	uint16_t qtype = query->stype;
 	const knot_dname_t *qname = minimized_qname(query, &qtype);
+
 	return query->id      == knot_wire_get_id(answer->wire) &&
 	       (query->sclass == KNOT_CLASS_ANY || query->sclass  == knot_pkt_qclass(answer)) &&
-	       (qtype == knot_pkt_qtype(answer) || query->stype == knot_pkt_qtype(answer)) &&
-	       (knot_dname_is_equal(qname, knot_pkt_qname(answer)) ||
-	        knot_dname_is_equal(query->sname, knot_pkt_qname(answer)));
+	       qtype          == knot_pkt_qtype(answer) &&
+	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
 
 /** Relaxed rule for AA, either AA=1 or SOA matching zone cut is required. */
