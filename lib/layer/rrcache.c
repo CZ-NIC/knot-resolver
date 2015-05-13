@@ -53,31 +53,14 @@ static int loot_rr(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t *name,
 	return kr_ok();
 }
 
-static int loot_cache_set(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
-                          uint16_t rrclass, uint16_t rrtype, uint32_t timestamp)
+static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint32_t timestamp)
 {
+	const knot_dname_t *qname = knot_pkt_qname(pkt);
+	uint16_t rrclass = knot_pkt_qclass(pkt);
+	uint16_t rrtype = knot_pkt_qtype(pkt);
 	int ret = loot_rr(txn, pkt, qname, rrtype, rrclass, timestamp);
 	if (ret == kr_error(ENOENT) && rrtype != KNOT_RRTYPE_CNAME) { /* Chase CNAME if no direct hit */
 		ret = loot_rr(txn, pkt, qname, KNOT_RRTYPE_CNAME, rrclass, timestamp);
-	}
-	return ret;
-}
-
-static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, struct kr_query *qry)
-{
-	uint32_t timestamp = qry->timestamp.tv_sec;
-	/* Try direct match first */
-	const knot_dname_t *qname = qry->sname;
-	uint16_t rrclass = qry->sclass;
-	uint16_t rrtype = qry->stype;
-	int ret = loot_cache_set(txn, pkt, qname, rrclass, rrtype, timestamp);
-	if (ret == kr_error(ENOENT)) {
-		/* Try minimized name second */
-		qname = knot_pkt_qname(pkt);
-		rrtype = knot_pkt_qtype(pkt);
-		if (!knot_dname_is_equal(qname, qry->sname)) {
-			ret = loot_cache_set(txn, pkt, qname, rrclass, rrtype, timestamp);
-		}
 	}
 	return ret;
 }
@@ -101,7 +84,8 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	 * it may either be a CNAME chain or direct answer.
 	 * Only one step of the chain is resolved at a time.
 	 */
-	int ret = loot_cache(&txn, pkt, qry);
+	uint32_t timestamp = qry->timestamp.tv_sec;
+	int ret = loot_cache(&txn, pkt, timestamp);
 	kr_cache_txn_abort(&txn);
 	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
