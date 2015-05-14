@@ -3,17 +3,18 @@ MAINTAINER Marek Vavrusa <marek.vavrusa@nic.cz>
 
 # Environment
 ENV THREADS 4
-ENV BUILD_PKGS git-core make gcc libtool autoconf pkg-config cmake libgnutls28-dev libjansson-dev liblua5.2-dev
-ENV RUN_PKGS libgnutls-deb0-28 libjansson4 liblua5.2-0 lua5.2 python vim-common
+ENV BUILD_PKGS git-core make gcc libtool autoconf pkg-config cmake libgnutls28-dev libjansson-dev libluajit-5.1-dev
+ENV RUN_PKGS libgnutls-deb0-28 libjansson4 libluajit-5.1-2 luajit python vim-common
 ENV PREFIX /usr/local
 ENV BUILD_DIR /tmp/build
 ENV BUILD_IGNORE gmp nettle jansson gnutls lua
+ENV CFLAGS -DNDEBUG -O2 -g -fstack-protector
 
 # Expose port
 EXPOSE 53
 
 # Select entrypoint
-WORKDIR /root
+WORKDIR /data
 CMD ["/usr/local/bin/kresolved"]
 
 # Install dependencies and sources
