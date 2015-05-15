@@ -139,6 +139,9 @@ The modules follow the `Lua way <http://lua-users.org/wiki/ModuleDefinition>`_, 
 
 	return counter
 
+.. tip:: The API functions may return an integer value just like in other languages, but they may also return a coroutine that will be continued asynchronously. A good use case for this approach is is a deferred initialization,
+e.g. loading a chunks of data or waiting for I/O.
+
 The created module can be then loaded just like any other module, except it isn't very useful since it
 doesn't provide any layer to capture events. The Lua module can however provide a processing layer, just
 :ref:`like its C counterpart <lib-layers>`.
