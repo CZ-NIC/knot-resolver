@@ -30,10 +30,22 @@ const char *global_env;
 #define CACHE_TTL 10
 #define CACHE_TIME 0
 
-/* Simulate init failure*/
+/* Simulate init failure */
 static int test_init_failure(namedb_t **db_ptr, mm_ctx_t *mm, void *arg)
 {
 	return KNOT_EINVAL;
+}
+
+/* Simulate commit failure */
+static int test_commit_failure(namedb_txn_t *txn)
+{
+	return KNOT_ESPACE;
+}
+
+/* Dummy abort */
+static void test_abort(namedb_txn_t *txn)
+{
+	return;
 }
 
 /* Fake api to simulate failures */
@@ -42,7 +54,7 @@ static const namedb_api_t *namedb_lmdb_api_fake(void)
 	static const namedb_api_t api_fake = {
 		"lmdb_api_fake",
 		test_init_failure, NULL,
-		NULL, NULL, NULL,
+		NULL, test_commit_failure, test_abort,
 		NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL
 	};
@@ -51,9 +63,13 @@ static const namedb_api_t *namedb_lmdb_api_fake(void)
 }
 
 
-/* Test invalid parameters. */
+/* Test invalid parameters and some api failures. */
 static void test_invalid(void **state)
 {
+	const namedb_api_t *(*kr_cache_storage_saved)(void);
+	void *ret_open;
+	int ret_commit;
+
 	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
 	assert_int_not_equal(kr_cache_txn_begin(&global_env, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
@@ -65,27 +81,28 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_remove(&global_txn, KR_CACHE_RR, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_remove(NULL, 0, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_clear(NULL), 0);
+
+	/* save original api */
+	kr_cache_storage_saved = kr_cache_storage;
+	/* fake to simulate failures */
+	kr_cache_storage_set(namedb_lmdb_api_fake);
+
+	ret_open = kr_cache_open(NULL, NULL);
+	ret_commit = kr_cache_txn_commit(&global_txn);
+
+	/* restore */
+	kr_cache_storage_set(kr_cache_storage_saved);
+	assert_null(ret_open);
+	assert_int_not_equal(ret_commit, KNOT_EOK);
 }
 
 /* Test cache open */
 static void test_open(void **state)
 {
 	struct namedb_lmdb_opts opts;
-	const namedb_api_t *(*kr_cache_storage_saved)(void);
-
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_env;
 	opts.mapsize = CACHE_SIZE;
-
-	/* save original api */
-	kr_cache_storage_saved = kr_cache_storage;
-	/* fake to simulate initialization failure */
-	kr_cache_storage_set(namedb_lmdb_api_fake);
-	*state = kr_cache_open(&opts, &global_mm);
-	/* restore */
-	kr_cache_storage_set(kr_cache_storage_saved);
-	assert_null(*state);
-
 	*state = kr_cache_open(&opts, &global_mm);
 	assert_non_null(*state);
 }
