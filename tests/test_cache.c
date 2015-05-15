@@ -30,6 +30,27 @@ const char *global_env;
 #define CACHE_TTL 10
 #define CACHE_TIME 0
 
+/* Simulate init failure*/
+static int test_init_failure(namedb_t **db_ptr, mm_ctx_t *mm, void *arg)
+{
+	return KNOT_EINVAL;
+}
+
+/* Fake api to simulate failures */
+static const namedb_api_t *namedb_lmdb_api_fake(void)
+{
+	static const namedb_api_t api_fake = {
+		"lmdb_api_fake",
+		test_init_failure, NULL,
+		NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL, NULL, NULL
+	};
+
+	return &api_fake;
+}
+
+
 /* Test invalid parameters. */
 static void test_invalid(void **state)
 {
@@ -50,9 +71,21 @@ static void test_invalid(void **state)
 static void test_open(void **state)
 {
 	struct namedb_lmdb_opts opts;
+	const namedb_api_t *(*kr_cache_storage_saved)(void);
+
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_env;
 	opts.mapsize = CACHE_SIZE;
+
+	/* save original api */
+	kr_cache_storage_saved = kr_cache_storage;
+	/* fake to simulate initialization failure */
+	kr_cache_storage_set(namedb_lmdb_api_fake);
+	*state = kr_cache_open(&opts, &global_mm);
+	/* restore */
+	kr_cache_storage_set(kr_cache_storage_saved);
+	assert_null(*state);
+
 	*state = kr_cache_open(&opts, &global_mm);
 	assert_non_null(*state);
 }
