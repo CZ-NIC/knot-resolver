@@ -1,7 +1,7 @@
 -- Units
 kB = 1024
-MB = 1024*1024
-GB = 1024*1024
+MB = 1024*kB
+GB = 1024*MB
 -- Time
 sec = 1000
 minute = 60 * sec
