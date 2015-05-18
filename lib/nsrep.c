@@ -15,6 +15,9 @@
  */
 
 #include <assert.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
 #include "lib/nsrep.h"
 #include "lib/defines.h"
