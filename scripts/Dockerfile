@@ -4,7 +4,7 @@ MAINTAINER Marek Vavrusa <marek.vavrusa@nic.cz>
 # Environment
 ENV THREADS 4
 ENV BUILD_PKGS git-core make gcc libtool autoconf pkg-config cmake libgnutls28-dev libjansson-dev libluajit-5.1-dev
-ENV RUN_PKGS libgnutls-deb0-28 libjansson4 libluajit-5.1-2 luajit python vim-common
+ENV RUN_PKGS bsdmainutils libgnutls-deb0-28 libjansson4 libluajit-5.1-2 luajit python vim-common
 ENV PREFIX /usr/local
 ENV BUILD_DIR /tmp/build
 ENV BUILD_IGNORE gmp nettle jansson gnutls lua
