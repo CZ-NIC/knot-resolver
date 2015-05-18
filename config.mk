@@ -16,6 +16,6 @@ CFLAGS	+= -std=c99 -D_GNU_SOURCE -Wall -fPIC -I$(abspath .) -I$(abspath lib/gene
 CFLAGS  += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 RM	:= rm -f
 LN      := ln -s
-XXD     ?= hexdump -v -e '/1 "0x%02X, " " "'
+XXD     := ./scripts/embed.sh
 INSTALL := install
 PYTHON  := python
