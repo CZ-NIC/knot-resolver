@@ -52,6 +52,25 @@ static const struct hint_info SBELT[HINT_COUNT] = {
         { U8("\x01""m""\x0c""root-servers""\x03""net"), U8("\xca\x0c\x1b!")    }, /* 202.12.27.33 */
 };
 
+static inline int nsset_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+{
+	if (*have >= want) {
+		return 0;
+	} else {
+		mm_ctx_t *pool = baton;
+		size_t next_size = (want + 3);
+		void *mem_new = mm_alloc(pool, next_size * elm_size);
+		if (mem_new != NULL) {
+			memcpy(mem_new, *mem, (*have)*(elm_size));
+			mm_free(pool, *mem);
+			*mem = mem_new;
+			*have = next_size;
+			return 0;
+		}
+	}
+	return -1;
+}
+
 static void update_cut_name(struct kr_zonecut *cut, const knot_dname_t *name)
 {
 	if (knot_dname_is_equal(name, cut->name)) {
@@ -126,7 +145,7 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 		return kr_ok();
 	}
 	uint16_t rdlen = knot_rdata_rdlen(rdata);
-	int ret = pack_reserve(*pack, 1, rdlen);
+	int ret = pack_reserve_mm(*pack, 1, rdlen, nsset_reserve, cut->pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}

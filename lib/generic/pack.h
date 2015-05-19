@@ -78,7 +78,7 @@ typedef array_t(uint8_t) pack_t;
 	array_clear(pack)
 /** @internal Clear pack with a callback. */
 #define pack_clear_mm(pack, free, baton) \
-	array_clear_mm(pack, array_std_free, baton)
+	array_clear_mm((pack), (free), (baton))
 /** Incrementally reserve objects in the pack. */
 #define pack_reserve(pack, objs_count, objs_len) \
 	pack_reserve_mm((pack), (objs_count), (objs_len), array_std_reserve, NULL)
