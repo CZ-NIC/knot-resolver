@@ -174,7 +174,10 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, na
 		/* Follow the chain */
 		rr->owner = (knot_dname_t *)knot_ns_name(&rr->rrs, 0);
 		knot_rdataset_clear(&rr->rrs, pool);
-
+		/* Check if target already cached. */
+		if (kr_cache_peek_rr(txn, rr, &timestamp) == KNOT_EOK) {
+			break;
+		}
 	}
 
 	/* Now there may be a terminal record. */
