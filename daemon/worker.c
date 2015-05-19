@@ -187,13 +187,14 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	int state = kr_resolve_consume(&task->req, packet);
 	while (state == KNOT_STATE_PRODUCE) {
 		state = kr_resolve_produce(&task->req, &addr, &sock_type, next_query);
+		if (++task->iter_count > KR_ITER_LIMIT) {
+			return qr_task_finalize(task, KNOT_STATE_FAIL);
+		}
 	}
 
 	/* We're done, no more iterations needed */
 	if (state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return qr_task_finalize(task, state);
-	} else if (++task->iter_count > KR_ITER_LIMIT) {
-		return qr_task_finalize(task, KNOT_STATE_FAIL);
 	}
 
 	/* Create connection for iterative query */
