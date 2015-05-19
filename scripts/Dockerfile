@@ -9,6 +9,7 @@ ENV PREFIX /usr/local
 ENV BUILD_DIR /tmp/build
 ENV BUILD_IGNORE gmp nettle jansson gnutls lua
 ENV CFLAGS -DNDEBUG -O2 -g -fstack-protector
+ENV LDFLAGS -Wl,--as-needed
 
 # Expose port
 EXPOSE 53
