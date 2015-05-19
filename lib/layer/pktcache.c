@@ -54,10 +54,9 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 	}
 }
 
-static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, uint32_t timestamp)
+static int loot_cache_pkt(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
+                          uint16_t rrtype, uint8_t tag, uint32_t timestamp)
 {
-	const knot_dname_t *qname = knot_pkt_qname(pkt);
-	uint16_t rrtype = knot_pkt_qtype(pkt);
 	struct kr_cache_entry *entry;
 	entry = kr_cache_peek(txn, tag, qname, rrtype, &timestamp);
 	if (!entry) { /* Not in the cache */
@@ -91,6 +90,25 @@ static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, uint32_t 
 	return ret;
 }
 
+/** @internal Try to find a shortcut directly to searched packet, otherwise try to find minimised QNAME. */
+static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, struct kr_query *qry)
+{
+	uint32_t timestamp = qry->timestamp.tv_sec;
+	const knot_dname_t *qname = qry->sname;
+	uint16_t rrtype = qry->stype;
+	int ret = loot_cache_pkt(txn, pkt, qname, rrtype, tag, timestamp);
+	if (ret == 0) { /* Signalize minimisation disabled */
+		qry->flags |= QUERY_NO_MINIMIZE;
+	} else { /* Retry with minimised name */
+		qname = knot_pkt_qname(pkt);
+		rrtype = knot_pkt_qtype(pkt);
+		if (!knot_dname_is_equal(qname, qry->sname)) {
+			ret = loot_cache_pkt(txn, pkt, qname, rrtype, tag, timestamp);
+		}
+	}
+	return ret;
+}
+
 static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
@@ -103,24 +121,25 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Only IN class */
 	}
 
-	/* Fetch packet from cache */
+	/* Prepare read transaction */
 	namedb_txn_t txn;
 	struct kr_cache *cache = req->ctx->cache;
 	if (kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY) != 0) {
 		return ctx->state;
 	}
-	uint32_t timestamp = qry->timestamp.tv_sec;
-	if (loot_cache(&txn, pkt, get_tag(req->answer), timestamp) != 0) {
-		kr_cache_txn_abort(&txn);
-		return ctx->state;
-	}
 
-	/* Mark as solved from cache */
-	DEBUG_MSG("=> satisfied from cache\n");
-	qry->flags |= QUERY_CACHED;
-	knot_wire_set_qr(pkt->wire);
+	/* Fetch either answer to original or minimized query */
+	uint8_t tag = get_tag(req->answer);
+	int ret = loot_cache(&txn, pkt, tag, qry);
 	kr_cache_txn_abort(&txn);
-	return KNOT_STATE_DONE;
+	if (ret == 0) {
+		DEBUG_MSG("=> satisfied from cache\n");
+		qry->flags |= QUERY_CACHED;
+		pkt->parsed = pkt->size;
+		knot_wire_set_qr(pkt->wire);
+		return KNOT_STATE_DONE;
+	}
+	return ctx->state;
 }
 
 static uint32_t packet_ttl(knot_pkt_t *pkt)
