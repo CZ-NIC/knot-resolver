@@ -30,11 +30,7 @@ struct qr_task
 	knot_pkt_t *next_query;
 	uv_handle_t *next_handle;
 	uv_timer_t timeout;
-	union {
-		uv_write_t tcp_send;
-		uv_udp_send_t udp_send;
-		uv_connect_t connect;
-	} ioreq;
+	uv_connect_t connect;
 	struct {
 		union {
 			struct sockaddr_in ip4;
@@ -117,8 +113,6 @@ static void qr_task_timeout(uv_timer_t *req)
 {
 	struct qr_task *task = req->data;
 	if (task->next_handle) {
-		uv_cancel((uv_req_t *)&task->ioreq);
-		io_stop_read(task->next_handle);
 		qr_task_step(task, NULL);
 	}
 }
@@ -160,7 +154,8 @@ static void qr_task_on_connect(uv_connect_t *connect, int status)
 {
 	uv_stream_t *handle = connect->handle;
 	struct qr_task *task = connect->data;
-	if (status == 0) { /* Failed to connect */
+	/* Use only if succeeded, and the connection didn't change. */
+	if (status == 0 && ((uv_handle_t *)handle == task->next_handle)) {
 		qr_task_send(task, (uv_handle_t *)handle, NULL, task->next_query);
 	}
 }
@@ -177,10 +172,12 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	/* Cancel timeout if active, close handle. */
 	if (task->next_handle) {
 		if (!uv_is_closing(task->next_handle)) {
+			io_stop_read(task->next_handle);
 			uv_close(task->next_handle, (uv_close_cb) free);
 		}
 		uv_timer_stop(&task->timeout);
 		task->next_handle = NULL;
+		task->connect.handle = NULL;
 	}
 
 	/* Consume input and produce next query */
@@ -209,7 +206,7 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	/* Connect or issue query datagram */
 	task->next_handle->data = task;
 	if (sock_type == SOCK_STREAM) {
-		uv_connect_t *connect = &task->ioreq.connect;
+		uv_connect_t *connect = &task->connect;
 		connect->data = task;
 		if (uv_tcp_connect(connect, (uv_tcp_t *)task->next_handle, addr, qr_task_on_connect) != 0) {
 			return qr_task_step(task, NULL);
