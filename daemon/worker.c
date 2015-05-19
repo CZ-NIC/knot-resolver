@@ -61,7 +61,7 @@ static int parse_query(knot_pkt_t *query)
 	return kr_ok();
 }
 
-static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *handle, const struct sockaddr *addr)
+static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr *addr)
 {
 	mm_ctx_t pool;
 	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
@@ -80,15 +80,28 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		memcpy(&task->source.addr, addr, sockaddr_len(addr));
 	}
 
+	/* How much can client handle? */
+	size_t answer_max = KNOT_WIRE_MIN_PKTSIZE;
+	if (!addr) { /* TCP */
+		answer_max = KNOT_WIRE_MAX_PKTSIZE;
+	} else if (knot_pkt_has_edns(query)) { /* EDNS */
+		answer_max = knot_edns_get_payload(query->opt_rr);
+	}
+	/* How much space do we need for intermediate packets? */
+	size_t pktbuf_max = KNOT_EDNS_MAX_UDP_PAYLOAD;
+	if (pktbuf_max < answer_max) {
+		pktbuf_max = answer_max;
+	}
+
 	/* Create buffers */
-	knot_pkt_t *next_query = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, &task->req.pool);
-	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, &task->req.pool);
-	if (!next_query || !answer) {
+	knot_pkt_t *pktbuf = knot_pkt_new(NULL, pktbuf_max, &task->req.pool);
+	knot_pkt_t *answer = knot_pkt_new(NULL, answer_max, &task->req.pool);
+	if (!pktbuf || !answer) {
 		mp_delete(pool.ctx);
 		return NULL;
 	}
 	task->req.answer = answer;
-	task->next_query = next_query;
+	task->next_query = pktbuf;
 
 	/* Start resolution */
 	uv_timer_init(handle->loop, &task->timeout);
@@ -240,7 +253,7 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 		if (ret != 0 || knot_wire_get_qr(query->wire)) {
 			return kr_error(EINVAL); /* Ignore. */
 		}
-		task = qr_task_create(worker, handle, addr);
+		task = qr_task_create(worker, handle, query, addr);
 		if (!task) {
 			return kr_error(ENOMEM);
 		}
