@@ -207,23 +207,6 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut)
 	return kr_ok();
 }
 
-/** Fetch address for zone cut. */
-static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t rrtype, namedb_txn_t *txn, uint32_t timestamp)
-{
-	knot_rrset_t cached_rr;
-	knot_rrset_init(&cached_rr, (knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
-	if (kr_cache_peek_rr(txn, &cached_rr, &timestamp) != 0) {
-		return;
-	}
-
-	for (uint16_t i = 0; i < cached_rr.rrs.rr_count; ++i) {
-		knot_rdata_t *rd = knot_rdataset_at(&cached_rr.rrs, i);
-		if (knot_rdata_ttl(rd) > timestamp) {
-			(void) kr_zonecut_add(cut, ns, rd);
-		}
-	}
-}
-
 /** Fetch best NS for zone cut. */
 static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
 {
@@ -235,12 +218,11 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn
 		return ret;
 	}
 
-	/* Fetch address records for this nameserver */
+	/* Insert name servers for this zone cut, addresses will be looked up
+	 * on-demand (either from cache or iteratively) */
 	for (unsigned i = 0; i < cached_rr.rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&cached_rr.rrs, i);
 		kr_zonecut_add(cut, ns_name, NULL);
-		fetch_addr(cut, ns_name, KNOT_RRTYPE_A, txn, timestamp);
-		fetch_addr(cut, ns_name, KNOT_RRTYPE_AAAA, txn, timestamp);
 	}
 
 	return kr_ok();
