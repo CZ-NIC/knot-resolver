@@ -1,5 +1,6 @@
 # List of built-in modules
 modules_TARGETS := hints \
+                   stats \
                    cachectl
 
 # List of Lua modules
