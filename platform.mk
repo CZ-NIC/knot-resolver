@@ -16,7 +16,6 @@ ifeq ($(OS),Windows_NT)
 	BINEXT := .exe
 else
 	UNAME := $(shell uname -s)
-	LDFLAGS += -Wl,--as-needed
     ifeq ($(UNAME),Darwin)
         PLATFORM := Darwin
         LIBEXT := .dylib

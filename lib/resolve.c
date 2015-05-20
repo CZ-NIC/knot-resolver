@@ -41,23 +41,27 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 {
 	struct kr_rplan *rplan = &param->rplan;
-	if (kr_rplan_satisfies(qry, qry->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_A) ||
-	    kr_rplan_satisfies(qry, qry->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA) ||
-	    qry->flags & QUERY_AWAIT_ADDR) {
+
+	/* Start NS queries from root, to avoid certain cases
+	 * where a NS drops out of cache and the rest is unavailable,
+	 * this would lead to dependency loop in current zone cut.
+	 * Prefer IPv6 and continue with IPv4 if not available.
+	 */
+	uint16_t next_type = KNOT_RRTYPE_AAAA;
+	if (!(qry->flags & QUERY_AWAIT_IPV6)) {
+		next_type = KNOT_RRTYPE_AAAA;
+		qry->flags |= QUERY_AWAIT_IPV6;
+	} else if (!(qry->flags & QUERY_AWAIT_IPV4)) {
+		next_type = KNOT_RRTYPE_A;
+		qry->flags |= QUERY_AWAIT_IPV4;
+	} else {
 		DEBUG_MSG("=> dependency loop, bailing out\n");
 		kr_rplan_pop(rplan, qry);
 		return KNOT_STATE_PRODUCE;
 	}
 
-	/* Start NS queries from root, to avoid certain cases
-	 * where a NS drops out of cache and the rest is unavailable,
-	 * this would lead to dependency loop in current zone cut.
-	 */
-	struct kr_query *next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+	struct kr_query *next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
 	kr_zonecut_set_sbelt(&next->zone_cut);
-	next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
-	kr_zonecut_set_sbelt(&next->zone_cut);
-	qry->flags |= QUERY_AWAIT_ADDR;
 	return KNOT_STATE_PRODUCE;
 }
 
@@ -405,7 +409,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 			return ns_resolve_addr(qry, request);
 		} else {
 			/* Address resolved, clear the flag */
-			qry->flags &= ~QUERY_AWAIT_ADDR;
+			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
 		}
 	}
 

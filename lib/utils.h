@@ -39,3 +39,6 @@ char* kr_strcatdup(unsigned n, ...);
 
 /** Fill buffer with random seed. */
 int kr_randseed(char *buf, size_t buflen);
+
+/** Memory reservation routine for mm_ctx_t */
+int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have);

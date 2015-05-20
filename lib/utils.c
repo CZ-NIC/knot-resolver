@@ -23,6 +23,7 @@
 
 #include "lib/defines.h"
 #include "lib/utils.h"
+#include "lib/generic/array.h"
 
 /*
  * Macros.
@@ -112,4 +113,23 @@ int kr_randseed(char *buf, size_t buflen)
     gettimeofday(&tv, NULL);
     memcpy(buf, &tv, buflen < sizeof(tv) ? buflen : sizeof(tv));
     return 0;
+}
+
+int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+{
+    if (*have >= want) {
+        return 0;
+    } else {
+        mm_ctx_t *pool = baton;
+        size_t next_size = array_next_count(want);
+        void *mem_new = mm_alloc(pool, next_size * elm_size);
+        if (mem_new != NULL) {
+            memcpy(mem_new, *mem, (*have)*(elm_size));
+            mm_free(pool, *mem);
+            *mem = mem_new;
+            *have = next_size;
+            return 0;
+        }
+    }
+    return -1;
 }

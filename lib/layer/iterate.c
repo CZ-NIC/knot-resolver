@@ -305,7 +305,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	}
 
 	/* Follow canonical name as next SNAME. */
-	if (cname != query->sname) {
+	if (!knot_dname_is_equal(cname, query->sname)) {
 		DEBUG_MSG("<= cname chain, following\n");
 		struct kr_query *next = kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
 		kr_zonecut_set_sbelt(&next->zone_cut);
