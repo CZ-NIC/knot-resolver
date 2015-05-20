@@ -34,6 +34,9 @@ static inline lua_State *l_ffi_preface(struct kr_module *module, const char *cal
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
 	lua_getfield(L, -1, call);
 	lua_remove(L, -2);
+	if (lua_isnil(L, -1)) {
+		return NULL;
+	}
 	lua_pushlightuserdata(L, module);
 	return L;
 }
@@ -86,12 +89,18 @@ static inline int l_ffi_call(lua_State *L, int argc)
 static int l_ffi_init(struct kr_module *module)
 {
 	lua_State *L = l_ffi_preface(module, "init");
+	if (!L) {
+		return 0;
+	}
 	return l_ffi_call(L, 1);
 }
 
 static int l_ffi_deinit(struct kr_module *module)
 {
 	lua_State *L = l_ffi_preface(module, "deinit");
+	if (!L) {
+		return 0;
+	}
 	int ret = l_ffi_call(L, 1);
 	/* Free the layer API wrapper */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
@@ -179,7 +188,7 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 	lua_pop(L, 1);
 	if (!api) {
 		/* Fabricate layer API wrapping the Lua functions */
-		knot_layer_api_t *api = malloc(sizeof(*api));
+		api = malloc(sizeof(*api));
 		if (api) {
 			api->begin = l_ffi_layer_begin;
 			api->finish = l_ffi_layer_finish;
