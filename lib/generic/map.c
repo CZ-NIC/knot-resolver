@@ -205,6 +205,7 @@ int map_set(map_t *map, const char *str, void *value)
 		newotherbits = data->key[newbyte];
 		goto different_byte_found;
 	}
+	data->value = value;
 	return 1;
 
 different_byte_found:
