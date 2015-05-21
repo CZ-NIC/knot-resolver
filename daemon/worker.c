@@ -30,7 +30,6 @@ struct qr_task
 	knot_pkt_t *next_query;
 	uv_handle_t *next_handle;
 	uv_timer_t timeout;
-	uv_connect_t connect;
 	struct {
 		union {
 			struct sockaddr_in ip4;
@@ -165,12 +164,11 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 
 static void qr_task_on_connect(uv_connect_t *connect, int status)
 {
-	uv_stream_t *handle = connect->handle;
-	struct qr_task *task = connect->data;
-	/* Use only if succeeded, and the connection didn't change. */
-	if (status == 0 && ((uv_handle_t *)handle == task->next_handle)) {
-		qr_task_send(task, (uv_handle_t *)handle, NULL, task->next_query);
+	if (status == 0) {
+		struct qr_task *task = connect->data;
+		qr_task_send(task, (uv_handle_t *)connect->handle, NULL, task->next_query);
 	}
+	free(connect);
 }
 
 static int qr_task_finalize(struct qr_task *task, int state)
@@ -190,7 +188,6 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 		}
 		uv_timer_stop(&task->timeout);
 		task->next_handle = NULL;
-		task->connect.handle = NULL;
 	}
 
 	/* Consume input and produce next query */
@@ -220,11 +217,14 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	/* Connect or issue query datagram */
 	task->next_handle->data = task;
 	if (sock_type == SOCK_STREAM) {
-		uv_connect_t *connect = &task->connect;
-		connect->data = task;
-		if (uv_tcp_connect(connect, (uv_tcp_t *)task->next_handle, addr, qr_task_on_connect) != 0) {
+		/* connect handle must be persistent even if the task mempool drops,
+		 * as it is referenced internally in the libuv event loop */
+		uv_connect_t *connect = malloc(sizeof(*connect));
+		if (!connect || uv_tcp_connect(connect, (uv_tcp_t *)task->next_handle, addr, qr_task_on_connect) != 0) {
+			free(connect);
 			return qr_task_step(task, NULL);
 		}
+		connect->data = task;
 	} else {
 		if (qr_task_send(task, task->next_handle, addr, next_query) != 0) {
 			return qr_task_step(task, NULL);
