@@ -443,13 +443,13 @@ int kr_resolve_finish(struct kr_request *request, int state)
 		state = KNOT_STATE_FAIL;
 	}
 	/* Error during procesing, internal failure */
-	knot_overlay_finish(&request->overlay);
 	if (state != KNOT_STATE_DONE) {
 		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
+	knot_overlay_finish(&request->overlay);
 	/* Clean up. */
 	knot_overlay_deinit(&request->overlay);
 	request->overlay.state = KNOT_STATE_NOOP;
