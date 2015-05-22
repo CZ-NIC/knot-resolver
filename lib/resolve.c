@@ -15,7 +15,7 @@
  */
 
 #include <stdio.h>
-#include <sys/fcntl.h>
+#include <fcntl.h>
 
 #include <libknot/internal/mempool.h>
 #include <libknot/rrtype/rdname.h>
