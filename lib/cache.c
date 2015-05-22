@@ -320,3 +320,50 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint32_
 	namedb_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
 	return kr_cache_insert(txn, KR_CACHE_RR, rr->owner, rr->type, &header, data);
 }
+
+int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *timestamp)
+{
+	if (!txn || !rr || !timestamp) {
+		return kr_error(EINVAL);
+	}
+
+	/* Check if the RRSet is in the cache. */
+	struct kr_cache_entry *entry = kr_cache_peek(txn, KR_CACHE_RRSIG, rr->owner, rr->type, timestamp);
+	if (entry) {
+		rr->type = KNOT_RRTYPE_RRSIG;
+		rr->rrs.rr_count = entry->count;
+		rr->rrs.data = entry->data;
+		return kr_ok();
+	}
+
+	/* Not found. */
+	return kr_error(ENOENT);
+}
+
+int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t typec, uint32_t timestamp)
+{
+	if (!txn || !rr) {
+		return kr_error(EINVAL);
+	}
+
+	/* Ignore empty records */
+	if (knot_rrset_empty(rr)) {
+		return kr_ok();
+	}
+
+	/* Prepare header to write */
+	struct kr_cache_entry header = {
+		.timestamp = timestamp,
+		.ttl = 0,
+		.count = rr->rrs.rr_count
+	};
+	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
+		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
+		if (knot_rdata_ttl(rd) > header.ttl) {
+			header.ttl = knot_rdata_ttl(rd);
+		}
+	}
+
+	namedb_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
+	return kr_cache_insert(txn, KR_CACHE_RRSIG, rr->owner, typec, &header, data);
+}

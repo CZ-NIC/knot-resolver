@@ -24,6 +24,7 @@ enum kr_cache_tag {
 	KR_CACHE_RR   = 'R',
 	KR_CACHE_PKT  = 'P',
 	KR_CACHE_SEC  = 'S',
+	KR_CACHE_RRSIG = 'G',
 	KR_CACHE_USER = 0x80
 };
 
@@ -173,3 +174,24 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
  * @return 0 or an errcode
  */
 int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint32_t timestamp);
+
+/**
+ * Peek the cache for the given RRset signature (name, type)
+ * @note The RRset type must not be RRSIG but instead it must equal the type covered field of the sought RRSIG.
+ * @param txn transaction instance
+ * @param rr query RRSET (its rdataset and type may be changed depending on the result)
+ * @param timestamp current time (will be replaced with drift if successful)
+ * @return 0 or an errcode
+ */
+int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *timestamp);
+
+/**
+ * Insert the selected RRSIG RRSet of the selected type covered into cache, replacing any existing data.
+ * @note The RRSet must contain RRSIGS with only the specified type covered.
+ * @param txn transaction instance
+ * @param rr inserted RRSIG RRSet
+ * @param typec type covered of the RDATA
+ * @param timestamp current time
+ * @return 0 or an errcode
+ */
+int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t typec, uint32_t timestamp);
