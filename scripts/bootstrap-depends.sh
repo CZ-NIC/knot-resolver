@@ -37,7 +37,8 @@ trap on_failure ERR
 
 function fetch_pkg {
 	if [ "${2##*.}" == git ]; then
-		[ ! -e $1 ] && git clone -b $3 "$2" $1 &> /dev/null
+		[ ! -e $1 ] && git clone "$2" $1 &> /dev/null
+		cd $1; git checkout $3 &> /dev/null; cd -
 	else
 		[ ! -f $1.tar.${2##*.} ] && curl "$2" > $1.tar.${2##*.}
 		tar xf $1.tar.${2##*.}
