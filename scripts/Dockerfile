@@ -1,14 +1,12 @@
-FROM debian:jessie
+FROM alpine:edge
 MAINTAINER Marek Vavrusa <marek.vavrusa@nic.cz>
 
 # Environment
-ENV THREADS 4
-ENV BUILD_PKGS git-core make gcc libtool autoconf pkg-config cmake libgnutls28-dev libjansson-dev libluajit-5.1-dev
-ENV RUN_PKGS bsdmainutils libgnutls-deb0-28 libjansson4 libluajit-5.1-2 luajit python vim-common
-ENV PREFIX /usr/local
-ENV BUILD_DIR /tmp/build
-ENV BUILD_IGNORE gmp nettle jansson gnutls lua
-ENV CFLAGS -DNDEBUG -O2 -g -fstack-protector
+ENV BUILD_PKGS build-base automake autoconf libtool pkgconfig git luajit-dev libuv-dev gnutls-dev jansson-dev userspace-rcu-dev
+ENV RUN_PKGS luajit libuv gnutls jansson bash
+ENV BUILD_IGNORE gmp nettle jansson gnutls lua libuv cmocka
+ENV PKG_CONFIG_PATH /usr/local/lib/pkgconfig
+ENV CFLAGS -O2 -g -DNDEBUG
 ENV LDFLAGS -Wl,--as-needed
 
 # Expose port
@@ -19,19 +17,14 @@ WORKDIR /data
 CMD ["/usr/local/bin/kresolved"]
 
 # Install dependencies and sources
-RUN apt-get -q -y update && \
-apt-get install -q -y ${BUILD_PKGS} ${RUN_PKGS} && \
-# Install dependencies
-git clone https://gitlab.labs.nic.cz/knot/resolver.git ${BUILD_DIR} && \
-cd ${BUILD_DIR} && \
-./scripts/bootstrap-depends.sh ${PREFIX} && \
-ldconfig && \
-# Install knot-resolver
-make -j${THREADS} && \
-make install && \
-ldconfig && \
+RUN \
+apk --update add ${RUN_PKGS} && \
+apk add --virtual build-dep ${BUILD_PKGS} && \
+git clone https://gitlab.labs.nic.cz/knot/resolver.git /tmp/build && \
+cd /tmp/build && \
+./scripts/bootstrap-depends.sh /usr/local && \
+make -j4 install && \
 # Trim down the image
-apt-get purge -q -y ${BUILD_PKGS} && \
-apt-get autoremove -q -y && \
-apt-get clean && \
-rm -rf /var/lib/apt/lists/* /var/tmp/* /tmp/*
+cd / && \
+apk del --purge build-dep && \
+rm -rf /var/cache/apk/* /tmp/build
