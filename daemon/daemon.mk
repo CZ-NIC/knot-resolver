@@ -1,4 +1,7 @@
+kresolved_EMBED := \
+	contrib/ccan/json/json.c
 kresolved_SOURCES := \
+	$(kresolved_EMBED)   \
 	daemon/io.c          \
 	daemon/network.c     \
 	daemon/engine.c      \

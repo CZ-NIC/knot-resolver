@@ -14,6 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ccan/json/json.h>
 #include <uv.h>
 #include <unistd.h>
 #include <libknot/internal/mempattern.h>
@@ -68,6 +69,29 @@ static int l_hostname(lua_State *L)
 	return 1;
 }
 
+/** Unpack JSON object to table */
+static void l_unpack_json(lua_State *L, JsonNode *table)
+{
+	lua_newtable(L);
+	JsonNode *node = NULL;
+	json_foreach(node, table) {
+		/* Push node value */
+		switch(node->tag) {
+		case JSON_OBJECT: /* as array */
+		case JSON_ARRAY:  l_unpack_json(L, node); break;
+		case JSON_STRING: lua_pushstring(L, node->string_); break;
+		case JSON_NUMBER: lua_pushnumber(L, node->number_); break;
+		default: continue;
+		}
+		/* Set table key */
+		if (node->key) {
+			lua_setfield(L, -2, node->key);
+		} else {
+			lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+		}
+	}
+}
+
 /** Trampoline function for module properties. */
 static int l_trampoline(lua_State *L)
 {
@@ -82,13 +106,25 @@ static int l_trampoline(lua_State *L)
 	/* Now we only have property callback or config,
 	 * if we expand the callables, we might need a callback_type.
 	 */
+	const char *args = NULL;
+	if (lua_gettop(L) > 0) {
+		args = lua_tostring(L, 1);
+	}
 	if (callback == module->config) {
-		const char *param = lua_tostring(L, 1);
-		module->config(module, param);
+		module->config(module, args);
 	} else {
 		kr_prop_cb *prop = (kr_prop_cb *)callback;
-		auto_free char *ret = prop(engine, module, lua_tostring(L, 1));
-		lua_pushstring(L, ret);
+		auto_free char *ret = prop(engine, module, args);
+		if (!ret) { /* No results */
+			return 0;
+		}
+		JsonNode *root_node = json_decode(ret);
+		if (root_node->tag == JSON_OBJECT || root_node->tag == JSON_ARRAY) {
+			l_unpack_json(L, root_node);
+		} else {
+			lua_pushstring(L, ret);
+		}
+		json_delete(root_node);
 		return 1;
 	}
 
