@@ -23,7 +23,7 @@ PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
 install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
 
 # prepare build env
-export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
+export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}"
 export BUILD_DIR="$(pwd)/.build-depend"
 export LOG=$(pwd)/build.log
 [ ! -e ${BUILD_DIR} ] && mkdir ${BUILD_DIR}; cd ${BUILD_DIR}
