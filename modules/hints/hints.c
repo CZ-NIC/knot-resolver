@@ -21,6 +21,7 @@
  * The module provides an override for queried address records.
  */
 
+#include <ccan/json/json.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
 #include <libknot/internal/lists.h>
@@ -215,7 +216,7 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	}
 
 	char *result = NULL;
-	asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false");
+	asprintf(&result, "{ \"result\": %s", ret == 0 ? "true" : "false");
 	return result;
 }
 
@@ -230,7 +231,6 @@ static char* hint_get(void *env, struct kr_module *module, const char *args)
 	struct kr_zonecut *hints = module->data;
 	knot_dname_t key[KNOT_DNAME_MAXLEN];
 	pack_t *pack = NULL;
-	size_t bufsize = 4096;
 	if (knot_dname_from_str(key, args, sizeof(key))) {
 		pack = kr_zonecut_find(hints, key);
 	}
@@ -238,28 +238,21 @@ static char* hint_get(void *env, struct kr_module *module, const char *args)
 		return NULL;
 	}
 
-	auto_free char *hint_buf = malloc(bufsize);
-	if (hint_buf == NULL) {
-		return NULL;
-	}
-	char *p = hint_buf, *endp = hint_buf + bufsize;
+	char buf[SOCKADDR_STRLEN];
+	JsonNode *root = json_mkarray();
 	uint8_t *addr = pack_head(*pack);
 	while (addr != pack_tail(*pack)) {
 		size_t len = pack_obj_len(addr);
 		int family = len == sizeof(struct in_addr) ? AF_INET : AF_INET6;
-		if (!inet_ntop(family, pack_obj_val(addr), p, endp - p)) {
+		if (!inet_ntop(family, pack_obj_val(addr), buf, sizeof(buf))) {
 			break;
 		}
-		p += strlen(p);
+		json_append_element(root, json_mkstring(buf));
 		addr = pack_obj_next(addr);
-		if (p + 2 < endp && addr != pack_tail(*pack)) {
-			strcpy(p, " ");
-			p += 1;
-		}
 	}
 
-	char *result = NULL;
-	asprintf(&result, "{ \"result\": [ %s ] }", hint_buf);
+	char *result = json_encode(root);
+	json_delete(root);
 	return result;
 }
 
