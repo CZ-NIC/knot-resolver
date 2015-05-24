@@ -23,6 +23,7 @@
  */
 
 #include <libknot/packet/pkt.h>
+#include <ccan/json/json.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/rplan.h"
@@ -148,13 +149,9 @@ static char* stats_get(void *env, struct kr_module *module, const char *args)
 
 static int list_entry(const char *key, void *val, void *baton)
 {
-	char **strval = (char **)baton;
+	JsonNode *root = baton;
 	size_t number = (size_t) val;
-	char buf[512];
-	snprintf(buf, sizeof(buf), "'%s': %zu,\n", key, number);
-	char *ret = kr_strcatdup(2, *strval, buf);
-	free(*strval);
-	*strval = ret;
+	json_append_member(root, key, json_mknumber(number));
 	return 0;
 }
 
@@ -166,11 +163,10 @@ static int list_entry(const char *key, void *val, void *baton)
 static char* stats_list(void *env, struct kr_module *module, const char *args)
 {
 	map_t *map = module->data;
-	char *strval = NULL;
-	/* @todo This is very inefficient with memory */
-	map_walk_prefixed(map, args ? args : "", list_entry, &strval);
-	char *ret = kr_strcatdup(3, "{\n", strval, "}");
-	free(strval);
+	JsonNode *root = json_mkobject();
+	map_walk_prefixed(map, args ? args : "", list_entry, root);
+	char *ret = json_encode(root);
+	json_delete(root);
 	return ret;
 }
 
