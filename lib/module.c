@@ -191,8 +191,6 @@ void kr_module_unload(struct kr_module *module)
 		return;
 	}
 
-	free(module->name);
-
 	if (module->deinit) {
 		module->deinit(module);
 	}
@@ -201,5 +199,6 @@ void kr_module_unload(struct kr_module *module)
 		dlclose(module->lib);
 	}
 
+	free(module->name);
 	memset(module, 0, sizeof(struct kr_module));
 }

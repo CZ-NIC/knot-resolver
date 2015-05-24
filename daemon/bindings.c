@@ -59,7 +59,7 @@ static int mod_list(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	lua_newtable(L);
 	for (unsigned i = 0; i < engine->modules.len; ++i) {
-		struct kr_module *module = &engine->modules.at[i];
+		struct kr_module *module = engine->modules.at[i];
 		lua_pushstring(L, module->name);
 		lua_rawseti(L, -2, i + 1);
 	}

@@ -70,6 +70,7 @@ static inline int l_ffi_call(lua_State *L, int argc)
 {
 	int status = lua_pcall(L, argc, LUA_MULTRET, 0);
 	if (status != 0) {
+		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
 		lua_pop(L, 1);
 		return kr_error(EIO);
 	}
@@ -110,8 +111,6 @@ static int l_ffi_deinit(struct kr_module *module)
 	/* Unref module and unset 'lib', so the module
 	 * interface doesn't attempt to close it.
 	 */
-	lua_pushnil(L);
-	lua_setglobal(L, module->name);
 	luaL_unref(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
 	module->lib = NULL;
 	return ret;

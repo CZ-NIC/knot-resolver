@@ -84,7 +84,7 @@
  */
 
 /* @cond internal Array of modules. */
-typedef array_t(struct kr_module) module_array_t;
+typedef array_t(struct kr_module *) module_array_t;
 /* @endcond */
 
 /**

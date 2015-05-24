@@ -69,7 +69,7 @@ static void prepare_layers(struct kr_request *param)
 {
 	struct kr_context *ctx = param->ctx;
 	for (size_t i = 0; i < ctx->modules->len; ++i) {
-		struct kr_module *mod = &ctx->modules->at[i];
+		struct kr_module *mod = ctx->modules->at[i];
 		if (mod->layer) {
 			knot_overlay_add(&param->overlay, mod->layer(mod), param);
 		}

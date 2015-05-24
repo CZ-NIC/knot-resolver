@@ -212,6 +212,19 @@ int engine_init(struct engine *engine, mm_ctx_t *pool)
 	return ret;
 }
 
+static void engine_unload(struct engine *engine, struct kr_module *module)
+{
+	/* Unregister module */
+	auto_free char *name = strdup(module->name);
+	kr_module_unload(module);
+	/* Clear in Lua world */
+	if (name) {
+		lua_pushnil(engine->L);
+		lua_setglobal(engine->L, name);
+	}
+	free(module);
+}
+
 void engine_deinit(struct engine *engine)
 {
 	if (engine == NULL) {
@@ -222,7 +235,7 @@ void engine_deinit(struct engine *engine)
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
-		kr_module_unload(&engine->modules.at[i]);
+		engine_unload(engine, engine->modules.at[i]);
 	}
 	array_clear(engine->modules);
 	array_clear(engine->storage_registry);
@@ -353,18 +366,23 @@ int engine_register(struct engine *engine, const char *name)
 	/* Make sure module is unloaded */
 	(void) engine_unregister(engine, name);
 	/* Attempt to load binary module */
-	size_t next = engine->modules.len;
-	array_reserve(engine->modules, next + 1);
-	struct kr_module *module = &engine->modules.at[next];
+	struct kr_module *module = malloc(sizeof(*module));
+	if (!module) {
+		return kr_error(ENOMEM);
+	}
 	int ret = kr_module_load(module, name, NULL);
 	/* Load Lua module if not a binary */
 	if (ret == kr_error(ENOENT)) {
 		ret = ffimodule_register_lua(engine, module, name);
 	}
 	if (ret != 0) {
+		free(module);
 		return ret;
-	} else {
-		engine->modules.len += 1;
+	}
+
+	if (array_push(engine->modules, module) < 0) {
+		engine_unload(engine, module);
+		return kr_error(ENOMEM);
 	}
 
 	/* Register properties */
@@ -381,18 +399,15 @@ int engine_unregister(struct engine *engine, const char *name)
 	module_array_t *mod_list = &engine->modules;
 	size_t found = mod_list->len;
 	for (size_t i = 0; i < mod_list->len; ++i) {
-		if (strcmp(mod_list->at[i].name, name) == 0) {
+		struct kr_module *mod = mod_list->at[i];
+		if (strcmp(mod->name, name) == 0) {
 			found = i;
 			break;
 		}
 	}
-
-	/* Unregister module */
 	if (found < mod_list->len) {
-		kr_module_unload(&mod_list->at[found]);
+		engine_unload(engine, mod_list->at[found]);
 		array_del(*mod_list, found);
-		lua_pushnil(engine->L);
-		lua_setglobal(engine->L, name);
 		return kr_ok();
 	}
 
