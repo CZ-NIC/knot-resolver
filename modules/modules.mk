@@ -5,7 +5,8 @@ modules_TARGETS := hints \
 
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
-modules_TARGETS += ketcd 
+modules_TARGETS += ketcd \
+                   graphite
 endif
 
 # List of Golang modules
