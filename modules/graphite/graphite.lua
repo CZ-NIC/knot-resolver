@@ -23,11 +23,11 @@ function graphite.publish()
 		return 0 -- No metrics to watch
 	end
 	for key,val in pairs(now_metrics) do
-		for i in pairs(graphite.cli) do
-			msg = key..' '..val..' '..now..'\n'
-			if graphite.prefix then
-				msg = prefix..'.'..msg
-			end
+		local msg = key..' '..val..' '..now..'\n'
+		if graphite.prefix then
+			msg = graphite.prefix..'.'..msg
+		end
+		for i in ipairs(graphite.cli) do
 			graphite.cli[i]:send(msg)
 		end
 	end
