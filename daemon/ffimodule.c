@@ -35,6 +35,7 @@ static inline lua_State *l_ffi_preface(struct kr_module *module, const char *cal
 	lua_getfield(L, -1, call);
 	lua_remove(L, -2);
 	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
 		return NULL;
 	}
 	lua_pushlightuserdata(L, module);
@@ -68,7 +69,7 @@ static int l_ffi_defer(lua_State *L)
 /** @internal Helper for calling the entrypoint. */
 static inline int l_ffi_call(lua_State *L, int argc)
 {
-	int status = lua_pcall(L, argc, LUA_MULTRET, 0);
+	int status = lua_pcall(L, argc, 1, 0);
 	if (status != 0) {
 		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
 		lua_pop(L, 1);
@@ -82,7 +83,7 @@ static inline int l_ffi_call(lua_State *L, int argc)
 		} else if (lua_isnumber(L, -1)) { /* Return code */
 			status = lua_tonumber(L, 1);
 		}
-		lua_pop(L, n);
+		lua_pop(L, 1);
 	}
 	return status;
 }
