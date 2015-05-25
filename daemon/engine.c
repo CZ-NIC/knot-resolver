@@ -27,6 +27,11 @@
 #include "lib/cache.h"
 #include "lib/defines.h"
 
+/** @internal Compatibility wrapper for Lua < 5.2 */
+#if LUA_VERSION_NUM < 502
+#define lua_rawlen(L, obj) lua_objlen((L), (obj))
+#endif
+
 /*
  * Global bindings.
  */
