@@ -52,14 +52,12 @@ static PyObject* init(PyObject* self, PyObject* args)
 
 	/* Load basic modules. */
 	array_init(global_modules);
-	int ret = array_reserve(global_modules, 3);
-	if (ret < 0) {
-		return NULL;
+	const char *load_modules[3] = {"iterate", "rrcache", "pktcache"};
+	for (unsigned i = 0; i < 3; ++i) {
+		struct kr_module *mod = malloc(sizeof(*mod));
+		kr_module_load(mod, load_modules[i], NULL);
+		array_push(global_modules, mod);
 	}
-	kr_module_load(&global_modules.at[0], "iterate", NULL);
-	kr_module_load(&global_modules.at[1], "rrcache", NULL);
-	kr_module_load(&global_modules.at[2], "pktcache", NULL);
-	global_modules.len = 3;
 
 	/* Initialize resolution context */
 	mm_ctx_init(&global_mm);
@@ -92,7 +90,7 @@ static PyObject* deinit(PyObject* self, PyObject* args)
 	}
 
 	for (size_t i = 0; i < global_modules.len; ++i) {
-		kr_module_unload(&global_modules.at[i]);
+		kr_module_unload(global_modules.at[i]);
 	}
 	array_clear(global_modules);
 
