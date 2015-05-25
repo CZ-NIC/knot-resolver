@@ -25,7 +25,7 @@ Only the ``host`` parameter is mandatory.
 		}
 	}
 
-The module support sending data to multiple servers at once.
+The module supports sending data to multiple servers at once.
 
 .. code-block:: lua
 
