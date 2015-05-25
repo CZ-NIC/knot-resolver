@@ -30,6 +30,11 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 
+/** @internal Compatibility wrapper for Lua < 5.2 */
+#if LUA_VERSION_NUM < 502
+#define lua_rawlen(L, obj) lua_objlen((L), (obj))
+#endif
+
 /* Defaults */
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "stat",  fmt)
 
