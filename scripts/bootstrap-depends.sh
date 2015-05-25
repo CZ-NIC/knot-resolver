@@ -109,7 +109,7 @@ pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 # libuv
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 # lua
-pkg lua ${LUA_URL} ${LUA_TAG} include/lua.h generic install INSTALL_TOP=${PREFIX}
+pkg lua ${LUA_URL} ${LUA_TAG} include/lua.h posix install INSTALL_TOP=${PREFIX} MYCFLAGS="-DLUA_USE_DLOPEN" MYLDFLAGS="-ldl"
 if [ ! -f ${PREFIX}/lib/pkgconfig/lua.pc ]; then
 cat > ${PREFIX}/lib/pkgconfig/lua.pc << EOF
 prefix=${PREFIX}
