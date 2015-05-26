@@ -79,6 +79,7 @@ static int txn_commit(namedb_txn_t *txn)
 			free(freelist->at[i]);
 		}
 		array_clear(*freelist);
+		free(freelist);
 		txn->txn = NULL;
 	}
 	return KNOT_EOK;
