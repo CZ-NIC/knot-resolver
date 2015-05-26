@@ -364,13 +364,14 @@ static int cache_open(lua_State *L)
 		format_error(L, "unsupported cache backend");
 		lua_error(L);
 	}
-	kr_cache_storage_set(storage->api);
 
 	/* Close if already open */
 	if (engine->resolver.cache != NULL) {
 		kr_cache_close(engine->resolver.cache);
 	}
+
 	/* Reopen cache */
+	kr_cache_storage_set(storage->api);
 	void *storage_opts = storage->opts_create(conf, cache_size);
 	engine->resolver.cache = kr_cache_open(storage_opts, engine->pool);
 	free(storage_opts);

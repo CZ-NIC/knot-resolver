@@ -375,6 +375,7 @@ int engine_register(struct engine *engine, const char *name)
 	if (!module) {
 		return kr_error(ENOMEM);
 	}
+	module->data = engine;
 	int ret = kr_module_load(module, name, NULL);
 	/* Load Lua module if not a binary */
 	if (ret == kr_error(ENOENT)) {
