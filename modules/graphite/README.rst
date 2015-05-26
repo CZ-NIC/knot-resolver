@@ -40,7 +40,7 @@ Dependencies
 
 * `luasocket <http://w3.impa.br/~diego/software/luasocket/>`_ available in LuaRocks
 
-    ``$ luarocks install socket``
+    ``$ luarocks install luasocket``
 
 .. _Graphite: http://graphite.readthedocs.org/en/latest/feeding-carbon.html
 .. _InfluxDB: http://influxdb.com/

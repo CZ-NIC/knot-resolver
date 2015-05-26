@@ -17,7 +17,8 @@ local function update_subtree(tree)
 end
 
 -- @function reload whole configuration
-local function reload()
+function ketcd.reload()
+	local ketcd = _G['ketcd']
 	local res, err = ketcd.cli:readdir('/', true)
 	if err then
 		error(err)
@@ -27,8 +28,6 @@ end
 
 function ketcd.init(module)
 	ketcd.Etcd = require('etcd.luasocket')
-	ketcd.cli = nil
-	ketcd.ev = nil
 	ketcd.defaults = { prefix = '/kresolved' }
 end
 
@@ -51,7 +50,7 @@ function ketcd.config(conf)
 	-- @todo: the etcd has watch() API, but this requires
 	--        coroutines on socket operations
 	if ketcd.ev then event.cancel(ketcd.ev) end
-	ketcd.ev = event.recurrent(5 * sec, reload)
+	ketcd.ev = event.recurrent(5 * sec, ketcd.reload)
 end
 
 return ketcd
