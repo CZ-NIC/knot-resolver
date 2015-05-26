@@ -40,18 +40,21 @@ int kmemcached_init(struct kr_module *module)
 	return kr_ok();
 }
 
-int lmemcached_deinit(struct kr_module *module)
+int kmemcached_deinit(struct kr_module *module)
 {
 	struct engine *engine = module->data;
+	/* It was currently loaded, close cache */
+	if (kr_cache_storage == namedb_memcached_api) {
+		kr_cache_close(engine->resolver.cache);
+		engine->resolver.cache = NULL;
+	}
+	/* Prevent from loading it again */
 	for (unsigned i = 0; i < engine->storage_registry.len; ++i) {
 		struct storage_api *storage = &engine->storage_registry.at[i];
 		if (strcmp(storage->prefix, "memcached://") == 0) {
 			array_del(engine->storage_registry, i);
 			break;
 		}
-	}
-	if (kr_cache_storage == namedb_memcached_api) {
-		kr_cache_storage_set(NULL);
 	}
 	return kr_ok();
 }

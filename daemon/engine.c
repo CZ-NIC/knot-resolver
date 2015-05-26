@@ -237,6 +237,8 @@ void engine_deinit(struct engine *engine)
 	}
 
 	network_deinit(&engine->net);
+	kr_cache_close(engine->resolver.cache);
+	engine->resolver.cache = NULL;
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
@@ -249,7 +251,6 @@ void engine_deinit(struct engine *engine)
 		lua_close(engine->L);
 	}
 
-	kr_cache_close(engine->resolver.cache);
 }
 
 int engine_pcall(lua_State *L, int argc)

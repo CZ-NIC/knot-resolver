@@ -53,7 +53,7 @@ namedb_t *kr_cache_open(void *opts, mm_ctx_t *mm)
 
 void kr_cache_close(namedb_t *cache)
 {
-	if (cache) {
+	if (cache && db_api) {
 		db_api->deinit(cache);
 	}
 }
