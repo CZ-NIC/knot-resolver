@@ -382,10 +382,10 @@ static int cache_open(lua_State *L)
 
 	/* Store current configuration */
 	lua_getglobal(L, "cache");
-	lua_pushstring(L, "size");
+	lua_pushstring(L, "current_size");
 	lua_pushnumber(L, cache_size);
 	lua_rawset(L, -3);
-	lua_pushstring(L, "storage");
+	lua_pushstring(L, "current_storage");
 	lua_pushstring(L, uri);
 	lua_rawset(L, -3);
 
