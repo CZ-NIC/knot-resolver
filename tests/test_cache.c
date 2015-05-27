@@ -20,8 +20,10 @@
 #include "tests/test.h"
 #include "lib/cache.h"
 
+#include <execinfo.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 #include <dlfcn.h>
 
 mm_ctx_t global_mm;
@@ -35,12 +37,36 @@ const namedb_api_t *(*kr_cache_storage_saved)(void);
 #define NAMEDB_DATA_SIZE (NAMEDB_INTS * sizeof(int))
 uint8_t namedb_data[NAMEDB_DATA_SIZE];
 namedb_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
+bool is_malloc_mocked = false;
+#define BACKTRACE_ARRAY_SIZE 1024
+void* callstack[BACKTRACE_ARRAY_SIZE];
 
 #define CACHE_SIZE 10 * 4096
 #define CACHE_TTL 10
 #define CACHE_TIME 0
 
+void * (*original_malloc) (size_t __size);
 int (*original_knot_rdataset_add)(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm) = NULL;
+
+void *malloc(size_t __size)
+{
+	Dl_info dli = {0};
+	char insert_name[] = "kr_cache_insert";
+	int err_mock = KNOT_EOK, insert_namelen = strlen(insert_name);
+
+	if (original_malloc == NULL)
+	{
+		original_malloc = dlsym(RTLD_NEXT,"malloc");
+		assert_non_null (malloc);
+	}
+	if (is_malloc_mocked)
+	{
+	    dladdr (__builtin_return_address (0), &dli);
+	    if (dli.dli_sname && (strncmp(insert_name,dli.dli_sname,insert_namelen) == 0))
+		    err_mock = mock();
+	}
+	return (err_mock != KNOT_EOK) ? NULL : original_malloc (__size);
+}
 
 int knot_rdataset_add(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm)
 {
@@ -145,16 +171,23 @@ static void test_fake_invalid (void **state)
 
 static void test_fake_insert(void **state)
 {
-	int ret_cache_ins_ok, ret_cache_ins_inval;
+	int ret_cache_ins_ok, ret_cache_lowmem, ret_cache_ins_inval;
 	knot_dname_t dname[] = "";
 	test_randstr((char *)&global_fake_ce,sizeof(global_fake_ce));
 	test_randstr((char *)namedb_data,NAMEDB_DATA_SIZE);
+
+	is_malloc_mocked = true;
+	will_return(malloc,KNOT_EINVAL);
+	ret_cache_lowmem = kr_cache_insert(&global_txn, KR_CACHE_USER, dname,
+		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
+	is_malloc_mocked = false;
 	will_return(test_ins,KNOT_EOK);
 	ret_cache_ins_ok = kr_cache_insert(&global_txn, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
 	will_return(test_ins,KNOT_EINVAL);
 	ret_cache_ins_inval = kr_cache_insert(&global_txn, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
+	assert_int_equal(ret_cache_lowmem, KNOT_ENOMEM);
 	assert_int_equal(ret_cache_ins_ok, KNOT_EOK);
 	assert_int_equal(ret_cache_ins_inval, KNOT_EINVAL);
 }
