@@ -33,8 +33,9 @@ enum kr_query_flag {
 	QUERY_RESOLVED    = 1 << 2, /**< Query is resolved. */
 	QUERY_AWAIT_IPV4  = 1 << 3, /**< Query is waiting for A address. */
 	QUERY_AWAIT_IPV6  = 1 << 4, /**< Query is waiting for AAAA address. */
-	QUERY_SAFEMODE    = 1 << 5, /**< Don't use fancy stuff (EDNS...) */
-	QUERY_CACHED      = 1 << 6  /**< Query response is cached. */
+	QUERY_AWAIT_CUT   = 1 << 5, /**< Query is waiting for zone cut lookup */
+	QUERY_SAFEMODE    = 1 << 6, /**< Don't use fancy stuff (EDNS...) */
+	QUERY_CACHED      = 1 << 7  /**< Query response is cached. */
 };
 
 /**

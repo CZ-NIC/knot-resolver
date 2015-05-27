@@ -209,24 +209,24 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_
 	return kr_ok();
 }
 
-int kr_zonecut_find_cached(struct kr_zonecut *cut, struct kr_cache_txn *txn, uint32_t timestamp)
+int kr_zonecut_find_cached(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
 {
 	if (cut == NULL) {
 		return kr_error(EINVAL);
 	}
 
-	/* Start at QNAME. */
-	const knot_dname_t *name = cut->name;
+	/* Start at QNAME parent. */
+	name = knot_wire_next_label(name, NULL);
 	while (txn) {
 		if (fetch_ns(cut, name, txn, timestamp) == 0) {
 			update_cut_name(cut, name);
 			return kr_ok();
 		}
-		name = knot_wire_next_label(name, NULL);
-		/* Subtract label from QNAME. */
 		if (name[0] == '\0') {
 			break;
 		}
+		/* Subtract label from QNAME. */
+		name = knot_wire_next_label(name, NULL);
 	}
 
 	/* Name server not found, start with SBELT. */

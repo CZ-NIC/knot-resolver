@@ -289,14 +289,8 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 		return KNOT_STATE_FAIL;
 	}
 
-	/* Find closest zone cut for this query. */
-	struct kr_cache_txn txn;
-	if (kr_cache_txn_begin(&rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
-		kr_zonecut_set_sbelt(&qry->zone_cut);
-	} else {
-		kr_zonecut_find_cached(&qry->zone_cut, &txn, qry->timestamp.tv_sec);
-		kr_cache_txn_abort(&txn);
-	}
+	/* Deferred zone cut lookup for this query. */
+	qry->flags |= QUERY_AWAIT_CUT;
 
 	/* Initialize answer packet */
 	knot_pkt_t *answer = request->answer;
@@ -393,6 +387,20 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 		knot_overlay_reset(&request->overlay);
 		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
+	}
+
+	/* The query wasn't resolved from cache,
+	 * now it's the time to look up closest zone cut from cache.
+	 */
+	if (qry->flags & QUERY_AWAIT_CUT) {
+		struct kr_cache_txn txn;
+		if (kr_cache_txn_begin(&rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
+			kr_zonecut_set_sbelt(&qry->zone_cut);
+		} else {
+			kr_zonecut_find_cached(&qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec);
+			kr_cache_txn_abort(&txn);
+		}
+		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
 
 	/* Elect best nameserver candidate */

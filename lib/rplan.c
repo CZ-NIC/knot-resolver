@@ -112,7 +112,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	qry->parent = parent;
 	gettimeofday(&qry->timestamp, NULL);
 	add_tail(&rplan->pending, &qry->node);
-	kr_zonecut_init(&qry->zone_cut, name, rplan->pool);
+	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
 
 #ifndef NDEBUG
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
