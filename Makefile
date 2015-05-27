@@ -26,7 +26,7 @@ $(eval $(call find_bin,doxygen))
 $(eval $(call find_bin,sphinx-build))
 $(eval $(call find_bin,gccgo))
 $(eval $(call find_python))
-$(eval $(call find_lib,libmemcached))
+$(eval $(call find_lib,libmemcached,1.0))
 
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)
