@@ -104,4 +104,4 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut);
  * @param timestamp transaction timestamp
  * @return 0 or error code
  */
-int kr_zonecut_find_cached(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timestamp);
+int kr_zonecut_find_cached(struct kr_zonecut *cut, struct kr_cache_txn *txn, uint32_t timestamp);

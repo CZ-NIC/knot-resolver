@@ -290,8 +290,8 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 	}
 
 	/* Find closest zone cut for this query. */
-	namedb_txn_t txn;
-	if (kr_cache_txn_begin(rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
+	struct kr_cache_txn txn;
+	if (kr_cache_txn_begin(&rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
 		kr_zonecut_set_sbelt(&qry->zone_cut);
 	} else {
 		kr_zonecut_find_cached(&qry->zone_cut, &txn, qry->timestamp.tv_sec);

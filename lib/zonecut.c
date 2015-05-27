@@ -189,7 +189,7 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut)
 }
 
 /** Fetch best NS for zone cut. */
-static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
+static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
 {
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
@@ -209,7 +209,7 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn
 	return kr_ok();
 }
 
-int kr_zonecut_find_cached(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timestamp)
+int kr_zonecut_find_cached(struct kr_zonecut *cut, struct kr_cache_txn *txn, uint32_t timestamp)
 {
 	if (cut == NULL) {
 		return kr_error(EINVAL);
@@ -222,11 +222,11 @@ int kr_zonecut_find_cached(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t t
 			update_cut_name(cut, name);
 			return kr_ok();
 		}
+		name = knot_wire_next_label(name, NULL);
 		/* Subtract label from QNAME. */
 		if (name[0] == '\0') {
 			break;
 		}
-		name = knot_wire_next_label(name, NULL);
 	}
 
 	/* Name server not found, start with SBELT. */

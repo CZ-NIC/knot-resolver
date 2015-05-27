@@ -53,8 +53,8 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 	struct engine *engine = env;
 	const namedb_api_t *storage = kr_cache_storage();
 
-	namedb_txn_t txn;
-	int ret = kr_cache_txn_begin(engine->resolver.cache, &txn, 0);
+	struct kr_cache_txn txn;
+	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, 0);
 	if (ret != 0) {
 		return NULL;
 	}
@@ -62,7 +62,7 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 	/* Iterate cache and find expired records. */
 	int pruned = 0;
 	uint32_t now = time(NULL);
-	namedb_iter_t *it = storage->iter_begin(&txn, 0);
+	namedb_iter_t *it = storage->iter_begin((namedb_txn_t *)&txn, 0);
 	while (it) {
 		/* Fetch RR from cache */
 		namedb_val_t key, val;
@@ -73,7 +73,7 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 		/* Prune expired records. */
 		struct kr_cache_entry *entry = val.data;
 		if (is_expired(entry, now - entry->timestamp)) {
-			storage->del(&txn, &key);
+			storage->del((namedb_txn_t *)&txn, &key);
 			pruned += 1;
 		}
 		it = storage->iter_next(it);
@@ -101,8 +101,8 @@ static char* clear(void *env, struct kr_module *module, const char *args)
 {
 	struct engine *engine = env;
 
-	namedb_txn_t txn;
-	int ret = kr_cache_txn_begin(engine->resolver.cache, &txn, 0);
+	struct kr_cache_txn txn;
+	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, 0);
 	if (ret != 0) {
 		return NULL;
 	}

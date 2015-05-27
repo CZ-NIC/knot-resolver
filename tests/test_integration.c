@@ -72,8 +72,8 @@ static PyObject* init(PyObject* self, PyObject* args)
 	opts.path = global_tmpdir;
 	opts.mapsize = 100 * 4096;
 	kr_cache_storage_set(namedb_lmdb_api);
-	global_context.cache = kr_cache_open(&opts, &global_mm);
-	assert(global_context.cache);
+	int ret = kr_cache_open(&global_context.cache, &opts, &global_mm);
+	assert(ret == 0);
 
 	/* No configuration parsing support yet. */
 	if (strstr(config, "query-minimization: on") == NULL) {

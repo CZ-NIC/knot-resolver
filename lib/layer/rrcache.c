@@ -32,7 +32,7 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
-static int loot_rr(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t *name,
+static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *name,
                   uint16_t rrclass, uint16_t rrtype, struct kr_query *qry)
 {
 	/* Check if record exists in cache */
@@ -63,7 +63,7 @@ static int loot_rr(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t *name,
 	return kr_ok();
 }
 
-static int loot_cache_set(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
+static int loot_cache_set(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
                           uint16_t rrclass, uint16_t rrtype, struct kr_query *qry)
 {
 	int ret = loot_rr(txn, pkt, qname, rrclass, rrtype, qry);
@@ -74,7 +74,7 @@ static int loot_cache_set(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t
 }
 
 /** @internal Try to find a shortcut directly to searched record, otherwise try to find minimised QNAME. */
-static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, struct kr_query *qry)
+static int loot_cache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query *qry)
 {
 	const knot_dname_t *qname = qry->sname;
 	uint16_t rrclass = qry->sclass;
@@ -101,8 +101,8 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	namedb_txn_t txn;
-	struct kr_cache *cache = req->ctx->cache;
+	struct kr_cache_txn txn;
+	struct kr_cache *cache = &req->ctx->cache;
 	if (kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY) != 0) {
 		return ctx->state;
 	}
@@ -152,7 +152,7 @@ static int merge_in_section(knot_rrset_t *cache_rr, const knot_pktsection_t *sec
 }
 
 /** Cache direct answer. */
-static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
+static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, struct kr_cache_txn *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
 	/* Check if already cached. */
 	knot_rrset_t query_rr;
@@ -192,7 +192,7 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, na
 }
 
 /** Cache direct answer. */
-static int write_cache_answer(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
+static int write_cache_answer(knot_pkt_t *pkt, struct kr_cache_txn *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, (knot_dname_t *)knot_pkt_qname(pkt), knot_pkt_qtype(pkt), knot_pkt_qclass(pkt));
@@ -202,7 +202,7 @@ static int write_cache_answer(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool
 }
 
 /** Cache stub nameservers. */
-static int write_cache_authority(knot_pkt_t *pkt, namedb_txn_t *txn, mm_ctx_t *pool, uint32_t timestamp)
+static int write_cache_authority(knot_pkt_t *pkt, struct kr_cache_txn *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
 	knot_rrset_t glue_rr = { NULL, 0, 0 };
 	knot_rrset_t cache_rr = { NULL, 0, 0 };
@@ -252,8 +252,8 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Open write transaction */
 	mm_ctx_t *pool = rplan->pool;
 	uint32_t timestamp = query->timestamp.tv_sec;
-	struct kr_cache *cache = req->ctx->cache;
-	namedb_txn_t txn;
+	struct kr_cache *cache = &req->ctx->cache;
+	struct kr_cache_txn txn;
 	if (kr_cache_txn_begin(cache, &txn, 0) != 0) {
 		return ctx->state; /* Couldn't acquire cache, ignore. */
 	}

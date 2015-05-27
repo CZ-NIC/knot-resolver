@@ -54,7 +54,7 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 	}
 }
 
-static int loot_cache_pkt(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
+static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
                           uint16_t rrtype, uint8_t tag, uint32_t timestamp)
 {
 	struct kr_cache_entry *entry;
@@ -91,7 +91,7 @@ static int loot_cache_pkt(namedb_txn_t *txn, knot_pkt_t *pkt, const knot_dname_t
 }
 
 /** @internal Try to find a shortcut directly to searched packet, otherwise try to find minimised QNAME. */
-static int loot_cache(namedb_txn_t *txn, knot_pkt_t *pkt, uint8_t tag, struct kr_query *qry)
+static int loot_cache(struct kr_cache_txn *txn, knot_pkt_t *pkt, uint8_t tag, struct kr_query *qry)
 {
 	uint32_t timestamp = qry->timestamp.tv_sec;
 	const knot_dname_t *qname = qry->sname;
@@ -122,8 +122,8 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Prepare read transaction */
-	namedb_txn_t txn;
-	struct kr_cache *cache = req->ctx->cache;
+	struct kr_cache_txn txn;
+	struct kr_cache *cache = &req->ctx->cache;
 	if (kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY) != 0) {
 		return ctx->state;
 	}
@@ -196,8 +196,8 @@ static int stash(knot_layer_t *ctx)
 	}
 
 	/* Open write transaction and prepare answer */
-	namedb_txn_t txn;
-	if (kr_cache_txn_begin(req->ctx->cache, &txn, 0) != 0) {
+	struct kr_cache_txn txn;
+	if (kr_cache_txn_begin(&req->ctx->cache, &txn, 0) != 0) {
 		return ctx->state; /* Couldn't acquire cache, ignore. */
 	}
 	const knot_dname_t *qname = knot_pkt_qname(pkt);

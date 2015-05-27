@@ -237,8 +237,7 @@ void engine_deinit(struct engine *engine)
 	}
 
 	network_deinit(&engine->net);
-	kr_cache_close(engine->resolver.cache);
-	engine->resolver.cache = NULL;
+	kr_cache_close(&engine->resolver.cache);
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {

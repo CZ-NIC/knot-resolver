@@ -23,6 +23,7 @@
 #include "lib/generic/array.h"
 #include "lib/rplan.h"
 #include "lib/module.h"
+#include "lib/cache.h"
 
 /**
  * @file resolve.h
@@ -98,7 +99,7 @@ typedef array_t(struct kr_module *) module_array_t;
 struct kr_context
 {
 	mm_ctx_t *pool;
-	struct kr_cache *cache;
+	struct kr_cache cache;
 	module_array_t *modules;
 	uint32_t options;
 };

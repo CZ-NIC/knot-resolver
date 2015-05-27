@@ -312,14 +312,14 @@ static int cache_count(lua_State *L)
 	const namedb_api_t *storage = kr_cache_storage();
 
 	/* Fetch item count */
-	namedb_txn_t txn;
-	int ret = kr_cache_txn_begin(engine->resolver.cache, &txn, NAMEDB_RDONLY);
+	struct kr_cache_txn txn;
+	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, NAMEDB_RDONLY);
 	if (ret != 0) {
 		format_error(L, kr_strerror(ret));
 		lua_error(L);
 	}
 
-	lua_pushinteger(L, storage->count(&txn));
+	lua_pushinteger(L, storage->count((namedb_txn_t *)&txn));
 	kr_cache_txn_abort(&txn);
 	return 1;
 }
@@ -366,16 +366,14 @@ static int cache_open(lua_State *L)
 	}
 
 	/* Close if already open */
-	if (engine->resolver.cache != NULL) {
-		kr_cache_close(engine->resolver.cache);
-	}
+	kr_cache_close(&engine->resolver.cache);
 
 	/* Reopen cache */
 	kr_cache_storage_set(storage->api);
 	void *storage_opts = storage->opts_create(conf, cache_size);
-	engine->resolver.cache = kr_cache_open(storage_opts, engine->pool);
+	int ret = kr_cache_open(&engine->resolver.cache, storage_opts, engine->pool);
 	free(storage_opts);
-	if (engine->resolver.cache == NULL) {
+	if (ret != 0) {
 		format_error(L, "can't open cache");
 		lua_error(L);
 	}
@@ -396,12 +394,7 @@ static int cache_open(lua_State *L)
 static int cache_close(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	if (engine->resolver.cache != NULL) {
-		struct kr_cache *cache = engine->resolver.cache;
-		engine->resolver.cache = NULL;
-		kr_cache_close(cache);
-	}
-
+	kr_cache_close(&engine->resolver.cache);
 	lua_pushboolean(L, 1);
 	return 1;
 }
