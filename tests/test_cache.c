@@ -38,8 +38,6 @@ const namedb_api_t *(*kr_cache_storage_saved)(void);
 uint8_t namedb_data[NAMEDB_DATA_SIZE];
 namedb_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
 bool is_malloc_mocked = false;
-#define BACKTRACE_ARRAY_SIZE 1024
-void* callstack[BACKTRACE_ARRAY_SIZE];
 
 #define CACHE_SIZE 10 * 4096
 #define CACHE_TTL 10
