@@ -92,7 +92,7 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	const knot_pktsection_t *ns = knot_pkt_section(answer, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (rr->type == KNOT_RRTYPE_SOA && knot_dname_is_equal(rr->owner, query->zone_cut.name)) {
+		if (rr->type == KNOT_RRTYPE_SOA && knot_dname_in(query->zone_cut.name, rr->owner)) {
 			return true;
 		}
 	}
@@ -304,19 +304,20 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		follow_cname_chain(&cname, rr, query);
 	}
 
+	/* Either way it resolves current query. */
+	query->flags |= QUERY_RESOLVED;
 	/* Follow canonical name as next SNAME. */
 	if (!knot_dname_is_equal(cname, query->sname)) {
 		DEBUG_MSG("<= cname chain, following\n");
 		struct kr_query *next = kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
+		rem_node(&query->node); /* *MUST* keep current query at tail */
+		insert_node(&query->node, &next->node);
 		kr_zonecut_set_sbelt(&next->zone_cut);
 	} else {
 		if (query->parent == NULL) {
 			finalize_answer(pkt, query, req);
 		}
 	}
-
-	/* Either way it resolves current query. */
-	query->flags |= QUERY_RESOLVED;
 	return KNOT_STATE_DONE;
 }
 
