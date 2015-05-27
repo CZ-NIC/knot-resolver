@@ -73,23 +73,13 @@ static int loot_cache_set(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 	return ret;
 }
 
-/** @internal Try to find a shortcut directly to searched record, otherwise try to find minimised QNAME. */
+/** @internal Try to find a shortcut directly to searched record. */
 static int loot_cache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query *qry)
 {
 	const knot_dname_t *qname = qry->sname;
 	uint16_t rrclass = qry->sclass;
 	uint16_t rrtype = qry->stype;
-	int ret = loot_cache_set(txn, pkt, qname, rrclass, rrtype, qry);
-	if (ret == 0) { /* Signalize minimisation disabled */
-		qry->flags |= QUERY_NO_MINIMIZE;
-	} else { /* Retry with minimised name */
-		qname = knot_pkt_qname(pkt);
-		rrtype = knot_pkt_qtype(pkt);
-		if (!knot_dname_is_equal(qname, qry->sname)) {
-			ret = loot_cache_set(txn, pkt, qname, rrclass, rrtype, qry);
-		}
-	}
-	return ret;
+	return loot_cache_set(txn, pkt, qname, rrclass, rrtype, qry);
 }
 
 static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -115,7 +105,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	kr_cache_txn_abort(&txn);
 	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
-		qry->flags |= QUERY_CACHED;
+		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 		pkt->parsed = pkt->size;
 		knot_wire_set_qr(pkt->wire);
 		knot_wire_set_aa(pkt->wire);
