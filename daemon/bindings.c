@@ -324,6 +324,27 @@ static int cache_count(lua_State *L)
 	return 1;
 }
 
+/** Return cache statistics. */
+static int cache_stats(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	lua_newtable(L);
+	lua_pushnumber(L, cache->stats.hit);
+	lua_setfield(L, -2, "hit");
+	lua_pushnumber(L, cache->stats.miss);
+	lua_setfield(L, -2, "miss");
+	lua_pushnumber(L, cache->stats.insert);
+	lua_setfield(L, -2, "insert");
+	lua_pushnumber(L, cache->stats.delete);
+	lua_setfield(L, -2, "delete");
+	lua_pushnumber(L, cache->stats.txn_read);
+	lua_setfield(L, -2, "txn_read");
+	lua_pushnumber(L, cache->stats.txn_write);
+	lua_setfield(L, -2, "txn_write");
+	return 1;
+}
+
 static struct storage_api *cache_select_storage(struct engine *engine, const char **conf)
 {
 	/* Return default backend */
@@ -404,6 +425,7 @@ int lib_cache(lua_State *L)
 	static const luaL_Reg lib[] = {
 		{ "backends", cache_backends },
 		{ "count",  cache_count },
+		{ "stats",  cache_stats },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
 		{ NULL, NULL }
