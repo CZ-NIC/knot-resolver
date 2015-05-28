@@ -203,15 +203,15 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 	}
 
 	/* Fetch glue for each NS */
-	kr_zonecut_add(cut, knot_ns_name(&rr->rrs, 0), NULL);
 	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
+		kr_zonecut_add(cut, ns_name, NULL);
 		int glue_records = fetch_glue(pkt, ns_name, req);
 		/* Glue is mandatory for NS below zone */
-		if (knot_dname_in(ns_name, rr->owner) ) {
+		if (knot_dname_in(rr->owner, ns_name) ) {
 			if (glue_records == 0) {
 				DEBUG_MSG("<= authority: missing mandatory glue, rejecting\n");
-				return KNOT_STATE_FAIL;
+				kr_zonecut_del(cut, ns_name, NULL);
 			}
 		}
 	}
@@ -310,13 +310,14 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	if (!knot_dname_is_equal(cname, query->sname)) {
 		DEBUG_MSG("<= cname chain, following\n");
 		struct kr_query *next = kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
+		if (!next) {
+			return KNOT_STATE_FAIL;
+		}
 		rem_node(&query->node); /* *MUST* keep current query at tail */
 		insert_node(&query->node, &next->node);
-		kr_zonecut_set_sbelt(&next->zone_cut);
-	} else {
-		if (query->parent == NULL) {
-			finalize_answer(pkt, query, req);
-		}
+		next->flags |= QUERY_AWAIT_CUT;
+	} else if (!query->parent) {
+		finalize_answer(pkt, query, req);
 	}
 	return KNOT_STATE_DONE;
 }

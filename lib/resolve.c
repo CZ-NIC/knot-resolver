@@ -62,7 +62,11 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		return KNOT_STATE_PRODUCE;
 	}
 
+	/* Push new query to the resolution plan */
 	struct kr_query *next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
+	if (!next) {
+		return kr_error(ENOMEM);
+	}
 	kr_zonecut_set_sbelt(&next->zone_cut);
 	return KNOT_STATE_PRODUCE;
 }
