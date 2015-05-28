@@ -196,6 +196,8 @@ static void test_invalid(void **state)
 	uint32_t timestamp = CACHE_TIME;
 	knot_dname_t dname[] = "";
 
+	knot_rrset_init_empty(&global_rr);
+
 	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
 	assert_int_not_equal(kr_cache_txn_begin(&global_env, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
@@ -206,6 +208,7 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_peek_rr(&global_txn, NULL, NULL), 0);
 	assert_int_not_equal(kr_cache_insert_rr(&global_txn, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_insert_rr(NULL, NULL, 0), 0);
+	assert_int_equal(kr_cache_insert_rr(&global_txn, &global_rr, 0), 0);
 	assert_int_not_equal(kr_cache_insert(NULL, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data), 0);
 	assert_int_not_equal(kr_cache_insert(&global_txn, 0, dname,
@@ -272,7 +275,19 @@ static void test_insert_rr(void **state)
 static void test_materialize(void **state)
 {
 	knot_rrset_t output_rr;
+	knot_dname_t * owner_saved = global_rr.owner;
+	bool res_cmp_ok_empty, res_cmp_fail_empty;
 	bool res_cmp_ok, res_cmp_fail;
+
+	global_rr.owner = NULL;
+	knot_rrset_init(&output_rr, NULL, 0, 0);
+	output_rr = kr_cache_materialize(&global_rr, 0, &global_mm);
+	res_cmp_ok_empty = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_HEADER);
+	res_cmp_fail_empty = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_WHOLE);
+	knot_rrset_clear(&output_rr,&global_mm);
+	global_rr.owner = owner_saved;
+	assert_true(res_cmp_ok_empty);
+	assert_false(res_cmp_fail_empty);
 
 	knot_rrset_init(&output_rr, NULL, 0, 0);
 	will_return (knot_rdataset_add,KNOT_EOK);
