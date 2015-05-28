@@ -47,16 +47,18 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	 * this would lead to dependency loop in current zone cut.
 	 * Prefer IPv6 and continue with IPv4 if not available.
 	 */
-	uint16_t next_type = KNOT_RRTYPE_AAAA;
+	uint16_t next_type = 0;
 	if (!(qry->flags & QUERY_AWAIT_IPV6)) {
 		next_type = KNOT_RRTYPE_AAAA;
 		qry->flags |= QUERY_AWAIT_IPV6;
 	} else if (!(qry->flags & QUERY_AWAIT_IPV4)) {
 		next_type = KNOT_RRTYPE_A;
 		qry->flags |= QUERY_AWAIT_IPV4;
-	} else {
+	}
+	/* Bail out if the query is already pending or dependency loop. */
+	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
 		DEBUG_MSG("=> dependency loop, bailing out\n");
-		kr_rplan_pop(rplan, qry);
+		invalidate_ns(rplan, qry);
 		return KNOT_STATE_PRODUCE;
 	}
 
