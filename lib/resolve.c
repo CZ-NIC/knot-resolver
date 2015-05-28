@@ -59,16 +59,15 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
 		DEBUG_MSG("=> dependency loop, bailing out\n");
 		invalidate_ns(rplan, qry);
-		return KNOT_STATE_PRODUCE;
+		return kr_error(EHOSTUNREACH);
 	}
-
 	/* Push new query to the resolution plan */
 	struct kr_query *next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
 	if (!next) {
 		return kr_error(ENOMEM);
 	}
 	kr_zonecut_set_sbelt(&next->zone_cut);
-	return KNOT_STATE_PRODUCE;
+	return kr_ok();
 }
 
 static void prepare_layers(struct kr_request *param)
@@ -409,6 +408,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
 
+ns_election:
 	/* Elect best nameserver candidate */
 	kr_nsrep_elect(&qry->ns, &qry->zone_cut.nsset);
 	if (qry->ns.score < KR_NS_VALID) {
@@ -418,9 +418,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		return KNOT_STATE_PRODUCE;
 	} else {
 		if (qry->ns.addr.ip.sa_family == AF_UNSPEC) {
-			DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
+			if (ns_resolve_addr(qry, request) != 0) {
+				goto ns_election; /* Must try different NS */
+			}
 			knot_overlay_reset(&request->overlay);
-			return ns_resolve_addr(qry, request);
+			return KNOT_STATE_PRODUCE;
 		} else {
 			/* Address resolved, clear the flag */
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
