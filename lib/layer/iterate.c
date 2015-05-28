@@ -389,8 +389,10 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	/* Check for packet processing errors first. */
-	if (pkt->parsed < pkt->size) {
+	/* Check for packet processing errors first.
+	 * Note - we *MUST* check if it has at least a QUESTION,
+	 * otherwise it would crash on accessing QNAME. */
+	if (pkt->parsed < pkt->size || pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		DEBUG_MSG("<= malformed response\n");
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
