@@ -103,9 +103,9 @@ static int collect(knot_layer_t *ctx)
 	/* Query parameters and transport mode */
 	stat_add(map, "query.concurrent", -1);
 	if (knot_pkt_has_edns(param->answer)) {
-		stat_add(map, "query.edns", -1);
+		stat_add(map, "query.edns", 1);
 		if (knot_pkt_has_dnssec(param->answer)) {
-			stat_add(map, "query.dnssec", -1);
+			stat_add(map, "query.dnssec", 1);
 		}
 	}
 	/* Collect data from iterator queries */
