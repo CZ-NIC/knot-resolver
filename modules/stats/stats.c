@@ -99,8 +99,6 @@ static int collect(knot_layer_t *ctx)
 		if (elapsed > 1000.0) {
 			stat_add(map, "answer.slow", 1);
 		}
-	} else {
-		stat_add(map, "answer.unresolved", 1);
 	}
 	/* Query parameters and transport mode */
 	stat_add(map, "query.concurrent", -1);
