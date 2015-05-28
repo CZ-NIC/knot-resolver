@@ -181,6 +181,7 @@ int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 	namedb_val_t entry = { NULL, sizeof(*header) + data.len };
 
 	/* LMDB can do late write and avoid copy */
+	txn->owner->stats.insert += 1;
 	if (db_api == namedb_lmdb_api()) {
 		int ret = db_api->insert((namedb_txn_t *)txn, &key, &entry, 0);
 		if (ret != 0) {
