@@ -135,7 +135,8 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 static uint32_t packet_ttl(knot_pkt_t *pkt)
 {
-	uint32_t ttl = DEFAULT_NOTTL;
+	bool has_ttl = false;
+	uint32_t ttl = UINT32_MAX;
 	/* Fetch SOA from authority. */
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
@@ -158,9 +159,14 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 				knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
 				if (knot_rdata_ttl(rd) < ttl) {
 					ttl = knot_rdata_ttl(rd);
+					has_ttl = true;
 				}
 			}
 		}
+	}
+	/* Get default if no valid TTL present */
+	if (!has_ttl) {
+		ttl = DEFAULT_NOTTL;
 	}
 	return limit_ttl(ttl);
 }
