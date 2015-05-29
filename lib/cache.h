@@ -43,15 +43,16 @@ struct kr_cache_entry
  */
 struct kr_cache
 {
-    namedb_t *db;             /**< Storage instance */
-    struct {
-        uint32_t hit;         /**< Number of cache hits */
-        uint32_t miss;        /**< Number of cache misses */
-        uint32_t insert;      /**< Number of insertions */
-        uint32_t delete;      /**< Number of deletions */
-        uint32_t txn_read;    /**< Number of read transactions */
-        uint32_t txn_write;   /**< Number of write transactions */
-    } stats;
+	namedb_t *db;		      /**< Storage instance */
+	const namedb_api_t *api;      /**< Storage engine */
+	struct {
+		uint32_t hit;         /**< Number of cache hits */
+		uint32_t miss;        /**< Number of cache misses */
+		uint32_t insert;      /**< Number of insertions */
+		uint32_t delete;      /**< Number of deletions */
+		uint32_t txn_read;    /**< Number of read transactions */
+		uint32_t txn_write;   /**< Number of write transactions */
+	} stats;
 };
 
 /** Cache transaction */
@@ -61,22 +62,23 @@ struct kr_cache_txn {
 };
 
 /** Used storage backend for cache (default LMDB) */
-extern const namedb_api_t *(*kr_cache_storage)(void);
+//extern const namedb_api_t *(*kr_cache_storage)(void);
 
 /** Replace used cache storage backend. */
-static inline void kr_cache_storage_set(const namedb_api_t *(*api)(void))
-{
-	kr_cache_storage = api;
-}
+//static inline void kr_cache_storage_set(const namedb_api_t *(*api)(void))
+//{
+//	kr_cache_storage = api;
+//}
 
 /**
  * Open/create cache with provided storage options.
  * @param cache cache structure to be initialized
+ * @param api Storage engine
  * @param storage_opts Storage-specific options (may be NULL for default)
  * @param mm Memory context.
  * @return 0 or an error code
  */
-int kr_cache_open(struct kr_cache *cache, void *opts, mm_ctx_t *mm);
+int kr_cache_open(struct kr_cache *cache, const namedb_api_t *api, void *opts, mm_ctx_t *mm);
 
 /**
  * Close persistent cache.

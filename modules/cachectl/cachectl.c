@@ -51,7 +51,7 @@ static bool is_expired(struct kr_cache_entry *entry, uint32_t drift)
 static char* prune(void *env, struct kr_module *module, const char *args)
 {
 	struct engine *engine = env;
-	const namedb_api_t *storage = kr_cache_storage();
+	const namedb_api_t *storage = engine->resolver.cache.api; /* kr_cache_storage(); */
 
 	struct kr_cache_txn txn;
 	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, 0);

@@ -30,22 +30,15 @@
 
 /* Key size */
 #define KEY_SIZE (sizeof(uint8_t) + KNOT_DNAME_MAXLEN + sizeof(uint16_t))
+#define db_api(cache) (cache->api)
 
-/**
- * Used cache storage engine (default LMDB)
- * @todo namedb_t should change so it always contains a pointer
- *       to its API, so it can be carried around instead of keeping it in a
- *       global variable.
- */
-const namedb_api_t *(*kr_cache_storage)(void) = namedb_lmdb_api;
-#define db_api kr_cache_storage()
-
-int kr_cache_open(struct kr_cache *cache, void *opts, mm_ctx_t *mm)
+int kr_cache_open(struct kr_cache *cache, const namedb_api_t *api, void *opts, mm_ctx_t *mm)
 {
 	if (!cache) {
 		return kr_error(EINVAL);
 	}
-	int ret = db_api->init(&cache->db, mm, opts);
+	db_api(cache) = (api == NULL) ? namedb_lmdb_api() : api;
+	int ret = db_api(cache)->init(&cache->db, mm, opts);
 	if (ret != 0) {
 		return ret;
 	}
@@ -56,8 +49,8 @@ int kr_cache_open(struct kr_cache *cache, void *opts, mm_ctx_t *mm)
 void kr_cache_close(struct kr_cache *cache)
 {
 	if (cache && cache->db) {
-		if (db_api) {
-			db_api->deinit(cache->db);
+		if (db_api(cache)) {
+			db_api(cache)->deinit(cache->db);
 		}
 		cache->db = NULL;
 	}
@@ -65,7 +58,7 @@ void kr_cache_close(struct kr_cache *cache)
 
 int kr_cache_txn_begin(struct kr_cache *cache, struct kr_cache_txn *txn, unsigned flags)
 {
-	if (!cache || !cache->db || !txn) {
+	if (!cache || !cache->db || !db_api(cache) || !txn ) {
 		return kr_error(EINVAL);
 	}
 
@@ -75,16 +68,16 @@ int kr_cache_txn_begin(struct kr_cache *cache, struct kr_cache_txn *txn, unsigne
 		cache->stats.txn_write += 1;
 	}
 	txn->owner = cache;
-	return db_api->txn_begin(cache->db, (namedb_txn_t *)txn, flags);
+	return db_api(cache)->txn_begin(cache->db, (namedb_txn_t *)txn, flags);
 }
 
 int kr_cache_txn_commit(struct kr_cache_txn *txn)
 {
-	if (!txn) {
+	if (!txn || !txn->owner) {
 		return kr_error(EINVAL);
 	}
 
-	int ret = db_api->txn_commit((namedb_txn_t *)txn);
+	int ret = db_api(txn->owner)->txn_commit((namedb_txn_t *)txn);
 	if (ret != 0) {
 		kr_cache_txn_abort(txn);
 	}
@@ -93,8 +86,8 @@ int kr_cache_txn_commit(struct kr_cache_txn *txn)
 
 void kr_cache_txn_abort(struct kr_cache_txn *txn)
 {
-	if (txn) {
-		db_api->txn_abort((namedb_txn_t *)txn);
+	if (txn && txn->owner) {
+		db_api(txn->owner)->txn_abort((namedb_txn_t *)txn);
 	}
 }
 
@@ -108,15 +101,18 @@ static size_t cache_key(uint8_t *buf, uint8_t tag, const knot_dname_t *name, uin
 	return len + sizeof(type);
 }
 
-static struct kr_cache_entry *cache_entry(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
+static struct kr_cache_entry *cache_entry(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
 {
 	uint8_t keybuf[KEY_SIZE];
 	size_t key_len = cache_key(keybuf, tag, name, type);
+	if (!txn || !txn->owner) {
+		return NULL;
+	}
 
 	/* Look up and return value */
 	namedb_val_t key = { keybuf, key_len };
 	namedb_val_t val = { NULL, 0 };
-	int ret = db_api->find(txn, &key, &val, 0);
+	int ret = db_api(txn->owner)->find((namedb_txn_t *)txn, &key, &val, 0);
 	if (ret != KNOT_EOK) {
 		return NULL;
 	}
@@ -131,7 +127,7 @@ struct kr_cache_entry *kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, cons
 		return NULL;
 	}
 
-	struct kr_cache_entry *entry = cache_entry((namedb_txn_t *)txn, tag, name, type);
+	struct kr_cache_entry *entry = cache_entry(txn, tag, name, type);
 	if (!entry) {
 		txn->owner->stats.miss += 1;
 		return NULL;
@@ -170,7 +166,7 @@ static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *heade
 int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
                     struct kr_cache_entry *header, namedb_val_t data)
 {
-	if (!txn || !name || !tag || !header) {
+	if (!txn || !txn->owner || !name || !tag || !header) {
 		return kr_error(EINVAL);
 	}
 
@@ -182,8 +178,8 @@ int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 
 	/* LMDB can do late write and avoid copy */
 	txn->owner->stats.insert += 1;
-	if (db_api == namedb_lmdb_api()) {
-		int ret = db_api->insert((namedb_txn_t *)txn, &key, &entry, 0);
+	if (db_api(txn->owner) == namedb_lmdb_api()) {
+		int ret = db_api(txn->owner)->insert((namedb_txn_t *)txn, &key, &entry, 0);
 		if (ret != 0) {
 			return ret;
 		}
@@ -195,7 +191,7 @@ int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 			return kr_error(ENOMEM);
 		}
 		entry_write(entry.data, header, data);
-		int ret = db_api->insert((namedb_txn_t *)txn, &key, &entry, 0);
+		int ret = db_api(txn->owner)->insert((namedb_txn_t *)txn, &key, &entry, 0);
 		free(entry.data);
 		if (ret != 0) {
 			return ret;
@@ -207,7 +203,7 @@ int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 
 int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
 {
-	if (!txn || !tag || !name ) {
+	if (!txn || !txn->owner || !tag || !name ) {
 		return kr_error(EINVAL);
 	}
 
@@ -215,16 +211,16 @@ int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 	size_t key_len = cache_key(keybuf, tag, name, type);
 	namedb_val_t key = { keybuf, key_len };
 	txn->owner->stats.delete += 1;
-	return db_api->del((namedb_txn_t *)txn, &key);
+	return db_api(txn->owner)->del((namedb_txn_t *)txn, &key);
 }
 
 int kr_cache_clear(struct kr_cache_txn *txn)
 {
-	if (!txn) {
+	if (!txn || !txn->owner ) {
 		return kr_error(EINVAL);
 	}
 
-	return db_api->clear((namedb_txn_t *)txn);
+	return db_api(txn->owner)->clear((namedb_txn_t *)txn);
 }
 
 int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *timestamp)
