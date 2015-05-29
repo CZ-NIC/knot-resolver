@@ -109,7 +109,6 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	if (cut == NULL || ns == NULL) {
 		return kr_error(EINVAL);
 	}
-
 	/* Fetch/insert nameserver. */
 	pack_t *pack = kr_zonecut_find(cut, ns);
 	if (pack == NULL) {
@@ -120,17 +119,20 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 		}
 		pack_init(*pack);
 	}
-
 	/* Insert data (if has any) */
 	if (rdata == NULL) {
 		return kr_ok();
 	}
+	/* Check for duplicates */
 	uint16_t rdlen = knot_rdata_rdlen(rdata);
+	if (pack_obj_find(pack, knot_rdata_data(rdata), rdlen)) {
+		return kr_ok();
+	}
+	/* Push new address */
 	int ret = pack_reserve_mm(*pack, 1, rdlen, mm_reserve, cut->pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}
-
 	return pack_obj_push(pack, knot_rdata_data(rdata), rdlen);
 }
 
