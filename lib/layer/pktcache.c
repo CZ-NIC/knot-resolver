@@ -171,21 +171,23 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 	return limit_ttl(ttl);
 }
 
-static int stash(knot_layer_t *ctx)
+static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_rplan *rplan = &req->rplan;
-	if (EMPTY_LIST(rplan->resolved) || ctx->state & KNOT_STATE_FAIL) {
+	struct kr_query *qry = kr_rplan_current(rplan);
+	/* Cache only answers that make query resolved (i.e. authoritative)
+	 * that didn't fail during processing and are negative. */
+	if (!(qry->flags & QUERY_RESOLVED) || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state; /* Don't cache anything if failed. */
 	}
-	struct kr_query *qry = TAIL(rplan->resolved);
-	knot_pkt_t *pkt = req->answer;
+	bool is_auth = knot_wire_get_aa(pkt->wire);
+	int pkt_class = kr_response_classify(pkt);
+	if (qry->flags & QUERY_CACHED || (!(pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) && is_auth)) {
+		return ctx->state; /* Cache only negative, not-cached answers. */
+	}
 	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		return ctx->state; /* Only IN class */
-	}
-	int pkt_class = kr_response_classify(pkt);
-	if (qry->flags & QUERY_CACHED || !(pkt_class & (PKT_NODATA|PKT_NXDOMAIN))) {
-		return ctx->state; /* Cache only negative, not-cached answers. */
 	}
 	uint32_t ttl = packet_ttl(pkt);
 	if (ttl == 0) {
@@ -223,7 +225,7 @@ const knot_layer_api_t *pktcache_layer(struct kr_module *module)
 	static const knot_layer_api_t _layer = {
 		.begin   = &begin,
 		.produce = &peek,
-		.finish  = &stash
+		.consume  = &stash
 	};
 
 	return &_layer;
