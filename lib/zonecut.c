@@ -141,15 +141,17 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	}
 
 	/* Find the address list. */
+	int ret = kr_ok();
 	pack_t *pack = kr_zonecut_find(cut, ns);
 	if (pack == NULL) {
 		return kr_error(ENOENT);
 	}
-
 	/* Remove address from the pack. */
-	int ret = pack_obj_del(pack, knot_rdata_data(rdata), knot_rdata_rdlen(rdata));
+	if (rdata) {
+		ret = pack_obj_del(pack, knot_rdata_data(rdata), knot_rdata_rdlen(rdata));
+	}
+	/* No servers left, remove NS from the set. */
 	if (pack->len == 0) {
-		/* No servers left, remove NS from the set. */
 		free_addr_set((const char *)ns, pack, cut->pool);
 		return map_del(&cut->nsset, (const char *)ns);
 	}
