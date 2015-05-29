@@ -299,7 +299,7 @@ static int cache_backends(lua_State *L)
 	lua_newtable(L);
 	for (unsigned i = 0; i < registry->len; ++i) {
 		struct storage_api *storage = &registry->at[i];
-		lua_pushboolean(L, storage->api() == engine->resolver.cache.api); /* kr_cache_storage()); */
+		lua_pushboolean(L, storage->api() == engine->resolver.cache.api);
 		lua_setfield(L, -2, storage->prefix);
 	}
 	return 1;
@@ -309,7 +309,7 @@ static int cache_backends(lua_State *L)
 static int cache_count(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	const namedb_api_t *storage = engine->resolver.cache.api; /* kr_cache_storage(); */
+	const namedb_api_t *storage = engine->resolver.cache.api;
 
 	/* Fetch item count */
 	struct kr_cache_txn txn;
@@ -390,7 +390,6 @@ static int cache_open(lua_State *L)
 	kr_cache_close(&engine->resolver.cache);
 
 	/* Reopen cache */
-	/* kr_cache_storage_set(storage->api); */
 	void *storage_opts = storage->opts_create(conf, cache_size);
 	int ret = kr_cache_open(&engine->resolver.cache, storage->api(), storage_opts, engine->pool);
 	free(storage_opts);

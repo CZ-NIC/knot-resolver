@@ -44,7 +44,7 @@ int kmemcached_deinit(struct kr_module *module)
 {
 	struct engine *engine = module->data;
 	/* It was currently loaded, close cache */
-	if (kr_cache_storage == namedb_memcached_api) {
+	if (engine->resolver.cache.api == namedb_memcached_api()) {
 		kr_cache_close(&engine->resolver.cache);
 	}
 	/* Prevent from loading it again */
