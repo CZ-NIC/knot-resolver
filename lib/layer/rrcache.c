@@ -192,7 +192,7 @@ static int write_cache_answer(knot_pkt_t *pkt, struct kr_cache_txn *txn, mm_ctx_
 }
 
 /** Cache stub nameservers. */
-static int write_cache_authority(knot_pkt_t *pkt, struct kr_cache_txn *txn, mm_ctx_t *pool, uint32_t timestamp)
+static int write_cache_authority(struct kr_zonecut *cut, knot_pkt_t *pkt, struct kr_cache_txn *txn, mm_ctx_t *pool, uint32_t timestamp)
 {
 	knot_rrset_t glue_rr = { NULL, 0, 0 };
 	knot_rrset_t cache_rr = { NULL, 0, 0 };
@@ -204,6 +204,10 @@ static int write_cache_authority(knot_pkt_t *pkt, struct kr_cache_txn *txn, mm_c
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
+			/* Cache in-bailiwick data only */
+			if (!knot_dname_in(cut->name, rr->owner)) {
+				return KNOT_ENOENT;
+			}
 			/* Cache glue (if contains) */
 			for (unsigned i = 0; i < sizeof(type_list)/sizeof(uint16_t); ++i) {
 				knot_dname_t *owner = (knot_dname_t *)knot_ns_name(&rr->rrs, 0);
@@ -254,7 +258,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		ret = write_cache_answer(pkt, &txn, pool, timestamp);
 	}
 	if (ret == KNOT_EOK) {
-		ret = write_cache_authority(pkt, &txn, pool, timestamp);
+		ret = write_cache_authority(&query->zone_cut, pkt, &txn, pool, timestamp);
 	}
 
 	/* Cache full, do what we must. */

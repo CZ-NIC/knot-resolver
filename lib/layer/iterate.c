@@ -192,8 +192,8 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 	/* Authority MUST be at/below the authority of the nameserver, otherwise
 	 * possible cache injection attempt. */
 	if (!knot_dname_in(cut->name, rr->owner)) {
-		DEBUG_MSG("<= authority: ns outside bailiwick, rejecting\n");
-		return KNOT_STATE_FAIL;
+		DEBUG_MSG("<= authority: ns outside bailiwick, ignoring\n");
+		return state;
 	}
 
 	/* Update zone cut name */
