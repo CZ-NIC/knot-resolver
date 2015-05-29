@@ -38,6 +38,14 @@
 /* Defaults */
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "stat",  fmt)
 
+/** @internal Subtract time (best effort) */
+float time_diff(struct timeval *begin, struct timeval *end)
+{
+	return (end->tv_sec - begin->tv_sec) * 1000 +
+	       (end->tv_usec - begin->tv_usec) / 1000.0;
+
+}
+
 /** @internal Add to map counter */
 static inline void stat_add(map_t *map, const char *key, ssize_t incr)
 {
@@ -79,19 +87,25 @@ static int collect(knot_layer_t *ctx)
 	collect_answer(map, param->answer);
 	/* Count cached and unresolved */
 	if (!EMPTY_LIST(rplan->resolved)) {
-		struct kr_query *qry = TAIL(rplan->resolved);
-		if (qry->flags & QUERY_CACHED) {
+		struct kr_query *last = TAIL(rplan->resolved);
+		if (last->flags & QUERY_CACHED) {
 			stat_add(map, "answer.cached", 1);
 		}
-	} else {
-		stat_add(map, "answer.unresolved", 1);
+		/* Count slow queries (>1000ms) */
+		struct kr_query *first = HEAD(rplan->resolved);
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		float elapsed = time_diff(&first->timestamp, &now);
+		if (elapsed > 1000.0) {
+			stat_add(map, "answer.slow", 1);
+		}
 	}
 	/* Query parameters and transport mode */
 	stat_add(map, "query.concurrent", -1);
 	if (knot_pkt_has_edns(param->answer)) {
-		stat_add(map, "query.edns", -1);
+		stat_add(map, "query.edns", 1);
 		if (knot_pkt_has_dnssec(param->answer)) {
-			stat_add(map, "query.dnssec", -1);
+			stat_add(map, "query.dnssec", 1);
 		}
 	}
 	/* Collect data from iterator queries */

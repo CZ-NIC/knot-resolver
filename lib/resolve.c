@@ -47,22 +47,27 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	 * this would lead to dependency loop in current zone cut.
 	 * Prefer IPv6 and continue with IPv4 if not available.
 	 */
-	uint16_t next_type = KNOT_RRTYPE_AAAA;
+	uint16_t next_type = 0;
 	if (!(qry->flags & QUERY_AWAIT_IPV6)) {
 		next_type = KNOT_RRTYPE_AAAA;
 		qry->flags |= QUERY_AWAIT_IPV6;
 	} else if (!(qry->flags & QUERY_AWAIT_IPV4)) {
 		next_type = KNOT_RRTYPE_A;
 		qry->flags |= QUERY_AWAIT_IPV4;
-	} else {
-		DEBUG_MSG("=> dependency loop, bailing out\n");
-		kr_rplan_pop(rplan, qry);
-		return KNOT_STATE_PRODUCE;
 	}
-
+	/* Bail out if the query is already pending or dependency loop. */
+	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
+		DEBUG_MSG("=> dependency loop, bailing out\n");
+		invalidate_ns(rplan, qry);
+		return kr_error(EHOSTUNREACH);
+	}
+	/* Push new query to the resolution plan */
 	struct kr_query *next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
+	if (!next) {
+		return kr_error(ENOMEM);
+	}
 	kr_zonecut_set_sbelt(&next->zone_cut);
-	return KNOT_STATE_PRODUCE;
+	return kr_ok();
 }
 
 static void prepare_layers(struct kr_request *param)
@@ -289,14 +294,8 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 		return KNOT_STATE_FAIL;
 	}
 
-	/* Find closest zone cut for this query. */
-	namedb_txn_t txn;
-	if (kr_cache_txn_begin(rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
-		kr_zonecut_set_sbelt(&qry->zone_cut);
-	} else {
-		kr_zonecut_find_cached(&qry->zone_cut, &txn, qry->timestamp.tv_sec);
-		kr_cache_txn_abort(&txn);
-	}
+	/* Deferred zone cut lookup for this query. */
+	qry->flags |= QUERY_AWAIT_CUT;
 
 	/* Initialize answer packet */
 	knot_pkt_t *answer = request->answer;
@@ -395,6 +394,21 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 	}
 
+	/* The query wasn't resolved from cache,
+	 * now it's the time to look up closest zone cut from cache.
+	 */
+	if (qry->flags & QUERY_AWAIT_CUT) {
+		struct kr_cache_txn txn;
+		if (kr_cache_txn_begin(&rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
+			kr_zonecut_set_sbelt(&qry->zone_cut);
+		} else {
+			kr_zonecut_find_cached(&qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec);
+			kr_cache_txn_abort(&txn);
+		}
+		qry->flags &= ~QUERY_AWAIT_CUT;
+	}
+
+ns_election:
 	/* Elect best nameserver candidate */
 	kr_nsrep_elect(&qry->ns, &qry->zone_cut.nsset);
 	if (qry->ns.score < KR_NS_VALID) {
@@ -404,9 +418,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		return KNOT_STATE_PRODUCE;
 	} else {
 		if (qry->ns.addr.ip.sa_family == AF_UNSPEC) {
-			DEBUG_MSG("=> ns missing A/AAAA, fetching\n");
+			if (ns_resolve_addr(qry, request) != 0) {
+				goto ns_election; /* Must try different NS */
+			}
 			knot_overlay_reset(&request->overlay);
-			return ns_resolve_addr(qry, request);
+			return KNOT_STATE_PRODUCE;
 		} else {
 			/* Address resolved, clear the flag */
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);

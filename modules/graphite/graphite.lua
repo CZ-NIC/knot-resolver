@@ -22,15 +22,19 @@ function graphite.publish()
 	if type(now_metrics) ~= 'table' then
 		return 0 -- No metrics to watch
 	end
-	for key,val in pairs(now_metrics) do
-		local msg = key..' '..val..' '..now..'\n'
-		if graphite.prefix then
-			msg = graphite.prefix..'.'..msg
-		end
-		for i in ipairs(graphite.cli) do
-			graphite.cli[i]:send(msg)
+	local function publish_table(metrics, prefix)
+		for key,val in pairs(metrics) do
+			local msg = key..' '..val..' '..now..'\n'
+			if prefix then
+				msg = prefix..'.'..msg
+			end
+			for i in ipairs(graphite.cli) do
+				graphite.cli[i]:send(msg)
+			end
 		end
 	end
+	publish_table(now_metrics, graphite.prefix)
+	publish_table(cache.stats(), graphite.prefix..'.cache')
 	return 0
 end
 

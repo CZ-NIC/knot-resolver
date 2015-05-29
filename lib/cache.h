@@ -38,29 +38,54 @@ struct kr_cache_entry
 	uint8_t  data[];
 };
 
+/**
+ * Cache structure, keeps API, instance and metadata.
+ */
+struct kr_cache
+{
+	namedb_t *db;		      /**< Storage instance */
+	const namedb_api_t *api;      /**< Storage engine */
+	struct {
+		uint32_t hit;         /**< Number of cache hits */
+		uint32_t miss;        /**< Number of cache misses */
+		uint32_t insert;      /**< Number of insertions */
+		uint32_t delete;      /**< Number of deletions */
+		uint32_t txn_read;    /**< Number of read transactions */
+		uint32_t txn_write;   /**< Number of write transactions */
+	} stats;
+};
+
+/** Cache transaction */
+struct kr_cache_txn {
+    namedb_txn_t txn;        /**< Storage transaction */  
+    struct kr_cache *owner;  /**< Transaction owner */
+};
+
 /** Used storage backend for cache (default LMDB) */
-extern const namedb_api_t *(*kr_cache_storage)(void);
+//extern const namedb_api_t *(*kr_cache_storage)(void);
 
 /** Replace used cache storage backend. */
-static inline void kr_cache_storage_set(const namedb_api_t *(*api)(void))
-{
-	kr_cache_storage = api;
-}
+//static inline void kr_cache_storage_set(const namedb_api_t *(*api)(void))
+//{
+//	kr_cache_storage = api;
+//}
 
 /**
  * Open/create cache with provided storage options.
+ * @param cache cache structure to be initialized
+ * @param api Storage engine
  * @param storage_opts Storage-specific options (may be NULL for default)
  * @param mm Memory context.
- * @return database instance or NULL
+ * @return 0 or an error code
  */
-namedb_t *kr_cache_open(void *storage_opts, mm_ctx_t *mm);
+int kr_cache_open(struct kr_cache *cache, const namedb_api_t *api, void *opts, mm_ctx_t *mm);
 
 /**
  * Close persistent cache.
  * @note This doesn't clear the data, just closes the connection to the database.
  * @param cache database instance
  */
-void kr_cache_close(namedb_t *cache);
+void kr_cache_close(struct kr_cache *cache);
 
 /**
  * Begin cache transaction (read-only or write).
@@ -70,20 +95,20 @@ void kr_cache_close(namedb_t *cache);
  * @param flags transaction flags (see namedb.h in libknot)
  * @return 0 or an errcode
  */
-int kr_cache_txn_begin(namedb_t *cache, namedb_txn_t *txn, unsigned flags);
+int kr_cache_txn_begin(struct kr_cache *cache, struct kr_cache_txn *txn, unsigned flags);
 
 /**
  * Commit existing transaction.
  * @param txn transaction instance
  * @return 0 or an errcode
  */
-int kr_cache_txn_commit(namedb_txn_t *txn);
+int kr_cache_txn_commit(struct kr_cache_txn *txn);
 
 /**
  * Abort existing transaction instance.
  * @param txn transaction instance
  */
-void kr_cache_txn_abort(namedb_txn_t *txn);
+void kr_cache_txn_abort(struct kr_cache_txn *txn);
 
 /**
  * Peek the cache for asset (name, type, tag)
@@ -95,7 +120,7 @@ void kr_cache_txn_abort(namedb_txn_t *txn);
  * @param timestamp current time (will be replaced with drift if successful)
  * @return cache entry or NULL
  */
-struct kr_cache_entry *kr_cache_peek(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name,
+struct kr_cache_entry *kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name,
                                      uint16_t type, uint32_t *timestamp);
 
 /**
@@ -108,7 +133,7 @@ struct kr_cache_entry *kr_cache_peek(namedb_txn_t *txn, uint8_t tag, const knot_
  * @param data inserted data
  * @return 0 or an errcode
  */
-int kr_cache_insert(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
+int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
                     struct kr_cache_entry *header, namedb_val_t data);
 
 /**
@@ -119,14 +144,14 @@ int kr_cache_insert(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name, ui
  * @param type record type
  * @return 0 or an errcode
  */
-int kr_cache_remove(namedb_txn_t *txn, uint8_t tag, const knot_dname_t *name, uint16_t type);
+int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type);
 
 /**
  * Clear all items from the cache.
  * @param txn transaction instance
  * @return 0 or an errcode
  */
-int kr_cache_clear(namedb_txn_t *txn);
+int kr_cache_clear(struct kr_cache_txn *txn);
 
 /**
  * Peek the cache for given RRSet (name, type)
@@ -136,7 +161,7 @@ int kr_cache_clear(namedb_txn_t *txn);
  * @param timestamp current time (will be replaced with drift if successful)
  * @return 0 or an errcode
  */
-int kr_cache_peek_rr(namedb_txn_t *txn, knot_rrset_t *rr, uint32_t *timestamp);
+int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *timestamp);
 
 /**
  * Clone read-only RRSet and adjust TTLs.
@@ -154,4 +179,4 @@ knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ct
  * @param timestamp current time
  * @return 0 or an errcode
  */
-int kr_cache_insert_rr(namedb_txn_t *txn, const knot_rrset_t *rr, uint32_t timestamp);
+int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint32_t timestamp);

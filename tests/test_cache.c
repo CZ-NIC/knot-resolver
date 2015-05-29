@@ -24,7 +24,7 @@
 #include <time.h>
 
 mm_ctx_t global_mm;
-namedb_txn_t global_txn;
+struct kr_cache_txn global_txn;
 knot_rrset_t global_rr;
 const char *global_env;
 struct kr_cache_entry global_fake_ce;
@@ -39,32 +39,32 @@ namedb_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
 #define CACHE_TIME 0
 
 /* Simulate init failure */
-static int test_init_failure(namedb_t **db_ptr, mm_ctx_t *mm, void *arg)
+static int fake_test_init(namedb_t **db_ptr, mm_ctx_t *mm, void *arg)
 {
-	return KNOT_EINVAL;
+	return mock();
 }
 
 /* Simulate commit failure */
-static int test_commit_failure(namedb_txn_t *txn)
+static int fake_test_commit(namedb_txn_t *txn)
 {
 	return KNOT_ESPACE;
 }
 
 /* Dummy abort */
-static void test_abort(namedb_txn_t *txn)
+static void fake_test_abort(namedb_txn_t *txn)
 {
 	return;
 }
 
 /* Stub for find */
-static int test_find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
+static int fake_test_find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
 {
 	val->data = &global_fake_ce;
 	return KNOT_EOK;
 }
 
 /* Stub for insert */
-static int test_ins(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
+static int fake_test_ins(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
 {
 	int err = KNOT_EINVAL, res_cmp;
 	struct kr_cache_entry *header = val->data;
@@ -81,33 +81,95 @@ static int test_ins(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, uns
 	return err;
 }
 
-
 /* Fake api */
-static const namedb_api_t *namedb_lmdb_api_fake(void)
+static namedb_api_t *fake_namedb_lmdb_api(void)
 {
-	static const namedb_api_t api_fake = {
-		"lmdb_api_fake",
-		test_init_failure, NULL,
-		NULL, test_commit_failure, test_abort,
-		NULL, NULL, test_find, test_ins, NULL,
+	static namedb_api_t fake_api = {
+		"lmdb_fake_api",
+		fake_test_init, NULL,
+		NULL, fake_test_commit, fake_test_abort,
+		NULL, NULL, fake_test_find, fake_test_ins, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL
 	};
 
-	return &api_fake;
+	return &fake_api;
+}
+
+/* Test cache open */
+static int test_open(void **state, namedb_api_t *api)
+{
+	static struct kr_cache cache;
+	struct namedb_lmdb_opts opts;
+	memset(&opts, 0, sizeof(opts));
+	opts.path = global_env;
+	opts.mapsize = CACHE_SIZE;
+	*state = &cache;
+	return kr_cache_open(&cache, api, &opts, &global_mm);
+}
+
+/* fake api test open */
+static void test_open_fake_api(void **state)
+{
+	bool res;
+	will_return(fake_test_init,KNOT_EOK);
+	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EOK);
+	res = (((struct kr_cache *)(*state))->api == fake_namedb_lmdb_api());
+	assert_true(res);
+}
+
+static void test_open_conventional_api(void **state)
+{
+	bool res;
+	assert_int_equal(test_open(state, NULL),KNOT_EOK);
+	res = (((struct kr_cache *)(*state))->api == namedb_lmdb_api());
+	assert_true(res);
+}
+
+
+/* Test cache teardown. */
+static void test_close(void **state)
+{
+	kr_cache_close(*state);
+	*state = NULL;
+}
+
+/* Open transaction */
+static struct kr_cache_txn *test_txn_write(void **state)
+{
+	assert_non_null(*state);
+	assert_int_equal(kr_cache_txn_begin(*state, &global_txn, 0), KNOT_EOK);
+	return &global_txn;
+}
+
+/* Open transaction */
+static struct kr_cache_txn *test_txn_rdonly(void **state)
+{
+	assert_non_null(*state);
+	assert_int_equal(kr_cache_txn_begin(*state, &global_txn, NAMEDB_RDONLY), 0);
+	return &global_txn;
+}
+
+/* test invalid parameters and some api failures */
+static void test_fake_invalid (void **state)
+{
+//	knot_dname_t dname[] = "";
+//	assert_null(kr_cache_open(NULL, NULL, NULL));
+//	assert_int_equal(kr_cache_peek(&global_txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0),
+//		&global_fake_ce);
+//	assert_int_not_equal(kr_cache_txn_commit(&global_txn), KNOT_EOK);
+	will_return(fake_test_init,KNOT_EINVAL);
+	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EINVAL);
 }
 
 
 /* Test invalid parameters and some api failures. */
 static void test_invalid(void **state)
 {
-	const namedb_api_t *(*kr_cache_storage_saved)(void);
-	void *ret_open, *ret_cache_peek;
-	int ret_commit;
-	uint32_t timestamp = CACHE_TIME;
 	knot_dname_t dname[] = "";
+	uint32_t timestamp = CACHE_TIME;
 
 	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
-	assert_int_not_equal(kr_cache_txn_begin(&global_env, NULL, 0), 0);
+	assert_int_not_equal(kr_cache_txn_begin(*state, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
 	assert_null(kr_cache_peek(NULL, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, &timestamp));
 	assert_null(kr_cache_peek(&global_txn, 0, dname, KNOT_RRTYPE_TSIG, &timestamp));
@@ -116,6 +178,7 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_peek_rr(&global_txn, NULL, NULL), 0);
 	assert_int_not_equal(kr_cache_insert_rr(&global_txn, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_insert_rr(NULL, NULL, 0), 0);
+	assert_int_equal(kr_cache_insert_rr(&global_txn, &global_rr, 0), 0);
 	assert_int_not_equal(kr_cache_insert(NULL, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data), 0);
 	assert_int_not_equal(kr_cache_insert(&global_txn, 0, dname,
@@ -128,94 +191,20 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_remove(&global_txn, KR_CACHE_RR, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_remove(NULL, 0, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_clear(NULL), 0);
-
-	/* save original api */
-	kr_cache_storage_saved = kr_cache_storage;
-	/* fake to simulate failures or constant success */
-	kr_cache_storage_set(namedb_lmdb_api_fake);
-
-	/* call kr_cache_peek() with no time constraint */
-	ret_cache_peek = kr_cache_peek(&global_txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0);
-	ret_open = kr_cache_open(NULL, NULL);
-	ret_commit = kr_cache_txn_commit(&global_txn);
-
-	/* restore */
-	kr_cache_storage_set(kr_cache_storage_saved);
-	assert_int_equal(ret_cache_peek, &global_fake_ce);
-	assert_null(ret_open);
-	assert_int_not_equal(ret_commit, KNOT_EOK);
-}
-
-/* Test cache open */
-static void test_open(void **state)
-{
-	struct namedb_lmdb_opts opts;
-	memset(&opts, 0, sizeof(opts));
-	opts.path = global_env;
-	opts.mapsize = CACHE_SIZE;
-	*state = kr_cache_open(&opts, &global_mm);
-	assert_non_null(*state);
-}
-
-/* Test cache teardown. */
-static void test_close(void **state)
-{
-	kr_cache_close(*state);
-	*state = NULL;
-}
-
-
-/* Open transaction */
-static namedb_txn_t *test_txn_write(void **state)
-{
-	assert_non_null(*state);
-	assert_int_equal(kr_cache_txn_begin(*state, &global_txn, 0), KNOT_EOK);
-	return &global_txn;
-}
-
-/* Open transaction */
-static namedb_txn_t *test_txn_rdonly(void **state)
-{
-	assert_non_null(*state);
-	assert_int_equal(kr_cache_txn_begin(*state, &global_txn, NAMEDB_RDONLY), 0);
-	return &global_txn;
 }
 
 /* Test cache write */
-static void test_insert(void **state)
+static void test_insert_rr(void **state)
 {
-	const namedb_api_t *(*kr_cache_storage_saved)(void);
-	int i, ret_cache_insert;
-	knot_dname_t dname[] = "";
 	test_random_rr(&global_rr, CACHE_TTL);
-
-	namedb_txn_t *txn = test_txn_write(state);
+	struct kr_cache_txn *txn = test_txn_write(state);
 	int ret = kr_cache_insert_rr(txn, &global_rr, CACHE_TIME);
 	if (ret == KNOT_EOK) {
 		ret = kr_cache_txn_commit(txn);
 	} else {
 		kr_cache_txn_abort(txn);
 	}
-
 	assert_int_equal(ret, KNOT_EOK);
-
-	memset(&global_fake_ce,0xAA,sizeof(global_fake_ce));
-	srand(time(NULL));
-	for (i = 0; i < NAMEDB_DATA_SIZE; i += 4)
-	{
-	    int r = rand();
-	    namedb_data[i] = r;
-	    namedb_data[i + 1] = r >> 8;
-	    namedb_data[i + 2] = r >> 16;
-	    namedb_data[i + 3] = r >> 24;
-	}
-
-	kr_cache_storage_saved = kr_cache_storage;
-	kr_cache_storage_set(namedb_lmdb_api_fake);
-	ret_cache_insert = kr_cache_insert(&global_txn, KR_CACHE_USER, dname,
-		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
-	kr_cache_storage_set(kr_cache_storage_saved);
-	assert_int_equal(ret_cache_insert, KNOT_EOK);
 }
 
 /* Test cache read */
@@ -225,7 +214,7 @@ static void test_query(void **state)
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
-	namedb_txn_t *txn = test_txn_rdonly(state);
+	struct kr_cache_txn *txn = test_txn_rdonly(state);
 
 	for (uint32_t timestamp = CACHE_TIME; timestamp < CACHE_TIME + CACHE_TTL; ++timestamp) {
 		uint32_t drift = timestamp;
@@ -245,7 +234,7 @@ static void test_query_aged(void **state)
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
-	namedb_txn_t *txn = test_txn_rdonly(state);
+	struct kr_cache_txn *txn = test_txn_rdonly(state);
 	int ret = kr_cache_peek_rr(txn, &cache_rr, &timestamp);
 	assert_int_equal(ret, KNOT_ENOENT);
 	kr_cache_txn_abort(txn);
@@ -258,7 +247,7 @@ static void test_remove(void **state)
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
-	namedb_txn_t *txn = test_txn_write(state);
+	struct kr_cache_txn *txn = test_txn_write(state);
 	int ret = kr_cache_remove(txn, KR_CACHE_RR, cache_rr.owner, cache_rr.type);
 	assert_int_equal(ret, KNOT_EOK);
 	ret = kr_cache_peek_rr(txn, &cache_rr, &timestamp);
@@ -269,7 +258,7 @@ static void test_remove(void **state)
 /* Test cache fill */
 static void test_fill(void **state)
 {
-	namedb_txn_t *txn = test_txn_write(state);
+	struct kr_cache_txn *txn = test_txn_write(state);
 
 	/* Fill with random values. */
 	int ret = KNOT_EOK;
@@ -301,7 +290,7 @@ static void test_fill(void **state)
 /* Test cache clear */
 static void test_clear(void **state)
 {
-	namedb_txn_t *txn = test_txn_write(state);
+	struct kr_cache_txn *txn = test_txn_write(state);
 	int preempt_ret = kr_cache_clear(txn);
 	int commit_ret = kr_cache_txn_commit(txn);
 	assert_int_equal(preempt_ret, KNOT_EOK);
@@ -314,12 +303,17 @@ int main(void)
 	test_mm_ctx_init(&global_mm);
 	global_env = test_tmpdir_create();
 
+	/* Invalid input */
+	const UnitTest tests_bad[] = {
+		group_test_setup(test_open_fake_api),
+		unit_test(test_fake_invalid),
+		group_test_teardown(test_close)
+	};
+
 	const UnitTest tests[] = {
-		/* Invalid input */
-		unit_test(test_invalid),
 	        /* Cache persistence */
-	        group_test_setup(test_open),
-	        unit_test(test_insert),
+	        group_test_setup(test_open_conventional_api),
+	        unit_test(test_insert_rr),
 	        unit_test(test_query),
 	        /* Cache aging */
 	        unit_test(test_query_aged),
@@ -331,10 +325,12 @@ int main(void)
 	        group_test_teardown(test_close)
 	};
 
-	int ret = run_group_tests(tests);
+	int ret = run_group_tests(tests_bad);
+	if (ret == 0) {
+		ret = run_group_tests(tests);
+	}
 
 	/* Cleanup */
 	test_tmpdir_remove(global_env);
-
 	return ret;
 }

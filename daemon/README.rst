@@ -376,6 +376,13 @@ daemons or manipulated from other processes, making for example synchronised loa
 
    	[lmdb://] => true
 
+.. function:: cache.stats()
+
+   :return: table of cache counters
+
+  The cache collects counters on various operations (hits, misses, transactions, ...). This function call returns a table of
+  cache counters that can be used for calculating statistics.
+
 .. function:: cache.open(max_size[, config_uri])
 
    :param number max_size: Maximum cache size in bytes.

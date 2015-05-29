@@ -49,6 +49,12 @@ static void test_pack_std(void **state)
 		count += 1;
 	}
 
+	/* Find */
+	it = pack_obj_find(&pack, U8("de"), 2);
+	assert_non_null(it);
+	it = pack_obj_find(&pack, U8("ed"), 2);
+	assert_null(it);
+
 	/* Delete */
 	assert_int_not_equal(pack_obj_del(&pack, U8("be"), 2), 0);
 	assert_int_equal(pack_obj_del(&pack, U8("de"), 2), 0);
