@@ -18,6 +18,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <libknot/internal/sockaddr.h>
 
 #include "lib/nsrep.h"
 #include "lib/defines.h"
@@ -36,6 +37,7 @@ static void update_nsrep(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t 
 	ns->name = name;
 	ns->score = score;
 	if (addr == NULL) {
+		ns->addr.ip.sa_family = AF_UNSPEC;
 		return;
 	}
 
@@ -54,28 +56,68 @@ static void update_nsrep(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t 
 
 static int eval_nsrep(const char *k, void *v, void *baton)
 {
-	unsigned score = KR_NS_VALID;
 	struct kr_nsrep *ns = baton;
+	unsigned score = ns->score;
 	pack_t *addr_set = v;
 	uint8_t *addr = NULL;
 
 	/* Name server is better candidate if it has address record. */
-	if (addr_set->len > 0) {
-		addr = pack_head(*addr_set);
-		score += 1;
+	uint8_t *it = pack_head(*addr_set);
+	while (it != pack_tail(*addr_set)) {
+		void *val = pack_obj_val(it);
+		size_t len = pack_obj_len(it);
+		unsigned *cached = lru_get(ns->repcache, val, len);
+		unsigned addr_score = (cached) ? *cached : KR_NS_UNKNOWN / 2;
+		/** @todo Favorize IPv6 */
+		if (addr_score <= score) {
+			addr = it;
+			score = addr_score;
+		}
+		it = pack_obj_next(it);
+	}
+	/* No known address */
+	if (!addr) {
+		score = KR_NS_UNKNOWN;
 	}
 
 	/* Update best scoring nameserver. */
-	if (ns->score < score) {
+	if (score < ns->score) {
 		update_nsrep(ns, (const knot_dname_t *)k, addr, score);
 	}
 
 	return kr_ok();
 }
 
-int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset)
+int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset, kr_nsrep_lru_t *repcache)
 {
+	ns->repcache = repcache;
 	ns->addr.ip.sa_family = AF_UNSPEC;
-	ns->score = KR_NS_INVALID;
+	ns->score = KR_NS_MAX_SCORE + 1;
 	return map_walk(nsset, eval_nsrep, ns);
+}
+
+int kr_nsrep_update(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *repcache)
+{
+	if (!ns || !repcache || ns->addr.ip.sa_family == AF_UNSPEC) {
+		return kr_error(EINVAL);
+	}
+
+	char *addr = kr_nsrep_inaddr(ns->addr);
+	size_t addr_len = kr_nsrep_inaddr_len(ns->addr);
+	unsigned *cur = lru_set(repcache, addr, addr_len);
+	if (!cur) {
+		return kr_error(ENOMEM);
+	}
+	/* Score limits */
+	if (score > KR_NS_MAX_SCORE) {
+		score = KR_NS_MAX_SCORE;
+	}
+	/* Set initial value or smooth over last two measurements */
+	if (*cur != 0) {
+		*cur = (*cur + score) / 2;
+	} else {
+	/* First measurement, reset */
+		*cur = score;
+	}
+	return kr_ok();
 }

@@ -18,17 +18,24 @@
 
 #include <netinet/in.h>
 #include <libknot/dname.h>
+#include <limits.h>
 
 #include "lib/generic/map.h"
+#include "lib/generic/lru.h"
 
 /** 
-  * Special values for nameserver score.
-  * All positive values mean valid nameserver.
+  * Special values for nameserver score (RTT in miliseconds)
   */
 enum kr_ns_score {
-	KR_NS_INVALID = 0,
-	KR_NS_VALID   = 1
+	KR_NS_MAX_SCORE = 10 * 1000,
+	KR_NS_TIMEOUT   = KR_NS_MAX_SCORE,
+	KR_NS_UNKNOWN   = 10
 };
+
+/**
+ * NS reputation/QoS tracking.
+ */
+typedef lru_hash(unsigned) kr_nsrep_lru_t;
 
 /**
  * Name server representation.
@@ -39,6 +46,7 @@ struct kr_nsrep
 {
 	unsigned score;                  /**< Server score */
 	const knot_dname_t *name;        /**< Server name */
+	kr_nsrep_lru_t *repcache;        /**< Reputation cache pointer */
 	union {
 		struct sockaddr ip;
 		struct sockaddr_in ip4;
@@ -55,8 +63,21 @@ struct kr_nsrep
 
 /**
  * Elect best nameserver/address pair from the nsset.
- * @param  ns    updated NS representation
- * @param  nsset NS set to choose from
- * @return       score, see enum kr_ns_score
+ * @param  ns           updated NS representation
+ * @param  nsset        NS set to choose from
+ * @param  repcache     reputation storage
+ * @return              score, see enum kr_ns_score
  */
-int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset);
+int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset, kr_nsrep_lru_t *repcache);
+
+/**
+ * Update NS quality information.
+ *
+ * @brief Reputation is smoothed over last N measurements.
+ * 
+ * @param  ns           updated NS representation
+ * @param  score        new score (i.e. RTT), see enum kr_ns_score
+ * @param  reputation   reputation storage
+ * @return              0 on success, error code on failure
+ */
+int kr_nsrep_update(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *repcache);

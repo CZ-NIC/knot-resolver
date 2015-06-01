@@ -28,14 +28,26 @@
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "resl",  fmt)
 
+/** @internal Subtract time (best effort) */
+float time_diff(struct timeval *begin, struct timeval *end)
+{
+	return (end->tv_sec - begin->tv_sec) * 1000 +
+	       (end->tv_usec - begin->tv_usec) / 1000.0;
+
+}
+
 /** Invalidate current NS/addr pair. */
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
-	uint8_t *addr = kr_nsrep_inaddr(qry->ns.addr);
-	size_t addr_len = kr_nsrep_inaddr_len(qry->ns.addr);
-	knot_rdata_t rdata[knot_rdata_array_size(addr_len)];
-	knot_rdata_init(rdata, addr_len, addr, 0);
-	return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata);
+	if (qry->ns.addr.ip.sa_family != AF_UNSPEC) {
+		uint8_t *addr = kr_nsrep_inaddr(qry->ns.addr);
+		size_t addr_len = kr_nsrep_inaddr_len(qry->ns.addr);
+		knot_rdata_t rdata[knot_rdata_array_size(addr_len)];
+		knot_rdata_init(rdata, addr_len, addr, 0);
+		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata);
+	} else {
+		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, NULL);
+	}
 }
 
 static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
@@ -334,6 +346,8 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 			DEBUG_MSG("=> ns unreachable, retrying over TCP\n");
 			qry->flags |= QUERY_TCP;
 			return KNOT_STATE_CONSUME; /* Try again */
+		} else {
+			kr_nsrep_update(&qry->ns, KR_NS_TIMEOUT, qry->ns.repcache);
 		}
 	} else {
 		state = knot_overlay_consume(&request->overlay, packet);
@@ -345,6 +359,11 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 		if (invalidate_ns(rplan, qry) == 0) {
 			qry->flags &= ~QUERY_TCP;
 		}
+	/* Track RTT for iterative answers */
+	} else if (!(qry->flags & QUERY_CACHED)) {
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		kr_nsrep_update(&qry->ns, time_diff(&qry->timestamp, &now), qry->ns.repcache);
 	}
 
 	/* Pop query if resolved. */
@@ -399,7 +418,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 */
 	if (qry->flags & QUERY_AWAIT_CUT) {
 		struct kr_cache_txn txn;
-		if (kr_cache_txn_begin(&rplan->context->cache, &txn, NAMEDB_RDONLY) != 0) {
+		if (kr_cache_txn_begin(&request->ctx->cache, &txn, NAMEDB_RDONLY) != 0) {
 			kr_zonecut_set_sbelt(&qry->zone_cut);
 		} else {
 			kr_zonecut_find_cached(&qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec);
@@ -410,8 +429,8 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 ns_election:
 	/* Elect best nameserver candidate */
-	kr_nsrep_elect(&qry->ns, &qry->zone_cut.nsset);
-	if (qry->ns.score < KR_NS_VALID) {
+	kr_nsrep_elect(&qry->ns, &qry->zone_cut.nsset, request->ctx->nsrep);
+	if (qry->ns.score > KR_NS_MAX_SCORE) {
 		DEBUG_MSG("=> no valid NS left\n");
 		knot_overlay_reset(&request->overlay);
 		kr_rplan_pop(rplan, qry);
@@ -419,6 +438,7 @@ ns_election:
 	} else {
 		if (qry->ns.addr.ip.sa_family == AF_UNSPEC) {
 			if (ns_resolve_addr(qry, request) != 0) {
+				qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
 				goto ns_election; /* Must try different NS */
 			}
 			knot_overlay_reset(&request->overlay);
@@ -435,7 +455,7 @@ ns_election:
 	struct sockaddr *addr = &qry->ns.addr.ip;
 	inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr), ns_str, sizeof(ns_str));
 	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
-	DEBUG_MSG("=> querying: '%s' zone cut: '%s' m12n: '%s'\n", ns_str, zonecut_str, qname_str);
+	DEBUG_MSG("=> querying: '%s' score: %u zone cut: '%s' m12n: '%s'\n", ns_str, qry->ns.score, zonecut_str, qname_str);
 #endif
 
 	/* Prepare additional query */
@@ -443,6 +463,7 @@ ns_election:
 	if (ret != 0) {
 		return KNOT_STATE_FAIL;
 	}
+	gettimeofday(&qry->timestamp, NULL);
 	*dst = &qry->ns.addr.ip;
 	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return state;
