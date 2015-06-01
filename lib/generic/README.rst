@@ -10,6 +10,7 @@ as long as it comes with a test case in `tests/test_generics.c`.
 * map_ - a `Crit-bit tree`_ key-value map implementation (public domain) that comes with tests.
 * set_ - set abstraction implemented on top of ``map``.
 * pack_ - length-prefixed list of objects (i.e. array-list).
+* lru_ - LRU-like hash table
 
 array
 ~~~~~
@@ -33,6 +34,12 @@ pack
 ~~~~
 
 .. doxygenfile:: pack.h
+   :project: libkresolve
+
+lru
+~~~
+
+.. doxygenfile:: lru.h
    :project: libkresolve
 
 .. _`Crit-bit tree`: http://cr.yp.to/critbit.html 

@@ -7,6 +7,7 @@ tests_BIN := \
 	test_map \
 	test_array \
 	test_pack \
+	test_lru \
 	test_utils \
 	test_module \
 	test_cache \
