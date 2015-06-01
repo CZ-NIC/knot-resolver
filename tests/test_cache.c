@@ -34,12 +34,34 @@ struct kr_cache_entry global_fake_ce;
 #define NAMEDB_DATA_SIZE (NAMEDB_INTS * sizeof(int))
 uint8_t namedb_data[NAMEDB_DATA_SIZE];
 namedb_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
+bool is_malloc_mocked = false;
 
 #define CACHE_SIZE 10 * 4096
 #define CACHE_TTL 10
 #define CACHE_TIME 0
 
+void * (*original_malloc) (size_t __size);
 int (*original_knot_rdataset_add)(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm) = NULL;
+
+void *malloc(size_t __size)
+{
+	Dl_info dli = {0};
+	char insert_name[] = "kr_cache_insert";
+	int err_mock = KNOT_EOK, insert_namelen = strlen(insert_name);
+
+	if (original_malloc == NULL)
+	{
+		original_malloc = dlsym(RTLD_NEXT,"malloc");
+		assert_non_null (malloc);
+	}
+	if (is_malloc_mocked)
+	{
+	    dladdr (__builtin_return_address (0), &dli);
+	    if (dli.dli_sname && (strncmp(insert_name,dli.dli_sname,insert_namelen) == 0))
+		    err_mock = mock();
+	}
+	return (err_mock != KNOT_EOK) ? NULL : original_malloc (__size);
+}
 
 int knot_rdataset_add(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm)
 {
@@ -56,11 +78,17 @@ int knot_rdataset_add(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm
 	return err;
 }
 
-
 /* Simulate init failure */
 static int fake_test_init(namedb_t **db_ptr, mm_ctx_t *mm, void *arg)
 {
+	static char db[1024];
+	*db_ptr = db;
 	return mock();
+}
+
+static void fake_test_deinit(namedb_t *db)
+{
+    return;
 }
 
 /* Simulate commit failure */
@@ -85,19 +113,26 @@ static int fake_test_find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *va
 /* Stub for insert */
 static int fake_test_ins(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
 {
-	int err = KNOT_EINVAL, res_cmp;
 	struct kr_cache_entry *header = val->data;
+	int  res_cmp, err = (int)mock();
 	if (val->len == sizeof (*header) + NAMEDB_DATA_SIZE)
 	{
 	    header = val->data;
 	    res_cmp  = memcmp(header->data,namedb_data,NAMEDB_DATA_SIZE);
-	    if (header->timestamp == global_fake_ce.timestamp &&
-		header->ttl == global_fake_ce.ttl &&
-		header->ttl == global_fake_ce.ttl &&
-		res_cmp == 0)
-		    err = KNOT_EOK;
+	    if (header->timestamp != global_fake_ce.timestamp ||
+		header->ttl != global_fake_ce.ttl ||
+		header->ttl != global_fake_ce.ttl ||
+		res_cmp != 0)
+	    {
+		err = KNOT_EINVAL;
+	    }
 	}
 	return err;
+}
+
+static int fake_test_txn_begin(namedb_t *db, namedb_txn_t *txn, unsigned flags)
+{
+    return KNOT_EOK;
 }
 
 /* Fake api */
@@ -105,8 +140,8 @@ static namedb_api_t *fake_namedb_lmdb_api(void)
 {
 	static namedb_api_t fake_api = {
 		"lmdb_fake_api",
-		fake_test_init, NULL,
-		NULL, fake_test_commit, fake_test_abort,
+		fake_test_init, fake_test_deinit,
+		fake_test_txn_begin, fake_test_commit, fake_test_abort,
 		NULL, NULL, fake_test_find, fake_test_ins, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL
 	};
@@ -119,6 +154,7 @@ static int test_open(void **state, namedb_api_t *api)
 {
 	static struct kr_cache cache;
 	struct namedb_lmdb_opts opts;
+	memset(&cache, 0, sizeof(cache));
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_env;
 	opts.mapsize = CACHE_SIZE;
@@ -171,12 +207,34 @@ static struct kr_cache_txn *test_txn_rdonly(void **state)
 /* test invalid parameters and some api failures */
 static void test_fake_invalid (void **state)
 {
-	knot_dname_t dname[] = "";
 	assert_int_not_equal(kr_cache_txn_commit(&global_txn), KNOT_EOK);
 	will_return(fake_test_init,KNOT_EINVAL);
 	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EINVAL);
 }
 
+static void test_fake_insert(void **state)
+{
+	int ret_cache_ins_ok, ret_cache_lowmem, ret_cache_ins_inval;
+	knot_dname_t dname[] = "";
+	struct kr_cache_txn *txn = test_txn_write(state);
+	test_randstr((char *)&global_fake_ce,sizeof(global_fake_ce));
+	test_randstr((char *)namedb_data,NAMEDB_DATA_SIZE);
+
+	is_malloc_mocked = true;
+	will_return(malloc,KNOT_EINVAL);
+	ret_cache_lowmem = kr_cache_insert(txn, KR_CACHE_USER, dname,
+		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
+	is_malloc_mocked = false;
+	will_return(fake_test_ins,KNOT_EOK);
+	ret_cache_ins_ok = kr_cache_insert(txn, KR_CACHE_USER, dname,
+		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
+	will_return(fake_test_ins,KNOT_EINVAL);
+	ret_cache_ins_inval = kr_cache_insert(txn, KR_CACHE_USER, dname,
+		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
+	assert_int_equal(ret_cache_lowmem, KNOT_ENOMEM);
+	assert_int_equal(ret_cache_ins_ok, KNOT_EOK);
+	assert_int_equal(ret_cache_ins_inval, KNOT_EINVAL);
+}
 
 /* Test invalid parameters and some api failures. */
 static void test_invalid(void **state)
@@ -361,6 +419,7 @@ int main(void)
 	const UnitTest tests_bad[] = {
 		group_test_setup(test_open_fake_api),
 		unit_test(test_fake_invalid),
+	        unit_test(test_fake_insert),
 		group_test_teardown(test_close)
 	};
 
