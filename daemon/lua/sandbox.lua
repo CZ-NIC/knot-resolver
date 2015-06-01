@@ -52,8 +52,8 @@ setmetatable(modules, {
 -- `cache.{size|storage} = value`
 setmetatable(cache, {
 	__newindex = function (t,k,v)
-		if     k == 'size'    then t.open(v, rawget(t, 'storage'))
-		elseif k == 'storage' then t.open(rawget(t, 'size'), v)
+		if     k == 'size'    then t.open(v, rawget(t, 'current_storage'))
+		elseif k == 'storage' then t.open(rawget(t, 'current_size'), v)
 		else   rawset(t, k, v) end
 	end
 })

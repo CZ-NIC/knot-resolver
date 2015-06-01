@@ -299,7 +299,7 @@ static int cache_backends(lua_State *L)
 	lua_newtable(L);
 	for (unsigned i = 0; i < registry->len; ++i) {
 		struct storage_api *storage = &registry->at[i];
-		lua_pushboolean(L, storage->api() == kr_cache_storage());
+		lua_pushboolean(L, storage->api() == engine->resolver.cache.api);
 		lua_setfield(L, -2, storage->prefix);
 	}
 	return 1;
@@ -309,18 +309,39 @@ static int cache_backends(lua_State *L)
 static int cache_count(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	const namedb_api_t *storage = kr_cache_storage();
+	const namedb_api_t *storage = engine->resolver.cache.api;
 
 	/* Fetch item count */
-	namedb_txn_t txn;
-	int ret = kr_cache_txn_begin(engine->resolver.cache, &txn, NAMEDB_RDONLY);
+	struct kr_cache_txn txn;
+	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, NAMEDB_RDONLY);
 	if (ret != 0) {
 		format_error(L, kr_strerror(ret));
 		lua_error(L);
 	}
 
-	lua_pushinteger(L, storage->count(&txn));
+	lua_pushinteger(L, storage->count((namedb_txn_t *)&txn));
 	kr_cache_txn_abort(&txn);
+	return 1;
+}
+
+/** Return cache statistics. */
+static int cache_stats(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	lua_newtable(L);
+	lua_pushnumber(L, cache->stats.hit);
+	lua_setfield(L, -2, "hit");
+	lua_pushnumber(L, cache->stats.miss);
+	lua_setfield(L, -2, "miss");
+	lua_pushnumber(L, cache->stats.insert);
+	lua_setfield(L, -2, "insert");
+	lua_pushnumber(L, cache->stats.delete);
+	lua_setfield(L, -2, "delete");
+	lua_pushnumber(L, cache->stats.txn_read);
+	lua_setfield(L, -2, "txn_read");
+	lua_pushnumber(L, cache->stats.txn_write);
+	lua_setfield(L, -2, "txn_write");
 	return 1;
 }
 
@@ -364,27 +385,25 @@ static int cache_open(lua_State *L)
 		format_error(L, "unsupported cache backend");
 		lua_error(L);
 	}
-	kr_cache_storage_set(storage->api);
 
 	/* Close if already open */
-	if (engine->resolver.cache != NULL) {
-		kr_cache_close(engine->resolver.cache);
-	}
+	kr_cache_close(&engine->resolver.cache);
+
 	/* Reopen cache */
 	void *storage_opts = storage->opts_create(conf, cache_size);
-	engine->resolver.cache = kr_cache_open(storage_opts, engine->pool);
+	int ret = kr_cache_open(&engine->resolver.cache, storage->api(), storage_opts, engine->pool);
 	free(storage_opts);
-	if (engine->resolver.cache == NULL) {
+	if (ret != 0) {
 		format_error(L, "can't open cache");
 		lua_error(L);
 	}
 
 	/* Store current configuration */
 	lua_getglobal(L, "cache");
-	lua_pushstring(L, "size");
+	lua_pushstring(L, "current_size");
 	lua_pushnumber(L, cache_size);
 	lua_rawset(L, -3);
-	lua_pushstring(L, "storage");
+	lua_pushstring(L, "current_storage");
 	lua_pushstring(L, uri);
 	lua_rawset(L, -3);
 
@@ -395,12 +414,7 @@ static int cache_open(lua_State *L)
 static int cache_close(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	if (engine->resolver.cache != NULL) {
-		struct kr_cache *cache = engine->resolver.cache;
-		engine->resolver.cache = NULL;
-		kr_cache_close(cache);
-	}
-
+	kr_cache_close(&engine->resolver.cache);
 	lua_pushboolean(L, 1);
 	return 1;
 }
@@ -410,6 +424,7 @@ int lib_cache(lua_State *L)
 	static const luaL_Reg lib[] = {
 		{ "backends", cache_backends },
 		{ "count",  cache_count },
+		{ "stats",  cache_stats },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
 		{ NULL, NULL }

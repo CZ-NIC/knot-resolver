@@ -129,24 +129,37 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
 	return 0;
 }
 
+/** Returns a pointer to packed object.
+  * @return pointer to packed object or NULL
+  */
+static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
+{
+		uint8_t *endp = pack_tail(*pack);
+		uint8_t *it = pack_head(*pack);
+		while (it != endp) {
+			uint8_t *val = pack_obj_val(it);
+			if (pack_obj_len(it) == len && memcmp(obj, val, len) == 0) {
+				return it;
+			}
+			it = pack_obj_next(it);
+		}
+		return NULL;
+}
+
 /** Delete object from the pack
   * @return 0 on success, negative number on failure
   */
 static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
 	uint8_t *endp = pack_tail(*pack);
-	uint8_t *it = pack_head(*pack);
-	while (it != endp) {
- 		uint8_t *val = pack_obj_val(it);
- 		if (pack_obj_len(it) == len && memcmp(obj, val, len) == 0) {
- 			size_t packed_len = len + sizeof(len);
- 			memmove(it, it + packed_len, endp - it - packed_len);
- 			pack->len -= packed_len;
- 			return 0;
- 		}
- 		it = pack_obj_next(it);
- 	}
- 	return -1;
+	uint8_t *it = pack_obj_find(pack, obj, len);
+	if (it) {
+		size_t packed_len = len + sizeof(len);
+		memmove(it, it + packed_len, endp - it - packed_len);
+		pack->len -= packed_len;
+		return 0;
+	}
+	return -1;
 }
 
 #ifdef __cplusplus

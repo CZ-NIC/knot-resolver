@@ -237,6 +237,7 @@ void engine_deinit(struct engine *engine)
 	}
 
 	network_deinit(&engine->net);
+	kr_cache_close(&engine->resolver.cache);
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
@@ -249,7 +250,6 @@ void engine_deinit(struct engine *engine)
 		lua_close(engine->L);
 	}
 
-	kr_cache_close(engine->resolver.cache);
 }
 
 int engine_pcall(lua_State *L, int argc)
@@ -375,6 +375,7 @@ int engine_register(struct engine *engine, const char *name)
 	if (!module) {
 		return kr_error(ENOMEM);
 	}
+	module->data = engine;
 	int ret = kr_module_load(module, name, NULL);
 	/* Load Lua module if not a binary */
 	if (ret == kr_error(ENOENT)) {

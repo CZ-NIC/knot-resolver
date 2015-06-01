@@ -283,7 +283,7 @@ Here's an example how a module can expose its property:
 		namedb_t *cache = engine->resolver.cache;
 
 		/* Open read transaction */
-		namedb_txn_t txn;
+		struct kr_cache_txn txn;
 		int ret = kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY);
 		if (ret != 0) {
 			return NULL;

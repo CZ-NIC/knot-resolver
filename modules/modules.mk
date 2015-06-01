@@ -3,6 +3,11 @@ modules_TARGETS := hints \
                    stats \
                    cachectl
 
+# Memcached
+ifeq ($(HAS_libmemcached),yes)
+modules_TARGETS += kmemcached
+endif
+
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
 modules_TARGETS += ketcd \

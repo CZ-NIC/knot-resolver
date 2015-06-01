@@ -109,7 +109,6 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	if (cut == NULL || ns == NULL) {
 		return kr_error(EINVAL);
 	}
-
 	/* Fetch/insert nameserver. */
 	pack_t *pack = kr_zonecut_find(cut, ns);
 	if (pack == NULL) {
@@ -120,17 +119,20 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 		}
 		pack_init(*pack);
 	}
-
 	/* Insert data (if has any) */
 	if (rdata == NULL) {
 		return kr_ok();
 	}
+	/* Check for duplicates */
 	uint16_t rdlen = knot_rdata_rdlen(rdata);
+	if (pack_obj_find(pack, knot_rdata_data(rdata), rdlen)) {
+		return kr_ok();
+	}
+	/* Push new address */
 	int ret = pack_reserve_mm(*pack, 1, rdlen, mm_reserve, cut->pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}
-
 	return pack_obj_push(pack, knot_rdata_data(rdata), rdlen);
 }
 
@@ -141,15 +143,17 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	}
 
 	/* Find the address list. */
+	int ret = kr_ok();
 	pack_t *pack = kr_zonecut_find(cut, ns);
 	if (pack == NULL) {
 		return kr_error(ENOENT);
 	}
-
 	/* Remove address from the pack. */
-	int ret = pack_obj_del(pack, knot_rdata_data(rdata), knot_rdata_rdlen(rdata));
+	if (rdata) {
+		ret = pack_obj_del(pack, knot_rdata_data(rdata), knot_rdata_rdlen(rdata));
+	}
+	/* No servers left, remove NS from the set. */
 	if (pack->len == 0) {
-		/* No servers left, remove NS from the set. */
 		free_addr_set((const char *)ns, pack, cut->pool);
 		return map_del(&cut->nsset, (const char *)ns);
 	}
@@ -189,7 +193,7 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut)
 }
 
 /** Fetch best NS for zone cut. */
-static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn_t *txn, uint32_t timestamp)
+static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
 {
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
@@ -209,23 +213,23 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, namedb_txn
 	return kr_ok();
 }
 
-int kr_zonecut_find_cached(struct kr_zonecut *cut, namedb_txn_t *txn, uint32_t timestamp)
+int kr_zonecut_find_cached(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
 {
 	if (cut == NULL) {
 		return kr_error(EINVAL);
 	}
 
-	/* Start at QNAME. */
-	const knot_dname_t *name = cut->name;
+	/* Start at QNAME parent. */
+	name = knot_wire_next_label(name, NULL);
 	while (txn) {
 		if (fetch_ns(cut, name, txn, timestamp) == 0) {
 			update_cut_name(cut, name);
 			return kr_ok();
 		}
-		/* Subtract label from QNAME. */
 		if (name[0] == '\0') {
 			break;
 		}
+		/* Subtract label from QNAME. */
 		name = knot_wire_next_label(name, NULL);
 	}
 
