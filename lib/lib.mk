@@ -1,6 +1,7 @@
 ccan_EMBED := \
 	contrib/ccan/ilog/ilog.c \
-	contrib/ccan/isaac/isaac.c
+	contrib/ccan/isaac/isaac.c \
+	contrib/murmurhash3/murmurhash3.c
 
 libkresolve_SOURCES := \
 	$(ccan_EMBED)          \
