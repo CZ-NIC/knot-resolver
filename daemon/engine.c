@@ -24,6 +24,7 @@
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
 #include "daemon/ffimodule.h"
+#include "lib/nsrep.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
 
@@ -157,6 +158,11 @@ static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
 	engine->resolver.modules = &engine->modules;
+	/* Open NS reputation cache */
+	engine->resolver.nsrep = malloc(lru_size(kr_nsrep_lru_t, DEFAULT_NSREP_SIZE));
+	if (engine->resolver.nsrep) {
+		lru_init(engine->resolver.nsrep, DEFAULT_NSREP_SIZE);
+	}
 
 	/* Load basic modules */
 	engine_register(engine, "iterate");
@@ -238,6 +244,7 @@ void engine_deinit(struct engine *engine)
 
 	network_deinit(&engine->net);
 	kr_cache_close(&engine->resolver.cache);
+	lru_deinit(engine->resolver.nsrep);
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
