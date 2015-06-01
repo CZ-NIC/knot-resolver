@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <time.h>
+#include <dlfcn.h>
 
 mm_ctx_t global_mm;
 struct kr_cache_txn global_txn;
@@ -37,6 +38,24 @@ namedb_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
 #define CACHE_SIZE 10 * 4096
 #define CACHE_TTL 10
 #define CACHE_TIME 0
+
+int (*original_knot_rdataset_add)(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm) = NULL;
+
+int knot_rdataset_add(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm)
+{
+	int err, err_mock;
+	err_mock = (int)mock();
+	if (original_knot_rdataset_add == NULL)
+	{
+		original_knot_rdataset_add = dlsym(RTLD_NEXT,"knot_rdataset_add");
+		assert_non_null (original_knot_rdataset_add);
+	}	
+	err = original_knot_rdataset_add(rrs, rr, mm);
+	if (err_mock != KNOT_EOK)
+	    err = err_mock;
+	return err;
+}
+
 
 /* Simulate init failure */
 static int fake_test_init(namedb_t **db_ptr, mm_ctx_t *mm, void *arg)
@@ -152,11 +171,8 @@ static struct kr_cache_txn *test_txn_rdonly(void **state)
 /* test invalid parameters and some api failures */
 static void test_fake_invalid (void **state)
 {
-//	knot_dname_t dname[] = "";
-//	assert_null(kr_cache_open(NULL, NULL, NULL));
-//	assert_int_equal(kr_cache_peek(&global_txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0),
-//		&global_fake_ce);
-//	assert_int_not_equal(kr_cache_txn_commit(&global_txn), KNOT_EOK);
+	knot_dname_t dname[] = "";
+	assert_int_not_equal(kr_cache_txn_commit(&global_txn), KNOT_EOK);
 	will_return(fake_test_init,KNOT_EINVAL);
 	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EINVAL);
 }
@@ -167,7 +183,13 @@ static void test_invalid(void **state)
 {
 	knot_dname_t dname[] = "";
 	uint32_t timestamp = CACHE_TIME;
+	struct namedb_lmdb_opts opts;
 
+	memset(&opts, 0, sizeof(opts));
+	opts.path = global_env;
+	opts.mapsize = CACHE_SIZE;
+
+	assert_int_equal(kr_cache_open(NULL, NULL, &opts, &global_mm),KNOT_EINVAL);
 	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
 	assert_int_not_equal(kr_cache_txn_begin(*state, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
@@ -205,6 +227,38 @@ static void test_insert_rr(void **state)
 		kr_cache_txn_abort(txn);
 	}
 	assert_int_equal(ret, KNOT_EOK);
+}
+
+static void test_materialize(void **state)
+{
+	knot_rrset_t output_rr;
+	knot_dname_t * owner_saved = global_rr.owner;
+	bool res_cmp_ok_empty, res_cmp_fail_empty;
+	bool res_cmp_ok, res_cmp_fail;
+
+	global_rr.owner = NULL;
+	knot_rrset_init(&output_rr, NULL, 0, 0);
+	output_rr = kr_cache_materialize(&global_rr, 0, &global_mm);
+	res_cmp_ok_empty = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_HEADER);
+	res_cmp_fail_empty = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_WHOLE);
+	knot_rrset_clear(&output_rr,&global_mm);
+	global_rr.owner = owner_saved;
+	assert_true(res_cmp_ok_empty);
+	assert_false(res_cmp_fail_empty);
+
+	knot_rrset_init(&output_rr, NULL, 0, 0);
+	will_return (knot_rdataset_add,KNOT_EOK);
+	output_rr = kr_cache_materialize(&global_rr, 0, &global_mm);
+	res_cmp_ok = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_WHOLE);
+	knot_rrset_clear(&output_rr,&global_mm);
+	assert_true(res_cmp_ok);
+
+	knot_rrset_init(&output_rr, NULL, 0, 0);
+	will_return (knot_rdataset_add,KNOT_EINVAL);
+	output_rr = kr_cache_materialize(&global_rr, 0, &global_mm);
+	res_cmp_fail = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_WHOLE);
+	knot_rrset_clear(&output_rr,&global_mm);
+	assert_false(res_cmp_fail);
 }
 
 /* Test cache read */
@@ -311,9 +365,12 @@ int main(void)
 	};
 
 	const UnitTest tests[] = {
+		/* Invalid input */
+	        unit_test(test_invalid),
 	        /* Cache persistence */
 	        group_test_setup(test_open_conventional_api),
 	        unit_test(test_insert_rr),
+	        unit_test(test_materialize),
 	        unit_test(test_query),
 	        /* Cache aging */
 	        unit_test(test_query_aged),
