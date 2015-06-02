@@ -24,7 +24,8 @@ enum {
 	PKT_NOERROR   = 1 << 0, /* Positive response */
 	PKT_NODATA    = 1 << 1, /* No data response */
 	PKT_NXDOMAIN  = 1 << 2, /* Negative response */
-	PKT_ERROR     = 1 << 3  /* Refused or server failure */
+	PKT_REFUSED   = 1 << 3, /* Refused response */
+	PKT_ERROR     = 1 << 4  /* Bad message */
 };
 
 /** Classify response by type. */

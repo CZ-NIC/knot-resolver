@@ -108,6 +108,8 @@ int kr_response_classify(knot_pkt_t *pkt)
 		return (an->count == 0) ? PKT_NODATA : PKT_NOERROR;
 	case KNOT_RCODE_NXDOMAIN:
 		return PKT_NXDOMAIN;
+	case KNOT_RCODE_REFUSED:
+		return PKT_REFUSED;
 	default:
 		return PKT_ERROR;
 	}
@@ -282,7 +284,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	bool is_final = (query->parent == NULL);
 	int pkt_class = kr_response_classify(pkt);
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) &&
-	    (pkt_class & (PKT_NOERROR|PKT_NXDOMAIN|PKT_NODATA))) {
+	    (pkt_class & (PKT_NOERROR|PKT_NXDOMAIN|PKT_REFUSED|PKT_NODATA))) {
 		DEBUG_MSG("<= found cut, retrying with non-minimized name\n");
 		query->flags |= QUERY_NO_MINIMIZE;
 		return KNOT_STATE_DONE;
@@ -424,6 +426,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
+	case KNOT_RCODE_REFUSED:
 		break; /* OK */
 	case KNOT_RCODE_FORMERR:
 	case KNOT_RCODE_NOTIMPL:
