@@ -120,6 +120,9 @@ static int merge_cache_rr(knot_rrset_t *cache_rr, const knot_rrset_t *rr, mm_ctx
 	if (rr->type != cache_rr->type || !knot_dname_is_equal(rr->owner, cache_rr->owner)) {
 		return KNOT_EOK; /* Ignore */
 	}
+	if (knot_rrset_ttl(rr) < 2) {
+		return KNOT_EINVAL; /* Cache busters */
+	}
 
 	return knot_rdataset_merge(&cache_rr->rrs, &rr->rrs, pool);
 }
