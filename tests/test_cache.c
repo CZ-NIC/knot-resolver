@@ -166,6 +166,8 @@ static int test_open(void **state, namedb_api_t *api)
 static void test_open_fake_api(void **state)
 {
 	bool res;
+	will_return(fake_test_init,KNOT_EINVAL);
+	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EINVAL);
 	will_return(fake_test_init,KNOT_EOK);
 	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EOK);
 	res = (((struct kr_cache *)(*state))->api == fake_namedb_lmdb_api());
@@ -207,9 +209,21 @@ static struct kr_cache_txn *test_txn_rdonly(void **state)
 /* test invalid parameters and some api failures */
 static void test_fake_invalid (void **state)
 {
-	assert_int_not_equal(kr_cache_txn_commit(&global_txn), KNOT_EOK);
-	will_return(fake_test_init,KNOT_EINVAL);
-	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EINVAL);
+	struct kr_cache_txn *txn = NULL;
+	const namedb_api_t *api_saved;
+	knot_dname_t dname[] = "";
+	struct kr_cache_entry *ret;
+
+	assert_int_not_equal(kr_cache_txn_commit(txn), KNOT_EOK);
+	txn = test_txn_write(state);
+	assert_int_not_equal(kr_cache_txn_commit(txn), KNOT_EOK);
+	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0);
+	assert_int_equal(ret, &global_fake_ce);
+	api_saved = txn->owner->api;
+	txn->owner->api = NULL;
+	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0);
+	txn->owner->api = api_saved;
+	assert_null(ret);
 }
 
 static void test_fake_insert(void **state)
@@ -246,6 +260,8 @@ static void test_invalid(void **state)
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_env;
 	opts.mapsize = CACHE_SIZE;
+
+	knot_rrset_init_empty(&global_rr);
 
 	assert_int_equal(kr_cache_open(NULL, NULL, &opts, &global_mm),KNOT_EINVAL);
 	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
