@@ -71,7 +71,8 @@ static PyObject* init(PyObject* self, PyObject* args)
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_tmpdir;
 	opts.mapsize = 100 * 4096;
-	assert(kr_cache_open(&global_context.cache, NULL, &opts, &global_mm) == 0);
+	int ret = kr_cache_open(&global_context.cache, NULL, &opts, &global_mm);
+	assert(ret == 0);
 
 	/* No configuration parsing support yet. */
 	if (strstr(config, "query-minimization: on") == NULL) {
