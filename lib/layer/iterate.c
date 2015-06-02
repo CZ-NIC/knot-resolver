@@ -170,19 +170,29 @@ int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_request *r
 	return KNOT_STATE_DONE;
 }
 
-/** Attempt to find glue for given nameserver name (best effort). */
-static int fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
+static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
 {
-	int result = 0;
 	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
 	for (unsigned i = 0; i < ar->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
 		if (knot_dname_is_equal(ns, rr->owner)) {
 			(void) update_glue(rr, 0, req);
-			result += 1;
 		}
 	}
-	return result;
+}
+
+/** Attempt to find glue for given nameserver name (best effort). */
+static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
+{
+	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
+	for (unsigned i = 0; i < ar->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
+		if (knot_dname_is_equal(ns, rr->owner) &&
+		    (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA)) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request *req)
@@ -207,15 +217,14 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 	/* Fetch glue for each NS */
 	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
-		kr_zonecut_add(cut, ns_name, NULL);
-		int glue_records = fetch_glue(pkt, ns_name, req);
+		int glue_records = has_glue(pkt, ns_name, req);
 		/* Glue is mandatory for NS below zone */
-		if (knot_dname_in(rr->owner, ns_name) ) {
-			if (glue_records == 0) {
-				DEBUG_MSG("<= authority: missing mandatory glue, rejecting\n");
-				kr_zonecut_del(cut, ns_name, NULL);
-			}
+		if (!glue_records && knot_dname_in(rr->owner, ns_name)) {
+			DEBUG_MSG("<= authority: missing mandatory glue, rejecting\n");
+			continue;
 		}
+		kr_zonecut_add(cut, ns_name, NULL);
+		fetch_glue(pkt, ns_name, req);
 	}
 
 	return state;
