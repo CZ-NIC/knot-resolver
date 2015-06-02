@@ -24,6 +24,9 @@
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
 
+/** Some built-in unfairness ... */
+#define FAVOUR_IPV6 20 /* 20ms bonus for v6 */
+
 /** @internal Macro to set address structure. */
 #define ADDR_SET(sa, family, addr, len) do {\
     	memcpy(&sa ## _addr, (addr), (len)); \
@@ -54,35 +57,55 @@ static void update_nsrep(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t 
 
 #undef ADDR_SET
 
-static int eval_nsrep(const char *k, void *v, void *baton)
+static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score, uint8_t **addr)
 {
-	struct kr_nsrep *ns = baton;
-	unsigned score = ns->score;
-	pack_t *addr_set = v;
-	uint8_t *addr = NULL;
-
 	/* Name server is better candidate if it has address record. */
 	uint8_t *it = pack_head(*addr_set);
 	while (it != pack_tail(*addr_set)) {
 		void *val = pack_obj_val(it);
 		size_t len = pack_obj_len(it);
-		unsigned *cached = lru_get(ns->repcache, val, len);
+		/* Get RTT for this address (if known) */
+		unsigned *cached = rttcache ? lru_get(rttcache, val, len) : NULL;
 		unsigned addr_score = (cached) ? *cached : KR_NS_UNKNOWN / 2;
-		/** @todo Favorize IPv6 */
-		if (addr_score <= score) {
-			addr = it;
+		/* Give v6 a head start */
+		unsigned favour = (len == sizeof(struct in6_addr)) ? FAVOUR_IPV6 : 0;
+		if (addr_score < score + favour) {
+			*addr = it;
 			score = addr_score;
 		}
 		it = pack_obj_next(it);
 	}
-	/* No known address */
-	if (!addr) {
+	return score;
+}
+
+static int eval_nsrep(const char *k, void *v, void *baton)
+{
+	struct kr_nsrep *ns = baton;
+	unsigned score = KR_NS_MAX_SCORE;
+	uint8_t *addr = NULL;
+
+	/* Favour nameservers with unknown addresses to probe them,
+	 * otherwise discover the current best address for the NS. */
+	pack_t *addr_set = (pack_t *)v;
+	if (addr_set->len == 0) {
 		score = KR_NS_UNKNOWN;
+	} else {
+		score = eval_addr_set(addr_set, ns->repcache, score, &addr);
 	}
 
-	/* Update best scoring nameserver. */
-	if (score < ns->score) {
+	/* Probabilistic bee foraging strategy (naive).
+	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
+	 * at the same time long distance scouts probe other sources (low probability).
+	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
+	if (score < ns->score && score < KR_NS_TIMEOUT) {
 		update_nsrep(ns, (const knot_dname_t *)k, addr, score);
+	} else {
+		/* With 5% chance, probe server with a probability given by its RTT / MAX_RTT */
+		unsigned roll = rand() % KR_NS_MAX_SCORE;
+		if ((roll % 100 < 5) && (roll >= score)) {
+			update_nsrep(ns, (const knot_dname_t *)k, addr, score);
+			return 1; /* Stop evaluation */
+		}
 	}
 
 	return kr_ok();

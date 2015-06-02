@@ -20,6 +20,7 @@
 #include <libknot/dname.h>
 #include <limits.h>
 
+#include "lib/defines.h"
 #include "lib/generic/map.h"
 #include "lib/generic/lru.h"
 
@@ -27,8 +28,8 @@
   * Special values for nameserver score (RTT in miliseconds)
   */
 enum kr_ns_score {
-	KR_NS_MAX_SCORE = 10 * 1000,
-	KR_NS_TIMEOUT   = KR_NS_MAX_SCORE,
+	KR_NS_MAX_SCORE = KR_CONN_RTT_MAX,
+	KR_NS_TIMEOUT   = (90 * KR_NS_MAX_SCORE) / 100,
 	KR_NS_UNKNOWN   = 10
 };
 
