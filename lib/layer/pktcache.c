@@ -45,12 +45,13 @@ static uint32_t limit_ttl(uint32_t ttl)
 
 static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 {
+	knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, 0);
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
-		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
 		uint32_t ttl = knot_rdata_ttl(rd);
 		if (ttl >= drift) {
 			knot_rdata_set_ttl(rd, ttl - drift);
 		}
+		rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
 	}
 }
 
@@ -146,12 +147,13 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 			if (rr->type == KNOT_RRTYPE_OPT || rr->type == KNOT_RRTYPE_TSIG) {
 				continue;
 			}
-			for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
-				knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
+			knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, 0);
+			for (uint16_t j = 0; j < rr->rrs.rr_count; ++j) {
 				if (knot_rdata_ttl(rd) < ttl) {
 					ttl = knot_rdata_ttl(rd);
 					has_ttl = true;
 				}
+				rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
 			}
 		}
 	}
@@ -169,12 +171,12 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = kr_rplan_current(rplan);
 	/* Cache only answers that make query resolved (i.e. authoritative)
 	 * that didn't fail during processing and are negative. */
-	if (!(qry->flags & QUERY_RESOLVED) || ctx->state & KNOT_STATE_FAIL) {
+	if (!(qry->flags & QUERY_RESOLVED) || qry->flags & QUERY_CACHED || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state; /* Don't cache anything if failed. */
 	}
 	bool is_auth = knot_wire_get_aa(pkt->wire);
 	int pkt_class = kr_response_classify(pkt);
-	if (qry->flags & QUERY_CACHED || (!(pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) && is_auth)) {
+	if (!(pkt_class & (PKT_NODATA|PKT_REFUSED|PKT_NXDOMAIN)) && is_auth) {
 		return ctx->state; /* Cache only negative, not-cached answers. */
 	}
 	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
