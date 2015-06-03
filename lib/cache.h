@@ -165,12 +165,13 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *times
 
 /**
  * Clone read-only RRSet and adjust TTLs.
+ * @param dst destination for materialized RRSet
  * @param src read-only RRSet (its rdataset may be changed depending on the result)
  * @param drift time passed between cache time and now
  * @param mm memory context
- * @return materialized (or empty) RRSet
+ * @return 0 or an errcode
  */
-knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm);
+int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm);
 
 /**
  * Insert RRSet into cache, replacing any existing data.

@@ -54,13 +54,15 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 	}
 
 	/* Update packet answer */
-	knot_rrset_t rr_copy = kr_cache_materialize(&cache_rr, timestamp, &pkt->mm);
-	ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &rr_copy, KNOT_PF_FREE);
-	if (ret != 0) {
-		knot_rrset_clear(&rr_copy, &pkt->mm);
-		return ret;
+	knot_rrset_t rr_copy;
+	ret = kr_cache_materialize(&rr_copy, &cache_rr, timestamp, &pkt->mm);
+	if (ret == 0) {
+		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr_copy, KNOT_PF_FREE);
+		if (ret != 0) {
+			knot_rrset_clear(&rr_copy, &pkt->mm);
+		}
 	}
-	return kr_ok();
+	return ret;
 }
 
 static int loot_cache_set(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *qname,

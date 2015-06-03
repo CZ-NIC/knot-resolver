@@ -241,35 +241,34 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *times
 	return kr_error(ENOENT);
 }
 
-knot_rrset_t kr_cache_materialize(const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm)
+int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm)
 {
 	assert(src);
 
-	/* Make RRSet copy. */
-	knot_rrset_t copy;
-	knot_rrset_init(&copy, NULL, src->type, src->rclass);
-	copy.owner = knot_dname_copy(src->owner, mm);
-	if (!copy.owner) {
-		return copy;
+	/* Make RRSet copy */
+	knot_rrset_init(dst, NULL, src->type, src->rclass);
+	dst->owner = knot_dname_copy(src->owner, mm);
+	if (!dst->owner) {
+		return kr_error(ENOMEM);
 	}
 
+	knot_rdata_t *rd = knot_rdataset_at(&src->rrs, 0);
+	knot_rdata_t *rd_dst = NULL;
 	for (uint16_t i = 0; i < src->rrs.rr_count; ++i) {
-		knot_rdata_t *rd = knot_rdataset_at(&src->rrs, i);
 		if (knot_rdata_ttl(rd) > drift) {
-			if (knot_rdataset_add(&copy.rrs, rd, mm) != 0) {
-				knot_rrset_clear(&copy, mm);
-				return copy;
+			/* Append record */
+			if (knot_rdataset_add(&dst->rrs, rd, mm) != 0) {
+				knot_rrset_clear(dst, mm);
+				return kr_error(ENOMEM);
 			}
+			/* Fixup TTL from absolute time */
+			rd_dst = knot_rdataset_at(&dst->rrs, dst->rrs.rr_count - 1);
+			knot_rdata_set_ttl(rd_dst, knot_rdata_ttl(rd) - drift);
 		}
+		rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
 	}
 
-	/* Update TTLs. */
-	for (uint16_t i = 0; i < copy.rrs.rr_count; ++i) {
-		knot_rdata_t *rd = knot_rdataset_at(&copy.rrs, i);
-		knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
-	}
-
-	return copy;
+	return kr_ok();
 }
 
 int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint32_t timestamp)
