@@ -381,7 +381,6 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 {
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *qry = kr_rplan_current(rplan);
-	unsigned ns_election_iter = 0;
 	
 	/* No query left for resolution */
 	if (kr_rplan_empty(rplan)) {
@@ -389,6 +388,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	}
 
 #ifndef NDEBUG
+	unsigned ns_election_iter = 0;
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 	knot_dname_to_str(name_str, qry->sname, sizeof(name_str));
 	knot_rrtype_to_string(qry->stype, type_str, sizeof(type_str));
