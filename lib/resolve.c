@@ -381,6 +381,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 {
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *qry = kr_rplan_current(rplan);
+	unsigned ns_election_iter = 0;
 	
 	/* No query left for resolution */
 	if (kr_rplan_empty(rplan)) {
@@ -429,6 +430,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 ns_election:
 	/* Elect best nameserver candidate */
+	assert(++ns_election_iter < KR_ITER_LIMIT);
 	kr_nsrep_elect(&qry->ns, &qry->zone_cut.nsset, request->ctx->nsrep);
 	if (qry->ns.score > KR_NS_MAX_SCORE) {
 		DEBUG_MSG("=> no valid NS left\n");
