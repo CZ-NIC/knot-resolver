@@ -147,13 +147,13 @@ static int update_glue(const knot_rrset_t *rr, unsigned hint, struct kr_request 
 	return update_nsaddr(rr, kr_rplan_current(&req->rplan), hint);
 }
 
-int rr_update_parent(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
+static int rr_update_parent(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
 {
 	struct kr_query *qry = kr_rplan_current(&req->rplan);
 	return update_nsaddr(rr, qry->parent, hint);
 }
 
-int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
+static int rr_update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
 {
 	knot_pkt_t *answer = req->answer;
 
