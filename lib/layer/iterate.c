@@ -300,9 +300,14 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	}
 
 	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
-	if (!is_authoritative(pkt, query) && (pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
-		DEBUG_MSG("<= lame response: non-auth sent negative response\n");
-		return KNOT_STATE_FAIL;
+	if (!is_authoritative(pkt, query)) {
+		if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+			DEBUG_MSG("<= lame response: non-auth sent negative response\n");
+			return KNOT_STATE_FAIL;
+		}
+	} else {
+		/* Make sure that this is an authoritative naswer (even with AA=0) for other layers */
+		knot_wire_set_aa(pkt->wire);
 	}
 
 	/* Process answer type */
