@@ -21,7 +21,9 @@
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 
+/* @cond internal Array of memory pools. */
 typedef array_t(mm_ctx_t) mempool_ring_t;
+/* @endcond */
 
 /**
  * Query resolution worker.
