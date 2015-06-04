@@ -147,7 +147,7 @@ int main(int argc, char **argv)
 	struct worker_ctx worker = {
 		.engine = &engine,
 		.loop = loop,
-		.mm = NULL
+		.mm = NULL,
 	};
 	loop->data = &worker;
 	array_init(worker.bufs.ring);

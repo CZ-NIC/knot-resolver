@@ -96,7 +96,7 @@ static void test_init(void **state)
 {
 	lru_int_t *lru = malloc(lru_size(lru_int_t, HASH_SIZE));
 	assert_non_null(lru);
-	lru_init(lru, HASH_SIZE), 0;
+	lru_init(lru, HASH_SIZE);
 	assert_int_equal(lru->size, HASH_SIZE);
 	*state = lru;
 }
