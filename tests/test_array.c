@@ -45,8 +45,7 @@ static void test_array(void **state)
 	/* Delete elements. */
 	array_del(arr, 0);
 	for (size_t i = arr.len; --i;) {
-		ret = array_pop(arr);
-		assert_true(ret == 0);
+		array_pop(arr);
 	}
 
 	/* Overfill. */
