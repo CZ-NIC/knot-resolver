@@ -16,6 +16,14 @@
 
 #pragma once
 
+/* Magic defaults */
+#ifndef DEFAULT_NSREP_SIZE
+#define DEFAULT_NSREP_SIZE 4096 /**< Default NS reputation cache size */
+#endif
+#ifndef DEFAULT_RING_SIZE
+#define DEFAULT_RING_SIZE 16 /**< Maximum size of the worker ring size */
+#endif
+
 /*
  * @internal These are forward decls to allow building modules with engine but without Lua.
  */

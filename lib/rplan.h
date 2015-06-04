@@ -29,13 +29,14 @@
 /** Query flags */
 enum kr_query_flag {
 	QUERY_NO_MINIMIZE = 1 << 0, /**< Don't minimize QNAME. */
-	QUERY_TCP         = 1 << 1, /**< Use TCP for this query. */
-	QUERY_RESOLVED    = 1 << 2, /**< Query is resolved. */
-	QUERY_AWAIT_IPV4  = 1 << 3, /**< Query is waiting for A address. */
-	QUERY_AWAIT_IPV6  = 1 << 4, /**< Query is waiting for AAAA address. */
-	QUERY_AWAIT_CUT   = 1 << 5, /**< Query is waiting for zone cut lookup */
-	QUERY_SAFEMODE    = 1 << 6, /**< Don't use fancy stuff (EDNS...) */
-	QUERY_CACHED      = 1 << 7  /**< Query response is cached. */
+	QUERY_NO_THROTTLE = 1 << 1, /**< No query/slow NS throttling. */
+	QUERY_TCP         = 1 << 2, /**< Use TCP for this query. */
+	QUERY_RESOLVED    = 1 << 3, /**< Query is resolved. */
+	QUERY_AWAIT_IPV4  = 1 << 4, /**< Query is waiting for A address. */
+	QUERY_AWAIT_IPV6  = 1 << 5, /**< Query is waiting for AAAA address. */
+	QUERY_AWAIT_CUT   = 1 << 6, /**< Query is waiting for zone cut lookup */
+	QUERY_SAFEMODE    = 1 << 7, /**< Don't use fancy stuff (EDNS...) */
+	QUERY_CACHED      = 1 << 8  /**< Query response is cached. */
 };
 
 /**

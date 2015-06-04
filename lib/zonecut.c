@@ -210,6 +210,11 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_
 		kr_zonecut_add(cut, ns_name, NULL);
 	}
 
+	/* Always keep SBELT as a backup for root */
+	if (name[0] == '\0') {
+		kr_zonecut_set_sbelt(cut);
+	}
+
 	return kr_ok();
 }
 

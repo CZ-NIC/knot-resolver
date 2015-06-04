@@ -54,13 +54,15 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 	}
 
 	/* Update packet answer */
-	knot_rrset_t rr_copy = kr_cache_materialize(&cache_rr, timestamp, &pkt->mm);
-	ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &rr_copy, KNOT_PF_FREE);
-	if (ret != 0) {
-		knot_rrset_clear(&rr_copy, &pkt->mm);
-		return ret;
+	knot_rrset_t rr_copy;
+	ret = kr_cache_materialize(&rr_copy, &cache_rr, timestamp, &pkt->mm);
+	if (ret == 0) {
+		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr_copy, KNOT_PF_FREE);
+		if (ret != 0) {
+			knot_rrset_clear(&rr_copy, &pkt->mm);
+		}
 	}
-	return kr_ok();
+	return ret;
 }
 
 static int loot_cache_set(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
@@ -119,6 +121,9 @@ static int merge_cache_rr(knot_rrset_t *cache_rr, const knot_rrset_t *rr, mm_ctx
 {
 	if (rr->type != cache_rr->type || !knot_dname_is_equal(rr->owner, cache_rr->owner)) {
 		return KNOT_EOK; /* Ignore */
+	}
+	if (knot_rrset_ttl(rr) < KR_TTL_GRACE) {
+		return KNOT_EINVAL; /* Cache busters */
 	}
 
 	return knot_rdataset_merge(&cache_rr->rrs, &rr->rrs, pool);

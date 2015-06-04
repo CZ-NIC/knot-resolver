@@ -21,6 +21,7 @@
 #include <libknot/packet/pkt.h>
 
 #include "lib/generic/array.h"
+#include "lib/nsrep.h"
 #include "lib/rplan.h"
 #include "lib/module.h"
 #include "lib/cache.h"
@@ -100,6 +101,7 @@ struct kr_context
 {
 	mm_ctx_t *pool;
 	struct kr_cache cache;
+	kr_nsrep_lru_t *nsrep;
 	module_array_t *modules;
 	uint32_t options;
 };

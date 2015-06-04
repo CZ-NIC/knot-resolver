@@ -147,9 +147,11 @@ int main(int argc, char **argv)
 	struct worker_ctx worker = {
 		.engine = &engine,
 		.loop = loop,
-		.mm = NULL
+		.mm = NULL,
 	};
 	loop->data = &worker;
+	array_init(worker.bufs.ring);
+	worker_reserve(&worker, DEFAULT_RING_SIZE);
 
 	/* Bind to sockets. */
 	if (addr != NULL) {
@@ -182,6 +184,7 @@ int main(int argc, char **argv)
 	/* Cleanup. */
 	fprintf(stderr, "\n[system] quitting\n");
 	engine_deinit(&engine);
+	worker_reclaim(&worker);
 
 	if (ret != 0) {
 		ret = EXIT_FAILURE;

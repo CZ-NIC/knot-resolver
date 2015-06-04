@@ -133,10 +133,9 @@ static inline void array_std_free(void *baton, void *p)
 
 /**
  * Pop value from the end of the array.
- * @return 0 on success, <0 on failure
  */
 #define array_pop(array) \
-	array_del((array), (array).len - 1)
+ 	(array).len -= 1
 
 /**
  * Remove value at given index.

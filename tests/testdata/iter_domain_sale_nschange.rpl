@@ -66,6 +66,17 @@ example.com.	IN NS	ns.example.com.
 SECTION ADDITIONAL
 ns.example.com.		IN 	A	1.2.3.4
 ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+a.gtld-servers.net.	IN	AAAA
+SECTION AUTHORITY
+. SOA bla bla 1 2 3 4 5
+ENTRY_END
+
 RANGE_END
 
 ; a.gtld-servers.net. (after sale of domain)

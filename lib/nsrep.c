@@ -18,10 +18,15 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <libknot/internal/sockaddr.h>
 
 #include "lib/nsrep.h"
+#include "lib/rplan.h"
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
+
+/** Some built-in unfairness ... */
+#define FAVOUR_IPV6 20 /* 20ms bonus for v6 */
 
 /** @internal Macro to set address structure. */
 #define ADDR_SET(sa, family, addr, len) do {\
@@ -36,6 +41,7 @@ static void update_nsrep(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t 
 	ns->name = name;
 	ns->score = score;
 	if (addr == NULL) {
+		ns->addr.ip.sa_family = AF_UNSPEC;
 		return;
 	}
 
@@ -52,30 +58,93 @@ static void update_nsrep(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t 
 
 #undef ADDR_SET
 
+static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score, uint8_t **addr)
+{
+	/* Name server is better candidate if it has address record. */
+	uint8_t *it = pack_head(*addr_set);
+	while (it != pack_tail(*addr_set)) {
+		void *val = pack_obj_val(it);
+		size_t len = pack_obj_len(it);
+		/* Get RTT for this address (if known) */
+		unsigned *cached = rttcache ? lru_get(rttcache, val, len) : NULL;
+		unsigned addr_score = (cached) ? *cached : KR_NS_UNKNOWN / 2;
+		/* Give v6 a head start */
+		unsigned favour = (len == sizeof(struct in6_addr)) ? FAVOUR_IPV6 : 0;
+		if (addr_score < score + favour) {
+			*addr = it;
+			score = addr_score;
+		}
+		it = pack_obj_next(it);
+	}
+	return score;
+}
+
 static int eval_nsrep(const char *k, void *v, void *baton)
 {
-	unsigned score = KR_NS_VALID;
 	struct kr_nsrep *ns = baton;
-	pack_t *addr_set = v;
+	unsigned score = KR_NS_MAX_SCORE;
 	uint8_t *addr = NULL;
 
-	/* Name server is better candidate if it has address record. */
-	if (addr_set->len > 0) {
-		addr = pack_head(*addr_set);
-		score += 1;
+	/* Favour nameservers with unknown addresses to probe them,
+	 * otherwise discover the current best address for the NS. */
+	pack_t *addr_set = (pack_t *)v;
+	if (addr_set->len == 0) {
+		score = KR_NS_UNKNOWN;
+	} else {
+		score = eval_addr_set(addr_set, ns->repcache, score, &addr);
 	}
 
-	/* Update best scoring nameserver. */
-	if (ns->score < score) {
+	/* Probabilistic bee foraging strategy (naive).
+	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
+	 * at the same time long distance scouts probe other sources (low probability).
+	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
+	if (score < ns->score && (ns->flags & QUERY_NO_THROTTLE || score < KR_NS_TIMEOUT)) {
 		update_nsrep(ns, (const knot_dname_t *)k, addr, score);
+	} else {
+		/* With 5% chance, probe server with a probability given by its RTT / MAX_RTT */
+		unsigned roll = rand() % KR_NS_MAX_SCORE;
+		if ((roll % 100 < 5) && (roll >= score)) {
+			update_nsrep(ns, (const knot_dname_t *)k, addr, score);
+			return 1; /* Stop evaluation */
+		}
 	}
 
 	return kr_ok();
 }
 
-int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset)
+int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset, kr_nsrep_lru_t *repcache)
 {
+	ns->repcache = repcache;
 	ns->addr.ip.sa_family = AF_UNSPEC;
-	ns->score = KR_NS_INVALID;
+	ns->score = KR_NS_MAX_SCORE + 1;
 	return map_walk(nsset, eval_nsrep, ns);
+}
+
+int kr_nsrep_update(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *repcache)
+{
+	if (!ns || !repcache || ns->addr.ip.sa_family == AF_UNSPEC) {
+		return kr_error(EINVAL);
+	}
+
+	char *addr = kr_nsrep_inaddr(ns->addr);
+	size_t addr_len = kr_nsrep_inaddr_len(ns->addr);
+	unsigned *cur = lru_set(repcache, addr, addr_len);
+	if (!cur) {
+		return kr_error(ENOMEM);
+	}
+	/* Score limits */
+	if (score > KR_NS_MAX_SCORE) {
+		score = KR_NS_MAX_SCORE;
+	}
+	if (score <= KR_NS_UNKNOWN) {
+		score = KR_NS_UNKNOWN + 1;
+	}
+	/* Set initial value or smooth over last two measurements */
+	if (*cur != 0) {
+		*cur = (*cur + score) / 2;
+	} else {
+	/* First measurement, reset */
+		*cur = score;
+	}
+	return kr_ok();
 }
