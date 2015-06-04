@@ -21,6 +21,7 @@
 #include <libknot/internal/sockaddr.h>
 
 #include "lib/nsrep.h"
+#include "lib/rplan.h"
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
 
@@ -97,7 +98,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
 	 * at the same time long distance scouts probe other sources (low probability).
 	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
-	if (score < ns->score && score < KR_NS_TIMEOUT) {
+	if (score < ns->score && (ns->flags & QUERY_NO_THROTTLE || score < KR_NS_TIMEOUT)) {
 		update_nsrep(ns, (const knot_dname_t *)k, addr, score);
 	} else {
 		/* With 5% chance, probe server with a probability given by its RTT / MAX_RTT */
@@ -134,6 +135,9 @@ int kr_nsrep_update(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *repcach
 	/* Score limits */
 	if (score > KR_NS_MAX_SCORE) {
 		score = KR_NS_MAX_SCORE;
+	}
+	if (score <= KR_NS_UNKNOWN) {
+		score = KR_NS_UNKNOWN + 1;
 	}
 	/* Set initial value or smooth over last two measurements */
 	if (*cur != 0) {

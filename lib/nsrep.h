@@ -46,6 +46,7 @@ typedef lru_hash(unsigned) kr_nsrep_lru_t;
 struct kr_nsrep
 {
 	unsigned score;                  /**< Server score */
+	unsigned flags;                  /**< Server flags */
 	const knot_dname_t *name;        /**< Server name */
 	kr_nsrep_lru_t *repcache;        /**< Reputation cache pointer */
 	union {

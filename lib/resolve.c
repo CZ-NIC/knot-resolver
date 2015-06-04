@@ -431,6 +431,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 ns_election:
 	/* Elect best nameserver candidate */
 	assert(++ns_election_iter < KR_ITER_LIMIT);
+	/* Set slow NS throttling mode */
+	qry->ns.flags = 0;
+	if (qry->flags & QUERY_NO_THROTTLE) {
+		qry->ns.flags = QUERY_NO_THROTTLE;
+	}
 	kr_nsrep_elect(&qry->ns, &qry->zone_cut.nsset, request->ctx->nsrep);
 	if (qry->ns.score > KR_NS_MAX_SCORE) {
 		DEBUG_MSG("=> no valid NS left\n");
