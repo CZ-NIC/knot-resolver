@@ -36,7 +36,7 @@
 static inline void *mm_test_malloc(void *ctx, size_t n)
 { return test_malloc(n); }
 static inline void mm_test_free(void *p)
-{ return test_free(p); }
+{ if (p) test_free(p); }
 
 /** Memory context using CMocka allocator. */
 static inline void test_mm_ctx_init(mm_ctx_t *mm)
