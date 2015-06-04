@@ -64,7 +64,7 @@ static PyObject* init(PyObject* self, PyObject* args)
 	memset(&global_context, 0, sizeof(struct kr_context));
 	global_context.pool = &global_mm;
 	global_context.modules = &global_modules;
-
+	/* Create cache */
 	global_tmpdir = test_tmpdir_create();
 	assert(global_tmpdir);
 	struct namedb_lmdb_opts opts;
@@ -73,6 +73,11 @@ static PyObject* init(PyObject* self, PyObject* args)
 	opts.mapsize = 100 * 4096;
 	int ret = kr_cache_open(&global_context.cache, NULL, &opts, &global_mm);
 	assert(ret == 0);
+	/* Create RTT tracking */
+	global_context.nsrep = malloc(lru_size(kr_nsrep_lru_t, 1000));
+	assert(global_context.nsrep);
+	lru_init(global_context.nsrep, 1000);
+	global_context.options = QUERY_NO_THROTTLE;
 
 	/* No configuration parsing support yet. */
 	if (strstr(config, "query-minimization: on") == NULL) {
@@ -92,6 +97,9 @@ static PyObject* deinit(PyObject* self, PyObject* args)
 		kr_module_unload(global_modules.at[i]);
 	}
 	array_clear(global_modules);
+	kr_cache_close(&global_context.cache);
+	lru_deinit(global_context.nsrep);
+	free(global_context.nsrep);
 
 	test_tmpdir_remove(global_tmpdir);
 	global_tmpdir = NULL;
