@@ -50,6 +50,24 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	}
 }
 
+static void ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
+{
+	struct kr_cache_txn txn;
+	if (kr_cache_txn_begin(&req->ctx->cache, &txn, NAMEDB_RDONLY) != 0) {
+		kr_zonecut_set_sbelt(&qry->zone_cut);
+	} else {
+		/* If at/subdomain of parent zone cut, start from 'one up' to avoid loops */
+		struct kr_query *parent = qry->parent;
+		const knot_dname_t *start_from = qry->sname;
+		if (parent && knot_dname_in(parent->zone_cut.name, qry->sname)) {
+			start_from = parent->zone_cut.name;
+		}
+		/* Find closest zone cut from cache */
+		kr_zonecut_find_cached(&qry->zone_cut, start_from, &txn, qry->timestamp.tv_sec);
+		kr_cache_txn_abort(&txn);
+	}
+}
+
 static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 {
 	struct kr_rplan *rplan = &param->rplan;
@@ -78,7 +96,8 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	if (!next) {
 		return kr_error(ENOMEM);
 	}
-	kr_zonecut_set_sbelt(&next->zone_cut);
+
+	next->flags |= QUERY_AWAIT_CUT;
 	return kr_ok();
 }
 
@@ -418,13 +437,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 * now it's the time to look up closest zone cut from cache.
 	 */
 	if (qry->flags & QUERY_AWAIT_CUT) {
-		struct kr_cache_txn txn;
-		if (kr_cache_txn_begin(&request->ctx->cache, &txn, NAMEDB_RDONLY) != 0) {
-			kr_zonecut_set_sbelt(&qry->zone_cut);
-		} else {
-			kr_zonecut_find_cached(&qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec);
-			kr_cache_txn_abort(&txn);
-		}
+		ns_fetch_cut(qry, request);
 		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
 
