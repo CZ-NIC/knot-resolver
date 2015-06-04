@@ -61,15 +61,6 @@ struct kr_cache_txn {
     struct kr_cache *owner;  /**< Transaction owner */
 };
 
-/** Used storage backend for cache (default LMDB) */
-//extern const namedb_api_t *(*kr_cache_storage)(void);
-
-/** Replace used cache storage backend. */
-//static inline void kr_cache_storage_set(const namedb_api_t *(*api)(void))
-//{
-//	kr_cache_storage = api;
-//}
-
 /**
  * Open/create cache with provided storage options.
  * @param cache cache structure to be initialized

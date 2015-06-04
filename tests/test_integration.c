@@ -73,6 +73,8 @@ static PyObject* init(PyObject* self, PyObject* args)
 	opts.mapsize = 100 * 4096;
 	int ret = kr_cache_open(&global_context.cache, NULL, &opts, &global_mm);
 	assert(ret == 0);
+	if (ret != 0)
+	    return NULL;
 
 	/* No configuration parsing support yet. */
 	if (strstr(config, "query-minimization: on") == NULL) {
