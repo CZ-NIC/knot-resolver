@@ -224,10 +224,12 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	int result = KNOT_STATE_CONSUME;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
+#ifdef STRICT_MODE
 	/* AA, terminate resolution chain. */
 	if (knot_wire_get_aa(pkt->wire)) {
 		return KNOT_STATE_CONSUME;
 	}
+#endif
 
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
@@ -367,6 +369,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_query *query)
 {
+#ifndef STRICT_MODE
 	/* Work around broken auths/load balancers */
 	if (query->flags & QUERY_SAFEMODE) {
 		return resolve_error(pkt, req);
@@ -374,6 +377,9 @@ static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_que
 		query->flags |= QUERY_SAFEMODE;
 		return KNOT_STATE_DONE;
 	}
+#else
+		return resolve_error(pkt, req);
+#endif
 }
 
 /** Resolve input query or continue resolution with followups.

@@ -137,15 +137,6 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 {
 	bool has_ttl = false;
 	uint32_t ttl = UINT32_MAX;
-	/* Fetch SOA from authority. */
-	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
-	for (unsigned i = 0; i < ns->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (rr->type == KNOT_RRTYPE_SOA) {
-			ttl = knot_soa_minimum(&rr->rrs);
-			break;
-		}
-	}
 	/* Get minimum entry TTL in the packet */
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
