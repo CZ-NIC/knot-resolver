@@ -164,6 +164,7 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, st
 		/* Cache the merged RRSet */
 		ret = kr_cache_insert_rr(txn, rr, timestamp);
 		if (ret != KNOT_EOK) {
+			knot_rdataset_clear(&rr->rrs, pool);
 			return ret;
 		}
 		/* Follow the chain */
@@ -180,9 +181,9 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, st
 	ret = merge_in_section(rr, section, 0, pool);
 	if (ret == KNOT_EOK) {
 		kr_cache_insert_rr(txn, rr, timestamp);
-		knot_rdataset_clear(&rr->rrs, pool);
 	}
-
+	
+	knot_rdataset_clear(&rr->rrs, pool);
 	return ret;
 }
 
@@ -249,7 +250,6 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Open write transaction */
-	mm_ctx_t *pool = rplan->pool;
 	uint32_t timestamp = query->timestamp.tv_sec;
 	struct kr_cache *cache = &req->ctx->cache;
 	struct kr_cache_txn txn;
@@ -260,20 +260,17 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* If authoritative, cache answer for current query. */
 	int ret = KNOT_EOK;
 	if (knot_wire_get_aa(pkt->wire)) {
-		ret = write_cache_answer(pkt, &txn, pool, timestamp);
+		ret = write_cache_answer(pkt, &txn, rplan->pool, timestamp);
 	}
 	if (ret == KNOT_EOK) {
-		ret = write_cache_authority(&query->zone_cut, pkt, &txn, pool, timestamp);
+		ret = write_cache_authority(&query->zone_cut, pkt, &txn, rplan->pool, timestamp);
 	}
-
 	/* Cache full, do what we must. */
 	if (ret == KNOT_ESPACE) {
 		kr_cache_clear(&txn);
-		kr_cache_txn_commit(&txn);
-	} else {
-		kr_cache_txn_commit(&txn);
 	}
 
+	kr_cache_txn_commit(&txn);
 	return ctx->state;
 }
 
