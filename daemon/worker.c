@@ -27,7 +27,6 @@
 struct qr_task
 {
 	struct kr_request req;
-	struct worker_ctx *worker;
 	knot_pkt_t *next_query;
 	uv_handle_t *next_handle;
 	uv_timer_t timeout;
@@ -63,15 +62,8 @@ static int parse_query(knot_pkt_t *query)
 
 static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr *addr)
 {
-	/* Recycle mempool from ring or create it */
 	mm_ctx_t pool;
-	mempool_ring_t *ring = &worker->bufs.ring;
-	if (ring->len > 0) {
-		pool = array_tail(*ring);
-		array_pop(*ring);
-	} else {
-		mm_ctx_mempool(&pool, KNOT_WIRE_MAX_PKTSIZE);
-	}
+	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
 
 	/* Create worker task */
 	struct engine *engine = worker->engine;
@@ -81,7 +73,6 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		mp_delete(pool.ctx);
 		return NULL;
 	}
-	task->worker = worker;
 	task->req.pool = pool;
 	task->source.handle = handle;
 	if (addr) {
@@ -127,15 +118,7 @@ static void qr_task_free(uv_handle_t *handle)
 		uv_ref(task->source.handle);
 		io_start_read(task->source.handle);
 	}
-	/* Return mempool to ring or free it if it's full */
-	struct worker_ctx *worker = task->worker;
-	mempool_ring_t *ring = &worker->bufs.ring;
-	if (ring->len < ring->cap) {
-		mp_flush(task->req.pool.ctx);
-		array_push(*ring, task->req.pool);
-	} else {
-		mp_delete(task->req.pool.ctx);
-	}
+	mp_delete(task->req.pool.ctx);
 }
 
 static void qr_task_timeout(uv_timer_t *req)
@@ -278,18 +261,4 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 
 	/* Consume input and produce next query */
 	return qr_task_step(task, query);
-}
-
-int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
-{
-	return array_reserve(worker->bufs.ring, ring_maxlen);
-}
-
-void worker_reclaim(struct worker_ctx *worker)
-{
-	mempool_ring_t *ring = &worker->bufs.ring;
-	for (unsigned i = 0; i < ring->len; ++i) {
-		mp_delete(ring->at[i].ctx);
-	}
-	array_clear(*ring);
 }
