@@ -192,6 +192,24 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut)
 	return kr_ok();
 }
 
+/** Fetch address for zone cut. */
+static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t rrtype, struct kr_cache_txn *txn, uint32_t timestamp)
+{
+	knot_rrset_t cached_rr;
+	knot_rrset_init(&cached_rr, (knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
+	if (kr_cache_peek_rr(txn, &cached_rr, &timestamp) != 0) {
+		return;
+	}
+
+	knot_rdata_t *rd = knot_rdataset_at(&cached_rr.rrs, 0);
+	for (uint16_t i = 0; i < cached_rr.rrs.rr_count; ++i) {
+		if (knot_rdata_ttl(rd) > timestamp) {
+			(void) kr_zonecut_add(cut, ns, rd);
+		}
+		rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
+	}
+}
+
 /** Fetch best NS for zone cut. */
 static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
 {
@@ -208,6 +226,8 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_
 	for (unsigned i = 0; i < cached_rr.rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&cached_rr.rrs, i);
 		kr_zonecut_add(cut, ns_name, NULL);
+		fetch_addr(cut, ns_name, KNOT_RRTYPE_A, txn, timestamp);
+		fetch_addr(cut, ns_name, KNOT_RRTYPE_AAAA, txn, timestamp);
 	}
 
 	/* Always keep SBELT as a backup for root */
