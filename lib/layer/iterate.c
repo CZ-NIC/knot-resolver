@@ -350,6 +350,25 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return reset(ctx);
 }
 
+int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
+{
+	/* Minimize QNAME (if possible). */
+	uint16_t qtype = query->stype;
+	const knot_dname_t *qname = minimized_qname(query, &qtype);
+
+	/* Form a query for the authoritative. */
+	knot_pkt_clear(pkt);
+	int ret = knot_pkt_put_question(pkt, qname, query->sclass, qtype);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	/* Query built, expect answer. */
+	query->id = isaac_next_uint(&ISAAC, UINT16_MAX);
+	knot_wire_set_id(pkt->wire, query->id);
+	return kr_ok();
+}
+
 static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
@@ -359,20 +378,12 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	/* Minimize QNAME (if possible). */
-	uint16_t qtype = query->stype;
-	const knot_dname_t *qname = minimized_qname(query, &qtype);
-
-	/* Form a query for the authoritative. */
-	knot_pkt_clear(pkt);
-	int ret = knot_pkt_put_question(pkt, qname, query->sclass, qtype);
-	if (ret != KNOT_EOK) {
+	/* Make query */
+	int ret = kr_make_query(query, pkt);
+	if (ret != 0) {
 		return KNOT_STATE_FAIL;
 	}
 
-	/* Query built, expect answer. */
-	query->id = isaac_next_uint(&ISAAC, UINT16_MAX);
-	knot_wire_set_id(pkt->wire, query->id);
 	return KNOT_STATE_CONSUME;
 }
 

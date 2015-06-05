@@ -22,9 +22,10 @@
 #include <libknot/descriptor.h>
 #include <libknot/internal/net.h>
 
+#include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"
-#include "lib/resolve.h"
+#include "lib/layer/iterate.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "resl",  fmt)
 
@@ -439,6 +440,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	if (qry->flags & QUERY_AWAIT_CUT) {
 		ns_fetch_cut(qry, request);
 		qry->flags &= ~QUERY_AWAIT_CUT;
+		/* Update minimized QNAME if zone cut changed */
+		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
+			if (kr_make_query(qry, packet) != 0) {
+				return KNOT_STATE_FAIL;
+			}
+		}
 	}
 
 ns_election:
