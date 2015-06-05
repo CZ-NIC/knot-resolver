@@ -44,7 +44,7 @@ static void test_array(void **state)
 
 	/* Delete elements. */
 	array_del(arr, 0);
-	for (size_t i = arr.len; --i;) {
+	while (arr.len > 0) {
 		array_pop(arr);
 	}
 
