@@ -210,20 +210,21 @@ static struct kr_cache_txn *test_txn_rdonly(void **state)
 static void test_fake_invalid (void **state)
 {
 	struct kr_cache_txn *txn = NULL;
-	const namedb_api_t *api_saved;
+	const namedb_api_t *api_saved = NULL;
 	knot_dname_t dname[] = "";
-	struct kr_cache_entry *ret;
+	struct kr_cache_entry *entry = NULL;
+	int ret = 0;
 
-	assert_int_not_equal(kr_cache_txn_commit(txn), KNOT_EOK);
+	assert_int_not_equal(kr_cache_txn_commit(txn), 0);
 	txn = test_txn_write(state);
-	assert_int_not_equal(kr_cache_txn_commit(txn), KNOT_EOK);
-	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0);
-	assert_int_equal(ret, &global_fake_ce);
+	assert_int_not_equal(kr_cache_txn_commit(txn), 0);
+	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, &entry, 0);
+	assert_int_equal(ret, 0);
 	api_saved = txn->owner->api;
 	txn->owner->api = NULL;
-	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0);
+	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, &entry, 0);
 	txn->owner->api = api_saved;
-	assert_null(ret);
+	assert_int_not_equal(ret, 0);
 }
 
 static void test_fake_insert(void **state)
@@ -256,6 +257,7 @@ static void test_invalid(void **state)
 	knot_dname_t dname[] = "";
 	uint32_t timestamp = CACHE_TIME;
 	struct namedb_lmdb_opts opts;
+	struct kr_cache_entry *entry = NULL;
 
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_env;
@@ -267,9 +269,9 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
 	assert_int_not_equal(kr_cache_txn_begin(*state, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
-	assert_null(kr_cache_peek(NULL, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, &timestamp));
-	assert_null(kr_cache_peek(&global_txn, 0, dname, KNOT_RRTYPE_TSIG, &timestamp));
-	assert_null(kr_cache_peek(&global_txn, KR_CACHE_USER, NULL, KNOT_RRTYPE_TSIG, &timestamp));
+	assert_int_not_equal(kr_cache_peek(NULL, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, NULL, &timestamp), 0);
+	assert_int_not_equal(kr_cache_peek(&global_txn, 0, dname, KNOT_RRTYPE_TSIG, &entry, &timestamp), 0);
+	assert_int_not_equal(kr_cache_peek(&global_txn, KR_CACHE_USER, NULL, KNOT_RRTYPE_TSIG, &entry, &timestamp), 0);
 	assert_int_not_equal(kr_cache_peek_rr(NULL, NULL, NULL), 0);
 	assert_int_not_equal(kr_cache_peek_rr(&global_txn, NULL, NULL), 0);
 	assert_int_not_equal(kr_cache_insert_rr(&global_txn, NULL, 0), 0);
@@ -364,7 +366,7 @@ static void test_query_aged(void **state)
 
 	struct kr_cache_txn *txn = test_txn_rdonly(state);
 	int ret = kr_cache_peek_rr(txn, &cache_rr, &timestamp);
-	assert_int_equal(ret, KNOT_ENOENT);
+	assert_int_equal(ret, kr_error(ESTALE));
 	kr_cache_txn_abort(txn);
 }
 

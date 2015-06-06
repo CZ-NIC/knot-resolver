@@ -152,7 +152,7 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, st
 	/* Check if already cached. */
 	knot_rrset_t query_rr;
 	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
-	if (kr_cache_peek_rr(txn, &query_rr, &timestamp) == KNOT_EOK) {
+	if (kr_cache_peek_rr(txn, &query_rr, &timestamp) == 0) {
 		return KNOT_EOK;
 	}
 
@@ -160,10 +160,10 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, st
 	int ret = KNOT_EOK;
 	uint16_t orig_rrtype = rr->type;
 	rr->type = KNOT_RRTYPE_CNAME;
-	while((merge_in_section(rr, section, 0, pool)) == KNOT_EOK) {
+	while((merge_in_section(rr, section, 0, pool)) == 0) {
 		/* Cache the merged RRSet */
 		ret = kr_cache_insert_rr(txn, rr, timestamp);
-		if (ret != KNOT_EOK) {
+		if (ret != 0) {
 			knot_rdataset_clear(&rr->rrs, pool);
 			return ret;
 		}
@@ -171,7 +171,7 @@ static int write_cache_rr(const knot_pktsection_t *section, knot_rrset_t *rr, st
 		rr->owner = (knot_dname_t *)knot_ns_name(&rr->rrs, 0);
 		knot_rdataset_clear(&rr->rrs, pool);
 		/* Check if target already cached. */
-		if (kr_cache_peek_rr(txn, rr, &timestamp) == KNOT_EOK) {
+		if (kr_cache_peek_rr(txn, rr, &timestamp) == 0) {
 			break;
 		}
 	}

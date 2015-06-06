@@ -58,10 +58,10 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
                           uint16_t rrtype, uint8_t tag, uint32_t timestamp)
 {
-	struct kr_cache_entry *entry;
-	entry = kr_cache_peek(txn, tag, qname, rrtype, &timestamp);
-	if (!entry) { /* Not in the cache */
-		return kr_error(ENOENT);
+	struct kr_cache_entry *entry = NULL;
+	int ret = kr_cache_peek(txn, tag, qname, rrtype, &entry, &timestamp);
+	if (ret != 0) { /* Not in the cache */
+		return ret;
 	}
 
 	/* Copy answer, keep the original message id */
@@ -79,7 +79,6 @@ static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 	}
 
 	/* Adjust TTL in records. */
-	int ret = 0;
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
@@ -176,7 +175,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	bool is_auth = knot_wire_get_aa(pkt->wire);
 	int pkt_class = kr_response_classify(pkt);
-	if (!(pkt_class & (PKT_NODATA|PKT_REFUSED|PKT_NXDOMAIN)) && is_auth) {
+	if (!(pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) && is_auth) {
 		return ctx->state; /* Cache only negative, not-cached answers. */
 	}
 	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {

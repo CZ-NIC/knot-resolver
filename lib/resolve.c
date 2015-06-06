@@ -94,7 +94,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
 		/* No IPv4 nor IPv6, flag server as unuseable. */
 		DEBUG_MSG("=> unresolvable NS address, bailing out\n");
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation | (KR_NS_NOIP4|KR_NS_NOIP6), ctx->cache_rep);
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation | KR_NS_NOIP6, ctx->cache_rep);
 		invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}

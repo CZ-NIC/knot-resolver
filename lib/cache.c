@@ -126,40 +126,41 @@ static struct kr_cache_entry *cache_entry(struct kr_cache_txn *txn, uint8_t tag,
 	return (struct kr_cache_entry *)val.data;
 }
 
-struct kr_cache_entry *kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name,
-                                     uint16_t type, uint32_t *timestamp)
+int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
+                  struct kr_cache_entry **entry, uint32_t *timestamp)
 {
-	if (!txn || !txn->owner || !tag || !name) {
-		return NULL;
+	if (!txn || !txn->owner || !tag || !name || !entry) {
+		return kr_error(EINVAL);
 	}
 
-	struct kr_cache_entry *entry = cache_entry(txn, tag, name, type);
-	if (!entry) {
+	struct kr_cache_entry *found = cache_entry(txn, tag, name, type);
+	if (!found) {
 		txn->owner->stats.miss += 1;
-		return NULL;
+		return kr_error(ENOENT);
 	}	
 
 	/* No time constraint */
+	*entry = found;
 	if (!timestamp) {
 		txn->owner->stats.hit += 1;
-		return entry;
-	} else if (*timestamp <= entry->timestamp) {
+		return kr_ok();
+	} else if (*timestamp <= found->timestamp) {
 		/* John Connor record cached in the future. */
 		*timestamp = 0;
 		txn->owner->stats.hit += 1;
-		return entry;
+		return kr_ok();
 	} else {
 		/* Check if the record is still valid. */
-		uint32_t drift = *timestamp - entry->timestamp;
-		if (drift < entry->ttl) {
+		uint32_t drift = *timestamp - found->timestamp;
+		if (drift < found->ttl) {
 			*timestamp = drift;
 			txn->owner->stats.hit += 1;
-			return entry;
+			return kr_ok();
 		}
 	}
 
 	txn->owner->stats.miss += 1;
-	return NULL;	
+	return kr_error(ESTALE);
 }
 
 static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *header, namedb_val_t data)
@@ -237,15 +238,14 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *times
 	}
 
 	/* Check if the RRSet is in the cache. */
-	struct kr_cache_entry *entry = kr_cache_peek(txn, KR_CACHE_RR, rr->owner, rr->type, timestamp);
-	if (entry) {
-		rr->rrs.rr_count = entry->count;
-		rr->rrs.data = entry->data;
-		return kr_ok();
+	struct kr_cache_entry *entry = NULL;
+	int ret = kr_cache_peek(txn, KR_CACHE_RR, rr->owner, rr->type, &entry, timestamp);
+	if (ret != 0) {
+		return ret;
 	}
-
-	/* Not found. */
-	return kr_error(ENOENT);
+	rr->rrs.rr_count = entry->count;
+	rr->rrs.data = entry->data;
+	return kr_ok();
 }
 
 int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm)

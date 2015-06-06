@@ -108,11 +108,12 @@ void kr_cache_txn_abort(struct kr_cache_txn *txn);
  * @param tag  asset tag
  * @param name asset name
  * @param type asset type
+ * @param entry cache entry, will be set to valid pointer or NULL
  * @param timestamp current time (will be replaced with drift if successful)
- * @return cache entry or NULL
+ * @return 0 or an errcode
  */
-struct kr_cache_entry *kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name,
-                                     uint16_t type, uint32_t *timestamp);
+int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
+                  struct kr_cache_entry **entry, uint32_t *timestamp);
 
 /**
  * Insert asset into cache, replacing any existing data.
