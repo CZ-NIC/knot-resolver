@@ -158,10 +158,14 @@ static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
 	engine->resolver.modules = &engine->modules;
-	/* Open NS reputation cache */
-	engine->resolver.nsrep = malloc(lru_size(kr_nsrep_lru_t, DEFAULT_NSREP_SIZE));
-	if (engine->resolver.nsrep) {
-		lru_init(engine->resolver.nsrep, DEFAULT_NSREP_SIZE);
+	/* Open NS rtt + reputation cache */
+	engine->resolver.cache_rtt = malloc(lru_size(kr_nsrep_lru_t, LRU_RTT_SIZE));
+	if (engine->resolver.cache_rtt) {
+		lru_init(engine->resolver.cache_rtt, LRU_RTT_SIZE);
+	}
+	engine->resolver.cache_rep = malloc(lru_size(kr_nsrep_lru_t, LRU_REP_SIZE));
+	if (engine->resolver.cache_rep) {
+		lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
 	}
 
 	/* Load basic modules */
@@ -244,7 +248,8 @@ void engine_deinit(struct engine *engine)
 
 	network_deinit(&engine->net);
 	kr_cache_close(&engine->resolver.cache);
-	lru_deinit(engine->resolver.nsrep);
+	lru_deinit(engine->resolver.cache_rtt);
+	lru_deinit(engine->resolver.cache_rep);
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {

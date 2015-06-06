@@ -21,6 +21,7 @@
 #include "lib/cache.h"
 
 struct kr_rplan;
+struct kr_context;
 
 /**
  * Current zone cut representation.
@@ -98,11 +99,13 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut);
 
 /**
  * Populate zone cut address set from cache.
- * 
+ *
+ * @param ctx       resolution context (to fetch data from LRU caches)
  * @param cut       zone cut to be populated
  * @param name      QNAME to start finding zone cut for
  * @param txn       cache transaction (read)
  * @param timestamp transaction timestamp
  * @return 0 or error code
  */
-int kr_zonecut_find_cached(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp);
+int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
+                           struct kr_cache_txn *txn, uint32_t timestamp);

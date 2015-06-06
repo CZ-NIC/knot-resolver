@@ -64,7 +64,7 @@ static void ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
 			start_from = parent->zone_cut.name;
 		}
 		/* Find closest zone cut from cache */
-		kr_zonecut_find_cached(&qry->zone_cut, start_from, &txn, qry->timestamp.tv_sec);
+		kr_zonecut_find_cached(req->ctx, &qry->zone_cut, start_from, &txn, qry->timestamp.tv_sec);
 		kr_cache_txn_abort(&txn);
 	}
 }
@@ -72,6 +72,8 @@ static void ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
 static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 {
 	struct kr_rplan *rplan = &param->rplan;
+	struct kr_context *ctx = param->ctx;
+
 
 	/* Start NS queries from root, to avoid certain cases
 	 * where a NS drops out of cache and the rest is unavailable,
@@ -85,10 +87,14 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	} else if (!(qry->flags & QUERY_AWAIT_IPV4)) {
 		next_type = KNOT_RRTYPE_A;
 		qry->flags |= QUERY_AWAIT_IPV4;
+		/* Hmm, no useable IPv6 then. */
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation | KR_NS_NOIP6, ctx->cache_rep);
 	}
 	/* Bail out if the query is already pending or dependency loop. */
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
-		DEBUG_MSG("=> dependency loop, bailing out\n");
+		/* No IPv4 nor IPv6, flag server as unuseable. */
+		DEBUG_MSG("=> unresolvable NS address, bailing out\n");
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation | (KR_NS_NOIP4|KR_NS_NOIP6), ctx->cache_rep);
 		invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}
@@ -343,6 +349,7 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
+	struct kr_context *ctx = request->ctx;
 	struct kr_query *qry = kr_rplan_current(rplan);
 
 	/* Empty resolution plan, push packet as the new query */
@@ -366,8 +373,6 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 			DEBUG_MSG("=> ns unreachable, retrying over TCP\n");
 			qry->flags |= QUERY_TCP;
 			return KNOT_STATE_CONSUME; /* Try again */
-		} else {
-			kr_nsrep_update(&qry->ns, KR_NS_TIMEOUT, qry->ns.repcache);
 		}
 	} else {
 		state = knot_overlay_consume(&request->overlay, packet);
@@ -376,6 +381,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	/* Resolution failed, invalidate current NS and reset to UDP. */
 	if (state == KNOT_STATE_FAIL) {
 		DEBUG_MSG("=> resolution failed, invalidating\n");
+		kr_nsrep_update_rtt(&qry->ns, KR_NS_TIMEOUT, ctx->cache_rtt);
 		if (invalidate_ns(rplan, qry) == 0) {
 			qry->flags &= ~QUERY_TCP;
 		}
@@ -383,7 +389,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	} else if (!(qry->flags & QUERY_CACHED)) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
-		kr_nsrep_update(&qry->ns, time_diff(&qry->timestamp, &now), qry->ns.repcache);
+		kr_nsrep_update_rtt(&qry->ns, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
 	}
 
 	/* Pop query if resolved. */
@@ -451,18 +457,21 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 ns_election:
 	/* Elect best nameserver candidate */
 	assert(++ns_election_iter < KR_ITER_LIMIT);
-	/* Set slow NS throttling mode */
-	qry->ns.flags = 0;
-	if (qry->flags & QUERY_NO_THROTTLE) {
-		qry->ns.flags = QUERY_NO_THROTTLE;
-	}
-	kr_nsrep_elect(&qry->ns, &qry->zone_cut.nsset, request->ctx->nsrep);
+	kr_nsrep_elect(qry, request->ctx);
 	if (qry->ns.score > KR_NS_MAX_SCORE) {
 		DEBUG_MSG("=> no valid NS left\n");
 		knot_overlay_reset(&request->overlay);
 		kr_rplan_pop(rplan, qry);
 		return KNOT_STATE_PRODUCE;
 	} else {
+		/* Update query flags based on the NS reputation */
+		if (qry->ns.reputation & KR_NS_NOIP6) {
+			qry->flags |= QUERY_AWAIT_IPV6;
+		}
+		if (qry->ns.reputation & KR_NS_NOIP4) {
+			qry->flags |= QUERY_AWAIT_IPV4;
+		}
+		/* Resolve address records */
 		if (qry->ns.addr.ip.sa_family == AF_UNSPEC) {
 			if (ns_resolve_addr(qry, request) != 0) {
 				qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);

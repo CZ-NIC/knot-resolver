@@ -211,7 +211,7 @@ static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t 
 }
 
 /** Fetch best NS for zone cut. */
-static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
+static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
 {
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
@@ -226,8 +226,15 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_
 	for (unsigned i = 0; i < cached_rr.rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&cached_rr.rrs, i);
 		kr_zonecut_add(cut, ns_name, NULL);
-		fetch_addr(cut, ns_name, KNOT_RRTYPE_A, txn, timestamp);
-		fetch_addr(cut, ns_name, KNOT_RRTYPE_AAAA, txn, timestamp);
+		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
+		unsigned *cached = lru_get(ctx->cache_rep, (const char *)ns_name, knot_dname_size(ns_name));
+		unsigned reputation = (cached) ? *cached : 0;
+		if (!(reputation & KR_NS_NOIP4)) {
+			fetch_addr(cut, ns_name, KNOT_RRTYPE_A, txn, timestamp);
+		}
+		if (!(reputation & KR_NS_NOIP6)) {
+			fetch_addr(cut, ns_name, KNOT_RRTYPE_AAAA, txn, timestamp);
+		}
 	}
 
 	/* Always keep SBELT as a backup for root */
@@ -238,7 +245,8 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_
 	return kr_ok();
 }
 
-int kr_zonecut_find_cached(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
+int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
+                           struct kr_cache_txn *txn, uint32_t timestamp)
 {
 	if (cut == NULL) {
 		return kr_error(EINVAL);
@@ -247,7 +255,7 @@ int kr_zonecut_find_cached(struct kr_zonecut *cut, const knot_dname_t *name, str
 	/* Start at QNAME parent. */
 	name = knot_wire_next_label(name, NULL);
 	while (txn) {
-		if (fetch_ns(cut, name, txn, timestamp) == 0) {
+		if (fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
 			update_cut_name(cut, name);
 			return kr_ok();
 		}

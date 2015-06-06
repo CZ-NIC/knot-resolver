@@ -129,7 +129,7 @@ int main(int argc, char **argv)
 
 	/* Create a server engine. */
 	mm_ctx_t pool;
-	mm_ctx_mempool(&pool, 4096);
+	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
 	struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {

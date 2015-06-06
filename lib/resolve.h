@@ -101,7 +101,8 @@ struct kr_context
 {
 	mm_ctx_t *pool;
 	struct kr_cache cache;
-	kr_nsrep_lru_t *nsrep;
+	kr_nsrep_lru_t *cache_rtt;
+	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
 	uint32_t options;
 };
