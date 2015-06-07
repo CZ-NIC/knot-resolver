@@ -159,11 +159,13 @@ static int update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_reques
 
 static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_query *qry)
 {
-	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
-	for (unsigned i = 0; i < ar->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
-		if (knot_dname_is_equal(ns, rr->owner)) {
-			(void) update_nsaddr(rr, qry);
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (knot_dname_is_equal(ns, rr->owner)) {
+				(void) update_nsaddr(rr, qry);
+			}
 		}
 	}
 }
@@ -171,12 +173,14 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_query 
 /** Attempt to find glue for given nameserver name (best effort). */
 static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
 {
-	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
-	for (unsigned i = 0; i < ar->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
-		if (knot_dname_is_equal(ns, rr->owner) &&
-		    (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA)) {
-			return 1;
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (knot_dname_is_equal(ns, rr->owner) &&
+			    (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA)) {
+				return 1;
+			}
 		}
 	}
 	return 0;

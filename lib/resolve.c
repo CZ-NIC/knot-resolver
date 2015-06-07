@@ -51,11 +51,12 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	}
 }
 
-static void ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
+static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
 {
 	struct kr_cache_txn txn;
+	int ret = 0;
 	if (kr_cache_txn_begin(&req->ctx->cache, &txn, NAMEDB_RDONLY) != 0) {
-		kr_zonecut_set_sbelt(&qry->zone_cut);
+		ret = kr_zonecut_set_sbelt(&qry->zone_cut);
 	} else {
 		/* If at/subdomain of parent zone cut, start from 'one up' to avoid loops */
 		struct kr_query *parent = qry->parent;
@@ -64,9 +65,10 @@ static void ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
 			start_from = parent->zone_cut.name;
 		}
 		/* Find closest zone cut from cache */
-		kr_zonecut_find_cached(req->ctx, &qry->zone_cut, start_from, &txn, qry->timestamp.tv_sec);
+		ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, start_from, &txn, qry->timestamp.tv_sec);
 		kr_cache_txn_abort(&txn);
 	}
+	return ret;
 }
 
 static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
@@ -444,7 +446,10 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 * now it's the time to look up closest zone cut from cache.
 	 */
 	if (qry->flags & QUERY_AWAIT_CUT) {
-		ns_fetch_cut(qry, request);
+		int ret = ns_fetch_cut(qry, request);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
 		qry->flags &= ~QUERY_AWAIT_CUT;
 		/* Update minimized QNAME if zone cut changed */
 		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
