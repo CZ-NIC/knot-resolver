@@ -1,4 +1,4 @@
 gostats_SOURCES := modules/gostats/gostats.go
-gostats_DEPEND := $(libkresolve)
-gostats_LIBS := $(libkresolve_TARGET) $(libkresolve_LIBS)
+gostats_DEPEND := $(libkres)
+gostats_LIBS := $(libkres_TARGET) $(libkres_LIBS)
 $(call make_go_module,gostats)

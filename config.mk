@@ -1,6 +1,6 @@
 # Project
 MAJOR := 15
-MINOR := 04
+MINOR := 07
 PATCH := 0
 
 # Paths

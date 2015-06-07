@@ -1,4 +1,4 @@
 hints_SOURCES := modules/hints/hints.c contrib/ccan/json/json.c
-hints_DEPEND := $(libkresolve)
-hints_LIBS := $(libkresolve_TARGET) $(libkresolve_LIBS)
+hints_DEPEND := $(libkres)
+hints_LIBS := $(libkres_TARGET) $(libkres_LIBS)
 $(call make_c_module,hints)

@@ -16,30 +16,30 @@ array
 ~~~~~
 
 .. doxygenfile:: array.h
-   :project: libkresolve
+   :project: libkres
 
 map
 ~~~
 
 .. doxygenfile:: map.h
-   :project: libkresolve
+   :project: libkres
 
 set
 ~~~
 
 .. doxygenfile:: set.h
-   :project: libkresolve
+   :project: libkres
 
 pack
 ~~~~
 
 .. doxygenfile:: pack.h
-   :project: libkresolve
+   :project: libkres
 
 lru
 ~~~
 
 .. doxygenfile:: lru.h
-   :project: libkresolve
+   :project: libkres
 
 .. _`Crit-bit tree`: http://cr.yp.to/critbit.html 

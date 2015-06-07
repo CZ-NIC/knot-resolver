@@ -11,8 +11,8 @@ if os.environ.get('READTHEDOCS', None) == 'True':
 extensions = ['sphinx.ext.todo', 'sphinx.ext.viewcode', 'breathe']
 
 # Breathe configuration
-breathe_projects = { "libkresolve": "doxyxml" }
-breathe_default_project = "libkresolve"
+breathe_projects = { "libkres": "doxyxml" }
+breathe_default_project = "libkres"
 breathe_domain_by_extension = {"h" : "c"}
 
 # The suffix of source filenames.
@@ -66,7 +66,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'libkresolve', u'libkresolve documentation',
+    ('index', 'libkres', u'libkres documentation',
      [u'CZ.NIC Labs'], 1)
 ]
 

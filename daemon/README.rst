@@ -16,7 +16,7 @@ the `daemon` directory.
 
 .. code-block:: bash
 
-	$ ./daemon/kresolved -h
+	$ ./daemon/kresd -h
 
 Interacting with the daemon
 ---------------------------
@@ -26,7 +26,7 @@ You can load modules this way and use their properties to get information about 
 
 .. code-block:: bash
 
-	$ kresolved /var/run/knot-resolver
+	$ kresd /var/run/knot-resolver
 	[system] started in interactive mode, type 'help()'
 	> cache.count()
 	53
@@ -47,7 +47,7 @@ comfortable in the current working directory.
 
 .. code-block:: sh
 
-	$ kresolved /var/run/kresolved
+	$ kresd /var/run/kresd
 
 And you're good to go for most use cases! If you want to use modules or configure daemon behavior, read on.
 

@@ -3,7 +3,7 @@ ccan_EMBED := \
 	contrib/ccan/isaac/isaac.c \
 	contrib/murmurhash3/murmurhash3.c
 
-libkresolve_SOURCES := \
+libkres_SOURCES := \
 	$(ccan_EMBED)          \
 	lib/generic/map.c      \
 	lib/layer/iterate.c    \
@@ -17,7 +17,7 @@ libkresolve_SOURCES := \
 	lib/rplan.c            \
 	lib/cache.c
 
-libkresolve_HEADERS := \
+libkres_HEADERS := \
 	lib/generic/array.h    \
 	lib/generic/map.h      \
 	lib/generic/set.h      \
@@ -31,16 +31,16 @@ libkresolve_HEADERS := \
 	lib/cache.h
 
 # Dependencies
-libkresolve_DEPEND := 
-libkresolve_LIBS := $(libknot_LIBS)
-libkresolve_TARGET := -Wl,-rpath,lib -Llib -lkresolve
+libkres_DEPEND := 
+libkres_LIBS := $(libknot_LIBS)
+libkres_TARGET := -Wl,-rpath,lib -Llib -lkres
 
 # Make library
-$(eval $(call make_static,libkresolve,lib))
+$(eval $(call make_static,libkres,lib))
 
 # Targets
-lib: $(libkresolve)
-lib-install: libkresolve-install
-lib-clean: libkresolve-clean
+lib: $(libkres)
+lib-install: libkres-install
+lib-clean: libkres-clean
 
 .PHONY: lib lib-install lib-clean
