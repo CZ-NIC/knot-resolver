@@ -64,9 +64,9 @@ struct kr_cache_txn {
 /**
  * Open/create cache with provided storage options.
  * @param cache cache structure to be initialized
- * @param api Storage engine
- * @param storage_opts Storage-specific options (may be NULL for default)
- * @param mm Memory context.
+ * @param api   storage engine API
+ * @param opts  storage-specific options (may be NULL for default)
+ * @param mm    memory context.
  * @return 0 or an error code
  */
 int kr_cache_open(struct kr_cache *cache, const namedb_api_t *api, void *opts, mm_ctx_t *mm);

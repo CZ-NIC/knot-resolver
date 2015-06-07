@@ -14,3 +14,4 @@ Implemented modules
 .. include:: ../modules/cachectl/README.rst
 .. include:: ../modules/graphite/README.rst
 .. include:: ../modules/ketcd/README.rst
+.. include:: ../modules/kmemcached/README.rst
