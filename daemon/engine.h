@@ -23,6 +23,9 @@
 #ifndef LRU_REP_SIZE
 #define LRU_REP_SIZE (LRU_RTT_SIZE / 2) /**< NS reputation cache size */
 #endif
+#ifndef MP_FREELIST_SIZE
+#define MP_FREELIST_SIZE 32 /**< Maximum length of the worker mempool freelist */
+#endif
 
 /*
  * @internal These are forward decls to allow building modules with engine but without Lua.

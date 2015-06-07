@@ -27,6 +27,7 @@
 struct qr_task
 {
 	struct kr_request req;
+	struct worker_ctx *worker;
 	knot_pkt_t *next_query;
 	uv_handle_t *next_handle;
 	uv_timer_t timeout;
@@ -62,10 +63,17 @@ static int parse_query(knot_pkt_t *query)
 
 static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr *addr)
 {
+	/* Recycle available mempool if possible */
 	mm_ctx_t pool = {
-		.ctx = mp_new (4096),
+		.ctx = NULL,
 		.alloc = (mm_alloc_t) mp_alloc
 	};
+	if (worker->pools.len > 0) {
+		pool.ctx = array_tail(worker->pools);
+		array_pop(worker->pools);
+	} else { /* No mempool on the freelist, create new one */
+		pool.ctx = mp_new (KNOT_WIRE_MAX_PKTSIZE);
+	}
 
 	/* Create worker task */
 	struct engine *engine = worker->engine;
@@ -75,6 +83,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		mp_delete(pool.ctx);
 		return NULL;
 	}
+	task->worker = worker;
 	task->req.pool = pool;
 	task->source.handle = handle;
 	if (addr) {
@@ -120,7 +129,15 @@ static void qr_task_free(uv_handle_t *handle)
 		uv_ref(task->source.handle);
 		io_start_read(task->source.handle);
 	}
-	mp_delete(task->req.pool.ctx);
+	/* Return mempool to ring or free it if it's full */
+	struct worker_ctx *worker = task->worker;
+	void *mp_context = task->req.pool.ctx;
+	if (worker->pools.len < MP_FREELIST_SIZE) {
+		mp_flush(mp_context);
+		array_push(worker->pools, mp_context);
+	} else {
+		mp_delete(mp_context);
+	}
 }
 
 static void qr_task_timeout(uv_timer_t *req)
@@ -263,4 +280,19 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 
 	/* Consume input and produce next query */
 	return qr_task_step(task, query);
+}
+
+int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
+{
+	array_init(worker->pools);
+	return array_reserve(worker->pools, ring_maxlen);
+}
+
+void worker_reclaim(struct worker_ctx *worker)
+{
+	mp_freelist_t *pools = &worker->pools;
+	for (unsigned i = 0; i < pools->len; ++i) {
+		mp_delete(pools->at[i]);
+	}
+	array_clear(*pools);
 }

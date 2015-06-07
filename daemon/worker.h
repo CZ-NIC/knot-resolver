@@ -19,6 +19,11 @@
 #include <libknot/internal/mempattern.h>
 
 #include "daemon/engine.h"
+#include "lib/generic/array.h"
+
+/* @cond internal Freelist of available mempools. */
+typedef array_t(void *) mp_freelist_t;
+/* @endcond */
 
 /**
  * Query resolution worker.
@@ -27,9 +32,8 @@ struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
 	mm_ctx_t *mm;
-	struct {
-		uint8_t wire[KNOT_WIRE_MAX_PKTSIZE];
-	} bufs;
+	uint8_t wire_buf[KNOT_WIRE_MAX_PKTSIZE];
+	mp_freelist_t pools;
 };
 
 /**
@@ -43,3 +47,9 @@ struct worker_ctx {
  * @return 0, error code
  */
 int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr* addr);
+
+/** Reserve worker buffers */
+int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen);
+
+/** Collect worker mempools */
+void worker_reclaim(struct worker_ctx *worker);

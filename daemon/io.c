@@ -44,8 +44,8 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 	 */
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
-	buf->base = (char *)worker->bufs.wire;
-	buf->len = sizeof(worker->bufs.wire);
+	buf->base = (char *)worker->wire_buf;
+	buf->len = sizeof(worker->wire_buf);
 }
 
 void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
@@ -59,7 +59,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	}
 
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
-	query->max_size = sizeof(worker->bufs.wire);
+	query->max_size = sizeof(worker->wire_buf);
 	worker_exec(worker, (uv_handle_t *)handle, query, addr);
 	knot_pkt_free(&query);
 }
@@ -109,7 +109,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	}
 
 	knot_pkt_t *query = knot_pkt_new(buf->base + 2, nbytes, worker->mm);
-	query->max_size = sizeof(worker->bufs.wire);
+	query->max_size = sizeof(worker->wire_buf);
 	int ret = worker_exec(worker, (uv_handle_t *)handle, query, NULL);
 	if (ret == 0) {
 		/* Push - pull, stop reading from this handle until
