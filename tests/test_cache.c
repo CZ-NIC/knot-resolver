@@ -360,7 +360,7 @@ static void test_query(void **state)
 /* Test cache read (simulate aged entry) */
 static void test_query_aged(void **state)
 {
-	uint32_t timestamp = CACHE_TIME + CACHE_TTL;
+	uint32_t timestamp = CACHE_TIME + CACHE_TTL + 1;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 

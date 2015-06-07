@@ -152,7 +152,7 @@ int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *nam
 	} else {
 		/* Check if the record is still valid. */
 		uint32_t drift = *timestamp - found->timestamp;
-		if (drift < found->ttl) {
+		if (drift <= found->ttl) {
 			*timestamp = drift;
 			txn->owner->stats.hit += 1;
 			return kr_ok();
@@ -264,7 +264,7 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
 	knot_rdata_t *rd = knot_rdataset_at(&src->rrs, 0);
 	knot_rdata_t *rd_dst = NULL;
 	for (uint16_t i = 0; i < src->rrs.rr_count; ++i) {
-		if (knot_rdata_ttl(rd) > drift) {
+		if (knot_rdata_ttl(rd) >= drift) {
 			/* Append record */
 			if (knot_rdataset_add(&dst->rrs, rd, mm) != 0) {
 				knot_rrset_clear(dst, mm);
