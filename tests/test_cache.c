@@ -14,8 +14,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libknot/internal/mempool.h>
 #include <libknot/internal/namedb/namedb_lmdb.h>
+#include <ucw/mempool.h>
 
 #include "tests/test.h"
 #include "lib/cache.h"

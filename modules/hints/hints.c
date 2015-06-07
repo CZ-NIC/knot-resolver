@@ -21,12 +21,12 @@
  * The module provides an override for queried address records.
  */
 
-#include <ccan/json/json.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
 #include <libknot/internal/lists.h>
-#include <libknot/internal/mempool.h>
 #include <libknot/rrtype/aaaa.h>
+#include <ccan/json/json.h>
+#include <ucw/mempool.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/zonecut.h"
@@ -171,8 +171,10 @@ static int load(struct kr_module *module, const char *path)
 	}
 
 	/* Create pool and copy itself */
-	mm_ctx_t _pool;
-	mm_ctx_mempool(&_pool, MM_DEFAULT_BLKSIZE);
+	mm_ctx_t _pool = {
+		.ctx = mp_new(4096),
+		.alloc = (mm_alloc_t) mp_alloc
+	};
 	mm_ctx_t *pool = mm_alloc(&_pool, sizeof(*pool));
 	if (!pool) {
 		return kr_error(ENOMEM);

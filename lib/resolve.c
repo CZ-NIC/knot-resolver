@@ -16,12 +16,10 @@
 
 #include <stdio.h>
 #include <fcntl.h>
-
-#include <libknot/internal/mempool.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
 #include <libknot/internal/net.h>
-
+#include <ucw/mempool.h>
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"
@@ -265,8 +263,10 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	}
 
 	/* Create memory pool */
-	mm_ctx_t pool;
-	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
+	mm_ctx_t pool = {
+		.ctx = mp_new (KNOT_WIRE_MAX_PKTSIZE),
+		.alloc = (mm_alloc_t) mp_alloc
+	};
 	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, &pool);
 	knot_pkt_t *resp = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, &pool);
 	if (!query || !resp) {
