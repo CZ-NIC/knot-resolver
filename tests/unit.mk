@@ -21,8 +21,8 @@ mock_gomodule_SOURCES := tests/mock_gomodule.c
 $(eval $(call make_lib,mock_gomodule,tests))
 
 # Dependencies
-tests_DEPEND := $(libkresolve) $(mock_cmodule) $(mock_gomodule)
-tests_LIBS :=  $(libkresolve_TARGET) $(libkresolve_LIBS) $(cmocka_LIBS)
+tests_DEPEND := $(libkres) $(mock_cmodule) $(mock_gomodule)
+tests_LIBS :=  $(libkres_TARGET) $(libkres_LIBS) $(cmocka_LIBS)
 
 # Make test binaries
 define make_test

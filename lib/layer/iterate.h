@@ -33,6 +33,3 @@ int kr_response_classify(knot_pkt_t *pkt);
 
 /** Make next iterative query. */
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt);
-
-/* Processing module implementation. */
-const knot_layer_api_t *iterate_layer(struct kr_module *module);

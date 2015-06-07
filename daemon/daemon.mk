@@ -1,7 +1,7 @@
-kresolved_EMBED := \
+kresd_EMBED := \
 	contrib/ccan/json/json.c
-kresolved_SOURCES := \
-	$(kresolved_EMBED)   \
+kresd_SOURCES := \
+	$(kresd_EMBED)   \
 	daemon/io.c          \
 	daemon/network.c     \
 	daemon/engine.c      \
@@ -16,18 +16,18 @@ daemon/engine.o: daemon/lua/sandbox.inc daemon/lua/config.inc
 	@$(call quiet,XXD,$<) $< > $@
 
 # Dependencies
-kresolved_DEPEND := $(libkresolve)
-kresolved_LIBS := $(libkresolve_TARGET) $(libknot_LIBS) $(libuv_LIBS) $(lua_LIBS)
+kresd_DEPEND := $(libkres)
+kresd_LIBS := $(libkres_TARGET) $(libknot_LIBS) $(libuv_LIBS) $(lua_LIBS)
 
 # Make binary
 ifeq ($(HAS_lua)|$(HAS_libuv), yes|yes)
-$(eval $(call make_bin,kresolved,daemon))
+$(eval $(call make_bin,kresd,daemon))
 endif
 
 # Targets
-daemon: $(kresolved)
-daemon-install: kresolved-install
-daemon-clean: kresolved-clean
+daemon: $(kresd)
+daemon-install: kresd-install
+daemon-clean: kresd-clean
 	@$(RM) daemon/lua/*.inc
 
 .PHONY: daemon daemon-install daemon-clean

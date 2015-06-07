@@ -314,7 +314,7 @@ Once you load the module, you can call the module property from the interactive 
 
 .. code-block:: bash
 
-	$ kresolved
+	$ kresd
 	...
 	[system] started in interactive mode, type 'help()'
 	> modules.load('cached')

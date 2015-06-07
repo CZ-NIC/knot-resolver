@@ -28,7 +28,7 @@ end
 
 function ketcd.init(module)
 	ketcd.Etcd = require('etcd.luasocket')
-	ketcd.defaults = { prefix = '/kresolved' }
+	ketcd.defaults = { prefix = '/kresd' }
 end
 
 function ketcd.deinit(module)

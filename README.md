@@ -35,8 +35,8 @@ See the [Building project][depends] documentation page for more information.
 The project builds a resolver library in the `lib` directory, and a daemon in the `daemon` directory.
 
 ```
-$ ./daemon/kresolved -h
-$ ./daemon/kresolved [working_directory]
+$ ./daemon/kresd -h
+$ ./daemon/kresd [working_directory]
 ```
 
 See the documentation at [knot-resolver.readthedocs.org][doc].

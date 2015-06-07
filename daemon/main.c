@@ -19,6 +19,7 @@
 #include <getopt.h>
 #include <uv.h>
 #include <libknot/internal/sockaddr.h>
+#include <ucw/mempool.h>
 
 #include "lib/defines.h"
 #include "lib/resolve.h"
@@ -128,8 +129,10 @@ int main(int argc, char **argv)
 	uv_signal_start(&sigint, signal_handler, SIGINT);
 
 	/* Create a server engine. */
-	mm_ctx_t pool;
-	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
+	mm_ctx_t pool = {
+		.ctx = mp_new (4096),
+		.alloc = (mm_alloc_t) mp_alloc
+	};
 	struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {

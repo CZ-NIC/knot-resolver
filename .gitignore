@@ -40,7 +40,7 @@ tmp*
 /ylwrap
 /doc/doxyxml
 /doc/html
-/daemon/kresolved
+/daemon/kresd
 /tests/test_array
 /tests/test_map
 /tests/test_module

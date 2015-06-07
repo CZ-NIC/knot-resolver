@@ -15,9 +15,9 @@ Name resolution
 ---------------
 
 .. doxygenfile:: resolve.h
-   :project: libkresolve
+   :project: libkres
 .. doxygenfile:: rplan.h
-   :project: libkresolve
+   :project: libkres
 
 .. _lib_api_cache:
 
@@ -25,7 +25,7 @@ Cache
 -----
 
 .. doxygenfile:: cache.h
-   :project: libkresolve
+   :project: libkres
 
 .. _lib_api_nameservers:
 
@@ -33,9 +33,9 @@ Nameservers
 -----------
 
 .. doxygenfile:: nsrep.h
-   :project: libkresolve
+   :project: libkres
 .. doxygenfile:: zonecut.h
-   :project: libkresolve
+   :project: libkres
 
 .. _lib_api_modules:
 
@@ -43,15 +43,15 @@ Modules
 -------
 
 .. doxygenfile:: module.h
-   :project: libkresolve
+   :project: libkres
 
 Utilities
 ---------
 
 .. doxygenfile:: utils.h
-   :project: libkresolve
+   :project: libkres
 .. doxygenfile:: defines.h
-   :project: libkresolve
+   :project: libkres
 
 .. _lib_generics:
 

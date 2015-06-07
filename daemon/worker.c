@@ -17,7 +17,7 @@
 #include <uv.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/internal/net.h>
-#include <libknot/internal/mempool.h>
+#include <ucw/mempool.h>
 
 #include "daemon/worker.h"
 #include "daemon/engine.h"
@@ -62,8 +62,10 @@ static int parse_query(knot_pkt_t *query)
 
 static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr *addr)
 {
-	mm_ctx_t pool;
-	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
+	mm_ctx_t pool = {
+		.ctx = mp_new (4096),
+		.alloc = (mm_alloc_t) mp_alloc
+	};
 
 	/* Create worker task */
 	struct engine *engine = worker->engine;

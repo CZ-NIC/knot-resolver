@@ -97,7 +97,7 @@ struct lru_hash_base {
 	char slots[];
 };
 
-/** @breif User-defined hashtable. */
+/** @brief User-defined hashtable. */
 #define lru_hash(type) \
 struct { \
 	lru_hash_struct \
@@ -155,9 +155,9 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
  * @param table hash table
  * @param max_slots number of slots
  */
-#define lru_init(table, max_size) \
- (memset((table), 0, sizeof(*table) + (max_size) * sizeof((table)->slots[0])), \
-  (table)->stride = sizeof((table)->slots[0]), (table)->size = (max_size))
+#define lru_init(table, max_slots) \
+ (memset((table), 0, sizeof(*table) + (max_slots) * sizeof((table)->slots[0])), \
+  (table)->stride = sizeof((table)->slots[0]), (table)->size = (max_slots))
 
 /**
  * @brief Free all keys and evict all values.
