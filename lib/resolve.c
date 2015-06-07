@@ -372,7 +372,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 		/* Network error, retry over TCP. */
 		if (!(qry->flags & QUERY_TCP)) {
 			/** @todo This should just penalize UDP and elect next best. */
-			DEBUG_MSG("=> ns unreachable, retrying over TCP\n");
+			DEBUG_MSG("=> NS unreachable, retrying over TCP\n");
 			qry->flags |= QUERY_TCP;
 			return KNOT_STATE_CONSUME; /* Try again */
 		}
@@ -382,7 +382,6 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 
 	/* Resolution failed, invalidate current NS and reset to UDP. */
 	if (state == KNOT_STATE_FAIL) {
-		DEBUG_MSG("=> resolution failed, invalidating\n");
 		kr_nsrep_update_rtt(&qry->ns, KR_NS_TIMEOUT, ctx->cache_rtt);
 		if (invalidate_ns(rplan, qry) == 0) {
 			qry->flags &= ~QUERY_TCP;
