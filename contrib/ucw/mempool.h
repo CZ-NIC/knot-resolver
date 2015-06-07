@@ -12,6 +12,8 @@
 #define _UCW_POOLS_H
 
 #include <ucw/alloc.h>
+#include <ucw/config.h>
+#include <ucw/lib.h>
 #include <string.h>
 
 #ifdef CONFIG_UCW_CLEAN_ABI

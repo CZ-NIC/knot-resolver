@@ -16,6 +16,7 @@
 #include <ucw/mempool.h>
 
 #include <string.h>
+#include <stdlib.h>
 
 #define MP_CHUNK_TAIL ALIGN_TO(sizeof(struct mempool_chunk), CPU_STRUCT_ALIGN)
 #define MP_SIZE_MAX (SIZE_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
@@ -85,7 +86,9 @@ static void *
 mp_new_big_chunk(struct mempool *pool, size_t size)
 {
   struct mempool_chunk *chunk;
-  chunk = xmalloc(size + MP_CHUNK_TAIL) + size;
+  chunk = malloc(size + MP_CHUNK_TAIL) + size;
+  if (!chunk)
+    return NULL;
   chunk->size = size;
   if (pool)
     pool->total_size += size + MP_CHUNK_TAIL;
@@ -96,7 +99,7 @@ static void
 mp_free_big_chunk(struct mempool *pool, struct mempool_chunk *chunk)
 {
   pool->total_size -= chunk->size + MP_CHUNK_TAIL;
-  xfree((void *)chunk - chunk->size);
+  free((void *)chunk - chunk->size);
 }
 
 static void *
@@ -288,7 +291,7 @@ mp_alloc_internal(struct mempool *pool, size_t size)
       return pool->last_big = (void *)chunk - aligned;
     }
   else
-    die("Cannot allocate %zu bytes from a mempool", size);
+    return NULL;
 }
 
 void *
@@ -315,6 +318,8 @@ void *
 mp_start_internal(struct mempool *pool, size_t size)
 {
   void *ptr = mp_alloc_internal(pool, size);
+  if (!ptr)
+    return NULL;
   pool->state.free[pool->idx] += size;
   return ptr;
 }
@@ -335,7 +340,7 @@ void *
 mp_grow_internal(struct mempool *pool, size_t size)
 {
   if (unlikely(size > MP_SIZE_MAX))
-    die("Cannot allocate %zu bytes of memory", size);
+    return NULL;
   size_t avail = mp_avail(pool);
   void *ptr = mp_ptr(pool);
   if (pool->idx)
@@ -345,7 +350,10 @@ mp_grow_internal(struct mempool *pool, size_t size)
       amortized = ALIGN_TO(amortized, CPU_STRUCT_ALIGN);
       struct mempool_chunk *chunk = pool->state.last[1], *next = chunk->next;
       pool->total_size = pool->total_size - chunk->size + amortized;
-      ptr = xrealloc(ptr, amortized + MP_CHUNK_TAIL);
+      void *nptr = realloc(ptr, amortized + MP_CHUNK_TAIL);
+      if (!nptr)
+        return NULL;
+      ptr = nptr;
       chunk = ptr + amortized;
       chunk->next = next;
       chunk->size = amortized;
@@ -390,6 +398,9 @@ mp_spread_internal(struct mempool *pool, void *p, size_t size)
 {
   void *old = mp_ptr(pool);
   void *new = mp_grow_internal(pool, p-old+size);
+  if (!new) {
+    return NULL;
+  }
   return p-old+new;
 }
 
