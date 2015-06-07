@@ -23,11 +23,21 @@
 #include "lib/utils.h"
 #include "lib/module.h"
 
+/* List of embedded modules */
+const knot_layer_api_t *iterate_layer(struct kr_module *module);
+const knot_layer_api_t *rrcache_layer(struct kr_module *module);
+const knot_layer_api_t *pktcache_layer(struct kr_module *module);
+static const struct kr_module embedded_modules[] = {
+	{ "iterate",  NULL, NULL, NULL, iterate_layer, NULL, NULL, NULL },
+	{ "rrcache",  NULL, NULL, NULL, rrcache_layer, NULL, NULL, NULL },
+	{ "pktcache", NULL, NULL, NULL, pktcache_layer, NULL, NULL, NULL },
+};
+
 /** Library extension. */
 #if defined(__APPLE__)
  #define LIBEXT ".dylib"
 #elif _WIN32
- #define LIBEXT ".lib"
+ #define LIBEXT ".dll"
 #else
  #define LIBEXT ".so"
 #endif
@@ -90,6 +100,18 @@ static int load_library(struct kr_module *module, const char *name, const char *
 /** Load C module symbols. */
 static int load_sym_c(struct kr_module *module, uint32_t api_required)
 {
+	/* Check if it's embedded first */
+	for (unsigned i = 0; i < sizeof(embedded_modules)/sizeof(embedded_modules[0]); ++i) {
+		const struct kr_module *embedded = &embedded_modules[i];
+		if (strcmp(module->name, embedded->name) == 0) {
+			module->init = embedded->init;
+			module->deinit = embedded->deinit;
+			module->config = embedded->config;
+			module->layer = embedded->layer;
+			return kr_ok();
+		}
+	}
+	/* Load dynamic library module */
 	auto_free char *module_prefix = kr_strcatdup(2, module->name, "_");
 	ABI_CHECK(module, module_prefix, "api", api_required);
 	ABI_LOAD(module, module_prefix, "init", "deinit", "config", "layer", "props");

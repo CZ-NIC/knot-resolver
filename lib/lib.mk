@@ -36,7 +36,7 @@ libkresolve_LIBS := $(libknot_LIBS)
 libkresolve_TARGET := -Wl,-rpath,lib -Llib -lkresolve
 
 # Make library
-$(eval $(call make_lib,libkresolve,lib))
+$(eval $(call make_static,libkresolve,lib))
 
 # Targets
 lib: $(libkresolve)
