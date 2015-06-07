@@ -33,7 +33,8 @@ struct kr_query;
 enum kr_ns_score {
 	KR_NS_MAX_SCORE = KR_CONN_RTT_MAX,
 	KR_NS_TIMEOUT   = (95 * KR_NS_MAX_SCORE) / 100,
-	KR_NS_UNKNOWN   = 10
+	KR_NS_UNKNOWN   = KR_NS_TIMEOUT / 2,
+	KR_NS_GLUED     = 10
 };
 
 /**
@@ -82,6 +83,14 @@ struct kr_nsrep
  * @return              0 or an error code
  */
 int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx);
+
+/**
+ * Elect best nameserver/address pair from the nsset.
+ * @param  qry          updated query
+ * @param  ctx          resolution context
+ * @return              0 or an error code
+ */
+int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
 
 /**
  * Update NS address RTT information.

@@ -68,7 +68,7 @@ static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsign
 		size_t len = pack_obj_len(it);
 		/* Get RTT for this address (if known) */
 		unsigned *cached = rttcache ? lru_get(rttcache, val, len) : NULL;
-		unsigned addr_score = (cached) ? *cached : KR_NS_UNKNOWN / 2;
+		unsigned addr_score = (cached) ? *cached : KR_NS_GLUED;
 		/* Give v6 a head start */
 		unsigned favour = (len == sizeof(struct in6_addr)) ? FAVOUR_IPV6 : 0;
 		if (addr_score < score + favour) {
@@ -102,10 +102,14 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	pack_t *addr_set = (pack_t *)v;
 	if (addr_set->len == 0) {
 		score = KR_NS_UNKNOWN;
-		/* If the server is unknown but has rep record, treat it as timeouted */
-		if ((reputation & KR_NS_NOIP4) && (reputation & KR_NS_NOIP6)) {
-			score = KR_NS_TIMEOUT;
-			reputation = 0; /* Start with clean slate */
+		/* If the server doesn't have IPv6, give it disadvantage. */
+		if (reputation & KR_NS_NOIP6) {
+			score += FAVOUR_IPV6;
+			/* If the server is unknown but has rep record, treat it as timeouted */
+			if (reputation & KR_NS_NOIP4) {
+				score = KR_NS_TIMEOUT;
+				reputation = 0; /* Start with clean slate */
+			}
 		}
 	} else {
 		score = eval_addr_set(addr_set, ctx->cache_rtt, score, &addr);
@@ -131,6 +135,13 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	return kr_ok();
 }
 
+#define ELECT_INIT(ns, ctx_) do { \
+	(ns)->ctx = (ctx_); \
+	(ns)->addr.ip.sa_family = AF_UNSPEC; \
+	(ns)->reputation = 0; \
+	(ns)->score = KR_NS_MAX_SCORE + 1; \
+} while (0)
+
 int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 {
 	if (!qry || !ctx) {
@@ -138,12 +149,31 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 	}
 
 	struct kr_nsrep *ns = &qry->ns;
-	ns->ctx = ctx;
-	ns->addr.ip.sa_family = AF_UNSPEC;
-	ns->reputation = 0;
-	ns->score = KR_NS_MAX_SCORE + 1;
+	ELECT_INIT(ns, ctx);
 	return map_walk(&qry->zone_cut.nsset, eval_nsrep, qry);
 }
+
+int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
+{
+	if (!qry || !ctx) {
+		return kr_error(EINVAL);
+	}
+
+	/* Get address list for this NS */
+	struct kr_nsrep *ns = &qry->ns;
+	ELECT_INIT(ns, ctx);
+	pack_t *addr_set = map_get(&qry->zone_cut.nsset, (const char *)ns->name);
+	if (!addr_set) {
+		return kr_error(ENOENT);
+	}
+	/* Evaluate addr list */
+	uint8_t *addr = NULL;
+	unsigned score = eval_addr_set(addr_set, ctx->cache_rtt, ns->score, &addr);
+	update_nsrep(ns, ns->name, addr, score);
+	return kr_ok();
+}
+
+#undef ELECT_INIT
 
 int kr_nsrep_update_rtt(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *cache)
 {
@@ -161,8 +191,8 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *cac
 	if (score > KR_NS_MAX_SCORE) {
 		score = KR_NS_MAX_SCORE;
 	}
-	if (score <= KR_NS_UNKNOWN) {
-		score = KR_NS_UNKNOWN + 1;
+	if (score <= KR_NS_GLUED) {
+		score = KR_NS_GLUED + 1;
 	}
 	/* Set initial value or smooth over last two measurements */
 	if (*cur != 0) {

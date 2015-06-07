@@ -455,34 +455,34 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	}
 
 ns_election:
-	/* Elect best nameserver candidate */
+
+	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
+	 * elect best address only, otherwise elect a completely new NS.
+	 */
 	assert(++ns_election_iter < KR_ITER_LIMIT);
-	kr_nsrep_elect(qry, request->ctx);
-	if (qry->ns.score > KR_NS_MAX_SCORE) {
-		DEBUG_MSG("=> no valid NS left\n");
+	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
+		kr_nsrep_elect_addr(qry, request->ctx);
+	} else {
+		kr_nsrep_elect(qry, request->ctx);
+		if (qry->ns.score > KR_NS_MAX_SCORE) {
+			DEBUG_MSG("=> no valid NS left\n");
+			knot_overlay_reset(&request->overlay);
+			kr_rplan_pop(rplan, qry);
+			return KNOT_STATE_PRODUCE;
+		}
+	}
+
+	/* Resolve address records */
+	if (qry->ns.addr.ip.sa_family == AF_UNSPEC) {
+		if (ns_resolve_addr(qry, request) != 0) {
+			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+			goto ns_election; /* Must try different NS */
+		}
 		knot_overlay_reset(&request->overlay);
-		kr_rplan_pop(rplan, qry);
 		return KNOT_STATE_PRODUCE;
 	} else {
-		/* Update query flags based on the NS reputation */
-		if (qry->ns.reputation & KR_NS_NOIP6) {
-			qry->flags |= QUERY_AWAIT_IPV6;
-		}
-		if (qry->ns.reputation & KR_NS_NOIP4) {
-			qry->flags |= QUERY_AWAIT_IPV4;
-		}
-		/* Resolve address records */
-		if (qry->ns.addr.ip.sa_family == AF_UNSPEC) {
-			if (ns_resolve_addr(qry, request) != 0) {
-				qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
-				goto ns_election; /* Must try different NS */
-			}
-			knot_overlay_reset(&request->overlay);
-			return KNOT_STATE_PRODUCE;
-		} else {
-			/* Address resolved, clear the flag */
-			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
-		}
+		/* Address resolved, clear the flag */
+		qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
 	}
 
 #ifndef NDEBUG
