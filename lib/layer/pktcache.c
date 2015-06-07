@@ -105,7 +105,10 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_rplan *rplan = &req->rplan;
 	struct kr_query *qry = kr_rplan_current(rplan);
 	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
-		return ctx->state;
+		return ctx->state; /* Already resolved/failed */
+	}
+	if (!(qry->flags & QUERY_AWAIT_CUT)) {
+		return ctx->state; /* Only lookup on first iteration */
 	}
 	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		return ctx->state; /* Only IN class */
