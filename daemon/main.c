@@ -147,13 +147,16 @@ int main(int argc, char **argv)
 	engine_lualib(&engine, "event",   lib_event);
 
 	/* Create main worker. */
-	struct worker_ctx worker = {
-		.engine = &engine,
-		.loop = loop,
-		.mm = NULL,
-	};
-	loop->data = &worker;
-	worker_reserve(&worker, MP_FREELIST_SIZE);
+	struct worker_ctx *worker = mm_alloc(&pool, sizeof(*worker));
+	if(!worker) {
+		fprintf(stderr, "[system] not enough memory\n");
+		return EXIT_FAILURE;
+	}
+	memset(worker, 0, sizeof(*worker));
+	worker->engine = &engine,
+	worker->loop = loop;
+	loop->data = worker;
+	worker_reserve(worker, MP_FREELIST_SIZE);
 
 	/* Bind to sockets. */
 	if (addr != NULL) {
@@ -186,7 +189,8 @@ int main(int argc, char **argv)
 	/* Cleanup. */
 	fprintf(stderr, "\n[system] quitting\n");
 	engine_deinit(&engine);
-	worker_reclaim(&worker);
+	worker_reclaim(worker);
+	mp_delete(pool.ctx);
 
 	if (ret != 0) {
 		ret = EXIT_FAILURE;
