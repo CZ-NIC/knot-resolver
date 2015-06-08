@@ -45,10 +45,7 @@ int (*original_knot_rdataset_add)(knot_rdataset_t *rrs, const knot_rdata_t *rr, 
 
 void *malloc(size_t __size)
 {
-	Dl_info dli = {0};
-	char insert_name[] = "kr_cache_insert";
-	int err_mock = KNOT_EOK, insert_namelen = strlen(insert_name);
-
+	int err_mock = KNOT_EOK;
 	if (original_malloc == NULL)
 	{
 		original_malloc = dlsym(RTLD_NEXT,"malloc");
@@ -56,9 +53,7 @@ void *malloc(size_t __size)
 	}
 	if (is_malloc_mocked)
 	{
-	    dladdr (__builtin_return_address (0), &dli);
-	    if (dli.dli_sname && (strncmp(insert_name,dli.dli_sname,insert_namelen) == 0))
-		    err_mock = mock();
+		err_mock = mock();
 	}
 	return (err_mock != KNOT_EOK) ? NULL : original_malloc (__size);
 }
@@ -235,8 +230,8 @@ static void test_fake_insert(void **state)
 	test_randstr((char *)&global_fake_ce,sizeof(global_fake_ce));
 	test_randstr((char *)namedb_data,NAMEDB_DATA_SIZE);
 
-	is_malloc_mocked = true;
 	will_return(malloc,KNOT_EINVAL);
+	is_malloc_mocked = true;
 	ret_cache_lowmem = kr_cache_insert(txn, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
 	is_malloc_mocked = false;
