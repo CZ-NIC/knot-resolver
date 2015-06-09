@@ -248,7 +248,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_d
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
                            struct kr_cache_txn *txn, uint32_t timestamp)
 {
-	if (cut == NULL) {
+	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
 	}
 

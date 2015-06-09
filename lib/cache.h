@@ -57,7 +57,7 @@ struct kr_cache
 
 /** Cache transaction */
 struct kr_cache_txn {
-    namedb_txn_t txn;        /**< Storage transaction */  
+    namedb_txn_t t;          /**< Storage transaction */  
     struct kr_cache *owner;  /**< Transaction owner */
 };
 

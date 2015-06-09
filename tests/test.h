@@ -100,8 +100,10 @@ static inline void test_random_rr(knot_rrset_t *rr, uint32_t ttl)
 	uint8_t tmp_buf[KNOT_DNAME_MAXLEN];
 
 	/* Create random label. */
-	owner_buf[0] = num;
-	test_randstr((char *)(owner_buf + 1), owner_buf[0] + 1);
+	memset(owner_buf, 0, sizeof(owner_buf));
+	uint8_t label_len = num % KNOT_DNAME_MAXLABELLEN;
+	owner_buf[0] = label_len;
+	test_randstr((char *)(owner_buf + 1), label_len);
 
 	/* Create payload */
 	tmp_buf[0] = num;

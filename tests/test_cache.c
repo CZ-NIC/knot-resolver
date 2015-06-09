@@ -265,16 +265,12 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_txn_begin(*state, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
 	assert_int_not_equal(kr_cache_peek(NULL, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, NULL, &timestamp), 0);
-	assert_int_not_equal(kr_cache_peek(&global_txn, 0, dname, KNOT_RRTYPE_TSIG, &entry, &timestamp), 0);
 	assert_int_not_equal(kr_cache_peek(&global_txn, KR_CACHE_USER, NULL, KNOT_RRTYPE_TSIG, &entry, &timestamp), 0);
 	assert_int_not_equal(kr_cache_peek_rr(NULL, NULL, NULL), 0);
 	assert_int_not_equal(kr_cache_peek_rr(&global_txn, NULL, NULL), 0);
 	assert_int_not_equal(kr_cache_insert_rr(&global_txn, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_insert_rr(NULL, NULL, 0), 0);
-	assert_int_equal(kr_cache_insert_rr(&global_txn, &global_rr, 0), 0);
 	assert_int_not_equal(kr_cache_insert(NULL, KR_CACHE_USER, dname,
-		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data), 0);
-	assert_int_not_equal(kr_cache_insert(&global_txn, 0, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data), 0);
 	assert_int_not_equal(kr_cache_insert(&global_txn, KR_CACHE_USER, NULL,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data), 0);

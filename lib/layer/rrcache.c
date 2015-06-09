@@ -155,9 +155,17 @@ static int merge_rr(knot_rrset_t *cache_rr, const knot_rrset_t *rr, mm_ctx_t *po
 
 static int stash_add(map_t *stash, const knot_rrset_t *rr, mm_ctx_t *pool)
 {
-	/* Stash key = {[1-5] type, [1-255] owner, [1] \x00 } */
-	char key[6 + KNOT_DNAME_MAXLEN];
-	sprintf(key, "%hu%*s", rr->type, knot_dname_size(rr->owner), rr->owner);
+	/* Stash key = {[1-255] owner, [1-5] type, [1] \x00 } */
+	char key[8 + KNOT_DNAME_MAXLEN];
+	int ret = knot_dname_to_wire((uint8_t *)key, rr->owner, KNOT_DNAME_MAXLEN);
+	if (ret <= 0) {
+		return ret;
+	}
+	knot_dname_to_lower((uint8_t *)key);
+	ret = snprintf(key + ret - 1, sizeof(key) - KNOT_DNAME_MAXLEN, "%hu", rr->type);
+	if (ret <= 0 || ret >= KNOT_DNAME_MAXLEN) {
+		return kr_error(EILSEQ);
+	}
 	
 	/* Check if already exists */
 	knot_rrset_t *stashed = map_get(stash, key);
@@ -252,14 +260,25 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		/* Open write transaction */
 		struct kr_cache *cache = &req->ctx->cache;
 		struct kr_cache_txn txn;
-		if (kr_cache_txn_begin(cache, &txn, 0) != 0) {
-			return ctx->state; /* Couldn't acquire cache, ignore. */
+		if (kr_cache_txn_begin(cache, &txn, 0) == 0) {
+			ret = stash_commit(&stash, qry->timestamp.tv_sec, &txn);
+			if (ret == 0) {
+				kr_cache_txn_commit(&txn);
+			} else {
+				kr_cache_txn_abort(&txn);
+			}
 		}
-		ret = stash_commit(&stash, qry->timestamp.tv_sec, &txn);
+		/* Clear if full */
 		if (ret == KNOT_ESPACE) {
-			kr_cache_clear(&txn);
+			if (kr_cache_txn_begin(cache, &txn, 0) == 0) {
+				ret = kr_cache_clear(&txn);
+				if (ret == 0) {
+					kr_cache_txn_commit(&txn);
+				} else {
+					kr_cache_txn_abort(&txn);
+				}
+			}
 		}
-		kr_cache_txn_commit(&txn);
 	}
 	
 	return ctx->state;
