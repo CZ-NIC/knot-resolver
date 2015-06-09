@@ -31,6 +31,9 @@
 #include "lib/module.h"
 #include "lib/cache.h"
 
+/* Max number of records pruned at one go. */
+#define PRUNE_GRANULARITY UINT16_MAX
+
 /*
  * Properties.
  */
@@ -62,8 +65,8 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 	/* Iterate cache and find expired records. */
 	int pruned = 0;
 	uint32_t now = time(NULL);
-	namedb_iter_t *it = storage->iter_begin((namedb_txn_t *)&txn, 0);
-	while (it) {
+	namedb_iter_t *it = storage->iter_begin(&txn.t, 0);
+	while (it && pruned < PRUNE_GRANULARITY) {
 		/* Fetch RR from cache */
 		namedb_val_t key, val;
 		if (storage->iter_key(it, &key) != 0 ||
@@ -73,7 +76,7 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 		/* Prune expired records. */
 		struct kr_cache_entry *entry = val.data;
 		if (is_expired(entry, now - entry->timestamp)) {
-			storage->del((namedb_txn_t *)&txn, &key);
+			storage->del(&txn.t, &key);
 			pruned += 1;
 		}
 		it = storage->iter_next(it);
