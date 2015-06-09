@@ -50,7 +50,7 @@ static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qty
 {
 	/* Minimization disabled. */
 	const knot_dname_t *qname = query->sname;
-	if (query->flags & QUERY_NO_MINIMIZE) {
+	if (qname[0] == '\0' || query->flags & QUERY_NO_MINIMIZE) {
 		return qname;
 	}
 
