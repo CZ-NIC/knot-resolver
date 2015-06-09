@@ -261,7 +261,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 			update_cut_name(cut, name);
 			return kr_ok();
 		}
-		if (!name || !name[0]) {
+		if (name[0] == '\0') {
 			break;
 		}
 		/* Subtract label from QNAME. */

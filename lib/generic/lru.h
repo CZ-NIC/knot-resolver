@@ -139,7 +139,6 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 		memset(slot, 0, lru->stride);
 		slot->key = malloc(len);
 		if (!slot->key) {
-			slot->len = 0;
 			return NULL;
 		}
 		memcpy(slot->key, key, len);
