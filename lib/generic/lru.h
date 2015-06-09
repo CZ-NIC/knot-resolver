@@ -110,6 +110,9 @@ struct { \
 /** @internal Slot data getter */
 static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uint32_t len, size_t offset)
 {
+	if (!lru || !key || len == 0) {
+		return NULL;
+	}
 	uint32_t id = hash(key, len) % lru->size;
 	struct lru_slot *slot = (struct lru_slot *)(lru->slots + (id * lru->stride));
 	if (lru_slot_match(slot, key, len)) {
@@ -121,6 +124,9 @@ static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uin
 /** @internal Slot data setter */
 static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uint32_t len, size_t offset)
 {
+	if (!lru || !key || len == 0) {
+		return NULL;
+	}
 	uint32_t id = hash(key, len) % lru->size;
 	struct lru_slot *slot = (struct lru_slot *)(lru->slots + (id * lru->stride));
 	if (!lru_slot_match(slot, key, len)) {
