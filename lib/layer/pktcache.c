@@ -205,7 +205,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Stash answer in the cache */
 	int ret = kr_cache_insert(&txn, get_tag(pkt), qname, qtype, &header, data);	
-	if (ret == KNOT_ESPACE) {
+	if (ret != 0) {
 		kr_cache_txn_abort(&txn);
 	} else {
 		DEBUG_MSG("=> answer cached for TTL=%u\n", ttl);
