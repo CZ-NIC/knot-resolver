@@ -130,12 +130,19 @@ static void txn_abort(namedb_txn_t *txn)
 	txn_commit(txn);
 }
 
-/* Attempt to reconnect */
-#define ERR_RECONNECT(cli) \
+/* Disconnect client */
+#define CLI_DISCONNECT(cli) \
 	if ((cli)->handle->err != REDIS_ERR_OTHER) { \
 		redisFree((cli)->handle); \
 		(cli)->handle = NULL; \
-		cli_connect(cli); \
+	}
+/* Attempt to reconnect */
+#define CLI_KEEPALIVE(cli_) \
+	if (!(cli_)->handle) { \
+		int ret = cli_connect((cli_)); \
+		if (ret != 0) { \
+			return ret; \
+		} \
 	}
 
 static int count(namedb_txn_t *txn)
@@ -145,9 +152,10 @@ static int count(namedb_txn_t *txn)
 	}
 	int ret = 0;
 	struct redis_cli *cli = txn->db;
+	CLI_KEEPALIVE(cli);
 	redisReply *reply = redisCommand(cli->handle, "DBSIZE");
 	if (!reply) {
-		ERR_RECONNECT(cli);
+		CLI_DISCONNECT(cli);
 		return kr_error(EIO);
 	}
 	if (reply->type == REDIS_REPLY_INTEGER) {
@@ -163,9 +171,10 @@ static int clear(namedb_txn_t *txn)
 		return kr_error(EINVAL);
 	}
 	struct redis_cli *cli = txn->db;
+	CLI_KEEPALIVE(cli);
 	redisReply *reply = redisCommand(cli->handle, "FLUSHDB");
 	if (!reply) {
-		ERR_RECONNECT(cli);
+		CLI_DISCONNECT(cli);
 		return kr_error(EIO);
 	}
 	freeReplyObject(reply);
@@ -178,9 +187,10 @@ static int find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigne
 		return kr_error(EINVAL);
 	}
 	struct redis_cli *cli = txn->db;
+	CLI_KEEPALIVE(cli);
 	redisReply *reply = redisCommand(cli->handle, "GET %b", key->data, key->len);
 	if (!reply) {
-		ERR_RECONNECT(cli);
+		CLI_DISCONNECT(cli);
 		return kr_error(EIO);
 	}
 	/* Track reply in a freelist for this transaction */ 
@@ -206,11 +216,12 @@ static int insert(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsig
 	 *          desires to port this somewhere else, TTL shouldn't be interpreted.
 	 */
 	struct redis_cli *cli = txn->db;
+	CLI_KEEPALIVE(cli);
 	struct kr_cache_entry *entry = val->data;
 	redisReply *reply = redisCommand(cli->handle, "SETEX %b %d %b",
 	                                 key->data, key->len, entry->ttl, val->data, val->len);
 	if (!reply) {
-		ERR_RECONNECT(cli);
+		CLI_DISCONNECT(cli);
 		return kr_error(EIO);
 	}
 	freeReplyObject(reply);
