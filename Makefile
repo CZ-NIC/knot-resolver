@@ -27,6 +27,7 @@ $(eval $(call find_bin,sphinx-build))
 $(eval $(call find_bin,gccgo))
 $(eval $(call find_python))
 $(eval $(call find_lib,libmemcached,1.0))
+$(eval $(call find_lib,hiredis))
 
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)
