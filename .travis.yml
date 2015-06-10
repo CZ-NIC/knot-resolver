@@ -9,6 +9,8 @@ notifications:
         on_success: change
         on_failure: change
     slack: cznic:xNJmvHU2xu2aGtN7Y2eqHKoD
+        on_success: change
+        on_failure: change
 matrix:
     fast_finish: true
     allow_failures:
