@@ -52,8 +52,14 @@ setmetatable(modules, {
 -- `cache.{size|storage} = value`
 setmetatable(cache, {
 	__newindex = function (t,k,v)
-		if     k == 'size'    then t.open(v, rawget(t, 'current_storage'))
-		elseif k == 'storage' then t.open(rawget(t, 'current_size'), v)
+		-- Defaults
+		local storage = rawget(t, 'current_storage')
+		if not storage then storage = 'lmdb://' end
+		local size = rawget(t, 'current_size')
+		if not size then size = 10*MB end
+		-- Declarative interface for cache
+		if     k == 'size'    then t.open(v, storage)
+		elseif k == 'storage' then t.open(size, v)
 		else   rawset(t, k, v) end
 	end
 })
