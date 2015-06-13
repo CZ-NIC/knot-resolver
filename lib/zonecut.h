@@ -55,6 +55,14 @@ void kr_zonecut_deinit(struct kr_zonecut *cut);
  */
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
 
+/** 
+ * Copy zone cut, including all data.
+ * @param dst destination zone cut
+ * @param src source zone cut
+ * @return 0 or an error code
+ */
+int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src);
+
 /**
  * Add address record to the zone cut.
  *
@@ -92,10 +100,11 @@ pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns);
 /**
  * Populate zone cut with a root zone using SBELT :rfc:`1034`
  *
+ * @param ctx resolution context (to fetch root hints)
  * @param cut zone cut to be populated
  * @return 0 or error code
  */
-int kr_zonecut_set_sbelt(struct kr_zonecut *cut);
+int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut);
 
 /**
  * Populate zone cut address set from cache.

@@ -104,6 +104,7 @@ typedef array_t(struct kr_module *) module_array_t;
 struct kr_context
 {
 	mm_ctx_t *pool;
+	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;

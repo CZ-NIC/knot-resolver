@@ -28,7 +28,7 @@
 #include <ccan/json/json.h>
 #include <ucw/mempool.h>
 
-#include "lib/layer/iterate.h"
+#include "daemon/engine.h"
 #include "lib/zonecut.h"
 #include "lib/module.h"
 #include "lib/layer.h"
@@ -222,6 +222,24 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	return result;
 }
 
+/** @internal Pack address list into JSON array. */
+static JsonNode *pack_addrs(pack_t *pack)
+{
+	char buf[SOCKADDR_STRLEN];
+	JsonNode *root = json_mkarray();
+	uint8_t *addr = pack_head(*pack);
+	while (addr != pack_tail(*pack)) {
+		size_t len = pack_obj_len(addr);
+		int family = len == sizeof(struct in_addr) ? AF_INET : AF_INET6;
+		if (!inet_ntop(family, pack_obj_val(addr), buf, sizeof(buf))) {
+			break;
+		}
+		json_append_element(root, json_mkstring(buf));
+		addr = pack_obj_next(addr);
+	}
+	return root;
+}
+
 /**
  * Retrieve address hint for given name.
  *
@@ -240,21 +258,59 @@ static char* hint_get(void *env, struct kr_module *module, const char *args)
 		return NULL;
 	}
 
-	char buf[SOCKADDR_STRLEN];
-	JsonNode *root = json_mkarray();
-	uint8_t *addr = pack_head(*pack);
-	while (addr != pack_tail(*pack)) {
-		size_t len = pack_obj_len(addr);
-		int family = len == sizeof(struct in_addr) ? AF_INET : AF_INET6;
-		if (!inet_ntop(family, pack_obj_val(addr), buf, sizeof(buf))) {
-			break;
-		}
-		json_append_element(root, json_mkstring(buf));
-		addr = pack_obj_next(addr);
+	char *result = NULL;
+	JsonNode *root = pack_addrs(pack);
+	if (root) {
+		result = json_encode(root);
+		json_delete(root);
 	}
+	return result;
+}
 
-	char *result = json_encode(root);
-	json_delete(root);
+/** Retrieve hint list. */
+static int pack_hint(const char *k, void *v, void *baton)
+{
+	char nsname_str[KNOT_DNAME_MAXLEN] = {'\0'};
+	knot_dname_to_str(nsname_str, (const uint8_t *)k, sizeof(nsname_str));
+	JsonNode *root_node = baton;
+	JsonNode *addr_list = pack_addrs((pack_t *)v);
+	if (!addr_list) {
+		return kr_error(ENOMEM);
+	}
+	json_append_member(root_node, nsname_str, addr_list);
+	return kr_ok();
+}
+
+/**
+ * Get/set root hints set.
+ *
+ * Input:  { name: [addr_list], ... }
+ * Output: current list
+ *
+ */
+static char* hint_root(void *env, struct kr_module *module, const char *args)
+{
+	struct engine *engine = env;
+	struct kr_context *ctx = &engine->resolver;
+	/* Replace root hints if parameter is set */
+	if (args && strlen(args) > 0) {
+		JsonNode *node = NULL;
+		JsonNode *root_node = json_decode(args);
+		kr_zonecut_set(&ctx->root_hints, (const uint8_t *)"");
+		json_foreach(node, root_node) {
+			switch(node->tag) {
+			case JSON_STRING: add_pair(&ctx->root_hints, node->key, node->string_); break;
+			default: continue;
+			}
+		}
+	}
+	/* Return current root hints */
+	char *result = NULL;
+	JsonNode *root_node = json_mkobject();
+	if (map_walk(&ctx->root_hints.nsset, pack_hint, root_node) == 0) {
+		result = json_encode(root_node);
+	}
+	json_delete(root_node);
 	return result;
 }
 
@@ -298,6 +354,7 @@ struct kr_prop *hints_props(void)
 	static struct kr_prop prop_list[] = {
 	    { &hint_set,    "set", "Set {name, address} hint.", },
 	    { &hint_get,    "get", "Retrieve hint for given name.", },
+	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;

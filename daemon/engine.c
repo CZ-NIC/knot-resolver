@@ -203,6 +203,9 @@ static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
 	engine->resolver.modules = &engine->modules;
+	/* Set default root hints */
+	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
+	kr_zonecut_set_sbelt(&engine->resolver, &engine->resolver.root_hints);
 	/* Open NS rtt + reputation cache */
 	engine->resolver.cache_rtt = malloc(lru_size(kr_nsrep_lru_t, LRU_RTT_SIZE));
 	if (engine->resolver.cache_rtt) {
@@ -292,6 +295,7 @@ void engine_deinit(struct engine *engine)
 	}
 
 	network_deinit(&engine->net);
+	kr_zonecut_deinit(&engine->resolver.root_hints);
 	kr_cache_close(&engine->resolver.cache);
 	lru_deinit(engine->resolver.cache_rtt);
 	lru_deinit(engine->resolver.cache_rep);
