@@ -105,6 +105,7 @@ static void test_deinit(void **state)
 {
 	lru_int_t *lru = *state;
 	lru_deinit(lru);
+	free(lru);
 }
 
 /* Program entry point */

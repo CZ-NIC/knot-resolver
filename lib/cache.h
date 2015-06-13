@@ -57,16 +57,16 @@ struct kr_cache
 
 /** Cache transaction */
 struct kr_cache_txn {
-    namedb_txn_t txn;        /**< Storage transaction */  
+    namedb_txn_t t;          /**< Storage transaction */  
     struct kr_cache *owner;  /**< Transaction owner */
 };
 
 /**
  * Open/create cache with provided storage options.
  * @param cache cache structure to be initialized
- * @param api Storage engine
- * @param storage_opts Storage-specific options (may be NULL for default)
- * @param mm Memory context.
+ * @param api   storage engine API
+ * @param opts  storage-specific options (may be NULL for default)
+ * @param mm    memory context.
  * @return 0 or an error code
  */
 int kr_cache_open(struct kr_cache *cache, const namedb_api_t *api, void *opts, mm_ctx_t *mm);
@@ -108,11 +108,12 @@ void kr_cache_txn_abort(struct kr_cache_txn *txn);
  * @param tag  asset tag
  * @param name asset name
  * @param type asset type
+ * @param entry cache entry, will be set to valid pointer or NULL
  * @param timestamp current time (will be replaced with drift if successful)
- * @return cache entry or NULL
+ * @return 0 or an errcode
  */
-struct kr_cache_entry *kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name,
-                                     uint16_t type, uint32_t *timestamp);
+int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
+                  struct kr_cache_entry **entry, uint32_t *timestamp);
 
 /**
  * Insert asset into cache, replacing any existing data.

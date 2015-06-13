@@ -5,7 +5,7 @@
 # Mocked calls library
 libmock_calls_SOURCES := tests/mock_calls.c
 libmock_calls_LIBS := $(tests_LIBS) $(python_LIBS)
-libmock_calls_DEPEND := $(libkresolve)
+libmock_calls_DEPEND := $(libkres)
 $(eval $(call make_lib,libmock_calls,tests))
 
 # Python module for tests

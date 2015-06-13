@@ -192,8 +192,26 @@ int kr_zonecut_set_sbelt(struct kr_zonecut *cut)
 	return kr_ok();
 }
 
+/** Fetch address for zone cut. */
+static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t rrtype, struct kr_cache_txn *txn, uint32_t timestamp)
+{
+	knot_rrset_t cached_rr;
+	knot_rrset_init(&cached_rr, (knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
+	if (kr_cache_peek_rr(txn, &cached_rr, &timestamp) != 0) {
+		return;
+	}
+
+	knot_rdata_t *rd = knot_rdataset_at(&cached_rr.rrs, 0);
+	for (uint16_t i = 0; i < cached_rr.rrs.rr_count; ++i) {
+		if (knot_rdata_ttl(rd) > timestamp) {
+			(void) kr_zonecut_add(cut, ns, rd);
+		}
+		rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
+	}
+}
+
 /** Fetch best NS for zone cut. */
-static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
+static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
 {
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
@@ -208,6 +226,15 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_
 	for (unsigned i = 0; i < cached_rr.rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&cached_rr.rrs, i);
 		kr_zonecut_add(cut, ns_name, NULL);
+		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
+		unsigned *cached = lru_get(ctx->cache_rep, (const char *)ns_name, knot_dname_size(ns_name));
+		unsigned reputation = (cached) ? *cached : 0;
+		if (!(reputation & KR_NS_NOIP4)) {
+			fetch_addr(cut, ns_name, KNOT_RRTYPE_A, txn, timestamp);
+		}
+		if (!(reputation & KR_NS_NOIP6)) {
+			fetch_addr(cut, ns_name, KNOT_RRTYPE_AAAA, txn, timestamp);
+		}
 	}
 
 	/* Always keep SBELT as a backup for root */
@@ -218,16 +245,19 @@ static int fetch_ns(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_
 	return kr_ok();
 }
 
-int kr_zonecut_find_cached(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
+int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
+                           struct kr_cache_txn *txn, uint32_t timestamp)
 {
-	if (cut == NULL) {
+	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
 	}
 
 	/* Start at QNAME parent. */
-	name = knot_wire_next_label(name, NULL);
+	if (name[0] != '\0') {
+		name = knot_wire_next_label(name, NULL);
+	}
 	while (txn) {
-		if (fetch_ns(cut, name, txn, timestamp) == 0) {
+		if (fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
 			update_cut_name(cut, name);
 			return kr_ok();
 		}

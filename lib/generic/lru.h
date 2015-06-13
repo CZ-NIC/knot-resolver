@@ -97,7 +97,7 @@ struct lru_hash_base {
 	char slots[];
 };
 
-/** @breif User-defined hashtable. */
+/** @brief User-defined hashtable. */
 #define lru_hash(type) \
 struct { \
 	lru_hash_struct \
@@ -110,6 +110,9 @@ struct { \
 /** @internal Slot data getter */
 static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uint32_t len, size_t offset)
 {
+	if (!lru || !key || len == 0) {
+		return NULL;
+	}
 	uint32_t id = hash(key, len) % lru->size;
 	struct lru_slot *slot = (struct lru_slot *)(lru->slots + (id * lru->stride));
 	if (lru_slot_match(slot, key, len)) {
@@ -121,6 +124,9 @@ static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uin
 /** @internal Slot data setter */
 static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uint32_t len, size_t offset)
 {
+	if (!lru || !key || len == 0) {
+		return NULL;
+	}
 	uint32_t id = hash(key, len) % lru->size;
 	struct lru_slot *slot = (struct lru_slot *)(lru->slots + (id * lru->stride));
 	if (!lru_slot_match(slot, key, len)) {
@@ -133,7 +139,6 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 		memset(slot, 0, lru->stride);
 		slot->key = malloc(len);
 		if (!slot->key) {
-			slot->len = 0;
 			return NULL;
 		}
 		memcpy(slot->key, key, len);
@@ -155,9 +160,9 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
  * @param table hash table
  * @param max_slots number of slots
  */
-#define lru_init(table, max_size) \
- (memset((table), 0, sizeof(*table) + (max_size) * sizeof((table)->slots[0])), \
-  (table)->stride = sizeof((table)->slots[0]), (table)->size = (max_size))
+#define lru_init(table, max_slots) \
+ (memset((table), 0, sizeof(*table) + (max_slots) * sizeof((table)->slots[0])), \
+  (table)->stride = sizeof((table)->slots[0]), (table)->size = (max_slots))
 
 /**
  * @brief Free all keys and evict all values.

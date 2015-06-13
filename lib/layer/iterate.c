@@ -50,14 +50,14 @@ static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qty
 {
 	/* Minimization disabled. */
 	const knot_dname_t *qname = query->sname;
-	if (query->flags & QUERY_NO_MINIMIZE) {
+	if (qname[0] == '\0' || query->flags & QUERY_NO_MINIMIZE) {
 		return qname;
 	}
 
 	/* Minimize name to contain current zone cut + 1 label. */
 	int cut_labels = knot_dname_labels(query->zone_cut.name, NULL);
 	int qname_labels = knot_dname_labels(qname, NULL);
-	while(qname_labels > cut_labels + 1) {
+	while(qname[0] && qname_labels > cut_labels + 1) {
 		qname = knot_wire_next_label(qname, NULL);
 		qname_labels -= 1;
 	}
@@ -159,11 +159,13 @@ static int update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_reques
 
 static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_query *qry)
 {
-	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
-	for (unsigned i = 0; i < ar->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
-		if (knot_dname_is_equal(ns, rr->owner)) {
-			(void) update_nsaddr(rr, qry);
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (knot_dname_is_equal(ns, rr->owner)) {
+				(void) update_nsaddr(rr, qry);
+			}
 		}
 	}
 }
@@ -171,12 +173,14 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_query 
 /** Attempt to find glue for given nameserver name (best effort). */
 static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
 {
-	const knot_pktsection_t *ar = knot_pkt_section(pkt, KNOT_ADDITIONAL);
-	for (unsigned i = 0; i < ar->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(ar, i);
-		if (knot_dname_is_equal(ns, rr->owner) &&
-		    (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA)) {
-			return 1;
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (knot_dname_is_equal(ns, rr->owner) &&
+			    (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA)) {
+				return 1;
+			}
 		}
 	}
 	return 0;
@@ -350,6 +354,25 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return reset(ctx);
 }
 
+int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
+{
+	/* Minimize QNAME (if possible). */
+	uint16_t qtype = query->stype;
+	const knot_dname_t *qname = minimized_qname(query, &qtype);
+
+	/* Form a query for the authoritative. */
+	knot_pkt_clear(pkt);
+	int ret = knot_pkt_put_question(pkt, qname, query->sclass, qtype);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	/* Query built, expect answer. */
+	query->id = isaac_next_uint(&ISAAC, UINT16_MAX);
+	knot_wire_set_id(pkt->wire, query->id);
+	return kr_ok();
+}
+
 static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
@@ -359,20 +382,12 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	/* Minimize QNAME (if possible). */
-	uint16_t qtype = query->stype;
-	const knot_dname_t *qname = minimized_qname(query, &qtype);
-
-	/* Form a query for the authoritative. */
-	knot_pkt_clear(pkt);
-	int ret = knot_pkt_put_question(pkt, qname, query->sclass, qtype);
-	if (ret != KNOT_EOK) {
+	/* Make query */
+	int ret = kr_make_query(query, pkt);
+	if (ret != 0) {
 		return KNOT_STATE_FAIL;
 	}
 
-	/* Query built, expect answer. */
-	query->id = isaac_next_uint(&ISAAC, UINT16_MAX);
-	knot_wire_set_id(pkt->wire, query->id);
 	return KNOT_STATE_CONSUME;
 }
 

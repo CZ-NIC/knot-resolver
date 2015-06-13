@@ -4,8 +4,10 @@ CGO := go tool cgo
 GCCGO := gccgo
 LIBEXT := .so
 MODEXT := $(LIBEXT)
+AREXT  := .a
 LIBTYPE := shared
 MODTYPE := shared
+ARTYPE  := static
 BINEXT :=
 PLATFORM = Linux
 ifeq ($(OS),Windows_NT)
@@ -51,7 +53,11 @@ define make_target
 $$(eval $$(call make_objs,$(1)))
 $(1) := $(2)/$(1)$(3)
 $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
+ifeq ($(4),-$(ARTYPE))
+	$(call quiet,AR,$$@) rcs $$@ $$($(1)_OBJ)
+else
 	$(call quiet,CCLD,$$@) $(CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $(LDFLAGS) $$($(1)_LIBS)
+endif
 $(1)-clean:
 	$(RM) $$($(1)_OBJ) $$($(1)_DEP) $(2)/$(1)$(3)
 $(1)-install: $(2)/$(1)$(3)
@@ -69,6 +75,7 @@ make_bin = $(call make_target,$(1),$(2),$(BINEXT),,$(BINDIR))
 make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR))
 make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR))
 make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR))
+make_static = $(call make_target,$(1),$(2),$(AREXT),-$(ARTYPE),$(LIBDIR))
 
 # Evaluate library
 define have_lib

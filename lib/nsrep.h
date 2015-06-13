@@ -24,13 +24,26 @@
 #include "lib/generic/map.h"
 #include "lib/generic/lru.h"
 
+struct kr_query;
+
 /** 
-  * Special values for nameserver score (RTT in miliseconds)
+  * NS RTT score (special values).
+  * @note RTT is measured in milliseconds.
   */
 enum kr_ns_score {
 	KR_NS_MAX_SCORE = KR_CONN_RTT_MAX,
 	KR_NS_TIMEOUT   = (95 * KR_NS_MAX_SCORE) / 100,
-	KR_NS_UNKNOWN   = 10
+	KR_NS_UNKNOWN   = KR_NS_TIMEOUT / 2,
+	KR_NS_GLUED     = 10
+};
+
+/**
+ * NS QoS flags.
+ */
+enum kr_ns_rep {
+	KR_NS_NOIP4  = 1 << 0, /**< NS has no IPv4 */
+	KR_NS_NOIP6  = 1 << 1, /**< NS has no IPv6 */
+	KR_NS_NOEDNS = 1 << 2  /**< NS has no EDNS support */
 };
 
 /**
@@ -45,15 +58,15 @@ typedef lru_hash(unsigned) kr_nsrep_lru_t;
  */
 struct kr_nsrep
 {
-	unsigned score;                  /**< Server score */
-	unsigned flags;                  /**< Server flags */
-	const knot_dname_t *name;        /**< Server name */
-	kr_nsrep_lru_t *repcache;        /**< Reputation cache pointer */
+	unsigned score;                  /**< NS score */
+	unsigned reputation;             /**< NS reputation */
+	const knot_dname_t *name;        /**< NS name */
+	struct kr_context *ctx;          /**< Resolution context */
 	union {
 		struct sockaddr ip;
 		struct sockaddr_in ip4;
 		struct sockaddr_in6 ip6;
-	} addr;                          /**< Server address */
+	} addr;                          /**< NS address */
 };
 
 /** @internal Address bytes for given family. */
@@ -65,21 +78,40 @@ struct kr_nsrep
 
 /**
  * Elect best nameserver/address pair from the nsset.
- * @param  ns           updated NS representation
- * @param  nsset        NS set to choose from
- * @param  repcache     reputation storage
- * @return              score, see enum kr_ns_score
+ * @param  qry          updated query
+ * @param  ctx          resolution context
+ * @return              0 or an error code
  */
-int kr_nsrep_elect(struct kr_nsrep *ns, map_t *nsset, kr_nsrep_lru_t *repcache);
+int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx);
 
 /**
- * Update NS quality information.
+ * Elect best nameserver/address pair from the nsset.
+ * @param  qry          updated query
+ * @param  ctx          resolution context
+ * @return              0 or an error code
+ */
+int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
+
+/**
+ * Update NS address RTT information.
  *
  * @brief Reputation is smoothed over last N measurements.
  * 
  * @param  ns           updated NS representation
  * @param  score        new score (i.e. RTT), see enum kr_ns_score
- * @param  reputation   reputation storage
+ * @param  cache        LRU cache
  * @return              0 on success, error code on failure
  */
-int kr_nsrep_update(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *repcache);
+int kr_nsrep_update_rtt(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *cache);
+
+/**
+ * Update NS name quality information.
+ *
+ * @brief Reputation is smoothed over last N measurements.
+ * 
+ * @param  ns           updated NS representation
+ * @param  reputation   combined reputation flags, see enum kr_ns_rep
+ * @param  cache        LRU cache
+ * @return              0 on success, error code on failure
+ */
+int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t *cache);

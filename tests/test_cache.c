@@ -14,8 +14,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libknot/internal/mempool.h>
 #include <libknot/internal/namedb/namedb_lmdb.h>
+#include <ucw/mempool.h>
 
 #include "tests/test.h"
 #include "lib/cache.h"
@@ -45,10 +45,7 @@ int (*original_knot_rdataset_add)(knot_rdataset_t *rrs, const knot_rdata_t *rr, 
 
 void *malloc(size_t __size)
 {
-	Dl_info dli = {0};
-	char insert_name[] = "kr_cache_insert";
-	int err_mock = KNOT_EOK, insert_namelen = strlen(insert_name);
-
+	int err_mock = KNOT_EOK;
 	if (original_malloc == NULL)
 	{
 		original_malloc = dlsym(RTLD_NEXT,"malloc");
@@ -56,9 +53,7 @@ void *malloc(size_t __size)
 	}
 	if (is_malloc_mocked)
 	{
-	    dladdr (__builtin_return_address (0), &dli);
-	    if (dli.dli_sname && (strncmp(insert_name,dli.dli_sname,insert_namelen) == 0))
-		    err_mock = mock();
+		err_mock = mock();
 	}
 	return (err_mock != KNOT_EOK) ? NULL : original_malloc (__size);
 }
@@ -210,20 +205,21 @@ static struct kr_cache_txn *test_txn_rdonly(void **state)
 static void test_fake_invalid (void **state)
 {
 	struct kr_cache_txn *txn = NULL;
-	const namedb_api_t *api_saved;
+	const namedb_api_t *api_saved = NULL;
 	knot_dname_t dname[] = "";
-	struct kr_cache_entry *ret;
+	struct kr_cache_entry *entry = NULL;
+	int ret = 0;
 
-	assert_int_not_equal(kr_cache_txn_commit(txn), KNOT_EOK);
+	assert_int_not_equal(kr_cache_txn_commit(txn), 0);
 	txn = test_txn_write(state);
-	assert_int_not_equal(kr_cache_txn_commit(txn), KNOT_EOK);
-	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0);
-	assert_int_equal(ret, &global_fake_ce);
+	assert_int_not_equal(kr_cache_txn_commit(txn), 0);
+	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, &entry, 0);
+	assert_int_equal(ret, 0);
 	api_saved = txn->owner->api;
 	txn->owner->api = NULL;
-	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, 0);
+	ret = kr_cache_peek(txn, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, &entry, 0);
 	txn->owner->api = api_saved;
-	assert_null(ret);
+	assert_int_not_equal(ret, 0);
 }
 
 static void test_fake_insert(void **state)
@@ -234,8 +230,8 @@ static void test_fake_insert(void **state)
 	test_randstr((char *)&global_fake_ce,sizeof(global_fake_ce));
 	test_randstr((char *)namedb_data,NAMEDB_DATA_SIZE);
 
-	is_malloc_mocked = true;
 	will_return(malloc,KNOT_EINVAL);
+	is_malloc_mocked = true;
 	ret_cache_lowmem = kr_cache_insert(txn, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
 	is_malloc_mocked = false;
@@ -256,6 +252,7 @@ static void test_invalid(void **state)
 	knot_dname_t dname[] = "";
 	uint32_t timestamp = CACHE_TIME;
 	struct namedb_lmdb_opts opts;
+	struct kr_cache_entry *entry = NULL;
 
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_env;
@@ -267,17 +264,13 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_txn_begin(NULL, &global_txn, 0), 0);
 	assert_int_not_equal(kr_cache_txn_begin(*state, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_txn_commit(NULL), 0);
-	assert_null(kr_cache_peek(NULL, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, &timestamp));
-	assert_null(kr_cache_peek(&global_txn, 0, dname, KNOT_RRTYPE_TSIG, &timestamp));
-	assert_null(kr_cache_peek(&global_txn, KR_CACHE_USER, NULL, KNOT_RRTYPE_TSIG, &timestamp));
+	assert_int_not_equal(kr_cache_peek(NULL, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, NULL, &timestamp), 0);
+	assert_int_not_equal(kr_cache_peek(&global_txn, KR_CACHE_USER, NULL, KNOT_RRTYPE_TSIG, &entry, &timestamp), 0);
 	assert_int_not_equal(kr_cache_peek_rr(NULL, NULL, NULL), 0);
 	assert_int_not_equal(kr_cache_peek_rr(&global_txn, NULL, NULL), 0);
 	assert_int_not_equal(kr_cache_insert_rr(&global_txn, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_insert_rr(NULL, NULL, 0), 0);
-	assert_int_equal(kr_cache_insert_rr(&global_txn, &global_rr, 0), 0);
 	assert_int_not_equal(kr_cache_insert(NULL, KR_CACHE_USER, dname,
-		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data), 0);
-	assert_int_not_equal(kr_cache_insert(&global_txn, 0, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data), 0);
 	assert_int_not_equal(kr_cache_insert(&global_txn, KR_CACHE_USER, NULL,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data), 0);
@@ -358,13 +351,13 @@ static void test_query(void **state)
 /* Test cache read (simulate aged entry) */
 static void test_query_aged(void **state)
 {
-	uint32_t timestamp = CACHE_TIME + CACHE_TTL;
+	uint32_t timestamp = CACHE_TIME + CACHE_TTL + 1;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, global_rr.owner, global_rr.type, global_rr.rclass);
 
 	struct kr_cache_txn *txn = test_txn_rdonly(state);
 	int ret = kr_cache_peek_rr(txn, &cache_rr, &timestamp);
-	assert_int_equal(ret, KNOT_ENOENT);
+	assert_int_equal(ret, kr_error(ESTALE));
 	kr_cache_txn_abort(txn);
 }
 

@@ -31,6 +31,9 @@
 #include "lib/module.h"
 #include "lib/cache.h"
 
+/* Max number of records pruned at one go. */
+#define PRUNE_GRANULARITY UINT16_MAX
+
 /*
  * Properties.
  */
@@ -38,7 +41,7 @@
 /** Return boolean true if a record is expired. */
 static bool is_expired(struct kr_cache_entry *entry, uint32_t drift)
 {
-	return entry->ttl >= drift;
+	return drift > entry->ttl;
 }
 
 /**
@@ -51,29 +54,44 @@ static bool is_expired(struct kr_cache_entry *entry, uint32_t drift)
 static char* prune(void *env, struct kr_module *module, const char *args)
 {
 	struct engine *engine = env;
-	const namedb_api_t *storage = engine->resolver.cache.api; /* kr_cache_storage(); */
+	struct kr_cache *cache = &engine->resolver.cache;
+	const namedb_api_t *storage = cache->api;
 
 	struct kr_cache_txn txn;
-	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, 0);
+	int ret = kr_cache_txn_begin(cache, &txn, 0);
 	if (ret != 0) {
 		return NULL;
 	}
 
 	/* Iterate cache and find expired records. */
 	int pruned = 0;
-	uint32_t now = time(NULL);
-	namedb_iter_t *it = storage->iter_begin((namedb_txn_t *)&txn, 0);
-	while (it) {
+	int prune_max = 0;
+	if (args) {
+		prune_max = atoi(args);
+	}
+	/* Default pruning granularity */
+	if (prune_max == 0) {
+		prune_max = PRUNE_GRANULARITY;
+	}
+	/* Fetch current time and start iterating */
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	namedb_iter_t *it = storage->iter_begin(&txn.t, 0);
+	while (it && pruned < prune_max) {
 		/* Fetch RR from cache */
 		namedb_val_t key, val;
 		if (storage->iter_key(it, &key) != 0 ||
-		    storage->iter_val(it, &val)) {
+		    storage->iter_val(it, &val) != 0) {
 			break;
 		}
 		/* Prune expired records. */
 		struct kr_cache_entry *entry = val.data;
-		if (is_expired(entry, now - entry->timestamp)) {
-			storage->del((namedb_txn_t *)&txn, &key);
+		if (entry->timestamp > now.tv_sec) {
+			continue;
+		}
+		if (is_expired(entry, now.tv_sec - entry->timestamp)) {
+			storage->del(&txn.t, &key);
+			cache->stats.delete += 1;
 			pruned += 1;
 		}
 		it = storage->iter_next(it);

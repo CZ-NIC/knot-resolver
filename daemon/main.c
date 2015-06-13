@@ -19,6 +19,7 @@
 #include <getopt.h>
 #include <uv.h>
 #include <libknot/internal/sockaddr.h>
+#include <ucw/mempool.h>
 
 #include "lib/defines.h"
 #include "lib/resolve.h"
@@ -128,8 +129,10 @@ int main(int argc, char **argv)
 	uv_signal_start(&sigint, signal_handler, SIGINT);
 
 	/* Create a server engine. */
-	mm_ctx_t pool;
-	mm_ctx_mempool(&pool, 4096);
+	mm_ctx_t pool = {
+		.ctx = mp_new (4096),
+		.alloc = (mm_alloc_t) mp_alloc
+	};
 	struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {
@@ -144,12 +147,16 @@ int main(int argc, char **argv)
 	engine_lualib(&engine, "event",   lib_event);
 
 	/* Create main worker. */
-	struct worker_ctx worker = {
-		.engine = &engine,
-		.loop = loop,
-		.mm = NULL,
-	};
-	loop->data = &worker;
+	struct worker_ctx *worker = mm_alloc(&pool, sizeof(*worker));
+	if(!worker) {
+		fprintf(stderr, "[system] not enough memory\n");
+		return EXIT_FAILURE;
+	}
+	memset(worker, 0, sizeof(*worker));
+	worker->engine = &engine,
+	worker->loop = loop;
+	loop->data = worker;
+	worker_reserve(worker, MP_FREELIST_SIZE);
 
 	/* Bind to sockets. */
 	if (addr != NULL) {
@@ -182,6 +189,8 @@ int main(int argc, char **argv)
 	/* Cleanup. */
 	fprintf(stderr, "\n[system] quitting\n");
 	engine_deinit(&engine);
+	worker_reclaim(worker);
+	mp_delete(pool.ctx);
 
 	if (ret != 0) {
 		ret = EXIT_FAILURE;

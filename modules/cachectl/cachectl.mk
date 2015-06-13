@@ -1,4 +1,4 @@
 cachectl_SOURCES := modules/cachectl/cachectl.c
-cachectl_DEPEND := $(libkresolve)
-cachectl_LIBS := $(libkresolve_TARGET) $(libkresolve_LIBS)
+cachectl_DEPEND := $(libkres)
+cachectl_LIBS := $(libkres_TARGET) $(libkres_LIBS)
 $(call make_c_module,cachectl)

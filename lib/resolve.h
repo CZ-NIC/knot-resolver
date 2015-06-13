@@ -59,8 +59,12 @@
  * @code{.c}
  *
  * // Create request and its memory pool
- * struct kr_request req;
- * mm_ctx_mempool(&req.pool, 4096);
+ * struct kr_request req = {
+ * 	.pool = {
+ * 		.ctx = mp_new (4096),
+ * 		.alloc = (mm_alloc_t) mp_alloc
+ * 	}
+ * };
  * kr_resolve_begin(&req, ctx, answer);
  * int state = kr_resolve_query(&req, qname, qclass, qtype);
  *
@@ -101,7 +105,8 @@ struct kr_context
 {
 	mm_ctx_t *pool;
 	struct kr_cache cache;
-	kr_nsrep_lru_t *nsrep;
+	kr_nsrep_lru_t *cache_rtt;
+	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
 	uint32_t options;
 };

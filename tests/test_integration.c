@@ -77,10 +77,13 @@ static PyObject* init(PyObject* self, PyObject* args)
 	    return NULL;
 	}
 
-	/* Create RTT tracking */
-	global_context.nsrep = malloc(lru_size(kr_nsrep_lru_t, 1000));
-	assert(global_context.nsrep);
-	lru_init(global_context.nsrep, 1000);
+	/* Create RTT + reputation tracking */
+	global_context.cache_rtt = malloc(lru_size(kr_nsrep_lru_t, 1024));
+	assert(global_context.cache_rtt);
+	lru_init(global_context.cache_rtt, 1024);
+	global_context.cache_rep = malloc(lru_size(kr_nsrep_lru_t, 512));
+	assert(global_context.cache_rep);
+	lru_init(global_context.cache_rep, 512);
 	global_context.options = QUERY_NO_THROTTLE;
 
 	/* No configuration parsing support yet. */
@@ -102,8 +105,10 @@ static PyObject* deinit(PyObject* self, PyObject* args)
 	}
 	array_clear(global_modules);
 	kr_cache_close(&global_context.cache);
-	lru_deinit(global_context.nsrep);
-	free(global_context.nsrep);
+	lru_deinit(global_context.cache_rtt);
+	lru_deinit(global_context.cache_rep);
+	free(global_context.cache_rtt);
+	free(global_context.cache_rep);
 
 	test_tmpdir_remove(global_tmpdir);
 	global_tmpdir = NULL;

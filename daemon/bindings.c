@@ -319,7 +319,7 @@ static int cache_count(lua_State *L)
 		lua_error(L);
 	}
 
-	lua_pushinteger(L, storage->count((namedb_txn_t *)&txn));
+	lua_pushinteger(L, storage->count(&txn.t));
 	kr_cache_txn_abort(&txn);
 	return 1;
 }

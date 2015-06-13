@@ -6,8 +6,9 @@ Module providing an interface to cache database, for inspection, manipulation an
 Properties
 ^^^^^^^^^^
 
-.. function:: cachectl.prune()
+.. function:: cachectl.prune([max_count])
 
+  :param number max_count:  maximum number of items to be pruned at once (default: 65536)
   :return: ``{ pruned: int }``
 
   Prune expired/invalid records.

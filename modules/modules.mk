@@ -7,6 +7,10 @@ modules_TARGETS := hints \
 ifeq ($(HAS_libmemcached),yes)
 modules_TARGETS += kmemcached
 endif
+# Redis
+ifeq ($(HAS_hiredis),yes)
+modules_TARGETS += redis
+endif
 
 # List of Lua modules
 ifeq ($(HAS_lua),yes)

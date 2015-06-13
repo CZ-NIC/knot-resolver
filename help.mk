@@ -19,4 +19,5 @@ info:
 	$(info [$(HAS_python)] Python (tests/integration))
 	$(info [$(HAS_gccgo)] GCCGO (modules/go))
 	$(info [$(HAS_libmemcached)] libmemcached (modules/memcached))
+	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info )

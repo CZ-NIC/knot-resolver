@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,20 @@
 
 #pragma once
 
-#include "lib/layer.h"
+#include <hiredis/hiredis.h>
+#include "lib/generic/array.h"
 
-/* Processing module implementation. */
-const knot_layer_api_t *rrcache_layer(struct kr_module *module);
+/** Redis buffer size */
+#define REDIS_BUFSIZE (512 * 1024)
+#define REDIS_PORT 6379
+
+typedef array_t(redisReply *) redis_freelist_t;
+
+/** @internal Redis client */
+struct redis_cli {
+	redisContext *handle;
+	redis_freelist_t freelist;
+	char *addr;
+	unsigned database;
+	unsigned port;
+};
