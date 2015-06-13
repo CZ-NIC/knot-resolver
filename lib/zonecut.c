@@ -64,7 +64,7 @@ static void update_cut_name(struct kr_zonecut *cut, const knot_dname_t *name)
 
 int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *pool)
 {
-	if (cut == NULL || name == NULL) {
+	if (!cut || !name) {
 		return kr_error(EINVAL);
 	}
 
@@ -87,7 +87,7 @@ static int free_addr_set(const char *k, void *v, void *baton)
 
 void kr_zonecut_deinit(struct kr_zonecut *cut)
 {
-	if (cut == NULL) {
+	if (!cut) {
 		return;
 	}
 	mm_free(cut->pool, cut->name);
@@ -97,16 +97,51 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
 {
-	if (cut == NULL || name == NULL) {
+	if (!cut || !name) {
 		return;
 	}
 	kr_zonecut_deinit(cut);
 	kr_zonecut_init(cut, name, cut->pool);
 }
 
+static int copy_addr_set(const char *k, void *v, void *baton)
+{
+	pack_t *addr_set = v;
+	struct kr_zonecut *dst = baton;
+	/* Clone addr_set pack */
+	pack_t *new_set = mm_alloc(dst->pool, sizeof(*new_set));
+	if (!new_set) {
+		return kr_error(ENOMEM);
+	}
+	new_set->at = mm_alloc(dst->pool, addr_set->len);
+	if (!new_set->at) {
+		mm_free(dst->pool, new_set);
+		return kr_error(ENOMEM);
+	}
+	memcpy(new_set->at, addr_set->at, addr_set->len);
+	new_set->len = addr_set->len;
+	new_set->cap = new_set->len;
+	/* Reinsert */
+	if (map_set(&dst->nsset, k, new_set) != 0) {
+		pack_clear_mm(*new_set, mm_free, dst->pool);
+		mm_free(dst->pool, new_set);
+		return kr_error(ENOMEM);
+	}
+	return kr_ok();
+}
+
+int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src)
+{
+	if (!dst || !src) {
+		return kr_error(EINVAL);
+	}
+	/* We're not touching src nsset, I promise */
+	return map_walk((map_t *)&src->nsset, copy_addr_set, dst);
+}
+
 int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
 {
-	if (cut == NULL || ns == NULL) {
+	if (!cut || !ns) {
 		return kr_error(EINVAL);
 	}
 	/* Fetch/insert nameserver. */
@@ -138,7 +173,7 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
 {
-	if (cut == NULL || ns == NULL) {
+	if (!cut || !ns) {
 		return kr_error(EINVAL);
 	}
 
@@ -163,7 +198,7 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 
 pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns)
 {
-	if (cut == NULL || ns == NULL) {
+	if (!cut || !ns) {
 		return NULL;
 	}
 
@@ -172,13 +207,23 @@ pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns)
 	return map_get(nsset, key);
 }
 
-int kr_zonecut_set_sbelt(struct kr_zonecut *cut)
+int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 {
-	if (cut == NULL) {
+	if (!ctx || !cut) {
 		return kr_error(EINVAL);
 	}
 
 	update_cut_name(cut, U8(""));
+
+	/* Copy root hints from resolution context. */
+	if (ctx->root_hints.nsset.root) {
+		int ret = kr_zonecut_copy(cut, &ctx->root_hints);
+		if (ret == 0) {
+			return ret;
+		}
+	}
+
+	/* Copy compiled-in root hints */
 	for (unsigned i = 0; i < HINT_COUNT; ++i) {
 		const struct hint_info *hint = &SBELT[i];
 		knot_rdata_t rdata[knot_rdata_array_size(HINT_ADDRLEN)];
@@ -239,7 +284,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_d
 
 	/* Always keep SBELT as a backup for root */
 	if (name[0] == '\0') {
-		kr_zonecut_set_sbelt(cut);
+		kr_zonecut_set_sbelt(ctx, cut);
 	}
 
 	return kr_ok();
@@ -269,5 +314,5 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	}
 
 	/* Name server not found, start with SBELT. */
-	return kr_zonecut_set_sbelt(cut);
+	return kr_zonecut_set_sbelt(ctx, cut);
 }

@@ -54,7 +54,7 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
 	struct kr_cache_txn txn;
 	int ret = 0;
 	if (kr_cache_txn_begin(&req->ctx->cache, &txn, NAMEDB_RDONLY) != 0) {
-		ret = kr_zonecut_set_sbelt(&qry->zone_cut);
+		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
 	} else {
 		/* If at/subdomain of parent zone cut, start from 'one up' to avoid loops */
 		struct kr_query *parent = qry->parent;

@@ -449,6 +449,7 @@ static void event_callback(uv_timer_t *timer)
 	lua_State *L = worker->engine->L;
 
 	/* Retrieve callback and execute */
+	int top = lua_gettop(L);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) timer->data);
 	lua_rawgeti(L, -1, 1);
 	lua_pushinteger(L, (intptr_t) timer->data);
@@ -457,7 +458,7 @@ static void event_callback(uv_timer_t *timer)
 		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
 	}
 	/* Clear the stack, there may be event a/o enything returned */
-	lua_settop(L, 0);
+	lua_settop(L, top);
 	/* Free callback if not recurrent or an error */
 	if (ret != 0 || uv_timer_get_repeat(timer) == 0) {
 		uv_close((uv_handle_t *)timer, (uv_close_cb) event_free);
