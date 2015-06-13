@@ -87,6 +87,7 @@ static void l_unpack_json(lua_State *L, JsonNode *table)
 		case JSON_ARRAY:  l_unpack_json(L, node); break;
 		case JSON_STRING: lua_pushstring(L, node->string_); break;
 		case JSON_NUMBER: lua_pushnumber(L, node->number_); break;
+		case JSON_BOOL:   lua_pushboolean(L, node->bool_); break;
 		default: continue;
 		}
 		/* Set table key */
@@ -96,6 +97,44 @@ static void l_unpack_json(lua_State *L, JsonNode *table)
 			lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
 		}
 	}
+}
+
+static JsonNode *l_pack_elem(lua_State *L, int top)
+{
+	if (lua_isstring(L, top)) {
+		return json_mkstring(lua_tostring(L, top));
+	}
+	if (lua_isnumber(L, top)) {
+		return json_mknumber(lua_tonumber(L, top));	
+	}
+	if (lua_isboolean(L, top)) {
+		return json_mkbool(lua_toboolean(L, top));	
+	}
+	return json_mknull();
+}
+
+static char *l_pack_json(lua_State *L, int top)
+{
+	JsonNode *root = json_mkobject();
+	if (!root) {
+		return NULL;
+	}
+	/* Iterate table on stack */
+	lua_pushnil(L);
+	while(lua_next(L, top)) {
+		JsonNode *val = l_pack_elem(L, -1);
+		if (lua_isstring(L, -2)) {
+			json_append_member(root, lua_tostring(L, -2), val);
+		} else {
+			json_append_element(root, val);
+		}
+		lua_pop(L, 1);
+	}
+	lua_pop(L, 1);
+	/* Serialize to string */
+	char *result = json_encode(root);
+	json_delete(root);
+	return result;
 }
 
 /** Trampoline function for module properties. */
@@ -113,8 +152,14 @@ static int l_trampoline(lua_State *L)
 	 * if we expand the callables, we might need a callback_type.
 	 */
 	const char *args = NULL;
+	auto_free char *cleanup_args = NULL;
 	if (lua_gettop(L) > 0) {
-		args = lua_tostring(L, 1);
+		if (lua_istable(L, 1)) {
+			cleanup_args = l_pack_json(L, 1);
+			args = cleanup_args;
+		} else {
+			args = lua_tostring(L, 1);
+		}
 	}
 	if (callback == module->config) {
 		module->config(module, args);
