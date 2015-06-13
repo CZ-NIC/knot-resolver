@@ -14,13 +14,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#if defined(__GLIBC__) && defined(_GNU_SOURCE)
-#include <malloc.h>
-#endif
 #include <uv.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/internal/net.h>
 #include <ucw/mempool.h>
+#if defined(__GLIBC__) && defined(_GNU_SOURCE)
+#include <malloc.h>
+#endif
 
 #include "daemon/worker.h"
 #include "daemon/engine.h"
