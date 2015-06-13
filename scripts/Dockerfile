@@ -6,7 +6,7 @@ ENV BUILD_PKGS build-base automake autoconf libtool pkgconfig git luajit-dev lib
 ENV RUN_PKGS luajit libuv gnutls jansson bash
 ENV BUILD_IGNORE gmp nettle jansson gnutls lua libuv cmocka
 ENV PKG_CONFIG_PATH /usr/local/lib/pkgconfig
-ENV CFLAGS -O2 -g -DNDEBUG
+ENV CFLAGS -O2 -ftree-vectorize -fstack-protector -g -DNDEBUG
 ENV LDFLAGS -Wl,--as-needed
 
 # Expose port

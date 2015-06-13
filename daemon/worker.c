@@ -14,7 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#if !defined(__APPLE__) && defined(_GNU_SOURCE)
+#if defined(__GLIBC__) && defined(_GNU_SOURCE)
 #include <malloc.h>
 #endif
 #include <uv.h>
@@ -140,7 +140,7 @@ static void qr_task_free(uv_handle_t *handle)
 		array_push(worker->pools, mp_context);
 	} else {
 		mp_delete(mp_context);
-#if !defined(__APPLE__) && defined(_GNU_SOURCE)
+#if defined(__GLIBC__) && defined(_GNU_SOURCE)
 		/* Decommit memory every once in a while */
 		static int mp_delete_count = 0;
 		if (++mp_delete_count == 1000) {
