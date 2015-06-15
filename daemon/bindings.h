@@ -25,16 +25,29 @@
 
 #include "daemon/engine.h"
 
- /** @internal Compatibility wrapper for Lua 5.0 - 5.2 */
- #if LUA_VERSION_NUM >= 502
- #define register_lib(L, name, lib) \
- 	luaL_newlib((L), (lib))
- #else
- #define lua_rawlen(L, obj) \
- 	lua_objlen((L), (obj))
- #define register_lib(L, name, lib) \
- 	luaL_openlib((L), (name), (lib), 0)
- #endif
+/** @internal Compatibility wrapper for Lua 5.0 - 5.2 */
+#if LUA_VERSION_NUM >= 502
+#define register_lib(L, name, lib) \
+	luaL_newlib((L), (lib))
+#else
+#define lua_rawlen(L, obj) \
+	lua_objlen((L), (obj))
+#define register_lib(L, name, lib) \
+	luaL_openlib((L), (name), (lib), 0)
+/* Adapted from Lua 5.2.0 */
+static inline void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
+  luaL_checkstack(L, nup+1, "too many upvalues");
+  for (; l->name != NULL; l++) {  /* fill the table with given functions */
+    int i;
+    lua_pushstring(L, l->name);
+    for (i = 0; i < nup; i++)  /* copy upvalues to the top */
+      lua_pushvalue(L, -(nup+1));
+    lua_pushcclosure(L, l->func, nup);  /* closure with those upvalues */
+    lua_settable(L, -(nup + 3));
+  }
+  lua_pop(L, nup);  /* remove upvalues */
+}
+#endif
 
 /**
  * Load 'modules' package.
