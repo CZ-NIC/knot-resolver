@@ -22,6 +22,11 @@
 
 #include "daemon/bindings.h"
 
+/* Metatable list */
+#define META_PKT   "kres.meta_pkt"
+#define META_QUERY "kres.meta_query"
+#define META_RPLAN "kres.meta_rplan"
+
 /**
  * Load libkres library.
  * @param  L scriptable

@@ -17,8 +17,21 @@
 #include "daemon/bindings/kres.h"
 #include "daemon/bindings.h"
 
-/* Metatable list */
-#define META_PKT "kres.meta_pkt"
+/** @internal Register metatable. */
+#define META_REGISTER(L, funcs, name) \
+	luaL_newmetatable((L), (name)); \
+	luaL_setfuncs((L), (funcs), 0); \
+	lua_pushvalue((L), -1); \
+	lua_setfield((L), -2, "__index"); \
+	lua_pop((L), 1);
+
+/** @internal Shortcut for dname conversion. */
+static inline void lua_pushdname(lua_State *L, const knot_dname_t *name)
+{
+	char dname_str[KNOT_DNAME_MAXLEN];
+	knot_dname_to_str(dname_str, name, sizeof(dname_str));
+	lua_pushstring(L, dname_str);
+}
 
 /* 
  * Packet interface
@@ -88,44 +101,88 @@ static int pkt_qclass(lua_State *L)
 static int pkt_qname(lua_State *L)
 {
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
-	const knot_dname_t *dname = knot_pkt_qname(pkt);
-	char dname_str[KNOT_DNAME_MAXLEN];
-	knot_dname_to_str(dname_str, dname, sizeof(dname_str));
-	lua_pushstring(L, dname_str);
+	lua_pushdname(L, knot_pkt_qname(pkt));
 	return 1;	
 }
 
 #warning TODO: record interfaces
 
-static int pkt_meta_set(lua_State *L)
+static int pkt_meta_register(lua_State *L)
 {
-	static const luaL_Reg pkt_wrap[] = {
-		{ "flag",      pkt_flag},
-		{ "rcode",     pkt_rcode},
-		{ "opcode",    pkt_opcode},
-		{ "qtype",     pkt_qtype },
+	static const luaL_Reg wrap[] = {
+		{ "flag",      pkt_flag   },
+		{ "rcode",     pkt_rcode  },
+		{ "opcode",    pkt_opcode },
+		{ "qtype",     pkt_qtype  },
 		{ "qclass",    pkt_qclass },
-		{ "qname",     pkt_qname },
+		{ "qname",     pkt_qname  },
 		{ NULL, NULL }
 	};
-	luaL_newmetatable(L, META_PKT);
-	luaL_setfuncs(L, pkt_wrap, 0);
-	lua_pushvalue(L, -1);
-	lua_setfield(L, -2, "__index");
-	lua_pop(L, 1);
+	META_REGISTER (L, wrap, META_PKT);
 	return 0;
 }
 
-static int pkt_meta_get(lua_State *L)
+/**
+ * Query interface.
+ */
+
+static int query_qtype(lua_State *L)
 {
-	luaL_getmetatable(L, META_PKT);
-	lua_setmetatable(L, -2);
+	struct kr_query *qry = lua_touserdata(L, 1);
+	lua_pushnumber(L, qry->stype);
 	return 1;
+}
+
+static int query_qclass(lua_State *L)
+{
+	struct kr_query *qry = lua_touserdata(L, 1);
+	lua_pushnumber(L, qry->sclass);
+	return 1;	
+}
+
+static int query_qname(lua_State *L)
+{
+	struct kr_query *qry = lua_touserdata(L, 1);
+	lua_pushdname(L, qry->sname);
+	return 1;	
+}
+
+static int query_meta_register(lua_State *L)
+{
+	static const luaL_Reg wrap[] = {
+		{ "qtype",     query_qtype  },
+		{ "qclass",    query_qclass },
+		{ "qname",     query_qname  },
+		{ NULL, NULL }
+	};
+	META_REGISTER (L, wrap, META_QUERY);
+	return 0;
 }
 
 /**
  * Resolution context interface.
  */
+
+static int rplan_query(lua_State *L)
+{
+	struct kr_rplan *rplan = lua_touserdata(L, 1);
+	lua_pushlightuserdata(L, kr_rplan_current(rplan));
+	luaL_getmetatable(L, META_QUERY);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+static int rplan_meta_register(lua_State *L)
+{
+	static const luaL_Reg wrap[] = {
+		{ "query",      rplan_query },
+		// { "pending",    rplan_pending },
+		// { "resolved",   rplan_resolved },
+		{ NULL, NULL }
+	};
+	META_REGISTER (L, wrap, META_RPLAN);
+	return 0;
+}
 
 #warning TODO: context interface, rplan
 
@@ -146,7 +203,6 @@ static int pkt_meta_get(lua_State *L)
 int lib_kres(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
-		{ "packet", pkt_meta_get },
 		{ NULL, NULL }
 	};
 	/* Create module and register functions */
@@ -162,6 +218,8 @@ int lib_kres(lua_State *L)
 	WRAP_LUT(L, "opcode", knot_opcode_names);
 	WRAP_LUT(L, "wire",   wire_flag_names);
 	/* Register metatables */
-	pkt_meta_set(L);
+	pkt_meta_register(L);
+	query_meta_register(L);
+	rplan_meta_register(L);
 	return 1;	
 }

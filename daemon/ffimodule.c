@@ -17,8 +17,9 @@
 #include <uv.h>
 
 #include "daemon/engine.h"
-#include "daemon/bindings.h"
 #include "daemon/ffimodule.h"
+#include "daemon/bindings.h"
+#include "daemon/bindings/kres.h"
 #include "lib/module.h"
 #include "lib/layer.h"
 
@@ -27,6 +28,13 @@
 #else
 #define l_resume(L, argc) lua_resume((L), (argc))
 #endif
+
+/** @internal Set metatable on the object on stack. */
+static void set_metatable(lua_State *L, const char *tname)
+{
+	luaL_getmetatable(L, tname);
+	lua_setmetatable(L, -2);
+}
 
 /** @internal Helper for retrieving the right function entrypoint. */
 static inline lua_State *l_ffi_preface(struct kr_module *module, const char *call) {
@@ -131,51 +139,61 @@ static int l_ffi_deinit(struct kr_module *module)
 		lua_pop(L, 1); \
 		return ctx->state; \
 	} \
-	lua_pushnumber(L, ctx->state);
+	lua_pushnumber(L, ctx->state)
+
+/** @internal Push rplan and metatable. */
+#define LAYER_PUSH_RPLAN(ctx) do { \
+	struct kr_request *req = (ctx)->data; \
+	lua_pushlightuserdata(L, &req->rplan); \
+	set_metatable(L, META_RPLAN); \
+} while (0)
 
 static int l_ffi_layer_begin(knot_layer_t *ctx, void *module_param)
 {
+	ctx->data = module_param;
 	LAYER_FFI_CALL(ctx, "begin");
 	lua_pushlightuserdata(L, module_param);
-	ctx->data = module_param;
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_reset(knot_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, "reset");
-	lua_pushlightuserdata(L, ctx->data);
+	LAYER_PUSH_RPLAN(ctx);
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_finish(knot_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, "finish");
-	lua_pushlightuserdata(L, ctx->data);
+	LAYER_PUSH_RPLAN(ctx);
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	LAYER_FFI_CALL(ctx, "consume");
-	lua_pushlightuserdata(L, ctx->data);
+	LAYER_PUSH_RPLAN(ctx);
 	lua_pushlightuserdata(L, pkt);
+	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
 }
 
 static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	LAYER_FFI_CALL(ctx, "produce");
-	lua_pushlightuserdata(L, ctx->data);
+	LAYER_PUSH_RPLAN(ctx);
 	lua_pushlightuserdata(L, pkt);
+	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
 }
 
 static int l_ffi_layer_fail(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	LAYER_FFI_CALL(ctx, "fail");
-	lua_pushlightuserdata(L, ctx->data);
+	LAYER_PUSH_RPLAN(ctx);
 	lua_pushlightuserdata(L, pkt);
+	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
 }
 
@@ -200,7 +218,8 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 		api = malloc(sizeof(*api));
 		if (api) {
 			memset(api, 0, sizeof(*api));
-			LAYER_REGISTER(L, api, begin);
+			/* Begin is always set, as it initializes layer baton. */
+			api->begin = l_ffi_layer_begin;
 			LAYER_REGISTER(L, api, finish);
 			LAYER_REGISTER(L, api, consume);
 			LAYER_REGISTER(L, api, produce);
@@ -218,6 +237,7 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 
 #undef LAYER_REGISTER
 #undef LAYER_FFI_CALL
+#undef LAYER_PUSH_RPLAN
 
 /** @internal Helper macro for function presence check. */
 #define REGISTER_FFI_CALL(L, attr, name, cb) do { \
