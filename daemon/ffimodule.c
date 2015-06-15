@@ -178,6 +178,14 @@ static int l_ffi_layer_fail(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return l_ffi_call(L, 3);
 }
 
+/** Conditionally register layer trampoline */
+#define LAYER_REGISTER(L, api, name) do { \
+	lua_getfield((L), -1, "layer"); \
+	lua_getfield((L), -1, #name); \
+	if (!lua_isnil((L), -1)) (api)->name = l_ffi_layer_ ## name; \
+	lua_pop((L), 2); \
+} while(0)
+
 /** @internal Retrieve C layer api wrapper. */
 static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 {
@@ -190,12 +198,13 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 		/* Fabricate layer API wrapping the Lua functions */
 		api = malloc(sizeof(*api));
 		if (api) {
-			api->begin = l_ffi_layer_begin;
-			api->finish = l_ffi_layer_finish;
-			api->consume = l_ffi_layer_consume;
-			api->produce = l_ffi_layer_produce;
-			api->reset = l_ffi_layer_reset;
-			api->fail = l_ffi_layer_fail;
+			memset(api, 0, sizeof(*api));
+			LAYER_REGISTER(L, api, begin);
+			LAYER_REGISTER(L, api, finish);
+			LAYER_REGISTER(L, api, consume);
+			LAYER_REGISTER(L, api, produce);
+			LAYER_REGISTER(L, api, reset);
+			LAYER_REGISTER(L, api, fail);
 			api->data = module;
 		}
 		/* Store the api in the registry. */
@@ -206,6 +215,7 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 	return api;
 }
 
+#undef LAYER_REGISTER
 #undef LAYER_FFI_CALL
 
 /** @internal Helper macro for function presence check. */
@@ -213,7 +223,7 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 	lua_getfield((L), -1, (name)); \
 	if (!lua_isnil((L), -1)) { attr = cb; } \
 	lua_pop((L), 1); \
-	} while (0)
+} while (0)
 
 int ffimodule_register_lua(struct engine *engine, struct kr_module *module, const char *name)
 {
@@ -238,7 +248,10 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	module->data = (void *)(intptr_t)luaL_ref(L, LUA_REGISTRYINDEX);
 	module->lib = L;
 	lua_pop(L, 1); /* Clear the module global */
-	return module->init(module);
+	if (module->init) {
+		return module->init(module);
+	}
+	return kr_ok();
 }
 
 #undef REGISTER_FFI_CALL
