@@ -99,14 +99,15 @@ static int l_ffi_init(struct kr_module *module)
 
 static int l_ffi_deinit(struct kr_module *module)
 {
-	lua_State *L = l_ffi_preface(module, "deinit");
-	if (!L) {
-		return 0;
+	/* Deinit the module in Lua (if possible) */
+	int ret = 0;
+	lua_State *L = module->lib;
+	if (l_ffi_preface(module, "deinit")) {
+		ret = l_ffi_call(L, 1);
 	}
-	int ret = l_ffi_call(L, 1);
 	/* Free the layer API wrapper */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
-	lua_getfield(L, -1, "_layercdata");
+	lua_getfield(L, -1, "_layer_capi");
 	free(lua_touserdata(L, -1));
 	lua_pop(L, 2);
 	/* Unref module and unset 'lib', so the module
@@ -242,8 +243,8 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	/* Create FFI module with trampolined functions. */
 	memset(module, 0, sizeof(*module));
 	module->name = strdup(name);
-	REGISTER_FFI_CALL(L, module->init,   "init",   &l_ffi_init);
-	REGISTER_FFI_CALL(L, module->deinit, "deinit", &l_ffi_deinit);
+	module->init = &l_ffi_init;
+	module->deinit = &l_ffi_deinit;
 	REGISTER_FFI_CALL(L, module->layer,  "layer",  &l_ffi_layer);
 	module->data = (void *)(intptr_t)luaL_ref(L, LUA_REGISTRYINDEX);
 	module->lib = L;

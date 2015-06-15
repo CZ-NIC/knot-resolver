@@ -303,6 +303,7 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 			default: continue;
 			}
 		}
+		json_delete(root_node);
 	}
 	/* Return current root hints */
 	char *result = NULL;
