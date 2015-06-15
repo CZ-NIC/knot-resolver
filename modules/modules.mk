@@ -15,7 +15,8 @@ endif
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
 modules_TARGETS += ketcd \
-                   graphite
+                   graphite \
+                   block
 endif
 
 # List of Golang modules
