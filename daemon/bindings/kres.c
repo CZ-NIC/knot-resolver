@@ -39,7 +39,7 @@ static lookup_table_t wire_flag_names[] = {
 
 static int pkt_flag(lua_State *L)
 {
-	knot_pkt_t *pkt = luaL_checkudata(L, 1, META_PKT);
+	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		int flag_id = lua_tonumber(L, 2);
 		switch(flag_id) {
@@ -53,7 +53,7 @@ static int pkt_flag(lua_State *L)
 
 static int pkt_opcode(lua_State *L)
 {
-	knot_pkt_t *pkt = luaL_checkudata(L, 1, META_PKT);
+	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		knot_wire_set_opcode(pkt->wire, lua_tonumber(L, 2));
 	}
@@ -63,7 +63,7 @@ static int pkt_opcode(lua_State *L)
 
 static int pkt_rcode(lua_State *L)
 {
-	knot_pkt_t *pkt = luaL_checkudata(L, 1, META_PKT);
+	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		knot_wire_set_rcode(pkt->wire, lua_tonumber(L, 2));
 	}
@@ -73,21 +73,21 @@ static int pkt_rcode(lua_State *L)
 
 static int pkt_qtype(lua_State *L)
 {
-	knot_pkt_t *pkt = luaL_checkudata(L, 1, META_PKT);
+	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	lua_pushnumber(L, knot_pkt_qtype(pkt));
 	return 1;
 }
 
 static int pkt_qclass(lua_State *L)
 {
-	knot_pkt_t *pkt = luaL_checkudata(L, 1, META_PKT);
+	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	lua_pushnumber(L, knot_pkt_qclass(pkt));
 	return 1;	
 }
 
 static int pkt_qname(lua_State *L)
 {
-	knot_pkt_t *pkt = luaL_checkudata(L, 1, META_PKT);
+	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	const knot_dname_t *dname = knot_pkt_qname(pkt);
 	char dname_str[KNOT_DNAME_MAXLEN];
 	knot_dname_to_str(dname_str, dname, sizeof(dname_str));

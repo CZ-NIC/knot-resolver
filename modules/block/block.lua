@@ -91,8 +91,6 @@ block.layer = {
 		else
 			return state
 		end
-
-		
 	end
 }
 
