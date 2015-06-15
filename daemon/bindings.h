@@ -25,6 +25,17 @@
 
 #include "daemon/engine.h"
 
+ /** @internal Compatibility wrapper for Lua 5.0 - 5.2 */
+ #if LUA_VERSION_NUM >= 502
+ #define register_lib(L, name, lib) \
+ 	luaL_newlib((L), (lib))
+ #else
+ #define lua_rawlen(L, obj) \
+ 	lua_objlen((L), (obj))
+ #define register_lib(L, name, lib) \
+ 	luaL_openlib((L), (name), (lib), 0)
+ #endif
+
 /**
  * Load 'modules' package.
  * @param  L scriptable

@@ -370,6 +370,7 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	/* Query built, expect answer. */
 	query->id = isaac_next_uint(&ISAAC, UINT16_MAX);
 	knot_wire_set_id(pkt->wire, query->id);
+	pkt->parsed = pkt->size;
 	return kr_ok();
 }
 

@@ -42,17 +42,6 @@ static int format_error(lua_State* L, const char *err)
 	return 1;
 }
 
-/** @internal Compatibility wrapper for Lua 5.0 - 5.2 */
-#if LUA_VERSION_NUM >= 502
-#define register_lib(L, name, lib) \
-	luaL_newlib((L), (lib))
-#else
-#define lua_rawlen(L, obj) \
-	lua_objlen((L), (obj))
-#define register_lib(L, name, lib) \
-	luaL_openlib((L), (name), (lib), 0)
-#endif
-
 /** List loaded modules */
 static int mod_list(lua_State *L)
 {

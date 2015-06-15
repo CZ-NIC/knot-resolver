@@ -8,6 +8,7 @@ kresd_SOURCES := \
 	daemon/worker.c      \
 	daemon/bindings.c    \
 	daemon/ffimodule.c   \
+	daemon/bindings/kres.c \
 	daemon/main.c
 
 # Embed resources
