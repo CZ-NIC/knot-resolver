@@ -47,7 +47,7 @@ local block = {
 -- @function Block requests which QNAME matches given zone list
 function block.in_zone(zone_list)
 	return function(pkt, qry)
-		local qname = pkt:qname()
+		local qname = qry:qname()
 		for _,zone in pairs(zone_list) do
 			if qname:sub(-zone:len()) == zone then
 				return block.DENY
@@ -70,21 +70,25 @@ end
 
 -- @function Block layer implementation
 block.layer = {
-	produce = function(state, data, pkt)
+	produce = function(state, req, pkt)
 		-- Only when a query isn't already answered
 		if state ~= kres.CONSUME then
 			return state
 		end
-		-- @todo Interpret QUERY (as it has final name)
 		-- Interpret packet in Lua and evaluate
-		local pkt = kres.packet(pkt)
-		local action = block:evaluate(pkt, nil)
+		local qry = kres.query_current(req)
+		local action = block:evaluate(pkt, qry)
 		if action == block.DENY then
+			-- Answer full question
+			qry:flag(kres.query.NO_MINIMIZE)
+			pkt:question(qry:qname(), qry:qclass(), qry:qtype())
 			pkt:flag(kres.wire.QR)
 			pkt:flag(kres.wire.AA)
-			pkt:flag(kres.wire.CD)
+			-- Write authority information
 			pkt:rcode(kres.rcode.NXDOMAIN)
-			-- @todo add SOA record
+			pkt:begin(kres.AUTHORITY)
+			-- pkt:add(qry:qname(), qry:qclass(), 6, 900,
+			-- 	'abcd\0efgh\0'..'\0\0\0\1'..'\0\0\0\0'..'\132\3\0\0'..'\132\3\0\0'..'\132\3\0\0')
 			return kres.DONE
 		elseif action == block.DROP then
 			return kres.FAIL

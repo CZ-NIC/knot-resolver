@@ -141,13 +141,6 @@ static int l_ffi_deinit(struct kr_module *module)
 	} \
 	lua_pushnumber(L, ctx->state)
 
-/** @internal Push rplan and metatable. */
-#define LAYER_PUSH_RPLAN(ctx) do { \
-	struct kr_request *req = (ctx)->data; \
-	lua_pushlightuserdata(L, &req->rplan); \
-	set_metatable(L, META_RPLAN); \
-} while (0)
-
 static int l_ffi_layer_begin(knot_layer_t *ctx, void *module_param)
 {
 	ctx->data = module_param;
@@ -159,21 +152,21 @@ static int l_ffi_layer_begin(knot_layer_t *ctx, void *module_param)
 static int l_ffi_layer_reset(knot_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, "reset");
-	LAYER_PUSH_RPLAN(ctx);
+	lua_pushlightuserdata(L, ctx->data);
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_finish(knot_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, "finish");
-	LAYER_PUSH_RPLAN(ctx);
+	lua_pushlightuserdata(L, ctx->data);
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	LAYER_FFI_CALL(ctx, "consume");
-	LAYER_PUSH_RPLAN(ctx);
+	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
 	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
@@ -182,7 +175,7 @@ static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	LAYER_FFI_CALL(ctx, "produce");
-	LAYER_PUSH_RPLAN(ctx);
+	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
 	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
@@ -191,7 +184,7 @@ static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 static int l_ffi_layer_fail(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	LAYER_FFI_CALL(ctx, "fail");
-	LAYER_PUSH_RPLAN(ctx);
+	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
 	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
@@ -237,7 +230,6 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 
 #undef LAYER_REGISTER
 #undef LAYER_FFI_CALL
-#undef LAYER_PUSH_RPLAN
 
 /** @internal Helper macro for function presence check. */
 #define REGISTER_FFI_CALL(L, attr, name, cb) do { \
