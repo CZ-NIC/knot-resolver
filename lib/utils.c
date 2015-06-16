@@ -21,9 +21,15 @@
 #include <stdio.h>
 #include <sys/time.h>
 
+#include "ccan/isaac/isaac.h"
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "lib/generic/array.h"
+
+/** @internal CSPRNG context */
+static isaac_ctx ISAAC;
+static bool isaac_seeded = false;
+#define SEED_SIZE 256
 
 /*
  * Macros.
@@ -95,7 +101,7 @@ static int seed_file(FILE *fp, char *buf, size_t buflen)
 	return 0;
 }
 
-int kr_randseed(char *buf, size_t buflen)
+static int randseed(char *buf, size_t buflen)
 {
     /* This is adapted from Tor's crypto_seed_rng() */
     static const char *filenames[] = {
@@ -113,6 +119,23 @@ int kr_randseed(char *buf, size_t buflen)
     gettimeofday(&tv, NULL);
     memcpy(buf, &tv, buflen < sizeof(tv) ? buflen : sizeof(tv));
     return 0;
+}
+
+int kr_rand_reseed(void)
+{
+	uint8_t seed[SEED_SIZE];
+	randseed((char *)seed, sizeof(seed));
+	isaac_reseed(&ISAAC, seed, sizeof(seed));
+	return kr_ok();
+}
+
+unsigned kr_rand_uint(unsigned max)
+{
+	if (!isaac_seeded) {
+		kr_rand_reseed();
+		isaac_seeded = true;
+	}
+	return isaac_next_uint(&ISAAC, max);
 }
 
 int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
