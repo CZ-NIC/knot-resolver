@@ -14,6 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <libknot/descriptor.h>
 #include "daemon/bindings/kres.h"
 #include "daemon/bindings.h"
 
@@ -56,6 +57,24 @@ static inline void lua_pushdname(lua_State *L, const knot_dname_t *name)
 	knot_dname_to_str(dname_str, name, sizeof(dname_str));
 	lua_pushstring(L, dname_str);
 }
+
+/*
+ * Record types, since the libknot doesn't export them.
+ */
+#define RECORD_TYPES(X) \
+	X(A) X(NS) X(CNAME) X(SOA) X(PTR) X(HINFO) X(MINFO) X(MX) \
+	X(TXT) X(RP) X(AFSDB) X(RT) X(SIG) X(KEY) X(AAAA) X(LOC) \
+	X(SRV) X(NAPTR) X(KX) X(CERT) X(DNAME) X(OPT) X(APL) X(DS) \
+	X(SSHFP) X(IPSECKEY) X(RRSIG) X(NSEC) X(DNSKEY) X(DHCID) \
+	X(NSEC3) X(NSEC3PARAM) X(TLSA) X(CDS) X(CDNSKEY) X(SPF) \
+	X(NID) X(L32) X(L64) X(LP) X(EUI48) X(EUI64) X(TKEY) \
+	X(TSIG) X(IXFR) X(AXFR)
+
+static lookup_table_t rrtype_names[] = {
+	#define X(rc) { KNOT_RRTYPE_ ## rc, #rc },
+	RECORD_TYPES(X)
+	#undef X
+};
 
 /* 
  * Packet interface
@@ -145,7 +164,7 @@ static int pkt_question(lua_State *L)
 		memcpy(pkt->wire, header, sizeof(header));
 		size_t max_size = pkt->max_size;
 		knot_pkt_put_question(pkt, dname, lua_tointeger(L, 3), lua_tointeger(L, 4));
-		// pkt->parsed = pkt->size;
+		pkt->parsed = pkt->size;
 		pkt->max_size = max_size;
 	}
 	return 0;
@@ -164,15 +183,18 @@ static int pkt_add(lua_State *L)
 	if (lua_gettop(L) < 6) {
 		return 0;
 	}
-	/* Create empty RR */
+	/* Get parameters */
 	uint8_t dname[KNOT_DNAME_MAXLEN];
 	knot_dname_from_str(dname, lua_tostring(L, 2), sizeof(dname));
-	knot_rrset_t rr;
-	knot_rrset_init(&rr, knot_dname_copy(dname, &pkt->mm), lua_tointeger(L, 3), lua_tointeger(L, 4));
-	/* Create RDATA */
+	uint16_t rrclass = lua_tointeger(L, 3);
+	uint16_t rrtype = lua_tointeger(L, 4);
 	uint32_t ttl = lua_tointeger(L, 5);
 	size_t rdlen = 0;
 	const char *raw_data = lua_tolstring(L, 6, &rdlen);
+	/* Create empty RR */
+	knot_rrset_t rr;
+	knot_rrset_init(&rr, knot_dname_copy(dname, &pkt->mm), rrtype, rrclass);
+	/* Create RDATA */
 	knot_rdata_t rdata[knot_rdata_array_size(rdlen)];
 	knot_rdata_init(rdata, rdlen, (const uint8_t *)raw_data, ttl);
 	knot_rdataset_add(&rr.rrs, rdata, &pkt->mm);
@@ -299,6 +321,7 @@ int lib_kres(lua_State *L)
 	WRAP_CONST(L, ADDITIONAL, KNOT_);
 	/* Register RCODE, OPCODE */
 	WRAP_LUT(L, "rcode",  knot_rcode_names);
+	WRAP_LUT(L, "rrtype", rrtype_names);
 	WRAP_LUT(L, "opcode", knot_opcode_names);
 	WRAP_LUT(L, "wire",   wire_flag_names);
 	WRAP_LUT(L, "query",  query_flag_names);
