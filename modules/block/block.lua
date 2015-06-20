@@ -44,14 +44,26 @@ local block = {
 	}
 }
 
--- @function Block requests which QNAME matches given zone list
-function block.in_zone(zone_list)
+-- @function Block requests which QNAME matches given zone list (i.e. suffix match)
+function block.suffix(action, zone_list)
+	local AC = require('aho-corasick')
+	local tree = AC.build(zone_list)
 	return function(pkt, qry)
 		local qname = qry:qname()
-		for _,zone in pairs(zone_list) do
-			if qname:sub(-zone:len()) == zone then
-				return block.DENY
-			end
+		local match = AC.match(tree, qname, false)
+		if next(match) ~= nil then
+			return action, match[1]
+		end
+		return nil
+	end
+end
+
+-- @function Block QNAME pattern
+function block.pattern(action, pattern)
+	return function(pkt, qry)
+		local qname = qry:qname()
+		if string.find(qname, pattern) then
+			return action, qname
 		end
 		return nil
 	end
@@ -60,12 +72,12 @@ end
 -- @function Evaluate packet in given rules to determine block action
 function block.evaluate(block, pkt, qry)
 	for _,rule in pairs(block.rules) do
-		local action = rule(pkt, qry)
-		if action then
-			return action
+		local action, authority = rule(pkt, qry)
+		if action ~= nil then
+			return action, authority
 		end
 	end
-	return block.PASS
+	return block.PASS, nil
 end
 
 -- @function Block layer implementation
@@ -77,7 +89,7 @@ block.layer = {
 		end
 		-- Interpret packet in Lua and evaluate
 		local qry = kres.query_current(req)
-		local action = block:evaluate(pkt, qry)
+		local action, authority = block:evaluate(pkt, qry)
 		if action == block.DENY then
 			-- Answer full question
 			qry:flag(kres.query.NO_MINIMIZE)
@@ -87,8 +99,8 @@ block.layer = {
 			-- Write authority information
 			pkt:rcode(kres.rcode.NXDOMAIN)
 			pkt:begin(kres.AUTHORITY)
-			-- pkt:add(qry:qname(), qry:qclass(), 6, 900,
-			-- 	'abcd\0efgh\0'..'\0\0\0\1'..'\0\0\0\0'..'\132\3\0\0'..'\132\3\0\0'..'\132\3\0\0')
+			pkt:add(authority, qry:qclass(), kres.rrtype.SOA, 900,
+				'\5block\0\0'..'\0\0\0\0'..'\0\0\14\16'..'\0\0\3\132'..'\0\9\58\128'..'\0\0\3\132')
 			return kres.DONE
 		elseif action == block.DROP then
 			return kres.FAIL
@@ -99,6 +111,11 @@ block.layer = {
 }
 
 -- @var Default rules
-block.rules = { block.in_zone(block.private_zones) }
+block.rules = { block.suffix(block.DENY, block.private_zones) }
+
+-- @function Add rule to block list
+function block.add(block, rule)
+	return table.insert(block.rules, rule)
+end
 
 return block
