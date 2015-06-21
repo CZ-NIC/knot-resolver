@@ -58,6 +58,25 @@ function block.suffix(action, zone_list)
 	end
 end
 
+-- @function Check for common suffix first, then suffix match (specialized version of suffix match)
+function block.suffix_common(action, common_suffix, suffix_list)
+	return function(pkt, qry)
+		local qname = qry:qname()
+		-- Preliminary check
+		local zone = common_suffix
+		if qname:sub(-zone:len()) ~= zone then
+			return nil
+		end
+		-- String match
+		for _, zone in pairs(suffix_list) do
+			if qname:sub(-zone:len()) == zone then
+				return action, zone
+			end
+		end
+		return nil
+	end
+end
+
 -- @function Block QNAME pattern
 function block.pattern(action, pattern)
 	return function(pkt, qry)
@@ -111,7 +130,7 @@ block.layer = {
 }
 
 -- @var Default rules
-block.rules = { block.suffix(block.DENY, block.private_zones) }
+block.rules = { block.suffix_common(block.DENY, '.arpa.', block.private_zones) }
 
 -- @function Add rule to block list
 function block.add(block, rule)
