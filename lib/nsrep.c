@@ -124,7 +124,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 		ns->reputation = reputation;
 	} else {
 		/* With 5% chance, probe server with a probability given by its RTT / MAX_RTT */
-		unsigned roll = rand() % KR_NS_MAX_SCORE;
+		unsigned roll = kr_rand_uint(KR_NS_MAX_SCORE);
 		if ((roll % 100 < 5) && (roll >= score)) {
 			update_nsrep(ns, (const knot_dname_t *)k, addr, score);
 			ns->reputation = reputation;

@@ -34,11 +34,20 @@ extern void _cleanup_fclose(FILE **p);
  * Defines.
  */
 
+/** @internal Fast packet reset. */
+#define KR_PKT_RECYCLE(pkt) do { \
+	(pkt)->parsed = (pkt)->size = KNOT_WIRE_HEADER_SIZE; \
+	knot_pkt_parse_question((pkt)); \
+} while (0)
+
 /** Concatenate N strings. */
 char* kr_strcatdup(unsigned n, ...);
 
-/** Fill buffer with random seed. */
-int kr_randseed(char *buf, size_t buflen);
+/** Reseed CSPRNG context. */
+int kr_rand_reseed(void);
+
+/** Get pseudo-random value. */
+unsigned kr_rand_uint(unsigned max);
 
 /** Memory reservation routine for mm_ctx_t */
 int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have);

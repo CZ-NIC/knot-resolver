@@ -26,18 +26,26 @@
 #include "lib/zonecut.h"
 #include "lib/nsrep.h"
 
+#define QUERY_FLAGS(X) \
+	X(NO_MINIMIZE, 1 << 0) /**< Don't minimize QNAME. */ \
+	X(NO_THROTTLE, 1 << 1) /**< No query/slow NS throttling. */ \
+	X(TCP        , 1 << 2) /**< Use TCP for this query. */ \
+	X(RESOLVED   , 1 << 3) /**< Query is resolved. */ \
+	X(AWAIT_IPV4 , 1 << 4) /**< Query is waiting for A address. */ \
+	X(AWAIT_IPV6 , 1 << 5) /**< Query is waiting for AAAA address. */ \
+	X(AWAIT_CUT  , 1 << 6) /**< Query is waiting for zone cut lookup */ \
+	X(SAFEMODE   , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
+	X(CACHED     , 1 << 8) /**< Query response is cached. */
+
 /** Query flags */
 enum kr_query_flag {
-	QUERY_NO_MINIMIZE = 1 << 0, /**< Don't minimize QNAME. */
-	QUERY_NO_THROTTLE = 1 << 1, /**< No query/slow NS throttling. */
-	QUERY_TCP         = 1 << 2, /**< Use TCP for this query. */
-	QUERY_RESOLVED    = 1 << 3, /**< Query is resolved. */
-	QUERY_AWAIT_IPV4  = 1 << 4, /**< Query is waiting for A address. */
-	QUERY_AWAIT_IPV6  = 1 << 5, /**< Query is waiting for AAAA address. */
-	QUERY_AWAIT_CUT   = 1 << 6, /**< Query is waiting for zone cut lookup */
-	QUERY_SAFEMODE    = 1 << 7, /**< Don't use fancy stuff (EDNS...) */
-	QUERY_CACHED      = 1 << 8  /**< Query response is cached. */
+	#define X(flag, val) QUERY_ ## flag = val,
+	QUERY_FLAGS(X)
+	#undef X
 };
+
+/** Query flag names table */
+extern const lookup_table_t query_flag_names[];
 
 /**
  * Single query representation.

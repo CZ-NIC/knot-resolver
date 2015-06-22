@@ -298,7 +298,9 @@ void engine_deinit(struct engine *engine)
 	kr_zonecut_deinit(&engine->resolver.root_hints);
 	kr_cache_close(&engine->resolver.cache);
 	lru_deinit(engine->resolver.cache_rtt);
+	free(engine->resolver.cache_rtt);
 	lru_deinit(engine->resolver.cache_rep);
+	free(engine->resolver.cache_rep);
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {

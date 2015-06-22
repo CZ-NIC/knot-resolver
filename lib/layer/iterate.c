@@ -19,7 +19,6 @@
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
 
-#include "ccan/isaac/isaac.h"
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
@@ -27,23 +26,10 @@
 #include "lib/nsrep.h"
 #include "lib/module.h"
 
-#define SEED_SIZE 256
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(&req->rplan), "iter", fmt)
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
-
-/** @internal CSPRNG context */
-static isaac_ctx ISAAC;
-
-/** @internal Reseed isaac context. */
-int iterate_init(struct kr_module *module)
-{
-	uint8_t seed[SEED_SIZE];
-	kr_randseed((char *)seed, sizeof(seed));
-	isaac_reseed(&ISAAC, seed, sizeof(seed));
-	return kr_ok();
-}
 
 /** Return minimized QNAME/QTYPE for current zone cut. */
 static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qtype)
@@ -368,8 +354,9 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	}
 
 	/* Query built, expect answer. */
-	query->id = isaac_next_uint(&ISAAC, UINT16_MAX);
+	query->id = kr_rand_uint(UINT16_MAX);
 	knot_wire_set_id(pkt->wire, query->id);
+	pkt->parsed = pkt->size;
 	return kr_ok();
 }
 

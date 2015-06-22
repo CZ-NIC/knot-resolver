@@ -27,6 +27,7 @@
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
+#include "daemon/bindings/kres.h"
 
 static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
@@ -145,6 +146,7 @@ int main(int argc, char **argv)
 	engine_lualib(&engine, "net",     lib_net);
 	engine_lualib(&engine, "cache",   lib_cache);
 	engine_lualib(&engine, "event",   lib_event);
+	engine_lualib(&engine, "kres",    lib_kres);
 
 	/* Create main worker. */
 	struct worker_ctx *worker = mm_alloc(&pool, sizeof(*worker));
