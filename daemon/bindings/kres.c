@@ -60,7 +60,7 @@ static inline void lua_pushdname(lua_State *L, const knot_dname_t *name)
 	X(SSHFP) X(IPSECKEY) X(RRSIG) X(NSEC) X(DNSKEY) X(DHCID) \
 	X(NSEC3) X(NSEC3PARAM) X(TLSA) X(CDS) X(CDNSKEY) X(SPF) \
 	X(NID) X(L32) X(L64) X(LP) X(EUI48) X(EUI64) X(TKEY) \
-	X(TSIG) X(IXFR) X(AXFR)
+	X(TSIG) X(IXFR) X(AXFR) X(ANY)
 
 static lookup_table_t rrtype_names[] = {
 	#define X(rc) { KNOT_RRTYPE_ ## rc, #rc },

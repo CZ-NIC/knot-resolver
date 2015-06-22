@@ -38,6 +38,12 @@ Example configuration
 			return block.DENY, '224.in-addr.arpa.'
 		end
 	end)
+	-- Disallow ANY queries
+	block:add(function (pkt, qname)
+		if pkt:qtype() == kres.rrtype.ANY then
+			return block.DROP
+		end
+	end)
 
 Properties
 ^^^^^^^^^^
