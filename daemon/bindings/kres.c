@@ -150,14 +150,9 @@ static int pkt_question(lua_State *L)
 	uint8_t dname[KNOT_DNAME_MAXLEN];
 	knot_dname_from_str(dname, lua_tostring(L, 2), sizeof(dname));
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), dname)) {
-		uint8_t header[KNOT_WIRE_HEADER_SIZE];
-		memcpy(header, pkt->wire, sizeof(header));
-		knot_pkt_clear(pkt);
-		memcpy(pkt->wire, header, sizeof(header));
-		size_t max_size = pkt->max_size;
+		KR_PKT_RECYCLE(pkt);
 		knot_pkt_put_question(pkt, dname, lua_tointeger(L, 3), lua_tointeger(L, 4));
 		pkt->parsed = pkt->size;
-		pkt->max_size = max_size;
 	}
 	return 0;
 }

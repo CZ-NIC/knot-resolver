@@ -46,10 +46,7 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 
 	/* Update packet question */
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)) {
-		uint8_t header[KNOT_WIRE_HEADER_SIZE];
-		memcpy(header, pkt->wire, sizeof(header));
-		knot_pkt_clear(pkt);
-		memcpy(pkt->wire, header, sizeof(header));
+		KR_PKT_RECYCLE(pkt);
 		knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
 	}
 
