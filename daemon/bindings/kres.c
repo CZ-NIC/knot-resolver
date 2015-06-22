@@ -18,14 +18,6 @@
 #include "daemon/bindings/kres.h"
 #include "daemon/bindings.h"
 
-/** @internal Create userdata of given type. */
-#define UDATA_CREATE(L, type, val, meta) do { \
-	type *udata = lua_newuserdata(L, sizeof(*udata)); \
-	*udata = (val); \
-	luaL_getmetatable(L, (meta)); \
-	lua_setmetatable(L, -2); \
-} while (0)
-
 #define WRAP_NUMBER(L, name, val) \
 	lua_pushnumber((L), (val)); \
 	lua_setfield((L), -2, (name))
@@ -230,81 +222,72 @@ static int pkt_meta_register(lua_State *L)
 
 static int query_qtype(lua_State *L)
 {
-	struct kr_query **qry = lua_touserdata(L, 1);
-	lua_pushnumber(L, (*qry)->stype);
+	struct kr_query *qry = lua_touserdata(L, 1);
+	lua_pushnumber(L, qry->stype);
 	return 1;
 }
 
 static int query_qclass(lua_State *L)
 {
-	struct kr_query **qry = lua_touserdata(L, 1);
-	lua_pushnumber(L, (*qry)->sclass);
+	struct kr_query *qry = lua_touserdata(L, 1);
+	lua_pushnumber(L, qry->sclass);
 	return 1;	
 }
 
 static int query_qname(lua_State *L)
 {
-	struct kr_query **qry = lua_touserdata(L, 1);
-	lua_pushdname(L, (*qry)->sname);
+	struct kr_query *qry = lua_touserdata(L, 1);
+	lua_pushdname(L, qry->sname);
 	return 1;	
 }
 
 static int query_flag(lua_State *L)
 {
-	struct kr_query **qry = lua_touserdata(L, 1);
+	struct kr_query *qry = lua_touserdata(L, 1);
 	if (lua_gettop(L) < 2 || !lua_isnumber(L, 2)) {
 		return 0;
 	}
-	(*qry)->flags |= lua_tointeger(L, 2);
+	qry->flags |= lua_tointeger(L, 2);
 	return 0;
 }
 
 static int query_clear_flag(lua_State *L)
 {
-	struct kr_query **qry = lua_touserdata(L, 1);
+	struct kr_query *qry = lua_touserdata(L, 1);
 	if (lua_gettop(L) < 2 || !lua_isnumber(L, 2)) {
 		return 0;
 	}
-	(*qry)->flags &= ~lua_tointeger(L, 2);
+	qry->flags &= ~lua_tointeger(L, 2);
 	return 0;
 }
 
 static int query_has_flag(lua_State *L)
 {
-	struct kr_query **qry = lua_touserdata(L, 1);
+	struct kr_query *qry = lua_touserdata(L, 1);
 	if (lua_gettop(L) < 2 || !lua_isnumber(L, 2)) {
 		return 0;
 	}
-	lua_pushboolean(L, (*qry)->flags & lua_tointeger(L, 2));
+	lua_pushboolean(L, qry->flags & lua_tointeger(L, 2));
 	return 1;
-}
-
-static int query_meta_register(lua_State *L)
-{
-	static const luaL_Reg wrap[] = {
-		{ "qtype",     query_qtype  },
-		{ "qclass",    query_qclass },
-		{ "qname",     query_qname  },
-		{ "flag",      query_flag   },
-		{ "clear_flag",  query_clear_flag },
-		{ "has_flag",  query_has_flag },
-		{ NULL, NULL }
-	};
-	lua_register_meta (L, wrap, META_QUERY);
-	return 0;
 }
 
 static int query_current(lua_State *L)
 {
 	struct kr_request *req = lua_touserdata(L, 1);
-	UDATA_CREATE(L, struct kr_query *, kr_rplan_current(&req->rplan), META_QUERY);
+	lua_pushlightuserdata(L, kr_rplan_current(&req->rplan));
 	return 1;
 }
 
 int lib_kres(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
-		{ "query_current", query_current },
+		{ "query_current",    query_current },
+		{ "query_qtype",      query_qtype  },
+		{ "query_qclass",     query_qclass },
+		{ "query_qname",      query_qname  },
+		{ "query_flag",       query_flag   },
+		{ "query_clear_flag", query_clear_flag },
+		{ "query_has_flag",   query_has_flag },
 		{ NULL, NULL }
 	};
 	/* Create module and register functions */
@@ -327,6 +310,5 @@ int lib_kres(lua_State *L)
 	WRAP_LUT(L, "query",  query_flag_names);
 	/* Register metatables */
 	pkt_meta_register(L);
-	query_meta_register(L);
 	return 1;	
 }
