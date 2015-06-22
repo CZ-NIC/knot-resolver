@@ -123,9 +123,12 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 		update_nsrep(ns, (const knot_dname_t *)k, addr, score);
 		ns->reputation = reputation;
 	} else {
-		/* With 5% chance, probe server with a probability given by its RTT / MAX_RTT */
-		unsigned roll = kr_rand_uint(KR_NS_MAX_SCORE);
-		if ((roll % 100 < 5) && (roll >= score)) {
+		/* With 10% chance, probe server with a probability given by its RTT / MAX_RTT */
+		if ((kr_rand_uint(100) < 10) && (kr_rand_uint(KR_NS_MAX_SCORE) >= score)) {
+			/* If this is a low-reliability probe, go with TCP to get ICMP reachability check. */
+			if (score >= KR_NS_LONG) {
+				qry->flags |= QUERY_TCP;
+			}
 			update_nsrep(ns, (const knot_dname_t *)k, addr, score);
 			ns->reputation = reputation;
 			return 1; /* Stop evaluation */

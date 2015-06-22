@@ -380,12 +380,10 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 		state = knot_overlay_consume(&request->overlay, packet);
 	}
 
-	/* Resolution failed, invalidate current NS and reset to UDP. */
+	/* Resolution failed, invalidate current NS. */
 	if (state == KNOT_STATE_FAIL) {
 		kr_nsrep_update_rtt(&qry->ns, KR_NS_TIMEOUT, ctx->cache_rtt);
-		if (invalidate_ns(rplan, qry) == 0) {
-			qry->flags &= ~QUERY_TCP;
-		}
+		invalidate_ns(rplan, qry); /* @note Stay with TCP as it's likely this is broken delegation. */
 	/* Track RTT for iterative answers */
 	} else if (!(qry->flags & QUERY_CACHED)) {
 		struct timeval now;

@@ -33,6 +33,7 @@ struct kr_query;
 enum kr_ns_score {
 	KR_NS_MAX_SCORE = KR_CONN_RTT_MAX,
 	KR_NS_TIMEOUT   = (95 * KR_NS_MAX_SCORE) / 100,
+	KR_NS_LONG      = (3 * KR_NS_TIMEOUT) / 4,
 	KR_NS_UNKNOWN   = KR_NS_TIMEOUT / 2,
 	KR_NS_GLUED     = 10
 };
