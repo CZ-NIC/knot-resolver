@@ -143,7 +143,7 @@ static void qr_task_free(uv_handle_t *handle)
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
 		/* Decommit memory every once in a while */
 		static int mp_delete_count = 0;
-		if (++mp_delete_count == 1000) {
+		if (++mp_delete_count == 2 * worker->pools.cap) {
 			malloc_trim(0);
 			mp_delete_count = 0;
 		}
