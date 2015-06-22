@@ -32,6 +32,12 @@ Example configuration
 	block:add(block.pattern(block.PASS, 'www[0-9].badboy.cz'))
 	-- Block all names below badboy.cz
 	block:add(block.suffix(block.DENY, {'badboy.cz'}))
+	-- Custom rule
+	block:add(function (pkt, qname)
+		if qname:find('%d.%d.%d.224.in-addr.arpa.') then
+			return block.DENY, '224.in-addr.arpa.'
+		end
+	end)
 
 Properties
 ^^^^^^^^^^
