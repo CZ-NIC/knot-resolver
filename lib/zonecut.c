@@ -113,14 +113,18 @@ static int copy_addr_set(const char *k, void *v, void *baton)
 	if (!new_set) {
 		return kr_error(ENOMEM);
 	}
-	new_set->at = mm_alloc(dst->pool, addr_set->len);
-	if (!new_set->at) {
-		mm_free(dst->pool, new_set);
-		return kr_error(ENOMEM);
+	pack_init(*new_set);
+	/* Clone data only if needed */
+	if (addr_set->len > 0) {
+		new_set->at = mm_alloc(dst->pool, addr_set->len);
+		if (!new_set->at) {
+			mm_free(dst->pool, new_set);
+			return kr_error(ENOMEM);
+		}
+		memcpy(new_set->at, addr_set->at, addr_set->len);
+		new_set->len = addr_set->len;
+		new_set->cap = addr_set->len;
 	}
-	memcpy(new_set->at, addr_set->at, addr_set->len);
-	new_set->len = addr_set->len;
-	new_set->cap = new_set->len;
 	/* Reinsert */
 	if (map_set(&dst->nsset, k, new_set) != 0) {
 		pack_clear_mm(*new_set, mm_free, dst->pool);
