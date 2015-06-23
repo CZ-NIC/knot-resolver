@@ -328,16 +328,15 @@ int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *ti
 	}
 
 	/* Check if the RRSet is in the cache. */
-	struct kr_cache_entry *entry = kr_cache_peek(txn, KR_CACHE_RRSIG, rr->owner, rr->type, timestamp);
-	if (entry) {
-		rr->type = KNOT_RRTYPE_RRSIG;
-		rr->rrs.rr_count = entry->count;
-		rr->rrs.data = entry->data;
-		return kr_ok();
+	struct kr_cache_entry *entry = NULL;
+	int ret = kr_cache_peek(txn, KR_CACHE_RRSIG, rr->owner, rr->type, &entry, timestamp);
+	if (ret != 0) {
+		return ret;
 	}
-
-	/* Not found. */
-	return kr_error(ENOENT);
+	rr->type = KNOT_RRTYPE_RRSIG;
+	rr->rrs.rr_count = entry->count;
+	rr->rrs.data = entry->data;
+	return kr_ok();
 }
 
 int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t typec, uint32_t timestamp)
