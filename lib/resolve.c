@@ -94,7 +94,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
 		/* No IPv4 nor IPv6, flag server as unuseable. */
 		DEBUG_MSG("=> unresolvable NS address, bailing out\n");
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation | KR_NS_NOIP6, ctx->cache_rep);
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation | KR_NS_NOIP4, ctx->cache_rep);
 		invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}
@@ -383,7 +383,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	/* Resolution failed, invalidate current NS. */
 	if (state == KNOT_STATE_FAIL) {
 		kr_nsrep_update_rtt(&qry->ns, KR_NS_TIMEOUT, ctx->cache_rtt);
-		invalidate_ns(rplan, qry); /* @note Stay with TCP as it's likely this is broken delegation. */
+		invalidate_ns(rplan, qry);
 	/* Track RTT for iterative answers */
 	} else if (!(qry->flags & QUERY_CACHED)) {
 		struct timeval now;
@@ -395,7 +395,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	if (qry->flags & QUERY_RESOLVED) {
 		kr_rplan_pop(rplan, qry);
 	} else { /* Clear query flags for next attempt */
-		qry->flags &= ~QUERY_CACHED;
+		qry->flags &= ~(QUERY_CACHED|QUERY_TCP);
 	}
 
 	knot_overlay_reset(&request->overlay);
