@@ -267,14 +267,6 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		/* Clear if full */
 		if (ret == KNOT_ESPACE) {
-			/*
-			 * Commit empty transaction to make freed pages reclaimable
-			 * (This increases the txnid)
-			 */
-			if (kr_cache_txn_begin(cache, &txn, 0) == 0) {
-				kr_cache_txn_commit(&txn);
-			}
-			/* Now drop the database */
 			if (kr_cache_txn_begin(cache, &txn, 0) == 0) {
 				ret = kr_cache_clear(&txn);
 				if (ret == 0) {

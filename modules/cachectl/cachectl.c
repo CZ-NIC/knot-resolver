@@ -99,7 +99,8 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 
 	/* Commit and format result. */
 	char *result = NULL;
-	if (kr_cache_txn_commit(&txn) != 0) {
+	ret = kr_cache_txn_commit(&txn);
+	if (ret != 0) {
 		asprintf(&result, "{ \"pruned\": %d, \"error\": \"%s\" }", pruned, knot_strerror(ret));
 	} else {
 		asprintf(&result, "{ \"pruned\": %d }", pruned);
