@@ -9,6 +9,7 @@ libkres_SOURCES := \
 	lib/generic/map.c      \
 	lib/layer/iterate.c    \
 	lib/layer/rrcache.c    \
+	lib/layer/rrsigcache.c \
 	lib/layer/pktcache.c   \
 	lib/utils.c            \
 	lib/nsrep.c            \
