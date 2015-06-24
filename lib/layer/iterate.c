@@ -87,7 +87,7 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	/* Construct expected randomized QNAME */
 	uint8_t qname[KNOT_DNAME_MAXLEN];
 	knot_dname_to_wire(qname, qname_min, sizeof(qname));
-	if (!(query->flags & QUERY_CACHED)) {
+	if (!(query->flags & (QUERY_CACHED|QUERY_SAFEMODE))) {
 		randomized_qname_case(qname, query->secret);
 	}
 
