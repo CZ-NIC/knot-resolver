@@ -61,6 +61,7 @@ struct kr_query {
 	uint16_t sclass;
 	uint16_t id;
 	uint16_t flags;
+	unsigned secret;
 };
 
 /**
