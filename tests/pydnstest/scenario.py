@@ -35,11 +35,13 @@ class Entry:
         elif code == 'qname':
             if len(expected.question) == 0:
                 return True
-            return self.__compare_val(expected.question[0].name, msg.question[0].name)
+            qname = dns.name.from_text(msg.question[0].name.to_text().lower())
+            return self.__compare_val(expected.question[0].name, qname)
         elif code == 'subdomain':
             if len(expected.question) == 0:
                 return True
-            return self.__compare_sub(expected.question[0].name, msg.question[0].name)
+            qname = dns.name.from_text(msg.question[0].name.to_text().lower())
+            return self.__compare_sub(expected.question[0].name, qname)
         elif code == 'flags':
             return self.__compare_val(dns.flags.to_text(expected.flags), dns.flags.to_text(msg.flags))
         elif code == 'question':
@@ -73,6 +75,7 @@ class Entry:
         answer = dns.message.from_text(self.message.to_text())
         if 'copy_id' in self.adjust_fields:
             answer.id = query.id
+            answer.question[0].name = query.question[0].name
         if 'copy_query' in self.adjust_fields:
             answer.question = query.question
         return answer
