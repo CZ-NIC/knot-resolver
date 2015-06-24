@@ -32,8 +32,36 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
+static int loot_rrsig(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *name,
+                      uint16_t rrclass, uint16_t typec, struct kr_query *qry)
+{
+	if (KNOT_RRTYPE_RRSIG == typec) {
+		return kr_ok();
+	}
+
+	/* Check if RRSIG record exists in cache. */
+	uint32_t timestamp = qry->timestamp.tv_sec;
+	knot_rrset_t cache_rr;
+	knot_rrset_init(&cache_rr, (knot_dname_t *)name, typec, rrclass);
+	int ret = kr_cache_peek_rrsig(txn, &cache_rr, &timestamp);
+	if (0 != ret) {
+		return ret;
+	}
+
+	/* Update packet answer */
+	knot_rrset_t rr_copy;
+	ret = kr_cache_materialize(&rr_copy, &cache_rr, timestamp, &pkt->mm);
+	if (0 == ret) {
+		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &rr_copy, KNOT_PF_FREE);
+		if (ret != 0) {
+			knot_rrset_clear(&rr_copy, &pkt->mm);
+		}
+	}
+	return ret;
+}
+
 static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *name,
-                  uint16_t rrclass, uint16_t rrtype, struct kr_query *qry)
+                  uint16_t rrclass, uint16_t rrtype, struct kr_query *qry, bool dobit)
 {
 	/* Check if record exists in cache */
 	uint32_t timestamp = qry->timestamp.tv_sec;
@@ -59,11 +87,14 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 			knot_rrset_clear(&rr_copy, &pkt->mm);
 		}
 	}
+	if (dobit) {
+		ret = loot_rrsig(txn, pkt, name, rrclass, rrtype, qry);
+	}
 	return ret;
 }
 
 /** @internal Try to find a shortcut directly to searched record. */
-static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry)
+static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, bool dobit)
 {
 	struct kr_cache_txn txn;
 	int ret = kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY);
@@ -71,9 +102,9 @@ static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *
 		return ret;
 	}
 	/* Lookup direct match first */
-	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, qry->stype, qry);
+	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, qry->stype, qry, dobit);
 	if (ret != 0 && qry->stype != KNOT_RRTYPE_CNAME) { /* Chase CNAME if no direct hit */
-		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, KNOT_RRTYPE_CNAME, qry);
+		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, KNOT_RRTYPE_CNAME, qry, dobit);
 	}
 	kr_cache_txn_abort(&txn);
 	return ret;
@@ -91,12 +122,14 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Only lookup on first iteration */
 	}
 
+	bool dobit = knot_pkt_has_dnssec(req->answer);
+
 	/* Reconstruct the answer from the cache,
 	 * it may either be a CNAME chain or direct answer.
 	 * Only one step of the chain is resolved at a time.
 	 */
 	struct kr_cache *cache = &req->ctx->cache;
-	int ret = loot_cache(cache, pkt, qry);
+	int ret = loot_cache(cache, pkt, qry, dobit);
 	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
@@ -187,6 +220,7 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx_t *pool)
 {
 	const knot_pktsection_t *authority = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	bool dobit = knot_pkt_has_dnssec(pkt);
 	for (unsigned i = 0; i < authority->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(authority, i);
 		/* Cache in-bailiwick data only */
@@ -196,6 +230,10 @@ static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, 
 		/* Look up glue records for NS */
 		if (rr->type == KNOT_RRTYPE_NS) {
 			stash_glue(stash, pkt, knot_ns_name(&rr->rrs, 0), pool);
+		}
+		/* Ignore RRSIGs if DNSSEC.*/
+		if (dobit && (KNOT_RRTYPE_RRSIG == rr->type)) {
+			continue;
 		}
 		/* Stash record */
 		stash_add(stash, rr, pool);
@@ -207,10 +245,15 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_
 {
 	const knot_dname_t *cname = qry->sname;
 	const knot_pktsection_t *answer = knot_pkt_section(pkt, KNOT_ANSWER);
+	bool dobit = knot_pkt_has_dnssec(pkt);
 	for (unsigned i = 0; i < answer->count; ++i) {
 		/* Stash direct answers (equal to current QNAME/CNAME) */
 		const knot_rrset_t *rr = knot_pkt_rr(answer, i);
 		if (!knot_dname_is_equal(rr->owner, cname)) {
+			continue;
+		}
+		/* Ignore RRSIGs if DNSSEC.*/
+		if (dobit && (KNOT_RRTYPE_RRSIG == rr->type)) {
 			continue;
 		}
 		stash_add(stash, rr, pool);
