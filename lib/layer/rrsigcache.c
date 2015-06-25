@@ -26,7 +26,8 @@
 #include "lib/module.h"
 
 //#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "rrsc",  fmt)
-#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "rrsc",  fmt)
+//#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "rrsc",  fmt)
+#define DEBUG_MSG(fmt...)
 
 static int begin(knot_layer_t *ctx, void *module_param)
 {
