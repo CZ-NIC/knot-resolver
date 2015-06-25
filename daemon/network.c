@@ -18,6 +18,22 @@
 #include "daemon/worker.h"
 #include "daemon/io.h"
 
+/* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
+#define UV_VERSION_NUM UV_VERSION_MAJOR ## UV_VERSION_MINOR ## UV_VERSION_PATCH
+#if (defined(ENABLE_REUSEPORT) || UV_VERSION_NUM >= 170) && (__linux__ && SO_REUSEPORT)
+  #define handle_init(type, loop, handle, family) do { \
+	uv_ ## type ## _init_ex((loop), (handle), (family)); \
+	uv_os_fd_t fd = 0; \
+	if (uv_fileno((uv_handle_t *)(handle), &fd) == 0) { \
+		int on = 1; \
+		setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)); \
+	} \
+  } while (0)
+#else
+  #define handle_init(type, loop, handle, family) \
+	uv_ ## type ## _init((loop), (handle))
+#endif
+
 void network_init(struct network *net, uv_loop_t *loop)
 {
 	if (net != NULL) {
@@ -96,7 +112,7 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 static int open_endpoint(struct network *net, struct endpoint *ep, struct sockaddr *sa, uint32_t flags)
 {
 	if (flags & NET_UDP) {
-		uv_udp_init(net->loop, &ep->udp);
+		handle_init(udp, net->loop, &ep->udp, sa->sa_family);
 		int ret = udp_bind(ep, sa);
 		if (ret != 0) {
 			return ret;
@@ -104,7 +120,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		ep->flags |= NET_UDP;
 	}
 	if (flags & NET_TCP) {
-		uv_tcp_init(net->loop, &ep->tcp);
+		handle_init(tcp, net->loop, &ep->tcp, sa->sa_family);
 		int ret = tcp_bind(ep, sa);
 		if (ret != 0) {
 			return ret;
