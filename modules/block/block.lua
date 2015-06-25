@@ -108,7 +108,7 @@ block.layer = {
 			-- Answer full question
 			local qclass = kres.query_qclass(qry)
 			local qtype = kres.query_qtype(qry)
-			kres.query_flag(qry, kres.query.NO_MINIMIZE)
+			kres.query_flag(qry, kres.query.NO_MINIMIZE + kres.query.SAFEMODE)
 			pkt:question(qname, qclass, qtype)
 			pkt:flag(kres.wire.QR)
 			pkt:flag(kres.wire.AA)

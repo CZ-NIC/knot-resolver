@@ -70,6 +70,12 @@ static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_query *qry)
 		addr = pack_obj_next(addr);
 	}
 
+	/* Update packet question */
+	if (!knot_dname_is_equal(knot_pkt_qname(pkt), qname)) {
+		KR_PKT_RECYCLE(pkt);
+		knot_pkt_put_question(pkt, qname, rrtype, rrclass);
+	}
+
 	/* Append to packet */
 	int ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &rr, KNOT_PF_FREE);
 	if (ret != 0) {

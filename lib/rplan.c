@@ -53,6 +53,7 @@ static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 		return NULL;
 	}
 
+	knot_dname_to_lower(qry->sname);
 	return qry;
 }
 
