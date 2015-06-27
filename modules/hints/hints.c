@@ -70,14 +70,17 @@ static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_query *qry)
 		addr = pack_obj_next(addr);
 	}
 
-	/* Update packet question */
-	if (!knot_dname_is_equal(knot_pkt_qname(pkt), qname)) {
-		KR_PKT_RECYCLE(pkt);
-		knot_pkt_put_question(pkt, qname, rrtype, rrclass);
+	int ret = kr_error(ENOENT);
+	if (!knot_rrset_empty(&rr)) {
+		/* Update packet question */
+		if (!knot_dname_is_equal(knot_pkt_qname(pkt), qname)) {
+			KR_PKT_RECYCLE(pkt);
+			knot_pkt_put_question(pkt, qname, rrclass, rrtype);
+		}
+		/* Append to packet */
+		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr, KNOT_PF_FREE);
 	}
-
-	/* Append to packet */
-	int ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, &rr, KNOT_PF_FREE);
+	/* Clear RR if failed */
 	if (ret != 0) {
 		knot_rrset_clear(&rr, &pkt->mm);
 	}
