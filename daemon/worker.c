@@ -140,15 +140,15 @@ static void qr_task_free(uv_handle_t *handle)
 		array_push(worker->pools, mp_context);
 	} else {
 		mp_delete(mp_context);
-#if defined(__GLIBC__) && defined(_GNU_SOURCE)
-		/* Decommit memory every once in a while */
-		static size_t mp_delete_count = 0;
-		if (++mp_delete_count == 100 * MP_FREELIST_SIZE) {
-			malloc_trim(0);
-			mp_delete_count = 0;
-		}
-#endif
 	}
+#if defined(__GLIBC__) && defined(_GNU_SOURCE)
+	/* Decommit memory every once in a while */
+	static size_t mp_delete_count = 0;
+	if (++mp_delete_count == 100 * MP_FREELIST_SIZE) {
+		malloc_trim(0);
+		mp_delete_count = 0;
+	}
+#endif
 }
 
 static void qr_task_timeout(uv_timer_t *req)
