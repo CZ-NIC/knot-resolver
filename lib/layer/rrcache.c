@@ -119,6 +119,9 @@ static int commit_rr(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rr = val;
 	struct stash_baton *baton = data;
+	if (knot_rrset_ttl(rr) < KR_TTL_GRACE) {
+		return kr_ok(); /* Ignore cache busters */
+	}
 	/* Check if already cached */
 	/** @todo This should check if less trusted data is in the cache,
 	          for that the cache would need to trace data trust level.
@@ -139,15 +142,6 @@ static int stash_commit(map_t *stash, unsigned timestamp, struct kr_cache_txn *t
 		.timestamp = timestamp
 	};
 	return map_walk(stash, &commit_rr, &baton);
-}
-
-static int merge_rr(knot_rrset_t *cache_rr, const knot_rrset_t *rr, mm_ctx_t *pool)
-{
-	if (knot_rrset_ttl(rr) < KR_TTL_GRACE) {
-		return KNOT_EINVAL; /* Cache busters */
-	}
-
-	return knot_rdataset_merge(&cache_rr->rrs, &rr->rrs, pool);
 }
 
 static int stash_add(map_t *stash, const knot_rrset_t *rr, mm_ctx_t *pool)
@@ -174,7 +168,7 @@ static int stash_add(map_t *stash, const knot_rrset_t *rr, mm_ctx_t *pool)
 		return map_set(stash, key, stashed);
 	}
 	/* Merge rdataset */
-	return merge_rr(stashed, rr, pool);
+	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
 }
 
 static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_name, mm_ctx_t *pool)
