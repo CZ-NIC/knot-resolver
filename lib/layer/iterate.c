@@ -448,7 +448,10 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
 		DEBUG_MSG("<= ignoring mismatching response\n");
-		return KNOT_STATE_CONSUME;
+		/* Force TCP, to work around authoritatives messing up question
+		 * without yielding to spoofed responses. */
+		query->flags |= QUERY_TCP;
+		return resolve_badmsg(pkt, req, query);
 	} else if (knot_wire_get_tc(pkt->wire)) {
 		DEBUG_MSG("<= truncated response, failover to TCP\n");
 		if (query) {
