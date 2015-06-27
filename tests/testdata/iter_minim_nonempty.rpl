@@ -85,9 +85,12 @@ REPLY AA QR NOERROR
 SECTION QUESTION
 example.com. IN NS
 SECTION ANSWER
-example.com. IN CNAME nowhere.
+example.com. IN CNAME nowhere.cdn.example.com.
 SECTION AUTHORITY
-com.	IN NS	a.gtld-servers.net.
+; Suggest authority of 'nowhere' (which must not be followed)
+cdn.example.com. IN NS ns01.cdn.example.com.
+SECTION ADDITIONAL
+ns01.cdn.example.com. IN A 1.1.1.1
 ENTRY_END
 
 ENTRY_BEGIN

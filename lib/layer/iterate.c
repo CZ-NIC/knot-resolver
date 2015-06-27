@@ -248,6 +248,15 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	}
 #endif
 
+	/* Work around servers sending back CNAME with different delegation and no AA. */
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+	if (an->count > 0 && ns->count > 0) {
+		const knot_rrset_t *rr = knot_pkt_rr(an, 0);
+		if (rr->type == KNOT_RRTYPE_CNAME) {
+			return KNOT_STATE_CONSUME;
+		}
+	}
+
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
@@ -258,16 +267,6 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			case KNOT_STATE_FAIL: return state; break;
 			default:              /* continue */ break;
 			}
-		}
-	}
-
-	/* Work around servers sending back CNAME with different delegation and no AA. */
-	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
-	if (result == KNOT_STATE_DONE && an->count > 0) {
-		const knot_rrset_t *rr = knot_pkt_rr(an, 0);
-		if (rr->type == KNOT_RRTYPE_CNAME) {
-			DEBUG_MSG("<= different delegation, but has a CNAME answer\n");
-			result = KNOT_STATE_CONSUME;
 		}
 	}
 
