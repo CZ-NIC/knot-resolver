@@ -36,11 +36,6 @@
 #define KR_ITER_LIMIT 50        /* Built-in iterator limit */
 
 /*
- * Timers.
- */
-#define KR_TTL_GRACE  ((KR_CONN_RTT_MAX) / 1000) /* TTL expire grace period. */
-
-/*
  * Defines.
  */
 #define KR_DNS_PORT   53

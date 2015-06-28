@@ -119,7 +119,7 @@ static int commit_rr(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rr = val;
 	struct stash_baton *baton = data;
-	if (knot_rrset_ttl(rr) < KR_TTL_GRACE) {
+	if (knot_rrset_ttl(rr) < 1) {
 		return kr_ok(); /* Ignore cache busters */
 	}
 	/* Check if already cached */
