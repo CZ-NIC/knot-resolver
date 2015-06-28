@@ -32,8 +32,6 @@ SECTION QUESTION
 com. IN A
 SECTION AUTHORITY
 com.	IN NS	a.gtld-servers.net.
-SECTION ADDITIONAL
-a.gtld-servers.net.	IN 	A	192.5.6.30
 ENTRY_END
 
 ENTRY_BEGIN
@@ -49,12 +47,18 @@ ENTRY_END
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id copy_query
-REPLY QR NOERROR
+REPLY QR AA NOERROR
 SECTION QUESTION
 a.gtld-servers.net.	IN	AAAA
-SECTION AUTHORITY
-. SOA bla bla 1 2 3 4 5
+SECTION ANSWER
+; Intentional bad address
+a.gtld-servers.net.	IN 	AAAA	1:2:3::4
 ENTRY_END
+RANGE_END
+
+; a.gtld-servers.net.
+RANGE_BEGIN 0 100
+	ADDRESS 1:2:3::4
 RANGE_END
 
 ; a.gtld-servers.net.

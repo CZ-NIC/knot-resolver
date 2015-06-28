@@ -88,13 +88,15 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		next_type = KNOT_RRTYPE_A;
 		qry->flags |= QUERY_AWAIT_IPV4;
 		/* Hmm, no useable IPv6 then. */
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation | KR_NS_NOIP6, ctx->cache_rep);
+		qry->ns.reputation |= KR_NS_NOIP6;
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 	}
 	/* Bail out if the query is already pending or dependency loop. */
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
 		/* No IPv4 nor IPv6, flag server as unuseable. */
 		DEBUG_MSG("=> unresolvable NS address, bailing out\n");
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation | KR_NS_NOIP4, ctx->cache_rep);
+		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 		invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}
@@ -389,6 +391,8 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		kr_nsrep_update_rtt(&qry->ns, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
+		/* Sucessful answer, lift any address resolution requests. */
+		qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
 	}
 
 	/* Pop query if resolved. */
@@ -482,9 +486,6 @@ ns_election:
 		}
 		knot_overlay_reset(&request->overlay);
 		return KNOT_STATE_PRODUCE;
-	} else {
-		/* Address resolved, clear the flag */
-		qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
 	}
 
 #ifndef NDEBUG
