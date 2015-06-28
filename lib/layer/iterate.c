@@ -112,6 +112,12 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 		}
 	}
 
+#ifndef STRICT_MODE
+	/* Last resort to work around broken auths, if the zone cut is at/parent of the QNAME. */
+	if (knot_dname_is_equal(query->zone_cut.name, knot_pkt_qname(answer))) {
+		return true;
+	}
+#endif
 	return false;
 }
 
@@ -246,8 +252,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	if (knot_wire_get_aa(pkt->wire)) {
 		return KNOT_STATE_CONSUME;
 	}
-#endif
-
+#else
 	/* Work around servers sending back CNAME with different delegation and no AA. */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	if (an->count > 0 && ns->count > 0) {
@@ -256,6 +261,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			return KNOT_STATE_CONSUME;
 		}
 	}
+#endif
 
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
