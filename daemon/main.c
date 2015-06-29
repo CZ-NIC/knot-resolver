@@ -60,6 +60,7 @@ static void help(int argc, char *argv[])
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
 	       " -a, --addr=[addr]   Server address (default: localhost#53).\n"
+	       " -f, --forks=N       Start N forks sharing the configuration.\n"
 	       " -v, --version       Print version of the server.\n"
 	       " -h, --help          Print help and usage.\n"
 	       "Options:\n"
@@ -81,20 +82,31 @@ int main(int argc, char **argv)
 {
 	const char *addr = NULL;
 	int port = 53;
+	int forks = 1;
+	int headless = 0;
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
 	struct option opts[] = {
 		{"addr", required_argument, 0, 'a'},
+		{"forks",required_argument, 0, 'f'},
 		{"version",   no_argument,  0, 'v'},
 		{"help",      no_argument,  0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:vh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:f:vh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
 			addr = set_addr(optarg, &port);
+			break;
+		case 'f':
+			headless = 1;
+			forks = atoi(optarg);
+			if (forks == 0) {
+				fprintf(stderr, "[system] error '-f' requires number, not '%s'\n", optarg);
+				return EXIT_FAILURE;
+			}
 			break;
 		case 'v':
 			printf("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
@@ -169,10 +181,24 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* Fork subprocesses if requested */
+	while (--forks > 0) {
+		int pid = fork();
+		if (pid < 0) {
+			perror("[system] fork");
+			exit(1);
+		}
+		/* Forked process */
+		if (pid == 0) {
+			break;
+		}
+		printf("[system] forked PID %d\n", pid);
+	}
+
 	if (ret == 0) {
 		/* Interactive stdin */
 		uv_pipe_t pipe;
-		if (!feof(stdin)) {
+		if (!headless) {
 			printf("[system] started in interactive mode, type 'help()'\n");
 			uv_pipe_init(loop, &pipe, 0);
 			uv_pipe_open(&pipe, 0);
