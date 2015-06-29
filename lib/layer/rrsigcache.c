@@ -25,9 +25,10 @@
 #include "lib/cache.h"
 #include "lib/module.h"
 
-//#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "rrsc",  fmt)
-//#define DEBUG_MSG(fmt...) QRDEBUG(NULL, "rrsc",  fmt)
-#define DEBUG_MSG(fmt...)
+#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "rrsc",  fmt)
+#define DEBUG_MSG_NOPLAN(fmt...) QRDEBUG(NULL, "rrsc",  fmt)
+//#define DEBUG_MSG(fmt...)
+//#define DEBUG_MSG_NOPLAN(fmt...)
 
 static int begin(knot_layer_t *ctx, void *module_param)
 {
@@ -113,16 +114,12 @@ static int stash_add_rrsig(map_t *stash, const knot_pktsection_t *section,
 	/* Check if already exists */
 	knot_rrset_t *stashed = map_get(stash, key);
 	if (stashed) {
-		DEBUG_MSG("%s() stashed %d %s\n", __func__, rr->type, rr->owner);
 		return kr_ok();
 	}
-
-	DEBUG_MSG("%s() stashing %d %s\n", __func__, rr->type, rr->owner);
 
 	/* Construct RRSIG RRSet containing related data. */
 	knot_rrset_t cache_rrsig;
 	knot_rrset_init(&cache_rrsig, rr->owner, rr->type, rr->rclass);
-	DEBUG_MSG("%s() A001 %d\n", __func__, cache_rrsig.rrs.rr_count);
 	for (uint16_t i = 0; i < section->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(section, i);
 		if (KNOT_RRTYPE_RRSIG != rrset->type) {
@@ -136,9 +133,7 @@ static int stash_add_rrsig(map_t *stash, const knot_pktsection_t *section,
 		}
 	}
 
-	DEBUG_MSG("%s() A002 %d\n", __func__, cache_rrsig.rrs.rr_count);
 	if (cache_rrsig.rrs.rr_count) {
-		DEBUG_MSG("%s() A003 %d\n", __func__, cache_rrsig.type);
 		stashed = knot_rrset_copy(&cache_rrsig, pool);
 	}
 	knot_rrset_clear(&cache_rrsig, pool);
