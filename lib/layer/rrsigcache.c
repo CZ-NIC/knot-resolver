@@ -135,12 +135,15 @@ static int stash_add_rrsig(map_t *stash, const knot_pktsection_t *section,
 
 	if (cache_rrsig.rrs.rr_count) {
 		stashed = knot_rrset_copy(&cache_rrsig, pool);
+		if (!stashed) {
+			return kr_error(ENOMEM);
+		}
 	}
 	knot_rrset_clear(&cache_rrsig, pool);
-	if (!stashed) {
-		return kr_error(ENOMEM);
+	if (stashed) {
+		return map_set(stash, key, stashed);
 	}
-	return map_set(stash, key, stashed);
+	return kr_ok();
 }
 
 static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_name, mm_ctx_t *pool)
