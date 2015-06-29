@@ -66,6 +66,7 @@ static lookup_table_t rrtype_names[] = {
 	#define X(rc) { KNOT_RRTYPE_ ## rc, #rc },
 	RECORD_TYPES(X)
 	#undef X
+	{ 0, NULL }
 };
 
 /* 
@@ -84,6 +85,7 @@ static lookup_table_t wire_flag_names[] = {
 	#define X(flag, _) { WIRE_ ## flag, #flag },
 	WIRE_FLAGS(X)
 	#undef X
+	{ 0, NULL }
 };
 
 static int pkt_flag(lua_State *L)
