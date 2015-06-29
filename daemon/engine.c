@@ -335,13 +335,7 @@ int engine_cmd(struct engine *engine, const char *str)
 	lua_pushstring(engine->L, str);
 
 	/* Check result. */
-	if (engine_pcall(engine->L, 1) != 0) {
-		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
-		lua_pop(engine->L, 1);
-		return kr_error(EINVAL);
-	}
-
-	return kr_ok();
+	return engine_pcall(engine->L, 1);
 }
 
 /* Execute byte code */
@@ -363,10 +357,10 @@ static int engine_loadconf(struct engine *engine)
 		return kr_error(ENOEXEC);
 	}
 	/* Use module path for including Lua scripts */
-	engine_cmd(engine, "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'");
+	int ret = engine_cmd(engine, "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'");
+	lua_pop(engine->L, 1);
 
 	/* Load config file */
-	int ret = 0;
 	if(access("config", F_OK ) != -1 ) {
 		ret = l_dosandboxfile(engine->L, "config");
 	} else {

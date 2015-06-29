@@ -119,15 +119,14 @@ function eval_cmd(line)
 	    end
 	end
 	local status, err, chunk
-	chunk, err = load_code('table_print('..line..')')
+	chunk, err = load_code('return table_print('..line..')')
 	if err then
 		chunk, err = load_code(line)
 	end
 	if not err then
-		chunk()
-	end
-	if err then
-		print(err)
+		return chunk()
+	else
+		error(err)
 	end
 end
 
@@ -135,21 +134,23 @@ end
 function table_print (tt, indent, done)
 	done = done or {}
 	indent = indent or 0
+	result = ""
 	if type(tt) == "table" then
 		for key, value in pairs (tt) do
-			io.write(string.rep (" ", indent))
+			result = result .. string.rep (" ", indent)
 			if type (value) == "table" and not done [value] then
 				done [value] = true
-				io.write(string.format("[%s] => {\n", tostring (key)));
+				result = result .. string.format("[%s] => {\n", tostring (key))
 				table_print (value, indent + 4, done)
-				io.write(string.rep (" ", indent))
-				io.write("}\n");
+				result = result .. string.rep (" ", indent)
+				result = result .. "}\n"
 			else
-				io.write(string.format("[%s] => %s\n",
-				         tostring (key), tostring(value)))
+				result = result .. string.format("[%s] => %s\n",
+				         tostring (key), tostring(value))
 			end
 		end
 	else
-		io.write(tostring(tt) .. "\n")
+		result = result .. tostring(tt) .. "\n"
 	end
+	return result
 end
