@@ -28,11 +28,12 @@ ENTRY_END
 
 ENTRY_BEGIN
 MATCH opcode qtype qname
-ADJUST copy_id
-REPLY QR NOERROR
+ADJUST copy_id copy_query
+REPLY QR NXDOMAIN
 SECTION QUESTION
-a.gtld-servers.net. IN AAAA
-SECTION ANSWER
+a.gtld-servers.net.	IN	AAAA
+SECTION AUTHORITY
+. SOA bla bla 1 2 3 4 5
 ENTRY_END
 
 ENTRY_BEGIN
@@ -64,6 +65,26 @@ a.gtld-servers.net.	IN 	A	192.5.6.30
 ENTRY_END
 
 ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id copy_query
+REPLY QR SERVFAIL
+SECTION QUESTION
+ns.example.com.	IN	AAAA
+SECTION AUTHORITY
+com. SOA bla bla 1 2 3 4 5
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id copy_query
+REPLY QR SERVFAIL
+SECTION QUESTION
+ns2.example.com.	IN	AAAA
+SECTION AUTHORITY
+com. SOA bla bla 1 2 3 4 5
+ENTRY_END
+
+ENTRY_BEGIN
 MATCH opcode subdomain
 ADJUST copy_id copy_query
 REPLY QR NOERROR
@@ -77,6 +98,7 @@ SECTION ADDITIONAL
 ns.example.com.		IN 	A	127.255.255.255
 ns2.example.com.	IN 	A	127.0.0.2
 ENTRY_END
+
 RANGE_END
 
 ; ns.example.com.
@@ -110,6 +132,17 @@ example.com.	IN NS	ns.example.com.
 SECTION ADDITIONAL
 ns.example.com.		IN 	A	1.2.3.4
 ENTRY_END
+
+RANGE_END
+
+; ns.example.com trap
+RANGE_BEGIN 0 100
+	ADDRESS 127.255.255.255
+RANGE_END
+
+; ns.example.com trap
+RANGE_BEGIN 0 100
+	ADDRESS 127.0.0.2
 RANGE_END
 
 STEP 1 QUERY
