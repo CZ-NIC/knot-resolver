@@ -46,6 +46,9 @@ static int commit_rrsig(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rrsig = val;
 	struct stash_baton *baton = data;
+	if (knot_rrset_ttl(rrsig) < 1) {
+		return kr_ok(); /* Ignore cache busters. */
+	}
 	/* Check if already cached */
 	/** @todo This should check if less trusted data is in the cache,
 	          for that the cache would need to trace data trust level.
@@ -73,10 +76,6 @@ static int stash_commit(map_t *stash, unsigned timestamp, struct kr_cache_txn *t
 static int merge_in_rrsigs(knot_rrset_t *cache_rr, const knot_rrset_t *rrsigset, uint16_t typec, mm_ctx_t *pool)
 {
 	int ret = KNOT_EOK;
-
-	if (knot_rrset_ttl(rrsigset) < KR_TTL_GRACE) {
-		return KNOT_EINVAL; /* Cache busters */
-	}
 
 	for (unsigned i = 0; i < rrsigset->rrs.rr_count; ++i) {
 		if ((knot_rrsig_type_covered(&rrsigset->rrs, i) == typec) &&
