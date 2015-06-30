@@ -30,6 +30,7 @@ struct kr_zonecut {
 	knot_dname_t *name; /**< Zone cut name. */
 	mm_ctx_t *pool;     /**< Memory pool. */
 	map_t nsset;        /**< Map of nameserver => address_set. */
+	knot_rrset_t* key;  /**< Zone cut DNSKEY. */
 };
 
 /**

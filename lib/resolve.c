@@ -458,6 +458,9 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 				return KNOT_STATE_FAIL;
 			}
 		}
+	} else if (qry->flags & QUERY_AWAIT_TRUST) {
+#warning TODO: request DNSKEY in the same way as in the ns_fetch_cut()
+#warning FLOW: this will put current query on hold and resolve DNSKEY first, so we can validate
 	}
 
 ns_election:

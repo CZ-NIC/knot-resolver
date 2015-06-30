@@ -70,6 +70,7 @@ int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *
 
 	cut->name = knot_dname_copy(name, pool);
 	cut->pool = pool;
+	cut->key  = NULL;
 	cut->nsset = map_make();
 	cut->nsset.malloc = (map_alloc_f) mm_alloc;
 	cut->nsset.free = (map_free_f) mm_free;
@@ -93,6 +94,7 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 	mm_free(cut->pool, cut->name);
 	map_walk(&cut->nsset, free_addr_set, cut->pool);
 	map_clear(&cut->nsset);
+	knot_rrset_free(&cut->key, cut->pool);
 }
 
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)

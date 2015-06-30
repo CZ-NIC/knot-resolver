@@ -148,12 +148,28 @@ struct stash_baton
 	unsigned timestamp;
 };
 
+static int commit_rrsig(knot_rrset_t *rrsig, struct stash_baton *baton)
+{
+	/* Check if already cached */
+	unsigned drift = baton->timestamp;
+	knot_rrset_t query_rrsig;
+	knot_rrset_init(&query_rrsig, rrsig->owner, rrsig->type, rrsig->rclass);
+	if (kr_cache_peek_rrsig(baton->txn, &query_rrsig, &drift) == 0) {
+	        return kr_ok();
+	}
+	return kr_cache_insert_rrsig(baton->txn, rrsig, rrsig->type, baton->timestamp);
+}
+
 static int commit_rr(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rr = val;
 	struct stash_baton *baton = data;
 	if (knot_rrset_ttl(rr) < 1) {
 		return kr_ok(); /* Ignore cache busters */
+	}
+	/* Insert RRSIGs in special cache. */
+	if (rr->type == KR_CACHE_RRSIG) {
+		return commit_rrsig(rr, baton);
 	}
 	/* Check if already cached */
 	/** @todo This should check if less trusted data is in the cache,
@@ -177,8 +193,14 @@ static int stash_commit(map_t *stash, unsigned timestamp, struct kr_cache_txn *t
 	return map_walk(stash, &commit_rr, &baton);
 }
 
-static int stash_add(map_t *stash, const knot_rrset_t *rr, mm_ctx_t *pool)
+static int stash_add(knot_pkt_t *pkt, map_t *stash, const knot_rrset_t *rr, mm_ctx_t *pool)
 {
+	/* Do not stash DNSSEC data if not secured. */
+	bool dobit = knot_pkt_has_dnssec(pkt);
+	if (!dobit && knot_rrtype_is_dnssec(rr->type)) {
+		return kr_ok();
+	}
+
 	/* Stash key = {[1-255] owner, [1-5] type, [1] \x00 } */
 	char key[8 + KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_to_wire((uint8_t *)key, rr->owner, KNOT_DNAME_MAXLEN);
@@ -213,14 +235,13 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 		    !knot_dname_is_equal(rr->owner, ns_name)) {
 			continue;
 		}
-		stash_add(stash, rr, pool);
+		stash_add(pkt, stash, rr, pool);
 	}
 }
 
 static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx_t *pool)
 {
 	const knot_pktsection_t *authority = knot_pkt_section(pkt, KNOT_AUTHORITY);
-	bool dobit = knot_pkt_has_dnssec(pkt);
 	for (unsigned i = 0; i < authority->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(authority, i);
 		/* Cache in-bailiwick data only */
@@ -231,12 +252,8 @@ static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, 
 		if (rr->type == KNOT_RRTYPE_NS) {
 			stash_glue(stash, pkt, knot_ns_name(&rr->rrs, 0), pool);
 		}
-		/* Ignore RRSIGs if DNSSEC.*/
-		if (dobit && (KNOT_RRTYPE_RRSIG == rr->type)) {
-			continue;
-		}
 		/* Stash record */
-		stash_add(stash, rr, pool);
+		stash_add(pkt, stash, rr, pool);
 	}
 	return kr_ok();
 }
@@ -245,18 +262,13 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_
 {
 	const knot_dname_t *cname = qry->sname;
 	const knot_pktsection_t *answer = knot_pkt_section(pkt, KNOT_ANSWER);
-	bool dobit = knot_pkt_has_dnssec(pkt);
 	for (unsigned i = 0; i < answer->count; ++i) {
 		/* Stash direct answers (equal to current QNAME/CNAME) */
 		const knot_rrset_t *rr = knot_pkt_rr(answer, i);
 		if (!knot_dname_is_equal(rr->owner, cname)) {
 			continue;
 		}
-		/* Ignore RRSIGs if DNSSEC.*/
-		if (dobit && (KNOT_RRTYPE_RRSIG == rr->type)) {
-			continue;
-		}
-		stash_add(stash, rr, pool);
+		stash_add(pkt, stash, rr, pool);
 		/* Follow CNAME chain */
 		if (rr->type == KNOT_RRTYPE_CNAME) {
 			cname = knot_cname_name(&rr->rrs);
