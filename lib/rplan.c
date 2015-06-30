@@ -33,6 +33,7 @@ const lookup_table_t query_flag_names[] = {
 	#define X(flag, _) { QUERY_ ## flag, #flag },
 	QUERY_FLAGS(X)
 	#undef X
+	{ 0, NULL }
 };
 
 static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
