@@ -87,7 +87,6 @@ static int validate_rrsig(const knot_rrset_t *rrsig, size_t pos, const knot_rrse
 	knot_rrset_init(&dnskey_rr, (knot_dname_t *)signer, KNOT_RRTYPE_DNSKEY, rr->rclass);
 	int ret = kr_cache_peek_rr(txn, &dnskey_rr, &timestamp);
 	if (ret != 0) {
-		DEBUG_MSG("<= missing DNSKEY\n");
 		return KNOT_DNSSEC_ENOKEY;
 	}
 
@@ -98,6 +97,7 @@ static int merge_in_rrsigs(knot_rrset_t *cache_rr, const knot_rrset_t *rrsigset,
                            struct kr_cache_txn *txn, struct kr_request *req)
 {
 	struct kr_rplan *rplan = &req->rplan;
+	struct kr_query *query = kr_rplan_current(&req->rplan);
 	int ret = KNOT_EOK;
 
 	/* Find rrset corresponding to RRSIG. */
@@ -115,6 +115,17 @@ static int merge_in_rrsigs(knot_rrset_t *cache_rr, const knot_rrset_t *rrsigset,
 					DEBUG_MSG_NOPLAN("%s() Missing DNSKEY for '%s %s'.\n", __func__, type_str, name_str);
 				}
 #endif
+				DEBUG_MSG("<= missing DNSKEY\n");
+				const knot_dname_t *signer = knot_rrsig_signer_name(&rrsigset->rrs, i);
+				struct kr_query *next = kr_rplan_push(rplan, query->parent,
+				                                      signer, query->sclass, KNOT_RRTYPE_DNSKEY);
+				if (!next) {
+					return KNOT_STATE_FAIL;
+				}
+				rem_node(&query->node); /* *MUST* keep current query at tail */
+				insert_node(&query->node, &next->node);
+				next->flags |= QUERY_AWAIT_CUT;
+				return ret;
 				break;
 			case 0:
 				break;
@@ -245,7 +256,10 @@ static int stash_authority(map_t *stash, knot_pkt_t *pkt, struct kr_request *req
 			continue;
 		}
 		/* Stash record */
-		stash_add_rrsig(stash, authority, rr, req);
+		int ret = stash_add_rrsig(stash, authority, rr, req);
+		if (ret == KNOT_DNSSEC_ENOKEY) {
+			return ret;
+		}
 	}
 	return kr_ok();
 }
@@ -266,7 +280,10 @@ static int stash_answer(map_t *stash, knot_pkt_t *pkt, struct kr_request *req)
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
 			continue;
 		}
-		stash_add_rrsig(stash, answer, rr, req);
+		int ret = stash_add_rrsig(stash, answer, rr, req);
+		if (ret == KNOT_DNSSEC_ENOKEY) {
+			return ret;
+		}
 		/* Follow CNAME chain */
 		if (rr->type == KNOT_RRTYPE_CNAME) {
 			cname = knot_cname_name(&rr->rrs);
@@ -296,6 +313,20 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	struct kr_request *req = ctx->data;
 	struct kr_rplan *rplan = &req->rplan;
+
+#ifndef NDEBUG
+	{
+		struct kr_query *qry = NULL;
+		WALK_LIST(qry, rplan->resolved) {
+			char qname_str[KNOT_DNAME_MAXLEN], qtype_str[16];
+			knot_dname_to_str(qname_str, qry->sname, sizeof(qname_str));
+			knot_rrtype_to_string(qry->stype, qtype_str, sizeof(qtype_str));
+
+			DEBUG_MSG("%s() resolved '%s %s' at %u\n", __func__, qtype_str, qname_str, qry->timestamp.tv_sec);
+		}
+	}
+#endif
+
 	struct kr_query *qry = kr_rplan_current(rplan);
 	if (!qry || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state;
