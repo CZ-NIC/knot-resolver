@@ -209,6 +209,35 @@ static int pkt_add(lua_State *L)
 	return 1;
 }
 
+static int pkt_get(lua_State *L)
+{
+	if (lua_gettop(L) < 3) {
+		return 0;
+	}
+	/* Get parameters */
+	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	uint16_t section_id = lua_tointeger(L, 2);
+	uint16_t index = lua_tointeger(L, 3);
+	/* Get RR */
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || sec->count <= index) {
+		return 0;
+	}
+	const knot_rrset_t *rr = knot_pkt_rr(sec, index);
+	lua_newtable(L);
+	lua_pushdname(L, rr->owner);
+	lua_setfield(L, -2, "owner");
+	lua_pushnumber(L, rr->rclass);
+	lua_setfield(L, -2, "class");
+	lua_pushnumber(L, rr->type);
+	lua_setfield(L, -2, "type");
+	lua_pushnumber(L, knot_rrset_ttl(rr));
+	lua_setfield(L, -2, "ttl");
+	lua_pushlightuserdata(L, (void *)&rr->rrs);
+	lua_setfield(L, -2, "rdata");
+	return 1;
+}
+
 static int pkt_meta_register(lua_State *L)
 {
 	static const luaL_Reg wrap[] = {
@@ -221,6 +250,7 @@ static int pkt_meta_register(lua_State *L)
 		{ "question",  pkt_question },
 		{ "begin",     pkt_begin },
 		{ "add",       pkt_add },
+		{ "get",       pkt_get },
 		{ NULL, NULL }
 	};
 	lua_register_meta(L, wrap, META_PKT);
