@@ -53,25 +53,25 @@ int original_dst_len = 0;
 int connected_fd = -1;
 
 int (*original_connect)(int __fd, MOCK__CONST_SOCKADDR_ARG __addr,
-				socklen_t __len) = NULL;
+                        socklen_t __len) = NULL;
 
 ssize_t (*original_recvfrom) (int __fd, void *__restrict __buf, size_t __n,
-				int __flags, MOCK__SOCKADDR_ARG __addr,
-				socklen_t *__restrict __addr_len) = NULL;
+                              int __flags, MOCK__SOCKADDR_ARG __addr,
+                              socklen_t *__restrict __addr_len) = NULL;
 
 ssize_t (*original_recv) (int __fd, void *__buf,
-				size_t __n, int __flags) = NULL;
+                          size_t __n, int __flags) = NULL;
 
 int (*original_select) (int __nfds, fd_set *__restrict __readfds,
-				fd_set *__restrict __writefds,
-				fd_set *__restrict __exceptfds,
-				struct timeval *__restrict __timeout) = NULL;
+                        fd_set *__restrict __writefds,
+                        fd_set *__restrict __exceptfds,
+                        struct timeval *__restrict __timeout) = NULL;
 
 #define FIND_ORIGINAL(fname) \
 	if (original_##fname == NULL) \
 	{ \
-		original_##fname = dlsym(RTLD_NEXT,#fname);\
-		assert(original_##fname);\
+		original_##fname = dlsym(RTLD_NEXT,#fname); \
+		assert(original_##fname); \
 	}
 
 int gettimeofday(struct timeval *tv, MOCK__TZ_ARG *tz)
@@ -84,26 +84,27 @@ ssize_t recvfrom (int __fd, void *__restrict __buf, size_t __n,
 			 int __flags, MOCK__SOCKADDR_ARG __addr,
 			 socklen_t *__restrict __addr_len)
 {
-	ssize_t ret;
+	ssize_t ret = -1;
 	struct sockaddr *addr = MOCK__GET_SOCKADDR(__addr);
 	FIND_ORIGINAL(recvfrom);
 	if (__fd == connected_fd) {
+		/* May block, must unlock GIL */
 		if ((__flags & MSG_DONTWAIT) == 0) {
 			Py_BEGIN_ALLOW_THREADS
 			ret = original_recvfrom( __fd,__buf,__n,__flags,__addr,__addr_len);
 			Py_END_ALLOW_THREADS
-		}
-		else
+		} else {
 			ret = original_recvfrom( __fd,__buf,__n,__flags,__addr,__addr_len);
+		}
 		if (addr != NULL && *__addr_len > 0) {
 		    int len = original_dst_len;
 		    if (len < *__addr_len)
 			len = *__addr_len;
 		    memcpy(addr, &original_dst, len);
 		}
-	}
-	else
+	} else {
 		ret = original_recvfrom( __fd,__buf,__n,__flags,__addr,__addr_len);
+	}
 	return ret;
 }
 
@@ -112,16 +113,17 @@ ssize_t recv (int __fd, void *__buf, size_t __n, int __flags)
 	ssize_t ret;
 	FIND_ORIGINAL(recv);
 	if (__fd == connected_fd) {
+		/* May block, must unlock GIL */
 		if ((__flags & MSG_DONTWAIT) == 0) {
 	                Py_BEGIN_ALLOW_THREADS
 			ret = original_recv (__fd,__buf,__n,__flags);
 			Py_END_ALLOW_THREADS
-		}
-		else
+		} else{
 			ret = original_recv (__fd,__buf,__n,__flags);
-	}
-	else
+		}
+	} else {
 		ret = original_recv (__fd,__buf,__n,__flags);
+	}
 	return ret;
 }
 
@@ -136,34 +138,35 @@ int select (int __nfds, fd_set *__restrict __readfds,
 		(__readfds   != NULL && FD_ISSET(connected_fd, __readfds))  ||
 		(__writefds  != NULL && FD_ISSET(connected_fd, __writefds)) ||
 		(__exceptfds != NULL && FD_ISSET(connected_fd, __exceptfds))
-	    ))
-	{
+	    )) {
 		struct timeval _timeout = {0, 200 * 1000};
 		Py_BEGIN_ALLOW_THREADS
 		ret = original_select (__nfds,
 			__readfds,__writefds,__exceptfds,&_timeout);
 		Py_END_ALLOW_THREADS
-	}
-        else
+	} else {
 		ret = original_select (__nfds,
 			__readfds,__writefds,__exceptfds,__timeout);
+	}
 	return ret;
 }
 
 int connect(int __fd, MOCK__CONST_SOCKADDR_ARG __addr, socklen_t __len)
 {
 	Dl_info dli = {0};
-	char *python_addr;
+	char *python_addr = NULL;
 	struct addrinfo hints;
 	struct addrinfo *info = NULL;
 	int ret, parse_ret, python_port = 0, flowinfo, scopeid, local_socktype;
 	socklen_t local_socktypelen = sizeof(int);
 	const struct sockaddr *dst_addr = MOCK__GET_SOCKADDR(__addr);
 	char right_caller[] = "net_connected_socket";
-	PyObject *result;
+	PyObject *result = NULL;
 	char addr_str[SOCKADDR_STRLEN];
 	char pport[32];
 
+	/* @note This is only going to work if we're calling from a function which has a
+	         symbol in the symbol table, must link dynamically. */
 	FIND_ORIGINAL(connect);
 	dladdr (__builtin_return_address (0), &dli);
 	if (!dli.dli_sname ||
@@ -188,18 +191,18 @@ int connect(int __fd, MOCK__CONST_SOCKADDR_ARG __addr, socklen_t __len)
 			errno = ECONNABORTED;
 			return -1;
 		}
-	}
-	else {
+	} else {
 		errno = EINVAL;
 		return -1;
 	}
 
-	if (dst_addr->sa_family == AF_INET)
+	if (dst_addr->sa_family == AF_INET) {
 		parse_ret = PyArg_ParseTuple(result, "si",
 				&python_addr, &python_port);
-	else
+	} else {
 		parse_ret = PyArg_ParseTuple(result, "siii",
 				&python_addr, &python_port, &flowinfo, &scopeid);
+	}
 
 	Py_DECREF(result);
 
