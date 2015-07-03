@@ -88,8 +88,15 @@ static lookup_table_t wire_flag_names[] = {
 	{ 0, NULL }
 };
 
+#define PKT_UDATA_CHECK(L) \
+	if (!lua_touserdata(L, 1)) { \
+		lua_pushstring(L, "bad parameters, expected (pkt[, newvalue])"); \
+		lua_error(L); \
+	}
+
 static int pkt_flag(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		int flag_id = lua_tonumber(L, 2);
@@ -104,6 +111,7 @@ static int pkt_flag(lua_State *L)
 
 static int pkt_opcode(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		knot_wire_set_opcode(pkt->wire, lua_tonumber(L, 2));
@@ -114,6 +122,7 @@ static int pkt_opcode(lua_State *L)
 
 static int pkt_rcode(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		knot_wire_set_rcode(pkt->wire, lua_tonumber(L, 2));
@@ -124,6 +133,7 @@ static int pkt_rcode(lua_State *L)
 
 static int pkt_qtype(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	lua_pushnumber(L, knot_pkt_qtype(pkt));
 	return 1;
@@ -131,6 +141,7 @@ static int pkt_qtype(lua_State *L)
 
 static int pkt_qclass(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	lua_pushnumber(L, knot_pkt_qclass(pkt));
 	return 1;
@@ -138,6 +149,7 @@ static int pkt_qclass(lua_State *L)
 
 static int pkt_qname(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	lua_pushdname(L, knot_pkt_qname(pkt));
 	return 1;
@@ -145,6 +157,7 @@ static int pkt_qname(lua_State *L)
 
 static int pkt_question(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	if (lua_gettop(L) < 4) {
 		return 0;
@@ -161,6 +174,7 @@ static int pkt_question(lua_State *L)
 
 static int pkt_begin(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	knot_pkt_begin(pkt, lua_tointeger(L, 2));
 	return 0;
@@ -168,6 +182,7 @@ static int pkt_begin(lua_State *L)
 
 static int pkt_add(lua_State *L)
 {
+	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	if (lua_gettop(L) < 6) {
 		return 0;
