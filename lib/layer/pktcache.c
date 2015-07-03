@@ -67,15 +67,14 @@ static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 	/* Copy answer, keep the original message id */
 	if (entry->count <= pkt->max_size) {
 		/* Keep original header and copy cached */
-		uint8_t header[KNOT_WIRE_HEADER_SIZE];
-		memcpy(header, pkt->wire, sizeof(header));
+		uint16_t msgid = knot_wire_get_id(pkt->wire);
 		/* Copy and reparse */
 		knot_pkt_clear(pkt);
 		memcpy(pkt->wire, entry->data, entry->count);
 		pkt->size = entry->count;
 		knot_pkt_parse(pkt, 0);
 		/* Restore header bits */
-		knot_wire_set_id(pkt->wire, knot_wire_get_id(header));
+		knot_wire_set_id(pkt->wire, msgid);
 	}
 
 	/* Adjust TTL in records. */
