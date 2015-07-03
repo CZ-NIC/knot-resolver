@@ -90,7 +90,7 @@ static lookup_table_t wire_flag_names[] = {
 
 #define PKT_UDATA_CHECK(L) \
 	if (!lua_touserdata(L, 1)) { \
-		lua_pushstring(L, "bad parameters, expected (pkt[, newvalue])"); \
+		lua_pushliteral(L, "bad parameters, expected (pkt[, newvalue])"); \
 		lua_error(L); \
 	}
 
@@ -164,7 +164,7 @@ static int pkt_question(lua_State *L)
 	}
 	uint8_t dname[KNOT_DNAME_MAXLEN];
 	knot_dname_from_str(dname, lua_tostring(L, 2), sizeof(dname));
-	if (!knot_dname_is_equal(knot_pkt_qname(pkt), dname)) {
+	if (!knot_dname_is_equal(knot_pkt_qname(pkt), dname) || pkt->rrset_count > 0) {
 		KR_PKT_RECYCLE(pkt);
 		knot_pkt_put_question(pkt, dname, lua_tointeger(L, 3), lua_tointeger(L, 4));
 		pkt->parsed = pkt->size;
@@ -176,6 +176,10 @@ static int pkt_begin(lua_State *L)
 {
 	PKT_UDATA_CHECK(L);
 	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	if (lua_isnil(L, 2) || lua_tonumber(L, 2) < pkt->current) {
+		lua_pushliteral(L, "bad parameters, expected packet section >= current");
+		lua_error(L);
+	}
 	knot_pkt_begin(pkt, lua_tointeger(L, 2));
 	return 0;
 }

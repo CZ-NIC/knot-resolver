@@ -36,9 +36,11 @@ extern void _cleanup_fclose(FILE **p);
 
 /** @internal Fast packet reset. */
 #define KR_PKT_RECYCLE(pkt) do { \
-	(pkt)->current = KNOT_ANSWER; \
 	(pkt)->rrset_count = 0; \
 	(pkt)->size = KNOT_WIRE_HEADER_SIZE; \
+	(pkt)->current = KNOT_ANSWER; \
+	memset((pkt)->sections, 0, sizeof((pkt)->sections)); \
+	knot_pkt_begin((pkt), KNOT_ANSWER); \
 	knot_pkt_parse_question((pkt)); \
 } while (0)
 
