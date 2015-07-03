@@ -6,41 +6,41 @@ local block = {
 	-- Private, local, broadcast, test and special zones 
 	private_zones = {
 		-- RFC1918
-		'10.in-addr.arpa.',
-		'16.172.in-addr.arpa.',
-		'17.172.in-addr.arpa.',
-		'18.172.in-addr.arpa.',
-		'19.172.in-addr.arpa.',
-		'20.172.in-addr.arpa.',
-		'21.172.in-addr.arpa.',
-		'22.172.in-addr.arpa.',
-		'23.172.in-addr.arpa.',
-		'24.172.in-addr.arpa.',
-		'25.172.in-addr.arpa.',
-		'26.172.in-addr.arpa.',
-		'27.172.in-addr.arpa.',
-		'28.172.in-addr.arpa.',
-		'29.172.in-addr.arpa.',
-		'30.172.in-addr.arpa.',
-		'31.172.in-addr.arpa.',
-		'168.192.in-addr.arpa.',
+		'.10.in-addr.arpa.',
+		'.16.172.in-addr.arpa.',
+		'.17.172.in-addr.arpa.',
+		'.18.172.in-addr.arpa.',
+		'.19.172.in-addr.arpa.',
+		'.20.172.in-addr.arpa.',
+		'.21.172.in-addr.arpa.',
+		'.22.172.in-addr.arpa.',
+		'.23.172.in-addr.arpa.',
+		'.24.172.in-addr.arpa.',
+		'.25.172.in-addr.arpa.',
+		'.26.172.in-addr.arpa.',
+		'.27.172.in-addr.arpa.',
+		'.28.172.in-addr.arpa.',
+		'.29.172.in-addr.arpa.',
+		'.30.172.in-addr.arpa.',
+		'.31.172.in-addr.arpa.',
+		'.168.192.in-addr.arpa.',
 		-- RFC5735, RFC5737
-		'0.in-addr.arpa.',
-		'127.in-addr.arpa.',
-		'254.169.in-addr.arpa.',
-		'2.0.192.in-addr.arpa.',
-		'100.51.198.in-addr.arpa.',
-		'113.0.203.in-addr.arpa.',
+		'.0.in-addr.arpa.',
+		'.127.in-addr.arpa.',
+		'.254.169.in-addr.arpa.',
+		'.2.0.192.in-addr.arpa.',
+		'.100.51.198.in-addr.arpa.',
+		'.113.0.203.in-addr.arpa.',
 		'255.255.255.255.in-addr.arpa.',
 		-- IPv6 local, example
 		'0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.',
 		'1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.',
-		'd.f.ip6.arpa.',
-		'8.e.f.ip6.arpa.',
-		'9.e.f.ip6.arpa.',
-		'a.e.f.ip6.arpa.',
-		'b.e.f.ip6.arpa.',
-		'8.b.d.0.1.0.0.2.ip6.arpa',
+		'.d.f.ip6.arpa.',
+		'.8.e.f.ip6.arpa.',
+		'.9.e.f.ip6.arpa.',
+		'.a.e.f.ip6.arpa.',
+		'.b.e.f.ip6.arpa.',
+		'.8.b.d.0.1.0.0.2.ip6.arpa',
 	}
 }
 
@@ -58,12 +58,14 @@ function block.suffix(action, zone_list)
 end
 
 -- @function Check for common suffix first, then suffix match (specialized version of suffix match)
-function block.suffix_common(action, common_suffix, suffix_list)
-	local common_len = common_suffix:len()
+function block.suffix_common(action, suffix_list, common_suffix)
 	return function(pkt, qname)
 		-- Preliminary check
-		if qname:sub(-common_len) ~= common_suffix then
-			return nil
+		if common_suffix ~= nil then
+			local common_len = common_suffix:len()
+			if qname:sub(-common_len) ~= common_suffix then
+				return nil
+			end
 		end
 		-- String match
 		for i = 1, #suffix_list do
@@ -127,7 +129,7 @@ block.layer = {
 }
 
 -- @var Default rules
-block.rules = { block.suffix_common(block.DENY, '.arpa.', block.private_zones) }
+block.rules = { block.suffix_common(block.DENY, block.private_zones, '.arpa.') }
 
 -- @function Add rule to block list
 function block.add(block, rule)

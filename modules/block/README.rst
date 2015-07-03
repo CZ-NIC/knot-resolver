@@ -74,6 +74,16 @@ Properties
   
   Policy to block queries based on the QNAME suffix match.
 
+.. function:: block.suffix_common(action, suffix_table[, common_suffix])
+
+  :param action: action if the pattern matches QNAME
+  :param suffix_table: table of valid suffixes
+  :param common_suffix: common suffix of entries in suffix_table
+  
+  Like suffix match, but you can also provide a common suffix of all matches for faster processing (nil otherwise).
+
+.. tip:: If you want to match suffixes only, prefix the strings with `.`, e.g. `.127.in-addr.arpa.` instead of `127.in-addr.arpa`.
+
 .. _`Aho-Corasick`: https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
 .. _`@jgrahamc`: https://github.com/jgrahamc/aho-corasick-lua
 
