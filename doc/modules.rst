@@ -12,6 +12,7 @@ Implemented modules
 .. include:: ../modules/hints/README.rst
 .. include:: ../modules/block/README.rst
 .. include:: ../modules/stats/README.rst
+.. include:: ../modules/prefetch/README.rst
 .. include:: ../modules/cachectl/README.rst
 .. include:: ../modules/graphite/README.rst
 .. include:: ../modules/ketcd/README.rst

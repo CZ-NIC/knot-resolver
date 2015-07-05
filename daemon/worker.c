@@ -266,7 +266,6 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 		}
 		connect->data = task;
 	} else {
-		printf("sending: %s %u\n", knot_dname_to_str_alloc(knot_pkt_qname(next_query)), knot_pkt_qtype(next_query));
 		if (qr_task_send(task, task->next_handle, addr, next_query) != 0) {
 			return qr_task_step(task, NULL);
 		}
