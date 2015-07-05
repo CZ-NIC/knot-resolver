@@ -180,8 +180,8 @@ static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
-	if (ctx->state & (KNOT_STATE_FAIL)) {
-		return ctx->state; /* Already failed, skip */
+	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE)) {
+		return ctx->state; /* Already failed or done, skip */
 	}
 	LAYER_FFI_CALL(ctx, "produce");
 	lua_pushlightuserdata(L, ctx->data);

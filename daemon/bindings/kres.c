@@ -32,6 +32,13 @@
 	} \
 	lua_setfield((L), -2, (prefix))
 
+#define LUA_ERRSTR(L, errstr) \
+	lua_pushliteral(L, errstr); \
+	lua_error(L)
+
+#define CHECK_UDATA(udata, L) \
+	lua_touserdata(L, 1); if (!udata) return 0
+
 /** @internal Register metatable. */
 static void lua_register_meta(lua_State *L, const luaL_Reg *funcs, const char *name)
 {
@@ -69,6 +76,17 @@ static lookup_table_t rrtype_names[] = {
 	{ 0, NULL }
 };
 
+/*
+ * Record class names.
+ */
+#define RECORD_CLASS(X) X(IN) X(CH) X(NONE) X(ANY)
+static lookup_table_t rrclass_names[] = {
+	#define X(rc) { KNOT_CLASS_ ## rc, #rc },
+	RECORD_CLASS(X)
+	#undef X
+	{ 0, NULL }
+};
+
 /* 
  * Packet interface
  * @note Packets are always light userdata, use single pointers.
@@ -90,14 +108,12 @@ static lookup_table_t wire_flag_names[] = {
 
 #define PKT_UDATA_CHECK(L) \
 	if (!lua_touserdata(L, 1)) { \
-		lua_pushliteral(L, "bad parameters, expected (pkt[, newvalue])"); \
-		lua_error(L); \
+		LUA_ERRSTR(L, "bad parameters, expected (pkt[, newvalue])"); \
 	}
 
 static int pkt_flag(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		int flag_id = lua_tonumber(L, 2);
 		switch(flag_id) {
@@ -111,8 +127,7 @@ static int pkt_flag(lua_State *L)
 
 static int pkt_opcode(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		knot_wire_set_opcode(pkt->wire, lua_tonumber(L, 2));
 	}
@@ -122,8 +137,7 @@ static int pkt_opcode(lua_State *L)
 
 static int pkt_rcode(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
 	if (lua_gettop(L) > 1 && lua_isnumber(L, 2)) {
 		knot_wire_set_rcode(pkt->wire, lua_tonumber(L, 2));
 	}
@@ -133,40 +147,45 @@ static int pkt_rcode(lua_State *L)
 
 static int pkt_qtype(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
 	lua_pushnumber(L, knot_pkt_qtype(pkt));
 	return 1;
 }
 
 static int pkt_qclass(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
 	lua_pushnumber(L, knot_pkt_qclass(pkt));
 	return 1;
 }
 
 static int pkt_qname(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
 	lua_pushdname(L, knot_pkt_qname(pkt));
 	return 1;
 }
 
 static int pkt_question(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
-	if (lua_gettop(L) < 4) {
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
+	if (lua_gettop(L) < 3) {
 		return 0;
 	}
+	/* Check parameters */
 	uint8_t dname[KNOT_DNAME_MAXLEN];
 	knot_dname_from_str(dname, lua_tostring(L, 2), sizeof(dname));
+	uint16_t rrtype = lua_tointeger(L, 3);
+	uint16_t rrclass = lua_tointeger(L, 4);
+	if (!lua_isnumber(L, 3)) {
+		LUA_ERRSTR(L, "invalid RR type");
+	}
+	if (!lua_isnumber(L, 4)) { /* Default class is IN */
+		rrclass = KNOT_CLASS_IN;
+	}
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), dname) || pkt->rrset_count > 0) {
 		KR_PKT_RECYCLE(pkt);
-		knot_pkt_put_question(pkt, dname, lua_tointeger(L, 3), lua_tointeger(L, 4));
+		knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 		pkt->parsed = pkt->size;
 	}
 	return 0;
@@ -174,11 +193,9 @@ static int pkt_question(lua_State *L)
 
 static int pkt_begin(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
-	if (lua_isnil(L, 2) || lua_tonumber(L, 2) < pkt->current) {
-		lua_pushliteral(L, "bad parameters, expected packet section >= current");
-		lua_error(L);
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
+	if (!lua_isnumber(L, 2) || lua_tonumber(L, 2) < pkt->current) {
+		LUA_ERRSTR(L, "bad parameters, expected packet section >= current");
 	}
 	knot_pkt_begin(pkt, lua_tointeger(L, 2));
 	return 0;
@@ -186,8 +203,7 @@ static int pkt_begin(lua_State *L)
 
 static int pkt_add(lua_State *L)
 {
-	PKT_UDATA_CHECK(L);
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
 	if (lua_gettop(L) < 6) {
 		return 0;
 	}
@@ -215,11 +231,11 @@ static int pkt_add(lua_State *L)
 
 static int pkt_get(lua_State *L)
 {
+	knot_pkt_t *pkt = CHECK_UDATA(pkt, L);
 	if (lua_gettop(L) < 3) {
 		return 0;
 	}
 	/* Get parameters */
-	knot_pkt_t *pkt = lua_touserdata(L, 1);
 	uint16_t section_id = lua_tointeger(L, 2);
 	uint16_t index = lua_tointeger(L, 3);
 	/* Get RR */
@@ -268,28 +284,28 @@ static int pkt_meta_register(lua_State *L)
 
 static int query_qtype(lua_State *L)
 {
-	struct kr_query *qry = lua_touserdata(L, 1);
+	struct kr_query *qry = CHECK_UDATA(qry, L);
 	lua_pushnumber(L, qry->stype);
 	return 1;
 }
 
 static int query_qclass(lua_State *L)
 {
-	struct kr_query *qry = lua_touserdata(L, 1);
+	struct kr_query *qry = CHECK_UDATA(qry, L);
 	lua_pushnumber(L, qry->sclass);
 	return 1;	
 }
 
 static int query_qname(lua_State *L)
 {
-	struct kr_query *qry = lua_touserdata(L, 1);
+	struct kr_query *qry = CHECK_UDATA(qry, L);
 	lua_pushdname(L, qry->sname);
 	return 1;	
 }
 
 static int query_flag(lua_State *L)
 {
-	struct kr_query *qry = lua_touserdata(L, 1);
+	struct kr_query *qry = CHECK_UDATA(qry, L);
 	if (lua_gettop(L) < 2 || !lua_isnumber(L, 2)) {
 		return 0;
 	}
@@ -299,7 +315,7 @@ static int query_flag(lua_State *L)
 
 static int query_clear_flag(lua_State *L)
 {
-	struct kr_query *qry = lua_touserdata(L, 1);
+	struct kr_query *qry = CHECK_UDATA(qry, L);
 	if (lua_gettop(L) < 2 || !lua_isnumber(L, 2)) {
 		return 0;
 	}
@@ -309,7 +325,7 @@ static int query_clear_flag(lua_State *L)
 
 static int query_has_flag(lua_State *L)
 {
-	struct kr_query *qry = lua_touserdata(L, 1);
+	struct kr_query *qry = CHECK_UDATA(qry, L);
 	if (lua_gettop(L) < 2 || !lua_isnumber(L, 2)) {
 		return 0;
 	}
@@ -319,21 +335,43 @@ static int query_has_flag(lua_State *L)
 
 static int query_current(lua_State *L)
 {
-	struct kr_request *req = lua_touserdata(L, 1);
+	struct kr_request *req = CHECK_UDATA(req, L);
 	lua_pushlightuserdata(L, kr_rplan_current(&req->rplan));
 	return 1;
+}
+
+static int query_resolved(lua_State *L)
+{
+	struct kr_request *req = CHECK_UDATA(req, L);
+	lua_pushlightuserdata(L, TAIL(req->rplan.resolved));
+	return 1;
+}
+
+static int qry_meta_register(lua_State *L)
+{
+	static const luaL_Reg wrap[] = {
+		{ "qtype",      query_qtype  },
+		{ "qclass",     query_qclass },
+		{ "qname",      query_qname  },
+		{ "flag",       query_flag   },
+		{ "clear_flag", query_clear_flag },
+		{ "has_flag",   query_has_flag },
+		{ NULL, NULL }
+	};
+	lua_getfield(L, -1, "query");
+	for (const luaL_Reg *reg = wrap; reg->name; ++reg) {
+		lua_pushcfunction(L, reg->func);
+		lua_setfield(L, -2, reg->name);
+	}
+	lua_pop(L, 1);
+	return 0;
 }
 
 int lib_kres(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "query_current",    query_current },
-		{ "query_qtype",      query_qtype  },
-		{ "query_qclass",     query_qclass },
-		{ "query_qname",      query_qname  },
-		{ "query_flag",       query_flag   },
-		{ "query_clear_flag", query_clear_flag },
-		{ "query_has_flag",   query_has_flag },
+		{ "query_resolved",   query_resolved },
 		{ NULL, NULL }
 	};
 	/* Create module and register functions */
@@ -350,11 +388,13 @@ int lib_kres(lua_State *L)
 	WRAP_CONST(L, ADDITIONAL, KNOT_);
 	/* Register RCODE, OPCODE */
 	WRAP_LUT(L, "rcode",  knot_rcode_names);
-	WRAP_LUT(L, "rrtype", rrtype_names);
+	WRAP_LUT(L, "type", rrtype_names);
+	WRAP_LUT(L, "class",  rrclass_names);
 	WRAP_LUT(L, "opcode", knot_opcode_names);
 	WRAP_LUT(L, "wire",   wire_flag_names);
 	WRAP_LUT(L, "query",  query_flag_names);
 	/* Register metatables */
 	pkt_meta_register(L);
+	qry_meta_register(L);
 	return 1;	
 }
