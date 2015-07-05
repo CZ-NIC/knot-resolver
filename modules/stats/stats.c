@@ -57,7 +57,6 @@ static int begin(knot_layer_t *ctx, void *module_param)
 {
 	struct kr_module *module = ctx->api->data;
 	map_t *map = module->data;
-	stat_add(map, "query.concurrent", 1);
 	ctx->data = module_param;
 	return ctx->state;
 }
@@ -101,22 +100,10 @@ static int collect(knot_layer_t *ctx)
 		}
 	}
 	/* Query parameters and transport mode */
-	stat_add(map, "query.concurrent", -1);
 	if (knot_pkt_has_edns(param->answer)) {
 		stat_add(map, "query.edns", 1);
 		if (knot_pkt_has_dnssec(param->answer)) {
 			stat_add(map, "query.dnssec", 1);
-		}
-	}
-	/* Collect data from iterator queries */
-	struct kr_query *qry = NULL;
-	WALK_LIST(qry, rplan->resolved) {
-		if (!(qry->flags & QUERY_CACHED) && qry != TAIL(rplan->resolved)) {
-			if (qry->flags & QUERY_TCP) {
-				stat_add(map, "iterator.tcp", 1);
-			} else {
-				stat_add(map, "iterator.udp", 1);
-			}
 		}
 	}
 	return ctx->state;

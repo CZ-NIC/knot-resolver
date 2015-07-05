@@ -104,20 +104,20 @@ block.layer = {
 	produce = function(state, req, pkt)
 		-- Interpret packet in Lua and evaluate
 		local qry = kres.query_current(req)
-		local qname = kres.query_qname(qry)
+		local qname = kres.query.qname(qry)
 		local action, authority = block:evaluate(pkt, qname)
 		if action == block.DENY then
 			-- Answer full question
-			local qclass = kres.query_qclass(qry)
-			local qtype = kres.query_qtype(qry)
-			kres.query_flag(qry, kres.query.NO_MINIMIZE + kres.query.SAFEMODE)
-			pkt:question(qname, qclass, qtype)
+			local qclass = kres.query.qclass(qry)
+			local qtype = kres.query.qtype(qry)
+			kres.query.flag(qry, kres.query.NO_MINIMIZE + kres.query.SAFEMODE)
+			pkt:question(qname, qtype, qclass)
 			pkt:flag(kres.wire.QR)
 			pkt:flag(kres.wire.AA)
 			-- Write authority information
 			pkt:rcode(kres.rcode.NXDOMAIN)
 			pkt:begin(kres.AUTHORITY)
-			pkt:add(authority, qclass, kres.rrtype.SOA, 900,
+			pkt:add(authority, qclass, kres.type.SOA, 900,
 				'\5block\0\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
 			return kres.DONE
 		elseif action == block.DROP then
