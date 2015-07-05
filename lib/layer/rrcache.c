@@ -17,8 +17,9 @@
 #include <libknot/descriptor.h>
 #include <libknot/errcode.h>
 #include <libknot/rrset.h>
-#include <libknot/internal/mempool.h>
 #include <libknot/rrtype/rdname.h>
+#include <ucw/config.h>
+#include <ucw/lib.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/cache.h"
@@ -36,10 +37,10 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
                   uint16_t rrclass, uint16_t rrtype, struct kr_query *qry)
 {
 	/* Check if record exists in cache */
-	uint32_t timestamp = qry->timestamp.tv_sec;
+	uint32_t drift = qry->timestamp.tv_sec;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, (knot_dname_t *)name, rrtype, rrclass);
-	int ret = kr_cache_peek_rr(txn, &cache_rr, &timestamp);
+	int ret = kr_cache_peek_rr(txn, &cache_rr, &drift);
 	if (ret != 0) {
 		return ret;
 	}
@@ -50,9 +51,14 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 		knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
 	}
 
+	/* Mark as expiring if it has less than 5% TTL (or less than 5s) */
+	if (100 * (drift + 5) > 95 * knot_rrset_ttl(&cache_rr)) {
+		qry->flags |= QUERY_EXPIRING;
+	}
+
 	/* Update packet answer */
 	knot_rrset_t rr_copy;
-	ret = kr_cache_materialize(&rr_copy, &cache_rr, timestamp, &pkt->mm);
+	ret = kr_cache_materialize(&rr_copy, &cache_rr, drift, &pkt->mm);
 	if (ret == 0) {
 		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr_copy, KNOT_PF_FREE);
 		if (ret != 0) {

@@ -35,7 +35,8 @@
 	X(AWAIT_IPV6 , 1 << 5) /**< Query is waiting for AAAA address. */ \
 	X(AWAIT_CUT  , 1 << 6) /**< Query is waiting for zone cut lookup */ \
 	X(SAFEMODE   , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
-	X(CACHED     , 1 << 8) /**< Query response is cached. */
+	X(CACHED     , 1 << 8) /**< Query response is cached. */ \
+	X(EXPIRING   , 1 << 9) /**< Query response is cached, but expiring. */
 
 /** Query flags */
 enum kr_query_flag {
