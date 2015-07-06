@@ -135,6 +135,7 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm
 	engine_lualib(engine, "cache",   lib_cache);
 	engine_lualib(engine, "event",   lib_event);
 	engine_lualib(engine, "kres",    lib_kres);
+	engine_lualib(engine, "worker",  lib_worker);
 
 	/* Create main worker. */
 	struct worker_ctx *worker = mm_alloc(pool, sizeof(*worker));
@@ -146,6 +147,9 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm
 	worker->loop = loop;
 	loop->data = worker;
 	worker_reserve(worker, MP_FREELIST_SIZE);
+	/* Register worker in Lua thread */
+	lua_pushlightuserdata(engine->L, worker);
+	lua_setglobal(engine->L, "__worker");
 	return worker;
 }
 

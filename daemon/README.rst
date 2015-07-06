@@ -437,6 +437,17 @@ daemons or manipulated from other processes, making for example synchronised loa
 
    .. note:: This may or may not clear the cache, depending on the used backend. See :func:`cachectl.clear()`. 
 
+.. function:: cache.stats()
+
+   Return table of statistics, note that this tracks all operations over cache, not just which
+   queries were answered from cache or not.
+
+   Example:
+
+   .. code-block:: lua
+
+	print('Insertions:', cache.stats().insert)
+
 Timers and events
 ^^^^^^^^^^^^^^^^^
 
@@ -486,6 +497,32 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
 	e = event.after(1 * minute, function() print('Hi!') end)
 	event.cancel(e)
+
+Scripting worker
+^^^^^^^^^^^^^^^^
+
+Worker is a service over event loop that tracks and schedules outstanding queries,
+you can see the statistics or schedule new queries.
+
+.. function:: worker.stats()
+
+   Return table of statistics.
+
+   Example:
+
+   .. code-block:: lua
+
+	print(worker.stats().concurrent)
+
+.. function:: worker.resolve(qname, qtype[, qclass])
+
+   :param string qname: Query name (e.g. 'com.')
+   :param string qtype: Query type (e.g. ``kres.type.NS``)
+   :param string qtype: Query class *(optional)* (e.g. ``kres.class.IN``)
+   :return: boolean
+
+   Resolve a query, there is currently no callback when its finished, but you can track the query
+   progress in layers, just like any other query.
 
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/

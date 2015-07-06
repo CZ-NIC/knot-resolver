@@ -76,3 +76,10 @@ int lib_cache(lua_State *L);
  * @return   number of packages to load
  */
 int lib_event(lua_State *L);
+
+/**
+ * Load worker API.
+ * @param  L scriptable
+ * @return   number of packages to load
+ */
+int lib_worker(lua_State *L);

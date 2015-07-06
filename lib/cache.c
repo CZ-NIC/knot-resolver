@@ -283,7 +283,7 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
 				knot_rrset_clear(dst, mm);
 				return kr_error(ENOMEM);
 			}
-			/* Fixup TTL from absolute time */
+			/* Fixup TTL time drift */
 			rd_dst = knot_rdataset_at(&dst->rrs, dst->rrs.rr_count - 1);
 			knot_rdata_set_ttl(rd_dst, knot_rdata_ttl(rd) - drift);
 		}
