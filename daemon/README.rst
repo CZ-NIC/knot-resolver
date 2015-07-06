@@ -514,11 +514,11 @@ you can see the statistics or schedule new queries.
 
 	print(worker.stats().concurrent)
 
-.. function:: worker.resolve(qname, qtype[, qclass])
+.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN])
 
    :param string qname: Query name (e.g. 'com.')
-   :param string qtype: Query type (e.g. ``kres.type.NS``)
-   :param string qtype: Query class *(optional)* (e.g. ``kres.class.IN``)
+   :param number qtype: Query type (e.g. ``kres.type.NS``)
+   :param number qclass: Query class *(optional)* (e.g. ``kres.class.IN``)
    :return: boolean
 
    Resolve a query, there is currently no callback when its finished, but you can track the query
