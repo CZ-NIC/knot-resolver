@@ -248,9 +248,14 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	stash.malloc = (map_alloc_f) mm_alloc;
 	stash.free = (map_free_f) mm_free;
 	stash.baton = rplan->pool;
-	int ret = stash_authority(qry, pkt, &stash, rplan->pool);
-	if (ret == 0 && knot_wire_get_aa(pkt->wire)) {
+	int ret = 0;
+	bool is_auth = knot_wire_get_aa(pkt->wire);
+	if (is_auth) {
 		ret = stash_answer(qry, pkt, &stash, rplan->pool);
+	}
+	/* Cache authority only if chasing referral/cname chain */
+	if (!is_auth || qry != HEAD(rplan->pending)) {
+		ret = stash_authority(qry, pkt, &stash, rplan->pool);
 	}
 	/* Cache stashed records */
 	if (ret == 0) {
