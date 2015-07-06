@@ -51,8 +51,8 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 		knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
 	}
 
-	/* Mark as expiring if it has less than 5% TTL (or less than 5s) */
-	if (100 * (drift + 5) > 95 * knot_rrset_ttl(&cache_rr)) {
+	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
+	if (100 * (drift + 5) > 99 * knot_rrset_ttl(&cache_rr)) {
 		qry->flags |= QUERY_EXPIRING;
 	}
 

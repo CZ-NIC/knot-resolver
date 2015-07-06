@@ -581,11 +581,7 @@ static int wrk_resolve(lua_State *L)
 	/* Resolve it */
 	int ret = worker_resolve(worker, pkt);
 	knot_pkt_free(&pkt);
-	if (ret != 0) {
-		lua_pushstring(L, kr_strerror(ret));
-		lua_error(L);
-	}
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, ret == 0);
 	return 1;
 }
 

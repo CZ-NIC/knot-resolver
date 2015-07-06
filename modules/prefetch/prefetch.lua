@@ -7,9 +7,9 @@
 -- @field window length of the coalescing window
 local prefetch = {
 	queue = {},
-	queue_max = 100,
+	queue_max = 1000,
 	queue_len = 0,
-	window = 60,
+	window = 30,
 	layer = {
 		-- Schedule cached entries that are expiring soon
 		finish = function(state, req, answer)
@@ -38,11 +38,21 @@ local prefetch = {
 
 -- Resolve queued records and flush the queue
 function prefetch.batch(module)
+	-- Defer prefetching if the server is loaded
+	if worker.stats().concurrent > 10 then
+		return 0
+	end
+	local to_delete = prefetch.queue_max / 5
+	local deleted = 0
 	for key, val in pairs(prefetch.queue) do
 		worker.resolve(string.sub(key, 2), string.byte(key))
 		prefetch.queue[key] = nil
+		deleted = deleted + 1
+		if deleted == to_delete then
+			break
+		end
 	end
-	prefetch.queue_len = 0
+	prefetch.queue_len = prefetch.queue_len - deleted
 	return 0
 end
 
