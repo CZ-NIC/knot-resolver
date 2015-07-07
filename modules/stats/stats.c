@@ -55,8 +55,6 @@ static inline void stat_add(map_t *map, const char *key, ssize_t incr)
 
 static int begin(knot_layer_t *ctx, void *module_param)
 {
-	struct kr_module *module = ctx->api->data;
-	map_t *map = module->data;
 	ctx->data = module_param;
 	return ctx->state;
 }

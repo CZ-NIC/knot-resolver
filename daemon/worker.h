@@ -32,7 +32,7 @@ struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
 	mm_ctx_t *mm;
-	uint8_t wire_buf[KNOT_WIRE_MAX_PKTSIZE];
+	uint8_t wire_buf[4 * KNOT_WIRE_MAX_PKTSIZE];
 	struct {
 		size_t concurrent;
 		size_t udp;
