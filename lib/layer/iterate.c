@@ -150,7 +150,7 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
 static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
-		const knot_rdata_t *rdata = knot_rdataset_at(&rr->rrs, 0);
+		const knot_rdata_t *rdata = rr->rrs.data;
 		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata);
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;

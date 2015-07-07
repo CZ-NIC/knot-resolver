@@ -45,13 +45,13 @@ static uint32_t limit_ttl(uint32_t ttl)
 
 static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 {
-	knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, 0);
+	knot_rdata_t *rd = rr->rrs.data;
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
 		uint32_t ttl = knot_rdata_ttl(rd);
 		if (ttl >= drift) {
 			knot_rdata_set_ttl(rd, ttl - drift);
 		}
-		rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
+		rd = kr_rdataset_next(rd);
 	}
 }
 
@@ -148,13 +148,13 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 			if (rr->type == KNOT_RRTYPE_OPT || rr->type == KNOT_RRTYPE_TSIG) {
 				continue;
 			}
-			knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, 0);
+			knot_rdata_t *rd = rr->rrs.data;
 			for (uint16_t j = 0; j < rr->rrs.rr_count; ++j) {
 				if (knot_rdata_ttl(rd) < ttl) {
 					ttl = knot_rdata_ttl(rd);
 					has_ttl = true;
 				}
-				rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
+				rd = kr_rdataset_next(rd);
 			}
 		}
 	}

@@ -44,6 +44,9 @@ extern void _cleanup_fclose(FILE **p);
 	knot_pkt_parse_question((pkt)); \
 } while (0)
 
+/** @internal Next RDATA shortcut. */
+#define kr_rdataset_next(rd) (rd + knot_rdata_array_size(knot_rdata_rdlen(rd)))
+
 /** Concatenate N strings. */
 char* kr_strcatdup(unsigned n, ...);
 
