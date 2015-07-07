@@ -83,8 +83,8 @@ static void tty_accept(uv_stream_t *master, int status)
 	if (client) {
 		 uv_tcp_init(master->loop, client);
 		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
-		 	free(client);
-		 	return;
+			free(client);
+			return;
 		 }
 		 client->data = master->data;
 		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_read);
@@ -127,7 +127,7 @@ static void help(int argc, char *argv[])
 	       " [rundir]            Path to the working directory (default: .)\n");
 }
 
-static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm_ctx_t *pool)
+static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm_ctx_t *pool, int worker_id)
 {
 	/* Load bindings */
 	engine_lualib(engine, "modules", lib_modules);
@@ -150,24 +150,15 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm
 	/* Register worker in Lua thread */
 	lua_pushlightuserdata(engine->L, worker);
 	lua_setglobal(engine->L, "__worker");
+	lua_getglobal(engine->L, "worker");
+	lua_pushnumber(engine->L, worker_id);
+	lua_setfield(engine->L, -2, "id");
+	lua_pop(engine->L, 1);
 	return worker;
 }
 
-static int run_worker(uv_loop_t *loop, struct engine *engine, int forks)
+static int run_worker(uv_loop_t *loop, struct engine *engine)
 {
-	/* Fork subprocesses if requested */
-	while (--forks > 0) {
-		int pid = fork();
-		if (pid < 0) {
-			perror("[system] fork");
-			return EXIT_FAILURE;
-		}
-		/* Forked process */
-		if (pid == 0) {
-			break;
-		}
-	}
-
 	/* Control sockets or TTY */
 	auto_free char *sock_file = NULL;
 	uv_pipe_t pipe;
@@ -253,6 +244,19 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* Fork subprocesses if requested */
+	while (--forks > 0) {
+		int pid = fork();
+		if (pid < 0) {
+			perror("[system] fork");
+			return EXIT_FAILURE;
+		}
+		/* Forked process */
+		if (pid == 0) {
+			break;
+		}
+	}
+
 	/* Block signals. */
 	uv_loop_t *loop = uv_default_loop();
 	uv_signal_t sigint;
@@ -270,7 +274,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Create worker */
-	struct worker_ctx *worker = init_worker(loop, &engine, &pool);
+	struct worker_ctx *worker = init_worker(loop, &engine, &pool, forks);
 	if (!worker) {
 		fprintf(stderr, "[system] not enough memory\n");
 		return EXIT_FAILURE;
@@ -284,7 +288,7 @@ int main(int argc, char **argv)
 		}
 	}
 	if (ret == 0) {
-		ret = run_worker(loop, &engine, forks);
+		ret = run_worker(loop, &engine);
 	}
 	/* Cleanup. */
 	fprintf(stderr, "\n[system] quitting\n");
