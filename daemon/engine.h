@@ -26,6 +26,9 @@
 #ifndef MP_FREELIST_SIZE
 #define MP_FREELIST_SIZE 32 /**< Maximum length of the worker mempool freelist */
 #endif
+#ifndef RECVMMSG_BATCH
+#define RECVMMSG_BATCH 8
+#endif
 
 /*
  * @internal These are forward decls to allow building modules with engine but without Lua.

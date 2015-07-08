@@ -75,7 +75,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		pool.ctx = array_tail(worker->pools);
 		array_pop(worker->pools);
 	} else { /* No mempool on the freelist, create new one */
-		pool.ctx = mp_new (16 * CPU_PAGE_SIZE);
+		pool.ctx = mp_new (20 * CPU_PAGE_SIZE);
 	}
 
 	/* Create worker task */

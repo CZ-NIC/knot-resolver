@@ -32,13 +32,18 @@ struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
 	mm_ctx_t *mm;
-	uint8_t wire_buf[4 * KNOT_WIRE_MAX_PKTSIZE];
+#if __linux__
+	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
+#else
+	uint8_t wire_buf[KNOT_WIRE_MAX_PKTSIZE];
+#endif
 	struct {
 		size_t concurrent;
 		size_t udp;
 		size_t tcp;
 	} stats;
 	mp_freelist_t pools;
+	mp_freelist_t ioreqs;
 };
 
 /**
