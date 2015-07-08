@@ -226,9 +226,12 @@ static void on_write(uv_write_t *req, int status)
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	int ret = 0;
-	struct ioreq *req = ioreq_take(task->worker);
-	if (!handle || !req) {
+	if (!handle) {
 		return qr_task_on_send(task, kr_error(EIO));
+	}
+	struct ioreq *req = ioreq_take(task->worker);
+	if (!req) {
+		return qr_task_on_send(task, kr_error(ENOMEM));
 	}
 	if (handle->type == UV_UDP) {
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
@@ -247,6 +250,9 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		if (handle != task->source.handle)
 			task->worker->stats.tcp += 1;
 	}
+	if (ret != 0) {
+		ioreq_release(task->worker, req);
+	}
 	return ret;
 }
 
@@ -255,8 +261,10 @@ static void on_connect(uv_connect_t *req, int status)
 	struct qr_task *task = req->data;
 	if (status == 0) {
 		qr_task_send(task, (uv_handle_t *)req->handle, NULL, task->next_query);
+		ioreq_release(task->worker, (struct ioreq *)req);
+	} else { /* Must not recycle, as 'task' may be freed. */
+		free(req);
 	}
-	ioreq_release(task->worker, (struct ioreq *)req);
 }
 
 static int qr_task_finalize(struct qr_task *task, int state)
