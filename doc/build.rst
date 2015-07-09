@@ -31,14 +31,16 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "C compiler", "*all*", "*(build only)* [#]_"
    "libknot_ 2.0+", "*all*", "Knot DNS library."
-
-There are also *optional* packages that enable specific functionality in Knot DNS Resolver, apart from the `libuv`_ and `GCCGO`_, they are useful mainly for developers to build documentation and tests.
-
-.. csv-table::
-   :header: "Requirement", "Required by", "Notes"
-
    "Lua_ 5.1+", "``daemon``", "Embeddable scripting language (LuaJIT_ is preferred)."
    "libuv_ 1.0+", "``daemon``", "Multiplatform I/O and services."
+
+There are also *optional* packages that enable specific functionality in Knot DNS Resolver, they are useful mainly for developers to build documentation and tests.
+
+.. csv-table::
+   :header: "Optional", "Needed for", "Notes"
+
+   "libmemcached_", "``modules/memcached``", "To build memcached backend module."
+   "hiredis_", "``modules/redis``", "To build redis backend module."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Python_", "``integration tests``", "For scripting tests, C header files are required (``python-dev``)"
    "GCCGO_",  "``modules/go``", "For building Go modules, see modules documentation."
@@ -87,7 +89,6 @@ Usually you only really need to rebuild `libknot`.
    $ export BUILD_IGNORE="..." # Ignore installed dependencies
    $ ./scripts/bootstrap-depends.sh ${FAKEROOT}
 
-
 .. note:: The build system relies on `pkg-config`_ to find dependencies.
    You can override it to force custom versions of the software by environment variables.
 
@@ -132,6 +133,8 @@ The project can be built with code coverage tracking using the ``COVERAGE=1`` va
 .. _Lua: http://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
 .. _GCCGO: https://golang.org/doc/install/gccgo
+.. _libmemcached: http://libmemcached.org/libMemcached.html
+.. _hiredis: https://github.com/redis/hiredis
 .. _Doxygen: http://www.stack.nl/~dimitri/doxygen/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
