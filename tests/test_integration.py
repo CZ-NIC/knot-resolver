@@ -41,6 +41,8 @@ def parse_entry(op, args, file_in):
             out.set_adjust(args)
         elif op == 'SECTION':
             out.begin_section(args[0])
+        elif op == 'RAW':
+            out.begin_raw()
         else:
             out.add_record(op, args)
     return out
@@ -141,14 +143,14 @@ def play_object(path):
     try:
         mock_ctx.set_server(server)
         if TEST_DEBUG > 0:
-            print('--- server listening at %s ---' % str(server.address()))
+            print('--- UDP test server started at')
+            print(server.address())
             print('--- scenario parsed, any key to continue ---')
             sys.stdin.readline()
         scenario.play(mock_ctx)
     finally:
         server.stop()
         mock_ctx.deinit()
-
 
 def test_platform(*args):
     if sys.platform == 'windows':

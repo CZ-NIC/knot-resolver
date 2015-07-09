@@ -125,7 +125,8 @@ static PyObject* resolve(PyObject *self, PyObject *args)
 	const char *query_wire = NULL;
 	size_t query_size = 0;
 	if (!PyArg_ParseTuple(args, "s#", &query_wire, &query_size)) {
-		return NULL;
+		PyObject *out = Py_BuildValue("s#", NULL, 0);
+		return out;
 	}
 
 	/* Prepare input */
@@ -133,8 +134,9 @@ static PyObject* resolve(PyObject *self, PyObject *args)
 	assert(query);
 	int ret = knot_pkt_parse(query, 0);
 	if (ret != KNOT_EOK) {
+		PyObject *out = Py_BuildValue("s#", NULL, 0);
 		knot_pkt_free(&query);
-		return NULL;
+		return out;
 	}
 
 	/* Resolve query */

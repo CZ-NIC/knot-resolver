@@ -2,6 +2,7 @@ import threading
 import select, socket, struct, sys, os, time
 import dns.message
 import test
+import binascii
 
 # Test debugging
 TEST_DEBUG = 0
@@ -27,7 +28,6 @@ def sendto_message(stream, message, addr):
     """ Send DNS/UDP message. """
     if TEST_DEBUG > 0:
         syn_message("outgoing data")
-    message = message.to_wire()
     stream.sendto(message, addr)
     if TEST_DEBUG > 0:
         syn_message("[Python] sent", len(message), "bytes to", addr)
@@ -109,16 +109,20 @@ class TestServer:
                 syn_message("Empty query")
             return False
         response = dns.message.make_response(query)
+        is_raw_data = False
         if self.scenario is not None:
             if TEST_DEBUG > 0:
                 syn_message("get scenario reply")
-            response = self.scenario.reply(query, client_address)
+            response, is_raw_data = self.scenario.reply(query, client_address)
         if response:
             if TEST_DEBUG > 0:
                 syn_message("sending answer")
             if TEST_DEBUG > 1:
                 syn_message("=========\n",response,"=========")
-            sendto_message(client, response, addr)
+            if is_raw_data is False:
+                sendto_message(client, response.to_wire(), addr)
+            else:
+                sendto_message(client, response, addr)
             return True
         else:
             if TEST_DEBUG > 0:
