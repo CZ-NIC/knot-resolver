@@ -10,16 +10,10 @@ Requirements
 For users
 =========
 
-.. contents::
-   :depth: 1
-   :local:
+The library as described provides basic services for name resolution, which should cover the usage,
+examples are in the :ref:`resolve API <lib_api_rplan>` documentation.
 
-The library as described provides basic services for name resolution, which should cover the usage.
-
-Resolving a name
-----------------
-
-.. note:: Migrating from ``getaddrinfo``
+.. tip:: If you're migrating from ``getaddrinfo()``, see *"synchronous"* API, but the library offers iterative API as well to plug it into your event loop for example.
 
 .. _lib-layers:
 
@@ -46,7 +40,7 @@ Writing layers
 
 The resolver :ref:`library <lib_index>` leverages the `processing API`_ from the libknot to separate packet processing code into layers.
 
-*Note* |---| This is only crash-course in the library internals, see the resolver :ref:`library <lib_index>` documentation for the complete overview of the services.
+.. note:: This is only crash-course in the library internals, see the resolver :ref:`library <lib_index>` documentation for the complete overview of the services.
 
 The library offers following services:
 
@@ -55,8 +49,8 @@ The library offers following services:
 - :ref:`Nameservers <lib_api_nameservers>` - Reputation database of nameservers, this serves as an aid for nameserver choice.
 
 A processing layer is going to be called by the query resolution driver for each query,
-so you're going to work with :ref:`struct kr_request <lib_api_rplan>` as your per-query context. This structure contains pointers to
-resolution context, resolution plan and also the final answer. You're likely to retrieve currently solved query from the query plan:
+so you're going to work with :ref:`struct kr_request <lib_api_rplan>` as your per-query context.
+This structure contains pointers to resolution context, resolution plan and also the final answer.
 
 .. code-block:: c
 
@@ -66,9 +60,9 @@ resolution context, resolution plan and also the final answer. You're likely to 
 		struct kr_query *query = kr_rplan_current(request->rplan);
 	}
 
-.. warning:: Never replace or push new queries onto the resolution plan, this is a job of the resolution driver. Single pass through layers expects *current query* to be constant. You can however signalize driver with requests using query flags, like ``QUERY_RESOLVED`` to mark it as resolved.
-
 This is only passive processing of the incoming answer. If you want to change the course of resolution, say satisfy a query from a local cache before the library issues a query to the nameserver, you can use states (see the :ref:`Static hints <mod-hints>` for example).
+
+.. warning:: Never replace or push new queries onto the resolution plan, this is a job of the resolution driver. Single pass through layers expects *current query* to be constant. You can however signalize driver with requests using query flags, like ``QUERY_RESOLVED`` to mark it as resolved.
 
 .. code-block:: c
 
