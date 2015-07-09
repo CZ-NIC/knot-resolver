@@ -424,27 +424,6 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	DEBUG_MSG("query '%s %s'\n", type_str, name_str);
 #endif
 
-	/* The query wasn't resolved from cache,
-	 * now it's the time to look up closest zone cut from cache.
-	 */
-	if (qry->flags & QUERY_AWAIT_CUT) {
-		int ret = ns_fetch_cut(qry, request, true);
-		if (ret != 0) {
-			return KNOT_STATE_FAIL;
-		}
-
-		if (!qry->zone_cut.key) {
-			/* Try to fetch missing DNSKEY. */
-			/* TODO -- Fetch all missing DNSKEYS and DS records. */
-			/* TODO -- Fetch DS at parent side of a zone cut. Fetch NS at the child side of the zone cut. */
-			/* TODO -- Handle holes (sequences with missing delegation). */
-			struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
-			if (!next) {
-				return kr_error(ENOMEM);
-			}
-		}
-	}
-
 	/* Resolve current query and produce dependent or finish */
 	int state = knot_overlay_produce(&request->overlay, packet);
 	if (state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
@@ -469,15 +448,28 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 */
 	if (qry->flags & QUERY_AWAIT_CUT) {
 		qry->flags &= ~QUERY_AWAIT_CUT;
+		bool want_secured = knot_pkt_has_dnssec(request->answer);
+		int ret = ns_fetch_cut(qry, request, want_secured);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
+		/* Try to fetch missing DNSKEY. */
+		if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
+			/* TODO -- Fetch all missing DNSKEYS and DS records. */
+			/* TODO -- Fetch DS at parent side of a zone cut. Fetch NS at the child side of the zone cut. */
+			/* TODO -- Handle holes (sequences with missing delegation). */
+			struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
+			if (!next) {
+				return kr_error(ENOMEM);
+			}
+			return KNOT_STATE_PRODUCE;
+		}
 		/* Update minimized QNAME if zone cut changed */
 		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
 			if (kr_make_query(qry, packet) != 0) {
 				return KNOT_STATE_FAIL;
 			}
 		}
-	} else if (qry->flags & QUERY_AWAIT_TRUST) {
-#warning TODO: request DNSKEY in the same way as in the ns_fetch_cut()
-#warning FLOW: this will put current query on hold and resolve DNSKEY first, so we can validate
 	}
 
 ns_election:

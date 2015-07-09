@@ -32,7 +32,7 @@ static void test_zonecut_params(void **state)
 	assert_null((void *)kr_zonecut_find(NULL, NULL));
 	assert_null((void *)kr_zonecut_find(&cut, NULL));
 	assert_int_not_equal(kr_zonecut_set_sbelt(NULL, NULL), 0);
-	assert_int_not_equal(kr_zonecut_find_cached(NULL, NULL, NULL, NULL, 0), 0);
+	assert_int_not_equal(kr_zonecut_find_cached(NULL, NULL, NULL, NULL, 0, 0), 0);
 }
 
 #define TEST_IP(cut, ip, expect) { \

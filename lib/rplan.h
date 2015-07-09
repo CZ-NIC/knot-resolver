@@ -34,7 +34,6 @@
 	X(AWAIT_IPV4 , 1 << 4) /**< Query is waiting for A address. */ \
 	X(AWAIT_IPV6 , 1 << 5) /**< Query is waiting for AAAA address. */ \
 	X(AWAIT_CUT  , 1 << 6) /**< Query is waiting for zone cut lookup */ \
-	X(AWAIT_TRUST, 1 << 7) /**< Query is waiting for trust anchor and key */ \
 	X(SAFEMODE   , 1 << 8) /**< Don't use fancy stuff (EDNS...) */ \
 	X(CACHED     , 1 << 9) /**< Query response is cached. */
 

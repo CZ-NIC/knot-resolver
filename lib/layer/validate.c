@@ -27,12 +27,11 @@
 #include "lib/nsrep.h"
 #include "lib/module.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(&req->rplan), "validate", fmt)
+#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(&req->rplan), "vldr", fmt)
 
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
 {
-#warning TODO: set root trust anchor
 	ctx->data = module_param;
 	return KNOT_STATE_PRODUCE;
 }
@@ -95,10 +94,17 @@ static int secure_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
+	struct kr_request *req = ctx->data;
+	struct kr_query *query = kr_rplan_current(&req->rplan);
+	if (ctx->state & KNOT_STATE_FAIL) {
+		return ctx->state;
+	}
 #warning TODO: check if we have DNSKEY in qry->zone_cut and validate RRSIGS/proof, return FAIL if failed
 #warning TODO: we must also validate incoming DNSKEY records against the current zone cut TA
 #warning FLOW: first answer that comes here must have the DNSKEY that we can validate using TA
-
+	DEBUG_MSG("checking query, dnskey: %d, secured: %d\n",
+		  knot_pkt_qtype(pkt) == KNOT_RRTYPE_DNSKEY,
+		  knot_pkt_has_dnssec(pkt));
 	return ctx->state;
 }
 
@@ -108,7 +114,6 @@ const knot_layer_api_t *validate_layer(struct kr_module *module)
 	static const knot_layer_api_t _layer = {
 		.begin = &begin,
 		.consume = &validate,
-		.produce = &secure_query
 	};
 	return &_layer;
 }
