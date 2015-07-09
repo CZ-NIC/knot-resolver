@@ -27,6 +27,7 @@
 
 #include "lib/cache.h"
 #include "lib/defines.h"
+#include "lib/utils.h"
 
 /* Key size */
 #define KEY_HSIZE (1 + sizeof(uint16_t))
@@ -274,20 +275,22 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
 		return kr_error(ENOMEM);
 	}
 
-	knot_rdata_t *rd = knot_rdataset_at(&src->rrs, 0);
-	knot_rdata_t *rd_dst = NULL;
+	/* Copy valid records */
+	knot_rdata_t *rd = src->rrs.data;
 	for (uint16_t i = 0; i < src->rrs.rr_count; ++i) {
 		if (knot_rdata_ttl(rd) >= drift) {
-			/* Append record */
 			if (knot_rdataset_add(&dst->rrs, rd, mm) != 0) {
 				knot_rrset_clear(dst, mm);
 				return kr_error(ENOMEM);
 			}
-			/* Fixup TTL from absolute time */
-			rd_dst = knot_rdataset_at(&dst->rrs, dst->rrs.rr_count - 1);
-			knot_rdata_set_ttl(rd_dst, knot_rdata_ttl(rd) - drift);
 		}
-		rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
+		rd = kr_rdataset_next(rd);
+	}
+	/* Fixup TTL by time passed */
+	rd = dst->rrs.data;
+	for (uint16_t i = 0; i < dst->rrs.rr_count; ++i) {
+		knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
+		rd = kr_rdataset_next(rd);
 	}
 
 	return kr_ok();
@@ -310,11 +313,12 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint32_
 		.ttl = 0,
 		.count = rr->rrs.rr_count
 	};
+	knot_rdata_t *rd = rr->rrs.data;
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
-		knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, i);
 		if (knot_rdata_ttl(rd) > header.ttl) {
 			header.ttl = knot_rdata_ttl(rd);
 		}
+		rd = kr_rdataset_next(rd);
 	}
 
 	namedb_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };

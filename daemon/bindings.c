@@ -15,6 +15,7 @@
  */
 
 #include <uv.h>
+#include <libknot/descriptor.h>
 
 #include "lib/cache.h"
 #include "daemon/bindings.h"
@@ -541,5 +542,73 @@ int lib_event(lua_State *L)
 	};
 
 	register_lib(L, "event", lib);
+	return 1;
+}
+
+static inline struct worker_ctx *wrk_luaget(lua_State *L) {
+	lua_getglobal(L, "__worker");
+	struct worker_ctx *worker = lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	return worker;
+}
+
+static int wrk_resolve(lua_State *L)
+{
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (!worker) {
+		return 0;
+	}
+	/* Create query packet */
+	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
+	if (!pkt) {
+		lua_pushstring(L, strerror(ENOMEM));
+		lua_error(L);
+	}
+	uint8_t dname[KNOT_DNAME_MAXLEN];
+	knot_dname_from_str(dname, lua_tostring(L, 1), sizeof(dname));
+	/* Check class and type */
+	uint16_t rrtype = lua_tointeger(L, 2);
+	if (!lua_isnumber(L, 2)) {
+		lua_pushstring(L, "invalid RR type");
+		lua_error(L);
+	}
+	uint16_t rrclass = lua_tointeger(L, 3);
+	if (!lua_isnumber(L, 3)) { /* Default class is IN */
+		rrclass = KNOT_CLASS_IN;
+	}
+	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
+	knot_wire_set_rd(pkt->wire);
+	/* Resolve it */
+	int ret = worker_resolve(worker, pkt);
+	knot_pkt_free(&pkt);
+	lua_pushboolean(L, ret == 0);
+	return 1;
+}
+
+/** Return worker statistics. */
+static int wrk_stats(lua_State *L)
+{
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (!worker) {
+		return 0;
+	}
+	lua_newtable(L);
+	lua_pushnumber(L, worker->stats.concurrent);
+	lua_setfield(L, -2, "concurrent");
+	lua_pushnumber(L, worker->stats.udp);
+	lua_setfield(L, -2, "udp");
+	lua_pushnumber(L, worker->stats.tcp);
+	lua_setfield(L, -2, "tcp");
+	return 1;
+}
+
+int lib_worker(lua_State *L)
+{
+	static const luaL_Reg lib[] = {
+		{ "resolve",  wrk_resolve },
+		{ "stats",    wrk_stats },
+		{ NULL, NULL }
+	};
+	register_lib(L, "worker", lib);
 	return 1;
 }

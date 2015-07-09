@@ -1,5 +1,6 @@
 kresd_EMBED := \
-	contrib/ccan/json/json.c
+	contrib/ccan/json/json.c \
+	contrib/ccan/asprintf/asprintf.c
 kresd_SOURCES := \
 	$(kresd_EMBED)   \
 	daemon/io.c          \

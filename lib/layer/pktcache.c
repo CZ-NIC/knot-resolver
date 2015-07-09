@@ -45,13 +45,13 @@ static uint32_t limit_ttl(uint32_t ttl)
 
 static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 {
-	knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, 0);
+	knot_rdata_t *rd = rr->rrs.data;
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
 		uint32_t ttl = knot_rdata_ttl(rd);
 		if (ttl >= drift) {
 			knot_rdata_set_ttl(rd, ttl - drift);
 		}
-		rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
+		rd = kr_rdataset_next(rd);
 	}
 }
 
@@ -67,15 +67,14 @@ static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 	/* Copy answer, keep the original message id */
 	if (entry->count <= pkt->max_size) {
 		/* Keep original header and copy cached */
-		uint8_t header[KNOT_WIRE_HEADER_SIZE];
-		memcpy(header, pkt->wire, sizeof(header));
+		uint16_t msgid = knot_wire_get_id(pkt->wire);
 		/* Copy and reparse */
 		knot_pkt_clear(pkt);
 		memcpy(pkt->wire, entry->data, entry->count);
 		pkt->size = entry->count;
 		knot_pkt_parse(pkt, 0);
 		/* Restore header bits */
-		knot_wire_set_id(pkt->wire, knot_wire_get_id(header));
+		knot_wire_set_id(pkt->wire, msgid);
 	}
 
 	/* Adjust TTL in records. */
@@ -149,13 +148,13 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 			if (rr->type == KNOT_RRTYPE_OPT || rr->type == KNOT_RRTYPE_TSIG) {
 				continue;
 			}
-			knot_rdata_t *rd = knot_rdataset_at(&rr->rrs, 0);
+			knot_rdata_t *rd = rr->rrs.data;
 			for (uint16_t j = 0; j < rr->rrs.rr_count; ++j) {
 				if (knot_rdata_ttl(rd) < ttl) {
 					ttl = knot_rdata_ttl(rd);
 					has_ttl = true;
 				}
-				rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
+				rd = kr_rdataset_next(rd);
 			}
 		}
 	}

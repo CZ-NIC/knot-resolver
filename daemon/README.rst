@@ -34,6 +34,31 @@ You can load modules this way and use their properties to get information about 
 .. role:: lua(code)
    :language: lua
 
+Running in forked mode
+----------------------
+
+The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
+
+.. code-block:: bash
+
+	$ kresd -f 2 rundir > kresd.log
+
+.. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If the kernel doesn't support it, you can still fork multiple processes on different ports, and do load balancing externally (on firewall or with `dnsdist <http://dnsdist.org/>`_).
+
+
+Notice it isn't interactive, but you can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
+
+.. code-block:: bash
+
+	$ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
+	> cache.count()
+	53
+
+This is also a way to enumerate and test running instances, the list of files int ``tty`` correspond to list
+of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
+
+.. warning:: This is very basic way to orchestrate multi-core deployments and doesn't scale in multi-node clusters. Keep an eye on the prepared ``hive`` module that is going to automate everything from service discovery to deployment and consistent configuration.
+
 Configuration
 =============
 
@@ -412,6 +437,17 @@ daemons or manipulated from other processes, making for example synchronised loa
 
    .. note:: This may or may not clear the cache, depending on the used backend. See :func:`cachectl.clear()`. 
 
+.. function:: cache.stats()
+
+   Return table of statistics, note that this tracks all operations over cache, not just which
+   queries were answered from cache or not.
+
+   Example:
+
+   .. code-block:: lua
+
+	print('Insertions:', cache.stats().insert)
+
 Timers and events
 ^^^^^^^^^^^^^^^^^
 
@@ -461,6 +497,32 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
 	e = event.after(1 * minute, function() print('Hi!') end)
 	event.cancel(e)
+
+Scripting worker
+^^^^^^^^^^^^^^^^
+
+Worker is a service over event loop that tracks and schedules outstanding queries,
+you can see the statistics or schedule new queries.
+
+.. function:: worker.stats()
+
+   Return table of statistics.
+
+   Example:
+
+   .. code-block:: lua
+
+	print(worker.stats().concurrent)
+
+.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN])
+
+   :param string qname: Query name (e.g. 'com.')
+   :param number qtype: Query type (e.g. ``kres.type.NS``)
+   :param number qclass: Query class *(optional)* (e.g. ``kres.class.IN``)
+   :return: boolean
+
+   Resolve a query, there is currently no callback when its finished, but you can track the query
+   progress in layers, just like any other query.
 
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/

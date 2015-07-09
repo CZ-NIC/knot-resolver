@@ -26,6 +26,9 @@
 #ifndef MP_FREELIST_SIZE
 #define MP_FREELIST_SIZE 32 /**< Maximum length of the worker mempool freelist */
 #endif
+#ifndef RECVMMSG_BATCH
+#define RECVMMSG_BATCH 8
+#endif
 
 /*
  * @internal These are forward decls to allow building modules with engine but without Lua.
@@ -56,6 +59,7 @@ struct engine {
 
 int engine_init(struct engine *engine, mm_ctx_t *pool);
 void engine_deinit(struct engine *engine);
+/** @warning This function leaves 1 string result on stack. */
 int engine_cmd(struct engine *engine, const char *str);
 int engine_start(struct engine *engine);
 void engine_stop(struct engine *engine);

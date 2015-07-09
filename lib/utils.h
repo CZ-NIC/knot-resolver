@@ -36,9 +36,16 @@ extern void _cleanup_fclose(FILE **p);
 
 /** @internal Fast packet reset. */
 #define KR_PKT_RECYCLE(pkt) do { \
-	(pkt)->parsed = (pkt)->size = KNOT_WIRE_HEADER_SIZE; \
+	(pkt)->rrset_count = 0; \
+	(pkt)->size = KNOT_WIRE_HEADER_SIZE; \
+	(pkt)->current = KNOT_ANSWER; \
+	memset((pkt)->sections, 0, sizeof((pkt)->sections)); \
+	knot_pkt_begin((pkt), KNOT_ANSWER); \
 	knot_pkt_parse_question((pkt)); \
 } while (0)
+
+/** @internal Next RDATA shortcut. */
+#define kr_rdataset_next(rd) (rd + knot_rdata_array_size(knot_rdata_rdlen(rd)))
 
 /** Concatenate N strings. */
 char* kr_strcatdup(unsigned n, ...);

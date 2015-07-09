@@ -167,9 +167,8 @@ doesn't provide any layer to capture events. The Lua module can however provide 
 				counter.total = counter.total + 1
 				return state
 			end,
-		finish = function (state, req)
-				-- catch KNOT_STATE_FAIL = 8, no bindings yet
-				if state == 8 then
+		finish = function (state, req, answer)
+				if state == kres.FAIL then
 					counter.failed = counter.failed + 1
 				end
 				return state
@@ -256,7 +255,7 @@ See the CGO_ for more information about type conversions and interoperability be
 Configuring modules
 -------------------
 
-There is a callback ``X_config()`` but it's NOOP for now, as the configuration is not yet implemented.
+There is a callback ``X_config()`` that you can implement, see hints module.
 
 .. _mod-properties:
 

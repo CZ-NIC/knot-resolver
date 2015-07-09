@@ -32,21 +32,31 @@ struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
 	mm_ctx_t *mm;
+#if __linux__
+	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
+#else
 	uint8_t wire_buf[KNOT_WIRE_MAX_PKTSIZE];
+#endif
+	struct {
+		size_t concurrent;
+		size_t udp;
+		size_t tcp;
+	} stats;
 	mp_freelist_t pools;
+	mp_freelist_t ioreqs;
 };
 
 /**
- * Resolve query.
- *
- * @param worker
- * @param handle
- * @param answer
- * @param query
- * @param addr
- * @return 0, error code
+ * Process incoming packet (query or answer to subrequest).
+ * @return 0 or an error code
  */
 int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr* addr);
+
+/**
+ * Schedule query for resolution.
+ * @return 0 or an error code
+ */
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query);
 
 /** Reserve worker buffers */
 int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen);

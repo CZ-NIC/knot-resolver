@@ -35,6 +35,7 @@ function graphite.publish()
 	end
 	publish_table(now_metrics, graphite.prefix)
 	publish_table(cache.stats(), graphite.prefix..'.cache')
+	publish_table(worker.stats(), graphite.prefix..'.worker')
 	return 0
 end
 

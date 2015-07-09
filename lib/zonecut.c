@@ -277,12 +277,12 @@ static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t 
 		return;
 	}
 
-	knot_rdata_t *rd = knot_rdataset_at(&cached_rr.rrs, 0);
+	knot_rdata_t *rd = cached_rr.rrs.data;
 	for (uint16_t i = 0; i < cached_rr.rrs.rr_count; ++i) {
 		if (knot_rdata_ttl(rd) > timestamp) {
 			(void) kr_zonecut_add(cut, ns, rd);
 		}
-		rd += knot_rdata_array_size(knot_rdata_rdlen(rd));
+		rd = kr_rdataset_next(rd);
 	}
 }
 

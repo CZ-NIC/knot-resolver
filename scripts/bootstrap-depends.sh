@@ -3,7 +3,7 @@ set -e
 
 CMOCKA_TAG="cmocka-0.4.1"
 CMOCKA_URL="git://git.cryptomilk.org/projects/cmocka.git"
-LIBUV_TAG="v1.5.0"
+LIBUV_TAG="v1.x"
 LIBUV_URL="https://github.com/libuv/libuv.git"
 KNOT_TAG="edc125bc"
 KNOT_URL="https://github.com/CZ-NIC/knot.git"
@@ -109,7 +109,7 @@ pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 # libuv
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 # lua
-pkg lua ${LUA_URL} ${LUA_TAG} include/lua.h posix install INSTALL_TOP=${PREFIX} MYCFLAGS="-DLUA_USE_DLOPEN" MYLDFLAGS="-ldl"
+pkg lua ${LUA_URL} ${LUA_TAG} include/lua.h posix install INSTALL_TOP=${PREFIX} MYCFLAGS="-DLUA_USE_DLOPEN" MYLIBS="-ldl"
 if [ ! -f ${PREFIX}/lib/pkgconfig/lua.pc ]; then
 cat > ${PREFIX}/lib/pkgconfig/lua.pc << EOF
 prefix=${PREFIX}
