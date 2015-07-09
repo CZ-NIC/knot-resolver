@@ -46,6 +46,39 @@ static int secure_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
+	if (query->zone_cut.key == NULL) {
+/*
+		query->flags |= QUERY_AWAIT_TRUST;
+
+		DEBUG_MSG("%s() A002 '%s'\n", __func__, knot_pkt_qname(pkt));
+
+		struct knot_rrset *opt_rr = knot_rrset_copy(req->answer->opt_rr, &pkt->mm);
+		if (opt_rr == NULL) {
+			return KNOT_STATE_FAIL;
+		}
+		knot_pkt_clear(pkt);
+		int ret = knot_pkt_put_question(pkt, query->zone_cut.name, query->sclass, KNOT_RRTYPE_DNSKEY);
+		if (ret != KNOT_EOK) {
+			knot_rrset_free(&opt_rr, &pkt->mm);
+			return KNOT_STATE_FAIL;
+		}
+		knot_pkt_begin(pkt, KNOT_ADDITIONAL);
+		knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, opt_rr, KNOT_PF_FREE);
+
+		{
+		char name_str[KNOT_DNAME_MAXLEN], type_str[16];
+		knot_dname_to_str(name_str, knot_pkt_qname(pkt), sizeof(name_str));
+		knot_rrtype_to_string(knot_pkt_qtype(pkt), type_str, sizeof(type_str));
+		DEBUG_MSG("%s() A003 '%s %s'\n", __func__, name_str, type_str);
+		}
+
+		return KNOT_STATE_CONSUME;
+*/
+	}
+
+	DEBUG_MSG("%s() A004\n", __func__);
+
+#if 0
 	/* Copy query EDNS options and request DNSKEY for current cut. */
 	pkt->opt_rr = knot_rrset_copy(req->answer->opt_rr, &pkt->mm);
 	query->flags |= QUERY_AWAIT_TRUST;
@@ -56,6 +89,8 @@ static int secure_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 
 	return KNOT_STATE_CONSUME;
+#endif
+	return ctx->state;
 }
 
 static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -63,6 +98,8 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 #warning TODO: check if we have DNSKEY in qry->zone_cut and validate RRSIGS/proof, return FAIL if failed
 #warning TODO: we must also validate incoming DNSKEY records against the current zone cut TA
 #warning FLOW: first answer that comes here must have the DNSKEY that we can validate using TA
+
+	return ctx->state;
 }
 
 /** Module implementation. */

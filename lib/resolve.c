@@ -49,7 +49,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	}
 }
 
-static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
+static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, bool secured)
 {
 	struct kr_cache_txn txn;
 	int ret = 0;
@@ -63,7 +63,7 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req)
 	if (kr_cache_txn_begin(&req->ctx->cache, &txn, NAMEDB_RDONLY) != 0) {
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
 	} else {
-		ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec);
+		ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, secured);
 		kr_cache_txn_abort(&txn);
 	}
 	return ret;
@@ -424,6 +424,27 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	DEBUG_MSG("query '%s %s'\n", type_str, name_str);
 #endif
 
+	/* The query wasn't resolved from cache,
+	 * now it's the time to look up closest zone cut from cache.
+	 */
+	if (qry->flags & QUERY_AWAIT_CUT) {
+		int ret = ns_fetch_cut(qry, request, true);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
+
+		if (!qry->zone_cut.key) {
+			/* Try to fetch missing DNSKEY. */
+			/* TODO -- Fetch all missing DNSKEYS and DS records. */
+			/* TODO -- Fetch DS at parent side of a zone cut. Fetch NS at the child side of the zone cut. */
+			/* TODO -- Handle holes (sequences with missing delegation). */
+			struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
+			if (!next) {
+				return kr_error(ENOMEM);
+			}
+		}
+	}
+
 	/* Resolve current query and produce dependent or finish */
 	int state = knot_overlay_produce(&request->overlay, packet);
 	if (state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
@@ -447,10 +468,6 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 * now it's the time to look up closest zone cut from cache.
 	 */
 	if (qry->flags & QUERY_AWAIT_CUT) {
-		int ret = ns_fetch_cut(qry, request);
-		if (ret != 0) {
-			return KNOT_STATE_FAIL;
-		}
 		qry->flags &= ~QUERY_AWAIT_CUT;
 		/* Update minimized QNAME if zone cut changed */
 		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
@@ -497,7 +514,8 @@ ns_election:
 	struct sockaddr *addr = &qry->ns.addr.ip;
 	inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr), ns_str, sizeof(ns_str));
 	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
-	DEBUG_MSG("=> querying: '%s' score: %u zone cut: '%s' m12n: '%s'\n", ns_str, qry->ns.score, zonecut_str, qname_str);
+	knot_rrtype_to_string(knot_pkt_qtype(packet), type_str, sizeof(type_str));
+	DEBUG_MSG("=> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n", ns_str, qry->ns.score, zonecut_str, qname_str, type_str);
 #endif
 
 	/* Prepare additional query */

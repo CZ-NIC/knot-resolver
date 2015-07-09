@@ -115,7 +115,8 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut);
  * @param name      QNAME to start finding zone cut for
  * @param txn       cache transaction (read)
  * @param timestamp transaction timestamp
+ * @param secured   search nearest containing a DNSKEY
  * @return 0 or error code
  */
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
-                           struct kr_cache_txn *txn, uint32_t timestamp);
+                           struct kr_cache_txn *txn, uint32_t timestamp, bool secured);

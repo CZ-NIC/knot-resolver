@@ -321,8 +321,36 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_d
 	return kr_ok();
 }
 
+/** Fetch DNSKEY for zone cut. */
+static int fetch_dnskey(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
+{
+	uint32_t drift = timestamp;
+	knot_rrset_t cached_rr;
+
+	knot_rrset_free(&cut->key, cut->pool);
+
+	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_DNSKEY, KNOT_CLASS_IN);
+	int ret = kr_cache_peek_rr(txn, &cached_rr, &drift);
+	if (ret != 0) {
+		return ret;
+	}
+
+	cut->key = knot_rrset_new(name, KNOT_RRTYPE_DNSKEY, KNOT_CLASS_IN, cut->pool);
+	if (cut->key == NULL) {
+		return kr_error(ENOMEM);
+	}
+
+	ret = kr_cache_materialize(cut->key, &cached_rr, timestamp, cut->pool);
+	if (ret != 0) {
+		knot_rrset_free(&cut->key, cut->pool);
+		return ret;
+	}
+
+	return kr_ok();
+}
+
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
-                           struct kr_cache_txn *txn, uint32_t timestamp)
+                           struct kr_cache_txn *txn, uint32_t timestamp, bool secured)
 {
 	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
@@ -330,7 +358,8 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 
 	/* Start at QNAME parent. */
 	while (txn) {
-		if (fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
+		bool has_key = !secured || fetch_dnskey(ctx, cut, name, txn, timestamp) == 0;
+		if (has_key && fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
 			update_cut_name(cut, name);
 			return kr_ok();
 		}
