@@ -464,7 +464,6 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 * now it's the time to look up closest zone cut from cache.
 	 */
 	if (qry->flags & QUERY_AWAIT_CUT) {
-		qry->flags &= ~QUERY_AWAIT_CUT;
 		bool want_secured = (request->flags & KR_REQ_DNSSEC);
 		int ret = ns_fetch_cut(qry, request, want_secured);
 		if (ret != 0) {
@@ -485,6 +484,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 				return KNOT_STATE_FAIL;
 			}
 		}
+		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
 
 ns_election:
