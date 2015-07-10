@@ -1,6 +1,7 @@
 #
 # Integration tests
 #
+TESTS ?= tests/testdata
 
 # Mocked calls library
 libmock_calls_SOURCES := tests/mock_calls.c
@@ -22,6 +23,6 @@ else
 endif
 
 check-integration: $(libmock_calls) $(_test_integration)
-	$(call preload_LIBS) $(preload_syms) tests/test_integration.py tests/testdata
+	$(call preload_LIBS) $(preload_syms) tests/test_integration.py $(TESTS)
 
 .PHONY: check-integration
