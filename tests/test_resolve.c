@@ -25,11 +25,11 @@ static void test_resolve_nullparams(void **state)
 
 	/* NULL parameter check */
 	void *non_null = (void *)0xDEADBEEF;
-	ret = kr_resolve(NULL, non_null, non_null, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY);
+	ret = kr_resolve(NULL, non_null, non_null, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY, 0);
 	assert_int_equal(ret, KNOT_EINVAL);
-	ret = kr_resolve(non_null, NULL, non_null, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY);
+	ret = kr_resolve(non_null, NULL, non_null, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY, 0);
 	assert_int_equal(ret, KNOT_EINVAL);
-	ret = kr_resolve(non_null, non_null, NULL, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY);
+	ret = kr_resolve(non_null, non_null, NULL, KNOT_CLASS_NONE, KNOT_RRTYPE_ANY, 0);
 	assert_int_equal(ret, KNOT_EINVAL);
 }
 

@@ -48,7 +48,7 @@
  *
  * // Resolve "IN A cz."
  * knot_pkt_t *answer = knot_pkt_new(NULL, 65535, ctx.pool);
- * int ret = kr_resolve(&ctx, answer, (uint8_t*)"\x02cz", 1, 1);
+ * int ret = kr_resolve(&ctx, answer, (uint8_t*)"\x02cz", 1, 1, 0);
  * printf("rcode: %d, ancount: %u\n",
  *        knot_wire_get_rcode(answer->wire),
  *        knot_wire_get_ancount(answer->wire));
@@ -113,6 +113,13 @@ struct kr_context
 };
 
 /**
+ * Name resolution flags.
+ */
+enum kr_request_flag {
+	KR_REQ_DNSSEC = 1 << 0, /* Want DNSSEC validation. */
+};
+
+/**
  * Name resolution request.
  *
  * Keeps information about current query processing between calls to
@@ -123,11 +130,12 @@ struct kr_context
  * @note All data for this request must be allocated from the given pool.
  */
 struct kr_request {
-    struct kr_context *ctx;
-    struct kr_rplan rplan;
-    struct knot_overlay overlay;
-    knot_pkt_t *answer;
-    mm_ctx_t pool;
+	unsigned flags;
+	struct kr_context *ctx;
+	struct kr_rplan rplan;
+	struct knot_overlay overlay;
+	knot_pkt_t *answer;
+	mm_ctx_t pool;
 };
 
 /**
@@ -140,10 +148,11 @@ struct kr_request {
  * @param qname  resolved query name
  * @param qclass resolved query class
  * @param qtype  resolved query type
+ * @param flags  resolution flags
  * @return       0 or an error code
  */
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
-               const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);
+               const knot_dname_t *qname, uint16_t qclass, uint16_t qtype, unsigned flags);
 
 /**
  * Begin name resolution.

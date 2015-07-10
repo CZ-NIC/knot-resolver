@@ -100,7 +100,7 @@ static int collect(knot_layer_t *ctx)
 	/* Query parameters and transport mode */
 	if (knot_pkt_has_edns(param->answer)) {
 		stat_add(map, "query.edns", 1);
-		if (knot_pkt_has_dnssec(param->answer)) {
+		if (param->flags & KR_REQ_DNSSEC) {
 			stat_add(map, "query.dnssec", 1);
 		}
 	}

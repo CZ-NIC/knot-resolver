@@ -26,9 +26,9 @@
 #define DEFAULT_MAXTTL (15 * 60)
 #define DEFAULT_NOTTL (5) /* Short-time "no data" retention to avoid bursts */
 
-static inline uint8_t get_tag(knot_pkt_t *pkt)
+static inline uint8_t get_tag(struct kr_request *req)
 {
-	return knot_pkt_has_dnssec(pkt) ? KR_CACHE_SEC : KR_CACHE_PKT;
+	return (req->flags & KR_REQ_DNSSEC) ? KR_CACHE_SEC : KR_CACHE_PKT;
 }
 
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -121,7 +121,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Fetch either answer to original or minimized query */
-	uint8_t tag = get_tag(req->answer);
+	uint8_t tag = get_tag(req);
 	int ret = loot_cache(&txn, pkt, tag, qry);
 	kr_cache_txn_abort(&txn);
 	if (ret == 0) {
@@ -203,7 +203,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	};
 
 	/* Stash answer in the cache */
-	int ret = kr_cache_insert(&txn, get_tag(pkt), qname, qtype, &header, data);	
+	int ret = kr_cache_insert(&txn, get_tag(req), qname, qtype, &header, data);	
 	if (ret != 0) {
 		kr_cache_txn_abort(&txn);
 	} else {

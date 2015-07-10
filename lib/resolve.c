@@ -197,7 +197,7 @@ static int edns_put(knot_pkt_t *pkt)
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
 
-static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template)
+static int edns_create(struct kr_request *request, knot_pkt_t *pkt)
 {
 	/* Create empty OPT RR */
 	pkt->opt_rr = mm_alloc(&pkt->mm, sizeof(*pkt->opt_rr));
@@ -208,15 +208,20 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template)
 	if (ret != 0) {
 		return ret;
 	}
-	/* Set DO bit if set (DNSSEC requested). */
-	if (knot_pkt_has_dnssec(template)) {
+	ret = knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
+	if (ret != 0) {
+		return ret;
+	}
+	/* Add DO=1 if resolving securely. */
+	if (request->flags & KR_REQ_DNSSEC) {
 		knot_edns_set_do(pkt->opt_rr);
 	}
-	return knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
+	return ret;
 }
 
-static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query)
+static int answer_prepare(struct kr_request *request, knot_pkt_t *query)
 {
+	knot_pkt_t *answer = request->answer;
 	if (!knot_wire_get_rd(query->wire)) {
 		return kr_error(ENOSYS); /* Only recursive service */
 	}
@@ -224,8 +229,8 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query)
 		return kr_error(ENOMEM); /* Failed to initialize answer */
 	}
 	/* Handle EDNS in the query */
-	if (knot_pkt_has_edns(query)) {
-		int ret = edns_create(answer, query);
+	if (knot_pkt_has_edns(query) || (request->flags & KR_REQ_DNSSEC)) {
+		int ret = edns_create(request, answer);
 		if (ret != 0){
 			return ret;
 		}
@@ -233,12 +238,17 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query)
 	return kr_ok();
 }
 
-static int answer_finalize(knot_pkt_t *answer)
+static int answer_finalize(struct kr_request *request, int state)
 {
+	/* Write EDNS information */
+	knot_pkt_t *answer = request->answer;
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
 	if (answer->opt_rr) {
 		return edns_put(answer);
-
+	}
+	/* Set AD=1 if succeeded and requested secured answer. */
+	if (state == KNOT_STATE_DONE && (request->flags & KR_REQ_DNSSEC)) {
+		knot_wire_set_ad(answer->wire);
 	}
 	return kr_ok();
 }
@@ -249,7 +259,7 @@ static int query_finalize(struct kr_request *request, knot_pkt_t *pkt)
 	struct kr_query *qry = kr_rplan_current(&request->rplan);
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	if (!(qry->flags & QUERY_SAFEMODE)) {
-		ret = edns_create(pkt, request->answer);
+		ret = edns_create(request, pkt);
 		if (ret == 0) {
 			ret = edns_put(pkt);
 		}
@@ -258,7 +268,7 @@ static int query_finalize(struct kr_request *request, knot_pkt_t *pkt)
 }
 
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
-               const knot_dname_t *qname, uint16_t qclass, uint16_t qtype)
+               const knot_dname_t *qname, uint16_t qclass, uint16_t qtype, unsigned flags)
 {
 	if (ctx == NULL || answer == NULL || qname == NULL) {
 		return kr_error(EINVAL);
@@ -278,6 +288,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 
 	/* Initialize context. */
 	struct kr_request request;
+	request.flags = flags;
 	request.pool = pool;
 	kr_resolve_begin(&request, ctx, answer);
 #ifndef NDEBUG
@@ -358,7 +369,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
-		if (answer_prepare(request->answer, packet) != 0) {
+		if (answer_prepare(request, packet) != 0) {
 			return KNOT_STATE_FAIL;
 		}
 		/* Start query resolution */
@@ -448,7 +459,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 */
 	if (qry->flags & QUERY_AWAIT_CUT) {
 		qry->flags &= ~QUERY_AWAIT_CUT;
-		bool want_secured = knot_pkt_has_dnssec(request->answer);
+		bool want_secured = (request->flags & KR_REQ_DNSSEC);
 		int ret = ns_fetch_cut(qry, request, want_secured);
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;

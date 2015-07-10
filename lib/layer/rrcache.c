@@ -115,14 +115,12 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Only lookup on first iteration */
 	}
 
-	bool dobit = knot_pkt_has_dnssec(req->answer);
-
 	/* Reconstruct the answer from the cache,
 	 * it may either be a CNAME chain or direct answer.
 	 * Only one step of the chain is resolved at a time.
 	 */
 	struct kr_cache *cache = &req->ctx->cache;
-	int ret = loot_cache(cache, pkt, qry, dobit);
+	int ret = loot_cache(cache, pkt, qry, req->flags & KR_REQ_DNSSEC);
 	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
@@ -137,12 +135,18 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 /** @internal Baton for stash_commit */
 struct stash_baton
 {
+	struct kr_request *req;
 	struct kr_cache_txn *txn;
 	unsigned timestamp;
 };
 
 static int commit_rrsig(struct stash_baton *baton, knot_rrset_t *rr)
 {
+	/* If not doing secure resolution, ignore (unvalidated) RRSIGs. */
+	if (!(baton->req->flags & KR_REQ_DNSSEC)) {
+		return kr_ok();
+	}
+	/* Commit covering RRSIG to a separate cache namespace. */
 	uint16_t covered = knot_rrsig_type_covered(&rr->rrs, 0);
 	unsigned drift = baton->timestamp;
 	knot_rrset_t query_rrsig;
@@ -177,9 +181,10 @@ static int commit_rr(const char *key, void *val, void *data)
 	return kr_cache_insert_rr(baton->txn, rr, baton->timestamp);
 }
 
-static int stash_commit(map_t *stash, unsigned timestamp, struct kr_cache_txn *txn)
+static int stash_commit(map_t *stash, unsigned timestamp, struct kr_cache_txn *txn, struct kr_request *req)
 {
 	struct stash_baton baton = {
+		.req = req,
 		.txn = txn,
 		.timestamp = timestamp
 	};
@@ -190,14 +195,14 @@ static int stash_add(const knot_pkt_t *pkt, map_t *stash, const knot_rrset_t *rr
 {
 	/* Stash key = {[1] flags, [1-255] owner, [1-5] type, [1] \x00 } */
 	char key[9 + KNOT_DNAME_MAXLEN];
-	bool dobit = knot_pkt_has_dnssec(pkt);
+	bool is_secure = knot_wire_get_ad(pkt->wire);
 	uint16_t rrtype = rr->type;
 	KEY_FLAG_SET(key, KEY_FLAG_NO);
 
 	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
 	 * This way it the stash won't merge RRSIGs together. */
 	if (knot_rrtype_is_dnssec(rr->type)) {
-		if (!dobit || rr->type != KNOT_RRTYPE_RRSIG) {
+		if (!is_secure || rr->type != KNOT_RRTYPE_RRSIG) {
 			return kr_ok(); /* Ignore other (and unsolicited) DNSSEC records. */
 		}
 		rrtype = knot_rrsig_type_covered(&rr->rrs, 0);
@@ -317,7 +322,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		struct kr_cache *cache = &req->ctx->cache;
 		struct kr_cache_txn txn;
 		if (kr_cache_txn_begin(cache, &txn, 0) == 0) {
-			ret = stash_commit(&stash, qry->timestamp.tv_sec, &txn);
+			ret = stash_commit(&stash, qry->timestamp.tv_sec, &txn, req);
 			if (ret == 0) {
 				kr_cache_txn_commit(&txn);
 			} else {
