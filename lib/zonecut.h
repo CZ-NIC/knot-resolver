@@ -31,6 +31,7 @@ struct kr_zonecut {
 	mm_ctx_t *pool;     /**< Memory pool. */
 	map_t nsset;        /**< Map of nameserver => address_set. */
 	knot_rrset_t* key;  /**< Zone cut DNSKEY. */
+	knot_rrset_t* trust_anchor; /**< Current trust anchor. */
 };
 
 /**

@@ -19,6 +19,7 @@
 
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
+#include <libknot/rrtype/dnskey.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
@@ -27,7 +28,7 @@
 #include "lib/nsrep.h"
 #include "lib/module.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(&req->rplan), "vldr", fmt)
+#define DEBUG_MSG(fmt...) QRDEBUG(qry, "vldr", fmt)
 
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -36,6 +37,7 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return KNOT_STATE_PRODUCE;
 }
 
+#if 0
 static int secure_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
@@ -91,20 +93,105 @@ static int secure_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 #endif
 	return ctx->state;
 }
+#endif
+
+static int validate_records(struct kr_query *qry, knot_pkt_t *answer)
+{
+#warning TODO: validate RRSIGS (records with ZSK, keys with KSK), return FAIL if failed
+	if (!qry->zone_cut.key) {
+		DEBUG_MSG("<= no DNSKEY, can't validate\n");
+	}
+
+	DEBUG_MSG("!! validation not implemented\n");
+	return kr_error(ENOSYS);
+}
+
+static int validate_proof(struct kr_query *qry, knot_pkt_t *answer)
+{
+#warning TODO: validate NSECx proof, RRSIGs will be checked later if it matches
+	return kr_ok();
+}
+
+static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
+{
+	/* Merge DNSKEY records from answer */
+	const knot_pktsection_t *an = knot_pkt_section(answer, KNOT_ANSWER);
+	for (unsigned i = 0; i < an->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(an, i);
+		if (rr->type == KNOT_RRTYPE_DNSKEY) {
+			DEBUG_MSG("+= DNSKEY flags: %hu algo: %x\n",
+				knot_dnskey_flags(&rr->rrs, 0),
+				0xff & knot_dnskey_alg(&rr->rrs, 0));
+#warning TODO: merge with zone cut 'key' RRSet
+		}
+	}
+	/* Check if there's a key for current TA. */
+#warning TODO: check if there is a DNSKEY we can trust (matching current TA)
+	return kr_ok();
+}
+
+static int update_delegation(struct kr_query *qry, knot_pkt_t *answer)
+{
+	DEBUG_MSG("<= referral, checking DS\n");
+#warning TODO: delegation, check DS record presence
+	return kr_ok();
+}
 
 static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
+	int ret = 0;
 	struct kr_request *req = ctx->data;
-	struct kr_query *query = kr_rplan_current(&req->rplan);
+	struct kr_query *qry = kr_rplan_current(&req->rplan);
 	if (ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state;
 	}
-#warning TODO: check if we have DNSKEY in qry->zone_cut and validate RRSIGS/proof, return FAIL if failed
-#warning TODO: we must also validate incoming DNSKEY records against the current zone cut TA
-#warning FLOW: first answer that comes here must have the DNSKEY that we can validate using TA
-	DEBUG_MSG("checking query, dnskey: %d, secured: %d\n",
-		  knot_pkt_qtype(pkt) == KNOT_RRTYPE_DNSKEY,
-		  knot_pkt_has_dnssec(pkt));
+
+	/* Pass-through if user doesn't want secure answer. */
+	if (!(req->flags & KR_REQ_DNSSEC)) {
+		return ctx->state;
+	}
+
+	/* Server didn't copy back DO=1, this is okay if it doesn't have DS => insecure.
+	 * If it has DS, it must be secured, fail it as bogus. */
+	if (!knot_pkt_has_dnssec(pkt)) {
+		DEBUG_MSG("<= asked with DO=1, got insecure response\n");
+#warning TODO: fail and retry if it has TA, otherwise flag as INSECURE and continue
+		return KNOT_STATE_FAIL;
+	}
+
+	/* Validate non-existence proof if not positive answer. */	
+	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN) {
+		ret = validate_proof(qry, pkt);
+		if (ret != 0) {
+			DEBUG_MSG("<= bad NXDOMAIN proof\n");
+			qry->flags |= QUERY_DNSSEC_BOGUS;
+			return KNOT_STATE_FAIL;
+		}
+	}
+
+	/* Check if this is a DNSKEY answer, check trust chain and store. */
+	uint16_t qtype = knot_pkt_qtype(pkt);
+	if (qtype == KNOT_RRTYPE_DNSKEY) {
+		ret = validate_keyset(qry, pkt);
+		if (ret != 0) {
+			DEBUG_MSG("<= bad keys, broken trust chain\n");
+			qry->flags |= QUERY_DNSSEC_BOGUS;
+			return KNOT_STATE_FAIL;
+		}
+	/* Update trust anchor. */
+	} else if (qtype == KNOT_RRTYPE_NS) {
+		update_delegation(qry, pkt);
+	}
+
+	/* Validate all records, fail as bogus if it doesn't match. */
+	ret = validate_records(qry, pkt);
+	if (ret != 0) {
+		DEBUG_MSG("<= couldn't validate RRSIGs\n");
+		qry->flags |= QUERY_DNSSEC_BOGUS;
+		return KNOT_STATE_FAIL;
+	}
+
+	DEBUG_MSG("<= answer valid, OK\n");
 	return ctx->state;
 }
 

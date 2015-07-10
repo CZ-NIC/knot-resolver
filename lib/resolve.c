@@ -397,6 +397,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	if (state == KNOT_STATE_FAIL) {
 		kr_nsrep_update_rtt(&qry->ns, KR_NS_TIMEOUT, ctx->cache_rtt);
 		invalidate_ns(rplan, qry);
+		qry->flags &= ~QUERY_RESOLVED;
 	/* Track RTT for iterative answers */
 	} else if (!(qry->flags & QUERY_CACHED)) {
 		struct timeval now;
@@ -414,6 +415,11 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	}
 
 	knot_overlay_reset(&request->overlay);
+
+	/* Do not finish with bogus answer. */
+	if (qry->flags & QUERY_DNSSEC_BOGUS)  {
+		return KNOT_STATE_FAIL;
+	}
 	return kr_rplan_empty(&request->rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 }
 
@@ -466,13 +472,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 		/* Try to fetch missing DNSKEY. */
 		if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
-			/* TODO -- Fetch all missing DNSKEYS and DS records. */
-			/* TODO -- Fetch DS at parent side of a zone cut. Fetch NS at the child side of the zone cut. */
-			/* TODO -- Handle holes (sequences with missing delegation). */
 			struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
 			if (!next) {
 				return kr_error(ENOMEM);
 			}
+			next->flags |= QUERY_AWAIT_CUT;
 			return KNOT_STATE_PRODUCE;
 		}
 		/* Update minimized QNAME if zone cut changed */
@@ -539,7 +543,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
 #endif
 	/* Finalize answer */
-	if (answer_finalize(request->answer) != 0) {
+	if (answer_finalize(request, state) != 0) {
 		state = KNOT_STATE_FAIL;
 	}
 	/* Error during procesing, internal failure */

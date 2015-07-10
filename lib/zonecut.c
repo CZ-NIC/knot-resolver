@@ -265,6 +265,7 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 		}
 	}
 
+#warning TODO: set root trust anchor from config, or hardcode for now
 	return kr_ok();
 }
 
@@ -358,6 +359,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 
 	/* Start at QNAME parent. */
 	while (txn) {
+#warning TODO: find closest trust anchor here, then find NS
 		bool has_key = !secured || fetch_dnskey(ctx, cut, name, txn, timestamp) == 0;
 		if (has_key && fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
 			update_cut_name(cut, name);

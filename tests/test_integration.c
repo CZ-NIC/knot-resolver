@@ -52,8 +52,8 @@ static PyObject* init(PyObject* self, PyObject* args)
 
 	/* Load basic modules. */
 	array_init(global_modules);
-	const char *load_modules[3] = {"iterate", "rrcache", "pktcache"};
-	for (unsigned i = 0; i < 3; ++i) {
+	const char *load_modules[4] = {"iterate", "validate", "rrcache", "pktcache" };
+	for (unsigned i = 0; i < 4; ++i) {
 		struct kr_module *mod = malloc(sizeof(*mod));
 		kr_module_load(mod, load_modules[i], NULL);
 		array_push(global_modules, mod);

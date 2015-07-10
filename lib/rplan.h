@@ -27,16 +27,17 @@
 #include "lib/nsrep.h"
 
 #define QUERY_FLAGS(X) \
-	X(NO_MINIMIZE, 1 << 0) /**< Don't minimize QNAME. */ \
-	X(NO_THROTTLE, 1 << 1) /**< No query/slow NS throttling. */ \
-	X(TCP        , 1 << 2) /**< Use TCP for this query. */ \
-	X(RESOLVED   , 1 << 3) /**< Query is resolved. */ \
-	X(AWAIT_IPV4 , 1 << 4) /**< Query is waiting for A address. */ \
-	X(AWAIT_IPV6 , 1 << 5) /**< Query is waiting for AAAA address. */ \
-	X(AWAIT_CUT  , 1 << 6) /**< Query is waiting for zone cut lookup */ \
-	X(SAFEMODE   , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
-	X(CACHED     , 1 << 8) /**< Query response is cached. */ \
-	X(EXPIRING   , 1 << 9) /**< Query response is cached, but expiring. */
+	X(NO_MINIMIZE  , 1 << 0) /**< Don't minimize QNAME. */ \
+	X(NO_THROTTLE  , 1 << 1) /**< No query/slow NS throttling. */ \
+	X(TCP          , 1 << 2) /**< Use TCP for this query. */ \
+	X(RESOLVED     , 1 << 3) /**< Query is resolved. */ \
+	X(AWAIT_IPV4   , 1 << 4) /**< Query is waiting for A address. */ \
+	X(AWAIT_IPV6   , 1 << 5) /**< Query is waiting for AAAA address. */ \
+	X(AWAIT_CUT    , 1 << 6) /**< Query is waiting for zone cut lookup */ \
+	X(SAFEMODE     , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
+	X(CACHED       , 1 << 8) /**< Query response is cached. */ \
+	X(EXPIRING     , 1 << 9) /**< Query response is cached, but expiring. */ \
+	X(DNSSEC_BOGUS , 1 << 10) /**< Query response is DNSSEC bogus. */ \
 
 /** Query flags */
 enum kr_query_flag {
