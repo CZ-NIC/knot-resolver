@@ -264,7 +264,7 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 			json_append_member(root, elm->key, json_mknumber(elm->val));
 		}
 	}
-	map_walk_prefixed(&data->map, args ? args : "", list_entry, root);
+	map_walk_prefixed(&data->map, (args_len > 0) ? args : "", list_entry, root);
 	char *ret = json_encode(root);
 	json_delete(root);
 	return ret;
