@@ -217,7 +217,7 @@ static char* stats_get(void *env, struct kr_module *module, const char *args)
 	struct stat_data *data = module->data;
 
 	/* Expecting CHAR_BIT to be 8, this is a safe bet */
-	char *ret = malloc(3 * sizeof(ret) + 2);
+	char *ret = malloc(3 * sizeof(size_t) + 2);
 	if (!ret) {
 		return NULL;
 	}
@@ -305,6 +305,19 @@ static char* freq_list(void *env, struct kr_module *module, const char *args)
 	return ret;
 }
 
+static char* freq_turnover(void *env, struct kr_module *module, const char *args)
+{
+	struct stat_data *data = module->data;
+	namehash_t *freq_table = data->frequent.names;
+	if (!freq_table) {
+		return NULL;
+	}
+	JsonNode *root = json_mknumber(freq_table->evictions);
+	char *ret = json_encode(root);
+	json_delete(root);
+	return ret;
+}
+
 static char* freq_clear(void *env, struct kr_module *module, const char *args)
 {
 	struct stat_data *data = module->data;
@@ -367,6 +380,7 @@ struct kr_prop *stats_props(void)
 	    { &stats_list,    "list", "List observed metrics.", },
 	    { &freq_list,     "queries", "List most frequent queries.", },
 	    { &freq_clear,    "queries_clear", "Clear most frequent queries.", },
+	    { &freq_turnover, "queries_turnover", "Turnover of the frequent queries.", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;
