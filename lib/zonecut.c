@@ -24,6 +24,7 @@
 #include "lib/rplan.h"
 #include "lib/defines.h"
 #include "lib/layer.h"
+#include "lib/layer/validate.h" // kr_ta_parse()
 #include "lib/generic/pack.h"
 
 /* Root hint descriptor. */
@@ -71,6 +72,7 @@ int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *
 	cut->name = knot_dname_copy(name, pool);
 	cut->pool = pool;
 	cut->key  = NULL;
+	cut->trust_anchor = NULL;
 	cut->nsset = map_make();
 	cut->nsset.malloc = (map_alloc_f) mm_alloc;
 	cut->nsset.free = (map_free_f) mm_free;
@@ -95,6 +97,7 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 	map_walk(&cut->nsset, free_addr_set, cut->pool);
 	map_clear(&cut->nsset);
 	knot_rrset_free(&cut->key, cut->pool);
+	knot_rrset_free(&cut->trust_anchor, cut->pool);
 }
 
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
@@ -265,7 +268,12 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 		}
 	}
 
-#warning TODO: set root trust anchor from config, or hardcode for now
+#warning TODO: set root trust anchor from config
+	/* Set trust achor. */
+	int ret = kr_ta_parse(&cut->trust_anchor, ROOT_TA, cut->pool);
+	if (ret != 0) {
+		return ret;
+	}
 	return kr_ok();
 }
 
