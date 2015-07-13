@@ -41,6 +41,8 @@ struct worker_ctx {
 		size_t concurrent;
 		size_t udp;
 		size_t tcp;
+		size_t ipv4;
+		size_t ipv6;
 	} stats;
 	mp_freelist_t pools;
 	mp_freelist_t ioreqs;

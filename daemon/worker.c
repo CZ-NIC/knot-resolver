@@ -233,12 +233,11 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	if (!req) {
 		return qr_task_on_send(task, kr_error(ENOMEM));
 	}
+	/* Send using given protocol */
 	if (handle->type == UV_UDP) {
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		req->as.send.data = task;
 		ret = uv_udp_send(&req->as.send, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
-		if (handle != task->source.handle)
-			task->worker->stats.udp += 1;
 	} else {
 		uint16_t pkt_size = htons(pkt->size);
 		uv_buf_t buf[2] = {
@@ -247,8 +246,15 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		};
 		req->as.write.data = task;
 		ret = uv_write(&req->as.write, (uv_stream_t *)handle, buf, 2, &on_write);
-		if (handle != task->source.handle)
-			task->worker->stats.tcp += 1;
+	}
+	/* Update statistics */
+	if (handle != task->source.handle && addr) {
+		if (handle->type == UV_UDP)
+			task->worker->stats.udp += 1;
+		else    task->worker->stats.tcp += 1;
+		if (addr->sa_family == AF_INET6)
+			task->worker->stats.ipv6 += 1;
+		else    task->worker->stats.ipv4 += 1;
 	}
 	if (ret != 0) {
 		ioreq_release(task->worker, req);
@@ -260,7 +266,11 @@ static void on_connect(uv_connect_t *req, int status)
 {
 	struct qr_task *task = req->data;
 	if (status == 0) {
-		qr_task_send(task, (uv_handle_t *)req->handle, NULL, task->next_query);
+		/* Retrieve endpoint IP for statistics */
+		struct sockaddr_in6 addr;
+		int addrlen = sizeof(addr);
+		uv_tcp_getpeername((uv_tcp_t *)req->handle, (struct sockaddr *)&addr, &addrlen);
+		qr_task_send(task, (uv_handle_t *)req->handle, (struct sockaddr *)&addr, task->next_query);
 		ioreq_release(task->worker, (struct ioreq *)req);
 	} else { /* Must not recycle, as 'task' may be freed. */
 		free(req);
@@ -302,6 +312,11 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	/* We're done, no more iterations needed */
 	if (state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return qr_task_finalize(task, state);
+	}
+
+	/* Not done, but no next address given. */
+	if (!addr || sock_type < 0) {
+		return qr_task_step(task, NULL);
 	}
 
 	/* Create connection for iterative query */
