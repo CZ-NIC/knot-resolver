@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include <libknot/descriptor.h>
+#include <libknot/internal/base64.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/dnskey.h>
 
@@ -133,6 +134,187 @@ static int hex2byte(const char hex[2], uint8_t *u)
 	return 0;
 }
 
+static int ta_ds_parse(uint8_t *rd, size_t *rd_written, size_t rd_maxsize, const char *seps, char **saveptr)
+{
+	if (!rd || !rd_written || !seps || !saveptr) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = 0;
+	const char *token;
+	unsigned aux;
+
+	/* Key tag. */
+	token = strtok_r(NULL, seps, saveptr);
+	if (!token) {
+		return kr_error(EINVAL);
+	}
+	ret = uint_parse(token, &aux);
+	if (ret != 0) {
+		return ret;
+	}
+	uint16_t key_tag = aux;
+
+	/* Algorithm. */
+	token = strtok_r(NULL, seps, saveptr);
+	if (!token) {
+		return kr_error(EINVAL);
+	}
+	ret = algorithm_parse(token, &aux);
+	if (ret != 0) {
+		return ret;
+	}
+	uint8_t algorithm = aux;
+
+	/* Digest type. */
+	token = strtok_r(NULL, seps, saveptr);
+	if (!token) {
+		return kr_error(EINVAL);
+	}
+	ret = uint_parse(token, &aux);
+	if (ret != 0) {
+		return ret;
+	}
+	uint8_t digest_type = aux;
+
+	size_t rd_pos = 0;
+	if (rd_maxsize >= 4) {
+		* (uint16_t *) (rd + rd_pos) = htons(key_tag); rd_pos += 2;
+		*(rd + rd_pos++) = algorithm;
+		*(rd + rd_pos++) = digest_type;
+	} else {
+		return kr_error(EINVAL);
+	}
+
+	char hexbuf[2];
+	int i = 0;
+	while ((token = strtok_r(NULL, seps, saveptr)) != NULL) {
+		for (int j = 0; j < strlen(token); ++j) {
+			hexbuf[i++] = token[j];
+			if (i == 2) {
+				uint8_t byte;
+				ret = hex2byte(hexbuf, &byte);
+				if (ret != 0) {
+					return ret;
+				}
+				i = 0;
+
+				if (rd_pos < rd_maxsize) {
+					*(rd + rd_pos++) = byte;
+				} else {
+					return kr_error(ENOMEM);
+				}
+			}
+		}
+	}
+
+	if (i != 0) {
+		return kr_error(EINVAL);
+	}
+
+	*rd_written = rd_pos;
+	return 0;
+}
+
+static int base2bytes(const char base[4], char bytes[3], unsigned *valid)
+{
+	int32_t decoded = base64_decode(base, 4, bytes, 3);
+	if (decoded < 0) {
+		return kr_error(EINVAL);
+	}
+	*valid = decoded;
+	return 0;
+}
+
+int ta_dnskey_parse(uint8_t *rd, size_t *rd_written, size_t rd_maxsize, const char *seps, char **saveptr)
+{
+	fprintf(stderr, "%s()\n", __func__);
+
+	if (!rd || !rd_written || !seps || !saveptr) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = 0;
+	const char *token;
+	unsigned aux;
+
+	/* Flags. */
+	token = strtok_r(NULL, seps, saveptr);
+	if (!token) {
+		return kr_error(EINVAL);
+	}
+	ret = uint_parse(token, &aux);
+	if (ret != 0) {
+		return ret;
+	}
+	uint16_t flags = aux;
+
+	/* Protocol. */
+	token = strtok_r(NULL, seps, saveptr);
+	if (!token) {
+		return kr_error(EINVAL);
+	}
+	ret = uint_parse(token, &aux);
+	if (ret != 0) {
+		return ret;
+	}
+	uint8_t protocol = aux;
+	if (protocol != 3) {
+		return kr_error(EINVAL);
+	}
+
+	/* Algorithm. */
+	token = strtok_r(NULL, seps, saveptr);
+	if (!token) {
+		return kr_error(EINVAL);
+	}
+	ret = algorithm_parse(token, &aux);
+	if (ret != 0) {
+		return ret;
+	}
+	uint8_t algorithm = aux;
+
+	size_t rd_pos = 0;
+	if (rd_maxsize >= 4) {
+		* (uint16_t *) (rd + rd_pos) = htons(flags); rd_pos += 2;
+		*(rd + rd_pos++) = protocol;
+		*(rd + rd_pos++) = algorithm;
+	} else {
+		return kr_error(EINVAL);
+	}
+
+	char basebuf[4];
+	char databuf[3];
+	int i = 0;
+	while ((token = strtok_r(NULL, seps, saveptr)) != NULL) {
+		for (int j = 0; j < strlen(token); ++j) {
+			basebuf[i++] = token[j];
+			if (i == 4) {
+				unsigned written;
+				ret = base2bytes(basebuf, databuf, &written);
+				if (ret != 0) {
+					return ret;
+				}
+				i = 0;
+
+				if ((rd_pos + written) < rd_maxsize) {
+					memcpy(rd + rd_pos, databuf, written);
+					rd_pos += written;
+				} else {
+					return kr_error(ENOMEM);
+				}
+			}
+		}
+	}
+
+	if (i != 0) {
+		return kr_error(EINVAL);
+	}
+
+	*rd_written = rd_pos;
+	return 0;
+}
+
 int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool)
 {
 #define SEPARATORS " \t\n\r"
@@ -145,8 +327,13 @@ int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool)
 		goto fail;
 	}
 
+	char *ds_cpy = NULL;
+	knot_dname_t *owner = NULL;
+	knot_rdata_t *rdata = NULL;
+	knot_rrset_t *ds_set = NULL;
+
 	size_t ds_len = strlen(ds_str) + 1;
-	char *ds_cpy = mm_alloc(pool, ds_len);
+	ds_cpy = mm_alloc(pool, ds_len);
 	if (!ds_cpy) {
 		ret = kr_error(ENOMEM);
 		goto fail;
@@ -155,7 +342,6 @@ int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool)
 	char *saveptr = NULL, *token;
 
 	/* Owner name. */
-	knot_dname_t *owner = NULL;
 	token = strtok_r(ds_cpy, SEPARATORS, &saveptr);
 	if (!token) {
 		ret = kr_error(EINVAL);
@@ -187,95 +373,43 @@ int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool)
 		goto fail;
 	}
 	ret = knot_rrtype_from_string(token, &type);
-	if ((ret != 0) || (type != KNOT_RRTYPE_DS)) {
+	if ((ret != 0) ||
+	    ((type != KNOT_RRTYPE_DS) && (type != KNOT_RRTYPE_DNSKEY))) {
 		ret = kr_error(EINVAL);
 		goto fail;
 	}
-
-	/* Key tag. */
-	token = strtok_r(NULL, SEPARATORS, &saveptr);
-	if (!token) {
-		ret = kr_error(EINVAL);
-		goto fail;
-	}
-	ret = uint_parse(token, &aux);
-	if (ret != 0) {
-		goto fail;
-	}
-	uint16_t key_tag = aux;
-
-	/* Algorithm. */
-	token = strtok_r(NULL, SEPARATORS, &saveptr);
-	if (!token) {
-		ret = kr_error(EINVAL);
-		goto fail;
-	}
-	ret = algorithm_parse(token, &aux);
-	if (ret != 0) {
-		goto fail;
-	}
-	uint8_t algorithm = aux;
-
-	/* Digest type. */
-	token = strtok_r(NULL, SEPARATORS, &saveptr);
-	if (!token) {
-		ret = kr_error(EINVAL);
-		goto fail;
-	}
-	ret = uint_parse(token, &aux);
-	if (ret != 0) {
-		goto fail;
-	}
-	uint8_t digest_type = aux;
 
 	/* Construct RDATA. */
-	knot_rdata_t *rdata = mm_alloc(pool, RDATA_MAXSIZE);
+	rdata = mm_alloc(pool, RDATA_MAXSIZE);
 	if (!rdata) {
 		ret = kr_error(ENOMEM);
 		goto fail;
 	}
-	size_t rd_pos = 0;
-	uint8_t *rd = rdata;
+	size_t rd_written = 0;
 
-	* (uint16_t *) (rd + rd_pos) = htons(key_tag); rd_pos += 2;
-	*(rd + rd_pos++) = algorithm;
-	*(rd + rd_pos++) = digest_type;
-
-	char hexbuf[2];
-	int i = 0;
-	while ((token = strtok_r(NULL, SEPARATORS, &saveptr)) != NULL) {
-		for (int j = 0; j < strlen(token); ++j) {
-			hexbuf[i++] = token[j];
-			if (i == 2) {
-				uint8_t byte;
-				ret = hex2byte(hexbuf, &byte);
-				if (ret != 0) {
-					goto fail;
-				}
-				i = 0;
-
-				if (rd_pos < RDATA_MAXSIZE) {
-					*(rd + rd_pos++) = byte;
-				} else {
-					ret = kr_error(ENOMEM);
-					goto fail;
-				}
-			}
-		}
-	}
-
-	if (i != 0) {
+	switch (type) {
+	case KNOT_RRTYPE_DS:
+		ret = ta_ds_parse(rdata, &rd_written, RDATA_MAXSIZE, SEPARATORS, &saveptr);
+		break;
+	case KNOT_RRTYPE_DNSKEY:
+		ret = ta_dnskey_parse(rdata, &rd_written, RDATA_MAXSIZE, SEPARATORS, &saveptr);
+		break;
+	default:
+		assert(0);
 		ret = kr_error(EINVAL);
+		break;
+	}
+	if (ret != 0) {
 		goto fail;
 	}
 
-	knot_rrset_t *ds_set = knot_rrset_new(owner, type, class, pool);
+	ds_set = knot_rrset_new(owner, type, class, pool);
 	if (!ds_set) {
 		ret = kr_error(ENOMEM);
 		goto fail;
 	}
 
-	ret = knot_rrset_add_rdata(ds_set, rdata, rd_pos, 0, pool);
+	ret = knot_rrset_add_rdata(ds_set, rdata, rd_written, 0, pool);
 	if (ret != 0) {
 		goto fail;
 	}
