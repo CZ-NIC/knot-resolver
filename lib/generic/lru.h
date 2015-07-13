@@ -17,8 +17,10 @@
  * @file lru.h
  * @brief LRU-like cache.
  *
- * @note This is a naive LRU implementation, if value exists it is treated as old
- *       if the key collides. This may be improved with double hashing or hopscotch.
+ * @note This is a naive LRU implementation with a simple slot stickiness counting.
+ *       Each write access increases stickiness on success, and decreases on collision.
+ *       A slot is freed if the stickiness decreases to zero. This makes it less likely,
+ *       that often-updated entries are jousted out of cache.
  *
  * # Example usage:
  *
@@ -48,7 +50,9 @@
  * 	}
  * 	char *enemies[] = {"goro", "raiden", "subzero", "scorpion"};
  * 	for (int i = 0; i < 4; ++i) {
- * 		*lru_set(&lru, enemies[i], strlen(enemies[i])) = i;
+ * 		int *val = lru_set(&lru, enemies[i], strlen(enemies[i]));
+ * 		if (val)
+ * 			*val = i;
  * 	}
  *
  * 	// We're done
@@ -68,6 +72,7 @@
 #define lru_slot_struct \
 	char *key;    /**< Slot key */ \
 	uint32_t len; /**< Slot length */ \
+	uint32_t refs; /**< Slot importance (#writes - #collisions) */ \
 /** @brief Slot header. */
 struct lru_slot {
 	lru_slot_struct
@@ -142,8 +147,14 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 	}
 	uint32_t id = hash(key, len) % lru->size;
 	struct lru_slot *slot = lru_slot_at(lru, id);
-	if (!lru_slot_match(slot, key, len)) {
+	if (lru_slot_match(slot, key, len)) {
+		slot->refs += 1; /* Increase slot significance */
+	} else {
 		if (slot->key) {
+			slot->refs -= 1; /* Decrease slot significance */
+			if (slot->refs > 0) {
+				return NULL; /* Couldn't joust former key. */
+			}
 			lru->evictions += 1;
 			free(slot->key);
 			if (lru->evict) {
@@ -157,6 +168,7 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 		}
 		memcpy(slot->key, key, len);
 		slot->len = len;
+		slot->refs = 1;
 	}
 	return lru_slot_val(slot, offset);
 }
