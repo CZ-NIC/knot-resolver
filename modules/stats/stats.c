@@ -43,7 +43,7 @@
 /** @cond internal Fixed-size map of predefined metrics. */
 #define CONST_METRICS(X) \
 	X(answer,total) X(answer,noerror) X(answer,nxdomain) X(answer,servfail) \
-	X(answer,cached) X(answer,slow) \
+	X(answer,cached) X(answer,10ms) X(answer,100ms) X(answer,1000ms) X(answer,slow) \
 	X(query,edns) X(query,dnssec) \
 	X(const,end)
 
@@ -80,13 +80,6 @@ float time_diff(struct timeval *begin, struct timeval *end)
 	return (end->tv_sec - begin->tv_sec) * 1000 +
 	       (end->tv_usec - begin->tv_usec) / 1000.0;
 
-}
-
-/** @internal Add to map counter */
-static inline void stat_add(struct stat_data *data, const char *key, ssize_t incr)
-{
-	void *val = map_get(&data->map, key);
-	map_set(&data->map, key, (void *)((size_t)val + incr));
 }
 
 /** @internal Add to const map counter */
@@ -161,12 +154,18 @@ static int collect(knot_layer_t *ctx)
 		if (last->flags & QUERY_CACHED) {
 			stat_const_add(data, metric_answer_cached, 1);
 		}
-		/* Count slow queries (>1000ms) */
+		/* Histogram of answer latency. */
 		struct kr_query *first = HEAD(rplan->resolved);
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		float elapsed = time_diff(&first->timestamp, &now);
-		if (elapsed > 1000.0) {
+		if (elapsed < 10.0) {
+			stat_const_add(data, metric_answer_10ms, 1);
+		} else if (elapsed < 100.0) {
+			stat_const_add(data, metric_answer_100ms, 1);
+		} else if (elapsed < 1000.0) {
+			stat_const_add(data, metric_answer_1000ms, 1);
+		} else {
 			stat_const_add(data, metric_answer_slow, 1);
 		}
 	}

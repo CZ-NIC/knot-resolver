@@ -79,5 +79,9 @@ Built-in statistics
 * ``answer.noerror`` - number of **NOERROR** answers
 * ``answer.nxdomain`` - number of **NXDOMAIN** answers
 * ``answer.servfail`` - number of **SERVFAIL** answers
+* ``answer.10ms`` - number of answers completed in 10ms
+* ``answer.100ms`` - number of answers completed in 100ms
+* ``answer.1000ms`` - number of answers completed in 1000ms
+* ``answer.slow`` - number of answers that took more than 1000ms
 * ``query.edns`` - number of queries with EDNS
 * ``query.dnssec`` - number of queries with DNSSEC DO=1
