@@ -1,3 +1,4 @@
+
 ************************
 Knot DNS Resolver daemon 
 ************************
@@ -507,6 +508,10 @@ you can see the statistics or schedule new queries.
 .. function:: worker.stats()
 
    Return table of statistics.
+
+   * ``udp`` - number of outbound queries over UDP
+   * ``tcp`` - number of outbound queries over TCP
+   * ``concurrent`` - number of concurrent queries at the moment
 
    Example:
 

@@ -37,6 +37,9 @@
 
 /* Defaults */
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "stat",  fmt)
+#define FREQUENT_COUNT 1000  /* Size of frequent tables */
+#define FREQUENT_PSAMPLE 100 /* Sampling rate, 1 in N */
+
 /** @cond internal Fixed-size map of predefined metrics. */
 #define CONST_METRICS(X) \
 	X(answer,total) X(answer,noerror) X(answer,nxdomain) X(answer,servfail) \
@@ -112,6 +115,33 @@ static int collect_answer(struct stat_data *data, knot_pkt_t *pkt)
 	return kr_ok();
 }
 
+static inline int collect_key(char *key, const knot_dname_t *name, uint16_t type)
+{
+	memcpy(key, &type, sizeof(type));
+	int key_len = knot_dname_to_wire((uint8_t *)key + sizeof(type), name, KNOT_DNAME_MAXLEN);
+	if (key_len > 0) {
+		return key_len + sizeof(type);
+	}
+	return key_len;
+}
+
+static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_pkt_t *pkt)
+{
+	/* Sample key = {[2] type, [1-255] owner} */
+	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
+	/* Sample queries leading to iteration */
+	struct kr_query *qry = NULL;
+	WALK_LIST(qry, rplan->resolved) {
+		if (!(qry->flags & QUERY_CACHED)) {
+			int key_len = collect_key(key, qry->sname, qry->stype);
+			unsigned *count = lru_set(data->frequent.names, key, key_len);
+			if (count) {
+				*count += 1;
+			}
+		}
+	}
+}
+
 static int collect(knot_layer_t *ctx)
 {
 	struct kr_request *param = ctx->data;
@@ -121,6 +151,10 @@ static int collect(knot_layer_t *ctx)
 
 	/* Collect data on final answer */
 	collect_answer(data, param->answer);
+	/* Probabilistic sampling of queries */
+	if (kr_rand_uint(FREQUENT_PSAMPLE) <= 1) {
+		collect_sample(data, rplan, param->answer);
+	}
 	/* Count cached and unresolved */
 	if (!EMPTY_LIST(rplan->resolved)) {
 		struct kr_query *last = TAIL(rplan->resolved);
@@ -236,6 +270,53 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 	return ret;
 }
 
+/**
+ * List frequent names.
+ *
+ * Output: [{ count: <counter>, name: <qname>, type: <qtype>}, ... ]
+ */
+static char* freq_list(void *env, struct kr_module *module, const char *args)
+{
+	struct stat_data *data = module->data;
+	namehash_t *freq_table = data->frequent.names;
+	if (!freq_table) {
+		return NULL;
+	}
+	uint16_t key_type = 0;
+	char key_name[KNOT_DNAME_MAXLEN];
+	JsonNode *root = json_mkarray();
+	for (unsigned i = 0; i < freq_table->size; ++i) {
+		struct lru_slot *slot = lru_slot_at((struct lru_hash_base *)freq_table, i);
+		if (slot->key) {
+			/* Extract query name, type and counter */
+			memcpy(&key_type, slot->key, sizeof(key_type));
+			knot_dname_to_str(key_name, (uint8_t *)slot->key + sizeof(key_type), sizeof(key_name));
+			unsigned *slot_val = lru_slot_val(slot, lru_slot_offset(freq_table));
+			/* Convert to JSON object */
+			JsonNode *json_val = json_mkobject();
+			json_append_member(json_val, "count", json_mknumber(*slot_val));
+			json_append_member(json_val, "name",  json_mkstring(key_name));
+			json_append_member(json_val, "type",  json_mknumber(key_type));
+			json_append_element(root, json_val);
+		}
+	}
+	char *ret = json_encode(root);
+	json_delete(root);
+	return ret;
+}
+
+static char* freq_clear(void *env, struct kr_module *module, const char *args)
+{
+	struct stat_data *data = module->data;
+	namehash_t *freq_table = data->frequent.names;
+	if (!freq_table) {
+		return NULL;
+	}
+	lru_deinit(freq_table);
+	lru_init(freq_table, FREQUENT_COUNT);
+	return NULL;
+}
+
 /*
  * Module implementation.
  */
@@ -259,6 +340,10 @@ int stats_init(struct kr_module *module)
 	}
 	data->map = map_make();
 	module->data = data;
+	data->frequent.names = malloc(lru_size(namehash_t, FREQUENT_COUNT));
+	if (data->frequent.names) {
+		lru_init(data->frequent.names, FREQUENT_COUNT);
+	}
 	return kr_ok();
 }
 
@@ -267,6 +352,8 @@ int stats_deinit(struct kr_module *module)
 	struct stat_data *data = module->data;
 	if (data) {
 		map_clear(&data->map);
+		lru_deinit(data->frequent.names);
+		free(data->frequent.names);
 		free(data);
 	}
 	return kr_ok();
@@ -275,9 +362,11 @@ int stats_deinit(struct kr_module *module)
 struct kr_prop *stats_props(void)
 {
 	static struct kr_prop prop_list[] = {
-	    { &stats_set,    "set", "Set {key, val} metrics.", },
-	    { &stats_get,    "get", "Get metrics for given key.", },
-	    { &stats_list,   "list", "List observed metrics.", },
+	    { &stats_set,     "set", "Set {key, val} metrics.", },
+	    { &stats_get,     "get", "Get metrics for given key.", },
+	    { &stats_list,    "list", "List observed metrics.", },
+	    { &freq_list,     "queries", "List most frequent queries.", },
+	    { &freq_clear,    "queries_clear", "Clear most frequent queries.", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;
