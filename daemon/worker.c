@@ -29,16 +29,18 @@
 /* @internal IO request entry. */
 struct ioreq
 {
-        union {
-                uv_udp_send_t send;
-                uv_write_t    write;
-                uv_connect_t  connect;
-        } as;
+	union {
+		uv_udp_t      udp;
+		uv_tcp_t      tcp;
+		uv_udp_send_t send;
+		uv_write_t    write;
+		uv_connect_t  connect;
+	} as;
 };
 
 static inline struct ioreq *ioreq_take(struct worker_ctx *worker)
 {
-        struct ioreq *req = NULL;
+	struct ioreq *req = NULL;
 	if (worker->ioreqs.len > 0) {
 		req = array_tail(worker->ioreqs);
 		array_pop(worker->ioreqs);
@@ -209,18 +211,24 @@ static int qr_task_on_send(struct qr_task *task, int status)
 	return status;
 }
 
+static void on_close(uv_handle_t *handle)
+{
+	struct qr_task *task = handle->data;
+	ioreq_release(task->worker, (struct ioreq *)handle);
+}
+
 static void on_send(uv_udp_send_t *req, int status)
 {
 	struct qr_task *task = req->data;
-        qr_task_on_send(task, status);
-        ioreq_release(task->worker, (struct ioreq *)req);
+	qr_task_on_send(task, status);
+	ioreq_release(task->worker, (struct ioreq *)req);
 }
 
 static void on_write(uv_write_t *req, int status)
 {
 	struct qr_task *task = req->data;
-        qr_task_on_send(task, status);
-        ioreq_release(task->worker, (struct ioreq *)req);
+	qr_task_on_send(task, status);
+	ioreq_release(task->worker, (struct ioreq *)req);
 }
 
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
@@ -291,7 +299,7 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	if (task->next_handle) {
 		if (!uv_is_closing(task->next_handle)) {
 			io_stop_read(task->next_handle);
-			uv_close(task->next_handle, (uv_close_cb) free);
+			uv_close(task->next_handle, on_close);
 		}
 		uv_timer_stop(&task->timeout);
 		task->next_handle = NULL;
@@ -320,12 +328,13 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	}
 
 	/* Create connection for iterative query */
-	task->next_handle = io_create(task->worker->loop, sock_type);
-	if (task->next_handle == NULL) {
+	task->next_handle = (uv_handle_t *)ioreq_take(task->worker);
+	if (!task->next_handle) {
 		return qr_task_finalize(task, KNOT_STATE_FAIL);
 	}
 
 	/* Connect or issue query datagram */
+	io_create(task->worker->loop, task->next_handle, sock_type);
 	task->next_handle->data = task;
 	if (sock_type == SOCK_STREAM) {
 		struct ioreq *req = ioreq_take(task->worker);

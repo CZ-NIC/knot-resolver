@@ -23,11 +23,7 @@
 
 static void *handle_alloc(uv_loop_t *loop, size_t size)
 {
-	uv_handle_t *handle = malloc(size);
-	if (handle) {
-		memset(handle, 0, size);
-	}
-	return handle;
+	return malloc(size);
 }
 
 static void handle_free(uv_handle_t *handle)
@@ -127,8 +123,12 @@ static void tcp_accept(uv_stream_t *master, int status)
 		return;
 	}
 
-	uv_stream_t *client = (uv_stream_t *)io_create(master->loop, SOCK_STREAM);
-	if (!client || uv_accept(master, client) != 0) {
+	uv_stream_t *client = handle_alloc(master->loop, sizeof(*client));
+	if (!client) {
+		return;
+	}
+	io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM);
+	if (uv_accept(master, client) != 0) {
 		handle_free((uv_handle_t *)client);
 		return;
 	}
@@ -163,26 +163,13 @@ void tcp_unbind(struct endpoint *ep)
 	uv_close((uv_handle_t *)&ep->tcp, NULL);
 }
 
-uv_handle_t *io_create(uv_loop_t *loop, int type)
+void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)
 {
 	if (type == SOCK_DGRAM) {
-		uv_udp_t *handle = handle_alloc(loop, sizeof(*handle));
-		if (handle) {
-			uv_udp_init(loop, handle);
-		}
-		return (uv_handle_t *)handle;
+		uv_udp_init(loop, (uv_udp_t *)handle);
 	} else {
-		uv_tcp_t *handle = handle_alloc(loop, sizeof(*handle));
-		if (handle) {
-			uv_tcp_init(loop, handle);
-		}
-		return (uv_handle_t *)handle;
+		uv_tcp_init(loop, (uv_tcp_t *)handle);
 	}
-}
-
-void io_close(uv_handle_t *handle)
-{
-	uv_close(handle, (uv_close_cb) handle_free);
 }
 
 int io_start_read(uv_handle_t *handle)
