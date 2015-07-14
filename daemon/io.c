@@ -59,7 +59,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	}
 
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
-	query->max_size = sizeof(worker->wire_buf);
+	query->max_size = KNOT_WIRE_MAX_PKTSIZE;
 	worker_exec(worker, (uv_handle_t *)handle, query, addr);
 	knot_pkt_free(&query);
 }
@@ -91,12 +91,11 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 
-	/* Check for originator connection close */
-	if (nread <= 0 && handle->data == 0) {
-		io_close((uv_handle_t *)handle);
-		return;
-	} else if (nread < 2) {
-		/* Not enough bytes to read length */
+	/* Check for originator connection close / not enough bytes */
+	if (nread < 2) {
+		if (!handle->data) {
+			/* @todo Notify the endpoint if master socket */
+		}
 		worker_exec(worker, (uv_handle_t *)handle, NULL, NULL);
 		return;
 	}
