@@ -270,6 +270,7 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 
 #warning TODO: set root trust anchor from config
 	/* Set trust achor. */
+	knot_rrset_free(&cut->trust_anchor, cut->pool);
 	int ret = kr_ta_parse(&cut->trust_anchor, ROOT_TA, cut->pool);
 	if (ret != 0) {
 		return ret;
