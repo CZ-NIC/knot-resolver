@@ -52,7 +52,7 @@ static inline struct ioreq *ioreq_take(struct worker_ctx *worker)
 
 static inline void ioreq_release(struct worker_ctx *worker, struct ioreq *req)
 {
-	if (!req || worker->ioreqs.len < MP_FREELIST_SIZE) {
+	if (!req || worker->ioreqs.len < 4 * MP_FREELIST_SIZE) {
 		array_push(worker->ioreqs, req);
 	} else {
 		free(req);
@@ -108,7 +108,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		pool.ctx = array_tail(worker->pools);
 		array_pop(worker->pools);
 	} else { /* No mempool on the freelist, create new one */
-		pool.ctx = mp_new (20 * CPU_PAGE_SIZE);
+		pool.ctx = mp_new (4 * CPU_PAGE_SIZE);
 	}
 
 	/* Create worker task */
@@ -132,6 +132,9 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
 	} else if (knot_pkt_has_edns(query)) { /* EDNS */
 		answer_max = knot_edns_get_payload(query->opt_rr);
+		if (answer_max < KNOT_WIRE_MIN_PKTSIZE) {
+			answer_max = KNOT_WIRE_MIN_PKTSIZE;
+		}
 	}
 	/* How much space do we need for intermediate packets? */
 	size_t pktbuf_max = KNOT_EDNS_MAX_UDP_PAYLOAD;
