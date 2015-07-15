@@ -122,10 +122,10 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 {
 	/* Sample key = {[2] type, [1-255] owner} */
 	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
-	/* Sample queries leading to iteration */
+	/* Sample queries leading to iteration or expiring */
 	struct kr_query *qry = NULL;
 	WALK_LIST(qry, rplan->resolved) {
-		if (!(qry->flags & QUERY_CACHED)) {
+		if (!(qry->flags & QUERY_CACHED) || (qry->flags & QUERY_EXPIRING)) {
 			int key_len = collect_key(key, qry->sname, qry->stype);
 			unsigned *count = lru_set(data->frequent.names, key, key_len);
 			if (count) {
