@@ -193,7 +193,8 @@ static void qr_task_free(uv_handle_t *handle)
 static void qr_task_timeout(uv_timer_t *req)
 {
 	struct qr_task *task = req->data;
-	if (task->next_handle) {
+	if (task->next_handle) { /* Handle data may be stale when it completes */
+		task->next_handle->data = NULL;
 		qr_task_step(task, NULL);
 	}
 }
@@ -217,21 +218,27 @@ static int qr_task_on_send(struct qr_task *task, int status)
 static void on_close(uv_handle_t *handle)
 {
 	struct qr_task *task = handle->data;
-	ioreq_release(task->worker, (struct ioreq *)handle);
+	if (task) {
+		ioreq_release(task->worker, (struct ioreq *)handle);
+	} else free(handle);
 }
 
 static void on_send(uv_udp_send_t *req, int status)
 {
 	struct qr_task *task = req->data;
-	qr_task_on_send(task, status);
-	ioreq_release(task->worker, (struct ioreq *)req);
+	if (task) {
+		qr_task_on_send(task, status);
+		ioreq_release(task->worker, (struct ioreq *)req);
+	} else free(req);
 }
 
 static void on_write(uv_write_t *req, int status)
 {
 	struct qr_task *task = req->data;
-	qr_task_on_send(task, status);
-	ioreq_release(task->worker, (struct ioreq *)req);
+	if (task) {
+		qr_task_on_send(task, status);
+		ioreq_release(task->worker, (struct ioreq *)req);
+	} else free(req);
 }
 
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
