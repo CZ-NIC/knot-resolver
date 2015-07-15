@@ -17,8 +17,10 @@
  * @file lru.h
  * @brief LRU-like cache.
  *
- * @note This is a naive LRU implementation, if value exists it is treated as old
- *       if the key collides. This may be improved with double hashing or hopscotch.
+ * @note This is a naive LRU implementation with a simple slot stickiness counting.
+ *       Each write access increases stickiness on success, and decreases on collision.
+ *       A slot is freed if the stickiness decreases to zero. This makes it less likely,
+ *       that often-updated entries are jousted out of cache.
  *
  * # Example usage:
  *
@@ -48,7 +50,9 @@
  * 	}
  * 	char *enemies[] = {"goro", "raiden", "subzero", "scorpion"};
  * 	for (int i = 0; i < 4; ++i) {
- * 		*lru_set(&lru, enemies[i], strlen(enemies[i])) = i;
+ * 		int *val = lru_set(&lru, enemies[i], strlen(enemies[i]));
+ * 		if (val)
+ * 			*val = i;
  * 	}
  *
  * 	// We're done
@@ -68,6 +72,7 @@
 #define lru_slot_struct \
 	char *key;    /**< Slot key */ \
 	uint32_t len; /**< Slot length */ \
+	uint32_t refs; /**< Slot importance (#writes - #collisions) */ \
 /** @brief Slot header. */
 struct lru_slot {
 	lru_slot_struct
@@ -88,6 +93,7 @@ typedef void (*lru_free_f)(void *baton, void *ptr);
 /** @brief LRU structure base. */
 #define lru_hash_struct \
 	uint32_t size;      /**< Number of slots */ \
+	uint32_t evictions; /**< Number of evictions. */ \
 	uint32_t stride;    /**< Stride of the 'slots' array */ \
 	lru_free_f evict;   /**< Eviction function */ \
 	void *baton;        /**< Passed to eviction function */
@@ -107,6 +113,18 @@ struct { \
 	} slots[]; \
 }
 
+/** Get slot at given index. */
+static inline void *lru_slot_at(struct lru_hash_base *lru, uint32_t id)
+{
+	return (struct lru_slot *)(lru->slots + (id * lru->stride));
+}
+
+/** Get pointer to slot value. */
+static inline void *lru_slot_val(struct lru_slot *slot, size_t offset)
+{
+	return ((char *)slot) + offset;
+}
+
 /** @internal Slot data getter */
 static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uint32_t len, size_t offset)
 {
@@ -114,9 +132,9 @@ static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uin
 		return NULL;
 	}
 	uint32_t id = hash(key, len) % lru->size;
-	struct lru_slot *slot = (struct lru_slot *)(lru->slots + (id * lru->stride));
+	struct lru_slot *slot = lru_slot_at(lru, id);
 	if (lru_slot_match(slot, key, len)) {
-		return ((char *)slot) + offset;
+		return lru_slot_val(slot, offset);
 	}
 	return NULL;
 }
@@ -128,12 +146,19 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 		return NULL;
 	}
 	uint32_t id = hash(key, len) % lru->size;
-	struct lru_slot *slot = (struct lru_slot *)(lru->slots + (id * lru->stride));
-	if (!lru_slot_match(slot, key, len)) {
+	struct lru_slot *slot = lru_slot_at(lru, id);
+	if (lru_slot_match(slot, key, len)) {
+		slot->refs += 1; /* Increase slot significance */
+	} else {
 		if (slot->key) {
+			slot->refs -= 1; /* Decrease slot significance */
+			if (slot->refs > 0) {
+				return NULL; /* Couldn't joust former key. */
+			}
+			lru->evictions += 1;
 			free(slot->key);
 			if (lru->evict) {
-				lru->evict(lru->baton, ((char *)slot) + offset);
+				lru->evict(lru->baton, lru_slot_val(slot, offset));
 			}
 		}
 		memset(slot, 0, lru->stride);
@@ -143,8 +168,9 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 		}
 		memcpy(slot->key, key, len);
 		slot->len = len;
+		slot->refs = 1;
 	}
-	return ((char *)slot) + offset;
+	return lru_slot_val(slot, offset);
 }
 
 /**

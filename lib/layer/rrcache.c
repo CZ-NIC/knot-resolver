@@ -33,6 +33,12 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return ctx->state;
 }
 
+/** Record is expiring if it has less than 1% TTL (or less than 5s) */
+static inline bool is_expiring(const knot_rrset_t *rr, uint32_t drift)
+{
+	return 100 * (drift + 5) > 99 * knot_rrset_ttl(rr);
+}
+
 static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *name,
                   uint16_t rrclass, uint16_t rrtype, struct kr_query *qry)
 {
@@ -52,7 +58,7 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 	}
 
 	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
-	if (100 * (drift + 5) > 99 * knot_rrset_ttl(&cache_rr)) {
+	if (is_expiring(&cache_rr, drift)) {
 		qry->flags |= QUERY_EXPIRING;
 	}
 
@@ -136,7 +142,10 @@ static int commit_rr(const char *key, void *val, void *data)
 	knot_rrset_t query_rr;
 	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
 	if (kr_cache_peek_rr(baton->txn, &query_rr, &drift) == 0) {
-	        return kr_ok();
+		/* Allow replace if RRSet in the cache is about to expire. */
+		if (!is_expiring(&query_rr, drift)) {
+		        return kr_ok();
+		}
 	}
 	return kr_cache_insert_rr(baton->txn, rr, baton->timestamp);
 }

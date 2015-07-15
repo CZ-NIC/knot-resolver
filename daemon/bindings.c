@@ -599,6 +599,10 @@ static int wrk_stats(lua_State *L)
 	lua_setfield(L, -2, "udp");
 	lua_pushnumber(L, worker->stats.tcp);
 	lua_setfield(L, -2, "tcp");
+	lua_pushnumber(L, worker->stats.ipv6);
+	lua_setfield(L, -2, "ipv6");
+	lua_pushnumber(L, worker->stats.ipv4);
+	lua_setfield(L, -2, "ipv4");
 	return 1;
 }
 

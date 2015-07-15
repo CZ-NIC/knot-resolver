@@ -14,6 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <libknot/rrtype/rdname.h>
@@ -26,6 +27,27 @@
 #include "lib/layer/iterate.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "resl",  fmt)
+
+/* Randomize QNAME letter case.
+ * This adds 32 bits of randomness at maximum, but that's more than an average domain name length.
+ * https://tools.ietf.org/html/draft-vixie-dnsext-dns0x20-00
+ */
+static void randomized_qname_case(knot_dname_t *qname, unsigned secret)
+{
+	unsigned k = 0;
+	while (*qname != '\0') {
+		for (unsigned i = *qname; i--;) {
+			int chr = qname[i + 1];
+			if (isalpha(chr)) {
+				if (secret & (1 << k)) {
+					qname[i + 1] ^= 0x20;
+				}
+				k = (k + 1) % (sizeof(secret) * CHAR_BIT);
+			}
+		}
+		qname = (uint8_t *)knot_wire_next_label(qname, NULL);
+	}
+}
 
 /** @internal Subtract time (best effort) */
 float time_diff(struct timeval *begin, struct timeval *end)
@@ -245,8 +267,13 @@ static int answer_finalize(knot_pkt_t *answer)
 
 static int query_finalize(struct kr_request *request, knot_pkt_t *pkt)
 {
-	int ret = 0;
+	/* Randomize query case (if not in safemode) */
 	struct kr_query *qry = kr_rplan_current(&request->rplan);
+	qry->secret = (qry->flags & QUERY_SAFEMODE) ? 0 : kr_rand_uint(UINT32_MAX);
+	knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(pkt);
+	randomized_qname_case(qname_raw, qry->secret);
+
+	int ret = 0;
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	if (!(qry->flags & QUERY_SAFEMODE)) {
 		ret = edns_create(pkt, request->answer);
@@ -379,6 +406,11 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 			return KNOT_STATE_CONSUME; /* Try again */
 		}
 	} else {
+		/* Packet cleared, derandomize QNAME. */
+		knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(packet);
+		if (qname_raw && qry->secret != 0) {
+			randomized_qname_case(qname_raw, qry->secret);
+		}
 		state = knot_overlay_consume(&request->overlay, packet);
 	}
 
@@ -428,6 +460,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	int state = knot_overlay_produce(&request->overlay, packet);
 	if (state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
 		/* Produced an answer, consume it. */
+		qry->secret = 0;
 		request->overlay.state = KNOT_STATE_CONSUME;
 		state = knot_overlay_consume(&request->overlay, packet);
 	}
@@ -488,6 +521,12 @@ ns_election:
 		return KNOT_STATE_PRODUCE;
 	}
 
+	/* Prepare additional query */
+	int ret = query_finalize(request, packet);
+	if (ret != 0) {
+		return KNOT_STATE_FAIL;
+	}
+
 #ifndef NDEBUG
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
@@ -497,11 +536,6 @@ ns_election:
 	DEBUG_MSG("=> querying: '%s' score: %u zone cut: '%s' m12n: '%s'\n", ns_str, qry->ns.score, zonecut_str, qname_str);
 #endif
 
-	/* Prepare additional query */
-	int ret = query_finalize(request, packet);
-	if (ret != 0) {
-		return KNOT_STATE_FAIL;
-	}
 	gettimeofday(&qry->timestamp, NULL);
 	*dst = &qry->ns.addr.ip;
 	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
