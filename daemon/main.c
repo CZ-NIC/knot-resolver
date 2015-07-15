@@ -24,6 +24,7 @@
 #include "contrib/ccan/asprintf/asprintf.h"
 #include "lib/defines.h"
 #include "lib/resolve.h"
+#include "lib/dnssec.h"
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/engine.h"
@@ -244,6 +245,8 @@ int main(int argc, char **argv)
 		}
 	}
 
+	kr_crypto_init();
+
 	/* Fork subprocesses if requested */
 	while (--forks > 0) {
 		int pid = fork();
@@ -253,6 +256,7 @@ int main(int argc, char **argv)
 		}
 		/* Forked process */
 		if (pid == 0) {
+			kr_crypto_reinit();
 			break;
 		}
 	}
@@ -298,5 +302,6 @@ int main(int argc, char **argv)
 	if (ret != 0) {
 		ret = EXIT_FAILURE;
 	}
+	kr_crypto_cleanup();
 	return ret;
 }

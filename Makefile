@@ -28,6 +28,7 @@ $(eval $(call find_bin,gccgo))
 $(eval $(call find_python))
 $(eval $(call find_lib,libmemcached,1.0))
 $(eval $(call find_lib,hiredis))
+$(eval $(call find_lib,libdnssec))
 
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)
@@ -36,7 +37,7 @@ ifneq (,$(findstring luajit, $(lua_LIBS)))
 endif
 endif
 
-CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS) $(lua_CFLAGS)
+CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS)
 
 # Sub-targets
 include help.mk

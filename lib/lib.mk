@@ -11,6 +11,7 @@ libkres_SOURCES := \
 	lib/layer/validate.c   \
 	lib/layer/rrcache.c    \
 	lib/layer/pktcache.c   \
+	lib/dnssec.c           \
 	lib/utils.c            \
 	lib/nsrep.c            \
 	lib/module.c           \
@@ -24,6 +25,7 @@ libkres_HEADERS := \
 	lib/generic/map.h      \
 	lib/generic/set.h      \
 	lib/layer.h            \
+	lib/dnssec.h           \
 	lib/utils.h            \
 	lib/nsrep.h            \
 	lib/module.h           \
@@ -34,7 +36,7 @@ libkres_HEADERS := \
 
 # Dependencies
 libkres_DEPEND := 
-libkres_LIBS := $(libknot_LIBS)
+libkres_LIBS := $(libknot_LIBS) $(libdnssec_LIBS)
 libkres_TARGET := -Wl,-rpath,lib -Llib -lkres
 
 # Make library
