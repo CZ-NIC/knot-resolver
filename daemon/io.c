@@ -41,7 +41,11 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 	buf->base = (char *)worker->wire_buf;
-	buf->len = sizeof(worker->wire_buf);
+	/* Use recvmmsg() on master sockets if possible. */
+	if (handle->data)
+		buf->len = suggested_size;
+	else
+		buf->len = sizeof(worker->wire_buf);
 }
 
 void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
