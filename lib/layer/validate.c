@@ -514,13 +514,31 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
 	const knot_pktsection_t *an = knot_pkt_section(answer, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-		if (rr->type == KNOT_RRTYPE_DNSKEY) {
-			DEBUG_MSG("+= DNSKEY flags: %hu algo: %x\n",
-				knot_dnskey_flags(&rr->rrs, 0),
-				0xff & knot_dnskey_alg(&rr->rrs, 0));
-#warning TODO: merge with zone cut 'key' RRSet
+		if ((rr->type != KNOT_RRTYPE_DNSKEY) ||
+		    (knot_dname_cmp(rr->owner, qry->zone_cut.name) != 0)) {
+			continue;
+		}
+		/* Merge with zone cut. */
+		if (!qry->zone_cut.key) {
+			qry->zone_cut.key = knot_rrset_copy(rr, qry->zone_cut.pool);
+			if (!qry->zone_cut.key) {
+				return kr_error(ENOMEM);
+			}
+		} else {
+			int ret = knot_rdataset_merge(&qry->zone_cut.key->rrs,
+			                              &rr->rrs, qry->zone_cut.pool);
+			if (ret != 0) {
+				knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+				return ret;
+			}
 		}
 	}
+
+	if (!qry->zone_cut.key) {
+		/* TODO -- Not sure about the error value. */
+		return kr_error(KNOT_DNSSEC_ENOKEY);
+	}
+
 	/* Check if there's a key for current TA. */
 #warning TODO: check if there is a DNSKEY we can trust (matching current TA)
 	return kr_ok();
