@@ -216,7 +216,7 @@ static int ta_ds_parse(uint8_t *rd, size_t *rd_written, size_t rd_maxsize, const
 	return 0;
 }
 
-static int base2bytes(const char base[4], char bytes[3], unsigned *valid)
+static int base2bytes(const uint8_t base[4], uint8_t bytes[3], unsigned *valid)
 {
 	int32_t decoded = base64_decode(base, 4, bytes, 3);
 	if (decoded < 0) {
@@ -283,8 +283,8 @@ int ta_dnskey_parse(uint8_t *rd, size_t *rd_written, size_t rd_maxsize, const ch
 		return kr_error(EINVAL);
 	}
 
-	char basebuf[4];
-	char databuf[3];
+	uint8_t basebuf[4];
+	uint8_t databuf[3];
 	int i = 0;
 	while ((token = strtok_r(NULL, seps, saveptr)) != NULL) {
 		for (int j = 0; j < strlen(token); ++j) {
@@ -320,7 +320,6 @@ int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool)
 #define SEPARATORS " \t\n\r"
 #define RDATA_MAXSIZE 640
 	int ret = 0;
-	unsigned aux;
 
 	if (!rr || !ds_str || !pool) {
 		ret = kr_error(EINVAL);
@@ -556,7 +555,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_FAIL;
 	}
 
-	/* Validate non-existence proof if not positive answer. */	
+	/* Validate non-existence proof if not positive answer. */
 	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN) {
 		ret = validate_proof(qry, pkt);
 		if (ret != 0) {
