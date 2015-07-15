@@ -540,9 +540,11 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
 		return kr_error(KNOT_DNSSEC_ENOKEY);
 	}
 
+#warning TODO: Ensure canonical format of the whole DNSKEY RRSet. (Also remove duplicities?)
+
 	/* Check if there's a key for current TA. */
 #warning TODO: check if there is a DNSKEY we can trust (matching current TA)
-	int ret = kr_dnskey_trusted(an, qry->zone_cut.key, qry->zone_cut.trust_anchor);
+	int ret = kr_dnskeys_trusted(an, qry->zone_cut.key, qry->zone_cut.trust_anchor, qry->zone_cut.name, qry->timestamp.tv_sec);
 	if (ret != 0) {
 		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
 		return ret;
