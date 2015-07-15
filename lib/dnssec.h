@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <libknot/packet/pkt.h>
+
 /**
  * Initialise cryptographic back-end.
  */
@@ -31,3 +33,12 @@ void kr_crypto_cleanup(void);
  * @note Must be called after fork() in the child.
  */
 void kr_crypto_reinit(void);
+
+/**
+ * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
+ * @param sec Packet section containing the DNSKEY RRSet including its signatures.
+ * @param key DNSKEY RRSet to check.
+ * @param ta  Trust anchor RRSet agains which to validate the DNSKEY.
+ * @return     0 or error code.
+ */
+int kr_dnskey_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys, const knot_rrset_t *ta);

@@ -24,6 +24,7 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/dnskey.h>
 
+#include "lib/dnssec.h"
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
@@ -541,6 +542,11 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
 
 	/* Check if there's a key for current TA. */
 #warning TODO: check if there is a DNSKEY we can trust (matching current TA)
+	int ret = kr_dnskey_trusted(an, qry->zone_cut.key, qry->zone_cut.trust_anchor);
+	if (ret != 0) {
+		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+		return ret;
+	}
 	return kr_ok();
 }
 
