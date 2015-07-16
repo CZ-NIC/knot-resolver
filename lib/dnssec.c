@@ -19,6 +19,7 @@
 #include <dnssec/crypto.h>
 #include <dnssec/error.h>
 #include <dnssec/key.h>
+#include <dnssec/sign.h>
 #include <libknot/descriptor.h>
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
@@ -164,6 +165,156 @@ static int validate_rrsig_rr(const knot_rrset_t *rrset, const knot_rrset_t *rrsi
 	return kr_ok();
 }
 
+/*!
+ * \brief Add RRSIG RDATA without signature to signing context.
+ *
+ * Requires signer name in RDATA in canonical form.
+ *
+ * \param ctx   Signing context.
+ * \param rdata Pointer to RRSIG RDATA.
+ *
+ * \return Error code, KNOT_EOK if successful.
+ */
+#define RRSIG_RDATA_SIGNER_OFFSET 18
+static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
+{
+	assert(ctx);
+	assert(rdata);
+
+	int result;
+
+	// static header
+
+	dnssec_binary_t header = { 0 };
+	header.data = (uint8_t *)rdata;
+	header.size = RRSIG_RDATA_SIGNER_OFFSET;
+
+	result = dnssec_sign_add(ctx, &header);
+	if (result != DNSSEC_EOK) {
+		return result;
+	}
+
+	// signer name
+
+	const uint8_t *rdata_signer = rdata + RRSIG_RDATA_SIGNER_OFFSET;
+	dnssec_binary_t signer = { 0 };
+	signer.data = knot_dname_copy(rdata_signer, NULL);
+	signer.size = knot_dname_size(signer.data);
+
+	result = dnssec_sign_add(ctx, &signer);
+	free(signer.data);
+
+	return result;
+}
+
+/*!
+ * \brief Add covered RRs to signing context.
+ *
+ * Requires all DNAMEs in canonical form and all RRs ordered canonically.
+ *
+ * \param ctx      Signing context.
+ * \param covered  Covered RRs.
+ *
+ * \return Error code, KNOT_EOK if successful.
+ */
+static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *covered)
+{
+	// huge block of rrsets can be optionally created
+	uint8_t *rrwf = malloc(KNOT_WIRE_MAX_PKTSIZE);
+	if (!rrwf) {
+		return KNOT_ENOMEM;
+	}
+
+	int written = knot_rrset_to_wire(covered, rrwf, KNOT_WIRE_MAX_PKTSIZE, NULL);
+	if (written < 0) {
+		free(rrwf);
+		return written;
+	}
+
+	dnssec_binary_t rrset_wire = { 0 };
+	rrset_wire.size = written;
+	rrset_wire.data = rrwf;
+	int result = dnssec_sign_add(ctx, &rrset_wire);
+	free(rrwf);
+
+	return result;
+}
+
+/*!
+ * \brief Add all data covered by signature into signing context.
+ *
+ * RFC 4034: The signature covers RRSIG RDATA field (excluding the signature)
+ * and all matching RR records, which are ordered canonically.
+ *
+ * Requires all DNAMEs in canonical form and all RRs ordered canonically.
+ *
+ * \param ctx          Signing context.
+ * \param rrsig_rdata  RRSIG RDATA with populated fields except signature.
+ * \param covered      Covered RRs.
+ *
+ * \return Error code, KNOT_EOK if successful.
+ */
+/* TODO -- Taken from knot/src/knot/dnssec/rrset-sign.c. Re-write for better fit needed. */
+static int sign_ctx_add_data(dnssec_sign_ctx_t *ctx,
+                             const uint8_t *rrsig_rdata,
+                             const knot_rrset_t *covered)
+{
+	int result = sign_ctx_add_self(ctx, rrsig_rdata);
+	if (result != KNOT_EOK) {
+		return result;
+	}
+
+	return sign_ctx_add_records(ctx, covered);
+}
+
+/* RFC4035 5.3.3 and 5.3.2 */
+static int check_signature(const knot_rrset_t *rrsigs, size_t pos,
+                           const dnssec_key_t *key, const dnssec_key_t *covered)
+{
+	if (!rrsigs || !key || !dnssec_key_can_verify(key)) {
+		return kr_error(EINVAL);
+	}
+
+	int ret;
+	dnssec_sign_ctx_t *sign_ctx = NULL;
+	dnssec_binary_t signature = {0, };
+	dnssec_binary_t new_signed = {0, };
+
+	knot_rrsig_signature(&rrsigs->rrs, pos, &signature.data, &signature.size);
+	if (!signature.data || !signature.size) {
+		ret = kr_error(EINVAL);
+		goto fail;
+	}
+
+	ret = dnssec_sign_new(&sign_ctx, key);
+	if (ret != DNSSEC_EOK) {
+		ret = kr_error(ENOMEM);
+		goto fail;
+	}
+
+	const knot_rdata_t *rr_data = knot_rdataset_at(&rrsigs->rrs, pos);
+	uint8_t *rdata = knot_rdata_data(rr_data);
+
+	ret = sign_ctx_add_data(sign_ctx, rdata, covered);
+	if (ret != KNOT_EOK) {
+		ret = kr_error(ENOMEM);
+		goto fail;
+	}
+
+	ret = dnssec_sign_verify(sign_ctx, &signature);
+	if (ret != KNOT_EOK) {
+#warning TODO: proper DNSSEC error codes needed
+		ret = kr_error(ENOMEM);
+		goto fail;
+	}
+
+	ret = kr_ok();
+
+fail:
+	dnssec_sign_free(sign_ctx);
+	return ret;
+}
+
 /** Validate RRSet in canonical format. */
 static int crrset_validate(const knot_pktsection_t *sec, const knot_rrset_t *rrset,
                            const knot_rrset_t *keys, size_t pos, const dnssec_key_t *key,
@@ -179,11 +330,14 @@ static int crrset_validate(const knot_pktsection_t *sec, const knot_rrset_t *rrs
 		if (validate_rrsig_rr(rrset, rr, keys, pos, key, zone_name, timestamp) != 0) {
 			continue;
 		}
+		if (check_signature(rr, 0, key, keys) != 0) {
+			continue;
+		}
 		ret = kr_ok();
 		break;
 	}
 
-	return kr_error(ENOSYS);
+	return ret;
 }
 
 int kr_dnskeys_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys,
@@ -216,7 +370,6 @@ int kr_dnskeys_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys,
 			kr_dnssec_key_free(&key);
 			continue;
 		}
-#warning TODO: Check the signature of the rrset.
 		if (crrset_validate(sec, keys, keys, i, (dnssec_key_t *) key, zone_name, timestamp) != 0) {
 			kr_dnssec_key_free(&key);
 			continue;
