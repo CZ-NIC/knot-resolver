@@ -12,6 +12,12 @@ notifications:
         rooms: cznic:xNJmvHU2xu2aGtN7Y2eqHKoD
         on_success: change
         on_failure: change
+    webhooks:
+        urls:
+	    - https://webhooks.gitter.im/e/66485d8f591942052faa
+	on_success: always  # options: [always|never|change] default: always
+	on_failure: always  # options: [always|never|change] default: always
+	on_start: false     # default: false
 matrix:
     fast_finish: true
     allow_failures:
