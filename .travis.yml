@@ -15,8 +15,8 @@ notifications:
     webhooks:
         urls:
 	    - https://webhooks.gitter.im/e/66485d8f591942052faa
-	on_success: change
-	on_failure: change
+	on_success: always
+	on_failure: always
 matrix:
     fast_finish: true
     allow_failures:
