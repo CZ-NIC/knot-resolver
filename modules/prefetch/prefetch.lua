@@ -19,6 +19,12 @@ local function current_epoch()
 	return (os.date('%H')*(60/prefetch.window) + math.floor(os.date('%M')/prefetch.window)) % prefetch.period + 1
 end
 
+-- Calculate next sample with jitter [1/5 +20% of window]
+local function next_event()
+	local jitter = (prefetch.window * minute) / 5;
+	return math.random(jitter, 1.2 * jitter)
+end
+
 -- Resolve queued records and flush the queue
 function prefetch.dispatch(ev)
 	local deleted = 0
@@ -48,8 +54,8 @@ local function sample(epoch_now)
 	local queries = stats.frequent()
 	stats.clear_frequent()
 	local start = os.clock()
-	local current = prefetch.log[prefetch.epoch]
-	if prefetch.epoch ~= epoch_now then
+	local current = prefetch.log[epoch_now]
+	if prefetch.epoch ~= epoch_now or current == nil then
 		current = {}
 	end
 	local nr_samples = #queries
@@ -58,8 +64,8 @@ local function sample(epoch_now)
 		local key = string.char(entry.type)..entry.name
 		current[key] = entry.count
 	end
-	print (string.format('[prob] sampling epoch: %d/%d, %.2f sec (%d items)', prefetch.epoch, prefetch.sample, os.clock() - start, #queries))
-	prefetch.log[prefetch.epoch] = current
+	print (string.format('[prob] .. sampling epoch: %d/%d, %.2f sec (%d items)', epoch_now, prefetch.sample, os.clock() - start, nr_samples))
+	prefetch.log[epoch_now] = current
 	prefetch.sample = prefetch.sample + 1
 	return nr_samples
 end
@@ -74,7 +80,7 @@ local function refresh()
 		local key = string.char(entry.type)..entry.name
 		prefetch.queue[key] = 1
 	end
-	print (string.format('[prob] prefetching epoch: %d/%d (%d items)', prefetch.epoch, prefetch.sample, nr_samples))
+	print (string.format('[prob]    .. prefetching %d items', nr_samples))
 	return nr_samples
 end
 
@@ -82,9 +88,10 @@ end
 local function predict(epoch_now)
 	local start = os.clock()
 	local queued = 0
+	local period = prefetch.period + 1
 	for i = 1, prefetch.period / 2 - 1 do
-		local current = prefetch.log[epoch_now - i]
-		local past = prefetch.log[epoch_now - 2*i]
+		local current = prefetch.log[(epoch_now - i) % period]
+		local past = prefetch.log[(epoch_now - 2*i) % period]
 		if current and past then
 			for k, v in pairs(current) do
 				if past[k] ~= nil and not prefetch.queue[k] then
@@ -94,7 +101,7 @@ local function predict(epoch_now)
 			end
 		end
 	end
-	print (string.format('[prob] predicted epoch: %d, %.2f sec (%d items)', prefetch.epoch, os.clock() - start, queued))
+	print (string.format('[prob] predicted epoch: %d, %.2f sec (%d items)', epoch_now, os.clock() - start, queued))
 	return queued
 end
 
@@ -118,10 +125,10 @@ function prefetch.process(ev)
 	-- Dispatch prefetch requests
 	if nr_queued > 0 then
 		prefetch.queue_len = prefetch.queue_len + nr_queued
-		prefetch.batch = prefetch.queue_len / 10
+		prefetch.batch = prefetch.queue_len / 5
 		event.after(0, prefetch.dispatch)
 	end
-	event.after(prefetch.window * minute, prefetch.process)
+	event.after(next_event(), prefetch.process)
 	stats['predict.epoch'] = epoch_now
 	stats['predict.queue'] = prefetch.queue_len
 	stats['predict.learned'] = nr_learned
@@ -130,7 +137,7 @@ end
 
 function prefetch.init(module)
 	prefetch.epoch = current_epoch()
-	event.after(prefetch.window * minute, prefetch.process)
+	event.after(next_event(), prefetch.process)
 end
 
 function prefetch.deinit(module)

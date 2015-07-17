@@ -37,8 +37,8 @@
 
 /* Defaults */
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "stat",  fmt)
-#define FREQUENT_COUNT 5000  /* Size of frequent tables */
-#define FREQUENT_PSAMPLE 100 /* Sampling rate, 1 in N */
+#define FREQUENT_COUNT 5000 /* Size of frequent tables */
+#define FREQUENT_PSAMPLE 50 /* Sampling rate, 1 in N */
 
 /** @cond internal Fixed-size map of predefined metrics. */
 #define CONST_METRICS(X) \
