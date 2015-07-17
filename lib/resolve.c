@@ -400,10 +400,9 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	if (!packet || packet->size == 0) {
 		/* Network error, retry over TCP. */
 		if (!(qry->flags & QUERY_TCP)) {
-			/** @todo This should just penalize UDP and elect next best. */
 			DEBUG_MSG("=> NS unreachable, retrying over TCP\n");
 			qry->flags |= QUERY_TCP;
-			return KNOT_STATE_CONSUME; /* Try again */
+			return KNOT_STATE_PRODUCE;
 		}
 	} else {
 		/* Packet cleared, derandomize QNAME. */
@@ -501,7 +500,7 @@ ns_election:
 	assert(++ns_election_iter < KR_ITER_LIMIT);
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
-	} else {
+	} else if (!(qry->flags & QUERY_TCP)) { /* Keep address when TCP retransmit. */
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
 			DEBUG_MSG("=> no valid NS left\n");
