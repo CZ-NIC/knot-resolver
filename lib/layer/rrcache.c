@@ -52,15 +52,19 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 		return ret;
 	}
 
+	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
+	if (is_expiring(&cache_rr, drift)) {
+		if (qry->flags & QUERY_NO_EXPIRING) {
+			return kr_error(ENOENT);
+		} else {
+			qry->flags |= QUERY_EXPIRING;
+		}
+	}
+
 	/* Update packet question */
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)) {
 		KR_PKT_RECYCLE(pkt);
 		knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
-	}
-
-	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
-	if (is_expiring(&cache_rr, drift)) {
-		qry->flags |= QUERY_EXPIRING;
 	}
 
 	/* Update packet answer */

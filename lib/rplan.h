@@ -36,7 +36,8 @@
 	X(AWAIT_CUT  , 1 << 6) /**< Query is waiting for zone cut lookup */ \
 	X(SAFEMODE   , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
 	X(CACHED     , 1 << 8) /**< Query response is cached. */ \
-	X(EXPIRING   , 1 << 9) /**< Query response is cached, but expiring. */
+	X(EXPIRING   , 1 << 9) /**< Query response is cached, but expiring. */ \
+	X(NO_EXPIRING, 1 << 10) /**< Do not use expiring cached records. */ \
 
 /** Query flags */
 enum kr_query_flag {
