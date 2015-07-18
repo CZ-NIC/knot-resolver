@@ -38,7 +38,7 @@
 /* Defaults */
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "stat",  fmt)
 #define FREQUENT_COUNT 5000 /* Size of frequent tables */
-#define FREQUENT_PSAMPLE 50 /* Sampling rate, 1 in N */
+#define FREQUENT_PSAMPLE 10 /* Sampling rate, 1 in N */
 
 /** @cond internal Fixed-size map of predefined metrics. */
 #define CONST_METRICS(X) \
@@ -121,6 +121,12 @@ static inline int collect_key(char *key, const knot_dname_t *name, uint16_t type
 
 static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_pkt_t *pkt)
 {
+	/* Probabilistic sampling of all queries (consider half) */
+	unsigned roll = kr_rand_uint(FREQUENT_PSAMPLE);
+	if (roll > FREQUENT_PSAMPLE / 2) {
+		return;
+	}
+
 	/* Sample key = {[2] type, [1-255] owner} */
 	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
 	struct kr_query *qry = NULL;
@@ -134,7 +140,8 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 			unsigned *count = lru_set(data->queries.expiring, key, key_len);
 			if (count)
 				*count += 1;
-		} else {
+		/* Consider 1 in N for frequent sampling. */
+		} else if (roll <= 1) {
 			unsigned *count = lru_set(data->queries.frequent, key, key_len);
 			if (count)
 				*count += 1;
@@ -151,10 +158,7 @@ static int collect(knot_layer_t *ctx)
 
 	/* Collect data on final answer */
 	collect_answer(data, param->answer);
-	/* Probabilistic sampling of queries */
-	if (kr_rand_uint(FREQUENT_PSAMPLE) <= 1) {
-		collect_sample(data, rplan, param->answer);
-	}
+	collect_sample(data, rplan, param->answer);
 	/* Count cached and unresolved */
 	if (!EMPTY_LIST(rplan->resolved)) {
 		/* Histogram of answer latency. */
