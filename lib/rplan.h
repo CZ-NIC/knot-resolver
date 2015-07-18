@@ -75,17 +75,17 @@ struct kr_query {
 struct kr_rplan {
 	list_t pending;              /**< List of pending queries. */
 	list_t resolved;             /**< List of resolved queries. */
-	struct kr_context *context;  /**< Parent resolution context. */
+	struct kr_request *request;  /**< Parent resolution request. */
 	mm_ctx_t *pool;              /**< Temporary memory pool. */
 };
 
 /**
  * Initialize resolution plan (empty).
  * @param rplan plan instance
- * @param context resolution context
+ * @param request resolution request
  * @param pool ephemeral memory pool for whole resolution
  */
-int kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *pool);
+int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, mm_ctx_t *pool);
 
 /**
  * Deinitialize resolution plan, aborting any uncommited transactions.

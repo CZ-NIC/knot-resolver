@@ -345,13 +345,14 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer)
 {
 	/* Initialize request */
-	kr_rplan_init(&request->rplan, ctx, &request->pool);
 	knot_overlay_init(&request->overlay, &request->pool);
 	request->ctx = ctx;
 	request->answer = answer;
+	request->options = ctx->options;
 	prepare_layers(request);
 
 	/* Expect first query */
+	kr_rplan_init(&request->rplan, request, &request->pool);
 	return KNOT_STATE_CONSUME;
 }
 

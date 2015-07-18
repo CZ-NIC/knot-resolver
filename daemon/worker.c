@@ -93,7 +93,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 {
 	/* How much can client handle? */
 	size_t answer_max = KNOT_WIRE_MIN_PKTSIZE;
-	if (!addr) { /* TCP */
+	if (!addr && handle) { /* TCP */
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
 	} else if (knot_pkt_has_edns(query)) { /* EDNS */
 		answer_max = MAX(knot_edns_get_payload(query->opt_rr), KNOT_WIRE_MIN_PKTSIZE);
@@ -404,7 +404,7 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 	return qr_task_step(task, query);
 }
 
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query)
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options)
 {
 	if (!worker) {
 		return kr_error(EINVAL);
@@ -415,6 +415,7 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query)
 	if (!task) {
 		return kr_error(ENOMEM);
 	}
+	task->req.options |= options;
 	return qr_task_step(task, query);
 }
 

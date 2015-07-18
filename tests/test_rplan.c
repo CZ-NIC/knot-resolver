@@ -44,8 +44,9 @@ static void test_rplan_push(void **state)
 {
 	mm_ctx_t mm;
 	test_mm_ctx_init(&mm);
-	struct kr_context context = {
-		.pool = &mm,
+	struct kr_request request = {
+		.pool = mm,
+		.flags = 0,
 	};
 
 	struct kr_rplan rplan;

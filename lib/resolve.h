@@ -128,6 +128,7 @@ struct kr_request {
     struct knot_overlay overlay;
     knot_pkt_t *answer;
     mm_ctx_t pool;
+    uint32_t options;
 };
 
 /**

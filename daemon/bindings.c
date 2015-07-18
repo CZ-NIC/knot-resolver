@@ -578,8 +578,19 @@ static int wrk_resolve(lua_State *L)
 	}
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 	knot_wire_set_rd(pkt->wire);
+	/* Add OPT RR */
+	pkt->opt_rr = mm_alloc(&pkt->mm, sizeof(*pkt->opt_rr));
+	if (!pkt->opt_rr) {
+		return kr_error(ENOMEM);
+	}
+	int ret = knot_edns_init(pkt->opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
+	if (ret != 0) {
+		knot_pkt_free(&pkt);
+		return 0;
+	}
 	/* Resolve it */
-	int ret = worker_resolve(worker, pkt);
+	unsigned options = lua_tointeger(L, 4);
+	ret = worker_resolve(worker, pkt, options);
 	knot_pkt_free(&pkt);
 	lua_pushboolean(L, ret == 0);
 	return 1;
