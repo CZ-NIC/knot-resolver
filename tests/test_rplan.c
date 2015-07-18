@@ -46,11 +46,11 @@ static void test_rplan_push(void **state)
 	test_mm_ctx_init(&mm);
 	struct kr_request request = {
 		.pool = mm,
-		.flags = 0,
+		.options = 0,
 	};
 
 	struct kr_rplan rplan;
-	kr_rplan_init(&rplan, &context, &mm);
+	kr_rplan_init(&rplan, &request, &mm);
 
 	/* Push query. */
 	assert_non_null((void *)kr_rplan_push(&rplan, NULL, (knot_dname_t *)"", 0, 0));
