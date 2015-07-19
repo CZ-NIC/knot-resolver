@@ -42,7 +42,7 @@ function predict.drain(ev)
 	end
 	predict.queue_len = predict.queue_len - deleted
 	stats['predict.queue'] = predict.queue_len
-	collectgarbage()
+	collectgarbage('step')
 	return 0
 end
 
@@ -85,7 +85,7 @@ function predict.sample(epoch_now)
 	for i = 1, nr_samples do
 		local entry = queries[i]
 		local key = string.char(entry.type)..entry.name
-		current[key] = entry.count
+		current[key] = 1
 	end
 	predict.log[epoch_now] = current
 	return nr_samples, queued
@@ -139,14 +139,20 @@ function predict.process(ev)
 end
 
 function predict.init(module)
-	predict.epoch = current_epoch()
-	predict.ev_sample = event.after(next_event(), predict.process)
+	if predict.window > 0 and predict.period > 0 then
+		predict.epoch = current_epoch()
+		predict.ev_sample = event.after(next_event(), predict.process)
+	end
 end
 
 function predict.deinit(module)
 	if predict.ev_sample then event.cancel(predict.ev_sample) end
 	if predict.ev_drain then event.cancel(predict.ev_drain) end
+	predict.ev_sample = nil
+	predict.ev_drain = nil
 	predict.log = {}
+	predict.queue = {}
+	predict.queue_len = 0
 	collectgarbage()
 end
 
