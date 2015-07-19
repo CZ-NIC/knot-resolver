@@ -28,6 +28,8 @@ Example configuration
 
 Defaults are 15 minutes window, 6 hours period.
 
+.. tip:: Use period 0 to turn off prediction and just do prefetching of expiring records.
+
 Exported metrics
 ^^^^^^^^^^^^^^^^
 
