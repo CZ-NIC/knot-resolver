@@ -121,12 +121,6 @@ static inline int collect_key(char *key, const knot_dname_t *name, uint16_t type
 
 static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_pkt_t *pkt)
 {
-	/* Probabilistic sampling of all queries (consider half) */
-	unsigned roll = kr_rand_uint(FREQUENT_PSAMPLE);
-	if (roll > FREQUENT_PSAMPLE / 2) {
-		return;
-	}
-
 	/* Sample key = {[2] type, [1-255] owner} */
 	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
 	struct kr_query *qry = NULL;
@@ -141,7 +135,7 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 			if (count)
 				*count += 1;
 		/* Consider 1 in N for frequent sampling. */
-		} else if (roll <= 1) {
+		} else if (kr_rand_uint(FREQUENT_PSAMPLE) <= 1) {
 			unsigned *count = lru_set(data->queries.frequent, key, key_len);
 			if (count)
 				*count += 1;
