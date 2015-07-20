@@ -21,6 +21,7 @@
 #include <dnssec/key.h>
 #include <dnssec/sign.h>
 #include <libknot/descriptor.h>
+#include <libknot/packet/rrset-wire.h>
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/dnskey.h>
@@ -114,20 +115,21 @@ fail:
 }
 
 /* RFC4035 5.3.1 */
-static int validate_rrsig_rr(const knot_rrset_t *rrset, const knot_rrset_t *rrsig,
-                             const knot_rrset_t *keys, size_t pos, const dnssec_key_t *key,
+static int validate_rrsig_rr(const knot_rrset_t *covered,
+                             const knot_rrset_t *rrsigs, size_t sig_pos,
+                             const knot_rrset_t *keys, size_t key_pos, const dnssec_key_t *key,
                              const knot_dname_t *zone_name, uint32_t timestamp)
 {
-	if (!rrset || !rrsig || !keys || !key || !zone_name) {
+	if (!covered || !rrsigs || !keys || !key || !zone_name) {
 		return kr_error(EINVAL);
 	}
 #warning TODO: Make the comparison case-insensitive.
 	/* bullet 1 */
-	if ((rrset->rclass != rrsig->rclass) || (knot_dname_cmp(rrset->owner, rrsig->owner) != 0)) {
+	if ((covered->rclass != rrsigs->rclass) || (knot_dname_cmp(covered->owner, rrsigs->owner) != 0)) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 2 */
-	const knot_dname_t *signer_name = knot_rrsig_signer_name(&rrsig->rrs, 0);
+	const knot_dname_t *signer_name = knot_rrsig_signer_name(&rrsigs->rrs, sig_pos);
 	if (signer_name == NULL) {
 		return kr_error(EINVAL);
 	}
@@ -135,26 +137,26 @@ static int validate_rrsig_rr(const knot_rrset_t *rrset, const knot_rrset_t *rrsi
 		return kr_error(EINVAL);
 	}
 	/* bullet 3 */
-	uint16_t tcovered = knot_rrsig_type_covered(&rrsig->rrs, 0);
-	if (tcovered != rrset->type) {
+	uint16_t tcovered = knot_rrsig_type_covered(&rrsigs->rrs, sig_pos);
+	if (tcovered != covered->type) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 4 */
-	if (knot_rrsig_labels(&rrsig->rrs, 0) > knot_dname_labels(rrset->owner, NULL)) {
+	if (knot_rrsig_labels(&rrsigs->rrs, sig_pos) > knot_dname_labels(covered->owner, NULL)) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 5 */
-	if (knot_rrsig_sig_expiration(&rrsig->rrs, 0) < timestamp) {
+	if (knot_rrsig_sig_expiration(&rrsigs->rrs, sig_pos) < timestamp) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 6 */
-	if (knot_rrsig_sig_inception(&rrsig->rrs, 0) > timestamp) {
+	if (knot_rrsig_sig_inception(&rrsigs->rrs, sig_pos) > timestamp) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 7 */
 	if ((knot_dname_cmp(keys->owner, signer_name) != 0) ||
-	    (knot_dnskey_alg(&keys->rrs, pos) != knot_rrsig_algorithm(&rrsig->rrs, 0)) ||
-	    (dnssec_key_get_keytag(key) != knot_rrsig_key_tag(&rrsig->rrs, 0))) {
+	    (knot_dnskey_alg(&keys->rrs, key_pos) != knot_rrsig_algorithm(&rrsigs->rrs, sig_pos)) ||
+	    (dnssec_key_get_keytag(key) != knot_rrsig_key_tag(&rrsigs->rrs, sig_pos))) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 8 */
@@ -269,7 +271,7 @@ static int sign_ctx_add_data(dnssec_sign_ctx_t *ctx,
 
 /* RFC4035 5.3.3 and 5.3.2 */
 static int check_signature(const knot_rrset_t *rrsigs, size_t pos,
-                           const dnssec_key_t *key, const dnssec_key_t *covered)
+                           const dnssec_key_t *key, const knot_rrset_t *covered)
 {
 	if (!rrsigs || !key || !dnssec_key_can_verify(key)) {
 		return kr_error(EINVAL);
@@ -278,7 +280,6 @@ static int check_signature(const knot_rrset_t *rrsigs, size_t pos,
 	int ret;
 	dnssec_sign_ctx_t *sign_ctx = NULL;
 	dnssec_binary_t signature = {0, };
-	dnssec_binary_t new_signed = {0, };
 
 	knot_rrsig_signature(&rrsigs->rrs, pos, &signature.data, &signature.size);
 	if (!signature.data || !signature.size) {
@@ -315,28 +316,44 @@ fail:
 	return ret;
 }
 
-/** Validate RRSet in canonical format. */
-static int crrset_validate(const knot_pktsection_t *sec, const knot_rrset_t *rrset,
-                           const knot_rrset_t *keys, size_t pos, const dnssec_key_t *key,
-                           const knot_dname_t *zone_name, uint32_t timestamp)
+int kr_rrset_validate(const knot_pktsection_t *sec, const knot_rrset_t *covered,
+                      const knot_rrset_t *keys, size_t key_pos, const struct dseckey *key,
+                      const knot_dname_t *zone_name, uint32_t timestamp)
 {
-	int ret = kr_error(KNOT_DNSSEC_ENOKEY);
-	for (unsigned i = 0; i < sec->count; ++i) {
-		/* Try every RRSIG. */
-		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
-		if (rr->type != KNOT_RRTYPE_RRSIG) {
-			continue;
+	int ret;
+	struct dseckey *created_key = NULL;
+	if (key == NULL) {
+		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, key_pos);
+		ret = kr_dnssec_key_from_rdata(&created_key, krr, keys->owner);
+		if (ret != 0) {
+			return ret;
 		}
-		if (validate_rrsig_rr(rrset, rr, keys, pos, key, zone_name, timestamp) != 0) {
-			continue;
-		}
-		if (check_signature(rr, 0, key, keys) != 0) {
-			continue;
-		}
-		ret = kr_ok();
-		break;
+		key = created_key;
 	}
 
+	ret = kr_error(KNOT_DNSSEC_ENOKEY);
+	for (unsigned i = 0; i < sec->count; ++i) {
+		/* Try every RRSIG. */
+		const knot_rrset_t *rrsig = knot_pkt_rr(sec, i);
+		if (rrsig->type != KNOT_RRTYPE_RRSIG) {
+			continue;
+		}
+		for (uint16_t j = 0; j < rrsig->rrs.rr_count; ++j) {
+			if (validate_rrsig_rr(covered, rrsig, j, keys, key_pos, (dnssec_key_t *) key, zone_name, timestamp) != 0) {
+				continue;
+			}
+			if (check_signature(rrsig, j, (dnssec_key_t *) key, keys) != 0) {
+				continue;
+			}
+			ret = kr_ok();
+			break;
+		}
+		if (ret == kr_ok()) {
+			break;
+		}
+	}
+
+	kr_dnssec_key_free(&created_key);
 	return ret;
 }
 
@@ -370,7 +387,7 @@ int kr_dnskeys_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys,
 			kr_dnssec_key_free(&key);
 			continue;
 		}
-		if (crrset_validate(sec, keys, keys, i, (dnssec_key_t *) key, zone_name, timestamp) != 0) {
+		if (kr_rrset_validate(sec, keys, keys, i, key, zone_name, timestamp) != 0) {
 			kr_dnssec_key_free(&key);
 			continue;
 		}

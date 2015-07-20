@@ -34,20 +34,34 @@ void kr_crypto_cleanup(void);
  */
 void kr_crypto_reinit(void);
 
+/** Opaque DNSSEC key pointer. */
+struct dseckey;
+
+/**
+ * Validate RRSet.
+ * @param sec       Packet section containing the RRSet to be validated.
+ * @param covered   RRSet covered by a signature. It must be in canonical format.
+ * @param keys      DNSKEY RRSet.
+ * @param key_pos   Position of the key to be validated with.
+ * @param key       Key to be used to validate. If NULL, then key from DNSKEY RRSet is used.
+ * @param zone_name Name of the zone containing the RRSIG RRSet.
+ * @param timestamp Validation time.
+ */
+int kr_rrset_validate(const knot_pktsection_t *sec, const knot_rrset_t *covered,
+                      const knot_rrset_t *keys, size_t key_pos, const struct dseckey *key,
+                      const knot_dname_t *zone_name, uint32_t timestamp);
+
 /**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
  * @param sec       Packet section containing the DNSKEY RRSet including its signatures.
- * @param key       DNSKEY RRSet to check.
- * @param ta        Trust anchor RRSet agains which to validate the DNSKEY.
+ * @param keys      DNSKEY RRSet to check.
+ * @param ta        Trust anchor RRSet against which to validate the DNSKEY RRSet.
  * @param zone_name Name of the zone containing the RRSet.
  * @param timestamp Time stamp.
  * @return     0 or error code.
  */
 int kr_dnskeys_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys,
                        const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp);
-
-/** Opaque DNSSEC key pointer. */
-struct dseckey;
 
 /**
  * Construct a DNSSEC key.
