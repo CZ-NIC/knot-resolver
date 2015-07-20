@@ -192,7 +192,7 @@ static void qr_task_timeout(uv_timer_t *req)
 
 static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 {
-	if (task->req.overlay.state != KNOT_STATE_NOOP) {
+	if (task->req.state != KNOT_STATE_NOOP) {
 		if (status == 0 && handle) {
 			io_start_read(handle); /* Start reading answer */
 		}
