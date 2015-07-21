@@ -71,8 +71,8 @@
 
 #define lru_slot_struct \
 	char *key;    /**< Slot key */ \
-	uint32_t len; /**< Slot length */ \
-	uint32_t refs; /**< Slot importance (#writes - #collisions) */ \
+	uint16_t len; /**< Slot length */ \
+	uint16_t refs; /**< Slot importance (#writes - #collisions) */ \
 /** @brief Slot header. */
 struct lru_slot {
 	lru_slot_struct
@@ -126,7 +126,7 @@ static inline void *lru_slot_val(struct lru_slot *slot, size_t offset)
 }
 
 /** @internal Slot data getter */
-static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uint32_t len, size_t offset)
+static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uint16_t len, size_t offset)
 {
 	if (!lru || !key || len == 0) {
 		return NULL;
@@ -140,7 +140,7 @@ static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uin
 }
 
 /** @internal Slot data setter */
-static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uint32_t len, size_t offset)
+static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uint16_t len, size_t offset)
 {
 	if (!lru || !key || len == 0) {
 		return NULL;
@@ -148,7 +148,7 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 	uint32_t id = hash(key, len) % lru->size;
 	struct lru_slot *slot = lru_slot_at(lru, id);
 	if (lru_slot_match(slot, key, len)) {
-		slot->refs += 1; /* Increase slot significance */
+		slot->refs = 1; /* Increase slot significance */
 	} else {
 		if (slot->key) {
 			slot->refs -= 1; /* Decrease slot significance */

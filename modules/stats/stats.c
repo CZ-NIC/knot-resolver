@@ -37,8 +37,8 @@
 
 /* Defaults */
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "stat",  fmt)
-#define FREQUENT_COUNT 1000  /* Size of frequent tables */
-#define FREQUENT_PSAMPLE 100 /* Sampling rate, 1 in N */
+#define FREQUENT_COUNT 5000 /* Size of frequent tables */
+#define FREQUENT_PSAMPLE 10 /* Sampling rate, 1 in N */
 
 /** @cond internal Fixed-size map of predefined metrics. */
 #define CONST_METRICS(X) \
@@ -70,8 +70,9 @@ typedef lru_hash(unsigned) namehash_t;
 struct stat_data {
 	map_t map;
 	struct {
-		namehash_t *names;
-	} frequent;
+		namehash_t *frequent;
+		namehash_t *expiring;
+	} queries;
 };
 
 /** @internal Subtract time (best effort) */
@@ -122,15 +123,22 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 {
 	/* Sample key = {[2] type, [1-255] owner} */
 	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
-	/* Sample queries leading to iteration */
 	struct kr_query *qry = NULL;
 	WALK_LIST(qry, rplan->resolved) {
-		if (!(qry->flags & QUERY_CACHED)) {
-			int key_len = collect_key(key, qry->sname, qry->stype);
-			unsigned *count = lru_set(data->frequent.names, key, key_len);
-			if (count) {
+		/* Sample queries leading to iteration or expiring */
+		if ((qry->flags & QUERY_CACHED) && !(qry->flags & QUERY_EXPIRING)) {
+			continue;
+		}
+		int key_len = collect_key(key, qry->sname, qry->stype);
+		if (qry->flags & QUERY_EXPIRING) {
+			unsigned *count = lru_set(data->queries.expiring, key, key_len);
+			if (count)
 				*count += 1;
-			}
+		/* Consider 1 in N for frequent sampling. */
+		} else if (kr_rand_uint(FREQUENT_PSAMPLE) <= 1) {
+			unsigned *count = lru_set(data->queries.frequent, key, key_len);
+			if (count)
+				*count += 1;
 		}
 	}
 }
@@ -144,22 +152,18 @@ static int collect(knot_layer_t *ctx)
 
 	/* Collect data on final answer */
 	collect_answer(data, param->answer);
-	/* Probabilistic sampling of queries */
-	if (kr_rand_uint(FREQUENT_PSAMPLE) <= 1) {
-		collect_sample(data, rplan, param->answer);
-	}
+	collect_sample(data, rplan, param->answer);
 	/* Count cached and unresolved */
 	if (!EMPTY_LIST(rplan->resolved)) {
-		struct kr_query *last = TAIL(rplan->resolved);
-		if (last->flags & QUERY_CACHED) {
-			stat_const_add(data, metric_answer_cached, 1);
-		}
 		/* Histogram of answer latency. */
 		struct kr_query *first = HEAD(rplan->resolved);
+		struct kr_query *last = TAIL(rplan->resolved);
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		float elapsed = time_diff(&first->timestamp, &now);
-		if (elapsed < 10.0) {
+		if (last->flags & QUERY_CACHED) {
+			stat_const_add(data, metric_answer_cached, 1);
+		} else if (elapsed < 10.0) {
 			stat_const_add(data, metric_answer_10ms, 1);
 		} else if (elapsed < 100.0) {
 			stat_const_add(data, metric_answer_100ms, 1);
@@ -274,23 +278,21 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
  *
  * Output: [{ count: <counter>, name: <qname>, type: <qtype>}, ... ]
  */
-static char* freq_list(void *env, struct kr_module *module, const char *args)
+static char* dump_list(void *env, struct kr_module *module, const char *args, namehash_t *table)
 {
-	struct stat_data *data = module->data;
-	namehash_t *freq_table = data->frequent.names;
-	if (!freq_table) {
+	if (!table) {
 		return NULL;
 	}
 	uint16_t key_type = 0;
 	char key_name[KNOT_DNAME_MAXLEN];
 	JsonNode *root = json_mkarray();
-	for (unsigned i = 0; i < freq_table->size; ++i) {
-		struct lru_slot *slot = lru_slot_at((struct lru_hash_base *)freq_table, i);
+	for (unsigned i = 0; i < table->size; ++i) {
+		struct lru_slot *slot = lru_slot_at((struct lru_hash_base *)table, i);
 		if (slot->key) {
 			/* Extract query name, type and counter */
 			memcpy(&key_type, slot->key, sizeof(key_type));
 			knot_dname_to_str(key_name, (uint8_t *)slot->key + sizeof(key_type), sizeof(key_name));
-			unsigned *slot_val = lru_slot_val(slot, lru_slot_offset(freq_table));
+			unsigned *slot_val = lru_slot_val(slot, lru_slot_offset(table));
 			/* Convert to JSON object */
 			JsonNode *json_val = json_mkobject();
 			json_append_member(json_val, "count", json_mknumber(*slot_val));
@@ -304,28 +306,31 @@ static char* freq_list(void *env, struct kr_module *module, const char *args)
 	return ret;
 }
 
-static char* freq_turnover(void *env, struct kr_module *module, const char *args)
+static char* dump_frequent(void *env, struct kr_module *module, const char *args)
 {
 	struct stat_data *data = module->data;
-	namehash_t *freq_table = data->frequent.names;
-	if (!freq_table) {
-		return NULL;
-	}
-	JsonNode *root = json_mknumber(freq_table->evictions);
-	char *ret = json_encode(root);
-	json_delete(root);
-	return ret;
+	return dump_list(env, module, args, data->queries.frequent);
 }
 
-static char* freq_clear(void *env, struct kr_module *module, const char *args)
+static char* clear_frequent(void *env, struct kr_module *module, const char *args)
 {
 	struct stat_data *data = module->data;
-	namehash_t *freq_table = data->frequent.names;
-	if (!freq_table) {
-		return NULL;
-	}
-	lru_deinit(freq_table);
-	lru_init(freq_table, FREQUENT_COUNT);
+	lru_deinit(data->queries.frequent);
+	lru_init(data->queries.frequent, FREQUENT_COUNT);
+	return NULL;
+}
+
+static char* dump_expiring(void *env, struct kr_module *module, const char *args)
+{
+	struct stat_data *data = module->data;
+	return dump_list(env, module, args, data->queries.expiring);
+}
+
+static char* clear_expiring(void *env, struct kr_module *module, const char *args)
+{
+	struct stat_data *data = module->data;
+	lru_deinit(data->queries.expiring);
+	lru_init(data->queries.expiring, FREQUENT_COUNT);
 	return NULL;
 }
 
@@ -352,9 +357,13 @@ int stats_init(struct kr_module *module)
 	}
 	data->map = map_make();
 	module->data = data;
-	data->frequent.names = malloc(lru_size(namehash_t, FREQUENT_COUNT));
-	if (data->frequent.names) {
-		lru_init(data->frequent.names, FREQUENT_COUNT);
+	data->queries.frequent = malloc(lru_size(namehash_t, FREQUENT_COUNT));
+	if (data->queries.frequent) {
+		lru_init(data->queries.frequent, FREQUENT_COUNT);
+	}
+	data->queries.expiring = malloc(lru_size(namehash_t, FREQUENT_COUNT));
+	if (data->queries.expiring) {
+		lru_init(data->queries.expiring, FREQUENT_COUNT);
 	}
 	return kr_ok();
 }
@@ -364,8 +373,10 @@ int stats_deinit(struct kr_module *module)
 	struct stat_data *data = module->data;
 	if (data) {
 		map_clear(&data->map);
-		lru_deinit(data->frequent.names);
-		free(data->frequent.names);
+		lru_deinit(data->queries.frequent);
+		lru_deinit(data->queries.expiring);
+		free(data->queries.frequent);
+		free(data->queries.expiring);
 		free(data);
 	}
 	return kr_ok();
@@ -377,9 +388,10 @@ struct kr_prop *stats_props(void)
 	    { &stats_set,     "set", "Set {key, val} metrics.", },
 	    { &stats_get,     "get", "Get metrics for given key.", },
 	    { &stats_list,    "list", "List observed metrics.", },
-	    { &freq_list,     "queries", "List most frequent queries.", },
-	    { &freq_clear,    "queries_clear", "Clear most frequent queries.", },
-	    { &freq_turnover, "queries_turnover", "Turnover of the frequent queries.", },
+	    { &dump_frequent, "frequent", "List most frequent queries.", },
+	    { &clear_frequent,"clear_frequent", "Clear frequent queries log.", },
+	    { &dump_expiring, "expiring", "List expiring records.", },
+	    { &clear_expiring,"clear_expiring", "Clear expiring records log.", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;

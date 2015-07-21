@@ -26,6 +26,7 @@
 #include "lib/module.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " rc ",  fmt)
+#define DEFAULT_MINTTL (5) /* Short-time "no data" retention to avoid bursts */
 
 static int begin(knot_layer_t *ctx, void *module_param)
 {
@@ -51,15 +52,19 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 		return ret;
 	}
 
+	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
+	if (is_expiring(&cache_rr, drift)) {
+		if (qry->flags & QUERY_NO_EXPIRING) {
+			return kr_error(ENOENT);
+		} else {
+			qry->flags |= QUERY_EXPIRING;
+		}
+	}
+
 	/* Update packet question */
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)) {
 		KR_PKT_RECYCLE(pkt);
 		knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
-	}
-
-	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
-	if (is_expiring(&cache_rr, drift)) {
-		qry->flags |= QUERY_EXPIRING;
 	}
 
 	/* Update packet answer */
@@ -125,15 +130,22 @@ struct stash_baton
 {
 	struct kr_cache_txn *txn;
 	unsigned timestamp;
+	uint32_t min_ttl;
 };
 
 static int commit_rr(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rr = val;
 	struct stash_baton *baton = data;
-	if (knot_rrset_ttl(rr) < 1) {
-		return kr_ok(); /* Ignore cache busters */
+	/* Ensure minimum TTL */
+	knot_rdata_t *rd = rr->rrs.data;
+	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
+		if (knot_rdata_ttl(rd) < baton->min_ttl) {
+			knot_rdata_set_ttl(rd, baton->min_ttl);
+		}
+		rd = kr_rdataset_next(rd);
 	}
+
 	/* Check if already cached */
 	/** @todo This should check if less trusted data is in the cache,
 	          for that the cache would need to trace data trust level.
@@ -154,7 +166,8 @@ static int stash_commit(map_t *stash, unsigned timestamp, struct kr_cache_txn *t
 {
 	struct stash_baton baton = {
 		.txn = txn,
-		.timestamp = timestamp
+		.timestamp = timestamp,
+		.min_ttl = DEFAULT_MINTTL
 	};
 	return map_walk(stash, &commit_rr, &baton);
 }

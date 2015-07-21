@@ -29,7 +29,7 @@ in new ones.
 	5
 
 	-- Fetch most common queries
-	> stats.queries()
+	> stats.frequent()
 	[1] => {
 		[type] => 2
 		[count] => 4
@@ -37,7 +37,7 @@ in new ones.
 	}
 
 	-- Fetch most common queries (sorted by frequency)
-	> table.sort(stats.queries(), function (a, b) return a.count > b.count end)
+	> table.sort(stats.frequent(), function (a, b) return a.count > b.count end)
 
 Properties
 ^^^^^^^^^^
@@ -62,19 +62,28 @@ Set nominal value of given metric.
 
 Outputs collected metrics as a JSON dictionary.
 
-.. function:: stats.queries()
+.. function:: stats.frequent()
 
 Outputs list of most frequent iterative queries as a JSON array. The queries are sampled probabilistically,
-and include subrequests. The list maximum size is 1000 entries, make diffs if you want to track it over time.
+and include subrequests. The list maximum size is 5000 entries, make diffs if you want to track it over time.
 
-.. function:: stats.queries_clear()
+.. function:: stats.clear_frequent()
 
 Clear the list of most frequent iterative queries.
+
+.. function:: stats.expiring()
+
+Outputs list of soon-to-expire records as a JSON array.
+The list maximum size is 5000 entries, make diffs if you want to track it over time.
+
+.. function:: stats.clear_expiring()
+
+Clear the list of soon expiring records.
 
 Built-in statistics
 ^^^^^^^^^^^^^^^^^^^
 
-* ``answer.total`` - total number of answerered queries
+* ``answer.total`` - total number of answered queries
 * ``answer.cached`` - number of queries answered from cache
 * ``answer.noerror`` - number of **NOERROR** answers
 * ``answer.nxdomain`` - number of **NXDOMAIN** answers
