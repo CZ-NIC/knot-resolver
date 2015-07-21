@@ -348,12 +348,15 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 		}
 	} else {
 		struct ioreq *conn_req = ioreq_take(task->worker);
+		if (!conn_req) {
+			return qr_task_step(task, NULL);
+		}
 		conn_req->as.connect.data = task;
-		if (!conn_req || uv_tcp_connect(&conn_req->as.connect, (uv_tcp_t *)subreq, addr, on_connect) != 0) {
+		task->ioreq = (uv_req_t *)conn_req;
+		if (uv_tcp_connect(&conn_req->as.connect, (uv_tcp_t *)subreq, addr, on_connect) != 0) {
 			ioreq_release(task->worker, conn_req);
 			return qr_task_step(task, NULL);
 		}
-		task->ioreq = (uv_req_t *)conn_req;
 	}
 
 	/* Start next step with timeout */
