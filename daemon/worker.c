@@ -425,7 +425,13 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned option
 int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 {
 	array_init(worker->pools);
-	return array_reserve(worker->pools, ring_maxlen);
+	array_init(worker->ioreqs);
+	array_reserve(worker->pools, ring_maxlen);
+	array_reserve(worker->ioreqs, ring_maxlen);
+	memset(&worker->pkt_pool, 0, sizeof(worker->pkt_pool));
+	worker->pkt_pool.ctx = mp_new (4 * sizeof(knot_pkt_t));
+	worker->pkt_pool.alloc = (mm_alloc_t) mp_alloc;
+	return kr_ok();
 }
 
 #define reclaim_freelist(list, cb) \
@@ -438,4 +444,6 @@ void worker_reclaim(struct worker_ctx *worker)
 {
 	reclaim_freelist(worker->pools, mp_delete);
 	reclaim_freelist(worker->ioreqs, free);
+	mp_delete(worker->pkt_pool.ctx);
+	worker->pkt_pool.ctx = NULL;
 }

@@ -16,6 +16,8 @@
 
 #include <libknot/errcode.h>
 #include <libknot/internal/utils.h>
+#include <contrib/ucw/lib.h>
+#include <contrib/ucw/mempool.h>
 
 #include "daemon/io.h"
 #include "daemon/network.h"
@@ -58,10 +60,10 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		return;
 	}
 
-	knot_pkt_t *query = knot_pkt_new(buf->base, nread, worker->mm);
+	knot_pkt_t *query = knot_pkt_new(buf->base, nread, &worker->pkt_pool);
 	query->max_size = KNOT_WIRE_MAX_PKTSIZE;
 	worker_exec(worker, (uv_handle_t *)handle, query, addr);
-	knot_pkt_free(&query);
+	mp_flush(worker->pkt_pool.ctx);
 }
 
 int udp_bind(struct endpoint *ep, struct sockaddr *addr)
@@ -107,7 +109,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
-	knot_pkt_t *query = knot_pkt_new(buf->base + 2, nbytes, worker->mm);
+	knot_pkt_t *query = knot_pkt_new(buf->base + 2, nbytes, &worker->pkt_pool);
 	query->max_size = sizeof(worker->wire_buf);
 	int ret = worker_exec(worker, (uv_handle_t *)handle, query, NULL);
 	if (ret == 0) {
@@ -118,7 +120,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		uv_unref((uv_handle_t *)handle);
 		io_stop_read((uv_handle_t *)handle);
 	}
-	knot_pkt_free(&query);
+	mp_flush(worker->pkt_pool.ctx);
 }
 
 static void tcp_accept(uv_stream_t *master, int status)
