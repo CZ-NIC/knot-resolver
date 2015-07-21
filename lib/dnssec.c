@@ -317,8 +317,26 @@ fail:
 }
 
 int kr_rrset_validate(const knot_pktsection_t *sec, const knot_rrset_t *covered,
-                      const knot_rrset_t *keys, size_t key_pos, const struct dseckey *key,
-                      const knot_dname_t *zone_name, uint32_t timestamp)
+                      const knot_rrset_t *keys, const knot_dname_t *zone_name, uint32_t timestamp)
+{
+	if (!sec || !covered || !keys || !zone_name) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = kr_error(KNOT_DNSSEC_ENOKEY);
+	for (unsigned i = 0; i < keys->rrs.rr_count; ++i) {
+		ret = kr_rrset_validate_with_key(sec, covered, keys, i, NULL, zone_name, timestamp);
+		if (ret == 0) {
+			break;
+		}
+	}
+
+	return ret;
+}
+
+int kr_rrset_validate_with_key(const knot_pktsection_t *sec, const knot_rrset_t *covered,
+                               const knot_rrset_t *keys, size_t key_pos, const struct dseckey *key,
+                               const knot_dname_t *zone_name, uint32_t timestamp)
 {
 	int ret;
 	struct dseckey *created_key = NULL;
@@ -387,7 +405,7 @@ int kr_dnskeys_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys,
 			kr_dnssec_key_free(&key);
 			continue;
 		}
-		if (kr_rrset_validate(sec, keys, keys, i, key, zone_name, timestamp) != 0) {
+		if (kr_rrset_validate_with_key(sec, keys, keys, i, key, zone_name, timestamp) != 0) {
 			kr_dnssec_key_free(&key);
 			continue;
 		}
@@ -396,11 +414,7 @@ int kr_dnskeys_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys,
 		break;
 	}
 
-	if (ret != 0) {
-		return ret;
-	}
-
-	return kr_error(ENOSYS);
+	return ret;
 }
 
 int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_rdata_t *krdata, const knot_dname_t *kown)

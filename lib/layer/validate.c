@@ -434,73 +434,140 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	return KNOT_STATE_PRODUCE;
 }
 
-#if 0
-static int secure_query(knot_layer_t *ctx, knot_pkt_t *pkt)
+struct rrset_ids {
+	const knot_dname_t *owner;
+	uint16_t type;
+	uint32_t ttl;
+};
+
+/** Simplistic structure holding RR types that are contained in the packet. */
+struct contained_ids {
+	struct rrset_ids *ids;
+	size_t size;
+	size_t max;
+	mm_ctx_t *pool;
+};
+
+static int rrtypes_add(struct contained_ids *stored, const knot_rrset_t *rr)
 {
-	assert(pkt && ctx);
-	struct kr_request *req = ctx->data;
-	struct kr_query *query = kr_rplan_current(&req->rplan);
-	if (ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
-		return ctx->state;
+	if (!stored || !rr) {
+		return kr_error(EINVAL);
 	}
 
-	if (query->zone_cut.key == NULL) {
-/*
-		query->flags |= QUERY_AWAIT_TRUST;
-
-		DEBUG_MSG("%s() A002 '%s'\n", __func__, knot_pkt_qname(pkt));
-
-		struct knot_rrset *opt_rr = knot_rrset_copy(req->answer->opt_rr, &pkt->mm);
-		if (opt_rr == NULL) {
-			return KNOT_STATE_FAIL;
+	size_t i;
+	for (i = 0; i < stored->size; ++i) {
+		if ((knot_dname_cmp(stored->ids[i].owner, rr->owner) == 0) &&
+		    (stored->ids[i].type == rr->type)) {
+			break;
 		}
-		knot_pkt_clear(pkt);
-		int ret = knot_pkt_put_question(pkt, query->zone_cut.name, query->sclass, KNOT_RRTYPE_DNSKEY);
-		if (ret != KNOT_EOK) {
-			knot_rrset_free(&opt_rr, &pkt->mm);
-			return KNOT_STATE_FAIL;
+	}
+	uint32_t rr_ttl = knot_rdata_ttl(knot_rdataset_at(&rr->rrs, 0));
+	if (i < stored->size) {
+		if (stored->ids[i].ttl == rr_ttl) {
+			return kr_ok(); /* Type is stored. */
+		} else {
+			/* RFC2181 5.2 */
+			return kr_error(EINVAL);
 		}
-		knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-		knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, opt_rr, KNOT_PF_FREE);
-
-		{
-		char name_str[KNOT_DNAME_MAXLEN], type_str[16];
-		knot_dname_to_str(name_str, knot_pkt_qname(pkt), sizeof(name_str));
-		knot_rrtype_to_string(knot_pkt_qtype(pkt), type_str, sizeof(type_str));
-		DEBUG_MSG("%s() A003 '%s %s'\n", __func__, name_str, type_str);
-		}
-
-		return KNOT_STATE_CONSUME;
-*/
 	}
 
-	DEBUG_MSG("%s() A004\n", __func__);
+	if (stored->max == stored->size) {
+#define INCREMENT 8
+		struct rrset_ids *new = mm_realloc(stored->pool, stored->ids, stored->max + INCREMENT * sizeof(*stored->ids), stored->max);
+		if (new) {
+			stored->ids = new;
+			stored->max += INCREMENT * sizeof(uint16_t);
+		} else {
+			return kr_error(ENOMEM);
+		}
+#undef INCREMENT
+	}
+	assert(stored->max > stored->size);
 
-#if 0
-	/* Copy query EDNS options and request DNSKEY for current cut. */
-	pkt->opt_rr = knot_rrset_copy(req->answer->opt_rr, &pkt->mm);
-	query->flags |= QUERY_AWAIT_TRUST;
-#warning TODO: check if we already have valid DNSKEY in zone cut, otherwise request it from the resolver
-#warning FLOW: since first query doesnt have it, resolve.c will catch this and issue subrequest for it
-	/* Write OPT to additional section */
-	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-	knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
-
-	return KNOT_STATE_CONSUME;
-#endif
-	return ctx->state;
+	stored->ids[stored->size].owner = rr->owner;
+	stored->ids[stored->size].type = rr->type;
+	stored->ids[stored->size].ttl = rr_ttl;
+	++stored->size;
+	return kr_ok();
 }
-#endif
 
-static int validate_records(struct kr_query *qry, knot_pkt_t *answer)
+static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
+                            knot_section_t section_id, mm_ctx_t *pool)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(answer, section_id);
+	if (!sec) {
+		return kr_ok();
+	}
+
+	int ret;
+	struct contained_ids stored = {0, };
+	stored.pool = pool;
+	knot_rrset_t *covered = NULL;
+
+	/* Determine RR types contained in the section. */
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
+		if (rr->type == KNOT_RRTYPE_RRSIG) {
+			continue;
+		}
+		ret = rrtypes_add(&stored, rr);
+		if (ret != 0) {
+			goto fail;
+		}
+	}
+
+	for (size_t i = 0; i < stored.size; ++i) {
+		/* Construct a RRSet. */
+		for (unsigned j = 0; j < sec->count; ++j) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, j);
+			if ((rr->type != stored.ids[i].type) ||
+			    (knot_dname_cmp(rr->owner, stored.ids[i].owner) != 0)) {
+				continue;
+			}
+
+			if (covered) {
+				ret = knot_rdataset_merge(&covered->rrs, &rr->rrs, pool);
+				if (ret != 0) {
+					goto fail;
+				}
+			} else {
+				covered = knot_rrset_copy(rr, pool);
+				if (!covered) {
+					ret = kr_error(ENOMEM);
+					goto fail;
+				}
+			}
+		}
+		/* Validate RRSet. */
+		ret = kr_rrset_validate(sec, covered, qry->zone_cut.key, qry->zone_cut.name, qry->timestamp.tv_sec);
+		if (ret == 0) {
+			break;
+		}
+	}
+
+fail:
+	mm_free(stored.pool, stored.ids);
+	knot_rrset_free(&covered, pool);
+	return ret;
+}
+
+static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *pool)
 {
 #warning TODO: validate RRSIGS (records with ZSK, keys with KSK), return FAIL if failed
 	if (!qry->zone_cut.key) {
 		DEBUG_MSG("<= no DNSKEY, can't validate\n");
+		return kr_error(KNOT_DNSSEC_ENOKEY);
 	}
 
-	DEBUG_MSG("!! validation not implemented\n");
-	return kr_error(ENOSYS);
+	int ret;
+
+	ret = validate_section(qry, answer, KNOT_ANSWER, pool);
+	if (ret != 0) {
+		return ret;
+	}
+	ret = validate_section(qry, answer, KNOT_AUTHORITY, pool);
+
+	return ret;
 }
 
 static int validate_proof(struct kr_query *qry, knot_pkt_t *answer)
@@ -543,7 +610,6 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
 #warning TODO: Ensure canonical format of the whole DNSKEY RRSet. (Also remove duplicities?)
 
 	/* Check if there's a key for current TA. */
-#warning TODO: check if there is a DNSKEY we can trust (matching current TA)
 	int ret = kr_dnskeys_trusted(an, qry->zone_cut.key, qry->zone_cut.trust_anchor, qry->zone_cut.name, qry->timestamp.tv_sec);
 	if (ret != 0) {
 		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
@@ -606,7 +672,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Validate all records, fail as bogus if it doesn't match. */
-	ret = validate_records(qry, pkt);
+	ret = validate_records(qry, pkt, req->rplan.pool);
 	if (ret != 0) {
 		DEBUG_MSG("<= couldn't validate RRSIGs\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
