@@ -394,7 +394,9 @@ static int engine_loadconf(struct engine *engine)
 	}
 	/* Use module path for including Lua scripts */
 	int ret = engine_cmd(engine, "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'");
-	lua_pop(engine->L, 1);
+	if (ret > 0) {
+		lua_pop(engine->L, 1);
+	}
 
 	/* Load config file */
 	if(access("config", F_OK ) != -1 ) {
