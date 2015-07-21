@@ -327,7 +327,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	}
 
 	/* Start at QNAME parent. */
-	while (txn) {
+	while (txn && name) {
 		if (fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
 			update_cut_name(cut, name);
 			return kr_ok();
