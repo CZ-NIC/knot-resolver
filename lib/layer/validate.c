@@ -499,7 +499,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		return kr_ok();
 	}
 
-	int ret;
+	int ret = kr_ok();
 	struct contained_ids stored = {0, };
 	stored.pool = pool;
 	knot_rrset_t *covered = NULL;
@@ -517,6 +517,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 	}
 
 	for (size_t i = 0; i < stored.size; ++i) {
+		knot_rrset_free(&covered, pool);
 		/* Construct a RRSet. */
 		for (unsigned j = 0; j < sec->count; ++j) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, j);
@@ -540,7 +541,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		}
 		/* Validate RRSet. */
 		ret = kr_rrset_validate(sec, covered, qry->zone_cut.key, qry->zone_cut.name, qry->timestamp.tv_sec);
-		if (ret == 0) {
+		if (ret != 0) {
 			break;
 		}
 	}
