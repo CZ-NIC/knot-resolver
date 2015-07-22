@@ -290,7 +290,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 		.ctx = mp_new (KNOT_WIRE_MAX_PKTSIZE),
 		.alloc = (mm_alloc_t) mp_alloc
 	};
-	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, &pool);
+	knot_pkt_t *query = knot_pkt_new(NULL, KR_EDNS_PAYLOAD, &pool);
 	knot_pkt_t *resp = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, &pool);
 	if (!query || !resp) {
 		mp_delete(pool.ctx);

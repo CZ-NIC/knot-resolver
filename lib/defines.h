@@ -36,12 +36,12 @@ static inline int __attribute__((__cold__)) kr_error(int x) {
  * @cond internal
  */
 #define KR_CONN_RTT_MAX 3000 /* Timeout for network activity */
-#define KR_ITER_LIMIT 50        /* Built-in iterator limit */
+#define KR_ITER_LIMIT 50     /* Built-in iterator limit */
 
 /*
  * Defines.
  */
 #define KR_DNS_PORT   53
 #define KR_EDNS_VERSION 0
-#define KR_EDNS_PAYLOAD 4096
+#define KR_EDNS_PAYLOAD 1452 /* Maximum payload for unfragmented UDP/v6 */
 /* @endcond */
