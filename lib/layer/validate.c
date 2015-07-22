@@ -540,7 +540,11 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 			}
 		}
 		/* Validate RRSet. */
-		ret = kr_rrset_validate(sec, covered, qry->zone_cut.key, qry->zone_cut.name, qry->timestamp.tv_sec);
+		/* Can't use qry->zone_cut.name directly, as this name can
+		 * change when updating cut information before validation.
+		 */
+		const knot_dname_t *zone_name = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
+		ret = kr_rrset_validate(sec, covered, qry->zone_cut.key, zone_name, qry->timestamp.tv_sec);
 		if (ret != 0) {
 			break;
 		}

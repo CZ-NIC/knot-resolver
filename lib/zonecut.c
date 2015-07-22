@@ -105,8 +105,13 @@ void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
 	if (!cut || !name) {
 		return;
 	}
+	knot_rrset_t *key, *ta;
+	key = cut->key; cut->key = NULL;
+	ta = cut->trust_anchor; cut->trust_anchor = NULL;
 	kr_zonecut_deinit(cut);
 	kr_zonecut_init(cut, name, cut->pool);
+	cut->key = key;
+	cut->trust_anchor = ta;
 }
 
 static int copy_addr_set(const char *k, void *v, void *baton)

@@ -51,7 +51,7 @@ void kr_zonecut_deinit(struct kr_zonecut *cut);
 
 /**
  * Reset zone cut to given name and clear address list.
- * @note This clears the address list even if the name doesn't change.
+ * @note This clears the address list even if the name doesn't change. TA and DNSKEY don't change.
  * @param cut  zone cut to be set
  * @param name new zone cut name
  */
