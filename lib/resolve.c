@@ -512,7 +512,7 @@ ns_election:
 	/* Resolve address records */
 	if (qry->ns.addr.ip.sa_family == AF_UNSPEC) {
 		if (ns_resolve_addr(qry, request) != 0) {
-			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
 			goto ns_election; /* Must try different NS */
 		}
 		ITERATE_LAYERS(request, knot_layer_reset);
