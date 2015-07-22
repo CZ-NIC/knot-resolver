@@ -201,8 +201,8 @@ static int stash_add(const knot_pkt_t *pkt, map_t *stash, const knot_rrset_t *rr
 
 	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
 	 * This way it the stash won't merge RRSIGs together. */
-	if (knot_rrtype_is_dnssec(rr->type)) {
-		if (!is_secure || rr->type != KNOT_RRTYPE_RRSIG) {
+	if (rr->type == KNOT_RRTYPE_RRSIG) {
+		if (!is_secure) {
 			return kr_ok(); /* Ignore other (and unsolicited) DNSSEC records. */
 		}
 		rrtype = knot_rrsig_type_covered(&rr->rrs, 0);
