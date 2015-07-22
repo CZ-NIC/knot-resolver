@@ -352,12 +352,12 @@ static int fetch_rrset(knot_rrset_t **rr, const knot_dname_t *owner, uint16_t ty
 		return ret;
 	}
 
-	*rr = knot_rrset_new(owner, type, KNOT_CLASS_IN, pool);
+	*rr = mm_alloc(pool, sizeof(knot_rrset_t));
 	if (*rr == NULL) {
 		return kr_error(ENOMEM);
 	}
 
-	ret = kr_cache_materialize(*rr, &cached_rr, timestamp, pool);
+	ret = kr_cache_materialize(*rr, &cached_rr, drift, pool);
 	if (ret != 0) {
 		knot_rrset_free(rr, pool);
 		return ret;
