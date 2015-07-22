@@ -109,6 +109,7 @@ struct kr_context
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
+	knot_rrset_t *opt_rr;
 	uint32_t options;
 };
 

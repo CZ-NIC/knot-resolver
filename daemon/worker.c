@@ -93,12 +93,13 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 {
 	/* How much can client handle? */
 	size_t answer_max = KNOT_WIRE_MIN_PKTSIZE;
+	size_t pktbuf_max = KR_EDNS_PAYLOAD;
 	if (!addr && handle) { /* TCP */
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
+		pktbuf_max = KNOT_WIRE_MAX_PKTSIZE;
 	} else if (knot_pkt_has_edns(query)) { /* EDNS */
 		answer_max = MAX(knot_edns_get_payload(query->opt_rr), KNOT_WIRE_MIN_PKTSIZE);
 	}
-	size_t pktbuf_max = MAX(KNOT_EDNS_MAX_UDP_PAYLOAD, answer_max);
 
 	/* Recycle available mempool if possible */
 	mm_ctx_t pool = {

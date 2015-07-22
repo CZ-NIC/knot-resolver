@@ -208,6 +208,9 @@ static int sendrecv(struct sockaddr *addr, int proto, const knot_pkt_t *query, k
 
 static int edns_put(knot_pkt_t *pkt)
 {
+	if (!pkt->opt_rr) {
+		return kr_ok();
+	}
 	/* Reclaim reserved size. */
 	int ret = knot_pkt_reclaim(pkt, knot_edns_wire_size(pkt->opt_rr));
 	if (ret != 0) {
@@ -218,17 +221,9 @@ static int edns_put(knot_pkt_t *pkt)
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
 
-static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template)
+static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
-	/* Create empty OPT RR */
-	pkt->opt_rr = mm_alloc(&pkt->mm, sizeof(*pkt->opt_rr));
-	if (!pkt->opt_rr) {
-		return kr_error(ENOMEM);
-	}
-	int ret = knot_edns_init(pkt->opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
-	if (ret != 0) {
-		return ret;
-	}
+	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
 	/* Set DO bit if set (DNSSEC requested). */
 	if (knot_pkt_has_dnssec(template)) {
 		knot_edns_set_do(pkt->opt_rr);
@@ -236,7 +231,7 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template)
 	return knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
 }
 
-static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query)
+static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_request *req)
 {
 	if (!knot_wire_get_rd(query->wire)) {
 		return kr_error(ENOSYS); /* Only recursive service */
@@ -246,7 +241,7 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query)
 	}
 	/* Handle EDNS in the query */
 	if (knot_pkt_has_edns(query)) {
-		int ret = edns_create(answer, query);
+		int ret = edns_create(answer, query, req);
 		if (ret != 0){
 			return ret;
 		}
@@ -275,7 +270,7 @@ static int query_finalize(struct kr_request *request, knot_pkt_t *pkt)
 	int ret = 0;
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	if (!(qry->flags & QUERY_SAFEMODE)) {
-		ret = edns_create(pkt, request->answer);
+		ret = edns_create(pkt, request->answer, request);
 		if (ret == 0) {
 			ret = edns_put(pkt);
 		}
@@ -384,7 +379,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
-		if (answer_prepare(request->answer, packet) != 0) {
+		if (answer_prepare(request->answer, packet, request) != 0) {
 			return KNOT_STATE_FAIL;
 		}
 		/* Start query resolution */
