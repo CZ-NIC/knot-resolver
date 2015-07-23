@@ -510,6 +510,9 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
 			continue;
 		}
+		if ((rr->type == KNOT_RRTYPE_NS) && (section_id == KNOT_AUTHORITY)) {
+			continue;
+		}
 		ret = rrtypes_add(&stored, rr);
 		if (ret != 0) {
 			goto fail;
