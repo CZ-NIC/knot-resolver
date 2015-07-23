@@ -64,6 +64,8 @@ static PyObject* init(PyObject* self, PyObject* args)
 	memset(&global_context, 0, sizeof(struct kr_context));
 	global_context.pool = &global_mm;
 	global_context.modules = &global_modules;
+	global_context.opt_rr = mm_alloc(&global_mm, sizeof(knot_rrset_t));
+	knot_edns_init(global_context.opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &global_mm);
 
 	/* Create cache */
 	global_tmpdir = test_tmpdir_create();
@@ -109,6 +111,7 @@ static PyObject* deinit(PyObject* self, PyObject* args)
 	lru_deinit(global_context.cache_rep);
 	free(global_context.cache_rtt);
 	free(global_context.cache_rep);
+	knot_rrset_free(&global_context.opt_rr, global_context.pool);
 
 	test_tmpdir_remove(global_tmpdir);
 	global_tmpdir = NULL;

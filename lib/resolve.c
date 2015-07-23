@@ -225,7 +225,7 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
 	/* Set DO bit if set (DNSSEC requested). */
-	if (knot_pkt_has_dnssec(template)) {
+	if (knot_pkt_has_dnssec(template) || (req->options & QUERY_DNSSEC_WANT)) {
 		knot_edns_set_do(pkt->opt_rr);
 	}
 	return knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
@@ -244,7 +244,7 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 		req->options |= QUERY_DNSSEC_WANT;
 	}
 	/* Handle EDNS in the query */
-	if (knot_pkt_has_edns(query)) {
+	if (knot_pkt_has_edns(query) || (req->options & QUERY_DNSSEC_WANT)) {
 		int ret = edns_create(answer, query, req);
 		if (ret != 0){
 			return ret;
