@@ -308,9 +308,9 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 
 	/* Initialize context. */
 	struct kr_request request;
-	request.options = options;
 	request.pool = pool;
 	kr_resolve_begin(&request, ctx, answer);
+	request.options |= options;
 #ifndef NDEBUG
 	struct kr_rplan *rplan = &request.rplan; /* for DEBUG_MSG */
 #endif

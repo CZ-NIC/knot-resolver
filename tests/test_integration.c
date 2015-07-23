@@ -138,7 +138,7 @@ static PyObject* resolve(PyObject *self, PyObject *args)
 	}
 	uint32_t options = 0;
 	if (knot_pkt_has_dnssec(query)) {
-		options = QUERY_DNSSEC_WANT;
+		options |= QUERY_DNSSEC_WANT;
 	}
 
 	/* Resolve query */
