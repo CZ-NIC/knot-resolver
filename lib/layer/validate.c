@@ -730,10 +730,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 		if (!qry->zone_cut.key) {
 			DEBUG_MSG("<= missing keys for new cut\n");
-			struct kr_query *next = kr_rplan_push(&req->rplan, qry->parent, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DNSKEY);
-			if (!next) {
-				return KNOT_STATE_FAIL;
-			}
+#warning TODO: set QUERY_AWAIT_CUT for next query in plan ?
 		}
 	}
 
