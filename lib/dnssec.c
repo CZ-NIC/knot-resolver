@@ -360,7 +360,7 @@ int kr_rrset_validate_with_key(const knot_pktsection_t *sec, const knot_rrset_t 
 			if (validate_rrsig_rr(covered, rrsig, j, keys, key_pos, (dnssec_key_t *) key, zone_name, timestamp) != 0) {
 				continue;
 			}
-			if (check_signature(rrsig, j, (dnssec_key_t *) key, keys) != 0) {
+			if (check_signature(rrsig, j, (dnssec_key_t *) key, covered) != 0) {
 				continue;
 			}
 			ret = kr_ok();
