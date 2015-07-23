@@ -274,7 +274,7 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 	}
 
 #warning TODO: set root trust anchor from config
-	/* Set trust achor. */
+	/* Set trust anchor. */
 	knot_rrset_free(&cut->trust_anchor, cut->pool);
 	int ret = kr_ta_parse(&cut->trust_anchor, ROOT_TA, cut->pool);
 	if (ret != 0) {
@@ -396,8 +396,10 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	/* Start at QNAME parent. */
 	while (txn) {
 		bool has_ta = !secured || fetch_ta(cut, name, txn, timestamp) == 0;
-		bool has_key = !secured || fetch_dnskey(cut, name, txn, timestamp) == 0;
-		if (has_ta && has_key && fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
+		if (secured) {
+			fetch_dnskey(cut, name, txn, timestamp);
+		}
+		if (has_ta && fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
 			update_cut_name(cut, name);
 			return kr_ok();
 		}
