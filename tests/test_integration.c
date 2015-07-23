@@ -136,9 +136,9 @@ static PyObject* resolve(PyObject *self, PyObject *args)
 		knot_pkt_free(&query);
 		return NULL;
 	}
-	unsigned flags = 0;
+	uint32_t options = 0;
 	if (knot_pkt_has_dnssec(query)) {
-		flags = KR_REQ_DNSSEC;
+		options = QUERY_DNSSEC_WANT;
 	}
 
 	/* Resolve query */
@@ -146,7 +146,7 @@ static PyObject* resolve(PyObject *self, PyObject *args)
 	assert(answer);
 	knot_pkt_init_response(answer, query);
 	ret = kr_resolve(&global_context, answer, knot_pkt_qname(query),
-	                 knot_pkt_qclass(query), knot_pkt_qtype(query), flags);
+	                 knot_pkt_qclass(query), knot_pkt_qtype(query), options);
 
 	/* Return wire and cleanup. */
 	PyObject *out = Py_BuildValue("s#", answer->wire, answer->size);

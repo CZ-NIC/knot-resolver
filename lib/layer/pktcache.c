@@ -28,7 +28,7 @@
 
 static inline uint8_t get_tag(struct kr_request *req)
 {
-	return (req->flags & KR_REQ_DNSSEC) ? KR_CACHE_SEC : KR_CACHE_PKT;
+	return (req->options & QUERY_DNSSEC_WANT) ? KR_CACHE_SEC : KR_CACHE_PKT;
 }
 
 static int begin(knot_layer_t *ctx, void *module_param)

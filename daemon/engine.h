@@ -27,7 +27,7 @@
 #define MP_FREELIST_SIZE 32 /**< Maximum length of the worker mempool freelist */
 #endif
 #ifndef RECVMMSG_BATCH
-#define RECVMMSG_BATCH 8
+#define RECVMMSG_BATCH 5
 #endif
 
 /*

@@ -680,7 +680,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Pass-through if user doesn't want secure answer. */
-	if (!(req->flags & KR_REQ_DNSSEC)) {
+	if (!(req->options & QUERY_DNSSEC_WANT)) {
 		return ctx->state;
 	}
 

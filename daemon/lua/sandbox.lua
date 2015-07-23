@@ -141,7 +141,7 @@ function table_print (tt, indent, done)
 			if type (value) == "table" and not done [value] then
 				done [value] = true
 				result = result .. string.format("[%s] => {\n", tostring (key))
-				table_print (value, indent + 4, done)
+				result = result .. table_print (value, indent + 4, done)
 				result = result .. string.rep (" ", indent)
 				result = result .. "}\n"
 			else

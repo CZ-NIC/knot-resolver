@@ -17,7 +17,7 @@
 #pragma once
 
 #include <netinet/in.h>
-#include <libknot/processing/overlay.h>
+#include <libknot/processing/layer.h>
 #include <libknot/packet/pkt.h>
 
 #include "lib/generic/array.h"
@@ -109,14 +109,8 @@ struct kr_context
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
+	knot_rrset_t *opt_rr;
 	uint32_t options;
-};
-
-/**
- * Name resolution flags.
- */
-enum kr_request_flag {
-	KR_REQ_DNSSEC = 1 << 0, /* Want DNSSEC validation. */
 };
 
 /**
@@ -130,12 +124,12 @@ enum kr_request_flag {
  * @note All data for this request must be allocated from the given pool.
  */
 struct kr_request {
-	unsigned flags;
-	struct kr_context *ctx;
-	struct kr_rplan rplan;
-	struct knot_overlay overlay;
-	knot_pkt_t *answer;
-	mm_ctx_t pool;
+    struct kr_context *ctx;
+    struct kr_rplan rplan;
+    knot_pkt_t *answer;
+    mm_ctx_t pool;
+    uint32_t options;
+    int state;
 };
 
 /**
@@ -148,11 +142,11 @@ struct kr_request {
  * @param qname  resolved query name
  * @param qclass resolved query class
  * @param qtype  resolved query type
- * @param flags  resolution flags
+ * @param options resolution options
  * @return       0 or an error code
  */
 int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
-               const knot_dname_t *qname, uint16_t qclass, uint16_t qtype, unsigned flags);
+               const knot_dname_t *qname, uint16_t qclass, uint16_t qtype, uint32_t options);
 
 /**
  * Begin name resolution.

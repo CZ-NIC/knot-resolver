@@ -578,8 +578,19 @@ static int wrk_resolve(lua_State *L)
 	}
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 	knot_wire_set_rd(pkt->wire);
+	/* Add OPT RR */
+	pkt->opt_rr = mm_alloc(&pkt->mm, sizeof(*pkt->opt_rr));
+	if (!pkt->opt_rr) {
+		return kr_error(ENOMEM);
+	}
+	int ret = knot_edns_init(pkt->opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
+	if (ret != 0) {
+		knot_pkt_free(&pkt);
+		return 0;
+	}
 	/* Resolve it */
-	int ret = worker_resolve(worker, pkt);
+	unsigned options = lua_tointeger(L, 4);
+	ret = worker_resolve(worker, pkt, options);
 	knot_pkt_free(&pkt);
 	lua_pushboolean(L, ret == 0);
 	return 1;
@@ -599,6 +610,10 @@ static int wrk_stats(lua_State *L)
 	lua_setfield(L, -2, "udp");
 	lua_pushnumber(L, worker->stats.tcp);
 	lua_setfield(L, -2, "tcp");
+	lua_pushnumber(L, worker->stats.ipv6);
+	lua_setfield(L, -2, "ipv6");
+	lua_pushnumber(L, worker->stats.ipv4);
+	lua_setfield(L, -2, "ipv4");
 	return 1;
 }
 

@@ -27,17 +27,19 @@
 #include "lib/nsrep.h"
 
 #define QUERY_FLAGS(X) \
-	X(NO_MINIMIZE  , 1 << 0) /**< Don't minimize QNAME. */ \
-	X(NO_THROTTLE  , 1 << 1) /**< No query/slow NS throttling. */ \
-	X(TCP          , 1 << 2) /**< Use TCP for this query. */ \
-	X(RESOLVED     , 1 << 3) /**< Query is resolved. */ \
-	X(AWAIT_IPV4   , 1 << 4) /**< Query is waiting for A address. */ \
-	X(AWAIT_IPV6   , 1 << 5) /**< Query is waiting for AAAA address. */ \
-	X(AWAIT_CUT    , 1 << 6) /**< Query is waiting for zone cut lookup */ \
-	X(SAFEMODE     , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
-	X(CACHED       , 1 << 8) /**< Query response is cached. */ \
-	X(EXPIRING     , 1 << 9) /**< Query response is cached, but expiring. */ \
-	X(DNSSEC_BOGUS , 1 << 10) /**< Query response is DNSSEC bogus. */ \
+	X(NO_MINIMIZE, 1 << 0) /**< Don't minimize QNAME. */ \
+	X(NO_THROTTLE, 1 << 1) /**< No query/slow NS throttling. */ \
+	X(TCP        , 1 << 2) /**< Use TCP for this query. */ \
+	X(RESOLVED   , 1 << 3) /**< Query is resolved. */ \
+	X(AWAIT_IPV4 , 1 << 4) /**< Query is waiting for A address. */ \
+	X(AWAIT_IPV6 , 1 << 5) /**< Query is waiting for AAAA address. */ \
+	X(AWAIT_CUT  , 1 << 6) /**< Query is waiting for zone cut lookup */ \
+	X(SAFEMODE   , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
+	X(CACHED     , 1 << 8) /**< Query response is cached. */ \
+	X(EXPIRING   , 1 << 9) /**< Query response is cached, but expiring. */ \
+	X(NO_EXPIRING, 1 << 10) /**< Do not use expiring cached records. */ \
+	X(DNSSEC_WANT , 1 << 11) /**< Want DNSSEC secured answer. */ \
+	X(DNSSEC_BOGUS , 1 << 12) /**< Query response is DNSSEC bogus. */
 
 /** Query flags */
 enum kr_query_flag {
@@ -76,17 +78,17 @@ struct kr_query {
 struct kr_rplan {
 	list_t pending;              /**< List of pending queries. */
 	list_t resolved;             /**< List of resolved queries. */
-	struct kr_context *context;  /**< Parent resolution context. */
+	struct kr_request *request;  /**< Parent resolution request. */
 	mm_ctx_t *pool;              /**< Temporary memory pool. */
 };
 
 /**
  * Initialize resolution plan (empty).
  * @param rplan plan instance
- * @param context resolution context
+ * @param request resolution request
  * @param pool ephemeral memory pool for whole resolution
  */
-int kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *pool);
+int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, mm_ctx_t *pool);
 
 /**
  * Deinitialize resolution plan, aborting any uncommited transactions.

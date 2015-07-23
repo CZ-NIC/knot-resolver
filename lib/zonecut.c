@@ -394,7 +394,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	}
 
 	/* Start at QNAME parent. */
-	while (txn) {
+	while (txn && name) {
 		bool has_ta = !secured || fetch_ta(cut, name, txn, timestamp) == 0;
 		if (secured) {
 			fetch_dnskey(cut, name, txn, timestamp);

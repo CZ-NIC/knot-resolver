@@ -50,7 +50,10 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
 			return;
 		}
-		out = outerr = fdopen(dup(stream_fd), "w");
+		uv_os_fd_t dup_fd = dup(stream_fd);
+		if (dup_fd >= 0) {
+			out = outerr = fdopen(dup_fd, "w");
+		}
 	}
 	/* Execute */
 	if (stream && buf && nread > 0) {
