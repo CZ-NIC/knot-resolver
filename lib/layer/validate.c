@@ -628,14 +628,51 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
 
 static int update_delegation(struct kr_query *qry, knot_pkt_t *answer)
 {
+	int ret = kr_ok();
+	struct kr_zonecut *cut = &qry->zone_cut;
+
 	DEBUG_MSG("<= referral, checking DS\n");
-#warning TODO: delegation, check DS record presence
-	return kr_ok();
+
+	/* New trust anchor. */
+	knot_rrset_t *new_ds = NULL;
+	const knot_pktsection_t *sec = knot_pkt_section(answer, KNOT_AUTHORITY);
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
+		if ((rr->type != KNOT_RRTYPE_DS) ||
+		    (knot_dname_cmp(rr->owner, cut->name) != 0)) {
+			continue;
+		}
+		if (new_ds) {
+			ret = knot_rdataset_merge(&new_ds->rrs, &rr->rrs, cut->pool);
+			if (ret != 0) {
+				goto fail;
+			}
+		} else {
+			new_ds = knot_rrset_copy(rr, cut->pool);
+			if (!new_ds) {
+				ret = kr_error(ENOMEM);
+				goto fail;
+			}
+		}
+	}
+
+	if (new_ds) {
+		knot_rrset_free(&cut->trust_anchor, cut->pool);
+		cut->trust_anchor = new_ds;
+		new_ds = NULL;
+
+		/* It is very likely, that the keys don't match now. */
+		knot_rrset_free(&cut->key, cut->pool);
+	}
+
+fail:
+	knot_rrset_free(&new_ds, cut->pool);
+	return ret;
 }
 
 static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
-	int ret = 0;
+	int ret;
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = kr_rplan_current(&req->rplan);
 	if (ctx->state & KNOT_STATE_FAIL) {
@@ -674,9 +711,6 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KNOT_STATE_FAIL;
 		}
-	/* Update trust anchor. */
-	} else if (qtype == KNOT_RRTYPE_NS) {
-		update_delegation(qry, pkt);
 	}
 
 	/* Validate all records, fail as bogus if it doesn't match. */
@@ -685,6 +719,18 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		DEBUG_MSG("<= couldn't validate RRSIGs\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
 		return KNOT_STATE_FAIL;
+	}
+
+	/* Update trust anchor. */
+	if (qtype == KNOT_RRTYPE_NS) {
+		ret = update_delegation(qry, pkt);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
+
+		if (!qry->zone_cut.key) {
+			DEBUG_MSG("<= missing keys for new cut\n");
+		}
 	}
 
 	DEBUG_MSG("<= answer valid, OK\n");
