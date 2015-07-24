@@ -733,6 +733,12 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 #warning TODO: set QUERY_AWAIT_CUT for next query in plan ?
 		}
 	}
+	if ((qtype == KNOT_RRTYPE_DNSKEY) && (qry->parent != NULL) && (qry->parent->zone_cut.key == NULL)) {
+		qry->parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, qry->parent->zone_cut.pool);
+		if (!qry->parent->zone_cut.key) {
+			return KNOT_STATE_FAIL;
+		}
+	}
 
 	DEBUG_MSG("<= answer valid, OK\n");
 	return ctx->state;

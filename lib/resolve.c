@@ -489,8 +489,8 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	/* The query wasn't resolved from cache,
 	 * now it's the time to look up closest zone cut from cache.
 	 */
+	bool want_secured = (request->options & QUERY_DNSSEC_WANT);
 	if (qry->flags & QUERY_AWAIT_CUT) {
-		bool want_secured = (request->options & QUERY_DNSSEC_WANT);
 		int ret = ns_fetch_cut(qry, request, want_secured);
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;
@@ -513,6 +513,17 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
 
+	if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
+		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
+		if (!next) {
+			return kr_error(ENOMEM);
+		}
+		int ret = kr_zonecut_copy_whole(&next->zone_cut, &qry->zone_cut);
+		if (ret != 0) {
+			return ret;
+		}
+		return KNOT_STATE_PRODUCE;
+	}
 ns_election:
 
 	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,

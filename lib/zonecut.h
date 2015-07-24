@@ -66,6 +66,14 @@ void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
 int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src);
 
 /**
+ * Copy zone cut, including all data, really.
+ * @param dst destination zone cut
+ * @param src source zone cut
+ * @return 0 or an error code
+ */
+int kr_zonecut_copy_whole(struct kr_zonecut *dst, const struct kr_zonecut *src);
+
+/**
  * Add address record to the zone cut.
  *
  * The record will be merged with existing data,

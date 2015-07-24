@@ -153,6 +153,57 @@ int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src)
 	return map_walk((map_t *)&src->nsset, copy_addr_set, dst);
 }
 
+int kr_zonecut_copy_whole(struct kr_zonecut *dst, const struct kr_zonecut *src)
+{
+	if (!dst || !src) {
+		return kr_error(EINVAL);
+	}
+	kr_zonecut_deinit(dst);
+	memset(dst, 0, sizeof(*dst));
+
+	int ret;
+	dst->pool = src->pool;
+
+	dst->nsset = map_make();
+	dst->nsset.malloc = (map_alloc_f) mm_alloc;
+	dst->nsset.free = (map_free_f) mm_free;
+	dst->nsset.baton = dst->pool;
+
+	dst->name = knot_dname_copy(src->name, dst->pool);
+	if (!dst->name) {
+		ret = kr_error(ENOMEM);
+		goto fail;
+	}
+
+	ret = map_walk((map_t *)&src->nsset, copy_addr_set, dst);
+	if (ret != 0) {
+		goto fail;
+	}
+
+	if (src->key) {
+		dst->key = knot_rrset_copy(src->key, dst->pool);
+		if (!dst->key) {
+			ret = kr_error(ENOMEM);
+			goto fail;
+		}
+	}
+
+	if (src->trust_anchor) {
+		dst->trust_anchor = knot_rrset_copy(src->trust_anchor, dst->pool);
+		if (!dst->trust_anchor) {
+			ret = kr_error(ENOMEM);
+			goto fail;
+		}
+	}
+
+	return kr_ok();
+
+fail:
+	kr_zonecut_deinit(dst);
+	memset(dst, 0, sizeof(*dst));
+	return ret;
+}
+
 /** @internal Filter ANY or loopback addresses. */
 static bool is_valid_addr(uint8_t *addr, size_t len)
 {
