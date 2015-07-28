@@ -58,7 +58,7 @@ void kr_zonecut_deinit(struct kr_zonecut *cut);
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
 
 /** 
- * Copy zone cut, including all data.
+ * Copy zone cut, including all data. Does not copy keys and trust anchor.
  * @param dst destination zone cut
  * @param src source zone cut
  * @return 0 or an error code
@@ -66,12 +66,12 @@ void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
 int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src);
 
 /**
- * Copy zone cut, including all data, really.
+ * Copy zone trust anchor and keys.
  * @param dst destination zone cut
  * @param src source zone cut
  * @return 0 or an error code
  */
-int kr_zonecut_copy_whole(struct kr_zonecut *dst, const struct kr_zonecut *src);
+int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src);
 
 /**
  * Add address record to the zone cut.
