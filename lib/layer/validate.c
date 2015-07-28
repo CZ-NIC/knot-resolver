@@ -705,6 +705,14 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check if this is a DNSKEY answer, check trust chain and store. */
 	uint16_t qtype = knot_pkt_qtype(pkt);
 	if (qtype == KNOT_RRTYPE_DNSKEY) {
+		if (!qry->zone_cut.trust_anchor) {
+			DEBUG_MSG("Missing trust anchor.\n");
+#warning TODO: the trust anchor must be fetched from a configurable storage
+			if (qry->zone_cut.name[0] == '\0') {
+				kr_ta_parse(&qry->zone_cut.trust_anchor, ROOT_TA, qry->zone_cut.pool);
+			}
+		}
+
 		ret = validate_keyset(qry, pkt);
 		if (ret != 0) {
 			DEBUG_MSG("<= bad keys, broken trust chain\n");

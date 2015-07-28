@@ -495,15 +495,6 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;
 		}
-		/* Try to fetch missing DNSKEY. */
-		if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
-			struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
-			if (!next) {
-				return KNOT_STATE_FAIL;
-			}
-			next->flags |= QUERY_AWAIT_CUT;
-			return KNOT_STATE_PRODUCE;
-		}
 		/* Update minimized QNAME if zone cut changed */
 		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
 			if (kr_make_query(qry, packet) != 0) {
@@ -513,6 +504,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
 
+	/* Try to fetch missing DNSKEY. */
 	if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
