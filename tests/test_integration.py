@@ -192,6 +192,7 @@ def play_object(path):
     childaddr = testserver.get_local_addr_str(socket.AF_INET,CHILD_IFACE)
     fd = os.open( TMPDIR + "/config", os.O_RDWR|os.O_CREAT )
     os.write(fd, "net.listen('{}',53)\n".format(childaddr) )
+    os.write(fd, "cache.size = 10*MB\n")
     os.write(fd, "modules = {'hints'}\n")
     os.write(fd, "hints.root({['k.root-servers.net'] = '%s'})\n" % selfaddr)
     os.close(fd)
