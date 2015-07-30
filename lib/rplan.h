@@ -39,7 +39,8 @@
 	X(EXPIRING   , 1 << 9) /**< Query response is cached, but expiring. */ \
 	X(NO_EXPIRING, 1 << 10) /**< Do not use expiring cached records. */ \
 	X(DNSSEC_WANT , 1 << 11) /**< Want DNSSEC secured answer. */ \
-	X(DNSSEC_BOGUS , 1 << 12) /**< Query response is DNSSEC bogus. */
+	X(DNSSEC_BOGUS , 1 << 12) /**< Query response is DNSSEC bogus. */ \
+	X(AWAIT_DS   , 1 << 13) /**< Query is waiting for DS lookup. */
 
 /** Query flags */
 enum kr_query_flag {

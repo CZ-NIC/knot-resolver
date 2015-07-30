@@ -243,7 +243,7 @@ static int stash_add(const knot_pkt_t *pkt, map_t *stash, const knot_rrset_t *rr
 	if (ret <= 0 || ret >= KNOT_DNAME_MAXLEN) {
 		return kr_error(EILSEQ);
 	}
-	
+
 	/* Check if already exists */
 	knot_rrset_t *stashed = map_get(stash, key);
 	if (!stashed) {

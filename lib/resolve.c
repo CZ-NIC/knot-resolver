@@ -504,6 +504,28 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
 
+	/* fetch missing DS record. */
+	if ((qry->flags & QUERY_AWAIT_DS) && (qry->zone_cut.missing_name)) {
+		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.missing_name, KNOT_CLASS_IN, KNOT_RRTYPE_DS);
+		if (!next) {
+			return KNOT_STATE_FAIL;
+		}
+		kr_zonecut_set(&next->zone_cut, qry->zone_cut.parent_name);
+		int ret = kr_zonecut_copy(&next->zone_cut, &qry->zone_cut);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
+		ret = kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
+		/* The current trust anchor and keys cannot be used. */
+		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+		knot_rrset_free(&qry->zone_cut.trust_anchor, qry->zone_cut.pool);
+		qry->flags &= ~QUERY_AWAIT_DS;
+		return KNOT_STATE_PRODUCE;
+	}
+
 	/* Try to fetch missing DNSKEY. */
 	if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);

@@ -32,6 +32,8 @@ struct kr_zonecut {
 	map_t nsset;        /**< Map of nameserver => address_set. */
 	knot_rrset_t* key;  /**< Zone cut DNSKEY. */
 	knot_rrset_t* trust_anchor; /**< Current trust anchor. */
+	knot_dname_t *parent_name; /**< Parent zone name after zone cut update. */
+	knot_dname_t *missing_name; /**< Missing zone cut name. */
 };
 
 /**

@@ -193,6 +193,8 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 
 	/* Update zone cut name */
 	if (!knot_dname_is_equal(rr->owner, cut->name)) {
+		mm_free(cut->pool, cut->parent_name);
+		cut->parent_name = cut->name; cut->name = NULL;
 		kr_zonecut_set(cut, rr->owner);
 		state = KNOT_STATE_DONE;
 	}

@@ -23,9 +23,11 @@
 #include <libknot/internal/base64.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/dnskey.h>
+#include <libknot/rrtype/rrsig.h>
 
 #include "lib/dnssec.h"
 #include "lib/layer/iterate.h"
+#include "lib/layer/validate.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
 #include "lib/defines.h"
@@ -626,6 +628,43 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
 	return kr_ok();
 }
 
+static const knot_dname_t *section_first_signer_name(knot_pkt_t *pkt, knot_section_t section_id)
+{
+	const knot_dname_t *sname = NULL;
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec) {
+		return sname;
+	}
+
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
+		if (rr->type != KNOT_RRTYPE_RRSIG) {
+			continue;
+		}
+
+		sname = knot_rrsig_signer_name(&rr->rrs, 0);
+		break;
+	}
+
+	return sname;
+}
+
+static const knot_dname_t *first_rrsig_signer_name(knot_pkt_t *answer)
+{
+	const knot_dname_t *ans_sname = section_first_signer_name(answer, KNOT_ANSWER);
+	const knot_dname_t *auth_sname = section_first_signer_name(answer, KNOT_AUTHORITY);
+
+	if (!ans_sname) {
+		return auth_sname;
+	} else if (!auth_sname) {
+		return ans_sname;
+	} else if (knot_dname_is_equal(ans_sname, auth_sname)) {
+		return ans_sname;
+	} else {
+		return NULL;
+	}
+}
+
 static int update_delegation(struct kr_query *qry, knot_pkt_t *answer)
 {
 	int ret = kr_ok();
@@ -635,11 +674,13 @@ static int update_delegation(struct kr_query *qry, knot_pkt_t *answer)
 
 	/* New trust anchor. */
 	knot_rrset_t *new_ds = NULL;
-	const knot_pktsection_t *sec = knot_pkt_section(answer, KNOT_AUTHORITY);
+	knot_section_t section_id = (knot_pkt_qtype(answer) == KNOT_RRTYPE_DS) ? KNOT_ANSWER : KNOT_AUTHORITY;
+	const knot_pktsection_t *sec = knot_pkt_section(answer, section_id);
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
 		if ((rr->type != KNOT_RRTYPE_DS) ||
-		    (knot_dname_cmp(rr->owner, cut->name) != 0)) {
+		    (0)) {
+//		    (knot_dname_cmp(rr->owner, cut->name) != 0)) {
 			continue;
 		}
 		if (new_ds) {
@@ -702,6 +743,22 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
+	/* Check whether the current zone cut holds keys that can be used
+	 * for validation (i.e. RRSIG signer name matches key owner).
+	 */
+	const knot_dname_t *key_own = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
+	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
+	if (key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
+		mm_free(qry->zone_cut.pool, qry->zone_cut.missing_name);
+		qry->zone_cut.missing_name = knot_dname_copy(sig_name, qry->zone_cut.pool);
+		if (!qry->zone_cut.missing_name) {
+			return KNOT_STATE_FAIL;
+		}
+		qry->flags |= QUERY_AWAIT_DS;
+		qry->flags &= ~QUERY_RESOLVED;
+		return KNOT_STATE_CONSUME;
+	}
+
 	/* Check if this is a DNSKEY answer, check trust chain and store. */
 	uint16_t qtype = knot_pkt_qtype(pkt);
 	if (qtype == KNOT_RRTYPE_DNSKEY) {
@@ -730,18 +787,23 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Update trust anchor. */
-	if (qtype == KNOT_RRTYPE_NS) {
-		ret = update_delegation(qry, pkt);
-		if (ret != 0) {
+	ret = update_delegation(qry, pkt);
+	if (ret != 0) {
+		return KNOT_STATE_FAIL;
+	}
+
+	if ((qtype == KNOT_RRTYPE_DS) && (qry->parent != NULL) && (qry->parent->zone_cut.trust_anchor == NULL)) {
+		DEBUG_MSG("updating trust anchor in zone cut\n");
+		qry->parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, qry->parent->zone_cut.pool);
+		if (!qry->parent->zone_cut.trust_anchor) {
 			return KNOT_STATE_FAIL;
 		}
-
-		if (!qry->zone_cut.key) {
-			DEBUG_MSG("<= missing keys for new cut\n");
-#warning TODO: set QUERY_AWAIT_CUT for next query in plan ?
-		}
+		/* Update zone cut name */
+		mm_free(qry->parent->zone_cut.pool, qry->parent->zone_cut.name);
+		qry->parent->zone_cut.name = knot_dname_copy(qry->zone_cut.trust_anchor->owner, qry->parent->zone_cut.pool);
 	}
 	if ((qtype == KNOT_RRTYPE_DNSKEY) && (qry->parent != NULL) && (qry->parent->zone_cut.key == NULL)) {
+		DEBUG_MSG("updating keys in zone cut\n");
 		qry->parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, qry->parent->zone_cut.pool);
 		if (!qry->parent->zone_cut.key) {
 			return KNOT_STATE_FAIL;
