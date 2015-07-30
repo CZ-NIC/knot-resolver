@@ -6,6 +6,7 @@ import binascii
 import socket
 import os
 import itertools
+from datetime import datetime
 
 class Entry:
     """
@@ -313,13 +314,15 @@ class Step:
 
     def __time_passes(self, ctx):
         """ Modify system time. """
-#        ctx.scenario.time = int(self.args[1])
-#        ctx.set_time(ctx.scenario.time)
+        ctx.time += int(self.args[1])
+        time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
+        time_file.write(datetime.fromtimestamp(ctx.time).strftime('%Y-%m-%d %H:%M:%S') + "\n")
 
 class Scenario:
     def __init__(self, info):
         """ Initialize scenario with description. """
         self.info = info
+        self.time = 0
         self.ranges = []
         self.steps = []
         self.current_step = None

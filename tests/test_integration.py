@@ -10,6 +10,7 @@ import time
 import signal
 import stat
 from pydnstest import scenario, testserver, test
+from datetime import datetime
 
 # Test debugging
 TEST_DEBUG = 0
@@ -51,6 +52,13 @@ if TMPDIR == "" or os.path.isdir(TMPDIR) is False:
 if TEST_DEBUG > 0:
     testserver.syn_print(None,"default_iface: {}, child_iface: {}, tmpdir {}".format(DEFAULT_IFACE, CHILD_IFACE, TMPDIR))
 del_files(TMPDIR)
+
+# Set up libfaketime
+os.environ["FAKETIME_NO_CACHE"] = "1"
+os.environ["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
+time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
+time_file.write(datetime.fromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S'))
+time_file.close()
 
 def get_next(file_in):
     """ Return next token from the input stream. """

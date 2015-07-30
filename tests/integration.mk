@@ -1,27 +1,20 @@
 #
 # Integration tests
 #
-
-# Mocked calls library
-libmock_calls_SOURCES := tests/mock_calls.c
-libmock_calls_LIBS := $(tests_LIBS) $(python_LIBS)
-libmock_calls_DEPEND := $(libkres)
-$(eval $(call make_lib,libmock_calls,tests))
-
-# Python module for tests
-_test_integration_SOURCES := tests/test_integration.c
-_test_integration_LIBS := -Ltests -lmock_calls $(libmock_calls_LIBS)
-_test_integration_DEPEND := $(libmock_calls)
-$(eval $(call make_shared,_test_integration,tests))
+CWRAP_PATH := $(shell pkg-config --libs socket_wrapper)
+# TODO: find this in ld search paths
+# TODO: this requires newer version than is in the Debian to support FAKETIME_TIMESTAMP_FILE
+# TODO: maybe we can bundle it (it's small enough)
+FAKETIME_PATH := $(wildcard ~/.local/lib/faketime/libfaketime.so.1)
 
 # Targets
 ifeq ($(PLATFORM),Darwin)
-	preload_syms := DYLD_INSERT_LIBRARIES=tests/libmock_calls.dylib
+	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="$(FAKETIME_PATH):$(CWRAP_PATH)"
 else
-	preload_syms := LD_PRELOAD=$(shell pkg-config --libs socket_wrapper)
+	preload_syms := LD_PRELOAD="$(FAKETIME_PATH):$(CWRAP_PATH)"
 endif
 
-check-integration: $(libmock_calls) $(_test_integration)
+check-integration:
 	$(call preload_LIBS) $(preload_syms) tests/test_integration.py tests/testdata
 
 .PHONY: check-integration
