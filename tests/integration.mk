@@ -18,7 +18,7 @@ $(eval $(call make_shared,_test_integration,tests))
 ifeq ($(PLATFORM),Darwin)
 	preload_syms := DYLD_INSERT_LIBRARIES=tests/libmock_calls.dylib
 else
-	preload_syms := LD_PRELOAD=tests/libmock_calls.so:$(shell pkg-config --libs socket_wrapper)
+	preload_syms := LD_PRELOAD=$(shell pkg-config --libs socket_wrapper)
 endif
 
 check-integration: $(libmock_calls) $(_test_integration)
