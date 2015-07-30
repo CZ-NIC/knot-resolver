@@ -148,10 +148,14 @@ static bool is_valid_addr(uint8_t *addr, size_t len)
 {
 	if (len == sizeof(struct in_addr)) {
 		/* Filter ANY and 127.0.0.0/8 */
+
+		/* temporary workaround for local testing 
 		uint32_t ip_host = ntohl(*(uint32_t *)(addr));
 		if (ip_host == 0 || (ip_host & 0xff000000) == 0x7f000000) {
 			return false;
 		}
+		*/
+
 	} else if (len == sizeof(struct in6_addr)) {
 		struct in6_addr ip6_mask;
 		memset(&ip6_mask, 0, sizeof(ip6_mask));

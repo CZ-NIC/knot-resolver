@@ -28,6 +28,7 @@ $(eval $(call find_bin,gccgo))
 $(eval $(call find_python))
 $(eval $(call find_lib,libmemcached,1.0))
 $(eval $(call find_lib,hiredis))
+$(eval $(call find_lib,socket_wrapper))
 
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)

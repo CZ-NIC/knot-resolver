@@ -2,14 +2,55 @@
 import sys
 import os
 import fileinput
+import subprocess
+import tempfile
+import shutil
+import socket
+import time
+import signal
+import stat
 from pydnstest import scenario, testserver, test
-import _test_integration as mock_ctx
 
 # Test debugging
 TEST_DEBUG = 0
 if 'TEST_DEBUG' in os.environ:
     TEST_DEBUG = int(os.environ['TEST_DEBUG'])
 
+def del_files(path_to):
+    for root, dirs, files in os.walk(path_to):
+        for f in files:
+            os.unlink(os.path.join(root, f))
+
+DEFAULT_IFACE = 0
+CHILD_IFACE = 0
+TMPDIR = ""
+if "SOCKET_WRAPPER_DEFAULT_IFACE" in os.environ:
+   DEFAULT_IFACE = int(os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"])
+if DEFAULT_IFACE < 2 or DEFAULT_IFACE > 254 :
+    if TEST_DEBUG > 0:
+        testserver.syn_print(None,"SOCKET_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default (10)".format(DEFAULT_IFACE))
+    DEFAULT_IFACE = 10
+    os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"]="{}".format(DEFAULT_IFACE)
+if "KRESD_WRAPPER_DEFAULT_IFACE" in os.environ:
+    CHILD_IFACE = int(os.environ["KRESD_WRAPPER_DEFAULT_IFACE"])
+if CHILD_IFACE < 2 or CHILD_IFACE > 254 or CHILD_IFACE == DEFAULT_IFACE:
+    if TEST_DEBUG > 0:
+        testserver.syn_print(None,"KRESD_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default ({})".format(CHILD_IFACE, DEFAULT_IFACE + 1))
+    CHILD_IFACE = DEFAULT_IFACE + 1
+    if CHILD_IFACE > 254:
+        CHILD_IFACE = 2
+if "SOCKET_WRAPPER_DIR" in os.environ:
+    TMPDIR = os.environ["SOCKET_WRAPPER_DIR"]
+if TMPDIR == "" or os.path.isdir(TMPDIR) is False:
+    OLDTMPDIR = TMPDIR
+    TMPDIR = tempfile.mkdtemp(suffix='', prefix='tmp')
+#    os.chmod(TMPDIR,stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR|stat.S_IRGRP|stat.S_IWGRP|stat.S_IXGRP|stat.S_IROTH|stat.S_IWOTH|stat.S_IXOTH)
+    os.environ["SOCKET_WRAPPER_DIR"] = TMPDIR
+    if TEST_DEBUG > 0:
+        testserver.syn_print(None,"SOCKET_WRAPPER_DIR is invalid or empty ({}), set to default ({})".format(OLDTMPDIR, TMPDIR))
+if TEST_DEBUG > 0:
+    testserver.syn_print(None,"default_iface: {}, child_iface: {}, tmpdir {}".format(DEFAULT_IFACE, CHILD_IFACE, TMPDIR))
+del_files(TMPDIR)
 
 def get_next(file_in):
     """ Return next token from the input stream. """
@@ -136,33 +177,74 @@ def play_object(path):
     finally:
         file_in.close()
 
+    child_env = os.environ.copy()
+    child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
+    child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
+    selfaddr = testserver.get_local_addr_str(socket.AF_INET,DEFAULT_IFACE)
+    childaddr = testserver.get_local_addr_str(socket.AF_INET,CHILD_IFACE)
+    fd = os.open( TMPDIR + "/config", os.O_RDWR|os.O_CREAT )
+    os.write(fd, "net.listen('{}',53)\n".format(childaddr) )
+    os.write(fd, "modules = {'hints'}\n")
+    os.write(fd, "hints.root({['k.root-servers.net'] = '%s'})\n" % selfaddr)
+    os.close(fd)
+
+
+    # !!! ATTENTION !!!
+    # cwrapped kresd constantly fails at startup with empty SOCKET_WRAPPER_DIR
+    # race condition?
+    # workaround - check output and try to restart if fails
+    # also, wait for subprocess starts
+    fails = False
+    binary = subprocess.Popen(["./daemon/kresd",TMPDIR], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid, env=child_env)
+    while binary.poll() is None:
+        line = binary.stdout.readline()
+        if line.find("[system] quitting") != -1:
+            fails = True
+            binary.wait()
+            break
+        elif line.find("[hint] loaded") != -1:
+            break
+
+    if fails or binary.poll() is not None: #second attempt
+        fails = False
+        binary = subprocess.Popen(["./daemon/kresd",TMPDIR], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid, env=child_env)
+        while binary.poll() is None:
+            line = binary.stdout.readline()
+            if line.find("[system] quitting") != -1:
+                fails = True
+                binary.wait()
+                break
+            elif line.find("[hint] loaded") != -1:
+                break
+    
+    if fails or binary.poll() is not None :
+        raise Exception("Can't start kresd")
+
     # Play scenario
-    server = testserver.TestServer(scenario)
+    server = testserver.TestServer(scenario, config, DEFAULT_IFACE, CHILD_IFACE)
     server.start()
-    mock_ctx.init(config)
     try:
-        mock_ctx.set_server(server)
         if TEST_DEBUG > 0:
-            print('--- UDP test server started at')
-            print(server.address())
-            print('--- scenario parsed, any key to continue ---')
-            sys.stdin.readline()
-        scenario.play(mock_ctx)
+            testserver.syn_print('--- UDP test server started at')
+            testserver.syn_print(server.address())
+            testserver.syn_print('--- scenario parsed, any key to continue ---')
+        server.play()
     finally:
         server.stop()
-        mock_ctx.deinit()
+        os.killpg(binary.pid, signal.SIGTERM)
+        del_files(TMPDIR)
+    subprocess.call(["pkill","kresd"])
 
 def test_platform(*args):
     if sys.platform == 'windows':
         raise Exception('not supported at all on Windows')
-
 
 if __name__ == '__main__':
 
     # Self-tests first
     test = test.Test()
     test.add('integration/platform', test_platform)
-    test.add('testserver/sendrecv', testserver.test_sendrecv)
+    test.add('testserver/sendrecv', testserver.test_sendrecv, DEFAULT_IFACE, DEFAULT_IFACE)
     if test.run() != 0:
         sys.exit(1)
     else:

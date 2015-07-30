@@ -3,6 +3,9 @@ import dns.rrset
 import dns.rcode
 import dns.dnssec
 import binascii
+import socket
+import os
+import itertools
 
 class Entry:
     """
@@ -66,7 +69,7 @@ class Entry:
             match_fields = tuple(['flags'] + self.sections)
         for code in match_fields:
             try:
-                self.match_part(code, msg)
+                res = self.match_part(code, msg)
             except Exception as e:
                 raise Exception("%s: %s" % (code, str(e)))
 
@@ -256,10 +259,10 @@ class Step:
         """ Append a data entry to this step. """
         self.data.append(entry)
 
-    def play(self, ctx):
+    def play(self, ctx, peeraddr):
         """ Play one step from a scenario. """
         if self.type == 'QUERY':
-            return self.__query(ctx)
+            return self.__query(ctx, peeraddr)
         elif self.type == 'CHECK_OUT_QUERY':
              pass # Ignore
         elif self.type == 'CHECK_ANSWER':
@@ -285,7 +288,7 @@ class Step:
 
 
 
-    def __query(self, ctx):
+    def __query(self, ctx, peeraddr):
         """ Resolve a query. """
         if len(self.data) == 0:
             raise Exception("query definition required")
@@ -295,8 +298,13 @@ class Step:
             msg = self.data[0].message
             msg.use_edns(edns = 1)
             data_to_wire = msg.to_wire()
-        self.raw_answer = ctx.resolve(data_to_wire)
-        ctx.last_raw_answer = self.raw_answer
+#        self.raw_answer = ctx.resolve(data_to_wire)
+#        ctx.last_raw_answer = self.raw_answer
+        ctx.sockudp4.sendto(data_to_wire,(peeraddr,53))
+        ctx.sockudp4.settimeout(60)
+        data, addr = ctx.sockudp4.recvfrom(8000)
+        self.raw_answer = data
+        ctx.last_raw_answer = data
         if self.raw_answer is not None:
             self.answer = dns.message.from_wire(self.raw_answer)
         else:
@@ -305,8 +313,8 @@ class Step:
 
     def __time_passes(self, ctx):
         """ Modify system time. """
-        ctx.scenario.time = int(self.args[1])
-        ctx.set_time(ctx.scenario.time)
+#        ctx.scenario.time = int(self.args[1])
+#        ctx.set_time(ctx.scenario.time)
 
 class Scenario:
     def __init__(self, info):
@@ -315,6 +323,9 @@ class Scenario:
         self.ranges = []
         self.steps = []
         self.current_step = None
+        self.sockudp4 = None
+        self.selfaddr = None
+        self.peeraddr = None
 
     def reply(self, query, address = None):
         """ Attempt to find a range reply for a query. """
@@ -347,15 +358,34 @@ class Scenario:
                 pass
         return (None, True)
 
-    def play(self, ctx):
+    def play(self, saddr, paddr):
         """ Play given scenario. """
+
+        self.selfaddr = saddr
+        self.peeraddr = paddr
+        #prevent from using port 53
+        while True:
+            if self.sockudp4 != None:
+                close(self.sockudp4)
+            self.sockudp4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            res = socket.getaddrinfo(self.selfaddr,0,socket.AF_INET,0,socket.IPPROTO_UDP)
+            entry0 = res[0]
+            sockaddr = entry0[4]
+            self.sockudp4.bind(sockaddr)
+            address = self.sockudp4.getsockname()
+            if address[1] != 53:
+                break;
+
+        self.sockudp4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         step = None
         if len(self.steps) == 0:
             raise ('no steps in this scenario')
         try:
-            ctx.scenario = self
             for step in self.steps:
                 self.current_step = step
-                step.play(ctx)
+                step.play(self, self.peeraddr)
         except Exception as e:
             raise Exception('step #%d %s' % (step.id, str(e)))
+        
+        self.sockudp4.close()
