@@ -29,6 +29,18 @@
 #define l_resume(L, argc) lua_resume((L), (argc))
 #endif
 
+/** @internal Slots for layer callbacks.
+  * Each slot ID corresponds to Lua reference in module API. */
+enum {
+	SLOT_begin = 0,
+	SLOT_reset,
+	SLOT_finish,
+	SLOT_consume,
+	SLOT_produce,
+	SLOT_count
+};
+#define SLOT_size sizeof(int)
+
 /** @internal Set metatable on the object on stack. */
 static void set_metatable(lua_State *L, const char *tname)
 {
@@ -105,6 +117,13 @@ static int l_ffi_init(struct kr_module *module)
 	return l_ffi_call(L, 1);
 }
 
+/** @internal Unregister layer callback reference from registry. */
+#define LAYER_UNREGISTER(L, api, name) do { \
+	int *cb_slot = (int *)((char *)api + sizeof(knot_layer_api_t)); \
+	if (cb_slot[SLOT_ ## name] > 0) \
+		luaL_unref(L, LUA_REGISTRYINDEX, cb_slot[SLOT_ ## name]); \
+} while(0)
+
 static int l_ffi_deinit(struct kr_module *module)
 {
 	/* Deinit the module in Lua (if possible) */
@@ -116,7 +135,15 @@ static int l_ffi_deinit(struct kr_module *module)
 	/* Free the layer API wrapper */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
 	lua_getfield(L, -1, "_layer_capi");
-	free(lua_touserdata(L, -1));
+	knot_layer_api_t* api = lua_touserdata(L, -1);
+	if (api) {
+		LAYER_UNREGISTER(L, api, begin);
+		LAYER_UNREGISTER(L, api, finish);
+		LAYER_UNREGISTER(L, api, consume);
+		LAYER_UNREGISTER(L, api, produce);
+		LAYER_UNREGISTER(L, api, reset);
+		free(api);
+	}
 	lua_pop(L, 2);
 	/* Unref module and unset 'lib', so the module
 	 * interface doesn't attempt to close it.
@@ -125,16 +152,14 @@ static int l_ffi_deinit(struct kr_module *module)
 	module->lib = NULL;
 	return ret;
 }
+#undef LAYER_UNREGISTER
 
 /** @internal Helper for retrieving layer Lua function by name. */
-#define LAYER_FFI_CALL(ctx, name) \
+#define LAYER_FFI_CALL(ctx, slot) \
+	int *cb_slot = (int *)((char *)(ctx)->api + sizeof(knot_layer_api_t)); \
 	struct kr_module *module = (ctx)->api->data; \
 	lua_State *L = module->lib; \
-	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data); \
-	lua_getfield(L, -1, "layer"); \
-	lua_remove(L, -2); \
-	lua_getfield(L, -1, (name)); \
-	lua_remove(L, -2); \
+	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot[SLOT_ ## slot]); \
 	if (lua_isnil(L, -1)) { \
 		lua_pop(L, 1); \
 		return ctx->state; \
@@ -144,14 +169,14 @@ static int l_ffi_deinit(struct kr_module *module)
 static int l_ffi_layer_begin(knot_layer_t *ctx, void *module_param)
 {
 	ctx->data = module_param;
-	LAYER_FFI_CALL(ctx, "begin");
+	LAYER_FFI_CALL(ctx, begin);
 	lua_pushlightuserdata(L, module_param);
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_reset(knot_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, "reset");
+	LAYER_FFI_CALL(ctx, reset);
 	lua_pushlightuserdata(L, ctx->data);
 	return l_ffi_call(L, 2);
 }
@@ -159,7 +184,7 @@ static int l_ffi_layer_reset(knot_layer_t *ctx)
 static int l_ffi_layer_finish(knot_layer_t *ctx)
 {
 	struct kr_request *req = ctx->data;
-	LAYER_FFI_CALL(ctx, "finish");
+	LAYER_FFI_CALL(ctx, finish);
 	lua_pushlightuserdata(L, req);
 	lua_pushlightuserdata(L, req->answer);
 	set_metatable(L, META_PKT);
@@ -171,7 +196,7 @@ static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	LAYER_FFI_CALL(ctx, "consume");
+	LAYER_FFI_CALL(ctx, consume);
 	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
 	set_metatable(L, META_PKT);
@@ -183,28 +208,26 @@ static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE)) {
 		return ctx->state; /* Already failed or done, skip */
 	}
-	LAYER_FFI_CALL(ctx, "produce");
+	LAYER_FFI_CALL(ctx, produce);
 	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
 	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
 }
-
-static int l_ffi_layer_fail(knot_layer_t *ctx, knot_pkt_t *pkt)
-{
-	LAYER_FFI_CALL(ctx, "fail");
-	lua_pushlightuserdata(L, ctx->data);
-	lua_pushlightuserdata(L, pkt);
-	set_metatable(L, META_PKT);
-	return l_ffi_call(L, 3);
-}
+#undef LAYER_FFI_CALL
 
 /** Conditionally register layer trampoline */
 #define LAYER_REGISTER(L, api, name) do { \
+	int *cb_slot = (int *)((char *)api + sizeof(knot_layer_api_t)); \
 	lua_getfield((L), -1, "layer"); \
 	lua_getfield((L), -1, #name); \
-	if (!lua_isnil((L), -1)) (api)->name = l_ffi_layer_ ## name; \
-	lua_pop((L), 2); \
+	if (!lua_isnil((L), -1)) { \
+		(api)->name = l_ffi_layer_ ## name; \
+		cb_slot[SLOT_ ## name] = luaL_ref(L, LUA_REGISTRYINDEX); \
+	} else { \
+		lua_pop((L), 1); \
+	} \
+	lua_pop((L), 1); \
 } while(0)
 
 /** @internal Retrieve C layer api wrapper. */
@@ -216,17 +239,19 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 	knot_layer_api_t *api = lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	if (!api) {
-		/* Fabricate layer API wrapping the Lua functions */
-		api = malloc(sizeof(*api));
+		/* Fabricate layer API wrapping the Lua functions
+		 * reserve slots after it for references to Lua callbacks. */
+		const size_t api_length = sizeof(*api) + (SLOT_count * SLOT_size);
+		api = malloc(api_length);
 		if (api) {
-			memset(api, 0, sizeof(*api));
-			/* Begin is always set, as it initializes layer baton. */
-			api->begin = l_ffi_layer_begin;
+			memset(api, 0, api_length);
+			LAYER_REGISTER(L, api, begin);
 			LAYER_REGISTER(L, api, finish);
 			LAYER_REGISTER(L, api, consume);
 			LAYER_REGISTER(L, api, produce);
 			LAYER_REGISTER(L, api, reset);
-			LAYER_REGISTER(L, api, fail);
+			/* Begin is always set, as it initializes layer baton. */
+			api->begin = l_ffi_layer_begin;
 			api->data = module;
 		}
 		/* Store the api in the registry. */
@@ -236,9 +261,7 @@ static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
 	lua_pop(L, 1); /* Clear module table */
 	return api;
 }
-
 #undef LAYER_REGISTER
-#undef LAYER_FFI_CALL
 
 /** @internal Helper macro for function presence check. */
 #define REGISTER_FFI_CALL(L, attr, name, cb) do { \
