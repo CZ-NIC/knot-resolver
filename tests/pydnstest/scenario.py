@@ -302,8 +302,15 @@ class Step:
 #        self.raw_answer = ctx.resolve(data_to_wire)
 #        ctx.last_raw_answer = self.raw_answer
         ctx.sockudp4.sendto(data_to_wire,(peeraddr,53))
-        ctx.sockudp4.settimeout(60)
-        data, addr = ctx.sockudp4.recvfrom(8000)
+        ctx.sockudp4.settimeout(10)
+        if self.data[0].is_raw_data_entry is True:
+            data = None
+        else:
+            try:
+                data, addr = ctx.sockudp4.recvfrom(8000)
+            except Exception as e:
+                data = None
+
         self.raw_answer = data
         ctx.last_raw_answer = data
         if self.raw_answer is not None:

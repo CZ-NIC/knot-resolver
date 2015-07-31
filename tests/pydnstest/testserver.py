@@ -201,15 +201,19 @@ class TestServer:
         if TEST_DEBUG > 0:
             syn_print(None,"translating config")
         m = re.search("(?P<kroot>\S+)\s+#\s+K.ROOT-SERVERS.NET.", self.config)
-        if m is None:
-            raise Exception("[map_adresses] Can't parse K.ROOT-SERVERS.NET. address, check the config")
-        kroot_addr = m.group("kroot")
-        self.kroot_local, self.kroot_family = self.get_local(kroot_addr, True)
-        if self.kroot_local is None:
-            raise Exception("[map_adresses] Invalid K.ROOT-SERVERS.NET. address, check the config")
+        if m is not None:
+#            raise Exception("[map_adresses] Can't parse K.ROOT-SERVERS.NET. address, check the config")
+            kroot_addr = m.group("kroot")
+            self.kroot_local, self.kroot_family = self.get_local(kroot_addr, True)
+            if self.kroot_local is None:
+                raise Exception("[map_adresses] Invalid K.ROOT-SERVERS.NET. address, check the config")
 
+            if TEST_DEBUG > 0:
+                syn_print(None,"K.ROOT-SERVERS.NET. %s translated to %s" % (kroot_addr, self.kroot_local))
+        else:
+            if TEST_DEBUG > 0:
+                syn_print(None,"K.ROOT-SERVERS.NET. address not found")
         if TEST_DEBUG > 0:
-            syn_print(None,"K.ROOT-SERVERS.NET. %s translated to %s" % (kroot_addr, self.kroot_local))
             syn_print(None,"translating ranges")
         for rng in self.scenario.ranges :
             range_local_address, family = self.get_local(rng.address, False)
@@ -322,6 +326,8 @@ class TestServer:
         """ Starts listening thread if necessary """
         if TEST_DEBUG > 0:
             syn_print(None,"starting server thread; socket type {type} {address} client {client_addr}".format(type=type,address=address,client_addr=client_addr))
+        if type == None:
+            type = socket.AF_INET
         if type == socket.AF_INET:
             if address == '' or address is None:
                 address = "127.0.0.{}".format(self.default_iface)
@@ -332,7 +338,7 @@ class TestServer:
                 address = "::1"
         else:
             syn_print(None, "unsupported socket type {sock_type}".format(sock_type=type))
-            raise Exception("[start_srv] unsupported socket type")
+            raise Exception("[start_srv] unsupported socket type {sock_type}".format(sock_type=type))
         if client_addr is not None:
             client_addr = client_addr.split('@')[0]
         else:
