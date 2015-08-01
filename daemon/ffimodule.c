@@ -95,16 +95,12 @@ static inline int l_ffi_call(lua_State *L, int argc)
 		lua_pop(L, 1);
 		return kr_error(EIO);
 	}
-
-	int n = lua_gettop(L);
-	if (n > 0) {
-		if (lua_isthread(L, -1)) { /* Continuations */
-			status = l_ffi_defer(lua_tothread(L, -1));
-		} else if (lua_isnumber(L, -1)) { /* Return code */
-			status = lua_tonumber(L, -1);
-		}
-		lua_pop(L, 1);
+	if (lua_isthread(L, -1)) { /* Continuations */
+		status = l_ffi_defer(lua_tothread(L, -1));
+	} else if (lua_isnumber(L, -1)) { /* Return code */
+		status = lua_tonumber(L, -1);
 	}
+	lua_pop(L, 1);
 	return status;
 }
 
