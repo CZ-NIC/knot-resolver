@@ -157,13 +157,12 @@ static int l_ffi_deinit(struct kr_module *module)
 /** @internal Helper for retrieving layer Lua function by name. */
 #define LAYER_FFI_CALL(ctx, slot) \
 	int *cb_slot = (int *)((char *)(ctx)->api + sizeof(knot_layer_api_t)); \
+	if (cb_slot[SLOT_ ## slot] <= 0) { \
+		return ctx->state; \
+	} \
 	struct kr_module *module = (ctx)->api->data; \
 	lua_State *L = module->lib; \
 	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot[SLOT_ ## slot]); \
-	if (lua_isnil(L, -1)) { \
-		lua_pop(L, 1); \
-		return ctx->state; \
-	} \
 	lua_pushnumber(L, ctx->state)
 
 static int l_ffi_layer_begin(knot_layer_t *ctx, void *module_param)
@@ -205,7 +204,7 @@ static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
-	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE)) {
+	if (ctx->state & (KNOT_STATE_FAIL)) {
 		return ctx->state; /* Already failed or done, skip */
 	}
 	LAYER_FFI_CALL(ctx, produce);

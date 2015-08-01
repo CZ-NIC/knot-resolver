@@ -183,7 +183,8 @@ static int pkt_question(lua_State *L)
 	if (!lua_isnumber(L, 4)) { /* Default class is IN */
 		rrclass = KNOT_CLASS_IN;
 	}
-	if (!knot_dname_is_equal(knot_pkt_qname(pkt), dname) || pkt->rrset_count > 0) {
+	const knot_dname_t *qname = knot_pkt_qname(pkt);
+	if (pkt->rrset_count > 0 || (!qname || !knot_dname_is_equal(qname, dname))) {
 		KR_PKT_RECYCLE(pkt);
 		knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 		pkt->parsed = pkt->size;
