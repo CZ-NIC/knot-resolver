@@ -59,20 +59,18 @@ end
 
 -- @function Check for common suffix first, then suffix match (specialized version of suffix match)
 function block.suffix_common(action, suffix_list, common_suffix)
-	local common_len = common_suffix:len()
+	local common_len = string.len(common_suffix)
 	local suffix_count = #suffix_list
 	return function(pkt, qname)
 		-- Preliminary check
-		if common_suffix ~= nil then
-			if qname:sub(-common_len) ~= common_suffix then
-				return nil
-			end
+		if not string.find(qname, common_suffix, -common_len, true) then
+			return nil
 		end
 		-- String match
 		local zone = nil
 		for i = 1, suffix_count do
 			zone = suffix_list[i]
-			if qname:sub(-zone:len()) == zone then
+			if string.find(qname, zone, -string.len(zone), true) then
 				return action
 			end
 		end
@@ -105,6 +103,9 @@ end
 block.layer = {
 	produce = function(state, req, pkt)
 		-- Check only for first iteration of a query
+		if state == kres.DONE then
+			return state
+		end
 		local qry = kres.query_current(req)
 		if kres.query.flag(qry, kres.query.AWAIT_CUT) then
 			return state
