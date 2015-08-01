@@ -51,7 +51,7 @@ function block.suffix(action, zone_list)
 	return function(pkt, qname)
 		local match = AC.match(tree, qname, false)
 		if match[1] ~= nil then
-			return action, match[1]
+			return action
 		end
 		return nil
 	end
@@ -59,19 +59,21 @@ end
 
 -- @function Check for common suffix first, then suffix match (specialized version of suffix match)
 function block.suffix_common(action, suffix_list, common_suffix)
+	local common_len = common_suffix:len()
+	local suffix_count = #suffix_list
 	return function(pkt, qname)
 		-- Preliminary check
 		if common_suffix ~= nil then
-			local common_len = common_suffix:len()
 			if qname:sub(-common_len) ~= common_suffix then
 				return nil
 			end
 		end
 		-- String match
-		for i = 1, #suffix_list do
-			local zone = suffix_list[i]
+		local zone = nil
+		for i = 1, suffix_count do
+			zone = suffix_list[i]
 			if qname:sub(-zone:len()) == zone then
-				return action, zone
+				return action
 			end
 		end
 		return nil
@@ -82,7 +84,7 @@ end
 function block.pattern(action, pattern)
 	return function(pkt, qname)
 		if string.find(qname, pattern) then
-			return action, qname
+			return action
 		end
 		return nil
 	end
@@ -90,34 +92,36 @@ end
 
 -- @function Evaluate packet in given rules to determine block action
 function block.evaluate(block, pkt, qname)
-	for i = 1, #block.rules do
-		local action, authority = block.rules[i](pkt, qname)
+	for i = 1, block.rules_count do
+		local action = block.rules[i](pkt, qname)
 		if action ~= nil then
-			return action, authority
+			return action
 		end
 	end
-	return block.PASS, nil
+	return block.PASS
 end
 
 -- @function Block layer implementation
 block.layer = {
 	produce = function(state, req, pkt)
-		-- Interpret packet in Lua and evaluate
+		-- Check only for first iteration of a query
 		local qry = kres.query_current(req)
+		if kres.query.flag(qry, kres.query.AWAIT_CUT) then
+			return state
+		end
 		local qname = kres.query.qname(qry)
-		local action, authority = block:evaluate(pkt, qname)
+		local action = block:evaluate(pkt, qname)
 		if action == block.DENY then
 			-- Answer full question
 			local qclass = kres.query.qclass(qry)
 			local qtype = kres.query.qtype(qry)
-			kres.query.flag(qry, kres.query.NO_MINIMIZE + kres.query.SAFEMODE)
+			kres.query.flag(qry, kres.query.NO_MINIMIZE + kres.query.CACHED)
 			pkt:question(qname, qtype, qclass)
 			pkt:flag(kres.wire.QR)
-			pkt:flag(kres.wire.AA)
 			-- Write authority information
 			pkt:rcode(kres.rcode.NXDOMAIN)
 			pkt:begin(kres.AUTHORITY)
-			pkt:add(authority, qclass, kres.type.SOA, 900,
+			pkt:add('block.', qclass, kres.type.SOA, 900,
 				'\5block\0\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
 			return kres.DONE
 		elseif action == block.DROP then
@@ -129,10 +133,12 @@ block.layer = {
 }
 
 -- @var Default rules
-block.rules = { block.suffix_common(block.DENY, block.private_zones, '.arpa.') }
+block.rules_count = 1
+block.rules = { block.suffix_common(block.DENY, block.private_zones, 'arpa.') }
 
 -- @function Add rule to block list
 function block.add(block, rule)
+	block.rules_count = block.rules_count + 1
 	return table.insert(block.rules, rule)
 end
 
