@@ -28,12 +28,6 @@
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " rc ",  fmt)
 #define DEFAULT_MINTTL (5) /* Short-time "no data" retention to avoid bursts */
 
-static int begin(knot_layer_t *ctx, void *module_param)
-{
-	ctx->data = module_param;
-	return ctx->state;
-}
-
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
 static inline bool is_expiring(const knot_rrset_t *rr, uint32_t drift)
 {
@@ -312,7 +306,6 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 const knot_layer_api_t *rrcache_layer(struct kr_module *module)
 {
 	static const knot_layer_api_t _layer = {
-		.begin = &begin,
 		.produce = &peek,
 		.consume = &stash
 	};

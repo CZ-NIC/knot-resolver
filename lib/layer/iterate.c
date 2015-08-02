@@ -351,7 +351,9 @@ static int finish(knot_layer_t *ctx) { return KNOT_STATE_NOOP; }
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
 {
-	ctx->data = module_param;
+	if (ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
+		return ctx->state;
+	}
 	return reset(ctx);
 }
 

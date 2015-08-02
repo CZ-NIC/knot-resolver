@@ -89,12 +89,6 @@ static inline void stat_const_add(struct stat_data *data, enum const_metric key,
 	const_metrics[key].val += incr;
 }
 
-static int begin(knot_layer_t *ctx, void *module_param)
-{
-	ctx->data = module_param;
-	return ctx->state;
-}
-
 static int collect_answer(struct stat_data *data, knot_pkt_t *pkt)
 {
 	stat_const_add(data, metric_answer_total, 1);
@@ -341,7 +335,6 @@ static char* clear_expiring(void *env, struct kr_module *module, const char *arg
 const knot_layer_api_t *stats_layer(struct kr_module *module)
 {
 	static knot_layer_api_t _layer = {
-		.begin = &begin,
 		.finish = &collect,
 	};
 	/* Store module reference */

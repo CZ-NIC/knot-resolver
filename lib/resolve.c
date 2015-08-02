@@ -32,9 +32,11 @@
 #define ITERATE_LAYERS(req, func, ...) \
 	for (unsigned i = 0; i < (req)->ctx->modules->len; ++i) { \
 		struct kr_module *mod = (req)->ctx->modules->at[i]; \
-		if (mod->layer) { \
+		if (mod->layer ) { \
 			struct knot_layer layer = {.state = (req)->state, .api = mod->layer(mod), .data = (req)}; \
-			(req)->state = (func)(&layer, ##__VA_ARGS__); \
+			if (layer.api && layer.api->func) { \
+				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
+			} \
 		} \
 	}
 
@@ -368,7 +370,8 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
 
 	/* Expect answer */
-	return KNOT_STATE_PRODUCE;
+	ITERATE_LAYERS(request, begin, request);
+	return request->state;
 }
 
 int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
@@ -404,7 +407,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 		if (qname_raw && qry->secret != 0) {
 			randomized_qname_case(qname_raw, qry->secret);
 		}
-		ITERATE_LAYERS(request, knot_layer_consume, packet);
+		ITERATE_LAYERS(request, consume, packet);
 	}
 
 	/* Resolution failed, invalidate current NS. */
@@ -427,7 +430,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 		qry->flags &= ~(QUERY_CACHED|QUERY_TCP);
 	}
 
-	ITERATE_LAYERS(request, knot_layer_reset);
+	ITERATE_LAYERS(request, reset);
 	return kr_rplan_empty(&request->rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 }
 
@@ -450,12 +453,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 #endif
 
 	/* Resolve current query and produce dependent or finish */
-	ITERATE_LAYERS(request, knot_layer_produce, packet);
+	ITERATE_LAYERS(request, produce, packet);
 	if (request->state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
 		/* Produced an answer, consume it. */
 		qry->secret = 0;
 		request->state = KNOT_STATE_CONSUME;
-		ITERATE_LAYERS(request, knot_layer_consume, packet);
+		ITERATE_LAYERS(request, consume, packet);
 	}
 	switch(request->state) {
 	case KNOT_STATE_FAIL: return request->state; break;
@@ -465,7 +468,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		if (qry->flags & QUERY_RESOLVED) {
 			kr_rplan_pop(rplan, qry);
 		}
-		ITERATE_LAYERS(request, knot_layer_reset);
+		ITERATE_LAYERS(request, reset);
 		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 	}
 
@@ -498,7 +501,7 @@ ns_election:
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
 			DEBUG_MSG("=> no valid NS left\n");
-			ITERATE_LAYERS(request, knot_layer_reset);
+			ITERATE_LAYERS(request, reset);
 			kr_rplan_pop(rplan, qry);
 			return KNOT_STATE_PRODUCE;
 		}
@@ -510,7 +513,7 @@ ns_election:
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
 			goto ns_election; /* Must try different NS */
 		}
-		ITERATE_LAYERS(request, knot_layer_reset);
+		ITERATE_LAYERS(request, reset);
 		return KNOT_STATE_PRODUCE;
 	}
 
@@ -552,7 +555,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
-	ITERATE_LAYERS(request, knot_layer_finish);
+	ITERATE_LAYERS(request, finish);
 	/* Clean up. */
 	kr_rplan_deinit(&request->rplan);
 	return KNOT_STATE_DONE;
