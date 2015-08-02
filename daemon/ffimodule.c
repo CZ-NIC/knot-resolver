@@ -51,7 +51,7 @@ static void set_metatable(lua_State *L, const char *tname)
 /** @internal Helper for retrieving the right function entrypoint. */
 static inline lua_State *l_ffi_preface(struct kr_module *module, const char *call) {
 	lua_State *L = module->lib;
-	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
+	lua_getglobal(L, module->name);
 	lua_getfield(L, -1, call);
 	lua_remove(L, -2);
 	if (lua_isnil(L, -1)) {
@@ -128,10 +128,8 @@ static int l_ffi_deinit(struct kr_module *module)
 	if (l_ffi_preface(module, "deinit")) {
 		ret = l_ffi_call(L, 1);
 	}
-	/* Free the layer API wrapper */
-	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
-	lua_getfield(L, -1, "_layer_capi");
-	knot_layer_api_t* api = lua_touserdata(L, -1);
+	/* Free the layer API wrapper (unconst it) */
+	knot_layer_api_t* api = module->data;
 	if (api) {
 		LAYER_UNREGISTER(L, api, begin);
 		LAYER_UNREGISTER(L, api, finish);
@@ -140,11 +138,6 @@ static int l_ffi_deinit(struct kr_module *module)
 		LAYER_UNREGISTER(L, api, reset);
 		free(api);
 	}
-	lua_pop(L, 2);
-	/* Unref module and unset 'lib', so the module
-	 * interface doesn't attempt to close it.
-	 */
-	luaL_unref(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
 	module->lib = NULL;
 	return ret;
 }
@@ -211,59 +204,49 @@ static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 }
 #undef LAYER_FFI_CALL
 
-/** Conditionally register layer trampoline */
+/** @internal Conditionally register layer trampoline
+  * @warning Expects 'module.layer' to be on top of Lua stack. */
 #define LAYER_REGISTER(L, api, name) do { \
 	int *cb_slot = (int *)((char *)api + sizeof(knot_layer_api_t)); \
-	lua_getfield((L), -1, "layer"); \
 	lua_getfield((L), -1, #name); \
 	if (!lua_isnil((L), -1)) { \
 		(api)->name = l_ffi_layer_ ## name; \
-		cb_slot[SLOT_ ## name] = luaL_ref(L, LUA_REGISTRYINDEX); \
+		cb_slot[SLOT_ ## name] = luaL_ref((L), LUA_REGISTRYINDEX); \
 	} else { \
 		lua_pop((L), 1); \
 	} \
-	lua_pop((L), 1); \
 } while(0)
 
-/** @internal Retrieve C layer api wrapper. */
-static const knot_layer_api_t* l_ffi_layer(struct kr_module *module)
+/** @internal Create C layer api wrapper. */
+static knot_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module)
 {
-	lua_State *L = module->lib;
-	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t)module->data);
-	lua_getfield(L, -1, "_layer_capi");
-	knot_layer_api_t *api = lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	if (!api) {
-		/* Fabricate layer API wrapping the Lua functions
-		 * reserve slots after it for references to Lua callbacks. */
-		const size_t api_length = sizeof(*api) + (SLOT_count * SLOT_size);
-		api = malloc(api_length);
-		if (api) {
-			memset(api, 0, api_length);
-			LAYER_REGISTER(L, api, begin);
-			LAYER_REGISTER(L, api, finish);
-			LAYER_REGISTER(L, api, consume);
-			LAYER_REGISTER(L, api, produce);
-			LAYER_REGISTER(L, api, reset);
-			/* Begin is always set, as it initializes layer baton. */
-			api->begin = l_ffi_layer_begin;
-			api->data = module;
-		}
-		/* Store the api in the registry. */
-		lua_pushlightuserdata(L, api);
-		lua_setfield(L, -2, "_layer_capi");
+	/* Fabricate layer API wrapping the Lua functions
+	 * reserve slots after it for references to Lua callbacks. */
+	const size_t api_length = sizeof(knot_layer_api_t) + (SLOT_count * SLOT_size);
+	knot_layer_api_t *api = malloc(api_length);
+	if (api) {
+		memset(api, 0, api_length);
+		LAYER_REGISTER(L, api, begin);
+		LAYER_REGISTER(L, api, finish);
+		LAYER_REGISTER(L, api, consume);
+		LAYER_REGISTER(L, api, produce);
+		LAYER_REGISTER(L, api, reset);
+		/* Begin is always set, as it initializes layer baton. */
+		api->begin = l_ffi_layer_begin;
+		api->data = module;
 	}
-	lua_pop(L, 1); /* Clear module table */
 	return api;
 }
-#undef LAYER_REGISTER
 
-/** @internal Helper macro for function presence check. */
-#define REGISTER_FFI_CALL(L, attr, name, cb) do { \
-	lua_getfield((L), -1, (name)); \
-	if (!lua_isnil((L), -1)) { attr = cb; } \
-	lua_pop((L), 1); \
-} while (0)
+/** @internal Retrieve C layer api wrapper. */
+static const knot_layer_api_t *l_ffi_layer(struct kr_module *module)
+{
+	if (module) {
+		return (const knot_layer_api_t *)module->data;
+	}
+	return NULL;
+}
+#undef LAYER_REGISTER
 
 int ffimodule_register_lua(struct engine *engine, struct kr_module *module, const char *name)
 {
@@ -284,14 +267,16 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	module->name = strdup(name);
 	module->init = &l_ffi_init;
 	module->deinit = &l_ffi_deinit;
-	REGISTER_FFI_CALL(L, module->layer,  "layer",  &l_ffi_layer);
-	module->data = (void *)(intptr_t)luaL_ref(L, LUA_REGISTRYINDEX);
+	/* Bake layer API if defined in module */
+	lua_getfield(L, -1, "layer");
+	if (!lua_isnil(L, -1)) {
+		module->layer = &l_ffi_layer;
+		module->data = l_ffi_layer_create(L, module);
+	}
 	module->lib = L;
-	lua_pop(L, 1); /* Clear the module global */
+	lua_pop(L, 2); /* Clear the layer + module global */
 	if (module->init) {
 		return module->init(module);
 	}
 	return kr_ok();
 }
-
-#undef REGISTER_FFI_CALL
