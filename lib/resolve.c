@@ -531,9 +531,10 @@ ns_election:
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
+#ifdef WITH_DEBUG
 	struct kr_rplan *rplan = &request->rplan;
 	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
-
+#endif
 	/* Finalize answer */
 	if (answer_finalize(request->answer) != 0) {
 		state = KNOT_STATE_FAIL;
