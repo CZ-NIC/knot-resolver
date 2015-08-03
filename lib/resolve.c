@@ -546,8 +546,6 @@ int kr_resolve_finish(struct kr_request *request, int state)
 		}
 	}
 	ITERATE_LAYERS(request, finish);
-	/* Clean up. */
-	kr_rplan_deinit(rplan);
 	return KNOT_STATE_DONE;
 }
 
