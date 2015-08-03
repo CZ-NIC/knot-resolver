@@ -401,7 +401,7 @@ int engine_start(struct engine *engine)
 	/* Clean up stack and restart GC */
 	lua_settop(engine->L, 0);
 	lua_gc(engine->L, LUA_GCCOLLECT, 0);
-	lua_gc(engine->L, LUA_GCSETSTEPMUL, 99);
+	lua_gc(engine->L, LUA_GCSETSTEPMUL, 50);
 	lua_gc(engine->L, LUA_GCSETPAUSE, 400);
 	lua_gc(engine->L, LUA_GCRESTART, 0);
 	return kr_ok();
