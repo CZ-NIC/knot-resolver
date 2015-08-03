@@ -45,20 +45,12 @@ if "SOCKET_WRAPPER_DIR" in os.environ:
 if TMPDIR == "" or os.path.isdir(TMPDIR) is False:
     OLDTMPDIR = TMPDIR
     TMPDIR = tempfile.mkdtemp(suffix='', prefix='tmp')
-#    os.chmod(TMPDIR,stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR|stat.S_IRGRP|stat.S_IWGRP|stat.S_IXGRP|stat.S_IROTH|stat.S_IWOTH|stat.S_IXOTH)
     os.environ["SOCKET_WRAPPER_DIR"] = TMPDIR
     if TEST_DEBUG > 0:
         testserver.syn_print(None,"SOCKET_WRAPPER_DIR is invalid or empty ({}), set to default ({})".format(OLDTMPDIR, TMPDIR))
 if TEST_DEBUG > 0:
     testserver.syn_print(None,"default_iface: {}, child_iface: {}, tmpdir {}".format(DEFAULT_IFACE, CHILD_IFACE, TMPDIR))
 del_files(TMPDIR)
-
-# Set up libfaketime
-os.environ["FAKETIME_NO_CACHE"] = "1"
-os.environ["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
-time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
-time_file.write(datetime.fromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S'))
-time_file.close()
 
 def get_next(file_in):
     """ Return next token from the input stream. """
@@ -184,6 +176,13 @@ def play_object(path):
         scenario, config = parse_file(file_in)
     finally:
         file_in.close()
+
+    # Set up libfaketime
+    os.environ["FAKETIME_NO_CACHE"] = "1"
+    os.environ["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
+    time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
+    time_file.write(datetime.fromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S'))
+    time_file.close()
 
     child_env = os.environ.copy()
     child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE

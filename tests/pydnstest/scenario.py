@@ -299,8 +299,6 @@ class Step:
             msg = self.data[0].message
             msg.use_edns(edns = 1)
             data_to_wire = msg.to_wire()
-#        self.raw_answer = ctx.resolve(data_to_wire)
-#        ctx.last_raw_answer = self.raw_answer
         ctx.sockudp4.sendto(data_to_wire,(peeraddr,53))
         ctx.sockudp4.settimeout(10)
         if self.data[0].is_raw_data_entry is True:
