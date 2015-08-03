@@ -449,6 +449,7 @@ static void event_callback(uv_timer_t *timer)
 	}
 	/* Clear the stack, there may be event a/o enything returned */
 	lua_settop(L, top);
+	lua_gc(L, LUA_GCCOLLECT, 0);
 	/* Free callback if not recurrent or an error */
 	if (ret != 0 || uv_timer_get_repeat(timer) == 0) {
 		uv_close((uv_handle_t *)timer, (uv_close_cb) event_free);

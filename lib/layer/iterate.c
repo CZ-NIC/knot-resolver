@@ -351,7 +351,9 @@ static int finish(knot_layer_t *ctx) { return KNOT_STATE_NOOP; }
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
 {
-	ctx->data = module_param;
+	if (ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
+		return ctx->state;
+	}
 	return reset(ctx);
 }
 
@@ -446,10 +448,11 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_DONE;
 	}
 
-	/* Check response code. */
-#ifndef NDEBUG
+#ifdef WITH_DEBUG
 	lookup_table_t *rcode = lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 #endif
+
+	/* Check response code. */
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:

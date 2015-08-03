@@ -15,6 +15,7 @@
  */
 
 #include <uv.h>
+#include <lua.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/internal/net.h>
 #include <contrib/ucw/lib.h>
@@ -168,14 +169,16 @@ static void qr_task_free(uv_handle_t *handle)
 	} else {
 		mp_delete(mp_context);
 	}
-#if defined(__GLIBC__) && defined(_GNU_SOURCE)
 	/* Decommit memory every once in a while */
 	static int mp_delete_count = 0;
-	if (++mp_delete_count == 100 * MP_FREELIST_SIZE) {
+	if (++mp_delete_count == 100000) {
+		lua_gc(worker->engine->L, LUA_GCCOLLECT, 0);
+#if defined(__GLIBC__) && defined(_GNU_SOURCE)
 		malloc_trim(0);
+#endif
 		mp_delete_count = 0;
 	}
-#endif
+
 	/* Update stats */
 	worker->stats.concurrent -= 1;
 }

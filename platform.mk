@@ -24,7 +24,7 @@ else
         MODTYPE := dynamiclib
     else
         PLATFORM := POSIX
-        LDFLAGS += -pthread
+        LDFLAGS += -pthread -lm -Wl,-E
         ifeq (,$(findstring BSD,$(UNAME)))
             LDFLAGS += -ldl
         endif
