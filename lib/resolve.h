@@ -210,8 +210,8 @@ int kr_resolve_finish(struct kr_request *request, int state);
 
 /**
  * Return resolution plan.
- * @param  req request state
- * @return     pointer to rplan
+ * @param  request request state
+ * @return         pointer to rplan
  */
 struct kr_rplan *kr_resolve_plan(struct kr_request *request);
 

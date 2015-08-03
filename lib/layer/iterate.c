@@ -448,10 +448,11 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_DONE;
 	}
 
-	/* Check response code. */
-#ifndef NDEBUG
+#ifdef WITH_DEBUG
 	lookup_table_t *rcode = lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 #endif
+
+	/* Check response code. */
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:

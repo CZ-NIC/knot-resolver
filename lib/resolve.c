@@ -295,7 +295,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	struct kr_request request;
 	request.pool = pool;
 	kr_resolve_begin(&request, ctx, answer);
-#ifndef NDEBUG
+#ifdef WITH_DEBUG
 	struct kr_rplan *rplan = &request.rplan; /* for DEBUG_MSG */
 #endif
 	/* Resolve query, iteratively */
@@ -433,19 +433,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 {
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *qry = kr_rplan_current(rplan);
+	unsigned ns_election_iter = 0;
 	
 	/* No query left for resolution */
 	if (kr_rplan_empty(rplan)) {
 		return KNOT_STATE_FAIL;
 	}
-
-#ifndef NDEBUG
-	unsigned ns_election_iter = 0;
-	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
-	knot_dname_to_str(name_str, qry->sname, sizeof(name_str));
-	knot_rrtype_to_string(qry->stype, type_str, sizeof(type_str));
-	DEBUG_MSG("query '%s %s'\n", type_str, name_str);
-#endif
 
 	/* Resolve current query and produce dependent or finish */
 	ITERATE_LAYERS(request, produce, packet);
@@ -489,7 +482,10 @@ ns_election:
 	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
 	 * elect best address only, otherwise elect a completely new NS.
 	 */
-	assert(++ns_election_iter < KR_ITER_LIMIT);
+	if(++ns_election_iter >= KR_ITER_LIMIT) {
+		DEBUG_MSG("=> couldn't agree NS decision, report this\n");
+		return KNOT_STATE_FAIL;
+	}
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
 	} else if (!(qry->flags & QUERY_TCP)) { /* Keep address when TCP retransmit. */
@@ -518,7 +514,7 @@ ns_election:
 		return KNOT_STATE_FAIL;
 	}
 
-#ifndef NDEBUG
+#ifdef WITH_DEBUG
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
 	struct sockaddr *addr = &qry->ns.addr.ip;
@@ -535,10 +531,9 @@ ns_election:
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
-#ifndef NDEBUG
 	struct kr_rplan *rplan = &request->rplan;
 	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
-#endif
+
 	/* Finalize answer */
 	if (answer_finalize(request->answer) != 0) {
 		state = KNOT_STATE_FAIL;
@@ -552,7 +547,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	}
 	ITERATE_LAYERS(request, finish);
 	/* Clean up. */
-	kr_rplan_deinit(&request->rplan);
+	kr_rplan_deinit(rplan);
 	return KNOT_STATE_DONE;
 }
 
