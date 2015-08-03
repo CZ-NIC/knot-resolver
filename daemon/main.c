@@ -292,7 +292,6 @@ int main(int argc, char **argv)
 		ret = run_worker(loop, &engine);
 	}
 	/* Cleanup. */
-	fprintf(stderr, "\n[system] quitting\n");
 	engine_deinit(&engine);
 	worker_reclaim(worker);
 	mp_delete(pool.ctx);
