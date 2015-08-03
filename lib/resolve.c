@@ -61,14 +61,6 @@ static void randomized_qname_case(knot_dname_t *qname, unsigned secret)
 	}
 }
 
-/** @internal Subtract time (best effort) */
-float time_diff(struct timeval *begin, struct timeval *end)
-{
-	return (end->tv_sec - begin->tv_sec) * 1000 +
-	       (end->tv_usec - begin->tv_usec) / 1000.0;
-
-}
-
 /** Invalidate current NS/addr pair. */
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {

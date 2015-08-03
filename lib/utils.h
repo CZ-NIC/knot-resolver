@@ -35,6 +35,20 @@ extern void _cleanup_fclose(FILE **p);
  * Defines.
  */
 
+/** Return time difference in miliseconds.
+  * @note based on the _BSD_SOURCE timersub() macro */
+static inline long time_diff(struct timeval *begin, struct timeval *end) {
+    struct timeval res = {
+        .tv_sec = end->tv_sec - begin->tv_sec,
+        .tv_usec = end->tv_usec - begin->tv_usec
+    };
+    if (res.tv_usec < 0) {
+        --res.tv_sec;
+        res.tv_usec += 1000000;
+    }
+    return res.tv_sec * 1000 + res.tv_usec / 1000;
+}
+
 /** @internal Next RDATA shortcut. */
 #define kr_rdataset_next(rd) (rd + knot_rdata_array_size(knot_rdata_rdlen(rd)))
 
