@@ -369,8 +369,11 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 	knot_wire_set_ra(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
 
-	/* Expect answer */
+	/* Expect answer, pop if satisfied immediately */
 	ITERATE_LAYERS(request, begin, request);
+	if (request->state == KNOT_STATE_DONE) {
+		kr_rplan_pop(rplan, qry);
+	}
 	return request->state;
 }
 
