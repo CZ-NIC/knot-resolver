@@ -55,15 +55,15 @@ extern const lookup_table_t query_flag_names[];
 struct kr_query {
 	node_t node;
 	struct kr_query *parent;
-	struct kr_nsrep ns;
-	struct kr_zonecut zone_cut;
-	struct timeval timestamp;
 	knot_dname_t *sname;
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;
 	uint16_t flags;
 	unsigned secret;
+	struct timeval timestamp;
+	struct kr_nsrep ns;
+	struct kr_zonecut zone_cut;
 };
 
 /**

@@ -125,11 +125,11 @@ struct kr_context
  */
 struct kr_request {
     struct kr_context *ctx;
-    struct kr_rplan rplan;
     knot_pkt_t *answer;
-    mm_ctx_t pool;
     uint32_t options;
     int state;
+    struct kr_rplan rplan;
+    mm_ctx_t pool;
 };
 
 /**
@@ -207,3 +207,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
  * @return         DONE
  */
 int kr_resolve_finish(struct kr_request *request, int state);
+
+/**
+ * Return resolution plan.
+ * @param  req request state
+ * @return     pointer to rplan
+ */
+struct kr_rplan *kr_resolve_plan(struct kr_request *request);
+

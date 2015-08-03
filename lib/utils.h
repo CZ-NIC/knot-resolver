@@ -17,6 +17,7 @@
 #pragma once
 
 #include <stdio.h>
+#include <libknot/packet/pkt.h>
 
 /*
  * General-purpose attributes.
@@ -34,16 +35,6 @@ extern void _cleanup_fclose(FILE **p);
  * Defines.
  */
 
-/** @internal Fast packet reset. */
-#define KR_PKT_RECYCLE(pkt) do { \
-	(pkt)->rrset_count = 0; \
-	(pkt)->size = KNOT_WIRE_HEADER_SIZE; \
-	(pkt)->current = KNOT_ANSWER; \
-	memset((pkt)->sections, 0, sizeof((pkt)->sections)); \
-	knot_pkt_begin((pkt), KNOT_ANSWER); \
-	knot_pkt_parse_question((pkt)); \
-} while (0)
-
 /** @internal Next RDATA shortcut. */
 #define kr_rdataset_next(rd) (rd + knot_rdata_array_size(knot_rdata_rdlen(rd)))
 
@@ -58,3 +49,17 @@ unsigned kr_rand_uint(unsigned max);
 
 /** Memory reservation routine for mm_ctx_t */
 int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have);
+
+/** @internal Fast packet reset. */
+#define KR_PKT_RECYCLE(pkt) do { \
+	(pkt)->rrset_count = 0; \
+	(pkt)->size = KNOT_WIRE_HEADER_SIZE; \
+	(pkt)->current = KNOT_ANSWER; \
+	memset((pkt)->sections, 0, sizeof((pkt)->sections)); \
+	knot_pkt_begin((pkt), KNOT_ANSWER); \
+	knot_pkt_parse_question((pkt)); \
+} while (0)
+
+/** Construct and put record to packet. */
+int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
+               uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);

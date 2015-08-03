@@ -28,7 +28,6 @@
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
-#include "daemon/bindings/kres.h"
 
 /*
  * Globals
@@ -137,7 +136,6 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm
 	engine_lualib(engine, "net",     lib_net);
 	engine_lualib(engine, "cache",   lib_cache);
 	engine_lualib(engine, "event",   lib_event);
-	engine_lualib(engine, "kres",    lib_kres);
 	engine_lualib(engine, "worker",  lib_worker);
 
 	/* Create main worker. */

@@ -560,3 +560,11 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	kr_rplan_deinit(&request->rplan);
 	return KNOT_STATE_DONE;
 }
+
+struct kr_rplan *kr_resolve_plan(struct kr_request *request)
+{
+	if (request) {
+		return &request->rplan;
+	}
+	return NULL;
+}

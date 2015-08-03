@@ -19,7 +19,6 @@
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
 #include "daemon/bindings.h"
-#include "daemon/bindings/kres.h"
 #include "lib/module.h"
 #include "lib/layer.h"
 
@@ -40,13 +39,6 @@ enum {
 	SLOT_count
 };
 #define SLOT_size sizeof(int)
-
-/** @internal Set metatable on the object on stack. */
-static void set_metatable(lua_State *L, const char *tname)
-{
-	luaL_getmetatable(L, tname);
-	lua_setmetatable(L, -2);
-}
 
 /** @internal Helper for retrieving the right function entrypoint. */
 static inline lua_State *l_ffi_preface(struct kr_module *module, const char *call) {
@@ -95,10 +87,10 @@ static inline int l_ffi_call(lua_State *L, int argc)
 		lua_pop(L, 1);
 		return kr_error(EIO);
 	}
-	if (lua_isthread(L, -1)) { /* Continuations */
-		status = l_ffi_defer(lua_tothread(L, -1));
-	} else if (lua_isnumber(L, -1)) { /* Return code */
+	if (lua_isnumber(L, -1)) { /* Return code */
 		status = lua_tonumber(L, -1);
+	} else if (lua_isthread(L, -1)) { /* Continuations */
+		status = l_ffi_defer(lua_tothread(L, -1));
 	}
 	lua_pop(L, 1);
 	return status;
@@ -156,9 +148,8 @@ static int l_ffi_deinit(struct kr_module *module)
 
 static int l_ffi_layer_begin(knot_layer_t *ctx, void *module_param)
 {
-	ctx->data = module_param;
 	LAYER_FFI_CALL(ctx, begin);
-	lua_pushlightuserdata(L, module_param);
+	lua_pushlightuserdata(L, ctx->data);
 	return l_ffi_call(L, 2);
 }
 
@@ -175,7 +166,6 @@ static int l_ffi_layer_finish(knot_layer_t *ctx)
 	LAYER_FFI_CALL(ctx, finish);
 	lua_pushlightuserdata(L, req);
 	lua_pushlightuserdata(L, req->answer);
-	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
 }
 
@@ -187,7 +177,6 @@ static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 	LAYER_FFI_CALL(ctx, consume);
 	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
-	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
 }
 
@@ -199,7 +188,6 @@ static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 	LAYER_FFI_CALL(ctx, produce);
 	lua_pushlightuserdata(L, ctx->data);
 	lua_pushlightuserdata(L, pkt);
-	set_metatable(L, META_PKT);
 	return l_ffi_call(L, 3);
 }
 #undef LAYER_FFI_CALL
