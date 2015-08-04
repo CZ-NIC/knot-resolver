@@ -17,6 +17,8 @@ GNUTLS_TAG="3.3.12"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_TAG="5.2.3"
 LUA_URL="http://www.lua.org/ftp/lua-${LUA_TAG}.tar.gz"
+CWRAP_TAG="master"
+CWRAP_URL="git://git.samba.org/socket_wrapper.git"
 
 # prepare install prefix
 PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
@@ -85,8 +87,10 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew link --overwrite python || true
 	pip install --upgrade pip || true
 	pip install -r ${PIP_PKGS}
+	pkg cwrap ${CWRAP_URL} ${CWRAP_TAG} lib/pkgconfig/socket_wrapper.pc
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
+	pkg cwrap ${CWRAP_URL} ${CWRAP_TAG} lib/pkgconfig/socket_wrapper.pc
 	pip install --user ${USER} -r ${PIP_PKGS}
 	rm ${HOME}/.cache/pip/log/debug.log || true
 fi
