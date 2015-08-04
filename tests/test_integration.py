@@ -205,6 +205,7 @@ def play_object(path):
     os.write(fd, "modules = {'hints'}\n")
     os.write(fd, "hints.root({['k.root-servers.net'] = '%s'})\n" % selfaddr)
     os.write(fd, "option('NO_MINIMIZE', true)\n")
+    os.write(fd, "option('ALLOW_LOCAL', true)\n") # Permit queries to localhost
     for k,v in config:
         # Enable selectively for some tests
         if k == 'query-minimization' and str2bool(v):

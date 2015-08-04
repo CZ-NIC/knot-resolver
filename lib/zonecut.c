@@ -143,29 +143,7 @@ int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src)
 	return map_walk((map_t *)&src->nsset, copy_addr_set, dst);
 }
 
-/** @internal Filter ANY or loopback addresses. */
-static bool is_valid_addr(uint8_t *addr, size_t len)
-{
-	if (len == sizeof(struct in_addr)) {
-		/* Filter ANY and 127.0.0.0/8 */
 
-		/* temporary workaround for local testing 
-		uint32_t ip_host = ntohl(*(uint32_t *)(addr));
-		if (ip_host == 0 || (ip_host & 0xff000000) == 0x7f000000) {
-			return false;
-		}
-		*/
-
-	} else if (len == sizeof(struct in6_addr)) {
-		struct in6_addr ip6_mask;
-		memset(&ip6_mask, 0, sizeof(ip6_mask));
-		/* All except last byte are zeroed, last byte defines ANY/::1 */
-		if (memcmp(addr, ip6_mask.s6_addr, sizeof(ip6_mask.s6_addr) - 1) == 0) {
-			return (addr[len - 1] > 1);
-		}
-	}
-	return true;
-}
 
 int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
 {
@@ -186,13 +164,9 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	if (rdata == NULL) {
 		return kr_ok();
 	}
-	/* Check for invalid */
+	/* Check for duplicates */
 	uint16_t rdlen = knot_rdata_rdlen(rdata);
 	uint8_t *raw_addr = knot_rdata_data(rdata);
-	if (!is_valid_addr(raw_addr, rdlen)) {
-		return kr_error(EILSEQ);
-	}
-	/* Check for duplicates */
 	if (pack_obj_find(pack, raw_addr, rdlen)) {
 		return kr_ok();
 	}
@@ -201,7 +175,7 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}
-	return pack_obj_push(pack, knot_rdata_data(rdata), rdlen);
+	return pack_obj_push(pack, raw_addr, rdlen);
 }
 
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
