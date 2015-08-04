@@ -22,7 +22,7 @@ $(libfaketime_DIR)/Makefile: $(libfaketime_DIR)
 	@git submodule update
 # Build libfaketime contrib
 $(libfaketime): $(libfaketime_DIR)/Makefile
-	@$(MAKE) -C $(libfaketime_DIR)
+	@CFLAGS="" $(MAKE) -C $(libfaketime_DIR)
 
 check-integration: $(libfaketime)
 	$(preload_LIBS) $(preload_syms) tests/test_integration.py tests/testdata
