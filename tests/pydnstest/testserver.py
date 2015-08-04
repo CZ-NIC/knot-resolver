@@ -73,7 +73,7 @@ class TestServer:
         self.thread = None
         self.srv_socks = []
         self.client_socks = []
-	self.active = False
+        self.active = False
         self.scenario = scenario
         self.config = config
         self.addr_map = []
@@ -208,9 +208,11 @@ class TestServer:
             return
         if TEST_DEBUG > 0:
             syn_print(None,"translating config")
-        m = re.search("(?P<kroot>\S+)\s+#\s+K.ROOT-SERVERS.NET.", self.config)
-        if m is not None:
-            kroot_addr = m.group("kroot")
+        kroot_addr = None
+        for k, v in self.config:
+            if k == 'stub-addr':
+                kroot_addr = v
+        if kroot_addr is not None:
             self.kroot_local, self.kroot_family = self.get_local(kroot_addr, True)
             if self.kroot_local is None:
                 raise Exception("[map_adresses] Invalid K.ROOT-SERVERS.NET. address, check the config")

@@ -12,6 +12,10 @@ import stat
 from pydnstest import scenario, testserver, test
 from datetime import datetime
 
+def str2bool(v):
+    """ Return conversion of JSON-ish string value to boolean. """ 
+    return v.lower() in ('yes', 'true', 'on')
+
 # Test debugging
 TEST_DEBUG = 0
 if 'TEST_DEBUG' in os.environ:
@@ -137,13 +141,19 @@ def parse_scenario(op, args, file_in):
 def parse_file(file_in):
     """ Parse scenario from a file. """
     try:
-        config = ''
+        config = []
         line = file_in.readline()
         while len(line):
             if line.startswith('CONFIG_END'):
                 break
             if not line.startswith(';'):
-                config += line
+                if '#' in line:
+                    line = line[0:line.index('#')]
+                # Break to key-value pairs
+                # e.g.: ['minimization', 'on']
+                kv = [x.strip() for x in line.split(':')]
+                if len(kv) >= 2:
+                    config.append(kv)
             line = file_in.readline()
         for op, args in iter(lambda: get_next(file_in), False):
             if op == 'SCENARIO_BEGIN':
@@ -194,6 +204,12 @@ def play_object(path):
     os.write(fd, "cache.size = 10*MB\n")
     os.write(fd, "modules = {'hints'}\n")
     os.write(fd, "hints.root({['k.root-servers.net'] = '%s'})\n" % selfaddr)
+    os.write(fd, "option('NO_MINIMIZE', true)\n")
+    for k,v in config:
+        # Enable selectively for some tests
+        if k == 'query-minimization' and str2bool(v):
+            os.write(fd, "option('NO_MINIMIZE', false)\n")
+
     os.close(fd)
 
 
