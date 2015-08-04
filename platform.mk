@@ -31,13 +31,6 @@ else
     endif
 endif
 
-# Libfaketime name
-ifeq ($(PLATFORM),Darwin)
-        libfaketime_name := libfaketime.1$(LIBEXT)
-else
-        libfaketime_name := libfaketime$(LIBEXT).1
-endif
-
 # Silent compilation
 ifeq ($(V),1)
 	quiet = $($1)
@@ -130,11 +123,5 @@ define find_python
 	python_CFLAGS := $(shell $(PYTHON) -c "from distutils import sysconfig as c;print('-I%s' % c.get_python_inc())")
 	python_LIBS := $(shell $(PYTHON) -c "from distutils import sysconfig as c;print('-L%s -lpython%s' % (c.get_config_var('LIBDIR'), c.get_config_var('VERSION')))")
 	$(call have_lib,python)
-endef
-
-# Find libfaketime
-define find_libfaketime
-        libfaketime_LIBS := $(shell find ./contrib -name $(libfaketime_name) -print -quit 2> /dev/null)
-	$(call have_lib,libfaketime)
 endef
 

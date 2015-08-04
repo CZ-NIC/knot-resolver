@@ -21,5 +21,4 @@ info:
 	$(info [$(HAS_libmemcached)] libmemcached (modules/memcached))
 	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_socket_wrapper)] socket_wrapper (lib))
-	$(info [$(HAS_libfaketime)] libfaketime (lib))
 	$(info )

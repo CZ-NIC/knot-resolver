@@ -29,7 +29,6 @@ $(eval $(call find_python))
 $(eval $(call find_lib,libmemcached,1.0))
 $(eval $(call find_lib,hiredis))
 $(eval $(call find_lib,socket_wrapper))
-$(eval $(call find_libfaketime))
 
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)
