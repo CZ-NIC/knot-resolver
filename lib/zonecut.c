@@ -24,7 +24,7 @@
 #include "lib/rplan.h"
 #include "lib/defines.h"
 #include "lib/layer.h"
-#include "lib/layer/validate.h" // kr_ta_parse()
+#include "lib/dnssec/ta.h" // kr_ta_parse()
 #include "lib/generic/pack.h"
 
 /* Root hint descriptor. */

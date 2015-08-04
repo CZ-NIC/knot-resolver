@@ -31,6 +31,7 @@
 
 
 #include "lib/defines.h"
+#include "lib/dnssec/rrtype/ds.h"
 #include "lib/dnssec.h"
 
 #define DEBUG_MSG(fmt...) fprintf(stderr, fmt)
@@ -48,37 +49,6 @@ void kr_crypto_cleanup(void)
 void kr_crypto_reinit(void)
 {
 	dnssec_crypto_reinit();
-}
-
-static inline
-uint16_t _knot_ds_ktag(const knot_rdataset_t *rrs, size_t pos)
-{
-	KNOT_RDATASET_CHECK(rrs, pos, return 0);
-	return wire_read_u16(knot_rdata_offset(rrs, pos, 0));
-}
-
-static inline
-uint8_t _knot_ds_alg(const knot_rdataset_t *rrs, size_t pos)
-{
-	KNOT_RDATASET_CHECK(rrs, pos, return 0);
-	return *knot_rdata_offset(rrs, pos, 2);
-}
-
-static inline
-uint8_t _knot_ds_dtype(const knot_rdataset_t *rrs, size_t pos)
-{
-	KNOT_RDATASET_CHECK(rrs, pos, return 0);
-	return *knot_rdata_offset(rrs, pos, 3);
-}
-
-static inline
-void _knot_ds_digest(const knot_rdataset_t *rrs, size_t pos,
-                    uint8_t **digest, uint16_t *digest_size)
-{
-	KNOT_RDATASET_CHECK(rrs, pos, return);
-	*digest = knot_rdata_offset(rrs, pos, 4);
-	const knot_rdata_t *rr = knot_rdataset_at(rrs, pos);
-	*digest_size = knot_rdata_rdlen(rr) - 4;
 }
 
 /* RFC4035 5.2, bullet 2 */
