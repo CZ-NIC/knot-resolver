@@ -134,8 +134,7 @@ endef
 
 # Find libfaketime
 define find_libfaketime
-        SPACED_PATH := $(subst :, ,$(PATH))
-        libfaketime_LIBS := $(shell find $(HOME)/.local /usr/local $(S_PATH) -name $(libfaketime_name) -print -quit 2> /dev/null)
+        libfaketime_LIBS := $(shell find ./contrib -name $(libfaketime_name) -print -quit 2> /dev/null)
 	$(call have_lib,libfaketime)
 endef
 

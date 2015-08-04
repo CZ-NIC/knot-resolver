@@ -15,12 +15,13 @@ if 'TEST_DEBUG' in os.environ:
 
 g_lock = threading.Lock()
 def syn_print(tag, *args):
-        g_lock.acquire()
-        if tag is None:
-            tag = inspect.stack()[1][3]
-        for s in args:
-            print "[{:<12}][{}] {}".format(tag,threading.current_thread().name,s)
-        g_lock.release()
+    """ Print message with some debug information included. """
+    g_lock.acquire()
+    if tag is None:
+        tag = inspect.stack()[1][3]
+    for s in args:
+        print "[{:<12}][{}] {}".format(tag,threading.current_thread().name,s)
+    g_lock.release()
 
 def recvfrom_msg(stream):
     """ Receive DNS/UDP message. """
@@ -49,18 +50,14 @@ def get_local_addr_str(family, iface):
         raise Exception("[get_local_addr_str] family not supported '%i'" % family)
     return addr_local_pattern.format(iface)
 
-
-class SInfo:
-    def __init__(self,type,addr,port,client_addr):
-        self.type = type
-        self.addr = addr
-        self.port = port
-        self.client_addr = client_addr
-        self.thread = None
-        self.active = False
-        self.name = ''
+class SrvSock (socket.socket):
+    """ Socket with some additional info  """
+    def __init__(self, client_address, family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP):
+        self.client_address = client_address
+        socket.socket.__init__(self, family, type, proto)
 
 class AddrMapInfo:
+    """ Saves mapping info between adresses from rpl and cwrap adresses """
     def __init__(self, family, local, external):
         self.family   = family
         self.local    = local
@@ -73,6 +70,7 @@ class TestServer:
         """ Initialize server instance. """
         if TEST_DEBUG > 0:
             syn_print(None, "initialization")
+        self.thread = None
         self.srv_socks = []
         self.client_socks = []
 	self.active = False
@@ -98,27 +96,27 @@ class TestServer:
             self.stop()
 
     def start(self):
-        """ Asynchronous start, returns immediately. """
+        """ Synchronous start """
         if TEST_DEBUG > 0:
             syn_print(None, "start")
         if self.active is True:
             raise Exception('TestServer already started')
         self.active = True
-        self.start_srv(self.kroot_local, self.kroot_family, self.kroot_local)
+        self.start_srv(self.kroot_local, self.kroot_family)
 
     def stop(self):
         """ Stop socket server operation. """
         if TEST_DEBUG > 0:
             syn_print(None,"stop")
         self.active = False
+        self.thread.join()
         for srv_sock in self.srv_socks:
             if TEST_DEBUG > 0:
-                syn_print(None, "closing socket {name}".format(name=srv_sock.name))
-            srv_sock.active = False
-            srv_sock.thread.join()
+                syn_print(None, "closing socket {name}".format(name=srv_sock.getsockname()))
+            srv_sock.close()
         for client_sock in self.client_socks:
             if TEST_DEBUG > 0:
-                syn_print(None, "closing client socket")
+                syn_print(None, "closing client socket {name}".format(name=client_sock.getsockname()))
             client_sock.close()
         self.client_socks = []
         self.srv_socks = []
@@ -175,6 +173,16 @@ class TestServer:
                 self.cur_iface = self.cur_iface + 1
         return local_address, family
 
+    def get_external(self, local_address, family):
+        """ Fetches external address mapped to local_address """
+        external_address = None
+        for am in self.addr_map:
+            if am.local == local_address and am.family == family:
+                external_address = am.external
+
+        return external_address
+
+
     def map_entries(self, entrylist):
         """ Translate addresses for A and AAAA records"""
         for entry in entrylist :
@@ -202,7 +210,6 @@ class TestServer:
             syn_print(None,"translating config")
         m = re.search("(?P<kroot>\S+)\s+#\s+K.ROOT-SERVERS.NET.", self.config)
         if m is not None:
-#            raise Exception("[map_adresses] Can't parse K.ROOT-SERVERS.NET. address, check the config")
             kroot_addr = m.group("kroot")
             self.kroot_local, self.kroot_family = self.get_local(kroot_addr, True)
             if self.kroot_local is None:
@@ -232,14 +239,15 @@ class TestServer:
         """ Returns opened sockets list """
         addrlist = [];
         for s in self.srv_socks:
-            addrlist.append(s.name);
+            addrlist.append(s.getsockname());
         return addrlist;
 
-    def handle_query(self, client, client_address):
+    def handle_query(self, client):
         """ Handle incoming queries. """
+        client_address = client.client_address
         query, addr = recvfrom_msg(client)
         if TEST_DEBUG > 0:
-            syn_print(None, "incoming query from {addr}; client={client}".format(addr=addr, client=client_address))
+            syn_print(None, "incoming query from {}; client address {}, mapped to external {}".format(addr, client_address, self.get_external(client_address, client.family)))
         if TEST_DEBUG > 1:
             syn_print(None,"========= INCOMING QUERY START =========")
             syn_print(None,query)
@@ -273,11 +281,11 @@ class TestServer:
                         if rd.rdtype == dns.rdatatype.A:
                             if TEST_DEBUG > 1:
                                  syn_print(None,"rd address =", rd.address)
-                            self.start_srv(rd.address, socket.AF_INET, rd.address)
+                            self.start_srv(rd.address, socket.AF_INET)
                         elif rd.rdtype == dns.rdatatype.AAAA:
                             if TEST_DEBUG > 1:
                                 syn_print(None,"rd address =", rd.address)
-                            self.start_srv(rd.address, socket.AF_INET6, rd.address)
+                            self.start_srv(rd.address, socket.AF_INET6)
                 sendto_msg(client, response.to_wire(), addr)
             else:
                 sendto_msg(client, response, addr)
@@ -291,47 +299,35 @@ class TestServer:
             sendto_msg(client, response.to_wire(), addr)
             return False
 
-    def query_io(self,srv_sock):
+    def query_io(self):
         """ Main server process """
-        if TEST_DEBUG > 0:
-            syn_print(None,"query_io starts")
         if self.active is False:
             raise Exception("[query_io] Test server not active")
-        res = socket.getaddrinfo(srv_sock.addr,srv_sock.port,srv_sock.type,0,socket.IPPROTO_UDP)
-        serv_sock = socket.socket(srv_sock.type, socket.SOCK_DGRAM,socket.IPPROTO_UDP)
-        entry0 = res[0]
-        sockaddr = entry0[4]
-        serv_sock.bind(sockaddr)
-        serv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        address = serv_sock.getsockname()
-        srv_sock.name = address
-        clients = [serv_sock]
-        srv_sock.active = True
         if TEST_DEBUG > 0:
-            syn_print(None,"UDP query handler type {type} started at {addr}".format(type=srv_sock.type,addr=address))
-        while srv_sock.active is True:
-           to_read, _, to_error = select.select(clients, [], clients, 0.1)
+            syn_print(None,"UDP query io handler started")
+
+        while self.active is True:
+           to_read, _, to_error = select.select(self.srv_socks, [], self.srv_socks, 0.1)
            for sock in to_read:
-              self.handle_query(sock,srv_sock.client_addr)
+              self.handle_query(sock)
            for sock in to_error:
               if TEST_DEBUG > 0:
-                  syn_print(None,"Socket error")
-              raise Exception("[query_io] Socket IO error, exit")
-        serv_sock.close()
+                  syn_print(None,"Error for socket {}".format(sock.getsockname()))
+              raise Exception("[query_io] Socket IO error {}, exit".format(sock.getsockname()))
         if TEST_DEBUG > 0:
-            syn_print(None,"UDP query handler exit")
+            syn_print(None,"UDP query io handler exit")
 
 
-    def start_srv(self, client_addr, type = socket.AF_INET, address = None, port = 53):
+    def start_srv(self, address = None, family = socket.AF_INET, port = 53):
         """ Starts listening thread if necessary """
         if TEST_DEBUG > 0:
-            syn_print(None,"starting server thread; socket type {type} {address} client {client_addr}".format(type=type,address=address,client_addr=client_addr))
-        if type == None:
-            type = socket.AF_INET
-        if type == socket.AF_INET:
+            syn_print(None,"starting socket; type {} {} {}".format(family,address,port))
+        if family == None:
+            family = socket.AF_INET
+        if family == socket.AF_INET:
             if address == '' or address is None:
                 address = "127.0.0.{}".format(self.default_iface)
-        elif type == socket.AF_INET6:
+        elif family == socket.AF_INET6:
             if socket.has_ipv6 is not True:
                 raise Exception("[start_srv] IPV6 is not supported")
             if address == '' or address is None:
@@ -339,33 +335,37 @@ class TestServer:
         else:
             syn_print(None, "unsupported socket type {sock_type}".format(sock_type=type))
             raise Exception("[start_srv] unsupported socket type {sock_type}".format(sock_type=type))
-        if client_addr is not None:
-            client_addr = client_addr.split('@')[0]
-        else:
-            client_addr = address
 	if port == 0 or port is None:
             port = 53
+
+        if (self.thread is None):
+            self.thread = threading.Thread(target=self.query_io)
+            self.thread.start()
+
         for srv_sock in self.srv_socks:
-            if srv_sock.type == type and srv_sock.client_addr == client_addr :
+            if srv_sock.family == family and srv_sock.client_address == address :
                 if TEST_DEBUG > 0:
-                    syn_print(None, "server thread '%s' at '%s' already started" % (srv_sock.thread.name, srv_sock.addr) )
-                return srv_sock.name
-        srv_sock = SInfo(type,address,port,client_addr)
-        srv_sock.thread = threading.Thread(target=self.query_io, args=(srv_sock,))
-        srv_sock.thread.start()
-        while srv_sock.active is False:
-            continue
-        self.srv_socks.append(srv_sock)
+                    syn_print(None, "server socket {} already started".format(srv_sock.getsockname()) )
+                return srv_sock.getsockname()
+    
+        addr_info = socket.getaddrinfo(address,port,family,0,socket.IPPROTO_UDP)
+        sock = SrvSock(address, family, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        addr_info_entry0 = addr_info[0]
+        sockaddr = addr_info_entry0[4]
+        sock.bind(sockaddr)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.srv_socks.append(sock)
+        sockname = sock.getsockname()
         if TEST_DEBUG > 0:
-            syn_print(None, "server thread '%s' at '%s:%i' started" % (srv_sock.thread.name, srv_sock.addr, srv_sock.port))
-        return srv_sock.name
+            syn_print(None, "server socket {} started".format(sockname))
+        return sockname
 
     def client(self, dst_addr = None):
         """ Return connected client. """
         if dst_addr is not None:
             dst_addr = dst_addr.split('@')[0]
+        sockname = self.start_srv(dst_addr, socket.AF_INET)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sockname = self.start_srv(dst_addr,socket.AF_INET)
         sock.connect(sockname)
         self.client_socks.append(sock)
         return sock, sockname
@@ -395,16 +395,26 @@ def test_sendrecv(default_iface,peer_iface):
 
 if __name__ == '__main__':
 
+    syn_print(None,"qqqqqqqqqqqqqq")
     # Self-test code
+    DEFAULT_IFACE = 0
+    CHILD_IFACE = 0
+    if "SOCKET_WRAPPER_DEFAULT_IFACE" in os.environ:
+       DEFAULT_IFACE = int(os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"])
+    if DEFAULT_IFACE < 2 or DEFAULT_IFACE > 254 :
+        if TEST_DEBUG > 0:
+            syn_print(None,"SOCKET_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default (10)".format(DEFAULT_IFACE))
+        DEFAULT_IFACE = 10
+        os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"]="{}".format(DEFAULT_IFACE)
+
     test = test.Test()
-    test.add('testserver/sendrecv', test_sendrecv)
+    test.add('testserver/sendrecv', test_sendrecv, DEFAULT_IFACE, DEFAULT_IFACE)
     if test.run() != 0:
         sys.exit(1)
 
     # Mirror server
-    server = TestServer(None)
+    server = TestServer(None,None,DEFAULT_IFACE,DEFAULT_IFACE)
     server.start()
-    server.start_srv(None, socket.AF_INET)
     syn_print("main","[==========] Mirror server running at", server.address())
     try:
         while True:
