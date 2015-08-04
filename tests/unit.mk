@@ -26,7 +26,6 @@ tests_LIBS :=  $(libkres_TARGET) $(libkres_LIBS) $(cmocka_LIBS)
 
 # Make test binaries
 define make_test
-$(1)_CFLAGS := -Wno-deprecated-declarations
 $(1)_SOURCES := tests/$(1).c
 $(1)_LIBS := $(tests_LIBS)
 $(1)_DEPEND := $(tests_DEPEND)
