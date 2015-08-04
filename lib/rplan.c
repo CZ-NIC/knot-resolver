@@ -123,7 +123,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	add_tail(&rplan->pending, &qry->node);
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
 
-#ifndef NDEBUG
+#ifdef WITH_DEBUG
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 	knot_dname_to_str(name_str, name, sizeof(name_str));
 	knot_rrtype_to_string(type, type_str, sizeof(type_str));

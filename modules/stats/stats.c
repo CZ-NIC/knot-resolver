@@ -75,24 +75,10 @@ struct stat_data {
 	} queries;
 };
 
-/** @internal Subtract time (best effort) */
-float time_diff(struct timeval *begin, struct timeval *end)
-{
-	return (end->tv_sec - begin->tv_sec) * 1000 +
-	       (end->tv_usec - begin->tv_usec) / 1000.0;
-
-}
-
 /** @internal Add to const map counter */
 static inline void stat_const_add(struct stat_data *data, enum const_metric key, ssize_t incr)
 {
 	const_metrics[key].val += incr;
-}
-
-static int begin(knot_layer_t *ctx, void *module_param)
-{
-	ctx->data = module_param;
-	return ctx->state;
 }
 
 static int collect_answer(struct stat_data *data, knot_pkt_t *pkt)
@@ -160,14 +146,14 @@ static int collect(knot_layer_t *ctx)
 		struct kr_query *last = TAIL(rplan->resolved);
 		struct timeval now;
 		gettimeofday(&now, NULL);
-		float elapsed = time_diff(&first->timestamp, &now);
+		long elapsed = time_diff(&first->timestamp, &now);
 		if (last->flags & QUERY_CACHED) {
 			stat_const_add(data, metric_answer_cached, 1);
-		} else if (elapsed < 10.0) {
+		} else if (elapsed <= 10) {
 			stat_const_add(data, metric_answer_10ms, 1);
-		} else if (elapsed < 100.0) {
+		} else if (elapsed <= 100) {
 			stat_const_add(data, metric_answer_100ms, 1);
-		} else if (elapsed < 1000.0) {
+		} else if (elapsed <= 1000) {
 			stat_const_add(data, metric_answer_1000ms, 1);
 		} else {
 			stat_const_add(data, metric_answer_slow, 1);
@@ -341,7 +327,6 @@ static char* clear_expiring(void *env, struct kr_module *module, const char *arg
 const knot_layer_api_t *stats_layer(struct kr_module *module)
 {
 	static knot_layer_api_t _layer = {
-		.begin = &begin,
 		.finish = &collect,
 	};
 	/* Store module reference */

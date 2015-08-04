@@ -245,6 +245,7 @@ static int init_state(struct engine *engine)
 		return kr_error(ENOMEM);
 	}
 	/* Initialize used libraries. */
+	lua_gc(engine->L, LUA_GCSTOP, 0);
 	luaL_openlibs(engine->L);
 	/* Global functions */
 	lua_pushcfunction(engine->L, l_help);
@@ -398,6 +399,12 @@ int engine_start(struct engine *engine)
 		return ret;
 	}
 
+	/* Clean up stack and restart GC */
+	lua_settop(engine->L, 0);
+	lua_gc(engine->L, LUA_GCCOLLECT, 0);
+	lua_gc(engine->L, LUA_GCSETSTEPMUL, 50);
+	lua_gc(engine->L, LUA_GCSETPAUSE, 400);
+	lua_gc(engine->L, LUA_GCRESTART, 0);
 	return kr_ok();
 }
 
@@ -435,7 +442,12 @@ int engine_register(struct engine *engine, const char *name)
 	if (engine == NULL || name == NULL) {
 		return kr_error(EINVAL);
 	}
-
+	/* Check priority modules */
+	bool is_priority = false;
+	if (name[0] == '<') {
+		is_priority = true;
+		name += 1;
+	}
 	/* Make sure module is unloaded */
 	(void) engine_unregister(engine, name);
 	/* Attempt to load binary module */
@@ -453,10 +465,15 @@ int engine_register(struct engine *engine, const char *name)
 		free(module);
 		return ret;
 	}
-
 	if (array_push(engine->modules, module) < 0) {
 		engine_unload(engine, module);
 		return kr_error(ENOMEM);
+	}
+	/* Push to front if priority module */
+	if (is_priority) {
+		struct kr_module **arr = engine->modules.at;
+		memmove(&arr[1], &arr[0], sizeof(*arr) * (engine->modules.len - 1));
+		arr[0] = module;
 	}
 
 	/* Register properties */
