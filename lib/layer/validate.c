@@ -549,7 +549,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		 * change when updating cut information before validation.
 		 */
 		const knot_dname_t *zone_name = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
-		ret = kr_rrset_validate(sec, covered, qry->zone_cut.key, zone_name, qry->timestamp.tv_sec);
+		ret = kr_rrset_validate(answer, section_id, covered, qry->zone_cut.key, zone_name, qry->timestamp.tv_sec);
 		if (ret != 0) {
 			break;
 		}
@@ -620,7 +620,9 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
 #warning TODO: Ensure canonical format of the whole DNSKEY RRSet. (Also remove duplicities?)
 
 	/* Check if there's a key for current TA. */
-	int ret = kr_dnskeys_trusted(an, qry->zone_cut.key, qry->zone_cut.trust_anchor, qry->zone_cut.name, qry->timestamp.tv_sec);
+	int ret = kr_dnskeys_trusted(answer, KNOT_ANSWER, qry->zone_cut.key,
+	                             qry->zone_cut.trust_anchor, qry->zone_cut.name,
+	                             qry->timestamp.tv_sec);
 	if (ret != 0) {
 		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
 		return ret;

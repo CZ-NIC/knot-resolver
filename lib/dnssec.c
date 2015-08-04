@@ -26,6 +26,7 @@
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/dnskey.h>
+#include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
 
 
@@ -259,11 +260,12 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 	if (trim_labels > 0) {
 		/**/
 		for (int i = 0; i < trim_labels; ++i) {
-			owner = knot_wire_next_label(owner, NULL);
+			owner = (uint8_t *) knot_wire_next_label(owner, NULL);
 		}
 		*(--owner) = '*';
 		*(--owner) = 1;
 	}
+
 	dnssec_binary_t rrset_wire = { 0 };
 	rrset_wire.size = written - (owner - rrwf);
 	rrset_wire.data = owner;
@@ -363,16 +365,71 @@ static int wildcard_radix_len_diff(const knot_dname_t *expanded,
 	return knot_dname_labels(expanded, NULL) - knot_rrsig_labels(&rrsigs->rrs, sig_pos);
 }
 
-int kr_rrset_validate(const knot_pktsection_t *sec, const knot_rrset_t *covered,
-                      const knot_rrset_t *keys, const knot_dname_t *zone_name, uint32_t timestamp)
+/* RFC4035 5.4, bullet 2 */
+static int nsec_nomatch_validate(const knot_rrset_t *nsec, const knot_dname_t *name)
 {
-	if (!sec || !covered || !keys || !zone_name) {
+	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
+
+	if ((knot_dname_cmp(nsec->owner, name) < 0) &&
+	    (knot_dname_cmp(name, next) < 0)) {
+		return kr_ok();
+	} else {
+		return 1;
+	}
+
+#warning TODO: Is an additional request for NSEC name or wildcard necessary?
+}
+
+/**
+ * Validates the non-existence of closer/exact match.
+ * @param pkt        Packet to be validated.
+ * @param section_id Section to work with.
+ * @param name       The name to be checked.
+ * @return           0 or error code.
+ */
+static int closer_match_nonexistence_validate(const knot_pkt_t *pkt, knot_section_t section_id,
+                                              const knot_dname_t *name)
+{
+	if (!pkt || !name) {
+		return kr_error(EINVAL);
+	}
+
+	/* Signatures are checked elsewhere. */
+
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec) {
+		return kr_error(EINVAL);
+	}
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if ((rrset->type != KNOT_RRTYPE_NSEC) &&
+		    (rrset->type != KNOT_RRTYPE_NSEC3)) {
+			continue;
+		}
+		if (rrset->type == KNOT_RRTYPE_NSEC) {
+			if (nsec_nomatch_validate(rrset, name) == 0) {
+				return kr_ok();
+			}
+		} else {
+#warning TODO: NSEC3 currently not supported
+			return kr_error(ENOSYS);
+		}
+	}
+
+	return kr_error(EINVAL);
+}
+
+int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
+                      const knot_rrset_t *covered, const knot_rrset_t *keys,
+                      const knot_dname_t *zone_name, uint32_t timestamp)
+{
+	if (!pkt || !covered || !keys || !zone_name) {
 		return kr_error(EINVAL);
 	}
 
 	int ret = kr_error(KNOT_DNSSEC_ENOKEY);
 	for (unsigned i = 0; i < keys->rrs.rr_count; ++i) {
-		ret = kr_rrset_validate_with_key(sec, covered, keys, i, NULL, zone_name, timestamp);
+		ret = kr_rrset_validate_with_key(pkt, section_id, covered, keys, i, NULL, zone_name, timestamp);
 		if (ret == 0) {
 			break;
 		}
@@ -381,8 +438,9 @@ int kr_rrset_validate(const knot_pktsection_t *sec, const knot_rrset_t *covered,
 	return ret;
 }
 
-int kr_rrset_validate_with_key(const knot_pktsection_t *sec, const knot_rrset_t *covered,
-                               const knot_rrset_t *keys, size_t key_pos, const struct dseckey *key,
+int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
+                               const knot_rrset_t *covered, const knot_rrset_t *keys,
+                               size_t key_pos, const struct dseckey *key,
                                const knot_dname_t *zone_name, uint32_t timestamp)
 {
 	int ret;
@@ -399,6 +457,7 @@ int kr_rrset_validate_with_key(const knot_pktsection_t *sec, const knot_rrset_t 
 	}
 
 	ret = kr_error(KNOT_DNSSEC_ENOKEY);
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
 	for (unsigned i = 0; i < sec->count; ++i) {
 		/* Try every RRSIG. */
 		const knot_rrset_t *rrsig = knot_pkt_rr(sec, i);
@@ -422,6 +481,11 @@ int kr_rrset_validate_with_key(const knot_pktsection_t *sec, const knot_rrset_t 
 			if (check_signature(rrsig, j, (dnssec_key_t *) key, covered, trim_labels) != 0) {
 				continue;
 			}
+			if (val_flgs & FLG_WILDCARD_EXPANSION) {
+				if (closer_match_nonexistence_validate(pkt, KNOT_AUTHORITY, covered->owner) != 0) {
+					continue;
+				}
+			}
 			ret = kr_ok();
 			break;
 		}
@@ -434,10 +498,10 @@ int kr_rrset_validate_with_key(const knot_pktsection_t *sec, const knot_rrset_t 
 	return ret;
 }
 
-int kr_dnskeys_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys,
+int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const knot_rrset_t *keys,
                        const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp)
 {
-	if (!sec || !keys || !ta) {
+	if (!pkt || !keys || !ta) {
 		return kr_error(EINVAL);
 	}
 
@@ -464,7 +528,7 @@ int kr_dnskeys_trusted(const knot_pktsection_t *sec, const knot_rrset_t *keys,
 			kr_dnssec_key_free(&key);
 			continue;
 		}
-		if (kr_rrset_validate_with_key(sec, keys, keys, i, key, zone_name, timestamp) != 0) {
+		if (kr_rrset_validate_with_key(pkt, section_id, keys, keys, i, key, zone_name, timestamp) != 0) {
 			kr_dnssec_key_free(&key);
 			continue;
 		}
