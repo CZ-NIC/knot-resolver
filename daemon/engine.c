@@ -52,6 +52,7 @@ static int l_help(lua_State *L)
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
 		"hostname()\n    hostname\n"
+		"option(opt[, new_val])\n    get/set server option\n"
 		;
 	lua_pushstring(L, help_str);
 	return 1;
@@ -72,6 +73,37 @@ static int l_hostname(lua_State *L)
 	char host_str[KNOT_DNAME_MAXLEN];
 	gethostname(host_str, sizeof(host_str));
 	lua_pushstring(L, host_str);
+	return 1;
+}
+
+/** Get/set context option. */
+static int l_option(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	/* Look up option name */
+	unsigned opt_code = 0;
+	if (lua_isstring(L, 1)) {
+		const char *opt = lua_tostring(L, 1);
+		for (const lookup_table_t *it = query_flag_names; it->name; ++it) {
+			if (strcmp(it->name, opt) == 0) {
+				opt_code = it->id;
+				break;
+			}
+		}
+		if (!opt_code) {
+			lua_pushstring(L, "invalid option name");
+			lua_error(L);
+		}
+	}
+	/* Get or set */
+	if (lua_isboolean(L, 2)) {
+		if (lua_toboolean(L, 2)) {
+			engine->resolver.options |= opt_code;
+		} else {
+			engine->resolver.options &= ~opt_code; 
+		}
+	}
+	lua_pushboolean(L, engine->resolver.options & opt_code);
 	return 1;
 }
 
@@ -245,6 +277,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "help");
 	lua_pushcfunction(engine->L, l_quit);
 	lua_setglobal(engine->L, "quit");
+	lua_pushcfunction(engine->L, l_option);
+	lua_setglobal(engine->L, "option");
 	lua_pushcfunction(engine->L, l_hostname);
 	lua_setglobal(engine->L, "hostname");
 	lua_pushlightuserdata(engine->L, engine);
