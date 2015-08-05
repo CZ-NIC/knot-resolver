@@ -368,6 +368,7 @@ class TestServer:
             dst_addr = dst_addr.split('@')[0]
         sockname = self.start_srv(dst_addr, socket.AF_INET)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.connect(sockname)
         self.client_socks.append(sock)
         return sock, sockname
