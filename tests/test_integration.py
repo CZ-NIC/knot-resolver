@@ -246,7 +246,6 @@ def play_object(path, binary_name, gencfg_script_name, binary_additional_pars):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while True:
         try:
-            time.sleep(0.1)
             sock.connect((testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE), 53))
         except: continue
         break
