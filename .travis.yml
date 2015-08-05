@@ -27,7 +27,7 @@ env:
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/.local
 script:
-    - make ${MAKEOPTS} check COVERAGE=1
+    - make ${MAKEOPTS} install check COVERAGE=1 PREFIX=${HOME}/.local
 after_success:
     - test $TRAVIS_OS_NAME = linux && coveralls -i lib -x ".c" --gcov-options '\-lp'
 sudo: false
