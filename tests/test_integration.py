@@ -30,7 +30,6 @@ def del_files(path_to):
 DEFAULT_IFACE = 0
 CHILD_IFACE = 0
 TMPDIR = ""
-SUBPROCESS_WAIT_TOUT = 0.2
 
 if "SOCKET_WRAPPER_DEFAULT_IFACE" in os.environ:
    DEFAULT_IFACE = int(os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"])
@@ -60,19 +59,8 @@ if TMPDIR == "" or os.path.isdir(TMPDIR) is False:
     if TEST_DEBUG > 0:
         testserver.syn_print(None,"SOCKET_WRAPPER_DIR is invalid or empty ({}), set to default ({})".format(OLDTMPDIR, TMPDIR))
 
-if "SUBPROCESS_WAIT_TOUT" in os.environ:
-    tout = os.environ["SUBPROCESS_WAIT_TOUT"]
-    try:
-      SUBPROCESS_WAIT_TOUT = float(tout)
-    except:
-      SUBPROCESS_WAIT_TOUT = 0.1
-      if TEST_DEBUG > 0:
-        testserver.syn_print(None,"SUBPROCESS_WAIT_TOUT is invalid ({}), set to default ({})".format(tout,SUBPROCESS_WAIT_TOUT))
-
 if TEST_DEBUG > 0:
-    testserver.syn_print(None,"default_iface: {}, child_iface: {}, tmpdir {} tout{}".format(DEFAULT_IFACE, CHILD_IFACE, TMPDIR, SUBPROCESS_WAIT_TOUT))
-
-del_files(TMPDIR)
+    testserver.syn_print(None,"default_iface: {}, child_iface: {}, tmpdir {}".format(DEFAULT_IFACE, CHILD_IFACE, TMPDIR))
 
 def get_next(file_in):
     """ Return next token from the input stream. """
@@ -192,6 +180,42 @@ def find_objects(path):
             result.append(path)
     return result
 
+def setup_env(child_env, config, config_script):
+    """ Set up test environment and config """
+    # Clear test directory
+    del_files(TMPDIR)
+    # Set up libfaketime
+    os.environ["FAKETIME_NO_CACHE"] = "1"
+    os.environ["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
+    time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
+    time_file.write(datetime.fromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S'))
+    time_file.close()
+    # Set up child process env() 
+    child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
+    child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
+    child_env["CONFIG_NO_MINIMIZE"] = "1"
+    for k,v in config:
+        # Enable selectively for some tests
+        if k == 'query-minimization' and str2bool(v):
+            child_env["CONFIG_NO_MINIMIZE"] = "0"
+            break
+    selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
+    childaddr = testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE)
+    child_env["CONFIG_SELF_ADDR"] = selfaddr
+    child_env["CONFIG_CHILD_ADDR"] = childaddr
+    # Prebind to sockets to create necessary files
+    # @TODO: this is probably a workaround for socket_wrapper bug
+    for sock_type in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+        sock = socket.socket(socket.AF_INET, sock_type)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((childaddr, 53))
+        if sock_type == socket.SOCK_STREAM:
+            sock.listen(5)
+    # Generate configuration
+    try :
+      subprocess.call(config_script, env=child_env)
+    except Exception as e:
+        raise Exception("Can't start configuraion script '%s': %s" % (config_script, str(e)))
 
 def play_object(path, binary_name, gencfg_script_name, binary_additional_pars):
     """ Play scenario from a file object. """
@@ -205,71 +229,39 @@ def play_object(path, binary_name, gencfg_script_name, binary_additional_pars):
     finally:
         file_in.close()
 
-    # Set up libfaketime
-    os.environ["FAKETIME_NO_CACHE"] = "1"
-    os.environ["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
-    time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
-    time_file.write(datetime.fromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S'))
-    time_file.close()
-
-    child_env = os.environ.copy()
-    child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
-    child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
-    child_env["CONFIG_NO_MINIMIZE"] = "1"
-    for k,v in config:
-        # Enable selectively for some tests
-        if k == 'query-minimization' and str2bool(v):
-            child_env["CONFIG_NO_MINIMIZE"] = "0"
-            break
-    selfaddr = testserver.get_local_addr_str(socket.AF_INET,DEFAULT_IFACE)
-    childaddr = testserver.get_local_addr_str(socket.AF_INET,CHILD_IFACE)
-    child_env["CONFIG_SELF_ADDR"] = selfaddr
-    child_env["CONFIG_CHILD_ADDR"] = childaddr
-
+    # Setup daemon environment
+    daemon_env = os.environ.copy()
+    setup_env(daemon_env, config, gencfg_script_name)
+    # Start binary
+    binary_name = os.path.abspath(binary_name)
+    daemon_proc = None
+    daemon_log = open('%s/server.log' % TMPDIR, 'w')
+    daemon_args = [binary_name] + binary_additional_pars
     try :
-      subprocess.call(gencfg_script_name, env=child_env)
+      daemon_proc = subprocess.Popen(daemon_args, stdout=daemon_log, stderr=daemon_log,
+                                     cwd=TMPDIR, preexec_fn=os.setsid, env=daemon_env)
     except Exception as e:
-        raise Exception("Can't start configuraion script '%s': %s" % (gencfg_script_name, str(e)))
-
-    parameters = ""
-    for s in binary_additional_pars:
-      parameters = parameters + " " + s
-    binary_with_pars = [binary_name,TMPDIR,parameters.strip()]
-    # cwrapped kresd constantly fails at startup when directory SOCKET_WRAPPER_DIR is empty
-    try :
-      binary = subprocess.Popen(binary_with_pars, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid, env=child_env)
-    except Exception as e:
-        raise Exception("Can't start '%s': %s" % (binary_name, str(e)))
-
-    time.sleep(SUBPROCESS_WAIT_TOUT)
-
-    if binary.poll() is not None: #second attempt
-        try :
-            binary = subprocess.Popen(binary_with_pars, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid, env=child_env)
-        except Exception as e:
-            raise Exception("Can't start '%s': %s" % (binary_name, str(e)))
-
-        time.sleep(SUBPROCESS_WAIT_TOUT)
-
-        if binary.poll() is not None:
-            out, err = binary.communicate()
-            print "==== stderr:", err
-            raise Exception("Can't start '%s'" % binary_name)
-
+        raise Exception("Can't start '%s': %s" % (daemon_args, str(e)))
+    # Wait until the server accepts TCP clients
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        try:
+            time.sleep(0.1)
+            sock.connect((testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE), 53))
+        except: continue
+        break
     # Play scenario
     server = testserver.TestServer(scenario, config, DEFAULT_IFACE, CHILD_IFACE)
     server.start()
     try:
-        if TEST_DEBUG > 0:
-            testserver.syn_print('--- UDP test server started at')
-            testserver.syn_print(server.address())
-            testserver.syn_print('--- scenario parsed, any key to continue ---')
         server.play()
+    except Exception as e:
+        print('... scenario "%s" crashed, logs in "%s"' % (os.path.basename(path), TMPDIR))
     finally:
         server.stop()
-        os.killpg(binary.pid, signal.SIGTERM)
-        del_files(TMPDIR)
-    subprocess.call(["pkill","kresd"])
+        daemon_proc.kill()
+    # Do not clear files if the server crashed (for analysis)
+    del_files(TMPDIR)
 
 def test_platform(*args):
     if sys.platform == 'windows':
@@ -301,7 +293,6 @@ if __name__ == '__main__':
     # Self-tests first
     test = test.Test()
     test.add('integration/platform', test_platform)
-    test.add('testserver/sendrecv', testserver.test_sendrecv, DEFAULT_IFACE, DEFAULT_IFACE)
     if test.run() != 0:
         sys.exit(1)
     else:

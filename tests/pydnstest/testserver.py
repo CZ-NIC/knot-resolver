@@ -362,39 +362,10 @@ class TestServer:
             syn_print(None, "server socket {} started".format(sockname))
         return sockname
 
-    def client(self, dst_addr = None):
-        """ Return connected client. """
-        if dst_addr is not None:
-            dst_addr = dst_addr.split('@')[0]
-        sockname = self.start_srv(dst_addr, socket.AF_INET)
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.connect(sockname)
-        self.client_socks.append(sock)
-        return sock, sockname
-
     def play(self):
         saddr = get_local_addr_str(socket.AF_INET,self.default_iface)
         paddr = get_local_addr_str(socket.AF_INET,self.peer_iface)
         self.scenario.play(saddr,paddr)
-
-
-def test_sendrecv(default_iface,peer_iface):
-    """ Module self-test code. """
-    server = TestServer(None,None,default_iface,peer_iface)
-    server.start()
-    client, peer = server.client()
-    try:
-        query = dns.message.make_query('.', dns.rdatatype.NS)
-        client.send(query.to_wire())
-        answer, _ = recvfrom_msg(client)
-        if answer is None:
-            raise Exception("[test_sendrecv] no answer received")
-        if not query.is_response(answer):
-            raise Exception("[test_sendrecv] not a mirror response")
-    finally:
-        server.stop()
-        client.close()
 
 if __name__ == '__main__':
 
@@ -408,11 +379,6 @@ if __name__ == '__main__':
             syn_print(None,"SOCKET_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default (10)".format(DEFAULT_IFACE))
         DEFAULT_IFACE = 10
         os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"]="{}".format(DEFAULT_IFACE)
-
-    test = test.Test()
-    test.add('testserver/sendrecv', test_sendrecv, DEFAULT_IFACE, DEFAULT_IFACE)
-    if test.run() != 0:
-        sys.exit(1)
 
     # Mirror server
     server = TestServer(None,None,DEFAULT_IFACE,DEFAULT_IFACE)
