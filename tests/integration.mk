@@ -2,7 +2,8 @@
 # Integration tests
 #
 
-CWRAP_PATH := $(socket_wrapper_LIBS)
+TESTS ?= tests/testdata
+CWRAP_PATH := $(strip $(socket_wrapper_LIBS))
 
 # Targets
 libfaketime_DIR := contrib/libfaketime
@@ -10,6 +11,7 @@ libfaketime := $(abspath $(libfaketime_DIR))/src/libfaketime$(LIBEXT).1
 
 # Platform-specific targets
 ifeq ($(PLATFORM),Darwin)
+	libfaketime := $(abspath $(libfaketime_DIR))/src/libfaketime.1$(LIBEXT)
 	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="$(libfaketime):$(CWRAP_PATH)"
 else
 	preload_syms := LD_PRELOAD="$(libfaketime):$(CWRAP_PATH)"
@@ -25,6 +27,6 @@ $(libfaketime): $(libfaketime_DIR)/Makefile
 	@CFLAGS="" $(MAKE) -C $(libfaketime_DIR)
 
 check-integration: $(libfaketime)
-	$(preload_LIBS) $(preload_syms) tests/test_integration.py tests/testdata tests/genconfig.sh daemon/kresd
+	$(preload_LIBS) $(preload_syms) tests/test_integration.py $(TESTS) tests/genconfig.sh daemon/kresd
 
 .PHONY: check-integration
