@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <libknot/internal/mempattern.h>
 #include <libknot/rrset.h>
 
 //#define ROOT_TA ". IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5"

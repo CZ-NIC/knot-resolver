@@ -21,6 +21,7 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
 
+#include "lib/dnssec/nsec.h"
 #include "lib/dnssec/ta.h"
 #include "lib/dnssec.h"
 #include "lib/layer.h"
@@ -185,10 +186,11 @@ static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *
 	return ret;
 }
 
-static int validate_proof(struct kr_query *qry, knot_pkt_t *answer)
+static int validate_proof(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *pool)
 {
 #warning TODO: validate NSECx proof, RRSIGs will be checked later if it matches
-	return kr_ok();
+	int ret = kr_nsec_existence_denial(answer, KNOT_AUTHORITY, qry->sname, qry->stype, pool);
+	return ret;
 }
 
 static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
@@ -342,7 +344,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Validate non-existence proof if not positive answer. */
 	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN) {
-		ret = validate_proof(qry, pkt);
+		ret = validate_proof(qry, pkt, &req->pool);
 		if (ret != 0) {
 			DEBUG_MSG("<= bad NXDOMAIN proof\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
@@ -409,6 +411,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		mm_free(qry->parent->zone_cut.pool, qry->parent->zone_cut.name);
 		qry->parent->zone_cut.name = knot_dname_copy(qry->zone_cut.trust_anchor->owner, qry->parent->zone_cut.pool);
 	}
+
 	if ((qtype == KNOT_RRTYPE_DNSKEY) && (qry->parent != NULL) && (qry->parent->zone_cut.key == NULL)) {
 		DEBUG_MSG("updating keys in zone cut\n");
 		qry->parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, qry->parent->zone_cut.pool);

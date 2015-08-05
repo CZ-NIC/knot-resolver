@@ -94,7 +94,7 @@ static int validate_rrsig_rr(int *flags, const knot_rrset_t *covered,
 	{
 		int rrsig_labels = knot_rrsig_labels(&rrsigs->rrs, sig_pos);
 		int dname_labels = knot_dname_labels(covered->owner, NULL);
-		if ((covered->owner[0] == 1) && (covered->owner[1] == '*')) {
+		if (knot_dname_is_wildcard(covered->owner)) {
 			/* The asterisk does not count, RFC4034 3.1.3, paragraph 3. */
 			--dname_labels;
 		}
@@ -144,21 +144,6 @@ static int wildcard_radix_len_diff(const knot_dname_t *expanded,
 	return knot_dname_labels(expanded, NULL) - knot_rrsig_labels(&rrsigs->rrs, sig_pos);
 }
 
-/* RFC4035 5.4, bullet 2 */
-static int nsec_nomatch_validate(const knot_rrset_t *nsec, const knot_dname_t *name)
-{
-	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
-
-	if ((knot_dname_cmp(nsec->owner, name) < 0) &&
-	    (knot_dname_cmp(name, next) < 0)) {
-		return kr_ok();
-	} else {
-		return 1;
-	}
-
-#warning TODO: Is an additional request for NSEC name or wildcard necessary?
-}
-
 /**
  * Validates the non-existence of closer/exact match.
  * @param pkt        Packet to be validated.
@@ -186,7 +171,7 @@ static int closer_match_nonexistence_validate(const knot_pkt_t *pkt, knot_sectio
 			continue;
 		}
 		if (rrset->type == KNOT_RRTYPE_NSEC) {
-			if (nsec_nomatch_validate(rrset, name) == 0) {
+			if (kr_nsec_nomatch_validate(rrset, name) == 0) {
 				return kr_ok();
 			}
 		} else {

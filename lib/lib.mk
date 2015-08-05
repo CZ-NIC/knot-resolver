@@ -11,6 +11,7 @@ libkres_SOURCES := \
 	lib/layer/validate.c   \
 	lib/layer/rrcache.c    \
 	lib/layer/pktcache.c   \
+	lib/dnssec/nsec.c      \
 	lib/dnssec/signature.c \
 	lib/dnssec/ta.c        \
 	lib/dnssec.c           \
@@ -28,6 +29,8 @@ libkres_HEADERS := \
 	lib/generic/set.h      \
 	lib/layer.h            \
 	lib/kayer/rrset/ds.h   \
+	lib/dnssec/nsec.h      \
+	lib/dnssec/rrtype/ds.h \
 	lib/dnssec/signature.h \
 	lib/dnssec/ta.h        \
 	lib/dnssec.h           \
