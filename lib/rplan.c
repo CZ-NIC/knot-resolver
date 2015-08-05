@@ -65,7 +65,7 @@ static void query_free(mm_ctx_t *pool, struct kr_query *qry)
 	mm_free(pool, qry);
 }
 
-int kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *pool)
+int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, mm_ctx_t *pool)
 {
 	if (rplan == NULL) {
 		return KNOT_EINVAL;
@@ -74,7 +74,7 @@ int kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *
 	memset(rplan, 0, sizeof(struct kr_rplan));
 
 	rplan->pool = pool;
-	rplan->context = context;
+	rplan->request = request;
 	init_list(&rplan->pending);
 	init_list(&rplan->resolved);
 	return KNOT_EOK;
@@ -117,13 +117,13 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	}
 	qry->sclass = cls;
 	qry->stype = type;
-	qry->flags = rplan->context->options;
+	qry->flags = rplan->request->options;
 	qry->parent = parent;
 	gettimeofday(&qry->timestamp, NULL);
 	add_tail(&rplan->pending, &qry->node);
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
 
-#ifndef NDEBUG
+#ifdef WITH_DEBUG
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 	knot_dname_to_str(name_str, name, sizeof(name_str));
 	knot_rrtype_to_string(type, type_str, sizeof(type_str));

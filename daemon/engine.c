@@ -234,16 +234,23 @@ void *namedb_lmdb_mkopts(const char *conf, size_t maxsize)
 static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
+	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
+	/* Create OPT RR */
+	engine->resolver.opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
+	if (!engine->resolver.opt_rr) {
+		return kr_error(ENOMEM);
+	}
+	knot_edns_init(engine->resolver.opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
 	/* Set default root hints */
 	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
 	kr_zonecut_set_sbelt(&engine->resolver, &engine->resolver.root_hints);
 	/* Open NS rtt + reputation cache */
-	engine->resolver.cache_rtt = malloc(lru_size(kr_nsrep_lru_t, LRU_RTT_SIZE));
+	engine->resolver.cache_rtt = mm_alloc(engine->pool, lru_size(kr_nsrep_lru_t, LRU_RTT_SIZE));
 	if (engine->resolver.cache_rtt) {
 		lru_init(engine->resolver.cache_rtt, LRU_RTT_SIZE);
 	}
-	engine->resolver.cache_rep = malloc(lru_size(kr_nsrep_lru_t, LRU_REP_SIZE));
+	engine->resolver.cache_rep = mm_alloc(engine->pool, lru_size(kr_nsrep_lru_t, LRU_REP_SIZE));
 	if (engine->resolver.cache_rep) {
 		lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
 	}
@@ -271,6 +278,7 @@ static int init_state(struct engine *engine)
 		return kr_error(ENOMEM);
 	}
 	/* Initialize used libraries. */
+	lua_gc(engine->L, LUA_GCSTOP, 0);
 	luaL_openlibs(engine->L);
 	/* Global functions */
 	lua_pushcfunction(engine->L, l_help);
@@ -303,6 +311,7 @@ int engine_init(struct engine *engine, mm_ctx_t *pool)
 	/* Initialize resolver */
 	ret = init_resolver(engine);
 	if (ret != 0) {
+		engine_deinit(engine);
 		return ret;
 	}
 	/* Initialize network */
@@ -330,13 +339,13 @@ void engine_deinit(struct engine *engine)
 		return;
 	}
 
+	/* Only close sockets and services,
+	 * no need to clean up mempool. */
 	network_deinit(&engine->net);
 	kr_zonecut_deinit(&engine->resolver.root_hints);
 	kr_cache_close(&engine->resolver.cache);
 	lru_deinit(engine->resolver.cache_rtt);
-	free(engine->resolver.cache_rtt);
 	lru_deinit(engine->resolver.cache_rep);
-	free(engine->resolver.cache_rep);
 
 	/* Unload modules. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
@@ -425,6 +434,12 @@ int engine_start(struct engine *engine)
 		return ret;
 	}
 
+	/* Clean up stack and restart GC */
+	lua_settop(engine->L, 0);
+	lua_gc(engine->L, LUA_GCCOLLECT, 0);
+	lua_gc(engine->L, LUA_GCSETSTEPMUL, 50);
+	lua_gc(engine->L, LUA_GCSETPAUSE, 400);
+	lua_gc(engine->L, LUA_GCRESTART, 0);
 	return kr_ok();
 }
 
@@ -462,7 +477,12 @@ int engine_register(struct engine *engine, const char *name)
 	if (engine == NULL || name == NULL) {
 		return kr_error(EINVAL);
 	}
-
+	/* Check priority modules */
+	bool is_priority = false;
+	if (name[0] == '<') {
+		is_priority = true;
+		name += 1;
+	}
 	/* Make sure module is unloaded */
 	(void) engine_unregister(engine, name);
 	/* Attempt to load binary module */
@@ -480,10 +500,15 @@ int engine_register(struct engine *engine, const char *name)
 		free(module);
 		return ret;
 	}
-
 	if (array_push(engine->modules, module) < 0) {
 		engine_unload(engine, module);
 		return kr_error(ENOMEM);
+	}
+	/* Push to front if priority module */
+	if (is_priority) {
+		struct kr_module **arr = engine->modules.at;
+		memmove(&arr[1], &arr[0], sizeof(*arr) * (engine->modules.len - 1));
+		arr[0] = module;
 	}
 
 	/* Register properties */

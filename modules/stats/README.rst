@@ -28,6 +28,17 @@ in new ones.
 	> stats['filter.match']
 	5
 
+	-- Fetch most common queries
+	> stats.frequent()
+	[1] => {
+		[type] => 2
+		[count] => 4
+		[name] => cz.
+	}
+
+	-- Fetch most common queries (sorted by frequency)
+	> table.sort(stats.frequent(), function (a, b) return a.count > b.count end)
+
 Properties
 ^^^^^^^^^^
 
@@ -51,19 +62,35 @@ Set nominal value of given metric.
 
 Outputs collected metrics as a JSON dictionary.
 
+.. function:: stats.frequent()
+
+Outputs list of most frequent iterative queries as a JSON array. The queries are sampled probabilistically,
+and include subrequests. The list maximum size is 5000 entries, make diffs if you want to track it over time.
+
+.. function:: stats.clear_frequent()
+
+Clear the list of most frequent iterative queries.
+
+.. function:: stats.expiring()
+
+Outputs list of soon-to-expire records as a JSON array.
+The list maximum size is 5000 entries, make diffs if you want to track it over time.
+
+.. function:: stats.clear_expiring()
+
+Clear the list of soon expiring records.
+
 Built-in statistics
 ^^^^^^^^^^^^^^^^^^^
 
-* ``answer.total`` - total number of answerered queries
+* ``answer.total`` - total number of answered queries
 * ``answer.cached`` - number of queries answered from cache
-* ``answer.unresolved`` - number of unresolved queries (likely unresolvable path)
 * ``answer.noerror`` - number of **NOERROR** answers
 * ``answer.nxdomain`` - number of **NXDOMAIN** answers
 * ``answer.servfail`` - number of **SERVFAIL** answers
-* ``query.concurrent`` - number of concurrent queries at the moment
+* ``answer.10ms`` - number of answers completed in 10ms
+* ``answer.100ms`` - number of answers completed in 100ms
+* ``answer.1000ms`` - number of answers completed in 1000ms
+* ``answer.slow`` - number of answers that took more than 1000ms
 * ``query.edns`` - number of queries with EDNS
 * ``query.dnssec`` - number of queries with DNSSEC DO=1
-* ``iterator.udp`` - number of outbound queries over UDP
-* ``iterator.tcp`` - number of outbound queries over TCP
-
-  * Note that the iterator tracks **completed** queries over given protocol, total number of outbound requests must be tracked by the I/O layer.

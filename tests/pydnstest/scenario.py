@@ -25,6 +25,7 @@ class Entry:
         self.adjust_fields = ['copy_id']
         self.origin = '.'
         self.message = dns.message.Message()
+        self.message.use_edns(edns = 0)
         self.sections = []
         self.is_raw_data_entry = False
         self.raw_data_pending = False
@@ -95,6 +96,7 @@ class Entry:
     def adjust_reply(self, query):
         """ Copy scripted reply and adjust to received query. """
         answer = dns.message.from_text(self.message.to_text())
+        answer.use_edns(query.edns, query.ednsflags)
         if 'copy_id' in self.adjust_fields:
             answer.id = query.id
             answer.question[0].name = query.question[0].name
@@ -120,7 +122,7 @@ class Entry:
             except:
                 flags.append(code)
         self.message.flags = dns.flags.from_text(' '.join(flags))
-        self.message.ednsflags = dns.flags.edns_from_text(' '.join(eflags))
+        self.message.want_dnssec('DO' in eflags)
         self.message.set_rcode(rcode)
 
     def begin_raw(self):
@@ -147,15 +149,23 @@ class Entry:
         else:
             rr = self.__rr_from_str(owner, args)
             if self.section == 'QUESTION':
-                self.message.question.append(rr)
+                self.__rr_add(self.message.question, rr)
             elif self.section == 'ANSWER':
-                self.message.answer.append(rr)
+                self.__rr_add(self.message.answer, rr)
             elif self.section == 'AUTHORITY':
-                self.message.authority.append(rr)
+                self.__rr_add(self.message.authority, rr)
             elif self.section == 'ADDITIONAL':
-                self.message.additional.append(rr)
+                self.__rr_add(self.message.additional, rr)
             else:
                 raise Exception('bad section %s' % self.section)
+
+    def __rr_add(self, section, rr):
+    	""" Merge record to existing RRSet, or append to given section. """
+    	for existing_rr in section:
+    		if existing_rr.match(rr.name, rr.rdclass, rr.rdtype, 0):
+    			existing_rr += rr
+    			return
+    	section.append(rr)
 
     def __rr_from_str(self, owner, args):
         """ Parse RR from tokenized string. """

@@ -28,7 +28,6 @@
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
-#include "daemon/bindings/kres.h"
 
 /*
  * Globals
@@ -49,7 +48,10 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
 			return;
 		}
-		out = outerr = fdopen(dup(stream_fd), "w");
+		uv_os_fd_t dup_fd = dup(stream_fd);
+		if (dup_fd >= 0) {
+			out = outerr = fdopen(dup_fd, "w");
+		}
 	}
 	/* Execute */
 	if (stream && buf && nread > 0) {
@@ -134,7 +136,6 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm
 	engine_lualib(engine, "net",     lib_net);
 	engine_lualib(engine, "cache",   lib_cache);
 	engine_lualib(engine, "event",   lib_event);
-	engine_lualib(engine, "kres",    lib_kres);
 	engine_lualib(engine, "worker",  lib_worker);
 
 	/* Create main worker. */
@@ -291,7 +292,6 @@ int main(int argc, char **argv)
 		ret = run_worker(loop, &engine);
 	}
 	/* Cleanup. */
-	fprintf(stderr, "\n[system] quitting\n");
 	engine_deinit(&engine);
 	worker_reclaim(worker);
 	mp_delete(pool.ctx);

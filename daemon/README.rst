@@ -1,3 +1,4 @@
+
 ************************
 Knot DNS Resolver daemon 
 ************************
@@ -508,17 +509,24 @@ you can see the statistics or schedule new queries.
 
    Return table of statistics.
 
+   * ``udp`` - number of outbound queries over UDP
+   * ``tcp`` - number of outbound queries over TCP
+   * ``ipv6`` - number of outbound queries over IPv6
+   * ``ipv4`` - number of outbound queries over IPv4
+   * ``concurrent`` - number of concurrent queries at the moment
+
    Example:
 
    .. code-block:: lua
 
 	print(worker.stats().concurrent)
 
-.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN])
+.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN, options = 0])
 
    :param string qname: Query name (e.g. 'com.')
    :param number qtype: Query type (e.g. ``kres.type.NS``)
    :param number qclass: Query class *(optional)* (e.g. ``kres.class.IN``)
+   :param number options: Resolution options (see query flags)
    :return: boolean
 
    Resolve a query, there is currently no callback when its finished, but you can track the query

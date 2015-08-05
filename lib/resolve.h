@@ -17,7 +17,7 @@
 #pragma once
 
 #include <netinet/in.h>
-#include <libknot/processing/overlay.h>
+#include <libknot/processing/layer.h>
 #include <libknot/packet/pkt.h>
 
 #include "lib/generic/array.h"
@@ -109,6 +109,7 @@ struct kr_context
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
+	knot_rrset_t *opt_rr;
 	uint32_t options;
 };
 
@@ -124,9 +125,10 @@ struct kr_context
  */
 struct kr_request {
     struct kr_context *ctx;
-    struct kr_rplan rplan;
-    struct knot_overlay overlay;
     knot_pkt_t *answer;
+    uint32_t options;
+    int state;
+    struct kr_rplan rplan;
     mm_ctx_t pool;
 };
 
@@ -205,3 +207,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
  * @return         DONE
  */
 int kr_resolve_finish(struct kr_request *request, int state);
+
+/**
+ * Return resolution plan.
+ * @param  request request state
+ * @return         pointer to rplan
+ */
+struct kr_rplan *kr_resolve_plan(struct kr_request *request);
+

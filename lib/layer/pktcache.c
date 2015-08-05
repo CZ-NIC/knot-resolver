@@ -31,12 +31,6 @@ static inline uint8_t get_tag(knot_pkt_t *pkt)
 	return knot_pkt_has_dnssec(pkt) ? KR_CACHE_SEC : KR_CACHE_PKT;
 }
 
-static int begin(knot_layer_t *ctx, void *module_param)
-{
-	ctx->data = module_param;
-	return ctx->state;
-}
-
 static uint32_t limit_ttl(uint32_t ttl)
 {
 	/* @todo Configurable limit */
@@ -217,7 +211,6 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 const knot_layer_api_t *pktcache_layer(struct kr_module *module)
 {
 	static const knot_layer_api_t _layer = {
-		.begin   = &begin,
 		.produce = &peek,
 		.consume  = &stash
 	};

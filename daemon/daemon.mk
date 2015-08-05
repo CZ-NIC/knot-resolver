@@ -9,13 +9,15 @@ kresd_SOURCES := \
 	daemon/worker.c      \
 	daemon/bindings.c    \
 	daemon/ffimodule.c   \
-	daemon/bindings/kres.c \
 	daemon/main.c
 
 # Embed resources
 daemon/engine.o: daemon/lua/sandbox.inc daemon/lua/config.inc
 %.inc: %.lua
 	@$(call quiet,XXD,$<) $< > $@
+# Installed FFI bindings
+bindings-install: daemon/lua/kres.lua
+	$(INSTALL) $< $(PREFIX)/$(MODULEDIR)
 
 # Dependencies
 kresd_DEPEND := $(libkres)
@@ -28,7 +30,7 @@ endif
 
 # Targets
 daemon: $(kresd)
-daemon-install: kresd-install
+daemon-install: kresd-install bindings-install
 daemon-clean: kresd-clean
 	@$(RM) daemon/lua/*.inc
 

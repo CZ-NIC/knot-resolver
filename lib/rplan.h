@@ -37,7 +37,8 @@
 	X(SAFEMODE   , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
 	X(CACHED     , 1 << 8) /**< Query response is cached. */ \
 	X(EXPIRING   , 1 << 9) /**< Query response is cached, but expiring. */ \
-	X(ALLOW_LOCAL, 1 << 10) /**< Allow queries to local or private address ranges. */
+	X(NO_EXPIRING, 1 << 10) /**< Do not use expiring cached records. */ \
+	X(ALLOW_LOCAL, 1 << 11) /**< Allow queries to local or private address ranges. */
 
 /** Query flags */
 enum kr_query_flag {
@@ -55,15 +56,15 @@ extern const lookup_table_t query_flag_names[];
 struct kr_query {
 	node_t node;
 	struct kr_query *parent;
-	struct kr_nsrep ns;
-	struct kr_zonecut zone_cut;
-	struct timeval timestamp;
 	knot_dname_t *sname;
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;
 	uint16_t flags;
 	unsigned secret;
+	struct timeval timestamp;
+	struct kr_nsrep ns;
+	struct kr_zonecut zone_cut;
 };
 
 /**
@@ -76,17 +77,17 @@ struct kr_query {
 struct kr_rplan {
 	list_t pending;              /**< List of pending queries. */
 	list_t resolved;             /**< List of resolved queries. */
-	struct kr_context *context;  /**< Parent resolution context. */
+	struct kr_request *request;  /**< Parent resolution request. */
 	mm_ctx_t *pool;              /**< Temporary memory pool. */
 };
 
 /**
  * Initialize resolution plan (empty).
  * @param rplan plan instance
- * @param context resolution context
+ * @param request resolution request
  * @param pool ephemeral memory pool for whole resolution
  */
-int kr_rplan_init(struct kr_rplan *rplan, struct kr_context *context, mm_ctx_t *pool);
+int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, mm_ctx_t *pool);
 
 /**
  * Deinitialize resolution plan, aborting any uncommited transactions.

@@ -17,7 +17,7 @@ ifeq ($(HAS_lua),yes)
 modules_TARGETS += ketcd \
                    graphite \
                    block \
-                   prefetch
+                   predict
 endif
 
 # List of Golang modules

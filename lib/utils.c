@@ -156,3 +156,20 @@ int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *ha
     }
     return -1;
 }
+
+int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
+               uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen)
+{
+	if (!pkt || !name)  {
+		return kr_error(EINVAL);
+	}
+	/* Create empty RR */
+	knot_rrset_t rr;
+	knot_rrset_init(&rr, knot_dname_copy(name, &pkt->mm), rtype, rclass);
+	/* Create RDATA */
+	knot_rdata_t rdata_arr[knot_rdata_array_size(rdlen)];
+	knot_rdata_init(rdata_arr, rdlen, rdata, ttl);
+	knot_rdataset_add(&rr.rrs, rdata_arr, &pkt->mm);
+	/* Append RR */
+	return knot_pkt_put(pkt, 0, &rr, KNOT_PF_FREE);
+}

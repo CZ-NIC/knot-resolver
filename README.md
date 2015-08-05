@@ -43,3 +43,7 @@ See the documentation at [knot-resolver.readthedocs.org][doc].
 
 [depends]: http://knot-resolver.readthedocs.org/en/latest/build.html
 [doc]: http://knot-resolver.readthedocs.org/en/latest/index.html
+
+### Contacting us
+
+[![Join the chat at https://gitter.im/CZ-NIC/knot-resolver](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/CZ-NIC/knot-resolver?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)

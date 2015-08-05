@@ -87,7 +87,6 @@
 
 #ifdef __GNUC__
 
-#undef inline
 #define NONRET __attribute__((noreturn))				/** Function does not return **/
 #define UNUSED __attribute__((unused))					/** Variable/parameter is knowingly unused **/
 #define CONSTRUCTOR __attribute__((constructor))			/** Call function upon start of program **/
@@ -124,128 +123,8 @@
  * === Basic logging functions (see <<log:,Logging>> and <ucw/log.h> for more)
  ***/
 
-enum log_levels {			/** The available log levels to pass to msg() and friends. **/
-  L_DEBUG=0,				// 'D' - Debugging
-  L_INFO,				// 'I' - Informational
-  L_WARN,				// 'W' - Warning
-  L_ERROR,				// 'E' - Error, but non-critical
-  L_INFO_R,				// 'i' - An alternative set of levels for messages caused by remote events
-  L_WARN_R,				// 'w'   (e.g., a packet received via network)
-  L_ERROR_R,				// 'e'
-  L_FATAL,				// '!' - Fatal error
-  L_MAX
-};
-
-#define LOG_LEVEL_NAMES P(DEBUG) P(INFO) P(WARN) P(ERROR) P(INFO_R) P(WARN_R) P(ERROR_R) P(FATAL)
-
-// Return the letter associated with a given severity level
-#define LS_LEVEL_LETTER(level) ("DIWEiwe!###"[( level )])
-
-#define L_SIGHANDLER	0x80000000	/** Avoid operations that are unsafe in signal handlers **/
-#define L_LOGGER_ERR	0x40000000	/** Used internally to avoid infinite reporting of logging errors **/
-
-/**
- * This is the basic printf-like function for logging a message.
- * The @flags contain the log level and possibly other flag bits (like `L_SIGHANDLER`).
- **/
-void msg(uint flags, const char *fmt, ...) FORMAT_CHECK(printf,2,3);
-void vmsg(uint flags, const char *fmt, va_list args);		/** A vararg version of msg(). **/
-void die(const char *, ...) NONRET FORMAT_CHECK(printf,1,2);	/** Log a fatal error message and exit the program. **/
-void vdie(const char *fmt, va_list args) NONRET;		/** va_list version of die() **/
-
-extern char *log_title;			/** An optional log message title. Set to program name by log_init(). **/
-extern int log_pid;			/** An optional PID printed in each log message. Set to 0 if it shouldn't be logged. **/
-extern void (*log_die_hook)(void);	/** An optional function called just before die() exists. **/	// API: log_die_hook
-
-void log_init(const char *argv0);	/** Set @log_title to the program name extracted from @argv[0]. **/
-void log_fork(void);			/** Call after fork() to update @log_pid. **/
-void log_file(const char *name);	/** Establish logging to the named file. Also redirect stderr there. **/
-
-void assert_failed(const char *assertion, const char *file, int line) NONRET;
-void assert_failed_msg(const char *assertion, const char *file, int line, const char *fmt, ...) NONRET FORMAT_CHECK(printf,4,5);
-void assert_failed_noinfo(void) NONRET;
-
-#ifdef DEBUG_ASSERTS
-/**
- * Check an assertion. If the condition @x is false, stop the program with a fatal error.
- * Assertion checks are compiled only when `DEBUG_ASSERTS` is defined.
- **/
-#define ASSERT(x) ({ if (unlikely(!(x))) assert_failed(#x, __FILE__, __LINE__); 1; })
-
-/**
- * Check an assertion with a debug message. If the condition @cond is false,
- * print the message and stop the program with fatal error.
- * Assertion checks are compiled only when `DEBUG_ASSERTS` is defined.
- **/
-#define ASSERT_MSG(cond,str,x...) ({ if (unlikely(!(cond))) assert_failed_msg(#cond, __FILE__, __LINE__, str,##x); 1; })
-
-#else
-#define ASSERT(x) ({ if (__builtin_constant_p(x) && !(x)) assert_failed_noinfo(); 1; })
-#define ASSERT_MSG(cond,str,x...) ASSERT(cond)
-#endif
-
-#define COMPILE_ASSERT(name,x) typedef char _COMPILE_ASSERT_##name[!!(x)-1]
-
-#ifdef LOCAL_DEBUG
-#define DBG(x,y...) msg(L_DEBUG, x,##y)	/** If `LOCAL_DEBUG` is defined before including <ucw/lib.h>, log a debug message. Otherwise do nothing. **/
-/**
- * If `LOCAL_DEBUG` is defined before including <ucw/lib.h>, log current
- * file name and line number. Otherwise do nothing.
- **/
-#define DBG_SPOT msg(L_DEBUG, "%s:%d (%s)", __FILE__, __LINE__, __func__)
-#else
 #define DBG(x,y...) do { } while(0)
 #define DBG_SPOT do { } while(0)
-#endif
-
-#ifdef DEBUG_ASSERTS
-/**
- * Sometimes, we may want to check that a pointer points to a valid memory
- * location before we start using it for anything more complicated. This
- * macro checks pointer validity by reading the byte it points to.
- **/
-#define ASSERT_READABLE(ptr) ({ volatile char *__p = (ptr); *__p; })
-/** Like the previous macro, but it checks writeability, too. **/
-#define ASSERT_WRITEABLE(ptr) ({ volatile char *__p = (ptr); *__p = *__p; })
-#else
-#define ASSERT_READABLE(ptr) do { } while(0)
-#define ASSERT_WRITEABLE(ptr) do { } while(0)
-#endif
-
-/*** === Memory allocation ***/
-
-/*
- * Unfortunately, several libraries we might want to link to define
- * their own xmalloc and we don't want to interfere with them, hence
- * the renaming.
- */
-#define xmalloc ucw_xmalloc
-#define xrealloc ucw_xrealloc
-#define xfree ucw_xfree
-
-void *xmalloc(size_t) LIKE_MALLOC;		/** Allocate memory and die() if there is none. **/
-void *xrealloc(void *, size_t);			/** Reallocate memory and die() if there is none. **/
-void xfree(void *);				/** Free memory allocated by xmalloc() or xrealloc(). **/
-
-void *xmalloc_zero(size_t) LIKE_MALLOC;		/** Allocate memory and fill it by zeroes. **/
-char *xstrdup(const char *) LIKE_MALLOC;	/** Make a xmalloc()'ed copy of a string. Returns NULL for NULL string. **/
-
-/* bigalloc.c */
-
-void *page_alloc(u64 len) LIKE_MALLOC;		// Internal: allocates a multiple of CPU_PAGE_SIZE bytes with mmap
-void *page_alloc_zero(u64 len) LIKE_MALLOC;
-void page_free(void *start, u64 len);
-void *page_realloc(void *start, u64 old_len, u64 new_len);
-
-void *big_alloc(u64 len) LIKE_MALLOC;		/** Allocate a large memory block in the most efficient way available. **/
-void *big_alloc_zero(u64 len) LIKE_MALLOC;	/** Allocate and clear a large memory block. **/
-void big_free(void *start, u64 len);		/** Free block allocated by @big_alloc() or @big_alloc_zero(). **/
-
-/*** === Random numbers (random.c) ***/
-
-uint random_u32(void);				/** Return a pseudorandom 32-bit number. **/
-uint random_max(uint max);			/** Return a pseudorandom 32-bit number in range [0,@max). **/
-u64 random_u64(void);				/** Return a pseudorandom 64-bit number. **/
-u64 random_max_u64(u64 max);			/** Return a pseudorandom 64-bit number in range [0,@max). **/
+#define ASSERT(x)
 
 #endif

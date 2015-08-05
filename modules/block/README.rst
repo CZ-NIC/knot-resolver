@@ -21,6 +21,8 @@ There are three action:
 * ``DENY`` - return NXDOMAIN answer
 * ``DROP`` - terminate query resolution, returns SERVFAIL to requestor
 
+.. note:: The module (and ``kres``) treats domain names as wire, not textual representation. So each label in name is prefixed with its length, e.g. "example.com" equals to "\7example\3com".
+
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -29,18 +31,18 @@ Example configuration
 	-- Load default block rules
 	modules = { 'block' }
 	-- Whitelist 'www[0-9].badboy.cz'
-	block:add(block.pattern(block.PASS, 'www[0-9].badboy.cz'))
+	block:add(block.pattern(block.PASS, '\4www[0-9]\6badboy\2cz'))
 	-- Block all names below badboy.cz
-	block:add(block.suffix(block.DENY, {'badboy.cz'}))
+	block:add(block.suffix(block.DENY, {'\6badboy\2cz'}))
 	-- Custom rule
-	block:add(function (pkt, qname)
-		if qname:find('%d.%d.%d.224.in-addr.arpa.') then
-			return block.DENY, '224.in-addr.arpa.'
+	block:add(function (req, query)
+		if query:qname():find('%d.%d.%d.224\7in-addr\4arpa') then
+			return block.DENY
 		end
 	end)
 	-- Disallow ANY queries
-	block:add(function (pkt, qname)
-		if pkt:qtype() == kres.rrtype.ANY then
+	block:add(function (req, query)
+		if query.type == kres.type.ANY then
 			return block.DROP
 		end
 	end)
@@ -51,11 +53,10 @@ Properties
 .. envvar:: block.PASS (number)
 .. envvar:: block.DENY (number)
 .. envvar:: block.DROP (number)
-.. envvar:: block.private_zones (table of private zones)
 
 .. function:: block:add(rule)
 
-  :param rule: added rule, i.e. ``block.pattern(block.DENY, '[0-9]+.cz')``
+  :param rule: added rule, i.e. ``block.pattern(block.DENY, '[0-9]+\2cz')``
   :param pattern: regular expression
   
   Policy to block queries based on the QNAME regex matching.
@@ -81,8 +82,7 @@ Properties
   :param common_suffix: common suffix of entries in suffix_table
   
   Like suffix match, but you can also provide a common suffix of all matches for faster processing (nil otherwise).
-
-.. tip:: If you want to match suffixes only, prefix the strings with `.`, e.g. `.127.in-addr.arpa.` instead of `127.in-addr.arpa`.
+  This function is faster for small suffix tables (in the order of "hundreds").
 
 .. _`Aho-Corasick`: https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
 .. _`@jgrahamc`: https://github.com/jgrahamc/aho-corasick-lua
