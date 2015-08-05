@@ -397,7 +397,6 @@ def test_sendrecv(default_iface,peer_iface):
 
 if __name__ == '__main__':
 
-    syn_print(None,"qqqqqqqqqqqqqq")
     # Self-test code
     DEFAULT_IFACE = 0
     CHILD_IFACE = 0

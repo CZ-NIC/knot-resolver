@@ -9,6 +9,7 @@ import socket
 import time
 import signal
 import stat
+import errno
 from pydnstest import scenario, testserver, test
 from datetime import datetime
 
@@ -29,6 +30,8 @@ def del_files(path_to):
 DEFAULT_IFACE = 0
 CHILD_IFACE = 0
 TMPDIR = ""
+SUBPROCESS_WAIT_TOUT = 0.2
+
 if "SOCKET_WRAPPER_DEFAULT_IFACE" in os.environ:
    DEFAULT_IFACE = int(os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"])
 if DEFAULT_IFACE < 2 or DEFAULT_IFACE > 254 :
@@ -36,14 +39,18 @@ if DEFAULT_IFACE < 2 or DEFAULT_IFACE > 254 :
         testserver.syn_print(None,"SOCKET_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default (10)".format(DEFAULT_IFACE))
     DEFAULT_IFACE = 10
     os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"]="{}".format(DEFAULT_IFACE)
+
 if "KRESD_WRAPPER_DEFAULT_IFACE" in os.environ:
     CHILD_IFACE = int(os.environ["KRESD_WRAPPER_DEFAULT_IFACE"])
 if CHILD_IFACE < 2 or CHILD_IFACE > 254 or CHILD_IFACE == DEFAULT_IFACE:
-    if TEST_DEBUG > 0:
-        testserver.syn_print(None,"KRESD_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default ({})".format(CHILD_IFACE, DEFAULT_IFACE + 1))
+    OLD_CHILD_IFACE = CHILD_IFACE
     CHILD_IFACE = DEFAULT_IFACE + 1
     if CHILD_IFACE > 254:
         CHILD_IFACE = 2
+    if TEST_DEBUG > 0:
+        testserver.syn_print(None,"KRESD_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default ({})".format(OLD_CHILD_IFACE, CHILD_IFACE))
+    os.environ["KRESD_WRAPPER_DEFAULT_IFACE"] = "{}".format(CHILD_IFACE)
+
 if "SOCKET_WRAPPER_DIR" in os.environ:
     TMPDIR = os.environ["SOCKET_WRAPPER_DIR"]
 if TMPDIR == "" or os.path.isdir(TMPDIR) is False:
@@ -52,8 +59,19 @@ if TMPDIR == "" or os.path.isdir(TMPDIR) is False:
     os.environ["SOCKET_WRAPPER_DIR"] = TMPDIR
     if TEST_DEBUG > 0:
         testserver.syn_print(None,"SOCKET_WRAPPER_DIR is invalid or empty ({}), set to default ({})".format(OLDTMPDIR, TMPDIR))
+
+if "SUBPROCESS_WAIT_TOUT" in os.environ:
+    tout = os.environ["SUBPROCESS_WAIT_TOUT"]
+    try:
+      SUBPROCESS_WAIT_TOUT = float(tout)
+    except:
+      SUBPROCESS_WAIT_TOUT = 0.1
+      if TEST_DEBUG > 0:
+        testserver.syn_print(None,"SUBPROCESS_WAIT_TOUT is invalid ({}), set to default ({})".format(tout,SUBPROCESS_WAIT_TOUT))
+
 if TEST_DEBUG > 0:
-    testserver.syn_print(None,"default_iface: {}, child_iface: {}, tmpdir {}".format(DEFAULT_IFACE, CHILD_IFACE, TMPDIR))
+    testserver.syn_print(None,"default_iface: {}, child_iface: {}, tmpdir {} tout{}".format(DEFAULT_IFACE, CHILD_IFACE, TMPDIR, SUBPROCESS_WAIT_TOUT))
+
 del_files(TMPDIR)
 
 def get_next(file_in):
@@ -175,7 +193,7 @@ def find_objects(path):
     return result
 
 
-def play_object(path):
+def play_object(path, binary_name, gencfg_script_name, binary_additional_pars):
     """ Play scenario from a file object. """
 
     # Parse scenario
@@ -197,53 +215,46 @@ def play_object(path):
     child_env = os.environ.copy()
     child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
     child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
-    selfaddr = testserver.get_local_addr_str(socket.AF_INET,DEFAULT_IFACE)
-    childaddr = testserver.get_local_addr_str(socket.AF_INET,CHILD_IFACE)
-    fd = os.open( TMPDIR + "/config", os.O_RDWR|os.O_CREAT )
-    os.write(fd, "net.listen('{}',53)\n".format(childaddr) )
-    os.write(fd, "cache.size = 10*MB\n")
-    os.write(fd, "modules = {'hints'}\n")
-    os.write(fd, "hints.root({['k.root-servers.net'] = '%s'})\n" % selfaddr)
-    os.write(fd, "option('NO_MINIMIZE', true)\n")
-    os.write(fd, "option('ALLOW_LOCAL', true)\n") # Permit queries to localhost
+    child_env["CONFIG_NO_MINIMIZE"] = "1"
     for k,v in config:
         # Enable selectively for some tests
         if k == 'query-minimization' and str2bool(v):
-            os.write(fd, "option('NO_MINIMIZE', false)\n")
-
-    os.close(fd)
-
-
-    # !!! ATTENTION !!!
-    # cwrapped kresd constantly fails at startup with empty SOCKET_WRAPPER_DIR
-    # race condition?
-    # workaround - check output and try to restart if fails
-    # also, wait for subprocess starts
-    fails = False
-    binary = subprocess.Popen(["./daemon/kresd",TMPDIR], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid, env=child_env)
-    while binary.poll() is None:
-        line = binary.stdout.readline()
-        if line.find("[system] quitting") != -1:
-            fails = True
-            binary.wait()
+            child_env["CONFIG_NO_MINIMIZE"] = "0"
             break
-        elif line.find("[hint] loaded") != -1:
-            break
+    selfaddr = testserver.get_local_addr_str(socket.AF_INET,DEFAULT_IFACE)
+    childaddr = testserver.get_local_addr_str(socket.AF_INET,CHILD_IFACE)
+    child_env["CONFIG_SELF_ADDR"] = selfaddr
+    child_env["CONFIG_CHILD_ADDR"] = childaddr
 
-    if fails or binary.poll() is not None: #second attempt
-        fails = False
-        binary = subprocess.Popen(["./daemon/kresd",TMPDIR], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid, env=child_env)
-        while binary.poll() is None:
-            line = binary.stdout.readline()
-            if line.find("[system] quitting") != -1:
-                fails = True
-                binary.wait()
-                break
-            elif line.find("[hint] loaded") != -1:
-                break
-    
-    if fails or binary.poll() is not None :
-        raise Exception("Can't start kresd")
+    try :
+      subprocess.call(gencfg_script_name, env=child_env)
+    except Exception as e:
+        raise Exception("Can't start configuraion script '%s': %s" % (gencfg_script_name, str(e)))
+
+    parameters = ""
+    for s in binary_additional_pars:
+      parameters = parameters + " " + s
+    binary_with_pars = [binary_name,TMPDIR,parameters.strip()]
+    # cwrapped kresd constantly fails at startup when directory SOCKET_WRAPPER_DIR is empty
+    try :
+      binary = subprocess.Popen(binary_with_pars, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid, env=child_env)
+    except Exception as e:
+        raise Exception("Can't start '%s': %s" % (binary_name, str(e)))
+
+    time.sleep(SUBPROCESS_WAIT_TOUT)
+
+    if binary.poll() is not None: #second attempt
+        try :
+            binary = subprocess.Popen(binary_with_pars, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid, env=child_env)
+        except Exception as e:
+            raise Exception("Can't start '%s': %s" % (binary_name, str(e)))
+
+        time.sleep(SUBPROCESS_WAIT_TOUT)
+
+        if binary.poll() is not None:
+            out, err = binary.communicate()
+            print "==== stderr:", err
+            raise Exception("Can't start '%s'" % binary_name)
 
     # Play scenario
     server = testserver.TestServer(scenario, config, DEFAULT_IFACE, CHILD_IFACE)
@@ -266,6 +277,27 @@ def test_platform(*args):
 
 if __name__ == '__main__':
 
+    if len(sys.argv) < 4:
+        print "Usage: test_integration.py <scenario> <cfg_script> <binary> [<additional>]"
+        print "\t<scenario> - path to scenario"
+        print "\t<cfg_script> - script to generate configuration"
+        print "\t<binary> - executable to test"
+        print "\t<additional> - additional parameters for <binary>"
+        sys.exit(0)
+
+    path_to_scenario = ""
+    gencfg_script_name = ""
+    binary_name = ""
+    binary_additional_pars = []
+
+    if len(sys.argv) > 3:
+        path_to_scenario = sys.argv[1]
+        gencfg_script_name = sys.argv[2]
+        binary_name = sys.argv[3]
+
+    if len(sys.argv) > 4:
+        binary_additional_pars = sys.argv[4:]
+
     # Self-tests first
     test = test.Test()
     test.add('integration/platform', test_platform)
@@ -274,8 +306,8 @@ if __name__ == '__main__':
         sys.exit(1)
     else:
         # Scan for scenarios
-        for arg in sys.argv[1:]:
+        for arg in [path_to_scenario]:
             objects = find_objects(arg)
             for path in objects:
-                test.add(path, play_object, path)
+                test.add(path, play_object, path, binary_name, gencfg_script_name, binary_additional_pars)
         sys.exit(test.run())
