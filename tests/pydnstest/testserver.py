@@ -86,7 +86,6 @@ class TestServer:
         self.peer_iface = p_iface
 
         self.map_adresses()
-        self.start()
 
 
     def __del__(self):
@@ -101,8 +100,7 @@ class TestServer:
         if TEST_DEBUG > 0:
             syn_print(None, "start")
         if self.active is True:
-            if TEST_DEBUG > 0:
-                syn_print(None, "TestServer already started")
+            raise Exception('TestServer already started')
         self.active = True
         self.start_srv(self.kroot_local, self.kroot_family)
 
