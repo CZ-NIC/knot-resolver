@@ -6,6 +6,7 @@ import binascii
 import socket
 import os
 import itertools
+import time
 from datetime import datetime
 
 class Entry:
@@ -299,18 +300,22 @@ class Step:
             msg = self.data[0].message
             msg.use_edns(edns = 1)
             data_to_wire = msg.to_wire()
-        ctx.sockudp4.sendto(data_to_wire,(peeraddr,53))
-        ctx.sockudp4.settimeout(10)
-        if self.data[0].is_raw_data_entry is True:
-            data = None
-        else:
+        # Send query to client and wait for response
+        while True:
             try:
-                data, addr = ctx.sockudp4.recvfrom(8000)
-            except Exception as e:
-                data = None
-
-        self.raw_answer = data
-        ctx.last_raw_answer = data
+                ctx.child_sock.send(data_to_wire)
+                break
+            except OSError, e:
+                # ENOBUFS, throttle sending
+                if e.errno == errno.ENOBUFS:
+                    time.sleep(0.1)
+        # Wait for a response for a reasonable time
+        answer = None
+        if not self.data[0].is_raw_data_entry:
+            answer, addr = ctx.child_sock.recvfrom(4096)
+        # Remember last answer for checking later
+        self.raw_answer = answer
+        ctx.last_raw_answer = answer
         if self.raw_answer is not None:
             self.answer = dns.message.from_wire(self.raw_answer)
         else:
@@ -331,9 +336,7 @@ class Scenario:
         self.ranges = []
         self.steps = []
         self.current_step = None
-        self.sockudp4 = None
-        self.selfaddr = None
-        self.peeraddr = None
+        self.child_sock = None
 
     def reply(self, query, address = None):
         """ Attempt to find a range reply for a query. """
@@ -368,23 +371,9 @@ class Scenario:
 
     def play(self, saddr, paddr):
         """ Play given scenario. """
-
-        self.selfaddr = saddr
-        self.peeraddr = paddr
-        #prevent from using port 53
-        while True:
-            if self.sockudp4 != None:
-                close(self.sockudp4)
-            self.sockudp4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-            res = socket.getaddrinfo(self.selfaddr,0,socket.AF_INET,0,socket.IPPROTO_UDP)
-            entry0 = res[0]
-            sockaddr = entry0[4]
-            self.sockudp4.bind(sockaddr)
-            address = self.sockudp4.getsockname()
-            if address[1] != 53:
-                break;
-
-        self.sockudp4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.child_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.child_sock.settimeout(1000)
+        self.child_sock.connect((paddr, 53))
 
         step = None
         if len(self.steps) == 0:
@@ -392,8 +381,9 @@ class Scenario:
         try:
             for step in self.steps:
                 self.current_step = step
-                step.play(self, self.peeraddr)
+                step.play(self, paddr)
         except Exception as e:
             raise Exception('step #%d %s' % (step.id, str(e)))
-        
-        self.sockudp4.close()
+        finally:
+        	self.child_sock.close()
+        	self.child_sock = None
