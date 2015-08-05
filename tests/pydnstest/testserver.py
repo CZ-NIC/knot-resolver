@@ -27,7 +27,7 @@ def recvfrom_msg(stream):
     """ Receive DNS/UDP message. """
     if TEST_DEBUG > 0:
         syn_print(None, "incoming data")
-    data, addr = stream.recvfrom(8000)
+    data, addr = stream.recvfrom(4096)
     if TEST_DEBUG > 0:
         syn_print(None, "received {len} butes from {addr}".format(len=len(data),addr=addr))
     return dns.message.from_wire(data), addr
@@ -36,7 +36,10 @@ def sendto_msg(stream, message, addr):
     """ Send DNS/UDP message. """
     if TEST_DEBUG > 0:
         syn_print(None, "outgoing data")
-    stream.sendto(message, addr)
+    try:
+        stream.sendto(message, addr)
+    except: # Failure to respond is OK, resolver should recover
+        pass
     if TEST_DEBUG > 0:
         syn_print(None,"{len} bytes sent to {addr}".format(len=len(message),addr=addr))
 
