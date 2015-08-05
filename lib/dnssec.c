@@ -91,11 +91,19 @@ static int validate_rrsig_rr(int *flags, const knot_rrset_t *covered,
 		return kr_error(EINVAL);
 	}
 	/* bullet 4 */
-	if (knot_rrsig_labels(&rrsigs->rrs, sig_pos) > knot_dname_labels(covered->owner, NULL)) {
-		return kr_error(EINVAL);
-	}
-	if (knot_rrsig_labels(&rrsigs->rrs, sig_pos) < knot_dname_labels(covered->owner, NULL)) {
-		*flags |= FLG_WILDCARD_EXPANSION;
+	{
+		int rrsig_labels = knot_rrsig_labels(&rrsigs->rrs, sig_pos);
+		int dname_labels = knot_dname_labels(covered->owner, NULL);
+		if ((covered->owner[0] == 1) && (covered->owner[1] == '*')) {
+			/* The asterisk does not count, RFC4034 3.1.3, paragraph 3. */
+			--dname_labels;
+		}
+		if (rrsig_labels > dname_labels) {
+			return kr_error(EINVAL);
+		}
+		if (rrsig_labels < dname_labels) {
+			*flags |= FLG_WILDCARD_EXPANSION;
+		}
 	}
 	/* bullet 5 */
 	if (knot_rrsig_sig_expiration(&rrsigs->rrs, sig_pos) < timestamp) {
