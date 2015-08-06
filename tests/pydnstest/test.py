@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import traceback
 
 class Test:
     """ Small library to imitate CMocka output. """
@@ -25,7 +26,7 @@ class Test:
                 passed += 1
                 print('[       OK ] %s' % name)
             except Exception as e:
-                print('[     FAIL ] %s (%s)' % (name, str(e)))
+                print('[     FAIL ] %s (%s) at %s' % (name, str(e), traceback.print_exc()[0]))
 
         # Clear test set
         self.tests = []

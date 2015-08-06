@@ -245,8 +245,6 @@ def play_object(path, binary_name, config_name, j2template, binary_additional_pa
     server.start()
     try:
         server.play()
-    except Exception as e:
-        print('... scenario "%s" crashed, logs in "%s"' % (os.path.basename(path), TMPDIR))
     finally:
         server.stop()
         daemon_proc.terminate()
