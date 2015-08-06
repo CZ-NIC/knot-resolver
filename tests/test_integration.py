@@ -236,6 +236,8 @@ def play_object(path, binary_name, config_name, j2template, binary_additional_pa
     # Wait until the server accepts TCP clients
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while True:
+        if daemon_proc.poll() != None:
+            raise Exception('process died "%s", logs in "%s"' % (os.path.basename(binary_name), TMPDIR))
         try:
             sock.connect((testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE), 53))
         except: continue
