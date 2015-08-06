@@ -254,8 +254,6 @@ static int init_resolver(struct engine *engine)
 	if (engine->resolver.cache_rep) {
 		lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
 	}
-        /* No query minimization */
-        engine->resolver.options |= QUERY_NO_MINIMIZE;
 
 	/* Load basic modules */
 	engine_register(engine, "iterate");
