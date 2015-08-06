@@ -33,7 +33,7 @@ before_script:
 script:
     - make ${MAKEOPTS} install check COVERAGE=1 PREFIX=${HOME}/.local
 after_success:
-    - test $TRAVIS_OS_NAME = linux && coveralls -i lib -x ".c" --gcov-options '\-lp'
+    - test $TRAVIS_OS_NAME = linux && coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'
 sudo: false
 cache:
     directories:
