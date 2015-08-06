@@ -78,7 +78,7 @@ function pkg {
 }
 
 # travis-specific
-PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
+PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls Jinja2"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
 	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
