@@ -180,11 +180,11 @@ def setup_env(child_env, config, config_name, j2template):
     # Set up child process env() 
     child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
     child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
-    no_mininize = "true"
+    no_minimize = "true"
     for k,v in config:
         # Enable selectively for some tests
         if k == 'query-minimization' and str2bool(v):
-            no_mininize = "false"
+            no_minimize = "false"
             break
     selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
     childaddr = testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE)
@@ -200,7 +200,8 @@ def setup_env(child_env, config, config_name, j2template):
     j2template_ctx = {
         "ROOT_ADDR" : selfaddr,
         "SELF_ADDR" : childaddr,
-        "NO_MINIMIZE" : no_mininize
+        "NO_MINIMIZE" : no_minimize,
+        "WORKING_DIR" : TMPDIR,
     }
     cfg_rendered = j2template.render(j2template_ctx)
     f = open(os.path.join(TMPDIR,config_name), 'w')
@@ -248,7 +249,8 @@ def play_object(path, binary_name, config_name, j2template, binary_additional_pa
         print('... scenario "%s" crashed, logs in "%s"' % (os.path.basename(path), TMPDIR))
     finally:
         server.stop()
-        daemon_proc.kill()
+        daemon_proc.terminate()
+        daemon_proc.wait()
     # Do not clear files if the server crashed (for analysis)
     del_files(TMPDIR)
 
