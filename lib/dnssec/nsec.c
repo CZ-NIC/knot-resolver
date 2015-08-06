@@ -18,6 +18,7 @@
 
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
+#include <libknot/packet/wire.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
@@ -25,39 +26,9 @@
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
 
-int kr_nsec_nomatch_validate(const knot_rrset_t *nsec, const knot_dname_t *name)
+bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t type)
 {
-	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
-
-	if ((knot_dname_cmp(nsec->owner, name) < 0) &&
-	    (knot_dname_cmp(name, next) < 0)) {
-		return kr_ok();
-	} else {
-		return 1;
-	}
-
-#warning TODO: Is an additional request for NSEC name or wildcard necessary?
-}
-
-#define FLG_NOEXIST_RRTYPE 0x01 /**< RR type has been proven not to exist. */
-#define FLG_NOEXIST_RRSET  0x02 /**< RRSet has been proven not to exist. */
-#define FLG_NOEXIST_WILDCARD 0x03 /**< No cowering wildcard exists. */
-
-/**
- * Checks whether the given type exists in the supplied NSEC bitmap.
- * @param nsec NSEC RR.
- * @param type Type to search for.
- */
-bool nsec_bitmap_has_type(const knot_rrset_t *nsec, uint16_t type)
-{
-	if (!nsec) {
-		return false;
-	}
-
-	uint8_t *bm;
-	uint16_t bm_size;
-	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
-	if (!bm) {
+	if (!bm && !bm_size) {
 		return false;
 	}
 
@@ -81,6 +52,99 @@ bool nsec_bitmap_has_type(const knot_rrset_t *nsec, uint16_t type)
 	}
 
 	return false;
+}
+
+int kr_nsec_nomatch_validate(const knot_rrset_t *nsec, const knot_dname_t *name)
+{
+	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
+
+	if ((knot_dname_cmp(nsec->owner, name) < 0) &&
+	    (knot_dname_cmp(name, next) < 0)) {
+		return kr_ok();
+	} else {
+		return kr_error(EINVAL);
+	}
+
+#warning TODO: Is an additional request for NSEC name or wildcard necessary?
+}
+
+#define FLG_NOEXIST_RRTYPE 0x01 /**< <SNAME, SCLASS> exists, <SNAME, SCLASS, STYPE> does not exist. */
+#define FLG_NOEXIST_RRSET  0x02 /**< <SNAME, SCLASS> does not exist. */
+#define FLG_NOEXIST_WILDCARD 0x03 /**< No wildcard covering <SNAME, SCLASS> exists. */
+#define FLG_NOEXIST_CLOSER 0x04 /**< Wildcard covering <SNAME, SCLASS> exists, but doesn't match STYPE. */
+
+/**
+ * According to set flags determine whether authenticated denial of existence has been proven.
+ * @param f Flags to inspect.
+ * @return  True if denial of existence proven.
+ */
+#define kr_nsec_existence_denied(f) \
+	(((f) & (FLG_NOEXIST_RRTYPE | FLG_NOEXIST_RRSET)) && ((f) & FLG_NOEXIST_WILDCARD))
+
+/**
+ * Name error response check (RFC4035 3.1.3.2; RFC4035 5.4, bullet 2).
+ * @note Returned flags must be checked in order to prove denial.
+ * @param flags Flags to be set according to check outcome.
+ * @param nsec  NSEC RR.
+ * @param name  Name to be checked.
+ * @param pool
+ * @return      0 or error code.
+ */
+static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
+                                        const knot_dname_t *name, mm_ctx_t *pool)
+{
+	assert(flags && nsec && name);
+
+	if (kr_nsec_nomatch_validate(nsec, name) == 0) {
+		*flags |= FLG_NOEXIST_RRSET;
+	}
+
+	knot_dname_t *name_copy = knot_dname_copy(name, pool);
+	if (!name_copy) {
+		return kr_error(ENOMEM);
+	}
+	knot_dname_t *ptr = name_copy;
+	while (ptr[0]) {
+		/* Remove leftmost label and replace it with '*.'. */
+		ptr = (uint8_t *) knot_wire_next_label(ptr, NULL);
+		*(--ptr) = '*';
+		*(--ptr) = 1;
+
+		if (kr_nsec_nomatch_validate(nsec, ptr) == 0) {
+			*flags |= FLG_NOEXIST_WILDCARD;
+			break;
+		}
+
+		/* Remove added leftmost asterisk. */
+		ptr += 2;
+	}
+
+	knot_dname_free(&name_copy, pool);
+	return kr_ok();
+}
+
+int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                      const knot_dname_t *sname, mm_ctx_t *pool)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = kr_error(ENOENT);
+	int flags = 0;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC) {
+			continue;
+		}
+		ret = name_error_response_check_rr(&flags, rrset, sname, pool);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+
+	return kr_nsec_existence_denied(flags) ? kr_ok() : kr_error(ENOENT);
 }
 
 /**
@@ -125,19 +189,40 @@ static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection
  * Perform check of RR type existence denial according to RFC4035 5.4, bullet 1.
  * @param flags Flags to be set according to check outcome.
  * @param nsec  NSEC RR.
- * @param sec   Packet section to work with.
  * @param type  Type to be checked.
+ * @return      0 or error code.
  */
-static int rr_type_existence_denial(int *flags, const knot_rrset_t *nsec,
-                                    const knot_pktsection_t *sec, uint16_t type)
+static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
+                                         uint16_t type)
+{
+	assert(flags && nsec);
+
+	uint8_t *bm = NULL;
+	uint16_t bm_size;
+	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+	if (!bm) {
+		return kr_error(EINVAL);
+	}
+
+	if (!kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+		/* The type is not listed in the NSEC bitmap. */
+		*flags |= FLG_NOEXIST_RRTYPE;
+	}
+
+	return kr_ok();
+}
+
+/**
+ * Perform check for RR type wildcard existence denial according to RFC4035 5.4, bullet 1.
+ * @param flags Flags to be set according to check outcome.
+ * @param nsec  NSEC RR.
+ * @param sec   Packet section to work with.
+ * @return      0 or error code.
+ */
+static int no_data_wildcard_existence_check(int *flags, const knot_rrset_t *nsec,
+                                            const knot_pktsection_t *sec)
 {
 	assert(flags && nsec && sec);
-
-	if (nsec_bitmap_has_type(nsec, type)) {
-		return kr_ok();
-	}
-	/* The type is not listed in the NSEC bitmap. */
-	*flags |= FLG_NOEXIST_RRTYPE;
 
 	int rrsig_labels = coverign_rrsig_labels(nsec, sec);
 	if (rrsig_labels < 0) {
@@ -155,57 +240,11 @@ static int rr_type_existence_denial(int *flags, const knot_rrset_t *nsec,
 	return kr_ok();
 }
 
-/**
- * Perform check of RRSet existence denial according to RFC4035 5.4, bullet 2.
- * @param flags Flags to be set according to check outcome.
- * @param nsec  NSEC RR.
- * @param name  Name to be checked.
- * @param pool
- * @return      0 or error code.
- */
-static int rrset_existence_denial(int *flags, const knot_rrset_t *nsec,
-                                  const knot_dname_t *name, mm_ctx_t *pool)
-{
-	assert(flags && nsec && name);
-
-	if (kr_nsec_nomatch_validate(nsec, name) == 0) {
-		*flags |= FLG_NOEXIST_RRSET;
-		return kr_ok();
-	}
-
-	if (!pool) {
-		return kr_error(EINVAL);
-	}
-
-	knot_dname_t *name_copy = knot_dname_copy(name, pool);
-	if (!name_copy) {
-		return kr_error(ENOMEM);
-	}
-	knot_dname_t *ptr = name_copy;
-	while (ptr[0]) {
-		/* Remove leftmost label and replace it with '*.'. */
-		ptr = (uint8_t *) knot_wire_next_label(ptr, NULL);
-		*(--ptr) = '*';
-		*(--ptr) = 1;
-
-		if (kr_nsec_nomatch_validate(nsec, ptr) == 0) {
-			*flags |= FLG_NOEXIST_WILDCARD;
-			break;
-		}
-
-		/* Remove added leftmost asterisk. */
-		ptr += 2;
-	}
-
-	knot_dname_free(&name_copy, pool);
-	return kr_ok();
-}
-
-int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
-                             const knot_dname_t *name, uint16_t type, mm_ctx_t *pool)
+int kr_nsec_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                   const knot_dname_t *sname, uint16_t stype)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec) {
+	if (!sec || !sname) {
 		return kr_error(EINVAL);
 	}
 
@@ -216,17 +255,101 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 		if (rrset->type != KNOT_RRTYPE_NSEC) {
 			continue;
 		}
-		if (knot_dname_is_equal(rrset->owner, name)) {
-			rr_type_existence_denial(&flags, rrset, sec, type);
-		} else {
-			rrset_existence_denial(&flags, rrset, name, pool);
+		if (knot_dname_is_equal(rrset->owner, sname)) {
+			ret = no_data_response_check_rrtype(&flags, rrset, stype);
+			if (ret != 0) {
+				return ret;
+			}
 		}
 	}
 
-	if (((flags & FLG_NOEXIST_RRTYPE) || (flags & FLG_NOEXIST_RRSET)) &&
-	    (flags & FLG_NOEXIST_WILDCARD)) {
-		ret = kr_ok();
+	return (flags & FLG_NOEXIST_RRTYPE) ? kr_ok() : kr_error(ENOENT);
+}
+
+/**
+ * Wildcard no data response check (RFC4035 3.1.3.4).
+ * @param flags Flags to be set according to check outcome.
+ * @param nsec  NSEC RR.
+ * @param name Name to be checked.
+ * @param type Type to be checked.
+ * @return      0 or error code.
+ */
+static int wildcard_no_data_response_check(int *flags, const knot_rrset_t *nsec,
+                                           const knot_dname_t *name, uint16_t type)
+{
+	assert(flags && nsec && name);
+
+	if (kr_nsec_nomatch_validate(nsec, name) == 0) {
+		*flags |= FLG_NOEXIST_RRSET;
 	}
 
-	return ret;
+	const knot_dname_t *nsec_own = nsec->owner;
+	if (knot_dname_is_wildcard(nsec_own)) {
+		nsec_own = knot_wire_next_label(nsec_own, NULL);
+
+		if (knot_dname_is_sub(name, nsec_own)) {
+			uint8_t *bm = NULL;
+			uint16_t bm_size;
+			knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+			if (!bm) {
+				return kr_error(EINVAL);
+			}
+
+			if (!kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+				*flags |= FLG_NOEXIST_CLOSER;
+			}
+		}
+	}
+
+	return kr_ok();
+}
+
+int kr_nsec_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                            const knot_dname_t *sname, uint16_t stype)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = kr_error(ENOENT);
+	int flags = 0;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC) {
+			continue;
+		}
+		ret = wildcard_no_data_response_check(&flags, rrset, sname, stype);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+
+	return ((flags & FLG_NOEXIST_RRSET) && (flags & FLG_NOEXIST_CLOSER)) ? kr_ok() : kr_error(ENOENT);
+	/* TODO */
+}
+
+int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
+                             const knot_dname_t *sname, uint16_t stype, mm_ctx_t *pool)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	int flags = 0;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC) {
+			continue;
+		}
+		if (knot_dname_is_equal(rrset->owner, sname)) {
+			no_data_response_check_rrtype(&flags, rrset, stype);
+			no_data_wildcard_existence_check(&flags, rrset, sec);
+		} else {
+			name_error_response_check_rr(&flags, rrset, sname, pool);
+		}
+	}
+
+	return kr_nsec_existence_denied(flags) ? kr_ok() : kr_error(ENOENT);
 }
