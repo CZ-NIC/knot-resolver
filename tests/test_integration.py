@@ -10,6 +10,7 @@ import time
 import signal
 import stat
 import errno
+import jinja2
 from pydnstest import scenario, testserver, test
 from datetime import datetime
 
@@ -166,7 +167,7 @@ def find_objects(path):
             result.append(path)
     return result
 
-def setup_env(child_env, config, config_script):
+def setup_env(child_env, config, config_name, j2template):
     """ Set up test environment and config """
     # Clear test directory
     del_files(TMPDIR)
@@ -179,16 +180,14 @@ def setup_env(child_env, config, config_script):
     # Set up child process env() 
     child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
     child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
-    child_env["CONFIG_NO_MINIMIZE"] = "1"
+    no_mininize = "true"
     for k,v in config:
         # Enable selectively for some tests
         if k == 'query-minimization' and str2bool(v):
-            child_env["CONFIG_NO_MINIMIZE"] = "0"
+            no_mininize = "false"
             break
     selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
     childaddr = testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE)
-    child_env["CONFIG_SELF_ADDR"] = selfaddr
-    child_env["CONFIG_CHILD_ADDR"] = childaddr
     # Prebind to sockets to create necessary files
     # @TODO: this is probably a workaround for socket_wrapper bug
     for sock_type in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
@@ -198,12 +197,17 @@ def setup_env(child_env, config, config_script):
         if sock_type == socket.SOCK_STREAM:
             sock.listen(5)
     # Generate configuration
-    try :
-      subprocess.call(config_script, env=child_env)
-    except Exception as e:
-        raise Exception("Can't start configuraion script '%s': %s" % (config_script, str(e)))
+    j2template_ctx = {
+        "ROOT_ADDR" : selfaddr,
+        "SELF_ADDR" : childaddr,
+        "NO_MINIMIZE" : no_mininize
+    }
+    cfg_rendered = j2template.render(j2template_ctx)
+    f = open(os.path.join(TMPDIR,config_name), 'w')
+    f.write(cfg_rendered)
+    f.close()
 
-def play_object(path, binary_name, gencfg_script_name, binary_additional_pars):
+def play_object(path, binary_name, config_name, j2template, binary_additional_pars):
     """ Play scenario from a file object. """
 
     # Parse scenario
@@ -217,7 +221,7 @@ def play_object(path, binary_name, gencfg_script_name, binary_additional_pars):
 
     # Setup daemon environment
     daemon_env = os.environ.copy()
-    setup_env(daemon_env, config, gencfg_script_name)
+    setup_env(daemon_env, config, config_name, j2template)
     # Start binary
     binary_name = os.path.abspath(binary_name)
     daemon_proc = None
@@ -254,26 +258,33 @@ def test_platform(*args):
 
 if __name__ == '__main__':
 
-    if len(sys.argv) < 4:
-        print "Usage: test_integration.py <scenario> <cfg_script> <binary> [<additional>]"
+    if len(sys.argv) < 5:
+        print "Usage: test_integration.py <scenario> <binary> <template> <config name> [<additional>]"
         print "\t<scenario> - path to scenario"
-        print "\t<cfg_script> - script to generate configuration"
         print "\t<binary> - executable to test"
+        print "\t<template> - jinja2 template file to generate configuration"
+        print "\t<config name> - name of configuration file to be generated"
         print "\t<additional> - additional parameters for <binary>"
         sys.exit(0)
 
     path_to_scenario = ""
-    gencfg_script_name = ""
     binary_name = ""
+    template_name = ""
+    config_name = ""
     binary_additional_pars = []
 
-    if len(sys.argv) > 3:
-        path_to_scenario = sys.argv[1]
-        gencfg_script_name = sys.argv[2]
-        binary_name = sys.argv[3]
-
     if len(sys.argv) > 4:
-        binary_additional_pars = sys.argv[4:]
+        path_to_scenario = sys.argv[1]
+        binary_name = sys.argv[2]
+        template_name = sys.argv[3]
+        config_name = sys.argv[4]
+
+    if len(sys.argv) > 5:
+        binary_additional_pars = sys.argv[5:]
+
+    j2template_loader = jinja2.FileSystemLoader(searchpath=os.path.dirname(os.path.abspath(__file__)))
+    j2template_env = jinja2.Environment(loader=j2template_loader)
+    j2template = j2template_env.get_template(template_name)
 
     # Self-tests first
     test = test.Test()
@@ -285,5 +296,5 @@ if __name__ == '__main__':
         for arg in [path_to_scenario]:
             objects = find_objects(arg)
             for path in objects:
-                test.add(path, play_object, path, binary_name, gencfg_script_name, binary_additional_pars)
+                test.add(path, play_object, path, binary_name, config_name, j2template, binary_additional_pars)
         sys.exit(test.run())

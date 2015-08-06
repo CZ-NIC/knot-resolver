@@ -1,0 +1,7 @@
+net.listen('{{SELF_ADDR}}',53)
+cache.size = 10*MB
+modules = {'hints'}
+hints.root({['k.root-servers.net'] = '{{ROOT_ADDR}}'})
+option('NO_MINIMIZE', {{NO_MINIMIZE}})
+option('ALLOW_LOCAL', true)
+
