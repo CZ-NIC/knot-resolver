@@ -17,11 +17,6 @@ def str2bool(v):
     """ Return conversion of JSON-ish string value to boolean. """ 
     return v.lower() in ('yes', 'true', 'on')
 
-# Test debugging
-TEST_DEBUG = 0
-if 'TEST_DEBUG' in os.environ:
-    TEST_DEBUG = int(os.environ['TEST_DEBUG'])
-
 def del_files(path_to):
     for root, dirs, files in os.walk(path_to):
         for f in files:
@@ -34,8 +29,6 @@ TMPDIR = ""
 if "SOCKET_WRAPPER_DEFAULT_IFACE" in os.environ:
    DEFAULT_IFACE = int(os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"])
 if DEFAULT_IFACE < 2 or DEFAULT_IFACE > 254 :
-    if TEST_DEBUG > 0:
-        testserver.syn_print(None,"SOCKET_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default (10)".format(DEFAULT_IFACE))
     DEFAULT_IFACE = 10
     os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"]="{}".format(DEFAULT_IFACE)
 
@@ -46,8 +39,6 @@ if CHILD_IFACE < 2 or CHILD_IFACE > 254 or CHILD_IFACE == DEFAULT_IFACE:
     CHILD_IFACE = DEFAULT_IFACE + 1
     if CHILD_IFACE > 254:
         CHILD_IFACE = 2
-    if TEST_DEBUG > 0:
-        testserver.syn_print(None,"KRESD_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default ({})".format(OLD_CHILD_IFACE, CHILD_IFACE))
     os.environ["KRESD_WRAPPER_DEFAULT_IFACE"] = "{}".format(CHILD_IFACE)
 
 if "SOCKET_WRAPPER_DIR" in os.environ:
@@ -56,11 +47,6 @@ if TMPDIR == "" or os.path.isdir(TMPDIR) is False:
     OLDTMPDIR = TMPDIR
     TMPDIR = tempfile.mkdtemp(suffix='', prefix='tmp')
     os.environ["SOCKET_WRAPPER_DIR"] = TMPDIR
-    if TEST_DEBUG > 0:
-        testserver.syn_print(None,"SOCKET_WRAPPER_DIR is invalid or empty ({}), set to default ({})".format(OLDTMPDIR, TMPDIR))
-
-if TEST_DEBUG > 0:
-    testserver.syn_print(None,"default_iface: {}, child_iface: {}, tmpdir {}".format(DEFAULT_IFACE, CHILD_IFACE, TMPDIR))
 
 def get_next(file_in):
     """ Return next token from the input stream. """

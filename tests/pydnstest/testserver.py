@@ -1,47 +1,23 @@
 import threading
-import select, socket, struct, sys, os, time
+import select
+import socket
+import os
+import time
 import dns.message
 import dns.rdatatype
-import test
-import binascii
-import re
 import itertools
-import inspect
-
-# Test debugging
-TEST_DEBUG = 0
-if 'TEST_DEBUG' in os.environ:
-    TEST_DEBUG = int(os.environ['TEST_DEBUG'])
-
-g_lock = threading.Lock()
-def syn_print(tag, *args):
-    """ Print message with some debug information included. """
-    g_lock.acquire()
-    if tag is None:
-        tag = inspect.stack()[1][3]
-    for s in args:
-        print "[{:<12}][{}] {}".format(tag,threading.current_thread().name,s)
-    g_lock.release()
 
 def recvfrom_msg(stream):
     """ Receive DNS/UDP message. """
-    if TEST_DEBUG > 0:
-        syn_print(None, "incoming data")
     data, addr = stream.recvfrom(4096)
-    if TEST_DEBUG > 0:
-        syn_print(None, "received {len} butes from {addr}".format(len=len(data),addr=addr))
     return dns.message.from_wire(data), addr
 
 def sendto_msg(stream, message, addr):
     """ Send DNS/UDP message. """
-    if TEST_DEBUG > 0:
-        syn_print(None, "outgoing data")
     try:
         stream.sendto(message, addr)
     except: # Failure to respond is OK, resolver should recover
         pass
-    if TEST_DEBUG > 0:
-        syn_print(None,"{len} bytes sent to {addr}".format(len=len(message),addr=addr))
 
 def get_local_addr_str(family, iface):
     """ Returns pattern string for localhost address  """
@@ -71,8 +47,6 @@ class TestServer:
 
     def __init__(self, scenario, config, d_iface, p_iface):
         """ Initialize server instance. """
-        if TEST_DEBUG > 0:
-            syn_print(None, "initialization")
         self.thread = None
         self.srv_socks = []
         self.client_socks = []
@@ -84,24 +58,17 @@ class TestServer:
         self.cur_iface = self.start_iface
         self.kroot_local = None
         self.kroot_family = None
-
         self.default_iface = d_iface
         self.peer_iface = p_iface
-
         self.map_adresses()
-
 
     def __del__(self):
         """ Cleanup after deletion. """
-        if TEST_DEBUG > 0:
-            syn_print(None, "cleanup")
         if self.active is True:
             self.stop()
 
     def start(self):
         """ Synchronous start """
-        if TEST_DEBUG > 0:
-            syn_print(None, "start")
         if self.active is True:
             raise Exception('TestServer already started')
         self.active = True
@@ -109,23 +76,15 @@ class TestServer:
 
     def stop(self):
         """ Stop socket server operation. """
-        if TEST_DEBUG > 0:
-            syn_print(None,"stop")
         self.active = False
         self.thread.join()
         for srv_sock in self.srv_socks:
-            if TEST_DEBUG > 0:
-                syn_print(None, "closing socket {name}".format(name=srv_sock.getsockname()))
             srv_sock.close()
         for client_sock in self.client_socks:
-            if TEST_DEBUG > 0:
-                syn_print(None, "closing client socket {name}".format(name=client_sock.getsockname()))
             client_sock.close()
         self.client_socks = []
         self.srv_socks = []
         self.scenario = None
-        if TEST_DEBUG > 0:
-            syn_print(None, "server stopped")
 
     def map_to_local(self, addr, family, iface):
         """ Maps arbitrary IP to localhost for using with cwrap """
@@ -142,7 +101,6 @@ class TestServer:
             if am.family == family and am.external == addr_external:
                  addr_local = am.local
                  new_entry = False
-                  
         if addr_local is None:
             addr_local = get_local_addr_str(family, iface)
             am = AddrMapInfo(family,addr_local,addr_external)
@@ -176,30 +134,13 @@ class TestServer:
                 self.cur_iface = self.cur_iface + 1
         return local_address, family
 
-    def get_external(self, local_address, family):
-        """ Fetches external address mapped to local_address """
-        external_address = None
-        for am in self.addr_map:
-            if am.local == local_address and am.family == family:
-                external_address = am.external
-
-        return external_address
-
-
     def map_entries(self, entrylist):
         """ Translate addresses for A and AAAA records"""
         for entry in entrylist :
             for rr in itertools.chain(entry.message.answer,entry.message.additional,entry.message.question,entry.message.authority):
-                if TEST_DEBUG > 0:
-                    syn_print(None,"rrset = {}".format(rr))
                 for rd in rr:
                     if rd.rdtype == dns.rdatatype.A or rd.rdtype == dns.rdatatype.AAAA:
                          rd_local_address, family = self.get_local(rd.address,False)
-                         if TEST_DEBUG > 0:
-                             if rd_local_address is None:
-                                 syn_print(None,"!!! rd address %s not translated" % (rd.to_text()))
-                             else:
-                                 syn_print(None,"rd address %s translated to %s" % (rd.to_text(),rd_local_address))
                          rd.address = rd_local_address
 
     def map_adresses(self):
@@ -209,8 +150,6 @@ class TestServer:
             self.kroot_family = socket.AF_INET
             self.kroot_local = get_local_addr_str(self.kroot_family, self.default_iface)
             return
-        if TEST_DEBUG > 0:
-            syn_print(None,"translating config")
         kroot_addr = None
         for k, v in self.config:
             if k == 'stub-addr':
@@ -219,24 +158,12 @@ class TestServer:
             self.kroot_local, self.kroot_family = self.get_local(kroot_addr, True)
             if self.kroot_local is None:
                 raise Exception("[map_adresses] Invalid K.ROOT-SERVERS.NET. address, check the config")
-
-            if TEST_DEBUG > 0:
-                syn_print(None,"K.ROOT-SERVERS.NET. %s translated to %s" % (kroot_addr, self.kroot_local))
-        else:
-            if TEST_DEBUG > 0:
-                syn_print(None,"K.ROOT-SERVERS.NET. address not found")
-        if TEST_DEBUG > 0:
-            syn_print(None,"translating ranges")
         for rng in self.scenario.ranges :
             range_local_address, family = self.get_local(rng.address, False)
             if range_local_address is None:
                 raise Exception("[map_adresses] Error translating address '%s', check the config" % rng.address)
-            if TEST_DEBUG > 0:
-                syn_print(None,"range addr '%s' translated to '%s'" % (rng.address, range_local_address))
             rng.address = range_local_address
             self.map_entries(rng.stored)
-        if TEST_DEBUG > 0:
-            syn_print(None,"translating steps")
         for stp in self.scenario.steps :
             self.map_entries(stp.data)
     
@@ -251,45 +178,19 @@ class TestServer:
         """ Handle incoming queries. """
         client_address = client.client_address
         query, addr = recvfrom_msg(client)
-        if TEST_DEBUG > 0:
-            syn_print(None, "incoming query from {}; client address {}, mapped to external {}".format(addr, client_address, self.get_external(client_address, client.family)))
-        if TEST_DEBUG > 1:
-            syn_print(None,"========= INCOMING QUERY START =========")
-            syn_print(None,query)
-            syn_print(None,"========= INCOMING QUERY END   =========")
         if query is None:
-            if TEST_DEBUG > 0:
-                syn_print(None,"Empty query")
             return False
         response = dns.message.make_response(query)
         is_raw_data = False
         if self.scenario is not None:
-            if TEST_DEBUG > 0:
-                syn_print(None,"get scenario reply")
             response, is_raw_data = self.scenario.reply(query, client_address)
         if response:
-            if TEST_DEBUG > 0:
-                syn_print(None,"sending answer")
-            if TEST_DEBUG > 1:
-                syn_print(None,"========= RESPONSE START =========")
-                syn_print(None,response)
-                syn_print(None,"========= RESPONSE END =========")
-
-
-            if TEST_DEBUG > 1:
-                syn_print(None, "parse response")
             if is_raw_data is False:
                 for rr in itertools.chain(response.answer,response.additional,response.question,response.authority):
-                    if TEST_DEBUG > 1:
-                        syn_print(None,"rrset = {}".format(rr))
                     for rd in rr:
                         if rd.rdtype == dns.rdatatype.A:
-                            if TEST_DEBUG > 1:
-                                 syn_print(None,"rd address =", rd.address)
                             self.start_srv(rd.address, socket.AF_INET)
                         elif rd.rdtype == dns.rdatatype.AAAA:
-                            if TEST_DEBUG > 1:
-                                syn_print(None,"rd address =", rd.address)
                             self.start_srv(rd.address, socket.AF_INET6)
                 sendto_msg(client, response.to_wire(), addr)
             else:
@@ -297,8 +198,6 @@ class TestServer:
 
             return True
         else:
-            if TEST_DEBUG > 0:
-                syn_print(None,"response is NULL, sending RECVFAIL")
             response = dns.message.make_response(query)
             response.rcode = dns.rcode.SERVFAIL
             sendto_msg(client, response.to_wire(), addr)
@@ -308,25 +207,15 @@ class TestServer:
         """ Main server process """
         if self.active is False:
             raise Exception("[query_io] Test server not active")
-        if TEST_DEBUG > 0:
-            syn_print(None,"UDP query io handler started")
-
         while self.active is True:
            to_read, _, to_error = select.select(self.srv_socks, [], self.srv_socks, 0.1)
            for sock in to_read:
               self.handle_query(sock)
            for sock in to_error:
-              if TEST_DEBUG > 0:
-                  syn_print(None,"Error for socket {}".format(sock.getsockname()))
               raise Exception("[query_io] Socket IO error {}, exit".format(sock.getsockname()))
-        if TEST_DEBUG > 0:
-            syn_print(None,"UDP query io handler exit")
-
 
     def start_srv(self, address = None, family = socket.AF_INET, port = 53):
         """ Starts listening thread if necessary """
-        if TEST_DEBUG > 0:
-            syn_print(None,"starting socket; type {} {} {}".format(family,address,port))
         if family == None:
             family = socket.AF_INET
         if family == socket.AF_INET:
@@ -338,7 +227,6 @@ class TestServer:
             if address == '' or address is None:
                 address = "::1"
         else:
-            syn_print(None, "unsupported socket type {sock_type}".format(sock_type=type))
             raise Exception("[start_srv] unsupported socket type {sock_type}".format(sock_type=type))
 	if port == 0 or port is None:
             port = 53
@@ -349,8 +237,6 @@ class TestServer:
 
         for srv_sock in self.srv_socks:
             if srv_sock.family == family and srv_sock.client_address == address :
-                if TEST_DEBUG > 0:
-                    syn_print(None, "server socket {} already started".format(srv_sock.getsockname()) )
                 return srv_sock.getsockname()
     
         addr_info = socket.getaddrinfo(address,port,family,0,socket.IPPROTO_UDP)
@@ -361,8 +247,6 @@ class TestServer:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.srv_socks.append(sock)
         sockname = sock.getsockname()
-        if TEST_DEBUG > 0:
-            syn_print(None, "server socket {} started".format(sockname))
         return sockname
 
     def play(self):
@@ -371,26 +255,22 @@ class TestServer:
         self.scenario.play(saddr,paddr)
 
 if __name__ == '__main__':
-
     # Self-test code
     DEFAULT_IFACE = 0
     CHILD_IFACE = 0
     if "SOCKET_WRAPPER_DEFAULT_IFACE" in os.environ:
        DEFAULT_IFACE = int(os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"])
     if DEFAULT_IFACE < 2 or DEFAULT_IFACE > 254 :
-        if TEST_DEBUG > 0:
-            syn_print(None,"SOCKET_WRAPPER_DEFAULT_IFACE is invalid ({}), set to default (10)".format(DEFAULT_IFACE))
         DEFAULT_IFACE = 10
         os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"]="{}".format(DEFAULT_IFACE)
-
     # Mirror server
     server = TestServer(None,None,DEFAULT_IFACE,DEFAULT_IFACE)
     server.start()
-    syn_print("main","[==========] Mirror server running at", server.address())
+    print "[==========] Mirror server running at", server.address()
     try:
         while True:
 	    time.sleep(0.5)
     except KeyboardInterrupt:
-        syn_print("main","[==========] Shutdown.")
+        print "[==========] Shutdown."
         pass
     server.stop()
