@@ -54,18 +54,24 @@ bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t 
 	return false;
 }
 
-int kr_nsec_nomatch_validate(const knot_rrset_t *nsec, const knot_dname_t *name)
+/**
+ * Check whether the NSEC RR proves that there is no closer match for <SNAME, SCLASS>.
+ * @param nsec  NSEC RRSet.
+ * @param sname Searched name.
+ * @return      0 or error code.
+ */
+static int nsec_nonamematch(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
+	assert(nsec && sname);
+
 	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
 
-	if ((knot_dname_cmp(nsec->owner, name) < 0) &&
-	    (knot_dname_cmp(name, next) < 0)) {
+	if ((knot_dname_cmp(nsec->owner, sname) < 0) &&
+	    (knot_dname_cmp(sname, next) < 0)) {
 		return kr_ok();
 	} else {
 		return kr_error(EINVAL);
 	}
-
-#warning TODO: Is an additional request for NSEC name or wildcard necessary?
 }
 
 #define FLG_NOEXIST_RRTYPE 0x01 /**< <SNAME, SCLASS> exists, <SNAME, SCLASS, STYPE> does not exist. */
@@ -95,7 +101,7 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 {
 	assert(flags && nsec && name);
 
-	if (kr_nsec_nomatch_validate(nsec, name) == 0) {
+	if (nsec_nonamematch(nsec, name) == 0) {
 		*flags |= FLG_NOEXIST_RRSET;
 	}
 
@@ -110,7 +116,7 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 		*(--ptr) = '*';
 		*(--ptr) = 1;
 
-		if (kr_nsec_nomatch_validate(nsec, ptr) == 0) {
+		if (nsec_nonamematch(nsec, ptr) == 0) {
 			*flags |= FLG_NOEXIST_WILDCARD;
 			break;
 		}
@@ -279,7 +285,7 @@ static int wildcard_no_data_response_check(int *flags, const knot_rrset_t *nsec,
 {
 	assert(flags && nsec && name);
 
-	if (kr_nsec_nomatch_validate(nsec, name) == 0) {
+	if (nsec_nonamematch(nsec, name) == 0) {
 		*flags |= FLG_NOEXIST_RRSET;
 	}
 
@@ -326,7 +332,27 @@ int kr_nsec_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section_
 	}
 
 	return ((flags & FLG_NOEXIST_RRSET) && (flags & FLG_NOEXIST_CLOSER)) ? kr_ok() : kr_error(ENOENT);
-	/* TODO */
+}
+
+int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                           const knot_dname_t *sname)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC) {
+			continue;
+		}
+		if (nsec_nonamematch(rrset, sname) == 0) {
+			return kr_ok();
+		}
+	}
+
+	return kr_error(ENOENT);
 }
 
 int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,

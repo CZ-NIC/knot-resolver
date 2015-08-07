@@ -30,15 +30,6 @@
 bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t type);
 
 /**
- * Check the non-existence of an exact/closer match according to RFC4035 5.4, bullet 2.
- * @note No signatures are checked.
- * @param nsec NSEC RRSet containing a single record.
- * @param name Domain name checked against the NSEC record.
- * @return     0 or error code.
- */
-//int kr_nsec_nomatch_validate(const knot_rrset_t *nsec, const knot_dname_t *name);
-
-/**
  * Name error response check (RFC4035 3.1.3.2; RFC4035 5.4, bullet 2).
  * @note No RRSIGs are validated.
  * @param pkt        Packet structure to be processed.
@@ -71,6 +62,17 @@ int kr_nsec_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section
  */
 int kr_nsec_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
                                             const knot_dname_t *sname, uint16_t stype);
+
+/**
+ * Wildcard answer response check (RFC4035 3.1.3.3).
+ *
+ * @param pkt        Packet structure to be processed.
+ * @param section_id Packet section to be processed.
+ * @param sname      Name to be checked.
+ * @return           0 or error code.
+ */
+int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                           const knot_dname_t *sname);
 
 /**
  * Authenticated denial of existence according to RFC4035 5.4.

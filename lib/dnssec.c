@@ -144,45 +144,6 @@ static int wildcard_radix_len_diff(const knot_dname_t *expanded,
 	return knot_dname_labels(expanded, NULL) - knot_rrsig_labels(&rrsigs->rrs, sig_pos);
 }
 
-/**
- * Validates the non-existence of closer/exact match.
- * @param pkt        Packet to be validated.
- * @param section_id Section to work with.
- * @param name       The name to be checked.
- * @return           0 or error code.
- */
-static int closer_match_nonexistence_validate(const knot_pkt_t *pkt, knot_section_t section_id,
-                                              const knot_dname_t *name)
-{
-	if (!pkt || !name) {
-		return kr_error(EINVAL);
-	}
-
-	/* Signatures are checked elsewhere. */
-
-	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec) {
-		return kr_error(EINVAL);
-	}
-	for (unsigned i = 0; i < sec->count; ++i) {
-		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if ((rrset->type != KNOT_RRTYPE_NSEC) &&
-		    (rrset->type != KNOT_RRTYPE_NSEC3)) {
-			continue;
-		}
-		if (rrset->type == KNOT_RRTYPE_NSEC) {
-			if (kr_nsec_nomatch_validate(rrset, name) == 0) {
-				return kr_ok();
-			}
-		} else {
-#warning TODO: NSEC3 currently not supported
-			return kr_error(ENOSYS);
-		}
-	}
-
-	return kr_error(EINVAL);
-}
-
 int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
                       const knot_rrset_t *covered, const knot_rrset_t *keys,
                       const knot_dname_t *zone_name, uint32_t timestamp)
@@ -246,7 +207,7 @@ int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
 				continue;
 			}
 			if (val_flgs & FLG_WILDCARD_EXPANSION) {
-				if (closer_match_nonexistence_validate(pkt, KNOT_AUTHORITY, covered->owner) != 0) {
+				if (kr_nsec_wildcard_answer_response_check(pkt, KNOT_AUTHORITY, covered->owner) != 0) {
 					continue;
 				}
 			}
