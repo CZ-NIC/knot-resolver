@@ -61,30 +61,34 @@ function policy.evaluate(policy, req, query)
 	return policy.PASS
 end
 
+-- @function Enforce policy action
+function policy.enforce(state, req, action)
+	if action == policy.DENY then
+		-- Write authority information
+		local answer = req.answer
+		answer:rcode(kres.rcode.NXDOMAIN)
+		answer:begin(kres.section.AUTHORITY)
+		answer:put('\7blocked', 900, answer:qclass(), kres.type.SOA,
+			'\7blocked\0\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
+		return kres.DONE
+	elseif action == policy.DROP then
+		return kres.FAIL
+	elseif action == policy.TC then
+		local answer = req.answer
+		if answer.max_size ~= 65535 then
+			answer:tc(1) -- ^ Only UDP queries
+			return kres.DONE
+		end
+	end
+	return state
+end
+
 -- @function policy layer implementation
 policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
 		local action = policy:evaluate(req, req:current())
-		if action == policy.DENY then
-			-- Write authority information
-			local answer = req.answer
-			answer:rcode(kres.rcode.NXDOMAIN)
-			answer:begin(kres.section.AUTHORITY)
-			answer:put('\7blocked', 900, answer:qclass(), kres.type.SOA,
-				'\7blocked\0\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
-			return kres.DONE
-		elseif action == policy.DROP then
-			return kres.FAIL
-		elseif action == policy.TC then
-			local answer = req.answer
-			print(answer.max_size)
-			if answer.max_size ~= 65535 then
-				answer:tc(1) -- ^ Only UDP queries
-				return kres.DONE
-			end
-		end
-		return state
+		return policy.enforce(state, req, action)
 	end
 }
 

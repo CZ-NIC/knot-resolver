@@ -85,4 +85,9 @@ const char *kr_inaddr(const struct sockaddr *addr);
 /** Address length for given family. */
 int kr_inaddr_len(const struct sockaddr *addr);
 /** Return address type for string. */
-int kr_inaddr_family(const char *addr);
+int kr_straddr_family(const char *addr);
+/** Parse address and return subnet length (bits).
+  * @warning 'dst' must be at least `sizeof(struct in6_addr)` long. */
+int kr_straddr_subnet(void *dst, const char *addr);
+/** Compare memory bitwise. */
+int kr_bitcmp(const char *a, const char *b, int bits);

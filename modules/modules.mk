@@ -17,6 +17,7 @@ ifeq ($(HAS_lua),yes)
 modules_TARGETS += ketcd \
                    graphite \
                    policy \
+                   view \
                    predict
 endif
 

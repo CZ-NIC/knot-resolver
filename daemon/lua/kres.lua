@@ -185,7 +185,7 @@ local sockaddr_t = ffi.typeof('struct sockaddr')
 ffi.metatype( sockaddr_t, {
 	__index = {
 		len = function(sa) return C.kr_inaddr_len(sa) end,
-		addr = function (sa) return ffi.string(C.kr_inaddr(sa), C.kr_inaddr_len(sa)) end,
+		ip = function (sa) return C.kr_inaddr(sa) end,
 	}
 })
 
