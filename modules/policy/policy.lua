@@ -1,13 +1,13 @@
 local kres = require('kres')
-local block = {
+local policy = {
 	-- Policies
-	PASS = 1, DENY = 2, DROP = 3,
+	PASS = 1, DENY = 2, DROP = 3, TC = 4,
 	-- Special values
 	ANY = 0,
 }
 
--- @function Block requests which QNAME matches given zone list (i.e. suffix match)
-function block.suffix(action, zone_list)
+-- @function Requests which QNAME matches given zone list (i.e. suffix match)
+function policy.suffix(action, zone_list)
 	local AC = require('aho-corasick')
 	local tree = AC.build(zone_list)
 	return function(req, query)
@@ -20,7 +20,7 @@ function block.suffix(action, zone_list)
 end
 
 -- @function Check for common suffix first, then suffix match (specialized version of suffix match)
-function block.suffix_common(action, suffix_list, common_suffix)
+function policy.suffix_common(action, suffix_list, common_suffix)
 	local common_len = string.len(common_suffix)
 	local suffix_count = #suffix_list
 	return function(req, query)
@@ -40,8 +40,8 @@ function block.suffix_common(action, suffix_list, common_suffix)
 	end
 end
 
--- @function Block QNAME pattern
-function block.pattern(action, pattern)
+-- @function policy QNAME pattern
+function policy.pattern(action, pattern)
 	return function(req, query)
 		if string.find(query:name(), pattern) then
 			return action
@@ -50,44 +50,51 @@ function block.pattern(action, pattern)
 	end
 end
 
--- @function Evaluate packet in given rules to determine block action
-function block.evaluate(block, req, query)
-	for i = 1, #block.rules do
-		local action = block.rules[i](req, query)
+-- @function Evaluate packet in given rules to determine policy action
+function policy.evaluate(policy, req, query)
+	for i = 1, #policy.rules do
+		local action = policy.rules[i](req, query)
 		if action ~= nil then
 			return action
 		end
 	end
-	return block.PASS
+	return policy.PASS
 end
 
--- @function Block layer implementation
-block.layer = {
+-- @function policy layer implementation
+policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
-		local action = block:evaluate(req, req:current())
-		if action == block.DENY then
+		local action = policy:evaluate(req, req:current())
+		if action == policy.DENY then
 			-- Write authority information
 			local answer = req.answer
 			answer:rcode(kres.rcode.NXDOMAIN)
 			answer:begin(kres.section.AUTHORITY)
-			answer:put('\5block', 900, answer:qclass(), kres.type.SOA,
-				'\5block\0\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
+			answer:put('\7blocked', 900, answer:qclass(), kres.type.SOA,
+				'\7blocked\0\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
 			return kres.DONE
-		elseif action == block.DROP then
+		elseif action == policy.DROP then
 			return kres.FAIL
+		elseif action == policy.TC then
+			local answer = req.answer
+			print(answer.max_size)
+			if answer.max_size ~= 65535 then
+				answer:tc(1) -- ^ Only UDP queries
+				return kres.DONE
+			end
 		end
 		return state
 	end
 }
 
--- @function Add rule to block list
-function block.add(block, rule)
-	return table.insert(block.rules, rule)
+-- @function Add rule to policy list
+function policy.add(policy, rule)
+	return table.insert(policy.rules, rule)
 end
 
 -- @function Convert list of string names to domain names
-function block.to_domains(names)
+function policy.to_domains(names)
 	for i, v in ipairs(names) do
 		names[i] = v:gsub('([^.]*%.)', function (x)
 			return string.format('%s%s', string.char(x:len()-1), x:sub(1,-2))
@@ -133,9 +140,9 @@ local private_zones = {
 	'b.e.f.ip6.arpa.',
 	'8.b.d.0.1.0.0.2.ip6.arpa',
 }
-block.to_domains(private_zones)
+policy.to_domains(private_zones)
 
 -- @var Default rules
-block.rules = { block.suffix_common(block.DENY, private_zones, '\4arpa') }
+policy.rules = { policy.suffix_common(policy.DENY, private_zones, '\4arpa') }
 
-return block
+return policy

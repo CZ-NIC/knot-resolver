@@ -1,11 +1,12 @@
-.. _mod-block:
+.. _mod-policy:
 
-Query blocking
+Query policies 
 --------------
 
-This module can block queries (and subrequests) based on user-defined policies.
+This module can block, rewrite, or alter queries based on user-defined policies.
 By default, it blocks queries to reverse lookups in private subnets as per :rfc:`1918`, :rfc:`5735` and :rfc:`5737`.
 You can however extend it to deflect `Slow drip DNS attacks <https://blog.secure64.com/?p=377>`_ for example, or gray-list resolution of misbehaving zones.
+It supports a subset of the ISC RPZ_ format.
 
 There are two policies implemented:
 
@@ -15,11 +16,12 @@ There are two policies implemented:
   - applies action if QNAME suffix matches given list of suffixes (useful for "is domain in zone" rules),
   uses `Aho-Corasick`_ string matching algorithm implemented by `@jgrahamc`_ (CloudFlare, Inc.) (BSD 3-clause)
 
-There are three action:
+There are several defined actions:
 
 * ``PASS`` - let the query pass through
 * ``DENY`` - return NXDOMAIN answer
 * ``DROP`` - terminate query resolution, returns SERVFAIL to requestor
+* ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
 
 .. note:: The module (and ``kres``) treats domain names as wire, not textual representation. So each label in name is prefixed with its length, e.g. "example.com" equals to "\7example\3com".
 
@@ -28,54 +30,55 @@ Example configuration
 
 .. code-block:: lua
 
-	-- Load default block rules
-	modules = { 'block' }
+	-- Load default policies
+	modules = { 'policy' }
 	-- Whitelist 'www[0-9].badboy.cz'
-	block:add(block.pattern(block.PASS, '\4www[0-9]\6badboy\2cz'))
+	policy:add(policy.pattern(policy.PASS, '\4www[0-9]\6badboy\2cz'))
 	-- Block all names below badboy.cz
-	block:add(block.suffix(block.DENY, {'\6badboy\2cz'}))
+	policy:add(policy.suffix(policy.DENY, {'\6badboy\2cz'}))
 	-- Custom rule
-	block:add(function (req, query)
+	policy:add(function (req, query)
 		if query:qname():find('%d.%d.%d.224\7in-addr\4arpa') then
-			return block.DENY
+			return policy.DENY
 		end
 	end)
 	-- Disallow ANY queries
-	block:add(function (req, query)
+	policy:add(function (req, query)
 		if query.type == kres.type.ANY then
-			return block.DROP
+			return policy.DROP
 		end
 	end)
 
 Properties
 ^^^^^^^^^^
 
-.. envvar:: block.PASS (number)
-.. envvar:: block.DENY (number)
-.. envvar:: block.DROP (number)
+.. envvar:: policy.PASS (number)
+.. envvar:: policy.DENY (number)
+.. envvar:: policy.DROP (number)
+.. envvar:: policy.TC   (number)
 
-.. function:: block:add(rule)
+.. function:: policy:add(rule)
 
-  :param rule: added rule, i.e. ``block.pattern(block.DENY, '[0-9]+\2cz')``
+  :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
   :param pattern: regular expression
   
   Policy to block queries based on the QNAME regex matching.
 
-.. function:: block.pattern(action, pattern)
+.. function:: policy.pattern(action, pattern)
 
   :param action: action if the pattern matches QNAME
   :param pattern: regular expression
   
   Policy to block queries based on the QNAME regex matching.
 
-.. function:: block.suffix(action, suffix_table)
+.. function:: policy.suffix(action, suffix_table)
 
   :param action: action if the pattern matches QNAME
   :param suffix_table: table of valid suffixes
   
   Policy to block queries based on the QNAME suffix match.
 
-.. function:: block.suffix_common(action, suffix_table[, common_suffix])
+.. function:: policy.suffix_common(action, suffix_table[, common_suffix])
 
   :param action: action if the pattern matches QNAME
   :param suffix_table: table of valid suffixes
@@ -86,4 +89,4 @@ Properties
 
 .. _`Aho-Corasick`: https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
 .. _`@jgrahamc`: https://github.com/jgrahamc/aho-corasick-lua
-
+.. _RPZ: https://dnsrpz.info/
