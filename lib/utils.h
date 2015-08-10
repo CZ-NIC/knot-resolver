@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <sys/time.h>
+#include <netinet/in.h>
 #include <libknot/packet/pkt.h>
 
 /*
@@ -78,3 +79,10 @@ int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *ha
 /** Construct and put record to packet. */
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
+
+/** Address bytes for given family. */
+const char *kr_inaddr(const struct sockaddr *addr);
+/** Address length for given family. */
+int kr_inaddr_len(const struct sockaddr *addr);
+/** Return address type for string. */
+int kr_inaddr_family(const char *addr);

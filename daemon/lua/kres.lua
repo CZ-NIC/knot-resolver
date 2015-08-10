@@ -3,7 +3,9 @@
 
 local ffi = require('ffi')
 local bit = require('bit')
-local csym = ffi.C
+local bor = bit.bor
+local band = bit.band
+local C = ffi.C
 local knot = ffi.load('knot')
 ffi.cdef[[
 
@@ -88,11 +90,27 @@ struct pkt_rcode {
  * Data structures
  */
 
+/* stdlib */
+struct sockaddr {
+    uint16_t sa_family;
+    uint8_t _stub[]; /* Do not touch */
+};
+
 /* libknot */
 typedef struct node {
   struct node *next, *prev;
 } node_t;
 typedef uint8_t knot_dname_t;
+typedef struct knot_rdataset {
+	uint16_t count;
+	uint8_t *data;
+} knot_rdataset_t;
+typedef struct knot_rrset {
+	knot_dname_t *_owner;
+	uint16_t type;
+	uint16_t class;
+	knot_rdataset_t rr;
+} knot_rrset_t;
 typedef struct {
 	uint8_t *wire;
 	size_t size;
@@ -102,6 +120,8 @@ typedef struct {
 	uint16_t qname_size;
 	uint16_t rrset_count;
 	uint16_t flags;
+	knot_rrset_t *opt;
+	knot_rrset_t *tsig;
 	uint8_t _stub[]; /* Do not touch */
 } knot_pkt_t;
 
@@ -123,6 +143,10 @@ struct kr_rplan {
 struct kr_request {
 	struct kr_context *_ctx;
 	knot_pkt_t *answer;
+    struct {
+        const knot_rrset_t *key;
+        const struct sockaddr *addr;
+    } qsource;
 	uint32_t options;
 	int state;
 	uint8_t _stub[]; /* Do not touch */
@@ -152,11 +176,28 @@ struct kr_query *kr_rplan_current(struct kr_rplan *rplan);
 unsigned kr_rand_uint(unsigned max);
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
+const char *kr_inaddr(const struct sockaddr *addr);
+int kr_inaddr_len(const struct sockaddr *addr);
 ]]
 
+-- Metatype for sockaddr
+local sockaddr_t = ffi.typeof('struct sockaddr')
+ffi.metatype( sockaddr_t, {
+	__index = {
+		len = function(sa) return C.kr_inaddr_len(sa) end,
+		addr = function (sa) return ffi.string(C.kr_inaddr(sa), C.kr_inaddr_len(sa)) end,
+	}
+})
+
+-- Metatype for RR set
+local knot_rrset_t = ffi.typeof('knot_rrset_t')
+ffi.metatype( knot_rrset_t, {
+	__index = {
+		owner = function(rr) return ffi.string(rr._owner) end,
+	}
+})
+
 -- Metatype for packet
-local bor = bit.bor
-local band = bit.band
 local knot_pkt_t = ffi.typeof('knot_pkt_t')
 ffi.metatype( knot_pkt_t, {
 	__index = {
@@ -173,7 +214,7 @@ ffi.metatype( knot_pkt_t, {
 		end,
 		begin = function (pkt, section) return knot.knot_pkt_begin(pkt, section) end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
-			return csym.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, string.len(rdata))
+			return C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, string.len(rdata))
 		end
 	},
 })
@@ -190,7 +231,7 @@ ffi.metatype( kr_request_t, {
 	__index = {
 		current = function(req)
 			assert(req)
-			return csym.kr_rplan_current(csym.kr_resolve_plan(req))
+			return C.kr_rplan_current(C.kr_resolve_plan(req))
 		end,
 	},
 })

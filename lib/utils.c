@@ -25,6 +25,7 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "lib/generic/array.h"
+#include "lib/nsrep.h"
 
 /** @internal CSPRNG context */
 static isaac_ctx ISAAC;
@@ -172,4 +173,35 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 	knot_rdataset_add(&rr.rrs, rdata_arr, &pkt->mm);
 	/* Append RR */
 	return knot_pkt_put(pkt, 0, &rr, KNOT_PF_FREE);
+}
+
+const char *kr_inaddr(const struct sockaddr *addr)
+{
+	if (!addr) {
+		return NULL;
+	}
+	switch (addr->sa_family) {
+	case AF_INET:  return (const char *)&(((const struct sockaddr_in *)addr)->sin_addr);
+	case AF_INET6: return (const char *)&(((const struct sockaddr_in6 *)addr)->sin6_addr);
+	default:       return NULL;
+	}
+}
+
+int kr_inaddr_len(const struct sockaddr *addr)
+{
+	if (!addr) {
+		return kr_error(EINVAL);
+	}
+	return addr->sa_family == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr);
+}
+
+int kr_inaddr_family(const char *addr)
+{
+	if (!addr) {
+		return kr_error(EINVAL);
+	}
+	if (strchr(addr, ':')) {
+		return AF_INET6;
+	}
+	return AF_INET;
 }

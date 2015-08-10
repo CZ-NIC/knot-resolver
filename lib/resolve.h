@@ -126,6 +126,10 @@ struct kr_context
 struct kr_request {
     struct kr_context *ctx;
     knot_pkt_t *answer;
+    struct {
+        const knot_rrset_t *key;
+        const struct sockaddr *addr;
+    } qsource;
     uint32_t options;
     int state;
     struct kr_rplan rplan;
