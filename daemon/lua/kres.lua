@@ -155,6 +155,8 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 ]]
 
 -- Metatype for packet
+local bor = bit.bor
+local band = bit.band
 local knot_pkt_t = ffi.typeof('knot_pkt_t')
 ffi.metatype( knot_pkt_t, {
 	__index = {
@@ -162,10 +164,12 @@ ffi.metatype( knot_pkt_t, {
 		qclass = function(pkt) return knot.knot_pkt_qclass(pkt) end,
 		qtype  = function(pkt) return knot.knot_pkt_qtype(pkt) end,
 		rcode = function (pkt, val)
-			if val then
-				pkt.wire[3] = bit.bor(bit.band(pkt.wire[3], 0xf0), val)
-			end
-			return bit.band(pkt.wire[3], 0x0f)
+			pkt.wire[3] = (val) and bor(band(pkt.wire[3], 0xf0), val) or pkt.wire[3]
+			return band(pkt.wire[3], 0x0f)
+		end,
+		tc = function (pkt, val)
+			pkt.wire[2] = bor(pkt.wire[2], (val) and 0x02 or 0x00)
+			return band(pkt.wire[2], 0x02)
 		end,
 		begin = function (pkt, section) return knot.knot_pkt_begin(pkt, section) end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
