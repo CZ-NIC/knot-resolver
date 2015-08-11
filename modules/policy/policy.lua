@@ -6,7 +6,7 @@ local policy = {
 	ANY = 0,
 }
 
--- @function Requests which QNAME matches given zone list (i.e. suffix match)
+-- Requests which QNAME matches given zone list (i.e. suffix match)
 function policy.suffix(action, zone_list)
 	local AC = require('aho-corasick')
 	local tree = AC.build(zone_list)
@@ -19,7 +19,7 @@ function policy.suffix(action, zone_list)
 	end
 end
 
--- @function Check for common suffix first, then suffix match (specialized version of suffix match)
+-- Check for common suffix first, then suffix match (specialized version of suffix match)
 function policy.suffix_common(action, suffix_list, common_suffix)
 	local common_len = string.len(common_suffix)
 	local suffix_count = #suffix_list
@@ -40,7 +40,7 @@ function policy.suffix_common(action, suffix_list, common_suffix)
 	end
 end
 
--- @function policy QNAME pattern
+-- Filter QNAME pattern
 function policy.pattern(action, pattern)
 	return function(req, query)
 		if string.find(query:name(), pattern) then
@@ -50,7 +50,55 @@ function policy.pattern(action, pattern)
 	end
 end
 
--- @function Evaluate packet in given rules to determine policy action
+local function rpz_parse(action, path)
+	local rules = {}
+	local ffi = require('ffi')
+	local action_map = {
+		-- RPZ Policy Actions
+		['\0'] = action,
+		['\1*\0'] = action, -- deviates from RPZ spec
+		['\012rpz-passthru\0'] = policy.PASS, -- the grammar...
+		['\008rpz-drop\0'] = policy.DROP,
+		['\012rpz-tcp-only\0'] = policy.TC,
+		-- Policy triggers @NYI@
+	}
+	local parser = require('zonefile').parser(function (p)
+		local name = ffi.string(p.r_owner, p.r_owner_length - 1)
+		local action = ffi.string(p.r_data, p.r_data_length)
+		rules[name] = action_map[action]
+	end, function (p)
+		print(string.format('[policy.rpz] %s: line %d: %s', path,
+			tonumber(p.line_counter), p:last_error()))
+	end)
+	parser:parse_file(path)
+	return rules
+end
+
+-- Create RPZ from zone file
+local function rpz_zonefile(action, path)
+	local rules = rpz_parse(action, path)
+	collectgarbage()
+	return function(req, query)
+		local label = query:name()
+		local action = rules[label]
+		while action == nil and string.len(label) > 0 do
+			label = string.sub(label, string.byte(label) + 2)
+			action = rules['\1*'..label]
+		end
+		return action
+	end
+end
+
+-- RPZ policy set
+function policy.rpz(action, path, format)
+	if format == 'lmdb' then
+		error('lmdb zone format is NYI')
+	else
+		return rpz_zonefile(action, path)
+	end
+end
+
+-- Evaluate packet in given rules to determine policy action
 function policy.evaluate(policy, req, query)
 	for i = 1, #policy.rules do
 		local action = policy.rules[i](req, query)
@@ -61,7 +109,7 @@ function policy.evaluate(policy, req, query)
 	return policy.PASS
 end
 
--- @function Enforce policy action
+-- Enforce policy action
 function policy.enforce(state, req, action)
 	if action == policy.DENY then
 		-- Write authority information
@@ -83,7 +131,7 @@ function policy.enforce(state, req, action)
 	return state
 end
 
--- @function policy layer implementation
+-- Capture queries before processing
 policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
@@ -92,12 +140,12 @@ policy.layer = {
 	end
 }
 
--- @function Add rule to policy list
+-- Add rule to policy list
 function policy.add(policy, rule)
 	return table.insert(policy.rules, rule)
 end
 
--- @function Convert list of string names to domain names
+-- Convert list of string names to domain names
 function policy.to_domains(names)
 	for i, v in ipairs(names) do
 		names[i] = v:gsub('([^.]*%.)', function (x)

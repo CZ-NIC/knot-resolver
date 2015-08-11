@@ -36,6 +36,8 @@ Example configuration
 	view:addr('127.0.0.1', function (req, qry) return policy.DENY end))
 	-- Drop queries with suffix match for remote client
 	view:addr('10.0.0.0/8', policy.suffix(policy.DROP, {'\3xxx'}))
+	-- RPZ for subset of clients
+	view:addr('192.168.1.0/24', policy.rpz(policy.PASS, 'whitelist.rpz'))
 
 Properties
 ^^^^^^^^^^
