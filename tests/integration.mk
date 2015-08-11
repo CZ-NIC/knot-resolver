@@ -1,28 +1,32 @@
 #
 # Integration tests
 #
+
 TESTS ?= tests/testdata
-
-# Mocked calls library
-libmock_calls_SOURCES := tests/mock_calls.c
-libmock_calls_LIBS := $(tests_LIBS) $(python_LIBS)
-libmock_calls_DEPEND := $(libkres)
-$(eval $(call make_lib,libmock_calls,tests))
-
-# Python module for tests
-_test_integration_SOURCES := tests/test_integration.c
-_test_integration_LIBS := -Ltests -lmock_calls $(libmock_calls_LIBS)
-_test_integration_DEPEND := $(libmock_calls)
-$(eval $(call make_shared,_test_integration,tests))
+CWRAP_PATH := $(strip $(socket_wrapper_LIBS))
 
 # Targets
+libfaketime_DIR := contrib/libfaketime
+libfaketime := $(abspath $(libfaketime_DIR))/src/libfaketime$(LIBEXT).1
+
+# Platform-specific targets
 ifeq ($(PLATFORM),Darwin)
-	preload_syms := DYLD_INSERT_LIBRARIES=tests/libmock_calls.dylib
+	libfaketime := $(abspath $(libfaketime_DIR))/src/libfaketime.1$(LIBEXT)
+	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="$(libfaketime):$(CWRAP_PATH)"
 else
-	preload_syms := LD_PRELOAD=tests/libmock_calls.so
+	preload_syms := LD_PRELOAD="$(libfaketime):$(CWRAP_PATH)"
 endif
 
-check-integration: $(libmock_calls) $(_test_integration)
-	$(call preload_LIBS) $(preload_syms) tests/test_integration.py $(TESTS)
+# Synchronize submodules
+$(libfaketime_DIR):
+	@git submodule init
+$(libfaketime_DIR)/Makefile: $(libfaketime_DIR)
+	@git submodule update
+# Build libfaketime contrib
+$(libfaketime): $(libfaketime_DIR)/Makefile
+	@CFLAGS="" $(MAKE) -C $(libfaketime_DIR)
+
+check-integration: $(libfaketime)
+	$(preload_LIBS) $(preload_syms) tests/test_integration.py $(TESTS) daemon/kresd ./kresd.j2 config
 
 .PHONY: check-integration

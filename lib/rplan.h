@@ -38,6 +38,7 @@
 	X(CACHED     , 1 << 8) /**< Query response is cached. */ \
 	X(EXPIRING   , 1 << 9) /**< Query response is cached, but expiring. */ \
 	X(NO_EXPIRING, 1 << 10) /**< Do not use expiring cached records. */ \
+	X(ALLOW_LOCAL, 1 << 11) /**< Allow queries to local or private address ranges. */
 
 /** Query flags */
 enum kr_query_flag {

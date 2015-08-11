@@ -14,9 +14,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <libknot/descriptor.h>
 #include "tests/test.h"
 #include <cmocka.h>
-
 #include "lib/resolve.h"
 
 static void test_resolve_nullparams(void **state)
@@ -33,11 +33,29 @@ static void test_resolve_nullparams(void **state)
 	assert_int_equal(ret, KNOT_EINVAL);
 }
 
+static void test_resolve_dummy(void **state)
+{
+	/* Create resolution context */
+	module_array_t module_arr = { NULL, 0, 0 };
+	struct kr_context ctx = { 
+		.pool = NULL,
+		.modules = &module_arr
+	};
+	/* Resolve a query (no iterator) */
+	knot_pkt_t *answer = knot_pkt_new(NULL, 4096, NULL);
+	int ret = kr_resolve(&ctx, answer, (const uint8_t *)"", KNOT_CLASS_IN, KNOT_RRTYPE_NS);
+	assert_int_not_equal(ret, kr_ok());
+	assert_int_equal(knot_wire_get_rcode(answer->wire), KNOT_RCODE_SERVFAIL);
+	knot_pkt_free(&answer);
+}
+
 int main(void)
 {
 	const UnitTest tests[] = {
 	        /* Parameter sanity checks */
-	        unit_test(test_resolve_nullparams)
+	        unit_test(test_resolve_nullparams),
+	        /* Simple resolution test cases */
+	        unit_test(test_resolve_dummy)
 	};
 
 	return run_tests(tests);

@@ -24,18 +24,24 @@ env:
     global:
         - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
         - PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
-        - CFLAGS="${CFLAGS} -O0 -g -fPIC -DNDEBUG"
+        - CFLAGS="${CFLAGS} -O0 -g -fPIC"
         - LD_LIBRARY_PATH="${HOME}/.local/lib"
         - DYLD_LIBRARY_PATH="${HOME}/.local/lib"
         - MAKEOPTS="-j2"
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/.local
 script:
-    - make ${MAKEOPTS} check COVERAGE=1
+    - make ${MAKEOPTS} install COVERAGE=1 PREFIX=${HOME}/.local
+    - make ${MAKEOPTS} check COVERAGE=1 PREFIX=${HOME}/.local
 after_success:
-    - test $TRAVIS_OS_NAME = linux && coveralls -i lib -x ".c" --gcov-options '\-lp'
+    - test $TRAVIS_OS_NAME = linux && coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'
 sudo: false
 cache:
     directories:
     - ${HOME}/.local
     - ${HOME}/.cache/pip
+before_cache:
+    - rm -f ${HOME}/.local/bin/kresd
+    - rm -f ${HOME}/.local/lib/libkres.a
+    - rm -rf ${HOME}/.local/include/libkres
+    - rm -rf ${HOME}/.local/lib/kdns_modules

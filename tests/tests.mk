@@ -1,5 +1,5 @@
 # Preload libraries
-preload_PATH := tests
+preload_PATH := tests:contrib/libfaketime/src
 ifeq ($(PLATFORM),Darwin)
 	preload_LIBS := @DYLD_FORCE_FLAT_NAMESPACE=1 \
 	                DYLD_LIBRARY_PATH="$(preload_PATH):${DYLD_LIBRARY_PATH}"
@@ -10,14 +10,19 @@ endif
 # Unit tests
 ifeq ($(HAS_cmocka), yes)
 include tests/unit.mk
+else
+$(warning cmocka not found, skipping unit tests)
+endif
+
 # Integration tests
-ifeq ($(HAS_python), yes)
+ifeq ($(HAS_python)|$(HAS_socket_wrapper), yes|yes)
 include tests/integration.mk
-endif # HAS_python
-endif # HAS_cmocka
+else
+$(warning python or socket_wrapper not found, skipping integration tests)
+endif
 
 # Targets
 tests: check-unit check-integration
-tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) libmock_calls-clean _test_integration-clean
+tests-clean: $(foreach test,$(tests_BIN),$(test)-clean)
 
 .PHONY: tests tests-clean

@@ -1,8 +1,5 @@
 ; config options
-server:
 	target-fetch-policy: "3 2 1 0 0"
-
-stub-zone:
 	name: "."
 	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
 CONFIG_END

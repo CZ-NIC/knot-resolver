@@ -2,14 +2,52 @@
 import sys
 import os
 import fileinput
+import subprocess
+import tempfile
+import shutil
+import socket
+import time
+import signal
+import stat
+import errno
+import jinja2
 from pydnstest import scenario, testserver, test
-import _test_integration as mock_ctx
+from datetime import datetime
 
-# Test debugging
-TEST_DEBUG = 0
-if 'TEST_DEBUG' in os.environ:
-    TEST_DEBUG = int(os.environ['TEST_DEBUG'])
+def str2bool(v):
+    """ Return conversion of JSON-ish string value to boolean. """ 
+    return v.lower() in ('yes', 'true', 'on')
 
+def del_files(path_to):
+    for root, dirs, files in os.walk(path_to):
+        for f in files:
+            os.unlink(os.path.join(root, f))
+
+DEFAULT_IFACE = 0
+CHILD_IFACE = 0
+TMPDIR = ""
+
+if "SOCKET_WRAPPER_DEFAULT_IFACE" in os.environ:
+   DEFAULT_IFACE = int(os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"])
+if DEFAULT_IFACE < 2 or DEFAULT_IFACE > 254 :
+    DEFAULT_IFACE = 10
+    os.environ["SOCKET_WRAPPER_DEFAULT_IFACE"]="{}".format(DEFAULT_IFACE)
+
+if "KRESD_WRAPPER_DEFAULT_IFACE" in os.environ:
+    CHILD_IFACE = int(os.environ["KRESD_WRAPPER_DEFAULT_IFACE"])
+if CHILD_IFACE < 2 or CHILD_IFACE > 254 or CHILD_IFACE == DEFAULT_IFACE:
+    OLD_CHILD_IFACE = CHILD_IFACE
+    CHILD_IFACE = DEFAULT_IFACE + 1
+    if CHILD_IFACE > 254:
+        CHILD_IFACE = 2
+    os.environ["KRESD_WRAPPER_DEFAULT_IFACE"] = "{}".format(CHILD_IFACE)
+
+if "SOCKET_WRAPPER_DIR" in os.environ:
+    TMPDIR = os.environ["SOCKET_WRAPPER_DIR"]
+if TMPDIR == "" or os.path.isdir(TMPDIR) is False:
+    OLDTMPDIR = TMPDIR
+    TMPDIR = tempfile.mkdtemp(suffix='', prefix='tmp')
+    os.environ["SOCKET_WRAPPER_DIR"] = TMPDIR
 
 def get_next(file_in):
     """ Return next token from the input stream. """
@@ -41,6 +79,8 @@ def parse_entry(op, args, file_in):
             out.set_adjust(args)
         elif op == 'SECTION':
             out.begin_section(args[0])
+        elif op == 'RAW':
+            out.begin_raw()
         else:
             out.add_record(op, args)
     return out
@@ -94,13 +134,19 @@ def parse_scenario(op, args, file_in):
 def parse_file(file_in):
     """ Parse scenario from a file. """
     try:
-        config = ''
+        config = []
         line = file_in.readline()
         while len(line):
             if line.startswith('CONFIG_END'):
                 break
             if not line.startswith(';'):
-                config += line
+                if '#' in line:
+                    line = line[0:line.index('#')]
+                # Break to key-value pairs
+                # e.g.: ['minimization', 'on']
+                kv = [x.strip() for x in line.split(':')]
+                if len(kv) >= 2:
+                    config.append(kv)
             line = file_in.readline()
         for op, args in iter(lambda: get_next(file_in), False):
             if op == 'SCENARIO_BEGIN':
@@ -121,8 +167,48 @@ def find_objects(path):
             result.append(path)
     return result
 
+def setup_env(child_env, config, config_name, j2template):
+    """ Set up test environment and config """
+    # Clear test directory
+    del_files(TMPDIR)
+    # Set up libfaketime
+    os.environ["FAKETIME_NO_CACHE"] = "1"
+    os.environ["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
+    time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
+    time_file.write(datetime.fromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S'))
+    time_file.close()
+    # Set up child process env() 
+    child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
+    child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
+    no_minimize = "true"
+    for k,v in config:
+        # Enable selectively for some tests
+        if k == 'query-minimization' and str2bool(v):
+            no_minimize = "false"
+            break
+    selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
+    childaddr = testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE)
+    # Prebind to sockets to create necessary files
+    # @TODO: this is probably a workaround for socket_wrapper bug
+    for sock_type in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+        sock = socket.socket(socket.AF_INET, sock_type)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((childaddr, 53))
+        if sock_type == socket.SOCK_STREAM:
+            sock.listen(5)
+    # Generate configuration
+    j2template_ctx = {
+        "ROOT_ADDR" : selfaddr,
+        "SELF_ADDR" : childaddr,
+        "NO_MINIMIZE" : no_minimize,
+        "WORKING_DIR" : TMPDIR,
+    }
+    cfg_rendered = j2template.render(j2template_ctx)
+    f = open(os.path.join(TMPDIR,config_name), 'w')
+    f.write(cfg_rendered)
+    f.close()
 
-def play_object(path):
+def play_object(path, binary_name, config_name, j2template, binary_additional_pars):
     """ Play scenario from a file object. """
 
     # Parse scenario
@@ -134,39 +220,83 @@ def play_object(path):
     finally:
         file_in.close()
 
+    # Setup daemon environment
+    daemon_env = os.environ.copy()
+    setup_env(daemon_env, config, config_name, j2template)
+    # Start binary
+    binary_name = os.path.abspath(binary_name)
+    daemon_proc = None
+    daemon_log = open('%s/server.log' % TMPDIR, 'w')
+    daemon_args = [binary_name] + binary_additional_pars
+    try :
+      daemon_proc = subprocess.Popen(daemon_args, stdout=daemon_log, stderr=daemon_log,
+                                     cwd=TMPDIR, preexec_fn=os.setsid, env=daemon_env)
+    except Exception as e:
+        raise Exception("Can't start '%s': %s" % (daemon_args, str(e)))
+    # Wait until the server accepts TCP clients
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        if daemon_proc.poll() != None:
+            raise Exception('process died "%s", logs in "%s"' % (os.path.basename(binary_name), TMPDIR))
+        try:
+            sock.connect((testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE), 53))
+        except: continue
+        break
     # Play scenario
-    server = testserver.TestServer(scenario)
+    server = testserver.TestServer(scenario, config, DEFAULT_IFACE, CHILD_IFACE)
     server.start()
-    mock_ctx.init(config)
     try:
-        mock_ctx.set_server(server)
-        if TEST_DEBUG > 0:
-            print('--- server listening at %s ---' % str(server.address()))
-            print('--- scenario parsed, any key to continue ---')
-            sys.stdin.readline()
-        scenario.play(mock_ctx)
+        server.play()
     finally:
         server.stop()
-        mock_ctx.deinit()
-
+        daemon_proc.terminate()
+        daemon_proc.wait()
+    # Do not clear files if the server crashed (for analysis)
+    del_files(TMPDIR)
 
 def test_platform(*args):
     if sys.platform == 'windows':
         raise Exception('not supported at all on Windows')
 
-
 if __name__ == '__main__':
+
+    if len(sys.argv) < 5:
+        print "Usage: test_integration.py <scenario> <binary> <template> <config name> [<additional>]"
+        print "\t<scenario> - path to scenario"
+        print "\t<binary> - executable to test"
+        print "\t<template> - jinja2 template file to generate configuration"
+        print "\t<config name> - name of configuration file to be generated"
+        print "\t<additional> - additional parameters for <binary>"
+        sys.exit(0)
+
+    path_to_scenario = ""
+    binary_name = ""
+    template_name = ""
+    config_name = ""
+    binary_additional_pars = []
+
+    if len(sys.argv) > 4:
+        path_to_scenario = sys.argv[1]
+        binary_name = sys.argv[2]
+        template_name = sys.argv[3]
+        config_name = sys.argv[4]
+
+    if len(sys.argv) > 5:
+        binary_additional_pars = sys.argv[5:]
+
+    j2template_loader = jinja2.FileSystemLoader(searchpath=os.path.dirname(os.path.abspath(__file__)))
+    j2template_env = jinja2.Environment(loader=j2template_loader)
+    j2template = j2template_env.get_template(template_name)
 
     # Self-tests first
     test = test.Test()
     test.add('integration/platform', test_platform)
-    test.add('testserver/sendrecv', testserver.test_sendrecv)
     if test.run() != 0:
         sys.exit(1)
     else:
         # Scan for scenarios
-        for arg in sys.argv[1:]:
+        for arg in [path_to_scenario]:
             objects = find_objects(arg)
             for path in objects:
-                test.add(path, play_object, path)
+                test.add(path, play_object, path, binary_name, config_name, j2template, binary_additional_pars)
         sys.exit(test.run())
