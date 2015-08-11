@@ -1,6 +1,6 @@
 net.listen('{{SELF_ADDR}}',53)
 cache.size = 1*MB
-modules = {'stats', 'block', 'hints'}
+modules = {'stats', 'policy', 'hints'}
 hints.root({['k.root-servers.net'] = '{{ROOT_ADDR}}'})
 option('NO_MINIMIZE', {{NO_MINIMIZE}})
 option('ALLOW_LOCAL', true)

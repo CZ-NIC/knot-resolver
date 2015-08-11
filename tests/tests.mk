@@ -1,5 +1,5 @@
 # Preload libraries
-preload_PATH := tests:contrib/libfaketime/src
+preload_PATH := $(abspath contrib/libfaketime/src)
 ifeq ($(PLATFORM),Darwin)
 	preload_LIBS := @DYLD_FORCE_FLAT_NAMESPACE=1 \
 	                DYLD_LIBRARY_PATH="$(preload_PATH):${DYLD_LIBRARY_PATH}"

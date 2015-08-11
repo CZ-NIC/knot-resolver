@@ -27,11 +27,12 @@ env:
         - CFLAGS="${CFLAGS} -O0 -g -fPIC"
         - LD_LIBRARY_PATH="${HOME}/.local/lib"
         - DYLD_LIBRARY_PATH="${HOME}/.local/lib"
-        - MAKEOPTS="-j2"
+        - SOCKET_WRAPPER_DIR="${HOME}/test-dir"
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/.local
+    - mkdir ${SOCKET_WRAPPER_DIR}
 script:
-    - make ${MAKEOPTS} install COVERAGE=1 PREFIX=${HOME}/.local
+    - make -j2 install COVERAGE=1 PREFIX=${HOME}/.local
     - make check COVERAGE=1 PREFIX=${HOME}/.local
 after_success:
     - test $TRAVIS_OS_NAME = linux && coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'

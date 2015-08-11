@@ -224,7 +224,6 @@ def play_object(path, binary_name, config_name, j2template, binary_additional_pa
     daemon_env = os.environ.copy()
     setup_env(daemon_env, config, config_name, j2template)
     # Start binary
-    binary_name = os.path.abspath(binary_name)
     daemon_proc = None
     daemon_log = open('%s/server.log' % TMPDIR, 'w')
     daemon_args = [binary_name] + binary_additional_pars
@@ -237,6 +236,7 @@ def play_object(path, binary_name, config_name, j2template, binary_additional_pa
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while True:
         if daemon_proc.poll() != None:
+            print(open('%s/server.log' % TMPDIR).read())
             raise Exception('process died "%s", logs in "%s"' % (os.path.basename(binary_name), TMPDIR))
         try:
             sock.connect((testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE), 53))
