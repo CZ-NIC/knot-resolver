@@ -22,6 +22,7 @@
 #include <libknot/rrtype/rrsig.h>
 
 #include "lib/dnssec/nsec.h"
+#include "lib/dnssec/nsec3.h"
 #include "lib/dnssec/packet/pkt.h"
 #include "lib/dnssec/ta.h"
 #include "lib/dnssec.h"
@@ -344,6 +345,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		if (!has_nsec3) {
 			ret = kr_nsec_existence_denial(pkt, KNOT_AUTHORITY, qry->sname, qry->stype, &req->pool);
 		} else {
+			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname, &req->pool);
 			/* TODO */
 		}
 		if (ret != 0) {
