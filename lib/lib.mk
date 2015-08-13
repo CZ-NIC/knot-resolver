@@ -30,7 +30,6 @@ libkres_HEADERS := \
 	lib/generic/map.h      \
 	lib/generic/set.h      \
 	lib/layer.h            \
-	lib/kayer/rrset/ds.h   \
 	lib/dnssec/nsec.h      \
 	lib/dnssec/nsec3.h     \
 	lib/dnssec/packet/pkt.h \
