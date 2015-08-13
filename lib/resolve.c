@@ -253,7 +253,10 @@ static int answer_finalize(struct kr_request *request, int state)
 	knot_pkt_t *answer = request->answer;
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
 	if (answer->opt_rr) {
-		return edns_put(answer);
+		int ret = edns_put(answer);
+		if (ret != 0) {
+			return ret;
+		}
 	}
 	/* Set AD=1 if succeeded and requested secured answer. */
 	if (state == KNOT_STATE_DONE && (request->options & QUERY_DNSSEC_WANT)) {
