@@ -572,7 +572,7 @@ ns_election:
 	}
 
 #ifdef WITH_DEBUG
-	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN];
+	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN], type_str[16];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
 	struct sockaddr *addr = &qry->ns.addr.ip;
 	inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr), ns_str, sizeof(ns_str));
