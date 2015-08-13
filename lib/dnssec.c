@@ -30,6 +30,8 @@
 
 
 #include "lib/defines.h"
+#include "lib/dnssec/nsec.h"
+#include "lib/dnssec/nsec3.h"
 #include "lib/dnssec/signature.h"
 #include "lib/dnssec.h"
 

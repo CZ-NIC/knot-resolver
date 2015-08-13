@@ -14,6 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <arpa/inet.h>
 #include <assert.h>
 #include <string.h>
 
@@ -66,6 +67,45 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 fail:
 	dnssec_binary_free(&generated_ds_rdata);
 	return ret;
+}
+
+/**
+ * Adjust TTL in wire format.
+ * @param wire      RR Set in wire format.
+ * @param wire_size Size of the wire data portion.
+ * @param new_ttl   TTL value to be set for all RRs.
+ * @return          0 or error code.
+ */
+static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
+{
+	assert(wire);
+	assert(sizeof(uint16_t) == 2);
+	assert(sizeof(uint32_t) == 4);
+	uint16_t rdlen;
+
+	int ret;
+
+	new_ttl = htonl(new_ttl);
+
+	size_t i = 0;
+	/* RR wire format in RFC1035 3.2.1 */
+	while(i < wire_size) {
+		ret = knot_dname_size(wire + i);
+		if (ret < 0) {
+			return ret;
+		}
+		i += ret + 4;
+		memcpy(wire + i, &new_ttl, sizeof(uint32_t));
+		i += sizeof(uint32_t);
+
+		memcpy(&rdlen, wire + i, sizeof(uint16_t));
+		rdlen = ntohs(rdlen);
+		i += sizeof(uint16_t) + rdlen;
+
+		assert(i <= wire_size);
+	}
+
+	return kr_ok();
 }
 
 /*!
@@ -122,7 +162,7 @@ static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
  * \return Error code, KNOT_EOK if successful.
  */
 static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *covered,
-                                int trim_labels)
+                                uint32_t orig_ttl, int trim_labels)
 {
 	// huge block of rrsets can be optionally created
 	uint8_t *rrwf = malloc(KNOT_WIRE_MAX_PKTSIZE);
@@ -134,6 +174,12 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 	if (written < 0) {
 		free(rrwf);
 		return written;
+	}
+
+	/* Set original ttl. */
+	int ret = adjust_wire_ttl(rrwf, written, orig_ttl);
+	if (ret != 0) {
+		return ret;
 	}
 
 	/* RFC4035 5.3.2
@@ -174,14 +220,14 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
  */
 /* TODO -- Taken from knot/src/knot/dnssec/rrset-sign.c. Re-write for better fit needed. */
 static int sign_ctx_add_data(dnssec_sign_ctx_t *ctx, const uint8_t *rrsig_rdata,
-                             const knot_rrset_t *covered, int trim_labels)
+                             const knot_rrset_t *covered, uint32_t orig_ttl, int trim_labels)
 {
 	int result = sign_ctx_add_self(ctx, rrsig_rdata);
 	if (result != KNOT_EOK) {
 		return result;
 	}
 
-	return sign_ctx_add_records(ctx, covered, trim_labels);
+	return sign_ctx_add_records(ctx, covered, orig_ttl, trim_labels);
 }
 
 int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
@@ -208,10 +254,11 @@ int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
 		goto fail;
 	}
 
+	uint32_t orig_ttl = knot_rrsig_original_ttl(&rrsigs->rrs, pos);
 	const knot_rdata_t *rr_data = knot_rdataset_at(&rrsigs->rrs, pos);
 	uint8_t *rdata = knot_rdata_data(rr_data);
 
-	ret = sign_ctx_add_data(sign_ctx, rdata, covered, trim_labels);
+	ret = sign_ctx_add_data(sign_ctx, rdata, covered, orig_ttl, trim_labels);
 	if (ret != KNOT_EOK) {
 		ret = kr_error(ENOMEM);
 		goto fail;
