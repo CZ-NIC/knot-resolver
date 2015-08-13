@@ -295,6 +295,9 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 	if (ctx->root_hints.nsset.root) {
 		int ret = kr_zonecut_copy(cut, &ctx->root_hints);
 		if (ret == 0) {
+			ret = kr_zonecut_copy_trust(cut, &ctx->root_hints);
+		}
+		if (ret == 0) {
 			return ret;
 		}
 	}
