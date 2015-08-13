@@ -345,8 +345,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname, &req->pool);
 		} else {
-			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname, &req->pool);
-			/* TODO */
+			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}
 		if (ret != 0) {
 			DEBUG_MSG("<= bad NXDOMAIN proof\n");

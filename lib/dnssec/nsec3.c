@@ -32,7 +32,7 @@
 
 //#define FLG_CLOSEST_ENCLOSER 0x01
 #define FLG_CLOSEST_PROVABLE_ENCLOSER 0x02
-#define FLG_NEXT_CLOSER_COVERED 0x04
+#define FLG_NAME_COVERED 0x04
 
 /**
  * Obtains NSEC3 parameters from RR.
@@ -172,13 +172,13 @@ fail:
 }
 
 /**
- * Checks whether NSEC3 RR covers the supplied name.
+ * Checks whether NSEC3 RR covers the supplied name (RFC5155 7.2.1, bullet 2).
  * @param flags Flags to be set according to check outcome.
  * @param nsec3 NSEC3 RR.
  * @param name  Name to be checked.
  * @return      0 or error code.
  */
-static int covers_next_closer(int *flags, const knot_rrset_t *nsec3,
+static int covers_name(int *flags, const knot_rrset_t *nsec3,
                               const knot_dname_t *name)
 {
 	assert(flags && nsec3 && name);
@@ -218,7 +218,7 @@ static int covers_next_closer(int *flags, const knot_rrset_t *nsec3,
 		goto fail;
 	}
 
-	*flags |= FLG_NEXT_CLOSER_COVERED;
+	*flags |= FLG_NAME_COVERED;
 	ret = kr_ok();
 
 fail:
@@ -276,21 +276,21 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 			if (rrset->type != KNOT_RRTYPE_NSEC3) {
 				continue;
 			}
-			ret = covers_next_closer(&flags, rrset, next_closer);
+			ret = covers_name(&flags, rrset, next_closer);
 			if (ret != 0) {
 				return ret;
 			}
-			if (flags & FLG_NEXT_CLOSER_COVERED) {
+			if (flags & FLG_NAME_COVERED) {
 				break;
 			}
 		}
-		if (flags & FLG_NEXT_CLOSER_COVERED) {
+		if (flags & FLG_NAME_COVERED) {
 			break;
 		}
 	}
 
 	if ((flags & FLG_CLOSEST_PROVABLE_ENCLOSER) &&
-	    (flags & FLG_NEXT_CLOSER_COVERED)) {
+	    (flags & FLG_NAME_COVERED)) {
 		*encloser = knot_wire_next_label(next_closer, NULL);
 		return kr_ok();
 	}
@@ -298,12 +298,56 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 	return kr_error(EINVAL);
 }
 
+/**
+ * Check whether any NSEC3 RR covers a wildcard RR at the closer encloser.
+ * @param pkt        Packet structure to be processed.
+ * @param section_id Packet section to be processed.
+ * @param encloser   Closest (provable) encloser domain name.
+ * @return           0 or error code.
+ */
+static int covers_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section_t section_id,
+                                            const knot_dname_t *encloser)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !encloser) {
+		return kr_error(EINVAL);
+	}
+
+	uint8_t wildcard[KNOT_DNAME_MAXLEN];
+	wildcard[0] = 1;
+	wildcard[1] = '*';
+	int encloser_len = knot_dname_size(encloser);
+	if (encloser_len < 0) {
+		return encloser_len;
+	}
+
+	memcpy(wildcard + 2, encloser, encloser_len);
+
+	int flags = 0;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC3) {
+			continue;
+		}
+		int ret = covers_name(&flags, rrset, wildcard);
+		if (ret != 0) {
+			return ret;
+		}
+		if (flags & FLG_NAME_COVERED) {
+			return kr_ok();
+		}
+	}
+
+	return kr_error(EINVAL);
+}
+
 int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
-                                      const knot_dname_t *sname, mm_ctx_t *pool)
+                                       const knot_dname_t *sname)
 {
 	const knot_dname_t *encloser = NULL;
 	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser);
-	fprintf(stderr, "%s() [%s %d]: Closest encloser proof: %d '%s'\n", __func__, __FILE__, __LINE__, ret, encloser);
-
-	return kr_error(ENOSYS);
+	if (ret != 0) {
+		return ret;
+	}
+	return covers_closest_encloser_wildcard(pkt, section_id, encloser);
 }
