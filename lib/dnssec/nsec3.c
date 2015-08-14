@@ -26,6 +26,7 @@
 #include <libknot/rrtype/nsec3.h>
 
 #include "lib/defines.h"
+#include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
 
 #define OPT_OUT_BIT 0x01
@@ -33,6 +34,9 @@
 //#define FLG_CLOSEST_ENCLOSER 0x01
 #define FLG_CLOSEST_PROVABLE_ENCLOSER 0x02
 #define FLG_NAME_COVERED 0x04
+#define FLG_NAME_MATCHED 0x08
+#define FLG_BITS_MISSING 0x10
+#define FLG_OPT_OUT_SET 0x20
 
 /**
  * Obtains NSEC3 parameters from RR.
@@ -178,8 +182,7 @@ fail:
  * @param name  Name to be checked.
  * @return      0 or error code.
  */
-static int covers_name(int *flags, const knot_rrset_t *nsec3,
-                              const knot_dname_t *name)
+static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t *name)
 {
 	assert(flags && nsec3 && name);
 
@@ -219,6 +222,66 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3,
 	}
 
 	*flags |= FLG_NAME_COVERED;
+
+	uint8_t nsec3_flags = knot_nsec3_flags(&nsec3->rrs, 0);
+	if (nsec3_flags & ~OPT_OUT_BIT) {
+		/* RFC5155 3.1.2 */
+		ret = kr_error(EINVAL);
+	}
+
+	if (nsec3_flags & OPT_OUT_BIT) {
+		*flags |= FLG_OPT_OUT_SET;
+	}
+	ret = kr_ok();
+
+fail:
+	if (params.salt.data) {
+		dnssec_nsec3_params_free(&params);
+	}
+	if (name_hash.data) {
+		dnssec_binary_free(&name_hash);
+	}
+	return ret;
+}
+
+/**
+ * Checks whether NSEC3 RR matches the supplied name.
+ * @param flags Flags to be set according to check outcome.
+ * @param nsec3 NSEC3 RR.
+ * @param name  Name to be checked.
+ * @return      0 or error code.
+ */
+static int matches_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t *name)
+{
+	assert(flags && nsec3 && name);
+
+	dnssec_binary_t owner_hash = {0, };
+	uint8_t hash_data[MAX_HASH_BYTES] = {0, };
+	owner_hash.data = hash_data;
+	dnssec_nsec3_params_t params = {0, };
+	dnssec_binary_t name_hash = {0, };
+
+	int ret = read_owner_hash(&owner_hash, MAX_HASH_BYTES, nsec3);
+	if (ret != 0) {
+		goto fail;
+	}
+
+	ret = nsec3_parameters(&params, nsec3);
+	if (ret != 0) {
+		goto fail;
+	}
+
+	ret = hash_name(&name_hash, &params, name);
+	if (ret != 0) {
+		goto fail;
+	}
+
+	if ((owner_hash.size != name_hash.size) ||
+	    (memcmp(owner_hash.data, name_hash.data, owner_hash.size) != 0)) {
+		goto fail;
+	}
+
+	*flags |= FLG_NAME_MATCHED;
 	ret = kr_ok();
 
 fail:
@@ -235,17 +298,19 @@ fail:
 /**
  * Closest encloser proof (RFC5155 7.2.1).
  * @note No RRSIGs are validated.
- * @param pkt        Packet structure to be processed.
- * @param section_id Packet section to be processed.
- * @param sname      Name to be checked.
- * @param encloser   Returned matching encloser, if found.
- * @return           0 or error code.
+ * @param pkt         Packet structure to be processed.
+ * @param section_id  Packet section to be processed.
+ * @param sname       Name to be checked.
+ * @param encloser    Returned matching encloser, if found.
+ * @param opt_out_set Returned value of the opt-out bit of the NSEC3 RR covering the next closer name.
+ * @return            0 or error code.
  */
 static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_id,
-                                  const knot_dname_t *sname, const knot_dname_t **encloser)
+                                  const knot_dname_t *sname, const knot_dname_t **encloser,
+                                  int *opt_out_set)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec || !sname || !encloser) {
+	if (!sec || !sname) {
 		return kr_error(EINVAL);
 	}
 
@@ -291,11 +356,16 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 
 	if ((flags & FLG_CLOSEST_PROVABLE_ENCLOSER) &&
 	    (flags & FLG_NAME_COVERED)) {
-		*encloser = knot_wire_next_label(next_closer, NULL);
+		if (encloser) {
+			*encloser = knot_wire_next_label(next_closer, NULL);
+		}
+		if (opt_out_set) {
+			*opt_out_set = (flags & FLG_OPT_OUT_SET) ? 1 : 0;
+		}
 		return kr_ok();
 	}
 
-	return kr_error(EINVAL);
+	return kr_error(ENOENT);
 }
 
 /**
@@ -338,16 +408,110 @@ static int covers_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section_
 		}
 	}
 
-	return kr_error(EINVAL);
+	return kr_error(ENOENT);
 }
 
 int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
                                        const knot_dname_t *sname)
 {
 	const knot_dname_t *encloser = NULL;
-	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser);
+	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser, NULL);
 	if (ret != 0) {
 		return ret;
 	}
 	return covers_closest_encloser_wildcard(pkt, section_id, encloser);
+}
+
+/**
+ * No data response check, no DS (RFC5155 7.2.3).
+ * @param pkt        Packet structure to be processed.
+ * @param section_id Packet section to be processed.
+ * @param sname      Name to be checked.
+ * @param stype      Type to be checked.
+ * @return           0 or error code.
+ */
+static int no_data_response_no_ds(const knot_pkt_t *pkt, knot_section_t section_id,
+                                  const knot_dname_t *sname, uint16_t stype)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	int flags;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC3) {
+			continue;
+		}
+		flags = 0;
+
+		int ret = matches_name(&flags, rrset, sname);
+		if (ret != 0) {
+			return ret;
+		}
+
+		if (!(flags & FLG_NAME_MATCHED)) {
+			continue;
+		}
+
+		uint8_t *bm = NULL;
+		uint16_t bm_size;
+		knot_nsec3_bitmap(&rrset->rrs, 0, &bm, &bm_size);
+		if (!bm) {
+			return kr_error(EINVAL);
+		}
+
+		if (!kr_nsec_bitmap_contains_type(bm, bm_size, stype)) {
+			flags |= FLG_BITS_MISSING;
+			break;
+		}
+	}
+
+	if ((flags & FLG_NAME_MATCHED) && (flags & FLG_BITS_MISSING)) {
+		return kr_ok();
+	}
+
+	return kr_error(ENOENT);
+}
+
+/**
+ * No data response check, DS (RFC5155 7.2.4, 2nd paragraph).
+ * @param pkt        Packet structure to be processed.
+ * @param section_id Packet section to be processed.
+ * @param sname      Name to be checked.
+ * @param stype      Type to be checked.
+ * @return           0 or error code.
+ */
+static int no_data_response_ds(const knot_pkt_t *pkt, knot_section_t section_id,
+                               const knot_dname_t *sname, uint16_t stype)
+{
+	assert(pkt && sname);
+	if (stype != KNOT_RRTYPE_DS) {
+		return kr_error(EINVAL);
+	}
+
+	int opt_out_set = 0;
+	int ret = closest_encloser_proof(pkt, section_id, sname, NULL, &opt_out_set);
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (opt_out_set) {
+		return kr_ok();
+	}
+
+	return kr_error(ENOENT);
+}
+
+int kr_nsec3_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                    const knot_dname_t *sname, uint16_t stype)
+{
+	/* DS record may be matched by an existing NSEC3 RR. */
+	int ret = no_data_response_no_ds(pkt, section_id, sname, stype);
+	if ((ret == 0) || (stype != KNOT_RRTYPE_DS)) {
+		return ret;
+	}
+	/* Closest provable encloser proof must be performed else. */
+	return no_data_response_ds(pkt, section_id, sname, stype);
 }

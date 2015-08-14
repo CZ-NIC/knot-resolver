@@ -21,7 +21,7 @@
 #include <libknot/packet/pkt.h>
 
 /**
- * Name error response check (RFC5155).
+ * Name error response check (RFC5155 7.2.2).
  * @note No RRSIGs are validated.
  * @param pkt        Packet structure to be processed.
  * @param section_id Packet section to be processed.
@@ -29,4 +29,15 @@
  * @return           0 or error code.
  */
 int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
-                                      const knot_dname_t *sname);
+                                       const knot_dname_t *sname);
+
+/**
+ * No data response check (RFC5155 7.2.3 and 7.2.4).
+ * @param pkt        Packet structure to be processed.
+ * @param section_id Packet section to be processed.
+ * @param sname      Name to be checked.
+ * @param stype      Type to be checked.
+ * @return           0 or error code.
+ */
+int kr_nsec3_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                    const knot_dname_t *sname, uint16_t stype);
