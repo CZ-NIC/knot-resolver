@@ -329,6 +329,11 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
+	/* Ignore truncated messages. */
+	if (knot_wire_get_tc(pkt->wire)) {
+		return ctx->state;
+	}
+
 	/* Server didn't copy back DO=1, this is okay if it doesn't have DS => insecure.
 	 * If it has DS, it must be secured, fail it as bogus. */
 	if (!knot_pkt_has_dnssec(pkt)) {
