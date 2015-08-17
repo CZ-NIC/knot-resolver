@@ -65,7 +65,6 @@ int kr_nsec_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section_
 
 /**
  * Wildcard answer response check (RFC4035 3.1.3.3).
- *
  * @param pkt        Packet structure to be processed.
  * @param section_id Packet section to be processed.
  * @param sname      Name to be checked.

@@ -52,3 +52,14 @@ int kr_nsec3_no_data_response_check(const knot_pkt_t *pkt, knot_section_t sectio
  */
 int kr_nsec3_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
                                              const knot_dname_t *sname, uint16_t stype);
+
+/**
+ * Wildcard answer response check (RFC5155 7.2.6).
+ * @param pkt          Packet structure to be processed.
+ * @param section_id   Packet section to be processed.
+ * @param sname        Name to be checked.
+ * @param trim_to_next Number of labels to remove to obtain next closer name.
+ * @return             0 or error code.
+ */
+int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                            const knot_dname_t *sname, int trim_to_next);

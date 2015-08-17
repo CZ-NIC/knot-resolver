@@ -594,3 +594,34 @@ int kr_nsec3_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section
 	}
 	return matches_closest_encloser_wildcard(pkt, section_id, encloser, stype);
 }
+
+int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                            const knot_dname_t *sname, int trim_to_next)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	/* Compute the next closer name. */
+	for (int i = 0; i < trim_to_next; ++i) {
+		sname = knot_wire_next_label(sname, NULL);
+	}
+
+	int flags = 0;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC3) {
+			continue;
+		}
+		int ret = covers_name(&flags, rrset, sname);
+		if (ret != 0) {
+			return ret;
+		}
+		if (flags & FLG_NAME_COVERED) {
+			return kr_ok();
+		}
+	}
+
+	return kr_error(ENOENT);
+}
