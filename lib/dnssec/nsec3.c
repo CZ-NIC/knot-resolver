@@ -390,7 +390,6 @@ static int covers_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section_
 	if (encloser_len < 0) {
 		return encloser_len;
 	}
-
 	memcpy(wildcard + 2, encloser, encloser_len);
 
 	int flags = 0;
@@ -423,6 +422,42 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
 }
 
 /**
+ * Checks whether supplied NSEC3 RR matches the supplied name and type.
+ * @param flags Flags to be set according to check outcome.
+ * @param nsec3 NSEC3 RR.
+ * @param name  Name to be checked.
+ * @param type  Type to be checked.
+ * @return      0 or error code.
+ */
+static int maches_name_and_type(int *flags, const knot_rrset_t *nsec3,
+                                const knot_dname_t *name, uint16_t type)
+{
+	assert(flags && nsec3 && name);
+
+	int ret = matches_name(flags, nsec3, name);
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (!(*flags & FLG_NAME_MATCHED)) {
+		return kr_ok();
+	}
+
+	uint8_t *bm = NULL;
+	uint16_t bm_size;
+	knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
+	if (!bm) {
+		return kr_error(EINVAL);
+	}
+
+	if (!kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+		*flags |= FLG_BITS_MISSING;
+	}
+
+	return kr_ok();
+}
+
+/**
  * No data response check, no DS (RFC5155 7.2.3).
  * @param pkt        Packet structure to be processed.
  * @param section_id Packet section to be processed.
@@ -446,30 +481,14 @@ static int no_data_response_no_ds(const knot_pkt_t *pkt, knot_section_t section_
 		}
 		flags = 0;
 
-		int ret = matches_name(&flags, rrset, sname);
+		int ret = maches_name_and_type(&flags, rrset, sname, stype);
 		if (ret != 0) {
 			return ret;
 		}
 
-		if (!(flags & FLG_NAME_MATCHED)) {
-			continue;
+		if ((flags & FLG_NAME_MATCHED) && (flags & FLG_BITS_MISSING)) {
+			return kr_ok();
 		}
-
-		uint8_t *bm = NULL;
-		uint16_t bm_size;
-		knot_nsec3_bitmap(&rrset->rrs, 0, &bm, &bm_size);
-		if (!bm) {
-			return kr_error(EINVAL);
-		}
-
-		if (!kr_nsec_bitmap_contains_type(bm, bm_size, stype)) {
-			flags |= FLG_BITS_MISSING;
-			break;
-		}
-	}
-
-	if ((flags & FLG_NAME_MATCHED) && (flags & FLG_BITS_MISSING)) {
-		return kr_ok();
 	}
 
 	return kr_error(ENOENT);
@@ -514,4 +533,64 @@ int kr_nsec3_no_data_response_check(const knot_pkt_t *pkt, knot_section_t sectio
 	}
 	/* Closest provable encloser proof must be performed else. */
 	return no_data_response_ds(pkt, section_id, sname, stype);
+}
+
+/**
+ * Check whether NSEC3 RR matches a wildcard at the closest encloser and has given type bit missing.
+ * @param pkt        Packet structure to be processed.
+ * @param section_id Packet section to be processed.
+ * @param encloser   Closest (provable) encloser domain name.
+ * @param stype      Type to be checked.
+ * @return           0 or error code.
+ */
+static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section_t section_id,
+                                             const knot_dname_t *encloser, uint16_t stype)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !encloser) {
+		return kr_error(EINVAL);
+	}
+
+	uint8_t wildcard[KNOT_DNAME_MAXLEN];
+	wildcard[0] = 1;
+	wildcard[1] = '*';
+	int encloser_len = knot_dname_size(encloser);
+	if (encloser_len < 0) {
+		return encloser_len;
+	}
+	memcpy(wildcard + 2, encloser, encloser_len);
+
+	int flags;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC3) {
+			continue;
+		}
+		flags = 0;
+
+		int ret = maches_name_and_type(&flags, rrset, wildcard, stype);
+		if (ret != 0) {
+			return ret;
+		}
+
+		/* TODO -- The loop resembles no_data_response_no_ds() exept
+		 * the following condition.
+		 */
+		if ((flags & FLG_NAME_MATCHED) && !(flags & FLG_BITS_MISSING)) {
+			return kr_ok();
+		}
+	}
+
+	return kr_error(ENOENT);
+}
+
+int kr_nsec3_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                             const knot_dname_t *sname, uint16_t stype)
+{
+	const knot_dname_t *encloser = NULL;
+	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser, NULL);
+	if (ret != 0) {
+		return ret;
+	}
+	return matches_closest_encloser_wildcard(pkt, section_id, encloser, stype);
 }
