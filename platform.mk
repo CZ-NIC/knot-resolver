@@ -117,10 +117,3 @@ define find_bin
 		$(1) := $$($(1)_BIN)
 	endif
 endef
-
-# Find Python 
-define find_python
-	python_CFLAGS := $(shell $(PYTHON) -c "from distutils import sysconfig as c;print('-I%s' % c.get_python_inc())")
-	python_LIBS := $(shell $(PYTHON) -c "from distutils import sysconfig as c;print('-L%s -lpython%s' % (c.get_config_var('LIBDIR'), c.get_config_var('VERSION')))")
-	$(call have_lib,python)
-endef

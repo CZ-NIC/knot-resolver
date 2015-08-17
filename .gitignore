@@ -16,6 +16,9 @@
 *.log
 *.inc
 *.mdb
+*.gcno
+*.gcda
+*.gcov
 .dirstamp
 .libs
 .deps

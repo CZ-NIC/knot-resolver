@@ -133,6 +133,7 @@ static void tcp_accept(uv_stream_t *master, int status)
 	if (!client) {
 		return;
 	}
+	memset(client, 0, sizeof(*client));
 	io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM);
 	if (uv_accept(master, client) != 0) {
 		handle_free((uv_handle_t *)client);

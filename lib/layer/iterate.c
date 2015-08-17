@@ -118,10 +118,34 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
 	}
 }
 
+/** @internal Filter ANY or loopback addresses. */
+static bool is_valid_addr(const uint8_t *addr, size_t len)
+{
+	if (len == sizeof(struct in_addr)) {
+		/* Filter ANY and 127.0.0.0/8 */
+		uint32_t ip_host = ntohl(*(const uint32_t *)(addr));
+		if (ip_host == 0 || (ip_host & 0xff000000) == 0x7f000000) {
+			return false;
+		}
+	} else if (len == sizeof(struct in6_addr)) {
+		struct in6_addr ip6_mask;
+		memset(&ip6_mask, 0, sizeof(ip6_mask));
+		/* All except last byte are zeroed, last byte defines ANY/::1 */
+		if (memcmp(addr, ip6_mask.s6_addr, sizeof(ip6_mask.s6_addr) - 1) == 0) {
+			return (addr[len - 1] > 1);
+		}
+	}
+	return true;
+}
+
 static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		const knot_rdata_t *rdata = rr->rrs.data;
+		if (!(query->flags & QUERY_ALLOW_LOCAL) &&
+			!is_valid_addr(knot_rdata_data(rdata), knot_rdata_rdlen(rdata))) {
+			return KNOT_STATE_CONSUME; /* Ignore invalid addresses */
+		}
 		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata);
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;

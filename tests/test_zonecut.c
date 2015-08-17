@@ -35,40 +35,6 @@ static void test_zonecut_params(void **state)
 	assert_int_not_equal(kr_zonecut_find_cached(NULL, NULL, NULL, NULL, 0, 0), 0);
 }
 
-#define TEST_IP(cut, ip, expect) { \
-	knot_rdata_t rdata[knot_rdata_array_size(sizeof(ip))]; \
-	knot_rdata_init(rdata, sizeof(ip), (uint8_t *)&ip, 0); \
-	assert_int_equal(kr_zonecut_add(&(cut), (const uint8_t *)"\x02cz", rdata), (expect)); \
-} while (0)
-
-static void test_zonecut_filter(void **state)
-{
-	struct kr_zonecut cut;
-	kr_zonecut_init(&cut, (const uint8_t *)"", NULL);
-
-	/* IPv4 */
-	uint32_t ip4 = 0; /* 0.0.0.0 */
-	TEST_IP(cut, ip4, kr_error(EILSEQ));
-	ip4 = htonl(0x7f000002); /* 127.0.0.2 */
-	TEST_IP(cut, ip4, kr_error(EILSEQ));
-	ip4 = htonl(0x7fffffff); /* 127.255.255.255 */
-	TEST_IP(cut, ip4, kr_error(EILSEQ));
-	ip4 = htonl(0xff000001); /* 255.0.0.1 */
-	TEST_IP(cut, ip4, 0);
-	/* IPv6 */
-	struct in6_addr ip6;
-	memset(&ip6, 0, sizeof(ip6)); /* :: */
-	TEST_IP(cut, ip6.s6_addr, kr_error(EILSEQ));
-	ip6.s6_addr[15] = 0x01; /* ::1 */
-	TEST_IP(cut, ip6.s6_addr, kr_error(EILSEQ));
-	ip6.s6_addr[15] = 0x02; /* ::2 */
-	TEST_IP(cut, ip6.s6_addr, 0);
-
-	kr_zonecut_deinit(&cut);
-}
-
-#undef TEST_IP
-
 static void test_zonecut_copy(void **state)
 {
 	const knot_dname_t *root = (const uint8_t *)"";
@@ -92,7 +58,6 @@ int main(void)
 {
 	const UnitTest tests[] = {
 	        unit_test(test_zonecut_params),
-	        unit_test(test_zonecut_filter),
 	        unit_test(test_zonecut_copy)
 	};
 

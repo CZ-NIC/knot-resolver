@@ -37,14 +37,9 @@
  * @code{.c}
  *
  * struct kr_context ctx = {
- *     .pool = NULL, // for persistent data
  *     .cache = ..., // open cache instance (or NULL)
- *     .layers = {}  // loaded layers
+ *     .layers = &modules,
  * };
- *
- * // Push basic layers
- * array_push(ctx.layers, iterate_layer);
- * array_push(ctx.layers, rrcache_layer);
  *
  * // Resolve "IN A cz."
  * knot_pkt_t *answer = knot_pkt_new(NULL, 65535, ctx.pool);
@@ -126,6 +121,10 @@ struct kr_context
 struct kr_request {
     struct kr_context *ctx;
     knot_pkt_t *answer;
+    struct {
+        const knot_rrset_t *key;
+        const struct sockaddr *addr;
+    } qsource;
     uint32_t options;
     int state;
     struct kr_rplan rplan;

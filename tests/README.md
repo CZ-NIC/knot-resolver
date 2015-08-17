@@ -1,3 +1,0 @@
-## Unit tests
-
-## Integration tests

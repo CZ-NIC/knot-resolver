@@ -1,0 +1,23 @@
+net.listen('{{SELF_ADDR}}',53)
+cache.size = 1*MB
+modules = {'stats', 'policy', 'hints'}
+hints.root({['k.root-servers.net'] = '{{ROOT_ADDR}}'})
+option('NO_MINIMIZE', {{NO_MINIMIZE}})
+option('ALLOW_LOCAL', true)
+
+-- Self-checks on globals
+assert(help() ~= nil)
+assert(worker.id ~= nil)
+-- Self-checks on facilities
+assert(cache.count() == 0)
+assert(cache.stats() ~= nil)
+assert(cache.backends() ~= nil)
+assert(worker.stats() ~= nil)
+assert(net.interfaces() ~= nil)
+-- Self-checks on loaded stuff
+assert(net.list()['{{SELF_ADDR}}'])
+assert(#modules.list() > 0)
+-- Self-check timers
+ev = event.recurrent(1 * sec, function (ev) return 1 end)
+event.cancel(ev)
+ev = event.after(0, function (ev) return 1 end)

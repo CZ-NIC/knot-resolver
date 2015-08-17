@@ -17,6 +17,8 @@ GNUTLS_TAG="3.3.12"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_TAG="v2.1"
 LUA_URL="http://luajit.org/git/luajit-2.0.git"
+CWRAP_TAG="master"
+CWRAP_URL="git://git.samba.org/socket_wrapper.git"
 
 # prepare install prefix
 PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
@@ -76,7 +78,7 @@ function pkg {
 }
 
 # travis-specific
-PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls"
+PIP_PKGS="${TRAVIS_BUILD_DIR}/tests/pydnstest/requirements.txt cpp-coveralls Jinja2"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
 	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
@@ -85,9 +87,11 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew link --overwrite python || true
 	pip install --upgrade pip || true
 	pip install -r ${PIP_PKGS}
+	pkg cwrap ${CWRAP_URL} ${CWRAP_TAG} lib/pkgconfig/socket_wrapper.pc
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
-	pip install --user ${USER} -r ${PIP_PKGS}
+	pkg cwrap ${CWRAP_URL} ${CWRAP_TAG} lib/pkgconfig/socket_wrapper.pc
+	pip install --user ${USER} -r ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
 fi
 
@@ -109,7 +113,7 @@ pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 # libuv
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 # luajit
-pkg lua ${LUA_URL} ${LUA_TAG} include/lua.h install LDFLAGS=-lm PREFIX=${PREFIX}
+pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc install LDFLAGS=-lm PREFIX=${PREFIX}
 
 # remove on successful build
 rm -rf ${BUILD_DIR}

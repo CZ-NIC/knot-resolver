@@ -1,0 +1,6 @@
+[submodule "contrib/socket_wrapper"]
+	path = contrib/socket_wrapper
+	url = git://git.samba.org/socket_wrapper.git
+[submodule "contrib/libfaketime"]
+	path = contrib/libfaketime
+	url = https://github.com/wolfcw/libfaketime.git

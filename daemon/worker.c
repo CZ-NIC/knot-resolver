@@ -139,10 +139,16 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->source.handle = handle;
 	uv_timer_init(worker->loop, &task->timeout);
 	task->timeout.data = task;
+	/* Remember query source addr */
 	if (addr) {
 		memcpy(&task->source.addr, addr, sockaddr_len(addr));
+		task->req.qsource.addr = (const struct sockaddr *)&task->source.addr;
 	} else {
 		task->source.addr.ip4.sin_family = AF_UNSPEC;
+	}
+	/* Remember query source TSIG key */
+	if (query->tsig_rr) {
+		task->req.qsource.key = knot_rrset_copy(query->tsig_rr, &task->req.pool);
 	}
 
 	/* Start resolution */
