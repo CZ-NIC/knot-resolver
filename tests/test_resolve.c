@@ -43,7 +43,7 @@ static void test_resolve_dummy(void **state)
 	};
 	/* Resolve a query (no iterator) */
 	knot_pkt_t *answer = knot_pkt_new(NULL, 4096, NULL);
-	int ret = kr_resolve(&ctx, answer, (const uint8_t *)"", KNOT_CLASS_IN, KNOT_RRTYPE_NS);
+	int ret = kr_resolve(&ctx, answer, (const uint8_t *)"", KNOT_CLASS_IN, KNOT_RRTYPE_NS, 0);
 	assert_int_not_equal(ret, kr_ok());
 	assert_int_equal(knot_wire_get_rcode(answer->wire), KNOT_RCODE_SERVFAIL);
 	knot_pkt_free(&answer);
