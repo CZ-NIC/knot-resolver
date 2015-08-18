@@ -46,11 +46,13 @@ struct dseckey;
  * @param keys       DNSKEY RRSet.
  * @param zone_name  Name of the zone containing the RRSIG RRSet.
  * @param timestamp  Validation time.
+ * @param has_nsec3  Whether to use NSEC3 validation.
  * @return           0 or error code.
  */
 int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
                       const knot_rrset_t *covered, const knot_rrset_t *keys,
-                      const knot_dname_t *zone_name, uint32_t timestamp);
+                      const knot_dname_t *zone_name, uint32_t timestamp,
+                      bool has_nsec3);
 
 /**
  * Validate RRSet using a specific key.
@@ -62,12 +64,14 @@ int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
  * @param key        Key to be used to validate. If NULL, then key from DNSKEY RRSet is used.
  * @param zone_name  Name of the zone containing the RRSIG RRSet.
  * @param timestamp  Validation time.
+ * @param has_nsec3  Whether to use NSEC3 validation.
  * @return           0 or error code.
  */
 int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
                                const knot_rrset_t *covered, const knot_rrset_t *keys,
                                size_t key_pos, const struct dseckey *key,
-                               const knot_dname_t *zone_name, uint32_t timestamp);
+                               const knot_dname_t *zone_name, uint32_t timestamp,
+                               bool has_nsec3);
 
 /**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
@@ -77,10 +81,12 @@ int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
  * @param ta         Trust anchor RRSet against which to validate the DNSKEY RRSet.
  * @param zone_name  Name of the zone containing the RRSet.
  * @param timestamp  Time stamp.
+ * @param has_nsec3  Whether to use NSEC3 validation.
  * @return     0 or error code.
  */
 int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const knot_rrset_t *keys,
-                       const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp);
+                       const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp,
+                       bool has_nsec3);
 
 /**
  * Construct a DNSSEC key.

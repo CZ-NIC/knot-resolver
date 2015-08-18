@@ -148,7 +148,8 @@ static int wildcard_radix_len_diff(const knot_dname_t *expanded,
 
 int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
                       const knot_rrset_t *covered, const knot_rrset_t *keys,
-                      const knot_dname_t *zone_name, uint32_t timestamp)
+                      const knot_dname_t *zone_name, uint32_t timestamp,
+                      bool has_nsec3)
 {
 	if (!pkt || !covered || !keys || !zone_name) {
 		return kr_error(EINVAL);
@@ -156,7 +157,7 @@ int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
 
 	int ret = kr_error(KNOT_DNSSEC_ENOKEY);
 	for (unsigned i = 0; i < keys->rrs.rr_count; ++i) {
-		ret = kr_rrset_validate_with_key(pkt, section_id, covered, keys, i, NULL, zone_name, timestamp);
+		ret = kr_rrset_validate_with_key(pkt, section_id, covered, keys, i, NULL, zone_name, timestamp, has_nsec3);
 		if (ret == 0) {
 			break;
 		}
@@ -168,7 +169,8 @@ int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
 int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
                                const knot_rrset_t *covered, const knot_rrset_t *keys,
                                size_t key_pos, const struct dseckey *key,
-                               const knot_dname_t *zone_name, uint32_t timestamp)
+                               const knot_dname_t *zone_name, uint32_t timestamp,
+                               bool has_nsec3)
 {
 	int ret;
 	int val_flgs;
@@ -209,7 +211,12 @@ int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
 				continue;
 			}
 			if (val_flgs & FLG_WILDCARD_EXPANSION) {
-				if (kr_nsec_wildcard_answer_response_check(pkt, KNOT_AUTHORITY, covered->owner) != 0) {
+				if (!has_nsec3) {
+					ret = kr_nsec_wildcard_answer_response_check(pkt, KNOT_AUTHORITY, covered->owner);
+				} else {
+					ret = kr_nsec3_wildcard_answer_response_check(pkt, KNOT_AUTHORITY, covered->owner, trim_labels - 1);
+				}
+				if (ret != 0) {
 					continue;
 				}
 			}
@@ -226,7 +233,8 @@ int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
 }
 
 int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const knot_rrset_t *keys,
-                       const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp)
+                       const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp,
+                       bool has_nsec3)
 {
 	if (!pkt || !keys || !ta) {
 		return kr_error(EINVAL);
@@ -255,7 +263,7 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
 			kr_dnssec_key_free(&key);
 			continue;
 		}
-		if (kr_rrset_validate_with_key(pkt, section_id, keys, keys, i, key, zone_name, timestamp) != 0) {
+		if (kr_rrset_validate_with_key(pkt, section_id, keys, keys, i, key, zone_name, timestamp, has_nsec3) != 0) {
 			kr_dnssec_key_free(&key);
 			continue;
 		}

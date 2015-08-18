@@ -18,6 +18,7 @@
 #include <sys/time.h>
 #include <string.h>
 
+#include <libknot/packet/wire.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
 
@@ -102,7 +103,8 @@ static int rrtypes_add(struct contained_ids *stored, const knot_rrset_t *rr)
 }
 
 static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
-                            knot_section_t section_id, mm_ctx_t *pool)
+                            knot_section_t section_id, mm_ctx_t *pool,
+                            bool has_nsec3)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(answer, section_id);
 	if (!sec) {
@@ -157,7 +159,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		 * change when updating cut information before validation.
 		 */
 		const knot_dname_t *zone_name = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
-		ret = kr_rrset_validate(answer, section_id, covered, qry->zone_cut.key, zone_name, qry->timestamp.tv_sec);
+		ret = kr_rrset_validate(answer, section_id, covered, qry->zone_cut.key, zone_name, qry->timestamp.tv_sec, has_nsec3);
 		if (ret != 0) {
 			break;
 		}
@@ -169,7 +171,7 @@ fail:
 	return ret;
 }
 
-static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *pool)
+static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *pool, bool has_nsec3)
 {
 #warning TODO: validate RRSIGS (records with ZSK, keys with KSK), return FAIL if failed
 	if (!qry->zone_cut.key) {
@@ -179,16 +181,16 @@ static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *
 
 	int ret;
 
-	ret = validate_section(qry, answer, KNOT_ANSWER, pool);
+	ret = validate_section(qry, answer, KNOT_ANSWER, pool, has_nsec3);
 	if (ret != 0) {
 		return ret;
 	}
-	ret = validate_section(qry, answer, KNOT_AUTHORITY, pool);
+	ret = validate_section(qry, answer, KNOT_AUTHORITY, pool, has_nsec3);
 
 	return ret;
 }
 
-static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
+static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_nsec3)
 {
 	/* Merge DNSKEY records from answer */
 	const knot_pktsection_t *an = knot_pkt_section(answer, KNOT_ANSWER);
@@ -224,7 +226,7 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer)
 	/* Check if there's a key for current TA. */
 	int ret = kr_dnskeys_trusted(answer, KNOT_ANSWER, qry->zone_cut.key,
 	                             qry->zone_cut.trust_anchor, qry->zone_cut.name,
-	                             qry->timestamp.tv_sec);
+	                             qry->timestamp.tv_sec, has_nsec3);
 	if (ret != 0) {
 		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
 		return ret;
@@ -386,7 +388,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			}
 		}
 
-		ret = validate_keyset(qry, pkt);
+		ret = validate_keyset(qry, pkt, has_nsec3);
 		if (ret != 0) {
 			DEBUG_MSG("<= bad keys, broken trust chain\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
@@ -395,7 +397,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Validate all records, fail as bogus if it doesn't match. */
-	ret = validate_records(qry, pkt, req->rplan.pool);
+	ret = validate_records(qry, pkt, req->rplan.pool, has_nsec3);
 	if (ret != 0) {
 		DEBUG_MSG("<= couldn't validate RRSIGs\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
