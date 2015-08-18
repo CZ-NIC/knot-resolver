@@ -35,8 +35,9 @@
 #define FLG_CLOSEST_PROVABLE_ENCLOSER 0x02
 #define FLG_NAME_COVERED 0x04
 #define FLG_NAME_MATCHED 0x08
-#define FLG_BITS_MISSING 0x10
-#define FLG_OPT_OUT_SET 0x20
+#define FLG_TYPE_BIT_MISSING 0x10
+#define FLG_CNAME_BIT_MISSING 0x20
+#define FLG_OPT_OUT_SET 0x40
 
 /**
  * Obtains NSEC3 parameters from RR.
@@ -451,7 +452,15 @@ static int maches_name_and_type(int *flags, const knot_rrset_t *nsec3,
 	}
 
 	if (!kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
-		*flags |= FLG_BITS_MISSING;
+		*flags |= FLG_TYPE_BIT_MISSING;
+		if (type == KNOT_RRTYPE_CNAME) {
+			*flags |= FLG_CNAME_BIT_MISSING;
+		}
+	}
+
+	if ((type != KNOT_RRTYPE_CNAME) &&
+	    !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_CNAME)) {
+		*flags |= FLG_CNAME_BIT_MISSING;
 	}
 
 	return kr_ok();
@@ -486,7 +495,9 @@ static int no_data_response_no_ds(const knot_pkt_t *pkt, knot_section_t section_
 			return ret;
 		}
 
-		if ((flags & FLG_NAME_MATCHED) && (flags & FLG_BITS_MISSING)) {
+		if ((flags & FLG_NAME_MATCHED) &&
+		    (flags & FLG_TYPE_BIT_MISSING) &&
+		    (flags & FLG_CNAME_BIT_MISSING)) {
 			return kr_ok();
 		}
 	}
@@ -576,7 +587,7 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 		/* TODO -- The loop resembles no_data_response_no_ds() exept
 		 * the following condition.
 		 */
-		if ((flags & FLG_NAME_MATCHED) && !(flags & FLG_BITS_MISSING)) {
+		if ((flags & FLG_NAME_MATCHED) && !(flags & FLG_TYPE_BIT_MISSING)) {
 			return kr_ok();
 		}
 	}
