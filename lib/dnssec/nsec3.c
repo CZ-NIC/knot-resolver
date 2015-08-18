@@ -31,13 +31,13 @@
 
 #define OPT_OUT_BIT 0x01
 
-//#define FLG_CLOSEST_ENCLOSER 0x01
-#define FLG_CLOSEST_PROVABLE_ENCLOSER 0x02
-#define FLG_NAME_COVERED 0x04
-#define FLG_NAME_MATCHED 0x08
-#define FLG_TYPE_BIT_MISSING 0x10
-#define FLG_CNAME_BIT_MISSING 0x20
-#define FLG_OPT_OUT_SET 0x40
+//#define FLG_CLOSEST_ENCLOSER (1 << 0)
+#define FLG_CLOSEST_PROVABLE_ENCLOSER (1 << 1)
+#define FLG_NAME_COVERED (1 << 2)
+#define FLG_NAME_MATCHED (1 << 3)
+#define FLG_TYPE_BIT_MISSING (1 << 4)
+#define FLG_CNAME_BIT_MISSING (1 << 5)
+#define FLG_OPT_OUT_SET (1 << 6)
 
 /**
  * Obtains NSEC3 parameters from RR.

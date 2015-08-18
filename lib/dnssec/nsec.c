@@ -74,10 +74,10 @@ static int nsec_nonamematch(const knot_rrset_t *nsec, const knot_dname_t *sname)
 	}
 }
 
-#define FLG_NOEXIST_RRTYPE 0x01 /**< <SNAME, SCLASS> exists, <SNAME, SCLASS, STYPE> does not exist. */
-#define FLG_NOEXIST_RRSET  0x02 /**< <SNAME, SCLASS> does not exist. */
-#define FLG_NOEXIST_WILDCARD 0x04 /**< No wildcard covering <SNAME, SCLASS> exists. */
-#define FLG_NOEXIST_CLOSER 0x08 /**< Wildcard covering <SNAME, SCLASS> exists, but doesn't match STYPE. */
+#define FLG_NOEXIST_RRTYPE (1 << 0) /**< <SNAME, SCLASS> exists, <SNAME, SCLASS, STYPE> does not exist. */
+#define FLG_NOEXIST_RRSET  (1 << 1) /**< <SNAME, SCLASS> does not exist. */
+#define FLG_NOEXIST_WILDCARD (1 << 2) /**< No wildcard covering <SNAME, SCLASS> exists. */
+#define FLG_NOEXIST_CLOSER (1 << 3) /**< Wildcard covering <SNAME, SCLASS> exists, but doesn't match STYPE. */
 
 /**
  * According to set flags determine whether authenticated denial of existence has been proven.
