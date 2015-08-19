@@ -289,10 +289,12 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 		}
 	}
 
-#warning TODO: set root trust anchor from config
 	/* Set trust anchor. */
 	knot_rrset_free(&cut->trust_anchor, cut->pool);
-	int ret = kr_ta_parse(&cut->trust_anchor, ROOT_TA, cut->pool);
+	/* The root trust anchor can be changed via the validator layer
+	 * (interactive) interface.
+	 */
+	int ret = kr_ta_get(&cut->trust_anchor, &global_trust_anchors, ROOT_NAME, cut->pool);
 	if (ret != 0) {
 		return ret;
 	}

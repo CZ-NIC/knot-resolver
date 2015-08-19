@@ -440,7 +440,43 @@ const knot_layer_api_t *validate_layer(struct kr_module *module)
 		.begin = &begin,
 		.consume = &validate,
 	};
+	/* Store module reference */
 	return &_layer;
+}
+
+int validate_init(struct kr_module *module)
+{
+	int ret = kr_ta_init(&global_trust_anchors);
+	if (ret != 0) {
+		return ret;
+	}
+	/* Add root trust anchor. */
+	ret = kr_ta_add(&global_trust_anchors, ROOT_TA);
+	if (ret != 0) {
+		return ret;
+	}
+	return kr_ok();
+}
+
+#warning TODO: set root trust anchor from config
+int validate_config(struct kr_module *module, const char *conf)
+{
+	return kr_ok();
+}
+
+int validate_deinit(struct kr_module *module)
+{
+	kr_ta_deinit(&global_trust_anchors);
+	return kr_ok();
+}
+
+const struct kr_prop validate_prop_list[] = {
+    { NULL, NULL, NULL }
+};
+
+struct kr_prop *validate_props(void)
+{
+	return (struct kr_prop *) validate_prop_list;
 }
 
 KR_MODULE_EXPORT(validate)

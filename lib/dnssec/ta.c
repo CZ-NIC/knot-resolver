@@ -17,9 +17,14 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <ctype.h>
+#include <pthread.h>
 
+#include <contrib/ucw/mempool.h>
 #include <libknot/descriptor.h>
+#include <libknot/dname.h>
 #include <libknot/internal/base64.h>
+#include <libknot/rdataset.h>
+#include <libknot/rrset.h>
 #include <libknot/rrtype/rdname.h>
 
 #include "lib/defines.h"
@@ -422,4 +427,223 @@ fail:
 	return ret;
 #undef RDATA_MAXSIZE
 #undef SEPARATORS
+}
+
+#define MAX_ANCHORS 16
+struct trust_anchors_nolock {
+	mm_ctx_t pool;
+	knot_rrset_t *anchors[MAX_ANCHORS];
+	int used;
+};
+
+struct trust_anchors {
+	struct trust_anchors_nolock locked;
+	pthread_rwlock_t rwlock;
+};
+
+struct trust_anchors global_trust_anchors = {
+	.locked.pool = {0, },
+	.locked.anchors = {0, },
+	.locked.used = 0,
+};
+
+static int ta_init(struct trust_anchors_nolock *tan)
+{
+	assert(tan);
+
+	memset(tan, 0, sizeof(*tan));
+	tan->pool.ctx = mp_new(4 * CPU_PAGE_SIZE);
+	tan->pool.alloc = (mm_alloc_t) mp_alloc;
+	tan->used = 0;
+
+	return kr_ok();
+}
+
+static void ta_deinit(struct trust_anchors_nolock *tan)
+{
+	assert(tan);
+
+	if (tan->pool.ctx) {
+		mp_delete(tan->pool.ctx);
+		tan->pool.ctx = NULL;
+	}
+}
+
+int kr_ta_init(struct trust_anchors *tas)
+{
+	if (!tas) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = ta_init(&tas->locked);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = pthread_rwlock_init(&tas->rwlock, NULL);
+	if (ret != 0) {
+		ta_deinit(&tas->locked);
+		return kr_error(ret);
+	}
+	return kr_ok();
+}
+
+void kr_ta_deinit(struct trust_anchors *tas)
+{
+	if (!tas) {
+		return;
+	}
+
+	while (pthread_rwlock_destroy(&tas->rwlock) == EBUSY);
+
+	ta_deinit(&tas->locked);
+}
+
+static int ta_reset(struct trust_anchors_nolock *tan, const char *ta_str)
+{
+	assert(tan);
+
+	ta_deinit(tan);
+	int ret = ta_init(tan);
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (!ta_str || (ta_str[0] == '\0')) {
+		return kr_ok();
+	}
+
+	knot_rrset_t *ta = NULL;
+	ret = kr_ta_parse(&ta, ta_str, &tan->pool);
+	if (ret != 0) {
+		return ret;
+	}
+
+	assert(ta);
+
+	tan->anchors[tan->used++] = ta;
+
+	return kr_ok();
+}
+
+int kr_ta_reset(struct trust_anchors *tas, const char *ta_str)
+{
+	if (!tas) {
+		return kr_error(ENOENT);
+	}
+
+	int ret = pthread_rwlock_wrlock(&tas->rwlock);
+	if (ret != 0) {
+		return kr_error(ret);
+	}
+
+	ret = ta_reset(&tas->locked, ta_str);
+
+	pthread_rwlock_unlock(&tas->rwlock);
+	return ret;
+}
+
+static knot_rrset_t *ta_find(struct trust_anchors_nolock *tan, const knot_dname_t *name)
+{
+	assert(tan && name);
+
+	knot_rrset_t *found = NULL;
+
+	int i;
+	for (i = 0; i < tan->used; ++i) {
+		if (knot_dname_is_equal(tan->anchors[i]->owner, name)) {
+			found = tan->anchors[i];
+			break;
+		}
+	}
+
+	return found;
+}
+
+static int ta_add(struct trust_anchors_nolock *tan, const char *ta_str)
+{
+	assert(tan && ta_str);
+
+	if (tan->used >= MAX_ANCHORS) {
+		return kr_error(ENOMEM);
+	}
+
+	knot_rrset_t *ta = NULL;
+	int ret = kr_ta_parse(&ta, ta_str, &tan->pool);
+	if (ret != 0) {
+		return ret;
+	}
+	assert(ta);
+
+	knot_rrset_t *found = ta_find(tan, ta->owner);
+	if (!found) {
+		tan->anchors[tan->used++] = ta;
+		return kr_ok();
+	}
+
+	if (found->type != ta->type) {
+		knot_rrset_free(&ta, &tan->pool);
+		return kr_error(EINVAL);
+	}
+
+	ret = knot_rdataset_merge(&found->rrs, &ta->rrs, &tan->pool);
+	knot_rrset_free(&ta, &tan->pool);
+	if (ret != 0) {
+		return ret;
+	}
+
+	return kr_ok();
+}
+
+int kr_ta_add(struct trust_anchors *tas, const char *ta_str)
+{
+	if (!tas || !ta_str) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = pthread_rwlock_wrlock(&tas->rwlock);
+	if (ret != 0) {
+		return kr_error(ret);
+	}
+
+	ret = ta_add(&tas->locked, ta_str);
+
+	pthread_rwlock_unlock(&tas->rwlock);
+	return ret;
+}
+
+static int ta_get(knot_rrset_t **ta, struct trust_anchors_nolock *tan, const knot_dname_t *name, mm_ctx_t *pool)
+{
+	assert(ta && tan && name);
+
+	knot_rrset_t *copy = ta_find(tan, name);
+	if (!copy) {
+		kr_error(ENOENT);
+	}
+
+	copy = knot_rrset_copy(copy, pool);
+	if (!copy) {
+		kr_error(ENOMEM);
+	}
+
+	*ta = copy;
+
+	return kr_ok();
+}
+
+int kr_ta_get(knot_rrset_t **ta, struct trust_anchors *tas, const knot_dname_t *name, mm_ctx_t *pool)
+{
+	if (!ta || !tas || !name) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = pthread_rwlock_rdlock(&tas->rwlock);
+	if (ret != 0) {
+		return kr_error(ret);
+	}
+
+	ret = ta_get(ta, &tas->locked, name, pool);
+
+	pthread_rwlock_unlock(&tas->rwlock);
+	return ret;
 }

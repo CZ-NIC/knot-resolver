@@ -25,12 +25,16 @@
 
 /* List of embedded modules */
 const knot_layer_api_t *iterate_layer(struct kr_module *module);
+int validate_init(struct kr_module *module);
+int validate_deinit(struct kr_module *module);
+int validate_config(struct kr_module *module, const char *conf);
 const knot_layer_api_t *validate_layer(struct kr_module *module);
+extern struct kr_prop validate_prop_list[];
 const knot_layer_api_t *rrcache_layer(struct kr_module *module);
 const knot_layer_api_t *pktcache_layer(struct kr_module *module);
 static const struct kr_module embedded_modules[] = {
 	{ "iterate",  NULL, NULL, NULL, iterate_layer, NULL, NULL, NULL },
-	{ "validate", NULL, NULL, NULL, validate_layer, NULL, NULL, NULL },
+	{ "validate", validate_init, validate_deinit, validate_config, validate_layer, validate_prop_list, NULL, NULL },
 	{ "rrcache",  NULL, NULL, NULL, rrcache_layer, NULL, NULL, NULL },
 	{ "pktcache", NULL, NULL, NULL, pktcache_layer, NULL, NULL, NULL },
 };
