@@ -110,6 +110,7 @@ static int load_sym_c(struct kr_module *module, uint32_t api_required)
 			module->deinit = embedded->deinit;
 			module->config = embedded->config;
 			module->layer = embedded->layer;
+			module->props = embedded->props;
 			return kr_ok();
 		}
 	}
