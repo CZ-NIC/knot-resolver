@@ -22,6 +22,7 @@
 
 #include <ccan/json/json.h>
 #include <libknot/packet/wire.h>
+#include <libknot/rrset-dump.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
 
@@ -37,9 +38,18 @@
 #include "lib/nsrep.h"
 #include "lib/module.h"
 
-#include <libknot/rrset-dump.h> //
-
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "vldr", fmt)
+
+static knot_dump_style_t KNOT_DUMP_STYLE_TA = {
+	.wrap = false,
+	.show_class = true,
+	.show_ttl = false,
+	.verbose = false,
+	.empty_ttl = false,
+	.human_ttl = false,
+	.human_tmstamp = true,
+	.ascii_to_idn = NULL
+};
 
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -437,18 +447,18 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 static int rrset_txt_dump_line(const knot_rrset_t *rrset, size_t pos,
-                               char *dst, const size_t maxlen)
+                               char *dst, const size_t maxlen, const knot_dump_style_t *style)
 {
-	assert(rrset && dst && maxlen);
+	assert(rrset && dst && maxlen && style);
 
 	int written = 0;
 	uint32_t ttl = knot_rdata_ttl(knot_rdataset_at(&rrset->rrs, 0));
-	int ret = knot_rrset_txt_dump_header(rrset, ttl, dst + written, maxlen - written, &KNOT_DUMP_STYLE_DEFAULT);
+	int ret = knot_rrset_txt_dump_header(rrset, ttl, dst + written, maxlen - written, style);
 	if (ret <= 0) {
 		return ret;
 	}
 	written += ret;
-	ret = knot_rrset_txt_dump_data(rrset, pos, dst + written, maxlen - written, &KNOT_DUMP_STYLE_DEFAULT);
+	ret = knot_rrset_txt_dump_data(rrset, pos, dst + written, maxlen - written, style);
 	if (ret <= 0) {
 		return ret;
 	}
@@ -473,7 +483,7 @@ static char *validate_trust_anchors(void *env, struct kr_module *module, const c
 		char buf[MAX_BUF_LEN];
 		for (uint16_t j = 0; j < ta->rrs.rr_count; ++j) {
 			buf[0] = '\0';
-			rrset_txt_dump_line(ta, j, buf, MAX_BUF_LEN);
+			rrset_txt_dump_line(ta, j, buf, MAX_BUF_LEN, &KNOT_DUMP_STYLE_TA);
 			json_append_element(root, json_mkstring(buf));
 		}
 	}
