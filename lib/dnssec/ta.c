@@ -647,3 +647,44 @@ int kr_ta_get(knot_rrset_t **ta, struct trust_anchors *tas, const knot_dname_t *
 	pthread_rwlock_unlock(&tas->rwlock);
 	return ret;
 }
+
+int kr_ta_rdlock(struct trust_anchors *tas)
+{
+	if (!tas) {
+		return kr_error(EINVAL);
+	}
+
+	return pthread_rwlock_rdlock(&tas->rwlock);
+}
+
+int kr_ta_unlock(struct trust_anchors *tas)
+{
+	if (!tas) {
+		return kr_error(EINVAL);
+	}
+
+	return pthread_rwlock_unlock(&tas->rwlock);
+}
+
+int kr_ta_rrs_count_nolock(struct trust_anchors *tas)
+{
+	if (!tas) {
+		return kr_error(EINVAL);
+	}
+
+	return tas->locked.used;
+}
+
+int kr_ta_rrs_at_nolock(const knot_rrset_t **ta, struct trust_anchors *tas, size_t pos)
+{
+	if (!tas || !ta) {
+		return kr_error(EINVAL);
+	}
+
+	if (pos >= tas->locked.used) {
+		return kr_error(EINVAL);
+	}
+
+	*ta = tas->locked.anchors[pos];
+	return kr_ok();
+}

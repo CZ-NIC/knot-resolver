@@ -15,9 +15,12 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <sys/time.h>
+#include <stdio.h>
 #include <string.h>
 
+#include <ccan/json/json.h>
 #include <libknot/packet/wire.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
@@ -36,7 +39,7 @@
 
 #include <libknot/rrset-dump.h> //
 
-#define DEBUG_MSG(fmt...) QRDEBUG(qry, "vldr", fmt)
+#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "vldr", fmt)
 
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -175,7 +178,7 @@ static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *
 {
 #warning TODO: validate RRSIGS (records with ZSK, keys with KSK), return FAIL if failed
 	if (!qry->zone_cut.key) {
-		DEBUG_MSG("<= no DNSKEY, can't validate\n");
+		DEBUG_MSG(qry, "<= no DNSKEY, can't validate\n");
 		return kr_error(KNOT_DNSSEC_ENOKEY);
 	}
 
@@ -276,7 +279,7 @@ static int update_delegation(struct kr_query *qry, knot_pkt_t *answer)
 	int ret = kr_ok();
 	struct kr_zonecut *cut = &qry->zone_cut;
 
-	DEBUG_MSG("<= referral, checking DS\n");
+	DEBUG_MSG(qry, "<= referral, checking DS\n");
 
 	/* New trust anchor. */
 	knot_rrset_t *new_ds = NULL;
@@ -339,7 +342,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Server didn't copy back DO=1, this is okay if it doesn't have DS => insecure.
 	 * If it has DS, it must be secured, fail it as bogus. */
 	if (!knot_pkt_has_dnssec(pkt)) {
-		DEBUG_MSG("<= asked with DO=1, got insecure response\n");
+		DEBUG_MSG(qry, "<= asked with DO=1, got insecure response\n");
 #warning TODO: fail and retry if it has TA, otherwise flag as INSECURE and continue
 		return KNOT_STATE_FAIL;
 	}
@@ -355,7 +358,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}
 		if (ret != 0) {
-			DEBUG_MSG("<= bad NXDOMAIN proof\n");
+			DEBUG_MSG(qry, "<= bad NXDOMAIN proof\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KNOT_STATE_FAIL;
 		}
@@ -381,7 +384,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	uint16_t qtype = knot_pkt_qtype(pkt);
 	if (qtype == KNOT_RRTYPE_DNSKEY) {
 		if (!qry->zone_cut.trust_anchor) {
-			DEBUG_MSG("Missing trust anchor.\n");
+			DEBUG_MSG(qry, "Missing trust anchor.\n");
 #warning TODO: the trust anchor must be fetched from a configurable storage
 			if (qry->zone_cut.name[0] == '\0') {
 				kr_ta_parse(&qry->zone_cut.trust_anchor, ROOT_TA, qry->zone_cut.pool);
@@ -390,7 +393,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 		ret = validate_keyset(qry, pkt, has_nsec3);
 		if (ret != 0) {
-			DEBUG_MSG("<= bad keys, broken trust chain\n");
+			DEBUG_MSG(qry, "<= bad keys, broken trust chain\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KNOT_STATE_FAIL;
 		}
@@ -399,7 +402,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Validate all records, fail as bogus if it doesn't match. */
 	ret = validate_records(qry, pkt, req->rplan.pool, has_nsec3);
 	if (ret != 0) {
-		DEBUG_MSG("<= couldn't validate RRSIGs\n");
+		DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
 		return KNOT_STATE_FAIL;
 	}
@@ -411,7 +414,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	if ((qtype == KNOT_RRTYPE_DS) && (qry->parent != NULL) && (qry->parent->zone_cut.trust_anchor == NULL)) {
-		DEBUG_MSG("updating trust anchor in zone cut\n");
+		DEBUG_MSG(qry, "updating trust anchor in zone cut\n");
 		qry->parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, qry->parent->zone_cut.pool);
 		if (!qry->parent->zone_cut.trust_anchor) {
 			return KNOT_STATE_FAIL;
@@ -422,15 +425,88 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	if ((qtype == KNOT_RRTYPE_DNSKEY) && (qry->parent != NULL) && (qry->parent->zone_cut.key == NULL)) {
-		DEBUG_MSG("updating keys in zone cut\n");
+		DEBUG_MSG(qry, "updating keys in zone cut\n");
 		qry->parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, qry->parent->zone_cut.pool);
 		if (!qry->parent->zone_cut.key) {
 			return KNOT_STATE_FAIL;
 		}
 	}
 
-	DEBUG_MSG("<= answer valid, OK\n");
+	DEBUG_MSG(qry, "<= answer valid, OK\n");
 	return ctx->state;
+}
+
+static int rrset_txt_dump_line(const knot_rrset_t *rrset, size_t pos,
+                               char *dst, const size_t maxlen)
+{
+	assert(rrset && dst && maxlen);
+
+	int written = 0;
+	uint32_t ttl = knot_rdata_ttl(knot_rdataset_at(&rrset->rrs, 0));
+	int ret = knot_rrset_txt_dump_header(rrset, ttl, dst + written, maxlen - written, &KNOT_DUMP_STYLE_DEFAULT);
+	if (ret <= 0) {
+		return ret;
+	}
+	written += ret;
+	ret = knot_rrset_txt_dump_data(rrset, pos, dst + written, maxlen - written, &KNOT_DUMP_STYLE_DEFAULT);
+	if (ret <= 0) {
+		return ret;
+	}
+	written += ret;
+
+	return written;
+}
+
+static char *validate_trust_anchors(void *env, struct kr_module *module, const char *args)
+{
+#define MAX_BUF_LEN 1024
+	JsonNode *root = json_mkarray();
+
+	kr_ta_rdlock(&global_trust_anchors);
+
+	const knot_rrset_t *ta;
+	int count = kr_ta_rrs_count_nolock(&global_trust_anchors);
+	for (int i = 0; i < count; ++i) {
+		ta = NULL;
+		kr_ta_rrs_at_nolock(&ta, &global_trust_anchors, i);
+		assert(ta);
+		char buf[MAX_BUF_LEN];
+		for (uint16_t j = 0; j < ta->rrs.rr_count; ++j) {
+			buf[0] = '\0';
+			rrset_txt_dump_line(ta, j, buf, MAX_BUF_LEN);
+			json_append_element(root, json_mkstring(buf));
+		}
+	}
+
+	kr_ta_unlock(&global_trust_anchors);
+
+	char *result = json_encode(root);
+	json_delete(root);
+	return result;
+#undef MAX_BUF_LEN
+}
+
+static int load(struct trust_anchors *tas, const char *path)
+{
+#define MAX_LINE_LEN 512
+	auto_fclose FILE *fp = fopen(path, "r");
+	if (fp == NULL) {
+		DEBUG_MSG(NULL, "reading '%s' failed: %s\n", path, strerror(errno));
+		return kr_error(errno);
+	} else {
+		DEBUG_MSG(NULL, "reading '%s'\n", path);
+	}
+
+	char line[MAX_LINE_LEN];
+	while (fgets(line, sizeof(line), fp) != NULL) {
+		int ret = kr_ta_add(tas, line);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+
+	return kr_ok();
+#undef MAX_LINE_LEN
 }
 
 /** Module implementation. */
@@ -461,7 +537,11 @@ int validate_init(struct kr_module *module)
 #warning TODO: set root trust anchor from config
 int validate_config(struct kr_module *module, const char *conf)
 {
-	return kr_ok();
+	int ret = kr_ta_reset(&global_trust_anchors, NULL);
+	if (ret != 0) {
+		return ret;
+	}
+	return load(&global_trust_anchors, conf);
 }
 
 int validate_deinit(struct kr_module *module)
@@ -471,6 +551,7 @@ int validate_deinit(struct kr_module *module)
 }
 
 const struct kr_prop validate_prop_list[] = {
+    { &validate_trust_anchors, "trust_anchors", "Retrieve trust anchors.", },
     { NULL, NULL, NULL }
 };
 

@@ -20,7 +20,7 @@
 #include <libknot/rrset.h>
 
 //#define ROOT_TA ". IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5"
-#define ROOT_NAME ""
+#define ROOT_NAME ((const uint8_t *) "")
 #define ROOT_TA ". IN DS 19036 RSASHA256 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5"
 //#define ROOT_TA ". IN DNSKEY 257 3 8 AwEAAagAIKlVZrpC6Ia7gEzahOR+9W29euxhJhVVLOyQbSEW0O8gcCjF FVQUTf6v58fLjwBd0YI0EzrAcQqBGCzh/RStIoO8g0NfnfL2MTJRkxoX bfDaUeVPQuYEhg37NZWAJQ9VnMVDxP/VHL496M/QZxkjf5/Efucp2gaD X6RS6CXpoY68LsvPVjR0ZSwzz1apAzvN9dlzEheX7ICJBBtuA6G3LQpz W5hOA2hzCTMjJPJ8LbqF6dsV6DoBQzgul0sGIcGOYl7OyQdXfZ57relS Qageu+ipAdTTJ25AsRTAoub8ONGcLmqrAmRLKBP1dfwhYB4N7knNnulq QxA+Uk1ihz0="
 
@@ -49,3 +49,9 @@ int kr_ta_reset(struct trust_anchors *tas, const char *ta_str);
 int kr_ta_add(struct trust_anchors *tas, const char *ta_str);
 
 int kr_ta_get(knot_rrset_t **ta, struct trust_anchors *tas, const knot_dname_t *name, mm_ctx_t *pool);
+
+int kr_ta_rdlock(struct trust_anchors *tas);
+int kr_ta_unlock(struct trust_anchors *tas);
+
+int kr_ta_rrs_count_nolock(struct trust_anchors *tas);
+int kr_ta_rrs_at_nolock(const knot_rrset_t **ta, struct trust_anchors *tas, size_t pos);
