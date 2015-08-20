@@ -496,6 +496,20 @@ static char *validate_trust_anchors(void *env, struct kr_module *module, const c
 #undef MAX_BUF_LEN
 }
 
+static char *validate_trust_anchor_add(void *env, struct kr_module *module, const char *args)
+{
+	int ret = 0;
+	if (!args || (args[0] == '\0')) {
+		ret = kr_error(EINVAL);
+	} else {
+		ret = kr_ta_add(&global_trust_anchors, args);
+	}
+
+	char *result = NULL;
+	asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false");
+	return result;
+}
+
 static int load(struct trust_anchors *tas, const char *path)
 {
 #define MAX_LINE_LEN 512
@@ -562,6 +576,7 @@ int validate_deinit(struct kr_module *module)
 
 const struct kr_prop validate_prop_list[] = {
     { &validate_trust_anchors, "trust_anchors", "Retrieve trust anchors.", },
+    { &validate_trust_anchor_add, "trust_anchor_add", "Adds a trust anchor.", },
     { NULL, NULL, NULL }
 };
 
