@@ -1,6 +1,7 @@
 ccan_EMBED := \
 	contrib/ccan/ilog/ilog.c \
 	contrib/ccan/isaac/isaac.c \
+	contrib/ccan/json/json.c \
 	contrib/ucw/mempool.c \
 	contrib/murmurhash3/murmurhash3.c
 
