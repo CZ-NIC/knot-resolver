@@ -348,9 +348,23 @@ int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool)
 		goto fail;
 	}
 
+	/* TTL may be missing. */
+	uint32_t ttl = 0;
+	token = strtok_r(NULL, SEPARATORS, &saveptr);
+	if (isdigit(token[0])) {
+		unsigned aux;
+		ret = uint_parse(token, &aux);
+		if (ret != 0) {
+			goto fail;
+		}
+		ttl = aux;
+		/* Read class token. */
+		token = strtok_r(NULL, SEPARATORS, &saveptr);
+	}
+
 	/* Class. */
 	uint16_t class;
-	token = strtok_r(NULL, SEPARATORS, &saveptr);
+	/* Token already read. */
 	if (!token) {
 		ret = kr_error(EINVAL);
 		goto fail;
@@ -405,7 +419,7 @@ int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool)
 		goto fail;
 	}
 
-	ret = knot_rrset_add_rdata(ds_set, rdata, rd_written, 0, pool);
+	ret = knot_rrset_add_rdata(ds_set, rdata, rd_written, ttl, pool);
 	if (ret != 0) {
 		goto fail;
 	}
