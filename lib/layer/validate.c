@@ -397,7 +397,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			DEBUG_MSG(qry, "Missing trust anchor.\n");
 #warning TODO: the trust anchor must be fetched from a configurable storage
 			if (qry->zone_cut.name[0] == '\0') {
-				kr_ta_parse(&qry->zone_cut.trust_anchor, ROOT_TA, qry->zone_cut.pool);
+				kr_ta_get(&qry->zone_cut.trust_anchor, &global_trust_anchors, ROOT_NAME, qry->zone_cut.pool);
 			}
 		}
 
@@ -550,8 +550,8 @@ int validate_init(struct kr_module *module)
 	if (ret != 0) {
 		return ret;
 	}
-	/* Add root trust anchor. */
-	ret = kr_ta_add(&global_trust_anchors, ROOT_TA);
+//	/* Add root trust anchor. */
+//	ret = kr_ta_add(&global_trust_anchors, ROOT_TA);
 	if (ret != 0) {
 		return ret;
 	}
