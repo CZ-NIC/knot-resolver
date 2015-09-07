@@ -307,9 +307,11 @@ class Step:
         if self.data[0].is_raw_data_entry is True:
             data_to_wire = self.data[0].raw_data
         else:
-            msg = self.data[0].message
-            msg.use_edns(edns = 1)
-            data_to_wire = msg.to_wire()
+            #msg = self.data[0].message
+            #msg.use_edns(edns = 1)
+            #data_to_wire = msg.to_wire()
+            # Don't use a message copy as the EDNS data portion is not copied.
+            data_to_wire = self.data[0].message.to_wire()
         # Send query to client and wait for response
         while True:
             try:
