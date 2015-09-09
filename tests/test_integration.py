@@ -167,6 +167,11 @@ def find_objects(path):
             result.append(path)
     return result
 
+def write_timestamp_file(path, tst):
+    time_file = open(path, 'w')
+    time_file.write(datetime.fromtimestamp(tst).strftime('%Y-%m-%d %H:%M:%S'))
+    time_file.close()
+
 def setup_env(child_env, config, config_name, j2template):
     """ Set up test environment and config """
     # Clear test directory
@@ -174,9 +179,9 @@ def setup_env(child_env, config, config_name, j2template):
     # Set up libfaketime
     os.environ["FAKETIME_NO_CACHE"] = "1"
     os.environ["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
-    time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
-    time_file.write(datetime.fromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S'))
-    time_file.close()
+    child_env["FAKETIME_NO_CACHE"] = "1"
+    child_env["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
+    write_timestamp_file(child_env["FAKETIME_TIMESTAMP_FILE"], 0)
     # Set up child process env() 
     child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
     child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
@@ -188,9 +193,16 @@ def setup_env(child_env, config, config_name, j2template):
             no_minimize = "false"
         elif k == 'trust-anchor':
             if ((v[0] == '"') and (v[-1] == '"')) or ((v[0] == '\'') and (v[-1] == '\'')):
-                trust_anchor = v[1:-1]
+                trust_anchor_str = v[1:-1]
             else:
-                trust_anchor = v
+                trust_anchor_str = v
+        elif k == 'val-override-date':
+            override_date_str = ""
+            if ((v[0] == '"') and (v[-1] == '"')) or ((v[0] == '\'') and (v[-1] == '\'')):
+                override_date_str = v[1:-1]
+            else:
+                override_date_str = v
+            write_timestamp_file(child_env["FAKETIME_TIMESTAMP_FILE"], int(override_date_str))
     selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
     childaddr = testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE)
     # Prebind to sockets to create necessary files
@@ -206,7 +218,7 @@ def setup_env(child_env, config, config_name, j2template):
         "ROOT_ADDR" : selfaddr,
         "SELF_ADDR" : childaddr,
         "NO_MINIMIZE" : no_minimize,
-        "TRUST_ANCHOR" : trust_anchor,
+        "TRUST_ANCHOR" : trust_anchor_str,
         "WORKING_DIR" : TMPDIR,
     }
     cfg_rendered = j2template.render(j2template_ctx)

@@ -336,15 +336,19 @@ class Step:
 
     def __time_passes(self, ctx):
         """ Modify system time. """
-        ctx.time += int(self.args[1])
+        time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'r')
+        line = time_file.readline().strip()
+        time_file.close()
+        t = time.mktime(datetime.strptime(line, '%Y-%m-%d %H:%M:%S').timetuple())
+        t += int(self.args[1])
         time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
-        time_file.write(datetime.fromtimestamp(ctx.time).strftime('%Y-%m-%d %H:%M:%S') + "\n")
+        time_file.write(datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M:%S') + "\n")
+        time_file.close()
 
 class Scenario:
     def __init__(self, info):
         """ Initialize scenario with description. """
         self.info = info
-        self.time = 0
         self.ranges = []
         self.steps = []
         self.current_step = None
@@ -397,5 +401,5 @@ class Scenario:
         except Exception as e:
             raise Exception('step #%d %s' % (step.id, str(e)))
         finally:
-        	self.child_sock.close()
-        	self.child_sock = None
+            self.child_sock.close()
+            self.child_sock = None
