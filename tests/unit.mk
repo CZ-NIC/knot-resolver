@@ -30,13 +30,13 @@ $(1)_SOURCES := tests/$(1).c
 $(1)_LIBS := $(tests_LIBS)
 $(1)_DEPEND := $(tests_DEPEND)
 $(call make_bin,$(1),tests)
-$(1)-run: $$($(1))
-	$(call preload_LIBS) $$<
-.PHONY: $(1)-run
+$(1): $$($(1))
+	@$$<
+.PHONY: $(1)
 endef
 
 # Targets
 $(foreach test,$(tests_BIN),$(eval $(call make_test,$(test))))
-check-unit: $(foreach test,$(tests_BIN),$(test)-run)
+check-unit: $(foreach test,$(tests_BIN),$(test))
 
 .PHONY: check-unit
