@@ -1,10 +1,10 @@
 # Preload libraries
 preload_PATH := $(abspath contrib/libfaketime/src)
 ifeq ($(PLATFORM),Darwin)
-	preload_LIBS := @DYLD_FORCE_FLAT_NAMESPACE=1 \
+	preload_LIBS := DYLD_FORCE_FLAT_NAMESPACE=1 \
 	                DYLD_LIBRARY_PATH="$(preload_PATH):${DYLD_LIBRARY_PATH}"
 else
-	preload_LIBS := @LD_LIBRARY_PATH="$(preload_PATH):${LD_LIBRARY_PATH}"
+	preload_LIBS := LD_LIBRARY_PATH="$(preload_PATH):${LD_LIBRARY_PATH}"
 endif
 
 # Unit tests

@@ -287,6 +287,7 @@ if __name__ == '__main__':
         print "\t<additional> - additional parameters for <binary>"
         sys.exit(0)
 
+    test_platform()
     path_to_scenario = ""
     binary_name = ""
     template_name = ""
@@ -306,15 +307,10 @@ if __name__ == '__main__':
     j2template_env = jinja2.Environment(loader=j2template_loader)
     j2template = j2template_env.get_template(template_name)
 
-    # Self-tests first
+    # Scan for scenarios
     test = test.Test()
-    test.add('integration/platform', test_platform)
-    if test.run() != 0:
-        sys.exit(1)
-    else:
-        # Scan for scenarios
-        for arg in [path_to_scenario]:
-            objects = find_objects(arg)
-            for path in objects:
-                test.add(path, play_object, path, binary_name, config_name, j2template, binary_additional_pars)
-        sys.exit(test.run())
+    for arg in [path_to_scenario]:
+        objects = find_objects(arg)
+        for path in objects:
+            test.add(path, play_object, path, binary_name, config_name, j2template, binary_additional_pars)
+    sys.exit(test.run())

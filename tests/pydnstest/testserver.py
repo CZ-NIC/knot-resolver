@@ -228,7 +228,7 @@ class TestServer:
                 address = "::1"
         else:
             raise Exception("[start_srv] unsupported socket type {sock_type}".format(sock_type=type))
-	if port == 0 or port is None:
+        if port == 0 or port is None:
             port = 53
 
         if (self.thread is None):
