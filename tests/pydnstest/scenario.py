@@ -9,6 +9,11 @@ import itertools
 import time
 from datetime import datetime
 
+def dprint(msg):
+    """ Verbose logging (if enabled). """
+    if 'VERBOSE' in os.environ:
+        print(msg)
+
 class Entry:
     """
     Data entry represents scripted message and extra metadata, notably match criteria and reply adjustments.
@@ -86,7 +91,7 @@ class Entry:
         if raw_value is not None:
             got = binascii.hexlify(raw_value)
         if expected != got:
-            print "expected '",expected,"', got '",got,"'"
+            print("expected '",expected,"', got '",got,"'")
             raise Exception("comparsion failed")
 
     def set_match(self, fields):
@@ -273,7 +278,9 @@ class Step:
 
     def play(self, ctx, peeraddr):
         """ Play one step from a scenario. """
+        dprint('=> %d\t%s' % (self.id, self.type))
         if self.type == 'QUERY':
+            dprint(self.data[0].message.to_text())
             return self.__query(ctx, peeraddr)
         elif self.type == 'CHECK_OUT_QUERY':
              pass # Ignore
@@ -292,13 +299,13 @@ class Step:
             raise Exception("response definition required")
         expected = self.data[0]
         if expected.is_raw_data_entry is True:
-            expected.cmp_raw(ctx.last_raw_answer);
+            dprint(ctx.last_raw_answer.to_text())
+            expected.cmp_raw(ctx.last_raw_answer)
         else:
-            if ctx.last_answer is None :
+            if ctx.last_answer is None:
                 raise Exception("no answer from preceding query")
             expected.match(ctx.last_answer)
-
-
+            dprint(ctx.last_answer.to_text())
 
     def __query(self, ctx, peeraddr):
         """ Resolve a query. """
@@ -307,9 +314,6 @@ class Step:
         if self.data[0].is_raw_data_entry is True:
             data_to_wire = self.data[0].raw_data
         else:
-            #msg = self.data[0].message
-            #msg.use_edns(edns = 1)
-            #data_to_wire = msg.to_wire()
             # Don't use a message copy as the EDNS data portion is not copied.
             data_to_wire = self.data[0].message.to_wire()
         # Send query to client and wait for response
