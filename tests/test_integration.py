@@ -187,6 +187,7 @@ def setup_env(child_env, config, config_name, j2template):
     child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
     no_minimize = "true"
     trust_anchor_str = ""
+    stub_addr = ""
     for k,v in config:
         # Enable selectively for some tests
         if k == 'query-minimization' and str2bool(v):
@@ -203,7 +204,15 @@ def setup_env(child_env, config, config_name, j2template):
             else:
                 override_date_str = v
             write_timestamp_file(child_env["FAKETIME_TIMESTAMP_FILE"], int(override_date_str))
-    selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
+        elif k == 'stub-addr':
+            if ((v[0] == '"') and (v[-1] == '"')) or ((v[0] == '\'') and (v[-1] == '\'')):
+                stub_addr = v[1:-1]
+            else:
+                stub_addr = v
+    if stub_addr.startswith('127.0.0.') or stub_addr.startswith('::'):
+        selfaddr = stub_addr
+    else:
+        selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
     childaddr = testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE)
     # Prebind to sockets to create necessary files
     # @TODO: this is probably a workaround for socket_wrapper bug
