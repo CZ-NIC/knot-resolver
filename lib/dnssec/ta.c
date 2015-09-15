@@ -427,12 +427,6 @@ int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool)
 	*rr = ds_set;
 	ds_set = NULL;
 
-#ifdef WITH_DEBUG
-//	char buff[1024];
-//	knot_rrset_txt_dump(*rr, buff, 1024, &KNOT_DUMP_STYLE_DEFAULT);
-//	fprintf(stderr, "%s() '%s'\n", __func__, buff);
-#endif
-
 fail:
 	knot_rrset_free(&ds_set, pool);
 	mm_free(pool, rdata);

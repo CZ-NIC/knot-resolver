@@ -308,7 +308,7 @@ int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
 	request.pool = pool;
 	kr_resolve_begin(&request, ctx, answer);
 	request.options |= options;
-#ifdef WITH_DEBUG
+#ifndef NDEBUG
 	struct kr_rplan *rplan = &request.rplan; /* for DEBUG_MSG */
 #endif
 	/* Resolve query, iteratively */
@@ -574,15 +574,16 @@ ns_election:
 		return KNOT_STATE_FAIL;
 	}
 
-#ifdef WITH_DEBUG
+	WITH_DEBUG {
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN], type_str[16];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
 	struct sockaddr *addr = &qry->ns.addr.ip;
 	inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr), ns_str, sizeof(ns_str));
 	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
 	knot_rrtype_to_string(knot_pkt_qtype(packet), type_str, sizeof(type_str));
-	DEBUG_MSG("=> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n", ns_str, qry->ns.score, zonecut_str, qname_str, type_str);
-#endif
+	DEBUG_MSG("=> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n",
+		ns_str, qry->ns.score, zonecut_str, qname_str, type_str);
+	}
 
 	gettimeofday(&qry->timestamp, NULL);
 	*dst = &qry->ns.addr.ip;
@@ -592,9 +593,8 @@ ns_election:
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
-#ifdef WITH_DEBUG
+#ifndef NDEBUG
 	struct kr_rplan *rplan = &request->rplan;
-	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
 #endif
 	/* Finalize answer */
 	if (answer_finalize(request, state) != 0) {
@@ -607,7 +607,9 @@ int kr_resolve_finish(struct kr_request *request, int state)
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
+
 	ITERATE_LAYERS(request, finish);
+	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
 	return KNOT_STATE_DONE;
 }
 

@@ -474,7 +474,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_DONE;
 	}
 
-#ifdef WITH_DEBUG
+#ifndef NDEBUG
 	lookup_table_t *rcode = lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 #endif
 

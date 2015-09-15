@@ -12,12 +12,11 @@ Requirements
 Running
 =======
 
-There is a separate resolver library in the `lib` directory, and a minimalistic daemon in
-the `daemon` directory.
+There is a separate resolver library in the `lib` directory, and a server in the `daemon` directory.
 
 .. code-block:: bash
 
-	$ ./daemon/kresd -h
+	$ kresd -h
 
 Interacting with the daemon
 ---------------------------
@@ -59,6 +58,16 @@ This is also a way to enumerate and test running instances, the list of files in
 of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
 
 .. warning:: This is very basic way to orchestrate multi-core deployments and doesn't scale in multi-node clusters. Keep an eye on the prepared ``hive`` module that is going to automate everything from service discovery to deployment and consistent configuration.
+
+Verbose output
+--------------
+
+If the debug logging is compiled in, you can turn on verbose tracing of server operation with the ``-v`` option.
+You can also toggle it on runtime with ``verbose(true|false)`` command.
+
+.. code-block:: bash
+
+   $ kresd -v
 
 Configuration
 =============
@@ -240,6 +249,10 @@ Environment
 .. function:: hostname()
 
    :return: Machine hostname.
+
+.. function:: verbose(true | false)
+
+   :return: Toggle verbose logging.
 
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^

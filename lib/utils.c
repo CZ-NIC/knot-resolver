@@ -28,6 +28,9 @@
 #include "lib/generic/array.h"
 #include "lib/nsrep.h"
 
+/* Logging & debugging */
+bool _env_debug = false;
+
 /** @internal CSPRNG context */
 static isaac_ctx ISAAC;
 static bool isaac_seeded = false;

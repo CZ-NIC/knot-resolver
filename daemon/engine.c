@@ -52,6 +52,7 @@ static int l_help(lua_State *L)
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
 		"hostname()\n    hostname\n"
+		"verbose(true|false)\n    toggle verbose mode\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		;
 	lua_pushstring(L, help_str);
@@ -61,10 +62,18 @@ static int l_help(lua_State *L)
 /** Quit current executable. */
 static int l_quit(lua_State *L)
 {
-	/* Stop engine */
 	engine_stop(engine_luaget(L));
-	/* No results */
 	return 0;
+}
+
+/** Toggle verbose mode. */
+static int l_verbose(lua_State *L)
+{
+	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
+		log_debug_enable(lua_toboolean(L, 1));
+	}
+	lua_pushboolean(L, log_debug_status());
+	return 1;
 }
 
 /** Return hostname. */
@@ -96,7 +105,7 @@ static int l_option(lua_State *L)
 		}
 	}
 	/* Get or set */
-	if (lua_isboolean(L, 2)) {
+	if (lua_isboolean(L, 2) || lua_isnumber(L, 2)) {
 		if (lua_toboolean(L, 2)) {
 			engine->resolver.options |= opt_code;
 		} else {
@@ -284,10 +293,12 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "help");
 	lua_pushcfunction(engine->L, l_quit);
 	lua_setglobal(engine->L, "quit");
-	lua_pushcfunction(engine->L, l_option);
-	lua_setglobal(engine->L, "option");
 	lua_pushcfunction(engine->L, l_hostname);
 	lua_setglobal(engine->L, "hostname");
+	lua_pushcfunction(engine->L, l_verbose);
+	lua_setglobal(engine->L, "verbose");
+	lua_pushcfunction(engine->L, l_option);
+	lua_setglobal(engine->L, "option");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();

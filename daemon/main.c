@@ -124,7 +124,8 @@ static void help(int argc, char *argv[])
 	printf("\nParameters:\n"
 	       " -a, --addr=[addr]   Server address (default: localhost#53).\n"
 	       " -f, --forks=N       Start N forks sharing the configuration.\n"
-	       " -v, --version       Print version of the server.\n"
+	       " -v, --verbose       Run in verbose mode.\n"
+	       " -V, --version       Print version of the server.\n"
 	       " -h, --help          Print help and usage.\n"
 	       "Options:\n"
 	       " [rundir]            Path to the working directory (default: .)\n");
@@ -201,11 +202,12 @@ int main(int argc, char **argv)
 	struct option opts[] = {
 		{"addr", required_argument, 0, 'a'},
 		{"forks",required_argument, 0, 'f'},
-		{"version",   no_argument,  0, 'v'},
+		{"verbose",    no_argument, 0, 'v'},
+		{"version",   no_argument,  0, 'V'},
 		{"help",      no_argument,  0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:f:vh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:f:vVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -215,12 +217,15 @@ int main(int argc, char **argv)
 			g_interactive = 0;
 			forks = atoi(optarg);
 			if (forks == 0) {
-				fprintf(stderr, "[system] error '-f' requires number, not '%s'\n", optarg);
+				log_error("[system] error '-f' requires number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
 			break;
 		case 'v':
-			printf("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
+			log_debug_enable(true);
+			break;
+		case 'V':
+			log_info("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
 			return EXIT_SUCCESS;
 		case 'h':
 		case '?':
@@ -236,12 +241,12 @@ int main(int argc, char **argv)
 	if (optind < argc) {
 		const char *rundir = argv[optind];
 		if (access(rundir, W_OK) != 0) {
-			fprintf(stderr, "[system] rundir '%s': not writeable\n", rundir);
+			log_error("[system] rundir '%s': not writeable\n", rundir);
 			return EXIT_FAILURE;
 		}
 		ret = chdir(rundir);
 		if (ret != 0) {
-			fprintf(stderr, "[system] rundir '%s': %s\n", rundir, strerror(errno));
+			log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
@@ -277,20 +282,20 @@ int main(int argc, char **argv)
 	struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {
-		fprintf(stderr, "[system] failed to initialize engine: %s\n", kr_strerror(ret));
+		log_error("[system] failed to initialize engine: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
 	/* Create worker */
 	struct worker_ctx *worker = init_worker(loop, &engine, &pool, forks);
 	if (!worker) {
-		fprintf(stderr, "[system] not enough memory\n");
+		log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
 	}
 	/* Bind to sockets and run */
 	if (addr != NULL) {
 		ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
 		if (ret != 0) {
-			fprintf(stderr, "[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
+			log_error("[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
 			ret = EXIT_FAILURE;
 		}
 	}
