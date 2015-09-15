@@ -304,8 +304,8 @@ class Step:
         else:
             if ctx.last_answer is None:
                 raise Exception("no answer from preceding query")
-            expected.match(ctx.last_answer)
             dprint(ctx.last_answer.to_text())
+            expected.match(ctx.last_answer)
 
     def __query(self, ctx, peeraddr):
         """ Resolve a query. """
