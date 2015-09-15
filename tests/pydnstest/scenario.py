@@ -30,7 +30,7 @@ class Entry:
         self.adjust_fields = ['copy_id']
         self.origin = '.'
         self.message = dns.message.Message()
-        self.message.use_edns(edns = 0)
+        self.message.use_edns(edns = 0, payload = 4096)
         self.sections = []
         self.is_raw_data_entry = False
         self.raw_data_pending = False
