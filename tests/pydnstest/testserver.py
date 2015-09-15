@@ -102,7 +102,11 @@ class TestServer:
                  addr_local = am.local
                  new_entry = False
         if addr_local is None:
-            addr_local = get_local_addr_str(family, iface)
+            # Do not remap addresses already in local range
+            if addr.startswith('127.0.0.') or addr.startswith('::'):
+                addr_local = addr
+            else:
+                addr_local = get_local_addr_str(family, iface)
             am = AddrMapInfo(family,addr_local,addr_external)
             self.addr_map.append(am)
             new_entry = True

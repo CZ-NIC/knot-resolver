@@ -2,14 +2,14 @@
 	target-fetch-policy: "0 0 0 0 0"
 	query-minimization: on
 	name: "."
-	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
+	stub-addr: 127.0.0.10 	# K.ROOT-SERVERS.NET.
 CONFIG_END
 
 SCENARIO_BEGIN Test basic query minimization www.example.com.
 
 ; K.ROOT-SERVERS.NET.
 RANGE_BEGIN 0 100
-	ADDRESS 193.0.14.129 
+	ADDRESS 127.0.0.10
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
@@ -19,7 +19,7 @@ SECTION QUESTION
 SECTION ANSWER
 . IN NS	K.ROOT-SERVERS.NET.
 SECTION ADDITIONAL
-K.ROOT-SERVERS.NET.	IN	A	193.0.14.129
+K.ROOT-SERVERS.NET.	IN	A	127.0.0.10
 ENTRY_END
 
 ENTRY_BEGIN
