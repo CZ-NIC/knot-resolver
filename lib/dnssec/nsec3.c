@@ -208,18 +208,41 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 		goto fail;
 	}
 
-	if ((owner_hash.size != name_hash.size) ||
-	    (memcmp(owner_hash.data, name_hash.data, owner_hash.size) >= 0)) {
-		goto fail;
-	}
-
 	uint8_t next_size = 0;
 	uint8_t *next_hash = NULL;
 	knot_nsec3_next_hashed(&nsec3->rrs, 0, &next_hash, &next_size);
 
-	if ((name_hash.size != next_size) ||
-	    (memcmp(name_hash.data, next_hash, name_hash.size) >= 0)) {
+	if ((owner_hash.size != next_size) || (name_hash.size != next_size)) {
+		/* All hash lengths must be same. */
 		goto fail;
+	}
+
+	const uint8_t *ownrd = owner_hash.data;
+	const uint8_t *nextd = next_hash;
+	if (memcmp(ownrd, nextd, next_size) < 0) {
+		/*
+		 * 0 (...) owner ... next (...) MAX
+		 *                ^
+		 *                name
+		 * ==>
+		 * (owner < name) && (name < next)
+		 */
+		if ((memcmp(ownrd, name_hash.data, next_size) >= 0) ||
+		    (memcmp(name_hash.data, nextd, next_size) >= 0)) {
+			goto fail;
+		}
+	} else {
+		/*
+		 * owner ... MAX, 0 ... next
+		 *        ^     ^    ^
+		 *        name  name name
+		 * =>
+		 * (owner < name) || (name < next)
+		 */
+		if ((memcmp(ownrd, name_hash.data, next_size) >= 0) &&
+		    (memcmp(name_hash.data, nextd, next_size) >= 0)) {
+			goto fail;
+		}
 	}
 
 	*flags |= FLG_NAME_COVERED;

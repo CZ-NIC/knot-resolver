@@ -361,7 +361,6 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Validate non-existence proof if not positive answer. */
 	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN) {
-#warning TODO: validate NSECx proof, RRSIGs will be checked later if it matches
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname, &req->pool);
 		} else {
