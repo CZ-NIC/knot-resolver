@@ -610,7 +610,7 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 		/* TODO -- The loop resembles no_data_response_no_ds() exept
 		 * the following condition.
 		 */
-		if ((flags & FLG_NAME_MATCHED) && !(flags & FLG_TYPE_BIT_MISSING)) {
+		if ((flags & FLG_NAME_MATCHED) && (flags & FLG_TYPE_BIT_MISSING)) {
 			return kr_ok();
 		}
 	}
