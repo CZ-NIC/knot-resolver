@@ -17,7 +17,6 @@
 #include <uv.h>
 #include <lua.h>
 #include <libknot/packet/pkt.h>
-#include <libknot/internal/net.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)

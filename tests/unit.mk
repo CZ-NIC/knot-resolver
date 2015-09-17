@@ -12,8 +12,7 @@ tests_BIN := \
 	test_module \
 	test_cache \
 	test_zonecut \
-	test_rplan \
-	test_resolve
+	test_rplan
 
 mock_cmodule_SOURCES := tests/mock_cmodule.c
 $(eval $(call make_lib,mock_cmodule,tests))
