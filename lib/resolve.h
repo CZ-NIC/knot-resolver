@@ -28,26 +28,8 @@
 
 /**
  * @file resolve.h
- * @brief The API provides a high-level API for simple name resolution,
- * and an API providing a "consumer-producer"-like interface to enable
- * you write custom I/O or special iterative resolution driver.
- *
- * # Example usage of the high-level API:
- *
- * @code{.c}
- *
- * struct kr_context ctx = {
- *     .cache = ..., // open cache instance (or NULL)
- *     .layers = &modules,
- * };
- *
- * // Resolve "IN A cz."
- * knot_pkt_t *answer = knot_pkt_new(NULL, 65535, ctx.pool);
- * int ret = kr_resolve(&ctx, answer, (uint8_t*)"\x02cz", 1, 1, 0);
- * printf("rcode: %d, ancount: %u\n",
- *        knot_wire_get_rcode(answer->wire),
- *        knot_wire_get_ancount(answer->wire));
- * @endcode
+ * @brief The API provides an API providing a "consumer-producer"-like interface to enable
+ * user to plug it into existing event loop or I/O code.
  *
  * # Example usage of the iterative API:
  *
@@ -130,22 +112,6 @@ struct kr_request {
     struct kr_rplan rplan;
     mm_ctx_t pool;
 };
-
-/**
- * Resolve an input query and produce a packet with an answer.
- *
- * @note The function doesn't change the packet question or message ID.
- *
- * @param ctx    resolution context
- * @param answer answer packet to be written
- * @param qname  resolved query name
- * @param qclass resolved query class
- * @param qtype  resolved query type
- * @param options resolution options
- * @return       0 or an error code
- */
-int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
-               const knot_dname_t *qname, uint16_t qclass, uint16_t qtype, uint32_t options);
 
 /**
  * Begin name resolution.

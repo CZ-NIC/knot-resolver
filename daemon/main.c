@@ -18,7 +18,6 @@
 #include <string.h>
 #include <getopt.h>
 #include <uv.h>
-#include <libknot/internal/sockaddr.h>
 
 #include "contrib/ucw/mempool.h"
 #include "contrib/ccan/asprintf/asprintf.h"

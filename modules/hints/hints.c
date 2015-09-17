@@ -23,7 +23,6 @@
 
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
-#include <libknot/internal/lists.h>
 #include <libknot/rrtype/aaaa.h>
 #include <ccan/json/json.h>
 #include <ucw/mempool.h>

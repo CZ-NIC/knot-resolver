@@ -19,7 +19,6 @@
 #include <fcntl.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
-#include <libknot/internal/net.h>
 #include <ucw/mempool.h>
 #include "lib/resolve.h"
 #include "lib/layer.h"
@@ -137,70 +136,6 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	return kr_ok();
 }
 
-static int connected(struct sockaddr *addr, int proto, struct timeval *timeout)
-{
-	unsigned flags = (proto == SOCK_STREAM) ? O_NONBLOCK : 0;
-	int fd = net_connected_socket(proto, (struct sockaddr_storage *)addr, NULL, flags);
-	if (fd < 0) {
-		return kr_error(ECONNREFUSED);
-	}
-
-	/* Workaround for timeout, as we have no control over
-	 * connect() time limit in blocking mode. */
-	if (proto == SOCK_STREAM) {
-		fd_set set;
-		FD_ZERO(&set);
-		FD_SET(fd, &set);
-		int ret = select(fd + 1, NULL, &set, NULL, timeout);
-		if (ret == 0) {
-			close(fd);
-			return kr_error(ETIMEDOUT);
-		}
-		if (ret < 0) {
-			close(fd);
-			return kr_error(ECONNREFUSED);
-		}
-		fcntl(fd, F_SETFL, 0);
-	}
-
-	return fd;
-}
-
-static int sendrecv(struct sockaddr *addr, int proto, const knot_pkt_t *query, knot_pkt_t *resp)
-{
-	struct timeval timeout = { KR_CONN_RTT_MAX / 1000, 0 };
-	auto_close int fd = connected(addr, proto, &timeout);
-	resp->size = 0;
-	if (fd < 0) {
-		return fd;
-	}
-
-	/* Send packet */
-	int ret = 0;
-	if (proto == SOCK_STREAM) {
-		ret = tcp_send_msg(fd, query->wire, query->size, &timeout);
-	} else {
-		ret = udp_send_msg(fd, query->wire, query->size, NULL);
-	}
-	if (ret != query->size) {
-		return kr_error(EIO);
-	}
-
-	/* Receive it */
-	if (proto == SOCK_STREAM) {
-		ret = tcp_recv_msg(fd, resp->wire, resp->max_size, &timeout);
-	} else {
-		ret = udp_recv_msg(fd, resp->wire, resp->max_size, &timeout);
-	}
-	if (ret <= 0) {
-		return kr_error(ETIMEDOUT);
-	}
-
-	/* Parse and return */
-	resp->size = ret;
-	return knot_pkt_parse(resp, 0);
-}
-
 static int edns_put(knot_pkt_t *pkt)
 {
 	if (!pkt->opt_rr) {
@@ -279,65 +214,6 @@ static int query_finalize(struct kr_request *request, knot_pkt_t *pkt)
 		}
 	}
 	return ret;
-}
-
-int kr_resolve(struct kr_context* ctx, knot_pkt_t *answer,
-               const knot_dname_t *qname, uint16_t qclass, uint16_t qtype, uint32_t options)
-{
-	if (ctx == NULL || answer == NULL || qname == NULL) {
-		return kr_error(EINVAL);
-	}
-
-	/* Create memory pool */
-	mm_ctx_t pool = {
-		.ctx = mp_new (KNOT_WIRE_MAX_PKTSIZE),
-		.alloc = (mm_alloc_t) mp_alloc
-	};
-	knot_pkt_t *query = knot_pkt_new(NULL, KR_EDNS_PAYLOAD, &pool);
-	knot_pkt_t *resp = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, &pool);
-	if (!query || !resp) {
-		mp_delete(pool.ctx);
-		return kr_error(ENOMEM);
-	}
-
-	/* Initialize context. */
-	struct kr_request request;
-	request.pool = pool;
-	kr_resolve_begin(&request, ctx, answer);
-	request.options |= options;
-#ifndef NDEBUG
-	struct kr_rplan *rplan = &request.rplan; /* for DEBUG_MSG */
-#endif
-	/* Resolve query, iteratively */
-	int proto = 0;
-	struct sockaddr *addr = NULL;
-	unsigned iter_count = 0;
-	int state = kr_resolve_query(&request, qname, qclass, qtype);
-	while (state == KNOT_STATE_PRODUCE) {
-		/* Hardlimit on iterative queries */
-		if (++iter_count > KR_ITER_LIMIT) {
-			DEBUG_MSG("iteration limit %d reached\n", KR_ITER_LIMIT);
-			state = KNOT_STATE_FAIL;
-			break;
-		}
-		/* Produce next query or finish */
-		state = kr_resolve_produce(&request, &addr, &proto, query);
-		while (state == KNOT_STATE_CONSUME) {
-			/* Get answer from nameserver and consume it */
-			int ret = sendrecv(addr, proto, query, resp);
-			if (ret != 0) {
-				DEBUG_MSG("sendrecv: %s\n", kr_strerror(ret));
-			}
-			state = kr_resolve_consume(&request, resp);
-			knot_pkt_clear(resp);
-		}
-		knot_pkt_clear(query);
-	}
-
-	/* Cleanup */
-	kr_resolve_finish(&request, state);
-	mp_delete(pool.ctx);
-	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
 }
 
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer)
