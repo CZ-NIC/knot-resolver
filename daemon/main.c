@@ -192,9 +192,9 @@ static int run_worker(uv_loop_t *loop, struct engine *engine)
 
 int main(int argc, char **argv)
 {
-	const char *addr = NULL;
-	int port = 53;
 	int forks = 1;
+	array_t(char*) addr_set;
+	array_init(addr_set);
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 		switch (c)
 		{
 		case 'a':
-			addr = set_addr(optarg, &port);
+			array_push(addr_set, optarg);
 			break;
 		case 'f':
 			g_interactive = 0;
@@ -291,7 +291,9 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Bind to sockets and run */
-	if (addr != NULL) {
+	for (size_t i = 0; i < addr_set.len; ++i) {
+		int port = 53;
+		const char *addr = set_addr(addr_set.at[i], &port);
 		ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
 		if (ret != 0) {
 			log_error("[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
@@ -302,6 +304,7 @@ int main(int argc, char **argv)
 		ret = run_worker(loop, &engine);
 	}
 	/* Cleanup. */
+	array_clear(addr_set);
 	engine_deinit(&engine);
 	worker_reclaim(worker);
 	mp_delete(pool.ctx);
