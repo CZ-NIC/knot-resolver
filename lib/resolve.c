@@ -234,10 +234,6 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 	if (knot_pkt_init_response(answer, query) != 0) {
 		return kr_error(ENOMEM); /* Failed to initialize answer */
 	}
-	/* Set DNSSEC required flag if query contains DO=1 */
-	if (knot_pkt_has_dnssec(query)) {
-		req->options |= QUERY_DNSSEC_WANT;
-	}
 	/* Handle EDNS in the query */
 	if (knot_pkt_has_edns(query)) {
 		int ret = edns_create(answer, query, req);
