@@ -393,11 +393,8 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	uint16_t qtype = knot_pkt_qtype(pkt);
 	if (qtype == KNOT_RRTYPE_DNSKEY) {
 		if (!qry->zone_cut.trust_anchor) {
-			DEBUG_MSG(qry, "Missing trust anchor.\n");
-#warning TODO: the trust anchor must be fetched from a configurable storage
-			if (qry->zone_cut.name[0] == '\0') {
-				kr_ta_get(&qry->zone_cut.trust_anchor, &global_trust_anchors, ROOT_NAME, qry->zone_cut.pool);
-			}
+			DEBUG_MSG(qry, ">< missing trust anchor\n");
+			kr_ta_get(&qry->zone_cut.trust_anchor, &global_trust_anchors, qry->zone_cut.name, qry->zone_cut.pool);
 		}
 
 		ret = validate_keyset(qry, pkt, has_nsec3);
@@ -423,7 +420,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	if ((qtype == KNOT_RRTYPE_DS) && (qry->parent != NULL) && (qry->parent->zone_cut.trust_anchor == NULL)) {
-		DEBUG_MSG(qry, "updating trust anchor in zone cut\n");
+		DEBUG_MSG(qry, "<= updating trust anchor in zone cut\n");
 		qry->parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, qry->parent->zone_cut.pool);
 		if (!qry->parent->zone_cut.trust_anchor) {
 			return KNOT_STATE_FAIL;
@@ -434,7 +431,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	if ((qtype == KNOT_RRTYPE_DNSKEY) && (qry->parent != NULL) && (qry->parent->zone_cut.key == NULL)) {
-		DEBUG_MSG(qry, "updating keys in zone cut\n");
+		DEBUG_MSG(qry, "<= updating keys in zone cut\n");
 		qry->parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, qry->parent->zone_cut.pool);
 		if (!qry->parent->zone_cut.key) {
 			return KNOT_STATE_FAIL;

@@ -25,6 +25,7 @@
 #include "lib/layer.h"
 #include "lib/rplan.h"
 #include "lib/layer/iterate.h"
+#include "lib/dnssec/ta.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "resl",  fmt)
 
@@ -238,7 +239,7 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 		req->options |= QUERY_DNSSEC_WANT;
 	}
 	/* Handle EDNS in the query */
-	if (knot_pkt_has_edns(query) || (req->options & QUERY_DNSSEC_WANT)) {
+	if (knot_pkt_has_edns(query)) {
 		int ret = edns_create(answer, query, req);
 		if (ret != 0){
 			return ret;
@@ -483,6 +484,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	/* The query wasn't resolved from cache,
 	 * now it's the time to look up closest zone cut from cache.
 	 */
+	 /* Always try with DNSSEC if it finds island of trust. */
+	 /* @todo this interface is going to change */
+	if (kr_ta_contains(&global_trust_anchors, qry->zone_cut.name)) {
+		request->options |= QUERY_DNSSEC_WANT;
+		DEBUG_MSG(">< entered island of trust\n");
+	}
 	bool want_secured = (request->options & QUERY_DNSSEC_WANT);
 	if (qry->flags & QUERY_AWAIT_CUT) {
 		int ret = ns_fetch_cut(qry, request, want_secured);

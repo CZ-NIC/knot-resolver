@@ -639,6 +639,11 @@ static int ta_get(knot_rrset_t **ta, struct trust_anchors_nolock *tan, const kno
 	return kr_ok();
 }
 
+int kr_ta_contains(struct trust_anchors *tas, const knot_dname_t *name)
+{
+	return ta_find(&tas->locked, name) != NULL;
+}
+
 int kr_ta_get(knot_rrset_t **ta, struct trust_anchors *tas, const knot_dname_t *name, mm_ctx_t *pool)
 {
 	if (!ta || !tas || !name) {
