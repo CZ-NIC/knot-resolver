@@ -193,22 +193,12 @@ def setup_env(child_env, config, config_name, j2template):
         if k == 'query-minimization' and str2bool(v):
             no_minimize = "false"
         elif k == 'trust-anchor':
-            if ((v[0] == '"') and (v[-1] == '"')) or ((v[0] == '\'') and (v[-1] == '\'')):
-                trust_anchor_str = v[1:-1]
-            else:
-                trust_anchor_str = v
+            trust_anchor_str = v.strip('"\'')
         elif k == 'val-override-date':
-            override_date_str = ""
-            if ((v[0] == '"') and (v[-1] == '"')) or ((v[0] == '\'') and (v[-1] == '\'')):
-                override_date_str = v[1:-1]
-            else:
-                override_date_str = v
+            override_date_str = v.strip('"\'')
             write_timestamp_file(child_env["FAKETIME_TIMESTAMP_FILE"], int(override_date_str))
         elif k == 'stub-addr':
-            if ((v[0] == '"') and (v[-1] == '"')) or ((v[0] == '\'') and (v[-1] == '\'')):
-                stub_addr = v[1:-1]
-            else:
-                stub_addr = v
+            stub_addr = v.strip('"\'')
     if stub_addr.startswith('127.0.0.') or stub_addr.startswith('::'):
         selfaddr = stub_addr
     else:
@@ -278,6 +268,8 @@ def play_object(path, binary_name, config_name, j2template, binary_additional_pa
         server.stop()
         daemon_proc.terminate()
         daemon_proc.wait()
+        if 'VERBOSE' in os.environ:
+            print('[ LOG      ]\n%s' % open('%s/server.log' % TMPDIR).read())
     # Do not clear files if the server crashed (for analysis)
     del_files(TMPDIR)
 

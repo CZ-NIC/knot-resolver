@@ -278,7 +278,7 @@ class Step:
 
     def play(self, ctx, peeraddr):
         """ Play one step from a scenario. """
-        dprint('=> %d\t%s' % (self.id, self.type))
+        dprint('[ STEP %03d ] %s' % (self.id, self.type))
         if self.type == 'QUERY':
             dprint(self.data[0].message.to_text())
             return self.__query(ctx, peeraddr)
