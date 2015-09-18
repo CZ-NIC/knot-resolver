@@ -322,6 +322,76 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	return kr_rplan_empty(&request->rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 }
 
+/** @internal Spawn subrequest in current zone cut (no minimization or lookup). */
+static int zone_cut_subreq(struct kr_rplan *rplan, struct kr_query *parent,
+                           const knot_dname_t *qname, uint16_t qtype)
+{
+	struct kr_query *next = kr_rplan_push(rplan, parent, qname, parent->sclass, qtype);
+	if (!next) {
+		return kr_error(ENOMEM);
+	}
+	kr_zonecut_set(&next->zone_cut, parent->zone_cut.name);
+	if (kr_zonecut_copy(&next->zone_cut, &parent->zone_cut) != 0 ||
+	    kr_zonecut_copy_trust(&next->zone_cut, &parent->zone_cut) != 0) {
+		return kr_error(ENOMEM);
+	}
+	next->flags |= QUERY_NO_MINIMIZE;
+	return kr_ok();
+}
+
+/** @internal Check current zone cut status and credibility, spawn subrequests if needed. */
+static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot_pkt_t *packet)
+{
+	struct kr_rplan *rplan = &request->rplan;
+
+	/* Always try with DNSSEC if it finds an island of trust. */
+	if (!(request->options & QUERY_DNSSEC_WANT) &&
+	    kr_ta_contains(&global_trust_anchors, qry->zone_cut.name)) {
+		request->options |= QUERY_DNSSEC_WANT;
+		DEBUG_MSG(">< entered island of trust\n");
+	}
+	/* The query wasn't resolved from cache,
+	 * now it's the time to look up closest zone cut from cache. */
+	bool want_secured = (request->options & QUERY_DNSSEC_WANT);
+	if (qry->flags & QUERY_AWAIT_CUT) {
+		int ret = ns_fetch_cut(qry, request, want_secured);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
+		/* Update minimized QNAME if zone cut changed */
+		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
+			if (kr_make_query(qry, packet) != 0) {
+				return KNOT_STATE_FAIL;
+			}
+		}
+		qry->flags &= ~QUERY_AWAIT_CUT;
+	}
+
+	/* Missing delegation signature, fetch it first. */
+	if ((qry->flags & QUERY_AWAIT_DS) && (qry->zone_cut.missing_name)) {
+		int ret = zone_cut_subreq(rplan, qry, qry->zone_cut.missing_name, KNOT_RRTYPE_DS);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
+		/* The current trust anchor and keys cannot be used. */
+		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+		knot_rrset_free(&qry->zone_cut.trust_anchor, qry->zone_cut.pool);
+		qry->flags &= ~QUERY_AWAIT_DS;
+		return KNOT_STATE_DONE;
+	}
+
+	/* Try to fetch missing DNSKEY. */
+	if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
+		int ret = zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_DNSKEY);
+		if (ret != 0) {
+			return KNOT_STATE_FAIL;
+		}
+		return KNOT_STATE_DONE;
+	}
+
+	return KNOT_STATE_PRODUCE;	
+}
+
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
@@ -342,7 +412,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		ITERATE_LAYERS(request, consume, packet);
 	}
 	switch(request->state) {
-	case KNOT_STATE_FAIL: return request->state; break;
+	case KNOT_STATE_FAIL: return request->state;
 	case KNOT_STATE_CONSUME: break;
 	case KNOT_STATE_DONE:
 	default: /* Current query is done */
@@ -353,76 +423,21 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 	}
 
-	/* The query wasn't resolved from cache,
-	 * now it's the time to look up closest zone cut from cache.
-	 */
-	 /* Always try with DNSSEC if it finds island of trust. */
-	 /* @todo this interface is going to change */
-	if (kr_ta_contains(&global_trust_anchors, qry->zone_cut.name)) {
-		request->options |= QUERY_DNSSEC_WANT;
-		DEBUG_MSG(">< entered island of trust\n");
-	}
-	bool want_secured = (request->options & QUERY_DNSSEC_WANT);
-	if (qry->flags & QUERY_AWAIT_CUT) {
-		int ret = ns_fetch_cut(qry, request, want_secured);
-		if (ret != 0) {
-			return KNOT_STATE_FAIL;
-		}
-		/* Update minimized QNAME if zone cut changed */
-		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
-			if (kr_make_query(qry, packet) != 0) {
-				return KNOT_STATE_FAIL;
-			}
-		}
-		qry->flags &= ~QUERY_AWAIT_CUT;
+	/* Update zone cut, spawn new subrequests. */
+	int state = zone_cut_check(request, qry, packet);
+	switch(state) {
+	case KNOT_STATE_FAIL: return KNOT_STATE_FAIL;
+	case KNOT_STATE_DONE: return KNOT_STATE_PRODUCE;
+	default: break;
 	}
 
-	/* fetch missing DS record. */
-	if ((qry->flags & QUERY_AWAIT_DS) && (qry->zone_cut.missing_name)) {
-		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.missing_name, KNOT_CLASS_IN, KNOT_RRTYPE_DS);
-		if (!next) {
-			return KNOT_STATE_FAIL;
-		}
-		kr_zonecut_set(&next->zone_cut, qry->zone_cut.parent_name);
-		int ret = kr_zonecut_copy(&next->zone_cut, &qry->zone_cut);
-		if (ret != 0) {
-			return KNOT_STATE_FAIL;
-		}
-		ret = kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
-		if (ret != 0) {
-			return KNOT_STATE_FAIL;
-		}
-		/* The current trust anchor and keys cannot be used. */
-		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
-		knot_rrset_free(&qry->zone_cut.trust_anchor, qry->zone_cut.pool);
-		qry->flags &= ~QUERY_AWAIT_DS;
-		return KNOT_STATE_PRODUCE;
-	}
-
-	/* Try to fetch missing DNSKEY. */
-	if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
-		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
-		if (!next) {
-			return KNOT_STATE_FAIL;
-		}
-		kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
-		int ret = kr_zonecut_copy(&next->zone_cut, &qry->zone_cut);
-		if (ret != 0) {
-			return KNOT_STATE_FAIL;
-		}
-		ret = kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
-		if (ret != 0) {
-			return KNOT_STATE_FAIL;
-		}
-		return KNOT_STATE_PRODUCE;
-	}
 ns_election:
 
 	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
 	 * elect best address only, otherwise elect a completely new NS.
 	 */
 	if(++ns_election_iter >= KR_ITER_LIMIT) {
-		DEBUG_MSG("=> couldn't agree NS decision, report this\n");
+		DEBUG_MSG("=> couldn't converge NS selection, bail out\n");
 		return KNOT_STATE_FAIL;
 	}
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
