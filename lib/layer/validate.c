@@ -358,9 +358,11 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	bool has_nsec3 = _knot_pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
+	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 
 	/* Validate non-existence proof if not positive answer. */
-	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN) {
+	if (pkt_rcode == KNOT_RCODE_NXDOMAIN) {
+		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the test crash. */
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname, &req->pool);
 		} else {
@@ -370,6 +372,39 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			DEBUG_MSG(qry, "<= bad NXDOMAIN proof\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KNOT_STATE_FAIL;
+		}
+	}
+
+	{
+		knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ANSWER);
+		uint16_t answer_count = sec ? sec->count : 0;
+
+		/* Validate no data response. */
+		if ((pkt_rcode == KNOT_RCODE_NOERROR) && (!answer_count) &&
+		    (KNOT_WIRE_AA_MASK & knot_wire_get_flags1(pkt->wire))) {
+			/* @todo
+			 * ? quick mechanism to determine which check to preform first
+			 * ? merge the functionality together to share code/resources
+			 */
+			if (!has_nsec3) {
+				ret = kr_nsec_no_data_response_check(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
+				if (ret != 0) {
+					ret = kr_nsec_wildcard_no_data_response_check(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
+				}
+				if (ret != 0) {
+					ret = kr_nsec_empty_nonterminal_response_check(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt));
+				}
+			} else {
+				ret = kr_nsec3_no_data_response_check(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
+				if (ret != 0) {
+					ret = kr_nsec3_wildcard_no_data_response_check(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
+				}
+			}
+			if (ret != 0) {
+				DEBUG_MSG(qry, "<= bad no data response proof\n");
+				qry->flags |= QUERY_DNSSEC_BOGUS;
+				return KNOT_STATE_FAIL;
+			}
 		}
 	}
 
