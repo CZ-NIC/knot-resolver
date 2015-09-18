@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import os
+import traceback
 
 class Test:
     """ Small library to imitate CMocka output. """
@@ -26,6 +28,8 @@ class Test:
                 print('[       OK ] %s' % name)
             except Exception as e:
                 print('[     FAIL ] %s (%s)' % (name, str(e)))
+                if 'VERBOSE' in os.environ:
+                    print(traceback.format_exc())
 
         # Clear test set
         self.tests = []
