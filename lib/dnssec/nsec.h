@@ -74,6 +74,18 @@ int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t
                                            const knot_dname_t *sname);
 
 /**
+ * Empty non-terminal response.
+ * @note There are no NSEC records for empty non-terminals. The existence of
+ *     the domain is inferred from the covering NSEC record.
+ * @param pkt        Packet structure to be processed.
+ * @param section_id Packet section to be processed.
+ * @param sname      Name to be checked.
+ * @return           0 or error code.
+ */
+int kr_nsec_empty_nonterminal_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                             const knot_dname_t *sname);
+
+/**
  * Authenticated denial of existence according to RFC4035 5.4.
  * @note No RRSIGs are validated.
  * @param pkt        Packet structure to be processed.

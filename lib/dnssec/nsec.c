@@ -355,6 +355,51 @@ int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t
 	return kr_error(ENOENT);
 }
 
+/**
+ * Check whether the NSEC RR proves that there is a empty non-terminal.
+ * @param nsec  NSEC RRSet.
+ * @param sname Searched name.
+ * @return      0 or error code.
+ */
+static int nsec_empty_nonterminal(const knot_rrset_t *nsec, const knot_dname_t *sname)
+{
+	assert(nsec && sname);
+
+	int ret = nsec_nonamematch(nsec, sname);
+	if (ret != 0) {
+		return ret;
+	}
+
+	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
+
+	if (knot_dname_in(sname, next)) {
+		return kr_ok();
+	} else {
+		return kr_error(EINVAL);
+	}
+}
+
+int kr_nsec_empty_nonterminal_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
+                                             const knot_dname_t *sname)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC) {
+			continue;
+		}
+		if (nsec_empty_nonterminal(rrset, sname) == 0) {
+			return kr_ok();
+		}
+	}
+
+	return kr_error(ENOENT);
+}
+
 int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
                              const knot_dname_t *sname, uint16_t stype, mm_ctx_t *pool)
 {
