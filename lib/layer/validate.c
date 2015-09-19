@@ -332,20 +332,18 @@ fail:
 
 static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
-	int ret;
+	int ret = 0;
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = kr_rplan_current(&req->rplan);
-	if (ctx->state & KNOT_STATE_FAIL) {
+	/* Ignore faulty or unprocessed responses. */
+	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_CONSUME)) {
 		return ctx->state;
 	}
 
-	/* Pass-through if user doesn't want secure answer. */
-	if (!(req->options & QUERY_DNSSEC_WANT)) {
-		return ctx->state;
-	}
-
-	/* Ignore truncated messages. */
-	if (knot_wire_get_tc(pkt->wire)) {
+	/* Pass-through if user doesn't want secure answer, or cached.
+	 * Since we let the data into cache, we're going to trust it.
+	 */
+	if (!(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_CACHED)) {
 		return ctx->state;
 	}
 

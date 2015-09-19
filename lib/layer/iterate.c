@@ -314,7 +314,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	    (pkt_class & (PKT_NOERROR|PKT_NXDOMAIN|PKT_REFUSED|PKT_NODATA))) {
 		DEBUG_MSG("<= found cut, retrying with non-minimized name\n");
 		query->flags |= QUERY_NO_MINIMIZE;
-		return KNOT_STATE_DONE;
+		return KNOT_STATE_CONSUME;
 	}
 
 	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
@@ -471,7 +471,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 			}
 			query->flags |= QUERY_TCP;
 		}
-		return KNOT_STATE_DONE;
+		return KNOT_STATE_CONSUME;
 	}
 
 #ifndef NDEBUG
