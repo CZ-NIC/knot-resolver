@@ -42,8 +42,10 @@
  * 		.alloc = (mm_alloc_t) mp_alloc
  * 	}
  * };
- * kr_resolve_begin(&req, ctx, answer);
- * int state = kr_resolve_query(&req, qname, qclass, qtype);
+ *
+ * // Setup and provide input query
+ * int state = kr_resolve_begin(&req, ctx, final_answer);
+ * state = kr_resolve_consume(&req, query);
  *
  * // Generate answer
  * while (state == KNOT_STATE_PRODUCE) {
@@ -125,16 +127,6 @@ struct kr_request {
  * @return        CONSUME (expecting query)
  */
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer);
-
-/**
- * Push new query for resolution to the state.
- * @param  request request state (if already has a question, this will be resolved first)
- * @param  qname
- * @param  qclass
- * @param  qtype
- * @return         PRODUCE|FAIL
- */
-int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);
 
 /**
  * Consume input packet (may be either first query or answer to query originated from kr_resolve_produce())

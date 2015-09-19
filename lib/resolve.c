@@ -154,10 +154,6 @@ static int edns_put(knot_pkt_t *pkt)
 static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
-	/* Set DO bit if set (DNSSEC requested). */
-	if (knot_pkt_has_dnssec(template) || (req->options & QUERY_DNSSEC_WANT)) {
-		knot_edns_set_do(pkt->opt_rr);
-	}
 	return knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
 }
 
@@ -174,6 +170,10 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 		int ret = edns_create(answer, query, req);
 		if (ret != 0){
 			return ret;
+		}
+		/* Set DO bit if set (DNSSEC requested). */
+		if (knot_pkt_has_dnssec(query)) {
+			knot_edns_set_do(answer->opt_rr);
 		}
 	}
 	return kr_ok();
@@ -197,10 +197,9 @@ static int answer_finalize(struct kr_request *request, int state)
 	return kr_ok();
 }
 
-static int query_finalize(struct kr_request *request, knot_pkt_t *pkt)
+static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
 {
 	/* Randomize query case (if not in safemode) */
-	struct kr_query *qry = kr_rplan_current(&request->rplan);
 	qry->secret = (qry->flags & QUERY_SAFEMODE) ? 0 : kr_rand_uint(UINT32_MAX);
 	knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(pkt);
 	randomized_qname_case(qname_raw, qry->secret);
@@ -209,7 +208,10 @@ static int query_finalize(struct kr_request *request, knot_pkt_t *pkt)
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	if (!(qry->flags & QUERY_SAFEMODE)) {
 		ret = edns_create(pkt, request->answer, request);
-		if (ret == 0) {
+		if (ret == 0) { /* Enable DNSSEC for query. */
+			if (qry->flags & QUERY_DNSSEC_WANT) {
+				knot_edns_set_do(pkt->opt_rr);
+			}
 			ret = edns_put(pkt);
 		}
 	}
@@ -229,9 +231,12 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	return KNOT_STATE_CONSUME;
 }
 
-int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint16_t qclass, uint16_t qtype)
+static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
+	const knot_dname_t *qname = knot_pkt_qname(packet);
+	uint16_t qclass = knot_pkt_qclass(packet);
+	uint16_t qtype = knot_pkt_qtype(packet);
 	struct kr_query *qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
 	if (!qry) {
 		return KNOT_STATE_FAIL;
@@ -239,6 +244,9 @@ int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint
 
 	/* Deferred zone cut lookup for this query. */
 	qry->flags |= QUERY_AWAIT_CUT;
+	if (knot_pkt_has_dnssec(packet)) {
+		qry->flags |= QUERY_DNSSEC_WANT;
+	}
 
 	/* Initialize answer packet */
 	knot_pkt_t *answer = request->answer;
@@ -266,11 +274,7 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 		if (answer_prepare(request->answer, packet, request) != 0) {
 			return KNOT_STATE_FAIL;
 		}
-		/* Start query resolution */
-		const knot_dname_t *qname = knot_pkt_qname(packet);
-		uint16_t qclass = knot_pkt_qclass(packet);
-		uint16_t qtype = knot_pkt_qtype(packet);
-		return kr_resolve_query(request, qname, qclass, qtype);
+		return resolve_query(request, packet);
 	}
 
 	/* Different processing for network error */
@@ -336,6 +340,9 @@ static int zone_cut_subreq(struct kr_rplan *rplan, struct kr_query *parent,
 		return kr_error(ENOMEM);
 	}
 	next->flags |= QUERY_NO_MINIMIZE;
+	if (parent->flags & QUERY_DNSSEC_WANT) {
+		next->flags |= QUERY_DNSSEC_WANT;
+	}
 	return kr_ok();
 }
 
@@ -472,7 +479,7 @@ ns_election:
 	}
 
 	/* Prepare additional query */
-	int ret = query_finalize(request, packet);
+	int ret = query_finalize(request, qry, packet);
 	if (ret != 0) {
 		return KNOT_STATE_FAIL;
 	}

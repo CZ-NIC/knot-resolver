@@ -162,7 +162,7 @@ static int collect(knot_layer_t *ctx)
 	/* Query parameters and transport mode */
 	if (knot_pkt_has_edns(param->answer)) {
 		stat_const_add(data, metric_query_edns, 1);
-		if (param->options & QUERY_DNSSEC_WANT) {
+		if (knot_pkt_has_dnssec(param->answer)) {
 			stat_const_add(data, metric_query_dnssec, 1);
 		}
 	}

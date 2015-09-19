@@ -125,7 +125,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	 * Only one step of the chain is resolved at a time.
 	 */
 	struct kr_cache *cache = &req->ctx->cache;
-	int ret = loot_cache(cache, pkt, qry, req->options & QUERY_DNSSEC_WANT);
+	int ret = loot_cache(cache, pkt, qry, (qry->flags & QUERY_DNSSEC_WANT));
 	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
@@ -141,6 +141,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 struct stash_baton
 {
 	struct kr_request *req;
+	struct kr_query *qry;
 	struct kr_cache_txn *txn;
 	unsigned timestamp;
 	uint32_t min_ttl;
@@ -149,7 +150,7 @@ struct stash_baton
 static int commit_rrsig(struct stash_baton *baton, knot_rrset_t *rr)
 {
 	/* If not doing secure resolution, ignore (unvalidated) RRSIGs. */
-	if (!(baton->req->options & QUERY_DNSSEC_WANT)) {
+	if (!(baton->qry->flags & QUERY_DNSSEC_WANT)) {
 		return kr_ok();
 	}
 	/* Commit covering RRSIG to a separate cache namespace. */
@@ -197,12 +198,13 @@ static int commit_rr(const char *key, void *val, void *data)
 	return kr_cache_insert_rr(baton->txn, rr, baton->timestamp);
 }
 
-static int stash_commit(map_t *stash, unsigned timestamp, struct kr_cache_txn *txn, struct kr_request *req)
+static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache_txn *txn, struct kr_request *req)
 {
 	struct stash_baton baton = {
 		.req = req,
+		.qry = qry,
 		.txn = txn,
-		.timestamp = timestamp,
+		.timestamp = qry->timestamp.tv_sec,
 		.min_ttl = DEFAULT_MINTTL
 	};
 	return map_walk(stash, &commit_rr, &baton);
@@ -339,7 +341,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		struct kr_cache *cache = &req->ctx->cache;
 		struct kr_cache_txn txn;
 		if (kr_cache_txn_begin(cache, &txn, 0) == 0) {
-			ret = stash_commit(&stash, qry->timestamp.tv_sec, &txn, req);
+			ret = stash_commit(&stash, qry, &txn, req);
 			if (ret == 0) {
 				kr_cache_txn_commit(&txn);
 			} else {
