@@ -24,7 +24,6 @@
 #include "lib/rplan.h"
 #include "lib/defines.h"
 #include "lib/layer.h"
-#include "lib/dnssec/ta.h" // kr_ta_parse()
 #include "lib/generic/pack.h"
 
 /* Root hint descriptor. */
@@ -291,13 +290,6 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 
 	/* Set trust anchor. */
 	knot_rrset_free(&cut->trust_anchor, cut->pool);
-	/* The root trust anchor can be changed via the validator layer
-	 * (interactive) interface.
-	 */
-	int ret = kr_ta_get(&cut->trust_anchor, &global_trust_anchors, ROOT_NAME, cut->pool);
-	if (ret != 0) {
-		return ret;
-	}
 	return kr_ok();
 }
 

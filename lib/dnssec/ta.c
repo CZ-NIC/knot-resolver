@@ -26,6 +26,7 @@
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/rdname.h>
+#include <libknot/packet/wire.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/ta.h"
@@ -642,6 +643,20 @@ static int ta_get(knot_rrset_t **ta, struct trust_anchors_nolock *tan, const kno
 int kr_ta_contains(struct trust_anchors *tas, const knot_dname_t *name)
 {
 	return ta_find(&tas->locked, name) != NULL;
+}
+
+int kr_ta_covers(struct trust_anchors *tas, const knot_dname_t *name)
+{
+	while(name) {
+		if (kr_ta_contains(tas, name)) {
+			return true;
+		}
+		if (name[0] == '\0') {
+			return false;
+		}
+		name = knot_wire_next_label(name, NULL);
+	}
+	return false;	
 }
 
 int kr_ta_get(knot_rrset_t **ta, struct trust_anchors *tas, const knot_dname_t *name, mm_ctx_t *pool)

@@ -50,6 +50,8 @@ int kr_ta_add(struct trust_anchors *tas, const char *ta_str);
 
 int kr_ta_contains(struct trust_anchors *tas, const knot_dname_t *name);
 
+int kr_ta_covers(struct trust_anchors *tas, const knot_dname_t *name);
+
 int kr_ta_get(knot_rrset_t **ta, struct trust_anchors *tas, const knot_dname_t *name, mm_ctx_t *pool);
 
 int kr_ta_rdlock(struct trust_anchors *tas);

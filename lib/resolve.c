@@ -344,17 +344,14 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 {
 	struct kr_rplan *rplan = &request->rplan;
 
-	/* Always try with DNSSEC if it finds an island of trust. */
-	if (!(request->options & QUERY_DNSSEC_WANT) &&
-	    kr_ta_contains(&global_trust_anchors, qry->zone_cut.name)) {
-		request->options |= QUERY_DNSSEC_WANT;
-		DEBUG_MSG(">< entered island of trust\n");
-	}
 	/* The query wasn't resolved from cache,
 	 * now it's the time to look up closest zone cut from cache. */
-	bool want_secured = (request->options & QUERY_DNSSEC_WANT);
 	if (qry->flags & QUERY_AWAIT_CUT) {
-		int ret = ns_fetch_cut(qry, request, want_secured);
+		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
+		if (kr_ta_covers(&global_trust_anchors, qry->zone_cut.name)) {
+			qry->flags |= QUERY_DNSSEC_WANT;
+		}
+		int ret = ns_fetch_cut(qry, request, (qry->flags & QUERY_DNSSEC_WANT));
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;
 		}
@@ -366,10 +363,22 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		}
 		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
-
-	/* Missing delegation signature, fetch it first. */
-	if ((qry->flags & QUERY_AWAIT_DS) && (qry->zone_cut.missing_name)) {
-		int ret = zone_cut_subreq(rplan, qry, qry->zone_cut.missing_name, KNOT_RRTYPE_DS);
+	/* Enable DNSSEC if enters a new island of trust. */
+	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT);
+	if (!want_secured && kr_ta_contains(&global_trust_anchors, qry->zone_cut.name)) {
+		qry->flags |= QUERY_DNSSEC_WANT;
+		want_secured = true;
+		WITH_DEBUG {
+		char qname_str[KNOT_DNAME_MAXLEN];
+		knot_dname_to_str(qname_str, qry->zone_cut.name, sizeof(qname_str));
+		DEBUG_MSG(">< TA: using '%s'\n", qname_str);
+		}
+	}
+	/* @todo Disable DNSSEC if it encounters NTA */
+	if (want_secured && !qry->zone_cut.trust_anchor) {
+		kr_ta_get(&qry->zone_cut.trust_anchor, &global_trust_anchors,
+		          qry->zone_cut.name, qry->zone_cut.pool);
+	}
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;
 		}
