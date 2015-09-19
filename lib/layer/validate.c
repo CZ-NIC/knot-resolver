@@ -284,49 +284,101 @@ static const knot_dname_t *first_rrsig_signer_name(knot_pkt_t *answer)
 	}
 }
 
-static int update_delegation(struct kr_query *qry, knot_pkt_t *answer)
+static knot_rrset_t *update_ds(struct kr_zonecut *cut, const knot_pktsection_t *sec)
 {
-	int ret = kr_ok();
-	struct kr_zonecut *cut = &qry->zone_cut;
-
-	DEBUG_MSG(qry, "<= referral, checking DS\n");
-
-	/* New trust anchor. */
+	/* Aggregate DS records (if using multiple keys) */
 	knot_rrset_t *new_ds = NULL;
-	knot_section_t section_id = (knot_pkt_qtype(answer) == KNOT_RRTYPE_DS) ? KNOT_ANSWER : KNOT_AUTHORITY;
-	const knot_pktsection_t *sec = knot_pkt_section(answer, section_id);
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
-		if ((rr->type != KNOT_RRTYPE_DS) ||
-		    (0)) {
-//		    (knot_dname_cmp(rr->owner, cut->name) != 0)) {
+		if (rr->type != KNOT_RRTYPE_DS) {
 			continue;
 		}
+		int ret = 0;
 		if (new_ds) {
 			ret = knot_rdataset_merge(&new_ds->rrs, &rr->rrs, cut->pool);
-			if (ret != 0) {
-				goto fail;
-			}
 		} else {
 			new_ds = knot_rrset_copy(rr, cut->pool);
 			if (!new_ds) {
-				ret = kr_error(ENOMEM);
-				goto fail;
+				return NULL;
 			}
 		}
+		if (ret != 0) {
+			knot_rrset_free(&new_ds, cut->pool);
+			return NULL;
+		}
+	}
+	return new_ds;	
+}
+
+static int update_parent(struct kr_query *qry, uint16_t answer_type)
+{
+	struct kr_query *parent = qry->parent;
+	assert(parent);
+	switch(answer_type) {
+	case KNOT_RRTYPE_DNSKEY:
+		DEBUG_MSG(qry, "<= parent: updating DNSKEY\n");
+		parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, parent->zone_cut.pool);
+		if (!parent->zone_cut.key) {
+			return KNOT_STATE_FAIL;
+		}
+		break;
+	case KNOT_RRTYPE_DS:
+		DEBUG_MSG(qry, "<= parent: updating DS\n");
+		parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.key, parent->zone_cut.pool);
+		if (!parent->zone_cut.key) {
+			return KNOT_STATE_FAIL;
+		}
+		parent->flags &= ~QUERY_AWAIT_DS;
+		break;
+	default: break;
+	}
+	return kr_ok();
+}
+
+static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_pkt_t *answer, bool has_nsec3)
+{
+	struct kr_zonecut *cut = &qry->zone_cut;
+
+	/* RFC4035 3.1.4. authoritative must send either DS or proof of non-existence.
+	 * If it contains neither, the referral is bogus (or an attempted downgrade attack).
+	 */
+
+	/* Aggregate DS records (if using multiple keys) */
+	unsigned section = KNOT_ANSWER;
+	if (!knot_wire_get_aa(answer->wire)) { /* Referral */
+		section = KNOT_AUTHORITY;
+	} else if (knot_pkt_qtype(answer) == KNOT_RRTYPE_DS) { /* Subrequest */
+		section = KNOT_ANSWER;
+	} else { /* N/A */
+		return kr_ok();
 	}
 
-	if (new_ds) {
-		knot_rrset_free(&cut->trust_anchor, cut->pool);
-		cut->trust_anchor = new_ds;
-		new_ds = NULL;
-
-		/* It is very likely, that the keys don't match now. */
-		knot_rrset_free(&cut->key, cut->pool);
+	/* No DS provided, check for proof of non-existence. */
+	int ret = 0;
+	knot_rrset_t *new_ds = update_ds(cut, knot_pkt_section(answer, section));
+	if (!new_ds) {
+		if (has_nsec3) {
+			ret = kr_nsec3_no_data_response_check(answer, section,
+			      knot_pkt_qname(answer), KNOT_RRTYPE_DS);
+		} else {
+			ret = kr_nsec_no_data_response_check(answer, section,
+			      knot_pkt_qname(answer), KNOT_RRTYPE_DS);
+		}
+		if (ret != 0) {
+			DEBUG_MSG(qry, "<= bogus proof of DS non-existence\n");
+			qry->flags |= QUERY_DNSSEC_BOGUS;
+		} else {
+			DEBUG_MSG(qry, "<= DS doesn't exist, going insecure\n");
+			qry->flags &= ~QUERY_DNSSEC_WANT;
+		}
+		return ret;
 	}
 
-fail:
-	knot_rrset_free(&new_ds, cut->pool);
+	/* Extend trust anchor */
+	DEBUG_MSG(qry, "<= DS: OK\n");
+	knot_rrset_free(&cut->trust_anchor, cut->pool);
+	knot_rrset_free(&cut->key, cut->pool);
+	cut->trust_anchor = new_ds;
 	return ret;
 }
 
@@ -346,13 +398,24 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_CACHED)) {
 		return ctx->state;
 	}
-
-	/* Server didn't copy back DO=1, this is okay if it doesn't have DS => insecure.
-	 * If it has DS, it must be secured, fail it as bogus. */
 	if (!knot_pkt_has_dnssec(pkt)) {
-		DEBUG_MSG(qry, "<= asked with DO=1, got insecure response\n");
-#warning TODO: fail and retry if it has TA, otherwise flag as INSECURE and continue
+		DEBUG_MSG(qry, "<= got insecure response\n");
+		qry->flags |= QUERY_DNSSEC_BOGUS;
 		return KNOT_STATE_FAIL;
+	}
+
+	/* Check whether the current zone cut holds keys that can be used
+	 * for validation (i.e. RRSIG signer name matches key owner).
+	 */
+	const knot_dname_t *key_own = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
+	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
+	if (key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
+		if (qry->flags & QUERY_AWAIT_DS) {
+			qry->flags |= QUERY_DNSSEC_BOGUS;
+			return KNOT_STATE_FAIL; /* This indicates a DS is not available. */
+		}
+		qry->flags |= QUERY_AWAIT_DS;
+		return KNOT_STATE_CONSUME;
 	}
 
 	bool has_nsec3 = _knot_pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
@@ -373,8 +436,11 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
+	/* @todo WTH, this needs API that just tries to find a proof and the caller
+	 * doesn't have to worry about NSEC/NSEC3
+	 * @todo rework this */
 	{
-		knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ANSWER);
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ANSWER);
 		uint16_t answer_count = sec ? sec->count : 0;
 
 		/* Validate no data response. */
@@ -406,30 +472,9 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	/* Check whether the current zone cut holds keys that can be used
-	 * for validation (i.e. RRSIG signer name matches key owner).
-	 */
-	const knot_dname_t *key_own = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
-	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
-	if (key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
-		mm_free(qry->zone_cut.pool, qry->zone_cut.missing_name);
-		qry->zone_cut.missing_name = knot_dname_copy(sig_name, qry->zone_cut.pool);
-		if (!qry->zone_cut.missing_name) {
-			return KNOT_STATE_FAIL;
-		}
-		qry->flags |= QUERY_AWAIT_DS;
-		qry->flags &= ~QUERY_RESOLVED;
-		return KNOT_STATE_CONSUME;
-	}
-
 	/* Check if this is a DNSKEY answer, check trust chain and store. */
 	uint16_t qtype = knot_pkt_qtype(pkt);
 	if (qtype == KNOT_RRTYPE_DNSKEY) {
-		if (!qry->zone_cut.trust_anchor) {
-			DEBUG_MSG(qry, ">< missing trust anchor\n");
-			kr_ta_get(&qry->zone_cut.trust_anchor, &global_trust_anchors, qry->zone_cut.name, qry->zone_cut.pool);
-		}
-
 		ret = validate_keyset(qry, pkt, has_nsec3);
 		if (ret != 0) {
 			DEBUG_MSG(qry, "<= bad keys, broken trust chain\n");
@@ -446,31 +491,17 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_FAIL;
 	}
 
-	/* Update trust anchor. */
-	ret = update_delegation(qry, pkt);
+	/* Check and update current delegation point security status. */
+	ret = update_delegation(req, qry, pkt, has_nsec3);
 	if (ret != 0) {
 		return KNOT_STATE_FAIL;
 	}
-
-	if ((qtype == KNOT_RRTYPE_DS) && (qry->parent != NULL) && (qry->parent->zone_cut.trust_anchor == NULL)) {
-		DEBUG_MSG(qry, "<= updating trust anchor in zone cut\n");
-		qry->parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, qry->parent->zone_cut.pool);
-		if (!qry->parent->zone_cut.trust_anchor) {
-			return KNOT_STATE_FAIL;
-		}
-		/* Update zone cut name */
-		mm_free(qry->parent->zone_cut.pool, qry->parent->zone_cut.name);
-		qry->parent->zone_cut.name = knot_dname_copy(qry->zone_cut.trust_anchor->owner, qry->parent->zone_cut.pool);
-	}
-
-	if ((qtype == KNOT_RRTYPE_DNSKEY) && (qry->parent != NULL) && (qry->parent->zone_cut.key == NULL)) {
-		DEBUG_MSG(qry, "<= updating keys in zone cut\n");
-		qry->parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, qry->parent->zone_cut.pool);
-		if (!qry->parent->zone_cut.key) {
+	/* Update parent query zone cut */
+	if (qry->parent) {
+		if (update_parent(qry, qtype) != 0) {
 			return KNOT_STATE_FAIL;
 		}
 	}
-
 	DEBUG_MSG(qry, "<= answer valid, OK\n");
 	return ctx->state;
 }
@@ -587,7 +618,6 @@ int validate_init(struct kr_module *module)
 	return kr_ok();
 }
 
-#warning TODO: set root trust anchor from config
 int validate_config(struct kr_module *module, const char *conf)
 {
 	int ret = kr_ta_reset(&global_trust_anchors, NULL);

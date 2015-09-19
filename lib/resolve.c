@@ -390,18 +390,16 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		kr_ta_get(&qry->zone_cut.trust_anchor, &global_trust_anchors,
 		          qry->zone_cut.name, qry->zone_cut.pool);
 	}
+	/* Try to fetch missing DS. */
+	if (want_secured && (qry->flags & QUERY_AWAIT_DS)) {
+		int ret = zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_DS);
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;
 		}
-		/* The current trust anchor and keys cannot be used. */
-		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
-		knot_rrset_free(&qry->zone_cut.trust_anchor, qry->zone_cut.pool);
-		qry->flags &= ~QUERY_AWAIT_DS;
 		return KNOT_STATE_DONE;
 	}
-
 	/* Try to fetch missing DNSKEY. */
-	if (want_secured && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
+	if (want_secured && qry->zone_cut.trust_anchor && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
 		int ret = zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_DNSKEY);
 		if (ret != 0) {
 			return KNOT_STATE_FAIL;
