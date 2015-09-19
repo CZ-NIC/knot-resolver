@@ -191,8 +191,12 @@ static int answer_finalize(struct kr_request *request, int state)
 		}
 	}
 	/* Set AD=1 if succeeded and requested secured answer. */
-	if (state == KNOT_STATE_DONE && (request->options & QUERY_DNSSEC_WANT)) {
-		knot_wire_set_ad(answer->wire);
+	struct kr_rplan *rplan = &request->rplan;
+	if (state == KNOT_STATE_DONE && !EMPTY_LIST(rplan->resolved)) {
+		struct kr_query *last = TAIL(rplan->resolved);
+		if (last->flags & QUERY_DNSSEC_WANT) {
+			knot_wire_set_ad(answer->wire);
+		}
 	}
 	return kr_ok();
 }
