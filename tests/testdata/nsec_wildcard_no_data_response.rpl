@@ -135,7 +135,7 @@ ADJUST copy_id
 REPLY QR AA NOERROR
 SECTION QUESTION
 local.nsec.example. IN NS
-SECTION ADDITIONAL
+SECTION AUTHORITY
 nsec.example.           3600    IN      SOA     ns.nsec.example. root.nsec.example. 6 60 60 120 3600
 alias.nsec.example.     3600    IN      NSEC    *.local.nsec.example. CNAME RRSIG NSEC
 nsec.example.           3600    IN      RRSIG   SOA 13 2 3600 20151017113144 20150917113144 54343 nsec.example. /3orb3cezQbBCZsFP9rx6Col9AB2QxHQtzQ32BYe09MfN7YZxtTE/HZJ aSXGWD3D7sLBdEkg8TGP8JPQtbW2yQ==
