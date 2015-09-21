@@ -248,7 +248,9 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 
 	/* Deferred zone cut lookup for this query. */
 	qry->flags |= QUERY_AWAIT_CUT;
-	if (knot_pkt_has_dnssec(packet)) {
+	/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
+	map_t *trust_anchors = &request->ctx->trust_anchors;
+	if (knot_pkt_has_dnssec(packet) && kr_ta_covers(trust_anchors, qname)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	}
 
@@ -354,12 +356,13 @@ static int zone_cut_subreq(struct kr_rplan *rplan, struct kr_query *parent,
 static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
+	map_t *trust_anchors = &request->ctx->trust_anchors;
 
 	/* The query wasn't resolved from cache,
 	 * now it's the time to look up closest zone cut from cache. */
 	if (qry->flags & QUERY_AWAIT_CUT) {
 		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
-		if (kr_ta_covers(&global_trust_anchors, qry->zone_cut.name)) {
+		if (kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
 			qry->flags |= QUERY_DNSSEC_WANT;
 		}
 		int ret = ns_fetch_cut(qry, request, (qry->flags & QUERY_DNSSEC_WANT));
@@ -376,7 +379,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	}
 	/* Enable DNSSEC if enters a new island of trust. */
 	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT);
-	if (!want_secured && kr_ta_contains(&global_trust_anchors, qry->zone_cut.name)) {
+	if (!want_secured && kr_ta_get(trust_anchors, qry->zone_cut.name)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 		want_secured = true;
 		WITH_DEBUG {
@@ -387,8 +390,8 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	}
 	/* @todo Disable DNSSEC if it encounters NTA */
 	if (want_secured && !qry->zone_cut.trust_anchor) {
-		kr_ta_get(&qry->zone_cut.trust_anchor, &global_trust_anchors,
-		          qry->zone_cut.name, qry->zone_cut.pool);
+		knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
+		qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
 	}
 	/* Try to fetch missing DS. */
 	if (want_secured && (qry->flags & QUERY_AWAIT_DS)) {

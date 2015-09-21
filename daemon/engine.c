@@ -27,6 +27,7 @@
 #include "lib/nsrep.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
+#include "lib/dnssec/ta.h"
 
 /** @internal Compatibility wrapper for Lua < 5.2 */
 #if LUA_VERSION_NUM < 502
@@ -243,6 +244,7 @@ void *namedb_lmdb_mkopts(const char *conf, size_t maxsize)
 static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
+	engine->resolver.trust_anchors = map_make();
 	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
 	/* Create OPT RR */
@@ -363,6 +365,7 @@ void engine_deinit(struct engine *engine)
 	}
 	array_clear(engine->modules);
 	array_clear(engine->storage_registry);
+	kr_ta_clear(&engine->resolver.trust_anchors);
 
 	if (engine->L) {
 		lua_close(engine->L);
@@ -402,6 +405,12 @@ int engine_cmd(struct engine *engine, const char *str)
 
 static int engine_loadconf(struct engine *engine)
 {
+	/* Use module path for including Lua scripts */
+	static const char l_paths[] = "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'";
+	int ret = l_dobytecode(engine->L, l_paths, sizeof(l_paths) - 1, "");
+	if (ret != 0) {
+		lua_pop(engine->L, 1);
+	}
 	/* Init environment */
 	static const char sandbox_bytecode[] = {
 		#include "daemon/lua/sandbox.inc"
@@ -411,12 +420,6 @@ static int engine_loadconf(struct engine *engine)
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
-	/* Use module path for including Lua scripts */
-	int ret = engine_cmd(engine, "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'");
-	if (ret > 0) {
-		lua_pop(engine->L, 1);
-	}
-
 	/* Load config file */
 	if(access("config", F_OK ) != -1 ) {
 		ret = l_dosandboxfile(engine->L, "config");

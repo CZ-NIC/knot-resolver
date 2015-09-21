@@ -20,43 +20,21 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <ccan/json/json.h>
 #include <libknot/packet/wire.h>
-#include <libknot/rrset-dump.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
 
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
 #include "lib/dnssec/packet/pkt.h"
-#include "lib/dnssec/ta.h"
 #include "lib/dnssec.h"
 #include "lib/layer.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
 #include "lib/defines.h"
-#include "lib/nsrep.h"
 #include "lib/module.h"
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "vldr", fmt)
-
-static knot_dump_style_t KNOT_DUMP_STYLE_TA = {
-	.wrap = false,
-	.show_class = true,
-	.show_ttl = false,
-	.verbose = false,
-	.empty_ttl = false,
-	.human_ttl = false,
-	.human_tmstamp = true,
-	.ascii_to_idn = NULL
-};
-
-/* Set resolution context and parameters. */
-static int begin(knot_layer_t *ctx, void *module_param)
-{
-	ctx->data = module_param;
-	return KNOT_STATE_PRODUCE;
-}
 
 struct rrset_ids {
 	const knot_dname_t *owner;
@@ -505,99 +483,10 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	DEBUG_MSG(qry, "<= answer valid, OK\n");
 	return ctx->state;
 }
-
-static int rrset_txt_dump_line(const knot_rrset_t *rrset, size_t pos,
-                               char *dst, const size_t maxlen, const knot_dump_style_t *style)
-{
-	assert(rrset && dst && maxlen && style);
-
-	int written = 0;
-	uint32_t ttl = knot_rdata_ttl(knot_rdataset_at(&rrset->rrs, 0));
-	int ret = knot_rrset_txt_dump_header(rrset, ttl, dst + written, maxlen - written, style);
-	if (ret <= 0) {
-		return ret;
-	}
-	written += ret;
-	ret = knot_rrset_txt_dump_data(rrset, pos, dst + written, maxlen - written, style);
-	if (ret <= 0) {
-		return ret;
-	}
-	written += ret;
-
-	return written;
-}
-
-static char *validate_trust_anchors(void *env, struct kr_module *module, const char *args)
-{
-#define MAX_BUF_LEN 1024
-	JsonNode *root = json_mkarray();
-
-	kr_ta_rdlock(&global_trust_anchors);
-
-	const knot_rrset_t *ta;
-	int count = kr_ta_rrs_count_nolock(&global_trust_anchors);
-	for (int i = 0; i < count; ++i) {
-		ta = NULL;
-		kr_ta_rrs_at_nolock(&ta, &global_trust_anchors, i);
-		assert(ta);
-		char buf[MAX_BUF_LEN];
-		for (uint16_t j = 0; j < ta->rrs.rr_count; ++j) {
-			buf[0] = '\0';
-			rrset_txt_dump_line(ta, j, buf, MAX_BUF_LEN, &KNOT_DUMP_STYLE_TA);
-			json_append_element(root, json_mkstring(buf));
-		}
-	}
-
-	kr_ta_unlock(&global_trust_anchors);
-
-	char *result = json_encode(root);
-	json_delete(root);
-	return result;
-#undef MAX_BUF_LEN
-}
-
-static char *validate_trust_anchor_add(void *env, struct kr_module *module, const char *args)
-{
-	int ret = 0;
-	if (!args || (args[0] == '\0')) {
-		ret = kr_error(EINVAL);
-	} else {
-		ret = kr_ta_add(&global_trust_anchors, args);
-	}
-
-	char *result = NULL;
-	asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false");
-	return result;
-}
-
-static int load(struct trust_anchors *tas, const char *path)
-{
-#define MAX_LINE_LEN 512
-	auto_fclose FILE *fp = fopen(path, "r");
-	if (fp == NULL) {
-		DEBUG_MSG(NULL, "reading '%s' failed: %s\n", path, strerror(errno));
-		return kr_error(errno);
-	} else {
-		DEBUG_MSG(NULL, "reading '%s'\n", path);
-	}
-
-	char line[MAX_LINE_LEN];
-	while (fgets(line, sizeof(line), fp) != NULL) {
-		int ret = kr_ta_add(tas, line);
-		if (ret != 0) {
-			return ret;
-		}
-	}
-
-	return kr_ok();
-#undef MAX_LINE_LEN
-}
-
 /** Module implementation. */
 const knot_layer_api_t *validate_layer(struct kr_module *module)
 {
 	static const knot_layer_api_t _layer = {
-		.begin = &begin,
 		.consume = &validate,
 	};
 	/* Store module reference */
@@ -606,42 +495,7 @@ const knot_layer_api_t *validate_layer(struct kr_module *module)
 
 int validate_init(struct kr_module *module)
 {
-	int ret = kr_ta_init(&global_trust_anchors);
-	if (ret != 0) {
-		return ret;
-	}
-//	/* Add root trust anchor. */
-//	ret = kr_ta_add(&global_trust_anchors, ROOT_TA);
-	if (ret != 0) {
-		return ret;
-	}
 	return kr_ok();
-}
-
-int validate_config(struct kr_module *module, const char *conf)
-{
-	int ret = kr_ta_reset(&global_trust_anchors, NULL);
-	if (ret != 0) {
-		return ret;
-	}
-	return load(&global_trust_anchors, conf);
-}
-
-int validate_deinit(struct kr_module *module)
-{
-	kr_ta_deinit(&global_trust_anchors);
-	return kr_ok();
-}
-
-const struct kr_prop validate_prop_list[] = {
-    { &validate_trust_anchors, "trust_anchors", "Retrieve trust anchors.", },
-    { &validate_trust_anchor_add, "trust_anchor_add", "Adds a trust anchor.", },
-    { NULL, NULL, NULL }
-};
-
-struct kr_prop *validate_props(void)
-{
-	return (struct kr_prop *) validate_prop_list;
 }
 
 KR_MODULE_EXPORT(validate)

@@ -64,6 +64,16 @@ setmetatable(cache, {
 	end
 })
 
+-- Syntactic sugar for TA store
+trust_anchors = require('kres').trust_anchors
+setmetatable(trust_anchors, {
+	__newindex = function (t,k,v)
+	if     k == 'file' then t.config(v)
+	elseif k == 'auto' then t.set_auto(v)
+	else   rawset(t, k, v) end
+	end,
+})
+
 -- Register module in Lua environment
 function modules_register(module)
 	-- Syntactic sugar for get() and set() properties
@@ -85,7 +95,7 @@ end
 
 -- Make sandboxed environment
 local function make_sandbox(defined)
-	local __protected = { modules = true, cache = true, net = true }
+	local __protected = { modules = true, cache = true, net = true, trust_anchors = true }
 	return setmetatable({}, {
 		__index = defined,
 		__newindex = function (t, k, v)

@@ -16,46 +16,49 @@
 
 #pragma once
 
-#include <libknot/internal/mempattern.h>
+#include "lib/generic/map.h"
 #include <libknot/rrset.h>
 
-//#define ROOT_TA ". IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5"
-#define ROOT_NAME ((const uint8_t *) "")
-#define ROOT_TA ". IN DS 19036 RSASHA256 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5"
-//#define ROOT_TA ". IN DNSKEY 257 3 8 AwEAAagAIKlVZrpC6Ia7gEzahOR+9W29euxhJhVVLOyQbSEW0O8gcCjF FVQUTf6v58fLjwBd0YI0EzrAcQqBGCzh/RStIoO8g0NfnfL2MTJRkxoX bfDaUeVPQuYEhg37NZWAJQ9VnMVDxP/VHL496M/QZxkjf5/Efucp2gaD X6RS6CXpoY68LsvPVjR0ZSwzz1apAzvN9dlzEheX7ICJBBtuA6G3LQpz W5hOA2hzCTMjJPJ8LbqF6dsV6DoBQzgul0sGIcGOYl7OyQdXfZ57relS Qageu+ipAdTTJ25AsRTAoub8ONGcLmqrAmRLKBP1dfwhYB4N7knNnulq QxA+Uk1ihz0="
+/**
+ * Find TA RRSet by name.
+ * @param  trust_anchors trust store
+ * @param  name          name of the TA
+ * @return non-empty RRSet or NULL
+ */
+knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name);
 
 /**
- * Parses the supplied trust anchor string and creates a new RRSet.
- *
- * @param rr     created resource record
- * @param ds_str DS in presentation format
- * @param pool
- * @return       0 or an error code
+ * Add TA to trust store. DS or DNSKEY types are supported.
+ * @param  trust_anchors trust store
+ * @param  name          name of the TA
+ * @param  type          RR type of the TA (DS or DNSKEY)
+ * @param  ttl           
+ * @param  rdata         
+ * @param  rdlen         
+ * @return 0 or an error
  */
-int kr_ta_parse(knot_rrset_t **rr, const char *ds_str, mm_ctx_t *pool);
+int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
+               uint32_t ttl, const uint8_t *rdata, uint16_t rdlen);
 
-/** Trust anchor container structure. */
-struct trust_anchors;
+/**
+ * Return true if the name is below/at any TA in the store.
+ * This can be useful to check if it's possible to validate a name beforehand.
+ * @param  trust_anchors trust store
+ * @param  name          name of the TA
+ * @return boolean
+ */
+int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name);
 
-/** Global trust anchor container. */
-extern struct trust_anchors global_trust_anchors;
+/**
+ * Remove TA from trust store.
+ * @param  trust_anchors trust store
+ * @param  name          name of the TA
+ * @return 0 or an error
+ */
+int kr_ta_del(map_t *trust_anchors, const knot_dname_t *name);
 
-int kr_ta_init(struct trust_anchors *tas);
-
-void kr_ta_deinit(struct trust_anchors *tas);
-
-int kr_ta_reset(struct trust_anchors *tas, const char *ta_str);
-
-int kr_ta_add(struct trust_anchors *tas, const char *ta_str);
-
-int kr_ta_contains(struct trust_anchors *tas, const knot_dname_t *name);
-
-int kr_ta_covers(struct trust_anchors *tas, const knot_dname_t *name);
-
-int kr_ta_get(knot_rrset_t **ta, struct trust_anchors *tas, const knot_dname_t *name, mm_ctx_t *pool);
-
-int kr_ta_rdlock(struct trust_anchors *tas);
-int kr_ta_unlock(struct trust_anchors *tas);
-
-int kr_ta_rrs_count_nolock(struct trust_anchors *tas);
-int kr_ta_rrs_at_nolock(const knot_rrset_t **ta, struct trust_anchors *tas, size_t pos);
+/**
+ * Clear trust store.
+ * @param trust_anchors trust store
+ */
+void kr_ta_clear(map_t *trust_anchors);

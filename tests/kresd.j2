@@ -1,10 +1,10 @@
-net.listen('{{SELF_ADDR}}',53)
-cache.size = 1*MB
+net = { '{{SELF_ADDR}}' }
 modules = {'stats', 'policy', 'hints'}
+cache.size = 1*MB
 hints.root({['k.root-servers.net'] = '{{ROOT_ADDR}}'})
 option('NO_MINIMIZE', {{NO_MINIMIZE}})
 option('ALLOW_LOCAL', true)
-validate.trust_anchor_add('{{TRUST_ANCHOR}}')
+trust_anchors.add('{{TRUST_ANCHOR}}')
 verbose(true)
 
 -- Self-checks on globals
