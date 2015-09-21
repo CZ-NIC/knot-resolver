@@ -191,7 +191,7 @@ SECTION QUESTION
 bbb.local.nsec3.example. IN A
 ENTRY_END
 
-STEP 2 CHECK_ANSWER
+STEP 4 CHECK_ANSWER
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
