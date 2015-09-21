@@ -104,7 +104,9 @@ class Entry:
         answer.use_edns(query.edns, query.ednsflags)
         if 'copy_id' in self.adjust_fields:
             answer.id = query.id
-            answer.question[0].name = query.question[0].name
+            # Copy letter-case if the template has QD
+            if len(answer.question) > 0:
+                answer.question[0].name = query.question[0].name
         if 'copy_query' in self.adjust_fields:
             answer.question = query.question
         return answer
