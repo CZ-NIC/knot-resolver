@@ -18,10 +18,11 @@
  *      map.malloc = &mymalloc;
  *      map.baton  = &mymalloc_context;
  *
- *      // Insert keys
- *      if (map_set(&map, "princess") != 0 ||
- *          map_set(&map, "prince")   != 0 ||
- *          map_set(&map, "leia")     != 0) {
+ *      // Insert k-v pairs
+ *      int values = { 42, 53, 64 };
+ *      if (map_set(&map, "princess", &values[0]) != 0 ||
+ *          map_set(&map, "prince", &values[1])   != 0 ||
+ *          map_set(&map, "leia", &values[2])     != 0) {
  *          fail();
  *      }
  *
