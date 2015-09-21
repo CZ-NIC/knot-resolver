@@ -28,12 +28,10 @@ struct kr_context;
 */
 struct kr_zonecut {
 	knot_dname_t *name; /**< Zone cut name. */
-	mm_ctx_t *pool;     /**< Memory pool. */
 	map_t nsset;        /**< Map of nameserver => address_set. */
 	knot_rrset_t* key;  /**< Zone cut DNSKEY. */
 	knot_rrset_t* trust_anchor; /**< Current trust anchor. */
-	knot_dname_t *parent_name; /**< Parent zone name after zone cut update. */
-	knot_dname_t *missing_name; /**< Missing zone cut name. */
+	mm_ctx_t *pool;     /**< Memory pool. */
 };
 
 /**

@@ -72,8 +72,6 @@ int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *
 	cut->pool = pool;
 	cut->key  = NULL;
 	cut->trust_anchor = NULL;
-	cut->parent_name = NULL;
-	cut->missing_name = NULL;
 	cut->nsset = map_make();
 	cut->nsset.malloc = (map_alloc_f) mm_alloc;
 	cut->nsset.free = (map_free_f) mm_free;
@@ -99,8 +97,6 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 	map_clear(&cut->nsset);
 	knot_rrset_free(&cut->key, cut->pool);
 	knot_rrset_free(&cut->trust_anchor, cut->pool);
-	mm_free(cut->pool, cut->parent_name);
-	mm_free(cut->pool, cut->missing_name);
 }
 
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
@@ -111,15 +107,10 @@ void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
 	knot_rrset_t *key, *ta;
 	key = cut->key; cut->key = NULL;
 	ta = cut->trust_anchor; cut->trust_anchor = NULL;
-	knot_dname_t *parent_name, *missing_name;
-	parent_name = cut->parent_name; cut->parent_name = NULL;
-	missing_name = cut->missing_name; cut->missing_name = NULL;
 	kr_zonecut_deinit(cut);
 	kr_zonecut_init(cut, name, cut->pool);
 	cut->key = key;
 	cut->trust_anchor = ta;
-	cut->parent_name = parent_name;
-	cut->missing_name = missing_name;
 }
 
 static int copy_addr_set(const char *k, void *v, void *baton)
