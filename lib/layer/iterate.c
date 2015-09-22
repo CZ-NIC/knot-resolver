@@ -188,7 +188,7 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_query 
 }
 
 /** Attempt to find glue for given nameserver name (best effort). */
-static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
+static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns)
 {
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
@@ -205,8 +205,8 @@ static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *
 
 static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request *req)
 {
-	struct kr_query *query = kr_rplan_current(&req->rplan);	
-	struct kr_zonecut *cut = &query->zone_cut;
+	struct kr_query *qry = kr_rplan_current(&req->rplan);
+	struct kr_zonecut *cut = &qry->zone_cut;
 	int state = KNOT_STATE_CONSUME;
 
 	/* Authority MUST be at/below the authority of the nameserver, otherwise
@@ -225,14 +225,14 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 	/* Fetch glue for each NS */
 	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
-		int glue_records = has_glue(pkt, ns_name, req);
+		int glue_records = has_glue(pkt, ns_name);
 		/* Glue is mandatory for NS below zone */
 		if (!glue_records && knot_dname_in(rr->owner, ns_name)) {
 			DEBUG_MSG("<= authority: missing mandatory glue, rejecting\n");
 			continue;
 		}
 		kr_zonecut_add(cut, ns_name, NULL);
-		fetch_glue(pkt, ns_name, query);
+		fetch_glue(pkt, ns_name, qry);
 	}
 
 	return state;
@@ -241,6 +241,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 {
 	int result = KNOT_STATE_CONSUME;
+	struct kr_query *qry = kr_rplan_current(&req->rplan);
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
 #ifdef STRICT_MODE
@@ -268,6 +269,11 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			case KNOT_STATE_DONE: result = state; break;
 			case KNOT_STATE_FAIL: return state; break;
 			default:              /* continue */ break;
+			}
+		} else if (rr->type == KNOT_RRTYPE_SOA) {
+			/* SOA below cut in authority indicates different authority, but same NS set. */
+			if (knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
+				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 			}
 		}
 	}
