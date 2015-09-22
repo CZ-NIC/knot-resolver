@@ -330,7 +330,6 @@ class Step:
         # Wait for a response for a reasonable time
         answer = None
         if not self.data[0].is_raw_data_entry:
-            ctx.child_sock.settimeout(1)
             answer, addr = ctx.child_sock.recvfrom(4096)
         # Remember last answer for checking later
         self.raw_answer = answer
@@ -395,7 +394,7 @@ class Scenario:
     def play(self, saddr, paddr):
         """ Play given scenario. """
         self.child_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.child_sock.settimeout(1000)
+        self.child_sock.settimeout(1)
         self.child_sock.connect((paddr, 53))
 
         step = None
