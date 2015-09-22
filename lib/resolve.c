@@ -77,20 +77,23 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 
 static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, bool secured)
 {
-	struct kr_cache_txn txn;
 	int ret = 0;
 
-	/* If at/subdomain of parent zone cut, start top-down search */
-	struct kr_query *parent = qry->parent;
-	if (parent && knot_dname_in(parent->zone_cut.name, qry->sname)) {
-		return kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
-	}
 	/* Find closest zone cut from cache */
+	struct kr_cache_txn txn;
 	if (kr_cache_txn_begin(&req->ctx->cache, &txn, NAMEDB_RDONLY) != 0) {
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
 	} else {
-		ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, secured);
-		kr_cache_txn_abort(&txn);
+		/* If at/subdomain of parent zone cut, start from its encloser.
+		 * This is for case when we get to a dead end (and need glue from parent), or DS refetch. */
+		struct kr_query *parent = qry->parent;
+		if (parent && qry->sname[0] != '\0' && knot_dname_in(parent->zone_cut.name, qry->sname)) {
+			const knot_dname_t *encloser = knot_wire_next_label(parent->zone_cut.name, NULL);
+			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, &txn, qry->timestamp.tv_sec, secured);
+		} else {
+			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, secured);
+			kr_cache_txn_abort(&txn);
+		}
 	}
 	return ret;
 }
