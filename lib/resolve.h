@@ -86,6 +86,7 @@ struct kr_context
 	uint32_t options;
 	knot_rrset_t *opt_rr;
 	map_t trust_anchors;
+	map_t negative_anchors;
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	kr_nsrep_lru_t *cache_rtt;

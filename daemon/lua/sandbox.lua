@@ -70,6 +70,7 @@ setmetatable(trust_anchors, {
 	__newindex = function (t,k,v)
 	if     k == 'file' then t.config(v)
 	elseif k == 'auto' then t.set_auto(v)
+	elseif k == 'negative' then t.set_insecure(v)
 	else   rawset(t, k, v) end
 	end,
 })

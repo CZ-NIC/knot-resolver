@@ -30,7 +30,7 @@ knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name)
 int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
                uint32_t ttl, const uint8_t *rdata, uint16_t rdlen)
 {
-	if (!trust_anchors || !name || !rdata) {
+	if (!trust_anchors || !name) {
 		return kr_error(EINVAL);
 	}
 
@@ -52,7 +52,7 @@ int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
 		is_new_key = true;
 	}
 	/* Merge-in new key data */
-	if (!ta_rr || knot_rrset_add_rdata(ta_rr, rdata, rdlen, ttl, NULL) != 0) {
+	if (!ta_rr || (rdlen > 0 && knot_rrset_add_rdata(ta_rr, rdata, rdlen, ttl, NULL) != 0)) {
 		knot_rrset_free(&ta_rr, NULL);
 		return kr_error(ENOMEM);
 	}
@@ -82,7 +82,9 @@ int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name)
 static int del_record(const char *k, void *v, void *ext)
 {
 	knot_rrset_t *ta_rr = v;
-	knot_rrset_free(&ta_rr, NULL);
+	if (ta_rr) {
+		knot_rrset_free(&ta_rr, NULL);
+	}
 	return 0;
 }
 

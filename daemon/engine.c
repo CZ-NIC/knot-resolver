@@ -245,6 +245,7 @@ static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
 	engine->resolver.trust_anchors = map_make();
+	engine->resolver.negative_anchors = map_make();
 	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
 	/* Create OPT RR */
@@ -359,18 +360,19 @@ void engine_deinit(struct engine *engine)
 	lru_deinit(engine->resolver.cache_rtt);
 	lru_deinit(engine->resolver.cache_rep);
 
-	/* Unload modules. */
+	/* Unload modules and engine. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
 		engine_unload(engine, engine->modules.at[i]);
 	}
-	array_clear(engine->modules);
-	array_clear(engine->storage_registry);
-	kr_ta_clear(&engine->resolver.trust_anchors);
-
 	if (engine->L) {
 		lua_close(engine->L);
 	}
 
+	/* Free data structures */
+	array_clear(engine->modules);
+	array_clear(engine->storage_registry);
+	kr_ta_clear(&engine->resolver.trust_anchors);
+	kr_ta_clear(&engine->resolver.negative_anchors);
 }
 
 int engine_pcall(lua_State *L, int argc)

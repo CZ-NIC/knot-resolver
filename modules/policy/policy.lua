@@ -148,9 +148,7 @@ end
 -- Convert list of string names to domain names
 function policy.to_domains(names)
 	for i, v in ipairs(names) do
-		names[i] = v:gsub('([^.]*%.)', function (x)
-			return string.format('%s%s', string.char(x:len()-1), x:sub(1,-2))
-		end)
+		names[i] = kres.str2dname(v)
 	end
 end
 

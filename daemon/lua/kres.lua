@@ -166,13 +166,21 @@ struct kr_context
 	uint32_t options;
 	knot_rrset_t *opt_rr;
 	map_t trust_anchors;
+	map_t negative_anchors;
 	uint8_t _stub[]; /* Do not touch */
 };
 
-/* libknot API
+/*
+ * libc APIs
  */
+void free(void *ptr);
 
+/*
+ * libknot APIs
+ */
 /* Domain names */
+knot_dname_t *knot_dname_from_str(uint8_t *dst, const char *name, size_t maxlen);
+char *knot_dname_to_str(char *dst, const knot_dname_t *name, size_t maxlen);
 /* Resource records */
 /* Packet */
 const knot_dname_t *knot_pkt_qname(const knot_pkt_t *pkt);
@@ -181,9 +189,9 @@ uint16_t knot_pkt_qclass(const knot_pkt_t *pkt);
 int knot_pkt_begin(knot_pkt_t *pkt, int section_id);
 int knot_pkt_put_question(knot_pkt_t *pkt, const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);
 
-/* libkres API
+/* 
+ * libkres API
  */
-
 /* Resolution request */
 struct kr_rplan *kr_resolve_plan(struct kr_request *request);
 /* Resolution plan */
@@ -259,34 +267,8 @@ ffi.metatype( kr_request_t, {
 	},
 })
 
--- Return DS/DNSKEY parser that adds keys to TA store
-local function ta_parser(store)
-	local parser = require('zonefile').parser(function (p)
-		C.kr_ta_add(store, p.r_owner, p.r_type, p.r_ttl, p.r_data, p.r_data_length)
-	end)
-	return parser
-end
-
--- TA store management
-local trust_anchors = {
-	current_file = "",
-	is_auto = false,
-	store = ffi.cast('struct kr_context *', __engine).trust_anchors,
-	-- Load keys from a file
-	config = function (path)
-		ta_parser(trust_anchors.store):parse_file(path)
-		trust_anchors.current_file = path
-	end,
-	-- Add DS/DNSKEY record
-	add = function (ds) ta_parser(trust_anchors.store):read(ds..'\n') end,
-	clear = function() C.kr_ta_clear(trust_anchors.store) end,
-	-- Set/disable RFC5011 TA management
-	set_auto = function (enable)
-		error("not supported")
-	end,
-}
-
 -- Module API
+local kres_context = ffi.cast('struct kr_context *', __engine)
 local kres = {
 	-- Constants
 	class = ffi.new('struct rr_class'),
@@ -298,8 +280,40 @@ local kres = {
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,
 	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,
 	-- Global API functions
-	context = function () return ffi.cast('struct kr_context *', __engine) end,
-	trust_anchors = trust_anchors,
+	str2dname = function(name) return ffi.string(ffi.gc(C.knot_dname_from_str(nil, name, 0), C.free)) end,
+	dname2str = function(dname) return ffi.string(ffi.gc(C.knot_dname_to_str(nil, dname, 0), C.free)) end,
+	context = function () return kres_context end,
+}
+
+-- Return DS/DNSKEY parser that adds keys to TA store
+local function ta_parser(store)
+	local parser = require('zonefile').parser(function (p)
+		C.kr_ta_add(store, p.r_owner, p.r_type, p.r_ttl, p.r_data, p.r_data_length)
+	end)
+	return parser
+end
+
+-- TA store management
+kres.trust_anchors = {
+	-- Load keys from a file
+	config = function (path)
+		ta_parser(kres_context.trust_anchors):parse_file(path)
+		kres.trust_anchors.current_file = path
+	end,
+	-- Add DS/DNSKEY record(s)
+	add = function (ds) ta_parser(kres_context.trust_anchors):read(ds..'\n') end,
+	-- Negative TA management
+	set_insecure = function (list)
+		C.kr_ta_clear(kres_context.negative_anchors)
+		for i = 1, #list do
+			local dname = kres.str2dname(list[i])
+			C.kr_ta_add(kres_context.negative_anchors, dname, kres.type.DS, 0, nil, 0)
+		end
+	end,
+	-- Set/disable RFC5011 TA management
+	set_auto = function (enable)
+		error("not supported")
+	end,
 }
 
 return kres

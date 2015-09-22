@@ -330,6 +330,7 @@ class Step:
         # Wait for a response for a reasonable time
         answer = None
         if not self.data[0].is_raw_data_entry:
+            ctx.child_sock.settimeout(1)
             answer, addr = ctx.child_sock.recvfrom(4096)
         # Remember last answer for checking later
         self.raw_answer = answer
