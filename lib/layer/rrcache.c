@@ -214,16 +214,12 @@ static int stash_add(const knot_pkt_t *pkt, map_t *stash, const knot_rrset_t *rr
 {
 	/* Stash key = {[1] flags, [1-255] owner, [1-5] type, [1] \x00 } */
 	char key[9 + KNOT_DNAME_MAXLEN];
-	bool is_secure = knot_wire_get_ad(pkt->wire);
 	uint16_t rrtype = rr->type;
 	KEY_FLAG_SET(key, KEY_FLAG_NO);
 
 	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
 	 * This way it the stash won't merge RRSIGs together. */
 	if (rr->type == KNOT_RRTYPE_RRSIG) {
-		if (!is_secure) {
-			return kr_ok(); /* Ignore other (and unsolicited) DNSSEC records. */
-		}
 		rrtype = knot_rrsig_type_covered(&rr->rrs, 0);
 		KEY_FLAG_SET(key, KEY_FLAG_RRSIG);
 	}
@@ -263,6 +259,18 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 			continue;
 		}
 		stash_add(pkt, stash, rr, pool);
+	}
+}
+
+/* @internal DS is special and is present only parent-side */
+static void stash_ds(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx_t *pool)
+{
+	const knot_pktsection_t *authority = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	for (unsigned i = 0; i < authority->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(authority, i);
+		if (rr->type == KNOT_RRTYPE_DS || rr->type == KNOT_RRTYPE_RRSIG) {
+			stash_add(pkt, stash, rr, pool);
+		}
 	}
 }
 
@@ -334,6 +342,10 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Cache authority only if chasing referral/cname chain */
 	if (!is_auth || qry != HEAD(rplan->pending)) {
 		ret = stash_authority(qry, pkt, &stash, rplan->pool);
+	}
+	/* Cache DS records in referrals */
+	if (!is_auth && knot_pkt_has_dnssec(pkt)) {
+		stash_ds(qry, pkt, &stash, rplan->pool);
 	}
 	/* Cache stashed records */
 	if (ret == 0) {
