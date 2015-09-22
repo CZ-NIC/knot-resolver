@@ -274,6 +274,9 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			/* SOA below cut in authority indicates different authority, but same NS set. */
 			if (knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
 				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
+				if (knot_pkt_has_dnssec(pkt)) { /* Treat as a referral */
+					return KNOT_STATE_DONE;
+				}
 			}
 		}
 	}
