@@ -333,23 +333,23 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 }
 
 /** @internal Spawn subrequest in current zone cut (no minimization or lookup). */
-static int zone_cut_subreq(struct kr_rplan *rplan, struct kr_query *parent,
+static struct kr_query *zone_cut_subreq(struct kr_rplan *rplan, struct kr_query *parent,
                            const knot_dname_t *qname, uint16_t qtype)
 {
 	struct kr_query *next = kr_rplan_push(rplan, parent, qname, parent->sclass, qtype);
 	if (!next) {
-		return kr_error(ENOMEM);
+		return NULL;
 	}
 	kr_zonecut_set(&next->zone_cut, parent->zone_cut.name);
 	if (kr_zonecut_copy(&next->zone_cut, &parent->zone_cut) != 0 ||
 	    kr_zonecut_copy_trust(&next->zone_cut, &parent->zone_cut) != 0) {
-		return kr_error(ENOMEM);
+		return NULL;
 	}
 	next->flags |= QUERY_NO_MINIMIZE;
 	if (parent->flags & QUERY_DNSSEC_WANT) {
 		next->flags |= QUERY_DNSSEC_WANT;
 	}
-	return kr_ok();
+	return next;
 }
 
 /** @internal Check current zone cut status and credibility, spawn subrequests if needed. */
@@ -399,18 +399,22 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
 		qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
 	}
-	/* Try to fetch missing DS. */
-	if (want_secured && (qry->flags & QUERY_AWAIT_DS)) {
-		int ret = zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_DS);
-		if (ret != 0) {
+	/* Try to fetch missing DS (from above the cut). */
+	bool refetch_ta = !qry->zone_cut.trust_anchor || !knot_dname_is_equal(qry->zone_cut.name, qry->zone_cut.trust_anchor->owner);
+	if (want_secured && refetch_ta) {
+		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
+		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);
+		if (!next) {
 			return KNOT_STATE_FAIL;
 		}
+		next->flags |= QUERY_AWAIT_CUT|QUERY_DNSSEC_WANT;
 		return KNOT_STATE_DONE;
 	}
-	/* Try to fetch missing DNSKEY. */
-	if (want_secured && qry->zone_cut.trust_anchor && !qry->zone_cut.key && qry->stype != KNOT_RRTYPE_DNSKEY) {
-		int ret = zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_DNSKEY);
-		if (ret != 0) {
+	/* Try to fetch missing DNSKEY (either missing or above current cut). */
+	bool refetch_key = !qry->zone_cut.key || !knot_dname_is_equal(qry->zone_cut.name, qry->zone_cut.key->owner);
+	if (want_secured && qry->zone_cut.trust_anchor && refetch_key && qry->stype != KNOT_RRTYPE_DNSKEY) {
+		struct kr_query *next = zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_DNSKEY);
+		if (!next) {
 			return KNOT_STATE_FAIL;
 		}
 		return KNOT_STATE_DONE;

@@ -41,7 +41,6 @@
 	X(ALLOW_LOCAL, 1 << 11) /**< Allow queries to local or private address ranges. */ \
 	X(DNSSEC_WANT , 1 << 12) /**< Want DNSSEC secured answer. */ \
 	X(DNSSEC_BOGUS , 1 << 13) /**< Query response is DNSSEC bogus. */ \
-	X(AWAIT_DS   , 1 << 14) /**< Query is waiting for DS lookup. */
 
 /** Query flags */
 enum kr_query_flag {

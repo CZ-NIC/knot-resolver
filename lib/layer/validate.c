@@ -191,8 +191,8 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_ns
 		    (knot_dname_cmp(rr->owner, qry->zone_cut.name) != 0)) {
 			continue;
 		}
-		/* Merge with zone cut. */
-		if (!qry->zone_cut.key) {
+		/* Merge with zone cut (or replace ancestor key). */
+		if (!qry->zone_cut.key || !knot_dname_is_equal(qry->zone_cut.key->owner, rr->owner)) {
 			qry->zone_cut.key = knot_rrset_copy(rr, qry->zone_cut.pool);
 			if (!qry->zone_cut.key) {
 				return kr_error(ENOMEM);
@@ -215,6 +215,8 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_ns
 #warning TODO: Ensure canonical format of the whole DNSKEY RRSet. (Also remove duplicities?)
 
 	/* Check if there's a key for current TA. */
+	/* @todo this is not going to work with cached DNSKEY, as the TA is not yet ready,
+	 *       must not check if the data comes from cache */
 	int ret = kr_dnskeys_trusted(answer, KNOT_ANSWER, qry->zone_cut.key,
 	                             qry->zone_cut.trust_anchor, qry->zone_cut.name,
 	                             qry->timestamp.tv_sec, has_nsec3);
@@ -302,11 +304,10 @@ static int update_parent(struct kr_query *qry, uint16_t answer_type)
 		break;
 	case KNOT_RRTYPE_DS:
 		DEBUG_MSG(qry, "<= parent: updating DS\n");
-		parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.key, parent->zone_cut.pool);
-		if (!parent->zone_cut.key) {
+		parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
+		if (!parent->zone_cut.trust_anchor) {
 			return KNOT_STATE_FAIL;
 		}
-		parent->flags &= ~QUERY_AWAIT_DS;
 		break;
 	default: break;
 	}
@@ -354,8 +355,6 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 
 	/* Extend trust anchor */
 	DEBUG_MSG(qry, "<= DS: OK\n");
-	knot_rrset_free(&cut->trust_anchor, cut->pool);
-	knot_rrset_free(&cut->key, cut->pool);
 	cut->trust_anchor = new_ds;
 	return ret;
 }
@@ -370,16 +369,26 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	/* Pass-through if user doesn't want secure answer, or cached.
-	 * Since we let the data into cache, we're going to trust it.
-	 */
-	if (!(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_CACHED)) {
+	/* Pass-through if user doesn't want secure answer. */
+	if (!(qry->flags & QUERY_DNSSEC_WANT)) {
 		return ctx->state;
 	}
-	if (!knot_pkt_has_dnssec(pkt)) {
+	if (!(qry->flags & QUERY_CACHED) && !knot_pkt_has_dnssec(pkt)) {
 		DEBUG_MSG(qry, "<= got insecure response\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
 		return KNOT_STATE_FAIL;
+	}
+
+	/* Check if this is a DNSKEY answer, check trust chain and store. */
+	uint16_t qtype = knot_pkt_qtype(pkt);
+	bool has_nsec3 = _knot_pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
+	if (qtype == KNOT_RRTYPE_DNSKEY) {
+		ret = validate_keyset(qry, pkt, has_nsec3);
+		if (ret != 0) {
+			DEBUG_MSG(qry, "<= bad keys, broken trust chain\n");
+			qry->flags |= QUERY_DNSSEC_BOGUS;
+			return KNOT_STATE_FAIL;
+		}
 	}
 
 	/* Check whether the current zone cut holds keys that can be used
@@ -388,15 +397,15 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_dname_t *key_own = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
 	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
 	if (key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
-		if (qry->flags & QUERY_AWAIT_DS) {
-			qry->flags |= QUERY_DNSSEC_BOGUS;
-			return KNOT_STATE_FAIL; /* This indicates a DS is not available. */
-		}
-		qry->flags |= QUERY_AWAIT_DS;
+		/* @todo this sometimes causes duplicated data in answer, as the answer is
+		 *       fetched again after we have a valid DS/DNSKEY, fix this */
+		/* @todo for non-existence proofs, there may be only SOA and we need to fetch the
+		 *       keys matching it instead of current cut */
+		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
+		qry->flags &= ~QUERY_RESOLVED;
 		return KNOT_STATE_CONSUME;
 	}
 
-	bool has_nsec3 = _knot_pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
 	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 
 	/* Validate non-existence proof if not positive answer. */
@@ -450,23 +459,15 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	/* Check if this is a DNSKEY answer, check trust chain and store. */
-	uint16_t qtype = knot_pkt_qtype(pkt);
-	if (qtype == KNOT_RRTYPE_DNSKEY) {
-		ret = validate_keyset(qry, pkt, has_nsec3);
+	/* Validate all records, fail as bogus if it doesn't match.
+	 * Do not revalidate data from cache, as it's already trusted. */
+	if (!(qry->flags & QUERY_CACHED)) {
+		ret = validate_records(qry, pkt, req->rplan.pool, has_nsec3);
 		if (ret != 0) {
-			DEBUG_MSG(qry, "<= bad keys, broken trust chain\n");
+			DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KNOT_STATE_FAIL;
 		}
-	}
-
-	/* Validate all records, fail as bogus if it doesn't match. */
-	ret = validate_records(qry, pkt, req->rplan.pool, has_nsec3);
-	if (ret != 0) {
-		DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
-		qry->flags |= QUERY_DNSSEC_BOGUS;
-		return KNOT_STATE_FAIL;
 	}
 
 	/* Check and update current delegation point security status. */
