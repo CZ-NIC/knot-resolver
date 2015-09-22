@@ -100,8 +100,8 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return ctx->state; /* Already resolved/failed */
 	}
-	if (!(qry->flags & QUERY_AWAIT_CUT)) {
-		return ctx->state; /* Only lookup on first iteration */
+	if (qry->ns.addr.ip.sa_family != AF_UNSPEC) {
+		return ctx->state; /* Only lookup before asking a query */
 	}
 	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		return ctx->state; /* Only IN class */
