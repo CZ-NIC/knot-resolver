@@ -183,12 +183,11 @@ static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *
 
 static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_nsec3)
 {
-	/* Merge DNSKEY records from answer */
+	/* Merge DNSKEY records from answer that are below/at current cut. */
 	const knot_pktsection_t *an = knot_pkt_section(answer, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-		if ((rr->type != KNOT_RRTYPE_DNSKEY) ||
-		    (knot_dname_cmp(rr->owner, qry->zone_cut.name) != 0)) {
+		if ((rr->type != KNOT_RRTYPE_DNSKEY) || !knot_dname_in(qry->zone_cut.name, rr->owner)) {
 			continue;
 		}
 		/* Merge with zone cut (or replace ancestor key). */
