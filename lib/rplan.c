@@ -119,6 +119,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	qry->stype = type;
 	qry->flags = rplan->request->options;
 	qry->parent = parent;
+	qry->ns.addr.ip.sa_family = AF_UNSPEC;
 	gettimeofday(&qry->timestamp, NULL);
 	add_tail(&rplan->pending, &qry->node);
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
