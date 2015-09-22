@@ -212,17 +212,15 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_ns
 		return kr_error(KNOT_DNSSEC_ENOKEY);
 	}
 
-#warning TODO: Ensure canonical format of the whole DNSKEY RRSet. (Also remove duplicities?)
-
 	/* Check if there's a key for current TA. */
-	/* @todo this is not going to work with cached DNSKEY, as the TA is not yet ready,
-	 *       must not check if the data comes from cache */
-	int ret = kr_dnskeys_trusted(answer, KNOT_ANSWER, qry->zone_cut.key,
-	                             qry->zone_cut.trust_anchor, qry->zone_cut.name,
-	                             qry->timestamp.tv_sec, has_nsec3);
-	if (ret != 0) {
-		knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
-		return ret;
+	if (!(qry->flags & QUERY_CACHED)) {
+		int ret = kr_dnskeys_trusted(answer, KNOT_ANSWER, qry->zone_cut.key,
+		                             qry->zone_cut.trust_anchor, qry->zone_cut.name,
+		                             qry->timestamp.tv_sec, has_nsec3);
+		if (ret != 0) {
+			knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+			return ret;
+		}
 	}
 	return kr_ok();
 }
@@ -397,10 +395,6 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_dname_t *key_own = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
 	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
 	if (key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
-		/* @todo this sometimes causes duplicated data in answer, as the answer is
-		 *       fetched again after we have a valid DS/DNSKEY, fix this */
-		/* @todo for non-existence proofs, there may be only SOA and we need to fetch the
-		 *       keys matching it instead of current cut */
 		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
 		qry->flags &= ~QUERY_RESOLVED;
 		return KNOT_STATE_CONSUME;
