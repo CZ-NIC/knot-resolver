@@ -25,15 +25,10 @@
 #include "lib/layer/iterate.h"
 #include "lib/cache.h"
 #include "lib/module.h"
+#include "lib/rrset_stash.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " rc ",  fmt)
 #define DEFAULT_MINTTL (5) /* Short-time "no data" retention to avoid bursts */
-
-/* Stash key flags */
-#define KEY_FLAG_NO 0x01
-#define KEY_FLAG_RRSIG 0x02
-#define KEY_FLAG_SET(key, flag) key[0] = (flag);
-#define KEY_COVERING_RRSIG(key) (key[0] & KEY_FLAG_RRSIG)
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
 static inline bool is_expiring(const knot_rrset_t *rr, uint32_t drift)
@@ -208,45 +203,6 @@ static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache_txn 
 		.min_ttl = DEFAULT_MINTTL
 	};
 	return map_walk(stash, &commit_rr, &baton);
-}
-
-static int stash_add(const knot_pkt_t *pkt, map_t *stash, const knot_rrset_t *rr, mm_ctx_t *pool)
-{
-	/* Stash key = {[1] flags, [1-255] owner, [1-5] type, [1] \x00 } */
-	char key[9 + KNOT_DNAME_MAXLEN];
-	uint16_t rrtype = rr->type;
-	KEY_FLAG_SET(key, KEY_FLAG_NO);
-
-	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
-	 * This way it the stash won't merge RRSIGs together. */
-	if (rr->type == KNOT_RRTYPE_RRSIG) {
-		rrtype = knot_rrsig_type_covered(&rr->rrs, 0);
-		KEY_FLAG_SET(key, KEY_FLAG_RRSIG);
-	}
-
-	uint8_t *key_buf = (uint8_t *)key + 1;
-	int ret = knot_dname_to_wire(key_buf, rr->owner, KNOT_DNAME_MAXLEN);
-	if (ret <= 0) {
-		return ret;
-	}
-	knot_dname_to_lower(key_buf);
-	/* Must convert to string, as the key must not contain 0x00 */
-	ret = snprintf((char *)key_buf + ret - 1, sizeof(key) - KNOT_DNAME_MAXLEN, "%hu", rrtype);
-	if (ret <= 0 || ret >= KNOT_DNAME_MAXLEN) {
-		return kr_error(EILSEQ);
-	}
-
-	/* Check if already exists */
-	knot_rrset_t *stashed = map_get(stash, key);
-	if (!stashed) {
-		stashed = knot_rrset_copy(rr, pool);
-		if (!stashed) {
-			return kr_error(ENOMEM);
-		}
-		return map_set(stash, key, stashed);
-	}
-	/* Merge rdataset */
-	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
 }
 
 static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_name, mm_ctx_t *pool)

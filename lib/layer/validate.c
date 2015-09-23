@@ -31,66 +31,35 @@
 #include "lib/layer.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
+#include "lib/rrset_stash.h"
 #include "lib/defines.h"
 #include "lib/module.h"
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "vldr", fmt)
 
-struct rrset_ids {
-	const knot_dname_t *owner;
-	uint16_t type;
-	uint32_t ttl;
+/** @internal Baton for validate_section */
+struct stash_baton {
+	const knot_pkt_t *pkt;
+	knot_section_t section_id;
+	const knot_rrset_t *keys;
+	const knot_dname_t *zone_name;
+	uint32_t timestamp;
+	bool has_nsec3;
+	int result;
 };
 
-/** Simplistic structure holding RR types that are contained in the packet. */
-struct contained_ids {
-	struct rrset_ids *ids;
-	size_t size;
-	size_t max;
-	mm_ctx_t *pool;
-};
-
-static int rrtypes_add(struct contained_ids *stored, const knot_rrset_t *rr)
+static int validate_rrset(const char *key, void *val, void *data)
 {
-	if (!stored || !rr) {
-		return kr_error(EINVAL);
-	}
+	knot_rrset_t *rr = val;
+	struct stash_baton *baton = data;
 
-	size_t i;
-	for (i = 0; i < stored->size; ++i) {
-		if ((knot_dname_cmp(stored->ids[i].owner, rr->owner) == 0) &&
-		    (stored->ids[i].type == rr->type)) {
-			break;
-		}
+	if (baton->result != 0) {
+		return baton->result;
 	}
-	uint32_t rr_ttl = knot_rdata_ttl(knot_rdataset_at(&rr->rrs, 0));
-	if (i < stored->size) {
-		if (stored->ids[i].ttl == rr_ttl) {
-			return kr_ok(); /* Type is stored. */
-		} else {
-			/* RFC2181 5.2 */
-			return kr_error(EINVAL);
-		}
-	}
-
-	if (stored->max == stored->size) {
-#define INCREMENT 8
-		struct rrset_ids *new = mm_realloc(stored->pool, stored->ids, stored->max + INCREMENT * sizeof(*stored->ids), stored->max);
-		if (new) {
-			stored->ids = new;
-			stored->max += INCREMENT * sizeof(uint16_t);
-		} else {
-			return kr_error(ENOMEM);
-		}
-#undef INCREMENT
-	}
-	assert(stored->max > stored->size);
-
-	stored->ids[stored->size].owner = rr->owner;
-	stored->ids[stored->size].type = rr->type;
-	stored->ids[stored->size].ttl = rr_ttl;
-	++stored->size;
-	return kr_ok();
+	baton->result = kr_rrset_validate(baton->pkt, baton->section_id, rr,
+	                                  baton->keys, baton->zone_name,
+	                                  baton->timestamp, baton->has_nsec3);
+	return baton->result;
 }
 
 static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
@@ -103,9 +72,11 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 	}
 
 	int ret = kr_ok();
-	struct contained_ids stored = {0, };
-	stored.pool = pool;
-	knot_rrset_t *covered = NULL;
+
+	map_t stash = map_make();
+	stash.malloc = (map_alloc_f) mm_alloc;
+	stash.free = (map_free_f) mm_free;
+	stash.baton = pool;
 
 	/* Determine RR types contained in the section. */
 	for (unsigned i = 0; i < sec->count; ++i) {
@@ -116,49 +87,32 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		if ((rr->type == KNOT_RRTYPE_NS) && (section_id == KNOT_AUTHORITY)) {
 			continue;
 		}
-		ret = rrtypes_add(&stored, rr);
+		ret = stash_add(answer, &stash, rr, pool);
 		if (ret != 0) {
 			goto fail;
 		}
 	}
 
-	for (size_t i = 0; i < stored.size; ++i) {
-		knot_rrset_free(&covered, pool);
-		/* Construct a RRSet. */
-		for (unsigned j = 0; j < sec->count; ++j) {
-			const knot_rrset_t *rr = knot_pkt_rr(sec, j);
-			if ((rr->type != stored.ids[i].type) ||
-			    (knot_dname_cmp(rr->owner, stored.ids[i].owner) != 0)) {
-				continue;
-			}
-
-			if (covered) {
-				ret = knot_rdataset_merge(&covered->rrs, &rr->rrs, pool);
-				if (ret != 0) {
-					goto fail;
-				}
-			} else {
-				covered = knot_rrset_copy(rr, pool);
-				if (!covered) {
-					ret = kr_error(ENOMEM);
-					goto fail;
-				}
-			}
-		}
-		/* Validate RRSet. */
+	struct stash_baton baton = {
+		.pkt = answer,
+		.section_id = section_id,
+		.keys = qry->zone_cut.key,
 		/* Can't use qry->zone_cut.name directly, as this name can
 		 * change when updating cut information before validation.
 		 */
-		const knot_dname_t *zone_name = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
-		ret = kr_rrset_validate(answer, section_id, covered, qry->zone_cut.key, zone_name, qry->timestamp.tv_sec, has_nsec3);
-		if (ret != 0) {
-			break;
-		}
+		.zone_name = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL,
+		.timestamp = qry->timestamp.tv_sec,
+		.has_nsec3 = has_nsec3,
+		.result = 0
+	};
+
+	ret = map_walk(&stash, &validate_rrset, &baton);
+	if (ret != 0) {
+		return ret;
 	}
+	ret = baton.result;
 
 fail:
-	mm_free(stored.pool, stored.ids);
-	knot_rrset_free(&covered, pool);
 	return ret;
 }
 
@@ -404,7 +358,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Validate non-existence proof if not positive answer. */
 	if (pkt_rcode == KNOT_RCODE_NXDOMAIN) {
-		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the test crash. */
+		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname, &req->pool);
 		} else {
