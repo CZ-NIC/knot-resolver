@@ -285,23 +285,48 @@ local kres = {
 	context = function () return kres_context end,
 }
 
--- Return DS/DNSKEY parser that adds keys to TA store
-local function ta_parser(store)
-	local parser = require('zonefile').parser(function (p)
-		C.kr_ta_add(store, p.r_owner, p.r_type, p.r_ttl, p.r_data, p.r_data_length)
-	end)
-	return parser
+-- Evaluate TA status according to RFC5011
+local function evaluate_ta(keyset, ta)
+	-- @todo: check if KSK
+	-- @todo: get TA id
+	-- @todo: check key flags for revoked
+	-- @todo: build a state table
+	table.insert(keyset, ta)
 end
 
 -- TA store management
 kres.trust_anchors = {
+	keyset = {},
+	-- Update existing keyset
+	update = function (new_keys)
+		-- Evaluate new TAs
+		local keyset = kres.trust_anchors.keyset
+		for i = 1, #new_keys do
+			local rr = new_keys[i]
+			if rr.type == kres.type.DS or rr.type == kres.type.DNSKEY then
+				evaluate_ta(keyset, rr)
+			end
+		end
+		-- Publish active TAs
+		local store = kres_context.trust_anchors
+		C.kr_ta_clear(store)
+		for id, key in pairs(keyset) do
+			C.kr_ta_add(store, key.owner, key.type, key.ttl, key.rdata, #key.rdata)
+		end
+	end,
 	-- Load keys from a file
 	config = function (path)
-		ta_parser(kres_context.trust_anchors):parse_file(path)
-		kres.trust_anchors.current_file = path
+		local new_keys = require('zonefile').parse_file(path)
+		kres.trust_anchors.update(new_keys)
 	end,
 	-- Add DS/DNSKEY record(s)
-	add = function (ds) ta_parser(kres_context.trust_anchors):read(ds..'\n') end,
+	add = function (rr)
+		local new_keys = {}
+		require('zonefile').parser(function (p)
+			table.insert(new_keys, p:current_rr())
+		end):read(rr..'\n')
+		kres.trust_anchors.update(new_keys)
+	end,
 	-- Negative TA management
 	set_insecure = function (list)
 		C.kr_ta_clear(kres_context.negative_anchors)
@@ -309,10 +334,6 @@ kres.trust_anchors = {
 			local dname = kres.str2dname(list[i])
 			C.kr_ta_add(kres_context.negative_anchors, dname, kres.type.DS, 0, nil, 0)
 		end
-	end,
-	-- Set/disable RFC5011 TA management
-	set_auto = function (enable)
-		error("not supported")
 	end,
 }
 

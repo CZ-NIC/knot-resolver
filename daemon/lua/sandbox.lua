@@ -68,11 +68,10 @@ setmetatable(cache, {
 })
 
 -- Syntactic sugar for TA store
-trust_anchors = require('kres').trust_anchors
+trust_anchors = kres.trust_anchors
 setmetatable(trust_anchors, {
 	__newindex = function (t,k,v)
 	if     k == 'file' then t.config(v)
-	elseif k == 'auto' then t.set_auto(v)
 	elseif k == 'negative' then t.set_insecure(v)
 	else   rawset(t, k, v) end
 	end,
