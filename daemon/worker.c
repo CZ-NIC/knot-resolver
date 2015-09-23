@@ -69,6 +69,8 @@ struct qr_task
 	uv_req_t *ioreq;
 	uv_handle_t *iohandle;
 	uv_timer_t timeout;
+	worker_cb_t on_complete;
+	void *baton;
 	struct {
 		union {
 			struct sockaddr_in ip4;
@@ -138,6 +140,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->source.handle = handle;
 	uv_timer_init(worker->loop, &task->timeout);
 	task->timeout.data = task;
+	task->on_complete = NULL;
 	/* Remember query source addr */
 	if (addr) {
 		memcpy(&task->source.addr, addr, sockaddr_len(addr));
@@ -159,6 +162,11 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 static void qr_task_free(uv_handle_t *handle)
 {
 	struct qr_task *task = handle->data;
+	struct worker_ctx *worker = task->worker;
+	/* Run the completion callback. */
+	if (task->on_complete) {
+		task->on_complete(worker, &task->req, task->baton);
+	}
 	/* Return handle to the event loop in case
 	 * it was exclusively taken by this task. */
 	if (task->source.handle && !uv_has_ref(task->source.handle)) {
@@ -166,7 +174,6 @@ static void qr_task_free(uv_handle_t *handle)
 		io_start_read(task->source.handle);
 	}
 	/* Return mempool to ring or free it if it's full */
-	struct worker_ctx *worker = task->worker;
 	void *mp_context = task->req.pool.ctx;
 	if (worker->pools.len < MP_FREELIST_SIZE) {
 		mp_flush(mp_context);
@@ -416,9 +423,9 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 	return qr_task_step(task, query);
 }
 
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options)
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options, worker_cb_t on_complete, void *baton)
 {
-	if (!worker) {
+	if (!worker || !query) {
 		return kr_error(EINVAL);
 	}
 
@@ -427,6 +434,8 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned option
 	if (!task) {
 		return kr_error(ENOMEM);
 	}
+	task->baton = baton;
+	task->on_complete = on_complete;
 	task->req.options |= options;
 	return qr_task_step(task, query);
 }

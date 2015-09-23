@@ -48,6 +48,9 @@ struct worker_ctx {
 	mm_ctx_t pkt_pool;
 };
 
+/* Worker callback */
+typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, void *baton);
+
 /**
  * Process incoming packet (query or answer to subrequest).
  * @return 0 or an error code
@@ -58,7 +61,7 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
  * Schedule query for resolution.
  * @return 0 or an error code
  */
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options);
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options, worker_cb_t on_complete, void *baton);
 
 /** Reserve worker buffers */
 int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen);

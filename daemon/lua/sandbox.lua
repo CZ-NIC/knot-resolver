@@ -7,6 +7,9 @@ sec = 1000
 minute = 60 * sec
 hour = 60 * minute
 
+-- Resolver bindings
+kres = require('kres')
+
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`
 env = {}

@@ -433,23 +433,28 @@ static void event_free(uv_timer_t *timer)
 	free(timer);
 }
 
+static int execute_callback(lua_State *L, int argc)
+{
+	int ret = engine_pcall(L, argc);
+	if (ret != 0) {
+		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
+	}
+	/* Clear the stack, there may be event a/o enything returned */
+	lua_settop(L, 0);
+	lua_gc(L, LUA_GCCOLLECT, 0);
+	return ret;
+}
+
 static void event_callback(uv_timer_t *timer)
 {
 	struct worker_ctx *worker = timer->loop->data;
 	lua_State *L = worker->engine->L;
 
 	/* Retrieve callback and execute */
-	int top = lua_gettop(L);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) timer->data);
 	lua_rawgeti(L, -1, 1);
 	lua_pushinteger(L, (intptr_t) timer->data);
-	int ret = engine_pcall(L, 1);
-	if (ret != 0) {
-		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
-	}
-	/* Clear the stack, there may be event a/o enything returned */
-	lua_settop(L, top);
-	lua_gc(L, LUA_GCCOLLECT, 0);
+	int ret = execute_callback(L, 1);
 	/* Free callback if not recurrent or an error */
 	if (ret != 0 || uv_timer_get_repeat(timer) == 0) {
 		uv_close((uv_handle_t *)timer, (uv_close_cb) event_free);
@@ -553,6 +558,20 @@ static inline struct worker_ctx *wrk_luaget(lua_State *L) {
 	return worker;
 }
 
+/* @internal Call the Lua callback stored in baton. */
+static void resolve_callback(struct worker_ctx *worker, struct kr_request *req, void *baton)
+{
+	assert(worker);
+	assert(req);
+	assert(baton);
+	lua_State *L = worker->engine->L;
+	intptr_t cb_ref = (intptr_t) baton;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_ref);
+	luaL_unref(L, LUA_REGISTRYINDEX, cb_ref);
+	lua_pushlightuserdata(L, req->answer);
+	(void) execute_callback(L, 1);
+}
+
 static int wrk_resolve(lua_State *L)
 {
 	struct worker_ctx *worker = wrk_luaget(L);
@@ -589,9 +608,17 @@ static int wrk_resolve(lua_State *L)
 		knot_pkt_free(&pkt);
 		return 0;
 	}
-	/* Resolve it */
+	/* Add completion callback */
 	unsigned options = lua_tointeger(L, 4);
-	ret = worker_resolve(worker, pkt, options);
+	if (lua_isfunction(L, 5)) {
+		/* Store callback in registry */
+		lua_pushvalue(L, 5);
+		int cb = luaL_ref(L, LUA_REGISTRYINDEX);
+		ret = worker_resolve(worker, pkt, options, resolve_callback, (void *) (intptr_t)cb);
+	} else {
+		ret = worker_resolve(worker, pkt, options, NULL, NULL);
+	}
+	
 	knot_pkt_free(&pkt);
 	lua_pushboolean(L, ret == 0);
 	return 1;
