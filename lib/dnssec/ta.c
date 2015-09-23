@@ -18,6 +18,8 @@
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
 #include <libknot/packet/wire.h>
+#include <dnssec/key.h>
+#include <dnssec/error.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/ta.h"
@@ -27,28 +29,44 @@ knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name)
 	return map_get(trust_anchors, (const char *)name);
 }
 
-int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
-               uint32_t ttl, const uint8_t *rdata, uint16_t rdlen)
+/* @internal Create DS from DNSKEY, caller MUST free dst if successful. */
+static int dnskey2ds(dnssec_binary_t *dst, const knot_dname_t *owner, const uint8_t *rdata, uint16_t rdlen)
 {
-	if (!trust_anchors || !name) {
-		return kr_error(EINVAL);
+	dnssec_key_t *key = NULL;
+	int ret = dnssec_key_new(&key);
+	if (ret != DNSSEC_EOK) {
+		return kr_error(ENOMEM);
 	}
-
-	/* Convert DNSKEY records to DS */
-	switch (type) {
-	case KNOT_RRTYPE_DS: break; /* OK */
-	case KNOT_RRTYPE_DNSKEY:
-#warning TODO: convert DNSKEY -> DS here
-		return kr_error(ENOSYS);
-		break;
-	default: return kr_error(EINVAL);
+	/* Create DS from DNSKEY and reinsert */
+	const dnssec_binary_t key_data = { .size = rdlen, .data = (uint8_t *)rdata };
+	ret = dnssec_key_set_rdata(key, &key_data);
+	if (ret == DNSSEC_EOK) {
+		/* Accept only KSK (257) to TA store */
+		if (dnssec_key_get_flags(key) == 257)  {
+			ret = dnssec_key_set_dname(key, owner);
+		} else {
+			ret = DNSSEC_EINVAL;
+		}
+		if (ret == DNSSEC_EOK) {
+			ret = dnssec_key_create_ds(key, DNSSEC_KEY_DIGEST_SHA256, dst);
+		}
 	}
+	dnssec_key_free(key);
+	/* Pick some sane error code */
+	if (ret != DNSSEC_EOK) {
+		return kr_error(ENOMEM);
+	}
+	return kr_ok();
+}
 
-	/* Create new RRSet or use existing */
+/* @internal Insert new TA to trust anchor set, rdata MUST be of DS type. */
+static int insert_ta(map_t *trust_anchors, const knot_dname_t *name,
+                     uint32_t ttl, const uint8_t *rdata, uint16_t rdlen)
+{
 	bool is_new_key = false;
 	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, name);
-	if (!ta_rr) { 
-		ta_rr = knot_rrset_new(name, type, KNOT_CLASS_IN, NULL);
+	if (!ta_rr) {
+		ta_rr = knot_rrset_new(name, KNOT_RRTYPE_DS, KNOT_CLASS_IN, NULL);
 		is_new_key = true;
 	}
 	/* Merge-in new key data */
@@ -56,12 +74,35 @@ int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
 		knot_rrset_free(&ta_rr, NULL);
 		return kr_error(ENOMEM);
 	}
-	/* Reinsert */
 	if (is_new_key) {
-		map_set(trust_anchors, (const char *)name, ta_rr);
+		return map_set(trust_anchors, (const char *)name, ta_rr);
+	}
+	return kr_ok();	
+}
+
+int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
+              uint32_t ttl, const uint8_t *rdata, uint16_t rdlen)
+{
+	if (!trust_anchors || !name) {
+		return kr_error(EINVAL);
 	}
 
-	return kr_ok();	
+	/* DS/DNSEY types are accepted, for DNSKEY we
+	 * need to compute a DS digest. */
+	if (type == KNOT_RRTYPE_DS) {
+		return insert_ta(trust_anchors, name, ttl, rdata, rdlen);
+	} else if (type == KNOT_RRTYPE_DNSKEY) {
+		dnssec_binary_t ds_rdata = { 0, };
+		int ret = dnskey2ds(&ds_rdata, name, rdata, rdlen);
+		if (ret != 0) {
+			return ret;
+		}
+		ret = insert_ta(trust_anchors, name, ttl, ds_rdata.data, ds_rdata.size);
+		dnssec_binary_free(&ds_rdata);
+		return ret;
+	} else { /* Invalid type for TA */
+		return kr_error(EINVAL);
+	}
 }
 
 int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name)
