@@ -63,3 +63,15 @@ int kr_nsec3_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section
  */
 int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
                                             const knot_dname_t *sname, int trim_to_next);
+
+/**
+ * Authenticated denial of existence according to RFC5155 8.5, 8.6 and 8.7.
+ * @note No RRSIGs are validated.
+ * @param pkt        Packet structure to be processed.
+ * @param section_id Packet section to be processed.
+ * @param sname      Queried domain name.
+ * @param stype      Queried type.
+ * @return           0 or error code.
+ */
+int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
+                     const knot_dname_t *sname, uint16_t stype);

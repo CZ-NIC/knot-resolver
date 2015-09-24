@@ -400,10 +400,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 					ret = kr_nsec_empty_nonterminal_response_check(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt));
 				}
 			} else {
-				ret = kr_nsec3_no_data_response_check(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
-				if (ret != 0) {
-					ret = kr_nsec3_wildcard_no_data_response_check(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
-				}
+				ret = kr_nsec3_no_data(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			}
 			if (ret != 0) {
 				DEBUG_MSG(qry, "<= bad no data response proof\n");

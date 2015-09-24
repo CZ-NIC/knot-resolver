@@ -37,7 +37,6 @@
 #define FLG_NAME_MATCHED (1 << 3)
 #define FLG_TYPE_BIT_MISSING (1 << 4)
 #define FLG_CNAME_BIT_MISSING (1 << 5)
-#define FLG_OPT_OUT_SET (1 << 6)
 
 /**
  * Obtains NSEC3 parameters from RR.
@@ -253,9 +252,6 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 		ret = kr_error(EINVAL);
 	}
 
-	if (nsec3_flags & OPT_OUT_BIT) {
-		*flags |= FLG_OPT_OUT_SET;
-	}
 	ret = kr_ok();
 
 fail:
@@ -266,6 +262,28 @@ fail:
 		dnssec_binary_free(&name_hash);
 	}
 	return ret;
+}
+
+/**
+ * Checks whether NSEC3 RR has the opt-out bit set.
+ * @param flags Flags to be set according to check outcome.
+ * @param nsec3 NSEC3 RR.
+ * @param name  Name to be checked.
+ * @return      0 or error code.
+ */
+static bool has_optout(const knot_rrset_t *nsec3)
+{
+	if (!nsec3) {
+		return false;
+	}
+
+	uint8_t nsec3_flags = knot_nsec3_flags(&nsec3->rrs, 0);
+	if (nsec3_flags & ~OPT_OUT_BIT) {
+		/* RFC5155 3.1.2 */
+		return false;
+	}
+
+	return nsec3_flags & OPT_OUT_BIT;
 }
 
 /**
@@ -320,23 +338,47 @@ fail:
 #undef MAX_HASH_BYTES
 
 /**
+ * Prepends an asterisk label to given name.
+ *
+ * @param tgt  Target buffer to write domain name into.
+ * @param name Name to be added to the asterisk.
+ * @return     0 or error code
+ */
+int prepend_asterisk(uint8_t tgt[KNOT_DNAME_MAXLEN], const knot_dname_t *name)
+{
+	tgt[0] = 1;
+	tgt[1] = '*';
+	tgt[2] = 0;
+	int name_len = knot_dname_size(name);
+	if (name_len < 0) {
+		return name_len;
+	}
+	memcpy(tgt + 2, name, name_len);
+	return 0;
+}
+
+/**
  * Closest encloser proof (RFC5155 7.2.1).
  * @note No RRSIGs are validated.
- * @param pkt         Packet structure to be processed.
- * @param section_id  Packet section to be processed.
- * @param sname       Name to be checked.
- * @param encloser    Returned matching encloser, if found.
- * @param opt_out_set Returned value of the opt-out bit of the NSEC3 RR covering the next closer name.
- * @return            0 or error code.
+ * @param pkt                    Packet structure to be processed.
+ * @param section_id             Packet section to be processed.
+ * @param sname                  Name to be checked.
+ * @param encloser_name          Returned matching encloser name, if found.
+ * @param matching_ecloser_nsec3 Pointer to matching encloser NSEC RRSet.
+ * @param covering_next_nsec3    Pointer to covering next closer NSEC3 RRSet.
+ * @return                       0 or error code.
  */
 static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_id,
-                                  const knot_dname_t *sname, const knot_dname_t **encloser,
-                                  int *opt_out_set)
+                                  const knot_dname_t *sname, const knot_dname_t **encloser_name,
+                                  const knot_rrset_t **matching_ecloser_nsec3, const knot_rrset_t **covering_next_nsec3)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
 	if (!sec || !sname) {
 		return kr_error(EINVAL);
 	}
+
+	const knot_rrset_t *matching = NULL;
+	const knot_rrset_t *covering = NULL;
 
 	int ret = kr_error(ENOENT);
 	int flags;
@@ -355,6 +397,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 		if (!(flags & FLG_CLOSEST_PROVABLE_ENCLOSER)) {
 			continue;
 		}
+		matching = rrset;
 		--skipped;
 		next_closer = sname;
 		for (unsigned j = 0; j < skipped; ++j) {
@@ -370,21 +413,26 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 				return ret;
 			}
 			if (flags & FLG_NAME_COVERED) {
+				covering = rrset;
 				break;
 			}
 		}
 		if (flags & FLG_NAME_COVERED) {
 			break;
 		}
+		flags = 0; //
 	}
 
 	if ((flags & FLG_CLOSEST_PROVABLE_ENCLOSER) &&
 	    (flags & FLG_NAME_COVERED)) {
-		if (encloser) {
-			*encloser = knot_wire_next_label(next_closer, NULL);
+		if (encloser_name) {
+			*encloser_name = knot_wire_next_label(next_closer, NULL);
 		}
-		if (opt_out_set) {
-			*opt_out_set = (flags & FLG_OPT_OUT_SET) ? 1 : 0;
+		if (matching_ecloser_nsec3) {
+			*matching_ecloser_nsec3 = matching;
+		}
+		if (covering_next_nsec3) {
+			*covering_next_nsec3 = covering;
 		}
 		return kr_ok();
 	}
@@ -438,7 +486,7 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
                                        const knot_dname_t *sname)
 {
 	const knot_dname_t *encloser = NULL;
-	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser, NULL);
+	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser, NULL, NULL);
 	if (ret != 0) {
 		return ret;
 	}
@@ -544,13 +592,13 @@ static int no_data_response_ds(const knot_pkt_t *pkt, knot_section_t section_id,
 		return kr_error(EINVAL);
 	}
 
-	int opt_out_set = 0;
-	int ret = closest_encloser_proof(pkt, section_id, sname, NULL, &opt_out_set);
+	const knot_rrset_t *covering_nsec3 = NULL;
+	int ret = closest_encloser_proof(pkt, section_id, sname, NULL, NULL, &covering_nsec3);
 	if (ret != 0) {
 		return ret;
 	}
 
-	if (opt_out_set) {
+	if (has_optout(covering_nsec3)) {
 		return kr_ok();
 	}
 
@@ -586,13 +634,10 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 	}
 
 	uint8_t wildcard[KNOT_DNAME_MAXLEN];
-	wildcard[0] = 1;
-	wildcard[1] = '*';
-	int encloser_len = knot_dname_size(encloser);
-	if (encloser_len < 0) {
-		return encloser_len;
+	int ret = prepend_asterisk(wildcard, encloser);
+	if (ret != 0) {
+		return ret;
 	}
-	memcpy(wildcard + 2, encloser, encloser_len);
 
 	int flags;
 	for (unsigned i = 0; i < sec->count; ++i) {
@@ -622,7 +667,7 @@ int kr_nsec3_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section
                                              const knot_dname_t *sname, uint16_t stype)
 {
 	const knot_dname_t *encloser = NULL;
-	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser, NULL);
+	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser, NULL, NULL);
 	if (ret != 0) {
 		return ret;
 	}
@@ -658,4 +703,33 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 	}
 
 	return kr_error(ENOENT);
+}
+
+int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
+                     const knot_dname_t *sname, uint16_t stype)
+{
+	/* DS record may be also matched by an existing NSEC3 RR. */
+	int ret = no_data_response_no_ds(pkt, section_id, sname, stype);
+	if (ret == 0) {
+		/* Satisfies RFC5155 8.5 and 8.6, first paragraph. */
+		return ret;
+	}
+
+	/* Find closest provable encloser. */
+	const knot_dname_t *encloser_name = NULL;
+	const knot_rrset_t *covering_next_nsec3 = NULL;
+	ret = closest_encloser_proof(pkt, section_id, sname, &encloser_name,
+                                     NULL, &covering_next_nsec3);
+	if (ret != 0) {
+		return ret;
+	}
+
+	assert(encloser_name && covering_next_nsec3);
+	if ((stype == KNOT_RRTYPE_DS) && has_optout(covering_next_nsec3)) {
+		/* Satisfies RFC5155 8.6, second paragraph. */
+		return 0;
+	}
+
+	return matches_closest_encloser_wildcard(pkt, section_id,
+	                                         encloser_name, stype);
 }
