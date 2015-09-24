@@ -197,7 +197,9 @@ static int answer_finalize(struct kr_request *request, int state)
 	struct kr_rplan *rplan = &request->rplan;
 	if (state == KNOT_STATE_DONE && !EMPTY_LIST(rplan->resolved)) {
 		struct kr_query *last = TAIL(rplan->resolved);
-		if ((last->flags & QUERY_DNSSEC_WANT) && knot_edns_do(answer->opt_rr)) {
+		/* Do not set AD for RRSIG query, as we can't validate it. */
+		if ((last->flags & QUERY_DNSSEC_WANT) && knot_edns_do(answer->opt_rr) &&
+			knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
 			knot_wire_set_ad(answer->wire);
 		}
 	}
@@ -218,6 +220,7 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 		if (ret == 0) { /* Enable DNSSEC for query. */
 			if (qry->flags & QUERY_DNSSEC_WANT) {
 				knot_edns_set_do(pkt->opt_rr);
+				knot_wire_set_cd(pkt->wire);
 			}
 			ret = edns_put(pkt);
 		}
@@ -287,9 +290,10 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	}
 
 	/* Different processing for network error */
+	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
 		/* Network error, retry over TCP. */
-		if (!(qry->flags & QUERY_TCP)) {
+		if (!tried_tcp) {
 			DEBUG_MSG("=> NS unreachable, retrying over TCP\n");
 			qry->flags |= QUERY_TCP;
 			return KNOT_STATE_PRODUCE;
@@ -321,6 +325,8 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 	/* Pop query if resolved. */
 	if (qry->flags & QUERY_RESOLVED) {
 		kr_rplan_pop(rplan, qry);
+	} else if (!tried_tcp && (qry->flags & QUERY_TCP)) {
+		return KNOT_STATE_PRODUCE; /* Requery over TCP */
 	} else { /* Clear query flags for next attempt */
 		qry->flags &= ~(QUERY_CACHED|QUERY_TCP);
 	}
