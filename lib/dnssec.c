@@ -251,10 +251,12 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
 	int ret = kr_error(KNOT_DNSSEC_ENOKEY);
 	for (uint16_t i = 0; i < keys->rrs.rr_count; ++i) {
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
-		if (!(knot_dnskey_flags(&keys->rrs, i) & 0x0100)) {
+		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
+		const uint8_t *key_data = knot_rdata_data(krr);
+		if (!kr_dnssec_key_ksk(key_data) && !kr_dnssec_key_revoked(key_data)) {
 			continue;
 		}
-		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
+		
 		struct dseckey *key;
 		if (kr_dnssec_key_from_rdata(&key, krr, keys->owner) != 0) {
 			continue;

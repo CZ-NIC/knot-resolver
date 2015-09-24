@@ -88,6 +88,12 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
                        const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp,
                        bool has_nsec3);
 
+/** Return true if the DNSKEY indicates being KSK (=> has SEP).  */
+bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata);
+
+/** Return true if the DNSKEY is revoked. */
+bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
+
 /**
  * Construct a DNSSEC key.
  * @param key    Pointer to be set to newly created DNSSEC key.
