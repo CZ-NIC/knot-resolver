@@ -400,6 +400,51 @@ int kr_nsec_empty_nonterminal_response_check(const knot_pkt_t *pkt, knot_section
 	return kr_error(ENOENT);
 }
 
+int kr_nsec_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
+                    const knot_dname_t *sname, uint16_t stype)
+{
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	int ret;
+	int flags = 0;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC) {
+			continue;
+		}
+
+		/* No data. */
+		if (knot_dname_is_equal(rrset->owner, sname)) {
+			ret = no_data_response_check_rrtype(&flags, rrset, stype);
+			if (ret != 0) {
+				return ret;
+			}
+		}
+		if (flags & FLG_NOEXIST_RRTYPE) {
+			return kr_ok();
+		}
+
+		/* Empty non-terminal. */
+		if (nsec_empty_nonterminal(rrset, sname) == 0) {
+			return kr_ok();
+		}
+
+		/* Wild card no data. */
+		ret = wildcard_no_data_response_check(&flags, rrset, sname, stype);
+		if (ret != 0) {
+			return ret;
+		}
+		if ((flags & FLG_NOEXIST_RRSET) && (flags & FLG_NOEXIST_CLOSER)) {
+			return kr_ok();
+		}
+	}
+
+	return kr_error(ENOENT);
+}
+
 int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
                              const knot_dname_t *sname, uint16_t stype, mm_ctx_t *pool)
 {
