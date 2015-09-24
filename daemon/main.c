@@ -121,13 +121,14 @@ static void help(int argc, char *argv[])
 {
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
-	       " -a, --addr=[addr]   Server address (default: localhost#53).\n"
-	       " -f, --forks=N       Start N forks sharing the configuration.\n"
-	       " -v, --verbose       Run in verbose mode.\n"
-	       " -V, --version       Print version of the server.\n"
-	       " -h, --help          Print help and usage.\n"
+	       " -a, --addr=[addr]    Server address (default: localhost#53).\n"
+	       " -k, --keyfile=[path] File containing trust anchors (DS or DNSKEY).\n"
+	       " -f, --forks=N        Start N forks sharing the configuration.\n"
+	       " -v, --verbose        Run in verbose mode.\n"
+	       " -V, --version        Print version of the server.\n"
+	       " -h, --help           Print help and usage.\n"
 	       "Options:\n"
-	       " [rundir]            Path to the working directory (default: .)\n");
+	       " [rundir]             Path to the working directory (default: .)\n");
 }
 
 static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm_ctx_t *pool, int worker_id)
@@ -195,18 +196,20 @@ int main(int argc, char **argv)
 	int forks = 1;
 	array_t(char*) addr_set;
 	array_init(addr_set);
+	const char *keyfile = NULL;
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
 	struct option opts[] = {
-		{"addr", required_argument, 0, 'a'},
-		{"forks",required_argument, 0, 'f'},
-		{"verbose",    no_argument, 0, 'v'},
-		{"version",   no_argument,  0, 'V'},
-		{"help",      no_argument,  0, 'h'},
+		{"addr", required_argument,   0, 'a'},
+		{"keyfile",required_argument, 0, 'k'},
+		{"forks",required_argument,   0, 'f'},
+		{"verbose",    no_argument,   0, 'v'},
+		{"version",   no_argument,    0, 'V'},
+		{"help",      no_argument,    0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:f:vVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:f:k:vVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -217,6 +220,13 @@ int main(int argc, char **argv)
 			forks = atoi(optarg);
 			if (forks == 0) {
 				log_error("[system] error '-f' requires number, not '%s'\n", optarg);
+				return EXIT_FAILURE;
+			}
+			break;
+		case 'k':
+			keyfile = optarg;
+			if (access(optarg, R_OK) != 0) {
+				log_error("[system] keyfile '%s': not readable\n", optarg);
 				return EXIT_FAILURE;
 			}
 			break;
@@ -289,6 +299,16 @@ int main(int argc, char **argv)
 	if (!worker) {
 		log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
+	}
+	/* Set keyfile */
+	if (keyfile) {
+		auto_free char *cmd = afmt("trust_anchors.file = '%s'", keyfile);
+		if (!cmd) {
+			log_error("[system] not enough memory\n");
+			return EXIT_FAILURE;
+		}
+		engine_cmd(&engine, cmd);
+		lua_pop(engine.L, 1);
 	}
 	/* Bind to sockets and run */
 	for (size_t i = 0; i < addr_set.len; ++i) {
