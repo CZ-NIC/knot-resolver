@@ -173,7 +173,6 @@ static int commit_rr(const char *key, void *val, void *data)
 	}
 
 	/* Save RRSIG in a special cache. */
-	unsigned drift = baton->timestamp;
 	if (KEY_COVERING_RRSIG(key)) {
 		return commit_rrsig(baton, rr);
 	}

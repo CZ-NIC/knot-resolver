@@ -164,7 +164,14 @@ static int update_parent(const knot_rrset_t *rr, struct kr_request *req)
 
 static int update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
 {
+	/* Scrub DNSSEC records when not requested. */
 	knot_pkt_t *answer = req->answer;
+	if (!knot_edns_do(answer->opt_rr)) {
+		if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
+			return KNOT_STATE_DONE; /* Scrub */
+		}
+	}
+
 	int ret = knot_pkt_put(answer, hint, rr, 0);
 	if (ret != KNOT_EOK) {
 		knot_wire_set_tc(answer->wire);

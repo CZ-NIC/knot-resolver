@@ -197,7 +197,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	struct kr_rplan *rplan = &request->rplan;
 	if (state == KNOT_STATE_DONE && !EMPTY_LIST(rplan->resolved)) {
 		struct kr_query *last = TAIL(rplan->resolved);
-		if (last->flags & QUERY_DNSSEC_WANT) {
+		if ((last->flags & QUERY_DNSSEC_WANT) && knot_edns_do(answer->opt_rr)) {
 			knot_wire_set_ad(answer->wire);
 		}
 	}
