@@ -184,12 +184,6 @@ static int commit_rr(const char *key, void *val, void *data)
 	   */
 	knot_rrset_t query_rr;
 	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
-	if (kr_cache_peek_rr(baton->txn, &query_rr, &drift) == 0) {
-		/* Allow replace if RRSet in the cache is about to expire. */
-		if (!is_expiring(&query_rr, drift)) {
-		        return kr_ok();
-		}
-	}
 	return kr_cache_insert_rr(baton->txn, rr, baton->timestamp);
 }
 
