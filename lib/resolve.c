@@ -198,7 +198,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (state == KNOT_STATE_DONE && !EMPTY_LIST(rplan->resolved)) {
 		struct kr_query *last = TAIL(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
-		if ((last->flags & QUERY_DNSSEC_WANT) && knot_edns_do(answer->opt_rr) &&
+		if ((last->flags & QUERY_DNSSEC_WANT) && knot_pkt_has_dnssec(answer) &&
 			knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
 			knot_wire_set_ad(answer->wire);
 		}

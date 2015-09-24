@@ -166,7 +166,7 @@ static int update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_reques
 {
 	/* Scrub DNSSEC records when not requested. */
 	knot_pkt_t *answer = req->answer;
-	if (answer->opt_rr && !knot_edns_do(answer->opt_rr)) {
+	if (!knot_pkt_has_dnssec(answer)) {
 		if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
 			return KNOT_STATE_DONE; /* Scrub */
 		}
