@@ -324,7 +324,13 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags & QUERY_DNSSEC_WANT)) {
 		return ctx->state;
 	}
-	if (!(qry->flags & QUERY_CACHED) && !knot_pkt_has_dnssec(pkt)) {
+	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */
+	bool use_signatures = (knot_pkt_qtype(pkt) != KNOT_RRTYPE_RRSIG);
+	/* @todo do not cache RRSIG answers until RFC2181 credibility is implemented */
+	if (!use_signatures) {
+		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_SERVFAIL); /* Prevent caching */
+	}
+	if (!(qry->flags & QUERY_CACHED) && !knot_pkt_has_dnssec(pkt) && !use_signatures) {
 		DEBUG_MSG(qry, "<= got insecure response\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
 		return KNOT_STATE_FAIL;
@@ -347,7 +353,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	 */
 	const knot_dname_t *key_own = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
 	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
-	if (key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
+	if (use_signatures && key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
 		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_SERVFAIL); /* Prevent caching */
 		qry->flags &= ~QUERY_RESOLVED;
