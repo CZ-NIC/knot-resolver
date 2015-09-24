@@ -394,7 +394,7 @@ class Scenario:
     def play(self, saddr, paddr):
         """ Play given scenario. """
         self.child_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.child_sock.settimeout(1)
+        self.child_sock.settimeout(2)
         self.child_sock.connect((paddr, 53))
 
         step = None
