@@ -94,13 +94,21 @@ bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata);
 /** Return true if the DNSKEY is revoked. */
 bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
 
+/** Return DNSKEY tag.
+  * @param rrtype RR type (either DS or DNSKEY are supported)
+  * @param rdata  Key/digest RDATA.
+  * @param rdlen  RDATA length.
+  * @return Key tag (positive number), or an error code
+  */
+int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen);
 /**
  * Construct a DNSSEC key.
- * @param key    Pointer to be set to newly created DNSSEC key.
- * @param krdata Key RDATA.
- * @param kown   DNSKEY RRSet owner name.
+ * @param key   Pointer to be set to newly created DNSSEC key.
+ * @param kown  DNSKEY owner name.
+ * @param rdata DNSKEY RDATA
+ * @param rdlen DNSKEY RDATA length
  */
-int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_rdata_t *krdata, const knot_dname_t *kown);
+int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen);
 
 /**
  * Frees the DNSSEC key.

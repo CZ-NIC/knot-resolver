@@ -178,7 +178,8 @@ int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
 	int trim_labels;
 	if (key == NULL) {
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, key_pos);
-		ret = kr_dnssec_key_from_rdata(&created_key, krr, keys->owner);
+		ret = kr_dnssec_key_from_rdata(&created_key, keys->owner,
+			                       knot_rdata_data(krr), knot_rdata_rdlen(krr));
 		if (ret != 0) {
 			return ret;
 		}
@@ -243,12 +244,7 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
 	/* RFC4035 5.2, bullet 1
 	 * The supplied DS record has been authenticated.
 	 * It has been validated or is part of a configured trust anchor.
-	 *
-	 * This implementation actually ignores the SEP flag.
 	 */
-
-#warning TODO: there should be an error saying that there is no matching key
-	int ret = kr_error(KNOT_DNSSEC_ENOKEY);
 	for (uint16_t i = 0; i < keys->rrs.rr_count; ++i) {
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
@@ -258,7 +254,7 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
 		}
 		
 		struct dseckey *key;
-		if (kr_dnssec_key_from_rdata(&key, krr, keys->owner) != 0) {
+		if (kr_dnssec_key_from_rdata(&key, keys->owner, key_data, knot_rdata_rdlen(krr)) != 0) {
 			continue;
 		}
 		if (kr_authenticate_referral(ta, (dnssec_key_t *) key) != 0) {
@@ -270,42 +266,71 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
 			continue;
 		}
 		kr_dnssec_key_free(&key);
-		ret = kr_ok();
-		break;
+		return kr_ok();
 	}
-
-	return ret;
+	/* No useable key found */
+	return kr_error(ENOENT);
 }
 
-int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_rdata_t *krdata, const knot_dname_t *kown)
+bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata)
 {
-	assert(key);
+	return wire_read_u16(dnskey_rdata) & 0x0001;
+}
 
-	dnssec_key_t *new_key = NULL;
-	dnssec_binary_t binary_key;
-	int ret;
+/** Return true if the DNSKEY is revoked. */
+bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata)
+{
+	return wire_read_u16(dnskey_rdata) & 0x0080;
+}
 
-	ret = dnssec_key_new(&new_key);
-	if (ret != DNSSEC_EOK) {
-		return kr_error(ENOMEM);
+int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen)
+{
+	if (!rdata || rdlen == 0 || (rrtype != KNOT_RRTYPE_DS && rrtype != KNOT_RRTYPE_DNSKEY)) {
+		return kr_error(EINVAL);
+	}
+	if (rrtype == KNOT_RRTYPE_DS) {
+		return wire_read_u16(rdata);
+	} else if (rrtype == KNOT_RRTYPE_DNSKEY) {
+		struct dseckey *key = NULL;
+		int ret = kr_dnssec_key_from_rdata(&key, NULL, rdata, rdlen);
+		if (ret != 0) {
+			return ret;
+		}
+		uint16_t keytag = dnssec_key_get_keytag((dnssec_key_t *)key);
+		kr_dnssec_key_free(&key);
+		return keytag;
+	} else {
+		return kr_error(EINVAL);
+	}
+}
+
+int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen)
+{
+	if (!key || !rdata || rdlen == 0) {
+		return kr_error(EINVAL);
 	}
 
-	binary_key.size = knot_rdata_rdlen(krdata);
-	binary_key.data = knot_rdata_data(krdata);
-	if (!binary_key.size || !binary_key.data) {
-		dnssec_key_free(new_key);
-		return kr_error(KNOT_DNSSEC_ENOKEY);
+	dnssec_key_t *new_key = NULL;
+	const dnssec_binary_t binary_key = {
+		.size = rdlen,
+		.data = (uint8_t *)rdata
+	};
+
+	int ret = dnssec_key_new(&new_key);
+	if (ret != DNSSEC_EOK) {
+		return kr_error(ENOMEM);
 	}
 	ret = dnssec_key_set_rdata(new_key, &binary_key);
 	if (ret != DNSSEC_EOK) {
 		dnssec_key_free(new_key);
 		return kr_error(ENOMEM);
 	}
-
-	ret = dnssec_key_set_dname(new_key, kown);
-	if (ret != DNSSEC_EOK) {
-		dnssec_key_free(new_key);
-		return kr_error(ENOMEM);
+	if (kown) {
+		ret = dnssec_key_set_dname(new_key, kown);
+		if (ret != DNSSEC_EOK) {
+			dnssec_key_free(new_key);
+			return kr_error(ENOMEM);
+		}
 	}
 
 	*key = (struct dseckey *) new_key;
