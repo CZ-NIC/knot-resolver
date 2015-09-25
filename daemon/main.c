@@ -62,8 +62,10 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		struct engine *engine = stream->data;
 		lua_State *L = engine->L;
 		int ret = engine_cmd(engine, cmd);
-		fprintf(ret ? outerr : out, "%s\n> ", lua_tostring(L, -1));
-		lua_pop(L, 1);
+		if (lua_gettop(L) > 0) {
+			fprintf(ret ? outerr : out, "%s\n> ", lua_tostring(L, -1));
+		}
+		lua_settop(L, 0);
 		free(buf->base);
 	}
 	fflush(out);
@@ -181,14 +183,11 @@ static int run_worker(uv_loop_t *loop, struct engine *engine)
 		}
 	}
 	/* Run event loop */
-	int ret = engine_start(engine);
-	if (ret == 0) {
-		uv_run(loop, UV_RUN_DEFAULT);
-	}
+	uv_run(loop, UV_RUN_DEFAULT);
 	if (sock_file) {
 		unlink(sock_file);
 	}
-	return ret;
+	return kr_ok();
 }
 
 int main(int argc, char **argv)
@@ -300,16 +299,6 @@ int main(int argc, char **argv)
 		log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
 	}
-	/* Set keyfile */
-	if (keyfile) {
-		auto_free char *cmd = afmt("trust_anchors.file = '%s'", keyfile);
-		if (!cmd) {
-			log_error("[system] not enough memory\n");
-			return EXIT_FAILURE;
-		}
-		engine_cmd(&engine, cmd);
-		lua_pop(engine.L, 1);
-	}
 	/* Bind to sockets and run */
 	for (size_t i = 0; i < addr_set.len; ++i) {
 		int port = 53;
@@ -320,8 +309,22 @@ int main(int argc, char **argv)
 			ret = EXIT_FAILURE;
 		}
 	}
+	/* Start the scripting engine */
 	if (ret == 0) {
-		ret = run_worker(loop, &engine);
+		ret = engine_start(&engine);
+		if (ret == 0) {
+			if (keyfile) {
+				auto_free char *cmd = afmt("trust_anchors.file = '%s'", keyfile);
+				if (!cmd) {
+					log_error("[system] not enough memory\n");
+					return EXIT_FAILURE;
+				}
+				engine_cmd(&engine, cmd);
+				lua_settop(engine.L, 0);
+			}
+			/* Run the event loop */
+			ret = run_worker(loop, &engine);
+		}
 	}
 	/* Cleanup. */
 	array_clear(addr_set);
