@@ -249,7 +249,7 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
 		const uint8_t *key_data = knot_rdata_data(krr);
-		if (!kr_dnssec_key_ksk(key_data) && !kr_dnssec_key_revoked(key_data)) {
+		if (!kr_dnssec_key_zsk(key_data) || kr_dnssec_key_revoked(key_data)) {
 			continue;
 		}
 		
@@ -270,6 +270,11 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
 	}
 	/* No useable key found */
 	return kr_error(ENOENT);
+}
+
+bool kr_dnssec_key_zsk(const uint8_t *dnskey_rdata)
+{
+	return wire_read_u16(dnskey_rdata) & 0x0100;
 }
 
 bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata)
@@ -302,6 +307,35 @@ int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen)
 	} else {
 		return kr_error(EINVAL);
 	}
+}
+
+int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
+                        const uint8_t *key_b_rdata, size_t key_b_rdlen)
+{
+	dnssec_key_t *key_a = NULL, *key_b = NULL;
+	int ret = kr_dnssec_key_from_rdata((struct dseckey **)&key_a, NULL, key_a_rdata, key_a_rdlen);
+	if (ret != 0) {
+		return ret;
+	}
+	ret = kr_dnssec_key_from_rdata((struct dseckey **)&key_b, NULL, key_b_rdata, key_b_rdlen);
+	if (ret != 0) {
+		dnssec_key_free(key_a);
+		return ret;
+	}
+	/* If the algorithm and the public key match, we can be sure
+	 * that they are the same key. */
+	ret = kr_error(ENOENT);
+	dnssec_binary_t pk_a, pk_b;
+	if (dnssec_key_get_algorithm(key_a) == dnssec_key_get_algorithm(key_b) &&
+	    dnssec_key_get_pubkey(key_a, &pk_a) == DNSSEC_EOK &&
+	    dnssec_key_get_pubkey(key_b, &pk_b) == DNSSEC_EOK) {
+		if (pk_a.size == pk_b.size && memcmp(pk_a.data, pk_b.data, pk_a.size) == 0) {
+			ret = 0;
+		}
+	}
+	dnssec_key_free(key_a);
+	dnssec_key_free(key_b);
+	return ret;
 }
 
 int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen)

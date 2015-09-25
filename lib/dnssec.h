@@ -88,6 +88,9 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
                        const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp,
                        bool has_nsec3);
 
+/** Return true if the DNSKEY can be used as a ZSK.  */
+bool kr_dnssec_key_zsk(const uint8_t *dnskey_rdata);
+
 /** Return true if the DNSKEY indicates being KSK (=> has SEP).  */
 bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata);
 
@@ -101,6 +104,18 @@ bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
   * @return Key tag (positive number), or an error code
   */
 int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen);
+
+/** Return 0 if the two keys are identical.
+  * @note This compares RDATA only, algorithm and public key must match.
+  * @param key_a_rdata First key RDATA
+  * @param key_a_rdlen First key RDATA length
+  * @param key_b_rdata Second key RDATA
+  * @param key_b_rdlen Second key RDATA length
+  * @return 0 if they match or an error code
+  */
+int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
+                        const uint8_t *key_b_rdata, size_t key_b_rdlen);
+
 /**
  * Construct a DNSSEC key.
  * @param key   Pointer to be set to newly created DNSSEC key.
