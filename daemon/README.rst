@@ -132,8 +132,6 @@ the modules use as the :ref:`input configuration <mod-properties>`.
 		}
 	}
 
-The possible simple data types are: string, integer or float, and boolean.
-
 .. tip:: The configuration and CLI syntax is Lua language, with which you may already be familiar with.
          If not, you can read the `Learn Lua in 15 minutes`_ for a syntax overview. Spending just a few minutes
          will allow you to break from static configuration, write more efficient configuration with iteration, and
@@ -179,7 +177,7 @@ to download cache from parent, to avoid cold-cache start.
 			sink = ltn12.sink.file(io.open('cache.mdb', 'w'))
 		}
 		-- reopen cache with 100M limit
-		cache.open(100*MB)
+		cache.size = 100*MB
 	end
 
 Events and services
@@ -332,6 +330,70 @@ For when listening on ``localhost`` just doesn't cut it.
 	}
 
    .. tip:: You can use ``net.<iface>`` as a shortcut for specific interface, e.g. ``net.eth0``
+
+Trust anchors and DNSSEC
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
+To enable it, you need to provide at least _one_ trust anchor. This step is not automatic, as you're supposed to obtain
+the trust anchor using a secure channel. From there, the Knot DNS Resolver can perform automatic updates for you if you
+run in managed mode.
+
+The recommended way is as follows:
+
+1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
+2. Fetch current keys, verify and use
+.. code-block:: bash
+
+   $ kdig dnskey . @a.root-servers.net +noall +answer | grep 257 > root.keys
+   $ ldns-key2ds -n root.keys
+   ... verify that digest matches TA published by IANA ...
+   $ kresd -k root.keys
+
+You've just enabled DNSSEC, congratulations!
+
+.. function:: trust_anchors.config(keyfile)
+
+   :param string keyfile: File containing DNSKEY records, should be writeable.
+
+   You can use only DNSKEY records in managed mode. It is equivalent to CLI parameter `-k <keyfile>` or `trust_anchors.file = keyfile`.
+
+   Example output:
+
+   .. code-block:: lua
+
+   > trust_anchors.config('root.keys')
+   [trust_anchors] key: 19036 state: Valid
+
+.. function:: trust_anchors.add(rr_string)
+
+   :param string rr_string: DS/DNSKEY records in presentation format (e.g. `. 3600 IN DS 19036 8 2 49AAC11...`)
+
+   Inserts DS/DNSKEY record(s) into current keyset. These will not be managed or updated.
+
+   Example output:
+
+   .. code-block:: lua
+
+   > trust_anchors.add('. 3600 IN DS 19036 8 2 49AAC11...')
+
+.. function:: trust_anchors.set_insecure(nta_set)
+
+   :param table nta_list: List of domain names (text format) representing NTAs.
+
+   When you use a domain name as an NTA, DNSSEC validation will be turned off at/below these names.
+   Each function call replaces the previous NTA set. You can find the current active set in `trust_anchors.insecure` variable.
+
+   .. tip:: Use the `trust_anchors.negative = {}` alias for easier configuration.
+
+   Example output:
+
+   .. code-block:: lua
+
+   > trust_anchors.negative = { 'bad.boy', 'example.com' }
+   > trust_anchors.insecure
+   [1] => bad.boy
+   [2] => example.com
 
 Modules configuration
 ^^^^^^^^^^^^^^^^^^^^^
@@ -534,16 +596,14 @@ you can see the statistics or schedule new queries.
 
 	print(worker.stats().concurrent)
 
-.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN, options = 0])
+.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN, options = 0, callback = nil])
 
    :param string qname: Query name (e.g. 'com.')
    :param number qtype: Query type (e.g. ``kres.type.NS``)
    :param number qclass: Query class *(optional)* (e.g. ``kres.class.IN``)
    :param number options: Resolution options (see query flags)
+   :param function callback: Callback to be executed when resolution completes (e.g. `function cb (pkt) end`). The callback gets a packet containing the final answer and doesn't have to return anything.
    :return: boolean
-
-   Resolve a query, there is currently no callback when its finished, but you can track the query
-   progress in layers, just like any other query.
 
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
