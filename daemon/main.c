@@ -62,9 +62,11 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		struct engine *engine = stream->data;
 		lua_State *L = engine->L;
 		int ret = engine_cmd(engine, cmd);
+		const char *message = "";
 		if (lua_gettop(L) > 0) {
-			fprintf(ret ? outerr : out, "%s\n> ", lua_tostring(L, -1));
+			message = lua_tostring(L, -1);
 		}
+		fprintf(ret ? outerr : out, "%s\n> ", message);
 		lua_settop(L, 0);
 		free(buf->base);
 	}
