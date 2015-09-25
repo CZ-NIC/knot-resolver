@@ -6,9 +6,11 @@ GB = 1024*MB
 sec = 1000
 minute = 60 * sec
 hour = 60 * minute
+day = 24 * hour
 
 -- Resolver bindings
 kres = require('kres')
+trust_anchors = require('trust_anchors')
 
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`
@@ -70,7 +72,6 @@ setmetatable(cache, {
 cache.size = 10 * MB
 
 -- Syntactic sugar for TA store
-trust_anchors = kres.trust_anchors
 setmetatable(trust_anchors, {
 	__newindex = function (t,k,v)
 	if     k == 'file' then t.config(v)
