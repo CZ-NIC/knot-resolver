@@ -325,6 +325,24 @@ ffi.metatype( kr_request_t, {
 	},
 })
 
+-- Pretty print for domain name
+local function dname2str(dname)
+	return ffi.string(ffi.gc(C.knot_dname_to_str(nil, dname, 0), C.free))
+end
+
+-- Pretty print for RR
+local function rr2str(rr)
+	local function hex_encode(str)
+		return (str:gsub('.', function (c)
+			return string.format('%02X', string.byte(c))
+		end))
+	end
+	local rdata = hex_encode(rr.rdata)
+	return string.format('%s %d IN TYPE%d \\# %d %s',
+		dname2str(rr.owner), rr.ttl, rr.type, #rr.rdata, rdata)
+end
+
+
 -- Module API
 local kres = {
 	-- Constants
@@ -339,7 +357,8 @@ local kres = {
 	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,
 	-- Global API functions
 	str2dname = function(name) return ffi.string(ffi.gc(C.knot_dname_from_str(nil, name, 0), C.free)) end,
-	dname2str = function(dname) return ffi.string(ffi.gc(C.knot_dname_to_str(nil, dname, 0), C.free)) end,
+	dname2str = dname2str,
+	rr2str = rr2str,
 	context = function () return ffi.cast('struct kr_context *', __engine) end,
 }
 
