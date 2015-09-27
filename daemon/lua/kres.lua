@@ -86,6 +86,13 @@ struct pkt_rcode {
 	static const int NOTZONE    = 10;
 	static const int BADVERS    = 16;
 };
+struct query_flag {
+	static const int NO_MINIMIZE = 1 << 0;
+	static const int CACHED      = 1 << 8;
+	static const int NO_CACHE    = 1 << 9;
+	static const int EXPIRING    = 1 << 10;
+};
+
 /*
  * Data structures
  */
@@ -280,6 +287,7 @@ local kres = {
 	type = ffi.new('struct rr_type'),
 	section = ffi.new('struct pkt_section'),
 	rcode = ffi.new('struct pkt_rcode'),
+	query = ffi.new('struct query_flag'),
 	NOOP = 0, CONSUME = 1, PRODUCE = 2, DONE = 4, FAIL = 8,
 	-- Metatypes
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,
