@@ -267,6 +267,24 @@ static int net_interfaces(lua_State *L)
 	return 1;
 }
 
+/** Set UDP maximum payload size. */
+static int net_bufsize(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	knot_rrset_t *opt_rr = engine->resolver.opt_rr;
+	if (!lua_isnumber(L, 1)) {
+		lua_pushnumber(L, knot_edns_get_payload(opt_rr));
+		return 1;
+	}
+	int bufsize = lua_tointeger(L, 1);
+	if (bufsize < KNOT_EDNS_MIN_DNSSEC_PAYLOAD || bufsize > UINT16_MAX) {
+		format_error(L, "bufsize must be within <1220, 65535>");
+		lua_error(L);
+	}
+	knot_edns_set_payload(opt_rr, (uint16_t) bufsize);
+	return 0;
+}
+
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -274,6 +292,7 @@ int lib_net(lua_State *L)
 		{ "listen",     net_listen },
 		{ "close",      net_close },
 		{ "interfaces", net_interfaces },
+		{ "bufsize",    net_bufsize },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
@@ -527,15 +546,16 @@ static int event_cancel(lua_State *L)
 	/* Fetch event if it exists */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
 	if (!lua_istable(L, -1)) {
-		format_error(L, "event not exists");
-		lua_error(L);
+		lua_pushboolean(L, false);
+		return 1;
 	}
 
 	/* Close the timer */
 	lua_rawgeti(L, -1, 2);
 	uv_handle_t *timer = lua_touserdata(L, -1);
 	uv_close(timer, (uv_close_cb) event_free);
-	return 0;
+	lua_pushboolean(L, true);
+	return 1;
 }
 
 int lib_event(lua_State *L)
@@ -599,16 +619,12 @@ static int wrk_resolve(lua_State *L)
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 	knot_wire_set_rd(pkt->wire);
 	/* Add OPT RR */
-	pkt->opt_rr = mm_alloc(&pkt->mm, sizeof(*pkt->opt_rr));
+	pkt->opt_rr = pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, &pkt->mm);
 	if (!pkt->opt_rr) {
 		return kr_error(ENOMEM);
-	}
-	int ret = knot_edns_init(pkt->opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, &pkt->mm);
-	if (ret != 0) {
-		knot_pkt_free(&pkt);
-		return 0;
-	}
+	}	
 	/* Add completion callback */
+	int ret = 0;
 	unsigned options = lua_tointeger(L, 4);
 	if (lua_isfunction(L, 5)) {
 		/* Store callback in registry */

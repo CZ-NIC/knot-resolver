@@ -331,6 +331,19 @@ For when listening on ``localhost`` just doesn't cut it.
 
    .. tip:: You can use ``net.<iface>`` as a shortcut for specific interface, e.g. ``net.eth0``
 
+.. function:: net.bufsize([udp_bufsize])
+
+   Get/set maximum EDNS payload available. Default is 1452 (the maximum unfragmented datagram size).
+   You cannot set less than 1220 (minimum size for DNSSEC) or more than 65535 octets.
+
+   Example output:
+
+   .. code-block:: lua
+
+	> net.bufsize(4096)
+	> net.bufsize()
+	4096
+
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
