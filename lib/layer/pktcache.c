@@ -97,7 +97,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->data;
 	struct kr_rplan *rplan = &req->rplan;
 	struct kr_query *qry = kr_rplan_current(rplan);
-	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
+	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
 	if (qry->ns.addr.ip.sa_family != AF_UNSPEC) {

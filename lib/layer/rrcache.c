@@ -55,11 +55,7 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 
 	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
 	if (is_expiring(&cache_rr, drift)) {
-		if (qry->flags & QUERY_NO_EXPIRING) {
-			return kr_error(ENOENT);
-		} else {
-			qry->flags |= QUERY_EXPIRING;
-		}
+		qry->flags |= QUERY_EXPIRING;
 	}
 
 	/* Update packet question */
@@ -108,7 +104,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->data;
 	struct kr_rplan *rplan = &req->rplan;
 	struct kr_query *qry = kr_rplan_current(rplan);
-	if (!qry || ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE)) {
+	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
 	if (qry->ns.addr.ip.sa_family != AF_UNSPEC) {
