@@ -104,13 +104,16 @@ struct sockaddr {
 };
 
 /* libknot */
+typedef int knot_section_t; /* Do not touch */
+typedef void knot_rrinfo_t; /* Do not touch */
 typedef struct node {
   struct node *next, *prev;
 } node_t;
 typedef uint8_t knot_dname_t;
+typedef uint8_t knot_rdata_t;
 typedef struct knot_rdataset {
 	uint16_t count;
-	uint8_t *data;
+	knot_rdata_t *data;
 } knot_rdataset_t;
 typedef struct knot_rrset {
 	knot_dname_t *_owner;
@@ -118,6 +121,11 @@ typedef struct knot_rrset {
 	uint16_t class;
 	knot_rdataset_t rr;
 } knot_rrset_t;
+typedef struct {
+	struct knot_pkt *pkt;
+	uint16_t pos;
+	uint16_t count;
+} knot_pktsection_t;
 typedef struct {
 	uint8_t *wire;
 	size_t size;
@@ -129,6 +137,11 @@ typedef struct {
 	uint16_t flags;
 	knot_rrset_t *opt;
 	knot_rrset_t *tsig;
+	knot_section_t _current;
+	knot_pktsection_t _sections[3];
+	size_t _rrset_allocd;
+	knot_rrinfo_t *_rr_info;
+	knot_rrset_t *_rr;
 	uint8_t _stub[]; /* Do not touch */
 } knot_pkt_t;
 
@@ -186,15 +199,21 @@ void free(void *ptr);
  * libknot APIs
  */
 /* Domain names */
+int knot_dname_size(const knot_dname_t *name);
 knot_dname_t *knot_dname_from_str(uint8_t *dst, const char *name, size_t maxlen);
 char *knot_dname_to_str(char *dst, const knot_dname_t *name, size_t maxlen);
 /* Resource records */
+uint16_t knot_rdata_rdlen(const knot_rdata_t *rr);
+uint8_t *knot_rdata_data(const knot_rdata_t *rr);
+knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *rrs, size_t pos);
+uint32_t knot_rrset_ttl(const knot_rrset_t *rrset);
 /* Packet */
 const knot_dname_t *knot_pkt_qname(const knot_pkt_t *pkt);
 uint16_t knot_pkt_qtype(const knot_pkt_t *pkt);
 uint16_t knot_pkt_qclass(const knot_pkt_t *pkt);
 int knot_pkt_begin(knot_pkt_t *pkt, int section_id);
 int knot_pkt_put_question(knot_pkt_t *pkt, const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);
+const knot_rrset_t *knot_pkt_rr(const knot_pktsection_t *section, uint16_t i);
 
 /* 
  * libkres API
@@ -237,7 +256,19 @@ ffi.metatype( sockaddr_t, {
 local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
 	__index = {
-		owner = function(rr) return ffi.string(rr._owner) end,
+		owner = function(rr) return ffi.string(rr._owner, knot.knot_dname_size(rr._owner)) end,
+		ttl = function(rr) return tonumber(knot.knot_rrset_ttl(rr)) end,
+		rdata = function(rr, i)
+			local rdata = knot.knot_rdataset_at(rr.rr, i)
+			return ffi.string(knot.knot_rdata_data(rdata), knot.knot_rdata_rdlen(rdata))
+		end,
+		get = function(rr, i)
+			return {owner = rr:owner(),
+			        ttl = rr:ttl(),
+			        class = tonumber(rr.class),
+			        type = tonumber(rr.type),
+			        rdata = rr:rdata(i)}
+		end,
 	}
 })
 
@@ -245,7 +276,10 @@ ffi.metatype( knot_rrset_t, {
 local knot_pkt_t = ffi.typeof('knot_pkt_t')
 ffi.metatype( knot_pkt_t, {
 	__index = {
-		qname = function(pkt) return ffi.string(knot.knot_pkt_qname(pkt)) end,
+		qname = function(pkt)
+			local qname = knot.knot_pkt_qname(pkt)
+			return ffi.string(qname, knot.knot_dname_size(qname))
+		end,
 		qclass = function(pkt) return knot.knot_pkt_qclass(pkt) end,
 		qtype  = function(pkt) return knot.knot_pkt_qtype(pkt) end,
 		rcode = function (pkt, val)
@@ -256,6 +290,17 @@ ffi.metatype( knot_pkt_t, {
 			pkt.wire[2] = bor(pkt.wire[2], (val) and 0x02 or 0x00)
 			return band(pkt.wire[2], 0x02)
 		end,
+		section = function (pkt, section_id)
+			local records = {}
+			local section = pkt._sections[section_id]
+			for i = 0, section.count - 1 do
+				local rrset = knot.knot_pkt_rr(section, i)
+				for k = 0, rrset.rr.count - 1 do
+					table.insert(records, rrset:get(k))
+				end
+			end
+			return records
+		end, 
 		begin = function (pkt, section) return knot.knot_pkt_begin(pkt, section) end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
 			return C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, string.len(rdata))
