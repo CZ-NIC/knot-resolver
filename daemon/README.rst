@@ -65,7 +65,7 @@ You can add start and stop processes on runtime based on the load.
 
 .. code-block:: bash
 
-	$ kresd -f 4 rundir > kresd.log &
+   $ kresd -f 4 rundir > kresd.log &
    $ kresd -f 2 rundir > kresd_2.log & # Extra instances
    $ pstree $$ -g
    bash(3533)─┬─kresd(19212)─┬─kresd(19212)

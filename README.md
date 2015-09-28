@@ -6,14 +6,22 @@
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
 
-The Knot DNS Resolver is a minimalistic caching resolver implementation. The project provides both a resolver
-library and a small daemon. Modular architecture of the library keeps the core tiny and efficient, and provides
-a state-machine like API for extensions. There are two built-in modules: *iterator* and *cache*,
-and each module can be flipped on and off.
+The Knot DNS Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], including both a resolver
+library and a daemon. Modular architecture of the library keeps the core tiny and efficient, and provides
+a state-machine like API for extensions. There are three built-in modules - *iterator*, *cache*, *validator*, and many external.
+
+The Lua modules, switchable and shareable cache, and fast FFI bindings makes it great to tap into resolution process, or be used for your recursive DNS service. It's the [OpenResty][openresty] of DNS.
+
+The server adopts a [different scaling strategy][scaling] than the rest of the DNS recursors - no threading, shared-nothing architecture (except MVCC cache that may be shared). You can start and stop additional nodes depending on the contention without downtime.
 
 ### Try it out?
 
-The Knot DNS Resolver is currently in an early development phase, you shouldn't put it in the production right away.
+Keep in mind that the Knot DNS Resolver is in beta. While it's being tested by the [DNS test harness][https://gitlab.labs.nic.cz/knot/deckard], we'll be super glad to hear out your feedback!
+
+### Building from sources
+
+The Knot DNS Resolver [depends][depends] on the 2.0.1 version of the Knot DNS library, [LuaJIT][luajit] and [libuv][libuv].
+See the [Building project][depends] documentation page for more information.
 
 ### Docker image
 
@@ -25,24 +33,22 @@ $ docker run cznic/knot-resolver
 
 See the build page [registry.hub.docker.com/u/cznic/knot-resolver](https://registry.hub.docker.com/u/cznic/knot-resolver) for more information and options.
 
-### Building from sources 
-
-The Knot DNS Resolver [depends][depends] on the pre-release version of the Knot DNS library and other projects.
-See the [Building project][depends] documentation page for more information.
-
 ### Running
 
 The project builds a resolver library in the `lib` directory, and a daemon in the `daemon` directory.
 
 ```
-$ ./daemon/kresd -h
-$ ./daemon/kresd [working_directory]
+$ kresd -h
 ```
 
 See the documentation at [knot-resolver.readthedocs.org][doc].
 
 [depends]: http://knot-resolver.readthedocs.org/en/latest/build.html
 [doc]: http://knot-resolver.readthedocs.org/en/latest/index.html
+[scaling]: http://knot-resolver.readthedocs.org/en/latest/daemon.html#scaling-out
+[luajit]: http://luajit.org/
+[libuv]: https://github.com/libuv/libuv
+[openresty]: https://openresty.org/
 
 ### Contacting us
 
