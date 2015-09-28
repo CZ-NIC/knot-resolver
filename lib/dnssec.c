@@ -74,9 +74,8 @@ static int validate_rrsig_rr(int *flags, const knot_rrset_t *covered,
 	if (!flags || !covered || !rrsigs || !keys || !key || !zone_name) {
 		return kr_error(EINVAL);
 	}
-#warning TODO: Make the comparison case-insensitive.
-	/* bullet 1 */
-	if ((covered->rclass != rrsigs->rclass) || (knot_dname_cmp(covered->owner, rrsigs->owner) != 0)) {
+	/* bullet 1 (presume same compression for the owner) */
+	if ((covered->rclass != rrsigs->rclass) || !knot_dname_is_equal(covered->owner, rrsigs->owner)) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 2 */
@@ -155,7 +154,7 @@ int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
 		return kr_error(EINVAL);
 	}
 
-	int ret = kr_error(KNOT_DNSSEC_ENOKEY);
+	int ret = kr_error(ENOENT);
 	for (unsigned i = 0; i < keys->rrs.rr_count; ++i) {
 		ret = kr_rrset_validate_with_key(pkt, section_id, covered, keys, i, NULL, zone_name, timestamp, has_nsec3);
 		if (ret == 0) {
@@ -186,7 +185,7 @@ int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
 		key = created_key;
 	}
 
-	ret = kr_error(KNOT_DNSSEC_ENOKEY);
+	ret = kr_error(ENOENT);
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
 	for (unsigned i = 0; i < sec->count; ++i) {
 		/* Try every RRSIG. */

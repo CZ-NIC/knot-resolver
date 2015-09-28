@@ -23,7 +23,7 @@
 /**
  * Check whether bitmap contains given type.
  * @param bm      Bitmap.
- * @patam bm_size Bitmap size.
+ * @param bm_size Bitmap size.
  * @param type    RR type to search for.
  * @return        True if bitmap contains type.
  */

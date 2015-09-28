@@ -62,7 +62,7 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 	 */
 	ret = (orig_ds_rdata.size == generated_ds_rdata.size) &&
 	    (memcmp(orig_ds_rdata.data, generated_ds_rdata.data, orig_ds_rdata.size) == 0);
-	ret = ret ? kr_ok() : kr_error(KNOT_DNSSEC_ENOKEY);
+	ret = ret ? kr_ok() : kr_error(ENOENT);
 
 fail:
 	dnssec_binary_free(&generated_ds_rdata);
@@ -266,8 +266,7 @@ int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
 
 	ret = dnssec_sign_verify(sign_ctx, &signature);
 	if (ret != KNOT_EOK) {
-#warning TODO: proper DNSSEC error codes needed
-		ret = kr_error(ENOMEM);
+		ret = kr_error(EBADMSG);
 		goto fail;
 	}
 

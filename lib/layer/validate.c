@@ -118,21 +118,17 @@ fail:
 
 static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *pool, bool has_nsec3)
 {
-#warning TODO: validate RRSIGS (records with ZSK, keys with KSK), return FAIL if failed
 	if (!qry->zone_cut.key) {
 		DEBUG_MSG(qry, "<= no DNSKEY, can't validate\n");
-		return kr_error(KNOT_DNSSEC_ENOKEY);
+		return kr_error(EBADMSG);
 	}
 
-	int ret;
-
-	ret = validate_section(qry, answer, KNOT_ANSWER, pool, has_nsec3);
+	int ret = validate_section(qry, answer, KNOT_ANSWER, pool, has_nsec3);
 	if (ret != 0) {
 		return ret;
 	}
-	ret = validate_section(qry, answer, KNOT_AUTHORITY, pool, has_nsec3);
 
-	return ret;
+	return validate_section(qry, answer, KNOT_AUTHORITY, pool, has_nsec3);
 }
 
 static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_nsec3)
@@ -159,10 +155,8 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_ns
 			}
 		}
 	}
-
 	if (!qry->zone_cut.key) {
-		/* TODO -- Not sure about the error value. */
-		return kr_error(KNOT_DNSSEC_ENOKEY);
+		return kr_error(EBADMSG);
 	}
 
 	/* Check if there's a key for current TA. */

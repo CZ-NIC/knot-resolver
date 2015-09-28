@@ -619,7 +619,7 @@ static int wrk_resolve(lua_State *L)
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 	knot_wire_set_rd(pkt->wire);
 	/* Add OPT RR */
-	pkt->opt_rr = pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, &pkt->mm);
+	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, &pkt->mm);
 	if (!pkt->opt_rr) {
 		return kr_error(ENOMEM);
 	}	
