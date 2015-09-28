@@ -33,6 +33,7 @@ before_script:
     - mkdir ${SOCKET_WRAPPER_DIR}
 script:
     - make -j2 install COVERAGE=1 PREFIX=${HOME}/.local
+    - ./daemon/kresd -h
     - make check COVERAGE=1 PREFIX=${HOME}/.local
 after_success:
     - test $TRAVIS_OS_NAME = linux && coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'
