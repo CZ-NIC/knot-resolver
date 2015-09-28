@@ -13,6 +13,7 @@ Modular architecture of the library keeps the core tiny and efficient, and provi
    lib
    daemon
    modules
+   modules_api
 
 
 Indices and tables

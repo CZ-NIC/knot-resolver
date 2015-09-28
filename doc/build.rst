@@ -30,7 +30,7 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "C compiler", "*all*", "*(build only)* [#]_"
-   "libknot_ 2.0+", "*all*", "Knot DNS library."
+   "libknot_ 2.0+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language (Lua_ 5.1+ with limitations)."
    "libuv_ 1.0+", "``daemon``", "Multiplatform I/O and services."
 
@@ -43,7 +43,6 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "hiredis_", "``modules/redis``", "To build redis backend module."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Python_", "``integration tests``", "For test scripts."
-   "GCCGO_",  "``modules/go``", "For building Go modules, see modules documentation."
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_", "``documentation``", "Building this HTML/PDF documentation."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."

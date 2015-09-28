@@ -3,50 +3,85 @@
 Knot DNS Resolver daemon 
 ************************
 
-Requirements
-============
-
-* libuv_ 1.0+ (a multi-platform support library with a focus on asynchronous I/O)
-* Lua_ 5.1+ (embeddable scripting language, LuaJIT_ is preferred)
-
-Running
-=======
-
-There is a separate resolver library in the `lib` directory, and a server in the `daemon` directory.
+The server is in the `daemon` directory, it works out of the box without any configuration.
 
 .. code-block:: bash
 
-	$ kresd -h
+   $ kresd -h # Get help
+   $ kresd -a ::1
 
-Interacting with the daemon
----------------------------
+Enabling DNSSEC
+===============
 
-The daemon features a CLI interface if launched interactively, type ``help`` to see the list of available commands.
-You can load modules this way and use their properties to get information about statistics and such.
+The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
+To enable it, you need to provide at least _one_ trust anchor. This step is not automatic, as you're supposed to obtain
+the trust anchor `using a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_.
+From there, the Knot DNS Resolver can perform automatic updates for you.
+
+1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
+2. Fetch current keys, verify
+3. Deploy them
 
 .. code-block:: bash
 
-	$ kresd /var/run/knot-resolver
-	[system] started in interactive mode, type 'help()'
-	> cache.count()
-	53
+   $ kdig DNSKEY . @a.root-servers.net +noall +answer | grep 257 > root.keys
+   $ ldns-key2ds -n root.keys
+   ... verify that digest matches TA published by IANA ...
+   $ kresd -k root.keys
+
+You've just enabled DNSSEC!
+
+CLI interface
+=============
+
+The daemon features a CLI interface, type ``help`` to see the list of available commands.
+
+.. code-block:: bash
+
+   $ kresd /var/run/knot-resolver
+   [system] started in interactive mode, type 'help()'
+   > cache.count()
+   53
 
 .. role:: lua(code)
    :language: lua
 
-Running in forked mode
-----------------------
+Verbose output
+--------------
 
-The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
+If the debug logging is compiled in, you can turn on verbose tracing of server operation with the ``-v`` option.
+You can also toggle it on runtime with ``verbose(true|false)`` command.
 
 .. code-block:: bash
 
-	$ kresd -f 2 rundir > kresd.log
+   $ kresd -v
+
+Scaling out
+===========
+
+The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
+Multiple processes can serve different addresses, but still share the same working directory and cache.
+You can add start and stop processes on runtime based on the load.
+
+.. code-block:: bash
+
+	$ kresd -f 4 rundir > kresd.log &
+   $ kresd -f 2 rundir > kresd_2.log & # Extra instances
+   $ pstree $$ -g
+   bash(3533)─┬─kresd(19212)─┬─kresd(19212)
+              │              ├─kresd(19212)
+              │              └─kresd(19212)
+              ├─kresd(19399)───kresd(19399)
+              └─pstree(19411)
+   $ kill 19399 # Kill group 2, former will continue to run
+   bash(3533)─┬─kresd(19212)─┬─kresd(19212)
+              │              ├─kresd(19212)
+              │              └─kresd(19212)
+              └─pstree(19460)  
 
 .. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If the kernel doesn't support it, you can still fork multiple processes on different ports, and do load balancing externally (on firewall or with `dnsdist <http://dnsdist.org/>`_).
 
-
-Notice it isn't interactive, but you can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
+Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
 
 .. code-block:: bash
 
@@ -58,16 +93,6 @@ This is also a way to enumerate and test running instances, the list of files in
 of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
 
 .. warning:: This is very basic way to orchestrate multi-core deployments and doesn't scale in multi-node clusters. Keep an eye on the prepared ``hive`` module that is going to automate everything from service discovery to deployment and consistent configuration.
-
-Verbose output
---------------
-
-If the debug logging is compiled in, you can turn on verbose tracing of server operation with the ``-v`` option.
-You can also toggle it on runtime with ``verbose(true|false)`` command.
-
-.. code-block:: bash
-
-   $ kresd -v
 
 Configuration
 =============
@@ -86,11 +111,8 @@ comfortable in the current working directory.
 
 And you're good to go for most use cases! If you want to use modules or configure daemon behavior, read on.
 
-There are several choices on how you can configure the daemon, a RPC interface a CLI and a configuration file.
-Fortunately all share common syntax and are transparent to each other, e.g. changes made during the runtime are kept
-in the redo log and are immediately visible.
-
-.. warning:: Redo log is not yet implemented, changes are visible during the process lifetime only.
+There are several choices on how you can configure the daemon, a RPC interface, a CLI, and a configuration file.
+Fortunately all share common syntax and are transparent to each other.
 
 Configuration example
 ---------------------
@@ -99,9 +121,9 @@ Configuration example
 	-- 10MB cache
 	cache.size = 10*MB
 	-- load some modules
-	modules = { 'hints', 'cachectl' }
+	modules = { 'policy', 'cachectl' }
 	-- interfaces
-	net = { '127.0.0.1' }
+	net = { '127.0.0.1', '::1' }
 
 Configuration syntax
 --------------------
@@ -347,24 +369,6 @@ For when listening on ``localhost`` just doesn't cut it.
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
-To enable it, you need to provide at least _one_ trust anchor. This step is not automatic, as you're supposed to obtain
-the trust anchor using a secure channel. From there, the Knot DNS Resolver can perform automatic updates for you if you
-run in managed mode.
-
-The recommended way is as follows:
-
-1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
-2. Fetch current keys, verify and use
-.. code-block:: bash
-
-   $ kdig dnskey . @a.root-servers.net +noall +answer | grep 257 > root.keys
-   $ ldns-key2ds -n root.keys
-   ... verify that digest matches TA published by IANA ...
-   $ kresd -k root.keys
-
-You've just enabled DNSSEC, congratulations!
-
 .. function:: trust_anchors.config(keyfile)
 
    :param string keyfile: File containing DNSKEY records, should be writeable.
@@ -377,18 +381,6 @@ You've just enabled DNSSEC, congratulations!
 
    > trust_anchors.config('root.keys')
    [trust_anchors] key: 19036 state: Valid
-
-.. function:: trust_anchors.add(rr_string)
-
-   :param string rr_string: DS/DNSKEY records in presentation format (e.g. `. 3600 IN DS 19036 8 2 49AAC11...`)
-
-   Inserts DS/DNSKEY record(s) into current keyset. These will not be managed or updated.
-
-   Example output:
-
-   .. code-block:: lua
-
-   > trust_anchors.add('. 3600 IN DS 19036 8 2 49AAC11...')
 
 .. function:: trust_anchors.set_insecure(nta_set)
 
@@ -407,6 +399,18 @@ You've just enabled DNSSEC, congratulations!
    > trust_anchors.insecure
    [1] => bad.boy
    [2] => example.com
+
+.. function:: trust_anchors.add(rr_string)
+
+   :param string rr_string: DS/DNSKEY records in presentation format (e.g. `. 3600 IN DS 19036 8 2 49AAC11...`)
+
+   Inserts DS/DNSKEY record(s) into current keyset. These will not be managed or updated.
+
+   Example output:
+
+   .. code-block:: lua
+
+   > trust_anchors.add('. 3600 IN DS 19036 8 2 49AAC11...')
 
 Modules configuration
 ^^^^^^^^^^^^^^^^^^^^^

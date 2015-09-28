@@ -1,16 +1,15 @@
-****************************
-Knot DNS Resolver extensions
-****************************
+.. _modules-api:
 
-Writing extensions
-==================
+*********************
+Modules API reference
+*********************
 
 .. contents::
-   :depth: 2
+   :depth: 1
    :local:
 
 Supported languages
--------------------
+===================
 
 Currently modules written in C and Lua are supported.
 There is also a rudimentary support for writing modules in Go |---|
@@ -19,7 +18,7 @@ There is also a rudimentary support for writing modules in Go |---|
 (3) no coroutines and no garbage collecting thread, as the Go code is called from C threads.
 
 The anatomy of an extension
----------------------------
+===========================
 
 A module is a shared object or script defining specific functions, here's an overview.
 
@@ -45,61 +44,8 @@ This doesn't apply for Go, as it for now always implements `main` and requires c
    
    If the module exports a layer implementation, it is automatically discovered by :c:func:`kr_resolver` on resolution init and plugged in. The order in which the modules are registered corresponds to the call order of layers.
 
-Writing a module in C
----------------------
-
-As almost all the functions are optional, the minimal module looks like this:
-
-.. code-block:: c
-
-	#include "lib/module.h"
-	/* Convenience macro to declare module API. */
-	KR_MODULE_EXPORT(mymodule);
-
-
-Let's define an observer thread for the module as well. It's going to be stub for the sake of brevity,
-but you can for example create a condition, and notify the thread from query processing by declaring
-module layer (see the :ref:`Writing layers <lib-layers>`).
-
-.. code-block:: c
-
-	static void* observe(void *arg)
-	{
-		/* ... do some observing ... */
-	}
-
-	int mymodule_init(struct kr_module *module)
-	{
-		/* Create a thread and start it in the background. */
-		pthread_t thr_id;
-		int ret = pthread_create(&thr_id, NULL, &observe, NULL);
-		if (ret != 0) {
-			return kr_error(errno);
-		}
-
-		/* Keep it in the thread */
-		module->data = thr_id;
-		return kr_ok();
-	}
-
-	int mymodule_deinit(struct kr_module *module)
-	{
-		/* ... signalize cancellation ... */
-		void *res = NULL;
-		pthread_t thr_id = (pthread_t) module->data;
-		int ret = pthread_join(thr_id, res);
-		if (ret != 0) {
-			return kr_error(errno);
-		}
-
-		return kr_ok();
-	}
-
-This example shows how a module can run in the background, this enables you to, for example, observe
-and publish data about query resolution.
-
 Writing a module in Lua
------------------------
+=======================
 
 The probably most convenient way of writing modules is Lua since you can use already installed modules
 from system and have first-class access to the scripting engine. You can also tap to all the events, that
@@ -179,8 +125,61 @@ Since the modules are like any other Lua modules, you can interact with them thr
 
 .. tip:: The module can be placed anywhere in the Lua search path, in the working directory or in the MODULESDIR.
 
+Writing a module in C
+=====================
+
+As almost all the functions are optional, the minimal module looks like this:
+
+.. code-block:: c
+
+	#include "lib/module.h"
+	/* Convenience macro to declare module API. */
+	KR_MODULE_EXPORT(mymodule);
+
+
+Let's define an observer thread for the module as well. It's going to be stub for the sake of brevity,
+but you can for example create a condition, and notify the thread from query processing by declaring
+module layer (see the :ref:`Writing layers <lib-layers>`).
+
+.. code-block:: c
+
+	static void* observe(void *arg)
+	{
+		/* ... do some observing ... */
+	}
+
+	int mymodule_init(struct kr_module *module)
+	{
+		/* Create a thread and start it in the background. */
+		pthread_t thr_id;
+		int ret = pthread_create(&thr_id, NULL, &observe, NULL);
+		if (ret != 0) {
+			return kr_error(errno);
+		}
+
+		/* Keep it in the thread */
+		module->data = thr_id;
+		return kr_ok();
+	}
+
+	int mymodule_deinit(struct kr_module *module)
+	{
+		/* ... signalize cancellation ... */
+		void *res = NULL;
+		pthread_t thr_id = (pthread_t) module->data;
+		int ret = pthread_join(thr_id, res);
+		if (ret != 0) {
+			return kr_error(errno);
+		}
+
+		return kr_ok();
+	}
+
+This example shows how a module can run in the background, this enables you to, for example, observe
+and publish data about query resolution.
+
 Writing a module in Go
-----------------------
+======================
 
 .. note:: At the moment only a limited subset of Go is supported. The reason is that the Go functions must run inside the goroutines, and *presume* the garbage collector and scheduler are running in the background. `GCCGO`_ compiler can build dynamic libraries, and also allow us to bootstrap basic Go runtime, including a trampoline to call Go functions. The problem with the ``layer()`` and callbacks is that they're called from C threads, that Go runtime has no knowledge of. Thus neither garbage collection or spawning routines can work. The solution could be to register C threads to Go runtime, or have each module to run inside its world loop and use IPC instead of callbacks |---| alas neither is implemented at the moment, but may be in the future.
 
@@ -253,14 +252,14 @@ Now we can add the implementations for the ``Begin`` and ``Finish`` functions, a
 See the CGO_ for more information about type conversions and interoperability between the C/Go.
 
 Configuring modules
--------------------
+===================
 
 There is a callback ``X_config()`` that you can implement, see hints module.
 
 .. _mod-properties:
 
 Exposing C/Go module properties
--------------------------------
+===============================
 
 A module can offer NULL-terminated list of *properties*, each property is essentially a callable with free-form JSON input/output.
 JSON was chosen as an interchangeable format that doesn't require any schema beforehand, so you can do two things - query the module properties
@@ -309,7 +308,8 @@ Here's an example how a module can expose its property:
 
 	KR_MODULE_EXPORT(cache)
 
-Once you load the module, you can call the module property from the interactive console:
+Once you load the module, you can call the module property from the interactive console.
+*Note* |---| the JSON output will be transparently converted to Lua tables.
 
 .. code-block:: bash
 
@@ -318,7 +318,7 @@ Once you load the module, you can call the module property from the interactive 
 	[system] started in interactive mode, type 'help()'
 	> modules.load('cached')
 	> cached.get_size()
-	{ "size": 53 }
+	[size] => 53
 
 *Note* |---| this relies on function pointers, so the same ``static inline`` trick as for the ``Layer()`` is required for C/Go.
 
@@ -327,9 +327,6 @@ Special properties
 
 If the module declares properties ``get`` or ``set``, they can be used in the Lua interpreter as
 regular tables.
-
-.. warning:: This is not yet completely implemented, as the module I/O format may change to map_t a/o
-             embedded JSON tokenizer.
 
 .. _`not present in Go`: http://blog.golang.org/gos-declaration-syntax
 .. _CGO: http://golang.org/cmd/cgo/
