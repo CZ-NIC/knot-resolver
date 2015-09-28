@@ -95,7 +95,9 @@ local function refresh_plan(trust_anchors, timeout, refresh_cb)
 		function (pkt)
 			-- Schedule itself with updated timeout
 			local next_time = refresh_cb(trust_anchors, kres.pkt_t(pkt))
-			next_time = math.min(next_time, trust_anchors.refresh_time)
+			if trust_anchors.refresh_time ~= nil then
+				next_time = math.min(next_time, trust_anchors.refresh_time)
+			end
 			print('[trust_anchors] next refresh: '..next_time)
 			refresh_plan(trust_anchors, next_time, refresh_cb)
 		end)
@@ -190,6 +192,7 @@ local trust_anchors = {
 	end,
 	-- Load keys from a file (managed)
 	config = function (path, is_unmanaged)
+		if path == trust_anchors.file_current then return end
 		local new_keys = require('zonefile').parse_file(path)
 		trust_anchors.file_current = path
 		if is_unmanaged then trust_anchors.file_current = nil end
