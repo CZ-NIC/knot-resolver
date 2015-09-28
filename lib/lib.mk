@@ -22,7 +22,6 @@ libkres_SOURCES := \
 	lib/nsrep.c            \
 	lib/module.c           \
 	lib/resolve.c          \
-	lib/rrset_stash.c      \
 	lib/zonecut.c          \
 	lib/rplan.c            \
 	lib/cache.c
@@ -43,7 +42,6 @@ libkres_HEADERS := \
 	lib/nsrep.h            \
 	lib/module.h           \
 	lib/resolve.h          \
-	lib/rrset_stash.h      \
 	lib/zonecut.h          \
 	lib/rplan.h            \
 	lib/cache.h

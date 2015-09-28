@@ -21,6 +21,9 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <libknot/descriptor.h>
+#include <libknot/dname.h>
+#include <libknot/rrtype/rrsig.h>
 
 #include "ccan/isaac/isaac.h"
 #include "lib/defines.h"
@@ -259,4 +262,50 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 		ret = ((uint8_t)(*a >> shift) - (uint8_t)(*b >> shift));
 	}
 	return ret;
+}
+
+/* Set stashed RR flag */
+#define KEY_FLAG_SET(key, flag) key[0] = (flag);
+
+int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, mm_ctx_t *pool)
+{
+	if (!stash || !rr) {
+		return kr_error(EINVAL);
+	}
+
+	/* Stash key = {[1] flags, [1-255] owner, [1-5] type, [1] \x00 } */
+	char key[9 + KNOT_DNAME_MAXLEN];
+	uint16_t rrtype = rr->type;
+	KEY_FLAG_SET(key, KEY_FLAG_NO);
+
+	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
+	 * This way it the stash won't merge RRSIGs together. */
+	if (rr->type == KNOT_RRTYPE_RRSIG) {
+		rrtype = knot_rrsig_type_covered(&rr->rrs, 0);
+		KEY_FLAG_SET(key, KEY_FLAG_RRSIG);
+	}
+
+	uint8_t *key_buf = (uint8_t *)key + 1;
+	int ret = knot_dname_to_wire(key_buf, rr->owner, KNOT_DNAME_MAXLEN);
+	if (ret <= 0) {
+		return ret;
+	}
+	knot_dname_to_lower(key_buf);
+	/* Must convert to string, as the key must not contain 0x00 */
+	ret = snprintf((char *)key_buf + ret - 1, sizeof(key) - KNOT_DNAME_MAXLEN, "%hu", rrtype);
+	if (ret <= 0 || ret >= KNOT_DNAME_MAXLEN) {
+		return kr_error(EILSEQ);
+	}
+
+	/* Check if already exists */
+	knot_rrset_t *stashed = map_get(stash, key);
+	if (!stashed) {
+		stashed = knot_rrset_copy(rr, pool);
+		if (!stashed) {
+			return kr_error(ENOMEM);
+		}
+		return map_set(stash, key, stashed);
+	}
+	/* Merge rdataset */
+	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
 }

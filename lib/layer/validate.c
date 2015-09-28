@@ -31,7 +31,7 @@
 #include "lib/layer.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
-#include "lib/rrset_stash.h"
+#include "lib/utils.h"
 #include "lib/defines.h"
 #include "lib/module.h"
 
@@ -87,7 +87,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		if ((rr->type == KNOT_RRTYPE_NS) && (section_id == KNOT_AUTHORITY)) {
 			continue;
 		}
-		ret = stash_add(answer, &stash, rr, pool);
+		ret = kr_rrmap_add(&stash, rr, pool);
 		if (ret != 0) {
 			goto fail;
 		}
