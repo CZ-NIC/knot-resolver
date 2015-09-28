@@ -1,7 +1,7 @@
 # Project
-MAJOR := 15
-MINOR := 07
-PATCH := 0
+MAJOR := 1
+MINOR := 0
+PATCH := 0-beta
 
 # Paths
 PREFIX := /usr/local
