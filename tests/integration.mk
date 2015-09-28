@@ -27,6 +27,6 @@ $(libfaketime): $(libfaketime_DIR)/Makefile
 	@CFLAGS="" $(MAKE) -C $(libfaketime_DIR)
 
 check-integration: $(libfaketime)
-	$(preload_LIBS) $(preload_syms) tests/test_integration.py $(TESTS) $(abspath daemon/kresd) ./kresd.j2 config
+	@$(preload_LIBS) $(preload_syms) python tests/test_integration.py $(TESTS) $(abspath daemon/kresd) ./kresd.j2 config
 
 .PHONY: check-integration

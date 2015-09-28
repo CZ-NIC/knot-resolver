@@ -19,8 +19,7 @@
 #include "daemon/io.h"
 
 /* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
-#define UV_VERSION_NUM UV_VERSION_MAJOR ## UV_VERSION_MINOR ## UV_VERSION_PATCH
-#if (defined(ENABLE_REUSEPORT) || UV_VERSION_NUM >= 170) && (__linux__ && SO_REUSEPORT)
+#if (defined(ENABLE_REUSEPORT) || defined(UV_VERSION_HEX)) && (__linux__ && SO_REUSEPORT)
   #define handle_init(type, loop, handle, family) do { \
 	uv_ ## type ## _init_ex((loop), (handle), (family)); \
 	uv_os_fd_t fd = 0; \

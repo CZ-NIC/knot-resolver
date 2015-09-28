@@ -3,51 +3,85 @@
 Knot DNS Resolver daemon 
 ************************
 
-Requirements
-============
-
-* libuv_ 1.0+ (a multi-platform support library with a focus on asynchronous I/O)
-* Lua_ 5.1+ (embeddable scripting language, LuaJIT_ is preferred)
-
-Running
-=======
-
-There is a separate resolver library in the `lib` directory, and a minimalistic daemon in
-the `daemon` directory.
+The server is in the `daemon` directory, it works out of the box without any configuration.
 
 .. code-block:: bash
 
-	$ ./daemon/kresd -h
+   $ kresd -h # Get help
+   $ kresd -a ::1
 
-Interacting with the daemon
----------------------------
+Enabling DNSSEC
+===============
 
-The daemon features a CLI interface if launched interactively, type ``help`` to see the list of available commands.
-You can load modules this way and use their properties to get information about statistics and such.
+The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
+To enable it, you need to provide at least _one_ trust anchor. This step is not automatic, as you're supposed to obtain
+the trust anchor `using a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_.
+From there, the Knot DNS Resolver can perform automatic updates for you.
+
+1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
+2. Fetch current keys, verify
+3. Deploy them
 
 .. code-block:: bash
 
-	$ kresd /var/run/knot-resolver
-	[system] started in interactive mode, type 'help()'
-	> cache.count()
-	53
+   $ kdig DNSKEY . @a.root-servers.net +noall +answer | grep 257 > root.keys
+   $ ldns-key2ds -n root.keys
+   ... verify that digest matches TA published by IANA ...
+   $ kresd -k root.keys
+
+You've just enabled DNSSEC!
+
+CLI interface
+=============
+
+The daemon features a CLI interface, type ``help`` to see the list of available commands.
+
+.. code-block:: bash
+
+   $ kresd /var/run/knot-resolver
+   [system] started in interactive mode, type 'help()'
+   > cache.count()
+   53
 
 .. role:: lua(code)
    :language: lua
 
-Running in forked mode
-----------------------
+Verbose output
+--------------
 
-The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
+If the debug logging is compiled in, you can turn on verbose tracing of server operation with the ``-v`` option.
+You can also toggle it on runtime with ``verbose(true|false)`` command.
 
 .. code-block:: bash
 
-	$ kresd -f 2 rundir > kresd.log
+   $ kresd -v
+
+Scaling out
+===========
+
+The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
+Multiple processes can serve different addresses, but still share the same working directory and cache.
+You can add start and stop processes on runtime based on the load.
+
+.. code-block:: bash
+
+	$ kresd -f 4 rundir > kresd.log &
+   $ kresd -f 2 rundir > kresd_2.log & # Extra instances
+   $ pstree $$ -g
+   bash(3533)─┬─kresd(19212)─┬─kresd(19212)
+              │              ├─kresd(19212)
+              │              └─kresd(19212)
+              ├─kresd(19399)───kresd(19399)
+              └─pstree(19411)
+   $ kill 19399 # Kill group 2, former will continue to run
+   bash(3533)─┬─kresd(19212)─┬─kresd(19212)
+              │              ├─kresd(19212)
+              │              └─kresd(19212)
+              └─pstree(19460)  
 
 .. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If the kernel doesn't support it, you can still fork multiple processes on different ports, and do load balancing externally (on firewall or with `dnsdist <http://dnsdist.org/>`_).
 
-
-Notice it isn't interactive, but you can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
+Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
 
 .. code-block:: bash
 
@@ -77,11 +111,8 @@ comfortable in the current working directory.
 
 And you're good to go for most use cases! If you want to use modules or configure daemon behavior, read on.
 
-There are several choices on how you can configure the daemon, a RPC interface a CLI and a configuration file.
-Fortunately all share common syntax and are transparent to each other, e.g. changes made during the runtime are kept
-in the redo log and are immediately visible.
-
-.. warning:: Redo log is not yet implemented, changes are visible during the process lifetime only.
+There are several choices on how you can configure the daemon, a RPC interface, a CLI, and a configuration file.
+Fortunately all share common syntax and are transparent to each other.
 
 Configuration example
 ---------------------
@@ -90,9 +121,9 @@ Configuration example
 	-- 10MB cache
 	cache.size = 10*MB
 	-- load some modules
-	modules = { 'hints', 'cachectl' }
+	modules = { 'policy', 'cachectl' }
 	-- interfaces
-	net = { '127.0.0.1' }
+	net = { '127.0.0.1', '::1' }
 
 Configuration syntax
 --------------------
@@ -122,8 +153,6 @@ the modules use as the :ref:`input configuration <mod-properties>`.
 			file = '/etc/hosts'
 		}
 	}
-
-The possible simple data types are: string, integer or float, and boolean.
 
 .. tip:: The configuration and CLI syntax is Lua language, with which you may already be familiar with.
          If not, you can read the `Learn Lua in 15 minutes`_ for a syntax overview. Spending just a few minutes
@@ -170,7 +199,7 @@ to download cache from parent, to avoid cold-cache start.
 			sink = ltn12.sink.file(io.open('cache.mdb', 'w'))
 		}
 		-- reopen cache with 100M limit
-		cache.open(100*MB)
+		cache.size = 100*MB
 	end
 
 Events and services
@@ -240,6 +269,10 @@ Environment
 .. function:: hostname()
 
    :return: Machine hostname.
+
+.. function:: verbose(true | false)
+
+   :return: Toggle verbose logging.
 
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
@@ -319,6 +352,65 @@ For when listening on ``localhost`` just doesn't cut it.
 	}
 
    .. tip:: You can use ``net.<iface>`` as a shortcut for specific interface, e.g. ``net.eth0``
+
+.. function:: net.bufsize([udp_bufsize])
+
+   Get/set maximum EDNS payload available. Default is 1452 (the maximum unfragmented datagram size).
+   You cannot set less than 1220 (minimum size for DNSSEC) or more than 65535 octets.
+
+   Example output:
+
+   .. code-block:: lua
+
+	> net.bufsize(4096)
+	> net.bufsize()
+	4096
+
+Trust anchors and DNSSEC
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. function:: trust_anchors.config(keyfile)
+
+   :param string keyfile: File containing DNSKEY records, should be writeable.
+
+   You can use only DNSKEY records in managed mode. It is equivalent to CLI parameter `-k <keyfile>` or `trust_anchors.file = keyfile`.
+
+   Example output:
+
+   .. code-block:: lua
+
+   > trust_anchors.config('root.keys')
+   [trust_anchors] key: 19036 state: Valid
+
+.. function:: trust_anchors.set_insecure(nta_set)
+
+   :param table nta_list: List of domain names (text format) representing NTAs.
+
+   When you use a domain name as an NTA, DNSSEC validation will be turned off at/below these names.
+   Each function call replaces the previous NTA set. You can find the current active set in `trust_anchors.insecure` variable.
+
+   .. tip:: Use the `trust_anchors.negative = {}` alias for easier configuration.
+
+   Example output:
+
+   .. code-block:: lua
+
+   > trust_anchors.negative = { 'bad.boy', 'example.com' }
+   > trust_anchors.insecure
+   [1] => bad.boy
+   [2] => example.com
+
+.. function:: trust_anchors.add(rr_string)
+
+   :param string rr_string: DS/DNSKEY records in presentation format (e.g. `. 3600 IN DS 19036 8 2 49AAC11...`)
+
+   Inserts DS/DNSKEY record(s) into current keyset. These will not be managed or updated.
+
+   Example output:
+
+   .. code-block:: lua
+
+   > trust_anchors.add('. 3600 IN DS 19036 8 2 49AAC11...')
 
 Modules configuration
 ^^^^^^^^^^^^^^^^^^^^^
@@ -521,16 +613,14 @@ you can see the statistics or schedule new queries.
 
 	print(worker.stats().concurrent)
 
-.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN, options = 0])
+.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN, options = 0, callback = nil])
 
    :param string qname: Query name (e.g. 'com.')
    :param number qtype: Query type (e.g. ``kres.type.NS``)
    :param number qclass: Query class *(optional)* (e.g. ``kres.class.IN``)
    :param number options: Resolution options (see query flags)
+   :param function callback: Callback to be executed when resolution completes (e.g. `function cb (pkt) end`). The callback gets a packet containing the final answer and doesn't have to return anything.
    :return: boolean
-
-   Resolve a query, there is currently no callback when its finished, but you can track the query
-   progress in layers, just like any other query.
 
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/

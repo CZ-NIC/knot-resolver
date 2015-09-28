@@ -30,7 +30,7 @@ end
 function predict.drain(ev)
 	local deleted = 0
 	for key, val in pairs(predict.queue) do
-		worker.resolve(string.sub(key, 2), string.byte(key), 1, kres.query.NO_EXPIRING)
+		worker.resolve(string.sub(key, 2), string.byte(key), 1, kres.query.NO_CACHE)
 		predict.queue[key] = nil
 		deleted = deleted + 1
 		if deleted >= predict.batch then

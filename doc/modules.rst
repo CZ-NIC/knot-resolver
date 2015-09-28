@@ -1,9 +1,8 @@
-.. include:: ../modules/README.rst
-
 .. _modules-implemented:
 
-Implemented modules
-===================
+*************************
+Knot DNS Resolver modules
+*************************
 
 .. contents::
    :depth: 1

@@ -26,9 +26,9 @@
 #define DEFAULT_MAXTTL (15 * 60)
 #define DEFAULT_NOTTL (5) /* Short-time "no data" retention to avoid bursts */
 
-static inline uint8_t get_tag(knot_pkt_t *pkt)
+static inline uint8_t get_tag(struct kr_query *qry)
 {
-	return knot_pkt_has_dnssec(pkt) ? KR_CACHE_SEC : KR_CACHE_PKT;
+	return (qry->flags & QUERY_DNSSEC_WANT) ? KR_CACHE_SEC : KR_CACHE_PKT;
 }
 
 static uint32_t limit_ttl(uint32_t ttl)
@@ -97,11 +97,11 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->data;
 	struct kr_rplan *rplan = &req->rplan;
 	struct kr_query *qry = kr_rplan_current(rplan);
-	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
+	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
-	if (!(qry->flags & QUERY_AWAIT_CUT)) {
-		return ctx->state; /* Only lookup on first iteration */
+	if (qry->ns.addr.ip.sa_family != AF_UNSPEC) {
+		return ctx->state; /* Only lookup before asking a query */
 	}
 	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		return ctx->state; /* Only IN class */
@@ -115,7 +115,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Fetch either answer to original or minimized query */
-	uint8_t tag = get_tag(req->answer);
+	uint8_t tag = get_tag(qry);
 	int ret = loot_cache(&txn, pkt, tag, qry);
 	kr_cache_txn_abort(&txn);
 	if (ret == 0) {
@@ -197,7 +197,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	};
 
 	/* Stash answer in the cache */
-	int ret = kr_cache_insert(&txn, get_tag(pkt), qname, qtype, &header, data);	
+	int ret = kr_cache_insert(&txn, get_tag(qry), qname, qtype, &header, data);	
 	if (ret != 0) {
 		kr_cache_txn_abort(&txn);
 	} else {

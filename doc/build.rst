@@ -30,7 +30,7 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "C compiler", "*all*", "*(build only)* [#]_"
-   "libknot_ 2.0+", "*all*", "Knot DNS library."
+   "libknot_ 2.0+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language (Lua_ 5.1+ with limitations)."
    "libuv_ 1.0+", "``daemon``", "Multiplatform I/O and services."
 
@@ -43,7 +43,6 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "hiredis_", "``modules/redis``", "To build redis backend module."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Python_", "``integration tests``", "For test scripts."
-   "GCCGO_",  "``modules/go``", "For building Go modules, see modules documentation."
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_", "``documentation``", "Building this HTML/PDF documentation."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
@@ -85,7 +84,7 @@ When you have all the dependencies ready, you can build and install.
    $ make PREFIX="/usr/local"
    $ make install
 
-.. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path.
+.. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path. If you build the binary with ``-DNDEBUG``, verbose logging will be disabled as well.
 
 Alternatively you can build only specific parts of the project, i.e. ``library``.
 
@@ -95,17 +94,6 @@ Alternatively you can build only specific parts of the project, i.e. ``library``
    $ make lib-install
 
 .. note:: Documentation is not built by default, run ``make doc`` to build it.
-
-Debug build
------------
-
-For debugging or tinkering purposes, it's useful to build the daemon with the debug messages enabled.
-
-.. code-block:: bash
-
-   $ CFLAGS="-O0 -g -DWITH_DEBUG" make
-
-.. warning:: If you want to track specific things like i.e. number of subrequests for given zone in production, use Lua modules or write custom layers rather then depending on debug output.
 
 Building dependencies
 ~~~~~~~~~~~~~~~~~~~~~

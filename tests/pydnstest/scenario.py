@@ -9,6 +9,11 @@ import itertools
 import time
 from datetime import datetime
 
+def dprint(msg):
+    """ Verbose logging (if enabled). """
+    if 'VERBOSE' in os.environ:
+        print(msg)
+
 class Entry:
     """
     Data entry represents scripted message and extra metadata, notably match criteria and reply adjustments.
@@ -25,7 +30,7 @@ class Entry:
         self.adjust_fields = ['copy_id']
         self.origin = '.'
         self.message = dns.message.Message()
-        self.message.use_edns(edns = 0)
+        self.message.use_edns(edns = 0, payload = 4096)
         self.sections = []
         self.is_raw_data_entry = False
         self.raw_data_pending = False
@@ -86,7 +91,7 @@ class Entry:
         if raw_value is not None:
             got = binascii.hexlify(raw_value)
         if expected != got:
-            print "expected '",expected,"', got '",got,"'"
+            print("expected '",expected,"', got '",got,"'")
             raise Exception("comparsion failed")
 
     def set_match(self, fields):
@@ -99,7 +104,9 @@ class Entry:
         answer.use_edns(query.edns, query.ednsflags)
         if 'copy_id' in self.adjust_fields:
             answer.id = query.id
-            answer.question[0].name = query.question[0].name
+            # Copy letter-case if the template has QD
+            if len(answer.question) > 0:
+                answer.question[0].name = query.question[0].name
         if 'copy_query' in self.adjust_fields:
             answer.question = query.question
         return answer
@@ -273,7 +280,9 @@ class Step:
 
     def play(self, ctx, peeraddr):
         """ Play one step from a scenario. """
+        dprint('[ STEP %03d ] %s' % (self.id, self.type))
         if self.type == 'QUERY':
+            dprint(self.data[0].message.to_text())
             return self.__query(ctx, peeraddr)
         elif self.type == 'CHECK_OUT_QUERY':
              pass # Ignore
@@ -292,13 +301,13 @@ class Step:
             raise Exception("response definition required")
         expected = self.data[0]
         if expected.is_raw_data_entry is True:
-            expected.cmp_raw(ctx.last_raw_answer);
+            dprint(ctx.last_raw_answer.to_text())
+            expected.cmp_raw(ctx.last_raw_answer)
         else:
-            if ctx.last_answer is None :
+            if ctx.last_answer is None:
                 raise Exception("no answer from preceding query")
+            dprint(ctx.last_answer.to_text())
             expected.match(ctx.last_answer)
-
-
 
     def __query(self, ctx, peeraddr):
         """ Resolve a query. """
@@ -307,9 +316,8 @@ class Step:
         if self.data[0].is_raw_data_entry is True:
             data_to_wire = self.data[0].raw_data
         else:
-            msg = self.data[0].message
-            msg.use_edns(edns = 1)
-            data_to_wire = msg.to_wire()
+            # Don't use a message copy as the EDNS data portion is not copied.
+            data_to_wire = self.data[0].message.to_wire()
         # Send query to client and wait for response
         while True:
             try:
@@ -334,15 +342,19 @@ class Step:
 
     def __time_passes(self, ctx):
         """ Modify system time. """
-        ctx.time += int(self.args[1])
+        time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'r')
+        line = time_file.readline().strip()
+        time_file.close()
+        t = time.mktime(datetime.strptime(line, '%Y-%m-%d %H:%M:%S').timetuple())
+        t += int(self.args[1])
         time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
-        time_file.write(datetime.fromtimestamp(ctx.time).strftime('%Y-%m-%d %H:%M:%S') + "\n")
+        time_file.write(datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M:%S') + "\n")
+        time_file.close()
 
 class Scenario:
     def __init__(self, info):
         """ Initialize scenario with description. """
         self.info = info
-        self.time = 0
         self.ranges = []
         self.steps = []
         self.current_step = None
@@ -382,7 +394,7 @@ class Scenario:
     def play(self, saddr, paddr):
         """ Play given scenario. """
         self.child_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.child_sock.settimeout(1000)
+        self.child_sock.settimeout(2)
         self.child_sock.connect((paddr, 53))
 
         step = None
@@ -395,5 +407,5 @@ class Scenario:
         except Exception as e:
             raise Exception('step #%d %s' % (step.id, str(e)))
         finally:
-        	self.child_sock.close()
-        	self.child_sock = None
+            self.child_sock.close()
+            self.child_sock = None

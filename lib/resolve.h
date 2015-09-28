@@ -20,6 +20,7 @@
 #include <libknot/processing/layer.h>
 #include <libknot/packet/pkt.h>
 
+#include "lib/generic/map.h"
 #include "lib/generic/array.h"
 #include "lib/nsrep.h"
 #include "lib/rplan.h"
@@ -42,8 +43,10 @@
  * 		.alloc = (mm_alloc_t) mp_alloc
  * 	}
  * };
- * kr_resolve_begin(&req, ctx, answer);
- * int state = kr_resolve_query(&req, qname, qclass, qtype);
+ *
+ * // Setup and provide input query
+ * int state = kr_resolve_begin(&req, ctx, final_answer);
+ * state = kr_resolve_consume(&req, query);
  *
  * // Generate answer
  * while (state == KNOT_STATE_PRODUCE) {
@@ -79,15 +82,17 @@ typedef array_t(struct kr_module *) module_array_t;
  *       be shared between threads.
  */
 struct kr_context
-{
-	mm_ctx_t *pool;
+{	
+	uint32_t options;
+	knot_rrset_t *opt_rr;
+	map_t trust_anchors;
+	map_t negative_anchors;
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
-	knot_rrset_t *opt_rr;
-	uint32_t options;
+	mm_ctx_t *pool;
 };
 
 /**
@@ -125,16 +130,6 @@ struct kr_request {
  * @return        CONSUME (expecting query)
  */
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer);
-
-/**
- * Push new query for resolution to the state.
- * @param  request request state (if already has a question, this will be resolved first)
- * @param  qname
- * @param  qclass
- * @param  qtype
- * @return         PRODUCE|FAIL
- */
-int kr_resolve_query(struct kr_request *request, const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);
 
 /**
  * Consume input packet (may be either first query or answer to query originated from kr_resolve_produce())

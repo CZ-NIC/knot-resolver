@@ -28,8 +28,10 @@ struct kr_context;
 */
 struct kr_zonecut {
 	knot_dname_t *name; /**< Zone cut name. */
-	mm_ctx_t *pool;     /**< Memory pool. */
 	map_t nsset;        /**< Map of nameserver => address_set. */
+	knot_rrset_t* key;  /**< Zone cut DNSKEY. */
+	knot_rrset_t* trust_anchor; /**< Current trust anchor. */
+	mm_ctx_t *pool;     /**< Memory pool. */
 };
 
 /**
@@ -49,19 +51,27 @@ void kr_zonecut_deinit(struct kr_zonecut *cut);
 
 /**
  * Reset zone cut to given name and clear address list.
- * @note This clears the address list even if the name doesn't change.
+ * @note This clears the address list even if the name doesn't change. TA and DNSKEY don't change.
  * @param cut  zone cut to be set
  * @param name new zone cut name
  */
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
 
 /** 
- * Copy zone cut, including all data.
+ * Copy zone cut, including all data. Does not copy keys and trust anchor.
  * @param dst destination zone cut
  * @param src source zone cut
  * @return 0 or an error code
  */
 int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src);
+
+/**
+ * Copy zone trust anchor and keys.
+ * @param dst destination zone cut
+ * @param src source zone cut
+ * @return 0 or an error code
+ */
+int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src);
 
 /**
  * Add address record to the zone cut.
@@ -114,7 +124,8 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut);
  * @param name      QNAME to start finding zone cut for
  * @param txn       cache transaction (read)
  * @param timestamp transaction timestamp
+ * @param secured   search nearest containing a DNSKEY
  * @return 0 or error code
  */
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
-                           struct kr_cache_txn *txn, uint32_t timestamp);
+                           struct kr_cache_txn *txn, uint32_t timestamp, bool secured);

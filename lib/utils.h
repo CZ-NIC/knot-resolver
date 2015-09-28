@@ -34,8 +34,27 @@ extern void _cleanup_fclose(FILE **p);
 /* @endcond */
 
 /*
- * Defines.
+ * Logging and debugging.
  */
+#define log_info(fmt, ...) printf((fmt), ## __VA_ARGS__)
+#define log_error(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__)
+#ifndef NDEBUG
+extern bool _env_debug; /* @internal cond variable */
+/* Toggle debug messages */
+#define log_debug_enable(x) _env_debug = (x)
+#define log_debug_status() _env_debug
+/* Message logging */
+#define log_debug(fmt, ...) do { \
+    if (_env_debug) { printf((fmt), ## __VA_ARGS__); fflush(stdout); } \
+    } while (0)
+/* Debug block */
+#define WITH_DEBUG if(__builtin_expect(_env_debug, 0))
+#else
+#define log_debug_status() false
+#define log_debug_enable(x)
+#define log_debug(fmt, ...)
+#define WITH_DEBUG if(0)
+#endif
 
 /** Return time difference in miliseconds.
   * @note based on the _BSD_SOURCE timersub() macro */

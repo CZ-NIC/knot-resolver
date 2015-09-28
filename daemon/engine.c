@@ -27,6 +27,7 @@
 #include "lib/nsrep.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
+#include "lib/dnssec/ta.h"
 
 /** @internal Compatibility wrapper for Lua < 5.2 */
 #if LUA_VERSION_NUM < 502
@@ -52,6 +53,7 @@ static int l_help(lua_State *L)
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
 		"hostname()\n    hostname\n"
+		"verbose(true|false)\n    toggle verbose mode\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		;
 	lua_pushstring(L, help_str);
@@ -61,10 +63,18 @@ static int l_help(lua_State *L)
 /** Quit current executable. */
 static int l_quit(lua_State *L)
 {
-	/* Stop engine */
 	engine_stop(engine_luaget(L));
-	/* No results */
 	return 0;
+}
+
+/** Toggle verbose mode. */
+static int l_verbose(lua_State *L)
+{
+	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
+		log_debug_enable(lua_toboolean(L, 1));
+	}
+	lua_pushboolean(L, log_debug_status());
+	return 1;
 }
 
 /** Return hostname. */
@@ -96,7 +106,7 @@ static int l_option(lua_State *L)
 		}
 	}
 	/* Get or set */
-	if (lua_isboolean(L, 2)) {
+	if (lua_isboolean(L, 2) || lua_isnumber(L, 2)) {
 		if (lua_toboolean(L, 2)) {
 			engine->resolver.options |= opt_code;
 		} else {
@@ -234,6 +244,8 @@ void *namedb_lmdb_mkopts(const char *conf, size_t maxsize)
 static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
+	engine->resolver.trust_anchors = map_make();
+	engine->resolver.negative_anchors = map_make();
 	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
 	/* Create OPT RR */
@@ -257,6 +269,7 @@ static int init_resolver(struct engine *engine)
 
 	/* Load basic modules */
 	engine_register(engine, "iterate");
+	engine_register(engine, "validate");
 	engine_register(engine, "rrcache");
 	engine_register(engine, "pktcache");
 
@@ -283,10 +296,12 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "help");
 	lua_pushcfunction(engine->L, l_quit);
 	lua_setglobal(engine->L, "quit");
-	lua_pushcfunction(engine->L, l_option);
-	lua_setglobal(engine->L, "option");
 	lua_pushcfunction(engine->L, l_hostname);
 	lua_setglobal(engine->L, "hostname");
+	lua_pushcfunction(engine->L, l_verbose);
+	lua_setglobal(engine->L, "verbose");
+	lua_pushcfunction(engine->L, l_option);
+	lua_setglobal(engine->L, "option");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
@@ -345,17 +360,19 @@ void engine_deinit(struct engine *engine)
 	lru_deinit(engine->resolver.cache_rtt);
 	lru_deinit(engine->resolver.cache_rep);
 
-	/* Unload modules. */
+	/* Unload modules and engine. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
 		engine_unload(engine, engine->modules.at[i]);
 	}
-	array_clear(engine->modules);
-	array_clear(engine->storage_registry);
-
 	if (engine->L) {
 		lua_close(engine->L);
 	}
 
+	/* Free data structures */
+	array_clear(engine->modules);
+	array_clear(engine->storage_registry);
+	kr_ta_clear(&engine->resolver.trust_anchors);
+	kr_ta_clear(&engine->resolver.negative_anchors);
 }
 
 int engine_pcall(lua_State *L, int argc)
@@ -390,6 +407,12 @@ int engine_cmd(struct engine *engine, const char *str)
 
 static int engine_loadconf(struct engine *engine)
 {
+	/* Use module path for including Lua scripts */
+	static const char l_paths[] = "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'";
+	int ret = l_dobytecode(engine->L, l_paths, sizeof(l_paths) - 1, "");
+	if (ret != 0) {
+		lua_pop(engine->L, 1);
+	}
 	/* Init environment */
 	static const char sandbox_bytecode[] = {
 		#include "daemon/lua/sandbox.inc"
@@ -399,12 +422,6 @@ static int engine_loadconf(struct engine *engine)
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
-	/* Use module path for including Lua scripts */
-	int ret = engine_cmd(engine, "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'");
-	if (ret > 0) {
-		lua_pop(engine->L, 1);
-	}
-
 	/* Load config file */
 	if(access("config", F_OK ) != -1 ) {
 		ret = l_dosandboxfile(engine->L, "config");

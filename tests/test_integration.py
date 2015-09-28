@@ -167,6 +167,11 @@ def find_objects(path):
             result.append(path)
     return result
 
+def write_timestamp_file(path, tst):
+    time_file = open(path, 'w')
+    time_file.write(datetime.fromtimestamp(tst).strftime('%Y-%m-%d %H:%M:%S'))
+    time_file.close()
+
 def setup_env(child_env, config, config_name, j2template):
     """ Set up test environment and config """
     # Clear test directory
@@ -174,19 +179,30 @@ def setup_env(child_env, config, config_name, j2template):
     # Set up libfaketime
     os.environ["FAKETIME_NO_CACHE"] = "1"
     os.environ["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
-    time_file = open(os.environ["FAKETIME_TIMESTAMP_FILE"], 'w')
-    time_file.write(datetime.fromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S'))
-    time_file.close()
+    child_env["FAKETIME_NO_CACHE"] = "1"
+    child_env["FAKETIME_TIMESTAMP_FILE"] = '%s/.time' % TMPDIR
+    write_timestamp_file(child_env["FAKETIME_TIMESTAMP_FILE"], 0)
     # Set up child process env() 
     child_env["SOCKET_WRAPPER_DEFAULT_IFACE"] = "%i" % CHILD_IFACE
     child_env["SOCKET_WRAPPER_DIR"] = TMPDIR
     no_minimize = "true"
+    trust_anchor_str = ""
+    stub_addr = ""
     for k,v in config:
         # Enable selectively for some tests
         if k == 'query-minimization' and str2bool(v):
             no_minimize = "false"
-            break
-    selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
+        elif k == 'trust-anchor':
+            trust_anchor_str = v.strip('"\'')
+        elif k == 'val-override-date':
+            override_date_str = v.strip('"\'')
+            write_timestamp_file(child_env["FAKETIME_TIMESTAMP_FILE"], int(override_date_str))
+        elif k == 'stub-addr':
+            stub_addr = v.strip('"\'')
+    if stub_addr.startswith('127.0.0.') or stub_addr.startswith('::'):
+        selfaddr = stub_addr
+    else:
+        selfaddr = testserver.get_local_addr_str(socket.AF_INET, DEFAULT_IFACE)
     childaddr = testserver.get_local_addr_str(socket.AF_INET, CHILD_IFACE)
     # Prebind to sockets to create necessary files
     # @TODO: this is probably a workaround for socket_wrapper bug
@@ -201,6 +217,7 @@ def setup_env(child_env, config, config_name, j2template):
         "ROOT_ADDR" : selfaddr,
         "SELF_ADDR" : childaddr,
         "NO_MINIMIZE" : no_minimize,
+        "TRUST_ANCHOR" : trust_anchor_str,
         "WORKING_DIR" : TMPDIR,
     }
     cfg_rendered = j2template.render(j2template_ctx)
@@ -235,6 +252,7 @@ def play_object(path, binary_name, config_name, j2template, binary_additional_pa
     # Wait until the server accepts TCP clients
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while True:
+    	time.sleep(0.1)
         if daemon_proc.poll() != None:
             print(open('%s/server.log' % TMPDIR).read())
             raise Exception('process died "%s", logs in "%s"' % (os.path.basename(binary_name), TMPDIR))
@@ -251,6 +269,8 @@ def play_object(path, binary_name, config_name, j2template, binary_additional_pa
         server.stop()
         daemon_proc.terminate()
         daemon_proc.wait()
+        if 'VERBOSE' in os.environ:
+            print('[ LOG      ]\n%s' % open('%s/server.log' % TMPDIR).read())
     # Do not clear files if the server crashed (for analysis)
     del_files(TMPDIR)
 
@@ -269,6 +289,7 @@ if __name__ == '__main__':
         print "\t<additional> - additional parameters for <binary>"
         sys.exit(0)
 
+    test_platform()
     path_to_scenario = ""
     binary_name = ""
     template_name = ""
@@ -288,15 +309,10 @@ if __name__ == '__main__':
     j2template_env = jinja2.Environment(loader=j2template_loader)
     j2template = j2template_env.get_template(template_name)
 
-    # Self-tests first
+    # Scan for scenarios
     test = test.Test()
-    test.add('integration/platform', test_platform)
-    if test.run() != 0:
-        sys.exit(1)
-    else:
-        # Scan for scenarios
-        for arg in [path_to_scenario]:
-            objects = find_objects(arg)
-            for path in objects:
-                test.add(path, play_object, path, binary_name, config_name, j2template, binary_additional_pars)
-        sys.exit(test.run())
+    for arg in [path_to_scenario]:
+        objects = find_objects(arg)
+        for path in objects:
+            test.add(path, play_object, path, binary_name, config_name, j2template, binary_additional_pars)
+    sys.exit(test.run())

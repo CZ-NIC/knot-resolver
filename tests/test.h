@@ -27,6 +27,9 @@
 #include <unistd.h>
 #include <cmocka.h>
 
+/* Silence clang/GCC warnings when using cmocka 1.0 */
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 #include "lib/defines.h"
 #include <libknot/internal/mempattern.h>
 #include <libknot/descriptor.h>

@@ -6,6 +6,11 @@ GB = 1024*MB
 sec = 1000
 minute = 60 * sec
 hour = 60 * minute
+day = 24 * hour
+
+-- Resolver bindings
+kres = require('kres')
+trust_anchors = require('trust_anchors')
 
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`
@@ -63,6 +68,17 @@ setmetatable(cache, {
 		else   rawset(t, k, v) end
 	end
 })
+-- Defaults
+cache.size = 10 * MB
+
+-- Syntactic sugar for TA store
+setmetatable(trust_anchors, {
+	__newindex = function (t,k,v)
+	if     k == 'file' then t.config(v)
+	elseif k == 'negative' then t.set_insecure(v)
+	else   rawset(t, k, v) end
+	end,
+})
 
 -- Register module in Lua environment
 function modules_register(module)
@@ -85,7 +101,7 @@ end
 
 -- Make sandboxed environment
 local function make_sandbox(defined)
-	local __protected = { modules = true, cache = true, net = true }
+	local __protected = { modules = true, cache = true, net = true, trust_anchors = true }
 	return setmetatable({}, {
 		__index = defined,
 		__newindex = function (t, k, v)
@@ -135,18 +151,31 @@ function table_print (tt, indent, done)
 	done = done or {}
 	indent = indent or 0
 	result = ""
+	-- Convert to printable string (escape unprintable)
+	local function printable(value)
+		value = tostring(value)
+		local bytes = {}
+		for i = 1, #value do
+			local c = string.byte(value, i)
+			if c >= 0x20 and c < 0x7f then table.insert(bytes, string.char(c))
+			else                           table.insert(bytes, '\\'..tostring(c))
+			end
+			if i > 50 then table.insert(bytes, '...') break end
+		end
+		return table.concat(bytes)
+	end
 	if type(tt) == "table" then
 		for key, value in pairs (tt) do
 			result = result .. string.rep (" ", indent)
 			if type (value) == "table" and not done [value] then
 				done [value] = true
-				result = result .. string.format("[%s] => {\n", tostring (key))
+				result = result .. string.format("[%s] => {\n", printable (key))
 				result = result .. table_print (value, indent + 4, done)
 				result = result .. string.rep (" ", indent)
 				result = result .. "}\n"
 			else
 				result = result .. string.format("[%s] => %s\n",
-				         tostring (key), tostring(value))
+				         tostring (key), printable(value))
 			end
 		end
 	else

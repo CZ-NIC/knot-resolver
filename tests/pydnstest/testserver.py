@@ -102,7 +102,11 @@ class TestServer:
                  addr_local = am.local
                  new_entry = False
         if addr_local is None:
-            addr_local = get_local_addr_str(family, iface)
+            # Do not remap addresses already in local range
+            if addr.startswith('127.0.0.') or addr.startswith('::'):
+                addr_local = addr
+            else:
+                addr_local = get_local_addr_str(family, iface)
             am = AddrMapInfo(family,addr_local,addr_external)
             self.addr_map.append(am)
             new_entry = True
@@ -228,7 +232,7 @@ class TestServer:
                 address = "::1"
         else:
             raise Exception("[start_srv] unsupported socket type {sock_type}".format(sock_type=type))
-	if port == 0 or port is None:
+        if port == 0 or port is None:
             port = 53
 
         if (self.thread is None):
