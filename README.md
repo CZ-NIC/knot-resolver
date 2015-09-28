@@ -16,7 +16,7 @@ The server adopts a [different scaling strategy][scaling] than the rest of the D
 
 ### Try it out?
 
-Keep in mind that the Knot DNS Resolver is in beta. While it's being tested by the [DNS test harness][https://gitlab.labs.nic.cz/knot/deckard], we'll be super glad to hear out your feedback!
+Keep in mind that the Knot DNS Resolver is in beta. While it's being tested by the [DNS test harness][deckard], we'll be super glad to hear out your feedback!
 
 ### Building from sources
 
@@ -46,6 +46,7 @@ See the documentation at [knot-resolver.readthedocs.org][doc].
 [depends]: http://knot-resolver.readthedocs.org/en/latest/build.html
 [doc]: http://knot-resolver.readthedocs.org/en/latest/index.html
 [scaling]: http://knot-resolver.readthedocs.org/en/latest/daemon.html#scaling-out
+[deckard]: https://gitlab.labs.nic.cz/knot/deckard
 [luajit]: http://luajit.org/
 [libuv]: https://github.com/libuv/libuv
 [openresty]: https://openresty.org/
