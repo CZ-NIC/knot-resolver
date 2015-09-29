@@ -52,6 +52,9 @@ enum kr_ns_rep {
  */
 typedef lru_hash(unsigned) kr_nsrep_lru_t;
 
+/* Maximum count of addresses probed in one go (last is left empty) */
+#define KR_NSREP_MAXADDR 3
+
 /**
  * Name server representation.
  * Contains extra information about the name server, e.g. score
@@ -67,7 +70,7 @@ struct kr_nsrep
 		struct sockaddr ip;
 		struct sockaddr_in ip4;
 		struct sockaddr_in6 ip6;
-	} addr;                          /**< NS address */
+	} addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
 };
 
 /** @internal Address bytes for given family. */
@@ -99,16 +102,15 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
  * @brief Reputation is smoothed over last N measurements.
  * 
  * @param  ns           updated NS representation
+ * @param  addr         chosen address (NULL for first)
  * @param  score        new score (i.e. RTT), see enum kr_ns_score
  * @param  cache        LRU cache
  * @return              0 on success, error code on failure
  */
-int kr_nsrep_update_rtt(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *cache);
+int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsigned score, kr_nsrep_lru_t *cache);
 
 /**
- * Update NS name quality information.
- *
- * @brief Reputation is smoothed over last N measurements.
+ * Update NSSET reputation information.
  * 
  * @param  ns           updated NS representation
  * @param  reputation   combined reputation flags, see enum kr_ns_rep

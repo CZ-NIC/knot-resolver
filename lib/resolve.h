@@ -57,7 +57,7 @@
  *         int ret = sendrecv(addr, proto, query, resp);
  *
  *         // If I/O fails, make "resp" empty
- *         state = kr_resolve_consume(&request, resp);
+ *         state = kr_resolve_consume(&request, addr, resp);
  *         knot_pkt_clear(resp);
  *     }
  *     knot_pkt_clear(query);
@@ -137,10 +137,11 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
  * @note If the I/O fails, provide an empty or NULL packet, this will make iterator recognize nameserver failure.
  * 
  * @param  request request state (awaiting input)
+ * @param  src     [in] packet source address
  * @param  packet  [in] input packet
  * @return         any state
  */
-int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet);
+int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet);
 
 /**
  * Produce either next additional query or finish.

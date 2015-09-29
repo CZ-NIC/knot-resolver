@@ -37,12 +37,10 @@
 } while (0)
 
 /** Update nameserver representation with current name/address pair. */
-static void update_nsrep(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t *addr, unsigned score)
+static void update_nsrep(struct kr_nsrep *ns, uint8_t *addr, size_t pos)
 {
-	ns->name = name;
-	ns->score = score;
 	if (addr == NULL) {
-		ns->addr.ip.sa_family = AF_UNSPEC;
+		ns->addr[pos].ip.sa_family = AF_UNSPEC;
 		return;
 	}
 
@@ -50,16 +48,25 @@ static void update_nsrep(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t 
 	void *addr_val = pack_obj_val(addr);
 	switch(len) {
 	case sizeof(struct in_addr):
-		ADDR_SET(ns->addr.ip4.sin, AF_INET, addr_val, len); break;
+		ADDR_SET(ns->addr[pos].ip4.sin, AF_INET, addr_val, len); break;
 	case sizeof(struct in6_addr):
-		ADDR_SET(ns->addr.ip6.sin6, AF_INET6, addr_val, len); break;
+		ADDR_SET(ns->addr[pos].ip6.sin6, AF_INET6, addr_val, len); break;
 	default: assert(0); break;
+	}
+}
+
+static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t *addr[], unsigned score)
+{
+	ns->name = name;
+	ns->score = score;
+	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
+		update_nsrep(ns, addr[i], i);
 	}
 }
 
 #undef ADDR_SET
 
-static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score, uint8_t **addr)
+static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score, uint8_t *addr[])
 {
 	/* Name server is better candidate if it has address record. */
 	uint8_t *it = pack_head(*addr_set);
@@ -72,7 +79,10 @@ static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsign
 		/* Give v6 a head start */
 		unsigned favour = (len == sizeof(struct in6_addr)) ? FAVOUR_IPV6 : 0;
 		if (addr_score < score + favour) {
-			*addr = it;
+			/* Shake down previous contenders, last one is always unused */
+			for (size_t i = KR_NSREP_MAXADDR - 2; i > 0; --i)
+				addr[i] = addr[i - 1];
+			addr[0] = it;
 			score = addr_score;
 		}
 		it = pack_obj_next(it);
@@ -87,7 +97,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	struct kr_context *ctx = ns->ctx;
 	unsigned score = KR_NS_MAX_SCORE;
 	unsigned reputation = 0;
-	uint8_t *addr = NULL;
+	uint8_t *addr_choice[KR_NSREP_MAXADDR] = { NULL, };
 
 	/* Fetch NS reputation */
 	if (ctx->cache_rep) {
@@ -112,7 +122,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 			}
 		}
 	} else {
-		score = eval_addr_set(addr_set, ctx->cache_rtt, score, &addr);
+		score = eval_addr_set(addr_set, ctx->cache_rtt, score, addr_choice);
 	}
 
 	/* Probabilistic bee foraging strategy (naive).
@@ -120,7 +130,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	 * at the same time long distance scouts probe other sources (low probability).
 	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
 	if (score < ns->score && (qry->flags & QUERY_NO_THROTTLE || score < KR_NS_TIMEOUT)) {
-		update_nsrep(ns, (const knot_dname_t *)k, addr, score);
+		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
 		ns->reputation = reputation;
 	} else {
 		/* With 5% chance, probe server with a probability given by its RTT / MAX_RTT */
@@ -129,7 +139,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 			if (score >= KR_NS_LONG) {
 				qry->flags |= QUERY_TCP;
 			}
-			update_nsrep(ns, (const knot_dname_t *)k, addr, score);
+			update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
 			ns->reputation = reputation;
 			return 1; /* Stop evaluation */
 		}
@@ -140,7 +150,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 
 #define ELECT_INIT(ns, ctx_) do { \
 	(ns)->ctx = (ctx_); \
-	(ns)->addr.ip.sa_family = AF_UNSPEC; \
+	(ns)->addr[0].ip.sa_family = AF_UNSPEC; \
 	(ns)->reputation = 0; \
 	(ns)->score = KR_NS_MAX_SCORE + 1; \
 } while (0)
@@ -170,23 +180,32 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 		return kr_error(ENOENT);
 	}
 	/* Evaluate addr list */
-	uint8_t *addr = NULL;
-	unsigned score = eval_addr_set(addr_set, ctx->cache_rtt, ns->score, &addr);
-	update_nsrep(ns, ns->name, addr, score);
+	uint8_t *addr_choice[KR_NSREP_MAXADDR] = { NULL, };
+	unsigned score = eval_addr_set(addr_set, ctx->cache_rtt, ns->score, addr_choice);
+	update_nsrep_set(ns, ns->name, addr_choice, score);
 	return kr_ok();
 }
 
 #undef ELECT_INIT
 
-int kr_nsrep_update_rtt(struct kr_nsrep *ns, unsigned score, kr_nsrep_lru_t *cache)
+int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsigned score, kr_nsrep_lru_t *cache)
 {
-	if (!ns || !cache || ns->addr.ip.sa_family == AF_UNSPEC) {
+	if (!ns || !cache || ns->addr[0].ip.sa_family == AF_UNSPEC) {
 		return kr_error(EINVAL);
 	}
 
-	char *addr = kr_nsrep_inaddr(ns->addr);
-	size_t addr_len = kr_nsrep_inaddr_len(ns->addr);
-	unsigned *cur = lru_set(cache, addr, addr_len);
+	const char *addr_in = kr_nsrep_inaddr(ns->addr[0]);
+	size_t addr_len = kr_nsrep_inaddr_len(ns->addr[0]);
+	if (addr) { /* Caller provided specific address */
+		if (addr->sa_family == AF_INET) {
+			addr_in = (const char *)&((struct sockaddr_in *)addr)->sin_addr;
+			addr_len = sizeof(struct in_addr);
+		} else if (addr->sa_family == AF_INET6) {
+			addr_in = (const char *)&((struct sockaddr_in6 *)addr)->sin6_addr;
+			addr_len = sizeof(struct in6_addr);
+		}
+	}
+	unsigned *cur = lru_set(cache, addr_in, addr_len);
 	if (!cur) {
 		return kr_error(ENOMEM);
 	}

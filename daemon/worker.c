@@ -333,7 +333,7 @@ static int qr_task_step(struct qr_task *task, knot_pkt_t *packet)
 	int sock_type = -1;
 	struct sockaddr *addr = NULL;
 	knot_pkt_t *pktbuf = task->pktbuf;
-	int state = kr_resolve_consume(&task->req, packet);
+	int state = kr_resolve_consume(&task->req, NULL, packet);
 	while (state == KNOT_STATE_PRODUCE) {
 		state = kr_resolve_produce(&task->req, &addr, &sock_type, pktbuf);
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT)) {

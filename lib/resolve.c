@@ -64,9 +64,9 @@ static void randomized_qname_case(knot_dname_t *qname, unsigned secret)
 /** Invalidate current NS/addr pair. */
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
-	if (qry->ns.addr.ip.sa_family != AF_UNSPEC) {
-		uint8_t *addr = kr_nsrep_inaddr(qry->ns.addr);
-		size_t addr_len = kr_nsrep_inaddr_len(qry->ns.addr);
+	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
+		uint8_t *addr = kr_nsrep_inaddr(qry->ns.addr[0]);
+		size_t addr_len = kr_nsrep_inaddr_len(qry->ns.addr[0]);
 		knot_rdata_t rdata[knot_rdata_array_size(addr_len)];
 		knot_rdata_init(rdata, addr_len, addr, 0);
 		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata);
@@ -275,7 +275,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	return request->state;
 }
 
-int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
+int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_context *ctx = request->ctx;
@@ -310,14 +310,14 @@ int kr_resolve_consume(struct kr_request *request, knot_pkt_t *packet)
 
 	/* Resolution failed, invalidate current NS. */
 	if (request->state == KNOT_STATE_FAIL) {
-		kr_nsrep_update_rtt(&qry->ns, KR_NS_TIMEOUT, ctx->cache_rtt);
+		kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt);
 		invalidate_ns(rplan, qry);
 		qry->flags &= ~QUERY_RESOLVED;
 	/* Track RTT for iterative answers */
 	} else if (!(qry->flags & QUERY_CACHED)) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
-		kr_nsrep_update_rtt(&qry->ns, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
+		kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
 		/* Sucessful answer, lift any address resolution requests. */
 		qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
 	}
@@ -493,7 +493,7 @@ ns_election:
 	}
 
 	/* Resolve address records */
-	if (qry->ns.addr.ip.sa_family == AF_UNSPEC) {
+	if (qry->ns.addr[0].ip.sa_family == AF_UNSPEC) {
 		if (ns_resolve_addr(qry, request) != 0) {
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
 			goto ns_election; /* Must try different NS */
@@ -511,16 +511,21 @@ ns_election:
 	WITH_DEBUG {
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN], type_str[16];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
-	struct sockaddr *addr = &qry->ns.addr.ip;
-	inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr), ns_str, sizeof(ns_str));
 	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
 	knot_rrtype_to_string(knot_pkt_qtype(packet), type_str, sizeof(type_str));
-	DEBUG_MSG("=> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n",
-		ns_str, qry->ns.score, zonecut_str, qname_str, type_str);
+	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
+		struct sockaddr *addr = &qry->ns.addr[i].ip;
+		if (addr->sa_family == AF_UNSPEC) {
+			break;
+		}
+		inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr[i]), ns_str, sizeof(ns_str));
+		DEBUG_MSG("%c> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n",
+		          i == 0 ? '=' : '+', ns_str, qry->ns.score, zonecut_str, qname_str, type_str);
+	}
 	}
 
 	gettimeofday(&qry->timestamp, NULL);
-	*dst = &qry->ns.addr.ip;
+	*dst = &qry->ns.addr[0].ip;
 	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return request->state;
 }
@@ -543,7 +548,8 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	}
 
 	ITERATE_LAYERS(request, finish);
-	DEBUG_MSG("finished: %d, mempool: %zu B\n", state, (size_t) mp_total_size(request->pool.ctx));
+	DEBUG_MSG("finished: %d, queries: %zu, mempool: %zu B\n",
+	          state, list_size(&rplan->resolved), (size_t) mp_total_size(request->pool.ctx));
 	return KNOT_STATE_DONE;
 }
 
