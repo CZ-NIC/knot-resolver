@@ -349,6 +349,9 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
 	if (use_signatures && key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
 		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
+		if (knot_dname_is_sub(sig_name, qry->zone_cut.name)) {
+			qry->zone_cut.name = knot_dname_copy(sig_name, &req->pool);
+		}
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_SERVFAIL); /* Prevent caching */
 		qry->flags &= ~QUERY_RESOLVED;
 		return KNOT_STATE_CONSUME;
