@@ -5,9 +5,7 @@ import sys, os, re, subprocess
 # -- General configuration -----------------------------------------------------
 
 if os.environ.get('READTHEDOCS', None) == 'True':
-  sys.path.append('..')
-  sys.path.append('../../')
-  subprocess.call("cd %s; doxygen" % os.getcwd(), shell=True)
+  subprocess.call('doxygen')
 
 # Add any Sphinx extension module names here, as strings.
 extensions = ['sphinx.ext.todo', 'sphinx.ext.viewcode', 'breathe']
