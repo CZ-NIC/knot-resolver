@@ -19,13 +19,13 @@ the trust anchor `using a secure channel <http://jpmens.net/2015/01/21/opendnsse
 From there, the Knot DNS Resolver can perform automatic updates for you.
 
 1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
-2. Fetch current keys, verify
+2. Fetch current keys (DNSKEY), verify digests
 3. Deploy them
 
 .. code-block:: bash
 
    $ kdig DNSKEY . @a.root-servers.net +noall +answer | grep 257 > root.keys
-   $ ldns-key2ds -n root.keys
+   $ ldns-key2ds -n root.keys # Only print to stdout
    ... verify that digest matches TA published by IANA ...
    $ kresd -k root.keys
 
@@ -404,7 +404,8 @@ Trust anchors and DNSSEC
 
    :param string rr_string: DS/DNSKEY records in presentation format (e.g. ``. 3600 IN DS 19036 8 2 49AAC11...``)
 
-   Inserts DS/DNSKEY record(s) into current keyset. These will not be managed or updated.
+   Inserts DS/DNSKEY record(s) into current keyset. These will not be managed or updated, use it only for testing
+   or if you have a specific use case for not using a keyfile.
 
    Example output:
 
