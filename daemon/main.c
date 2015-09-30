@@ -197,7 +197,8 @@ int main(int argc, char **argv)
 	int forks = 1;
 	array_t(char*) addr_set;
 	array_init(addr_set);
-	const char *keyfile = NULL;
+	char *keyfile = NULL;
+	static char keyfile_buf[PATH_MAX + 1];
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
@@ -225,9 +226,9 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'k':
-			keyfile = optarg;
-			if (access(optarg, R_OK) != 0) {
-				log_error("[system] keyfile '%s': not readable\n", optarg);
+			keyfile = realpath(optarg, keyfile_buf);
+			if (!keyfile || access(optarg, R_OK|W_OK) != 0) {
+				log_error("[system] keyfile '%s': not readable/writeable\n", optarg);
 				return EXIT_FAILURE;
 			}
 			break;
