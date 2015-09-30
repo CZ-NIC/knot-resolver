@@ -373,21 +373,21 @@ Trust anchors and DNSSEC
 
    :param string keyfile: File containing DNSKEY records, should be writeable.
 
-   You can use only DNSKEY records in managed mode. It is equivalent to CLI parameter `-k <keyfile>` or `trust_anchors.file = keyfile`.
+   You can use only DNSKEY records in managed mode. It is equivalent to CLI parameter ``-k <keyfile>`` or ``trust_anchors.file = keyfile``.
 
    Example output:
 
    .. code-block:: lua
 
-   > trust_anchors.config('root.keys')
-   [trust_anchors] key: 19036 state: Valid
+      > trust_anchors.config('root.keys')
+      [trust_anchors] key: 19036 state: Valid
 
 .. function:: trust_anchors.set_insecure(nta_set)
 
    :param table nta_list: List of domain names (text format) representing NTAs.
 
    When you use a domain name as an NTA, DNSSEC validation will be turned off at/below these names.
-   Each function call replaces the previous NTA set. You can find the current active set in `trust_anchors.insecure` variable.
+   Each function call replaces the previous NTA set. You can find the current active set in ``trust_anchors.insecure`` variable.
 
    .. tip:: Use the `trust_anchors.negative = {}` alias for easier configuration.
 
@@ -395,14 +395,14 @@ Trust anchors and DNSSEC
 
    .. code-block:: lua
 
-   > trust_anchors.negative = { 'bad.boy', 'example.com' }
-   > trust_anchors.insecure
-   [1] => bad.boy
-   [2] => example.com
+      > trust_anchors.negative = { 'bad.boy', 'example.com' }
+      > trust_anchors.insecure
+      [1] => bad.boy
+      [2] => example.com
 
 .. function:: trust_anchors.add(rr_string)
 
-   :param string rr_string: DS/DNSKEY records in presentation format (e.g. `. 3600 IN DS 19036 8 2 49AAC11...`)
+   :param string rr_string: DS/DNSKEY records in presentation format (e.g. ``. 3600 IN DS 19036 8 2 49AAC11...``)
 
    Inserts DS/DNSKEY record(s) into current keyset. These will not be managed or updated.
 
@@ -410,7 +410,7 @@ Trust anchors and DNSSEC
 
    .. code-block:: lua
 
-   > trust_anchors.add('. 3600 IN DS 19036 8 2 49AAC11...')
+      > trust_anchors.add('. 3600 IN DS 19036 8 2 49AAC11...')
 
 Modules configuration
 ^^^^^^^^^^^^^^^^^^^^^
