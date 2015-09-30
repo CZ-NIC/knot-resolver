@@ -351,6 +351,12 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
 		if (knot_dname_is_sub(sig_name, qry->zone_cut.name)) {
 			qry->zone_cut.name = knot_dname_copy(sig_name, &req->pool);
+		} else if (!knot_dname_is_equal(sig_name, qry->zone_cut.name) && qry->zone_cut.parent) {
+			/* Key signer is above the current cut, so we can't validate it. This happens when
+			   a server is authoritative for both grandparent, parent and child zone.
+			   Ascend to parent cut, and refetch authority for signer. */
+			memcpy(&qry->zone_cut, qry->zone_cut.parent, sizeof(qry->zone_cut));
+			qry->zone_cut.name = knot_dname_copy(sig_name, &req->pool);
 		}
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_SERVFAIL); /* Prevent caching */
 		qry->flags &= ~QUERY_RESOLVED;
