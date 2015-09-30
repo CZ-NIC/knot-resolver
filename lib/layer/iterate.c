@@ -225,7 +225,17 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 
 	/* Update zone cut name */
 	if (!knot_dname_is_equal(rr->owner, cut->name)) {
-		kr_zonecut_set(cut, rr->owner);
+		/* Remember parent cut and descend to new (keep keys and TA). */
+		struct kr_zonecut *parent = mm_alloc(&req->pool, sizeof(*parent));
+		if (parent) {
+			memcpy(parent, cut, sizeof(*parent));
+			kr_zonecut_init(cut, rr->owner, &req->pool);
+			cut->key = parent->key;
+			cut->trust_anchor = parent->trust_anchor;
+			cut->parent = parent;
+		} else {
+			kr_zonecut_set(cut, rr->owner);
+		}
 		state = KNOT_STATE_DONE;
 	}
 

@@ -72,6 +72,7 @@ int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *
 	cut->pool = pool;
 	cut->key  = NULL;
 	cut->trust_anchor = NULL;
+	cut->parent = NULL;
 	cut->nsset = map_make();
 	cut->nsset.malloc = (map_alloc_f) mm_alloc;
 	cut->nsset.free = (map_free_f) mm_free;
