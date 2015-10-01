@@ -257,32 +257,29 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 	}
 
 	update_cut_name(cut, U8(""));
+	map_walk(&cut->nsset, free_addr_set, cut->pool);
+	map_clear(&cut->nsset);
 
 	/* Copy root hints from resolution context. */
+	int ret = 0;
 	if (ctx->root_hints.nsset.root) {
-		int ret = kr_zonecut_copy(cut, &ctx->root_hints);
-		if (ret == 0) {
-			ret = kr_zonecut_copy_trust(cut, &ctx->root_hints);
-		}
-		if (ret == 0) {
-			return ret;
-		}
-	}
-
-	/* Copy compiled-in root hints */
-	for (unsigned i = 0; i < HINT_COUNT; ++i) {
-		const struct hint_info *hint = &SBELT[i];
-		knot_rdata_t rdata[knot_rdata_array_size(HINT_ADDRLEN)];
-		knot_rdata_init(rdata, HINT_ADDRLEN, hint->addr, 0);
-		int ret = kr_zonecut_add(cut, hint->name, rdata);
-		if (ret != 0) {
-			return ret;
+		ret = kr_zonecut_copy(cut, &ctx->root_hints);
+	} else {
+		/* Copy compiled-in root hints */
+		for (unsigned i = 0; i < HINT_COUNT; ++i) {
+			const struct hint_info *hint = &SBELT[i];
+			knot_rdata_t rdata[knot_rdata_array_size(HINT_ADDRLEN)];
+			knot_rdata_init(rdata, HINT_ADDRLEN, hint->addr, 0);
+			ret = kr_zonecut_add(cut, hint->name, rdata);
+			if (ret != 0) {
+				break;
+			}
 		}
 	}
 
 	/* Set trust anchor. */
 	knot_rrset_free(&cut->trust_anchor, cut->pool);
-	return kr_ok();
+	return ret;
 }
 
 /** Fetch address for zone cut. */
@@ -328,11 +325,6 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_d
 		if (!(reputation & KR_NS_NOIP6)) {
 			fetch_addr(cut, ns_name, KNOT_RRTYPE_AAAA, txn, timestamp);
 		}
-	}
-
-	/* Always keep SBELT as a backup for root */
-	if (name[0] == '\0') {
-		kr_zonecut_set_sbelt(ctx, cut);
 	}
 
 	return kr_ok();
@@ -411,6 +403,5 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 		name = knot_wire_next_label(name, NULL);
 	}
 
-	/* Name server not found, start with SBELT. */
-	return kr_zonecut_set_sbelt(ctx, cut);
+	return kr_error(ENOENT);
 }

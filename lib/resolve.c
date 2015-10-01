@@ -77,7 +77,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 
 static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, bool secured)
 {
-	int ret = 0;
+	int ret = kr_error(ENOENT);
 
 	/* Find closest zone cut from cache */
 	struct kr_cache_txn txn;
@@ -92,8 +92,6 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, bool secur
 			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, secured);
 		}
 		kr_cache_txn_abort(&txn);
-	} else {
-		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
 	}
 	return ret;
 }
@@ -122,6 +120,12 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	}
 	/* Bail out if the query is already pending or dependency loop. */
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
+		/* Fall back to SBELT if root server query fails. */
+		if (!next_type && qry->zone_cut.name[0] == '\0') {
+			DEBUG_MSG("=> fallback to root hints\n");
+			kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
+			return kr_error(EAGAIN);
+		}
 		/* No IPv4 nor IPv6, flag server as unuseable. */
 		DEBUG_MSG("=> unresolvable NS address, bailing out\n");
 		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
@@ -134,9 +138,14 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	if (!next) {
 		return kr_error(ENOMEM);
 	}
-
-	next->flags |= QUERY_AWAIT_CUT;
-	return kr_ok();
+	/* At the root level with no NS addresses, revert to SBELT. */
+	int ret = 0;
+	if (qry->zone_cut.name[0] == '\0') {
+		ret = kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
+	} else {
+		next->flags |= QUERY_AWAIT_CUT;
+	}
+	return ret;
 }
 
 static int edns_put(knot_pkt_t *pkt)
@@ -378,7 +387,19 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		}
 		int ret = ns_fetch_cut(qry, request, (qry->flags & QUERY_DNSSEC_WANT));
 		if (ret != 0) {
-			return KNOT_STATE_FAIL;
+			/* No cached cut found, start from SBELT and issue priming query. */
+			if (ret == kr_error(ENOENT)) {
+				DEBUG_MSG("=> root priming query\n");
+				ret = kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
+				if (ret != 0) {
+					return KNOT_STATE_FAIL;
+				}
+				zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_NS);
+				qry->flags &= ~QUERY_AWAIT_CUT;
+				return KNOT_STATE_DONE;
+			} else {
+				return KNOT_STATE_FAIL;
+			}
 		}
 		/* Update minimized QNAME if zone cut changed */
 		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
@@ -494,7 +515,8 @@ ns_election:
 
 	/* Resolve address records */
 	if (qry->ns.addr[0].ip.sa_family == AF_UNSPEC) {
-		if (ns_resolve_addr(qry, request) != 0) {
+		int ret = ns_resolve_addr(qry, request);
+		if (ret != 0) {
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
 			goto ns_election; /* Must try different NS */
 		}
