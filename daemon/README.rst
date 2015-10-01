@@ -89,6 +89,9 @@ Notice the absence of an interactive CLI. You can attach to the the consoles for
 	> cache.count()
 	53
 
+The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
+Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
+
 This is also a way to enumerate and test running instances, the list of files int ``tty`` correspond to list
 of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
 
@@ -149,9 +152,7 @@ the modules use as the :ref:`input configuration <mod-properties>`.
 
 	modules = {
 		cachectl = true,
-		hints = { -- with configuration
-			file = '/etc/hosts'
-		}
+		hints = '/etc/hosts'
 	}
 
 .. tip:: The configuration and CLI syntax is Lua language, with which you may already be familiar with.

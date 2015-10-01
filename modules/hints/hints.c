@@ -340,7 +340,8 @@ const knot_layer_api_t *hints_layer(struct kr_module *module)
 
 int hints_init(struct kr_module *module)
 {
-	return load(module, DEFAULT_FILE);
+	module->data = NULL;
+	return 0;
 }
 
 int hints_config(struct kr_module *module, const char *conf)

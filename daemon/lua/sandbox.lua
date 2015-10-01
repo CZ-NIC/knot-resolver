@@ -45,11 +45,12 @@ setmetatable(modules, {
 		if type(k) == 'number' then k = v end
 		if not rawget(_G, k) then
 			modules.load(k)
-			local mod = rawget(_G, k)
-			if k ~= v and mod and mod['config'] then
-				mod['config'](v)
+			local mod = _G[k]
+			if mod and mod['config'] then
+				if k ~= v then mod['config'](v)
+				else           mod['config']()
+				end
 			end
-
 		end
 	end
 })
