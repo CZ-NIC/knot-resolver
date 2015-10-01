@@ -9,7 +9,10 @@ import itertools
 
 def recvfrom_msg(stream):
     """ Receive DNS/UDP message. """
-    data, addr = stream.recvfrom(4096)
+    try:
+    	data, addr = stream.recvfrom(4096)
+    except:
+    	return None, None
     return dns.message.from_wire(data), addr
 
 def sendto_msg(stream, message, addr):
