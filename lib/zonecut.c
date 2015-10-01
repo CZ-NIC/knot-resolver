@@ -396,11 +396,11 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 
 	/* Start at QNAME parent. */
 	while (txn && name) {
-		bool has_ta = !secured || fetch_ta(cut, name, txn, timestamp) == 0;
-		if (secured) {
-			fetch_dnskey(cut, name, txn, timestamp);
-		}
+		bool has_ta = !secured || !name[0] || fetch_ta(cut, name, txn, timestamp) == 0;
 		if (has_ta && fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
+			if (secured) {
+				fetch_dnskey(cut, name, txn, timestamp);
+			}
 			update_cut_name(cut, name);
 			return kr_ok();
 		}
