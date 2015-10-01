@@ -91,7 +91,7 @@ end
 local function refresh_plan(trust_anchors, timeout, refresh_cb)
 	if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
 	trust_anchors.refresh_ev = event.after(timeout, function (ev)
-		worker.resolve('.', kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE,
+		resolve('.', kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE,
 		function (pkt)
 			-- Schedule itself with updated timeout
 			local next_time = refresh_cb(trust_anchors, kres.pkt_t(pkt))

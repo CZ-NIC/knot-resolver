@@ -11,6 +11,7 @@ day = 24 * hour
 -- Resolver bindings
 kres = require('kres')
 trust_anchors = require('trust_anchors')
+resolve = worker.resolve
 
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`
