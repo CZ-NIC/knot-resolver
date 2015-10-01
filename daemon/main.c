@@ -66,7 +66,11 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		if (lua_gettop(L) > 0) {
 			message = lua_tostring(L, -1);
 		}
-		fprintf(ret ? outerr : out, "%s\n> ", message);
+		if (stream_fd != STDIN_FILENO) {
+			fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
+			fprintf(out, "%s\n> ", message); /* Duplicate output to sender */
+		}
+		fprintf(ret ? stderr : stdout, "%s\n> ", message);
 		lua_settop(L, 0);
 		free(buf->base);
 	}
