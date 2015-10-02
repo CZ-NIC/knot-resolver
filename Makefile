@@ -11,7 +11,7 @@ doc: doc-html
 
 # Options
 ifdef COVERAGE
-CFLAGS += --coverage
+BUILD_CFLAGS += --coverage
 endif
 
 # Dependencies
@@ -38,7 +38,7 @@ ifneq (,$(findstring luajit, $(lua_LIBS)))
 endif
 endif
 
-CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS)
+BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS)
 
 # Sub-targets
 include help.mk

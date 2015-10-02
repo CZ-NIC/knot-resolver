@@ -12,8 +12,9 @@ MODULEDIR := $(LIBDIR)/kdns_modules
 
 # Tools
 CC	?= cc
-CFLAGS	+= -std=c99 -D_GNU_SOURCE -fPIC -Wall -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
-CFLAGS  += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
+BUILD_LDFLAGS += $(LDFLAGS)
+BUILD_CFLAGS := $(CFLAGS) -std=c99 -D_GNU_SOURCE -fPIC -Wall -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
+BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 RM	:= rm -f
 LN      := ln -s
 XXD     := ./scripts/embed.sh

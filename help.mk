@@ -1,8 +1,8 @@
 info:
 	$(info )
 	$(info Target:     Knot DNS Resolver $(MAJOR).$(MINOR).$(PATCH)-$(PLATFORM))
-	$(info Compiler:   $(CC) $(CFLAGS))
-	$(info Linker:     $(LD) $(LDFLAGS))
+	$(info Compiler:   $(CC) $(BUILD_CFLAGS))
+	$(info Linker:     $(LD) $(BUILD_LDFLAGS))
 	$(info PREFIX:     $(PREFIX))
 	$(info BINDIR:     $(BINDIR))
 	$(info LIBDIR:     $(LIBDIR))

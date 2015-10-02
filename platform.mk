@@ -39,7 +39,7 @@ else
 endif	
 
 %.o: %.c
-	$(call quiet,CC,$<) $(CFLAGS) -MMD -MP -c $< -o $@
+	$(call quiet,CC,$<) $(BUILD_CFLAGS) -MMD -MP -c $< -o $@
 
 # Make objects and depends (name)
 define make_objs
@@ -56,7 +56,7 @@ $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 ifeq ($(4),-$(ARTYPE))
 	$(call quiet,AR,$$@) rcs $$@ $$($(1)_OBJ)
 else
-	$(call quiet,CCLD,$$@) $(CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $$($(1)_LIBS) $(LDFLAGS)
+	$(call quiet,CCLD,$$@) $(BUILD_CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS)
 endif
 $(1)-clean:
 	$(RM) $$($(1)_OBJ) $$($(1)_DEP) $(2)/$(1)$(3)

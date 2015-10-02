@@ -58,11 +58,11 @@ $(1)_OBJS := $(addprefix $(2)/_obj/,_cgo_defun.c _cgo_export.c $(subst /,_,$(2))
 $(1)_GOBJS := $(addprefix $(2)/_obj/,_cgo_gotypes.go $(subst /,_,$(2))_$(1).cgo1.go)
 $(2)/_obj/_cgo_export.h: $$($(1)_SOURCES)
 	@$(INSTALL) -d $(2)/_obj
-	$(call quiet,CGO,$$^) -gccgo=true -objdir=$(2)/_obj -- $(CFLAGS) $$^
+	$(call quiet,CGO,$$^) -gccgo=true -objdir=$(2)/_obj -- $(BUILD_CFLAGS) $$^
 $(2)/$(1).o: $(2)/_obj/_cgo_export.h
 	$(call quiet,GCCGO,$$@) -I$(2)/_obj -c -fPIC $$($(1)_GOBJS) -o $$@
 $(2)/$(1)$(LIBEXT): $(2)/$(1).o $$($(1)_DEPEND)
-	$(call quiet,GCCGO,$$@) -g -fPIC $(CFLAGS) -I$(2)/_obj $(2)/$(1).o $$($(1)_OBJS) -o $$@ -$(LIBTYPE) -lgcc -lgo $$($(1)_LIBS)
+	$(call quiet,GCCGO,$$@) -g -fPIC $(BUILD_CFLAGS) -I$(2)/_obj $(2)/$(1).o $$($(1)_OBJS) -o $$@ -$(LIBTYPE) -lgcc -lgo $$($(1)_LIBS)
 $(1)-clean:
 	$(RM) -r $(2)/_obj $(2)/$(1)$(LIBEXT)
 $(1)-install: $(2)/$(1)$(LIBEXT)
