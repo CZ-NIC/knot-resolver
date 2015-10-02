@@ -228,6 +228,12 @@ int main(int argc, char **argv)
 				log_error("[system] error '-f' requires number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
+#if (!defined(UV_VERSION_HEX)) || (!defined(SO_REUSEPORT))
+			if (forks > 1) {
+				log_error("[system] libuv 1.7+ is required for SO_REUSEPORT support, multiple forks not supported\n");
+				return EXIT_FAILURE;
+			}
+#endif
 			break;
 		case 'k':
 			keyfile = realpath(optarg, keyfile_buf);

@@ -79,6 +79,8 @@ You can add start and stop processes on runtime based on the load.
               │              └─kresd(19212)
               └─pstree(19460)  
 
+.. _daemon-reuseport:
+
 .. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If the kernel doesn't support it, you can still fork multiple processes on different ports, and do load balancing externally (on firewall or with `dnsdist <http://dnsdist.org/>`_).
 
 Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.

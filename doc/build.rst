@@ -32,7 +32,7 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "C compiler", "*all*", "*(build only)* [#]_"
    "libknot_ 2.0+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language (Lua_ 5.1+ with limitations)."
-   "libuv_ 1.0+", "``daemon``", "Multiplatform I/O and services."
+   "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
 
 There are also *optional* packages that enable specific functionality in Knot DNS Resolver, they are useful mainly for developers to build documentation and tests.
 
@@ -49,6 +49,7 @@ There are also *optional* packages that enable specific functionality in Knot DN
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
+.. [#] libuv 1.7 brings SO_REUSEPORT support that is needed for multiple forks. libuv < 1.7 can be still used, but only in single-process mode. Use :ref:`different method <daemon-reuseport>` for load balancing.
 
 Getting Docker image
 --------------------
