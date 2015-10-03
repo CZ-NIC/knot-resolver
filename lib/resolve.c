@@ -124,6 +124,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		if (!next_type && qry->zone_cut.name[0] == '\0') {
 			DEBUG_MSG("=> fallback to root hints\n");
 			kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
+			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
 			return kr_error(EAGAIN);
 		}
 		/* No IPv4 nor IPv6, flag server as unuseable. */
@@ -513,6 +514,7 @@ ns_election:
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			DEBUG_MSG("=> priming root DNSKEY\n");
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
+			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
 		}
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
