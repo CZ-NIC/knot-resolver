@@ -390,6 +390,8 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		if (!kr_ta_covers(negative_anchors, qry->zone_cut.name) &&
 		    kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
 			qry->flags |= QUERY_DNSSEC_WANT;
+		} else {
+			qry->flags &= ~QUERY_DNSSEC_WANT;
 		}
 		int ret = ns_fetch_cut(qry, request, (qry->flags & QUERY_DNSSEC_WANT));
 		if (ret != 0) {
