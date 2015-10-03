@@ -138,10 +138,15 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	if (!next) {
 		return kr_error(ENOMEM);
 	}
-	/* At the root level with no NS addresses, revert to SBELT. */
+	/* At the root level with no NS addresses, add SBELT subrequest. */
 	int ret = 0;
 	if (qry->zone_cut.name[0] == '\0') {
-		ret = kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
+		ret = kr_zonecut_set_sbelt(ctx, &next->zone_cut);
+		if (ret == 0) { /* Copy TA and key since it's the same cut to avoid lookup. */
+			kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
+			kr_zonecut_set_sbelt(ctx, &qry->zone_cut); /* Add SBELT to parent in case query fails. */
+			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
+		}
 	} else {
 		next->flags |= QUERY_AWAIT_CUT;
 	}
@@ -422,7 +427,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		WITH_DEBUG {
 		char qname_str[KNOT_DNAME_MAXLEN];
 		knot_dname_to_str(qname_str, qry->zone_cut.name, sizeof(qname_str));
-		DEBUG_MSG(">< TA: using '%s'\n", qname_str);
+		DEBUG_MSG(">< TA: '%s'\n", qname_str);
 		}
 	}
 	if (want_secured && !qry->zone_cut.trust_anchor) {
@@ -504,6 +509,11 @@ ns_election:
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
 	} else if (!(qry->flags & QUERY_TCP)) { /* Keep address when TCP retransmit. */
+		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
+		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
+			DEBUG_MSG("=> priming root DNSKEY\n");
+			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
+		}
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
 			DEBUG_MSG("=> no valid NS left\n");
@@ -541,8 +551,9 @@ ns_election:
 			break;
 		}
 		inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr[i]), ns_str, sizeof(ns_str));
-		DEBUG_MSG("%c> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n",
-		          i == 0 ? '=' : '+', ns_str, qry->ns.score, zonecut_str, qname_str, type_str);
+		DEBUG_MSG("%s: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n",
+		          i == 0 ? "=> querying" : "   optional",
+		          ns_str, qry->ns.score, zonecut_str, qname_str, type_str);
 	}
 	}
 

@@ -276,9 +276,6 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 			}
 		}
 	}
-
-	/* Set trust anchor. */
-	knot_rrset_free(&cut->trust_anchor, cut->pool);
 	return ret;
 }
 
