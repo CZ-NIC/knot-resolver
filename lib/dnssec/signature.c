@@ -28,30 +28,15 @@
 #include <libknot/rrtype/rrsig.h>
 
 #include "lib/defines.h"
+#include "lib/utils.h"
 #include "lib/dnssec/rrtype/ds.h"
 #include "lib/dnssec/signature.h"
 
-int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
+static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, uint8_t digest_type)
 {
-	assert(ref && key);
-	if (ref->type != KNOT_RRTYPE_DS) {
-		assert(0);
-		return kr_error(EINVAL);
-	}
-
-	int ret = 0;
-	dnssec_binary_t orig_ds_rdata;
-	dnssec_binary_t generated_ds_rdata = {0, };
-
-	{
-		/* Obtain RDATA of the supplied DS. */
-		const knot_rdata_t *rr = knot_rdataset_at(&ref->rrs, 0);
-		orig_ds_rdata.size = knot_rdata_rdlen(rr);
-		orig_ds_rdata.data = knot_rdata_data(rr);
-	}
-
 	/* Compute DS RDATA from the DNSKEY. */
-	ret = dnssec_key_create_ds(key, _knot_ds_dtype(&ref->rrs, 0), &generated_ds_rdata);
+	dnssec_binary_t computed_ds = {0, };
+	int ret = dnssec_key_create_ds(key, digest_type, &computed_ds);
 	if (ret != DNSSEC_EOK) {
 		ret = kr_error(ENOMEM);
 		goto fail;
@@ -60,12 +45,36 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 	/* DS records contain algorithm, key tag and the digest.
 	 * Therefore the comparison of the two DS is sufficient.
 	 */
-	ret = (orig_ds_rdata.size == generated_ds_rdata.size) &&
-	    (memcmp(orig_ds_rdata.data, generated_ds_rdata.data, orig_ds_rdata.size) == 0);
+	ret = (ds_rdata->size == computed_ds.size) &&
+	    (memcmp(ds_rdata->data, computed_ds.data, ds_rdata->size) == 0);
 	ret = ret ? kr_ok() : kr_error(ENOENT);
 
 fail:
-	dnssec_binary_free(&generated_ds_rdata);
+	dnssec_binary_free(&computed_ds);
+	return ret;
+}
+
+int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
+{
+	assert(ref && key);
+	if (ref->type != KNOT_RRTYPE_DS) {
+		return kr_error(EINVAL);
+	}
+
+	/* Try all possible DS records */
+	int ret = 0;
+	knot_rdata_t *rd = ref->rrs.data;
+	for (uint16_t i = 0; i < ref->rrs.rr_count; ++i) {
+		dnssec_binary_t ds_rdata = {
+			.size = knot_rdata_rdlen(rd),
+			.data = knot_rdata_data(rd)
+		};
+		ret = authenticate_ds(key, &ds_rdata, _knot_ds_dtype(&ref->rrs, i));
+		if (ret == 0) { /* Found a good DS */
+			break;
+		}
+		rd = kr_rdataset_next(rd);
+	}
 	return ret;
 }
 
