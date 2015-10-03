@@ -367,6 +367,10 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return state;
 		}
 		follow_cname_chain(&cname, rr, query);
+		/* Trust only CNAME targets in current cut. */
+		if (!knot_dname_in(query->zone_cut.name, cname)) {
+			break;
+		}
 	}
 
 	/* Make sure that this is an authoritative naswer (even with AA=0) for other layers */

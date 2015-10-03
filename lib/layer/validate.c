@@ -87,6 +87,10 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		if ((rr->type == KNOT_RRTYPE_NS) && (section_id == KNOT_AUTHORITY)) {
 			continue;
 		}
+		/* Only validate answers from current cut, records above the cut are stripped. */
+		if (section_id == KNOT_ANSWER && !knot_dname_in(qry->zone_cut.name, rr->owner)) {
+			continue;
+		}
 		ret = kr_rrmap_add(&stash, rr, pool);
 		if (ret != 0) {
 			goto fail;
