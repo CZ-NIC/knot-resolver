@@ -253,11 +253,11 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_
 		kr_rrmap_add(stash, rr, pool);
 		/* Follow CNAME chain in current cut. */
 		if (rr->type == KNOT_RRTYPE_CNAME) {
-			cname = knot_cname_name(&rr->rrs);
-			if (!knot_dname_in(qry->zone_cut.name, cname)) {
-				break;
+			const knot_dname_t *next_cname = knot_cname_name(&rr->rrs);
+			if (knot_dname_in(qry->zone_cut.name, next_cname)) {
+				cname = next_cname;
 			}
-		} else {
+		} else if (rr->type != KNOT_RRTYPE_RRSIG) {
 			cname = qry->sname;
 		}
 	}

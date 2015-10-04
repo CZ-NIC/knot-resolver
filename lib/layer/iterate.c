@@ -113,8 +113,8 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
 {
 	if (rr->type == KNOT_RRTYPE_CNAME) {
 		*cname = knot_cname_name(&rr->rrs);
-	} else {
-		/* Terminate CNAME chain. */
+	} else if (rr->type != KNOT_RRTYPE_RRSIG) {
+		/* Terminate CNAME chain (if not RRSIG). */
 		*cname = cur->sname;
 	}
 }
@@ -352,10 +352,13 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 
 	/* Process answer type */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+	bool follow_chain = (query->stype != KNOT_RRTYPE_CNAME);
 	const knot_dname_t *cname = query->sname;
 	for (unsigned i = 0; i < an->count; ++i) {
+		/* @todo construct a CNAME chain closure and accept all names from that set */ 
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-		if (!knot_dname_is_equal(rr->owner, cname)) {
+		if (!knot_dname_is_equal(rr->owner, query->sname) &&
+			!(follow_chain && knot_dname_is_equal(rr->owner, cname))) {
 			continue;
 		}
 		unsigned hint = 0;
@@ -366,10 +369,12 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (state == KNOT_STATE_FAIL) {
 			return state;
 		}
-		follow_cname_chain(&cname, rr, query);
-		/* Trust only CNAME targets in current cut. */
-		if (!knot_dname_in(query->zone_cut.name, cname)) {
-			break;
+		/* Follow chain only within current cut. */
+		if (follow_chain) {
+			follow_cname_chain(&cname, rr, query);
+			if (!knot_dname_in(query->zone_cut.name, cname)) {
+				follow_chain = false; 
+			}
 		}
 	}
 
