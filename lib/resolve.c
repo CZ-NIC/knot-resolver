@@ -270,8 +270,10 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	/* Deferred zone cut lookup for this query. */
 	qry->flags |= QUERY_AWAIT_CUT;
 	/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
+	map_t *negative_anchors = &request->ctx->negative_anchors;
 	map_t *trust_anchors = &request->ctx->trust_anchors;
-	if (knot_pkt_has_dnssec(packet) && kr_ta_covers(trust_anchors, qname)) {
+	if (knot_pkt_has_dnssec(packet) &&
+	    kr_ta_covers(trust_anchors, qname) && !kr_ta_covers(negative_anchors, qname)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	}
 
