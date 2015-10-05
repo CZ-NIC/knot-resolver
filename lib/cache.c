@@ -333,7 +333,7 @@ int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *ti
 
 	/* Check if the RRSet is in the cache. */
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cache_peek(txn, KR_CACHE_RRSIG, rr->owner, rr->type, &entry, timestamp);
+	int ret = kr_cache_peek(txn, KR_CACHE_SIG, rr->owner, rr->type, &entry, timestamp);
 	if (ret != 0) {
 		return ret;
 	}
@@ -368,5 +368,5 @@ int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint
 	}
 
 	namedb_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
-	return kr_cache_insert(txn, KR_CACHE_RRSIG, rr->owner, typec, &header, data);
+	return kr_cache_insert(txn, KR_CACHE_SIG, rr->owner, typec, &header, data);
 }

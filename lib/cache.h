@@ -24,7 +24,7 @@ enum kr_cache_tag {
 	KR_CACHE_RR   = 'R',
 	KR_CACHE_PKT  = 'P',
 	KR_CACHE_SEC  = 'S',
-	KR_CACHE_RRSIG = 'G',
+	KR_CACHE_SIG  = 'G',
 	KR_CACHE_USER = 0x80
 };
 
