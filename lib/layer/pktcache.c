@@ -169,13 +169,15 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags & QUERY_RESOLVED) || qry->flags & QUERY_CACHED || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state; /* Don't cache anything if failed. */
 	}
-	bool is_auth = knot_wire_get_aa(pkt->wire);
-	int pkt_class = kr_response_classify(pkt);
-	if (!(pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) && is_auth) {
-		return ctx->state; /* Cache only negative, not-cached answers. */
+	/* Cache only authoritative answers from IN class. */
+	if (!knot_wire_get_aa(pkt->wire) || knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
+		return ctx->state;
 	}
-	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
-		return ctx->state; /* Only IN class */
+	const bool is_any = knot_pkt_qtype(pkt) == KNOT_RRTYPE_ANY;
+	int pkt_class = kr_response_classify(pkt);
+	/* Cache only NODATA/NXDOMAIN or ANY answers. */
+	if (!(pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) || is_any) {
+		return ctx->state;
 	}
 	uint32_t ttl = packet_ttl(pkt);
 	if (ttl == 0) {
