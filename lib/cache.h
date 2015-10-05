@@ -36,6 +36,7 @@ struct kr_cache_entry
 	uint32_t timestamp;
 	uint32_t ttl;
 	uint16_t count;
+	uint16_t rank;
 	uint8_t  data[];
 };
 

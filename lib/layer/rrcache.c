@@ -47,7 +47,7 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 	if (fetch_rrsig) {
 		ret = kr_cache_peek_rrsig(txn, &cache_rr, &drift);
 	} else {
-		ret = kr_cache_peek_rr(txn, &cache_rr, &drift);	
+		ret = kr_cache_peek_rr(txn, &cache_rr, &drift);
 	}
 	if (ret != 0) {
 		return ret;

@@ -29,22 +29,58 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 
+/* Cache version */
+#define KEY_VERSION "V\x01"
 /* Key size */
-#define KEY_HSIZE (1 + sizeof(uint16_t))
+#define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
-#define txn_api(txn) (txn->owner->api)
+#define txn_api(txn) ((txn)->owner->api)
+
+/** @internal Check cache internal data version. Clear if it doesn't match. */
+static void assert_right_version(struct kr_cache *cache)
+{
+	/* Check cache ABI version */
+	struct kr_cache_txn txn;
+	int ret = kr_cache_txn_begin(cache, &txn, 0);
+	if (ret != 0) {
+		return; /* N/A, doesn't work. */
+	}
+	namedb_val_t key = { KEY_VERSION, 2 };
+	namedb_val_t val = { NULL, 0 };
+	ret = txn_api(&txn)->find(&txn.t, &key, &val, 0);
+	if (ret == 0) { /* Version is OK */
+		kr_cache_txn_abort(&txn);
+		return;
+	}
+	/* Recreate cache and write version key */
+	ret = txn_api(&txn)->count(&txn.t);
+	if (ret > 0) { /* Non-empty cache, purge it. */
+		log_info("[cache] version mismatch, clearing\n");
+		kr_cache_clear(&txn);
+		kr_cache_txn_commit(&txn);
+		ret = kr_cache_txn_begin(cache, &txn, 0);
+	}
+	/* Either purged or empty. */
+	if (ret == 0) {
+		txn_api(&txn)->insert(&txn.t, &key, &val, 0);
+		kr_cache_txn_commit(&txn);
+	}
+}
 
 int kr_cache_open(struct kr_cache *cache, const namedb_api_t *api, void *opts, mm_ctx_t *mm)
 {
 	if (!cache) {
 		return kr_error(EINVAL);
 	}
+	/* Open cache */
 	cache->api = (api == NULL) ? namedb_lmdb_api() : api;
 	int ret = cache->api->init(&cache->db, mm, opts);
 	if (ret != 0) {
 		return ret;
 	}
 	memset(&cache->stats, 0, sizeof(cache->stats));
+	/* Check cache ABI version */
+	assert_right_version(cache);
 	return kr_ok();
 }
 
@@ -99,20 +135,23 @@ void kr_cache_txn_abort(struct kr_cache_txn *txn)
 	}
 }
 
-/** @internal Composed key as { u8 tag, u8[1-255] name, u16 type } */
+/**
+ * @internal Composed key as { u8 tag, u8[1-255] name, u16 type }
+ * The name is lowercased and label order is reverted for easy prefix search.
+ * e.g. '\x03nic\x02cz\x00' is saved as '\0x00cz\x00nic\x00'
+ */
 static size_t cache_key(uint8_t *buf, uint8_t tag, const knot_dname_t *name, uint16_t rrtype)
 {
-	/* Write tag + type */
-	buf[0] = tag;
-	memcpy(buf + 1, &rrtype, sizeof(uint16_t));
-	buf += KEY_HSIZE;
-	/* Write lowercased name */
-	int ret = knot_dname_to_wire(buf, name, KNOT_DNAME_MAXLEN);
-	if (ret <= 0) {
+	/* Convert to lookup format */
+	int ret = knot_dname_lf(buf, name, NULL);
+	if (ret != 0) {
 		return 0;
 	}
-	knot_dname_to_lower(buf);
-	return KEY_HSIZE + ret;
+	/* Write tag + type */
+	uint8_t name_len = buf[0];
+	buf[0] = tag;
+	memcpy(buf + sizeof(uint8_t) + name_len, &rrtype, sizeof(uint16_t));
+	return name_len + KEY_HSIZE;
 }
 
 static struct kr_cache_entry *cache_entry(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
