@@ -26,6 +26,9 @@
  */
 
 #include <time.h>
+#include <libknot/descriptor.h>
+#include <ccan/json/json.h>
+#include <ccan/asprintf/asprintf.h>
 
 #include "daemon/engine.h"
 #include "lib/module.h"
@@ -38,10 +41,93 @@
  * Properties.
  */
 
+typedef int (*cache_cb_t)(struct kr_cache_txn *txn, namedb_iter_t *it, namedb_val_t *key, void *baton);
+
+/** @internal Prefix walk. */
+NON_NULL(1,2) static int cache_prefixed(struct engine *engine, const char *args, unsigned txn_flags, cache_cb_t cb, void *baton)
+{
+	/* Decode parameters */
+	uint8_t namespace = 'R';
+	char *extra = (char *)strchr(args, ' ');
+	if (extra != NULL) {
+		extra[0] = '\0';
+		namespace = extra[1];
+	}
+
+	/* Convert to domain name */
+	uint8_t buf[KNOT_DNAME_MAXLEN];
+	if (!knot_dname_from_str(buf, args, sizeof(buf))) {
+		return kr_error(EINVAL);
+	}
+	/* '*' starts subtree search */
+	const uint8_t *dname = buf;
+	bool subtree_match = false;
+	if (dname[0] == '\1' && dname[1] == '*') {
+		subtree_match = true;
+		dname = knot_wire_next_label(dname, NULL);
+	}
+	/* Convert to search key prefix */
+	uint8_t prefix[sizeof(uint8_t) + KNOT_DNAME_MAXLEN];
+	int ret = knot_dname_lf(prefix, dname, NULL);
+	if (ret != 0) {
+		return kr_error(EINVAL);
+	}
+	size_t prefix_len = prefix[0] + sizeof(uint8_t);
+	prefix[0] = namespace;
+
+	/* Start search transaction */
+	struct kr_cache *cache = &engine->resolver.cache;
+	const namedb_api_t *api = cache->api;
+	struct kr_cache_txn txn;
+	ret = kr_cache_txn_begin(cache, &txn, txn_flags);
+	if (ret != 0) {
+		return kr_error(EIO);
+	}
+
+	/* Walk through cache records matching given prefix.
+	 * Note that since the backend of the cache is opaque, there's no exactly efficient
+	 * way to do prefix search (i.e. Redis uses hashtable but offers SCAN, LMDB can do lexical closest match, ...). */
+	namedb_val_t key = { prefix, prefix_len };
+	namedb_iter_t *it = api->iter_begin(&txn.t, 0);
+	if (it) { /* Seek first key matching the prefix. */
+		it = api->iter_seek(it, &key, NAMEDB_GEQ);
+	}
+	while (it != NULL) {
+		if (api->iter_key(it, &key) != 0) {
+			break;
+		}
+		/* If not subtree match, allow only keys with the same length. */
+		if (!subtree_match && key.len != prefix_len + sizeof(uint16_t)) {
+			break;
+		}
+		/* Allow equal or longer keys with the same prefix. */
+		if (key.len < prefix_len || memcmp(key.data, prefix, prefix_len) != 0) {
+			break;
+		}
+		/* Callback */
+		ret = cb(&txn, it, &key, baton);
+		if (ret != 0) {
+			break;
+		}
+		/* Next key */
+		it = api->iter_next(it);
+	}
+	api->iter_finish(it);
+	kr_cache_txn_commit(&txn);
+	return ret;
+}
+
 /** Return boolean true if a record is expired. */
 static bool is_expired(struct kr_cache_entry *entry, uint32_t drift)
 {
 	return drift > entry->ttl;
+}
+
+/** @internal Delete iterated key. */
+static int cache_delete_cb(struct kr_cache_txn *txn, namedb_iter_t *it, namedb_val_t *key, void *baton)
+{
+	struct kr_cache *cache = txn->owner;
+	return cache->api->del(&txn->t, key);
 }
 
 /**
@@ -120,6 +206,15 @@ static char* clear(void *env, struct kr_module *module, const char *args)
 {
 	struct engine *engine = env;
 
+	/* Partial clear (potentially slow/unsupported). */
+	if (args && strlen(args) > 0) {
+		int ret = cache_prefixed(env, args, 0, &cache_delete_cb, NULL);
+		if (ret != 0) {
+			return afmt("%s", kr_strerror(ret));
+		}
+		return strdup("true");
+	}
+
 	struct kr_cache_txn txn;
 	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, 0);
 	if (ret != 0) {
@@ -134,8 +229,71 @@ static char* clear(void *env, struct kr_module *module, const char *args)
 		kr_cache_txn_abort(&txn);
 	}
 
+	/* Clear reputation tables */
+	lru_deinit(engine->resolver.cache_rtt);
+	lru_deinit(engine->resolver.cache_rep);
+	lru_init(engine->resolver.cache_rtt, LRU_RTT_SIZE);
+	lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
+	return afmt("%s", ret == 0 ? "true" : kr_strerror(ret));
+}
+
+/** @internal Serialize cached record name into JSON. */
+static int cache_dump_cb(struct kr_cache_txn *txn, namedb_iter_t *it, namedb_val_t *key, void *baton)
+{
+	JsonNode* json_records = baton;
+	char buf[KNOT_DNAME_MAXLEN];
+	/* Extract type */
+	uint16_t type = 0;
+	const char *endp = (const char *)key->data + key->len - sizeof(uint16_t);
+	memcpy(&type, endp, sizeof(uint16_t));
+	endp -= 1;
+	/* Extract domain name */
+	char *dst = buf;
+	const char *scan = endp - 1;
+	while (scan > key->data) {
+		if (*scan == '\0') {
+			const size_t lblen = endp - scan - 1;
+			memcpy(dst, scan + 1, lblen);
+			dst += lblen;
+			*dst++ = '.';
+			endp = scan;
+		}
+		--scan;
+	}
+	memcpy(dst, scan + 1, endp - scan);
+	JsonNode *json_item = json_find_member(json_records, buf);
+	if (!json_item) {
+		json_item = json_mkarray();
+		json_append_member(json_records, buf, json_item);
+	}
+	knot_rrtype_to_string(type, buf, sizeof(buf));
+	json_append_element(json_item, json_mkstring(buf));
+	return kr_ok();
+}
+
+/**
+ * Query cached records.
+ *
+ * Input:  [string] domain name
+ * Output: { result: bool }
+ *
+ */
+static char* get(void *env, struct kr_module *module, const char *args)
+{
+	if (!args) {
+		return NULL;
+	}
+	/* Dump all keys matching prefix */
 	char *result = NULL;
-	asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false");
+	JsonNode *json_records = json_mkobject();
+	if (json_records) {
+		int ret = cache_prefixed(env, args, NAMEDB_RDONLY, &cache_dump_cb, json_records);
+		if (ret == 0) {
+			result = json_encode(json_records);
+		}
+		json_delete(json_records);
+	}
+
 	return result;
 }
 
@@ -146,8 +304,9 @@ static char* clear(void *env, struct kr_module *module, const char *args)
 struct kr_prop *cachectl_props(void)
 {
 	static struct kr_prop prop_list[] = {
-	    { &prune,    "prune", "Prune expired/invalid records.", },
-	    { &clear,    "clear", "Clear all cache records.", },
+	    { &prune,    "prune", "Prune expired/invalid records." },
+	    { &clear,    "clear", "Clear cache records." },
+	    { &get,      "get",   "Get a list of cached record(s)." },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;

@@ -24,7 +24,7 @@ enum kr_cache_tag {
 	KR_CACHE_RR   = 'R',
 	KR_CACHE_PKT  = 'P',
 	KR_CACHE_SEC  = 'S',
-	KR_CACHE_RRSIG = 'G',
+	KR_CACHE_SIG  = 'G',
 	KR_CACHE_USER = 0x80
 };
 
@@ -36,6 +36,7 @@ struct kr_cache_entry
 	uint32_t timestamp;
 	uint32_t ttl;
 	uint16_t count;
+	uint16_t rank;
 	uint8_t  data[];
 };
 

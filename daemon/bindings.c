@@ -328,7 +328,8 @@ static int cache_count(lua_State *L)
 		lua_error(L);
 	}
 
-	lua_pushinteger(L, storage->count(&txn.t));
+	/* First key is a version counter, omit it. */
+	lua_pushinteger(L, storage->count(&txn.t) - 1);
 	kr_cache_txn_abort(&txn);
 	return 1;
 }

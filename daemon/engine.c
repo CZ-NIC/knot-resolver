@@ -212,7 +212,7 @@ static int l_trampoline(lua_State *L)
 			return 0;
 		}
 		JsonNode *root_node = json_decode(ret);
-		if (root_node->tag == JSON_OBJECT || root_node->tag == JSON_ARRAY) {
+		if (root_node && (root_node->tag == JSON_OBJECT || root_node->tag == JSON_ARRAY)) {
 			l_unpack_json(L, root_node);
 		} else {
 			lua_pushstring(L, ret);
