@@ -176,7 +176,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	const bool is_any = knot_pkt_qtype(pkt) == KNOT_RRTYPE_ANY;
 	int pkt_class = kr_response_classify(pkt);
 	/* Cache only NODATA/NXDOMAIN or ANY answers. */
-	if (!(pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) || is_any) {
+	if (!((pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) || is_any)) {
 		return ctx->state;
 	}
 	uint32_t ttl = packet_ttl(pkt);
@@ -195,6 +195,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,
 		.ttl = ttl,
+		.rank = (qry->flags & QUERY_DNSSEC_WANT) ? KR_RANK_SECURE : KR_RANK_INSECURE,
 		.count = data.len
 	};
 

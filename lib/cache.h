@@ -28,6 +28,18 @@ enum kr_cache_tag {
 	KR_CACHE_USER = 0x80
 };
 
+/** Cache entry rank */
+enum kr_cache_rank {
+	KR_RANK_BAD       = 0,  /* BAD cache, do not use. */ 
+	KR_RANK_INSECURE  = 1,  /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
+	KR_RANK_SECURE    = 2,  /* Entry is DNSSEC valid (e.g. RRSIG exists). */
+	/* <= Lower 3 bits reserved for various flags. */ 
+	KR_RANK_NONAUTH   = 8,  /* Entry from authority section (i.e. parent-side) */
+	KR_RANK_AUTH      = 16, /* Entry from answer (authoritative data) */
+};
+/* Compare ranks (ignore flags) */
+#define kr_cache_rank_cmp(x, y) (((x) >> 2) - ((y) >> 2))
+
 /**
  * Serialized form of the RRSet with inception timestamp and maximum TTL.
  */

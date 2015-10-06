@@ -39,8 +39,9 @@
 	X(NO_CACHE   , 1 << 9) /**< Do not use expiring cache for lookup. */ \
 	X(EXPIRING   , 1 << 10) /**< Query response is cached, but expiring. */ \
 	X(ALLOW_LOCAL, 1 << 11) /**< Allow queries to local or private address ranges. */ \
-	X(DNSSEC_WANT , 1 << 12) /**< Want DNSSEC secured answer. */ \
-	X(DNSSEC_BOGUS , 1 << 13) /**< Query response is DNSSEC bogus. */ \
+	X(DNSSEC_WANT, 1 << 12) /**< Want DNSSEC secured answer. */ \
+	X(DNSSEC_BOGUS, 1 << 13) /**< Query response is DNSSEC bogus. */ \
+	X(DNSSEC_INSECURE, 1 << 14) /**< Query response is DNSSEC insecure. */ \
 
 /** Query flags */
 enum kr_query_flag {

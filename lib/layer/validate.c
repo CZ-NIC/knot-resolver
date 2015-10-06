@@ -298,6 +298,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 		} else {
 			DEBUG_MSG(qry, "<= DS doesn't exist, going insecure\n");
 			qry->flags &= ~QUERY_DNSSEC_WANT;
+			qry->flags |= QUERY_DNSSEC_INSECURE;
 		}
 		return ret;
 	}
