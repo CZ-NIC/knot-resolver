@@ -371,7 +371,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 
 	/* Validate non-existence proof if not positive answer. */
-	if (pkt_rcode == KNOT_RCODE_NXDOMAIN) {
+	if (!(qry->flags & QUERY_CACHED) && pkt_rcode == KNOT_RCODE_NXDOMAIN) {
 		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname, &req->pool);
@@ -388,7 +388,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* @todo WTH, this needs API that just tries to find a proof and the caller
 	 * doesn't have to worry about NSEC/NSEC3
 	 * @todo rework this */
-	{
+	if (!(qry->flags & QUERY_CACHED)) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ANSWER);
 		uint16_t answer_count = sec ? sec->count : 0;
 
