@@ -44,7 +44,7 @@
  * This adds 32 bits of randomness at maximum, but that's more than an average domain name length.
  * https://tools.ietf.org/html/draft-vixie-dnsext-dns0x20-00
  */
-static void randomized_qname_case(knot_dname_t *qname, unsigned secret)
+static void randomized_qname_case(knot_dname_t *qname, uint32_t secret)
 {
 	unsigned k = 0;
 	while (*qname != '\0') {

@@ -28,7 +28,7 @@
 #include <time.h>
 #include <libknot/descriptor.h>
 #include <ccan/json/json.h>
-#include <ccan/asprintf/asprintf.h>
+#include <ccan/compiler/compiler.h>
 
 #include "daemon/engine.h"
 #include "lib/module.h"
@@ -210,7 +210,7 @@ static char* clear(void *env, struct kr_module *module, const char *args)
 	if (args && strlen(args) > 0) {
 		int ret = cache_prefixed(env, args, 0, &cache_delete_cb, NULL);
 		if (ret != 0) {
-			return afmt("%s", kr_strerror(ret));
+			return strdup(kr_strerror(ret));
 		}
 		return strdup("true");
 	}
@@ -234,7 +234,7 @@ static char* clear(void *env, struct kr_module *module, const char *args)
 	lru_deinit(engine->resolver.cache_rep);
 	lru_init(engine->resolver.cache_rtt, LRU_RTT_SIZE);
 	lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
-	return afmt("%s", ret == 0 ? "true" : kr_strerror(ret));
+	return strdup(ret == 0 ? "true" : kr_strerror(ret));
 }
 
 /** @internal Serialize cached record name into JSON. */
@@ -250,7 +250,7 @@ static int cache_dump_cb(struct kr_cache_txn *txn, namedb_iter_t *it, namedb_val
 	/* Extract domain name */
 	char *dst = buf;
 	const char *scan = endp - 1;
-	while (scan > key->data) {
+	while (scan > (const char *)key->data) {
 		if (*scan == '\0') {
 			const size_t lblen = endp - scan - 1;
 			memcpy(dst, scan + 1, lblen);

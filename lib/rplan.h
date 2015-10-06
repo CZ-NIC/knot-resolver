@@ -63,7 +63,7 @@ struct kr_query {
 	uint16_t sclass;
 	uint16_t id;
 	uint16_t flags;
-	unsigned secret;
+	uint32_t secret;
 	struct timeval timestamp;
 	struct kr_nsrep ns;
 	struct kr_zonecut zone_cut;
