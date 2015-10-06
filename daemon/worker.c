@@ -94,8 +94,12 @@ static inline struct worker_ctx *get_worker(void)
 static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr *addr)
 {
 	/* How much can client handle? */
+	struct engine *engine = worker->engine;
 	size_t answer_max = KNOT_WIRE_MIN_PKTSIZE;
 	size_t pktbuf_max = KR_EDNS_PAYLOAD;
+	if (engine->resolver.opt_rr) {
+		pktbuf_max = MAX(knot_edns_get_payload(engine->resolver.opt_rr), pktbuf_max);
+	}
 	if (!addr && handle) { /* TCP */
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
 		pktbuf_max = KNOT_WIRE_MAX_PKTSIZE;
@@ -116,7 +120,6 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	}
 
 	/* Create resolution task */
-	struct engine *engine = worker->engine;
 	struct qr_task *task = mm_alloc(&pool, sizeof(*task));
 	if (!task) {
 		mp_delete(pool.ctx);
