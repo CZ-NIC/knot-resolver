@@ -34,7 +34,7 @@ struct hint_info {
 
 /* Initialize with SBELT name servers. */
 #define U8(x) (const uint8_t *)(x)
-#define HINT_COUNT 13
+#define HINT_COUNT 24
 #define HINT_ADDRLEN sizeof(struct in_addr)
 static const struct hint_info SBELT[HINT_COUNT] = {
         { U8("\x01""a""\x0c""root-servers""\x03""net"), U8("\xc6)\x00\x04")    }, /* 198.41.0.4 */
@@ -44,12 +44,23 @@ static const struct hint_info SBELT[HINT_COUNT] = {
         { U8("\x01""e""\x0c""root-servers""\x03""net"), U8("\xc0\xcb\xe6\n")   }, /* 192.203.230.10 */
         { U8("\x01""f""\x0c""root-servers""\x03""net"), U8("\xc0\x05\x05\xf1") }, /* 192.5.5.241 */
         { U8("\x01""g""\x0c""root-servers""\x03""net"), U8("\xc0p$\x04")       }, /* 192.112.36.4 */
-        { U8("\x01""h""\x0c""root-servers""\x03""net"), U8("\x80?\x025")       }, /* 128.63.2.53 */
+        { U8("\x01""h""\x0c""root-servers""\x03""net"), U8("\xc6\x61\xbe\x35") }, /* 198.97.190.53 */
         { U8("\x01""i""\x0c""root-servers""\x03""net"), U8("\xc0$\x94\x11")    }, /* 192.36.148.17 */
         { U8("\x01""j""\x0c""root-servers""\x03""net"), U8("\xc0:\x80\x1e")    }, /* 192.58.128.30 */
         { U8("\x01""k""\x0c""root-servers""\x03""net"), U8("\xc1\x00\x0e\x81") }, /* 193.0.14.129 */
         { U8("\x01""l""\x0c""root-servers""\x03""net"), U8("\xc7\x07S*")       }, /* 199.7.83.42 */
         { U8("\x01""m""\x0c""root-servers""\x03""net"), U8("\xca\x0c\x1b!")    }, /* 202.12.27.33 */
+        { U8("\x01""a""\x0c""root-servers""\x03""net"), U8(" \x01\x05\x03\xba>\x00\x00\x00\x00\x00\x00\x00\x02\x000")       },
+        { U8("\x01""b""\x0c""root-servers""\x03""net"), U8(" \x01\x05\x00\x00\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0b") },
+        { U8("\x01""c""\x0c""root-servers""\x03""net"), U8(" \x01\x05\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0c") },
+        { U8("\x01""d""\x0c""root-servers""\x03""net"), U8(" \x01\x05\x00\x00-\x00\x00\x00\x00\x00\x00\x00\x00\x00\r")      },
+        { U8("\x01""f""\x0c""root-servers""\x03""net"), U8(" \x01\x05\x00\x00/\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0f")    },
+        { U8("\x01""h""\x0c""root-servers""\x03""net"), U8(" \x01\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00S")    },
+        { U8("\x01""i""\x0c""root-servers""\x03""net"), U8(" \x01\x07\xfe\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00S")    },
+        { U8("\x01""j""\x0c""root-servers""\x03""net"), U8(" \x01\x05\x03\x0c'\x00\x00\x00\x00\x00\x00\x00\x02\x00\x03")    },
+        { U8("\x01""k""\x0c""root-servers""\x03""net"), U8(" \x01\x07\xfd\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01") },
+        { U8("\x01""l""\x0c""root-servers""\x03""net"), U8(" \x01\x05\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00B")    },
+        { U8("\x01""m""\x0c""root-servers""\x03""net"), U8(" \x01\r\xc3\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x005")      },
 };
 
 static void update_cut_name(struct kr_zonecut *cut, const knot_dname_t *name)
