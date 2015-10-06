@@ -3,7 +3,7 @@
 --
 
 local ffi = require('ffi')
-local libzscanner = ffi.load('zscanner')
+local libzscanner = ffi.load(libpath('libzscanner', '0'))
 ffi.cdef[[
 
 /*

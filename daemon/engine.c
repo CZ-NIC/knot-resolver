@@ -15,6 +15,7 @@
  */
 
 #include <ccan/json/json.h>
+#include <ccan/asprintf/asprintf.h>
 #include <uv.h>
 #include <unistd.h>
 #include <libknot/internal/mempattern.h>
@@ -57,6 +58,26 @@ static int l_help(lua_State *L)
 		"option(opt[, new_val])\n    get/set server option\n"
 		;
 	lua_pushstring(L, help_str);
+	return 1;
+}
+
+/** Return platform-specific versioned library name. */
+static int l_libpath(lua_State *L)
+{
+	int n = lua_gettop(L);
+	if (n < 2)
+		return 0;
+	auto_free char *lib_path = NULL;
+	const char *lib_name = lua_tostring(L, 1);
+	const char *lib_version = lua_tostring(L, 2);
+#if defined(__APPLE__)
+	lib_path = afmt("%s.%s.dylib", lib_name, lib_version);
+#elif _WIN32
+	lib_path = afmt("%s.dll", lib_name); /* Versioned in RC files */
+#else
+	lib_path = afmt("%s.so.%s", lib_name, lib_version);
+#endif
+	lua_pushstring(L, lib_path);
 	return 1;
 }
 
@@ -302,6 +323,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "verbose");
 	lua_pushcfunction(engine->L, l_option);
 	lua_setglobal(engine->L, "option");
+	lua_pushcfunction(engine->L, l_libpath);
+	lua_setglobal(engine->L, "libpath");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
