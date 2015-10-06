@@ -37,18 +37,17 @@ static inline bool is_expiring(const knot_rrset_t *rr, uint32_t drift)
 }
 
 static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *name,
-                  uint16_t rrclass, uint16_t rrtype, struct kr_query *qry, bool fetch_rrsig)
+                  uint16_t rrclass, uint16_t rrtype, struct kr_query *qry, uint16_t *rank, bool fetch_rrsig)
 {
 	/* Check if record exists in cache */
 	int ret = 0;
-	uint16_t rank = 0;
 	uint32_t drift = qry->timestamp.tv_sec;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, (knot_dname_t *)name, rrtype, rrclass);
 	if (fetch_rrsig) {
-		ret = kr_cache_peek_rrsig(txn, &cache_rr, &rank, &drift);
+		ret = kr_cache_peek_rrsig(txn, &cache_rr, rank, &drift);
 	} else {
-		ret = kr_cache_peek_rr(txn, &cache_rr, &rank, &drift);
+		ret = kr_cache_peek_rr(txn, &cache_rr, rank, &drift);
 	}
 	if (ret != 0) {
 		return ret;
@@ -86,15 +85,19 @@ static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *
 		return ret;
 	}
 	/* Lookup direct match first */
+	uint16_t rank = 0;
 	uint16_t rrtype = qry->stype;
-	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, 0);
+	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, 0);
 	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) { /* Chase CNAME if no direct hit */
 		rrtype = KNOT_RRTYPE_CNAME;
-		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, 0);
+		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, 0);
 	}
-	/* Loot RRSIG if matched. */
-	if (ret == 0 && dobit) {
-		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, true);
+	/* Record isn't flagged as INSECURE => doesn't have RRSIG. */
+	if (ret == 0 && (rank & KR_RANK_INSECURE)) {
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+	/* Record may have RRSIG, try to find it. */
+	} else if (ret == 0 && dobit) {
+		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, true);
 	}
 	kr_cache_txn_abort(&txn);
 	return ret;
