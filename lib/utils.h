@@ -113,12 +113,12 @@ int kr_straddr_subnet(void *dst, const char *addr);
 int kr_bitcmp(const char *a, const char *b, int bits);
 
 /** @internal RR map flags. */
-#define KEY_FLAG_NO 0x01
 #define KEY_FLAG_RRSIG 0x02
+#define KEY_FLAG_RANK(key) (key[0] >> 2)
 #define KEY_COVERING_RRSIG(key) (key[0] & KEY_FLAG_RRSIG)
 
 /** @internal Merges RRSets with matching owner name and type together.
  * @note RRSIG RRSets are merged according the type covered fields.
  * @return 0 or an error
  */
-int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, mm_ctx_t *pool);
+int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *pool);

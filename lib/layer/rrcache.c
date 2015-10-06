@@ -203,7 +203,7 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 		    !knot_dname_is_equal(rr->owner, ns_name)) {
 			continue;
 		}
-		kr_rrmap_add(stash, rr, pool);
+		kr_rrmap_add(stash, rr, KR_RANK_BAD, pool);
 	}
 }
 
@@ -214,7 +214,7 @@ static void stash_ds(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx
 	for (unsigned i = 0; i < authority->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(authority, i);
 		if (rr->type == KNOT_RRTYPE_DS || rr->type == KNOT_RRTYPE_RRSIG) {
-			kr_rrmap_add(stash, rr, pool);
+			kr_rrmap_add(stash, rr, KR_RANK_AUTH, pool);
 		}
 	}
 }
@@ -233,7 +233,7 @@ static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, 
 			stash_glue(stash, pkt, knot_ns_name(&rr->rrs, 0), pool);
 		}
 		/* Stash record */
-		kr_rrmap_add(stash, rr, pool);
+		kr_rrmap_add(stash, rr, KR_RANK_NONAUTH, pool);
 	}
 	return kr_ok();
 }
@@ -250,7 +250,7 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_
 		    && rr->type != KNOT_RRTYPE_RRSIG) {
 			continue;
 		}
-		kr_rrmap_add(stash, rr, pool);
+		kr_rrmap_add(stash, rr, KR_RANK_AUTH, pool);
 		/* Follow CNAME chain in current cut. */
 		if (rr->type == KNOT_RRTYPE_CNAME) {
 			const knot_dname_t *next_cname = knot_cname_name(&rr->rrs);

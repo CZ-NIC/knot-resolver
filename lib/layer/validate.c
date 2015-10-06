@@ -91,7 +91,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		if (section_id == KNOT_ANSWER && !knot_dname_in(qry->zone_cut.name, rr->owner)) {
 			continue;
 		}
-		ret = kr_rrmap_add(&stash, rr, pool);
+		ret = kr_rrmap_add(&stash, rr, 0, pool);
 		if (ret != 0) {
 			goto fail;
 		}
