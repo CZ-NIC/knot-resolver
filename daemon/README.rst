@@ -287,6 +287,19 @@ For when listening on ``localhost`` just doesn't cut it.
          .. code-block:: lua
 
          	net = { '127.0.0.1', net.eth0, net.eth1.addr[1] }
+            net.ipv4 = false
+
+.. function:: net.ipv6 = true|false
+
+   :return: boolean (default: true)
+
+   Enable/disable using IPv6 for recursion.
+
+.. function:: net.ipv4 = true|false
+
+   :return: boolean (default: true)
+
+   Enable/disable using IPv4 for recursion.
 
 .. function:: net.listen(address, [port = 53])
 

@@ -27,21 +27,23 @@
 #include "lib/nsrep.h"
 
 #define QUERY_FLAGS(X) \
-	X(NO_MINIMIZE, 1 << 0) /**< Don't minimize QNAME. */ \
-	X(NO_THROTTLE, 1 << 1) /**< No query/slow NS throttling. */ \
-	X(TCP        , 1 << 2) /**< Use TCP for this query. */ \
-	X(RESOLVED   , 1 << 3) /**< Query is resolved. */ \
-	X(AWAIT_IPV4 , 1 << 4) /**< Query is waiting for A address. */ \
-	X(AWAIT_IPV6 , 1 << 5) /**< Query is waiting for AAAA address. */ \
-	X(AWAIT_CUT  , 1 << 6) /**< Query is waiting for zone cut lookup */ \
-	X(SAFEMODE   , 1 << 7) /**< Don't use fancy stuff (EDNS...) */ \
-	X(CACHED     , 1 << 8) /**< Query response is cached. */ \
-	X(NO_CACHE   , 1 << 9) /**< Do not use expiring cache for lookup. */ \
-	X(EXPIRING   , 1 << 10) /**< Query response is cached, but expiring. */ \
-	X(ALLOW_LOCAL, 1 << 11) /**< Allow queries to local or private address ranges. */ \
-	X(DNSSEC_WANT, 1 << 12) /**< Want DNSSEC secured answer. */ \
-	X(DNSSEC_BOGUS, 1 << 13) /**< Query response is DNSSEC bogus. */ \
-	X(DNSSEC_INSECURE, 1 << 14) /**< Query response is DNSSEC insecure. */ \
+	X(NO_MINIMIZE,     1 << 0) /**< Don't minimize QNAME. */ \
+	X(NO_THROTTLE,     1 << 1) /**< No query/slow NS throttling. */ \
+	X(NO_IPV6,         1 << 2) /**< Disable IPv6 */ \
+	X(NO_IPV4,         1 << 3) /**< Disable IPv4 */ \
+	X(TCP,             1 << 4) /**< Use TCP for this query. */ \
+	X(RESOLVED,        1 << 5) /**< Query is resolved. */ \
+	X(AWAIT_IPV4,      1 << 6) /**< Query is waiting for A address. */ \
+	X(AWAIT_IPV6,      1 << 7) /**< Query is waiting for AAAA address. */ \
+	X(AWAIT_CUT,       1 << 8) /**< Query is waiting for zone cut lookup */ \
+	X(SAFEMODE,        1 << 9) /**< Don't use fancy stuff (EDNS...) */ \
+	X(CACHED,          1 << 10) /**< Query response is cached. */ \
+	X(NO_CACHE,        1 << 11) /**< Do not use expiring cache for lookup. */ \
+	X(EXPIRING,        1 << 12) /**< Query response is cached, but expiring. */ \
+	X(ALLOW_LOCAL,     1 << 13) /**< Allow queries to local or private address ranges. */ \
+	X(DNSSEC_WANT,     1 << 14) /**< Want DNSSEC secured answer. */ \
+	X(DNSSEC_BOGUS,    1 << 15) /**< Query response is DNSSEC bogus. */ \
+	X(DNSSEC_INSECURE, 1 << 16) /**< Query response is DNSSEC insecure. */ \
 
 /** Query flags */
 enum kr_query_flag {
@@ -63,7 +65,7 @@ struct kr_query {
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;
-	uint16_t flags;
+	uint32_t flags;
 	uint32_t secret;
 	struct timeval timestamp;
 	struct kr_nsrep ns;

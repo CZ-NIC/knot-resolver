@@ -66,24 +66,33 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 
 #undef ADDR_SET
 
-static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score, uint8_t *addr[])
+static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score, uint8_t *addr[], uint32_t opts)
 {
 	/* Name server is better candidate if it has address record. */
 	uint8_t *it = pack_head(*addr_set);
 	while (it != pack_tail(*addr_set)) {
 		void *val = pack_obj_val(it);
 		size_t len = pack_obj_len(it);
+		unsigned favour = 0;
+		bool is_valid = false;
+		/* Check if the address isn't disabled. */
+		if (len == sizeof(struct in6_addr)) {
+			is_valid = !(opts & QUERY_NO_IPV6);
+			favour = FAVOUR_IPV6;
+		} else {
+			is_valid = !(opts & QUERY_NO_IPV4);
+		}
 		/* Get RTT for this address (if known) */
-		unsigned *cached = rttcache ? lru_get(rttcache, val, len) : NULL;
-		unsigned addr_score = (cached) ? *cached : KR_NS_GLUED;
-		/* Give v6 a head start */
-		unsigned favour = (len == sizeof(struct in6_addr)) ? FAVOUR_IPV6 : 0;
-		if (addr_score < score + favour) {
-			/* Shake down previous contenders, last one is always unused */
-			for (size_t i = KR_NSREP_MAXADDR - 2; i > 0; --i)
-				addr[i] = addr[i - 1];
-			addr[0] = it;
-			score = addr_score;
+		if (is_valid) {
+			unsigned *cached = rttcache ? lru_get(rttcache, val, len) : NULL;
+			unsigned addr_score = (cached) ? *cached : KR_NS_GLUED;
+			if (addr_score < score + favour) {
+				/* Shake down previous contenders, last one is always unused */
+				for (size_t i = KR_NSREP_MAXADDR - 2; i > 0; --i)
+					addr[i] = addr[i - 1];
+				addr[0] = it;
+				score = addr_score;
+			}
 		}
 		it = pack_obj_next(it);
 	}
@@ -122,7 +131,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 			}
 		}
 	} else {
-		score = eval_addr_set(addr_set, ctx->cache_rtt, score, addr_choice);
+		score = eval_addr_set(addr_set, ctx->cache_rtt, score, addr_choice, ctx->options);
 	}
 
 	/* Probabilistic bee foraging strategy (naive).
@@ -181,7 +190,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 	}
 	/* Evaluate addr list */
 	uint8_t *addr_choice[KR_NSREP_MAXADDR] = { NULL, };
-	unsigned score = eval_addr_set(addr_set, ctx->cache_rtt, ns->score, addr_choice);
+	unsigned score = eval_addr_set(addr_set, ctx->cache_rtt, ns->score, addr_choice, ctx->options);
 	update_nsrep_set(ns, ns->name, addr_choice, score);
 	return kr_ok();
 }

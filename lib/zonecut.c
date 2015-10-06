@@ -329,10 +329,10 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_d
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
 		unsigned *cached = lru_get(ctx->cache_rep, (const char *)ns_name, knot_dname_size(ns_name));
 		unsigned reputation = (cached) ? *cached : 0;
-		if (!(reputation & KR_NS_NOIP4)) {
+		if (!(reputation & KR_NS_NOIP4) && !(ctx->options & QUERY_NO_IPV4)) {
 			fetch_addr(cut, ns_name, KNOT_RRTYPE_A, txn, timestamp);
 		}
-		if (!(reputation & KR_NS_NOIP6)) {
+		if (!(reputation & KR_NS_NOIP6) && !(ctx->options & QUERY_NO_IPV6)) {
 			fetch_addr(cut, ns_name, KNOT_RRTYPE_AAAA, txn, timestamp);
 		}
 	}

@@ -88,9 +88,11 @@ struct pkt_rcode {
 };
 struct query_flag {
 	static const int NO_MINIMIZE = 1 << 0;
-	static const int CACHED      = 1 << 8;
-	static const int NO_CACHE    = 1 << 9;
-	static const int EXPIRING    = 1 << 10;
+	static const int NO_IPV6     = 1 << 2;
+	static const int NO_IPV4     = 1 << 3;
+	static const int CACHED      = 1 << 10;
+	static const int NO_CACHE    = 1 << 11;
+	static const int EXPIRING    = 1 << 12;
 };
 
 /*

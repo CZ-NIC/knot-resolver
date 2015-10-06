@@ -23,17 +23,24 @@ setmetatable(env, {
 -- Quick access to interfaces
 -- `net.<iface>` => `net.interfaces()[iface]`
 -- `net = {addr1, ..}` => `net.listen(name, addr1)`
+-- `net.ipv{4,6} = {true, false}` => enable/disable IPv{4,6}
 setmetatable(net, {
 	__index = function (t, k)
 		local v = rawget(t, k)
 		if v then return v
+		elseif k == 'ipv6' then return not option('NO_IPV6')
+		elseif k == 'ipv4' then return not option('NO_IPV4')
 		else return net.interfaces()[k]
 		end
 	end,
 	__newindex = function (t,k,v)
-		local iname = rawget(net.interfaces(), v)
-		if iname then t.listen(iname)
-		else t.listen(v)
+		if     k == 'ipv6' then return option('NO_IPV6', not v)
+		elseif k == 'ipv4' then return option('NO_IPV4', not v)
+		else
+			local iname = rawget(net.interfaces(), v)
+			if iname then t.listen(iname)
+			else t.listen(v)
+			end
 		end
 	end
 })
