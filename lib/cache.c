@@ -156,7 +156,7 @@ static size_t cache_key(uint8_t *buf, uint8_t tag, const knot_dname_t *name, uin
 	return name_len + KEY_HSIZE;
 }
 
-static struct kr_cache_entry *cache_entry(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
+static struct kr_cache_entry *lookup(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
 {
 	uint8_t keybuf[KEY_SIZE];
 	size_t key_len = cache_key(keybuf, tag, name, type);
@@ -175,6 +175,26 @@ static struct kr_cache_entry *cache_entry(struct kr_cache_txn *txn, uint8_t tag,
 	return (struct kr_cache_entry *)val.data;
 }
 
+static int check_lifetime(struct kr_cache_entry *found, uint32_t *timestamp)
+{
+	/* No time constraint */
+	if (!timestamp) {
+		return kr_ok();
+	} else if (*timestamp <= found->timestamp) {
+		/* John Connor record cached in the future. */
+		*timestamp = 0;
+		return kr_ok();
+	} else {
+		/* Check if the record is still valid. */
+		uint32_t drift = *timestamp - found->timestamp;
+		if (drift <= found->ttl) {
+			*timestamp = drift;
+			return kr_ok();
+		}
+	}
+	return kr_error(ESTALE);
+}
+
 int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
                   struct kr_cache_entry **entry, uint32_t *timestamp)
 {
@@ -182,34 +202,21 @@ int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *nam
 		return kr_error(EINVAL);
 	}
 
-	struct kr_cache_entry *found = cache_entry(txn, tag, name, type);
+	struct kr_cache_entry *found = lookup(txn, tag, name, type);
 	if (!found) {
 		txn->owner->stats.miss += 1;
 		return kr_error(ENOENT);
-	}	
-
-	/* No time constraint */
-	*entry = found;
-	if (!timestamp) {
-		txn->owner->stats.hit += 1;
-		return kr_ok();
-	} else if (*timestamp <= found->timestamp) {
-		/* John Connor record cached in the future. */
-		*timestamp = 0;
-		txn->owner->stats.hit += 1;
-		return kr_ok();
-	} else {
-		/* Check if the record is still valid. */
-		uint32_t drift = *timestamp - found->timestamp;
-		if (drift <= found->ttl) {
-			*timestamp = drift;
-			txn->owner->stats.hit += 1;
-			return kr_ok();
-		}
 	}
 
-	txn->owner->stats.miss += 1;
-	return kr_error(ESTALE);
+	/* Check entry lifetime */
+	*entry = found;
+	int ret = check_lifetime(found, timestamp);
+	if (ret == 0) {
+		txn->owner->stats.hit += 1;
+	} else {
+		txn->owner->stats.miss += 1;
+	}
+	return ret;
 }
 
 static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *header, namedb_val_t data)
@@ -235,6 +242,17 @@ int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 	namedb_val_t key = { keybuf, key_len };
 	namedb_val_t entry = { NULL, sizeof(*header) + data.len };
 	const namedb_api_t *db_api = txn_api(txn);
+
+	/* Do not overwrite entries that are higher ranked and not expired. */
+	namedb_val_t old_entry = { NULL, 0 };
+	int ret = txn_api(txn)->find(&txn->t, &key, &old_entry, 0);
+	if (ret == 0) {
+		struct kr_cache_entry *old = old_entry.data;
+		uint32_t timestamp = header->timestamp;
+		if (kr_cache_rank_cmp(old->rank, header->rank) > 0 && check_lifetime(old, &timestamp) == 0) {
+			return kr_error(EPERM);
+		}
+	}
 
 	/* LMDB can do late write and avoid copy */
 	txn->owner->stats.insert += 1;
@@ -297,6 +315,9 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank,
 	int ret = kr_cache_peek(txn, KR_CACHE_RR, rr->owner, rr->type, &entry, timestamp);
 	if (ret != 0) {
 		return ret;
+	}
+	if (rank) {
+		*rank = entry->rank;
 	}
 	rr->rrs.rr_count = entry->count;
 	rr->rrs.data = entry->data;
@@ -378,6 +399,9 @@ int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *ra
 	int ret = kr_cache_peek(txn, KR_CACHE_SIG, rr->owner, rr->type, &entry, timestamp);
 	if (ret != 0) {
 		return ret;
+	}
+	if (rank) {
+		*rank = entry->rank;
 	}
 	rr->type = KNOT_RRTYPE_RRSIG;
 	rr->rrs.rr_count = entry->count;
