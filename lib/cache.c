@@ -24,6 +24,8 @@
 #include <libknot/internal/namedb/namedb_lmdb.h>
 #include <libknot/errcode.h>
 #include <libknot/descriptor.h>
+#include <libknot/dname.h>
+#include <libknot/rrtype/rrsig.h>
 
 #include "lib/cache.h"
 #include "lib/defines.h"
@@ -284,7 +286,7 @@ int kr_cache_clear(struct kr_cache_txn *txn)
 	return txn_api(txn)->clear(&txn->t);
 }
 
-int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *timestamp)
+int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank, uint32_t *timestamp)
 {
 	if (!txn || !rr || !timestamp) {
 		return kr_error(EINVAL);
@@ -335,7 +337,7 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
 	return kr_ok();
 }
 
-int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint32_t timestamp)
+int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t rank, uint32_t timestamp)
 {
 	if (!txn || !rr) {
 		return kr_error(EINVAL);
@@ -350,6 +352,7 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint32_
 	struct kr_cache_entry header = {
 		.timestamp = timestamp,
 		.ttl = 0,
+		.rank = rank,
 		.count = rr->rrs.rr_count
 	};
 	knot_rdata_t *rd = rr->rrs.data;
@@ -364,7 +367,7 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint32_
 	return kr_cache_insert(txn, KR_CACHE_RR, rr->owner, rr->type, &header, data);
 }
 
-int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *timestamp)
+int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank, uint32_t *timestamp)
 {
 	if (!txn || !rr || !timestamp) {
 		return kr_error(EINVAL);
@@ -382,7 +385,7 @@ int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint32_t *ti
 	return kr_ok();
 }
 
-int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t typec, uint32_t timestamp)
+int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t rank, uint32_t timestamp)
 {
 	if (!txn || !rr) {
 		return kr_error(EINVAL);
@@ -397,6 +400,7 @@ int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint
 	struct kr_cache_entry header = {
 		.timestamp = timestamp,
 		.ttl = 0,
+		.rank = rank,
 		.count = rr->rrs.rr_count
 	};
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
@@ -406,6 +410,7 @@ int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint
 		}
 	}
 
+	uint16_t covered = knot_rrsig_type_covered(&rr->rrs, 0);
 	namedb_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
-	return kr_cache_insert(txn, KR_CACHE_SIG, rr->owner, typec, &header, data);
+	return kr_cache_insert(txn, KR_CACHE_SIG, rr->owner, covered, &header, data);
 }

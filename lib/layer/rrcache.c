@@ -41,13 +41,14 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 {
 	/* Check if record exists in cache */
 	int ret = 0;
+	uint16_t rank = 0;
 	uint32_t drift = qry->timestamp.tv_sec;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, (knot_dname_t *)name, rrtype, rrclass);
 	if (fetch_rrsig) {
-		ret = kr_cache_peek_rrsig(txn, &cache_rr, &drift);
+		ret = kr_cache_peek_rrsig(txn, &cache_rr, &rank, &drift);
 	} else {
-		ret = kr_cache_peek_rr(txn, &cache_rr, &drift);
+		ret = kr_cache_peek_rr(txn, &cache_rr, &rank, &drift);
 	}
 	if (ret != 0) {
 		return ret;
@@ -138,21 +139,14 @@ struct stash_baton
 	uint32_t min_ttl;
 };
 
-static int commit_rrsig(struct stash_baton *baton, knot_rrset_t *rr)
+static int commit_rrsig(struct stash_baton *baton, uint16_t rank, knot_rrset_t *rr)
 {
 	/* If not doing secure resolution, ignore (unvalidated) RRSIGs. */
 	if (!(baton->qry->flags & QUERY_DNSSEC_WANT)) {
 		return kr_ok();
 	}
 	/* Commit covering RRSIG to a separate cache namespace. */
-	uint16_t covered = knot_rrsig_type_covered(&rr->rrs, 0);
-	unsigned drift = baton->timestamp;
-	knot_rrset_t query_rrsig;
-	knot_rrset_init(&query_rrsig, rr->owner, covered, rr->rclass);
-	if (kr_cache_peek_rrsig(baton->txn, &query_rrsig, &drift) == 0) {
-		return kr_ok();
-	}
-	return kr_cache_insert_rrsig(baton->txn, rr, covered, baton->timestamp);
+	return kr_cache_insert_rrsig(baton->txn, rr, rank, baton->timestamp);
 }
 
 static int commit_rr(const char *key, void *val, void *data)
@@ -169,17 +163,19 @@ static int commit_rr(const char *key, void *val, void *data)
 	}
 
 	/* Save RRSIG in a special cache. */
+	uint16_t rank = KEY_FLAG_RANK(key);
+	if (baton->qry->flags & QUERY_DNSSEC_WANT)
+		rank |= KR_RANK_SECURE;
+	if (baton->qry->flags & QUERY_DNSSEC_INSECURE)
+		rank |= KR_RANK_INSECURE;
 	if (KEY_COVERING_RRSIG(key)) {
-		return commit_rrsig(baton, rr);
+		return commit_rrsig(baton, rank, rr);
 	}
 
 	/* Check if already cached */
-	/** @todo This should check if less trusted data is in the cache,
-	          for that the cache would need to trace data trust level.
-	   */
 	knot_rrset_t query_rr;
 	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
-	return kr_cache_insert_rr(baton->txn, rr, baton->timestamp);
+	return kr_cache_insert_rr(baton->txn, rr, rank, baton->timestamp);
 }
 
 static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache_txn *txn, struct kr_request *req)
