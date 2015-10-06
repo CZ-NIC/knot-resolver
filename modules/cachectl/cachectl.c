@@ -28,7 +28,6 @@
 #include <time.h>
 #include <libknot/descriptor.h>
 #include <ccan/json/json.h>
-#include <ccan/compiler/compiler.h>
 
 #include "daemon/engine.h"
 #include "lib/module.h"
@@ -44,7 +43,7 @@
 typedef int (*cache_cb_t)(struct kr_cache_txn *txn, namedb_iter_t *it, namedb_val_t *key, void *baton);
 
 /** @internal Prefix walk. */
-NON_NULL(1,2) static int cache_prefixed(struct engine *engine, const char *args, unsigned txn_flags, cache_cb_t cb, void *baton)
+static int cache_prefixed(struct engine *engine, const char *args, unsigned txn_flags, cache_cb_t cb, void *baton)
 {
 	/* Decode parameters */
 	uint8_t namespace = 'R';

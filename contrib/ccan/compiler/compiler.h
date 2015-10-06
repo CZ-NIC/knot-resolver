@@ -228,16 +228,4 @@
 #define WARN_UNUSED_RESULT
 #endif
 #endif
-
-#ifndef NON_NULL
-#if HAVE_ATTRIBUTE_NONNULL
-/**
- * NON_NULL - nonnull attribute specifies that some function parameters should be non-null pointers.
- */
-#define NON_NULL(...) __attribute__((nonnull(__VA_ARGS__)))
-#else
-#define NON_NULL(...)
-#endif
-#endif
-
 #endif /* CCAN_COMPILER_H */
