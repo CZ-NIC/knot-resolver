@@ -19,11 +19,8 @@
 #include <uv.h>
 #include <libknot/packet/pkt.h>
 
-struct endpoint;
-int udp_bind(struct endpoint *ep, struct sockaddr *addr);
-void udp_unbind(struct endpoint *ep);
-int tcp_bind(struct endpoint *ep, struct sockaddr *addr);
-void tcp_unbind(struct endpoint *ep);
+int udp_bind(uv_udp_t *handle, struct sockaddr *addr);
+int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr);
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type);
 int io_start_read(uv_handle_t *handle);
 int io_stop_read(uv_handle_t *handle);

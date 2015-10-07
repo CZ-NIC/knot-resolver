@@ -28,8 +28,8 @@ enum endpoint_flag {
 };
 
 struct endpoint {
-    uv_udp_t udp;
-    uv_tcp_t tcp;
+    uv_udp_t *udp;
+    uv_tcp_t *tcp;
     uint16_t port;
     uint16_t flags;
 };
