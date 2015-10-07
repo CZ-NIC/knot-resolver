@@ -152,6 +152,22 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 	return kr_ok();
 }
 
+/** @internal Fetch endpoint array and offset of the address/port query. */
+static endpoint_array_t *network_get(struct network *net, const char *addr, uint16_t port, size_t *index)
+{
+	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
+	if (ep_array) {
+		for (size_t i = ep_array->len; i--;) {
+			struct endpoint *ep = ep_array->at[i];
+			if (ep->port == port) {
+				*index = i;
+				return ep_array;
+			}
+		}
+	}
+	return NULL;
+}
+
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags)
 {
 	if (net == NULL || addr == 0 || port == 0) {
@@ -159,7 +175,8 @@ int network_listen(struct network *net, const char *addr, uint16_t port, uint32_
 	}
 
 	/* Already listening */
-	if (map_get(&net->endpoints, addr)) {
+	size_t index = 0;
+	if (network_get(net, addr, port, &index)) {
 		return kr_ok();
 	}
 
@@ -193,20 +210,15 @@ int network_listen(struct network *net, const char *addr, uint16_t port, uint32_
 
 int network_close(struct network *net, const char *addr, uint16_t port)
 {
-	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
-	if (ep_array == NULL) {
+	size_t index = 0;
+	endpoint_array_t *ep_array = network_get(net, addr, port, &index);
+	if (!ep_array) {
 		return kr_error(ENOENT);
 	}
 
 	/* Close endpoint in array. */
-	for (size_t i = ep_array->len; i--;) {
-		struct endpoint *ep = ep_array->at[i];
-		if (ep->port == port) {
-			close_endpoint(ep, false);
-			array_del(*ep_array, i);
-			break;
-		}
-	}
+	close_endpoint(ep_array->at[index], false);
+	array_del(*ep_array, index);
 
 	/* Collapse key if it has no endpoint. */
 	if (ep_array->len == 0) {
