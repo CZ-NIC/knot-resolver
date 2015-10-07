@@ -78,8 +78,6 @@ setmetatable(cache, {
 		else   rawset(t, k, v) end
 	end
 })
--- Defaults
-cache.size = 10 * MB
 
 -- Syntactic sugar for TA store
 setmetatable(trust_anchors, {

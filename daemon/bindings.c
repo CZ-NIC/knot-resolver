@@ -416,6 +416,7 @@ static int cache_open(lua_State *L)
 	lua_pushstring(L, "current_storage");
 	lua_pushstring(L, uri);
 	lua_rawset(L, -3);
+	lua_pop(L, 1);
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -425,6 +426,11 @@ static int cache_close(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	kr_cache_close(&engine->resolver.cache);
+	lua_getglobal(L, "cache");
+	lua_pushstring(L, "current_size");
+	lua_pushnumber(L, 0);
+	lua_rawset(L, -3);
+	lua_pop(L, 1);
 	lua_pushboolean(L, 1);
 	return 1;
 }

@@ -323,6 +323,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "verbose");
 	lua_pushcfunction(engine->L, l_option);
 	lua_setglobal(engine->L, "option");
+	lua_pushcfunction(engine->L, l_setuser);
+	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_libpath);
 	lua_setglobal(engine->L, "libpath");
 	lua_pushlightuserdata(engine->L, engine);
@@ -448,7 +450,8 @@ static int engine_loadconf(struct engine *engine)
 	/* Load config file */
 	if(access("config", F_OK ) != -1 ) {
 		ret = l_dosandboxfile(engine->L, "config");
-	} else {
+	}
+	if (ret == 0) {
 		/* Load defaults */
 		static const char config_bytecode[] = {
 			#include "daemon/lua/config.inc"

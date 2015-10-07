@@ -4,3 +4,7 @@ if not next(net.list()) then
 		error('failed to bind to localhost#53')
 	end
 end
+-- Open cache if not set/disabled
+if not cache.current_size then
+	cache.size = 10 * MB
+end
