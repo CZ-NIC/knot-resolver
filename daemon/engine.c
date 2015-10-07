@@ -18,6 +18,8 @@
 #include <ccan/asprintf/asprintf.h>
 #include <uv.h>
 #include <unistd.h>
+#include <grp.h>
+#include <pwd.h>
 #include <libknot/internal/mempattern.h>
 /* #include <libknot/internal/namedb/namedb_trie.h> @todo Not supported (doesn't keep value copy) */
 #include <libknot/internal/namedb/namedb_lmdb.h>
@@ -54,10 +56,60 @@ static int l_help(lua_State *L)
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
 		"hostname()\n    hostname\n"
+		"user(name[, group])\n    change process user (and group)\n"
 		"verbose(true|false)\n    toggle verbose mode\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		;
 	lua_pushstring(L, help_str);
+	return 1;
+}
+
+static bool update_privileges(int uid, int gid)
+{
+	if ((gid_t)gid != getgid()) {
+		if (setregid(gid, gid) < 0) {
+			return false;
+		}
+	}
+	if ((uid_t)uid != getuid()) {
+		if (setreuid(uid, uid) < 0) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/** Set process user/group. */
+static int l_setuser(lua_State *L)
+{
+	int n = lua_gettop(L);
+	if (n < 1 || !lua_isstring(L, 1)) {
+		lua_pushliteral(L, "user(user[, group)");
+		lua_error(L);
+	}
+	/* Fetch UID/GID based on string identifiers. */
+	struct passwd *user_pw = getpwnam(lua_tostring(L, 1));
+	if (!user_pw) {
+		lua_pushliteral(L, "invalid user name");
+		lua_error(L);
+	}
+	int uid = user_pw->pw_uid;
+	int gid = getgid();
+	if (n > 1 && lua_isstring(L, 2)) {
+		struct group *group_pw = getgrnam(lua_tostring(L, 2));
+		if (!group_pw) {
+			lua_pushliteral(L, "invalid group name");
+			lua_error(L);
+		}
+		gid = group_pw->gr_gid;
+	}
+	/* Drop privileges */
+	bool ret = update_privileges(uid, gid);
+	if (!ret) {
+		lua_pushstring(L, strerror(errno));
+		lua_error(L);
+	}
+	lua_pushboolean(L, ret);
 	return 1;
 }
 

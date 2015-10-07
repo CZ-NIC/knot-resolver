@@ -123,12 +123,12 @@ Configuration example
 ---------------------
 .. code-block:: lua
 
-	-- 10MB cache
-	cache.size = 10*MB
-	-- load some modules
-	modules = { 'policy', 'cachectl' }
-	-- interfaces
-	net = { '127.0.0.1', '::1' }
+   -- interfaces
+   net = { '127.0.0.1', '::1' }
+   -- load some modules
+   modules = { 'policy', 'cachectl' }
+   -- 10MB cache
+   cache.size = 10*MB
 
 Configuration syntax
 --------------------
@@ -276,6 +276,35 @@ Environment
 .. function:: verbose(true | false)
 
    :return: Toggle verbose logging.
+
+.. function:: user(name, [group])
+
+   :param string name: user name
+   :param string group: group name (optional)
+   :return: boolean
+
+   Drop privileges and run as given user (and group, if provided).
+
+   .. tip:: Note that you should bind to required network addresses before changing user. At the same time, you should open the cache **AFTER** you change the user (so it remains accessible). A good practice is to divide configuration in two parts:
+
+      .. code-block:: lua
+
+         -- privileged
+         net = { '127.0.0.1', '::1' }
+         -- unprivileged
+         cache.size = 100*MB
+         trust_anchors.file = 'root.key'
+
+   Example output:
+
+   .. code-block:: lua
+
+      > user('baduser')
+      invalid user name
+      > user('kresd', 'netgrp')
+      true
+      > user('root')
+      Operation not permitted
 
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
