@@ -306,6 +306,40 @@ Environment
       > user('root')
       Operation not permitted
 
+.. function:: resolve(qname, qtype[, qclass = kres.class.IN, options = 0, callback = nil])
+
+   :param string qname: Query name (e.g. 'com.')
+   :param number qtype: Query type (e.g. ``kres.type.NS``)
+   :param number qclass: Query class *(optional)* (e.g. ``kres.class.IN``)
+   :param number options: Resolution options (see query flags)
+   :param function callback: Callback to be executed when resolution completes (e.g. `function cb (pkt) end`). The callback gets a packet containing the final answer and doesn't have to return anything.
+   :return: boolean
+
+   Example:
+
+   .. code-block:: lua
+
+      -- Send query for root DNSKEY, ignore cache
+      resolve('.', kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE)
+
+      -- Query for AAAA record
+      resolve('example.com', kres.type.AAAA, kres.class.IN, 0,
+      function (answer)
+         -- Check answer RCODE
+         local pkt = kres.pkt_t(answer)
+         if pkt:rcode() == kres.rcode.NOERROR then
+            -- Print matching records
+            local records = pkt:section(kres.section.ANSWER)
+            for i = 1, #records do
+               if rr.type == kres.type.AAAA then
+                  print ('record:', kres.rr2str(rr))
+               end
+            end
+         else
+            print ('rcode: ', pkt:rcode())
+         end
+      end)
+
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -658,15 +692,6 @@ you can see the statistics or schedule new queries.
    .. code-block:: lua
 
 	print(worker.stats().concurrent)
-
-.. function:: worker.resolve(qname, qtype[, qclass = kres.class.IN, options = 0, callback = nil])
-
-   :param string qname: Query name (e.g. 'com.')
-   :param number qtype: Query type (e.g. ``kres.type.NS``)
-   :param number qclass: Query class *(optional)* (e.g. ``kres.class.IN``)
-   :param number options: Resolution options (see query flags)
-   :param function callback: Callback to be executed when resolution completes (e.g. `function cb (pkt) end`). The callback gets a packet containing the final answer and doesn't have to return anything.
-   :return: boolean
 
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
