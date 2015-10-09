@@ -25,6 +25,7 @@
 #include "lib/defines.h"
 #include "lib/nsrep.h"
 #include "lib/module.h"
+#include "lib/dnssec/ta.h"
 
 #define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(&req->rplan), "iter", fmt)
 
@@ -392,6 +393,11 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		rem_node(&query->node); /* *MUST* keep current query at tail */
 		insert_node(&query->node, &next->node);
 		next->flags |= QUERY_AWAIT_CUT;
+		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
+		if (kr_ta_covers(&req->ctx->trust_anchors, cname) &&
+		    !kr_ta_covers(&req->ctx->negative_anchors, cname)) {
+			next->flags |= QUERY_DNSSEC_WANT;
+		}
 	} else if (!query->parent) {
 		finalize_answer(pkt, query, req);
 	}
