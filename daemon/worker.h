@@ -58,6 +58,14 @@ typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, v
 int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr* addr);
 
 /**
+ * Process incoming DNS/TCP message fragment.
+ * If the fragment contains only a partial message, it is buffered.
+ * If the fragment contains a complete query or completes current fragment, execute it.
+ * @return 0, number of bytes remaining to assemble, or an error code
+ */
+int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uint8_t *msg, size_t len);
+
+/**
  * Schedule query for resolution.
  * @return 0 or an error code
  */

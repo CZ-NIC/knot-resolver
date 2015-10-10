@@ -86,25 +86,15 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 
-	/* Check for originator connection close / not enough bytes */
-	if (nread < 2) {
-		if (!handle->data) {
-			/* @todo Notify the endpoint if master socket */
+	/* Check for originator connection close. */
+	if (nread <= 0) {
+		if (handle->data) {
+			worker_exec(worker, (uv_handle_t *)handle, NULL, NULL);
 		}
-		worker_exec(worker, (uv_handle_t *)handle, NULL, NULL);
 		return;
 	}
-
-	/** @todo This is not going to work if the packet is fragmented in the stream ! */
-	uint16_t nbytes = wire_read_u16((const uint8_t *)buf->base);
-	if (nbytes + 2 < nread) {
-		worker_exec(worker, (uv_handle_t *)handle, NULL, NULL);
-		return;
-	}
-
-	knot_pkt_t *query = knot_pkt_new(buf->base + 2, nbytes, &worker->pkt_pool);
-	query->max_size = sizeof(worker->wire_buf);
-	int ret = worker_exec(worker, (uv_handle_t *)handle, query, NULL);
+	
+	int ret = worker_process_tcp(worker, (uv_handle_t *)handle, (const uint8_t *)buf->base, nread);
 	if (ret == 0) {
 		/* Push - pull, stop reading from this handle until
 		 * the task is finished. Since the handle has no track of the
