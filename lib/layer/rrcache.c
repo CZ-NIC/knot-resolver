@@ -77,7 +77,7 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 }
 
 /** @internal Try to find a shortcut directly to searched record. */
-static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, bool dobit)
+static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, uint16_t rrtype, bool dobit)
 {
 	struct kr_cache_txn txn;
 	int ret = kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY);
@@ -86,7 +86,6 @@ static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *
 	}
 	/* Lookup direct match first */
 	uint16_t rank = 0;
-	uint16_t rrtype = qry->stype;
 	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, 0);
 	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) { /* Chase CNAME if no direct hit */
 		rrtype = KNOT_RRTYPE_CNAME;
@@ -120,7 +119,19 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	 * Only one step of the chain is resolved at a time.
 	 */
 	struct kr_cache *cache = &req->ctx->cache;
-	int ret = loot_cache(cache, pkt, qry, (qry->flags & QUERY_DNSSEC_WANT));
+	int ret = -1;
+	if (qry->stype != KNOT_RRTYPE_ANY) {
+		ret = loot_cache(cache, pkt, qry, qry->stype, (qry->flags & QUERY_DNSSEC_WANT));
+	} else {
+		/* ANY query are used by either qmail or certain versions of Firefox.
+		 * Probe cache for a few interesting records. */
+		static uint16_t any_types[] = { KNOT_RRTYPE_A, KNOT_RRTYPE_AAAA, KNOT_RRTYPE_MX };
+		for (size_t i = 0; i < sizeof(any_types)/sizeof(any_types[0]); ++i) {
+			if (loot_cache(cache, pkt, qry, any_types[i], (qry->flags & QUERY_DNSSEC_WANT)) == 0) {
+				ret = 0; /* At least single record matches */
+			}
+		}
+	}
 	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;

@@ -69,7 +69,7 @@ static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_query *qry)
 		addr = pack_obj_next(addr);
 	}
 
-	int ret = kr_error(ENOENT);
+	int ret = 0;
 	if (!knot_rrset_empty(&rr)) {
 		/* Update packet question */
 		if (!knot_dname_is_equal(knot_pkt_qname(pkt), qname)) {
@@ -78,6 +78,8 @@ static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_query *qry)
 		}
 		/* Append to packet */
 		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr, KNOT_PF_FREE);
+	} else {
+		ret = kr_error(ENOENT);
 	}
 	/* Clear RR if failed */
 	if (ret != 0) {

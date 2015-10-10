@@ -77,7 +77,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 
 static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, bool secured)
 {
-	int ret = kr_error(ENOENT);
+	int ret = 0;
 
 	/* Find closest zone cut from cache */
 	struct kr_cache_txn txn;
@@ -92,6 +92,8 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, bool secur
 			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, secured);
 		}
 		kr_cache_txn_abort(&txn);
+	} else {
+		ret = kr_error(ENOENT);
 	}
 	return ret;
 }
@@ -177,9 +179,6 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 
 static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_request *req)
 {
-	if (!knot_wire_get_rd(query->wire)) {
-		return kr_error(ENOSYS); /* Only recursive service */
-	}
 	if (knot_pkt_init_response(answer, query) != 0) {
 		return kr_error(ENOMEM); /* Failed to initialize answer */
 	}
@@ -494,6 +493,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 	}
 
+	/* This query has RD=0 or is ANY, stop here. */
+	if (qry->stype == KNOT_RRTYPE_ANY || !knot_wire_get_rd(request->answer->wire)) {
+		DEBUG_MSG("=> qtype is ANY or RD=0, bail out\n");
+		return KNOT_STATE_FAIL;
+	}
+
 	/* Update zone cut, spawn new subrequests. */
 	int state = zone_cut_check(request, qry, packet);
 	switch(state) {
@@ -513,7 +518,7 @@ ns_election:
 	}
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
-	} else if (!(qry->flags & QUERY_TCP)) { /* Keep address when TCP retransmit. */
+	} else if (!qry->ns.name || !(qry->flags & QUERY_TCP)) { /* Keep address when TCP retransmit. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			DEBUG_MSG("=> priming root DNSKEY\n");

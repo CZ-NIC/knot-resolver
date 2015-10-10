@@ -154,15 +154,14 @@ int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
 		return kr_error(EINVAL);
 	}
 
-	int ret = kr_error(ENOENT);
 	for (unsigned i = 0; i < keys->rrs.rr_count; ++i) {
-		ret = kr_rrset_validate_with_key(pkt, section_id, covered, keys, i, NULL, zone_name, timestamp, has_nsec3);
+		int ret = kr_rrset_validate_with_key(pkt, section_id, covered, keys, i, NULL, zone_name, timestamp, has_nsec3);
 		if (ret == 0) {
-			break;
+			return ret;
 		}
 	}
 
-	return ret;
+	return kr_error(ENOENT);
 }
 
 int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
