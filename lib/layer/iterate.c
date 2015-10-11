@@ -18,6 +18,7 @@
 
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
+#include <libknot/rrtype/rrsig.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
@@ -256,6 +257,24 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 	return state;
 }
 
+static const knot_dname_t *signature_authority(knot_pkt_t *pkt)
+{
+	/* Can't find signer for RRSIGs, bail out. */
+	if (knot_pkt_qtype(pkt) == KNOT_RRTYPE_RRSIG) {
+		return NULL;
+	}
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_AUTHORITY; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (rr->type == KNOT_RRTYPE_RRSIG) {
+				return knot_rrsig_signer_name(&rr->rrs, 0);
+			}
+		}
+	}
+	return NULL;
+}
+
 static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 {
 	int result = KNOT_STATE_CONSUME;
@@ -288,20 +307,41 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			case KNOT_STATE_FAIL: return state; break;
 			default:              /* continue */ break;
 			}
-		} else if (rr->type == KNOT_RRTYPE_SOA) {
+		} else if (rr->type == KNOT_RRTYPE_SOA && knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
 			/* SOA below cut in authority indicates different authority, but same NS set. */
-			if (knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
-				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
-				if (qry->flags & QUERY_DNSSEC_WANT) { /* Treat as a referral */
-					result = KNOT_STATE_DONE;
-					break;
-				}
-			}
+			qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 		}
 	}
 
+	/* Track difference between current TA and signer name.
+	 * This indicates that the NS is auth for both parent-child, and we must update DS/DNSKEY to validate it.
+	 * @todo: This has to be checked here before we put the data into packet, there is no "DEFER" or "PAUSE" action yet.
+	 */
+	const bool track_pc_change = (!(qry->flags & QUERY_CACHED) && (qry->flags & QUERY_DNSSEC_WANT));
+	const knot_dname_t *ta_name = qry->zone_cut.trust_anchor ? qry->zone_cut.trust_anchor->owner : NULL;
+	const knot_dname_t *signer = signature_authority(pkt);
+	if (track_pc_change && ta_name && signer && !knot_dname_is_equal(ta_name, signer)) {
+		DEBUG_MSG(">< cut changed, needs revalidation\n");
+		if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
+			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
+		} else if (!knot_dname_is_equal(signer, qry->zone_cut.name)) {
+			/* Key signer is above the current cut, so we can't validate it. This happens when
+			   a server is authoritative for both grandparent, parent and child zone.
+			   Ascend to parent cut, and refetch authority for signer. */
+			if (qry->zone_cut.parent) {
+				memcpy(&qry->zone_cut, qry->zone_cut.parent, sizeof(qry->zone_cut));
+			} else {
+				qry->flags |= QUERY_AWAIT_CUT;
+			}
+			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
+		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
+		knot_wire_set_tc(pkt->wire);
+		result = KNOT_STATE_NOOP;
+	}
+
 	/* CONSUME => Unhelpful referral.
-	 * DONE    => Zone cut updated. */
+	 * DONE    => Zone cut updated.
+	 * NOOP    => Ignore this answer. */
 	return result;
 }
 
@@ -544,6 +584,9 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	case KNOT_STATE_DONE: /* Referral */
 		DEBUG_MSG("<= referral response, follow\n");
+		break;
+	case KNOT_STATE_NOOP: /* Deferred, bail out. */
+		state = KNOT_STATE_CONSUME;
 		break;
 	default:
 		break;
