@@ -28,27 +28,31 @@
 
 bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t type)
 {
-	if (!bm && !bm_size) {
+	if (!bm || bm_size == 0) {
 		return false;
 	}
 
-	uint8_t sought_win = (type >> 8 ) & 0xff;
-	uint8_t bitmap_idx = (type >> 3) & 0x1f;
-	uint8_t bitmap_bit_mask = 1 << (7 - (type & 0x07));
+	const uint8_t type_hi = (type >> 8);
+	const uint8_t type_lo = (type & 0xff);
+	const uint8_t bitmap_idx = (type_lo >> 3);
+	const uint8_t bitmap_bit_mask = 1 << (7 - (type_lo & 0x07));
 
 	size_t bm_pos = 0;
-	while (bm_pos < bm_size) {
+	while (bm_pos + 3 < bm_size) {
 		uint8_t win = bm[bm_pos++];
 		uint8_t win_size = bm[bm_pos++];
-
-		if (win == sought_win) {
-			if (win_size >= bitmap_idx) {
+		/* Check remaining window length. */
+		if (win_size < 1 || bm_pos + win_size > bm_size)
+			return false;
+		/* Check that we have a correct window. */
+		if (win == type_hi) {
+			if (bitmap_idx < win_size) {
 				return bm[bm_pos + bitmap_idx] & bitmap_bit_mask;
 			}
 			return false;
+		} else {
+			bm_pos += win_size;
 		}
-
-		bm_pos += win_size;
 	}
 
 	return false;
