@@ -138,6 +138,7 @@ static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *
 static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_nsec3)
 {
 	/* Merge DNSKEY records from answer that are below/at current cut. */
+	bool updated_key = false;
 	const knot_pktsection_t *an = knot_pkt_section(answer, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
@@ -150,6 +151,7 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_ns
 			if (!qry->zone_cut.key) {
 				return kr_error(ENOMEM);
 			}
+			updated_key = true;
 		} else {
 			int ret = knot_rdataset_merge(&qry->zone_cut.key->rrs,
 			                              &rr->rrs, qry->zone_cut.pool);
@@ -157,6 +159,7 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_ns
 				knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
 				return ret;
 			}
+			updated_key = true;
 		}
 	}
 	if (!qry->zone_cut.key) {
@@ -164,7 +167,7 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_ns
 	}
 
 	/* Check if there's a key for current TA. */
-	if (!(qry->flags & QUERY_CACHED)) {
+	if (updated_key && !(qry->flags & QUERY_CACHED)) {
 		int ret = kr_dnskeys_trusted(answer, KNOT_ANSWER, qry->zone_cut.key,
 		                             qry->zone_cut.trust_anchor, qry->zone_cut.name,
 		                             qry->timestamp.tv_sec, has_nsec3);
@@ -335,10 +338,39 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_FAIL;
 	}
 
+	/* Check if we descended to a NS, which is authoritative for both parent-child, this means that
+	 * the signatures are made using a different key than we have.
+	 * Although we can't "pause" the response procesing and fetch the keys, we can
+	 * say "do not cache this answer, and try again". This way, the resolver will realise
+	 * that the keys are missing and will schedule a subrequest before retrying.
+	 */
+	const knot_dname_t *key_own = qry->zone_cut.trust_anchor ? qry->zone_cut.trust_anchor->owner : NULL;
+	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
+	if (use_signatures && sig_name && key_own && !knot_dname_is_equal(key_own, sig_name)) {
+		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
+		if (knot_dname_is_sub(sig_name, qry->zone_cut.name)) {
+			qry->zone_cut.name = knot_dname_copy(sig_name, &req->pool);
+		} else if (!knot_dname_is_equal(sig_name, qry->zone_cut.name)) {
+			/* Key signer is above the current cut, so we can't validate it. This happens when
+			   a server is authoritative for both grandparent, parent and child zone.
+			   Ascend to parent cut, and refetch authority for signer. */
+			if (qry->zone_cut.parent) {
+				memcpy(&qry->zone_cut, qry->zone_cut.parent, sizeof(qry->zone_cut));
+			} else {
+				qry->flags |= QUERY_AWAIT_CUT;
+			}
+			qry->zone_cut.name = knot_dname_copy(sig_name, &req->pool);
+		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
+		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_SERVFAIL); /* Prevent caching */
+		qry->flags &= ~QUERY_RESOLVED;
+		return KNOT_STATE_CONSUME;
+	}
+
 	/* Check if this is a DNSKEY answer, check trust chain and store. */
+	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 	uint16_t qtype = knot_pkt_qtype(pkt);
 	bool has_nsec3 = _knot_pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
-	if (qtype == KNOT_RRTYPE_DNSKEY) {
+	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
 		ret = validate_keyset(qry, pkt, has_nsec3);
 		if (ret != 0) {
 			DEBUG_MSG(qry, "<= bad keys, broken trust chain\n");
@@ -346,29 +378,6 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			return KNOT_STATE_FAIL;
 		}
 	}
-
-	/* Check whether the current zone cut holds keys that can be used
-	 * for validation (i.e. RRSIG signer name matches key owner).
-	 */
-	const knot_dname_t *key_own = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL;
-	const knot_dname_t *sig_name = first_rrsig_signer_name(pkt);
-	if (use_signatures && key_own && sig_name && !knot_dname_is_equal(key_own, sig_name)) {
-		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
-		if (knot_dname_is_sub(sig_name, qry->zone_cut.name)) {
-			qry->zone_cut.name = knot_dname_copy(sig_name, &req->pool);
-		} else if (!knot_dname_is_equal(sig_name, qry->zone_cut.name) && qry->zone_cut.parent) {
-			/* Key signer is above the current cut, so we can't validate it. This happens when
-			   a server is authoritative for both grandparent, parent and child zone.
-			   Ascend to parent cut, and refetch authority for signer. */
-			memcpy(&qry->zone_cut, qry->zone_cut.parent, sizeof(qry->zone_cut));
-			qry->zone_cut.name = knot_dname_copy(sig_name, &req->pool);
-		}
-		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_SERVFAIL); /* Prevent caching */
-		qry->flags &= ~QUERY_RESOLVED;
-		return KNOT_STATE_CONSUME;
-	}
-
-	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 
 	/* Validate non-existence proof if not positive answer. */
 	if (!(qry->flags & QUERY_CACHED) && pkt_rcode == KNOT_RCODE_NXDOMAIN) {
@@ -389,12 +398,8 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	 * doesn't have to worry about NSEC/NSEC3
 	 * @todo rework this */
 	if (!(qry->flags & QUERY_CACHED)) {
-		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ANSWER);
-		uint16_t answer_count = sec ? sec->count : 0;
-
-		/* Validate no data response. */
-		if ((pkt_rcode == KNOT_RCODE_NOERROR) && (!answer_count) &&
-		    (KNOT_WIRE_AA_MASK & knot_wire_get_flags1(pkt->wire))) {
+		const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+		if (pkt_rcode == KNOT_RCODE_NOERROR && an->count == 0 && knot_wire_get_aa(pkt->wire)) { 
 			/* @todo
 			 * ? quick mechanism to determine which check to preform first
 			 * ? merge the functionality together to share code/resources
