@@ -282,9 +282,14 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qry || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state;
 	}
-
-	/* Cache only positive answers. */
-	if (qry->flags & QUERY_CACHED || knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
+	/* Do not cache truncated answers. */
+	if (knot_wire_get_tc(pkt->wire)) {
+		return ctx->state;
+	}
+	/* Cache only positive answers, not meta types or RRSIG. */
+	const uint16_t qtype = knot_pkt_qtype(pkt);
+	const bool is_eligible = !(knot_rrtype_is_metatype(qtype) || qtype == KNOT_RRTYPE_RRSIG);
+	if (qry->flags & QUERY_CACHED || knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR || !is_eligible) {
 		return ctx->state;
 	}
 	/* Stash in-bailiwick data from the AUTHORITY and ANSWER. */
@@ -306,7 +311,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		stash_ds(qry, pkt, &stash, rplan->pool);
 	}
 	/* Cache stashed records */
-	if (ret == 0) {
+	if (ret == 0 && stash.root != NULL) {
 		/* Open write transaction */
 		struct kr_cache *cache = &req->ctx->cache;
 		struct kr_cache_txn txn;

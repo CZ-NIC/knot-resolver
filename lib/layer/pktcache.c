@@ -173,10 +173,11 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!knot_wire_get_aa(pkt->wire) || knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		return ctx->state;
 	}
-	const bool is_any = knot_pkt_qtype(pkt) == KNOT_RRTYPE_ANY;
+	/* Cache only NODATA/NXDOMAIN or metatype/RRSIG answers. */
+	const uint16_t qtype = knot_pkt_qtype(pkt);
+	const bool is_eligible = (knot_rrtype_is_metatype(qtype) || qtype == KNOT_RRTYPE_RRSIG);
 	int pkt_class = kr_response_classify(pkt);
-	/* Cache only NODATA/NXDOMAIN or ANY answers. */
-	if (!((pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) || is_any)) {
+	if (!(is_eligible || (pkt_class & (PKT_NODATA|PKT_NXDOMAIN)))) {
 		return ctx->state;
 	}
 	uint32_t ttl = packet_ttl(pkt);
@@ -190,7 +191,6 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Couldn't acquire cache, ignore. */
 	}
 	const knot_dname_t *qname = knot_pkt_qname(pkt);
-	uint16_t qtype = knot_pkt_qtype(pkt);
 	namedb_val_t data = { pkt->wire, pkt->size };
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,
