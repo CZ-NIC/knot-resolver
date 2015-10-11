@@ -40,7 +40,7 @@ class Entry:
         """ Compare scripted reply to given message using single criteria. """
         if code not in self.match_fields and 'all' not in self.match_fields:
             return True
-        expected = self.message
+        expected = dns.message.from_text(self.message.to_text())
         if code == 'opcode':
             return self.__compare_val(expected.opcode(), msg.opcode())
         elif code == 'qtype':
