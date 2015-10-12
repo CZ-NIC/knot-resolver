@@ -26,11 +26,6 @@
 #define DEFAULT_MAXTTL (15 * 60)
 #define DEFAULT_NOTTL (5) /* Short-time "no data" retention to avoid bursts */
 
-static inline uint8_t get_tag(struct kr_query *qry)
-{
-	return (qry->flags & QUERY_DNSSEC_WANT) ? KR_CACHE_SEC : KR_CACHE_PKT;
-}
-
 static uint32_t limit_ttl(uint32_t ttl)
 {
 	/* @todo Configurable limit */
@@ -50,12 +45,17 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 }
 
 static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
-                          uint16_t rrtype, uint8_t tag, uint32_t timestamp)
+                          uint16_t rrtype, bool want_secure, uint32_t timestamp)
 {
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cache_peek(txn, tag, qname, rrtype, &entry, &timestamp);
+	int ret = kr_cache_peek(txn, KR_CACHE_PKT, qname, rrtype, &entry, &timestamp);
 	if (ret != 0) { /* Not in the cache */
 		return ret;
+	}
+
+	/* Check that we have secure rank. */
+	if (want_secure && entry->rank == KR_RANK_INSECURE) {
+		return kr_error(ENOENT);
 	}
 
 	/* Copy answer, keep the original message id */
@@ -84,12 +84,13 @@ static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 }
 
 /** @internal Try to find a shortcut directly to searched packet. */
-static int loot_cache(struct kr_cache_txn *txn, knot_pkt_t *pkt, uint8_t tag, struct kr_query *qry)
+static int loot_cache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query *qry)
 {
 	uint32_t timestamp = qry->timestamp.tv_sec;
 	const knot_dname_t *qname = qry->sname;
 	uint16_t rrtype = qry->stype;
-	return loot_cache_pkt(txn, pkt, qname, rrtype, tag, timestamp);
+	const bool want_secure = (qry->flags & QUERY_DNSSEC_WANT);
+	return loot_cache_pkt(txn, pkt, qname, rrtype, want_secure, timestamp);
 }
 
 static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -115,8 +116,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Fetch either answer to original or minimized query */
-	uint8_t tag = get_tag(qry);
-	int ret = loot_cache(&txn, pkt, tag, qry);
+	int ret = loot_cache(&txn, pkt, qry);
 	kr_cache_txn_abort(&txn);
 	if (ret == 0) {
 		DEBUG_MSG("=> satisfied from cache\n");
@@ -166,7 +166,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = kr_rplan_current(rplan);
 	/* Cache only answers that make query resolved (i.e. authoritative)
 	 * that didn't fail during processing and are negative. */
-	if (!(qry->flags & QUERY_RESOLVED) || qry->flags & QUERY_CACHED || ctx->state & KNOT_STATE_FAIL) {
+	if (qry->flags & QUERY_CACHED || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state; /* Don't cache anything if failed. */
 	}
 	/* Cache only authoritative answers from IN class. */
@@ -200,7 +200,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	};
 
 	/* Stash answer in the cache */
-	int ret = kr_cache_insert(&txn, get_tag(qry), qname, qtype, &header, data);	
+	int ret = kr_cache_insert(&txn, KR_CACHE_PKT, qname, qtype, &header, data);	
 	if (ret != 0) {
 		kr_cache_txn_abort(&txn);
 	} else {
