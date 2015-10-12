@@ -54,7 +54,7 @@ static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 	}
 
 	/* Check that we have secure rank. */
-	if (want_secure && entry->rank == KR_RANK_INSECURE) {
+	if (want_secure && entry->rank == KR_RANK_BAD) {
 		return kr_error(ENOENT);
 	}
 
@@ -195,9 +195,16 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,
 		.ttl = ttl,
-		.rank = (qry->flags & QUERY_DNSSEC_WANT) ? KR_RANK_SECURE : KR_RANK_INSECURE,
+		.rank = KR_RANK_BAD,
 		.count = data.len
 	};
+
+	/* Set cache rank */
+	if (qry->flags & QUERY_DNSSEC_WANT) {
+		header.rank = KR_RANK_SECURE;
+	} else if (qry->flags & QUERY_DNSSEC_INSECURE) {
+		header.rank = KR_RANK_INSECURE;
+	}
 
 	/* Stash answer in the cache */
 	int ret = kr_cache_insert(&txn, KR_CACHE_PKT, qname, qtype, &header, data);	
