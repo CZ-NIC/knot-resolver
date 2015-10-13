@@ -90,6 +90,7 @@ struct query_flag {
 	static const int NO_MINIMIZE = 1 << 0;
 	static const int NO_IPV6     = 1 << 2;
 	static const int NO_IPV4     = 1 << 3;
+	static const int AWAIT_CUT   = 1 << 8;
 	static const int CACHED      = 1 << 10;
 	static const int NO_CACHE    = 1 << 11;
 	static const int EXPIRING    = 1 << 12;
@@ -224,6 +225,8 @@ const knot_rrset_t *knot_pkt_rr(const knot_pktsection_t *section, uint16_t i);
 /* Resolution request */
 struct kr_rplan *kr_resolve_plan(struct kr_request *request);
 /* Resolution plan */
+struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
+                               const knot_dname_t *name, uint16_t cls, uint16_t type);
 /* Query */
 /* Utils */
 unsigned kr_rand_uint(unsigned max);
@@ -323,6 +326,15 @@ ffi.metatype( kr_request_t, {
 		current = function(req)
 			assert(req)
 			return req.current_query
+		end,
+		push = function(req, qname, qtype, qclass, flags, parent)
+			assert(req)
+			local rplan = C.kr_resolve_plan(req)
+			local qry = C.kr_rplan_push(rplan, parent, qname, qclass, qtype)
+			if qry ~= nil and flags ~= nil then
+				qry.flags = bor(qry.flags, flags)
+			end
+			return qry
 		end,
 	},
 })
