@@ -33,10 +33,12 @@
     (req)->current_query = (qry); \
 	for (unsigned i = 0; i < (req)->ctx->modules->len; ++i) { \
 		struct kr_module *mod = (req)->ctx->modules->at[i]; \
-		if (mod->layer ) { \
+		if (mod->layer) { \
 			struct knot_layer layer = {.state = (req)->state, .api = mod->layer(mod), .data = (req)}; \
 			if (layer.api && layer.api->func) { \
 				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
+				if ((req)->state == KNOT_STATE_YIELD) \
+					break; \
 			} \
 		} \
 	} /* Invalidate current query. */ \
@@ -324,6 +326,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		if (qname_raw && qry->secret != 0) {
 			randomized_qname_case(qname_raw, qry->secret);
 		}
+		request->state = KNOT_STATE_CONSUME;
 		ITERATE_LAYERS(request, qry, consume, packet);
 	}
 
@@ -485,6 +488,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 	/* Resolve current query and produce dependent or finish */
 	struct kr_query *qry = TAIL(rplan->pending);
+	request->state = KNOT_STATE_PRODUCE;
 	ITERATE_LAYERS(request, qry, produce, packet);
 	if (request->state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
 		/* Produced an answer, consume it. */

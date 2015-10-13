@@ -333,13 +333,12 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			}
 			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
 		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
-		knot_wire_set_tc(pkt->wire);
-		result = KNOT_STATE_NOOP;
+		result = KNOT_STATE_YIELD;
 	}
 
 	/* CONSUME => Unhelpful referral.
 	 * DONE    => Zone cut updated.
-	 * NOOP    => Ignore this answer. */
+	 * YIELD   => Bail out. */
 	return result;
 }
 
@@ -449,7 +448,6 @@ static int resolve_error(knot_pkt_t *pkt, struct kr_request *req)
 
 /* State-less single resolution iteration step, not needed. */
 static int reset(knot_layer_t *ctx)  { return KNOT_STATE_PRODUCE; }
-static int finish(knot_layer_t *ctx) { return KNOT_STATE_NOOP; }
 
 /* Set resolution context and parameters. */
 static int begin(knot_layer_t *ctx, void *module_param)
@@ -581,9 +579,6 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_STATE_DONE: /* Referral */
 		DEBUG_MSG("<= referral response, follow\n");
 		break;
-	case KNOT_STATE_NOOP: /* Deferred, bail out. */
-		state = KNOT_STATE_CONSUME;
-		break;
 	default:
 		break;
 	}
@@ -597,7 +592,6 @@ const knot_layer_api_t *iterate_layer(struct kr_module *module)
 	static const knot_layer_api_t _layer = {
 		.begin = &begin,
 		.reset = &reset,
-		.finish = &finish,
 		.consume = &resolve,
 		.produce = &prepare_query
 	};

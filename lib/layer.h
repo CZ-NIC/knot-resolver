@@ -30,3 +30,6 @@
 #else
  #define QRDEBUG(query, cls, fmt, ...)
 #endif
+
+/* Repurpose layer states. */
+#define KNOT_STATE_YIELD KNOT_STATE_NOOP
