@@ -175,6 +175,7 @@ struct kr_rplan {
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
+	struct kr_query *current_query;
 	struct {
 		const knot_rrset_t *key;
 		const struct sockaddr *addr;
@@ -223,7 +224,6 @@ const knot_rrset_t *knot_pkt_rr(const knot_pktsection_t *section, uint16_t i);
 /* Resolution request */
 struct kr_rplan *kr_resolve_plan(struct kr_request *request);
 /* Resolution plan */
-struct kr_query *kr_rplan_current(struct kr_rplan *rplan);
 /* Query */
 /* Utils */
 unsigned kr_rand_uint(unsigned max);
@@ -322,7 +322,7 @@ ffi.metatype( kr_request_t, {
 	__index = {
 		current = function(req)
 			assert(req)
-			return C.kr_rplan_current(C.kr_resolve_plan(req))
+			return req.current_query
 		end,
 	},
 })

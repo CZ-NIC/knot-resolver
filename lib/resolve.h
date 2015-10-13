@@ -108,6 +108,7 @@ struct kr_context
 struct kr_request {
     struct kr_context *ctx;
     knot_pkt_t *answer;
+    struct kr_query *current_query;    /**< Current evaluated query. */
     struct {
         const knot_rrset_t *key;
         const struct sockaddr *addr;

@@ -31,7 +31,7 @@ These we call as *driver*. The driver is not meant to know *"how"* the query is 
 .. image:: ../doc/resolution.png
    :align: center
 
-On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a produce layer can generate a sub-request, a consume layer can satisfy an outstanding query or simply log something, but they should **never** alter resolution plan directly, as it would change "current query" for next-in-line layers (appending to the resolution plan is fine). They also must not block, and may not be paused.
+On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a produce layer can generate a sub-request, a consume layer can satisfy an outstanding query or simply log something. They also must not block, and may not be paused.
 
 .. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``QUERY_AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``QUERY_RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query. The important thing is, these actions happen **after** current set of layers is done.
 
@@ -57,7 +57,7 @@ This structure contains pointers to resolution context, resolution plan and also
 	int consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 	{
 		struct kr_request *request = ctx->data;
-		struct kr_query *query = kr_rplan_current(request->rplan);
+		struct kr_query *query = request->current_query;
 	}
 
 This is only passive processing of the incoming answer. If you want to change the course of resolution, say satisfy a query from a local cache before the library issues a query to the nameserver, you can use states (see the :ref:`Static hints <mod-hints>` for example).
@@ -69,7 +69,7 @@ This is only passive processing of the incoming answer. If you want to change th
 	int produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 	{
 		struct kr_request *request = ctx->data;
-		struct kr_query *cur = kr_rplan_current(request->rplan);
+		struct kr_query *cur = request->current_query;
 		
 		/* Query can be satisfied locally. */
 		if (can_satisfy(cur)) {

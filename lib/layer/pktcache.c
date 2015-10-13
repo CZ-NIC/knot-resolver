@@ -22,7 +22,7 @@
 #include "lib/cache.h"
 #include "lib/module.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " pc ",  fmt)
+#define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), " pc ",  fmt)
 #define DEFAULT_MAXTTL (15 * 60)
 #define DEFAULT_NOTTL (5) /* Short-time "no data" retention to avoid bursts */
 
@@ -96,8 +96,7 @@ static int loot_cache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query
 static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
-	struct kr_rplan *rplan = &req->rplan;
-	struct kr_query *qry = kr_rplan_current(rplan);
+	struct kr_query *qry = req->current_query;
 	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
@@ -119,7 +118,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = loot_cache(&txn, pkt, qry);
 	kr_cache_txn_abort(&txn);
 	if (ret == 0) {
-		DEBUG_MSG("=> satisfied from cache\n");
+		DEBUG_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 		pkt->parsed = pkt->size;
 		knot_wire_set_qr(pkt->wire);
@@ -162,8 +161,7 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
-	struct kr_rplan *rplan = &req->rplan;
-	struct kr_query *qry = kr_rplan_current(rplan);
+	struct kr_query *qry = req->current_query;
 	/* Cache only answers that make query resolved (i.e. authoritative)
 	 * that didn't fail during processing and are negative. */
 	if (qry->flags & QUERY_CACHED || ctx->state & KNOT_STATE_FAIL) {
@@ -211,7 +209,7 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret != 0) {
 		kr_cache_txn_abort(&txn);
 	} else {
-		DEBUG_MSG("=> answer cached for TTL=%u\n", ttl);
+		DEBUG_MSG(qry, "=> answer cached for TTL=%u\n", ttl);
 		kr_cache_txn_commit(&txn);
 	}
 	return ctx->state;

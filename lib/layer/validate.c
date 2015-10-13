@@ -276,7 +276,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	int ret = 0;
 	struct kr_request *req = ctx->data;
-	struct kr_query *qry = kr_rplan_current(&req->rplan);
+	struct kr_query *qry = req->current_query;
 	/* Ignore faulty or unprocessed responses. */
 	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_CONSUME)) {
 		return ctx->state;

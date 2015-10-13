@@ -144,15 +144,6 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 	return KNOT_EOK;
 }
 
-struct kr_query *kr_rplan_current(struct kr_rplan *rplan)
-{
-	if (kr_rplan_empty(rplan)) {
-		return NULL;
-	}
-
-	return TAIL(rplan->pending);
-}
-
 bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
 	while (closure != NULL) {

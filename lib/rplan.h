@@ -130,13 +130,6 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry);
 
 /**
- * Currently resolved query (at the top).
- * @param rplan plan instance
- * @return query instance or NULL if empty
- */
-struct kr_query *kr_rplan_current(struct kr_rplan *rplan);
-
-/**
  * Return true if resolution chain satisfies given query.
  */
 bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type);

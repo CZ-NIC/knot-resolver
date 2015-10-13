@@ -90,8 +90,8 @@ static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_query *qry)
 
 static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *param = ctx->data;
-	struct kr_query *qry = kr_rplan_current(&param->rplan);
+	struct kr_request *req = ctx->data;
+	struct kr_query *qry = req->current_query;
 	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return ctx->state;
 	}

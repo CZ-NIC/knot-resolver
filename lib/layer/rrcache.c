@@ -27,7 +27,7 @@
 #include "lib/module.h"
 #include "lib/utils.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), " rc ",  fmt)
+#define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), " rc ",  fmt)
 #define DEFAULT_MINTTL (5) /* Short-time "no data" retention to avoid bursts */
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
@@ -105,8 +105,7 @@ static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *
 static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
-	struct kr_rplan *rplan = &req->rplan;
-	struct kr_query *qry = kr_rplan_current(rplan);
+	struct kr_query *qry = req->current_query;
 	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
@@ -133,7 +132,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 	if (ret == 0) {
-		DEBUG_MSG("=> satisfied from cache\n");
+		DEBUG_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 		pkt->parsed = pkt->size;
 		knot_wire_set_qr(pkt->wire);
@@ -277,8 +276,7 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_
 static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
-	struct kr_rplan *rplan = &req->rplan;
-	struct kr_query *qry = kr_rplan_current(rplan);
+	struct kr_query *qry = req->current_query;
 	if (!qry || ctx->state & KNOT_STATE_FAIL) {
 		return ctx->state;
 	}
@@ -296,19 +294,19 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	map_t stash = map_make();
 	stash.malloc = (map_alloc_f) mm_alloc;
 	stash.free = (map_free_f) mm_free;
-	stash.baton = rplan->pool;
+	stash.baton = &req->pool;
 	int ret = 0;
 	bool is_auth = knot_wire_get_aa(pkt->wire);
 	if (is_auth) {
-		ret = stash_answer(qry, pkt, &stash, rplan->pool);
+		ret = stash_answer(qry, pkt, &stash, &req->pool);
 	}
 	/* Cache authority only if chasing referral/cname chain */
-	if (!is_auth || qry != HEAD(rplan->pending)) {
-		ret = stash_authority(qry, pkt, &stash, rplan->pool);
+	if (!is_auth || qry != TAIL(req->rplan.pending)) {
+		ret = stash_authority(qry, pkt, &stash, &req->pool);
 	}
 	/* Cache DS records in referrals */
 	if (!is_auth && knot_pkt_has_dnssec(pkt)) {
-		stash_ds(qry, pkt, &stash, rplan->pool);
+		stash_ds(qry, pkt, &stash, &req->pool);
 	}
 	/* Cache stashed records */
 	if (ret == 0 && stash.root != NULL) {

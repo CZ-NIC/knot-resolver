@@ -26,10 +26,11 @@
 #include "lib/layer/iterate.h"
 #include "lib/dnssec/ta.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(rplan), "resl",  fmt)
+#define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), "resl",  fmt)
 
 /** @internal Macro for iterating module layers. */
-#define ITERATE_LAYERS(req, func, ...) \
+#define ITERATE_LAYERS(req, qry, func, ...) \
+    (req)->current_query = (qry); \
 	for (unsigned i = 0; i < (req)->ctx->modules->len; ++i) { \
 		struct kr_module *mod = (req)->ctx->modules->at[i]; \
 		if (mod->layer ) { \
@@ -38,7 +39,8 @@
 				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
 			} \
 		} \
-	}
+	} /* Invalidate current query. */ \
+	(req)->current_query = NULL
 
 /* Randomize QNAME letter case.
  * This adds 32 bits of randomness at maximum, but that's more than an average domain name length.
@@ -124,13 +126,13 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
 		/* Fall back to SBELT if root server query fails. */
 		if (!next_type && qry->zone_cut.name[0] == '\0') {
-			DEBUG_MSG("=> fallback to root hints\n");
+			DEBUG_MSG(qry, "=> fallback to root hints\n");
 			kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
 			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
 			return kr_error(EAGAIN);
 		}
 		/* No IPv4 nor IPv6, flag server as unuseable. */
-		DEBUG_MSG("=> unresolvable NS address, bailing out\n");
+		DEBUG_MSG(qry, "=> unresolvable NS address, bailing out\n");
 		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
 		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 		invalidate_ns(rplan, qry);
@@ -249,6 +251,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->answer = answer;
 	request->options = ctx->options;
 	request->state = KNOT_STATE_CONSUME;
+	request->current_query = NULL;
 
 	/* Expect first query */
 	kr_rplan_init(&request->rplan, request, &request->pool);
@@ -284,7 +287,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
 
 	/* Expect answer, pop if satisfied immediately */
-	ITERATE_LAYERS(request, begin, request);
+	ITERATE_LAYERS(request, qry, begin, request);
 	if (request->state == KNOT_STATE_DONE) {
 		kr_rplan_pop(rplan, qry);
 	}
@@ -295,7 +298,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 {
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_context *ctx = request->ctx;
-	struct kr_query *qry = kr_rplan_current(rplan);
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
@@ -306,11 +308,12 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	}
 
 	/* Different processing for network error */
+	struct kr_query *qry = TAIL(rplan->pending);
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
 		/* Network error, retry over TCP. */
 		if (!tried_tcp) {
-			DEBUG_MSG("=> NS unreachable, retrying over TCP\n");
+			DEBUG_MSG(qry, "=> NS unreachable, retrying over TCP\n");
 			qry->flags |= QUERY_TCP;
 			return KNOT_STATE_PRODUCE;
 		}
@@ -321,7 +324,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		if (qname_raw && qry->secret != 0) {
 			randomized_qname_case(qname_raw, qry->secret);
 		}
-		ITERATE_LAYERS(request, consume, packet);
+		ITERATE_LAYERS(request, qry, consume, packet);
 	}
 
 	/* Resolution failed, invalidate current NS. */
@@ -347,7 +350,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		qry->flags &= ~(QUERY_CACHED|QUERY_TCP);
 	}
 
-	ITERATE_LAYERS(request, reset);
+	ITERATE_LAYERS(request, qry, reset);
 
 	/* Do not finish with bogus answer. */
 	if (qry->flags & QUERY_DNSSEC_BOGUS)  {
@@ -403,10 +406,10 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 					return KNOT_STATE_FAIL;
 				}
 				if (qry->sname[0] != '\0') {
-					DEBUG_MSG("=> root priming query\n");
+					DEBUG_MSG(qry, "=> root priming query\n");
 					zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_NS);
 				} else {
-					DEBUG_MSG("=> using root hints\n");
+					DEBUG_MSG(qry, "=> using root hints\n");
 				}
 				qry->flags &= ~QUERY_AWAIT_CUT;
 				return KNOT_STATE_DONE;
@@ -424,7 +427,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	}
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
-		DEBUG_MSG(">< negative TA, going insecure\n");
+		DEBUG_MSG(qry, ">< negative TA, going insecure\n");
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
 	/* Enable DNSSEC if enters a new island of trust. */
@@ -435,7 +438,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		WITH_DEBUG {
 		char qname_str[KNOT_DNAME_MAXLEN];
 		knot_dname_to_str(qname_str, qry->zone_cut.name, sizeof(qname_str));
-		DEBUG_MSG(">< TA: '%s'\n", qname_str);
+		DEBUG_MSG(qry, ">< TA: '%s'\n", qname_str);
 		}
 	}
 	if (want_secured && !qry->zone_cut.trust_anchor) {
@@ -473,21 +476,21 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
-	struct kr_query *qry = kr_rplan_current(rplan);
 	unsigned ns_election_iter = 0;
-	
+
 	/* No query left for resolution */
 	if (kr_rplan_empty(rplan)) {
 		return KNOT_STATE_FAIL;
 	}
 
 	/* Resolve current query and produce dependent or finish */
-	ITERATE_LAYERS(request, produce, packet);
+	struct kr_query *qry = TAIL(rplan->pending);
+	ITERATE_LAYERS(request, qry, produce, packet);
 	if (request->state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
 		/* Produced an answer, consume it. */
 		qry->secret = 0;
 		request->state = KNOT_STATE_CONSUME;
-		ITERATE_LAYERS(request, consume, packet);
+		ITERATE_LAYERS(request, qry, consume, packet);
 	}
 	switch(request->state) {
 	case KNOT_STATE_FAIL: return request->state;
@@ -497,13 +500,13 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		if (qry->flags & QUERY_RESOLVED) {
 			kr_rplan_pop(rplan, qry);
 		}
-		ITERATE_LAYERS(request, reset);
+		ITERATE_LAYERS(request, qry, reset);
 		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 	}
 
 	/* This query has RD=0 or is ANY, stop here. */
 	if (qry->stype == KNOT_RRTYPE_ANY || !knot_wire_get_rd(request->answer->wire)) {
-		DEBUG_MSG("=> qtype is ANY or RD=0, bail out\n");
+		DEBUG_MSG(qry, "=> qtype is ANY or RD=0, bail out\n");
 		return KNOT_STATE_FAIL;
 	}
 
@@ -521,7 +524,7 @@ ns_election:
 	 * elect best address only, otherwise elect a completely new NS.
 	 */
 	if(++ns_election_iter >= KR_ITER_LIMIT) {
-		DEBUG_MSG("=> couldn't converge NS selection, bail out\n");
+		DEBUG_MSG(qry, "=> couldn't converge NS selection, bail out\n");
 		return KNOT_STATE_FAIL;
 	}
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
@@ -529,14 +532,14 @@ ns_election:
 	} else if (!qry->ns.name || !(qry->flags & QUERY_TCP)) { /* Keep address when TCP retransmit. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
-			DEBUG_MSG("=> priming root DNSKEY\n");
+			DEBUG_MSG(qry, "=> priming root DNSKEY\n");
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
 			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
 		}
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
-			DEBUG_MSG("=> no valid NS left\n");
-			ITERATE_LAYERS(request, reset);
+			DEBUG_MSG(qry, "=> no valid NS left\n");
+			ITERATE_LAYERS(request, qry, reset);
 			kr_rplan_pop(rplan, qry);
 			return KNOT_STATE_PRODUCE;
 		}
@@ -549,7 +552,7 @@ ns_election:
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
 			goto ns_election; /* Must try different NS */
 		}
-		ITERATE_LAYERS(request, reset);
+		ITERATE_LAYERS(request, qry, reset);
 		return KNOT_STATE_PRODUCE;
 	}
 
@@ -570,7 +573,7 @@ ns_election:
 			break;
 		}
 		inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr[i]), ns_str, sizeof(ns_str));
-		DEBUG_MSG("%s: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n",
+		DEBUG_MSG(qry, "%s: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s'\n",
 		          i == 0 ? "=> querying" : "   optional",
 		          ns_str, qry->ns.score, zonecut_str, qname_str, type_str);
 	}
@@ -599,8 +602,8 @@ int kr_resolve_finish(struct kr_request *request, int state)
 		}
 	}
 
-	ITERATE_LAYERS(request, finish);
-	DEBUG_MSG("finished: %d, queries: %zu, mempool: %zu B\n",
+	ITERATE_LAYERS(request, NULL, finish);
+	DEBUG_MSG(NULL, "finished: %d, queries: %zu, mempool: %zu B\n",
 	          state, list_size(&rplan->resolved), (size_t) mp_total_size(request->pool.ctx));
 	return KNOT_STATE_DONE;
 }

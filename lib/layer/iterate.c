@@ -28,7 +28,7 @@
 #include "lib/module.h"
 #include "lib/dnssec/ta.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(kr_rplan_current(&req->rplan), "iter", fmt)
+#define DEBUG_MSG(fmt...) QRDEBUG(req->current_query, "iter", fmt)
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
@@ -158,16 +158,14 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 	return KNOT_STATE_CONSUME;
 }
 
-static int update_parent(const knot_rrset_t *rr, struct kr_request *req)
+static int update_parent(const knot_rrset_t *rr, struct kr_query *qry)
 {
-	struct kr_query *qry = kr_rplan_current(&req->rplan);
 	return update_nsaddr(rr, qry->parent);
 }
 
-static int update_answer(const knot_rrset_t *rr, unsigned hint, struct kr_request *req)
+static int update_answer(const knot_rrset_t *rr, unsigned hint, knot_pkt_t *answer)
 {
 	/* Scrub DNSSEC records when not requested. */
-	knot_pkt_t *answer = req->answer;
 	if (!knot_pkt_has_dnssec(answer)) {
 		if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
 			return KNOT_STATE_DONE; /* Scrub */
@@ -214,7 +212,7 @@ static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns)
 
 static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request *req)
 {
-	struct kr_query *qry = kr_rplan_current(&req->rplan);
+	struct kr_query *qry = req->current_query;
 	struct kr_zonecut *cut = &qry->zone_cut;
 	int state = KNOT_STATE_CONSUME;
 
@@ -278,7 +276,7 @@ static const knot_dname_t *signature_authority(knot_pkt_t *pkt)
 static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 {
 	int result = KNOT_STATE_CONSUME;
-	struct kr_query *qry = kr_rplan_current(&req->rplan);
+	struct kr_query *qry = req->current_query;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
 #ifdef STRICT_MODE
@@ -360,7 +358,7 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 		for (unsigned i = 0; i < ns->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 			if (knot_dname_in(cut->name, rr->owner)) {
-				update_answer(rr, 0, req);
+				update_answer(rr, 0, answer);
 			}
 		}
 	}
@@ -368,7 +366,7 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 
 static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
-	struct kr_query *query = kr_rplan_current(&req->rplan);
+	struct kr_query *query = req->current_query;
 
 	/* Response for minimized QNAME.
 	 * NODATA   => may be empty non-terminal, retry (found zone cut)
@@ -407,7 +405,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if(knot_dname_is_equal(cname, knot_pkt_qname(req->answer))) {
 			hint = KNOT_COMPR_HINT_QNAME;
 		}
-		int state = is_final ? update_answer(rr, hint, req) : update_parent(rr, req);
+		int state = is_final ? update_answer(rr, hint, req->answer) : update_parent(rr, query);
 		if (state == KNOT_STATE_FAIL) {
 			return state;
 		}
@@ -431,8 +429,6 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (!next) {
 			return KNOT_STATE_FAIL;
 		}
-		rem_node(&query->node); /* *MUST* keep current query at tail */
-		insert_node(&query->node, &next->node);
 		next->flags |= QUERY_AWAIT_CUT;
 		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
 		if (kr_ta_covers(&req->ctx->trust_anchors, cname) &&
@@ -488,7 +484,7 @@ static int prepare_query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->data;
-	struct kr_query *query = kr_rplan_current(&req->rplan);
+	struct kr_query *query = req->current_query;
 	if (!query || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return ctx->state;
 	}
@@ -525,7 +521,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->data;
-	struct kr_query *query = kr_rplan_current(&req->rplan);
+	struct kr_query *query = req->current_query;
 	if (!query || (query->flags & QUERY_RESOLVED)) {
 		return ctx->state;
 	}
