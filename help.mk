@@ -12,7 +12,7 @@ info:
 	$(info Dependencies)
 	$(info ------------)
 	$(info [$(HAS_libknot)] libknot (lib))
-	$(info [$(HAS_lua)] lua (daemon))
+	$(info [$(HAS_lua)] LuaJIT (daemon))
 	$(info [$(HAS_libuv)] libuv (daemon))
 	$(info )
 	$(info Optional)
