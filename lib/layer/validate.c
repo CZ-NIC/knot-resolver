@@ -272,6 +272,24 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 	return ret;
 }
 
+static const knot_dname_t *signature_authority(knot_pkt_t *pkt)
+{
+	/* Can't find signer for RRSIGs, bail out. */
+	if (knot_pkt_qtype(pkt) == KNOT_RRTYPE_RRSIG) {
+		return NULL;
+	}
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_AUTHORITY; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (rr->type == KNOT_RRTYPE_RRSIG) {
+				return knot_rrsig_signer_name(&rr->rrs, 0);
+			}
+		}
+	}
+	return NULL;
+}
+
 static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	int ret = 0;
@@ -294,6 +312,34 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_FAIL;
 	}
 
+	/* Track difference between current TA and signer name.
+	 * This indicates that the NS is auth for both parent-child, and we must update DS/DNSKEY to validate it.
+	 * @todo: This has to be checked here before we put the data into packet, there is no "DEFER" or "PAUSE" action yet.
+	 */
+	const bool track_pc_change = (!(qry->flags & QUERY_CACHED) && (qry->flags & QUERY_DNSSEC_WANT));
+	const knot_dname_t *ta_name = qry->zone_cut.trust_anchor ? qry->zone_cut.trust_anchor->owner : NULL;
+	const knot_dname_t *signer = signature_authority(pkt);
+	if (track_pc_change && ta_name && signer && !knot_dname_is_equal(ta_name, signer)) {
+		if (ctx->state == KNOT_STATE_YIELD) { /* Already yielded for revalidation. */
+			return KNOT_STATE_FAIL;
+		}
+		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
+		if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
+			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
+		} else if (!knot_dname_is_equal(signer, qry->zone_cut.name)) {
+			/* Key signer is above the current cut, so we can't validate it. This happens when
+			   a server is authoritative for both grandparent, parent and child zone.
+			   Ascend to parent cut, and refetch authority for signer. */
+			if (qry->zone_cut.parent) {
+				memcpy(&qry->zone_cut, qry->zone_cut.parent, sizeof(qry->zone_cut));
+			} else {
+				qry->flags |= QUERY_AWAIT_CUT;
+			}
+			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
+		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
+		return KNOT_STATE_YIELD;
+	}
+	
 	/* Check if this is a DNSKEY answer, check trust chain and store. */
 	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 	uint16_t qtype = knot_pkt_qtype(pkt);
@@ -368,7 +414,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 	DEBUG_MSG(qry, "<= answer valid, OK\n");
-	return ctx->state;
+	return KNOT_STATE_DONE;
 }
 /** Module implementation. */
 const knot_layer_api_t *validate_layer(struct kr_module *module)

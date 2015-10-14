@@ -28,21 +28,63 @@
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), "resl",  fmt)
 
+/**
+ * @internal Defer execution of current query.
+ * The current layer state and input will be pushed to a stack and resumed on next iteration.
+ */
+static int consume_yield(knot_layer_t *ctx, knot_pkt_t *pkt)
+{
+	struct kr_request *req = ctx->data;
+	knot_pkt_t *pkt_copy = knot_pkt_new(NULL, pkt->size, &req->pool);
+	struct kr_layer_pickle *pickle = mm_alloc(&req->pool, sizeof(*pickle));
+	if (pickle && pkt_copy && knot_pkt_copy(pkt_copy, pkt) == 0) {
+		struct kr_query *qry = req->current_query;
+		pickle->api = ctx->api;
+		pickle->state = ctx->state;
+		pickle->pkt = pkt_copy;
+		pickle->next = qry->deferred;
+		qry->deferred = pickle;
+		return kr_ok();
+	}
+	return kr_error(ENOMEM);
+}
+static int begin_yield(knot_layer_t *ctx, void *module) { return kr_ok(); }
+static int reset_yield(knot_layer_t *ctx) { return kr_ok(); }
+static int finish_yield(knot_layer_t *ctx) { return kr_ok(); }
+static int produce_yield(knot_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
+
 /** @internal Macro for iterating module layers. */
-#define ITERATE_LAYERS(req, qry, func, ...) \
+#define RESUME_LAYERS(from, req, qry, func, ...) \
     (req)->current_query = (qry); \
-	for (unsigned i = 0; i < (req)->ctx->modules->len; ++i) { \
+	for (size_t i = (from); i < (req)->ctx->modules->len; ++i) { \
 		struct kr_module *mod = (req)->ctx->modules->at[i]; \
 		if (mod->layer) { \
 			struct knot_layer layer = {.state = (req)->state, .api = mod->layer(mod), .data = (req)}; \
 			if (layer.api && layer.api->func) { \
 				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
-				if ((req)->state == KNOT_STATE_YIELD) \
+				if ((req)->state == KNOT_STATE_YIELD) { \
+					func ## _yield(&layer, ##__VA_ARGS__); \
 					break; \
+				} \
 			} \
 		} \
 	} /* Invalidate current query. */ \
 	(req)->current_query = NULL
+
+/** @internal Macro for starting module iteration. */
+#define ITERATE_LAYERS(req, qry, func, ...) RESUME_LAYERS(0, req, qry, func, ##__VA_ARGS__)
+
+/** @internal Find layer id matching API. */
+static inline size_t layer_id(struct kr_request *req, const struct knot_layer_api *api) {
+	module_array_t *modules = req->ctx->modules;
+	for (size_t i = 0; i < modules->len; ++i) {
+		struct kr_module *mod = modules->at[i];
+		if (mod->layer && mod->layer(mod) == api) {
+			return i;
+		}
+	}
+	return 0; /* Not found, try all. */
+}
 
 /* Randomize QNAME letter case.
  * This adds 32 bits of randomness at maximum, but that's more than an average domain name length.
@@ -345,7 +387,9 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	}
 
 	/* Pop query if resolved. */
-	if (qry->flags & QUERY_RESOLVED) {
+	if (request->state == KNOT_STATE_YIELD) {
+		return KNOT_STATE_PRODUCE; /* Requery */
+	} else if (qry->flags & QUERY_RESOLVED) {
 		kr_rplan_pop(rplan, qry);
 	} else if (!tried_tcp && (qry->flags & QUERY_TCP)) {
 		return KNOT_STATE_PRODUCE; /* Requery over TCP */
@@ -381,6 +425,61 @@ static struct kr_query *zone_cut_subreq(struct kr_rplan *rplan, struct kr_query 
 		next->flags |= QUERY_DNSSEC_WANT;
 	}
 	return next;
+}
+
+/* @todo: Validator refactoring, keep this in driver for now. */
+static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
+{
+	struct kr_rplan *rplan = &request->rplan;
+	map_t *trust_anchors = &request->ctx->trust_anchors;
+	map_t *negative_anchors = &request->ctx->negative_anchors;
+
+	/* Disable DNSSEC if it enters NTA. */
+	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
+		DEBUG_MSG(qry, ">< negative TA, going insecure\n");
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+	}
+	/* Enable DNSSEC if enters a new island of trust. */
+	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT);
+	if (!want_secured && kr_ta_get(trust_anchors, qry->zone_cut.name)) {
+		qry->flags |= QUERY_DNSSEC_WANT;
+		want_secured = true;
+		WITH_DEBUG {
+		char qname_str[KNOT_DNAME_MAXLEN];
+		knot_dname_to_str(qname_str, qry->zone_cut.name, sizeof(qname_str));
+		DEBUG_MSG(qry, ">< TA: '%s'\n", qname_str);
+		}
+	}
+	if (want_secured && !qry->zone_cut.trust_anchor) {
+		knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
+		qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
+	}
+	/* Try to fetch missing DS (from above the cut). */
+	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
+	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
+	const bool refetch_ta = !has_ta || !knot_dname_is_equal(qry->zone_cut.name, ta_name);
+	if (want_secured && refetch_ta) {
+		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
+		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);
+		if (!next) {
+			return KNOT_STATE_FAIL;
+		}
+		next->flags |= QUERY_AWAIT_CUT|QUERY_DNSSEC_WANT;
+		return KNOT_STATE_DONE;
+	}
+	/* Try to fetch missing DNSKEY (either missing or above current cut).
+	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
+	const bool is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
+	const bool refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
+	if (want_secured && refetch_key && !is_dnskey_subreq) {
+		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
+		if (!next) {
+			return KNOT_STATE_FAIL;
+		}
+		return KNOT_STATE_DONE;
+	}
+
+	return KNOT_STATE_PRODUCE;
 }
 
 /** @internal Check current zone cut status and credibility, spawn subrequests if needed. */
@@ -428,52 +527,9 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		}
 		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
-	/* Disable DNSSEC if it enters NTA. */
-	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
-		DEBUG_MSG(qry, ">< negative TA, going insecure\n");
-		qry->flags &= ~QUERY_DNSSEC_WANT;
-	}
-	/* Enable DNSSEC if enters a new island of trust. */
-	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT);
-	if (!want_secured && kr_ta_get(trust_anchors, qry->zone_cut.name)) {
-		qry->flags |= QUERY_DNSSEC_WANT;
-		want_secured = true;
-		WITH_DEBUG {
-		char qname_str[KNOT_DNAME_MAXLEN];
-		knot_dname_to_str(qname_str, qry->zone_cut.name, sizeof(qname_str));
-		DEBUG_MSG(qry, ">< TA: '%s'\n", qname_str);
-		}
-	}
-	if (want_secured && !qry->zone_cut.trust_anchor) {
-		knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
-		qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
-	}
-	/* Try to fetch missing DS (from above the cut). */
-	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
-	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
-	const bool refetch_ta = !has_ta || !knot_dname_is_equal(qry->zone_cut.name, ta_name);
-	if (want_secured && refetch_ta) {
-		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
-		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);
-		if (!next) {
-			return KNOT_STATE_FAIL;
-		}
-		next->flags |= QUERY_AWAIT_CUT|QUERY_DNSSEC_WANT;
-		return KNOT_STATE_DONE;
-	}
-	/* Try to fetch missing DNSKEY (either missing or above current cut).
-	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
-	const bool is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
-	const bool refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
-	if (want_secured && refetch_key && !is_dnskey_subreq) {
-		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
-		if (!next) {
-			return KNOT_STATE_FAIL;
-		}
-		return KNOT_STATE_DONE;
-	}
 
-	return KNOT_STATE_PRODUCE;	
+	/* Check trust chain */
+	return trust_chain_check(request, qry);
 }
 
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
@@ -485,23 +541,37 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	if (kr_rplan_empty(rplan)) {
 		return KNOT_STATE_FAIL;
 	}
-
-	/* Resolve current query and produce dependent or finish */
+	/* If we have deferred answers, resume them. */
 	struct kr_query *qry = TAIL(rplan->pending);
-	request->state = KNOT_STATE_PRODUCE;
-	ITERATE_LAYERS(request, qry, produce, packet);
-	if (request->state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
-		/* Produced an answer, consume it. */
-		qry->secret = 0;
-		request->state = KNOT_STATE_CONSUME;
-		ITERATE_LAYERS(request, qry, consume, packet);
+	if (qry->deferred != NULL) {
+		/* @todo: Refactoring validator, check trust chain before resuming. */
+		switch(trust_chain_check(request, qry)) {
+		case KNOT_STATE_FAIL: return KNOT_STATE_FAIL;
+		case KNOT_STATE_DONE: return KNOT_STATE_PRODUCE;
+		default: break;
+		}
+		DEBUG_MSG(qry, "=> resuming yielded answer\n");
+		struct kr_layer_pickle *pickle = qry->deferred;
+		request->state = KNOT_STATE_YIELD;
+		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
+		qry->deferred = pickle->next;
+	} else {
+		/* Resolve current query and produce dependent or finish */
+		request->state = KNOT_STATE_PRODUCE;
+		ITERATE_LAYERS(request, qry, produce, packet);
+		if (request->state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
+			/* Produced an answer, consume it. */
+			qry->secret = 0;
+			request->state = KNOT_STATE_CONSUME;
+			ITERATE_LAYERS(request, qry, consume, packet);
+		}
 	}
 	switch(request->state) {
 	case KNOT_STATE_FAIL: return request->state;
 	case KNOT_STATE_CONSUME: break;
 	case KNOT_STATE_DONE:
 	default: /* Current query is done */
-		if (qry->flags & QUERY_RESOLVED) {
+		if (qry->flags & QUERY_RESOLVED && request->state != KNOT_STATE_YIELD) {
 			kr_rplan_pop(rplan, qry);
 		}
 		ITERATE_LAYERS(request, qry, reset);

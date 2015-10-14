@@ -23,17 +23,55 @@ For developers
 The resolution process starts with the functions in :ref:`resolve.c <lib_api_rplan>`, they are responsible for:
 
 * reacting to state machine state (i.e. calling consume layers if we have an answer ready)
-* interacting with the user (i.e. asking caller for I/O, accepting queries)
-* fetching assets needed by layers (i.e. zone cut, next best NS address or trust anchor)
+* interacting with the library user (i.e. asking caller for I/O, accepting queries)
+* fetching assets needed by layers (i.e. zone cut)
 
-These we call as *driver*. The driver is not meant to know *"how"* the query is resolved, but rather *"when"* to execute *"what"*. Typically here you can modify or reorder the resolution plan, or request input from the caller.
+This is the *driver*. The driver is not meant to know *"how"* the query resolves, but rather *"when"* to execute *"what"*.
 
 .. image:: ../doc/resolution.png
    :align: center
 
-On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a produce layer can generate a sub-request, a consume layer can satisfy an outstanding query or simply log something. They also must not block, and may not be paused.
+On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a *produce* layer generates query, a *consume* layer validates answer.
 
-.. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``QUERY_AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``QUERY_RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query. The important thing is, these actions happen **after** current set of layers is done.
+.. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``QUERY_AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``QUERY_RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query.
+
+Layers can also change course of resolution, for example by appending additional queries.
+
+.. code-block:: lua
+
+	consume = function (state, req, answer)
+		answer = kres.pkt_t(answer)
+		if answer:qtype() == kres.type.NS then
+			req = kres.request_t(req)
+			local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
+			qry.flags = kres.query.AWAIT_CUT
+		end
+		return state
+	end
+
+This **doesn't** block currently processed query, and the newly created sub-request will start as soon as driver finishes processing current. In some cases you might need to issue sub-request and process it **before** continuing with the current, i.e. validator may need a DNSKEY before it can validate signatures. In this case, layers can yield and resume afterwards.
+
+.. code-block:: lua
+
+	consume = function (state, req, answer)
+		answer = kres.pkt_t(answer)
+		if state == kres.YIELD then
+			print('continuing yielded layer')
+			return kres.DONE
+		else
+			if answer:qtype() == kres.type.NS then
+				req = kres.request_t(req)
+				local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
+				qry.flags = kres.query.AWAIT_CUT
+				print('planned SOA query, yielding')
+				return kres.YIELD
+			end
+			return state
+		end
+	end
+
+The ``YIELD`` state is a bit special. When a layer returns it, it interrupts current walk through the layers. When the layer receives it,
+it means that it yielded before and now it is resumed. This is useful in a situation where you need a sub-request to determine whether current answer is valid or not.
 
 Writing layers
 ==============
@@ -61,8 +99,6 @@ This structure contains pointers to resolution context, resolution plan and also
 	}
 
 This is only passive processing of the incoming answer. If you want to change the course of resolution, say satisfy a query from a local cache before the library issues a query to the nameserver, you can use states (see the :ref:`Static hints <mod-hints>` for example).
-
-.. warning:: Never replace or push new queries onto the resolution plan, this is a job of the resolution driver. Single pass through layers expects *current query* to be constant. You can however signalize driver with requests using query flags, like ``QUERY_RESOLVED`` to mark it as resolved.
 
 .. code-block:: c
 
@@ -103,7 +139,125 @@ It is possible to not only act during the query resolution, but also to view the
 		return ctx->state;
 	}
 
+APIs in Lua
+===========
+
+The APIs in Lua world try to mirror the C APIs using LuaJIT FFI, with several differences and enhancements.
+There is not comprehensive guide on the API yet, but you can have a look at the bindings_ file.
+
+Elementary types and constants
+------------------------------
+
+* States are directly in ``kres`` table, e.g. ``kres.YIELD, kres.CONSUME, kres.PRODUCE, kres.DONE, kres.FAIL``.
+* DNS classes are in ``kres.class`` table, e.g. ``kres.class.IN`` for Internet class.
+* DNS types are in  ``kres.type`` table, e.g. ``kres.type.AAAA`` for AAAA type.
+* DNS rcodes types are in ``kres.rcode`` table, e.g. ``kres.rcode.NOERROR``.
+* Packet sections (QUESTION, ANSWER, AUTHORITY, ADDITIONAL) are in the ``kres.section`` table.
+
+Working with domain names
+-------------------------
+
+The internal API usually works with domain names in label format, you can convert between text and wire freely.
+
+.. code-block:: lua
+
+	local dname = kres.str2dname('business.se')
+	local strname = kres.dname2str(dname)
+
+Working with resource records
+-----------------------------
+
+Resource records are stored as tables.
+
+.. code-block:: lua
+
+	local rr = { owner = kres.str2dname('owner'),
+	             ttl = 0,
+	             class = kres.class.IN,
+	             type = kres.type.CNAME,
+	             rdata = kres.str2dname('someplace') }
+	print(kres.rr2str(rr))
+
+RRSets in packet can be accessed using FFI, you can easily fetch single records.
+
+.. code-block:: lua
+
+	local rrset = { ... }
+	local rr = rrset:get(0) -- Return first RR
+	print(kres.dname2str(rr:owner()))
+	print(rr:ttl())
+	print(kres.rr2str(rr))
+
+Working with packets
+--------------------
+
+Packet is the data structure that you're going to see in layers very often. They consists of a header, and four sections: QUESTION, ANSWER, AUTHORITY, ADDITIONAL. The first section is special, as it contains the query name, type, and class; the rest of the sections contain RRSets.
+
+First you need to convert it to a type known to FFI and check basic properties. Let's start with a snippet of a *consume* layer.
+
+.. code-block:: lua
+
+	consume = function (state, req, pkt)
+		pkt = kres.pkt_t(answer)
+		print('rcode:', pkt:rcode())
+		print('query:', kres.dname2str(pkt:qname()), pkt:qclass(), pkt:qtype())
+		if pkt:rcode() ~= kres.rcode.NOERROR then
+			print('error response')
+		end
+	end
+
+You can enumerate records in the sections.
+
+.. code-block:: lua
+
+	local records = pkt:section(kres.section.ANSWER)
+	for i = 1, #records do
+		local rr = records[i]
+		if rr.type == kres.type.AAAA then
+			print(kres.rr2str(rr))
+		end
+	end
+
+During *produce* or *begin*, you might want to want to write to packet. Keep in mind that you have to write packet sections in sequence,
+e.g. you can't write to ANSWER after writing AUTHORITY, it's like stages where you can't go back.
+
+.. code-block:: lua
+
+		pkt:rcode(kres.rcode.NXDOMAIN)
+		pkt:begin(kres.section.ANSWER)
+		-- Nothing in answer
+		pkt:begin(kres.section.AUTHORITY)
+		local soa = { owner = '\7blocked', ttl = 900, class = kres.class.IN, type = kres.type.SOA, rdata = '...' }
+		pkt:put(soa.owner, soa.ttl, soa.class, soa.type, soa.rdata)
+
+Working with requests
+---------------------
+
+The request holds information about currently processed query, enabled options, cache, and other extra data.
+You primarily need to retrieve currently processed query.
+
+.. code-block:: lua
+
+	consume = function (state, req, pkt)
+		req = kres.request_t(req)
+		print(req.options)
+		print(req.state)
+
+		-- Print information about current query
+		local current = req:current()
+		print(kres.dname2str(current.owner))
+		print(current.type, current.class, current.id, current.flags)
+	end
+
+As described in the layers, you can not only retrieve information about current query, but also push new ones.
+
+.. code-block:: lua
+
+		local qry = req:push(pkt:qname(), kres.type.SOA, kres.class.IN)
+		qry.flags = kres.query.AWAIT_CUT
+
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot
 .. _`processing API`: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot/processing
+.. _bindings: https://gitlab.labs.nic.cz/knot/resolver/blob/master/daemon/lua/kres.lua#L361
 
 .. |---| unicode:: U+02014 .. em dash
