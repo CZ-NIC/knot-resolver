@@ -28,21 +28,63 @@
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), "resl",  fmt)
 
+/**
+ * @internal Defer execution of current query.
+ * The current layer state and input will be pushed to a stack and resumed on next iteration.
+ */
+static int consume_yield(knot_layer_t *ctx, knot_pkt_t *pkt)
+{
+	struct kr_request *req = ctx->data;
+	knot_pkt_t *pkt_copy = knot_pkt_new(NULL, pkt->size, &req->pool);
+	struct kr_layer_pickle *pickle = mm_alloc(&req->pool, sizeof(*pickle));
+	if (pickle && pkt_copy && knot_pkt_copy(pkt_copy, pkt) == 0) {
+		struct kr_query *qry = req->current_query;
+		pickle->api = ctx->api;
+		pickle->state = ctx->state;
+		pickle->pkt = pkt_copy;
+		pickle->next = qry->deferred;
+		qry->deferred = pickle;
+		return kr_ok();
+	}
+	return kr_error(ENOMEM);
+}
+static int begin_yield(knot_layer_t *ctx, void *module) { return kr_ok(); }
+static int reset_yield(knot_layer_t *ctx) { return kr_ok(); }
+static int finish_yield(knot_layer_t *ctx) { return kr_ok(); }
+static int produce_yield(knot_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
+
 /** @internal Macro for iterating module layers. */
-#define ITERATE_LAYERS(req, qry, func, ...) \
+#define RESUME_LAYERS(from, req, qry, func, ...) \
     (req)->current_query = (qry); \
-	for (unsigned i = 0; i < (req)->ctx->modules->len; ++i) { \
+	for (size_t i = (from); i < (req)->ctx->modules->len; ++i) { \
 		struct kr_module *mod = (req)->ctx->modules->at[i]; \
 		if (mod->layer) { \
 			struct knot_layer layer = {.state = (req)->state, .api = mod->layer(mod), .data = (req)}; \
 			if (layer.api && layer.api->func) { \
 				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
-				if ((req)->state == KNOT_STATE_YIELD) \
+				if ((req)->state == KNOT_STATE_YIELD) { \
+					func ## _yield(&layer, ##__VA_ARGS__); \
 					break; \
+				} \
 			} \
 		} \
 	} /* Invalidate current query. */ \
 	(req)->current_query = NULL
+
+/** @internal Macro for starting module iteration. */
+#define ITERATE_LAYERS(req, qry, func, ...) RESUME_LAYERS(0, req, qry, func, ##__VA_ARGS__)
+
+/** @internal Find layer id matching API. */
+static inline size_t layer_id(struct kr_request *req, const struct knot_layer_api *api) {
+	module_array_t *modules = req->ctx->modules;
+	for (size_t i = 0; i < modules->len; ++i) {
+		struct kr_module *mod = modules->at[i];
+		if (mod->layer && mod->layer(mod) == api) {
+			return i;
+		}
+	}
+	return 0; /* Not found, try all. */
+}
 
 /* Randomize QNAME letter case.
  * This adds 32 bits of randomness at maximum, but that's more than an average domain name length.
@@ -485,23 +527,30 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	if (kr_rplan_empty(rplan)) {
 		return KNOT_STATE_FAIL;
 	}
-
-	/* Resolve current query and produce dependent or finish */
+	/* If we have deferred answers, resume them. */
 	struct kr_query *qry = TAIL(rplan->pending);
-	request->state = KNOT_STATE_PRODUCE;
-	ITERATE_LAYERS(request, qry, produce, packet);
-	if (request->state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
-		/* Produced an answer, consume it. */
-		qry->secret = 0;
-		request->state = KNOT_STATE_CONSUME;
-		ITERATE_LAYERS(request, qry, consume, packet);
+	if (false && qry->deferred != NULL) { /** DISABLED until validator is fixed */
+		struct kr_layer_pickle *pickle = qry->deferred;
+		request->state = KNOT_STATE_YIELD;
+		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
+		qry->deferred = pickle->next;
+	} else {
+		/* Resolve current query and produce dependent or finish */
+		request->state = KNOT_STATE_PRODUCE;
+		ITERATE_LAYERS(request, qry, produce, packet);
+		if (request->state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
+			/* Produced an answer, consume it. */
+			qry->secret = 0;
+			request->state = KNOT_STATE_CONSUME;
+			ITERATE_LAYERS(request, qry, consume, packet);
+		}
 	}
 	switch(request->state) {
 	case KNOT_STATE_FAIL: return request->state;
 	case KNOT_STATE_CONSUME: break;
 	case KNOT_STATE_DONE:
 	default: /* Current query is done */
-		if (qry->flags & QUERY_RESOLVED) {
+		if (qry->flags & QUERY_RESOLVED && request->state != KNOT_STATE_YIELD) {
 			kr_rplan_pop(rplan, qry);
 		}
 		ITERATE_LAYERS(request, qry, reset);

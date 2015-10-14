@@ -31,5 +31,13 @@
  #define QRDEBUG(query, cls, fmt, ...)
 #endif
 
+/** Pickled layer state (api, input, state). */
+struct kr_layer_pickle {
+    struct kr_layer_pickle *next;
+    const struct knot_layer_api *api;
+    knot_pkt_t *pkt;
+    unsigned state;
+};
+
 /* Repurpose layer states. */
 #define KNOT_STATE_YIELD KNOT_STATE_NOOP

@@ -70,6 +70,7 @@ struct kr_query {
 	struct timeval timestamp;
 	struct kr_nsrep ns;
 	struct kr_zonecut zone_cut;
+	struct kr_layer_pickle *deferred;
 };
 
 /**
@@ -125,7 +126,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
  * @note Popped queries are not discarded, but moved to the resolved list.
  * @param rplan plan instance
  * @param qry resolved query
- * @return KNOT_E*
+ * @return 0 or an error
  */
 int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry);
 
