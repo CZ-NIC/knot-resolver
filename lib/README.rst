@@ -139,7 +139,125 @@ It is possible to not only act during the query resolution, but also to view the
 		return ctx->state;
 	}
 
+APIs in Lua
+===========
+
+The APIs in Lua world try to mirror the C APIs using LuaJIT FFI, with several differences and enhancements.
+There is not comprehensive guide on the API yet, but you can have a look at the bindings_ file.
+
+Elementary types and constants
+------------------------------
+
+* States are directly in ``kres`` table, e.g. ``kres.YIELD, kres.CONSUME, kres.PRODUCE, kres.DONE, kres.FAIL``.
+* DNS classes are in ``kres.class`` table, e.g. ``kres.class.IN`` for Internet class.
+* DNS types are in  ``kres.type`` table, e.g. ``kres.type.AAAA`` for AAAA type.
+* DNS rcodes types are in ``kres.rcode`` table, e.g. ``kres.rcode.NOERROR``.
+* Packet sections (QUESTION, ANSWER, AUTHORITY, ADDITIONAL) are in the ``kres.section`` table.
+
+Working with domain names
+-------------------------
+
+The internal API usually works with domain names in label format, you can convert between text and wire freely.
+
+.. code-block:: lua
+
+	local dname = kres.str2dname('business.se')
+	local strname = kres.dname2str(dname)
+
+Working with resource records
+-----------------------------
+
+Resource records are stored as tables.
+
+.. code-block:: lua
+
+	local rr = { owner = kres.str2dname('owner'),
+	             ttl = 0,
+	             class = kres.class.IN,
+	             type = kres.type.CNAME,
+	             rdata = kres.str2dname('someplace') }
+	print(kres.rr2str(rr))
+
+RRSets in packet can be accessed using FFI, you can easily fetch single records.
+
+.. code-block:: lua
+
+	local rrset = { ... }
+	local rr = rrset:get(0) -- Return first RR
+	print(kres.dname2str(rr:owner()))
+	print(rr:ttl())
+	print(kres.rr2str(rr))
+
+Working with packets
+--------------------
+
+Packet is the data structure that you're going to see in layers very often. They consists of a header, and four sections: QUESTION, ANSWER, AUTHORITY, ADDITIONAL. The first section is special, as it contains the query name, type, and class; the rest of the sections contain RRSets.
+
+First you need to convert it to a type known to FFI and check basic properties. Let's start with a snippet of a *consume* layer.
+
+.. code-block:: lua
+
+	consume = function (state, req, pkt)
+		pkt = kres.pkt_t(answer)
+		print('rcode:', pkt:rcode())
+		print('query:', kres.dname2str(pkt:qname()), pkt:qclass(), pkt:qtype())
+		if pkt:rcode() ~= kres.rcode.NOERROR then
+			print('error response')
+		end
+	end
+
+You can enumerate records in the sections.
+
+.. code-block:: lua
+
+	local records = pkt:section(kres.section.ANSWER)
+	for i = 1, #records do
+		local rr = records[i]
+		if rr.type == kres.type.AAAA then
+			print(kres.rr2str(rr))
+		end
+	end
+
+During *produce* or *begin*, you might want to want to write to packet. Keep in mind that you have to write packet sections in sequence,
+e.g. you can't write to ANSWER after writing AUTHORITY, it's like stages where you can't go back.
+
+.. code-block:: lua
+
+		pkt:rcode(kres.rcode.NXDOMAIN)
+		pkt:begin(kres.section.ANSWER)
+		-- Nothing in answer
+		pkt:begin(kres.section.AUTHORITY)
+		local soa = { owner = '\7blocked', ttl = 900, class = kres.class.IN, type = kres.type.SOA, rdata = '...' }
+		pkt:put(soa.owner, soa.ttl, soa.class, soa.type, soa.rdata)
+
+Working with requests
+---------------------
+
+The request holds information about currently processed query, enabled options, cache, and other extra data.
+You primarily need to retrieve currently processed query.
+
+.. code-block:: lua
+
+	consume = function (state, req, pkt)
+		req = kres.request_t(req)
+		print(req.options)
+		print(req.state)
+
+		-- Print information about current query
+		local current = req:current()
+		print(kres.dname2str(current.owner))
+		print(current.type, current.class, current.id, current.flags)
+	end
+
+As described in the layers, you can not only retrieve information about current query, but also push new ones.
+
+.. code-block:: lua
+
+		local qry = req:push(pkt:qname(), kres.type.SOA, kres.class.IN)
+		qry.flags = kres.query.AWAIT_CUT
+
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot
 .. _`processing API`: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot/processing
+.. _bindings: https://gitlab.labs.nic.cz/knot/resolver/blob/master/daemon/lua/kres.lua#L361
 
 .. |---| unicode:: U+02014 .. em dash
