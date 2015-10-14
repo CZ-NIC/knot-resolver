@@ -23,17 +23,55 @@ For developers
 The resolution process starts with the functions in :ref:`resolve.c <lib_api_rplan>`, they are responsible for:
 
 * reacting to state machine state (i.e. calling consume layers if we have an answer ready)
-* interacting with the user (i.e. asking caller for I/O, accepting queries)
-* fetching assets needed by layers (i.e. zone cut, next best NS address or trust anchor)
+* interacting with the library user (i.e. asking caller for I/O, accepting queries)
+* fetching assets needed by layers (i.e. zone cut)
 
-These we call as *driver*. The driver is not meant to know *"how"* the query is resolved, but rather *"when"* to execute *"what"*. Typically here you can modify or reorder the resolution plan, or request input from the caller.
+This is the *driver*. The driver is not meant to know *"how"* the query resolves, but rather *"when"* to execute *"what"*.
 
 .. image:: ../doc/resolution.png
    :align: center
 
-On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a produce layer can generate a sub-request, a consume layer can satisfy an outstanding query or simply log something. They also must not block, and may not be paused.
+On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a *produce* layer generates query, a *consume* layer validates answer.
 
-.. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``QUERY_AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``QUERY_RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query. The important thing is, these actions happen **after** current set of layers is done.
+.. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``QUERY_AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``QUERY_RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query.
+
+Layers can also change course of resolution, for example by appending additional queries.
+
+.. code-block:: lua
+
+	consume = function (state, req, answer)
+		answer = kres.pkt_t(answer)
+		if answer:qtype() == kres.type.NS then
+			req = kres.request_t(req)
+			local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
+			qry.flags = kres.query.AWAIT_CUT
+		end
+		return state
+	end
+
+This **doesn't** block currently processed query, and the newly created sub-request will start as soon as driver finishes processing current. In some cases you might need to issue sub-request and process it **before** continuing with the current, i.e. validator may need a DNSKEY before it can validate signatures. In this case, layers can yield and resume afterwards.
+
+.. code-block:: lua
+
+	consume = function (state, req, answer)
+		answer = kres.pkt_t(answer)
+		if state == kres.YIELD then
+			print('continuing yielded layer')
+			return kres.DONE
+		else
+			if answer:qtype() == kres.type.NS then
+				req = kres.request_t(req)
+				local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
+				qry.flags = kres.query.AWAIT_CUT
+				print('planned SOA query, yielding')
+				return kres.YIELD
+			end
+			return state
+		end
+	end
+
+The ``YIELD`` state is a bit special. When a layer returns it, it interrupts current walk through the layers. When the layer receives it,
+it means that it yielded before and now it is resumed. This is useful in a situation where you need a sub-request to determine whether current answer is valid or not.
 
 Writing layers
 ==============
@@ -61,8 +99,6 @@ This structure contains pointers to resolution context, resolution plan and also
 	}
 
 This is only passive processing of the incoming answer. If you want to change the course of resolution, say satisfy a query from a local cache before the library issues a query to the nameserver, you can use states (see the :ref:`Static hints <mod-hints>` for example).
-
-.. warning:: Never replace or push new queries onto the resolution plan, this is a job of the resolution driver. Single pass through layers expects *current query* to be constant. You can however signalize driver with requests using query flags, like ``QUERY_RESOLVED`` to mark it as resolved.
 
 .. code-block:: c
 
