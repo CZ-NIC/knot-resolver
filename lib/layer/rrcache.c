@@ -249,7 +249,7 @@ static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, 
 
 static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx_t *pool)
 {
-	const knot_dname_t *cname = qry->sname;
+	const knot_dname_t *cname = knot_pkt_qname(pkt);
 	const knot_pktsection_t *answer = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < answer->count; ++i) {
 		/* Stash direct answers (equal to current QNAME/CNAME),
