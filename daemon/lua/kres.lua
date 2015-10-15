@@ -90,10 +90,12 @@ struct query_flag {
 	static const int NO_MINIMIZE = 1 << 0;
 	static const int NO_IPV6     = 1 << 2;
 	static const int NO_IPV4     = 1 << 3;
+	static const int RESOLVED    = 1 << 5;
 	static const int AWAIT_CUT   = 1 << 8;
 	static const int CACHED      = 1 << 10;
 	static const int NO_CACHE    = 1 << 11;
 	static const int EXPIRING    = 1 << 12;
+	static const int DNSSEC_WANT = 1 << 14;
 };
 
 /*
@@ -227,6 +229,8 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request);
 /* Resolution plan */
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type);
+struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
+struct kr_query *kr_rplan_next(struct kr_query *qry);
 /* Query */
 /* Utils */
 unsigned kr_rand_uint(unsigned max);
@@ -316,7 +320,11 @@ ffi.metatype( knot_pkt_t, {
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
-		name = function(qry) return ffi.string(qry.sname) end,
+		name = function(qry, new_name) return ffi.string(qry.sname) end,
+		next = function(qry)
+			assert(qry)
+			return C.kr_rplan_next(qry)
+		end,
 	},
 })
 -- Metatype for request
@@ -327,6 +335,10 @@ ffi.metatype( kr_request_t, {
 			assert(req)
 			return req.current_query
 		end,
+		resolved = function(req)
+			assert(req)
+			return C.kr_rplan_resolved(C.kr_resolve_plan(req))
+		end,
 		push = function(req, qname, qtype, qclass, flags, parent)
 			assert(req)
 			local rplan = C.kr_resolve_plan(req)
@@ -335,6 +347,10 @@ ffi.metatype( kr_request_t, {
 				qry.flags = bor(qry.flags, flags)
 			end
 			return qry
+		end,
+		pop = function(req, qry)
+			assert(req)
+			return C.kr_rplan_pop(C.kr_resolve_plan(req), qry)
 		end,
 	},
 })

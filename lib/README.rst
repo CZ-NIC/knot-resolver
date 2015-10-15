@@ -249,12 +249,28 @@ You primarily need to retrieve currently processed query.
 		print(current.type, current.class, current.id, current.flags)
 	end
 
-As described in the layers, you can not only retrieve information about current query, but also push new ones.
+In layers that either begin or finalize, you can walk the list of resolved queries.
 
 .. code-block:: lua
 
+	local last = req:resolved()
+	print(last.type)
+	last = last:next()
+	if last ~= nil then
+		print(last.type)
+	end
+
+As described in the layers, you can not only retrieve information about current query, but also push new ones or pop old ones.
+
+.. code-block:: lua
+
+		-- Push new query
 		local qry = req:push(pkt:qname(), kres.type.SOA, kres.class.IN)
 		qry.flags = kres.query.AWAIT_CUT
+
+		-- Pop the query, this will erase it from resolution plan
+		req:pop(qry)
+
 
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot
 .. _`processing API`: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot/processing

@@ -154,3 +154,19 @@ bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint
 	}
 	return false;
 }
+
+struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan)
+{
+	if (EMPTY_LIST(rplan->resolved)) {
+		return NULL;
+	}
+	return TAIL(rplan->resolved);
+}
+
+struct kr_query *kr_rplan_next(struct kr_query *qry)
+{
+	if (!qry) {
+		return NULL;
+	}
+	return (struct kr_query *)qry->node.prev; /* The lists are used as stack, TOP is the TAIL. */
+}
