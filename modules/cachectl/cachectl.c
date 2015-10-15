@@ -169,6 +169,11 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 		    storage->iter_val(it, &val) != 0) {
 			break;
 		}
+		/* Ignore special namespaces. */
+		if (key.len < 2 || ((const char *)key.data)[0] == 'V') {
+			it = storage->iter_next(it);
+			continue;
+		}
 		/* Prune expired records. */
 		struct kr_cache_entry *entry = val.data;
 		if (entry->timestamp > now.tv_sec) {
