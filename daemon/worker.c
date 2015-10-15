@@ -328,6 +328,7 @@ static void on_connect(uv_connect_t *req, int status)
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	kr_resolve_finish(&task->req, state);
+	task->req.state = KNOT_STATE_NOOP;
 	/* Send back answer */
 	(void) qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, task->req.answer);
 	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
