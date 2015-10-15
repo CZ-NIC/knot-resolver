@@ -60,6 +60,7 @@ end
 
 function graphite.config(conf)
 	-- config defaults
+	if not conf then return 0 end
 	if not conf.port then conf.port = 2003 end
 	if not conf.interval then conf.interval = 5 * sec end
 	if conf.prefix then graphite.prefix = conf.prefix end
