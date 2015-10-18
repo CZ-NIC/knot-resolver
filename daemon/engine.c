@@ -214,39 +214,46 @@ static void l_unpack_json(lua_State *L, JsonNode *table)
 	}
 }
 
+/** @internal Recursive Lua/JSON serialization. */
 static JsonNode *l_pack_elem(lua_State *L, int top)
 {
-	if (lua_isstring(L, top)) {
-		return json_mkstring(lua_tostring(L, top));
+	switch(lua_type(L, top)) {
+	case LUA_TSTRING:  return json_mkstring(lua_tostring(L, top));
+	case LUA_TNUMBER:  return json_mknumber(lua_tonumber(L, top));
+	case LUA_TBOOLEAN: return json_mkbool(lua_toboolean(L, top));
+	case LUA_TTABLE:   break; /* Table, iterate it. */
+	default:           return json_mknull();
 	}
-	if (lua_isnumber(L, top)) {
-		return json_mknumber(lua_tonumber(L, top));	
-	}
-	if (lua_isboolean(L, top)) {
-		return json_mkbool(lua_toboolean(L, top));	
-	}
-	return json_mknull();
-}
-
-static char *l_pack_json(lua_State *L, int top)
-{
-	JsonNode *root = json_mkobject();
-	if (!root) {
-		return NULL;
-	}
-	/* Iterate table on stack */
+	/* Use absolute indexes here, as the table may be nested. */
+	JsonNode *node = NULL;
 	lua_pushnil(L);
-	while(lua_next(L, top)) {
-		JsonNode *val = l_pack_elem(L, -1);
-		if (lua_isstring(L, -2)) {
-			json_append_member(root, lua_tostring(L, -2), val);
+	while(lua_next(L, top) != 0) {
+		JsonNode *val = l_pack_elem(L, top + 2);
+		const bool no_key = lua_isnumber(L, top + 1);
+		if (!node) {
+			node = no_key ? json_mkarray() : json_mkobject();
+			if (!node) {
+				return NULL;
+			}
+		}
+		/* Insert to array/table */
+		if (no_key) {
+			json_append_element(node, val);
 		} else {
-			json_append_element(root, val);
+			json_append_member(node, lua_tostring(L, top + 1), val);
 		}
 		lua_pop(L, 1);
 	}
-	lua_pop(L, 1);
-	/* Serialize to string */
+	return node;
+}
+
+/** @internal Serialize to string */
+static char *l_pack_json(lua_State *L, int top)
+{
+	JsonNode *root = l_pack_elem(L, top);
+	if (!root) {
+		return NULL;
+	}
 	char *result = json_encode(root);
 	json_delete(root);
 	return result;
