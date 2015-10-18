@@ -36,24 +36,130 @@
 #define DEFAULT_FILE "/etc/hosts"
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "hint",  fmt)
 
+/* Structure for reverse search (address to domain) */
+struct rev_search_baton {
+	knot_pkt_t *pkt;
+	const knot_dname_t *name;
+	union {
+		struct in_addr ip4;
+		struct in6_addr ip6;
+	} addr;
+	size_t addr_len;
+};
+
 static int begin(knot_layer_t *ctx, void *module_param)
 {
 	ctx->data = module_param;
 	return ctx->state;
 }
 
-static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_query *qry)
+static int put_answer(knot_pkt_t *pkt, knot_rrset_t *rr)
 {
-	uint16_t rrtype = qry->stype;
-	uint16_t rrclass = qry->sclass;
-	if (rrtype != KNOT_RRTYPE_A && rrtype != KNOT_RRTYPE_AAAA) {
+	int ret = 0;
+	if (!knot_rrset_empty(rr)) {
+		/* Update packet question */
+		if (!knot_dname_is_equal(knot_pkt_qname(pkt), rr->owner)) {
+			KR_PKT_RECYCLE(pkt);
+			knot_pkt_put_question(pkt, rr->owner, rr->rclass, rr->type);
+		}
+		/* Append to packet */
+		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, rr, KNOT_PF_FREE);
+	} else {
+		ret = kr_error(ENOENT);
+	}
+	/* Clear RR if failed */
+	if (ret != 0) {
+		knot_rrset_clear(rr, &pkt->mm);
+	}
+	return ret;
+}
+
+static int find_reverse(const char *k, void *v, void *baton)
+{
+	const knot_dname_t *domain = (const knot_dname_t *)k;
+	pack_t *addr_set = (pack_t *)v;
+	struct rev_search_baton *search = baton;
+	/* Check if it matches any of the addresses. */
+	bool matches = false;
+	uint8_t *addr = pack_head(*addr_set);
+	while (!matches && addr != pack_tail(*addr_set)) {
+		size_t len = pack_obj_len(addr);
+		void *addr_val = pack_obj_val(addr);
+		matches = (len == search->addr_len && memcmp(addr_val, (void *)&search->addr, len) == 0);
+		addr = pack_obj_next(addr);
+	}
+	/* Synthesise PTR record */
+	if (!matches) {
+		return 0;
+	}
+	knot_pkt_t *pkt = search->pkt;
+	knot_dname_t *qname = knot_dname_copy(search->name, &pkt->mm);
+	knot_rrset_t rr;
+	knot_rrset_init(&rr, qname, KNOT_RRTYPE_PTR, KNOT_CLASS_IN);
+	knot_rrset_add_rdata(&rr, domain, knot_dname_size(domain), 0, &pkt->mm);
+	/* Insert into packet */
+	int ret = put_answer(pkt, &rr);
+	if (ret == 0) {
+		return 1;
+	}
+	return ret;
+}
+
+static inline uint8_t label2num(const uint8_t **src, int base)
+{
+	uint8_t ret = strtoul((const char *)(*src + 1), NULL, base) & 0xff; /* ord(0-64) => labels are separators */
+	*src = knot_wire_next_label(*src, NULL);
+	return ret;
+}
+
+static int satisfy_reverse(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_query *qry)
+{
+	struct rev_search_baton baton = {
+		.pkt = pkt,
+		.name = qry->sname,
+		.addr_len = sizeof(struct in_addr)
+	};
+	/* Check if it is IPv6/IPv4 query. */
+	size_t need_labels = baton.addr_len;
+	if (knot_dname_in((const uint8_t *)"\3ip6\4arpa", qry->sname)) {
+		baton.addr_len = sizeof(struct in6_addr);
+		need_labels = baton.addr_len * 2; /* Each label is a nibble */
+	}
+	/* Make address from QNAME (reverse order). */
+	int labels = knot_dname_labels(qry->sname, NULL);
+	if (labels != need_labels + 2) {
+		return kr_error(EINVAL);
+	}
+	const uint8_t *src = qry->sname;
+	uint8_t *dst = (uint8_t *)&baton.addr.ip4 + baton.addr_len - 1;
+	for (size_t i = 0; i < baton.addr_len; ++i) {
+		if (baton.addr_len == sizeof(struct in_addr)) { /* IPv4, 1 label = 1 octet */
+			*dst = label2num(&src, 10);
+		} else { /* IPv4, 1 label = 1 nibble */
+			*dst = label2num(&src, 16);
+			*dst |= label2num(&src, 16) << 4;
+		}
+		dst -= 1;
+	}
+	/* Try to find matching domains. */
+	int ret = map_walk(&hints->nsset, find_reverse, &baton);
+	if (ret > 0) {
+		return kr_ok(); /* Found */
+	}
+	return kr_error(ENOENT);
+}
+
+static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_query *qry)
+{
+	/* Find a matching name */
+	pack_t *addr_set = kr_zonecut_find(hints, qry->sname);
+	if (!addr_set || addr_set->len == 0) {
 		return kr_error(ENOENT);
 	}
-
 	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
 	knot_rrset_t rr;
-	knot_rrset_init(&rr, qname, rrtype, rrclass);
-	int family_len = sizeof(struct in_addr);
+	knot_rrset_init(&rr, qname, qry->stype, qry->sclass);
+	size_t family_len = sizeof(struct in_addr);
 	if (rr.type == KNOT_RRTYPE_AAAA) {
 		family_len = sizeof(struct in6_addr);
 	}
@@ -69,46 +175,33 @@ static int answer_query(knot_pkt_t *pkt, pack_t *addr_set, struct kr_query *qry)
 		addr = pack_obj_next(addr);
 	}
 
-	int ret = 0;
-	if (!knot_rrset_empty(&rr)) {
-		/* Update packet question */
-		if (!knot_dname_is_equal(knot_pkt_qname(pkt), qname)) {
-			KR_PKT_RECYCLE(pkt);
-			knot_pkt_put_question(pkt, qname, rrclass, rrtype);
-		}
-		/* Append to packet */
-		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr, KNOT_PF_FREE);
-	} else {
-		ret = kr_error(ENOENT);
-	}
-	/* Clear RR if failed */
-	if (ret != 0) {
-		knot_rrset_clear(&rr, &pkt->mm);
-	}
-	return ret;
+	return put_answer(pkt, &rr);
 }
 
 static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
-	if (!qry || ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
+	if (!qry || ctx->state & (KNOT_STATE_FAIL)) {
 		return ctx->state;
 	}
 
-	/* Find a matching name */
 	struct kr_module *module = ctx->api->data;
 	struct kr_zonecut *hint_map = module->data;
-	pack_t *pack = kr_zonecut_find(hint_map, qry->sname);
-	if (!pack || pack->len == 0) {
-		return ctx->state;
+	switch(qry->stype) {
+	case KNOT_RRTYPE_A:
+	case KNOT_RRTYPE_AAAA: /* Find forward record hints */
+		if (satisfy_forward(hint_map, pkt, qry) != 0)
+			return ctx->state;
+		break;
+	case KNOT_RRTYPE_PTR: /* Find PTR record */
+		if (satisfy_reverse(hint_map, pkt, qry) != 0)
+			return ctx->state;
+		break;
+	default:
+		return ctx->state; /* Ignore */
 	}
 
-	/* Write to packet */
-	int ret = answer_query(pkt, pack, qry);
-	if (ret != 0) {
-		return ctx->state;
-	}
 	DEBUG_MSG(qry, "<= answered from hints\n");
 	qry->flags &= ~QUERY_DNSSEC_WANT; /* Never authenticated */
 	qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
@@ -292,6 +385,18 @@ static int pack_hint(const char *k, void *v, void *baton)
 	return kr_ok();
 }
 
+static void unpack_hint(struct kr_zonecut *root_hints, JsonNode *table, const char *name)
+{
+	JsonNode *node = NULL;
+	json_foreach(node, table) {
+		switch(node->tag) {
+		case JSON_STRING: add_pair(root_hints, name ? name : node->key, node->string_); break;
+		case JSON_ARRAY: unpack_hint(root_hints, node, name ? name : node->key); break;
+		default: continue;
+		}
+	}
+}
+
 /**
  * Get/set root hints set.
  *
@@ -303,23 +408,18 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 {
 	struct engine *engine = env;
 	struct kr_context *ctx = &engine->resolver;
+	struct kr_zonecut *root_hints = &ctx->root_hints;
 	/* Replace root hints if parameter is set */
 	if (args && strlen(args) > 0) {
-		JsonNode *node = NULL;
 		JsonNode *root_node = json_decode(args);
-		kr_zonecut_set(&ctx->root_hints, (const uint8_t *)"");
-		json_foreach(node, root_node) {
-			switch(node->tag) {
-			case JSON_STRING: add_pair(&ctx->root_hints, node->key, node->string_); break;
-			default: continue;
-			}
-		}
+		kr_zonecut_set(root_hints, (const uint8_t *)"");
+		unpack_hint(root_hints, root_node, NULL);
 		json_delete(root_node);
 	}
 	/* Return current root hints */
 	char *result = NULL;
 	JsonNode *root_node = json_mkobject();
-	if (map_walk(&ctx->root_hints.nsset, pack_hint, root_node) == 0) {
+	if (map_walk(&root_hints->nsset, pack_hint, root_node) == 0) {
 		result = json_encode(root_node);
 	}
 	json_delete(root_node);

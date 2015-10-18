@@ -130,6 +130,7 @@ static void help(int argc, char *argv[])
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
 	       " -a, --addr=[addr]    Server address (default: localhost#53).\n"
+	       " -c, --config=[path]  Config file path (relative to [rundir]) (default: config).\n"
 	       " -k, --keyfile=[path] File containing trust anchors (DS or DNSKEY).\n"
 	       " -f, --forks=N        Start N forks sharing the configuration.\n"
 	       " -v, --verbose        Run in verbose mode.\n"
@@ -202,12 +203,14 @@ int main(int argc, char **argv)
 	array_t(char*) addr_set;
 	array_init(addr_set);
 	char *keyfile = NULL;
+	const char *config = NULL;
 	static char keyfile_buf[PATH_MAX + 1];
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
 	struct option opts[] = {
 		{"addr", required_argument,   0, 'a'},
+		{"config", required_argument, 0, 'c'},
 		{"keyfile",required_argument, 0, 'k'},
 		{"forks",required_argument,   0, 'f'},
 		{"verbose",    no_argument,   0, 'v'},
@@ -215,11 +218,14 @@ int main(int argc, char **argv)
 		{"help",      no_argument,    0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:f:k:vVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:c:f:k:vVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
 			array_push(addr_set, optarg);
+			break;
+		case 'c':
+			config = optarg;
 			break;
 		case 'f':
 			g_interactive = 0;
@@ -262,12 +268,17 @@ int main(int argc, char **argv)
 	if (optind < argc) {
 		const char *rundir = argv[optind];
 		if (access(rundir, W_OK) != 0) {
-			log_error("[system] rundir '%s': not writeable\n", rundir);
+			log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
 		ret = chdir(rundir);
 		if (ret != 0) {
 			log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
+			return EXIT_FAILURE;
+		}
+		if(config && access(config, R_OK) != 0) {
+			log_error("[system] rundir '%s'\n", rundir);
+			log_error("[system] config '%s': %s\n", config, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
@@ -324,7 +335,7 @@ int main(int argc, char **argv)
 	}
 	/* Start the scripting engine */
 	if (ret == 0) {
-		ret = engine_start(&engine);
+		ret = engine_start(&engine, config ? config : "config");
 		if (ret == 0) {
 			if (keyfile) {
 				auto_free char *cmd = afmt("trust_anchors.file = '%s'", keyfile);

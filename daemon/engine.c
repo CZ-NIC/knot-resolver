@@ -214,39 +214,46 @@ static void l_unpack_json(lua_State *L, JsonNode *table)
 	}
 }
 
+/** @internal Recursive Lua/JSON serialization. */
 static JsonNode *l_pack_elem(lua_State *L, int top)
 {
-	if (lua_isstring(L, top)) {
-		return json_mkstring(lua_tostring(L, top));
+	switch(lua_type(L, top)) {
+	case LUA_TSTRING:  return json_mkstring(lua_tostring(L, top));
+	case LUA_TNUMBER:  return json_mknumber(lua_tonumber(L, top));
+	case LUA_TBOOLEAN: return json_mkbool(lua_toboolean(L, top));
+	case LUA_TTABLE:   break; /* Table, iterate it. */
+	default:           return json_mknull();
 	}
-	if (lua_isnumber(L, top)) {
-		return json_mknumber(lua_tonumber(L, top));	
-	}
-	if (lua_isboolean(L, top)) {
-		return json_mkbool(lua_toboolean(L, top));	
-	}
-	return json_mknull();
-}
-
-static char *l_pack_json(lua_State *L, int top)
-{
-	JsonNode *root = json_mkobject();
-	if (!root) {
-		return NULL;
-	}
-	/* Iterate table on stack */
+	/* Use absolute indexes here, as the table may be nested. */
+	JsonNode *node = NULL;
 	lua_pushnil(L);
-	while(lua_next(L, top)) {
-		JsonNode *val = l_pack_elem(L, -1);
-		if (lua_isstring(L, -2)) {
-			json_append_member(root, lua_tostring(L, -2), val);
+	while(lua_next(L, top) != 0) {
+		JsonNode *val = l_pack_elem(L, top + 2);
+		const bool no_key = lua_isnumber(L, top + 1);
+		if (!node) {
+			node = no_key ? json_mkarray() : json_mkobject();
+			if (!node) {
+				return NULL;
+			}
+		}
+		/* Insert to array/table */
+		if (no_key) {
+			json_append_element(node, val);
 		} else {
-			json_append_element(root, val);
+			json_append_member(node, lua_tostring(L, top + 1), val);
 		}
 		lua_pop(L, 1);
 	}
-	lua_pop(L, 1);
-	/* Serialize to string */
+	return node;
+}
+
+/** @internal Serialize to string */
+static char *l_pack_json(lua_State *L, int top)
+{
+	JsonNode *root = l_pack_elem(L, top);
+	if (!root) {
+		return NULL;
+	}
 	char *result = json_encode(root);
 	json_delete(root);
 	return result;
@@ -341,10 +348,10 @@ static int init_resolver(struct engine *engine)
 	}
 
 	/* Load basic modules */
-	engine_register(engine, "iterate");
-	engine_register(engine, "validate");
-	engine_register(engine, "rrcache");
-	engine_register(engine, "pktcache");
+	engine_register(engine, "iterate", NULL, NULL);
+	engine_register(engine, "validate", NULL, NULL);
+	engine_register(engine, "rrcache", NULL, NULL);
+	engine_register(engine, "pktcache", NULL, NULL);
 
 	/* Initialize storage backends */
 	struct storage_api lmdb = {
@@ -482,7 +489,7 @@ int engine_cmd(struct engine *engine, const char *str)
 #define l_dosandboxfile(L, filename) \
 	(luaL_loadfile((L), (filename)) || engine_pcall((L), 0))
 
-static int engine_loadconf(struct engine *engine)
+static int engine_loadconf(struct engine *engine, const char *config_path)
 {
 	/* Use module path for including Lua scripts */
 	static const char l_paths[] = "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'";
@@ -500,8 +507,8 @@ static int engine_loadconf(struct engine *engine)
 		return kr_error(ENOEXEC);
 	}
 	/* Load config file */
-	if(access("config", F_OK ) != -1 ) {
-		ret = l_dosandboxfile(engine->L, "config");
+	if(access(config_path, F_OK ) != -1 ) {
+		ret = l_dosandboxfile(engine->L, config_path);
 	}
 	if (ret == 0) {
 		/* Load defaults */
@@ -519,10 +526,10 @@ static int engine_loadconf(struct engine *engine)
 	return ret;
 }
 
-int engine_start(struct engine *engine)
+int engine_start(struct engine *engine, const char *config_path)
 {
 	/* Load configuration. */
-	int ret = engine_loadconf(engine);
+	int ret = engine_loadconf(engine, config_path);
 	if (ret != 0) {
 		return ret;
 	}
@@ -565,19 +572,36 @@ static int register_properties(struct engine *engine, struct kr_module *module)
 	return kr_ok();
 }
 
-int engine_register(struct engine *engine, const char *name)
+/** @internal Find matching module */
+static size_t module_find(module_array_t *mod_list, const char *name)
+{
+	size_t found = mod_list->len;
+	for (size_t i = 0; i < mod_list->len; ++i) {
+		struct kr_module *mod = mod_list->at[i];
+		if (strcmp(mod->name, name) == 0) {
+			found = i;
+			break;
+		}
+	}
+	return found;
+}
+
+int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
 {
 	if (engine == NULL || name == NULL) {
 		return kr_error(EINVAL);
 	}
-	/* Check priority modules */
-	bool is_priority = false;
-	if (name[0] == '<') {
-		is_priority = true;
-		name += 1;
-	}
 	/* Make sure module is unloaded */
 	(void) engine_unregister(engine, name);
+	/* Find the index of referenced module. */
+	module_array_t *mod_list = &engine->modules;
+	size_t ref_pos = mod_list->len;
+	if (precedence && ref) {
+		ref_pos = module_find(mod_list, ref);
+		if (ref_pos >= mod_list->len) {
+			return kr_error(EIDRM);
+		}
+	}
 	/* Attempt to load binary module */
 	struct kr_module *module = malloc(sizeof(*module));
 	if (!module) {
@@ -597,11 +621,22 @@ int engine_register(struct engine *engine, const char *name)
 		engine_unload(engine, module);
 		return kr_error(ENOMEM);
 	}
-	/* Push to front if priority module */
-	if (is_priority) {
-		struct kr_module **arr = engine->modules.at;
-		memmove(&arr[1], &arr[0], sizeof(*arr) * (engine->modules.len - 1));
-		arr[0] = module;
+	/* Evaluate precedence operator */
+	if (precedence) {
+		struct kr_module **arr = mod_list->at;
+		size_t emplacement = mod_list->len;
+		if (strcasecmp(precedence, ">") == 0) {
+			if (ref_pos + 1 < mod_list->len)
+				emplacement = ref_pos + 1; /* Insert after target */
+		}
+		if (strcasecmp(precedence, "<") == 0) {
+			emplacement = ref_pos; /* Insert at target */
+		}
+		/* Move the tail if it has some elements. */
+		if (emplacement + 1 < mod_list->len) {
+			memmove(&arr[emplacement + 1], &arr[emplacement], sizeof(*arr) * (mod_list->len - (emplacement + 1)));
+			arr[emplacement] = module;
+		}
 	}
 
 	/* Register properties */
@@ -614,16 +649,8 @@ int engine_register(struct engine *engine, const char *name)
 
 int engine_unregister(struct engine *engine, const char *name)
 {
-	/* Find matching module. */
 	module_array_t *mod_list = &engine->modules;
-	size_t found = mod_list->len;
-	for (size_t i = 0; i < mod_list->len; ++i) {
-		struct kr_module *mod = mod_list->at[i];
-		if (strcmp(mod->name, name) == 0) {
-			found = i;
-			break;
-		}
-	}
+	size_t found = module_find(mod_list, name);
 	if (found < mod_list->len) {
 		engine_unload(engine, mod_list->at[found]);
 		array_del(*mod_list, found);

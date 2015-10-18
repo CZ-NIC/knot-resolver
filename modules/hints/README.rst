@@ -3,9 +3,25 @@
 Static hints
 ------------
 
-This is a module providing static hints from ``/etc/hosts`` like file.
-You can also use it to change root hints that are used as a safety belt or if the root NS
+This is a module providing static hints from ``/etc/hosts`` like file for forward records (A/AAAA) and reverse records (PTR).
+You can also use it to change root hints that are used as a safety belt, or if the root NS
 drops out of cache.
+
+Examples
+^^^^^^^^
+
+.. code-block:: lua
+
+  -- Load hints after iterator
+  modules = { 'hints > iterate' }
+  -- Load hints before rrcache, custom hosts file
+  modules = { ['hints < rrcache'] = 'hosts.custom' }
+  -- Add root hints
+  hints.root({
+    ['j.root-servers.net.'] = { '2001:503:c27::2:30', '192.58.128.30' }
+  })
+  -- Set custom hint
+  hints['localhost'] = '127.0.0.1'
 
 Properties
 ^^^^^^^^^^
