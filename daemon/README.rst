@@ -157,6 +157,21 @@ the modules use as the :ref:`input configuration <mod-properties>`.
 		hints = '/etc/hosts'
 	}
 
+.. warning:: Modules specified including their configuration may not load exactly in the same order as specified.
+
+Modules are inherently ordered by their declaration. Some modules are built-in, so it would be normally impossible to place for example *hints* before *rrcache*. You can enforce specific order by precedence operators **>** and **<**.
+
+.. code-block:: lua
+
+   modules = {
+      'hints  > iterate', -- Hints AFTER iterate
+      'policy > hints',   -- Policy AFTER hints
+      'view   < rrcache'  -- View BEFORE rrcache
+   }
+   modules.list() -- Check module call order
+
+This is useful if you're writing a module with a layer, that evaluates an answer before writing it into cache for example.
+
 .. tip:: The configuration and CLI syntax is Lua language, with which you may already be familiar with.
          If not, you can read the `Learn Lua in 15 minutes`_ for a syntax overview. Spending just a few minutes
          will allow you to break from static configuration, write more efficient configuration with iteration, and

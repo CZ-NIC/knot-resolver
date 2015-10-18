@@ -63,7 +63,7 @@ void engine_deinit(struct engine *engine);
 int engine_cmd(struct engine *engine, const char *str);
 int engine_start(struct engine *engine);
 void engine_stop(struct engine *engine);
-int engine_register(struct engine *engine, const char *module);
+int engine_register(struct engine *engine, const char *module, const char *precedence, const char* ref);
 int engine_unregister(struct engine *engine, const char *module);
 void engine_lualib(struct engine *engine, const char *name, int (*lib_cb) (struct lua_State *));
 

@@ -52,6 +52,7 @@ setmetatable(modules, {
 		if type(k) == 'number' then k = v end
 		if not rawget(_G, k) then
 			modules.load(k)
+			k = string.match(k, '%w+')
 			local mod = _G[k]
 			local config = rawget(mod, 'config')
 			if mod and config then

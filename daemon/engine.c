@@ -348,10 +348,10 @@ static int init_resolver(struct engine *engine)
 	}
 
 	/* Load basic modules */
-	engine_register(engine, "iterate");
-	engine_register(engine, "validate");
-	engine_register(engine, "rrcache");
-	engine_register(engine, "pktcache");
+	engine_register(engine, "iterate", NULL, NULL);
+	engine_register(engine, "validate", NULL, NULL);
+	engine_register(engine, "rrcache", NULL, NULL);
+	engine_register(engine, "pktcache", NULL, NULL);
 
 	/* Initialize storage backends */
 	struct storage_api lmdb = {
@@ -572,19 +572,36 @@ static int register_properties(struct engine *engine, struct kr_module *module)
 	return kr_ok();
 }
 
-int engine_register(struct engine *engine, const char *name)
+/** @internal Find matching module */
+static size_t module_find(module_array_t *mod_list, const char *name)
+{
+	size_t found = mod_list->len;
+	for (size_t i = 0; i < mod_list->len; ++i) {
+		struct kr_module *mod = mod_list->at[i];
+		if (strcmp(mod->name, name) == 0) {
+			found = i;
+			break;
+		}
+	}
+	return found;
+}
+
+int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
 {
 	if (engine == NULL || name == NULL) {
 		return kr_error(EINVAL);
 	}
-	/* Check priority modules */
-	bool is_priority = false;
-	if (name[0] == '<') {
-		is_priority = true;
-		name += 1;
-	}
 	/* Make sure module is unloaded */
 	(void) engine_unregister(engine, name);
+	/* Find the index of referenced module. */
+	module_array_t *mod_list = &engine->modules;
+	size_t ref_pos = mod_list->len;
+	if (precedence && ref) {
+		ref_pos = module_find(mod_list, ref);
+		if (ref_pos >= mod_list->len) {
+			return kr_error(EIDRM);
+		}
+	}
 	/* Attempt to load binary module */
 	struct kr_module *module = malloc(sizeof(*module));
 	if (!module) {
@@ -604,11 +621,22 @@ int engine_register(struct engine *engine, const char *name)
 		engine_unload(engine, module);
 		return kr_error(ENOMEM);
 	}
-	/* Push to front if priority module */
-	if (is_priority) {
-		struct kr_module **arr = engine->modules.at;
-		memmove(&arr[1], &arr[0], sizeof(*arr) * (engine->modules.len - 1));
-		arr[0] = module;
+	/* Evaluate precedence operator */
+	if (precedence) {
+		struct kr_module **arr = mod_list->at;
+		size_t emplacement = mod_list->len;
+		if (strcasecmp(precedence, ">") == 0) {
+			if (ref_pos + 1 < mod_list->len)
+				emplacement = ref_pos + 1; /* Insert after target */
+		}
+		if (strcasecmp(precedence, "<") == 0) {
+			emplacement = ref_pos; /* Insert at target */
+		}
+		/* Move the tail if it has some elements. */
+		if (emplacement + 1 < mod_list->len) {
+			memmove(&arr[emplacement + 1], &arr[emplacement], sizeof(*arr) * (mod_list->len - (emplacement + 1)));
+			arr[emplacement] = module;
+		}
 	}
 
 	/* Register properties */
@@ -621,16 +649,8 @@ int engine_register(struct engine *engine, const char *name)
 
 int engine_unregister(struct engine *engine, const char *name)
 {
-	/* Find matching module. */
 	module_array_t *mod_list = &engine->modules;
-	size_t found = mod_list->len;
-	for (size_t i = 0; i < mod_list->len; ++i) {
-		struct kr_module *mod = mod_list->at[i];
-		if (strcmp(mod->name, name) == 0) {
-			found = i;
-			break;
-		}
-	}
+	size_t found = module_find(mod_list, name);
 	if (found < mod_list->len) {
 		engine_unload(engine, mod_list->at[found]);
 		array_del(*mod_list, found);

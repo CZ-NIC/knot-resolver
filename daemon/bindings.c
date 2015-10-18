@@ -65,11 +65,23 @@ static int mod_load(lua_State *L)
 		format_error(L, "expected 'load(string name)'");
 		lua_error(L);
 	}
+	/* Parse precedence declaration */
+	auto_free char *declaration = strdup(lua_tostring(L, 1));
+	if (!declaration) {
+		return kr_error(ENOMEM);
+	}
+	const char *name = strtok(declaration, " ");
+	const char *precedence = strtok(NULL, " ");
+	const char *ref = strtok(NULL, " ");
 	/* Load engine module */
 	struct engine *engine = engine_luaget(L);
-	int ret = engine_register(engine, lua_tostring(L, 1));
+	int ret = engine_register(engine, name, precedence, ref);
 	if (ret != 0) {
-		format_error(L, kr_strerror(ret));
+		if (ret == kr_error(EIDRM)) {
+			format_error(L, "referenced module not found");
+		} else {
+			format_error(L, kr_strerror(ret));
+		}
 		lua_error(L);
 	}
 
