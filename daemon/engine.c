@@ -489,7 +489,7 @@ int engine_cmd(struct engine *engine, const char *str)
 #define l_dosandboxfile(L, filename) \
 	(luaL_loadfile((L), (filename)) || engine_pcall((L), 0))
 
-static int engine_loadconf(struct engine *engine)
+static int engine_loadconf(struct engine *engine, const char *config_path)
 {
 	/* Use module path for including Lua scripts */
 	static const char l_paths[] = "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'";
@@ -507,8 +507,8 @@ static int engine_loadconf(struct engine *engine)
 		return kr_error(ENOEXEC);
 	}
 	/* Load config file */
-	if(access("config", F_OK ) != -1 ) {
-		ret = l_dosandboxfile(engine->L, "config");
+	if(access(config_path, F_OK ) != -1 ) {
+		ret = l_dosandboxfile(engine->L, config_path);
 	}
 	if (ret == 0) {
 		/* Load defaults */
@@ -526,10 +526,10 @@ static int engine_loadconf(struct engine *engine)
 	return ret;
 }
 
-int engine_start(struct engine *engine)
+int engine_start(struct engine *engine, const char *config_path)
 {
 	/* Load configuration. */
-	int ret = engine_loadconf(engine);
+	int ret = engine_loadconf(engine, config_path);
 	if (ret != 0) {
 		return ret;
 	}

@@ -61,7 +61,7 @@ int engine_init(struct engine *engine, mm_ctx_t *pool);
 void engine_deinit(struct engine *engine);
 /** @warning This function leaves 1 string result on stack. */
 int engine_cmd(struct engine *engine, const char *str);
-int engine_start(struct engine *engine);
+int engine_start(struct engine *engine, const char *config_path);
 void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *module, const char *precedence, const char* ref);
 int engine_unregister(struct engine *engine, const char *module);
