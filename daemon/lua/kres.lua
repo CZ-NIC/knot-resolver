@@ -220,6 +220,8 @@ uint16_t knot_pkt_qclass(const knot_pkt_t *pkt);
 int knot_pkt_begin(knot_pkt_t *pkt, int section_id);
 int knot_pkt_put_question(knot_pkt_t *pkt, const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);
 const knot_rrset_t *knot_pkt_rr(const knot_pktsection_t *section, uint16_t i);
+const knot_pktsection_t *knot_pkt_section(const knot_pkt_t *pkt,
+                                          knot_section_t section_id);
 
 /* 
  * libkres API
@@ -301,7 +303,7 @@ ffi.metatype( knot_pkt_t, {
 		end,
 		section = function (pkt, section_id)
 			local records = {}
-			local section = pkt._sections[section_id]
+			local section = C.knot_pkt_section(pkt, section_id)
 			for i = 0, section.count - 1 do
 				local rrset = knot.knot_pkt_rr(section, i)
 				for k = 0, rrset.rr.count - 1 do
