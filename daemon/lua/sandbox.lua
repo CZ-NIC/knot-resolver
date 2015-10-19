@@ -49,7 +49,7 @@ setmetatable(net, {
 -- `modules.<name> = <config>`
 setmetatable(modules, {
 	__newindex = function (t,k,v)
-		if type(k) == 'number' then k = v end
+		if type(k) == 'number' then k = v v = nil end
 		if not rawget(_G, k) then
 			modules.load(k)
 			k = string.match(k, '%w+')
