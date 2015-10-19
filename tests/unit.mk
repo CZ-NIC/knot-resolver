@@ -16,8 +16,6 @@ tests_BIN := \
 
 mock_cmodule_SOURCES := tests/mock_cmodule.c
 $(eval $(call make_lib,mock_cmodule,tests))
-mock_gomodule_SOURCES := tests/mock_gomodule.c
-$(eval $(call make_lib,mock_gomodule,tests))
 
 # Dependencies
 tests_DEPEND := $(libkres) $(mock_cmodule) $(mock_gomodule)

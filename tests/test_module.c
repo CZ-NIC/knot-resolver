@@ -39,20 +39,12 @@ static void test_module_c(void **state)
 	kr_module_unload(&module);
 }
 
-static void test_module_go(void **state)
-{
-	/* Mock Go module fails on version check. */
-	struct kr_module module;
-	assert_int_equal(kr_module_load(&module, "mock_gomodule", "tests"), kr_error(ENOTSUP));
-}
-
 int main(void)
 {
 	const UnitTest tests[] = {
 		unit_test(test_module_params),
 		unit_test(test_module_builtin),
 		unit_test(test_module_c),
-		unit_test(test_module_go)
 	};
 
 	return run_tests(tests);

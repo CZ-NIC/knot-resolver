@@ -121,54 +121,6 @@ static int load_sym_c(struct kr_module *module, uint32_t api_required)
 	return kr_ok();
 }
 
-/** Bootstrap Go runtime from module. */
-static int bootstrap_libgo(struct kr_module *module)
-{
-	/* Check if linked against compatible libgo */
-	void (*go_check)(void) = dlsym(module->lib, "runtime_check");
-	void (*go_args)(int, void*) = dlsym(module->lib, "runtime_args");
-	void (*go_init_os)(void) = dlsym(module->lib, "runtime_osinit");
-	void (*go_init_sched)(void) = dlsym(module->lib, "runtime_schedinit");
-	void (*go_init_main)(void) = dlsym(module->lib, "__go_init_main");
-	if ((go_check && go_args && go_init_os && go_init_sched && go_init_main) == false) {
-		return kr_error(EINVAL);
-	}
-
-	/*
-	 * Bootstrap runtime - this is minimal runtime, we would need a running scheduler
-	 * and gc for coroutines and memory allocation. That would require a custom "world loop",
-	 * message passing, and either runtime sharing or module isolation.
-	 * https://github.com/gcc-mirror/gcc/blob/gcc-4_9_2-release/libgo/runtime/proc.c#L457
-	 */
-	char *fake_argv[2] = {
-		getenv("_"),
-		NULL
-	};
-	go_check();
-	go_args(1, fake_argv);
-	go_init_os();
-	go_init_sched();
-	go_init_main();
-
-	return kr_ok();
-}
-
-/** Load Go module symbols. */
-static int load_ffi_go(struct kr_module *module, uint32_t api_required)
-{
-	/* Bootstrap libgo */
-	int ret = bootstrap_libgo(module);
-	if (ret != 0) {
-		return ret;
-	}
-
-	/* Enforced prefix for now. */
-	const char *module_prefix = "main.";
-	ABI_CHECK(module, module_prefix, "Api", api_required);
-	ABI_LOAD(module, module_prefix, "Init", "Deinit", "Config", "Layer", "Props");
-	return kr_ok();
-}
-
 int kr_module_load(struct kr_module *module, const char *name, const char *path)
 {
 	if (module == NULL || name == NULL) {
@@ -197,11 +149,6 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 
 	/* Try to load module ABI. */
 	int ret = load_sym_c(module, KR_MODULE_API);
-	if (ret != 0 && module->lib != RTLD_DEFAULT) {
-		ret = load_ffi_go(module, KR_MODULE_API);
-	}
-
-	/* Module constructor. */
 	if (ret == 0 && module->init) {
 		ret = module->init(module);
 	}

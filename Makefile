@@ -21,12 +21,15 @@ $(eval $(call find_alt,lua,luajit))
 $(eval $(call find_lib,cmocka))
 $(eval $(call find_bin,doxygen))
 $(eval $(call find_bin,sphinx-build))
-$(eval $(call find_bin,gccgo))
 $(eval $(call find_bin,python))
 $(eval $(call find_lib,libmemcached,1.0))
 $(eval $(call find_lib,hiredis))
 $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libdnssec))
+# Find Go compiler version
+E :=
+GO_VERSION := $(subst $(E) $(E),,$(subst go,,$(wordlist 1,3,$(subst ., ,$(word 3,$(shell $(GO) version))))))
+$(eval $(call find_ver,go,$(GO_VERSION),150))
 
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)

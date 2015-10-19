@@ -22,7 +22,7 @@ modules_TARGETS += ketcd \
 endif
 
 # List of Golang modules
-ifeq ($(HAS_gccgo),yes)
+ifeq ($(HAS_go),yes)
 modules_TARGETS += gostats
 endif
 
@@ -54,17 +54,10 @@ endef
 # Go target definition
 define go_target 
 $(1) := $(2)/$(1)$(LIBEXT)
-$(1)_OBJS := $(addprefix $(2)/_obj/,_cgo_defun.c _cgo_export.c $(subst /,_,$(2))_$(1).cgo2.c)
-$(1)_GOBJS := $(addprefix $(2)/_obj/,_cgo_gotypes.go $(subst /,_,$(2))_$(1).cgo1.go)
-$(2)/_obj/_cgo_export.h: $$($(1)_SOURCES)
-	@$(INSTALL) -d $(2)/_obj
-	$(call quiet,CGO,$$^) -gccgo=true -objdir=$(2)/_obj -- $(BUILD_CFLAGS) $$^
-$(2)/$(1).o: $(2)/_obj/_cgo_export.h
-	$(call quiet,GCCGO,$$@) -I$(2)/_obj -c -fPIC $$($(1)_GOBJS) -o $$@
-$(2)/$(1)$(LIBEXT): $(2)/$(1).o $$($(1)_DEPEND)
-	$(call quiet,GCCGO,$$@) -g -fPIC $(BUILD_CFLAGS) -I$(2)/_obj $(2)/$(1).o $$($(1)_OBJS) -o $$@ -$(LIBTYPE) -lgcc -lgo $$($(1)_LIBS)
+$(2)/$(1)$(LIBEXT): $$($(1)_SOURCES) $$($(1)_DEPEND)
+	@echo "  GO	$(2)"; CGO_CFLAGS="$(BUILD_CFLAGS)" CGO_LDFLAGS="$$($(1)_LIBS)" $(GO) build -buildmode=c-shared -o $$@ $$($(1)_SOURCES)
 $(1)-clean:
-	$(RM) -r $(2)/_obj $(2)/$(1)$(LIBEXT)
+	$(RM) -r $(2)/$(1).h $(2)/$(1)$(LIBEXT)
 $(1)-install: $(2)/$(1)$(LIBEXT)
 	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
 	$(INSTALL) $$^ $(PREFIX)/$(MODULEDIR)

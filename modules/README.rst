@@ -11,11 +11,8 @@ Modules API reference
 Supported languages
 ===================
 
-Currently modules written in C and Lua are supported.
-There is also a rudimentary support for writing modules in Go |---|
-(1) the library has no native Go bindings, library is accessible using CGO_,
-(2) gc doesn't support building shared libraries, GCCGO_ is required,
-(3) no coroutines and no garbage collecting thread, as the Go code is called from C threads.
+Currently modules written in C and LuaJIT are supported.
+There is also a support for writing modules in Go 1.5+ |---| the library has no native Go bindings, library is accessible using CGO_.
 
 The anatomy of an extension
 ===========================
@@ -25,14 +22,14 @@ A module is a shared object or script defining specific functions, here's an ove
 *Note* |---| the :ref:`Modules <lib_api_modules>` header documents the module loading and API.
 
 .. csv-table::
-   :header: "C", "Lua", "Go", "Params", "Comment"
+   :header: "C/Go", "Lua", "Params", "Comment"
 
-   "``X_api()`` [#]_", "",               "``Api()``",    "",                "API version"
-   "``X_init()``",     "``X.init()``",   "``Init()``",   "``module``",      "Constructor"
-   "``X_deinit()``",   "``X.deinit()``", "``Deinit()``", "``module, key``", "Destructor"
-   "``X_config()``",   "``X.config()``", "``Config()``", "``module``",      "Configuration"
-   "``X_layer()``",    "``X.layer``",    "``Layer()``",  "``module``",      ":ref:`Module layer <lib-layers>`"
-   "``X_props()``",    "",               "``Props()``",  "",                "List of properties"
+   "``X_api()`` [#]_", "",               "",                "API version"
+   "``X_init()``",     "``X.init()``",   "``module``",      "Constructor"
+   "``X_deinit()``",   "``X.deinit()``", "``module, key``", "Destructor"
+   "``X_config()``",   "``X.config()``", "``module``",      "Configuration"
+   "``X_layer()``",    "``X.layer``",    "``module``",      ":ref:`Module layer <lib-layers>`"
+   "``X_props()``",    "",               "",                "List of properties"
 
 .. [#] Mandatory symbol.
 
@@ -181,9 +178,7 @@ and publish data about query resolution.
 Writing a module in Go
 ======================
 
-.. note:: At the moment only a limited subset of Go is supported. The reason is that the Go functions must run inside the goroutines, and *presume* the garbage collector and scheduler are running in the background. `GCCGO`_ compiler can build dynamic libraries, and also allow us to bootstrap basic Go runtime, including a trampoline to call Go functions. The problem with the ``layer()`` and callbacks is that they're called from C threads, that Go runtime has no knowledge of. Thus neither garbage collection or spawning routines can work. The solution could be to register C threads to Go runtime, or have each module to run inside its world loop and use IPC instead of callbacks |---| alas neither is implemented at the moment, but may be in the future.
-
-The Go modules also use CGO_ to interface C resolver library, and to declare layers with function pointers, which are `not present in Go`_. Each module must be the ``main`` package, here's a minimal example:
+The Go modules use CGO_ to interface C resolver library, there are no native bindings yet. Second issue is that layers are declared as a structure of function pointers, which are `not present in Go`_, the workaround is to declare them in CGO_ header. Each module must be the ``main`` package, here's a minimal example:
 
 .. code-block:: go
 
@@ -195,9 +190,15 @@ The Go modules also use CGO_ to interface C resolver library, and to declare lay
 	import "C"
 	import "unsafe"
 
-	func Api() C.uint32_t {
+	//export mymodule_api
+	func mymodule_api() C.uint32_t {
 		return C.KR_MODULE_API
 	}
+
+	// Mandatory function
+	func main() {}
+
+.. warning:: Do not forget to prefix function declarations with ``//export symbol_name``, as only these will be exported in module.
 
 In order to integrate with query processing, you have to declare a helper function with function pointers to the
 the layer implementation. Since the code prefacing ``import "C"`` is expanded in headers, you need the `static inline` trick
@@ -206,45 +207,37 @@ to avoid multiple declarations. Here's how the preface looks like:
 .. code-block:: go
 
 	/*
+	#include "lib/layer.h"
 	#include "lib/module.h"
-	#include "lib/layer.h" 
-
-	//! Trampoline for Go callbacks, note that this is going to work
-	//! with ELF only, this is hopefully going to change in the future
-	extern int Begin(knot_layer_t *, void *) __asm__ ("main.Begin");
-	extern int Finish(knot_layer_t *) __asm__ ("main.Finish");
-	static inline const knot_layer_api_t *_gostats_layer(void)
+	// Need a forward declaration of the function signature
+	int finish(knot_layer_t *);
+	// Workaround for layers composition
+	static inline const knot_layer_api_t *_layer(void)
 	{
 		static const knot_layer_api_t api = {
-			.begin = &Begin,
-			.finish = &Finish
+			.finish = &finish
 		};
 		return &api;
 	}
 	*/
 	import "C"
 	import "unsafe"
-	import "fmt"
 
-Now we can add the implementations for the ``Begin`` and ``Finish`` functions, and finalize the module:
+Now we can add the implementations for the ``finish`` layer and finalize the module:
 
 .. code-block:: go
 
-	func Begin(ctx *C.knot_layer_t, param unsafe.Pointer) C.int {
-		// Save the context
-		ctx.data = param
-		return 0
-	}
-
-	func Finish(ctx *C.knot_layer_t) C.int {
+	//export finish
+	func finish(ctx *C.knot_layer_t) C.int {
 		// Since the context is unsafe.Pointer, we need to cast it
 		var param *C.struct_kr_request = (*C.struct_kr_request)(ctx.data)
 		// Now we can use the C API as well
-		fmt.Printf("[go] resolved %d queries", C.list_size(&param.rplan.resolved))
+		fmt.Printf("[go] resolved %d queries\n", C.list_size(&param.rplan.resolved))
 		return 0
 	}
 
-	func Layer(module *C.struct_kr_module) *C.knot_layer_api_t {
+	//export mymodule_layer
+	func mymodule_layer(module *C.struct_kr_module) *C.knot_layer_api_t {
 		// Wrapping the inline trampoline function
 		return C._layer()
 	}
@@ -330,6 +323,5 @@ regular tables.
 
 .. _`not present in Go`: http://blog.golang.org/gos-declaration-syntax
 .. _CGO: http://golang.org/cmd/cgo/
-.. _GCCGO: https://golang.org/doc/install/gccgo
 
 .. |---| unicode:: U+02014 .. em dash

@@ -1,7 +1,7 @@
 # Platform-specific
 CCLD := $(CC)
 CGO := go tool cgo
-GCCGO := gccgo
+GO := go
 LIBEXT := .so
 MODEXT := $(LIBEXT)
 AREXT  := .a
@@ -71,7 +71,7 @@ endif
 endef
 
 # Make targets (name,path)
-make_bin = $(call make_target,$(1),$(2),$(BINEXT),,$(BINDIR))
+make_bin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(BINDIR))
 make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR))
 make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR))
 make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR))
@@ -117,3 +117,13 @@ define find_bin
 		$(1) := $$($(1)_BIN)
 	endif
 endef
+
+# Find version
+define find_ver
+	ifeq ($(shell test $(2) -gt $(3); echo $$?),0)
+		HAS_$(1) := yes
+	else
+		HAS_$(1) := no
+	endif
+endef
+

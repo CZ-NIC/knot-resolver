@@ -41,6 +41,7 @@ There are also *optional* packages that enable specific functionality in Knot DN
 
    "libmemcached_", "``modules/memcached``", "To build memcached backend module."
    "hiredis_", "``modules/redis``", "To build redis backend module."
+   "Go_ 1.5+", "``modules``", "Build modules written in Go."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Python_", "``integration tests``", "For test scripts."
    "Doxygen_", "``documentation``", "Generating API documentation."
@@ -134,7 +135,7 @@ The project can be built with code coverage tracking using the ``COVERAGE=1`` va
 
 .. _Lua: http://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
-.. _GCCGO: https://golang.org/doc/install/gccgo
+.. _Go: https://golang.org
 .. _libmemcached: http://libmemcached.org/libMemcached.html
 .. _hiredis: https://github.com/redis/hiredis
 .. _Doxygen: http://www.stack.nl/~dimitri/doxygen/manual/index.html

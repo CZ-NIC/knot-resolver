@@ -18,7 +18,7 @@ info:
 	$(info Optional)
 	$(info --------)
 	$(info [$(HAS_doxygen)] doxygen (doc))
-	$(info [$(HAS_gccgo)] GCCGO (modules/go))
+	$(info [$(HAS_go)] Go (modules/go))
 	$(info [$(HAS_libmemcached)] libmemcached (modules/memcached))
 	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
