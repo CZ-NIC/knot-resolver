@@ -250,10 +250,10 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 	if (!new_ds) {
 		if (has_nsec3) {
 			ret = kr_nsec3_no_data_response_check(answer, section,
-			      knot_pkt_qname(answer), KNOT_RRTYPE_DS);
+			      qry->zone_cut.name, KNOT_RRTYPE_DS);
 		} else {
 			ret = kr_nsec_no_data_response_check(answer, section,
-			      knot_pkt_qname(answer), KNOT_RRTYPE_DS);
+			      qry->zone_cut.name, KNOT_RRTYPE_DS);
 		}
 		if (ret != 0) {
 			DEBUG_MSG(qry, "<= bogus proof of DS non-existence\n");
