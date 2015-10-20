@@ -21,6 +21,7 @@
 #include <netinet/in.h>
 #include <libknot/packet/pkt.h>
 #include "lib/generic/map.h"
+#include "lib/resolve.h"
 
 /*
  * General-purpose attributes.
@@ -122,3 +123,8 @@ int kr_bitcmp(const char *a, const char *b, int bits);
  * @return 0 or an error
  */
 int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *pool);
+
+/**
+ * Call module property.
+ */
+char *kr_module_call(struct kr_context *ctx, const char *module, const char *prop, const char *input);

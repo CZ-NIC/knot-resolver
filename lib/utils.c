@@ -30,6 +30,7 @@
 #include "lib/utils.h"
 #include "lib/generic/array.h"
 #include "lib/nsrep.h"
+#include "lib/module.h"
 
 /* Logging & debugging */
 bool _env_debug = false;
@@ -305,4 +306,32 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 	}
 	/* Merge rdataset */
 	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
+}
+
+static char *callprop(struct kr_module *module, const char *prop, const char *input, void *env)
+{
+	if (!module || !prop) {
+		return NULL;
+	}
+	for (struct kr_prop *p = module->props; p && p->name; ++p) {
+		if (p->cb != NULL && strcmp(p->name, prop) == 0) {
+			return p->cb(env, module, input);
+		}
+	}
+	return NULL;
+}
+
+char *kr_module_call(struct kr_context *ctx, const char *module, const char *prop, const char *input)
+{
+	if (!ctx || !ctx->modules || !module || !prop) {
+		return NULL;
+	}
+	module_array_t *mod_list = ctx->modules;
+	for (size_t i = 0; i < mod_list->len; ++i) {
+		struct kr_module *mod = mod_list->at[i];
+		if (strcmp(mod->name, module) == 0) {
+			return callprop(mod, prop, input, ctx);
+		}
+	}
+	return NULL;
 }
