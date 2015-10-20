@@ -555,7 +555,7 @@ static int register_properties(struct engine *engine, struct kr_module *module)
 	if (module->config != NULL) {
 		REGISTER_MODULE_CALL(engine->L, module, module->config, "config");
 	}
-	for (struct kr_prop *p = module->props; p->name; ++p) {
+	for (struct kr_prop *p = module->props; p && p->name; ++p) {
 		if (p->cb != NULL && p->name != NULL) {
 			REGISTER_MODULE_CALL(engine->L, module, p->cb, p->name);
 		}
@@ -640,7 +640,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	}
 
 	/* Register properties */
-	if (module->props) {
+	if (module->props || module->config) {
 		return register_properties(engine, module);
 	}
 
