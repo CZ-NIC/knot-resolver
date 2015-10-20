@@ -190,12 +190,12 @@ The Go modules use CGO_ to interface C resolver library, there are no native bin
 	import "C"
 	import "unsafe"
 
+	/* Mandatory functions */
+
 	//export mymodule_api
 	func mymodule_api() C.uint32_t {
 		return C.KR_MODULE_API
 	}
-
-	// Mandatory function
 	func main() {}
 
 .. warning:: Do not forget to prefix function declarations with ``//export symbol_name``, as only these will be exported in module.
@@ -243,6 +243,14 @@ Now we can add the implementations for the ``finish`` layer and finalize the mod
 	}
 
 See the CGO_ for more information about type conversions and interoperability between the C/Go.
+
+Gotchas
+-------
+
+* ``main()`` function is mandatory in each module, otherwise it won't compile.
+* Module layer function implementation must be done in C during ``import "C"``, as Go doesn't support pointers to functions.
+* The library doesn't have a Go-ified bindings yet, so interacting with it requires CGO shims, namely structure traversal and type conversions (strings, numbers).
+* Other modules can be called through C call ``C.kr_module_call(kr_context, module_name, module_propery, input)``
 
 Configuring modules
 ===================

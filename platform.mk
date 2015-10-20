@@ -127,3 +127,8 @@ define find_ver
 	endif
 endef
 
+# Find Go package
+define find_gopkg
+	HAS_$(1) := $(shell go list $(2) > /dev/null 2>&1 && echo yes || echo no)
+endef
+

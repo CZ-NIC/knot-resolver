@@ -23,7 +23,9 @@ endif
 
 # List of Golang modules
 ifeq ($(HAS_go),yes)
-modules_TARGETS += gostats
+ifeq ($(HAS_geoip),yes)
+modules_TARGETS += tinyweb
+endif
 endif
 
 # Make C module
@@ -58,10 +60,17 @@ $(2)/$(1)$(LIBEXT): $$($(1)_SOURCES) $$($(1)_DEPEND)
 	@echo "  GO	$(2)"; CGO_CFLAGS="$(BUILD_CFLAGS)" CGO_LDFLAGS="$$($(1)_LIBS)" $(GO) build -buildmode=c-shared -o $$@ $$($(1)_SOURCES)
 $(1)-clean:
 	$(RM) -r $(2)/$(1).h $(2)/$(1)$(LIBEXT)
-$(1)-install: $(2)/$(1)$(LIBEXT)
+ifeq ($$(strip $$($(1)_INSTALL)),)
+$(1)-dist:
 	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
-	$(INSTALL) $$^ $(PREFIX)/$(MODULEDIR)
-.PHONY: $(1)-clean $(1)-install
+else
+$(1)-dist: $$($(1)_INSTALL)
+	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)/$(1)
+	$(INSTALL) $$^ $(PREFIX)/$(MODULEDIR)/$(1)
+endif
+$(1)-install: $(2)/$(1)$(LIBEXT) $(1)-dist
+	$(INSTALL) $(2)/$(1)$(LIBEXT) $(PREFIX)/$(MODULEDIR)
+.PHONY: $(1)-clean $(1)-install $(1)-dist
 endef
 
 # Include modules

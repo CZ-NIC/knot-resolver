@@ -18,3 +18,4 @@ Knot DNS Resolver modules
 .. include:: ../modules/redis/README.rst
 .. include:: ../modules/ketcd/README.rst
 .. include:: ../modules/cachectl/README.rst
+.. include:: ../modules/tinyweb/README.rst

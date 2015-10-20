@@ -26,6 +26,7 @@ $(eval $(call find_lib,libmemcached,1.0))
 $(eval $(call find_lib,hiredis))
 $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libdnssec))
+$(eval $(call find_gopkg,geoip,github.com/abh/geoip))
 # Find Go compiler version
 E :=
 GO_VERSION := $(subst $(E) $(E),,$(subst go,,$(wordlist 1,3,$(subst ., ,$(word 3,$(shell $(GO) version))))))
