@@ -22,14 +22,16 @@ window.onload = function() {
 	});
 	/* Realtime updates */ 
 	function poller(feed, interval, cb) {
-		setInterval(function () {
+		var func = function() {
 			$.ajax({
 				url: feed,
 				type: 'get',
 				dataType: 'json',
 				success: cb
 			});
-		}, interval);
+		}
+		setInterval(func, interval);
+		func();
 	}
 	poller('stats', 1000, function(resp) {
 		var now = Date.now();
@@ -81,7 +83,7 @@ window.onload = function() {
 		/* Normalize, convert to HSL. */
 		for (var key in update) {
 			var ratio = 1.0 - update[key]/max;
-			update[key] = 'hsl(205,70%,' + Math.floor(20.0 + 70.0 * ratio) + '%)'
+			update[key] = 'hsl(205,70%,' + Math.floor(10.0 + 70.0 * (ratio * ratio)) + '%)'
 		}
 		map.updateChoropleth(update);
 	});

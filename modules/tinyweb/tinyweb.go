@@ -195,6 +195,7 @@ func tinyweb_config(module *C.struct_kr_module, conf *C.char) int {
 	http.HandleFunc("/", serve_page)
 	// @todo Not sure how to cancel this routine yet
 	// wg.Add(1)
+	fmt.Printf("[tinyweb] listening on %s\n", addr)
 	go http.ListenAndServe(addr, nil)
 	return 0
 }
