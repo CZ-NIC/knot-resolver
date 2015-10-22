@@ -30,7 +30,7 @@
 	<div class="epoch" id="stats"></div>
 	<ul class="legend"></ul>
 	<h2>Queried servers</h2>
-	<div id="map" style=""></div>
+	<div id="map" style="position: relative;"></div>
 	<h2>Last queries</h2>
 	<table id="feed"></table>
 </div>

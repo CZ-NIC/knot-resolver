@@ -6,6 +6,7 @@ Web interface
 This module provides an embedded web interface for resolver. It plots current performance in real-time,
 including a feed of recent iterative queries. It also includes bindings_ to `MaxMind GeoIP`_, and presents a world map coloured by frequency of queries, so you can see where do your queries go.
 
+The *stats* module is required for plotting query rate.
 By default, it listens on ``localhost:8053``.
 
 Examples
