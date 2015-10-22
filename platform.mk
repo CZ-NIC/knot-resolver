@@ -120,7 +120,7 @@ endef
 
 # Find version
 define find_ver
-	ifeq ($(shell test $(2) -gt $(3); echo $$?),0)
+	ifeq ($(shell test $(2) -ge $(3); echo $$?),0)
 		HAS_$(1) := yes
 	else
 		HAS_$(1) := no

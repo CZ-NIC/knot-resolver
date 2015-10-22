@@ -29,8 +29,8 @@ $(eval $(call find_lib,libdnssec))
 $(eval $(call find_gopkg,geoip,github.com/abh/geoip))
 # Find Go compiler version
 E :=
-GO_VERSION := $(subst $(E) $(E),,$(subst go,,$(wordlist 1,3,$(subst ., ,$(word 3,$(shell $(GO) version))))))
-$(eval $(call find_ver,go,$(GO_VERSION),150))
+GO_VERSION := $(subst $(E) $(E),,$(subst go,,$(wordlist 1,2,$(subst ., ,$(word 3,$(shell $(GO) version))))))
+$(eval $(call find_ver,go,$(GO_VERSION),15))
 
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)
