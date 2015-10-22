@@ -363,10 +363,10 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (state == KNOT_STATE_FAIL) {
 			return state;
 		}
-		/* Follow chain only within current cut. */
+		/* Follow chain only within current cut (if secure). */
 		if (follow_chain) {
 			follow_cname_chain(&cname, rr, query);
-			if (!knot_dname_in(query->zone_cut.name, cname)) {
+			if (!(query->flags & QUERY_DNSSEC_WANT) || !knot_dname_in(query->zone_cut.name, cname)) {
 				follow_chain = false; 
 			}
 		}

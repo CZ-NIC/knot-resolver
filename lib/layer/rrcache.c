@@ -260,8 +260,8 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_
 			continue;
 		}
 		kr_rrmap_add(stash, rr, KR_RANK_AUTH, pool);
-		/* Follow CNAME chain in current cut. */
-		if (rr->type == KNOT_RRTYPE_CNAME) {
+		/* Follow CNAME chain in current cut (if SECURE). */
+		if ((qry->flags & QUERY_DNSSEC_WANT) && rr->type == KNOT_RRTYPE_CNAME) {
 			const knot_dname_t *next_cname = knot_cname_name(&rr->rrs);
 			if (knot_dname_in(qry->zone_cut.name, next_cname)) {
 				cname = next_cname;
