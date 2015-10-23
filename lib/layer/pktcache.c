@@ -204,6 +204,15 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		header.rank = KR_RANK_INSECURE;
 	}
 
+	/* Check if we can replace (allow current or better rank, SECURE is always accepted). */
+	if (header.rank < KR_RANK_SECURE) {
+		int cached_rank = kr_cache_peek_rank(&txn, KR_CACHE_PKT, qname, qtype, header.timestamp);
+		if (cached_rank > header.rank) {
+			kr_cache_txn_abort(&txn);
+			return ctx->state;
+		}
+	}
+
 	/* Stash answer in the cache */
 	int ret = kr_cache_insert(&txn, KR_CACHE_PKT, qname, qtype, &header, data);	
 	if (ret != 0) {

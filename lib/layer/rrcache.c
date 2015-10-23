@@ -184,8 +184,14 @@ static int commit_rr(const char *key, void *val, void *data)
 	if (KEY_COVERING_RRSIG(key)) {
 		return commit_rrsig(baton, rank, rr);
 	}
+	/* Accept only better rank (if not overriding) */
+	if (!(rank & KR_RANK_SECURE) && !(baton->qry->flags & QUERY_NO_CACHE)) {
+		int cached_rank = kr_cache_peek_rank(baton->txn, KR_CACHE_RR, rr->owner, rr->type, baton->timestamp);
+		if (cached_rank >= rank) {
+			return kr_ok();
+		}
+	}
 
-	/* Check if already cached */
 	knot_rrset_t query_rr;
 	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
 	return kr_cache_insert_rr(baton->txn, rr, rank, baton->timestamp);

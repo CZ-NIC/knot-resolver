@@ -32,7 +32,7 @@
 #include "lib/utils.h"
 
 /* Cache version */
-#define KEY_VERSION "V\x01"
+#define KEY_VERSION "V\x02"
 /* Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
@@ -243,17 +243,6 @@ int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 	namedb_val_t entry = { NULL, sizeof(*header) + data.len };
 	const namedb_api_t *db_api = txn_api(txn);
 
-	/* Do not overwrite entries that are higher ranked and not expired. */
-	namedb_val_t old_entry = { NULL, 0 };
-	int ret = txn_api(txn)->find(&txn->t, &key, &old_entry, 0);
-	if (ret == 0) {
-		struct kr_cache_entry *old = old_entry.data;
-		uint32_t timestamp = header->timestamp;
-		if (kr_cache_rank_cmp(old->rank, header->rank) > 0 && check_lifetime(old, &timestamp) == 0) {
-			return kr_error(EPERM);
-		}
-	}
-
 	/* LMDB can do late write and avoid copy */
 	txn->owner->stats.insert += 1;
 	if (db_api == namedb_lmdb_api()) {
@@ -322,6 +311,18 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank,
 	rr->rrs.rr_count = entry->count;
 	rr->rrs.data = entry->data;
 	return kr_ok();
+}
+
+int kr_cache_peek_rank(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type, uint32_t timestamp)
+{
+	struct kr_cache_entry *found = lookup(txn, tag, name, type);
+	if (!found) {
+		return kr_error(ENOENT);
+	}
+	if (check_lifetime(found, &timestamp) != 0) {
+		return kr_error(ESTALE);
+	}
+	return found->rank;
 }
 
 int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm)

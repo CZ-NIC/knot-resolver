@@ -27,17 +27,20 @@ enum kr_cache_tag {
 	KR_CACHE_USER = 0x80
 };
 
-/** Cache entry rank */
+/**
+ * Cache entry rank.
+ * @note Be careful about chosen cache rank nominal values.
+ * - AUTH must be > than NONAUTH
+ * - AUTH INSECURE must be > than AUTH (because it attempted validation)
+ * - NONAUTH SECURE must be > than AUTH (because it's valid)
+ */
 enum kr_cache_rank {
 	KR_RANK_BAD       = 0,  /* BAD cache, do not use. */ 
 	KR_RANK_INSECURE  = 1,  /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
-	KR_RANK_SECURE    = 2,  /* Entry is DNSSEC valid (e.g. RRSIG exists). */
-	/* <= Lower 3 bits reserved for various flags. */ 
 	KR_RANK_NONAUTH   = 8,  /* Entry from authority section (i.e. parent-side) */
 	KR_RANK_AUTH      = 16, /* Entry from answer (authoritative data) */
+	KR_RANK_SECURE    = 256,  /* Entry is DNSSEC valid (e.g. RRSIG exists). */
 };
-/* Compare ranks (ignore flags) */
-#define kr_cache_rank_cmp(x, y) (((x) >> 2) - ((y) >> 2))
 
 /**
  * Serialized form of the RRSet with inception timestamp and maximum TTL.
@@ -128,6 +131,8 @@ void kr_cache_txn_abort(struct kr_cache_txn *txn);
 int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
                   struct kr_cache_entry **entry, uint32_t *timestamp);
 
+
+
 /**
  * Insert asset into cache, replacing any existing data.
  * @param txn transaction instance
@@ -157,6 +162,17 @@ int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
  * @return 0 or an errcode
  */
 int kr_cache_clear(struct kr_cache_txn *txn);
+
+/**
+ * Peek the cache for given key and retrieve it's rank.
+ * @param txn transaction instance
+ * @param tag asset tag
+ * @param name asset name
+ * @param type record type
+ * @param timestamp current time
+ * @return rank (0 or positive), or an error (negative number)
+ */
+int kr_cache_peek_rank(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type, uint32_t timestamp);
 
 /**
  * Peek the cache for given RRSet (name, type)
