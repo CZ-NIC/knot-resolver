@@ -6,13 +6,26 @@ var iso2_to_iso3 = {
 window.onload = function() {
 	var statsLabels = ['cached', '10ms', '100ms', '1000ms', 'slow'];
 	var statsHistory = [];
+	var now = Date.now();
 	for (i = 0; i < statsLabels.length; ++i) {
-		statsHistory.push({ label: 'Layer ' + statsLabels[i], values: [] });
+		statsHistory.push({ label: 'Layer ' + statsLabels[i], values: [{time: now, y:0}] });
 		$('.legend').append('<li class="l-' + statsLabels[i] + '">' + statsLabels[i]);
 	}
 	var statsChart = $('#stats').epoch({
 		type: 'time.area',
-		axes: ['left', 'right'],
+		axes: ['right', 'bottom'],
+		ticks: { right: 2 },
+		margins: { right: 60 },
+		tickFormats: {
+			right: function(d) {
+				if (d < 1000) {
+					return d + ' pps';
+				} else {
+					return (d / 1000.0).toFixed(1) + ' Kpps';
+				}
+			},
+			bottom: function(d) { return new Date(d).toTimeString().split(' ')[0]; },
+		},
 		data: statsHistory
 	});
 	var statsPrev = null;
@@ -83,7 +96,7 @@ window.onload = function() {
 		/* Normalize, convert to HSL. */
 		for (var key in update) {
 			var ratio = 1.0 - update[key]/max;
-			update[key] = 'hsl(205,70%,' + Math.floor(10.0 + 70.0 * (ratio * ratio)) + '%)'
+			update[key] = 'hsl(205,70%,' + Math.round((10.0 + 70.0 * (ratio * ratio)) / 10) * 10 + '%)'
 		}
 		map.updateChoropleth(update);
 	});
