@@ -121,7 +121,38 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	}
 }
 
-static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, bool secured)
+/** This turns of QNAME minimisation if there is a non-terminal between current zone cut, and name target.
+ *  It save several minimization steps, as the zone cut is likely final one.
+ */
+static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct kr_cache_txn *txn, uint32_t timestamp)
+{
+	if (qry->flags & QUERY_NO_MINIMIZE) {
+		return;
+	}
+
+	const knot_dname_t *target = qry->sname;
+	const knot_dname_t *cut_name = qry->zone_cut.name;
+	struct kr_cache_entry *entry = NULL;
+	/* @note: The non-terminal must be direct child of zone cut (e.g. label distance == 2),
+	 *        otherwise this would risk leaking information to parent if the NODATA TTD > zone cut TTD.
+	 */
+	size_t labels = knot_dname_labels(target, NULL) - knot_dname_labels(cut_name, NULL);
+	if (labels > 2) {
+		return;
+	}
+	for (size_t i = 0; i < labels; ++i) {
+		int ret = kr_cache_peek(txn, KR_CACHE_PKT, target, KNOT_RRTYPE_NS, &entry, &timestamp);
+		if (ret == 0) { /* Either NXDOMAIN or NODATA, start here. */
+			/* @todo We could stop resolution here for NXDOMAIN, but we can't because of broken CDNs */
+			qry->flags |= QUERY_NO_MINIMIZE;
+			kr_make_query(qry, pkt);
+			return;
+		}
+		target = knot_wire_next_label(target, NULL);
+	}
+}
+
+static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t *pkt, bool secured)
 {
 	int ret = 0;
 
@@ -136,6 +167,10 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, bool secur
 			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, &txn, qry->timestamp.tv_sec, secured);
 		} else {
 			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, secured);
+		}
+		/* Check if there's a non-terminal between target and current cut. */
+		if (ret == 0) {
+			check_empty_nonterms(qry, pkt, &txn, qry->timestamp.tv_sec);
 		}
 		kr_cache_txn_abort(&txn);
 	} else {
@@ -499,7 +534,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		} else {
 			qry->flags &= ~QUERY_DNSSEC_WANT;
 		}
-		int ret = ns_fetch_cut(qry, request, (qry->flags & QUERY_DNSSEC_WANT));
+		int ret = ns_fetch_cut(qry, request, packet, (qry->flags & QUERY_DNSSEC_WANT));
 		if (ret != 0) {
 			/* No cached cut found, start from SBELT and issue priming query. */
 			if (ret == kr_error(ENOENT)) {
