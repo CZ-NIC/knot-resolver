@@ -133,12 +133,12 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 	const knot_dname_t *target = qry->sname;
 	const knot_dname_t *cut_name = qry->zone_cut.name;
 	struct kr_cache_entry *entry = NULL;
-	/* @note: The non-terminal must be direct child of zone cut (e.g. label distance == 2),
-	 *        otherwise this would risk leaking information to parent if the NODATA TTD > zone cut TTD.
-	 */
+	/* @note: The non-terminal must be direct child of zone cut (e.g. label distance <= 2),
+	 *        otherwise this would risk leaking information to parent if the NODATA TTD > zone cut TTD. */
 	size_t labels = knot_dname_labels(target, NULL) - knot_dname_labels(cut_name, NULL);
-	if (labels > 2) {
-		return;
+	while (labels > 2) {
+		target = knot_wire_next_label(target, NULL);
+		--labels;
 	}
 	for (size_t i = 0; i < labels; ++i) {
 		int ret = kr_cache_peek(txn, KR_CACHE_PKT, target, KNOT_RRTYPE_NS, &entry, &timestamp);
