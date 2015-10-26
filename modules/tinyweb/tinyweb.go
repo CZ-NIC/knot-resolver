@@ -36,6 +36,7 @@ type QueryInfo struct {
 	Qtype string
 	Addr  string
 	Secure bool
+	Country string
 }
 
 // Global context
@@ -137,8 +138,6 @@ func tinyweb_init(module *C.struct_kr_module) int {
 		for msg := range ch_metrics {
 			var qtype_str [16] byte
 			C.knot_rrtype_to_string(C.uint16_t(msg.qtype), (*C.char)(unsafe.Pointer(&qtype_str[0])), C.size_t(16))
-			fifo_metrics[fifo_metrics_i] = QueryInfo{msg.qname, string(qtype_str[:]), msg.addr.String(), msg.secure}
-			fifo_metrics_i = (fifo_metrics_i + 1) % len(fifo_metrics)
 			// Sample NS country code
 			var cc string
 			switch len(msg.addr) {
@@ -152,6 +151,8 @@ func tinyweb_init(module *C.struct_kr_module) int {
 			} else {
 				geo_freq[cc] = 1
 			}
+			fifo_metrics[fifo_metrics_i] = QueryInfo{msg.qname, string(qtype_str[:]), msg.addr.String(), msg.secure, cc}
+			fifo_metrics_i = (fifo_metrics_i + 1) % len(fifo_metrics)
 		}
 	}()
 	return 0
