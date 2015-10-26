@@ -9,7 +9,7 @@ window.onload = function() {
 	var now = Date.now();
 	for (i = 0; i < statsLabels.length; ++i) {
 		statsHistory.push({ label: 'Layer ' + statsLabels[i], values: [{time: now, y:0}] });
-		$('.legend').append('<li class="l-' + statsLabels[i] + '">' + statsLabels[i]);
+		$('.stats-legend').append('<li class="l-' + statsLabels[i] + '">' + statsLabels[i]);
 	}
 	var statsChart = $('#stats').epoch({
 		type: 'time.area',
@@ -29,10 +29,44 @@ window.onload = function() {
 		data: statsHistory
 	});
 	var statsPrev = null;
+	/* Map colour brackets. */
+	var colours = [
+		'#F5F5F5',
+		'rgb(198,219,239)',
+		'rgb(158,202,225)',
+		'rgb(107,174,214)',
+		'rgb(66,146,198)',
+		'rgb(33,113,181)',
+		'rgb(8,81,156)',
+		'rgb(8,48,107)',
+	];
+	var fills = { defaultFill: '#F5F5F5' };
+	for (var i in colours) {
+		fills['q' + i] = colours[i];
+	}
 	var map = new Datamap({
 		element: document.getElementById('map'),
-		fills: { defaultFill: '#F5F5F5' },
+		fills: fills,
+		data: {},
+		geographyConfig: {
+			popupTemplate: function(geo, data) {
+				return ['<div class="hoverinfo">',
+					'<strong>', geo.properties.name, '</strong>',
+					'<br>Queries: <strong>', data ? data.queries : '0', '</strong>',
+					'</div>'].join('');
+			}
+		}
 	});
+	/* Draw map legend */
+	var legendBarWidth = 30, legendBarHeight = 10, legendOffset = 150;
+	d3.select('#map svg').append('g').attr('class', 'map-legend');
+	d3.select('.map-legend').selectAll('.map-legend')
+		.data(colours).enter()
+		.append('rect')
+			.attr('y', function(d,i) { return legendOffset + legendBarHeight*i; })
+			.attr('width', legendBarWidth)
+			.attr('height', legendBarHeight)
+			.attr('fill', function(d){ return d; });
 	/* Realtime updates */ 
 	function poller(feed, interval, cb) {
 		var func = function() {
@@ -62,7 +96,7 @@ window.onload = function() {
 		statsPrev = next;
 	});
 	poller('feed', 2000, function(resp) {
-		var feed = $('#feed')
+		var feed = $('#feed');
 		feed.children().remove();
 		feed.append('<tr><th>Type</th><th>Query</th><th>Nameserver</th><th>DNSSEC</th></tr>')
 		for (i = 0; i < resp.length; ++i) {
@@ -81,23 +115,41 @@ window.onload = function() {
 		}
 	});
 	poller('geo', 2000, function(resp) {
-		var update = {};
-		var max = 0.0;
-		/* Convert country code, calculate maximum. */
+		var min = 0.0, max = 0.0;
+		/* Calculate dataset limits. */
 		for (var key in resp) {
 			if (resp.hasOwnProperty(key)) {
+				min = Math.min(min, resp[key]);
 				max = Math.max(max, resp[key]);
+			}
+		}
+		/* Map frequency to palette. */
+		var dataset = {};
+		var quantize = d3.scale.quantize()
+			.domain([min, max])
+			.range(d3.range(colours.length).map(function(i) { return "q" + i; }));
+		for (var key in resp) {
+			if (resp.hasOwnProperty(key)) {
 				var iso3_key = iso2_to_iso3[key];
 				if (iso3_key) {
-					update[iso3_key] = resp[key];
+					var val = resp[key];
+					dataset[iso3_key] = { queries: val, fillColor: quantize(val) };
 				}
 			}
 		}
-		/* Normalize, convert to HSL. */
-		for (var key in update) {
-			var ratio = 1.0 - update[key]/max;
-			update[key] = 'hsl(205,70%,' + Math.round((10.0 + 70.0 * (ratio * ratio)) / 10) * 10 + '%)'
-		}
-		map.updateChoropleth(update);
+		map.updateChoropleth(dataset);
+		/* Update legend */
+		d3.select('.map-legend').selectAll('text').remove();
+		d3.select('.map-legend').selectAll('.map-legend')
+			.data(colours).enter()
+			.append('text')
+				.text(function(d, i) {
+					var quantizedRange = quantize.invertExtent('q' + i);
+					return parseInt(quantizedRange[0]) + ' - ' + parseInt(quantizedRange[1]);
+				})
+				.attr('x', (legendBarWidth*1.25))
+				.attr('y', function(d, i){
+					return legendOffset + (legendBarHeight*0.9) + legendBarHeight*i;
+				})
 	});
 }
