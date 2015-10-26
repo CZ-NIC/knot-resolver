@@ -52,6 +52,7 @@ window.onload = function() {
 		geographyConfig: {
 			highlightOnHover: false,
 			borderColor: '#ccc',
+			borderWidth: 0.5,
 			popupTemplate: function(geo, data) {
 				return ['<div class="hoverinfo">',
 					'<strong>', geo.properties.name, '</strong>',
