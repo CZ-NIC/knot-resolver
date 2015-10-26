@@ -116,23 +116,25 @@ window.onload = function() {
 	});
 	poller('geo', 2000, function(resp) {
 		var max = 0.0;
+		var series = [];
 		/* Calculate dataset limits. */
 		for (var key in resp) {
 			if (resp.hasOwnProperty(key)) {
 				max = Math.max(max, resp[key]);
+				series.push(resp[key]);
 			}
 		}
 		/* Map frequency to palette. */
 		var dataset = {};
-		var quantize = d3.scale.quantize()
-			.domain([0, max])
+		var quantile = d3.scale.quantile()
+			.domain(series)
 			.range(d3.range(colours.length).map(function(i) { return "q" + i; }));
 		for (var key in resp) {
 			if (resp.hasOwnProperty(key)) {
 				var iso3_key = iso2_to_iso3[key];
 				if (iso3_key) {
 					var val = resp[key];
-					dataset[iso3_key] = { queries: val, fillKey: quantize(val) };
+					dataset[iso3_key] = { queries: val, fillKey: quantile(val) };
 				}
 			}
 		}
@@ -143,7 +145,7 @@ window.onload = function() {
 			.data(colours).enter()
 			.append('text')
 				.text(function(d, i) {
-					var range = quantize.invertExtent('q' + i);
+					var range = quantile.invertExtent('q' + i);
 					if (parseInt(range[1]) > 0) {
 						return tounit(range[0]) + ' - ' + tounit(range[1]);
 					}
