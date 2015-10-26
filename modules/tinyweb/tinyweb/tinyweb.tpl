@@ -6,8 +6,8 @@
 	h1, h2, h3 { font-weight: 300; }
 	th { text-align: left; font-weight: normal; margin-bottom: 0.5em; }
 	#page { font-weight: 300; }
-	#page { width: 800px; margin: 0 auto; }
-	#stats, #map { width: 800px; height: 300px; }
+	#page { width: 900px; margin: 0 auto; }
+	#stats { height: 300px; }
 	#stats .layer-cached .area, .l-cached  { fill: #2CA02C; color: #2CA02C; }
 	#stats .layer-10ms .area  , .l-10ms    { fill: #165683; color: #165683; }
 	#stats .layer-100ms .area , .l-100ms   { fill: #258FDA; color: #258FDA; }
