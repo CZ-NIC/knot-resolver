@@ -39,7 +39,8 @@ enum kr_cache_rank {
 	KR_RANK_INSECURE  = 1,  /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
 	KR_RANK_NONAUTH   = 8,  /* Entry from authority section (i.e. parent-side) */
 	KR_RANK_AUTH      = 16, /* Entry from answer (authoritative data) */
-	KR_RANK_SECURE    = 256,  /* Entry is DNSSEC valid (e.g. RRSIG exists). */
+	KR_RANK_SECURE    = 64, /* Entry is DNSSEC valid (e.g. RRSIG exists). */
+	/* @note Rank must not exceed 6 bits */
 };
 
 /**
