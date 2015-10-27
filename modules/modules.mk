@@ -18,7 +18,8 @@ modules_TARGETS += ketcd \
                    graphite \
                    policy \
                    view \
-                   predict
+                   predict \
+                   dns64
 endif
 
 # List of Golang modules

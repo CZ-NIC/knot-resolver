@@ -72,9 +72,10 @@ static inline long time_diff(struct timeval *begin, struct timeval *end) {
     return res.tv_sec * 1000 + res.tv_usec / 1000;
 }
 
-/** @internal Array types */
+/** @cond Array types */
 struct kr_context;
 typedef array_t(knot_rrset_t *) rr_array_t;
+/* @endcond */
 
 /** @internal Next RDATA shortcut. */
 #define kr_rdataset_next(rd) (rd + knot_rdata_array_size(knot_rdata_rdlen(rd)))
