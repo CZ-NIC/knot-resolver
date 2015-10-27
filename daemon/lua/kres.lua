@@ -207,6 +207,7 @@ struct kr_context
  * libc APIs
  */
 void free(void *ptr);
+int inet_pton(int af, const char *src, void *dst);
 
 /*
  * libknot APIs
@@ -402,6 +403,13 @@ local kres = {
 	str2dname = function(name) return ffi.string(ffi.gc(C.knot_dname_from_str(nil, name, 0), C.free)) end,
 	dname2str = dname2str,
 	rr2str = rr2str,
+	str2ip = function (ip)
+		local buf = ffi.new('char [16]')
+		local family = C.kr_straddr_family(ip)
+		local ret = C.inet_pton(family, ip, buf)
+		if ret ~= 1 then return nil end
+		return ffi.string(buf, C.kr_family_len(family))
+	end,
 	context = function () return ffi.cast('struct kr_context *', __engine) end,
 }
 
