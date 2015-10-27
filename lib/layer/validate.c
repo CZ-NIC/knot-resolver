@@ -379,12 +379,12 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			 * ? merge the functionality together to share code/resources
 			 */
 			if (!has_nsec3) {
-				ret = kr_nsec_no_data(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
+				ret = kr_nsec_existence_denial(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			} else {
 				ret = kr_nsec3_no_data(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			}
 			if (ret != 0) {
-				DEBUG_MSG(qry, "<= bad no data response proof\n");
+				DEBUG_MSG(qry, "<= bad NODATA proof\n");
 				qry->flags |= QUERY_DNSSEC_BOGUS;
 				return KNOT_STATE_FAIL;
 			}
