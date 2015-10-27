@@ -339,6 +339,12 @@ ffi.metatype( kr_query_t, {
 			assert(qry)
 			return C.kr_rplan_next(qry)
 		end,
+		resolved = function(qry)
+			return band(qry.flags, kres.query.RESOLVED) ~= 0
+		end,
+		final = function(qry)
+			return qry:resolved() and (qry.parent == nil)
+		end,
 	},
 })
 -- Metatype for request

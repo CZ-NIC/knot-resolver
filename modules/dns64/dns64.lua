@@ -16,7 +16,7 @@ mod.layer = {
 		req = kres.request_t(req)
 		qry = req:current()
 		-- Observe only authoritative answers
-		if mod.proxy == nil or bit.band(qry.flags, kres.query.RESOLVED) == 0 then
+		if mod.proxy == nil or not qry:resolved() then
 			return state
 		end
 		-- Synthetic AAAA from marked A responses
@@ -36,7 +36,7 @@ mod.layer = {
 		end
 		-- Observe AAAA NODATA responses
 		local is_nodata = (pkt:rcode() == kres.rcode.NOERROR) and (#answer == 0)
-		if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name() then
+		if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name() and qry:final() then
 			local next = req:push(pkt:qname(), kres.type.A, kres.class.IN, 0, qry)
 			next.flags = bit.band(qry.flags, kres.query.DNSSEC_WANT) + kres.query.AWAIT_CUT + MARK_DNS64
 		end
