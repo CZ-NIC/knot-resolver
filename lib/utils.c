@@ -31,6 +31,7 @@
 #include "lib/generic/array.h"
 #include "lib/nsrep.h"
 #include "lib/module.h"
+#include "lib/resolve.h"
 
 /* Logging & debugging */
 bool _env_debug = false;
@@ -200,7 +201,7 @@ int kr_inaddr_len(const struct sockaddr *addr)
 	if (!addr) {
 		return kr_error(EINVAL);
 	}
-	return addr->sa_family == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr);
+	return kr_family_len(addr->sa_family);
 }
 
 int kr_straddr_family(const char *addr)
@@ -212,6 +213,11 @@ int kr_straddr_family(const char *addr)
 		return AF_INET6;
 	}
 	return AF_INET;
+}
+
+int kr_family_len(int family)
+{
+	return (family == AF_INET) ? sizeof(struct in_addr) : sizeof(struct in6_addr);
 }
 
 int kr_straddr_subnet(void *dst, const char *addr)
@@ -306,6 +312,20 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 	}
 	/* Merge rdataset */
 	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
+}
+
+int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, mm_ctx_t *pool)
+{
+	int ret = array_reserve_mm(*array, array->len + 1, mm_reserve, pool);
+	if (ret != 0) {
+		return kr_error(ENOMEM);
+	}
+	knot_rrset_t *copy = knot_rrset_copy(rr, pool);
+	if (!copy) {
+		return kr_error(ENOMEM);
+	}
+	array_push(*array, copy);
+	return kr_ok();
 }
 
 static char *callprop(struct kr_module *module, const char *prop, const char *input, void *env)

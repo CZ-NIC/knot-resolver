@@ -21,7 +21,7 @@
 #include <netinet/in.h>
 #include <libknot/packet/pkt.h>
 #include "lib/generic/map.h"
-#include "lib/resolve.h"
+#include "lib/generic/array.h"
 
 /*
  * General-purpose attributes.
@@ -72,6 +72,10 @@ static inline long time_diff(struct timeval *begin, struct timeval *end) {
     return res.tv_sec * 1000 + res.tv_usec / 1000;
 }
 
+/** @internal Array types */
+struct kr_context;
+typedef array_t(knot_rrset_t *) rr_array_t;
+
 /** @internal Next RDATA shortcut. */
 #define kr_rdataset_next(rd) (rd + knot_rdata_array_size(knot_rdata_rdlen(rd)))
 
@@ -107,6 +111,8 @@ const char *kr_inaddr(const struct sockaddr *addr);
 int kr_inaddr_len(const struct sockaddr *addr);
 /** Return address type for string. */
 int kr_straddr_family(const char *addr);
+/** Return address length in given family. */
+int kr_family_len(int family);
 /** Parse address and return subnet length (bits).
   * @warning 'dst' must be at least `sizeof(struct in6_addr)` long. */
 int kr_straddr_subnet(void *dst, const char *addr);
@@ -123,6 +129,9 @@ int kr_bitcmp(const char *a, const char *b, int bits);
  * @return 0 or an error
  */
 int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *pool);
+
+/** @internal Add RRSet copy to RR array. */
+int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, mm_ctx_t *pool);
 
 /**
  * Call module property.

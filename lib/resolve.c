@@ -277,11 +277,24 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 	return kr_ok();
 }
 
+static void write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
+{
+	for (size_t i = 0; i < arr->len; ++i) {
+		knot_pkt_put(answer, 0, arr->at[i], 0);
+	}
+}
+
 static int answer_finalize(struct kr_request *request, int state)
 {
-	/* Write EDNS information */
+	/* Write authority records. */
 	knot_pkt_t *answer = request->answer;
+	if (answer->current < KNOT_AUTHORITY)
+		knot_pkt_begin(answer, KNOT_AUTHORITY);
+	write_extra_records(&request->authority, answer);
+	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
+	write_extra_records(&request->additional, answer);
+	/* Write EDNS information */
 	if (answer->opt_rr) {
 		int ret = edns_put(answer);
 		if (ret != 0) {
@@ -331,6 +344,8 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->options = ctx->options;
 	request->state = KNOT_STATE_CONSUME;
 	request->current_query = NULL;
+	array_init(request->authority);
+	array_init(request->additional);
 
 	/* Expect first query */
 	kr_rplan_init(&request->rplan, request, &request->pool);
@@ -721,6 +736,14 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request)
 {
 	if (request) {
 		return &request->rplan;
+	}
+	return NULL;
+}
+
+mm_ctx_t *kr_resolve_pool(struct kr_request *request)
+{
+	if (request) {
+		return &request->pool;
 	}
 	return NULL;
 }

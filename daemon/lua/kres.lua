@@ -161,6 +161,11 @@ typedef struct {
 } map_t;
 
 /* libkres */
+typedef struct {
+	knot_rrset_t *at;
+	size_t len;
+	size_t cap;
+} rr_array_t;
 struct kr_query {
 	node_t _node;
 	struct kr_query *parent;
@@ -185,6 +190,8 @@ struct kr_request {
 	} qsource;
 	uint32_t options;
 	int state;
+	rr_array_t authority;
+	rr_array_t additional;
 	uint8_t _stub[]; /* Do not touch */
 };
 struct kr_context
@@ -228,6 +235,7 @@ const knot_pktsection_t *knot_pkt_section(const knot_pkt_t *pkt,
  */
 /* Resolution request */
 struct kr_rplan *kr_resolve_plan(struct kr_request *request);
+void *kr_resolve_pool(struct kr_request *request);
 /* Resolution plan */
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type);
@@ -240,6 +248,9 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
 const char *kr_inaddr(const struct sockaddr *addr);
 int kr_inaddr_len(const struct sockaddr *addr);
+int kr_straddr_family(const char *addr);
+int kr_family_len(int family);
+int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, void *pool);
 /* Trust anchors */
 knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name);
 int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,

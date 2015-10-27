@@ -115,6 +115,8 @@ struct kr_request {
     } qsource;
     uint32_t options;
     int state;
+    rr_array_t authority;
+    rr_array_t additional;
     struct kr_rplan rplan;
     mm_ctx_t pool;
 };
@@ -177,4 +179,11 @@ int kr_resolve_finish(struct kr_request *request, int state);
  * @return         pointer to rplan
  */
 struct kr_rplan *kr_resolve_plan(struct kr_request *request);
+
+/**
+ * Return memory pool associated with request.
+ * @param  request request state
+ * @return         mempool
+ */
+mm_ctx_t *kr_resolve_pool(struct kr_request *request);
 
