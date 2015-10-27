@@ -334,7 +334,7 @@ ffi.metatype( knot_pkt_t, {
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
-		name = function(qry, new_name) return ffi.string(qry.sname) end,
+		name = function(qry, new_name) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
 		next = function(qry)
 			assert(qry)
 			return C.kr_rplan_next(qry)
@@ -400,7 +400,10 @@ local kres = {
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,
 	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,
 	-- Global API functions
-	str2dname = function(name) return ffi.string(ffi.gc(C.knot_dname_from_str(nil, name, 0), C.free)) end,
+	str2dname = function(name)
+		local dname = ffi.gc(C.knot_dname_from_str(nil, name, 0), C.free)
+		return ffi.string(dname, knot.knot_dname_size(dname))
+	end,
 	dname2str = dname2str,
 	rr2str = rr2str,
 	str2ip = function (ip)

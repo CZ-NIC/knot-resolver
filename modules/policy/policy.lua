@@ -63,7 +63,7 @@ local function rpz_parse(action, path)
 		-- Policy triggers @NYI@
 	}
 	local parser = require('zonefile').parser(function (p)
-		local name = ffi.string(p.r_owner, p.r_owner_length - 1)
+		local name = ffi.string(p.r_owner, p.r_owner_length)
 		local action = ffi.string(p.r_data, p.r_data_length)
 		rules[name] = action_map[action]
 	end, function (p)
@@ -193,6 +193,6 @@ local private_zones = {
 policy.to_domains(private_zones)
 
 -- @var Default rules
-policy.rules = { policy.suffix_common(policy.DENY, private_zones, '\4arpa') }
+policy.rules = { policy.suffix_common(policy.DENY, private_zones, '\4arpa\0') }
 
 return policy
