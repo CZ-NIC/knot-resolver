@@ -67,15 +67,20 @@ bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t 
 static int nsec_nonamematch(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
 	assert(nsec && sname);
-
 	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
-
-	if ((knot_dname_cmp(nsec->owner, sname) < 0) &&
-	    (knot_dname_cmp(sname, next) < 0)) {
-		return kr_ok();
+	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
+	const bool is_last_nsec = (knot_dname_cmp(nsec->owner, next) >= 0);
+	if (is_last_nsec) { /* SNAME is after owner => provably doesn't exist */
+		if (knot_dname_cmp(nsec->owner, sname) < 0) {
+			return kr_ok();
+		}
 	} else {
-		return kr_error(EINVAL);
+		/* Prove that SNAME is between 'owner' and 'next' */
+		if ((knot_dname_cmp(nsec->owner, sname) < 0) && (knot_dname_cmp(sname, next) < 0)) {
+			return kr_ok();
+		}
 	}
+	return kr_error(EINVAL);
 }
 
 #define FLG_NOEXIST_RRTYPE (1 << 0) /**< <SNAME, SCLASS> exists, <SNAME, SCLASS, STYPE> does not exist. */
