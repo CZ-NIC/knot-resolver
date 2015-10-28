@@ -52,6 +52,30 @@ There are also *optional* packages that enable specific functionality in Knot DN
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
 .. [#] libuv 1.7 brings SO_REUSEPORT support that is needed for multiple forks. libuv < 1.7 can be still used, but only in single-process mode. Use :ref:`different method <daemon-reuseport>` for load balancing.
 
+Packaged dependencies
+~~~~~~~~~~~~~~~~~~~~~
+
+Most of the dependencies can be resolved from packages, here's an overview for several platforms.
+
+* **Debian** (since *sid*) - current stable doesn't have libknot and libuv, which must be installed from sources.
+
+.. code-block:: bash
+
+   sudo apt-get install pkg-config libknot-dev libuv1-dev libcmocka-dev libluajit-5.1-dev
+
+* **Ubuntu** - unknown.
+* **RHEL/CentOS** - unknown.
+* **openSUSE** - there is an `experimental package <https://build.opensuse.org/package/show/server:dns/knot-resolver>`_.
+* **RHEL** - unknown.
+* **FreeBSD** - unknown.
+* **NetBSD** - unknown.
+* **OpenBSD** - unknown.
+* **Mac OS X** - most of the dependencies can be found through `Homebrew <http://brew.sh/>`_, with the exception of libknot.
+
+.. code-block:: bash
+
+   brew install pkg-config libuv luajit cmocka
+
 Getting Docker image
 --------------------
 
