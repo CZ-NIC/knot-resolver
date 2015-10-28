@@ -37,7 +37,7 @@ static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qty
 {
 	/* Minimization disabled. */
 	const knot_dname_t *qname = query->sname;
-	if (qname[0] == '\0' || query->flags & QUERY_NO_MINIMIZE) {
+	if (qname[0] == '\0' || query->flags & (QUERY_NO_MINIMIZE|QUERY_STUB)) {
 		return qname;
 	}
 
@@ -260,6 +260,11 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	struct kr_query *qry = req->current_query;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
+	/* Stub resolution doesn't process authority */
+	if (qry->flags & QUERY_STUB) {
+		return KNOT_STATE_CONSUME;
+	}
+
 #ifdef STRICT_MODE
 	/* AA, terminate resolution chain. */
 	if (knot_wire_get_aa(pkt->wire)) {
@@ -337,7 +342,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	}
 
 	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
-	if (!is_authoritative(pkt, query)) {
+	if (!(query->flags & QUERY_STUB) && !is_authoritative(pkt, query)) {
 		if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
 			DEBUG_MSG("<= lame response: non-auth sent negative response\n");
 			return KNOT_STATE_FAIL;
@@ -524,8 +529,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
-	int state = KNOT_STATE_CONSUME;
-	state = process_authority(pkt, req);
+	int state = process_authority(pkt, req);
 	switch(state) {
 	case KNOT_STATE_CONSUME: /* Not referral, process answer. */
 		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");

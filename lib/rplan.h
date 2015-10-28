@@ -44,6 +44,7 @@
 	X(DNSSEC_WANT,     1 << 14) /**< Want DNSSEC secured answer. */ \
 	X(DNSSEC_BOGUS,    1 << 15) /**< Query response is DNSSEC bogus. */ \
 	X(DNSSEC_INSECURE, 1 << 16) /**< Query response is DNSSEC insecure. */ \
+	X(STUB,            1 << 17) /**< Stub resolution, accept received answer as solved. */ \
 
 /** Query flags */
 enum kr_query_flag {

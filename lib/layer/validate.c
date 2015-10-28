@@ -300,8 +300,9 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	/* Pass-through if user doesn't want secure answer. */
-	if (!(qry->flags & QUERY_DNSSEC_WANT)) {
+	/* Pass-through if user doesn't want secure answer or stub. */
+	/* @todo: Validating stub resolver mode. */
+	if (!(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_STUB)) {
 		return ctx->state;
 	}
 	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */

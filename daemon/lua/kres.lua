@@ -88,6 +88,7 @@ struct pkt_rcode {
 };
 struct query_flag {
 	static const int NO_MINIMIZE = 1 << 0;
+	static const int NO_THROTTLE = 1 << 1;
 	static const int NO_IPV6     = 1 << 2;
 	static const int NO_IPV4     = 1 << 3;
 	static const int RESOLVED    = 1 << 5;
@@ -96,6 +97,7 @@ struct query_flag {
 	static const int NO_CACHE    = 1 << 11;
 	static const int EXPIRING    = 1 << 12;
 	static const int DNSSEC_WANT = 1 << 14;
+	static const int STUB        = 1 << 17;
 };
 
 /*

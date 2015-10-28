@@ -325,8 +325,14 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	if (!(qry->flags & QUERY_SAFEMODE)) {
 		ret = edns_create(pkt, request->answer, request);
-		if (ret == 0) { /* Enable DNSSEC for query. */
-			if (qry->flags & QUERY_DNSSEC_WANT) {
+		if (ret == 0) {
+			/* Stub resolution (ask for +rd and +do) */
+			if (qry->flags & QUERY_STUB) {
+				knot_wire_set_rd(pkt->wire);
+				if (knot_pkt_has_dnssec(request->answer))
+					knot_edns_set_do(pkt->opt_rr);
+			/* Full resolution (ask for +cd and +do) */
+			} else if (qry->flags & QUERY_DNSSEC_WANT) {
 				knot_edns_set_do(pkt->opt_rr);
 				knot_wire_set_cd(pkt->wire);
 			}
@@ -539,6 +545,11 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	map_t *trust_anchors = &request->ctx->trust_anchors;
 	map_t *negative_anchors = &request->ctx->negative_anchors;
 
+	/* Stub mode, just forward and do not solve cut. */
+	if (qry->flags & QUERY_STUB) {
+		return KNOT_STATE_PRODUCE;
+	}
+
 	/* The query wasn't resolved from cache,
 	 * now it's the time to look up closest zone cut from cache. */
 	if (qry->flags & QUERY_AWAIT_CUT) {
@@ -653,7 +664,7 @@ ns_election:
 	}
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
-	} else if (!qry->ns.name || !(qry->flags & QUERY_TCP)) { /* Keep address when TCP retransmit. */
+	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB))) { /* Keep NS when requerying/stub. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			DEBUG_MSG(qry, "=> priming root DNSKEY\n");
