@@ -242,6 +242,8 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 struct kr_query *kr_rplan_next(struct kr_query *qry);
+/* Nameservers */
+int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len);
 /* Query */
 /* Utils */
 unsigned kr_rand_uint(unsigned max);
@@ -331,6 +333,7 @@ ffi.metatype( knot_pkt_t, {
 	},
 })
 -- Metatype for query
+local ub_t = ffi.typeof('unsigned char *')
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
@@ -344,6 +347,10 @@ ffi.metatype( kr_query_t, {
 		end,
 		final = function(qry)
 			return qry:resolved() and (qry.parent == nil)
+		end,
+		nslist = function(qry, ns)
+			if ns ~= nil then C.kr_nsrep_set(qry, ffi.cast(ub_t, ns), #ns) end
+			-- @todo: Return list of NS entries, not possible ATM because the NSLIST is union and missing typedef
 		end,
 	},
 })

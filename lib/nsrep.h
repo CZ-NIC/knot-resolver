@@ -81,6 +81,15 @@ struct kr_nsrep
 	((addr).ip.sa_family == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr))
 
 /**
+ * Set given NS address.
+ * @param  qry      updated query
+ * @param  addr     address bytes (struct in_addr or struct in6_addr)
+ * @param  addr_len address bytes length (type will be derived from this)
+ * @return          0 or an error code
+ */
+int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len);
+
+/**
  * Elect best nameserver/address pair from the nsset.
  * @param  qry          updated query
  * @param  ctx          resolution context

@@ -217,7 +217,11 @@ int kr_straddr_family(const char *addr)
 
 int kr_family_len(int family)
 {
-	return (family == AF_INET) ? sizeof(struct in_addr) : sizeof(struct in6_addr);
+	switch (family) {
+	case AF_INET:  return sizeof(struct in_addr);
+	case AF_INET6: return sizeof(struct in6_addr);
+	default:       return kr_error(EINVAL);
+	}
 }
 
 int kr_straddr_subnet(void *dst, const char *addr)
