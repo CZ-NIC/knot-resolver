@@ -1,10 +1,29 @@
 local kres = require('kres')
+
+-- Forward request, and solve as stub query
+local function forward(target)
+	local dst_ip = kres.str2ip(target)
+	if dst_ip == nil then error("FORWARD target '"..target..'" is not a valid IP address') end
+	return function(state, req)
+		req = kres.request_t(req)
+		local qry = req:current()
+		qry.flags = qry.flags + kres.query.STUB
+		qry:nslist(dst_ip)
+		return state
+	end
+end
+
 local policy = {
 	-- Policies
-	PASS = 1, DENY = 2, DROP = 3, TC = 4,
+	PASS = 1, DENY = 2, DROP = 3, TC = 4, FORWARD = forward,
 	-- Special values
 	ANY = 0,
 }
+
+-- All requests
+function policy.all(action)
+	return function(req, query) return action end
+end
 
 -- Requests which QNAME matches given zone list (i.e. suffix match)
 function policy.suffix(action, zone_list)
@@ -127,6 +146,8 @@ function policy.enforce(state, req, action)
 			answer:tc(1) -- ^ Only UDP queries
 			return kres.DONE
 		end
+	elseif type(action) == 'function' then
+		return action(state, req)
 	end
 	return state
 end

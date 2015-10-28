@@ -24,6 +24,7 @@ There are several defined actions:
 * ``DENY`` - return NXDOMAIN answer
 * ``DROP`` - terminate query resolution, returns SERVFAIL to requestor
 * ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
+* ``FORWARD(ip)`` - forward query to given IP and proxy back response (stub mode)
 
 .. note:: The module (and ``kres``) treats domain names as wire, not textual representation. So each label in name is prefixed with its length, e.g. "example.com" equals to ``"\7example\3com"``.
 
@@ -52,14 +53,21 @@ Example configuration
 	end)
 	-- Enforce local RPZ
 	policy:add(policy.rpz(policy.DENY, 'blacklist.rpz'))
+  -- Forward all queries below 'company.se' to given resolver
+  policy:add(policy.suffix(policy.FORWARD('192.168.1.1'), {'\7company\2se'}))
+  -- Forward all queries matching pattern
+  policy:add(policy.pattern(policy.FORWARD('2001:DB8::1'), '\4bad[0-9]\2cz'))
+  -- Forward all queries (complete stub mode)
+  policy:add(policy.all(policy.FORWARD('2001:DB8::1')))
 
 Properties
 ^^^^^^^^^^
 
-.. envvar:: policy.PASS (number)
-.. envvar:: policy.DENY (number)
-.. envvar:: policy.DROP (number)
-.. envvar:: policy.TC   (number)
+.. envvar:: policy.PASS    (number)
+.. envvar:: policy.DENY    (number)
+.. envvar:: policy.DROP    (number)
+.. envvar:: policy.TC      (number)
+.. envvar:: policy.FORWARD (function)
 
 .. function:: policy:add(rule)
 
@@ -67,6 +75,12 @@ Properties
   :param pattern: regular expression
   
   Policy to block queries based on the QNAME regex matching.
+
+.. function:: policy.all(action)
+
+  :param action: executed action for all queries
+  
+  Perform action for all queries (no filtering).
 
 .. function:: policy.pattern(action, pattern)
 
