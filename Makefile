@@ -15,7 +15,7 @@ BUILD_CFLAGS += --coverage
 endif
 
 # Dependencies
-$(eval $(call find_lib,libknot,2.0))
+$(eval $(call find_lib,libknot))
 $(eval $(call find_lib,libuv,1.0))
 $(eval $(call find_alt,lua,luajit))
 $(eval $(call find_lib,cmocka))
