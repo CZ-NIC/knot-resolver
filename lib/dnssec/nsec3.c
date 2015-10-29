@@ -381,7 +381,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 	const knot_rrset_t *covering = NULL;
 
 	int ret = kr_error(ENOENT);
-	int flags;
+	int flags = 0;
 	const knot_dname_t *next_closer = NULL;
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
@@ -423,8 +423,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 		flags = 0; //
 	}
 
-	if ((flags & FLG_CLOSEST_PROVABLE_ENCLOSER) &&
-	    (flags & FLG_NAME_COVERED)) {
+	if ((flags & FLG_CLOSEST_PROVABLE_ENCLOSER) && (flags & FLG_NAME_COVERED) && next_closer) {
 		if (encloser_name) {
 			*encloser_name = knot_wire_next_label(next_closer, NULL);
 		}
