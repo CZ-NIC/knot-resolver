@@ -247,7 +247,7 @@ int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
 		return kr_error(EINVAL);
 	}
 
-	int ret;
+	int ret = 0;
 	dnssec_sign_ctx_t *sign_ctx = NULL;
 	dnssec_binary_t signature = {0, };
 
@@ -257,8 +257,7 @@ int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
 		goto fail;
 	}
 
-	ret = dnssec_sign_new(&sign_ctx, key);
-	if (ret != DNSSEC_EOK) {
+	if (dnssec_sign_new(&sign_ctx, key) != 0) {
 		ret = kr_error(ENOMEM);
 		goto fail;
 	}
@@ -267,14 +266,12 @@ int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
 	const knot_rdata_t *rr_data = knot_rdataset_at(&rrsigs->rrs, pos);
 	uint8_t *rdata = knot_rdata_data(rr_data);
 
-	ret = sign_ctx_add_data(sign_ctx, rdata, covered, orig_ttl, trim_labels);
-	if (ret != KNOT_EOK) {
+	if (sign_ctx_add_data(sign_ctx, rdata, covered, orig_ttl, trim_labels) != 0) {
 		ret = kr_error(ENOMEM);
 		goto fail;
 	}
 
-	ret = dnssec_sign_verify(sign_ctx, &signature);
-	if (ret != KNOT_EOK) {
+	if (dnssec_sign_verify(sign_ctx, &signature) != 0) {
 		ret = kr_error(EBADMSG);
 		goto fail;
 	}
