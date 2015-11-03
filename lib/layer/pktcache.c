@@ -182,13 +182,15 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (ttl == 0) {
 		return ctx->state; /* No useable TTL, can't cache this. */
 	}
-
+	const knot_dname_t *qname = knot_pkt_qname(pkt);
+	if (!qname) {
+		return ctx->state;
+	}
 	/* Open write transaction and prepare answer */
 	struct kr_cache_txn txn;
 	if (kr_cache_txn_begin(&req->ctx->cache, &txn, 0) != 0) {
 		return ctx->state; /* Couldn't acquire cache, ignore. */
 	}
-	const knot_dname_t *qname = knot_pkt_qname(pkt);
 	namedb_val_t data = { pkt->wire, pkt->size };
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,

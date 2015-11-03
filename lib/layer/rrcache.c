@@ -255,7 +255,12 @@ static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, 
 
 static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx_t *pool)
 {
-	const knot_dname_t *cname = knot_pkt_qname(pkt);
+	/* Work with QNAME, as minimised name data is cacheable. */
+	const knot_dname_t *cname_begin = knot_pkt_qname(pkt);
+	if (!cname_begin) {
+		cname_begin = qry->sname;
+	}
+	const knot_dname_t *cname = cname_begin;
 	const knot_pktsection_t *answer = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < answer->count; ++i) {
 		/* Stash direct answers (equal to current QNAME/CNAME),
@@ -269,11 +274,11 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_
 		/* Follow CNAME chain in current cut (if SECURE). */
 		if ((qry->flags & QUERY_DNSSEC_WANT) && rr->type == KNOT_RRTYPE_CNAME) {
 			const knot_dname_t *next_cname = knot_cname_name(&rr->rrs);
-			if (knot_dname_in(qry->zone_cut.name, next_cname)) {
+			if (next_cname && knot_dname_in(qry->zone_cut.name, next_cname)) {
 				cname = next_cname;
 			}
 		} else if (rr->type != KNOT_RRTYPE_RRSIG) {
-			cname = qry->sname;
+			cname = cname_begin;
 		}
 	}
 	return kr_ok();

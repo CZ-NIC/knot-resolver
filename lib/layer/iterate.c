@@ -113,7 +113,9 @@ static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *r
                                struct kr_query *cur)
 {
 	if (rr->type == KNOT_RRTYPE_CNAME) {
-		*cname = knot_cname_name(&rr->rrs);
+		const knot_dname_t *next_cname = knot_cname_name(&rr->rrs);
+		if (next_cname)
+			*cname = next_cname;
 	} else if (rr->type != KNOT_RRTYPE_RRSIG) {
 		/* Terminate CNAME chain (if not RRSIG). */
 		*cname = cur->sname;
