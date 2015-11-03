@@ -89,7 +89,6 @@ end
 
 -- Plan refresh event and re-schedule itself based on the result of the callback
 local function refresh_plan(trust_anchors, timeout, refresh_cb)
-	if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
 	trust_anchors.refresh_ev = event.after(timeout, function (ev)
 		resolve('.', kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE,
 		function (pkt)
@@ -198,6 +197,7 @@ local trust_anchors = {
 		if is_unmanaged then trust_anchors.file_current = nil end
 		trust_anchors.keyset = {}
 		if trust_anchors.update(new_keys, true) then
+			if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
 			refresh_plan(trust_anchors, sec, active_refresh)
 		end
 	end,
