@@ -88,7 +88,7 @@ local function ta_missing(keyset, ta, hold_down_time)
 end
 
 -- Plan refresh event and re-schedule itself based on the result of the callback
-local function refresh_plan(trust_anchors, timeout, refresh_cb)
+local function refresh_plan(trust_anchors, timeout, refresh_cb, priming)
 	trust_anchors.refresh_ev = event.after(timeout, function (ev)
 		resolve('.', kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE,
 		function (pkt)
@@ -99,6 +99,10 @@ local function refresh_plan(trust_anchors, timeout, refresh_cb)
 			end
 			print('[trust_anchors] next refresh: '..next_time)
 			refresh_plan(trust_anchors, next_time, refresh_cb)
+			-- Priming query, prime root NS next
+			if priming ~= nil then
+				resolve('.', kres.type.NS, kres.class.IN)
+			end
 		end)
 	end)
 end
@@ -198,7 +202,7 @@ local trust_anchors = {
 		trust_anchors.keyset = {}
 		if trust_anchors.update(new_keys, true) then
 			if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
-			refresh_plan(trust_anchors, sec, active_refresh)
+			refresh_plan(trust_anchors, sec, active_refresh, true)
 		end
 	end,
 	-- Add DS/DNSKEY record(s) (unmanaged)

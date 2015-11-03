@@ -557,12 +557,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 				if (ret != 0) {
 					return KNOT_STATE_FAIL;
 				}
-				if (qry->sname[0] != '\0') {
-					DEBUG_MSG(qry, "=> root priming query\n");
-					zone_cut_subreq(rplan, qry, qry->zone_cut.name, KNOT_RRTYPE_NS);
-				} else {
-					DEBUG_MSG(qry, "=> using root hints\n");
-				}
+				DEBUG_MSG(qry, "=> using root hints\n");
 				qry->flags &= ~QUERY_AWAIT_CUT;
 				return KNOT_STATE_DONE;
 			} else {
