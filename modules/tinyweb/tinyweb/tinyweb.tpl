@@ -25,6 +25,7 @@
 <script type="text/javascript" src="topojson.js"></script>
 <script type="text/javascript" src="datamaps.world.min.js"></script>
 <script type="text/javascript" src="tinyweb.js"></script>
+<link rel="icon" type="image/ico" href="favicon.ico">
 <link rel="stylesheet" type="text/css" href="epoch.css">
 <div id="page">
 	<h1>{{.Title}}</h1>

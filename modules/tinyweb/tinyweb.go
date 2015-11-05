@@ -191,6 +191,7 @@ func tinyweb_config(module *C.struct_kr_module, conf *C.char) int {
 	http.HandleFunc("/topojson.js", serve_file)
 	http.HandleFunc("/jquery.js", serve_file)
 	http.HandleFunc("/epoch.css", serve_file)
+	http.HandleFunc("/favicon.ico", serve_file)
 	http.HandleFunc("/epoch.js", serve_file)
 	http.HandleFunc("/d3.js", serve_file)
 	http.HandleFunc("/", serve_page)
