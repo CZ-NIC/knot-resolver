@@ -53,12 +53,12 @@ Example configuration
 	end)
 	-- Enforce local RPZ
 	policy:add(policy.rpz(policy.DENY, 'blacklist.rpz'))
-  -- Forward all queries below 'company.se' to given resolver
-  policy:add(policy.suffix(policy.FORWARD('192.168.1.1'), {'\7company\2se'}))
-  -- Forward all queries matching pattern
-  policy:add(policy.pattern(policy.FORWARD('2001:DB8::1'), '\4bad[0-9]\2cz'))
-  -- Forward all queries (complete stub mode)
-  policy:add(policy.all(policy.FORWARD('2001:DB8::1')))
+	-- Forward all queries below 'company.se' to given resolver
+	policy:add(policy.suffix(policy.FORWARD('192.168.1.1'), {'\7company\2se'}))
+	-- Forward all queries matching pattern
+	policy:add(policy.pattern(policy.FORWARD('2001:DB8::1'), '\4bad[0-9]\2cz'))
+	-- Forward all queries (complete stub mode)
+	policy:add(policy.all(policy.FORWARD('2001:DB8::1')))
 
 Properties
 ^^^^^^^^^^
