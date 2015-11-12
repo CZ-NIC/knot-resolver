@@ -88,6 +88,7 @@ struct pkt_rcode {
 };
 struct query_flag {
 	static const int NO_MINIMIZE = 1 << 0;
+	static const int NO_THROTTLE = 1 << 1;
 	static const int NO_IPV6     = 1 << 2;
 	static const int NO_IPV4     = 1 << 3;
 	static const int RESOLVED    = 1 << 5;
@@ -96,6 +97,7 @@ struct query_flag {
 	static const int NO_CACHE    = 1 << 11;
 	static const int EXPIRING    = 1 << 12;
 	static const int DNSSEC_WANT = 1 << 14;
+	static const int STUB        = 1 << 17;
 };
 
 /*
@@ -242,6 +244,8 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 struct kr_query *kr_rplan_next(struct kr_query *qry);
+/* Nameservers */
+int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len);
 /* Query */
 /* Utils */
 unsigned kr_rand_uint(unsigned max);
@@ -331,6 +335,7 @@ ffi.metatype( knot_pkt_t, {
 	},
 })
 -- Metatype for query
+local ub_t = ffi.typeof('unsigned char *')
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
@@ -344,6 +349,10 @@ ffi.metatype( kr_query_t, {
 		end,
 		final = function(qry)
 			return qry:resolved() and (qry.parent == nil)
+		end,
+		nslist = function(qry, ns)
+			if ns ~= nil then C.kr_nsrep_set(qry, ffi.cast(ub_t, ns), #ns) end
+			-- @todo: Return list of NS entries, not possible ATM because the NSLIST is union and missing typedef
 		end,
 	},
 })

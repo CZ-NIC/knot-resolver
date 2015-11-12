@@ -37,20 +37,18 @@
 } while (0)
 
 /** Update nameserver representation with current name/address pair. */
-static void update_nsrep(struct kr_nsrep *ns, uint8_t *addr, size_t pos)
+static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t addr_len)
 {
 	if (addr == NULL) {
 		ns->addr[pos].ip.sa_family = AF_UNSPEC;
 		return;
 	}
 
-	size_t len = pack_obj_len(addr);
-	void *addr_val = pack_obj_val(addr);
-	switch(len) {
+	switch(addr_len) {
 	case sizeof(struct in_addr):
-		ADDR_SET(ns->addr[pos].ip4.sin, AF_INET, addr_val, len); break;
+		ADDR_SET(ns->addr[pos].ip4.sin, AF_INET, addr, addr_len); break;
 	case sizeof(struct in6_addr):
-		ADDR_SET(ns->addr[pos].ip6.sin6, AF_INET6, addr_val, len); break;
+		ADDR_SET(ns->addr[pos].ip6.sin6, AF_INET6, addr, addr_len); break;
 	default: assert(0); break;
 	}
 }
@@ -60,7 +58,13 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 	ns->name = name;
 	ns->score = score;
 	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		update_nsrep(ns, addr[i], i);
+		if (addr[i]) {
+			void *addr_val = pack_obj_val(addr[i]);
+			size_t len = pack_obj_len(addr[i]);
+			update_nsrep(ns, i, addr_val, len);
+		} else {
+			update_nsrep(ns, i, NULL, 0);
+		}
 	}
 }
 
@@ -154,6 +158,19 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 		}
 	}
 
+	return kr_ok();
+}
+
+int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len)
+{
+	if (!qry || !addr) {
+		return kr_error(EINVAL);
+	}
+	qry->ns.name = (const uint8_t *)"";
+	qry->ns.score = KR_NS_UNKNOWN;
+	qry->ns.reputation = 0;
+	update_nsrep(&qry->ns, 0, addr, addr_len);
+	update_nsrep(&qry->ns, 1, NULL, 0);
 	return kr_ok();
 }
 
