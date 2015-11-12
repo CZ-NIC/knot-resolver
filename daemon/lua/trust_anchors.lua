@@ -9,8 +9,7 @@ local key_state = {
 
 -- Find key in current keyset
 local function ta_find(keyset, rr)
-	for i = 1, #keyset do
-		local ta = keyset[i]
+	for i, ta in ipairs(keyset) do
 		-- Match key owner and content
 		if ta.owner == rr.owner and
 		   C.kr_dnssec_key_match(ta.rdata, #ta.rdata, rr.rdata, #rr.rdata) == 0 then
@@ -113,8 +112,7 @@ local function active_refresh(trust_anchors, pkt)
 	if pkt:rcode() == kres.rcode.NOERROR then
 		local records = pkt:section(kres.section.ANSWER)
 		local keyset = {}
-		for i = 1, #records do
-			local rr = records[i]
+		for i, rr in ipairs(records) do
 			if rr.type == kres.type.DNSKEY then
 				table.insert(keyset, rr)
 			end
@@ -155,32 +153,27 @@ local trust_anchors = {
 		if not new_keys then return false end
 		-- Filter TAs to be purged from the keyset (KeyRem)
 		local hold_down = trust_anchors.hold_down_time / 1000
-		local keyset_keep = {}
-		local keyset = trust_anchors.keyset
-		for i = 1, #keyset do
-			local ta = keyset[i]
+		local keyset = {}
+		for i, ta in ipairs(trust_anchors.keyset) do
 			local keep = true
 			if not ta_find(new_keys, ta) then
-				keep = ta_missing(trust_anchors, keyset, ta, hold_down)
+				keep = ta_missing(trust_anchors, trust_anchors.keyset, ta, hold_down)
 			end
 			if keep then
-				table.insert(keyset_keep, ta)
+				table.insert(keyset, ta)
 			end
 		end
-		keyset = keyset_keep
 		-- Evaluate new TAs
-		for i = 1, #new_keys do
-			local rr = new_keys[i]
-			if rr.type == kres.type.DNSKEY then
+		for i, rr in ipairs(new_keys) do
+			if rr.type == kres.type.DNSKEY and rr.rdata ~= nil then
 				ta_present(keyset, rr, hold_down, initial)
 			end
 		end
 		-- Publish active TAs
 		local store = kres.context().trust_anchors
 		C.kr_ta_clear(store)
-		if #keyset == 0 then return false end
-		for i = 1, #keyset do
-			local ta = keyset[i]
+		if next(keyset) == nil then return false end
+		for i, ta in ipairs(keyset) do
 			-- Key MAY be used as a TA only in these two states (RFC5011, 4.2)
 			if ta.state == key_state.Valid or ta.state == key_state.Missing then
 				C.kr_ta_add(store, ta.owner, ta.type, ta.ttl, ta.rdata, #ta.rdata)

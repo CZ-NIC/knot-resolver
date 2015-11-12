@@ -316,10 +316,10 @@ ffi.metatype( knot_pkt_t, {
 		section = function (pkt, section_id)
 			local records = {}
 			local section = C.knot_pkt_section(pkt, section_id)
-			for i = 0, section.count - 1 do
-				local rrset = knot.knot_pkt_rr(section, i)
-				for k = 0, rrset.rr.count - 1 do
-					table.insert(records, rrset:get(k))
+			for i = 1, section.count do
+				local rrset = knot.knot_pkt_rr(section, i - 1)
+				for k = 1, rrset.rr.count do
+					table.insert(records, rrset:get(k - 1))
 				end
 			end
 			return records
