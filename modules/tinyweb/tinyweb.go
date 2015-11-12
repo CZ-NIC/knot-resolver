@@ -14,7 +14,6 @@ static inline const knot_layer_api_t *_layer(void)
 import "C"
 import (
 	"os"
-	"sync"
 	"unsafe"
 	"fmt"
 	"net"
@@ -25,12 +24,6 @@ import (
 	"github.com/abh/geoip"
 )
 
-type Sample struct {
-	qname string
-	qtype int
-    addr  net.IP
-    secure bool
-}
 type QueryInfo struct {
 	Qname string
 	Qtype string
@@ -41,10 +34,6 @@ type QueryInfo struct {
 
 // Global context
 var resolver *C.struct_kr_context
-// Synchronisation
-var wg sync.WaitGroup
-// Global channel for metrics
-var ch_metrics chan Sample
 // FIFO of last-seen metrics
 var fifo_metrics [10] QueryInfo
 var fifo_metrics_i = 0
@@ -126,35 +115,30 @@ func serve_stats(w http.ResponseWriter, r *http.Request) {
  * Module implementation.
  */
 
+func process_sample(qname string, qtype int, addr net.IP, secure bool) {
+	var qtype_str [16] byte
+	C.knot_rrtype_to_string(C.uint16_t(qtype), (*C.char)(unsafe.Pointer(&qtype_str[0])), C.size_t(16))
+	// Sample NS country code
+	var cc string
+	switch len(addr) {
+	case 4:  if (geo_db  != nil) { cc, _ = geo_db.GetCountry(addr.String()) }
+	case 16: if (geo_db6 != nil) { cc, _ = geo_db6.GetCountry_v6(addr.String()) }
+	default: return
+	}
+	// Count occurences
+	if freq, exists := geo_freq[cc]; exists {
+		geo_freq[cc] = freq + 1
+	} else {
+		geo_freq[cc] = 1
+	}
+	fifo_metrics[fifo_metrics_i] = QueryInfo{qname, string(qtype_str[:]), addr.String(), secure, cc}
+	fifo_metrics_i = (fifo_metrics_i + 1) % len(fifo_metrics)
+}
+
 //export tinyweb_init
 func tinyweb_init(module *C.struct_kr_module) int {
 	resolver = (*C.struct_kr_context)(module.data)
-	ch_metrics = make(chan Sample, 10)
 	geo_freq = make(map[string]int)
-	// Start sample collector goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for msg := range ch_metrics {
-			var qtype_str [16] byte
-			C.knot_rrtype_to_string(C.uint16_t(msg.qtype), (*C.char)(unsafe.Pointer(&qtype_str[0])), C.size_t(16))
-			// Sample NS country code
-			var cc string
-			switch len(msg.addr) {
-			case 4:  if (geo_db  != nil) { cc, _ = geo_db.GetCountry(msg.addr.String()) }
-			case 16: if (geo_db6 != nil) { cc, _ = geo_db6.GetCountry_v6(msg.addr.String()) }
-			default: continue
-			}
-			// Count occurences
-			if freq, exists := geo_freq[cc]; exists {
-				geo_freq[cc] = freq + 1
-			} else {
-				geo_freq[cc] = 1
-			}
-			fifo_metrics[fifo_metrics_i] = QueryInfo{msg.qname, string(qtype_str[:]), msg.addr.String(), msg.secure, cc}
-			fifo_metrics_i = (fifo_metrics_i + 1) % len(fifo_metrics)
-		}
-	}()
 	return 0
 }
 
@@ -196,7 +180,6 @@ func tinyweb_config(module *C.struct_kr_module, conf *C.char) int {
 	http.HandleFunc("/d3.js", serve_file)
 	http.HandleFunc("/", serve_page)
 	// @todo Not sure how to cancel this routine yet
-	// wg.Add(1)
 	fmt.Printf("[tinyweb] listening on %s\n", addr)
 	go http.ListenAndServe(addr, nil)
 	return 0
@@ -204,8 +187,6 @@ func tinyweb_config(module *C.struct_kr_module, conf *C.char) int {
 
 //export tinyweb_deinit
 func tinyweb_deinit(module *C.struct_kr_module) int {
-	close(ch_metrics)
-	wg.Wait()
 	return 0
 }
 
@@ -232,8 +213,8 @@ func consume(ctx *C.knot_layer_t, pkt *C.knot_pkt_t) C.int {
 	defer C.free(unsafe.Pointer(qname))
 	qtype := C.knot_pkt_qtype(pkt)
 	secure := (bool)(C.knot_pkt_has_dnssec(pkt))
-	// Process metric
-	ch_metrics <- Sample{C.GoString(qname), (int)(qtype), ip, secure}
+	// Sample metric
+	process_sample(C.GoString(qname), int(qtype), ip, secure)
 	return state
 }
 

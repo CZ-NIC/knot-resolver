@@ -113,6 +113,7 @@ local function generate(epoch_now)
 end
 
 function predict.process(ev)
+	if not stats then error("'stats' module required") end
 	-- Start a new epoch, or continue sampling
 	predict.ev_sample = nil
 	local epoch_now = current_epoch()
@@ -158,9 +159,6 @@ function predict.deinit(module)
 end
 
 function predict.config(config)
-	if not stats then
-		error("'stats' module required")
-	end
 	-- Reconfigure
 	if type(config) ~= 'table' then return end
 	if config.window then predict.window = config.window end
