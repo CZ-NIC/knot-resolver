@@ -36,6 +36,7 @@ static inline int __attribute__((__cold__)) kr_error(int x) {
  * @cond internal
  */
 #define KR_CONN_RTT_MAX 3000 /* Timeout for network activity */
+#define KR_CONN_RETRY 300    /* Retry interval for network activity */
 #define KR_ITER_LIMIT 50     /* Built-in iterator limit */
 
 /*

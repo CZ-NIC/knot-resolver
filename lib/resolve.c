@@ -411,12 +411,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	struct kr_query *qry = TAIL(rplan->pending);
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
-		/* Network error, retry over TCP. */
-		if (!tried_tcp) {
-			DEBUG_MSG(qry, "=> NS unreachable, retrying over TCP\n");
-			qry->flags |= QUERY_TCP;
-			return KNOT_STATE_PRODUCE;
-		}
 		request->state = KNOT_STATE_FAIL;
 	} else {
 		/* Packet cleared, derandomize QNAME. */
