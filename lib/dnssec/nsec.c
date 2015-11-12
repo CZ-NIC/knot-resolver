@@ -316,11 +316,11 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 		/* NSEC proves that name exists, but has no data (RFC4035 4.9, 1) */
 		if (knot_dname_is_equal(rrset->owner, sname)) {
 			no_data_response_check_rrtype(&flags, rrset, stype);
-			no_data_wildcard_existence_check(&flags, rrset, sec);
 		} else {
 			/* NSEC proves that name doesn't exist (RFC4035, 4.9, 2) */
 			name_error_response_check_rr(&flags, rrset, sname);
 		}
+		no_data_wildcard_existence_check(&flags, rrset, sec);
 	}
 
 	return kr_nsec_existence_denied(flags) ? kr_ok() : kr_error(ENOENT);
