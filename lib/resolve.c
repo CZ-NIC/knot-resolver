@@ -535,7 +535,6 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 /** @internal Check current zone cut status and credibility, spawn subrequests if needed. */
 static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot_pkt_t *packet)
 {
-	struct kr_rplan *rplan = &request->rplan;
 	map_t *trust_anchors = &request->ctx->trust_anchors;
 	map_t *negative_anchors = &request->ctx->negative_anchors;
 
@@ -651,7 +650,6 @@ ns_election:
 	} else if (!qry->ns.name || !(qry->flags & QUERY_TCP)) { /* Keep address when TCP retransmit. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
-			DEBUG_MSG(qry, "=> priming root DNSKEY\n");
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
 			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
 		}
