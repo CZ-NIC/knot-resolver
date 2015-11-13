@@ -14,6 +14,7 @@ static inline const knot_layer_api_t *_layer(void)
 import "C"
 import (
 	"os"
+	"runtime"
 	"unsafe"
 	"fmt"
 	"net"
@@ -187,6 +188,9 @@ func tinyweb_config(module *C.struct_kr_module, conf *C.char) int {
 
 //export tinyweb_deinit
 func tinyweb_deinit(module *C.struct_kr_module) int {
+	geo_db = nil
+	geo_db6 = nil
+	runtime.GC()
 	return 0
 }
 
