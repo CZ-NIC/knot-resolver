@@ -172,8 +172,10 @@ static int update_answer(const knot_rrset_t *rr, unsigned hint, knot_pkt_t *answ
 			return KNOT_STATE_DONE; /* Scrub */
 		}
 	}
-
-	int ret = knot_pkt_put(answer, hint, rr, 0);
+	/* Copy record, as it may be accessed after packet processing. */
+	knot_rrset_t *copy = knot_rrset_copy(rr, &answer->mm);
+	/* Write to final answer. */
+	int ret = knot_pkt_put(answer, hint, copy, KNOT_PF_FREE);
 	if (ret != KNOT_EOK) {
 		knot_wire_set_tc(answer->wire);
 		return KNOT_STATE_DONE;
