@@ -48,15 +48,43 @@ static inline struct ioreq *ioreq_take(struct worker_ctx *worker)
 	} else {
 		req = malloc(sizeof(*req));
 	}
+	kr_asan_unpoison(req, sizeof(*req));
 	return req;
 }
 
 static inline void ioreq_release(struct worker_ctx *worker, struct ioreq *req)
 {
+	kr_asan_poison(req, sizeof(*req));
 	if (!req || worker->ioreqs.len < 4 * MP_FREELIST_SIZE) {
 		array_push(worker->ioreqs, req);
 	} else {
 		free(req);
+	}
+}
+
+static inline struct mempool *pool_take(struct worker_ctx *worker)
+{
+	/* Recycle available mempool if possible */
+	struct mempool *mp = NULL;
+	if (worker->pools.len > 0) {
+		mp = array_tail(worker->pools);
+		array_pop(worker->pools);
+	} else { /* No mempool on the freelist, create new one */
+		mp = mp_new (4 * CPU_PAGE_SIZE);
+	}
+	kr_asan_unpoison(mp, sizeof(*mp));
+	return mp;
+}
+
+static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)
+{
+	/* Return mempool to ring or free it if it's full */
+	if (worker->pools.len < MP_FREELIST_SIZE) {
+		mp_flush(mp);
+		array_push(worker->pools, mp);
+		kr_asan_poison(mp, sizeof(*mp));
+	} else {
+		mp_delete(mp);
 	}
 }
 
@@ -117,15 +145,9 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 
 	/* Recycle available mempool if possible */
 	mm_ctx_t pool = {
-		.ctx = NULL,
+		.ctx = pool_take(worker),
 		.alloc = (mm_alloc_t) mp_alloc
 	};
-	if (worker->pools.len > 0) {
-		pool.ctx = array_tail(worker->pools);
-		array_pop(worker->pools);
-	} else { /* No mempool on the freelist, create new one */
-		pool.ctx = mp_new (4 * CPU_PAGE_SIZE);
-	}
 
 	/* Create resolution task */
 	struct qr_task *task = mm_alloc(&pool, sizeof(*task));
@@ -174,13 +196,8 @@ static void qr_task_free(struct qr_task *task)
 {
 	/* Return mempool to ring or free it if it's full */
 	struct worker_ctx *worker = task->worker;
-	void *mp_context = task->req.pool.ctx;
-	if (worker->pools.len < MP_FREELIST_SIZE) {
-		mp_flush(mp_context);
-		array_push(worker->pools, mp_context);
-	} else {
-		mp_delete(mp_context);
-	}
+	pool_release(worker, task->req.pool.ctx);
+	/* @note The 'task' is invalidated from now on. */
 	/* Decommit memory every once in a while */
 	static int mp_delete_count = 0;
 	if (++mp_delete_count == 100000) {
@@ -528,16 +545,18 @@ int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 	return kr_ok();
 }
 
-#define reclaim_freelist(list, cb) \
+#define reclaim_freelist(list, type, cb) \
 	for (unsigned i = 0; i < list.len; ++i) { \
-		cb(list.at[i]); \
+		type *elm = list.at[i]; \
+		kr_asan_unpoison(elm, sizeof(type)); \
+		cb(elm); \
 	} \
 	array_clear(list)
 
 void worker_reclaim(struct worker_ctx *worker)
 {
-	reclaim_freelist(worker->pools, mp_delete);
-	reclaim_freelist(worker->ioreqs, free);
+	reclaim_freelist(worker->pools, struct mempool, mp_delete);
+	reclaim_freelist(worker->ioreqs, struct ioreq, free);
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 }
