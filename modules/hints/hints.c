@@ -59,7 +59,7 @@ static int put_answer(knot_pkt_t *pkt, knot_rrset_t *rr)
 	if (!knot_rrset_empty(rr)) {
 		/* Update packet question */
 		if (!knot_dname_is_equal(knot_pkt_qname(pkt), rr->owner)) {
-			KR_PKT_RECYCLE(pkt);
+			kr_pkt_recycle(pkt);
 			knot_pkt_put_question(pkt, rr->owner, rr->rclass, rr->type);
 		}
 		/* Append to packet */

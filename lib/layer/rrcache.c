@@ -60,7 +60,7 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 
 	/* Update packet question */
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)) {
-		KR_PKT_RECYCLE(pkt);
+		kr_pkt_recycle(pkt);
 		knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
 	}
 

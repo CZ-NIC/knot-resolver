@@ -251,9 +251,12 @@ int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len);
 unsigned kr_rand_uint(unsigned max);
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
+int kr_pkt_recycle(knot_pkt_t *pkt);
 const char *kr_inaddr(const struct sockaddr *addr);
 int kr_inaddr_len(const struct sockaddr *addr);
 int kr_straddr_family(const char *addr);
+int kr_straddr_subnet(void *dst, const char *addr);
+int kr_bitcmp(const char *a, const char *b, int bits);
 int kr_family_len(int family);
 int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, void *pool);
 /* Trust anchors */
@@ -331,7 +334,11 @@ ffi.metatype( knot_pkt_t, {
 		begin = function (pkt, section) return knot.knot_pkt_begin(pkt, section) end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
 			return C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, string.len(rdata))
-		end
+		end,
+		clear = function (pkt) return C.kr_pkt_recycle(pkt) end,
+		question = function(pkt, qname, qclass, qtype)
+			return C.knot_pkt_put_question(pkt, qname, qclass, qtype)
+		end,
 	},
 })
 -- Metatype for query

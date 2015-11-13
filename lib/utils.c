@@ -167,6 +167,16 @@ int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *ha
     return -1;
 }
 
+int kr_pkt_recycle(knot_pkt_t *pkt)
+{
+	pkt->rrset_count = 0;
+	pkt->size = KNOT_WIRE_HEADER_SIZE;
+	pkt->current = KNOT_ANSWER;
+	memset(pkt->sections, 0, sizeof(pkt->sections));
+	knot_pkt_begin(pkt, KNOT_ANSWER);
+	return knot_pkt_parse_question(pkt);
+}
+
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen)
 {

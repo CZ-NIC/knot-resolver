@@ -93,14 +93,7 @@ unsigned kr_rand_uint(unsigned max);
 int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have);
 
 /** @internal Fast packet reset. */
-#define KR_PKT_RECYCLE(pkt) do { \
-	(pkt)->rrset_count = 0; \
-	(pkt)->size = KNOT_WIRE_HEADER_SIZE; \
-	(pkt)->current = KNOT_ANSWER; \
-	memset((pkt)->sections, 0, sizeof((pkt)->sections)); \
-	knot_pkt_begin((pkt), KNOT_ANSWER); \
-	knot_pkt_parse_question((pkt)); \
-} while (0)
+int kr_pkt_recycle(knot_pkt_t *pkt);
 
 /** Construct and put record to packet. */
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,

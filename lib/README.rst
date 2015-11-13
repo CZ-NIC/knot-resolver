@@ -224,6 +224,10 @@ e.g. you can't write to ANSWER after writing AUTHORITY, it's like stages where y
 .. code-block:: lua
 
 		pkt:rcode(kres.rcode.NXDOMAIN)
+		-- Clear answer and write QUESTION
+		pkt:clear()
+		pkt:question('\7blocked', kres.class.IN, kres.type.SOA)
+		-- Start writing data
 		pkt:begin(kres.section.ANSWER)
 		-- Nothing in answer
 		pkt:begin(kres.section.AUTHORITY)

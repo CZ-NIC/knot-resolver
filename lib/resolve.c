@@ -730,9 +730,10 @@ int kr_resolve_finish(struct kr_request *request, int state)
 		}
 	}
 
+	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
 	DEBUG_MSG(NULL, "finished: %d, queries: %zu, mempool: %zu B\n",
-	          state, list_size(&rplan->resolved), (size_t) mp_total_size(request->pool.ctx));
+	          request->state, list_size(&rplan->resolved), (size_t) mp_total_size(request->pool.ctx));
 	return KNOT_STATE_DONE;
 }
 
