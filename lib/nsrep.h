@@ -53,7 +53,7 @@ enum kr_ns_rep {
 typedef lru_hash(unsigned) kr_nsrep_lru_t;
 
 /* Maximum count of addresses probed in one go (last is left empty) */
-#define KR_NSREP_MAXADDR 3
+#define KR_NSREP_MAXADDR 4
 
 /**
  * Name server representation.

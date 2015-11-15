@@ -44,6 +44,9 @@ static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t 
 		return;
 	}
 
+	/* Rotate previous addresses to the right. */
+	memmove(ns->addr + pos + 1, ns->addr + pos, (KR_NSREP_MAXADDR - pos - 1) * sizeof(ns->addr[0]));
+
 	switch(addr_len) {
 	case sizeof(struct in_addr):
 		ADDR_SET(ns->addr[pos].ip4.sin, AF_INET, addr, addr_len); break;
@@ -63,7 +66,7 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 			size_t len = pack_obj_len(addr[i]);
 			update_nsrep(ns, i, addr_val, len);
 		} else {
-			update_nsrep(ns, i, NULL, 0);
+			break;
 		}
 	}
 }
@@ -91,8 +94,8 @@ static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsign
 			unsigned *cached = rttcache ? lru_get(rttcache, val, len) : NULL;
 			unsigned addr_score = (cached) ? *cached : KR_NS_GLUED;
 			if (addr_score < score + favour) {
-				/* Shake down previous contenders, last one is always unused */
-				for (size_t i = KR_NSREP_MAXADDR - 2; i > 0; --i)
+				/* Shake down previous contenders */
+				for (size_t i = KR_NSREP_MAXADDR - 1; i > 0; --i)
 					addr[i] = addr[i - 1];
 				addr[0] = it;
 				score = addr_score;
@@ -142,7 +145,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
 	 * at the same time long distance scouts probe other sources (low probability).
 	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
-	if (score < ns->score && (qry->flags & QUERY_NO_THROTTLE || score < KR_NS_TIMEOUT)) {
+	if (score <= ns->score && (qry->flags & QUERY_NO_THROTTLE || score < KR_NS_TIMEOUT)) {
 		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
 		ns->reputation = reputation;
 	} else {
