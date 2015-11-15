@@ -91,6 +91,9 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		if (handle->data) {
 			worker_exec(worker, (uv_handle_t *)handle, NULL, NULL);
 		}
+		if (!uv_is_closing((uv_handle_t *)handle)) {
+			uv_close((uv_handle_t *)handle, handle_free);
+		}
 		return;
 	}
 	
