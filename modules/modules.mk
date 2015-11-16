@@ -19,7 +19,8 @@ modules_TARGETS += ketcd \
                    policy \
                    view \
                    predict \
-                   dns64
+                   dns64 \
+                   renumber
 endif
 
 # List of Golang modules
