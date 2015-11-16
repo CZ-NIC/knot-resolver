@@ -3,12 +3,12 @@
 Renumber
 --------
 
-The module allows you to remap addresses in answers to different address spaces.
-You can for example redirect malicious addresses to a blackhole, or use private address ranges
-in local zones that will be remapped to real addresses by the resolver.
+The module renumbers addresses in answers to different address space.
+e.g. you can redirect malicious addresses to a blackhole, or use private address ranges
+in local zones, that will be remapped to real addresses by the resolver.
 
 
-.. warning:: The requests is still validated using DNSSEC, but the signatures are stripped from the final answer. The reason is that the address synthesis breaks signatures. You can see whether the answer was valid or not based on the AD flag presence.
+.. warning:: While requests are still validated using DNSSEC, the signatures are stripped from final answer. The reason is that the address synthesis breaks signatures. You can see whether an answer was valid or not based on the AD flag.
 
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
