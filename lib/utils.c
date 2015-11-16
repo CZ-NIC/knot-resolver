@@ -172,6 +172,10 @@ int kr_pkt_recycle(knot_pkt_t *pkt)
 	pkt->rrset_count = 0;
 	pkt->size = KNOT_WIRE_HEADER_SIZE;
 	pkt->current = KNOT_ANSWER;
+	knot_wire_set_qdcount(pkt->wire, 0);
+	knot_wire_set_ancount(pkt->wire, 0);
+	knot_wire_set_nscount(pkt->wire, 0);
+	knot_wire_set_arcount(pkt->wire, 0);
 	memset(pkt->sections, 0, sizeof(pkt->sections));
 	knot_pkt_begin(pkt, KNOT_ANSWER);
 	return knot_pkt_parse_question(pkt);
