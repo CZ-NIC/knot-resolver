@@ -274,6 +274,7 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
 ]]
 
 -- Metatype for sockaddr
+local addr_buf = ffi.new('char[16]')
 local sockaddr_t = ffi.typeof('struct sockaddr')
 ffi.metatype( sockaddr_t, {
 	__index = {
@@ -429,11 +430,10 @@ local kres = {
 	dname2str = dname2str,
 	rr2str = rr2str,
 	str2ip = function (ip)
-		local buf = ffi.new('char [16]')
 		local family = C.kr_straddr_family(ip)
-		local ret = C.inet_pton(family, ip, buf)
+		local ret = C.inet_pton(family, ip, addr_buf)
 		if ret ~= 1 then return nil end
-		return ffi.string(buf, C.kr_family_len(family))
+		return ffi.string(addr_buf, C.kr_family_len(family))
 	end,
 	context = function () return ffi.cast('struct kr_context *', __engine) end,
 }

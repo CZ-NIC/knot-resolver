@@ -18,6 +18,7 @@ local function match_subnet(family, subnet, bitlen, addr)
 	return (#addr >= bitlen / 8) and (ffi.C.kr_bitcmp(subnet, addr, bitlen) == 0)
 end
 -- Renumber address record
+local addr_buf = ffi.new('char[16]')
 local function renumber(tbl, rr)
 	for i = 1, #tbl do
 		local prefix = tbl[i]
@@ -26,11 +27,11 @@ local function renumber(tbl, rr)
 			local chunks = to_copy / 8
 			local rdlen = #rr.rdata
 			if rdlen < chunks then return rr end -- Address length mismatch
-			local rd = ffi.new('char [?]', rdlen, rr.rdata)
-			ffi.copy(rd, prefix[4], chunks)
+			ffi.copy(addr_buf, rr.rdata, rdlen)
+			ffi.copy(addr_buf, prefix[4], chunks)
 			-- @todo: CIDR not supported
 			to_copy = to_copy - chunks * 8
-			rr.rdata = ffi.string(rd, rdlen)
+			rr.rdata = ffi.string(addr_buf, rdlen)
 			return rr
 		end
 	end	

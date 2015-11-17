@@ -3,6 +3,7 @@ local ffi = require('ffi')
 local bit = require('bit')
 local mod = {}
 local MARK_DNS64 = bit.lshift(1, 31)
+local addr_buf = ffi.new('char[16]')
 -- Config
 function mod.config (confstr)
 	if confstr == nil then return end
@@ -27,19 +28,17 @@ mod.layer = {
 				local rr = answer[i]
 				-- Synthesise AAAA from A
 				if rr.type == kres.type.A then
-					local rdata = ffi.new('char [16]')
-					ffi.copy(rdata, mod.proxy)
-					ffi.copy(rdata + 12, rr.rdata, 4)
-					req.answer:put(rr.owner, rr.ttl, rr.class, kres.type.AAAA, ffi.string(rdata, 16))
+					ffi.copy(addr_buf, mod.proxy)
+					ffi.copy(addr_buf + 12, rr.rdata, 4)
+					req.answer:put(rr.owner, rr.ttl, rr.class, kres.type.AAAA, ffi.string(addr_buf, 16))
 				end
 			end
-			return state
-		end
-		-- Observe AAAA NODATA responses
-		local is_nodata = (pkt:rcode() == kres.rcode.NOERROR) and (#answer == 0)
-		if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name() and qry:final() then
-			local next = req:push(pkt:qname(), kres.type.A, kres.class.IN, 0, qry)
-			next.flags = bit.band(qry.flags, kres.query.DNSSEC_WANT) + kres.query.AWAIT_CUT + MARK_DNS64
+		else -- Observe AAAA NODATA responses
+			local is_nodata = (pkt:rcode() == kres.rcode.NOERROR) and (#answer == 0)
+			if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name() and qry:final() then
+				local next = req:push(pkt:qname(), kres.type.A, kres.class.IN, 0, qry)
+				next.flags = bit.band(qry.flags, kres.query.DNSSEC_WANT) + kres.query.AWAIT_CUT + MARK_DNS64
+			end
 		end
 		return state
 	end
