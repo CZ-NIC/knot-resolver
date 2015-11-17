@@ -350,6 +350,8 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->options = ctx->options;
 	request->state = KNOT_STATE_CONSUME;
 	request->current_query = NULL;
+	request->qsource.key = NULL;
+	request->qsource.addr = NULL;
 	array_init(request->authority);
 	array_init(request->additional);
 

@@ -55,7 +55,7 @@ setmetatable(modules, {
 			k = string.match(k, '%w+')
 			local mod = _G[k]
 			local config = rawget(mod, 'config')
-			if mod and config then
+			if mod ~= nil and config ~= nil then
 				if k ~= v then config(v)
 				else           config()
 				end
