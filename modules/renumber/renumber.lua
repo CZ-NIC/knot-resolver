@@ -45,14 +45,13 @@ end
 -- Layers
 mod.layer = {
 	finish = function (state, req)
+		if state == kres.FAIL then return state end
 		req = kres.request_t(req)
 		pkt = kres.pkt_t(req.answer)
 		-- Only successful answers
 		local records = pkt:section(kres.section.ANSWER)
 		local ancount = #records
-		if state ~= kres.DONE or ancount == 0 then
-			return state
-		end
+		if ancount == 0 then return state end
 		-- Find renumber candidates
 		local changed = false
 		for i = 1, ancount do

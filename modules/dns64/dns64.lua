@@ -12,6 +12,7 @@ end
 -- Layers
 mod.layer = {
 	consume = function (state, req, pkt)
+		if state == kres.FAIL then return state end
 		pkt = kres.pkt_t(pkt)
 		req = kres.request_t(req)
 		qry = req:current()
@@ -24,13 +25,13 @@ mod.layer = {
 		if bit.band(qry.flags, MARK_DNS64) ~= 0 then -- Marked request
 			for i = 1, #answer do
 				local rr = answer[i]
-				-- Synthesise address
-				local rdata = ffi.new('char [16]')
-				ffi.copy(rdata, mod.proxy)
-				ffi.copy(rdata + 12, rr.rdata, 4)
-				rdata = ffi.string(rdata, 16)
-				-- Write to answer
-				req.answer:put(rr.owner, rr.ttl, rr.class, kres.type.AAAA, rdata)
+				-- Synthesise AAAA from A
+				if rr.type == kres.type.A then
+					local rdata = ffi.new('char [16]')
+					ffi.copy(rdata, mod.proxy)
+					ffi.copy(rdata + 12, rr.rdata, 4)
+					req.answer:put(rr.owner, rr.ttl, rr.class, kres.type.AAAA, ffi.string(rdata, 16))
+				end
 			end
 			return state
 		end
