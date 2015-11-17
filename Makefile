@@ -7,7 +7,7 @@ install: lib-install modules-install daemon-install
 check: all tests
 clean: lib-clean modules-clean daemon-clean tests-clean doc-clean
 doc: doc-html
-.PHONY: all install check clean doc
+.PHONY: all install check clean doc info
 
 # Options
 ifdef COVERAGE
