@@ -10,6 +10,7 @@ MODTYPE := shared
 ARTYPE  := static
 BINEXT :=
 PLATFORM = Linux
+ARCH :=
 ifeq ($(OS),Windows_NT)
 	PLATFORM := Windows
 	RM := del
@@ -17,6 +18,7 @@ ifeq ($(OS),Windows_NT)
 	LIBEXT := .lib
 	BINEXT := .exe
 else
+	ARCH := $(shell uname -m)
 	UNAME := $(shell uname -s)
     ifeq ($(UNAME),Darwin)
         PLATFORM := Darwin

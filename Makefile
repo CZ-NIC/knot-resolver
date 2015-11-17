@@ -28,10 +28,14 @@ $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libdnssec))
 $(eval $(call find_gopkg,geoip,github.com/abh/geoip))
 # Find Go compiler version
+# @note Go 1.5 support amd64 only, disabled for other architectures
+ifeq ($(ARCH),x86_64)
 E :=
 GO_VERSION := $(subst $(E) $(E),,$(subst go,,$(wordlist 1,2,$(subst ., ,$(word 3,$(shell $(GO) version))))))
 $(eval $(call find_ver,go,$(GO_VERSION),15))
-
+else
+HAS_go = no
+endif
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)
 ifneq (,$(findstring luajit, $(lua_LIBS)))
@@ -41,8 +45,36 @@ endif
 
 BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS)
 
+# Overview
+info:
+	$(info Target:     Knot DNS Resolver $(MAJOR).$(MINOR).$(PATCH)-$(PLATFORM))
+	$(info Compiler:   $(CC) $(BUILD_CFLAGS))
+	$(info Linker:     $(LD) $(BUILD_LDFLAGS))
+	$(info PREFIX:     $(PREFIX))
+	$(info BINDIR:     $(BINDIR))
+	$(info LIBDIR:     $(LIBDIR))
+	$(info INCLUDEDIR: $(INCLUDEDIR))
+	$(info MODULEDIR:  $(MODULEDIR))
+	$(info )
+	$(info Dependencies)
+	$(info ------------)
+	$(info [$(HAS_libknot)] libknot (lib))
+	$(info [$(HAS_lua)] LuaJIT (daemon))
+	$(info [$(HAS_libuv)] libuv (daemon))
+	$(info )
+	$(info Optional)
+	$(info --------)
+	$(info [$(HAS_doxygen)] doxygen (doc))
+	$(info [$(HAS_go)] Go 1.5+ on amd64 (modules/go))
+	$(info [$(HAS_geoip)] github.com/abh/geoip (modules/tinyweb))
+	$(info [$(HAS_libmemcached)] libmemcached (modules/memcached))
+	$(info [$(HAS_hiredis)] hiredis (modules/redis))
+	$(info [$(HAS_cmocka)] cmocka (tests/unit))
+	$(info [$(HAS_python)] Python (tests/integration))
+	$(info [$(HAS_socket_wrapper)] socket_wrapper (lib))
+	$(info )
+
 # Sub-targets
-include help.mk
 include lib/lib.mk
 include daemon/daemon.mk
 include modules/modules.mk
