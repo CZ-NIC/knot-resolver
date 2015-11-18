@@ -37,6 +37,7 @@
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
 #define txn_api(txn) ((txn)->owner->api)
+#define txn_is_valid(txn) ((txn) && (txn)->owner && txn_api(txn))
 
 /** @internal Check cache internal data version. Clear if it doesn't match. */
 static void assert_right_version(struct kr_cache *cache)
@@ -119,7 +120,7 @@ int kr_cache_txn_begin(struct kr_cache *cache, struct kr_cache_txn *txn, unsigne
 
 int kr_cache_txn_commit(struct kr_cache_txn *txn)
 {
-	if (!txn || !txn->owner || !txn_api(txn)) {
+	if (!txn_is_valid(txn)) {
 		return kr_error(EINVAL);
 	}
 
@@ -132,7 +133,7 @@ int kr_cache_txn_commit(struct kr_cache_txn *txn)
 
 void kr_cache_txn_abort(struct kr_cache_txn *txn)
 {
-	if (txn && txn->owner && txn_api(txn)) {
+	if (txn_is_valid(txn)) {
 		txn_api(txn)->txn_abort(&txn->t);
 	}
 }
@@ -160,7 +161,7 @@ static struct kr_cache_entry *lookup(struct kr_cache_txn *txn, uint8_t tag, cons
 {
 	uint8_t keybuf[KEY_SIZE];
 	size_t key_len = cache_key(keybuf, tag, name, type);
-	if (!txn || !txn->owner || !txn_api(txn) || !name) {
+	if (!txn_is_valid(txn) || !name) {
 		return NULL;
 	}
 
@@ -198,7 +199,7 @@ static int check_lifetime(struct kr_cache_entry *found, uint32_t *timestamp)
 int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
                   struct kr_cache_entry **entry, uint32_t *timestamp)
 {
-	if (!txn || !txn->owner || !name || !entry) {
+	if (!txn_is_valid(txn) || !name || !entry) {
 		return kr_error(EINVAL);
 	}
 
@@ -229,7 +230,7 @@ static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *heade
 int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
                     struct kr_cache_entry *header, namedb_val_t data)
 {
-	if (!txn || !txn->owner || !txn_api(txn) || !name || !header) {
+	if (!txn_is_valid(txn) || !name || !header) {
 		return kr_error(EINVAL);
 	}
 
@@ -270,7 +271,7 @@ int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 
 int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
 {
-	if (!txn || !txn->owner || !txn_api(txn) || !name ) {
+	if (!txn_is_valid(txn) || !name ) {
 		return kr_error(EINVAL);
 	}
 
@@ -286,7 +287,7 @@ int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 
 int kr_cache_clear(struct kr_cache_txn *txn)
 {
-	if (!txn || !txn->owner || !txn_api(txn)) {
+	if (!txn_is_valid(txn)) {
 		return kr_error(EINVAL);
 	}
 
@@ -295,7 +296,7 @@ int kr_cache_clear(struct kr_cache_txn *txn)
 
 int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank, uint32_t *timestamp)
 {
-	if (!txn || !rr || !timestamp) {
+	if (!txn_is_valid(txn) || !rr || !timestamp) {
 		return kr_error(EINVAL);
 	}
 
@@ -315,6 +316,9 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank,
 
 int kr_cache_peek_rank(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type, uint32_t timestamp)
 {
+	if (!txn_is_valid(txn) || !name) {
+		return kr_error(EINVAL);
+	}
 	struct kr_cache_entry *found = lookup(txn, tag, name, type);
 	if (!found) {
 		return kr_error(ENOENT);
@@ -361,7 +365,7 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
 
 int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t rank, uint32_t timestamp)
 {
-	if (!txn || !rr) {
+	if (!txn_is_valid(txn) || !rr) {
 		return kr_error(EINVAL);
 	}
 
@@ -391,7 +395,7 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_
 
 int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank, uint32_t *timestamp)
 {
-	if (!txn || !rr || !timestamp) {
+	if (!txn_is_valid(txn) || !rr || !timestamp) {
 		return kr_error(EINVAL);
 	}
 
@@ -412,7 +416,7 @@ int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *ra
 
 int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t rank, uint32_t timestamp)
 {
-	if (!txn || !rr) {
+	if (!txn_is_valid(txn) || !rr) {
 		return kr_error(EINVAL);
 	}
 
