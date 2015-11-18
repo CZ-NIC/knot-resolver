@@ -417,6 +417,8 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);
 			return kr_ok();
+		} else { /* Clear TA, as it is below any known NS. */
+			knot_rrset_free(&cut->trust_anchor, cut->pool);
 		}
 		/* Subtract label from QNAME. */
 		if (!is_root) {
