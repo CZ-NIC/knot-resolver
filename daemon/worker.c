@@ -149,6 +149,30 @@ static void ioreq_killall(struct qr_task *task)
 	task->pending_count = 0;
 }
 
+/** @cond This memory layout is internal to mempool.c, use only for debugging. */
+#if defined(__SANITIZE_ADDRESS__)
+struct mempool_chunk {
+  struct mempool_chunk *next;
+  size_t size;
+};
+static void mp_poison(struct mempool *mp, bool poison)
+{
+	if (!poison) { /* @note mempool is part of the first chunk, unpoison it first */
+		kr_asan_unpoison(mp, sizeof(*mp));
+	}
+	struct mempool_chunk *chunk = mp->state.last[0];
+	void *chunk_off = (void *)chunk - chunk->size;
+	if (poison) {
+		kr_asan_poison(chunk_off, chunk->size);
+	} else {
+		kr_asan_unpoison(chunk_off, chunk->size);
+	}
+}
+#else
+#define mp_poison(mp, enable)
+#endif
+/** @endcond */
+
 static inline struct mempool *pool_take(struct worker_ctx *worker)
 {
 	/* Recycle available mempool if possible */
@@ -159,7 +183,7 @@ static inline struct mempool *pool_take(struct worker_ctx *worker)
 	} else { /* No mempool on the freelist, create new one */
 		mp = mp_new (4 * CPU_PAGE_SIZE);
 	}
-	kr_asan_unpoison(mp, sizeof(*mp));
+	mp_poison(mp, 0);
 	return mp;
 }
 
@@ -169,7 +193,7 @@ static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)
 	if (worker->pools.len < MP_FREELIST_SIZE) {
 		mp_flush(mp);
 		array_push(worker->pools, mp);
-		kr_asan_poison(mp, sizeof(*mp));
+		mp_poison(mp, 1);
 	} else {
 		mp_delete(mp);
 	}
