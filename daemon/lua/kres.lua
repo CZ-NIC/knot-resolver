@@ -334,7 +334,7 @@ ffi.metatype( knot_pkt_t, {
 		end, 
 		begin = function (pkt, section) return knot.knot_pkt_begin(pkt, section) end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
-			return C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, string.len(rdata))
+			return C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, #rdata)
 		end,
 		clear = function (pkt) return C.kr_pkt_recycle(pkt) end,
 		question = function(pkt, qname, qclass, qtype)
