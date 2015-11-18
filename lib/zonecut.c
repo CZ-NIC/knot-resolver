@@ -400,23 +400,31 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
 	}
-
+	/* Copy name as it may overlap with cut name that is to be replaced. */
+	knot_dname_t *qname = knot_dname_copy(name, cut->pool);
+	const knot_dname_t *label = qname;
+	if (!label) {
+		return kr_error(ENOMEM);
+	}
 	/* Start at QNAME parent. */
-	while (txn && name) {
-		bool has_ta = !secured || !name[0] || fetch_ta(cut, name, txn, timestamp) == 0;
-		if (has_ta && fetch_ns(ctx, cut, name, txn, timestamp) == 0) {
+	while (txn) {
+		const bool is_root = (label[0] == '\0');
+		bool has_ta = !secured || is_root || fetch_ta(cut, label, txn, timestamp) == 0;
+		if (has_ta && fetch_ns(ctx, cut, label, txn, timestamp) == 0) {
 			if (secured) {
-				fetch_dnskey(cut, name, txn, timestamp);
+				fetch_dnskey(cut, label, txn, timestamp);
 			}
-			update_cut_name(cut, name);
+			update_cut_name(cut, label);
+			mm_free(cut->pool, qname);
 			return kr_ok();
 		}
-		if (name[0] == '\0') {
+		/* Subtract label from QNAME. */
+		if (!is_root) {
+			label = knot_wire_next_label(label, NULL);
+		} else {
 			break;
 		}
-		/* Subtract label from QNAME. */
-		name = knot_wire_next_label(name, NULL);
 	}
-
+	mm_free(cut->pool, qname);
 	return kr_error(ENOENT);
 }
