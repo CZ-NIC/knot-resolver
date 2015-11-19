@@ -313,12 +313,18 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
 
 	/* Fill in bailiwick records in authority */
+	const bool scrub_dnssec = !knot_pkt_has_dnssec(answer);
+	const uint16_t qtype = knot_pkt_qtype(answer);
 	struct kr_zonecut *cut = &qry->zone_cut;
 	int pkt_class = kr_response_classify(pkt);
 	if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
 		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 		for (unsigned i = 0; i < ns->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
+			/* Scrub DNSSEC records when not requested. */
+			if (scrub_dnssec && rr->type != qtype && knot_rrtype_is_dnssec(rr->type)) {
+				continue;
+			}
 			/* Stash the authority records, they will be written to wire on answer finalization. */
 			if (knot_dname_in(cut->name, rr->owner)) {
 				kr_rrarray_add(&req->authority, rr, &answer->mm);
