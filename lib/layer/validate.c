@@ -216,9 +216,14 @@ static int update_parent(struct kr_query *qry, uint16_t answer_type)
 		break;
 	case KNOT_RRTYPE_DS:
 		DEBUG_MSG(qry, "<= parent: updating DS\n");
-		parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
-		if (!parent->zone_cut.trust_anchor) {
-			return KNOT_STATE_FAIL;
+		if (qry->flags & QUERY_DNSSEC_INSECURE) { /* DS non-existence proven. */
+			parent->flags &= ~QUERY_DNSSEC_WANT;
+			parent->flags |= QUERY_DNSSEC_INSECURE;
+		} else { /* DS existence proven. */
+			parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
+			if (!parent->zone_cut.trust_anchor) {
+				return KNOT_STATE_FAIL;
+			}
 		}
 		break;
 	default: break;
@@ -246,14 +251,13 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 
 	/* No DS provided, check for proof of non-existence. */
 	int ret = 0;
+	const knot_dname_t *proved_name = qry->zone_cut.name;
 	knot_rrset_t *new_ds = update_ds(cut, knot_pkt_section(answer, section));
 	if (!new_ds) {
-		if (has_nsec3) {
-			ret = kr_nsec3_no_data_response_check(answer, section,
-			      qry->zone_cut.name, KNOT_RRTYPE_DS);
+		if (!has_nsec3) {
+			ret = kr_nsec_existence_denial(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
 		} else {
-			ret = kr_nsec_no_data_response_check(answer, section,
-			      qry->zone_cut.name, KNOT_RRTYPE_DS);
+			ret = kr_nsec3_no_data(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
 		}
 		if (ret != 0) {
 			DEBUG_MSG(qry, "<= bogus proof of DS non-existence\n");
@@ -315,17 +319,19 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Track difference between current TA and signer name.
 	 * This indicates that the NS is auth for both parent-child, and we must update DS/DNSKEY to validate it.
-	 * @todo: This has to be checked here before we put the data into packet, there is no "DEFER" or "PAUSE" action yet.
 	 */
 	const bool track_pc_change = (!(qry->flags & QUERY_CACHED) && (qry->flags & QUERY_DNSSEC_WANT));
 	const knot_dname_t *ta_name = qry->zone_cut.trust_anchor ? qry->zone_cut.trust_anchor->owner : NULL;
 	const knot_dname_t *signer = signature_authority(pkt);
-	if (track_pc_change && ta_name && signer && !knot_dname_is_equal(ta_name, signer)) {
+	if (track_pc_change && ta_name && (!signer || !knot_dname_is_equal(ta_name, signer))) {
 		if (ctx->state == KNOT_STATE_YIELD) { /* Already yielded for revalidation. */
 			return KNOT_STATE_FAIL;
 		}
 		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
-		if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
+		if (!signer) {
+			/* Not a DNSSEC-signed response, ask parent for DS to prove transition to INSECURE. */
+		} else if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
+			/* Key signer is below current cut, advance and refetch keys. */
 			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
 		} else if (!knot_dname_is_equal(signer, qry->zone_cut.name)) {
 			/* Key signer is above the current cut, so we can't validate it. This happens when
