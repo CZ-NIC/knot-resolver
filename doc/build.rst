@@ -151,6 +151,22 @@ Building extras
 
 The project can be built with code coverage tracking using the ``COVERAGE=1`` variable.
 
+Running unit and integration tests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The unit tests require cmocka_ and are executed with ``make check``.
+
+The integration tests use Deckard, the `DNS test harness <deckard>`_.
+
+.. code-block:: bash
+
+	$  make check-integration
+
+Note that the daemon and modules must be installed first before running integration tests, the reason is that the daemon
+is otherwise unable to find and load modules.
+
+Read the `documentation <deckard_doc>`_ for more information about requirements, how to run it and extend it.
+
 .. _Docker images: https://registry.hub.docker.com/u/cznic/knot-resolver
 .. _libuv: https://github.com/libuv/libuv
 .. _MSVC: https://msdn.microsoft.com/en-us/vstudio/hh386302.aspx
@@ -172,3 +188,6 @@ The project can be built with code coverage tracking using the ``COVERAGE=1`` va
 .. _Python: https://www.python.org/
 
 .. _boot2docker: http://boot2docker.io/
+
+.. _deckard: https://gitlab.labs.nic.cz/knot/deckard
+.. _deckard_doc: https://gitlab.labs.nic.cz/knot/resolver/blob/master/tests/README.rst

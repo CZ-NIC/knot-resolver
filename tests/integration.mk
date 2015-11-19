@@ -1,23 +1,12 @@
-#
-# Integration tests
-#
-
-# Path to scenario files
+# Config
 TESTS=tests/integration/sets/resolver
-# Path to daemon
-DAEMON=kresd
-# Template file name
 TEMPLATE=template/kresd.j2
-# Config file name
-CONFIG=config
 
 # Targets
 deckard_DIR := tests/integration
 deckard := $(libfaketime_DIR)/deckard.py
-
 libfaketime_DIR := contrib/libfaketime
 libfaketime := $(abspath $(libfaketime_DIR))/src/libfaketime$(LIBEXT).1
-
 libswrap_DIR := contrib/libswrap
 libswrap_cmake_DIR := $(libswrap_DIR)/obj
 libswrap=$(abspath $(libswrap_cmake_DIR))/src/libsocket_wrapper$(LIBEXT).0
@@ -36,19 +25,21 @@ $(deckard):
 	@git submodule update --init
 $(libfaketime_DIR)/Makefile:
 	@git submodule update --init
-# Build libfaketime contrib
+
+# Build contrib libraries
 $(libfaketime): $(libfaketime_DIR)/Makefile
 	@CFLAGS="" $(MAKE) -C $(libfaketime_DIR)
 $(libswrap_DIR):
 	@git submodule update --init
-$(libswrap_cmake_DIR):$(libswrap_DIR)
-	mkdir $(libswrap_cmake_DIR)
+$(libswrap_cmake_DIR): $(libswrap_DIR)
+	@mkdir $(libswrap_cmake_DIR)
 $(libswrap_cmake_DIR)/Makefile: $(libswrap_cmake_DIR)
 	@cd $(libswrap_cmake_DIR); cmake ..
 $(libswrap): $(libswrap_cmake_DIR)/Makefile
-	@CFLAGS="-O2 -g" $(MAKE) -C $(libswrap_cmake_DIR)
+	@CFLAGS="-O2 -g" $(MAKE) -s -C $(libswrap_cmake_DIR)
 
+deckard: check-integration
 check-integration: $(deckard) $(libswrap) $(libfaketime)
-	$(preload_syms) tests/integration/deckard.py $(TESTS) $(DAEMON) $(TEMPLATE) $(CONFIG) $(ADDITIONAL)
+	@$(preload_LIBS) $(preload_syms) python tests/integration/deckard.py $(TESTS) $(abspath daemon/kresd) $(TEMPLATE) config
 
-.PHONY: check-integration
+.PHONY: deckard check-integration
