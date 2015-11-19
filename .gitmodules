@@ -2,7 +2,7 @@
 	path = contrib/libfaketime
 	url = https://github.com/wolfcw/libfaketime.git
 [submodule "tests/integration"]
-	path = tests/integration
+	path = tests/deckard
 	url = https://gitlab.labs.nic.cz/knot/deckard.git
 [submodule "contrib/libswrap"]
 	path = contrib/libswrap
