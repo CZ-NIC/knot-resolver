@@ -17,12 +17,10 @@ endif
 # Integration tests
 ifeq ($(HAS_python)|$(HAS_socket_wrapper), yes|yes)
 include tests/integration.mk
-else
-$(warning python or socket_wrapper not found, skipping integration tests)
 endif
 
 # Targets
-tests: check-unit check-integration
+tests: check-unit
 tests-clean: $(foreach test,$(tests_BIN),$(test)-clean)
 
 .PHONY: tests tests-clean

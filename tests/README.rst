@@ -1,21 +1,19 @@
 Unit tests
 ==========
 
-The tests depend on cmocka_.
+The unit tests depend on cmocka_.
 
 .. code-block:: bash
 
-	$ make check-unit
-
+	$ make check
 
 .. todo:: Writing tests.
 
 Integration tests
 =================
 
-The tests depend on cwrap's `socket_wrapper`_, libfaketime_ and Python.
-The libfaketime is included in ``contrib/libfaketime`` as it depends on rather latest version of it,
-it is automatically synchronised with ``make``.
+The integration tests are using Deckard, the `DNS test harness <deckard>`_.
+It requires Jinja2_ and Python, `socket_wrapper`_, libfaketime_ are embedded in the build (cmake is required for `socket_wrapper`_).
 
 Execute the tests by:
 
@@ -23,8 +21,9 @@ Execute the tests by:
 
 	$ make check-integration
 
-.. todo:: Writing tests.
+See deckard_ documentation on how to write additional tests.
 
 .. _cmocka: https://cmocka.org/
 .. _`socket_wrapper`: https://cwrap.org/socket_wrapper.html
 .. _libfaketime: https://cwrap.org/socket_wrapper.html
+.. _deckard: https://gitlab.labs.nic.cz/knot/deckard
