@@ -86,12 +86,12 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew install --force makedepend python libtasn1 || true
 	brew link --overwrite python || true
 	pip install --upgrade pip || true
-	pip install -r ${PIP_PKGS}
+	pip install ${PIP_PKGS}
 	pkg cwrap ${CWRAP_URL} ${CWRAP_TAG} lib/pkgconfig/socket_wrapper.pc
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pkg cwrap ${CWRAP_URL} ${CWRAP_TAG} lib/pkgconfig/socket_wrapper.pc
-	pip install --user ${USER} -r ${PIP_PKGS} || true
+	pip install --user ${USER} ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
 fi
 
