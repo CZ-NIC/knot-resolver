@@ -17,7 +17,7 @@ daemon/engine.o: daemon/lua/sandbox.inc daemon/lua/config.inc
 	@$(call quiet,XXD,$<) $< > $@
 # Installed FFI bindings
 bindings-install: daemon/lua/kres.lua daemon/lua/trust_anchors.lua
-	$(INSTALL) $^ $(PREFIX)/$(MODULEDIR)
+	$(INSTALL) -m 0644 $^ $(PREFIX)/$(MODULEDIR)
 
 # Dependencies
 kresd_DEPEND := $(libkres)

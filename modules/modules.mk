@@ -46,7 +46,7 @@ $(1) := $$(addprefix $(2)/,$$($(1)_SOURCES))
 $(1)-clean:
 $(1)-install: $$(addprefix $(2)/,$$($(1)_SOURCES))
 	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
-	$(INSTALL) $$^ $(PREFIX)/$(MODULEDIR)
+	$(INSTALL) -m 0644 $$^ $(PREFIX)/$(MODULEDIR)
 .PHONY: $(1) $(1)-install $(1)-clean
 endef
 
@@ -68,7 +68,7 @@ $(1)-dist:
 else
 $(1)-dist: $$($(1)_INSTALL)
 	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)/$(1)
-	$(INSTALL) $$^ $(PREFIX)/$(MODULEDIR)/$(1)
+	$(INSTALL) -m 0644 $$^ $(PREFIX)/$(MODULEDIR)/$(1)
 endif
 $(1)-install: $(2)/$(1)$(LIBEXT) $(1)-dist
 	$(INSTALL) $(2)/$(1)$(LIBEXT) $(PREFIX)/$(MODULEDIR)
