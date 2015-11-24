@@ -58,6 +58,11 @@ static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t 
 
 static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t *addr[], unsigned score)
 {
+	/* NSLIST is not empty, empty NS cannot be a leader. */
+	if (!addr[0] && ns->addr[0].ip.sa_family != AF_UNSPEC) {
+		return;
+	}
+	/* Set new NS leader */
 	ns->name = name;
 	ns->score = score;
 	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
@@ -133,7 +138,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 			score += FAVOUR_IPV6;
 			/* If the server is unknown but has rep record, treat it as timeouted */
 			if (reputation & KR_NS_NOIP4) {
-				score = KR_NS_TIMEOUT;
+				score = KR_NS_UNKNOWN;
 				reputation = 0; /* Start with clean slate */
 			}
 		}

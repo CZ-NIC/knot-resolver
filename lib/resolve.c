@@ -424,18 +424,19 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		ITERATE_LAYERS(request, qry, consume, packet);
 	}
 
-	/* Resolution failed, invalidate current NS. */
-	if (request->state == KNOT_STATE_FAIL) {
-		kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt);
-		invalidate_ns(rplan, qry);
-		qry->flags &= ~QUERY_RESOLVED;
 	/* Track RTT for iterative answers */
-	} else if (!(qry->flags & QUERY_CACHED)) {
+	if (!(qry->flags & QUERY_CACHED)) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
 		/* Sucessful answer, lift any address resolution requests. */
-		qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+		if (request->state != KNOT_STATE_FAIL)
+			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+	}
+	/* Resolution failed, invalidate current NS. */
+	if (request->state == KNOT_STATE_FAIL) {
+		invalidate_ns(rplan, qry);
+		qry->flags &= ~QUERY_RESOLVED;
 	}
 
 	/* Pop query if resolved. */
