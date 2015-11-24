@@ -5,7 +5,7 @@ CMOCKA_TAG="cmocka-0.4.1"
 CMOCKA_URL="git://git.cryptomilk.org/projects/cmocka.git"
 LIBUV_TAG="v1.x"
 LIBUV_URL="https://github.com/libuv/libuv.git"
-KNOT_TAG="v2.0.1"
+KNOT_TAG="c1353efc"
 KNOT_URL="https://github.com/CZ-NIC/knot.git"
 GMP_TAG="6.0.0"
 GMP_URL="https://gmplib.org/download/gmp/gmp-${GMP_TAG}.tar.xz"
@@ -17,8 +17,6 @@ GNUTLS_TAG="3.3.12"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_TAG="v2.1"
 LUA_URL="http://luajit.org/git/luajit-2.0.git"
-CWRAP_TAG="master"
-CWRAP_URL="git://git.samba.org/socket_wrapper.git"
 
 # prepare install prefix
 PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
@@ -83,14 +81,12 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
 	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
 	brew update
-	brew install --force makedepend python libtasn1 || true
+	brew install --force makedepend python || true
 	brew link --overwrite python || true
 	pip install --upgrade pip || true
 	pip install ${PIP_PKGS}
-	pkg cwrap ${CWRAP_URL} ${CWRAP_TAG} lib/pkgconfig/socket_wrapper.pc
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
-	pkg cwrap ${CWRAP_URL} ${CWRAP_TAG} lib/pkgconfig/socket_wrapper.pc
 	pip install --user ${USER} ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
 fi
@@ -102,7 +98,7 @@ pkg nettle ${NETTLE_URL} ${NETTLE_TAG} include/nettle \
 export GMP_CFLAGS="-I${PREFIX}/include"
 export GMP_LIBS="-L${PREFIX}/lib -lgmp"
 pkg gnutls ${GNUTLS_URL} ${GNUTLS_TAG} include/gnutls \
-	--disable-tests --disable-doc --disable-valgrind-tests --disable-static
+	--disable-tests --disable-doc --disable-valgrind-tests --disable-static --with-included-libtasn1
 # jansson
 pkg jansson ${JANSSON_URL} ${JANSSON_TAG} include/jansson.h --disable-static
 # libknot
@@ -113,7 +109,7 @@ pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 # libuv
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 # luajit
-pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc install LDFLAGS=-lm PREFIX=${PREFIX}
+pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc amalg install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
 
 # remove on successful build
 rm -rf ${BUILD_DIR}
