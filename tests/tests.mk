@@ -12,6 +12,7 @@ TEMPLATE := template/kresd.j2
 $(deckard_DIR)/Makefile:
 	@git submodule update --init
 check-integration: $(deckard_DIR)/Makefile
+	@cd $(deckard_DIR); git submodule update --init
 	@make -C $(deckard_DIR) TESTS=$(TESTS) DAEMON=$(abspath daemon/kresd) TEMPLATE=$(TEMPLATE)
 deckard: check-integration
 
