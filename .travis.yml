@@ -32,7 +32,7 @@ before_script:
 script:
     - make -j2 install COVERAGE=1 PREFIX=${HOME}/.local
     - ./daemon/kresd -h
-    - make check COVERAGE=1 PREFIX=${HOME}/.local
+    - make -j2 check COVERAGE=1 PREFIX=${HOME}/.local
     - make -j2 check-integration COVERAGE=1 PREFIX=${HOME}/.local
 after_success:
     - test $TRAVIS_OS_NAME = linux && coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'

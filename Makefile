@@ -21,7 +21,6 @@ $(eval $(call find_alt,lua,luajit))
 $(eval $(call find_lib,cmocka))
 $(eval $(call find_bin,doxygen))
 $(eval $(call find_bin,sphinx-build))
-$(eval $(call find_bin,python))
 $(eval $(call find_lib,libmemcached,1.0))
 $(eval $(call find_lib,hiredis))
 $(eval $(call find_lib,socket_wrapper))
@@ -43,7 +42,7 @@ ifneq (,$(findstring luajit, $(lua_LIBS)))
 endif
 endif
 
-BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(python_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS)
+BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS)
 
 # Overview
 info:
@@ -70,7 +69,6 @@ info:
 	$(info [$(HAS_libmemcached)] libmemcached (modules/memcached))
 	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
-	$(info [$(HAS_python)] Python (tests/integration))
 	$(info [$(HAS_socket_wrapper)] socket_wrapper (lib))
 	$(info )
 

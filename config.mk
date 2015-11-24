@@ -19,4 +19,3 @@ RM	:= rm -f
 LN      := ln -s
 XXD     := ./scripts/embed.sh
 INSTALL := install
-PYTHON  := python
