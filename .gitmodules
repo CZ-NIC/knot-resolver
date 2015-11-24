@@ -1,9 +1,3 @@
-[submodule "contrib/libfaketime"]
-	path = contrib/libfaketime
-	url = https://github.com/wolfcw/libfaketime.git
-[submodule "contrib/libswrap"]
-	path = contrib/libswrap
-	url = https://gitlab.labs.nic.cz/labs/socket_wrapper.git
 [submodule "tests/deckard"]
 	path = tests/deckard
 	url = https://gitlab.labs.nic.cz/knot/deckard.git
