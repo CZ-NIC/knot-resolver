@@ -167,10 +167,11 @@ function policy.add(policy, rule)
 end
 
 -- Convert list of string names to domain names
-function policy.to_domains(names)
+function policy.todnames(names)
 	for i, v in ipairs(names) do
 		names[i] = kres.str2dname(v)
 	end
+	return names
 end
 
 -- RFC1918 Private, local, broadcast, test and special zones 
@@ -211,7 +212,7 @@ local private_zones = {
 	'b.e.f.ip6.arpa.',
 	'8.b.d.0.1.0.0.2.ip6.arpa',
 }
-policy.to_domains(private_zones)
+policy.todnames(private_zones)
 
 -- @var Default rules
 policy.rules = { policy.suffix_common(policy.DENY, private_zones, '\4arpa\0') }

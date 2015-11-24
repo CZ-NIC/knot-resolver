@@ -12,6 +12,7 @@ day = 24 * hour
 kres = require('kres')
 trust_anchors = require('trust_anchors')
 resolve = worker.resolve
+todname = kres.str2dname
 
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`
