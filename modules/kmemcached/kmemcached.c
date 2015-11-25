@@ -29,6 +29,7 @@ void *namedb_memcached_mkopts(const char *conf, size_t maxsize)
 	return strdup(conf);
 }
 
+KR_EXPORT
 int kmemcached_init(struct kr_module *module)
 {
 	struct engine *engine = module->data;
@@ -40,6 +41,7 @@ int kmemcached_init(struct kr_module *module)
 	return kr_ok();
 }
 
+KR_EXPORT
 int kmemcached_deinit(struct kr_module *module)
 {
 	struct engine *engine = module->data;

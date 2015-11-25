@@ -430,6 +430,7 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
  * Module implementation.
  */
 
+KR_EXPORT
 const knot_layer_api_t *hints_layer(struct kr_module *module)
 {
 	static knot_layer_api_t _layer = {
@@ -441,12 +442,14 @@ const knot_layer_api_t *hints_layer(struct kr_module *module)
 	return &_layer;
 }
 
+KR_EXPORT
 int hints_init(struct kr_module *module)
 {
 	module->data = NULL;
 	return 0;
 }
 
+KR_EXPORT
 int hints_config(struct kr_module *module, const char *conf)
 {
 	unload(module);
@@ -456,12 +459,14 @@ int hints_config(struct kr_module *module, const char *conf)
 	return load(module, conf);
 }
 
+KR_EXPORT
 int hints_deinit(struct kr_module *module)
 {
 	unload(module);
 	return kr_ok();
 }
 
+KR_EXPORT
 struct kr_prop *hints_props(void)
 {
 	static struct kr_prop prop_list[] = {
