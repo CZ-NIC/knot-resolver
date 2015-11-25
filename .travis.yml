@@ -30,9 +30,8 @@ env:
 before_script:
     - ./scripts/bootstrap-depends.sh ${HOME}/.local
 script:
-    - make -j2 install AMALG=yes COVERAGE=1 PREFIX=${HOME}/.local
+    - make -j2 install check AMALG=yes COVERAGE=1 PREFIX=${HOME}/.local
     - ./daemon/kresd -h
-    - make -j2 check COVERAGE=1 PREFIX=${HOME}/.local
     - make -j2 check-integration COVERAGE=1 PREFIX=${HOME}/.local
 after_success:
     - test $TRAVIS_OS_NAME = linux && coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'

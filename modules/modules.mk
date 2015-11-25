@@ -55,11 +55,14 @@ define make_go_module
 $(eval $(call go_target,$(1),modules/$(1)))
 endef
 
+# Filter CGO flags
+CGO_CFLAGS := $(filter-out -flto,$(BUILD_CFLAGS))
+
 # Go target definition
 define go_target 
 $(1) := $(2)/$(1)$(LIBEXT)
 $(2)/$(1)$(LIBEXT): $$($(1)_SOURCES) $$($(1)_DEPEND)
-	@echo "  GO	$(2)"; CGO_CFLAGS="$(BUILD_CFLAGS)" CGO_LDFLAGS="$$($(1)_LIBS) $(CFLAGS)" $(GO) build -buildmode=c-shared -o $$@ $$($(1)_SOURCES)
+	@echo "  GO	$(2)"; CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$$($(1)_LIBS) $(CFLAGS)" $(GO) build -buildmode=c-shared -o $$@ $$($(1)_SOURCES)
 $(1)-clean:
 	$(RM) -r $(2)/$(1).h $(2)/$(1)$(LIBEXT)
 ifeq ($$(strip $$($(1)_INSTALL)),)

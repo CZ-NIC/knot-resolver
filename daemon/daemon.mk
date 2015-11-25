@@ -11,21 +11,20 @@ kresd_SOURCES := \
 	daemon/main.c
 
 # Embed resources
+ifeq ($(AMALG), yes)
+kresd.amalg.c: daemon/lua/sandbox.inc daemon/lua/config.inc
+else
 daemon/engine.o: daemon/lua/sandbox.inc daemon/lua/config.inc
+endif
 %.inc: %.lua
 	@$(call quiet,XXD,$<) $< > $@
 # Installed FFI bindings
 bindings-install: daemon/lua/kres.lua daemon/lua/trust_anchors.lua
+	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
 	$(INSTALL) -m 0644 $^ $(PREFIX)/$(MODULEDIR)
 
 kresd_DEPEND := $(libkres)
 kresd_LIBS := $(libkres_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS)
-
-# Amalgamated build for smaller code
-ifeq ($(AMALG), yes)
-kresd_CFLAGS := -fwhole-program
-kresd.amalg.c: daemon/lua/sandbox.inc daemon/lua/config.inc
-endif
 
 # Make binary
 ifeq ($(HAS_lua)|$(HAS_libuv), yes|yes)

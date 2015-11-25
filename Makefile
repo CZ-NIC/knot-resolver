@@ -3,9 +3,9 @@ include platform.mk
 
 # Targets
 all: info lib daemon modules
-install: lib-install modules-install daemon-install
+install: lib-install daemon-install modules-install
 check: all tests
-clean: lib-clean modules-clean daemon-clean tests-clean doc-clean
+clean: lib-clean daemon-clean modules-clean tests-clean doc-clean
 doc: doc-html
 .PHONY: all install check clean doc info
 
