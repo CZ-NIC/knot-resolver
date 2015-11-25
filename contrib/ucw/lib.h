@@ -87,13 +87,7 @@
 
 #ifdef __GNUC__
 
-#define NONRET __attribute__((noreturn))				/** Function does not return **/
-#define UNUSED __attribute__((unused))					/** Variable/parameter is knowingly unused **/
-#define CONSTRUCTOR __attribute__((constructor))			/** Call function upon start of program **/
-#define CONSTRUCTOR_WITH_PRIORITY(p) __attribute__((constructor(p)))	/** Define constructor with a given priority **/
-#define PACKED __attribute__((packed))					/** Structure should be packed **/
-#define CONST __attribute__((const))					/** Function depends only on arguments **/
-#define PURE __attribute__((pure))					/** Function depends only on arguments and global vars **/
+#include "ccan/compiler/compiler.h"
 #define FORMAT_CHECK(x,y,z) __attribute__((format(x,y,z)))		/** Checking of printf-like format strings **/
 #define likely(x) __builtin_expect((x),1)				/** Use `if (likely(@x))` if @x is almost always true **/
 #define unlikely(x) __builtin_expect((x),0)				/** Use `if (unlikely(@x))` to hint that @x is almost always false **/

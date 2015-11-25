@@ -77,7 +77,7 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 }
 
 /** @internal Try to find a shortcut directly to searched record. */
-static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, uint16_t rrtype, bool dobit)
+static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, uint16_t rrtype, bool dobit)
 {
 	struct kr_cache_txn txn;
 	int ret = kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY);
@@ -102,7 +102,7 @@ static int loot_cache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *
 	return ret;
 }
 
-static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int rrcache_peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
@@ -120,13 +120,13 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_cache *cache = &req->ctx->cache;
 	int ret = -1;
 	if (qry->stype != KNOT_RRTYPE_ANY) {
-		ret = loot_cache(cache, pkt, qry, qry->stype, (qry->flags & QUERY_DNSSEC_WANT));
+		ret = loot_rrcache(cache, pkt, qry, qry->stype, (qry->flags & QUERY_DNSSEC_WANT));
 	} else {
 		/* ANY query are used by either qmail or certain versions of Firefox.
 		 * Probe cache for a few interesting records. */
 		static uint16_t any_types[] = { KNOT_RRTYPE_A, KNOT_RRTYPE_AAAA, KNOT_RRTYPE_MX };
 		for (size_t i = 0; i < sizeof(any_types)/sizeof(any_types[0]); ++i) {
-			if (loot_cache(cache, pkt, qry, any_types[i], (qry->flags & QUERY_DNSSEC_WANT)) == 0) {
+			if (loot_rrcache(cache, pkt, qry, any_types[i], (qry->flags & QUERY_DNSSEC_WANT)) == 0) {
 				ret = 0; /* At least single record matches */
 			}
 		}
@@ -143,7 +143,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /** @internal Baton for stash_commit */
-struct stash_baton
+struct rrcache_baton
 {
 	struct kr_request *req;
 	struct kr_query *qry;
@@ -152,7 +152,7 @@ struct stash_baton
 	uint32_t min_ttl;
 };
 
-static int commit_rrsig(struct stash_baton *baton, uint16_t rank, knot_rrset_t *rr)
+static int commit_rrsig(struct rrcache_baton *baton, uint16_t rank, knot_rrset_t *rr)
 {
 	/* If not doing secure resolution, ignore (unvalidated) RRSIGs. */
 	if (!(baton->qry->flags & QUERY_DNSSEC_WANT)) {
@@ -165,7 +165,7 @@ static int commit_rrsig(struct stash_baton *baton, uint16_t rank, knot_rrset_t *
 static int commit_rr(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rr = val;
-	struct stash_baton *baton = data;
+	struct rrcache_baton *baton = data;
 	/* Ensure minimum TTL */
 	knot_rdata_t *rd = rr->rrs.data;
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
@@ -199,7 +199,7 @@ static int commit_rr(const char *key, void *val, void *data)
 
 static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache_txn *txn, struct kr_request *req)
 {
-	struct stash_baton baton = {
+	struct rrcache_baton baton = {
 		.req = req,
 		.qry = qry,
 		.txn = txn,
@@ -284,7 +284,7 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_
 	return kr_ok();
 }
 
-static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int rrcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
@@ -352,11 +352,13 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 const knot_layer_api_t *rrcache_layer(struct kr_module *module)
 {
 	static const knot_layer_api_t _layer = {
-		.produce = &peek,
-		.consume = &stash
+		.produce = &rrcache_peek,
+		.consume = &rrcache_stash
 	};
 
 	return &_layer;
 }
 
 KR_MODULE_EXPORT(rrcache)
+
+#undef DEBUG_MSG

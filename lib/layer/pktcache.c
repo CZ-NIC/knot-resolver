@@ -84,7 +84,7 @@ static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 }
 
 /** @internal Try to find a shortcut directly to searched packet. */
-static int loot_cache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query *qry)
+static int loot_pktcache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query *qry)
 {
 	uint32_t timestamp = qry->timestamp.tv_sec;
 	const knot_dname_t *qname = qry->sname;
@@ -93,7 +93,7 @@ static int loot_cache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query
 	return loot_cache_pkt(txn, pkt, qname, rrtype, want_secure, timestamp);
 }
 
-static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int pktcache_peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
@@ -115,7 +115,7 @@ static int peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Fetch either answer to original or minimized query */
-	int ret = loot_cache(&txn, pkt, qry);
+	int ret = loot_pktcache(&txn, pkt, qry);
 	kr_cache_txn_abort(&txn);
 	if (ret == 0) {
 		DEBUG_MSG(qry, "=> satisfied from cache\n");
@@ -158,7 +158,7 @@ static uint32_t packet_ttl(knot_pkt_t *pkt)
 	return limit_ttl(ttl);
 }
 
-static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
@@ -230,11 +230,13 @@ static int stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 const knot_layer_api_t *pktcache_layer(struct kr_module *module)
 {
 	static const knot_layer_api_t _layer = {
-		.produce = &peek,
-		.consume  = &stash
+		.produce = &pktcache_peek,
+		.consume = &pktcache_stash
 	};
 
 	return &_layer;
 }
 
 KR_MODULE_EXPORT(pktcache)
+
+#undef DEBUG_MSG

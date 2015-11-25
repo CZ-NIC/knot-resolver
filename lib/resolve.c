@@ -749,3 +749,6 @@ mm_ctx_t *kr_resolve_pool(struct kr_request *request)
 	}
 	return NULL;
 }
+
+#undef DEBUG_MSG
+

@@ -2,7 +2,7 @@ include config.mk
 include platform.mk
 
 # Targets
-all: info lib modules daemon
+all: info lib daemon modules
 install: lib-install modules-install daemon-install
 check: all tests
 clean: lib-clean modules-clean daemon-clean tests-clean doc-clean
@@ -43,6 +43,7 @@ endif
 endif
 
 BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS)
+BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
 
 # Overview
 info:
