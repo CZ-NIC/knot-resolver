@@ -602,11 +602,7 @@ static int msg_size(const uint8_t *msg, size_t len)
 		if (len < 2) {
 			return kr_error(EMSGSIZE);
 		}
-		uint16_t nbytes = wire_read_u16(msg);
-		if (nbytes > len - 2) {
-			return kr_error(EMSGSIZE);
-		}
-		return nbytes;
+		return wire_read_u16(msg);
 }
 
 int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uint8_t *msg, size_t len)
