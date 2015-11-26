@@ -515,8 +515,9 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 
 	/* Start fast retransmit with UDP, otherwise connect. */
 	if (sock_type == SOCK_DGRAM) {
-		if (retransmit(task))
+		if (retransmit(task)) {
 			uv_timer_start(&task->retry, on_retransmit, KR_CONN_RETRY, KR_CONN_RETRY);
+		}
 	} else {
 		struct ioreq *conn = ioreq_take(task->worker);
 		if (!conn) {
