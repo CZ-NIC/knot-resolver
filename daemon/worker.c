@@ -329,7 +329,7 @@ static void on_timeout(uv_timer_t *req)
 {
 	struct qr_task *task = req->data;
 	if (!uv_is_closing((uv_handle_t *)req)) {
-		DEBUG_MSG("ioreq timeout %p", req);
+		DEBUG_MSG("ioreq timeout %p\n", req);
 		qr_task_step(task, NULL, NULL);
 	}
 }
@@ -341,7 +341,7 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 		if (status == 0 && handle) {
 			io_start_read(handle); /* Start reading answer */
 		} else {
-			DEBUG_MSG("ioreq send_done %p => %d, %s", handle, status, uv_strerror(status));
+			DEBUG_MSG("ioreq send_done %p => %d, %s\n", handle, status, uv_strerror(status));
 		}
 	} else {
 		/* Close retry timer (borrows task) */
@@ -405,7 +405,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	if (ret == 0) {
 		qr_task_ref(task); /* Pending ioreq on current task */
 	} else {
-		DEBUG_MSG("ioreq send_start %p => %d, %s", send_req, ret, uv_strerror(ret));
+		DEBUG_MSG("ioreq send_start %p => %d, %s\n", send_req, ret, uv_strerror(ret));
 		ioreq_release(task->worker, send_req);
 	}
 
@@ -435,7 +435,7 @@ static void on_connect(uv_connect_t *req, int status)
 		if (status == 0) {
 			qr_task_send(task, (uv_handle_t *)handle, (struct sockaddr *)&addr, task->pktbuf);
 		} else {
-			DEBUG_MSG("ioreq conn_done %p => %d, %s", req, status, uv_strerror(status));
+			DEBUG_MSG("ioreq conn_done %p => %d, %s\n", req, status, uv_strerror(status));
 			qr_task_step(task, (struct sockaddr *)&addr, NULL);
 		}
 	}
@@ -464,7 +464,7 @@ static void on_retransmit(uv_timer_t *req)
 		return;
 	if (!retransmit(req->data)) {
 		/* Not possible to spawn request, stop trying */
-		DEBUG_MSG("ioreq retransmit %p => failed", req);
+		DEBUG_MSG("ioreq retransmit %p => failed\n", req);
 		uv_timer_stop(req);
 	}
 }
@@ -494,7 +494,7 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	while (state == KNOT_STATE_PRODUCE) {
 		state = kr_resolve_produce(&task->req, &task->addrlist, &sock_type, task->pktbuf);
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT)) {
-			DEBUG_MSG("task iter_limit %p", task);
+			DEBUG_MSG("task iter_limit %p\n", task);
 			return qr_task_finalize(task, KNOT_STATE_FAIL);
 		}
 	}
@@ -529,7 +529,7 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 		}
 		conn->as.connect.data = task;
 		if (uv_tcp_connect(&conn->as.connect, (uv_tcp_t *)client, task->addrlist, on_connect) != 0) {
-			DEBUG_MSG("task conn_start %p => failed", task);
+			DEBUG_MSG("task conn_start %p => failed\n", task);
 			ioreq_release(task->worker, conn);
 			return qr_task_step(task, NULL, NULL);
 		}
@@ -573,7 +573,7 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 	if (is_master_socket) {
 		/* Ignore badly formed queries or responses. */
 		if (ret != 0 || knot_wire_get_qr(query->wire)) {
-			DEBUG_MSG("task bad_query %p => %d, %s", task, ret, kr_strerror(ret));
+			DEBUG_MSG("task bad_query %p => %d, %s\n", task, ret, kr_strerror(ret));
 			return kr_error(EINVAL); /* Ignore. */
 		}
 		task = qr_task_create(worker, handle, query, addr);
