@@ -56,7 +56,9 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 	if (nread <= 0) {
-		worker_exec(worker, (uv_handle_t *)handle, NULL, addr);
+		if (nread < 0) { /* Error response, notify resolver */
+			worker_exec(worker, (uv_handle_t *)handle, NULL, addr);
+		} /* nread == 0 is for freeing buffers, we don't need to do this */
 		return;
 	}
 
