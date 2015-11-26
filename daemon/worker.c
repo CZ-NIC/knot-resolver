@@ -66,6 +66,7 @@ struct qr_task
 	uint16_t iter_count;
 	uint16_t refs;
 	uint16_t bytes_remaining;
+	uint16_t finished;
 };
 
 /* Convenience macros */
@@ -242,6 +243,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->bytes_remaining = 0;
 	task->iter_count = 0;
 	task->refs = 1;
+	task->finished = false;
 	task->worker = worker;
 	task->source.handle = handle;
 	uv_timer_init(worker->loop, &task->retry);
@@ -327,9 +329,7 @@ static void on_timeout(uv_timer_t *req)
 /* This is called when we send subrequest / answer */
 static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 {
-	/* When NOOP, it means we sent the final answer to originator,
-	 * there we start to close timers and finalize task. */
-	if (task->req.state != KNOT_STATE_NOOP) {
+	if (!task->finished) {
 		if (status == 0 && handle) {
 			io_start_read(handle); /* Start reading answer */
 		}
@@ -452,7 +452,7 @@ static void on_retransmit(uv_timer_t *req)
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	kr_resolve_finish(&task->req, state);
-	task->req.state = KNOT_STATE_NOOP;
+	task->finished = true;
 	/* Send back answer */
 	(void) qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, task->req.answer);
 	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
