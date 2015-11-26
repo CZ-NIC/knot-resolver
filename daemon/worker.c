@@ -17,6 +17,7 @@
 #include <uv.h>
 #include <lua.h>
 #include <libknot/packet/pkt.h>
+#include <libknot/descriptor.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
@@ -462,9 +463,15 @@ static void on_retransmit(uv_timer_t *req)
 {
 	if (uv_is_closing((uv_handle_t *)req))
 		return;
-	if (!retransmit(req->data)) {
+	struct qr_task *task = req->data;
+	if (!retransmit(task)) {
 		/* Not possible to spawn request, stop trying */
-		DEBUG_MSG("ioreq retransmit %p => failed\n", req);
+#ifdef DEBUG
+		char qname_str[KNOT_DNAME_MAXLEN] = {'\0'}, type_str[16] = {'\0'};
+		knot_dname_to_str(qname_str, knot_pkt_qname(task->pktbuf), sizeof(qname_str));
+		knot_rrtype_to_string(knot_pkt_qtype(task->pktbuf), type_str, sizeof(type_str));
+		DEBUG_MSG("ioreq retransmit %s %s %p => canceled\n", qname_str, type_str, req);
+#endif
 		uv_timer_stop(req);
 	}
 }
@@ -517,6 +524,8 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	if (sock_type == SOCK_DGRAM) {
 		if (retransmit(task)) {
 			uv_timer_start(&task->retry, on_retransmit, KR_CONN_RETRY, KR_CONN_RETRY);
+		} else {
+			return qr_task_step(task, NULL, NULL);
 		}
 	} else {
 		struct ioreq *conn = ioreq_take(task->worker);
