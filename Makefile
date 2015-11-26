@@ -73,6 +73,11 @@ info:
 	$(info [$(HAS_socket_wrapper)] socket_wrapper (lib))
 	$(info )
 
+# Moduledir
+$(PREFIX)/$(MODULEDIR):
+	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
+moduledir: $(PREFIX)/$(MODULEDIR)
+
 # Sub-targets
 include lib/lib.mk
 include daemon/daemon.mk

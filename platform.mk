@@ -80,8 +80,10 @@ ifeq ($(6), yes)
 	$(RM) $(1).amalg.c $(1).amalg.o
 endif
 $(1)-install: $(2)/$(1)$(3)
+ifneq ($(5),$(MODULEDIR))
 	$(INSTALL) -d $(PREFIX)/$(5)
-	$(INSTALL) $$^ $(PREFIX)/$(5)
+endif
+	$(INSTALL) $(2)/$(1)$(3) $(PREFIX)/$(5)
 ifneq ($$(strip $$($(1)_HEADERS)),)
 	$(INSTALL) -d $(PREFIX)/$(INCLUDEDIR)/$(1)
 	$(INSTALL) -m 644 $$($(1)_HEADERS) $(PREFIX)/$(INCLUDEDIR)/$(1)
@@ -89,21 +91,12 @@ endif
 .PHONY: $(1)-clean $(1)-install
 endef
 
-# Make targets (name,path)
-make_bin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(BINDIR),yes)
-make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR),yes)
-make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR),no)
-make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR),yes)
-make_static = $(call make_target,$(1),$(2),$(AREXT),-$(ARTYPE),$(LIBDIR),yes)
-
-# Evaluate library
-define have_lib
-ifeq ($$(strip $$($(1)_LIBS)),)
-	HAS_$(1) := no
-else
-	HAS_$(1) := yes
-endif
-endef
+# Make targets (name,path,amalgable yes|no)
+make_bin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(BINDIR),$(3))
+make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR),$(3))
+make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR),$(3))
+make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR),$(3))
+make_static = $(call make_target,$(1),$(2),$(AREXT),-$(ARTYPE),$(LIBDIR),$(3))
 
 # Find library (pkg-config)
 define find_lib
@@ -121,7 +114,11 @@ define find_alt
 			$(1)_LIBS := $(shell pkg-config --libs $(2)  --silence-errors)
 		endif
 	endif
-	$(call have_lib,$(1),$(3))
+	ifeq ($$(strip $$($(1)_LIBS)),)
+		HAS_$(1) := no
+	else
+		HAS_$(1) := yes
+	endif
 endef
 
 # Find binary
