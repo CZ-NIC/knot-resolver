@@ -46,16 +46,18 @@
  */
 static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *nsec3)
 {
-#define SALT_OFFSET 5
 	assert(params && nsec3);
 
 	const knot_rdata_t *rr = knot_rdataset_at(&nsec3->rrs, 0);
 	assert(rr);
 
 	/* Every NSEC3 RR contains data from NSEC3PARAMS. */
+	const size_t SALT_OFFSET = 5; /* First 5 octets contain { Alg, Flags, Iterations, Salt length } */
 	dnssec_binary_t rdata = {0, };
 	rdata.size = SALT_OFFSET + (size_t) knot_nsec3_salt_length(&nsec3->rrs, 0);
 	rdata.data = knot_rdata_data(rr);
+	if (rdata.size > knot_rdata_rdlen(rr))
+		return kr_error(EMSGSIZE);
 
 	int ret = dnssec_nsec3_params_from_rdata(params, &rdata);
 	if (ret != DNSSEC_EOK) {
@@ -63,7 +65,6 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 	}
 
 	return kr_ok();
-#undef SALT_OFFSET
 }
 
 /**
@@ -76,7 +77,9 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
                      const knot_dname_t *name)
 {
-	assert(hash && params && name);
+	assert(hash && params);
+	if (!name)
+		return kr_error(EINVAL);
 
 	dnssec_binary_t dname = {0, };
 	dname.size = knot_dname_size(name);
@@ -344,17 +347,11 @@ fail:
  * @param name Name to be added to the asterisk.
  * @return     0 or error code
  */
-int prepend_asterisk(uint8_t tgt[KNOT_DNAME_MAXLEN], const knot_dname_t *name)
+static int prepend_asterisk(uint8_t *tgt, size_t maxlen, const knot_dname_t *name)
 {
-	tgt[0] = 1;
-	tgt[1] = '*';
-	tgt[2] = 0;
-	int name_len = knot_dname_size(name);
-	if (name_len < 0) {
-		return name_len;
-	}
-	memcpy(tgt + 2, name, name_len);
-	return 0;
+	assert(maxlen >= 3);
+	memcpy(tgt, "\1*", 3);
+	return knot_dname_to_wire(tgt + 2, name, maxlen - 2);
 }
 
 /**
@@ -633,7 +630,7 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 	}
 
 	uint8_t wildcard[KNOT_DNAME_MAXLEN];
-	int ret = prepend_asterisk(wildcard, encloser);
+	int ret = prepend_asterisk(wildcard, sizeof(wildcard), encloser);
 	if (ret != 0) {
 		return ret;
 	}
