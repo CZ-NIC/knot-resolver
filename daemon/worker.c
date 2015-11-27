@@ -329,8 +329,14 @@ static void qr_task_complete(uv_handle_t *handle)
 static void on_timeout(uv_timer_t *req)
 {
 	struct qr_task *task = req->data;
-	if (!uv_is_closing((uv_handle_t *)req)) {
-		DEBUG_MSG("ioreq timeout %p\n", req);
+	uv_handle_t *handle = (uv_handle_t *)req;
+#ifdef DEBUG
+	char qname_str[KNOT_DNAME_MAXLEN] = {'\0'}, type_str[16] = {'\0'};
+	knot_dname_to_str(qname_str, knot_pkt_qname(task->pktbuf), sizeof(qname_str));
+	knot_rrtype_to_string(knot_pkt_qtype(task->pktbuf), type_str, sizeof(type_str));
+	DEBUG_MSG("ioreq timeout %s %s %p\n", qname_str, type_str, req);
+#endif
+	if (!uv_is_closing(handle)) {
 		qr_task_step(task, NULL, NULL);
 	}
 }
@@ -347,10 +353,8 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 	} else {
 		/* Close retry timer (borrows task) */
 		qr_task_ref(task);
-		uv_timer_stop(&task->retry);
 		uv_close((uv_handle_t *)&task->retry, retransmit_close);
 		/* Close timeout timer (finishes task) */
-		uv_timer_stop(&task->timeout);
 		uv_close((uv_handle_t *)&task->timeout, qr_task_complete);
 	}
 	return status;
@@ -463,16 +467,8 @@ static void on_retransmit(uv_timer_t *req)
 {
 	if (uv_is_closing((uv_handle_t *)req))
 		return;
-	struct qr_task *task = req->data;
-	if (!retransmit(task)) {
-		/* Not possible to spawn request, stop trying */
-#ifdef DEBUG
-		char qname_str[KNOT_DNAME_MAXLEN] = {'\0'}, type_str[16] = {'\0'};
-		knot_dname_to_str(qname_str, knot_pkt_qname(task->pktbuf), sizeof(qname_str));
-		knot_rrtype_to_string(knot_pkt_qtype(task->pktbuf), type_str, sizeof(type_str));
-		DEBUG_MSG("ioreq retransmit %s %s %p => canceled\n", qname_str, type_str, req);
-#endif
-		uv_timer_stop(req);
+	if (!retransmit(req->data)) {
+		uv_timer_stop(req); /* Not possible to spawn request, stop trying */
 	}
 }
 
@@ -485,13 +481,24 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
 }
 
-static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *packet)
+static void cancel_subrequests(struct qr_task *task)
 {
 	/* Close pending I/O requests */
-	uv_timer_stop(&task->retry);
-	uv_timer_stop(&task->timeout);
+	if (uv_is_active((uv_handle_t *)&task->retry))
+		uv_timer_stop(&task->retry);
+	if (uv_is_active((uv_handle_t *)&task->timeout))
+		uv_timer_stop(&task->timeout);
 	ioreq_killall(task);
+}
 
+static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *packet)
+{
+	/* No more steps after we're finished. */
+	if (task->finished) {
+		return kr_error(ESTALE);
+	}
+	/* Close pending I/O requests */
+	cancel_subrequests(task);
 	/* Consume input and produce next query */
 	int sock_type = -1;
 	task->addrlist = NULL;
@@ -547,8 +554,10 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 		qr_task_ref(task);
 	}
 
-	/* Start next step with timeout */
-	uv_timer_start(&task->timeout, on_timeout, KR_CONN_RTT_MAX, 0);
+	/* Start next step with timeout, fatal if can't start a timer. */
+	int ret = uv_timer_start(&task->timeout, on_timeout, KR_CONN_RTT_MAX, 0);
+	if (ret != 0)
+		return qr_task_finalize(task, KNOT_STATE_FAIL);
 	return kr_ok();
 }
 

@@ -58,7 +58,7 @@ static void assert_right_version(struct kr_cache *cache)
 	/* Recreate cache and write version key */
 	ret = txn_api(&txn)->count(&txn.t);
 	if (ret > 0) { /* Non-empty cache, purge it. */
-		log_info("[cache] version mismatch, clearing\n");
+		log_info("[cache] purging cache\n");
 		kr_cache_clear(&txn);
 		kr_cache_txn_commit(&txn);
 		ret = kr_cache_txn_begin(cache, &txn, 0);
