@@ -23,6 +23,27 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 
+#define negotiate_bufsize(func, handle, bufsize_want) do { \
+    int bufsize = 0; func(handle, &bufsize); \
+	if (bufsize < bufsize_want) { \
+		bufsize = bufsize_want; \
+		func(handle, &bufsize); \
+	} \
+} while (0)
+
+static void check_bufsize(uv_handle_t* handle)
+{
+	/* We want to buffer at least N waves in advance.
+	 * This is magic presuming we can pull in a whole recvmmsg width in one wave.
+	 * Linux will double this the bufsize wanted.
+	 */
+	const int bufsize_want = RECVMMSG_BATCH * 65535 * 2;
+	negotiate_bufsize(uv_recv_buffer_size, handle, bufsize_want);
+	negotiate_bufsize(uv_send_buffer_size, handle, bufsize_want);
+}
+
+#undef negotiate_bufsize
+
 static void *handle_alloc(uv_loop_t *loop, size_t size)
 {
 	return malloc(size);
@@ -78,8 +99,8 @@ int udp_bind(uv_udp_t *handle, struct sockaddr *addr)
 	if (ret != 0) {
 		return ret;
 	}
-
 	handle->data = NULL;
+	check_bufsize((uv_handle_t *)handle);
 	return io_start_read((uv_handle_t *)handle);
 }
 
