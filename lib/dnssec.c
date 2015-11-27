@@ -376,3 +376,6 @@ void kr_dnssec_key_free(struct dseckey **key)
 	dnssec_key_free((dnssec_key_t *) *key);
 	*key = NULL;
 }
+
+#undef DEBUG_MSG
+

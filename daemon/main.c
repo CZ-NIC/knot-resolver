@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 	array_init(addr_set);
 	char *keyfile = NULL;
 	const char *config = NULL;
-	static char keyfile_buf[PATH_MAX + 1];
+	char *keyfile_buf = NULL;
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
@@ -242,7 +242,12 @@ int main(int argc, char **argv)
 #endif
 			break;
 		case 'k':
+			keyfile_buf = malloc(PATH_MAX + 1);
+			assert(keyfile_buf);
 			keyfile = realpath(optarg, keyfile_buf);
+			if (keyfile)
+				keyfile = strdup(keyfile);
+			free(keyfile_buf);
 			if (!keyfile || access(optarg, R_OK|W_OK) != 0) {
 				log_error("[system] keyfile '%s': not readable/writeable\n", optarg);
 				return EXIT_FAILURE;

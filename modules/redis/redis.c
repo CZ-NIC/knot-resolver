@@ -73,6 +73,7 @@ void *namedb_redis_mkopts(const char *conf_, size_t maxsize)
 	return cli;
 }
 
+KR_EXPORT
 int redis_init(struct kr_module *module)
 {
 	struct engine *engine = module->data;
@@ -84,6 +85,7 @@ int redis_init(struct kr_module *module)
 	return kr_ok();
 }
 
+KR_EXPORT
 int redis_deinit(struct kr_module *module)
 {
 	struct engine *engine = module->data;

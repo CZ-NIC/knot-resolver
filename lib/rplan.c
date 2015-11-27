@@ -170,3 +170,5 @@ struct kr_query *kr_rplan_next(struct kr_query *qry)
 	}
 	return (struct kr_query *)qry->node.prev; /* The lists are used as stack, TOP is the TAIL. */
 }
+
+#undef DEBUG_MSG
