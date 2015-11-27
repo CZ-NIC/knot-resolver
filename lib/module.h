@@ -87,4 +87,4 @@ void kr_module_unload(struct kr_module *module);
  * @param module module name (f.e. hints)
  */
 #define KR_MODULE_EXPORT(module) \
-    uint32_t module ## _api() { return KR_MODULE_API; }
+    KR_EXPORT uint32_t module ## _api() { return KR_MODULE_API; }

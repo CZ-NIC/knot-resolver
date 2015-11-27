@@ -568,3 +568,5 @@ const knot_layer_api_t *iterate_layer(struct kr_module *module)
 }
 
 KR_MODULE_EXPORT(iterate)
+
+#undef DEBUG_MSG

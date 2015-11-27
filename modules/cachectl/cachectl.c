@@ -305,6 +305,7 @@ static char* get(void *env, struct kr_module *module, const char *args)
  * Module implementation.
  */
 
+KR_EXPORT
 struct kr_prop *cachectl_props(void)
 {
 	static struct kr_prop prop_list[] = {

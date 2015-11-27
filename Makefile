@@ -2,10 +2,10 @@ include config.mk
 include platform.mk
 
 # Targets
-all: info lib modules daemon
-install: lib-install modules-install daemon-install
+all: info lib daemon modules
+install: lib-install daemon-install modules-install
 check: all tests
-clean: lib-clean modules-clean daemon-clean tests-clean doc-clean
+clean: lib-clean daemon-clean modules-clean tests-clean doc-clean
 doc: doc-html
 .PHONY: all install check clean doc info
 
@@ -43,6 +43,7 @@ endif
 endif
 
 BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS)
+BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
 
 # Overview
 info:
@@ -71,6 +72,11 @@ info:
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
 	$(info [$(HAS_socket_wrapper)] socket_wrapper (lib))
 	$(info )
+
+# Moduledir
+$(PREFIX)/$(MODULEDIR):
+	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
+moduledir: $(PREFIX)/$(MODULEDIR)
 
 # Sub-targets
 include lib/lib.mk

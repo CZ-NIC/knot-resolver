@@ -48,11 +48,12 @@ libkres_HEADERS := \
 
 # Dependencies
 libkres_DEPEND := 
+libkres_CFLAGS := -fvisibility=hidden
 libkres_LIBS := $(libknot_LIBS) $(libdnssec_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
 # Make library
-$(eval $(call make_static,libkres,lib))
+$(eval $(call make_static,libkres,lib,yes))
 
 # Targets
 lib: $(libkres)

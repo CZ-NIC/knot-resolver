@@ -51,3 +51,5 @@ tmp*
 /tests/test_set
 /tests/test_utils
 /tests/test_zonecut
+kresd.amalg.c
+libkres.amalg.c

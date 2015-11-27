@@ -178,6 +178,7 @@ void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)
 		uv_udp_init(loop, (uv_udp_t *)handle);
 	} else {
 		uv_tcp_init(loop, (uv_tcp_t *)handle);
+		uv_tcp_nodelay((uv_tcp_t *)handle, 1);
 	}
 }
 

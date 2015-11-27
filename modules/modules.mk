@@ -32,6 +32,7 @@ endif
 
 # Make C module
 define make_c_module
+$(1)-install: moduledir
 $(eval $(call make_module,$(1),modules/$(1)))
 endef
 
@@ -44,9 +45,8 @@ endef
 define lua_target
 $(1) := $$(addprefix $(2)/,$$($(1)_SOURCES))
 $(1)-clean:
-$(1)-install: $$(addprefix $(2)/,$$($(1)_SOURCES))
-	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
-	$(INSTALL) -m 0644 $$^ $(PREFIX)/$(MODULEDIR)
+$(1)-install: $$(addprefix $(2)/,$$($(1)_SOURCES)) moduledir
+	$(INSTALL) -m 0644 $$(addprefix $(2)/,$$($(1)_SOURCES)) $(PREFIX)/$(MODULEDIR)
 .PHONY: $(1) $(1)-install $(1)-clean
 endef
 
@@ -55,11 +55,14 @@ define make_go_module
 $(eval $(call go_target,$(1),modules/$(1)))
 endef
 
+# Filter CGO flags
+CGO_CFLAGS := $(filter-out -flto,$(BUILD_CFLAGS))
+
 # Go target definition
 define go_target 
 $(1) := $(2)/$(1)$(LIBEXT)
 $(2)/$(1)$(LIBEXT): $$($(1)_SOURCES) $$($(1)_DEPEND)
-	@echo "  GO	$(2)"; CGO_CFLAGS="$(BUILD_CFLAGS)" CGO_LDFLAGS="$$($(1)_LIBS) $(CFLAGS)" $(GO) build -buildmode=c-shared -o $$@ $$($(1)_SOURCES)
+	@echo "  GO	$(2)"; CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$$($(1)_LIBS) $(CFLAGS)" $(GO) build -buildmode=c-shared -o $$@ $$($(1)_SOURCES)
 $(1)-clean:
 	$(RM) -r $(2)/$(1).h $(2)/$(1)$(LIBEXT)
 ifeq ($$(strip $$($(1)_INSTALL)),)
@@ -70,7 +73,7 @@ $(1)-dist: $$($(1)_INSTALL)
 	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)/$(1)
 	$(INSTALL) -m 0644 $$^ $(PREFIX)/$(MODULEDIR)/$(1)
 endif
-$(1)-install: $(2)/$(1)$(LIBEXT) $(1)-dist
+$(1)-install: $(2)/$(1)$(LIBEXT) $(1)-dist moduledir
 	$(INSTALL) $(2)/$(1)$(LIBEXT) $(PREFIX)/$(MODULEDIR)
 .PHONY: $(1)-clean $(1)-install $(1)-dist
 endef

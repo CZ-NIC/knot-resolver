@@ -682,6 +682,12 @@ static int wrk_stats(lua_State *L)
 	lua_setfield(L, -2, "ipv6");
 	lua_pushnumber(L, worker->stats.ipv4);
 	lua_setfield(L, -2, "ipv4");
+	lua_pushnumber(L, worker->stats.queries);
+	lua_setfield(L, -2, "queries");
+	lua_pushnumber(L, worker->stats.dropped);
+	lua_setfield(L, -2, "dropped");
+	lua_pushnumber(L, worker->stats.timeout);
+	lua_setfield(L, -2, "timeout");
 	return 1;
 }
 

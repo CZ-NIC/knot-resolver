@@ -1,7 +1,11 @@
-# Platform-specific
+# Platform-specific stuff
+# Don't touch this unless you're changing the way targets are compiled
+# You have been warned
+
 CCLD := $(CC)
 CGO := go tool cgo
 GO := go
+CAT := cat
 LIBEXT := .so
 MODEXT := $(LIBEXT)
 AREXT  := .a
@@ -46,24 +50,40 @@ endif
 define make_objs
 $(1)_OBJ := $$($(1)_SOURCES:.c=.o)
 $(1)_DEP := $$($(1)_SOURCES:.c=.d)
+
 -include $$($(1)_DEP)
 endef
 
-# Make target (name,path,ext,ldflags,dst)
+# Make target (name,path,ext,ldflags,dst,amalgable)
 define make_target
+ifeq ($(AMALG)|$(6), yes|yes)
+$(1).amalg.c: $$($(1)_SOURCES)
+	$(call quiet,CAT,$$@) $$($(1)_SOURCES) > $$@
+# AR requires .o compiled
+$(1)_OBJ := $(1).amalg.c
+ifeq ($(4),-$(ARTYPE))
+$(1)_OBJ := $(1).amalg.o
+endif
+else
 $$(eval $$(call make_objs,$(1)))
+endif
 $(1) := $(2)/$(1)$(3)
 $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 ifeq ($(4),-$(ARTYPE))
 	$(call quiet,AR,$$@) rcs $$@ $$($(1)_OBJ)
 else
-	$(call quiet,CCLD,$$@) $(BUILD_CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS)
+	$(call quiet,CCLD,$$@) $(BUILD_CFLAGS) $$($(1)_CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS)
 endif
 $(1)-clean:
 	$(RM) $$($(1)_OBJ) $$($(1)_DEP) $(2)/$(1)$(3)
+ifeq ($(6), yes)
+	$(RM) $(1).amalg.c $(1).amalg.o
+endif
 $(1)-install: $(2)/$(1)$(3)
+ifneq ($(5),$(MODULEDIR))
 	$(INSTALL) -d $(PREFIX)/$(5)
-	$(INSTALL) $$^ $(PREFIX)/$(5)
+endif
+	$(INSTALL) $(2)/$(1)$(3) $(PREFIX)/$(5)
 ifneq ($$(strip $$($(1)_HEADERS)),)
 	$(INSTALL) -d $(PREFIX)/$(INCLUDEDIR)/$(1)
 	$(INSTALL) -m 644 $$($(1)_HEADERS) $(PREFIX)/$(INCLUDEDIR)/$(1)
@@ -71,21 +91,12 @@ endif
 .PHONY: $(1)-clean $(1)-install
 endef
 
-# Make targets (name,path)
-make_bin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(BINDIR))
-make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR))
-make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR))
-make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR))
-make_static = $(call make_target,$(1),$(2),$(AREXT),-$(ARTYPE),$(LIBDIR))
-
-# Evaluate library
-define have_lib
-ifeq ($$(strip $$($(1)_LIBS)),)
-	HAS_$(1) := no
-else
-	HAS_$(1) := yes
-endif
-endef
+# Make targets (name,path,amalgable yes|no)
+make_bin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(BINDIR),$(3))
+make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR),$(3))
+make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR),$(3))
+make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR),$(3))
+make_static = $(call make_target,$(1),$(2),$(AREXT),-$(ARTYPE),$(LIBDIR),$(3))
 
 # Find library (pkg-config)
 define find_lib
@@ -103,7 +114,11 @@ define find_alt
 			$(1)_LIBS := $(shell pkg-config --libs $(2)  --silence-errors)
 		endif
 	endif
-	$(call have_lib,$(1),$(3))
+	ifeq ($$(strip $$($(1)_LIBS)),)
+		HAS_$(1) := no
+	else
+		HAS_$(1) := yes
+	endif
 endef
 
 # Find binary
@@ -132,4 +147,3 @@ endef
 define find_gopkg
 	HAS_$(1) := $(shell go list $(2) > /dev/null 2>&1 && echo yes || echo no)
 endef
-

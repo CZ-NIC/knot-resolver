@@ -324,6 +324,7 @@ static char* clear_expiring(void *env, struct kr_module *module, const char *arg
  * Module implementation.
  */
 
+KR_EXPORT
 const knot_layer_api_t *stats_layer(struct kr_module *module)
 {
 	static knot_layer_api_t _layer = {
@@ -334,6 +335,7 @@ const knot_layer_api_t *stats_layer(struct kr_module *module)
 	return &_layer;
 }
 
+KR_EXPORT
 int stats_init(struct kr_module *module)
 {
 	struct stat_data *data = malloc(sizeof(*data));
@@ -353,6 +355,7 @@ int stats_init(struct kr_module *module)
 	return kr_ok();
 }
 
+KR_EXPORT
 int stats_deinit(struct kr_module *module)
 {
 	struct stat_data *data = module->data;
@@ -367,6 +370,7 @@ int stats_deinit(struct kr_module *module)
 	return kr_ok();
 }
 
+KR_EXPORT
 struct kr_prop *stats_props(void)
 {
 	static struct kr_prop prop_list[] = {

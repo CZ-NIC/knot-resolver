@@ -38,7 +38,7 @@
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "vldr", fmt)
 
 /** @internal Baton for validate_section */
-struct stash_baton {
+struct validate_baton {
 	const knot_pkt_t *pkt;
 	knot_section_t section_id;
 	const knot_rrset_t *keys;
@@ -51,7 +51,7 @@ struct stash_baton {
 static int validate_rrset(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rr = val;
-	struct stash_baton *baton = data;
+	struct validate_baton *baton = data;
 
 	if (baton->result != 0) {
 		return baton->result;
@@ -97,7 +97,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		}
 	}
 
-	struct stash_baton baton = {
+	struct validate_baton baton = {
 		.pkt = answer,
 		.section_id = section_id,
 		.keys = qry->zone_cut.key,
@@ -202,7 +202,7 @@ static knot_rrset_t *update_ds(struct kr_zonecut *cut, const knot_pktsection_t *
 	return new_ds;	
 }
 
-static int update_parent(struct kr_query *qry, uint16_t answer_type)
+static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 {
 	struct kr_query *parent = qry->parent;
 	assert(parent);
@@ -416,7 +416,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	/* Update parent query zone cut */
 	if (qry->parent) {
-		if (update_parent(qry, qtype) != 0) {
+		if (update_parent_keys(qry, qtype) != 0) {
 			return KNOT_STATE_FAIL;
 		}
 	}
@@ -439,3 +439,5 @@ int validate_init(struct kr_module *module)
 }
 
 KR_MODULE_EXPORT(validate)
+
+#undef DEBUG_MSG

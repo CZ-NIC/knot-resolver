@@ -274,6 +274,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	/* Start resolution */
 	kr_resolve_begin(&task->req, &engine->resolver, answer);
 	worker->stats.concurrent += 1;
+	worker->stats.queries += 1;
 	return task;
 }
 
@@ -337,6 +338,8 @@ static void on_timeout(uv_timer_t *req)
 	DEBUG_MSG("ioreq timeout %s %s %p\n", qname_str, type_str, req);
 #endif
 	if (!uv_is_closing(handle)) {
+		struct worker_ctx *worker = task->worker;
+		worker->stats.queries += 1;
 		qr_task_step(task, NULL, NULL);
 	}
 }
@@ -593,6 +596,7 @@ int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *quer
 		/* Ignore badly formed queries or responses. */
 		if (ret != 0 || knot_wire_get_qr(query->wire)) {
 			DEBUG_MSG("task bad_query %p => %d, %s\n", task, ret, kr_strerror(ret));
+			worker->stats.dropped += 1;
 			return kr_error(EINVAL); /* Ignore. */
 		}
 		task = qr_task_create(worker, handle, query, addr);

@@ -21,6 +21,17 @@
 #include <libknot/dname.h>
 #include <libknot/rrset.h>
 
+/* Function attributes */
+#if __GNUC__ >= 4
+#define KR_EXPORT __attribute__ ((visibility ("default")))
+#define KR_CONST __attribute__((__const__))
+#define KR_PURE __attribute__((__pure__))
+#else
+#define KR_EXPORT
+#define KR_CONST
+#define KR_PURE
+#endif
+
 /*
  * Error codes.
  */

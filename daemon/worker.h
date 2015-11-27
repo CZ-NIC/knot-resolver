@@ -42,6 +42,9 @@ struct worker_ctx {
 		size_t tcp;
 		size_t ipv4;
 		size_t ipv6;
+		size_t queries;
+		size_t dropped;
+		size_t timeout;
 	} stats;
 	mp_freelist_t pools;
 	mp_freelist_t ioreqs;
