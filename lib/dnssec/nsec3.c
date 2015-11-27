@@ -144,10 +144,16 @@ static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
 		goto fail;
 	}
 
+	/* Root label has no encloser */
+	if (!name[0]) {
+		ret = kr_error(ENOENT);
+		goto fail;
+	}
+
 	const knot_dname_t *encloser = knot_wire_next_label(name, NULL);
 	*skipped = 1;
 
-	do {
+	while(encloser) {
 		ret = hash_name(&name_hash, &params, encloser);
 		if (ret != 0) {
 			goto fail;
@@ -162,9 +168,11 @@ static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
 
 		dnssec_binary_free(&name_hash);
 
+		if (!encloser[0])
+			break;
 		encloser = knot_wire_next_label(encloser, NULL);
 		++(*skipped);
-	} while (encloser && (encloser[0] != '\0'));
+	}
 
 	ret = kr_ok();
 
@@ -398,6 +406,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 		--skipped;
 		next_closer = sname;
 		for (unsigned j = 0; j < skipped; ++j) {
+			assert(next_closer[0]);
 			next_closer = knot_wire_next_label(next_closer, NULL);
 		}
 		for (unsigned j = 0; j < sec->count; ++j) {
@@ -421,7 +430,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 	}
 
 	if ((flags & FLG_CLOSEST_PROVABLE_ENCLOSER) && (flags & FLG_NAME_COVERED) && next_closer) {
-		if (encloser_name) {
+		if (encloser_name && next_closer[0]) {
 			*encloser_name = knot_wire_next_label(next_closer, NULL);
 		}
 		if (matching_ecloser_nsec3) {
@@ -680,6 +689,7 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 
 	/* Compute the next closer name. */
 	for (int i = 0; i < trim_to_next; ++i) {
+		assert(sname[0]);
 		sname = knot_wire_next_label(sname, NULL);
 	}
 

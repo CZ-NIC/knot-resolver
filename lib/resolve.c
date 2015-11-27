@@ -93,7 +93,7 @@ static inline size_t layer_id(struct kr_request *req, const struct knot_layer_ap
 static void randomized_qname_case(knot_dname_t *qname, uint32_t secret)
 {
 	unsigned k = 0;
-	while (*qname != '\0') {
+	while (qname[0]) {
 		for (unsigned i = *qname; i--;) {
 			int chr = qname[i + 1];
 			if (isalpha(chr)) {
@@ -132,15 +132,18 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 
 	const knot_dname_t *target = qry->sname;
 	const knot_dname_t *cut_name = qry->zone_cut.name;
+	if (!target || !cut_name)
+		return;
+
 	struct kr_cache_entry *entry = NULL;
 	/* @note: The non-terminal must be direct child of zone cut (e.g. label distance <= 2),
 	 *        otherwise this would risk leaking information to parent if the NODATA TTD > zone cut TTD. */
-	size_t labels = knot_dname_labels(target, NULL) - knot_dname_labels(cut_name, NULL);
-	while (labels > 2) {
+	int labels = knot_dname_labels(target, NULL) - knot_dname_labels(cut_name, NULL);
+	while (target[0] && labels > 2) {
 		target = knot_wire_next_label(target, NULL);
 		--labels;
 	}
-	for (size_t i = 0; i < labels; ++i) {
+	for (int i = 0; i < labels; ++i) {
 		int ret = kr_cache_peek(txn, KR_CACHE_PKT, target, KNOT_RRTYPE_NS, &entry, &timestamp);
 		if (ret == 0) { /* Either NXDOMAIN or NODATA, start here. */
 			/* @todo We could stop resolution here for NXDOMAIN, but we can't because of broken CDNs */
@@ -148,6 +151,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 			kr_make_query(qry, pkt);
 			return;
 		}
+		assert(target[0]);
 		target = knot_wire_next_label(target, NULL);
 	}
 }

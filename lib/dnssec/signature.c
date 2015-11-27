@@ -198,6 +198,7 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 	if (trim_labels > 0) {
 		/**/
 		for (int i = 0; i < trim_labels; ++i) {
+			assert(owner[0]);
 			owner = (uint8_t *) knot_wire_next_label(owner, NULL);
 		}
 		*(--owner) = '*';
