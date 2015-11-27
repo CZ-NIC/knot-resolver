@@ -323,7 +323,7 @@ void *namedb_lmdb_mkopts(const char *conf, size_t maxsize)
 		memset(opts, 0, sizeof(*opts));
 		opts->path = (conf && strlen(conf)) ? conf : ".";
 		opts->mapsize = maxsize;
-		opts->flags.env = 0x80000 | 0x40000; /* MDB_WRITEMAP | MDB_NOMETASYNC */
+		opts->flags.env = 0x80000 | 0x100000; /* MDB_WRITEMAP|MDB_MAPASYNC */
 	}
 	return opts;
 }
