@@ -96,7 +96,8 @@ typedef array_t(uint8_t) pack_t;
 static inline pack_objlen_t pack_obj_len(uint8_t *it)
 {
 	pack_objlen_t len = 0;
-	memcpy(&len, it, sizeof(len));
+	if (it)
+		memcpy(&len, it, sizeof(len));
 	return len;
 }
 

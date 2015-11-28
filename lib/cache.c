@@ -222,9 +222,10 @@ int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *nam
 
 static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *header, namedb_val_t data)
 {
-	assert(dst);
+	assert(dst && header);
 	memcpy(dst, header, sizeof(*header));
-	memcpy(dst->data, data.data, data.len);
+	if (data.data)
+		memcpy(dst->data, data.data, data.len);
 }
 
 int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
@@ -405,6 +406,7 @@ int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *ra
 	if (ret != 0) {
 		return ret;
 	}
+	assert(entry);
 	if (rank) {
 		*rank = entry->rank;
 	}

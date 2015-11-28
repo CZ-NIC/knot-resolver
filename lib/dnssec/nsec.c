@@ -116,7 +116,9 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 
 	/* Try to find parent wildcard that is proved by this NSEC. */ 
 	uint8_t namebuf[KNOT_DNAME_MAXLEN];
-	knot_dname_to_wire(namebuf, name, sizeof(namebuf));
+	int ret = knot_dname_to_wire(namebuf, name, sizeof(namebuf));
+	if (ret != 0)
+		return ret;
 	knot_dname_t *ptr = namebuf;
 	while (ptr[0]) {
 		/* Remove leftmost label and replace it with '\1*'. */
@@ -143,14 +145,13 @@ int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sect
 		return kr_error(EINVAL);
 	}
 
-	int ret = kr_error(ENOENT);
 	int flags = 0;
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
 		if (rrset->type != KNOT_RRTYPE_NSEC) {
 			continue;
 		}
-		ret = name_error_response_check_rr(&flags, rrset, sname);
+		int ret = name_error_response_check_rr(&flags, rrset, sname);
 		if (ret != 0) {
 			return ret;
 		}
@@ -260,7 +261,6 @@ int kr_nsec_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section
 		return kr_error(EINVAL);
 	}
 
-	int ret = kr_error(ENOENT);
 	int flags = 0;
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
@@ -268,7 +268,7 @@ int kr_nsec_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section
 			continue;
 		}
 		if (knot_dname_is_equal(rrset->owner, sname)) {
-			ret = no_data_response_check_rrtype(&flags, rrset, stype);
+			int ret = no_data_response_check_rrtype(&flags, rrset, stype);
 			if (ret != 0) {
 				return ret;
 			}

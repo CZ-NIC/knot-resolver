@@ -84,8 +84,10 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	}
 
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, &worker->pkt_pool);
-	query->max_size = KNOT_WIRE_MAX_PKTSIZE;
-	worker_exec(worker, (uv_handle_t *)handle, query, addr);
+	if (query) {
+		query->max_size = KNOT_WIRE_MAX_PKTSIZE;
+		worker_exec(worker, (uv_handle_t *)handle, query, addr);
+	}
 	mp_flush(worker->pkt_pool.ctx);
 }
 

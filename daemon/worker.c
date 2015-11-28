@@ -564,8 +564,11 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	return kr_ok();
 }
 
-static int parse_query(knot_pkt_t *query)
+static int parse_packet(knot_pkt_t *query)
 {
+	if (!query)
+		return kr_error(EINVAL);
+
 	/* Parse query packet. */
 	int ret = knot_pkt_parse(query, 0);
 	if (ret != KNOT_EOK) {
@@ -582,19 +585,19 @@ static int parse_query(knot_pkt_t *query)
 
 int worker_exec(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr* addr)
 {
-	if (!worker) {
+	if (!worker || !handle) {
 		return kr_error(EINVAL);
 	}
 
-	/* Parse query */
-	int ret = parse_query(query);
+	/* Parse packet */
+	int ret = parse_packet(query);
 
 	/* Start new task on master sockets, or resume existing */
 	struct qr_task *task = handle->data;
 	bool is_master_socket = (!task);
 	if (is_master_socket) {
 		/* Ignore badly formed queries or responses. */
-		if (ret != 0 || knot_wire_get_qr(query->wire)) {
+		if (!query || ret != 0 || knot_wire_get_qr(query->wire)) {
 			DEBUG_MSG("task bad_query %p => %d, %s\n", task, ret, kr_strerror(ret));
 			worker->stats.dropped += 1;
 			return kr_error(EINVAL); /* Ignore. */
@@ -687,8 +690,8 @@ int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 {
 	array_init(worker->pools);
 	array_init(worker->ioreqs);
-	array_reserve(worker->pools, ring_maxlen);
-	array_reserve(worker->ioreqs, ring_maxlen);
+	if (array_reserve(worker->pools, ring_maxlen) || array_reserve(worker->ioreqs, ring_maxlen))
+		return kr_error(ENOMEM);
 	memset(&worker->pkt_pool, 0, sizeof(worker->pkt_pool));
 	worker->pkt_pool.ctx = mp_new (4 * sizeof(knot_pkt_t));
 	worker->pkt_pool.alloc = (mm_alloc_t) mp_alloc;

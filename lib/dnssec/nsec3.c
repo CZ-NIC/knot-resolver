@@ -385,7 +385,6 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 	const knot_rrset_t *matching = NULL;
 	const knot_rrset_t *covering = NULL;
 
-	int ret = kr_error(ENOENT);
 	int flags = 0;
 	const knot_dname_t *next_closer = NULL;
 	for (unsigned i = 0; i < sec->count; ++i) {
@@ -395,7 +394,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 		}
 		unsigned skipped = 0;
 		flags = 0;
-		ret = closest_encloser_match(&flags, rrset, sname, &skipped);
+		int ret = closest_encloser_match(&flags, rrset, sname, &skipped);
 		if (ret != 0) {
 			return ret;
 		}
