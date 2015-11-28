@@ -97,7 +97,7 @@ static void randomized_qname_case(knot_dname_t *qname, uint32_t secret)
 		for (unsigned i = *qname; i--;) {
 			int chr = qname[i + 1];
 			if (isalpha(chr)) {
-				if (secret & (1 << k)) {
+				if (secret & ((unsigned)1 << k)) {
 					qname[i + 1] ^= 0x20;
 				}
 				k = (k + 1) % (sizeof(secret) * CHAR_BIT);
