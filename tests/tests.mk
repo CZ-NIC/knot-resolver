@@ -12,7 +12,7 @@ TEMPLATE := template/kresd.j2
 $(deckard_DIR)/Makefile:
 	@git submodule update --init
 check-integration: $(deckard_DIR)/Makefile
-	@$(MAKE) -s -C $(deckard_DIR) TESTS=$(TESTS) DAEMON=$(abspath daemon/kresd) TEMPLATE=$(TEMPLATE)
+	@$(MAKE) -s -C $(deckard_DIR) TESTS=$(TESTS) DAEMON=$(abspath daemon/kresd) TEMPLATE=$(TEMPLATE) DYLD_LIBRARY_PATH=$(DYLD_LIBRARY_PATH)
 deckard: check-integration
 
 # Targets
