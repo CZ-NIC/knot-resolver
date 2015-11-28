@@ -86,24 +86,22 @@ static inline size_t layer_id(struct kr_request *req, const struct knot_layer_ap
 	return 0; /* Not found, try all. */
 }
 
+/* @internal We don't need to deal with locale here */
+KR_CONST KR_INLINE static bool isletter(unsigned chr)
+{ return (chr | 0x20 /* tolower */) - 'a' <= 'z' - 'a'; }
+
 /* Randomize QNAME letter case.
  * This adds 32 bits of randomness at maximum, but that's more than an average domain name length.
  * https://tools.ietf.org/html/draft-vixie-dnsext-dns0x20-00
  */
-static void randomized_qname_case(knot_dname_t *qname, uint32_t secret)
+static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret)
 {
-	unsigned k = 0;
-	while (qname[0]) {
-		for (unsigned i = *qname; i--;) {
-			int chr = qname[i + 1];
-			if (isalpha(chr)) {
-				if (secret & ((unsigned)1 << k)) {
-					qname[i + 1] ^= 0x20;
-				}
-				k = (k + 1) % (sizeof(secret) * CHAR_BIT);
-			}
+	assert(qname);
+	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. */
+	for (int i = 0; i < len; ++i) {
+		if (isletter(*++qname)) {
+				*qname ^= ((secret >> (i & 31)) & 1) * 0x20;
 		}
-		qname = (uint8_t *)knot_wire_next_label(qname, NULL);
 	}
 }
 
