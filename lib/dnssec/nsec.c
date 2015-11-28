@@ -117,7 +117,7 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 	/* Try to find parent wildcard that is proved by this NSEC. */ 
 	uint8_t namebuf[KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_to_wire(namebuf, name, sizeof(namebuf));
-	if (ret != 0)
+	if (ret < 0)
 		return ret;
 	knot_dname_t *ptr = namebuf;
 	while (ptr[0]) {
