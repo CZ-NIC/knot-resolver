@@ -261,9 +261,9 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 	if (nsec3_flags & ~OPT_OUT_BIT) {
 		/* RFC5155 3.1.2 */
 		ret = kr_error(EINVAL);
+	} else {
+		ret = kr_ok();
 	}
-
-	ret = kr_ok();
 
 fail:
 	if (params.salt.data) {
