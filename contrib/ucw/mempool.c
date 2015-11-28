@@ -86,9 +86,10 @@ static void *
 mp_new_big_chunk(struct mempool *pool, size_t size)
 {
   struct mempool_chunk *chunk;
-  chunk = malloc(size + MP_CHUNK_TAIL) + size;
+  chunk = malloc(size + MP_CHUNK_TAIL);
   if (!chunk)
     return NULL;
+  chunk = (struct mempool_chunk *)((char *)chunk + size);
   chunk->size = size;
   if (pool)
     pool->total_size += size + MP_CHUNK_TAIL;
