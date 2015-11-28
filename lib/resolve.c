@@ -87,7 +87,7 @@ static inline size_t layer_id(struct kr_request *req, const struct knot_layer_ap
 }
 
 /* @internal We don't need to deal with locale here */
-KR_CONST KR_INLINE static bool isletter(unsigned chr)
+KR_CONST static inline bool isletter(unsigned chr)
 { return (chr | 0x20 /* tolower */) - 'a' <= 'z' - 'a'; }
 
 /* Randomize QNAME letter case.
