@@ -21,6 +21,9 @@
 #include "daemon/bindings.h"
 #include "daemon/worker.h"
 
+/** @internal Annotate for static checkers. */
+KR_NORETURN int lua_error (lua_State *L);
+
 /** @internal Prefix error with file:line */
 static int format_error(lua_State* L, const char *err)
 {

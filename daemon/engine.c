@@ -37,6 +37,9 @@
 #define lua_rawlen(L, obj) lua_objlen((L), (obj))
 #endif
 
+/** @internal Annotate for static checkers. */
+KR_NORETURN int lua_error (lua_State *L);
+
 /*
  * Global bindings.
  */

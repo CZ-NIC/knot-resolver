@@ -26,10 +26,12 @@
 #define KR_EXPORT __attribute__ ((visibility ("default")))
 #define KR_CONST __attribute__((__const__))
 #define KR_PURE __attribute__((__pure__))
+#define KR_NORETURN __attribute__((__noreturn__))
 #else
 #define KR_EXPORT
 #define KR_CONST
 #define KR_PURE
+#define KR_NORETURN
 #endif
 
 /*
