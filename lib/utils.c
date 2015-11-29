@@ -46,6 +46,21 @@ static bool isaac_seeded = false;
  */
 #define strlen_safe(x) ((x) ? strlen(x) : 0)
 
+/**
+ * @internal Convert 16bit unsigned to string, keeps leading spaces.
+ * @note Always fills dst length = 5
+ * Credit: http://computer-programming-forum.com/46-asm/7aa4b50bce8dd985.htm
+ */
+static inline int u16tostr(uint8_t *dst, uint16_t num)
+{
+	uint32_t tmp = num * (((1 << 28) / 10000) + 1) - (num / 4);
+	for(size_t i = 0; i < 5; i++) {
+		dst[i] = '0' + (char) (tmp >> 28);
+		tmp = (tmp & 0x0fffffff) * 10;
+	}
+	return 5;
+}
+
 /*
  * Cleanup callbacks.
  */
@@ -295,7 +310,7 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 		return kr_error(EINVAL);
 	}
 
-	/* Stash key = {[1] flags, [1-255] owner, [1-5] type, [1] \x00 } */
+	/* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
 	char key[9 + KNOT_DNAME_MAXLEN];
 	uint16_t rrtype = rr->type;
 	key[0] = (rank << 2) | 0x01; /* Must be non-zero */
@@ -313,11 +328,10 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 		return ret;
 	}
 	knot_dname_to_lower(key_buf);
+	key_buf += ret - 1;
 	/* Must convert to string, as the key must not contain 0x00 */
-	ret = snprintf((char *)key_buf + ret - 1, sizeof(key) - KNOT_DNAME_MAXLEN, "%hu", rrtype);
-	if (ret <= 0 || ret >= KNOT_DNAME_MAXLEN) {
-		return kr_error(EILSEQ);
-	}
+	ret = u16tostr(key_buf, rrtype);
+	key_buf[ret] = '\0';
 
 	/* Check if already exists */
 	knot_rrset_t *stashed = map_get(stash, key);
