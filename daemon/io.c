@@ -14,8 +14,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <string.h>
 #include <libknot/errcode.h>
-#include <libknot/internal/utils.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 
