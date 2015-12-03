@@ -437,13 +437,30 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	}
 
 	/* Track RTT for iterative answers */
-	if (!(qry->flags & QUERY_CACHED)) {
-		struct timeval now;
-		gettimeofday(&now, NULL);
-		kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
-		/* Sucessful answer, lift any address resolution requests. */
-		if (request->state != KNOT_STATE_FAIL)
+	if (src && !(qry->flags & QUERY_CACHED)) {
+		/* Sucessful answer, track RTT and lift any address resolution requests. */
+		if (request->state != KNOT_STATE_FAIL) {
+			/* Do not track in safe mode. */
+			if (!(qry->flags & QUERY_SAFEMODE)) {
+				struct timeval now;
+				gettimeofday(&now, NULL);
+				kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
+				WITH_DEBUG {
+					char addr_str[SOCKADDR_STRLEN];
+					inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
+					DEBUG_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, time_diff(&qry->timestamp, &now));
+				}
+			}
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+		/* Do not penalize validation timeouts. */
+		} else if (!(qry->flags & QUERY_DNSSEC_BOGUS)) {
+			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt);
+			WITH_DEBUG {
+				char addr_str[SOCKADDR_STRLEN];
+				inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
+				DEBUG_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
+			}
+		}
 	}
 	/* Resolution failed, invalidate current NS. */
 	if (request->state == KNOT_STATE_FAIL) {
