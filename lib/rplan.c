@@ -146,6 +146,8 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 
 bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
+	if (!name)
+		return false;
 	while (closure != NULL) {
 		if (QUERY_PROVIDES(closure, name, cls, type)) {
 			return true;
