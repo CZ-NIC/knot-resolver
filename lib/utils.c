@@ -304,6 +304,26 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 	return ret;
 }
 
+int kr_rrmap_key(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank)
+{
+	if (!key || !owner) {
+		printf("key owner %p %p\n", key, owner);
+		return kr_error(EINVAL);
+	}
+	key[0] = (rank << 2) | 0x01; /* Must be non-zero */
+	uint8_t *key_buf = (uint8_t *)key + 1;
+	int ret = knot_dname_to_wire(key_buf, owner, KNOT_DNAME_MAXLEN);
+	if (ret <= 0) {
+		return ret;
+	}
+	knot_dname_to_lower(key_buf);
+	key_buf += ret - 1;
+	/* Must convert to string, as the key must not contain 0x00 */
+	ret = u16tostr(key_buf, type);
+	key_buf[ret] = '\0';
+	return (char *)&key_buf[ret] - key;
+}
+
 int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *pool)
 {
 	if (!stash || !rr) {
@@ -311,27 +331,20 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 	}
 
 	/* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
-	char key[9 + KNOT_DNAME_MAXLEN];
+	char key[RRMAP_KEYSIZE];
+	uint8_t extra_flags = 0;
 	uint16_t rrtype = rr->type;
-	key[0] = (rank << 2) | 0x01; /* Must be non-zero */
-
 	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
 	 * This way it the stash won't merge RRSIGs together. */
 	if (rr->type == KNOT_RRTYPE_RRSIG) {
 		rrtype = knot_rrsig_type_covered(&rr->rrs, 0);
-		key[0] |= KEY_FLAG_RRSIG;
+		extra_flags |= KEY_FLAG_RRSIG;
 	}
-
-	uint8_t *key_buf = (uint8_t *)key + 1;
-	int ret = knot_dname_to_wire(key_buf, rr->owner, KNOT_DNAME_MAXLEN);
+	int ret = kr_rrmap_key(key, rr->owner, rrtype, rank);
 	if (ret <= 0) {
-		return ret;
+		return kr_error(EILSEQ);
 	}
-	knot_dname_to_lower(key_buf);
-	key_buf += ret - 1;
-	/* Must convert to string, as the key must not contain 0x00 */
-	ret = u16tostr(key_buf, rrtype);
-	key_buf[ret] = '\0';
+	key[0] |= extra_flags;
 
 	/* Check if already exists */
 	knot_rrset_t *stashed = map_get(stash, key);
