@@ -315,13 +315,12 @@ static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t 
 }
 
 /** Fetch best NS for zone cut. */
-static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
+static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp, uint16_t * restrict rank)
 {
-	uint16_t rank = 0;
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-	int ret = kr_cache_peek_rr(txn, &cached_rr, &rank, &drift);
+	int ret = kr_cache_peek_rr(txn, &cached_rr, rank, &drift);
 	if (ret != 0) {
 		return ret;
 	}
@@ -395,7 +394,7 @@ static int fetch_dnskey(struct kr_zonecut *cut, const knot_dname_t *name, struct
 }
 
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
-                           struct kr_cache_txn *txn, uint32_t timestamp, bool secured)
+                           struct kr_cache_txn *txn, uint32_t timestamp, bool * restrict secured)
 {
 	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
@@ -408,17 +407,21 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	}
 	/* Start at QNAME parent. */
 	while (txn) {
+		/* Fetch NS first and see if it's insecure. */
+		uint16_t rank = 0;
 		const bool is_root = (label[0] == '\0');
-		bool has_ta = !secured || is_root || fetch_ta(cut, label, txn, timestamp) == 0;
-		if (has_ta && fetch_ns(ctx, cut, label, txn, timestamp) == 0) {
-			if (secured) {
+		if (fetch_ns(ctx, cut, label, txn, timestamp, &rank) == 0) {
+			/* Flag as insecure if cached as this */
+			if (rank & KR_RANK_INSECURE)
+				*secured = false;
+			/* Fetch DS if caller wants secure zone cut */
+			if (*secured || is_root) {
+				fetch_ta(cut, label, txn, timestamp);
 				fetch_dnskey(cut, label, txn, timestamp);
 			}
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);
 			return kr_ok();
-		} else { /* Clear TA, as it is below any known NS. */
-			knot_rrset_free(&cut->trust_anchor, cut->pool);
 		}
 		/* Subtract label from QNAME. */
 		if (!is_root) {

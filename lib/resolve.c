@@ -154,7 +154,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 	}
 }
 
-static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t *pkt, bool secured)
+static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t *pkt)
 {
 	int ret = 0;
 
@@ -164,15 +164,22 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t
 		/* If at/subdomain of parent zone cut, start from its encloser.
 		 * This is for case when we get to a dead end (and need glue from parent), or DS refetch. */
 		struct kr_query *parent = qry->parent;
+		bool secured = (qry->flags & QUERY_DNSSEC_WANT);
 		if (parent && parent->zone_cut.name[0] != '\0' && knot_dname_in(parent->zone_cut.name, qry->sname)) {
 			const knot_dname_t *encloser = knot_wire_next_label(parent->zone_cut.name, NULL);
-			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, &txn, qry->timestamp.tv_sec, secured);
+			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, &txn, qry->timestamp.tv_sec, &secured);
 		} else {
-			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, secured);
+			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, &secured);
 		}
 		/* Check if there's a non-terminal between target and current cut. */
 		if (ret == 0) {
 			check_empty_nonterms(qry, pkt, &txn, qry->timestamp.tv_sec);
+			/* Go insecure if the zone cut is provably insecure */
+			if ((qry->flags & QUERY_DNSSEC_WANT) && !secured) {
+				DEBUG_MSG(qry, "=> NS is provably without DS, going insecure\n");
+				qry->flags &= ~QUERY_DNSSEC_WANT;
+				qry->flags |= QUERY_DNSSEC_INSECURE;
+			}
 		}
 		kr_cache_txn_abort(&txn);
 	} else {
@@ -561,7 +568,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		} else {
 			qry->flags &= ~QUERY_DNSSEC_WANT;
 		}
-		int ret = ns_fetch_cut(qry, request, packet, (qry->flags & QUERY_DNSSEC_WANT));
+		int ret = ns_fetch_cut(qry, request, packet);
 		if (ret != 0) {
 			/* No cached cut found, start from SBELT and issue priming query. */
 			if (ret == kr_error(ENOENT)) {
