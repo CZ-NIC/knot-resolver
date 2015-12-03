@@ -117,6 +117,11 @@ int kr_bitcmp(const char *a, const char *b, int bits);
 #define KEY_FLAG_RRSIG 0x02
 #define KEY_FLAG_RANK(key) (key[0] >> 2)
 #define KEY_COVERING_RRSIG(key) (key[0] & KEY_FLAG_RRSIG)
+/* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
+#define RRMAP_KEYSIZE (9 + KNOT_DNAME_MAXLEN)
+
+/** @internal Create unique string key for RR. */
+int kr_rrmap_key(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank);
 
 /** @internal Merges RRSets with matching owner name and type together.
  * @note RRSIG RRSets are merged according the type covered fields.
