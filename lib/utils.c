@@ -307,7 +307,6 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 int kr_rrmap_key(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank)
 {
 	if (!key || !owner) {
-		printf("key owner %p %p\n", key, owner);
 		return kr_error(EINVAL);
 	}
 	key[0] = (rank << 2) | 0x01; /* Must be non-zero */

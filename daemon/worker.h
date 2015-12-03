@@ -20,6 +20,7 @@
 
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
+#include "lib/generic/map.h"
 
 /* @cond internal Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
@@ -46,6 +47,7 @@ struct worker_ctx {
 		size_t dropped;
 		size_t timeout;
 	} stats;
+	map_t outstanding;
 	mp_freelist_t pools;
 	mp_freelist_t ioreqs;
 	mm_ctx_t pkt_pool;
