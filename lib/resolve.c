@@ -154,7 +154,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 	}
 }
 
-static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t *pkt, bool secured)
+static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t *pkt)
 {
 	int ret = 0;
 
@@ -164,15 +164,22 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t
 		/* If at/subdomain of parent zone cut, start from its encloser.
 		 * This is for case when we get to a dead end (and need glue from parent), or DS refetch. */
 		struct kr_query *parent = qry->parent;
+		bool secured = (qry->flags & QUERY_DNSSEC_WANT);
 		if (parent && parent->zone_cut.name[0] != '\0' && knot_dname_in(parent->zone_cut.name, qry->sname)) {
 			const knot_dname_t *encloser = knot_wire_next_label(parent->zone_cut.name, NULL);
-			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, &txn, qry->timestamp.tv_sec, secured);
+			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, &txn, qry->timestamp.tv_sec, &secured);
 		} else {
-			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, secured);
+			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, &secured);
 		}
 		/* Check if there's a non-terminal between target and current cut. */
 		if (ret == 0) {
 			check_empty_nonterms(qry, pkt, &txn, qry->timestamp.tv_sec);
+			/* Go insecure if the zone cut is provably insecure */
+			if ((qry->flags & QUERY_DNSSEC_WANT) && !secured) {
+				DEBUG_MSG(qry, "=> NS is provably without DS, going insecure\n");
+				qry->flags &= ~QUERY_DNSSEC_WANT;
+				qry->flags |= QUERY_DNSSEC_INSECURE;
+			}
 		}
 		kr_cache_txn_abort(&txn);
 	} else {
@@ -430,13 +437,30 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	}
 
 	/* Track RTT for iterative answers */
-	if (!(qry->flags & QUERY_CACHED)) {
-		struct timeval now;
-		gettimeofday(&now, NULL);
-		kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
-		/* Sucessful answer, lift any address resolution requests. */
-		if (request->state != KNOT_STATE_FAIL)
+	if (src && !(qry->flags & QUERY_CACHED)) {
+		/* Sucessful answer, track RTT and lift any address resolution requests. */
+		if (request->state != KNOT_STATE_FAIL) {
+			/* Do not track in safe mode. */
+			if (!(qry->flags & QUERY_SAFEMODE)) {
+				struct timeval now;
+				gettimeofday(&now, NULL);
+				kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
+				WITH_DEBUG {
+					char addr_str[SOCKADDR_STRLEN];
+					inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
+					DEBUG_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, time_diff(&qry->timestamp, &now));
+				}
+			}
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+		/* Do not penalize validation timeouts. */
+		} else if (!(qry->flags & QUERY_DNSSEC_BOGUS)) {
+			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt);
+			WITH_DEBUG {
+				char addr_str[SOCKADDR_STRLEN];
+				inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
+				DEBUG_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
+			}
+		}
 	}
 	/* Resolution failed, invalidate current NS. */
 	if (request->state == KNOT_STATE_FAIL) {
@@ -561,7 +585,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		} else {
 			qry->flags &= ~QUERY_DNSSEC_WANT;
 		}
-		int ret = ns_fetch_cut(qry, request, packet, (qry->flags & QUERY_DNSSEC_WANT));
+		int ret = ns_fetch_cut(qry, request, packet);
 		if (ret != 0) {
 			/* No cached cut found, start from SBELT and issue priming query. */
 			if (ret == kr_error(ENOENT)) {
