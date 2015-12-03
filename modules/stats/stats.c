@@ -42,7 +42,7 @@
 
 /** @cond internal Fixed-size map of predefined metrics. */
 #define CONST_METRICS(X) \
-	X(answer,total) X(answer,noerror) X(answer,nxdomain) X(answer,servfail) \
+	X(answer,total) X(answer,noerror) X(answer,nodata) X(answer,nxdomain) X(answer,servfail) \
 	X(answer,cached) X(answer,10ms) X(answer,100ms) X(answer,1000ms) X(answer,slow) \
 	X(query,edns) X(query,dnssec) \
 	X(const,end)
@@ -86,7 +86,12 @@ static int collect_answer(struct stat_data *data, knot_pkt_t *pkt)
 	stat_const_add(data, metric_answer_total, 1);
 	/* Count per-rcode */
 	switch(knot_wire_get_rcode(pkt->wire)) {
-	case KNOT_RCODE_NOERROR:  stat_const_add(data, metric_answer_noerror, 1); break;
+	case KNOT_RCODE_NOERROR:
+		if (knot_wire_get_ancount(pkt->wire) > 0)
+			stat_const_add(data, metric_answer_noerror, 1);
+		else
+			stat_const_add(data, metric_answer_nodata, 1);
+	break;
 	case KNOT_RCODE_NXDOMAIN: stat_const_add(data, metric_answer_nxdomain, 1); break;
 	case KNOT_RCODE_SERVFAIL: stat_const_add(data, metric_answer_servfail, 1); break;
 	default: break;

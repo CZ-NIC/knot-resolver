@@ -86,6 +86,7 @@ Built-in statistics
 * ``answer.total`` - total number of answered queries
 * ``answer.cached`` - number of queries answered from cache
 * ``answer.noerror`` - number of **NOERROR** answers
+* ``answer.nodata`` - number of **NOERROR**, but empty answers
 * ``answer.nxdomain`` - number of **NXDOMAIN** answers
 * ``answer.servfail`` - number of **SERVFAIL** answers
 * ``answer.10ms`` - number of answers completed in 10ms
