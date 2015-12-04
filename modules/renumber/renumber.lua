@@ -40,7 +40,9 @@ end
 -- Config
 function mod.config (conf)
 	if conf == nil then return end
-	if type(conf) ~= 'table' then error('[renumber] expected { {prefix, target}, ... }') end
+	if type(conf) ~= 'table' or type(conf[1]) ~= 'table' then
+		error('[renumber] expected { {prefix, target}, ... }')
+	end
 	for i = 1, #conf do add_prefix(conf[i][1], conf[1][2]) end
 end
 -- Layers
