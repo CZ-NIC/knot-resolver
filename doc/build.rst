@@ -39,6 +39,8 @@ There are also *optional* packages that enable specific functionality in Knot DN
 .. csv-table::
    :header: "Optional", "Needed for", "Notes"
 
+   "luasocket_", "``trust anchors, modules/stats``", "Sockets for Lua."
+   "luasec_", "``trust anchors``", "TLS for Lua."
    "libmemcached_", "``modules/memcached``", "To build memcached backend module."
    "hiredis_", "``modules/redis``", "To build redis backend module."
    "Go_ 1.5+", "``modules``", "Build modules written in Go."
@@ -186,6 +188,8 @@ Read the `documentation <deckard_doc>`_ for more information about requirements,
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot
 .. _cmocka: https://cmocka.org/
 .. _Python: https://www.python.org/
+.. _luasec: https://luarocks.org/modules/luarocks/luasec
+.. _luasocket: https://luarocks.org/modules/luarocks/luasocket
 
 .. _boot2docker: http://boot2docker.io/
 

@@ -3,7 +3,7 @@ include platform.mk
 
 # Targets
 all: info lib daemon modules
-install: lib-install daemon-install modules-install
+install: lib-install daemon-install modules-install etc-install
 check: all tests
 clean: lib-clean daemon-clean modules-clean tests-clean doc-clean
 doc: doc-html
@@ -53,6 +53,7 @@ info:
 	$(info PREFIX:     $(PREFIX))
 	$(info BINDIR:     $(BINDIR))
 	$(info LIBDIR:     $(LIBDIR))
+	$(info ETCDIR:     $(ETCDIR))
 	$(info INCLUDEDIR: $(INCLUDEDIR))
 	$(info MODULEDIR:  $(MODULEDIR))
 	$(info )
@@ -73,10 +74,13 @@ info:
 	$(info [$(HAS_socket_wrapper)] socket_wrapper (lib))
 	$(info )
 
-# Moduledir
+# Installation directories
 $(PREFIX)/$(MODULEDIR):
-	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
+	$(INSTALL) -d $@
 moduledir: $(PREFIX)/$(MODULEDIR)
+$(PREFIX)/$(ETCDIR):
+	$(INSTALL) -m 0750 -d $@
+etcdir: $(PREFIX)/$(ETCDIR)
 
 # Sub-targets
 include lib/lib.mk
@@ -84,3 +88,4 @@ include daemon/daemon.mk
 include modules/modules.mk
 include tests/tests.mk
 include doc/doc.mk
+include etc/etc.mk

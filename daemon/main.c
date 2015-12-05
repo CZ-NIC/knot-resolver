@@ -242,14 +242,29 @@ int main(int argc, char **argv)
 #endif
 			break;
 		case 'k':
-			keyfile_buf = malloc(PATH_MAX + 1);
+			keyfile_buf = malloc(PATH_MAX);
 			assert(keyfile_buf);
-			keyfile = realpath(optarg, keyfile_buf);
-			if (keyfile)
-				keyfile = strdup(keyfile);
+			/* Check if the path is absolute */
+			if (optarg[0] == '/') {
+				keyfile = strdup(optarg);
+			} else {
+				/* Construct absolute path, the file may not exist */
+				keyfile = realpath(".", keyfile_buf);
+				if (keyfile) {
+					int len = strlen(keyfile);
+					int namelen = strlen(optarg);
+					if (len + namelen < PATH_MAX - 1) {
+						keyfile[len] = '/';
+						memcpy(keyfile + len + 1, optarg, namelen + 1);
+						keyfile = strdup(keyfile); /* Duplicate */
+					} else {
+						keyfile = NULL; /* Invalidate */
+					}
+				}
+			}
 			free(keyfile_buf);
-			if (!keyfile || access(optarg, R_OK|W_OK) != 0) {
-				log_error("[system] keyfile '%s': not readable/writeable\n", optarg);
+			if (!keyfile) {
+				log_error("[system] keyfile '%s': not writeable\n", optarg);
 				return EXIT_FAILURE;
 			}
 			break;

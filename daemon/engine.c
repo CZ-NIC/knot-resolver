@@ -396,6 +396,10 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_libpath);
 	lua_setglobal(engine->L, "libpath");
+	lua_pushliteral(engine->L, PREFIX MODULEDIR);
+	lua_setglobal(engine->L, "moduledir");
+	lua_pushliteral(engine->L, PREFIX ETCDIR);
+	lua_setglobal(engine->L, "etcdir");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();

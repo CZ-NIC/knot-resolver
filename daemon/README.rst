@@ -14,9 +14,34 @@ Enabling DNSSEC
 ===============
 
 The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
-To enable it, you need to provide at least _one_ trust anchor. This step is not automatic, as you're supposed to obtain
-the trust anchor `using a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_.
-From there, the Knot DNS Resolver can perform automatic updates for you.
+To enable it, you need to provide trusted root keys. Bootstrapping of the keys is automated, and kresd fetches root trust anchors set `over a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_ from IANA. From there, it can perform :rfc:`5011` automatic updates for you.
+
+.. note:: Automatic bootstrap requires luasocket_ and luasec_ installed.
+
+.. code-block:: bash
+
+   $ kresd -k root.keys # File for root keys
+   [ ta ] bootstrapped root anchor "19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5"
+   [ ta ] warning: you SHOULD check the key manually, see: https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs
+   [ ta ] key: 19036 state: Valid
+   [ ta ] next refresh: 86400000
+
+Alternatively, you can set it in configuration file with ``trust_anchors.file = 'root.keys'``. If the file doesn't exist, it will be automatically populated with root keys validated using root anchors retrieved over HTTPS.
+
+This is equivalent to `using unbound-anchor <https://www.unbound.net/documentation/howto_anchor.html>`_:
+
+.. code-block:: bash
+
+   $ unbound-anchor -a "root.keys" || echo "warning: check the key at this point"
+   $ echo "auto-trust-anchor-file: \"root.keys\"" >> unbound.conf
+   $ unbound -c unbound.conf
+
+.. warning:: Bootstrapping of the root trust anchors is automatic, you are however **encouraged to check** the key over **secure channel**, as specified in `DNSSEC Trust Anchor Publication for the Root Zone <https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs>`_. This is a critical step where the whole infrastructure may be compromised, you will be warned in the server log.
+
+Manually providing root anchors
+-------------------------------
+
+The root anchors bootstrap may fail for various reasons, in this case you need to provide IANA or alternative root anchors. The format of the keyfile is the same as for Unbound or BIND and contains DNSKEY records.
 
 1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
 2. Fetch current keys (DNSKEY), verify digests
@@ -715,3 +740,5 @@ you can see the statistics or schedule new queries.
 .. _libuv: https://github.com/libuv/libuv
 .. _Lua: http://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
+.. _luasec: https://luarocks.org/modules/luarocks/luasec
+.. _luasocket: https://luarocks.org/modules/luarocks/luasocket
