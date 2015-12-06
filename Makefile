@@ -51,6 +51,7 @@ info:
 	$(info Compiler:   $(CC) $(BUILD_CFLAGS))
 	$(info Linker:     $(LD) $(BUILD_LDFLAGS))
 	$(info PREFIX:     $(PREFIX))
+	$(info DESTDIR:    $(DESTDIR))
 	$(info BINDIR:     $(BINDIR))
 	$(info LIBDIR:     $(LIBDIR))
 	$(info ETCDIR:     $(ETCDIR))
@@ -75,12 +76,10 @@ info:
 	$(info )
 
 # Installation directories
-$(MODULEDIR):
+$(DESTDIR)$(MODULEDIR):
 	$(INSTALL) -d $@
-moduledir: $(MODULEDIR)
-$(ETCDIR):
+$(DESTDIR)$(ETCDIR):
 	$(INSTALL) -m 0750 -d $@
-etcdir: $(ETCDIR)
 
 # Sub-targets
 include lib/lib.mk

@@ -81,12 +81,12 @@ ifeq ($(6), yes)
 endif
 $(1)-install: $(2)/$(1)$(3)
 ifneq ($(5),$(MODULEDIR))
-	$(INSTALL) -d $(5)
+	$(INSTALL) -d $(DESTDIR)$(5)
 endif
-	$(INSTALL) $(2)/$(1)$(3) $(5)
+	$(INSTALL) $(2)/$(1)$(3) $(DESTDIR)$(5)
 ifneq ($$(strip $$($(1)_HEADERS)),)
-	$(INSTALL) -d $(INCLUDEDIR)/$(1)
-	$(INSTALL) -m 644 $$($(1)_HEADERS) $(INCLUDEDIR)/$(1)
+	$(INSTALL) -d $(DESTDIR)$(INCLUDEDIR)/$(1)
+	$(INSTALL) -m 644 $$($(1)_HEADERS) $(DESTDIR)$(INCLUDEDIR)/$(1)
 endif
 .PHONY: $(1)-clean $(1)-install
 endef

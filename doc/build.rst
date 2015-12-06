@@ -123,6 +123,18 @@ Alternatively you can build only specific parts of the project, i.e. ``library``
 
 .. note:: Documentation is not built by default, run ``make doc`` to build it.
 
+Building for packages
+~~~~~~~~~~~~~~~~~~~~~
+
+The build system supports both DESTDIR_ and `amalgamated builds <https://www.sqlite.org/amalgamation.html>`_.
+
+.. code-block:: bash
+
+   $ make install DESTDIR=/tmp/stage # Staged install
+   $ make all install AMALG=yes # Amalgamated build
+
+.. note:: Amalgamated build assembles everything in one source file and compiles it. It is useful for packages, as the compiler sees the whole program and is able to produce a smaller and faster binary. On the other hand, it complicates debugging.
+
 Building dependencies
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -195,3 +207,5 @@ Read the `documentation <deckard_doc>`_ for more information about requirements,
 
 .. _deckard: https://gitlab.labs.nic.cz/knot/deckard
 .. _deckard_doc: https://gitlab.labs.nic.cz/knot/resolver/blob/master/tests/README.rst
+
+.. _DESTDIR: https://www.gnu.org/prep/standards/html_node/DESTDIR.html

@@ -21,8 +21,8 @@ daemon/engine.o: daemon/lua/sandbox.inc daemon/lua/config.inc
 endif
 
 # Installed FFI bindings
-bindings-install: $(kresd_DIST) moduledir
-	$(INSTALL) -m 0644 $(kresd_DIST) $(MODULEDIR)
+bindings-install: $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
+	$(INSTALL) -m 0644 $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 
 kresd_DEPEND := $(libkres)
 kresd_LIBS := $(libkres_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS)
