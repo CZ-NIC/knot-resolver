@@ -22,7 +22,7 @@ endif
 
 # Installed FFI bindings
 bindings-install: $(kresd_DIST) moduledir
-	$(INSTALL) -m 0644 $(kresd_DIST) $(PREFIX)/$(MODULEDIR)
+	$(INSTALL) -m 0644 $(kresd_DIST) $(MODULEDIR)
 
 kresd_DEPEND := $(libkres)
 kresd_LIBS := $(libkres_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS)

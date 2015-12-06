@@ -46,7 +46,7 @@ define lua_target
 $(1) := $$(addprefix $(2)/,$$($(1)_SOURCES))
 $(1)-clean:
 $(1)-install: $$(addprefix $(2)/,$$($(1)_SOURCES)) moduledir
-	$(INSTALL) -m 0644 $$(addprefix $(2)/,$$($(1)_SOURCES)) $(PREFIX)/$(MODULEDIR)
+	$(INSTALL) -m 0644 $$(addprefix $(2)/,$$($(1)_SOURCES)) $(MODULEDIR)
 .PHONY: $(1) $(1)-install $(1)-clean
 endef
 
@@ -67,14 +67,14 @@ $(1)-clean:
 	$(RM) -r $(2)/$(1).h $(2)/$(1)$(LIBEXT)
 ifeq ($$(strip $$($(1)_INSTALL)),)
 $(1)-dist:
-	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)
+	$(INSTALL) -d $(MODULEDIR)
 else
 $(1)-dist: $$($(1)_INSTALL)
-	$(INSTALL) -d $(PREFIX)/$(MODULEDIR)/$(1)
-	$(INSTALL) -m 0644 $$^ $(PREFIX)/$(MODULEDIR)/$(1)
+	$(INSTALL) -d $(MODULEDIR)/$(1)
+	$(INSTALL) -m 0644 $$^ $(MODULEDIR)/$(1)
 endif
 $(1)-install: $(2)/$(1)$(LIBEXT) $(1)-dist moduledir
-	$(INSTALL) $(2)/$(1)$(LIBEXT) $(PREFIX)/$(MODULEDIR)
+	$(INSTALL) $(2)/$(1)$(LIBEXT) $(MODULEDIR)
 .PHONY: $(1)-clean $(1)-install $(1)-dist
 endef
 

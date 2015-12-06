@@ -5,11 +5,11 @@ PATCH := 0-beta2
 
 # Paths
 PREFIX := /usr/local
-BINDIR := /bin
-LIBDIR := /lib
-INCLUDEDIR := /include
+BINDIR := $(PREFIX)/bin
+LIBDIR := $(PREFIX)/lib
+INCLUDEDIR := $(PREFIX)/include
 MODULEDIR := $(LIBDIR)/kdns_modules
-ETCDIR := /etc/kresd
+ETCDIR := $(PREFIX)/etc/kresd
 
 # Tools
 CC	?= cc

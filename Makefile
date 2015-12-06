@@ -75,12 +75,12 @@ info:
 	$(info )
 
 # Installation directories
-$(PREFIX)/$(MODULEDIR):
+$(MODULEDIR):
 	$(INSTALL) -d $@
-moduledir: $(PREFIX)/$(MODULEDIR)
-$(PREFIX)/$(ETCDIR):
+moduledir: $(MODULEDIR)
+$(ETCDIR):
 	$(INSTALL) -m 0750 -d $@
-etcdir: $(PREFIX)/$(ETCDIR)
+etcdir: $(ETCDIR)
 
 # Sub-targets
 include lib/lib.mk

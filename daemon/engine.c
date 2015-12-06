@@ -396,9 +396,9 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_libpath);
 	lua_setglobal(engine->L, "libpath");
-	lua_pushliteral(engine->L, PREFIX MODULEDIR);
+	lua_pushliteral(engine->L, MODULEDIR);
 	lua_setglobal(engine->L, "moduledir");
-	lua_pushliteral(engine->L, PREFIX ETCDIR);
+	lua_pushliteral(engine->L, ETCDIR);
 	lua_setglobal(engine->L, "etcdir");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
@@ -506,7 +506,7 @@ int engine_cmd(struct engine *engine, const char *str)
 static int engine_loadconf(struct engine *engine, const char *config_path)
 {
 	/* Use module path for including Lua scripts */
-	static const char l_paths[] = "package.path = package.path..';" PREFIX MODULEDIR "/?.lua'";
+	static const char l_paths[] = "package.path = package.path..';" MODULEDIR "/?.lua'";
 	int ret = l_dobytecode(engine->L, l_paths, sizeof(l_paths) - 1, "");
 	if (ret != 0) {
 		lua_pop(engine->L, 1);
