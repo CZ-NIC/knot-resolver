@@ -292,6 +292,7 @@ int kr_cache_clear(struct kr_cache_txn *txn)
 		return kr_error(EINVAL);
 	}
 
+	txn->owner->stats.delete += 1;
 	return txn_api(txn)->clear(&txn->t);
 }
 
