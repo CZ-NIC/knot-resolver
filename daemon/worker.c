@@ -443,14 +443,11 @@ static void on_connect(uv_connect_t *req, int status)
 	struct qr_task *task = req->data;
 	uv_stream_t *handle = req->handle;
 	if (qr_valid_handle(task, (uv_handle_t *)req->handle)) {
-		struct sockaddr_in6 addr;
-		int addrlen = sizeof(addr); /* Retrieve endpoint IP for statistics */
-		uv_tcp_getpeername((uv_tcp_t *)handle, (struct sockaddr *)&addr, &addrlen);
 		if (status == 0) {
-			qr_task_send(task, (uv_handle_t *)handle, (struct sockaddr *)&addr, task->pktbuf);
+			qr_task_send(task, (uv_handle_t *)handle, NULL, task->pktbuf);
 		} else {
 			DEBUG_MSG("ioreq conn_done %p => %d, %s\n", req, status, uv_strerror(status));
-			qr_task_step(task, (struct sockaddr *)&addr, NULL);
+			qr_task_step(task, task->addrlist, NULL);
 		}
 	}
 	qr_task_unref(task);
