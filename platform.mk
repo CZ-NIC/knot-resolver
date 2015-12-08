@@ -2,6 +2,7 @@
 # Don't touch this unless you're changing the way targets are compiled
 # You have been warned
 
+# Platform-dependent stuff checks
 CCLD := $(CC)
 CGO := go tool cgo
 GO := go
@@ -27,9 +28,18 @@ else
         PLATFORM := Darwin
         LIBEXT := .dylib
         MODTYPE := dynamiclib
+        # OS X specific hardening since -pie doesn't work
+        ifneq ($(HARDENING),no)
+            BINFLAGS += -Wl,-pie
+        endif
     else
         PLATFORM := POSIX
         LDFLAGS += -pthread -lm -Wl,-E
+        # ELF hardening options
+        ifneq ($(HARDENING),no)
+            BINFLAGS += -pie
+            LDFLAGS += -Wl,-z,relro,-z,now
+        endif
         ifeq (,$(findstring BSD,$(UNAME)))
             LDFLAGS += -ldl
         endif
@@ -41,16 +51,12 @@ ifeq ($(V),1)
 	quiet = $($1)
 else
 	quiet = @echo "  $1	$2"; $($1)
-endif	
-
-%.o: %.c
-	$(call quiet,CC,$<) $(BUILD_CFLAGS) -MMD -MP -c $< -o $@
+endif
 
 # Make objects and depends (name)
 define make_objs
 $(1)_OBJ := $$($(1)_SOURCES:.c=.o)
 $(1)_DEP := $$($(1)_SOURCES:.c=.d)
-
 -include $$($(1)_DEP)
 endef
 
@@ -67,13 +73,17 @@ endif
 else
 $$(eval $$(call make_objs,$(1)))
 endif
+# Rules to generate objects with custom CFLAGS and binary/library
+$$($(1)_OBJ): $$($(1)_SOURCES)
+	$(call quiet,CC,$$(@:%.o=%.c)) $(BUILD_CFLAGS) $$($(1)_CFLAGS) -MMD -MP -c $$(@:%.o=%.c) -o $$@
 $(1) := $(2)/$(1)$(3)
 $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 ifeq ($(4),-$(ARTYPE))
 	$(call quiet,AR,$$@) rcs $$@ $$($(1)_OBJ)
 else
-	$(call quiet,CCLD,$$@) $(BUILD_CFLAGS) $$($(1)_CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS)
+	$(call quiet,CCLD,$$@) $$($(1)_CFLAGS) $(BUILD_CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $$($(1)_LDFLAGS) $$($(1)_LIBS) $(BUILD_LDFLAGS)
 endif
+# Additional rules
 $(1)-clean:
 	$(RM) $$($(1)_OBJ) $$($(1)_DEP) $(2)/$(1)$(3)
 ifeq ($(6), yes)

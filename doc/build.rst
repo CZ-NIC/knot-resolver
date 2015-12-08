@@ -123,6 +123,24 @@ Alternatively you can build only specific parts of the project, i.e. ``library``
 
 .. note:: Documentation is not built by default, run ``make doc`` to build it.
 
+Building with security compiler flags
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Knot DNS Resolver enables certain `security compile-time flags <https://wiki.debian.org/Hardening#Notes_on_Memory_Corruption_Mitigation_Methods>`_ that do not affect performance.
+You can add more flags to the build by appending them to `CFLAGS` variable, e.g. ``make CFLAGS="-fstack-protector"``.
+
+  .. csv-table::
+   :header: "Method", "Status", "Notes"
+
+   "-fstack-protector", "*disabled*", "(must be specifically enabled in CFLAGS)"
+   "-D_FORTIFY_SOURCE=2", "**enabled**", ""
+   "-pie", "**enabled**", "enables ASLR for kresd (disable with ``make HARDENING=no``)"
+   "RELRO", "**enabled**", "full [#]_"
+
+You can also disable ELF hardening when it's unsupported with ``make HARDENING=no``.
+
+.. [#] See `checksec.sh <http://www.trapkit.de/tools/checksec.html>`_
+
 Building for packages
 ~~~~~~~~~~~~~~~~~~~~~
 

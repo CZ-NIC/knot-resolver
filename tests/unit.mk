@@ -14,6 +14,7 @@ tests_BIN := \
 	test_zonecut \
 	test_rplan
 
+mock_cmodule_CFLAGS := -fPIC
 mock_cmodule_SOURCES := tests/mock_cmodule.c
 $(eval $(call make_lib,mock_cmodule,tests))
 
@@ -23,6 +24,7 @@ tests_LIBS :=  $(libkres_TARGET) $(libkres_LIBS) $(cmocka_LIBS)
 
 # Make test binaries
 define make_test
+$(1)_CFLAGS := -fPIE
 $(1)_SOURCES := tests/$(1).c
 $(1)_LIBS := $(tests_LIBS)
 $(1)_DEPEND := $(tests_DEPEND)

@@ -48,7 +48,7 @@ libkres_HEADERS := \
 
 # Dependencies
 libkres_DEPEND := 
-libkres_CFLAGS := -fvisibility=hidden
+libkres_CFLAGS := -fvisibility=hidden -fPIC
 libkres_LIBS := $(libknot_LIBS) $(libdnssec_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
