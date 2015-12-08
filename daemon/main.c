@@ -140,7 +140,7 @@ static void help(int argc, char *argv[])
 	       " [rundir]             Path to the working directory (default: .)\n");
 }
 
-static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm_ctx_t *pool, int worker_id)
+static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm_ctx_t *pool, int worker_id, int worker_count)
 {
 	/* Load bindings */
 	engine_lualib(engine, "modules", lib_modules);
@@ -155,6 +155,8 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm
 		return NULL;
 	}
 	memset(worker, 0, sizeof(*worker));
+	worker->id = worker_id;
+	worker->count = worker_count;
 	worker->engine = engine,
 	worker->loop = loop;
 	loop->data = worker;
@@ -165,6 +167,8 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm
 	lua_getglobal(engine->L, "worker");
 	lua_pushnumber(engine->L, worker_id);
 	lua_setfield(engine->L, -2, "id");
+	lua_pushnumber(engine->L, worker_count);
+	lua_setfield(engine->L, -2, "count");
 	lua_pop(engine->L, 1);
 	return worker;
 }
@@ -306,6 +310,7 @@ int main(int argc, char **argv)
 	kr_crypto_init();
 
 	/* Fork subprocesses if requested */
+	int fork_count = forks;
 	while (--forks > 0) {
 		int pid = fork();
 		if (pid < 0) {
@@ -338,7 +343,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Create worker */
-	struct worker_ctx *worker = init_worker(loop, &engine, &pool, forks);
+	struct worker_ctx *worker = init_worker(loop, &engine, &pool, forks, fork_count);
 	if (!worker) {
 		log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;

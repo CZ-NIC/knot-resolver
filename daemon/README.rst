@@ -715,7 +715,16 @@ Scripting worker
 ^^^^^^^^^^^^^^^^
 
 Worker is a service over event loop that tracks and schedules outstanding queries,
-you can see the statistics or schedule new queries.
+you can see the statistics or schedule new queries. It also contains information about
+specified worker count and process rank.
+
+.. envvar:: worker.count
+
+   Return current total worker count (e.g. `1` for single-process)
+
+.. envvar:: worker.id
+
+   Return current worker ID (starting from `0` up to `worker.count - 1`)
 
 .. function:: worker.stats()
 

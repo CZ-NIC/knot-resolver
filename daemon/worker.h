@@ -32,6 +32,8 @@ typedef array_t(void *) mp_freelist_t;
 struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
+	int id;
+	int count;
 #if __linux__
 	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
 #else
