@@ -278,10 +278,6 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 
 static const knot_dname_t *signature_authority(knot_pkt_t *pkt)
 {
-	/* Can't find signer for RRSIGs, bail out. */
-	if (knot_pkt_qtype(pkt) == KNOT_RRTYPE_RRSIG) {
-		return NULL;
-	}
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_AUTHORITY; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
