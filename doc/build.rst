@@ -135,6 +135,25 @@ The build system supports both DESTDIR_ and `amalgamated builds <https://www.sql
 
 .. note:: Amalgamated build assembles everything in one source file and compiles it. It is useful for packages, as the compiler sees the whole program and is able to produce a smaller and faster binary. On the other hand, it complicates debugging.
 
+Default paths
+~~~~~~~~~~~~~
+
+The default installation follows FHS with several custom paths for configuration and modules.
+All paths are prefixed with ``PREFIX`` variable by default if not specified otherwise.
+
+  .. csv-table::
+   :header: "Component", "Variable", "Default", "Notes"
+
+   "library", "``LIBDIR``", "``$(PREFIX)/lib``", "Built statically."
+   "daemon",  "``BINDIR``", "``$(PREFIX)/bin``", ""
+   "configuration", "``ETCDIR``", "``$(PREFIX)/etc/kresd``", "Configuration file, templates."
+   "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "[#]_"
+   "work directory", "", "``$(PREFIX)/var/run/kresd``", "Run directory for daemon."
+
+.. [#] Users may install additional modules in ``~/.local/lib/kdns_modules`` or in the rundir of a specific instance.
+
+.. note:: Each module is self-contained and may install additional bundled files within ``$(MODULEDIR)/$(modulename)``. These files should be read-only, non-executable.
+
 Building dependencies
 ~~~~~~~~~~~~~~~~~~~~~
 
