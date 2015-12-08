@@ -205,8 +205,10 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 	/* Create empty RR */
 	knot_rrset_t rr;
 	knot_rrset_init(&rr, knot_dname_copy(name, &pkt->mm), rtype, rclass);
-	/* Create RDATA */
-	knot_rdata_t rdata_arr[knot_rdata_array_size(rdlen)];
+	/* Create RDATA
+	 * @warning _NOT_ thread safe.
+	 */
+	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
 	knot_rdata_init(rdata_arr, rdlen, rdata, ttl);
 	knot_rdataset_add(&rr.rrs, rdata_arr, &pkt->mm);
 	/* Append RR */

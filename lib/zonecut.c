@@ -271,6 +271,8 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 	if (!ctx || !cut) {
 		return kr_error(EINVAL);
 	}
+	/* @warning _NOT_ thread-safe */
+	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
 
 	update_cut_name(cut, U8(""));
 	map_walk(&cut->nsset, free_addr_set, cut->pool);
@@ -284,9 +286,8 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 		/* Copy compiled-in root hints */
 		for (unsigned i = 0; i < HINT_COUNT; ++i) {
 			const struct hint_info *hint = &SBELT[i];
-			knot_rdata_t rdata[knot_rdata_array_size(hint->len)];
-			knot_rdata_init(rdata, hint->len, hint->addr, 0);
-			ret = kr_zonecut_add(cut, hint->name, rdata);
+			knot_rdata_init(rdata_arr, hint->len, hint->addr, 0);
+			ret = kr_zonecut_add(cut, hint->name, rdata_arr);
 			if (ret != 0) {
 				break;
 			}
