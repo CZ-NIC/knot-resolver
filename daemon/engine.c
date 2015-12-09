@@ -154,9 +154,9 @@ static int l_quit(lua_State *L)
 static int l_verbose(lua_State *L)
 {
 	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
-		log_debug_enable(lua_toboolean(L, 1));
+		kr_debug_set(lua_toboolean(L, 1));
 	}
-	lua_pushboolean(L, log_debug_status());
+	lua_pushboolean(L, kr_debug_status());
 	return 1;
 }
 
@@ -177,7 +177,7 @@ static int l_option(lua_State *L)
 	unsigned opt_code = 0;
 	if (lua_isstring(L, 1)) {
 		const char *opt = lua_tostring(L, 1);
-		for (const lookup_table_t *it = query_flag_names; it->name; ++it) {
+		for (const lookup_table_t *it = kr_query_flag_names(); it->name; ++it) {
 			if (strcmp(it->name, opt) == 0) {
 				opt_code = it->id;
 				break;

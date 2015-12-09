@@ -132,6 +132,7 @@ struct kr_request {
  * @param answer  allocated packet for final answer
  * @return        CONSUME (expecting query)
  */
+KR_EXPORT
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer);
 
 /**
@@ -144,6 +145,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
  * @param  packet  [in] input packet
  * @return         any state
  */
+KR_EXPORT
 int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet);
 
 /**
@@ -159,6 +161,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
  * @param  packet  [out] packet to be filled with additional query
  * @return         any state
  */
+KR_EXPORT
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet);
 
 /**
@@ -171,6 +174,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
  * @param  state   either DONE or FAIL state
  * @return         DONE
  */
+KR_EXPORT
 int kr_resolve_finish(struct kr_request *request, int state);
 
 /**
@@ -178,6 +182,7 @@ int kr_resolve_finish(struct kr_request *request, int state);
  * @param  request request state
  * @return         pointer to rplan
  */
+KR_EXPORT KR_PURE
 struct kr_rplan *kr_resolve_plan(struct kr_request *request);
 
 /**
@@ -185,5 +190,6 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request);
  * @param  request request state
  * @return         mempool
  */
+KR_EXPORT KR_PURE
 mm_ctx_t *kr_resolve_pool(struct kr_request *request);
 

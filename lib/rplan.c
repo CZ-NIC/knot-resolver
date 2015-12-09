@@ -36,6 +36,11 @@ const lookup_table_t query_flag_names[] = {
 	{ 0, NULL }
 };
 
+const lookup_table_t *kr_query_flag_names(void)
+{
+	return query_flag_names;
+}
+
 static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 {
 	if (name == NULL) {

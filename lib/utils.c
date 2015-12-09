@@ -34,7 +34,7 @@
 #include "lib/resolve.h"
 
 /* Logging & debugging */
-bool _env_debug = false;
+static bool _env_debug = false;
 
 /** @internal CSPRNG context */
 static isaac_ctx ISAAC;
@@ -64,19 +64,26 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
 /*
  * Cleanup callbacks.
  */
-void _cleanup_free(char **p)
+
+bool kr_debug_set(bool status)
 {
-	free(*p);
+	return _env_debug = status;
 }
 
-void _cleanup_close(int *p)
+bool kr_debug_status(void)
 {
-	if (*p > 0) close(*p);
+	return _env_debug;
 }
 
-void _cleanup_fclose(FILE **p)
+void kr_log_debug(const char *fmt, ...)
 {
-	if (*p) fclose(*p);
+	if (_env_debug) {
+		va_list args;
+		va_start(args, fmt);
+		vprintf(fmt, args);
+		va_end(args);
+		fflush(stdout);
+	}
 }
 
 char* kr_strcatdup(unsigned n, ...)
@@ -163,7 +170,7 @@ unsigned kr_rand_uint(unsigned max)
 	return isaac_next_uint(&ISAAC, max);
 }
 
-int mm_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
 {
     if (*have >= want) {
         return 0;
@@ -306,7 +313,7 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 	return ret;
 }
 
-int kr_rrmap_key(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank)
+int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank)
 {
 	if (!key || !owner) {
 		return kr_error(EINVAL);
@@ -332,7 +339,7 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 	}
 
 	/* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
-	char key[RRMAP_KEYSIZE];
+	char key[KR_RRKEY_LEN];
 	uint8_t extra_flags = 0;
 	uint16_t rrtype = rr->type;
 	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
@@ -341,7 +348,7 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 		rrtype = knot_rrsig_type_covered(&rr->rrs, 0);
 		extra_flags |= KEY_FLAG_RRSIG;
 	}
-	int ret = kr_rrmap_key(key, rr->owner, rrtype, rank);
+	int ret = kr_rrkey(key, rr->owner, rrtype, rank);
 	if (ret <= 0) {
 		return kr_error(EILSEQ);
 	}
@@ -362,7 +369,7 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 
 int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, mm_ctx_t *pool)
 {
-	int ret = array_reserve_mm(*array, array->len + 1, mm_reserve, pool);
+	int ret = array_reserve_mm(*array, array->len + 1, kr_memreserve, pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}

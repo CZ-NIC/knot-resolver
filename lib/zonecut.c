@@ -223,7 +223,7 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 		return kr_ok();
 	}
 	/* Push new address */
-	int ret = pack_reserve_mm(*pack, 1, rdlen, mm_reserve, cut->pool);
+	int ret = pack_reserve_mm(*pack, 1, rdlen, kr_memreserve, cut->pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}

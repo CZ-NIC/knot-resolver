@@ -16,23 +16,27 @@
 
 #pragma once
 
+#include "lib/defines.h"
 #include <libknot/internal/consts.h>
 #include <libknot/packet/pkt.h>
 
 /**
  * Initialise cryptographic back-end.
  */
+KR_EXPORT
 void kr_crypto_init(void);
 
 /**
  * De-initialise cryptographic back-end.
  */
+KR_EXPORT
 void kr_crypto_cleanup(void);
 
 /**
  * Re-initialise cryptographic back-end.
  * @note Must be called after fork() in the child.
  */
+KR_EXPORT
 void kr_crypto_reinit(void);
 
 /** Opaque DNSSEC key pointer. */
@@ -89,12 +93,15 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
                        bool has_nsec3);
 
 /** Return true if the DNSKEY can be used as a ZSK.  */
+KR_EXPORT KR_PURE
 bool kr_dnssec_key_zsk(const uint8_t *dnskey_rdata);
 
 /** Return true if the DNSKEY indicates being KSK (=> has SEP).  */
+KR_EXPORT KR_PURE
 bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata);
 
 /** Return true if the DNSKEY is revoked. */
+KR_EXPORT KR_PURE
 bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
 
 /** Return DNSKEY tag.
@@ -103,6 +110,7 @@ bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
   * @param rdlen  RDATA length.
   * @return Key tag (positive number), or an error code
   */
+KR_EXPORT KR_PURE
 int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen);
 
 /** Return 0 if the two keys are identical.
@@ -113,6 +121,7 @@ int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen);
   * @param key_b_rdlen Second key RDATA length
   * @return 0 if they match or an error code
   */
+KR_EXPORT KR_PURE
 int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
                         const uint8_t *key_b_rdata, size_t key_b_rdlen);
 

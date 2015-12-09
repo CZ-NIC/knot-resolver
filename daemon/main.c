@@ -236,12 +236,12 @@ int main(int argc, char **argv)
 			g_interactive = 0;
 			forks = atoi(optarg);
 			if (forks == 0) {
-				log_error("[system] error '-f' requires number, not '%s'\n", optarg);
+				kr_log_error("[system] error '-f' requires number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
 #if (!defined(UV_VERSION_HEX)) || (!defined(SO_REUSEPORT))
 			if (forks > 1) {
-				log_error("[system] libuv 1.7+ is required for SO_REUSEPORT support, multiple forks not supported\n");
+				kr_log_error("[system] libuv 1.7+ is required for SO_REUSEPORT support, multiple forks not supported\n");
 				return EXIT_FAILURE;
 			}
 #endif
@@ -269,15 +269,15 @@ int main(int argc, char **argv)
 			}
 			free(keyfile_buf);
 			if (!keyfile) {
-				log_error("[system] keyfile '%s': not writeable\n", optarg);
+				kr_log_error("[system] keyfile '%s': not writeable\n", optarg);
 				return EXIT_FAILURE;
 			}
 			break;
 		case 'v':
-			log_debug_enable(true);
+			kr_debug_set(true);
 			break;
 		case 'V':
-			log_info("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
+			kr_log_info("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
 			return EXIT_SUCCESS;
 		case 'h':
 		case '?':
@@ -293,17 +293,17 @@ int main(int argc, char **argv)
 	if (optind < argc) {
 		const char *rundir = argv[optind];
 		if (access(rundir, W_OK) != 0) {
-			log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
+			kr_log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
 		ret = chdir(rundir);
 		if (ret != 0) {
-			log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
+			kr_log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
 		if(config && access(config, R_OK) != 0) {
-			log_error("[system] rundir '%s'\n", rundir);
-			log_error("[system] config '%s': %s\n", config, strerror(errno));
+			kr_log_error("[system] rundir '%s'\n", rundir);
+			kr_log_error("[system] config '%s': %s\n", config, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
@@ -340,13 +340,13 @@ int main(int argc, char **argv)
 	struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {
-		log_error("[system] failed to initialize engine: %s\n", kr_strerror(ret));
+		kr_log_error("[system] failed to initialize engine: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
 	/* Create worker */
 	struct worker_ctx *worker = init_worker(loop, &engine, &pool, forks, fork_count);
 	if (!worker) {
-		log_error("[system] not enough memory\n");
+		kr_log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
 	}
 	/* Bind to sockets and run */
@@ -355,7 +355,7 @@ int main(int argc, char **argv)
 		const char *addr = set_addr(addr_set.at[i], &port);
 		ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
 		if (ret != 0) {
-			log_error("[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
+			kr_log_error("[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
 			ret = EXIT_FAILURE;
 		}
 	}
@@ -366,7 +366,7 @@ int main(int argc, char **argv)
 			if (keyfile) {
 				auto_free char *cmd = afmt("trust_anchors.file = '%s'", keyfile);
 				if (!cmd) {
-					log_error("[system] not enough memory\n");
+					kr_log_error("[system] not enough memory\n");
 					return EXIT_FAILURE;
 				}
 				engine_cmd(&engine, cmd);

@@ -137,7 +137,7 @@ You can add more flags to the build by appending them to `CFLAGS` variable, e.g.
    "-pie", "**enabled**", "enables ASLR for kresd (disable with ``make HARDENING=no``)"
    "RELRO", "**enabled**", "full [#]_"
 
-You can also disable ELF hardening when it's unsupported with ``make HARDENING=no``.
+You can also disable linker hardening when it's unsupported with ``make HARDENING=no``.
 
 .. [#] See `checksec.sh <http://www.trapkit.de/tools/checksec.html>`_
 
@@ -162,15 +162,28 @@ All paths are prefixed with ``PREFIX`` variable by default if not specified othe
   .. csv-table::
    :header: "Component", "Variable", "Default", "Notes"
 
-   "library", "``LIBDIR``", "``$(PREFIX)/lib``", "Built statically."
+   "library", "``LIBDIR``", "``$(PREFIX)/lib``", "pkg-config is auto-generated [#]_"
    "daemon",  "``BINDIR``", "``$(PREFIX)/bin``", ""
    "configuration", "``ETCDIR``", "``$(PREFIX)/etc/kresd``", "Configuration file, templates."
    "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "[#]_"
    "work directory", "", "``$(PREFIX)/var/run/kresd``", "Run directory for daemon."
 
+.. [#] The ``libkres.pc`` is installed in ``$(LIBDIR)/pkgconfig``.
 .. [#] Users may install additional modules in ``~/.local/lib/kdns_modules`` or in the rundir of a specific instance.
 
 .. note:: Each module is self-contained and may install additional bundled files within ``$(MODULEDIR)/$(modulename)``. These files should be read-only, non-executable.
+
+Static or dynamic?
+~~~~~~~~~~~~~~~~~~
+
+By default the resolver library is built as a dynamic library with versioned ABI. You can revert to static build with ``BUILDMODE`` variable.
+
+.. code-block:: bash
+
+   $ make BUILDMODE=dynamic # Default, create dynamic library
+   $ make BUILDMODE=static  # Create static library
+
+When the library is linked statically, it usually produces a smaller binary. However linking it to various C modules might violate ODR and increase the size. 
 
 Building dependencies
 ~~~~~~~~~~~~~~~~~~~~~

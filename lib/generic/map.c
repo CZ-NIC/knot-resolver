@@ -17,6 +17,13 @@
 
 #include "map.h"
 
+ /* Exports */
+#if defined _WIN32 || defined __CYGWIN__
+  #define EXPORT __attribute__ ((dllexport))
+#else
+  #define EXPORT __attribute__ ((visibility ("default")))
+#endif
+
 #ifdef _MSC_VER /* MSVC */
  typedef unsigned __int8 uint8_t;
  typedef unsigned __int32 uint32_t;
@@ -112,7 +119,7 @@ static cb_data_t *cbt_make_data(map_t *map, const uint8_t *str, size_t len, void
 }
 
 /*! Creates a new, empty critbit map */
-map_t map_make(void)
+EXPORT map_t map_make(void)
 {
 	map_t map;
 	map.root = NULL;
@@ -123,12 +130,12 @@ map_t map_make(void)
 }
 
 /*! Returns non-zero if map contains str */
-int map_contains(map_t *map, const char *str)
+EXPORT int map_contains(map_t *map, const char *str)
 {
 	return map_get(map, str) != NULL;
 }
 
-void *map_get(map_t *map, const char *str)
+EXPORT void *map_get(map_t *map, const char *str)
 {
 	const uint8_t *ubytes = (void *)str;
 	const size_t ulen = strlen(str);
@@ -161,7 +168,7 @@ void *map_get(map_t *map, const char *str)
 }
 
 /*! Inserts str into map, returns 0 on success */
-int map_set(map_t *map, const char *str, void *value)
+EXPORT int map_set(map_t *map, const char *str, void *value)
 {
 	const uint8_t *const ubytes = (void *)str;
 	const size_t ulen = strlen(str);
@@ -262,7 +269,7 @@ different_byte_found:
 }
 
 /*! Deletes str from the map, returns 0 on success */
-int map_del(map_t *map, const char *str)
+EXPORT int map_del(map_t *map, const char *str)
 {
 	const uint8_t *ubytes = (void *)str;
 	const size_t ulen = strlen(str);
@@ -307,7 +314,7 @@ int map_del(map_t *map, const char *str)
 }
 
 /*! Clears the given map */
-void map_clear(map_t *map)
+EXPORT void map_clear(map_t *map)
 {
 	if (map->root) {
 		cbt_traverse_delete(map, map->root);
@@ -316,7 +323,7 @@ void map_clear(map_t *map)
 }
 
 /*! Calls callback for all strings in map with the given prefix */
-int map_walk_prefixed(map_t *map, const char *prefix,
+EXPORT int map_walk_prefixed(map_t *map, const char *prefix,
 	int (*callback)(const char *, void *, void *), void *baton)
 {
 	const uint8_t *ubytes = (void *)prefix;

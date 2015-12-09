@@ -45,11 +45,30 @@ libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
 # Make library
+ifeq ($(BUILDMODE), static)
 $(eval $(call make_static,libkres,lib,yes))
+else
+$(eval $(call make_lib,libkres,lib,yes,$(ABIVER)))
+endif
+
+# Generate pkg-config file
+libkres.pc:
+	@echo 'prefix='$(PREFIX) > $@
+	@echo 'exec_prefix=$${prefix}' >> $@
+	@echo 'libdir='$(LIBDIR) >> $@
+	@echo 'includedir='$(INCLUDEDIR) >> $@
+	@echo 'Name: libkres' >> $@
+	@echo 'Description: Knot DNS Resolver library' >> $@
+	@echo 'URL: https://www.knot-dns.cz' >> $@
+	@echo 'Version: $(MAJOR).$(MINOR).$(PATCH)' >> $@
+	@echo 'Libs: -L$${libdir} -lkres' >> $@
+	@echo 'Cflags: -I$${includedir}' >> $@
+libkres-pcinstall: libkres.pc libkres-install
+	$(INSTALL) -m 644 $< $(DESTDIR)$(LIBDIR)/pkgconfig
 
 # Targets
 lib: $(libkres)
-lib-install: libkres-install
+lib-install: libkres-install libkres-pcinstall
 lib-clean: libkres-clean
 
-.PHONY: lib lib-install lib-clean
+.PHONY: lib lib-install lib-clean libkres.pc

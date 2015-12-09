@@ -16,6 +16,10 @@ ARTYPE  := static
 BINEXT :=
 PLATFORM = Linux
 ARCH := $(word 1, $(subst -, ,$(shell $(CC) -dumpmachine)))
+# Library versioning flags (platform-specific)
+SOVER = 
+# Library versioned extension (platform-specific)
+SOVER_EXT = $(LIBEXT).$(1)
 ifeq ($(OS),Windows_NT)
 	PLATFORM := Windows
 	RM := del
@@ -32,6 +36,9 @@ else
         ifneq ($(HARDENING),no)
             BINFLAGS += -Wl,-pie
         endif
+        # Version is prepended to dylib
+        SOVER_EXT = .$(1)$(LIBEXT)
+        SOVER = $(if $(1), -compatibility_version $(2) -current_version $(1),)
     else
         PLATFORM := POSIX
         LDFLAGS += -pthread -lm -Wl,-E
@@ -81,7 +88,7 @@ $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 ifeq ($(4),-$(ARTYPE))
 	$(call quiet,AR,$$@) rcs $$@ $$($(1)_OBJ)
 else
-	$(call quiet,CCLD,$$@) $$($(1)_CFLAGS) $(BUILD_CFLAGS) $$($(1)_OBJ) -o $$@ $(4) $$($(1)_LDFLAGS) $$($(1)_LIBS) $(BUILD_LDFLAGS)
+	$(call quiet,CCLD,$$@) $$($(1)_CFLAGS) $(BUILD_CFLAGS) $$($(1)_OBJ) $(call SOVER,$(7),$(7)) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS) $$($(1)_LDFLAGS)
 endif
 # Additional rules
 $(1)-clean:
@@ -90,10 +97,17 @@ ifeq ($(6), yes)
 	$(RM) $(1).amalg.c $(1).amalg.o
 endif
 $(1)-install: $(2)/$(1)$(3)
+# Modules install to special path
 ifneq ($(5),$(MODULEDIR))
 	$(INSTALL) -d $(DESTDIR)$(5)
 endif
+# Versioned library install
+ifneq ($(strip $(7)),)
+	$(INSTALL) $(2)/$(1)$(3) $(DESTDIR)$(5)/$(1)$(call SOVER_EXT,$(7))
+	$(LN) -f $(1)$(call SOVER_EXT,$(7)) $(DESTDIR)$(5)/$(1)$(3)
+else
 	$(INSTALL) $(2)/$(1)$(3) $(DESTDIR)$(5)
+endif
 ifneq ($$(strip $$($(1)_HEADERS)),)
 	$(INSTALL) -d $(DESTDIR)$(INCLUDEDIR)/$(1)
 	$(INSTALL) -m 644 $$($(1)_HEADERS) $(DESTDIR)$(INCLUDEDIR)/$(1)
@@ -101,9 +115,9 @@ endif
 .PHONY: $(1)-clean $(1)-install
 endef
 
-# Make targets (name,path,amalgable yes|no)
+# Make targets (name,path,amalgable yes|no,abiver)
 make_bin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(BINDIR),$(3))
-make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR),$(3))
+make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR),$(3),$(4))
 make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR),$(3))
 make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR),$(3))
 make_static = $(call make_target,$(1),$(2),$(AREXT),-$(ARTYPE),$(LIBDIR),$(3))
