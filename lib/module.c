@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <pthread.h>
-#include <unistd.h>
+#include <contrib/cleanup.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"

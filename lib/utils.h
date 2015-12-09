@@ -24,18 +24,6 @@
 #include "lib/generic/array.h"
 
 /*
- * General-purpose attributes.
- * @cond internal
- */
-#define auto_free __attribute__((cleanup(_cleanup_free)))
-extern void _cleanup_free(char **p);
-#define auto_close __attribute__((cleanup(_cleanup_close)))
-extern void _cleanup_close(int *p);
-#define auto_fclose __attribute__((cleanup(_cleanup_fclose)))
-extern void _cleanup_fclose(FILE **p);
-/* @endcond */
-
-/*
  * Logging and debugging.
  */
 #define log_info(fmt, ...) printf((fmt), ## __VA_ARGS__)

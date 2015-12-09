@@ -26,6 +26,7 @@
 #include <libknot/rrtype/aaaa.h>
 #include <ccan/json/json.h>
 #include <ucw/mempool.h>
+#include <contrib/cleanup.h>
 
 #include "daemon/engine.h"
 #include "lib/zonecut.h"

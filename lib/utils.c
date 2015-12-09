@@ -17,15 +17,15 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <contrib/cleanup.h>
+#include <ccan/isaac/isaac.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
 #include <libknot/rrtype/rrsig.h>
 
-#include "ccan/isaac/isaac.h"
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "lib/generic/array.h"

@@ -24,6 +24,7 @@
 
 #include <libknot/packet/pkt.h>
 #include <ccan/json/json.h>
+#include <contrib/cleanup.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/rplan.h"

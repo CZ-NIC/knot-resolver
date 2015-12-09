@@ -1,12 +1,4 @@
-ccan_EMBED := \
-	contrib/ccan/ilog/ilog.c \
-	contrib/ccan/isaac/isaac.c \
-	contrib/ccan/json/json.c \
-	contrib/ucw/mempool.c \
-	contrib/murmurhash3/murmurhash3.c
-
 libkres_SOURCES := \
-	$(ccan_EMBED)          \
 	lib/generic/map.c      \
 	lib/layer/iterate.c    \
 	lib/layer/validate.c   \
@@ -47,9 +39,9 @@ libkres_HEADERS := \
 	lib/cache.h
 
 # Dependencies
-libkres_DEPEND := 
+libkres_DEPEND := $(contrib)
 libkres_CFLAGS := -fvisibility=hidden -fPIC
-libkres_LIBS := $(libknot_LIBS) $(libdnssec_LIBS)
+libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
 # Make library

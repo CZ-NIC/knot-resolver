@@ -18,9 +18,10 @@
 #include <string.h>
 #include <getopt.h>
 #include <uv.h>
+#include <contrib/cleanup.h>
+#include <contrib/ucw/mempool.h>
+#include <contrib/ccan/asprintf/asprintf.h>
 
-#include "contrib/ucw/mempool.h"
-#include "contrib/ccan/asprintf/asprintf.h"
 #include "lib/defines.h"
 #include "lib/resolve.h"
 #include "lib/dnssec.h"
