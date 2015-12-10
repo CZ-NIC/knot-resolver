@@ -44,7 +44,7 @@ function fetch_pkg {
 		[ ! -e $1 ] && git clone "$2" $1 &> /dev/null
 		cd $1; git checkout $3 &> /dev/null; cd -
 	else
-		[ ! -f $1.tar.${2##*.} ] && curl "$2" > $1.tar.${2##*.}
+		[ ! -f $1.tar.${2##*.} ] && curl -L "$2" > $1.tar.${2##*.}
 		tar xf $1.tar.${2##*.}
 	fi
 	cd $1
