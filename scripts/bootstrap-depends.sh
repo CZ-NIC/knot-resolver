@@ -93,8 +93,8 @@ fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pip install --user ${USER} ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
-	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} hiredis/hiredis.h install PREFIX=${PREFIX}
-	pkg libmemcached ${LIBMEMCACHED_URL} ${LIBMEMCACHED_TAG} libmemcached/memcached.h
+	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} include/hiredis/hiredis.h install PREFIX=${PREFIX}
+	pkg libmemcached ${LIBMEMCACHED_URL} ${LIBMEMCACHED_TAG} include/libmemcached/memcached.h
 fi
 
 pkg gmp ${GMP_URL} ${GMP_TAG} include/gmp.h --disable-static
