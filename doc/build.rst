@@ -78,24 +78,6 @@ Most of the dependencies can be resolved from packages, here's an overview for s
 
    brew install pkg-config libuv luajit cmocka
 
-Getting Docker image
---------------------
-
-Docker images require only either Linux or a Linux VM (see boot2docker_ on OS X).
-
-.. code-block:: bash
-
-   $ docker run cznic/knot-resolver
-
-See the `Docker images`_ page for more information and options.
-You can hack on the container by changing the container entrypoint to shell like:
-
-.. code-block:: bash
-
-   $ docker run -it --entrypoint=/bin/bash cznic/knot-resolver
-
-.. tip:: You can build the Docker image yourself with ``docker build -t knot-resolver scripts``.
-
 Building from sources 
 ---------------------
 
@@ -151,7 +133,9 @@ The build system supports both DESTDIR_ and `amalgamated builds <https://www.sql
    $ make install DESTDIR=/tmp/stage # Staged install
    $ make all install AMALG=yes # Amalgamated build
 
-.. note:: Amalgamated build assembles everything in one source file and compiles it. It is useful for packages, as the compiler sees the whole program and is able to produce a smaller and faster binary. On the other hand, it complicates debugging.
+Amalgamated build assembles everything in one source file and compiles it. It is useful for packages, as the compiler sees the whole program and is able to produce a smaller and faster binary. On the other hand, it complicates debugging.
+
+.. tip:: There is a template for service file and AppArmor profile to help you kickstart the package.
 
 Default paths
 ~~~~~~~~~~~~~
@@ -230,6 +214,24 @@ Note that the daemon and modules must be installed first before running integrat
 is otherwise unable to find and load modules.
 
 Read the `documentation <deckard_doc>`_ for more information about requirements, how to run it and extend it.
+
+Getting Docker image
+--------------------
+
+Docker images require only either Linux or a Linux VM (see boot2docker_ on OS X).
+
+.. code-block:: bash
+
+   $ docker run cznic/knot-resolver
+
+See the `Docker images`_ page for more information and options.
+You can hack on the container by changing the container entrypoint to shell like:
+
+.. code-block:: bash
+
+   $ docker run -it --entrypoint=/bin/bash cznic/knot-resolver
+
+.. tip:: You can build the Docker image yourself with ``docker build -t knot-resolver scripts``.
 
 .. _Docker images: https://registry.hub.docker.com/u/cznic/knot-resolver
 .. _libuv: https://github.com/libuv/libuv
