@@ -17,6 +17,10 @@ GNUTLS_TAG="3.3.12"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_TAG="v2.1"
 LUA_URL="http://luajit.org/git/luajit-2.0.git"
+HIREDIS_URL="https://github.com/redis/hiredis.git"
+HIREDIS_TAG="v0.13.3"
+LIBMEMCACHED_TAG="1.0.18"
+LIBMEMCACHED_URL="https://launchpad.net/libmemcached/1.0/1.0.18/+download/libmemcached-1.0.18.tar.gz"
 
 # prepare install prefix
 PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
@@ -81,7 +85,7 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
 	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
 	brew update
-	brew install --force makedepend python || true
+	brew install --force makedepend python hiredis libmemcached || true
 	brew link --overwrite python || true
 	pip install --upgrade pip || true
 	pip install ${PIP_PKGS}
@@ -89,9 +93,10 @@ fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pip install --user ${USER} ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
+	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} hiredis/hiredis.h
+	pkg libmemcached ${LIBMEMCACHED_URL} ${LIBMEMCACHED_TAG} libmemcached/memcached.h
 fi
 
-# gnutls + dependencies
 pkg gmp ${GMP_URL} ${GMP_TAG} include/gmp.h --disable-static
 pkg nettle ${NETTLE_URL} ${NETTLE_TAG} include/nettle \
 	--disable-documentation --with-lib-path=${PREFIX}/lib --with-include-path=${PREFIX}/include
@@ -99,16 +104,11 @@ export GMP_CFLAGS="-I${PREFIX}/include"
 export GMP_LIBS="-L${PREFIX}/lib -lgmp"
 pkg gnutls ${GNUTLS_URL} ${GNUTLS_TAG} include/gnutls \
 	--disable-tests --disable-doc --disable-valgrind-tests --disable-static --with-included-libtasn1
-# jansson
 pkg jansson ${JANSSON_URL} ${JANSSON_TAG} include/jansson.h --disable-static
-# libknot
 pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 	--disable-static --with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
-# cmocka
 pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
-# libuv
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
-# luajit
 pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc amalg install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
 
 # remove on successful build
