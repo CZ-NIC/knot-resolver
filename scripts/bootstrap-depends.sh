@@ -17,8 +17,8 @@ GNUTLS_TAG="3.3.12"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_TAG="v2.1"
 LUA_URL="http://luajit.org/git/luajit-2.0.git"
-HIREDIS_URL="https://github.com/redis/hiredis.git"
 HIREDIS_TAG="v0.13.3"
+HIREDIS_URL="https://github.com/redis/hiredis/archive/v0.13.3.tar.gz"
 LIBMEMCACHED_TAG="1.0.18"
 LIBMEMCACHED_URL="https://launchpad.net/libmemcached/1.0/1.0.18/+download/libmemcached-1.0.18.tar.gz"
 
@@ -93,7 +93,7 @@ fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pip install --user ${USER} ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
-	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} hiredis/hiredis.h
+	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} hiredis/hiredis.h install PREFIX=${PREFIX}
 	pkg libmemcached ${LIBMEMCACHED_URL} ${LIBMEMCACHED_TAG} libmemcached/memcached.h
 fi
 
