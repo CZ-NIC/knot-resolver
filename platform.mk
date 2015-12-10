@@ -67,6 +67,10 @@ $(1)_OBJ := $$($(1)_SOURCES:.c=.o)
 $(1)_DEP := $$($(1)_SOURCES:.c=.d)
 -include $$($(1)_DEP)
 endef
+define make_objrule
+$(1): $(1:.o=.c)
+	$$(call quiet,CC,$$<) $(2) -MMD -MP -c $$< -o $$@
+endef
 
 # Make target (name,path,ext,ldflags,dst,amalgable)
 define make_target
@@ -82,8 +86,7 @@ else
 $$(eval $$(call make_objs,$(1)))
 endif
 # Rules to generate objects with custom CFLAGS and binary/library
-$$($(1)_OBJ): $$($(1)_SOURCES)
-	$(call quiet,CC,$$(@:%.o=%.c)) $(BUILD_CFLAGS) $$($(1)_CFLAGS) -MMD -MP -c $$(@:%.o=%.c) -o $$@
+$$(foreach obj,$$($(1)_OBJ),$$(eval $$(call make_objrule,$$(obj),$(BUILD_CFLAGS) $$($(1)_CFLAGS))))
 $(1) := $(2)/$(1)$(3)
 $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 ifeq ($(4),-$(ARTYPE))
