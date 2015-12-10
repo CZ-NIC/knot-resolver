@@ -15,6 +15,7 @@
  */
 
 #include <libknot/internal/namedb/namedb.h>
+#include <contrib/cleanup.h>
 
 #include "daemon/engine.h"
 #include "lib/module.h"

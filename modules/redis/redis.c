@@ -15,6 +15,7 @@
  */
 
 #include <libknot/internal/namedb/namedb.h>
+#include <contrib/cleanup.h>
 #include <uv.h>
 
 #include "modules/redis/redis.h"

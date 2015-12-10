@@ -28,6 +28,7 @@
 #include <libmemcached/memcached.h>
 #include <libknot/internal/namedb/namedb.h>
 #include <libknot/errcode.h>
+#include <contrib/cleanup.h>
 
 #include "lib/generic/array.h"
 #include "lib/cache.h"
