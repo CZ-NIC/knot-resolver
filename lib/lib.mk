@@ -41,6 +41,7 @@ libkres_HEADERS := \
 # Dependencies
 libkres_DEPEND := $(contrib)
 libkres_CFLAGS := -fvisibility=hidden -fPIC
+libkres_LDFLAGS := -fvisibility=hidden -fPIC
 libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
@@ -64,7 +65,8 @@ libkres.pc:
 	@echo 'Libs: -L$${libdir} -lkres' >> $@
 	@echo 'Cflags: -I$${includedir}' >> $@
 libkres-pcinstall: libkres.pc libkres-install
-	$(INSTALL) -m 644 $< $(DESTDIR)$(LIBDIR)/pkgconfig
+	$(INSTALL) -d -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig/
+	$(INSTALL)    -m 644 $< $(DESTDIR)$(LIBDIR)/pkgconfig/
 
 # Targets
 lib: $(libkres)
