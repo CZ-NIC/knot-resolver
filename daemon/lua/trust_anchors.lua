@@ -145,8 +145,11 @@ end
 
 -- Fetch over HTTPS with peert cert checked
 local function https_fetch(url, ca)
-	local https = require('ssl.https')
-	local ltn12 = require('ltn12')
+	local ssl_ok, https = pcall(require, 'ssl.https')
+	local ltn_ok, ltn12 = pcall(require, 'ltn12')
+	if not ssl_ok or not ltn_ok then
+		return nil, 'luasec and luasocket needed for root TA bootstrap'
+	end
 	local resp = {}
 	local r, c, h, s = https.request{
 	       url = url,
