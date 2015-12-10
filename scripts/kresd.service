@@ -1,0 +1,12 @@
+[Unit]
+Description=Knot DNS Resolver daemon
+After=syslog.target network.target auditd.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/kresd
+ExecStart=/usr/bin/kresd -c /etc/kresd/config -f $KRESD_WORKERS $KRESD_OPTIONS /var/lib/kresd/
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
