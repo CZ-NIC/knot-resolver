@@ -17,7 +17,8 @@ BINEXT :=
 PLATFORM = Linux
 ARCH := $(word 1, $(subst -, ,$(shell $(CC) -dumpmachine)))
 # Library versioning flags (platform-specific)
-SOVER = 
+comma := ,
+SOVER = $(if $(1),-Wl$(comma)-soname$(comma)$(3)$(call SOVER_EXT,$(1)))
 # Library versioned extension (platform-specific)
 SOVER_EXT = $(LIBEXT).$(1)
 ifeq ($(OS),Windows_NT)
@@ -88,7 +89,7 @@ $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 ifeq ($(4),-$(ARTYPE))
 	$(call quiet,AR,$$@) rcs $$@ $$($(1)_OBJ)
 else
-	$(call quiet,CCLD,$$@) $$($(1)_CFLAGS) $(BUILD_CFLAGS) $$($(1)_OBJ) $(call SOVER,$(7),$(7)) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS) $$($(1)_LDFLAGS)
+	$(call quiet,CCLD,$$@) $$($(1)_CFLAGS) $(BUILD_CFLAGS) $$($(1)_OBJ) $(call SOVER,$(7),$(7),$(1)) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS) $$($(1)_LDFLAGS)
 endif
 # Additional rules
 $(1)-clean:
