@@ -18,6 +18,7 @@
 
 #include "lib/generic/map.h"
 #include "lib/generic/pack.h"
+#include "lib/defines.h"
 #include "lib/cache.h"
 
 struct kr_rplan;
@@ -42,12 +43,14 @@ struct kr_zonecut {
  * @param pool
  * @return 0 or error code
  */
+KR_EXPORT
 int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *pool);
 
 /**
  * Clear the structure and free the address set.
  * @param cut zone cut
  */
+KR_EXPORT
 void kr_zonecut_deinit(struct kr_zonecut *cut);
 
 /**
@@ -56,6 +59,7 @@ void kr_zonecut_deinit(struct kr_zonecut *cut);
  * @param cut  zone cut to be set
  * @param name new zone cut name
  */
+KR_EXPORT
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
 
 /** 
@@ -64,6 +68,7 @@ void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
  * @param src source zone cut
  * @return 0 or an error code
  */
+KR_EXPORT
 int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src);
 
 /**
@@ -72,6 +77,7 @@ int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src);
  * @param src source zone cut
  * @return 0 or an error code
  */
+KR_EXPORT
 int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src);
 
 /**
@@ -85,6 +91,7 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src);
  * @param rdata  nameserver address (as rdata)
  * @return 0 or error code
  */
+KR_EXPORT
 int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
 
 /**
@@ -94,6 +101,7 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
  * @param  rdata name server address
  * @return       0 or error code
  */
+KR_EXPORT
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
 
 /**
@@ -106,6 +114,7 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
  * @param  ns    name server name
  * @return       pack of addresses or NULL
  */
+KR_EXPORT KR_PURE
 pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns);
 
 /**
@@ -115,6 +124,7 @@ pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns);
  * @param cut zone cut to be populated
  * @return 0 or error code
  */
+KR_EXPORT
 int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut);
 
 /**
@@ -128,5 +138,6 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut);
  * @param secured   set to true if want secured zone cut, will return false if it is provably insecure
  * @return 0 or error code (ENOENT if it doesn't find anything)
  */
+KR_EXPORT
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
                            struct kr_cache_txn *txn, uint32_t timestamp, bool * restrict secured);

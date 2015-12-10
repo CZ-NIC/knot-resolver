@@ -87,6 +87,7 @@ struct kr_nsrep
  * @param  addr_len address bytes length (type will be derived from this)
  * @return          0 or an error code
  */
+KR_EXPORT
 int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len);
 
 /**
@@ -95,6 +96,7 @@ int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len);
  * @param  ctx          resolution context
  * @return              0 or an error code
  */
+KR_EXPORT
 int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx);
 
 /**
@@ -103,6 +105,7 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx);
  * @param  ctx          resolution context
  * @return              0 or an error code
  */
+KR_EXPORT
 int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
 
 /**
@@ -116,6 +119,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
  * @param  cache        LRU cache
  * @return              0 on success, error code on failure
  */
+KR_EXPORT
 int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsigned score, kr_nsrep_lru_t *cache);
 
 /**
@@ -126,4 +130,5 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsign
  * @param  cache        LRU cache
  * @return              0 on success, error code on failure
  */
+KR_EXPORT
 int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t *cache);

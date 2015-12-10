@@ -484,7 +484,7 @@ static int subreq_key(char *dst, struct qr_task *task)
 	assert(task);
 	knot_pkt_t *pkt = task->pktbuf;
 	assert(knot_wire_get_qr(pkt->wire) == false);
-	return kr_rrmap_key(dst, knot_pkt_qname(pkt), knot_pkt_qtype(pkt), knot_pkt_qclass(pkt));
+	return kr_rrkey(dst, knot_pkt_qname(pkt), knot_pkt_qtype(pkt), knot_pkt_qclass(pkt));
 }
 
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt)
@@ -498,7 +498,7 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 	/* Clear from outstanding table. */
 	if (!task->leading)
 		return;
-	char key[RRMAP_KEYSIZE];
+	char key[KR_RRKEY_LEN];
 	int ret = subreq_key(key, task);
 	if (ret > 0) {
 		assert(map_get(&task->worker->outstanding, key) == task);
@@ -525,7 +525,7 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 static void subreq_lead(struct qr_task *task)
 {
 	assert(task);
-	char key[RRMAP_KEYSIZE];
+	char key[KR_RRKEY_LEN];
 	if (subreq_key(key, task) > 0) {
 		assert(map_contains(&task->worker->outstanding, key) == false);
 		map_set(&task->worker->outstanding, key, task);
@@ -536,12 +536,12 @@ static void subreq_lead(struct qr_task *task)
 static bool subreq_enqueue(struct qr_task *task)
 {
 	assert(task);
-	char key[RRMAP_KEYSIZE];
+	char key[KR_RRKEY_LEN];
 	if (subreq_key(key, task) > 0) {
 		struct qr_task *leader = map_get(&task->worker->outstanding, key);
 		if (leader) {
 			/* Enqueue itself to leader for this subrequest. */
-			int ret = array_reserve_mm(leader->waiting, leader->waiting.len + 1, mm_reserve, &leader->req.pool);
+			int ret = array_reserve_mm(leader->waiting, leader->waiting.len + 1, kr_memreserve, &leader->req.pool);
 			if (ret == 0) {
 				array_push(leader->waiting, task);
 				qr_task_ref(task);

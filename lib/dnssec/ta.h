@@ -25,6 +25,7 @@
  * @param  name          name of the TA
  * @return non-empty RRSet or NULL
  */
+KR_EXPORT
 knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name);
 
 /**
@@ -37,6 +38,7 @@ knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name);
  * @param  rdlen         
  * @return 0 or an error
  */
+KR_EXPORT
 int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
                uint32_t ttl, const uint8_t *rdata, uint16_t rdlen);
 
@@ -47,6 +49,7 @@ int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
  * @param  name          name of the TA
  * @return boolean
  */
+KR_EXPORT KR_PURE
 int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name);
 
 /**
@@ -55,10 +58,12 @@ int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name);
  * @param  name          name of the TA
  * @return 0 or an error
  */
+KR_EXPORT
 int kr_ta_del(map_t *trust_anchors, const knot_dname_t *name);
 
 /**
  * Clear trust store.
  * @param trust_anchors trust store
  */
+KR_EXPORT
 void kr_ta_clear(map_t *trust_anchors);

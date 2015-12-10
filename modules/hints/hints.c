@@ -26,6 +26,7 @@
 #include <libknot/rrtype/aaaa.h>
 #include <ccan/json/json.h>
 #include <ucw/mempool.h>
+#include <contrib/cleanup.h>
 
 #include "daemon/engine.h"
 #include "lib/zonecut.h"
@@ -230,13 +231,13 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 		return kr_error(EINVAL);
 	}
 
-	/* Build rdata */
-	size_t addr_len = 0;
-	uint8_t *raw_addr = sockaddr_raw(&ss, &addr_len);
-	knot_rdata_t rdata[knot_rdata_array_size(addr_len)];
-	knot_rdata_init(rdata, addr_len, raw_addr, 0);
-
-	return kr_zonecut_add(hints, key, rdata);
+	/* Build RDATA */
+	size_t addr_len = kr_inaddr_len((struct sockaddr *)&ss);
+	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr((struct sockaddr *)&ss);
+	/* @warning _NOT_ thread-safe */
+	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
+	knot_rdata_init(rdata_arr, addr_len, raw_addr, 0);
+	return kr_zonecut_add(hints, key, rdata_arr);
 }
 
 static int load_map(struct kr_zonecut *hints, FILE *fp)

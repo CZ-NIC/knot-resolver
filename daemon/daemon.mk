@@ -1,7 +1,4 @@
-kresd_EMBED := \
-	contrib/ccan/asprintf/asprintf.c
 kresd_SOURCES := \
-	$(kresd_EMBED)   \
 	daemon/io.c          \
 	daemon/network.c     \
 	daemon/engine.c      \
@@ -9,6 +6,7 @@ kresd_SOURCES := \
 	daemon/bindings.c    \
 	daemon/ffimodule.c   \
 	daemon/main.c
+
 kresd_DIST := daemon/lua/kres.lua daemon/lua/trust_anchors.lua
 
 # Embedded resources
@@ -24,8 +22,9 @@ endif
 bindings-install: $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 	$(INSTALL) -m 0644 $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 
-kresd_DEPEND := $(libkres)
-kresd_LIBS := $(libkres_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS)
+kresd_CFLAGS := -fPIE
+kresd_DEPEND := $(libkres) $(contrib)
+kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS)
 
 # Make binary
 ifeq ($(HAS_lua)|$(HAS_libuv), yes|yes)

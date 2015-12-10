@@ -54,7 +54,8 @@ enum kr_query_flag {
 };
 
 /** Query flag names table */
-extern const lookup_table_t query_flag_names[];
+KR_EXPORT KR_CONST
+const lookup_table_t *kr_query_flag_names(void);
 
 /**
  * Single query representation.
@@ -94,12 +95,14 @@ struct kr_rplan {
  * @param request resolution request
  * @param pool ephemeral memory pool for whole resolution
  */
+KR_EXPORT
 int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, mm_ctx_t *pool);
 
 /**
  * Deinitialize resolution plan, aborting any uncommited transactions.
  * @param rplan plan instance
  */
+KR_EXPORT
 void kr_rplan_deinit(struct kr_rplan *rplan);
 
 /**
@@ -107,6 +110,7 @@ void kr_rplan_deinit(struct kr_rplan *rplan);
  * @param rplan plan instance
  * @return true or false
  */
+KR_EXPORT KR_PURE
 bool kr_rplan_empty(struct kr_rplan *rplan);
 
 /**
@@ -119,6 +123,7 @@ bool kr_rplan_empty(struct kr_rplan *rplan);
  * @param type resolved type
  * @return query instance or NULL
  */
+KR_EXPORT
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type);
 
@@ -129,15 +134,19 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
  * @param qry resolved query
  * @return 0 or an error
  */
+KR_EXPORT
 int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry);
 
 /**
  * Return true if resolution chain satisfies given query.
  */
+KR_EXPORT KR_PURE
 bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type);
 
 /** Return last resolved query. */
+KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 
 /** Return query predecessor. */
+KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_next(struct kr_query *qry);

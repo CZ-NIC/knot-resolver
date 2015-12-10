@@ -78,24 +78,6 @@ Most of the dependencies can be resolved from packages, here's an overview for s
 
    brew install pkg-config libuv luajit cmocka
 
-Getting Docker image
---------------------
-
-Docker images require only either Linux or a Linux VM (see boot2docker_ on OS X).
-
-.. code-block:: bash
-
-   $ docker run cznic/knot-resolver
-
-See the `Docker images`_ page for more information and options.
-You can hack on the container by changing the container entrypoint to shell like:
-
-.. code-block:: bash
-
-   $ docker run -it --entrypoint=/bin/bash cznic/knot-resolver
-
-.. tip:: You can build the Docker image yourself with ``docker build -t knot-resolver scripts``.
-
 Building from sources 
 ---------------------
 
@@ -123,6 +105,24 @@ Alternatively you can build only specific parts of the project, i.e. ``library``
 
 .. note:: Documentation is not built by default, run ``make doc`` to build it.
 
+Building with security compiler flags
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Knot DNS Resolver enables certain `security compile-time flags <https://wiki.debian.org/Hardening#Notes_on_Memory_Corruption_Mitigation_Methods>`_ that do not affect performance.
+You can add more flags to the build by appending them to `CFLAGS` variable, e.g. ``make CFLAGS="-fstack-protector"``.
+
+  .. csv-table::
+   :header: "Method", "Status", "Notes"
+
+   "-fstack-protector", "*disabled*", "(must be specifically enabled in CFLAGS)"
+   "-D_FORTIFY_SOURCE=2", "**enabled**", ""
+   "-pie", "**enabled**", "enables ASLR for kresd (disable with ``make HARDENING=no``)"
+   "RELRO", "**enabled**", "full [#]_"
+
+You can also disable linker hardening when it's unsupported with ``make HARDENING=no``.
+
+.. [#] See `checksec.sh <http://www.trapkit.de/tools/checksec.html>`_
+
 Building for packages
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -133,7 +133,41 @@ The build system supports both DESTDIR_ and `amalgamated builds <https://www.sql
    $ make install DESTDIR=/tmp/stage # Staged install
    $ make all install AMALG=yes # Amalgamated build
 
-.. note:: Amalgamated build assembles everything in one source file and compiles it. It is useful for packages, as the compiler sees the whole program and is able to produce a smaller and faster binary. On the other hand, it complicates debugging.
+Amalgamated build assembles everything in one source file and compiles it. It is useful for packages, as the compiler sees the whole program and is able to produce a smaller and faster binary. On the other hand, it complicates debugging.
+
+.. tip:: There is a template for service file and AppArmor profile to help you kickstart the package.
+
+Default paths
+~~~~~~~~~~~~~
+
+The default installation follows FHS with several custom paths for configuration and modules.
+All paths are prefixed with ``PREFIX`` variable by default if not specified otherwise.
+
+  .. csv-table::
+   :header: "Component", "Variable", "Default", "Notes"
+
+   "library", "``LIBDIR``", "``$(PREFIX)/lib``", "pkg-config is auto-generated [#]_"
+   "daemon",  "``BINDIR``", "``$(PREFIX)/bin``", ""
+   "configuration", "``ETCDIR``", "``$(PREFIX)/etc/kresd``", "Configuration file, templates."
+   "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "[#]_"
+   "work directory", "", "``$(PREFIX)/var/run/kresd``", "Run directory for daemon."
+
+.. [#] The ``libkres.pc`` is installed in ``$(LIBDIR)/pkgconfig``.
+.. [#] Users may install additional modules in ``~/.local/lib/kdns_modules`` or in the rundir of a specific instance.
+
+.. note:: Each module is self-contained and may install additional bundled files within ``$(MODULEDIR)/$(modulename)``. These files should be read-only, non-executable.
+
+Static or dynamic?
+~~~~~~~~~~~~~~~~~~
+
+By default the resolver library is built as a dynamic library with versioned ABI. You can revert to static build with ``BUILDMODE`` variable.
+
+.. code-block:: bash
+
+   $ make BUILDMODE=dynamic # Default, create dynamic library
+   $ make BUILDMODE=static  # Create static library
+
+When the library is linked statically, it usually produces a smaller binary. However linking it to various C modules might violate ODR and increase the size. 
 
 Building dependencies
 ~~~~~~~~~~~~~~~~~~~~~
@@ -180,6 +214,24 @@ Note that the daemon and modules must be installed first before running integrat
 is otherwise unable to find and load modules.
 
 Read the `documentation <deckard_doc>`_ for more information about requirements, how to run it and extend it.
+
+Getting Docker image
+--------------------
+
+Docker images require only either Linux or a Linux VM (see boot2docker_ on OS X).
+
+.. code-block:: bash
+
+   $ docker run cznic/knot-resolver
+
+See the `Docker images`_ page for more information and options.
+You can hack on the container by changing the container entrypoint to shell like:
+
+.. code-block:: bash
+
+   $ docker run -it --entrypoint=/bin/bash cznic/knot-resolver
+
+.. tip:: You can build the Docker image yourself with ``docker build -t knot-resolver scripts``.
 
 .. _Docker images: https://registry.hub.docker.com/u/cznic/knot-resolver
 .. _libuv: https://github.com/libuv/libuv

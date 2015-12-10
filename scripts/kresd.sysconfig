@@ -1,0 +1,14 @@
+## Path:        System/DNS
+## Description: Number of worker processes to spawn
+## Type:        integer
+## Default:     1
+## ServiceRestart:      kresd
+##
+#
+# Number of workers to spawn for kresd.
+# If you get start up failures with "already in use" your libuv is too
+# old and you have to stick to 1.
+#
+KRESD_WORKERS=1
+# Additional options
+KRESD_OPTIONS=

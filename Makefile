@@ -5,7 +5,7 @@ include platform.mk
 all: info lib daemon modules
 install: lib-install daemon-install modules-install etc-install
 check: all tests
-clean: lib-clean daemon-clean modules-clean tests-clean doc-clean
+clean: contrib-clean lib-clean daemon-clean modules-clean tests-clean doc-clean
 doc: doc-html
 .PHONY: all install check clean doc info
 
@@ -49,7 +49,9 @@ BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
 info:
 	$(info Target:     Knot DNS Resolver $(MAJOR).$(MINOR).$(PATCH)-$(PLATFORM))
 	$(info Compiler:   $(CC) $(BUILD_CFLAGS))
-	$(info Linker:     $(LD) $(BUILD_LDFLAGS))
+	$(info HARDENING:  $(HARDENING))
+	$(info BUILDMODE:  $(BUILDMODE))
+	$(info PREFIX:     $(PREFIX))
 	$(info PREFIX:     $(PREFIX))
 	$(info DESTDIR:    $(DESTDIR))
 	$(info BINDIR:     $(BINDIR))
@@ -72,7 +74,6 @@ info:
 	$(info [$(HAS_libmemcached)] libmemcached (modules/memcached))
 	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
-	$(info [$(HAS_socket_wrapper)] socket_wrapper (lib))
 	$(info )
 
 # Installation directories
@@ -82,6 +83,7 @@ $(DESTDIR)$(ETCDIR):
 	$(INSTALL) -m 0750 -d $@
 
 # Sub-targets
+include contrib/contrib.mk
 include lib/lib.mk
 include daemon/daemon.mk
 include modules/modules.mk

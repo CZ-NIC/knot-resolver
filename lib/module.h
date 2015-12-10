@@ -72,6 +72,7 @@ struct kr_module {
  * @param path module search path
  * @return 0 or an error
  */
+KR_EXPORT
 int kr_module_load(struct kr_module *module, const char *name, const char *path);
 
 /**
@@ -79,6 +80,7 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
  *
  * @param module module structure
  */
+KR_EXPORT
 void kr_module_unload(struct kr_module *module);
 
 /**

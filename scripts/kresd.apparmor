@@ -1,0 +1,30 @@
+#include <tunables/global>
+
+/usr/bin/kresd {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  capability net_bind_service,
+  capability setgid,
+  capability setuid,
+  # seems to be needed during start to read /var/lib/kresd
+  # while we still run as root.
+  capability dac_override,
+
+  network tcp,
+  network udp,
+
+  /proc/sys/net/core/somaxconn r,
+  /etc/kresd/* r, 
+  /var/lib/kresd/ r,
+  /var/lib/kresd/** rwlk,
+
+  # modules
+  /usr/lib{,64}/kdns_modules/*.lua r,
+  /usr/lib{,64}/kdns_modules/*.so rm,
+
+  # for tinyweb
+  /usr/lib{,64}/kdns_modules/tinyweb/ r,
+  /usr/lib{,64}/kdns_modules/tinyweb/* r,
+  /var/lib/GeoIP/* r,
+}
+

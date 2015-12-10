@@ -155,6 +155,8 @@ Configuration example
    -- 10MB cache
    cache.size = 10*MB
 
+.. tip:: There are more configuration examples in `etc/` directory for personal, ISP, company internal and resolver cluster use cases.
+
 Configuration syntax
 --------------------
 

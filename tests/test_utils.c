@@ -16,6 +16,7 @@
 
 #include <sys/socket.h>
 #include <stdio.h>
+#include <contrib/cleanup.h>
 
 #include "tests/test.h"
 #include "lib/utils.h"

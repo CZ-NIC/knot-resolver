@@ -14,6 +14,7 @@ tests_BIN := \
 	test_zonecut \
 	test_rplan
 
+mock_cmodule_CFLAGS := -fPIC
 mock_cmodule_SOURCES := tests/mock_cmodule.c
 $(eval $(call make_lib,mock_cmodule,tests))
 
@@ -21,14 +22,22 @@ $(eval $(call make_lib,mock_cmodule,tests))
 tests_DEPEND := $(libkres) $(mock_cmodule) $(mock_gomodule)
 tests_LIBS :=  $(libkres_TARGET) $(libkres_LIBS) $(cmocka_LIBS)
 
+# Platform-specific library injection
+ifeq ($(PLATFORM),Darwin)
+	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH="$(DYLD_LIBRARY_PATH):$(abspath lib)"
+else
+	preload_syms := LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):$(abspath lib)"
+endif
+
 # Make test binaries
 define make_test
+$(1)_CFLAGS := -fPIE
 $(1)_SOURCES := tests/$(1).c
 $(1)_LIBS := $(tests_LIBS)
 $(1)_DEPEND := $(tests_DEPEND)
 $(call make_bin,$(1),tests)
 $(1): $$($(1))
-	@$$<
+	@$(preload_syms) $$<
 .PHONY: $(1)
 endef
 

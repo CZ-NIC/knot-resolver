@@ -15,6 +15,7 @@
  */
 
 #include <uv.h>
+#include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
 
 #include "lib/cache.h"
