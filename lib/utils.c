@@ -65,6 +65,11 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
  * Cleanup callbacks.
  */
 
+/* Always compile-in log symbols, even if disabled. */
+#undef kr_debug_set
+#undef kr_debug_status
+#undef kr_log_debug
+
 bool kr_debug_set(bool status)
 {
 	return _env_debug = status;
