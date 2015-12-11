@@ -63,11 +63,25 @@ Example configuration
 Properties
 ^^^^^^^^^^
 
-.. envvar:: policy.PASS    (number)
-.. envvar:: policy.DENY    (number)
-.. envvar:: policy.DROP    (number)
-.. envvar:: policy.TC      (number)
-.. envvar:: policy.FORWARD (function)
+.. envvar:: policy.PASS
+
+   Pass-through all queries matching the rule.
+
+.. envvar:: policy.DENY
+
+   Respond with NXDOMAIN to all queries matching the rule.
+
+.. envvar:: policy.DROP
+
+   Drop all queries matching the rule.
+
+.. envvar:: policy.TC
+
+   Respond with empty answer with TC bit set (if the query came through UDP).
+
+.. envvar:: policy.FORWARD (address)
+
+   Forward query to given IP address.
 
 .. function:: policy:add(rule)
 
