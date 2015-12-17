@@ -1,7 +1,7 @@
 # Project
 MAJOR := 1
 MINOR := 0
-PATCH := 0-beta2
+PATCH := 0-beta3
 ABIVER := 1
 BUILDMODE := dynamic
 HARDENING := yes
