@@ -1,5 +1,9 @@
+local ffi_ok, ffi = pcall(require, 'ffi')
+if not ffi_ok then
+	return { error = 'FFI not available, trust_anchors disabled.' }
+end
 local kres = require('kres')
-local C = require('ffi').C
+local C = ffi.C
 
 -- RFC5011 state table
 local key_state = {
