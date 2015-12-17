@@ -17,11 +17,13 @@
 #pragma once
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <libknot/packet/pkt.h>
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
+#include "lib/defines.h"
 
 /*
  * Logging and debugging.
@@ -41,6 +43,22 @@ KR_EXPORT void kr_log_debug(const char *fmt, ...);
 #define kr_log_debug(fmt, ...)
 #define WITH_DEBUG if(0)
 #endif
+
+/** @cond Memory alloc routines */
+static inline void *mm_alloc(knot_mm_t *mm, size_t size)
+{
+	if (mm) return mm->alloc(mm->ctx, size);
+	else return malloc(size);
+}
+static inline void mm_free(knot_mm_t *mm, void *what)
+{
+	if (mm) { 
+		if (mm->free)
+			mm->free(what);
+	}
+	else free(what);
+}
+/* @endcond */
 
 /** Return time difference in miliseconds.
   * @note based on the _BSD_SOURCE timersub() macro */
@@ -77,7 +95,7 @@ int kr_rand_reseed(void);
 KR_EXPORT
 unsigned kr_rand_uint(unsigned max);
 
-/** Memory reservation routine for mm_ctx_t */
+/** Memory reservation routine for knot_mm_t */
 KR_EXPORT
 int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have);
 
@@ -131,10 +149,10 @@ int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank);
  * @note RRSIG RRSets are merged according the type covered fields.
  * @return 0 or an error
  */
-int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *pool);
+int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *pool);
 
 /** @internal Add RRSet copy to RR array. */
-int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, mm_ctx_t *pool);
+int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool);
 
 /**
  * Call module property.

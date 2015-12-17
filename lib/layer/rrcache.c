@@ -80,7 +80,7 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, uint16_t rrtype, bool dobit)
 {
 	struct kr_cache_txn txn;
-	int ret = kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY);
+	int ret = kr_cache_txn_begin(cache, &txn, KNOT_DB_RDONLY);
 	if (ret != 0) {
 		return ret;
 	}
@@ -209,7 +209,7 @@ static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache_txn 
 	return map_walk(stash, &commit_rr, &baton);
 }
 
-static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_name, mm_ctx_t *pool)
+static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_name, knot_mm_t *pool)
 {
 	const knot_pktsection_t *additional = knot_pkt_section(pkt, KNOT_ADDITIONAL);
 	for (unsigned i = 0; i < additional->count; ++i) {
@@ -223,7 +223,7 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 }
 
 /* @internal DS is special and is present only parent-side */
-static void stash_ds(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx_t *pool)
+static void stash_ds(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
 {
 	const knot_pktsection_t *authority = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < authority->count; ++i) {
@@ -234,7 +234,7 @@ static void stash_ds(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx
 	}
 }
 
-static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx_t *pool)
+static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
 {
 	const knot_pktsection_t *authority = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < authority->count; ++i) {
@@ -253,7 +253,7 @@ static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, 
 	return kr_ok();
 }
 
-static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, mm_ctx_t *pool)
+static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
 {
 	/* Work with QNAME, as minimised name data is cacheable. */
 	const knot_dname_t *cname_begin = knot_pkt_qname(pkt);
@@ -312,7 +312,7 @@ static int rrcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		ret = stash_answer(qry, pkt, &stash, &req->pool);
 	}
 	/* Cache authority only if chasing referral/cname chain */
-	if (!is_auth || qry != TAIL(req->rplan.pending)) {
+	if (!is_auth || qry != array_tail(req->rplan.pending)) {
 		ret = stash_authority(qry, pkt, &stash, &req->pool);
 	}
 	/* Cache DS records in referrals */

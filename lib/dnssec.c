@@ -27,7 +27,7 @@
 #include <libknot/rrtype/dnskey.h>
 #include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
-
+#include <contrib/wire.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"

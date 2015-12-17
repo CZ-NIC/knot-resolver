@@ -14,6 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <uv.h>
 #include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
@@ -334,11 +335,11 @@ static int cache_backends(lua_State *L)
 static int cache_count(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	const namedb_api_t *storage = engine->resolver.cache.api;
+	const knot_db_api_t *storage = engine->resolver.cache.api;
 
 	/* Fetch item count */
 	struct kr_cache_txn txn;
-	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, NAMEDB_RDONLY);
+	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, KNOT_DB_RDONLY);
 	if (ret != 0) {
 		format_error(L, kr_strerror(ret));
 		lua_error(L);

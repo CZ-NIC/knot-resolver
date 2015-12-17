@@ -21,7 +21,7 @@
 #include <dnssec/error.h>
 #include <dnssec/nsec.h>
 #include <libknot/descriptor.h>
-#include <libknot/internal/base32hex.h>
+#include <contrib/base32hex.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/nsec3.h>
 
@@ -107,7 +107,7 @@ static int read_owner_hash(dnssec_binary_t *hash, size_t max_hash_size, const kn
 
 	int32_t ret = base32hex_decode(nsec3->owner + 1, nsec3->owner[0], hash->data, max_hash_size);
 	if (ret < 0) {
-		return ret;
+		return kr_error(EILSEQ);
 	}
 	hash->size = ret;
 

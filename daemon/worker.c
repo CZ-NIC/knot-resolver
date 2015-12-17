@@ -20,10 +20,12 @@
 #include <libknot/descriptor.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
+#include <contrib/wire.h>
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
 #include <malloc.h>
 #endif
-
+#include <assert.h>
+#include "lib/utils.h"
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
@@ -227,9 +229,9 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	}
 
 	/* Recycle available mempool if possible */
-	mm_ctx_t pool = {
+	knot_mm_t pool = {
 		.ctx = pool_take(worker),
-		.alloc = (mm_alloc_t) mp_alloc
+		.alloc = (knot_mm_alloc_t) mp_alloc
 	};
 
 	/* Create resolution task */
@@ -265,7 +267,10 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->on_complete = NULL;
 	/* Remember query source addr */
 	if (addr) {
-		memcpy(&task->source.addr, addr, sockaddr_len(addr));
+		size_t addr_len = sizeof(struct sockaddr_in);
+		if (addr->sa_family == AF_INET6)
+			addr_len = sizeof(struct sockaddr_in6);
+		memcpy(&task->source.addr, addr, addr_len);
 		task->req.qsource.addr = (const struct sockaddr *)&task->source.addr;
 	} else {
 		task->source.addr.ip4.sin_family = AF_UNSPEC;
@@ -505,10 +510,10 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 		map_del(&task->worker->outstanding, key);
 	}
 	/* Notify waiting tasks. */
-	struct kr_query *leader_qry = TAIL(task->req.rplan.pending);
+	struct kr_query *leader_qry = array_tail(task->req.rplan.pending);
 	for (size_t i = task->waiting.len; i --> 0;) {
 		struct qr_task *follower = task->waiting.at[i];
-		struct kr_query *qry = TAIL(follower->req.rplan.pending);
+		struct kr_query *qry = array_tail(follower->req.rplan.pending);
 		/* Reuse MSGID and 0x20 secret */
 		if (qry) {
 			qry->id = leader_qry->id;
@@ -773,7 +778,7 @@ int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 		return kr_error(ENOMEM);
 	memset(&worker->pkt_pool, 0, sizeof(worker->pkt_pool));
 	worker->pkt_pool.ctx = mp_new (4 * sizeof(knot_pkt_t));
-	worker->pkt_pool.alloc = (mm_alloc_t) mp_alloc;
+	worker->pkt_pool.alloc = (knot_mm_alloc_t) mp_alloc;
 	worker->outstanding = map_make();
 	return kr_ok();
 }

@@ -214,7 +214,13 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 static int parse_addr_str(struct sockaddr_storage *sa, const char *addr)
 {
 	int family = strchr(addr, ':') ? AF_INET6 : AF_INET;
-	return sockaddr_set(sa, family, addr, 0);
+	memset(sa, 0, sizeof(struct sockaddr_storage));
+	sa->ss_family = family;
+	char *addr_bytes = (char *)kr_inaddr((struct sockaddr *)sa);
+	if (inet_pton(family, addr, addr_bytes) < 1) {
+		return kr_error(EILSEQ);
+	}
+	return 0;
 }
 
 static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr)
@@ -276,11 +282,11 @@ static int load(struct kr_module *module, const char *path)
 	}
 
 	/* Create pool and copy itself */
-	mm_ctx_t _pool = {
+	knot_mm_t _pool = {
 		.ctx = mp_new(4096),
-		.alloc = (mm_alloc_t) mp_alloc
+		.alloc = (knot_mm_alloc_t) mp_alloc
 	};
-	mm_ctx_t *pool = mm_alloc(&_pool, sizeof(*pool));
+	knot_mm_t *pool = mm_alloc(&_pool, sizeof(*pool));
 	if (!pool) {
 		return kr_error(ENOMEM);
 	}
@@ -330,7 +336,7 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 /** @internal Pack address list into JSON array. */
 static JsonNode *pack_addrs(pack_t *pack)
 {
-	char buf[SOCKADDR_STRLEN];
+	char buf[INET6_ADDRSTRLEN];
 	JsonNode *root = json_mkarray();
 	uint8_t *addr = pack_head(*pack);
 	while (addr != pack_tail(*pack)) {

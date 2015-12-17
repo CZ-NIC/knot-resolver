@@ -17,7 +17,6 @@
 #pragma once
 
 #include "lib/defines.h"
-#include <libknot/internal/consts.h>
 #include <libknot/packet/pkt.h>
 
 /**

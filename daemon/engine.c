@@ -21,9 +21,8 @@
 #include <unistd.h>
 #include <grp.h>
 #include <pwd.h>
-#include <libknot/internal/mempattern.h>
-/* #include <libknot/internal/namedb/namedb_trie.h> @todo Not supported (doesn't keep value copy) */
-#include <libknot/internal/namedb/namedb_lmdb.h>
+/* #include <libknot/internal/namedb/knot_db_trie.h> @todo Not supported (doesn't keep value copy) */
+#include <libknot/db/db_lmdb.h>
 
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
@@ -177,7 +176,7 @@ static int l_option(lua_State *L)
 	unsigned opt_code = 0;
 	if (lua_isstring(L, 1)) {
 		const char *opt = lua_tostring(L, 1);
-		for (const lookup_table_t *it = kr_query_flag_names(); it->name; ++it) {
+		for (const knot_lookup_t *it = kr_query_flag_names(); it->name; ++it) {
 			if (strcmp(it->name, opt) == 0) {
 				opt_code = it->id;
 				break;
@@ -320,9 +319,9 @@ static int l_trampoline(lua_State *L)
  */
 
 /** @internal Make lmdb options. */
-void *namedb_lmdb_mkopts(const char *conf, size_t maxsize)
+void *knot_db_lmdb_mkopts(const char *conf, size_t maxsize)
 {
-	struct namedb_lmdb_opts *opts = malloc(sizeof(*opts));
+	struct knot_db_lmdb_opts *opts = malloc(sizeof(*opts));
 	if (opts) {
 		memset(opts, 0, sizeof(*opts));
 		opts->path = (conf && strlen(conf)) ? conf : ".";
@@ -366,7 +365,7 @@ static int init_resolver(struct engine *engine)
 
 	/* Initialize storage backends */
 	struct storage_api lmdb = {
-		"lmdb://", namedb_lmdb_api, namedb_lmdb_mkopts
+		"lmdb://", knot_db_lmdb_api, knot_db_lmdb_mkopts
 	};
 
 	return array_push(engine->storage_registry, lmdb);
@@ -406,7 +405,7 @@ static int init_state(struct engine *engine)
 	return kr_ok();
 }
 
-int engine_init(struct engine *engine, mm_ctx_t *pool)
+int engine_init(struct engine *engine, knot_mm_t *pool)
 {
 	if (engine == NULL) {
 		return kr_error(EINVAL);

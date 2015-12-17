@@ -26,10 +26,10 @@
 #include <libknot/packet/wire.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/rrsig.h>
+#include <libknot/rrtype/ds.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
-#include "lib/dnssec/rrtype/ds.h"
 #include "lib/dnssec/signature.h"
 
 static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, uint8_t digest_type)
@@ -69,7 +69,7 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 			.size = knot_rdata_rdlen(rd),
 			.data = knot_rdata_data(rd)
 		};
-		ret = authenticate_ds(key, &ds_rdata, _knot_ds_dtype(&ref->rrs, i));
+		ret = authenticate_ds(key, &ds_rdata, knot_ds_dtype(&ref->rrs, i));
 		if (ret == 0) { /* Found a good DS */
 			break;
 		}

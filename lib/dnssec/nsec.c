@@ -138,7 +138,7 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 }
 
 int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
-                                      const knot_dname_t *sname, mm_ctx_t *pool)
+                                      const knot_dname_t *sname)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
 	if (!sec || !sname) {

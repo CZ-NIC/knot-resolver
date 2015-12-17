@@ -18,7 +18,7 @@
 #include "lib/generic/pack.h"
 
 #define U8(x) (const uint8_t *)(x)
-mm_ctx_t global_mm;
+knot_mm_t global_mm;
 
 static void test_pack_std(void **state)
 {

@@ -27,6 +27,7 @@
 
 #include <time.h>
 #include <libknot/descriptor.h>
+#include <libknot/error.h>
 #include <ccan/json/json.h>
 
 #include "daemon/engine.h"
@@ -40,7 +41,7 @@
  * Properties.
  */
 
-typedef int (*cache_cb_t)(struct kr_cache_txn *txn, namedb_iter_t *it, namedb_val_t *key, void *baton);
+typedef int (*cache_cb_t)(struct kr_cache_txn *txn, knot_db_iter_t *it, knot_db_val_t *key, void *baton);
 
 /** @internal Prefix walk. */
 static int cache_prefixed(struct engine *engine, const char *args, unsigned txn_flags, cache_cb_t cb, void *baton)
@@ -76,7 +77,7 @@ static int cache_prefixed(struct engine *engine, const char *args, unsigned txn_
 
 	/* Start search transaction */
 	struct kr_cache *cache = &engine->resolver.cache;
-	const namedb_api_t *api = cache->api;
+	const knot_db_api_t *api = cache->api;
 	struct kr_cache_txn txn;
 	ret = kr_cache_txn_begin(cache, &txn, txn_flags);
 	if (ret != 0) {
@@ -86,10 +87,10 @@ static int cache_prefixed(struct engine *engine, const char *args, unsigned txn_
 	/* Walk through cache records matching given prefix.
 	 * Note that since the backend of the cache is opaque, there's no exactly efficient
 	 * way to do prefix search (i.e. Redis uses hashtable but offers SCAN, LMDB can do lexical closest match, ...). */
-	namedb_val_t key = { prefix, prefix_len };
-	namedb_iter_t *it = api->iter_begin(&txn.t, 0);
+	knot_db_val_t key = { prefix, prefix_len };
+	knot_db_iter_t *it = api->iter_begin(&txn.t, 0);
 	if (it) { /* Seek first key matching the prefix. */
-		it = api->iter_seek(it, &key, NAMEDB_GEQ);
+		it = api->iter_seek(it, &key, KNOT_DB_GEQ);
 	}
 	while (it != NULL) {
 		if (api->iter_key(it, &key) != 0) {
@@ -123,7 +124,7 @@ static bool is_expired(struct kr_cache_entry *entry, uint32_t drift)
 }
 
 /** @internal Delete iterated key. */
-static int cache_delete_cb(struct kr_cache_txn *txn, namedb_iter_t *it, namedb_val_t *key, void *baton)
+static int cache_delete_cb(struct kr_cache_txn *txn, knot_db_iter_t *it, knot_db_val_t *key, void *baton)
 {
 	struct kr_cache *cache = txn->owner;
 	return cache->api->del(&txn->t, key);
@@ -140,7 +141,7 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 {
 	struct engine *engine = env;
 	struct kr_cache *cache = &engine->resolver.cache;
-	const namedb_api_t *storage = cache->api;
+	const knot_db_api_t *storage = cache->api;
 
 	struct kr_cache_txn txn;
 	int ret = kr_cache_txn_begin(cache, &txn, 0);
@@ -161,10 +162,10 @@ static char* prune(void *env, struct kr_module *module, const char *args)
 	/* Fetch current time and start iterating */
 	struct timeval now;
 	gettimeofday(&now, NULL);
-	namedb_iter_t *it = storage->iter_begin(&txn.t, 0);
+	knot_db_iter_t *it = storage->iter_begin(&txn.t, 0);
 	while (it && pruned < prune_max) {
 		/* Fetch RR from cache */
-		namedb_val_t key, val;
+		knot_db_val_t key, val;
 		if (storage->iter_key(it, &key) != 0 ||
 		    storage->iter_val(it, &val) != 0) {
 			break;
@@ -242,7 +243,7 @@ static char* clear(void *env, struct kr_module *module, const char *args)
 }
 
 /** @internal Serialize cached record name into JSON. */
-static int cache_dump_cb(struct kr_cache_txn *txn, namedb_iter_t *it, namedb_val_t *key, void *baton)
+static int cache_dump_cb(struct kr_cache_txn *txn, knot_db_iter_t *it, knot_db_val_t *key, void *baton)
 {
 	JsonNode* json_records = baton;
 	char buf[KNOT_DNAME_MAXLEN];
@@ -291,7 +292,7 @@ static char* get(void *env, struct kr_module *module, const char *args)
 	char *result = NULL;
 	JsonNode *json_records = json_mkobject();
 	if (json_records) {
-		int ret = cache_prefixed(env, args, NAMEDB_RDONLY, &cache_dump_cb, json_records);
+		int ret = cache_prefixed(env, args, KNOT_DB_RDONLY, &cache_dump_cb, json_records);
 		if (ret == 0) {
 			result = json_encode(json_records);
 		}

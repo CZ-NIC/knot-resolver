@@ -26,7 +26,7 @@
 #include <assert.h>
 #include <string.h>
 #include <libmemcached/memcached.h>
-#include <libknot/internal/namedb/namedb.h>
+#include <libknot/db/db.h>
 #include <libknot/errcode.h>
 #include <contrib/cleanup.h>
 
@@ -37,7 +37,7 @@
 /* Oh, the irony... */
 typedef array_t(char *) freelist_t;
 
-static int init(namedb_t **db, mm_ctx_t *mm, void *arg)
+static int init(knot_db_t **db, knot_mm_t *mm, void *arg)
 {
 	if (!db || !arg) {
 		return KNOT_EINVAL;
@@ -55,12 +55,12 @@ static int init(namedb_t **db, mm_ctx_t *mm, void *arg)
 	return KNOT_EOK;
 }
 
-static void deinit(namedb_t *db)
+static void deinit(knot_db_t *db)
 {
 	memcached_free((memcached_st *)db);
 }
 
-static int txn_begin(namedb_t *db, namedb_txn_t *txn, unsigned flags)
+static int txn_begin(knot_db_t *db, knot_db_txn_t *txn, unsigned flags)
 {
 	freelist_t *freelist = malloc(sizeof(*freelist));
 	if (!freelist) {
@@ -72,7 +72,7 @@ static int txn_begin(namedb_t *db, namedb_txn_t *txn, unsigned flags)
 	return KNOT_EOK;
 }
 
-static int txn_commit(namedb_txn_t *txn)
+static int txn_commit(knot_db_txn_t *txn)
 {
 	freelist_t *freelist = txn->txn;
 	if (freelist) {
@@ -86,7 +86,7 @@ static int txn_commit(namedb_txn_t *txn)
 	return KNOT_EOK;
 }
 
-static void txn_abort(namedb_txn_t *txn)
+static void txn_abort(knot_db_txn_t *txn)
 {
 	/** @warning No real transactions here,
 	  *          all the reads/writes are done synchronously.
@@ -96,7 +96,7 @@ static void txn_abort(namedb_txn_t *txn)
 	txn_commit(txn);
 }
 
-static int count(namedb_txn_t *txn)
+static int count(knot_db_txn_t *txn)
 {
 	memcached_return_t error = 0;
 	memcached_stat_st *stats = memcached_stat(txn->db, NULL, &error);
@@ -108,7 +108,7 @@ static int count(namedb_txn_t *txn)
 	return ret;
 }
 
-static int clear(namedb_txn_t *txn)
+static int clear(knot_db_txn_t *txn)
 {
 	memcached_return_t ret = memcached_flush(txn->db, 0);
 	if (ret != 0) {
@@ -117,7 +117,7 @@ static int clear(namedb_txn_t *txn)
 	return KNOT_EOK;
 }
 
-static int find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
+static int find(knot_db_txn_t *txn, knot_db_val_t *key, knot_db_val_t *val, unsigned flags)
 {
 	uint32_t mc_flags = 0;
 	memcached_return_t error = 0;
@@ -134,7 +134,7 @@ static int find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigne
 	return KNOT_EOK;
 }
 
-static int insert(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
+static int insert(knot_db_txn_t *txn, knot_db_val_t *key, knot_db_val_t *val, unsigned flags)
 {
 	if (!txn || !key || !val) {
 		return KNOT_EINVAL;
@@ -150,7 +150,7 @@ static int insert(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsig
 	return KNOT_EOK;
 }
 
-static int del(namedb_txn_t *txn, namedb_val_t *key)
+static int del(knot_db_txn_t *txn, knot_db_val_t *key)
 {
 	memcached_return_t ret = memcached_delete(txn->db, key->data, key->len, 0);
 	if (ret != 0) {
@@ -159,43 +159,43 @@ static int del(namedb_txn_t *txn, namedb_val_t *key)
 	return KNOT_EOK;
 }
 
-static namedb_iter_t *iter_begin(namedb_txn_t *txn, unsigned flags)
+static knot_db_iter_t *iter_begin(knot_db_txn_t *txn, unsigned flags)
 {
 	/* Iteration is not supported, pruning should be
 	 * left on the memcached server */
 	return NULL;
 }
 
-static namedb_iter_t *iter_seek(namedb_iter_t *iter, namedb_val_t *key, unsigned flags)
+static knot_db_iter_t *iter_seek(knot_db_iter_t *iter, knot_db_val_t *key, unsigned flags)
 {
 	assert(0);
 	return NULL; /* ENOTSUP */
 }
 
-static namedb_iter_t *iter_next(namedb_iter_t *iter)
+static knot_db_iter_t *iter_next(knot_db_iter_t *iter)
 {
 	assert(0);
 	return NULL;
 }
 
-static int iter_key(namedb_iter_t *iter, namedb_val_t *val)
+static int iter_key(knot_db_iter_t *iter, knot_db_val_t *val)
 {
 	return KNOT_ENOTSUP;
 }
 
-static int iter_val(namedb_iter_t *iter, namedb_val_t *val)
+static int iter_val(knot_db_iter_t *iter, knot_db_val_t *val)
 {
 	return KNOT_ENOTSUP;
 }
 
-static void iter_finish(namedb_iter_t *iter)
+static void iter_finish(knot_db_iter_t *iter)
 {
 	assert(0);
 }
 
-const namedb_api_t *namedb_memcached_api(void)
+const knot_db_api_t *namedb_memcached_api(void)
 {
-	static const namedb_api_t api = {
+	static const knot_db_api_t api = {
 		"memcached",
 		init, deinit,
 		txn_begin, txn_commit, txn_abort,

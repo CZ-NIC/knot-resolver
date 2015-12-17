@@ -17,6 +17,8 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <assert.h>
+#include <arpa/inet.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
@@ -161,7 +163,7 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t
 
 	/* Find closest zone cut from cache */
 	struct kr_cache_txn txn;
-	if (kr_cache_txn_begin(&req->ctx->cache, &txn, NAMEDB_RDONLY) == 0) {
+	if (kr_cache_txn_begin(&req->ctx->cache, &txn, KNOT_DB_RDONLY) == 0) {
 		/* If at/subdomain of parent zone cut, start from its encloser.
 		 * This is for case when we get to a dead end (and need glue from parent), or DS refetch. */
 		struct kr_query *parent = qry->parent;
@@ -313,8 +315,8 @@ static int answer_finalize(struct kr_request *request, int state)
 	}
 	/* Set AD=1 if succeeded and requested secured answer. */
 	struct kr_rplan *rplan = &request->rplan;
-	if (state == KNOT_STATE_DONE && !EMPTY_LIST(rplan->resolved)) {
-		struct kr_query *last = TAIL(rplan->resolved);
+	if (state == KNOT_STATE_DONE && rplan->resolved.len > 0) {
+		struct kr_query *last = array_tail(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
 		if ((last->flags & QUERY_DNSSEC_WANT) && knot_pkt_has_dnssec(answer) &&
 			knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
@@ -420,7 +422,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	}
 
 	/* Different processing for network error */
-	struct kr_query *qry = TAIL(rplan->pending);
+	struct kr_query *qry = array_tail(rplan->pending);
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
 		if (tried_tcp)
@@ -447,7 +449,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 				gettimeofday(&now, NULL);
 				kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
 				WITH_DEBUG {
-					char addr_str[SOCKADDR_STRLEN];
+					char addr_str[INET6_ADDRSTRLEN];
 					inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
 					DEBUG_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, time_diff(&qry->timestamp, &now));
 				}
@@ -457,7 +459,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		} else if (!(qry->flags & QUERY_DNSSEC_BOGUS)) {
 			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt);
 			WITH_DEBUG {
-				char addr_str[SOCKADDR_STRLEN];
+				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
 				DEBUG_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
 			}
@@ -624,7 +626,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		return KNOT_STATE_FAIL;
 	}
 	/* If we have deferred answers, resume them. */
-	struct kr_query *qry = TAIL(rplan->pending);
+	struct kr_query *qry = array_tail(rplan->pending);
 	if (qry->deferred != NULL) {
 		/* @todo: Refactoring validator, check trust chain before resuming. */
 		switch(trust_chain_check(request, qry)) {
@@ -718,7 +720,7 @@ ns_election:
 	}
 
 	WITH_DEBUG {
-	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[SOCKADDR_STRLEN], type_str[16];
+	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[INET6_ADDRSTRLEN], type_str[16];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
 	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
 	knot_rrtype_to_string(knot_pkt_qtype(packet), type_str, sizeof(type_str));
@@ -760,7 +762,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
 	DEBUG_MSG(NULL, "finished: %d, queries: %zu, mempool: %zu B\n",
-	          request->state, list_size(&rplan->resolved), (size_t) mp_total_size(request->pool.ctx));
+	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
 	return KNOT_STATE_DONE;
 }
 
@@ -772,7 +774,7 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request)
 	return NULL;
 }
 
-mm_ctx_t *kr_resolve_pool(struct kr_request *request)
+knot_mm_t *kr_resolve_pool(struct kr_request *request)
 {
 	if (request) {
 		return &request->pool;

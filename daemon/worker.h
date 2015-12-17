@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <libknot/internal/mempattern.h>
-
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
@@ -52,7 +50,7 @@ struct worker_ctx {
 	map_t outstanding;
 	mp_freelist_t pools;
 	mp_freelist_t ioreqs;
-	mm_ctx_t pkt_pool;
+	knot_mm_t pkt_pool;
 };
 
 /* Worker callback */

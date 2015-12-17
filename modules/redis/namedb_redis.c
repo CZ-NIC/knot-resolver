@@ -22,7 +22,7 @@
 
 #include <assert.h>
 #include <string.h>
-#include <libknot/internal/namedb/namedb.h>
+#include <libknot/db/db.h>
 
 #include "modules/redis/redis.h"
 
@@ -79,7 +79,7 @@ static void cli_free(struct redis_cli *cli)
 	free(cli);
 }
 
-static int init(namedb_t **db, mm_ctx_t *mm, void *arg)
+static int init(knot_db_t **db, knot_mm_t *mm, void *arg)
 {
 	if (!db || !arg) {
 		return kr_error(EINVAL);
@@ -99,13 +99,13 @@ static int init(namedb_t **db, mm_ctx_t *mm, void *arg)
 	return ret;
 }
 
-static void deinit(namedb_t *db)
+static void deinit(knot_db_t *db)
 {
 	struct redis_cli *cli = db;
 	cli_free(cli);
 }
 
-static int txn_begin(namedb_t *db, namedb_txn_t *txn, unsigned flags)
+static int txn_begin(knot_db_t *db, knot_db_txn_t *txn, unsigned flags)
 {
 	if (!db || !txn) {
 		return kr_error(EINVAL);
@@ -114,7 +114,7 @@ static int txn_begin(namedb_t *db, namedb_txn_t *txn, unsigned flags)
 	return kr_ok();
 }
 
-static int txn_commit(namedb_txn_t *txn)
+static int txn_commit(knot_db_txn_t *txn)
 {
 	if (!txn || !txn->db) {
 		return kr_error(EINVAL);
@@ -124,7 +124,7 @@ static int txn_commit(namedb_txn_t *txn)
 	return kr_ok();
 }
 
-static void txn_abort(namedb_txn_t *txn)
+static void txn_abort(knot_db_txn_t *txn)
 {
 	/** @warning No real transactions here. */
 	txn_commit(txn);
@@ -145,7 +145,7 @@ static void txn_abort(namedb_txn_t *txn)
 		} \
 	}
 
-static int count(namedb_txn_t *txn)
+static int count(knot_db_txn_t *txn)
 {
 	if (!txn || !txn->db) {
 		return kr_error(EINVAL);
@@ -165,7 +165,7 @@ static int count(namedb_txn_t *txn)
 	return ret;
 }
 
-static int clear(namedb_txn_t *txn)
+static int clear(knot_db_txn_t *txn)
 {
 	if (!txn || !txn->db) {
 		return kr_error(EINVAL);
@@ -181,7 +181,7 @@ static int clear(namedb_txn_t *txn)
 	return kr_ok();
 }
 
-static int find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
+static int find(knot_db_txn_t *txn, knot_db_val_t *key, knot_db_val_t *val, unsigned flags)
 {
 	if (!txn || !key || !val) {
 		return kr_error(EINVAL);
@@ -207,7 +207,7 @@ static int find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigne
 	return kr_ok();
 }
 
-static int insert(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
+static int insert(knot_db_txn_t *txn, knot_db_val_t *key, knot_db_val_t *val, unsigned flags)
 {
 	if (!txn || !key || !val) {
 		return kr_error(EINVAL);
@@ -228,48 +228,48 @@ static int insert(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsig
 	return kr_ok();
 }
 
-static int del(namedb_txn_t *txn, namedb_val_t *key)
+static int del(knot_db_txn_t *txn, knot_db_val_t *key)
 {
 	return kr_error(ENOSYS);
 }
 
-static namedb_iter_t *iter_begin(namedb_txn_t *txn, unsigned flags)
+static knot_db_iter_t *iter_begin(knot_db_txn_t *txn, unsigned flags)
 {
 	/* Iteration is not supported, pruning should be
 	 * left on the Redis server setting */
 	return NULL;
 }
 
-static namedb_iter_t *iter_seek(namedb_iter_t *iter, namedb_val_t *key, unsigned flags)
+static knot_db_iter_t *iter_seek(knot_db_iter_t *iter, knot_db_val_t *key, unsigned flags)
 {
 	assert(0);
 	return NULL; /* ENOSYS */
 }
 
-static namedb_iter_t *iter_next(namedb_iter_t *iter)
+static knot_db_iter_t *iter_next(knot_db_iter_t *iter)
 {
 	assert(0);
 	return NULL;
 }
 
-static int iter_key(namedb_iter_t *iter, namedb_val_t *val)
+static int iter_key(knot_db_iter_t *iter, knot_db_val_t *val)
 {
 	return kr_error(ENOSYS);
 }
 
-static int iter_val(namedb_iter_t *iter, namedb_val_t *val)
+static int iter_val(knot_db_iter_t *iter, knot_db_val_t *val)
 {
 	return kr_error(ENOSYS);
 }
 
-static void iter_finish(namedb_iter_t *iter)
+static void iter_finish(knot_db_iter_t *iter)
 {
 	assert(0);
 }
 
-const namedb_api_t *namedb_redis_api(void)
+const knot_db_api_t *namedb_redis_api(void)
 {
-	static const namedb_api_t api = {
+	static const knot_db_api_t api = {
 		"redis",
 		init, deinit,
 		txn_begin, txn_commit, txn_abort,

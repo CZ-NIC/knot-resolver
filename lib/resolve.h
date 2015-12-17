@@ -92,7 +92,7 @@ struct kr_context
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
-	mm_ctx_t *pool;
+	knot_mm_t *pool;
 };
 
 /**
@@ -118,7 +118,7 @@ struct kr_request {
     rr_array_t authority;
     rr_array_t additional;
     struct kr_rplan rplan;
-    mm_ctx_t pool;
+    knot_mm_t pool;
 };
 
 /**
@@ -191,5 +191,5 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request);
  * @return         mempool
  */
 KR_EXPORT KR_PURE
-mm_ctx_t *kr_resolve_pool(struct kr_request *request);
+knot_mm_t *kr_resolve_pool(struct kr_request *request);
 

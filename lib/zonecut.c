@@ -78,7 +78,7 @@ static void update_cut_name(struct kr_zonecut *cut, const knot_dname_t *name)
 	cut->name = next_name;
 }
 
-int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *pool)
+int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, knot_mm_t *pool)
 {
 	if (!cut || !name) {
 		return kr_error(EINVAL);
@@ -349,7 +349,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_d
  * Fetch RRSet of given type.
  */
 static int fetch_rrset(knot_rrset_t **rr, const knot_dname_t *owner, uint16_t type,
-                       struct kr_cache_txn *txn, mm_ctx_t *pool, uint32_t timestamp)
+                       struct kr_cache_txn *txn, knot_mm_t *pool, uint32_t timestamp)
 {
 	if (!rr) {
 		return kr_error(ENOENT);

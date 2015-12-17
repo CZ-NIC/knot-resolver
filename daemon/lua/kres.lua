@@ -118,9 +118,6 @@ struct sockaddr {
 /* libknot */
 typedef int knot_section_t; /* Do not touch */
 typedef void knot_rrinfo_t; /* Do not touch */
-typedef struct node {
-  struct node *next, *prev;
-} node_t;
 typedef uint8_t knot_dname_t;
 typedef uint8_t knot_rdata_t;
 typedef struct knot_rdataset {
@@ -174,7 +171,6 @@ typedef struct {
 	size_t cap;
 } rr_array_t;
 struct kr_query {
-	node_t _node;
 	struct kr_query *parent;
 	knot_dname_t *sname;
 	uint16_t type;
@@ -353,10 +349,6 @@ local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
 		name = function(qry, new_name) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
-		next = function(qry)
-			assert(qry)
-			return C.kr_rplan_next(qry)
-		end,
 		resolved = function(qry)
 			return band(qry.flags, kres.query.RESOLVED) ~= 0
 		end,

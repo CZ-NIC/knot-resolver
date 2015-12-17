@@ -17,7 +17,7 @@
 #pragma once
 
 #include <libknot/rrset.h>
-#include <libknot/internal/namedb/namedb.h>
+#include <libknot/db/db.h>
 #include "lib/defines.h"
 
 /** Cache entry tag */
@@ -61,8 +61,8 @@ struct kr_cache_entry
  */
 struct kr_cache
 {
-	namedb_t *db;		      /**< Storage instance */
-	const namedb_api_t *api;      /**< Storage engine */
+	knot_db_t *db;		      /**< Storage instance */
+	const knot_db_api_t *api;      /**< Storage engine */
 	struct {
 		uint32_t hit;         /**< Number of cache hits */
 		uint32_t miss;        /**< Number of cache misses */
@@ -75,7 +75,7 @@ struct kr_cache
 
 /** Cache transaction */
 struct kr_cache_txn {
-    namedb_txn_t t;          /**< Storage transaction */  
+    knot_db_txn_t t;          /**< Storage transaction */  
     struct kr_cache *owner;  /**< Transaction owner */
 };
 
@@ -88,7 +88,7 @@ struct kr_cache_txn {
  * @return 0 or an error code
  */
 KR_EXPORT
-int kr_cache_open(struct kr_cache *cache, const namedb_api_t *api, void *opts, mm_ctx_t *mm);
+int kr_cache_open(struct kr_cache *cache, const knot_db_api_t *api, void *opts, knot_mm_t *mm);
 
 /**
  * Close persistent cache.
@@ -153,7 +153,7 @@ int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *nam
  */
 KR_EXPORT
 int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
-                    struct kr_cache_entry *header, namedb_val_t data);
+                    struct kr_cache_entry *header, knot_db_val_t data);
 
 /**
  * Remove asset from cache.
@@ -207,7 +207,7 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank,
  * @return 0 or an errcode
  */
 KR_EXPORT
-int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm);
+int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, knot_mm_t *mm);
 
 /**
  * Insert RRSet into cache, replacing any existing data.
