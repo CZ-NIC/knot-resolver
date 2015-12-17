@@ -11,7 +11,7 @@ There are two identification mechanisms:
 
 * ``subnet``
   - identifies the client based on his subnet
-* ``key``
+* ``tsig``
   - identifies the client based on a TSIG key
 
 You can combine this information with :ref:`policy <mod-policy>` rules.
@@ -31,7 +31,7 @@ Example configuration
 	-- Load modules
 	modules = { 'policy', 'view' }
 	-- Whitelist queries identified by TSIG key
-	view:key('\5mykey', function (req, qry) return policy.PASS end)
+	view:tsig('\5mykey', function (req, qry) return policy.PASS end)
 	-- Block local clients (ACL like)
 	view:addr('127.0.0.1', function (req, qry) return policy.DENY end))
 	-- Drop queries with suffix match for remote client
@@ -51,7 +51,7 @@ Properties
   
   Apply rule to clients in given subnet.
 
-.. function:: view:key(key_name, rule)
+.. function:: view:tsig(key, rule)
 
   :param key: client TSIG key domain name, i.e. ``\5mykey``
   :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
