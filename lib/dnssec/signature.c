@@ -69,7 +69,7 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 			.size = knot_rdata_rdlen(rd),
 			.data = knot_rdata_data(rd)
 		};
-		ret = authenticate_ds(key, &ds_rdata, knot_ds_dtype(&ref->rrs, i));
+		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(&ref->rrs, i));
 		if (ret == 0) { /* Found a good DS */
 			break;
 		}

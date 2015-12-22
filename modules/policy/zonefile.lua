@@ -3,8 +3,11 @@
 --
 
 local ffi = require('ffi')
-local libzscanner = ffi.load(libpath('libzscanner', '0'))
+local utils = require('kdns.utils')
+local libzscanner = ffi.load(libpath('libzscanner', '1'))
 ffi.cdef[[
+void free(void *ptr);
+void *realloc(void *ptr, size_t size);
 
 /*
  * Data structures
@@ -38,9 +41,16 @@ typedef struct {
 	uint64_t siz, hp, vp;
 	int8_t   lat_sign, long_sign, alt_sign;
 } loc_t;
+typedef struct zs_state {
+	static const int NONE    = 0;
+	static const int DATA    = 1;
+	static const int ERROR   = 2;
+	static const int INCLUDE = 3;
+	static const int EOF     = 4;
+	static const int STOP    = 5;
+} zs_state_t;
 
-typedef struct scanner zs_scanner_t;
-struct scanner {
+typedef struct scanner {
 	int      cs;
 	int      top;
 	int      stack[RAGEL_STACK_SIZE];
@@ -54,7 +64,8 @@ struct scanner {
 	uint8_t *item_length_location;
 	uint32_t buffer_length;
 	uint8_t  buffer[MAX_RDATA_LENGTH];
-	char     include_filename[MAX_RDATA_LENGTH + 1];
+	char     include_filename[MAX_RDATA_LENGTH];
+	char     *path;
 	window_t windows[BITMAP_WINDOWS];
 	int16_t  last_window;
 	apl_t    apl;
@@ -68,18 +79,29 @@ struct scanner {
 	uint8_t  zone_origin[MAX_DNAME_LENGTH + MAX_LABEL_LENGTH];
 	uint16_t default_class;
 	uint32_t default_ttl;
-	void (*process_record)(zs_scanner_t *);
-	void (*process_error)(zs_scanner_t *);
-	void *data;
-	char     *path;
-	uint64_t line_counter;
-	int      error_code;
-	uint64_t error_counter;
-	bool     stop;
+	int state;
+	struct {
+		bool automatic;
+		void (*record)(struct zs_scanner *);
+		void (*error)(struct zs_scanner *);
+		void *data;
+	} process;
+	struct {
+		const char *start;
+		const char *current;
+		const char *end;
+		bool eof;
+	} input;
 	struct {
 		char *name;
 		int  descriptor;
 	} file;
+	struct {
+		int code;
+		uint64_t counter;
+		bool fatal;
+	} error;
+	uint64_t line_counter;
 	uint32_t r_owner_length;
 	uint8_t  r_owner[MAX_DNAME_LENGTH + MAX_LABEL_LENGTH];
 	uint16_t r_class;
@@ -87,72 +109,115 @@ struct scanner {
 	uint16_t r_type;
 	uint32_t r_data_length;
 	uint8_t  r_data[MAX_RDATA_LENGTH];
-};
+} zs_scanner_t;
 
 /*
  * Function signatures
  */
-
-zs_scanner_t* zs_scanner_create(const char     *origin,
-                                const uint16_t rclass,
-                                const uint32_t ttl,
-                                void (*process_record)(zs_scanner_t *),
-                                void (*process_error)(zs_scanner_t *),
-                                void *data);
-void zs_scanner_free(zs_scanner_t *scanner);
-int zs_scanner_parse(zs_scanner_t *scanner,
-                     const char   *start,
-                     const char   *end,
-                     const bool   final_block);
-int zs_scanner_parse_file(zs_scanner_t *scanner,
-                          const char   *file_name);
+int zs_init(zs_scanner_t *scanner, const char *origin, const uint16_t rclass, const uint32_t ttl);
+void zs_deinit(zs_scanner_t *scanner);
+int zs_set_input_string(zs_scanner_t *scanner, const char *input, size_t size);
+int zs_set_input_file(zs_scanner_t *scanner, const char *file_name);
+int zs_parse_record(zs_scanner_t *scanner);
 const char* zs_strerror(const int code);
 ]]
 
+-- Constant table
+local zs_state = ffi.new('struct zs_state')
+
+-- Sorted set of records
+local bsearch = utils.bsearch
+sortedset_t = ffi.typeof('struct { knot_rrset_t *at; int32_t len; int32_t cap; }')
+ffi.metatype(sortedset_t, {
+	__gc = function (set)
+		for i = 0, tonumber(set.len) - 1 do set.at[i]:init(nil, 0) end
+		ffi.C.free(set.at)
+	end,
+	__len = function (set) return tonumber(set.len) end,
+	__index = {
+		newrr = function (set, noinit)
+			-- Reserve enough memory in buffer
+			if set.cap == set.len then assert(utils.buffer_grow(set)) end
+			local nid = set.len
+			set.len = nid + 1
+			-- Don't initialize if caller is going to do it immediately
+			if not noinit then
+				ffi.fill(set.at + nid, ffi.sizeof(set.at[0]))
+			end
+			return set.at[nid]
+		end,
+		sort = function (set)
+			-- Prefetch RR set comparison function
+			return utils.sort(set.at, tonumber(set.len))
+		end,
+		search = function (set, owner)
+			return bsearch(set.at, tonumber(set.len), owner)
+		end,
+		searcher = function (set)
+			return utils.bsearcher(set.at, tonumber(set.len))
+		end,
+	}
+})
+
 -- Wrap scanner context
-local zs_scanner_t = ffi.typeof('zs_scanner_t')
+local const_char_t = ffi.typeof('const char *')
+local zs_scanner_t = ffi.typeof('struct scanner')
 ffi.metatype( zs_scanner_t, {
-	__new = function(zs, on_record, on_error)
-		return ffi.gc(libzscanner.zs_scanner_create('.', 1, 3600, on_record, on_error, nil),
-		              libzscanner.zs_scanner_free)
+	__gc = function(zs) return libzscanner.zs_deinit(zs) end,
+	__new = function(ct, origin, class, ttl)
+		if not class then class = 1 end
+		if not ttl then ttl = 3600 end
+		local parser = ffi.new(ct)
+		libzscanner.zs_init(parser, origin, class, ttl)
+		return parser
 	end,
 	__index = {
-		parse_file = function(zs, file)
-			return libzscanner.zs_scanner_parse_file(zs, file)
+		open = function (zs, file)
+			assert(ffi.istype(zs, zs_scanner_t))
+			local ret = libzscanner.zs_set_input_file(zs, file)
+			if ret ~= 0 then return false, zs:strerr() end
+			return true
 		end,
-		read = function(zs, str)
-			local buf = ffi.cast(ffi.typeof('const char *'), str)
-			return libzscanner.zs_scanner_parse(zs, buf, buf + #str, false)
+		parse = function(zs, input)
+			assert(ffi.istype(zs, zs_scanner_t))
+			if input ~= nil then libzscanner.zs_set_input_string(zs, input, #input) end
+			local ret = libzscanner.zs_parse_record(zs)
+			-- Return current state only when parsed correctly, otherwise return error
+			if ret == 0 and zs.state ~= zs_state.ERROR then
+				return zs.state == zs_state.DATA
+			else
+				return false, zs:strerr()
+			end
 		end,
 		current_rr = function(zs)
+			assert(ffi.istype(zs, zs_scanner_t))
 			return {owner = ffi.string(zs.r_owner, zs.r_owner_length),
 			        ttl = tonumber(zs.r_ttl),
 			        class = tonumber(zs.r_class),
 			        type = tonumber(zs.r_type), 
 			        rdata = ffi.string(zs.r_data, zs.r_data_length)}
 		end,
-		last_error = function(zs)
-			return ffi.string(libzscanner.zs_strerror(zs.error_code))
+		strerr = function(zs)
+			assert(ffi.istype(zs, zs_scanner_t))
+			return ffi.string(libzscanner.zs_strerror(zs.error.code))
 		end,
 	},
 })
 
 -- Module API
-local zonefile = {}
-
-function zonefile.parser(on_record, on_error)
-	return zs_scanner_t(on_record, on_error)
-end
-
-function zonefile.parse_file(file)
-	local records = {}
-	local context = zonefile.parser(function (parser)
-		table.insert(records, parser:current_rr())
-	end)
-	if context:parse_file(file) ~= 0 then
-		return nil
-	end
-	return records
-end
-
-return zonefile
+local rrparser = {
+	new = zs_scanner_t,
+	file = function (path)
+		local zs = zs_scanner_t()
+		local ok, err = zs:open(path)
+		if not ok then error(err) end
+		local results = {}
+		while zs:parse() do
+			table.insert(results, zs:current_rr())
+		end
+		return results
+	end,
+	state = zs_state,
+	set = sortedset_t,
+}
+return rrparser

@@ -11,7 +11,7 @@ local bit = require('bit')
 local bor = bit.bor
 local band = bit.band
 local C = ffi.C
-local knot = ffi.load(libpath('libknot', '1'))
+local knot = ffi.load(libpath('libknot', '2'))
 ffi.cdef[[
 
 /*

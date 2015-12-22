@@ -30,7 +30,7 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "C compiler", "*all*", "*(build only)* [#]_"
-   "libknot_ 2.0+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
+   "libknot_ 2.1+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
    "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
 
@@ -45,7 +45,6 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "hiredis_", "``modules/redis``", "To build redis backend module."
    "Go_ 1.5+", "``modules``", "Build modules written in Go."
    "cmocka_", "``unit tests``", "Unit testing framework."
-   "Python_", "``integration tests``", "For test scripts."
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_", "``documentation``", "Building this HTML/PDF documentation."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
@@ -169,8 +168,25 @@ By default the resolver library is built as a dynamic library with versioned ABI
 
 When the library is linked statically, it usually produces a smaller binary. However linking it to various C modules might violate ODR and increase the size. 
 
-Building dependencies
-~~~~~~~~~~~~~~~~~~~~~
+Resolving dependencies
+~~~~~~~~~~~~~~~~~~~~~~
+
+The build system relies on `pkg-config`_ to find dependencies.
+You can override it to force custom versions of the software by environment variables.
+
+.. code-block:: bash
+
+   $ make libknot_CFLAGS="-I/opt/include" libknot_LIBS="-L/opt/lib -lknot -ldnssec"
+
+Optional dependencies may be disabled as well using ``HAS_x=yes|no`` variable.
+
+.. code-block:: bash
+
+   $ make HAS_go=no HAS_cmocka=no
+
+.. warning:: If the dependencies lie outside of library search path, you need to add them somehow.
+   Try ``LD_LIBRARY_PATH`` on Linux/BSD, and ``DYLD_FALLBACK_LIBRARY_PATH`` on OS X.
+   Otherwise you need to add the locations to linker search path.
 
 Several dependencies may not be in the packages yet, the script pulls and installs all dependencies in a chroot.
 You can avoid rebuilding dependencies by specifying `BUILD_IGNORE` variable, see the Dockerfile_ for example.
@@ -182,17 +198,6 @@ Usually you only really need to rebuild libknot_.
    $ export PKG_CONFIG_PATH="${FAKEROOT}/lib/pkgconfig"
    $ export BUILD_IGNORE="..." # Ignore installed dependencies
    $ ./scripts/bootstrap-depends.sh ${FAKEROOT}
-
-.. note:: The build system relies on `pkg-config`_ to find dependencies.
-   You can override it to force custom versions of the software by environment variables.
-
-   .. code-block:: bash
-
-      $ make libknot_CFLAGS="-I/opt/include" libknot_LIBS="-L/opt/lib -lknot -lknot-int -ldnssec"
-
-.. warning:: If the dependencies lie outside of library search path, you need to add them somehow.
-   Try ``LD_LIBRARY_PATH`` on Linux/BSD, and ``DYLD_FALLBACK_LIBRARY_PATH`` on OS X.
-   Otherwise you need to add the locations to linker search path.
 
 Building extras
 ~~~~~~~~~~~~~~~

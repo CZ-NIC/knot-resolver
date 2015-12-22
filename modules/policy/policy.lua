@@ -81,15 +81,13 @@ local function rpz_parse(action, path)
 		['\012rpz-tcp-only\0'] = policy.TC,
 		-- Policy triggers @NYI@
 	}
-	local parser = require('zonefile').parser(function (p)
-		local name = ffi.string(p.r_owner, p.r_owner_length)
-		local action = ffi.string(p.r_data, p.r_data_length)
+	local parser = require('zonefile').new()
+	if not parser:open(path) then error(string.format('failed to parse "%s"', path)) end
+	while parser:parse() do
+		local name = ffi.string(parser.r_owner, parser.r_owner_length)
+		local action = ffi.string(parser.r_data, parser.r_data_length)
 		rules[name] = action_map[action]
-	end, function (p)
-		print(string.format('[policy.rpz] %s: line %d: %s', path,
-			tonumber(p.line_counter), p:last_error()))
-	end)
-	parser:parse_file(path)
+	end
 	return rules
 end
 
