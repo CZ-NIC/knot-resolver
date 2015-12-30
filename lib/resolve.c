@@ -313,8 +313,15 @@ static int answer_finalize(struct kr_request *request, int state)
 			return ret;
 		}
 	}
-	/* Set AD=1 if succeeded and requested secured answer. */
 	struct kr_rplan *rplan = &request->rplan;
+	/* Always set SERVFAIL for bogus answers. */
+	if (state == KNOT_STATE_FAIL && rplan->pending.len > 0) {
+		struct kr_query *last = array_tail(rplan->pending);
+		if ((last->flags & QUERY_DNSSEC_WANT) && (last->flags & QUERY_DNSSEC_BOGUS)) {
+			knot_wire_set_rcode(answer->wire,KNOT_RCODE_SERVFAIL);
+		}
+	}
+	/* Set AD=1 if succeeded and requested secured answer. */
 	if (state == KNOT_STATE_DONE && rplan->resolved.len > 0) {
 		struct kr_query *last = array_tail(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
@@ -362,8 +369,6 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->options = ctx->options;
 	request->state = KNOT_STATE_CONSUME;
 	request->current_query = NULL;
-	request->qsource.key = NULL;
-	request->qsource.addr = NULL;
 	array_init(request->authority);
 	array_init(request->additional);
 
