@@ -7,7 +7,7 @@ package main
 #include <libknot/descriptor.h>
 int consume(knot_layer_t *, knot_pkt_t *);
 static inline const char *module_path(void)
-{ return PREFIX MODULEDIR; }
+{ return MODULEDIR; }
 static inline const knot_layer_api_t *_layer(void)
 { static const knot_layer_api_t api = { .consume = &consume, }; return &api; }
 */
