@@ -180,7 +180,7 @@ int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t 
     if (*have >= want) {
         return 0;
     } else {
-        mm_ctx_t *pool = baton;
+        knot_mm_t *pool = baton;
         size_t next_size = array_next_count(want);
         void *mem_new = mm_alloc(pool, next_size * elm_size);
         if (mem_new != NULL) {
@@ -237,6 +237,13 @@ const char *kr_inaddr(const struct sockaddr *addr)
 	case AF_INET6: return (const char *)&(((const struct sockaddr_in6 *)addr)->sin6_addr);
 	default:       return NULL;
 	}
+}
+
+int kr_inaddr_family(const struct sockaddr *addr)
+{
+	if (!addr)
+		return AF_UNSPEC;
+	return addr->sa_family;
 }
 
 int kr_inaddr_len(const struct sockaddr *addr)
@@ -337,7 +344,7 @@ int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank)
 	return (char *)&key_buf[ret] - key;
 }
 
-int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *pool)
+int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *pool)
 {
 	if (!stash || !rr) {
 		return kr_error(EINVAL);
@@ -372,7 +379,7 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, mm_ctx_t *p
 	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
 }
 
-int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, mm_ctx_t *pool)
+int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool)
 {
 	int ret = array_reserve_mm(*array, array->len + 1, kr_memreserve, pool);
 	if (ret != 0) {

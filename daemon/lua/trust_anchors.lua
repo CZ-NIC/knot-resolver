@@ -1,6 +1,66 @@
+-- Fetch over HTTPS with peert cert checked
+local function https_fetch(url, ca)
+	local ssl_ok, https = pcall(require, 'ssl.https')
+	local ltn_ok, ltn12 = pcall(require, 'ltn12')
+	if not ssl_ok or not ltn_ok then
+		return nil, 'luasec and luasocket needed for root TA bootstrap'
+	end
+	local resp = {}
+	local r, c, h, s = https.request{
+	       url = url,
+	       cafile = ca,
+	       verify = {'peer', 'fail_if_no_peer_cert' },
+	       protocol = 'tlsv1_2',
+	       sink = ltn12.sink.table(resp),
+	}
+	if r == nil then return r, c end
+	return resp[1]
+end
+
+-- Fetch root anchors in XML over HTTPS
+local function bootstrap(url, ca)
+	-- @todo ICANN certificate is verified against current CA
+	--       this is not ideal, as it should rather verify .xml signature which
+	--       is signed by ICANN long-lived cert, but luasec has no PKCS7
+	ca = ca or etcdir..'/icann-ca.pem'
+	url = url or 'https://data.iana.org/root-anchors/root-anchors.xml'
+	local xml, err = https_fetch(url, ca)
+	if not xml then
+		return false, string.format('[ ta ] fetch of "%s" failed: %s', url, err)
+	end
+	-- Parse root trust anchor
+	local fields = {}
+	string.gsub(xml, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
+	local rrdata = string.format('%s %s %s %s', fields.KeyDigest, fields.Algorithm, fields.DigestType, fields.Digest)
+	local rr = string.format('%s 0 IN DS %s', fields.TrustAnchor, rrdata)
+	-- Add to key set, create an empty keyset file to be filled
+	print('[ ta ] warning: root anchor bootstrapped, you SHOULD check the key manually, see: '..
+	      'https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs')
+	return rr
+end
+
+-- Load the module (check for FFI)
 local ffi_ok, ffi = pcall(require, 'ffi')
 if not ffi_ok then
-	return { error = 'FFI not available, trust_anchors disabled.' }
+	-- Simplified TA management, no RFC5011 automatics
+	return {
+		-- Reuse Lua/C global function
+		add = trustanchor,
+		-- Simplified trust anchor management
+		config = function (path)
+			if not path then return end
+			if not io.open(path, 'r') then
+				local rr, err = bootstrap()
+				if not rr then print(err) return false end
+				io.open(path, 'w'):write(rr..'\n')
+			end
+			for line in io.lines(path) do
+				trustanchor(line)
+			end
+		end,
+		-- Disabled
+		set_insecure = function () error('[ ta ] FFI not available, this function is disabled') end,
+	}
 end
 local kres = require('kres')
 local C = ffi.C
@@ -147,25 +207,6 @@ local function keyset_write(keyset, path)
 	os.rename(path..'.lock', path)
 end
 
--- Fetch over HTTPS with peert cert checked
-local function https_fetch(url, ca)
-	local ssl_ok, https = pcall(require, 'ssl.https')
-	local ltn_ok, ltn12 = pcall(require, 'ltn12')
-	if not ssl_ok or not ltn_ok then
-		return nil, 'luasec and luasocket needed for root TA bootstrap'
-	end
-	local resp = {}
-	local r, c, h, s = https.request{
-	       url = url,
-	       cafile = ca,
-	       verify = {'peer', 'fail_if_no_peer_cert' },
-	       protocol = 'tlsv1_2',
-	       sink = ltn12.sink.table(resp),
-	}
-	if r == nil then return r, c end
-	return resp[1]
-end
-
 -- TA store management
 local trust_anchors = {
 	keyset = {},
@@ -210,19 +251,21 @@ local trust_anchors = {
 		return true
 	end,
 	-- Load keys from a file (managed)
-	config = function (path, unmanaged, bootstrap)
-		bootstrap = true
+	config = function (path, unmanaged)
 		-- Bootstrap if requested and keyfile doesn't exist
-		if bootstrap and not io.open(path, 'r') then
-			if not trust_anchors.bootstrap() then
+		if not io.open(path, 'r') then
+			local rr, msg = bootstrap()
+			print(msg)
+			if not rr then
 				error('you MUST obtain the root TA manually, see: '..
 				      'http://knot-resolver.readthedocs.org/en/latest/daemon.html#enabling-dnssec')
 			end
+			trustanchor(rr)
 		elseif path == trust_anchors.file_current then
 			return
 		end
 		-- Parse new keys
-		local new_keys = require('zonefile').parse_file(path)
+		local new_keys = require('zonefile').file(path)
 		trust_anchors.file_current = path
 		if unmanaged then trust_anchors.file_current = nil end
 		trust_anchors.keyset = {}
@@ -233,11 +276,7 @@ local trust_anchors = {
 	end,
 	-- Add DS/DNSKEY record(s) (unmanaged)
 	add = function (keystr)
-		local store = kres.context().trust_anchors
-		return require('zonefile').parser(function (p)
-			local rr = p:current_rr()
-			C.kr_ta_add(store, rr.owner, rr.type, rr.ttl, rr.rdata, #rr.rdata)
-		end):read(keystr..'\n')
+		return trustanchor(keystr)
 	end,
 	-- Negative TA management
 	set_insecure = function (list)
@@ -248,33 +287,6 @@ local trust_anchors = {
 			C.kr_ta_add(store, dname, kres.type.DS, 0, nil, 0)
 		end
 		trust_anchors.insecure = list
-	end,
-	bootstrap = function (url, ca)
-		-- Fetch root anchors in XML over HTTPS
-		-- @todo ICANN certificate is verified against current CA
-		--       this is not ideal, as it should rather verify .xml signature which
-		--       is signed by ICANN long-lived cert, but luasec has no PKCS7
-		ca = ca or etcdir..'/icann-ca.pem'
-		url = url or 'https://data.iana.org/root-anchors/root-anchors.xml'
-		local xml, err = https_fetch(url, ca)
-		if not xml then
-			print(string.format('[ ta ] fetch of "%s" failed: %s', url, err))
-			return false
-		end
-		-- Parse root trust anchor
-		local fields = {}
-		string.gsub(xml, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
-		local rrdata = string.format('%s %s %s %s', fields.KeyDigest, fields.Algorithm, fields.DigestType, fields.Digest)
-		local rr = string.format('%s 0 IN DS %s', fields.TrustAnchor, rrdata)
-		-- Add to key set, create an empty keyset file to be filled
-		if trust_anchors.add(rr) ~= 0 then
-			print(string.format('[ ta ] invalid format of the RR "%s"', rr))
-			return false
-		end
-		print(string.format('[ ta ] bootstrapped root anchor "%s"', rrdata))
-		print('[ ta ] warning: you SHOULD check the key manually, see: '..
-		      'https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs')
-		return true
 	end,
 }
 

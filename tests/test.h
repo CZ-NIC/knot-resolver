@@ -31,7 +31,7 @@
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 #include "lib/defines.h"
-#include <libknot/internal/mempattern.h>
+#include "lib/utils.h"
 #include <libknot/descriptor.h>
 #include <libknot/rrset.h>
 
@@ -42,7 +42,7 @@ static inline void mm_test_free(void *p)
 { if (p) test_free(p); }
 
 /** Memory context using CMocka allocator. */
-static inline void test_mm_ctx_init(mm_ctx_t *mm)
+static inline void test_mm_ctx_init(knot_mm_t *mm)
 {
 	mm->alloc = &mm_test_malloc;
 	mm->free = &mm_test_free;

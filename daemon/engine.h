@@ -35,13 +35,14 @@
  */
 struct lua_State;
 
+#include "lib/utils.h"
 #include "lib/resolve.h"
 #include "daemon/network.h"
 
 /** Cache storage backend. */
 struct storage_api {
 	const char *prefix; /**< Storage prefix, e.g. 'lmdb://' */
-	const namedb_api_t *(*api)(void); /**< Storage API implementation */
+	const knot_db_api_t *(*api)(void); /**< Storage API implementation */
 	void *(*opts_create)(const char *, size_t); /**< Storage options factory */
 };
 
@@ -53,11 +54,11 @@ struct engine {
     struct network net;
     module_array_t modules;
     storage_registry_t storage_registry;
-    mm_ctx_t *pool;
+    knot_mm_t *pool;
     struct lua_State *L;
 };
 
-int engine_init(struct engine *engine, mm_ctx_t *pool);
+int engine_init(struct engine *engine, knot_mm_t *pool);
 void engine_deinit(struct engine *engine);
 /** @warning This function leaves 1 string result on stack. */
 int engine_cmd(struct engine *engine, const char *str);

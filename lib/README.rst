@@ -259,10 +259,6 @@ In layers that either begin or finalize, you can walk the list of resolved queri
 
 	local last = req:resolved()
 	print(last.type)
-	last = last:next()
-	if last ~= nil then
-		print(last.type)
-	end
 
 As described in the layers, you can not only retrieve information about current query, but also push new ones or pop old ones.
 

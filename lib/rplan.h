@@ -18,9 +18,7 @@
 
 #include <sys/time.h>
 #include <libknot/dname.h>
-#include <libknot/internal/lists.h>
-#include <libknot/internal/namedb/namedb.h>
-#include <libknot/internal/sockaddr.h>
+#include <libknot/codes.h>
 
 #include "lib/cache.h"
 #include "lib/zonecut.h"
@@ -55,13 +53,12 @@ enum kr_query_flag {
 
 /** Query flag names table */
 KR_EXPORT KR_CONST
-const lookup_table_t *kr_query_flag_names(void);
+const knot_lookup_t *kr_query_flag_names(void);
 
 /**
  * Single query representation.
  */
 struct kr_query {
-	node_t node;
 	struct kr_query *parent;
 	knot_dname_t *sname;
 	uint16_t stype;
@@ -75,6 +72,9 @@ struct kr_query {
 	struct kr_layer_pickle *deferred;
 };
 
+/** @internal Array of queries. */
+typedef array_t(struct kr_query *) kr_qarray_t;
+
 /**
  * Query resolution plan structure.
  *
@@ -83,10 +83,10 @@ struct kr_query {
  * It also keeps a notion of current zone cut.
  */
 struct kr_rplan {
-	list_t pending;              /**< List of pending queries. */
-	list_t resolved;             /**< List of resolved queries. */
-	struct kr_request *request;  /**< Parent resolution request. */
-	mm_ctx_t *pool;              /**< Temporary memory pool. */
+	kr_qarray_t pending;        /**< List of pending queries. */
+	kr_qarray_t resolved;       /**< List of resolved queries. */
+	struct kr_request *request; /**< Parent resolution request. */
+	knot_mm_t *pool;             /**< Temporary memory pool. */
 };
 
 /**
@@ -96,7 +96,7 @@ struct kr_rplan {
  * @param pool ephemeral memory pool for whole resolution
  */
 KR_EXPORT
-int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, mm_ctx_t *pool);
+int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, knot_mm_t *pool);
 
 /**
  * Deinitialize resolution plan, aborting any uncommited transactions.

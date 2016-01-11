@@ -11,7 +11,7 @@ local bit = require('bit')
 local bor = bit.bor
 local band = bit.band
 local C = ffi.C
-local knot = ffi.load(libpath('libknot', '1'))
+local knot = ffi.load(libpath('libknot', '2'))
 ffi.cdef[[
 
 /*
@@ -118,9 +118,6 @@ struct sockaddr {
 /* libknot */
 typedef int knot_section_t; /* Do not touch */
 typedef void knot_rrinfo_t; /* Do not touch */
-typedef struct node {
-  struct node *next, *prev;
-} node_t;
 typedef uint8_t knot_dname_t;
 typedef uint8_t knot_rdata_t;
 typedef struct knot_rdataset {
@@ -174,7 +171,6 @@ typedef struct {
 	size_t cap;
 } rr_array_t;
 struct kr_query {
-	node_t _node;
 	struct kr_query *parent;
 	knot_dname_t *sname;
 	uint16_t type;
@@ -258,6 +254,7 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
 int kr_pkt_recycle(knot_pkt_t *pkt);
 const char *kr_inaddr(const struct sockaddr *addr);
+int kr_inaddr_family(const struct sockaddr *addr);
 int kr_inaddr_len(const struct sockaddr *addr);
 int kr_straddr_family(const char *addr);
 int kr_straddr_subnet(void *dst, const char *addr);
@@ -285,6 +282,7 @@ ffi.metatype( sockaddr_t, {
 	__index = {
 		len = function(sa) return C.kr_inaddr_len(sa) end,
 		ip = function (sa) return C.kr_inaddr(sa) end,
+		family = function (sa) return C.kr_inaddr_family(sa) end,
 	}
 })
 
@@ -353,10 +351,6 @@ local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
 		name = function(qry, new_name) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
-		next = function(qry)
-			assert(qry)
-			return C.kr_rplan_next(qry)
-		end,
 		resolved = function(qry)
 			return band(qry.flags, kres.query.RESOLVED) ~= 0
 		end,

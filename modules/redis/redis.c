@@ -14,7 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libknot/internal/namedb/namedb.h>
+#include <libknot/db/db.h>
 #include <contrib/cleanup.h>
 #include <uv.h>
 
@@ -24,7 +24,7 @@
 #include "lib/cache.h"
 
 /** @internal Redis API */
-extern const namedb_api_t *namedb_redis_api(void);
+extern const knot_db_api_t *namedb_redis_api(void);
 
 /** @internal Make redis options. */
 void *namedb_redis_mkopts(const char *conf_, size_t maxsize)

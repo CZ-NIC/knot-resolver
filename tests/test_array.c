@@ -17,7 +17,7 @@
 #include "tests/test.h"
 #include "lib/generic/array.h"
 
-mm_ctx_t global_mm;
+knot_mm_t global_mm;
 
 static void test_array(void **state)
 {

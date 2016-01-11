@@ -21,9 +21,9 @@
 #include <unistd.h>
 #include <grp.h>
 #include <pwd.h>
-#include <libknot/internal/mempattern.h>
-/* #include <libknot/internal/namedb/namedb_trie.h> @todo Not supported (doesn't keep value copy) */
-#include <libknot/internal/namedb/namedb_lmdb.h>
+/* #include <libknot/internal/namedb/knot_db_trie.h> @todo Not supported (doesn't keep value copy) */
+#include <libknot/db/db_lmdb.h>
+#include <zscanner/scanner.h>
 
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
@@ -177,7 +177,7 @@ static int l_option(lua_State *L)
 	unsigned opt_code = 0;
 	if (lua_isstring(L, 1)) {
 		const char *opt = lua_tostring(L, 1);
-		for (const lookup_table_t *it = kr_query_flag_names(); it->name; ++it) {
+		for (const knot_lookup_t *it = kr_query_flag_names(); it->name; ++it) {
 			if (strcmp(it->name, opt) == 0) {
 				opt_code = it->id;
 				break;
@@ -197,6 +197,52 @@ static int l_option(lua_State *L)
 		}
 	}
 	lua_pushboolean(L, engine->resolver.options & opt_code);
+	return 1;
+}
+
+/** Enable/disable trust anchor. */
+static int l_trustanchor(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	const char *anchor = lua_tostring(L, 1);
+	bool enable = lua_isboolean(L, 2) ? lua_toboolean(L, 2) : true;
+	if (!anchor || strlen(anchor) == 0) {
+		return 0;
+	}
+	/* If disabling, parse the owner string only. */
+	if (!enable) {
+		knot_dname_t *owner = knot_dname_from_str(NULL, anchor, KNOT_DNAME_MAXLEN);
+		if (!owner) {
+			lua_pushstring(L, "invalid trust anchor owner");
+			lua_error(L);
+		}
+		lua_pushboolean(L, kr_ta_del(&engine->resolver.trust_anchors, owner) == 0);
+		free(owner);
+		return 1;
+	}
+
+	/* Parse the record */
+	zs_scanner_t *zs = malloc(sizeof(*zs));
+	if (!zs || zs_init(zs, ".", 1, 0) != 0) {
+		free(zs);
+		lua_pushstring(L, "not enough memory");
+		lua_error(L);
+	}
+	int ok = zs_set_input_string(zs, anchor, strlen(anchor)) == 0 &&
+	         zs_parse_all(zs) == 0;
+	/* Add it to TA set and cleanup */
+	if (ok) {
+		ok = kr_ta_add(&engine->resolver.trust_anchors,
+		               zs->r_owner, zs->r_type, zs->r_ttl, zs->r_data, zs->r_data_length) == 0;
+	}
+	zs_deinit(zs);
+	free(zs);
+	/* Report errors */
+	if (!ok) {
+		lua_pushstring(L, "failed to process trust anchor RR");
+		lua_error(L);
+	}
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -320,9 +366,9 @@ static int l_trampoline(lua_State *L)
  */
 
 /** @internal Make lmdb options. */
-void *namedb_lmdb_mkopts(const char *conf, size_t maxsize)
+void *knot_db_lmdb_mkopts(const char *conf, size_t maxsize)
 {
-	struct namedb_lmdb_opts *opts = malloc(sizeof(*opts));
+	struct knot_db_lmdb_opts *opts = malloc(sizeof(*opts));
 	if (opts) {
 		memset(opts, 0, sizeof(*opts));
 		opts->path = (conf && strlen(conf)) ? conf : ".";
@@ -366,7 +412,7 @@ static int init_resolver(struct engine *engine)
 
 	/* Initialize storage backends */
 	struct storage_api lmdb = {
-		"lmdb://", namedb_lmdb_api, namedb_lmdb_mkopts
+		"lmdb://", knot_db_lmdb_api, knot_db_lmdb_mkopts
 	};
 
 	return array_push(engine->storage_registry, lmdb);
@@ -395,6 +441,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "option");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
+	lua_pushcfunction(engine->L, l_trustanchor);
+	lua_setglobal(engine->L, "trustanchor");
 	lua_pushcfunction(engine->L, l_libpath);
 	lua_setglobal(engine->L, "libpath");
 	lua_pushliteral(engine->L, MODULEDIR);
@@ -406,7 +454,7 @@ static int init_state(struct engine *engine)
 	return kr_ok();
 }
 
-int engine_init(struct engine *engine, mm_ctx_t *pool)
+int engine_init(struct engine *engine, knot_mm_t *pool)
 {
 	if (engine == NULL) {
 		return kr_error(EINVAL);

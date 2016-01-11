@@ -6,7 +6,6 @@ libkres_SOURCES := \
 	lib/layer/pktcache.c   \
 	lib/dnssec/nsec.c      \
 	lib/dnssec/nsec3.c     \
-	lib/dnssec/packet/pkt.c \
 	lib/dnssec/signature.c \
 	lib/dnssec/ta.c        \
 	lib/dnssec.c           \
@@ -25,8 +24,6 @@ libkres_HEADERS := \
 	lib/layer.h            \
 	lib/dnssec/nsec.h      \
 	lib/dnssec/nsec3.h     \
-	lib/dnssec/packet/pkt.h \
-	lib/dnssec/rrtype/ds.h \
 	lib/dnssec/signature.h \
 	lib/dnssec/ta.h        \
 	lib/dnssec.h           \

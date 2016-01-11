@@ -24,7 +24,7 @@ bindings-install: $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 
 kresd_CFLAGS := -fPIE
 kresd_DEPEND := $(libkres) $(contrib)
-kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS)
+kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) $(libzscanner_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS)
 
 # Make binary
 ifeq ($(HAS_lua)|$(HAS_libuv), yes|yes)

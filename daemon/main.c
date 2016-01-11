@@ -18,9 +18,11 @@
 #include <string.h>
 #include <getopt.h>
 #include <uv.h>
+#include <assert.h>
 #include <contrib/cleanup.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/ccan/asprintf/asprintf.h>
+#include <libknot/error.h>
 
 #include "lib/defines.h"
 #include "lib/resolve.h"
@@ -141,7 +143,7 @@ static void help(int argc, char *argv[])
 	       " [rundir]             Path to the working directory (default: .)\n");
 }
 
-static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, mm_ctx_t *pool, int worker_id, int worker_count)
+static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, knot_mm_t *pool, int worker_id, int worker_count)
 {
 	/* Load bindings */
 	engine_lualib(engine, "modules", lib_modules);
@@ -333,9 +335,9 @@ int main(int argc, char **argv)
 	uv_signal_start(&sigint, signal_handler, SIGINT);
 	uv_signal_start(&sigterm, signal_handler, SIGTERM);
 	/* Create a server engine. */
-	mm_ctx_t pool = {
+	knot_mm_t pool = {
 		.ctx = mp_new (4096),
-		.alloc = (mm_alloc_t) mp_alloc
+		.alloc = (knot_mm_alloc_t) mp_alloc
 	};
 	struct engine engine;
 	ret = engine_init(&engine, &pool);

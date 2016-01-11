@@ -18,7 +18,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include <libknot/internal/sockaddr.h>
 
 #include "lib/nsrep.h"
 #include "lib/rplan.h"

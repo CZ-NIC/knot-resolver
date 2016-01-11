@@ -110,7 +110,7 @@ static int pktcache_peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Prepare read transaction */
 	struct kr_cache_txn txn;
 	struct kr_cache *cache = &req->ctx->cache;
-	if (kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY) != 0) {
+	if (kr_cache_txn_begin(cache, &txn, KNOT_DB_RDONLY) != 0) {
 		return ctx->state;
 	}
 
@@ -191,7 +191,7 @@ static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (kr_cache_txn_begin(&req->ctx->cache, &txn, 0) != 0) {
 		return ctx->state; /* Couldn't acquire cache, ignore. */
 	}
-	namedb_val_t data = { pkt->wire, pkt->size };
+	knot_db_val_t data = { pkt->wire, pkt->size };
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,
 		.ttl = ttl,

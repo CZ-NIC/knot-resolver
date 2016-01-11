@@ -15,6 +15,7 @@
  */
 
 #include <sys/time.h>
+#include <assert.h>
 
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
@@ -520,7 +521,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 #ifndef NDEBUG
-	lookup_table_t *rcode = lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
+	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 #endif
 
 	/* Check response code. */

@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <libknot/internal/consts.h>
-#include <libknot/internal/mempattern.h>
 #include <libknot/packet/pkt.h>
 
 /**

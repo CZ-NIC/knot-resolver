@@ -26,7 +26,6 @@
 
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
-#include "lib/dnssec/packet/pkt.h"
 #include "lib/dnssec.h"
 #include "lib/layer.h"
 #include "lib/resolve.h"
@@ -36,6 +35,44 @@
 #include "lib/module.h"
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "vldr", fmt)
+
+/**
+ * Search in section for given type.
+ * @param sec  Packet section.
+ * @param type Type to search for.
+ * @return     True if found.
+ */
+static bool section_has_type(const knot_pktsection_t *sec, uint16_t type)
+{
+	if (!sec) {
+		return false;
+	}
+
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
+		if (rr->type == type) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
+{
+	if (!pkt) {
+		return false;
+	}
+
+	if (section_has_type(knot_pkt_section(pkt, KNOT_ANSWER), type)) {
+		return true;
+	}
+	if (section_has_type(knot_pkt_section(pkt, KNOT_AUTHORITY), type)) {
+		return true;
+	}
+	return section_has_type(knot_pkt_section(pkt, KNOT_ADDITIONAL), type);
+}
+
 
 /** @internal Baton for validate_section */
 struct validate_baton {
@@ -63,7 +100,7 @@ static int validate_rrset(const char *key, void *val, void *data)
 }
 
 static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
-                            knot_section_t section_id, mm_ctx_t *pool,
+                            knot_section_t section_id, knot_mm_t *pool,
                             bool has_nsec3)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(answer, section_id);
@@ -120,7 +157,7 @@ fail:
 	return ret;
 }
 
-static int validate_records(struct kr_query *qry, knot_pkt_t *answer, mm_ctx_t *pool, bool has_nsec3)
+static int validate_records(struct kr_query *qry, knot_pkt_t *answer, knot_mm_t *pool, bool has_nsec3)
 {
 	if (!qry->zone_cut.key) {
 		DEBUG_MSG(qry, "<= no DNSKEY, can't validate\n");
@@ -346,7 +383,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check if this is a DNSKEY answer, check trust chain and store. */
 	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 	uint16_t qtype = knot_pkt_qtype(pkt);
-	bool has_nsec3 = _knot_pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
+	bool has_nsec3 = pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
 	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
 		ret = validate_keyset(qry, pkt, has_nsec3);
 		if (ret != 0) {
@@ -360,7 +397,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags & QUERY_CACHED) && pkt_rcode == KNOT_RCODE_NXDOMAIN) {
 		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
-			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname, &req->pool);
+			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		} else {
 			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}

@@ -29,19 +29,19 @@
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
 /** @internal LUT of query flag names. */
-const lookup_table_t query_flag_names[] = {
+const knot_lookup_t query_flag_names[] = {
 	#define X(flag, _) { QUERY_ ## flag, #flag },
 	QUERY_FLAGS(X)
 	#undef X
 	{ 0, NULL }
 };
 
-const lookup_table_t *kr_query_flag_names(void)
+const knot_lookup_t *kr_query_flag_names(void)
 {
 	return query_flag_names;
 }
 
-static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
+static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name)
 {
 	if (name == NULL) {
 		return NULL;
@@ -63,14 +63,14 @@ static struct kr_query *query_create(mm_ctx_t *pool, const knot_dname_t *name)
 	return qry;
 }
 
-static void query_free(mm_ctx_t *pool, struct kr_query *qry)
+static void query_free(knot_mm_t *pool, struct kr_query *qry)
 {
 	kr_zonecut_deinit(&qry->zone_cut);
 	mm_free(pool, qry->sname);
 	mm_free(pool, qry);
 }
 
-int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, mm_ctx_t *pool)
+int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, knot_mm_t *pool)
 {
 	if (rplan == NULL) {
 		return KNOT_EINVAL;
@@ -80,8 +80,8 @@ int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, mm_ctx_t *
 
 	rplan->pool = pool;
 	rplan->request = request;
-	init_list(&rplan->pending);
-	init_list(&rplan->resolved);
+	array_init(rplan->pending);
+	array_init(rplan->resolved);
 	return KNOT_EOK;
 }
 
@@ -91,13 +91,14 @@ void kr_rplan_deinit(struct kr_rplan *rplan)
 		return;
 	}
 
-	struct kr_query *qry = NULL, *next = NULL;
-	WALK_LIST_DELSAFE(qry, next, rplan->pending) {
-		query_free(rplan->pool, qry);
+	for (size_t i = 0; i < rplan->pending.len; ++i) {
+		query_free(rplan->pool, rplan->pending.at[i]);
 	}
-	WALK_LIST_DELSAFE(qry, next, rplan->resolved) {
-		query_free(rplan->pool, qry);
+	for (size_t i = 0; i < rplan->resolved.len; ++i) {
+		query_free(rplan->pool, rplan->resolved.at[i]);
 	}
+	array_clear_mm(rplan->pending, mm_free, rplan->pool);
+	array_clear_mm(rplan->resolved, mm_free, rplan->pool);
 }
 
 bool kr_rplan_empty(struct kr_rplan *rplan)
@@ -106,13 +107,19 @@ bool kr_rplan_empty(struct kr_rplan *rplan)
 		return true;
 	}
 
-	return EMPTY_LIST(rplan->pending);
+	return rplan->pending.len == 0;
 }
 
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
 	if (rplan == NULL || name == NULL) {
+		return NULL;
+	}
+
+	/* Make sure there's enough space */
+	int ret = array_reserve_mm(rplan->pending, rplan->pending.len + 1, kr_memreserve, rplan->pool);
+	if (ret != 0) {
 		return NULL;
 	}
 
@@ -126,8 +133,8 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	qry->parent = parent;
 	qry->ns.addr[0].ip.sa_family = AF_UNSPEC;
 	gettimeofday(&qry->timestamp, NULL);
-	add_tail(&rplan->pending, &qry->node);
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
+	array_push(rplan->pending, qry);
 
 	WITH_DEBUG {
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
@@ -144,16 +151,26 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 		return KNOT_EINVAL;
 	}
 
-	rem_node(&qry->node);
-	add_tail(&rplan->resolved, &qry->node);
+	/* Make sure there's enough space */
+	int ret = array_reserve_mm(rplan->resolved, rplan->resolved.len + 1, kr_memreserve, rplan->pool);
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* Find the query, it will likely be on top */
+	for (size_t i = rplan->pending.len; i --> 0;) {
+		if (rplan->pending.at[i] == qry) {
+			array_del(rplan->pending, i);
+			array_push(rplan->resolved, qry);
+			break;
+		}
+	}
 	return KNOT_EOK;
 }
 
 bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
-	if (!name)
-		return false;
-	while (closure != NULL) {
+	while (name && closure) {
 		if (QUERY_PROVIDES(closure, name, cls, type)) {
 			return true;
 		}
@@ -164,18 +181,10 @@ bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint
 
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan)
 {
-	if (EMPTY_LIST(rplan->resolved)) {
+	if (rplan->resolved.len == 0) {
 		return NULL;
 	}
-	return TAIL(rplan->resolved);
-}
-
-struct kr_query *kr_rplan_next(struct kr_query *qry)
-{
-	if (!qry) {
-		return NULL;
-	}
-	return (struct kr_query *)qry->node.prev; /* The lists are used as stack, TOP is the TAIL. */
+	return array_tail(rplan->resolved);
 }
 
 #undef DEBUG_MSG

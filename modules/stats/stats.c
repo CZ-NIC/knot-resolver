@@ -115,9 +115,9 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 {
 	/* Sample key = {[2] type, [1-255] owner} */
 	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
-	struct kr_query *qry = NULL;
-	WALK_LIST(qry, rplan->resolved) {
+	for (size_t i = 0; i < rplan->resolved.len; ++i) {
 		/* Sample queries leading to iteration or expiring */
+		struct kr_query *qry = rplan->resolved.at[i];
 		if ((qry->flags & QUERY_CACHED) && !(qry->flags & QUERY_EXPIRING)) {
 			continue;
 		}
@@ -146,10 +146,10 @@ static int collect(knot_layer_t *ctx)
 	collect_answer(data, param->answer);
 	collect_sample(data, rplan, param->answer);
 	/* Count cached and unresolved */
-	if (!EMPTY_LIST(rplan->resolved)) {
+	if (rplan->resolved.len > 0) {
 		/* Histogram of answer latency. */
-		struct kr_query *first = HEAD(rplan->resolved);
-		struct kr_query *last = TAIL(rplan->resolved);
+		struct kr_query *first = rplan->resolved.at[0];
+		struct kr_query *last = array_tail(rplan->resolved);
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		long elapsed = time_diff(&first->timestamp, &now);

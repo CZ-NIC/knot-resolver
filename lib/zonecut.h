@@ -33,7 +33,7 @@ struct kr_zonecut {
 	knot_rrset_t* key;  /**< Zone cut DNSKEY. */
 	knot_rrset_t* trust_anchor; /**< Current trust anchor. */
 	struct kr_zonecut *parent; /**< Parent zone cut. */
-	mm_ctx_t *pool;     /**< Memory pool. */
+	knot_mm_t *pool;     /**< Memory pool. */
 };
 
 /**
@@ -44,7 +44,7 @@ struct kr_zonecut {
  * @return 0 or error code
  */
 KR_EXPORT
-int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, mm_ctx_t *pool);
+int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, knot_mm_t *pool);
 
 /**
  * Clear the structure and free the address set.

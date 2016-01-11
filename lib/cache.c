@@ -20,8 +20,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <libknot/internal/mempattern.h>
-#include <libknot/internal/namedb/namedb_lmdb.h>
+#include <libknot/db/db_lmdb.h>
 #include <libknot/errcode.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
@@ -48,8 +47,8 @@ static void assert_right_version(struct kr_cache *cache)
 	if (ret != 0) {
 		return; /* N/A, doesn't work. */
 	}
-	namedb_val_t key = { KEY_VERSION, 2 };
-	namedb_val_t val = { NULL, 0 };
+	knot_db_val_t key = { KEY_VERSION, 2 };
+	knot_db_val_t val = { NULL, 0 };
 	ret = txn_api(&txn)->find(&txn.t, &key, &val, 0);
 	if (ret == 0) { /* Version is OK */
 		kr_cache_txn_abort(&txn);
@@ -70,13 +69,13 @@ static void assert_right_version(struct kr_cache *cache)
 	}
 }
 
-int kr_cache_open(struct kr_cache *cache, const namedb_api_t *api, void *opts, mm_ctx_t *mm)
+int kr_cache_open(struct kr_cache *cache, const knot_db_api_t *api, void *opts, knot_mm_t *mm)
 {
 	if (!cache) {
 		return kr_error(EINVAL);
 	}
 	/* Open cache */
-	cache->api = (api == NULL) ? namedb_lmdb_api() : api;
+	cache->api = (api == NULL) ? knot_db_lmdb_api() : api;
 	int ret = cache->api->init(&cache->db, mm, opts);
 	if (ret != 0) {
 		return ret;
@@ -109,7 +108,7 @@ int kr_cache_txn_begin(struct kr_cache *cache, struct kr_cache_txn *txn, unsigne
 	} else {
 		/* Count statistics */
 		txn->owner = cache;
-		if (flags & NAMEDB_RDONLY) {
+		if (flags & KNOT_DB_RDONLY) {
 			cache->stats.txn_read += 1;
 		} else {
 			cache->stats.txn_write += 1;
@@ -166,8 +165,8 @@ static struct kr_cache_entry *lookup(struct kr_cache_txn *txn, uint8_t tag, cons
 	}
 
 	/* Look up and return value */
-	namedb_val_t key = { keybuf, key_len };
-	namedb_val_t val = { NULL, 0 };
+	knot_db_val_t key = { keybuf, key_len };
+	knot_db_val_t val = { NULL, 0 };
 	int ret = txn_api(txn)->find(&txn->t, &key, &val, 0);
 	if (ret != KNOT_EOK) {
 		return NULL;
@@ -220,7 +219,7 @@ int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *nam
 	return ret;
 }
 
-static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *header, namedb_val_t data)
+static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *header, knot_db_val_t data)
 {
 	assert(dst && header);
 	memcpy(dst, header, sizeof(*header));
@@ -229,7 +228,7 @@ static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *heade
 }
 
 int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
-                    struct kr_cache_entry *header, namedb_val_t data)
+                    struct kr_cache_entry *header, knot_db_val_t data)
 {
 	if (!txn_is_valid(txn) || !name || !header) {
 		return kr_error(EINVAL);
@@ -241,13 +240,13 @@ int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 	if (key_len == 0) {
 		return kr_error(EILSEQ);
 	}
-	namedb_val_t key = { keybuf, key_len };
-	namedb_val_t entry = { NULL, sizeof(*header) + data.len };
-	const namedb_api_t *db_api = txn_api(txn);
+	knot_db_val_t key = { keybuf, key_len };
+	knot_db_val_t entry = { NULL, sizeof(*header) + data.len };
+	const knot_db_api_t *db_api = txn_api(txn);
 
 	/* LMDB can do late write and avoid copy */
 	txn->owner->stats.insert += 1;
-	if (db_api == namedb_lmdb_api()) {
+	if (db_api == knot_db_lmdb_api()) {
 		int ret = db_api->insert(&txn->t, &key, &entry, 0);
 		if (ret != 0) {
 			return ret;
@@ -281,7 +280,7 @@ int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 	if (key_len == 0) {
 		return kr_error(EILSEQ);
 	}
-	namedb_val_t key = { keybuf, key_len };
+	knot_db_val_t key = { keybuf, key_len };
 	txn->owner->stats.delete += 1;
 	return txn_api(txn)->del(&txn->t, &key);
 }
@@ -331,7 +330,7 @@ int kr_cache_peek_rank(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t
 	return found->rank;
 }
 
-int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, mm_ctx_t *mm)
+int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, knot_mm_t *mm)
 {
 	if (!dst || !src) {
 		return kr_error(EINVAL);
@@ -391,7 +390,7 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_
 		rd = kr_rdataset_next(rd);
 	}
 
-	namedb_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
+	knot_db_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
 	return kr_cache_insert(txn, KR_CACHE_RR, rr->owner, rr->type, &header, data);
 }
 
@@ -443,6 +442,6 @@ int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint
 	}
 
 	uint16_t covered = knot_rrsig_type_covered(&rr->rrs, 0);
-	namedb_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
+	knot_db_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
 	return kr_cache_insert(txn, KR_CACHE_SIG, rr->owner, covered, &header, data);
 }

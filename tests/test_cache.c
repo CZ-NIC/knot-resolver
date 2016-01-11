@@ -14,7 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libknot/internal/namedb/namedb_lmdb.h>
+#include <libknot/db/db_lmdb.h>
 #include <ucw/mempool.h>
 
 #include "tests/test.h"
@@ -24,7 +24,7 @@
 #include <time.h>
 #include <dlfcn.h>
 
-mm_ctx_t global_mm;
+knot_mm_t global_mm;
 struct kr_cache_txn global_txn;
 knot_rrset_t global_rr;
 const char *global_env;
@@ -33,32 +33,15 @@ struct kr_cache_entry global_fake_ce;
 #define NAMEDB_INTS 256
 #define NAMEDB_DATA_SIZE (NAMEDB_INTS * sizeof(int))
 uint8_t namedb_data[NAMEDB_DATA_SIZE];
-namedb_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
-bool is_malloc_mocked = false;
+knot_db_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
 
 #define CACHE_SIZE 10 * 4096
 #define CACHE_TTL 10
 #define CACHE_TIME 0
 
-void * (*original_malloc) (size_t __size);
-int (*original_knot_rdataset_add)(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm) = NULL;
+int (*original_knot_rdataset_add)(knot_rdataset_t *rrs, const knot_rdata_t *rr, knot_mm_t *mm) = NULL;
 
-void *malloc(size_t __size)
-{
-	int err_mock = KNOT_EOK;
-	if (original_malloc == NULL)
-	{
-		original_malloc = dlsym(RTLD_NEXT,"malloc");
-		assert_non_null (malloc);
-	}
-	if (is_malloc_mocked)
-	{
-		err_mock = mock();
-	}
-	return (err_mock != KNOT_EOK) ? NULL : original_malloc (__size);
-}
-
-int knot_rdataset_add(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm)
+int knot_rdataset_add(knot_rdataset_t *rrs, const knot_rdata_t *rr, knot_mm_t *mm)
 {
 	int err, err_mock;
 	err_mock = (int)mock();
@@ -74,39 +57,39 @@ int knot_rdataset_add(knot_rdataset_t *rrs, const knot_rdata_t *rr, mm_ctx_t *mm
 }
 
 /* Simulate init failure */
-static int fake_test_init(namedb_t **db_ptr, mm_ctx_t *mm, void *arg)
+static int fake_test_init(knot_db_t **db_ptr, knot_mm_t *mm, void *arg)
 {
 	static char db[1024];
 	*db_ptr = db;
 	return mock();
 }
 
-static void fake_test_deinit(namedb_t *db)
+static void fake_test_deinit(knot_db_t *db)
 {
     return;
 }
 
 /* Simulate commit failure */
-static int fake_test_commit(namedb_txn_t *txn)
+static int fake_test_commit(knot_db_txn_t *txn)
 {
 	return KNOT_ESPACE;
 }
 
 /* Dummy abort */
-static void fake_test_abort(namedb_txn_t *txn)
+static void fake_test_abort(knot_db_txn_t *txn)
 {
 	return;
 }
 
 /* Stub for find */
-static int fake_test_find(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
+static int fake_test_find(knot_db_txn_t *txn, knot_db_val_t *key, knot_db_val_t *val, unsigned flags)
 {
 	val->data = &global_fake_ce;
 	return KNOT_EOK;
 }
 
 /* Stub for insert */
-static int fake_test_ins(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val, unsigned flags)
+static int fake_test_ins(knot_db_txn_t *txn, knot_db_val_t *key, knot_db_val_t *val, unsigned flags)
 {
 	struct kr_cache_entry *header = val->data;
 	int  res_cmp, err = (int)mock();
@@ -125,15 +108,15 @@ static int fake_test_ins(namedb_txn_t *txn, namedb_val_t *key, namedb_val_t *val
 	return err;
 }
 
-static int fake_test_txn_begin(namedb_t *db, namedb_txn_t *txn, unsigned flags)
+static int fake_test_txn_begin(knot_db_t *db, knot_db_txn_t *txn, unsigned flags)
 {
     return KNOT_EOK;
 }
 
 /* Fake api */
-static namedb_api_t *fake_namedb_lmdb_api(void)
+static knot_db_api_t *fake_knot_db_lmdb_api(void)
 {
-	static namedb_api_t fake_api = {
+	static knot_db_api_t fake_api = {
 		"lmdb_fake_api",
 		fake_test_init, fake_test_deinit,
 		fake_test_txn_begin, fake_test_commit, fake_test_abort,
@@ -145,10 +128,10 @@ static namedb_api_t *fake_namedb_lmdb_api(void)
 }
 
 /* Test cache open */
-static int test_open(void **state, namedb_api_t *api)
+static int test_open(void **state, knot_db_api_t *api)
 {
 	static struct kr_cache cache;
-	struct namedb_lmdb_opts opts;
+	struct knot_db_lmdb_opts opts;
 	memset(&cache, 0, sizeof(cache));
 	memset(&opts, 0, sizeof(opts));
 	opts.path = global_env;
@@ -162,10 +145,10 @@ static void test_open_fake_api(void **state)
 {
 	bool res;
 	will_return(fake_test_init,KNOT_EINVAL);
-	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EINVAL);
+	assert_int_equal(test_open(state, fake_knot_db_lmdb_api()),KNOT_EINVAL);
 	will_return(fake_test_init,KNOT_EOK);
-	assert_int_equal(test_open(state, fake_namedb_lmdb_api()),KNOT_EOK);
-	res = (((struct kr_cache *)(*state))->api == fake_namedb_lmdb_api());
+	assert_int_equal(test_open(state, fake_knot_db_lmdb_api()),KNOT_EOK);
+	res = (((struct kr_cache *)(*state))->api == fake_knot_db_lmdb_api());
 	assert_true(res);
 }
 
@@ -173,7 +156,7 @@ static void test_open_conventional_api(void **state)
 {
 	bool res;
 	assert_int_equal(test_open(state, NULL),KNOT_EOK);
-	res = (((struct kr_cache *)(*state))->api == namedb_lmdb_api());
+	res = (((struct kr_cache *)(*state))->api == knot_db_lmdb_api());
 	assert_true(res);
 }
 
@@ -197,7 +180,7 @@ static struct kr_cache_txn *test_txn_write(void **state)
 static struct kr_cache_txn *test_txn_rdonly(void **state)
 {
 	assert_non_null(*state);
-	assert_int_equal(kr_cache_txn_begin(*state, &global_txn, NAMEDB_RDONLY), 0);
+	assert_int_equal(kr_cache_txn_begin(*state, &global_txn, KNOT_DB_RDONLY), 0);
 	return &global_txn;
 }
 
@@ -205,7 +188,7 @@ static struct kr_cache_txn *test_txn_rdonly(void **state)
 static void test_fake_invalid (void **state)
 {
 	struct kr_cache_txn *txn = NULL;
-	const namedb_api_t *api_saved = NULL;
+	const knot_db_api_t *api_saved = NULL;
 	knot_dname_t dname[] = "";
 	struct kr_cache_entry *entry = NULL;
 	int ret = 0;
@@ -224,24 +207,18 @@ static void test_fake_invalid (void **state)
 
 static void test_fake_insert(void **state)
 {
-	int ret_cache_ins_ok, ret_cache_lowmem, ret_cache_ins_inval;
+	int ret_cache_ins_ok, ret_cache_ins_inval;
 	knot_dname_t dname[] = "";
 	struct kr_cache_txn *txn = test_txn_write(state);
 	test_randstr((char *)&global_fake_ce,sizeof(global_fake_ce));
 	test_randstr((char *)namedb_data,NAMEDB_DATA_SIZE);
 
-	will_return(malloc,KNOT_EINVAL);
-	is_malloc_mocked = true;
-	ret_cache_lowmem = kr_cache_insert(txn, KR_CACHE_USER, dname,
-		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
-	is_malloc_mocked = false;
 	will_return(fake_test_ins,KNOT_EOK);
 	ret_cache_ins_ok = kr_cache_insert(txn, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
 	will_return(fake_test_ins,KNOT_EINVAL);
 	ret_cache_ins_inval = kr_cache_insert(txn, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
-	assert_int_equal(ret_cache_lowmem, KNOT_ENOMEM);
 	assert_int_equal(ret_cache_ins_ok, KNOT_EOK);
 	assert_int_equal(ret_cache_ins_inval, KNOT_EINVAL);
 }
@@ -251,7 +228,7 @@ static void test_invalid(void **state)
 {
 	knot_dname_t dname[] = "";
 	uint32_t timestamp = CACHE_TIME;
-	struct namedb_lmdb_opts opts;
+	struct knot_db_lmdb_opts opts;
 	struct kr_cache_entry *entry = NULL;
 
 	memset(&opts, 0, sizeof(opts));

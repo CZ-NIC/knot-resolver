@@ -1,11 +1,11 @@
 #!/bin/bash  
-set -e
+#set -e
 
 CMOCKA_TAG="cmocka-0.4.1"
 CMOCKA_URL="git://git.cryptomilk.org/projects/cmocka.git"
 LIBUV_TAG="v1.x"
 LIBUV_URL="https://github.com/libuv/libuv.git"
-KNOT_TAG="c1353efc"
+KNOT_TAG="v2.1.0-rc1"
 KNOT_URL="https://github.com/CZ-NIC/knot.git"
 GMP_TAG="6.0.0"
 GMP_URL="https://gmplib.org/download/gmp/gmp-${GMP_TAG}.tar.xz"
@@ -15,8 +15,8 @@ NETTLE_TAG="2.7.1"
 NETTLE_URL="https://ftp.gnu.org/gnu/nettle/nettle-${NETTLE_TAG}.tar.gz"
 GNUTLS_TAG="3.3.12"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
-LUA_TAG="v2.1"
-LUA_URL="http://luajit.org/git/luajit-2.0.git"
+LUA_TAG="2.1.0-beta1"
+LUA_URL="http://luajit.org/download/LuaJIT-${LUA_TAG}.tar.gz"
 HIREDIS_TAG="v0.13.3"
 HIREDIS_URL="https://github.com/redis/hiredis.git"
 LIBMEMCACHED_TAG="1.0.18"
@@ -109,7 +109,8 @@ pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 	--disable-static --with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
 pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
-pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc amalg install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
+pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
+cat build.log
 
 # remove on successful build
 rm -rf ${BUILD_DIR}

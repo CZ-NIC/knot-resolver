@@ -14,6 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <unistd.h>
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
