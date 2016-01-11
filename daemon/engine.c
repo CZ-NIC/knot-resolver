@@ -206,7 +206,7 @@ static int l_trustanchor(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	const char *anchor = lua_tostring(L, 1);
 	bool enable = lua_isboolean(L, 2) ? lua_toboolean(L, 2) : true;
-	if (!anchor) {
+	if (!anchor || strlen(anchor) == 0) {
 		return 0;
 	}
 	/* If disabling, parse the owner string only. */
