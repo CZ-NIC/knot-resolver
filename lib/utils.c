@@ -239,6 +239,13 @@ const char *kr_inaddr(const struct sockaddr *addr)
 	}
 }
 
+int kr_inaddr_family(const struct sockaddr *addr)
+{
+	if (!addr)
+		return AF_UNSPEC;
+	return addr->sa_family;
+}
+
 int kr_inaddr_len(const struct sockaddr *addr)
 {
 	if (!addr) {

@@ -254,6 +254,7 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
 int kr_pkt_recycle(knot_pkt_t *pkt);
 const char *kr_inaddr(const struct sockaddr *addr);
+int kr_inaddr_family(const struct sockaddr *addr);
 int kr_inaddr_len(const struct sockaddr *addr);
 int kr_straddr_family(const char *addr);
 int kr_straddr_subnet(void *dst, const char *addr);
@@ -281,6 +282,7 @@ ffi.metatype( sockaddr_t, {
 	__index = {
 		len = function(sa) return C.kr_inaddr_len(sa) end,
 		ip = function (sa) return C.kr_inaddr(sa) end,
+		family = function (sa) return C.kr_inaddr_family(sa) end,
 	}
 })
 

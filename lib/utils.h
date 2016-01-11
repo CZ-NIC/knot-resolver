@@ -111,6 +111,9 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 /** Address bytes for given family. */
 KR_EXPORT KR_PURE
 const char *kr_inaddr(const struct sockaddr *addr);
+/** Address family. */
+KR_EXPORT KR_PURE
+int kr_inaddr_family(const struct sockaddr *addr);
 /** Address length for given family. */
 KR_EXPORT KR_PURE
 int kr_inaddr_len(const struct sockaddr *addr);
