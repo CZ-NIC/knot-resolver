@@ -34,29 +34,12 @@ struct kr_cache_entry global_fake_ce;
 #define NAMEDB_DATA_SIZE (NAMEDB_INTS * sizeof(int))
 uint8_t namedb_data[NAMEDB_DATA_SIZE];
 knot_db_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
-bool is_malloc_mocked = false;
 
 #define CACHE_SIZE 10 * 4096
 #define CACHE_TTL 10
 #define CACHE_TIME 0
 
-void * (*original_malloc) (size_t __size);
 int (*original_knot_rdataset_add)(knot_rdataset_t *rrs, const knot_rdata_t *rr, knot_mm_t *mm) = NULL;
-
-void *malloc(size_t __size)
-{
-	int err_mock = KNOT_EOK;
-	if (original_malloc == NULL)
-	{
-		original_malloc = dlsym(RTLD_NEXT,"malloc");
-		assert_non_null (malloc);
-	}
-	if (is_malloc_mocked)
-	{
-		err_mock = mock();
-	}
-	return (err_mock != KNOT_EOK) ? NULL : original_malloc (__size);
-}
 
 int knot_rdataset_add(knot_rdataset_t *rrs, const knot_rdata_t *rr, knot_mm_t *mm)
 {
@@ -224,24 +207,18 @@ static void test_fake_invalid (void **state)
 
 static void test_fake_insert(void **state)
 {
-	int ret_cache_ins_ok, ret_cache_lowmem, ret_cache_ins_inval;
+	int ret_cache_ins_ok, ret_cache_ins_inval;
 	knot_dname_t dname[] = "";
 	struct kr_cache_txn *txn = test_txn_write(state);
 	test_randstr((char *)&global_fake_ce,sizeof(global_fake_ce));
 	test_randstr((char *)namedb_data,NAMEDB_DATA_SIZE);
 
-	will_return(malloc,KNOT_EINVAL);
-	is_malloc_mocked = true;
-	ret_cache_lowmem = kr_cache_insert(txn, KR_CACHE_USER, dname,
-		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
-	is_malloc_mocked = false;
 	will_return(fake_test_ins,KNOT_EOK);
 	ret_cache_ins_ok = kr_cache_insert(txn, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
 	will_return(fake_test_ins,KNOT_EINVAL);
 	ret_cache_ins_inval = kr_cache_insert(txn, KR_CACHE_USER, dname,
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
-	assert_int_equal(ret_cache_lowmem, KNOT_ENOMEM);
 	assert_int_equal(ret_cache_ins_ok, KNOT_EOK);
 	assert_int_equal(ret_cache_ins_inval, KNOT_EINVAL);
 }
