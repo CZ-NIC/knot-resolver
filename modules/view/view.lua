@@ -2,11 +2,6 @@ local kres = require('kres')
 local policy = require('policy')
 local ffi = require('ffi')
 local C = ffi.C
-ffi.cdef[[
-int kr_straddr_family(const char *addr);
-int kr_straddr_subnet(void *dst, const char *addr);
-int kr_bitcmp(const char *a, const char *b, int bits);
-]]
 
 -- Module declaration
 local view = {
@@ -29,7 +24,7 @@ end
 
 -- @function Match IP against given subnet
 local function match_subnet(family, subnet, bitlen, addr)
-	return (family == addr.sa_family) and (C.kr_bitcmp(subnet, addr:ip(), bitlen) == 0)
+	return (family == addr:family()) and (C.kr_bitcmp(subnet, addr:ip(), bitlen) == 0)
 end
 
 -- @function Find view for given request
