@@ -3,7 +3,6 @@
 --
 
 local ffi = require('ffi')
-local utils = require('kdns.utils')
 local libzscanner = ffi.load(libpath('libzscanner', '1'))
 ffi.cdef[[
 void free(void *ptr);
@@ -125,40 +124,6 @@ const char* zs_strerror(const int code);
 -- Constant table
 local zs_state = ffi.new('struct zs_state')
 
--- Sorted set of records
-local bsearch = utils.bsearch
-sortedset_t = ffi.typeof('struct { knot_rrset_t *at; int32_t len; int32_t cap; }')
-ffi.metatype(sortedset_t, {
-	__gc = function (set)
-		for i = 0, tonumber(set.len) - 1 do set.at[i]:init(nil, 0) end
-		ffi.C.free(set.at)
-	end,
-	__len = function (set) return tonumber(set.len) end,
-	__index = {
-		newrr = function (set, noinit)
-			-- Reserve enough memory in buffer
-			if set.cap == set.len then assert(utils.buffer_grow(set)) end
-			local nid = set.len
-			set.len = nid + 1
-			-- Don't initialize if caller is going to do it immediately
-			if not noinit then
-				ffi.fill(set.at + nid, ffi.sizeof(set.at[0]))
-			end
-			return set.at[nid]
-		end,
-		sort = function (set)
-			-- Prefetch RR set comparison function
-			return utils.sort(set.at, tonumber(set.len))
-		end,
-		search = function (set, owner)
-			return bsearch(set.at, tonumber(set.len), owner)
-		end,
-		searcher = function (set)
-			return utils.bsearcher(set.at, tonumber(set.len))
-		end,
-	}
-})
-
 -- Wrap scanner context
 local const_char_t = ffi.typeof('const char *')
 local zs_scanner_t = ffi.typeof('struct scanner')
@@ -218,6 +183,5 @@ local rrparser = {
 		return results
 	end,
 	state = zs_state,
-	set = sortedset_t,
 }
 return rrparser
