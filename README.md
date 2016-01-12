@@ -31,7 +31,7 @@ This is simple and doesn't require any dependencies or system modifications, jus
 $ docker run -it cznic/knot-resolver
 ```
 
-See the build page [hub.docker.com/u/cznic/knot-resolver](https://hub.docker.com/r/cznic/knot-resolver/) for more information and options.
+See the build page [hub.docker.com/r/cznic/knot-resolver](https://hub.docker.com/r/cznic/knot-resolver/) for more information and options.
 
 ### Running
 
