@@ -639,7 +639,7 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 
 	uint8_t wildcard[KNOT_DNAME_MAXLEN];
 	int ret = prepend_asterisk(wildcard, sizeof(wildcard), encloser);
-	if (ret != 0) {
+	if (ret < 3) {
 		return ret;
 	}
 
