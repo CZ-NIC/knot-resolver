@@ -35,7 +35,8 @@
 /*
  * Globals
  */
-static int g_interactive = 1;
+static bool g_quiet = false;
+static bool g_interactive = true;
 
 /*
  * TTY control
@@ -69,11 +70,23 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		if (lua_gettop(L) > 0) {
 			message = lua_tostring(L, -1);
 		}
+		/* Log to remote socket if connected */
+		const char *delim = g_quiet ? "" : "> ";
 		if (stream_fd != STDIN_FILENO) {
 			fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
-			fprintf(out, "%s\n> ", message); /* Duplicate output to sender */
+			if (message)
+				fprintf(out, "%s", message); /* Duplicate output to sender */
+			if (message || !g_quiet)
+				fprintf(out, "\n");
+			fprintf(out, "%s", delim);
 		}
-		fprintf(ret ? stderr : stdout, "%s\n> ", message);
+		/* Log to standard streams */
+		FILE *fp_out = ret ? stderr : stdout;
+		if (message)
+			fprintf(fp_out, "%s", message);
+		if (message || !g_quiet)
+			fprintf(fp_out, "\n");
+		fprintf(fp_out, "%s", delim);
 		lua_settop(L, 0);
 		free(buf->base);
 	}
@@ -102,8 +115,10 @@ static void tty_accept(uv_stream_t *master, int status)
 		 client->data = master->data;
 		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_read);
 		 /* Write command line */
-		 uv_buf_t buf = { "> ", 2 };
-		 uv_try_write((uv_stream_t *)client, &buf, 1);
+		 if (!g_quiet) {
+		 	uv_buf_t buf = { "> ", 2 };
+		 	uv_try_write((uv_stream_t *)client, &buf, 1);
+		 }
 	}
 }
 
@@ -136,6 +151,7 @@ static void help(int argc, char *argv[])
 	       " -c, --config=[path]  Config file path (relative to [rundir]) (default: config).\n"
 	       " -k, --keyfile=[path] File containing trust anchors (DS or DNSKEY).\n"
 	       " -f, --forks=N        Start N forks sharing the configuration.\n"
+	       " -q, --quiet          Quiet output, no prompt in interactive mode.\n"
 	       " -v, --verbose        Run in verbose mode.\n"
 	       " -V, --version        Print version of the server.\n"
 	       " -h, --help           Print help and usage.\n"
@@ -184,7 +200,8 @@ static int run_worker(uv_loop_t *loop, struct engine *engine)
 	uv_pipe_init(loop, &pipe, 0);
 	pipe.data = engine;
 	if (g_interactive) {
-		printf("[system] interactive mode\n> ");
+		if (!g_quiet)
+			printf("[system] interactive mode\n> ");
 		fflush(stdout);
 		uv_pipe_open(&pipe, 0);
 		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_read);
@@ -221,11 +238,12 @@ int main(int argc, char **argv)
 		{"keyfile",required_argument, 0, 'k'},
 		{"forks",required_argument,   0, 'f'},
 		{"verbose",    no_argument,   0, 'v'},
+		{"quiet",      no_argument,   0, 'q'},
 		{"version",   no_argument,    0, 'V'},
 		{"help",      no_argument,    0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:c:f:k:vVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:c:f:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -235,7 +253,7 @@ int main(int argc, char **argv)
 			config = optarg;
 			break;
 		case 'f':
-			g_interactive = 0;
+			g_interactive = false;
 			forks = atoi(optarg);
 			if (forks == 0) {
 				kr_log_error("[system] error '-f' requires number, not '%s'\n", optarg);
@@ -277,6 +295,9 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			kr_debug_set(true);
+			break;
+		case 'q':
+			g_quiet = true;
 			break;
 		case 'V':
 			kr_log_info("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
