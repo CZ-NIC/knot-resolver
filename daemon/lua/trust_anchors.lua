@@ -52,7 +52,8 @@ if not ffi_ok then
 			if not io.open(path, 'r') then
 				local rr, err = bootstrap()
 				if not rr then print(err) return false end
-				io.open(path, 'w'):write(rr..'\n')
+				local keyfile = assert(io.open(path, 'w'))
+				keyfile:write(rr..'\n')
 			end
 			for line in io.lines(path) do
 				trustanchor(line)
@@ -255,7 +256,6 @@ local trust_anchors = {
 		-- Bootstrap if requested and keyfile doesn't exist
 		if not io.open(path, 'r') then
 			local rr, msg = bootstrap()
-			print(msg)
 			if not rr then
 				error('you MUST obtain the root TA manually, see: '..
 				      'http://knot-resolver.readthedocs.org/en/latest/daemon.html#enabling-dnssec')

@@ -175,7 +175,9 @@ local rrparser = {
 	file = function (path)
 		local zs = zs_scanner_t()
 		local ok, err = zs:open(path)
-		if not ok then error(err) end
+		if not ok then
+			return ok, err
+		end
 		local results = {}
 		while zs:parse() do
 			table.insert(results, zs:current_rr())
