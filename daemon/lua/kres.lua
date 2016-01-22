@@ -102,6 +102,8 @@ struct query_flag {
 	static const int NO_CACHE    = 1 << 11;
 	static const int EXPIRING    = 1 << 12;
 	static const int DNSSEC_WANT = 1 << 14;
+	static const int DNSSEC_BOGUS    = 1 << 15;
+	static const int DNSSEC_INSECURE = 1 << 16;
 	static const int STUB        = 1 << 17;
 	static const int ALWAYS_CUT  = 1 << 18;
 };
@@ -122,6 +124,10 @@ struct sockaddr {
 };
 
 /* libknot */
+typedef struct {
+	uint8_t _stub[]; /* Do not touch */
+} knot_dump_style_t;
+extern const knot_dump_style_t KNOT_DUMP_STYLE_DEFAULT;
 typedef int knot_section_t; /* Do not touch */
 typedef void knot_rrinfo_t; /* Do not touch */
 typedef uint8_t knot_dname_t;
@@ -238,6 +244,9 @@ uint16_t knot_rdata_rdlen(const knot_rdata_t *rr);
 uint8_t *knot_rdata_data(const knot_rdata_t *rr);
 knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *rrs, size_t pos);
 uint32_t knot_rrset_ttl(const knot_rrset_t *rrset);
+int knot_rrset_txt_dump_data(const knot_rrset_t *rrset, size_t pos, char *dst, size_t maxlen, const knot_dump_style_t *style);
+int knot_rrset_txt_dump(const knot_rrset_t *rrset, char *dst, size_t maxlen, const knot_dump_style_t *style);
+
 /* Packet */
 const knot_dname_t *knot_pkt_qname(const knot_pkt_t *pkt);
 uint16_t knot_pkt_qtype(const knot_pkt_t *pkt);
@@ -301,6 +310,8 @@ ffi.metatype( sockaddr_t, {
 })
 
 -- Metatype for RR set
+local rrset_buflen = (64 + 1) * 1024
+local rrset_buf = ffi.new('char[?]', rrset_buflen)
 local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
 	__index = {
@@ -316,6 +327,18 @@ ffi.metatype( knot_rrset_t, {
 			        class = tonumber(rr.class),
 			        type = tonumber(rr.type),
 			        rdata = rr:rdata(i)}
+		end,
+		tostring = function(rr, i)
+			assert(ffi.istype(knot_rrset_t, rr))
+			if rr.rr.count > 0 then
+				local ret = -1
+				if i ~= nil then
+					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
+				else
+					ret = knot.knot_rrset_txt_dump(rr, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
+				end
+				return ret >= 0 and ffi.string(rrset_buf)
+			end
 		end,
 	}
 })
@@ -338,9 +361,18 @@ ffi.metatype( knot_pkt_t, {
 			pkt.wire[2] = bor(pkt.wire[2], (val) and 0x02 or 0x00)
 			return band(pkt.wire[2], 0x02)
 		end,
+		rrsets = function (pkt, section_id)
+			local records = {}
+			local section = knot.knot_pkt_section(pkt, section_id)
+			for i = 1, section.count do
+				local rrset = knot.knot_pkt_rr(section, i - 1)
+				table.insert(records, rrset)
+			end
+			return records
+		end,
 		section = function (pkt, section_id)
 			local records = {}
-			local section = C.knot_pkt_section(pkt, section_id)
+			local section = knot.knot_pkt_section(pkt, section_id)
 			for i = 1, section.count do
 				local rrset = knot.knot_pkt_rr(section, i - 1)
 				for k = 1, rrset.rr.count do
@@ -365,8 +397,11 @@ local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
 		name = function(qry, new_name) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
+		hasflag = function(qry, flag)
+			return band(qry.flags, flag) ~= 0
+		end,
 		resolved = function(qry)
-			return band(qry.flags, kres.query.RESOLVED) ~= 0
+			return qry:hasflag(kres.query.RESOLVED)
 		end,
 		final = function(qry)
 			return qry:resolved() and (qry.parent == nil)
