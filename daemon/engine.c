@@ -69,6 +69,7 @@ static int l_help(lua_State *L)
 		"cache\n    network configuration\n"
 		"modules\n    modules configuration\n"
 		"kres\n    resolver services\n"
+		"trust_anchors\n    configure trust anchors\n"
 		;
 	lua_pushstring(L, help_str);
 	return 1;
@@ -570,6 +571,9 @@ static int engine_loadconf(struct engine *engine, const char *config_path)
 		return kr_error(ENOEXEC);
 	}
 	/* Load config file */
+	if (strcmp(config_path, "-") == 0) {
+		return ret; /* No config, no defaults. */
+	}
 	if(access(config_path, F_OK ) != -1 ) {
 		ret = l_dosandboxfile(engine->L, config_path);
 	}

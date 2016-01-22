@@ -324,7 +324,7 @@ int main(int argc, char **argv)
 			kr_log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
-		if(config && access(config, R_OK) != 0) {
+		if(config && strcmp(config, "-") != 0 && access(config, R_OK) != 0) {
 			kr_log_error("[system] rundir '%s'\n", rundir);
 			kr_log_error("[system] config '%s': %s\n", config, strerror(errno));
 			return EXIT_FAILURE;
