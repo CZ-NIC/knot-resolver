@@ -111,6 +111,11 @@ struct query_flag {
  */
 
 /* stdlib */
+typedef long time_t;
+struct timeval {
+	time_t tv_sec;
+	time_t tv_usec;
+};
 struct sockaddr {
     uint16_t sa_family;
     uint8_t _stub[]; /* Do not touch */
@@ -171,6 +176,12 @@ typedef struct {
 	size_t len;
 	size_t cap;
 } rr_array_t;
+struct kr_zonecut {
+	knot_dname_t *name;
+	knot_rrset_t *key;
+	knot_rrset_t *trust_anchor;
+	uint8_t _stub[]; /* Do not touch */
+};
 struct kr_query {
 	struct kr_query *parent;
 	knot_dname_t *sname;
@@ -179,6 +190,8 @@ struct kr_query {
 	uint16_t id;
 	uint32_t flags;
 	unsigned secret;
+	struct timeval timestamp;
+	struct kr_zonecut zone_cut;
 	uint8_t _stub[]; /* Do not touch */
 };
 struct kr_rplan {
