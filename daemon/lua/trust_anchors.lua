@@ -261,17 +261,22 @@ local trust_anchors = {
 				      'http://knot-resolver.readthedocs.org/en/latest/daemon.html#enabling-dnssec')
 			end
 			trustanchor(rr)
+			-- Fetch DNSKEY immediately
+			trust_anchors.file_current = path
+			if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
+			refresh_plan(trust_anchors, 0, active_refresh, true, true)
+			return
 		elseif path == trust_anchors.file_current then
 			return
 		end
-		-- Parse new keys
+		-- Parse new keys, refresh eventually
 		local new_keys = require('zonefile').file(path)
 		trust_anchors.file_current = path
 		if unmanaged then trust_anchors.file_current = nil end
 		trust_anchors.keyset = {}
-		if bootstrap or trust_anchors.update(new_keys, true) then
+		if trust_anchors.update(new_keys, true) then
 			if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
-			refresh_plan(trust_anchors, 5 * sec, active_refresh, true, bootstrap)
+			refresh_plan(trust_anchors, 5 * sec, active_refresh, true, false)
 		end
 	end,
 	-- Add DS/DNSKEY record(s) (unmanaged)
