@@ -354,7 +354,7 @@ Environment
    :param number qtype: Query type (e.g. ``kres.type.NS``)
    :param number qclass: Query class *(optional)* (e.g. ``kres.class.IN``)
    :param number options: Resolution options (see query flags)
-   :param function callback: Callback to be executed when resolution completes (e.g. `function cb (pkt) end`). The callback gets a packet containing the final answer and doesn't have to return anything.
+   :param function callback: Callback to be executed when resolution completes (e.g. `function cb (pkt, req) end`). The callback gets a packet containing the final answer and doesn't have to return anything.
    :return: boolean
 
    Example:
@@ -366,7 +366,7 @@ Environment
 
       -- Query for AAAA record
       resolve('example.com', kres.type.AAAA, kres.class.IN, 0,
-      function (answer)
+      function (answer, req)
          -- Check answer RCODE
          local pkt = kres.pkt_t(answer)
          if pkt:rcode() == kres.rcode.NOERROR then

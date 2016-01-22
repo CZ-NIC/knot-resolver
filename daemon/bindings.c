@@ -617,7 +617,8 @@ static void resolve_callback(struct worker_ctx *worker, struct kr_request *req, 
 	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_ref);
 	luaL_unref(L, LUA_REGISTRYINDEX, cb_ref);
 	lua_pushlightuserdata(L, req->answer);
-	(void) execute_callback(L, 1);
+	lua_pushlightuserdata(L, req);
+	(void) execute_callback(L, 2);
 }
 
 static int wrk_resolve(lua_State *L)
