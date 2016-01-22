@@ -103,6 +103,7 @@ struct query_flag {
 	static const int EXPIRING    = 1 << 12;
 	static const int DNSSEC_WANT = 1 << 14;
 	static const int STUB        = 1 << 17;
+	static const int ALWAYS_CUT  = 1 << 18;
 };
 
 /*

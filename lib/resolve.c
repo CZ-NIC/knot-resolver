@@ -645,6 +645,15 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
 		qry->deferred = pickle->next;
 	} else {
+		/* Caller is interested in always tracking a zone cut, even if the answer is cached
+		 * this is normally not required, and incurrs another cache lookups for cached answer. */
+		if (qry->flags & QUERY_ALWAYS_CUT) {
+			switch(zone_cut_check(request, qry, packet)) {
+			case KNOT_STATE_FAIL: return KNOT_STATE_FAIL;
+			case KNOT_STATE_DONE: return KNOT_STATE_PRODUCE;
+			default: break;
+			}
+		}
 		/* Resolve current query and produce dependent or finish */
 		request->state = KNOT_STATE_PRODUCE;
 		ITERATE_LAYERS(request, qry, produce, packet);
