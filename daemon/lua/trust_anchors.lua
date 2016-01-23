@@ -117,7 +117,9 @@ local function ta_present(keyset, rr, hold_down_time, force)
 			ta.state = key_state.Valid
 			ta.timer = nil
 		end
-		print('[ ta ] key: '..key_tag..' state: '..ta.state)
+		if rr.state ~= key_state.Valid or verbose() then
+			print('[ ta ] key: '..key_tag..' state: '..ta.state)
+		end
 		return true
 	elseif not key_revoked then -- First time seen (NewKey)
 		rr.key_tag = key_tag
@@ -127,7 +129,9 @@ local function ta_present(keyset, rr, hold_down_time, force)
 			rr.state = key_state.AddPend
 			rr.timer = now + hold_down_time
 		end
-		print('[ ta ] key: '..key_tag..' state: '..rr.state)
+		if rr.state ~= key_state.Valid or verbose() then
+			print('[ ta ] key: '..key_tag..' state: '..rr.state)
+		end
 		table.insert(keyset, rr)
 		return true
 	end

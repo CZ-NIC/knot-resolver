@@ -12,7 +12,10 @@ return resolve("%s", kres.type.%s, kres.class.%s, 0,
 function (pkt, req)
 	pkt = kres.pkt_t(pkt)
 	req = kres.request_t(req)
-	pcall(function () %s end)
+	local ok, err = pcall(function () %s end)
+	if not ok then
+		print(err)
+	end
 	quit()
 end)']]
 -- Parse CLI arguments
