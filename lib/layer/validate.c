@@ -288,7 +288,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 
 	/* No DS provided, check for proof of non-existence. */
 	int ret = 0;
-	const knot_dname_t *proved_name = qry->zone_cut.name;
+	const knot_dname_t *proved_name = knot_pkt_qname(answer);
 	knot_rrset_t *new_ds = update_ds(cut, knot_pkt_section(answer, section));
 	if (!new_ds) {
 		if (!has_nsec3) {
