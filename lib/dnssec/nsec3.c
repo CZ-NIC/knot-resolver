@@ -581,47 +581,6 @@ static int no_data_response_no_ds(const knot_pkt_t *pkt, knot_section_t section_
 }
 
 /**
- * No data response check, DS (RFC5155 7.2.4, 2nd paragraph).
- * @param pkt        Packet structure to be processed.
- * @param section_id Packet section to be processed.
- * @param sname      Name to be checked.
- * @param stype      Type to be checked.
- * @return           0 or error code.
- */
-static int no_data_response_ds(const knot_pkt_t *pkt, knot_section_t section_id,
-                               const knot_dname_t *sname, uint16_t stype)
-{
-	assert(pkt && sname);
-	if (stype != KNOT_RRTYPE_DS) {
-		return kr_error(EINVAL);
-	}
-
-	const knot_rrset_t *covering_nsec3 = NULL;
-	int ret = closest_encloser_proof(pkt, section_id, sname, NULL, NULL, &covering_nsec3);
-	if (ret != 0) {
-		return ret;
-	}
-
-	if (has_optout(covering_nsec3)) {
-		return kr_ok();
-	}
-
-	return kr_error(ENOENT);
-}
-
-int kr_nsec3_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
-                                    const knot_dname_t *sname, uint16_t stype)
-{
-	/* DS record may be matched by an existing NSEC3 RR. */
-	int ret = no_data_response_no_ds(pkt, section_id, sname, stype);
-	if ((ret == 0) || (stype != KNOT_RRTYPE_DS)) {
-		return ret;
-	}
-	/* Closest provable encloser proof must be performed else. */
-	return no_data_response_ds(pkt, section_id, sname, stype);
-}
-
-/**
  * Check whether NSEC3 RR matches a wildcard at the closest encloser and has given type bit missing.
  * @param pkt        Packet structure to be processed.
  * @param section_id Packet section to be processed.
@@ -666,17 +625,6 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 	}
 
 	return kr_error(ENOENT);
-}
-
-int kr_nsec3_wildcard_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
-                                             const knot_dname_t *sname, uint16_t stype)
-{
-	const knot_dname_t *encloser = NULL;
-	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser, NULL, NULL);
-	if (ret != 0) {
-		return ret;
-	}
-	return matches_closest_encloser_wildcard(pkt, section_id, encloser, stype);
 }
 
 int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
