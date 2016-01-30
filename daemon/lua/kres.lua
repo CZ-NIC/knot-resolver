@@ -418,11 +418,15 @@ ffi.metatype( kr_request_t, {
 	__index = {
 		current = function(req)
 			assert(req)
+			if req.current_query == nil then return nil end
 			return req.current_query
 		end,
 		resolved = function(req)
 			assert(req)
-			return C.kr_rplan_resolved(C.kr_resolve_plan(req))
+			qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))
+			if qry == nil then return nil end
+			return qry
+
 		end,
 		push = function(req, qname, qtype, qclass, flags, parent)
 			assert(req)

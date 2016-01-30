@@ -747,6 +747,40 @@ specified worker count and process rank.
 
 	print(worker.stats().concurrent)
 
+Using CLI tools
+===============
+
+* ``kresd-host.lua`` - a drop-in replacement for *host(1)* utility
+
+Queries the DNS for information.
+The hostname is looked up for IP4, IP6 and mail.
+
+Example:
+
+.. code-block:: bash
+
+	$ kresd-host.lua -f root.key -v nic.cz
+	nic.cz. has address 217.31.205.50 (secure)
+	nic.cz. has IPv6 address 2001:1488:0:3::2 (secure)
+	nic.cz. mail is handled by 10 mail.nic.cz. (secure)
+	nic.cz. mail is handled by 20 mx.nic.cz. (secure)
+	nic.cz. mail is handled by 30 bh.nic.cz. (secure)
+
+* ``kresd-query.lua`` - run the daemon in zero-configuration mode, perform a query and execute given callback.
+
+This is useful for executing one-shot queries and hooking into the processing of the result,
+for example to check if a domain is managed by a certain registrar or if it's signed.
+
+Example:
+
+.. code-block:: bash
+
+	$ kresd-query.lua www.sub.nic.cz 'assert(kres.dname2str(req:resolved().zone_cut.name) == "nic.cz.")' && echo "yes"
+	yes
+	$ kresd-query.lua -C 'trust_anchors.config("root.keys")' nic.cz 'assert(req:resolved():hasflag(kres.query.DNSSEC_WANT))'
+	$ echo $?
+	0
+
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
 .. _`PowerDNS Recursor`: https://doc.powerdns.com/md/recursor/scripting/

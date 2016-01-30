@@ -280,7 +280,7 @@ local trust_anchors = {
 		trust_anchors.keyset = {}
 		if trust_anchors.update(new_keys, true) then
 			if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
-			refresh_plan(trust_anchors, 5 * sec, active_refresh, true, false)
+			refresh_plan(trust_anchors, 10 * sec, active_refresh, true, false)
 		end
 	end,
 	-- Add DS/DNSKEY record(s) (unmanaged)

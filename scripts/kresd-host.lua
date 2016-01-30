@@ -12,7 +12,6 @@ Usage: %s [-vdh46D] [-c class] [-t type]
           [-f keyfile] hostname
   Queries the DNS for information.
   The hostname is looked up for IP4, IP6 and mail.
-  If an ip-address is given a reverse lookup is done.
   Use the -v option to see DNSSEC security information.
     -t type     what type to look for.
     -c class    what class to look for, if not class IN.
