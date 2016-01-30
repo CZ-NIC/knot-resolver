@@ -103,8 +103,8 @@ for i, qtype in ipairs(qtypes) do
 				print(string.format("%s has IPv6 address %s", qname, rdata))
 			elseif rr.type == kres.type.MX then
 				print(string.format("%s mail is handled by %s", qname, rdata))
-			else
-				print(string.format("%s has %s record %s%s", qname, qtype, rdata))
+			elseif rr.type == pkt:qtype() then
+				print(string.format("%s has %s record %s", qname, qtype, rdata))
 			end
 		end
 	end
