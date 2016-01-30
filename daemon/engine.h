@@ -46,8 +46,9 @@ struct storage_api {
 	void *(*opts_create)(const char *, size_t); /**< Storage options factory */
 };
 
-/** @internal Array of cache backend options. */
+/** @cond internal Array of cache backend options. */
 typedef array_t(struct storage_api) storage_registry_t;
+/* @endcond */
 
 struct engine {
     struct kr_context resolver;

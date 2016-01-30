@@ -73,8 +73,9 @@ struct kr_query {
 	struct kr_layer_pickle *deferred;
 };
 
-/** @internal Array of queries. */
+/** @cond internal Array of queries. */
 typedef array_t(struct kr_query *) kr_qarray_t;
+/* @endcond */
 
 /**
  * Query resolution plan structure.

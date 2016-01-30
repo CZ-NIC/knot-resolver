@@ -20,7 +20,7 @@
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
 
-/* @cond internal Freelist of available mempools. */
+/** @cond internal Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
 /* @endcond */
 

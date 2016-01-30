@@ -34,7 +34,9 @@ struct endpoint {
     uint16_t flags;
 };
 
+/** @cond internal Array of endpoints */
 typedef array_t(struct endpoint*) endpoint_array_t;
+/* @endcond */
 
 struct network {
     uv_loop_t *loop;

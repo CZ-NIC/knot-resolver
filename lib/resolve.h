@@ -69,7 +69,7 @@
  * @endcode
  */
 
-/* @cond internal Array of modules. */
+/** @cond internal Array of modules. */
 typedef array_t(struct kr_module *) module_array_t;
 /* @endcond */
 
