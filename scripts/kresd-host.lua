@@ -89,6 +89,7 @@ for i, qtype in ipairs(qtypes) do
 		local rr = section[i]
 		for k = 1, rr.rr.count do
 			local rdata = rr:tostring(k - 1)
+			local owner = kres.dname2str(rr:owner())
 			if qverbose then
 				if not qry:hasflag(kres.query.DNSSEC_WANT) or
 				   qry:hasflag(kres.query.DNSSEC_INSECURE) then
@@ -98,13 +99,15 @@ for i, qtype in ipairs(qtypes) do
 				end
 			end
 			if rr.type == kres.type.A then
-				print(string.format("%s has address %s", qname, rdata))
+				print(string.format("%s has address %s", owner, rdata))
 			elseif rr.type == kres.type.AAAA then
-				print(string.format("%s has IPv6 address %s", qname, rdata))
+				print(string.format("%s has IPv6 address %s", owner, rdata))
 			elseif rr.type == kres.type.MX then
-				print(string.format("%s mail is handled by %s", qname, rdata))
-			elseif rr.type == pkt:qtype() then
-				print(string.format("%s has %s record %s", qname, qtype, rdata))
+				print(string.format("%s mail is handled by %s", owner, rdata))
+			elseif rr.type == kres.type.CNAME then
+				print(string.format("%s is an alias for %s", owner, rdata))
+			else
+				print(string.format("%s has %s record %s", owner, qtype, rdata))
 			end
 		end
 	end
