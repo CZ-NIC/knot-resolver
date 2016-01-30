@@ -736,7 +736,10 @@ specified worker count and process rank.
    * ``tcp`` - number of outbound queries over TCP
    * ``ipv6`` - number of outbound queries over IPv6
    * ``ipv4`` - number of outbound queries over IPv4
+   * ``timeout`` - number of timeouted outbound queries
    * ``concurrent`` - number of concurrent queries at the moment
+   * ``queries`` - number of inbound queries
+   * ``dropped`` - number of dropped inbound queries
 
    Example:
 

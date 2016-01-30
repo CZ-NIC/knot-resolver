@@ -352,7 +352,7 @@ static void on_timeout(uv_timer_t *req)
 #endif
 	if (!uv_is_closing(handle)) {
 		struct worker_ctx *worker = task->worker;
-		worker->stats.queries += 1;
+		worker->stats.timeout += 1;
 		qr_task_step(task, NULL, NULL);
 	}
 }
