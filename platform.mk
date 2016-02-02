@@ -86,7 +86,7 @@ else
 $$(eval $$(call make_objs,$(1)))
 endif
 # Rules to generate objects with custom CFLAGS and binary/library
-$$(foreach obj,$$($(1)_OBJ),$$(eval $$(call make_objrule,$$(obj),$(BUILD_CFLAGS) $$($(1)_CFLAGS))))
+$$(foreach obj,$$($(1)_OBJ),$$(eval $$(call make_objrule,$$(obj),$$(BUILD_CFLAGS) $$($(1)_CFLAGS))))
 $(1) := $(2)/$(1)$(3)
 $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 ifeq ($(4),-$(ARTYPE))
