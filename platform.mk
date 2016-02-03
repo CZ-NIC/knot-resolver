@@ -48,9 +48,7 @@ else
             BINFLAGS += -pie
             LDFLAGS += -Wl,-z,relro,-z,now
         endif
-        ifeq (,$(findstring BSD,$(UNAME)))
-            LDFLAGS += -ldl
-        endif
+        LDFLAGS += -ldl
     endif
 endif
 
