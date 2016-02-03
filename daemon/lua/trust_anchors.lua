@@ -76,9 +76,31 @@ local key_state = {
 local function ta_find(keyset, rr)
 	for i, ta in ipairs(keyset) do
 		-- Match key owner and content
-		if ta.owner == rr.owner and
-		   C.kr_dnssec_key_match(ta.rdata, #ta.rdata, rr.rdata, #rr.rdata) == 0 then
-		   return ta
+		if ta.owner == rr.owner then
+			if ta.type == rr.type then
+				if rr.type == kres.type.DNSKEY then
+					if C.kr_dnssec_key_match(ta.rdata, #ta.rdata, rr.rdata, #rr.rdata) == 0 then
+						return ta
+					end
+				elseif rr.type == kres.type.DS and ta.rdata == rr.rdata then
+					return ta
+				end
+			-- DNSKEY superseding DS, inexact match
+			elseif rr.type == kres.type.DNSKEY and ta.type == kres.type.DS then
+				if ta.key_tag == C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata) then
+					keyset[i] = rr -- Replace current DS
+					rr.state = ta.state
+					rr.key_tag = ta.key_tag
+					return rr
+				end
+			-- DS key matching DNSKEY, inexact match
+			elseif rr.type == kres.type.DS and ta.type == kres.type.DNSKEY then
+				local ds_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
+				local dnskey_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
+				if ds_tag == dnskey_tag then
+					return ta
+				end 
+			end
 		end
 	end
 	return nil
@@ -86,12 +108,12 @@ end
 
 -- Evaluate TA status according to RFC5011
 local function ta_present(keyset, rr, hold_down_time, force)
-	if not C.kr_dnssec_key_ksk(rr.rdata) then
+	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
 		return false -- Ignore
 	end
 	-- Find the key in current key set and check its status
 	local now = os.time()
-	local key_revoked = C.kr_dnssec_key_revoked(rr.rdata)
+	local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
 	local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 	local ta = ta_find(keyset, rr)
 	if ta then
@@ -139,7 +161,7 @@ local function ta_present(keyset, rr, hold_down_time, force)
 end
 
 -- TA is missing in the new key set
-local function ta_missing(keyset, ta, hold_down_time)
+local function ta_missing(ta, hold_down_time)
 	-- Key is removed (KeyRem)
 	local keep_ta = true
 	local key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
@@ -226,7 +248,7 @@ local trust_anchors = {
 		for i, ta in ipairs(trust_anchors.keyset) do
 			local keep = true
 			if not ta_find(new_keys, ta) then
-				keep = ta_missing(trust_anchors, trust_anchors.keyset, ta, hold_down)
+				keep = ta_missing(ta, hold_down)
 			end
 			if keep then
 				table.insert(keyset, ta)
@@ -234,7 +256,7 @@ local trust_anchors = {
 		end
 		-- Evaluate new TAs
 		for i, rr in ipairs(new_keys) do
-			if rr.type == kres.type.DNSKEY and rr.rdata ~= nil then
+			if (rr.type == kres.type.DNSKEY or rr.type == kres.type.DS) and rr.rdata ~= nil then
 				ta_present(keyset, rr, hold_down, initial)
 			end
 		end
@@ -258,6 +280,7 @@ local trust_anchors = {
 	-- Load keys from a file (managed)
 	config = function (path, unmanaged)
 		-- Bootstrap if requested and keyfile doesn't exist
+		if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
 		if not io.open(path, 'r') then
 			local rr, msg = bootstrap()
 			if not rr then
@@ -267,7 +290,6 @@ local trust_anchors = {
 			trustanchor(rr)
 			-- Fetch DNSKEY immediately
 			trust_anchors.file_current = path
-			if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
 			refresh_plan(trust_anchors, 0, active_refresh, true, true)
 			return
 		elseif path == trust_anchors.file_current then
@@ -275,11 +297,13 @@ local trust_anchors = {
 		end
 		-- Parse new keys, refresh eventually
 		local new_keys = require('zonefile').file(path)
-		trust_anchors.file_current = path
-		if unmanaged then trust_anchors.file_current = nil end
+		if unmanaged then
+			trust_anchors.file_current = nil
+		else
+			trust_anchors.file_current = path
+		end
 		trust_anchors.keyset = {}
 		if trust_anchors.update(new_keys, true) then
-			if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
 			refresh_plan(trust_anchors, 10 * sec, active_refresh, true, false)
 		end
 	end,
