@@ -41,7 +41,7 @@ This is equivalent to `using unbound-anchor <https://www.unbound.net/documentati
 Manually providing root anchors
 -------------------------------
 
-The root anchors bootstrap may fail for various reasons, in this case you need to provide IANA or alternative root anchors. The format of the keyfile is the same as for Unbound or BIND and contains DNSKEY records.
+The root anchors bootstrap may fail for various reasons, in this case you need to provide IANA or alternative root anchors. The format of the keyfile is the same as for Unbound or BIND and contains DS/DNSKEY records.
 
 1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
 2. Fetch current keys (DNSKEY), verify digests
@@ -49,7 +49,7 @@ The root anchors bootstrap may fail for various reasons, in this case you need t
 
 .. code-block:: bash
 
-   $ kdig DNSKEY . @a.root-servers.net +noall +answer | grep 257 > root.keys
+   $ kdig DNSKEY . @k.root-servers.net +noall +answer | grep "DNSKEY[[:space:]]257" > root.keys
    $ ldns-key2ds -n root.keys # Only print to stdout
    ... verify that digest matches TA published by IANA ...
    $ kresd -k root.keys
