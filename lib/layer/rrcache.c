@@ -177,10 +177,15 @@ static int commit_rr(const char *key, void *val, void *data)
 
 	/* Save RRSIG in a special cache. */
 	uint16_t rank = KEY_FLAG_RANK(key);
-	if (baton->qry->flags & QUERY_DNSSEC_WANT)
-		rank |= KR_RANK_SECURE;
-	if (baton->qry->flags & QUERY_DNSSEC_INSECURE)
-		rank |= KR_RANK_INSECURE;
+	/* Non-authoritative NSs should never be trusted,
+	 * it may be present in an otherwise secure answer but it
+	 * is only a hint for local state. */
+	if (rr->type != KNOT_RRTYPE_NS || (rank & KR_RANK_AUTH)) {
+	 	if (baton->qry->flags & QUERY_DNSSEC_WANT)
+			rank |= KR_RANK_SECURE;
+		if (baton->qry->flags & QUERY_DNSSEC_INSECURE)
+			rank |= KR_RANK_INSECURE;
+	}
 	if (KEY_COVERING_RRSIG(key)) {
 		return commit_rrsig(baton, rank, rr);
 	}

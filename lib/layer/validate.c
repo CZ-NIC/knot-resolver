@@ -125,7 +125,7 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 			continue;
 		}
 		/* Only validate answers from current cut, records above the cut are stripped. */
-		if (section_id == KNOT_ANSWER && !knot_dname_in(qry->zone_cut.name, rr->owner)) {
+		if (!knot_dname_in(qry->zone_cut.name, rr->owner)) {
 			continue;
 		}
 		ret = kr_rrmap_add(&stash, rr, 0, pool);
