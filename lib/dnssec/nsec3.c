@@ -505,7 +505,7 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
  * @param type  Type to be checked.
  * @return      0 or error code.
  */
-static int maches_name_and_type(int *flags, const knot_rrset_t *nsec3,
+static int matches_name_and_type(int *flags, const knot_rrset_t *nsec3,
                                 const knot_dname_t *name, uint16_t type)
 {
 	assert(flags && nsec3 && name);
@@ -565,7 +565,7 @@ static int no_data_response_no_ds(const knot_pkt_t *pkt, knot_section_t section_
 		}
 		flags = 0;
 
-		int ret = maches_name_and_type(&flags, rrset, sname, stype);
+		int ret = matches_name_and_type(&flags, rrset, sname, stype);
 		if (ret != 0) {
 			return ret;
 		}
@@ -611,7 +611,7 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 		}
 		flags = 0;
 
-		int ret = maches_name_and_type(&flags, rrset, wildcard, stype);
+		int ret = matches_name_and_type(&flags, rrset, wildcard, stype);
 		if (ret != 0) {
 			return ret;
 		}
@@ -659,13 +659,14 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 	return kr_error(ENOENT);
 }
 
-int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
-                     const knot_dname_t *sname, uint16_t stype)
+
+int kr_nsec3_no_data_ds(const knot_pkt_t *pkt, knot_section_t section_id,
+                     const knot_dname_t *sname)
 {
 	/* DS record may be also matched by an existing NSEC3 RR. */
-	int ret = no_data_response_no_ds(pkt, section_id, sname, stype);
+	int ret = no_data_response_no_ds(pkt, section_id, sname, KNOT_RRTYPE_DS);
 	if (ret == 0) {
-		/* Satisfies RFC5155 8.5 and 8.6, first paragraph. */
+		/* Satisfies RFC5155 8.6, first paragraph. */
 		return ret;
 	}
 
@@ -679,11 +680,56 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 	}
 
 	assert(encloser_name && covering_next_nsec3);
-	if ((stype == KNOT_RRTYPE_DS) && has_optout(covering_next_nsec3)) {
-		/* Satisfies RFC5155 8.6, second paragraph. */
-		return 0;
+	if (!has_optout(covering_next_nsec3)) {
+		ret = DNSSEC_NOT_FOUND;
 	}
 
-	return matches_closest_encloser_wildcard(pkt, section_id,
-	                                         encloser_name, stype);
+	/* Satisfies RFC5155 8.6, second paragraph. */
+	return ret;
 }
+
+
+int kr_nsec3_no_data_no_ds(const knot_pkt_t *pkt, knot_section_t section_id,
+                     const knot_dname_t *sname, uint16_t stype)
+{
+	int ret = no_data_response_no_ds(pkt, section_id, sname, stype);
+	if (ret == 0) {
+		/* Satisfies RFC5155 8.5, first paragraph. */
+		return ret;
+	}
+
+	/* Check RFC5155 8.7.  	*/
+	/* Find closest provable encloser. */
+	const knot_dname_t *encloser_name = NULL;
+	const knot_rrset_t *covering_next_nsec3 = NULL;
+	ret = closest_encloser_proof(pkt, section_id, sname, &encloser_name,
+                                     NULL, &covering_next_nsec3);
+	if (ret != 0) {
+		return ret;
+	}
+
+	assert(encloser_name && covering_next_nsec3);
+	ret = matches_closest_encloser_wildcard(pkt, section_id,
+	                                         encloser_name, stype);
+	if (ret == 0) {
+		/* Satisfies RFC5155 8.7 */
+		return ret;
+	}
+
+	if (has_optout(covering_next_nsec3)) {
+		/* 
+		 * Satisfies RFC5155 ERRATA 3441 8.5 
+		 * (No Data Responses, QTYPE is not DS)
+		 * - empty nonterminal derived from unsecure delegation.
+		 * Moreover, ENT may be wilcard.
+		 * Hence it covers "wilcard nodata response" case.
+		 * It is not an error, but
+		 * denial of existance can not be proven.
+		 * Set error code to proceed unsecure.
+		 */
+		ret = DNSSEC_NOT_FOUND;
+	}
+	
+	return ret;
+}
+
