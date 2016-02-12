@@ -223,7 +223,12 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 	knot_nsec3_next_hashed(&nsec3->rrs, 0, &next_hash, &next_size);
 
 	if ((owner_hash.size != next_size) || (name_hash.size != next_size)) {
-		/* All hash lengths must be same. */
+		/*
+		 * All hash lengths must be same.
+		 * NSEC3 rr span doesn't cover name which has to be checked.
+		 * Exit with no-error return code,
+		 * FLG_NAME_COVERED will not be set.
+		 */
 		goto fail;
 	}
 
@@ -239,6 +244,11 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 		 */
 		if ((memcmp(ownrd, name_hash.data, next_size) >= 0) ||
 		    (memcmp(name_hash.data, nextd, next_size) >= 0)) {
+			/*
+			 * NSEC3 rr span doesn't cover name has to be checked.
+			 * Exit with no-error return code,
+			 * FLG_NAME_COVERED will not be set.
+			 */
 			goto fail;
 		}
 	} else {
@@ -251,6 +261,11 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 		 */
 		if ((memcmp(ownrd, name_hash.data, next_size) >= 0) &&
 		    (memcmp(name_hash.data, nextd, next_size) >= 0)) {
+			/*
+			 * NSEC3 rr span doesn't cover name has to be checked.
+			 * Exit with no-error return code,
+			 * FLG_NAME_COVERED will not be set.
+			 */
 			goto fail;
 		}
 	}
@@ -331,6 +346,11 @@ static int matches_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_
 
 	if ((owner_hash.size != name_hash.size) ||
 	    (memcmp(owner_hash.data, name_hash.data, owner_hash.size) != 0)) {
+		/*
+		 * NSEC3 owner does not match name has to be checked.
+		 * Exit with no-error return code,
+		 * FLG_NAME_MATCHED will not be set.
+		 */
 		goto fail;
 	}
 
