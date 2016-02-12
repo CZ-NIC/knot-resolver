@@ -681,10 +681,10 @@ int kr_nsec3_no_data_ds(const knot_pkt_t *pkt, knot_section_t section_id,
 
 	assert(encloser_name && covering_next_nsec3);
 	if (!has_optout(covering_next_nsec3)) {
-		ret = DNSSEC_NOT_FOUND;
+		/* Don't satisfies RFC5155 8.6, second paragraph. */
+		ret = kr_error(DNSSEC_NOT_FOUND);
 	}
 
-	/* Satisfies RFC5155 8.6, second paragraph. */
 	return ret;
 }
 
@@ -727,7 +727,7 @@ int kr_nsec3_no_data_no_ds(const knot_pkt_t *pkt, knot_section_t section_id,
 		 * denial of existance can not be proven.
 		 * Set error code to proceed unsecure.
 		 */
-		ret = DNSSEC_NOT_FOUND;
+		ret = kr_error(DNSSEC_NOT_FOUND);
 	}
 	
 	return ret;

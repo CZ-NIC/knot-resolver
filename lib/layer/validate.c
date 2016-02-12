@@ -425,7 +425,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 				ret = kr_nsec3_no_data_no_ds(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			}
 			if (ret != 0) {
-				if (has_nsec3 && (ret == DNSSEC_NOT_FOUND)) {
+				if (has_nsec3 && (ret == kr_error(DNSSEC_NOT_FOUND))) {
 					DEBUG_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
 					qry->flags &= ~QUERY_DNSSEC_WANT;
 					qry->flags |= QUERY_DNSSEC_INSECURE;
