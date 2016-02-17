@@ -183,8 +183,9 @@ static int commit_rr(const char *key, void *val, void *data)
 	if (rr->type != KNOT_RRTYPE_NS || (rank & KR_RANK_AUTH)) {
 	 	if (baton->qry->flags & QUERY_DNSSEC_WANT)
 			rank |= KR_RANK_SECURE;
-		if (baton->qry->flags & QUERY_DNSSEC_INSECURE)
-			rank |= KR_RANK_INSECURE;
+	}
+	if (baton->qry->flags & QUERY_DNSSEC_INSECURE) {
+		rank |= KR_RANK_INSECURE;
 	}
 	if (KEY_COVERING_RRSIG(key)) {
 		return commit_rrsig(baton, rank, rr);
