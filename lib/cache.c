@@ -38,7 +38,52 @@
 #define txn_api(txn) ((txn)->owner->api)
 #define txn_is_valid(txn) ((txn) && (txn)->owner && txn_api(txn))
 
-/** @internal Check cache internal data version. Clear if it doesn't match. */
+
+/** @internal Removes all records from cache. */
+static int cache_purge(struct kr_cache_txn *txn)
+{
+	int ret;
+	if (!txn_is_valid(txn)) {
+		return kr_error(EINVAL);
+	}
+
+	txn->owner->stats.delete += 1;
+	ret = txn_api(txn)->clear(&txn->t);
+	return ret;
+}
+
+/** @internal	Check cache internal data version. Clear if it doesn't match.
+ * returns :	EEXIST - cache data version matched.
+ *              0 - cache recreated, txn has to be committed.
+ *		otherwise - cache recreation fails.
+ */
+static int assert_right_version_txn(struct kr_cache_txn *txn)
+{
+	/* Check cache ABI version */
+	knot_db_val_t key = { KEY_VERSION, 2 };
+	knot_db_val_t val = { NULL, 0 };
+	int ret = txn_api(txn)->find(&txn->t, &key, &val, 0);
+	if (ret == 0) {
+		ret = kr_error(EEXIST);
+	} else {
+		/*
+		 * Version doesn't not match.
+		 * Recreate cache and write version key.
+		 */
+		ret = txn_api(txn)->count(&txn->t);
+		if (ret != 0) { /* Non-empty cache, purge it. */
+			kr_log_info("[cache] purging cache\n");
+			ret = cache_purge(txn);
+		}
+		/* Either purged or empty. */
+		if (ret == 0) {
+			ret = txn_api(txn)->insert(&txn->t, &key, &val, 0);
+		}
+	}
+	return ret;
+}
+
+/** @internal Open cache db transaction and check internal data version. */
 static void assert_right_version(struct kr_cache *cache)
 {
 	/* Check cache ABI version */
@@ -47,25 +92,11 @@ static void assert_right_version(struct kr_cache *cache)
 	if (ret != 0) {
 		return; /* N/A, doesn't work. */
 	}
-	knot_db_val_t key = { KEY_VERSION, 2 };
-	knot_db_val_t val = { NULL, 0 };
-	ret = txn_api(&txn)->find(&txn.t, &key, &val, 0);
-	if (ret == 0) { /* Version is OK */
+	ret = assert_right_version_txn(&txn);
+	if (ret == 0) { /* Cache recreated, commit. */
+		kr_cache_txn_commit(&txn);
+	} else {
 		kr_cache_txn_abort(&txn);
-		return;
-	}
-	/* Recreate cache and write version key */
-	ret = txn_api(&txn)->count(&txn.t);
-	if (ret > 0) { /* Non-empty cache, purge it. */
-		kr_log_info("[cache] purging cache\n");
-		kr_cache_clear(&txn);
-		kr_cache_txn_commit(&txn);
-		ret = kr_cache_txn_begin(cache, &txn, 0);
-	}
-	/* Either purged or empty. */
-	if (ret == 0) {
-		txn_api(&txn)->insert(&txn.t, &key, &val, 0);
-		kr_cache_txn_commit(&txn);
 	}
 }
 
@@ -290,9 +321,15 @@ int kr_cache_clear(struct kr_cache_txn *txn)
 	if (!txn_is_valid(txn)) {
 		return kr_error(EINVAL);
 	}
-
-	txn->owner->stats.delete += 1;
-	return txn_api(txn)->clear(&txn->t);
+	int ret = cache_purge(txn);
+	if (ret == 0) {
+		/*
+		 * normally must return 0, never EEXIST
+		 * (due to cache_purge())
+		 */
+		ret = assert_right_version_txn(txn);
+	}
+	return ret;
 }
 
 int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank, uint32_t *timestamp)
