@@ -12,7 +12,7 @@ Example configuration
 
 Only the ``host`` parameter is mandatory.
 
-.. info:: By default the module uses UDP so it doesn't guarantee the delivery, set ``tcp = true`` to enable Graphite over TCP. If the TCP consumer goes down or the connection with Graphite is lost, resolver will periodically attempt to reconnect with it.
+By default the module uses UDP so it doesn't guarantee the delivery, set ``tcp = true`` to enable Graphite over TCP. If the TCP consumer goes down or the connection with Graphite is lost, resolver will periodically attempt to reconnect with it.
 
 .. code-block:: lua
 
