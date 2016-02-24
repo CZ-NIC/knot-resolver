@@ -42,20 +42,18 @@
 /** @internal Removes all records from cache. */
 static int cache_purge(struct kr_cache_txn *txn)
 {
-	int ret;
-	if (!txn_is_valid(txn)) {
-		return kr_error(EINVAL);
+	int ret = kr_error(EINVAL);
+	if (txn_is_valid(txn)) {
+		txn->owner->stats.delete += 1;
+		ret = txn_api(txn)->clear(&txn->t);
 	}
-
-	txn->owner->stats.delete += 1;
-	ret = txn_api(txn)->clear(&txn->t);
 	return ret;
 }
 
 /** @internal	Check cache internal data version. Clear if it doesn't match.
  * returns :	EEXIST - cache data version matched.
- *              0 - cache recreated, txn has to be committed.
- *		otherwise - cache recreation fails.
+ *		0 - cache recreated, txn has to be committed.
+ *		Otherwise - cache recreation fails.
  */
 static int assert_right_version_txn(struct kr_cache_txn *txn)
 {
@@ -67,7 +65,7 @@ static int assert_right_version_txn(struct kr_cache_txn *txn)
 		ret = kr_error(EEXIST);
 	} else {
 		/*
-		 * Version doesn't not match.
+		 * Version doesn't match.
 		 * Recreate cache and write version key.
 		 */
 		ret = txn_api(txn)->count(&txn->t);

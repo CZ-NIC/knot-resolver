@@ -222,62 +222,44 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 	uint8_t *next_hash = NULL;
 	knot_nsec3_next_hashed(&nsec3->rrs, 0, &next_hash, &next_size);
 
-	if ((owner_hash.size != next_size) || (name_hash.size != next_size)) {
-		/*
-		 * All hash lengths must be same.
-		 * NSEC3 rr span doesn't cover name which has to be checked.
-		 * Exit with no-error return code,
-		 * FLG_NAME_COVERED will not be set.
-		 */
-		goto fail;
-	}
-
-	const uint8_t *ownrd = owner_hash.data;
-	const uint8_t *nextd = next_hash;
-	if (memcmp(ownrd, nextd, next_size) < 0) {
-		/*
-		 * 0 (...) owner ... next (...) MAX
-		 *                ^
-		 *                name
-		 * ==>
-		 * (owner < name) && (name < next)
-		 */
-		if ((memcmp(ownrd, name_hash.data, next_size) >= 0) ||
-		    (memcmp(name_hash.data, nextd, next_size) >= 0)) {
+	if ((owner_hash.size == next_size) && (name_hash.size == next_size)) {
+		/* All hash lengths must be same. */
+		const uint8_t *ownrd = owner_hash.data;
+		const uint8_t *nextd = next_hash;
+		int covered = 0;
+		int greater_then_owner = (memcmp(ownrd, name_hash.data, next_size) < 0);
+		int less_then_next = (memcmp(name_hash.data, nextd, next_size) < 0);
+		if (memcmp(ownrd, nextd, next_size) < 0) {
 			/*
-			 * NSEC3 rr span doesn't cover name has to be checked.
-			 * Exit with no-error return code,
-			 * FLG_NAME_COVERED will not be set.
+			 * 0 (...) owner ... next (...) MAX
+			 *                ^
+			 *                name
+			 * ==>
+			 * (owner < name) && (name < next)
 			 */
-			goto fail;
-		}
-	} else {
-		/*
-		 * owner ... MAX, 0 ... next
-		 *        ^     ^    ^
-		 *        name  name name
-		 * =>
-		 * (owner < name) || (name < next)
-		 */
-		if ((memcmp(ownrd, name_hash.data, next_size) >= 0) &&
-		    (memcmp(name_hash.data, nextd, next_size) >= 0)) {
+			covered = ((greater_then_owner) && (less_then_next));
+		} else {
 			/*
-			 * NSEC3 rr span doesn't cover name has to be checked.
-			 * Exit with no-error return code,
-			 * FLG_NAME_COVERED will not be set.
+			 * owner ... MAX, 0 ... next
+			 *        ^     ^    ^
+			 *        name  name name
+			 * =>
+			 * (owner < name) || (name < next)
 			 */
-			goto fail;
+			covered = ((greater_then_owner) || (less_then_next));
 		}
-	}
 
-	*flags |= FLG_NAME_COVERED;
+		if (covered) {
+			*flags |= FLG_NAME_COVERED;
 
-	uint8_t nsec3_flags = knot_nsec3_flags(&nsec3->rrs, 0);
-	if (nsec3_flags & ~OPT_OUT_BIT) {
-		/* RFC5155 3.1.2 */
-		ret = kr_error(EINVAL);
-	} else {
-		ret = kr_ok();
+			uint8_t nsec3_flags = knot_nsec3_flags(&nsec3->rrs, 0);
+			if (nsec3_flags & ~OPT_OUT_BIT) {
+				/* RFC5155 3.1.2 */
+				ret = kr_error(EINVAL);
+			} else {
+				ret = kr_ok();
+			}
+		}
 	}
 
 fail:
@@ -344,18 +326,11 @@ static int matches_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_
 		goto fail;
 	}
 
-	if ((owner_hash.size != name_hash.size) ||
-	    (memcmp(owner_hash.data, name_hash.data, owner_hash.size) != 0)) {
-		/*
-		 * NSEC3 owner does not match name has to be checked.
-		 * Exit with no-error return code,
-		 * FLG_NAME_MATCHED will not be set.
-		 */
-		goto fail;
+	if ((owner_hash.size == name_hash.size) &&
+	    (memcmp(owner_hash.data, name_hash.data, owner_hash.size) == 0)) {
+		*flags |= FLG_NAME_MATCHED;
+		ret = kr_ok();
 	}
-
-	*flags |= FLG_NAME_MATCHED;
-	ret = kr_ok();
 
 fail:
 	if (params.salt.data) {
@@ -639,7 +614,10 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 		/* TODO -- The loop resembles no_data_response_no_ds() exept
 		 * the following condition.
 		 */
-		if ((flags & FLG_NAME_MATCHED) && (flags & FLG_TYPE_BIT_MISSING)) {
+		if ((flags & FLG_NAME_MATCHED) &&
+		    (flags & FLG_TYPE_BIT_MISSING) &&
+		    (flags & FLG_CNAME_BIT_MISSING)) {
+			/* rfc5155 8.7 */
 			return kr_ok();
 		}
 	}
@@ -680,45 +658,16 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 }
 
 
-int kr_nsec3_no_data_ds(const knot_pkt_t *pkt, knot_section_t section_id,
-                     const knot_dname_t *sname)
-{
-	/* DS record may be also matched by an existing NSEC3 RR. */
-	int ret = no_data_response_no_ds(pkt, section_id, sname, KNOT_RRTYPE_DS);
-	if (ret == 0) {
-		/* Satisfies RFC5155 8.6, first paragraph. */
-		return ret;
-	}
-
-	/* Find closest provable encloser. */
-	const knot_dname_t *encloser_name = NULL;
-	const knot_rrset_t *covering_next_nsec3 = NULL;
-	ret = closest_encloser_proof(pkt, section_id, sname, &encloser_name,
-                                     NULL, &covering_next_nsec3);
-	if (ret != 0) {
-		return ret;
-	}
-
-	assert(encloser_name && covering_next_nsec3);
-	if (!has_optout(covering_next_nsec3)) {
-		/* Don't satisfies RFC5155 8.6, second paragraph. */
-		ret = kr_error(DNSSEC_NOT_FOUND);
-	}
-
-	return ret;
-}
-
-
-int kr_nsec3_no_data_no_ds(const knot_pkt_t *pkt, knot_section_t section_id,
+int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
                      const knot_dname_t *sname, uint16_t stype)
 {
+	/* DS record may be also matched by an existing NSEC3 RR. */
 	int ret = no_data_response_no_ds(pkt, section_id, sname, stype);
 	if (ret == 0) {
-		/* Satisfies RFC5155 8.5, first paragraph. */
+		/* Satisfies RFC5155 8.5 and 8.6, both first paragraph. */
 		return ret;
 	}
 
-	/* Check RFC5155 8.7.  	*/
 	/* Find closest provable encloser. */
 	const knot_dname_t *encloser_name = NULL;
 	const knot_rrset_t *covering_next_nsec3 = NULL;
@@ -736,15 +685,16 @@ int kr_nsec3_no_data_no_ds(const knot_pkt_t *pkt, knot_section_t section_id,
 		return ret;
 	}
 
-	if (has_optout(covering_next_nsec3)) {
+	if (!has_optout(covering_next_nsec3)) {
+		/* Bogus */
+		ret = kr_error(ENOENT);
+	} else {
 		/* 
-		 * Satisfies RFC5155 ERRATA 3441 8.5 
-		 * (No Data Responses, QTYPE is not DS)
-		 * - empty nonterminal derived from unsecure delegation.
-		 * Moreover, ENT may be wilcard.
-		 * Hence it covers "wilcard nodata response" case.
-		 * It is not an error, but
-		 * denial of existance can not be proven.
+		 * Satisfies RFC5155 8.6 (QTYPE == DS), 2nd paragraph.
+		 * Also satisfies ERRATA 3441 8.5 (QTYPE != DS), 3rd paragraph.
+		 * - (wildcard) empty nonterminal
+		 * derived from unsecure delegation.
+		 * Denial of existance can not be proven.
 		 * Set error code to proceed unsecure.
 		 */
 		ret = kr_error(DNSSEC_NOT_FOUND);

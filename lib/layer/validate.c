@@ -295,7 +295,11 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 		if (!has_nsec3) {
 			ret = kr_nsec_existence_denial(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
 		} else {
-			ret = kr_nsec3_no_data_ds(answer, KNOT_AUTHORITY, proved_name);
+			ret = kr_nsec3_no_data(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
+			if (ret == kr_error(DNSSEC_NOT_FOUND)) {
+				/* Not bogus, but going insecure */
+				ret = 0;
+			}
 		}
 		if (ret != 0) {
 			DEBUG_MSG(qry, "<= bogus proof of DS non-existence\n");
@@ -422,7 +426,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			if (!has_nsec3) {
 				ret = kr_nsec_existence_denial(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			} else {
-				ret = kr_nsec3_no_data_no_ds(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
+				ret = kr_nsec3_no_data(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			}
 			if (ret != 0) {
 				if (has_nsec3 && (ret == kr_error(DNSSEC_NOT_FOUND))) {
