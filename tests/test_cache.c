@@ -394,8 +394,11 @@ static void test_clear(void **state)
 	struct kr_cache_txn *txn = test_txn_write(state);
 	int preempt_ret = kr_cache_clear(txn);
 	int commit_ret = kr_cache_txn_commit(txn);
+	int count_ret = txn->owner->api->count(&txn->t);
+
 	assert_int_equal(preempt_ret, KNOT_EOK);
 	assert_int_equal(commit_ret, KNOT_EOK);
+	assert_int_equal(count_ret, 1); /* Version record */
 }
 
 int main(void)
