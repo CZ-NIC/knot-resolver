@@ -322,11 +322,13 @@ static int answer_finalize(struct kr_request *request, int state)
 		}
 	}
 	/* Set AD=1 if succeeded and requested secured answer. */
+	const bool has_ad = knot_wire_get_ad(answer->wire);
+	knot_wire_clear_ad(answer->wire);
 	if (state == KNOT_STATE_DONE && rplan->resolved.len > 0) {
 		struct kr_query *last = array_tail(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
-		const bool dnssec_ok = (last->flags & QUERY_DNSSEC_WANT) && !(last->flags & QUERY_DNSSEC_INSECURE);
-		if (dnssec_ok && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
+		const bool secure = (last->flags & QUERY_DNSSEC_WANT) && !(last->flags & QUERY_DNSSEC_INSECURE);
+		if (has_ad && secure && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
 			knot_wire_set_ad(answer->wire);
 		}
 	}
@@ -404,6 +406,9 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	knot_wire_clear_aa(answer->wire);
 	knot_wire_set_ra(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
+	if (qry->flags & QUERY_DNSSEC_WANT) {
+		knot_wire_set_ad(answer->wire);
+	}
 
 	/* Expect answer, pop if satisfied immediately */
 	ITERATE_LAYERS(request, qry, begin, request);
