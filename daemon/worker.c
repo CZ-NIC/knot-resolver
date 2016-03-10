@@ -26,6 +26,7 @@
 #endif
 #include <assert.h>
 #include "lib/utils.h"
+#include "lib/layer.h"
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
@@ -350,11 +351,28 @@ static void on_timeout(uv_timer_t *req)
 	knot_rrtype_to_string(knot_pkt_qtype(task->pktbuf), type_str, sizeof(type_str));
 	DEBUG_MSG("ioreq timeout %s %s %p\n", qname_str, type_str, req);
 #endif
-	if (!uv_is_closing(handle)) {
-		struct worker_ctx *worker = task->worker;
-		worker->stats.timeout += 1;
-		qr_task_step(task, NULL, NULL);
+	/* Ignore if this timeout is being terminated. */
+	if (uv_is_closing(handle)) {
+		return;
 	}
+	/* Penalize all tried nameservers with a timeout. */
+	struct worker_ctx *worker = task->worker;
+	if (task->leading && task->pending_count > 0) {
+		struct kr_query *qry = array_tail(task->req.rplan.pending);
+		struct sockaddr_in6 *addrlist = (struct sockaddr_in6 *)task->addrlist;
+		for (uint16_t i = 0; i < MIN(task->pending_count, task->addrlist_count); ++i) {
+			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
+			WITH_DEBUG {
+				char addr_str[INET6_ADDRSTRLEN];
+				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
+				QRDEBUG(qry, "wrkr", "=> server: '%s' flagged as 'bad'\n", addr_str);
+			}
+			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_TIMEOUT, worker->engine->resolver.cache_rtt);
+		}
+	}
+	/* Interrupt current pending request. */
+	worker->stats.timeout += 1;
+	qr_task_step(task, NULL, NULL);
 }
 
 /* This is called when we send subrequest / answer */

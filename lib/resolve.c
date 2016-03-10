@@ -325,8 +325,8 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (state == KNOT_STATE_DONE && rplan->resolved.len > 0) {
 		struct kr_query *last = array_tail(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
-		if ((last->flags & QUERY_DNSSEC_WANT) && knot_pkt_has_dnssec(answer) &&
-			knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
+		const bool dnssec_ok = (last->flags & QUERY_DNSSEC_WANT) && !(last->flags & QUERY_DNSSEC_INSECURE);
+		if (dnssec_ok && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
 			knot_wire_set_ad(answer->wire);
 		}
 	}
@@ -393,7 +393,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
 	map_t *negative_anchors = &request->ctx->negative_anchors;
 	map_t *trust_anchors = &request->ctx->trust_anchors;
-	if (knot_pkt_has_dnssec(packet) &&
+	if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
 	    kr_ta_covers(trust_anchors, qname) && !kr_ta_covers(negative_anchors, qname)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	}

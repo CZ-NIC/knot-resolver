@@ -91,8 +91,9 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query
 		rrtype = KNOT_RRTYPE_CNAME;
 		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, 0);
 	}
-	/* Record isn't flagged as INSECURE => doesn't have RRSIG. */
+	/* Record is flagged as INSECURE => doesn't have RRSIG. */
 	if (ret == 0 && (rank & KR_RANK_INSECURE)) {
+		qry->flags |= QUERY_DNSSEC_INSECURE;
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	/* Record may have RRSIG, try to find it. */
 	} else if (ret == 0 && dobit) {
