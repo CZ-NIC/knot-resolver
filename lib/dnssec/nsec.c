@@ -38,7 +38,7 @@ bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t 
 	const uint8_t bitmap_bit_mask = 1 << (7 - (type_lo & 0x07));
 
 	size_t bm_pos = 0;
-	while (bm_pos + 3 < bm_size) {
+	while (bm_pos + 3 <= bm_size) {
 		uint8_t win = bm[bm_pos++];
 		uint8_t win_size = bm[bm_pos++];
 		/* Check remaining window length. */
