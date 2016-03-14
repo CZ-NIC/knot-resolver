@@ -277,7 +277,6 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 	 * If it contains neither, the referral is bogus (or an attempted downgrade attack).
 	 */
 
-	/* Aggregate DS records (if using multiple keys) */
 	unsigned section = KNOT_ANSWER;
 	if (!knot_wire_get_aa(answer->wire)) { /* Referral */
 		section = KNOT_AUTHORITY;
@@ -287,17 +286,30 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 		return kr_ok();
 	}
 
-	/* No DS provided, check for proof of non-existence. */
 	int ret = 0;
 	const knot_dname_t *proved_name = knot_pkt_qname(answer);
+	/* Aggregate DS records (if using multiple keys) */
 	knot_rrset_t *new_ds = update_ds(cut, knot_pkt_section(answer, section));
 	if (!new_ds) {
+		/* No DS provided, check for proof of non-existence. */
 		if (!has_nsec3) {
-			ret = kr_nsec_existence_denial(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
+			if (!knot_wire_get_aa(answer->wire)) {
+				/* Referral, check if it is referral to unsigned, rfc4035 5.2 */
+				ret = kr_nsec_ref_to_unsigned(answer);
+			} else {
+				/* No-data answer */
+				ret = kr_nsec_existence_denial(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
+			}
 		} else {
-			ret = kr_nsec3_no_data(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
+			if (!knot_wire_get_aa(answer->wire)) {
+				/* Referral, check if it is referral to unsigned, rfc5155 8.9 */
+				ret = kr_nsec3_ref_to_unsigned(answer);
+			} else {
+				/* No-data answer, QTYPE is DS, rfc5155 8.6 */
+				ret = kr_nsec3_no_data(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
+			}
 			if (ret == kr_error(DNSSEC_NOT_FOUND)) {
-				/* Not bogus, but going insecure */
+				/* Not bogus, going insecure due to optout */
 				ret = 0;
 			}
 		}

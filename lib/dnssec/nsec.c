@@ -22,6 +22,7 @@
 #include <libknot/rrset.h>
 #include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
+#include <dnssec/error.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
@@ -324,4 +325,67 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 	}
 
 	return kr_nsec_existence_denied(flags) ? kr_ok() : kr_error(ENOENT);
+}
+
+int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
+{
+	int nsec_found = 0;
+	uint8_t *bm = NULL;
+	uint16_t bm_size = 0;
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	if (!sec) {
+		return kr_error(EINVAL);
+	}
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *ns = knot_pkt_rr(sec, i);
+		if (ns->type == KNOT_RRTYPE_DS) {
+			return kr_error(EEXIST);
+		}
+		if (ns->type != KNOT_RRTYPE_NS) {
+			continue;
+		}
+		nsec_found = 0;
+		for (unsigned j = 0; j < sec->count; ++j) {
+			const knot_rrset_t *nsec = knot_pkt_rr(sec, j);
+			if (nsec->type == KNOT_RRTYPE_DS) {
+				return kr_error(EEXIST);
+			}
+			if (nsec->type != KNOT_RRTYPE_NSEC) {
+				continue;
+			}
+			/* nsec found
+			 * check if owner name matches the delegation name
+			 */
+			if (knot_dname_is_equal(nsec->owner, ns->owner)) {
+				/* nsec does not match the delegation */
+				continue;
+			}
+			nsec_found = 1;
+			knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+			if (!bm) {
+				return kr_error(EINVAL);
+			}
+			if (kr_nsec_bitmap_contains_type(bm, bm_size,
+							  KNOT_RRTYPE_NS) &&
+			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+							  KNOT_RRTYPE_DS) &&
+			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+							  KNOT_RRTYPE_SOA)) {
+				/* rfc4035, 5.2 */
+				return kr_ok();
+			}
+		}
+		if (nsec_found) {
+			/* nsec which owner matches
+			 * the delegation name was found,
+			 * but nsec type bitmap contains wrong types
+			 */
+			return kr_error(EINVAL);
+		} else {
+			/* nsec that matches delegation was not found */
+			return kr_error(DNSSEC_NOT_FOUND);
+		}
+	}
+
+	return kr_error(EINVAL);
 }
