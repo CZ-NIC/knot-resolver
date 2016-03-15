@@ -19,6 +19,7 @@
 
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
+#include <libknot/rrtype/rrsig.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
@@ -107,19 +108,6 @@ int kr_response_classify(knot_pkt_t *pkt)
 		return PKT_REFUSED;
 	default:
 		return PKT_ERROR;
-	}
-}
-
-static void follow_cname_chain(const knot_dname_t **cname, const knot_rrset_t *rr,
-                               struct kr_query *cur)
-{
-	if (rr->type == KNOT_RRTYPE_CNAME) {
-		const knot_dname_t *next_cname = knot_cname_name(&rr->rrs);
-		if (next_cname)
-			*cname = next_cname;
-	} else if (rr->type != KNOT_RRTYPE_RRSIG) {
-		/* Terminate CNAME chain (if not RRSIG). */
-		*cname = cur->sname;
 	}
 }
 
@@ -346,7 +334,6 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *query = req->current_query;
-
 	/* Response for minimized QNAME.
 	 * NODATA   => may be empty non-terminal, retry (found zone cut)
 	 * NOERROR  => found zone cut, retry
@@ -371,39 +358,75 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 
 	/* Process answer type */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
-	bool follow_chain = (query->stype != KNOT_RRTYPE_CNAME);
-	const knot_dname_t *cname = query->sname;
-	for (unsigned i = 0; i < an->count; ++i) {
-		/* @todo construct a CNAME chain closure and accept all names from that set */ 
-		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-		if (!knot_dname_is_equal(rr->owner, query->sname) &&
-			!(follow_chain && knot_dname_is_equal(rr->owner, cname))) {
-			continue;
-		}
-		unsigned hint = 0;
-		if(knot_dname_is_equal(cname, knot_pkt_qname(req->answer))) {
-			hint = KNOT_COMPR_HINT_QNAME;
-		}
-		int state = is_final ? update_answer(rr, hint, req->answer) : update_parent(rr, query);
-		if (state == KNOT_STATE_FAIL) {
-			return state;
-		}
-		/* Follow chain only within current cut (if secure). */
-		if (follow_chain) {
-			follow_cname_chain(&cname, rr, query);
-			if (!(query->flags & QUERY_DNSSEC_WANT) || !knot_dname_in(query->zone_cut.name, cname)) {
-				follow_chain = false; 
+	const knot_dname_t *cname = NULL;
+	const knot_dname_t *pending_cname = query->sname;
+	unsigned cname_chain_len = 0;
+	while (pending_cname) {
+		/* CNAME was found at previous iteration, but records may not follow the correct order.
+		 * Try to find records for pending_cname owner from section start. */
+		cname = pending_cname;
+		pending_cname = NULL;
+		for (unsigned i = 0; i < an->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(an, i);
+			if (!knot_dname_is_equal(rr->owner, cname)) {
+				continue;
+			}
+			/* Process records matching current SNAME */
+			unsigned hint = 0;
+			if(knot_dname_is_equal(cname, knot_pkt_qname(req->answer))) {
+				hint = KNOT_COMPR_HINT_QNAME;
+			}
+			int state = is_final ? update_answer(rr, hint, req->answer) : update_parent(rr, query);
+			if (state == KNOT_STATE_FAIL) {
+				return state;
+			}
+			/* Jump to next CNAME target */
+			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
+				continue;
+			}
+			cname_chain_len += 1;
+			pending_cname = knot_cname_name(&rr->rrs);
+			if (!pending_cname) {
+				break;
+			}
+			if (cname_chain_len > an->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
+				DEBUG_MSG("<= too long cname chain\n");
+				return KNOT_STATE_FAIL;
+			}
+			/* If secure, don't use pending_cname immediately.
+			 * There are can be RRSIG for "old" cname.
+			 */
+			if (query->flags & QUERY_DNSSEC_WANT) {
+				/* Follow chain only within current cut (if secure). */
+				if (pending_cname && !knot_dname_in(query->zone_cut.name, pending_cname)) {
+					pending_cname = NULL;
+				}
+			} else {
+				/* Try to find next cname */
+				cname = pending_cname;
 			}
 		}
 	}
 
-	/* Make sure that this is an authoritative naswer (even with AA=0) for other layers */
+	/* Make sure that this is an authoritative answer (even with AA=0) for other layers */
 	knot_wire_set_aa(pkt->wire);
 	/* Either way it resolves current query. */
 	query->flags |= QUERY_RESOLVED;
 	/* Follow canonical name as next SNAME. */
 	if (!knot_dname_is_equal(cname, query->sname)) {
 		DEBUG_MSG("<= cname chain, following\n");
+		/* Check if already resolved */
+		if (cname && !knot_dname_is_equal(cname, query->sname)) {
+			for (int i = 0; i < req->rplan.resolved.len; ++i) {
+				struct kr_query * q = req->rplan.resolved.at[i];
+				if (q->sclass == query->sclass &&
+				    q->stype == query->stype   &&
+				    knot_dname_is_equal(q->sname, cname)) {
+					DEBUG_MSG("<= cname chain loop\n");
+					return KNOT_STATE_FAIL;
+				}
+			}
+		}
 		struct kr_query *next = kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
 		if (!next) {
 			return KNOT_STATE_FAIL;
