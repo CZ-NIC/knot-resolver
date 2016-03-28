@@ -15,6 +15,7 @@
  */
 
 #include <unistd.h>
+#include <assert.h>
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
@@ -153,6 +154,44 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 	return kr_ok();
 }
 
+/** Open fd as endpoint. */
+static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, int sock_type)
+{
+	if (sock_type == SOCK_DGRAM) {
+		if (ep->udp) {
+			return kr_error(EEXIST);
+		}
+		ep->udp = malloc(sizeof(*ep->udp));
+		if (!ep->udp) {
+			return kr_error(ENOMEM);
+		}
+		uv_udp_init(net->loop, ep->udp);
+		int ret = uv_udp_open(ep->udp, (uv_os_sock_t) fd);
+		if (ret != 0) {
+			close_handle((uv_handle_t *)ep->udp, false);
+			return ret;
+		}
+		ep->flags |= NET_UDP;
+	}
+	if (sock_type == SOCK_STREAM) {
+		if (ep->tcp) {
+			return kr_error(EEXIST);
+		}
+		ep->tcp = malloc(sizeof(*ep->tcp));
+		if (!ep->tcp) {
+			return kr_error(ENOMEM);
+		}
+		uv_tcp_init(net->loop, ep->tcp);
+		int ret = uv_tcp_open(ep->tcp, (uv_os_sock_t) fd);
+		if (ret != 0) {
+			close_handle((uv_handle_t *)ep->tcp, false);
+			return ret;
+		}
+		ep->flags |= NET_TCP;
+	}
+	return kr_ok();
+}
+
 /** @internal Fetch endpoint array and offset of the address/port query. */
 static endpoint_array_t *network_get(struct network *net, const char *addr, uint16_t port, size_t *index)
 {
@@ -167,6 +206,56 @@ static endpoint_array_t *network_get(struct network *net, const char *addr, uint
 		}
 	}
 	return NULL;
+}
+
+int network_listen_fd(struct network *net, int fd)
+{
+	/* Extract local address and socket type. */
+	int sock_type = SOCK_DGRAM;
+	socklen_t len = sizeof(sock_type);
+	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);	
+	if (ret != 0) {
+		return kr_error(EBADF);
+	}
+	/* Extract local address for this socket. */
+	struct sockaddr_storage ss;
+	socklen_t addr_len = sizeof(ss);
+	ret = getsockname(fd, (struct sockaddr *)&ss, &addr_len);
+	if (ret != 0) {
+		return kr_error(EBADF);
+	}
+	int port = 0;
+	char addr_str[INET6_ADDRSTRLEN]; /* http://tools.ietf.org/html/rfc4291 */
+	if (ss.ss_family == AF_INET) {
+		uv_ip4_name((const struct sockaddr_in*)&ss, addr_str, sizeof(addr_str));
+		port = ntohs(((struct sockaddr_in *)&ss)->sin_port);
+	} else if (ss.ss_family == AF_INET6) {
+		uv_ip6_name((const struct sockaddr_in6*)&ss, addr_str, sizeof(addr_str));
+		port = ntohs(((struct sockaddr_in6 *)&ss)->sin6_port);
+	} else {
+		uv_ip4_name((const struct sockaddr_in*)&ss, addr_str, sizeof(addr_str));
+		port = ntohs(((struct sockaddr_in *)&ss)->sin_port);
+		return kr_error(EAFNOSUPPORT);
+	}
+	/* Fetch or create endpoint for this fd */
+	size_t index = 0;
+	endpoint_array_t *ep_array = network_get(net, addr_str, port, &index);
+	if (!ep_array) {
+		struct endpoint *ep = malloc(sizeof(*ep));
+		memset(ep, 0, sizeof(*ep));
+		ep->flags = NET_DOWN;
+		ep->port = port;
+		ret = insert_endpoint(net, addr_str, ep);
+		if (ret != 0) {
+			return ret;
+		}
+		ep_array = network_get(net, addr_str, port, &index);
+	}
+	/* Open fd in found/created endpoint. */
+	struct endpoint *ep = ep_array->at[index];
+	assert(ep != NULL);
+	/* Create a libuv struct for this socket. */
+	return open_endpoint_fd(net, ep, fd, sock_type);
 }
 
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags)

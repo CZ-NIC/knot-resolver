@@ -124,6 +124,22 @@ of running processes, and you can test the process for liveliness by connecting 
 
 .. warning:: This is very basic way to orchestrate multi-core deployments and doesn't scale in multi-node clusters. Keep an eye on the prepared ``hive`` module that is going to automate everything from service discovery to deployment and consistent configuration.
 
+Running supervised
+==================
+
+Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to resolver daemon. Thus if the resolver terminates or is killed, the sockets are still active and no queries are dropped.
+
+The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. There's a tiny supervisor script for convenience, but you should have a look at [real process managers](http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly).
+
+.. code-block:: bash
+
+   $ python scripts/supervisor.py ./daemon/kresd 127.0.0.1@53
+   $ [system] interactive mode
+   > quit()
+   > [2016-03-28 16:06:36.795879] process finished, pid = 99342, status = 0, uptime = 0:00:01.720612
+   [system] interactive mode
+   >
+
 Configuration
 =============
 
