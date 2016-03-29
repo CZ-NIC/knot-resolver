@@ -23,6 +23,9 @@
 #include <contrib/ucw/mempool.h>
 #include <contrib/ccan/asprintf/asprintf.h>
 #include <libknot/error.h>
+#ifdef HAS_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
 
 #include "lib/defines.h"
 #include "lib/resolve.h"
@@ -148,6 +151,7 @@ static void help(int argc, char *argv[])
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
 	       " -a, --addr=[addr]    Server address (default: localhost#53).\n"
+	       " -S, --fd=[fd]        Listen on given fd (handed out by supervisor).\n"
 	       " -c, --config=[path]  Config file path (relative to [rundir]) (default: config).\n"
 	       " -k, --keyfile=[path] File containing trust anchors (DS or DNSKEY).\n"
 	       " -f, --forks=N        Start N forks sharing the configuration.\n"
@@ -213,6 +217,10 @@ static int run_worker(uv_loop_t *loop, struct engine *engine)
 			uv_listen((uv_stream_t *) &pipe, 16, tty_accept);
 		}
 	}
+	/* Notify supervisor. */
+#ifdef HAS_SYSTEMD
+	sd_notify(0, "READY=1");
+#endif
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
 	if (sock_file) {
@@ -225,7 +233,9 @@ int main(int argc, char **argv)
 {
 	int forks = 1;
 	array_t(char*) addr_set;
+	array_t(int) fd_set;
 	array_init(addr_set);
+	array_init(fd_set);
 	char *keyfile = NULL;
 	const char *config = NULL;
 	char *keyfile_buf = NULL;
@@ -234,6 +244,7 @@ int main(int argc, char **argv)
 	int c = 0, li = 0, ret = 0;
 	struct option opts[] = {
 		{"addr", required_argument,   0, 'a'},
+		{"fd",   required_argument,   0, 'S'},
 		{"config", required_argument, 0, 'c'},
 		{"keyfile",required_argument, 0, 'k'},
 		{"forks",required_argument,   0, 'f'},
@@ -243,11 +254,14 @@ int main(int argc, char **argv)
 		{"help",      no_argument,    0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:c:f:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:S:c:f:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
 			array_push(addr_set, optarg);
+			break;
+		case 'S':
+			array_push(fd_set,  atoi(optarg));
 			break;
 		case 'c':
 			config = optarg;
@@ -312,6 +326,15 @@ int main(int argc, char **argv)
 		}
 	}
 
+#ifdef HAS_SYSTEMD
+	/* Accept passed sockets from systemd supervisor. */
+	int sd_nsocks = sd_listen_fds(0);
+	for (int i = 0; i < sd_nsocks; ++i) {
+		int fd = SD_LISTEN_FDS_START + i;
+		array_push(fd_set, fd);
+	}
+#endif
+
 	/* Switch to rundir. */
 	if (optind < argc) {
 		const char *rundir = argv[optind];
@@ -372,13 +395,21 @@ int main(int argc, char **argv)
 		kr_log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
 	}
+	/* Bind to passed fds and run */
+	for (size_t i = 0; i < fd_set.len; ++i) {
+		ret = network_listen_fd(&engine.net, fd_set.at[i]);
+		if (ret != 0) {
+			kr_log_error("[system] listen on fd=%d %s\n", fd_set.at[i], kr_strerror(ret));
+			ret = EXIT_FAILURE;
+		}
+	}
 	/* Bind to sockets and run */
 	for (size_t i = 0; i < addr_set.len; ++i) {
 		int port = 53;
 		const char *addr = set_addr(addr_set.at[i], &port);
 		ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
 		if (ret != 0) {
-			kr_log_error("[system] bind to '%s#%d' %s\n", addr, port, knot_strerror(ret));
+			kr_log_error("[system] bind to '%s#%d' %s\n", addr, port, kr_strerror(ret));
 			ret = EXIT_FAILURE;
 		}
 	}
