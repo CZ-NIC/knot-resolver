@@ -129,7 +129,7 @@ Running supervised
 
 Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to resolver daemon. Thus if the resolver terminates or is killed, the sockets are still active and no queries are dropped.
 
-The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. There's a tiny supervisor script for convenience, but you should have a look at [real process managers](http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly).
+The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. There's a tiny supervisor script for convenience, but you should have a look at `real process managers`_.
 
 .. code-block:: bash
 
@@ -140,7 +140,7 @@ The watchdog process must notify kresd about active file descriptors, and kresd 
    [system] interactive mode
    >
 
-The daemon also supports [systemd socket activation](http://0pointer.de/blog/projects/socket-activation.html), it is automatically detected and requires no configuration on users's side.
+The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
 
 Configuration
 =============
@@ -806,3 +806,5 @@ Example:
 .. _LuaJIT: http://luajit.org/luajit.html
 .. _luasec: https://luarocks.org/modules/luarocks/luasec
 .. _luasocket: https://luarocks.org/modules/luarocks/luasocket
+.. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
+.. _`systemd socket activation`: http://0pointer.de/blog/projects/socket-activation.html
