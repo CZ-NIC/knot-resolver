@@ -1,0 +1,135 @@
+.TH "kresd" "8" "@DATE@" "CZ.NIC" "Knot DNS Resolver @VERSION@"
+.\"
+.\" kresd.8 -- kresd daemon manpage
+.\"
+.\" Copyright (c) 2016, CZ.NIC. All rights reserved.
+.\"
+.\" See COPYING for the license.
+.\"
+.\"
+.SH "NAME"
+.B kresd
+\- Knot DNS @VERSION@ full caching resolver.
+.SH "SYNOPSIS"
+.B kresd
+.RB [ \-a
+.IR addr[#port] ]
+.RB [ \-\-fd=\fIfd\fR ]
+.RB [ \-c
+.IR config ]
+.RB [ \-k
+.IR keyfile ]
+.RB [ \-f
+.IR N ]
+.RB [ \-q ]
+.RB [ \-v ]
+.RB [ \-V ]
+.RB [ \-h ]
+.IR [rundir]
+.SH "DESCRIPTION"
+.B Knot DNS Resolver is a DNSSEC-enabled full caching resolver.
+.P
+Default mode of operation: when it receives a DNS query it iteratively
+asks authoritative nameservers starting from root zone (.) and ending
+with a nameservers authoritative for queried name. Automatic DNSSEC means
+verification of integrity of authoritative responses by following
+keys and signatures starting from root. Root trust anchor is automatically
+bootstrapped from IANA, or you can provide a file with root trust anchors
+(same format as Unbound or BIND9 root keys file).
+
+The daemon also caches intermediate answers into cache, which by default
+uses LMDB memory-mapped database. This has a significant advantage over
+in-memory caches as the process may be stopped and restarted without
+loss of cache entries. In multi-user scenario a shared cache
+is potential privacy/security issue, with kresd each user can have resolver cache
+in their private directory and use it in similar fashion to keychain.
+
+By default, no configuration is needed, only a directory where the daemon can store
+runtime data (cache, control sockets, ...)
+.P
+To use a locally running
+.B kresd
+for resolving put
+.sp
+.RS 6n
+nameserver 127.0.0.1
+.RE
+.sp
+into
+.IR resolv.conf (5)
+and start
+.B kresd
+.PP
+.nf
+.RS 6n
+$ kresd -a 127.0.0.1 -k root.keys
+[system] interactive mode
+>
+.RE
+.fi
+.PP
+.P
+The daemon may be configured also as a plain forwarder using query policies, that requires
+creating a file
+.B config
+in daemon runtime directory. See \fIdaemon/README.md\fR for more information about interacting
+with CLI and configuration file options, or visit
+.b http://knot-resolver.rtfd.org online documentation.
+.PP
+.nf
+.RS 6n
+# Create a basic forwarder configuration 
+$ cat << EOF > config
+modules = { 'policy' }
+policy:add(policy.all(policy.FORWARD('192.168.1.1')))
+$ kresd -a 127.0.0.1 -k root.keys
+EOF
+.RE
+.fi
+.PP
+.P
+The available CLI options are:
+.TP
+.B \-a\fI addr[#port]
+Listen on given address (and port) pair. If no port is given, \fI53\fR is used as a default.
+Option may be passed multiple times to listen on more addresses.
+.TP
+.B \-S\fI fd\fR, \-\-fd=\fI<fd>
+Listen on given file descriptor(s), passed by supervisor.
+Option may be passed multiple times to listen on more file descriptors.
+.TP
+.B \-k\fI keyfile
+Use given for keeping root trust anchors. If the file doesn't exist, it will be
+automatically boostrapped from IANA and warning for you will be issued to check it
+before trusting it. The file contains DNSKEY/DS records in presentation format,
+and is compatible with Unbound or BIND9 root key files.
+.TP
+.B \-f\fI N
+With this option, the daemon is started in non-interactive mode and instead creates a
+UNIX socket in \fIrundir\fR that the operator can connect to for interactive session.
+A number greater than 1 forks the daemon N times, all forks will bind to same addresses
+and the kernel will load-balance between them on Linux with \fISO_REUSEPORT\fR support.
+.TP
+.B \-q
+Daemon will refrain from printing any informative messages, not even a prompt.
+.TP
+.B \-v
+Increase verbosity. If given multiple times, more information is logged.
+This is in addition to the verbosity (if any) from the config file.
+.TP
+.B \-c\fI config
+Set the config file with settings for unbound to read instead of reading the
+file at the default location (\fIconfig\fR). The syntax is
+described in \fIdaemon/README.md\fR.
+.TP
+.B \-h
+Show the version and commandline option help.
+.TP
+.B \-V
+Show the version.
+.SH "SEE ALSO"
+\fIdaemon/README.md\fR,
+\fIhttp://knot-resolver.rtfd.org\fR
+.SH "AUTHORS"
+.B kresd
+developers are mentioned in the AUTHORS file in the distribution.

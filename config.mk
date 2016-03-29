@@ -1,7 +1,7 @@
 # Project
 MAJOR := 1
 MINOR := 0
-PATCH := 0-beta4
+PATCH := 0
 ABIVER := 1
 BUILDMODE := dynamic
 HARDENING := yes
@@ -25,3 +25,6 @@ INSTALL := install
 BUILD_LDFLAGS += $(LDFLAGS)
 BUILD_CFLAGS := $(CFLAGS) -std=c99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=2 -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
 BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR).$(PATCH)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\"" -DETCDIR="\"$(ETCDIR)\""
+ifeq (,$(findstring -O,$(CFLAGS)))
+	BUILD_CFLAGS += -O2
+endif

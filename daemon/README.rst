@@ -209,9 +209,7 @@ This is useful if you're writing a module with a layer, that evaluates an answer
 Dynamic configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-Knowing that the the configuration is a Lua in disguise enables you to write dynamic rules, and also avoid
-repetition and templating. This is unavoidable with static configuration, e.g. when you want to configure
-each node a little bit differently.
+Knowing that the the configuration is a Lua in disguise enables you to write dynamic rules. It also helps you to avoid repetitive templating that is unavoidable with static configuration.
 
 .. code-block:: lua
 
