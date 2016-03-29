@@ -6,21 +6,18 @@
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
 
-The Knot DNS Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], including both a resolver
-library and a daemon. Modular architecture of the library keeps the core tiny and efficient, and provides
-a state-machine like API for extensions. There are three built-in modules - *iterator*, *cache*, *validator*, and many external.
+The Knot DNS Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
+a state-machine like API for extensions. There are three of those built-in - *iterator*, *cache*, *validator*, and most of the [rich features](http://knot-resolver.readthedocs.org/en/latest/modules.html) are written in LuaJIT, Go and C. Batteries are included, but optional. 
 
-The Lua modules, switchable and shareable cache, and fast FFI bindings makes it great to tap into resolution process, or be used for your recursive DNS service. It's the [OpenResty][openresty] of DNS.
+The LuaJIT modules, support for DNS privacy and DNSSEC, and persistent cache with low memory footprint make it a great personal DNS resolver or a research tool to tap into DNS data. TL;DR it's the [OpenResty][openresty] of DNS.
 
-The server adopts a [different scaling strategy][scaling] than the rest of the DNS recursors - no threading, shared-nothing architecture (except MVCC cache that may be shared). You can start and stop additional nodes depending on the contention without downtime.
+Several cache backends (LMDB, Redis and Memcached), strong filtering rules, and auto-configuration with etcd make it a great large-scale resolver solution. 
 
-### Try it out?
-
-Keep in mind that the Knot DNS Resolver is in beta. While it's being tested by the [DNS test harness][deckard], we'll be super glad to hear out your feedback!
+The server adopts a [different scaling strategy][scaling] than the rest of the DNS recursors - no threading, shared-nothing architecture (except MVCC cache that may be shared) that allows you to pin instances on available CPU cores and grow by self-replication. You can start and stop additional nodes depending on the contention without downtime.
 
 ### Building from sources
 
-The Knot DNS Resolver [depends][depends] on the 2.0.1 version of the Knot DNS library, [LuaJIT][luajit] and [libuv][libuv].
+The Knot DNS Resolver [depends][depends] on the 2.1 version of the Knot DNS library, [LuaJIT][luajit] and [libuv][libuv].
 See the [Building project][depends] documentation page for more information.
 
 ### Docker image

@@ -6,7 +6,6 @@
 *.dylib.*
 *.lo
 *.la
-*.in
 *.Plo
 *.swp
 *.d

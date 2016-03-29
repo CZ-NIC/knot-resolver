@@ -7,6 +7,7 @@ CCLD := $(CC)
 CGO := go tool cgo
 GO := go
 CAT := cat
+SED := sed
 LIBEXT := .so
 MODEXT := $(LIBEXT)
 AREXT  := .a

@@ -39,8 +39,13 @@ $(eval $(call make_bin,kresd,daemon,yes))
 endif
 
 # Targets
+date := $(shell date +%F)
 daemon: $(kresd)
 daemon-install: kresd-install bindings-install
+ifneq ($(SED),)
+	$(SED) -e "s/@VERSION@/$(MAJOR).$(MINOR).$(PATCH)/" -e "s/@DATE@/$(date)/" doc/kresd.8.in > doc/kresd.8
+	$(INSTALL) -m 0644 doc/kresd.8 $(DESTDIR)$(PREFIX)/share/man/man8/
+endif
 daemon-clean: kresd-clean
 	@$(RM) daemon/lua/*.inc
 
