@@ -140,6 +140,8 @@ The watchdog process must notify kresd about active file descriptors, and kresd 
    [system] interactive mode
    >
 
+The daemon also supports [systemd socket activation](http://0pointer.de/blog/projects/socket-activation.html), it is automatically detected and requires no configuration on users's side.
+
 Configuration
 =============
 

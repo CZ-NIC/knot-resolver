@@ -23,6 +23,9 @@
 #include <contrib/ucw/mempool.h>
 #include <contrib/ccan/asprintf/asprintf.h>
 #include <libknot/error.h>
+#ifdef HAS_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
 
 #include "lib/defines.h"
 #include "lib/resolve.h"
@@ -214,6 +217,10 @@ static int run_worker(uv_loop_t *loop, struct engine *engine)
 			uv_listen((uv_stream_t *) &pipe, 16, tty_accept);
 		}
 	}
+	/* Notify supervisor. */
+#ifdef HAS_SYSTEMD
+	sd_notify(0, "READY=1");
+#endif
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
 	if (sock_file) {
@@ -318,6 +325,15 @@ int main(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 	}
+
+#ifdef HAS_SYSTEMD
+	/* Accept passed sockets from systemd supervisor. */
+	int sd_nsocks = sd_listen_fds(0);
+	for (int i = 0; i < sd_nsocks; ++i) {
+		int fd = SD_LISTEN_FDS_START + i;
+		array_push(fd_set, fd);
+	}
+#endif
 
 	/* Switch to rundir. */
 	if (optind < argc) {
