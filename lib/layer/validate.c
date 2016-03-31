@@ -74,37 +74,25 @@ static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
 	return section_has_type(knot_pkt_section(pkt, KNOT_ADDITIONAL), type);
 }
 
-
-/** @internal Baton for validate_section */
-struct validate_baton {
-	const knot_pkt_t *pkt;
-	knot_section_t section_id;
-	const knot_rrset_t *keys;
-	const knot_dname_t *zone_name;
-	uint32_t timestamp;
-	bool has_nsec3;
-	int result;
-};
-
 static int validate_rrset(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rr = val;
-	struct validate_baton *baton = data;
-
-	if (baton->result != 0) {
-		return baton->result;
+	kr_rrset_validation_ctx_t *vctx = data;
+	if (vctx->result != 0) {
+		return vctx->result;
 	}
-	baton->result = kr_rrset_validate(baton->pkt, baton->section_id, rr,
-	                                  baton->keys, baton->zone_name,
-	                                  baton->timestamp, baton->has_nsec3);
-	return baton->result;
+
+	return kr_rrset_validate(vctx, rr);
 }
 
-static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
-                            knot_section_t section_id, knot_mm_t *pool,
-                            bool has_nsec3)
+static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 {
-	const knot_pktsection_t *sec = knot_pkt_section(answer, section_id);
+	if (!vctx) {
+		return kr_error(EINVAL);
+	}
+
+	const knot_pktsection_t *sec = knot_pkt_section(vctx->pkt,
+							vctx->section_id);
 	if (!sec) {
 		return kr_ok();
 	}
@@ -122,11 +110,11 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
 			continue;
 		}
-		if ((rr->type == KNOT_RRTYPE_NS) && (section_id == KNOT_AUTHORITY)) {
+		if ((rr->type == KNOT_RRTYPE_NS) && (vctx->section_id == KNOT_AUTHORITY)) {
 			continue;
 		}
 		/* Only validate answers from current cut, records above the cut are stripped. */
-		if (!knot_dname_in(qry->zone_cut.name, rr->owner)) {
+		if (!knot_dname_in(vctx->zone_name, rr->owner)) {
 			continue;
 		}
 		ret = kr_rrmap_add(&stash, rr, 0, pool);
@@ -135,24 +123,16 @@ static int validate_section(struct kr_query *qry, knot_pkt_t *answer,
 		}
 	}
 
-	struct validate_baton baton = {
-		.pkt = answer,
-		.section_id = section_id,
-		.keys = qry->zone_cut.key,
-		/* Can't use qry->zone_cut.name directly, as this name can
-		 * change when updating cut information before validation.
-		 */
-		.zone_name = qry->zone_cut.key ? qry->zone_cut.key->owner : NULL,
-		.timestamp = qry->timestamp.tv_sec,
-		.has_nsec3 = has_nsec3,
-		.result = 0
-	};
+	/* Can't use qry->zone_cut.name directly, as this name can
+	 * change when updating cut information before validation.
+	 */
+	vctx->zone_name = vctx->keys ? vctx->keys->owner  : NULL;
 
-	ret = map_walk(&stash, &validate_rrset, &baton);
+	ret = map_walk(&stash, &validate_rrset, vctx);
 	if (ret != 0) {
 		return ret;
 	}
-	ret = baton.result;
+	ret = vctx->result;
 
 fail:
 	return ret;
@@ -165,13 +145,66 @@ static int validate_records(struct kr_query *qry, knot_pkt_t *answer, knot_mm_t 
 		return kr_error(EBADMSG);
 	}
 
-	int ret = validate_section(qry, answer, KNOT_ANSWER, pool, has_nsec3);
+	kr_rrset_validation_ctx_t vctx = {
+		.pkt		= answer,
+		.section_id	= KNOT_ANSWER,
+		.keys		= qry->zone_cut.key,
+		.zone_name	= qry->zone_cut.name,
+		.timestamp	= qry->timestamp.tv_sec,
+		.has_nsec3	= has_nsec3,
+		.flags		= 0,
+		.result		= 0
+	};
+
+	int ret = validate_section(&vctx, pool);
 	if (ret != 0) {
 		return ret;
 	}
 
-	return validate_section(qry, answer, KNOT_AUTHORITY, pool, has_nsec3);
+	uint32_t an_flags = vctx.flags;
+	vctx.section_id   = KNOT_AUTHORITY;
+	/* zone_name can be changed by validate_section(), restore it */
+	vctx.zone_name	  = qry->zone_cut.name;
+	vctx.flags	  = 0;
+	vctx.result	  = 0;
+
+	ret = validate_section(&vctx, pool);
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* Records were validated.
+	 * If there is wildcard expansion in answer, flag the query.
+         */
+	if (an_flags & KR_DNSSEC_VFLG_WEXPAND) {
+		qry->flags |= QUERY_DNSSEC_WEXPAND;
+	}
+
+	return ret;
 }
+
+static int check_wcard_expanded(struct kr_query *qry, knot_pkt_t *pkt, knot_section_t section_id)
+{
+	kr_rrset_validation_ctx_t vctx = {
+		.pkt		= pkt,
+		.section_id	= section_id,
+		.keys		= NULL,
+		.zone_name	= qry->zone_cut.name,
+		.timestamp	= 0,
+		.has_nsec3	= false,
+		.flags		= 0,
+		.result		= 0
+	};
+	int ret = kr_section_check_wcard(&vctx);
+	if (ret != 0) {
+		return ret;
+	}
+	if (vctx.flags & KR_DNSSEC_VFLG_WEXPAND) {
+		qry->flags |= QUERY_DNSSEC_WEXPAND;
+	}
+	return kr_ok();
+}
+
 
 static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_nsec3)
 {
@@ -203,13 +236,28 @@ static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_ns
 
 	/* Check if there's a key for current TA. */
 	if (updated_key && !(qry->flags & QUERY_CACHED)) {
-		int ret = kr_dnskeys_trusted(answer, KNOT_ANSWER, qry->zone_cut.key,
-		                             qry->zone_cut.trust_anchor, qry->zone_cut.name,
-		                             qry->timestamp.tv_sec, has_nsec3);
+
+		kr_rrset_validation_ctx_t vctx = {
+			.pkt		= answer,
+			.section_id	= KNOT_ANSWER,
+			.keys		= qry->zone_cut.key,
+			.zone_name	= qry->zone_cut.name,
+			.timestamp	= qry->timestamp.tv_sec,
+			.has_nsec3	= has_nsec3,
+			.flags		= 0,
+			.result		= 0
+		};
+		int ret = kr_dnskeys_trusted(&vctx, qry->zone_cut.trust_anchor);
 		if (ret != 0) {
 			knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
 			return ret;
 		}
+
+		if (vctx.flags & KR_DNSSEC_VFLG_WEXPAND)
+		{
+			qry->flags |= QUERY_DNSSEC_WEXPAND;
+		}
+
 	}
 	return kr_ok();
 }
@@ -458,10 +506,24 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	 * Do not revalidate data from cache, as it's already trusted. */
 	if (!(qry->flags & QUERY_CACHED)) {
 		ret = validate_records(qry, pkt, req->rplan.pool, has_nsec3);
-		if (ret != 0) {
-			DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
-			qry->flags |= QUERY_DNSSEC_BOGUS;
-			return KNOT_STATE_FAIL;
+	} else {
+		/* Records already were validated.
+		 * Check if wildcard answer. */
+		ret = check_wcard_expanded(qry, pkt, KNOT_ANSWER);
+	}
+	if (ret != 0) {
+		DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
+		qry->flags |= QUERY_DNSSEC_BOGUS;
+		return KNOT_STATE_FAIL;
+	}
+
+	if ((qry->parent == NULL) && (qry->flags & QUERY_DNSSEC_WEXPAND)) {
+		/* Wildcard expansion detected for final query.
+		 * Copy authority. */
+		const knot_pktsection_t *auth = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		for (unsigned i = 0; i < auth->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(auth, i);
+			kr_rrarray_add(&req->authority, rr, &pkt->mm);
 		}
 	}
 

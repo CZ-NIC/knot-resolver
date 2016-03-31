@@ -43,7 +43,8 @@
 	X(DNSSEC_BOGUS,    1 << 15) /**< Query response is DNSSEC bogus. */ \
 	X(DNSSEC_INSECURE, 1 << 16) /**< Query response is DNSSEC insecure. */ \
 	X(STUB,            1 << 17) /**< Stub resolution, accept received answer as solved. */ \
-	X(ALWAYS_CUT,      1 << 18) /**< Always recover zone cut (even if cached). */
+	X(ALWAYS_CUT,      1 << 18) /**< Always recover zone cut (even if cached). */ \
+	X(DNSSEC_WEXPAND,  1 << 19) /**< Query response has wildcard expansion. */
 
 /** Query flags */
 enum kr_query_flag {

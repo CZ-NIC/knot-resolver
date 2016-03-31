@@ -302,6 +302,12 @@ static int rrcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (knot_wire_get_tc(pkt->wire)) {
 		return ctx->state;
 	}
+	/* Do not cache wildcard expanded anwsers,
+	 * as they must deal with packet cache */
+	if (qry->flags & QUERY_DNSSEC_WEXPAND) {
+		return ctx->state;
+	}
+
 	/* Cache only positive answers, not meta types or RRSIG. */
 	const uint16_t qtype = knot_pkt_qtype(pkt);
 	const bool is_eligible = !(knot_rrtype_is_metatype(qtype) || qtype == KNOT_RRTYPE_RRSIG);
@@ -351,7 +357,6 @@ static int rrcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 			}
 		}
 	}
-	
 	return ctx->state;
 }
 

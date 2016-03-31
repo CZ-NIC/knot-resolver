@@ -129,17 +129,17 @@ static int wildcard_radix_len_diff(const knot_dname_t *expanded,
 	return knot_dname_labels(expanded, NULL) - knot_rrsig_labels(&rrsigs->rrs, sig_pos);
 }
 
-int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
-                      const knot_rrset_t *covered, const knot_rrset_t *keys,
-                      const knot_dname_t *zone_name, uint32_t timestamp,
-                      bool has_nsec3)
+int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *covered)
 {
-	if (!pkt || !covered || !keys || !zone_name) {
+	if (!vctx) {
+		return kr_error(EINVAL);
+	}
+	if (!vctx->pkt || !covered || !vctx->keys || !vctx->zone_name) {
 		return kr_error(EINVAL);
 	}
 
-	for (unsigned i = 0; i < keys->rrs.rr_count; ++i) {
-		int ret = kr_rrset_validate_with_key(pkt, section_id, covered, keys, i, NULL, zone_name, timestamp, has_nsec3);
+	for (unsigned i = 0; i < vctx->keys->rrs.rr_count; ++i) {
+		int ret = kr_rrset_validate_with_key(vctx, covered, i, NULL);
 		if (ret == 0) {
 			return ret;
 		}
@@ -148,19 +148,24 @@ int kr_rrset_validate(const knot_pkt_t *pkt, knot_section_t section_id,
 	return kr_error(ENOENT);
 }
 
-int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
-                               const knot_rrset_t *covered, const knot_rrset_t *keys,
-                               size_t key_pos, const struct dseckey *key,
-                               const knot_dname_t *zone_name, uint32_t timestamp,
-                               bool has_nsec3)
+int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
+				const knot_rrset_t *covered,
+				size_t key_pos, const struct dseckey *key)
 {
+	const knot_pkt_t *pkt         = vctx->pkt;
+	knot_section_t section_id     = vctx->section_id;
+	const knot_rrset_t *keys      = vctx->keys;
+	const knot_dname_t *zone_name = vctx->zone_name;
+	uint32_t timestamp            = vctx->timestamp;
+	bool has_nsec3		      = vctx->has_nsec3;
 	struct dseckey *created_key = NULL;
 	if (key == NULL) {
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, key_pos);
 		int ret = kr_dnssec_key_from_rdata(&created_key, keys->owner,
 			                       knot_rdata_data(krr), knot_rdata_rdlen(krr));
 		if (ret != 0) {
-			return ret;
+			vctx->result = ret;
+			return vctx->result;
 		}
 		key = created_key;
 	}
@@ -211,21 +216,72 @@ int kr_rrset_validate_with_key(const knot_pkt_t *pkt, knot_section_t section_id,
 				if (ret != 0) {
 					continue;
 				}
+				vctx->flags |= KR_DNSSEC_VFLG_WEXPAND;
 			}
 			/* Validated with current key, OK */
 			kr_dnssec_key_free(&created_key);
-			return kr_ok();
+			vctx->result = kr_ok();
+			return vctx->result;
 		}
 	}
 	/* No applicable key found, cannot be validated. */
 	kr_dnssec_key_free(&created_key);
-	return kr_error(ENOENT);
+	vctx->result = kr_error(ENOENT);
+	return vctx->result;
 }
 
-int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const knot_rrset_t *keys,
-                       const knot_rrset_t *ta, const knot_dname_t *zone_name, uint32_t timestamp,
-                       bool has_nsec3)
+int kr_section_check_wcard(kr_rrset_validation_ctx_t *vctx)
 {
+	const knot_pkt_t *pkt         = vctx->pkt;
+	knot_section_t section_id     = vctx->section_id;
+	const knot_dname_t *zone_name = vctx->zone_name;
+	const knot_pktsection_t *sec  = knot_pkt_section(pkt, section_id);
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
+		if (rr->type == KNOT_RRTYPE_RRSIG) {
+			continue;
+		}
+		if ((rr->type == KNOT_RRTYPE_NS) && (vctx->section_id == KNOT_AUTHORITY)) {
+			continue;
+		}
+		if (!knot_dname_in(zone_name, rr->owner)) {
+			continue;
+		}
+		int covered_labels = knot_dname_labels(rr->owner, NULL);
+		if (knot_dname_is_wildcard(rr->owner)) {
+			/* The asterisk does not count, RFC4034 3.1.3, paragraph 3. */
+			--covered_labels;
+		}
+		for (unsigned j = 0; j < sec->count; ++j) {
+			const knot_rrset_t *rrsig = knot_pkt_rr(sec, j);
+			if (rrsig->type != KNOT_RRTYPE_RRSIG) {
+				continue;
+			}
+			if ((rr->rclass != rrsig->rclass) || !knot_dname_is_equal(rr->owner, rrsig->owner)) {
+				continue;
+			}
+			for (uint16_t k = 0; k < rrsig->rrs.rr_count; ++k) {
+				if (knot_rrsig_type_covered(&rrsig->rrs, k) != rr->type) {
+					continue;
+				}
+				int rrsig_labels = knot_rrsig_labels(&rrsig->rrs, k);
+				if (rrsig_labels > covered_labels) {
+					return kr_error(EINVAL);
+				}
+				if (rrsig_labels < covered_labels) {
+					vctx->flags |= KR_DNSSEC_VFLG_WEXPAND;
+				}
+			}
+		}
+	}
+	return kr_ok();
+}
+
+int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
+{
+	const knot_pkt_t *pkt         = vctx->pkt;
+	const knot_rrset_t *keys      = vctx->keys;
+
 	if (!pkt || !keys || !ta) {
 		return kr_error(EINVAL);
 	}
@@ -250,15 +306,17 @@ int kr_dnskeys_trusted(const knot_pkt_t *pkt, knot_section_t section_id, const k
 			kr_dnssec_key_free(&key);
 			continue;
 		}
-		if (kr_rrset_validate_with_key(pkt, section_id, keys, keys, i, key, zone_name, timestamp, has_nsec3) != 0) {
+		if (kr_rrset_validate_with_key(vctx, keys, i, key) != 0) {
 			kr_dnssec_key_free(&key);
 			continue;
 		}
 		kr_dnssec_key_free(&key);
-		return kr_ok();
+		assert (vctx->result == 0);
+		return vctx->result;
 	}
 	/* No useable key found */
-	return kr_error(ENOENT);
+	vctx->result = kr_error(ENOENT);
+	return vctx->result;
 }
 
 bool kr_dnssec_key_zsk(const uint8_t *dnskey_rdata)

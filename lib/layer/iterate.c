@@ -315,7 +315,7 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 	const uint16_t qtype = knot_pkt_qtype(answer);
 	struct kr_zonecut *cut = &qry->zone_cut;
 	int pkt_class = kr_response_classify(pkt);
-	if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+	if ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
 		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 		for (unsigned i = 0; i < ns->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
@@ -414,17 +414,31 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	query->flags |= QUERY_RESOLVED;
 	/* Follow canonical name as next SNAME. */
 	if (!knot_dname_is_equal(cname, query->sname)) {
-		DEBUG_MSG("<= cname chain, following\n");
-		/* Check if already resolved */
-		if (cname && !knot_dname_is_equal(cname, query->sname)) {
-			for (int i = 0; i < req->rplan.resolved.len; ++i) {
-				struct kr_query * q = req->rplan.resolved.at[i];
-				if (q->sclass == query->sclass &&
-				    q->stype == query->stype   &&
-				    knot_dname_is_equal(q->sname, cname)) {
-					DEBUG_MSG("<= cname chain loop\n");
-					return KNOT_STATE_FAIL;
+		/* Check if target record has been already copied */
+		if (is_final) {
+			const knot_pktsection_t *an = knot_pkt_section(req->answer, KNOT_ANSWER);
+			for (unsigned i = 0; i < an->count; ++i) {
+				const knot_rrset_t *rr = knot_pkt_rr(an, i);
+				if (!knot_dname_is_equal(rr->owner, cname)) {
+					continue;
 				}
+				if ((rr->rclass != query->sclass) ||
+				    (rr->type != query->stype)) {
+					continue;
+				}
+				finalize_answer(pkt, query, req);
+				return KNOT_STATE_DONE;
+			}
+		}
+		DEBUG_MSG("<= cname chain, following\n");
+		/* Check if the same query was already resolved */
+		for (int i = 0; i < req->rplan.resolved.len; ++i) {
+			struct kr_query * q = req->rplan.resolved.at[i];
+			if (q->sclass == query->sclass &&
+			    q->stype == query->stype   &&
+			    knot_dname_is_equal(q->sname, cname)) {
+				DEBUG_MSG("<= cname chain loop\n");
+				return KNOT_STATE_FAIL;
 			}
 		}
 		struct kr_query *next = kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
