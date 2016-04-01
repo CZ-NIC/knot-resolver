@@ -330,7 +330,7 @@ int kr_cache_clear(struct kr_cache_txn *txn)
 	return ret;
 }
 
-int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank, uint32_t *timestamp)
+int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp)
 {
 	if (!txn_is_valid(txn) || !rr || !timestamp) {
 		return kr_error(EINVAL);
@@ -344,6 +344,9 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank,
 	}
 	if (rank) {
 		*rank = entry->rank;
+	}
+	if (flags) {
+		*flags = entry->flags;
 	}
 	rr->rrs.rr_count = entry->count;
 	rr->rrs.data = entry->data;
@@ -399,7 +402,7 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
 	return kr_ok();
 }
 
-int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t rank, uint32_t timestamp)
+int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp)
 {
 	if (!txn_is_valid(txn) || !rr) {
 		return kr_error(EINVAL);
@@ -415,6 +418,7 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_
 		.timestamp = timestamp,
 		.ttl = 0,
 		.rank = rank,
+		.flags = flags,
 		.count = rr->rrs.rr_count
 	};
 	knot_rdata_t *rd = rr->rrs.data;
@@ -429,7 +433,7 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_
 	return kr_cache_insert(txn, KR_CACHE_RR, rr->owner, rr->type, &header, data);
 }
 
-int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *rank, uint32_t *timestamp)
+int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp)
 {
 	if (!txn_is_valid(txn) || !rr || !timestamp) {
 		return kr_error(EINVAL);
@@ -445,13 +449,16 @@ int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint16_t *ra
 	if (rank) {
 		*rank = entry->rank;
 	}
+	if (flags) {
+		*flags = entry->flags;
+	}
 	rr->type = KNOT_RRTYPE_RRSIG;
 	rr->rrs.rr_count = entry->count;
 	rr->rrs.data = entry->data;
 	return kr_ok();
 }
 
-int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint16_t rank, uint32_t timestamp)
+int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp)
 {
 	if (!txn_is_valid(txn) || !rr) {
 		return kr_error(EINVAL);
@@ -467,6 +474,7 @@ int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint
 		.timestamp = timestamp,
 		.ttl = 0,
 		.rank = rank,
+		.flags = flags,
 		.count = rr->rrs.rr_count
 	};
 	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {

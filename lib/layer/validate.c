@@ -183,29 +183,6 @@ static int validate_records(struct kr_query *qry, knot_pkt_t *answer, knot_mm_t 
 	return ret;
 }
 
-static int check_wcard_expanded(struct kr_query *qry, knot_pkt_t *pkt, knot_section_t section_id)
-{
-	kr_rrset_validation_ctx_t vctx = {
-		.pkt		= pkt,
-		.section_id	= section_id,
-		.keys		= NULL,
-		.zone_name	= qry->zone_cut.name,
-		.timestamp	= 0,
-		.has_nsec3	= false,
-		.flags		= 0,
-		.result		= 0
-	};
-	int ret = kr_section_check_wcard(&vctx);
-	if (ret != 0) {
-		return ret;
-	}
-	if (vctx.flags & KR_DNSSEC_VFLG_WEXPAND) {
-		qry->flags |= QUERY_DNSSEC_WEXPAND;
-	}
-	return kr_ok();
-}
-
-
 static int validate_keyset(struct kr_query *qry, knot_pkt_t *answer, bool has_nsec3)
 {
 	/* Merge DNSKEY records from answer that are below/at current cut. */
@@ -506,20 +483,16 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	 * Do not revalidate data from cache, as it's already trusted. */
 	if (!(qry->flags & QUERY_CACHED)) {
 		ret = validate_records(qry, pkt, req->rplan.pool, has_nsec3);
-	} else {
-		/* Records already were validated.
-		 * Check if wildcard answer. */
-		ret = check_wcard_expanded(qry, pkt, KNOT_ANSWER);
-	}
-	if (ret != 0) {
-		DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
-		qry->flags |= QUERY_DNSSEC_BOGUS;
-		return KNOT_STATE_FAIL;
+		if (ret != 0) {
+			DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
+			qry->flags |= QUERY_DNSSEC_BOGUS;
+			return KNOT_STATE_FAIL;
+		}
 	}
 
+	/* Check if wildcard expansion detected for final query.
+	 * If yes, copy authority. */
 	if ((qry->parent == NULL) && (qry->flags & QUERY_DNSSEC_WEXPAND)) {
-		/* Wildcard expansion detected for final query.
-		 * Copy authority. */
 		const knot_pktsection_t *auth = knot_pkt_section(pkt, KNOT_AUTHORITY);
 		for (unsigned i = 0; i < auth->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(auth, i);

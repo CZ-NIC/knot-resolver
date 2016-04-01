@@ -230,53 +230,6 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	return vctx->result;
 }
 
-int kr_section_check_wcard(kr_rrset_validation_ctx_t *vctx)
-{
-	const knot_pkt_t *pkt         = vctx->pkt;
-	knot_section_t section_id     = vctx->section_id;
-	const knot_dname_t *zone_name = vctx->zone_name;
-	const knot_pktsection_t *sec  = knot_pkt_section(pkt, section_id);
-	for (unsigned i = 0; i < sec->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(sec, i);
-		if (rr->type == KNOT_RRTYPE_RRSIG) {
-			continue;
-		}
-		if ((rr->type == KNOT_RRTYPE_NS) && (vctx->section_id == KNOT_AUTHORITY)) {
-			continue;
-		}
-		if (!knot_dname_in(zone_name, rr->owner)) {
-			continue;
-		}
-		int covered_labels = knot_dname_labels(rr->owner, NULL);
-		if (knot_dname_is_wildcard(rr->owner)) {
-			/* The asterisk does not count, RFC4034 3.1.3, paragraph 3. */
-			--covered_labels;
-		}
-		for (unsigned j = 0; j < sec->count; ++j) {
-			const knot_rrset_t *rrsig = knot_pkt_rr(sec, j);
-			if (rrsig->type != KNOT_RRTYPE_RRSIG) {
-				continue;
-			}
-			if ((rr->rclass != rrsig->rclass) || !knot_dname_is_equal(rr->owner, rrsig->owner)) {
-				continue;
-			}
-			for (uint16_t k = 0; k < rrsig->rrs.rr_count; ++k) {
-				if (knot_rrsig_type_covered(&rrsig->rrs, k) != rr->type) {
-					continue;
-				}
-				int rrsig_labels = knot_rrsig_labels(&rrsig->rrs, k);
-				if (rrsig_labels > covered_labels) {
-					return kr_error(EINVAL);
-				}
-				if (rrsig_labels < covered_labels) {
-					vctx->flags |= KR_DNSSEC_VFLG_WEXPAND;
-				}
-			}
-		}
-	}
-	return kr_ok();
-}
-
 int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 {
 	const knot_pkt_t *pkt         = vctx->pkt;

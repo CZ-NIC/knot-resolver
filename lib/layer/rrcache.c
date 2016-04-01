@@ -37,7 +37,8 @@ static inline bool is_expiring(const knot_rrset_t *rr, uint32_t drift)
 }
 
 static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *name,
-                  uint16_t rrclass, uint16_t rrtype, struct kr_query *qry, uint16_t *rank, bool fetch_rrsig)
+                  uint16_t rrclass, uint16_t rrtype, struct kr_query *qry,
+		  uint8_t *rank, uint8_t *flags, bool fetch_rrsig)
 {
 	/* Check if record exists in cache */
 	int ret = 0;
@@ -45,9 +46,9 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, (knot_dname_t *)name, rrtype, rrclass);
 	if (fetch_rrsig) {
-		ret = kr_cache_peek_rrsig(txn, &cache_rr, rank, &drift);
+		ret = kr_cache_peek_rrsig(txn, &cache_rr, rank, flags, &drift);
 	} else {
-		ret = kr_cache_peek_rr(txn, &cache_rr, rank, &drift);
+		ret = kr_cache_peek_rr(txn, &cache_rr, rank, flags, &drift);
 	}
 	if (ret != 0) {
 		return ret;
@@ -85,11 +86,11 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query
 		return ret;
 	}
 	/* Lookup direct match first */
-	uint16_t rank = 0;
-	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, 0);
+	uint8_t rank  = 0;
+	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, NULL, 0);
 	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) { /* Chase CNAME if no direct hit */
 		rrtype = KNOT_RRTYPE_CNAME;
-		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, 0);
+		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, NULL, 0);
 	}
 	/* Record is flagged as INSECURE => doesn't have RRSIG. */
 	if (ret == 0 && (rank & KR_RANK_INSECURE)) {
@@ -97,7 +98,7 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	/* Record may have RRSIG, try to find it. */
 	} else if (ret == 0 && dobit) {
-		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, true);
+		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, NULL, true);
 	}
 	kr_cache_txn_abort(&txn);
 	return ret;
@@ -153,14 +154,14 @@ struct rrcache_baton
 	uint32_t min_ttl;
 };
 
-static int commit_rrsig(struct rrcache_baton *baton, uint16_t rank, knot_rrset_t *rr)
+static int commit_rrsig(struct rrcache_baton *baton, uint8_t rank, uint8_t flags, knot_rrset_t *rr)
 {
 	/* If not doing secure resolution, ignore (unvalidated) RRSIGs. */
 	if (!(baton->qry->flags & QUERY_DNSSEC_WANT)) {
 		return kr_ok();
 	}
 	/* Commit covering RRSIG to a separate cache namespace. */
-	return kr_cache_insert_rrsig(baton->txn, rr, rank, baton->timestamp);
+	return kr_cache_insert_rrsig(baton->txn, rr, rank, flags, baton->timestamp);
 }
 
 static int commit_rr(const char *key, void *val, void *data)
@@ -177,7 +178,7 @@ static int commit_rr(const char *key, void *val, void *data)
 	}
 
 	/* Save RRSIG in a special cache. */
-	uint16_t rank = KEY_FLAG_RANK(key);
+	uint8_t rank = KEY_FLAG_RANK(key);
 	/* Non-authoritative NSs should never be trusted,
 	 * it may be present in an otherwise secure answer but it
 	 * is only a hint for local state. */
@@ -189,7 +190,7 @@ static int commit_rr(const char *key, void *val, void *data)
 		rank |= KR_RANK_INSECURE;
 	}
 	if (KEY_COVERING_RRSIG(key)) {
-		return commit_rrsig(baton, rank, rr);
+		return commit_rrsig(baton, rank, KR_CACHE_FLAG_NONE, rr);
 	}
 	/* Accept only better rank (if not overriding) */
 	if (!(rank & KR_RANK_SECURE) && !(baton->qry->flags & QUERY_NO_CACHE)) {
@@ -201,7 +202,7 @@ static int commit_rr(const char *key, void *val, void *data)
 
 	knot_rrset_t query_rr;
 	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
-	return kr_cache_insert_rr(baton->txn, rr, rank, baton->timestamp);
+	return kr_cache_insert_rr(baton->txn, rr, rank, KR_CACHE_FLAG_NONE, baton->timestamp);
 }
 
 static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache_txn *txn, struct kr_request *req)

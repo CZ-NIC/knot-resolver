@@ -119,14 +119,6 @@ KR_EXPORT KR_PURE
 int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
                         const uint8_t *key_b_rdata, size_t key_b_rdlen);
 
-/** Return 0 if wildcard expansion occurs in specified section.
- * @param vctx Pointer to validation context.
- * @note vctx->keys, vctx->timestamp, vctx->has_nsec3 has no meanings.
- * @return 0 if wildcard expansion occurs or an error code.
- */
-KR_EXPORT KR_PURE
-int kr_section_check_wcard(kr_rrset_validation_ctx_t *vctx);
-
 /**
  * Construct a DNSSEC key.
  * @param key   Pointer to be set to newly created DNSSEC key.

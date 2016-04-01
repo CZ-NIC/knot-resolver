@@ -45,7 +45,7 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 }
 
 static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
-                          uint16_t rrtype, bool want_secure, uint32_t timestamp)
+                          uint16_t rrtype, bool want_secure, uint32_t timestamp, uint8_t *flags)
 {
 	struct kr_cache_entry *entry = NULL;
 	int ret = kr_cache_peek(txn, KR_CACHE_PKT, qname, rrtype, &entry, &timestamp);
@@ -80,17 +80,22 @@ static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 		}
 	}
 
+	/* Copy cache entry flags */
+	if (flags) {
+		*flags = entry->flags;
+	}
+
 	return ret;
 }
 
 /** @internal Try to find a shortcut directly to searched packet. */
-static int loot_pktcache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query *qry)
+static int loot_pktcache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query *qry, uint8_t *flags)
 {
 	uint32_t timestamp = qry->timestamp.tv_sec;
 	const knot_dname_t *qname = qry->sname;
 	uint16_t rrtype = qry->stype;
 	const bool want_secure = (qry->flags & QUERY_DNSSEC_WANT);
-	return loot_cache_pkt(txn, pkt, qname, rrtype, want_secure, timestamp);
+	return loot_cache_pkt(txn, pkt, qname, rrtype, want_secure, timestamp, flags);
 }
 
 static int pktcache_peek(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -115,11 +120,15 @@ static int pktcache_peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Fetch either answer to original or minimized query */
-	int ret = loot_pktcache(&txn, pkt, qry);
+	uint8_t flags = 0;
+	int ret = loot_pktcache(&txn, pkt, qry, &flags);
 	kr_cache_txn_abort(&txn);
 	if (ret == 0) {
 		DEBUG_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
+		if (flags & KR_CACHE_FLAG_WCARD_PROOF) {
+			qry->flags |= QUERY_DNSSEC_WEXPAND;
+		}
 		pkt->parsed = pkt->size;
 		knot_wire_set_qr(pkt->wire);
 		knot_wire_set_aa(pkt->wire);
@@ -199,6 +208,7 @@ static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		.timestamp = qry->timestamp.tv_sec,
 		.ttl = ttl,
 		.rank = KR_RANK_BAD,
+		.flags = KR_CACHE_FLAG_NONE,
 		.count = data.len
 	};
 
@@ -207,6 +217,11 @@ static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		header.rank = KR_RANK_SECURE;
 	} else if (qry->flags & QUERY_DNSSEC_INSECURE) {
 		header.rank = KR_RANK_INSECURE;
+	}
+
+	/* Set cache flags */
+	if (qry->flags & QUERY_DNSSEC_WANT) {
+		header.flags |= KR_CACHE_FLAG_WCARD_PROOF;
 	}
 
 	/* Check if we can replace (allow current or better rank, SECURE is always accepted). */
