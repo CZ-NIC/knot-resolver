@@ -28,6 +28,7 @@ $(eval $(call find_lib,hiredis))
 $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libdnssec))
 $(eval $(call find_lib,libsystemd,227))
+$(eval $(call find_lib,gnutls))
 
 # Find Go version and platform
 GO_VERSION := $(shell $(GO) version 2>/dev/null)
@@ -88,6 +89,7 @@ info:
 	$(info [$(HAS_lmdb)] lmdb (lib))
 	$(info [$(HAS_lua)] luajit (daemon))
 	$(info [$(HAS_libuv)] libuv (daemon))
+	$(info [$(HAS_gnutls)] libgnutls (daemon))
 	$(info )
 	$(info Optional)
 	$(info --------)
