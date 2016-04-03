@@ -472,19 +472,19 @@ For when listening on ``localhost`` just doesn't cut it.
 
    Enable/disable using IPv4 for recursion.
 
-.. function:: net.listen(address, [port = 53])
+.. function:: net.listen(address, [port = 53, flags = {tls = false}])
 
    :return: boolean
 
-   Listen on address, port is optional.
+   Listen on address, port and flags are optional.
 
-.. function:: net.listen({address1, ...}, [port = 53])
+.. function:: net.listen({address1, ...}, [port = 53, flags = {tls = false}])
 
    :return: boolean
 
    Listen on list of addresses.
 
-.. function:: net.listen(interface, [port = 53])
+.. function:: net.listen(interface, [port = 53, flags = {tls = false}])
 
    :return: boolean
 
@@ -557,13 +557,34 @@ For when listening on ``localhost`` just doesn't cut it.
 
    Get/set per-client TCP pipeline limit (number of outstanding queries that a single client connection can make in parallel). Default is 50.
 
+   .. code-block:: lua
+
+      > net.tcp_pipeline()
+      50
+      > net.tcp_pipeline(100)
+
+.. function:: net.tls_cert([path])
+
+   Get/set path to a server TLS certificate for DNS/TLS.
+
    Example output:
 
    .. code-block:: lua
 
-   > net.tcp_pipeline()
-   50
-   > net.tcp_pipeline(100)
+      > net.tls_cert("/etc/kresd/server-cert.pem")
+      > net.tls_cert()
+      /etc/kresd/server-cert.pem
+
+.. function:: net.tls_key([path])
+
+   Get/set path to a server TLS private key.
+
+   .. code-block:: lua
+
+      > net.tls_cert("/etc/kresd/server-cert.pem")
+      > net.tls_key("/etc/kresd/server-key.pem")
+      > net.listen("::", 853)
+      > net.listen("::", 443, {tls = true})
 
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
