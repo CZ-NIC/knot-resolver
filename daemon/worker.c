@@ -30,6 +30,7 @@
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
+#include "daemon/tls.h"
 
 /* @internal Union of various libuv objects for freelist. */
 struct req
@@ -455,13 +456,18 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		send_req->as.send.data = task;
 		ret = uv_udp_send(&send_req->as.send, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
 	} else {
-		uint16_t pkt_size = htons(pkt->size);
-		uv_buf_t buf[2] = {
-			{ (char *)&pkt_size, sizeof(pkt_size) },
-			{ (char *)pkt->wire, pkt->size }
-		};
-		send_req->as.write.data = task;
-		ret = uv_write(&send_req->as.write, (uv_stream_t *)handle, buf, 2, &on_write);
+		struct session *session = handle->data;
+		if (session->has_tls) {
+			ret = push_tls(task, handle, pkt, &send_req->as.write, qr_task_on_send);
+		} else {
+			uint16_t pkt_size = htons(pkt->size);
+			uv_buf_t buf[2] = {
+				{ (char *)&pkt_size, sizeof(pkt_size) },
+				{ (char *)pkt->wire, pkt->size }
+			};
+			send_req->as.write.data = task;
+			ret = uv_write(&send_req->as.write, (uv_stream_t *)handle, buf, 2, &on_write);
+		}
 	}
 	if (ret == 0) {
 		qr_task_ref(task); /* Pending ioreq on current task */
@@ -834,7 +840,7 @@ int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle)
 	return 0;
 }
 
-int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uint8_t *msg, ssize_t len)
+int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *msg, ssize_t len)
 {
 	if (!worker || !handle) {
 		return kr_error(EINVAL);
@@ -865,7 +871,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uin
 	 * to buffer incoming message until it's complete. */
 	if (!session->outgoing) {
 		if (!task) {
-			task = qr_task_create(worker, handle, NULL);
+			task = qr_task_create(worker, (uv_handle_t *)handle, NULL);
 			if (!task) {
 				return kr_error(ENOMEM);
 			}

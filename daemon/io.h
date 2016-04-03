@@ -21,6 +21,7 @@
 #include "lib/generic/array.h"
 
 struct qr_task;
+struct tls_ctx_t;
 
 /* Per-session (TCP or UDP) persistent structure,
  * that exists between remote counterpart and a local socket.
@@ -31,6 +32,7 @@ struct session {
     bool has_tls;
     uv_timer_t timeout;
     struct qr_task *buffering;
+    struct tls_ctx_t *tls_ctx;
 	array_t(struct qr_task *) tasks;
 };
 

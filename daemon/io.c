@@ -23,6 +23,7 @@
 #include "daemon/io.h"
 #include "daemon/network.h"
 #include "daemon/worker.h"
+#include "daemon/tls.h"
 
 #define negotiate_bufsize(func, handle, bufsize_want) do { \
     int bufsize = 0; func(handle, &bufsize); \
@@ -49,6 +50,7 @@ static void session_clear(struct session *s)
 {
 	assert(s->outgoing || s->tasks.len == 0);
 	array_clear(s->tasks);
+	tls_free(s->tls_ctx);
 	memset(s, 0, sizeof(*s));
 }
 
@@ -204,7 +206,12 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	struct worker_ctx *worker = loop->data;
 	/* TCP pipelining is rather complicated and requires cooperation from the worker
 	 * so the whole message reassembly and demuxing logic is inside worker */
-	int ret = worker_process_tcp(worker, (uv_handle_t *)handle, (const uint8_t *)buf->base, nread);
+	int ret = 0;
+	if (s->has_tls) {
+		ret = worker_process_tls(worker, handle, (const uint8_t *)buf->base, nread);
+	} else {
+		ret = worker_process_tcp(worker, handle, (const uint8_t *)buf->base, nread);
+	}
 	if (ret < 0) {
 		worker_end_tcp(worker, (uv_handle_t *)handle);
 		/* Exceeded per-connection quota for outstanding requests
@@ -245,6 +252,9 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	 * is idle and should be terminated, this is an educated guess. */
 	struct session *session = client->data;
 	session->has_tls = tls;
+	if (tls && !session->tls_ctx) {
+		session->tls_ctx = tls_new(master->loop->data);
+	}
 	uv_timer_t *timer = &session->timeout;
 	uv_timer_init(master->loop, timer);
 	timer->data = client;

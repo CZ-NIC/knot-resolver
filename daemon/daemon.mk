@@ -5,6 +5,7 @@ kresd_SOURCES := \
 	daemon/worker.c      \
 	daemon/bindings.c    \
 	daemon/ffimodule.c   \
+	daemon/tls.c         \
 	daemon/main.c
 
 kresd_DIST := daemon/lua/kres.lua daemon/lua/trust_anchors.lua
