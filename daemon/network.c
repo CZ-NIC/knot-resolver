@@ -101,6 +101,10 @@ void network_deinit(struct network *net)
 		map_walk(&net->endpoints, close_key, 0);
 		map_walk(&net->endpoints, free_key, 0);
 		map_clear(&net->endpoints);
+		free(net->tls_cert);
+		net->tls_cert = NULL;
+		free(net->tls_key);
+		net->tls_key = NULL;
 	}
 }
 
@@ -328,4 +332,34 @@ int network_close(struct network *net, const char *addr, uint16_t port)
 	}
 
 	return kr_ok();
+}
+
+static int str_replace(char **where_ptr, const char *with)
+{
+	char *copy = with ? strdup(with) : NULL;
+	if (with && !copy) {
+		return kr_error(ENOMEM);
+	}
+
+	free(*where_ptr);
+	*where_ptr = copy;
+	return kr_ok();
+}
+
+int network_set_tls_cert(struct network *net, const char *value)
+{
+	if (!net) {
+		return kr_error(EINVAL);
+	}
+
+	return str_replace(&net->tls_cert, value);
+}
+
+int network_set_tls_key(struct network *net, const char *value)
+{
+	if (!net) {
+		return kr_error(EINVAL);
+	}
+
+	return str_replace(&net->tls_key, value);
 }

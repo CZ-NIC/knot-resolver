@@ -348,6 +348,42 @@ static int net_pipeline(lua_State *L)
 	return 1;
 }
 
+static int net_tls_cert(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!lua_isstring(L, 1)) {
+		lua_pushstring(L, engine->net.tls_cert);
+		return 1;
+	}
+
+	int r = network_set_tls_cert(&engine->net, lua_tostring(L, 1));
+	if (r != 0) {
+		lua_pushstring(L, strerror(ENOMEM));
+		lua_error(L);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+static int net_tls_key(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!lua_isstring(L, 1)) {
+		lua_pushstring(L, engine->net.tls_key);
+		return 1;
+	}
+
+	int r = network_set_tls_key(&engine->net, lua_tostring(L, 1));
+	if (r != 0) {
+		lua_pushstring(L, strerror(ENOMEM));
+		lua_error(L);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -357,6 +393,8 @@ int lib_net(lua_State *L)
 		{ "interfaces",   net_interfaces },
 		{ "bufsize",      net_bufsize },
 		{ "tcp_pipeline", net_pipeline },
+		{ "tls_cert",     net_tls_cert },
+		{ "tls_key",      net_tls_key },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);

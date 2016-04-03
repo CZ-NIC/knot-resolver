@@ -42,6 +42,8 @@ typedef array_t(struct endpoint*) endpoint_array_t;
 struct network {
     uv_loop_t *loop;
     map_t endpoints;
+    char *tls_cert;
+    char *tls_key;
 };
 
 void network_init(struct network *net, uv_loop_t *loop);
@@ -49,3 +51,5 @@ void network_deinit(struct network *net);
 int network_listen_fd(struct network *net, int fd);
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags);
 int network_close(struct network *net, const char *addr, uint16_t port);
+int network_set_tls_cert(struct network *net, const char *cert);
+int network_set_tls_key(struct network *net, const char *key);
