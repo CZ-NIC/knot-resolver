@@ -329,7 +329,8 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	}
 
 	char *result = NULL;
-	asprintf(&result, "{ \"result\": %s", ret == 0 ? "true" : "false");
+	if (-1 == asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false"))
+		result = NULL;
 	return result;
 }
 
