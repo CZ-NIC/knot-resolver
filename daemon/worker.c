@@ -380,7 +380,7 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 {
 	if (!task->finished) {
 		if (status == 0 && handle) {
-			io_start_read(handle); /* Start reading answer */
+			io_start_read(handle); /* Start reading new query */
 		} else {
 			DEBUG_MSG("ioreq send_done %p => %d, %s\n", handle, status, uv_strerror(status));
 		}
