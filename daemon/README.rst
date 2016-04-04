@@ -191,7 +191,7 @@ A simple example would be to load static hints.
 		'hints' -- no configuration
 	}
 
-If the module accepts accepts configuration, you can call the ``module.config({...})`` or provide options table.
+If the module accepts configuration, you can call the ``module.config({...})`` or provide options table.
 The syntax for table is ``{ key1 = value, key2 = value }``, and it represents the unpacked `JSON-encoded`_ string, that
 the modules use as the :ref:`input configuration <mod-properties>`.
 
