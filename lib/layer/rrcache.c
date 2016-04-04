@@ -14,6 +14,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+
 #include <libknot/descriptor.h>
 #include <libknot/errcode.h>
 #include <libknot/rrset.h>
@@ -59,6 +61,14 @@ static int loot_rr(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t
 		qry->flags |= QUERY_EXPIRING;
 	}
 
+	assert(flags != NULL);
+	if ((*flags) & KR_CACHE_FLAG_WCARD_PROOF) {
+		/* Record was found, but wildcard answer proof is needed.
+		 * Do not update packet, try to fetch whole packet from pktcache instead. */
+		qry->flags |= QUERY_DNSSEC_WEXPAND;
+		return kr_error(ENOENT);
+	}
+
 	/* Update packet question */
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)) {
 		kr_pkt_recycle(pkt);
@@ -87,10 +97,11 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query
 	}
 	/* Lookup direct match first */
 	uint8_t rank  = 0;
-	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, NULL, 0);
+	uint8_t flags = 0;
+	ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, &flags, 0);
 	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) { /* Chase CNAME if no direct hit */
 		rrtype = KNOT_RRTYPE_CNAME;
-		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, NULL, 0);
+		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, &flags, 0);
 	}
 	/* Record is flagged as INSECURE => doesn't have RRSIG. */
 	if (ret == 0 && (rank & KR_RANK_INSECURE)) {
@@ -98,7 +109,7 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	/* Record may have RRSIG, try to find it. */
 	} else if (ret == 0 && dobit) {
-		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, NULL, true);
+		ret = loot_rr(&txn, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, &flags, true);
 	}
 	kr_cache_txn_abort(&txn);
 	return ret;
@@ -202,7 +213,11 @@ static int commit_rr(const char *key, void *val, void *data)
 
 	knot_rrset_t query_rr;
 	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
-	return kr_cache_insert_rr(baton->txn, rr, rank, KR_CACHE_FLAG_NONE, baton->timestamp);
+	uint8_t flags = KR_CACHE_FLAG_NONE;
+	if ((rank & KR_RANK_AUTH) && (baton->qry->flags & QUERY_DNSSEC_WEXPAND)) {
+		flags |= KR_CACHE_FLAG_WCARD_PROOF;
+	}
+	return kr_cache_insert_rr(baton->txn, rr, rank, flags, baton->timestamp);
 }
 
 static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache_txn *txn, struct kr_request *req)
@@ -301,11 +316,6 @@ static int rrcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	/* Do not cache truncated answers. */
 	if (knot_wire_get_tc(pkt->wire)) {
-		return ctx->state;
-	}
-	/* Do not cache wildcard expanded anwsers,
-	 * as they must deal with packet cache */
-	if (qry->flags & QUERY_DNSSEC_WEXPAND) {
 		return ctx->state;
 	}
 
