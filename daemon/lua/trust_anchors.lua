@@ -185,7 +185,7 @@ local function refresh_plan(trust_anchors, timeout, refresh_cb, priming, bootstr
 			-- Schedule itself with updated timeout
 			local next_time = refresh_cb(trust_anchors, kres.pkt_t(pkt), bootstrap)
 			if trust_anchors.refresh_time ~= nil then
-				next_time = math.min(next_time, trust_anchors.refresh_time)
+				next_time = trust_anchors.refresh_time
 			end
 			print('[ ta ] next refresh: '..next_time)
 			refresh_plan(trust_anchors, next_time, refresh_cb)
@@ -239,16 +239,26 @@ local trust_anchors = {
 	keyset = {},
 	insecure = {},
 	hold_down_time = 30 * day,
+	keep_removed = 0,
 	-- Update existing keyset
 	update = function (new_keys, initial)
 		if not new_keys then return false end
 		-- Filter TAs to be purged from the keyset (KeyRem)
 		local hold_down = trust_anchors.hold_down_time / 1000
 		local keyset = {}
+		local keep_removed = trust_anchors.keep_removed
 		for i, ta in ipairs(trust_anchors.keyset) do
 			local keep = true
 			if not ta_find(new_keys, ta) then
 				keep = ta_missing(ta, hold_down)
+			end
+			-- Purge removed keys
+			if ta.state == key_state.Removed then
+				if keep_removed > 0 then
+					keep_removed = keep_removed - 1
+				else
+					keep = false
+				end
 			end
 			if keep then
 				table.insert(keyset, ta)

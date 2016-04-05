@@ -506,6 +506,27 @@ For when listening on ``localhost`` just doesn't cut it.
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. envvar:: trust_anchors.hold_down_time = 30 * day
+
+   :return: int (default: 30 * day)
+
+   Modify RFC5011 hold-down timer to given value. Example: ``30 * second``
+
+.. envvar:: trust_anchors.refresh_time = nil
+
+   :return: int (default: nil)
+
+   Modify RFC5011 refresh timer to given value (not set by default), this will force trust anchors
+   to be updated every N seconds periodically instead of relying on RFC5011 logic and TTLs.
+   Example: ``10 * second``
+
+.. envvar:: trust_anchors.keep_removed = 0
+
+   :return: int (default: 1)
+
+   How many ``Removed`` keys should be held in history (and key file) before being purged.
+   Note: all ``Removed`` keys will be purged from key file after restarting the process.
+
 .. function:: trust_anchors.config(keyfile)
 
    :param string keyfile: File containing DNSKEY records, should be writeable.
