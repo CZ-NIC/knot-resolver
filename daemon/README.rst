@@ -510,7 +510,7 @@ Trust anchors and DNSSEC
 
    :return: int (default: 30 * day)
 
-   Modify RFC5011 hold-down timer to given value. Example: ``30 * second``
+   Modify RFC5011 hold-down timer to given value. Example: ``30 * sec``
 
 .. envvar:: trust_anchors.refresh_time = nil
 
@@ -518,11 +518,11 @@ Trust anchors and DNSSEC
 
    Modify RFC5011 refresh timer to given value (not set by default), this will force trust anchors
    to be updated every N seconds periodically instead of relying on RFC5011 logic and TTLs.
-   Example: ``10 * second``
+   Example: ``10 * sec``
 
 .. envvar:: trust_anchors.keep_removed = 0
 
-   :return: int (default: 1)
+   :return: int (default: 0)
 
    How many ``Removed`` keys should be held in history (and key file) before being purged.
    Note: all ``Removed`` keys will be purged from key file after restarting the process.

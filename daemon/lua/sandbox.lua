@@ -4,7 +4,9 @@ MB = 1024*kB
 GB = 1024*MB
 -- Time
 sec = 1000
+second = sec
 minute = 60 * sec
+min = minute
 hour = 60 * minute
 day = 24 * hour
 
