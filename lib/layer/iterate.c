@@ -224,6 +224,8 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 #endif
 	}
 
+	/* Remember current bailiwick for NS processing. */
+	const knot_dname_t *current_cut = cut->name;
 	/* Update zone cut name */
 	if (!knot_dname_is_equal(rr->owner, cut->name)) {
 		/* Remember parent cut and descend to new (keep keys and TA). */
@@ -250,7 +252,10 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 			continue;
 		}
 		kr_zonecut_add(cut, ns_name, NULL);
-		fetch_glue(pkt, ns_name, qry);
+		/* Use glue only in permissive mode or when in bailiwick. */
+		if ((qry->flags & QUERY_PERMISSIVE) || knot_dname_in(current_cut, ns_name)) {
+			fetch_glue(pkt, ns_name, qry);
+		}
 	}
 
 	return state;

@@ -268,7 +268,10 @@ static int stash_authority(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, 
 		}
 		/* Look up glue records for NS */
 		if (rr->type == KNOT_RRTYPE_NS) {
-			stash_glue(stash, pkt, knot_ns_name(&rr->rrs, 0), pool);
+			const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, 0);
+			if (qry->flags & QUERY_PERMISSIVE || knot_dname_in(qry->zone_cut.name, ns_name)) {
+				stash_glue(stash, pkt, ns_name, pool);
+			}
 		}
 		/* Stash record */
 		kr_rrmap_add(stash, rr, KR_RANK_NONAUTH, pool);
@@ -334,9 +337,11 @@ static int rrcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	bool is_auth = knot_wire_get_aa(pkt->wire);
 	if (is_auth) {
 		ret = stash_answer(qry, pkt, &stash, &req->pool);
-	}
+		if (ret == 0) {
+			ret = stash_authority(qry, pkt, &stash, &req->pool);
+		}
 	/* Cache authority only if chasing referral/cname chain */
-	if (!is_auth || qry != array_tail(req->rplan.pending)) {
+	} else if (!is_auth || qry != array_tail(req->rplan.pending)) {
 		ret = stash_authority(qry, pkt, &stash, &req->pool);
 	}
 	/* Cache DS records in referrals */

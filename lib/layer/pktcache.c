@@ -181,10 +181,9 @@ static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 	/* Cache only NODATA/NXDOMAIN or metatype/RRSIG or
-         * wildcard expanded answers. */
+	 * wildcard expanded answers. */
 	const uint16_t qtype = knot_pkt_qtype(pkt);
-	const bool is_eligible = (knot_rrtype_is_metatype(qtype) ||
-				  qtype == KNOT_RRTYPE_RRSIG);
+	const bool is_eligible = (knot_rrtype_is_metatype(qtype) || qtype == KNOT_RRTYPE_RRSIG);
 	int pkt_class = kr_response_classify(pkt);
 	if (!(is_eligible || (pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) ||
 	    (qry->flags & QUERY_DNSSEC_WEXPAND))) {
