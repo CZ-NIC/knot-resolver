@@ -23,8 +23,11 @@ INSTALL := install
 
 # Flags
 BUILD_LDFLAGS += $(LDFLAGS)
-BUILD_CFLAGS := $(CFLAGS) -std=c99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=2 -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
+BUILD_CFLAGS := $(CFLAGS) -std=c99 -D_GNU_SOURCE -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
 BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(MAJOR).$(MINOR).$(PATCH)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\"" -DETCDIR="\"$(ETCDIR)\""
 ifeq (,$(findstring -O,$(CFLAGS)))
 	BUILD_CFLAGS += -O2
+endif
+ifeq (,$(findstring -fsanitize=address,$(CFLAGS)))
+	BUILD_CFLAGS += -D_FORTIFY_SOURCE=2
 endif
