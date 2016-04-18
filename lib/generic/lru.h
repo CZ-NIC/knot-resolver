@@ -116,6 +116,9 @@ struct { \
 /** Get slot at given index. */
 static inline void *lru_slot_at(struct lru_hash_base *lru, uint32_t id)
 {
+	if (id >= lru->size) {
+		return NULL;
+	}
 	return (struct lru_slot *)(lru->slots + (id * lru->stride));
 }
 
@@ -139,6 +142,21 @@ static inline void *lru_slot_get(struct lru_hash_base *lru, const char *key, uin
 	return NULL;
 }
 
+static inline int lru_slot_evict(struct lru_hash_base *lru, uint32_t id, size_t offset)
+{
+	struct lru_slot *slot = lru_slot_at(lru, id);
+	if (!slot || !slot->key) {
+		return -1;
+	}
+	lru->evictions += 1;
+	free(slot->key);
+	if (lru->evict) {
+		lru->evict(lru->baton, lru_slot_val(slot, offset));
+	}
+	memset(slot, 0, lru->stride);
+	return 0;
+}
+
 /** @internal Slot data setter */
 static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uint16_t len, size_t offset)
 {
@@ -155,10 +173,8 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 			if (slot->refs > 0) {
 				return NULL; /* Couldn't joust former key. */
 			}
-			lru->evictions += 1;
-			free(slot->key);
-			if (lru->evict) {
-				lru->evict(lru->baton, lru_slot_val(slot, offset));
+			if (lru_slot_evict(lru, id, offset) < 0) {
+				return NULL;
 			}
 		}
 		memset(slot, 0, lru->stride);
@@ -226,5 +242,14 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 #define lru_set(table, key_, len_) \
  	(__typeof__(&(table)->slots[0].data)) \
 		lru_slot_set((struct lru_hash_base *)(table), (key_), (len_), lru_slot_offset(table))
+
+/**
+ * @brief Evict element at index.
+ * @param table hash table
+ * @param pos_ element position
+ * @return 0 if successful, negative integer if failed
+ */
+#define lru_evict(table, pos_) \
+ 	lru_slot_evict((struct lru_hash_base *)(table), (pos_), lru_slot_offset(table))
 
 /** @} */

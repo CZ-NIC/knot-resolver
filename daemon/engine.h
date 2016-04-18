@@ -59,6 +59,7 @@ struct engine {
     module_array_t modules;
     storage_registry_t storage_registry;
     knot_mm_t *pool;
+    uv_timer_t *updater;
     struct lua_State *L;
 };
 

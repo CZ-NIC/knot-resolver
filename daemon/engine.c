@@ -41,6 +41,9 @@
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error (lua_State *L);
 
+/* Cleanup engine state every 5 minutes */
+const size_t CLEANUP_TIMER = 5*60*1000;
+
 /*
  * Global bindings.
  */
@@ -455,6 +458,22 @@ static int init_state(struct engine *engine)
 	return kr_ok();
 }
 
+static void update_state(uv_timer_t *handle)
+{
+	struct engine *engine = handle->data;
+
+	/* Walk RTT table, clearing all entries with bad score
+	 * to compensate for intermittent network issues or temporary bad behaviour. */
+	kr_nsrep_lru_t *table = engine->resolver.cache_rtt;
+	for (size_t i = 0; i < table->size; ++i) {
+		if (!table->slots[i].key)
+			continue;
+		if (table->slots[i].data > KR_NS_LONG) {
+			lru_evict(table, i);
+		}
+	}
+}
+
 int engine_init(struct engine *engine, knot_mm_t *pool)
 {
 	if (engine == NULL) {
@@ -607,11 +626,23 @@ int engine_start(struct engine *engine, const char *config_path)
 	lua_gc(engine->L, LUA_GCSETSTEPMUL, 50);
 	lua_gc(engine->L, LUA_GCSETPAUSE, 400);
 	lua_gc(engine->L, LUA_GCRESTART, 0);
+
+	/* Set up periodic update function */
+	uv_timer_t *timer = malloc(sizeof(*timer));
+	if (timer) {
+		uv_timer_init(uv_default_loop(), timer);
+		timer->data = engine;
+		engine->updater = timer;
+		uv_timer_start(timer, update_state, CLEANUP_TIMER, CLEANUP_TIMER);
+	}
+
 	return kr_ok();
 }
 
 void engine_stop(struct engine *engine)
 {
+	uv_timer_stop(engine->updater);
+	uv_close((uv_handle_t *)engine->updater, (uv_close_cb) free);
 	uv_stop(uv_default_loop());
 }
 
