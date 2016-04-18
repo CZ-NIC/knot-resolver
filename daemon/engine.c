@@ -66,6 +66,7 @@ static int l_help(lua_State *L)
 		"user(name[, group])\n    change process user (and group)\n"
 		"verbose(true|false)\n    toggle verbose mode\n"
 		"option(opt[, new_val])\n    get/set server option\n"
+		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"resolve(name, type[, class, flags, callback])\n    resolve query, callback when it's finished\n"
 		"todname(name)\n    convert name to wire format\n"
 		"net\n    network configuration\n"

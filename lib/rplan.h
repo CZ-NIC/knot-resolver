@@ -45,7 +45,8 @@
 	X(STUB,            1 << 17) /**< Stub resolution, accept received answer as solved. */ \
 	X(ALWAYS_CUT,      1 << 18) /**< Always recover zone cut (even if cached). */ \
 	X(DNSSEC_WEXPAND,  1 << 19) /**< Query response has wildcard expansion. */ \
-	X(PERMISSIVE,      1 << 20) /**< Permissive referral path resolution. */
+	X(PERMISSIVE,      1 << 20) /**< Permissive resolver mode. */ \
+	X(STRICT,          1 << 21) /**< Strict resolver mode. */
 
 /** Query flags */
 enum kr_query_flag {

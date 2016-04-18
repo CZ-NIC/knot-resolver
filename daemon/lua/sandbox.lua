@@ -18,6 +18,19 @@ if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
 
+-- Resolver mode of operation
+local current_mode = 'normal'
+local mode_table = { normal=0, strict=1, permissive=2 }
+function mode(m)
+	if not m then return current_mode end
+	if not mode_table[m] then error('unsupported mode: '..m) end
+	-- Update current operation mode
+	current_mode = m
+	option('STRICT', current_mode == 'strict')
+	option('PERMISSIVE', current_mode == 'permissive')
+	return true
+end
+
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`
 env = {}

@@ -173,15 +173,24 @@ static int update_answer(const knot_rrset_t *rr, unsigned hint, knot_pkt_t *answ
 	return KNOT_STATE_DONE;
 }
 
-static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_query *qry)
+static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
 {
+	bool used_glue = false;
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
 			if (knot_dname_is_equal(ns, rr->owner)) {
-				(void) update_nsaddr(rr, qry);
+				(void) update_nsaddr(rr, req->current_query);
+				used_glue = true;
 			}
+		}
+	}
+	WITH_DEBUG {
+		char name_str[KNOT_DNAME_MAXLEN];
+		knot_dname_to_str(name_str, ns, sizeof(name_str));
+		if (used_glue) {
+			DEBUG_MSG("<= using glue for '%s'\n", name_str);
 		}
 	}
 }
@@ -252,9 +261,17 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 			continue;
 		}
 		kr_zonecut_add(cut, ns_name, NULL);
-		/* Use glue only in permissive mode or when in bailiwick. */
-		if ((qry->flags & QUERY_PERMISSIVE) || knot_dname_in(current_cut, ns_name)) {
-			fetch_glue(pkt, ns_name, qry);
+		/* Choose when to use glue records. */
+		if (qry->flags & QUERY_PERMISSIVE) {
+			fetch_glue(pkt, ns_name, req);
+		} else if (qry->flags & QUERY_STRICT) {
+			/* Strict mode uses only mandatory glue. */
+			if (knot_dname_in(cut->name, ns_name))
+				fetch_glue(pkt, ns_name, req);
+		} else {
+			/* Normal mode uses in-bailiwick glue. */
+			if (knot_dname_in(current_cut, ns_name))
+				fetch_glue(pkt, ns_name, req);
 		}
 	}
 

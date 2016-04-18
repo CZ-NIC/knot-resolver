@@ -335,6 +335,23 @@ Environment
 
    :return: Toggle verbose logging.
 
+.. function:: mode('strict' | 'normal' | 'permissive')
+
+   :return: Change resolver strictness checking level.
+
+   By default, resolver runs in *normal* mode. There are possibly many small adjustments
+   hidden behind the mode settings, but the main idea is that in *permissive* mode, the resolver
+   tries to resolve a name with as few lookups as possible, while in *strict* mode it spends much
+   more effort resolving and checking referral path. However, if majority of the traffic is covered
+   by DNSSEC, some of the strict checking actions are counter-productive.
+
+   .. csv-table::
+    :header: "Action", "Modes"
+
+    "Use mandatory glue", "strict, normal, permissive"
+    "Use in-bailiwick glue", "normal, permissive"
+    "Use any glue records", "permissive"
+
 .. function:: user(name, [group])
 
    :param string name: user name

@@ -106,6 +106,8 @@ struct query_flag {
 	static const int DNSSEC_INSECURE = 1 << 16;
 	static const int STUB        = 1 << 17;
 	static const int ALWAYS_CUT  = 1 << 18;
+	static const int PERMISSIVE  = 1 << 20;
+	static const int STRICT      = 1 << 21;
 };
 
 /*
