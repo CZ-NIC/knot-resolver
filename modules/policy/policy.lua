@@ -87,6 +87,10 @@ local function rpz_parse(action, path)
 		local name = ffi.string(parser.r_owner, parser.r_owner_length)
 		local action = ffi.string(parser.r_data, parser.r_data_length)
 		rules[name] = action_map[action]
+		-- Warn when NYI
+		if #name > 1 and not action_map[action] then
+			print(string.format('[ rpz ] %s:%d: unsupported policy action', path, tonumber(parser.line_counter)))
+		end
 	end
 	return rules
 end
