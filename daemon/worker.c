@@ -287,6 +287,10 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	kr_resolve_begin(&task->req, &engine->resolver, answer);
 	worker->stats.concurrent += 1;
 	worker->stats.queries += 1;
+	/* Throttle outbound queries only when high pressure */
+	if (worker->stats.concurrent < QUERY_RATE_THRESHOLD) {
+		task->req.options |= QUERY_NO_THROTTLE;
+	}
 	return task;
 }
 

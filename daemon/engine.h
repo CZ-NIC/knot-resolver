@@ -29,6 +29,9 @@
 #ifndef RECVMMSG_BATCH
 #define RECVMMSG_BATCH 4
 #endif
+#ifndef QUERY_RATE_THRESHOLD
+#define QUERY_RATE_THRESHOLD (2 * MP_FREELIST_SIZE) /**< Nr of parallel queries considered as high rate */
+#endif
 
 /*
  * @internal These are forward decls to allow building modules with engine but without Lua.
