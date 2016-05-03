@@ -18,9 +18,30 @@
 
 #include <uv.h>
 #include <libknot/packet/pkt.h>
+#include "lib/generic/array.h"
+
+struct qr_task;
+
+/* Per-session (TCP or UDP) persistent structure,
+ * that exists between remote counterpart and a local socket.
+ */
+struct session {
+	bool is_subreq;
+    bool throttled;
+    uv_timer_t timeout;
+    struct qr_task *buffering;
+	array_t(struct qr_task *) tasks;
+};
+
+void session_free(struct session *s);
+struct session *session_new(void);
 
 int udp_bind(uv_udp_t *handle, struct sockaddr *addr);
 int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr);
+
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type);
+void io_deinit(uv_handle_t *handle);
+void io_free(uv_handle_t *handle);
+
 int io_start_read(uv_handle_t *handle);
 int io_stop_read(uv_handle_t *handle);

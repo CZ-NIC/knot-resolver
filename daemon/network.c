@@ -21,7 +21,8 @@
 #include "daemon/io.h"
 
 /* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
-#if (defined(ENABLE_REUSEPORT) || defined(UV_VERSION_HEX)) && (__linux__ && SO_REUSEPORT)
+#if defined(UV_VERSION_HEX)
+#if (__linux__ && SO_REUSEPORT)
   #define handle_init(type, loop, handle, family) do { \
 	uv_ ## type ## _init_ex((loop), (handle), (family)); \
 	uv_os_fd_t fd = 0; \
@@ -30,6 +31,12 @@
 		setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)); \
 	} \
   } while (0)
+/* libuv 1.7.0+ is able to assign fd immediately */
+#else
+  #define handle_init(type, loop, handle, family) do { \
+	uv_ ## type ## _init_ex((loop), (handle), (family)); \
+  } while (0)
+#endif
 #else
   #define handle_init(type, loop, handle, family) \
 	uv_ ## type ## _init((loop), (handle))

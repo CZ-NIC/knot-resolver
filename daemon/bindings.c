@@ -48,6 +48,13 @@ static int format_error(lua_State* L, const char *err)
 	return 1;
 }
 
+static inline struct worker_ctx *wrk_luaget(lua_State *L) {
+	lua_getglobal(L, "__worker");
+	struct worker_ctx *worker = lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	return worker;
+}
+
 /** List loaded modules */
 static int mod_list(lua_State *L)
 {
@@ -302,14 +309,36 @@ static int net_bufsize(lua_State *L)
 	return 0;
 }
 
+/** Set TCP pipelining size. */
+static int net_pipeline(lua_State *L)
+{
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (!worker) {
+		return 0;
+	}
+	if (!lua_isnumber(L, 1)) {
+		lua_pushnumber(L, worker->tcp_pipeline_max);
+		return 1;
+	}
+	int len = lua_tointeger(L, 1);
+	if (len < 0 || len > 4096) {
+		format_error(L, "tcp_pipeline must be within <0, 4096>");
+		lua_error(L);
+	}
+	worker->tcp_pipeline_max = len;
+	lua_pushnumber(L, len);
+	return 1;
+}
+
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
-		{ "list",       net_list },
-		{ "listen",     net_listen },
-		{ "close",      net_close },
-		{ "interfaces", net_interfaces },
-		{ "bufsize",    net_bufsize },
+		{ "list",         net_list },
+		{ "listen",       net_listen },
+		{ "close",        net_close },
+		{ "interfaces",   net_interfaces },
+		{ "bufsize",      net_bufsize },
+		{ "tcp_pipeline", net_pipeline },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
@@ -597,13 +626,6 @@ int lib_event(lua_State *L)
 
 	register_lib(L, "event", lib);
 	return 1;
-}
-
-static inline struct worker_ctx *wrk_luaget(lua_State *L) {
-	lua_getglobal(L, "__worker");
-	struct worker_ctx *worker = lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	return worker;
 }
 
 /* @internal Call the Lua callback stored in baton. */
