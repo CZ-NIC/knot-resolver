@@ -46,7 +46,8 @@
 	X(ALWAYS_CUT,      1 << 18) /**< Always recover zone cut (even if cached). */ \
 	X(DNSSEC_WEXPAND,  1 << 19) /**< Query response has wildcard expansion. */ \
 	X(PERMISSIVE,      1 << 20) /**< Permissive resolver mode. */ \
-	X(STRICT,          1 << 21) /**< Strict resolver mode. */
+	X(STRICT,          1 << 21) /**< Strict resolver mode. */ \
+	X(SERVFAIL,        1 << 22) /**< Query response is SERVFAIL or REFUSED. */
 
 /** Query flags */
 enum kr_query_flag {
@@ -70,6 +71,7 @@ struct kr_query {
 	uint16_t id;
 	uint32_t flags;
 	uint32_t secret;
+	uint16_t fails;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;

@@ -55,6 +55,10 @@ static inline int __attribute__((__cold__)) kr_error(int x) {
 #define KR_ITER_LIMIT 50     /* Built-in iterator limit */
 #define KR_CNAME_CHAIN_LIMIT 40 /* Built-in maximum CNAME chain length */
 #define KR_TIMEOUT_LIMIT 4   /* Maximum number of retries after timeout. */
+#define KR_QUERY_FAIL_LIMIT 40 /* Limit to the number of SERVFAIL\REFUSED
+                                * responses per query
+                                */
+#define KR_QUERY_NSRETRY_LIMIT 3 /* Maximum number of retries for single ns */
 
 /*
  * Defines.

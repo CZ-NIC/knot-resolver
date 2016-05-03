@@ -493,7 +493,8 @@ static void on_timeout(uv_timer_t *req)
 				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
 				QRDEBUG(qry, "wrkr", "=> server: '%s' flagged as 'bad'\n", addr_str);
 			}
-			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_TIMEOUT, worker->engine->resolver.cache_rtt);
+			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_TIMEOUT,
+					    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
 		}
 	}
 	/* Release timer handle */

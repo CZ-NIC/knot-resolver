@@ -48,6 +48,14 @@ enum kr_ns_rep {
 };
 
 /**
+ * NS RTT update modes.
+ */
+enum kr_ns_update_mode {
+	KR_NS_UPDATE  = 0, /**< Update as smooth over last two measurements */
+	KR_NS_RESET	   /**< Set to given value */
+};
+
+/**
  * NS reputation/QoS tracking.
  */
 typedef lru_hash(unsigned) kr_nsrep_lru_t;
@@ -64,6 +72,7 @@ struct kr_nsrep
 {
 	unsigned score;                  /**< NS score */
 	unsigned reputation;             /**< NS reputation */
+	unsigned fails;             	 /**< NS fail counter */
 	const knot_dname_t *name;        /**< NS name */
 	struct kr_context *ctx;          /**< Resolution context */
 	union {
@@ -111,16 +120,18 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
 /**
  * Update NS address RTT information.
  *
- * @brief Reputation is smoothed over last N measurements.
+ * @brief In KR_NS_UPDATE mode reputation is smoothed over last N measurements.
  * 
  * @param  ns           updated NS representation
  * @param  addr         chosen address (NULL for first)
  * @param  score        new score (i.e. RTT), see enum kr_ns_score
  * @param  cache        LRU cache
+ * @param  umode        update mode (KR_NS_UPDATE or KR_NS_RESET)
  * @return              0 on success, error code on failure
  */
 KR_EXPORT
-int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsigned score, kr_nsrep_lru_t *cache);
+int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
+			unsigned score, kr_nsrep_lru_t *cache, int umode);
 
 /**
  * Update NSSET reputation information.

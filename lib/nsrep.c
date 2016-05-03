@@ -176,6 +176,7 @@ int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len)
 	qry->ns.name = (const uint8_t *)"";
 	qry->ns.score = KR_NS_UNKNOWN;
 	qry->ns.reputation = 0;
+	qry->ns.fails = 0;
 	update_nsrep(&qry->ns, 0, addr, addr_len);
 	update_nsrep(&qry->ns, 1, NULL, 0);
 	return kr_ok();
@@ -185,6 +186,7 @@ int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len)
 	(ns)->ctx = (ctx_); \
 	(ns)->addr[0].ip.sa_family = AF_UNSPEC; \
 	(ns)->reputation = 0; \
+	(ns)->fails = 0; \
 	(ns)->score = KR_NS_MAX_SCORE + 1; \
 } while (0)
 
@@ -221,7 +223,8 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 
 #undef ELECT_INIT
 
-int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsigned score, kr_nsrep_lru_t *cache)
+int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
+			unsigned score, kr_nsrep_lru_t *cache, int umode)
 {
 	if (!ns || !cache || ns->addr[0].ip.sa_family == AF_UNSPEC) {
 		return kr_error(EINVAL);
@@ -249,13 +252,15 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsign
 	if (score <= KR_NS_GLUED) {
 		score = KR_NS_GLUED + 1;
 	}
-	/* Set initial value or smooth over last two measurements */
-	if (*cur != 0) {
+
+	if ((*cur != 0) && (umode == KR_NS_UPDATE)) {
+	/* In KR_NS_UPDATE mode, calculate smooth over last two measurements */
 		*cur = (*cur + score) / 2;
 	} else {
-	/* First measurement, reset */
+	/* First measurement or KR_NS_RESET mode, reset */
 		*cur = score;
 	}
+
 	return kr_ok();
 }
 
