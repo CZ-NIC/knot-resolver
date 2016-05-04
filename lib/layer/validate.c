@@ -484,7 +484,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		const knot_pktsection_t *auth = knot_pkt_section(pkt, KNOT_AUTHORITY);
 		for (unsigned i = 0; i < auth->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(auth, i);
-			kr_rrarray_add(&req->authority, rr, &pkt->mm);
+			kr_rrarray_add(&req->authority, rr, &req->answer->mm);
 		}
 	}
 
