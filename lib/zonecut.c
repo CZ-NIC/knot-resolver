@@ -114,6 +114,7 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 	map_clear(&cut->nsset);
 	knot_rrset_free(&cut->key, cut->pool);
 	knot_rrset_free(&cut->trust_anchor, cut->pool);
+	cut->name = NULL;
 }
 
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)

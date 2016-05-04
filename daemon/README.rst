@@ -520,6 +520,18 @@ For when listening on ``localhost`` just doesn't cut it.
 	> net.bufsize()
 	4096
 
+.. function:: net.tcp_pipeline([len])
+
+   Get/set per-client TCP pipeline limit (number of outstanding queries that a single client connection can make in parallel). Default is 50.
+
+   Example output:
+
+   .. code-block:: lua
+
+   > net.tcp_pipeline()
+   50
+   > net.tcp_pipeline(100)
+
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
