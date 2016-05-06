@@ -47,7 +47,6 @@
 	X(DNSSEC_WEXPAND,  1 << 19) /**< Query response has wildcard expansion. */ \
 	X(PERMISSIVE,      1 << 20) /**< Permissive resolver mode. */ \
 	X(STRICT,          1 << 21) /**< Strict resolver mode. */ \
-	X(SERVFAIL,        1 << 22) /**< Query response is SERVFAIL or REFUSED. */
 
 /** Query flags */
 enum kr_query_flag {

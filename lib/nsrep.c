@@ -24,6 +24,7 @@
 #include "lib/resolve.h"
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
+#include "contrib/ucw/lib.h"
 
 /** Some built-in unfairness ... */
 #define FAVOUR_IPV6 20 /* 20ms bonus for v6 */
@@ -176,7 +177,6 @@ int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len)
 	qry->ns.name = (const uint8_t *)"";
 	qry->ns.score = KR_NS_UNKNOWN;
 	qry->ns.reputation = 0;
-	qry->ns.fails = 0;
 	update_nsrep(&qry->ns, 0, addr, addr_len);
 	update_nsrep(&qry->ns, 1, NULL, 0);
 	return kr_ok();
@@ -186,7 +186,6 @@ int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len)
 	(ns)->ctx = (ctx_); \
 	(ns)->addr[0].ip.sa_family = AF_UNSPEC; \
 	(ns)->reputation = 0; \
-	(ns)->fails = 0; \
 	(ns)->score = KR_NS_MAX_SCORE + 1; \
 } while (0)
 
@@ -252,15 +251,17 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	if (score <= KR_NS_GLUED) {
 		score = KR_NS_GLUED + 1;
 	}
-
-	if ((*cur != 0) && (umode == KR_NS_UPDATE)) {
-	/* In KR_NS_UPDATE mode, calculate smooth over last two measurements */
-		*cur = (*cur + score) / 2;
-	} else {
-	/* First measurement or KR_NS_RESET mode, reset */
-		*cur = score;
+	/* First update is always set. */
+	if (*cur == 0) {
+		umode = KR_NS_RESET;
 	}
-
+	/* Update score, by default smooth over last two measurements. */
+	switch (umode) {
+	case KR_NS_UPDATE: *cur = (*cur + score) / 2; break;
+	case KR_NS_RESET:  *cur = score; break;
+	case KR_NS_ADD:    *cur = MIN(KR_NS_MAX_SCORE - 1, *cur + score); break;
+	default: break;
+	}
 	return kr_ok();
 }
 

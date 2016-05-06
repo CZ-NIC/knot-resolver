@@ -35,6 +35,7 @@ enum kr_ns_score {
 	KR_NS_TIMEOUT   = (95 * KR_NS_MAX_SCORE) / 100,
 	KR_NS_LONG      = (3 * KR_NS_TIMEOUT) / 4,
 	KR_NS_UNKNOWN   = KR_NS_TIMEOUT / 2,
+	KR_NS_PENALTY   = 100,
 	KR_NS_GLUED     = 10
 };
 
@@ -51,8 +52,9 @@ enum kr_ns_rep {
  * NS RTT update modes.
  */
 enum kr_ns_update_mode {
-	KR_NS_UPDATE  = 0, /**< Update as smooth over last two measurements */
-	KR_NS_RESET	   /**< Set to given value */
+	KR_NS_UPDATE = 0, /**< Update as smooth over last two measurements */
+	KR_NS_RESET,      /**< Set to given value */
+	KR_NS_ADD         /**< Increment current value */
 };
 
 /**
@@ -72,7 +74,6 @@ struct kr_nsrep
 {
 	unsigned score;                  /**< NS score */
 	unsigned reputation;             /**< NS reputation */
-	unsigned fails;             	 /**< NS fail counter */
 	const knot_dname_t *name;        /**< NS name */
 	struct kr_context *ctx;          /**< Resolution context */
 	union {
@@ -126,7 +127,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
  * @param  addr         chosen address (NULL for first)
  * @param  score        new score (i.e. RTT), see enum kr_ns_score
  * @param  cache        LRU cache
- * @param  umode        update mode (KR_NS_UPDATE or KR_NS_RESET)
+ * @param  umode        update mode (KR_NS_UPDATE or KR_NS_RESET or KR_NS_ADD)
  * @return              0 on success, error code on failure
  */
 KR_EXPORT

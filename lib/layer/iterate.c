@@ -601,12 +601,10 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_SERVFAIL: {
 		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		query->fails += 1;
-		query->ns.fails += 1;
-		if (query->fails >= KR_QUERY_FAIL_LIMIT ||
-		    query->ns.fails >= KR_QUERY_NSRETRY_LIMIT) {
+		if (query->fails >= KR_QUERY_NSRETRY_LIMIT) {
+			query->fails = 0; /* Reset per-query counter. */
 			return resolve_error(pkt, req);
 		} else {
-			query->flags |= QUERY_SERVFAIL;
 			return KNOT_STATE_CONSUME;
 		}
 	}

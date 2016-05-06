@@ -464,8 +464,12 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 					DEBUG_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, time_diff(&qry->timestamp, &now));
 				}
 			}
-			if (!(qry->flags & QUERY_SERVFAIL)) {
+			/* Do not complete NS address resolution on soft-fail. */
+			const int rcode = knot_wire_get_rcode(packet->wire);
+			if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
 				qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+			} else { /* Penalize SERVFAILs. */
+				kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
 			}
 		/* Do not penalize validation timeouts. */
 		} else if (!(qry->flags & QUERY_DNSSEC_BOGUS)) {
@@ -708,9 +712,7 @@ ns_election:
 		return KNOT_STATE_FAIL;
 	}
 
-	if (qry->flags & QUERY_SERVFAIL) {
-		qry->flags &= ~QUERY_SERVFAIL;
-	} else if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
+	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
 	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB))) { /* Keep NS when requerying/stub. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
