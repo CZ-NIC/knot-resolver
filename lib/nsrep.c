@@ -24,6 +24,7 @@
 #include "lib/resolve.h"
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
+#include "contrib/ucw/lib.h"
 
 /** Some built-in unfairness ... */
 #define FAVOUR_IPV6 20 /* 20ms bonus for v6 */
@@ -221,7 +222,8 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 
 #undef ELECT_INIT
 
-int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsigned score, kr_nsrep_lru_t *cache)
+int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
+			unsigned score, kr_nsrep_lru_t *cache, int umode)
 {
 	if (!ns || !cache || ns->addr[0].ip.sa_family == AF_UNSPEC) {
 		return kr_error(EINVAL);
@@ -249,12 +251,16 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr, unsign
 	if (score <= KR_NS_GLUED) {
 		score = KR_NS_GLUED + 1;
 	}
-	/* Set initial value or smooth over last two measurements */
-	if (*cur != 0) {
-		*cur = (*cur + score) / 2;
-	} else {
-	/* First measurement, reset */
-		*cur = score;
+	/* First update is always set. */
+	if (*cur == 0) {
+		umode = KR_NS_RESET;
+	}
+	/* Update score, by default smooth over last two measurements. */
+	switch (umode) {
+	case KR_NS_UPDATE: *cur = (*cur + score) / 2; break;
+	case KR_NS_RESET:  *cur = score; break;
+	case KR_NS_ADD:    *cur = MIN(KR_NS_MAX_SCORE - 1, *cur + score); break;
+	default: break;
 	}
 	return kr_ok();
 }

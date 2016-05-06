@@ -457,17 +457,23 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 			if (!(qry->flags & QUERY_SAFEMODE)) {
 				struct timeval now;
 				gettimeofday(&now, NULL);
-				kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt);
+				kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt, KR_NS_UPDATE);
 				WITH_DEBUG {
 					char addr_str[INET6_ADDRSTRLEN];
 					inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
 					DEBUG_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, time_diff(&qry->timestamp, &now));
 				}
 			}
-			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+			/* Do not complete NS address resolution on soft-fail. */
+			const int rcode = knot_wire_get_rcode(packet->wire);
+			if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
+				qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+			} else { /* Penalize SERVFAILs. */
+				kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
+			}
 		/* Do not penalize validation timeouts. */
 		} else if (!(qry->flags & QUERY_DNSSEC_BOGUS)) {
-			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt);
+			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt, KR_NS_RESET);
 			WITH_DEBUG {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
@@ -697,13 +703,15 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 ns_election:
 
-	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
+	/* If the query has got REFUSED & SERVFAIL, retry with current src up to KR_QUERY_NSRETRY_LIMIT.
+	 * If the query has already selected a NS and is waiting for IPv4/IPv6 record,
 	 * elect best address only, otherwise elect a completely new NS.
 	 */
 	if(++ns_election_iter >= KR_ITER_LIMIT) {
 		DEBUG_MSG(qry, "=> couldn't converge NS selection, bail out\n");
 		return KNOT_STATE_FAIL;
 	}
+
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
 	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB))) { /* Keep NS when requerying/stub. */
