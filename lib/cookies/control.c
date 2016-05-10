@@ -14,15 +14,29 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <assert.h>
 #include <stdint.h>
 #include <libknot/error.h>
 #include <libknot/rrtype/opt_cookie.h>
 
 #include "lib/cookies/control.h"
+#include "lib/layer.h"
+#include "lib/utils.h"
 
-struct cookies_control cookies_control = {
-	.enabled = true
+#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies_control",  fmt)
+
+static uint8_t cc[KNOT_OPT_COOKIE_CLNT] = { 1, 2, 3, 4, 5, 6, 7, 8};
+
+static struct secret_quantity client = {
+	.size = KNOT_OPT_COOKIE_CLNT,
+	.secret = cc
+};
+
+struct cookies_control kr_cookies_control = {
+	.enabled = true,
+	.client = &client
 };
 
 static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
@@ -54,15 +68,67 @@ static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
 	return KNOT_EOK;
 }
 
-int kr_pkt_add_cookie(knot_pkt_t *pkt)
+int prepare_client_cookie(uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                           const void *srvr_addr,
+                           const struct secret_quantity *csq)
 {
+	assert(cc);
+	assert(srvr_addr);
+	assert(csq);
+
+	assert(csq->size >= KNOT_OPT_COOKIE_CLNT);
+
+	/* According to the draft (section A.1) the recommended sequence is
+	 * client IP address | server IP address , client secret. */
+
+	int addr_family = ((struct sockaddr *) srvr_addr)->sa_family;
+	if (addr_family == AF_INET) {
+		srvr_addr = &((struct sockaddr_in *) srvr_addr)->sin_addr;
+	} else if (addr_family == AF_INET6) {
+		srvr_addr = &((struct sockaddr_in6 *) srvr_addr)->sin6_addr;
+	} else {
+		assert(0);
+		return kr_error(EINVAL);
+	}
+
+	WITH_DEBUG {
+		char ns_str[INET6_ADDRSTRLEN];
+		inet_ntop(addr_family, srvr_addr, ns_str, sizeof(ns_str));
+		DEBUG_MSG(NULL, "adding server address '%s' into client cookie\n", ns_str);
+	}
+
+	memcpy(cc, csq->secret, KNOT_OPT_COOKIE_CLNT);
+}
+
+int kr_pkt_put_cookie(struct cookies_control *cntrl, void *sockaddr,
+                      knot_pkt_t *pkt)
+{
+	assert(cntrl);
 	assert(pkt);
-	assert(pkt->opt_rr);
+
+	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
+
+	if (!pkt->opt_rr) {
+		return kr_ok();
+	}
+
+	if (!cntrl->client) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = prepare_client_cookie(cc, sockaddr, cntrl->client);
+
+	/* Reclaim reserved size. */
+	ret = knot_pkt_reclaim(pkt, knot_edns_wire_size(pkt->opt_rr));
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
 
 	/* TODO -- generate cleitn cookie from client address, server address
 	 * and secret quentity. */
-	static uint8_t cc[KNOT_OPT_COOKIE_CLNT] = { 1, 2, 3, 4, 5, 6, 7, 8};
+	ret = opt_rr_add_cookies(pkt->opt_rr, cc, NULL, 0, &pkt->mm);
 
-	int ret = opt_rr_add_cookies(pkt->opt_rr, cc, NULL, 0, &pkt->mm);
-	return ret;
+	/* Write to packet. */
+	assert(pkt->current == KNOT_ADDITIONAL);
+	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }

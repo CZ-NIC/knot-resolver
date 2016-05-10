@@ -19,20 +19,33 @@
 #include <libknot/packet/pkt.h>
 #include <stdbool.h>
 
+#include "lib/defines.h"
+
 #define KR_COOKIE_PLD_MAX 44 /* Define in libknot. */
+
+/** Holds secret quantity. */
+struct secret_quantity {
+	size_t size; /*!< Secret quantity size. */
+	const uint8_t *secret;
+};
 
 /** DNSSEC cookies controlling structure. */
 struct cookies_control {
 	bool enabled; /*!< Enabled/disables DNS cookies functionality. */
-	/* Cache. */
+	struct secret_quantity *client; /*!< Client secret quantity. */
+	/* TODO -- Cache. */
 };
 
 /** Global cookies control. */
-extern struct cookies_control cookies_control;
+KR_EXPORT
+extern struct cookies_control kr_cookies_control;
 
 /**
  * Insert a DNS cookie into the packet.
  * @note The packet must already contain ENDS section.
- * @param pkt Packet.
+ * @param cntrl Cookie control structure.
+ * @param pkt   Packet.
  */
-int kr_pkt_add_cookie(knot_pkt_t *pkt);
+KR_EXPORT
+int kr_pkt_put_cookie(struct cookies_control *cntrl, void *sockaddr,
+                      knot_pkt_t *pkt);

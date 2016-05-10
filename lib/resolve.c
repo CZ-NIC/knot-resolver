@@ -268,7 +268,7 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
-	if (cookies_control.enabled) {
+	if (kr_cookies_control.enabled) {
 		wire_size += KR_COOKIE_PLD_MAX;
 	}
 	return knot_pkt_reserve(pkt, wire_size);
@@ -360,10 +360,6 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 			} else if (qry->flags & QUERY_DNSSEC_WANT) {
 				knot_edns_set_do(pkt->opt_rr);
 				knot_wire_set_cd(pkt->wire);
-			}
-			/* Insert cookies. */
-			if (cookies_control.enabled) {
-				ret = kr_pkt_add_cookie(pkt);
 			}
 			ret = edns_put(pkt);
 		}

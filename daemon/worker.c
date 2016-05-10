@@ -25,6 +25,7 @@
 #include <malloc.h>
 #endif
 #include <assert.h>
+#include "lib/cookies/control.h"
 #include "lib/utils.h"
 #include "lib/layer.h"
 #include "daemon/worker.h"
@@ -645,6 +646,25 @@ static void subreq_lead(struct qr_task *task)
 	}
 }
 
+/** UpdateDNS cookie data in */
+static bool subreq_update_cookies(struct qr_task *task)
+{
+	assert(task);
+	if (!kr_cookies_control.enabled || !task->pktbuf->opt_rr) {
+		fprintf(stderr, "XXX [%s %s %d]: packet has no edns\n", __FILE__, __func__, __LINE__);
+		return true;
+	}
+
+	fprintf(stderr, "XXX [%s %s %d]: packet has edns\n", __FILE__, __func__, __LINE__);
+
+	struct sockaddr_in6 *choice = &((struct sockaddr_in6 *)task->addrlist)[task->addrlist_turn];
+
+	kr_pkt_put_cookie(&kr_cookies_control, choice, task->pktbuf);
+
+	/*TODO */
+	return true;
+}
+
 static bool subreq_enqueue(struct qr_task *task)
 {
 	assert(task);
@@ -712,6 +732,8 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	/* Start fast retransmit with UDP, otherwise connect. */
 	int ret = 0;
 	if (sock_type == SOCK_DGRAM) {
+		/* Update DNS cookies data. */
+		subreq_update_cookies(task);
 		/* If there is already outgoing query, enqueue to it. */
 		if (subreq_enqueue(task)) {
 			return kr_ok(); /* Will be notified when outgoing query finishes. */
