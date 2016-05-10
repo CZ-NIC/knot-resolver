@@ -440,6 +440,21 @@ static void on_write(uv_write_t *req, int status)
 	req_release(worker, (struct req *)req);
 }
 
+/** UpdateDNS cookie data in */
+static bool subreq_update_cookies(struct sockaddr *addr, knot_pkt_t *pkt)
+{
+	assert(addr);
+	assert(pkt);
+	if (!kr_cookies_control.enabled || !pkt->opt_rr) {
+		return true;
+	}
+
+	kr_pkt_put_cookie(&kr_cookies_control, addr, pkt);
+
+	/*TODO */
+	return true;
+}
+
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	if (!handle) {
@@ -460,6 +475,9 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		return qr_task_on_send(task, handle, kr_error(ENOMEM));
 	}
 	if (handle->type == UV_UDP) {
+		/* Update DNS cookies data. */
+		subreq_update_cookies(addr, pkt);
+
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->as.send.data = task;
 		ret = uv_udp_send(&send_req->as.send, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
@@ -646,25 +664,6 @@ static void subreq_lead(struct qr_task *task)
 	}
 }
 
-/** UpdateDNS cookie data in */
-static bool subreq_update_cookies(struct qr_task *task)
-{
-	assert(task);
-	if (!kr_cookies_control.enabled || !task->pktbuf->opt_rr) {
-		fprintf(stderr, "XXX [%s %s %d]: packet has no edns\n", __FILE__, __func__, __LINE__);
-		return true;
-	}
-
-	fprintf(stderr, "XXX [%s %s %d]: packet has edns\n", __FILE__, __func__, __LINE__);
-
-	struct sockaddr_in6 *choice = &((struct sockaddr_in6 *)task->addrlist)[task->addrlist_turn];
-
-	kr_pkt_put_cookie(&kr_cookies_control, choice, task->pktbuf);
-
-	/*TODO */
-	return true;
-}
-
 static bool subreq_enqueue(struct qr_task *task)
 {
 	assert(task);
@@ -732,8 +731,6 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	/* Start fast retransmit with UDP, otherwise connect. */
 	int ret = 0;
 	if (sock_type == SOCK_DGRAM) {
-		/* Update DNS cookies data. */
-		subreq_update_cookies(task);
 		/* If there is already outgoing query, enqueue to it. */
 		if (subreq_enqueue(task)) {
 			return kr_ok(); /* Will be notified when outgoing query finishes. */
