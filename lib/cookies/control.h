@@ -41,11 +41,13 @@ KR_EXPORT
 extern struct cookies_control kr_cookies_control;
 
 /**
- * Insert a DNS cookie into the packet.
+ * Insert a DNS cookie into query packet.
  * @note The packet must already contain ENDS section.
- * @param cntrl Cookie control structure.
- * @param pkt   Packet.
+ * @param cntrl         Cookie control structure.
+ * @param clnt_sockaddr Client address.
+ * @param srvr_sockaddr Server address.
+ * @param pkt           DNS request packet.
  */
 KR_EXPORT
-int kr_pkt_put_cookie(struct cookies_control *cntrl, void *sockaddr,
-                      knot_pkt_t *pkt);
+int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
+                          void *srvr_sockaddr, knot_pkt_t *pkt);

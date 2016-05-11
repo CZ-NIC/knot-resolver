@@ -69,8 +69,9 @@ static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
 }
 
 int prepare_client_cookie(uint8_t cc[KNOT_OPT_COOKIE_CLNT],
-                           const void *srvr_addr,
-                           const struct secret_quantity *csq)
+                          const void *clnt_addr,
+                          const void *srvr_addr,
+                          const struct secret_quantity *csq)
 {
 	assert(cc);
 	assert(srvr_addr);
@@ -81,27 +82,53 @@ int prepare_client_cookie(uint8_t cc[KNOT_OPT_COOKIE_CLNT],
 	/* According to the draft (section A.1) the recommended sequence is
 	 * client IP address | server IP address , client secret. */
 
-	int addr_family = ((struct sockaddr *) srvr_addr)->sa_family;
-	if (addr_family == AF_INET) {
-		srvr_addr = &((struct sockaddr_in *) srvr_addr)->sin_addr;
-	} else if (addr_family == AF_INET6) {
-		srvr_addr = &((struct sockaddr_in6 *) srvr_addr)->sin6_addr;
-	} else {
-		assert(0);
-		return kr_error(EINVAL);
+	if (clnt_addr) {
+		int addr_family = ((struct sockaddr *) clnt_addr)->sa_family;
+		if (addr_family == AF_INET) {
+			clnt_addr = &((struct sockaddr_in *) clnt_addr)->sin_addr;
+		} else if (addr_family == AF_INET6) {
+			clnt_addr = &((struct sockaddr_in6 *) clnt_addr)->sin6_addr;
+		} else {
+			//assert(0);
+			//return kr_error(EINVAL);
+			addr_family = AF_UNSPEC;
+			DEBUG_MSG(NULL, "%s\n", "could not obtain client IP address for client cookie");
+		}
+
+		if (addr_family != AF_UNSPEC) {
+			WITH_DEBUG {
+				char ns_str[INET6_ADDRSTRLEN];
+				inet_ntop(addr_family, clnt_addr, ns_str, sizeof(ns_str));
+				DEBUG_MSG(NULL, "adding client IP address '%s' into client cookie\n", ns_str);
+			}
+		}
 	}
 
-	WITH_DEBUG {
-		char ns_str[INET6_ADDRSTRLEN];
-		inet_ntop(addr_family, srvr_addr, ns_str, sizeof(ns_str));
-		DEBUG_MSG(NULL, "adding server address '%s' into client cookie\n", ns_str);
+	if (srvr_addr) {
+		int addr_family = ((struct sockaddr *) srvr_addr)->sa_family;
+		if (addr_family == AF_INET) {
+			srvr_addr = &((struct sockaddr_in *) srvr_addr)->sin_addr;
+		} else if (addr_family == AF_INET6) {
+			srvr_addr = &((struct sockaddr_in6 *) srvr_addr)->sin6_addr;
+		} else {
+			addr_family = AF_UNSPEC;
+			DEBUG_MSG(NULL, "%s\n", "could not obtain server IP address for client cookie");
+		}
+
+		if (addr_family != AF_UNSPEC) {
+			WITH_DEBUG {
+				char ns_str[INET6_ADDRSTRLEN];
+				inet_ntop(addr_family, srvr_addr, ns_str, sizeof(ns_str));
+				DEBUG_MSG(NULL, "adding server address '%s' into client cookie\n", ns_str);
+			}
+		}
 	}
 
 	memcpy(cc, csq->secret, KNOT_OPT_COOKIE_CLNT);
 }
 
-int kr_pkt_put_cookie(struct cookies_control *cntrl, void *sockaddr,
-                      knot_pkt_t *pkt)
+int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
+                          void *srvr_sockaddr, knot_pkt_t *pkt)
 {
 	assert(cntrl);
 	assert(pkt);
@@ -116,7 +143,8 @@ int kr_pkt_put_cookie(struct cookies_control *cntrl, void *sockaddr,
 		return kr_error(EINVAL);
 	}
 
-	int ret = prepare_client_cookie(cc, sockaddr, cntrl->client);
+	int ret = prepare_client_cookie(cc, clnt_sockaddr, srvr_sockaddr,
+	                                cntrl->client);
 
 	/* Reclaim reserved size. */
 	ret = knot_pkt_reclaim(pkt, knot_edns_wire_size(pkt->opt_rr));
@@ -124,8 +152,8 @@ int kr_pkt_put_cookie(struct cookies_control *cntrl, void *sockaddr,
 		return ret;
 	}
 
-	/* TODO -- generate cleitn cookie from client address, server address
-	 * and secret quentity. */
+	/* TODO -- generate client cookie from client address, server address
+	 * and secret quantity. */
 	ret = opt_rr_add_cookies(pkt->opt_rr, cc, NULL, 0, &pkt->mm);
 
 	/* Write to packet. */

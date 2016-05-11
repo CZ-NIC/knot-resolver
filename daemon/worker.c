@@ -440,18 +440,36 @@ static void on_write(uv_write_t *req, int status)
 	req_release(worker, (struct req *)req);
 }
 
-/** UpdateDNS cookie data in */
-static bool subreq_update_cookies(struct sockaddr *addr, knot_pkt_t *pkt)
+/** Update DNS cookie data in packet. */
+static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
+                                  knot_pkt_t *pkt)
 {
-	assert(addr);
+	assert(handle);
+	assert(srvr_addr);
 	assert(pkt);
+
+	/* Cookies disabled or packet has no ENDS section. */
 	if (!kr_cookies_control.enabled || !pkt->opt_rr) {
 		return true;
 	}
 
-	kr_pkt_put_cookie(&kr_cookies_control, addr, pkt);
+	/* Libuv does not offer a convenient way how to obtain a source IP
+	 * address from a UDP handle that has been initialised using
+	 * uv_udp_init(). The uv_udp_getsockname() fails because of the lazy
+	 * socket initialisation. */
 
-	/*TODO */
+	struct sockaddr_storage sockaddr = {0, };
+	struct sockaddr_storage *sockaddr_ptr = &sockaddr;
+	int sockaddr_len = sizeof(sockaddr);
+	int ret = uv_udp_getsockname(handle, (struct sockaddr*) &sockaddr,
+	                             &sockaddr_len);
+	if (ret != 0) {
+		sockaddr_ptr = NULL;
+	}
+
+	kr_request_put_cookie(&kr_cookies_control,
+	                      (struct sockaddr*) sockaddr_ptr, srvr_addr, pkt);
+
 	return true;
 }
 
@@ -476,7 +494,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	}
 	if (handle->type == UV_UDP) {
 		/* Update DNS cookies data. */
-		subreq_update_cookies(addr, pkt);
+		subreq_update_cookies((uv_udp_t *) handle, addr, pkt);
 
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->as.send.data = task;
