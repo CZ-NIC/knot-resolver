@@ -26,7 +26,7 @@ struct qr_task;
  * that exists between remote counterpart and a local socket.
  */
 struct session {
-	bool is_subreq;
+	bool outgoing;
     bool throttled;
     uv_timer_t timeout;
     struct qr_task *buffering;

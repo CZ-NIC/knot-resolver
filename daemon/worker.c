@@ -109,7 +109,7 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype)
 	io_create(task->worker->loop, handle, socktype);
 	/* Set current handle as a subrequest type. */
 	struct session *session = handle->data;
-	session->is_subreq = true;
+	session->outgoing = true;
 	int ret = array_push(session->tasks, task);
 	if (ret != 0) {
 		io_deinit(handle);
@@ -756,7 +756,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *ms
 
 	/* Start new task on listening sockets, or resume if this is subrequest */
 	struct qr_task *task = NULL;
-	if (!session->is_subreq) {
+	if (!session->outgoing) {
 		/* Ignore badly formed queries or responses. */
 		if (!msg || ret != 0 || knot_wire_get_qr(msg->wire)) {
 			if (msg) worker->stats.dropped += 1;
@@ -803,7 +803,7 @@ int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle)
 	 * because in this case session doesn't own tasks, it has just
 	 * borrowed the task from parent session. */
 	struct session *session = handle->data;
-	if (session->is_subreq) {
+	if (session->outgoing) {
 		worker_submit(worker, (uv_handle_t *)handle, NULL, NULL);	
 	} else {
 		discard_buffered(session);
@@ -836,7 +836,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uin
 
 	/* If this is a new query, create a new task that we can use
 	 * to buffer incoming message until it's complete. */
-	if (!session->is_subreq) {
+	if (!session->outgoing) {
 		if (!task) {
 			task = qr_task_create(worker, handle, NULL);
 			if (!task) {
@@ -889,7 +889,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uin
 		task->bytes_remaining = 0;
 		/* Parse the packet and start resolving complete query */
 		int ret = parse_packet(pkt_buf);
-		if (ret == 0 && !session->is_subreq) {
+		if (ret == 0 && !session->outgoing) {
 			ret = qr_task_start(task, pkt_buf);
 			if (ret != 0) {
 				return ret;
@@ -910,7 +910,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uin
 		if (ret != 0) {
 			return ret;
 		}
-		if (len - to_read > 0 && !session->is_subreq) {
+		if (len - to_read > 0 && !session->outgoing) {
 			ret = worker_process_tcp(worker, handle, msg + to_read, len - to_read);
 			if (ret < 0) {
 				return ret;

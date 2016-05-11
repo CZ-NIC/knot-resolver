@@ -47,7 +47,7 @@ static void check_bufsize(uv_handle_t* handle)
 
 static void session_clear(struct session *s)
 {
-	assert(s->is_subreq || s->tasks.len == 0);
+	assert(s->outgoing || s->tasks.len == 0);
 	array_clear(s->tasks);
 	memset(s, 0, sizeof(*s));
 }
@@ -112,7 +112,7 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 	if (handle->type == UV_TCP) {
 		buf->len = MIN(suggested_size, 4096);
 	/* Regular buffer size for subrequests. */
-	} else if (session->is_subreq) {
+	} else if (session->outgoing) {
 		buf->len = suggested_size;
 	/* Use recvmmsg() on master sockets if possible. */
 	} else {
@@ -186,7 +186,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		worker_end_tcp(worker, (uv_handle_t *)handle);
 		/* Exceeded per-connection quota for outstanding requests
 		 * stop reading from stream and close after last message is processed. */
-		if (!s->is_subreq && !uv_is_closing((uv_handle_t *)&s->timeout)) {
+		if (!s->outgoing && !uv_is_closing((uv_handle_t *)&s->timeout)) {
 			uv_timer_stop(&s->timeout);
 			if (s->tasks.len == 0) {
 				uv_close((uv_handle_t *)&s->timeout, tcp_timeout);
@@ -195,7 +195,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			}
 		}
 	/* Connection spawned more than one request, reset its deadline for next query. */
-	} else if (ret > 0 && !s->is_subreq) {
+	} else if (ret > 0 && !s->outgoing) {
 		uv_timer_again(&s->timeout);
 	}
 	mp_flush(worker->pkt_pool.ctx);
