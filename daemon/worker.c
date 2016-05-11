@@ -460,7 +460,7 @@ static void on_connect(uv_connect_t *req, int status)
 	uv_stream_t *handle = req->handle;
 	if (qr_valid_handle(task, (uv_handle_t *)req->handle)) {
 		if (status == 0) {
-			qr_task_send(task, (uv_handle_t *)handle, NULL, task->pktbuf);
+			qr_task_send(task, (uv_handle_t *)handle, task->addrlist, task->pktbuf);
 		} else {
 			qr_task_step(task, task->addrlist, NULL);
 		}
