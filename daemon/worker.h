@@ -50,6 +50,7 @@ struct worker_ctx {
 		size_t dropped;
 		size_t timeout;
 	} stats;
+	map_t outgoing;
 	map_t outstanding;
 	mp_freelist_t pool_mp;
 	mp_freelist_t pool_ioreq;
