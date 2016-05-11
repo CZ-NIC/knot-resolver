@@ -820,13 +820,17 @@ int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uin
 	struct session *session = handle->data;
 	if (len <= 0 || !msg) {
 		/* If we have pending tasks, we must dissociate them from the
-		 * connection so they don't try to access closed and freed handle */
-		for (size_t i = 0; i < session->tasks.len; ++i) {
-			struct qr_task *task = session->tasks.at[i];
-			task->session = NULL;
-			task->source.handle = NULL;
+		 * connection so they don't try to access closed and freed handle.
+		 * @warning Do not modify task if this is outgoing request as it is shared with originator.
+		 */
+		if (!session->outgoing) {
+			for (size_t i = 0; i < session->tasks.len; ++i) {
+				struct qr_task *task = session->tasks.at[i];
+				task->session = NULL;
+				task->source.handle = NULL;
+			}
+			session->tasks.len = 0;
 		}
-		session->tasks.len = 0;
 		return kr_error(ECONNRESET);
 	}
 
@@ -877,7 +881,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uin
 	}
 	/* Message is too long, can't process it. */
 	ssize_t to_read = MIN(len, task->bytes_remaining);
-	if (to_read > (ssize_t)(pkt_buf->max_size - pkt_buf->size)) {
+	if (pkt_buf->size + to_read > pkt_buf->max_size) {
 		pkt_buf->size = 0;
 		task->bytes_remaining = 0;
 		return kr_error(EMSGSIZE);
