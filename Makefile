@@ -28,15 +28,24 @@ $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libdnssec))
 $(eval $(call find_lib,libsystemd))
 $(eval $(call find_gopkg,geoip,github.com/abh/geoip))
-# Find Go compiler version
-# @note Go 1.5 support amd64 only, disabled for other architectures
-ifeq ($(ARCH),x86_64)
-E :=
-GO_VERSION := $(subst $(E) $(E),,$(subst go,,$(wordlist 1,2,$(subst ., ,$(word 3,$(shell $(GO) version))))))
-$(eval $(call find_ver,go,$(GO_VERSION),15))
-else
-HAS_go = no
+
+GO_VERSION  := $(shell $(GO) version | sed -e 's/^go version go\([0-9]\)[.]\([0-9]\)[.]\([0-9]\) .*/\1\2/')
+GO_PLATFORM := $(shell $(GO) version | sed -e 's,^go version go[0-9.]* linux/,,')
+
+$(eval $(call find_ver,go,$(GO_VERSION),16))
+
+ifeq ($(HAS_go),yes)
+ifneq ($(GO_PLATFORM),$(filter $(GO_PLATFORM),amd64 386 arm arm64))
+HAS_go := no
 endif
+else
+$(eval $(call find_ver,go,$(GO_VERSION),15))
+ifeq ($HAS_go,yes)
+ifneq($(GO_PLATFORM),$(filter $(GO_PLATFORM),arm amd64))
+HAS_go := no
+endif
+endif
+
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)
 ifneq (,$(findstring luajit, $(lua_LIBS)))
@@ -74,7 +83,7 @@ info:
 	$(info Optional)
 	$(info --------)
 	$(info [$(HAS_doxygen)] doxygen (doc))
-	$(info [$(HAS_go)] go (modules/go, Go 1.5+ on amd64))
+	$(info [$(HAS_go)] go (modules/go, Go buildmode=c-shared support))
 	$(info [$(HAS_geoip)] geoip (modules/tinyweb, github.com/abh/geoip))
 	$(info [$(HAS_libmemcached)] libmemcached (modules/memcached))
 	$(info [$(HAS_hiredis)] hiredis (modules/redis))
