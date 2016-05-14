@@ -12,7 +12,7 @@
  */
 char *PRINTF_FMT(1, 2) afmt(const char *fmt, ...);
 
-#if HAVE_ASPRINTF
+#if HAVE_ASPRINTF || defined(__USE_FORTIFY_LEVEL)
 #include <stdio.h>
 #else
 #include <stdarg.h>

@@ -111,7 +111,7 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype)
 	struct session *session = handle->data;
 	session->outgoing = true;
 	int ret = array_push(session->tasks, task);
-	if (ret != 0) {
+	if (ret < 0) {
 		io_deinit(handle);
 		req_release(task->worker, (struct req *)handle);
 		return NULL;
