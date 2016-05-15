@@ -169,7 +169,7 @@ Configuration example
    -- interfaces
    net = { '127.0.0.1', '::1' }
    -- load some modules
-   modules = { 'policy', 'cachectl' }
+   modules = { 'policy' }
    -- 10MB cache
    cache.size = 10*MB
 
@@ -198,7 +198,6 @@ the modules use as the :ref:`input configuration <mod-properties>`.
 .. code-block:: lua
 
 	modules = {
-		cachectl = true,
 		hints = '/etc/hosts'
 	}
 
@@ -274,7 +273,7 @@ Here's an example of an anonymous function with :func:`event.recurrent()`:
 
 	-- every 5 minutes
 	event.recurrent(5 * minute, function()
-		cachectl.prune()
+		cache.prune()
 	end)
 
 Note that each scheduled event is identified by a number valid for the duration of the event,
@@ -288,7 +287,7 @@ as a parameter, but it's not very useful as you don't have any *non-global* way 
 		local i = 0
 		-- pruning function
 		return function(e)
-			cachectl.prune()
+			cache.prune()
 			-- cancel event on 5th attempt
 			i = i + 1
 			if i == 5 then
@@ -609,7 +608,6 @@ The daemon provides an interface for dynamic loading of :ref:`daemon modules <mo
 
          .. code-block:: lua
 
-         	modules = { 'cachectl' }
 		modules = {
 			hints = {file = '/etc/hosts'}
 		}
@@ -618,7 +616,6 @@ The daemon provides an interface for dynamic loading of :ref:`daemon modules <mo
 
          .. code-block:: lua
 
-		modules.load('cachectl')
 		modules.load('hints')
 		hints.config({file = '/etc/hosts'})
 
@@ -716,7 +713,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
    Close the cache.
 
-   .. note:: This may or may not clear the cache, depending on the used backend. See :func:`cachectl.clear()`. 
+   .. note:: This may or may not clear the cache, depending on the used backend. See :func:`cache.clear()`. 
 
 .. function:: cache.stats()
 
@@ -728,6 +725,56 @@ daemons or manipulated from other processes, making for example synchronised loa
    .. code-block:: lua
 
 	print('Insertions:', cache.stats().insert)
+
+
+.. function:: cache.prune([max_count])
+
+  :param number max_count:  maximum number of items to be pruned at once (default: 65536)
+  :return: ``{ pruned: int }``
+
+  Prune expired/invalid records.
+
+.. function:: cache.get([domain])
+
+  :return: list of matching records in cache
+
+  Fetches matching records from cache. The **domain** can either be:
+
+  - a domain name (e.g. ``"domain.cz"``)
+  - a wildcard (e.g. ``"*.domain.cz"``)
+
+  The domain name fetches all records matching this name, while the wildcard matches all records at or below that name.
+
+  You can also use a special namespace ``"P"`` to purge NODATA/NXDOMAIN matching this name (e.g. ``"domain.cz P"``).
+
+  .. note:: This is equivalent to ``cache['domain']`` getter.
+
+  Examples:
+
+  .. code-block:: lua
+
+     -- Query cache for 'domain.cz'
+     cache['domain.cz']
+     -- Query cache for all records at/below 'insecure.net'
+     cache['*.insecure.net']
+
+.. function:: cache.clear([domain])
+
+  :return: ``bool``
+
+  Purge cache records. If the domain isn't provided, whole cache is purged. See *cache.get()* documentation for subtree matching policy.
+
+  Examples:
+
+  .. code-block:: lua
+
+   -- Clear records at/below 'bad.cz'
+   cache.clear('*.bad.cz')
+   -- Clear packet cache
+   cache.clear('*. P')
+   -- Clear whole cache
+   cache.clear()
+
 
 Timers and events
 ^^^^^^^^^^^^^^^^^

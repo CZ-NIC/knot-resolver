@@ -24,65 +24,13 @@
 #include "lib/cache.h"
 
 /** @internal Redis API */
-extern const knot_db_api_t *namedb_redis_api(void);
-
-/** @internal Make redis options. */
-void *namedb_redis_mkopts(const char *conf_, size_t maxsize)
-{
-	auto_free char *conf = strdup(conf_);
-	struct redis_cli *cli = malloc(sizeof(*cli));
-	if (!cli || !conf) {
-		free(cli);
-		return NULL;
-	}
-	/* Parse database */
-	memset(cli, 0, sizeof(*cli));
-	char *bp = conf;
-	char *p = strchr(bp, '@');
-	if (p) {
-		*p = '\0';
-		cli->database = atoi(conf);
-		bp = (p + 1);
-	}
-	/* Parse host / ip / sock */
-	if (access(bp, W_OK) == 0) { /* UNIX */
-		cli->addr = strdup(bp);
-		return cli;
-	}
-	struct sockaddr_in6 ip6;
-	p = strchr(bp, ':');
-	if (!p) { /* IPv4 */
-		cli->addr = strdup(bp);
-		cli->port = REDIS_PORT;
-		return cli;
-	}
-	if (!strchr(p + 1, ':')) { /* IPv4 + port */
-		*p = '\0';
-		cli->addr = strdup(bp);
-		cli->port = atoi(p + 1);
-	} else { /* IPv6 */
-		if (uv_ip6_addr(bp, 0, &ip6) == 0) {
-			cli->addr = strdup(bp);
-			cli->port = REDIS_PORT;
-		} else { /* IPv6 + port */
-			p = strrchr(bp, ':');
-			*p = '\0';
-			cli->addr = strdup(bp);
-			cli->port = atoi(p + 1);
-		}
-	}
-	return cli;
-}
+const struct kr_cdb_api *cdb_redis(void);
 
 KR_EXPORT
 int redis_init(struct kr_module *module)
 {
 	struct engine *engine = module->data;
-	/* Register new storage option */
-	static struct storage_api redis = {
-		"redis://", namedb_redis_api, namedb_redis_mkopts
-	};
-	array_push(engine->storage_registry, redis);
+	array_push(engine->backends, cdb_redis());
 	return kr_ok();
 }
 
@@ -91,14 +39,14 @@ int redis_deinit(struct kr_module *module)
 {
 	struct engine *engine = module->data;
 	/* It was currently loaded, close cache */
-	if (engine->resolver.cache.api == namedb_redis_api()) {
+	if (engine->resolver.cache.api == cdb_redis()) {
 		kr_cache_close(&engine->resolver.cache);
 	}
 	/* Prevent from loading it again */
-	for (unsigned i = 0; i < engine->storage_registry.len; ++i) {
-		struct storage_api *storage = &engine->storage_registry.at[i];
-		if (strcmp(storage->prefix, "redis://") == 0) {
-			array_del(engine->storage_registry, i);
+	for (unsigned i = 0; i < engine->backends.len; ++i) {
+		const struct kr_cdb_api *api = engine->backends.at[i];
+		if (strcmp(api->name, "redis") == 0) {
+			array_del(engine->backends, i);
 			break;
 		}
 	}

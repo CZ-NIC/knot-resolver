@@ -24,7 +24,7 @@ env:
     global:
         - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
         - PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
-        - CFLAGS="-O2 -g -fno-omit-frame-pointer -DMP_FREELIST_SIZE=0"
+        - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG"
         - LD_LIBRARY_PATH="${HOME}/.local/lib"
         - DYLD_LIBRARY_PATH="${HOME}/.local/lib"
         - MALLOC_CHECK_=3

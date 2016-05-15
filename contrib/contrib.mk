@@ -8,4 +8,13 @@ contrib_SOURCES := \
 	contrib/base32hex.c
 contrib_CFLAGS := -fPIC
 contrib_TARGET := $(abspath contrib)/contrib$(AREXT)
+
+# Use built-in LMDB if not found
+ifneq ($(HAS_lmdb), yes)
+contrib_SOURCES += contrib/lmdb/mdb.c \
+                   contrib/lmdb/midl.c
+contrib_CFLAGS  += -pthread
+contrib_LIBS    += -pthread
+endif
+
 $(eval $(call make_static,contrib,contrib))

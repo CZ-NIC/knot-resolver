@@ -298,12 +298,12 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 }
 
 /** Fetch address for zone cut. */
-static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t rrtype, struct kr_cache_txn *txn, uint32_t timestamp)
+static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const knot_dname_t *ns, uint16_t rrtype, uint32_t timestamp)
 {
 	uint8_t rank = 0;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
-	if (kr_cache_peek_rr(txn, &cached_rr, &rank, NULL, &timestamp) != 0) {
+	if (kr_cache_peek_rr(cache, &cached_rr, &rank, NULL, &timestamp) != 0) {
 		return;
 	}
 
@@ -317,40 +317,48 @@ static void fetch_addr(struct kr_zonecut *cut, const knot_dname_t *ns, uint16_t 
 }
 
 /** Fetch best NS for zone cut. */
-static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp, uint8_t * restrict rank)
+static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, uint32_t timestamp, uint8_t * restrict rank)
 {
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-	int ret = kr_cache_peek_rr(txn, &cached_rr, rank, NULL, &drift);
+	int ret = kr_cache_peek_rr(&ctx->cache, &cached_rr, rank, NULL, &drift);
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* Materialize as we'll going to do more cache lookups. */
+	knot_rrset_t rr_copy;
+	ret = kr_cache_materialize(&rr_copy, &cached_rr, drift, cut->pool);
 	if (ret != 0) {
 		return ret;
 	}
 
 	/* Insert name servers for this zone cut, addresses will be looked up
 	 * on-demand (either from cache or iteratively) */
-	for (unsigned i = 0; i < cached_rr.rrs.rr_count; ++i) {
-		const knot_dname_t *ns_name = knot_ns_name(&cached_rr.rrs, i);
+	for (unsigned i = 0; i < rr_copy.rrs.rr_count; ++i) {
+		const knot_dname_t *ns_name = knot_ns_name(&rr_copy.rrs, i);
 		kr_zonecut_add(cut, ns_name, NULL);
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
 		unsigned *cached = lru_get(ctx->cache_rep, (const char *)ns_name, knot_dname_size(ns_name));
 		unsigned reputation = (cached) ? *cached : 0;
 		if (!(reputation & KR_NS_NOIP4) && !(ctx->options & QUERY_NO_IPV4)) {
-			fetch_addr(cut, ns_name, KNOT_RRTYPE_A, txn, timestamp);
+			fetch_addr(cut, &ctx->cache, ns_name, KNOT_RRTYPE_A, timestamp);
 		}
 		if (!(reputation & KR_NS_NOIP6) && !(ctx->options & QUERY_NO_IPV6)) {
-			fetch_addr(cut, ns_name, KNOT_RRTYPE_AAAA, txn, timestamp);
+			fetch_addr(cut,  &ctx->cache, ns_name, KNOT_RRTYPE_AAAA, timestamp);
 		}
 	}
 
+	knot_rrset_clear(&rr_copy, cut->pool);
 	return kr_ok();
 }
 
 /**
  * Fetch RRSet of given type.
  */
-static int fetch_rrset(knot_rrset_t **rr, const knot_dname_t *owner, uint16_t type,
-                       struct kr_cache_txn *txn, knot_mm_t *pool, uint32_t timestamp)
+static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
+                       const knot_dname_t *owner, uint16_t type, knot_mm_t *pool, uint32_t timestamp)
 {
 	if (!rr) {
 		return kr_error(ENOENT);
@@ -360,7 +368,7 @@ static int fetch_rrset(knot_rrset_t **rr, const knot_dname_t *owner, uint16_t ty
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)owner, type, KNOT_CLASS_IN);
-	int ret = kr_cache_peek_rr(txn, &cached_rr, &rank, NULL, &drift);
+	int ret = kr_cache_peek_rr(cache, &cached_rr, &rank, NULL, &drift);
 	if (ret != 0) {
 		return ret;
 	}
@@ -384,19 +392,19 @@ static int fetch_rrset(knot_rrset_t **rr, const knot_dname_t *owner, uint16_t ty
  * Fetch trust anchors for zone cut.
  * @note The trust anchor can theoretically be a DNSKEY but for now lets use only DS.
  */
-static int fetch_ta(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
+static int fetch_ta(struct kr_zonecut *cut, struct kr_cache *cache, const knot_dname_t *name, uint32_t timestamp)
 {
-	return fetch_rrset(&cut->trust_anchor, name, KNOT_RRTYPE_DS, txn, cut->pool, timestamp);
+	return fetch_rrset(&cut->trust_anchor, cache, name, KNOT_RRTYPE_DS, cut->pool, timestamp);
 }
 
 /** Fetch DNSKEY for zone cut. */
-static int fetch_dnskey(struct kr_zonecut *cut, const knot_dname_t *name, struct kr_cache_txn *txn, uint32_t timestamp)
+static int fetch_dnskey(struct kr_zonecut *cut, struct kr_cache *cache, const knot_dname_t *name, uint32_t timestamp)
 {
-	return fetch_rrset(&cut->key, name, KNOT_RRTYPE_DNSKEY, txn, cut->pool, timestamp);
+	return fetch_rrset(&cut->key, cache, name, KNOT_RRTYPE_DNSKEY, cut->pool, timestamp);
 }
 
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
-                           struct kr_cache_txn *txn, uint32_t timestamp, bool * restrict secured)
+                           uint32_t timestamp, bool * restrict secured)
 {
 	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
@@ -408,18 +416,18 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 		return kr_error(ENOMEM);
 	}
 	/* Start at QNAME parent. */
-	while (txn) {
+	while (true) {
 		/* Fetch NS first and see if it's insecure. */
 		uint8_t rank = 0;
 		const bool is_root = (label[0] == '\0');
-		if (fetch_ns(ctx, cut, label, txn, timestamp, &rank) == 0) {
+		if (fetch_ns(ctx, cut, label, timestamp, &rank) == 0) {
 			/* Flag as insecure if cached as this */
 			if (rank & KR_RANK_INSECURE)
 				*secured = false;
 			/* Fetch DS if caller wants secure zone cut */
 			if (*secured || is_root) {
-				fetch_ta(cut, label, txn, timestamp);
-				fetch_dnskey(cut, label, txn, timestamp);
+				fetch_ta(cut, &ctx->cache, label, timestamp);
+				fetch_dnskey(cut, &ctx->cache, label, timestamp);
 			}
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);

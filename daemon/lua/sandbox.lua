@@ -72,7 +72,7 @@ setmetatable(modules, {
 			modules.load(k)
 			k = string.match(k, '%w+')
 			local mod = _G[k]
-			local config = rawget(mod, 'config')
+			local config = mod and rawget(mod, 'config')
 			if mod ~= nil and config ~= nil then
 				if k ~= v then config(v)
 				else           config()
@@ -83,8 +83,16 @@ setmetatable(modules, {
 })
 
 -- Syntactic sugar for cache
+-- `#cache -> cache.count()`
+-- `cache[x] -> cache.get(x)`
 -- `cache.{size|storage} = value`
 setmetatable(cache, {
+	__len = function (t)
+		return t.count()
+	end,
+	__index = function (t, k)
+		return rawget(t, k) or (rawget(t, 'current_size') and t.get(k))
+	end,
 	__newindex = function (t,k,v)
 		-- Defaults
 		local storage = rawget(t, 'current_storage')

@@ -55,6 +55,12 @@ static int reset_yield(knot_layer_t *ctx) { return kr_ok(); }
 static int finish_yield(knot_layer_t *ctx) { return kr_ok(); }
 static int produce_yield(knot_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
 
+/** Enforce cache flushing in debug mode. */
+static void flush_caches(struct kr_request *req) {
+#ifdef DEBUG
+	kr_cache_sync(&req->ctx->cache);
+#endif
+}
 /** @internal Macro for iterating module layers. */
 #define RESUME_LAYERS(from, req, qry, func, ...) \
     (req)->current_query = (qry); \
@@ -63,6 +69,7 @@ static int produce_yield(knot_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
 		if (mod->layer) { \
 			struct knot_layer layer = {.state = (req)->state, .api = mod->layer(mod), .data = (req)}; \
 			if (layer.api && layer.api->func) { \
+				flush_caches(req); \
 				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
 				if ((req)->state == KNOT_STATE_YIELD) { \
 					func ## _yield(&layer, ##__VA_ARGS__); \
@@ -125,7 +132,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 /** This turns of QNAME minimisation if there is a non-terminal between current zone cut, and name target.
  *  It save several minimization steps, as the zone cut is likely final one.
  */
-static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct kr_cache_txn *txn, uint32_t timestamp)
+static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct kr_cache *cache, uint32_t timestamp)
 {
 	if (qry->flags & QUERY_NO_MINIMIZE) {
 		return;
@@ -145,7 +152,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 		--labels;
 	}
 	for (int i = 0; i < labels; ++i) {
-		int ret = kr_cache_peek(txn, KR_CACHE_PKT, target, KNOT_RRTYPE_NS, &entry, &timestamp);
+		int ret = kr_cache_peek(cache, KR_CACHE_PKT, target, KNOT_RRTYPE_NS, &entry, &timestamp);
 		if (ret == 0) { /* Either NXDOMAIN or NODATA, start here. */
 			/* @todo We could stop resolution here for NXDOMAIN, but we can't because of broken CDNs */
 			qry->flags |= QUERY_NO_MINIMIZE;
@@ -162,21 +169,21 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t
 	int ret = 0;
 
 	/* Find closest zone cut from cache */
-	struct kr_cache_txn txn;
-	if (kr_cache_txn_begin(&req->ctx->cache, &txn, KNOT_DB_RDONLY) == 0) {
+	struct kr_cache *cache = &req->ctx->cache;
+	if (kr_cache_is_open(cache)) {
 		/* If at/subdomain of parent zone cut, start from its encloser.
 		 * This is for case when we get to a dead end (and need glue from parent), or DS refetch. */
 		struct kr_query *parent = qry->parent;
 		bool secured = (qry->flags & QUERY_DNSSEC_WANT);
 		if (parent && parent->zone_cut.name[0] != '\0' && knot_dname_in(parent->zone_cut.name, qry->sname)) {
 			const knot_dname_t *encloser = knot_wire_next_label(parent->zone_cut.name, NULL);
-			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, &txn, qry->timestamp.tv_sec, &secured);
+			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, qry->timestamp.tv_sec, &secured);
 		} else {
-			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, &txn, qry->timestamp.tv_sec, &secured);
+			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, qry->timestamp.tv_sec, &secured);
 		}
 		/* Check if there's a non-terminal between target and current cut. */
 		if (ret == 0) {
-			check_empty_nonterms(qry, pkt, &txn, qry->timestamp.tv_sec);
+			check_empty_nonterms(qry, pkt, cache, qry->timestamp.tv_sec);
 			/* Go insecure if the zone cut is provably insecure */
 			if ((qry->flags & QUERY_DNSSEC_WANT) && !secured) {
 				DEBUG_MSG(qry, "=> NS is provably without DS, going insecure\n");
@@ -184,7 +191,6 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t
 				qry->flags |= QUERY_DNSSEC_INSECURE;
 			}
 		}
-		kr_cache_txn_abort(&txn);
 	} else {
 		ret = kr_error(ENOENT);
 	}

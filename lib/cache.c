@@ -20,13 +20,14 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <libknot/db/db_lmdb.h>
 #include <libknot/errcode.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
 #include <libknot/rrtype/rrsig.h>
 
+#include "contrib/cleanup.h"
 #include "lib/cache.h"
+#include "lib/cdb_lmdb.h"
 #include "lib/defines.h"
 #include "lib/utils.h"
 
@@ -35,32 +36,25 @@
 /* Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
-#define txn_api(txn) ((txn)->owner->api)
-#define txn_is_valid(txn) ((txn) && (txn)->owner && txn_api(txn))
 
+/* Shorthand for operations on cache backend */
+#define cache_isvalid(cache) ((cache) && (cache)->api && (cache)->db)
+#define cache_op(cache, op, ...) (cache)->api->op((cache)->db, ## __VA_ARGS__)
 
 /** @internal Removes all records from cache. */
-static int cache_purge(struct kr_cache_txn *txn)
+static inline int cache_purge(struct kr_cache *cache)
 {
-	int ret = kr_error(EINVAL);
-	if (txn_is_valid(txn)) {
-		txn->owner->stats.delete += 1;
-		ret = txn_api(txn)->clear(&txn->t);
-	}
-	return ret;
+	cache->stats.delete += 1;
+	return cache_op(cache, clear);
 }
 
-/** @internal	Check cache internal data version. Clear if it doesn't match.
- * returns :	EEXIST - cache data version matched.
- *		0 - cache recreated, txn has to be committed.
- *		Otherwise - cache recreation fails.
- */
-static int assert_right_version_txn(struct kr_cache_txn *txn)
+/** @internal Open cache db transaction and check internal data version. */
+static int assert_right_version(struct kr_cache *cache)
 {
 	/* Check cache ABI version */
 	knot_db_val_t key = { KEY_VERSION, 2 };
 	knot_db_val_t val = { NULL, 0 };
-	int ret = txn_api(txn)->find(&txn->t, &key, &val, 0);
+	int ret = cache_op(cache, read, &key, &val, 1);
 	if (ret == 0) {
 		ret = kr_error(EEXIST);
 	} else {
@@ -68,101 +62,51 @@ static int assert_right_version_txn(struct kr_cache_txn *txn)
 		 * Version doesn't match.
 		 * Recreate cache and write version key.
 		 */
-		ret = txn_api(txn)->count(&txn->t);
+		ret = cache_op(cache, count);
 		if (ret != 0) { /* Non-empty cache, purge it. */
 			kr_log_info("[cache] purging cache\n");
-			ret = cache_purge(txn);
+			ret = cache_purge(cache);
 		}
 		/* Either purged or empty. */
 		if (ret == 0) {
-			ret = txn_api(txn)->insert(&txn->t, &key, &val, 0);
+			ret = cache_op(cache, write, &key, &val, 1);
 		}
 	}
 	return ret;
 }
 
-/** @internal Open cache db transaction and check internal data version. */
-static void assert_right_version(struct kr_cache *cache)
-{
-	/* Check cache ABI version */
-	struct kr_cache_txn txn;
-	int ret = kr_cache_txn_begin(cache, &txn, 0);
-	if (ret != 0) {
-		return; /* N/A, doesn't work. */
-	}
-	ret = assert_right_version_txn(&txn);
-	if (ret == 0) { /* Cache recreated, commit. */
-		kr_cache_txn_commit(&txn);
-	} else {
-		kr_cache_txn_abort(&txn);
-	}
-}
-
-int kr_cache_open(struct kr_cache *cache, const knot_db_api_t *api, void *opts, knot_mm_t *mm)
+int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm)
 {
 	if (!cache) {
 		return kr_error(EINVAL);
 	}
 	/* Open cache */
-	cache->api = (api == NULL) ? knot_db_lmdb_api() : api;
-	int ret = cache->api->init(&cache->db, mm, opts);
+	if (!api) {
+		api = kr_cdb_lmdb();
+	}
+	cache->api = api;
+	int ret = cache->api->open(&cache->db, opts, mm);
 	if (ret != 0) {
 		return ret;
 	}
 	memset(&cache->stats, 0, sizeof(cache->stats));
 	/* Check cache ABI version */
-	assert_right_version(cache);
-	return kr_ok();
+	(void) assert_right_version(cache);
+	return 0;
 }
 
 void kr_cache_close(struct kr_cache *cache)
 {
-	if (cache && cache->db) {
-		if (cache->api) {
-			cache->api->deinit(cache->db);
-		}
+	if (cache_isvalid(cache)) {
+		cache_op(cache, close);
 		cache->db = NULL;
 	}
 }
 
-int kr_cache_txn_begin(struct kr_cache *cache, struct kr_cache_txn *txn, unsigned flags)
+void kr_cache_sync(struct kr_cache *cache)
 {
-	if (!cache || !cache->db || !cache->api || !txn ) {
-		return kr_error(EINVAL);
-	}
-	/* Open new transaction */
-	int ret = cache->api->txn_begin(cache->db, &txn->t, flags);
-	if (ret != 0) {
-		memset(txn, 0, sizeof(*txn));
-	} else {
-		/* Count statistics */
-		txn->owner = cache;
-		if (flags & KNOT_DB_RDONLY) {
-			cache->stats.txn_read += 1;
-		} else {
-			cache->stats.txn_write += 1;
-		}
-	}
-	return ret;
-}
-
-int kr_cache_txn_commit(struct kr_cache_txn *txn)
-{
-	if (!txn_is_valid(txn)) {
-		return kr_error(EINVAL);
-	}
-
-	int ret = txn_api(txn)->txn_commit(&txn->t);
-	if (ret != 0) {
-		kr_cache_txn_abort(txn);
-	}
-	return ret;
-}
-
-void kr_cache_txn_abort(struct kr_cache_txn *txn)
-{
-	if (txn_is_valid(txn)) {
-		txn_api(txn)->txn_abort(&txn->t);
+	if (cache_isvalid(cache) && cache->api->sync) {
+		cache_op(cache, sync);
 	}
 }
 
@@ -185,19 +129,20 @@ static size_t cache_key(uint8_t *buf, uint8_t tag, const knot_dname_t *name, uin
 	return name_len + KEY_HSIZE;
 }
 
-static struct kr_cache_entry *lookup(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
+static struct kr_cache_entry *lookup(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type)
 {
-	uint8_t keybuf[KEY_SIZE];
-	size_t key_len = cache_key(keybuf, tag, name, type);
-	if (!txn_is_valid(txn) || !name) {
+	if (!name || !cache) {
 		return NULL;
 	}
+
+	uint8_t keybuf[KEY_SIZE];
+	size_t key_len = cache_key(keybuf, tag, name, type);
 
 	/* Look up and return value */
 	knot_db_val_t key = { keybuf, key_len };
 	knot_db_val_t val = { NULL, 0 };
-	int ret = txn_api(txn)->find(&txn->t, &key, &val, 0);
-	if (ret != KNOT_EOK) {
+	int ret = cache_op(cache, read, &key, &val, 1);
+	if (ret != 0) {
 		return NULL;
 	}
 
@@ -224,16 +169,16 @@ static int check_lifetime(struct kr_cache_entry *found, uint32_t *timestamp)
 	return kr_error(ESTALE);
 }
 
-int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
+int kr_cache_peek(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type,
                   struct kr_cache_entry **entry, uint32_t *timestamp)
 {
-	if (!txn_is_valid(txn) || !name || !entry) {
+	if (!cache_isvalid(cache) || !name || !entry) {
 		return kr_error(EINVAL);
 	}
 
-	struct kr_cache_entry *found = lookup(txn, tag, name, type);
+	struct kr_cache_entry *found = lookup(cache, tag, name, type);
 	if (!found) {
-		txn->owner->stats.miss += 1;
+		cache->stats.miss += 1;
 		return kr_error(ENOENT);
 	}
 
@@ -241,66 +186,61 @@ int kr_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *nam
 	*entry = found;
 	int ret = check_lifetime(found, timestamp);
 	if (ret == 0) {
-		txn->owner->stats.hit += 1;
+		cache->stats.hit += 1;
 	} else {
-		txn->owner->stats.miss += 1;
+		cache->stats.miss += 1;
 	}
 	return ret;
 }
 
 static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *header, knot_db_val_t data)
 {
-	assert(dst && header);
 	memcpy(dst, header, sizeof(*header));
 	if (data.data)
 		memcpy(dst->data, data.data, data.len);
 }
 
-int kr_cache_insert(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type,
+int kr_cache_insert(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type,
                     struct kr_cache_entry *header, knot_db_val_t data)
 {
-	if (!txn_is_valid(txn) || !name || !header) {
+	if (!cache_isvalid(cache) || !name || !header) {
 		return kr_error(EINVAL);
 	}
 
-	/* Insert key */
+	/* Prepare key/value for insertion. */
 	uint8_t keybuf[KEY_SIZE];
 	size_t key_len = cache_key(keybuf, tag, name, type);
 	if (key_len == 0) {
 		return kr_error(EILSEQ);
 	}
+	assert(data.len != 0);
 	knot_db_val_t key = { keybuf, key_len };
 	knot_db_val_t entry = { NULL, sizeof(*header) + data.len };
-	const knot_db_api_t *db_api = txn_api(txn);
 
 	/* LMDB can do late write and avoid copy */
-	txn->owner->stats.insert += 1;
-	if (db_api == knot_db_lmdb_api()) {
-		int ret = db_api->insert(&txn->t, &key, &entry, 0);
+	int ret = 0;
+	cache->stats.insert += 1;
+	if (cache->api == kr_cdb_lmdb()) {
+		ret = cache_op(cache, write, &key, &entry, 1);
 		if (ret != 0) {
 			return ret;
 		}
 		entry_write(entry.data, header, data);
+		ret = cache_op(cache, sync); /* Make sure the entry is comitted. */
 	} else {
 		/* Other backends must prepare contiguous data first */
-		entry.data = malloc(entry.len);
-		if (!entry.data) {
-			return kr_error(ENOMEM);
-		}
+		auto_free char *buffer = malloc(entry.len);
+		entry.data = buffer;
 		entry_write(entry.data, header, data);
-		int ret = db_api->insert(&txn->t, &key, &entry, 0);
-		free(entry.data);
-		if (ret != 0) {
-			return ret;
-		}
+		ret = cache_op(cache, write, &key, &entry, 1);
 	}
 
-	return kr_ok();
+	return ret;
 }
 
-int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type)
+int kr_cache_remove(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type)
 {
-	if (!txn_is_valid(txn) || !name ) {
+	if (!cache_isvalid(cache) || !name ) {
 		return kr_error(EINVAL);
 	}
 
@@ -310,35 +250,51 @@ int kr_cache_remove(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *n
 		return kr_error(EILSEQ);
 	}
 	knot_db_val_t key = { keybuf, key_len };
-	txn->owner->stats.delete += 1;
-	return txn_api(txn)->del(&txn->t, &key);
+	cache->stats.delete += 1;
+	return cache_op(cache, remove, &key, 1);
 }
 
-int kr_cache_clear(struct kr_cache_txn *txn)
+int kr_cache_clear(struct kr_cache *cache)
 {
-	if (!txn_is_valid(txn)) {
+	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
-	int ret = cache_purge(txn);
+	int ret = cache_purge(cache);
 	if (ret == 0) {
-		/*
-		 * normally must return 0, never EEXIST
-		 * (due to cache_purge())
-		 */
-		ret = assert_right_version_txn(txn);
+		ret = assert_right_version(cache);
 	}
 	return ret;
 }
 
-int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp)
+int kr_cache_match(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, knot_db_val_t *val, int maxcount)
 {
-	if (!txn_is_valid(txn) || !rr || !timestamp) {
+	if (!cache_isvalid(cache) || !name ) {
+		return kr_error(EINVAL);
+	}
+	if (!cache->api->match) {
+		return kr_error(ENOSYS);
+	}
+
+	uint8_t keybuf[KEY_SIZE];
+	size_t key_len = cache_key(keybuf, tag, name, 0);
+	if (key_len == 0) {
+		return kr_error(EILSEQ);
+	}
+
+	/* Trim type from the search key */ 
+	knot_db_val_t key = { keybuf, key_len - 2 };
+	return cache_op(cache, match, &key, val, maxcount);
+}
+
+int kr_cache_peek_rr(struct kr_cache *cache, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp)
+{
+	if (!cache_isvalid(cache) || !rr || !timestamp) {
 		return kr_error(EINVAL);
 	}
 
 	/* Check if the RRSet is in the cache. */
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cache_peek(txn, KR_CACHE_RR, rr->owner, rr->type, &entry, timestamp);
+	int ret = kr_cache_peek(cache, KR_CACHE_RR, rr->owner, rr->type, &entry, timestamp);
 	if (ret != 0) {
 		return ret;
 	}
@@ -353,12 +309,12 @@ int kr_cache_peek_rr(struct kr_cache_txn *txn, knot_rrset_t *rr, uint8_t *rank, 
 	return kr_ok();
 }
 
-int kr_cache_peek_rank(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t *name, uint16_t type, uint32_t timestamp)
+int kr_cache_peek_rank(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type, uint32_t timestamp)
 {
-	if (!txn_is_valid(txn) || !name) {
+	if (!cache_isvalid(cache) || !name) {
 		return kr_error(EINVAL);
 	}
-	struct kr_cache_entry *found = lookup(txn, tag, name, type);
+	struct kr_cache_entry *found = lookup(cache, tag, name, type);
 	if (!found) {
 		return kr_error(ENOENT);
 	}
@@ -370,7 +326,7 @@ int kr_cache_peek_rank(struct kr_cache_txn *txn, uint8_t tag, const knot_dname_t
 
 int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, knot_mm_t *mm)
 {
-	if (!dst || !src) {
+	if (!dst || !src || dst == src) {
 		return kr_error(EINVAL);
 	}
 
@@ -402,9 +358,9 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
 	return kr_ok();
 }
 
-int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp)
+int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp)
 {
-	if (!txn_is_valid(txn) || !rr) {
+	if (!cache_isvalid(cache) || !rr) {
 		return kr_error(EINVAL);
 	}
 
@@ -430,18 +386,18 @@ int kr_cache_insert_rr(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint8_t
 	}
 
 	knot_db_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
-	return kr_cache_insert(txn, KR_CACHE_RR, rr->owner, rr->type, &header, data);
+	return kr_cache_insert(cache, KR_CACHE_RR, rr->owner, rr->type, &header, data);
 }
 
-int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp)
+int kr_cache_peek_rrsig(struct kr_cache *cache, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp)
 {
-	if (!txn_is_valid(txn) || !rr || !timestamp) {
+	if (!cache_isvalid(cache) || !rr || !timestamp) {
 		return kr_error(EINVAL);
 	}
 
 	/* Check if the RRSet is in the cache. */
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cache_peek(txn, KR_CACHE_SIG, rr->owner, rr->type, &entry, timestamp);
+	int ret = kr_cache_peek(cache, KR_CACHE_SIG, rr->owner, rr->type, &entry, timestamp);
 	if (ret != 0) {
 		return ret;
 	}
@@ -458,9 +414,9 @@ int kr_cache_peek_rrsig(struct kr_cache_txn *txn, knot_rrset_t *rr, uint8_t *ran
 	return kr_ok();
 }
 
-int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp)
+int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp)
 {
-	if (!txn_is_valid(txn) || !rr) {
+	if (!cache_isvalid(cache) || !rr) {
 		return kr_error(EINVAL);
 	}
 
@@ -486,5 +442,5 @@ int kr_cache_insert_rrsig(struct kr_cache_txn *txn, const knot_rrset_t *rr, uint
 
 	uint16_t covered = knot_rrsig_type_covered(&rr->rrs, 0);
 	knot_db_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
-	return kr_cache_insert(txn, KR_CACHE_SIG, rr->owner, covered, &header, data);
+	return kr_cache_insert(cache, KR_CACHE_SIG, rr->owner, covered, &header, data);
 }

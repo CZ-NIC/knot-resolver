@@ -20,6 +20,7 @@
 #include <libknot/descriptor.h>
 
 #include "lib/cache.h"
+#include "lib/cdb.h"
 #include "daemon/bindings.h"
 #include "daemon/worker.h"
 
@@ -349,13 +350,12 @@ int lib_net(lua_State *L)
 static int cache_backends(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	storage_registry_t *registry = &engine->storage_registry;
 
 	lua_newtable(L);
-	for (unsigned i = 0; i < registry->len; ++i) {
-		struct storage_api *storage = &registry->at[i];
-		lua_pushboolean(L, storage->api() == engine->resolver.cache.api);
-		lua_setfield(L, -2, storage->prefix);
+	for (unsigned i = 0; i < engine->backends.len; ++i) {
+		const struct kr_cdb_api *api = engine->backends.at[i];
+		lua_pushboolean(L, api == engine->resolver.cache.api);
+		lua_setfield(L, -2, api->name);
 	}
 	return 1;
 }
@@ -364,20 +364,15 @@ static int cache_backends(lua_State *L)
 static int cache_count(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	const knot_db_api_t *storage = engine->resolver.cache.api;
-
-	/* Fetch item count */
-	struct kr_cache_txn txn;
-	int ret = kr_cache_txn_begin(&engine->resolver.cache, &txn, KNOT_DB_RDONLY);
-	if (ret != 0) {
-		format_error(L, kr_strerror(ret));
-		lua_error(L);
-	}
+	const struct kr_cdb_api *api = engine->resolver.cache.api;
 
 	/* First key is a version counter, omit it. */
-	lua_pushinteger(L, storage->count(&txn.t) - 1);
-	kr_cache_txn_abort(&txn);
-	return 1;
+	struct kr_cache *cache = &engine->resolver.cache;
+	if (kr_cache_is_open(cache)) {
+		lua_pushinteger(L, api->count(cache->db) - 1);
+		return 1;
+	}
+	return 0;
 }
 
 /** Return cache statistics. */
@@ -394,27 +389,22 @@ static int cache_stats(lua_State *L)
 	lua_setfield(L, -2, "insert");
 	lua_pushnumber(L, cache->stats.delete);
 	lua_setfield(L, -2, "delete");
-	lua_pushnumber(L, cache->stats.txn_read);
-	lua_setfield(L, -2, "txn_read");
-	lua_pushnumber(L, cache->stats.txn_write);
-	lua_setfield(L, -2, "txn_write");
 	return 1;
 }
 
-static struct storage_api *cache_select_storage(struct engine *engine, const char **conf)
+static const struct kr_cdb_api *cache_select(struct engine *engine, const char **conf)
 {
 	/* Return default backend */
-	storage_registry_t *registry = &engine->storage_registry;
-	if (!*conf || !strstr(*conf, "://")) {
-		return &registry->at[0];
+	if (*conf == NULL || !strstr(*conf, "://")) {
+		return engine->backends.at[0];
 	}
 
 	/* Find storage backend from config prefix */
-	for (unsigned i = 0; i < registry->len; ++i) {
-		struct storage_api *storage = &registry->at[i];
-		if (strncmp(*conf, storage->prefix, strlen(storage->prefix)) == 0) {
-			*conf += strlen(storage->prefix);
-			return storage;
+	for (unsigned i = 0; i < engine->backends.len; ++i) {
+		const struct kr_cdb_api *api = engine->backends.at[i];
+		if (strncmp(*conf, api->name, strlen(api->name)) == 0) {
+			*conf += strlen(api->name) + strlen("://");
+			return api;
 		}
 	}
 
@@ -436,8 +426,8 @@ static int cache_open(lua_State *L)
 	unsigned cache_size = lua_tonumber(L, 1);
 	const char *conf = n > 1 ? lua_tostring(L, 2) : NULL;
 	const char *uri = conf;
-	struct storage_api *storage = cache_select_storage(engine, &conf);
-	if (!storage) {
+	const struct kr_cdb_api *api = cache_select(engine, &conf);
+	if (!api) {
 		format_error(L, "unsupported cache backend");
 		lua_error(L);
 	}
@@ -446,9 +436,11 @@ static int cache_open(lua_State *L)
 	kr_cache_close(&engine->resolver.cache);
 
 	/* Reopen cache */
-	void *storage_opts = storage->opts_create(conf, cache_size);
-	int ret = kr_cache_open(&engine->resolver.cache, storage->api(), storage_opts, engine->pool);
-	free(storage_opts);
+	struct kr_cdb_opts opts = {
+		(conf && strlen(conf)) ? conf : ".",
+		cache_size
+	};
+	int ret = kr_cache_open(&engine->resolver.cache, api, &opts, engine->pool);
 	if (ret != 0) {
 		format_error(L, "can't open cache");
 		lua_error(L);
@@ -481,6 +473,190 @@ static int cache_close(lua_State *L)
 	return 1;
 }
 
+/** @internal Prefix walk. */
+static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_t *results, int maxresults)
+{
+	/* Decode parameters */
+	uint8_t namespace = 'R';
+	char *extra = (char *)strchr(args, ' ');
+	if (extra != NULL) {
+		extra[0] = '\0';
+		namespace = extra[1];
+	}
+
+	/* Convert to domain name */
+	uint8_t buf[KNOT_DNAME_MAXLEN];
+	if (!knot_dname_from_str(buf, args, sizeof(buf))) {
+		return kr_error(EINVAL);
+	}
+
+	/* Start prefix search */
+	return kr_cache_match(cache, namespace, buf, results, maxresults);
+}
+
+/** @internal Delete iterated key. */
+static int cache_remove_prefix(struct kr_cache *cache, const char *args)
+{
+	/* Check if we can remove */
+	if (!cache || !cache->api || !cache->api->remove) {
+		return kr_error(ENOSYS);
+	}
+	static knot_db_val_t result_set[1000];
+	int ret = cache_prefixed(cache, args, result_set, 1000);
+	if (ret < 0) {
+		return ret;
+	}
+	/* Duplicate result set as we're going to remove it
+	 * which will invalidate result set. */
+	for (int i = 0; i < ret; ++i) {
+		void *dst = malloc(result_set[i].len);
+		if (!dst) {
+			return kr_error(ENOMEM);
+		}
+		memcpy(dst, result_set[i].data, result_set[i].len);
+		result_set[i].data = dst;
+	}
+	cache->api->remove(cache->db, result_set, ret);
+	/* Free keys */
+	for (int i = 0; i < ret; ++i) {
+		free(result_set[i].data);
+	}
+	return ret;
+}
+
+/** Prune expired/invalid records. */
+static int cache_prune(lua_State *L)
+{
+	/* Check parameters */
+	int prune_max = UINT16_MAX;
+	int n = lua_gettop(L);
+	if (n >= 1 && lua_isnumber(L, 1)) {
+		prune_max = lua_tointeger(L, 1);
+	}
+
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+
+	/* Check if API supports pruning. */
+	int ret = kr_error(ENOSYS);
+	if (cache->api->prune) {
+		ret = cache->api->prune(cache->db, prune_max);
+	}
+	/* Commit and format result. */
+	if (ret < 0) {
+		format_error(L, kr_strerror(ret));
+		lua_error(L);
+	}
+	lua_pushinteger(L, ret);
+	return 1;
+}
+
+/** Clear all records. */
+static int cache_clear(lua_State *L)
+{
+	/* Check parameters */
+	const char *args = NULL;
+	int n = lua_gettop(L);
+	if (n >= 1 && lua_isstring(L, 1)) {
+		args = lua_tostring(L, 1);
+	}
+
+	/* Clear a sub-tree in cache. */
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	if (args && strlen(args) > 0) {
+		int ret = cache_remove_prefix(cache, args);
+		if (ret < 0) {
+			format_error(L, kr_strerror(ret));
+			lua_error(L);
+		}
+		lua_pushinteger(L, ret);
+		return 1;
+	}
+
+	/* Clear cache. */
+	int ret = kr_cache_clear(cache);
+	if (ret < 0) {
+		format_error(L, kr_strerror(ret));
+		lua_error(L);
+	}
+
+	/* Clear reputation tables */
+	lru_deinit(engine->resolver.cache_rtt);
+	lru_deinit(engine->resolver.cache_rep);
+	lru_init(engine->resolver.cache_rtt, LRU_RTT_SIZE);
+	lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/** @internal Dump cache key into table on Lua stack. */
+static void cache_dump_key(lua_State *L, knot_db_val_t *key)
+{
+	char buf[KNOT_DNAME_MAXLEN];
+	/* Extract type */
+	uint16_t type = 0;
+	const char *endp = (const char *)key->data + key->len - sizeof(uint16_t);
+	memcpy(&type, endp, sizeof(uint16_t));
+	endp -= 1;
+	/* Extract domain name */
+	char *dst = buf;
+	const char *scan = endp - 1;
+	while (scan > (const char *)key->data) {
+		if (*scan == '\0') {
+			const size_t lblen = endp - scan - 1;
+			memcpy(dst, scan + 1, lblen);
+			dst += lblen;
+			*dst++ = '.';
+			endp = scan;
+		}
+		--scan;
+	}
+	memcpy(dst, scan + 1, endp - scan);
+	/* If name typemap doesn't exist yet, create it */
+	lua_getfield(L, -1, buf);
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+		lua_newtable(L);
+	}
+	/* Append to typemap */
+	char type_buf[16] = { '\0' };
+	knot_rrtype_to_string(type, type_buf, sizeof(type_buf));
+	lua_pushboolean(L, true);
+	lua_setfield(L, -2, type_buf);
+	/* Set name typemap */
+	lua_setfield(L, -2, buf);
+}
+
+/** Query cached records. */
+static int cache_get(lua_State *L)
+{
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 1 || !lua_isstring(L, 1)) {
+		format_error(L, "expected 'cache.get(string key)'");
+		lua_error(L);
+	}
+
+	/* Clear a sub-tree in cache. */
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	const char *args = lua_tostring(L, 1);
+	/* Retrieve set of keys */
+	static knot_db_val_t result_set[100];
+	int ret = cache_prefixed(cache, args, result_set, 100);
+	if (ret < 0) {
+		format_error(L, kr_strerror(ret));
+		lua_error(L);
+	}
+	/* Format output */
+	lua_newtable(L);
+	for (int i = 0; i < ret; ++i) {
+		cache_dump_key(L, &result_set[i]);
+	}
+	return 1;
+}
+
 int lib_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -489,6 +665,9 @@ int lib_cache(lua_State *L)
 		{ "stats",  cache_stats },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
+		{ "prune",  cache_prune },
+		{ "clear",  cache_clear },
+		{ "get",    cache_get },
 		{ NULL, NULL }
 	};
 

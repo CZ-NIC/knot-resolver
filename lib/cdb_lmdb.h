@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -12,25 +12,12 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+*/
 
 #pragma once
 
-#include <hiredis/hiredis.h>
-#include "lib/generic/array.h"
+#include "lib/cdb.h"
+#include "lib/defines.h"
 
-/** Redis buffer size */
-#define REDIS_MAXFREELIST 1024
-#define REDIS_BUFSIZE (1024 * 1024)
-#define REDIS_PORT 6379
-
-typedef array_t(redisReply *) redis_freelist_t;
-
-/** @internal Redis client */
-struct redis_cli {
-	redisContext *handle;
-	redis_freelist_t freelist;
-	char *addr;
-	unsigned database;
-	unsigned port;
-};
+KR_EXPORT KR_CONST
+const struct kr_cdb_api *kr_cdb_lmdb(void);

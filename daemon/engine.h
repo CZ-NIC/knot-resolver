@@ -45,22 +45,11 @@ struct lua_State;
 #include "lib/resolve.h"
 #include "daemon/network.h"
 
-/** Cache storage backend. */
-struct storage_api {
-	const char *prefix; /**< Storage prefix, e.g. 'lmdb://' */
-	const knot_db_api_t *(*api)(void); /**< Storage API implementation */
-	void *(*opts_create)(const char *, size_t); /**< Storage options factory */
-};
-
-/** @cond internal Array of cache backend options. */
-typedef array_t(struct storage_api) storage_registry_t;
-/* @endcond */
-
 struct engine {
     struct kr_context resolver;
     struct network net;
     module_array_t modules;
-    storage_registry_t storage_registry;
+    array_t(const struct kr_cdb_api *) backends;
     knot_mm_t *pool;
     uv_timer_t *updater;
     struct lua_State *L;

@@ -44,11 +44,11 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 	}
 }
 
-static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_dname_t *qname,
+static int loot_cache_pkt(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *qname,
                           uint16_t rrtype, bool want_secure, uint32_t timestamp, uint8_t *flags)
 {
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cache_peek(txn, KR_CACHE_PKT, qname, rrtype, &entry, &timestamp);
+	int ret = kr_cache_peek(cache, KR_CACHE_PKT, qname, rrtype, &entry, &timestamp);
 	if (ret != 0) { /* Not in the cache */
 		return ret;
 	}
@@ -89,13 +89,13 @@ static int loot_cache_pkt(struct kr_cache_txn *txn, knot_pkt_t *pkt, const knot_
 }
 
 /** @internal Try to find a shortcut directly to searched packet. */
-static int loot_pktcache(struct kr_cache_txn *txn, knot_pkt_t *pkt, struct kr_query *qry, uint8_t *flags)
+static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, uint8_t *flags)
 {
 	uint32_t timestamp = qry->timestamp.tv_sec;
 	const knot_dname_t *qname = qry->sname;
 	uint16_t rrtype = qry->stype;
 	const bool want_secure = (qry->flags & QUERY_DNSSEC_WANT);
-	return loot_cache_pkt(txn, pkt, qname, rrtype, want_secure, timestamp, flags);
+	return loot_cache_pkt(cache, pkt, qname, rrtype, want_secure, timestamp, flags);
 }
 
 static int pktcache_peek(knot_layer_t *ctx, knot_pkt_t *pkt)
@@ -112,17 +112,10 @@ static int pktcache_peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Only IN class */
 	}
 
-	/* Prepare read transaction */
-	struct kr_cache_txn txn;
-	struct kr_cache *cache = &req->ctx->cache;
-	if (kr_cache_txn_begin(cache, &txn, KNOT_DB_RDONLY) != 0) {
-		return ctx->state;
-	}
-
 	/* Fetch either answer to original or minimized query */
 	uint8_t flags = 0;
-	int ret = loot_pktcache(&txn, pkt, qry, &flags);
-	kr_cache_txn_abort(&txn);
+	struct kr_cache *cache = &req->ctx->cache;
+	int ret = loot_pktcache(cache, pkt, qry, &flags);
 	if (ret == 0) {
 		DEBUG_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
@@ -197,11 +190,6 @@ static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qname) {
 		return ctx->state;
 	}
-	/* Open write transaction and prepare answer */
-	struct kr_cache_txn txn;
-	if (kr_cache_txn_begin(&req->ctx->cache, &txn, 0) != 0) {
-		return ctx->state; /* Couldn't acquire cache, ignore. */
-	}
 	knot_db_val_t data = { pkt->wire, pkt->size };
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,
@@ -224,22 +212,20 @@ static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Check if we can replace (allow current or better rank, SECURE is always accepted). */
+	struct kr_cache *cache = &req->ctx->cache;
 	if (header.rank < KR_RANK_SECURE) {
-		int cached_rank = kr_cache_peek_rank(&txn, KR_CACHE_PKT, qname, qtype, header.timestamp);
+		int cached_rank = kr_cache_peek_rank(cache, KR_CACHE_PKT, qname, qtype, header.timestamp);
 		if (cached_rank > header.rank) {
-			kr_cache_txn_abort(&txn);
 			return ctx->state;
 		}
 	}
 
 	/* Stash answer in the cache */
-	int ret = kr_cache_insert(&txn, KR_CACHE_PKT, qname, qtype, &header, data);	
-	if (ret != 0) {
-		kr_cache_txn_abort(&txn);
-	} else {
+	int ret = kr_cache_insert(cache, KR_CACHE_PKT, qname, qtype, &header, data);
+	if (ret == 0) {
 		DEBUG_MSG(qry, "=> answer cached for TTL=%u\n", ttl);
-		kr_cache_txn_commit(&txn);
 	}
+	kr_cache_sync(cache);
 	return ctx->state;
 }
 

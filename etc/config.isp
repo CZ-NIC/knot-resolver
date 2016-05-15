@@ -19,7 +19,6 @@ cache.size = 4 * GB
 modules = {
 	'policy',   -- Block queries to local zones/bad sites
 	'view',     -- Views for certain clients
-	'cachectl', -- Cache control interface
 	'hints',    -- Load /etc/hosts and allow custom root hints
 	'stats',    -- Track internal statistics
 	graphite = { -- Send statistics to local InfluxDB

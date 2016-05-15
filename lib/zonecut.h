@@ -133,11 +133,10 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut);
  * @param ctx       resolution context (to fetch data from LRU caches)
  * @param cut       zone cut to be populated
  * @param name      QNAME to start finding zone cut for
- * @param txn       cache transaction (read)
  * @param timestamp transaction timestamp
  * @param secured   set to true if want secured zone cut, will return false if it is provably insecure
  * @return 0 or error code (ENOENT if it doesn't find anything)
  */
 KR_EXPORT
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
-                           struct kr_cache_txn *txn, uint32_t timestamp, bool * restrict secured);
+                           uint32_t timestamp, bool * restrict secured);

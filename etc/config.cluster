@@ -21,7 +21,6 @@ cache.size = 100 * GB
 -- Load Useful modules
 modules = {
 	'policy',   -- Block queries to local zones/bad sites
-	'cachectl', -- Cache control interface
 	'hints',    -- Load /etc/hosts and allow custom root hints
 	'stats',    -- Track internal statistics
 	graphite = { -- Send statistics to local InfluxDB

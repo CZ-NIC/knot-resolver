@@ -21,8 +21,6 @@
 #include <unistd.h>
 #include <grp.h>
 #include <pwd.h>
-/* #include <libknot/internal/namedb/knot_db_trie.h> @todo Not supported (doesn't keep value copy) */
-#include <libknot/db/db_lmdb.h>
 #include <zscanner/scanner.h>
 
 #include "daemon/engine.h"
@@ -31,6 +29,7 @@
 #include "lib/nsrep.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
+#include "lib/cdb_lmdb.h"
 #include "lib/dnssec/ta.h"
 
 /** @internal Compatibility wrapper for Lua < 5.2 */
@@ -370,19 +369,6 @@ static int l_trampoline(lua_State *L)
  * Engine API.
  */
 
-/** @internal Make lmdb options. */
-void *knot_db_lmdb_mkopts(const char *conf, size_t maxsize)
-{
-	struct knot_db_lmdb_opts *opts = malloc(sizeof(*opts));
-	if (opts) {
-		memset(opts, 0, sizeof(*opts));
-		opts->path = (conf && strlen(conf)) ? conf : ".";
-		opts->mapsize = maxsize;
-		opts->flags.env = 0x80000 | 0x100000; /* MDB_WRITEMAP|MDB_MAPASYNC */
-	}
-	return opts;
-}
-
 static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
@@ -415,12 +401,7 @@ static int init_resolver(struct engine *engine)
 	engine_register(engine, "rrcache", NULL, NULL);
 	engine_register(engine, "pktcache", NULL, NULL);
 
-	/* Initialize storage backends */
-	struct storage_api lmdb = {
-		"lmdb://", knot_db_lmdb_api, knot_db_lmdb_mkopts
-	};
-
-	return array_push(engine->storage_registry, lmdb);
+	return array_push(engine->backends, kr_cdb_lmdb());
 }
 
 static int init_state(struct engine *engine)
@@ -538,7 +519,7 @@ void engine_deinit(struct engine *engine)
 
 	/* Free data structures */
 	array_clear(engine->modules);
-	array_clear(engine->storage_registry);
+	array_clear(engine->backends);
 	kr_ta_clear(&engine->resolver.trust_anchors);
 	kr_ta_clear(&engine->resolver.negative_anchors);
 }

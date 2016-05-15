@@ -12,7 +12,6 @@ The subtree structure corresponds to the configuration variables in the declarat
 .. code-block:: bash
 
 	$ etcdctl set /kresd/net/127.0.0.1 53
-	$ etcdctl set /kresd/modules/cachectl true
 	$ etcdctl set /kresd/cache/size 10000000
 
 Configures all listening nodes to following configuration:
@@ -20,7 +19,6 @@ Configures all listening nodes to following configuration:
 .. code-block:: lua
 
 	net = { '127.0.0.1' }
-	modules = { 'cachectl' }
 	cache.size = 10000000
 
 Example configuration

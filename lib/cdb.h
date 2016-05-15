@@ -1,0 +1,52 @@
+/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#pragma once
+
+#include <libknot/db/db.h>
+
+/* Cache options. */
+struct kr_cdb_opts {
+	const char *path; /*!< Cache URI path. */
+	size_t maxsize;   /*!< Suggested cache size in bytes. */
+};
+
+/*! Cache database API.
+  * This is a simplified version of generic DB API from libknot,
+  * that is tailored to caching purposes.
+  */
+struct kr_cdb_api {
+	const char *name;
+
+	/* Context operations */
+
+	int (*open)(knot_db_t **db, struct kr_cdb_opts *opts, knot_mm_t *mm);
+	void (*close)(knot_db_t *db);
+	int (*count)(knot_db_t *db);
+	int (*clear)(knot_db_t *db);
+	int (*sync)(knot_db_t *db);
+
+	/* Data access */
+
+	int (*read)(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount);
+	int (*write)(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount);
+	int (*remove)(knot_db_t *db, knot_db_val_t *key, int maxcount);
+
+	/* Specialised operations */
+
+	int (*match)(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount);
+	int (*prune)(knot_db_t *db, int maxcount);
+};

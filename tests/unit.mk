@@ -20,7 +20,7 @@ $(eval $(call make_lib,mock_cmodule,tests))
 
 # Dependencies
 tests_DEPEND := $(libkres) $(mock_cmodule) $(mock_gomodule)
-tests_LIBS :=  $(libkres_TARGET) $(libkres_LIBS) $(cmocka_LIBS)
+tests_LIBS :=  $(libkres_TARGET) $(libkres_LIBS) $(cmocka_LIBS) $(lmdb_LIBS)
 
 # Platform-specific library injection
 ifeq ($(PLATFORM),Darwin)

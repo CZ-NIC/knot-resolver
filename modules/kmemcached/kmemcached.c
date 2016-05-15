@@ -14,32 +14,22 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libknot/db/db.h>
 #include <contrib/cleanup.h>
 
 #include "daemon/engine.h"
+#include "lib/cdb.h"
 #include "lib/module.h"
 #include "lib/cache.h"
 
-/** @internal Memcached API */
-extern const knot_db_api_t *namedb_memcached_api(void);
-
-/** @internal Make memcached options. */
-void *namedb_memcached_mkopts(const char *conf, size_t maxsize)
-{
-	return strdup(conf);
-}
+/** @internal Redis API */
+const struct kr_cdb_api *cdb_memcached(void);
 
 KR_EXPORT
 int kmemcached_init(struct kr_module *module)
 {
 	struct engine *engine = module->data;
-	/* Register new storage option */
-	static struct storage_api memcached = {
-		"memcached://", namedb_memcached_api, namedb_memcached_mkopts
-	};
-	array_push(engine->storage_registry, memcached);
-	return kr_ok();
+	array_push(engine->backends, cdb_memcached());
+	return 0;
 }
 
 KR_EXPORT
@@ -47,18 +37,18 @@ int kmemcached_deinit(struct kr_module *module)
 {
 	struct engine *engine = module->data;
 	/* It was currently loaded, close cache */
-	if (engine->resolver.cache.api == namedb_memcached_api()) {
+	if (engine->resolver.cache.api == cdb_memcached()) {
 		kr_cache_close(&engine->resolver.cache);
 	}
 	/* Prevent from loading it again */
-	for (unsigned i = 0; i < engine->storage_registry.len; ++i) {
-		struct storage_api *storage = &engine->storage_registry.at[i];
-		if (strcmp(storage->prefix, "memcached://") == 0) {
-			array_del(engine->storage_registry, i);
+	for (unsigned i = 0; i < engine->backends.len; ++i) {
+		const struct kr_cdb_api *api = engine->backends.at[i];
+		if (strcmp(api->name, "memcached") == 0) {
+			array_del(engine->backends, i);
 			break;
 		}
 	}
-	return kr_ok();
+	return 0;
 }
 
 KR_MODULE_EXPORT(kmemcached);

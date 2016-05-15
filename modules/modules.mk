@@ -1,7 +1,6 @@
 # List of built-in modules
 modules_TARGETS := hints \
-                   stats \
-                   cachectl
+                   stats
 
 # Memcached
 ifeq ($(HAS_libmemcached),yes)

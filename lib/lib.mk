@@ -15,7 +15,8 @@ libkres_SOURCES := \
 	lib/resolve.c          \
 	lib/zonecut.c          \
 	lib/rplan.c            \
-	lib/cache.c
+	lib/cache.c            \
+	lib/cdb_lmdb.c
 
 libkres_HEADERS := \
 	lib/generic/array.h    \
@@ -33,15 +34,9 @@ libkres_HEADERS := \
 	lib/resolve.h          \
 	lib/zonecut.h          \
 	lib/rplan.h            \
-	lib/cache.h
-# Use built-in LMDB if not found
-ifneq ($(HAS_lmdb), yes)
-libkres_SOURCES := $(libkres_SOURCES) \
-                   contrib/lmdb/mdb.c \
-                   contrib/lmdb/midl.c
-lmdb_CFLAGS  := -Icontrib/lmdb
-lmdb_LIBS    :=
-endif
+	lib/cache.h            \
+	lib/cdb.h              \
+	lib/cdb_lmdb.h
 
 # Dependencies
 libkres_DEPEND := $(contrib)
