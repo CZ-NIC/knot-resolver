@@ -34,11 +34,19 @@ libkres_HEADERS := \
 	lib/zonecut.h          \
 	lib/rplan.h            \
 	lib/cache.h
+# Use built-in LMDB if not found
+ifneq ($(HAS_lmdb), yes)
+libkres_SOURCES := $(libkres_SOURCES) \
+                   contrib/lmdb/mdb.c \
+                   contrib/lmdb/midl.c
+lmdb_CFLAGS  := -Icontrib/lmdb
+lmdb_LIBS    :=
+endif
 
 # Dependencies
 libkres_DEPEND := $(contrib)
-libkres_CFLAGS := -fvisibility=hidden -fPIC
-libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS)
+libkres_CFLAGS := -fvisibility=hidden -fPIC $(lmdb_CFLAGS)
+libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
 # Make library

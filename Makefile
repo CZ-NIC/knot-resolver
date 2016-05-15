@@ -16,6 +16,7 @@ endif
 
 # Dependencies
 $(eval $(call find_lib,libknot,2.1))
+$(eval $(call find_lib,lmdb))
 $(eval $(call find_lib,libzscanner,2.1))
 $(eval $(call find_lib,libuv,1.0))
 $(eval $(call find_alt,lua,luajit))
@@ -77,6 +78,7 @@ info:
 	$(info Dependencies)
 	$(info ------------)
 	$(info [$(HAS_libknot)] libknot (lib))
+	$(info [$(HAS_lmdb)] lmdb (lib))
 	$(info [$(HAS_lua)] luajit (daemon))
 	$(info [$(HAS_libuv)] libuv (daemon))
 	$(info )
