@@ -219,7 +219,7 @@ static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Set cache flags */
-	if (qry->flags & QUERY_DNSSEC_WANT) {
+	if (qry->flags & QUERY_DNSSEC_WEXPAND) {
 		header.flags |= KR_CACHE_FLAG_WCARD_PROOF;
 	}
 
