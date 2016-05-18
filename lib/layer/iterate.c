@@ -415,17 +415,14 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 				DEBUG_MSG("<= too long cname chain\n");
 				return KNOT_STATE_FAIL;
 			}
-			/* If secure, don't use pending_cname immediately.
-			 * There are can be RRSIG for "old" cname.
+			/* Don't use pending_cname immediately.
+			 * There are can be records for "old" cname.
 			 */
 			if (query->flags & QUERY_DNSSEC_WANT) {
 				/* Follow chain only within current cut (if secure). */
 				if (pending_cname && !knot_dname_in(query->zone_cut.name, pending_cname)) {
 					pending_cname = NULL;
 				}
-			} else {
-				/* Try to find next cname */
-				cname = pending_cname;
 			}
 		}
 	}
