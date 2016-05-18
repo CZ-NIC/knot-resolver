@@ -703,3 +703,85 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 	return ret;
 }
 
+int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
+{
+	int ret = kr_error(EINVAL);
+	int flags = 0;
+	uint8_t *bm = NULL;
+	uint16_t bm_size = 0;
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	if (!sec) {
+		return kr_error(EINVAL);
+	}
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *ns = knot_pkt_rr(sec, i);
+		if (ns->type == KNOT_RRTYPE_DS) {
+			return kr_error(EEXIST);
+		}
+		if (ns->type != KNOT_RRTYPE_NS) {
+			continue;
+		}
+		flags = 0;
+		for (unsigned j = 0; j < sec->count; ++j) {
+			const knot_rrset_t *nsec3 = knot_pkt_rr(sec, j);
+			if (nsec3->type == KNOT_RRTYPE_DS) {
+				return kr_error(EEXIST);
+			}
+			if (nsec3->type != KNOT_RRTYPE_NSEC3) {
+				continue;
+			}
+			/* nsec3 found, check if owner name matches
+			 * the delegation name
+			 */
+			ret = matches_name(&flags, nsec3, ns->owner);
+			if (ret != 0) {
+				return kr_error(EINVAL);
+			}
+			if (!(flags & FLG_NAME_MATCHED)) {
+				/* nsec3 owner name does not match
+				 * the delegation name
+				 */
+				continue;
+			}
+			knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
+			if (!bm) {
+				return kr_error(EINVAL);
+			}
+			if (kr_nsec_bitmap_contains_type(bm, bm_size,
+							  KNOT_RRTYPE_NS) &&
+			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+							  KNOT_RRTYPE_DS) &&
+			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+							  KNOT_RRTYPE_SOA)) {
+				/* Satisfies rfc5155, 8.9. paragraph 2 */
+				return kr_ok();
+			}
+		}
+		if (flags & FLG_NAME_MATCHED) {
+			/* nsec3 which owner matches
+			 * the delegation name was found,
+			 * but nsec3 type bitmap contains wrong types
+			 */
+			return kr_error(EINVAL);
+		}
+		/* nsec3 that matches the delegation was not found.
+		 * Check rfc5155, 8.9. paragraph 4.
+		 * Find closest provable encloser.
+		 */
+		const knot_dname_t *encloser_name = NULL;
+		const knot_rrset_t *covering_next_nsec3 = NULL;
+		ret = closest_encloser_proof(pkt, KNOT_AUTHORITY, ns->owner, &encloser_name,
+                                     NULL, &covering_next_nsec3);
+		if (ret != 0) {
+			return kr_error(EINVAL);
+		}
+
+		if (has_optout(covering_next_nsec3)) {
+			return kr_error(DNSSEC_NOT_FOUND);
+		} else {
+			return kr_error(EINVAL);
+		}
+	}
+	return kr_error(EINVAL);
+}
+

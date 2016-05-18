@@ -53,3 +53,15 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
  */
 int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
                      const knot_dname_t *sname, uint16_t stype);
+
+/**
+ * Referral to unsigned subzone check (RFC5155 8.9).
+ * @note 	     No RRSIGs are validated.
+ * @param pkt        Packet structure to be processed.
+ * @return           0 or error code:
+ * 		     DNSSEC_NOT_FOUND - denial of existence can't be proven
+ *		     due to opt-out.
+ *		     EEXIST - ds record was found.
+ *		     EINVAL - bogus.
+ */
+int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt);
