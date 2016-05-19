@@ -68,10 +68,10 @@ static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
 	return KNOT_EOK;
 }
 
-int prepare_client_cookie(uint8_t cc[KNOT_OPT_COOKIE_CLNT],
-                          const void *clnt_addr,
-                          const void *srvr_addr,
-                          const struct secret_quantity *csq)
+static int prepare_client_cookie(uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                                 const void *clnt_addr,
+                                 const void *srvr_addr,
+                                 const struct secret_quantity *csq)
 {
 	assert(cc);
 	assert(srvr_addr);
@@ -146,11 +146,20 @@ int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
 	int ret = prepare_client_cookie(cc, clnt_sockaddr, srvr_sockaddr,
 	                                cntrl->client);
 
-	/* Reclaim reserved size. */
+	/* This is a very nasty hack that prevents the packet to be corrupted
+	 * when using contemporary 'Cookie interface'. */
+	assert(pkt->current == KNOT_ADDITIONAL);
+	pkt->sections[KNOT_ADDITIONAL].count -= 1;
+	pkt->rrset_count -= 1;
+	pkt->size -= knot_edns_wire_size(pkt->opt_rr);
+	knot_wire_set_arcount(pkt->wire, knot_wire_get_arcount(pkt->wire) - 1);
+#if 0
+	/* Reclaim reserved size -- does not work as intended.. */
 	ret = knot_pkt_reclaim(pkt, knot_edns_wire_size(pkt->opt_rr));
 	if (ret != KNOT_EOK) {
 		return ret;
 	}
+#endif
 
 	/* TODO -- generate client cookie from client address, server address
 	 * and secret quantity. */
