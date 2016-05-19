@@ -14,6 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <arpa/inet.h> /* inet_ntop() */
 #include <uv.h>
 #include <lua.h>
 #include <libknot/packet/pkt.h>
@@ -456,7 +457,11 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 	/* Libuv does not offer a convenient way how to obtain a source IP
 	 * address from a UDP handle that has been initialised using
 	 * uv_udp_init(). The uv_udp_getsockname() fails because of the lazy
-	 * socket initialisation. */
+	 * socket initialisation.
+	 *
+	 * TODO -- A solution might be opening a separate socket and trying
+	 * to obtain the IP address from it.
+	 */
 
 	struct sockaddr_storage sockaddr = {0, };
 	struct sockaddr_storage *sockaddr_ptr = &sockaddr;

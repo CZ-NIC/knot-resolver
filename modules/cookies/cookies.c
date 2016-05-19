@@ -17,6 +17,8 @@
 //#define PRINT_PACKETS 1 /* Comment out to disable packet printing. */
 
 #include <assert.h>
+#include <libknot/db/db_lmdb.h>
+#include <libknot/error.h>
 #include <libknot/mm_ctx.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/rrtype/opt_cookie.h> // branch dns-cookies-wip
@@ -24,6 +26,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "daemon/engine.h"
+#include "lib/cookies/control.h"
 #include "lib/module.h"
 #include "lib/layer.h"
 
@@ -38,120 +42,53 @@
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies",  fmt)
 
-#define CLNT_SCRT_MIN 8 /* Minimum client secret size. */
-
-/**
- * Holds the DNS cookies context.
- */
-struct cookies_ctx {
-	size_t clnt_scrt_size; /* Client secret size. */
-	uint8_t *clnt_scrt; /* Client secret. */
-};
-
-/* Generates random client secret. */
-static int clnt_scrt_create(struct cookies_ctx *ctx, unsigned int *seed)
-{
-	if (!ctx || !ctx->clnt_scrt || !seed) {
-		return kr_error(EINVAL);
-	}
-
-	for (size_t i = 0; i < ctx->clnt_scrt_size; ++i) {
-		ctx->clnt_scrt[i] = rand_r(seed) & 0xff;
-	}
-
-	return kr_ok();
-}
-
-/* Generates client cookie data. */
-static int cc_data(const struct cookies_ctx *ctx,
-                   uint8_t data[KNOT_OPT_COOKIE_CLNT])
-{
-	assert(data);
-
-	/* TODO -- Currently we cannot obtain our IP address and are sure about
-	 * the actual IP address of the server we are going to query. */
-
-	if (!ctx || !ctx->clnt_scrt || ctx->clnt_scrt_size >= CLNT_SCRT_MIN) {
-		return kr_error(EINVAL);
-	}
-
-	/* TODO -- We need to use a pseudo-random function to generate
-	 * the client cookie. */
-
-	assert(ctx->clnt_scrt_size >= KNOT_OPT_COOKIE_CLNT);
-	memcpy(data, ctx->clnt_scrt, KNOT_OPT_COOKIE_CLNT);
-
-	return kr_ok();
-}
-
-static int pkt_add_cookies(knot_pkt_t *pkt, struct cookies_ctx *ctx)
-{
-	uint16_t cookies_size = 0;
-        uint8_t *cookies_data = NULL;
-
-	uint8_t data[KNOT_OPT_COOKIE_CLNT];
-	cc_data(ctx, data);
-
-	if (!pkt->opt_rr) {
-		pkt->opt_rr = mm_alloc(&pkt->mm, sizeof(knot_rrset_t));
-		if (!pkt->opt_rr) {
-			return kr_error(ENOMEM);
-		}
-		knot_edns_init(pkt->opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION,
-		               &pkt->mm);
-	}
-
-	cookies_size = knot_edns_opt_cookie_data_len(0);
-
-	int ret = knot_edns_reserve_option(pkt->opt_rr, KNOT_EDNS_OPTION_COOKIE,
-	                                   cookies_size, &cookies_data,
-	                                   &pkt->mm);
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
-	assert(cookies_data != NULL);
-
-	ret = knot_edns_opt_cookie_create(data, NULL, 0,
-	                                  cookies_data, &cookies_size);
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
-
-	return kr_ok();
-}
-
-/* Process query. */
-static int insert_cookie(knot_layer_t *ctx, knot_pkt_t *pkt)
-{
-	DEBUG_MSG(NULL, "%s\n", "inserting client cookie into request");
-
-	uint8_t data[KNOT_OPT_COOKIE_CLNT];
-
-	struct kr_module *module = ctx->api->data;
-	struct cookies_ctx *cookies_ctx = module->data;
-
-	struct kr_request *req = ctx->data;
-	/* req->answer contains EDNS data of primary request */
-	struct kr_query *qry = req->current_query;
-
-	if (kr_ok() != pkt_add_cookies(pkt, cookies_ctx)) {
-		DEBUG_MSG(NULL, "%s\n", "Failed adding client cookie.");
-	}
-
-	print_packet_dflt(req->answer);
-	DEBUG_MSG(NULL, "%s\n", "end inserting client cookie into request");
-
-	return ctx->state;
-}
-
 /* Process response. */
 static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
-	DEBUG_MSG(NULL, "%s\n", "checking response");
+	if (!kr_cookies_control.enabled) {
+		return ctx->state;
+	}
+
+	struct kr_request *req = ctx->data;
+	struct kr_query *qry = req->current_query;
+	struct kr_nsrep *ns = &qry->ns;
+
+	/* Abusing name server reputation mechanism to obtain IP addresses. */
+	for (int i = 0; i < KR_NSREP_MAXADDR; ++i) {
+		if (ns->addr[i].ip.sa_family == AF_UNSPEC) {
+			break;
+		}
+		WITH_DEBUG {
+			char addr_str[INET6_ADDRSTRLEN];
+			inet_ntop(ns->addr[i].ip.sa_family,
+			          kr_nsrep_inaddr(ns->addr[i]), addr_str,
+			          sizeof(addr_str));
+			DEBUG_MSG(NULL, "nsrep address '%s'\n", addr_str);
+		}
+	}
+
+	DEBUG_MSG(NULL, "%s\n", "checking response for received cookies");
 
 	print_packet_dflt(pkt);
 
 	return ctx->state;
+}
+
+/** Find storage API with given prefix. */
+static struct storage_api *find_storage_api(const storage_registry_t *registry,
+                                            const char *prefix)
+{
+	assert(registry);
+	assert(prefix);
+
+	for (unsigned i = 0; i < registry->len; ++i) {
+		struct storage_api *storage = &registry->at[i];
+		if (strcmp(storage->prefix, "lmdb://") == 0) {
+			return storage;
+		}
+	}
+
+	return NULL;
 }
 
 /*
@@ -162,7 +99,6 @@ KR_EXPORT
 const knot_layer_api_t *cookies_layer(struct kr_module *module)
 {
 	static knot_layer_api_t _layer = {
-		.produce = &insert_cookie,
 		.consume = &check_response
 	};
 	/* Store module reference */
@@ -173,32 +109,38 @@ const knot_layer_api_t *cookies_layer(struct kr_module *module)
 KR_EXPORT
 int cookies_init(struct kr_module *module)
 {
-	struct cookies_ctx *data = malloc(sizeof(*data));
-	if (!data) {
-		return kr_error(ENOMEM);
-	}
-	data->clnt_scrt_size = CLNT_SCRT_MIN;
-	data->clnt_scrt = malloc(data->clnt_scrt_size);
-	if (!data->clnt_scrt) {
-		return kr_error(ENOMEM);
-	}
+	const char *storage_prefix = "lmdb://";
+	struct engine *engine = module->data;
+	DEBUG_MSG(NULL, "initialising with engine %p\n", (void *) engine);
 
-	unsigned int seed = time(NULL);
-	clnt_scrt_create(data, &seed);
+	kr_cookies_control.enabled = true; /* Leave enabled by default. */
+	memset(&kr_cookies_control.cache, 0, sizeof(kr_cookies_control.cache));
 
-	module->data = data;
+	struct storage_api *lmdb_storage_api = find_storage_api(&engine->storage_registry,
+	                                                        storage_prefix);
+	DEBUG_MSG(NULL, "found storage API %p for prefix '%s'\n",
+	          (void *) lmdb_storage_api, storage_prefix);
+
+	struct knot_db_lmdb_opts opts = KNOT_DB_LMDB_OPTS_INITIALIZER;
+	opts.path = "cookies_db";
+	//opts.dbname = "cookies";
+	opts.mapsize = 1024 * 1024 * 1024;
+	opts.maxdbs = 2;
+	opts.flags.env = 0x80000 | 0x100000; /* MDB_WRITEMAP|MDB_MAPASYNC */
+
+	errno = 0;
+	int ret = kr_cache_open(&kr_cookies_control.cache,
+	                        lmdb_storage_api->api(), &opts, engine->pool);
+	DEBUG_MSG(NULL, "cache_open retval %d: %s\n", ret, kr_strerror(ret));
+
+	module->data = NULL;
+
 	return kr_ok();
 }
 
 KR_EXPORT
 int cookies_deinit(struct kr_module *module)
 {
-	struct cookies_ctx *data = module->data;
-	module->data = NULL;
-
-	free(data->clnt_scrt);
-	free(data);
-
 	return kr_ok();
 }
 

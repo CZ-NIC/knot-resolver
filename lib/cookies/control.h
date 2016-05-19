@@ -19,9 +19,10 @@
 #include <libknot/packet/pkt.h>
 #include <stdbool.h>
 
+#include "lib/cache.h"
 #include "lib/defines.h"
 
-#define KR_COOKIE_PLD_MAX 44 /* Define in libknot. */
+#define KR_COOKIE_PLD_MAX 44 /* TODO -- Define in libknot. */
 
 /** Holds secret quantity. */
 struct secret_quantity {
@@ -33,7 +34,8 @@ struct secret_quantity {
 struct cookies_control {
 	bool enabled; /*!< Enabled/disables DNS cookies functionality. */
 	struct secret_quantity *client; /*!< Client secret quantity. */
-	/* TODO -- Cache. */
+
+	struct kr_cache cache; /*!< Server cookies cache. */
 };
 
 /** Global cookies control. */
