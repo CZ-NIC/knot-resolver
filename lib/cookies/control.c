@@ -14,13 +14,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <arpa/inet.h> /* inet_ntop() */
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <assert.h>
 #include <stdint.h>
 #include <libknot/error.h>
-#include <libknot/rrtype/opt_cookie.h>
 
+#include "contrib/fnv/fnv.h"
 #include "lib/cookies/control.h"
 #include "lib/layer.h"
 #include "lib/utils.h"
@@ -31,7 +32,7 @@ static uint8_t cc[KNOT_OPT_COOKIE_CLNT] = { 1, 2, 3, 4, 5, 6, 7, 8};
 
 static struct secret_quantity client = {
 	.size = KNOT_OPT_COOKIE_CLNT,
-	.secret = cc
+	.data = cc
 };
 
 struct cookies_control kr_cookies_control = {
@@ -68,63 +69,79 @@ static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
 	return KNOT_EOK;
 }
 
-static int prepare_client_cookie(uint8_t cc[KNOT_OPT_COOKIE_CLNT],
-                                 const void *clnt_addr,
-                                 const void *srvr_addr,
-                                 const struct secret_quantity *csq)
+static void obtain_address(void *sockaddr, uint8_t **addr, size_t *len)
 {
-	assert(cc);
-	assert(srvr_addr);
-	assert(csq);
+	assert(sockaddr && addr && len);
 
-	assert(csq->size >= KNOT_OPT_COOKIE_CLNT);
+	int addr_family = ((struct sockaddr *) sockaddr)->sa_family;
 
-	/* According to the draft (section A.1) the recommended sequence is
-	 * client IP address | server IP address , client secret. */
+	switch (addr_family) {
+	case AF_INET:
+		*addr = (uint8_t *) &((struct sockaddr_in *) sockaddr)->sin_addr;
+		*len = 4;
+		break;
+	case AF_INET6:
+		*addr = (uint8_t *) &((struct sockaddr_in6 *) sockaddr)->sin6_addr;
+		*len = 16;
+		break;
+	default:
+		*addr = NULL;
+		*len = 0;
+		addr_family = AF_UNSPEC;
+		DEBUG_MSG(NULL, "%s\n", "could obtain IP address");
+		return;
+		break;
+	}
 
-	if (clnt_addr) {
-		int addr_family = ((struct sockaddr *) clnt_addr)->sa_family;
-		if (addr_family == AF_INET) {
-			clnt_addr = &((struct sockaddr_in *) clnt_addr)->sin_addr;
-		} else if (addr_family == AF_INET6) {
-			clnt_addr = &((struct sockaddr_in6 *) clnt_addr)->sin6_addr;
-		} else {
-			//assert(0);
-			//return kr_error(EINVAL);
-			addr_family = AF_UNSPEC;
-			DEBUG_MSG(NULL, "%s\n", "could not obtain client IP address for client cookie");
-		}
+	WITH_DEBUG {
+		char ns_str[INET6_ADDRSTRLEN];
+		inet_ntop(addr_family, *addr, ns_str, sizeof(ns_str));
+		DEBUG_MSG(NULL, "obtaned IP address '%s'\n", ns_str);
+	}
+}
 
-		if (addr_family != AF_UNSPEC) {
-			WITH_DEBUG {
-				char ns_str[INET6_ADDRSTRLEN];
-				inet_ntop(addr_family, clnt_addr, ns_str, sizeof(ns_str));
-				DEBUG_MSG(NULL, "adding client IP address '%s' into client cookie\n", ns_str);
-			}
+int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
+                          void *clnt_sockaddr, void *srvr_sockaddr,
+                          struct secret_quantity *secret)
+{
+	if (!cc_buf) {
+		return kr_error(EINVAL);
+	}
+
+	if (!clnt_sockaddr && !srvr_sockaddr &&
+	    !(secret && secret->size && secret->data)) {
+		return kr_error(EINVAL);
+	}
+
+	uint8_t *addr = NULL;
+	size_t size = 0;
+
+	Fnv64_t hash_val = FNV1A_64_INIT;
+
+	if (clnt_sockaddr) {
+		obtain_address(clnt_sockaddr, &addr, &size);
+		if (addr && size) {
+			hash_val = fnv_64a_buf(addr, size, hash_val);
 		}
 	}
 
-	if (srvr_addr) {
-		int addr_family = ((struct sockaddr *) srvr_addr)->sa_family;
-		if (addr_family == AF_INET) {
-			srvr_addr = &((struct sockaddr_in *) srvr_addr)->sin_addr;
-		} else if (addr_family == AF_INET6) {
-			srvr_addr = &((struct sockaddr_in6 *) srvr_addr)->sin6_addr;
-		} else {
-			addr_family = AF_UNSPEC;
-			DEBUG_MSG(NULL, "%s\n", "could not obtain server IP address for client cookie");
-		}
-
-		if (addr_family != AF_UNSPEC) {
-			WITH_DEBUG {
-				char ns_str[INET6_ADDRSTRLEN];
-				inet_ntop(addr_family, srvr_addr, ns_str, sizeof(ns_str));
-				DEBUG_MSG(NULL, "adding server address '%s' into client cookie\n", ns_str);
-			}
+	if (srvr_sockaddr) {
+		obtain_address(srvr_sockaddr, &addr, &size);
+		if (addr && size) {
+			hash_val = fnv_64a_buf(addr, size, hash_val);
 		}
 	}
 
-	memcpy(cc, csq->secret, KNOT_OPT_COOKIE_CLNT);
+	if (secret && secret->size && secret->data) {
+		DEBUG_MSG(NULL, "%s\n", "adding client secret into cookie");
+		hash_val = fnv_64a_buf(addr, size, hash_val);
+	}
+
+	assert(KNOT_OPT_COOKIE_CLNT == sizeof(hash_val));
+
+	memcpy(cc_buf, &hash_val, KNOT_OPT_COOKIE_CLNT);
+
+	return kr_ok();
 }
 
 int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
@@ -143,7 +160,7 @@ int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
 		return kr_error(EINVAL);
 	}
 
-	int ret = prepare_client_cookie(cc, clnt_sockaddr, srvr_sockaddr,
+	int ret = kr_client_cokie_fnv64(cc, clnt_sockaddr, srvr_sockaddr,
 	                                cntrl->client);
 
 	/* This is a very nasty hack that prevents the packet to be corrupted

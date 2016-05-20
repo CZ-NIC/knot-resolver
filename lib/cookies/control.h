@@ -17,6 +17,7 @@
 #pragma once
 
 #include <libknot/packet/pkt.h>
+#include <libknot/rrtype/opt_cookie.h>
 #include <stdbool.h>
 
 #include "lib/cache.h"
@@ -27,7 +28,7 @@
 /** Holds secret quantity. */
 struct secret_quantity {
 	size_t size; /*!< Secret quantity size. */
-	const uint8_t *secret;
+	const uint8_t *data; /*!< Secret quantity data. */
 };
 
 /** DNSSEC cookies controlling structure. */
@@ -41,6 +42,19 @@ struct cookies_control {
 /** Global cookies control. */
 KR_EXPORT
 extern struct cookies_control kr_cookies_control;
+
+/**
+ * Compute client cookie.
+ * @not At least one of the arguments must be non-null.
+ * @param cc_buf        Buffer to which to write the cookie into.
+ * @param clnt_sockaddr Client address.
+ * @param srvr_sockaddr Server address.
+ * @param secret        Client secret quantity.
+ */
+KR_EXPORT
+int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
+                          void *clnt_sockaddr, void *srvr_sockaddr,
+                          struct secret_quantity *secret);
 
 /**
  * Insert a DNS cookie into query packet.
