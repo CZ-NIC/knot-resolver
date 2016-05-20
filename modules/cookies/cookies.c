@@ -42,12 +42,69 @@
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies",  fmt)
 
-/* Process response. */
+/**
+ * Check whether supplied client cookie was generated from given client secret
+ * and address.
+ *
+ * TODO -- The context must store sent cookies and server addresses in order
+ * to make the process more reliable.
+ */
+static int check_client_cookie(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                               void *clnt_sockaddr, void *srvr_sockaddr,
+                               struct secret_quantity *secret)
+{
+	uint8_t generated_cc[KNOT_OPT_COOKIE_CLNT] = {0, };
+
+	int ret = kr_client_cokie_fnv64(generated_cc, clnt_sockaddr,
+	                                srvr_sockaddr, secret);
+	if (ret != kr_ok()) {
+		return ret;
+	}
+
+	ret = memcmp(cc, generated_cc, KNOT_OPT_COOKIE_CLNT);
+	if (ret == 0) {
+		return kr_ok();
+	}
+
+	return kr_error(EINVAL);
+}
+
+/** Process response. */
 static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	if (!kr_cookies_control.enabled) {
 		return ctx->state;
 	}
+
+	if (!knot_pkt_has_edns(pkt)) {
+		return ctx->state;
+	}
+
+	uint8_t *cookie_opt = knot_edns_get_option(pkt->opt_rr, KNOT_EDNS_OPTION_COOKIE);
+	if (!cookie_opt) {
+		return ctx->state;
+	}
+
+	uint8_t *cookie_data = knot_edns_opt_get_data(cookie_opt);
+	uint16_t cookie_len = knot_edns_opt_get_length(cookie_opt);
+	assert(cookie_data && cookie_len);
+
+	const uint8_t *cc = NULL, *sc = NULL;
+	uint16_t cc_len = 0, sc_len = 0;
+
+	int ret = knot_edns_opt_cookie_parse(cookie_data, cookie_len,
+	                                     &cc, &cc_len, &sc, &sc_len);
+	if (ret != KNOT_EOK) {
+		DEBUG_MSG(NULL, "%s\n", "received malformed DNS cookie");
+		/* TODO -- Generate error. */
+		return ctx->state;
+	}
+
+	assert(cc_len == KNOT_OPT_COOKIE_CLNT);
+
+	DEBUG_MSG(NULL, "%s\n", "checking response for received cookies");
+
+	const void *srvr_sockaddr = NULL;
 
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
@@ -58,16 +115,28 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		if (ns->addr[i].ip.sa_family == AF_UNSPEC) {
 			break;
 		}
+		ret = check_client_cookie(cc, NULL, &ns->addr[i], kr_cookies_control.client);
 		WITH_DEBUG {
 			char addr_str[INET6_ADDRSTRLEN];
 			inet_ntop(ns->addr[i].ip.sa_family,
 			          kr_nsrep_inaddr(ns->addr[i]), addr_str,
 			          sizeof(addr_str));
-			DEBUG_MSG(NULL, "nsrep address '%s'\n", addr_str);
+			DEBUG_MSG(NULL, "nsrep address '%s' %d\n", addr_str, ret);
+		}
+		if (ret == kr_ok()) {
+			srvr_sockaddr = &ns->addr[i];
+			break;
 		}
 	}
 
-	DEBUG_MSG(NULL, "%s\n", "checking response for received cookies");
+	if (!srvr_sockaddr) {
+		DEBUG_MSG(NULL, "%s\n",
+		          "could not ensure any server for received cookie");
+		/* TODO -- Generate error. */
+		return ctx->state;
+	}
+
+	DEBUG_MSG(NULL, "%s\n", "caching server cookie");
 
 	print_packet_dflt(pkt);
 

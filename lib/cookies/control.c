@@ -118,12 +118,15 @@ int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
 
 	Fnv64_t hash_val = FNV1A_64_INIT;
 
+	/* Client address currently always ignored. */
+#if 0
 	if (clnt_sockaddr) {
 		obtain_address(clnt_sockaddr, &addr, &size);
 		if (addr && size) {
 			hash_val = fnv_64a_buf(addr, size, hash_val);
 		}
 	}
+#endif
 
 	if (srvr_sockaddr) {
 		obtain_address(srvr_sockaddr, &addr, &size);
