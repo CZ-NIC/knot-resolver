@@ -517,12 +517,11 @@ static void on_timeout(uv_timer_t *req)
 	}
 	/* Release timer handle */
 	task->timeout = NULL;
-	req_release(worker, (struct req *)req);
+	uv_close((uv_handle_t *)req, on_timer_close); /* Return borrowed task here */
 	/* Interrupt current pending request. */
 	task->timeouts += 1;
 	worker->stats.timeout += 1;
 	qr_task_step(task, NULL, NULL);
-	qr_task_unref(task); /* Return borrowed task */
 }
 
 static bool retransmit(struct qr_task *task)
@@ -544,6 +543,10 @@ static void on_retransmit(uv_timer_t *req)
 {
 	uv_timer_stop(req);
 	struct qr_task *task = req->data;
+	assert(task->finished == false);
+	assert(task->timeout != NULL);
+
+	uv_timer_stop(req);
 	if (!retransmit(req->data)) {
 		/* Not possible to spawn request, start timeout timer with remaining deadline. */
 		uint64_t timeout = KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
@@ -598,9 +601,9 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 	struct kr_query *leader_qry = array_tail(task->req.rplan.pending);
 	for (size_t i = task->waiting.len; i --> 0;) {
 		struct qr_task *follower = task->waiting.at[i];
-		struct kr_query *qry = array_tail(follower->req.rplan.pending);
 		/* Reuse MSGID and 0x20 secret */
-		if (qry) {
+		if (follower->req.rplan.pending.len > 0) {
+			struct kr_query *qry = array_tail(follower->req.rplan.pending);
 			qry->id = leader_qry->id;
 			qry->secret = leader_qry->secret;
 			leader_qry->secret = 0; /* Next will be already decoded */
