@@ -471,7 +471,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 				}
 			}
 			/* Do not complete NS address resolution on soft-fail. */
-			const int rcode = knot_wire_get_rcode(packet->wire);
+			const int rcode = packet ? knot_wire_get_rcode(packet->wire) : 0;
 			if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
 				qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
 			} else { /* Penalize SERVFAILs. */
