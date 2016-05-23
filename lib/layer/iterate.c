@@ -353,6 +353,18 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 	}
 }
 
+static bool is_rrsig_type_covered(const knot_rrset_t *rr, uint16_t type)
+{
+	bool ret = false;
+	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
+		if (knot_rrsig_type_covered(&rr->rrs, i) == type) {
+			ret = true;
+			break;
+		}
+	}
+	return ret;
+}
+
 static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *query = req->current_query;
@@ -383,11 +395,14 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	const knot_dname_t *cname = NULL;
 	const knot_dname_t *pending_cname = query->sname;
 	unsigned cname_chain_len = 0;
-	while (pending_cname) {
+	bool can_follow = false;
+	do {
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
 		pending_cname = NULL;
+		/* If not secure, always follow cname chain. */
+		can_follow = !(query->flags & QUERY_DNSSEC_WANT);
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 			if (!knot_dname_is_equal(rr->owner, cname)) {
@@ -401,6 +416,12 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			int state = is_final ? update_answer(rr, hint, req->answer) : update_parent(rr, query);
 			if (state == KNOT_STATE_FAIL) {
 				return state;
+			}
+			/* can_follow is false, therefore QUERY_DNSSEC_WANT flag is set.
+			 * Follow cname chain only if rrsig exists. */
+			if (!can_follow && rr->type == KNOT_RRTYPE_RRSIG &&
+			    is_rrsig_type_covered(rr, KNOT_RRTYPE_CNAME)) {
+				can_follow = true;
 			}
 			/* Jump to next CNAME target */
 			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
@@ -416,16 +437,9 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 				return KNOT_STATE_FAIL;
 			}
 			/* Don't use pending_cname immediately.
-			 * There are can be records for "old" cname.
-			 */
-			if (query->flags & QUERY_DNSSEC_WANT) {
-				/* Follow chain only within current cut (if secure). */
-				if (pending_cname && !knot_dname_in(query->zone_cut.name, pending_cname)) {
-					pending_cname = NULL;
-				}
-			}
+			 * There are can be records for "old" cname. */
 		}
-	}
+	} while (pending_cname && can_follow);
 
 	/* Make sure that this is an authoritative answer (even with AA=0) for other layers */
 	knot_wire_set_aa(pkt->wire);
