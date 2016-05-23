@@ -13,6 +13,7 @@ Knot DNS Resolver modules
 .. include:: ../modules/policy/README.rst
 .. include:: ../modules/view/README.rst
 .. include:: ../modules/predict/README.rst
+.. include:: ../modules/http/README.rst
 .. include:: ../modules/graphite/README.rst
 .. include:: ../modules/kmemcached/README.rst
 .. include:: ../modules/redis/README.rst

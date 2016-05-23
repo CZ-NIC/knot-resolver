@@ -9,6 +9,8 @@ including a feed of recent iterative queries. It also includes bindings_ to `Max
 The *stats* module is required for plotting query rate.
 By default, it listens on ``localhost:8053``.
 
+.. warning:: This is a proof of concept module for embedding Go, which has several drawbacks - it runs in separate threads, is relatively heavy-weight due to the nature of Go, and is opaque for other modules. Look at :ref:`http module <mod-http>` if you want to expose services over HTTP from other modules.
+
 Examples
 ^^^^^^^^
 

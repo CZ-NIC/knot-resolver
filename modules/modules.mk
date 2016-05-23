@@ -19,7 +19,8 @@ modules_TARGETS += ketcd \
                    view \
                    predict \
                    dns64 \
-                   renumber
+                   renumber \
+                   http
 endif
 
 # List of Golang modules
@@ -44,9 +45,17 @@ endef
 define lua_target
 $(1) := $$(addprefix $(2)/,$$($(1)_SOURCES))
 $(1)-clean:
-$(1)-install: $$(addprefix $(2)/,$$($(1)_SOURCES)) $(DESTDIR)$(MODULEDIR)
+ifeq ($$(strip $$($(1)_INSTALL)),)
+$(1)-dist:
+	$(INSTALL) -d $(DESTDIR)$(MODULEDIR)
+else
+$(1)-dist: $$($(1)_INSTALL)
+	$(INSTALL) -d $(DESTDIR)$(MODULEDIR)/$(1)
+	$(INSTALL) -m 0644 $$^ $(DESTDIR)$(MODULEDIR)/$(1)
+endif
+$(1)-install: $$(addprefix $(2)/,$$($(1)_SOURCES)) $(DESTDIR)$(MODULEDIR) $(1)-dist
 	$(INSTALL) -m 0644 $$(addprefix $(2)/,$$($(1)_SOURCES)) $(DESTDIR)$(MODULEDIR)
-.PHONY: $(1) $(1)-install $(1)-clean
+.PHONY: $(1) $(1)-install $(1)-clean $(1)-dist
 endef
 
 # Make Go module
