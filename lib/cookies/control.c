@@ -175,6 +175,34 @@ int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
 	return kr_ok();
 }
 
+/**
+ * Check whether there is a cached cookie that matches the current client
+ * cookie.
+ */
+static const uint8_t *peek_and_check_cc(struct kr_cache_txn *txn, void *sockaddr,
+                                        const uint8_t cc[KNOT_OPT_COOKIE_CLNT])
+{
+	assert(txn && sockaddr && cc);
+
+	const uint8_t *cached_opt = NULL;
+	uint32_t timestamp = 0;
+
+	int ret = kr_cookie_cache_peek_cookie(txn, sockaddr, &cached_opt,
+	                                      &timestamp);
+	if (ret != kr_ok()) {
+		return NULL;
+	}
+	assert(cached_opt);
+
+	const uint8_t *cached_cc = knot_edns_opt_get_data((uint8_t *) cached_opt);
+
+	if (0 == memcmp(cc, cached_cc, KNOT_OPT_COOKIE_CLNT)) {
+		return cached_opt;
+	}
+
+	return NULL;
+}
+
 int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
                           void *srvr_sockaddr, knot_pkt_t *pkt)
 {
@@ -189,15 +217,19 @@ int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
 		return kr_error(EINVAL);
 	}
 
-//
+	/* Generate client cookie.
+	 * TODO -- generate client cookie from client address, server address
+	 * and secret quantity. */
+	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
+	int ret = kr_client_cokie_fnv64(cc, clnt_sockaddr, srvr_sockaddr,
+	                                cntrl->secret);
+	if (ret != kr_ok()) {
+		return ret;
+	}
+
 	struct kr_cache_txn txn;
-	const uint8_t *cached_cookie = NULL;
-	uint32_t timestamp = 0;
 	kr_cache_txn_begin(&kr_cookies_control.cache, &txn, KNOT_DB_RDONLY);
-	int ret = kr_cookie_cache_peek_cookie(&txn, srvr_sockaddr,
-	                                      &cached_cookie, &timestamp);
-	bool cached = (ret == kr_ok());
-//
+	const uint8_t *cached_cookie = peek_and_check_cc(&txn, srvr_sockaddr, cc);
 
 	/* This is a very nasty hack that prevents the packet to be corrupted
 	 * when using contemporary 'Cookie interface'. */
@@ -214,17 +246,10 @@ int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
 	}
 #endif
 
-	if (cached) {
+	if (cached_cookie) {
 		ret = opt_rr_add_option(pkt->opt_rr, (uint8_t *) cached_cookie,
 		                        &pkt->mm);
 	} else {
-		/* Generate new client cookie only. */
-		uint8_t cc[KNOT_OPT_COOKIE_CLNT];
-		ret = kr_client_cokie_fnv64(cc, clnt_sockaddr, srvr_sockaddr,
-	                            cntrl->secret);
-
-		/* TODO -- generate client cookie from client address, server address
-		 * and secret quantity. */
 		ret = opt_rr_add_cookies(pkt->opt_rr, cc, NULL, 0, &pkt->mm);
 	}
 
