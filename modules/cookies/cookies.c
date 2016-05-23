@@ -27,6 +27,7 @@
 #include <time.h>
 
 #include "daemon/engine.h"
+#include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
 #include "lib/module.h"
 #include "lib/layer.h"
@@ -69,6 +70,39 @@ static int check_client_cookie(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
 	return kr_error(EINVAL);
 }
 
+/**
+ * Tries to guess the name server address from the reputation mechanism.
+ */
+static const struct sockaddr *guess_server_addr(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                                                struct kr_nsrep *nsrep,
+                                                struct secret_quantity *secret)
+{
+	assert(cc && nsrep && secret);
+
+	const struct sockaddr *sockaddr = NULL;
+
+	/* Abusing name server reputation mechanism to obtain IP addresses. */
+	for (int i = 0; i < KR_NSREP_MAXADDR; ++i) {
+		if (nsrep->addr[i].ip.sa_family == AF_UNSPEC) {
+			break;
+		}
+		int ret = check_client_cookie(cc, NULL, &nsrep->addr[i], secret);
+		WITH_DEBUG {
+			char addr_str[INET6_ADDRSTRLEN];
+			inet_ntop(nsrep->addr[i].ip.sa_family,
+			          kr_nsrep_inaddr(nsrep->addr[i]), addr_str,
+			          sizeof(addr_str));
+			DEBUG_MSG(NULL, "nsrep address '%s' %d\n", addr_str, ret);
+		}
+		if (ret == kr_ok()) {
+			sockaddr = (struct sockaddr *) &nsrep->addr[i];
+			break;
+		}
+	}
+
+	return sockaddr;
+}
+
 /** Process response. */
 static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
@@ -104,31 +138,14 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	DEBUG_MSG(NULL, "%s\n", "checking response for received cookies");
 
-	const void *srvr_sockaddr = NULL;
+	const struct sockaddr *srvr_sockaddr = NULL;
 
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
 	struct kr_nsrep *ns = &qry->ns;
 
 	/* Abusing name server reputation mechanism to obtain IP addresses. */
-	for (int i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		if (ns->addr[i].ip.sa_family == AF_UNSPEC) {
-			break;
-		}
-		ret = check_client_cookie(cc, NULL, &ns->addr[i], kr_cookies_control.client);
-		WITH_DEBUG {
-			char addr_str[INET6_ADDRSTRLEN];
-			inet_ntop(ns->addr[i].ip.sa_family,
-			          kr_nsrep_inaddr(ns->addr[i]), addr_str,
-			          sizeof(addr_str));
-			DEBUG_MSG(NULL, "nsrep address '%s' %d\n", addr_str, ret);
-		}
-		if (ret == kr_ok()) {
-			srvr_sockaddr = &ns->addr[i];
-			break;
-		}
-	}
-
+	srvr_sockaddr = guess_server_addr(cc, ns, kr_cookies_control.secret);
 	if (!srvr_sockaddr) {
 		DEBUG_MSG(NULL, "%s\n",
 		          "could not ensure any server for received cookie");
@@ -136,7 +153,25 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
+	struct kr_cache_txn txn;
+	if (kr_cache_txn_begin(&kr_cookies_control.cache, &txn, 0) != 0) {
+		/* Could not acquire cache. */
+		return ctx->state;
+	}
+
 	DEBUG_MSG(NULL, "%s\n", "caching server cookie");
+
+	/* TODO -- Cache only missing or change cookie. */
+
+	ret = kr_cookie_cache_insert_cookie(&txn, srvr_sockaddr, cookie_opt,
+	                                    qry->timestamp.tv_sec);
+	if (ret != kr_ok()) {
+		kr_cache_txn_abort(&txn);
+	} else {
+		DEBUG_MSG(NULL, "%s\n", "cookie_cached");
+		kr_cache_txn_commit(&txn);
+	}
+
 
 	print_packet_dflt(pkt);
 

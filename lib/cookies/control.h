@@ -34,7 +34,7 @@ struct secret_quantity {
 /** DNSSEC cookies controlling structure. */
 struct cookies_control {
 	bool enabled; /*!< Enabled/disables DNS cookies functionality. */
-	struct secret_quantity *client; /*!< Client secret quantity. */
+	struct secret_quantity *secret; /*!< Client secret quantity. */
 
 	struct kr_cache cache; /*!< Server cookies cache. */
 };
@@ -42,6 +42,14 @@ struct cookies_control {
 /** Global cookies control. */
 KR_EXPORT
 extern struct cookies_control kr_cookies_control;
+
+/**
+ * Get pointers to IP address bytes.
+ * @param sockaddr socket address
+ * @param addr pointer to address
+ * @param len address length
+ */
+int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len);
 
 /**
  * Compute client cookie.

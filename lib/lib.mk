@@ -5,6 +5,7 @@ libkres_SOURCES := \
 	lib/layer/validate.c   \
 	lib/layer/rrcache.c    \
 	lib/layer/pktcache.c   \
+	lib/cookies/cache.c    \
 	lib/cookies/control.c  \
 	lib/dnssec/nsec.c      \
 	lib/dnssec/nsec3.c     \
@@ -25,6 +26,7 @@ libkres_HEADERS := \
 	lib/generic/map.h      \
 	lib/generic/set.h      \
 	lib/layer.h            \
+	lib/cookies/cache.h    \
 	lib/cookies/control.h  \
 	lib/dnssec/nsec.h      \
 	lib/dnssec/nsec3.h     \

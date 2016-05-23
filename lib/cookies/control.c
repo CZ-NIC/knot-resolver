@@ -19,9 +19,11 @@
 #include <netinet/in.h>
 #include <assert.h>
 #include <stdint.h>
+#include <string.h>
 #include <libknot/error.h>
 
 #include "contrib/fnv/fnv.h"
+#include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
 #include "lib/layer.h"
 #include "lib/utils.h"
@@ -30,14 +32,14 @@
 
 static uint8_t cc[KNOT_OPT_COOKIE_CLNT] = { 1, 2, 3, 4, 5, 6, 7, 8};
 
-static struct secret_quantity client = {
+static struct secret_quantity client_secret = {
 	.size = KNOT_OPT_COOKIE_CLNT,
 	.data = cc
 };
 
 struct cookies_control kr_cookies_control = {
 	.enabled = true,
-	.client = &client
+	.secret = &client_secret
 };
 
 static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
@@ -45,14 +47,13 @@ static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
                               uint8_t *sc, uint16_t sc_len,
                               knot_mm_t *mm)
 {
-	int ret;
 	uint16_t cookies_size = 0;
 	uint8_t *cookies_data = NULL;
 
 	cookies_size = knot_edns_opt_cookie_data_len(sc_len);
 
-	ret = knot_edns_reserve_option(opt_rr, KNOT_EDNS_OPTION_COOKIE,
-	                               cookies_size, &cookies_data, mm);
+	int ret = knot_edns_reserve_option(opt_rr, KNOT_EDNS_OPTION_COOKIE,
+	                                   cookies_size, &cookies_data, mm);
 	if (ret != KNOT_EOK) {
 		return ret;
 	}
@@ -69,8 +70,33 @@ static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
 	return KNOT_EOK;
 }
 
-static void obtain_address(void *sockaddr, uint8_t **addr, size_t *len)
+static int opt_rr_add_option(knot_rrset_t *opt_rr, uint8_t *option,
+                             knot_mm_t *mm)
 {
+	assert(opt_rr && option);
+
+	uint8_t *reserved_data = NULL;
+	uint16_t opt_code = knot_edns_opt_get_code(option);
+	uint16_t opt_len = knot_edns_opt_get_length(option);
+	uint8_t *opt_data = knot_edns_opt_get_data(option);
+
+	int ret = knot_edns_reserve_option(opt_rr, opt_code,
+	                                   opt_len, &reserved_data, mm);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+	assert(reserved_data);
+
+	memcpy(reserved_data, opt_data, opt_len);
+	return KNOT_EOK;
+}
+
+int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)
+{
+	if (!sockaddr || !addr || !len) {
+		return kr_error(EINVAL);
+	}
+
 	assert(sockaddr && addr && len);
 
 	int addr_family = ((struct sockaddr *) sockaddr)->sa_family;
@@ -89,7 +115,7 @@ static void obtain_address(void *sockaddr, uint8_t **addr, size_t *len)
 		*len = 0;
 		addr_family = AF_UNSPEC;
 		DEBUG_MSG(NULL, "%s\n", "could obtain IP address");
-		return;
+		return kr_error(EINVAL);
 		break;
 	}
 
@@ -98,6 +124,8 @@ static void obtain_address(void *sockaddr, uint8_t **addr, size_t *len)
 		inet_ntop(addr_family, *addr, ns_str, sizeof(ns_str));
 		DEBUG_MSG(NULL, "obtaned IP address '%s'\n", ns_str);
 	}
+
+	return kr_ok();
 }
 
 int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
@@ -113,7 +141,7 @@ int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
 		return kr_error(EINVAL);
 	}
 
-	uint8_t *addr = NULL;
+	const uint8_t *addr = NULL;
 	size_t size = 0;
 
 	Fnv64_t hash_val = FNV1A_64_INIT;
@@ -121,23 +149,23 @@ int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
 	/* Client address currently always ignored. */
 #if 0
 	if (clnt_sockaddr) {
-		obtain_address(clnt_sockaddr, &addr, &size);
-		if (addr && size) {
+		if (kr_ok() == kr_address_bytes(clnt_sockaddr, &addr, &size)) {
+			assert(addr && size);
 			hash_val = fnv_64a_buf(addr, size, hash_val);
 		}
 	}
 #endif
 
 	if (srvr_sockaddr) {
-		obtain_address(srvr_sockaddr, &addr, &size);
-		if (addr && size) {
-			hash_val = fnv_64a_buf(addr, size, hash_val);
+		if (kr_ok() == kr_address_bytes(srvr_sockaddr, &addr, &size)) {
+			assert(addr && size);
+			hash_val = fnv_64a_buf((void *) addr, size, hash_val);
 		}
 	}
 
 	if (secret && secret->size && secret->data) {
 		DEBUG_MSG(NULL, "%s\n", "adding client secret into cookie");
-		hash_val = fnv_64a_buf(addr, size, hash_val);
+		hash_val = fnv_64a_buf((void *) addr, size, hash_val);
 	}
 
 	assert(KNOT_OPT_COOKIE_CLNT == sizeof(hash_val));
@@ -153,18 +181,23 @@ int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
 	assert(cntrl);
 	assert(pkt);
 
-	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
-
 	if (!pkt->opt_rr) {
 		return kr_ok();
 	}
 
-	if (!cntrl->client) {
+	if (!cntrl->secret) {
 		return kr_error(EINVAL);
 	}
 
-	int ret = kr_client_cokie_fnv64(cc, clnt_sockaddr, srvr_sockaddr,
-	                                cntrl->client);
+//
+	struct kr_cache_txn txn;
+	const uint8_t *cached_cookie = NULL;
+	uint32_t timestamp = 0;
+	kr_cache_txn_begin(&kr_cookies_control.cache, &txn, KNOT_DB_RDONLY);
+	int ret = kr_cookie_cache_peek_cookie(&txn, srvr_sockaddr,
+	                                      &cached_cookie, &timestamp);
+	bool cached = (ret == kr_ok());
+//
 
 	/* This is a very nasty hack that prevents the packet to be corrupted
 	 * when using contemporary 'Cookie interface'. */
@@ -181,9 +214,21 @@ int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
 	}
 #endif
 
-	/* TODO -- generate client cookie from client address, server address
-	 * and secret quantity. */
-	ret = opt_rr_add_cookies(pkt->opt_rr, cc, NULL, 0, &pkt->mm);
+	if (cached) {
+		ret = opt_rr_add_option(pkt->opt_rr, (uint8_t *) cached_cookie,
+		                        &pkt->mm);
+	} else {
+		/* Generate new client cookie only. */
+		uint8_t cc[KNOT_OPT_COOKIE_CLNT];
+		ret = kr_client_cokie_fnv64(cc, clnt_sockaddr, srvr_sockaddr,
+	                            cntrl->secret);
+
+		/* TODO -- generate client cookie from client address, server address
+		 * and secret quantity. */
+		ret = opt_rr_add_cookies(pkt->opt_rr, cc, NULL, 0, &pkt->mm);
+	}
+
+	kr_cache_txn_abort(&txn);
 
 	/* Write to packet. */
 	assert(pkt->current == KNOT_ADDITIONAL);
