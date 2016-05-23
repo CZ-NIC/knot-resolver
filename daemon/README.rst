@@ -299,8 +299,42 @@ as a parameter, but it's not very useful as you don't have any *non-global* way 
 	-- make recurrent event that will cancel after 5 times
 	event.recurrent(5 * minute, pruner())
 
+Another type of actionable event is activity on a file descriptor. This allows you to embed other
+event loops or monitor open files and then fire a callback when an activity is detected.
+This allows you to build persistent services like HTTP servers or monitoring probes that cooperate
+well with the daemon internal operations.
+
+For example a simple web server that doesn't block:
+
+.. code-block:: lua
+
+   local server, headers = require 'http.server', require 'http.headers'
+   local cqueues = require 'cqueues'
+   -- Start socket server
+   local s = server.listen { host = 'localhost', port = 8080 }
+   assert(s:listen())
+   -- Compose per-request coroutine
+   local cq = cqueues.new()
+   cq:wrap(function()
+      s:run(function(stream)
+         -- Create response headers
+         local headers = headers.new()
+         headers:append(':status', '200')
+         headers:append('connection', 'close')
+         -- Send response and close connection
+         assert(stream:write_headers(headers, false))
+         assert(stream:write_chunk('OK', true))
+         stream:shutdown()
+         stream.connection:shutdown()
+      end)
+      s:close()
+   end)
+   -- Hook to socket watcher
+   event.socket(cq:pollfd(), function (ev, status, events)
+      cq:step(0)
+   end)
+
 * File watchers
-* Data I/O
 
 .. note:: Work in progress, come back later!
 
@@ -825,6 +859,28 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
 	e = event.after(1 * minute, function() print('Hi!') end)
 	event.cancel(e)
+
+Watch for file descriptor activity. This allows embedding other event loops or simply
+firing events when a pipe endpoint becomes active. In another words, asynchronous
+notifications for daemon.
+
+.. function:: event.socket(fd, cb)
+
+   :param number fd: file descriptor to watch
+   :param cb: closure or callback to execute when fd becomes active
+   :return: event id
+
+   Execute function when there is activity on the file descriptor and calls a closure
+   with event id as the first parameter, status as second and number of events as third.
+
+   Example:
+
+   .. code-block:: lua
+
+   e = event.socket(0, function(e, status, nevents)
+      print('activity detected')
+   end)
+   e.cancel(e)
 
 Scripting worker
 ^^^^^^^^^^^^^^^^

@@ -68,6 +68,7 @@ static int l_help(lua_State *L)
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"resolve(name, type[, class, flags, callback])\n    resolve query, callback when it's finished\n"
 		"todname(name)\n    convert name to wire format\n"
+		"tojson(val)\n    convert value to JSON\n"
 		"net\n    network configuration\n"
 		"cache\n    network configuration\n"
 		"modules\n    modules configuration\n"
@@ -319,6 +320,16 @@ static char *l_pack_json(lua_State *L, int top)
 	return result;
 }
 
+static int l_tojson(lua_State *L)
+{
+	auto_free char *json_str = l_pack_json(L, 1);
+	if (!json_str) {
+		return 0;
+	}
+	lua_pushstring(L, json_str);
+	return 1;
+}
+
 /** Trampoline function for module properties. */
 static int l_trampoline(lua_State *L)
 {
@@ -431,6 +442,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "trustanchor");
 	lua_pushcfunction(engine->L, l_libpath);
 	lua_setglobal(engine->L, "libpath");
+	lua_pushcfunction(engine->L, l_tojson);
+	lua_setglobal(engine->L, "tojson");
 	lua_pushliteral(engine->L, MODULEDIR);
 	lua_setglobal(engine->L, "moduledir");
 	lua_pushliteral(engine->L, ETCDIR);

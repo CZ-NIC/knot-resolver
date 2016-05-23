@@ -692,7 +692,6 @@ static int execute_callback(lua_State *L, int argc)
 	}
 	/* Clear the stack, there may be event a/o enything returned */
 	lua_settop(L, 0);
-	lua_gc(L, LUA_GCCOLLECT, 0);
 	return ret;
 }
 
@@ -710,6 +709,26 @@ static void event_callback(uv_timer_t *timer)
 	if (ret != 0 || uv_timer_get_repeat(timer) == 0) {
 		if (!uv_is_closing((uv_handle_t *)timer)) {
 			uv_close((uv_handle_t *)timer, (uv_close_cb) event_free);
+		}
+	}
+}
+
+static void event_fdcallback(uv_poll_t* handle, int status, int events)
+{
+	struct worker_ctx *worker = handle->loop->data;
+	lua_State *L = worker->engine->L;
+
+	/* Retrieve callback and execute */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) handle->data);
+	lua_rawgeti(L, -1, 1);
+	lua_pushinteger(L, (intptr_t) handle->data);
+	lua_pushinteger(L, status);
+	lua_pushinteger(L, events);
+	int ret = execute_callback(L, 3);
+	/* Free callback if not recurrent or an error */
+	if (ret != 0) {
+		if (!uv_is_closing((uv_handle_t *)handle)) {
+			uv_close((uv_handle_t *)handle, (uv_close_cb) event_free);
 		}
 	}
 }
@@ -794,12 +813,69 @@ static int event_cancel(lua_State *L)
 	return 1;
 }
 
+static int event_fdwatch(lua_State *L)
+{
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2)) {
+		format_error(L, "expected 'socket(number fd, function)'");
+		lua_error(L);
+	}
+
+	uv_poll_t *handle = malloc(sizeof(*handle));
+	if (!handle) {
+		format_error(L, "out of memory");
+		lua_error(L);
+	}
+
+	/* Start timer with the reference */
+	int sock = lua_tonumber(L, 1);
+	uv_loop_t *loop = uv_default_loop();
+#if defined(__APPLE__) || defined(__FreeBSD__)
+	/* libuv is buggy and fails to create poller for
+	 * kqueue sockets as it can't be fcntl'd to non-blocking mode,
+	 * so we pass it a copy of standard input and then
+	 * switch it with real socket before starting the poller
+	 */
+	int decoy_fd = dup(STDIN_FILENO);
+	int ret = uv_poll_init(loop, handle, decoy_fd);
+	if (ret == 0) {
+		handle->io_watcher.fd = sock;
+	}
+	close(decoy_fd);
+#else
+	int ret = uv_poll_init(loop, handle, sock);
+#endif
+	if (ret == 0) {
+		ret = uv_poll_start(handle, UV_READABLE, event_fdcallback);
+	}
+	if (ret != 0) {
+		free(handle);
+		format_error(L, "couldn't start event poller");
+		lua_error(L);
+	}
+
+	/* Save callback and timer in registry */
+	lua_newtable(L);
+	lua_pushvalue(L, 2);
+	lua_rawseti(L, -2, 1);
+	lua_pushlightuserdata(L, handle);
+	lua_rawseti(L, -2, 2);
+	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	/* Save reference to the timer */
+	handle->data = (void *) (intptr_t)ref;
+	lua_pushinteger(L, ref);
+	return 1;
+}
+
 int lib_event(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "after",      event_after },
 		{ "recurrent",  event_recurrent },
 		{ "cancel",     event_cancel },
+		{ "socket",     event_fdwatch },
 		{ NULL, NULL }
 	};
 
