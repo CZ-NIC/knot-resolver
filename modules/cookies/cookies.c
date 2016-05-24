@@ -17,6 +17,7 @@
 //#define PRINT_PACKETS 1 /* Comment out to disable packet printing. */
 
 #include <assert.h>
+#include <ccan/json/json.h>
 #include <libknot/db/db_lmdb.h>
 #include <libknot/error.h>
 #include <libknot/mm_ctx.h>
@@ -243,6 +244,177 @@ static struct storage_api *find_storage_api(const storage_registry_t *registry,
 	return NULL;
 }
 
+#define NAME_ENABLED "enabled"
+#define NAME_CLIENT_SECRET "client_secret"
+
+static bool aply_enabled(struct cookies_control *cntrl, const JsonNode *node)
+{
+	if (node->tag == JSON_BOOL) {
+		cntrl->enabled = node->bool_;
+		return true;
+	}
+
+	return false;
+}
+
+static struct secret_quantity *new_sq_str(const JsonNode *node)
+{
+	assert(node && node->tag == JSON_STRING);
+
+	size_t len = strlen(node->string_);
+
+	struct secret_quantity *sq = malloc(sizeof(*sq) + len);
+	if (!sq) {
+		return NULL;
+	}
+	sq->size = len;
+	memcpy(sq->data, node->string_, len);
+
+	return sq;
+}
+
+#define holds_char(x) ((x) >= 0 && (x) <= 255)
+
+static struct secret_quantity *new_sq_array(const JsonNode *node)
+{
+	assert(node && node->tag == JSON_ARRAY);
+
+	const JsonNode *element = NULL;
+	size_t cnt = 0;
+	json_foreach(element, node) {
+		if (element->tag != JSON_NUMBER || !holds_char(element->number_)) {
+			return NULL;
+		}
+		++cnt;
+	}
+	if (cnt == 0) {
+		return NULL;
+	}
+
+	struct secret_quantity *sq = malloc(sizeof(*sq) + cnt);
+	if (!sq) {
+		return NULL;
+	}
+
+	sq->size = cnt;
+	cnt = 0;
+	json_foreach(element, node) {
+		sq->data[cnt++] = (uint8_t) element->number_;
+	}
+
+	return sq;
+}
+
+static bool apply_client_secret(struct cookies_control *cntrl, const JsonNode *node)
+{
+	struct secret_quantity *sq = NULL;
+
+	switch (node->tag) {
+	case JSON_STRING:
+		sq = new_sq_str(node);
+		break;
+	case JSON_ARRAY:
+		sq = new_sq_array(node);
+		break;
+	default:
+		break;
+	}
+
+	if (!sq) {
+		return false;
+	}
+
+	if (sq->size == cntrl->current_cs->size &&
+	    memcmp(sq->data, cntrl->current_cs->data, sq->size) == 0) {
+		/* Ignore same values. */
+		free(sq);
+		return true;
+	}
+
+	struct secret_quantity *tmp = cntrl->recent_cs;
+	cntrl->recent_cs = cntrl->current_cs;
+	cntrl->current_cs = sq;
+
+	if (tmp && tmp != &dflt_cs) {
+		free(tmp);
+	}
+
+	return true;
+}
+
+static bool apply_configuration(struct cookies_control *cntrl, const JsonNode *node)
+{
+	assert(cntrl && node);
+
+	if (!node->key) {
+		/* All top most nodes must have names. */
+		return false;
+	}
+
+	if (strcmp(node->key, NAME_ENABLED) == 0) {
+		return aply_enabled(cntrl, node);
+	} else if (strcmp(node->key, NAME_CLIENT_SECRET) == 0) {
+		return apply_client_secret(cntrl, node);
+	}
+
+	return false;
+}
+
+static bool read_secret(JsonNode *root, struct cookies_control *cntrl)
+{
+	assert(root && cntrl);
+
+	JsonNode *array = json_mkarray();
+	if (!array) {
+		return false;
+	}
+
+	for (size_t i = 0; i < cntrl->current_cs->size; ++i) {
+		JsonNode *element = json_mknumber(cntrl->current_cs->data[i]);
+		if (!element) {
+			goto fail;
+		}
+		json_append_element(array, element);
+	}
+
+	json_append_member(root, NAME_CLIENT_SECRET, array);
+
+	return true;
+
+fail:
+	if (array) {
+		json_delete(array);
+	}
+	return false;
+}
+
+/**
+ * Get/set DNS cookie related stuff.
+ *
+ * Input: { name: value, ... }
+ * Output: current configuration
+ */
+static char *cookies_config(void *env, struct kr_module *module, const char *args)
+{
+	if (args && strlen(args) > 0) {
+		JsonNode *node;
+		JsonNode *root_node = json_decode(args);
+		json_foreach (node, root_node) {
+			apply_configuration(&kr_cookies_control, node);
+		}
+		json_delete(root_node);
+	}
+
+	/* Return current configuration. */
+	char *result = NULL;
+	JsonNode *root_node = json_mkobject();
+	json_append_member(root_node, NAME_ENABLED, json_mkbool(kr_cookies_control.enabled));
+	read_secret(root_node, &kr_cookies_control);
+	result = json_encode(root_node);
+	json_delete(root_node);
+	return result;
+}
+
 /*
  * Module implementation.
  */
@@ -321,6 +493,7 @@ KR_EXPORT
 struct kr_prop *cookies_props(void)
 {
 	static struct kr_prop prop_list[] = {
+	    { &cookies_config, "config", "Empty value to return current configuration.", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;
