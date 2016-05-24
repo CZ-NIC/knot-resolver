@@ -149,8 +149,13 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
+	struct kr_request *req = ctx->data;
+	struct kr_query *qry = req->current_query;
+	struct kr_nsrep *ns = &qry->ns;
+
 	uint8_t *cookie_opt = knot_edns_get_option(pkt->opt_rr, KNOT_EDNS_OPTION_COOKIE);
 	if (!cookie_opt) {
+		/* Don't do anything if no cookies received. */
 		return ctx->state;
 	}
 
@@ -165,8 +170,9 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	                                     &cc, &cc_len, &sc, &sc_len);
 	if (ret != KNOT_EOK) {
 		DEBUG_MSG(NULL, "%s\n", "received malformed DNS cookie");
-		/* TODO -- Generate error. */
-		return ctx->state;
+		DEBUG_MSG(NULL, "%s'n", "falling back to TCP");
+		qry->flags |= QUERY_TCP;
+		return KNOT_STATE_PRODUCE;
 	}
 
 	assert(cc_len == KNOT_OPT_COOKIE_CLNT);
@@ -175,17 +181,13 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	const struct sockaddr *srvr_sockaddr = NULL;
 
-	struct kr_request *req = ctx->data;
-	struct kr_query *qry = req->current_query;
-	struct kr_nsrep *ns = &qry->ns;
-
 	/* Abusing name server reputation mechanism to obtain IP addresses. */
 	srvr_sockaddr = guess_server_addr(cc, ns, kr_cookies_control.secret);
 	if (!srvr_sockaddr) {
-		DEBUG_MSG(NULL, "%s\n",
-		          "could not ensure any server for received cookie");
-		/* TODO -- Generate error. */
-		return ctx->state;
+		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
+		DEBUG_MSG(NULL, "%s\n", "falling back to TCP");
+		qry->flags |= QUERY_TCP;
+		return KNOT_STATE_PRODUCE;
 	}
 
 	if (!is_cookie_cached(&kr_cookies_control.cache, srvr_sockaddr,
