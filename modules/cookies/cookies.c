@@ -182,7 +182,14 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	const struct sockaddr *srvr_sockaddr = NULL;
 
 	/* Abusing name server reputation mechanism to obtain IP addresses. */
-	srvr_sockaddr = guess_server_addr(cc, ns, kr_cookies_control.secret);
+	srvr_sockaddr = guess_server_addr(cc, ns,
+	                                  kr_cookies_control.current_cs);
+	bool returned_current = (srvr_sockaddr != NULL);
+	if (!srvr_sockaddr && kr_cookies_control.recent_cs) {
+		/* Try recent client secret to check obtained cookie. */
+		srvr_sockaddr = guess_server_addr(cc, ns,
+		                                  kr_cookies_control.recent_cs);
+	}
 	if (!srvr_sockaddr) {
 		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
 		DEBUG_MSG(NULL, "%s\n", "falling back to TCP");
@@ -190,7 +197,9 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return KNOT_STATE_PRODUCE;
 	}
 
-	if (!is_cookie_cached(&kr_cookies_control.cache, srvr_sockaddr,
+	/* Don't cache received cookies that don't match the current secret. */
+	if (returned_current &&
+	    !is_cookie_cached(&kr_cookies_control.cache, srvr_sockaddr,
 	                      cookie_opt)) {
 		DEBUG_MSG(NULL, "%s\n", "caching server cookie");
 
@@ -256,7 +265,12 @@ int cookies_init(struct kr_module *module)
 	struct engine *engine = module->data;
 	DEBUG_MSG(NULL, "initialising with engine %p\n", (void *) engine);
 
-	kr_cookies_control.enabled = true; /* Leave enabled by default. */
+	memset(&kr_cookies_control, 0, sizeof(kr_cookies_control));
+
+	kr_cookies_control.enabled = false;
+
+	kr_cookies_control.current_cs = &dflt_cs;
+
 	memset(&kr_cookies_control.cache, 0, sizeof(kr_cookies_control.cache));
 
 	struct storage_api *lmdb_storage_api = find_storage_api(&engine->storage_registry,
@@ -284,6 +298,22 @@ int cookies_init(struct kr_module *module)
 KR_EXPORT
 int cookies_deinit(struct kr_module *module)
 {
+	kr_cookies_control.enabled = false;
+
+	if (kr_cookies_control.recent_cs &&
+	    kr_cookies_control.recent_cs != &dflt_cs) {
+		free(kr_cookies_control.recent_cs);
+	}
+	kr_cookies_control.recent_cs = NULL;
+
+	if (kr_cookies_control.current_cs &&
+	    kr_cookies_control.current_cs != &dflt_cs) {
+		free(kr_cookies_control.current_cs);
+	}
+	kr_cookies_control.current_cs = &dflt_cs;
+
+	kr_cache_close(&kr_cookies_control.cache);
+
 	return kr_ok();
 }
 

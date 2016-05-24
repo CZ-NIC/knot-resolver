@@ -28,13 +28,19 @@
 /** Holds secret quantity. */
 struct secret_quantity {
 	size_t size; /*!< Secret quantity size. */
-	const uint8_t *data; /*!< Secret quantity data. */
+	uint8_t data[]; /*!< Secret quantity data. */
 };
+
+/* Default client secret. */
+KR_EXPORT
+extern struct secret_quantity dflt_cs;
 
 /** DNSSEC cookies controlling structure. */
 struct cookies_control {
 	bool enabled; /*!< Enabled/disables DNS cookies functionality. */
-	struct secret_quantity *secret; /*!< Client secret quantity. */
+
+	struct secret_quantity *current_cs; /*!< current client secret */
+	struct secret_quantity *recent_cs; /*!< recent client secret */
 
 	struct kr_cache cache; /*!< Server cookies cache. */
 };

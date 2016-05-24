@@ -30,16 +30,15 @@
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies_control",  fmt)
 
-static uint8_t cc[KNOT_OPT_COOKIE_CLNT] = { 1, 2, 3, 4, 5, 6, 7, 8};
-
-static struct secret_quantity client_secret = {
+/* Default client secret. */
+struct secret_quantity dflt_cs = {
 	.size = KNOT_OPT_COOKIE_CLNT,
-	.data = cc
+	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
 struct cookies_control kr_cookies_control = {
-	.enabled = true,
-	.secret = &client_secret
+	.enabled = false,
+	.current_cs = &dflt_cs
 };
 
 static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
@@ -213,7 +212,7 @@ int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
 		return kr_ok();
 	}
 
-	if (!cntrl->secret) {
+	if (!cntrl->current_cs) {
 		return kr_error(EINVAL);
 	}
 
@@ -222,7 +221,7 @@ int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
 	 * and secret quantity. */
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
 	int ret = kr_client_cokie_fnv64(cc, clnt_sockaddr, srvr_sockaddr,
-	                                cntrl->secret);
+	                                cntrl->current_cs);
 	if (ret != kr_ok()) {
 		return ret;
 	}
