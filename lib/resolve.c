@@ -469,6 +469,19 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Track RTT for iterative answers */
 	if (src && !(qry->flags & QUERY_CACHED)) {
+		/* Track response source. */
+		switch (src->sa_family) {
+		case AF_INET:
+			qry->rsource.ip4 = *(struct sockaddr_in *) src;
+			break;
+		case AF_INET6:
+			qry->rsource.ip6 = *(struct sockaddr_in6 *) src;
+			break;
+		default:
+			qry->rsource.ip4.sin_family = AF_UNSPEC;
+			break;
+		}
+
 		/* Sucessful answer, track RTT and lift any address resolution requests. */
 		if (request->state != KNOT_STATE_FAIL) {
 			/* Do not track in safe mode. */

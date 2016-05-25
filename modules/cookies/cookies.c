@@ -181,11 +181,29 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	DEBUG_MSG(NULL, "%s\n", "checking response for received cookies");
 
+	/* Try obtaining response origin address from query context. */
 	const struct sockaddr *srvr_sockaddr = NULL;
+	if (qry->rsource.ip4.sin_family == AF_INET ||
+	    qry->rsource.ip4.sin_family == AF_INET6) {
+		srvr_sockaddr = (struct sockaddr *) &qry->rsource.ip4;
+		WITH_DEBUG {
+			char addr_str[INET6_ADDRSTRLEN];
+			(void *) &qry->rsource.ip4.sin_addr;
+			(void *) &qry->rsource.ip6.sin6_addr;
+			inet_ntop(srvr_sockaddr->sa_family,
+			          (srvr_sockaddr->sa_family == AF_INET) ?
+			              (void *) &qry->rsource.ip4.sin_addr :
+			              (void *) &qry->rsource.ip6.sin6_addr,
+			          addr_str, sizeof(addr_str));
+			DEBUG_MSG(NULL, "response address '%s' %d\n", addr_str, ret);
+		}
+	}
 
 	/* Abusing name server reputation mechanism to obtain IP addresses. */
-	srvr_sockaddr = guess_server_addr(cc, ns,
-	                                  kr_cookies_control.current_cs);
+	if (!srvr_sockaddr) {
+		srvr_sockaddr = guess_server_addr(cc, ns,
+		                                  kr_cookies_control.current_cs);
+	}
 	bool returned_current = (srvr_sockaddr != NULL);
 	if (!srvr_sockaddr && kr_cookies_control.recent_cs) {
 		/* Try recent client secret to check obtained cookie. */

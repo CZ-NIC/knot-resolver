@@ -75,6 +75,10 @@ struct kr_query {
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;
+	union {
+		struct sockaddr_in ip4;
+		struct sockaddr_in6 ip6;
+	} rsource; /**< Response source address. */
 };
 
 /** @cond internal Array of queries. */
