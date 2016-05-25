@@ -156,7 +156,10 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	uint8_t *cookie_opt = knot_edns_get_option(pkt->opt_rr, KNOT_EDNS_OPTION_COOKIE);
 	if (!cookie_opt) {
-		/* Don't do anything if no cookies received. */
+		/* Don't do anything if no cookies received.
+		 * TODO -- If cookies expected then discard response. The
+		 * interface must provide information about the IP address of
+		 * the server. */
 		return ctx->state;
 	}
 
@@ -171,9 +174,7 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	                                     &cc, &cc_len, &sc, &sc_len);
 	if (ret != KNOT_EOK) {
 		DEBUG_MSG(NULL, "%s\n", "received malformed DNS cookie");
-		DEBUG_MSG(NULL, "%s'n", "falling back to TCP");
-		qry->flags |= QUERY_TCP;
-		return KNOT_STATE_PRODUCE;
+		return KNOT_STATE_FAIL;
 	}
 
 	assert(cc_len == KNOT_OPT_COOKIE_CLNT);
@@ -193,9 +194,7 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	if (!srvr_sockaddr) {
 		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
-		DEBUG_MSG(NULL, "%s\n", "falling back to TCP");
-		qry->flags |= QUERY_TCP;
-		return KNOT_STATE_PRODUCE;
+		return KNOT_STATE_FAIL;
 	}
 
 	/* Don't cache received cookies that don't match the current secret. */
