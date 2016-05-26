@@ -128,8 +128,8 @@ int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)
 }
 
 int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
-                          void *clnt_sockaddr, void *srvr_sockaddr,
-                          struct secret_quantity *secret)
+                          const void *clnt_sockaddr, const void *srvr_sockaddr,
+                          const struct secret_quantity *secret)
 {
 	if (!cc_buf) {
 		return kr_error(EINVAL);
@@ -178,7 +178,8 @@ int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
  * Check whether there is a cached cookie that matches the current client
  * cookie.
  */
-static const uint8_t *peek_and_check_cc(struct kr_cache_txn *txn, void *sockaddr,
+static const uint8_t *peek_and_check_cc(struct kr_cache_txn *txn,
+                                        const void *sockaddr,
                                         const uint8_t cc[KNOT_OPT_COOKIE_CLNT])
 {
 	assert(txn && sockaddr && cc);
@@ -202,8 +203,9 @@ static const uint8_t *peek_and_check_cc(struct kr_cache_txn *txn, void *sockaddr
 	return NULL;
 }
 
-int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
-                          void *srvr_sockaddr, knot_pkt_t *pkt)
+int kr_request_put_cookie(const struct cookies_control *cntrl,
+                          const void *clnt_sockaddr, const void *srvr_sockaddr,
+                          knot_pkt_t *pkt)
 {
 	assert(cntrl);
 	assert(pkt);

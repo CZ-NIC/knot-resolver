@@ -67,8 +67,8 @@ int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len);
  */
 KR_EXPORT
 int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
-                          void *clnt_sockaddr, void *srvr_sockaddr,
-                          struct secret_quantity *secret);
+                          const void *clnt_sockaddr, const void *srvr_sockaddr,
+                          const struct secret_quantity *secret);
 
 /**
  * Insert a DNS cookie into query packet.
@@ -79,5 +79,6 @@ int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
  * @param pkt           DNS request packet.
  */
 KR_EXPORT
-int kr_request_put_cookie(struct cookies_control *cntrl, void *clnt_sockaddr,
-                          void *srvr_sockaddr, knot_pkt_t *pkt);
+int kr_request_put_cookie(const struct cookies_control *cntrl,
+                          const void *clnt_sockaddr, const void *srvr_sockaddr,
+                          knot_pkt_t *pkt);
