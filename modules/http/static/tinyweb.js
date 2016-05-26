@@ -25,7 +25,6 @@ window.onload = function() {
 		},
 		data: statsHistory
 	});
-	var statsPrev = null;
 
 	/*
 	 * Realtime updates over WebSockets
@@ -34,16 +33,10 @@ window.onload = function() {
 		var now = Date.now();
 		var next = [];
 		for (i = 0; i < statsLabels.length; ++i) {
-			next.push(resp['answer.' + statsLabels[i]]);
+			var val = resp['answer.' + statsLabels[i]];
+			next.push({time: now, y: val});
 		}
-		if (statsPrev) {
-			var delta = [];
-			for (i = 0; i < statsLabels.length; ++i) {
-				delta.push({time: now, y: next[i]-statsPrev[i]});
-			}
-			statsChart.push(delta);
-		}
-		statsPrev = next;
+		statsChart.push(next);
 	}
 
 	/* WebSocket endpoints */
@@ -54,7 +47,4 @@ window.onload = function() {
       var data = $.parseJSON(evt.data);
       pushMetrics(data);
     };
-    setInterval(function() {
-    	ws.send('ping')
-    }, 500);
 }

@@ -14,15 +14,17 @@ local M = {
 -- Load dependent modules
 if not stats then modules.load('stats') end
 local function stream_stats(h, ws)
-	local ok, err = true, nil
+	local ok, prev = true, stats.list()
 	while ok do
-		-- Receive PINGs
-		ok, err = ws:receive()
-		if not ok then
-			ws.socket:clearerr()
+		-- Get current snapshot
+		local cur, update = stats.list(), {}
+		for k,v in pairs(cur) do
+			update[k] = v - (prev[k] or 0)
 		end
-		-- Stream 
-		ok, err = ws:send(tojson(stats.list()))
+		prev = cur
+		-- Publish stats updates periodically
+		ok = ws:send(tojson(update))
+		cqueues.sleep(0.5)
 	end
 	ws:close()
 end
@@ -140,14 +142,12 @@ function M.listen(m, host, port, cb, cert)
 	table.insert(M.servers, s)
 end
 
--- @function 
-
 -- @function Cleanup module
 function M.deinit()
 	if M.ev then event.cancel(M.ev) end
 	M.servers = {}
 end
-
+-- 
 -- @function Configure module
 function M.config(conf)
 		assert(type(conf) == 'table', 'config { host = "...", port = 443, cert = "..." }')
@@ -158,10 +158,29 @@ function M.config(conf)
 		-- TODO: configure DNS/HTTP(s) interface
 		-- M:listen(conf.dns.host, conf.dns/port, serve_web)
 		if M.ev then return end
-		M.ev = event.socket(cq:pollfd(), function (ev, status, events)
+		-- Schedule both I/O activity notification and timeouts
+		local poll_step
+		poll_step = function (ev, status, events)
 			local ok, err, _, co = cq:step(0)
 			if not ok then print('[http] '..err, debug.traceback(co)) end
-		end)
+			-- Reschedule timeout or create new one
+			local timeout = cq:timeout()
+			if timeout then
+				-- Convert from seconds to duration
+				timeout = timeout * sec
+				if not M.timeout then
+					M.timeout = event.after(timeout, poll_step)
+				else
+					event.reschedule(M.timeout, timeout)
+				end
+			else -- Cancel running timeout when there is no next deadline
+				if M.timeout then
+					event.cancel(M.timeout)
+					M.timeout = nil
+				end
+			end
+		end
+		M.ev = event.socket(cq:pollfd(), poll_step)
 end
 
 return M
