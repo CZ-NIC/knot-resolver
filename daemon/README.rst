@@ -847,6 +847,24 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 		print('Hi #'..msg_count)
 	end)
 
+.. function:: event.reschedule(event_id, timeout)
+
+   Reschedule a running event, it has no effect on canceled events.
+   New events may reuse the event_id, so the behaviour is undefined if the function
+   is called after another event is started.
+
+   Example:
+
+   .. code-block:: lua
+
+   local interval = 1 * minute
+   event.after(1 * minute, function (ev)
+      print('Good morning!')
+      -- Halven the interval for each iteration
+      interval = interval / 2
+      event.reschedule(ev, interval)
+   end)
+
 .. function:: event.cancel(event_id)
 
    Cancel running event, it has no effect on already canceled events.

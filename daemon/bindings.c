@@ -722,7 +722,7 @@ static void event_callback(uv_timer_t *timer)
 	lua_pushinteger(L, (intptr_t) timer->data);
 	int ret = execute_callback(L, 1);
 	/* Free callback if not recurrent or an error */
-	if (ret != 0 || uv_timer_get_repeat(timer) == 0) {
+	if (ret != 0 || (uv_timer_get_repeat(timer) == 0 && uv_is_active((uv_handle_t *)timer) == 0)) {
 		if (!uv_is_closing((uv_handle_t *)timer)) {
 			uv_close((uv_handle_t *)timer, (uv_close_cb) event_free);
 		}
@@ -829,6 +829,39 @@ static int event_cancel(lua_State *L)
 	return 1;
 }
 
+static int event_reschedule(lua_State *L)
+{
+	int n = lua_gettop(L);
+	if (n < 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		format_error(L, "expected 'reschedule(number event, number timeout)'");
+		lua_error(L);
+	}
+
+	/* Fetch event if it exists */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
+	if (!lua_istable(L, -1)) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	/* Reschedule the timer */
+	lua_rawgeti(L, -1, 2);
+	uv_handle_t *timer = lua_touserdata(L, -1);
+	if (!uv_is_closing(timer)) {
+		if (uv_is_active(timer)) {
+			uv_timer_stop((uv_timer_t *)timer);
+		}
+		int ret = uv_timer_start((uv_timer_t *)timer, event_callback, lua_tointeger(L, 2), 0);
+		if (ret != 0) {
+			event_cancel(L);
+			lua_pushboolean(L, false);
+			return 1;
+		}
+	}
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 static int event_fdwatch(lua_State *L)
 {
 	/* Check parameters */
@@ -892,6 +925,7 @@ int lib_event(lua_State *L)
 		{ "recurrent",  event_recurrent },
 		{ "cancel",     event_cancel },
 		{ "socket",     event_fdwatch },
+		{ "reschedule", event_reschedule },
 		{ NULL, NULL }
 	};
 
