@@ -50,11 +50,6 @@ void network_init(struct network *net, uv_loop_t *loop)
 	}
 }
 
-static void free_handle(uv_handle_t *handle)
-{
-	free(handle);
-}
-
 static void close_handle(uv_handle_t *handle, bool force)
 {
 	if (force) { /* Force close if event loop isn't running. */
@@ -62,9 +57,10 @@ static void close_handle(uv_handle_t *handle, bool force)
 		if (uv_fileno(handle, &fd) == 0) {
 			close(fd);
 		}
-		free_handle(handle);
+		handle->loop = NULL;
+		io_free(handle);
 	} else { /* Asynchronous close */
-		uv_close(handle, free_handle);
+		uv_close(handle, io_free);
 	}
 }
 

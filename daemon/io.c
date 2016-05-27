@@ -54,8 +54,10 @@ static void session_clear(struct session *s)
 
 void session_free(struct session *s)
 {
-	session_clear(s);
-	free(s);
+	if (s) {
+		session_clear(s);
+		free(s);
+	}
 }
 
 struct session *session_new(void)
