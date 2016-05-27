@@ -463,7 +463,12 @@ static int cache_open(lua_State *L)
 static int cache_close(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	kr_cache_close(&engine->resolver.cache);
+	struct kr_cache *cache = &engine->resolver.cache;
+	if (!kr_cache_is_open(cache)) {
+		return 0;
+	}
+
+	kr_cache_close(cache);
 	lua_getglobal(L, "cache");
 	lua_pushstring(L, "current_size");
 	lua_pushnumber(L, 0);
@@ -527,15 +532,18 @@ static int cache_remove_prefix(struct kr_cache *cache, const char *args)
 /** Prune expired/invalid records. */
 static int cache_prune(lua_State *L)
 {
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	if (!kr_cache_is_open(cache)) {
+		return 0;
+	}
+
 	/* Check parameters */
 	int prune_max = UINT16_MAX;
 	int n = lua_gettop(L);
 	if (n >= 1 && lua_isnumber(L, 1)) {
 		prune_max = lua_tointeger(L, 1);
 	}
-
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
 
 	/* Check if API supports pruning. */
 	int ret = kr_error(ENOSYS);
@@ -554,6 +562,12 @@ static int cache_prune(lua_State *L)
 /** Clear all records. */
 static int cache_clear(lua_State *L)
 {
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	if (!kr_cache_is_open(cache)) {
+		return 0;
+	}
+
 	/* Check parameters */
 	const char *args = NULL;
 	int n = lua_gettop(L);
@@ -562,8 +576,6 @@ static int cache_clear(lua_State *L)
 	}
 
 	/* Clear a sub-tree in cache. */
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
 	if (args && strlen(args) > 0) {
 		int ret = cache_remove_prefix(cache, args);
 		if (ret < 0) {
@@ -631,6 +643,12 @@ static void cache_dump_key(lua_State *L, knot_db_val_t *key)
 /** Query cached records. */
 static int cache_get(lua_State *L)
 {
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	if (!kr_cache_is_open(cache)) {
+		return 0;
+	}
+
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n < 1 || !lua_isstring(L, 1)) {
@@ -639,8 +657,6 @@ static int cache_get(lua_State *L)
 	}
 
 	/* Clear a sub-tree in cache. */
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
 	const char *args = lua_tostring(L, 1);
 	/* Retrieve set of keys */
 	static knot_db_val_t result_set[100];
