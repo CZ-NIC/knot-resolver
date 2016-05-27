@@ -30,11 +30,17 @@ $(eval $(call find_lib,libdnssec))
 $(eval $(call find_lib,libsystemd))
 $(eval $(call find_gopkg,geoip,github.com/abh/geoip))
 
-GO_VERSION  := $(shell $(GO) version | sed -e 's/^go version go\([0-9]\)[.]\([0-9]\)[.]\([0-9]\) .*/\1\2/')
-GO_PLATFORM := $(shell $(GO) version | sed -e 's,^go version go[0-9.]* linux/,,')
-
+# Find Go version and platform
+GO_VERSION := $(shell $(GO) version 2>/dev/null)
+ifeq ($(GO_VERSION),)
+        GO_VERSION := 0
+else
+        GO_PLATFORM := $(word 2,$(subst /, ,$(word 4,$(GO_VERSION))))
+        GO_VERSION := $(subst .,,$(subst go,,$(word 3,$(GO_VERSION))))
+endif
 $(eval $(call find_ver,go,$(GO_VERSION),16))
 
+# Check if Go is able to build shared libraries
 ifeq ($(HAS_go),yes)
 ifneq ($(GO_PLATFORM),$(filter $(GO_PLATFORM),amd64 386 arm arm64))
 HAS_go := no
@@ -42,8 +48,9 @@ endif
 else
 $(eval $(call find_ver,go,$(GO_VERSION),15))
 ifeq ($HAS_go,yes)
-ifneq($(GO_PLATFORM),$(filter $(GO_PLATFORM),arm amd64))
+ifneq ($(GO_PLATFORM),$(filter $(GO_PLATFORM),arm amd64))
 HAS_go := no
+endif
 endif
 endif
 
