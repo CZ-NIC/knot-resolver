@@ -164,6 +164,23 @@ int kr_cookie_cache_insert(struct kr_cache_txn *txn,
 	return kr_ok();
 }
 
+int kr_cookie_cache_remove(struct kr_cache_txn *txn,
+                           uint8_t tag, const void *sockaddr)
+{
+	if (!txn_is_valid(txn) || !sockaddr) {
+		return kr_error(EINVAL);
+	}
+
+	uint8_t keybuf[KEY_SIZE];
+	size_t key_len = cache_key(keybuf, tag, sockaddr);
+	if (key_len == 0) {
+		return kr_error(EILSEQ);
+	}
+	knot_db_val_t key = { keybuf, key_len };
+	txn->owner->stats.delete += 1;
+	return txn_api(txn)->del(&txn->t, &key);
+}
+
 int kr_cookie_cache_peek_cookie(struct kr_cache_txn *txn, const void *sockaddr,
                                 struct timed_cookie *cookie, uint32_t *timestamp)
 {

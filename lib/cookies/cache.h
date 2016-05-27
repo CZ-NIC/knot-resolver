@@ -52,6 +52,17 @@ int kr_cookie_cache_insert(struct kr_cache_txn *txn,
                            struct kr_cache_entry *header, knot_db_val_t data);
 
 /**
+ * Remove asset from cache.
+ * @param txn transaction instance
+ * @param tag asset tag
+ * @param sockaddr asset socket address
+ * @return 0 or an error code
+ */
+KR_EXPORT
+int kr_cookie_cache_remove(struct kr_cache_txn *txn,
+                           uint8_t tag, const void *sockaddr);
+
+/**
  * Structure used for cookie cache interface.
  * @note There is no other way how to pass a ttl into a cookie.
  */
@@ -86,3 +97,6 @@ KR_EXPORT
 int kr_cookie_cache_insert_cookie(struct kr_cache_txn *txn, const void *sockaddr,
                                   const struct timed_cookie *cookie,
                                   uint32_t timestamp);
+
+#define kr_cookie_cache_remove_cookie(txn, sockaddr) \
+	kr_cookie_cache_remove((txn), KR_CACHE_COOKIE, (sockaddr))
