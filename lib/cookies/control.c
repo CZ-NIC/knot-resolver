@@ -184,20 +184,24 @@ static const uint8_t *peek_and_check_cc(struct kr_cache_txn *txn,
 {
 	assert(txn && sockaddr && cc);
 
-	const uint8_t *cached_opt = NULL;
 	uint32_t timestamp = 0;
+	struct timed_cookie timed_cookie = { 0, };
 
-	int ret = kr_cookie_cache_peek_cookie(txn, sockaddr, &cached_opt,
+	int ret = kr_cookie_cache_peek_cookie(txn, sockaddr, &timed_cookie,
 	                                      &timestamp);
 	if (ret != kr_ok()) {
 		return NULL;
 	}
-	assert(cached_opt);
+	assert(timed_cookie.cookie_opt);
 
-	const uint8_t *cached_cc = knot_edns_opt_get_data((uint8_t *) cached_opt);
+	/* Ignore the timestamp and time to leave. If the cookie is in cache
+	 * then just use it. The cookie control should be prerformed in the
+	 * cookie module/layer. */
+
+	const uint8_t *cached_cc = knot_edns_opt_get_data((uint8_t *) timed_cookie.cookie_opt);
 
 	if (0 == memcmp(cc, cached_cc, KNOT_OPT_COOKIE_CLNT)) {
-		return cached_opt;
+		return timed_cookie.cookie_opt;
 	}
 
 	return NULL;
@@ -230,7 +234,8 @@ int kr_request_put_cookie(const struct cookies_control *cntrl,
 
 	struct kr_cache_txn txn;
 	kr_cache_txn_begin(&kr_cookies_control.cache, &txn, KNOT_DB_RDONLY);
-	const uint8_t *cached_cookie = peek_and_check_cc(&txn, srvr_sockaddr, cc);
+	const uint8_t *cached_cookie = peek_and_check_cc(&txn, srvr_sockaddr,
+	                                                 cc);
 
 	/* This is a very nasty hack that prevents the packet to be corrupted
 	 * when using contemporary 'Cookie interface'. */

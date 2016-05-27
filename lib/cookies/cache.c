@@ -116,8 +116,9 @@ static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *heade
 {
 	assert(dst && header);
 	memcpy(dst, header, sizeof(*header));
-	if (data.data)
+	if (data.data) {
 		memcpy(dst->data, data.data, data.len);
+	}
 }
 
 int kr_cookie_cache_insert(struct kr_cache_txn *txn,
@@ -164,9 +165,9 @@ int kr_cookie_cache_insert(struct kr_cache_txn *txn,
 }
 
 int kr_cookie_cache_peek_cookie(struct kr_cache_txn *txn, const void *sockaddr,
-                                const uint8_t **cookie_opt, uint32_t *timestamp)
+                                struct timed_cookie *cookie, uint32_t *timestamp)
 {
-	if (!txn_is_valid(txn) || !sockaddr || !cookie_opt || !timestamp) {
+	if (!txn_is_valid(txn) || !sockaddr || !cookie || !timestamp) {
 		return kr_error(EINVAL);
 	}
 
@@ -176,34 +177,36 @@ int kr_cookie_cache_peek_cookie(struct kr_cache_txn *txn, const void *sockaddr,
 	if (ret != 0) {
 		return ret;
 	}
-	*cookie_opt = entry->data;
+	cookie->ttl = entry->ttl;
+	cookie->cookie_opt = entry->data;
 	return kr_ok();
 }
 
 int kr_cookie_cache_insert_cookie(struct kr_cache_txn *txn, const void *sockaddr,
-                                  uint8_t *cookie_opt, uint32_t timestamp)
+                                  const struct timed_cookie *cookie,
+                                  uint32_t timestamp)
 {
 	if (!txn_is_valid(txn) || !sockaddr) {
 		return kr_error(EINVAL);
 	}
 
 	/* Ignore empty cookie data. */
-	if (!cookie_opt) {
+	if (!cookie || !cookie->cookie_opt) {
 		return kr_ok();
 	}
 
 	/* Prepare header to write. */
 	struct kr_cache_entry header = {
 		.timestamp = timestamp,
-		.ttl = 72000,
+		.ttl = cookie->ttl,
 		.rank = KR_RANK_BAD,
 		.flags = KR_CACHE_FLAG_NONE,
-		.count = 1
+		.count = 1 /* Only one entry. */
 	};
 
-	size_t cookie_opt_size = knot_edns_opt_get_length(cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
+	size_t cookie_opt_size = knot_edns_opt_get_length(cookie->cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
 
-	knot_db_val_t data = { cookie_opt, cookie_opt_size };
+	knot_db_val_t data = { (uint8_t *) cookie->cookie_opt, cookie_opt_size };
 	return kr_cookie_cache_insert(txn, KR_CACHE_COOKIE, sockaddr, &header,
 	                              data);
 }

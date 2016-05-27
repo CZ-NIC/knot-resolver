@@ -180,34 +180,36 @@ static int server_sockaddr(const struct sockaddr **sockaddr, bool *is_current,
 
 static bool is_cookie_cached(struct kr_cache *cache,
                              const struct sockaddr *sockaddr,
-                             uint8_t *cookie_opt)
+                             const uint8_t *cookie_opt)
 {
 	assert(cache && sockaddr && cookie_opt);
 
-	const uint8_t *cached_cookie = NULL;
+	struct timed_cookie timed_cookie = { 0, };
 	uint32_t timestamp = 0;
 
 	struct kr_cache_txn txn;
 	kr_cache_txn_begin(&kr_cookies_control.cache, &txn, KNOT_DB_RDONLY);
 
-	int ret = kr_cookie_cache_peek_cookie(&txn, sockaddr, &cached_cookie,
+	int ret = kr_cookie_cache_peek_cookie(&txn, sockaddr, &timed_cookie,
 	                                      &timestamp);
 	if (ret != kr_ok()) {
 		/* Not cached or error. */
 		kr_cache_txn_abort(&txn);
 		return false;
 	}
-	assert(cached_cookie);
+	assert(timed_cookie.cookie_opt);
+
+	/* TODO -- Check ttl and drift, if not present then delete cookie. */
 
 	uint16_t cookie_opt_size = knot_edns_opt_get_length(cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
-	uint16_t cached_cookie_size = knot_edns_opt_get_length((uint8_t *) cached_cookie) + KNOT_EDNS_OPTION_HDRLEN;
+	uint16_t cached_cookie_size = knot_edns_opt_get_length(timed_cookie.cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
 
 	if (cookie_opt_size != cached_cookie_size) {
 		kr_cache_txn_abort(&txn);
 		return false;
 	}
 
-	bool equal = (memcmp(cookie_opt, cached_cookie, cookie_opt_size) == 0);
+	bool equal = (memcmp(cookie_opt, timed_cookie.cookie_opt, cookie_opt_size) == 0);
 
 	kr_cache_txn_abort(&txn);
 	return equal;
@@ -279,8 +281,10 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 			return ctx->state;
 		}
 
+		struct timed_cookie timed_cookie = { COOKIE_TTL, cookie_opt };
+
 		ret = kr_cookie_cache_insert_cookie(&txn, srvr_sockaddr,
-		                                    cookie_opt,
+		                                    &timed_cookie,
 		                                    qry->timestamp.tv_sec);
 		if (ret != kr_ok()) {
 			kr_cache_txn_abort(&txn);
