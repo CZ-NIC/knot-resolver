@@ -73,6 +73,35 @@ static int check_client_cookie(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
 }
 
 /**
+ * Obtain address from query/response context if if can be obtained.
+ */
+static const struct sockaddr *passed_server_sockaddr(const struct kr_query *qry)
+{
+	assert(qry);
+
+	const struct sockaddr *tmp_sockaddr = NULL;
+	if (qry->rsource.ip4.sin_family == AF_INET ||
+	    qry->rsource.ip4.sin_family == AF_INET6) {
+		tmp_sockaddr = (struct sockaddr *) &qry->rsource.ip4;
+		WITH_DEBUG {
+			char addr_str[INET6_ADDRSTRLEN];
+			(void *) &qry->rsource.ip4.sin_addr;
+			(void *) &qry->rsource.ip6.sin6_addr;
+			inet_ntop(tmp_sockaddr->sa_family,
+			          (tmp_sockaddr->sa_family == AF_INET) ?
+			              (void *) &qry->rsource.ip4.sin_addr :
+			              (void *) &qry->rsource.ip6.sin6_addr,
+			          addr_str, sizeof(addr_str));
+			DEBUG_MSG(NULL,
+			          "obtained response address '%s' from query context \n",
+			          addr_str);
+		}
+	}
+
+	return tmp_sockaddr;
+}
+
+/**
  * Tries to guess the name server address from the reputation mechanism.
  */
 static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
@@ -113,31 +142,14 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
  * @param cntr cookie control structure
  * @return kr_ok() if matching address found, error code else
  */
-static int server_sockaddr(const struct sockaddr **sockaddr, bool *is_current,
-                           const struct kr_query *qry,
-                           const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
-                           const struct cookies_control *cntrl)
+static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr, bool *is_current,
+                                  const struct kr_query *qry,
+                                  const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                                  const struct cookies_control *cntrl)
 {
 	assert(sockaddr && is_current && qry && cc && cntrl);
 
-	/* Obtain address from query/response context. */
-	const struct sockaddr *tmp_sockaddr = NULL;
-	if (qry->rsource.ip4.sin_family == AF_INET ||
-	    qry->rsource.ip4.sin_family == AF_INET6) {
-		tmp_sockaddr = (struct sockaddr *) &qry->rsource.ip4;
-		WITH_DEBUG {
-			char addr_str[INET6_ADDRSTRLEN];
-			(void *) &qry->rsource.ip4.sin_addr;
-			(void *) &qry->rsource.ip6.sin6_addr;
-			inet_ntop(tmp_sockaddr->sa_family,
-			          (tmp_sockaddr->sa_family == AF_INET) ?
-			              (void *) &qry->rsource.ip4.sin_addr :
-			              (void *) &qry->rsource.ip6.sin6_addr,
-			          addr_str, sizeof(addr_str));
-			DEBUG_MSG(NULL, "obtained response address '%s'\n",
-			          addr_str);
-		}
-	}
+	const struct sockaddr *tmp_sockaddr = passed_server_sockaddr(qry);
 
 	/* The address must correspond with the client cookie. */
 	if (tmp_sockaddr) {
@@ -178,41 +190,75 @@ static int server_sockaddr(const struct sockaddr **sockaddr, bool *is_current,
 	return tmp_sockaddr ? kr_ok() : kr_error(EINVAL);
 }
 
-static bool is_cookie_cached(struct kr_cache *cache,
-                             const struct sockaddr *sockaddr,
-                             const uint8_t *cookie_opt)
-{
-	assert(cache && sockaddr && cookie_opt);
+#define MAX_COOKIE_OPT_LEN (KNOT_EDNS_OPTION_HDRLEN + KNOT_OPT_COOKIE_CLNT + KNOT_OPT_COOKIE_SRVR_MAX)
 
+/**
+ * Obtain cookie from cache.
+ * @note The ttl and current time are respected. Outdated entries are ignored.
+ */
+static bool materialise_cookie_opt(struct kr_cache *cache,
+                                   const struct sockaddr *sockaddr,
+                                   uint32_t timestamp, bool remove_outdated,
+                                   uint8_t cookie_opt[MAX_COOKIE_OPT_LEN])
+{
+	assert(cache && sockaddr);
+
+	bool found = false;
 	struct timed_cookie timed_cookie = { 0, };
-	uint32_t timestamp = 0;
 
 	struct kr_cache_txn txn;
-	kr_cache_txn_begin(&kr_cookies_control.cache, &txn, KNOT_DB_RDONLY);
-
+	kr_cache_txn_begin(cache, &txn, KNOT_DB_RDONLY);
 	int ret = kr_cookie_cache_peek_cookie(&txn, sockaddr, &timed_cookie,
 	                                      &timestamp);
 	if (ret != kr_ok()) {
-		/* Not cached or error. */
 		kr_cache_txn_abort(&txn);
 		return false;
 	}
 	assert(timed_cookie.cookie_opt);
 
-	/* TODO -- Check ttl and drift, if not present then delete cookie. */
-
-	uint16_t cookie_opt_size = knot_edns_opt_get_length(cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
-	uint16_t cached_cookie_size = knot_edns_opt_get_length(timed_cookie.cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
-
-	if (cookie_opt_size != cached_cookie_size) {
+	if (remove_outdated && (timed_cookie.ttl < timestamp)) {
+		/* Outdated entries must be removed. */
 		kr_cache_txn_abort(&txn);
+		kr_cache_txn_begin(cache, &txn, 0);
+		DEBUG_MSG(NULL, "%s\n", "removing outdated entry from cache");
+		kr_cookie_cache_remove_cookie(&txn, sockaddr);
+		kr_cache_txn_commit(&txn);
 		return false;
 	}
 
-	bool equal = (memcmp(cookie_opt, timed_cookie.cookie_opt, cookie_opt_size) == 0);
+	size_t cookie_opt_size = knot_edns_opt_get_length(timed_cookie.cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
+	assert(cookie_opt_size <= MAX_COOKIE_OPT_LEN);
 
+	if (cookie_opt) {
+		memcpy(cookie_opt, timed_cookie.cookie_opt, cookie_opt_size);
+	}
 	kr_cache_txn_abort(&txn);
-	return equal;
+	return true;
+}
+
+static bool is_cookie_cached(struct kr_cache *cache,
+                             const struct sockaddr *sockaddr,
+                             uint32_t timestamp,
+                             const uint8_t *pkt_cookie_opt)
+{
+	assert(cache && sockaddr && pkt_cookie_opt);
+
+	uint8_t cached_cookie_opt[MAX_COOKIE_OPT_LEN];
+
+	bool have_cached = materialise_cookie_opt(cache, sockaddr, timestamp,
+	                                          false, cached_cookie_opt);
+	if (!have_cached) {
+		return false;
+	}
+
+	uint16_t pkt_cookie_opt_size = knot_edns_opt_get_length(pkt_cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
+	uint16_t cached_cookie_size = knot_edns_opt_get_length(cached_cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
+
+	if (pkt_cookie_opt_size != cached_cookie_size) {
+		return false;
+	}
+
+	return memcmp(pkt_cookie_opt, cached_cookie_opt, pkt_cookie_opt_size) == 0;
 }
 
 /** Process response. */
@@ -222,47 +268,57 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	/* TODO -- Check whether we expect a response with a cookie. */
-
-	if (!knot_pkt_has_edns(pkt)) {
-		return ctx->state;
+	/* Obtain cookie if present in response. Don't check content. */
+	uint8_t *pkt_cookie_opt = NULL;
+	if (knot_pkt_has_edns(pkt)) {
+		pkt_cookie_opt = knot_edns_get_option(pkt->opt_rr,
+		                                      KNOT_EDNS_OPTION_COOKIE);
 	}
 
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
 
-	uint8_t *cookie_opt = knot_edns_get_option(pkt->opt_rr,
-	                                           KNOT_EDNS_OPTION_COOKIE);
-	if (!cookie_opt) {
-		/* Don't do anything if no cookies received.
-		 * TODO -- If cookies expected then discard response. The
-		 * interface must provide information about the IP address of
-		 * the server. */
-		return ctx->state;
-	}
+	struct kr_cache *cache = &kr_cookies_control.cache;
 
-	uint8_t *cookie_data = knot_edns_opt_get_data(cookie_opt);
-	uint16_t cookie_len = knot_edns_opt_get_length(cookie_opt);
-	assert(cookie_data && cookie_len);
+	const struct sockaddr *srvr_sockaddr = passed_server_sockaddr(qry);
 
-	const uint8_t *cc = NULL, *sc = NULL;
-	uint16_t cc_len = 0, sc_len = 0;
-
-	int ret = knot_edns_opt_cookie_parse(cookie_data, cookie_len,
-	                                     &cc, &cc_len, &sc, &sc_len);
-	if (ret != KNOT_EOK || !sc) {
-		DEBUG_MSG(NULL, "%s\n", "received malformed DNS cookie or server cookie missing");
+	if (!pkt_cookie_opt && srvr_sockaddr &&
+	    materialise_cookie_opt(cache, srvr_sockaddr, qry->timestamp.tv_sec,
+	                           true, NULL)) {
+		/* We haven't received any cookies although we should. */
+		DEBUG_MSG(NULL, "%s\n", "expected to receive a cookie but none received");
 		return KNOT_STATE_FAIL;
 	}
 
-	assert(cc_len == KNOT_OPT_COOKIE_CLNT);
+	if (!pkt_cookie_opt) {
+		/* Don't do anything if no cookies received. */
+		return ctx->state;
+	}
+
+	uint8_t *pkt_cookie_data = knot_edns_opt_get_data(pkt_cookie_opt);
+	uint16_t pkt_cookie_len = knot_edns_opt_get_length(pkt_cookie_opt);
+	assert(pkt_cookie_data && pkt_cookie_len);
+
+	const uint8_t *pkt_cc = NULL, *pkt_sc = NULL;
+	uint16_t pkt_cc_len = 0, pkt_sc_len = 0;
+
+	/* Check cookie semantics. */
+	int ret = knot_edns_opt_cookie_parse(pkt_cookie_data, pkt_cookie_len,
+	                                     &pkt_cc, &pkt_cc_len,
+	                                     &pkt_sc, &pkt_sc_len);
+	if (ret != KNOT_EOK || !pkt_sc) {
+		DEBUG_MSG(NULL, "%s\n", "received malformed DNS cookie or server cookie missing");
+		return KNOT_STATE_FAIL;
+	}
+	assert(pkt_cc_len == KNOT_OPT_COOKIE_CLNT);
 
 	DEBUG_MSG(NULL, "%s\n", "checking response for received cookies");
 
-	const struct sockaddr *srvr_sockaddr = NULL;
+	/* Check server address against received client cookie. */
+	srvr_sockaddr = NULL;
 	bool returned_current = false;
-	ret = server_sockaddr(&srvr_sockaddr, &returned_current, qry, cc,
-	                      &kr_cookies_control);
+	ret = srvr_sockaddr_cc_check(&srvr_sockaddr, &returned_current, qry,
+	                             pkt_cc, &kr_cookies_control);
 	if (ret != kr_ok()) {
 		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
 		return KNOT_STATE_FAIL;
@@ -271,17 +327,17 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Don't cache received cookies that don't match the current secret. */
 	if (returned_current &&
-	    !is_cookie_cached(&kr_cookies_control.cache, srvr_sockaddr,
-	                      cookie_opt)) {
+	    !is_cookie_cached(cache, srvr_sockaddr, qry->timestamp.tv_sec,
+	                      pkt_cookie_opt)) {
 		DEBUG_MSG(NULL, "%s\n", "caching server cookie");
 
 		struct kr_cache_txn txn;
-		if (kr_cache_txn_begin(&kr_cookies_control.cache, &txn, 0) != 0) {
+		if (kr_cache_txn_begin(cache, &txn, 0) != 0) {
 			/* Could not acquire cache. */
 			return ctx->state;
 		}
 
-		struct timed_cookie timed_cookie = { COOKIE_TTL, cookie_opt };
+		struct timed_cookie timed_cookie = { COOKIE_TTL, pkt_cookie_opt };
 
 		ret = kr_cookie_cache_insert_cookie(&txn, srvr_sockaddr,
 		                                    &timed_cookie,
