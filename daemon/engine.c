@@ -289,23 +289,24 @@ static JsonNode *l_pack_elem(lua_State *L, int top)
 	JsonNode *node = NULL;
 	lua_pushnil(L);
 	while(lua_next(L, top) != 0) {
-		JsonNode *val = l_pack_elem(L, top + 2);
-		const bool no_key = lua_isnumber(L, top + 1);
+		const bool is_array = lua_isnumber(L, top + 1);
 		if (!node) {
-			node = no_key ? json_mkarray() : json_mkobject();
+			node = is_array ? json_mkarray() : json_mkobject();
 			if (!node) {
 				return NULL;
 			}
 		}
-		/* Insert to array/table */
-		if (no_key) {
+		/* Insert to array/table. */
+		JsonNode *val = l_pack_elem(L, top + 2);
+		if (is_array) {
 			json_append_element(node, val);
 		} else {
 			json_append_member(node, lua_tostring(L, top + 1), val);
 		}
 		lua_pop(L, 1);
 	}
-	return node;
+	/* Return empty object for empty tables. */
+	return node ? node : json_mkobject();
 }
 
 /** @internal Serialize to string */
