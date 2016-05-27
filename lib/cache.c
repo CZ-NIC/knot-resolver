@@ -53,15 +53,12 @@ static int assert_right_version(struct kr_cache *cache)
 {
 	/* Check cache ABI version */
 	knot_db_val_t key = { KEY_VERSION, 2 };
-	knot_db_val_t val = { NULL, 0 };
+	knot_db_val_t val = { KEY_VERSION, 2 };
 	int ret = cache_op(cache, read, &key, &val, 1);
 	if (ret == 0) {
 		ret = kr_error(EEXIST);
 	} else {
-		/*
-		 * Version doesn't match.
-		 * Recreate cache and write version key.
-		 */
+		/* Version doesn't match. Recreate cache and write version key. */
 		ret = cache_op(cache, count);
 		if (ret != 0) { /* Non-empty cache, purge it. */
 			kr_log_info("[cache] purging cache\n");
@@ -69,9 +66,14 @@ static int assert_right_version(struct kr_cache *cache)
 		}
 		/* Either purged or empty. */
 		if (ret == 0) {
+			/* Key/Val is invalidated by cache purge, recreate it */
+			key.data = KEY_VERSION;
+			key.len = 2;
+			val = key;
 			ret = cache_op(cache, write, &key, &val, 1);
 		}
 	}
+	cache_op(cache, sync);
 	return ret;
 }
 

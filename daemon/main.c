@@ -430,14 +430,14 @@ int main(int argc, char **argv)
 			ret = run_worker(loop, &engine);
 		}
 	}
-	/* Cleanup. */
-	array_clear(addr_set);
-	engine_deinit(&engine);
-	worker_reclaim(worker);
-	mp_delete(pool.ctx);
 	if (ret != 0) {
 		ret = EXIT_FAILURE;
 	}
+	/* Cleanup. */
+	engine_deinit(&engine);
+	worker_reclaim(worker);
+	mp_delete(pool.ctx);
+	array_clear(addr_set);
 	kr_crypto_cleanup();
 	return ret;
 }

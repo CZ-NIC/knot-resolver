@@ -63,6 +63,11 @@ static int fake_test_init(knot_db_t **db, struct kr_cdb_opts *opts, knot_mm_t *p
 	return mock();
 }
 
+static int fake_test_sync(knot_db_t *db)
+{
+	return 0;
+}
+
 static void fake_test_deinit(knot_db_t *db)
 {
 }
@@ -94,7 +99,7 @@ static const struct kr_cdb_api *fake_knot_db_lmdb_api(void)
 {
 	static const struct kr_cdb_api api = {
 		"lmdb_fake_api",
-		fake_test_init, fake_test_deinit, NULL, NULL, NULL,
+		fake_test_init, fake_test_deinit, NULL, NULL, fake_test_sync,
 		fake_test_find, fake_test_ins, NULL,
 		NULL, NULL
 	};
