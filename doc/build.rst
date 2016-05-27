@@ -1,8 +1,13 @@
 Building project
 ================
 
-The resolver isn't yet available in the repositories, so you can either build it from sources or use
-official `Docker images`_.
+Installing from packages
+------------------------
+
+The resolver is packaged for Debian, Fedora, Ubuntu and openSUSE Linux distributions.
+Refer to `project page <https://www.knot-resolver.cz/pages/try.html>`_ for information about
+installing from packages. If packages are not available for your OS, see following sections
+to see how you can build it from sources (or package it), or use official `Docker images`_.
 
 Platform considerations
 -----------------------

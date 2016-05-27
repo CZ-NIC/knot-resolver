@@ -15,6 +15,13 @@ Several cache backends (LMDB, Redis and Memcached), strong filtering rules, and 
 
 The server adopts a [different scaling strategy][scaling] than the rest of the DNS recursors - no threading, shared-nothing architecture (except MVCC cache that may be shared) that allows you to pin instances on available CPU cores and grow by self-replication. You can start and stop additional nodes depending on the contention without downtime.
 
+It also has strong support for DNS over TCP, notably TCP Fast-Open, query pipelining and deduplication, and response reordering.
+
+### Packages
+
+Knot Resolver is packaged for Debian, Fedora, Ubuntu and [openSUSE](https://build.opensuse.org/package/show/server:dns/knot-resolver).
+See [project page](https://www.knot-resolver.cz/pages/try.html) for more information.
+
 ### Building from sources
 
 The Knot DNS Resolver [depends][depends] on the 2.1 version of the Knot DNS library, [LuaJIT][luajit] and [libuv][libuv].
@@ -32,13 +39,13 @@ See the build page [hub.docker.com/r/cznic/knot-resolver](https://hub.docker.com
 
 ### Running
 
-The project builds a resolver library in the `lib` directory, and a daemon in the `daemon` directory.
+The project builds a resolver library in the `lib` directory, and a daemon in the `daemon` directory. It requires no configuration or parameters to run a server on localhost.
 
 ```
-$ kresd -h
+$ kresd
 ```
 
-See the documentation at [knot-resolver.readthedocs.org][doc].
+See the documentation at [knot-resolver.readthedocs.org][doc] for more options.
 
 [depends]: http://knot-resolver.readthedocs.org/en/latest/build.html
 [doc]: http://knot-resolver.readthedocs.org/en/latest/index.html
