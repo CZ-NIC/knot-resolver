@@ -13,17 +13,26 @@ local M = {
 
 -- Load dependent modules
 if not stats then modules.load('stats') end
+-- Function to sort frequency list
+local function freqsort(a, b) return a.count < b.count end
 local function stream_stats(h, ws)
 	local ok, prev = true, stats.list()
 	while ok do
 		-- Get current snapshot
-		local cur, update = stats.list(), {}
+		local cur, stats_dt = stats.list(), {}
 		for k,v in pairs(cur) do
-			update[k] = v - (prev[k] or 0)
+			stats_dt[k] = v - (prev[k] or 0)
 		end
 		prev = cur
+		-- Update frequent query list
+		local cur, freq = stats.frequent(), {}
+		table.sort(cur, freqsort)
+		for i = 1,math.min(20, #cur) do
+			table.insert(freq, cur[i])
+		end
 		-- Publish stats updates periodically
-		ok = ws:send(tojson(update))
+		local push = tojson({stats=stats_dt,freq=freq})
+		ok = ws:send(push)
 		cqueues.sleep(0.5)
 	end
 	ws:close()

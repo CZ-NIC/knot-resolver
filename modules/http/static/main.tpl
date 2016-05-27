@@ -2,7 +2,7 @@
 <title>{{.Title}}</title>
 <style>
 	body { font-family: 'Gill Sans', 'Gill Sans MT', Verdana, sans-serif; color: #555; }
-	h1, h2, h3 { line-height: 2em; color: #000; text-align: center; border-bottom: 1px solid #ccc; }
+	h1, h2, h3 { line-height: 1.5em; color: #000; text-align: center; border-bottom: 1px solid #ccc; }
 	h1, h2, h3 { font-weight: 300; }
 	th { text-align: left; font-weight: normal; margin-bottom: 0.5em; }
 	#page { font-weight: 300; }

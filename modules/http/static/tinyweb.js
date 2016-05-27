@@ -38,6 +38,18 @@ window.onload = function() {
 		}
 		statsChart.push(next);
 	}
+	function updateFeed(resp) {
+		var feed = $('#feed');
+		feed.children().remove();
+		feed.append('<tr><th>Query name</th><th>Type</th><th>Frequency</th></tr>')
+		for (i = 0; i < resp.length; ++i) {
+			var row = $('<tr />');
+			row.append('<td>' + resp[i].name + '</td>');
+			row.append('<td>' + resp[i].type + '</td>');
+			row.append('<td>' + resp[i].count + '</td>');
+			feed.append(row);
+		}
+	}
 
 	/* WebSocket endpoints */
 	var wsStats = 'ws://' + location.host + '/stats';
@@ -45,6 +57,7 @@ window.onload = function() {
     var ws = new Socket(wsStats);
     ws.onmessage = function(evt) {
       var data = $.parseJSON(evt.data);
-      pushMetrics(data);
+      pushMetrics(data.stats);
+      updateFeed(data.freq)
     };
 }
