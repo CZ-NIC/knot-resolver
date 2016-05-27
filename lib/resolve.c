@@ -57,9 +57,9 @@ static int produce_yield(knot_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
 
 /** Enforce cache flushing in debug mode. */
 static void flush_caches(struct kr_request *req) {
-#ifdef DEBUG
-	kr_cache_sync(&req->ctx->cache);
-#endif
+	if (req->options & QUERY_CACHE_SYNC) {
+		kr_cache_sync(&req->ctx->cache);
+	}
 }
 /** @internal Macro for iterating module layers. */
 #define RESUME_LAYERS(from, req, qry, func, ...) \
@@ -69,7 +69,6 @@ static void flush_caches(struct kr_request *req) {
 		if (mod->layer) { \
 			struct knot_layer layer = {.state = (req)->state, .api = mod->layer(mod), .data = (req)}; \
 			if (layer.api && layer.api->func) { \
-				flush_caches(req); \
 				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
 				if ((req)->state == KNOT_STATE_YIELD) { \
 					func ## _yield(&layer, ##__VA_ARGS__); \
@@ -77,7 +76,8 @@ static void flush_caches(struct kr_request *req) {
 				} \
 			} \
 		} \
-	} /* Invalidate current query. */ \
+	} /* Invalidate current query and maybe flush caches. */ \
+	flush_caches(req); \
 	(req)->current_query = NULL
 
 /** @internal Macro for starting module iteration. */

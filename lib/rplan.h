@@ -47,6 +47,7 @@
 	X(DNSSEC_WEXPAND,  1 << 19) /**< Query response has wildcard expansion. */ \
 	X(PERMISSIVE,      1 << 20) /**< Permissive resolver mode. */ \
 	X(STRICT,          1 << 21) /**< Strict resolver mode. */ \
+	X(CACHE_SYNC,      1 << 22) /**< Sync cache as often as possible. */
 
 /** Query flags */
 enum kr_query_flag {
