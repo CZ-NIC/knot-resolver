@@ -66,6 +66,7 @@ static inline int test_tmpdir_remove(const char *path)
 		remove(buf);
 	}
 	remove(path);
+	closedir(dir);
 	return 0;
 }
 
