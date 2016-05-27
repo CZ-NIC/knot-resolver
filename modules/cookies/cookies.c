@@ -348,7 +348,14 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 			DEBUG_MSG(NULL, "%s\n", "cookie_cached");
 			kr_cache_txn_commit(&txn);
 		}
+	}
 
+	uint16_t rcode = knot_pkt_get_ext_rcode(pkt);
+	if (rcode == KNOT_RCODE_BADCOOKIE) {
+		/* TODO -- Fall back to TCP after a limited number of retries. */
+		DEBUG_MSG(NULL, "%s'n", "falling back to TCP");
+		qry->flags |= QUERY_TCP;
+		return KNOT_STATE_PRODUCE;
 	}
 
 	print_packet_dflt(pkt);
