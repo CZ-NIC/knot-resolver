@@ -205,8 +205,6 @@ static int commit_rr(const char *key, void *val, void *data)
 		}
 	}
 
-	knot_rrset_t query_rr;
-	knot_rrset_init(&query_rr, rr->owner, rr->type, rr->rclass);
 	uint8_t flags = KR_CACHE_FLAG_NONE;
 	if ((rank & KR_RANK_AUTH) && (baton->qry->flags & QUERY_DNSSEC_WEXPAND)) {
 		flags |= KR_CACHE_FLAG_WCARD_PROOF;

@@ -411,11 +411,11 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	}
 	/* Copy name as it may overlap with cut name that is to be replaced. */
 	knot_dname_t *qname = knot_dname_copy(name, cut->pool);
-	const knot_dname_t *label = qname;
-	if (!label) {
+	if (!qname) {
 		return kr_error(ENOMEM);
 	}
 	/* Start at QNAME parent. */
+	const knot_dname_t *label = qname;
 	while (true) {
 		/* Fetch NS first and see if it's insecure. */
 		uint8_t rank = 0;

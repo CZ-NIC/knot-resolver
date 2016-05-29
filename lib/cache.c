@@ -73,7 +73,7 @@ static int assert_right_version(struct kr_cache *cache)
 			ret = cache_op(cache, write, &key, &val, 1);
 		}
 	}
-	cache_op(cache, sync);
+	kr_cache_sync(cache);
 	return ret;
 }
 

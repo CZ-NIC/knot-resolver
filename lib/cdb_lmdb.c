@@ -261,6 +261,8 @@ static int cdb_count(knot_db_t *db)
 static int cdb_clear(knot_db_t *db)
 {
 	struct lmdb_env *env = db;
+	/* Always attempt to commit write transactions in-flight. */
+	(void) cdb_sync(db);
 
 	/* Since there is no guarantee that there will be free
 	 * pages to hold whole dirtied db for transaction-safe clear,
