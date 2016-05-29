@@ -215,7 +215,7 @@ static void tcp_accept(uv_stream_t *master, int status)
 	memset(client, 0, sizeof(*client));
 	io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM);
 	if (uv_accept(master, client) != 0) {
-		io_free((uv_handle_t *)client);
+		uv_close((uv_handle_t *)client, io_free);
 		return;
 	}
 
