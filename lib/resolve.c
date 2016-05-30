@@ -55,12 +55,6 @@ static int reset_yield(knot_layer_t *ctx) { return kr_ok(); }
 static int finish_yield(knot_layer_t *ctx) { return kr_ok(); }
 static int produce_yield(knot_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
 
-/** Enforce cache flushing in debug mode. */
-static void flush_caches(struct kr_request *req) {
-	if (req->options & QUERY_CACHE_SYNC) {
-		kr_cache_sync(&req->ctx->cache);
-	}
-}
 /** @internal Macro for iterating module layers. */
 #define RESUME_LAYERS(from, req, qry, func, ...) \
     (req)->current_query = (qry); \
@@ -76,8 +70,7 @@ static void flush_caches(struct kr_request *req) {
 				} \
 			} \
 		} \
-	} /* Invalidate current query and maybe flush caches. */ \
-	flush_caches(req); \
+	} /* Invalidate current query. */ \
 	(req)->current_query = NULL
 
 /** @internal Macro for starting module iteration. */
