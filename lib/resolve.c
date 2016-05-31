@@ -750,7 +750,7 @@ ns_election:
 
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
-	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_COOKIE_AGAIN))) { /* Keep NS when requerying/stub/badcookie. */
+	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_BADCOOKIE_AGAIN))) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);

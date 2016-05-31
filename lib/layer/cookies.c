@@ -14,8 +14,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-//#define PRINT_PACKETS 1 /* Comment out to disable packet printing. */
-
 #include <assert.h>
 #include <ccan/json/json.h>
 #include <libknot/db/db_lmdb.h>
@@ -31,15 +29,6 @@
 #include "lib/cookies/control.h"
 #include "lib/module.h"
 #include "lib/layer.h"
-
-#define print_packet_dflt(pkt) do { } while(0)
-
-#if defined(PRINT_PACKETS)
-#include "print_pkt.h"
-
-#undef print_packet_dflt
-#define print_packet_dflt(pkt) print_packet((pkt), &DEFAULT_STYLE_DIG)
-#endif /* PRINT_PACKETS */
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies",  fmt)
 
@@ -351,21 +340,28 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	uint16_t rcode = knot_pkt_get_ext_rcode(pkt);
 	if (rcode == KNOT_RCODE_BADCOOKIE) {
-		if (qry->flags & QUERY_COOKIE_AGAIN) {
-			DEBUG_MSG(NULL, "%s\n", "falling back to TCP");
-			qry->flags &= ~QUERY_COOKIE_AGAIN;
-			qry->flags |= QUERY_TCP;
-			return KNOT_STATE_CONSUME;
-		} else {
-			struct kr_query *next = kr_rplan_push(&req->rplan, qry->parent, qry->sname, qry->sclass, qry->stype);
-			next->flags = qry->flags;
-			DEBUG_MSG(NULL, "%s\n", "BADCOOKIE querying again");
-			qry->flags |= QUERY_COOKIE_AGAIN;
-			return KNOT_STATE_CONSUME;
+		struct kr_query *next = NULL;
+		if (!(qry->flags & QUERY_BADCOOKIE_AGAIN)) {
+			/* Received first BADCOOKIE, regenerate query. */
+			next = kr_rplan_push(&req->rplan, qry->parent,
+			                     qry->sname,  qry->sclass,
+			                     qry->stype);
 		}
-	}
 
-	print_packet_dflt(pkt);
+		if (next) {
+			DEBUG_MSG(NULL, "%s\n", "BADCOOKIE querying again");
+			qry->flags |= QUERY_BADCOOKIE_AGAIN;
+		} else {
+			/* Either the planning of second request failed or
+			 * BADCOOKIE received for the second time.
+			 * Fall back to TCP. */
+			DEBUG_MSG(NULL, "%s\n", "falling back to TCP");
+			qry->flags &= ~QUERY_BADCOOKIE_AGAIN;
+			qry->flags |= QUERY_TCP;
+		}
+
+		return KNOT_STATE_CONSUME;
+	}
 
 	return ctx->state;
 }

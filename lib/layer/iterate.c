@@ -576,7 +576,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->data;
 	struct kr_query *query = req->current_query;
-	if (!query || (query->flags & (QUERY_RESOLVED|QUERY_COOKIE_AGAIN))) {
+	if (!query || (query->flags & (QUERY_RESOLVED|QUERY_BADCOOKIE_AGAIN))) {
 		return ctx->state;
 	}
 
