@@ -351,9 +351,18 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	uint16_t rcode = knot_pkt_get_ext_rcode(pkt);
 	if (rcode == KNOT_RCODE_BADCOOKIE) {
-		DEBUG_MSG(NULL, "%s\n", "falling back to TCP");
-		qry->flags |= QUERY_TCP;
-		return KNOT_STATE_CONSUME;
+		if (qry->flags & QUERY_COOKIE_AGAIN) {
+			DEBUG_MSG(NULL, "%s\n", "falling back to TCP");
+			qry->flags &= ~QUERY_COOKIE_AGAIN;
+			qry->flags |= QUERY_TCP;
+			return KNOT_STATE_CONSUME;
+		} else {
+			struct kr_query *next = kr_rplan_push(&req->rplan, qry->parent, qry->sname, qry->sclass, qry->stype);
+			next->flags = qry->flags;
+			DEBUG_MSG(NULL, "%s\n", "BADCOOKIE querying again");
+			qry->flags |= QUERY_COOKIE_AGAIN;
+			return KNOT_STATE_CONSUME;
+		}
 	}
 
 	print_packet_dflt(pkt);

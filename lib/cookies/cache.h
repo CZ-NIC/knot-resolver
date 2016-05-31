@@ -18,6 +18,7 @@
 
 #include "lib/cache.h"
 
+/** DNS cookie cache entry tag. */
 #define KR_CACHE_COOKIE (KR_CACHE_USER + 'C')
 
 #define COOKIE_TTL 72000
@@ -98,5 +99,11 @@ int kr_cookie_cache_insert_cookie(struct kr_cache_txn *txn, const void *sockaddr
                                   const struct timed_cookie *cookie,
                                   uint32_t timestamp);
 
+/**
+ * Remove asset from cache.
+ * @param txn transaction instance
+ * @param sockaddr socket address
+ * @return 0 or an error code
+ */
 #define kr_cookie_cache_remove_cookie(txn, sockaddr) \
 	kr_cookie_cache_remove((txn), KR_CACHE_COOKIE, (sockaddr))
