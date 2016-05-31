@@ -1,6 +1,7 @@
 libkres_SOURCES := \
 	contrib/fnv/hash_64a.c \
 	lib/generic/map.c      \
+	lib/layer/cookies.c    \
 	lib/layer/iterate.c    \
 	lib/layer/validate.c   \
 	lib/layer/rrcache.c    \
