@@ -443,6 +443,7 @@ static void on_write(uv_write_t *req, int status)
 
 /** Update DNS cookie data in packet. */
 static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
+                                  struct kr_cache *cookie_cache,
                                   knot_pkt_t *pkt)
 {
 	assert(handle);
@@ -472,7 +473,7 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 		sockaddr_ptr = NULL;
 	}
 
-	kr_request_put_cookie(&kr_cookies_control,
+	kr_request_put_cookie(&kr_cookies_control, cookie_cache,
 	                      (struct sockaddr*) sockaddr_ptr, srvr_addr, pkt);
 
 	return true;
@@ -500,7 +501,8 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	if (handle->type == UV_UDP) {
 		if (knot_wire_get_qr(pkt->wire) == 0) {
 			/* Update DNS cookies data in query. */
-			subreq_update_cookies((uv_udp_t *) handle, addr, pkt);
+			subreq_update_cookies((uv_udp_t *) handle, addr,
+			                      &task->worker->engine->resolver.cache, pkt);
 		}
 
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };

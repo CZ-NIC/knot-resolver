@@ -214,24 +214,13 @@ static char *cookies_control_config(void *env, struct kr_module *module, const c
 	return result;
 }
 
-/*
- * Module implementation.
- */
-
-KR_EXPORT
-int cookies_control_init(struct kr_module *module)
+static int cookies_cache_init(struct kr_cache *cache, struct engine *engine)
 {
+	assert(cache);
+
 	const char *storage_prefix = "lmdb://";
-	struct engine *engine = module->data;
-	DEBUG_MSG(NULL, "initialising with engine %p\n", (void *) engine);
 
-	memset(&kr_cookies_control, 0, sizeof(kr_cookies_control));
-
-	kr_cookies_control.enabled = false;
-
-	kr_cookies_control.current_cs = &dflt_cs;
-
-	memset(&kr_cookies_control.cache, 0, sizeof(kr_cookies_control.cache));
+	memset(cache, 0, sizeof(*cache));
 
 	struct storage_api *lmdb_storage_api = find_storage_api(&engine->storage_registry,
 	                                                        storage_prefix);
@@ -246,9 +235,29 @@ int cookies_control_init(struct kr_module *module)
 	opts.flags.env = 0x80000 | 0x100000; /* MDB_WRITEMAP|MDB_MAPASYNC */
 
 	errno = 0;
-	int ret = kr_cache_open(&kr_cookies_control.cache,
-	                        lmdb_storage_api->api(), &opts, engine->pool);
+	int ret = kr_cache_open(cache, lmdb_storage_api->api(), &opts,
+	                        engine->pool);
 	DEBUG_MSG(NULL, "cache_open retval %d: %s\n", ret, kr_strerror(ret));
+
+	return ret;
+}
+
+/*
+ * Module implementation.
+ */
+
+KR_EXPORT
+int cookies_control_init(struct kr_module *module)
+{
+	struct engine *engine = module->data;
+
+	memset(&kr_cookies_control, 0, sizeof(kr_cookies_control));
+
+	kr_cookies_control.enabled = false;
+
+	kr_cookies_control.current_cs = &dflt_cs;
+
+//	cookies_cache_init(&kr_cookies_control.cache, engine);
 
 	module->data = NULL;
 
@@ -272,7 +281,7 @@ int cookies_control_deinit(struct kr_module *module)
 	}
 	kr_cookies_control.current_cs = &dflt_cs;
 
-	kr_cache_close(&kr_cookies_control.cache);
+//	kr_cache_close(&kr_cookies_control.cache);
 
 	return kr_ok();
 }

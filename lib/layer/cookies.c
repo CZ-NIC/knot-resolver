@@ -266,12 +266,12 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
 
-	struct kr_cache *cache = &kr_cookies_control.cache;
+	struct kr_cache *cookie_cache = &req->ctx->cache; //&kr_cookies_control.cache;
 
 	const struct sockaddr *srvr_sockaddr = passed_server_sockaddr(qry);
 
 	if (!pkt_cookie_opt && srvr_sockaddr &&
-	    materialise_cookie_opt(cache, srvr_sockaddr, qry->timestamp.tv_sec,
+	    materialise_cookie_opt(cookie_cache, srvr_sockaddr, qry->timestamp.tv_sec,
 	                           true, NULL)) {
 		/* We haven't received any cookies although we should. */
 		DEBUG_MSG(NULL, "%s\n", "expected to receive a cookie but none received");
@@ -315,12 +315,12 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Don't cache received cookies that don't match the current secret. */
 	if (returned_current &&
-	    !is_cookie_cached(cache, srvr_sockaddr, qry->timestamp.tv_sec,
+	    !is_cookie_cached(cookie_cache, srvr_sockaddr, qry->timestamp.tv_sec,
 	                      pkt_cookie_opt)) {
 		DEBUG_MSG(NULL, "%s\n", "caching server cookie");
 
 		struct kr_cache_txn txn;
-		if (kr_cache_txn_begin(cache, &txn, 0) != 0) {
+		if (kr_cache_txn_begin(cookie_cache, &txn, 0) != 0) {
 			/* Could not acquire cache. */
 			return ctx->state;
 		}

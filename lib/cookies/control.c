@@ -208,6 +208,7 @@ static const uint8_t *peek_and_check_cc(struct kr_cache_txn *txn,
 }
 
 int kr_request_put_cookie(const struct cookies_control *cntrl,
+                          struct kr_cache *cookie_cache,
                           const void *clnt_sockaddr, const void *srvr_sockaddr,
                           knot_pkt_t *pkt)
 {
@@ -218,7 +219,7 @@ int kr_request_put_cookie(const struct cookies_control *cntrl,
 		return kr_ok();
 	}
 
-	if (!cntrl->current_cs) {
+	if (!cntrl->current_cs || !cookie_cache) {
 		return kr_error(EINVAL);
 	}
 
@@ -233,7 +234,7 @@ int kr_request_put_cookie(const struct cookies_control *cntrl,
 	}
 
 	struct kr_cache_txn txn;
-	kr_cache_txn_begin(&kr_cookies_control.cache, &txn, KNOT_DB_RDONLY);
+	kr_cache_txn_begin(cookie_cache, &txn, KNOT_DB_RDONLY);
 	const uint8_t *cached_cookie = peek_and_check_cc(&txn, srvr_sockaddr,
 	                                                 cc);
 

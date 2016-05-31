@@ -42,7 +42,7 @@ struct cookies_control {
 	struct secret_quantity *current_cs; /*!< current client secret */
 	struct secret_quantity *recent_cs; /*!< recent client secret */
 
-	struct kr_cache cache; /*!< Server cookies cache. */
+//	struct kr_cache cache; /*!< Server cookies cache. */
 };
 
 /** Global cookies control. */
@@ -74,11 +74,13 @@ int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
  * Insert a DNS cookie into query packet.
  * @note The packet must already contain ENDS section.
  * @param cntrl         Cookie control structure.
+ * @param cookie_cache  Cookie cache.
  * @param clnt_sockaddr Client address.
  * @param srvr_sockaddr Server address.
  * @param pkt           DNS request packet.
  */
 KR_EXPORT
 int kr_request_put_cookie(const struct cookies_control *cntrl,
+                          struct kr_cache *cookie_cache,
                           const void *clnt_sockaddr, const void *srvr_sockaddr,
                           knot_pkt_t *pkt);
