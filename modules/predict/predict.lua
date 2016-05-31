@@ -30,7 +30,8 @@ end
 function predict.drain(ev)
 	local deleted = 0
 	for key, val in pairs(predict.queue) do
-		worker.resolve(string.sub(key, 2), string.byte(key), 1, kres.query.NO_CACHE)
+		local qname, qtype = key:match('(%S*)%s(.*)')
+		worker.resolve(qname, kres.type[qtype], 1, kres.query.NO_CACHE)
 		predict.queue[key] = nil
 		deleted = deleted + 1
 		if deleted >= predict.batch then
@@ -53,7 +54,7 @@ local function enqueue(queries)
 	local nr_queries = #queries
 	for i = 1, nr_queries do
 		local entry = queries[i]
-		local key = string.char(entry.type)..entry.name
+		local key = string.format('%s %s', entry.type, entry.name)
 		if not predict.queue[key] then
 			predict.queue[key] = 1
 			queued = queued + 1
@@ -85,7 +86,7 @@ function predict.sample(epoch_now)
 	local nr_samples = #queries
 	for i = 1, nr_samples do
 		local entry = queries[i]
-		local key = string.char(entry.type)..entry.name
+		local key = string.format('%s %s', entry.type, entry.name)
 		current[key] = 1
 	end
 	predict.log[epoch_now] = current
