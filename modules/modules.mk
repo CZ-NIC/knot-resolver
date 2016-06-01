@@ -20,7 +20,8 @@ modules_TARGETS += ketcd \
                    predict \
                    dns64 \
                    renumber \
-                   http
+                   http \
+                   daf
 endif
 
 # List of Golang modules
