@@ -1,9 +1,13 @@
+-- This is a module that does the heavy lifting to provide an HTTP/2 enabled
+-- server that supports TLS by default and provides endpoint for other modules
+-- in order to enable them to export restful APIs and websocket streams.
+-- One example is statistics module that can stream live metrics on the website,
+-- or publish metrics on request for Prometheus scraper.
 local cqueues = require('cqueues')
-local ce = require('cqueues.errno')
 local server = require('http.server')
 local headers = require('http.headers')
 local websocket = require('http.websocket')
-local kres = require('kres')
+local x509, pkey = require('openssl.x509'), require('openssl.pkey')
 
 -- Module declaration
 local cq = cqueues.new()
@@ -11,10 +15,79 @@ local M = {
 	servers = {},
 }
 
+-- Map extensions to MIME type
+local mime_types = {
+	js = 'application/javascript',
+	css = 'text/css',
+	tpl = 'text/html',
+	ico = 'image/x-icon'
+}
+
+-- Preload static contents, nothing on runtime will touch the disk
+local function pgload(relpath)
+	local fp, err = io.open(moduledir..'/http/'..relpath, 'r')
+	if not fp then error(err) end
+	local data = fp:read('*all')
+	fp:close()
+	-- Guess content type
+	local ext = relpath:match('[^\\.]+$')
+	return {'/'..relpath, mime_types[ext] or 'text', data}
+end
+
+-- Preloaded static assets
+local pages = {
+	pgload('kresd.js'),
+	pgload('datamaps.world.min.js'),
+	pgload('topojson.js'),
+	pgload('jquery.js'),
+	pgload('epoch.css'),
+	pgload('epoch.js'),
+	pgload('favicon.ico'),
+	pgload('d3.js'),
+}
+
+-- Serve preloaded root page
+local function serve_root()
+	local _, mime_root, mime_data = unpack(pgload('main.tpl'))
+	mime_data = mime_data
+	            :gsub('{{ title }}', 'kresd @ '..hostname())
+	            :gsub('{{ host }}', hostname())
+	return function (h, stream)
+		-- Return index page
+		local rsnippets = {}
+		for _,v in pairs(M.snippets) do
+			table.insert(rsnippets, string.format('<h2>%s</h2>\n%s', v[1], v[2]))
+		end
+		local data = mime_data
+		             :gsub('{{ secure }}', stream:checktls() and 'true' or 'false')
+		             :gsub('{{ snippets }}', table.concat(rsnippets, '\n'))
+		local hsend = headers.new()
+		hsend:append(':status', '200')
+		hsend:append('content/type', mime_root)
+		assert(stream:write_headers(hsend, false))
+		assert(stream:write_chunk(data, true))
+		-- Push assets
+		-- local path, mime, data = unpack(pages[1])
+		-- local hpush = headers.new()
+		-- hpush:append(':scheme', h:get(':scheme'))
+		-- hpush:append(':method', 'GET')
+		-- hpush:append(':authority', h:get(':authority'))
+		-- hpush:append(':path', path)
+		-- local nstream = stream:push_promise(hpush)
+		-- hpush = headers.new()
+		-- hpush:append(':status', '200')
+		-- hpush:append('content/type', mime)
+		-- print('pushing', path)
+		-- assert(nstream:write_headers(hpush, false))
+		-- assert(nstream:write_chunk(data, true))
+		-- Do not send anything else
+		return false
+	end
+end
+
 -- Load dependent modules
 if not stats then modules.load('stats') end
 -- Function to sort frequency list
-local function freqsort(a, b) return a.count < b.count end
 local function stream_stats(h, ws)
 	local ok, prev = true, stats.list()
 	while ok do
@@ -24,55 +97,27 @@ local function stream_stats(h, ws)
 			stats_dt[k] = v - (prev[k] or 0)
 		end
 		prev = cur
-		-- Update frequent query list
-		local cur, freq = stats.frequent(), {}
-		table.sort(cur, freqsort)
-		for i = 1,math.min(20, #cur) do
-			table.insert(freq, cur[i])
-		end
 		-- Publish stats updates periodically
-		local push = tojson({stats=stats_dt,freq=freq})
+		local push = tojson({stats=stats_dt})
 		ok = ws:send(push)
 		cqueues.sleep(0.5)
 	end
 	ws:close()
 end
 
--- Preload static contents, nothing on runtime will touch the disk
-local function pgload(relpath)
-	local fp, err = io.open(moduledir..'/http/'..relpath, 'r')
-	if not fp then error(err) end
-	local data = fp:read('*all')
-	fp:close()
-	return data
-end
-local pages = {
-	root = pgload('main.tpl'):gsub('{{.Title}}', 'kresd @ '..hostname()),
-	rootjs = pgload('tinyweb.js'),
-	datamaps = pgload('datamaps.world.min.js'),
-	topojson = pgload('topojson.js'),
-	jquery = pgload('jquery.js'),
-	epochcss = pgload('epoch.css'),
-	epoch = pgload('epoch.js'),
-	favicon = pgload('favicon.ico'),
-	d3 = pgload('d3.js'),
-}
-
 -- Export HTTP service endpoints
 M.endpoints = {
-	['/']                      = {'text/html', pages.root},
-	['/tinyweb.js']            = {'application/json', pages.rootjs},
-	['/datamaps.world.min.js'] = {'application/json', pages.datamaps},
-	['/topojson.js']           = {'application/json', pages.topojson},
-	['/jquery.js']             = {'application/json', pages.jquery},
-	['/epoch.js']              = {'application/json', pages.epoch},
-	['/epoch.css']             = {'text/css', pages.epochcss},
-	['/favicon.ico']           = {'text/html', pages.favicon},
-	['/d3.js']                 = {'text/html', pages.d3},
+	['/']                      = {'text/html', serve_root()},
 	['/stats']                 = {'application/json', stats.list, stream_stats},
 	['/feed']                  = {'application/json', stats.frequent},
-
 }
+for _, pg in ipairs(pages) do
+	local path, mime, data = unpack(pg)
+	M.endpoints[path] = {mime, data}
+end
+
+-- Export HTTP service page snippets
+M.snippets = {}
 
 -- Serve GET requests, we only support a fixed
 -- number of endpoints that are actually preloaded
@@ -80,31 +125,42 @@ M.endpoints = {
 local function serve_get(h, stream)
 	local hsend = headers.new()
 	local path = h:get(':path')
-	local ctype, data = M.endpoints[path]
-	-- Unpack ctype
-	if ctype then
-		ctype, data = unpack(ctype)
+	local entry = M.endpoints[path]
+	-- Unpack MIME and data
+	local mime, data
+	if entry then
+		mime, data = unpack(entry)
 	end
 	-- Get string data out of service endpoint
-	if type(data) == 'function' then data = data(h) end
+	if type(data) == 'function' then
+		data = data(h, stream)
+		-- Handler doesn't provide any data
+		if data == false then return end
+	end
 	if type(data) == 'table' then data = tojson(data) end
-	if not ctype or type(data) ~= 'string' then
+	if not mime or type(data) ~= 'string' then
 		hsend:append(':status', '404')
-		hsend:append('connection', 'close')
-		assert(stream:write_headers(hsend, true))
+		assert(stream:write_headers(hsend, false))
 	else
 		-- Serve content type appropriately
 		hsend:append(':status', '200')
-		hsend:append('content/type', ctype)
-		hsend:append('connection', 'close')
+		hsend:append('content/type', mime)
 		assert(stream:write_headers(hsend, false))
 		assert(stream:write_chunk(data, true))
 	end
 end
 
 -- Web server service closure
-function M.route(endpoints)
+local function route(endpoints)
 	return function (stream)
+		-- HTTP/2: We're only permitted to send in open/half-closed (remote)
+		local connection = stream.connection
+		if connection.version >= 2 then
+			if stream.state ~= 'open' and stream.state ~= 'half closed (remote)' then
+				return
+			end
+		end
+		-- Start reading headers
 		local h = assert(stream:get_headers())
 		local m = h:get(':method')
 		local path = h:get(':path')
@@ -126,29 +182,136 @@ function M.route(endpoints)
 			-- Method is not supported
 			local hsend = headers.new()
 			hsend:append(':status', '500')
-			hsend:append('connection', 'close')
-			assert(stream:write_headers(hsend, true))
+			assert(stream:write_headers(hsend, false))
 		end
 		stream:shutdown()
-		stream.connection:shutdown()
+		-- Close multiplexed HTTP/2 connection only when empty
+		if connection.version < 2 or connection.new_streams:length() == 0 then
+			connection:shutdown()
+		end
 	end
 end
 
+-- @function Create self-signed certificate
+local function ephemeralcert(host)
+	-- Import luaossl directly
+	local name = require('openssl.x509.name')
+	local altname = require('openssl.x509.altname')
+	-- Create self-signed certificate
+	host = host or hostname()
+	local crt = x509.new()
+	local now = os.time()
+	crt:setSerial(now)
+	local dn = name.new()
+	dn:add("CN", host)
+	crt:setSubject(dn)
+	local alt = altname.new()
+	alt:add("DNS", host)
+	crt:setSubjectAlt(alt)
+	-- Valid for 90 days
+	crt:setLifetime(now, now + 90*60*60*24)
+	-- Can't be used as a CA
+	crt:setBasicConstraints{CA=false}
+	crt:setBasicConstraintsCritical(true)
+	-- Create and set key (default: EC/P-256 as a most "interoperable")
+	local key = pkey.new {type = 'EC', curve = 'prime256v1'}
+	crt:setPublicKey(key)
+	crt:sign(key)
+	return crt, key
+end
+
+-- @function Prefer HTTP/2 or HTTP/1.1
+local function alpnselect(_, protos)
+	for _, proto in ipairs(protos) do
+		if proto == 'h2' or proto == 'http/1.1' then
+			return proto
+		end
+	end
+	return nil
+end
+
+-- @function Create TLS context
+local function tlscontext(crt, key)
+	local http_tls = require('http.tls')
+	local ctx = http_tls.new_server_context()
+	if ctx.setAlpnSelect then
+		ctx:setAlpnSelect(alpnselect)
+	end
+	assert(ctx:setPrivateKey(key))
+	assert(ctx:setCertificate(crt))
+	return ctx
+end
+
+-- @function Refresh self-signed certificates
+local function updatecert(crtfile, keyfile)
+	local f = assert(io.open(crtfile, 'w'), string.format('cannot open "%s" for writing', crtfile))
+	local crt, key = ephemeralcert()
+	-- Write back to file
+	f:write(tostring(crt))
+	f:close()
+	f = assert(io.open(keyfile, 'w'), string.format('cannot open "%s" for writing', keyfile))
+	local pub, priv = key:toPEM('public', 'private')
+	assert(f:write(pub..priv))
+	f:close()
+	return crt, key
+end
+
 -- @function Listen on given HTTP(s) host
-function M.listen(m, host, port, cb, cert)
+function M.interface(host, port, endpoints, crtfile, keyfile)
+	local crt, key, ephemeral
+	if crtfile ~= false then
+		-- Check if the cert file exists
+		if not crtfile then
+			crtfile = 'self.crt'
+			keyfile = 'self.key'
+			ephemeral = true
+		else error('certificate provided, but missing key') end
+		-- Read or create self-signed x509 certificate
+		local f = io.open(crtfile, 'r')
+		if f then
+			crt = assert(x509.new(f:read('*all')))
+			f:close()
+			-- Continue reading key file
+			if crt then
+				f = io.open(keyfile, 'r')
+				key = assert(pkey.new(f:read('*all')))
+				f:close()
+			end
+		elseif ephemeral then
+			crt, key = updatecert(crtfile, keyfile)
+		end
+		-- Check loaded certificate
+		if not crt or not key then
+			error(string.format('failed to load certificate "%s" - %s', crtfile, err or 'error'))
+		end
+	end
+	-- Create TLS context and start listening
 	local s, err = server.listen {
 		host = host,
 		port = port,
+		tls = crt ~= nil,
+		ctx = crt and tlscontext(crt, key), 
 	}
 	if not s then
 		error(string.format('failed to listen on %s#%d: %s', host, port, err))
 	end
 	-- Compose server handler
+	local routes = route(endpoints)
 	cq:wrap(function ()
-		assert(s:run(cb))
+		assert(s:run(routes))
 		s:close()
 	end)
 	table.insert(M.servers, s)
+	-- Create certificate renewal timer if ephemeral
+	if crt and ephemeral then
+		local _, expiry = crt:getLifetime()
+		expiry = math.max(0, expiry - (os.time() - 3 * 24 * 3600))
+		event.after(expiry, function (ev)
+			print('[http] refreshed ephemeral certificate')
+			crt, key = updatecert(crtfile, keyfile)
+			s.ctx = tlscontext(crt, key)
+		end)
+	end
 end
 
 -- @function Cleanup module
@@ -156,25 +319,28 @@ function M.deinit()
 	if M.ev then event.cancel(M.ev) end
 	M.servers = {}
 end
--- 
+
 -- @function Configure module
+local ffi = require('ffi')
 function M.config(conf)
-		assert(type(conf) == 'table', 'config { host = "...", port = 443, cert = "..." }')
+		conf = conf or {}
+		assert(type(conf) == 'table', 'config { host = "...", port = 443, cert = "...", key = "..." }')
 		-- Configure web interface for resolver
-		if not conf.port then conf.port = conf.cert and 80 or 443 end
-		if not conf.host then conf.host = 'localhost' end 
-		M:listen(conf.host, conf.port, M.route(M.endpoints))
+		if not conf.port then conf.port = 8053 end
+		if not conf.host then conf.host = 'localhost' end
+		M.interface(conf.host, conf.port, M.endpoints, conf.cert, conf.key)
 		-- TODO: configure DNS/HTTP(s) interface
-		-- M:listen(conf.dns.host, conf.dns/port, serve_web)
 		if M.ev then return end
 		-- Schedule both I/O activity notification and timeouts
 		local poll_step
 		poll_step = function (ev, status, events)
 			local ok, err, _, co = cq:step(0)
-			if not ok then print('[http] '..err, debug.traceback(co)) end
+			if not ok then print('[http]', err, debug.traceback(co)) end
 			-- Reschedule timeout or create new one
 			local timeout = cq:timeout()
 			if timeout then
+				-- Throttle web requests
+				if timeout == 0 then timeout = 0.001 end
 				-- Convert from seconds to duration
 				timeout = timeout * sec
 				if not M.timeout then

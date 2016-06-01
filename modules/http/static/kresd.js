@@ -1,3 +1,13 @@
+// Colour palette
+var colours = [
+	'rgb(198,219,239)',
+	'rgb(158,202,225)',
+	'rgb(107,174,214)',
+	'rgb(66,146,198)',
+	'rgb(33,113,181)',
+	'rgb(8,81,156)',
+	'rgb(8,48,107)',
+];
 // Unit conversion
 function tounit(d) {
 	d = parseInt(d);
@@ -24,6 +34,27 @@ window.onload = function() {
 			bottom: function(d) { return new Date(d).toTimeString().split(' ')[0]; },
 		},
 		data: statsHistory
+	});
+	var fills = { defaultFill: '#F5F5F5' };
+	for (var i in colours) {
+		fills['q' + i] = colours[i];
+	}
+	var map = new Datamap({
+		element: document.getElementById('map'),
+		fills: fills,
+		data: {},
+		height: 350,
+		geographyConfig: {
+			highlightOnHover: false,
+			borderColor: '#ccc',
+			borderWidth: 0.5,
+			popupTemplate: function(geo, data) {
+				return ['<div class="hoverinfo">',
+					'<strong>', geo.properties.name, '</strong>',
+					'<br>Queries: <strong>', data ? data.queries : '0', '</strong>',
+					'</div>'].join('');
+			}
+		}
 	});
 
 	/*
@@ -52,7 +83,7 @@ window.onload = function() {
 	}
 
 	/* WebSocket endpoints */
-	var wsStats = 'ws://' + location.host + '/stats';
+	var wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/stats';
     var Socket = "MozWebSocket" in window ? MozWebSocket : WebSocket;
     var ws = new Socket(wsStats);
     ws.onmessage = function(evt) {
