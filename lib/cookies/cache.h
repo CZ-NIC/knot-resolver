@@ -21,8 +21,6 @@
 /** DNS cookie cache entry tag. */
 #define KR_CACHE_COOKIE (KR_CACHE_USER + 'C')
 
-#define COOKIE_TTL 72000
-
 /**
  * Peek the cache for asset (tag, socket address).
  * @note The 'drift' is the time passed between the inception time and now (in seconds).

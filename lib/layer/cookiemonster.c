@@ -262,11 +262,12 @@ static bool is_cookie_cached(struct kr_cache *cache,
 /**
  * Check cookie content and store it to cache.
  */
-static bool check_cookie_content_and_cache(struct kr_query *qry,
+static bool check_cookie_content_and_cache(struct kr_cookie_ctx *cntrl,
+                                           struct kr_query *qry,
                                            uint8_t *pkt_cookie_opt,
                                            struct kr_cache *cache)
 {
-	assert(pkt_cookie_opt);
+	assert(cntrl && qry && pkt_cookie_opt && cache);
 
 	uint8_t *pkt_cookie_data = knot_edns_opt_get_data(pkt_cookie_opt);
 	uint16_t pkt_cookie_len = knot_edns_opt_get_length(pkt_cookie_opt);
@@ -289,7 +290,7 @@ static bool check_cookie_content_and_cache(struct kr_query *qry,
 	const struct sockaddr *srvr_sockaddr = NULL;
 	bool returned_current = false;
 	ret = srvr_sockaddr_cc_check(&srvr_sockaddr, &returned_current, qry,
-	                             pkt_cc, &kr_glob_cookie_ctx);
+	                             pkt_cc, cntrl);
 	if (ret != kr_ok()) {
 		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
 		return false;
@@ -303,7 +304,7 @@ static bool check_cookie_content_and_cache(struct kr_query *qry,
 		struct kr_cache_txn txn;
 		if (kr_cache_txn_begin(cache, &txn, 0) == kr_ok()) {
 
-			struct timed_cookie timed_cookie = { COOKIE_TTL, pkt_cookie_opt };
+			struct timed_cookie timed_cookie = { cntrl->cache_ttl, pkt_cookie_opt };
 
 			ret = kr_cookie_cache_insert_cookie(&txn, srvr_sockaddr,
 			                                    &timed_cookie,
@@ -356,8 +357,8 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	if (!check_cookie_content_and_cache(qry, pkt_cookie_opt,
-	                                    cookie_cache)) {
+	if (!check_cookie_content_and_cache(&kr_glob_cookie_ctx, qry,
+	                                    pkt_cookie_opt, cookie_cache)) {
 		return KNOT_STATE_FAIL;
 	}
 

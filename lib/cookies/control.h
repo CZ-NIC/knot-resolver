@@ -36,12 +36,17 @@ struct kr_cookie_secret {
 KR_EXPORT
 extern struct kr_cookie_secret dflt_cs;
 
+/** Default cookie TTL. */
+#define DFLT_COOKIE_TTL 72000
+
 /** DNS cookies controlling structure. */
 struct kr_cookie_ctx {
-	bool enabled; /*!< Enabled/disables DNS cookies functionality. */
+	bool enabled; /**< Enabled/disables DNS cookies functionality. */
 
-	struct kr_cookie_secret *current_cs; /*!< current client secret */
-	struct kr_cookie_secret *recent_cs; /*!< recent client secret */
+	struct kr_cookie_secret *current_cs; /**< current client secret */
+	struct kr_cookie_secret *recent_cs; /**< recent client secret */
+
+	uint32_t cache_ttl; /**< TTL used when caching cookies */
 
 //	struct kr_cache cache; /*!< Server cookies cache. */
 };
