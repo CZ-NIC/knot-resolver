@@ -23,31 +23,32 @@
 #include "lib/cache.h"
 #include "lib/defines.h"
 
-#define KR_COOKIE_PLD_MAX 44 /* TODO -- Define in libknot. */
+/** Maximal size of a cookie option. */
+#define KR_COOKIE_OPT_MAX_LEN (KNOT_EDNS_OPTION_HDRLEN + KNOT_OPT_COOKIE_CLNT + KNOT_OPT_COOKIE_SRVR_MAX)
 
 /** Holds secret quantity. */
-struct secret_quantity {
+struct kr_cookie_secret {
 	size_t size; /*!< Secret quantity size. */
 	uint8_t data[]; /*!< Secret quantity data. */
 };
 
-/* Default client secret. */
+/** Default client secret. */
 KR_EXPORT
-extern struct secret_quantity dflt_cs;
+extern struct kr_cookie_secret dflt_cs;
 
-/** DNSSEC cookies controlling structure. */
-struct cookies_control {
+/** DNS cookies controlling structure. */
+struct kr_cookie_ctx {
 	bool enabled; /*!< Enabled/disables DNS cookies functionality. */
 
-	struct secret_quantity *current_cs; /*!< current client secret */
-	struct secret_quantity *recent_cs; /*!< recent client secret */
+	struct kr_cookie_secret *current_cs; /*!< current client secret */
+	struct kr_cookie_secret *recent_cs; /*!< recent client secret */
 
 //	struct kr_cache cache; /*!< Server cookies cache. */
 };
 
-/** Global cookies control. */
+/** Global cookie control context. */
 KR_EXPORT
-extern struct cookies_control kr_cookies_control;
+extern struct kr_cookie_ctx kr_glob_cookie_ctx;
 
 /**
  * Get pointers to IP address bytes.
@@ -68,7 +69,7 @@ int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len);
 KR_EXPORT
 int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
                           const void *clnt_sockaddr, const void *srvr_sockaddr,
-                          const struct secret_quantity *secret);
+                          const struct kr_cookie_secret *secret);
 
 /**
  * Insert a DNS cookie into query packet.
@@ -80,7 +81,7 @@ int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
  * @param pkt           DNS request packet.
  */
 KR_EXPORT
-int kr_request_put_cookie(const struct cookies_control *cntrl,
+int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
                           struct kr_cache *cookie_cache,
                           const void *clnt_sockaddr, const void *srvr_sockaddr,
                           knot_pkt_t *pkt);

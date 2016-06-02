@@ -24,7 +24,7 @@
 #include "lib/cookies/control.h"
 #include "lib/layer.h"
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies_control",  fmt)
+#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookiectl",  fmt)
 
 /** Find storage API with given prefix. */
 static struct storage_api *find_storage_api(const storage_registry_t *registry,
@@ -46,7 +46,7 @@ static struct storage_api *find_storage_api(const storage_registry_t *registry,
 #define NAME_ENABLED "enabled"
 #define NAME_CLIENT_SECRET "client_secret"
 
-static bool aply_enabled(struct cookies_control *cntrl, const JsonNode *node)
+static bool aply_enabled(struct kr_cookie_ctx *cntrl, const JsonNode *node)
 {
 	if (node->tag == JSON_BOOL) {
 		cntrl->enabled = node->bool_;
@@ -56,13 +56,13 @@ static bool aply_enabled(struct cookies_control *cntrl, const JsonNode *node)
 	return false;
 }
 
-static struct secret_quantity *new_sq_str(const JsonNode *node)
+static struct kr_cookie_secret *new_sq_str(const JsonNode *node)
 {
 	assert(node && node->tag == JSON_STRING);
 
 	size_t len = strlen(node->string_);
 
-	struct secret_quantity *sq = malloc(sizeof(*sq) + len);
+	struct kr_cookie_secret *sq = malloc(sizeof(*sq) + len);
 	if (!sq) {
 		return NULL;
 	}
@@ -74,7 +74,7 @@ static struct secret_quantity *new_sq_str(const JsonNode *node)
 
 #define holds_char(x) ((x) >= 0 && (x) <= 255)
 
-static struct secret_quantity *new_sq_array(const JsonNode *node)
+static struct kr_cookie_secret *new_sq_array(const JsonNode *node)
 {
 	assert(node && node->tag == JSON_ARRAY);
 
@@ -90,7 +90,7 @@ static struct secret_quantity *new_sq_array(const JsonNode *node)
 		return NULL;
 	}
 
-	struct secret_quantity *sq = malloc(sizeof(*sq) + cnt);
+	struct kr_cookie_secret *sq = malloc(sizeof(*sq) + cnt);
 	if (!sq) {
 		return NULL;
 	}
@@ -104,9 +104,9 @@ static struct secret_quantity *new_sq_array(const JsonNode *node)
 	return sq;
 }
 
-static bool apply_client_secret(struct cookies_control *cntrl, const JsonNode *node)
+static bool apply_client_secret(struct kr_cookie_ctx *cntrl, const JsonNode *node)
 {
-	struct secret_quantity *sq = NULL;
+	struct kr_cookie_secret *sq = NULL;
 
 	switch (node->tag) {
 	case JSON_STRING:
@@ -130,7 +130,7 @@ static bool apply_client_secret(struct cookies_control *cntrl, const JsonNode *n
 		return true;
 	}
 
-	struct secret_quantity *tmp = cntrl->recent_cs;
+	struct kr_cookie_secret *tmp = cntrl->recent_cs;
 	cntrl->recent_cs = cntrl->current_cs;
 	cntrl->current_cs = sq;
 
@@ -141,7 +141,7 @@ static bool apply_client_secret(struct cookies_control *cntrl, const JsonNode *n
 	return true;
 }
 
-static bool apply_configuration(struct cookies_control *cntrl, const JsonNode *node)
+static bool apply_configuration(struct kr_cookie_ctx *cntrl, const JsonNode *node)
 {
 	assert(cntrl && node);
 
@@ -159,7 +159,7 @@ static bool apply_configuration(struct cookies_control *cntrl, const JsonNode *n
 	return false;
 }
 
-static bool read_secret(JsonNode *root, struct cookies_control *cntrl)
+static bool read_secret(JsonNode *root, struct kr_cookie_ctx *cntrl)
 {
 	assert(root && cntrl);
 
@@ -193,13 +193,13 @@ fail:
  * Input: { name: value, ... }
  * Output: current configuration
  */
-static char *cookies_control_config(void *env, struct kr_module *module, const char *args)
+static char *cookiectl_config(void *env, struct kr_module *module, const char *args)
 {
 	if (args && strlen(args) > 0) {
 		JsonNode *node;
 		JsonNode *root_node = json_decode(args);
 		json_foreach (node, root_node) {
-			apply_configuration(&kr_cookies_control, node);
+			apply_configuration(&kr_glob_cookie_ctx, node);
 		}
 		json_delete(root_node);
 	}
@@ -207,8 +207,9 @@ static char *cookies_control_config(void *env, struct kr_module *module, const c
 	/* Return current configuration. */
 	char *result = NULL;
 	JsonNode *root_node = json_mkobject();
-	json_append_member(root_node, NAME_ENABLED, json_mkbool(kr_cookies_control.enabled));
-	read_secret(root_node, &kr_cookies_control);
+	json_append_member(root_node, NAME_ENABLED,
+	                   json_mkbool(kr_glob_cookie_ctx.enabled));
+	read_secret(root_node, &kr_glob_cookie_ctx);
 	result = json_encode(root_node);
 	json_delete(root_node);
 	return result;
@@ -247,17 +248,16 @@ static int cookies_cache_init(struct kr_cache *cache, struct engine *engine)
  */
 
 KR_EXPORT
-int cookies_control_init(struct kr_module *module)
+int cookiectl_init(struct kr_module *module)
 {
 	struct engine *engine = module->data;
 
-	memset(&kr_cookies_control, 0, sizeof(kr_cookies_control));
+	memset(&kr_glob_cookie_ctx, 0, sizeof(kr_glob_cookie_ctx));
 
-	kr_cookies_control.enabled = false;
+	kr_glob_cookie_ctx.enabled = false;
+	kr_glob_cookie_ctx.current_cs = &dflt_cs;
 
-	kr_cookies_control.current_cs = &dflt_cs;
-
-//	cookies_cache_init(&kr_cookies_control.cache, engine);
+//	cookies_cache_init(&kr_glob_cookie_ctx.cache, engine);
 
 	module->data = NULL;
 
@@ -265,35 +265,35 @@ int cookies_control_init(struct kr_module *module)
 }
 
 KR_EXPORT
-int cookies_control_deinit(struct kr_module *module)
+int cookiectl_deinit(struct kr_module *module)
 {
-	kr_cookies_control.enabled = false;
+	kr_glob_cookie_ctx.enabled = false;
 
-	if (kr_cookies_control.recent_cs &&
-	    kr_cookies_control.recent_cs != &dflt_cs) {
-		free(kr_cookies_control.recent_cs);
+	if (kr_glob_cookie_ctx.recent_cs &&
+	    kr_glob_cookie_ctx.recent_cs != &dflt_cs) {
+		free(kr_glob_cookie_ctx.recent_cs);
 	}
-	kr_cookies_control.recent_cs = NULL;
+	kr_glob_cookie_ctx.recent_cs = NULL;
 
-	if (kr_cookies_control.current_cs &&
-	    kr_cookies_control.current_cs != &dflt_cs) {
-		free(kr_cookies_control.current_cs);
+	if (kr_glob_cookie_ctx.current_cs &&
+	    kr_glob_cookie_ctx.current_cs != &dflt_cs) {
+		free(kr_glob_cookie_ctx.current_cs);
 	}
-	kr_cookies_control.current_cs = &dflt_cs;
+	kr_glob_cookie_ctx.current_cs = &dflt_cs;
 
-//	kr_cache_close(&kr_cookies_control.cache);
+//	kr_cache_close(&kr_glob_cookie_ctx.cache);
 
 	return kr_ok();
 }
 
 KR_EXPORT
-struct kr_prop *cookies_control_props(void)
+struct kr_prop *cookiectl_props(void)
 {
 	static struct kr_prop prop_list[] = {
-	    { &cookies_control_config, "config", "Empty value to return current configuration.", },
+	    { &cookiectl_config, "config", "Empty value to return current configuration.", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;
 }
 
-KR_MODULE_EXPORT(cookies_control);
+KR_MODULE_EXPORT(cookiectl);

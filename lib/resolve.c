@@ -268,8 +268,8 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
-	if (kr_cookies_control.enabled) {
-		wire_size += KR_COOKIE_PLD_MAX;
+	if (kr_glob_cookie_ctx.enabled) {
+		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 	return knot_pkt_reserve(pkt, wire_size);
 }

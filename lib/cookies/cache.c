@@ -221,7 +221,8 @@ int kr_cookie_cache_insert_cookie(struct kr_cache_txn *txn, const void *sockaddr
 		.count = 1 /* Only one entry. */
 	};
 
-	size_t cookie_opt_size = knot_edns_opt_get_length(cookie->cookie_opt) + KNOT_EDNS_OPTION_HDRLEN;
+	size_t cookie_opt_size = KNOT_EDNS_OPTION_HDRLEN +
+	                         knot_edns_opt_get_length(cookie->cookie_opt);
 
 	knot_db_val_t data = { (uint8_t *) cookie->cookie_opt, cookie_opt_size };
 	return kr_cookie_cache_insert(txn, KR_CACHE_COOKIE, sockaddr, &header,

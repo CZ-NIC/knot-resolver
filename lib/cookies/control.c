@@ -14,6 +14,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//#define MODULE_DEBUG_MSGS 1 /* Comment out if debug messages are not desired. */
+
 #include <arpa/inet.h> /* inet_ntop() */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -28,15 +30,19 @@
 #include "lib/layer.h"
 #include "lib/utils.h"
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies_control",  fmt)
+#if defined MODULE_DEBUG_MSGS
+#  define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies_control",  fmt)
+#else /* !defined MODULE_DEBUG_MSGS */
+#  define DEBUG_MSG(qry, fmt...) do { } while (0)
+#endif /* defined MODULE_DEBUG_MSGS */
 
 /* Default client secret. */
-struct secret_quantity dflt_cs = {
+struct kr_cookie_secret dflt_cs = {
 	.size = KNOT_OPT_COOKIE_CLNT,
 	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
-struct cookies_control kr_cookies_control = {
+struct kr_cookie_ctx kr_glob_cookie_ctx = {
 	.enabled = false,
 	.current_cs = &dflt_cs
 };
@@ -129,7 +135,7 @@ int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)
 
 int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
                           const void *clnt_sockaddr, const void *srvr_sockaddr,
-                          const struct secret_quantity *secret)
+                          const struct kr_cookie_secret *secret)
 {
 	if (!cc_buf) {
 		return kr_error(EINVAL);
@@ -207,7 +213,7 @@ static const uint8_t *peek_and_check_cc(struct kr_cache_txn *txn,
 	return NULL;
 }
 
-int kr_request_put_cookie(const struct cookies_control *cntrl,
+int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
                           struct kr_cache *cookie_cache,
                           const void *clnt_sockaddr, const void *srvr_sockaddr,
                           knot_pkt_t *pkt)
@@ -234,7 +240,10 @@ int kr_request_put_cookie(const struct cookies_control *cntrl,
 	}
 
 	struct kr_cache_txn txn;
-	kr_cache_txn_begin(cookie_cache, &txn, KNOT_DB_RDONLY);
+	ret = kr_cache_txn_begin(cookie_cache, &txn, KNOT_DB_RDONLY);
+	if (ret != kr_ok()) {
+		return kr_error(EIO);
+	}
 	const uint8_t *cached_cookie = peek_and_check_cc(&txn, srvr_sockaddr,
 	                                                 cc);
 
