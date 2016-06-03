@@ -1,7 +1,11 @@
 # List of built-in modules
 modules_TARGETS := hints \
-                   stats \
-                   cookiectl
+                   stats
+
+# DNS cookies
+ifeq ($(ENABLE_cookies),yes)
+modules_TARGETS += cookiectl
+endif
 
 # Memcached
 ifeq ($(HAS_libmemcached),yes)

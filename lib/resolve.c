@@ -27,7 +27,9 @@
 #include "lib/rplan.h"
 #include "lib/layer/iterate.h"
 #include "lib/dnssec/ta.h"
+#if defined(ENABLE_COOKIES)
 #include "lib/cookies/control.h"
+#endif /* defined(ENABLE_COOKIES) */
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), "resl",  fmt)
 
@@ -267,11 +269,15 @@ static int edns_put(knot_pkt_t *pkt)
 static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
+#if defined(ENABLE_COOKIES)
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
 	if (kr_glob_cookie_ctx.enabled) {
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 	return knot_pkt_reserve(pkt, wire_size);
+#else /* !defined(ENABLE_COOKIES) */
+	return knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
+#endif /* defined(ENABLE_COOKIES) */
 }
 
 static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_request *req)
@@ -440,6 +446,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
 
+#if defined(ENABLE_COOKIES)
 	if (src && !(qry->flags & QUERY_CACHED)) {
 		/* Track response source.
 		 * TODO -- Find a more suitable place to put the source address
@@ -456,6 +463,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 			break;
 		}
 	}
+#endif /* defined(ENABLE_COOKIES) */
 
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
@@ -750,7 +758,11 @@ ns_election:
 
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
+#if defined(ENABLE_COOKIES)
 	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_BADCOOKIE_AGAIN))) { /* Keep NS when requerying/stub/badcookie. */
+#else /* defined(ENABLE_COOKIES) */
+	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB))) { /* Keep NS when requerying/stub. */
+#endif /* defined(ENABLE_COOKIES) */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);

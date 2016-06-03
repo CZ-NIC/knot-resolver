@@ -30,11 +30,11 @@
 #include "lib/layer.h"
 #include "lib/utils.h"
 
-#if defined MODULE_DEBUG_MSGS
+#if defined(MODULE_DEBUG_MSGS)
 #  define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies_control",  fmt)
-#else /* !defined MODULE_DEBUG_MSGS */
+#else /* !defined(MODULE_DEBUG_MSGS) */
 #  define DEBUG_MSG(qry, fmt...) do { } while (0)
-#endif /* defined MODULE_DEBUG_MSGS */
+#endif /* defined(MODULE_DEBUG_MSGS) */
 
 /* Default client secret. */
 struct kr_cookie_secret dflt_cs = {

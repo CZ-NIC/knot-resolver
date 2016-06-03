@@ -14,7 +14,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <arpa/inet.h> /* inet_ntop() */
 #include <uv.h>
 #include <lua.h>
 #include <libknot/packet/pkt.h>
@@ -26,7 +25,10 @@
 #include <malloc.h>
 #endif
 #include <assert.h>
+#if defined(ENABLE_COOKIES)
+#include <arpa/inet.h> /* inet_ntop() */
 #include "lib/cookies/control.h"
+#endif /* defined(ENABLE_COOKIES) */
 #include "lib/utils.h"
 #include "lib/layer.h"
 #include "daemon/worker.h"
@@ -441,6 +443,7 @@ static void on_write(uv_write_t *req, int status)
 	req_release(worker, (struct req *)req);
 }
 
+#if defined(ENABLE_COOKIES)
 /** Update DNS cookie data in packet. */
 static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
                                   struct kr_cache *cookie_cache,
@@ -478,6 +481,7 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 
 	return true;
 }
+#endif /* defined(ENABLE_COOKIES) */
 
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
 {
@@ -499,11 +503,13 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		return qr_task_on_send(task, handle, kr_error(ENOMEM));
 	}
 	if (handle->type == UV_UDP) {
+#if defined(ENABLE_COOKIES)
 		if (knot_wire_get_qr(pkt->wire) == 0) {
 			/* Update DNS cookies data in query. */
 			subreq_update_cookies((uv_udp_t *) handle, addr,
 			                      &task->worker->engine->resolver.cache, pkt);
 		}
+#endif /* defined(ENABLE_COOKIES) */
 
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->as.send.data = task;

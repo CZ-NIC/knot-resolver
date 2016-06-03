@@ -1,13 +1,10 @@
 libkres_SOURCES := \
 	contrib/fnv/hash_64a.c \
 	lib/generic/map.c      \
-	lib/layer/cookiemonster.c \
 	lib/layer/iterate.c    \
 	lib/layer/validate.c   \
 	lib/layer/rrcache.c    \
 	lib/layer/pktcache.c   \
-	lib/cookies/cache.c    \
-	lib/cookies/control.c  \
 	lib/dnssec/nsec.c      \
 	lib/dnssec/nsec3.c     \
 	lib/dnssec/signature.c \
@@ -27,8 +24,6 @@ libkres_HEADERS := \
 	lib/generic/map.h      \
 	lib/generic/set.h      \
 	lib/layer.h            \
-	lib/cookies/cache.h    \
-	lib/cookies/control.h  \
 	lib/dnssec/nsec.h      \
 	lib/dnssec/nsec3.h     \
 	lib/dnssec/signature.h \
@@ -49,6 +44,17 @@ libkres_DEPEND := $(contrib)
 libkres_CFLAGS := -fvisibility=hidden -fPIC $(lmdb_CFLAGS)
 libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
+
+ifeq ($(ENABLE_cookies),yes)
+libkres_SOURCES += \
+	lib/layer/cookiemonster.c \
+	lib/cookies/cache.c    \
+	lib/cookies/control.c
+
+libkres_HEADERS += \
+	lib/cookies/cache.h    \
+	lib/cookies/control.h
+endif
 
 # Make library
 ifeq ($(BUILDMODE), static)

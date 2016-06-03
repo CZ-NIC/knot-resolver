@@ -64,6 +64,10 @@ endif
 BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
 BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
 
+ifeq ($(ENABLE_cookies),yes)
+BUILD_CFLAGS += -DENABLE_COOKIES
+endif
+
 # Overview
 info:
 	$(info Target:     Knot DNS Resolver $(MAJOR).$(MINOR).$(PATCH)-$(PLATFORM))

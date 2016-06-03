@@ -471,7 +471,9 @@ static int init_resolver(struct engine *engine)
 	}
 
 	/* Load basic modules */
+#if defined(ENABLE_COOKIES)
 	engine_register(engine, "cookiemonster", NULL, NULL);
+#endif /* defined(ENABLE_COOKIES) */
 	engine_register(engine, "iterate", NULL, NULL);
 	engine_register(engine, "validate", NULL, NULL);
 	engine_register(engine, "rrcache", NULL, NULL);
