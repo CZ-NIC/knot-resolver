@@ -20,9 +20,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <assert.h>
+#include <libknot/error.h>
+#include <openssl/hmac.h>
+#include <openssl/sha.h>
 #include <stdint.h>
 #include <string.h>
-#include <libknot/error.h>
 
 #include "contrib/fnv/fnv.h"
 #include "lib/cookies/cache.h"
@@ -36,10 +38,12 @@
 #  define DEBUG_MSG(qry, fmt...) do { } while (0)
 #endif /* defined(MODULE_DEBUG_MSGS) */
 
+//#define CC_HASH_USE_CLIENT_ADDRESS /* When defined, client address will be used when generating client cookie. */
+
 /* Default client secret. */
 struct kr_cookie_secret dflt_cs = {
 	.size = KNOT_OPT_COOKIE_CLNT,
-	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
 struct kr_cookie_ctx kr_glob_cookie_ctx = {
@@ -127,57 +131,124 @@ int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)
 	WITH_DEBUG {
 		char ns_str[INET6_ADDRSTRLEN];
 		inet_ntop(addr_family, *addr, ns_str, sizeof(ns_str));
-		DEBUG_MSG(NULL, "obtaned IP address '%s'\n", ns_str);
+		DEBUG_MSG(NULL, "obtained IP address '%s'\n", ns_str);
 	}
 
 	return kr_ok();
 }
 
-int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
-                          const void *clnt_sockaddr, const void *srvr_sockaddr,
-                          const struct kr_cookie_secret *secret)
+int kr_cc_compute_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
+                        const void *clnt_sockaddr, const void *srvr_sockaddr,
+                        const struct kr_cookie_secret *secret)
 {
 	if (!cc_buf) {
 		return kr_error(EINVAL);
 	}
 
-	if (!clnt_sockaddr && !srvr_sockaddr &&
+	if ((!clnt_sockaddr && !srvr_sockaddr) ||
 	    !(secret && secret->size && secret->data)) {
 		return kr_error(EINVAL);
 	}
 
 	const uint8_t *addr = NULL;
-	size_t size = 0;
+	size_t alen = 0; /* Address length. */
 
 	Fnv64_t hash_val = FNV1A_64_INIT;
 
-	/* Client address currently always ignored. */
-#if 0
+#if defined(CC_HASH_USE_CLIENT_ADDRESS)
 	if (clnt_sockaddr) {
-		if (kr_ok() == kr_address_bytes(clnt_sockaddr, &addr, &size)) {
-			assert(addr && size);
-			hash_val = fnv_64a_buf(addr, size, hash_val);
+		if (kr_ok() == kr_address_bytes(clnt_sockaddr, &addr, &alen)) {
+			assert(addr && alen);
+			hash_val = fnv_64a_buf(addr, alen, hash_val);
 		}
 	}
-#endif
+#endif /* defined(CC_HASH_USE_CLIENT_ADDRESS) */
 
 	if (srvr_sockaddr) {
-		if (kr_ok() == kr_address_bytes(srvr_sockaddr, &addr, &size)) {
-			assert(addr && size);
-			hash_val = fnv_64a_buf((void *) addr, size, hash_val);
+		if (kr_ok() == kr_address_bytes(srvr_sockaddr, &addr, &alen)) {
+			assert(addr && alen);
+			hash_val = fnv_64a_buf((void *) addr, alen, hash_val);
 		}
 	}
 
-	if (secret && secret->size && secret->data) {
-		DEBUG_MSG(NULL, "%s\n", "adding client secret into cookie");
-		hash_val = fnv_64a_buf((void *) addr, size, hash_val);
-	}
+	hash_val = fnv_64a_buf((void *) secret->data, secret->size, hash_val);
 
 	assert(KNOT_OPT_COOKIE_CLNT == sizeof(hash_val));
 
 	memcpy(cc_buf, &hash_val, KNOT_OPT_COOKIE_CLNT);
 
 	return kr_ok();
+}
+
+int kr_cc_compute_hmac_sha256_64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
+                                 const void *clnt_sockaddr, const void *srvr_sockaddr,
+                                 const struct kr_cookie_secret *secret)
+{
+	if (!cc_buf) {
+		return kr_error(EINVAL);
+	}
+
+	if ((!clnt_sockaddr && !srvr_sockaddr) ||
+	    !(secret && secret->size && secret->data)) {
+		return kr_error(EINVAL);
+	}
+
+	const uint8_t *addr = NULL;
+	size_t alen = 0; /* Address length. */
+
+	uint8_t digest[SHA256_DIGEST_LENGTH];
+	unsigned int digest_len = SHA256_DIGEST_LENGTH;
+
+	/* text: (client IP | server IP)
+	 * key: client secret */
+
+	HMAC_CTX ctx;
+	HMAC_CTX_init(&ctx);
+
+	int ret = HMAC_Init_ex(&ctx, secret->data, secret->size, EVP_sha256(),
+	                       NULL);
+	if (ret != 1) {
+		ret = kr_error(EINVAL);
+		goto fail;
+	}
+
+#if defined(CC_HASH_USE_CLIENT_ADDRESS)
+	if (clnt_sockaddr) {
+		if (kr_ok() == kr_address_bytes(clnt_sockaddr, &addr, &alen)) {
+			assert(addr && alen);
+			ret = HMAC_Update(&ctx, addr, alen);
+			if (ret != 1) {
+				ret = kr_error(EINVAL);
+				goto fail;
+			}
+		}
+	}
+#endif /* defined(CC_HASH_USE_CLIENT_ADDRESS) */
+
+	if (srvr_sockaddr) {
+		if (kr_ok() == kr_address_bytes(srvr_sockaddr, &addr, &alen)) {
+			assert(addr && alen);
+			ret = HMAC_Update(&ctx, addr, alen);
+			if (ret != 1) {
+				ret = kr_error(EINVAL);
+				goto fail;
+			}
+		}
+	}
+
+	if (1 != HMAC_Final(&ctx, digest, &digest_len)) {
+		ret = kr_error(EINVAL);
+		goto fail;
+	}
+
+	assert(KNOT_OPT_COOKIE_CLNT <= SHA256_DIGEST_LENGTH);
+
+	memcpy(cc_buf, digest, KNOT_OPT_COOKIE_CLNT);
+	ret = kr_ok();
+
+fail:
+	HMAC_CTX_cleanup(&ctx);
+	return ret;
 }
 
 /**
@@ -233,8 +304,9 @@ int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
 	 * TODO -- generate client cookie from client address, server address
 	 * and secret quantity. */
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
-	int ret = kr_client_cokie_fnv64(cc, clnt_sockaddr, srvr_sockaddr,
-	                                cntrl->current_cs);
+	assert(cntrl->cc_compute_func);
+	int ret = cntrl->cc_compute_func(cc, clnt_sockaddr, srvr_sockaddr,
+	                                 cntrl->current_cs);
 	if (ret != kr_ok()) {
 		return ret;
 	}

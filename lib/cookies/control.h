@@ -39,6 +39,10 @@ extern struct kr_cookie_secret dflt_cs;
 /** Default cookie TTL. */
 #define DFLT_COOKIE_TTL 72000
 
+/** Client cookie creation function type. */
+typedef int (cc_compute_func_t)(uint8_t *, const void *, const void *,
+                               const struct kr_cookie_secret *);
+
 /** DNS cookies controlling structure. */
 struct kr_cookie_ctx {
 	bool enabled; /**< Enabled/disables DNS cookies functionality. */
@@ -48,7 +52,8 @@ struct kr_cookie_ctx {
 
 	uint32_t cache_ttl; /**< TTL used when caching cookies */
 
-//	struct kr_cache cache; /*!< Server cookies cache. */
+	/**< Client cookie computation callback. */
+	cc_compute_func_t *cc_compute_func;
 };
 
 /** Global cookie control context. */
@@ -64,17 +69,32 @@ extern struct kr_cookie_ctx kr_glob_cookie_ctx;
 int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len);
 
 /**
- * Compute client cookie.
- * @not At least one of the arguments must be non-null.
+ * Compute client cookie using FNV-64.
+ * @note At least one of the arguments must be non-null.
  * @param cc_buf        Buffer to which to write the cookie into.
  * @param clnt_sockaddr Client address.
  * @param srvr_sockaddr Server address.
  * @param secret        Client secret quantity.
+ * @return kr_ok() on success, error code else.
  */
 KR_EXPORT
-int kr_client_cokie_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
-                          const void *clnt_sockaddr, const void *srvr_sockaddr,
-                          const struct kr_cookie_secret *secret);
+int kr_cc_compute_fnv64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
+                        const void *clnt_sockaddr, const void *srvr_sockaddr,
+                        const struct kr_cookie_secret *secret);
+
+/**
+ * Compute client cookie using HMAC_SHA256-64.
+ * @note At least one of the arguments must be non-null.
+ * @param cc_buf        Buffer to which to write the cookie into.
+ * @param clnt_sockaddr Client address.
+ * @param srvr_sockaddr Server address.
+ * @param secret        Client secret quantity.
+ * @return kr_ok() on success, error code else.
+ */
+KR_EXPORT
+int kr_cc_compute_hmac_sha256_64(uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT],
+                                 const void *clnt_sockaddr, const void *srvr_sockaddr,
+                                 const struct kr_cookie_secret *secret);
 
 /**
  * Insert a DNS cookie into query packet.

@@ -19,6 +19,7 @@ $(eval $(call find_lib,libknot,2.1))
 $(eval $(call find_lib,lmdb))
 $(eval $(call find_lib,libzscanner,2.1))
 $(eval $(call find_lib,libuv,1.0))
+$(eval $(call find_lib,libcrypto))
 $(eval $(call find_alt,lua,luajit))
 $(eval $(call find_lib,cmocka))
 $(eval $(call find_bin,doxygen))
@@ -65,7 +66,7 @@ BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS)
 BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
 
 ifeq ($(ENABLE_cookies),yes)
-BUILD_CFLAGS += -DENABLE_COOKIES
+BUILD_CFLAGS += -DENABLE_COOKIES $(libcrypto_CFLAGS)
 endif
 
 # Overview
@@ -94,6 +95,7 @@ info:
 	$(info [$(HAS_lua)] luajit (daemon))
 	$(info [$(HAS_libuv)] libuv (daemon))
 	$(info [$(HAS_gnutls)] libgnutls (daemon))
+	$(info [$(HAS_libcrypto)] crypto (DNS cookies))
 	$(info )
 	$(info Optional)
 	$(info --------)

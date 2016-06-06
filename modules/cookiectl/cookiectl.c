@@ -273,6 +273,8 @@ int cookiectl_init(struct kr_module *module)
 	kr_glob_cookie_ctx.current_cs = &dflt_cs;
 	kr_glob_cookie_ctx.cache_ttl = DFLT_COOKIE_TTL;
 
+	kr_glob_cookie_ctx.cc_compute_func = kr_cc_compute_fnv64;
+
 //	cookies_cache_init(&kr_glob_cookie_ctx.cache, engine);
 
 	module->data = NULL;

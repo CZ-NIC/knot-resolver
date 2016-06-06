@@ -54,6 +54,8 @@ libkres_SOURCES += \
 libkres_HEADERS += \
 	lib/cookies/cache.h    \
 	lib/cookies/control.h
+
+libkres_LIBS += $(libcrypto_LIBS)
 endif
 
 # Make library

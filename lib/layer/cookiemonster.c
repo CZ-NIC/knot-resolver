@@ -42,17 +42,19 @@
  * @param clnt_sockaddr client socket address (i.e. resolver address)
  * @param srvr_sockaddr server socket address
  * @param csecr client secret
+ * @param cc_compute_func function generating client cookie
  * @return kr_ok() or error code
  */
 static int check_client_cookie(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
                                const void *clnt_sockaddr,
                                const void *srvr_sockaddr,
-                               const struct kr_cookie_secret *csecr)
+                               const struct kr_cookie_secret *csecr,
+                               cc_compute_func_t *cc_compute_func)
 {
 	uint8_t generated_cc[KNOT_OPT_COOKIE_CLNT] = {0, };
 
-	int ret = kr_client_cokie_fnv64(generated_cc, clnt_sockaddr,
-	                                srvr_sockaddr, csecr);
+	int ret = cc_compute_func(generated_cc, clnt_sockaddr,
+	                          srvr_sockaddr, csecr);
 	if (ret != kr_ok()) {
 		return ret;
 	}
@@ -88,13 +90,15 @@ static const struct sockaddr *passed_server_sockaddr(const struct kr_query *qry)
  * @param nsrep name server reputation context
  * @param cc client cookie data
  * @param csecr client secret
+ * @param cc_compute_func function generating client cookie
  * @return pointer to address if a matching found, NULL if none matches
  */
 static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
                                                 const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
-                                                const struct kr_cookie_secret *csecr)
+                                                const struct kr_cookie_secret *csecr,
+                                                cc_compute_func_t *cc_compute_func)
 {
-	assert(nsrep && cc && csecr);
+	assert(nsrep && cc && csecr && cc_compute_func);
 
 	const struct sockaddr *sockaddr = NULL;
 
@@ -103,7 +107,8 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
 		if (nsrep->addr[i].ip.sa_family == AF_UNSPEC) {
 			break;
 		}
-		int ret = check_client_cookie(cc, NULL, &nsrep->addr[i], csecr);
+		int ret = check_client_cookie(cc, NULL, &nsrep->addr[i], csecr,
+		                              cc_compute_func);
 		if (ret == kr_ok()) {
 			sockaddr = (struct sockaddr *) &nsrep->addr[i];
 			break;
@@ -121,8 +126,8 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
  * @param cntr cookie control structure
  * @return kr_ok() if matching address found, error code else
  */
-static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr, bool *is_current,
-                                  const struct kr_query *qry,
+static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
+                                  bool *is_current, const struct kr_query *qry,
                                   const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
                                   const struct kr_cookie_ctx *cntrl)
 {
@@ -133,11 +138,13 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr, bool *is_cur
 	/* The address must correspond with the client cookie. */
 	if (tmp_sockaddr) {
 		int ret = check_client_cookie(cc, NULL, tmp_sockaddr,
-		                              cntrl->current_cs);
+		                              cntrl->current_cs,
+		                              cntrl->cc_compute_func);
 		bool have_current = (ret == kr_ok());
 		if ((ret != kr_ok()) && cntrl->recent_cs) {
 			ret = check_client_cookie(cc, NULL, tmp_sockaddr,
-		                              cntrl->recent_cs);
+			                          cntrl->recent_cs,
+			                          cntrl->cc_compute_func);
 		}
 		if (ret == kr_ok()) {
 			*sockaddr = tmp_sockaddr;
@@ -155,11 +162,13 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr, bool *is_cur
 
 	/* Abusing name server reputation mechanism to guess IP addresses. */
 	const struct kr_nsrep *ns = &qry->ns;
-	tmp_sockaddr = guess_server_addr(ns, cc, cntrl->current_cs);
+	tmp_sockaddr = guess_server_addr(ns, cc, cntrl->current_cs,
+	                                 cntrl->cc_compute_func);
 	bool have_current = (tmp_sockaddr != NULL);
 	if (!tmp_sockaddr && cntrl->recent_cs) {
 		/* Try recent client secret to check obtained cookie. */
-		tmp_sockaddr = guess_server_addr(ns, cc, cntrl->recent_cs);
+		tmp_sockaddr = guess_server_addr(ns, cc, cntrl->recent_cs,
+		                                 cntrl->cc_compute_func);
 	}
 	if (tmp_sockaddr) {
 		*sockaddr = tmp_sockaddr;
