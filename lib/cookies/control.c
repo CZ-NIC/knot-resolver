@@ -46,6 +46,12 @@ struct kr_cookie_secret dflt_cs = {
 	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
+const struct kr_cc_hash_descr kr_cc_hashes[] = {
+	{ kr_cc_compute_fnv64, "FNV-64" },
+	{ kr_cc_compute_hmac_sha256_64, "HMAC-SHA256-64" },
+	{ NULL, NULL }
+};
+
 struct kr_cookie_ctx kr_glob_cookie_ctx = {
 	.enabled = false,
 	.current_cs = &dflt_cs
@@ -98,6 +104,45 @@ static int opt_rr_add_option(knot_rrset_t *opt_rr, uint8_t *option,
 
 	memcpy(reserved_data, opt_data, opt_len);
 	return KNOT_EOK;
+}
+
+cc_compute_func_t *kr_cc_hash_func(const struct kr_cc_hash_descr cc_hashes[],
+                                   const char *name)
+{
+	if (!cc_hashes || !name) {
+		return NULL;
+	}
+
+	const struct kr_cc_hash_descr *aux_ptr = cc_hashes;
+
+	while (aux_ptr && aux_ptr->hash_func) {
+		assert(aux_ptr->name);
+		if (strcmp(aux_ptr->name, name) == 0) {
+			return aux_ptr->hash_func;
+		}
+		++aux_ptr;
+	}
+
+	return NULL;
+}
+
+const char *kr_cc_hash_name(const struct kr_cc_hash_descr cc_hashes[],
+                            cc_compute_func_t *func)
+{
+	if (!cc_hashes || !func) {
+		return NULL;
+	}
+
+	const struct kr_cc_hash_descr *aux_ptr = cc_hashes;
+	while (aux_ptr && aux_ptr->hash_func) {
+		assert(aux_ptr->name);
+		if (aux_ptr->hash_func == func) {
+			return aux_ptr->name;
+		}
+		++aux_ptr;
+	}
+
+	return NULL;
 }
 
 int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)

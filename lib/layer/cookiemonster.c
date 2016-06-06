@@ -348,7 +348,7 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		                                      KNOT_EDNS_OPTION_COOKIE);
 	}
 
-	struct kr_cache *cookie_cache = &req->ctx->cache; //&kr_glob_cookie_ctx.cache;
+	struct kr_cache *cookie_cache = &req->ctx->cache;
 
 	const struct sockaddr *srvr_sockaddr = passed_server_sockaddr(qry);
 

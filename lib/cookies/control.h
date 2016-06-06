@@ -43,6 +43,20 @@ extern struct kr_cookie_secret dflt_cs;
 typedef int (cc_compute_func_t)(uint8_t *, const void *, const void *,
                                const struct kr_cookie_secret *);
 
+/** Holds description of client cookie hashing algorithms. */
+struct kr_cc_hash_descr {
+	cc_compute_func_t *hash_func; /**< Pointer to has function. */
+	const char *name; /**< Hash function name. */
+};
+
+/**
+ * List of available client cookie hash functions.
+ *
+ * Last element contains all null entries.
+ */
+KR_EXPORT
+extern const struct kr_cc_hash_descr kr_cc_hashes[];
+
 /** DNS cookies controlling structure. */
 struct kr_cookie_ctx {
 	bool enabled; /**< Enabled/disables DNS cookies functionality. */
@@ -52,13 +66,32 @@ struct kr_cookie_ctx {
 
 	uint32_t cache_ttl; /**< TTL used when caching cookies */
 
-	/**< Client cookie computation callback. */
-	cc_compute_func_t *cc_compute_func;
+	cc_compute_func_t *cc_compute_func; /**< Client cookie hash computation callback. */
 };
 
 /** Global cookie control context. */
 KR_EXPORT
 extern struct kr_cookie_ctx kr_glob_cookie_ctx;
+
+/**
+ * @brief Return pointer to client cookie hash function with given name.
+ * @param cc_hashes list of avilable has functions
+ * @param name has function name
+ * @return pointer to function or NULL if not found
+ */
+KR_EXPORT
+cc_compute_func_t *kr_cc_hash_func(const struct kr_cc_hash_descr cc_hashes[],
+                                   const char *name);
+
+/**
+ * @brief Return name of given client cookie hash function.
+ * @param cc_hashes list of avilable has functions
+ * @param func sought function
+ * @return pointer to string or NULL if not found
+ */
+KR_EXPORT
+const char *kr_cc_hash_name(const struct kr_cc_hash_descr cc_hashes[],
+                            cc_compute_func_t *func);
 
 /**
  * Get pointers to IP address bytes.
