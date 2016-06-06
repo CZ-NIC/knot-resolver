@@ -45,7 +45,7 @@ libkres_CFLAGS := -fvisibility=hidden -fPIC $(lmdb_CFLAGS)
 libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
-ifeq ($(ENABLE_cookies),yes)
+ifeq ($(HAS_libcrypto),yes)
 libkres_SOURCES += \
 	lib/layer/cookiemonster.c \
 	lib/cookies/cache.c    \

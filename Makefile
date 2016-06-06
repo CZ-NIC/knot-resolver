@@ -62,11 +62,11 @@ ifneq (,$(findstring luajit, $(lua_LIBS)))
 endif
 endif
 
-BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
+BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(libcrypto_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
 BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
 
-ifeq ($(ENABLE_cookies),yes)
-BUILD_CFLAGS += -DENABLE_COOKIES $(libcrypto_CFLAGS)
+ifeq ($(HAS_libcrypto),yes)
+BUILD_CFLAGS += -DENABLE_COOKIES
 endif
 
 # Overview
