@@ -571,7 +571,7 @@ int engine_cmd(struct engine *engine, const char *str)
 static int engine_loadconf(struct engine *engine, const char *config_path)
 {
 	/* Use module path for including Lua scripts */
-	static const char l_paths[] = "package.path = package.path..';" MODULEDIR "/?.lua'";
+	static const char l_paths[] = "package.path = '" MODULEDIR "/?.lua;'..package.path";
 	int ret = l_dobytecode(engine->L, l_paths, sizeof(l_paths) - 1, "");
 	if (ret != 0) {
 		lua_pop(engine->L, 1);
@@ -770,6 +770,6 @@ struct engine *engine_luaget(lua_State *L)
 {
 	lua_getglobal(L, "__engine");
 	struct engine *engine = lua_touserdata(L, -1);
-	lua_pop(engine->L, 1);
+	lua_pop(L, 1);
 	return engine;
 }
