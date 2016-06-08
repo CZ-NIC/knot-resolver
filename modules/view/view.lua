@@ -19,7 +19,9 @@ function view.addr(view, subnet, policy)
 	local subnet_cd = ffi.new('char[16]')
 	local family = C.kr_straddr_family(subnet)
 	local bitlen = C.kr_straddr_subnet(subnet_cd, subnet)
-	table.insert(view.subnet, {family, subnet_cd, bitlen, policy})
+	local t = {family, subnet_cd, bitlen, policy}
+	table.insert(view.subnet, t)
+	return t
 end
 
 -- @function Match IP against given subnet
@@ -29,7 +31,6 @@ end
 
 -- @function Find view for given request
 local function evaluate(view, req)
-	local answer = req.answer
 	local client_key = req.qsource.key
 	local match_cb = (client_key ~= nil) and view.key[client_key:owner()] or nil
 	-- Search subnets otherwise
@@ -43,6 +44,19 @@ local function evaluate(view, req)
 		end
 	end
 	return match_cb
+end
+
+-- @function Return view policy rule
+function view.rule(action, subnet)
+	local subnet_cd = ffi.new('char[16]')
+	local family = C.kr_straddr_family(subnet)
+	local bitlen = C.kr_straddr_subnet(subnet_cd, subnet)
+	return function(req, _)
+		local src_addr = req.qsource.addr
+		if src_addr ~= nil and match_subnet(family, subnet_cd, bitlen, src_addr) then
+			return action
+		end
+	end
 end
 
 -- @function Module layers
