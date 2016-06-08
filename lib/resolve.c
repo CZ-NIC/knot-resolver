@@ -445,7 +445,19 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 			randomized_qname_case(qname_raw, qry->secret);
 		}
 		request->state = KNOT_STATE_CONSUME;
-		ITERATE_LAYERS(request, qry, consume, packet);
+		if (qry->flags & QUERY_CACHED) {
+			ITERATE_LAYERS(request, qry, consume, packet);
+		} else {
+			struct timeval now;
+			gettimeofday(&now, NULL);
+			/* Fill in source and latency information. */
+			request->upstream.rtt = time_diff(&qry->timestamp, &now);
+			request->upstream.addr = src;
+			ITERATE_LAYERS(request, qry, consume, packet);
+			/* Clear temporary information */
+			request->upstream.addr = NULL;
+			request->upstream.rtt = 0;
+		}
 	}
 
 	/* Track RTT for iterative answers */

@@ -113,6 +113,10 @@ struct kr_request {
         const knot_rrset_t *key;
         const struct sockaddr *addr;
     } qsource;
+    struct {
+        unsigned rtt;                  /**< Current upstream RTT */
+        const struct sockaddr *addr;   /**< Current upstream address */
+    } upstream;                        /**< Upstream information, valid only in consume() phase */
     uint32_t options;
     int state;
     rr_array_t authority;

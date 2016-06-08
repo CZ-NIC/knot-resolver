@@ -213,6 +213,10 @@ struct kr_request {
 		const knot_rrset_t *key;
 		const struct sockaddr *addr;
 	} qsource;
+	struct {
+	    unsigned rtt;
+	    const struct sockaddr *addr;
+	} upstream;
 	uint32_t options;
 	int state;
 	rr_array_t authority;
