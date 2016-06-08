@@ -3,19 +3,48 @@
 <title>{{ title }}</title>
 <style>
 	body { font-family: 'Gill Sans', 'Gill Sans MT', Verdana, sans-serif; color: #555; }
-	h1, h2, h3 { line-height: 1.5em; color: #000; text-align: center; border-bottom: 1px solid #ccc; }
-	h1, h2, h3 { font-weight: 300; }
+	h1, h2 { line-height: 1.5em; text-align: center; border-bottom: 1px solid #ccc; }
+	h1, h2, h3 { color: #000; font-weight: 300; }
 	th { text-align: left; font-weight: normal; margin-bottom: 0.5em; }
 	#page { font-weight: 300; }
 	#page { width: 900px; margin: 0 auto; }
-	#stats { height: 300px; }
-	#stats .layer-cached , .l-cached  { fill: #2CA02C; color: #2CA02C; }
-	#stats .layer-10ms   , .l-10ms    { fill: #165683; color: #165683; }
-	#stats .layer-100ms  , .l-100ms   { fill: #258FDA; color: #258FDA; }
-	#stats .layer-1000ms , .l-1000ms  { fill: #51A5E1; color: #51A5E1; }
-	#stats .layer-slow   , .l-slow    { fill: #E1AC51; color: #E1AC51; }
-	.stats-legend { text-align: center; }
-	.stats-legend li { display: inline; list-style-type: none; padding-right: 20px; }
+	#stats { height: 350px; display: block; }
+	#chart {
+		display: inline-block;
+		left: 50px;
+	}
+	#legend {
+		background-color: white;
+	}
+	#legend .label {
+		color: #404040;
+	}
+	#legend .action {
+		color: black;
+		opacity: 0.5;
+	}
+	#legend ul {
+		padding: 0;
+	}
+	#legend_container h3 {
+		margin-top: 0;
+	}
+	#y_axis {
+		position: absolute;
+		width: 50px;
+		height: 350px;
+	}
+	#legend_container {
+		padding: 0;
+		width: 140px;
+		display: inline-block;
+		vertical-align: top;
+	}
+	#chart_container {
+		width: 760px;
+		float: left;
+		position: relative;
+	}
 	.map-legend { font-size: 10px; }
 </style>
 <script type="text/javascript">
@@ -24,16 +53,24 @@
 </script>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="d3.js"></script>
-<script type="text/javascript" src="epoch.js"></script>
+<script type="text/javascript" src="rickshaw.min.js"></script>
 <script type="text/javascript" src="topojson.js"></script>
 <script type="text/javascript" src="datamaps.world.min.js"></script>
 <script type="text/javascript" src="kresd.js"></script>
 <link rel="icon" type="image/ico" href="favicon.ico">
-<link rel="stylesheet" type="text/css" href="epoch.css">
+<link rel="stylesheet" type="text/css" href="rickshaw.min.css">
 <div id="page">
 	<h1>{{ title }}</h1>
-	<div class="epoch" id="stats"></div>
-	<ul class="stats-legend"></ul>
+	<div id="stats">
+		<form id="legend_container">
+			<div id="legend"></div>
+		</form>
+		<div id="chart_container">
+			<div id="y_axis"></div>
+			<div id="chart"></div>
+			<div id="x_axis"></div>
+		</div>
+	</div>
 	<h2>Where do the queries go?</h2>
 	<div id="map" style="position: relative;"></div>
 	{{ snippets }}

@@ -10,6 +10,17 @@ min = minute
 hour = 60 * minute
 day = 24 * hour
 
+-- Logging
+function panic(fmt, ...)
+        error(string.format('error: '..fmt, ...))
+end
+function warn(fmt, ...)
+        io.stderr:write(string.format(fmt..'\n', ...))
+end
+function log(fmt, ...)
+        print(string.format(fmt, ...))
+end
+
 -- Resolver bindings
 kres = require('kres')
 trust_anchors = require('trust_anchors')

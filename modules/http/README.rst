@@ -28,6 +28,7 @@ for starters?
 		http = {
 			host = 'localhost',
 			port = 8053,
+			geoip = 'GeoLite2-City.mmdb' -- Optional
 		}
 	}
 
@@ -70,6 +71,40 @@ the outputs of following:
 	openssl ecparam -genkey -name prime256v1 -out mykey.key
 	openssl req -new -key mykey.key -out csr.pem
 	openssl req -x509 -days 90 -key mykey.key -in csr.pem -out mycert.crt
+
+Built-in services
+^^^^^^^^^^^^^^^^^
+
+The HTTP module has several built-in services to use.
+
+.. csv-table::
+ :header: "Endpoint", "Service", "Description"
+
+ "``/stats``", "Statistics/metrics", "Exported metrics in JSON."
+ "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_"
+ "``/feed``", "Most frequent queries", "List of most frequent queries in JSON."
+
+Enabling Prometheus metrics endpoint
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The module exposes ``/metrics`` endpoint that serves internal metrics in Prometheus_ text format.
+You can use it out of the box:
+
+.. code-block:: bash
+
+	$ curl -k https://localhost:8053/metrics | tail
+	# TYPE latency histogram
+	latency_bucket{le=10} 2.000000
+	latency_bucket{le=50} 2.000000
+	latency_bucket{le=100} 2.000000
+	latency_bucket{le=250} 2.000000
+	latency_bucket{le=500} 2.000000
+	latency_bucket{le=1000} 2.000000
+	latency_bucket{le=1500} 2.000000
+	latency_bucket{le=+Inf} 2.000000
+	latency_count 2.000000
+	latency_sum 11.000000
+
 
 How to expose services over HTTP
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -142,3 +177,9 @@ Dependencies
 * `lua-http <https://github.com/daurnimator/lua-http>`_ available in LuaRocks
 
     ``$ luarocks install --server=http://luarocks.org/dev http``
+
+* `mmdblua <https://github.com/daurnimator/mmdblua>`_ available in LuaRocks
+
+    ``$ luarocks install --server=http://luarocks.org/dev mmdblua``
+
+.. _Prometheus: https://prometheus.io
