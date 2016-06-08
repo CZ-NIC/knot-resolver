@@ -45,7 +45,8 @@
 /** @cond internal Fixed-size map of predefined metrics. */
 #define CONST_METRICS(X) \
 	X(answer,total) X(answer,noerror) X(answer,nodata) X(answer,nxdomain) X(answer,servfail) \
-	X(answer,cached) X(answer,10ms) X(answer,100ms) X(answer,1000ms) X(answer,slow) \
+	X(answer,cached) X(answer,1ms) X(answer,10ms) X(answer,50ms) X(answer,100ms) \
+	X(answer,250ms) X(answer,500ms) X(answer,1000ms) X(answer,1500ms) X(answer,slow) \
 	X(query,edns) X(query,dnssec) \
 	X(const,end)
 
@@ -150,20 +151,32 @@ static int collect(knot_layer_t *ctx)
 	if (rplan->resolved.len > 0) {
 		/* Histogram of answer latency. */
 		struct kr_query *first = rplan->resolved.at[0];
-		struct kr_query *last = array_tail(rplan->resolved);
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		long elapsed = time_diff(&first->timestamp, &now);
-		if (last->flags & QUERY_CACHED) {
-			stat_const_add(data, metric_answer_cached, 1);
+		if (elapsed <= 1) {
+			stat_const_add(data, metric_answer_1ms, 1);
 		} else if (elapsed <= 10) {
 			stat_const_add(data, metric_answer_10ms, 1);
+		} else if (elapsed <= 50) {
+			stat_const_add(data, metric_answer_50ms, 1);
 		} else if (elapsed <= 100) {
 			stat_const_add(data, metric_answer_100ms, 1);
+		} else if (elapsed <= 250) {
+			stat_const_add(data, metric_answer_250ms, 1);
+		} else if (elapsed <= 500) {
+			stat_const_add(data, metric_answer_500ms, 1);
 		} else if (elapsed <= 1000) {
 			stat_const_add(data, metric_answer_1000ms, 1);
+		} else if (elapsed <= 1500) {
+			stat_const_add(data, metric_answer_1500ms, 1);
 		} else {
 			stat_const_add(data, metric_answer_slow, 1);
+		}
+		/* Observe the final query. */
+		struct kr_query *last = array_tail(rplan->resolved);
+		if (last->flags & QUERY_CACHED) {
+			stat_const_add(data, metric_answer_cached, 1);
 		}
 	}
 	/* Query parameters and transport mode */

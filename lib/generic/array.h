@@ -113,7 +113,7 @@ static inline void array_std_free(void *baton, void *p)
 
 /**
  * Reserve capacity up to 'n' bytes.
- * @return >=0 if success
+ * @return 0 if success, <0 on failure
  */
 #define array_reserve(array, n) \
 	array_reserve_mm(array, n, array_std_reserve, NULL)

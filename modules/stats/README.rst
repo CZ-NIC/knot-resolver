@@ -89,9 +89,14 @@ Built-in statistics
 * ``answer.nodata`` - number of **NOERROR**, but empty answers
 * ``answer.nxdomain`` - number of **NXDOMAIN** answers
 * ``answer.servfail`` - number of **SERVFAIL** answers
+* ``answer.1ms`` - number of answers completed in 1ms
 * ``answer.10ms`` - number of answers completed in 10ms
+* ``answer.50ms`` - number of answers completed in 50ms
 * ``answer.100ms`` - number of answers completed in 100ms
+* ``answer.250ms`` - number of answers completed in 250ms
+* ``answer.500ms`` - number of answers completed in 500ms
 * ``answer.1000ms`` - number of answers completed in 1000ms
-* ``answer.slow`` - number of answers that took more than 1000ms
+* ``answer.1500ms`` - number of answers completed in 1500ms
+* ``answer.slow`` - number of answers that took more than 1500ms
 * ``query.edns`` - number of queries with EDNS
 * ``query.dnssec`` - number of queries with DNSSEC DO=1

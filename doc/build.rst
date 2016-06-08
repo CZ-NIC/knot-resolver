@@ -44,6 +44,7 @@ There are also *optional* packages that enable specific functionality in Knot DN
 .. csv-table::
    :header: "Optional", "Needed for", "Notes"
 
+   "`lua-http`_", "``modules/http``", "HTTP/2 client/server for Lua."
    "luasocket_", "``trust anchors, modules/stats``", "Sockets for Lua."
    "luasec_", "``trust anchors``", "TLS for Lua."
    "libmemcached_", "``modules/memcached``", "To build memcached backend module."
@@ -265,6 +266,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _Python: https://www.python.org/
 .. _luasec: https://luarocks.org/modules/luarocks/luasec
 .. _luasocket: https://luarocks.org/modules/luarocks/luasocket
+.. _lua-http: https://luarocks.org/modules/daurnimator/http
 
 .. _boot2docker: http://boot2docker.io/
 
