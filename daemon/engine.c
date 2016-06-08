@@ -289,19 +289,24 @@ static JsonNode *l_pack_elem(lua_State *L, int top)
 	JsonNode *node = NULL;
 	lua_pushnil(L);
 	while(lua_next(L, top) != 0) {
-		const bool is_array = lua_isnumber(L, top + 1);
+		bool is_array = false;
 		if (!node) {
+			is_array = lua_isnumber(L, top + 1);
 			node = is_array ? json_mkarray() : json_mkobject();
 			if (!node) {
 				return NULL;
 			}
+		} else {
+			is_array = node->tag == JSON_ARRAY;
 		}
+
 		/* Insert to array/table. */
 		JsonNode *val = l_pack_elem(L, top + 2);
 		if (is_array) {
 			json_append_element(node, val);
 		} else {
-			json_append_member(node, lua_tostring(L, top + 1), val);
+			const char *key = lua_tostring(L, top + 1);
+			json_append_member(node, key, val);
 		}
 		lua_pop(L, 1);
 	}
@@ -323,7 +328,7 @@ static char *l_pack_json(lua_State *L, int top)
 
 static int l_tojson(lua_State *L)
 {
-	auto_free char *json_str = l_pack_json(L, 1);
+	auto_free char *json_str = l_pack_json(L, lua_gettop(L));
 	if (!json_str) {
 		return 0;
 	}
