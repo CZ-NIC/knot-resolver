@@ -39,6 +39,15 @@ in new ones.
 	-- Fetch most common queries (sorted by frequency)
 	> table.sort(stats.frequent(), function (a, b) return a.count > b.count end)
 
+	-- Show recently contacted authoritative servers
+	> stats.upstreams()
+	[2a01:618:404::1] => {
+	    [1] => 26 -- RTT
+	}
+	[128.241.220.33] => {
+	    [1] => 31 - RTT
+	}
+
 Properties
 ^^^^^^^^^^
 
@@ -61,6 +70,12 @@ Set nominal value of given metric.
   :param string prefix:  optional metric prefix, i.e. ``"answer"`` shows only metrics beginning with "answer"
 
 Outputs collected metrics as a JSON dictionary.
+
+.. function:: stats.upstreams()
+
+Outputs a list of recent upstreams and their RTT. It is sorted by time and stored in a ring buffer of
+a fixed size. This means it's not aggregated and readable by multiple consumers, but also that
+you may lose entries if you don't read quickly enough. The default ring size is 512 entries, and may be overriden on compile time by ``-DUPSTREAMS_COUNT=X``.
 
 .. function:: stats.frequent()
 
