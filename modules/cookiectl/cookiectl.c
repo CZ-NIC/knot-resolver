@@ -26,23 +26,6 @@
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookiectl",  fmt)
 
-/** Find storage API with given prefix. */
-static struct storage_api *find_storage_api(const storage_registry_t *registry,
-                                            const char *prefix)
-{
-	assert(registry);
-	assert(prefix);
-
-	for (unsigned i = 0; i < registry->len; ++i) {
-		struct storage_api *storage = &registry->at[i];
-		if (strcmp(storage->prefix, "lmdb://") == 0) {
-			return storage;
-		}
-	}
-
-	return NULL;
-}
-
 #define NAME_ENABLED "enabled"
 #define NAME_CLIENT_SECRET "client_secret"
 #define NAME_CLIENT_HASH_FUNC "client_hash_func"
@@ -293,34 +276,6 @@ static char *cookiectl_config(void *env, struct kr_module *module, const char *a
 	result = json_encode(root_node);
 	json_delete(root_node);
 	return result;
-}
-
-static int cookies_cache_init(struct kr_cache *cache, struct engine *engine)
-{
-	assert(cache);
-
-	const char *storage_prefix = "lmdb://";
-
-	memset(cache, 0, sizeof(*cache));
-
-	struct storage_api *lmdb_storage_api = find_storage_api(&engine->storage_registry,
-	                                                        storage_prefix);
-	DEBUG_MSG(NULL, "found storage API %p for prefix '%s'\n",
-	          (void *) lmdb_storage_api, storage_prefix);
-
-	struct knot_db_lmdb_opts opts = KNOT_DB_LMDB_OPTS_INITIALIZER;
-	opts.path = "cookies_db";
-	//opts.dbname = "cookies";
-	opts.mapsize = 1024 * 1024 * 1024;
-	opts.maxdbs = 2;
-	opts.flags.env = 0x80000 | 0x100000; /* MDB_WRITEMAP|MDB_MAPASYNC */
-
-	errno = 0;
-	int ret = kr_cache_open(cache, lmdb_storage_api->api(), &opts,
-	                        engine->pool);
-	DEBUG_MSG(NULL, "cache_open retval %d: %s\n", ret, kr_strerror(ret));
-
-	return ret;
 }
 
 /*

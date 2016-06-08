@@ -24,7 +24,7 @@
 /**
  * Peek the cache for asset (tag, socket address).
  * @note The 'drift' is the time passed between the inception time and now (in seconds).
- * @param txn transaction instance
+ * @param cache cache structure
  * @param tag  asset tag
  * @param sockaddr asset socket address
  * @param entry cache entry, will be set to valid pointer or NULL
@@ -32,13 +32,13 @@
  * @return 0 or an error code
  */
 KR_EXPORT
-int kr_cookie_cache_peek(struct kr_cache_txn *txn,
+int kr_cookie_cache_peek(struct kr_cache *cache,
                          uint8_t tag, const void *sockaddr,
                          struct kr_cache_entry **entry, uint32_t *timestamp);
 
 /**
  * Insert asset into cache, replacing any existing data.
- * @param txn transaction instance
+ * @param cache cache structure
  * @param tag  asset tag
  * @param sockaddr asset socket address
  * @param header filled entry header (ttl and time stamp)
@@ -46,19 +46,19 @@ int kr_cookie_cache_peek(struct kr_cache_txn *txn,
  * @return 0 or an error code
  */
 KR_EXPORT
-int kr_cookie_cache_insert(struct kr_cache_txn *txn,
+int kr_cookie_cache_insert(struct kr_cache *cache,
                            uint8_t tag, const void *sockaddr,
                            struct kr_cache_entry *header, knot_db_val_t data);
 
 /**
  * Remove asset from cache.
- * @param txn transaction instance
+ * @param cache cache structure
  * @param tag asset tag
  * @param sockaddr asset socket address
  * @return 0 or an error code
  */
 KR_EXPORT
-int kr_cookie_cache_remove(struct kr_cache_txn *txn,
+int kr_cookie_cache_remove(struct kr_cache *cache,
                            uint8_t tag, const void *sockaddr);
 
 /**
@@ -73,27 +73,26 @@ struct timed_cookie {
 /**
  * Peek the cache for given cookie (socket address)
  * @note The 'drift' is the time passed between the cache time of the cookie and now (in seconds).
- * @param txn transaction instance
+ * @param cache cache structure
  * @param sockaddr socket address
  * @param cookie asset
  * @param timestamp current time (will be replaced with drift if successful)
  * @return 0 or an error code
  */
-
 KR_EXPORT
-int kr_cookie_cache_peek_cookie(struct kr_cache_txn *txn, const void *sockaddr,
+int kr_cookie_cache_peek_cookie(struct kr_cache *cache, const void *sockaddr,
                                 struct timed_cookie *cookie, uint32_t *timestamp);
 
 /**
  * Insert a DNS cookie (client and server) entry for the given server signature (IP address).
- * @param txn transaction instance
+ * @param cache cache structure
  * @param sockaddr server IP address
  * @param cookie ttl and whole EDNS cookie option (header, client and server cookies)
  * @param timestamp current time
  * @return 0 or an error code
  */
 KR_EXPORT
-int kr_cookie_cache_insert_cookie(struct kr_cache_txn *txn, const void *sockaddr,
+int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const void *sockaddr,
                                   const struct timed_cookie *cookie,
                                   uint32_t timestamp);
 
@@ -103,5 +102,5 @@ int kr_cookie_cache_insert_cookie(struct kr_cache_txn *txn, const void *sockaddr
  * @param sockaddr socket address
  * @return 0 or an error code
  */
-#define kr_cookie_cache_remove_cookie(txn, sockaddr) \
-	kr_cookie_cache_remove((txn), KR_CACHE_COOKIE, (sockaddr))
+#define kr_cookie_cache_remove_cookie(cache, sockaddr) \
+	kr_cookie_cache_remove((cache), KR_CACHE_COOKIE, (sockaddr))

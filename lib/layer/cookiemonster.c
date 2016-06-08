@@ -198,28 +198,17 @@ static bool materialise_cookie_opt(struct kr_cache *cache,
 	bool found = false;
 	struct timed_cookie timed_cookie = { 0, };
 
-	struct kr_cache_txn txn;
-	int ret = kr_cache_txn_begin(cache, &txn, KNOT_DB_RDONLY);
-	if (ret != kr_ok()) {
-		return false;
-	}
-	ret = kr_cookie_cache_peek_cookie(&txn, sockaddr, &timed_cookie,
+	int ret = kr_cookie_cache_peek_cookie(cache, sockaddr, &timed_cookie,
 	                                      &timestamp);
 	if (ret != kr_ok()) {
-		kr_cache_txn_abort(&txn);
 		return false;
 	}
 	assert(timed_cookie.cookie_opt);
 
 	if (remove_outdated && (timed_cookie.ttl < timestamp)) {
 		/* Outdated entries must be removed. */
-		kr_cache_txn_abort(&txn);
-		if (kr_cache_txn_begin(cache, &txn, 0) == kr_ok()) {
-			DEBUG_MSG(NULL, "%s\n",
-			          "removing outdated entry from cache");
-			kr_cookie_cache_remove_cookie(&txn, sockaddr);
-			kr_cache_txn_commit(&txn);
-		}
+		DEBUG_MSG(NULL, "%s\n", "removing outdated entry from cache");
+		kr_cookie_cache_remove_cookie(cache, sockaddr);
 		return false;
 	}
 
@@ -230,7 +219,6 @@ static bool materialise_cookie_opt(struct kr_cache *cache,
 	if (cookie_opt) {
 		memcpy(cookie_opt, timed_cookie.cookie_opt, cookie_opt_size);
 	}
-	kr_cache_txn_abort(&txn);
 	return true;
 }
 
@@ -310,21 +298,15 @@ static bool check_cookie_content_and_cache(struct kr_cookie_ctx *cntrl,
 	if (returned_current &&
 	    !is_cookie_cached(cache, srvr_sockaddr, qry->timestamp.tv_sec,
 	                      pkt_cookie_opt)) {
-		struct kr_cache_txn txn;
-		if (kr_cache_txn_begin(cache, &txn, 0) == kr_ok()) {
+		struct timed_cookie timed_cookie = { cntrl->cache_ttl, pkt_cookie_opt };
 
-			struct timed_cookie timed_cookie = { cntrl->cache_ttl, pkt_cookie_opt };
-
-			ret = kr_cookie_cache_insert_cookie(&txn, srvr_sockaddr,
-			                                    &timed_cookie,
-			                                    qry->timestamp.tv_sec);
-			if (ret != kr_ok()) {
-				DEBUG_MSG(NULL, "%s\n", "failed caching cookie");
-				kr_cache_txn_abort(&txn);
-			} else {
-				DEBUG_MSG(NULL, "%s\n", "cookie cached");
-				kr_cache_txn_commit(&txn);
-			}
+		ret = kr_cookie_cache_insert_cookie(cache, srvr_sockaddr,
+		                                    &timed_cookie,
+		                                    qry->timestamp.tv_sec);
+		if (ret != kr_ok()) {
+			DEBUG_MSG(NULL, "%s\n", "failed caching cookie");
+		} else {
+			DEBUG_MSG(NULL, "%s\n", "cookie cached");
 		}
 	}
 

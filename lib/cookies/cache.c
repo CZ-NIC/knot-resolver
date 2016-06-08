@@ -17,14 +17,17 @@
 #include <assert.h>
 #include <libknot/db/db_lmdb.h>
 
+#include "contrib/cleanup.h"
+#include "lib/cdb_lmdb.h"
 #include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
 
 /* Key size */
 #define KEY_HSIZE (sizeof(uint8_t))
 #define KEY_SIZE (KEY_HSIZE + 16)
-#define txn_api(txn) ((txn)->owner->api)
-#define txn_is_valid(txn) ((txn) && (txn)->owner && txn_api(txn))
+/* Shorthand for operations on cache backend */
+#define cache_isvalid(cache) ((cache) && (cache)->api && (cache)->db)
+#define cache_op(cache, op, ...) (cache)->api->op((cache)->db, ## __VA_ARGS__)
 
 /**
  * @internal Composed key as { u8 tag, u8[4,16] IP address }
@@ -47,10 +50,10 @@ static size_t cache_key(uint8_t *buf, uint8_t tag, const void *sockaddr)
 	return addr_len + KEY_HSIZE;
 }
 
-static struct kr_cache_entry *lookup(struct kr_cache_txn *txn, uint8_t tag,
+static struct kr_cache_entry *lookup(struct kr_cache *cache, uint8_t tag,
                                      const void *sockaddr)
 {
-	if (!txn_is_valid(txn) || !sockaddr) {
+	if (!cache || !sockaddr) {
 		return NULL;
 	}
 
@@ -60,7 +63,7 @@ static struct kr_cache_entry *lookup(struct kr_cache_txn *txn, uint8_t tag,
 	/* Look up and return value */
 	knot_db_val_t key = { keybuf, key_len };
 	knot_db_val_t val = { NULL, 0 };
-	int ret = txn_api(txn)->find(&txn->t, &key, &val, 0);
+	int ret = cache_op(cache, read, &key, &val, 1);
 	if (ret != KNOT_EOK) {
 		return NULL;
 	}
@@ -88,16 +91,17 @@ static int check_lifetime(struct kr_cache_entry *found, uint32_t *timestamp)
 	return kr_error(ESTALE);
 }
 
-int kr_cookie_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const void *sockaddr,
-                         struct kr_cache_entry **entry, uint32_t *timestamp)
+int kr_cookie_cache_peek(struct kr_cache *cache, uint8_t tag,
+                         const void *sockaddr, struct kr_cache_entry **entry,
+                         uint32_t *timestamp)
 {
-	if (!txn_is_valid(txn) || !sockaddr || !entry) {
+	if (!cache_isvalid(cache) || !sockaddr || !entry) {
 		return kr_error(EINVAL);
 	}
 
-	struct kr_cache_entry *found = lookup(txn, tag, sockaddr);
+	struct kr_cache_entry *found = lookup(cache, tag, sockaddr);
 	if (!found) {
-		txn->owner->stats.miss += 1;
+		cache->stats.miss += 1;
 		return kr_error(ENOENT);
 	}
 
@@ -105,9 +109,9 @@ int kr_cookie_cache_peek(struct kr_cache_txn *txn, uint8_t tag, const void *sock
 	*entry = found;
 	int ret = check_lifetime(found, timestamp);
 	if (ret == 0) {
-		txn->owner->stats.hit += 1;
+		cache->stats.hit += 1;
 	} else {
-		txn->owner->stats.miss += 1;
+		cache->stats.miss += 1;
 	}
 	return ret;
 }
@@ -121,11 +125,11 @@ static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *heade
 	}
 }
 
-int kr_cookie_cache_insert(struct kr_cache_txn *txn,
+int kr_cookie_cache_insert(struct kr_cache *cache,
                            uint8_t tag, const void *sockaddr,
                            struct kr_cache_entry *header, knot_db_val_t data)
 {
-	if (!txn_is_valid(txn) || !sockaddr || !header) {
+	if (!cache_isvalid(cache) || !sockaddr || !header) {
 		return kr_error(EINVAL);
 	}
 
@@ -135,39 +139,35 @@ int kr_cookie_cache_insert(struct kr_cache_txn *txn,
 	if (key_len == 0) {
 		return kr_error(EILSEQ);
 	}
+	assert(data.len != 0);
 	knot_db_val_t key = { keybuf, key_len };
 	knot_db_val_t entry = { NULL, sizeof(*header) + data.len };
-	const knot_db_api_t *db_api = txn_api(txn);
 
 	/* LMDB can do late write and avoid copy */
-	txn->owner->stats.insert += 1;
-	if (db_api == knot_db_lmdb_api()) {
-		int ret = db_api->insert(&txn->t, &key, &entry, 0);
+	int ret = 0;
+	cache->stats.insert += 1;
+	if (cache->api == kr_cdb_lmdb()) {
+		ret = cache_op(cache, write, &key, &entry, 1);
 		if (ret != 0) {
 			return ret;
 		}
 		entry_write(entry.data, header, data);
+		ret = cache_op(cache, sync); /* Make sure the entry is comitted. */
 	} else {
 		/* Other backends must prepare contiguous data first */
-		entry.data = malloc(entry.len);
-		if (!entry.data) {
-			return kr_error(ENOMEM);
-		}
+		auto_free char *buffer = malloc(entry.len);
+		entry.data = buffer;
 		entry_write(entry.data, header, data);
-		int ret = db_api->insert(&txn->t, &key, &entry, 0);
-		free(entry.data);
-		if (ret != 0) {
-			return ret;
-		}
+		ret = cache_op(cache, write, &key, &entry, 1);
 	}
 
-	return kr_ok();
+	return ret;
 }
 
-int kr_cookie_cache_remove(struct kr_cache_txn *txn,
+int kr_cookie_cache_remove(struct kr_cache *cache,
                            uint8_t tag, const void *sockaddr)
 {
-	if (!txn_is_valid(txn) || !sockaddr) {
+	if (!cache_isvalid(cache) || !sockaddr) {
 		return kr_error(EINVAL);
 	}
 
@@ -177,20 +177,21 @@ int kr_cookie_cache_remove(struct kr_cache_txn *txn,
 		return kr_error(EILSEQ);
 	}
 	knot_db_val_t key = { keybuf, key_len };
-	txn->owner->stats.delete += 1;
-	return txn_api(txn)->del(&txn->t, &key);
+	cache->stats.delete += 1;
+	return cache_op(cache, remove, &key, 1);
 }
 
-int kr_cookie_cache_peek_cookie(struct kr_cache_txn *txn, const void *sockaddr,
+int kr_cookie_cache_peek_cookie(struct kr_cache *cache, const void *sockaddr,
                                 struct timed_cookie *cookie, uint32_t *timestamp)
 {
-	if (!txn_is_valid(txn) || !sockaddr || !cookie || !timestamp) {
+	if (!cache_isvalid(cache) || !sockaddr || !cookie || !timestamp) {
 		return kr_error(EINVAL);
 	}
 
 	/* Check if the RRSet is in the cache. */
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cookie_cache_peek(txn, KR_CACHE_COOKIE, sockaddr, &entry, timestamp);
+	int ret = kr_cookie_cache_peek(cache, KR_CACHE_COOKIE, sockaddr,
+	                               &entry, timestamp);
 	if (ret != 0) {
 		return ret;
 	}
@@ -199,11 +200,11 @@ int kr_cookie_cache_peek_cookie(struct kr_cache_txn *txn, const void *sockaddr,
 	return kr_ok();
 }
 
-int kr_cookie_cache_insert_cookie(struct kr_cache_txn *txn, const void *sockaddr,
+int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const void *sockaddr,
                                   const struct timed_cookie *cookie,
                                   uint32_t timestamp)
 {
-	if (!txn_is_valid(txn) || !sockaddr) {
+	if (!cache_isvalid(cache) || !sockaddr) {
 		return kr_error(EINVAL);
 	}
 
@@ -225,6 +226,6 @@ int kr_cookie_cache_insert_cookie(struct kr_cache_txn *txn, const void *sockaddr
 	                         knot_edns_opt_get_length(cookie->cookie_opt);
 
 	knot_db_val_t data = { (uint8_t *) cookie->cookie_opt, cookie_opt_size };
-	return kr_cookie_cache_insert(txn, KR_CACHE_COOKIE, sockaddr, &header,
-	                              data);
+	return kr_cookie_cache_insert(cache, KR_CACHE_COOKIE, sockaddr,
+	                              &header, data);
 }

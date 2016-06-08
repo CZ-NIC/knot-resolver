@@ -151,8 +151,6 @@ int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)
 		return kr_error(EINVAL);
 	}
 
-	assert(sockaddr && addr && len);
-
 	int addr_family = ((struct sockaddr *) sockaddr)->sa_family;
 
 	switch (addr_family) {
@@ -300,16 +298,16 @@ fail:
  * Check whether there is a cached cookie that matches the current client
  * cookie.
  */
-static const uint8_t *peek_and_check_cc(struct kr_cache_txn *txn,
+static const uint8_t *peek_and_check_cc(struct kr_cache *cache,
                                         const void *sockaddr,
                                         const uint8_t cc[KNOT_OPT_COOKIE_CLNT])
 {
-	assert(txn && sockaddr && cc);
+	assert(cache && sockaddr && cc);
 
 	uint32_t timestamp = 0;
 	struct timed_cookie timed_cookie = { 0, };
 
-	int ret = kr_cookie_cache_peek_cookie(txn, sockaddr, &timed_cookie,
+	int ret = kr_cookie_cache_peek_cookie(cache, sockaddr, &timed_cookie,
 	                                      &timestamp);
 	if (ret != kr_ok()) {
 		return NULL;
@@ -334,8 +332,9 @@ int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
                           const void *clnt_sockaddr, const void *srvr_sockaddr,
                           knot_pkt_t *pkt)
 {
-	assert(cntrl);
-	assert(pkt);
+	if (!cntrl || !pkt) {
+		return kr_error(EINVAL);
+	}
 
 	if (!pkt->opt_rr) {
 		return kr_ok();
@@ -356,13 +355,8 @@ int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
 		return ret;
 	}
 
-	struct kr_cache_txn txn;
-	ret = kr_cache_txn_begin(cookie_cache, &txn, KNOT_DB_RDONLY);
-	if (ret != kr_ok()) {
-		return kr_error(EIO);
-	}
-	const uint8_t *cached_cookie = peek_and_check_cc(&txn, srvr_sockaddr,
-	                                                 cc);
+	const uint8_t *cached_cookie = peek_and_check_cc(cookie_cache,
+	                                                 srvr_sockaddr, cc);
 
 	/* This is a very nasty hack that prevents the packet to be corrupted
 	 * when using contemporary 'Cookie interface'. */
@@ -385,8 +379,6 @@ int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
 	} else {
 		ret = opt_rr_add_cookies(pkt->opt_rr, cc, NULL, 0, &pkt->mm);
 	}
-
-	kr_cache_txn_abort(&txn);
 
 	/* Write to packet. */
 	assert(pkt->current == KNOT_ADDITIONAL);
