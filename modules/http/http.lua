@@ -25,31 +25,33 @@ local mime_types = {
 }
 
 -- Preload static contents, nothing on runtime will touch the disk
-local function pgload(relpath)
-	local fp, err = io.open(moduledir..'/http/'..relpath, 'r')
+local function pgload(relpath, modname)
+	if not modname then modname = 'http' end
+	local fp, err = io.open(string.format('%s/%s/%s', moduledir, modname, relpath), 'r')
 	if not fp then error(err) end
 	local data = fp:read('*all')
 	fp:close()
 	-- Guess content type
 	local ext = relpath:match('[^\\.]+$')
-	return {'/'..relpath, mime_types[ext] or 'text', data, 86400}
+	return {mime_types[ext] or 'text', data, nil, 86400}
 end
+M.page = pgload
 
 -- Preloaded static assets
 local pages = {
-	pgload('favicon.ico'),
-	pgload('rickshaw.min.css'),
-	pgload('kresd.js'),
-	pgload('datamaps.world.min.js'),
-	pgload('topojson.js'),
-	pgload('jquery.js'),
-	pgload('rickshaw.min.js'),
-	pgload('d3.js'),
+	'favicon.ico',
+	'rickshaw.min.css',
+	'kresd.js',
+	'datamaps.world.min.js',
+	'topojson.js',
+	'jquery.js',
+	'rickshaw.min.js',
+	'd3.js',
 }
 
 -- Serve preloaded root page
 local function serve_root()
-	local data = pgload('main.tpl')[3]
+	local data = pgload('main.tpl')[2]
 	data = data
 	        :gsub('{{ title }}', 'kresd @ '..hostname())
 	        :gsub('{{ host }}', hostname())
@@ -73,8 +75,7 @@ M.endpoints = {
 
 -- Export static pages
 for _, pg in ipairs(pages) do
-	local path, mime, data, ttl = unpack(pg)
-	M.endpoints[path] = {mime, data, nil, ttl}
+	M.endpoints['/'..pg] = pgload(pg)
 end
 
 -- Export built-in prometheus interface

@@ -6,7 +6,32 @@ if not policy then modules.load('policy') end
 
 -- Actions
 local actions = {
-	pass = 1, deny = 2, drop = 3, tc = 4, forward = policy.FORWARD,
+	pass = 1, deny = 2, drop = 3, tc = 4,
+	forward = function (g)
+		return policy.FORWARD(g())
+	end,
+	reroute = function (g)
+		local rules = {}
+		local tok = g()
+		while tok do
+			local from, to = tok:match '([^-]+)-(%S+)'
+			rules[from] = to
+			tok = g()
+		end
+		return policy.REROUTE(rules)
+	end,
+	rewrite = function (g)
+		local rules = {}
+		local tok = g()
+		while tok do
+			-- This is currently limited to A/AAAA rewriting
+			-- in fixed format '<owner> <type> <addr>'
+			local _, to = g(), g()
+			rules[tok] = to
+			tok = g()
+		end
+		return policy.REROUTE(rules, true)
+	end,
 }
 
 -- Filter rules per column
@@ -14,7 +39,7 @@ local filters = {
 	-- Filter on QNAME (either pattern or suffix match)
 	qname = function (g)
 		local op, val = g(), todname(g())
-		if     op == '~' then return policy.pattern(true, val)
+		if     op == '~' then return policy.pattern(true, val:sub(2)) -- Skip leading label length
 		elseif op == '=' then return policy.suffix(true, {val})
 		else error(string.format('invalid operator "%s" on qname', op)) end
 	end,
@@ -39,30 +64,29 @@ local function parse_rule(g)
 	local tok = g()
 	while tok do
 		if tok == 'AND' then
-			local fnext = parse_filter(g(), g)
-			f = function (req, qry) return f(req, qry) and fnext(req, qry) end
+			local fa, fb = f, parse_filter(g(), g)
+			f = function (req, qry) return fa(req, qry) and fb(req, qry) end
 		elseif tok == 'OR' then
-			local fnext = parse_filter(g(), g)
-			f = function (req, qry) return f(req, qry) or fnext(req, qry) end
+			local fa, fb = f, parse_filter(g(), g)
+			f = function (req, qry) return fa(req, qry) or fb(req, qry) end
 		else
 			break
 		end
 		tok = g()
-		print('next token is', tok)
 	end
 	return tok, f
 end
 
 local function parse_query(g)
-	local ok, action, filter = pcall(parse_rule, g)
-	if not ok then return nil, action end
-	if not actions[action] then return nil, string.format('invalid action "%s"', action) end
+	local ok, actid, filter = pcall(parse_rule, g)
+	if not ok then return nil, actid end
+	if not actions[actid] then return nil, string.format('invalid action "%s"', actid) end
 	-- Parse and interpret action
-	action = actions[action]
+	local action = actions[actid]
 	if type(action) == 'function' then
-		action = action(g())
+		action = action(g)
 	end
-	return action, filter
+	return filter, action, actid
 end
 
 -- Compile a rule described by query language
@@ -105,6 +129,7 @@ end
 function M.deinit()
 	if http then
 		http.endpoints['/daf'] = nil
+		http.endpoints['/daf.js'] = nil
 		http.snippets['/daf'] = nil
 	end
 end
@@ -113,21 +138,30 @@ end
 function M.config(conf)
 	if not http then error('"http" module is not loaded, cannot load DAF') end
 	-- Export API and data publisher
+	http.endpoints['/daf.js'] = http.page('daf.js', 'daf')
 	http.endpoints['/daf'] = {'application/json', api, publish}
 	-- Export snippet
 	http.snippets['/daf'] = {'Application Firewall', [[
-		<p>Hello world!</p>
+		<script type="text/javascript" src="daf.js"></script>
+		<table id="daf-rules"><th><td>No rules here yet.</td></th></table>
 	]]}
-	M.rule('qname = *.example.com AND src = 127.0.0.1/8 deny')
-	-- M.rule('answer ~ (%w+).facebook.com AND src = 127.0.0.1/8 forward 8.8.8.8')
 end
 
 -- @function Add rule
-function M.rule(rule)
-	local action, filter = compile(rule)
-	if not action then error(filter) end
-	table.insert(M.rules, {rule, action, filter})
-	print(action, filter, rule)
+function M.add(rule)
+	local filter, action, id = compile(rule)
+	if not filter then error(action) end
+	-- Combine filter and action into policy
+	local p = function (req, qry)
+		return filter(req, qry) and action
+	end
+	table.insert(M.rules, {rule=rule, action=id, policy=p})
+	-- Enforce in policy module, special actions are postrules
+	if id == 'reroute' or id == 'rewrite' then
+		table.insert(policy.postrules, p)
+	else
+		table.insert(policy.rules, p)
+	end
 end
 
 return M
