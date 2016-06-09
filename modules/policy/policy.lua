@@ -13,9 +13,22 @@ local function forward(target)
 	end
 end
 
+-- Rewrite records in packet
+local function reroute(tbl, names)
+	-- Import renumbering rules
+	local ren = require('renumber')
+	local prefixes = {}
+	for from, to in pairs(tbl) do
+		table.insert(prefixes, names and ren.name(from, to) or ren.prefix(from, to))
+	end
+	-- Return rule closure
+	tbl = nil
+	return ren.rule(prefixes)
+end
+
 local policy = {
 	-- Policies
-	PASS = 1, DENY = 2, DROP = 3, TC = 4, FORWARD = forward,
+	PASS = 1, DENY = 2, DROP = 3, TC = 4, FORWARD = forward, REROUTE = reroute,
 	-- Special values
 	ANY = 0,
 }
@@ -120,9 +133,9 @@ function policy.rpz(action, path, format)
 end
 
 -- Evaluate packet in given rules to determine policy action
-function policy.evaluate(policy, req, query)
-	for i = 1, #policy.rules do
-		local action = policy.rules[i](req, query)
+function policy.evaluate(rules, req, query)
+	for i = 1, #rules do
+		local action = rules[i](req, query)
 		if action ~= nil then
 			return action
 		end
@@ -158,7 +171,12 @@ end
 policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
-		local action = policy:evaluate(req, req:current())
+		local action = policy.evaluate(policy.rules, req, req:current())
+		return policy.enforce(state, req, action)
+	end,
+	finish = function(state, req)
+		req = kres.request_t(req)
+		local action = policy.evaluate(policy.postrules, req, req:current())
 		return policy.enforce(state, req, action)
 	end
 }
@@ -218,5 +236,6 @@ policy.todnames(private_zones)
 
 -- @var Default rules
 policy.rules = { policy.suffix_common(policy.DENY, private_zones, '\4arpa\0') }
+policy.postrules = {}
 
 return policy

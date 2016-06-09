@@ -2,33 +2,59 @@
 local policy = require('policy')
 local ffi = require('ffi')
 local bit = require('bit')
-local mod = {}
 local prefixes = {}
--- Add subnet prefix rewrite rule
-local function add_prefix(subnet, addr)
+
+-- Create subnet prefix rule
+local function matchprefix(subnet, addr)
 	local target = kres.str2ip(addr)
 	if target == nil then error('[renumber] invalid address: '..addr) end
+	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
 	local subnet_cd = ffi.new('char[16]')
-	local family = ffi.C.kr_straddr_family(subnet)
 	local bitlen = ffi.C.kr_straddr_subnet(subnet_cd, subnet)
-	table.insert(prefixes, {family, subnet_cd, bitlen, target})
+	-- Mask unspecified, renumber whole IP
+	if bitlen == 0 then
+		bitlen = #target * 8
+	end
+	return {subnet_cd, bitlen, target, addrtype}
 end
--- Match IP against given subnet
-local function match_subnet(family, subnet, bitlen, addr)
-	return (#addr >= bitlen / 8) and (ffi.C.kr_bitcmp(subnet, addr, bitlen) == 0)
+
+-- Create name match rule
+local function matchname(name, addr)
+	local target = kres.str2ip(addr)
+	if target == nil then error('[renumber] invalid address: '..addr) end
+	local owner = todname(name)
+	if not name then error('[renumber] invalid name: '..name) end
+	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
+	return {owner, nil, target, addrtype}
 end
+
+-- Add subnet prefix rewrite rule
+local function add_prefix(subnet, addr)
+	table.insert(prefixes, matchprefix(subnet, addr))
+end
+
+-- Match IP against given subnet or record owner
+local function match_subnet(subnet, bitlen, addrtype, rr)
+	local addr = rr.rdata
+	return addrtype == rr.type and
+	       ((bitlen and (#addr >= bitlen / 8) and (ffi.C.kr_bitcmp(subnet, addr, bitlen) == 0)) or subnet == rr.owner)
+end
+
 -- Renumber address record
 local addr_buf = ffi.new('char[16]')
-local function renumber(tbl, rr)
+local function renumber_record(tbl, rr)
 	for i = 1, #tbl do
 		local prefix = tbl[i]
-		if match_subnet(prefix[1], prefix[2], prefix[3], rr.rdata) then
-			local to_copy = prefix[3]
+		-- Match record type to address family and record address to given subnet
+		-- If provided, compare record owner to prefix name
+		if match_subnet(prefix[1], prefix[2], prefix[4], rr) then
+			-- Replace part or whole address
+			local to_copy = prefix[2] or (#prefix[3] * 8)
 			local chunks = to_copy / 8
 			local rdlen = #rr.rdata
 			if rdlen < chunks then return rr end -- Address length mismatch
 			ffi.copy(addr_buf, rr.rdata, rdlen)
-			ffi.copy(addr_buf, prefix[4], chunks)
+			ffi.copy(addr_buf, prefix[3], chunks)
 			-- @todo: CIDR not supported
 			to_copy = to_copy - chunks * 8
 			rr.rdata = ffi.string(addr_buf, rdlen)
@@ -37,17 +63,10 @@ local function renumber(tbl, rr)
 	end	
 	return nil
 end
--- Config
-function mod.config (conf)
-	if conf == nil then return end
-	if type(conf) ~= 'table' or type(conf[1]) ~= 'table' then
-		error('[renumber] expected { {prefix, target}, ... }')
-	end
-	for i = 1, #conf do add_prefix(conf[i][1], conf[1][2]) end
-end
--- Layers
-mod.layer = {
-	finish = function (state, req)
+
+-- Renumber addresses based on config
+local function rule(prefixes)
+	return function (state, req)
 		if state == kres.FAIL then return state end
 		req = kres.request_t(req)
 		pkt = kres.pkt_t(req.answer)
@@ -59,8 +78,8 @@ mod.layer = {
 		local changed = false
 		for i = 1, ancount do
 			local rr = records[i]
-			if rr.type == kres.type.A then
-				local new_rr = renumber(prefixes, rr)
+			if rr.type == kres.type.A or rr.type == kres.type.AAAA then
+				local new_rr = renumber_record(prefixes, rr)
 				if new_rr ~= nil then
 					records[i] = new_rr
 					changed = true
@@ -83,5 +102,27 @@ mod.layer = {
 		end
 		return state
 	end
+end
+
+-- Export module interface
+local M = {
+	prefix = matchprefix,
+	name = matchname,
+	rule = rule,
 }
-return mod
+
+-- Config
+function M.config (conf)
+	if conf == nil then return end
+	if type(conf) ~= 'table' or type(conf[1]) ~= 'table' then
+		error('[renumber] expected { {prefix, target}, ... }')
+	end
+	for i = 1, #conf do add_prefix(conf[i][1], conf[1][2]) end
+end
+
+-- Layers
+M.layer = {
+	finish = rule(prefixes),
+}
+
+return M
