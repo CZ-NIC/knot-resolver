@@ -173,7 +173,7 @@ function connection_methods:events()
 end
 
 function connection_methods:timeout()
-	if not self:empty() then
+	if self.cq:empty() then
 		return 0
 	end
 end
