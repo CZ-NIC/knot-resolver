@@ -1,5 +1,13 @@
 local kres = require('kres')
 
+-- Counter of unique rules
+local nextid = 0
+local function getruleid()
+	local newid = nextid
+	nextid = nextid + 1
+	return newid
+end
+
 -- Forward request, and solve as stub query
 local function forward(target)
 	local dst_ip = kres.str2ip(target)
@@ -135,8 +143,10 @@ end
 -- Evaluate packet in given rules to determine policy action
 function policy.evaluate(rules, req, query)
 	for i = 1, #rules do
-		local action = rules[i](req, query)
+		local rule = rules[i]
+		local action = rule.cb(req, query)
 		if action ~= nil then
+			rule.count = rule.count + 1
 			return action
 		end
 	end
@@ -182,8 +192,10 @@ policy.layer = {
 }
 
 -- Add rule to policy list
-function policy.add(policy, rule)
-	return table.insert(policy.rules, rule)
+function policy.add(policy, rule, postrule)
+	local desc = {id=getruleid(), cb=rule, count=0}
+	table.insert(postrule and policy.postrules or policy.rules, desc)
+	return desc
 end
 
 -- Convert list of string names to domain names
@@ -235,7 +247,8 @@ local private_zones = {
 policy.todnames(private_zones)
 
 -- @var Default rules
-policy.rules = { policy.suffix_common(policy.DENY, private_zones, '\4arpa\0') }
+policy.rules = {}
 policy.postrules = {}
+policy:add(policy.suffix_common(policy.DENY, private_zones, '\4arpa\0'))
 
 return policy
