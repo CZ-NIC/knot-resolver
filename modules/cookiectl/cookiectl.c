@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "daemon/engine.h"
+#include "lib/cookies/algorithm.h"
 #include "lib/cookies/control.h"
 #include "lib/layer.h"
 
@@ -28,8 +29,8 @@
 
 #define NAME_ENABLED "enabled"
 #define NAME_CLIENT_SECRET "client_secret"
-#define NAME_CLIENT_HASH_FUNC "client_hash_func"
-#define NAME_AVAILABLE_CLIENT_HASH_FUNCS "available_client_hash_funcs"
+#define NAME_CLIENT_COOKIE_ALG "client_cookie_alg"
+#define NAME_AVAILABLE_CLIENT_COOKIE_ALGS "available_client_cookie_algs"
 #define NAME_CACHE_TTL "cache_ttl"
 
 static bool aply_enabled(struct kr_cookie_ctx *cntrl, const JsonNode *node)
@@ -132,12 +133,12 @@ static bool apply_client_hash_func(struct kr_cookie_ctx *cntrl,
                                    const JsonNode *node)
 {
 	if (node->tag == JSON_STRING) {
-		cc_compute_func_t *cc_compute_func = kr_cc_hash_func(kr_cc_hashes,
-		                                                     node->string_);
-		if (!cc_compute_func) {
+		clnt_cookie_alg_t *cc_alg_func = kr_clnt_cookie_alg_func(kr_clnt_cookie_algs,
+		                                                         node->string_);
+		if (!cc_alg_func) {
 			return false;
 		}
-		cntrl->cc_compute_func = cc_compute_func;
+		cntrl->cc_alg_func = cc_alg_func;
 		return true;
 	}
 
@@ -167,7 +168,7 @@ static bool apply_configuration(struct kr_cookie_ctx *cntrl, const JsonNode *nod
 		return aply_enabled(cntrl, node);
 	} else if (strcmp(node->key, NAME_CLIENT_SECRET) == 0) {
 		return apply_client_secret(cntrl, node);
-	} else  if (strcmp(node->key, NAME_CLIENT_HASH_FUNC) == 0) {
+	} else  if (strcmp(node->key, NAME_CLIENT_COOKIE_ALG) == 0) {
 		return apply_client_hash_func(cntrl, node);
 	} else if (strcmp(node->key, NAME_CACHE_TTL) == 0) {
 		return apply_cache_ttl(cntrl, node);
@@ -214,8 +215,8 @@ static bool read_available_cc_hashes(JsonNode *root,
 		return false;
 	}
 
-	const struct kr_cc_hash_descr *aux_ptr = kr_cc_hashes;
-	while (aux_ptr && aux_ptr->hash_func) {
+	const struct kr_clnt_cookie_alg_descr *aux_ptr = kr_clnt_cookie_algs;
+	while (aux_ptr && aux_ptr->func) {
 		assert(aux_ptr->name);
 		JsonNode *element = json_mkstring(aux_ptr->name);
 		if (!element) {
@@ -225,7 +226,7 @@ static bool read_available_cc_hashes(JsonNode *root,
 		++aux_ptr;
 	}
 
-	json_append_member(root, NAME_AVAILABLE_CLIENT_HASH_FUNCS, array);
+	json_append_member(root, NAME_AVAILABLE_CLIENT_COOKIE_ALGS, array);
 
 	return true;
 
@@ -262,10 +263,10 @@ static char *cookiectl_config(void *env, struct kr_module *module, const char *a
 
 	read_secret(root_node, &kr_glob_cookie_ctx);
 
-	const char *name = kr_cc_hash_name(kr_cc_hashes,
-	                                   kr_glob_cookie_ctx.cc_compute_func);
+	const char *name = kr_clnt_cookie_alg_name(kr_clnt_cookie_algs,
+	                                           kr_glob_cookie_ctx.cc_alg_func);
 	assert(name);
-	json_append_member(root_node, NAME_CLIENT_HASH_FUNC,
+	json_append_member(root_node, NAME_CLIENT_COOKIE_ALG,
 	                   json_mkstring(name));
 
 	read_available_cc_hashes(root_node, &kr_glob_cookie_ctx);
@@ -292,7 +293,7 @@ int cookiectl_init(struct kr_module *module)
 	kr_glob_cookie_ctx.enabled = false;
 	kr_glob_cookie_ctx.current_cs = &dflt_cs;
 	kr_glob_cookie_ctx.cache_ttl = DFLT_COOKIE_TTL;
-	kr_glob_cookie_ctx.cc_compute_func = kr_cc_compute_fnv64;
+	kr_glob_cookie_ctx.cc_alg_func = kr_clnt_cookie_alg_fnv64;
 
 	module->data = NULL;
 

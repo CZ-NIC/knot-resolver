@@ -1,5 +1,4 @@
 libkres_SOURCES := \
-	contrib/fnv/hash_64a.c \
 	lib/generic/map.c      \
 	lib/layer/iterate.c    \
 	lib/layer/validate.c   \
@@ -47,11 +46,14 @@ libkres_TARGET := -L$(abspath lib) -lkres
 
 ifeq ($(HAS_libcrypto),yes)
 libkres_SOURCES += \
+	contrib/fnv/hash_64a.c \
 	lib/layer/cookiemonster.c \
+	lib/cookies/algorithm.c \
 	lib/cookies/cache.c    \
 	lib/cookies/control.c
 
 libkres_HEADERS += \
+	lib/cookies/algorithm.h \
 	lib/cookies/cache.h    \
 	lib/cookies/control.h
 
