@@ -86,28 +86,30 @@ end
 -- Export HTTP service page snippets
 M.snippets = {}
 
--- Serve GET requests, we only support a fixed
--- number of endpoints that are actually preloaded
--- in memory or constructed on request
-local function serve_get(h, stream)
+-- Serve known requests, for methods other than GET
+-- the endpoint must be a closure and not a preloaded string
+local function serve(h, stream)
 	local hsend = headers.new()
 	local path = h:get(':path')
 	local entry = M.endpoints[path]
 	-- Unpack MIME and data
-	local mime, data
+	local mime, data, err
 	if entry then
 		mime, data = unpack(entry)
 	end
 	-- Get string data out of service endpoint
 	if type(data) == 'function' then
-		data = data(h, stream)
+		data, err = data(h, stream)
 		-- Handler doesn't provide any data
 		if data == false then return end
+		if type(data) == 'number' then return tostring(data) end
+	-- Methods other than GET require handler to be closure
+	elseif h:get(':method') ~= 'GET' then
+		return '501'
 	end
 	if type(data) == 'table' then data = tojson(data) end
 	if not mime or type(data) ~= 'string' then
-		hsend:append(':status', '404')
-		assert(stream:write_headers(hsend, true))
+		return '404'
 	else
 		-- Serve content type appropriately
 		hsend:append(':status', '200')
@@ -147,14 +149,15 @@ local function route(endpoints)
 			end
 			ws:close()
 			return
-		-- Handle HTTP method appropriately
-		elseif m == 'GET' then
-			serve_get(h, stream)
 		else
-			-- Method is not supported
-			local hsend = headers.new()
-			hsend:append(':status', '500')
-			assert(stream:write_headers(hsend, true))
+			local ok, err = pcall(serve, h, stream)
+			if not ok or err then
+				log('[http] %s %s: %s', m, path, err or '500')
+				-- Method is not supported
+				local hsend = headers.new()
+				hsend:append(':status', err or '500')
+				assert(stream:write_headers(hsend, true))
+			end
 		end
 		stream:shutdown()
 	end
