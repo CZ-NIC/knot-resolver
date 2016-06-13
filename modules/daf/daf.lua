@@ -52,7 +52,7 @@ local filters = {
 }
 
 local function parse_filter(tok, g)
-	local filter = filters[tok]
+	local filter = filters[tok:lower()]
 	if not filter then error(string.format('invalid filter "%s"', tok)) end
 	return filter(g)
 end
@@ -80,6 +80,7 @@ end
 local function parse_query(g)
 	local ok, actid, filter = pcall(parse_rule, g)
 	if not ok then return nil, actid end
+	actid = actid:lower()
 	if not actions[actid] then return nil, string.format('invalid action "%s"', actid) end
 	-- Parse and interpret action
 	local action = actions[actid]
@@ -109,18 +110,45 @@ local M = {
 
 -- @function Public-facing API
 local function api(h, stream)
-	print('DAF: ')
-	for k,v in h:each() do print(k,v) end
+	local m = h:get(':method')
+	-- GET method
+	if m == 'GET' then
+		local ret = {}
+		for _, r in ipairs(M.rules) do
+			table.insert(ret, {info=r.info, id=r.rule.id, count=r.rule.count})
+		end
+		return ret
+	-- POST method
+	elseif m == 'POST' then
+		local query = stream:get_body_as_string()
+		if query then
+			local ok, r = pcall(M.add, query)
+			if not ok then return 505 end
+			return {info=r.info, id=r.rule.id, count=r.rule.count}
+		end
+		return 400
+	end
 end
 
 -- @function Publish DAF statistics
 local function publish(h, ws)
-	local ok = true
+	local ok, counters = true, {}
 	while ok do
-		-- Publish stats updates periodically
-		local push = tojson({})
-		ok = ws:send(push)
-		cqueues.sleep(0.5)
+		-- Check if we have new rule matches
+		local update = {}
+		for _, r in ipairs(M.rules) do
+			local id = r.rule.id
+			if counters[id] ~= r.rule.count then
+				-- Must have string keys for JSON object and not an array
+				update[tostring(id)] = r.rule.count
+				counters[id] = r.rule.count
+			end
+		end
+		-- Update counters when there is a new data
+		if next(update) ~= nil then
+			ws:send(tojson(update))
+		end
+		cqueues.sleep(2)
 	end
 	ws:close()
 end
@@ -143,7 +171,21 @@ function M.config(conf)
 	-- Export snippet
 	http.snippets['/daf'] = {'Application Firewall', [[
 		<script type="text/javascript" src="daf.js"></script>
-		<table id="daf-rules"><th><td>No rules here yet.</td></th></table>
+		<div class="row">
+			<form id="daf-builder-form">
+				<div class="input-group">
+					<input type="text" id="daf-builder" class="form-control" aria-label="..." />
+					<div class="input-group-btn">
+						<button type="button" id="daf-add" class="btn btn-default" style="margin-top: -5px;">Add</button>
+					</div>
+				</div>
+			</form>
+		</div>
+		<div class="row">
+			<table id="daf-rules" class="table table-striped table-responsive">
+			<th><td>No rules here yet.</td></th>
+			</table>
+		</div>
 	]]}
 end
 
@@ -155,13 +197,15 @@ function M.add(rule)
 	local p = function (req, qry)
 		return filter(req, qry) and action
 	end
-	table.insert(M.rules, {rule=rule, action=id, policy=p})
+	local desc = {info=rule, policy=p}
 	-- Enforce in policy module, special actions are postrules
 	if id == 'reroute' or id == 'rewrite' then
-		table.insert(policy.postrules, p)
+		desc.rule = policy:add(p, true)
 	else
-		table.insert(policy.rules, p)
+		desc.rule = policy:add(p)
 	end
+	table.insert(M.rules, desc)
+	return desc
 end
 
 return M
