@@ -1,0 +1,68 @@
+/*
+ * Base structure
+ */
+
+/* Move down content because we have a fixed navbar that is 50px tall */
+body {
+  padding-top: 50px;
+}
+
+/*
+ * Tags and labels.
+ */
+.tag {
+  margin: 0 3px 3px 0;
+}
+
+.tag-default {
+  background-color: #efefef !important;
+  color: #000 !important;
+}
+
+.tag-warning {
+  background-color: #f0ad4e !important;
+  border-color: #eea236 !important;
+  color: #fff !important;
+}
+.tag-success {
+  background-color: #5cb85c !important;
+  border-color: #4cae4c !important;
+  color: #fff !important;
+}
+
+/*
+ * Graphs and maps.
+ */
+#stats { height: 350px; display: block; }
+#chart {
+  display: inline-block;
+  left: 60px;
+}
+#legend {
+  background-color: white;
+}
+#legend .label {
+  color: #404040;
+}
+#legend .action {
+  color: black;
+  opacity: 0.5;
+}
+#legend ul {
+  padding: 0;
+}
+#legend_container h3 {
+  margin-top: 0;
+}
+#y_axis {
+  position: absolute;
+  width: 60px;
+  height: 350px;
+}
+#legend_container {
+  float: right;
+  width: 140px;
+}
+#chart_container {
+  float: left;
+}

@@ -1,8 +1,14 @@
 var colours = ['#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'];
 var latency = ['1ms', '10ms', '50ms', '100ms', '250ms', '500ms', '1000ms', '1500ms', 'slow'];
 var palette = new Rickshaw.Color.Palette( { scheme: 'colorwheel' } );
+var Socket = "MozWebSocket" in window ? MozWebSocket : WebSocket;
 
-window.onload = function() {
+$(function() {
+	/* Initialize snippets. */
+	$('section').each(function () {
+		const heading = $(this).find('h2');
+		$('#modules-dropdown').append('<li><a href="#'+this.id+'">'+heading.text()+'</a></li>');
+	});
 	/* Latency has its own palette */
 	var series = [];
 	var data = [];
@@ -44,12 +50,12 @@ window.onload = function() {
 		s.renderer = 'line';
 		s.disabled = true;
 	}
-
 	/* Define how graph looks like. */
+	var graphContainer = $('#stats');
 	var graph = new Rickshaw.Graph( {
 		element: document.getElementById('chart'),
 		height: 350,
-		width: 700,
+		width: graphContainer.innerWidth() - 200,
 		renderer: 'multi',
 		series: series,
 	});
@@ -80,7 +86,13 @@ window.onload = function() {
 		graph: graph,
 		legend: legend
 	} );
-
+	/* Somehow follow the responsive design. */
+	$(window).on('resize', function(){
+		graph.configure({
+			width: graphContainer.innerWidth() - 200,
+		});
+		graph.render();
+	});
 	graph.render();
 
 	/* Data map */
@@ -92,7 +104,7 @@ window.onload = function() {
 		element: document.getElementById('map'),
 		fills: fills,
 		data: {},
-		height: 350,
+		height: 400,
 		geographyConfig: {
 			highlightOnHover: false,
 			borderColor: '#ccc',
@@ -203,11 +215,10 @@ window.onload = function() {
 
 	/* WebSocket endpoints */
 	var wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/stats';
-    var Socket = "MozWebSocket" in window ? MozWebSocket : WebSocket;
     var ws = new Socket(wsStats);
     ws.onmessage = function(evt) {
       var data = $.parseJSON(evt.data);
       pushMetrics(data.stats);
       pushUpstreams(data.upstreams);
     };
-}
+});

@@ -40,13 +40,22 @@ M.page = pgload
 -- Preloaded static assets
 local pages = {
 	'favicon.ico',
-	'rickshaw.min.css',
 	'kresd.js',
-	'datamaps.world.min.js',
-	'topojson.js',
+	'kresd.css',
 	'jquery.js',
-	'rickshaw.min.js',
 	'd3.js',
+	'topojson.js',
+	'datamaps.world.min.js',
+	'rickshaw.min.js',
+	'rickshaw.min.css',
+	'selectize.min.js',
+	'selectize.min.css',
+	'selectize.bootstrap3.min.css',
+	'bootstrap.min.js',
+	'bootstrap.min.css',
+	'bootstrap.min.css.map',
+	'bootstrap-theme.min.css',
+	'bootstrap-theme.min.css.map',
 }
 
 -- Serve preloaded root page
@@ -59,7 +68,8 @@ local function serve_root()
 		-- Render snippets
 		local rsnippets = {}
 		for _,v in pairs(M.snippets) do
-			table.insert(rsnippets, string.format('<h2>%s</h2>\n%s', v[1], v[2]))
+			local sid = string.lower(string.gsub(v[1], ' ', '-'))
+			table.insert(rsnippets, string.format('<section id="%s"><h2>%s</h2>\n%s</section>', sid, v[1], v[2]))
 		end
 		-- Return index page
 		return data
