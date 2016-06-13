@@ -24,84 +24,19 @@
 #include <openssl/sha.h>
 
 #include "contrib/fnv/fnv.h"
-#include "lib/cookies/algorithm.h"
+#include "lib/cookies/alg_clnt.h"
 
 //#define CC_HASH_USE_CLIENT_ADDRESS /* When defined, client address will be used when generating client cookie. */
 
-const struct kr_clnt_cookie_alg_descr kr_clnt_cookie_algs[] = {
-	{ kr_clnt_cookie_alg_fnv64, "FNV-64" },
-	{ kr_clnt_cookie_alg_hmac_sha256_64, "HMAC-SHA256-64" },
-	{ NULL, NULL }
-};
-
-clnt_cookie_alg_t *kr_clnt_cookie_alg_func(const struct kr_clnt_cookie_alg_descr cc_algs[],
-                                           const char *name)
-{
-	if (!cc_algs || !name) {
-		return NULL;
-	}
-
-	const struct kr_clnt_cookie_alg_descr *aux_ptr = cc_algs;
-	while (aux_ptr && aux_ptr->func) {
-		assert(aux_ptr->name);
-		if (strcmp(aux_ptr->name, name) == 0) {
-			return aux_ptr->func;
-		}
-		++aux_ptr;
-	}
-
-	return NULL;
-}
-
-const char *kr_clnt_cookie_alg_name(const struct kr_clnt_cookie_alg_descr cc_algs[],
-                                    clnt_cookie_alg_t *func)
-{
-	if (!cc_algs || !func) {
-		return NULL;
-	}
-
-	const struct kr_clnt_cookie_alg_descr *aux_ptr = cc_algs;
-	while (aux_ptr && aux_ptr->func) {
-		assert(aux_ptr->name);
-		if (aux_ptr->func == func) {
-			return aux_ptr->name;
-		}
-		++aux_ptr;
-	}
-
-	return NULL;
-}
-
-int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)
-{
-	if (!sockaddr || !addr || !len) {
-		return kr_error(EINVAL);
-	}
-
-	int addr_family = ((struct sockaddr *) sockaddr)->sa_family;
-
-	switch (addr_family) {
-	case AF_INET:
-		*addr = (uint8_t *) &((struct sockaddr_in *) sockaddr)->sin_addr;
-		*len = 4;
-		break;
-	case AF_INET6:
-		*addr = (uint8_t *) &((struct sockaddr_in6 *) sockaddr)->sin6_addr;
-		*len = 16;
-		break;
-	default:
-		*addr = NULL;
-		*len = 0;
-		addr_family = AF_UNSPEC;
-		return kr_error(EINVAL);
-		break;
-	}
-
-	return kr_ok();
-}
-
-int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
-                             uint8_t cc_out[KNOT_OPT_COOKIE_CLNT])
+/**
+ * Compute client cookie using FNV-64.
+ * @note At least one of the arguments must be non-null.
+ * @param input  Input parameters.
+ * @param cc_out Buffer for computed client cookie.
+ * @return kr_ok() on success, error code else.
+ */
+static int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
+                                    uint8_t cc_out[KNOT_OPT_COOKIE_CLNT])
 {
 	if (!input || !cc_out) {
 		return kr_error(EINVAL);
@@ -145,8 +80,15 @@ int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
 	return kr_ok();
 }
 
-int kr_clnt_cookie_alg_hmac_sha256_64(const struct kr_clnt_cookie_input *input,
-                                      uint8_t cc_out[KNOT_OPT_COOKIE_CLNT])
+/**
+ * Compute client cookie using HMAC_SHA256-64.
+ * @note At least one of the arguments must be non-null.
+ * @param input  Input parameters.
+ * @param cc_out Buffer for computed client cookie.
+ * @return kr_ok() on success, error code else.
+ */
+static int kr_clnt_cookie_alg_hmac_sha256_64(const struct kr_clnt_cookie_input *input,
+                                             uint8_t cc_out[KNOT_OPT_COOKIE_CLNT])
 {
 	if (!input || !cc_out) {
 		return kr_error(EINVAL);
@@ -215,4 +157,80 @@ int kr_clnt_cookie_alg_hmac_sha256_64(const struct kr_clnt_cookie_input *input,
 fail:
 	HMAC_CTX_cleanup(&ctx);
 	return ret;
+}
+
+const struct kr_clnt_cookie_alg_descr kr_clnt_cookie_algs[] = {
+	{ "FNV-64",         kr_clnt_cookie_alg_fnv64 },
+	{ "HMAC-SHA256-64", kr_clnt_cookie_alg_hmac_sha256_64 },
+	{ NULL, NULL }
+};
+
+const struct kr_clnt_cookie_alg_descr *kr_clnt_cookie_alg(const struct kr_clnt_cookie_alg_descr cc_algs[],
+                                                          const char *name)
+{
+	if (!cc_algs || !name) {
+		return NULL;
+	}
+
+	const struct kr_clnt_cookie_alg_descr *aux_ptr = cc_algs;
+	while (aux_ptr && aux_ptr->func) {
+		assert(aux_ptr->name);
+		if (strcmp(aux_ptr->name, name) == 0) {
+			return aux_ptr;
+		}
+		++aux_ptr;
+	}
+
+	return NULL;
+}
+
+int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)
+{
+	if (!sockaddr || !addr || !len) {
+		return kr_error(EINVAL);
+	}
+
+	int addr_family = ((struct sockaddr *) sockaddr)->sa_family;
+
+	switch (addr_family) {
+	case AF_INET:
+		*addr = (uint8_t *) &((struct sockaddr_in *) sockaddr)->sin_addr;
+		*len = 4;
+		break;
+	case AF_INET6:
+		*addr = (uint8_t *) &((struct sockaddr_in6 *) sockaddr)->sin6_addr;
+		*len = 16;
+		break;
+	default:
+		*addr = NULL;
+		*len = 0;
+		addr_family = AF_UNSPEC;
+		return kr_error(EINVAL);
+		break;
+	}
+
+	return kr_ok();
+}
+
+int kr_clnt_cookie_check(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                         const struct kr_clnt_cookie_input *input,
+                         const struct kr_clnt_cookie_alg_descr *cc_alg)
+{
+	if (!cc || !input || !cc_alg || !cc_alg->func) {
+		return kr_error(EINVAL);
+	}
+
+	uint8_t generated_cc[KNOT_OPT_COOKIE_CLNT] = {0, };
+
+	int ret = cc_alg->func(input, generated_cc);
+	if (ret != kr_ok()) {
+		return ret;
+	}
+
+	ret = memcmp(cc, generated_cc, KNOT_OPT_COOKIE_CLNT);
+	if (ret == 0) {
+		return kr_ok();
+	}
+
+	return kr_error(EINVAL);
 }

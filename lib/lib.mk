@@ -48,12 +48,14 @@ ifeq ($(HAS_libcrypto),yes)
 libkres_SOURCES += \
 	contrib/fnv/hash_64a.c \
 	lib/layer/cookiemonster.c \
-	lib/cookies/algorithm.c \
+	lib/cookies/alg_clnt.c \
+	lib/cookies/alg_srvr.c \
 	lib/cookies/cache.c    \
 	lib/cookies/control.c
 
 libkres_HEADERS += \
-	lib/cookies/algorithm.h \
+	lib/cookies/alg_clnt.h \
+	lib/cookies/alg_srvr.h \
 	lib/cookies/cache.h    \
 	lib/cookies/control.h
 

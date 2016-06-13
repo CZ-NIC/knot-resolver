@@ -152,8 +152,8 @@ int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
 		.secret_len = cntrl->current_cs->size
 	};
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
-	assert(cntrl->cc_alg_func);
-	int ret = cntrl->cc_alg_func(&input, cc);
+	assert(cntrl->cc_alg && cntrl->cc_alg->func);
+	int ret = cntrl->cc_alg->func(&input, cc);
 	if (ret != kr_ok()) {
 		return ret;
 	}

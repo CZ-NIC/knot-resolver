@@ -21,7 +21,7 @@
 #include <string.h>
 
 #include "daemon/engine.h"
-#include "lib/cookies/algorithm.h"
+#include "lib/cookies/alg_clnt.h"
 #include "lib/cookies/control.h"
 #include "lib/layer.h"
 
@@ -133,12 +133,12 @@ static bool apply_client_hash_func(struct kr_cookie_ctx *cntrl,
                                    const JsonNode *node)
 {
 	if (node->tag == JSON_STRING) {
-		clnt_cookie_alg_t *cc_alg_func = kr_clnt_cookie_alg_func(kr_clnt_cookie_algs,
-		                                                         node->string_);
-		if (!cc_alg_func) {
+		const struct kr_clnt_cookie_alg_descr *cc_alg = kr_clnt_cookie_alg(kr_clnt_cookie_algs,
+		                                                                   node->string_);
+		if (!cc_alg) {
 			return false;
 		}
-		cntrl->cc_alg_func = cc_alg_func;
+		cntrl->cc_alg = cc_alg;
 		return true;
 	}
 
@@ -263,11 +263,9 @@ static char *cookiectl_config(void *env, struct kr_module *module, const char *a
 
 	read_secret(root_node, &kr_glob_cookie_ctx);
 
-	const char *name = kr_clnt_cookie_alg_name(kr_clnt_cookie_algs,
-	                                           kr_glob_cookie_ctx.cc_alg_func);
-	assert(name);
+	assert(kr_glob_cookie_ctx.cc_alg->name);
 	json_append_member(root_node, NAME_CLIENT_COOKIE_ALG,
-	                   json_mkstring(name));
+	                   json_mkstring(kr_glob_cookie_ctx.cc_alg->name));
 
 	read_available_cc_hashes(root_node, &kr_glob_cookie_ctx);
 
@@ -293,7 +291,7 @@ int cookiectl_init(struct kr_module *module)
 	kr_glob_cookie_ctx.enabled = false;
 	kr_glob_cookie_ctx.current_cs = &dflt_cs;
 	kr_glob_cookie_ctx.cache_ttl = DFLT_COOKIE_TTL;
-	kr_glob_cookie_ctx.cc_alg_func = kr_clnt_cookie_alg_fnv64;
+	kr_glob_cookie_ctx.cc_alg = kr_clnt_cookie_alg(kr_clnt_cookie_algs, "FNV-64");
 
 	module->data = NULL;
 

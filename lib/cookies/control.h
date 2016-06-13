@@ -20,7 +20,7 @@
 #include <libknot/rrtype/opt_cookie.h>
 #include <stdbool.h>
 
-#include "lib/cookies/algorithm.h"
+#include "lib/cookies/alg_clnt.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
 
@@ -46,7 +46,7 @@ struct kr_cookie_ctx {
 
 	uint32_t cache_ttl; /**< TTL used when caching cookies */
 
-	clnt_cookie_alg_t *cc_alg_func; /**< Client cookie hash computation callback. */
+	const struct kr_clnt_cookie_alg_descr *cc_alg; /**< Client cookie algorithm. */
 };
 
 /** Global cookie control context. */

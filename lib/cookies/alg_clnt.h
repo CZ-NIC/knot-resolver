@@ -28,17 +28,22 @@ struct kr_clnt_cookie_input {
 	const void *clnt_sockaddr; /**< Client (local) socket address. */
 	const void *srvr_sockaddr; /**< Server (remote) socket address. */
 	const uint8_t *secret_data; /**< Client secret data. */
-	size_t secret_len;
+	size_t secret_len; /**< Secret data length. */
 };
 
-/** Client cookie algorithm type. */
+/**
+ * @brief Client cookie generator function type.
+ * @param input Data which to generate the cookie from.
+ * @param cc_out Buffer to write the resulting client cookie data into.
+ * @return kr_ok() or error code
+ */
 typedef int (clnt_cookie_alg_t)(const struct kr_clnt_cookie_input *input,
-                                uint8_t *);
+                                uint8_t *cc_out);
 
 /** Holds description of client cookie hashing algorithms. */
 struct kr_clnt_cookie_alg_descr {
-	clnt_cookie_alg_t *func; /**< Pointer to has function. */
 	const char *name; /**< Hash function name. */
+	clnt_cookie_alg_t *func; /**< Pointer to hash function. */
 };
 
 /**
@@ -50,27 +55,17 @@ KR_EXPORT
 extern const struct kr_clnt_cookie_alg_descr kr_clnt_cookie_algs[];
 
 /**
- * @brief Return pointer to client cookie hash function with given name.
+ * @brief Return pointer to client cookie algorithm with given name.
  * @param cc_algs List of available algorithms.
  * @param name    Algorithm name.
- * @return pointer to function or NULL if not found.
+ * @return pointer to algorithm or NULL if not found.
  */
 KR_EXPORT
-clnt_cookie_alg_t *kr_clnt_cookie_alg_func(const struct kr_clnt_cookie_alg_descr cc_algs[],
-                                           const char *name);
+const struct kr_clnt_cookie_alg_descr *kr_clnt_cookie_alg(const struct kr_clnt_cookie_alg_descr cc_algs[],
+                                                          const char *name);
 
 /**
- * @brief Return name of given client cookie hash function.
- * @param cc_algs List of available algorithms.
- * @param func    Sought algorithm function.
- * @return pointer to string or NULL if not found.
- */
-KR_EXPORT
-const char *kr_clnt_cookie_alg_name(const struct kr_clnt_cookie_alg_descr cc_algs[],
-                                    clnt_cookie_alg_t *func);
-
-/**
- * Get pointers to IP address bytes.
+ * @brief Get pointers to IP address bytes.
  * @param sockaddr socket address
  * @param addr pointer to address
  * @param len address length
@@ -79,23 +74,14 @@ const char *kr_clnt_cookie_alg_name(const struct kr_clnt_cookie_alg_descr cc_alg
 int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len);
 
 /**
- * Compute client cookie using FNV-64.
- * @note At least one of the arguments must be non-null.
- * @param input  Input parameters.
- * @param cc_out Buffer for computed client cookie.
- * @return kr_ok() on success, error code else.
+ * @brief Check whether supplied client cookie was generated from given client
+ * secret and address.
+ * @param cc     Client cookie that should be checked.
+ * @param input  Input cookie algorithm parameters.
+ * @param cc_alg Client cookie algorithm.
+ * @return kr_ok() or error code
  */
 KR_EXPORT
-int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
-                             uint8_t cc_out[KNOT_OPT_COOKIE_CLNT]);
-
-/**
- * Compute client cookie using HMAC_SHA256-64.
- * @note At least one of the arguments must be non-null.
- * @param input  Input parameters.
- * @param cc_out Buffer for computed client cookie.
- * @return kr_ok() on success, error code else.
- */
-KR_EXPORT
-int kr_clnt_cookie_alg_hmac_sha256_64(const struct kr_clnt_cookie_input *input,
-                                      uint8_t cc_buf[KNOT_OPT_COOKIE_CLNT]);
+int kr_clnt_cookie_check(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                         const struct kr_clnt_cookie_input *input,
+                         const struct kr_clnt_cookie_alg_descr *cc_alg);
