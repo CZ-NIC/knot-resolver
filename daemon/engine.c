@@ -291,7 +291,7 @@ static JsonNode *l_pack_elem(lua_State *L, int top)
 	while(lua_next(L, top) != 0) {
 		bool is_array = false;
 		if (!node) {
-			is_array = lua_isnumber(L, top + 1);
+			is_array = (lua_type(L, top + 1) == LUA_TNUMBER);
 			node = is_array ? json_mkarray() : json_mkobject();
 			if (!node) {
 				return NULL;
