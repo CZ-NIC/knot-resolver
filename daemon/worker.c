@@ -349,6 +349,13 @@ static int qr_task_start(struct qr_task *task, knot_pkt_t *query)
 		task->req.qsource.key = knot_rrset_copy(query->tsig_rr, &task->req.pool);
 	}
 
+#if defined(ENABLE_COOKIES)
+	/* Remember query source EDNS data */
+	if (query->opt_rr) {
+		task->req.qsource.opt = knot_rrset_copy(query->opt_rr, &task->req.pool);
+	}
+#endif /* defined(ENABLE_COOKIES) */
+
 	/* Start resolution */
 	struct worker_ctx *worker = task->worker;
 	struct engine *engine = worker->engine;

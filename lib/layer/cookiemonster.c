@@ -26,6 +26,7 @@
 
 #include "daemon/engine.h"
 #include "lib/cookies/alg_clnt.h"
+#include "lib/cookies/alg_srvr.h"
 #include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
 #include "lib/module.h"
@@ -366,12 +367,85 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return ctx->state;
 }
 
+static int check_request(knot_layer_t *ctx, void *module_param)
+{
+	if (!kr_glob_cookie_ctx.enabled) {
+		/* TODO -- IS there a way how to determine whether the original
+		 * request came via TCP? */
+		return ctx->state;
+	}
+
+	struct kr_request *req = ctx->data;
+	const knot_rrset_t *req_opt_rr = req->qsource.opt;
+
+	if (!req_opt_rr) {
+		return ctx->state;
+	}
+
+	uint8_t *req_cookie_opt = knot_edns_get_option(req_opt_rr,
+	                                               KNOT_EDNS_OPTION_COOKIE);
+	if (!req_cookie_opt) {
+		return ctx->state;
+	}
+
+	const uint8_t *req_cookie_data = knot_edns_opt_get_data(req_cookie_opt);
+	uint16_t req_cookie_len = knot_edns_opt_get_length(req_cookie_opt);
+	assert(req_cookie_data && req_cookie_len);
+
+	const uint8_t *req_cc = NULL, *req_sc = NULL;
+	uint16_t req_cc_len = 0, req_sc_len = 0;
+	int ret = knot_edns_opt_cookie_parse(req_cookie_data, req_cookie_len,
+	                                     &req_cc, &req_cc_len,
+	                                     &req_sc, &req_sc_len);
+	if (ret != KNOT_EOK) {
+		/* TODO -- Generate BADCOOKIE response. */
+		DEBUG_MSG(NULL, "%s\n", "got malformed DNS cookie in request");
+		return ctx->state;
+	}
+	assert(req_cc_len == KNOT_OPT_COOKIE_CLNT);
+
+	if (!req_sc) {
+		/* TODO -- BADCOOKIE? Occasionally ignore? */
+		DEBUG_MSG(NULL, "%s\n", "no server cookie in request");
+		return ctx->state;
+	}
+
+	/* Check server cookie obtained in request. */
+
+	const struct kr_cookie_ctx *cntrl = &kr_glob_cookie_ctx;
+
+	if (!req->qsource.addr || !cntrl->current_ss) {
+		/* TODO -- SERVFAIL? */
+		DEBUG_MSG(NULL, "%s\n", "no server DNS cookie context data");
+		return ctx->state;
+	}
+
+	struct kr_srvr_cookie_check_ctx check_ctx = {
+		.clnt_sockaddr = req->qsource.addr,
+		.secret_data = cntrl->current_ss->data,
+		.secret_len = cntrl->current_ss->size
+	};
+
+	ret = kr_srvr_cookie_check(req_cc, req_sc, req_sc_len, &check_ctx,
+	                           cntrl->sc_alg);
+	if (ret != kr_ok()) {
+		/* TODO -- BADCOOKIE? Occasionally ignore? */
+		DEBUG_MSG(NULL, "%s\n", "invalid server DNS cookie data");
+		return ctx->state;
+	}
+
+	/* Server cookie OK. */
+
+	return ctx->state;
+}
+
 /** Module implementation. */
 
 KR_EXPORT
 const knot_layer_api_t *cookiemonster_layer(struct kr_module *module)
 {
 	static knot_layer_api_t _layer = {
+		.begin = &check_request,
 		.consume = &check_response
 	};
 	/* Store module reference */

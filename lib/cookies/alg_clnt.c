@@ -160,7 +160,7 @@ fail:
 }
 
 const struct kr_clnt_cookie_alg_descr kr_clnt_cookie_algs[] = {
-	{ "FNV-64",         kr_clnt_cookie_alg_fnv64 },
+	{ "FNV-64", kr_clnt_cookie_alg_fnv64 },
 	{ "HMAC-SHA256-64", kr_clnt_cookie_alg_hmac_sha256_64 },
 	{ NULL, NULL }
 };

@@ -29,7 +29,6 @@ struct kr_srvr_cookie_check_ctx {
 
 /** Inbound server cookie content structure. */
 struct kr_srvr_cookie_inbound {
-	const uint8_t *clnt_cookie; /**< Client cookie, `KNOT_OPT_COOKIE_CLNT` bytes long. */
 	uint32_t nonce; /**< Some value. */
 	uint32_t time; /**< Time stamp. */
 	const uint8_t *hash_data; /**< Hash data. */
@@ -41,17 +40,17 @@ struct kr_srvr_cookie_input {
 	const uint8_t *clnt_cookie; /**< Client cookie, must be `KNOT_OPT_COOKIE_CLNT` bytes long. */
 	uint32_t nonce; /**< Some generated value. */
 	uint32_t time; /**< Cookie time stamp. */
-	struct kr_srvr_cookie_check_ctx srvr_data; /**< Data known to the server. */
+	const struct kr_srvr_cookie_check_ctx *srvr_data; /**< Data known to the server. */
 };
 
 /**
  * @brief Server cookie parser function type.
- * @param cookie_data Entire cookie option data (without option header).
- * @param data_len    Cookie data length.
- * @param inbound     Inbound cookie structure to be set.
+ * @param sc        Server cookie data.
+ * @param data_len  Server cookie data length.
+ * @param inbound   Inbound cookie structure to be set.
  * @return kr_ok() or error code.
  */
-typedef int (srvr_cookie_parse_t)(const uint8_t *cookie_data, uint16_t data_len,
+typedef int (srvr_cookie_parse_t)(const uint8_t *sc, uint16_t sc_len,
                                   struct kr_srvr_cookie_inbound *inbound);
 /**
  * @brief Server cookie generator function type.
@@ -65,10 +64,10 @@ typedef int (srvr_cookie_gen_t)(const struct kr_srvr_cookie_input *input,
 
 /** Holds description of server cookie hashing algorithms. */
 struct kr_srvr_cookie_alg_descr {
-	const char *name; /** Server cookie algorithm name. */
+	const char *name; /**< Server cookie algorithm name. */
 	const uint16_t srvr_cookie_size; /**< Size of the generated server cookie. */
-	const srvr_cookie_parse_t *opt_parse_func; /**< Cookie option parser function. */
-	const srvr_cookie_gen_t *gen_func; /*< Cookie generator function. */
+	srvr_cookie_parse_t *opt_parse_func; /**< Cookie option parser function. */
+	srvr_cookie_gen_t *gen_func; /**< Cookie generator function. */
 };
 
 /**
@@ -80,13 +79,26 @@ KR_EXPORT
 extern const struct kr_srvr_cookie_alg_descr kr_srvr_cookie_algs[];
 
 /**
+ * @brief Return pointer to server cookie algorithm with given name.
+ * @param sc_algs List of available algorithms.
+ * @param name    Algorithm name.
+ * @return pointer to algorithm or NULL if not found.
+ */
+KR_EXPORT
+const struct kr_srvr_cookie_alg_descr *kr_srvr_cookie_alg(const struct kr_srvr_cookie_alg_descr sc_algs[],
+                                                          const char *name);
+
+/**
  * @brief Check whether supplied client and server cookie match.
- * @param cookie_opt Entire cookie option, must contain server cookie.
+ * @param cc         Client cookie.
+ * @param sc         Server cookie that should be checked.
+ * @param sc_len     Server cookie length.
  * @param check_ctx  Data known to the server needed for cookie validation.
  * @param sc_alg     Server cookie algorithm.
  * @return kr_ok() if check OK, error code else.
  */
 KR_EXPORT
-int kr_srvr_cookie_check(const uint8_t *cookie_opt,
+int kr_srvr_cookie_check(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                         const uint8_t *sc, uint16_t sc_len,
                          const struct kr_srvr_cookie_check_ctx *check_ctx,
                          const struct kr_srvr_cookie_alg_descr *sc_alg);

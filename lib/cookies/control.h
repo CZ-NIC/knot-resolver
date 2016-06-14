@@ -34,6 +34,10 @@ struct kr_cookie_secret {
 KR_EXPORT
 extern struct kr_cookie_secret dflt_cs;
 
+/** Default server secret. */
+KR_EXPORT
+extern struct kr_cookie_secret dflt_ss;
+
 /** Default cookie TTL. */
 #define DFLT_COOKIE_TTL 72000
 
@@ -46,7 +50,11 @@ struct kr_cookie_ctx {
 
 	uint32_t cache_ttl; /**< TTL used when caching cookies */
 
+	struct kr_cookie_secret *current_ss; /**< current server secret */
+	struct kr_cookie_secret *recent_ss; /**< recent server secret */
+
 	const struct kr_clnt_cookie_alg_descr *cc_alg; /**< Client cookie algorithm. */
+	const struct kr_srvr_cookie_alg_descr *sc_alg; /**< Server cookie algorithm. */
 };
 
 /** Global cookie control context. */

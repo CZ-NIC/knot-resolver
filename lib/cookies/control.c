@@ -38,9 +38,16 @@ struct kr_cookie_secret dflt_cs = {
 	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
+/* Default srver secret. */
+struct kr_cookie_secret dflt_ss = {
+	.size = KNOT_OPT_COOKIE_CLNT,
+	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+
 struct kr_cookie_ctx kr_glob_cookie_ctx = {
 	.enabled = false,
-	.current_cs = &dflt_cs
+	.current_cs = &dflt_cs,
+	.current_ss = &dflt_ss
 };
 
 static int opt_rr_add_cookies(knot_rrset_t *opt_rr,

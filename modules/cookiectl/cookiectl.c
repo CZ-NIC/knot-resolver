@@ -22,6 +22,7 @@
 
 #include "daemon/engine.h"
 #include "lib/cookies/alg_clnt.h"
+#include "lib/cookies/alg_srvr.h"
 #include "lib/cookies/control.h"
 #include "lib/layer.h"
 
@@ -291,7 +292,9 @@ int cookiectl_init(struct kr_module *module)
 	kr_glob_cookie_ctx.enabled = false;
 	kr_glob_cookie_ctx.current_cs = &dflt_cs;
 	kr_glob_cookie_ctx.cache_ttl = DFLT_COOKIE_TTL;
+	kr_glob_cookie_ctx.current_ss = &dflt_ss;
 	kr_glob_cookie_ctx.cc_alg = kr_clnt_cookie_alg(kr_clnt_cookie_algs, "FNV-64");
+	kr_glob_cookie_ctx.sc_alg = kr_srvr_cookie_alg(kr_srvr_cookie_algs, "HMAC-SHA256-64");
 
 	module->data = NULL;
 
@@ -314,6 +317,18 @@ int cookiectl_deinit(struct kr_module *module)
 		free(kr_glob_cookie_ctx.current_cs);
 	}
 	kr_glob_cookie_ctx.current_cs = &dflt_cs;
+
+	if (kr_glob_cookie_ctx.recent_ss &&
+	    kr_glob_cookie_ctx.recent_ss != &dflt_ss) {
+		free(kr_glob_cookie_ctx.recent_ss);
+	}
+	kr_glob_cookie_ctx.recent_ss = NULL;
+
+	if (kr_glob_cookie_ctx.current_ss &&
+	    kr_glob_cookie_ctx.current_ss != &dflt_ss) {
+		free(kr_glob_cookie_ctx.current_ss);
+	}
+	kr_glob_cookie_ctx.current_ss = &dflt_ss;
 
 	return kr_ok();
 }
