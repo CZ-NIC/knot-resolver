@@ -28,20 +28,45 @@
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookiectl",  fmt)
 
-#define NAME_ENABLED "enabled"
+#define NAME_CLIENT_ENABLED "client_enabled"
 #define NAME_CLIENT_SECRET "client_secret"
 #define NAME_CLIENT_COOKIE_ALG "client_cookie_alg"
 #define NAME_AVAILABLE_CLIENT_COOKIE_ALGS "available_client_cookie_algs"
 #define NAME_CACHE_TTL "cache_ttl"
 
-static bool aply_enabled(struct kr_cookie_ctx *cntrl, const JsonNode *node)
+#define NAME_SERVER_ENABLED "server_enabled"
+#define NAME_SERVER_SECRET "server_secret"
+#define NAME_SERVER_COOKIE_ALG "server_cookie_alg"
+#define NAME_AVAILABLE_SERVER_COOKIE_ALGS "available_server_cookie_algs"
+
+static bool aply_enabled(bool *enabled, const JsonNode *node)
 {
+	assert(enabled && node);
+
 	if (node->tag == JSON_BOOL) {
-		cntrl->enabled = node->bool_;
+		*enabled = node->bool_;
 		return true;
 	}
 
 	return false;
+}
+
+static struct kr_cookie_secret *new_cookie_secret(size_t size, bool zero)
+{
+	if (!size) {
+		return NULL;
+	}
+
+	struct kr_cookie_secret *sq = malloc(sizeof(*sq) + size);
+	if (!sq) {
+		return NULL;
+	}
+
+	sq->size = size;
+	if (zero) {
+		memset(sq->data, 0, size);
+	}
+	return sq;
 }
 
 static struct kr_cookie_secret *new_sq_str(const JsonNode *node)
@@ -50,11 +75,10 @@ static struct kr_cookie_secret *new_sq_str(const JsonNode *node)
 
 	size_t len = strlen(node->string_);
 
-	struct kr_cookie_secret *sq = malloc(sizeof(*sq) + len);
+	struct kr_cookie_secret *sq = new_cookie_secret(len, false);
 	if (!sq) {
 		return NULL;
 	}
-	sq->size = len;
 	memcpy(sq->data, node->string_, len);
 
 	return sq;
@@ -78,12 +102,11 @@ static struct kr_cookie_secret *new_sq_array(const JsonNode *node)
 		return NULL;
 	}
 
-	struct kr_cookie_secret *sq = malloc(sizeof(*sq) + cnt);
+	struct kr_cookie_secret *sq = new_cookie_secret(cnt, false);
 	if (!sq) {
 		return NULL;
 	}
 
-	sq->size = cnt;
 	cnt = 0;
 	json_foreach(element, node) {
 		sq->data[cnt++] = (uint8_t) element->number_;
@@ -92,9 +115,10 @@ static struct kr_cookie_secret *new_sq_array(const JsonNode *node)
 	return sq;
 }
 
-static bool apply_client_secret(struct kr_cookie_ctx *cntrl,
-                                const JsonNode *node)
+static bool apply_secret(struct kr_cookie_secret **sec, const JsonNode *node)
 {
+	assert(sec && node);
+
 	struct kr_cookie_secret *sq = NULL;
 
 	switch (node->tag) {
@@ -112,20 +136,8 @@ static bool apply_client_secret(struct kr_cookie_ctx *cntrl,
 		return false;
 	}
 
-	if (sq->size == cntrl->current_cs->size &&
-	    memcmp(sq->data, cntrl->current_cs->data, sq->size) == 0) {
-		/* Ignore same values. */
-		free(sq);
-		return true;
-	}
-
-	struct kr_cookie_secret *tmp = cntrl->recent_cs;
-	cntrl->recent_cs = cntrl->current_cs;
-	cntrl->current_cs = sq;
-
-	if (tmp && tmp != &dflt_cs) {
-		free(tmp);
-	}
+	/* Overwrite data. */
+	*sec = sq;
 
 	return true;
 }
@@ -139,7 +151,23 @@ static bool apply_client_hash_func(struct kr_cookie_ctx *cntrl,
 		if (!cc_alg) {
 			return false;
 		}
-		cntrl->cc_alg = cc_alg;
+		cntrl->clnt.current.calg = cc_alg;
+		return true;
+	}
+
+	return false;
+}
+
+static bool apply_server_hash_func(struct kr_cookie_ctx *cntrl,
+                                   const JsonNode *node)
+{
+	if (node->tag == JSON_STRING) {
+		const struct kr_srvr_cookie_alg_descr *sc_alg = kr_srvr_cookie_alg(kr_srvr_cookie_algs,
+		                                                                   node->string_);
+		if (!sc_alg) {
+			return false;
+		}
+		cntrl->srvr.current.salg = sc_alg;
 		return true;
 	}
 
@@ -149,7 +177,7 @@ static bool apply_client_hash_func(struct kr_cookie_ctx *cntrl,
 static bool apply_cache_ttl(struct kr_cookie_ctx *cntrl, const JsonNode *node)
 {
 	if (node->tag == JSON_NUMBER) {
-		cntrl->cache_ttl = node->number_;
+		cntrl->clnt.cache_ttl = node->number_;
 		return true;
 	}
 
@@ -165,37 +193,44 @@ static bool apply_configuration(struct kr_cookie_ctx *cntrl, const JsonNode *nod
 		return false;
 	}
 
-	if (strcmp(node->key, NAME_ENABLED) == 0) {
-		return aply_enabled(cntrl, node);
+	if (strcmp(node->key, NAME_CLIENT_ENABLED) == 0) {
+		return aply_enabled(&cntrl->clnt.enabled, node);
 	} else if (strcmp(node->key, NAME_CLIENT_SECRET) == 0) {
-		return apply_client_secret(cntrl, node);
+		return apply_secret(&cntrl->clnt.current.csec, node);
 	} else  if (strcmp(node->key, NAME_CLIENT_COOKIE_ALG) == 0) {
 		return apply_client_hash_func(cntrl, node);
 	} else if (strcmp(node->key, NAME_CACHE_TTL) == 0) {
 		return apply_cache_ttl(cntrl, node);
+	} else if (strcmp(node->key, NAME_SERVER_ENABLED) == 0) {
+		return aply_enabled(&cntrl->srvr.enabled, node);
+	} else if (strcmp(node->key, NAME_SERVER_SECRET) == 0) {
+		return apply_secret(&cntrl->srvr.current.ssec, node);
+	} else if (strcmp(node->key, NAME_SERVER_COOKIE_ALG) == 0) {
+		return apply_server_hash_func(cntrl, node);
 	}
 
 	return false;
 }
 
-static bool read_secret(JsonNode *root, struct kr_cookie_ctx *cntrl)
+static bool read_secret(JsonNode *root, const char *node_name,
+                        const struct kr_cookie_secret *secret)
 {
-	assert(root && cntrl);
+	assert(root && node_name && secret);
 
 	JsonNode *array = json_mkarray();
 	if (!array) {
 		return false;
 	}
 
-	for (size_t i = 0; i < cntrl->current_cs->size; ++i) {
-		JsonNode *element = json_mknumber(cntrl->current_cs->data[i]);
+	for (size_t i = 0; i < secret->size; ++i) {
+		JsonNode *element = json_mknumber(secret->data[i]);
 		if (!element) {
 			goto fail;
 		}
 		json_append_element(array, element);
 	}
 
-	json_append_member(root, NAME_CLIENT_SECRET, array);
+	json_append_member(root, node_name, array);
 
 	return true;
 
@@ -206,10 +241,9 @@ fail:
 	return false;
 }
 
-static bool read_available_cc_hashes(JsonNode *root,
-                                     struct kr_cookie_ctx *cntrl)
+static bool read_available_cc_hashes(JsonNode *root)
 {
-	assert(root && cntrl);
+	assert(root);
 
 	JsonNode *array = json_mkarray();
 	if (!array) {
@@ -238,6 +272,169 @@ fail:
 	return false;
 }
 
+static bool read_available_sc_hashes(JsonNode *root)
+{
+	assert(root);
+
+	JsonNode *array = json_mkarray();
+	if (!array) {
+		return false;
+	}
+
+	const struct kr_srvr_cookie_alg_descr *aux_ptr = kr_srvr_cookie_algs;
+	while (aux_ptr && aux_ptr->gen_func) {
+		assert(aux_ptr->name);
+		JsonNode *element = json_mkstring(aux_ptr->name);
+		if (!element) {
+			goto fail;
+		}
+		json_append_element(array, element);
+		++aux_ptr;
+	}
+
+	json_append_member(root, NAME_AVAILABLE_SERVER_COOKIE_ALGS, array);
+
+	return true;
+
+fail:
+	if (array) {
+		json_delete(array);
+	}
+	return false;
+}
+
+static bool clnt_settings_equal(const struct kr_clnt_cookie_settings *s1,
+                                const struct kr_clnt_cookie_settings *s2)
+{
+	assert(s1 && s2 && s1->csec && s2->csec);
+
+	if (s1->calg != s2->calg || s1->csec->size != s2->csec->size) {
+		return false;
+	}
+
+	return 0 == memcmp(s1->csec->data, s2->csec->data, s1->csec->size);
+}
+
+static bool srvr_settings_equal(const struct kr_srvr_cookie_settings *s1,
+                                const struct kr_srvr_cookie_settings *s2)
+{
+	assert(s1 && s2 && s1->ssec && s2->ssec);
+
+	if (s1->salg != s2->salg || s1->ssec->size != s2->ssec->size) {
+		return false;
+	}
+
+	return 0 == memcmp(s1->ssec->data, s2->ssec->data, s1->ssec->size);
+}
+
+static void apply_from_copy(struct kr_cookie_ctx *running,
+                            const struct kr_cookie_ctx *shallow)
+{
+	assert(running && shallow);
+
+	if (!clnt_settings_equal(&running->clnt.current,
+	                         &shallow->clnt.current)) {
+		free(running->clnt.recent.csec); /* Delete old secret. */
+		running->clnt.recent = running->clnt.current;
+		running->clnt.current = shallow->clnt.current;
+		/* Shallow will be deleted after this function call. */
+	}
+
+	if (!srvr_settings_equal(&running->srvr.current,
+	                         &shallow->srvr.current)) {
+		free(running->srvr.recent.ssec); /* Delete old secret. */
+		running->srvr.recent = running->srvr.current;
+		running->srvr.current = shallow->srvr.current;
+		/* Shallow will be deleted after this function call. */
+	}
+
+	/* Direct application. */
+	running->clnt.cache_ttl = shallow->clnt.cache_ttl;
+	running->clnt.enabled = shallow->clnt.enabled;
+	running->srvr.enabled = shallow->srvr.enabled;
+}
+
+static bool apply_config(struct kr_cookie_ctx *ctx, const char *args)
+{
+	if (!ctx) {
+		return false;
+	}
+
+	if (!args || !strlen(args)) {
+		return true;
+	}
+
+	struct kr_cookie_ctx shallow_copy = *ctx;
+	bool success = true;
+
+	if (!args || !strlen(args)) {
+		return success;
+	}
+
+	JsonNode *node;
+	JsonNode *root_node = json_decode(args);
+	json_foreach (node, root_node) {
+		success = apply_configuration(&shallow_copy, node);
+		if (!success) {
+			break;
+		}
+	}
+	json_delete(root_node);
+
+	if (success) {
+		apply_from_copy(ctx, &shallow_copy);
+	} else {
+		/* Clean newly allocated data. */
+		if (shallow_copy.clnt.current.csec != ctx->clnt.current.csec) {
+			free(shallow_copy.clnt.current.csec);
+		}
+		if (shallow_copy.srvr.current.ssec != ctx->srvr.current.ssec) {
+			free(shallow_copy.srvr.current.ssec);
+		}
+	}
+
+	return success;
+}
+
+char *read_config(struct kr_cookie_ctx *ctx)
+{
+	if (!ctx) {
+		return NULL;
+	}
+
+	char *result = NULL;
+	JsonNode *root_node = json_mkobject();
+
+	json_append_member(root_node, NAME_CLIENT_ENABLED,
+	                   json_mkbool(ctx->clnt.enabled));
+
+	read_secret(root_node, NAME_CLIENT_SECRET, ctx->clnt.current.csec);
+
+	assert(ctx->clnt.current.calg->name);
+	json_append_member(root_node, NAME_CLIENT_COOKIE_ALG,
+	                   json_mkstring(ctx->clnt.current.calg->name));
+
+	read_available_cc_hashes(root_node);
+
+	json_append_member(root_node, NAME_CACHE_TTL,
+	                   json_mknumber(ctx->clnt.cache_ttl));
+
+	json_append_member(root_node, NAME_SERVER_ENABLED,
+	                   json_mkbool(ctx->srvr.enabled));
+
+	read_secret(root_node, NAME_SERVER_SECRET, ctx->srvr.current.ssec);
+
+	assert(ctx->srvr.current.salg->name);
+	json_append_member(root_node, NAME_SERVER_COOKIE_ALG,
+	                   json_mkstring(ctx->srvr.current.salg->name));
+
+	read_available_sc_hashes(root_node);
+
+	result = json_encode(root_node);
+	json_delete(root_node);
+	return result;
+}
+
 /**
  * Get/set DNS cookie related stuff.
  *
@@ -246,36 +443,11 @@ fail:
  */
 static char *cookiectl_config(void *env, struct kr_module *module, const char *args)
 {
-	if (args && strlen(args) > 0) {
-		JsonNode *node;
-		JsonNode *root_node = json_decode(args);
-		json_foreach (node, root_node) {
-			apply_configuration(&kr_glob_cookie_ctx, node);
-		}
-		json_delete(root_node);
-	}
+	/* Apply configuration, if any. */
+	apply_config(&kr_glob_cookie_ctx, args);
 
 	/* Return current configuration. */
-	char *result = NULL;
-	JsonNode *root_node = json_mkobject();
-
-	json_append_member(root_node, NAME_ENABLED,
-	                   json_mkbool(kr_glob_cookie_ctx.enabled));
-
-	read_secret(root_node, &kr_glob_cookie_ctx);
-
-	assert(kr_glob_cookie_ctx.cc_alg->name);
-	json_append_member(root_node, NAME_CLIENT_COOKIE_ALG,
-	                   json_mkstring(kr_glob_cookie_ctx.cc_alg->name));
-
-	read_available_cc_hashes(root_node, &kr_glob_cookie_ctx);
-
-	json_append_member(root_node, NAME_CACHE_TTL,
-	                   json_mknumber(kr_glob_cookie_ctx.cache_ttl));
-
-	result = json_encode(root_node);
-	json_delete(root_node);
-	return result;
+	return read_config(&kr_glob_cookie_ctx);
 }
 
 /*
@@ -289,12 +461,26 @@ int cookiectl_init(struct kr_module *module)
 
 	memset(&kr_glob_cookie_ctx, 0, sizeof(kr_glob_cookie_ctx));
 
-	kr_glob_cookie_ctx.enabled = false;
-	kr_glob_cookie_ctx.current_cs = &dflt_cs;
-	kr_glob_cookie_ctx.cache_ttl = DFLT_COOKIE_TTL;
-	kr_glob_cookie_ctx.current_ss = &dflt_ss;
-	kr_glob_cookie_ctx.cc_alg = kr_clnt_cookie_alg(kr_clnt_cookie_algs, "FNV-64");
-	kr_glob_cookie_ctx.sc_alg = kr_srvr_cookie_alg(kr_srvr_cookie_algs, "HMAC-SHA256-64");
+	struct kr_cookie_secret *cs = new_cookie_secret(KNOT_OPT_COOKIE_CLNT,
+	                                                true);
+	struct kr_cookie_secret *ss = new_cookie_secret(KNOT_OPT_COOKIE_CLNT,
+	                                                true);
+	if (!cs || !ss) {
+		free(cs);
+		free(ss);
+		return kr_error(ENOMEM);
+	}
+
+	kr_glob_cookie_ctx.clnt.enabled = false;
+	kr_glob_cookie_ctx.clnt.current.csec = cs;
+	kr_glob_cookie_ctx.clnt.current.calg = kr_clnt_cookie_alg(kr_clnt_cookie_algs,
+	                                                          "FNV-64");
+	kr_glob_cookie_ctx.clnt.cache_ttl = DFLT_COOKIE_TTL;
+
+	kr_glob_cookie_ctx.srvr.enabled = false;
+	kr_glob_cookie_ctx.srvr.current.ssec = ss;
+	kr_glob_cookie_ctx.srvr.current.salg = kr_srvr_cookie_alg(kr_srvr_cookie_algs,
+	                                                          "HMAC-SHA256-64");
 
 	module->data = NULL;
 
@@ -304,31 +490,21 @@ int cookiectl_init(struct kr_module *module)
 KR_EXPORT
 int cookiectl_deinit(struct kr_module *module)
 {
-	kr_glob_cookie_ctx.enabled = false;
+	kr_glob_cookie_ctx.clnt.enabled = false;
 
-	if (kr_glob_cookie_ctx.recent_cs &&
-	    kr_glob_cookie_ctx.recent_cs != &dflt_cs) {
-		free(kr_glob_cookie_ctx.recent_cs);
-	}
-	kr_glob_cookie_ctx.recent_cs = NULL;
+	free(kr_glob_cookie_ctx.clnt.recent.csec);
+	kr_glob_cookie_ctx.clnt.recent.csec = NULL;
 
-	if (kr_glob_cookie_ctx.current_cs &&
-	    kr_glob_cookie_ctx.current_cs != &dflt_cs) {
-		free(kr_glob_cookie_ctx.current_cs);
-	}
-	kr_glob_cookie_ctx.current_cs = &dflt_cs;
+	free(kr_glob_cookie_ctx.clnt.current.csec);
+	kr_glob_cookie_ctx.clnt.current.csec = NULL;
 
-	if (kr_glob_cookie_ctx.recent_ss &&
-	    kr_glob_cookie_ctx.recent_ss != &dflt_ss) {
-		free(kr_glob_cookie_ctx.recent_ss);
-	}
-	kr_glob_cookie_ctx.recent_ss = NULL;
+	kr_glob_cookie_ctx.srvr.enabled = false;
 
-	if (kr_glob_cookie_ctx.current_ss &&
-	    kr_glob_cookie_ctx.current_ss != &dflt_ss) {
-		free(kr_glob_cookie_ctx.current_ss);
-	}
-	kr_glob_cookie_ctx.current_ss = &dflt_ss;
+	free(kr_glob_cookie_ctx.srvr.recent.ssec);
+	kr_glob_cookie_ctx.srvr.recent.ssec = NULL;
+
+	free(kr_glob_cookie_ctx.srvr.current.ssec);
+	kr_glob_cookie_ctx.srvr.current.ssec = NULL;
 
 	return kr_ok();
 }

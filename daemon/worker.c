@@ -461,7 +461,7 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 	assert(pkt);
 
 	/* Cookies disabled or packet has no ENDS section. */
-	if (!kr_glob_cookie_ctx.enabled || !pkt->opt_rr) {
+	if (!kr_glob_cookie_ctx.clnt.enabled || !pkt->opt_rr) {
 		return true;
 	}
 
@@ -483,7 +483,7 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 		sockaddr_ptr = NULL;
 	}
 
-	kr_request_put_cookie(&kr_glob_cookie_ctx, cookie_cache,
+	kr_request_put_cookie(&kr_glob_cookie_ctx.clnt.current, cookie_cache,
 	                      (struct sockaddr*) sockaddr_ptr, srvr_addr, pkt);
 
 	return true;

@@ -32,22 +32,9 @@
 #  define DEBUG_MSG(qry, fmt...) do { } while (0)
 #endif /* defined(MODULE_DEBUG_MSGS) */
 
-/* Default client secret. */
-struct kr_cookie_secret dflt_cs = {
-	.size = KNOT_OPT_COOKIE_CLNT,
-	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-};
-
-/* Default srver secret. */
-struct kr_cookie_secret dflt_ss = {
-	.size = KNOT_OPT_COOKIE_CLNT,
-	.data = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-};
-
 struct kr_cookie_ctx kr_glob_cookie_ctx = {
-	.enabled = false,
-	.current_cs = &dflt_cs,
-	.current_ss = &dflt_ss
+	.clnt = { false, { NULL, NULL }, { NULL, NULL}, DFLT_COOKIE_TTL },
+	.srvr = { false, { NULL, NULL }, { NULL, NULL} }
 };
 
 static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
@@ -132,12 +119,12 @@ static const uint8_t *peek_and_check_cc(struct kr_cache *cache,
 	return NULL;
 }
 
-int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
+int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
                           struct kr_cache *cookie_cache,
                           const void *clnt_sockaddr, const void *srvr_sockaddr,
                           knot_pkt_t *pkt)
 {
-	if (!cntrl || !pkt) {
+	if (!clnt_cntrl || !pkt) {
 		return kr_error(EINVAL);
 	}
 
@@ -145,7 +132,8 @@ int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
 		return kr_ok();
 	}
 
-	if (!cntrl->current_cs || !cookie_cache) {
+	if (!clnt_cntrl->csec || !clnt_cntrl->calg ||
+	    !cookie_cache) {
 		return kr_error(EINVAL);
 	}
 
@@ -155,12 +143,12 @@ int kr_request_put_cookie(const struct kr_cookie_ctx *cntrl,
 	struct kr_clnt_cookie_input input = {
 		.clnt_sockaddr = clnt_sockaddr,
 		.srvr_sockaddr = srvr_sockaddr,
-		.secret_data = cntrl->current_cs->data,
-		.secret_len = cntrl->current_cs->size
+		.secret_data = clnt_cntrl->csec->data,
+		.secret_len = clnt_cntrl->csec->size
 	};
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
-	assert(cntrl->cc_alg && cntrl->cc_alg->func);
-	int ret = cntrl->cc_alg->func(&input, cc);
+	assert(clnt_cntrl->calg && clnt_cntrl->calg->func);
+	int ret = clnt_cntrl->calg->func(&input, cc);
 	if (ret != kr_ok()) {
 		return ret;
 	}

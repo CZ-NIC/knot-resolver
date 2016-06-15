@@ -32,8 +32,6 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 
-#include "lib/layer/__/print_pkt.h"
-
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookiemonster",  fmt)
 
 /* TODO -- The context must store sent cookies and server addresses in order
@@ -103,34 +101,37 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
  * @param sockaddr pointer to socket address to be set
  * @param is_current set to true if the cookie was generate from current secret
  * @param cc client cookie from the response
- * @param cntr cookie control structure
+ * @param clnt_cntr client cookie control structure
  * @return kr_ok() if matching address found, error code else
  */
 static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
                                   bool *is_current, const struct kr_query *qry,
                                   const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
-                                  const struct kr_cookie_ctx *cntrl)
+                                  const struct kr_clnt_cookie_ctx *clnt_cntrl)
 {
-	assert(sockaddr && is_current && qry && cc && cntrl);
+	assert(sockaddr && is_current && qry && cc && clnt_cntrl);
 
 	const struct sockaddr *tmp_sockaddr = passed_server_sockaddr(qry);
 
 	/* The address must correspond with the client cookie. */
 	if (tmp_sockaddr) {
-		assert(cntrl->current_cs);
+		assert(clnt_cntrl->current.csec);
 
 		struct kr_clnt_cookie_input input = {
 			.clnt_sockaddr = NULL,
 			.srvr_sockaddr = tmp_sockaddr,
-			.secret_data = cntrl->current_cs->data,
-			.secret_len = cntrl->current_cs->size
+			.secret_data = clnt_cntrl->current.csec->data,
+			.secret_len = clnt_cntrl->current.csec->size
 		};
-		int ret = kr_clnt_cookie_check(cc, &input, cntrl->cc_alg);
+		int ret = kr_clnt_cookie_check(cc, &input,
+		                               clnt_cntrl->current.calg);
 		bool have_current = (ret == kr_ok());
-		if ((ret != kr_ok()) && cntrl->recent_cs) {
-			input.secret_data = cntrl->recent_cs->data;
-			input.secret_len = cntrl->recent_cs->size;
-			ret = kr_clnt_cookie_check(cc, &input, cntrl->cc_alg);
+		if ((ret != kr_ok()) &&
+		    clnt_cntrl->recent.csec && clnt_cntrl->recent.calg) {
+			input.secret_data = clnt_cntrl->recent.csec->data;
+			input.secret_len = clnt_cntrl->recent.csec->size;
+			ret = kr_clnt_cookie_check(cc, &input,
+			                           clnt_cntrl->recent.calg);
 		}
 		if (ret == kr_ok()) {
 			*sockaddr = tmp_sockaddr;
@@ -139,22 +140,24 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 		return ret;
 	}
 
-	if (!cc || !cntrl) {
-		return kr_error(EINVAL);
-	}
+//	if (!cc || !clnt_cntrl) {
+//		return kr_error(EINVAL);
+//	}
 
 	DEBUG_MSG(NULL, "%s\n",
 	          "guessing response address from ns reputation");
 
 	/* Abusing name server reputation mechanism to guess IP addresses. */
 	const struct kr_nsrep *ns = &qry->ns;
-	tmp_sockaddr = guess_server_addr(ns, cc, cntrl->current_cs,
-	                                 cntrl->cc_alg);
+	tmp_sockaddr = guess_server_addr(ns, cc, clnt_cntrl->current.csec,
+	                                 clnt_cntrl->current.calg);
 	bool have_current = (tmp_sockaddr != NULL);
-	if (!tmp_sockaddr && cntrl->recent_cs) {
+	if (!tmp_sockaddr &&
+	    clnt_cntrl->recent.csec && clnt_cntrl->recent.calg) {
 		/* Try recent client secret to check obtained cookie. */
-		tmp_sockaddr = guess_server_addr(ns, cc, cntrl->recent_cs,
-		                                 cntrl->cc_alg);
+		tmp_sockaddr = guess_server_addr(ns, cc,
+		                                 clnt_cntrl->recent.csec,
+		                                 clnt_cntrl->recent.calg);
 	}
 	if (tmp_sockaddr) {
 		*sockaddr = tmp_sockaddr;
@@ -245,12 +248,12 @@ static bool is_cookie_cached(struct kr_cache *cache,
 /**
  * Check cookie content and store it to cache.
  */
-static bool check_cookie_content_and_cache(struct kr_cookie_ctx *cntrl,
+static bool check_cookie_content_and_cache(struct kr_clnt_cookie_ctx *clnt_cntrl,
                                            struct kr_query *qry,
                                            uint8_t *pkt_cookie_opt,
                                            struct kr_cache *cache)
 {
-	assert(cntrl && qry && pkt_cookie_opt && cache);
+	assert(clnt_cntrl && qry && pkt_cookie_opt && cache);
 
 	uint8_t *pkt_cookie_data = knot_edns_opt_get_data(pkt_cookie_opt);
 	uint16_t pkt_cookie_len = knot_edns_opt_get_length(pkt_cookie_opt);
@@ -273,7 +276,7 @@ static bool check_cookie_content_and_cache(struct kr_cookie_ctx *cntrl,
 	const struct sockaddr *srvr_sockaddr = NULL;
 	bool returned_current = false;
 	ret = srvr_sockaddr_cc_check(&srvr_sockaddr, &returned_current, qry,
-	                             pkt_cc, cntrl);
+	                             pkt_cc, clnt_cntrl);
 	if (ret != kr_ok()) {
 		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
 		return false;
@@ -284,7 +287,7 @@ static bool check_cookie_content_and_cache(struct kr_cookie_ctx *cntrl,
 	if (returned_current &&
 	    !is_cookie_cached(cache, srvr_sockaddr, qry->timestamp.tv_sec,
 	                      pkt_cookie_opt)) {
-		struct timed_cookie timed_cookie = { cntrl->cache_ttl, pkt_cookie_opt };
+		struct timed_cookie timed_cookie = { clnt_cntrl->cache_ttl, pkt_cookie_opt };
 
 		ret = kr_cookie_cache_insert_cookie(cache, srvr_sockaddr,
 		                                    &timed_cookie,
@@ -305,7 +308,7 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
 
-	if (!kr_glob_cookie_ctx.enabled || (qry->flags & QUERY_TCP)) {
+	if (!kr_glob_cookie_ctx.clnt.enabled || (qry->flags & QUERY_TCP)) {
 		return ctx->state;
 	}
 
@@ -334,7 +337,7 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	if (!check_cookie_content_and_cache(&kr_glob_cookie_ctx, qry,
+	if (!check_cookie_content_and_cache(&kr_glob_cookie_ctx.clnt, qry,
 	                                    pkt_cookie_opt, cookie_cache)) {
 		return KNOT_STATE_FAIL;
 	}
@@ -369,7 +372,7 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 static int check_request(knot_layer_t *ctx, void *module_param)
 {
-	if (!kr_glob_cookie_ctx.enabled) {
+	if (!kr_glob_cookie_ctx.srvr.enabled) {
 		/* TODO -- IS there a way how to determine whether the original
 		 * request came via TCP? */
 		return ctx->state;
@@ -406,15 +409,16 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	if (!req_sc) {
 		/* TODO -- BADCOOKIE? Occasionally ignore? */
-		DEBUG_MSG(NULL, "%s\n", "no server cookie in request");
+		DEBUG_MSG(NULL, "%s\n", "no server DNS cookie in request");
 		return ctx->state;
 	}
 
 	/* Check server cookie obtained in request. */
 
-	const struct kr_cookie_ctx *cntrl = &kr_glob_cookie_ctx;
+	struct kr_srvr_cookie_ctx *srvr_cntrl = &kr_glob_cookie_ctx.srvr;
 
-	if (!req->qsource.addr || !cntrl->current_ss) {
+	if (!req->qsource.addr ||
+	    !srvr_cntrl->current.ssec || !srvr_cntrl->current.salg) {
 		/* TODO -- SERVFAIL? */
 		DEBUG_MSG(NULL, "%s\n", "no server DNS cookie context data");
 		return ctx->state;
@@ -422,12 +426,21 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	struct kr_srvr_cookie_check_ctx check_ctx = {
 		.clnt_sockaddr = req->qsource.addr,
-		.secret_data = cntrl->current_ss->data,
-		.secret_len = cntrl->current_ss->size
+		.secret_data = srvr_cntrl->current.ssec->data,
+		.secret_len = srvr_cntrl->current.ssec->size
 	};
 
 	ret = kr_srvr_cookie_check(req_cc, req_sc, req_sc_len, &check_ctx,
-	                           cntrl->sc_alg);
+	                           srvr_cntrl->current.salg);
+	if (ret == kr_error(EBADMSG) &&
+	    srvr_cntrl->recent.ssec && srvr_cntrl->recent.salg) {
+		/* Try recent algorithm. */
+		check_ctx.secret_data = srvr_cntrl->recent.ssec->data;
+		check_ctx.secret_len = srvr_cntrl->recent.ssec->size;
+		ret = kr_srvr_cookie_check(req_cc, req_sc, req_sc_len,
+		                           &check_ctx,
+		                           srvr_cntrl->recent.salg);
+	}
 	if (ret != kr_ok()) {
 		/* TODO -- BADCOOKIE? Occasionally ignore? */
 		DEBUG_MSG(NULL, "%s\n", "invalid server DNS cookie data");
