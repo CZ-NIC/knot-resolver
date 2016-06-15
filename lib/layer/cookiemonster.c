@@ -370,6 +370,18 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return ctx->state;
 }
 
+static int knot_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode)
+{
+	assert(pkt && knot_pkt_has_edns(pkt));
+
+	uint8_t rcode = whole_rcode & 0x0f;
+	uint8_t ext_rcode = whole_rcode >> 4;
+	knot_wire_set_rcode(pkt->wire, rcode);
+	knot_edns_set_ext_rcode(pkt->opt_rr, ext_rcode);
+
+	return kr_ok();
+}
+
 static int check_request(knot_layer_t *ctx, void *module_param)
 {
 	if (!kr_glob_cookie_ctx.srvr.enabled) {
@@ -401,15 +413,32 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 	                                     &req_cc, &req_cc_len,
 	                                     &req_sc, &req_sc_len);
 	if (ret != KNOT_EOK) {
-		/* TODO -- Generate BADCOOKIE response. */
+		/* Generate FORMERR response because malformed DNS cookie. */
 		DEBUG_MSG(NULL, "%s\n", "got malformed DNS cookie in request");
-		return ctx->state;
+		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_FORMERR);
+		return KNOT_STATE_FAIL | KNOT_STATE_DONE;
 	}
 	assert(req_cc_len == KNOT_OPT_COOKIE_CLNT);
 
+	bool ignore_badcookie = true; /* TODO -- Occasionally ignore? */
+
 	if (!req_sc) {
-		/* TODO -- BADCOOKIE? Occasionally ignore? */
-		DEBUG_MSG(NULL, "%s\n", "no server DNS cookie in request");
+		/* TODO -- Silently discard? */
+		if (!ignore_badcookie) {
+			/* Generate BADCOOKIE response. */
+			DEBUG_MSG(NULL, "%s\n",
+			          "missing server DNS cookie in request");
+			if (!knot_pkt_has_edns(req->answer)) {
+				DEBUG_MSG(NULL, "%s\n",
+				          "missing EDNS section in prepared answer");
+				return KNOT_STATE_FAIL;
+			}
+			knot_pkt_set_ext_rcode(req->answer,
+			                       KNOT_RCODE_BADCOOKIE);
+			return KNOT_STATE_FAIL | KNOT_STATE_DONE;
+		}
+		DEBUG_MSG(NULL, "%s\n",
+		          "ignoring missing server DNS cookie in request");
 		return ctx->state;
 	}
 
@@ -419,9 +448,8 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	if (!req->qsource.addr ||
 	    !srvr_cntrl->current.ssec || !srvr_cntrl->current.salg) {
-		/* TODO -- SERVFAIL? */
 		DEBUG_MSG(NULL, "%s\n", "no server DNS cookie context data");
-		return ctx->state;
+		return KNOT_STATE_FAIL;
 	}
 
 	struct kr_srvr_cookie_check_ctx check_ctx = {
@@ -442,12 +470,50 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 		                           srvr_cntrl->recent.salg);
 	}
 	if (ret != kr_ok()) {
-		/* TODO -- BADCOOKIE? Occasionally ignore? */
-		DEBUG_MSG(NULL, "%s\n", "invalid server DNS cookie data");
+		/* TODO -- Silently discard? */
+		if (!ignore_badcookie) {
+			/* Generate BADCOOKIE response. */
+			DEBUG_MSG(NULL, "%s\n",
+			          "invalid server DNS cookie in request");
+			if (!knot_pkt_has_edns(req->answer)) {
+				DEBUG_MSG(NULL, "%s\n",
+				          "missing EDNS section in prepared answer");
+				return KNOT_STATE_FAIL;
+			}
+			knot_pkt_set_ext_rcode(req->answer,
+			                       KNOT_RCODE_BADCOOKIE);
+			return KNOT_STATE_FAIL | KNOT_STATE_DONE;
+		}
+		DEBUG_MSG(NULL, "%s\n",
+		          "ignoring invalid server DNS cookie in request");
 		return ctx->state;
 	}
 
 	/* Server cookie OK. */
+
+	return ctx->state;
+}
+
+static int process_response(knot_layer_t *ctx)
+{
+	if (!kr_glob_cookie_ctx.srvr.enabled) {
+		return ctx->state;
+	}
+
+	struct kr_request *req = ctx->data;
+	const knot_rrset_t *req_opt_rr = req->qsource.opt;
+
+	if (!req_opt_rr) {
+		return ctx->state;
+	}
+
+	uint8_t *req_cookie_opt = knot_edns_get_option(req_opt_rr,
+	                                               KNOT_EDNS_OPTION_COOKIE);
+	if (!req_cookie_opt) {
+		return ctx->state;
+	}
+
+	/* TODO -- Add server cookie into answer. */
 
 	return ctx->state;
 }
@@ -459,6 +525,7 @@ const knot_layer_api_t *cookiemonster_layer(struct kr_module *module)
 {
 	static knot_layer_api_t _layer = {
 		.begin = &check_request,
+		.finish = &process_response,
 		.consume = &check_response
 	};
 	/* Store module reference */
