@@ -6,9 +6,12 @@ if not policy then modules.load('policy') end
 
 -- Actions
 local actions = {
-	pass = 1, deny = 2, drop = 3, tc = 4,
+	pass = 1, deny = 2, drop = 3, tc = 4, truncate = 4,
 	forward = function (g)
 		return policy.FORWARD(g())
+	end,
+	mirror = function (g)
+		return policy.MIRROR(g())
 	end,
 	reroute = function (g)
 		local rules = {}
@@ -46,9 +49,15 @@ local filters = {
 	-- Filter on source address
 	src = function (g)
 		local op = g()
-		if op ~= '=' then error('source address supports only "=" operator') end
-		return view.rule(true, g())
-	end
+		if op ~= '=' then error('address supports only "=" operator') end
+		return view.rule_src(true, g())
+	end,
+	-- Filter on destination address
+	dst = function (g)
+		local op = g()
+		if op ~= '=' then error('address supports only "=" operator') end
+		return view.rule_dst(true, g())
+	end,
 }
 
 local function parse_filter(tok, g)
@@ -58,10 +67,15 @@ local function parse_filter(tok, g)
 end
 
 local function parse_rule(g)
-	local f = parse_filter(g(), g)
+	-- Allow action without filter
+	local tok = g()
+	if not filters[tok:lower()] then
+		return tok, nil
+	end
+	local f = parse_filter(tok, g)
 	-- Compose filter functions on conjunctions
 	-- or terminate filter chain and return
-	local tok = g()
+	tok = g()
 	while tok do
 		if tok == 'AND' then
 			local fa, fb = f, parse_filter(g(), g)
@@ -87,7 +101,7 @@ local function parse_query(g)
 	if type(action) == 'function' then
 		action = action(g)
 	end
-	return filter, action, actid
+	return actid, action, filter 
 end
 
 -- Compile a rule described by query language
@@ -108,6 +122,72 @@ local M = {
 	rules = {}
 }
 
+-- @function Remove a rule
+
+-- @function Cleanup module
+function M.deinit()
+	if http then
+		http.endpoints['/daf'] = nil
+		http.endpoints['/daf.js'] = nil
+		http.snippets['/daf'] = nil
+	end
+end
+
+-- @function Add rule
+function M.add(rule)
+	local id, action, filter = compile(rule)
+	if not id then error(action) end
+	-- Combine filter and action into policy
+	local p
+	if filter then
+		p = function (req, qry)
+			return filter(req, qry) and action
+		end
+	else
+		p = function (req, qry)
+			return action
+		end
+	end
+	local desc = {info=rule, policy=p}
+	-- Enforce in policy module, special actions are postrules
+	if id == 'reroute' or id == 'rewrite' then
+		desc.rule = policy.add(p, true)
+	else
+		desc.rule = policy.add(p)
+	end
+	table.insert(M.rules, desc)
+	return desc
+end
+
+-- @function Remove a rule
+function M.del(id)
+	for i, r in ipairs(M.rules) do
+		if r.rule.id == id then
+			policy.del(id)
+			table.remove(M.rules, id)
+			return true
+		end
+	end
+end
+
+-- @function Enable/disable a rule
+function M.toggle(id, val)
+	for i, r in ipairs(M.rules) do
+		if r.rule.id == id then
+			r.rule.suspended = not val
+			return true
+		end
+	end
+end
+
+-- @function Enable/disable a rule
+function M.disable(id, val)
+	return M.toggle(id, false)
+end
+function M.enable(id, val)
+	return M.toggle(id, true)
+end
+
 -- @function Public-facing API
 local function api(h, stream)
 	local m = h:get(':method')
@@ -115,18 +195,47 @@ local function api(h, stream)
 	if m == 'GET' then
 		local ret = {}
 		for _, r in ipairs(M.rules) do
-			table.insert(ret, {info=r.info, id=r.rule.id, count=r.rule.count})
+			table.insert(ret, {info=r.info, id=r.rule.id, active=(r.rule.suspended ~= true), count=r.rule.count})
 		end
 		return ret
+	-- DELETE method
+	elseif m == 'DELETE' then
+		local path = h:get(':path')
+		local id = tonumber(path:match '/([^/]*)$')
+		if id then
+			if M.del(id) then
+				return tojson(true)
+			end
+			return 404, 'No such rule' -- Not found
+		end
+		return 400 -- Request doesn't have numeric id
 	-- POST method
 	elseif m == 'POST' then
 		local query = stream:get_body_as_string()
 		if query then
-			local ok, r = pcall(M.add, query)
-			if not ok then return 505 end
-			return {info=r.info, id=r.rule.id, count=r.rule.count}
+			local ok, r, err = pcall(M.add, query)
+			if not ok then return 500, r end
+			return {info=r.info, id=r.rule.id, active=(r.rule.suspended ~= true), count=r.rule.count}
 		end
 		return 400
+	-- PATCH method
+	elseif m == 'PATCH' then
+		local path = h:get(':path')
+		local id, action, val = path:match '(%d+)/([^/]*)/([^/]*)$'
+		id = tonumber(id)
+		if not id or not action or not val then
+			return 400 -- Request not well formatted
+		end
+		-- We do not support more actions
+		if action == 'active' then
+			if M.toggle(id, val == 'true') then
+				return tojson(true)
+			else
+				return 404, 'No such rule'
+			end
+		else
+			return 501, 'Action not implemented'
+		end
 	end
 end
 
@@ -151,15 +260,6 @@ local function publish(h, ws)
 		cqueues.sleep(2)
 	end
 	ws:close()
-end
-
--- @function Cleanup module
-function M.deinit()
-	if http then
-		http.endpoints['/daf'] = nil
-		http.endpoints['/daf.js'] = nil
-		http.snippets['/daf'] = nil
-	end
 end
 
 -- @function Configure module
@@ -187,25 +287,6 @@ function M.config(conf)
 			</table>
 		</div>
 	]]}
-end
-
--- @function Add rule
-function M.add(rule)
-	local filter, action, id = compile(rule)
-	if not filter then error(action) end
-	-- Combine filter and action into policy
-	local p = function (req, qry)
-		return filter(req, qry) and action
-	end
-	local desc = {info=rule, policy=p}
-	-- Enforce in policy module, special actions are postrules
-	if id == 'reroute' or id == 'rewrite' then
-		desc.rule = policy:add(p, true)
-	else
-		desc.rule = policy:add(p)
-	end
-	table.insert(M.rules, desc)
-	return desc
 end
 
 return M

@@ -56,6 +56,7 @@ local pages = {
 	'bootstrap.min.css.map',
 	'bootstrap-theme.min.css',
 	'bootstrap-theme.min.css.map',
+	'glyphicons-halflings-regular.woff2',
 }
 
 -- Serve preloaded root page

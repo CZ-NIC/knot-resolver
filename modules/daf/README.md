@@ -32,3 +32,40 @@ Example configuration
 	-- This rewrites all A answers for 'example.com' from
 	-- whatever the original address was to 127.0.0.2
 	daf.add 'src = 127.0.0.0/8 rewrite example.com A 127.0.0.2'
+
+	-- Mirror queries matching given name to DNS logger
+	daf.add 'qname ~ %w+.example.com MIRROR 127.0.0.2'
+
+	-- Truncate queries based on destination IPs
+	daf.add 'dst = 192.0.2.51 truncate'
+
+	-- Show active rules
+	daf.rules
+	[1] => {
+	    [rule] => {
+	        [count] => 42
+	        [id] => 1
+	        [cb] => function: 0x1a3eda38
+	    }
+	    [info] => qname = example.com AND src = 127.0.0.1/8 deny
+	    [policy] => function: 0x1a3eda38
+	}
+	[2] => {
+	    [rule] => {
+	        [suspended] => true
+	        [count] => 123522
+	        [id] => 2
+	        [cb] => function: 0x1a3ede88
+	    }
+	    [info] => qname ~ %w+.facebook.com AND src = 127.0.0.1/8 deny...
+	    [policy] => function: 0x1a3ede88
+	}
+	...
+
+	-- Disable a rule
+	daf.disable 2
+	-- Enable a rule
+	daf.enable 2
+	-- Delete a rule
+	daf.del 2
+

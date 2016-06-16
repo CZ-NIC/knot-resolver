@@ -234,10 +234,26 @@ Dependencies
 
 * `lua-http <https://github.com/daurnimator/lua-http>`_ available in LuaRocks
 
-    ``$ luarocks install --server=http://luarocks.org/dev http``
+	If you're installing via Homebrew on OS X, you need OpenSSL too.
+
+    .. code-block:: bash
+
+       $ brew update
+       $ brew install openssl
+       $ brew link openssl --force # Override system OpenSSL
+
+    Any other system can install from LuaRocks directly:
+
+    .. code-block:: bash
+
+       $ luarocks install --server=http://luarocks.org/dev http CC=cc
 
 * `mmdblua <https://github.com/daurnimator/mmdblua>`_ available in LuaRocks
 
-    ``$ luarocks install --server=http://luarocks.org/dev mmdblua``
+    .. code-block:: bash
+
+       $ luarocks install --server=http://luarocks.org/dev mmdblua
+       $ curl -O http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz
+       $ gzip -d GeoLite2-City.mmdb.gz
 
 .. _Prometheus: https://prometheus.io

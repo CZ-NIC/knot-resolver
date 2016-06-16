@@ -242,7 +242,7 @@ policy.layer = {
 }
 
 -- Add rule to policy list
-function policy.add(policy, rule, postrule)
+function policy.add(rule, postrule)
 	local desc = {id=getruleid(), cb=rule, count=0}
 	table.insert(postrule and policy.postrules or policy.rules, desc)
 	return desc
@@ -260,7 +260,7 @@ local function delrule(rules, id)
 end
 
 -- Delete rule from policy list
-function policy.del(policy, id)
+function policy.del(id)
 	if not delrule(policy.rules, id) then
 		if not delrule(policy.postrules, id) then
 			return false
@@ -320,6 +320,6 @@ policy.todnames(private_zones)
 -- @var Default rules
 policy.rules = {}
 policy.postrules = {}
-policy:add(policy.suffix_common(policy.DENY, private_zones, '\4arpa\0'))
+policy.add(policy.suffix_common(policy.DENY, private_zones, '\4arpa\0'))
 
 return policy

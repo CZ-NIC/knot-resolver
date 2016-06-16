@@ -38,38 +38,38 @@ Example configuration
 	-- Load default policies
 	modules = { 'policy' }
 	-- Whitelist 'www[0-9].badboy.cz'
-	policy:add(policy.pattern(policy.PASS, '\4www[0-9]\6badboy\2cz'))
+	policy.add(policy.pattern(policy.PASS, '\4www[0-9]\6badboy\2cz'))
 	-- Block all names below badboy.cz
-	policy:add(policy.suffix(policy.DENY, {'\6badboy\2cz'}))
+	policy.add(policy.suffix(policy.DENY, {'\6badboy\2cz'}))
 	-- Custom rule
-	policy:add(function (req, query)
+	policy.add(function (req, query)
 		if query:qname():find('%d.%d.%d.224\7in-addr\4arpa') then
 			return policy.DENY
 		end
 	end)
 	-- Disallow ANY queries
-	policy:add(function (req, query)
+	policy.add(function (req, query)
 		if query.type == kres.type.ANY then
 			return policy.DROP
 		end
 	end)
 	-- Enforce local RPZ
-	policy:add(policy.rpz(policy.DENY, 'blacklist.rpz'))
+	policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
 	-- Forward all queries below 'company.se' to given resolver
-	policy:add(policy.suffix(policy.FORWARD('192.168.1.1'), {'\7company\2se'}))
+	policy.add(policy.suffix(policy.FORWARD('192.168.1.1'), {'\7company\2se'}))
 	-- Forward all queries matching pattern
-	policy:add(policy.pattern(policy.FORWARD('2001:DB8::1'), '\4bad[0-9]\2cz'))
+	policy.add(policy.pattern(policy.FORWARD('2001:DB8::1'), '\4bad[0-9]\2cz'))
 	-- Forward all queries (complete stub mode)
-	policy:add(policy.all(policy.FORWARD('2001:DB8::1')))
+	policy.add(policy.all(policy.FORWARD('2001:DB8::1')))
   -- Mirror all queries and retrieve information
-  local rule = policy:add(policy.all(policy.MIRROR('127.0.0.2')))
+  local rule = policy.add(policy.all(policy.MIRROR('127.0.0.2')))
   -- Print information about the rule
   print(string.format('id: %d, matched queries: %d', rule.id, rule.count)
   -- Reroute all addresses found in answer from 192.0.2.0/24 to 127.0.0.x
   -- this policy is enforced on answers, therefore 'postrule'
-  local rule = policy:add(policy.REROUTE({'192.0.2.0/24', '127.0.0.0'}), true)
+  local rule = policy.add(policy.REROUTE({'192.0.2.0/24', '127.0.0.0'}), true)
   -- Delete rule that we just created
-  policy:del(rule.id)
+  policy.del(rule.id)
 
 Properties
 ^^^^^^^^^^
@@ -102,7 +102,7 @@ Properties
 
    Reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55'.
 
-.. function:: policy:add(rule, postrule)
+.. function:: policy.add(rule, postrule)
 
   :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
   :param postrule: boolean, if true the rule will be evaluated on answer instead of query
@@ -110,7 +110,7 @@ Properties
   
   Add a new policy rule that is executed either or queries or answers, depending on the ``postrule`` parameter. You can then use the returned rule description to get information and unique identifier for the rule, as well as match count.
 
-.. function:: policy:del(id)
+.. function:: policy.del(id)
 
   :param id: identifier of a given rule
   :return: boolean
