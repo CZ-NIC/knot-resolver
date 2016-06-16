@@ -186,12 +186,12 @@ the HTTP response code or send headers and body yourself.
 		elseif m == 'POST' then
 			local data = stream:get_body_as_string()
 			if not tonumber(data) then
-				return 505
+				return 500, 'Not a good request'
 			end
 			value = tonumber(data)
 		-- Unsupported method, return 405 Method not allowed
 		else
-			return 405
+			return 405, 'Cannot do that'
 		end
 	end}
 

@@ -102,6 +102,9 @@ local function serve(h, stream)
 	local hsend = headers.new()
 	local path = h:get(':path')
 	local entry = M.endpoints[path]
+	if not entry then -- Accept top-level path match
+		entry = M.endpoints[path:match '^/[^/]*']
+	end
 	-- Unpack MIME and data
 	local mime, data, err
 	if entry then
@@ -112,7 +115,7 @@ local function serve(h, stream)
 		data, err = data(h, stream)
 		-- Handler doesn't provide any data
 		if data == false then return end
-		if type(data) == 'number' then return tostring(data) end
+		if type(data) == 'number' then return tostring(data), err end
 	-- Methods other than GET require handler to be closure
 	elseif h:get(':method') ~= 'GET' then
 		return '501'
@@ -160,13 +163,18 @@ local function route(endpoints)
 			ws:close()
 			return
 		else
-			local ok, err = pcall(serve, h, stream)
+			local ok, err, reason = pcall(serve, h, stream)
 			if not ok or err then
-				log('[http] %s %s: %s', m, path, err or '500')
+				log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
 				-- Method is not supported
 				local hsend = headers.new()
 				hsend:append(':status', err or '500')
-				assert(stream:write_headers(hsend, true))
+				if reason then
+					assert(stream:write_headers(hsend, false))
+					assert(stream:write_chunk(reason, true))
+				else
+					assert(stream:write_headers(hsend, true))
+				end
 			end
 		end
 		stream:shutdown()
