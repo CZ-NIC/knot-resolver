@@ -112,6 +112,8 @@ struct kr_request {
     struct {
         const knot_rrset_t *key;
         const struct sockaddr *addr;
+        const struct sockaddr *dst_addr;
+        const knot_pkt_t *packet;
     } qsource;
     struct {
         unsigned rtt;                  /**< Current upstream RTT */

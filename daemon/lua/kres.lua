@@ -212,6 +212,8 @@ struct kr_request {
 	struct {
 		const knot_rrset_t *key;
 		const struct sockaddr *addr;
+		const struct sockaddr *dst_addr;
+		const knot_pkt_t *packet;
 	} qsource;
 	struct {
 	    unsigned rtt;
@@ -466,7 +468,6 @@ local function rr2str(rr)
 	return string.format('%s %d IN TYPE%d \\# %d %s',
 		dname2str(rr.owner), rr.ttl, rr.type, #rr.rdata, rdata)
 end
-
 
 -- Module API
 local kres = {

@@ -410,7 +410,9 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	}
 
 	/* Expect answer, pop if satisfied immediately */
+	request->qsource.packet = packet;
 	ITERATE_LAYERS(request, qry, begin, request);
+	request->qsource.packet = NULL;
 	if (request->state == KNOT_STATE_DONE) {
 		kr_rplan_pop(rplan, qry);
 	}

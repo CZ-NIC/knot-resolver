@@ -254,6 +254,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->on_complete = NULL;
 	task->req.qsource.key = NULL;
 	task->req.qsource.addr = NULL;
+	task->req.qsource.dst_addr = NULL;
 	/* Remember query source addr */
 	if (addr) {
 		size_t addr_len = sizeof(struct sockaddr_in);
@@ -263,6 +264,21 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		task->req.qsource.addr = (const struct sockaddr *)&task->source.addr;
 	} else {
 		task->source.addr.ip4.sin_family = AF_UNSPEC;
+	}
+	/* Remember the destination address. */
+	if (handle) {
+		int addr_len = sizeof(task->source.dst_addr);
+		struct sockaddr *dst_addr = (struct sockaddr *)&task->source.dst_addr;
+		task->source.dst_addr.ip4.sin_family = AF_UNSPEC;
+		if (handle->type == UV_UDP) {
+			if (uv_udp_getsockname((uv_udp_t *)handle, dst_addr, &addr_len) == 0) {
+				task->req.qsource.dst_addr = dst_addr;
+			}
+		} else if (handle->type == UV_TCP) {
+			if (uv_tcp_getsockname((uv_tcp_t *)handle, dst_addr, &addr_len) == 0) {
+				task->req.qsource.dst_addr = dst_addr;
+			}
+		}
 	}
 	worker->stats.concurrent += 1;
 	return task;
