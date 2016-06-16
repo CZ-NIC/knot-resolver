@@ -802,12 +802,12 @@ daemons or manipulated from other processes, making for example synchronised loa
 
   .. code-block:: lua
 
-   -- Clear records at/below 'bad.cz'
-   cache.clear('*.bad.cz')
-   -- Clear packet cache
-   cache.clear('*. P')
-   -- Clear whole cache
-   cache.clear()
+     -- Clear records at/below 'bad.cz'
+     cache.clear('*.bad.cz')
+     -- Clear packet cache
+     cache.clear('*. P')
+     -- Clear whole cache
+     cache.clear()
 
 
 Timers and events
@@ -829,7 +829,7 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
    .. code-block:: lua
 
-	event.after(1 * minute, function() print('Hi!') end)
+      event.after(1 * minute, function() print('Hi!') end)
 
 .. function:: event.recurrent(interval, function)
 
@@ -841,11 +841,11 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
    .. code-block:: lua
 
-	msg_count = 0
-	event.recurrent(5 * sec, function(e) 
-		msg_count = msg_count + 1
-		print('Hi #'..msg_count)
-	end)
+      msg_count = 0
+      event.recurrent(5 * sec, function(e) 
+         msg_count = msg_count + 1
+         print('Hi #'..msg_count)
+      end)
 
 .. function:: event.reschedule(event_id, timeout)
 
@@ -857,13 +857,13 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
    .. code-block:: lua
 
-   local interval = 1 * minute
-   event.after(1 * minute, function (ev)
-      print('Good morning!')
-      -- Halven the interval for each iteration
-      interval = interval / 2
-      event.reschedule(ev, interval)
-   end)
+      local interval = 1 * minute
+      event.after(1 * minute, function (ev)
+         print('Good morning!')
+         -- Halven the interval for each iteration
+         interval = interval / 2
+         event.reschedule(ev, interval)
+      end)
 
 .. function:: event.cancel(event_id)
 
@@ -875,8 +875,8 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
    .. code-block:: lua
 
-	e = event.after(1 * minute, function() print('Hi!') end)
-	event.cancel(e)
+      e = event.after(1 * minute, function() print('Hi!') end)
+      event.cancel(e)
 
 Watch for file descriptor activity. This allows embedding other event loops or simply
 firing events when a pipe endpoint becomes active. In another words, asynchronous
@@ -895,10 +895,10 @@ notifications for daemon.
 
    .. code-block:: lua
 
-   e = event.socket(0, function(e, status, nevents)
-      print('activity detected')
-   end)
-   e.cancel(e)
+      e = event.socket(0, function(e, status, nevents)
+         print('activity detected')
+      end)
+      e.cancel(e)
 
 Scripting worker
 ^^^^^^^^^^^^^^^^

@@ -12,16 +12,16 @@ Examples
 
 .. code-block:: lua
 
-  -- Load hints after iterator
-  modules = { 'hints > iterate' }
-  -- Load hints before rrcache, custom hosts file
-  modules = { ['hints < rrcache'] = 'hosts.custom' }
-  -- Add root hints
-  hints.root({
-    ['j.root-servers.net.'] = { '2001:503:c27::2:30', '192.58.128.30' }
-  })
-  -- Set custom hint
-  hints['localhost'] = '127.0.0.1'
+    -- Load hints after iterator
+    modules = { 'hints > iterate' }
+    -- Load hints before rrcache, custom hosts file
+    modules = { ['hints < rrcache'] = 'hosts.custom' }
+    -- Add root hints
+    hints.root({
+      ['j.root-servers.net.'] = { '2001:503:c27::2:30', '192.58.128.30' }
+    })
+    -- Set custom hint
+    hints['localhost'] = '127.0.0.1'
 
 Properties
 ^^^^^^^^^^
@@ -64,16 +64,16 @@ Properties
 
   .. code-block:: lua
 
-	> hints.root({
-		['l.root-servers.net.'] = '199.7.83.42',
-		['m.root-servers.net.'] = '202.12.27.33'
-	})
-	[l.root-servers.net.] => {
-	    [1] => 199.7.83.42
-	}
-	[m.root-servers.net.] => {
-	    [1] => 202.12.27.33
-	}
+    > hints.root({
+      ['l.root-servers.net.'] = '199.7.83.42',
+      ['m.root-servers.net.'] = '202.12.27.33'
+    })
+    [l.root-servers.net.] => {
+      [1] => 199.7.83.42
+    }
+    [m.root-servers.net.] => {
+      [1] => 202.12.27.33
+    }
 
   .. tip:: A good rule of thumb is to select only a few fastest root hints. The server learns RTT and NS quality over time, and thus tries all servers available. You can help it by preselecting the candidates.
   
