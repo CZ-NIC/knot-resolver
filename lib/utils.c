@@ -293,6 +293,9 @@ int kr_straddr_subnet(void *dst, const char *addr)
 		if (bit_len < 0 || bit_len > max_len) {
 			return kr_error(ERANGE);
 		}
+	} else {
+		/* No subnet, use maximal subnet length. */
+		bit_len = (family == AF_INET6) ? 128 : 32;
 	}
 	/* Parse address */
 	int ret = inet_pton(family, addr_str, dst);
