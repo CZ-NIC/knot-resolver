@@ -1,6 +1,6 @@
 # Project
 MAJOR := 1
-MINOR := 0
+MINOR := 1
 PATCH := 0
 ABIVER := 1
 BUILDMODE := dynamic
