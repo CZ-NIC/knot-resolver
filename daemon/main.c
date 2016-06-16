@@ -418,7 +418,7 @@ int main(int argc, char **argv)
 		ret = engine_start(&engine, config ? config : "config");
 		if (ret == 0) {
 			if (keyfile) {
-				auto_free char *cmd = afmt("trust_anchors.file = '%s'", keyfile);
+				auto_free char *cmd = afmt("trust_anchors.config('%s')", keyfile);
 				if (!cmd) {
 					kr_log_error("[system] not enough memory\n");
 					return EXIT_FAILURE;

@@ -19,6 +19,7 @@
 #include <libknot/processing/layer.h>
 #include "lib/defines.h"
 #include "lib/utils.h"
+#include "lib/layer.h"
 
 /*
  * Forward decls

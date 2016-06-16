@@ -541,7 +541,6 @@ static bool retransmit(struct qr_task *task)
 
 static void on_retransmit(uv_timer_t *req)
 {
-	uv_timer_stop(req);
 	struct qr_task *task = req->data;
 	assert(task->finished == false);
 	assert(task->timeout != NULL);
