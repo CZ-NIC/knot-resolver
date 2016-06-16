@@ -278,27 +278,29 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, kno
 	if (!cname_begin) {
 		cname_begin = qry->sname;
 	}
-	const knot_dname_t *cname = cname_begin;
+	/* Stash direct answers (equal to current QNAME/CNAME),
+	 * accept out-of-order RRSIGS. */
 	const knot_pktsection_t *answer = knot_pkt_section(pkt, KNOT_ANSWER);
-	for (unsigned i = 0; i < answer->count; ++i) {
-		/* Stash direct answers (equal to current QNAME/CNAME),
-		 * accept out-of-order RRSIGS. */
-		const knot_rrset_t *rr = knot_pkt_rr(answer, i);
-		if (!knot_dname_is_equal(rr->owner, cname)
-		    && rr->type != KNOT_RRTYPE_RRSIG) {
-			continue;
-		}
-		kr_rrmap_add(stash, rr, KR_RANK_AUTH, pool);
-		/* Follow CNAME chain in current cut (if SECURE). */
-		if ((qry->flags & QUERY_DNSSEC_WANT) && rr->type == KNOT_RRTYPE_CNAME) {
-			const knot_dname_t *next_cname = knot_cname_name(&rr->rrs);
-			if (next_cname && knot_dname_in(qry->zone_cut.name, next_cname)) {
-				cname = next_cname;
+	const knot_dname_t *cname = NULL;
+	const knot_dname_t *next_cname = cname_begin;
+	do {
+		cname = next_cname;
+		next_cname = NULL;
+		for (unsigned i = 0; i < answer->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(answer, i);
+			if (!knot_dname_is_equal(rr->owner, cname)) {
+				continue;
 			}
-		} else if (rr->type != KNOT_RRTYPE_RRSIG) {
-			cname = cname_begin;
+			kr_rrmap_add(stash, rr, KR_RANK_AUTH, pool);
+			/* Follow CNAME chain in current cut (if SECURE). */
+			if ((qry->flags & QUERY_DNSSEC_WANT) && rr->type == KNOT_RRTYPE_CNAME) {
+				next_cname = knot_cname_name(&rr->rrs);
+				if (next_cname && !knot_dname_in(qry->zone_cut.name, next_cname)) {
+					next_cname = NULL;
+				}
+			}
 		}
-	}
+	} while (next_cname);
 	return kr_ok();
 }
 
