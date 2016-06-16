@@ -395,6 +395,13 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 {
 	if (!task->finished) {
 		if (status == 0 && handle) {
+			/* For TCP we can be sure there will be no retransmit, so we flush
+			 * the packet buffer so it can be reused again for reassembly. */
+			if (handle->type == UV_TCP) {
+				knot_pkt_t *pktbuf = task->pktbuf;
+				knot_pkt_clear(pktbuf);
+				pktbuf->size = 0;
+			}
 			io_start_read(handle); /* Start reading new query */
 		}
 	} else {
