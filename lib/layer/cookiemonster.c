@@ -382,6 +382,39 @@ static int knot_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode)
 	return kr_ok();
 }
 
+/** Only adds cookies into the OPT RR. */
+static int answer_opt_rr_add_cookies(knot_pkt_t *answer,
+                                     const struct kr_srvr_cookie_input *input,
+                                     const struct kr_srvr_cookie_alg_descr *alg)
+{
+	assert(answer && input && alg);
+
+	size_t cookie_size = KNOT_OPT_COOKIE_CLNT + alg->srvr_cookie_size;
+	uint8_t *data = NULL;
+
+	if (!answer->opt_rr) {
+		kr_error(EINVAL);
+	}
+	int ret = knot_edns_reserve_option(answer->opt_rr,
+	                                   KNOT_EDNS_OPTION_COOKIE,
+	                                   cookie_size, &data, &answer->mm);
+	if (ret != KNOT_EOK) {
+		return kr_error(ret);
+	}
+
+	memcpy(data, input->clnt_cookie, KNOT_OPT_COOKIE_CLNT);
+	cookie_size = alg->srvr_cookie_size;
+	ret = alg->gen_func(input, data + KNOT_OPT_COOKIE_CLNT, &cookie_size);
+	if (ret != kr_ok()) {
+		/* TODO -- Delete COOKIE option. */
+		return ret;
+	}
+
+	return ret;
+}
+
+/* TODO -- DNS cookie request. */
+
 static int check_request(knot_layer_t *ctx, void *module_param)
 {
 	if (!kr_glob_cookie_ctx.srvr.enabled) {
@@ -463,10 +496,13 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 	if (ret == kr_error(EBADMSG) &&
 	    srvr_cntrl->recent.ssec && srvr_cntrl->recent.salg) {
 		/* Try recent algorithm. */
-		check_ctx.secret_data = srvr_cntrl->recent.ssec->data;
-		check_ctx.secret_len = srvr_cntrl->recent.ssec->size;
+		struct kr_srvr_cookie_check_ctx recent_ctx = {
+			.clnt_sockaddr = req->qsource.addr,
+			.secret_data = srvr_cntrl->recent.ssec->data,
+			.secret_len = srvr_cntrl->recent.ssec->size
+		};
 		ret = kr_srvr_cookie_check(req_cc, req_sc, req_sc_len,
-		                           &check_ctx,
+		                           &recent_ctx,
 		                           srvr_cntrl->recent.salg);
 	}
 	if (ret != kr_ok()) {
@@ -491,29 +527,14 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	/* Server cookie OK. */
 
-	return ctx->state;
-}
-
-static int process_response(knot_layer_t *ctx)
-{
-	if (!kr_glob_cookie_ctx.srvr.enabled) {
-		return ctx->state;
-	}
-
-	struct kr_request *req = ctx->data;
-	const knot_rrset_t *req_opt_rr = req->qsource.opt;
-
-	if (!req_opt_rr) {
-		return ctx->state;
-	}
-
-	uint8_t *req_cookie_opt = knot_edns_get_option(req_opt_rr,
-	                                               KNOT_EDNS_OPTION_COOKIE);
-	if (!req_cookie_opt) {
-		return ctx->state;
-	}
-
-	/* TODO -- Add server cookie into answer. */
+	/* Add server cookie into response. */
+	struct kr_srvr_cookie_input input = {
+		.clnt_cookie = req_cc,
+		.nonce = 0, /*TODO -- Some pseudo-random value? */
+		.time = req->current_query->timestamp.tv_sec,
+		.srvr_data = &check_ctx
+	};
+	answer_opt_rr_add_cookies(req->answer, &input, srvr_cntrl->current.salg);
 
 	return ctx->state;
 }
@@ -523,9 +544,11 @@ static int process_response(knot_layer_t *ctx)
 KR_EXPORT
 const knot_layer_api_t *cookiemonster_layer(struct kr_module *module)
 {
+	/* The function answer_finalize() in resolver is called before any
+	 * .finish callback. Therefore this layer does not use it. */
+
 	static knot_layer_api_t _layer = {
 		.begin = &check_request,
-		.finish = &process_response,
 		.consume = &check_response
 	};
 	/* Store module reference */
