@@ -8,6 +8,49 @@ local function getruleid()
 	return newid
 end
 
+-- Support for client sockets from inside policy actions
+local socket_client = function () return error("missing luasocket, can't create socket client") end
+local has_socket, socket = pcall(require, 'socket')
+if has_socket then
+	socket_client = function (host, port)
+		local s, err, status
+		if host:find(':') then
+			s, err = socket.udp6()
+		else
+			s, err = socket.udp()
+		end
+		if not s then
+			return nil, err
+		end
+		status, err = s:setpeername(host, port)
+		if not status then
+			return nil, err
+		end
+		return s
+	end
+end
+local has_ffi, ffi = pcall(require, 'ffi')
+if not has_ffi then
+	socket_client = function () return error("missing ffi library, required for this policy") end
+end
+
+-- Mirror request elsewhere, and continue solving
+local function mirror(target)
+	local addr, port = target:match '([^@]*)@?(.*)'
+	if not port or #port == 0 then port = 53 end
+	local sink, err = socket_client(addr, port)
+	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
+	return function(state, req)
+		if state == kres.FAIL then return state end
+		req = kres.request_t(req)
+		local query = req.qsource.packet
+		if query ~= nil then
+			sink:send(ffi.string(query.wire, query.size))
+		end
+		return -- Chain action to next
+	end
+end
+
 -- Forward request, and solve as stub query
 local function forward(target)
 	local dst_ip = kres.str2ip(target)
@@ -36,7 +79,7 @@ end
 
 local policy = {
 	-- Policies
-	PASS = 1, DENY = 2, DROP = 3, TC = 4, FORWARD = forward, REROUTE = reroute,
+	PASS = 1, DENY = 2, DROP = 3, TC = 4, FORWARD = forward, REROUTE = reroute, MIRROR = mirror,
 	-- Special values
 	ANY = 0,
 }
@@ -141,16 +184,21 @@ function policy.rpz(action, path, format)
 end
 
 -- Evaluate packet in given rules to determine policy action
-function policy.evaluate(rules, req, query)
+function policy.evaluate(rules, req, query, state)
 	for i = 1, #rules do
 		local rule = rules[i]
-		local action = rule.cb(req, query)
-		if action ~= nil then
-			rule.count = rule.count + 1
-			return action
+		if not rule.suspended then
+			local action = rule.cb(req, query)
+			if action ~= nil then
+				rule.count = rule.count + 1
+				local next_state = policy.enforce(state, req, action)
+				if next_state then    -- Not a chain rule,
+					return next_state -- stop on first match
+				end
+			end
 		end
 	end
-	return policy.PASS
+	return state
 end
 
 -- Enforce policy action
@@ -177,17 +225,19 @@ function policy.enforce(state, req, action)
 	return state
 end
 
--- Capture queries before processing
+-- Top-down policy list walk until we hit a match
+-- the caller is responsible for reordering policy list
+-- from most specific to least specific.
+-- Some rules may be chained, in this case they are evaluated
+-- as a dependency chain, e.g. r1,r2,r3 -> r3(r2(r1(state)))
 policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
-		local action = policy.evaluate(policy.rules, req, req:current())
-		return policy.enforce(state, req, action)
+		return policy.evaluate(policy.rules, req, req:current(), state)
 	end,
 	finish = function(state, req)
 		req = kres.request_t(req)
-		local action = policy.evaluate(policy.postrules, req, req:current())
-		return policy.enforce(state, req, action)
+		return policy.evaluate(policy.postrules, req, req:current(), state)
 	end
 }
 
@@ -196,6 +246,27 @@ function policy.add(policy, rule, postrule)
 	local desc = {id=getruleid(), cb=rule, count=0}
 	table.insert(postrule and policy.postrules or policy.rules, desc)
 	return desc
+end
+
+-- Remove rule from a list
+local function delrule(rules, id)
+	for i, r in ipairs(rules) do
+		if r.id == id then
+			table.remove(rules, i)
+			return true
+		end
+	end
+	return false
+end
+
+-- Delete rule from policy list
+function policy.del(policy, id)
+	if not delrule(policy.rules, id) then
+		if not delrule(policy.postrules, id) then
+			return false
+		end
+	end
+	return true
 end
 
 -- Convert list of string names to domain names
