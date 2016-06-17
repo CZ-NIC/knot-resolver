@@ -616,6 +616,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 			query->fails = 0; /* Reset per-query counter. */
 			return resolve_error(pkt, req);
 		} else {
+			query->flags |= QUERY_NO_MINIMIZE; /* Drop minimisation as a safe-guard. */
 			return KNOT_STATE_CONSUME;
 		}
 	}
