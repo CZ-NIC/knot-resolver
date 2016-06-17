@@ -243,6 +243,13 @@ policy.layer = {
 
 -- Add rule to policy list
 function policy.add(rule, postrule)
+	-- Compatibility with 1.0.0 API
+	-- it will be dropped in 1.2.0
+	if rule == policy then
+		rule = postrule
+		postrule = nil
+	end
+	-- End of compatibility shim
 	local desc = {id=getruleid(), cb=rule, count=0}
 	table.insert(postrule and policy.postrules or policy.rules, desc)
 	return desc
