@@ -78,15 +78,15 @@ static int srvr_cookie_parse(const uint8_t *sc, uint16_t sc_len,
  * @note Server cookie = FNV-64( client IP | client cookie | server secret )
  */
 static int kr_srvr_cookie_alg_fnv64_simple(const struct kr_srvr_cookie_input *input,
-                                           uint8_t sc_out[KNOT_OPT_COOKIE_SRVR_MAX],
-                                           size_t *sc_size)
+                                           uint8_t *sc_out, uint16_t *sc_len)
 {
 	if (!input || !sc_out ||
-	    !sc_size || (*sc_size < SRVR_FNV64_SIMPLE_HASH_SIZE)) {
+	    !sc_len || (*sc_len < SRVR_FNV64_SIMPLE_HASH_SIZE)) {
 		return kr_error(EINVAL);
 	}
 
-	if (!input->clnt_cookie || !input->srvr_data ||
+	if (!input->clnt_cookie || !input->clnt_cookie_len ||
+	    !input->srvr_data ||
 	    !input->srvr_data->secret_data || !input->srvr_data->secret_len) {
 		return kr_error(EINVAL);
 	}
@@ -103,14 +103,14 @@ static int kr_srvr_cookie_alg_fnv64_simple(const struct kr_srvr_cookie_input *in
 	}
 
 	hash_val = fnv_64a_buf((void *) input->clnt_cookie,
-	                       KNOT_OPT_COOKIE_CLNT, hash_val);
+	                       input->clnt_cookie_len, hash_val);
 
 	hash_val = fnv_64a_buf((void *) input->srvr_data->secret_data,
 	                       input->srvr_data->secret_len, hash_val);
 
 	memcpy(sc_out, &hash_val, sizeof(hash_val));
-	*sc_size = sizeof(hash_val);
-	assert(SRVR_FNV64_SIMPLE_HASH_SIZE == *sc_size);
+	*sc_len = sizeof(hash_val);
+	assert(SRVR_FNV64_SIMPLE_HASH_SIZE == *sc_len);
 
 	return kr_ok();
 }
@@ -122,15 +122,15 @@ static int kr_srvr_cookie_alg_fnv64_simple(const struct kr_srvr_cookie_input *in
  * @note Server cookie = nonce | time | FNV-64( client IP | nonce| time | client cookie | server secret )
  */
 static int kr_srvr_cookie_alg_fnv64(const struct kr_srvr_cookie_input *input,
-                                    uint8_t sc_out[KNOT_OPT_COOKIE_SRVR_MAX],
-                                    size_t *sc_size)
+                                    uint8_t *sc_out, uint16_t *sc_len)
 {
 	if (!input || !sc_out ||
-	    !sc_size || (*sc_size < SRVR_FNV64_SIMPLE_HASH_SIZE)) {
+	    !sc_len || (*sc_len < SRVR_FNV64_SIZE)) {
 		return kr_error(EINVAL);
 	}
 
-	if (!input->clnt_cookie || !input->srvr_data ||
+	if (!input->clnt_cookie || !input->clnt_cookie_len ||
+	    !input->srvr_data ||
 	    !input->srvr_data->secret_data || !input->srvr_data->secret_len) {
 		return kr_error(EINVAL);
 	}
@@ -155,7 +155,7 @@ static int kr_srvr_cookie_alg_fnv64(const struct kr_srvr_cookie_input *input,
 	                       hash_val);
 
 	hash_val = fnv_64a_buf((void *) input->clnt_cookie,
-	                       KNOT_OPT_COOKIE_CLNT, hash_val);
+	                       input->clnt_cookie_len, hash_val);
 
 	hash_val = fnv_64a_buf((void *) input->srvr_data->secret_data,
 	                       input->srvr_data->secret_len, hash_val);
@@ -166,8 +166,8 @@ static int kr_srvr_cookie_alg_fnv64(const struct kr_srvr_cookie_input *input,
 	memcpy(sc_out + sizeof(aux), &aux, sizeof(aux));
 
 	memcpy(sc_out + (2 * sizeof(aux)), &hash_val, sizeof(hash_val));
-	*sc_size = (2 * sizeof(aux)) + sizeof(hash_val);
-	assert(SRVR_FNV64_SIZE == *sc_size);
+	*sc_len = (2 * sizeof(aux)) + sizeof(hash_val);
+	assert(SRVR_FNV64_SIZE == *sc_len);
 
 	return kr_ok();
 }
@@ -179,15 +179,16 @@ static int kr_srvr_cookie_alg_fnv64(const struct kr_srvr_cookie_input *input,
  * @note Server cookie = HMAC-SHA256-64( server secret, client cookie | client IP )
  */
 static int kr_srvr_cookie_alg_hmac_sha256_64_simple(const struct kr_srvr_cookie_input *input,
-                                                    uint8_t sc_out[KNOT_OPT_COOKIE_SRVR_MAX],
-                                                    size_t *sc_size)
+                                                    uint8_t *sc_out,
+                                                    uint16_t *sc_len)
 {
 	if (!input || !sc_out ||
-	    !sc_size || (*sc_size < SRVR_FNV64_SIMPLE_HASH_SIZE)) {
+	    !sc_len || (*sc_len < SRVR_HMAC_SHA256_64_SIMPLE_HASH_SIZE)) {
 		return kr_error(EINVAL);
 	}
 
-	if (!input->clnt_cookie || !input->srvr_data ||
+	if (!input->clnt_cookie || !input->clnt_cookie_len ||
+	    !input->srvr_data ||
 	    !input->srvr_data->secret_data || !input->srvr_data->secret_len) {
 		return kr_error(EINVAL);
 	}
@@ -209,7 +210,7 @@ static int kr_srvr_cookie_alg_hmac_sha256_64_simple(const struct kr_srvr_cookie_
 		goto fail;
 	}
 
-	ret = HMAC_Update(&ctx, input->clnt_cookie, KNOT_OPT_COOKIE_CLNT);
+	ret = HMAC_Update(&ctx, input->clnt_cookie, input->clnt_cookie_len);
 	if (ret != 1) {
 		ret = kr_error(EINVAL);
 		goto fail;
@@ -235,7 +236,7 @@ static int kr_srvr_cookie_alg_hmac_sha256_64_simple(const struct kr_srvr_cookie_
 	assert(SRVR_HMAC_SHA256_64_SIMPLE_HASH_SIZE <= SHA256_DIGEST_LENGTH);
 
 	memcpy(sc_out, digest, SRVR_HMAC_SHA256_64_SIMPLE_HASH_SIZE);
-	*sc_size = SRVR_HMAC_SHA256_64_SIMPLE_HASH_SIZE;
+	*sc_len = SRVR_HMAC_SHA256_64_SIMPLE_HASH_SIZE;
 
 	ret = kr_ok();
 
@@ -251,15 +252,15 @@ fail:
  * @note Server cookie = nonce | time | HMAC-SHA256-64( server secret, client cookie | nonce| time | client IP )
  */
 static int kr_srvr_cookie_alg_hmac_sha256_64(const struct kr_srvr_cookie_input *input,
-                                             uint8_t sc_out[KNOT_OPT_COOKIE_SRVR_MAX],
-                                             size_t *sc_size)
+                                             uint8_t *sc_out, uint16_t *sc_len)
 {
 	if (!input || !sc_out ||
-	    !sc_size || (*sc_size < SRVR_FNV64_SIMPLE_HASH_SIZE)) {
+	    !sc_len || (*sc_len < SRVR_HMAC_SHA256_64_SIZE)) {
 		return kr_error(EINVAL);
 	}
 
-	if (!input->clnt_cookie || !input->srvr_data ||
+	if (!input->clnt_cookie || !input->clnt_cookie_len ||
+	    !input->srvr_data ||
 	    !input->srvr_data->secret_data || !input->srvr_data->secret_len) {
 		return kr_error(EINVAL);
 	}
@@ -281,7 +282,7 @@ static int kr_srvr_cookie_alg_hmac_sha256_64(const struct kr_srvr_cookie_input *
 		goto fail;
 	}
 
-	ret = HMAC_Update(&ctx, input->clnt_cookie, KNOT_OPT_COOKIE_CLNT);
+	ret = HMAC_Update(&ctx, input->clnt_cookie, input->clnt_cookie_len);
 	if (ret != 1) {
 		ret = kr_error(EINVAL);
 		goto fail;
@@ -325,8 +326,8 @@ static int kr_srvr_cookie_alg_hmac_sha256_64(const struct kr_srvr_cookie_input *
 
 	memcpy(sc_out + (2 * sizeof(aux)), digest,
 	       SRVR_HMAC_SHA256_64_SIMPLE_HASH_SIZE);
-	*sc_size = (2 * sizeof(aux)) + SRVR_HMAC_SHA256_64_SIMPLE_HASH_SIZE;
-	assert(SRVR_HMAC_SHA256_64_SIZE == *sc_size);
+	*sc_len = (2 * sizeof(aux)) + SRVR_HMAC_SHA256_64_SIMPLE_HASH_SIZE;
+	assert(SRVR_HMAC_SHA256_64_SIZE == *sc_len);
 
 	ret = kr_ok();
 
@@ -362,7 +363,7 @@ const struct kr_srvr_cookie_alg_descr *kr_srvr_cookie_alg(const struct kr_srvr_c
 	return NULL;
 }
 
-int kr_srvr_cookie_check(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+int kr_srvr_cookie_check(const uint8_t *cc, uint16_t cc_len,
                          const uint8_t *sc, uint16_t sc_len,
                          const struct kr_srvr_cookie_check_ctx *check_ctx,
                          const struct kr_srvr_cookie_alg_descr *sc_alg)
@@ -395,9 +396,10 @@ int kr_srvr_cookie_check(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
 	}
 
 	uint8_t generated_sc[KNOT_OPT_COOKIE_SRVR_MAX] = { 0, };
-	size_t generated_sc_len = KNOT_OPT_COOKIE_SRVR_MAX;
+	uint16_t generated_sc_len = KNOT_OPT_COOKIE_SRVR_MAX;
 	struct kr_srvr_cookie_input sc_input = {
 		.clnt_cookie = cc,
+		.clnt_cookie_len = cc_len,
 		.nonce = inbound_sc.nonce,
 		.time = inbound_sc.time,
 		.srvr_data = check_ctx

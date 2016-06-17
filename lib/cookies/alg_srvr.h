@@ -37,7 +37,8 @@ struct kr_srvr_cookie_inbound {
 
 /** Server cookie creation context. */
 struct kr_srvr_cookie_input {
-	const uint8_t *clnt_cookie; /**< Client cookie, must be `KNOT_OPT_COOKIE_CLNT` bytes long. */
+	const uint8_t *clnt_cookie; /**< Client cookie. */
+	uint16_t clnt_cookie_len; /**< Client cookie size. */
 	uint32_t nonce; /**< Some generated value. */
 	uint32_t time; /**< Cookie time stamp. */
 	const struct kr_srvr_cookie_check_ctx *srvr_data; /**< Data known to the server. */
@@ -54,13 +55,13 @@ typedef int (srvr_cookie_parse_t)(const uint8_t *sc, uint16_t sc_len,
                                   struct kr_srvr_cookie_inbound *inbound);
 /**
  * @brief Server cookie generator function type.
- * @param input   Data which to generate the cookie from.
- * @param sc_out  Buffer to write the resulting client cookie data into.
- * @param sc_size On input must contain size of the buffer, on successful return contains size of actual written data.
+ * @param input  Data which to generate the cookie from.
+ * @param sc_out Buffer to write the resulting client cookie data into.
+ * @param sc_len On input must contain size of the buffer, on successful return contains size of actual written data.
  * @return kr_ok() or error code
  */
 typedef int (srvr_cookie_gen_t)(const struct kr_srvr_cookie_input *input,
-                                uint8_t *sc_out, size_t *sc_size);
+                                uint8_t *sc_out, uint16_t *sc_len);
 
 /** Holds description of server cookie hashing algorithms. */
 struct kr_srvr_cookie_alg_descr {
@@ -91,6 +92,7 @@ const struct kr_srvr_cookie_alg_descr *kr_srvr_cookie_alg(const struct kr_srvr_c
 /**
  * @brief Check whether supplied client and server cookie match.
  * @param cc         Client cookie.
+ * @param cc_len     Client cookie length.
  * @param sc         Server cookie that should be checked.
  * @param sc_len     Server cookie length.
  * @param check_ctx  Data known to the server needed for cookie validation.
@@ -98,7 +100,7 @@ const struct kr_srvr_cookie_alg_descr *kr_srvr_cookie_alg(const struct kr_srvr_c
  * @return kr_ok() if check OK, error code else.
  */
 KR_EXPORT
-int kr_srvr_cookie_check(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+int kr_srvr_cookie_check(const uint8_t *cc, uint16_t cc_len,
                          const uint8_t *sc, uint16_t sc_len,
                          const struct kr_srvr_cookie_check_ctx *check_ctx,
                          const struct kr_srvr_cookie_alg_descr *sc_alg);

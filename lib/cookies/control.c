@@ -38,14 +38,14 @@ struct kr_cookie_ctx kr_glob_cookie_ctx = {
 };
 
 static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
-                              uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                              uint8_t *cc, uint16_t cc_len,
                               uint8_t *sc, uint16_t sc_len,
                               knot_mm_t *mm)
 {
 	uint16_t cookies_size = 0;
 	uint8_t *cookies_data = NULL;
 
-	cookies_size = knot_edns_opt_cookie_data_len(sc_len);
+	cookies_size = knot_edns_opt_cookie_data_len(cc_len, sc_len);
 
 	int ret = knot_edns_reserve_option(opt_rr, KNOT_EDNS_OPTION_COOKIE,
 	                                   cookies_size, &cookies_data, mm);
@@ -54,13 +54,13 @@ static int opt_rr_add_cookies(knot_rrset_t *opt_rr,
 	}
 	assert(cookies_data != NULL);
 
-	ret = knot_edns_opt_cookie_create(cc, sc, sc_len,
-	                                  cookies_data, &cookies_size);
+	ret = knot_edns_opt_cookie_write(cc, cc_len, sc, sc_len,
+	                                 cookies_data, &cookies_size);
 	if (ret != KNOT_EOK) {
 		return ret;
 	}
 
-	assert(cookies_size == knot_edns_opt_cookie_data_len(sc_len));
+	assert(cookies_size == knot_edns_opt_cookie_data_len(cc_len, sc_len));
 
 	return KNOT_EOK;
 }
@@ -92,9 +92,9 @@ static int opt_rr_add_option(knot_rrset_t *opt_rr, uint8_t *option,
  */
 static const uint8_t *peek_and_check_cc(struct kr_cache *cache,
                                         const void *sockaddr,
-                                        const uint8_t cc[KNOT_OPT_COOKIE_CLNT])
+                                        const uint8_t *cc, uint16_t cc_len)
 {
-	assert(cache && sockaddr && cc);
+	assert(cache && sockaddr && cc && cc_len);
 
 	uint32_t timestamp = 0;
 	struct timed_cookie timed_cookie = { 0, };
@@ -112,7 +112,8 @@ static const uint8_t *peek_and_check_cc(struct kr_cache *cache,
 
 	const uint8_t *cached_cc = knot_edns_opt_get_data((uint8_t *) timed_cookie.cookie_opt);
 
-	if (0 == memcmp(cc, cached_cc, KNOT_OPT_COOKIE_CLNT)) {
+	if (cc_len == KNOT_OPT_COOKIE_CLNT &&
+	    0 == memcmp(cc, cached_cc, cc_len)) {
 		return timed_cookie.cookie_opt;
 	}
 
@@ -147,14 +148,17 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 		.secret_len = clnt_cntrl->csec->size
 	};
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
+	uint16_t cc_len = KNOT_OPT_COOKIE_CLNT;
 	assert(clnt_cntrl->calg && clnt_cntrl->calg->func);
-	int ret = clnt_cntrl->calg->func(&input, cc);
+	int ret = clnt_cntrl->calg->func(&input, cc, &cc_len);
 	if (ret != kr_ok()) {
 		return ret;
 	}
+	assert(cc_len == KNOT_OPT_COOKIE_CLNT);
 
 	const uint8_t *cached_cookie = peek_and_check_cc(cookie_cache,
-	                                                 srvr_sockaddr, cc);
+	                                                 srvr_sockaddr,
+	                                                 cc, cc_len);
 
 	/* This is a very nasty hack that prevents the packet to be corrupted
 	 * when using contemporary 'Cookie interface'. */
@@ -175,7 +179,8 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 		ret = opt_rr_add_option(pkt->opt_rr, (uint8_t *) cached_cookie,
 		                        &pkt->mm);
 	} else {
-		ret = opt_rr_add_cookies(pkt->opt_rr, cc, NULL, 0, &pkt->mm);
+		ret = opt_rr_add_cookies(pkt->opt_rr, cc, cc_len,
+		                         NULL, 0, &pkt->mm);
 	}
 
 	/* Write to packet. */

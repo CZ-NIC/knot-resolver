@@ -59,16 +59,17 @@ static const struct sockaddr *passed_server_sockaddr(const struct kr_query *qry)
  * Tries to guess the name server address from the reputation mechanism.
  * @param nsrep name server reputation context
  * @param cc client cookie data
+ * @param cc_len client cookie size
  * @param csecr client secret
  * @param cc_alg client cookie algorithm
  * @return pointer to address if a matching found, NULL if none matches
  */
 static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
-                                                const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                                                const uint8_t *cc, uint16_t cc_len,
                                                 const struct kr_cookie_secret *csecr,
                                                 const struct kr_clnt_cookie_alg_descr *cc_alg)
 {
-	assert(nsrep && cc && csecr && cc_alg);
+	assert(nsrep && cc && cc_len && csecr && cc_alg);
 
 	const struct sockaddr *sockaddr = NULL;
 
@@ -86,7 +87,7 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
 		}
 
 		input.srvr_sockaddr = &nsrep->addr[i];
-		int ret = kr_clnt_cookie_check(cc, &input, cc_alg);
+		int ret = kr_clnt_cookie_check(cc, cc_len, &input, cc_alg);
 		if (ret == kr_ok()) {
 			sockaddr = (struct sockaddr *) &nsrep->addr[i];
 			break;
@@ -101,15 +102,16 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
  * @param sockaddr pointer to socket address to be set
  * @param is_current set to true if the cookie was generate from current secret
  * @param cc client cookie from the response
+ * @param cc_len client cookie size
  * @param clnt_cntr client cookie control structure
  * @return kr_ok() if matching address found, error code else
  */
 static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
                                   bool *is_current, const struct kr_query *qry,
-                                  const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+                                  const uint8_t *cc, uint16_t cc_len,
                                   const struct kr_clnt_cookie_ctx *clnt_cntrl)
 {
-	assert(sockaddr && is_current && qry && cc && clnt_cntrl);
+	assert(sockaddr && is_current && qry && cc && cc_len && clnt_cntrl);
 
 	const struct sockaddr *tmp_sockaddr = passed_server_sockaddr(qry);
 
@@ -123,14 +125,14 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 			.secret_data = clnt_cntrl->current.csec->data,
 			.secret_len = clnt_cntrl->current.csec->size
 		};
-		int ret = kr_clnt_cookie_check(cc, &input,
+		int ret = kr_clnt_cookie_check(cc, cc_len, &input,
 		                               clnt_cntrl->current.calg);
 		bool have_current = (ret == kr_ok());
 		if ((ret != kr_ok()) &&
 		    clnt_cntrl->recent.csec && clnt_cntrl->recent.calg) {
 			input.secret_data = clnt_cntrl->recent.csec->data;
 			input.secret_len = clnt_cntrl->recent.csec->size;
-			ret = kr_clnt_cookie_check(cc, &input,
+			ret = kr_clnt_cookie_check(cc, cc_len, &input,
 			                           clnt_cntrl->recent.calg);
 		}
 		if (ret == kr_ok()) {
@@ -149,13 +151,14 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 
 	/* Abusing name server reputation mechanism to guess IP addresses. */
 	const struct kr_nsrep *ns = &qry->ns;
-	tmp_sockaddr = guess_server_addr(ns, cc, clnt_cntrl->current.csec,
+	tmp_sockaddr = guess_server_addr(ns, cc, cc_len,
+	                                 clnt_cntrl->current.csec,
 	                                 clnt_cntrl->current.calg);
 	bool have_current = (tmp_sockaddr != NULL);
 	if (!tmp_sockaddr &&
 	    clnt_cntrl->recent.csec && clnt_cntrl->recent.calg) {
 		/* Try recent client secret to check obtained cookie. */
-		tmp_sockaddr = guess_server_addr(ns, cc,
+		tmp_sockaddr = guess_server_addr(ns, cc, cc_len,
 		                                 clnt_cntrl->recent.csec,
 		                                 clnt_cntrl->recent.calg);
 	}
@@ -276,7 +279,7 @@ static bool check_cookie_content_and_cache(struct kr_clnt_cookie_ctx *clnt_cntrl
 	const struct sockaddr *srvr_sockaddr = NULL;
 	bool returned_current = false;
 	ret = srvr_sockaddr_cc_check(&srvr_sockaddr, &returned_current, qry,
-	                             pkt_cc, clnt_cntrl);
+	                             pkt_cc, pkt_cc_len, clnt_cntrl);
 	if (ret != kr_ok()) {
 		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
 		return false;
@@ -389,7 +392,7 @@ static int answer_opt_rr_add_cookies(knot_pkt_t *answer,
 {
 	assert(answer && input && alg);
 
-	size_t cookie_size = KNOT_OPT_COOKIE_CLNT + alg->srvr_cookie_size;
+	size_t cookie_size = input->clnt_cookie_len + alg->srvr_cookie_size;
 	uint8_t *data = NULL;
 
 	if (!answer->opt_rr) {
@@ -402,9 +405,9 @@ static int answer_opt_rr_add_cookies(knot_pkt_t *answer,
 		return kr_error(ret);
 	}
 
-	memcpy(data, input->clnt_cookie, KNOT_OPT_COOKIE_CLNT);
+	memcpy(data, input->clnt_cookie, input->clnt_cookie_len);
 	cookie_size = alg->srvr_cookie_size;
-	ret = alg->gen_func(input, data + KNOT_OPT_COOKIE_CLNT, &cookie_size);
+	ret = alg->gen_func(input, data + input->clnt_cookie_len, &cookie_size);
 	if (ret != kr_ok()) {
 		/* TODO -- Delete COOKIE option. */
 		return ret;
@@ -491,8 +494,8 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 		.secret_len = srvr_cntrl->current.ssec->size
 	};
 
-	ret = kr_srvr_cookie_check(req_cc, req_sc, req_sc_len, &check_ctx,
-	                           srvr_cntrl->current.salg);
+	ret = kr_srvr_cookie_check(req_cc, req_cc_len, req_sc, req_sc_len,
+	                           &check_ctx, srvr_cntrl->current.salg);
 	if (ret == kr_error(EBADMSG) &&
 	    srvr_cntrl->recent.ssec && srvr_cntrl->recent.salg) {
 		/* Try recent algorithm. */
@@ -501,8 +504,8 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 			.secret_data = srvr_cntrl->recent.ssec->data,
 			.secret_len = srvr_cntrl->recent.ssec->size
 		};
-		ret = kr_srvr_cookie_check(req_cc, req_sc, req_sc_len,
-		                           &recent_ctx,
+		ret = kr_srvr_cookie_check(req_cc, req_cc_len, req_sc,
+		                           req_sc_len, &recent_ctx,
 		                           srvr_cntrl->recent.salg);
 	}
 	if (ret != kr_ok()) {
@@ -530,6 +533,7 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 	/* Add server cookie into response. */
 	struct kr_srvr_cookie_input input = {
 		.clnt_cookie = req_cc,
+		.clnt_cookie_len = req_cc_len,
 		.nonce = 0, /*TODO -- Some pseudo-random value? */
 		.time = req->current_query->timestamp.tv_sec,
 		.srvr_data = &check_ctx

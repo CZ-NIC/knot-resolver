@@ -35,10 +35,11 @@ struct kr_clnt_cookie_input {
  * @brief Client cookie generator function type.
  * @param input Data which to generate the cookie from.
  * @param cc_out Buffer to write the resulting client cookie data into.
+ * @param cc_len Set to length of buffer. After successful return contains size of client cookie.
  * @return kr_ok() or error code
  */
 typedef int (clnt_cookie_alg_t)(const struct kr_clnt_cookie_input *input,
-                                uint8_t *cc_out);
+                                uint8_t *cc_out, uint16_t *cc_len);
 
 /** Holds description of client cookie hashing algorithms. */
 struct kr_clnt_cookie_alg_descr {
@@ -77,11 +78,12 @@ int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len);
  * @brief Check whether supplied client cookie was generated from given client
  * secret and address.
  * @param cc     Client cookie that should be checked.
+ * @param cc_len Client cookie size.
  * @param input  Input cookie algorithm parameters.
  * @param cc_alg Client cookie algorithm.
  * @return kr_ok() or error code
  */
 KR_EXPORT
-int kr_clnt_cookie_check(const uint8_t cc[KNOT_OPT_COOKIE_CLNT],
+int kr_clnt_cookie_check(const uint8_t *cc, uint16_t cc_len,
                          const struct kr_clnt_cookie_input *input,
                          const struct kr_clnt_cookie_alg_descr *cc_alg);
