@@ -363,12 +363,16 @@ const struct kr_srvr_cookie_alg_descr *kr_srvr_cookie_alg(const struct kr_srvr_c
 	return NULL;
 }
 
-int kr_srvr_cookie_check(const uint8_t *cc, uint16_t cc_len,
-                         const uint8_t *sc, uint16_t sc_len,
+int kr_srvr_cookie_check(const struct kr_dns_cookies *cookies,
                          const struct kr_srvr_cookie_check_ctx *check_ctx,
                          const struct kr_srvr_cookie_alg_descr *sc_alg)
 {
-	if (!cc || !sc || !sc_len || !check_ctx || !sc_alg) {
+	if (!cookies || !check_ctx || !sc_alg) {
+		return kr_error(EINVAL);
+	}
+
+	if (!cookies->cc || !cookies->cc_len ||
+	    !cookies->sc || !cookies->sc_len) {
 		return kr_error(EINVAL);
 	}
 
@@ -382,7 +386,7 @@ int kr_srvr_cookie_check(const uint8_t *cc, uint16_t cc_len,
 		return kr_error(EINVAL);
 	}
 
-	if (sc_len != sc_alg->srvr_cookie_size) {
+	if (cookies->sc_len != sc_alg->srvr_cookie_size) {
 		/* Cookie size does to match. */
 		return kr_error(EBADMSG);
 	}
@@ -390,7 +394,8 @@ int kr_srvr_cookie_check(const uint8_t *cc, uint16_t cc_len,
 	struct kr_srvr_cookie_inbound inbound_sc = { 0, };
 
 	/* Obtain data from received server cookie. */
-	int ret = sc_alg->opt_parse_func(sc, sc_len, &inbound_sc);
+	int ret = sc_alg->opt_parse_func(cookies->sc, cookies->sc_len,
+	                                 &inbound_sc);
 	if (ret != kr_ok()) {
 		return ret;
 	}
@@ -398,8 +403,8 @@ int kr_srvr_cookie_check(const uint8_t *cc, uint16_t cc_len,
 	uint8_t generated_sc[KNOT_OPT_COOKIE_SRVR_MAX] = { 0, };
 	uint16_t generated_sc_len = KNOT_OPT_COOKIE_SRVR_MAX;
 	struct kr_srvr_cookie_input sc_input = {
-		.clnt_cookie = cc,
-		.clnt_cookie_len = cc_len,
+		.clnt_cookie = cookies->cc,
+		.clnt_cookie_len = cookies->cc_len,
 		.nonce = inbound_sc.nonce,
 		.time = inbound_sc.time,
 		.srvr_data = check_ctx
@@ -412,7 +417,7 @@ int kr_srvr_cookie_check(const uint8_t *cc, uint16_t cc_len,
 	}
 	assert(generated_sc_len == sc_alg->srvr_cookie_size);
 
-	ret = (memcmp(sc, generated_sc, generated_sc_len) == 0) ?
+	ret = (memcmp(cookies->sc, generated_sc, generated_sc_len) == 0) ?
 	       kr_ok() : kr_error(EBADMSG);
 
 	return ret;

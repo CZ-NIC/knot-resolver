@@ -20,6 +20,14 @@
 
 #include "lib/defines.h"
 
+/** Convenience Structure holding both, server and client, cookies. */
+struct kr_dns_cookies {
+	const uint8_t *cc; /**< Client cookie. */
+	uint16_t cc_len; /**< Client cookie size. */
+	const uint8_t *sc; /**< Server cookie. */
+	uint16_t sc_len; /**< Server cookie size. */
+};
+
 /** Inbound server cookie checking context. */
 struct kr_srvr_cookie_check_ctx {
 	const void *clnt_sockaddr; /**< Client (remote) socket address. */
@@ -91,16 +99,12 @@ const struct kr_srvr_cookie_alg_descr *kr_srvr_cookie_alg(const struct kr_srvr_c
 
 /**
  * @brief Check whether supplied client and server cookie match.
- * @param cc         Client cookie.
- * @param cc_len     Client cookie length.
- * @param sc         Server cookie that should be checked.
- * @param sc_len     Server cookie length.
- * @param check_ctx  Data known to the server needed for cookie validation.
- * @param sc_alg     Server cookie algorithm.
+ * @param cookies   Cookie data.
+ * @param check_ctx Data known to the server needed for cookie validation.
+ * @param sc_alg    Server cookie algorithm.
  * @return kr_ok() if check OK, error code else.
  */
 KR_EXPORT
-int kr_srvr_cookie_check(const uint8_t *cc, uint16_t cc_len,
-                         const uint8_t *sc, uint16_t sc_len,
+int kr_srvr_cookie_check(const struct kr_dns_cookies *cookies,
                          const struct kr_srvr_cookie_check_ctx *check_ctx,
                          const struct kr_srvr_cookie_alg_descr *sc_alg);

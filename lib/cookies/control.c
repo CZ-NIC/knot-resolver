@@ -187,3 +187,79 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 	assert(pkt->current == KNOT_ADDITIONAL);
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
+
+int kr_answer_opt_rr_add_cookies(const struct kr_srvr_cookie_input *input,
+                                 const struct kr_srvr_cookie_alg_descr *alg,
+                                 knot_pkt_t *pkt)
+{
+	if (!input || !alg || pkt) {
+		kr_error(EINVAL);
+	}
+
+	uint16_t cookie_size = input->clnt_cookie_len + alg->srvr_cookie_size;
+	uint8_t *data = NULL;
+
+	if (!pkt->opt_rr) {
+		kr_error(EINVAL);
+	}
+	int ret = knot_edns_reserve_option(pkt->opt_rr,
+	                                   KNOT_EDNS_OPTION_COOKIE,
+	                                   cookie_size, &data, &pkt->mm);
+	if (ret != KNOT_EOK) {
+		return kr_error(ret);
+	}
+
+	memcpy(data, input->clnt_cookie, input->clnt_cookie_len);
+	cookie_size = alg->srvr_cookie_size;
+	ret = alg->gen_func(input, data + input->clnt_cookie_len, &cookie_size);
+	if (ret != kr_ok()) {
+		/* TODO -- Delete COOKIE option. */
+		return ret;
+	}
+
+	return ret;
+}
+
+int kr_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode)
+{
+	if (!pkt || !knot_pkt_has_edns(pkt)) {
+		return kr_error(EINVAL);
+	}
+
+	uint8_t rcode = whole_rcode & 0x0f;
+	uint8_t ext_rcode = whole_rcode >> 4;
+	knot_wire_set_rcode(pkt->wire, rcode);
+	knot_edns_set_ext_rcode(pkt->opt_rr, ext_rcode);
+
+	return kr_ok();
+}
+
+uint8_t *kr_is_cookie_query(const knot_pkt_t *pkt)
+{
+	if (!pkt || knot_wire_get_qdcount(pkt->wire) > 0) {
+		return false;
+	}
+
+	if (knot_wire_get_qr(pkt->wire) != 0 || !pkt->opt_rr) {
+		return false;
+	}
+
+	return knot_edns_get_option(pkt->opt_rr, KNOT_EDNS_OPTION_COOKIE);
+}
+
+int kr_parse_cookie_opt(uint8_t *cookie_opt, struct kr_dns_cookies *cookies)
+{
+	if (!cookie_opt || !cookies) {
+		kr_error(EINVAL);
+	}
+
+	const uint8_t *cookie_data = knot_edns_opt_get_data(cookie_opt);
+	uint16_t cookie_len = knot_edns_opt_get_length(cookie_opt);
+	assert(cookie_data && cookie_len);
+
+	int ret =  knot_edns_opt_cookie_parse(cookie_data, cookie_len,
+	                                      &cookies->cc, &cookies->cc_len,
+	                                      &cookies->sc, &cookies->sc_len);
+
+	return (ret == KNOT_EOK) ? kr_ok() : kr_error(EINVAL);
+}

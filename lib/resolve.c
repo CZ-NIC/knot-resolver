@@ -389,6 +389,67 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	return KNOT_STATE_CONSUME;
 }
 
+#if defined(ENABLE_COOKIES)
+/**
+ * @brief Put cookie into answer packet.
+ * @param clnt_sockaddr client socket address
+ * @param srvr_cntrl control structure of the server cookie algorithm
+ * @param cookies obtained cookies
+ * @param answer answer packet
+ * @return state
+ */
+static int cookie_answer(const void *clnt_sockaddr,
+                         const struct kr_srvr_cookie_ctx *srvr_cntrl,
+                         struct kr_dns_cookies *cookies, knot_pkt_t *answer)
+{
+	assert(srvr_cntrl && cookies && answer);
+
+	/* Initialise answer. */
+	knot_wire_set_qr(answer->wire);
+	knot_wire_clear_aa(answer->wire);
+	knot_wire_set_ra(answer->wire);
+	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
+
+	struct kr_srvr_cookie_check_ctx check_ctx = {
+		.clnt_sockaddr = clnt_sockaddr,
+		.secret_data = srvr_cntrl->current.ssec->data,
+		.secret_len = srvr_cntrl->current.ssec->size
+	};
+
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+
+	struct kr_srvr_cookie_input input = {
+		.clnt_cookie = cookies->cc,
+		.clnt_cookie_len = cookies->cc_len,
+		.nonce = kr_rand_uint(UINT32_MAX),
+		.time = tv.tv_sec,
+		.srvr_data = &check_ctx
+	};
+
+	int ret =  kr_answer_opt_rr_add_cookies(&input,
+	                                        srvr_cntrl->current.salg,
+	                                        answer);
+	if (ret != kr_ok()) {
+		return KNOT_STATE_FAIL;
+	}
+
+	if (!cookies->sc) {
+		return KNOT_STATE_DONE;
+	}
+
+	/* Check server cookie only with current settings. */
+	ret = kr_srvr_cookie_check(cookies, &check_ctx,
+	                           srvr_cntrl->current.salg);
+	if (ret != kr_ok()) {
+		kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
+		return KNOT_STATE_FAIL | KNOT_STATE_DONE;
+	}
+
+	return KNOT_STATE_DONE;
+}
+#endif /* defined(ENABLE_COOKIES) */
+
 static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
@@ -397,7 +458,24 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	uint16_t qtype = knot_pkt_qtype(packet);
 	struct kr_query *qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
 	if (!qry) {
+#if defined(ENABLE_COOKIES)
+		/* May be a DNS cookies query. */
+		struct kr_dns_cookies cookies = { 0, };
+		uint8_t *cookie_opt = kr_is_cookie_query(packet);
+		if (cookie_opt && kr_glob_cookie_ctx.clnt.enabled) {
+			if (kr_ok() != kr_parse_cookie_opt(cookie_opt,
+			                                   &cookies)) {
+				/* TODO -- KNOT_RCODE_FORMERR? */
+				return KNOT_STATE_FAIL;
+			}
+		}
+
+		return cookie_answer(request->qsource.addr,
+		                     &kr_glob_cookie_ctx.srvr,
+		                     &cookies, request->answer);
+#else /* !defined(ENABLE_COOKIES) */
 		return KNOT_STATE_FAIL;
+#endif /* defined(ENABLE_COOKIES) */
 	}
 
 	/* Deferred zone cut lookup for this query. */
