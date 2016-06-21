@@ -251,7 +251,7 @@ static bool read_available_cc_hashes(JsonNode *root)
 	}
 
 	const struct kr_clnt_cookie_alg_descr *aux_ptr = kr_clnt_cookie_algs;
-	while (aux_ptr && aux_ptr->func) {
+	while (aux_ptr && aux_ptr->alg.gen_func) {
 		assert(aux_ptr->name);
 		JsonNode *element = json_mkstring(aux_ptr->name);
 		if (!element) {
@@ -282,7 +282,7 @@ static bool read_available_sc_hashes(JsonNode *root)
 	}
 
 	const struct kr_srvr_cookie_alg_descr *aux_ptr = kr_srvr_cookie_algs;
-	while (aux_ptr && aux_ptr->gen_func) {
+	while (aux_ptr && aux_ptr->alg.gen_func) {
 		assert(aux_ptr->name);
 		JsonNode *element = json_mkstring(aux_ptr->name);
 		if (!element) {

@@ -14,14 +14,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <arpa/inet.h> /* inet_ntop() */
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
+
+#include <libknot/errcode.h>
+#include <libknot/rrtype/opt_cookie.h>
 
 #include "contrib/fnv/fnv.h"
 #include "lib/cookies/alg_clnt.h"
@@ -34,18 +34,18 @@
  * @param input  Input parameters.
  * @param cc_out Buffer for computed client cookie.
  * @param cc_len Size of buffre/written data.
- * @return kr_ok() on success, error code else.
+ * @return KNOT_EOK on success, error code else.
  */
-static int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
+static int kr_clnt_cookie_alg_fnv64(const struct knot_ccookie_input *input,
                                     uint8_t *cc_out, uint16_t *cc_len)
 {
 	if (!input || !cc_out || !cc_len) {
-		return kr_error(EINVAL);
+		return KNOT_EINVAL;
 	}
 
 	if ((!input->clnt_sockaddr && !input->srvr_sockaddr) ||
 	    !(input->secret_data && input->secret_len)) {
-		return kr_error(EINVAL);
+		return KNOT_EINVAL;
 	}
 
 	const uint8_t *addr = NULL;
@@ -55,8 +55,8 @@ static int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
 
 #if defined(CC_HASH_USE_CLIENT_ADDRESS)
 	if (input->clnt_sockaddr) {
-		if (kr_ok() == kr_address_bytes(input->clnt_sockaddr, &addr,
-		                                &alen)) {
+		if (KNOT_EOK == knot_sockaddr_bytes(input->clnt_sockaddr,
+		                                    &addr, &alen)) {
 			assert(addr && alen);
 			hash_val = fnv_64a_buf(addr, alen, hash_val);
 		}
@@ -64,8 +64,8 @@ static int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
 #endif /* defined(CC_HASH_USE_CLIENT_ADDRESS) */
 
 	if (input->srvr_sockaddr) {
-		if (kr_ok() == kr_address_bytes(input->srvr_sockaddr, &addr,
-		                                &alen)) {
+		if (KNOT_EOK == knot_sockaddr_bytes(input->srvr_sockaddr,
+		                                    &addr, &alen)) {
 			assert(addr && alen);
 			hash_val = fnv_64a_buf((void *) addr, alen, hash_val);
 		}
@@ -76,13 +76,13 @@ static int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
 
 	assert(KNOT_OPT_COOKIE_CLNT == sizeof(hash_val));
 	if (*cc_len < KNOT_OPT_COOKIE_CLNT) {
-		return kr_error(ENOSPC);
+		return KNOT_ESPACE;
 	}
 
 	*cc_len = KNOT_OPT_COOKIE_CLNT;
 	memcpy(cc_out, &hash_val, *cc_len);
 
-	return kr_ok();
+	return KNOT_EOK;
 }
 
 /**
@@ -91,18 +91,18 @@ static int kr_clnt_cookie_alg_fnv64(const struct kr_clnt_cookie_input *input,
  * @param input  Input parameters.
  * @param cc_out Buffer for computed client cookie.
  * @param cc_len Size of buffre/written data.
- * @return kr_ok() on success, error code else.
+ * @return KNOT_EOK on success, error code else.
  */
-static int kr_clnt_cookie_alg_hmac_sha256_64(const struct kr_clnt_cookie_input *input,
+static int kr_clnt_cookie_alg_hmac_sha256_64(const struct knot_ccookie_input *input,
                                              uint8_t *cc_out, uint16_t *cc_len)
 {
 	if (!input || !cc_out || !cc_len) {
-		return kr_error(EINVAL);
+		return KNOT_EINVAL;
 	}
 
 	if ((!input->clnt_sockaddr && !input->srvr_sockaddr) ||
 	    !(input->secret_data && input->secret_len)) {
-		return kr_error(EINVAL);
+		return KNOT_EINVAL;
 	}
 
 	const uint8_t *addr = NULL;
@@ -120,18 +120,18 @@ static int kr_clnt_cookie_alg_hmac_sha256_64(const struct kr_clnt_cookie_input *
 	int ret = HMAC_Init_ex(&ctx, input->secret_data, input->secret_len,
 	                       EVP_sha256(), NULL);
 	if (ret != 1) {
-		ret = kr_error(EINVAL);
+		ret = KNOT_EINVAL;
 		goto fail;
 	}
 
 #if defined(CC_HASH_USE_CLIENT_ADDRESS)
 	if (input->clnt_sockaddr) {
-		if (kr_ok() == kr_address_bytes(input->clnt_sockaddr, &addr,
-		                                &alen)) {
+		if (KNOT_EOK == knot_sockaddr_bytes(input->clnt_sockaddr,
+		                                    &addr, &alen)) {
 			assert(addr && alen);
 			ret = HMAC_Update(&ctx, addr, alen);
 			if (ret != 1) {
-				ret = kr_error(EINVAL);
+				ret = KNOT_EINVAL;
 				goto fail;
 			}
 		}
@@ -139,30 +139,30 @@ static int kr_clnt_cookie_alg_hmac_sha256_64(const struct kr_clnt_cookie_input *
 #endif /* defined(CC_HASH_USE_CLIENT_ADDRESS) */
 
 	if (input->srvr_sockaddr) {
-		if (kr_ok() == kr_address_bytes(input->srvr_sockaddr, &addr,
-		                                &alen)) {
+		if (KNOT_EOK == knot_sockaddr_bytes(input->srvr_sockaddr,
+		                                    &addr, &alen)) {
 			assert(addr && alen);
 			ret = HMAC_Update(&ctx, addr, alen);
 			if (ret != 1) {
-				ret = kr_error(EINVAL);
+				ret = KNOT_EINVAL;
 				goto fail;
 			}
 		}
 	}
 
 	if (1 != HMAC_Final(&ctx, digest, &digest_len)) {
-		ret = kr_error(EINVAL);
+		ret = KNOT_EINVAL;
 		goto fail;
 	}
 
 	assert(KNOT_OPT_COOKIE_CLNT <= SHA256_DIGEST_LENGTH);
 	if (*cc_len < KNOT_OPT_COOKIE_CLNT) {
-		return kr_error(ENOSPC);
+		return KNOT_ESPACE;
 	}
 
 	*cc_len = KNOT_OPT_COOKIE_CLNT;
 	memcpy(cc_out, digest, *cc_len);
-	ret = kr_ok();
+	ret = KNOT_EOK;
 
 fail:
 	HMAC_CTX_cleanup(&ctx);
@@ -170,9 +170,9 @@ fail:
 }
 
 const struct kr_clnt_cookie_alg_descr kr_clnt_cookie_algs[] = {
-	{ "FNV-64", kr_clnt_cookie_alg_fnv64 },
-	{ "HMAC-SHA256-64", kr_clnt_cookie_alg_hmac_sha256_64 },
-	{ NULL, NULL }
+	{ "FNV-64", { KNOT_OPT_COOKIE_CLNT, kr_clnt_cookie_alg_fnv64 } },
+	{ "HMAC-SHA256-64", { KNOT_OPT_COOKIE_CLNT, kr_clnt_cookie_alg_hmac_sha256_64 } },
+	{ NULL, { 0, NULL } }
 };
 
 const struct kr_clnt_cookie_alg_descr *kr_clnt_cookie_alg(const struct kr_clnt_cookie_alg_descr cc_algs[],
@@ -183,7 +183,7 @@ const struct kr_clnt_cookie_alg_descr *kr_clnt_cookie_alg(const struct kr_clnt_c
 	}
 
 	const struct kr_clnt_cookie_alg_descr *aux_ptr = cc_algs;
-	while (aux_ptr && aux_ptr->func) {
+	while (aux_ptr && aux_ptr->alg.gen_func) {
 		assert(aux_ptr->name);
 		if (strcmp(aux_ptr->name, name) == 0) {
 			return aux_ptr;
@@ -194,58 +194,15 @@ const struct kr_clnt_cookie_alg_descr *kr_clnt_cookie_alg(const struct kr_clnt_c
 	return NULL;
 }
 
-int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len)
-{
-	if (!sockaddr || !addr || !len) {
-		return kr_error(EINVAL);
-	}
-
-	int addr_family = ((struct sockaddr *) sockaddr)->sa_family;
-
-	switch (addr_family) {
-	case AF_INET:
-		*addr = (uint8_t *) &((struct sockaddr_in *) sockaddr)->sin_addr;
-		*len = 4;
-		break;
-	case AF_INET6:
-		*addr = (uint8_t *) &((struct sockaddr_in6 *) sockaddr)->sin6_addr;
-		*len = 16;
-		break;
-	default:
-		*addr = NULL;
-		*len = 0;
-		addr_family = AF_UNSPEC;
-		return kr_error(EINVAL);
-		break;
-	}
-
-	return kr_ok();
-}
-
 int kr_clnt_cookie_check(const uint8_t *cc, uint16_t cc_len,
-                         const struct kr_clnt_cookie_input *input,
+                         const struct knot_ccookie_input *input,
                          const struct kr_clnt_cookie_alg_descr *cc_alg)
 {
-	if (!cc || !cc_len || !input || !cc_alg || !cc_alg->func) {
+	if (!cc || !cc_len || !input || !cc_alg) {
 		return kr_error(EINVAL);
 	}
 
-	uint8_t generated_cc[KNOT_OPT_COOKIE_CLNT] = {0, };
-	uint16_t generated_cc_len = KNOT_OPT_COOKIE_CLNT;
+	int ret = knot_ccookie_check(cc, cc_len, input, &cc_alg->alg);
 
-	int ret = cc_alg->func(input, generated_cc, &generated_cc_len);
-	if (ret != kr_ok()) {
-		return ret;
-	}
-
-	if (generated_cc_len != cc_len) {
-		return kr_error(EINVAL);
-	}
-
-	ret = memcmp(cc, generated_cc, generated_cc_len);
-	if (ret == 0) {
-		return kr_ok();
-	}
-
-	return kr_error(EINVAL);
+	return (ret == KNOT_EOK) ? kr_ok() : kr_error(EINVAL);
 }

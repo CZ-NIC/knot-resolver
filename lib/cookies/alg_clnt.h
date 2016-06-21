@@ -16,35 +16,17 @@
 
 #pragma once
 
-#include <libknot/rrtype/opt_cookie.h>
+#include <libknot/cookies/client.h>
 
 #include "lib/defines.h"
 
 /** Maximal size of a cookie option. */
 #define KR_COOKIE_OPT_MAX_LEN (KNOT_EDNS_OPTION_HDRLEN + KNOT_OPT_COOKIE_CLNT + KNOT_OPT_COOKIE_SRVR_MAX)
 
-/** Client cookie computation context. */
-struct kr_clnt_cookie_input {
-	const void *clnt_sockaddr; /**< Client (local) socket address. */
-	const void *srvr_sockaddr; /**< Server (remote) socket address. */
-	const uint8_t *secret_data; /**< Client secret data. */
-	size_t secret_len; /**< Secret data length. */
-};
-
-/**
- * @brief Client cookie generator function type.
- * @param input Data which to generate the cookie from.
- * @param cc_out Buffer to write the resulting client cookie data into.
- * @param cc_len Set to length of buffer. After successful return contains size of client cookie.
- * @return kr_ok() or error code
- */
-typedef int (clnt_cookie_alg_t)(const struct kr_clnt_cookie_input *input,
-                                uint8_t *cc_out, uint16_t *cc_len);
-
 /** Holds description of client cookie hashing algorithms. */
 struct kr_clnt_cookie_alg_descr {
-	const char *name; /**< Hash function name. */
-	clnt_cookie_alg_t *func; /**< Pointer to hash function. */
+	const char *name; /**< Hash algorithgm name. */
+	struct knot_cc_alg alg; /**< Hash algorithm. */
 };
 
 /**
@@ -66,15 +48,6 @@ const struct kr_clnt_cookie_alg_descr *kr_clnt_cookie_alg(const struct kr_clnt_c
                                                           const char *name);
 
 /**
- * @brief Get pointers to IP address bytes.
- * @param sockaddr socket address
- * @param addr pointer to address
- * @param len address length
- * @return kr_ok() on success, error code else.
- */
-int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len);
-
-/**
  * @brief Check whether supplied client cookie was generated from given client
  * secret and address.
  * @param cc     Client cookie that should be checked.
@@ -85,5 +58,5 @@ int kr_address_bytes(const void *sockaddr, const uint8_t **addr, size_t *len);
  */
 KR_EXPORT
 int kr_clnt_cookie_check(const uint8_t *cc, uint16_t cc_len,
-                         const struct kr_clnt_cookie_input *input,
+                         const struct knot_ccookie_input *input,
                          const struct kr_clnt_cookie_alg_descr *cc_alg);

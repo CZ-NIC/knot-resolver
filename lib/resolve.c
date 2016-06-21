@@ -400,7 +400,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
  */
 static int cookie_answer(const void *clnt_sockaddr,
                          const struct kr_srvr_cookie_ctx *srvr_cntrl,
-                         struct kr_dns_cookies *cookies, knot_pkt_t *answer)
+                         struct knot_dns_cookies *cookies, knot_pkt_t *answer)
 {
 	assert(srvr_cntrl && cookies && answer);
 
@@ -410,7 +410,7 @@ static int cookie_answer(const void *clnt_sockaddr,
 	knot_wire_set_ra(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
 
-	struct kr_srvr_cookie_check_ctx check_ctx = {
+	struct knot_scookie_check_ctx check_ctx = {
 		.clnt_sockaddr = clnt_sockaddr,
 		.secret_data = srvr_cntrl->current.ssec->data,
 		.secret_len = srvr_cntrl->current.ssec->size
@@ -419,9 +419,9 @@ static int cookie_answer(const void *clnt_sockaddr,
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-	struct kr_srvr_cookie_input input = {
-		.clnt_cookie = cookies->cc,
-		.clnt_cookie_len = cookies->cc_len,
+	struct knot_scookie_input input = {
+		.cc = cookies->cc,
+		.cc_len = cookies->cc_len,
 		.nonce = kr_rand_uint(UINT32_MAX),
 		.time = tv.tv_sec,
 		.srvr_data = &check_ctx
@@ -460,7 +460,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	if (!qry) {
 #if defined(ENABLE_COOKIES)
 		/* May be a DNS cookies query. */
-		struct kr_dns_cookies cookies = { 0, };
+		struct knot_dns_cookies cookies = { 0, };
 		uint8_t *cookie_opt = kr_is_cookie_query(packet);
 		if (cookie_opt && kr_glob_cookie_ctx.clnt.enabled) {
 			if (kr_ok() != kr_parse_cookie_opt(cookie_opt,

@@ -93,13 +93,13 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
  * @brief Add cookies into answer.
  * @note Data are only added into the OPT RR.
  * @param input input data to generate server cookie from
- * @param alg algorithm to use
+ * @param sc_alg algorithm to use
  * @param pkt packet which to put cookie into
  * @return kr_ok() or error code
  */
 KR_EXPORT
-int kr_answer_opt_rr_add_cookies(const struct kr_srvr_cookie_input *input,
-                                 const struct kr_srvr_cookie_alg_descr *alg,
+int kr_answer_opt_rr_add_cookies(const struct knot_scookie_input *input,
+                                 const struct kr_srvr_cookie_alg_descr *sc_alg,
                                  knot_pkt_t *pkt);
 
 /**
@@ -127,4 +127,4 @@ uint8_t *kr_is_cookie_query(const knot_pkt_t *pkt);
  * @return kr_ok() on success, error if cookies are malformed.
  */
 KR_EXPORT
-int kr_parse_cookie_opt(uint8_t *cookie_opt, struct kr_dns_cookies *cookies);
+int kr_parse_cookie_opt(uint8_t *cookie_opt, struct knot_dns_cookies *cookies);

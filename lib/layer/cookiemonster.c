@@ -73,7 +73,7 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
 
 	const struct sockaddr *sockaddr = NULL;
 
-	struct kr_clnt_cookie_input input = {
+	struct knot_ccookie_input input = {
 		.clnt_sockaddr = NULL,
 		.srvr_sockaddr = NULL,
 		.secret_data = csecr->data,
@@ -119,7 +119,7 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 	if (tmp_sockaddr) {
 		assert(clnt_cntrl->current.csec);
 
-		struct kr_clnt_cookie_input input = {
+		struct knot_ccookie_input input = {
 			.clnt_sockaddr = NULL,
 			.srvr_sockaddr = tmp_sockaddr,
 			.secret_data = clnt_cntrl->current.csec->data,
@@ -398,7 +398,7 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 		return ctx->state; /* Don't do anything without cookies. */
 	}
 
-	struct kr_dns_cookies cookies = { 0, };
+	struct knot_dns_cookies cookies = { 0, };
 	int ret = kr_parse_cookie_opt(req_cookie_opt, &cookies);
 	if (ret != kr_ok()) {
 		/* FORMERR -- malformed cookies. */
@@ -418,15 +418,15 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	int return_state = ctx->state;
 
-	struct kr_srvr_cookie_check_ctx check_ctx = {
+	struct knot_scookie_check_ctx check_ctx = {
 		.clnt_sockaddr = req->qsource.addr,
 		.secret_data = srvr_cntrl->current.ssec->data,
 		.secret_len = srvr_cntrl->current.ssec->size
 	};
 
-	struct kr_srvr_cookie_input input = {
-		.clnt_cookie = cookies.cc,
-		.clnt_cookie_len = cookies.cc_len,
+	struct knot_scookie_input input = {
+		.cc = cookies.cc,
+		.cc_len = cookies.cc_len,
 		.nonce = kr_rand_uint(UINT32_MAX),
 		.time = req->current_query->timestamp.tv_sec,
 		.srvr_data = &check_ctx
@@ -457,7 +457,7 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 	if (ret == kr_error(EBADMSG) &&
 	    srvr_cntrl->recent.ssec && srvr_cntrl->recent.salg) {
 		/* Try recent algorithm. */
-		struct kr_srvr_cookie_check_ctx recent_ctx = {
+		struct knot_scookie_check_ctx recent_ctx = {
 			.clnt_sockaddr = req->qsource.addr,
 			.secret_data = srvr_cntrl->recent.ssec->data,
 			.secret_len = srvr_cntrl->recent.ssec->size

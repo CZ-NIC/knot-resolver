@@ -15,7 +15,11 @@
  */
 
 #include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+
 #include <libknot/db/db_lmdb.h>
+#include <libknot/cookies/client.h>
 
 #include "contrib/cleanup.h"
 #include "lib/cdb_lmdb.h"
@@ -39,7 +43,7 @@ static size_t cache_key(uint8_t *buf, uint8_t tag, const void *sockaddr)
 	const uint8_t *addr = NULL;
 	size_t addr_len = 0;
 
-	if (kr_ok() != kr_address_bytes(sockaddr, &addr, &addr_len)) {
+	if (kr_ok() != knot_sockaddr_bytes(sockaddr, &addr, &addr_len)) {
 		return 0;
 	}
 	assert(addr_len > 0);
