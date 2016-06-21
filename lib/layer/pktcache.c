@@ -18,6 +18,7 @@
 #include <libknot/rrset.h>
 #include <libknot/rrtype/soa.h>
 
+#include <contrib/ucw/lib.h>
 #include "lib/layer/iterate.h"
 #include "lib/cache.h"
 #include "lib/module.h"
@@ -130,23 +131,31 @@ static int pktcache_peek(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return ctx->state;
 }
 
-static uint32_t packet_ttl(knot_pkt_t *pkt)
+static uint32_t packet_ttl(knot_pkt_t *pkt, bool is_negative)
 {
 	bool has_ttl = false;
 	uint32_t ttl = UINT32_MAX;
-	/* Get minimum entry TTL in the packet */
+	/* Find minimum entry TTL in the packet or SOA minimum TTL. */
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
-			/* Skip OPT and TSIG */
-			if (rr->type == KNOT_RRTYPE_OPT || rr->type == KNOT_RRTYPE_TSIG) {
-				continue;
+			if (is_negative) {
+				/* Use SOA minimum TTL for negative answers. */
+				if (rr->type == KNOT_RRTYPE_SOA) {
+					return limit_ttl(MIN(knot_rrset_ttl(rr), knot_soa_minimum(&rr->rrs)));
+				} else {
+					continue; /* Use SOA only for negative answers. */
+				}
 			}
+			if (knot_rrtype_is_metatype(rr->type)) {
+				continue; /* Skip metatypes. */
+			}
+			/* Find minimum TTL in the record set */
 			knot_rdata_t *rd = rr->rrs.data;
 			for (uint16_t j = 0; j < rr->rrs.rr_count; ++j) {
 				if (knot_rdata_ttl(rd) < ttl) {
-					ttl = knot_rdata_ttl(rd);
+					ttl = limit_ttl(knot_rdata_ttl(rd));
 					has_ttl = true;
 				}
 				rd = kr_rdataset_next(rd);
@@ -173,16 +182,14 @@ static int pktcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!knot_wire_get_aa(pkt->wire) || knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		return ctx->state;
 	}
-	/* Cache only NODATA/NXDOMAIN or metatype/RRSIG or
-	 * wildcard expanded answers. */
+	/* Cache only NODATA/NXDOMAIN or metatype/RRSIG or wildcard expanded answers. */
 	const uint16_t qtype = knot_pkt_qtype(pkt);
 	const bool is_eligible = (knot_rrtype_is_metatype(qtype) || qtype == KNOT_RRTYPE_RRSIG);
-	int pkt_class = kr_response_classify(pkt);
-	if (!(is_eligible || (pkt_class & (PKT_NODATA|PKT_NXDOMAIN)) ||
-	    (qry->flags & QUERY_DNSSEC_WEXPAND))) {
+	const bool is_negative = kr_response_classify(pkt) & (PKT_NODATA|PKT_NXDOMAIN);
+	if (!(is_eligible || is_negative || (qry->flags & QUERY_DNSSEC_WEXPAND))) {
 		return ctx->state;
 	}
-	uint32_t ttl = packet_ttl(pkt);
+	uint32_t ttl = packet_ttl(pkt, is_negative);
 	if (ttl == 0) {
 		return ctx->state; /* No useable TTL, can't cache this. */
 	}
