@@ -255,11 +255,12 @@ local function publish(h, ws)
 		end
 		-- Update counters when there is a new data
 		if next(update) ~= nil then
-			ws:send(tojson(update))
+			ok = ws:send(tojson(update))
+		else
+			ok = ws:send_ping()
 		end
-		cqueues.sleep(2)
+		cqueues.sleep(1)
 	end
-	ws:close()
 end
 
 -- @function Configure module

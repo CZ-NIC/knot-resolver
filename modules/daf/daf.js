@@ -218,11 +218,9 @@ $(function() {
 		    const tok = input.split(' ');
 		    if (dafg.action[tok[0].toLowerCase()]) {
 		    	$('#daf-add').focus();
-		    	$(this).close();
 		    } else if(dafComplete(this)) {
 		    	/* No more rules after query is complete. */
 		    	item.remove();
-		    	$(this).close();
 		    }
 		},
 		createFilter: function (input) {
