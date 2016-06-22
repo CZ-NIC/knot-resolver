@@ -18,6 +18,6 @@ deckard: check-integration
 
 # Targets
 tests: check-unit
-tests-clean: $(foreach test,$(tests_BIN),$(test)-clean)
+tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean
 
 .PHONY: tests tests-clean check-integration deckard
