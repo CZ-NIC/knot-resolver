@@ -149,8 +149,9 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 	};
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
 	uint16_t cc_len = KNOT_OPT_COOKIE_CLNT;
-	assert(clnt_cntrl->calg && clnt_cntrl->calg->alg.gen_func);
-	int ret = clnt_cntrl->calg->alg.gen_func(&input, cc, &cc_len);
+	assert(clnt_cntrl->calg && clnt_cntrl->calg->alg &&
+	       clnt_cntrl->calg->alg->gen_func);
+	int ret = clnt_cntrl->calg->alg->gen_func(&input, cc, &cc_len);
 	if (ret != kr_ok()) {
 		return ret;
 	}
@@ -189,14 +190,14 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 }
 
 int kr_answer_opt_rr_add_cookies(const struct knot_scookie_input *input,
-                                 const struct kr_srvr_cookie_alg_descr *sc_alg,
+                                 const struct kr_sc_alg_descr *sc_alg,
                                  knot_pkt_t *pkt)
 {
-	if (!input || !sc_alg || pkt) {
+	if (!input || !sc_alg || !sc_alg->alg || pkt) {
 		kr_error(EINVAL);
 	}
 
-	uint16_t cookie_size = input->cc_len + sc_alg->alg.sc_size;
+	uint16_t cookie_size = input->cc_len + sc_alg->alg->sc_size;
 	uint8_t *data = NULL;
 
 	if (!pkt->opt_rr) {
@@ -210,8 +211,8 @@ int kr_answer_opt_rr_add_cookies(const struct knot_scookie_input *input,
 	}
 
 	memcpy(data, input->cc, input->cc_len);
-	cookie_size = sc_alg->alg.sc_size;
-	ret = sc_alg->alg.gen_func(input, data + input->cc_len, &cookie_size);
+	cookie_size = sc_alg->alg->sc_size;
+	ret = sc_alg->alg->gen_func(input, data + input->cc_len, &cookie_size);
 	if (ret != kr_ok()) {
 		/* TODO -- Delete COOKIE option. */
 		return ret;

@@ -17,11 +17,10 @@
 #pragma once
 
 #include <libknot/packet/pkt.h>
-#include <libknot/rrtype/opt_cookie.h>
+#include <libknot/rrtype/opt-cookie.h>
 #include <stdbool.h>
 
-#include "lib/cookies/alg_clnt.h"
-#include "lib/cookies/alg_srvr.h"
+#include "lib/cookies/alg_containers.h"
 #include "lib/cache.h"
 #include "lib/defines.h"
 
@@ -37,7 +36,7 @@ struct kr_cookie_secret {
 /** Holds settings that have direct influence on client cookie values. */
 struct kr_clnt_cookie_settings {
 	struct kr_cookie_secret *csec; /*!< Client secret data. */
-	const struct kr_clnt_cookie_alg_descr *calg; /**< Client cookie algorithm. */
+	const struct kr_cc_alg_descr *calg; /**< Client cookie algorithm. */
 };
 
 /** Holds settings that control client behaviour. */
@@ -53,7 +52,7 @@ struct kr_clnt_cookie_ctx {
 /** Holds settings that have direct influence on server cookie values. */
 struct kr_srvr_cookie_settings {
 	struct kr_cookie_secret *ssec; /*!< Server secret data. */
-	const struct kr_srvr_cookie_alg_descr *salg; /**< Server cookie algorithm. */
+	const struct kr_sc_alg_descr *salg; /**< Server cookie algorithm. */
 };
 
 /** Holds settings that control server behaviour. */
@@ -99,7 +98,7 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
  */
 KR_EXPORT
 int kr_answer_opt_rr_add_cookies(const struct knot_scookie_input *input,
-                                 const struct kr_srvr_cookie_alg_descr *sc_alg,
+                                 const struct kr_sc_alg_descr *sc_alg,
                                  knot_pkt_t *pkt);
 
 /**

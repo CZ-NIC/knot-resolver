@@ -439,9 +439,9 @@ static int cookie_answer(const void *clnt_sockaddr,
 	}
 
 	/* Check server cookie only with current settings. */
-	ret = kr_srvr_cookie_check(cookies, &check_ctx,
-	                           srvr_cntrl->current.salg);
-	if (ret != kr_ok()) {
+	ret = knot_scookie_check(cookies, &check_ctx,
+	                         srvr_cntrl->current.salg->alg);
+	if (ret != KNOT_EOK) {
 		kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 		return KNOT_STATE_FAIL | KNOT_STATE_DONE;
 	}

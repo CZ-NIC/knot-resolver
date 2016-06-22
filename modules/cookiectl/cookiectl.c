@@ -21,8 +21,7 @@
 #include <string.h>
 
 #include "daemon/engine.h"
-#include "lib/cookies/alg_clnt.h"
-#include "lib/cookies/alg_srvr.h"
+#include "lib/cookies/alg_containers.h"
 #include "lib/cookies/control.h"
 #include "lib/layer.h"
 
@@ -146,8 +145,8 @@ static bool apply_client_hash_func(struct kr_cookie_ctx *cntrl,
                                    const JsonNode *node)
 {
 	if (node->tag == JSON_STRING) {
-		const struct kr_clnt_cookie_alg_descr *cc_alg = kr_clnt_cookie_alg(kr_clnt_cookie_algs,
-		                                                                   node->string_);
+		const struct kr_cc_alg_descr *cc_alg = kr_cc_alg(kr_cc_algs,
+		                                                 node->string_);
 		if (!cc_alg) {
 			return false;
 		}
@@ -162,8 +161,8 @@ static bool apply_server_hash_func(struct kr_cookie_ctx *cntrl,
                                    const JsonNode *node)
 {
 	if (node->tag == JSON_STRING) {
-		const struct kr_srvr_cookie_alg_descr *sc_alg = kr_srvr_cookie_alg(kr_srvr_cookie_algs,
-		                                                                   node->string_);
+		const struct kr_sc_alg_descr *sc_alg = kr_sc_alg(kr_sc_algs,
+		                                                 node->string_);
 		if (!sc_alg) {
 			return false;
 		}
@@ -250,8 +249,8 @@ static bool read_available_cc_hashes(JsonNode *root)
 		return false;
 	}
 
-	const struct kr_clnt_cookie_alg_descr *aux_ptr = kr_clnt_cookie_algs;
-	while (aux_ptr && aux_ptr->alg.gen_func) {
+	const struct kr_cc_alg_descr *aux_ptr = kr_cc_algs;
+	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->gen_func) {
 		assert(aux_ptr->name);
 		JsonNode *element = json_mkstring(aux_ptr->name);
 		if (!element) {
@@ -281,8 +280,8 @@ static bool read_available_sc_hashes(JsonNode *root)
 		return false;
 	}
 
-	const struct kr_srvr_cookie_alg_descr *aux_ptr = kr_srvr_cookie_algs;
-	while (aux_ptr && aux_ptr->alg.gen_func) {
+	const struct kr_sc_alg_descr *aux_ptr = kr_sc_algs;
+	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->gen_func) {
 		assert(aux_ptr->name);
 		JsonNode *element = json_mkstring(aux_ptr->name);
 		if (!element) {
@@ -473,14 +472,13 @@ int cookiectl_init(struct kr_module *module)
 
 	kr_glob_cookie_ctx.clnt.enabled = false;
 	kr_glob_cookie_ctx.clnt.current.csec = cs;
-	kr_glob_cookie_ctx.clnt.current.calg = kr_clnt_cookie_alg(kr_clnt_cookie_algs,
-	                                                          "FNV-64");
+	kr_glob_cookie_ctx.clnt.current.calg = kr_cc_alg(kr_cc_algs, "FNV-64");
 	kr_glob_cookie_ctx.clnt.cache_ttl = DFLT_COOKIE_TTL;
 
 	kr_glob_cookie_ctx.srvr.enabled = false;
 	kr_glob_cookie_ctx.srvr.current.ssec = ss;
-	kr_glob_cookie_ctx.srvr.current.salg = kr_srvr_cookie_alg(kr_srvr_cookie_algs,
-	                                                          "HMAC-SHA256-64");
+	kr_glob_cookie_ctx.srvr.current.salg = kr_sc_alg(kr_sc_algs,
+	                                                 "HMAC-SHA256-64");
 
 	module->data = NULL;
 

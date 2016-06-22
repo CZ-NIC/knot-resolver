@@ -17,6 +17,7 @@
 #pragma once
 
 #include <libknot/cookies/client.h>
+#include <libknot/cookies/server.h>
 
 #include "lib/defines.h"
 
@@ -24,9 +25,9 @@
 #define KR_COOKIE_OPT_MAX_LEN (KNOT_EDNS_OPTION_HDRLEN + KNOT_OPT_COOKIE_CLNT + KNOT_OPT_COOKIE_SRVR_MAX)
 
 /** Holds description of client cookie hashing algorithms. */
-struct kr_clnt_cookie_alg_descr {
-	const char *name; /**< Hash algorithgm name. */
-	struct knot_cc_alg alg; /**< Hash algorithm. */
+struct kr_cc_alg_descr {
+	const char *name; /**< Algorithgm name. */
+	const struct knot_cc_alg *alg; /**< Algorithm. */
 };
 
 /**
@@ -35,7 +36,7 @@ struct kr_clnt_cookie_alg_descr {
  * Last element contains all null entries.
  */
 KR_EXPORT
-extern const struct kr_clnt_cookie_alg_descr kr_clnt_cookie_algs[];
+extern const struct kr_cc_alg_descr kr_cc_algs[];
 
 /**
  * @brief Return pointer to client cookie algorithm with given name.
@@ -44,19 +45,29 @@ extern const struct kr_clnt_cookie_alg_descr kr_clnt_cookie_algs[];
  * @return pointer to algorithm or NULL if not found.
  */
 KR_EXPORT
-const struct kr_clnt_cookie_alg_descr *kr_clnt_cookie_alg(const struct kr_clnt_cookie_alg_descr cc_algs[],
-                                                          const char *name);
+const struct kr_cc_alg_descr *kr_cc_alg(const struct kr_cc_alg_descr cc_algs[],
+                                        const char *name);
+
+/** Holds description of server cookie hashing algorithms. */
+struct kr_sc_alg_descr {
+	const char *name; /**< Algorithm name. */
+	const struct knot_sc_alg *alg; /**< Algorithm. */
+};
 
 /**
- * @brief Check whether supplied client cookie was generated from given client
- * secret and address.
- * @param cc     Client cookie that should be checked.
- * @param cc_len Client cookie size.
- * @param input  Input cookie algorithm parameters.
- * @param cc_alg Client cookie algorithm.
- * @return kr_ok() or error code
+ * List of available server cookie algorithms.
+ *
+ * Last element contains all null entries.
  */
 KR_EXPORT
-int kr_clnt_cookie_check(const uint8_t *cc, uint16_t cc_len,
-                         const struct knot_ccookie_input *input,
-                         const struct kr_clnt_cookie_alg_descr *cc_alg);
+extern const struct kr_sc_alg_descr kr_sc_algs[];
+
+/**
+ * @brief Return pointer to server cookie algorithm with given name.
+ * @param sc_algs List of available algorithms.
+ * @param name    Algorithm name.
+ * @return pointer to algorithm or NULL if not found.
+ */
+KR_EXPORT
+const struct kr_sc_alg_descr *kr_sc_alg(const struct kr_sc_alg_descr sc_algs[],
+                                        const char *name);

@@ -20,13 +20,12 @@
 #include <libknot/error.h>
 #include <libknot/mm_ctx.h>
 #include <libknot/packet/pkt.h>
-#include <libknot/rrtype/opt_cookie.h> // branch dns-cookies-wip
+#include <libknot/rrtype/opt-cookie.h> // branch dns-cookies-wip
 #include <stdlib.h>
 #include <string.h>
 
 #include "daemon/engine.h"
-#include "lib/cookies/alg_clnt.h"
-#include "lib/cookies/alg_srvr.h"
+#include "lib/cookies/alg_containers.h"
 #include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
 #include "lib/module.h"
@@ -67,7 +66,7 @@ static const struct sockaddr *passed_server_sockaddr(const struct kr_query *qry)
 static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
                                                 const uint8_t *cc, uint16_t cc_len,
                                                 const struct kr_cookie_secret *csecr,
-                                                const struct kr_clnt_cookie_alg_descr *cc_alg)
+                                                const struct kr_cc_alg_descr *cc_alg)
 {
 	assert(nsrep && cc && cc_len && csecr && cc_alg);
 
@@ -87,8 +86,8 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
 		}
 
 		input.srvr_sockaddr = &nsrep->addr[i];
-		int ret = kr_clnt_cookie_check(cc, cc_len, &input, cc_alg);
-		if (ret == kr_ok()) {
+		int ret = knot_ccookie_check(cc, cc_len, &input, cc_alg->alg);
+		if (ret == KNOT_EOK) {
 			sockaddr = (struct sockaddr *) &nsrep->addr[i];
 			break;
 		}
@@ -125,21 +124,21 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 			.secret_data = clnt_cntrl->current.csec->data,
 			.secret_len = clnt_cntrl->current.csec->size
 		};
-		int ret = kr_clnt_cookie_check(cc, cc_len, &input,
-		                               clnt_cntrl->current.calg);
-		bool have_current = (ret == kr_ok());
-		if ((ret != kr_ok()) &&
+		int ret = knot_ccookie_check(cc, cc_len, &input,
+		                             clnt_cntrl->current.calg->alg);
+		bool have_current = (ret == KNOT_EOK);
+		if ((ret != KNOT_EOK) &&
 		    clnt_cntrl->recent.csec && clnt_cntrl->recent.calg) {
 			input.secret_data = clnt_cntrl->recent.csec->data;
 			input.secret_len = clnt_cntrl->recent.csec->size;
-			ret = kr_clnt_cookie_check(cc, cc_len, &input,
-			                           clnt_cntrl->recent.calg);
+			ret = knot_ccookie_check(cc, cc_len, &input,
+			                         clnt_cntrl->recent.calg->alg);
 		}
-		if (ret == kr_ok()) {
+		if (ret == KNOT_EOK) {
 			*sockaddr = tmp_sockaddr;
 			*is_current = have_current;
 		}
-		return ret;
+		return (ret == KNOT_EOK) ? kr_ok() : kr_error(EINVAL);
 	}
 
 //	if (!cc || !clnt_cntrl) {
@@ -452,20 +451,20 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	/* Check server cookie obtained in request. */
 
-	ret = kr_srvr_cookie_check(&cookies, &check_ctx,
-	                           srvr_cntrl->current.salg);
-	if (ret == kr_error(EBADMSG) &&
-	    srvr_cntrl->recent.ssec && srvr_cntrl->recent.salg) {
+	ret = knot_scookie_check(&cookies, &check_ctx,
+	                         srvr_cntrl->current.salg->alg);
+	if (ret == KNOT_EINVAL &&
+	    srvr_cntrl->recent.ssec && srvr_cntrl->recent.salg->alg) {
 		/* Try recent algorithm. */
 		struct knot_scookie_check_ctx recent_ctx = {
 			.clnt_sockaddr = req->qsource.addr,
 			.secret_data = srvr_cntrl->recent.ssec->data,
 			.secret_len = srvr_cntrl->recent.ssec->size
 		};
-		ret = kr_srvr_cookie_check(&cookies, &recent_ctx,
-		                           srvr_cntrl->recent.salg);
+		ret = knot_scookie_check(&cookies, &recent_ctx,
+		                         srvr_cntrl->recent.salg->alg);
 	}
-	if (ret != kr_ok()) {
+	if (ret != KNOT_EOK) {
 		/* TODO -- Silently discard? */
 		if (!ignore_badcookie) {
 			/* Generate BADCOOKIE response. */
