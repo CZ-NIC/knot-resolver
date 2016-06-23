@@ -353,11 +353,6 @@ static int qr_task_start(struct qr_task *task, knot_pkt_t *query)
 	if (worker->stats.concurrent < QUERY_RATE_THRESHOLD) {
 		task->req.options |= QUERY_NO_THROTTLE;
 	}
-	/* Track outstanding inbound queries as well for deduplication. */
-	char key[KR_RRKEY_LEN];
-	if (subreq_key(key, query) > 0) {
-		map_set(&task->worker->outstanding, key, task);
-	}
 	return 0;
 }
 
@@ -395,12 +390,6 @@ static void qr_task_complete(struct qr_task *task)
 	/* Run the completion callback. */
 	if (task->on_complete) {
 		task->on_complete(worker, &task->req, task->baton);
-	}
-	char key[KR_RRKEY_LEN];
-	/* Clear outstanding query. */
-	int ret = subreq_key(key, task->req.answer);
-	if (ret > 0) {
-		map_del(&task->worker->outstanding, key);
 	}
 	/* Release primary reference to task. */
 	qr_task_unref(task);
@@ -796,28 +785,6 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *ms
 			if (msg) worker->stats.dropped += 1;
 			return kr_error(EINVAL); /* Ignore. */
 		}
-		/* De-duplicate inbound requests.
-		 * Many clients do frequent retransmits of the query
-		 * in order to avoid network losses and get better service,
-		 * but fail to work properly when resolver answers them all
-		 * but some of them SERVFAIL because of the time limit and some
-		 * of them succeed. It's also a good idea to avoid wasting time
-		 * tracking pending tasks to solve the same thing. */
-		char key[KR_RRKEY_LEN];
-		if (subreq_key(key, msg) > 0) {
-			struct qr_task *task = map_get(&worker->outstanding, key);
-			if (task && task->source.handle == handle && task->req.qsource.addr &&
-				addr->sa_family == task->source.addr.ip4.sin_family &&
-				knot_wire_get_id(msg->wire) == knot_wire_get_id(task->req.answer->wire)) {
-				/* Query probably matches, check if it comes from the same origin. */
-				size_t addr_len = sizeof(struct sockaddr_in);
-				if (addr->sa_family == AF_INET6)
-					addr_len = sizeof(struct sockaddr_in6);
-				if (memcmp(&task->source.addr, addr, addr_len) == 0) {
-					return kr_error(EEXIST); /* Ignore query */
-				}
-			}
-		}
 		task = qr_task_create(worker, handle, addr);
 		if (!task) {
 			return kr_error(ENOMEM);
@@ -1019,7 +986,6 @@ int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 	worker->pkt_pool.ctx = mp_new (4 * sizeof(knot_pkt_t));
 	worker->pkt_pool.alloc = (knot_mm_alloc_t) mp_alloc;
 	worker->outgoing = map_make();
-	worker->outstanding = map_make();
 	worker->tcp_pipeline_max = MAX_PIPELINED;
 	return kr_ok();
 }
@@ -1040,7 +1006,6 @@ void worker_reclaim(struct worker_ctx *worker)
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 	map_clear(&worker->outgoing);
-	map_clear(&worker->outstanding);
 }
 
 #undef DEBUG_MSG
