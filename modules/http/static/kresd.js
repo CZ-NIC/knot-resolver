@@ -59,11 +59,6 @@ $(function() {
 		renderer: 'multi',
 		series: series,
 	});
-	var x_axis = new Rickshaw.Graph.Axis.Time( {
-		graph: graph,
-		ticksTreatment: 'glow',
-		element: document.querySelector("#x_axis"),
-	} );
 	var y_axis = new Rickshaw.Graph.Axis.Y( {
 		graph: graph,
 		orientation: 'left',
@@ -139,20 +134,22 @@ $(function() {
 	}
 
 	/* Realtime updates over WebSockets */
-	function pushMetrics(resp) {
-		var now = Date.now() / 1000;
+	function pushMetrics(resp, now, buffer) {
 		for (var lb in resp) {
 			var val = resp[lb];
 			/* Push new datapoints */
 			if (lb in data) {
 				data[lb].push({x: now, y:val});
-				if (data[lb].length > 100) {
+				if (data[lb].length > 120) {
 					data[lb].shift();
 				}
 			}
 
 		}
-		graph.update();
+		/* Buffer graph  changes. */
+		if (!buffer) {
+			graph.update();
+		}
 	}
 
 	var age = 0;
@@ -173,7 +170,7 @@ $(function() {
 		/* Update bubbles and prune the oldest */
 		for (var key in resp) {
 			var val = resp[key];
-			if (!val.data) {
+			if (!val.data || !val.location || val.location.longitude == null) {
 				continue;
 			}
 			var sum = val.data.reduce(function(a, b) { return a + b; });
@@ -215,10 +212,21 @@ $(function() {
 
 	/* WebSocket endpoints */
 	var wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/stats';
-    var ws = new Socket(wsStats);
-    ws.onmessage = function(evt) {
-      var data = $.parseJSON(evt.data);
-      pushMetrics(data.stats);
-      pushUpstreams(data.upstreams);
-    };
+	var ws = new Socket(wsStats);
+	ws.onmessage = function(evt) {
+		var data = JSON.parse(evt.data);
+		if (data[0]) {
+			if (data.length > 0) {
+				pushUpstreams(data[data.length - 1].upstreams);
+			}
+			for (var i in data) {
+				pushMetrics(data[i].stats, data[i].time, true);
+			}
+			graph.update();
+		} else {
+			pushMetrics(data.stats, data.time);
+			pushUpstreams(data.upstreams);
+		}
+
+	};
 });

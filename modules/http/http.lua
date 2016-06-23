@@ -90,7 +90,8 @@ for _, pg in ipairs(pages) do
 end
 
 -- Export built-in prometheus interface
-for k, v in pairs(require('prometheus')) do
+local prometheus = require('prometheus')
+for k, v in pairs(prometheus.endpoints) do
 	M.endpoints[k] = v
 end
 
@@ -304,10 +305,16 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 	end
 end
 
+-- @function Init module
+function M.init()
+	cq:wrap(prometheus.init)
+end
+
 -- @function Cleanup module
 function M.deinit()
 	if M.ev then event.cancel(M.ev) end
 	M.servers = {}
+	prometheus.deinit()
 end
 
 -- @function Configure module

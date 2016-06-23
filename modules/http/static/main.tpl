@@ -50,7 +50,6 @@
 			<div id="chart_container">
 				<div id="y_axis"></div>
 				<div id="chart"></div>
-				<div id="x_axis"></div>
 			</div>
 			<form id="legend_container">
 				<div id="legend"></div>

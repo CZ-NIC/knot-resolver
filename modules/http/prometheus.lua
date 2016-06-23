@@ -1,4 +1,5 @@
 local cqueues = require('cqueues')
+local snapshots, snapshots_count = {}, 120
 
 -- Load dependent modules
 if not stats then modules.load('stats') end
@@ -10,14 +11,20 @@ local function getstats()
 	return t
 end
 
+local function snapshot_end(h, ws)
+	snapshots_count = false
+end
+
 -- Function to sort frequency list
-local function stream_stats(h, ws)
+local function snapshot_start(h, ws)
 	local ok, prev = true, getstats()
-	while ok do
+	while snapshots_count do
+		local is_empty = true
 		-- Get current snapshot
 		local cur, stats_dt = getstats(), {}
 		for k,v in pairs(cur) do
 			stats_dt[k] = v - (prev[k] or 0)
+			is_empty = is_empty and stats_dt[k] == 0
 		end
 		prev = cur
 		-- Calculate upstreams and geotag them if possible
@@ -37,8 +44,38 @@ local function stream_stats(h, ws)
 			end
 		end
 		-- Publish stats updates periodically
-		local push = tojson({stats=stats_dt,upstreams=upstreams or {}})
-		ok = ws:send(push)
+		if not is_empty then
+			local update = {time=os.time(), stats=stats_dt, upstreams=upstreams or {}}
+			table.insert(snapshots, update)
+			if #snapshots > snapshots_count then
+				table.remove(snapshots, 1)
+			end
+		end
+		cqueues.sleep(1)
+	end
+end
+
+-- Function to sort frequency list
+local function stream_stats(h, ws)
+	-- Initially, stream history
+	local ok, last = true, nil
+	local batch = {}
+	for i, s in ipairs(snapshots) do
+		table.insert(batch, s)
+		if #batch == 20 or i + 1 == #snapshots then
+			ok = ws:send(tojson(batch))
+			batch = {}
+		end
+	end
+	-- Publish stats updates periodically
+	while ok do
+		-- Get last snapshot
+		local id = #snapshots - 1
+		if id > 0 and snapshots[id].time ~= last then
+			local push = tojson(snapshots[id])
+			last = snapshots[id].time
+			ok = ws:send(push)
+		end
 		cqueues.sleep(1)
 	end
 end
@@ -79,7 +116,11 @@ end
 
 -- Export endpoints
 return {
-	['/stats']     = {'application/json', getstats, stream_stats},
-	['/frequent']  = {'application/json', function () return stats.frequent() end},
-	['/metrics']   = {'text/plain; version=0.0.4', serve_prometheus},
+	init = snapshot_start,
+	deinit = snapshot_end,
+	endpoints = {
+		['/stats']     = {'application/json', getstats, stream_stats},
+		['/frequent']  = {'application/json', function () return stats.frequent() end},
+		['/metrics']   = {'text/plain; version=0.0.4', serve_prometheus},
+	}
 }
