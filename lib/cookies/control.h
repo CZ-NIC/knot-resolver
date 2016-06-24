@@ -16,9 +16,10 @@
 
 #pragma once
 
-#include <libknot/packet/pkt.h>
 #include <libknot/rrtype/opt-cookie.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #include "lib/cookies/alg_containers.h"
 #include "lib/cache.h"
@@ -72,58 +73,3 @@ struct kr_cookie_ctx {
 /** Global cookie control context. */
 KR_EXPORT
 extern struct kr_cookie_ctx kr_glob_cookie_ctx;
-
-/**
- * @brief Insert a DNS cookie into query packet.
- * @note The packet must already contain ENDS section.
- * @param clnt_cntrl    Client cookie control structure.
- * @param cookie_cache  Cookie cache.
- * @param clnt_sockaddr Client address.
- * @param srvr_sockaddr Server address.
- * @param pkt           DNS request packet.
- */
-KR_EXPORT
-int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
-                          struct kr_cache *cookie_cache,
-                          const void *clnt_sockaddr, const void *srvr_sockaddr,
-                          knot_pkt_t *pkt);
-
-/**
- * @brief Add cookies into answer.
- * @note Data are only added into the OPT RR.
- * @param input input data to generate server cookie from
- * @param sc_alg algorithm to use
- * @param pkt packet which to put cookie into
- * @return kr_ok() or error code
- */
-KR_EXPORT
-int kr_answer_opt_rr_add_cookies(const struct knot_scookie_input *input,
-                                 const struct kr_sc_alg_descr *sc_alg,
-                                 knot_pkt_t *pkt);
-
-/**
- * @brief Set RCODE and extended RCODE.
- * @param pkt DNS packet
- * @param whole_rcode RCODE value
- * @return kr_ok() or error code
- */
-KR_EXPORT
-int kr_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode);
-
-/**
- * @brief Check whether packet is a server cookie request.
- * @param pkt     Packet to be examined.
- * @param cookies Received cookies.
- * @return Pointer to entire cookie option if is a cookie query, NULL else.
- */
-KR_EXPORT
-uint8_t *kr_is_cookie_query(const knot_pkt_t *pkt);
-
-/**
- * @brief Parse cookies from cookie option.
- * @param cookie_opt Cookie option.
- * @param cookies    Cookie structure to be set.
- * @return kr_ok() on success, error if cookies are malformed.
- */
-KR_EXPORT
-int kr_parse_cookie_opt(uint8_t *cookie_opt, struct knot_dns_cookies *cookies);

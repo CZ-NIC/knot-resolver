@@ -281,7 +281,7 @@ static bool read_available_sc_hashes(JsonNode *root)
 	}
 
 	const struct kr_sc_alg_descr *aux_ptr = kr_sc_algs;
-	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->gen_func) {
+	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->hash_func) {
 		assert(aux_ptr->name);
 		JsonNode *element = json_mkstring(aux_ptr->name);
 		if (!element) {
@@ -477,8 +477,7 @@ int cookiectl_init(struct kr_module *module)
 
 	kr_glob_cookie_ctx.srvr.enabled = false;
 	kr_glob_cookie_ctx.srvr.current.ssec = ss;
-	kr_glob_cookie_ctx.srvr.current.salg = kr_sc_alg(kr_sc_algs,
-	                                                 "HMAC-SHA256-64");
+	kr_glob_cookie_ctx.srvr.current.salg = kr_sc_alg(kr_sc_algs, "FNV-64");
 
 	module->data = NULL;
 

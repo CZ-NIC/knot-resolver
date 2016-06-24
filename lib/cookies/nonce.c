@@ -14,9 +14,28 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lib/cookies/control.h"
+#include <arpa/inet.h>
+#include <assert.h>
 
-struct kr_cookie_ctx kr_glob_cookie_ctx = {
-	.clnt = { false, { NULL, NULL }, { NULL, NULL}, DFLT_COOKIE_TTL },
-	.srvr = { false, { NULL, NULL }, { NULL, NULL} }
-};
+#include "lib/cookies/nonce.h"
+
+int kr_nonce_write_wire(uint8_t *buf, uint16_t *buf_len,
+                        struct kr_nonce_input *input)
+{
+	if (!buf || !buf_len || !input) {;
+		return kr_error(EINVAL);
+	}
+
+	if (*buf_len < NONCE_LEN) {
+		kr_error(EINVAL);
+	}
+
+	uint32_t aux = htonl(input->rand);
+	memcpy(buf, &aux, sizeof(aux));
+	aux = htonl(input->time);
+	memcpy(buf + sizeof(aux), &aux, sizeof(aux));
+	*buf_len = 2 * sizeof(aux);
+	assert(NONCE_LEN == *buf_len);
+
+	return kr_ok();
+}

@@ -14,9 +14,17 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lib/cookies/control.h"
+#pragma once
 
-struct kr_cookie_ctx kr_glob_cookie_ctx = {
-	.clnt = { false, { NULL, NULL }, { NULL, NULL}, DFLT_COOKIE_TTL },
-	.srvr = { false, { NULL, NULL }, { NULL, NULL} }
-};
+#include <libknot/cookies/client.h>
+#include <libknot/cookies/server.h>
+
+#include "lib/defines.h"
+
+/** FNV-64 client cookie algorithm. */
+KR_EXPORT
+extern const struct knot_cc_alg knot_cc_alg_hmac_sha256_64;
+
+/** FNV-64 server cookie algorithm. */
+KR_EXPORT
+extern const struct knot_sc_alg knot_sc_alg_hmac_sha256_64;

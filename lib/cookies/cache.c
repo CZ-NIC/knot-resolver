@@ -25,6 +25,7 @@
 #include "lib/cdb_lmdb.h"
 #include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
+#include "lib/utils.h"
 
 /* Key size */
 #define KEY_HSIZE (sizeof(uint8_t))
@@ -36,17 +37,16 @@
 /**
  * @internal Composed key as { u8 tag, u8[4,16] IP address }
  */
-static size_t cache_key(uint8_t *buf, uint8_t tag, const void *sockaddr)
+static size_t cache_key(uint8_t *buf, uint8_t tag, const struct sockaddr *sa)
 {
-	assert(buf && sockaddr);
+	assert(buf && sa);
 
-	const uint8_t *addr = NULL;
-	size_t addr_len = 0;
+	const char *addr = kr_inaddr(sa);
+	int addr_len = kr_inaddr_len(sa);
 
-	if (kr_ok() != knot_sockaddr_bytes(sockaddr, &addr, &addr_len)) {
+	if (!addr || (addr_len <= 0)) {
 		return 0;
 	}
-	assert(addr_len > 0);
 
 	buf[0] = tag;
 	memcpy(buf + sizeof(uint8_t), addr, addr_len);
@@ -55,14 +55,14 @@ static size_t cache_key(uint8_t *buf, uint8_t tag, const void *sockaddr)
 }
 
 static struct kr_cache_entry *lookup(struct kr_cache *cache, uint8_t tag,
-                                     const void *sockaddr)
+                                     const struct sockaddr *sa)
 {
-	if (!cache || !sockaddr) {
+	if (!cache || !sa) {
 		return NULL;
 	}
 
 	uint8_t keybuf[KEY_SIZE];
-	size_t key_len = cache_key(keybuf, tag, sockaddr);
+	size_t key_len = cache_key(keybuf, tag, sa);
 
 	/* Look up and return value */
 	knot_db_val_t key = { keybuf, key_len };
@@ -96,14 +96,14 @@ static int check_lifetime(struct kr_cache_entry *found, uint32_t *timestamp)
 }
 
 int kr_cookie_cache_peek(struct kr_cache *cache, uint8_t tag,
-                         const void *sockaddr, struct kr_cache_entry **entry,
+                         const struct sockaddr *sa, struct kr_cache_entry **entry,
                          uint32_t *timestamp)
 {
-	if (!cache_isvalid(cache) || !sockaddr || !entry) {
+	if (!cache_isvalid(cache) || !sa || !entry) {
 		return kr_error(EINVAL);
 	}
 
-	struct kr_cache_entry *found = lookup(cache, tag, sockaddr);
+	struct kr_cache_entry *found = lookup(cache, tag, sa);
 	if (!found) {
 		cache->stats.miss += 1;
 		return kr_error(ENOENT);
@@ -130,16 +130,16 @@ static void entry_write(struct kr_cache_entry *dst, struct kr_cache_entry *heade
 }
 
 int kr_cookie_cache_insert(struct kr_cache *cache,
-                           uint8_t tag, const void *sockaddr,
+                           uint8_t tag, const struct sockaddr *sa,
                            struct kr_cache_entry *header, knot_db_val_t data)
 {
-	if (!cache_isvalid(cache) || !sockaddr || !header) {
+	if (!cache_isvalid(cache) || !sa || !header) {
 		return kr_error(EINVAL);
 	}
 
 	/* Insert key */
 	uint8_t keybuf[KEY_SIZE];
-	size_t key_len = cache_key(keybuf, tag, sockaddr);
+	size_t key_len = cache_key(keybuf, tag, sa);
 	if (key_len == 0) {
 		return kr_error(EILSEQ);
 	}
@@ -169,14 +169,14 @@ int kr_cookie_cache_insert(struct kr_cache *cache,
 }
 
 int kr_cookie_cache_remove(struct kr_cache *cache,
-                           uint8_t tag, const void *sockaddr)
+                           uint8_t tag, const struct sockaddr *sa)
 {
-	if (!cache_isvalid(cache) || !sockaddr) {
+	if (!cache_isvalid(cache) || !sa) {
 		return kr_error(EINVAL);
 	}
 
 	uint8_t keybuf[KEY_SIZE];
-	size_t key_len = cache_key(keybuf, tag, sockaddr);
+	size_t key_len = cache_key(keybuf, tag, sa);
 	if (key_len == 0) {
 		return kr_error(EILSEQ);
 	}
@@ -185,16 +185,16 @@ int kr_cookie_cache_remove(struct kr_cache *cache,
 	return cache_op(cache, remove, &key, 1);
 }
 
-int kr_cookie_cache_peek_cookie(struct kr_cache *cache, const void *sockaddr,
+int kr_cookie_cache_peek_cookie(struct kr_cache *cache, const struct sockaddr *sa,
                                 struct timed_cookie *cookie, uint32_t *timestamp)
 {
-	if (!cache_isvalid(cache) || !sockaddr || !cookie || !timestamp) {
+	if (!cache_isvalid(cache) || !sa || !cookie || !timestamp) {
 		return kr_error(EINVAL);
 	}
 
 	/* Check if the RRSet is in the cache. */
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cookie_cache_peek(cache, KR_CACHE_COOKIE, sockaddr,
+	int ret = kr_cookie_cache_peek(cache, KR_CACHE_COOKIE, sa,
 	                               &entry, timestamp);
 	if (ret != 0) {
 		return ret;
@@ -204,11 +204,11 @@ int kr_cookie_cache_peek_cookie(struct kr_cache *cache, const void *sockaddr,
 	return kr_ok();
 }
 
-int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const void *sockaddr,
+int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const struct sockaddr *sa,
                                   const struct timed_cookie *cookie,
                                   uint32_t timestamp)
 {
-	if (!cache_isvalid(cache) || !sockaddr) {
+	if (!cache_isvalid(cache) || !sa) {
 		return kr_error(EINVAL);
 	}
 
@@ -230,6 +230,6 @@ int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const void *sockaddr,
 	                         knot_edns_opt_get_length(cookie->cookie_opt);
 
 	knot_db_val_t data = { (uint8_t *) cookie->cookie_opt, cookie_opt_size };
-	return kr_cookie_cache_insert(cache, KR_CACHE_COOKIE, sockaddr,
+	return kr_cookie_cache_insert(cache, KR_CACHE_COOKIE, sa,
 	                              &header, data);
 }

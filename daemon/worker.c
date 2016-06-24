@@ -28,6 +28,7 @@
 #if defined(ENABLE_COOKIES)
 #include <arpa/inet.h> /* inet_ntop() */
 #include "lib/cookies/control.h"
+#include "lib/cookies/helper.h"
 #endif /* defined(ENABLE_COOKIES) */
 #include "lib/utils.h"
 #include "lib/layer.h"
@@ -465,6 +466,8 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 		return true;
 	}
 
+	struct sockaddr_storage *sockaddr_ptr = NULL; /* Not supported yet. */
+#if 0
 	/* Libuv does not offer a convenient way how to obtain a source IP
 	 * address from a UDP handle that has been initialised using
 	 * uv_udp_init(). The uv_udp_getsockname() fails because of the lazy
@@ -473,7 +476,6 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 	 * TODO -- A solution might be opening a separate socket and trying
 	 * to obtain the IP address from it.
 	 */
-
 	struct sockaddr_storage sockaddr = {0, };
 	struct sockaddr_storage *sockaddr_ptr = &sockaddr;
 	int sockaddr_len = sizeof(sockaddr);
@@ -482,6 +484,7 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 	if (ret != 0) {
 		sockaddr_ptr = NULL;
 	}
+#endif /* 0 */
 
 	kr_request_put_cookie(&kr_glob_cookie_ctx.clnt.current, cookie_cache,
 	                      (struct sockaddr*) sockaddr_ptr, srvr_addr, pkt);
@@ -511,6 +514,10 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	}
 	if (handle->type == UV_UDP) {
 #if defined(ENABLE_COOKIES)
+		/* The actual server IP address is needed before generating the
+		 * actual cookie. Also the resolver somehow mangles the query
+		 * packets before building the query i.e. the space needed for
+		 * the cookie cannot be allocated in the cookie layer. */
 		if (knot_wire_get_qr(pkt->wire) == 0) {
 			/* Update DNS cookies data in query. */
 			subreq_update_cookies((uv_udp_t *) handle, addr,

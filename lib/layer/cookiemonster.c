@@ -28,6 +28,8 @@
 #include "lib/cookies/alg_containers.h"
 #include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
+#include "lib/cookies/helper.h"
+#include "lib/cookies/nonce.h"
 #include "lib/module.h"
 #include "lib/layer.h"
 
@@ -72,8 +74,8 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
 
 	const struct sockaddr *sockaddr = NULL;
 
-	struct knot_ccookie_input input = {
-		.clnt_sockaddr = NULL,
+	struct knot_cc_input input = {
+		.clnt_sockaddr = NULL, /* Not supported yet. */
 		.srvr_sockaddr = NULL,
 		.secret_data = csecr->data,
 		.secret_len = csecr->size
@@ -85,10 +87,10 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
 			break;
 		}
 
-		input.srvr_sockaddr = &nsrep->addr[i];
-		int ret = knot_ccookie_check(cc, cc_len, &input, cc_alg->alg);
+		input.srvr_sockaddr = (struct sockaddr *)&nsrep->addr[i];
+		int ret = knot_cc_check(cc, cc_len, &input, cc_alg->alg);
 		if (ret == KNOT_EOK) {
-			sockaddr = (struct sockaddr *) &nsrep->addr[i];
+			sockaddr = (struct sockaddr *)&nsrep->addr[i];
 			break;
 		}
 	}
@@ -118,21 +120,21 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 	if (tmp_sockaddr) {
 		assert(clnt_cntrl->current.csec);
 
-		struct knot_ccookie_input input = {
-			.clnt_sockaddr = NULL,
+		struct knot_cc_input input = {
+			.clnt_sockaddr = NULL, /* Not supported yet. */
 			.srvr_sockaddr = tmp_sockaddr,
 			.secret_data = clnt_cntrl->current.csec->data,
 			.secret_len = clnt_cntrl->current.csec->size
 		};
-		int ret = knot_ccookie_check(cc, cc_len, &input,
+		int ret = knot_cc_check(cc, cc_len, &input,
 		                             clnt_cntrl->current.calg->alg);
 		bool have_current = (ret == KNOT_EOK);
 		if ((ret != KNOT_EOK) &&
 		    clnt_cntrl->recent.csec && clnt_cntrl->recent.calg) {
 			input.secret_data = clnt_cntrl->recent.csec->data;
 			input.secret_len = clnt_cntrl->recent.csec->size;
-			ret = knot_ccookie_check(cc, cc_len, &input,
-			                         clnt_cntrl->recent.calg->alg);
+			ret = knot_cc_check(cc, cc_len, &input,
+			                    clnt_cntrl->recent.calg->alg);
 		}
 		if (ret == KNOT_EOK) {
 			*sockaddr = tmp_sockaddr;
@@ -381,8 +383,6 @@ static inline uint8_t *req_cookie_option(struct kr_request *req)
 	return knot_edns_get_option(req->qsource.opt, KNOT_EDNS_OPTION_COOKIE);
 }
 
-/* TODO -- DNS cookie request. */
-
 static int check_request(knot_layer_t *ctx, void *module_param)
 {
 	if (!kr_glob_cookie_ctx.srvr.enabled) {
@@ -417,18 +417,15 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	int return_state = ctx->state;
 
-	struct knot_scookie_check_ctx check_ctx = {
+	struct knot_sc_private srvr_data = {
 		.clnt_sockaddr = req->qsource.addr,
 		.secret_data = srvr_cntrl->current.ssec->data,
 		.secret_len = srvr_cntrl->current.ssec->size
 	};
 
-	struct knot_scookie_input input = {
-		.cc = cookies.cc,
-		.cc_len = cookies.cc_len,
-		.nonce = kr_rand_uint(UINT32_MAX),
-		.time = req->current_query->timestamp.tv_sec,
-		.srvr_data = &check_ctx
+	struct kr_nonce_input nonce = {
+		.rand = kr_rand_uint(UINT32_MAX),
+		.time = req->current_query->timestamp.tv_sec
 	};
 
 	if (!cookies.sc) {
@@ -451,18 +448,18 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	/* Check server cookie obtained in request. */
 
-	ret = knot_scookie_check(&cookies, &check_ctx,
-	                         srvr_cntrl->current.salg->alg);
+	ret = knot_sc_check(NONCE_LEN, &cookies, &srvr_data,
+	                    srvr_cntrl->current.salg->alg);
 	if (ret == KNOT_EINVAL &&
 	    srvr_cntrl->recent.ssec && srvr_cntrl->recent.salg->alg) {
 		/* Try recent algorithm. */
-		struct knot_scookie_check_ctx recent_ctx = {
+		struct knot_sc_private recent_srvr_data = {
 			.clnt_sockaddr = req->qsource.addr,
 			.secret_data = srvr_cntrl->recent.ssec->data,
 			.secret_len = srvr_cntrl->recent.ssec->size
 		};
-		ret = knot_scookie_check(&cookies, &recent_ctx,
-		                         srvr_cntrl->recent.salg->alg);
+		ret = knot_sc_check(NONCE_LEN, &cookies, &recent_srvr_data,
+		                    srvr_cntrl->recent.salg->alg);
 	}
 	if (ret != KNOT_EOK) {
 		/* TODO -- Silently discard? */
@@ -486,8 +483,12 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 answer_add_cookies:
 	/* Add server cookie into response. */
-	kr_answer_opt_rr_add_cookies(&input, srvr_cntrl->current.salg,
+	ret = kr_answer_write_cookie(&srvr_data, cookies.cc, cookies.cc_len,
+	                             &nonce, srvr_cntrl->current.salg->alg,
 	                             req->answer);
+	if (ret != kr_ok()) {
+		return_state = KNOT_STATE_FAIL;
+	}
 	return return_state;
 }
 

@@ -48,15 +48,19 @@ ifeq ($(HAS_libcrypto),yes)
 libkres_SOURCES += \
 	lib/layer/cookiemonster.c \
 	lib/cookies/alg_containers.c \
-	lib/cookies/alg_sha.c  \
-	lib/cookies/cache.c    \
-	lib/cookies/control.c
+	lib/cookies/alg_sha.c \
+	lib/cookies/cache.c \
+	lib/cookies/control.c \
+	lib/cookies/helper.c \
+	lib/cookies/nonce.c
 
 libkres_HEADERS += \
-	lib/cookies/alg_containers..h \
-	lib/cookies/alg_sha.h  \
-	lib/cookies/cache.h    \
-	lib/cookies/control.h
+	lib/cookies/alg_containers.h \
+	lib/cookies/alg_sha.h \
+	lib/cookies/cache.h \
+	lib/cookies/control.h \
+	lib/cookies/helper.h \
+	lib/cookies/nonce.h
 
 libkres_LIBS += $(libcrypto_LIBS)
 endif

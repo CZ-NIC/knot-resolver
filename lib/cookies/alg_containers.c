@@ -49,9 +49,7 @@ const struct kr_cc_alg_descr *kr_cc_alg(const struct kr_cc_alg_descr cc_algs[],
 }
 
 const struct kr_sc_alg_descr kr_sc_algs[] = {
-	{ "FNV-64-SIMPLE", &knot_sc_alg_fnv64_simple },
 	{ "FNV-64", &knot_sc_alg_fnv64 },
-	{ "HMAC-SHA256-64-SIMPLE", &knot_sc_alg_hmac_sha256_64_simple },
 	{ "HMAC-SHA256-64", &knot_sc_alg_hmac_sha256_64 },
 	{ NULL, NULL }
 };
@@ -64,7 +62,7 @@ const struct kr_sc_alg_descr *kr_sc_alg(const struct kr_sc_alg_descr sc_algs[],
 	}
 
 	const struct kr_sc_alg_descr *aux_ptr = sc_algs;
-	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->gen_func) {
+	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->hash_func) {
 		assert(aux_ptr->name);
 		if (strcmp(aux_ptr->name, name) == 0) {
 			return aux_ptr;

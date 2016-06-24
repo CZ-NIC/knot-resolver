@@ -29,6 +29,8 @@
 #include "lib/dnssec/ta.h"
 #if defined(ENABLE_COOKIES)
 #include "lib/cookies/control.h"
+#include "lib/cookies/helper.h"
+#include "lib/cookies/nonce.h"
 #endif /* defined(ENABLE_COOKIES) */
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), "resl",  fmt)
@@ -410,7 +412,7 @@ static int cookie_answer(const void *clnt_sockaddr,
 	knot_wire_set_ra(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
 
-	struct knot_scookie_check_ctx check_ctx = {
+	struct knot_sc_private srvr_data = {
 		.clnt_sockaddr = clnt_sockaddr,
 		.secret_data = srvr_cntrl->current.ssec->data,
 		.secret_len = srvr_cntrl->current.ssec->size
@@ -419,28 +421,22 @@ static int cookie_answer(const void *clnt_sockaddr,
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-	struct knot_scookie_input input = {
-		.cc = cookies->cc,
-		.cc_len = cookies->cc_len,
-		.nonce = kr_rand_uint(UINT32_MAX),
-		.time = tv.tv_sec,
-		.srvr_data = &check_ctx
+	struct kr_nonce_input nonce = {
+		.rand = kr_rand_uint(UINT32_MAX),
+		.time = tv.tv_sec
 	};
 
-	int ret =  kr_answer_opt_rr_add_cookies(&input,
-	                                        srvr_cntrl->current.salg,
-	                                        answer);
+	/* Add fres cookie into the answer. */
+	int ret = kr_answer_write_cookie(&srvr_data,
+	                                 cookies->cc, cookies->cc_len, &nonce,
+	                                 srvr_cntrl->current.salg->alg, answer);
 	if (ret != kr_ok()) {
 		return KNOT_STATE_FAIL;
 	}
 
-	if (!cookies->sc) {
-		return KNOT_STATE_DONE;
-	}
-
 	/* Check server cookie only with current settings. */
-	ret = knot_scookie_check(cookies, &check_ctx,
-	                         srvr_cntrl->current.salg->alg);
+	ret = knot_sc_check(NONCE_LEN, cookies, &srvr_data,
+	                    srvr_cntrl->current.salg->alg);
 	if (ret != KNOT_EOK) {
 		kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 		return KNOT_STATE_FAIL | KNOT_STATE_DONE;
@@ -459,7 +455,11 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	struct kr_query *qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
 	if (!qry) {
 #if defined(ENABLE_COOKIES)
-		/* May be a DNS cookies query. */
+		/* RFC7873 5.4 specifies a query for server cookie. Such query
+		 * has QDCOUNT == 0 and contains a cookie option.
+		 *
+		 * The layers don't expect to handle queries with QDCOUNT != 1
+		 * so such queries are handled directly here. */
 		struct knot_dns_cookies cookies = { 0, };
 		uint8_t *cookie_opt = kr_is_cookie_query(packet);
 		if (cookie_opt && kr_glob_cookie_ctx.clnt.enabled) {

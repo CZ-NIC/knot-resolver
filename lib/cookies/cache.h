@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <netinet/in.h>
+
 #include "lib/cache.h"
 
 /** DNS cookie cache entry tag. */
@@ -26,40 +28,40 @@
  * @note The 'drift' is the time passed between the inception time and now (in seconds).
  * @param cache cache structure
  * @param tag  asset tag
- * @param sockaddr asset socket address
+ * @param sa asset socket address
  * @param entry cache entry, will be set to valid pointer or NULL
  * @param timestamp current time (will be replaced with drift if successful)
  * @return 0 or an error code
  */
 KR_EXPORT
 int kr_cookie_cache_peek(struct kr_cache *cache,
-                         uint8_t tag, const void *sockaddr,
+                         uint8_t tag, const struct sockaddr *sa,
                          struct kr_cache_entry **entry, uint32_t *timestamp);
 
 /**
  * Insert asset into cache, replacing any existing data.
  * @param cache cache structure
  * @param tag  asset tag
- * @param sockaddr asset socket address
+ * @param sa asset socket address
  * @param header filled entry header (ttl and time stamp)
  * @param data inserted data
  * @return 0 or an error code
  */
 KR_EXPORT
 int kr_cookie_cache_insert(struct kr_cache *cache,
-                           uint8_t tag, const void *sockaddr,
+                           uint8_t tag, const struct sockaddr *sa,
                            struct kr_cache_entry *header, knot_db_val_t data);
 
 /**
  * Remove asset from cache.
  * @param cache cache structure
  * @param tag asset tag
- * @param sockaddr asset socket address
+ * @param sa asset socket address
  * @return 0 or an error code
  */
 KR_EXPORT
 int kr_cookie_cache_remove(struct kr_cache *cache,
-                           uint8_t tag, const void *sockaddr);
+                           uint8_t tag, const struct sockaddr *sa);
 
 /**
  * Structure used for cookie cache interface.
@@ -74,33 +76,33 @@ struct timed_cookie {
  * Peek the cache for given cookie (socket address)
  * @note The 'drift' is the time passed between the cache time of the cookie and now (in seconds).
  * @param cache cache structure
- * @param sockaddr socket address
+ * @param sa socket address
  * @param cookie asset
  * @param timestamp current time (will be replaced with drift if successful)
  * @return 0 or an error code
  */
 KR_EXPORT
-int kr_cookie_cache_peek_cookie(struct kr_cache *cache, const void *sockaddr,
+int kr_cookie_cache_peek_cookie(struct kr_cache *cache, const struct sockaddr *sa,
                                 struct timed_cookie *cookie, uint32_t *timestamp);
 
 /**
  * Insert a DNS cookie (client and server) entry for the given server signature (IP address).
  * @param cache cache structure
- * @param sockaddr server IP address
+ * @param sa server IP address
  * @param cookie ttl and whole EDNS cookie option (header, client and server cookies)
  * @param timestamp current time
  * @return 0 or an error code
  */
 KR_EXPORT
-int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const void *sockaddr,
+int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const struct sockaddr *sa,
                                   const struct timed_cookie *cookie,
                                   uint32_t timestamp);
 
 /**
  * Remove asset from cache.
  * @param txn transaction instance
- * @param sockaddr socket address
+ * @param sa socket address
  * @return 0 or an error code
  */
-#define kr_cookie_cache_remove_cookie(cache, sockaddr) \
-	kr_cookie_cache_remove((cache), KR_CACHE_COOKIE, (sockaddr))
+#define kr_cookie_cache_remove_cookie(cache, sa) \
+	kr_cookie_cache_remove((cache), KR_CACHE_COOKIE, (sa))
