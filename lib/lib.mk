@@ -44,7 +44,7 @@ libkres_CFLAGS := -fvisibility=hidden -fPIC $(lmdb_CFLAGS)
 libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
-ifeq ($(HAS_libcrypto),yes)
+ifeq ($(HAS_nettle),yes)
 libkres_SOURCES += \
 	lib/layer/cookiemonster.c \
 	lib/cookies/alg_containers.c \
@@ -62,7 +62,7 @@ libkres_HEADERS += \
 	lib/cookies/helper.h \
 	lib/cookies/nonce.h
 
-libkres_LIBS += $(libcrypto_LIBS)
+libkres_LIBS += $(nettle_LIBS)
 endif
 
 # Make library

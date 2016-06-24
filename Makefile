@@ -19,7 +19,7 @@ $(eval $(call find_lib,libknot,2.1))
 $(eval $(call find_lib,lmdb))
 $(eval $(call find_lib,libzscanner,2.1))
 $(eval $(call find_lib,libuv,1.0))
-$(eval $(call find_lib,libcrypto))
+$(eval $(call find_lib,nettle))
 $(eval $(call find_alt,lua,luajit))
 $(eval $(call find_lib,cmocka))
 $(eval $(call find_bin,doxygen))
@@ -62,10 +62,10 @@ ifneq (,$(findstring luajit, $(lua_LIBS)))
 endif
 endif
 
-BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(libcrypto_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
+BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(nettle_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
 BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
 
-ifeq ($(HAS_libcrypto),yes)
+ifeq ($(HAS_nettle),yes)
 BUILD_CFLAGS += -DENABLE_COOKIES
 endif
 
@@ -95,7 +95,7 @@ info:
 	$(info [$(HAS_lua)] luajit (daemon))
 	$(info [$(HAS_libuv)] libuv (daemon))
 	$(info [$(HAS_gnutls)] libgnutls (daemon))
-	$(info [$(HAS_libcrypto)] crypto (DNS cookies))
+	$(info [$(HAS_nettle)] nettle (DNS cookies))
 	$(info )
 	$(info Optional)
 	$(info --------)

@@ -14,12 +14,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <arpa/inet.h> /* htonl(), ... */
 #include <assert.h>
+#include <nettle/hmac.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <openssl/hmac.h>
-#include <openssl/sha.h>
 
 #include <libknot/errcode.h>
 #include <libknot/rrtype/opt-cookie.h>
@@ -38,7 +36,7 @@
 static int cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
                                  uint8_t *cc_out, uint16_t *cc_len)
 {
-	if (!input || !cc_out || !cc_len) {
+	if (!input || !cc_out || !cc_len || *cc_len < KNOT_OPT_COOKIE_CLNT) {
 		return KNOT_EINVAL;
 	}
 
@@ -50,31 +48,14 @@ static int cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
 	const uint8_t *addr = NULL;
 	int addr_len = 0; /* Address length. */
 
-	uint8_t digest[SHA256_DIGEST_LENGTH];
-	unsigned int digest_len = SHA256_DIGEST_LENGTH;
-
-	/* text: (client IP | server IP)
-	 * key: client secret */
-
-	HMAC_CTX ctx;
-	HMAC_CTX_init(&ctx);
-
-	int ret = HMAC_Init_ex(&ctx, input->secret_data, input->secret_len,
-	                       EVP_sha256(), NULL);
-	if (ret != 1) {
-		ret = KNOT_EINVAL;
-		goto fail;
-	}
+	struct hmac_sha256_ctx ctx;
+	hmac_sha256_set_key(&ctx, input->secret_len, input->secret_data);
 
 	if (input->clnt_sockaddr) {
 		addr = (uint8_t *)kr_inaddr(input->clnt_sockaddr);
 		addr_len = kr_inaddr_len(input->clnt_sockaddr);
 		if (addr && addr_len > 0) {
-			ret = HMAC_Update(&ctx, addr, addr_len);
-			if (ret != 1) {
-				ret = KNOT_EINVAL;
-				goto fail;
-			}
+			hmac_sha256_update(&ctx, addr_len, addr);
 		}
 	}
 
@@ -82,37 +63,22 @@ static int cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
 		addr = (uint8_t *)kr_inaddr(input->srvr_sockaddr);
 		addr_len = kr_inaddr_len(input->srvr_sockaddr);
 		if (addr && addr_len > 0) {
-			ret = HMAC_Update(&ctx, addr, addr_len);
-			if (ret != 1) {
-				ret = KNOT_EINVAL;
-				goto fail;
-			}
+			hmac_sha256_update(&ctx, addr_len, addr);
 		}
 	}
 
-	if (1 != HMAC_Final(&ctx, digest, &digest_len)) {
-		ret = KNOT_EINVAL;
-		goto fail;
-	}
-
-	assert(KNOT_OPT_COOKIE_CLNT <= SHA256_DIGEST_LENGTH);
-	if (*cc_len < KNOT_OPT_COOKIE_CLNT) {
-		return KNOT_ESPACE;
-	}
+	assert(KNOT_OPT_COOKIE_CLNT <= SHA256_DIGEST_SIZE);
 
 	*cc_len = KNOT_OPT_COOKIE_CLNT;
-	memcpy(cc_out, digest, *cc_len);
-	ret = KNOT_EOK;
+	hmac_sha256_digest(&ctx, *cc_len, cc_out);
 
-fail:
-	HMAC_CTX_cleanup(&ctx);
-	return ret;
+	return KNOT_EOK;
 }
 
 #define SRVR_HMAC_SHA256_64_HASH_SIZE 8
 
 /**
- * @brief Compute server cookie using HMAC-SHA256-64).
+ * @brief Compute server cookie hash using HMAC-SHA256-64).
  * @note Server cookie = nonce | time | HMAC-SHA256-64( server secret, client cookie | nonce| time | client IP )
  * @param input    data to compute cookie from
  * @param hash_out hash cookie output buffer
@@ -133,63 +99,32 @@ static int sc_gen_hmac_sha256_64(const struct knot_sc_input *input,
 	}
 
 	const uint8_t *addr = NULL;
-	size_t addr_len = 0; /* Address length. */
+	int addr_len = 0; /* Address length. */
 
-	uint8_t digest[SHA256_DIGEST_LENGTH];
-	unsigned int digest_len = SHA256_DIGEST_LENGTH;
+	struct hmac_sha256_ctx ctx;
+	hmac_sha256_set_key(&ctx, input->srvr_data->secret_len,
+	                    input->srvr_data->secret_data);
 
-	HMAC_CTX ctx;
-	HMAC_CTX_init(&ctx);
-
-	int ret = HMAC_Init_ex(&ctx, input->srvr_data->secret_data,
-	                       input->srvr_data->secret_len,
-	                       EVP_sha256(), NULL);
-	if (ret != 1) {
-		ret = KNOT_EINVAL;
-		goto fail;
-	}
-
-	ret = HMAC_Update(&ctx, input->cc, input->cc_len);
-	if (ret != 1) {
-		ret = KNOT_EINVAL;
-		goto fail;
-	}
+	hmac_sha256_update(&ctx, input->cc_len, input->cc);
 
 	if (input->nonce && input->nonce_len) {
-		ret = HMAC_Update(&ctx, (void *)input->nonce, input->nonce_len);
-		if (ret != 1) {
-			ret = KNOT_EINVAL;
-			goto fail;
-		}
+		hmac_sha256_update(&ctx, input->nonce_len, input->nonce);
 	}
 
 	if (input->srvr_data->clnt_sockaddr) {
 		addr = (uint8_t *)kr_inaddr(input->srvr_data->clnt_sockaddr);
 		addr_len = kr_inaddr_len(input->srvr_data->clnt_sockaddr);
 		if (addr && addr_len > 0) {
-			ret = HMAC_Update(&ctx, addr, addr_len);
-			if (ret != 1) {
-				ret = KNOT_EINVAL;
-				goto fail;
-			}
+			hmac_sha256_update(&ctx, addr_len, addr);
 		}
 	}
 
-	if (1 != HMAC_Final(&ctx, digest, &digest_len)) {
-		ret = KNOT_EINVAL;
-		goto fail;
-	}
-
-	assert(SRVR_HMAC_SHA256_64_HASH_SIZE <= SHA256_DIGEST_LENGTH);
+	assert(SRVR_HMAC_SHA256_64_HASH_SIZE < SHA256_DIGEST_SIZE);
 
 	*hash_len = SRVR_HMAC_SHA256_64_HASH_SIZE;
-	memcpy(hash_out, digest, *hash_len);
+	hmac_sha256_digest(&ctx, *hash_len, hash_out);
 
-	ret = KNOT_EOK;
-
-fail:
-	HMAC_CTX_cleanup(&ctx);
-	return ret;
+	return KNOT_EOK;
 }
 
 const struct knot_cc_alg knot_cc_alg_hmac_sha256_64 = { KNOT_OPT_COOKIE_CLNT, cc_gen_hmac_sha256_64 };

@@ -3,7 +3,7 @@ modules_TARGETS := hints \
                    stats
 
 # DNS cookies
-ifeq ($(HAS_libcrypto),yes)
+ifeq ($(HAS_nettle),yes)
 modules_TARGETS += cookiectl
 endif
 
