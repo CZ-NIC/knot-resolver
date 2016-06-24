@@ -272,14 +272,12 @@ function M.config(conf)
 	-- Export snippet
 	http.snippets['/daf'] = {'Application Firewall', [[
 		<script type="text/javascript" src="daf.js"></script>
-		<div class="row">
+		<div class="row" style="margin-bottom: 5px">
 			<form id="daf-builder-form">
-				<div class="input-group">
+				<div class="col-md-11">
 					<input type="text" id="daf-builder" class="form-control" aria-label="..." />
-					<div class="input-group-btn">
-						<button type="button" id="daf-add" class="btn btn-default" style="margin-top: -5px;">Add</button>
-					</div>
 				</div>
+				<button type="button" id="daf-add" class="btn btn-default btn-sm">Add</button>
 			</form>
 		</div>
 		<div class="row">

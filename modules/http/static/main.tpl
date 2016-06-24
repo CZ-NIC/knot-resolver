@@ -7,19 +7,16 @@
 	var secure = {{ secure }};
 </script>
 <script src="jquery.js"></script>
-<script src="d3.js"></script>
-<script src="rickshaw.min.js"></script>
-<script src="topojson.js"></script>
-<script src="selectize.min.js"></script>
 <script src="bootstrap.min.js"></script>
+<script src="d3.js"></script>
+<script src="dygraph-combined.js"></script>
+<script src="selectize.min.js"></script>
+<script src="topojson.js"></script>
 <script src="datamaps.world.min.js"></script>
 <script src="kresd.js"></script>
 <link rel="icon" type="image/ico" href="favicon.ico">
 <link href="kresd.css" rel="stylesheet">
-<link href="rickshaw.min.css" rel="stylesheet">
 <link href="bootstrap.min.css" rel="stylesheet">
-<link href="bootstrap-theme.min.css" rel="stylesheet">
-<link href="selectize.min.css" rel="stylesheet">
 <link href="selectize.bootstrap3.min.css" rel="stylesheet">
 <nav class="navbar navbar-inverse navbar-fixed-top">
 	<div class="container">
@@ -47,13 +44,20 @@
 	<div class="main">
 		<h2 class="sub-header">Metrics</h2>
 		<div id="stats" class="row placeholders">
-			<div id="chart_container">
-				<div id="y_axis"></div>
-				<div id="chart"></div>
+			<div id="chart" style="width:100%"></div>
+		</div>
+		<div class="row">
+			<div class="col-md-12">
+				<h3><small>More metrics</small></h3>
+				<div class="col-md-11">
+					<select id="chart-selector" multiple></select>
+				</div>
+				<div class="col-md-1">
+					<div class="checkbox">
+						<label><input id="chart-stacked" type="checkbox">Stacked</label>
+					</div>
+				</div>
 			</div>
-			<form id="legend_container">
-				<div id="legend"></div>
-			</form>
 		</div>
 		<a name="worldmap"></a>
 		<h2 class="sub-header">Where do the queries go?</h2>

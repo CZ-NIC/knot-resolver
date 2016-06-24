@@ -184,7 +184,7 @@ $(function() {
 	const ws = new Socket(wsStats);
 	var lastRateUpdate = Date.now();
 	ws.onmessage = function(evt) {
-		var data = $.parseJSON(evt.data);
+		var data = JSON.parse(evt.data);
 		/* Update heartbeat clock */
 		var now = Date.now();
 		var dt = now - lastRateUpdate;
@@ -201,7 +201,7 @@ $(function() {
 				if (diff > 0) {
 					/* Normalize difference to heartbeat (in msecs) */
 					const rate = Math.ceil((1000 * diff) / dt);
-					badge.text(Rickshaw.Fixtures.Number.formatKMBT(rate) + ' pps');
+					badge.text(rate + ' pps');
 				}
 			}
 		}

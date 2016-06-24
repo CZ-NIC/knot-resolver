@@ -46,16 +46,13 @@ local pages = {
 	'd3.js',
 	'topojson.js',
 	'datamaps.world.min.js',
-	'rickshaw.min.js',
-	'rickshaw.min.css',
+	'dygraph-combined.js',
 	'selectize.min.js',
 	'selectize.min.css',
 	'selectize.bootstrap3.min.css',
 	'bootstrap.min.js',
 	'bootstrap.min.css',
-	'bootstrap.min.css.map',
 	'bootstrap-theme.min.css',
-	'bootstrap-theme.min.css.map',
 	'glyphicons-halflings-regular.woff2',
 }
 
@@ -120,11 +117,11 @@ local function serve(h, stream)
 		if type(data) == 'number' then return tostring(data), err end
 	-- Methods other than GET require handler to be closure
 	elseif h:get(':method') ~= 'GET' then
-		return '501'
+		return '501', ''
 	end
 	if type(data) == 'table' then data = tojson(data) end
 	if not mime or type(data) ~= 'string' then
-		return '404'
+		return '404', ''
 	else
 		-- Serve content type appropriately
 		hsend:append(':status', '200')
@@ -167,7 +164,9 @@ local function route(endpoints)
 		else
 			local ok, err, reason = pcall(serve, h, stream)
 			if not ok or err then
-				log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
+				if err ~= '404' then
+					log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
+				end
 				-- Method is not supported
 				local hsend = headers.new()
 				hsend:append(':status', err or '500')

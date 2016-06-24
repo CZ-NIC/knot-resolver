@@ -1,101 +1,131 @@
-var colours = ['#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'];
-var latency = ['1ms', '10ms', '50ms', '100ms', '250ms', '500ms', '1000ms', '1500ms', 'slow'];
-var palette = new Rickshaw.Color.Palette( { scheme: 'colorwheel' } );
+var colours = ["#081d58", "#253494", "#225ea8", "#1d91c0", "#41b6c4", "#7fcdbb", "#c7e9b4", "#edf8b1", "#edf8b1"];
+var latency = ["slow", "1500ms", "1000ms", "500ms", "250ms", "100ms", "50ms", "10ms", "1ms"];
 var Socket = "MozWebSocket" in window ? MozWebSocket : WebSocket;
 
 $(function() {
+	/* Helper functions */
+	function colorBracket(rtt) {
+		for (var i = latency.length - 1; i >= 0; i--) {
+			if (rtt <= parseInt(latency[i])) {
+				return 'q' + i;
+			}
+		}
+		return 'q8';
+	}
+	function toGeokey(lon, lat) {
+		return lon.toFixed(0)+'#'+lat.toFixed(0);
+	}
+	function updateVisibility(graph, metrics, id, toggle) {
+		/* Some labels are aggregates */
+		if (metrics[id] == null) {
+			for (var key in metrics) {
+				const m = metrics[key];
+				if (m.length > 3 && m[3] == id) {
+					graph.setVisibility(m[0], toggle);
+				}
+			}
+		} else {
+			graph.setVisibility(metrics[id][0], toggle);
+		}
+	}
+
 	/* Initialize snippets. */
 	$('section').each(function () {
 		const heading = $(this).find('h2');
 		$('#modules-dropdown').append('<li><a href="#'+this.id+'">'+heading.text()+'</a></li>');
 	});
-	/* Latency has its own palette */
-	var series = [];
-	var data = [];
-	function pushSeries(name, color) {
-		data[name] = [];
-		var s = {
-			name: name,
-			color: color,
-			data: data[name],
-			stroke: true,
-			preserve: true
-		}
-		series.push(s);
-		return s;
-	}
-	/* Render latency metrics as sort of a heatmap */
-	for (var i in latency) {
-		var s = pushSeries('answer.'+latency[i], colours[colours.length - i - 1]);
-		s.name = 'RTT '+latency[i];
-		s.renderer = 'bar';
-	}
+
 	/* Render other interesting metrics as lines (hidden by default) */
+	var data = [];
+	var last_metric = 15;
 	var metrics = {
-		'answer.noerror': 'NOERROR',
-		'answer.nodata': 'NODATA',
-		'answer.nxdomain': 'NXDOMAIN',
-		'answer.servfail': 'SERVFAIL',
-		'answer.dnssec': 'DNSSEC',
-		'cache.hit': 'Cache hit',
-		'cache.miss': 'Cache miss',
-		'worker.udp': 'Outgoing UDP',
-		'worker.tcp': 'Outgoing TCP',
-		'worker.ipv4': 'Outgoing IPv4',
-		'worker.ipv6': 'Outgoing IPv6',
+		'answer.noerror':    [0, 'NOERROR', null, 'By RCODE'],
+		'answer.nodata':     [1, 'NODATA', null, 'By RCODE'],
+		'answer.nxdomain':   [2, 'NXDOMAIN', null, 'By RCODE'],
+		'answer.servfail':   [3, 'SERVFAIL', null, 'By RCODE'],
+		'answer.dnssec':     [4, 'DNSSEC', null, 'By RCODE'],
+		'cache.hit':         [5, 'Cache hit'],
+		'cache.miss':        [6, 'Cache miss'],
+		'cache.insert':      [7, 'Cache insert'],
+		'cache.delete':      [8, 'Cache delete'],
+		'worker.udp':        [9, 'Outgoing UDP'],
+		'worker.tcp':        [10, 'Outgoing TCP'],
+		'worker.ipv4':       [11, 'Outgoing IPv4'],
+		'worker.ipv6':       [12, 'Outgoing IPv6'],
+		'worker.concurrent': [13, 'Queries outstanding'],
+		'worker.queries':    [14, 'Queries received/s'],
+		'worker.dropped':    [15, 'Queries dropped'],
 	};
-	for (var key in metrics) {
-		var s = pushSeries(key, palette.color());
-		s.name = metrics[key];
-		s.renderer = 'line';
-		s.disabled = true;
+	
+	/* Render latency metrics as sort of a heatmap */
+	var series = {};
+	for (var i in latency) {
+		const name = 'RTT '+latency[i];
+		const colour = colours[colours.length - i - 1];
+		last_metric = last_metric + 1;
+		metrics['answer.'+latency[i]] = [last_metric, name, colour, 'latency'];
+		series[name] = {fillGraph: true, color: colour, fillAlpha: 1.0};
 	}
+	var labels = ['x'];
+	var visibility = [];
+	for (var key in metrics) {
+		labels.push(metrics[key][1]);
+		visibility.push(false);
+	}
+	
 	/* Define how graph looks like. */
-	var graphContainer = $('#stats');
-	var graph = new Rickshaw.Graph( {
-		element: document.getElementById('chart'),
-		height: 350,
-		width: graphContainer.innerWidth() - 200,
-		renderer: 'multi',
-		series: series,
-	});
-	var y_axis = new Rickshaw.Graph.Axis.Y( {
-		graph: graph,
-		orientation: 'left',
-		ticksTreatment: 'glow',
-		tickFormat: function (y) {
-			return Rickshaw.Fixtures.Number.formatKMBT(y) + ' pps';
-		},
-		element: document.querySelector("#y_axis")
-	} );
-	var graphHover = new Rickshaw.Graph.HoverDetail({graph: graph});
-	var legend = new Rickshaw.Graph.Legend({
-		graph: graph,
-		element: document.querySelector("#legend")
-	});
-	var highlighter = new Rickshaw.Graph.Behavior.Series.Highlight( {
-		graph: graph,
-		legend: legend
-	} );
-	var shelving = new Rickshaw.Graph.Behavior.Series.Toggle( {
-		graph: graph,
-		legend: legend
-	} );
-	/* Somehow follow the responsive design. */
-	$(window).on('resize', function(){
-		graph.configure({
-			width: graphContainer.innerWidth() - 200,
+	const graphContainer = $('#stats');
+    const graph = new Dygraph(
+        document.getElementById("chart"),
+        data, {
+			labels: labels,
+			labelsUTC: true,
+			labelsShowZeroValues: false,
+			visibility: visibility,
+			axes: { y: {
+				axisLabelFormatter: function(d) {
+					return d + ' pps';
+				},
+			}},
+			series: series,
+			strokeWidth: 1,
+			highlightSeriesOpts: {
+				strokeWidth: 3,
+				strokeBorderWidth: 1,
+				highlightCircleSize: 5,
+			},
 		});
-		graph.render();
-	});
-	graph.render();
+    /* Define metric selector */
+    const chartSelector = $('#chart-selector').selectize({
+		maxItems: null,
+		create: false,
+		onItemAdd: function (x) { updateVisibility(graph, metrics, x, true); },
+		onItemRemove: function (x) { updateVisibility(graph, metrics, x, false); }
+	})[0].selectize;
+	for (var key in metrics) {
+		const m = metrics[key];
+		const groupid = m.length > 3 ? m[3] : key.split('.')[0];
+		const group = m.length > 3 ? m[3] : m[1].split(' ')[0];
+		/* Latency has a special aggregated item */
+		if (group != 'latency') {
+			chartSelector.addOptionGroup(groupid, { label: group } );
+			chartSelector.addOption({ text: m[1], value: key, optgroup: groupid });
+		}
+	}
+	/* Add latency as default */
+	chartSelector.addOption({ text: 'Latency', value: 'latency', optgroup: 'Queries' });
+	chartSelector.addItem('latency');
+	/* Add stacked graph control */
+	$('#chart-stacked').on('change', function(e) {
+		graph.updateOptions({stackedGraph: this.checked});
+    }).click();
 
 	/* Data map */
 	var fills = { defaultFill: '#F5F5F5' };
 	for (var i in colours) {
-		fills['q' + i] = colours[colours.length - 1 - i];
+		fills['q' + i] = colours[i];
 	}
-	var map = new Datamap({
+	const map = new Datamap({
 		element: document.getElementById('map'),
 		fills: fills,
 		data: {},
@@ -121,34 +151,22 @@ $(function() {
 			}
 		}
 	});
-	function colorBracket(rtt) {
-		for (var i in latency) {
-			if (rtt <= parseInt(latency[i])) {
-				return 'q' + i;
-			}
-		}
-		return 'q8';
-	}
-	function togeokey(lon, lat) {
-		return lon.toFixed(0)+'#'+lat.toFixed(0);
-	}
 
 	/* Realtime updates over WebSockets */
 	function pushMetrics(resp, now, buffer) {
+		var line = new Array(last_metric + 1);
+		line[0] = new Date(now * 1000);
 		for (var lb in resp) {
-			var val = resp[lb];
 			/* Push new datapoints */
-			if (lb in data) {
-				data[lb].push({x: now, y:val});
-				if (data[lb].length > 120) {
-					data[lb].shift();
-				}
+			const metric = metrics[lb];
+			if (metric) {
+				line[metric[0] + 1] = resp[lb];
 			}
-
 		}
 		/* Buffer graph  changes. */
+		data.push(line);
 		if (!buffer) {
-			graph.update();
+			graph.updateOptions( { 'file': data } );
 		}
 	}
 
@@ -175,7 +193,7 @@ $(function() {
 			}
 			var sum = val.data.reduce(function(a, b) { return a + b; });
 			var avg = sum / val.data.length;
-			var geokey = togeokey(val.location.longitude, val.location.latitude)
+			var geokey = toGeokey(val.location.longitude, val.location.latitude)
 			var found = bubblemap[geokey];
 			if (!found) {
 				found = {
@@ -222,7 +240,7 @@ $(function() {
 			for (var i in data) {
 				pushMetrics(data[i].stats, data[i].time, true);
 			}
-			graph.update();
+			graph.updateOptions( { 'file': data } );
 		} else {
 			pushMetrics(data.stats, data.time);
 			pushUpstreams(data.upstreams);
