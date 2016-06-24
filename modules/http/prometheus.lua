@@ -1,6 +1,11 @@
 local cqueues = require('cqueues')
 local snapshots, snapshots_count = {}, 120
 
+-- Gauge metrics
+local gauges = {
+	['worker.concurrent'] = true,
+}
+
 -- Load dependent modules
 if not stats then modules.load('stats') end
 
@@ -23,7 +28,11 @@ local function snapshot_start(h, ws)
 		-- Get current snapshot
 		local cur, stats_dt = getstats(), {}
 		for k,v in pairs(cur) do
-			stats_dt[k] = v - (prev[k] or 0)
+			if gauges[k] then
+				stats_dt[k] = v
+			else
+				stats_dt[k] = v - (prev[k] or 0)
+			end
 			is_empty = is_empty and stats_dt[k] == 0
 		end
 		prev = cur
