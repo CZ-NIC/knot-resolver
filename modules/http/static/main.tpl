@@ -43,25 +43,33 @@
 <div class="container">
 	<div class="main">
 		<h2 class="sub-header">Metrics</h2>
-		<div id="stats" class="row placeholders">
-			<div id="chart" style="width:100%"></div>
-		</div>
-		<div class="row">
-			<div class="col-md-12">
-				<h3><small>More metrics</small></h3>
-				<div class="col-md-11">
-					<select id="chart-selector" multiple></select>
+		<div class="col-md-12">
+			<div class="row">
+				<div id="stats" class="row placeholders">
+					<div id="chart" style="width:100%"></div>
 				</div>
-				<div class="col-md-1">
-					<div class="checkbox">
-						<label><input id="chart-stacked" type="checkbox">Stacked</label>
+			</div>
+			<div class="row">
+				<div class="col-md-12">
+					<h3><small>More metrics</small></h3>
+					<div class="col-md-11">
+						<select id="chart-selector" multiple></select>
+					</div>
+					<div class="col-md-1">
+						<div class="checkbox">
+							<label><input id="chart-stacked" type="checkbox">Stacked</label>
+						</div>
 					</div>
 				</div>
 			</div>
 		</div>
 		<a name="worldmap"></a>
 		<h2 class="sub-header">Where do the queries go?</h2>
-		<div id="map" style="position: relative;"></div>
-		{{ snippets }}
+		<div class="col-md-12">
+			<div id="map" style="position: relative;"></div>
+		</div>
+		<div class="col-md-12">
+			{{ snippets }}
+		</div>
 	</div>
 </div>

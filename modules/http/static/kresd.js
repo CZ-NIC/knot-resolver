@@ -28,6 +28,13 @@ $(function() {
 			graph.setVisibility(metrics[id][0], toggle);
 		}
 	}
+	function formatNumber(n) {
+	    with (Math) {
+	        var base = floor(log(abs(n))/log(1000));
+	        var suffix = 'KMB'[base-1];
+	        return suffix ? String(n/pow(1000,base)).substring(0,3)+suffix : ''+n;
+	    }
+	}
 
 	/* Initialize snippets. */
 	$('section').each(function () {
@@ -84,7 +91,7 @@ $(function() {
 			visibility: visibility,
 			axes: { y: {
 				axisLabelFormatter: function(d) {
-					return d + ' pps';
+					return formatNumber(d) + 'pps';
 				},
 			}},
 			series: series,
