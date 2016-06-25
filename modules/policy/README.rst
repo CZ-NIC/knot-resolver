@@ -150,7 +150,6 @@ Properties
 
   :param action: the default action for match in the zone (e.g. RH-value `.`)
   :param path: path to zone file | database
-  :param format: set to `'lmdb'` for binary DB, currently NYI
   
   Enforce RPZ_ rules. This can be used in conjunction with published blocklist feeds.
   The RPZ_ operation is well described in this `Jan-Piet Mens's post`_,

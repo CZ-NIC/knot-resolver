@@ -117,6 +117,11 @@ local function compile(query)
 	return parse_query(g)
 end
 
+-- @function Describe given rule for presentation
+local function rule_info(r)
+	return {info=r.info, id=r.rule.id, active=(r.rule.suspended ~= true), count=r.rule.count}
+end
+
 -- Module declaration
 local M = {
 	rules = {}
@@ -170,6 +175,15 @@ function M.del(id)
 	end
 end
 
+-- @function Find a rule
+function M.get(id)
+	for i, r in ipairs(M.rules) do
+		if r.rule.id == id then
+			return r
+		end
+	end
+end
+
 -- @function Enable/disable a rule
 function M.toggle(id, val)
 	for i, r in ipairs(M.rules) do
@@ -193,11 +207,21 @@ local function api(h, stream)
 	local m = h:get(':method')
 	-- GET method
 	if m == 'GET' then
-		local ret = {}
-		for _, r in ipairs(M.rules) do
-			table.insert(ret, {info=r.info, id=r.rule.id, active=(r.rule.suspended ~= true), count=r.rule.count})
+		local path = h:get(':path')
+		local id = tonumber(path:match '/([^/]*)$')
+		if id then
+			local r = M.get(id)
+			if r then
+				return rule_info(r)
+			end
+			return 404, '"No such rule"' -- Not found
+		else
+			local ret = {}
+			for _, r in ipairs(M.rules) do
+				table.insert(ret, rule_info(r))
+			end
+			return ret
 		end
-		return ret
 	-- DELETE method
 	elseif m == 'DELETE' then
 		local path = h:get(':path')
@@ -206,7 +230,7 @@ local function api(h, stream)
 			if M.del(id) then
 				return tojson(true)
 			end
-			return 404, 'No such rule' -- Not found
+			return 404, '"No such rule"' -- Not found
 		end
 		return 400 -- Request doesn't have numeric id
 	-- POST method
@@ -214,8 +238,8 @@ local function api(h, stream)
 		local query = stream:get_body_as_string()
 		if query then
 			local ok, r, err = pcall(M.add, query)
-			if not ok then return 500, r end
-			return {info=r.info, id=r.rule.id, active=(r.rule.suspended ~= true), count=r.rule.count}
+			if not ok then return 500, string.format('"%s"', r) end
+			return rule_info(r)
 		end
 		return 400
 	-- PATCH method
@@ -231,10 +255,10 @@ local function api(h, stream)
 			if M.toggle(id, val == 'true') then
 				return tojson(true)
 			else
-				return 404, 'No such rule'
+				return 404, '"No such rule"'
 			end
 		else
-			return 501, 'Action not implemented'
+			return 501, '"Action not implemented"'
 		end
 	end
 end

@@ -106,7 +106,7 @@ You can add start and stop processes on runtime based on the load.
 
 .. _daemon-reuseport:
 
-.. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If the kernel doesn't support it, you can still fork multiple processes on different ports, and do load balancing externally (on firewall or with `dnsdist <http://dnsdist.org/>`_).
+.. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, you can :ref:`use supervisor <daemon-supervised>` that is going to bind to sockets before starting multiple processes.
 
 Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
 
@@ -122,18 +122,18 @@ Error or debug logs aren't captured, but you can find them in the daemon standar
 This is also a way to enumerate and test running instances, the list of files int ``tty`` correspond to list
 of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
 
-.. warning:: This is very basic way to orchestrate multi-core deployments and doesn't scale in multi-node clusters. Keep an eye on the prepared ``hive`` module that is going to automate everything from service discovery to deployment and consistent configuration.
+.. _daemon-supervised:
 
 Running supervised
 ==================
 
-Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to resolver daemon. Thus if the resolver terminates or is killed, the sockets are still active and no queries are dropped.
+Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to the resolver daemon. If the resolver terminates or is killed, the sockets remain open and no queries are dropped.
 
 The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. There's a tiny supervisor script for convenience, but you should have a look at `real process managers`_.
 
 .. code-block:: bash
 
-   $ python scripts/supervisor.py ./daemon/kresd 127.0.0.1@53
+   $ python scripts/supervisor.py ./daemon/kresd -a 127.0.0.1
    $ [system] interactive mode
    > quit()
    > [2016-03-28 16:06:36.795879] process finished, pid = 99342, status = 0, uptime = 0:00:01.720612
@@ -900,6 +900,47 @@ notifications for daemon.
       end)
       e.cancel(e)
 
+Map over multiple forks
+^^^^^^^^^^^^^^^^^^^^^^^
+
+When daemon is running in forked mode, each process acts independently. This is good because it reduces software complexity and allows for runtime scaling, but not ideal because of additional operational burden.
+For example, when you want to add a new policy, you'd need to add it to either put it in the configuration, or execute command on each process independently. The daemon simplifies this by promoting process group leader which is able to execute commands synchronously over forks.
+
+.. function:: map(expr)
+
+   Run expression synchronously over all forks, results are returned as a table ordered as forks. Expression can be any valid expression in Lua.
+
+
+   Example:
+
+   .. code-block:: lua
+
+      -- Current instance only
+      hostname()
+      localhost
+      -- Mapped to forks
+      map 'hostname()'
+      [1] => localhost
+      [2] => localhost
+      -- Get worker ID from each fork
+      map 'worker.id'
+      [1] => 0
+      [2] => 1
+      -- Get cache stats from each fork
+      map 'cache.stats()'
+      [1] => {
+          [hit] => 0
+          [delete] => 0
+          [miss] => 0
+          [insert] => 0
+      }
+      [2] => {
+          [hit] => 0
+          [delete] => 0
+          [miss] => 0
+          [insert] => 0
+      }
+
 Scripting worker
 ^^^^^^^^^^^^^^^^
 
@@ -914,6 +955,12 @@ specified worker count and process rank.
 .. envvar:: worker.id
 
    Return current worker ID (starting from `0` up to `worker.count - 1`)
+
+
+.. envvar:: pid (number)
+
+   Current worker process PID.
+
 
 .. function:: worker.stats()
 

@@ -72,3 +72,59 @@ If you're not sure what firewall rules are in effect, see ``daf.rules``:
         [info] => qname ~ %w+.facebook.com AND src = 127.0.0.1/8 deny...
         [policy] => function: 0x1a3ede88
     }
+
+Web interface
+^^^^^^^^^^^^^
+
+If you have :ref:`HTTP/2 <mod-http>` loaded, the firewall automatically loads as a snippet.
+You can create, track, suspend and remove firewall rules from the web interface.
+
+RESTful interface
+^^^^^^^^^^^^^^^^^
+
+The module also exports a RESTful API for operations over rule chains.
+
+
+.. csv-table::
+    :header: "URL", "HTTP Verb", "Action"
+
+    "/daf", "GET", "Return JSON list of active rules."
+    "/daf", "POST", "Insert new rule, rule string is expected in body. Returns rule information in JSON."
+    "/daf/<id>", "GET", "Retrieve a rule matching given ID."
+    "/daf/<id>", "DELETE", "Delete a rule matching given ID."
+    "/daf/<id>/<prop>/<val>", "PATCH", "Modify given rule, for example /daf/3/active/false suspends rule 3."
+
+This interface is used by the web interface for all operations, but you can also use it directly
+for testing.
+
+.. code-block:: bash
+
+    # Get current rule set
+    $ curl -s -X GET http://localhost:8053/daf | jq .
+    {}
+
+    # Create new rule
+    $ curl -s -X POST -d "src = 127.0.0.1 pass" http://localhost:8053/daf | jq .
+    {
+      "count": 0,
+      "active": true,
+      "info": "src = 127.0.0.1 pass",
+      "id": 1
+    }
+
+    # Disable rule
+    $ curl -s -X PATCH http://localhost:8053/daf/1/active/false | jq .
+    true
+
+    # Retrieve a rule information
+    $ curl -s -X GET http://localhost:8053/daf/1 | jq .
+    {
+      "count": 4,
+      "active": true,
+      "info": "src = 127.0.0.1 pass",
+      "id": 1
+    }
+
+    # Delete a rule
+    $ curl -s -X DELETE http://localhost:8053/daf/1 | jq .
+    true
