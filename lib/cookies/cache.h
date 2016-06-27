@@ -100,7 +100,7 @@ int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const struct sockaddr 
 
 /**
  * Remove asset from cache.
- * @param txn transaction instance
+ * @param cache cache structure
  * @param sa socket address
  * @return 0 or an error code
  */

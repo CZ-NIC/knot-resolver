@@ -67,8 +67,7 @@ int kr_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode);
 
 /**
  * @brief Check whether packet is a server cookie request.
- * @param pkt     Packet to be examined.
- * @param cookies Received cookies.
+ * @param pkt Packet to be examined.
  * @return Pointer to entire cookie option if is a cookie query, NULL else.
  */
 KR_EXPORT
