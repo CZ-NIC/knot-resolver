@@ -2,6 +2,7 @@
 
 /usr/bin/kresd {
   #include <abstractions/base>
+  #include <abstractions/p11-kit>
   #include <abstractions/nameservice>
   capability net_bind_service,
   capability setgid,
