@@ -26,7 +26,26 @@
 #include "lib/utils.h"
 
 /**
- * Compute client cookie using HMAC_SHA256-64.
+ * @brief Update hash value.
+ *
+ * @param ctx HMAC-SHA256 context to be updated.
+ * @param sa  Socket address.
+ */
+static inline void update_hash(struct hmac_sha256_ctx *ctx,
+                               const struct sockaddr *sa)
+{
+	assert(ctx && sa);
+
+	int addr_len = kr_inaddr_len(sa);
+	const uint8_t *addr = (uint8_t *)kr_inaddr(sa);
+
+	if (addr && addr_len > 0) {
+		hmac_sha256_update(ctx, addr_len, addr);
+	}
+}
+
+/**
+ * @brief Compute client cookie using HMAC_SHA256-64.
  * @note At least one of the arguments must be non-null.
  * @param input  Input parameters.
  * @param cc_out Buffer for computed client cookie.
@@ -45,26 +64,15 @@ static int cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
 		return KNOT_EINVAL;
 	}
 
-	const uint8_t *addr = NULL;
-	int addr_len = 0; /* Address length. */
-
 	struct hmac_sha256_ctx ctx;
 	hmac_sha256_set_key(&ctx, input->secret_len, input->secret_data);
 
 	if (input->clnt_sockaddr) {
-		addr = (uint8_t *)kr_inaddr(input->clnt_sockaddr);
-		addr_len = kr_inaddr_len(input->clnt_sockaddr);
-		if (addr && addr_len > 0) {
-			hmac_sha256_update(&ctx, addr_len, addr);
-		}
+		update_hash(&ctx, input->clnt_sockaddr);
 	}
 
 	if (input->srvr_sockaddr) {
-		addr = (uint8_t *)kr_inaddr(input->srvr_sockaddr);
-		addr_len = kr_inaddr_len(input->srvr_sockaddr);
-		if (addr && addr_len > 0) {
-			hmac_sha256_update(&ctx, addr_len, addr);
-		}
+		update_hash(&ctx, input->srvr_sockaddr);
 	}
 
 	assert(KNOT_OPT_COOKIE_CLNT <= SHA256_DIGEST_SIZE);
@@ -98,9 +106,6 @@ static int sc_gen_hmac_sha256_64(const struct knot_sc_input *input,
 		return KNOT_EINVAL;
 	}
 
-	const uint8_t *addr = NULL;
-	int addr_len = 0; /* Address length. */
-
 	struct hmac_sha256_ctx ctx;
 	hmac_sha256_set_key(&ctx, input->srvr_data->secret_len,
 	                    input->srvr_data->secret_data);
@@ -112,11 +117,7 @@ static int sc_gen_hmac_sha256_64(const struct knot_sc_input *input,
 	}
 
 	if (input->srvr_data->clnt_sockaddr) {
-		addr = (uint8_t *)kr_inaddr(input->srvr_data->clnt_sockaddr);
-		addr_len = kr_inaddr_len(input->srvr_data->clnt_sockaddr);
-		if (addr && addr_len > 0) {
-			hmac_sha256_update(&ctx, addr_len, addr);
-		}
+		update_hash(&ctx, input->srvr_data->clnt_sockaddr);
 	}
 
 	assert(SRVR_HMAC_SHA256_64_HASH_SIZE < SHA256_DIGEST_SIZE);
