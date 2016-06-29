@@ -21,3 +21,4 @@ Knot DNS Resolver modules
 .. include:: ../modules/ketcd/README.rst
 .. include:: ../modules/dns64/README.rst
 .. include:: ../modules/renumber/README.rst
+.. include:: ../modules/cookiectl/README.rst
