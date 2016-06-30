@@ -120,6 +120,7 @@ endef
 
 # Make targets (name,path,amalgable yes|no,abiver)
 make_bin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(BINDIR),$(3))
+make_sbin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(SBINDIR),$(3))
 make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR),$(3),$(4))
 make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR),$(3))
 make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR),$(3))

@@ -7,12 +7,13 @@ BUILDMODE := dynamic
 HARDENING := yes
 
 # Paths
-PREFIX := /usr/local
-BINDIR := $(PREFIX)/bin
-LIBDIR := $(PREFIX)/lib
-INCLUDEDIR := $(PREFIX)/include
-MODULEDIR := $(LIBDIR)/kdns_modules
-ETCDIR := $(PREFIX)/etc/kresd
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+SBINDIR ?= $(PREFIX)/sbin
+LIBDIR ?= $(PREFIX)/lib
+INCLUDEDIR ?= $(PREFIX)/include
+MODULEDIR ?= $(LIBDIR)/kdns_modules
+ETCDIR ?= $(PREFIX)/etc/kresd
 
 # Tools
 CC	?= cc
