@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=-/etc/sysconfig/kresd
-ExecStart=/usr/bin/kresd -c /etc/kresd/config -f $KRESD_WORKERS $KRESD_OPTIONS /var/lib/kresd/
+ExecStart=/usr/sbin/kresd -c /etc/kresd/config -f $KRESD_WORKERS $KRESD_OPTIONS /var/lib/kresd/
 Restart=on-abort
 
 [Install]
