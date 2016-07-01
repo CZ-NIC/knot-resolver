@@ -37,7 +37,7 @@ struct kr_cookie_secret {
 /** Holds settings that have direct influence on client cookie values. */
 struct kr_clnt_cookie_settings {
 	struct kr_cookie_secret *csec; /*!< Client secret data. */
-	const struct kr_cc_alg_descr *calg; /**< Client cookie algorithm. */
+	int calg_id; /*!< Client cookie algorithm identifier. */
 };
 
 /** Holds settings that control client behaviour. */
@@ -53,7 +53,7 @@ struct kr_clnt_cookie_ctx {
 /** Holds settings that have direct influence on server cookie values. */
 struct kr_srvr_cookie_settings {
 	struct kr_cookie_secret *ssec; /*!< Server secret data. */
-	const struct kr_sc_alg_descr *salg; /**< Server cookie algorithm. */
+	int salg_id; /**< Server cookie algorithm identifier. */
 };
 
 /** Holds settings that control server behaviour. */

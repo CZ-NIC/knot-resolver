@@ -429,14 +429,14 @@ static int cookie_answer(const void *clnt_sockaddr,
 	/* Add fres cookie into the answer. */
 	int ret = kr_answer_write_cookie(&srvr_data,
 	                                 cookies->cc, cookies->cc_len, &nonce,
-	                                 srvr_cntrl->current.salg->alg, answer);
+	                                 kr_sc_algs[srvr_cntrl->current.salg_id], answer);
 	if (ret != kr_ok()) {
 		return KNOT_STATE_FAIL;
 	}
 
 	/* Check server cookie only with current settings. */
 	ret = knot_sc_check(NONCE_LEN, cookies, &srvr_data,
-	                    srvr_cntrl->current.salg->alg);
+	                    kr_sc_algs[srvr_cntrl->current.salg_id]);
 	if (ret != KNOT_EOK) {
 		kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 		return KNOT_STATE_FAIL | KNOT_STATE_DONE;

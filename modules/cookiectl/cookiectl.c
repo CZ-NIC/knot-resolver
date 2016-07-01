@@ -145,12 +145,12 @@ static bool apply_client_hash_func(struct kr_cookie_ctx *cntrl,
                                    const JsonNode *node)
 {
 	if (node->tag == JSON_STRING) {
-		const struct kr_cc_alg_descr *cc_alg = kr_cc_alg(kr_cc_algs,
-		                                                 node->string_);
-		if (!cc_alg) {
+		const knot_lookup_t *lookup = knot_lookup_by_name(kr_cc_alg_names,
+		                                                  node->string_);
+		if (!lookup) {
 			return false;
 		}
-		cntrl->clnt.current.calg = cc_alg;
+		cntrl->clnt.current.calg_id = lookup->id;
 		return true;
 	}
 
@@ -161,12 +161,12 @@ static bool apply_server_hash_func(struct kr_cookie_ctx *cntrl,
                                    const JsonNode *node)
 {
 	if (node->tag == JSON_STRING) {
-		const struct kr_sc_alg_descr *sc_alg = kr_sc_alg(kr_sc_algs,
-		                                                 node->string_);
-		if (!sc_alg) {
+		const knot_lookup_t *lookup = knot_lookup_by_name(kr_sc_alg_names,
+		                                                  node->string_);
+		if (!lookup) {
 			return false;
 		}
-		cntrl->srvr.current.salg = sc_alg;
+		cntrl->srvr.current.salg_id = lookup->id;
 		return true;
 	}
 
@@ -249,9 +249,8 @@ static bool read_available_cc_hashes(JsonNode *root)
 		return false;
 	}
 
-	const struct kr_cc_alg_descr *aux_ptr = kr_cc_algs;
-	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->gen_func) {
-		assert(aux_ptr->name);
+	const knot_lookup_t *aux_ptr = kr_cc_alg_names;
+	while (aux_ptr && (aux_ptr->id >= 0) && aux_ptr->name) {
 		JsonNode *element = json_mkstring(aux_ptr->name);
 		if (!element) {
 			goto fail;
@@ -280,9 +279,8 @@ static bool read_available_sc_hashes(JsonNode *root)
 		return false;
 	}
 
-	const struct kr_sc_alg_descr *aux_ptr = kr_sc_algs;
-	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->hash_func) {
-		assert(aux_ptr->name);
+	const knot_lookup_t *aux_ptr = kr_sc_alg_names;
+	while (aux_ptr && (aux_ptr->id >= 0) && aux_ptr->name) {
 		JsonNode *element = json_mkstring(aux_ptr->name);
 		if (!element) {
 			goto fail;
@@ -307,7 +305,7 @@ static bool clnt_settings_equal(const struct kr_clnt_cookie_settings *s1,
 {
 	assert(s1 && s2 && s1->csec && s2->csec);
 
-	if (s1->calg != s2->calg || s1->csec->size != s2->csec->size) {
+	if (s1->calg_id != s2->calg_id || s1->csec->size != s2->csec->size) {
 		return false;
 	}
 
@@ -319,7 +317,7 @@ static bool srvr_settings_equal(const struct kr_srvr_cookie_settings *s1,
 {
 	assert(s1 && s2 && s1->ssec && s2->ssec);
 
-	if (s1->salg != s2->salg || s1->ssec->size != s2->ssec->size) {
+	if (s1->salg_id != s2->salg_id || s1->ssec->size != s2->ssec->size) {
 		return false;
 	}
 
@@ -401,7 +399,8 @@ char *read_config(struct kr_cookie_ctx *ctx)
 		return NULL;
 	}
 
-	char *result = NULL;
+	const knot_lookup_t *lookup;
+	char *result;
 	JsonNode *root_node = json_mkobject();
 
 	json_append_member(root_node, NAME_CLIENT_ENABLED,
@@ -409,9 +408,11 @@ char *read_config(struct kr_cookie_ctx *ctx)
 
 	read_secret(root_node, NAME_CLIENT_SECRET, ctx->clnt.current.csec);
 
-	assert(ctx->clnt.current.calg->name);
-	json_append_member(root_node, NAME_CLIENT_COOKIE_ALG,
-	                   json_mkstring(ctx->clnt.current.calg->name));
+	lookup = knot_lookup_by_id(kr_cc_alg_names, ctx->clnt.current.calg_id);
+	if (lookup) {
+		json_append_member(root_node, NAME_CLIENT_COOKIE_ALG,
+		                   json_mkstring(lookup->name));
+	}
 
 	read_available_cc_hashes(root_node);
 
@@ -423,9 +424,11 @@ char *read_config(struct kr_cookie_ctx *ctx)
 
 	read_secret(root_node, NAME_SERVER_SECRET, ctx->srvr.current.ssec);
 
-	assert(ctx->srvr.current.salg->name);
-	json_append_member(root_node, NAME_SERVER_COOKIE_ALG,
-	                   json_mkstring(ctx->srvr.current.salg->name));
+	lookup = knot_lookup_by_id(kr_sc_alg_names, ctx->srvr.current.salg_id);
+	if (lookup) {
+		json_append_member(root_node, NAME_SERVER_COOKIE_ALG,
+		                   json_mkstring(lookup->name));
+	}
 
 	read_available_sc_hashes(root_node);
 
@@ -470,14 +473,20 @@ int cookiectl_init(struct kr_module *module)
 		return kr_error(ENOMEM);
 	}
 
+	const knot_lookup_t *lookup;
+
 	kr_glob_cookie_ctx.clnt.enabled = false;
 	kr_glob_cookie_ctx.clnt.current.csec = cs;
-	kr_glob_cookie_ctx.clnt.current.calg = kr_cc_alg(kr_cc_algs, "FNV-64");
+	lookup = knot_lookup_by_name(kr_cc_alg_names, "FNV-64");
+	assert(lookup);
+	kr_glob_cookie_ctx.clnt.current.calg_id = lookup->id;
 	kr_glob_cookie_ctx.clnt.cache_ttl = DFLT_COOKIE_TTL;
 
 	kr_glob_cookie_ctx.srvr.enabled = false;
 	kr_glob_cookie_ctx.srvr.current.ssec = ss;
-	kr_glob_cookie_ctx.srvr.current.salg = kr_sc_alg(kr_sc_algs, "FNV-64");
+	lookup = knot_lookup_by_name(kr_sc_alg_names, "FNV-64");
+	assert(lookup);
+	kr_glob_cookie_ctx.srvr.current.salg_id = lookup->id;
 
 	module->data = NULL;
 

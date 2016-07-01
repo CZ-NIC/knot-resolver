@@ -125,8 +125,7 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 		return kr_ok();
 	}
 
-	if (!clnt_cntrl->csec || !clnt_cntrl->calg ||
-	    !cookie_cache) {
+	if (!clnt_cntrl->csec || (clnt_cntrl->calg_id < 0) || !cookie_cache) {
 		return kr_error(EINVAL);
 	}
 
@@ -141,9 +140,9 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 	};
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
 	uint16_t cc_len = KNOT_OPT_COOKIE_CLNT;
-	assert(clnt_cntrl->calg && clnt_cntrl->calg->alg &&
-	       clnt_cntrl->calg->alg->gen_func);
-	int ret = clnt_cntrl->calg->alg->gen_func(&input, cc, &cc_len);
+	assert((clnt_cntrl->calg_id >= 0) && kr_cc_algs[clnt_cntrl->calg_id] &&
+	       kr_cc_algs[clnt_cntrl->calg_id]->gen_func);
+	int ret = kr_cc_algs[clnt_cntrl->calg_id]->gen_func(&input, cc, &cc_len);
 	if (ret != kr_ok()) {
 		return ret;
 	}

@@ -18,56 +18,25 @@
 
 #include <libknot/cookies/client.h>
 #include <libknot/cookies/server.h>
+#include <libknot/lookup.h>
 
 #include "lib/defines.h"
 
+/** Client algorithm identifiers are used as index into this array of pointers. */
+KR_EXPORT
+extern const struct knot_cc_alg *const kr_cc_algs[];
+
+/** Binds client algorithm identifiers onto names. */
+KR_EXPORT
+extern const knot_lookup_t kr_cc_alg_names[];
+
+/** Server algorithm identifiers are used as index into this array of pointers. */
+KR_EXPORT
+extern const struct knot_sc_alg *const kr_sc_algs[];
+
+/** Binds server algorithm identifiers onto names. */
+KR_EXPORT
+extern const knot_lookup_t kr_sc_alg_names[];
+
 /** Maximal size of a cookie option. */
 #define KR_COOKIE_OPT_MAX_LEN (KNOT_EDNS_OPTION_HDRLEN + KNOT_OPT_COOKIE_CLNT + KNOT_OPT_COOKIE_SRVR_MAX)
-
-/** Holds description of client cookie hashing algorithms. */
-struct kr_cc_alg_descr {
-	const char *name; /**< Algorithgm name. */
-	const struct knot_cc_alg *alg; /**< Algorithm. */
-};
-
-/**
- * List of available client cookie algorithms.
- *
- * Last element contains all null entries.
- */
-KR_EXPORT
-extern const struct kr_cc_alg_descr kr_cc_algs[];
-
-/**
- * @brief Return pointer to client cookie algorithm with given name.
- * @param cc_algs List of available algorithms.
- * @param name    Algorithm name.
- * @return pointer to algorithm or NULL if not found.
- */
-KR_EXPORT
-const struct kr_cc_alg_descr *kr_cc_alg(const struct kr_cc_alg_descr cc_algs[],
-                                        const char *name);
-
-/** Holds description of server cookie hashing algorithms. */
-struct kr_sc_alg_descr {
-	const char *name; /**< Algorithm name. */
-	const struct knot_sc_alg *alg; /**< Algorithm. */
-};
-
-/**
- * List of available server cookie algorithms.
- *
- * Last element contains all null entries.
- */
-KR_EXPORT
-extern const struct kr_sc_alg_descr kr_sc_algs[];
-
-/**
- * @brief Return pointer to server cookie algorithm with given name.
- * @param sc_algs List of available algorithms.
- * @param name    Algorithm name.
- * @return pointer to algorithm or NULL if not found.
- */
-KR_EXPORT
-const struct kr_sc_alg_descr *kr_sc_alg(const struct kr_sc_alg_descr sc_algs[],
-                                        const char *name);

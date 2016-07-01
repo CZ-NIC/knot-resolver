@@ -23,52 +23,24 @@
 #include "lib/cookies/alg_containers.h"
 #include "lib/cookies/alg_sha.h"
 
-const struct kr_cc_alg_descr kr_cc_algs[] = {
-	{ "FNV-64", &knot_cc_alg_fnv64 },
-	{ "HMAC-SHA256-64", &knot_cc_alg_hmac_sha256_64 },
-	{ NULL, NULL }
+const struct knot_cc_alg *const kr_cc_algs[] = {
+	/* 0 */ &knot_cc_alg_fnv64,
+	/* 1 */ &knot_cc_alg_hmac_sha256_64
 };
 
-const struct kr_cc_alg_descr *kr_cc_alg(const struct kr_cc_alg_descr cc_algs[],
-                                        const char *name)
-{
-	if (!cc_algs || !name) {
-		return NULL;
-	}
-
-	const struct kr_cc_alg_descr *aux_ptr = cc_algs;
-	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->gen_func) {
-		assert(aux_ptr->name);
-		if (strcmp(aux_ptr->name, name) == 0) {
-			return aux_ptr;
-		}
-		++aux_ptr;
-	}
-
-	return NULL;
-}
-
-const struct kr_sc_alg_descr kr_sc_algs[] = {
-	{ "FNV-64", &knot_sc_alg_fnv64 },
-	{ "HMAC-SHA256-64", &knot_sc_alg_hmac_sha256_64 },
-	{ NULL, NULL }
+const knot_lookup_t kr_cc_alg_names[] = {
+	{ 0, "FNV-64" },
+	{ 1, "HMAC-SHA256-64" },
+	{ -1, NULL }
 };
 
-const struct kr_sc_alg_descr *kr_sc_alg(const struct kr_sc_alg_descr sc_algs[],
-                                        const char *name)
-{
-	if (!sc_algs || !name) {
-		return NULL;
-	}
+const struct knot_sc_alg *const kr_sc_algs[] = {
+	/* 0 */ &knot_sc_alg_fnv64,
+	/* 1 */ &knot_sc_alg_hmac_sha256_64
+};
 
-	const struct kr_sc_alg_descr *aux_ptr = sc_algs;
-	while (aux_ptr && aux_ptr->alg && aux_ptr->alg->hash_func) {
-		assert(aux_ptr->name);
-		if (strcmp(aux_ptr->name, name) == 0) {
-			return aux_ptr;
-		}
-		++aux_ptr;
-	}
-
-	return NULL;
-}
+const knot_lookup_t kr_sc_alg_names[] = {
+	{ 0, "FNV-64" },
+	{ 1, "HMAC-SHA256-64" },
+	{ -1, NULL }
+};
