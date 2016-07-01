@@ -111,13 +111,13 @@ static int opt_rr_add_cc(knot_rrset_t *opt_rr, uint8_t *cc, uint16_t cc_len,
 #undef SC_LEN
 }
 
-int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
+int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
                           struct kr_cache *cookie_cache,
                           const struct sockaddr *clnt_sa,
                           const struct sockaddr *srvr_sa,
                           knot_pkt_t *pkt)
 {
-	if (!clnt_cntrl || !pkt) {
+	if (!clnt_comp || !pkt) {
 		return kr_error(EINVAL);
 	}
 
@@ -125,7 +125,7 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 		return kr_ok();
 	}
 
-	if (!clnt_cntrl->csec || (clnt_cntrl->calg_id < 0) || !cookie_cache) {
+	if (!clnt_comp->secr || (clnt_comp->alg_id < 0) || !cookie_cache) {
 		return kr_error(EINVAL);
 	}
 
@@ -135,14 +135,14 @@ int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
 	struct knot_cc_input input = {
 		.clnt_sockaddr = clnt_sa,
 		.srvr_sockaddr = srvr_sa,
-		.secret_data = clnt_cntrl->csec->data,
-		.secret_len = clnt_cntrl->csec->size
+		.secret_data = clnt_comp->secr->data,
+		.secret_len = clnt_comp->secr->size
 	};
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
 	uint16_t cc_len = KNOT_OPT_COOKIE_CLNT;
-	assert((clnt_cntrl->calg_id >= 0) && kr_cc_algs[clnt_cntrl->calg_id] &&
-	       kr_cc_algs[clnt_cntrl->calg_id]->gen_func);
-	int ret = kr_cc_algs[clnt_cntrl->calg_id]->gen_func(&input, cc, &cc_len);
+	assert((clnt_comp->alg_id >= 0) && kr_cc_algs[clnt_comp->alg_id] &&
+	       kr_cc_algs[clnt_comp->alg_id]->gen_func);
+	int ret = kr_cc_algs[clnt_comp->alg_id]->gen_func(&input, cc, &cc_len);
 	if (ret != kr_ok()) {
 		return ret;
 	}

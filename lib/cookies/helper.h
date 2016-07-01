@@ -25,7 +25,7 @@
 /**
  * @brief Insert a DNS cookie into query packet.
  * @note The packet must already contain ENDS section.
- * @param clnt_cntrl   client cookie control structure
+ * @param clnt_comp    client cookie control structure
  * @param cookie_cache cookie cache
  * @param clnt_sa      client socket address
  * @param srvr_sa      server socket address
@@ -33,7 +33,7 @@
  * @return kr_ok() or error code
  */
 KR_EXPORT
-int kr_request_put_cookie(const struct kr_clnt_cookie_settings *clnt_cntrl,
+int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
                           struct kr_cache *cookie_cache,
                           const struct sockaddr *clnt_sa,
                           const struct sockaddr *srvr_sa,

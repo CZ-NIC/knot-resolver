@@ -17,6 +17,7 @@
 #include "lib/cookies/control.h"
 
 struct kr_cookie_ctx kr_glob_cookie_ctx = {
-	.clnt = { false, { NULL, -1 }, { NULL, -1}, DFLT_COOKIE_TTL },
-	.srvr = { false, { NULL, -1 }, { NULL, -1} }
+	.clnt = { false, { NULL, -1 }, { NULL, -1} },
+	.srvr = { false, { NULL, -1 }, { NULL, -1} },
+	.cache_ttl = DFLT_COOKIE_TTL
 };

@@ -395,16 +395,16 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 /**
  * @brief Put cookie into answer packet.
  * @param clnt_sockaddr client socket address
- * @param srvr_cntrl control structure of the server cookie algorithm
+ * @param srvr_sett settings structure of the server cookie algorithm
  * @param cookies obtained cookies
  * @param answer answer packet
  * @return state
  */
 static int cookie_answer(const void *clnt_sockaddr,
-                         const struct kr_srvr_cookie_ctx *srvr_cntrl,
+                         const struct kr_cookie_settings *srvr_sett,
                          struct knot_dns_cookies *cookies, knot_pkt_t *answer)
 {
-	assert(srvr_cntrl && cookies && answer);
+	assert(srvr_sett && cookies && answer);
 
 	/* Initialise answer. */
 	knot_wire_set_qr(answer->wire);
@@ -414,8 +414,8 @@ static int cookie_answer(const void *clnt_sockaddr,
 
 	struct knot_sc_private srvr_data = {
 		.clnt_sockaddr = clnt_sockaddr,
-		.secret_data = srvr_cntrl->current.ssec->data,
-		.secret_len = srvr_cntrl->current.ssec->size
+		.secret_data = srvr_sett->current.secr->data,
+		.secret_len = srvr_sett->current.secr->size
 	};
 
 	struct timeval tv;
@@ -429,14 +429,14 @@ static int cookie_answer(const void *clnt_sockaddr,
 	/* Add fres cookie into the answer. */
 	int ret = kr_answer_write_cookie(&srvr_data,
 	                                 cookies->cc, cookies->cc_len, &nonce,
-	                                 kr_sc_algs[srvr_cntrl->current.salg_id], answer);
+	                                 kr_sc_algs[srvr_sett->current.alg_id], answer);
 	if (ret != kr_ok()) {
 		return KNOT_STATE_FAIL;
 	}
 
 	/* Check server cookie only with current settings. */
 	ret = knot_sc_check(NONCE_LEN, cookies, &srvr_data,
-	                    kr_sc_algs[srvr_cntrl->current.salg_id]);
+	                    kr_sc_algs[srvr_sett->current.alg_id]);
 	if (ret != KNOT_EOK) {
 		kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 		return KNOT_STATE_FAIL | KNOT_STATE_DONE;

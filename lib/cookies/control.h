@@ -34,40 +34,26 @@ struct kr_cookie_secret {
 /** Default cookie TTL. */
 #define DFLT_COOKIE_TTL 72000
 
-/** Holds settings that have direct influence on client cookie values. */
-struct kr_clnt_cookie_settings {
-	struct kr_cookie_secret *csec; /*!< Client secret data. */
-	int calg_id; /*!< Client cookie algorithm identifier. */
+/** Holds settings that have direct influence on cookie values computation. */
+struct kr_cookie_comp {
+	struct kr_cookie_secret *secr; /*!< Secret data. */
+	int alg_id; /*!< Cookie algorithm identifier. */
 };
 
-/** Holds settings that control client behaviour. */
-struct kr_clnt_cookie_ctx {
-	bool enabled; /**< Enable/disables client DNS cookies functionality. */
+/** Holds settings that control client/server cookie behaviour. */
+struct kr_cookie_settings {
+	bool enabled; /**< Enable/disables DNS cookies functionality. */
 
-	struct kr_clnt_cookie_settings current; /**< Current cookie client settings. */
-	struct kr_clnt_cookie_settings recent; /**< Current cookie client settings. */
-
-	uint32_t cache_ttl; /**< TTL used when caching cookies */
-};
-
-/** Holds settings that have direct influence on server cookie values. */
-struct kr_srvr_cookie_settings {
-	struct kr_cookie_secret *ssec; /*!< Server secret data. */
-	int salg_id; /**< Server cookie algorithm identifier. */
-};
-
-/** Holds settings that control server behaviour. */
-struct kr_srvr_cookie_ctx {
-	bool enabled; /**< Enable/disables server DNS cookies functionality. */
-
-	struct kr_srvr_cookie_settings current; /**< Current cookie server settings. */
-	struct kr_srvr_cookie_settings recent; /**< Current cookie server settings. */
+	struct kr_cookie_comp current; /**< Current cookie settings. */
+	struct kr_cookie_comp recent; /**< Recent cookie settings. */
 };
 
 /** DNS cookies controlling structure. */
 struct kr_cookie_ctx {
-	struct kr_clnt_cookie_ctx clnt; /**< Client settings. */
-	struct kr_srvr_cookie_ctx srvr; /**< Server settings. */
+	struct kr_cookie_settings clnt; /**< Client settings. */
+	struct kr_cookie_settings srvr; /**< Server settings. */
+
+	uint32_t cache_ttl; /**< TTL used when caching cookies */
 };
 
 /** Global cookie control context. */
