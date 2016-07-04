@@ -245,7 +245,7 @@ You can hack on the container by changing the container entrypoint to shell like
 
 .. tip:: You can build the Docker image yourself with ``docker build -t knot-resolver scripts``.
 
-.. _Docker images: https://registry.hub.docker.com/u/cznic/knot-resolver
+.. _Docker images: https://hub.docker.com/r/cznic/knot-resolver
 .. _libuv: https://github.com/libuv/libuv
 .. _MSVC: https://msdn.microsoft.com/en-us/vstudio/hh386302.aspx
 .. _MinGW: http://www.mingw.org/
