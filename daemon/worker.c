@@ -451,16 +451,18 @@ static void on_write(uv_write_t *req, int status)
 
 #if defined(ENABLE_COOKIES)
 /** Update DNS cookie data in packet. */
-static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
-                                  struct kr_cache *cookie_cache,
-                                  knot_pkt_t *pkt)
+static bool subreq_update_cookies(struct qr_task *task, uv_udp_t *handle,
+                                  struct sockaddr *srvr_addr, knot_pkt_t *pkt)
 {
+	assert(task);
 	assert(handle);
 	assert(srvr_addr);
 	assert(pkt);
 
+	struct kr_cookie_settings *clnt_sett = &task->req.ctx->cookie_ctx.clnt;
+
 	/* Cookies disabled or packet has no ENDS section. */
-	if (!kr_glob_cookie_ctx.clnt.enabled || !pkt->opt_rr) {
+	if (!clnt_sett->enabled || !pkt->opt_rr) {
 		return true;
 	}
 
@@ -484,7 +486,8 @@ static bool subreq_update_cookies(uv_udp_t *handle, struct sockaddr *srvr_addr,
 	}
 #endif /* 0 */
 
-	kr_request_put_cookie(&kr_glob_cookie_ctx.clnt.current, cookie_cache,
+	kr_request_put_cookie(&clnt_sett->current,
+	                      &task->worker->engine->resolver.cache,
 	                      (struct sockaddr*) sockaddr_ptr, srvr_addr, pkt);
 
 	return true;
@@ -513,13 +516,15 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	if (handle->type == UV_UDP) {
 #if defined(ENABLE_COOKIES)
 		/* The actual server IP address is needed before generating the
-		 * actual cookie. Also the resolver somehow mangles the query
-		 * packets before building the query i.e. the space needed for
-		 * the cookie cannot be allocated in the cookie layer. */
+		 * actual cookie. If we don't know the server address then we
+		 * also don't know the actual cookie size.
+		 * Also the resolver somehow mangles the query packets before
+		 * building the query i.e. the space needed for the cookie
+		 * cannot be allocated in the cookie layer. */
 		if (knot_wire_get_qr(pkt->wire) == 0) {
 			/* Update DNS cookies data in query. */
-			subreq_update_cookies((uv_udp_t *) handle, addr,
-			                      &task->worker->engine->resolver.cache, pkt);
+			subreq_update_cookies(task, (uv_udp_t *) handle, addr,
+			                      pkt);
 		}
 #endif /* defined(ENABLE_COOKIES) */
 

@@ -14,10 +14,20 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <string.h>
+
 #include "lib/cookies/control.h"
 
-struct kr_cookie_ctx kr_glob_cookie_ctx = {
-	.clnt = { false, { NULL, -1 }, { NULL, -1} },
-	.srvr = { false, { NULL, -1 }, { NULL, -1} },
-	.cache_ttl = DFLT_COOKIE_TTL
-};
+void kr_cookie_ctx_init(struct kr_cookie_ctx *ctx)
+{
+	if (!ctx) {
+		return;
+	}
+
+	memset(ctx, 0, sizeof(*ctx));
+
+	ctx->clnt.current.alg_id = ctx->clnt.recent.alg_id = -1;
+	ctx->srvr.current.alg_id = ctx->srvr.recent.alg_id = -1;
+
+	ctx->cache_ttl = DFLT_COOKIE_TTL;
+}

@@ -16,10 +16,13 @@
 
 #pragma once
 
+#include <libknot/rrtype/opt-cookie.h>
 #include <libknot/packet/pkt.h>
 
+#include "lib/cookies/alg_containers.h"
 #include "lib/cookies/control.h"
 #include "lib/cookies/nonce.h"
+#include "lib/cache.h"
 #include "lib/defines.h"
 
 /**

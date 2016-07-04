@@ -16,13 +16,10 @@
 
 #pragma once
 
-#include <libknot/rrtype/opt-cookie.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "lib/cookies/alg_containers.h"
-#include "lib/cache.h"
 #include "lib/defines.h"
 
 /** Holds secret quantity. */
@@ -56,6 +53,9 @@ struct kr_cookie_ctx {
 	uint32_t cache_ttl; /**< TTL used when caching cookies */
 };
 
-/** Global cookie control context. */
+/**
+ * @brief Initialises cookie control context.
+ * @param ctx cookie control context
+ */
 KR_EXPORT
-extern struct kr_cookie_ctx kr_glob_cookie_ctx;
+void kr_cookie_ctx_init(struct kr_cookie_ctx *ctx);

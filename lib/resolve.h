@@ -19,6 +19,7 @@
 #include <netinet/in.h>
 #include <libknot/packet/pkt.h>
 
+#include "lib/cookies/control.h"
 #include "lib/layer.h"
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
@@ -92,6 +93,11 @@ struct kr_context
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
+#if defined(ENABLE_COOKIES)
+	/* The structure should not be held within the cookies module because
+	 * of better access. */
+	struct kr_cookie_ctx cookie_ctx;
+#endif /* defined(ENABLE_COOKIES) */
 	knot_mm_t *pool;
 };
 

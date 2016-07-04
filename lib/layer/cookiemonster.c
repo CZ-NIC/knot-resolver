@@ -308,8 +308,9 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
+	struct kr_cookie_ctx *cookie_ctx = &req->ctx->cookie_ctx;
 
-	if (!kr_glob_cookie_ctx.clnt.enabled || (qry->flags & QUERY_TCP)) {
+	if (!cookie_ctx->clnt.enabled || (qry->flags & QUERY_TCP)) {
 		return ctx->state;
 	}
 
@@ -338,8 +339,8 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	if (!check_cookie_content_and_cache(&kr_glob_cookie_ctx.clnt,
-	                                    kr_glob_cookie_ctx.cache_ttl, qry,
+	if (!check_cookie_content_and_cache(&cookie_ctx->clnt,
+	                                    cookie_ctx->cache_ttl, qry,
 	                                    pkt_cookie_opt, cookie_cache)) {
 		return KNOT_STATE_FAIL;
 	}
@@ -383,13 +384,15 @@ static inline uint8_t *req_cookie_option(struct kr_request *req)
 
 static int check_request(knot_layer_t *ctx, void *module_param)
 {
-	if (!kr_glob_cookie_ctx.srvr.enabled) {
+	struct kr_request *req = ctx->data;
+	struct kr_cookie_settings *srvr_sett = &req->ctx->cookie_ctx.srvr;
+
+	if (!srvr_sett->enabled) {
 		/* TODO -- IS there a way how to determine whether the original
 		 * request came via TCP? */
 		return ctx->state;
 	}
 
-	struct kr_request *req = ctx->data;
 	uint8_t *req_cookie_opt = req_cookie_option(req);
 	if (!req_cookie_opt) {
 		return ctx->state; /* Don't do anything without cookies. */
@@ -406,7 +409,6 @@ static int check_request(knot_layer_t *ctx, void *module_param)
 
 	bool ignore_badcookie = true; /* TODO -- Occasionally ignore? */
 
-	struct kr_cookie_settings *srvr_sett = &kr_glob_cookie_ctx.srvr;
 	if (!req->qsource.addr ||
 	    !srvr_sett->current.secr || (srvr_sett->current.alg_id < 0)) {
 		DEBUG_MSG(NULL, "%s\n", "missing server cookie context");

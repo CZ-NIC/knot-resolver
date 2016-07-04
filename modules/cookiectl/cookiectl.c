@@ -16,6 +16,7 @@
 
 #include <assert.h>
 #include <ccan/json/json.h>
+#include <libknot/rrtype/opt-cookie.h>
 #include <libknot/db/db_lmdb.h>
 #include <stdlib.h>
 #include <string.h>
@@ -399,11 +400,14 @@ char *read_config(struct kr_cookie_ctx *ctx)
  */
 static char *cookiectl_config(void *env, struct kr_module *module, const char *args)
 {
+	struct kr_cookie_ctx *cookie_ctx = module->data;
+	assert(cookie_ctx);
+
 	/* Apply configuration, if any. */
-	apply_config(&kr_glob_cookie_ctx, args);
+	apply_config(cookie_ctx, args);
 
 	/* Return current configuration. */
-	return read_config(&kr_glob_cookie_ctx);
+	return read_config(cookie_ctx);
 }
 
 /*
@@ -415,7 +419,9 @@ int cookiectl_init(struct kr_module *module)
 {
 	struct engine *engine = module->data;
 
-	memset(&kr_glob_cookie_ctx, 0, sizeof(kr_glob_cookie_ctx));
+	struct kr_cookie_ctx *cookie_ctx = &engine->resolver.cookie_ctx;
+
+	kr_cookie_ctx_init(cookie_ctx);
 
 	struct kr_cookie_secret *cs = new_cookie_secret(KNOT_OPT_COOKIE_CLNT,
 	                                                true);
@@ -427,25 +433,24 @@ int cookiectl_init(struct kr_module *module)
 		return kr_error(ENOMEM);
 	}
 
-	const knot_lookup_t *lookup;
+	const knot_lookup_t *clookup = knot_lookup_by_name(kr_cc_alg_names,
+	                                                   "FNV-64");
+	const knot_lookup_t *slookup = knot_lookup_by_name(kr_sc_alg_names,
+	                                                   "FNV-64");
+	if (!clookup || !slookup) {
+		free(cs);
+		free(ss);
+		return kr_error(ENOKEY);
+	}
 
-	kr_glob_cookie_ctx.clnt.enabled = false;
-	kr_glob_cookie_ctx.clnt.current.secr = cs;
-	lookup = knot_lookup_by_name(kr_cc_alg_names, "FNV-64");
-	assert(lookup);
-	kr_glob_cookie_ctx.clnt.current.alg_id = lookup->id;
-	kr_glob_cookie_ctx.clnt.recent.alg_id = -1;
+	cookie_ctx->clnt.current.secr = cs;
+	cookie_ctx->clnt.current.alg_id = clookup->id;
 
-	kr_glob_cookie_ctx.srvr.enabled = false;
-	kr_glob_cookie_ctx.srvr.current.secr = ss;
-	lookup = knot_lookup_by_name(kr_sc_alg_names, "FNV-64");
-	assert(lookup);
-	kr_glob_cookie_ctx.srvr.current.alg_id = lookup->id;
-	kr_glob_cookie_ctx.srvr.recent.alg_id = -1;
+	cookie_ctx->srvr.current.secr = ss;
+	cookie_ctx->srvr.current.alg_id = slookup->id;
 
-	kr_glob_cookie_ctx.cache_ttl = DFLT_COOKIE_TTL;
-
-	module->data = NULL;
+	/* Replace engine pointer. */
+	module->data = cookie_ctx;
 
 	return kr_ok();
 }
@@ -453,21 +458,25 @@ int cookiectl_init(struct kr_module *module)
 KR_EXPORT
 int cookiectl_deinit(struct kr_module *module)
 {
-	kr_glob_cookie_ctx.clnt.enabled = false;
+	struct engine *engine = module->data;
 
-	free(kr_glob_cookie_ctx.clnt.recent.secr);
-	kr_glob_cookie_ctx.clnt.recent.secr = NULL;
+	struct kr_cookie_ctx *cookie_ctx = module->data;
 
-	free(kr_glob_cookie_ctx.clnt.current.secr);
-	kr_glob_cookie_ctx.clnt.current.secr = NULL;
+	cookie_ctx->clnt.enabled = false;
 
-	kr_glob_cookie_ctx.srvr.enabled = false;
+	free(cookie_ctx->clnt.recent.secr);
+	cookie_ctx->clnt.recent.secr = NULL;
 
-	free(kr_glob_cookie_ctx.srvr.recent.secr);
-	kr_glob_cookie_ctx.srvr.recent.secr = NULL;
+	free(cookie_ctx->clnt.current.secr);
+	cookie_ctx->clnt.current.secr = NULL;
 
-	free(kr_glob_cookie_ctx.srvr.current.secr);
-	kr_glob_cookie_ctx.srvr.current.secr = NULL;
+	cookie_ctx->srvr.enabled = false;
+
+	free(cookie_ctx->srvr.recent.secr);
+	cookie_ctx->srvr.recent.secr = NULL;
+
+	free(cookie_ctx->srvr.current.secr);
+	cookie_ctx->srvr.current.secr = NULL;
 
 	return kr_ok();
 }
