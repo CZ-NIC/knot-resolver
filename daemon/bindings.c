@@ -997,6 +997,11 @@ static int wrk_resolve(lua_State *L)
 	return 1;
 }
 
+static inline double getseconds(uv_timeval_t *tv)
+{
+	return (double)tv->tv_sec + 0.000001*((double)tv->tv_usec);
+}
+
 /** Return worker statistics. */
 static int wrk_stats(lua_State *L)
 {
@@ -1021,6 +1026,26 @@ static int wrk_stats(lua_State *L)
 	lua_setfield(L, -2, "dropped");
 	lua_pushnumber(L, worker->stats.timeout);
 	lua_setfield(L, -2, "timeout");
+	/* Add subset of rusage that represents counters. */
+	uv_rusage_t rusage;
+	if (uv_getrusage(&rusage) == 0) {
+		lua_pushnumber(L, getseconds(&rusage.ru_utime));
+		lua_setfield(L, -2, "usertime");
+		lua_pushnumber(L, getseconds(&rusage.ru_stime));
+		lua_setfield(L, -2, "systime");
+		lua_pushnumber(L, rusage.ru_majflt);
+		lua_setfield(L, -2, "pagefaults");
+		lua_pushnumber(L, rusage.ru_nswap);
+		lua_setfield(L, -2, "swaps");
+		lua_pushnumber(L, rusage.ru_nvcsw + rusage.ru_nivcsw);
+		lua_setfield(L, -2, "csw");
+	}
+	/* Get RSS */
+	size_t rss = 0;
+	if (uv_resident_set_memory(&rss) == 0) {
+		lua_pushnumber(L, rss);
+		lua_setfield(L, -2, "rss");
+	}
 	return 1;
 }
 

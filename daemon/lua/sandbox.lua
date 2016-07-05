@@ -29,6 +29,13 @@ if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
 
+-- Shorthand for aggregated per-worker information
+worker.info = function ()
+	local t = worker.stats()
+	t.pid = worker.pid
+	return t
+end
+
 -- Resolver mode of operation
 local current_mode = 'normal'
 local mode_table = { normal=0, strict=1, permissive=2 }
