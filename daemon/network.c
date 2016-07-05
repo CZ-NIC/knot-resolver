@@ -169,12 +169,13 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 			return kr_error(ENOMEM);
 		}
 		uv_udp_init(net->loop, ep->udp);
-		int ret = uv_udp_open(ep->udp, (uv_os_sock_t) fd);
+		int ret = udp_bindfd(ep->udp, fd);
 		if (ret != 0) {
 			close_handle((uv_handle_t *)ep->udp, false);
 			return ret;
 		}
 		ep->flags |= NET_UDP;
+		return kr_ok();
 	}
 	if (sock_type == SOCK_STREAM) {
 		if (ep->tcp) {
@@ -185,14 +186,15 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 			return kr_error(ENOMEM);
 		}
 		uv_tcp_init(net->loop, ep->tcp);
-		int ret = uv_tcp_open(ep->tcp, (uv_os_sock_t) fd);
+		int ret = tcp_bindfd(ep->tcp, fd);
 		if (ret != 0) {
 			close_handle((uv_handle_t *)ep->tcp, false);
 			return ret;
 		}
 		ep->flags |= NET_TCP;
+		return kr_ok();
 	}
-	return kr_ok();
+	return kr_error(EINVAL);
 }
 
 /** @internal Fetch endpoint array and offset of the address/port query. */
@@ -236,8 +238,6 @@ int network_listen_fd(struct network *net, int fd)
 		uv_ip6_name((const struct sockaddr_in6*)&ss, addr_str, sizeof(addr_str));
 		port = ntohs(((struct sockaddr_in6 *)&ss)->sin6_port);
 	} else {
-		uv_ip4_name((const struct sockaddr_in*)&ss, addr_str, sizeof(addr_str));
-		port = ntohs(((struct sockaddr_in *)&ss)->sin_port);
 		return kr_error(EAFNOSUPPORT);
 	}
 	/* Fetch or create endpoint for this fd */

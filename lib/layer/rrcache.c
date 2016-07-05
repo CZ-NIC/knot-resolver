@@ -350,7 +350,7 @@ static int rrcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 		/* Clear if full */
 		if (ret == kr_error(ENOSPC)) {
 			ret = kr_cache_clear(cache);
-			if (ret != 0) {
+			if (ret != 0 && ret != kr_error(EEXIST)) {
 				kr_log_error("[cache] failed to clear cache: %s\n", kr_strerror(ret));
 			}
 		}

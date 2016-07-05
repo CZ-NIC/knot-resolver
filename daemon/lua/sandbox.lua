@@ -171,7 +171,7 @@ else -- Lua 5.2+
 end
 
 -- Interactive command evaluation
-function eval_cmd(line)
+function eval_cmd(line, raw)
 	-- Compatibility sandbox code loading
 	local function load_code(code)
 	    if getfenv then -- Lua 5.1
@@ -181,7 +181,7 @@ function eval_cmd(line)
 	    end
 	end
 	local status, err, chunk
-	chunk, err = load_code('return table_print('..line..')')
+	chunk, err = load_code(raw and 'return '..line or 'return table_print('..line..')')
 	if err then
 		chunk, err = load_code(line)
 	end

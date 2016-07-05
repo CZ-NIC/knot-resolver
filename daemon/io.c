@@ -142,6 +142,15 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	mp_flush(worker->pkt_pool.ctx);
 }
 
+static int udp_bind_finalize(uv_handle_t *handle)
+{
+	check_bufsize((uv_handle_t *)handle);
+	/* Handle is already created, just create context. */
+	handle->data = session_new();
+	assert(handle->data);
+	return io_start_read((uv_handle_t *)handle);
+}
+
 int udp_bind(uv_udp_t *handle, struct sockaddr *addr)
 {
 	unsigned flags = UV_UDP_REUSEADDR;
@@ -152,11 +161,20 @@ int udp_bind(uv_udp_t *handle, struct sockaddr *addr)
 	if (ret != 0) {
 		return ret;
 	}
-	check_bufsize((uv_handle_t *)handle);
-	/* Handle is already created, just create context. */
-	handle->data = session_new();
-	assert(handle->data);
-	return io_start_read((uv_handle_t *)handle);
+	return udp_bind_finalize((uv_handle_t *)handle);
+}
+
+int udp_bindfd(uv_udp_t *handle, int fd)
+{
+	if (!handle) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = uv_udp_open(handle, (uv_os_sock_t) fd);
+	if (ret != 0) {
+		return ret;
+	}
+	return udp_bind_finalize((uv_handle_t *)handle);
 }
 
 static void tcp_timeout(uv_handle_t *timer)
@@ -230,13 +248,28 @@ static void tcp_accept(uv_stream_t *master, int status)
 	io_start_read((uv_handle_t *)client);
 }
 
-static int set_tcp_option(uv_tcp_t *handle, int option, int val)
+static int set_tcp_option(uv_handle_t *handle, int option, int val)
 {
 	uv_os_fd_t fd = 0;
-	if (uv_fileno((uv_handle_t *)handle, &fd) == 0) {
+	if (uv_fileno(handle, &fd) == 0) {
 		return setsockopt(fd, IPPROTO_TCP, option, &val, sizeof(val));
 	}
 	return 0; /* N/A */
+}
+
+static int tcp_bind_finalize(uv_handle_t *handle)
+{
+	/* TCP_FASTOPEN enables 1 RTT connection resumptions. */
+#ifdef TCP_FASTOPEN
+# ifdef __linux__
+	(void) set_tcp_option(handle, TCP_FASTOPEN, 16); /* Accepts queue length hint */
+# else
+	(void) set_tcp_option(handle, TCP_FASTOPEN, 1);  /* Accepts on/off */
+# endif
+#endif
+
+	handle->data = NULL;
+	return 0;
 }
 
 static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb connection)
@@ -253,7 +286,7 @@ static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb c
 
 	/* TCP_DEFER_ACCEPT delays accepting connections until there is readable data. */
 #ifdef TCP_DEFER_ACCEPT
-	if (set_tcp_option(handle, TCP_DEFER_ACCEPT, KR_CONN_RTT_MAX/1000) != 0) {
+	if (set_tcp_option((uv_handle_t *)handle, TCP_DEFER_ACCEPT, KR_CONN_RTT_MAX/1000) != 0) {
 		kr_log_info("[ io ] tcp_bind (defer_accept): %s\n", strerror(errno));
 	}
 #endif
@@ -263,22 +296,30 @@ static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb c
 		return ret;
 	}
 
-	/* TCP_FASTOPEN enables 1 RTT connection resumptions. */
-#ifdef TCP_FASTOPEN
-# ifdef __linux__
-	(void) set_tcp_option(handle, TCP_FASTOPEN, 16); /* Accepts queue length hint */
-# else
-	(void) set_tcp_option(handle, TCP_FASTOPEN, 1);  /* Accepts on/off */
-# endif
-#endif
-
-	handle->data = NULL;
-	return 0;
+	return tcp_bind_finalize((uv_handle_t *)handle);
 }
 
 int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr)
 {
 	return _tcp_bind(handle, addr, tcp_accept);
+}
+
+int tcp_bindfd(uv_tcp_t *handle, int fd)
+{
+	if (!handle) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = uv_tcp_open(handle, (uv_os_sock_t) fd);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = uv_listen((uv_stream_t *)handle, 16, tcp_accept);
+	if (ret != 0) {
+		return ret;
+	}
+	return tcp_bind_finalize((uv_handle_t *)handle);
 }
 
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)

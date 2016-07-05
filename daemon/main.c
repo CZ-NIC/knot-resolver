@@ -35,6 +35,11 @@
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
 
+/* We can fork early on Linux 3.9+ and do SO_REUSEPORT for better performance. */
+#if defined(UV_VERSION_HEX) && defined(SO_REUSEPORT) && defined(__linux__)
+ #define CAN_FORK_EARLY 1
+#endif
+
 /*
  * Globals
  */
@@ -69,7 +74,7 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		}
 		struct engine *engine = stream->data;
 		lua_State *L = engine->L;
-		int ret = engine_cmd(engine, cmd);
+		int ret = engine_cmd(L, cmd, false);
 		const char *message = "";
 		if (lua_gettop(L) > 0) {
 			message = lua_tostring(L, -1);
@@ -126,6 +131,92 @@ static void tty_accept(uv_stream_t *master, int status)
 	}
 }
 
+static void ipc_close(uv_handle_t *handle)
+{
+	free(handle);
+}
+
+/* @internal AF_LOCAL reads may still be interrupted, loop it. */
+static bool ipc_readall(int fd, char *dst, size_t len)
+{
+	while (len > 0) {
+		int rb = read(fd, dst, len);
+		if (rb > 0) {
+			dst += rb;
+			len -= rb;
+		} else if (errno != EAGAIN && errno != EINTR) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void ipc_activity(uv_poll_t* handle, int status, int events)
+{
+	struct engine *engine = handle->data;
+	if (status != 0) {
+		kr_log_error("[system] ipc: %s\n", uv_strerror(status));
+		ipc_close((uv_handle_t *)handle);
+		return;
+	}
+	/* Get file descriptor from handle */
+	uv_os_fd_t fd = 0;
+	(void) uv_fileno((uv_handle_t *)(handle), &fd);
+	/* Read expression from IPC pipe */
+	uint32_t len = 0;
+	if (ipc_readall(fd, (char *)&len, sizeof(len))) {
+		auto_free char *rbuf = malloc(len + 1);
+		if (!rbuf) {
+			kr_log_error("[system] ipc: %s\n", strerror(errno));
+			engine_stop(engine); /* Panic and stop this fork. */
+			return;
+		}
+		if (ipc_readall(fd, rbuf, len)) {
+			rbuf[len] = '\0';
+			/* Run expression */
+			const char *message = "";
+			int ret = engine_ipc(engine, rbuf);
+			if (ret > 0) {
+				message = lua_tostring(engine->L, -1);
+			}
+			/* Send response back */
+			len = strlen(message);
+			if (write(fd, &len, sizeof(len)) != sizeof(len) ||
+				write(fd, message, len) != len) {
+				kr_log_error("[system] ipc: %s\n", strerror(errno));
+			}
+			/* Clear the Lua stack */
+			lua_settop(engine->L, 0);
+		} else {
+			kr_log_error("[system] ipc: %s\n", strerror(errno));
+		}
+	} else {
+		kr_log_error("[system] ipc: %s\n", strerror(errno));
+	}
+}
+
+static bool ipc_watch(uv_loop_t *loop, struct engine *engine, int fd)
+{
+	uv_poll_t *poller = malloc(sizeof(*poller));
+	if (!poller) {
+		return false;
+	}
+	int ret = uv_poll_init(loop, poller, fd);
+	if (ret != 0) {
+		free(poller);
+		return false;
+	}
+	poller->data = engine;
+	ret = uv_poll_start(poller, UV_READABLE, ipc_activity);
+	if (ret != 0) {
+		free(poller);
+		return false;
+	}
+	/* libuv sets O_NONBLOCK whether we want it or not */
+	(void) fcntl(fd, F_SETFD, fcntl(fd, F_GETFL) & ~O_NONBLOCK);
+	return true;
+}
+
 static void signal_handler(uv_signal_t *handle, int signum)
 {
 	uv_stop(uv_default_loop());
@@ -147,6 +238,39 @@ static const char *set_addr(char *addr, int *port)
  * Server operation.
  */
 
+static int fork_workers(fd_array_t *ipc_set, int forks)
+{
+	/* Fork subprocesses if requested */
+	while (--forks > 0) {
+		int sv[2] = {-1, -1};
+		if (socketpair(AF_LOCAL, SOCK_STREAM, 0, sv) < 0) {
+			perror("[system] socketpair");
+			return kr_error(errno);
+		}
+		int pid = fork();
+		if (pid < 0) {
+			perror("[system] fork");
+			return kr_error(errno);
+		}
+
+		/* Forked process */
+		if (pid == 0) {
+			array_clear(*ipc_set);
+			array_push(*ipc_set, sv[0]);
+			close(sv[1]);
+			kr_crypto_reinit();
+			return forks;
+		/* Parent process */
+		} else {
+			array_push(*ipc_set, sv[1]);
+			/* Do not share parent-end with other forks. */
+			(void) fcntl(sv[1], F_SETFD, FD_CLOEXEC);
+			close(sv[0]);
+		}
+	}
+	return 0;
+}
+
 static void help(int argc, char *argv[])
 {
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
@@ -164,7 +288,7 @@ static void help(int argc, char *argv[])
 	       " [rundir]             Path to the working directory (default: .)\n");
 }
 
-static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, knot_mm_t *pool, int worker_id, int worker_count)
+static struct worker_ctx *init_worker(struct engine *engine, knot_mm_t *pool, int worker_id, int worker_count)
 {
 	/* Load bindings */
 	engine_lualib(engine, "modules", lib_modules);
@@ -181,9 +305,7 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, kn
 	memset(worker, 0, sizeof(*worker));
 	worker->id = worker_id;
 	worker->count = worker_count;
-	worker->engine = engine,
-	worker->loop = loop;
-	loop->data = worker;
+	worker->engine = engine;
 	worker_reserve(worker, MP_FREELIST_SIZE);
 	/* Register worker in Lua thread */
 	lua_pushlightuserdata(engine->L, worker);
@@ -191,13 +313,15 @@ static struct worker_ctx *init_worker(uv_loop_t *loop, struct engine *engine, kn
 	lua_getglobal(engine->L, "worker");
 	lua_pushnumber(engine->L, worker_id);
 	lua_setfield(engine->L, -2, "id");
+	lua_pushnumber(engine->L, getpid());
+	lua_setfield(engine->L, -2, "pid");
 	lua_pushnumber(engine->L, worker_count);
 	lua_setfield(engine->L, -2, "count");
 	lua_pop(engine->L, 1);
 	return worker;
 }
 
-static int run_worker(uv_loop_t *loop, struct engine *engine)
+static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader)
 {
 	/* Control sockets or TTY */
 	auto_free char *sock_file = NULL;
@@ -218,6 +342,16 @@ static int run_worker(uv_loop_t *loop, struct engine *engine)
 			uv_listen((uv_stream_t *) &pipe, 16, tty_accept);
 		}
 	}
+	/* Watch IPC pipes (or just assign them if leading the pgroup). */
+	if (!leader) {
+		for (size_t i = 0; i < ipc_set->len; ++i) {
+			if (!ipc_watch(loop, engine, ipc_set->at[i])) {
+				kr_log_error("[system] failed to create poller: %s\n", strerror(errno));
+				close(ipc_set->at[i]);
+			}
+		}
+	}
+	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 	/* Notify supervisor. */
 #ifdef HAS_SYSTEMD
 	sd_notify(0, "READY=1");
@@ -234,8 +368,8 @@ int main(int argc, char **argv)
 {
 	int forks = 1;
 	array_t(char*) addr_set;
-	array_t(int) fd_set;
 	array_init(addr_set);
+	array_t(int) fd_set;
 	array_init(fd_set);
 	char *keyfile = NULL;
 	const char *config = NULL;
@@ -274,12 +408,6 @@ int main(int argc, char **argv)
 				kr_log_error("[system] error '-f' requires number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
-#if (!defined(UV_VERSION_HEX)) || (!defined(SO_REUSEPORT))
-			if (forks > 1) {
-				kr_log_error("[system] libuv 1.7+ is required for SO_REUSEPORT support, multiple forks not supported\n");
-				return EXIT_FAILURE;
-			}
-#endif
 			break;
 		case 'k':
 			keyfile_buf = malloc(PATH_MAX);
@@ -354,31 +482,28 @@ int main(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 	}
+#ifndef CAN_FORK_EARLY
+	/* Forking is currently broken with libuv. We need libuv to bind to
+	 * sockets etc. before forking, but at the same time can't touch it before
+	 * forking otherwise it crashes, so it's a chicken and egg problem.
+	 * Disabling until https://github.com/libuv/libuv/pull/846 is done. */
+	 if (forks > 1 && fd_set.len == 0) {
+	 	kr_log_error("[system] forking >1 workers supported only on Linux 3.9+ or with supervisor\n");
+	 	return EXIT_FAILURE;
+	 }
+#endif
 
 	kr_crypto_init();
 
+	/* Connect forks with local socket */
+	fd_array_t ipc_set;
+	array_init(ipc_set);
 	/* Fork subprocesses if requested */
-	int fork_count = forks;
-	while (--forks > 0) {
-		int pid = fork();
-		if (pid < 0) {
-			perror("[system] fork");
-			return EXIT_FAILURE;
-		}
-		/* Forked process */
-		if (pid == 0) {
-			kr_crypto_reinit();
-			break;
-		}
+	int fork_id = fork_workers(&ipc_set, forks);
+	if (fork_id < 0) {
+		return EXIT_FAILURE;
 	}
 
-	/* Block signals. */
-	uv_loop_t *loop = uv_default_loop();
-	uv_signal_t sigint, sigterm;
-	uv_signal_init(loop, &sigint);
-	uv_signal_init(loop, &sigterm);
-	uv_signal_start(&sigint, signal_handler, SIGINT);
-	uv_signal_start(&sigterm, signal_handler, SIGTERM);
 	/* Create a server engine. */
 	knot_mm_t pool = {
 		.ctx = mp_new (4096),
@@ -391,7 +516,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Create worker */
-	struct worker_ctx *worker = init_worker(loop, &engine, &pool, forks, fork_count);
+	struct worker_ctx *worker = init_worker(&engine, &pool, fork_id, forks);
 	if (!worker) {
 		kr_log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
@@ -414,7 +539,17 @@ int main(int argc, char **argv)
 			ret = EXIT_FAILURE;
 		}
 	}
+
+	/* Block signals. */
+	uv_loop_t *loop = uv_default_loop();
+	uv_signal_t sigint, sigterm;
+	uv_signal_init(loop, &sigint);
+	uv_signal_init(loop, &sigterm);
+	uv_signal_start(&sigint, signal_handler, SIGINT);
+	uv_signal_start(&sigterm, signal_handler, SIGTERM);
 	/* Start the scripting engine */
+	worker->loop = loop;
+	loop->data = worker;
 	if (ret == 0) {
 		ret = engine_start(&engine, config ? config : "config");
 		if (ret == 0) {
@@ -424,14 +559,15 @@ int main(int argc, char **argv)
 					kr_log_error("[system] not enough memory\n");
 					return EXIT_FAILURE;
 				}
-				engine_cmd(&engine, cmd);
+				engine_cmd(engine.L, cmd, false);
 				lua_settop(engine.L, 0);
 			}
 			/* Run the event loop */
-			ret = run_worker(loop, &engine);
+			ret = run_worker(loop, &engine, &ipc_set, fork_id == 0);
 		}
 	}
 	if (ret != 0) {
+		perror("[system] worker failed");
 		ret = EXIT_FAILURE;
 	}
 	/* Cleanup. */
