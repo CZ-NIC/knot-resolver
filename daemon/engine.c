@@ -250,10 +250,17 @@ static int l_trustanchor(lua_State *L)
 	lua_pushboolean(L, true);
 	return 1;
 }
-
 /** Unpack JSON object to table */
 static void l_unpack_json(lua_State *L, JsonNode *table)
 {
+	/* Unpack POD */
+	switch(table->tag) {
+		case JSON_STRING: lua_pushstring(L, table->string_); return;
+		case JSON_NUMBER: lua_pushnumber(L, table->number_); return;
+		case JSON_BOOL:   lua_pushboolean(L, table->bool_); return;
+		default: break;
+	}
+	/* Unpack object or array into table */
 	lua_newtable(L);
 	JsonNode *node = NULL;
 	json_foreach(node, table) {
@@ -369,7 +376,7 @@ static int l_trampoline(lua_State *L)
 			return 0;
 		}
 		JsonNode *root_node = json_decode(ret);
-		if (root_node && (root_node->tag == JSON_OBJECT || root_node->tag == JSON_ARRAY)) {
+		if (root_node) {
 			l_unpack_json(L, root_node);
 		} else {
 			lua_pushstring(L, ret);
