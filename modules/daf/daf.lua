@@ -1,5 +1,3 @@
-local cqueues = require('cqueues')
-
 -- Load dependent modules
 if not view then modules.load('view') end
 if not policy then modules.load('policy') end
@@ -60,7 +58,8 @@ local filters = {
 	end,
 }
 
-local function parse_filter(tok, g)
+local function parse_filter(tok, g, prev)
+	if not tok then error(string.format('expected filter after "%s"', prev)) end
 	local filter = filters[tok:lower()]
 	if not filter then error(string.format('invalid filter "%s"', tok)) end
 	return filter(g)
@@ -77,11 +76,11 @@ local function parse_rule(g)
 	-- or terminate filter chain and return
 	tok = g()
 	while tok do
-		if tok == 'AND' then
-			local fa, fb = f, parse_filter(g(), g)
+		if tok:lower() == 'and' then
+			local fa, fb = f, parse_filter(g(), g, tok)
 			f = function (req, qry) return fa(req, qry) and fb(req, qry) end
-		elseif tok == 'OR' then
-			local fa, fb = f, parse_filter(g(), g)
+		elseif tok:lower() == 'or' then
+			local fa, fb = f, parse_filter(g(), g, tok)
 			f = function (req, qry) return fa(req, qry) or fb(req, qry) end
 		else
 			break
@@ -131,7 +130,7 @@ local M = {
 
 -- @function Cleanup module
 function M.deinit()
-	if http then
+	if http and http.endpoints then
 		http.endpoints['/daf'] = nil
 		http.endpoints['/daf.js'] = nil
 		http.snippets['/daf'] = nil
@@ -140,6 +139,10 @@ end
 
 -- @function Add rule
 function M.add(rule)
+	-- Ignore duplicates
+	for _, r in ipairs(M.rules) do
+		if r.info == rule then return r end
+	end
 	local id, action, filter = compile(rule)
 	if not id then error(action) end
 	-- Combine filter and action into policy
@@ -202,6 +205,15 @@ function M.enable(id, val)
 	return M.toggle(id, true)
 end
 
+local function consensus(op, ...)
+	local ret = true
+	local results = map(string.format(op, ...))
+	for _, r in ipairs(results) do
+		ret = ret and r
+	end
+	return ret
+end
+
 -- @function Public-facing API
 local function api(h, stream)
 	local m = h:get(':method')
@@ -227,7 +239,7 @@ local function api(h, stream)
 		local path = h:get(':path')
 		local id = tonumber(path:match '/([^/]*)$')
 		if id then
-			if M.del(id) then
+			if consensus('daf.del "%s"', id) then
 				return tojson(true)
 			end
 			return 404, '"No such rule"' -- Not found
@@ -237,8 +249,10 @@ local function api(h, stream)
 	elseif m == 'POST' then
 		local query = stream:get_body_as_string()
 		if query then
-			local ok, r, err = pcall(M.add, query)
-			if not ok then return 500, string.format('"%s"', r) end
+			local ok, r = pcall(M.add, query)
+			if not ok then return 500, string.format('"%s"', r:match('/([^/]+)$')) end
+			-- Dispatch to all other workers
+			consensus('daf.add "%s"', query)
 			return rule_info(r)
 		end
 		return 400
@@ -252,7 +266,7 @@ local function api(h, stream)
 		end
 		-- We do not support more actions
 		if action == 'active' then
-			if M.toggle(id, val == 'true') then
+			if consensus('daf.toggle(%d, %s)', id, val == 'true' or 'false') then
 				return tojson(true)
 			else
 				return 404, '"No such rule"'
@@ -263,23 +277,39 @@ local function api(h, stream)
 	end
 end
 
+local function getmatches()
+	local update = {}
+	for _, rules in ipairs(map 'daf.rules') do
+		for _, r in ipairs(rules) do
+			local id = tostring(r.rule.id)
+			-- Must have string keys for JSON object and not an array
+			update[id] = (update[id] or 0) + r.rule.count
+		end
+	end
+	return update
+end
+
 -- @function Publish DAF statistics
 local function publish(h, ws)
-	local ok, counters = true, {}
+	local cqueues = require('cqueues')
+	local ok, last = true, nil
 	while ok do
 		-- Check if we have new rule matches
-		local update = {}
-		for _, r in ipairs(M.rules) do
-			local id = r.rule.id
-			if counters[id] ~= r.rule.count then
-				-- Must have string keys for JSON object and not an array
-				update[tostring(id)] = r.rule.count
-				counters[id] = r.rule.count
+		local diff = {}
+		local has_update, update = pcall(getmatches)
+		if has_update then
+			if last then
+				for id, count in pairs(update) do
+					if not last[id] or last[id] < count then
+						diff[id] = count
+					end
+				end
 			end
+			last = update
 		end
 		-- Update counters when there is a new data
-		if next(update) ~= nil then
-			ok = ws:send(tojson(update))
+		if next(diff) ~= nil then
+			ok = ws:send(tojson(diff))
 		else
 			ok = ws:send_ping()
 		end
@@ -289,7 +319,7 @@ end
 
 -- @function Configure module
 function M.config(conf)
-	if not http then error('"http" module is not loaded, cannot load DAF') end
+	if not http or not http.endpoints then return end
 	-- Export API and data publisher
 	http.endpoints['/daf.js'] = http.page('daf.js', 'daf')
 	http.endpoints['/daf'] = {'application/json', api, publish}
@@ -301,13 +331,17 @@ function M.config(conf)
 				<div class="col-md-11">
 					<input type="text" id="daf-builder" class="form-control" aria-label="..." />
 				</div>
-				<button type="button" id="daf-add" class="btn btn-default btn-sm">Add</button>
+				<div class="col-md-1">
+					<button type="button" id="daf-add" class="btn btn-default btn-sm">Add</button>
+				</div>
 			</form>
 		</div>
 		<div class="row">
-			<table id="daf-rules" class="table table-striped table-responsive">
-			<th><td>No rules here yet.</td></th>
-			</table>
+			<div class="col-md-12">
+				<table id="daf-rules" class="table table-striped table-responsive">
+				<th><td>No rules here yet.</td></th>
+				</table>
+			</div>
 		</div>
 	]]}
 end

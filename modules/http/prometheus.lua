@@ -4,15 +4,25 @@ local snapshots, snapshots_count = {}, 120
 -- Gauge metrics
 local gauges = {
 	['worker.concurrent'] = true,
+	['worker.rss']        = true,
 }
 
--- Load dependent modules
-if not stats then modules.load('stats') end
+local function merge(t, results, prefix)
+	for x, result in pairs(results) do
+		if type(result) == 'table' then
+			for k, v in pairs(result) do
+				local val = t[prefix..k]
+				t[prefix..k] = (val or 0) + v
+			end
+		end
+	end
+end
 
 local function getstats()
-	local t = stats.list()
-	for k,v in pairs(cache.stats()) do t['cache.'..k] = v end
-	for k,v in pairs(worker.stats()) do t['worker.'..k] = v end
+	local t = {}
+	merge(t, map 'stats.list()', '')
+	merge(t, map 'cache.stats()', 'cache.')
+	merge(t, map 'worker.stats()', 'worker.')
 	return t
 end
 
@@ -52,9 +62,16 @@ local function snapshot_start(h, ws)
 				end
 			end
 		end
+		-- Aggregate per-worker metrics
+		local wdata = {}
+		for i, info in pairs(map 'worker.info()') do
+			if type(info) == 'table' then
+				wdata[tostring(info.pid)] = {rss=info.rss, usertime=info.usertime, systime=info.systime, pagefaults=info.pagefaults, queries=info.queries}
+			end
+		end
 		-- Publish stats updates periodically
 		if not is_empty then
-			local update = {time=os.time(), stats=stats_dt, upstreams=upstreams or {}}
+			local update = {time=os.time(), stats=stats_dt, upstreams=upstreams, workers=wdata}
 			table.insert(snapshots, update)
 			if #snapshots > snapshots_count then
 				table.remove(snapshots, 1)

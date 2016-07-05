@@ -62,11 +62,24 @@
 					</div>
 				</div>
 			</div>
+			<div class="row">
+				<h3>Running workers</h3>
+				<div class="col-md-12">
+				<table id="workers" class="table table-responsive">
+					<tr>
+						<th>PID</th><th>CPU per-worker (user/sys)</th>
+						<th>RSS</th><th>Page faults</th><th>Status</th>
+					</tr>
+				</table>
+				</div>
+			</div>
 		</div>
-		<a name="worldmap"></a>
-		<h2 class="sub-header">Where do the queries go?</h2>
-		<div class="col-md-12">
-			<div id="map" style="position: relative;"></div>
+		<div class="row" id="map-container">
+			<a name="worldmap"></a>
+			<h2 class="sub-header">Where do the queries go?</h2>
+			<div class="col-md-12">
+				<div id="map" style="position: relative;"></div>
+			</div>
 		</div>
 		<div class="col-md-12">
 			{{ snippets }}

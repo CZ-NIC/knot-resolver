@@ -29,3 +29,11 @@ body {
   border-color: #4cae4c !important;
   color: #fff !important;
 }
+
+.spark {
+  display: inline-block;
+}
+
+.spark-legend {
+  display: inline-block; 
+}

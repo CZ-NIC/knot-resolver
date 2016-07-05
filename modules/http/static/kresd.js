@@ -44,7 +44,7 @@ $(function() {
 
 	/* Render other interesting metrics as lines (hidden by default) */
 	var data = [];
-	var last_metric = 15;
+	var last_metric = 17;
 	var metrics = {
 		'answer.noerror':    [0, 'NOERROR', null, 'By RCODE'],
 		'answer.nodata':     [1, 'NODATA', null, 'By RCODE'],
@@ -62,6 +62,8 @@ $(function() {
 		'worker.concurrent': [13, 'Queries outstanding'],
 		'worker.queries':    [14, 'Queries received/s'],
 		'worker.dropped':    [15, 'Queries dropped'],
+		'worker.usertime':   [16, 'CPU (user)', null, 'Workers'],
+		'worker.systime':    [17, 'CPU (sys)', null, 'Workers'],
 	};
 	
 	/* Render latency metrics as sort of a heatmap */
@@ -182,7 +184,10 @@ $(function() {
 	var bubblemap = {};
 	function pushUpstreams(resp) {
 		if (resp == null) {
+			$('#map-container').hide();
 			return;
+		} else {
+			$('#map-container').show();
 		}
 		/* Get current maximum number of queries for bubble diameter adjustment */
 		var maxQueries = 1;
@@ -235,6 +240,90 @@ $(function() {
 		age = age + 1;
 	}
 
+	/* Per-worker information */
+	function updateRate(x, y, dt) {
+		return (100.0 * ((x - y) / dt)).toFixed(1);
+	}
+	function updateWorker(row, next, data, timestamp, buffer) {
+		const dt = timestamp - data.timestamp;
+		const cell = row.find('td');
+		/* Update spark lines and CPU times first */
+		if (dt > 0.0) {
+			const utimeRate = updateRate(next.usertime, data.last.usertime, dt);
+			const stimeRate = updateRate(next.systime, data.last.systime, dt);
+			cell.eq(1).find('span').text(utimeRate + '% / ' + stimeRate + '%');
+			/* Update sparkline graph */
+			data.data.push([new Date(timestamp * 1000), utimeRate, stimeRate]);
+			if (data.data.length > 60) {
+				data.data.shift();
+			}
+			if (!buffer) {
+				data.graph.updateOptions( { 'file': data.data } );	
+			}
+		}
+		/* Update other fields */
+		if (!buffer) {
+			cell.eq(2).text(formatNumber(next.rss) + 'B');
+			cell.eq(3).text(next.pagefaults);
+			cell.eq(4).text('Healthy').addClass('text-success');	
+		}
+	}
+
+	var workerData = {};
+	function pushWorkers(resp, timestamp, buffer) {
+		if (resp == null) {
+			return;
+		}
+		const workerTable = $('#workers');
+		for (var pid in resp) {
+			var row = workerTable.find('tr[data-pid='+pid+']');
+			if (row.length == 0) {
+				row = workerTable.append(
+					'<tr data-pid='+pid+'><td>'+pid+'</td>'+
+					'<td><div class="spark" id="spark-'+pid+'" /><span /></td><td></td><td></td><td></td>'+
+					'</tr>');
+				/* Create sparkline visualisation */
+				const spark = row.find('#spark-'+pid);
+				spark.css({'margin-right': '1em', width: '80px', height: '1.4em'});
+				workerData[pid] = {timestamp: timestamp, data: [[new Date(timestamp * 1000),0,0]], last: resp[pid]};
+				const workerGraph = new Dygraph(spark[0],
+			        workerData[pid].data, {
+			        	valueRange: [0, 100],
+			        	legend: 'never',
+						axes : {
+							x : {
+								drawGrid: false,
+								drawAxis : false,
+							},
+							y : {
+								drawGrid: false,
+								drawAxis : false,
+							}
+						},
+						labels: ['x', '%user', '%sys'],
+						labelsDiv: '',
+			        }
+				);
+				workerData[pid].graph = workerGraph;
+			}
+			updateWorker(row, resp[pid], workerData[pid], timestamp, buffer);
+			/* Track last datapoint */
+			workerData[pid].last = resp[pid];
+			workerData[pid].timestamp = timestamp;
+		}
+		/* Prune unhealthy PIDs */
+		if (!buffer) {
+			workerTable.find('tr').each(function () {
+				const e = $(this);
+				if (!(e.data('pid') in resp)) {
+					const healthCell = e.find('td').last();
+					healthCell.removeClass('text-success')
+					healthCell.text('Dead').addClass('text-danger');
+				}
+			});
+		}
+	}
+
 	/* WebSocket endpoints */
 	var wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/stats';
 	var ws = new Socket(wsStats);
@@ -244,14 +333,16 @@ $(function() {
 			if (data.length > 0) {
 				pushUpstreams(data[data.length - 1].upstreams);
 			}
+			/* Buffer datapoints and redraw last */
 			for (var i in data) {
-				pushMetrics(data[i].stats, data[i].time, true);
+				const is_last = (i == data.length - 1);
+				pushWorkers(data[i].workers, data[i].time, !is_last);
+				pushMetrics(data[i].stats, data[i].time, !is_last);
 			}
-			graph.updateOptions( { 'file': data } );
 		} else {
-			pushMetrics(data.stats, data.time);
 			pushUpstreams(data.upstreams);
+			pushWorkers(data.workers, data.time);
+			pushMetrics(data.stats, data.time);
 		}
-
 	};
 });

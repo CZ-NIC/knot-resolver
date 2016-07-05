@@ -1,3 +1,9 @@
+-- Load dependent modules
+if not stats then modules.load('stats') end
+
+-- This is leader-only module
+if worker.id > 0 then return {} end
+
 -- This is a module that does the heavy lifting to provide an HTTP/2 enabled
 -- server that supports TLS by default and provides endpoint for other modules
 -- in order to enable them to export restful APIs and websocket streams.
@@ -318,40 +324,40 @@ end
 
 -- @function Configure module
 function M.config(conf)
-		conf = conf or {}
-		assert(type(conf) == 'table', 'config { host = "...", port = 443, cert = "...", key = "..." }')
-		-- Configure web interface for resolver
-		if not conf.port then conf.port = 8053 end
-		if not conf.host then conf.host = 'localhost' end
-		if conf.geoip and has_mmdb then M.geoip = mmdb.open(conf.geoip) end
-		M.interface(conf.host, conf.port, M.endpoints, conf.cert, conf.key)
-		-- TODO: configure DNS/HTTP(s) interface
-		if M.ev then return end
-		-- Schedule both I/O activity notification and timeouts
-		local poll_step
-		poll_step = function ()
-			local ok, err, _, co = cq:step(0)
-			if not ok then warn('[http] error: %s %s', err, debug.traceback(co)) end
-			-- Reschedule timeout or create new one
-			local timeout = cq:timeout()
-			if timeout then
-				-- Throttle web requests
-				if timeout == 0 then timeout = 0.001 end
-				-- Convert from seconds to duration
-				timeout = timeout * sec
-				if not M.timeout then
-					M.timeout = event.after(timeout, poll_step)
-				else
-					event.reschedule(M.timeout, timeout)
-				end
-			else -- Cancel running timeout when there is no next deadline
-				if M.timeout then
-					event.cancel(M.timeout)
-					M.timeout = nil
-				end
+	if conf == true then conf = {} end
+	assert(type(conf) == 'table', 'config { host = "...", port = 443, cert = "...", key = "..." }')
+	-- Configure web interface for resolver
+	if not conf.port then conf.port = 8053 end
+	if not conf.host then conf.host = 'localhost' end
+	if conf.geoip and has_mmdb then M.geoip = mmdb.open(conf.geoip) end
+	M.interface(conf.host, conf.port, M.endpoints, conf.cert, conf.key)
+	-- TODO: configure DNS/HTTP(s) interface
+	if M.ev then return end
+	-- Schedule both I/O activity notification and timeouts
+	local poll_step
+	poll_step = function ()
+		local ok, err, _, co = cq:step(0)
+		if not ok then warn('[http] error: %s %s', err, debug.traceback(co)) end
+		-- Reschedule timeout or create new one
+		local timeout = cq:timeout()
+		if timeout then
+			-- Throttle web requests
+			if timeout == 0 then timeout = 0.001 end
+			-- Convert from seconds to duration
+			timeout = timeout * sec
+			if not M.timeout then
+				M.timeout = event.after(timeout, poll_step)
+			else
+				event.reschedule(M.timeout, timeout)
+			end
+		else -- Cancel running timeout when there is no next deadline
+			if M.timeout then
+				event.cancel(M.timeout)
+				M.timeout = nil
 			end
 		end
-		M.ev = event.socket(cq:pollfd(), poll_step)
+	end
+	M.ev = event.socket(cq:pollfd(), poll_step)
 end
 
 return M

@@ -271,12 +271,12 @@ $(function() {
 	}
 	/* Rule builder submit */
 	$('#daf-add').click(function () {
-		const form = $('#daf-builder-form');
+		const form = $('#daf-builder-form').parent();
 		if (dafBuilder.items.length == 0 || form.hasClass('has-error')) {
 			return;
 		}
 		/* Clear previous errors and resubmit. */
-		form.find('.alert').remove();
+		form.parent().find('.alert').remove();
 		$.post('daf', dafBuilder.items.join(' '))
 			.done(function (data) {
 				dafBuilder.clear();
@@ -284,7 +284,7 @@ $(function() {
 			})
 			.fail(function (data) {
 				const reason = data.responseText.length > 0 ? data.responseText : 'internal error';
-				form.append(
+				form.after(
 					'<div class="alert alert-danger" role="alert">'+
 				       'Couldn\'t add rule (code: '+data.status+', reason: '+reason+').'+
 				    '</div>'

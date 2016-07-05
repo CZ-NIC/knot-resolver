@@ -175,12 +175,8 @@ local function rpz_zonefile(action, path)
 end
 
 -- RPZ policy set
-function policy.rpz(action, path, format)
-	if format == 'lmdb' then
-		error('lmdb zone format is NYI')
-	else
-		return rpz_zonefile(action, path)
-	end
+function policy.rpz(action, path)
+	return rpz_zonefile(action, path)
 end
 
 -- Evaluate packet in given rules to determine policy action
