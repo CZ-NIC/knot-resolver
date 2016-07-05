@@ -77,6 +77,7 @@ info:
 	$(info PREFIX:     $(PREFIX))
 	$(info DESTDIR:    $(DESTDIR))
 	$(info BINDIR:     $(BINDIR))
+	$(info SBINDIR:    $(SBINDIR))
 	$(info LIBDIR:     $(LIBDIR))
 	$(info ETCDIR:     $(ETCDIR))
 	$(info INCLUDEDIR: $(INCLUDEDIR))

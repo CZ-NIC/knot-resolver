@@ -1,6 +1,6 @@
 #include <tunables/global>
 
-/usr/bin/kresd {
+/usr/sbin/kresd {
   #include <abstractions/base>
   #include <abstractions/p11-kit>
   #include <abstractions/nameservice>
@@ -28,6 +28,6 @@
   /usr/lib{,64}/kdns_modules/tinyweb/* r,
   /var/lib/GeoIP/* r,
   # Site-specific additions and overrides. See local/README for details.
-  #include <local/usr.bin.kresd>
+  #include <local/usr.sbin.kresd>
 }
 

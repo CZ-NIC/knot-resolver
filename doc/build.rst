@@ -152,7 +152,7 @@ All paths are prefixed with ``PREFIX`` variable by default if not specified othe
    :header: "Component", "Variable", "Default", "Notes"
 
    "library", "``LIBDIR``", "``$(PREFIX)/lib``", "pkg-config is auto-generated [#]_"
-   "daemon",  "``BINDIR``", "``$(PREFIX)/bin``", ""
+   "daemon",  "``SBINDIR``", "``$(PREFIX)/sbin``", ""
    "configuration", "``ETCDIR``", "``$(PREFIX)/etc/kresd``", "Configuration file, templates."
    "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "[#]_"
    "work directory", "", "``$(PREFIX)/var/run/kresd``", "Run directory for daemon."

@@ -14,7 +14,7 @@ EXPOSE 53
 
 # Select entrypoint
 WORKDIR /data
-CMD ["/usr/local/bin/kresd"]
+CMD ["/usr/local/sbin/kresd"]
 
 # Install dependencies and sources
 RUN \

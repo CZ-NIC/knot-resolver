@@ -35,7 +35,7 @@ endif
 
 # Make binary
 ifeq ($(HAS_lua)|$(HAS_libuv), yes|yes)
-$(eval $(call make_bin,kresd,daemon,yes))
+$(eval $(call make_sbin,kresd,daemon,yes))
 endif
 
 # Targets
