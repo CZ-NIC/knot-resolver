@@ -80,6 +80,9 @@ static struct session *session_borrow(struct worker_ctx *worker)
 
 static void session_release(struct worker_ctx *worker, struct session *s)
 {
+	if (!s) {
+		return;
+	}
 	if (worker->pool_sessions.len < MP_FREELIST_SIZE) {
 		session_clear(s);
 		array_push(worker->pool_sessions, s);

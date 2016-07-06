@@ -182,8 +182,7 @@ static int net_listen_iface(lua_State *L, int port)
 		int ret = network_listen(&engine->net, lua_tostring(L, -1),
 		                         port, NET_TCP|NET_UDP);
 		if (ret != 0) {
-			format_error(L, kr_strerror(ret));
-			lua_error(L);
+			kr_log_info("[system] bind to '%s#%d' %s\n", lua_tostring(L, -1), port, kr_strerror(ret));
 		}
 		lua_pop(L, 1);
 	}

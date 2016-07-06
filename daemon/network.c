@@ -135,6 +135,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		if (!ep->udp) {
 			return kr_error(ENOMEM);
 		}
+		memset(ep->udp, 0, sizeof(*ep->udp));
 		handle_init(udp, net->loop, ep->udp, sa->sa_family);
 		int ret = udp_bind(ep->udp, sa);
 		if (ret != 0) {
@@ -147,6 +148,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		if (!ep->tcp) {
 			return kr_error(ENOMEM);
 		}
+		memset(ep->tcp, 0, sizeof(*ep->tcp));
 		handle_init(tcp, net->loop, ep->tcp, sa->sa_family);
 		int ret = tcp_bind(ep->tcp, sa);
 		if (ret != 0) {
