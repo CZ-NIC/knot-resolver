@@ -38,8 +38,6 @@
 #define NAME_SERVER_COOKIE_ALG "server_cookie_alg"
 #define NAME_AVAILABLE_SERVER_COOKIE_ALGS "available_server_cookie_algs"
 
-#define NAME_CACHE_TTL "cache_ttl"
-
 static bool aply_enabled(bool *enabled, const JsonNode *node)
 {
 	assert(enabled && node);
@@ -161,18 +159,6 @@ static bool apply_hash_func(int *alg_id, const JsonNode *node,
 	return false;
 }
 
-static bool apply_cache_ttl(uint32_t *cache_ttl, const JsonNode *node)
-{
-	assert(cache_ttl && node);
-
-	if (node->tag == JSON_NUMBER) {
-		*cache_ttl = node->number_;
-		return true;
-	}
-
-	return false;
-}
-
 static bool apply_configuration(struct kr_cookie_ctx *cntrl,
                                 const JsonNode *node)
 {
@@ -190,8 +176,6 @@ static bool apply_configuration(struct kr_cookie_ctx *cntrl,
 	} else  if (strcmp(node->key, NAME_CLIENT_COOKIE_ALG) == 0) {
 		return apply_hash_func(&cntrl->clnt.current.alg_id, node,
 		                       kr_cc_alg_names);
-	} else if (strcmp(node->key, NAME_CACHE_TTL) == 0) {
-		return apply_cache_ttl(&cntrl->cache_ttl, node);
 	} else if (strcmp(node->key, NAME_SERVER_ENABLED) == 0) {
 		return aply_enabled(&cntrl->srvr.enabled, node);
 	} else if (strcmp(node->key, NAME_SERVER_SECRET) == 0) {
@@ -296,7 +280,6 @@ static void apply_from_copy(struct kr_cookie_ctx *running,
 	}
 
 	/* Direct application. */
-	running->cache_ttl = shallow->cache_ttl;
 	running->clnt.enabled = shallow->clnt.enabled;
 	running->srvr.enabled = shallow->srvr.enabled;
 }
@@ -369,9 +352,6 @@ char *read_config(struct kr_cookie_ctx *ctx)
 
 	read_available_hashes(root_node, NAME_AVAILABLE_CLIENT_COOKIE_ALGS,
 	                      kr_cc_alg_names);
-
-	json_append_member(root_node, NAME_CACHE_TTL,
-	                   json_mknumber(ctx->cache_ttl));
 
 	json_append_member(root_node, NAME_SERVER_ENABLED,
 	                   json_mkbool(ctx->srvr.enabled));

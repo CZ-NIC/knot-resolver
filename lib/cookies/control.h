@@ -28,9 +28,6 @@ struct kr_cookie_secret {
 	uint8_t data[]; /*!< Secret quantity data. */
 };
 
-/** Default cookie TTL. */
-#define DFLT_COOKIE_TTL 72000
-
 /** Holds settings that have direct influence on cookie values computation. */
 struct kr_cookie_comp {
 	struct kr_cookie_secret *secr; /*!< Secret data. */
@@ -49,8 +46,6 @@ struct kr_cookie_settings {
 struct kr_cookie_ctx {
 	struct kr_cookie_settings clnt; /**< Client settings. */
 	struct kr_cookie_settings srvr; /**< Server settings. */
-
-	uint32_t cache_ttl; /**< TTL used when caching cookies */
 };
 
 /**

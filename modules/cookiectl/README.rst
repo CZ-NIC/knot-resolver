@@ -18,9 +18,6 @@ Example Configuration
 	cookiectl.config( { ['client_secret'] = { 0, 1, 2, 3, 4, 5, 6, 7 },
 	                    ['client_cookie_alg'] = 'FNV-64' } )
 
-	-- Cache received server cookies for 12 hours.
-	cookiectl.config( { ['cache_ttl'] = 43200 } )
-
 	-- Configure the server part of the resolver. Sets a string to be used
 	-- as server secret. Also chooses the hashing algorithm to be used.
 	cookiectl.config( { ['server_secret'] = 'secret key',

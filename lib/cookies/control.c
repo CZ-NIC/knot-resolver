@@ -28,6 +28,4 @@ void kr_cookie_ctx_init(struct kr_cookie_ctx *ctx)
 
 	ctx->clnt.current.alg_id = ctx->clnt.recent.alg_id = -1;
 	ctx->srvr.current.alg_id = ctx->srvr.recent.alg_id = -1;
-
-	ctx->cache_ttl = DFLT_COOKIE_TTL;
 }
