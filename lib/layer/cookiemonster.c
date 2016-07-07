@@ -169,34 +169,29 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 
 /**
  * Obtain cookie from cache.
- * @note The ttl and current time are respected. Outdated entries are ignored.
+ * @note Cookies with invalid length are ignored.
  * @param cache cache context
  * @param sa key value
  * @param cookie_opt entire EDNS cookie option (including header)
  * @return true if a cookie exists in cache
  */
-static bool materialise_cookie_opt(kr_cookie_lru_t *cache,
-                                   const struct sockaddr *sa,
-                                   uint8_t cookie_opt[KR_COOKIE_OPT_MAX_LEN])
+static const uint8_t *get_cookie_opt(kr_cookie_lru_t *cache,
+                                     const struct sockaddr *sa)
 {
 	assert(cache && sa);
 
 	const uint8_t *cached_cookie_opt = kr_cookie_lru_get(cache, sa);
 	if (!cached_cookie_opt) {
-		return false;
+		return NULL;
 	}
 
 	size_t cookie_opt_size = KNOT_EDNS_OPTION_HDRLEN +
 	                         knot_edns_opt_get_length(cached_cookie_opt);
 	if (cookie_opt_size > KR_COOKIE_OPT_MAX_LEN) {
-		return false;
+		return NULL;
 	}
 
-	if (cookie_opt) {
-		memcpy(cookie_opt, cached_cookie_opt, cookie_opt_size);
-	}
-
-	return true;
+	return cached_cookie_opt;
 }
 
 /**
@@ -210,10 +205,8 @@ static bool is_cookie_cached(kr_cookie_lru_t *cache, const struct sockaddr *sa,
 {
 	assert(cache && sa && cookie_opt);
 
-	uint8_t cached_opt[KR_COOKIE_OPT_MAX_LEN];
-
-	bool have_cached = materialise_cookie_opt(cache, sa, cached_opt);
-	if (!have_cached) {
+	const uint8_t *cached_opt = get_cookie_opt(cache, sa);
+	if (!cached_opt) {
 		return false;
 	}
 
@@ -304,7 +297,7 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	const struct sockaddr *srvr_sockaddr = passed_server_sockaddr(qry);
 
 	if (!pkt_cookie_opt && srvr_sockaddr &&
-	    materialise_cookie_opt(cookie_cache, srvr_sockaddr, NULL)) {
+	    get_cookie_opt(cookie_cache, srvr_sockaddr)) {
 		/* We haven't received any cookies although we should. */
 		DEBUG_MSG(NULL, "%s\n",
 		          "expected to receive a cookie but none received");
