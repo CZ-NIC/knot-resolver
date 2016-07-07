@@ -15,6 +15,7 @@
  */
 
 #include <assert.h>
+#include <libknot/rrtype/opt.h>
 #include <libknot/rrtype/opt-cookie.h>
 
 #include "lib/cookies/cache.h"
@@ -25,31 +26,21 @@
  * @brief Check whether there is a cached cookie that matches the current
  *        client cookie.
  */
-static const uint8_t *peek_and_check_cc(struct kr_cache *cache,
-                                        const void *sockaddr,
+static const uint8_t *peek_and_check_cc(kr_cookie_lru_t *cache, const void *sa,
                                         const uint8_t *cc, uint16_t cc_len)
 {
-	assert(cache && sockaddr && cc && cc_len);
+	assert(cache && sa && cc && cc_len);
 
-	uint32_t timestamp = 0;
-	struct timed_cookie timed_cookie = { 0, };
-
-	int ret = kr_cookie_cache_peek_cookie(cache, sockaddr, &timed_cookie,
-	                                      &timestamp);
-	if (ret != kr_ok()) {
+	const uint8_t *cached_opt = kr_cookie_lru_get(cache, sa);
+	if (!cached_opt) {
 		return NULL;
 	}
-	assert(timed_cookie.cookie_opt);
 
-	/* Ignore the time stamp and time to leave. If the cookie is in cache
-	 * then just use it. The cookie control should be performed in the
-	 * cookie module/layer. */
-
-	const uint8_t *cached_cc = knot_edns_opt_get_data((uint8_t *) timed_cookie.cookie_opt);
+	const uint8_t *cached_cc = knot_edns_opt_get_data((uint8_t *) cached_opt);
 
 	if (cc_len == KNOT_OPT_COOKIE_CLNT &&
 	    0 == memcmp(cc, cached_cc, cc_len)) {
-		return timed_cookie.cookie_opt;
+		return cached_opt;
 	}
 
 	return NULL;
@@ -112,7 +103,7 @@ static int opt_rr_add_cc(knot_rrset_t *opt_rr, uint8_t *cc, uint16_t cc_len,
 }
 
 int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
-                          struct kr_cache *cookie_cache,
+                          kr_cookie_lru_t *cookie_cache,
                           const struct sockaddr *clnt_sa,
                           const struct sockaddr *srvr_sa,
                           knot_pkt_t *pkt)

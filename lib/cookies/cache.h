@@ -16,93 +16,47 @@
 
 #pragma once
 
+#include <libknot/rrtype/opt-cookie.h>
 #include <netinet/in.h>
+#include <stdint.h>
 
-#include "lib/cache.h"
+#include "lib/defines.h"
+#include "lib/generic/lru.h"
 
-/** DNS cookie cache entry tag. */
-#define KR_CACHE_COOKIE (KR_CACHE_USER + 'C')
-
-/**
- * Peek the cache for asset (tag, socket address).
- * @note The 'drift' is the time passed between the inception time and now (in seconds).
- * @param cache cache structure
- * @param tag  asset tag
- * @param sa asset socket address
- * @param entry cache entry, will be set to valid pointer or NULL
- * @param timestamp current time (will be replaced with drift if successful)
- * @return 0 or an error code
- */
-KR_EXPORT
-int kr_cookie_cache_peek(struct kr_cache *cache,
-                         uint8_t tag, const struct sockaddr *sa,
-                         struct kr_cache_entry **entry, uint32_t *timestamp);
+/** Maximal size of a cookie option. */
+#define KR_COOKIE_OPT_MAX_LEN (KNOT_EDNS_OPTION_HDRLEN + KNOT_OPT_COOKIE_CLNT + KNOT_OPT_COOKIE_SRVR_MAX)
 
 /**
- * Insert asset into cache, replacing any existing data.
- * @param cache cache structure
- * @param tag  asset tag
- * @param sa asset socket address
- * @param header filled entry header (ttl and time stamp)
- * @param data inserted data
- * @return 0 or an error code
+ * Cookie option entry.
  */
-KR_EXPORT
-int kr_cookie_cache_insert(struct kr_cache *cache,
-                           uint8_t tag, const struct sockaddr *sa,
-                           struct kr_cache_entry *header, knot_db_val_t data);
-
-/**
- * Remove asset from cache.
- * @param cache cache structure
- * @param tag asset tag
- * @param sa asset socket address
- * @return 0 or an error code
- */
-KR_EXPORT
-int kr_cookie_cache_remove(struct kr_cache *cache,
-                           uint8_t tag, const struct sockaddr *sa);
-
-/**
- * Structure used for cookie cache interface.
- * @note There is no other way how to pass a ttl into a cookie.
- */
-struct timed_cookie {
-	uint32_t ttl;
-	const uint8_t *cookie_opt;
+struct cookie_opt_data {
+	uint8_t opt_data[KR_COOKIE_OPT_MAX_LEN];
 };
 
 /**
- * Peek the cache for given cookie (socket address)
- * @note The 'drift' is the time passed between the cache time of the cookie and now (in seconds).
- * @param cache cache structure
- * @param sa socket address
- * @param cookie asset
- * @param timestamp current time (will be replaced with drift if successful)
- * @return 0 or an error code
+ * DNS cookies tracking.
  */
-KR_EXPORT
-int kr_cookie_cache_peek_cookie(struct kr_cache *cache, const struct sockaddr *sa,
-                                struct timed_cookie *cookie, uint32_t *timestamp);
+typedef lru_hash(struct cookie_opt_data) kr_cookie_lru_t;
 
 /**
- * Insert a DNS cookie (client and server) entry for the given server signature (IP address).
- * @param cache cache structure
- * @param sa server IP address
- * @param cookie ttl and whole EDNS cookie option (header, client and server cookies)
- * @param timestamp current time
- * @return 0 or an error code
+ * @brief Obtain LRU cache entry.
+ *
+ * @param cache cookie LRU cache
+ * @param sa socket address serving as key
+ * @return pointer to cached option or NULL if not found or error occurred
  */
 KR_EXPORT
-int kr_cookie_cache_insert_cookie(struct kr_cache *cache, const struct sockaddr *sa,
-                                  const struct timed_cookie *cookie,
-                                  uint32_t timestamp);
+const uint8_t *kr_cookie_lru_get(kr_cookie_lru_t *cache,
+                                 const struct sockaddr *sa);
 
 /**
- * Remove asset from cache.
- * @param cache cache structure
- * @param sa socket address
- * @return 0 or an error code
+ * @brief Stores cookie option into LRU cache.
+ *
+ * @param cache cookie LRU cache
+ * @param sa socket address serving as key
+ * @param opt cookie option to be stored
+ * @return kr_ok() or error code
  */
-#define kr_cookie_cache_remove_cookie(cache, sa) \
-	kr_cookie_cache_remove((cache), KR_CACHE_COOKIE, (sa))
+KR_EXPORT
+int kr_cookie_lru_set(kr_cookie_lru_t *cache, const struct sockaddr *sa,
+                      uint8_t *opt);

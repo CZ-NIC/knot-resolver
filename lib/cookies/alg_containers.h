@@ -37,6 +37,3 @@ extern const struct knot_sc_alg *const kr_sc_algs[];
 /** Binds server algorithm identifiers onto names. */
 KR_EXPORT
 extern const knot_lookup_t kr_sc_alg_names[];
-
-/** Maximal size of a cookie option. */
-#define KR_COOKIE_OPT_MAX_LEN (KNOT_EDNS_OPTION_HDRLEN + KNOT_OPT_COOKIE_CLNT + KNOT_OPT_COOKIE_SRVR_MAX)

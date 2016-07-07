@@ -16,13 +16,12 @@
 
 #pragma once
 
-#include <libknot/rrtype/opt-cookie.h>
 #include <libknot/packet/pkt.h>
 
 #include "lib/cookies/alg_containers.h"
+#include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
 #include "lib/cookies/nonce.h"
-#include "lib/cache.h"
 #include "lib/defines.h"
 
 /**
@@ -37,7 +36,7 @@
  */
 KR_EXPORT
 int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
-                          struct kr_cache *cookie_cache,
+                          kr_cookie_lru_t *cookie_cache,
                           const struct sockaddr *clnt_sa,
                           const struct sockaddr *srvr_sa,
                           knot_pkt_t *pkt);

@@ -171,64 +171,48 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
  * Obtain cookie from cache.
  * @note The ttl and current time are respected. Outdated entries are ignored.
  * @param cache cache context
- * @param sockaddr key value
- * @param timestamp current time
- * @param remove_outdated true if outdated entries should be removed
+ * @param sa key value
  * @param cookie_opt entire EDNS cookie option (including header)
  * @return true if a cookie exists in cache
  */
-static bool materialise_cookie_opt(struct kr_cache *cache,
-                                   const struct sockaddr *sockaddr,
-                                   uint32_t timestamp, bool remove_outdated,
+static bool materialise_cookie_opt(kr_cookie_lru_t *cache,
+                                   const struct sockaddr *sa,
                                    uint8_t cookie_opt[KR_COOKIE_OPT_MAX_LEN])
 {
-	assert(cache && sockaddr);
+	assert(cache && sa);
 
-	bool found = false;
-	struct timed_cookie timed_cookie = { 0, };
-
-	int ret = kr_cookie_cache_peek_cookie(cache, sockaddr, &timed_cookie,
-	                                      &timestamp);
-	if (ret != kr_ok()) {
-		return false;
-	}
-	assert(timed_cookie.cookie_opt);
-
-	if (remove_outdated && (timed_cookie.ttl < timestamp)) {
-		/* Outdated entries must be removed. */
-		DEBUG_MSG(NULL, "%s\n", "removing outdated entry from cache");
-		kr_cookie_cache_remove_cookie(cache, sockaddr);
+	const uint8_t *cached_cookie_opt = kr_cookie_lru_get(cache, sa);
+	if (!cached_cookie_opt) {
 		return false;
 	}
 
 	size_t cookie_opt_size = KNOT_EDNS_OPTION_HDRLEN +
-	                         knot_edns_opt_get_length(timed_cookie.cookie_opt);
-	assert(cookie_opt_size <= KR_COOKIE_OPT_MAX_LEN);
+	                         knot_edns_opt_get_length(cached_cookie_opt);
+	if (cookie_opt_size > KR_COOKIE_OPT_MAX_LEN) {
+		return false;
+	}
 
 	if (cookie_opt) {
-		memcpy(cookie_opt, timed_cookie.cookie_opt, cookie_opt_size);
+		memcpy(cookie_opt, cached_cookie_opt, cookie_opt_size);
 	}
+
 	return true;
 }
 
 /**
  * Check whether the supplied cookie is cached under the given key.
  * @param cache cache context
- * @param sockaddr key value
- * @param timestamp current time
+ * @param sa key value
  * @param cookie_opt cookie option to search for
  */
-static bool is_cookie_cached(struct kr_cache *cache,
-                             const struct sockaddr *sockaddr,
-                             uint32_t timestamp,
+static bool is_cookie_cached(kr_cookie_lru_t *cache, const struct sockaddr *sa,
                              const uint8_t *cookie_opt)
 {
-	assert(cache && sockaddr && cookie_opt);
+	assert(cache && sa && cookie_opt);
 
 	uint8_t cached_opt[KR_COOKIE_OPT_MAX_LEN];
 
-	bool have_cached = materialise_cookie_opt(cache, sockaddr, timestamp,
-	                                          false, cached_opt);
+	bool have_cached = materialise_cookie_opt(cache, sa, cached_opt);
 	if (!have_cached) {
 		return false;
 	}
@@ -249,10 +233,9 @@ static bool is_cookie_cached(struct kr_cache *cache,
  * Check cookie content and store it to cache.
  */
 static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt_sett,
-                                           uint32_t cookie_cache_ttl,
                                            struct kr_query *qry,
                                            uint8_t *pkt_cookie_opt,
-                                           struct kr_cache *cache)
+                                           kr_cookie_lru_t *cache)
 {
 	assert(clnt_sett && qry && pkt_cookie_opt && cache);
 
@@ -286,13 +269,8 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 
 	/* Don't cache received cookies that don't match the current secret. */
 	if (returned_current &&
-	    !is_cookie_cached(cache, srvr_sockaddr, qry->timestamp.tv_sec,
-	                      pkt_cookie_opt)) {
-		struct timed_cookie timed_cookie = { cookie_cache_ttl, pkt_cookie_opt };
-
-		ret = kr_cookie_cache_insert_cookie(cache, srvr_sockaddr,
-		                                    &timed_cookie,
-		                                    qry->timestamp.tv_sec);
+	    !is_cookie_cached(cache, srvr_sockaddr, pkt_cookie_opt)) {
+		ret = kr_cookie_lru_set(cache, srvr_sockaddr, pkt_cookie_opt);
 		if (ret != kr_ok()) {
 			DEBUG_MSG(NULL, "%s\n", "failed caching cookie");
 		} else {
@@ -321,13 +299,12 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		                                      KNOT_EDNS_OPTION_COOKIE);
 	}
 
-	struct kr_cache *cookie_cache = &req->ctx->cache;
+	kr_cookie_lru_t *cookie_cache = req->ctx->cache_cookie;
 
 	const struct sockaddr *srvr_sockaddr = passed_server_sockaddr(qry);
 
 	if (!pkt_cookie_opt && srvr_sockaddr &&
-	    materialise_cookie_opt(cookie_cache, srvr_sockaddr,
-	                           qry->timestamp.tv_sec, true, NULL)) {
+	    materialise_cookie_opt(cookie_cache, srvr_sockaddr, NULL)) {
 		/* We haven't received any cookies although we should. */
 		DEBUG_MSG(NULL, "%s\n",
 		          "expected to receive a cookie but none received");
@@ -339,8 +316,7 @@ static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	if (!check_cookie_content_and_cache(&cookie_ctx->clnt,
-	                                    cookie_ctx->cache_ttl, qry,
+	if (!check_cookie_content_and_cache(&cookie_ctx->clnt, qry,
 	                                    pkt_cookie_opt, cookie_cache)) {
 		return KNOT_STATE_FAIL;
 	}

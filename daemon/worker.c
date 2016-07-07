@@ -487,7 +487,7 @@ static bool subreq_update_cookies(struct qr_task *task, uv_udp_t *handle,
 #endif /* 0 */
 
 	kr_request_put_cookie(&clnt_sett->current,
-	                      &task->worker->engine->resolver.cache,
+	                      task->worker->engine->resolver.cache_cookie,
 	                      (struct sockaddr*) sockaddr_ptr, srvr_addr, pkt);
 
 	return true;
