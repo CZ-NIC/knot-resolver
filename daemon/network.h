@@ -25,6 +25,7 @@ enum endpoint_flag {
     NET_DOWN = 0 << 0,
     NET_UDP  = 1 << 0,
     NET_TCP  = 1 << 1,
+    NET_TLS  = 1 << 2,
 };
 
 struct endpoint {

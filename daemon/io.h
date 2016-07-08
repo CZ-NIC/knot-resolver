@@ -28,6 +28,7 @@ struct qr_task;
 struct session {
 	bool outgoing;
     bool throttled;
+    bool has_tls;
     uv_timer_t timeout;
     struct qr_task *buffering;
 	array_t(struct qr_task *) tasks;
@@ -39,6 +40,7 @@ struct session *session_new(void);
 int udp_bind(uv_udp_t *handle, struct sockaddr *addr);
 int udp_bindfd(uv_udp_t *handle, int fd);
 int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr);
+int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr);
 int tcp_bindfd(uv_tcp_t *handle, int fd);
 
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type);

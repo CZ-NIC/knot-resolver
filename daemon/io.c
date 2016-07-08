@@ -224,7 +224,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	mp_flush(worker->pkt_pool.ctx);
 }
 
-static void tcp_accept(uv_stream_t *master, int status)
+static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 {
 	if (status != 0) {
 		return;
@@ -244,11 +244,22 @@ static void tcp_accept(uv_stream_t *master, int status)
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
 	struct session *session = client->data;
+	session->has_tls = tls;
 	uv_timer_t *timer = &session->timeout;
 	uv_timer_init(master->loop, timer);
 	timer->data = client;
 	uv_timer_start(timer, tcp_timeout_trigger, KR_CONN_RTT_MAX/2, KR_CONN_RTT_MAX/2);
 	io_start_read((uv_handle_t *)client);
+}
+
+static void tcp_accept(uv_stream_t *master, int status)
+{
+	_tcp_accept(master, status, false);
+}
+
+static void tls_accept(uv_stream_t *master, int status)
+{
+	_tcp_accept(master, status, true);
 }
 
 static int set_tcp_option(uv_handle_t *handle, int option, int val)
@@ -305,6 +316,11 @@ static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb c
 int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr)
 {
 	return _tcp_bind(handle, addr, tcp_accept);
+}
+
+int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr)
+{
+	return _tcp_bind(handle, addr, tls_accept);
 }
 
 int tcp_bindfd(uv_tcp_t *handle, int fd)

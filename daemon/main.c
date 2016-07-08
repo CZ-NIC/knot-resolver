@@ -276,6 +276,7 @@ static void help(int argc, char *argv[])
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
 	       " -a, --addr=[addr]    Server address (default: localhost#53).\n"
+	       " -t, --addr=[addr]    Server address for TLS (default: off).\n"
 	       " -S, --fd=[fd]        Listen on given fd (handed out by supervisor).\n"
 	       " -c, --config=[path]  Config file path (relative to [rundir]) (default: config).\n"
 	       " -k, --keyfile=[path] File containing trust anchors (DS or DNSKEY).\n"
@@ -382,7 +383,9 @@ int main(int argc, char **argv)
 {
 	int forks = 1;
 	array_t(char*) addr_set;
+	array_t(char*) tls_set;
 	array_init(addr_set);
+	array_init(tls_set);
 	array_t(int) fd_set;
 	array_init(fd_set);
 	char *keyfile = NULL;
@@ -394,6 +397,7 @@ int main(int argc, char **argv)
 	int c = 0, li = 0, ret = 0;
 	struct option opts[] = {
 		{"addr", required_argument,   0, 'a'},
+		{"tls",  required_argument,   0, 't'},
 		{"fd",   required_argument,   0, 'S'},
 		{"config", required_argument, 0, 'c'},
 		{"keyfile",required_argument, 0, 'k'},
@@ -404,11 +408,14 @@ int main(int argc, char **argv)
 		{"help",      no_argument,    0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:S:c:f:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:c:f:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
 			array_push(addr_set, optarg);
+			break;
+		case 't':
+			array_push(tls_set, optarg);
 			break;
 		case 'S':
 			array_push(fd_set,  atoi(optarg));
@@ -556,16 +563,33 @@ int main(int argc, char **argv)
 		if (ret != 0) {
 			kr_log_error("[system] listen on fd=%d %s\n", fd_set.at[i], kr_strerror(ret));
 			ret = EXIT_FAILURE;
+			break;
 		}
 	}
 	/* Bind to sockets and run */
-	for (size_t i = 0; i < addr_set.len; ++i) {
-		int port = 53;
-		const char *addr = set_addr(addr_set.at[i], &port);
-		ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
-		if (ret != 0) {
-			kr_log_error("[system] bind to '%s#%d' %s\n", addr, port, kr_strerror(ret));
-			ret = EXIT_FAILURE;
+	if (ret == 0) {
+		for (size_t i = 0; i < addr_set.len; ++i) {
+			int port = 53;
+			const char *addr = set_addr(addr_set.at[i], &port);
+			ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
+			if (ret != 0) {
+				kr_log_error("[system] bind to '%s#%d' %s\n", addr, port, kr_strerror(ret));
+				ret = EXIT_FAILURE;
+				break;
+			}
+		}
+	}
+	/* Bind to TLS sockets */
+	if (ret == 0) {
+		for (size_t i = 0; i < tls_set.len; ++i) {
+			int port = 853;
+			const char *addr = set_addr(tls_set.at[i], &port);
+			ret = network_listen(&engine.net, addr, (uint16_t)port, NET_TCP|NET_TLS);
+			if (ret != 0) {
+				kr_log_error("[system] bind to '%s#%d' (TLS) %s\n", addr, port, kr_strerror(ret));
+				ret = EXIT_FAILURE;
+				break;
+			}
 		}
 	}
 
@@ -604,6 +628,7 @@ int main(int argc, char **argv)
 	worker_reclaim(worker);
 	mp_delete(pool.ctx);
 	array_clear(addr_set);
+	array_clear(tls_set);
 	kr_crypto_cleanup();
 	return ret;
 }

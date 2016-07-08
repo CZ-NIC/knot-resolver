@@ -130,6 +130,7 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 /** Open endpoint protocols. */
 static int open_endpoint(struct network *net, struct endpoint *ep, struct sockaddr *sa, uint32_t flags)
 {
+	int ret = 0;
 	if (flags & NET_UDP) {
 		ep->udp = malloc(sizeof(*ep->udp));
 		if (!ep->udp) {
@@ -137,7 +138,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		}
 		memset(ep->udp, 0, sizeof(*ep->udp));
 		handle_init(udp, net->loop, ep->udp, sa->sa_family);
-		int ret = udp_bind(ep->udp, sa);
+		ret = udp_bind(ep->udp, sa);
 		if (ret != 0) {
 			return ret;
 		}
@@ -150,13 +151,18 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		}
 		memset(ep->tcp, 0, sizeof(*ep->tcp));
 		handle_init(tcp, net->loop, ep->tcp, sa->sa_family);
-		int ret = tcp_bind(ep->tcp, sa);
+		if (flags & NET_TLS) {
+			ret = tcp_bind_tls(ep->tcp, sa);
+			ep->flags |= NET_TLS;
+		} else {
+			ret = tcp_bind(ep->tcp, sa);
+		}
 		if (ret != 0) {
 			return ret;
 		}
 		ep->flags |= NET_TCP;
 	}
-	return kr_ok();
+	return ret;
 }
 
 /** Open fd as endpoint. */

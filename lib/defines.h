@@ -61,6 +61,7 @@ static inline int __attribute__((__cold__)) kr_error(int x) {
  * Defines.
  */
 #define KR_DNS_PORT   53
+#define KR_DNS_TLS_PORT 853
 #define KR_EDNS_VERSION 0
 #define KR_EDNS_PAYLOAD 4096 /* Default UDP payload (max unfragmented UDP is 1452B) */
 

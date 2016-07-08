@@ -150,6 +150,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 		lua_setfield(L, -2, "udp");
 		lua_pushboolean(L, ep->flags & NET_TCP);
 		lua_setfield(L, -2, "tcp");
+		lua_pushboolean(L, ep->flags & NET_TLS);
+		lua_setfield(L, -2, "tls");
 	}
 	lua_setfield(L, -2, key);
 	return kr_ok();
@@ -165,7 +167,7 @@ static int net_list(lua_State *L)
 }
 
 /** Listen on interface address list. */
-static int net_listen_iface(lua_State *L, int port)
+static int net_listen_iface(lua_State *L, int port, int flags)
 {
 	/* Expand 'addr' key if exists */
 	lua_getfield(L, 1, "addr");
@@ -180,7 +182,7 @@ static int net_listen_iface(lua_State *L, int port)
 	for (size_t i = 0; i < count; ++i) {
 		lua_rawgeti(L, -1, i + 1);
 		int ret = network_listen(&engine->net, lua_tostring(L, -1),
-		                         port, NET_TCP|NET_UDP);
+		                         port, flags);
 		if (ret != 0) {
 			kr_log_info("[system] bind to '%s#%d' %s\n", lua_tostring(L, -1), port, kr_strerror(ret));
 		}
@@ -189,6 +191,17 @@ static int net_listen_iface(lua_State *L, int port)
 
 	lua_pushboolean(L, true);
 	return 1;
+}
+
+static bool table_get_flag(lua_State *L, int index, const char *key, bool def)
+{
+	bool result = def;
+	lua_getfield(L, index, key);
+	if (lua_isboolean(L, -1)) {
+		result = lua_toboolean(L, -1);
+	}
+	lua_pop(L, 1);
+	return result;
 }
 
 /** Listen on endpoint. */
@@ -200,18 +213,23 @@ static int net_listen(lua_State *L)
 	if (n > 1 && lua_isnumber(L, 2)) {
 		port = lua_tointeger(L, 2);
 	}
+	bool tls = (port == KR_DNS_TLS_PORT);
+	if (n > 2 && lua_istable(L, 3)) {
+		tls = table_get_flag(L, 3, "tls", tls);
+	}
 
-	/* Process interface or (address, port) pair. */
+	/* Process interface or (address, port, flags) triple. */
+	int flags = tls ? (NET_TCP|NET_TLS) : (NET_TCP|NET_UDP);
 	if (lua_istable(L, 1)) {
-		return net_listen_iface(L, port);
+		return net_listen_iface(L, port, flags);
 	} else if (n < 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected 'listen(string addr, number port = 53)'");
+		format_error(L, "expected 'listen(string addr, number port = 53[, bool tls = false])'");
 		lua_error(L);
 	}
 
 	/* Open resolution context cache */
 	struct engine *engine = engine_luaget(L);
-	int ret = network_listen(&engine->net, lua_tostring(L, 1), port, NET_TCP|NET_UDP);
+	int ret = network_listen(&engine->net, lua_tostring(L, 1), port, flags);
 	if (ret != 0) {
 		format_error(L, kr_strerror(ret));
 		lua_error(L);
