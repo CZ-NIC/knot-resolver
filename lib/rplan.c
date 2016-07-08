@@ -15,7 +15,6 @@
  */
 
 #include <libknot/descriptor.h>
-#include <libknot/processing/layer.h>
 #include <libknot/errcode.h>
 
 #include "lib/rplan.h"

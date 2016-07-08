@@ -18,7 +18,6 @@
 
 #include "lib/defines.h"
 #include "lib/utils.h"
-#include "lib/resolve.h"
 
 #ifndef NDEBUG
  /** @internal Print a debug message related to resolution. */
@@ -30,6 +29,42 @@
 #else
  #define QRDEBUG(query, cls, fmt, ...)
 #endif
+
+/*! Layer processing states.
+ *  Each state represents the state machine transition,
+ *  and determines readiness for the next action.
+ */
+enum knot_layer_state {
+	KNOT_STATE_NOOP    = 0,      /*!< N/A */
+	KNOT_STATE_CONSUME = 1 << 0, /*!< Consume data. */
+	KNOT_STATE_PRODUCE = 1 << 1, /*!< Produce data. */
+	KNOT_STATE_DONE    = 1 << 2, /*!< Finished. */
+	KNOT_STATE_FAIL    = 1 << 3  /*!< Error. */
+};
+
+/* Forward declarations. */
+struct knot_layer_api;
+
+/*! \brief Packet processing context. */
+typedef struct knot_layer {
+	knot_mm_t *mm;   /* Processing memory context. */
+	uint16_t state;  /* Bitmap of enum knot_layer_state. */
+	void *data;      /* Module specific. */
+	const struct knot_layer_api *api;
+} knot_layer_t;
+
+/*! \brief Packet processing module API. */
+struct knot_layer_api {
+	int (*begin)(knot_layer_t *ctx, void *module_param);
+	int (*reset)(knot_layer_t *ctx);
+	int (*finish)(knot_layer_t *ctx);
+	int (*consume)(knot_layer_t *ctx, knot_pkt_t *pkt);
+	int (*produce)(knot_layer_t *ctx, knot_pkt_t *pkt);
+	int (*fail)(knot_layer_t *ctx, knot_pkt_t *pkt);
+	void *data;
+};
+
+typedef struct knot_layer_api knot_layer_api_t;
 
 /** Pickled layer state (api, input, state). */
 struct kr_layer_pickle {

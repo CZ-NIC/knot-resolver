@@ -24,6 +24,7 @@
 #include "lib/rplan.h"
 #include "lib/defines.h"
 #include "lib/layer.h"
+#include "lib/resolve.h"
 #include "lib/generic/pack.h"
 
 /* Root hint descriptor. */

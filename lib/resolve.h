@@ -17,9 +17,9 @@
 #pragma once
 
 #include <netinet/in.h>
-#include <libknot/processing/layer.h>
 #include <libknot/packet/pkt.h>
 
+#include "lib/layer.h"
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
 #include "lib/nsrep.h"

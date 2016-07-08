@@ -22,6 +22,7 @@
 #include "lib/layer/iterate.h"
 #include "lib/cache.h"
 #include "lib/module.h"
+#include "lib/resolve.h"
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), " pc ",  fmt)
 #define DEFAULT_MAXTTL (15 * 60)

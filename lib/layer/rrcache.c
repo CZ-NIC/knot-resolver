@@ -28,6 +28,7 @@
 #include "lib/cache.h"
 #include "lib/module.h"
 #include "lib/utils.h"
+#include "lib/resolve.h"
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), " rc ",  fmt)
 #define DEFAULT_MINTTL (5) /* Short-time "no data" retention to avoid bursts */

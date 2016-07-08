@@ -32,6 +32,7 @@
 #include "lib/rplan.h"
 #include "lib/module.h"
 #include "lib/layer.h"
+#include "lib/resolve.h"
 
 /** @internal Compatibility wrapper for Lua < 5.2 */
 #if LUA_VERSION_NUM < 502
