@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <libknot/rrtype/opt.h>
 #include <libknot/rrtype/opt-cookie.h>
 #include <netinet/in.h>
 #include <stdint.h>

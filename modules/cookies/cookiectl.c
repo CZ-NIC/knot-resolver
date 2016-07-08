@@ -21,12 +21,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "daemon/engine.h"
 #include "lib/cookies/alg_containers.h"
-#include "lib/cookies/control.h"
-#include "lib/layer.h"
-
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookiectl",  fmt)
+#include "modules/cookies/cookiectl.h"
 
 #define NAME_CLIENT_ENABLED "client_enabled"
 #define NAME_CLIENT_SECRET "client_secret"
@@ -284,7 +280,7 @@ static void apply_from_copy(struct kr_cookie_ctx *running,
 	running->srvr.enabled = shallow->srvr.enabled;
 }
 
-static bool apply_config(struct kr_cookie_ctx *ctx, const char *args)
+bool config_apply(struct kr_cookie_ctx *ctx, const char *args)
 {
 	if (!ctx) {
 		return false;
@@ -326,7 +322,7 @@ static bool apply_config(struct kr_cookie_ctx *ctx, const char *args)
 	return success;
 }
 
-char *read_config(struct kr_cookie_ctx *ctx)
+char *config_read(struct kr_cookie_ctx *ctx)
 {
 	if (!ctx) {
 		return NULL;
@@ -372,36 +368,13 @@ char *read_config(struct kr_cookie_ctx *ctx)
 	return result;
 }
 
-/**
- * Get/set DNS cookie related stuff.
- *
- * Input: { name: value, ... }
- * Output: current configuration
- */
-static char *cookiectl_config(void *env, struct kr_module *module, const char *args)
+int config_init(struct kr_cookie_ctx *ctx)
 {
-	struct kr_cookie_ctx *cookie_ctx = module->data;
-	assert(cookie_ctx);
+	if (!ctx) {
+		return kr_error(EINVAL);
+	}
 
-	/* Apply configuration, if any. */
-	apply_config(cookie_ctx, args);
-
-	/* Return current configuration. */
-	return read_config(cookie_ctx);
-}
-
-/*
- * Module implementation.
- */
-
-KR_EXPORT
-int cookiectl_init(struct kr_module *module)
-{
-	struct engine *engine = module->data;
-
-	struct kr_cookie_ctx *cookie_ctx = &engine->resolver.cookie_ctx;
-
-	kr_cookie_ctx_init(cookie_ctx);
+	kr_cookie_ctx_init(ctx);
 
 	struct kr_cookie_secret *cs = new_cookie_secret(KNOT_OPT_COOKIE_CLNT,
 	                                                true);
@@ -423,52 +396,34 @@ int cookiectl_init(struct kr_module *module)
 		return kr_error(ENOKEY);
 	}
 
-	cookie_ctx->clnt.current.secr = cs;
-	cookie_ctx->clnt.current.alg_id = clookup->id;
+	ctx->clnt.current.secr = cs;
+	ctx->clnt.current.alg_id = clookup->id;
 
-	cookie_ctx->srvr.current.secr = ss;
-	cookie_ctx->srvr.current.alg_id = slookup->id;
-
-	/* Replace engine pointer. */
-	module->data = cookie_ctx;
+	ctx->srvr.current.secr = ss;
+	ctx->srvr.current.alg_id = slookup->id;
 
 	return kr_ok();
 }
 
-KR_EXPORT
-int cookiectl_deinit(struct kr_module *module)
+void config_deinit(struct kr_cookie_ctx *ctx)
 {
-	struct engine *engine = module->data;
+	if (!ctx) {
+		return;
+	}
 
-	struct kr_cookie_ctx *cookie_ctx = module->data;
+	ctx->clnt.enabled = false;
 
-	cookie_ctx->clnt.enabled = false;
+	free(ctx->clnt.recent.secr);
+	ctx->clnt.recent.secr = NULL;
 
-	free(cookie_ctx->clnt.recent.secr);
-	cookie_ctx->clnt.recent.secr = NULL;
+	free(ctx->clnt.current.secr);
+	ctx->clnt.current.secr = NULL;
 
-	free(cookie_ctx->clnt.current.secr);
-	cookie_ctx->clnt.current.secr = NULL;
+	ctx->srvr.enabled = false;
 
-	cookie_ctx->srvr.enabled = false;
+	free(ctx->srvr.recent.secr);
+	ctx->srvr.recent.secr = NULL;
 
-	free(cookie_ctx->srvr.recent.secr);
-	cookie_ctx->srvr.recent.secr = NULL;
-
-	free(cookie_ctx->srvr.current.secr);
-	cookie_ctx->srvr.current.secr = NULL;
-
-	return kr_ok();
+	free(ctx->srvr.current.secr);
+	ctx->srvr.current.secr = NULL;
 }
-
-KR_EXPORT
-struct kr_prop *cookiectl_props(void)
-{
-	static struct kr_prop prop_list[] = {
-	    { &cookiectl_config, "config", "Empty value to return current configuration.", },
-	    { NULL, NULL, NULL }
-	};
-	return prop_list;
-}
-
-KR_MODULE_EXPORT(cookiectl);

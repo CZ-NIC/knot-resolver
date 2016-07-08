@@ -19,21 +19,18 @@
 #include <libknot/db/db_lmdb.h>
 #include <libknot/error.h>
 #include <libknot/mm_ctx.h>
-#include <libknot/packet/pkt.h>
 #include <libknot/rrtype/opt-cookie.h> // branch dns-cookies-wip
 #include <stdlib.h>
 #include <string.h>
 
-#include "daemon/engine.h"
 #include "lib/cookies/alg_containers.h"
 #include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
 #include "lib/cookies/helper.h"
 #include "lib/cookies/nonce.h"
-#include "lib/module.h"
-#include "lib/layer.h"
+#include "modules/cookies/cookiemonster.h"
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookiemonster",  fmt)
+#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies",  fmt)
 
 /* TODO -- The context must store sent cookies and server addresses in order
  * to make the process more reliable. */
@@ -275,7 +272,7 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 }
 
 /** Process incoming response. */
-static int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
+int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
@@ -351,7 +348,7 @@ static inline uint8_t *req_cookie_option(struct kr_request *req)
 	return knot_edns_get_option(req->qsource.opt, KNOT_EDNS_OPTION_COOKIE);
 }
 
-static int check_request(knot_layer_t *ctx, void *module_param)
+int check_request(knot_layer_t *ctx, void *module_param)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_cookie_settings *srvr_sett = &req->ctx->cookie_ctx.srvr;
@@ -461,22 +458,3 @@ answer_add_cookies:
 	}
 	return return_state;
 }
-
-/** Module implementation. */
-
-KR_EXPORT
-const knot_layer_api_t *cookiemonster_layer(struct kr_module *module)
-{
-	/* The function answer_finalize() in resolver is called before any
-	 * .finish callback. Therefore this layer does not use it. */
-
-	static knot_layer_api_t _layer = {
-		.begin = &check_request,
-		.consume = &check_response
-	};
-	/* Store module reference */
-	_layer.data = module;
-	return &_layer;
-}
-
-KR_MODULE_EXPORT(cookiemonster)

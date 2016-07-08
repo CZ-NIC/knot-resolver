@@ -46,7 +46,6 @@ libkres_TARGET := -L$(abspath lib) -lkres
 
 ifeq ($(HAS_nettle),yes)
 libkres_SOURCES += \
-	lib/layer/cookiemonster.c \
 	lib/cookies/alg_containers.c \
 	lib/cookies/alg_sha.c \
 	lib/cookies/cache.c \

@@ -4,7 +4,7 @@ modules_TARGETS := hints \
 
 # DNS cookies
 ifeq ($(HAS_nettle),yes)
-modules_TARGETS += cookiectl
+modules_TARGETS += cookies
 endif
 
 # Memcached
