@@ -18,7 +18,6 @@
 #include <libknot/rrtype/opt.h>
 #include <libknot/rrtype/opt-cookie.h>
 
-#include "lib/cookies/cache.h"
 #include "lib/cookies/helper.h"
 #include "lib/defines.h"
 

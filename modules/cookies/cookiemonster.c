@@ -19,14 +19,14 @@
 #include <libknot/db/db_lmdb.h>
 #include <libknot/error.h>
 #include <libknot/mm_ctx.h>
-#include <libknot/rrtype/opt-cookie.h> // branch dns-cookies-wip
+#include <libknot/rrtype/opt-cookie.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "lib/cookies/alg_containers.h"
-#include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
 #include "lib/cookies/helper.h"
+#include "lib/cookies/lru_cache.h"
 #include "lib/cookies/nonce.h"
 #include "modules/cookies/cookiemonster.h"
 

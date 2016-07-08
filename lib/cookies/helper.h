@@ -19,8 +19,8 @@
 #include <libknot/packet/pkt.h>
 
 #include "lib/cookies/alg_containers.h"
-#include "lib/cookies/cache.h"
 #include "lib/cookies/control.h"
+#include "lib/cookies/lru_cache.h"
 #include "lib/cookies/nonce.h"
 #include "lib/defines.h"
 

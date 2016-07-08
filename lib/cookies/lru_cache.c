@@ -17,7 +17,7 @@
 #include <libknot/rrtype/opt.h>
 #include <string.h>
 
-#include "lib/cookies/cache.h"
+#include "lib/cookies/lru_cache.h"
 #include "lib/utils.h"
 
 const uint8_t *kr_cookie_lru_get(kr_cookie_lru_t *cache,
