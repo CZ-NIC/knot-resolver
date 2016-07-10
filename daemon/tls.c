@@ -321,25 +321,38 @@ worker_process_tls(struct worker_ctx *worker, uv_stream_t * handle, const uint8_
 			return kr_error(err);
 		}
 	}
-	count = gnutls_record_recv(tls_p->session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
-	if (count == 0) {
-		/* this means there has been an end of the stream */
-		kr_log_error("[tls] got zero from gnutls_record_recv\n");
-		worker_submit(worker, (uv_handle_t *) handle, NULL, NULL);
-		return kr_error(EIO);
-	}
-	if (count < 0) {
-		if (count == GNUTLS_E_AGAIN || count == GNUTLS_E_INTERRUPTED) {
-			return 0; /* Wait for more */
-		} else {
-			kr_log_error("[tls] unknown gnutls_record_recv error: (%zd) %s\n",
-				     count, gnutls_strerror_name(count));
+
+	/* FIXME: Decoded buffer should be at least as big as received bytes, otherwise we may lose
+	 *        records, especially with pipelined queries. Quick solution is to read multiple times.
+	 *        instead of aggregating decoded data into output buffer and submit once, but it's slower.
+	 */
+	int pushed_queries = 0;
+	while (true) {
+		count = gnutls_record_recv(tls_p->session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
+		if (count == 0) {
+			/* this means there has been an end of the stream */
+			kr_log_error("[tls] got zero from gnutls_record_recv\n");
 			worker_submit(worker, (uv_handle_t *) handle, NULL, NULL);
 			return kr_error(EIO);
 		}
+		if (count < 0) {
+			if (count == GNUTLS_E_AGAIN || count == GNUTLS_E_INTERRUPTED) {
+				return pushed_queries; /* Wait for more */
+			} else {
+				kr_log_error("[tls] unknown gnutls_record_recv error: (%zd) %s\n",
+					     count, gnutls_strerror_name(count));
+				worker_submit(worker, (uv_handle_t *) handle, NULL, NULL);
+				return kr_error(EIO);
+			}
+		}
+		kr_log_error("[tls] we got %zd cleartext octets\n", count);
+		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
+		if (ret < 0) {
+			return ret;
+		}
+		pushed_queries += ret;
 	}
-	kr_log_error("[tls] we got %zd cleartext octets\n", count);
-	return worker_process_tcp(worker, handle, tls_p->recv_buf, count);
+	return pushed_queries;
 }
 
 #undef DEBUG_MSG
