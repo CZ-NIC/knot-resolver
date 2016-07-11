@@ -438,6 +438,7 @@ static int cookie_answer(const void *clnt_sockaddr,
 	ret = knot_sc_check(NONCE_LEN, cookies, &srvr_data,
 	                    kr_sc_algs[srvr_sett->current.alg_id]);
 	if (ret != KNOT_EOK) {
+		/* RFC7873 5.4 */
 		kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 		return KNOT_STATE_FAIL | KNOT_STATE_DONE;
 	}
@@ -465,7 +466,9 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		if (cookie_opt && request->ctx->cookie_ctx.clnt.enabled) {
 			if (kr_ok() != kr_parse_cookie_opt(cookie_opt,
 			                                   &cookies)) {
-				/* TODO -- KNOT_RCODE_FORMERR? */
+				/* RFC7873 5.2.2 malformed cookie. */
+				knot_wire_set_rcode(request->answer->wire,
+				                    KNOT_RCODE_FORMERR);
 				return KNOT_STATE_FAIL;
 			}
 		}
@@ -838,7 +841,7 @@ ns_election:
 		kr_nsrep_elect_addr(qry, request->ctx);
 #if defined(ENABLE_COOKIES)
 	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_BADCOOKIE_AGAIN))) { /* Keep NS when requerying/stub/badcookie. */
-#else /* defined(ENABLE_COOKIES) */
+#else /* !defined(ENABLE_COOKIES) */
 	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB))) { /* Keep NS when requerying/stub. */
 #endif /* defined(ENABLE_COOKIES) */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
