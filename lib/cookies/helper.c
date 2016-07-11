@@ -119,9 +119,8 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 		return kr_error(EINVAL);
 	}
 
-	/* Generate client cookie.
-	 * TODO -- generate client cookie from client address, server address
-	 * and secret quantity. */
+	/* Generate client cookie from client address, server address and
+	 * secret quantity. */
 	struct knot_cc_input input = {
 		.clnt_sockaddr = clnt_sa,
 		.srvr_sockaddr = srvr_sa,

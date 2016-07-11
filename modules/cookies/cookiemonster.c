@@ -32,9 +32,6 @@
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies",  fmt)
 
-/* TODO -- The context must store sent cookies and server addresses in order
- * to make the process more reliable. */
-
 /**
  * Obtain address from query/response context if if can be obtained.
  * @param qry query context

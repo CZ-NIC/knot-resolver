@@ -530,8 +530,8 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 #if defined(ENABLE_COOKIES)
 	if (src && !(qry->flags & QUERY_CACHED)) {
 		/* Track response source.
-		 * TODO -- Find a more suitable place to put the source address
-		 * into query/response context. */
+		 * @todo -- Find a more suitable place to put the source
+		 * address into query/response context. */
 		switch (src->sa_family) {
 		case AF_INET:
 			qry->rsource.ip4 = *(struct sockaddr_in *) src;

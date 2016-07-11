@@ -22,7 +22,7 @@
 
 #include "lib/defines.h"
 
-/** Client algorithm identifiers are used as index into this array of pointers. */
+/** Client algorithm identifiers are used to index this array of pointers. */
 KR_EXPORT
 extern const struct knot_cc_alg *const kr_cc_algs[];
 
@@ -30,7 +30,7 @@ extern const struct knot_cc_alg *const kr_cc_algs[];
 KR_EXPORT
 extern const knot_lookup_t kr_cc_alg_names[];
 
-/** Server algorithm identifiers are used as index into this array of pointers. */
+/** Server algorithm identifiers are used to index this array of pointers. */
 KR_EXPORT
 extern const struct knot_sc_alg *const kr_sc_algs[];
 

@@ -31,7 +31,7 @@ struct kr_nonce_input {
 };
 
 /**
- * @brief Writes server cookie nonce balue into given buffer.
+ * @brief Writes server cookie nonce value into given buffer.
  *
  * @param buf     buffer to write nonce data in wire format into
  * @param buf_len on input contains nonce buffer size, on output contains

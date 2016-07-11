@@ -473,7 +473,7 @@ static bool subreq_update_cookies(struct qr_task *task, uv_udp_t *handle,
 	 * uv_udp_init(). The uv_udp_getsockname() fails because of the lazy
 	 * socket initialisation.
 	 *
-	 * TODO -- A solution might be opening a separate socket and trying
+	 * @note -- A solution might be opening a separate socket and trying
 	 * to obtain the IP address from it.
 	 */
 	struct sockaddr_storage sockaddr = {0, };
