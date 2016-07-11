@@ -24,7 +24,5 @@ struct tls_ctx_t;
 struct tls_ctx_t* tls_new(struct worker_ctx *worker);
 void tls_free(struct tls_ctx_t* tls);
 
-int push_tls(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt,
-	     uv_write_t *writer, qr_task_send_cb on_send);
-
-int worker_process_tls(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread);
+int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
+int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread);

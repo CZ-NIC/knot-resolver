@@ -208,7 +208,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	 * so the whole message reassembly and demuxing logic is inside worker */
 	int ret = 0;
 	if (s->has_tls) {
-		ret = worker_process_tls(worker, handle, (const uint8_t *)buf->base, nread);
+		ret = tls_process(worker, handle, (const uint8_t *)buf->base, nread);
 	} else {
 		ret = worker_process_tcp(worker, handle, (const uint8_t *)buf->base, nread);
 	}

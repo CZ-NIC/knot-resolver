@@ -444,30 +444,32 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	if (!handle) {
 		return qr_task_on_send(task, handle, kr_error(EIO));
 	}
-	struct req *send_req = req_borrow(task->worker);
-	if (!send_req) {
-		return qr_task_on_send(task, handle, kr_error(ENOMEM));
+
+	/* Synchronous push to TLS context, bypassing event loop. */
+	struct session *session = handle->data;
+	if (session->has_tls) {
+		int ret = tls_push(task, handle, pkt);
+		return qr_task_on_send(task, handle, ret);
 	}
 
 	/* Send using given protocol */
 	int ret = 0;
+	struct req *send_req = req_borrow(task->worker);
+	if (!send_req) {
+		return qr_task_on_send(task, handle, kr_error(ENOMEM));
+	}
 	if (handle->type == UV_UDP) {
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->as.send.data = task;
 		ret = uv_udp_send(&send_req->as.send, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
 	} else {
-		struct session *session = handle->data;
-		if (session->has_tls) {
-			ret = push_tls(task, handle, pkt, &send_req->as.write, qr_task_on_send);
-		} else {
-			uint16_t pkt_size = htons(pkt->size);
-			uv_buf_t buf[2] = {
-				{ (char *)&pkt_size, sizeof(pkt_size) },
-				{ (char *)pkt->wire, pkt->size }
-			};
-			send_req->as.write.data = task;
-			ret = uv_write(&send_req->as.write, (uv_stream_t *)handle, buf, 2, &on_write);
-		}
+		uint16_t pkt_size = htons(pkt->size);
+		uv_buf_t buf[2] = {
+			{ (char *)&pkt_size, sizeof(pkt_size) },
+			{ (char *)pkt->wire, pkt->size }
+		};
+		send_req->as.write.data = task;
+		ret = uv_write(&send_req->as.write, (uv_stream_t *)handle, buf, 2, &on_write);
 	}
 	if (ret == 0) {
 		qr_task_ref(task); /* Pending ioreq on current task */

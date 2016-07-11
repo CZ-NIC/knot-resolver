@@ -41,10 +41,6 @@ struct tls_ctx_t {
 	ssize_t nread;
 	ssize_t consumed;
 	uint8_t recv_buf[4096];
-
-	/* for writing to the network */
-	uv_write_t *writer;
-	uv_write_cb	write_cb;
 };
 
 /** @internal Debugging facility. */
@@ -107,38 +103,6 @@ kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 	memcpy(buf, t->buf + t->consumed, transfer);
 	t->consumed += transfer;
 	return transfer;
-}
-
-static		ssize_t
-kres_gnutls_push_vec(gnutls_transport_ptr_t h, const giovec_t * iov, int iovcnt)
-{
-	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
-	int	ret;
-
-	DEBUG_MSG("vecpush %d (%p) handle: <%p> writer <%p>\n", iovcnt, iov, t->handle, t->writer);
-
-	/*
-	 * because of the struct of giovec_t is identical to struct iovec;
-	 * and uv_buf_t header (uv-unix.h) says it may be cast to struct
-	 * iovec; so we should be able to just cast directly.
-	 */
-	ret = uv_write(t->writer, t->handle, (uv_buf_t *) iov, iovcnt, t->write_cb);
-	if (ret >= 0) {
-		/* Pending ioreq on current task */
-		return (ssize_t) ret;
-	}
-	switch (ret) {
-	case UV_EAGAIN:
-		errno = EAGAIN;
-		break;
-	case UV_EINTR:
-		errno = EINTR;
-		break;
-	default:
-		kr_log_error("[tls] uv_write unknown error: %d\n", ret);
-		errno = EIO;	/* dkg just picked this at random */
-	}
-	return -1;
 }
 
 struct tls_ctx_t *
@@ -236,65 +200,50 @@ tls_free(struct tls_ctx_t *tls)
 	free(tls);
 }
 
-int
-push_tls(struct qr_task *task, uv_handle_t * handle, knot_pkt_t * pkt,
-	 uv_write_t * writer, qr_task_send_cb on_send)
+int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt)
 {
-	ssize_t count;
-	if (!pkt) {
-		kr_log_error("[tls] cannot push null packet\n");
-		return on_send(task, handle, kr_error(EIO));
+	if (!pkt || !handle || !handle->data) {
+		return kr_error(EINVAL);
 	}
-	uint16_t pkt_size = htons(pkt->size);
 
+	ssize_t count;
 	struct session *session = handle->data;
-	if (!session) {
-		kr_log_error("[tls] no session on push\n");
-		return on_send(task, handle, kr_error(EIO));
-	}
+	uint16_t pkt_size = htons(pkt->size);
 	struct tls_ctx_t *tls_p = session->tls_ctx;
 	if (!tls_p) {
 		kr_log_error("[tls] no tls context on push\n");
-		/* FIXME: might be necessary if we ever do outbound TLS */
-		return on_send(task, handle, kr_error(EIO));
+		return kr_error(ENOENT);
 	}
-	tls_p->handle = (uv_stream_t *) handle;
-	tls_p->writer = writer;
 	gnutls_record_cork(tls_p->session);
 	count = gnutls_record_send(tls_p->session, &pkt_size, sizeof(pkt_size));
 	if (count != sizeof(pkt_size)) {
 		kr_log_error("[tls] gnutls_record_send pkt_size fail wanted: %u (%zd) %s\n",
 			     pkt_size, count, gnutls_strerror_name(count));
-		return on_send(task, handle, kr_error(EIO));
+		return kr_error(EIO);
 	}
 	count = gnutls_record_send(tls_p->session, pkt->wire, pkt->size);
 	if (count != pkt->size) {
 		kr_log_error("[tls] gnutls_record_send wire fail wanted: %zu (%zd) %s\n",
 			     pkt->size, count, gnutls_strerror_name(count));
-		return on_send(task, handle, kr_error(EIO));
+		return kr_error(EIO);
 	}
 	count = gnutls_record_uncork(tls_p->session, 0);
 	if (count != sizeof(pkt_size) + pkt->size) {
 		if (count == GNUTLS_E_AGAIN || count == GNUTLS_E_INTERRUPTED) {
 			kr_log_error("[tls] gnutls_record_send incomplete: %zu (%zd) %s\n",
 			     pkt->size, count, gnutls_strerror_name(count));
-			/*
-			 * FIXME: we need to know when this frees up; when it
-			 * does, we should do gnutls_record_send(tls.session,
-			 * NULL, 0);   how do i know?
-			 */
+			return kr_error(EAGAIN);
 		} else {
 			kr_log_error("[tls] gnutls_record_send wire fail wanted: %zu (%zd) %s\n",
 			     pkt->size, count, gnutls_strerror_name(count));
 		}
-		return on_send(task, handle, kr_error(EIO));
+		return kr_error(EIO);
 	}
-	return count;
+	return 0;
 }
 
 
-int 
-worker_process_tls(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t * buf, ssize_t nread)
+int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t * buf, ssize_t nread)
 {
 	struct session *session = handle->data;
 	struct tls_ctx_t *tls_p = session->tls_ctx;
