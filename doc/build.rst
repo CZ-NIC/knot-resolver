@@ -98,7 +98,7 @@ When you have all the dependencies ready, you can build and install.
 .. code-block:: bash
 
    $ make PREFIX="/usr/local"
-   $ make install
+   $ make install PREFIX="/usr/local"
 
 .. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path. If you build the binary with ``-DNDEBUG``, verbose logging will be disabled as well.
 

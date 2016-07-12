@@ -59,7 +59,7 @@ libkres.pc:
 	@echo 'includedir='$(INCLUDEDIR) >> $@
 	@echo 'Name: libkres' >> $@
 	@echo 'Description: Knot DNS Resolver library' >> $@
-	@echo 'URL: https://www.knot-dns.cz' >> $@
+	@echo 'URL: https://www.knot-resolver.cz' >> $@
 	@echo 'Version: $(MAJOR).$(MINOR).$(PATCH)' >> $@
 	@echo 'Libs: -L$${libdir} -lkres' >> $@
 	@echo 'Cflags: -I$${includedir}' >> $@
