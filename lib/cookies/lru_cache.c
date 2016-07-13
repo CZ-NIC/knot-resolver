@@ -54,13 +54,17 @@ int kr_cookie_lru_set(kr_cookie_lru_t *cache, const struct sockaddr *sa,
 		return kr_error(EINVAL);
 	}
 
+	uint16_t opt_size = KNOT_EDNS_OPTION_HDRLEN +
+	                    knot_edns_opt_get_length(opt);
+
+	if (opt_size > KR_COOKIE_OPT_MAX_LEN) {
+		return kr_error(EINVAL);
+	}
+
 	struct cookie_opt_data *cached = lru_set(cache, addr, addr_len);
 	if (!cached) {
 		return kr_error(ENOMEM);
 	}
-
-	uint16_t opt_size = KNOT_EDNS_OPTION_HDRLEN +
-	                    knot_edns_opt_get_length(opt);
 
 	memcpy(cached->opt_data, opt, opt_size);
 
