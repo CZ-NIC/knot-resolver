@@ -76,12 +76,10 @@ struct kr_query {
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;
-#if defined(ENABLE_COOKIES)
 	union {
 		struct sockaddr_in ip4;
 		struct sockaddr_in6 ip6;
 	} rsource; /**< Response source address. */
-#endif /* defined(ENABLE_COOKIES) */
 };
 
 /** @cond internal Array of queries. */

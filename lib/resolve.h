@@ -94,12 +94,10 @@ struct kr_context
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
-#if defined(ENABLE_COOKIES)
-	/* The structure should not be held within the cookies module because
-	 * of better access. */
+	/* The cookie context structure should not be held within the cookies
+	 * module because of better access. */
 	struct kr_cookie_ctx cookie_ctx;
 	kr_cookie_lru_t *cache_cookie;
-#endif /* defined(ENABLE_COOKIES) */
 	knot_mm_t *pool;
 };
 

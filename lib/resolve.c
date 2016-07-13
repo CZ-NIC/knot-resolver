@@ -527,7 +527,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
 
-#if defined(ENABLE_COOKIES)
 	if (src && !(qry->flags & QUERY_CACHED)) {
 		/* Track response source.
 		 * @todo -- Find a more suitable place to put the source
@@ -544,7 +543,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 			break;
 		}
 	}
-#endif /* defined(ENABLE_COOKIES) */
 
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
