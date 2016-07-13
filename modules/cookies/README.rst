@@ -40,7 +40,7 @@ Example Configuration
 Properties
 ^^^^^^^^^^
 
-.. function:: cookiectl.config(configuration)
+.. function:: cookies.config(configuration)
 
   :param table configuration: part of cookie configuration to be changed, may be called without parameter
   :return: JSON dictionary containing corrent configuration
@@ -52,5 +52,3 @@ Dependencies
 
 * `Nettle <https://www.lysator.liu.se/~nisse/nettle/>`_ required for HMAC-SHA256
 * development version of `libknot (master branch) <https://gitlab.labs.nic.cz/labs/knot/tree/master>`_ for DNS cookies handling
-
-.. warning:: Libknot is dropping its processing API in latest development versions. However, this should not be a big deal as only some structures have been in usage by the resolver code.
