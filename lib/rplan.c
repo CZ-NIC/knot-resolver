@@ -17,7 +17,6 @@
 #include <libknot/descriptor.h>
 #include <libknot/errcode.h>
 
-#include "lib/legacy/libknot/processing/layer.h"
 #include "lib/rplan.h"
 #include "lib/resolve.h"
 #include "lib/cache.h"

@@ -28,6 +28,8 @@
 #include "lib/cookies/helper.h"
 #include "lib/cookies/lru_cache.h"
 #include "lib/cookies/nonce.h"
+#include "lib/resolve.h"
+#include "lib/rplan.h"
 #include "modules/cookies/cookiemonster.h"
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies",  fmt)
