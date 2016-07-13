@@ -174,6 +174,9 @@ $(function() {
 		}
 		/* Buffer graph  changes. */
 		data.push(line);
+		if (data.length > 1000) {
+			data.shift();
+		}
 		if (!buffer) {
 			graph.updateOptions( { 'file': data } );
 		}
