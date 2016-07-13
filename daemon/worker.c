@@ -458,7 +458,7 @@ static bool subreq_update_cookies(struct qr_task *task, uv_udp_t *handle,
 	assert(handle);
 	assert(pkt);
 
-	/* Must have server address. */
+	/* RFC7873 4.1 strongly requires server address. */
 	if (!srvr_addr) {
 		return false;
 	}
@@ -472,7 +472,11 @@ static bool subreq_update_cookies(struct qr_task *task, uv_udp_t *handle,
 
 	struct sockaddr_storage *sockaddr_ptr = NULL; /* Not supported yet. */
 #if 0
-	/* Libuv does not offer a convenient way how to obtain a source IP
+	/*
+	 * RFC7873 4.1 recommends using also the client address. The matter is
+	 * also discussed in section 6.
+	 *
+	 * Libuv does not offer a convenient way how to obtain a source IP
 	 * address from a UDP handle that has been initialised using
 	 * uv_udp_init(). The uv_udp_getsockname() fails because of the lazy
 	 * socket initialisation.
