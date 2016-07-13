@@ -68,12 +68,14 @@ KR_EXPORT
 int kr_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode);
 
 /**
- * @brief Check whether packet is a server cookie request.
+ * @brief Check whether packet is a server cookie request according to
+ *        RFC7873 5.4.
  * @param pkt Packet to be examined.
- * @return Pointer to entire cookie option if is a cookie query, NULL else.
+ * @return Pointer to entire cookie option if is a server cookie query, NULL on
+ *         errors or if packet doesn't contain cookies or if QDCOUNT > 0.
  */
 KR_EXPORT
-uint8_t *kr_is_cookie_query(const knot_pkt_t *pkt);
+uint8_t *kr_no_question_cookie_query(const knot_pkt_t *pkt);
 
 /**
  * @brief Parse cookies from cookie option.

@@ -243,7 +243,7 @@ int kr_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode)
 	return kr_ok();
 }
 
-uint8_t *kr_is_cookie_query(const knot_pkt_t *pkt)
+uint8_t *kr_no_question_cookie_query(const knot_pkt_t *pkt)
 {
 	if (!pkt || knot_wire_get_qdcount(pkt->wire) > 0) {
 		return false;

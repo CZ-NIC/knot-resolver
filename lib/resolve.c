@@ -462,7 +462,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		 * The layers don't expect to handle queries with QDCOUNT != 1
 		 * so such queries are handled directly here. */
 		struct knot_dns_cookies cookies = { 0, };
-		uint8_t *cookie_opt = kr_is_cookie_query(packet);
+		uint8_t *cookie_opt = kr_no_question_cookie_query(packet);
 		if (cookie_opt && request->ctx->cookie_ctx.clnt.enabled) {
 			if (kr_ok() != kr_parse_cookie_opt(cookie_opt,
 			                                   &cookies)) {
