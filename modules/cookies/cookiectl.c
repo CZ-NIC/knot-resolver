@@ -16,6 +16,7 @@
 
 #include <assert.h>
 #include <ccan/json/json.h>
+#include <ctype.h>
 #include <libknot/rrtype/opt-cookie.h>
 #include <libknot/db/db_lmdb.h>
 #include <stdlib.h>
@@ -86,6 +87,115 @@ static struct kr_cookie_secret *new_cookie_secret(size_t size, bool zero)
 	return sq;
 }
 
+static int hexchar2val(int d)
+{
+	if (('0' <= d) && (d <= '9')) {
+		return d - '0';
+	} else if (('a' <= d) && (d <= 'f')) {
+		return d - 'a' + 0x0a;
+	} else {
+		return -1;
+	}
+}
+
+static int hexval2char(int i)
+{
+	if ((0 <= i) && (i <= 9)) {
+		return i + '0';
+	} if ((0x0a <= i) && (i <= 0x0f)) {
+		return i - 0x0a + 'A';
+	} else {
+		return -1;
+	}
+}
+
+/**
+ * @brief Converts string containing two-digit hexadecimal number into int.
+ * @param hexstr hexadecimal string
+ * @return -1 on error, value from 0 to 255 else.
+ */
+static int hexbyte2int(const char *hexstr)
+{
+	if (!hexstr) {
+		return -1;
+	}
+
+	int dhi = tolower(hexstr[0]);
+	if (!isxdigit(dhi)) {
+		/* Exit also on empty string. */
+		return -1;
+	}
+	int dlo = tolower(hexstr[1]);
+	if (!isxdigit(dlo)) {
+		return -1;
+	}
+
+	dhi = hexchar2val(dhi);
+	assert(dhi != -1);
+	dlo = hexchar2val(dlo);
+	assert(dlo != -1);
+
+	return (dhi << 4) | dlo;
+}
+
+/**
+ * @brief Writes two hexadecimal digits (two byes) into given memory location.
+ * @param tgt target location
+ * @param i number from 0 to 255
+ * @return 0 on success, -1 on failure
+ */
+static int int2hexbyte(char *tgt, int i)
+{
+	if (!tgt || i < 0x00 || i > 0xff) {
+		return -1;
+	}
+
+	int ilo = hexval2char(i & 0x0f);
+	assert(ilo != -1);
+	int ihi = hexval2char((i >> 4) & 0x0f);
+	assert(ihi != -1);
+
+	tgt[0] = ihi;
+	tgt[1] = ilo;
+
+	return 0;
+}
+
+/**
+ * @brief Reads a string containing hexadecimal values.
+ * @note String must consist of hexadecimal digits only and must have even
+ *       non-zero length.
+ */
+static struct kr_cookie_secret *new_sq_from_hexstr(const JsonNode *node)
+{
+	assert(node && node->tag == JSON_STRING);
+
+	size_t len = strlen(node->string_);
+	if ((len % 2) != 0) {
+		return NULL;
+	}
+
+	struct kr_cookie_secret *sq = new_cookie_secret(len / 2, false);
+	if (!sq) {
+		return NULL;
+	}
+
+	const char *hexstr = node->string_;
+	uint8_t *data = sq->data;
+	for (int i = 0; i < len; i += 2) {
+		int num = hexbyte2int(hexstr + i);
+		if (num == -1) {
+			free(sq);
+			return NULL;
+		}
+		assert(0x00 <= num && num <= 0xff);
+		*data = num;
+		++data;
+	}
+
+	return sq;
+}
+
 static struct kr_cookie_secret *new_sq_str(const JsonNode *node)
 {
 	assert(node && node->tag == JSON_STRING);
@@ -97,37 +207,6 @@ static struct kr_cookie_secret *new_sq_str(const JsonNode *node)
 		return NULL;
 	}
 	memcpy(sq->data, node->string_, len);
-
-	return sq;
-}
-
-#define holds_char(x) ((x) >= 0 && (x) <= 255)
-
-static struct kr_cookie_secret *new_sq_array(const JsonNode *node)
-{
-	assert(node && node->tag == JSON_ARRAY);
-
-	const JsonNode *element = NULL;
-	size_t cnt = 0;
-	json_foreach(element, node) {
-		if (element->tag != JSON_NUMBER || !holds_char(element->number_)) {
-			return NULL;
-		}
-		++cnt;
-	}
-	if (cnt == 0) {
-		return NULL;
-	}
-
-	struct kr_cookie_secret *sq = new_cookie_secret(cnt, false);
-	if (!sq) {
-		return NULL;
-	}
-
-	cnt = 0;
-	json_foreach(element, node) {
-		sq->data[cnt++] = (uint8_t) element->number_;
-	}
 
 	return sq;
 }
@@ -147,10 +226,7 @@ static bool apply_secret_shallow(struct kr_cookie_secret **sec,
 
 	switch (node->tag) {
 	case JSON_STRING:
-		sq = new_sq_str(node);
-		break;
-	case JSON_ARRAY:
-		sq = new_sq_array(node);
+		sq = new_sq_from_hexstr(node);
 		break;
 	default:
 		break;
@@ -224,33 +300,55 @@ static bool apply_configuration_shallow(struct kr_cookie_ctx *cntrl,
 	return false;
 }
 
+/**
+ * @brief Creates a new string from secret quantity.
+ * @param sq secret quantity
+ * @return newly allocated string or NULL on error
+ */
+static char *new_hexstr_from_sq(const struct kr_cookie_secret *sq)
+{
+	if (!sq) {
+		return NULL;
+	}
+
+	char *new_str = malloc((sq->size * 2) + 1);
+	if (!new_str) {
+		return NULL;
+	}
+
+	char *tgt = new_str;
+	for (size_t i = 0; i < sq->size; ++i) {
+		if (0 != int2hexbyte(tgt, sq->data[i])) {
+			free(new_str);
+			return NULL;
+		}
+		tgt += 2;
+	}
+
+	*tgt = '\0';
+	return new_str;
+}
+
 static bool read_secret(JsonNode *root, const char *node_name,
                         const struct kr_cookie_secret *secret)
 {
 	assert(root && node_name && secret);
 
-	JsonNode *array = json_mkarray();
-	if (!array) {
+	char *secret_str = new_hexstr_from_sq(secret);
+	if (!secret_str) {
 		return false;
 	}
 
-	for (size_t i = 0; i < secret->size; ++i) {
-		JsonNode *element = json_mknumber(secret->data[i]);
-		if (!element) {
-			goto fail;
-		}
-		json_append_element(array, element);
+	JsonNode *str_node = json_mkstring(secret_str);
+	if (!str_node) {
+		free(secret_str);
+		return false;
 	}
 
-	json_append_member(root, node_name, array);
+	json_append_member(root, node_name, str_node);
 
+	free(secret_str);
 	return true;
-
-fail:
-	if (array) {
-		json_delete(array);
-	}
-	return false;
 }
 
 static bool read_available_hashes(JsonNode *root, const char *root_name,

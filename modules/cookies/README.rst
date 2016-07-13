@@ -17,12 +17,12 @@ Example Configuration
 
 	-- Configure the client part of the resolver. Set 8 bytes of the client
 	-- secret and choose the hashing algorithm to be used.
-	cookies.config( { ['client_secret'] = { 0, 1, 2, 3, 4, 5, 6, 7 },
+	-- Use a string composed of hexadecimal digits to set the secret.
+	cookies.config( { ['client_secret'] = '0123456789ABCDEF',
 	                  ['client_cookie_alg'] = 'FNV-64' } )
 
-	-- Configure the server part of the resolver. Sets a string to be used
-	-- as server secret. Also chooses the hashing algorithm to be used.
-	cookies.config( { ['server_secret'] = 'secret key',
+	-- Configure the server part of the resolver.
+	cookies.config( { ['server_secret'] = 'FEDCBA9876543210',
 	                  ['server_cookie_alg'] = 'FNV-64' } )
 
 	-- Enable client cookie functionality. (Add cookies into outbound
@@ -43,7 +43,7 @@ Properties
 .. function:: cookies.config(configuration)
 
   :param table configuration: part of cookie configuration to be changed, may be called without parameter
-  :return: JSON dictionary containing corrent configuration
+  :return: JSON dictionary containing current configuration
 
   The function may be called without any parameter. In such case it only returns current configuration. The returned JSON alsao contains available algorithm choices.
 
