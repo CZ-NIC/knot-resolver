@@ -170,7 +170,7 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 		return kr_error(EINVAL);
 	}
 
-	if (!cc || !cc_len || !nonce) {
+	if (!cc || cc_len == 0 || !nonce) {
 		return kr_error(EINVAL);
 	}
 
