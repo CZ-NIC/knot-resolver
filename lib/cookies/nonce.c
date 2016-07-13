@@ -14,9 +14,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <arpa/inet.h>
 #include <assert.h>
 
+#include "contrib/wire.h"
 #include "lib/cookies/nonce.h"
 
 int kr_nonce_write_wire(uint8_t *buf, uint16_t *buf_len,
@@ -30,11 +30,9 @@ int kr_nonce_write_wire(uint8_t *buf, uint16_t *buf_len,
 		return kr_error(EINVAL);
 	}
 
-	uint32_t aux = htonl(input->rand);
-	memcpy(buf, &aux, sizeof(aux));
-	aux = htonl(input->time);
-	memcpy(buf + sizeof(aux), &aux, sizeof(aux));
-	*buf_len = 2 * sizeof(aux);
+	wire_write_u32(buf, input->rand);
+	wire_write_u32(buf + sizeof(uint32_t), input->time);
+	*buf_len = 2 * sizeof(uint32_t);
 	assert(KR_NONCE_LEN == *buf_len);
 
 	return kr_ok();
