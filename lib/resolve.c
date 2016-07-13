@@ -525,23 +525,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
 
-	if (src && !(qry->flags & QUERY_CACHED)) {
-		/* Track response source.
-		 * @todo -- Find a more suitable place to put the source
-		 * address into query/response context. */
-		switch (src->sa_family) {
-		case AF_INET:
-			qry->rsource.ip4 = *(struct sockaddr_in *) src;
-			break;
-		case AF_INET6:
-			qry->rsource.ip6 = *(struct sockaddr_in6 *) src;
-			break;
-		default:
-			qry->rsource.ip4.sin_family = AF_UNSPEC;
-			break;
-		}
-	}
-
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
 		if (tried_tcp)

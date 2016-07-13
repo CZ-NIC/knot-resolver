@@ -36,20 +36,21 @@
 
 /**
  * Obtain address from query/response context if if can be obtained.
- * @param qry query context
+ * @param req resolution context
  * @return pointer to where the server socket address, NULL if not provided within context
  */
-static const struct sockaddr *passed_server_sockaddr(const struct kr_query *qry)
+static const struct sockaddr *passed_server_sockaddr(const struct kr_request *req)
 {
-	assert(qry);
-
-	const struct sockaddr *tmp_sockaddr = NULL;
-	if (qry->rsource.ip4.sin_family == AF_INET ||
-	    qry->rsource.ip4.sin_family == AF_INET6) {
-		tmp_sockaddr = (struct sockaddr *) &qry->rsource.ip4;
+	if (!req || !req->upstream.addr) {
+		return NULL;
 	}
 
-	return tmp_sockaddr;
+	if (req->upstream.addr->sa_family == AF_INET ||
+	    req->upstream.addr->sa_family == AF_INET6) {
+		return req->upstream.addr;
+	}
+
+	return NULL;
 }
 
 /**
@@ -98,19 +99,22 @@ static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
  * Obtain pointer to server socket address that matches obtained cookie.
  * @param sockaddr pointer to socket address to be set
  * @param is_current set to true if the cookie was generate from current secret
+ * @param req resolution context
  * @param cc client cookie from the response
  * @param cc_len client cookie size
  * @param clnt_sett client cookie settings structure
  * @return kr_ok() if matching address found, error code else
  */
 static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
-                                  bool *is_current, const struct kr_query *qry,
+                                  bool *is_current, struct kr_request *req,
                                   const uint8_t *cc, uint16_t cc_len,
                                   const struct kr_cookie_settings *clnt_sett)
 {
-	assert(sockaddr && is_current && qry && cc && cc_len && clnt_sett);
+	assert(sockaddr && is_current && req && cc && cc_len && clnt_sett);
 
-	const struct sockaddr *tmp_sockaddr = passed_server_sockaddr(qry);
+	struct kr_query *qry = req->current_query;
+
+	const struct sockaddr *tmp_sockaddr = passed_server_sockaddr(req);
 
 	/* The address must correspond with the client cookie. */
 	if (tmp_sockaddr) {
@@ -222,11 +226,11 @@ static bool is_cookie_cached(kr_cookie_lru_t *cache, const struct sockaddr *sa,
  * Check cookie content and store it to cache.
  */
 static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt_sett,
-                                           struct kr_query *qry,
+                                           struct kr_request *req,
                                            uint8_t *pkt_cookie_opt,
                                            kr_cookie_lru_t *cache)
 {
-	assert(clnt_sett && qry && pkt_cookie_opt && cache);
+	assert(clnt_sett && req && pkt_cookie_opt && cache);
 
 	uint8_t *pkt_cookie_data = knot_edns_opt_get_data(pkt_cookie_opt);
 	uint16_t pkt_cookie_len = knot_edns_opt_get_length(pkt_cookie_opt);
@@ -248,7 +252,7 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 	/* Check server address against received client cookie. */
 	const struct sockaddr *srvr_sockaddr = NULL;
 	bool returned_current = false;
-	ret = srvr_sockaddr_cc_check(&srvr_sockaddr, &returned_current, qry,
+	ret = srvr_sockaddr_cc_check(&srvr_sockaddr, &returned_current, req,
 	                             pkt_cc, pkt_cc_len, clnt_sett);
 	if (ret != kr_ok()) {
 		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
@@ -290,7 +294,7 @@ int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	kr_cookie_lru_t *cookie_cache = req->ctx->cache_cookie;
 
-	const struct sockaddr *srvr_sockaddr = passed_server_sockaddr(qry);
+	const struct sockaddr *srvr_sockaddr = passed_server_sockaddr(req);
 
 	if (!pkt_cookie_opt && srvr_sockaddr &&
 	    get_cookie_opt(cookie_cache, srvr_sockaddr)) {
@@ -305,7 +309,7 @@ int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	if (!check_cookie_content_and_cache(&cookie_ctx->clnt, qry,
+	if (!check_cookie_content_and_cache(&cookie_ctx->clnt, req,
 	                                    pkt_cookie_opt, cookie_cache)) {
 		return KNOT_STATE_FAIL;
 	}
