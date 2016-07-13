@@ -49,6 +49,7 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "luasec_", "``trust anchors``", "TLS for Lua."
    "libmemcached_", "``modules/memcached``", "To build memcached backend module."
    "hiredis_", "``modules/redis``", "To build redis backend module."
+   "geoip_", "``modules/tinyweb``", "To build a proof-of-concept web interface (needs Go as well)."
    "Go_ 1.5+", "``modules``", "Build modules written in Go."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
@@ -256,6 +257,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _Go: https://golang.org
 .. _libmemcached: http://libmemcached.org/libMemcached.html
 .. _hiredis: https://github.com/redis/hiredis
+.. _geoip: https://github.com/abh/geoip
 .. _Doxygen: http://www.stack.nl/~dimitri/doxygen/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
