@@ -196,21 +196,6 @@ static struct kr_cookie_secret *new_sq_from_hexstr(const JsonNode *node)
 	return sq;
 }
 
-static struct kr_cookie_secret *new_sq_str(const JsonNode *node)
-{
-	assert(node && node->tag == JSON_STRING);
-
-	size_t len = strlen(node->string_);
-
-	struct kr_cookie_secret *sq = new_cookie_secret(len, false);
-	if (!sq) {
-		return NULL;
-	}
-	memcpy(sq->data, node->string_, len);
-
-	return sq;
-}
-
 /**
  * @brief Sets secret value according to content onto shallow copy.
  * @param sec newly created secret
