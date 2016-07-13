@@ -47,10 +47,3 @@ struct kr_cookie_ctx {
 	struct kr_cookie_settings clnt; /**< Client settings. */
 	struct kr_cookie_settings srvr; /**< Server settings. */
 };
-
-/**
- * @brief Initialises cookie control context.
- * @param ctx cookie control context
- */
-KR_EXPORT
-void kr_cookie_ctx_init(struct kr_cookie_ctx *ctx);

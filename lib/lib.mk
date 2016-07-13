@@ -48,7 +48,6 @@ ifeq ($(HAS_nettle),yes)
 libkres_SOURCES += \
 	lib/cookies/alg_containers.c \
 	lib/cookies/alg_sha.c \
-	lib/cookies/control.c \
 	lib/cookies/helper.c \
 	lib/cookies/lru_cache.c \
 	lib/cookies/nonce.c

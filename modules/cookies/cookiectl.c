@@ -34,6 +34,22 @@
 #define NAME_SERVER_COOKIE_ALG "server_cookie_alg"
 #define NAME_AVAILABLE_SERVER_COOKIE_ALGS "available_server_cookie_algs"
 
+/**
+ * @brief Initialises cookie control context.
+ * @param ctx cookie control context
+ */
+static void kr_cookie_ctx_init(struct kr_cookie_ctx *ctx)
+{
+	if (!ctx) {
+		return;
+	}
+
+	memset(ctx, 0, sizeof(*ctx));
+
+	ctx->clnt.current.alg_id = ctx->clnt.recent.alg_id = -1;
+	ctx->srvr.current.alg_id = ctx->srvr.recent.alg_id = -1;
+}
+
 static bool aply_enabled(bool *enabled, const JsonNode *node)
 {
 	assert(enabled && node);
