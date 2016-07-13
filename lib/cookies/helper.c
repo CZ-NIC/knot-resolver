@@ -72,7 +72,7 @@ static int opt_rr_add_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_t *mm)
  * @brief Add a client cookie option into the RR Set.
  */
 static int opt_rr_add_cc(knot_rrset_t *opt_rr, uint8_t *cc, uint16_t cc_len,
-                              knot_mm_t *mm)
+                         knot_mm_t *mm)
 {
 #define SC NULL
 #define SC_LEN 0
@@ -147,13 +147,6 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	pkt->rrset_count -= 1;
 	pkt->size -= knot_edns_wire_size(pkt->opt_rr);
 	knot_wire_set_arcount(pkt->wire, knot_wire_get_arcount(pkt->wire) - 1);
-#if 0
-	/* Reclaim reserved size -- does not work as intended.. */
-	ret = knot_pkt_reclaim(pkt, knot_edns_wire_size(pkt->opt_rr));
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
-#endif
 
 	if (cached_cookie) {
 		ret = opt_rr_add_opt(pkt->opt_rr, (uint8_t *)cached_cookie,
