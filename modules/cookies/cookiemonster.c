@@ -411,7 +411,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 
 	/* Check server cookie obtained in request. */
 
-	ret = knot_sc_check(NONCE_LEN, &cookies, &srvr_data,
+	ret = knot_sc_check(KR_NONCE_LEN, &cookies, &srvr_data,
 	                    kr_sc_algs[srvr_sett->current.alg_id]);
 	if (ret == KNOT_EINVAL &&
 	    srvr_sett->recent.secr && (srvr_sett->recent.alg_id >= 0)) {
@@ -421,7 +421,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 			.secret_data = srvr_sett->recent.secr->data,
 			.secret_len = srvr_sett->recent.secr->size
 		};
-		ret = knot_sc_check(NONCE_LEN, &cookies, &recent_srvr_data,
+		ret = knot_sc_check(KR_NONCE_LEN, &cookies, &recent_srvr_data,
 		                    kr_sc_algs[srvr_sett->recent.alg_id]);
 	}
 	if (ret != KNOT_EOK) {

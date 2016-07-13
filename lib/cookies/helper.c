@@ -182,7 +182,7 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 		return kr_error(EINVAL);
 	}
 
-	uint16_t nonce_len = NONCE_LEN;
+	uint16_t nonce_len = KR_NONCE_LEN;
 	uint16_t hash_len = alg->hash_size;
 
 	uint8_t *cookie = NULL;

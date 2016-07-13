@@ -435,7 +435,7 @@ static int cookie_answer(const void *clnt_sockaddr,
 	}
 
 	/* Check server cookie only with current settings. */
-	ret = knot_sc_check(NONCE_LEN, cookies, &srvr_data,
+	ret = knot_sc_check(KR_NONCE_LEN, cookies, &srvr_data,
 	                    kr_sc_algs[srvr_sett->current.alg_id]);
 	if (ret != KNOT_EOK) {
 		/* RFC7873 5.4 */

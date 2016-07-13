@@ -22,7 +22,7 @@
  * actual server cookie hash. */
 
 /** Nonce value length. */
-#define NONCE_LEN 8
+#define KR_NONCE_LEN 8
 
 /** Input data to generate nonce from. */
 struct kr_nonce_input {

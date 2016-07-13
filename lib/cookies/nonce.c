@@ -22,12 +22,12 @@
 int kr_nonce_write_wire(uint8_t *buf, uint16_t *buf_len,
                         struct kr_nonce_input *input)
 {
-	if (!buf || !buf_len || !input) {;
+	if (!buf || !buf_len || !input) {
 		return kr_error(EINVAL);
 	}
 
-	if (*buf_len < NONCE_LEN) {
-		kr_error(EINVAL);
+	if (*buf_len < KR_NONCE_LEN) {
+		return kr_error(EINVAL);
 	}
 
 	uint32_t aux = htonl(input->rand);
@@ -35,7 +35,7 @@ int kr_nonce_write_wire(uint8_t *buf, uint16_t *buf_len,
 	aux = htonl(input->time);
 	memcpy(buf + sizeof(aux), &aux, sizeof(aux));
 	*buf_len = 2 * sizeof(aux);
-	assert(NONCE_LEN == *buf_len);
+	assert(KR_NONCE_LEN == *buf_len);
 
 	return kr_ok();
 }
