@@ -456,8 +456,12 @@ static bool subreq_update_cookies(struct qr_task *task, uv_udp_t *handle,
 {
 	assert(task);
 	assert(handle);
-	assert(srvr_addr);
 	assert(pkt);
+
+	/* Must have server address. */
+	if (!srvr_addr) {
+		return false;
+	}
 
 	struct kr_cookie_settings *clnt_sett = &task->req.ctx->cookie_ctx.clnt;
 
