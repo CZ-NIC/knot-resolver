@@ -50,7 +50,13 @@ static void kr_cookie_ctx_init(struct kr_cookie_ctx *ctx)
 	ctx->srvr.current.alg_id = ctx->srvr.recent.alg_id = -1;
 }
 
-static bool aply_enabled(bool *enabled, const JsonNode *node)
+/**
+ * @brief Sets boolean value according to content of JSON node.
+ * @param enabled boolean value to be set
+ * @patam node JSON node holding the value
+ * @return true if proper value has been set, false on error
+ */
+static bool apply_enabled(bool *enabled, const JsonNode *node)
 {
 	assert(enabled && node);
 
@@ -64,7 +70,7 @@ static bool aply_enabled(bool *enabled, const JsonNode *node)
 
 static struct kr_cookie_secret *new_cookie_secret(size_t size, bool zero)
 {
-	if (!size) {
+	if (size == 0) {
 		return NULL;
 	}
 
@@ -126,7 +132,14 @@ static struct kr_cookie_secret *new_sq_array(const JsonNode *node)
 	return sq;
 }
 
-static bool apply_secret(struct kr_cookie_secret **sec, const JsonNode *node)
+/**
+ * @brief Sets secret value according to content onto shallow copy.
+ * @param sec newly created secret
+ * @patam node JSON node holding the value
+ * @return true if proper value has been set, false on error
+ */
+static bool apply_secret_shallow(struct kr_cookie_secret **sec,
+                                 const JsonNode *node)
 {
 	assert(sec && node);
 
@@ -153,6 +166,13 @@ static bool apply_secret(struct kr_cookie_secret **sec, const JsonNode *node)
 	return true;
 }
 
+/**
+ * @brief Sets hash function value according to content of JSON node.
+ * @param alg_id algorithm identifier to be set
+ * @patam node JSON node holding the value
+ * @param table lookup table with algorithm names
+ * @return true if proper value has been set, false on error
+ */
 static bool apply_hash_func(int *alg_id, const JsonNode *node,
                             const knot_lookup_t table[])
 {
@@ -171,8 +191,12 @@ static bool apply_hash_func(int *alg_id, const JsonNode *node,
 	return false;
 }
 
-static bool apply_configuration(struct kr_cookie_ctx *cntrl,
-                                const JsonNode *node)
+/**
+ * @brief Applies configuration onto a shallow cookie configuration structure
+ *        copy.
+ */
+static bool apply_configuration_shallow(struct kr_cookie_ctx *cntrl,
+                                        const JsonNode *node)
 {
 	assert(cntrl && node);
 
@@ -182,16 +206,16 @@ static bool apply_configuration(struct kr_cookie_ctx *cntrl,
 	}
 
 	if (strcmp(node->key, NAME_CLIENT_ENABLED) == 0) {
-		return aply_enabled(&cntrl->clnt.enabled, node);
+		return apply_enabled(&cntrl->clnt.enabled, node);
 	} else if (strcmp(node->key, NAME_CLIENT_SECRET) == 0) {
-		return apply_secret(&cntrl->clnt.current.secr, node);
+		return apply_secret_shallow(&cntrl->clnt.current.secr, node);
 	} else  if (strcmp(node->key, NAME_CLIENT_COOKIE_ALG) == 0) {
 		return apply_hash_func(&cntrl->clnt.current.alg_id, node,
 		                       kr_cc_alg_names);
 	} else if (strcmp(node->key, NAME_SERVER_ENABLED) == 0) {
-		return aply_enabled(&cntrl->srvr.enabled, node);
+		return apply_enabled(&cntrl->srvr.enabled, node);
 	} else if (strcmp(node->key, NAME_SERVER_SECRET) == 0) {
-		return apply_secret(&cntrl->srvr.current.secr, node);
+		return apply_secret_shallow(&cntrl->srvr.current.secr, node);
 	} else if (strcmp(node->key, NAME_SERVER_COOKIE_ALG) == 0) {
 		return apply_hash_func(&cntrl->srvr.current.alg_id, node,
 		                       kr_sc_alg_names);
@@ -316,7 +340,7 @@ bool config_apply(struct kr_cookie_ctx *ctx, const char *args)
 	JsonNode *node;
 	JsonNode *root_node = json_decode(args);
 	json_foreach (node, root_node) {
-		success = apply_configuration(&shallow_copy, node);
+		success = apply_configuration_shallow(&shallow_copy, node);
 		if (!success) {
 			break;
 		}
