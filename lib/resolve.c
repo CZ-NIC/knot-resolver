@@ -271,15 +271,13 @@ static int edns_put(knot_pkt_t *pkt)
 static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
-#if defined(ENABLE_COOKIES)
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
+#if defined(ENABLE_COOKIES)
 	if (req->ctx->cookie_ctx.clnt.enabled) {
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
-	return knot_pkt_reserve(pkt, wire_size);
-#else /* !defined(ENABLE_COOKIES) */
-	return knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
 #endif /* defined(ENABLE_COOKIES) */
+	return knot_pkt_reserve(pkt, wire_size);
 }
 
 static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_request *req)
