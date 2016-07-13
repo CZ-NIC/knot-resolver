@@ -222,6 +222,15 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 
 int kr_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode)
 {
+	/*
+	 * RFC6891 6.1.3 -- extended RCODE forms the upper 8 bits of whole
+	 * 12-bit RCODE (together with the 4 bits of 'normal' RCODE).
+	 *
+	 * | 11 10 09 08 07 06 05 04 | 03 02 01 00 |
+	 * |          12-bit whole RCODE           |
+	 * |   8-bit extended RCODE  | 4-bit RCODE |
+	 */
+
 	if (!pkt || !knot_pkt_has_edns(pkt)) {
 		return kr_error(EINVAL);
 	}
