@@ -259,7 +259,7 @@ uint8_t *kr_no_question_cookie_query(const knot_pkt_t *pkt)
 int kr_parse_cookie_opt(uint8_t *cookie_opt, struct knot_dns_cookies *cookies)
 {
 	if (!cookie_opt || !cookies) {
-		kr_error(EINVAL);
+		return kr_error(EINVAL);
 	}
 
 	const uint8_t *cookie_data = knot_edns_opt_get_data(cookie_opt);
