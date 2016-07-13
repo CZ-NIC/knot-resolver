@@ -156,7 +156,6 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	}
 
 	/* Write to packet. */
-	assert(pkt->current == KNOT_ADDITIONAL);
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
 
