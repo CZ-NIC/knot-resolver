@@ -19,21 +19,17 @@
 #include "contrib/wire.h"
 #include "lib/cookies/nonce.h"
 
-int kr_nonce_write_wire(uint8_t *buf, uint16_t *buf_len,
-                        struct kr_nonce_input *input)
+uint16_t kr_nonce_write_wire(uint8_t *buf, uint16_t buf_len,
+                             struct kr_nonce_input *input)
 {
-	if (!buf || !buf_len || !input) {
-		return kr_error(EINVAL);
-	}
-
-	if (*buf_len < KR_NONCE_LEN) {
-		return kr_error(EINVAL);
+	if (!buf || buf_len < KR_NONCE_LEN || !input) {
+		return 0;
 	}
 
 	wire_write_u32(buf, input->rand);
 	wire_write_u32(buf + sizeof(uint32_t), input->time);
-	*buf_len = 2 * sizeof(uint32_t);
-	assert(KR_NONCE_LEN == *buf_len);
+	buf_len = 2 * sizeof(uint32_t);
+	assert(KR_NONCE_LEN == buf_len);
 
-	return kr_ok();
+	return buf_len;
 }

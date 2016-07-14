@@ -34,11 +34,10 @@ struct kr_nonce_input {
  * @brief Writes server cookie nonce value into given buffer.
  *
  * @param buf     buffer to write nonce data in wire format into
- * @param buf_len on input contains nonce buffer size, on output contains
- *                size of actual written data
+ * @param buf_len buffer size
  * @param input   data to generate wire data from
- * @return kr_ok() on success, error code else
+ * @return non-zero size of written data on success, 0 on failure
  */
 KR_EXPORT
-int kr_nonce_write_wire(uint8_t *buf, uint16_t *buf_len,
-                        struct kr_nonce_input *input);
+uint16_t kr_nonce_write_wire(uint8_t *buf, uint16_t buf_len,
+                             struct kr_nonce_input *input);

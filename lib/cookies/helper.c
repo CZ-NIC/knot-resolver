@@ -206,7 +206,7 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 	memcpy(cookie, cc, cc_len);
 
 	if (nonce_len) {
-		kr_nonce_write_wire(cookie + cc_len, &nonce_len, nonce);
+		kr_nonce_write_wire(cookie + cc_len, nonce_len, nonce);
 
 		input.nonce = cookie + cc_len;
 		input.nonce_len = nonce_len;
