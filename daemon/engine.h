@@ -24,7 +24,7 @@
 #define LRU_REP_SIZE (LRU_RTT_SIZE / 4) /**< NS reputation cache size */
 #endif
 #ifndef LRU_COOKIES_SIZE
-#define LRU_COOKIES_SIZE 65536 /**< DNS cookies cache size. */
+#define LRU_COOKIES_SIZE LRU_RTT_SIZE /**< DNS cookies cache size. */
 #endif
 #ifndef MP_FREELIST_SIZE
 #define MP_FREELIST_SIZE 64 /**< Maximum length of the worker mempool freelist */
