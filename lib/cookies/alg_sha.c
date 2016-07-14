@@ -45,7 +45,7 @@ static inline void update_hash(struct hmac_sha256_ctx *ctx,
 }
 
 /**
- * @brief Compute client cookie using HMAC_SHA256-64.
+ * @brief Compute client cookie using HMAC-SHA256-64.
  * @note At least one of the arguments must be non-null.
  * @param input  input parameters
  * @param cc_out buffer for computed client cookie
@@ -55,12 +55,8 @@ static inline void update_hash(struct hmac_sha256_ctx *ctx,
 static uint16_t cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
                                       uint8_t *cc_out, uint16_t cc_len)
 {
-	if (!input || !cc_out || cc_len < KNOT_OPT_COOKIE_CLNT) {
-		return 0;
-	}
-
-	if ((!input->clnt_sockaddr && !input->srvr_sockaddr) ||
-	    !(input->secret_data && input->secret_len)) {
+	if (!knot_cc_input_is_valid(input) ||
+	    !cc_out || cc_len < KNOT_OPT_COOKIE_CLNT) {
 		return 0;
 	}
 
@@ -96,12 +92,8 @@ static uint16_t cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
 static uint16_t sc_gen_hmac_sha256_64(const struct knot_sc_input *input,
                                       uint8_t *hash_out, uint16_t hash_len)
 {
-	if (!input || !hash_out || hash_len < SRVR_HMAC_SHA256_64_HASH_SIZE) {
-		return 0;
-	}
-
-	if (!input->cc || !input->cc_len || !input->srvr_data ||
-	    !input->srvr_data->secret_data || !input->srvr_data->secret_len) {
+	if (!knot_sc_input_is_valid(input) ||
+	    !hash_out || hash_len < SRVR_HMAC_SHA256_64_HASH_SIZE) {
 		return 0;
 	}
 
