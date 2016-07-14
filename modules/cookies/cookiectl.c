@@ -182,7 +182,7 @@ static struct kr_cookie_secret *new_sq_from_hexstr(const JsonNode *node)
 
 	const char *hexstr = node->string_;
 	uint8_t *data = sq->data;
-	for (int i = 0; i < len; i += 2) {
+	for (size_t i = 0; i < len; i += 2) {
 		int num = hexbyte2int(hexstr + i);
 		if (num == -1) {
 			free(sq);
