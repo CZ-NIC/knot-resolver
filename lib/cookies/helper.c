@@ -131,9 +131,9 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	uint16_t cc_len = KNOT_OPT_COOKIE_CLNT;
 	assert((clnt_comp->alg_id >= 0) && kr_cc_algs[clnt_comp->alg_id] &&
 	       kr_cc_algs[clnt_comp->alg_id]->gen_func);
-	int ret = kr_cc_algs[clnt_comp->alg_id]->gen_func(&input, cc, &cc_len);
-	if (ret != kr_ok()) {
-		return ret;
+	cc_len = kr_cc_algs[clnt_comp->alg_id]->gen_func(&input, cc, cc_len);
+	if (cc_len == 0) {
+		return kr_error(EINVAL);
 	}
 	assert(cc_len == KNOT_OPT_COOKIE_CLNT);
 
@@ -148,6 +148,7 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	pkt->size -= knot_edns_wire_size(pkt->opt_rr);
 	knot_wire_set_arcount(pkt->wire, knot_wire_get_arcount(pkt->wire) - 1);
 
+	int ret;
 	if (cached_cookie) {
 		ret = opt_rr_add_opt(pkt->opt_rr, (uint8_t *)cached_cookie,
 		                     &pkt->mm);
@@ -212,8 +213,8 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 		input.nonce_len = nonce_len;
 	}
 
-	ret = alg->hash_func(&input, cookie + cc_len + nonce_len, &hash_len);
-	if (ret != KNOT_EOK) {
+	hash_len = alg->hash_func(&input, cookie + cc_len + nonce_len, hash_len);
+	if (hash_len == 0) {
 		return kr_error(EINVAL);
 	}
 

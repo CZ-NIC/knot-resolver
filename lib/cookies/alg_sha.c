@@ -47,21 +47,21 @@ static inline void update_hash(struct hmac_sha256_ctx *ctx,
 /**
  * @brief Compute client cookie using HMAC_SHA256-64.
  * @note At least one of the arguments must be non-null.
- * @param input  Input parameters.
- * @param cc_out Buffer for computed client cookie.
- * @param cc_len Size of buffer/written data.
- * @return KNOT_EOK on success, error code else.
+ * @param input  input parameters
+ * @param cc_out buffer for computed client cookie
+ * @param cc_len buffer size
+ * @return Non-zero size of written data on success, 0 in case of a failure.
  */
-static int cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
-                                 uint8_t *cc_out, uint16_t *cc_len)
+static uint16_t cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
+                                      uint8_t *cc_out, uint16_t cc_len)
 {
-	if (!input || !cc_out || !cc_len || *cc_len < KNOT_OPT_COOKIE_CLNT) {
-		return KNOT_EINVAL;
+	if (!input || !cc_out || cc_len < KNOT_OPT_COOKIE_CLNT) {
+		return 0;
 	}
 
 	if ((!input->clnt_sockaddr && !input->srvr_sockaddr) ||
 	    !(input->secret_data && input->secret_len)) {
-		return KNOT_EINVAL;
+		return 0;
 	}
 
 	struct hmac_sha256_ctx ctx;
@@ -77,10 +77,10 @@ static int cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
 
 	assert(KNOT_OPT_COOKIE_CLNT <= SHA256_DIGEST_SIZE);
 
-	*cc_len = KNOT_OPT_COOKIE_CLNT;
-	hmac_sha256_digest(&ctx, *cc_len, cc_out);
+	cc_len = KNOT_OPT_COOKIE_CLNT;
+	hmac_sha256_digest(&ctx, cc_len, cc_out);
 
-	return KNOT_EOK;
+	return cc_len;
 }
 
 #define SRVR_HMAC_SHA256_64_HASH_SIZE 8
@@ -89,21 +89,20 @@ static int cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
  * @brief Compute server cookie hash using HMAC-SHA256-64).
  * @note Server cookie = nonce | time | HMAC-SHA256-64( server secret, client cookie | nonce| time | client IP )
  * @param input    data to compute cookie from
- * @param hash_out hash cookie output buffer
- * @param hash_len buffer size / written data size
- * @return KNOT_EOK or error code.
+ * @param hash_out hash output buffer
+ * @param hash_len buffer size
+ * @return Non-zero size of written data on success, 0 in case of a failure.
  */
-static int sc_gen_hmac_sha256_64(const struct knot_sc_input *input,
-                                 uint8_t *hash_out, uint16_t *hash_len)
+static uint16_t sc_gen_hmac_sha256_64(const struct knot_sc_input *input,
+                                      uint8_t *hash_out, uint16_t hash_len)
 {
-	if (!input || !hash_out ||
-	    !hash_len || (*hash_len < SRVR_HMAC_SHA256_64_HASH_SIZE)) {
-		return KNOT_EINVAL;
+	if (!input || !hash_out || hash_len < SRVR_HMAC_SHA256_64_HASH_SIZE) {
+		return 0;
 	}
 
 	if (!input->cc || !input->cc_len || !input->srvr_data ||
 	    !input->srvr_data->secret_data || !input->srvr_data->secret_len) {
-		return KNOT_EINVAL;
+		return 0;
 	}
 
 	struct hmac_sha256_ctx ctx;
@@ -122,10 +121,10 @@ static int sc_gen_hmac_sha256_64(const struct knot_sc_input *input,
 
 	assert(SRVR_HMAC_SHA256_64_HASH_SIZE < SHA256_DIGEST_SIZE);
 
-	*hash_len = SRVR_HMAC_SHA256_64_HASH_SIZE;
-	hmac_sha256_digest(&ctx, *hash_len, hash_out);
+	hash_len = SRVR_HMAC_SHA256_64_HASH_SIZE;
+	hmac_sha256_digest(&ctx, hash_len, hash_out);
 
-	return KNOT_EOK;
+	return hash_len;
 }
 
 const struct knot_cc_alg knot_cc_alg_hmac_sha256_64 = { KNOT_OPT_COOKIE_CLNT, cc_gen_hmac_sha256_64 };
