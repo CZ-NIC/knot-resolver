@@ -69,6 +69,12 @@ static bool apply_enabled(bool *enabled, const JsonNode *node)
 	return false;
 }
 
+/**
+ * @brief Creates a cookie secret structure.
+ * @param size size of the actual secret
+ * @param zero set to true if value should be cleared
+ * @return pointer to new structure, NULL on failure or if @size is zero
+ */
 static struct kr_cookie_secret *new_cookie_secret(size_t size, bool zero)
 {
 	if (size == 0) {
@@ -84,6 +90,27 @@ static struct kr_cookie_secret *new_cookie_secret(size_t size, bool zero)
 	if (zero) {
 		memset(sq->data, 0, size);
 	}
+	return sq;
+}
+
+/**
+ * @brief Clone a cookie secret.
+ * @param sec secret to be cloned
+ * @return pointer to new structure, NULL on failure or if @size is zero
+ */
+static struct kr_cookie_secret *clone_cookie_secret(const struct kr_cookie_secret *sec)
+{
+	if (!sec || sec->size == 0) {
+		return NULL;
+	}
+
+	struct kr_cookie_secret *sq = malloc(sizeof(*sq) + sec->size);
+	if (!sq) {
+		return NULL;
+	}
+
+	sq->size = sec->size;
+	memcpy(sq->data, sec->data, sq->size);
 	return sq;
 }
 
@@ -211,6 +238,7 @@ static bool apply_secret_shallow(struct kr_cookie_secret **sec,
 
 	switch (node->tag) {
 	case JSON_STRING:
+		free(sq); /* Delete values that may have bee set previously. */
 		sq = new_sq_from_hexstr(node);
 		break;
 	default:
@@ -367,34 +395,69 @@ fail:
 	return false;
 }
 
-static bool settings_equal(const struct kr_cookie_comp *s1,
-                           const struct kr_cookie_comp *s2)
+static bool modified_in_shallow(const struct kr_cookie_comp *running,
+                                const struct kr_cookie_comp *shallow)
 {
-	assert(s1 && s2 && s1->secr && s2->secr);
+	assert(running && shallow && running->secr && running->alg_id >= 0);
 
-	if (s1->alg_id != s2->alg_id || s1->secr->size != s2->secr->size) {
-		return false;
+	bool ret = false;
+
+	if (shallow->alg_id >= 0) {
+		if (running->alg_id != shallow->alg_id) {
+			return true;
+		}
 	}
 
-	return 0 == memcmp(s1->secr->data, s2->secr->data, s1->secr->size);
+
+	if (shallow->secr) {
+		assert(shallow->secr->size > 0);
+		if (running->secr->size != shallow->secr->size ||
+		    0 != memcmp(running->secr->data, shallow->secr->data,
+		                running->secr->size)) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
-static void apply_from_copy(struct kr_cookie_ctx *running,
-                            const struct kr_cookie_ctx *shallow)
+static void apply_settings_from_copy(struct kr_cookie_settings *running,
+                                     struct kr_cookie_settings *shallow)
+{
+	free(running->recent.secr); /* Delete old secret. */
+	running->recent = running->current; /* Current becomes recent. */
+
+	if (shallow->current.secr) {
+		/* Use new secret. */
+		running->current.secr = shallow->current.secr;
+		shallow->current.secr = NULL; /* Must be zeroed. */
+	} else {
+		/* Create a copy of secret but store it into recent. */
+		running->current.secr = running->recent.secr;
+		running->recent.secr = clone_cookie_secret(running->current.secr);
+		if (!running->recent.secr) {
+			/* Properly invalidate recent. */
+			running->recent.alg_id = -1;
+		}
+	}
+
+	if (shallow->current.alg_id >= 0) {
+		running->current.alg_id = shallow->current.alg_id;
+	}
+}
+
+static void apply_ctx_from_copy(struct kr_cookie_ctx *running,
+                                struct kr_cookie_ctx *shallow)
 {
 	assert(running && shallow);
 
-	if (!settings_equal(&running->clnt.current, &shallow->clnt.current)) {
-		free(running->clnt.recent.secr); /* Delete old secret. */
-		running->clnt.recent = running->clnt.current;
-		running->clnt.current = shallow->clnt.current;
+	if (modified_in_shallow(&running->clnt.current, &shallow->clnt.current)) {
+		apply_settings_from_copy(&running->clnt, &shallow->clnt);
 		/* Shallow will be deleted after this function call. */
 	}
 
-	if (!settings_equal(&running->srvr.current, &shallow->srvr.current)) {
-		free(running->srvr.recent.secr); /* Delete old secret. */
-		running->srvr.recent = running->srvr.current;
-		running->srvr.current = shallow->srvr.current;
+	if (modified_in_shallow(&running->srvr.current, &shallow->srvr.current)) {
+		apply_settings_from_copy(&running->srvr, &shallow->srvr);
 		/* Shallow will be deleted after this function call. */
 	}
 
@@ -413,7 +476,12 @@ bool config_apply(struct kr_cookie_ctx *ctx, const char *args)
 		return true;
 	}
 
-	struct kr_cookie_ctx shallow_copy = *ctx;
+	/* Basically, copy only `enabled` values. */
+	struct kr_cookie_ctx shallow_copy;
+	kr_cookie_ctx_init(&shallow_copy);
+	shallow_copy.clnt.enabled = ctx->clnt.enabled;
+	shallow_copy.srvr.enabled = ctx->srvr.enabled;
+
 	bool success = true;
 
 	if (!args || !strlen(args)) {
@@ -431,16 +499,14 @@ bool config_apply(struct kr_cookie_ctx *ctx, const char *args)
 	json_delete(root_node);
 
 	if (success) {
-		apply_from_copy(ctx, &shallow_copy);
-	} else {
-		/* Clean newly allocated data. */
-		if (shallow_copy.clnt.current.secr != ctx->clnt.current.secr) {
-			free(shallow_copy.clnt.current.secr);
-		}
-		if (shallow_copy.srvr.current.secr != ctx->srvr.current.secr) {
-			free(shallow_copy.srvr.current.secr);
-		}
+		apply_ctx_from_copy(ctx, &shallow_copy);
 	}
+
+	/* Clean possible residues of newly allocated data. */
+	free(shallow_copy.clnt.current.secr);
+	assert(!shallow_copy.clnt.recent.secr);
+	free(shallow_copy.srvr.current.secr);
+	assert(!shallow_copy.srvr.recent.secr);
 
 	return success;
 }
