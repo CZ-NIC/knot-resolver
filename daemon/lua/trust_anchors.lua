@@ -295,7 +295,7 @@ local trust_anchors = {
 			local rr, msg = bootstrap()
 			if not rr then
 				error('you MUST obtain the root TA manually, see: '..
-				      'http://knot-resolver.readthedocs.org/en/latest/daemon.html#enabling-dnssec')
+				      'https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec')
 			end
 			trustanchor(rr)
 			-- Fetch DNSKEY immediately

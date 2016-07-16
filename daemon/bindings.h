@@ -15,7 +15,7 @@
  */
 
 /**
- * Bindings to engine services, see \a http://www.lua.org/manual/5.2/manual.html#luaL_newlib for the reference.
+ * Bindings to engine services, see \a https://www.lua.org/manual/5.2/manual.html#luaL_newlib for the reference.
  */
 #pragma once
 

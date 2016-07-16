@@ -252,17 +252,17 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _MinGW: http://www.mingw.org/
 .. _Dockerfile: https://registry.hub.docker.com/u/cznic/knot-resolver/dockerfile/
 
-.. _Lua: http://www.lua.org/about.html
+.. _Lua: https://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
 .. _Go: https://golang.org
 .. _libmemcached: http://libmemcached.org/libMemcached.html
 .. _hiredis: https://github.com/redis/hiredis
 .. _geoip: https://github.com/abh/geoip
-.. _Doxygen: http://www.stack.nl/~dimitri/doxygen/manual/index.html
+.. _Doxygen: https://www.stack.nl/~dimitri/doxygen/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
 .. _GNU Make: https://www.gnu.org/software/make/
-.. _pkg-config: http://www.freedesktop.org/wiki/Software/pkg-config/
+.. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot
 .. _cmocka: https://cmocka.org/
 .. _Python: https://www.python.org/

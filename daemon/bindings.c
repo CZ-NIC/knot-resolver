@@ -243,7 +243,7 @@ static int net_interfaces(lua_State *L)
 {
 	/* Retrieve interface list */
 	int count = 0;
-	char buf[INET6_ADDRSTRLEN]; /* http://tools.ietf.org/html/rfc4291 */
+	char buf[INET6_ADDRSTRLEN]; /* https://tools.ietf.org/html/rfc4291 */
 	uv_interface_address_t *info = NULL;
 	uv_interface_addresses(&info, &count);
 	lua_newtable(L);

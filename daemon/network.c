@@ -232,7 +232,7 @@ int network_listen_fd(struct network *net, int fd)
 		return kr_error(EBADF);
 	}
 	int port = 0;
-	char addr_str[INET6_ADDRSTRLEN]; /* http://tools.ietf.org/html/rfc4291 */
+	char addr_str[INET6_ADDRSTRLEN]; /* https://tools.ietf.org/html/rfc4291 */
 	if (ss.ss_family == AF_INET) {
 		uv_ip4_name((const struct sockaddr_in*)&ss, addr_str, sizeof(addr_str));
 		port = ntohs(((struct sockaddr_in *)&ss)->sin_port);

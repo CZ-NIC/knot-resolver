@@ -37,6 +37,6 @@ Dependencies
 
 Depends on the libmemcached_ library.
 
-.. _memcached: http://memcached.org/
+.. _memcached: https://memcached.org/
 .. _libmemcached: http://libmemcached.org/libMemcached.html
 .. _`libmemcached configuration`: http://docs.libmemcached.org/libmemcached_configuration.html#description

@@ -42,4 +42,4 @@ lru
 .. doxygenfile:: lru.h
    :project: libkres
 
-.. _`Crit-bit tree`: http://cr.yp.to/critbit.html 
+.. _`Crit-bit tree`: https://cr.yp.to/critbit.html 

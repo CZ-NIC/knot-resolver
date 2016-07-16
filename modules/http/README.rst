@@ -246,14 +246,14 @@ Dependencies
 
     .. code-block:: bash
 
-       $ luarocks install --server=http://luarocks.org/dev http CC=cc
+       $ luarocks install --server=https://luarocks.org/dev http CC=cc
 
 * `mmdblua <https://github.com/daurnimator/mmdblua>`_ available in LuaRocks
 
     .. code-block:: bash
 
-       $ luarocks install --server=http://luarocks.org/dev mmdblua
-       $ curl -O http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz
+       $ luarocks install --server=https://luarocks.org/dev mmdblua
+       $ curl -O https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz
        $ gzip -d GeoLite2-City.mmdb.gz
 
 .. _Prometheus: https://prometheus.io

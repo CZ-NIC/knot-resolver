@@ -338,7 +338,7 @@ For example a simple web server that doesn't block:
 
 .. note:: Work in progress, come back later!
 
-.. _closures: http://www.lua.org/pil/6.1.html
+.. _closures: https://www.lua.org/pil/6.1.html
 
 Configuration reference
 -----------------------
@@ -1020,7 +1020,7 @@ Example:
 .. _`PowerDNS Recursor`: https://doc.powerdns.com/md/recursor/scripting/
 .. _LuaRocks: https://rocks.moonscript.org/
 .. _libuv: https://github.com/libuv/libuv
-.. _Lua: http://www.lua.org/about.html
+.. _Lua: https://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
 .. _luasec: https://luarocks.org/modules/luarocks/luasec
 .. _luasocket: https://luarocks.org/modules/luarocks/luasocket
