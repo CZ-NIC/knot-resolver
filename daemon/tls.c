@@ -278,30 +278,25 @@ int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t *
 	int pushed_queries = 0;
 	while (true) {
 		count = gnutls_record_recv(tls_p->session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
-		if (count == 0) {
-			/* this means there has been an end of the stream */
-			kr_log_error("[tls] got zero from gnutls_record_recv\n");
-			worker_submit(worker, (uv_handle_t *) handle, NULL, NULL);
-			return kr_error(EIO);
-		}
 		if (count < 0) {
-			if (count == GNUTLS_E_AGAIN || count == GNUTLS_E_INTERRUPTED) {
-				return pushed_queries; /* Wait for more */
+			if (count == GNUTLS_E_AGAIN) {
+				return pushed_queries; /* No more data available at the moment */
+			} else if (count == GNUTLS_E_INTERRUPTED) {
+				continue; /* Try reading again */
 			} else {
 				kr_log_error("[tls] unknown gnutls_record_recv error: (%zd) %s\n",
 					     count, gnutls_strerror_name(count));
 				worker_submit(worker, (uv_handle_t *) handle, NULL, NULL);
-				return kr_error(EIO);
+				return kr_error(EIO); /*  ???? */
 			}
 		}
-		kr_log_error("[tls] we got %zd cleartext octets\n", count);
+		/* if count == 0 let worker_process_tcp handle the end-of-stream */
 		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
 		if (ret < 0) {
 			return ret;
 		}
 		pushed_queries += ret;
 	}
-	return pushed_queries;
 }
 
 #undef DEBUG_MSG
