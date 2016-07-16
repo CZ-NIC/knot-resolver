@@ -261,7 +261,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _Doxygen: http://www.stack.nl/~dimitri/doxygen/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
-.. _GNU Make: http://www.gnu.org/software/make/
+.. _GNU Make: https://www.gnu.org/software/make/
 .. _pkg-config: http://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot
 .. _cmocka: https://cmocka.org/
