@@ -75,7 +75,8 @@ creating a file
 .B config
 in daemon runtime directory. See \fIdaemon/README.md\fR for more information about interacting
 with CLI and configuration file options, or visit
-.b https://knot-resolver.readthedocs.io online documentation.
+.B https://knot-resolver.readthedocs.io
+online documentation.
 .PP
 .nf
 .RS 6n
