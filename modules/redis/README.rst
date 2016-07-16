@@ -39,7 +39,7 @@ Dependencies
 Depends on the hiredis_ library, which is usually in the packages / ports or you can install it from sources.
 
 .. _Redis: http://redis.io/
-.. _memcached: http://memcached.org/
+.. _memcached: https://memcached.org/
 .. _`Redis Cluster`: http://redis.io/topics/cluster-tutorial
 .. _hiredis: https://github.com/redis/hiredis
 .. _redis-lru: http://redis.io/topics/lru-cache

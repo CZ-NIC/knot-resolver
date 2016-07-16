@@ -1,5 +1,5 @@
 -- Config file with split-view for internal zone
--- Refer to manual: http://knot-resolver.readthedocs.org/en/latest/daemon.html#configuration
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/latest/daemon.html#configuration
 
 -- Listen on localhost and external interface
 net = { '127.0.0.1', '::1', '192.168.1.1' }

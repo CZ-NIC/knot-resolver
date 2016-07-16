@@ -12,19 +12,20 @@
 \- Knot DNS @VERSION@ full caching resolver.
 .SH "SYNOPSIS"
 .B kresd
-.RB [ \-a
+.RB [ \-a | \-\-addr
 .IR addr[#port] ]
-.RB [ \-\-fd=\fIfd\fR ]
-.RB [ \-c
+.RB [ \-S | \-\-fd
+.IR fd ]
+.RB [ \-c | \-\-config
 .IR config ]
-.RB [ \-k
+.RB [ \-k | \-\-keyfile
 .IR keyfile ]
-.RB [ \-f
+.RB [ \-f | \-\-forks
 .IR N ]
-.RB [ \-q ]
-.RB [ \-v ]
-.RB [ \-V ]
-.RB [ \-h ]
+.RB [ \-q | \-\-quiet ]
+.RB [ \-v | \-\-verbose ]
+.RB [ \-V | \-\-version ]
+.RB [ \-h | \-\-help ]
 .IR [rundir]
 .SH "DESCRIPTION"
 .B Knot DNS Resolver is a DNSSEC-enabled full caching resolver.
@@ -74,7 +75,8 @@ creating a file
 .B config
 in daemon runtime directory. See \fIdaemon/README.md\fR for more information about interacting
 with CLI and configuration file options, or visit
-.b http://knot-resolver.rtfd.org online documentation.
+.B https://knot-resolver.readthedocs.io
+online documentation.
 .PP
 .nf
 .RS 6n
@@ -129,7 +131,7 @@ Show the version and commandline option help.
 Show the version.
 .SH "SEE ALSO"
 \fIdaemon/README.md\fR,
-\fIhttp://knot-resolver.rtfd.org\fR
+\fIhttps://knot-resolver.readthedocs.io\fR
 .SH "AUTHORS"
 .B kresd
 developers are mentioned in the AUTHORS file in the distribution.

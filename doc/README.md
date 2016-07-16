@@ -9,7 +9,7 @@ The code is documented with [Doxygen][doxygen] JavaDoc style, a prettified docum
 also requires [breathe][breathe] and [Sphinx][sphinx] for building sane documentation pages.
 It is not however required.
 
-[doxygen]:http://www.stack.nl/~dimitri/doxygen/manual/index.html
+[doxygen]:https://www.stack.nl/~dimitri/doxygen/manual/index.html
 [breathe]: https://github.com/michaeljones/breathe
 [sphinx]: http://sphinx-doc.org/
 

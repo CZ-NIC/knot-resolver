@@ -1,7 +1,7 @@
 -- Config file example useable for personal resolver.
 -- The goal is to have a validating resolver with tiny memory footprint,
 -- while actively tracking and refreshing frequent records to lower user latency.
--- Refer to manual: http://knot-resolver.readthedocs.org/en/latest/daemon.html#configuration
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/latest/daemon.html#configuration
 
 -- Listen on localhost (default)
 -- net = { '127.0.0.1', '::1' }

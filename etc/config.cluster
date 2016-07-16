@@ -2,7 +2,7 @@
 -- In this case cache should be made as large as possible, and prefetching turned off
 -- as the resolver is busy most of the time.
 -- Alternative is using `etcd` as a configuration backend.
--- Refer to manual: http://knot-resolver.readthedocs.org/en/latest/daemon.html#configuration
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/latest/daemon.html#configuration
 
 -- Listen on localhost and external interface
 net = { '127.0.0.1', '::1', '192.168.1.1' }

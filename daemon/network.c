@@ -11,7 +11,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include <unistd.h>
@@ -232,7 +232,7 @@ int network_listen_fd(struct network *net, int fd)
 		return kr_error(EBADF);
 	}
 	int port = 0;
-	char addr_str[INET6_ADDRSTRLEN]; /* http://tools.ietf.org/html/rfc4291 */
+	char addr_str[INET6_ADDRSTRLEN]; /* https://tools.ietf.org/html/rfc4291 */
 	if (ss.ss_family == AF_INET) {
 		uv_ip4_name((const struct sockaddr_in*)&ss, addr_str, sizeof(addr_str));
 		port = ntohs(((struct sockaddr_in *)&ss)->sin_port);

@@ -43,7 +43,7 @@ Dependencies
 
     ``$ luarocks install luasocket``
 
-.. _Graphite: http://graphite.readthedocs.org/en/latest/feeding-carbon.html
-.. _InfluxDB: http://influxdb.com/
+.. _Graphite: https://graphite.readthedocs.io/en/latest/feeding-carbon.html
+.. _InfluxDB: https://influxdb.com/
 .. _Metronome: https://github.com/ahuPowerDNS/metronome
 .. _Grafana: http://grafana.org/
