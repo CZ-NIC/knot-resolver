@@ -510,6 +510,8 @@ int main(int argc, char **argv)
 		}
 		if (!strcasecmp("control",socket_names[i])) {
 			control_fd = fd;
+		} else if (!strcasecmp("tls",socket_names[i])) {
+			array_push(tls_fd_set, fd);
 		} else {
 			array_push(fd_set, fd);
 		}
