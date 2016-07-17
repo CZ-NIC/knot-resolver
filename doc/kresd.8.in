@@ -111,6 +111,10 @@ With this option, the daemon is started in non-interactive mode and instead crea
 UNIX socket in \fIrundir\fR that the operator can connect to for interactive session.
 A number greater than 1 forks the daemon N times, all forks will bind to same addresses
 and the kernel will load-balance between them on Linux with \fISO_REUSEPORT\fR support.
+
+When socket-activated and supervised by systemd or the equivalent, kresd defaults to
+--forks=1, and must not be set to any other value.  If you want multiple concurrent
+processes supervised in this way, they should be supervised independently.
 .TP
 .B \-q\fR, \fB\-\-quiet
 Daemon will refrain from printing any informative messages, not even a prompt.
