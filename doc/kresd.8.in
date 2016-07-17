@@ -105,6 +105,10 @@ times to listen on more addresses.
 Listen on given file descriptor(s), passed by supervisor.
 Option may be passed multiple times to listen on more file descriptors.
 .TP
+.B \-T\fI fd\fR, \-\-tlsfd=\fI<fd>
+Listen using TLS on given file descriptor(s), passed by supervisor.
+Option may be passed multiple times to listen on more file descriptors.
+.TP
 .B \-k\fI keyfile\fR, \fB\-\-keyfile=\fI<keyfile>
 Use given for keeping root trust anchors. If the file doesn't exist, it will be
 automatically boostrapped from IANA and warning for you will be issued to check it

@@ -333,7 +333,7 @@ int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr)
 	return _tcp_bind(handle, addr, tls_accept);
 }
 
-int tcp_bindfd(uv_tcp_t *handle, int fd)
+static int _tcp_bindfd(uv_tcp_t *handle, int fd, uv_connection_cb connection)
 {
 	if (!handle) {
 		return kr_error(EINVAL);
@@ -344,11 +344,21 @@ int tcp_bindfd(uv_tcp_t *handle, int fd)
 		return ret;
 	}
 
-	ret = uv_listen((uv_stream_t *)handle, 16, tcp_accept);
+	ret = uv_listen((uv_stream_t *)handle, 16, connection);
 	if (ret != 0) {
 		return ret;
 	}
 	return tcp_bind_finalize((uv_handle_t *)handle);
+}
+
+int tcp_bindfd(uv_tcp_t *handle, int fd)
+{
+	return _tcp_bindfd(handle, fd, tcp_accept);
+}
+
+int tcp_bindfd_tls(uv_tcp_t *handle, int fd)
+{
+	return _tcp_bindfd(handle, fd, tls_accept);
 }
 
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)

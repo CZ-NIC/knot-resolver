@@ -17,6 +17,7 @@
 #pragma once
 
 #include <uv.h>
+#include <stdbool.h>
 
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
@@ -48,7 +49,7 @@ struct network {
 
 void network_init(struct network *net, uv_loop_t *loop);
 void network_deinit(struct network *net);
-int network_listen_fd(struct network *net, int fd);
+int network_listen_fd(struct network *net, int fd, bool use_tls);
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags);
 int network_close(struct network *net, const char *addr, uint16_t port);
 int network_set_tls_cert(struct network *net, const char *cert);
