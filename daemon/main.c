@@ -321,7 +321,7 @@ static struct worker_ctx *init_worker(struct engine *engine, knot_mm_t *pool, in
 	return worker;
 }
 
-static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader)
+static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader, int control_fd)
 {
 	/* Control sockets or TTY */
 	auto_free char *sock_file = NULL;
@@ -335,12 +335,18 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 		uv_pipe_open(&pipe, 0);
 		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_read);
 	} else {
-		(void) mkdir("tty", S_IRWXU|S_IRWXG);
-		sock_file = afmt("tty/%ld", getpid());
-		if (sock_file) {
-			uv_pipe_bind(&pipe, sock_file);
-			uv_listen((uv_stream_t *) &pipe, 16, tty_accept);
+		int pipe_ret = -1;
+		if (control_fd != -1) {
+			pipe_ret = uv_pipe_open(&pipe, control_fd);
+		} else {
+			(void) mkdir("tty", S_IRWXU|S_IRWXG);
+			sock_file = afmt("tty/%ld", getpid());
+			if (sock_file) {
+				pipe_ret = uv_pipe_bind(&pipe, sock_file);
+			}
 		}
+		if (!pipe_ret)
+			uv_listen((uv_stream_t *) &pipe, 16, tty_accept);
 	}
 	/* Watch IPC pipes (or just assign them if leading the pgroup). */
 	if (!leader) {
@@ -364,6 +370,14 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return kr_ok();
 }
 
+void free_sd_socket_names(char **socket_names, int count)
+{
+	for (int i = 0; i < count; i++) {
+		free(socket_names[i]);
+	}
+	free(socket_names);
+}
+
 int main(int argc, char **argv)
 {
 	int forks = 1;
@@ -374,6 +388,7 @@ int main(int argc, char **argv)
 	char *keyfile = NULL;
 	const char *config = NULL;
 	char *keyfile_buf = NULL;
+	int control_fd = -1;
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
@@ -457,11 +472,25 @@ int main(int argc, char **argv)
 
 #ifdef HAS_SYSTEMD
 	/* Accept passed sockets from systemd supervisor. */
-	int sd_nsocks = sd_listen_fds(0);
+	char **socket_names = NULL;
+	int sd_nsocks = sd_listen_fds_with_names(0, &socket_names);
 	for (int i = 0; i < sd_nsocks; ++i) {
 		int fd = SD_LISTEN_FDS_START + i;
-		array_push(fd_set, fd);
+		/* when run under systemd supervision, do not use interactive mode */
+		g_interactive = false;
+		if (forks != 1) {
+			kr_log_error("[system] when run under systemd-style supervision, "
+				     "use single-process only (bad: --fork=%d).\n", forks);
+			free_sd_socket_names(socket_names, sd_nsocks);
+			return EXIT_FAILURE;
+		}
+		if (!strcasecmp("control",socket_names[i])) {
+			control_fd = fd;
+		} else {
+			array_push(fd_set, fd);
+		}
 	}
+	free_sd_socket_names(socket_names, sd_nsocks);
 #endif
 
 	/* Switch to rundir. */
@@ -563,7 +592,7 @@ int main(int argc, char **argv)
 				lua_settop(engine.L, 0);
 			}
 			/* Run the event loop */
-			ret = run_worker(loop, &engine, &ipc_set, fork_id == 0);
+			ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, control_fd);
 		}
 	}
 	if (ret != 0) {
