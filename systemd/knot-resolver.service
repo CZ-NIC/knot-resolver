@@ -1,5 +1,6 @@
 [Unit]
 Description=Knot DNS Resolver daemon
+Documentation=man:kresd(8)
 ## This is a socket-activated service:
 RefuseManualStart=true
 
