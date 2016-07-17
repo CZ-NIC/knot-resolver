@@ -1,0 +1,14 @@
+[Unit]
+Description=Knot DNS Resolver daemon
+## This is a socket-activated service:
+RefuseManualStart=true
+
+[Service]
+Type=notify
+WorkingDirectory=/run/knot-resolver/cache
+ExecStart=/usr/sbin/kresd
+User=knot-resolver
+Restart=on-failure
+
+[Install]
+WantedBy=sockets.target
