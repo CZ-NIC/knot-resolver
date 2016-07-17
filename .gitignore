@@ -8,6 +8,7 @@
 *.la
 *.Plo
 *.swp
+*~
 *.d
 *.db
 *.out
