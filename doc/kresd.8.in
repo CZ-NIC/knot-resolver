@@ -92,34 +92,34 @@ EOF
 .P
 The available CLI options are:
 .TP
-.B \-a\fI addr[#port]
+.B \-a\fI addr[#port]\fR, \fB\-\-addr=\fI<addr[#port]>
 Listen on given address (and port) pair. If no port is given, \fI53\fR is used as a default.
 Option may be passed multiple times to listen on more addresses.
 .TP
-.B \-S\fI fd\fR, \-\-fd=\fI<fd>
+.B \-S\fI fd\fR, \fB\-\-fd=\fI<fd>
 Listen on given file descriptor(s), passed by supervisor.
 Option may be passed multiple times to listen on more file descriptors.
 .TP
-.B \-k\fI keyfile
+.B \-k\fI keyfile\fR, \fB\-\-keyfile=\fI<keyfile>
 Use given for keeping root trust anchors. If the file doesn't exist, it will be
 automatically boostrapped from IANA and warning for you will be issued to check it
 before trusting it. The file contains DNSKEY/DS records in presentation format,
 and is compatible with Unbound or BIND9 root key files.
 .TP
-.B \-f\fI N
+.B \-f\fI N\fR, \fB\-\-forks=\fI<N>
 With this option, the daemon is started in non-interactive mode and instead creates a
 UNIX socket in \fIrundir\fR that the operator can connect to for interactive session.
 A number greater than 1 forks the daemon N times, all forks will bind to same addresses
 and the kernel will load-balance between them on Linux with \fISO_REUSEPORT\fR support.
 .TP
-.B \-q
+.B \-q\fR, \fB\-\-quiet
 Daemon will refrain from printing any informative messages, not even a prompt.
 .TP
-.B \-v
+.B \-v\fR, \fB\-\-verbose
 Increase verbosity. If given multiple times, more information is logged.
 This is in addition to the verbosity (if any) from the config file.
 .TP
-.B \-c\fI config
+.B \-c\fI config\fR, \fB\-\-config=\fI<config>
 Set the config file with settings for unbound to read instead of reading the
 file at the default location (\fIconfig\fR). The syntax is
 described in \fIdaemon/README.md\fR.
