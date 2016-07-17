@@ -276,7 +276,7 @@ static void help(int argc, char *argv[])
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
 	       " -a, --addr=[addr]    Server address (default: localhost#53).\n"
-	       " -t, --addr=[addr]    Server address for TLS (default: off).\n"
+	       " -t, --tls=[addr]     Server address for TLS (default: off).\n"
 	       " -S, --fd=[fd]        Listen on given fd (handed out by supervisor).\n"
 	       " -c, --config=[path]  Config file path (relative to [rundir]) (default: config).\n"
 	       " -k, --keyfile=[path] File containing trust anchors (DS or DNSKEY).\n"
