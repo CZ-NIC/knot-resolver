@@ -25,11 +25,6 @@
 #include <malloc.h>
 #endif
 #include <assert.h>
-#if defined(ENABLE_COOKIES)
-#include <arpa/inet.h> /* inet_ntop() */
-#include "lib/cookies/control.h"
-#include "lib/cookies/helper.h"
-#endif /* defined(ENABLE_COOKIES) */
 #include "lib/utils.h"
 #include "lib/layer.h"
 #include "daemon/worker.h"
@@ -449,59 +444,6 @@ static void on_write(uv_write_t *req, int status)
 	req_release(worker, (struct req *)req);
 }
 
-#if defined(ENABLE_COOKIES)
-/** Update DNS cookie data in packet. */
-static bool subreq_update_cookies(struct qr_task *task, uv_udp_t *handle,
-                                  struct sockaddr *srvr_addr, knot_pkt_t *pkt)
-{
-	assert(task);
-	assert(handle);
-	assert(pkt);
-
-	/* RFC7873 4.1 strongly requires server address. */
-	if (!srvr_addr) {
-		return false;
-	}
-
-	struct kr_cookie_settings *clnt_sett = &task->req.ctx->cookie_ctx.clnt;
-
-	/* Cookies disabled or packet has no ENDS section. */
-	if (!clnt_sett->enabled || !pkt->opt_rr) {
-		return true;
-	}
-
-	struct sockaddr_storage *sockaddr_ptr = NULL; /* Not supported yet. */
-#if 0
-	/*
-	 * RFC7873 4.1 recommends using also the client address. The matter is
-	 * also discussed in section 6.
-	 *
-	 * Libuv does not offer a convenient way how to obtain a source IP
-	 * address from a UDP handle that has been initialised using
-	 * uv_udp_init(). The uv_udp_getsockname() fails because of the lazy
-	 * socket initialisation.
-	 *
-	 * @note -- A solution might be opening a separate socket and trying
-	 * to obtain the IP address from it.
-	 */
-	struct sockaddr_storage sockaddr = {0, };
-	struct sockaddr_storage *sockaddr_ptr = &sockaddr;
-	int sockaddr_len = sizeof(sockaddr);
-	int ret = uv_udp_getsockname(handle, (struct sockaddr*) &sockaddr,
-	                             &sockaddr_len);
-	if (ret != 0) {
-		sockaddr_ptr = NULL;
-	}
-#endif /* 0 */
-
-	kr_request_put_cookie(&clnt_sett->current,
-	                      task->worker->engine->resolver.cache_cookie,
-	                      (struct sockaddr*) sockaddr_ptr, srvr_addr, pkt);
-
-	return true;
-}
-#endif /* defined(ENABLE_COOKIES) */
-
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	if (!handle) {
@@ -515,27 +457,23 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		return qr_task_on_send(task, handle, ret);
 	}
 
-	/* Send using given protocol */
 	int ret = 0;
 	struct req *send_req = req_borrow(task->worker);
 	if (!send_req) {
 		return qr_task_on_send(task, handle, kr_error(ENOMEM));
 	}
-	if (handle->type == UV_UDP) {
-#if defined(ENABLE_COOKIES)
-		/* The actual server IP address is needed before generating the
-		 * actual cookie. If we don't know the server address then we
-		 * also don't know the actual cookie size.
-		 * Also the resolver somehow mangles the query packets before
-		 * building the query i.e. the space needed for the cookie
-		 * cannot be allocated in the cookie layer. */
-		if (knot_wire_get_qr(pkt->wire) == 0) {
-			/* Update DNS cookies data in query. */
-			subreq_update_cookies(task, (uv_udp_t *) handle, addr,
-			                      pkt);
+	if (knot_wire_get_qr(pkt->wire) == 0) {
+		/* Query must be finalised using destination address before sending. */
+		ret = kr_resolve_query_finalize(&task->req, addr,
+		                                handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
+		                                pkt);
+		if (ret == KNOT_STATE_FAIL) {
+			return kr_error(EINVAL); /* @todo: What error code should it return. */
 		}
-#endif /* defined(ENABLE_COOKIES) */
-
+	}
+	/* Send using given protocol */
+	ret = 0;
+	if (handle->type == UV_UDP) {
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->as.send.data = task;
 		ret = uv_udp_send(&send_req->as.send, (uv_udp_t *)handle, &buf, 1, addr, &on_send);

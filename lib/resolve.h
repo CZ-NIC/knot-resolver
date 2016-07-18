@@ -178,6 +178,20 @@ KR_EXPORT
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet);
 
 /**
+ * Finalises the query with the knowledge of the target (remote server) IP address.
+ *
+ * @note The function must be called before actual sending of the request packet.
+ *
+ * @param  request request state (in PRODUCE state)
+ * @param  dst     address of the name server
+ * @param  type    used socket type (SOCK_STREAM, SOCK_DGRAM)
+ * @param  packet  [in,out] query packet to be finalised
+ * @return         any state
+ */
+KR_EXPORT
+int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *dst, int type, knot_pkt_t *packet);
+
+/**
  * Finish resolution and commit results if the state is DONE.
  *
  * @note The structures will be deinitialized, but the assigned memory pool is not going to

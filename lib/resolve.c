@@ -844,11 +844,100 @@ ns_election:
 		return KNOT_STATE_PRODUCE;
 	}
 
-	/* Prepare additional query */
+	/*
+	 * Additional query is going to be finalised when calling
+	 * kr_resolve_query_finalize().
+	 */
+
+	gettimeofday(&qry->timestamp, NULL);
+	*dst = &qry->ns.addr[0].ip;
+	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
+	return request->state;
+}
+
+#if defined(ENABLE_COOKIES)
+/** Update DNS cookie data in packet. */
+static bool outbound_query_add_cookies(struct kr_request *req,
+                                       const struct sockaddr *dst,
+                                       knot_pkt_t *pkt)
+{
+	assert(req);
+	assert(pkt);
+
+	/* RFC7873 4.1 strongly requires server address. */
+	if (!dst) {
+		return false;
+	}
+
+	struct kr_cookie_settings *clnt_sett = &req->ctx->cookie_ctx.clnt;
+
+	/* Cookies disabled or packet has no ENDS section. */
+	if (!clnt_sett->enabled || !pkt->opt_rr) {
+		return true;
+	}
+
+	/*
+	 * RFC7873 4.1 recommends using also the client address. The matter is
+	 * also discussed in section 6.
+	 *
+	 * Libuv does not offer a convenient way how to obtain a source IP
+	 * address from a UDP handle that has been initialised using
+	 * uv_udp_init(). The uv_udp_getsockname() fails because of the lazy
+	 * socket initialisation.
+	 *
+	 * @note -- A solution might be opening a separate socket and trying
+	 * to obtain the IP address from it.
+	 */
+
+	kr_request_put_cookie(&clnt_sett->current, req->ctx->cache_cookie,
+	                      NULL, dst, pkt);
+
+	return true;
+}
+#endif /* defined(ENABLE_COOKIES) */
+
+int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *dst, int type, knot_pkt_t *packet)
+{
+	/* @todo: Update documentation if this function becomes approved. */
+
+	struct kr_rplan *rplan = &request->rplan;
+
+	if (knot_wire_get_qr(packet->wire) != 0) {
+		return request->state;
+	}
+
+	/* No query left for resolution */
+	if (kr_rplan_empty(rplan)) {
+		return KNOT_STATE_FAIL;
+	}
+	/* If we have deferred answers, resume them. */
+	struct kr_query *qry = array_tail(rplan->pending);
+
+	/*
+	 * @todo: Expose this point into the layers/modules?
+	 * pros: Cookie control structure and LRU cache can be stored in module.
+	 * cons: Additional stress on API before sending every packet.
+	 */
+
 	int ret = query_finalize(request, qry, packet);
 	if (ret != 0) {
 		return KNOT_STATE_FAIL;
 	}
+
+#if defined(ENABLE_COOKIES)
+	/* Update DNS cookies data in query. */
+	if (type == SOCK_DGRAM) { /* @todo: Add cookies also over TCP? */
+		/* The actual server IP address is needed before generating the
+		 * actual cookie. If we don't know the server address then we
+		 * also don't know the actual cookie size.
+		 * Also the resolver somehow mangles the query packets before
+		 * building the query i.e. the space needed for the cookie
+		 * cannot be allocated in the cookie layer. */
+		if (!outbound_query_add_cookies(request, dst, packet)) {
+			return KNOT_STATE_FAIL;
+		}
+	}
+#endif /* defined(ENABLE_COOKIES) */
 
 	WITH_DEBUG {
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[INET6_ADDRSTRLEN], type_str[16];
@@ -867,9 +956,6 @@ ns_election:
 	}
 	}
 
-	gettimeofday(&qry->timestamp, NULL);
-	*dst = &qry->ns.addr[0].ip;
-	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return request->state;
 }
 
