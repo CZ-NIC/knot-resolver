@@ -396,6 +396,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	const knot_dname_t *pending_cname = query->sname;
 	unsigned cname_chain_len = 0;
 	bool can_follow = false;
+	bool strict_mode = (query->flags & QUERY_STRICT);
 	do {
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
@@ -429,7 +430,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			}
 			cname_chain_len += 1;
 			pending_cname = knot_cname_name(&rr->rrs);
-			if (!pending_cname) {
+			if (!pending_cname || strict_mode) {
 				break;
 			}
 			if (cname_chain_len > an->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
@@ -438,6 +439,11 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			}
 			/* Don't use pending_cname immediately.
 			 * There are can be records for "old" cname. */
+		}
+		/* In strict mode, explicitly fetch each CNAME target. */
+		if (strict_mode && pending_cname) {
+			cname = pending_cname;
+			break;
 		}
 	} while (pending_cname && can_follow);
 
