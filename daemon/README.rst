@@ -542,14 +542,14 @@ For when listening on ``localhost`` just doesn't cut it.
 
 .. function:: net.bufsize([udp_bufsize])
 
-   Get/set maximum EDNS payload available. Default is 1452 (the maximum unfragmented datagram size).
-   You cannot set less than 1220 (minimum size for DNSSEC) or more than 65535 octets.
+   Get/set maximum EDNS payload available. Default is 1452, increase it in cases when authoritatives send large payloads over UDP and don't support TCP.
+   You cannot set less than 512 (512 is DNS packet size without EDNS, 1220 is minimum size for DNSSEC) or more than 65535 octets.
 
    Example output:
 
    .. code-block:: lua
 
-	> net.bufsize(4096)
+	> net.bufsize 4096
 	> net.bufsize()
 	4096
 

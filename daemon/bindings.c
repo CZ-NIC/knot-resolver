@@ -301,8 +301,8 @@ static int net_bufsize(lua_State *L)
 		return 1;
 	}
 	int bufsize = lua_tointeger(L, 1);
-	if (bufsize < KNOT_EDNS_MIN_DNSSEC_PAYLOAD || bufsize > UINT16_MAX) {
-		format_error(L, "bufsize must be within <1220, 65535>");
+	if (bufsize < 512 || bufsize > UINT16_MAX) {
+		format_error(L, "bufsize must be within <512, 65535>");
 		lua_error(L);
 	}
 	knot_edns_set_payload(opt_rr, (uint16_t) bufsize);
