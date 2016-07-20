@@ -23,15 +23,16 @@
 #include "lib/cookies/lru_cache.h"
 #include "lib/cookies/nonce.h"
 #include "lib/defines.h"
+#include "lib/resolve.h"
 
 /**
- * @brief Insert a DNS cookie into query packet.
- * @note The packet must already contain ENDS section.
+ * @brief Updates DNS cookie in the request EDNS options.
+ * @note This function must be called before the request packet is finalised.
  * @param clnt_comp    client cookie control structure
  * @param cookie_cache cookie cache
  * @param clnt_sa      client socket address
  * @param srvr_sa      server socket address
- * @param pkt          DNS request packet
+ * @param req          name resolution request
  * @return kr_ok() or error code
  */
 KR_EXPORT
@@ -39,7 +40,7 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
                           kr_cookie_lru_t *cookie_cache,
                           const struct sockaddr *clnt_sa,
                           const struct sockaddr *srvr_sa,
-                          knot_pkt_t *pkt);
+                          struct kr_request *req);
 
 /**
  * @brief Inserts a cookie option into the OPT RR. It does not write any

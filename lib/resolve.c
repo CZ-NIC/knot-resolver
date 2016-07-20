@@ -857,12 +857,10 @@ ns_election:
 
 #if defined(ENABLE_COOKIES)
 /** Update DNS cookie data in packet. */
-static bool outbound_query_add_cookies(struct kr_request *req,
-                                       const struct sockaddr *dst,
-                                       knot_pkt_t *pkt)
+static bool outbound_request_update_cookies(struct kr_request *req,
+                                            const struct sockaddr *dst)
 {
 	assert(req);
-	assert(pkt);
 
 	/* RFC7873 4.1 strongly requires server address. */
 	if (!dst) {
@@ -872,7 +870,7 @@ static bool outbound_query_add_cookies(struct kr_request *req,
 	struct kr_cookie_settings *clnt_sett = &req->ctx->cookie_ctx.clnt;
 
 	/* Cookies disabled or packet has no ENDS section. */
-	if (!clnt_sett->enabled || !pkt->opt_rr) {
+	if (!clnt_sett->enabled) {
 		return true;
 	}
 
@@ -890,7 +888,7 @@ static bool outbound_query_add_cookies(struct kr_request *req,
 	 */
 
 	kr_request_put_cookie(&clnt_sett->current, req->ctx->cache_cookie,
-	                      NULL, dst, pkt);
+	                      NULL, dst, req);
 
 	return true;
 }
@@ -919,13 +917,8 @@ int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *dst, 
 	 * cons: Additional stress on API before sending every packet.
 	 */
 
-	int ret = query_finalize(request, qry, packet);
-	if (ret != 0) {
-		return KNOT_STATE_FAIL;
-	}
-
 #if defined(ENABLE_COOKIES)
-	/* Update DNS cookies data in query. */
+	/* Update DNS cookies in request. */
 	if (type == SOCK_DGRAM) { /* @todo: Add cookies also over TCP? */
 		/* The actual server IP address is needed before generating the
 		 * actual cookie. If we don't know the server address then we
@@ -933,11 +926,16 @@ int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *dst, 
 		 * Also the resolver somehow mangles the query packets before
 		 * building the query i.e. the space needed for the cookie
 		 * cannot be allocated in the cookie layer. */
-		if (!outbound_query_add_cookies(request, dst, packet)) {
+		if (!outbound_request_update_cookies(request, dst)) {
 			return KNOT_STATE_FAIL;
 		}
 	}
 #endif /* defined(ENABLE_COOKIES) */
+
+	int ret = query_finalize(request, qry, packet);
+	if (ret != 0) {
+		return KNOT_STATE_FAIL;
+	}
 
 	WITH_DEBUG {
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[INET6_ADDRSTRLEN], type_str[16];

@@ -46,9 +46,9 @@ static const uint8_t *peek_and_check_cc(kr_cookie_lru_t *cache, const void *sa,
 }
 
 /**
- * @brief Add a client cookie option into the RR Set.
+ * @brief Put a client cookie into the RR Set.
  */
-static int opt_rr_add_cookie(knot_rrset_t *opt_rr, uint8_t *data,
+static int opt_rr_put_cookie(knot_rrset_t *opt_rr, uint8_t *data,
                              uint16_t data_len, knot_mm_t *mm)
 {
 	assert(opt_rr && data && data_len > 0);
@@ -84,9 +84,9 @@ static int opt_rr_add_cookie(knot_rrset_t *opt_rr, uint8_t *data,
 }
 
 /**
- * @brief Adds entire EDNS option into the RR Set.
+ * @brief Puts entire EDNS option into the RR Set.
  */
-static int opt_rr_add_cookie_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_t *mm)
+static int opt_rr_put_cookie_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_t *mm)
 {
 	assert(opt_rr && option);
 
@@ -99,20 +99,20 @@ static int opt_rr_add_cookie_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_
 	uint16_t opt_len = knot_edns_opt_get_length(option);
 	uint8_t *opt_data = knot_edns_opt_get_data(option);
 
-	return opt_rr_add_cookie(opt_rr, opt_data, opt_len, mm);
+	return opt_rr_put_cookie(opt_rr, opt_data, opt_len, mm);
 }
 
 int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
                           kr_cookie_lru_t *cookie_cache,
                           const struct sockaddr *clnt_sa,
                           const struct sockaddr *srvr_sa,
-                          knot_pkt_t *pkt)
+                          struct kr_request *req)
 {
-	if (!clnt_comp || !pkt) {
+	if (!clnt_comp || !req) {
 		return kr_error(EINVAL);
 	}
 
-	if (!pkt->opt_rr) {
+	if (!req->ctx->opt_rr) {
 		return kr_ok();
 	}
 
@@ -120,8 +120,10 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 		return kr_error(EINVAL);
 	}
 
-	/* Generate client cookie from client address, server address and
-	 * secret quantity. */
+	/*
+	 * Generate client cookie from client address, server address and
+	 * secret quantity.
+	 */
 	struct knot_cc_input input = {
 		.clnt_sockaddr = clnt_sa,
 		.srvr_sockaddr = srvr_sa,
@@ -141,25 +143,18 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	const uint8_t *cached_cookie = peek_and_check_cc(cookie_cache,
 	                                                 srvr_sa, cc, cc_len);
 
-	/* This is a very nasty hack that prevents the packet to be corrupted
-	 * when using contemporary 'Cookie interface'. */
-	assert(pkt->current == KNOT_ADDITIONAL);
-	pkt->sections[KNOT_ADDITIONAL].count -= 1;
-	pkt->rrset_count -= 1;
-	pkt->size -= knot_edns_wire_size(pkt->opt_rr);
-	knot_wire_set_arcount(pkt->wire, knot_wire_get_arcount(pkt->wire) - 1);
-
+	/* Add cookie option. */
 	int ret;
 	if (cached_cookie) {
-		ret = opt_rr_add_cookie_opt(pkt->opt_rr,
+		ret = opt_rr_put_cookie_opt(req->ctx->opt_rr,
 		                            (uint8_t *)cached_cookie,
-		                            &pkt->mm);
+		                            req->ctx->pool);
 	} else {
-		ret = opt_rr_add_cookie(pkt->opt_rr, cc, cc_len, &pkt->mm);
+		ret = opt_rr_put_cookie(req->ctx->opt_rr, cc, cc_len,
+		                        req->ctx->pool);
 	}
 
-	/* Write to packet. */
-	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
+	return ret;
 }
 
 int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
