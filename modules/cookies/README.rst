@@ -18,20 +18,20 @@ Example Configuration
 	-- Configure the client part of the resolver. Set 8 bytes of the client
 	-- secret and choose the hashing algorithm to be used.
 	-- Use a string composed of hexadecimal digits to set the secret.
-	cookies.config( { ['client_secret'] = '0123456789ABCDEF',
-	                  ['client_cookie_alg'] = 'FNV-64' } )
+	cookies.config( { client_secret = '0123456789ABCDEF',
+	                  client_cookie_alg = 'FNV-64' } )
 
 	-- Configure the server part of the resolver.
-	cookies.config( { ['server_secret'] = 'FEDCBA9876543210',
-	                  ['server_cookie_alg'] = 'FNV-64' } )
+	cookies.config( { server_secret = 'FEDCBA9876543210',
+	                  server_cookie_alg = 'FNV-64' } )
 
 	-- Enable client cookie functionality. (Add cookies into outbound
 	-- queries.)
-	cookies.config( { ['client_enabled'] = true } )
+	cookies.config( { client_enabled = true } )
 
 	-- Enable server cookie functionliaty. (Handle cookies in inbound
 	-- requests.)
-	cookies.config( { ['server_enabled'] = true } )
+	cookies.config( { server_enabled = true } )
 
 .. tip:: If you want to change several parameters regarding the client or server configuration then do it within a single ``cookies.config()`` invocation.
 
