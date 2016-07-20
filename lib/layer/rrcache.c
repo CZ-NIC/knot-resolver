@@ -284,6 +284,7 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, kno
 	const knot_pktsection_t *answer = knot_pkt_section(pkt, KNOT_ANSWER);
 	const knot_dname_t *cname = NULL;
 	const knot_dname_t *next_cname = cname_begin;
+	unsigned cname_chain_len = 0;
 	do {
 		cname = next_cname;
 		next_cname = NULL;
@@ -295,8 +296,22 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, kno
 			kr_rrmap_add(stash, rr, KR_RANK_AUTH, pool);
 			/* Follow CNAME chain in current cut (if SECURE). */
 			if ((qry->flags & QUERY_DNSSEC_WANT) && rr->type == KNOT_RRTYPE_CNAME) {
+				cname_chain_len += 1;
 				next_cname = knot_cname_name(&rr->rrs);
 				if (next_cname && !knot_dname_in(qry->zone_cut.name, next_cname)) {
+					next_cname = NULL;
+				}
+				/* Check if the same CNAME was already resolved */
+				if (next_cname) {
+					char key[KR_RRKEY_LEN];
+					int ret = kr_rrkey(key, next_cname, rr->type, KR_RANK_AUTH);
+					if (ret != 0 || map_get(stash, key)) {
+						DEBUG_MSG(qry, "<= cname chain loop\n");
+						next_cname = NULL;
+					}
+				}
+				if (cname_chain_len > answer->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
+					DEBUG_MSG(qry, "<= too long cname chain\n");
 					next_cname = NULL;
 				}
 			}
