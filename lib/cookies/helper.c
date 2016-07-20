@@ -46,59 +46,60 @@ static const uint8_t *peek_and_check_cc(kr_cookie_lru_t *cache, const void *sa,
 }
 
 /**
+ * @brief Add a client cookie option into the RR Set.
+ */
+static int opt_rr_add_cookie(knot_rrset_t *opt_rr, uint8_t *data,
+                             uint16_t data_len, knot_mm_t *mm)
+{
+	assert(opt_rr && data && data_len > 0);
+
+	const uint8_t *cc = NULL, *sc = NULL;
+	uint16_t cc_len = 0, sc_len = 0;
+
+	int ret = knot_edns_opt_cookie_parse(data, data_len, &cc, &cc_len,
+	                                     &sc, &sc_len);
+	if (ret != KNOT_EOK) {
+		return kr_error(EINVAL);
+	}
+	assert(data_len == cc_len + sc_len);
+
+	uint16_t cookies_size = data_len;
+	uint8_t *cookies_data = NULL;
+
+	ret = knot_edns_reserve_option(opt_rr, KNOT_EDNS_OPTION_COOKIE,
+	                               cookies_size, &cookies_data, mm);
+	if (ret != KNOT_EOK) {
+		return kr_error(EINVAL);
+	}
+	assert(cookies_data != NULL);
+
+	ret = knot_edns_opt_cookie_write(cc, cc_len, sc, sc_len,
+	                                 cookies_data, &cookies_size);
+	if (ret != KNOT_EOK) {
+		return kr_error(EINVAL);
+	}
+	assert(cookies_size == data_len);
+
+	return kr_ok();
+}
+
+/**
  * @brief Adds entire EDNS option into the RR Set.
  */
-static int opt_rr_add_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_t *mm)
+static int opt_rr_add_cookie_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_t *mm)
 {
 	assert(opt_rr && option);
 
 	uint8_t *reserved_data = NULL;
 	uint16_t opt_code = knot_edns_opt_get_code(option);
+	if (opt_code != KNOT_EDNS_OPTION_COOKIE) {
+		return kr_error(EINVAL);
+	}
+
 	uint16_t opt_len = knot_edns_opt_get_length(option);
 	uint8_t *opt_data = knot_edns_opt_get_data(option);
 
-	int ret = knot_edns_reserve_option(opt_rr, opt_code,
-	                                   opt_len, &reserved_data, mm);
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
-	assert(reserved_data);
-
-	memcpy(reserved_data, opt_data, opt_len);
-	return KNOT_EOK;
-}
-
-/**
- * @brief Add a client cookie option into the RR Set.
- */
-static int opt_rr_add_cc(knot_rrset_t *opt_rr, uint8_t *cc, uint16_t cc_len,
-                         knot_mm_t *mm)
-{
-#define SC NULL
-#define SC_LEN 0
-	uint16_t cookies_size = 0;
-	uint8_t *cookies_data = NULL;
-
-	cookies_size = knot_edns_opt_cookie_data_len(cc_len, SC_LEN);
-
-	int ret = knot_edns_reserve_option(opt_rr, KNOT_EDNS_OPTION_COOKIE,
-	                                   cookies_size, &cookies_data, mm);
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
-	assert(cookies_data != NULL);
-
-	ret = knot_edns_opt_cookie_write(cc, cc_len, SC, SC_LEN,
-	                                 cookies_data, &cookies_size);
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
-
-	assert(cookies_size == knot_edns_opt_cookie_data_len(cc_len, SC_LEN));
-
-	return KNOT_EOK;
-#undef SC
-#undef SC_LEN
+	return opt_rr_add_cookie(opt_rr, opt_data, opt_len, mm);
 }
 
 int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
@@ -150,10 +151,11 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 
 	int ret;
 	if (cached_cookie) {
-		ret = opt_rr_add_opt(pkt->opt_rr, (uint8_t *)cached_cookie,
-		                     &pkt->mm);
+		ret = opt_rr_add_cookie_opt(pkt->opt_rr,
+		                            (uint8_t *)cached_cookie,
+		                            &pkt->mm);
 	} else {
-		ret = opt_rr_add_cc(pkt->opt_rr, cc, cc_len, &pkt->mm);
+		ret = opt_rr_add_cookie(pkt->opt_rr, cc, cc_len, &pkt->mm);
 	}
 
 	/* Write to packet. */
