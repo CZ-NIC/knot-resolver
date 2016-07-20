@@ -55,4 +55,3 @@ kresd.amalg.c
 libkres.amalg.c
 /doc/kresd.8
 /libkres.pc
-/modules/tinyweb/tinyweb.h

@@ -28,7 +28,6 @@ $(eval $(call find_lib,hiredis))
 $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libdnssec))
 $(eval $(call find_lib,libsystemd))
-$(eval $(call find_gopkg,geoip,github.com/abh/geoip))
 
 # Find Go version and platform
 GO_VERSION := $(shell $(GO) version 2>/dev/null)
@@ -94,7 +93,6 @@ info:
 	$(info --------)
 	$(info [$(HAS_doxygen)] doxygen (doc))
 	$(info [$(HAS_go)] go (modules/go, Go buildmode=c-shared support))
-	$(info [$(HAS_geoip)] geoip (modules/tinyweb, github.com/abh/geoip))
 	$(info [$(HAS_libmemcached)] libmemcached (modules/memcached))
 	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))

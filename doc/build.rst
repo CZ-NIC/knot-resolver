@@ -49,7 +49,6 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "luasec_", "``trust anchors``", "TLS for Lua."
    "libmemcached_", "``modules/memcached``", "To build memcached backend module."
    "hiredis_", "``modules/redis``", "To build redis backend module."
-   "geoip_", "``modules/tinyweb``", "To build a proof-of-concept web interface (needs Go as well)."
    "Go_ 1.5+", "``modules``", "Build modules written in Go."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."

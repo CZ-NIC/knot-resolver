@@ -19,6 +19,5 @@ Knot DNS Resolver modules
 .. include:: ../modules/kmemcached/README.rst
 .. include:: ../modules/redis/README.rst
 .. include:: ../modules/ketcd/README.rst
-.. include:: ../modules/tinyweb/README.rst
 .. include:: ../modules/dns64/README.rst
 .. include:: ../modules/renumber/README.rst

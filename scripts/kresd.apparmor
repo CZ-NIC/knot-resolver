@@ -23,10 +23,6 @@
   /usr/lib{,64}/kdns_modules/*.lua r,
   /usr/lib{,64}/kdns_modules/*.so rm,
 
-  # for tinyweb
-  /usr/lib{,64}/kdns_modules/tinyweb/ r,
-  /usr/lib{,64}/kdns_modules/tinyweb/* r,
-  /var/lib/GeoIP/* r,
   # Site-specific additions and overrides. See local/README for details.
   #include <local/usr.sbin.kresd>
 }

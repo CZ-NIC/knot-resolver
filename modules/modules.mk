@@ -24,13 +24,6 @@ modules_TARGETS += ketcd \
                    daf
 endif
 
-# List of Golang modules
-ifeq ($(HAS_go),yes)
-ifeq ($(HAS_geoip),yes)
-modules_TARGETS += tinyweb
-endif
-endif
-
 # Make C module
 define make_c_module
 $(1)-install: $(DESTDIR)$(MODULEDIR)
