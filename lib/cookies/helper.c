@@ -66,8 +66,8 @@ static int opt_rr_add_cookie(knot_rrset_t *opt_rr, uint8_t *data,
 	uint16_t cookies_size = data_len;
 	uint8_t *cookies_data = NULL;
 
-	ret = knot_edns_reserve_option(opt_rr, KNOT_EDNS_OPTION_COOKIE,
-	                               cookies_size, &cookies_data, mm);
+	ret = knot_edns_reserve_unique_option(opt_rr, KNOT_EDNS_OPTION_COOKIE,
+	                                      cookies_size, &cookies_data, mm);
 	if (ret != KNOT_EOK) {
 		return kr_error(EINVAL);
 	}
@@ -195,8 +195,10 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 		return kr_error(EINVAL);
 	}
 
-	int ret = knot_edns_reserve_option(pkt->opt_rr, KNOT_EDNS_OPTION_COOKIE,
-	                                   cookie_len, &cookie, &pkt->mm);
+	int ret = knot_edns_reserve_unique_option(pkt->opt_rr,
+	                                          KNOT_EDNS_OPTION_COOKIE,
+	                                          cookie_len, &cookie,
+	                                          &pkt->mm);
 	if (ret != KNOT_EOK) {
 		return kr_error(ENOMEM);
 	}
