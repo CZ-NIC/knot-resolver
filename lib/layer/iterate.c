@@ -511,6 +511,15 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	if (ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return ctx->state;
 	}
+	/*
+	 * Fail if no query section. DNS cookies must be handled before
+	 * this layer.
+	 */
+	const struct kr_request *req = ctx->data;
+	const struct kr_query *qry = req->current_query;
+	if (qry->qdcount == 0) {
+		return KNOT_STATE_FAIL;
+	}
 	return reset(ctx);
 }
 

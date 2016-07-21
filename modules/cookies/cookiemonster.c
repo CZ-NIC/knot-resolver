@@ -397,9 +397,14 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		.time = req->current_query->timestamp.tv_sec
 	};
 
+	const struct kr_query *qry = req->current_query;
+
 	if (!cookies.sc) {
-		/* Request has no server cookie. TODO -- Silently discard? */
-		if (!ignore_badcookie) {
+		/* Request has no server cookie. */
+		if (qry->qdcount == 0) {
+			/* RFC7873 5.4 */
+			return_state = KNOT_STATE_DONE;
+		} else if (!ignore_badcookie) { /* TODO -- Silently discard? */
 			/* Generate BADCOOKIE response. */
 			DEBUG_MSG(NULL, "%s\n",
 			          "request is missing server cookie");
@@ -431,8 +436,12 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		                    kr_sc_algs[srvr_sett->recent.alg_id]);
 	}
 	if (ret != KNOT_EOK) {
-		/* TODO -- Silently discard? */
-		if (!ignore_badcookie) {
+		/* Invalid server cookie. */
+		if (qry->qdcount == 0) {
+			/* RFC7873 5.4 */
+			kr_pkt_set_ext_rcode(req->answer, KNOT_RCODE_BADCOOKIE);
+			return_state = KNOT_STATE_DONE | KNOT_STATE_FAIL;
+		} else if (!ignore_badcookie) { /* TODO -- Silently discard? */
 			/* Generate BADCOOKIE response. */
 			DEBUG_MSG(NULL, "%s\n",
 			          "request has invalid server cookie");

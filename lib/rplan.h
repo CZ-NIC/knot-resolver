@@ -65,6 +65,7 @@ const knot_lookup_t *kr_query_flag_names(void);
  */
 struct kr_query {
 	struct kr_query *parent;
+	uint16_t qdcount; /* Can be 0 when querying server cookie. */
 	knot_dname_t *sname;
 	uint16_t stype;
 	uint16_t sclass;

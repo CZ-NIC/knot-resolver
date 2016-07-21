@@ -42,20 +42,19 @@ const knot_lookup_t *kr_query_flag_names(void)
 
 static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name)
 {
-	if (name == NULL) {
-		return NULL;
-	}
-
 	struct kr_query *qry = mm_alloc(pool, sizeof(struct kr_query));
 	if (qry == NULL) {
 		return NULL;
 	}
 
 	memset(qry, 0, sizeof(struct kr_query));
-	qry->sname = knot_dname_copy(name, pool);
-	if (qry->sname == NULL) {
-		mm_free(pool, qry);
-		return NULL;
+	if (name != NULL) {
+		qry->sname = knot_dname_copy(name, pool);
+		if (qry->sname == NULL) {
+			mm_free(pool, qry);
+			return NULL;
+		}
+		qry->qdcount = 1;
 	}
 
 	knot_dname_to_lower(qry->sname);
@@ -112,7 +111,7 @@ bool kr_rplan_empty(struct kr_rplan *rplan)
 struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
-	if (rplan == NULL || name == NULL) {
+	if (rplan == NULL) {
 		return NULL;
 	}
 
