@@ -361,6 +361,11 @@ int check_request(knot_layer_t *ctx, void *module_param)
 	if (!srvr_sett->enabled) {
 		/* TODO -- IS there a way how to determine whether the original
 		 * request came via TCP? */
+		if (knot_pkt_has_edns(answer)) {
+			/* Delete any cookies. */
+			knot_edns_remove_options(answer->opt_rr,
+			                         KNOT_EDNS_OPTION_COOKIE);
+		}
 		return ctx->state;
 	}
 
