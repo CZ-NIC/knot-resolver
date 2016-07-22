@@ -356,6 +356,8 @@ int check_request(knot_layer_t *ctx, void *module_param)
 	struct kr_request *req = ctx->data;
 	struct kr_cookie_settings *srvr_sett = &req->ctx->cookie_ctx.srvr;
 
+	knot_pkt_t *answer = req->answer;
+
 	if (!srvr_sett->enabled) {
 		/* TODO -- IS there a way how to determine whether the original
 		 * request came via TCP? */
@@ -372,7 +374,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 	if (ret != kr_ok()) {
 		/* FORMERR -- malformed cookies. */
 		DEBUG_MSG(NULL, "%s\n", "request with malformed cookie");
-		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_FORMERR);
+		knot_wire_set_rcode(answer->wire, KNOT_RCODE_FORMERR);
 		return KNOT_STATE_FAIL | KNOT_STATE_DONE;
 	}
 
@@ -408,13 +410,12 @@ int check_request(knot_layer_t *ctx, void *module_param)
 			/* Generate BADCOOKIE response. */
 			DEBUG_MSG(NULL, "%s\n",
 			          "request is missing server cookie");
-			if (!knot_pkt_has_edns(req->answer)) {
+			if (!knot_pkt_has_edns(answer)) {
 				DEBUG_MSG(NULL, "%s\n",
 				          "missing EDNS section in prepared answer");
 				return KNOT_STATE_FAIL;
 			}
-			kr_pkt_set_ext_rcode(req->answer,
-			                     KNOT_RCODE_BADCOOKIE);
+			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 			return_state = KNOT_STATE_FAIL | KNOT_STATE_DONE;
 		}
 		goto answer_add_cookies;
@@ -439,7 +440,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		/* Invalid server cookie. */
 		if (qry->qdcount == 0) {
 			/* RFC7873 5.4 */
-			kr_pkt_set_ext_rcode(req->answer, KNOT_RCODE_BADCOOKIE);
+			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 			return_state = KNOT_STATE_DONE | KNOT_STATE_FAIL;
 		} else if (!ignore_badcookie) { /* TODO -- Silently discard? */
 			/* Generate BADCOOKIE response. */
@@ -450,8 +451,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 				          "missing EDNS section in prepared answer");
 				return KNOT_STATE_FAIL;
 			}
-			kr_pkt_set_ext_rcode(req->answer,
-			                     KNOT_RCODE_BADCOOKIE);
+			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 			return_state = KNOT_STATE_FAIL | KNOT_STATE_DONE;
 		}
 		goto answer_add_cookies;
@@ -464,7 +464,7 @@ answer_add_cookies:
 	ret = kr_answer_write_cookie(&srvr_data, cookies.cc, cookies.cc_len,
 	                             &nonce,
 	                             kr_sc_algs[srvr_sett->current.alg_id],
-	                             req->answer);
+	                             answer);
 	if (ret != kr_ok()) {
 		return_state = KNOT_STATE_FAIL;
 	}
