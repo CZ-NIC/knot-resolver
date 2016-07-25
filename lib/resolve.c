@@ -827,12 +827,6 @@ int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
 	/* If we have deferred answers, resume them. */
 	struct kr_query *qry = array_tail(rplan->pending);
 
-	/*
-	 * @todo: Expose this point into the layers/modules?
-	 * pros: Cookie control structure and LRU cache can be stored in module.
-	 * cons: Additional stress on API before sending every packet.
-	 */
-
 #if defined(ENABLE_COOKIES)
 	/* Update DNS cookies in request. */
 	if (type == SOCK_DGRAM) { /* @todo: Add cookies also over TCP? */
