@@ -185,6 +185,10 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 	uint16_t nonce_len = KR_NONCE_LEN;
 	uint16_t hash_len = alg->hash_size;
 
+	/*
+	 * Space for cookie is reserved inside the EDNS OPT RR inside
+	 * the answer packet.
+	 */
 	uint8_t *cookie = NULL;
 	uint16_t cookie_len = knot_edns_opt_cookie_data_len(cc_len,
 	                                                    nonce_len + hash_len);
