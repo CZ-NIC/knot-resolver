@@ -98,6 +98,9 @@ static int opt_rr_put_cookie_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_
 
 	uint16_t opt_len = knot_edns_opt_get_length(option);
 	uint8_t *opt_data = knot_edns_opt_get_data(option);
+	if (!opt_data || opt_len == 0) {
+		return kr_error(EINVAL);
+	}
 
 	return opt_rr_put_cookie(opt_rr, opt_data, opt_len, mm);
 }
@@ -264,7 +267,9 @@ int kr_parse_cookie_opt(uint8_t *cookie_opt, struct knot_dns_cookies *cookies)
 
 	const uint8_t *cookie_data = knot_edns_opt_get_data(cookie_opt);
 	uint16_t cookie_len = knot_edns_opt_get_length(cookie_opt);
-	assert(cookie_data && cookie_len);
+	if (!cookie_data || cookie_len == 0) {
+		return kr_error(EINVAL);
+	}
 
 	int ret =  knot_edns_opt_cookie_parse(cookie_data, cookie_len,
 	                                      &cookies->cc, &cookies->cc_len,
