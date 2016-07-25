@@ -183,13 +183,15 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
  * @note The function must be called before actual sending of the request packet.
  *
  * @param  request request state (in PRODUCE state)
+ * @param  src     address from which the query is going to be sent
  * @param  dst     address of the name server
  * @param  type    used socket type (SOCK_STREAM, SOCK_DGRAM)
  * @param  packet  [in,out] query packet to be finalised
  * @return         any state
  */
 KR_EXPORT
-int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *dst, int type, knot_pkt_t *packet);
+int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
+                              struct sockaddr *dst, int type, knot_pkt_t *packet);
 
 /**
  * Finish resolution and commit results if the state is DONE.

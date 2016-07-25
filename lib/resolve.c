@@ -780,6 +780,7 @@ ns_election:
 #if defined(ENABLE_COOKIES)
 /** Update DNS cookie data in packet. */
 static bool outbound_request_update_cookies(struct kr_request *req,
+                                            const struct sockaddr *src,
                                             const struct sockaddr *dst)
 {
 	assert(req);
@@ -791,7 +792,7 @@ static bool outbound_request_update_cookies(struct kr_request *req,
 
 	struct kr_cookie_settings *clnt_sett = &req->ctx->cookie_ctx.clnt;
 
-	/* Cookies disabled or packet has no ENDS section. */
+	/* Cookies disabled or packet has no EDNS section. */
 	if (!clnt_sett->enabled) {
 		return true;
 	}
@@ -799,24 +800,17 @@ static bool outbound_request_update_cookies(struct kr_request *req,
 	/*
 	 * RFC7873 4.1 recommends using also the client address. The matter is
 	 * also discussed in section 6.
-	 *
-	 * Libuv does not offer a convenient way how to obtain a source IP
-	 * address from a UDP handle that has been initialised using
-	 * uv_udp_init(). The uv_udp_getsockname() fails because of the lazy
-	 * socket initialisation.
-	 *
-	 * @note -- A solution might be opening a separate socket and trying
-	 * to obtain the IP address from it.
 	 */
 
 	kr_request_put_cookie(&clnt_sett->current, req->ctx->cache_cookie,
-	                      NULL, dst, req);
+	                      src, dst, req);
 
 	return true;
 }
 #endif /* defined(ENABLE_COOKIES) */
 
-int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *dst, int type, knot_pkt_t *packet)
+int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
+                              struct sockaddr *dst, int type, knot_pkt_t *packet)
 {
 	/* @todo: Update documentation if this function becomes approved. */
 
@@ -848,7 +842,7 @@ int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *dst, 
 		 * Also the resolver somehow mangles the query packets before
 		 * building the query i.e. the space needed for the cookie
 		 * cannot be allocated in the cookie layer. */
-		if (!outbound_request_update_cookies(request, dst)) {
+		if (!outbound_request_update_cookies(request, src, dst)) {
 			return KNOT_STATE_FAIL;
 		}
 	}

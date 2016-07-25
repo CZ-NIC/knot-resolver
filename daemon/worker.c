@@ -463,8 +463,19 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		return qr_task_on_send(task, handle, kr_error(ENOMEM));
 	}
 	if (knot_wire_get_qr(pkt->wire) == 0) {
-		/* Query must be finalised using destination address before sending. */
-		ret = kr_resolve_query_finalize(&task->req, addr,
+		/*
+		 * Query must be finalised using destination address before
+		 * sending.
+		 *
+		 * Libuv does not offer a convenient way how to obtain a source
+		 * IP address from a UDP handle that has been initialised using
+		 * uv_udp_init(). The uv_udp_getsockname() fails because of the
+		 * lazy socket initialisation.
+		 *
+		 * @note -- A solution might be opening a separate socket and
+		 * trying to obtain the IP address from it.
+		 */
+		ret = kr_resolve_query_finalize(&task->req, NULL, addr,
 		                                handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
 		                                pkt);
 		if (ret == KNOT_STATE_FAIL) {
