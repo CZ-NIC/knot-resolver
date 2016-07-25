@@ -200,6 +200,14 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 		return kr_error(ENOMEM);
 	}
 
+	/*
+	 * Function knot_edns_opt_cookie_data_len() returns the sum of its
+	 * parameters or zero. Anyway, let's check again.
+	 */
+	if (cookie_len < (cc_len + nonce_len + hash_len)) {
+		return kr_error(EINVAL);
+	}
+
 	struct knot_sc_input input = {
 		.cc = cookie,
 		.cc_len = cc_len,
@@ -209,7 +217,7 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 
 	if (nonce_len) {
 		kr_nonce_write_wire(cookie + cc_len, nonce_len, nonce);
-
+		/* Adjust input for written nonce value. */
 		input.nonce = cookie + cc_len;
 		input.nonce_len = nonce_len;
 	}
