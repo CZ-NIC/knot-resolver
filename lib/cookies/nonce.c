@@ -29,7 +29,6 @@ uint16_t kr_nonce_write_wire(uint8_t *buf, uint16_t buf_len,
 	wire_write_u32(buf, input->rand);
 	wire_write_u32(buf + sizeof(uint32_t), input->time);
 	buf_len = 2 * sizeof(uint32_t);
-	assert(KR_NONCE_LEN == buf_len);
 
 	return buf_len;
 }
