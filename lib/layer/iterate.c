@@ -512,8 +512,11 @@ static int begin(knot_layer_t *ctx, void *module_param)
 		return ctx->state;
 	}
 	/*
-	 * Fail if no query section. DNS cookies must be handled before
-	 * this layer.
+	 * RFC7873 5.4 extends the QUERY operation code behaviour in order to
+	 * be able to generate requests for server cookies. Such requests have
+	 * QDCOUNT equal to zero and must contain a cookie option.
+	 * Server cookie queries must be handled by the cookie module/layer
+	 * before this layer.
 	 */
 	const struct kr_request *req = ctx->data;
 	const struct kr_query *qry = req->current_query;
