@@ -138,10 +138,9 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	assert((clnt_comp->alg_id >= 0) && kr_cc_algs[clnt_comp->alg_id] &&
 	       kr_cc_algs[clnt_comp->alg_id]->gen_func);
 	cc_len = kr_cc_algs[clnt_comp->alg_id]->gen_func(&input, cc, cc_len);
-	if (cc_len == 0) {
+	if (cc_len != KNOT_OPT_COOKIE_CLNT) {
 		return kr_error(EINVAL);
 	}
-	assert(cc_len == KNOT_OPT_COOKIE_CLNT);
 
 	const uint8_t *cached_cookie = peek_and_check_cc(cookie_cache,
 	                                                 srvr_sa, cc, cc_len);
