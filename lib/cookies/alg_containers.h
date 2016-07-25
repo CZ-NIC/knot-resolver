@@ -22,17 +22,27 @@
 
 #include "lib/defines.h"
 
-/** Client algorithm identifiers are used to index this array of pointers. */
+/**
+ * @brief Returns pointer to client cookie algorithm.
+ *
+ * @param id algorithm identifier as defined by lookup table
+ * @return   pointer to algorithm structure with given id or NULL on error
+ */
 KR_EXPORT
-extern const struct knot_cc_alg *const kr_cc_algs[];
+const struct knot_cc_alg *kr_cc_alg_get(int id);
 
 /** Binds client algorithm identifiers onto names. */
 KR_EXPORT
 extern const knot_lookup_t kr_cc_alg_names[];
 
-/** Server algorithm identifiers are used to index this array of pointers. */
+/**
+ * @brief Returns pointer to server cookie algorithm.
+ *
+ * @param id algorithm identifier as defined by lookup table
+ * @return   pointer to algorithm structure with given id or NULL on error
+ */
 KR_EXPORT
-extern const struct knot_sc_alg *const kr_sc_algs[];
+const struct knot_sc_alg *kr_sc_alg_get(int id);
 
 /** Binds server algorithm identifiers onto names. */
 KR_EXPORT

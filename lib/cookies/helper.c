@@ -135,9 +135,12 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	};
 	uint8_t cc[KNOT_OPT_COOKIE_CLNT];
 	uint16_t cc_len = KNOT_OPT_COOKIE_CLNT;
-	assert((clnt_comp->alg_id >= 0) && kr_cc_algs[clnt_comp->alg_id] &&
-	       kr_cc_algs[clnt_comp->alg_id]->gen_func);
-	cc_len = kr_cc_algs[clnt_comp->alg_id]->gen_func(&input, cc, cc_len);
+	const struct knot_cc_alg *cc_alg = kr_cc_alg_get(clnt_comp->alg_id);
+	if (!cc_alg) {
+		return kr_error(EINVAL);
+	}
+	assert(cc_alg->gen_func);
+	cc_len = cc_alg->gen_func(&input, cc, cc_len);
 	if (cc_len != KNOT_OPT_COOKIE_CLNT) {
 		return kr_error(EINVAL);
 	}
