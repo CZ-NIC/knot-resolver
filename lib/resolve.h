@@ -187,7 +187,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
  * @param  dst     address of the name server
  * @param  type    used socket type (SOCK_STREAM, SOCK_DGRAM)
  * @param  packet  [in,out] query packet to be finalised
- * @return         any state
+ * @return         kr_ok() or error code
  */
 KR_EXPORT
 int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,

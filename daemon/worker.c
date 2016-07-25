@@ -478,8 +478,8 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		ret = kr_resolve_query_finalize(&task->req, NULL, addr,
 		                                handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
 		                                pkt);
-		if (ret == KNOT_STATE_FAIL) {
-			return kr_error(EINVAL); /* @todo: What error code should it return. */
+		if (ret != kr_ok()) {
+			return ret;
 		}
 	}
 	/* Send using given protocol */

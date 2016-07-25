@@ -817,12 +817,12 @@ int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
 	struct kr_rplan *rplan = &request->rplan;
 
 	if (knot_wire_get_qr(packet->wire) != 0) {
-		return request->state;
+		return kr_ok();
 	}
 
 	/* No query left for resolution */
 	if (kr_rplan_empty(rplan)) {
-		return KNOT_STATE_FAIL;
+		return kr_error(EINVAL);
 	}
 	/* If we have deferred answers, resume them. */
 	struct kr_query *qry = array_tail(rplan->pending);
@@ -843,14 +843,14 @@ int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
 		 * building the query i.e. the space needed for the cookie
 		 * cannot be allocated in the cookie layer. */
 		if (!outbound_request_update_cookies(request, src, dst)) {
-			return KNOT_STATE_FAIL;
+			return kr_error(EINVAL);
 		}
 	}
 #endif /* defined(ENABLE_COOKIES) */
 
 	int ret = query_finalize(request, qry, packet);
 	if (ret != 0) {
-		return KNOT_STATE_FAIL;
+		return kr_error(EINVAL);
 	}
 
 	WITH_DEBUG {
@@ -870,7 +870,7 @@ int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
 	}
 	}
 
-	return request->state;
+	return kr_ok();
 }
 
 int kr_resolve_finish(struct kr_request *request, int state)
