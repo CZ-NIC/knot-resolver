@@ -73,10 +73,9 @@ static uint16_t cc_gen_hmac_sha256_64(const struct knot_cc_input *input,
 
 	/* KNOT_OPT_COOKIE_CLNT <= SHA256_DIGEST_SIZE */
 
-	cc_len = KNOT_OPT_COOKIE_CLNT;
-	hmac_sha256_digest(&ctx, cc_len, cc_out);
+	hmac_sha256_digest(&ctx, KNOT_OPT_COOKIE_CLNT, cc_out);
 
-	return cc_len;
+	return KNOT_OPT_COOKIE_CLNT;
 }
 
 #define SRVR_HMAC_SHA256_64_HASH_SIZE 8
@@ -113,10 +112,9 @@ static uint16_t sc_gen_hmac_sha256_64(const struct knot_sc_input *input,
 
 	/* SRVR_HMAC_SHA256_64_HASH_SIZE < SHA256_DIGEST_SIZE */
 
-	hash_len = SRVR_HMAC_SHA256_64_HASH_SIZE;
-	hmac_sha256_digest(&ctx, hash_len, hash_out);
+	hmac_sha256_digest(&ctx, SRVR_HMAC_SHA256_64_HASH_SIZE, hash_out);
 
-	return hash_len;
+	return SRVR_HMAC_SHA256_64_HASH_SIZE;
 }
 
 const struct knot_cc_alg knot_cc_alg_hmac_sha256_64 = { KNOT_OPT_COOKIE_CLNT, cc_gen_hmac_sha256_64 };
