@@ -21,10 +21,10 @@
 
 #include "lib/defines.h"
 
+/* These structures are not meant to be part of public interface. */
+
 /** HMAC-SHA256-64 client cookie algorithm. */
-KR_EXPORT
 extern const struct knot_cc_alg knot_cc_alg_hmac_sha256_64;
 
 /** HMAC-SHA256-64 server cookie algorithm. */
-KR_EXPORT
 extern const struct knot_sc_alg knot_sc_alg_hmac_sha256_64;
