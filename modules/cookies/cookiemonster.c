@@ -55,25 +55,23 @@ static const struct sockaddr *passed_server_sockaddr(const struct kr_request *re
 
 /**
  * Obtain pointer to server socket address that matches obtained cookie.
- * @param sockaddr pointer to socket address to be set
- * @param is_current set to true if the cookie was generate from current secret
- * @param req resolution context
- * @param cc client cookie from the response
- * @param cc_len client cookie size
- * @param clnt_sett client cookie settings structure
- * @return kr_ok() if matching address found, error code else
+ * @param srvr_sa server socket address
+ * @param cc         client cookie from the response
+ * @param cc_len     client cookie size
+ * @param clnt_sett  client cookie settings structure
+ * @retval  1 if cookie matches current settings
+ * @retval  0 if cookie matches recent settings
+ * @return -1 if cookie does not match
+ * @return -2 on any error
  */
-static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
-                                  bool *is_current, struct kr_request *req,
+static int srvr_sockaddr_cc_check(const struct sockaddr *srvr_sa,
                                   const uint8_t *cc, uint16_t cc_len,
                                   const struct kr_cookie_settings *clnt_sett)
 {
-	assert(sockaddr && is_current && req && cc && cc_len && clnt_sett);
+	assert(cc && cc_len > 0 && clnt_sett);
 
-	const struct sockaddr *tmp_sockaddr = passed_server_sockaddr(req);
-	if (!tmp_sockaddr) {
-		/* Server did not provide information about source address. */
-		return kr_error(EINVAL);
+	if (!srvr_sa) {
+		return -2;
 	}
 
 	const struct knot_cc_alg *cc_alg = NULL;
@@ -83,27 +81,32 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 	/* The address must correspond with the client cookie. */
 	struct knot_cc_input input = {
 		.clnt_sockaddr = NULL, /* Not supported yet. */
-		.srvr_sockaddr = tmp_sockaddr,
+		.srvr_sockaddr = srvr_sa,
 		.secret_data = clnt_sett->current.secr->data,
 		.secret_len = clnt_sett->current.secr->size
 	};
+
 	cc_alg = kr_cc_alg_get(clnt_sett->current.alg_id);
 	if (!cc_alg) {
-		kr_error(EINVAL);
+		return -2;
 	}
+	int comp_ret = -1; /* Cookie does not match. */
 	int ret = knot_cc_check(cc, cc_len, &input, cc_alg);
-	bool have_current = (ret == KNOT_EOK);
-	cc_alg = kr_cc_alg_get(clnt_sett->recent.alg_id);
-	if ((ret != KNOT_EOK) && clnt_sett->recent.secr && cc_alg) {
-		input.secret_data = clnt_sett->recent.secr->data;
-		input.secret_len = clnt_sett->recent.secr->size;
-		ret = knot_cc_check(cc, cc_len, &input, cc_alg);
-	}
 	if (ret == KNOT_EOK) {
-		*sockaddr = tmp_sockaddr;
-		*is_current = have_current;
+		comp_ret = 1;
+	} else {
+		cc_alg = kr_cc_alg_get(clnt_sett->recent.alg_id);
+		if (clnt_sett->recent.secr && cc_alg) {
+			input.secret_data = clnt_sett->recent.secr->data;
+			input.secret_len = clnt_sett->recent.secr->size;
+			ret = knot_cc_check(cc, cc_len, &input, cc_alg);
+			if (ret == KNOT_EOK) {
+				comp_ret = 0;
+			}
+		}
 	}
-	return (ret == KNOT_EOK) ? kr_ok() : kr_error(EINVAL);
+
+	return comp_ret;
 }
 
 /**
@@ -189,18 +192,17 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 	assert(pkt_cc_len == KNOT_OPT_COOKIE_CLNT);
 
 	/* Check server address against received client cookie. */
-	const struct sockaddr *srvr_sockaddr = NULL;
-	bool returned_current = false;
-	ret = srvr_sockaddr_cc_check(&srvr_sockaddr, &returned_current, req,
-	                             pkt_cc, pkt_cc_len, clnt_sett);
-	if (ret != kr_ok()) {
+	const struct sockaddr *srvr_sockaddr = passed_server_sockaddr(req);
+	ret = srvr_sockaddr_cc_check(srvr_sockaddr, pkt_cc, pkt_cc_len,
+	                             clnt_sett);
+	if (ret < 0) {
 		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
 		return false;
 	}
 	assert(srvr_sockaddr);
 
 	/* Don't cache received cookies that don't match the current secret. */
-	if (returned_current &&
+	if ((ret == 1) &&
 	    !is_cookie_cached(cache, srvr_sockaddr, pkt_cookie_opt)) {
 		ret = kr_cookie_lru_set(cache, srvr_sockaddr, pkt_cookie_opt);
 		if (ret != kr_ok()) {
