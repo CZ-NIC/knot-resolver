@@ -824,7 +824,6 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	if (kr_rplan_empty(rplan)) {
 		return kr_error(EINVAL);
 	}
-	/* If we have deferred answers, resume them. */
 	struct kr_query *qry = array_tail(rplan->pending);
 
 #if defined(ENABLE_COOKIES)
