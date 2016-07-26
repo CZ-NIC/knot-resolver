@@ -40,4 +40,4 @@ struct kr_nonce_input {
  */
 KR_EXPORT
 uint16_t kr_nonce_write_wire(uint8_t *buf, uint16_t buf_len,
-                             struct kr_nonce_input *input);
+                             const struct kr_nonce_input *input);

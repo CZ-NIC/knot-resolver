@@ -20,7 +20,7 @@
 #include "lib/cookies/nonce.h"
 
 uint16_t kr_nonce_write_wire(uint8_t *buf, uint16_t buf_len,
-                             struct kr_nonce_input *input)
+                             const struct kr_nonce_input *input)
 {
 	if (!buf || buf_len < KR_NONCE_LEN || !input) {
 		return 0;

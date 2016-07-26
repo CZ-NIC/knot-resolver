@@ -164,7 +164,7 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 
 int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
                            const uint8_t *cc, uint16_t cc_len,
-                           struct kr_nonce_input *nonce,
+                           const struct kr_nonce_input *nonce,
                            const struct knot_sc_alg *alg,
                            knot_pkt_t *pkt)
 {
