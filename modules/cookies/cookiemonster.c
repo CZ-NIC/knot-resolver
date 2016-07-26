@@ -54,48 +54,6 @@ static const struct sockaddr *passed_server_sockaddr(const struct kr_request *re
 }
 
 /**
- * Tries to guess the name server address from the reputation mechanism.
- * @param nsrep name server reputation context
- * @param cc client cookie data
- * @param cc_len client cookie size
- * @param csecr client secret
- * @param cc_alg client cookie algorithm
- * @return pointer to address if a matching found, NULL if none matches
- */
-static const struct sockaddr *guess_server_addr(const struct kr_nsrep *nsrep,
-                                                const uint8_t *cc, uint16_t cc_len,
-                                                const struct kr_cookie_secret *csecr,
-                                                const struct knot_cc_alg *cc_alg)
-{
-	assert(nsrep && cc && cc_len && csecr && cc_alg);
-
-	const struct sockaddr *sockaddr = NULL;
-
-	struct knot_cc_input input = {
-		.clnt_sockaddr = NULL, /* Not supported yet. */
-		.srvr_sockaddr = NULL,
-		.secret_data = csecr->data,
-		.secret_len = csecr->size
-	};
-
-	/* Abusing name server reputation mechanism to obtain IP addresses. */
-	for (int i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		if (nsrep->addr[i].ip.sa_family == AF_UNSPEC) {
-			break;
-		}
-
-		input.srvr_sockaddr = (struct sockaddr *)&nsrep->addr[i];
-		int ret = knot_cc_check(cc, cc_len, &input, cc_alg);
-		if (ret == KNOT_EOK) {
-			sockaddr = (struct sockaddr *)&nsrep->addr[i];
-			break;
-		}
-	}
-
-	return sockaddr;
-}
-
-/**
  * Obtain pointer to server socket address that matches obtained cookie.
  * @param sockaddr pointer to socket address to be set
  * @param is_current set to true if the cookie was generate from current secret
@@ -112,66 +70,40 @@ static int srvr_sockaddr_cc_check(const struct sockaddr **sockaddr,
 {
 	assert(sockaddr && is_current && req && cc && cc_len && clnt_sett);
 
-	struct kr_query *qry = req->current_query;
-
 	const struct sockaddr *tmp_sockaddr = passed_server_sockaddr(req);
+	if (!tmp_sockaddr) {
+		/* Server did not provide information about source address. */
+		return kr_error(EINVAL);
+	}
 
 	const struct knot_cc_alg *cc_alg = NULL;
 
+	assert(clnt_sett->current.secr);
+
 	/* The address must correspond with the client cookie. */
-	if (tmp_sockaddr) {
-		assert(clnt_sett->current.secr);
-
-		struct knot_cc_input input = {
-			.clnt_sockaddr = NULL, /* Not supported yet. */
-			.srvr_sockaddr = tmp_sockaddr,
-			.secret_data = clnt_sett->current.secr->data,
-			.secret_len = clnt_sett->current.secr->size
-		};
-		cc_alg = kr_cc_alg_get(clnt_sett->current.alg_id);
-		if (!cc_alg) {
-			kr_error(EINVAL);
-		}
-		int ret = knot_cc_check(cc, cc_len, &input, cc_alg);
-		bool have_current = (ret == KNOT_EOK);
-		cc_alg = kr_cc_alg_get(clnt_sett->recent.alg_id);
-		if ((ret != KNOT_EOK) && clnt_sett->recent.secr && cc_alg) {
-			input.secret_data = clnt_sett->recent.secr->data;
-			input.secret_len = clnt_sett->recent.secr->size;
-			ret = knot_cc_check(cc, cc_len, &input, cc_alg);
-		}
-		if (ret == KNOT_EOK) {
-			*sockaddr = tmp_sockaddr;
-			*is_current = have_current;
-		}
-		return (ret == KNOT_EOK) ? kr_ok() : kr_error(EINVAL);
-	}
-
-	DEBUG_MSG(NULL, "%s\n",
-	          "guessing response address from ns reputation");
-
-	/* Abusing name server reputation mechanism to guess IP addresses. */
+	struct knot_cc_input input = {
+		.clnt_sockaddr = NULL, /* Not supported yet. */
+		.srvr_sockaddr = tmp_sockaddr,
+		.secret_data = clnt_sett->current.secr->data,
+		.secret_len = clnt_sett->current.secr->size
+	};
 	cc_alg = kr_cc_alg_get(clnt_sett->current.alg_id);
 	if (!cc_alg) {
 		kr_error(EINVAL);
 	}
-	const struct kr_nsrep *ns = &qry->ns;
-	tmp_sockaddr = guess_server_addr(ns, cc, cc_len,
-	                                 clnt_sett->current.secr, cc_alg);
-	bool have_current = (tmp_sockaddr != NULL);
+	int ret = knot_cc_check(cc, cc_len, &input, cc_alg);
+	bool have_current = (ret == KNOT_EOK);
 	cc_alg = kr_cc_alg_get(clnt_sett->recent.alg_id);
-	if (!tmp_sockaddr && clnt_sett->recent.secr && cc_alg) {
-		/* Try recent client secret to check obtained cookie. */
-		tmp_sockaddr = guess_server_addr(ns, cc, cc_len,
-		                                 clnt_sett->recent.secr,
-		                                 cc_alg);
+	if ((ret != KNOT_EOK) && clnt_sett->recent.secr && cc_alg) {
+		input.secret_data = clnt_sett->recent.secr->data;
+		input.secret_len = clnt_sett->recent.secr->size;
+		ret = knot_cc_check(cc, cc_len, &input, cc_alg);
 	}
-	if (tmp_sockaddr) {
+	if (ret == KNOT_EOK) {
 		*sockaddr = tmp_sockaddr;
 		*is_current = have_current;
 	}
-
-	return tmp_sockaddr ? kr_ok() : kr_error(EINVAL);
+	return (ret == KNOT_EOK) ? kr_ok() : kr_error(EINVAL);
 }
 
 /**
