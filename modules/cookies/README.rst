@@ -29,7 +29,7 @@ Example Configuration
 	-- queries.)
 	cookies.config { client_enabled = true }
 
-	-- Enable server cookie functionliaty. (Handle cookies in inbound
+	-- Enable server cookie functionality. (Handle cookies in inbound
 	-- requests.)
 	cookies.config { server_enabled = true }
 
@@ -45,7 +45,7 @@ Properties
   :param table configuration: part of cookie configuration to be changed, may be called without parameter
   :return: JSON dictionary containing current configuration
 
-  The function may be called without any parameter. In such case it only returns current configuration. The returned JSON alsao contains available algorithm choices.
+  The function may be called without any parameter. In such case it only returns current configuration. The returned JSON also contains available algorithm choices.
 
 Dependencies
 ^^^^^^^^^^^^
