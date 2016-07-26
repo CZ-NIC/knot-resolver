@@ -292,6 +292,48 @@ static inline uint8_t *req_cookie_option(struct kr_request *req)
 	return knot_edns_get_option(req->qsource.opt, KNOT_EDNS_OPTION_COOKIE);
 }
 
+/**
+ * @brief Returns resolver state and sets answer RCODE on missing or invalid
+ *        server cookie.
+ *
+ * @note Caller should exit when only KNOT_STATE_FAIL is returned.
+ *
+ * @param state            original resolver state
+ * @param sc_present       true if server cookie is present
+ * @param ignore_badcookie true if bad cookies should be treated as good ones
+ * @param qry              query context
+ * @return new resolver state
+ */
+static int invalid_sc_status(int state, bool sc_present, bool ignore_badcookie,
+                             const struct kr_query *qry, knot_pkt_t *answer)
+{
+	assert(qry && answer);
+
+	if (qry->qdcount == 0) {
+		/* RFC7873 5.4 */
+		state = KNOT_STATE_DONE;
+		if (sc_present) {
+			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
+			state |= KNOT_STATE_FAIL;
+		}
+	} else if (!ignore_badcookie) { /* TODO -- Silently discard? */
+		/* Generate BADCOOKIE response. */
+		DEBUG_MSG(NULL, "%s\n",
+		          !sc_present ? "request is missing server cookie" :
+		                        "request has invalid server cookie");
+		if (!knot_pkt_has_edns(answer)) {
+			DEBUG_MSG(NULL, "%s\n",
+			          "missing EDNS section in prepared answer");
+			/* Caller should exit on this (and only this) state. */
+			return KNOT_STATE_FAIL;
+		}
+		kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
+		state = KNOT_STATE_FAIL | KNOT_STATE_DONE;
+	}
+
+	return state;
+}
+
 int check_request(knot_layer_t *ctx, void *module_param)
 {
 	struct kr_request *req = ctx->data;
@@ -350,20 +392,10 @@ int check_request(knot_layer_t *ctx, void *module_param)
 
 	if (!cookies.sc) {
 		/* Request has no server cookie. */
-		if (qry->qdcount == 0) {
-			/* RFC7873 5.4 */
-			return_state = KNOT_STATE_DONE;
-		} else if (!ignore_badcookie) { /* TODO -- Silently discard? */
-			/* Generate BADCOOKIE response. */
-			DEBUG_MSG(NULL, "%s\n",
-			          "request is missing server cookie");
-			if (!knot_pkt_has_edns(answer)) {
-				DEBUG_MSG(NULL, "%s\n",
-				          "missing EDNS section in prepared answer");
-				return KNOT_STATE_FAIL;
-			}
-			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
-			return_state = KNOT_STATE_FAIL | KNOT_STATE_DONE;
+		return_state = invalid_sc_status(return_state, false,
+		                                 ignore_badcookie, qry, answer);
+		if (return_state == KNOT_STATE_FAIL) {
+			return return_state;
 		}
 		goto answer_add_cookies;
 	}
@@ -386,21 +418,10 @@ int check_request(knot_layer_t *ctx, void *module_param)
 	}
 	if (ret != KNOT_EOK) {
 		/* Invalid server cookie. */
-		if (qry->qdcount == 0) {
-			/* RFC7873 5.4 */
-			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
-			return_state = KNOT_STATE_DONE | KNOT_STATE_FAIL;
-		} else if (!ignore_badcookie) { /* TODO -- Silently discard? */
-			/* Generate BADCOOKIE response. */
-			DEBUG_MSG(NULL, "%s\n",
-			          "request has invalid server cookie");
-			if (!knot_pkt_has_edns(req->answer)) {
-				DEBUG_MSG(NULL, "%s\n",
-				          "missing EDNS section in prepared answer");
-				return KNOT_STATE_FAIL;
-			}
-			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
-			return_state = KNOT_STATE_FAIL | KNOT_STATE_DONE;
+		return_state = invalid_sc_status(return_state, true,
+		                                 ignore_badcookie, qry, answer);
+		if (return_state == KNOT_STATE_FAIL) {
+			return return_state;
 		}
 		goto answer_add_cookies;
 	}
