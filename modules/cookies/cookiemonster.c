@@ -239,9 +239,9 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 {
 	assert(clnt_sett && req && pkt_cookie_opt && cache);
 
-	uint8_t *pkt_cookie_data = knot_edns_opt_get_data(pkt_cookie_opt);
+	const uint8_t *pkt_cookie_data = knot_edns_opt_get_data(pkt_cookie_opt);
 	uint16_t pkt_cookie_len = knot_edns_opt_get_length(pkt_cookie_opt);
-	assert(pkt_cookie_data && pkt_cookie_len);
+	/* knot_edns_opt_cookie_parse() returns error on invalid data. */
 
 	const uint8_t *pkt_cc = NULL, *pkt_sc = NULL;
 	uint16_t pkt_cc_len = 0, pkt_sc_len = 0;
