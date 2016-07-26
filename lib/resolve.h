@@ -178,7 +178,7 @@ KR_EXPORT
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet);
 
 /**
- * Finalises the query with the knowledge of the target (remote server) IP address.
+ * Finalises the outbound query packet with the knowledge of the IP addresses.
  *
  * @note The function must be called before actual sending of the request packet.
  *
@@ -190,8 +190,8 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
  * @return         kr_ok() or error code
  */
 KR_EXPORT
-int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
-                              struct sockaddr *dst, int type, knot_pkt_t *packet);
+int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
+                        struct sockaddr *dst, int type, knot_pkt_t *packet);
 
 /**
  * Finish resolution and commit results if the state is DONE.

@@ -475,9 +475,9 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		 * @note -- A solution might be opening a separate socket and
 		 * trying to obtain the IP address from it.
 		 */
-		ret = kr_resolve_query_finalize(&task->req, NULL, addr,
-		                                handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
-		                                pkt);
+		ret = kr_resolve_checkout(&task->req, NULL, addr,
+		                          handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
+		                          pkt);
 		if (ret != kr_ok()) {
 			return ret;
 		}

@@ -768,7 +768,7 @@ ns_election:
 
 	/*
 	 * Additional query is going to be finalised when calling
-	 * kr_resolve_query_finalize().
+	 * kr_resolve_checkout().
 	 */
 
 	gettimeofday(&qry->timestamp, NULL);
@@ -809,8 +809,8 @@ static bool outbound_request_update_cookies(struct kr_request *req,
 }
 #endif /* defined(ENABLE_COOKIES) */
 
-int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
-                              struct sockaddr *dst, int type, knot_pkt_t *packet)
+int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
+                        struct sockaddr *dst, int type, knot_pkt_t *packet)
 {
 	/* @todo: Update documentation if this function becomes approved. */
 
