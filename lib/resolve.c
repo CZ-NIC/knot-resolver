@@ -830,12 +830,11 @@ int kr_resolve_query_finalize(struct kr_request *request, struct sockaddr *src,
 #if defined(ENABLE_COOKIES)
 	/* Update DNS cookies in request. */
 	if (type == SOCK_DGRAM) { /* @todo: Add cookies also over TCP? */
-		/* The actual server IP address is needed before generating the
+		/*
+		 * The actual server IP address is needed before generating the
 		 * actual cookie. If we don't know the server address then we
 		 * also don't know the actual cookie size.
-		 * Also the resolver somehow mangles the query packets before
-		 * building the query i.e. the space needed for the cookie
-		 * cannot be allocated in the cookie layer. */
+		 */
 		if (!outbound_request_update_cookies(request, src, dst)) {
 			return kr_error(EINVAL);
 		}
