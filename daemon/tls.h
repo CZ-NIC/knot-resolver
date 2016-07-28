@@ -29,6 +29,8 @@ struct tls_credentials_t {
 	gnutls_certificate_credentials_t credentials;
 };
 
+void tls_setup_logging(bool verbose);
+
 struct tls_ctx_t* tls_new(struct worker_ctx *worker);
 void tls_free(struct tls_ctx_t* tls);
 

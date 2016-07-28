@@ -52,6 +52,19 @@ struct tls_ctx_t {
 #define DEBUG_MSG(fmt...)
 #endif
 
+static void
+kres_gnutls_log(int level, const char *message)
+{
+	kr_log_error("[tls] gnutls: (%d) %s", level, message);
+}
+
+void
+tls_setup_logging(bool verbose)
+{
+	gnutls_global_set_log_function(kres_gnutls_log);
+	gnutls_global_set_log_level(verbose ? 1 : 0);
+}
+
 static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
