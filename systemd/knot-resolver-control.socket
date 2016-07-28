@@ -1,0 +1,13 @@
+[Unit]
+Description=Knot DNS Resolver control socket
+Documentation=man:kresd(8)
+Before=sockets.target
+
+[Socket]
+ListenStream=/run/knot-resolver/control
+FileDescriptorName=control
+Service=knot-resolver.service
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target

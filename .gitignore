@@ -23,7 +23,6 @@
 .libs
 .deps
 _obj
-tmp*
 /autom4te.cache/*
 /config.log
 /config.h
