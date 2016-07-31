@@ -222,6 +222,10 @@ int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 	struct kr_cookie_ctx *cookie_ctx = &req->ctx->cookie_ctx;
 
+	if (ctx->state & (KNOT_STATE_DONE | KNOT_STATE_FAIL)) {
+		return ctx->state;
+	}
+
 	if (!cookie_ctx->clnt.enabled || (qry->flags & QUERY_TCP)) {
 		return ctx->state;
 	}
@@ -340,6 +344,10 @@ int check_request(knot_layer_t *ctx, void *module_param)
 	struct kr_cookie_settings *srvr_sett = &req->ctx->cookie_ctx.srvr;
 
 	knot_pkt_t *answer = req->answer;
+
+	if (ctx->state & (KNOT_STATE_DONE | KNOT_STATE_FAIL)) {
+		return ctx->state;
+	}
 
 	if (!srvr_sett->enabled) {
 		/* TODO -- IS there a way how to determine whether the original
