@@ -598,7 +598,7 @@ int main(int argc, char **argv)
 	/* Bind to TLS sockets */
 	if (ret == 0) {
 		for (size_t i = 0; i < tls_set.len; ++i) {
-			int port = 853;
+			int port = KR_DNS_TLS_PORT;
 			const char *addr = set_addr(tls_set.at[i], &port);
 			ret = network_listen(&engine.net, addr, (uint16_t)port, NET_TCP|NET_TLS);
 			if (ret != 0) {

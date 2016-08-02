@@ -32,7 +32,7 @@ static const char *priorities = "NORMAL";
 struct tls_ctx_t {
 	gnutls_session_t session;
 	gnutls_certificate_credentials_t x509_creds;
-	int handshake_done;
+	bool handshake_done;
 
 	uv_stream_t *handle;
 
@@ -50,15 +50,13 @@ struct tls_ctx_t {
 #define DEBUG_MSG(fmt...)
 #endif
 
-static void
-kres_gnutls_log(int level, const char *message)
+static void kres_gnutls_log(int level, const char *message)
 {
 	kr_log_error("[tls] gnutls: (%d) %s", level, message);
 }
 
 
-static		ssize_t
-kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
+static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
 	const uv_buf_t ub = {(void *)buf, len};
@@ -71,11 +69,12 @@ kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 	}
 	ret = uv_try_write(t->handle, &ub, 1);
 
-	if (ret > 0)
+	if (ret > 0) {
 		return (ssize_t) ret;
-	if (ret == UV_EAGAIN)
+	}
+	if (ret == UV_EAGAIN) {
 		errno = EAGAIN;
-	else {
+	} else {
 		kr_log_error("[tls] uv_try_write unknown error: %d\n", ret);
 		errno = EIO;	/* dkg just picked this at random */
 	}
@@ -83,8 +82,7 @@ kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 }
 
 
-static		ssize_t
-kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
+static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 {
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
 	ssize_t	avail = t->nread - t->consumed;
@@ -95,23 +93,20 @@ kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 		errno = EAGAIN;
 		return -1;
 	}
-	if (avail <= len)
+	if (avail <= len) {
 		transfer = avail;
-	else
+	} else {
 		transfer = len;
+	}
 
 	memcpy(buf, t->buf + t->consumed, transfer);
 	t->consumed += transfer;
 	return transfer;
 }
 
-struct tls_ctx_t *
-tls_new(struct worker_ctx *worker)
+struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 {
-	int	err;
-	struct tls_ctx_t *t;
 	struct network *net = &worker->engine->net;
-	const char *errpos;
 
 	if (!net->tls_cert) {
 		kr_log_error("[tls] net.tls_cert is missing; no TLS\n");
@@ -122,7 +117,7 @@ tls_new(struct worker_ctx *worker)
 	if (!net->tls_key || !net->tls_cert) {
 		return NULL;
 	}
-	t = calloc(1, sizeof(struct tls_ctx_t));
+	struct tls_ctx_t *t = calloc(1, sizeof(struct tls_ctx_t));
 
 	if (t == NULL) {
 		kr_log_error("[tls] failed to allocate TLS context\n");
@@ -136,60 +131,66 @@ tls_new(struct worker_ctx *worker)
 	/*
 	 * FIXME: credentials should be global, instead of per-session; but
 	 * then we would have to keep track of which sessions use them before
-	 * changing them dyamically
+	 * changing them dynamically
 	 */
-	if ((err = gnutls_certificate_allocate_credentials(&t->x509_creds))) {
+	int err;
+	if ((err = gnutls_certificate_allocate_credentials(&t->x509_creds)) < 0) {
 		kr_log_error("[tls] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		tls_free(t);
 		return NULL;
 	}
-	err = gnutls_certificate_set_x509_system_trust(t->x509_creds);
-	if (err < 0) {
-		kr_log_error("[tls] warning: gnutls_certificate_set_x509_system_trust() failed: (%d) %s\n",
-			     err, gnutls_strerror_name(err));
+	if ((err = gnutls_certificate_set_x509_system_trust(t->x509_creds)) < 0) {
+		if (err != GNUTLS_E_UNIMPLEMENTED_FEATURE) {
+			kr_log_error("[tls] warning: gnutls_certificate_set_x509_system_trust() failed: (%d) %s\n",
+				     err, gnutls_strerror_name(err));
+			tls_free(t);
+			return NULL;
+		}
 	}
 	if ((err = gnutls_certificate_set_x509_key_file(t->x509_creds, net->tls_cert,
-				      net->tls_key, GNUTLS_X509_FMT_PEM))) {
+				      net->tls_key, GNUTLS_X509_FMT_PEM)) < 0) {
 		kr_log_error("[tls] gnutls_certificate_set_x509_key_file(%s,%s) failed: %d (%s)\n",
 		net->tls_cert, net->tls_key, err, gnutls_strerror_name(err));
 		tls_free(t);
 		return NULL;
 	}
-	if ((err = gnutls_init(&t->session, GNUTLS_SERVER | GNUTLS_NONBLOCK))) {
+	if ((err = gnutls_init(&t->session, GNUTLS_SERVER | GNUTLS_NONBLOCK)) < 0) {
 		kr_log_error("[tls] gnutls_init() failed: %d (%s)\n",
 			     err, gnutls_strerror_name(err));
 		tls_free(t);
 		return NULL;
 	}
 	if ((err = gnutls_credentials_set(t->session, GNUTLS_CRD_CERTIFICATE,
-					  t->x509_creds))) {
-		kr_log_error("[tls] warning: gnutls_credentials_set() failed: (%d) %s\n",
+					  t->x509_creds)) < 0) {
+		kr_log_error("[tls] gnutls_credentials_set() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
+		tls_free(t);
+		return NULL;	
 	}
-	if ((err = gnutls_priority_set_direct(t->session, priorities, &errpos))) {
-		kr_log_error("[tls] warning: setting priority '%s' failed at character %zd (...'%s') with error (%d) %s\n",
+
+	const char *errpos;
+	if ((err = gnutls_priority_set_direct(t->session, priorities, &errpos)) < 0) {
+		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with error (%d) %s\n",
 			     priorities, errpos - priorities, errpos, err, gnutls_strerror_name(err));
+		tls_free(t);
+		return NULL;
 	}
 	gnutls_transport_set_pull_function(t->session, kres_gnutls_pull);
-	/*
-	 * gnutls_transport_set_vec_push_function (t->session,
-	 * kres_gnutls_push_vec);
-	 */
 	gnutls_transport_set_push_function(t->session, kres_gnutls_push);
 	gnutls_transport_set_ptr(t->session, t);
 
 	return t;
 }
 
-void
-tls_free(struct tls_ctx_t *tls)
+void tls_free(struct tls_ctx_t *tls)
 {
 	if (!tls) {
 		return;
 	}
-	/* FIXME: do we want to do gnutls_bye() to close TLS cleanly ? */
+
 	if (tls->session) {
+		gnutls_bye(net->tls_session, GNUTLS_SHUT_RDWR);
 		gnutls_deinit(tls->session);
 		tls->session = NULL;
 	}
@@ -206,7 +207,6 @@ int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt)
 		return kr_error(EINVAL);
 	}
 
-	ssize_t count;
 	struct session *session = handle->data;
 	uint16_t pkt_size = htons(pkt->size);
 	struct tls_ctx_t *tls_p = session->tls_ctx;
@@ -215,7 +215,7 @@ int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt)
 		return kr_error(ENOENT);
 	}
 	gnutls_record_cork(tls_p->session);
-	count = gnutls_record_send(tls_p->session, &pkt_size, sizeof(pkt_size));
+	ssize_t count = gnutls_record_send(tls_p->session, &pkt_size, sizeof(pkt_size));
 	if (count != sizeof(pkt_size)) {
 		kr_log_error("[tls] gnutls_record_send pkt_size fail wanted: %u (%zd) %s\n",
 			     pkt_size, count, gnutls_strerror_name(count));
@@ -233,10 +233,9 @@ int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt)
 			kr_log_error("[tls] gnutls_record_send incomplete: %zu (%zd) %s\n",
 			     pkt->size, count, gnutls_strerror_name(count));
 			return kr_error(EAGAIN);
-		} else {
-			kr_log_error("[tls] gnutls_record_send wire fail wanted: %zu (%zd) %s\n",
-			     pkt->size, count, gnutls_strerror_name(count));
 		}
+		kr_log_error("[tls] gnutls_record_send wire fail wanted: %zu (%zd) %s\n",
+			     pkt->size, count, gnutls_strerror_name(count));
 		return kr_error(EIO);
 	}
 	return 0;
@@ -250,20 +249,16 @@ int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t *
 	if (!tls_p) {
 		return kr_error(ENOSYS);
 	}
-	int	err;
-	ssize_t count;
 
 	tls_p->buf = buf;
 	tls_p->nread = nread;
 	tls_p->handle = handle;
 	tls_p->consumed = 0;	/* FIXME: doesn't handle split TLS records */
 	if (!tls_p->handshake_done) {
-		kr_log_error("[tls] handshake not done, what is going on?\n");
-		err = gnutls_handshake(tls_p->session);
+		int err = gnutls_handshake(tls_p->session);
 		if (!err) {
-			tls_p->handshake_done = 1;
+			tls_p->handshake_done = true;
 		} else {
-			kr_log_error("[tls] gnutls handshake gets: %d (%s)\n", err, gnutls_strerror_name(err));
 			if (err == GNUTLS_E_AGAIN || err == GNUTLS_E_INTERRUPTED) {
 				return 0; /* Wait for more */
 			}
@@ -271,13 +266,9 @@ int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t *
 		}
 	}
 
-	/* FIXME: Decoded buffer should be at least as big as received bytes, otherwise we may lose
-	 *        records, especially with pipelined queries. Quick solution is to read multiple times.
-	 *        instead of aggregating decoded data into output buffer and submit once, but it's slower.
-	 */
 	int pushed_queries = 0;
 	while (true) {
-		count = gnutls_record_recv(tls_p->session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
+		ssize_t count = gnutls_record_recv(tls_p->session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
 		if (count < 0) {
 			if (count == GNUTLS_E_AGAIN) {
 				return pushed_queries; /* No more data available at the moment */
@@ -286,8 +277,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t *
 			} else {
 				kr_log_error("[tls] unknown gnutls_record_recv error: (%zd) %s\n",
 					     count, gnutls_strerror_name(count));
-				worker_submit(worker, (uv_handle_t *) handle, NULL, NULL);
-				return kr_error(EIO); /*  ???? */
+				return kr_error(EIO);
 			}
 		}
 		/* if count == 0 let worker_process_tcp handle the end-of-stream */
