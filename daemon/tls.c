@@ -31,7 +31,6 @@ static const char *priorities = "NORMAL";
 /* gnutls_record_recv and gnutls_record_send */
 struct tls_ctx_t {
 	gnutls_session_t session;
-	gnutls_certificate_credentials_t x509_creds;
 	bool handshake_done;
 
 	uv_stream_t *handle;
@@ -49,12 +48,6 @@ struct tls_ctx_t {
 #else
 #define DEBUG_MSG(fmt...)
 #endif
-
-static void kres_gnutls_log(int level, const char *message)
-{
-	kr_log_error("[tls] gnutls: (%d) %s", level, message);
-}
-
 
 static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
@@ -108,79 +101,43 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 {
 	struct network *net = &worker->engine->net;
 
-	if (!net->tls_cert) {
-		kr_log_error("[tls] net.tls_cert is missing; no TLS\n");
-	}
-	if (!net->tls_key) {
-		kr_log_error("[tls] net.tls_key is missing; no TLS\n");
-	}
-	if (!net->tls_key || !net->tls_cert) {
+	if (!worker->x509_credentials) {
+		kr_log_error("[tls] x509 credentials are missing; no TLS\n");
 		return NULL;
 	}
-	struct tls_ctx_t *t = calloc(1, sizeof(struct tls_ctx_t));
+	struct tls_ctx_t *tls = calloc(1, sizeof(struct tls_ctx_t));
 
-	if (t == NULL) {
+	if (tls == NULL) {
 		kr_log_error("[tls] failed to allocate TLS context\n");
 		return NULL;
 	}
-	/* FIXME: this should only be done once on the daemon */
-	/* FIXME: propagate verbosity here? */
-	gnutls_global_set_log_function(kres_gnutls_log);
-	gnutls_global_set_log_level(0);
 
-	/*
-	 * FIXME: credentials should be global, instead of per-session; but
-	 * then we would have to keep track of which sessions use them before
-	 * changing them dynamically
-	 */
 	int err;
-	if ((err = gnutls_certificate_allocate_credentials(&t->x509_creds)) < 0) {
-		kr_log_error("[tls] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
-			     err, gnutls_strerror_name(err));
-		tls_free(t);
-		return NULL;
-	}
-	if ((err = gnutls_certificate_set_x509_system_trust(t->x509_creds)) < 0) {
-		if (err != GNUTLS_E_UNIMPLEMENTED_FEATURE) {
-			kr_log_error("[tls] warning: gnutls_certificate_set_x509_system_trust() failed: (%d) %s\n",
-				     err, gnutls_strerror_name(err));
-			tls_free(t);
-			return NULL;
-		}
-	}
-	if ((err = gnutls_certificate_set_x509_key_file(t->x509_creds, net->tls_cert,
-				      net->tls_key, GNUTLS_X509_FMT_PEM)) < 0) {
-		kr_log_error("[tls] gnutls_certificate_set_x509_key_file(%s,%s) failed: %d (%s)\n",
-		net->tls_cert, net->tls_key, err, gnutls_strerror_name(err));
-		tls_free(t);
-		return NULL;
-	}
-	if ((err = gnutls_init(&t->session, GNUTLS_SERVER | GNUTLS_NONBLOCK)) < 0) {
+	if ((err = gnutls_init(&tls->session, GNUTLS_SERVER | GNUTLS_NONBLOCK)) < 0) {
 		kr_log_error("[tls] gnutls_init() failed: %d (%s)\n",
 			     err, gnutls_strerror_name(err));
-		tls_free(t);
+		tls_free(tls);
 		return NULL;
 	}
-	if ((err = gnutls_credentials_set(t->session, GNUTLS_CRD_CERTIFICATE,
-					  t->x509_creds)) < 0) {
+	if ((err = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE,
+                                          *worker->x509_credentials)) < 0) {
 		kr_log_error("[tls] gnutls_credentials_set() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
-		tls_free(t);
-		return NULL;	
-	}
-
-	const char *errpos;
-	if ((err = gnutls_priority_set_direct(t->session, priorities, &errpos)) < 0) {
-		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with error (%d) %s\n",
-			     priorities, errpos - priorities, errpos, err, gnutls_strerror_name(err));
-		tls_free(t);
+		tls_free(tls);
 		return NULL;
 	}
-	gnutls_transport_set_pull_function(t->session, kres_gnutls_pull);
-	gnutls_transport_set_push_function(t->session, kres_gnutls_push);
-	gnutls_transport_set_ptr(t->session, t);
+	const char *errpos;
+	if ((err = gnutls_priority_set_direct(tls->session, priorities, &errpos)) < 0) {
+		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with error (%d) %s\n",
+			     priorities, errpos - priorities, errpos, err, gnutls_strerror_name(err));
+		tls_free(tls);
+		return NULL;
+	}
+	gnutls_transport_set_pull_function(tls->session, kres_gnutls_pull);
+	gnutls_transport_set_push_function(tls->session, kres_gnutls_push);
+	gnutls_transport_set_ptr(tls->session, tls);
 
-	return t;
+	return tls;
 }
 
 void tls_free(struct tls_ctx_t *tls)
@@ -190,13 +147,9 @@ void tls_free(struct tls_ctx_t *tls)
 	}
 
 	if (tls->session) {
-		gnutls_bye(net->tls_session, GNUTLS_SHUT_RDWR);
+		gnutls_bye(tls->session, GNUTLS_SHUT_RDWR);
 		gnutls_deinit(tls->session);
 		tls->session = NULL;
-	}
-	if (tls->x509_creds) {
-		gnutls_certificate_free_credentials(tls->x509_creds);
-		tls->x509_creds = NULL;
 	}
 	free(tls);
 }
@@ -215,32 +168,24 @@ int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt)
 		return kr_error(ENOENT);
 	}
 	gnutls_record_cork(tls_p->session);
-	ssize_t count = gnutls_record_send(tls_p->session, &pkt_size, sizeof(pkt_size));
-	if (count != sizeof(pkt_size)) {
-		kr_log_error("[tls] gnutls_record_send pkt_size fail wanted: %u (%zd) %s\n",
-			     pkt_size, count, gnutls_strerror_name(count));
+	ssize_t count;
+	if ((count = gnutls_record_send(tls_p->session, &pkt_size, sizeof(pkt_size)) < 0) ||
+	    (count = gnutls_record_send(tls_p->session, pkt->wire, pkt->size) < 0)) {
+		kr_log_error("[tls] gnutls_record_send failed: %zu (%zd) %s\n",
+			     sizeof(pkt_size) + pkt->size, count, gnutls_strerror_name(count));
 		return kr_error(EIO);
 	}
-	count = gnutls_record_send(tls_p->session, pkt->wire, pkt->size);
-	if (count != pkt->size) {
-		kr_log_error("[tls] gnutls_record_send wire fail wanted: %zu (%zd) %s\n",
-			     pkt->size, count, gnutls_strerror_name(count));
-		return kr_error(EIO);
-	}
-	count = gnutls_record_uncork(tls_p->session, 0);
+	
+	/* GNUTLS_RECORD_WAIT blocks until the data is sent or a fatal error occurs */
+	count = gnutls_record_uncork(tls_p->session, GNUTLS_RECORD_WAIT);
 	if (count != sizeof(pkt_size) + pkt->size) {
-		if (count == GNUTLS_E_AGAIN || count == GNUTLS_E_INTERRUPTED) {
-			kr_log_error("[tls] gnutls_record_send incomplete: %zu (%zd) %s\n",
-			     pkt->size, count, gnutls_strerror_name(count));
-			return kr_error(EAGAIN);
-		}
-		kr_log_error("[tls] gnutls_record_send wire fail wanted: %zu (%zd) %s\n",
-			     pkt->size, count, gnutls_strerror_name(count));
+		kr_log_error("[tls] gnutls_record_uncork failed: %zu (%zd) %s\n",
+			     sizeof(pkt_size) + pkt->size, count, gnutls_strerror_name(count));
 		return kr_error(EIO);
 	}
-	return 0;
-}
 
+	return kr_ok();
+}
 
 int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t * buf, ssize_t nread)
 {
@@ -253,7 +198,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t *
 	tls_p->buf = buf;
 	tls_p->nread = nread;
 	tls_p->handle = handle;
-	tls_p->consumed = 0;	/* FIXME: doesn't handle split TLS records */
+	tls_p->consumed = 0;	/* TODO: doesn't handle split TLS records */
 	if (!tls_p->handshake_done) {
 		int err = gnutls_handshake(tls_p->session);
 		if (!err) {
@@ -266,27 +211,87 @@ int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t *
 		}
 	}
 
-	int pushed_queries = 0;
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
-		if (count < 0) {
-			if (count == GNUTLS_E_AGAIN) {
-				return pushed_queries; /* No more data available at the moment */
-			} else if (count == GNUTLS_E_INTERRUPTED) {
-				continue; /* Try reading again */
-			} else {
-				kr_log_error("[tls] unknown gnutls_record_recv error: (%zd) %s\n",
-					     count, gnutls_strerror_name(count));
-				return kr_error(EIO);
-			}
+		if (count == 0) {
+			kr_log_error("[tls] gnutls_record_recv peer has closed the TLS connection\n");
+			return kr_error(EIO);
+		} else if (count < 0 && gnutls_error_is_fatal(count) == 0) {
+			/* gnutls_record_recv error not fatal, try reading again */
+			continue;
+		} else if (count < 0) {
+			kr_log_error("[tls] gnutls_record_recv failed: (%zd) %s\n",
+				     count, gnutls_strerror_name(count));
+			return kr_error(EIO);
 		}
-		/* if count == 0 let worker_process_tcp handle the end-of-stream */
-		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
-		if (ret < 0) {
-			return ret;
-		}
-		pushed_queries += ret;
+		/* Now let worker_process_tcp handle the end-of-stream */
+		return worker_process_tcp(worker, handle, tls_p->recv_buf, count);
 	}
+}
+
+static int str_replace(char **where_ptr, const char *with)
+{
+	char *copy = with ? strdup(with) : NULL;
+	if (with && !copy) {
+		return kr_error(ENOMEM);
+	}
+
+	free(*where_ptr);
+	*where_ptr = copy;
+	return kr_ok();
+}
+
+int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const char *tls_key)
+{
+	int err;
+
+	if (!worker) {
+		return kr_error(EINVAL);
+	}
+
+	gnutls_certificate_credentials_t *x509_credentials = calloc(1, sizeof(x509_credentials));
+	if (x509_credentials == NULL) {
+		return kr_error(ENOMEM);
+	}
+	
+	if ((err = gnutls_certificate_allocate_credentials(x509_credentials)) < 0) {
+		kr_log_error("[tls] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
+			     err, gnutls_strerror_name(err));
+		return kr_error(ENOMEM);
+	}
+	if ((err = gnutls_certificate_set_x509_system_trust(*x509_credentials)) < 0) {
+		if (err != GNUTLS_E_UNIMPLEMENTED_FEATURE) {
+			kr_log_error("[tls] warning: gnutls_certificate_set_x509_system_trust() failed: (%d) %s\n",
+				     err, gnutls_strerror_name(err));
+			gnutls_certificate_free_credentials(*x509_credentials);
+			return err;
+		}
+	}
+	
+	if (((err = str_replace(&worker->tls_cert, tls_cert)) != 0) ||
+	    ((err = str_replace(&worker->tls_key, tls_key)) != 0)) {
+		return kr_error(ENOMEM);
+	}
+	
+	if ((err = gnutls_certificate_set_x509_key_file(*x509_credentials, tls_cert,
+							tls_key, GNUTLS_X509_FMT_PEM)) < 0) {
+		kr_log_error("[tls] gnutls_certificate_set_x509_key_file(%s,%s) failed: %d (%s)\n",
+			     tls_cert, tls_key, err, gnutls_strerror_name(err));
+		return kr_error(EINVAL);
+	}
+	// Exchange the x509 credentials
+	gnutls_certificate_credentials_t *old_credentials = worker->x509_credentials;
+
+	// Start using the new x509_credentials
+	worker->x509_credentials = x509_credentials;
+
+	// Deallocate old x509 credentials
+	if (old_credentials) {
+		gnutls_certificate_free_credentials(*old_credentials);
+		free(old_credentials);
+	}
+
+	return kr_ok();
 }
 
 #undef DEBUG_MSG

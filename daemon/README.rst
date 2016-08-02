@@ -563,26 +563,17 @@ For when listening on ``localhost`` just doesn't cut it.
       50
       > net.tcp_pipeline(100)
 
-.. function:: net.tls_cert([path])
+.. function:: net.tls([cert_path], [key_path])
 
-   Get/set path to a server TLS certificate for DNS/TLS.
+   Get/set path to a server TLS certificate and private key for DNS/TLS.
 
    Example output:
 
    .. code-block:: lua
 
-      > net.tls_cert("/etc/kresd/server-cert.pem")
+      > net.tls_cert("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
       > net.tls_cert()
-      /etc/kresd/server-cert.pem
-
-.. function:: net.tls_key([path])
-
-   Get/set path to a server TLS private key.
-
-   .. code-block:: lua
-
-      > net.tls_cert("/etc/kresd/server-cert.pem")
-      > net.tls_key("/etc/kresd/server-key.pem")
+      ("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
       > net.listen("::", 853)
       > net.listen("::", 443, {tls = true})
 

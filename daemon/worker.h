@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <gnutls/gnutls.h>
+
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
@@ -55,6 +57,9 @@ struct worker_ctx {
 	mp_freelist_t pool_ioreq;
 	mp_freelist_t pool_sessions;
 	knot_mm_t pkt_pool;
+	gnutls_certificate_credentials_t *x509_credentials;
+	char *tls_cert;
+	char *tls_key;
 };
 
 /* Worker callback */

@@ -1014,6 +1014,18 @@ void worker_reclaim(struct worker_ctx *worker)
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 	map_clear(&worker->outgoing);
+	if (worker->tls_cert) {
+		free(worker->tls_cert);
+		worker->tls_cert = NULL;
+	}
+	if (worker->tls_key) {
+		free(worker->tls_key);
+		worker->tls_key = NULL;
+	}
+	if (worker->x509_credentials) {
+		gnutls_certificate_free_credentials(*worker->x509_credentials);
+		free(worker->x509_credentials);
+	}
 }
 
 #undef DEBUG_MSG

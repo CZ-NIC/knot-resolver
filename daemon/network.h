@@ -43,8 +43,6 @@ typedef array_t(struct endpoint*) endpoint_array_t;
 struct network {
     uv_loop_t *loop;
     map_t endpoints;
-    char *tls_cert;
-    char *tls_key;
 };
 
 void network_init(struct network *net, uv_loop_t *loop);

@@ -18,11 +18,13 @@
 #include <uv.h>
 #include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
+#include <gnutls/gnutls.h>
 
 #include "lib/cache.h"
 #include "lib/cdb.h"
 #include "daemon/bindings.h"
 #include "daemon/worker.h"
+#include "daemon/tls.h"
 
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error (lua_State *L);
@@ -348,33 +350,24 @@ static int net_pipeline(lua_State *L)
 	return 1;
 }
 
-static int net_tls_cert(lua_State *L)
+static int net_tls(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	if (!lua_isstring(L, 1)) {
-		lua_pushstring(L, engine->net.tls_cert);
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (!worker) {
+		return 0;
+	}
+
+	if (lua_gettop(L) == 0) {
+		lua_pushfstring(L, "(\"%s\", \"%s\")", worker->tls_cert, worker->tls_key);
 		return 1;
 	}
 
-	int r = network_set_tls_cert(&engine->net, lua_tostring(L, 1));
-	if (r != 0) {
-		lua_pushstring(L, strerror(ENOMEM));
+	if ((lua_gettop(L) != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2)) {
+		lua_pushstring(L, "net.tls takes two parameters: (\"cert_file\", \"key_file\")");
 		lua_error(L);
 	}
 
-	lua_pushboolean(L, true);
-	return 1;
-}
-
-static int net_tls_key(lua_State *L)
-{
-	struct engine *engine = engine_luaget(L);
-	if (!lua_isstring(L, 1)) {
-		lua_pushstring(L, engine->net.tls_key);
-		return 1;
-	}
-
-	int r = network_set_tls_key(&engine->net, lua_tostring(L, 1));
+	int r = tls_certificate_set(worker, lua_tostring(L, 1), lua_tostring(L, 2));
 	if (r != 0) {
 		lua_pushstring(L, strerror(ENOMEM));
 		lua_error(L);
@@ -393,8 +386,7 @@ int lib_net(lua_State *L)
 		{ "interfaces",   net_interfaces },
 		{ "bufsize",      net_bufsize },
 		{ "tcp_pipeline", net_pipeline },
-		{ "tls_cert",     net_tls_cert },
-		{ "tls_key",      net_tls_key },
+		{ "tls",          net_tls },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
