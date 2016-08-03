@@ -202,7 +202,7 @@ int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt)
 	return kr_ok();
 }
 
-int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t * buf, ssize_t nread)
+int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread)
 {
 	struct session *session = handle->data;
 	struct tls_ctx_t *tls_p = session->tls_ctx;
@@ -214,14 +214,18 @@ int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t *
 	tls_p->nread = nread;
 	tls_p->handle = handle;
 	tls_p->consumed = 0;	/* TODO: doesn't handle split TLS records */
-	if (!tls_p->handshake_done) {
+
+	while (tls_p->handshake_done == false) {
 		int err = gnutls_handshake(tls_p->session);
-		if (!err) {
+		if (err == GNUTLS_E_SUCCESS) {
 			tls_p->handshake_done = true;
+			break;
+		} else if (err == GNUTLS_E_AGAIN) {
+			/* No data, bail out */
+			return 0;
+		} else if (err < 0 && gnutls_error_is_fatal(err) == 0) {
+			continue;
 		} else {
-			if (err == GNUTLS_E_AGAIN || err == GNUTLS_E_INTERRUPTED) {
-				return 0; /* Wait for more data */
-			}
 			return kr_error(err);
 		}
 	}
@@ -230,18 +234,23 @@ int tls_process(struct worker_ctx *worker, uv_stream_t * handle, const uint8_t *
 	
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
-		if (count == 0 || count == GNUTLS_E_AGAIN) {
-			break; /* We are finished with reading */
-		} else if (count < 0 && gnutls_error_is_fatal(count) == 0) {
-			/* gnutls_record_recv error not fatal, try reading again */
+		if (count == GNUTLS_E_AGAIN) {
+			/* No data available */
+			break;
+		} else if (count == GNUTLS_E_INTERRUPTED) {
+			/* try reading again */
 			continue;
 		} else if (count < 0) {
 			kr_log_error("[tls] gnutls_record_recv failed: (%zd) %s\n",
 				     count, gnutls_strerror_name(count));
 			return kr_error(EIO);
 		}
-		/* Now let worker_process_tcp handle the end-of-stream */
-		submitted += worker_process_tcp(worker, handle, tls_p->recv_buf, count);
+		kr_log_error("[tls]: submitting %zd data to worker_process_tcp\n", count);
+		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
+		if (ret < 0) {
+			return ret;
+		}
+		submitted += ret;
 	}
 	return submitted;
 }
