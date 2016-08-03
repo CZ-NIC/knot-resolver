@@ -28,11 +28,11 @@ struct tls_ctx_t;
  */
 struct session {
 	bool outgoing;
-    bool throttled;
-    bool has_tls;
-    uv_timer_t timeout;
-    struct qr_task *buffering;
-    struct tls_ctx_t *tls_ctx;
+	bool throttled;
+	bool has_tls;
+	uv_timer_t timeout;
+	struct qr_task *buffering;
+	struct tls_ctx_t *tls_ctx;
 	array_t(struct qr_task *) tasks;
 };
 

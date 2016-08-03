@@ -29,3 +29,6 @@ int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
 int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread);
 
 int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const char *tls_key);
+int tls_credentials_release(struct tls_credentials_t *tls_credentials);
+void tls_credentials_free(struct tls_credentials_t **tls_credentials);
+struct tls_credentials_t *tls_credentials_reserve(struct worker_ctx *worker);

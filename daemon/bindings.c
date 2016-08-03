@@ -358,7 +358,7 @@ static int net_tls(lua_State *L)
 	}
 
 	if (lua_gettop(L) == 0) {
-		lua_pushfstring(L, "(\"%s\", \"%s\")", worker->tls_cert, worker->tls_key);
+		lua_pushfstring(L, "(\"%s\", \"%s\")", worker->tls_credentials->tls_cert, worker->tls_credentials->tls_key);
 		return 1;
 	}
 

@@ -995,6 +995,7 @@ int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 	worker->pkt_pool.alloc = (knot_mm_alloc_t) mp_alloc;
 	worker->outgoing = map_make();
 	worker->tcp_pipeline_max = MAX_PIPELINED;
+	worker->tls_credentials = NULL;
 	return kr_ok();
 }
 
@@ -1014,18 +1015,8 @@ void worker_reclaim(struct worker_ctx *worker)
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 	map_clear(&worker->outgoing);
-	if (worker->tls_cert) {
-		free(worker->tls_cert);
-		worker->tls_cert = NULL;
-	}
-	if (worker->tls_key) {
-		free(worker->tls_key);
-		worker->tls_key = NULL;
-	}
-	if (worker->x509_credentials) {
-		gnutls_certificate_free_credentials(*worker->x509_credentials);
-		free(worker->x509_credentials);
-	}
+	tls_credentials_free(&worker->tls_credentials);
+	worker->tls_credentials = NULL;
 }
 
 #undef DEBUG_MSG

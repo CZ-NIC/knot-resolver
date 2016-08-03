@@ -28,6 +28,13 @@
 /** @cond internal Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
 
+struct tls_credentials_t {
+	int count;
+	char *tls_cert;
+	char *tls_key;
+	gnutls_certificate_credentials_t credentials;
+};
+
 /**
  * Query resolution worker.
  */
@@ -57,9 +64,7 @@ struct worker_ctx {
 	mp_freelist_t pool_ioreq;
 	mp_freelist_t pool_sessions;
 	knot_mm_t pkt_pool;
-	gnutls_certificate_credentials_t *x509_credentials;
-	char *tls_cert;
-	char *tls_key;
+	struct tls_credentials_t *tls_credentials;
 };
 
 /* Worker callback */
