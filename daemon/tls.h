@@ -41,3 +41,6 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 int tls_credentials_release(struct tls_credentials *tls_credentials);
 void tls_credentials_free(struct tls_credentials *tls_credentials);
 struct tls_credentials *tls_credentials_reserve(struct tls_credentials *worker);
+/* Log DNS-over-TLS OOB key-pin form of current credentials:
+ * https://tools.ietf.org/html/rfc7858#appendix-A */
+void tls_credentials_log_pins(struct tls_credentials *tls_credentials);

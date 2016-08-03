@@ -17,6 +17,10 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+#include <gnutls/abstract.h>
+#include <gnutls/crypto.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
@@ -24,6 +28,7 @@
 #include <uv.h>
 
 #include <contrib/ucw/lib.h>
+#include "contrib/base64.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
 #include "daemon/io.h"
@@ -260,6 +265,75 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	return submitted;
 }
 
+/*
+  DNS-over-TLS Out of band key-pinned authentication profile uses the
+  same form of pins as HPKP:
+  
+  e.g.  pin-sha256="FHkyLhvI0n70E47cJlRTamTrnYVcsYdjUGbr79CfAVI="
+  
+  DNS-over-TLS OOB key-pins: https://tools.ietf.org/html/rfc7858#appendix-A
+  HPKP pin reference:        https://tools.ietf.org/html/rfc7469#appendix-A
+*/
+#define PINLEN  (((32) * 8 + 4)/6) + 3 + 1
+
+/* out must be at least PINLEN octets long */
+static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len)
+{
+	int err;
+	gnutls_pubkey_t key;
+	gnutls_datum_t datum = { .size = 0 };
+
+	if ((err = gnutls_pubkey_init(&key)) < 0) {
+		return err;
+	}
+
+	if ((err = gnutls_pubkey_import_x509(key, crt, 0)) != GNUTLS_E_SUCCESS) {
+		goto leave;
+	} else {
+		if ((err = gnutls_pubkey_export2(key, GNUTLS_X509_FMT_DER, &datum)) != GNUTLS_E_SUCCESS) {
+			goto leave;
+		} else {
+			uint8_t raw_pin[32];
+			if ((err = gnutls_hash_fast(GNUTLS_DIG_SHA256, datum.data, datum.size, raw_pin)) != GNUTLS_E_SUCCESS) {
+				goto leave;
+			} else {
+				base64_encode(raw_pin, sizeof(raw_pin), (uint8_t *)outchar, outchar_len);
+			}
+		}
+	}
+leave:
+	gnutls_free(datum.data);
+	gnutls_pubkey_deinit(key);
+	return err;
+}
+
+void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
+{
+	for (int index = 0;; index++) {
+		int err;
+		gnutls_x509_crt_t *certs = NULL;
+		unsigned int cert_count = 0;
+
+		if ((err = gnutls_certificate_get_x509_crt(tls_credentials->credentials, index, &certs, &cert_count)) != GNUTLS_E_SUCCESS) {
+			if (err != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
+				kr_log_error("[tls] could not get x509 certificates (%d) %s\n", err, gnutls_strerror_name(err));
+			}
+			return;
+		}
+
+		for (int i = 0; i < cert_count; i++) {
+			char pin[PINLEN] = { 0 };
+			if ((err = get_oob_key_pin(certs[i], pin, sizeof(pin))) != GNUTLS_E_SUCCESS) {
+				kr_log_error("[tls] could not calculate RFC 7858 OOB key-pin from cert %d (%d) %s\n", i, err, gnutls_strerror_name(err));
+			} else {
+				kr_log_info("[tls] RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n", i, pin);
+			}
+			gnutls_x509_crt_deinit(certs[i]);
+		}
+		gnutls_free(certs);
+	}
+}
+
 static int str_replace(char **where_ptr, const char *with)
 {
 	char *copy = with ? strdup(with) : NULL;
@@ -314,9 +388,10 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 	}
 	// Exchange the x509 credentials
 	struct tls_credentials *old_credentials = net->tls_credentials;
-
+	
 	// Start using the new x509_credentials
 	net->tls_credentials = tls_credentials;
+	tls_credentials_log_pins(net->tls_credentials);
 
 	if (old_credentials) {
 		err = tls_credentials_release(old_credentials);
