@@ -73,9 +73,9 @@ static int opt_rr_put_cookie(knot_rrset_t *opt_rr, uint8_t *data,
 	}
 	assert(cookies_data != NULL);
 
-	ret = knot_edns_opt_cookie_write(cc, cc_len, sc, sc_len,
-	                                 cookies_data, &cookies_size);
-	if (ret != KNOT_EOK) {
+	cookies_size = knot_edns_opt_cookie_write(cc, cc_len, sc, sc_len,
+	                                          cookies_data, cookies_size);
+	if (cookies_size == 0) {
 		return kr_error(EINVAL);
 	}
 	assert(cookies_size == data_len);
