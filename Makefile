@@ -27,7 +27,7 @@ $(eval $(call find_lib,libmemcached,1.0))
 $(eval $(call find_lib,hiredis))
 $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libdnssec))
-$(eval $(call find_lib,libsystemd))
+$(eval $(call find_lib,libsystemd,227))
 
 # Find Go version and platform
 GO_VERSION := $(shell $(GO) version 2>/dev/null)
