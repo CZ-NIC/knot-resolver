@@ -313,15 +313,21 @@ static inline uint8_t *req_cookie_option(struct kr_request *req)
  * @param state            original resolver state
  * @param sc_present       true if server cookie is present
  * @param ignore_badcookie true if bad cookies should be treated as good ones
- * @param qry              query context
+ * @param req              request context
  * @return new resolver state
  */
 static int invalid_sc_status(int state, bool sc_present, bool ignore_badcookie,
-                             const struct kr_query *qry, knot_pkt_t *answer)
+                             const struct kr_request *req, knot_pkt_t *answer)
 {
-	assert(qry && answer);
+	assert(req && answer);
 
-	if (qry->qdcount == 0) {
+	const knot_pkt_t *pkt = req->qsource.packet;
+
+	if (!pkt) {
+		return KNOT_STATE_FAIL;
+	}
+
+	if (knot_wire_get_qdcount(pkt->wire) == 0) {
 		/* RFC7873 5.4 */
 		state = KNOT_STATE_DONE;
 		if (sc_present) {
@@ -409,7 +415,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 	if (!cookies.sc) {
 		/* Request has no server cookie. */
 		return_state = invalid_sc_status(return_state, false,
-		                                 ignore_badcookie, qry, answer);
+		                                 ignore_badcookie, req, answer);
 		if (return_state == KNOT_STATE_FAIL) {
 			return return_state;
 		}
@@ -435,7 +441,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 	if (ret != KNOT_EOK) {
 		/* Invalid server cookie. */
 		return_state = invalid_sc_status(return_state, true,
-		                                 ignore_badcookie, qry, answer);
+		                                 ignore_badcookie, req, answer);
 		if (return_state == KNOT_STATE_FAIL) {
 			return return_state;
 		}

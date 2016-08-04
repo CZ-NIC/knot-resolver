@@ -203,7 +203,6 @@ struct kr_zonecut {
 };
 struct kr_query {
 	struct kr_query *parent;
-	uint16_t qdcount;
 	knot_dname_t *sname;
 	uint16_t type;
 	uint16_t class;

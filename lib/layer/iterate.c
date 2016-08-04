@@ -519,8 +519,8 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	 * before this layer.
 	 */
 	const struct kr_request *req = ctx->data;
-	const struct kr_query *qry = req->current_query;
-	if (qry->qdcount == 0) {
+	const knot_pkt_t *pkt = req->qsource.packet;
+	if (!pkt || knot_wire_get_qdcount(pkt->wire) == 0) {
 		return KNOT_STATE_FAIL;
 	}
 	return reset(ctx);

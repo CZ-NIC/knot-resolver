@@ -54,7 +54,6 @@ static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name)
 			mm_free(pool, qry);
 			return NULL;
 		}
-		qry->qdcount = 1;
 	}
 
 	knot_dname_to_lower(qry->sname);
