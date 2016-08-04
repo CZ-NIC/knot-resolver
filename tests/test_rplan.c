@@ -32,8 +32,7 @@ static void test_rplan_params(void **state)
 
 	struct kr_rplan rplan;
 	assert_int_equal(kr_rplan_init(&rplan, NULL, NULL), KNOT_EOK);
-	// TODO: add test for empty dname
-//	assert_null((void *)kr_rplan_push(&rplan, NULL, NULL, 0, 0));
+	assert_null((void *)kr_rplan_push(&rplan, NULL, NULL, 0, 0));
 	assert_int_equal(kr_rplan_pop(&rplan, NULL), KNOT_EINVAL);
 	assert_true(kr_rplan_empty(&rplan) == true);
 	kr_rplan_deinit(&rplan);

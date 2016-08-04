@@ -107,8 +107,9 @@ bool kr_rplan_empty(struct kr_rplan *rplan)
 	return rplan->pending.len == 0;
 }
 
-struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
-                               const knot_dname_t *name, uint16_t cls, uint16_t type)
+static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
+                                            struct kr_query *parent,
+                                            const knot_dname_t *name)
 {
 	if (rplan == NULL) {
 		return NULL;
@@ -124,14 +125,48 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	if (qry == NULL) {
 		return NULL;
 	}
-	qry->sclass = cls;
-	qry->stype = type;
+	/* Class and type must be set outside this function. */
 	qry->flags = rplan->request->options;
 	qry->parent = parent;
 	qry->ns.addr[0].ip.sa_family = AF_UNSPEC;
 	gettimeofday(&qry->timestamp, NULL);
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
 	array_push(rplan->pending, qry);
+
+	return qry;
+}
+
+struct kr_query *kr_rplan_push_empty(struct kr_rplan *rplan, struct kr_query *parent)
+{
+	if (rplan == NULL) {
+		return NULL;
+	}
+
+	struct kr_query *qry = kr_rplan_push_query(rplan, parent, NULL);
+	if (qry == NULL) {
+		return NULL;
+	}
+
+	WITH_DEBUG {
+	DEBUG_MSG(parent, "plan '%s' type '%s'\n", "", "");
+	}
+	return qry;
+}
+
+struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
+                               const knot_dname_t *name, uint16_t cls, uint16_t type)
+{
+	if (rplan == NULL || name == NULL) {
+		return NULL;
+	}
+
+	struct kr_query *qry = kr_rplan_push_query(rplan, parent, name);
+	if (qry == NULL) {
+		return NULL;
+	}
+
+	qry->sclass = cls;
+	qry->stype = type;
 
 	WITH_DEBUG {
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];

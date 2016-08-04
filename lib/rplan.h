@@ -121,6 +121,17 @@ KR_EXPORT KR_PURE
 bool kr_rplan_empty(struct kr_rplan *rplan);
 
 /**
+ * Push empty query to the top of the resolution plan.
+ * @note This query serves as a cookie query only.
+ * @param rplan plan instance
+ * @param parent query parent (or NULL)
+ * @return query instance or NULL
+ */
+KR_EXPORT
+struct kr_query *kr_rplan_push_empty(struct kr_rplan *rplan,
+                                     struct kr_query *parent);
+
+/**
  * Push a query to the top of the resolution plan.
  * @note This means that this query takes precedence before all pending queries.
  * @param rplan plan instance

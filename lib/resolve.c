@@ -396,7 +396,16 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	const knot_dname_t *qname = knot_pkt_qname(packet);
 	uint16_t qclass = knot_pkt_qclass(packet);
 	uint16_t qtype = knot_pkt_qtype(packet);
-	struct kr_query *qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
+	struct kr_query *qry = NULL;
+
+	if (qname != NULL) {
+		qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
+	} else if (knot_wire_get_qdcount(packet->wire) == 0 &&
+                   knot_pkt_has_edns(packet) &&
+                   knot_edns_has_option(packet->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
+		/* Plan empty query only for cookies. */
+		qry = kr_rplan_push_empty(rplan, NULL);
+	}
 	if (!qry) {
 		return KNOT_STATE_FAIL;
 	}
