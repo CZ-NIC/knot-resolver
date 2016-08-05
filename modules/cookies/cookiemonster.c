@@ -364,8 +364,6 @@ int check_request(knot_layer_t *ctx, void *module_param)
 	}
 
 	if (!srvr_sett->enabled) {
-		/* TODO -- IS there a way how to determine whether the original
-		 * request came via TCP? */
 		if (knot_pkt_has_edns(answer)) {
 			/* Delete any cookies. */
 			knot_edns_remove_options(answer->opt_rr,
@@ -373,6 +371,11 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		}
 		return ctx->state;
 	}
+
+	/*
+	 * TODO -- Would it be of any benefit to know whether the request came
+	 * via TCP?
+	 */
 
 	uint8_t *req_cookie_opt = req_cookie_option(req);
 	if (!req_cookie_opt) {
@@ -403,6 +406,13 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		.clnt_sockaddr = req->qsource.addr,
 		.secret_data = srvr_sett->current.secr->data,
 		.secret_len = srvr_sett->current.secr->size
+	};
+
+	struct knot_sc_input sc_input = {
+		.cc = cookies.cc,
+		.cc_len = cookies.cc_len,
+		/* Don't set nonce here. */
+		.srvr_data = &srvr_data
 	};
 
 	struct kr_nonce_input nonce = {
@@ -452,8 +462,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 
 answer_add_cookies:
 	/* Add server cookie into response. */
-	ret = kr_answer_write_cookie(&srvr_data, cookies.cc, cookies.cc_len,
-	                             &nonce, current_sc_alg, answer);
+	ret = kr_answer_write_cookie(&sc_input, &nonce, current_sc_alg, answer);
 	if (ret != kr_ok()) {
 		return_state = KNOT_STATE_FAIL;
 	}

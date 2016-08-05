@@ -45,19 +45,17 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 /**
  * @brief Inserts a cookie option into the OPT RR. It does not write any
  *        wire data.
- * @param srvr_data server knowledge
- * @param cc        client cookie
- * @param cc_len    client cookie length
- * @param nonce     nonce value
+ * @note The content of @a sc_input is modified. Any pre-set nonce value is
+ *       ignored. After retuning its nonce value will be null.
+ * @param sc_input  data needed to compute server cookie, nonce is ignored
+ * @param nonce     nonce value that is actually used
  * @param alg       hash algorithm
  * @param pkt       DNS response packet
  */
 KR_EXPORT
-int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
-                           const uint8_t *cc, uint16_t cc_len,
+int kr_answer_write_cookie(struct knot_sc_input *sc_input,
                            const struct kr_nonce_input *nonce,
-                           const struct knot_sc_alg *alg,
-                           knot_pkt_t *pkt);
+                           const struct knot_sc_alg *alg, knot_pkt_t *pkt);
 
 /**
  * @brief Set RCODE and extended RCODE.

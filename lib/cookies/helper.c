@@ -162,18 +162,21 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	return ret;
 }
 
-int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
-                           const uint8_t *cc, uint16_t cc_len,
+int kr_answer_write_cookie(struct knot_sc_input *sc_input,
                            const struct kr_nonce_input *nonce,
-                           const struct knot_sc_alg *alg,
-                           knot_pkt_t *pkt)
+                           const struct knot_sc_alg *alg, knot_pkt_t *pkt)
 {
-	if (!srvr_data || !srvr_data->clnt_sockaddr ||
-	    !srvr_data->secret_data|| !srvr_data->secret_len) {
+	if (!sc_input || !sc_input->cc || sc_input->cc_len == 0) {
 		return kr_error(EINVAL);
 	}
 
-	if (!cc || cc_len == 0 || !nonce) {
+	if (!sc_input->srvr_data || !sc_input->srvr_data->clnt_sockaddr ||
+	    !sc_input->srvr_data->secret_data ||
+	    !sc_input->srvr_data->secret_len) {
+		return kr_error(EINVAL);
+	}
+
+	if (!nonce) {
 		return kr_error(EINVAL);
 	}
 
@@ -181,7 +184,7 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 		return kr_error(EINVAL);
 	}
 
-	if (!pkt && !pkt->opt_rr) {
+	if (!pkt || !pkt->opt_rr) {
 		return kr_error(EINVAL);
 	}
 
@@ -189,11 +192,11 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 	uint16_t hash_len = alg->hash_size;
 
 	/*
-	 * Space for cookie is reserved inside the EDNS OPT RR inside
+	 * Space for cookie is reserved inside the EDNS OPT RR of
 	 * the answer packet.
 	 */
 	uint8_t *cookie = NULL;
-	uint16_t cookie_len = knot_edns_opt_cookie_data_len(cc_len,
+	uint16_t cookie_len = knot_edns_opt_cookie_data_len(sc_input->cc_len,
 	                                                    nonce_len + hash_len);
 	if (cookie_len == 0) {
 		return kr_error(EINVAL);
@@ -206,35 +209,36 @@ int kr_answer_write_cookie(const struct knot_sc_private *srvr_data,
 	if (ret != KNOT_EOK) {
 		return kr_error(ENOMEM);
 	}
+	assert(cookie != NULL);
 
 	/*
 	 * Function knot_edns_opt_cookie_data_len() returns the sum of its
 	 * parameters or zero. Anyway, let's check again.
 	 */
-	if (cookie_len < (cc_len + nonce_len + hash_len)) {
+	if (cookie_len < (sc_input->cc_len + nonce_len + hash_len)) {
 		return kr_error(EINVAL);
 	}
 
-	struct knot_sc_input input = {
-		.cc = cookie,
-		.cc_len = cc_len,
-		.srvr_data = srvr_data
-	};
-	memcpy(cookie, cc, cc_len);
+	/* Copy client cookie data portion. */
+	memcpy(cookie, sc_input->cc, sc_input->cc_len);
 
 	if (nonce_len) {
-		kr_nonce_write_wire(cookie + cc_len, nonce_len, nonce);
+		/* Write nonce data portion. */
+		kr_nonce_write_wire(cookie + sc_input->cc_len, nonce_len,
+		                    nonce);
 		/* Adjust input for written nonce value. */
-		input.nonce = cookie + cc_len;
-		input.nonce_len = nonce_len;
+		sc_input->nonce = cookie + sc_input->cc_len;
+		sc_input->nonce_len = nonce_len;
 	}
 
-	hash_len = alg->hash_func(&input, cookie + cc_len + nonce_len, hash_len);
-	if (hash_len == 0) {
-		return kr_error(EINVAL);
-	}
+	hash_len = alg->hash_func(sc_input,
+	                          cookie + sc_input->cc_len + nonce_len,
+	                          hash_len);
+	/* Zero nonce values. */
+	sc_input->nonce = NULL;
+	sc_input->nonce_len = 0;
 
-	return kr_ok();
+	return (hash_len != 0) ? kr_ok() : kr_error(EINVAL);
 }
 
 int kr_pkt_set_ext_rcode(knot_pkt_t *pkt, uint16_t whole_rcode)
