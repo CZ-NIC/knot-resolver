@@ -265,6 +265,8 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	return submitted;
 }
 
+#if GNUTLS_VERSION_NUMBER >= 0x030400
+
 /*
   DNS-over-TLS Out of band key-pinned authentication profile uses the
   same form of pins as HPKP:
@@ -333,6 +335,12 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 		gnutls_free(certs);
 	}
 }
+#else
+void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
+{
+	kr_log_error("[tls] could not calculate RFC 7858 OOB key-pin; GnuTLS 3.4.0+ required\n");
+}
+#endif
 
 static int str_replace(char **where_ptr, const char *with)
 {
