@@ -28,12 +28,7 @@
 /** @cond internal Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
 
-struct tls_credentials_t {
-	int count;
-	char *tls_cert;
-	char *tls_key;
-	gnutls_certificate_credentials_t credentials;
-};
+struct tls_credentials_t;
 
 /**
  * Query resolution worker.

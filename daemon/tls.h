@@ -21,6 +21,13 @@
 #include <libknot/packet/pkt.h>
 
 struct tls_ctx_t;
+struct tls_credentials_t;
+struct tls_credentials_t {
+	int count;
+	char *tls_cert;
+	char *tls_key;
+	gnutls_certificate_credentials_t credentials;
+};
 
 struct tls_ctx_t* tls_new(struct worker_ctx *worker);
 void tls_free(struct tls_ctx_t* tls);
