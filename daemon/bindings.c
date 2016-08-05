@@ -352,13 +352,17 @@ static int net_pipeline(lua_State *L)
 
 static int net_tls(lua_State *L)
 {
-	struct worker_ctx *worker = wrk_luaget(L);
-	if (!worker) {
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+	struct network *net = &engine->net;
+	if (!net) {
 		return 0;
 	}
 
 	if (lua_gettop(L) == 0) {
-		lua_pushfstring(L, "(\"%s\", \"%s\")", worker->tls_credentials->tls_cert, worker->tls_credentials->tls_key);
+		lua_pushfstring(L, "(\"%s\", \"%s\")", net->tls_credentials->tls_cert, net->tls_credentials->tls_key);
 		return 1;
 	}
 
@@ -367,7 +371,7 @@ static int net_tls(lua_State *L)
 		lua_error(L);
 	}
 
-	int r = tls_certificate_set(worker, lua_tostring(L, 1), lua_tostring(L, 2));
+	int r = tls_certificate_set(net, lua_tostring(L, 1), lua_tostring(L, 2));
 	if (r != 0) {
 		lua_pushstring(L, strerror(ENOMEM));
 		lua_error(L);

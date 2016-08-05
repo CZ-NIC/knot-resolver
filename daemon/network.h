@@ -41,8 +41,9 @@ typedef array_t(struct endpoint*) endpoint_array_t;
 /* @endcond */
 
 struct network {
-    uv_loop_t *loop;
-    map_t endpoints;
+	uv_loop_t *loop;
+	map_t endpoints;
+	struct tls_credentials *tls_credentials;
 };
 
 void network_init(struct network *net, uv_loop_t *loop);

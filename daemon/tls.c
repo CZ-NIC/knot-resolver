@@ -42,7 +42,7 @@ struct tls_ctx_t {
 	ssize_t nread;
 	ssize_t consumed;
 	uint8_t recv_buf[4096];
-	struct tls_credentials_t *credentials;
+	struct tls_credentials *credentials;
 };
 
 /** @internal Debugging facility. */
@@ -111,7 +111,8 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 {
 	assert(worker != NULL);
-	if (!worker->tls_credentials) {
+	struct network *net = &worker->engine->net;
+	if (!net->tls_credentials) {
 		kr_log_error("[tls] x509 credentials are missing; no TLS\n");
 		return NULL;
 	}
@@ -128,7 +129,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 		tls_free(tls);
 		return NULL;
 	}
-	tls->credentials = tls_credentials_reserve(worker);
+	tls->credentials = tls_credentials_reserve(net->tls_credentials);
 	err = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE, tls->credentials->credentials);
 	if (err < 0) {
 		kr_log_error("[tls] gnutls_credentials_set(): %s (%d)\n", gnutls_strerror_name(err), err);
@@ -269,13 +270,13 @@ static int str_replace(char **where_ptr, const char *with)
 	return kr_ok();
 }
 
-int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const char *tls_key)
+int tls_certificate_set(struct network *net, const char *tls_cert, const char *tls_key)
 {
-	if (!worker) {
+	if (!net) {
 		return kr_error(EINVAL);
 	}
 
-	struct tls_credentials_t *tls_credentials = calloc(1, sizeof(*tls_credentials));
+	struct tls_credentials *tls_credentials = calloc(1, sizeof(*tls_credentials));
 	if (tls_credentials == NULL) {
 		return kr_error(ENOMEM);
 	}
@@ -310,10 +311,10 @@ int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const c
 		return kr_error(EINVAL);
 	}
 	// Exchange the x509 credentials
-	struct tls_credentials_t *old_credentials = worker->tls_credentials;
+	struct tls_credentials *old_credentials = net->tls_credentials;
 
 	// Start using the new x509_credentials
-	worker->tls_credentials = tls_credentials;
+	net->tls_credentials = tls_credentials;
 
 	if (old_credentials) {
 		err = tls_credentials_release(old_credentials);
@@ -325,12 +326,15 @@ int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const c
 	return kr_ok();
 }
 
-struct tls_credentials_t *tls_credentials_reserve(struct worker_ctx *worker) {
-	worker->tls_credentials->count++;
-	return worker->tls_credentials;
+struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials) {
+	if (!tls_credentials) {
+		return NULL;
+	}
+	tls_credentials->count++;
+	return tls_credentials;
 }
 
-int tls_credentials_release(struct tls_credentials_t *tls_credentials) {
+int tls_credentials_release(struct tls_credentials *tls_credentials) {
 	if (!tls_credentials) {
 		return kr_error(EINVAL);
 	}
@@ -342,7 +346,7 @@ int tls_credentials_release(struct tls_credentials_t *tls_credentials) {
 	return kr_ok();
 }
 
-void tls_credentials_free(struct tls_credentials_t *tls_credentials) {
+void tls_credentials_free(struct tls_credentials *tls_credentials) {
 	if (!tls_credentials) {
 		return;
 	}

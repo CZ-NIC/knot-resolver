@@ -21,8 +21,8 @@
 #include <libknot/packet/pkt.h>
 
 struct tls_ctx_t;
-struct tls_credentials_t;
-struct tls_credentials_t {
+struct tls_credentials;
+struct tls_credentials {
 	int count;
 	char *tls_cert;
 	char *tls_key;
@@ -37,7 +37,7 @@ void tls_free(struct tls_ctx_t* tls);
 int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
 int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread);
 
-int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const char *tls_key);
-int tls_credentials_release(struct tls_credentials_t *tls_credentials);
-void tls_credentials_free(struct tls_credentials_t *tls_credentials);
-struct tls_credentials_t *tls_credentials_reserve(struct worker_ctx *worker);
+int tls_certificate_set(struct network *net, const char *tls_cert, const char *tls_key);
+int tls_credentials_release(struct tls_credentials *tls_credentials);
+void tls_credentials_free(struct tls_credentials *tls_credentials);
+struct tls_credentials *tls_credentials_reserve(struct tls_credentials *worker);

@@ -28,7 +28,7 @@
 /** @cond internal Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
 
-struct tls_credentials_t;
+struct tls_credentials;
 
 /**
  * Query resolution worker.
@@ -59,7 +59,6 @@ struct worker_ctx {
 	mp_freelist_t pool_ioreq;
 	mp_freelist_t pool_sessions;
 	knot_mm_t pkt_pool;
-	struct tls_credentials_t *tls_credentials;
 };
 
 /* Worker callback */

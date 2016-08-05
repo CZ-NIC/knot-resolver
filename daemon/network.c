@@ -19,6 +19,7 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
+#include "daemon/tls.h"
 
 /* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
 #if defined(UV_VERSION_HEX)
@@ -101,6 +102,8 @@ void network_deinit(struct network *net)
 		map_walk(&net->endpoints, close_key, 0);
 		map_walk(&net->endpoints, free_key, 0);
 		map_clear(&net->endpoints);
+		tls_credentials_free(net->tls_credentials);
+		net->tls_credentials = NULL;
 	}
 }
 
