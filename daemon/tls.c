@@ -271,31 +271,27 @@ int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const c
 	if ((err = gnutls_certificate_allocate_credentials(&tls_credentials->credentials)) < 0) {
 		kr_log_error("[tls] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
-		tls_credentials_free(&tls_credentials);
+		tls_credentials_free(tls_credentials);
 		return kr_error(ENOMEM);
 	}
 	if ((err = gnutls_certificate_set_x509_system_trust(tls_credentials->credentials)) < 0) {
 		if (err != GNUTLS_E_UNIMPLEMENTED_FEATURE) {
 			kr_log_error("[tls] warning: gnutls_certificate_set_x509_system_trust() failed: (%d) %s\n",
 				     err, gnutls_strerror_name(err));
-			tls_credentials_free(&tls_credentials);
+			tls_credentials_free(tls_credentials);
 			return err;
 		}
 	}
 
-	if (str_replace(&tls_credentials->tls_cert, tls_cert) != 0) {
-		tls_credentials_free(&tls_credentials);
-		return kr_error(ENOMEM);
-	}
-	
-	if (str_replace(&tls_credentials->tls_key, tls_key) != 0) {
-		tls_credentials_free(&tls_credentials);
+	if ((str_replace(&tls_credentials->tls_cert, tls_cert) != 0) ||
+	    (str_replace(&tls_credentials->tls_key, tls_key) != 0)) {
+		tls_credentials_free(tls_credentials);
 		return kr_error(ENOMEM);
 	}
 	
 	if ((err = gnutls_certificate_set_x509_key_file(tls_credentials->credentials,
 							tls_cert, tls_key, GNUTLS_X509_FMT_PEM)) < 0) {
-		tls_credentials_free(&tls_credentials);
+		tls_credentials_free(tls_credentials);
 		kr_log_error("[tls] gnutls_certificate_set_x509_key_file(%s,%s) failed: %d (%s)\n",
 			     tls_cert, tls_key, err, gnutls_strerror_name(err));
 		return kr_error(EINVAL);
@@ -326,37 +322,28 @@ int tls_credentials_release(struct tls_credentials_t *tls_credentials) {
 		return kr_error(EINVAL);
 	}
 	if (--tls_credentials->count < 0) {
-		tls_credentials_free(&tls_credentials);
+		tls_credentials_free(tls_credentials);
 	} else {
 		return kr_error(EBUSY);
 	}
 	return kr_ok();
 }
 
-void tls_credentials_free(struct tls_credentials_t **tls_credentials_ptr) {
-	if (!tls_credentials_ptr) {
-		return;
-	}
-
-	struct tls_credentials_t *tls_credentials = *tls_credentials_ptr;
+void tls_credentials_free(struct tls_credentials_t *tls_credentials) {
 	if (!tls_credentials) {
 		return;
 	}
 
 	if (tls_credentials->credentials) {
 		gnutls_certificate_free_credentials(tls_credentials->credentials);
-		tls_credentials->credentials = NULL;
 	}
 	if (tls_credentials->tls_cert) {
 		free(tls_credentials->tls_cert);
-		tls_credentials->tls_cert = NULL;
 	}
 	if (tls_credentials->tls_key) {
 		free(tls_credentials->tls_key);
-		tls_credentials->tls_key = NULL;
 	}
 	free(tls_credentials);
-	tls_credentials = NULL;
 }
 
 #undef DEBUG_MSG

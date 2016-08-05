@@ -1015,7 +1015,7 @@ void worker_reclaim(struct worker_ctx *worker)
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 	map_clear(&worker->outgoing);
-	tls_credentials_free(&worker->tls_credentials);
+	tls_credentials_free(worker->tls_credentials);
 	worker->tls_credentials = NULL;
 }
 
