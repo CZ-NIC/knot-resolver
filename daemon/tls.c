@@ -17,11 +17,13 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <gnutls/gnutls.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <assert.h>
+#include <gnutls/gnutls.h>
 #include <uv.h>
 
+#include <contrib/ucw/lib.h>
 #include "daemon/worker.h"
 #include "daemon/tls.h"
 #include "daemon/io.h"
@@ -45,7 +47,7 @@ struct tls_ctx_t {
 
 /** @internal Debugging facility. */
 #ifdef DEBUG
-#define DEBUG_MSG(fmt...) fprintf(stderr, "[daem] " fmt)
+#define DEBUG_MSG(fmt...) fprintf(stderr, "[tls] " fmt)
 #else
 #define DEBUG_MSG(fmt...)
 #endif
@@ -55,21 +57,21 @@ static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
 	const uv_buf_t ub = {(void *)buf, len};
 
-	DEBUG_MSG("[tls] push %zu <%p>\n", len, h);
+	DEBUG_MSG("push %zu <%p>\n", len, h);
 	if (t == NULL) {
 		errno = EFAULT;
 		return -1;
 	}
-	int ret = uv_try_write(t->handle, &ub, 1);
 
+	int ret = uv_try_write(t->handle, &ub, 1);
 	if (ret > 0) {
 		return (ssize_t) ret;
 	}
 	if (ret == UV_EAGAIN) {
 		errno = EAGAIN;
 	} else {
-		kr_log_error("[tls] uv_try_write unknown error: %d: %s\n", ret, strerror(-ret));
-		errno = EIO;	/* dkg just picked this at random */
+		kr_log_error("[tls] uv_try_write: %s\n", uv_strerror(ret));
+		errno = EIO;
 	}
 	return -1;
 }
@@ -78,20 +80,16 @@ static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_
 static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 {
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
-	ssize_t	avail = t->nread - t->consumed;
-	ssize_t	transfer;
-	DEBUG_MSG("[tls] pull wanted: %zu available: %zu\n", len, avail);
+	assert(t != NULL);
 
+	ssize_t	avail = t->nread - t->consumed;
+	DEBUG_MSG("pull wanted: %zu available: %zu\n", len, avail);
 	if (t->nread <= t->consumed) {
 		errno = EAGAIN;
 		return -1;
 	}
-	if (avail <= len) {
-		transfer = avail;
-	} else {
-		transfer = len;
-	}
 
+	ssize_t	transfer = MIN(avail, len);
 	memcpy(buf, t->buf + t->consumed, transfer);
 	t->consumed += transfer;
 	return transfer;
@@ -99,45 +97,43 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 
 struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 {
-	struct network *net = &worker->engine->net;
-
+	assert(worker != NULL);
 	if (!worker->tls_credentials) {
 		kr_log_error("[tls] x509 credentials are missing; no TLS\n");
 		return NULL;
 	}
-	struct tls_ctx_t *tls = calloc(1, sizeof(struct tls_ctx_t));
 
+	struct tls_ctx_t *tls = calloc(1, sizeof(struct tls_ctx_t));
 	if (tls == NULL) {
 		kr_log_error("[tls] failed to allocate TLS context\n");
 		return NULL;
 	}
 
-	int err;
-	if ((err = gnutls_init(&tls->session, GNUTLS_SERVER | GNUTLS_NONBLOCK)) < 0) {
-		kr_log_error("[tls] gnutls_init() failed: %d (%s)\n",
-			     err, gnutls_strerror_name(err));
+	int err = gnutls_init(&tls->session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
+	if (err < 0) {
+		kr_log_error("[tls] gnutls_init(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
 	tls->credentials = tls_credentials_reserve(worker);
-	if ((err = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE,
-                                          tls->credentials->credentials)) < 0) {
-		kr_log_error("[tls] gnutls_credentials_set() failed: (%d) %s\n",
-			     err, gnutls_strerror_name(err));
+	err = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE, tls->credentials->credentials);
+	if (err < 0) {
+		kr_log_error("[tls] gnutls_credentials_set(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
-	const char *errpos;
-	if ((err = gnutls_priority_set_direct(tls->session, priorities, &errpos)) < 0) {
-		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with error (%d) %s\n",
-			     priorities, errpos - priorities, errpos, err, gnutls_strerror_name(err));
+	const char *errpos = NULL;
+	err = gnutls_priority_set_direct(tls->session, priorities, &errpos);
+	if (err < 0) {
+		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
+			     priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
+
 	gnutls_transport_set_pull_function(tls->session, kres_gnutls_pull);
 	gnutls_transport_set_push_function(tls->session, kres_gnutls_push);
 	gnutls_transport_set_ptr(tls->session, tls);
-
 	return tls;
 }
 
@@ -148,11 +144,12 @@ void tls_free(struct tls_ctx_t *tls)
 	}
 
 	if (tls->session) {
-		/* Don't terminal TLS connection, just tear it down */
+		/* Don't terminate TLS connection, just tear it down */
 		gnutls_deinit(tls->session);
 		tls->session = NULL;
-		tls_credentials_release(tls->credentials);
 	}
+
+	tls_credentials_release(tls->credentials);
 	free(tls);
 }
 
@@ -163,42 +160,40 @@ int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt)
 	}
 
 	struct session *session = handle->data;
-	uint16_t pkt_size = htons(pkt->size);
+	const uint16_t pkt_size = htons(pkt->size);
 	struct tls_ctx_t *tls_p = session->tls_ctx;
 	if (!tls_p) {
 		kr_log_error("[tls] no tls context on push\n");
 		return kr_error(ENOENT);
 	}
+
 	gnutls_record_cork(tls_p->session);
-	ssize_t count;
+	ssize_t count = 0;
 	if ((count = gnutls_record_send(tls_p->session, &pkt_size, sizeof(pkt_size)) < 0) ||
 	    (count = gnutls_record_send(tls_p->session, pkt->wire, pkt->size) < 0)) {
-		kr_log_error("[tls] gnutls_record_send failed: %zu (%zd) %s\n",
-			     sizeof(pkt_size) + pkt->size, count, gnutls_strerror_name(count));
+		kr_log_error("[tls] gnutls_record_send failed: %s (%zd)\n", gnutls_strerror_name(count), count);
 		return kr_error(EIO);
 	}
 
-	int submitted = 0;
+	ssize_t submitted = 0;
 	do {
 		count = gnutls_record_uncork(tls_p->session, 0);
-		if (count == 0) {
-			break;
-		} else if (count < 0 && gnutls_error_is_fatal(count) == 0) {
-			continue;
-		} else if (count <= 0) {
-			kr_log_error("[tls] gnutls_record_uncord failed: (%zd) %s\n",
-				     count, gnutls_strerror_name(count));
-			return kr_error(EIO);
+		if (count < 0) {
+			if (gnutls_error_is_fatal(count)) {
+				kr_log_error("[tls] gnutls_record_uncork failed: %s (%zd)\n",
+				             gnutls_strerror_name(count), count);
+				return kr_error(EIO);
+			}
+		} else {
+			submitted += count;
+			if (count == 0 && submitted != sizeof(pkt_size) + pkt->size) {
+				kr_log_error("[tls] gnutls_record_uncork didn't send all data: %s (%zd)\n",
+				             gnutls_strerror_name(count), count);
+				return kr_error(EIO);
+			}
 		}
-		submitted += count;
 	} while (submitted != sizeof(pkt_size) + pkt->size);
 	
-	if (submitted != sizeof(pkt_size) + pkt->size) {
-		kr_log_error("[tls] gnutls_record_uncork didn't send all data: %zu (%zd) %s\n",
-			     sizeof(pkt_size) + pkt->size, count, gnutls_strerror_name(count));
-		return kr_error(EIO);
-	}
-
 	return kr_ok();
 }
 
@@ -215,37 +210,31 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	tls_p->handle = handle;
 	tls_p->consumed = 0;	/* TODO: doesn't handle split TLS records */
 
-	while (tls_p->handshake_done == false) {
+	/* Ensure TLS handshake is performed before receiving data. */
+	while (!tls_p->handshake_done) {
 		int err = gnutls_handshake(tls_p->session);
 		if (err == GNUTLS_E_SUCCESS) {
 			tls_p->handshake_done = true;
-			break;
 		} else if (err == GNUTLS_E_AGAIN) {
-			/* No data, bail out */
-			return 0;
-		} else if (err < 0 && gnutls_error_is_fatal(err) == 0) {
-			continue;
-		} else {
+			return 0; /* No data, bail out */
+		} else if (err < 0 && gnutls_error_is_fatal(err)) {
 			return kr_error(err);
 		}
 	}
 
 	int submitted = 0;
-	
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
 		if (count == GNUTLS_E_AGAIN) {
-			/* No data available */
-			break;
+			break;    /* No data available */
 		} else if (count == GNUTLS_E_INTERRUPTED) {
-			/* try reading again */
-			continue;
+			continue; /* Try reading again */
 		} else if (count < 0) {
-			kr_log_error("[tls] gnutls_record_recv failed: (%zd) %s\n",
-				     count, gnutls_strerror_name(count));
+			kr_log_error("[tls] gnutls_record_recv failed: %s (%zd)\n",
+			             gnutls_strerror_name(count), count);
 			return kr_error(EIO);
 		}
-		kr_log_error("[tls]: submitting %zd data to worker_process_tcp\n", count);
+		DEBUG_MSG("submitting %zd data to worker\n", count);
 		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
 		if (ret < 0) {
 			return ret;
@@ -269,8 +258,6 @@ static int str_replace(char **where_ptr, const char *with)
 
 int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const char *tls_key)
 {
-	int err;
-
 	if (!worker) {
 		return kr_error(EINVAL);
 	}
@@ -280,6 +267,7 @@ int tls_certificate_set(struct worker_ctx *worker, const char *tls_cert, const c
 		return kr_error(ENOMEM);
 	}
 
+	int err = 0;
 	if ((err = gnutls_certificate_allocate_credentials(&tls_credentials->credentials)) < 0) {
 		kr_log_error("[tls] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));

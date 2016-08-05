@@ -401,7 +401,6 @@ int main(int argc, char **argv)
 	const char *config = NULL;
 	char *keyfile_buf = NULL;
 	int control_fd = -1;
-	gnutls_certificate_credentials_t *x509_credentials;
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
