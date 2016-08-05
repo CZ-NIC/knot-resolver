@@ -70,7 +70,7 @@ static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
 	const uv_buf_t ub = {(void *)buf, len};
 
-	DEBUG_MSG("push %zu <%p>\n", len, h);
+	DEBUG_MSG("[tls] push %zu <%p>\n", len, h);
 	if (t == NULL) {
 		errno = EFAULT;
 		return -1;
@@ -96,7 +96,7 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 	assert(t != NULL);
 
 	ssize_t	avail = t->nread - t->consumed;
-	DEBUG_MSG("pull wanted: %zu available: %zu\n", len, avail);
+	DEBUG_MSG("[tls] pull wanted: %zu available: %zu\n", len, avail);
 	if (t->nread <= t->consumed) {
 		errno = EAGAIN;
 		return -1;
@@ -111,6 +111,8 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 {
 	assert(worker != NULL);
+	assert(worker->engine != NULL);
+
 	struct network *net = &worker->engine->net;
 	if (!net->tls_credentials) {
 		kr_log_error("[tls] x509 credentials are missing; no TLS\n");
@@ -248,7 +250,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 			             gnutls_strerror_name(count), count);
 			return kr_error(EIO);
 		}
-		DEBUG_MSG("submitting %zd data to worker\n", count);
+		DEBUG_MSG("[tls] submitting %zd data to worker\n", count);
 		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
 		if (ret < 0) {
 			return ret;

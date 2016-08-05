@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <gnutls/gnutls.h>
-
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
@@ -27,8 +25,6 @@
 
 /** @cond internal Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
-
-struct tls_credentials;
 
 /**
  * Query resolution worker.

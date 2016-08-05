@@ -383,11 +383,6 @@ void free_sd_socket_names(char **socket_names, int count)
 	free(socket_names);
 }
 
-static void kres_gnutls_log(int level, const char *message)
-{
-	kr_log_error("[tls] gnutls: (%d) %s", level, message);
-}
-
 int main(int argc, char **argv)
 {
 	int forks = 1;
@@ -475,8 +470,6 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			kr_debug_set(true);
-			/* FIXME: Experiment with various GnuTLS log levels */
-			gnutls_global_set_log_level(1);
 			break;
 		case 'q':
 			g_quiet = true;
@@ -550,10 +543,7 @@ int main(int argc, char **argv)
 
 	kr_crypto_init();
 
-	/* Setup a global GnuTLS logging function */
-	gnutls_global_set_log_function(kres_gnutls_log);
-
-       	/* Connect forks with local socket */
+	/* Connect forks with local socket */
 	fd_array_t ipc_set;
 	array_init(ipc_set);
 	/* Fork subprocesses if requested */

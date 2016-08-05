@@ -18,7 +18,6 @@
 #include <uv.h>
 #include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
-#include <gnutls/gnutls.h>
 
 #include "lib/cache.h"
 #include "lib/cdb.h"
