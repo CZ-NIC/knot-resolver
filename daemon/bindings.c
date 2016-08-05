@@ -340,8 +340,8 @@ static int net_pipeline(lua_State *L)
 		return 1;
 	}
 	int len = lua_tointeger(L, 1);
-	if (len < 0 || len > 4096) {
-		format_error(L, "tcp_pipeline must be within <0, 4096>");
+	if (len < 0 || len > UINT16_MAX) {
+		format_error(L, "tcp_pipeline must be within <0, 65535>");
 		lua_error(L);
 	}
 	worker->tcp_pipeline_max = len;
@@ -360,8 +360,17 @@ static int net_tls(lua_State *L)
 		return 0;
 	}
 
+	/* Only return current credentials. */
 	if (lua_gettop(L) == 0) {
-		lua_pushfstring(L, "(\"%s\", \"%s\")", net->tls_credentials->tls_cert, net->tls_credentials->tls_key);
+		/* No credentials configured yet. */
+		if (!net->tls_credentials) {
+			return 0;
+		}
+		lua_newtable(L);
+		lua_pushstring(L, net->tls_credentials->tls_cert);
+		lua_setfield(L, -2, "cert_file");
+		lua_pushstring(L, net->tls_credentials->tls_key);
+		lua_setfield(L, -2, "key_file");
 		return 1;
 	}
 
