@@ -28,7 +28,7 @@
 /*
  * Logging and debugging.
  */
-#define kr_log_info(fmt, ...) printf((fmt), ## __VA_ARGS__)
+#define kr_log_info(fmt, ...) do { printf((fmt), ## __VA_ARGS__); fflush(stdout); } while(0)
 #define kr_log_error(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__)
 #ifndef NDEBUG
 /* Toggle debug messages */
