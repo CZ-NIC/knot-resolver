@@ -96,8 +96,17 @@ The available CLI options are:
 Listen on given address (and port) pair. If no port is given, \fI53\fR is used as a default.
 Option may be passed multiple times to listen on more addresses.
 .TP
+.B \-t\fI addr[#port]\fR, \fB\-\-tls=\fI<addr[#port]>
+Listen using TLS on given address (and port) pair. If no port is
+given, \fI853\fR is used as a default.  Option may be passed multiple
+times to listen on more addresses.
+.TP
 .B \-S\fI fd\fR, \fB\-\-fd=\fI<fd>
 Listen on given file descriptor(s), passed by supervisor.
+Option may be passed multiple times to listen on more file descriptors.
+.TP
+.B \-T\fI fd\fR, \-\-tlsfd=\fI<fd>
+Listen using TLS on given file descriptor(s), passed by supervisor.
 Option may be passed multiple times to listen on more file descriptors.
 .TP
 .B \-k\fI keyfile\fR, \fB\-\-keyfile=\fI<keyfile>

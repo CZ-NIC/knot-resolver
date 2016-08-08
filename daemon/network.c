@@ -19,6 +19,7 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
+#include "daemon/tls.h"
 
 /* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
 #if defined(UV_VERSION_HEX)
@@ -101,6 +102,8 @@ void network_deinit(struct network *net)
 		map_walk(&net->endpoints, close_key, 0);
 		map_walk(&net->endpoints, free_key, 0);
 		map_clear(&net->endpoints);
+		tls_credentials_free(net->tls_credentials);
+		net->tls_credentials = NULL;
 	}
 }
 
@@ -130,6 +133,7 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 /** Open endpoint protocols. */
 static int open_endpoint(struct network *net, struct endpoint *ep, struct sockaddr *sa, uint32_t flags)
 {
+	int ret = 0;
 	if (flags & NET_UDP) {
 		ep->udp = malloc(sizeof(*ep->udp));
 		if (!ep->udp) {
@@ -137,7 +141,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		}
 		memset(ep->udp, 0, sizeof(*ep->udp));
 		handle_init(udp, net->loop, ep->udp, sa->sa_family);
-		int ret = udp_bind(ep->udp, sa);
+		ret = udp_bind(ep->udp, sa);
 		if (ret != 0) {
 			return ret;
 		}
@@ -150,19 +154,29 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		}
 		memset(ep->tcp, 0, sizeof(*ep->tcp));
 		handle_init(tcp, net->loop, ep->tcp, sa->sa_family);
-		int ret = tcp_bind(ep->tcp, sa);
+		if (flags & NET_TLS) {
+			ret = tcp_bind_tls(ep->tcp, sa);
+			ep->flags |= NET_TLS;
+		} else {
+			ret = tcp_bind(ep->tcp, sa);
+		}
 		if (ret != 0) {
 			return ret;
 		}
 		ep->flags |= NET_TCP;
 	}
-	return kr_ok();
+	return ret;
 }
 
 /** Open fd as endpoint. */
-static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, int sock_type)
+static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, int sock_type, bool use_tls)
 {
+	int ret = kr_ok();
 	if (sock_type == SOCK_DGRAM) {
+		if (use_tls) {
+			/* we do not support TLS over UDP */
+			return kr_error(EBADF);
+		}
 		if (ep->udp) {
 			return kr_error(EEXIST);
 		}
@@ -171,7 +185,7 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 			return kr_error(ENOMEM);
 		}
 		uv_udp_init(net->loop, ep->udp);
-		int ret = udp_bindfd(ep->udp, fd);
+		ret = udp_bindfd(ep->udp, fd);
 		if (ret != 0) {
 			close_handle((uv_handle_t *)ep->udp, false);
 			return ret;
@@ -188,7 +202,12 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 			return kr_error(ENOMEM);
 		}
 		uv_tcp_init(net->loop, ep->tcp);
-		int ret = tcp_bindfd(ep->tcp, fd);
+		if (use_tls) {
+			ret = tcp_bindfd_tls(ep->tcp, fd);
+			ep->flags |= NET_TLS;
+		} else {
+			ret = tcp_bindfd(ep->tcp, fd);
+		}
 		if (ret != 0) {
 			close_handle((uv_handle_t *)ep->tcp, false);
 			return ret;
@@ -215,7 +234,7 @@ static endpoint_array_t *network_get(struct network *net, const char *addr, uint
 	return NULL;
 }
 
-int network_listen_fd(struct network *net, int fd)
+int network_listen_fd(struct network *net, int fd, bool use_tls)
 {
 	/* Extract local address and socket type. */
 	int sock_type = SOCK_DGRAM;
@@ -260,7 +279,7 @@ int network_listen_fd(struct network *net, int fd)
 	struct endpoint *ep = ep_array->at[index];
 	assert(ep != NULL);
 	/* Create a libuv struct for this socket. */
-	return open_endpoint_fd(net, ep, fd, sock_type);
+	return open_endpoint_fd(net, ep, fd, sock_type, use_tls);
 }
 
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags)

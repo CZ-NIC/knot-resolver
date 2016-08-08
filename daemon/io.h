@@ -21,15 +21,18 @@
 #include "lib/generic/array.h"
 
 struct qr_task;
+struct tls_ctx_t;
 
 /* Per-session (TCP or UDP) persistent structure,
  * that exists between remote counterpart and a local socket.
  */
 struct session {
 	bool outgoing;
-    bool throttled;
-    uv_timer_t timeout;
-    struct qr_task *buffering;
+	bool throttled;
+	bool has_tls;
+	uv_timer_t timeout;
+	struct qr_task *buffering;
+	struct tls_ctx_t *tls_ctx;
 	array_t(struct qr_task *) tasks;
 };
 
@@ -39,7 +42,9 @@ struct session *session_new(void);
 int udp_bind(uv_udp_t *handle, struct sockaddr *addr);
 int udp_bindfd(uv_udp_t *handle, int fd);
 int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr);
+int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr);
 int tcp_bindfd(uv_tcp_t *handle, int fd);
+int tcp_bindfd_tls(uv_tcp_t *handle, int fd);
 
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type);
 void io_deinit(uv_handle_t *handle);

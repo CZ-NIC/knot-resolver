@@ -5,6 +5,7 @@ kresd_SOURCES := \
 	daemon/worker.c      \
 	daemon/bindings.c    \
 	daemon/ffimodule.c   \
+	daemon/tls.c         \
 	daemon/main.c
 
 kresd_DIST := daemon/lua/kres.lua daemon/lua/trust_anchors.lua
@@ -25,7 +26,8 @@ bindings-install: $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 kresd_CFLAGS := -fPIE
 kresd_DEPEND := $(libkres) $(contrib)
 kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) \
-              $(libzscanner_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS)
+              $(libzscanner_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS) \
+              $(gnutls_LIBS)
 
 # Enable systemd
 ifeq ($(HAS_libsystemd), yes)

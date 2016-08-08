@@ -108,7 +108,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *qu
  * If the fragment contains a complete query or completes current fragment, execute it.
  * @return 0 or an error code
  */
-int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uint8_t *msg, ssize_t len);
+int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *msg, ssize_t len);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session
@@ -128,3 +128,6 @@ int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen);
 
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);
+
+struct qr_task;
+typedef int (*qr_task_send_cb)(struct qr_task *task, uv_handle_t *handle, int status);

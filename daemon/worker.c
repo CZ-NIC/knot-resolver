@@ -30,6 +30,7 @@
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
+#include "daemon/tls.h"
 
 /* @internal Union of various libuv objects for freelist. */
 struct req
@@ -443,13 +444,20 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	if (!handle) {
 		return qr_task_on_send(task, handle, kr_error(EIO));
 	}
-	struct req *send_req = req_borrow(task->worker);
-	if (!send_req) {
-		return qr_task_on_send(task, handle, kr_error(ENOMEM));
+
+	/* Synchronous push to TLS context, bypassing event loop. */
+	struct session *session = handle->data;
+	if (session->has_tls) {
+		int ret = tls_push(task, handle, pkt);
+		return qr_task_on_send(task, handle, ret);
 	}
 
 	/* Send using given protocol */
 	int ret = 0;
+	struct req *send_req = req_borrow(task->worker);
+	if (!send_req) {
+		return qr_task_on_send(task, handle, kr_error(ENOMEM));
+	}
 	if (handle->type == UV_UDP) {
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->as.send.data = task;
@@ -834,7 +842,7 @@ int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle)
 	return 0;
 }
 
-int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uint8_t *msg, ssize_t len)
+int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *msg, ssize_t len)
 {
 	if (!worker || !handle) {
 		return kr_error(EINVAL);
@@ -865,7 +873,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_handle_t *handle, const uin
 	 * to buffer incoming message until it's complete. */
 	if (!session->outgoing) {
 		if (!task) {
-			task = qr_task_create(worker, handle, NULL);
+			task = qr_task_create(worker, (uv_handle_t *)handle, NULL);
 			if (!task) {
 				return kr_error(ENOMEM);
 			}

@@ -23,6 +23,7 @@
 #include "daemon/io.h"
 #include "daemon/network.h"
 #include "daemon/worker.h"
+#include "daemon/tls.h"
 
 #define negotiate_bufsize(func, handle, bufsize_want) do { \
     int bufsize = 0; func(handle, &bufsize); \
@@ -49,6 +50,7 @@ static void session_clear(struct session *s)
 {
 	assert(s->outgoing || s->tasks.len == 0);
 	array_clear(s->tasks);
+	tls_free(s->tls_ctx);
 	memset(s, 0, sizeof(*s));
 }
 
@@ -204,7 +206,12 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	struct worker_ctx *worker = loop->data;
 	/* TCP pipelining is rather complicated and requires cooperation from the worker
 	 * so the whole message reassembly and demuxing logic is inside worker */
-	int ret = worker_process_tcp(worker, (uv_handle_t *)handle, (const uint8_t *)buf->base, nread);
+	int ret = 0;
+	if (s->has_tls) {
+		ret = tls_process(worker, handle, (const uint8_t *)buf->base, nread);
+	} else {
+		ret = worker_process_tcp(worker, handle, (const uint8_t *)buf->base, nread);
+	}
 	if (ret < 0) {
 		worker_end_tcp(worker, (uv_handle_t *)handle);
 		/* Exceeded per-connection quota for outstanding requests
@@ -224,7 +231,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	mp_flush(worker->pkt_pool.ctx);
 }
 
-static void tcp_accept(uv_stream_t *master, int status)
+static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 {
 	if (status != 0) {
 		return;
@@ -244,11 +251,25 @@ static void tcp_accept(uv_stream_t *master, int status)
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
 	struct session *session = client->data;
+	session->has_tls = tls;
+	if (tls && !session->tls_ctx) {
+		session->tls_ctx = tls_new(master->loop->data);
+	}
 	uv_timer_t *timer = &session->timeout;
 	uv_timer_init(master->loop, timer);
 	timer->data = client;
 	uv_timer_start(timer, tcp_timeout_trigger, KR_CONN_RTT_MAX/2, KR_CONN_RTT_MAX/2);
 	io_start_read((uv_handle_t *)client);
+}
+
+static void tcp_accept(uv_stream_t *master, int status)
+{
+	_tcp_accept(master, status, false);
+}
+
+static void tls_accept(uv_stream_t *master, int status)
+{
+	_tcp_accept(master, status, true);
 }
 
 static int set_tcp_option(uv_handle_t *handle, int option, int val)
@@ -307,7 +328,12 @@ int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr)
 	return _tcp_bind(handle, addr, tcp_accept);
 }
 
-int tcp_bindfd(uv_tcp_t *handle, int fd)
+int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr)
+{
+	return _tcp_bind(handle, addr, tls_accept);
+}
+
+static int _tcp_bindfd(uv_tcp_t *handle, int fd, uv_connection_cb connection)
 {
 	if (!handle) {
 		return kr_error(EINVAL);
@@ -318,11 +344,21 @@ int tcp_bindfd(uv_tcp_t *handle, int fd)
 		return ret;
 	}
 
-	ret = uv_listen((uv_stream_t *)handle, 16, tcp_accept);
+	ret = uv_listen((uv_stream_t *)handle, 16, connection);
 	if (ret != 0) {
 		return ret;
 	}
 	return tcp_bind_finalize((uv_handle_t *)handle);
+}
+
+int tcp_bindfd(uv_tcp_t *handle, int fd)
+{
+	return _tcp_bindfd(handle, fd, tcp_accept);
+}
+
+int tcp_bindfd_tls(uv_tcp_t *handle, int fd)
+{
+	return _tcp_bindfd(handle, fd, tls_accept);
 }
 
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)

@@ -23,6 +23,7 @@
 #include "lib/cdb.h"
 #include "daemon/bindings.h"
 #include "daemon/worker.h"
+#include "daemon/tls.h"
 
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error (lua_State *L);
@@ -150,6 +151,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 		lua_setfield(L, -2, "udp");
 		lua_pushboolean(L, ep->flags & NET_TCP);
 		lua_setfield(L, -2, "tcp");
+		lua_pushboolean(L, ep->flags & NET_TLS);
+		lua_setfield(L, -2, "tls");
 	}
 	lua_setfield(L, -2, key);
 	return kr_ok();
@@ -165,7 +168,7 @@ static int net_list(lua_State *L)
 }
 
 /** Listen on interface address list. */
-static int net_listen_iface(lua_State *L, int port)
+static int net_listen_iface(lua_State *L, int port, int flags)
 {
 	/* Expand 'addr' key if exists */
 	lua_getfield(L, 1, "addr");
@@ -180,7 +183,7 @@ static int net_listen_iface(lua_State *L, int port)
 	for (size_t i = 0; i < count; ++i) {
 		lua_rawgeti(L, -1, i + 1);
 		int ret = network_listen(&engine->net, lua_tostring(L, -1),
-		                         port, NET_TCP|NET_UDP);
+		                         port, flags);
 		if (ret != 0) {
 			kr_log_info("[system] bind to '%s#%d' %s\n", lua_tostring(L, -1), port, kr_strerror(ret));
 		}
@@ -189,6 +192,17 @@ static int net_listen_iface(lua_State *L, int port)
 
 	lua_pushboolean(L, true);
 	return 1;
+}
+
+static bool table_get_flag(lua_State *L, int index, const char *key, bool def)
+{
+	bool result = def;
+	lua_getfield(L, index, key);
+	if (lua_isboolean(L, -1)) {
+		result = lua_toboolean(L, -1);
+	}
+	lua_pop(L, 1);
+	return result;
 }
 
 /** Listen on endpoint. */
@@ -200,18 +214,23 @@ static int net_listen(lua_State *L)
 	if (n > 1 && lua_isnumber(L, 2)) {
 		port = lua_tointeger(L, 2);
 	}
+	bool tls = (port == KR_DNS_TLS_PORT);
+	if (n > 2 && lua_istable(L, 3)) {
+		tls = table_get_flag(L, 3, "tls", tls);
+	}
 
-	/* Process interface or (address, port) pair. */
+	/* Process interface or (address, port, flags) triple. */
+	int flags = tls ? (NET_TCP|NET_TLS) : (NET_TCP|NET_UDP);
 	if (lua_istable(L, 1)) {
-		return net_listen_iface(L, port);
+		return net_listen_iface(L, port, flags);
 	} else if (n < 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected 'listen(string addr, number port = 53)'");
+		format_error(L, "expected 'listen(string addr, number port = 53[, bool tls = false])'");
 		lua_error(L);
 	}
 
 	/* Open resolution context cache */
 	struct engine *engine = engine_luaget(L);
-	int ret = network_listen(&engine->net, lua_tostring(L, 1), port, NET_TCP|NET_UDP);
+	int ret = network_listen(&engine->net, lua_tostring(L, 1), port, flags);
 	if (ret != 0) {
 		format_error(L, kr_strerror(ret));
 		lua_error(L);
@@ -321,12 +340,52 @@ static int net_pipeline(lua_State *L)
 		return 1;
 	}
 	int len = lua_tointeger(L, 1);
-	if (len < 0 || len > 4096) {
-		format_error(L, "tcp_pipeline must be within <0, 4096>");
+	if (len < 0 || len > UINT16_MAX) {
+		format_error(L, "tcp_pipeline must be within <0, 65535>");
 		lua_error(L);
 	}
 	worker->tcp_pipeline_max = len;
 	lua_pushnumber(L, len);
+	return 1;
+}
+
+static int net_tls(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+	struct network *net = &engine->net;
+	if (!net) {
+		return 0;
+	}
+
+	/* Only return current credentials. */
+	if (lua_gettop(L) == 0) {
+		/* No credentials configured yet. */
+		if (!net->tls_credentials) {
+			return 0;
+		}
+		lua_newtable(L);
+		lua_pushstring(L, net->tls_credentials->tls_cert);
+		lua_setfield(L, -2, "cert_file");
+		lua_pushstring(L, net->tls_credentials->tls_key);
+		lua_setfield(L, -2, "key_file");
+		return 1;
+	}
+
+	if ((lua_gettop(L) != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2)) {
+		lua_pushstring(L, "net.tls takes two parameters: (\"cert_file\", \"key_file\")");
+		lua_error(L);
+	}
+
+	int r = tls_certificate_set(net, lua_tostring(L, 1), lua_tostring(L, 2));
+	if (r != 0) {
+		lua_pushstring(L, strerror(ENOMEM));
+		lua_error(L);
+	}
+
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -339,6 +398,7 @@ int lib_net(lua_State *L)
 		{ "interfaces",   net_interfaces },
 		{ "bufsize",      net_bufsize },
 		{ "tcp_pipeline", net_pipeline },
+		{ "tls",          net_tls },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
