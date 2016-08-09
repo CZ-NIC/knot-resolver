@@ -90,7 +90,6 @@ static int opt_rr_put_cookie_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_
 {
 	assert(opt_rr && option);
 
-	uint8_t *reserved_data = NULL;
 	uint16_t opt_code = knot_edns_opt_get_code(option);
 	if (opt_code != KNOT_EDNS_OPTION_COOKIE) {
 		return kr_error(EINVAL);

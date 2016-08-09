@@ -415,8 +415,6 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		.time = req->current_query->timestamp.tv_sec
 	};
 
-	const struct kr_query *qry = req->current_query;
-
 	if (!cookies.sc) {
 		/* Request has no server cookie. */
 		return_state = invalid_sc_status(return_state, false,

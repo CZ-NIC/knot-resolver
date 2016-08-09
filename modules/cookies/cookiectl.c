@@ -402,8 +402,6 @@ static bool is_modified(const struct kr_cookie_comp *running,
 {
 	assert(running);
 
-	bool ret = false;
-
 	if (alg_lookup && alg_lookup->id >= 0) {
 		if (running->alg_id != alg_lookup->id) {
 			return true;
@@ -650,7 +648,7 @@ int config_init(struct kr_cookie_ctx *ctx)
 	if (!clookup || !slookup) {
 		free(cs);
 		free(ss);
-		return kr_error(ENOKEY);
+		return kr_error(ENOENT);
 	}
 
 	ctx->clnt.current.secr = cs;

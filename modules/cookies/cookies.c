@@ -65,8 +65,6 @@ int cookies_init(struct kr_module *module)
 KR_EXPORT
 int cookies_deinit(struct kr_module *module)
 {
-	struct engine *engine = module->data;
-
 	struct kr_cookie_ctx *cookie_ctx = module->data;
 
 	config_deinit(cookie_ctx);
