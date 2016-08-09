@@ -31,6 +31,8 @@
 #include "lib/cookies/control.h"
 #include "lib/cookies/helper.h"
 #include "lib/cookies/nonce.h"
+#else /* Define compatibility macros */
+#define KNOT_EDNS_OPTION_COOKIE 10
 #endif /* defined(ENABLE_COOKIES) */
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), "resl",  fmt)

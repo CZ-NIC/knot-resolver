@@ -65,8 +65,11 @@ endif
 BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(nettle_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
 BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
 
-ifeq ($(HAS_nettle),yes)
+# Check if it has libknot 2.3.0 and nettle to support DNS cookies
+$(eval $(call find_alt,knot230,libknot,2.3))
+ifeq ($(HAS_nettle)|$(HAS_knot230),yes|yes)
 BUILD_CFLAGS += -DENABLE_COOKIES
+ENABLE_COOKIES := yes
 endif
 
 # Overview

@@ -44,7 +44,7 @@ libkres_CFLAGS := -fvisibility=hidden -fPIC $(lmdb_CFLAGS)
 libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
-ifeq ($(HAS_nettle),yes)
+ifeq ($(ENABLE_COOKIES),yes)
 libkres_SOURCES += \
 	lib/cookies/alg_containers.c \
 	lib/cookies/alg_sha.c \
