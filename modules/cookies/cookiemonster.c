@@ -277,16 +277,11 @@ int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 			 * Either the planning of the second request failed or
 			 * BADCOOKIE received for the second time.
 			 *
-			 * A TCP fall-back would be desirable. But, TCP is not
-			 * currently reliably supported in the resolver.
-			 * Therefore, the resolution just fails.
+			 * RFC7873 5.3 says that TCP should be used. Currently
+			 * we always expect that the server doesn't support TCP.
 			 */
 			qry->flags &= ~QUERY_BADCOOKIE_AGAIN;
 			return KNOT_STATE_FAIL;
-			/*
-			DEBUG_MSG(NULL, "%s\n", "falling back to TCP");
-			qry->flags |= QUERY_TCP;
-			 */
 		}
 
 		return KNOT_STATE_CONSUME;
