@@ -329,7 +329,7 @@ static int invalid_sc_status(int state, bool sc_present, bool ignore_badcookie,
 			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
 			state |= KNOT_STATE_FAIL;
 		}
-	} else if (!ignore_badcookie) { /* TODO -- Silently discard? */
+	} else if (!ignore_badcookie) {
 		/* Generate BADCOOKIE response. */
 		DEBUG_MSG(NULL, "%s\n",
 		          !sc_present ? "request is missing server cookie" :
@@ -367,11 +367,6 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		return ctx->state;
 	}
 
-	/*
-	 * TODO -- Would it be of any benefit to know whether the request came
-	 * via TCP?
-	 */
-
 	uint8_t *req_cookie_opt = req_cookie_option(req);
 	if (!req_cookie_opt) {
 		return ctx->state; /* Don't do anything without cookies. */
@@ -386,7 +381,12 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		return KNOT_STATE_FAIL | KNOT_STATE_DONE;
 	}
 
-	bool ignore_badcookie = true; /* TODO -- Occasionally ignore? */
+	/*
+	 * RFC7873 5.2.3 and 5.2.4 suggest that queries with invalid or
+	 * missing server cookies can be treated like normal.
+	 * Right now bad cookies are always ignored (i.e. treated as valid).
+	 */
+	bool ignore_badcookie = true;
 
 	const struct knot_sc_alg *current_sc_alg = kr_sc_alg_get(srvr_sett->current.alg_id);
 
