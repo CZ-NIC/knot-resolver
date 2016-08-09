@@ -725,8 +725,13 @@ int engine_start(struct engine *engine, const char *config_path)
 
 void engine_stop(struct engine *engine)
 {
-	uv_timer_stop(engine->updater);
-	uv_close((uv_handle_t *)engine->updater, (uv_close_cb) free);
+	if (!engine) {
+		return;
+	}
+	if (engine->updater) {
+		uv_timer_stop(engine->updater);
+		uv_close((uv_handle_t *)engine->updater, (uv_close_cb) free);
+	}
 	uv_stop(uv_default_loop());
 }
 
