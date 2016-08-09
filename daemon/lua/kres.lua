@@ -11,7 +11,18 @@ local bit = require('bit')
 local bor = bit.bor
 local band = bit.band
 local C = ffi.C
-local knot = ffi.load(libpath('libknot', '2'))
+
+-- Load any of supported libknot SO versions
+local knot
+for ver = 2, 3 do
+	local ok, lib = pcall(ffi.load, libpath('libknot', tostring(ver)))
+	if ok then
+		knot = lib
+		break
+	end
+end
+assert(knot, 'support libknot not found')
+
 ffi.cdef[[
 
 /*
