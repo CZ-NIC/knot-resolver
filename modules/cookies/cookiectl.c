@@ -518,6 +518,7 @@ static bool config_apply_json(struct kr_cookie_ctx *ctx, JsonNode *root_node)
 		return false;
 	}
 	if (!obtain_secret(root_node, &new_srvr_secret, NAME_SERVER_SECRET)) {
+		free(new_clnt_secret);
 		return false;
 	}
 
