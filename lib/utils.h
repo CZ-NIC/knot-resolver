@@ -103,6 +103,10 @@ int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t 
 KR_EXPORT
 int kr_pkt_recycle(knot_pkt_t *pkt);
 
+/** @internal Clear packet payload. */
+KR_EXPORT
+int kr_pkt_clear_payload(knot_pkt_t *pkt);
+
 /** Construct and put record to packet. */
 KR_EXPORT
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,

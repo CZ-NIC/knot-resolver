@@ -208,6 +208,22 @@ int kr_pkt_recycle(knot_pkt_t *pkt)
 	return knot_pkt_parse_question(pkt);
 }
 
+int kr_pkt_clear_payload(knot_pkt_t *pkt)
+{
+	pkt->rrset_count = 0;
+	pkt->size = KNOT_WIRE_HEADER_SIZE + pkt->qname_size +
+		    2 * sizeof(uint16_t); /* QTYPE + QCLASS */
+	pkt->parsed = KNOT_WIRE_HEADER_SIZE;
+	pkt->current = KNOT_ANSWER;
+	knot_wire_set_ancount(pkt->wire, 0);
+	knot_wire_set_nscount(pkt->wire, 0);
+	knot_wire_set_arcount(pkt->wire, 0);
+	memset(&pkt->sections[KNOT_ANSWER], 0, sizeof(knot_pktsection_t) *
+	       (KNOT_PKT_SECTIONS - (KNOT_ANSWER + 1)));
+	knot_pkt_begin(pkt, KNOT_ANSWER);
+	return knot_pkt_parse_question(pkt);
+}
+
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen)
 {

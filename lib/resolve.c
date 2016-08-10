@@ -337,43 +337,62 @@ static void write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
 	}
 }
 
+static int answer_fail(knot_pkt_t *answer)
+{
+	int ret = kr_pkt_clear_payload(answer);
+	knot_wire_clear_ad(answer->wire);
+	knot_wire_clear_aa(answer->wire);
+	knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
+	if (ret == 0 && answer->opt_rr) {
+		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
+		knot_pkt_begin(answer, KNOT_ADDITIONAL);
+		ret = edns_put(answer);
+	}
+	return ret;
+}
+
 static int answer_finalize(struct kr_request *request, int state)
 {
-	/* Write authority records. */
+	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
-	if (answer->current < KNOT_AUTHORITY)
+
+	/* Always set SERVFAIL for bogus answers. */
+	if (state == KNOT_STATE_FAIL && rplan->pending.len > 0) {
+		struct kr_query *last = array_tail(rplan->pending);
+		if ((last->flags & QUERY_DNSSEC_WANT) && (last->flags & QUERY_DNSSEC_BOGUS)) {
+			return answer_fail(answer);
+		}
+	}
+
+	/* Write authority records. */
+	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
+	}
 	write_extra_records(&request->authority, answer);
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
 	write_extra_records(&request->additional, answer);
 	/* Write EDNS information */
+	int ret = 0;
 	if (answer->opt_rr) {
-		int ret = edns_put(answer);
-		if (ret != 0) {
-			return ret;
-		}
+		knot_pkt_begin(answer, KNOT_ADDITIONAL);
+		ret = edns_put(answer);
 	}
-	struct kr_rplan *rplan = &request->rplan;
-	/* Always set SERVFAIL for bogus answers. */
-	if (state == KNOT_STATE_FAIL && rplan->pending.len > 0) {
-		struct kr_query *last = array_tail(rplan->pending);
-		if ((last->flags & QUERY_DNSSEC_WANT) && (last->flags & QUERY_DNSSEC_BOGUS)) {
-			knot_wire_set_rcode(answer->wire,KNOT_RCODE_SERVFAIL);
-		}
-	}
+
 	/* Set AD=1 if succeeded and requested secured answer. */
 	const bool has_ad = knot_wire_get_ad(answer->wire);
 	knot_wire_clear_ad(answer->wire);
 	if (state == KNOT_STATE_DONE && rplan->resolved.len > 0) {
 		struct kr_query *last = array_tail(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
-		const bool secure = (last->flags & QUERY_DNSSEC_WANT) && !(last->flags & QUERY_DNSSEC_INSECURE);
+		const bool secure = (last->flags & QUERY_DNSSEC_WANT) &&
+		                   !(last->flags & QUERY_DNSSEC_INSECURE);
 		if (has_ad && secure && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
 			knot_wire_set_ad(answer->wire);
 		}
 	}
-	return kr_ok();
+
+	return ret;
 }
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
