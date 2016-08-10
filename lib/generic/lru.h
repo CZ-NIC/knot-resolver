@@ -166,7 +166,7 @@ static inline void *lru_slot_set(struct lru_hash_base *lru, const char *key, uin
 	uint32_t id = hash(key, len) % lru->size;
 	struct lru_slot *slot = lru_slot_at(lru, id);
 	if (lru_slot_match(slot, key, len)) {
-		slot->refs = 1; /* Increase slot significance */
+		slot->refs += 1; /* Increase slot significance */
 	} else {
 		if (slot->key) {
 			slot->refs -= 1; /* Decrease slot significance */
