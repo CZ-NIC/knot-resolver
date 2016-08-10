@@ -270,6 +270,34 @@ static int edns_put(knot_pkt_t *pkt)
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
 
+/** Removes last EDNS OPT RR written to the packet. */
+static int edns_erase_and_reserve(knot_pkt_t *pkt)
+{
+	/* Nothing to be done. */
+	if (!pkt || !pkt->opt_rr) {
+		return 0;
+	}
+
+	/* Fail if the data are located elsewhere than at the end of packet. */
+	if (pkt->current != KNOT_ADDITIONAL ||
+	    pkt->opt_rr != &pkt->rr[pkt->rrset_count - 1]) {
+		return -1;
+	}
+
+	size_t len = knot_rrset_size(pkt->opt_rr);
+	int16_t rr_removed = pkt->opt_rr->rrs.rr_count;
+	/* Decrease rrset counters. */
+	pkt->rrset_count -= 1;
+	pkt->sections[pkt->current].count -= 1;
+	pkt->size -= len;
+	knot_wire_add_arcount(pkt->wire, -rr_removed); /* ADDITIONAL */
+
+	pkt->opt_rr = NULL;
+
+	/* Reserve the freed space. */
+	return knot_pkt_reserve(pkt, len);
+}
+
 static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
@@ -358,7 +386,11 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	int ret = 0;
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	if (!(qry->flags & QUERY_SAFEMODE)) {
-		ret = edns_create(pkt, request->answer, request);
+		/* Remove any EDNS records from any previous iteration. */
+		ret = edns_erase_and_reserve(pkt);
+		if (ret == 0) {
+			ret = edns_create(pkt, request->answer, request);
+		}
 		if (ret == 0) {
 			/* Stub resolution (ask for +rd and +do) */
 			if (qry->flags & QUERY_STUB) {
