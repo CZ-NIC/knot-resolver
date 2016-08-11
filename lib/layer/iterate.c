@@ -511,6 +511,18 @@ static int begin(knot_layer_t *ctx, void *module_param)
 	if (ctx->state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
 		return ctx->state;
 	}
+	/*
+	 * RFC7873 5.4 extends the QUERY operation code behaviour in order to
+	 * be able to generate requests for server cookies. Such requests have
+	 * QDCOUNT equal to zero and must contain a cookie option.
+	 * Server cookie queries must be handled by the cookie module/layer
+	 * before this layer.
+	 */
+	const struct kr_request *req = ctx->data;
+	const knot_pkt_t *pkt = req->qsource.packet;
+	if (!pkt || knot_wire_get_qdcount(pkt->wire) == 0) {
+		return KNOT_STATE_FAIL;
+	}
 	return reset(ctx);
 }
 
@@ -576,7 +588,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->data;
 	struct kr_query *query = req->current_query;
-	if (!query || (query->flags & QUERY_RESOLVED)) {
+	if (!query || (query->flags & (QUERY_RESOLVED|QUERY_BADCOOKIE_AGAIN))) {
 		return ctx->state;
 	}
 

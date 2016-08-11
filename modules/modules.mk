@@ -2,6 +2,11 @@
 modules_TARGETS := hints \
                    stats
 
+# DNS cookies
+ifeq ($(ENABLE_COOKIES),yes)
+modules_TARGETS += cookies
+endif
+
 # Memcached
 ifeq ($(HAS_libmemcached),yes)
 modules_TARGETS += kmemcached

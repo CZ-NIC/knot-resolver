@@ -469,6 +469,10 @@ static int init_resolver(struct engine *engine)
 	if (engine->resolver.cache_rep) {
 		lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
 	}
+	engine->resolver.cache_cookie = mm_alloc(engine->pool, lru_size(kr_cookie_lru_t, LRU_COOKIES_SIZE));
+	if (engine->resolver.cache_cookie) {
+		lru_init(engine->resolver.cache_cookie, LRU_COOKIES_SIZE);
+	}
 
 	/* Load basic modules */
 	engine_register(engine, "iterate", NULL, NULL);
@@ -587,6 +591,7 @@ void engine_deinit(struct engine *engine)
 	kr_cache_close(&engine->resolver.cache);
 	lru_deinit(engine->resolver.cache_rtt);
 	lru_deinit(engine->resolver.cache_rep);
+	lru_deinit(engine->resolver.cache_cookie);
 
 	/* Clear IPC pipes */
 	for (size_t i = 0; i < engine->ipc_set.len; ++i) {

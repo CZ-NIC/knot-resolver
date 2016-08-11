@@ -44,6 +44,25 @@ libkres_CFLAGS := -fvisibility=hidden -fPIC $(lmdb_CFLAGS)
 libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
+ifeq ($(ENABLE_COOKIES),yes)
+libkres_SOURCES += \
+	lib/cookies/alg_containers.c \
+	lib/cookies/alg_sha.c \
+	lib/cookies/helper.c \
+	lib/cookies/lru_cache.c \
+	lib/cookies/nonce.c
+
+libkres_HEADERS += \
+	lib/cookies/alg_containers.h \
+	lib/cookies/alg_sha.h \
+	lib/cookies/control.h \
+	lib/cookies/helper.h \
+	lib/cookies/lru_cache.h \
+	lib/cookies/nonce.h
+
+libkres_LIBS += $(nettle_LIBS)
+endif
+
 # Make library
 ifeq ($(BUILDMODE), static)
 $(eval $(call make_static,libkres,lib,yes))

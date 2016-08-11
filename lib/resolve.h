@@ -19,6 +19,8 @@
 #include <netinet/in.h>
 #include <libknot/packet/pkt.h>
 
+#include "lib/cookies/control.h"
+#include "lib/cookies/lru_cache.h"
 #include "lib/layer.h"
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
@@ -92,6 +94,10 @@ struct kr_context
 	kr_nsrep_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
+	/* The cookie context structure should not be held within the cookies
+	 * module because of better access. */
+	struct kr_cookie_ctx cookie_ctx;
+	kr_cookie_lru_t *cache_cookie;
 	knot_mm_t *pool;
 };
 
@@ -114,6 +120,7 @@ struct kr_request {
         const struct sockaddr *addr;
         const struct sockaddr *dst_addr;
         const knot_pkt_t *packet;
+        const knot_rrset_t *opt;
     } qsource;
     struct {
         unsigned rtt;                  /**< Current upstream RTT */
@@ -169,6 +176,22 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
  */
 KR_EXPORT
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet);
+
+/**
+ * Finalises the outbound query packet with the knowledge of the IP addresses.
+ *
+ * @note The function must be called before actual sending of the request packet.
+ *
+ * @param  request request state (in PRODUCE state)
+ * @param  src     address from which the query is going to be sent
+ * @param  dst     address of the name server
+ * @param  type    used socket type (SOCK_STREAM, SOCK_DGRAM)
+ * @param  packet  [in,out] query packet to be finalised
+ * @return         kr_ok() or error code
+ */
+KR_EXPORT
+int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
+                        struct sockaddr *dst, int type, knot_pkt_t *packet);
 
 /**
  * Finish resolution and commit results if the state is DONE.

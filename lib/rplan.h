@@ -46,7 +46,8 @@
 	X(ALWAYS_CUT,      1 << 18) /**< Always recover zone cut (even if cached). */ \
 	X(DNSSEC_WEXPAND,  1 << 19) /**< Query response has wildcard expansion. */ \
 	X(PERMISSIVE,      1 << 20) /**< Permissive resolver mode. */ \
-	X(STRICT,          1 << 21) /**< Strict resolver mode. */
+	X(STRICT,          1 << 21) /**< Strict resolver mode. */ \
+	X(BADCOOKIE_AGAIN, 1 << 22) /**< Query again because bad cookie returned. */
 
 /** Query flags */
 enum kr_query_flag {
@@ -118,6 +119,17 @@ void kr_rplan_deinit(struct kr_rplan *rplan);
  */
 KR_EXPORT KR_PURE
 bool kr_rplan_empty(struct kr_rplan *rplan);
+
+/**
+ * Push empty query to the top of the resolution plan.
+ * @note This query serves as a cookie query only.
+ * @param rplan plan instance
+ * @param parent query parent (or NULL)
+ * @return query instance or NULL
+ */
+KR_EXPORT
+struct kr_query *kr_rplan_push_empty(struct kr_rplan *rplan,
+                                     struct kr_query *parent);
 
 /**
  * Push a query to the top of the resolution plan.

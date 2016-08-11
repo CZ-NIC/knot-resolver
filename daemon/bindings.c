@@ -657,6 +657,8 @@ static int cache_clear(lua_State *L)
 	lru_deinit(engine->resolver.cache_rep);
 	lru_init(engine->resolver.cache_rtt, LRU_RTT_SIZE);
 	lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
+	lru_deinit(engine->resolver.cache_cookie);
+	lru_init(engine->resolver.cache_cookie, LRU_COOKIES_SIZE);
 	lua_pushboolean(L, true);
 	return 1;
 }

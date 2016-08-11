@@ -345,6 +345,11 @@ static int qr_task_start(struct qr_task *task, knot_pkt_t *query)
 		task->req.qsource.key = knot_rrset_copy(query->tsig_rr, &task->req.pool);
 	}
 
+	/* Remember query source EDNS data */
+	if (query->opt_rr) {
+		task->req.qsource.opt = knot_rrset_copy(query->opt_rr, &task->req.pool);
+	}
+
 	/* Start resolution */
 	struct worker_ctx *worker = task->worker;
 	struct engine *engine = worker->engine;
@@ -452,12 +457,33 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		return qr_task_on_send(task, handle, ret);
 	}
 
-	/* Send using given protocol */
 	int ret = 0;
 	struct req *send_req = req_borrow(task->worker);
 	if (!send_req) {
 		return qr_task_on_send(task, handle, kr_error(ENOMEM));
 	}
+	if (knot_wire_get_qr(pkt->wire) == 0) {
+		/*
+		 * Query must be finalised using destination address before
+		 * sending.
+		 *
+		 * Libuv does not offer a convenient way how to obtain a source
+		 * IP address from a UDP handle that has been initialised using
+		 * uv_udp_init(). The uv_udp_getsockname() fails because of the
+		 * lazy socket initialisation.
+		 *
+		 * @note -- A solution might be opening a separate socket and
+		 * trying to obtain the IP address from it.
+		 */
+		ret = kr_resolve_checkout(&task->req, NULL, addr,
+		                          handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
+		                          pkt);
+		if (ret != kr_ok()) {
+			return ret;
+		}
+	}
+	/* Send using given protocol */
+	ret = 0;
 	if (handle->type == UV_UDP) {
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->as.send.data = task;

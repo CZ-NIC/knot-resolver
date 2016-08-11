@@ -27,6 +27,13 @@
 #include "lib/rplan.h"
 #include "lib/layer/iterate.h"
 #include "lib/dnssec/ta.h"
+#if defined(ENABLE_COOKIES)
+#include "lib/cookies/control.h"
+#include "lib/cookies/helper.h"
+#include "lib/cookies/nonce.h"
+#else /* Define compatibility macros */
+#define KNOT_EDNS_OPTION_COOKIE 10
+#endif /* defined(ENABLE_COOKIES) */
 
 #define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), "resl",  fmt)
 
@@ -263,10 +270,45 @@ static int edns_put(knot_pkt_t *pkt)
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
 
+/** Removes last EDNS OPT RR written to the packet. */
+static int edns_erase_and_reserve(knot_pkt_t *pkt)
+{
+	/* Nothing to be done. */
+	if (!pkt || !pkt->opt_rr) {
+		return 0;
+	}
+
+	/* Fail if the data are located elsewhere than at the end of packet. */
+	if (pkt->current != KNOT_ADDITIONAL ||
+	    pkt->opt_rr != &pkt->rr[pkt->rrset_count - 1]) {
+		return -1;
+	}
+
+	size_t len = knot_rrset_size(pkt->opt_rr);
+	int16_t rr_removed = pkt->opt_rr->rrs.rr_count;
+	/* Decrease rrset counters. */
+	pkt->rrset_count -= 1;
+	pkt->sections[pkt->current].count -= 1;
+	pkt->size -= len;
+	knot_wire_add_arcount(pkt->wire, -rr_removed); /* ADDITIONAL */
+
+	pkt->opt_rr = NULL;
+
+	/* Reserve the freed space. */
+	return knot_pkt_reserve(pkt, len);
+}
+
 static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
-	return knot_pkt_reserve(pkt, knot_edns_wire_size(pkt->opt_rr));
+	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
+#if defined(ENABLE_COOKIES)
+	if (req->ctx->cookie_ctx.clnt.enabled ||
+	    req->ctx->cookie_ctx.srvr.enabled) {
+		wire_size += KR_COOKIE_OPT_MAX_LEN;
+	}
+#endif /* defined(ENABLE_COOKIES) */
+	return knot_pkt_reserve(pkt, wire_size);
 }
 
 static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_request *req)
@@ -344,7 +386,11 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	int ret = 0;
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	if (!(qry->flags & QUERY_SAFEMODE)) {
-		ret = edns_create(pkt, request->answer, request);
+		/* Remove any EDNS records from any previous iteration. */
+		ret = edns_erase_and_reserve(pkt);
+		if (ret == 0) {
+			ret = edns_create(pkt, request->answer, request);
+		}
 		if (ret == 0) {
 			/* Stub resolution (ask for +rd and +do) */
 			if (qry->flags & QUERY_STUB) {
@@ -384,7 +430,16 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	const knot_dname_t *qname = knot_pkt_qname(packet);
 	uint16_t qclass = knot_pkt_qclass(packet);
 	uint16_t qtype = knot_pkt_qtype(packet);
-	struct kr_query *qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
+	struct kr_query *qry = NULL;
+
+	if (qname != NULL) {
+		qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
+	} else if (knot_wire_get_qdcount(packet->wire) == 0 &&
+                   knot_pkt_has_edns(packet) &&
+                   knot_edns_has_option(packet->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
+		/* Plan empty query only for cookies. */
+		qry = kr_rplan_push_empty(rplan, NULL);
+	}
 	if (!qry) {
 		return KNOT_STATE_FAIL;
 	}
@@ -434,6 +489,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
+
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
 		if (tried_tcp)
@@ -727,7 +783,7 @@ ns_election:
 
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
-	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB))) { /* Keep NS when requerying/stub. */
+	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_BADCOOKIE_AGAIN))) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
@@ -753,10 +809,83 @@ ns_election:
 		return KNOT_STATE_PRODUCE;
 	}
 
-	/* Prepare additional query */
+	/*
+	 * Additional query is going to be finalised when calling
+	 * kr_resolve_checkout().
+	 */
+
+	gettimeofday(&qry->timestamp, NULL);
+	*dst = &qry->ns.addr[0].ip;
+	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
+	return request->state;
+}
+
+#if defined(ENABLE_COOKIES)
+/** Update DNS cookie data in packet. */
+static bool outbound_request_update_cookies(struct kr_request *req,
+                                            const struct sockaddr *src,
+                                            const struct sockaddr *dst)
+{
+	assert(req);
+
+	/* RFC7873 4.1 strongly requires server address. */
+	if (!dst) {
+		return false;
+	}
+
+	struct kr_cookie_settings *clnt_sett = &req->ctx->cookie_ctx.clnt;
+
+	/* Cookies disabled or packet has no EDNS section. */
+	if (!clnt_sett->enabled) {
+		return true;
+	}
+
+	/*
+	 * RFC7873 4.1 recommends using also the client address. The matter is
+	 * also discussed in section 6.
+	 */
+
+	kr_request_put_cookie(&clnt_sett->current, req->ctx->cache_cookie,
+	                      src, dst, req);
+
+	return true;
+}
+#endif /* defined(ENABLE_COOKIES) */
+
+int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
+                        struct sockaddr *dst, int type, knot_pkt_t *packet)
+{
+	/* @todo: Update documentation if this function becomes approved. */
+
+	struct kr_rplan *rplan = &request->rplan;
+
+	if (knot_wire_get_qr(packet->wire) != 0) {
+		return kr_ok();
+	}
+
+	/* No query left for resolution */
+	if (kr_rplan_empty(rplan)) {
+		return kr_error(EINVAL);
+	}
+	struct kr_query *qry = array_tail(rplan->pending);
+
+#if defined(ENABLE_COOKIES)
+	/* Update DNS cookies in request. */
+	if (type == SOCK_DGRAM) { /* @todo: Add cookies also over TCP? */
+		/*
+		 * The actual server IP address is needed before generating the
+		 * actual cookie. If we don't know the server address then we
+		 * also don't know the actual cookie size.
+		 */
+		if (!outbound_request_update_cookies(request, src, dst)) {
+			return kr_error(EINVAL);
+		}
+	}
+#endif /* defined(ENABLE_COOKIES) */
+
 	int ret = query_finalize(request, qry, packet);
 	if (ret != 0) {
-		return KNOT_STATE_FAIL;
+		return kr_error(EINVAL);
 	}
 
 	WITH_DEBUG {
@@ -776,10 +905,7 @@ ns_election:
 	}
 	}
 
-	gettimeofday(&qry->timestamp, NULL);
-	*dst = &qry->ns.addr[0].ip;
-	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
-	return request->state;
+	return kr_ok();
 }
 
 int kr_resolve_finish(struct kr_request *request, int state)

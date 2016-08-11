@@ -225,6 +225,7 @@ struct kr_request {
 		const struct sockaddr *addr;
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
+		const knot_rrset_t *opt;
 	} qsource;
 	struct {
 	    unsigned rtt;
