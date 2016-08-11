@@ -46,6 +46,6 @@ cache:
     - ${HOME}/.cache/pip
 before_cache:
     - rm -f ${HOME}/.local/sbin/kresd
-    - rm -f ${HOME}/.local/lib/libkres.a
+    - rm -f ${HOME}/.local/lib/libkres.*
     - rm -rf ${HOME}/.local/include/libkres
     - rm -rf ${HOME}/.local/lib/kdns_modules
