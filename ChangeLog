@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 
 * N/A
 
+## 1.1.0
+
+* RFC7873 DNS Cookies
+* RFC7858 DNS over TLS
+* HTTP/2 web interface, RESTful API
+* Metrics exported in Prometheus
+* DNS firewall module
+* Explicit CNAME target fetching in strict mode
+* Query minimisation improvements 
+* Improved integration with systemd
+
 ## 1.0.0
 
 * First release
