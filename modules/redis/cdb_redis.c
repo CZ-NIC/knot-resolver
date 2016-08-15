@@ -147,7 +147,7 @@ static int cdb_init(knot_db_t **cache, struct kr_cdb_opts *opts, knot_mm_t *pool
 		cli_free(cli);
 		return ret;
 	}    
-    *cache = cli;
+	*cache = cli;
 	return ret;
 }
 
