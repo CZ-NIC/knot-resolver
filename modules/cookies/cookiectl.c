@@ -169,7 +169,7 @@ static int hexval2char(int i)
 {
 	if ((0 <= i) && (i <= 9)) {
 		return i + '0';
-	} if ((0x0a <= i) && (i <= 0x0f)) {
+	} else if ((0x0a <= i) && (i <= 0x0f)) {
 		return i - 0x0a + 'A';
 	} else {
 		return -1;
