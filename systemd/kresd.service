@@ -7,7 +7,7 @@ RefuseManualStart=true
 [Service]
 Type=notify
 WorkingDirectory=/run/knot-resolver/cache
-ExecStart=/usr/sbin/kresd
+ExecStart=/usr/sbin/kresd -c /etc/knot-resolver/kresd.conf -v -f 1 -k /usr/share/dns/root.key
 User=knot-resolver
 Restart=on-failure
 

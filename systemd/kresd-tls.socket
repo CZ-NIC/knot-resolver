@@ -2,11 +2,12 @@
 Description=Knot DNS Resolver TLS network listener
 Documentation=man:kresd(8)
 Before=sockets.target
+PartOf=kresd.socket
 
 [Socket]
 ListenStream=853
 FileDescriptorName=tls
-Service=knot-resolver.service
+Service=kresd.service
 
 [Install]
 WantedBy=sockets.target
