@@ -289,10 +289,6 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 		for (unsigned i = 0; i < HINT_COUNT; ++i) {
 			const struct hint_info *hint = &SBELT[i];
 			knot_rdata_init(rdata_arr, hint->len, hint->addr, 0);
-			for(int j = 0; j < (uint16_t)rdata_arr[4]; j++) {
-				printf("%02x", rdata_arr[j+4+2]);
-			}
-			printf("\n");
 			ret = kr_zonecut_add(cut, hint->name, rdata_arr);
 			if (ret != 0) {
 				break;
