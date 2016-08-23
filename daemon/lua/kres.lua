@@ -290,7 +290,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 struct kr_query *kr_rplan_next(struct kr_query *qry);
 /* Nameservers */
-int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len);
+int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len, int port);
 /* Query */
 /* Utils */
 unsigned kr_rand_uint(unsigned max);
@@ -318,6 +318,9 @@ int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen);
 int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
                         const uint8_t *key_b_rdata, size_t key_b_rdlen);
 ]]
+
+-- Constants
+local query_flag = ffi.new('struct query_flag')
 
 -- Metatype for sockaddr
 local addr_buf = ffi.new('char[16]')
@@ -352,7 +355,7 @@ ffi.metatype( knot_rrset_t, {
 		tostring = function(rr, i)
 			assert(ffi.istype(knot_rrset_t, rr))
 			if rr.rr.count > 0 then
-				local ret = -1
+				local ret
 				if i ~= nil then
 					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
 				else
@@ -417,18 +420,18 @@ local ub_t = ffi.typeof('unsigned char *')
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
-		name = function(qry, new_name) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
+		name = function(qry) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
 		hasflag = function(qry, flag)
 			return band(qry.flags, flag) ~= 0
 		end,
 		resolved = function(qry)
-			return qry:hasflag(kres.query.RESOLVED)
+			return qry:hasflag(query_flag.RESOLVED)
 		end,
 		final = function(qry)
 			return qry:resolved() and (qry.parent == nil)
 		end,
-		nslist = function(qry, ns)
-			if ns ~= nil then C.kr_nsrep_set(qry, ffi.cast(ub_t, ns), #ns) end
+		nslist = function(qry, ns, port)
+			if ns ~= nil then C.kr_nsrep_set(qry, ffi.cast(ub_t, ns), #ns, port) end
 			-- @todo: Return list of NS entries, not possible ATM because the NSLIST is union and missing typedef
 		end,
 	},
@@ -444,7 +447,7 @@ ffi.metatype( kr_request_t, {
 		end,
 		resolved = function(req)
 			assert(req)
-			qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))
+			local qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))
 			if qry == nil then return nil end
 			return qry
 
@@ -489,7 +492,7 @@ local kres = {
 	type = ffi.new('struct rr_type'),
 	section = ffi.new('struct pkt_section'),
 	rcode = ffi.new('struct pkt_rcode'),
-	query = ffi.new('struct query_flag'),
+	query = query_flag,
 	NOOP = 0, YIELD = 0, CONSUME = 1, PRODUCE = 2, DONE = 4, FAIL = 8,
 	-- Metatypes
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,

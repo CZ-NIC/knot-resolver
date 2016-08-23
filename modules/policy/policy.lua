@@ -1,4 +1,5 @@
 local kres = require('kres')
+local bit = require('bit')
 
 -- Counter of unique rules
 local nextid = 0
@@ -53,13 +54,16 @@ end
 
 -- Forward request, and solve as stub query
 local function forward(target)
-	local dst_ip = kres.str2ip(target)
-	if dst_ip == nil then error("FORWARD target '"..target..'" is not a valid IP address') end
+	local addr, port = target:match '([^@]*)@?(.*)'
+	port = port and tonumber(port) or 53
+	addr = kres.str2ip(addr)
+	if addr == nil then error("FORWARD target '"..target..'" is not a valid IP address') end
 	return function(state, req)
 		req = kres.request_t(req)
 		local qry = req:current()
-		qry.flags = qry.flags + kres.query.STUB
-		qry:nslist(dst_ip)
+		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
+		qry.flags = bit.band(bit.bor(qry.flags, kres.query.STUB), bit.bnot(kres.query.ALWAYS_CUT))
+		qry:nslist(addr, port)
 		return state
 	end
 end

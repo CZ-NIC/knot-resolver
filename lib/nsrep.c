@@ -30,14 +30,14 @@
 #define FAVOUR_IPV6 20 /* 20ms bonus for v6 */
 
 /** @internal Macro to set address structure. */
-#define ADDR_SET(sa, family, addr, len) do {\
+#define ADDR_SET(sa, family, addr, len, port) do {\
     	memcpy(&sa ## _addr, (addr), (len)); \
     	sa ## _family = (family); \
-	sa ## _port = htons(KR_DNS_PORT); \
+	sa ## _port = htons(port); \
 } while (0)
 
 /** Update nameserver representation with current name/address pair. */
-static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t addr_len)
+static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t addr_len, int port)
 {
 	if (addr == NULL) {
 		ns->addr[pos].ip.sa_family = AF_UNSPEC;
@@ -49,9 +49,9 @@ static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t 
 
 	switch(addr_len) {
 	case sizeof(struct in_addr):
-		ADDR_SET(ns->addr[pos].ip4.sin, AF_INET, addr, addr_len); break;
+		ADDR_SET(ns->addr[pos].ip4.sin, AF_INET, addr, addr_len, port); break;
 	case sizeof(struct in6_addr):
-		ADDR_SET(ns->addr[pos].ip6.sin6, AF_INET6, addr, addr_len); break;
+		ADDR_SET(ns->addr[pos].ip6.sin6, AF_INET6, addr, addr_len, port); break;
 	default: assert(0); break;
 	}
 }
@@ -69,7 +69,7 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 		if (addr[i]) {
 			void *addr_val = pack_obj_val(addr[i]);
 			size_t len = pack_obj_len(addr[i]);
-			update_nsrep(ns, i, addr_val, len);
+			update_nsrep(ns, i, addr_val, len, KR_DNS_PORT);
 		} else {
 			break;
 		}
@@ -169,7 +169,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	return kr_ok();
 }
 
-int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len)
+int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len, int port)
 {
 	if (!qry || !addr) {
 		return kr_error(EINVAL);
@@ -177,8 +177,8 @@ int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len)
 	qry->ns.name = (const uint8_t *)"";
 	qry->ns.score = KR_NS_UNKNOWN;
 	qry->ns.reputation = 0;
-	update_nsrep(&qry->ns, 0, addr, addr_len);
-	update_nsrep(&qry->ns, 1, NULL, 0);
+	update_nsrep(&qry->ns, 0, addr, addr_len, port);
+	update_nsrep(&qry->ns, 1, NULL, 0, 0);
 	return kr_ok();
 }
 

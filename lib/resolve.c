@@ -508,7 +508,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
-
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
 		if (tried_tcp)
