@@ -19,12 +19,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <libknot/errcode.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
 #include <libknot/rrtype/rrsig.h>
 
+#include "contrib/ucw/lib.h"
 #include "contrib/cleanup.h"
 #include "lib/cache.h"
 #include "lib/cdb_lmdb.h"
@@ -92,6 +94,8 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		return ret;
 	}
 	memset(&cache->stats, 0, sizeof(cache->stats));
+	cache->ttl_min = 0;
+	cache->ttl_max = KR_CACHE_DEFAULT_MAXTTL;
 	/* Check cache ABI version */
 	(void) assert_right_version(cache);
 	return 0;
@@ -208,6 +212,11 @@ int kr_cache_insert(struct kr_cache *cache, uint8_t tag, const knot_dname_t *nam
 	if (!cache_isvalid(cache) || !name || !header) {
 		return kr_error(EINVAL);
 	}
+
+	/* Enforce cache maximum TTL limits without TTL decay.
+	 * Minimum TTL is enforced in specific caches as it requires
+	 * rewriting of the records to avoid negative TTL when decayed. */
+	header->ttl = MIN(header->ttl, cache->ttl_max);
 
 	/* Prepare key/value for insertion. */
 	uint8_t keybuf[KEY_SIZE];

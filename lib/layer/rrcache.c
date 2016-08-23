@@ -234,7 +234,7 @@ static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache *cac
 		.qry = qry,
 		.cache = cache,
 		.timestamp = qry->timestamp.tv_sec,
-		.min_ttl = DEFAULT_MINTTL
+		.min_ttl = MAX(DEFAULT_MINTTL, cache->ttl_min),
 	};
 	return map_walk(stash, &commit_rr, &baton);
 }
