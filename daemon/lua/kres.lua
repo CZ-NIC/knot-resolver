@@ -208,7 +208,8 @@ struct kr_query {
 	uint16_t class;
 	uint16_t id;
 	uint32_t flags;
-	unsigned secret;
+	uint32_t secret;
+	uint16_t fails;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	uint8_t _stub[]; /* Do not touch */
