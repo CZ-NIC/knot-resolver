@@ -397,11 +397,6 @@ static int answer_finalize(struct kr_request *request, int state)
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
 {
-	/* Randomize query case (if not in safemode) */
-	qry->secret = (qry->flags & QUERY_SAFEMODE) ? 0 : kr_rand_uint(UINT32_MAX);
-	knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(pkt);
-	randomized_qname_case(qname_raw, qry->secret);
-
 	int ret = 0;
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
 	if (!(qry->flags & QUERY_SAFEMODE)) {
@@ -830,6 +825,11 @@ ns_election:
 		ITERATE_LAYERS(request, qry, reset);
 		return KNOT_STATE_PRODUCE;
 	}
+
+	/* Randomize query case (if not in safemode) */
+	qry->secret = (qry->flags & QUERY_SAFEMODE) ? 0 : kr_rand_uint(UINT32_MAX);
+	knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(packet);
+	randomized_qname_case(qname_raw, qry->secret);
 
 	/*
 	 * Additional query is going to be finalised when calling
