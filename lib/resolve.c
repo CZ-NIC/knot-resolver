@@ -773,6 +773,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		ITERATE_LAYERS(request, qry, reset);
 		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
 	}
+	
 
 	/* This query has RD=0 or is ANY, stop here. */
 	if (qry->stype == KNOT_RRTYPE_ANY || !knot_wire_get_rd(request->answer->wire)) {
@@ -781,11 +782,13 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	}
 
 	/* Update zone cut, spawn new subrequests. */
-	int state = zone_cut_check(request, qry, packet);
-	switch(state) {
-	case KNOT_STATE_FAIL: return KNOT_STATE_FAIL;
-	case KNOT_STATE_DONE: return KNOT_STATE_PRODUCE;
-	default: break;
+	if (!(qry->flags & QUERY_STUB)) {
+		int state = zone_cut_check(request, qry, packet);
+		switch(state) {
+		case KNOT_STATE_FAIL: return KNOT_STATE_FAIL;
+		case KNOT_STATE_DONE: return KNOT_STATE_PRODUCE;
+		default: break;
+		}
 	}
 
 ns_election:
@@ -799,9 +802,10 @@ ns_election:
 		return KNOT_STATE_FAIL;
 	}
 
+	const bool retry = (qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_BADCOOKIE_AGAIN));
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
-	} else if (!qry->ns.name || !(qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_BADCOOKIE_AGAIN))) { /* Keep NS when requerying/stub/badcookie. */
+	} else if (!qry->ns.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);

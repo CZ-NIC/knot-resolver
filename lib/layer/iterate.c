@@ -396,14 +396,14 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	const knot_dname_t *pending_cname = query->sname;
 	unsigned cname_chain_len = 0;
 	bool can_follow = false;
-	bool strict_mode = (query->flags & QUERY_STRICT);
+	bool strict_mode = (query->flags & QUERY_STRICT) && !(query->flags & QUERY_STUB);
 	do {
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
 		pending_cname = NULL;
 		/* If not secure, always follow cname chain. */
-		can_follow = !(query->flags & QUERY_DNSSEC_WANT);
+		can_follow = !(query->flags & QUERY_DNSSEC_WANT) || (query->flags & QUERY_STUB);
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 			if (!knot_dname_is_equal(rr->owner, cname)) {
@@ -629,6 +629,7 @@ static int resolve(knot_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_SERVFAIL: {
 		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		if (query->flags & QUERY_STUB) { break; } /* Pass through in stub mode */
 		query->fails += 1;
 		if (query->fails >= KR_QUERY_NSRETRY_LIMIT) {
 			query->fails = 0; /* Reset per-query counter. */
