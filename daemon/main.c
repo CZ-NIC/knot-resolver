@@ -259,7 +259,6 @@ static int fork_workers(fd_array_t *ipc_set, int forks)
 			array_clear(*ipc_set);
 			array_push(*ipc_set, sv[0]);
 			close(sv[1]);
-			kr_crypto_reinit();
 			return forks;
 		/* Parent process */
 		} else {
@@ -541,8 +540,6 @@ int main(int argc, char **argv)
 	 }
 #endif
 
-	kr_crypto_init();
-
 	/* Connect forks with local socket */
 	fd_array_t ipc_set;
 	array_init(ipc_set);
@@ -551,6 +548,8 @@ int main(int argc, char **argv)
 	if (fork_id < 0) {
 		return EXIT_FAILURE;
 	}
+
+	kr_crypto_init();
 
 	/* Create a server engine. */
 	knot_mm_t pool = {
