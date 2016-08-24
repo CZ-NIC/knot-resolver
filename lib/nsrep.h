@@ -54,7 +54,8 @@ enum kr_ns_rep {
 enum kr_ns_update_mode {
 	KR_NS_UPDATE = 0, /**< Update as smooth over last two measurements */
 	KR_NS_RESET,      /**< Set to given value */
-	KR_NS_ADD         /**< Increment current value */
+	KR_NS_ADD,        /**< Increment current value */
+	KR_NS_MAX         /**< Set to maximum of current/proposed value. */
 };
 
 /**

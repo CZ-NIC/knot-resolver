@@ -260,6 +260,7 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	case KR_NS_UPDATE: *cur = (*cur + score) / 2; break;
 	case KR_NS_RESET:  *cur = score; break;
 	case KR_NS_ADD:    *cur = MIN(KR_NS_MAX_SCORE - 1, *cur + score); break;
+	case KR_NS_MAX:    *cur = MAX(*cur, score); break;
 	default: break;
 	}
 	return kr_ok();

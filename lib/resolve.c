@@ -488,10 +488,93 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	return request->state;
 }
 
+KR_PURE static bool kr_inaddr_equal(const struct sockaddr *a, const struct sockaddr *b)
+{
+	const int a_len = kr_inaddr_len(a);
+	const int b_len = kr_inaddr_len(b);
+	return a_len == b_len && memcmp(kr_inaddr(a), kr_inaddr(b), a_len) == 0;
+}
+
+static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, const struct sockaddr *src)
+{
+	/* Do not track in safe mode. */
+	if (qry->flags & QUERY_SAFEMODE) {
+		return;
+	}
+
+	/* Calculate total resolution time from the time the query was generated. */
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	unsigned elapsed = time_diff(&qry->timestamp, &now);
+
+	/* NSs in the preference list prior to the one who responded will be penalised
+	 * with the RETRY timer interval. This is because we know they didn't respond
+	 * for N retries, so their RTT must be at least N * RETRY.
+	 * The NS in the preference list that responded will have RTT relative to the
+	 * time when the query was sent out, not when it was originated.
+	 */
+	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
+		const struct sockaddr *addr = &qry->ns.addr[i].ip;
+		if (addr->sa_family == AF_UNSPEC) {
+			break;
+		}
+		/* If this address is the source of the answer, update its RTT */
+		if (kr_inaddr_equal(src, addr)) {
+			kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_UPDATE);
+			WITH_DEBUG {
+				char addr_str[INET6_ADDRSTRLEN];
+				inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
+				DEBUG_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, elapsed);
+			}
+		} else {
+			/* Response didn't come from this IP, but we know the RTT must be at least
+			 * several RETRY timer tries, e.g. if we have addresses [a, b, c] and we have
+			 * tried [a, b] when the answer from 'a' came after 350ms, then we know
+			 * that 'b' didn't respond for at least 350 - (1 * 300) ms. We can't say that
+			 * its RTT is 50ms, but we can say that its score shouldn't be less than 50. */
+			 kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_MAX);
+			 WITH_DEBUG {
+			 	char addr_str[INET6_ADDRSTRLEN];
+			 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
+			 	DEBUG_MSG(qry, "<= server: '%s' rtt: >=%ld ms\n", addr_str, elapsed);
+			 }
+		}
+		/* Subtract query start time from elapsed time */
+		if (elapsed < KR_CONN_RETRY) {
+			break;
+		}
+		elapsed = elapsed - KR_CONN_RETRY;
+	}
+}
+
+static void update_nslist_score(struct kr_request *request, struct kr_query *qry, const struct sockaddr *src, knot_pkt_t *packet)
+{
+	struct kr_context *ctx = request->ctx;
+	/* On sucessful answer, update preference list RTT and penalise timer  */
+	if (request->state != KNOT_STATE_FAIL) {
+		/* Update RTT information for preference list */
+		update_nslist_rtt(ctx, qry, src);
+		/* Do not complete NS address resolution on soft-fail. */
+		const int rcode = packet ? knot_wire_get_rcode(packet->wire) : 0;
+		if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
+			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+		} else { /* Penalize SERVFAILs. */
+			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
+		}
+	/* Penalise resolution failures except validation failures. */
+	} else if (!(qry->flags & QUERY_DNSSEC_BOGUS)) {
+		kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt, KR_NS_RESET);
+		WITH_DEBUG {
+			char addr_str[INET6_ADDRSTRLEN];
+			inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
+			DEBUG_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
+		}
+	}
+}
+
 int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
-	struct kr_context *ctx = request->ctx;
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
@@ -533,35 +616,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Track RTT for iterative answers */
 	if (src && !(qry->flags & QUERY_CACHED)) {
-		/* Sucessful answer, track RTT and lift any address resolution requests. */
-		if (request->state != KNOT_STATE_FAIL) {
-			/* Do not track in safe mode. */
-			if (!(qry->flags & QUERY_SAFEMODE)) {
-				struct timeval now;
-				gettimeofday(&now, NULL);
-				kr_nsrep_update_rtt(&qry->ns, src, time_diff(&qry->timestamp, &now), ctx->cache_rtt, KR_NS_UPDATE);
-				WITH_DEBUG {
-					char addr_str[INET6_ADDRSTRLEN];
-					inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
-					DEBUG_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, time_diff(&qry->timestamp, &now));
-				}
-			}
-			/* Do not complete NS address resolution on soft-fail. */
-			const int rcode = packet ? knot_wire_get_rcode(packet->wire) : 0;
-			if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
-				qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
-			} else { /* Penalize SERVFAILs. */
-				kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
-			}
-		/* Do not penalize validation timeouts. */
-		} else if (!(qry->flags & QUERY_DNSSEC_BOGUS)) {
-			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt, KR_NS_RESET);
-			WITH_DEBUG {
-				char addr_str[INET6_ADDRSTRLEN];
-				inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
-				DEBUG_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
-			}
-		}
+		update_nslist_score(request, qry, src, packet);
 	}
 	/* Resolution failed, invalidate current NS. */
 	if (request->state == KNOT_STATE_FAIL) {

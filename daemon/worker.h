@@ -21,7 +21,7 @@
 #include "lib/generic/map.h"
 
 /** @internal Number of request within timeout window. */
-#define MAX_PENDING (KR_NSREP_MAXADDR + (KR_NSREP_MAXADDR / 2))
+#define MAX_PENDING KR_NSREP_MAXADDR
 
 /** @cond internal Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
