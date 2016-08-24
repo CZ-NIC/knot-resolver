@@ -1,0 +1,32 @@
+Knot Resolver 1.1.1 (2016-08-24)
+================================
+
+Bugfixes:
+---------
+ - Fix 0x20 randomization with retransmit
+ - Fix pass-through for the stub mode
+ - Fix the root hints IPv6 addresses
+
+Improvements:
+-------------
+ - Track RTT of all tried servers for faster retransmit
+ - DAF: Allow forwarding to custom port
+ - systemd: Read EnvironmentFile and user $KRESD_ARGS
+ - systemd: Update systemd units to be named after daemon
+
+Knot Resolver 1.1.0 (2016-08-12)
+================================
+
+* RFC7873 DNS Cookies
+* RFC7858 DNS over TLS
+* HTTP/2 web interface, RESTful API
+* Metrics exported in Prometheus
+* DNS firewall module
+* Explicit CNAME target fetching in strict mode
+* Query minimisation improvements 
+* Improved integration with systemd
+
+Knot Resolver 1.0.0 (2016-05-30)
+================================
+
+* First release
