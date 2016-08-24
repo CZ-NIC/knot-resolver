@@ -6,6 +6,7 @@ Bugfixes:
  - Fix 0x20 randomization with retransmit
  - Fix pass-through for the stub mode
  - Fix the root hints IPv6 addresses
+ - Fix dst addr for retries over TCP
 
 Improvements:
 -------------
