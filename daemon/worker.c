@@ -524,7 +524,10 @@ static void on_connect(uv_connect_t *req, int status)
 	uv_stream_t *handle = req->handle;
 	if (qr_valid_handle(task, (uv_handle_t *)req->handle)) {
 		if (status == 0) {
-			qr_task_send(task, (uv_handle_t *)handle, task->addrlist, task->pktbuf);
+			struct sockaddr_storage addr;
+			int addr_len = sizeof(addr);
+			uv_tcp_getpeername((uv_tcp_t *)handle, (struct sockaddr *)&addr, &addr_len);
+			qr_task_send(task, (uv_handle_t *)handle, (struct sockaddr *)&addr, task->pktbuf);
 		} else {
 			qr_task_step(task, task->addrlist, NULL);
 		}
@@ -763,7 +766,7 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 			return qr_task_step(task, NULL, NULL);
 		}
 		conn->data = task;
-		if (uv_tcp_connect(conn, (uv_tcp_t *)client, task->addrlist, on_connect) != 0) {
+		if (uv_tcp_connect(conn, (uv_tcp_t *)client, packet_source?packet_source:task->addrlist, on_connect) != 0) {
 			req_release(task->worker, (struct req *)conn);
 			return qr_task_step(task, NULL, NULL);
 		}
