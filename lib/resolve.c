@@ -977,7 +977,8 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 		}
 		inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr[i]), ns_str, sizeof(ns_str));
 		DEBUG_MSG(qry, "%s: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s' proto: '%s'\n",
-		          i == 0 ? "=> querying" : "   optional",
+                          i == 0 ? "=>" : "  ",
+			  kr_inaddr_equal(dst, addr) ? "*querying" : " optional",
 		          ns_str, qry->ns.score, zonecut_str, qname_str, type_str, (qry->flags & QUERY_TCP)?"tcp":"udp");
 	}
 	}
