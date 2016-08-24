@@ -588,10 +588,11 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	struct kr_query *qry = array_tail(rplan->pending);
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
-		if (tried_tcp)
+		if (tried_tcp) {
 			request->state = KNOT_STATE_FAIL;
-		else
+		} else {
 			qry->flags |= QUERY_TCP;
+		}
 	} else {
 		/* Packet cleared, derandomize QNAME. */
 		knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(packet);
