@@ -49,7 +49,9 @@ else
             BINFLAGS += -pie
             LDFLAGS += -Wl,-z,relro,-z,now
         endif
-        LDFLAGS += -ldl
+        ifeq ($(UNAME),Linux)
+        	LDFLAGS += -ldl
+        endif
     endif
 endif
 
