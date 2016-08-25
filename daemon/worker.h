@@ -62,9 +62,6 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned option
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);
 
-struct qr_task;
-typedef int (*qr_task_send_cb)(struct qr_task *task, uv_handle_t *handle, int status);
-
 
 /** @cond internal */
 
