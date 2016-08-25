@@ -169,16 +169,29 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	return kr_ok();
 }
 
-int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len, int port)
+int kr_nsrep_set(struct kr_query *qry, size_t index, uint8_t *addr, size_t addr_len, int port)
 {
-	if (!qry || !addr) {
+	if (!qry) {
 		return kr_error(EINVAL);
 	}
+	if (index >= KR_NSREP_MAXADDR) {
+		return kr_error(ENOSPC);
+	}
 	qry->ns.name = (const uint8_t *)"";
-	qry->ns.score = KR_NS_UNKNOWN;
-	qry->ns.reputation = 0;
-	update_nsrep(&qry->ns, 0, addr, addr_len, port);
-	update_nsrep(&qry->ns, 1, NULL, 0, 0);
+	/* Reset score on first entry */
+	if (index == 0) {
+		qry->ns.score = KR_NS_UNKNOWN;
+		qry->ns.reputation = 0;
+	}
+	/* Retrieve RTT from cache */
+	if (addr && addr_len > 0) {
+		struct kr_context *ctx = qry->ns.ctx;
+		unsigned *score = ctx ? lru_get(ctx->cache_rtt, (const char *)addr, addr_len) : NULL;
+		if (score) {
+			qry->ns.score = MIN(qry->ns.score, *score);
+		}
+	}
+	update_nsrep(&qry->ns, index, addr, addr_len, port);
 	return kr_ok();
 }
 

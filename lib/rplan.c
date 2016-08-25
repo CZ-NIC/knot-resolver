@@ -128,6 +128,7 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	/* Class and type must be set outside this function. */
 	qry->flags = rplan->request->options;
 	qry->parent = parent;
+	qry->ns.ctx = rplan->request->ctx;
 	qry->ns.addr[0].ip.sa_family = AF_UNSPEC;
 	gettimeofday(&qry->timestamp, NULL);
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);

@@ -94,13 +94,14 @@ struct kr_nsrep
 /**
  * Set given NS address.
  * @param  qry      updated query
+ * @param  index    index of the updated target
  * @param  addr     address bytes (struct in_addr or struct in6_addr)
  * @param  addr_len address bytes length (type will be derived from this)
  * @param  port     address port (if <= 0, 53 will be used)
  * @return          0 or an error code
  */
 KR_EXPORT
-int kr_nsrep_set(struct kr_query *qry, uint8_t *addr, size_t addr_len, int port);
+int kr_nsrep_set(struct kr_query *qry, size_t index, uint8_t *addr, size_t addr_len, int port);
 
 /**
  * Elect best nameserver/address pair from the nsset.

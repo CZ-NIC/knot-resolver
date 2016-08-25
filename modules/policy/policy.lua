@@ -35,10 +35,19 @@ if not has_ffi then
 	socket_client = function () return error("missing ffi library, required for this policy") end
 end
 
+local function parse_target(target)
+	local addr, port = target:match '([^@]*)@?(.*)'
+	port = port and tonumber(port) or 53
+	addr = kres.str2ip(addr)
+	if addr == nil then
+		error("target '"..target..'" is not a valid IP address')
+	end
+	return addr, port
+end
+
 -- Mirror request elsewhere, and continue solving
 local function mirror(target)
-	local addr, port = target:match '([^@]*)@?(.*)'
-	if not port or #port == 0 then port = 53 end
+	local addr, port = parse_target(target)
 	local sink, err = socket_client(addr, port)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
 	return function(state, req)
@@ -54,16 +63,21 @@ end
 
 -- Forward request, and solve as stub query
 local function forward(target)
-	local addr, port = target:match '([^@]*)@?(.*)'
-	port = port and tonumber(port) or 53
-	addr = kres.str2ip(addr)
-	if addr == nil then error("FORWARD target '"..target..'" is not a valid IP address') end
+	local list = {}
+	if type(target) == 'table' then
+		for _, v in pairs(target) do
+			table.insert(list, {parse_target(v)})
+			assert(#list <= 4, 'at most 4 FORWARD targets are supported')
+		end
+	else
+		table.insert(list, {parse_target(target)})
+	end
 	return function(state, req)
 		req = kres.request_t(req)
 		local qry = req:current()
 		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
 		qry.flags = bit.band(bit.bor(qry.flags, kres.query.STUB), bit.bnot(kres.query.ALWAYS_CUT))
-		qry:nslist(addr, port)
+		qry:nslist(list)
 		return state
 	end
 end
@@ -77,7 +91,6 @@ local function reroute(tbl, names)
 		table.insert(prefixes, names and ren.name(from, to) or ren.prefix(from, to))
 	end
 	-- Return rule closure
-	tbl = nil
 	return ren.rule(prefixes)
 end
 
@@ -139,7 +152,6 @@ end
 
 local function rpz_parse(action, path)
 	local rules = {}
-	local ffi = require('ffi')
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,

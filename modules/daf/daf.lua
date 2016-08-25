@@ -6,7 +6,12 @@ if not policy then modules.load('policy') end
 local actions = {
 	pass = 1, deny = 2, drop = 3, tc = 4, truncate = 4,
 	forward = function (g)
-		return policy.FORWARD(g())
+		local addrs = {}
+		local tok = g()
+		for addr in string.gmatch(tok, '[^,]+') do
+			table.insert(addrs, addr)
+		end
+		return policy.FORWARD(addrs)
 	end,
 	mirror = function (g)
 		return policy.MIRROR(g())
