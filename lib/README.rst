@@ -111,7 +111,7 @@ This is only passive processing of the incoming answer. If you want to change th
 		if (can_satisfy(cur)) {
 			/* This flag makes the resolver move the query
 			 * to the "resolved" list. */
-			query->flags |= QUERY_RESOLVED;
+			cur->flags |= QUERY_RESOLVED;
 			return KNOT_STATE_DONE;
 		}
 

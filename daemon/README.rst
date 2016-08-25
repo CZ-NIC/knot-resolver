@@ -86,7 +86,7 @@ Scaling out
 
 The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
 Multiple processes can serve different addresses, but still share the same working directory and cache.
-You can add start and stop processes on runtime based on the load.
+You can add, start and stop processes during runtime based on the load.
 
 .. code-block:: bash
 
@@ -102,7 +102,7 @@ You can add start and stop processes on runtime based on the load.
    bash(3533)─┬─kresd(19212)─┬─kresd(19212)
               │              ├─kresd(19212)
               │              └─kresd(19212)
-              └─pstree(19460)  
+              └─pstree(19460)
 
 .. _daemon-reuseport:
 
