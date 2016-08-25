@@ -26,6 +26,10 @@ struct worker_ctx;
 /** Worker callback */
 typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, void *baton);
 
+/** Create and initialize the worker. */
+struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
+		int worker_id, int worker_count);
+
 /**
  * Process incoming packet (query or answer to subrequest).
  * @return 0 or an error code
@@ -54,9 +58,6 @@ int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
  */
 int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options,
 		worker_cb_t on_complete, void *baton);
-
-/** Reserve worker buffers */
-int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen);
 
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);

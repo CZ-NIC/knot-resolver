@@ -25,9 +25,12 @@
 #include <malloc.h>
 #endif
 #include <assert.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "lib/utils.h"
 #include "lib/layer.h"
 #include "daemon/worker.h"
+#include "daemon/bindings.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
@@ -1010,7 +1013,8 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned option
 	return qr_task_step(task, NULL, query);
 }
 
-int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
+/** Reserve worker buffers */
+static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 {
 	array_init(worker->pool_mp);
 	array_init(worker->pool_ioreq);
@@ -1043,6 +1047,40 @@ void worker_reclaim(struct worker_ctx *worker)
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 	map_clear(&worker->outgoing);
+}
+
+struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
+		int worker_id, int worker_count)
+{
+	/* Load bindings */
+	engine_lualib(engine, "modules", lib_modules);
+	engine_lualib(engine, "net",     lib_net);
+	engine_lualib(engine, "cache",   lib_cache);
+	engine_lualib(engine, "event",   lib_event);
+	engine_lualib(engine, "worker",  lib_worker);
+
+	/* Create main worker. */
+	struct worker_ctx *worker = mm_alloc(pool, sizeof(*worker));
+	if (!worker) {
+		return NULL;
+	}
+	memset(worker, 0, sizeof(*worker));
+	worker->id = worker_id;
+	worker->count = worker_count;
+	worker->engine = engine;
+	worker_reserve(worker, MP_FREELIST_SIZE);
+	/* Register worker in Lua thread */
+	lua_pushlightuserdata(engine->L, worker);
+	lua_setglobal(engine->L, "__worker");
+	lua_getglobal(engine->L, "worker");
+	lua_pushnumber(engine->L, worker_id);
+	lua_setfield(engine->L, -2, "id");
+	lua_pushnumber(engine->L, getpid());
+	lua_setfield(engine->L, -2, "pid");
+	lua_pushnumber(engine->L, worker_count);
+	lua_setfield(engine->L, -2, "count");
+	lua_pop(engine->L, 1);
+	return worker;
 }
 
 #undef DEBUG_MSG

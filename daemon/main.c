@@ -290,39 +290,6 @@ static void help(int argc, char *argv[])
 	       " [rundir]             Path to the working directory (default: .)\n");
 }
 
-static struct worker_ctx *init_worker(struct engine *engine, knot_mm_t *pool, int worker_id, int worker_count)
-{
-	/* Load bindings */
-	engine_lualib(engine, "modules", lib_modules);
-	engine_lualib(engine, "net",     lib_net);
-	engine_lualib(engine, "cache",   lib_cache);
-	engine_lualib(engine, "event",   lib_event);
-	engine_lualib(engine, "worker",  lib_worker);
-
-	/* Create main worker. */
-	struct worker_ctx *worker = mm_alloc(pool, sizeof(*worker));
-	if(!worker) {
-		return NULL;
-	}
-	memset(worker, 0, sizeof(*worker));
-	worker->id = worker_id;
-	worker->count = worker_count;
-	worker->engine = engine;
-	worker_reserve(worker, MP_FREELIST_SIZE);
-	/* Register worker in Lua thread */
-	lua_pushlightuserdata(engine->L, worker);
-	lua_setglobal(engine->L, "__worker");
-	lua_getglobal(engine->L, "worker");
-	lua_pushnumber(engine->L, worker_id);
-	lua_setfield(engine->L, -2, "id");
-	lua_pushnumber(engine->L, getpid());
-	lua_setfield(engine->L, -2, "pid");
-	lua_pushnumber(engine->L, worker_count);
-	lua_setfield(engine->L, -2, "count");
-	lua_pop(engine->L, 1);
-	return worker;
-}
-
 static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader, int control_fd)
 {
 	/* Control sockets or TTY */
@@ -568,7 +535,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Create worker */
-	struct worker_ctx *worker = init_worker(&engine, &pool, fork_id, forks);
+	struct worker_ctx *worker = worker_create(&engine, &pool, fork_id, forks);
 	if (!worker) {
 		kr_log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
