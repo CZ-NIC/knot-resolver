@@ -435,14 +435,18 @@ int main(int argc, char **argv)
 		case 'f':
 			g_interactive = false;
 			forks = atoi(optarg);
-			if (forks == 0) {
-				kr_log_error("[system] error '-f' requires number, not '%s'\n", optarg);
+			if (forks <= 0) {
+				kr_log_error("[system] error '-f' requires a positive"
+						" number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
 			break;
 		case 'k':
 			keyfile_buf = malloc(PATH_MAX);
-			assert(keyfile_buf);
+			if (!keyfile_buf) {
+				kr_log_error("[system] not enough memory\n");
+				return EXIT_FAILURE;
+			}
 			/* Check if the path is absolute */
 			if (optarg[0] == '/') {
 				keyfile = strdup(optarg);
@@ -463,7 +467,8 @@ int main(int argc, char **argv)
 			}
 			free(keyfile_buf);
 			if (!keyfile) {
-				kr_log_error("[system] keyfile '%s': not writeable\n", optarg);
+				kr_log_error("[system] keyfile '%s':"
+					"failed to construct absolute path\n", optarg);
 				return EXIT_FAILURE;
 			}
 			break;
@@ -638,10 +643,10 @@ int main(int argc, char **argv)
 			/* Run the event loop */
 			ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, control_fd);
 		}
-	}
-	if (ret != 0) {
-		perror("[system] worker failed");
-		ret = EXIT_FAILURE;
+		if (ret != 0) {
+			perror("[system] worker failed");
+			ret = EXIT_FAILURE;
+		}
 	}
 	/* Cleanup. */
 	engine_deinit(&engine);
