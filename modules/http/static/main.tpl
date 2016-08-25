@@ -31,7 +31,6 @@
 		</div>
 		<ul class="nav navbar-nav navbar-right">
 			<li><a href="#">Metrics</a></li>
-			<li><a href="#worldmap">World Map</a></li>
 			<li class="dropdown">
 				<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Modules <span class="caret"></span></a>
 				<ul class="dropdown-menu" id="modules-dropdown">
@@ -63,7 +62,7 @@
 				</div>
 			</div>
 			<div class="row">
-				<h3>Running workers</h3>
+				<h3>Instances</h3>
 				<div class="col-md-12">
 				<table id="workers" class="table table-responsive">
 					<tr>
@@ -76,7 +75,7 @@
 		</div>
 		<div class="row" id="map-container">
 			<a name="worldmap"></a>
-			<h2 class="sub-header">Where do the queries go?</h2>
+			<h2 class="sub-header">Outbound queries</h2>
 			<div class="col-md-12">
 				<div id="map" style="position: relative;"></div>
 			</div>

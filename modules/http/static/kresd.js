@@ -55,10 +55,10 @@ $(function() {
 		'cache.miss':        [6, 'Cache miss'],
 		'cache.insert':      [7, 'Cache insert'],
 		'cache.delete':      [8, 'Cache delete'],
-		'worker.udp':        [9, 'Outgoing UDP'],
-		'worker.tcp':        [10, 'Outgoing TCP'],
-		'worker.ipv4':       [11, 'Outgoing IPv4'],
-		'worker.ipv6':       [12, 'Outgoing IPv6'],
+		'worker.udp':        [9, 'UDP queries'],
+		'worker.tcp':        [10, 'TCP queries'],
+		'worker.ipv4':       [11, 'IPv4 queries'],
+		'worker.ipv6':       [12, 'IPv6 queries'],
 		'worker.concurrent': [13, 'Queries outstanding'],
 		'worker.queries':    [14, 'Queries received/s'],
 		'worker.dropped':    [15, 'Queries dropped'],
@@ -163,7 +163,7 @@ $(function() {
 
 	/* Realtime updates over WebSockets */
 	function pushMetrics(resp, now, buffer) {
-		var line = new Array(last_metric + 1);
+		var line = new Array(labels.length);
 		line[0] = new Date(now * 1000);
 		for (var lb in resp) {
 			/* Push new datapoints */
@@ -305,6 +305,7 @@ $(function() {
 						},
 						labels: ['x', '%user', '%sys'],
 						labelsDiv: '',
+						stackedGraph: true,
 			        }
 				);
 				workerData[pid].graph = workerGraph;

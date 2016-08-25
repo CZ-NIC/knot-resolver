@@ -34,6 +34,9 @@ local mime_types = {
 local function pgload(relpath, modname)
 	if not modname then modname = 'http' end
 	local fp, err = io.open(string.format('%s/%s/%s', moduledir, modname, relpath), 'r')
+	if not fp then
+		fp, err = io.open(string.format('%s/%s/static/%s', moduledir, modname, relpath), 'r')
+	end
 	if not fp then error(err) end
 	local data = fp:read('*all')
 	fp:close()
@@ -66,7 +69,7 @@ local pages = {
 local function serve_root()
 	local data = pgload('main.tpl')[2]
 	data = data
-	        :gsub('{{ title }}', 'kresd @ '..hostname())
+	        :gsub('{{ title }}', title or ('kresd @ ' .. hostname()))
 	        :gsub('{{ host }}', hostname())
 	return function (h, stream)
 		-- Render snippets
@@ -97,6 +100,7 @@ local prometheus = require('prometheus')
 for k, v in pairs(prometheus.endpoints) do
 	M.endpoints[k] = v
 end
+M.prometheus = prometheus
 
 -- Export HTTP service page snippets
 M.snippets = {}
@@ -320,6 +324,17 @@ function M.deinit()
 	if M.ev then event.cancel(M.ev) end
 	M.servers = {}
 	prometheus.deinit()
+end
+
+-- @function Module runnable
+function M.step(timeout)
+	local ok, err = cq:step(timeout)
+	return ok, err, cq:timeout()
+end
+
+-- @function Module pollable fd
+function M.pollfd()
+	return cq:pollfd()
 end
 
 -- @function Configure module

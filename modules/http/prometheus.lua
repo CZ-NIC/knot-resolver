@@ -8,7 +8,7 @@ local gauges = {
 }
 
 local function merge(t, results, prefix)
-	for x, result in pairs(results) do
+	for _, result in pairs(results) do
 		if type(result) == 'table' then
 			for k, v in pairs(result) do
 				local val = t[prefix..k]
@@ -64,7 +64,7 @@ local function snapshot_start(h, ws)
 		end
 		-- Aggregate per-worker metrics
 		local wdata = {}
-		for i, info in pairs(map 'worker.info()') do
+		for _, info in pairs(map 'worker.info()') do
 			if type(info) == 'table' then
 				wdata[tostring(info.pid)] = {rss=info.rss, usertime=info.usertime, systime=info.systime, pagefaults=info.pagefaults, queries=info.queries}
 			end
@@ -144,6 +144,7 @@ end
 return {
 	init = snapshot_start,
 	deinit = snapshot_end,
+	gauges = gauges,
 	endpoints = {
 		['/stats']     = {'application/json', getstats, stream_stats},
 		['/frequent']  = {'application/json', function () return stats.frequent() end},
