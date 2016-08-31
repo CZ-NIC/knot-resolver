@@ -148,3 +148,4 @@ include modules/modules.mk
 include tests/tests.mk
 include doc/doc.mk
 include etc/etc.mk
+include bench/bench.mk
