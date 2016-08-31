@@ -62,11 +62,9 @@ int kr_cookie_lru_set(kr_cookie_lru_t *cache, const struct sockaddr *sa,
 	}
 
 	struct cookie_opt_data *cached = lru_get_new(cache, addr, addr_len);
-	if (!cached) {
-		return kr_error(ENOMEM);
+	if (cached) {
+		memcpy(cached->opt_data, opt, opt_size);
 	}
-
-	memcpy(cached->opt_data, opt, opt_size);
 
 	return kr_ok();
 }

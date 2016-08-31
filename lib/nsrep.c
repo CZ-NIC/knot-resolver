@@ -260,7 +260,7 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	}
 	unsigned *cur = lru_get_new(cache, addr_in, addr_len);
 	if (!cur) {
-		return kr_error(ENOMEM);
+		return kr_ok();
 	}
 	/* Score limits */
 	if (score > KR_NS_MAX_SCORE) {
@@ -294,9 +294,8 @@ int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t
 	ns->reputation = reputation;
 	/* Store reputation in the LRU cache */
 	unsigned *cur = lru_get_new(cache, (const char *)ns->name, knot_dname_size(ns->name));
-	if (!cur) {
-		return kr_error(ENOMEM);
+	if (cur) {
+		*cur = reputation;
 	}
-	*cur = reputation;
 	return kr_ok();
 }
