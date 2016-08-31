@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <sys/time.h>
@@ -42,6 +43,11 @@ KR_EXPORT void kr_log_debug(const char *fmt, ...);
 #define kr_debug_set(x)
 #define kr_log_debug(fmt, ...)
 #define WITH_DEBUG if(0)
+#endif
+
+/* C11 compatibility, but without any implementation so far. */
+#ifndef static_assert
+#define static_assert(cond, msg)
 #endif
 
 /** @cond Memory alloc routines */

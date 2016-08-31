@@ -5,7 +5,7 @@ include platform.mk
 all: info lib daemon modules
 install: lib-install daemon-install modules-install etc-install
 check: all tests
-clean: contrib-clean lib-clean daemon-clean modules-clean tests-clean doc-clean
+clean: contrib-clean lib-clean daemon-clean modules-clean tests-clean doc-clean bench-clean
 doc: doc-html
 .PHONY: all install check clean doc info
 

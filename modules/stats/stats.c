@@ -76,7 +76,7 @@ static struct const_metric_elm const_metrics[] = {
 /** @endcond */
 
 /** @internal LRU hash of most frequent names. */
-typedef lru_hash(unsigned) namehash_t;
+typedef lru_t(unsigned) namehash_t;
 typedef array_t(struct sockaddr_in6) addrlist_t;
 
 /** @internal Stats data structure. */
@@ -142,12 +142,12 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 		}
 		int key_len = collect_key(key, qry->sname, qry->stype);
 		if (qry->flags & QUERY_EXPIRING) {
-			unsigned *count = lru_set(data->queries.expiring, key, key_len);
+			unsigned *count = lru_get_new(data->queries.expiring, key, key_len);
 			if (count)
 				*count += 1;
 		/* Consider 1 in N for frequent sampling. */
 		} else if (kr_rand_uint(FREQUENT_PSAMPLE) <= 1) {
-			unsigned *count = lru_set(data->queries.frequent, key, key_len);
+			unsigned *count = lru_get_new(data->queries.frequent, key, key_len);
 			if (count)
 				*count += 1;
 		}
@@ -325,6 +325,23 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 	return ret;
 }
 
+/** @internal Helper for dump_list: add a single namehash_t item to JSON. */
+static enum lru_apply_do dump_value(const char *key, uint len, unsigned *val, void *baton)
+{
+	uint16_t key_type = 0;
+	char key_name[KNOT_DNAME_MAXLEN], type_str[16];
+	/* Extract query name, type and counter */
+	memcpy(&key_type, key, sizeof(key_type));
+	knot_dname_to_str(key_name, (uint8_t *)key + sizeof(key_type), sizeof(key_name));
+	knot_rrtype_to_string(key_type, type_str, sizeof(type_str));
+	/* Convert to JSON object */
+	JsonNode *json_val = json_mkobject();
+	json_append_member(json_val, "count", json_mknumber(*val));
+	json_append_member(json_val, "name",  json_mkstring(key_name));
+	json_append_member(json_val, "type",  json_mkstring(type_str));
+	json_append_element((JsonNode *)baton, json_val);
+	return LRU_APPLY_DO_NOTHING; // keep the item
+}
 /**
  * List frequent names.
  *
@@ -335,25 +352,8 @@ static char* dump_list(void *env, struct kr_module *module, const char *args, na
 	if (!table) {
 		return NULL;
 	}
-	uint16_t key_type = 0;
-	char key_name[KNOT_DNAME_MAXLEN], type_str[16];
 	JsonNode *root = json_mkarray();
-	for (unsigned i = 0; i < table->size; ++i) {
-		struct lru_slot *slot = lru_slot_at((struct lru_hash_base *)table, i);
-		if (slot->key) {
-			/* Extract query name, type and counter */
-			memcpy(&key_type, slot->key, sizeof(key_type));
-			knot_dname_to_str(key_name, (uint8_t *)slot->key + sizeof(key_type), sizeof(key_name));
-			knot_rrtype_to_string(key_type, type_str, sizeof(type_str));
-			unsigned *slot_val = lru_slot_val(slot, lru_slot_offset(table));
-			/* Convert to JSON object */
-			JsonNode *json_val = json_mkobject();
-			json_append_member(json_val, "count", json_mknumber(*slot_val));
-			json_append_member(json_val, "name",  json_mkstring(key_name));
-			json_append_member(json_val, "type",  json_mkstring(type_str));
-			json_append_element(root, json_val);
-		}
-	}
+	lru_apply(table, dump_value, root);
 	char *ret = json_encode(root);
 	json_delete(root);
 	return ret;
@@ -368,8 +368,7 @@ static char* dump_frequent(void *env, struct kr_module *module, const char *args
 static char* clear_frequent(void *env, struct kr_module *module, const char *args)
 {
 	struct stat_data *data = module->data;
-	lru_deinit(data->queries.frequent);
-	lru_init(data->queries.frequent, FREQUENT_COUNT);
+	lru_reset(data->queries.frequent);
 	return NULL;
 }
 
@@ -382,8 +381,7 @@ static char* dump_expiring(void *env, struct kr_module *module, const char *args
 static char* clear_expiring(void *env, struct kr_module *module, const char *args)
 {
 	struct stat_data *data = module->data;
-	lru_deinit(data->queries.expiring);
-	lru_init(data->queries.expiring, FREQUENT_COUNT);
+	lru_reset(data->queries.expiring);
 	return NULL;
 }
 
@@ -450,14 +448,8 @@ int stats_init(struct kr_module *module)
 	memset(data, 0, sizeof(*data));
 	data->map = map_make();
 	module->data = data;
-	data->queries.frequent = malloc(lru_size(namehash_t, FREQUENT_COUNT));
-	if (data->queries.frequent) {
-		lru_init(data->queries.frequent, FREQUENT_COUNT);
-	}
-	data->queries.expiring = malloc(lru_size(namehash_t, FREQUENT_COUNT));
-	if (data->queries.expiring) {
-		lru_init(data->queries.expiring, FREQUENT_COUNT);
-	}
+	lru_create(&data->queries.frequent, FREQUENT_COUNT, NULL, NULL);
+	lru_create(&data->queries.expiring, FREQUENT_COUNT, NULL, NULL);
 	/* Initialize ring buffer of recently visited upstreams */
 	array_init(data->upstreams.q);
 	if (array_reserve(data->upstreams.q, UPSTREAMS_COUNT) != 0) {
@@ -476,10 +468,8 @@ int stats_deinit(struct kr_module *module)
 	struct stat_data *data = module->data;
 	if (data) {
 		map_clear(&data->map);
-		lru_deinit(data->queries.frequent);
-		lru_deinit(data->queries.expiring);
-		free(data->queries.frequent);
-		free(data->queries.expiring);
+		lru_free(data->queries.frequent);
+		lru_free(data->queries.expiring);
 		array_clear(data->upstreams.q);
 		free(data);
 	}

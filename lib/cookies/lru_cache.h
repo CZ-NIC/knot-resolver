@@ -43,7 +43,7 @@ struct cookie_opt_data {
 /**
  * DNS cookies tracking.
  */
-typedef lru_hash(struct cookie_opt_data) kr_cookie_lru_t;
+typedef lru_t(struct cookie_opt_data) kr_cookie_lru_t;
 
 /**
  * @brief Obtain LRU cache entry.

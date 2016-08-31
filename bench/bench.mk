@@ -27,9 +27,9 @@ $(foreach bench,$(bench_BIN),$(eval $(call make_bench,$(bench))))
 .PHONY: bench bench-clean
 bench-clean: $(foreach bench,$(bench_BIN),$(bench)-clean)
 bench: $(foreach bench,$(bench_BIN),bench/$(bench))
-	# Test LRU with increasing overfill, misses should increase ~ linearly
-	@./bench/bench_lru 22 bench/bench_lru_set1.tsv - 65536 # fill = 1
-	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 32768 # fill = 2
-	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 16384 # fill = 4
-	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 8192  # fill = 8
-	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 4096  # fill = 16
+	@echo "Test LRU with increasing overfill, misses should increase ~ linearly" >&2
+	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 65536 # fill ~ 1
+	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 32768 # fill ~ 2
+	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 16384 # fill ~ 4
+	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 8192  # fill ~ 8
+	@./bench/bench_lru 23 bench/bench_lru_set1.tsv - 4096  # fill ~ 16

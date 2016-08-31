@@ -33,7 +33,7 @@ const uint8_t *kr_cookie_lru_get(kr_cookie_lru_t *cache,
 		return NULL;
 	}
 
-	struct cookie_opt_data *cached = lru_get(cache, addr, addr_len);
+	struct cookie_opt_data *cached = lru_get_try(cache, addr, addr_len);
 	return cached ? cached->opt_data : NULL;
 }
 
@@ -61,7 +61,7 @@ int kr_cookie_lru_set(kr_cookie_lru_t *cache, const struct sockaddr *sa,
 		return kr_error(EINVAL);
 	}
 
-	struct cookie_opt_data *cached = lru_set(cache, addr, addr_len);
+	struct cookie_opt_data *cached = lru_get_new(cache, addr, addr_len);
 	if (!cached) {
 		return kr_error(ENOMEM);
 	}

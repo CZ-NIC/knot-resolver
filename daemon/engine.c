@@ -443,18 +443,9 @@ static int init_resolver(struct engine *engine)
 	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
 	kr_zonecut_set_sbelt(&engine->resolver, &engine->resolver.root_hints);
 	/* Open NS rtt + reputation cache */
-	engine->resolver.cache_rtt = mm_alloc(engine->pool, lru_size(kr_nsrep_lru_t, LRU_RTT_SIZE));
-	if (engine->resolver.cache_rtt) {
-		lru_init(engine->resolver.cache_rtt, LRU_RTT_SIZE);
-	}
-	engine->resolver.cache_rep = mm_alloc(engine->pool, lru_size(kr_nsrep_lru_t, LRU_REP_SIZE));
-	if (engine->resolver.cache_rep) {
-		lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
-	}
-	engine->resolver.cache_cookie = mm_alloc(engine->pool, lru_size(kr_cookie_lru_t, LRU_COOKIES_SIZE));
-	if (engine->resolver.cache_cookie) {
-		lru_init(engine->resolver.cache_cookie, LRU_COOKIES_SIZE);
-	}
+	lru_create(&engine->resolver.cache_rtt, LRU_RTT_SIZE, engine->pool, NULL);
+	lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, engine->pool, NULL);
+	lru_create(&engine->resolver.cache_cookie, LRU_COOKIES_SIZE, engine->pool, NULL);
 
 	/* Load basic modules */
 	engine_register(engine, "iterate", NULL, NULL);
@@ -507,20 +498,17 @@ static int init_state(struct engine *engine)
 	return kr_ok();
 }
 
+static enum lru_apply_do update_stat_item(const char *key, uint len,
+						unsigned *rtt, void *baton)
+{
+	return *rtt > KR_NS_LONG ? LRU_APPLY_DO_EVICT : LRU_APPLY_DO_NOTHING;
+}
+/** @internal Walk RTT table, clearing all entries with bad score
+ *    to compensate for intermittent network issues or temporary bad behaviour. */
 static void update_state(uv_timer_t *handle)
 {
 	struct engine *engine = handle->data;
-
-	/* Walk RTT table, clearing all entries with bad score
-	 * to compensate for intermittent network issues or temporary bad behaviour. */
-	kr_nsrep_lru_t *table = engine->resolver.cache_rtt;
-	for (size_t i = 0; i < table->size; ++i) {
-		if (!table->slots[i].key)
-			continue;
-		if (table->slots[i].data > KR_NS_LONG) {
-			lru_evict(table, i);
-		}
-	}
+	lru_apply(engine->resolver.cache_rtt, update_stat_item, NULL);
 }
 
 int engine_init(struct engine *engine, knot_mm_t *pool)
@@ -573,9 +561,11 @@ void engine_deinit(struct engine *engine)
 	network_deinit(&engine->net);
 	kr_zonecut_deinit(&engine->resolver.root_hints);
 	kr_cache_close(&engine->resolver.cache);
-	lru_deinit(engine->resolver.cache_rtt);
-	lru_deinit(engine->resolver.cache_rep);
-	lru_deinit(engine->resolver.cache_cookie);
+
+	/* The lru keys are currently malloc-ated and need to be freed. */
+	lru_free(engine->resolver.cache_rtt);
+	lru_free(engine->resolver.cache_rep);
+	lru_free(engine->resolver.cache_cookie);
 
 	/* Clear IPC pipes */
 	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
