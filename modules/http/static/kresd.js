@@ -59,7 +59,7 @@ $(function() {
 		'worker.tcp':        [10, 'TCP queries'],
 		'worker.ipv4':       [11, 'IPv4 queries'],
 		'worker.ipv6':       [12, 'IPv6 queries'],
-		'worker.concurrent': [13, 'Queries outstanding'],
+		'worker.concurrent': [13, 'Concurrent requests'],
 		'worker.queries':    [14, 'Queries received/s'],
 		'worker.dropped':    [15, 'Queries dropped'],
 		'worker.usertime':   [16, 'CPU (user)', null, 'Workers'],
