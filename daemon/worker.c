@@ -745,9 +745,21 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 		if (subreq_enqueue(task)) {
 			return kr_ok(); /* Will be notified when outgoing query finishes. */
 		}
+		/* Check current query NSLIST */
+		struct kr_query *qry = array_tail(task->req.rplan.pending);
 		/* Start transmitting */
 		if (retransmit(task)) {
-			ret = timer_start(task, on_retransmit, KR_CONN_RETRY, 0);
+			assert(qry != NULL);
+			/* Retransmit at default interval, or more frequently if the mean
+			 * RTT of the server is better. If the server is glued, use default rate. */
+			size_t timeout = qry->ns.score;
+			if (timeout > KR_NS_GLUED) {
+				/* We don't have information about variance in RTT, expect +10ms */
+				timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
+			} else {
+				timeout = KR_CONN_RETRY;
+			}
+			ret = timer_start(task, on_retransmit, timeout, 0);
 		} else {
 			return qr_task_step(task, NULL, NULL);
 		}
