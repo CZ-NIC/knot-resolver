@@ -27,7 +27,9 @@
 #include "contrib/ucw/lib.h"
 
 /** Some built-in unfairness ... */
+#ifndef FAVOUR_IPV6
 #define FAVOUR_IPV6 20 /* 20ms bonus for v6 */
+#endif
 
 /** @internal Macro to set address structure. */
 #define ADDR_SET(sa, family, addr, len, port) do {\
