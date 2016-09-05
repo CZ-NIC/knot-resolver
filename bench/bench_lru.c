@@ -138,7 +138,7 @@ static struct key * read_lines(const char *fname, size_t *count) {
 #endif
 
 static void usage(const char *progname) {
-	fprintf(stderr, "usage: %s <seed> <input>\n"
+	fprintf(stderr, "usage: %s <log_count> <input> <seed> [lru_size]\n"
 		"The seed must be at least 12 characters or \"-\".\n" , progname);
 	exit(1);
 }
@@ -154,7 +154,8 @@ int main(int argc, char ** argv) {
 	size_t run_count;
 	{
 		size_t run_log = atoi(argv[1]);
-		run_count = 1 << run_log;
+		assert(run_log < 64);
+		run_count = 1ULL << run_log;
 		printf("test run length: 2^%zd\n", run_log);
 	}
 
