@@ -167,30 +167,43 @@ static int net_list(lua_State *L)
 	return 1;
 }
 
-/** Listen on interface address list. */
-static int net_listen_iface(lua_State *L, int port, int flags)
+/** Listen on an address list represented by the top of lua stack. */
+static int net_listen_addrs(lua_State *L, int port, int flags)
 {
-	/* Expand 'addr' key if exists */
-	lua_getfield(L, 1, "addr");
-	if (lua_isnil(L, -1)) {
+	/* Case: table with 'addr' field; only follow that field directly. */
+	lua_getfield(L, -1, "addr");
+	if (!lua_isnil(L, -1)) {
+		lua_replace(L, -2);
+		kr_log_info("  .addr\n");
+	} else {
 		lua_pop(L, 1);
-		lua_pushvalue(L, 1);
 	}
 
-	/* Bind to address list */
-	struct engine *engine = engine_luaget(L);
-	size_t count = lua_rawlen(L, -1);
-	for (size_t i = 0; i < count; ++i) {
-		lua_rawgeti(L, -1, i + 1);
-		int ret = network_listen(&engine->net, lua_tostring(L, -1),
-		                         port, flags);
+	/* Case: string, representing a single address. */
+	const char *str = lua_tostring(L, -1);
+	if (str != NULL) {
+		kr_log_info("  string\n");
+		struct engine *engine = engine_luaget(L);
+		int ret = network_listen(&engine->net, str, port, flags);
 		if (ret != 0) {
-			kr_log_info("[system] bind to '%s#%d' %s\n", lua_tostring(L, -1), port, kr_strerror(ret));
+			kr_log_info("[system] bind to '%s#%d' %s\n",
+					str, port, kr_strerror(ret));
 		}
-		lua_pop(L, 1);
+		return ret == 0;
 	}
 
-	lua_pushboolean(L, true);
+	/* Last case: table where all entries are added recursively. */
+	if (!lua_istable(L, -1)) {
+		format_error(L, "bad type for address");
+		lua_error(L);
+		return 0;
+	}
+	lua_pushnil(L);
+	while (lua_next(L, -2)) {
+		if (net_listen_addrs(L, port, flags) == 0)
+			return 0;
+		lua_pop(L, 1);
+	}
 	return 1;
 }
 
@@ -210,34 +223,28 @@ static int net_listen(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
+	if (n < 1 || n > 3) {
+		format_error(L, "expected one to three arguments; usage:\n"
+			"net.listen(addressses, [port = 53, flags = {tls = (port == 853)}])\n");
+		lua_error(L);
+	}
+
 	int port = KR_DNS_PORT;
 	if (n > 1 && lua_isnumber(L, 2)) {
 		port = lua_tointeger(L, 2);
 	}
+
 	bool tls = (port == KR_DNS_TLS_PORT);
 	if (n > 2 && lua_istable(L, 3)) {
 		tls = table_get_flag(L, 3, "tls", tls);
 	}
-
-	/* Process interface or (address, port, flags) triple. */
 	int flags = tls ? (NET_TCP|NET_TLS) : (NET_TCP|NET_UDP);
-	if (lua_istable(L, 1)) {
-		return net_listen_iface(L, port, flags);
-	} else if (n < 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected 'listen(string addr, number port = 53[, bool tls = false])'");
-		lua_error(L);
-	}
-
-	/* Open resolution context cache */
-	struct engine *engine = engine_luaget(L);
-	int ret = network_listen(&engine->net, lua_tostring(L, 1), port, flags);
-	if (ret != 0) {
-		format_error(L, kr_strerror(ret));
-		lua_error(L);
-	}
-
-	lua_pushboolean(L, true);
-	return 1;
+	
+	/* Now focus on the first argument. */
+	lua_pop(L, n - 1);
+	int res = net_listen_addrs(L, port, flags);
+	lua_pushboolean(L, res);
+	return res;
 }
 
 /** Close endpoint. */
