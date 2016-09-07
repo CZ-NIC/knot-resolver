@@ -20,15 +20,58 @@
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
 
-/** @internal Number of request within timeout window. */
-#define MAX_PENDING KR_NSREP_MAXADDR
 
-/** @cond internal Freelist of available mempools. */
-typedef array_t(void *) mp_freelist_t;
+/** Worker state (opaque). */
+struct worker_ctx;
+/** Worker callback */
+typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, void *baton);
+
+/** Create and initialize the worker. */
+struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
+		int worker_id, int worker_count);
 
 /**
- * Query resolution worker.
+ * Process incoming packet (query or answer to subrequest).
+ * @return 0 or an error code
  */
+int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query,
+		const struct sockaddr* addr);
+
+/**
+ * Process incoming DNS/TCP message fragment(s).
+ * If the fragment contains only a partial message, it is buffered.
+ * If the fragment contains a complete query or completes current fragment, execute it.
+ * @return 0 or an error code
+ */
+int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
+		const uint8_t *msg, ssize_t len);
+
+/**
+ * End current DNS/TCP session, this disassociates pending tasks from this session
+ * which may be freely closed afterwards.
+ */
+int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
+
+/**
+ * Schedule query for resolution.
+ * @return 0 or an error code
+ */
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options,
+		worker_cb_t on_complete, void *baton);
+
+/** Collect worker mempools */
+void worker_reclaim(struct worker_ctx *worker);
+
+
+/** @cond internal */
+
+/** Number of request within timeout window. */
+#define MAX_PENDING KR_NSREP_MAXADDR
+
+/** Freelist of available mempools. */
+typedef array_t(void *) mp_freelist_t;
+
+/** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
@@ -57,10 +100,7 @@ struct worker_ctx {
 	knot_mm_t pkt_pool;
 };
 
-/* Worker callback */
-typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, void *baton);
-
-/** @internal Query resolution task. */
+/** Query resolution task. */
 struct qr_task
 {
 	struct kr_request req;
@@ -94,40 +134,6 @@ struct qr_task
 	bool finished : 1;
 	bool leading  : 1;
 };
-/* @endcond */
 
-/**
- * Process incoming packet (query or answer to subrequest).
- * @return 0 or an error code
- */
-int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query, const struct sockaddr* addr);
+/** @endcond */
 
-/**
- * Process incoming DNS/TCP message fragment(s).
- * If the fragment contains only a partial message, it is buffered.
- * If the fragment contains a complete query or completes current fragment, execute it.
- * @return 0 or an error code
- */
-int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *msg, ssize_t len);
-
-/**
- * End current DNS/TCP session, this disassociates pending tasks from this session
- * which may be freely closed afterwards.
- */
-int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
-
-
-/**
- * Schedule query for resolution.
- * @return 0 or an error code
- */
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options, worker_cb_t on_complete, void *baton);
-
-/** Reserve worker buffers */
-int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen);
-
-/** Collect worker mempools */
-void worker_reclaim(struct worker_ctx *worker);
-
-struct qr_task;
-typedef int (*qr_task_send_cb)(struct qr_task *task, uv_handle_t *handle, int status);
