@@ -30,29 +30,29 @@ ifeq ($(OS),Windows_NT)
 	BINEXT := .exe
 else
 	UNAME := $(shell uname -s)
-    ifeq ($(UNAME),Darwin)
-        PLATFORM := Darwin
-        LIBEXT := .dylib
-        MODTYPE := dynamiclib
-        # OS X specific hardening since -pie doesn't work
-        ifneq ($(HARDENING),no)
-            BINFLAGS += -Wl,-pie
-        endif
-        # Version is prepended to dylib
-        SOVER_EXT = .$(1)$(LIBEXT)
-        SOVER = $(if $(1), -compatibility_version $(2) -current_version $(1),)
-    else
-        PLATFORM := POSIX
-        LDFLAGS += -pthread -lm -Wl,-E
-        # ELF hardening options
-        ifneq ($(HARDENING),no)
-            BINFLAGS += -pie
-            LDFLAGS += -Wl,-z,relro,-z,now
-        endif
-        ifeq ($(UNAME),Linux)
-        	LDFLAGS += -ldl
-        endif
-    endif
+	ifeq ($(UNAME),Darwin)
+		PLATFORM := Darwin
+		LIBEXT := .dylib
+		MODTYPE := dynamiclib
+                # OS X specific hardening since -pie doesn't work
+		ifneq ($(HARDENING),no)
+			BINFLAGS += -Wl,-pie
+		endif
+                # Version is prepended to dylib
+		SOVER_EXT = .$(1)$(LIBEXT)
+		SOVER = $(if $(1), -compatibility_version $(2) -current_version $(1),)
+	else
+		PLATFORM := POSIX
+		LDFLAGS += -pthread -lm -Wl,-E
+                # ELF hardening options
+		ifneq ($(HARDENING),no)
+			BINFLAGS += -pie
+			LDFLAGS += -Wl,-z,relro,-z,now
+		endif
+		ifeq ($(UNAME),Linux)
+		LDFLAGS += -ldl
+		endif
+	endif
 endif
 
 # Silent compilation

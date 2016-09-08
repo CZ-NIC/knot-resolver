@@ -83,8 +83,8 @@ libkres.pc:
 	@echo 'Libs: -L$${libdir} -lkres' >> $@
 	@echo 'Cflags: -I$${includedir}' >> $@
 libkres-pcinstall: libkres.pc libkres-install
-	$(INSTALL) -d -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig/
-	$(INSTALL)    -m 644 $< $(DESTDIR)$(LIBDIR)/pkgconfig/
+	$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)
+	$(INSTALL)    -m 644 $< $(DESTDIR)$(PKGCONFIGDIR)
 
 # Targets
 lib: $(libkres)

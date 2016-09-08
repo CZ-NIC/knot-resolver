@@ -17,6 +17,7 @@
 #pragma once
 
 #include <netinet/in.h>
+#include <sys/socket.h>
 #include <libknot/packet/pkt.h>
 
 #include "lib/cookies/control.h"
