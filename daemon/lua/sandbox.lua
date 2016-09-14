@@ -49,6 +49,11 @@ function mode(m)
 	return true
 end
 
+-- Trivial option alias
+function reorder_RR(val)
+	return option('REORDER_RR', val)
+end
+
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`
 env = {}

@@ -207,11 +207,13 @@ int kr_cache_peek_rr(struct kr_cache *cache, knot_rrset_t *rr, uint8_t *rank, ui
  * @param dst destination for materialized RRSet
  * @param src read-only RRSet (its rdataset may be changed depending on the result)
  * @param drift time passed between cache time and now
+ * @param reorder (pseudo)-random seed to reorder the data or zero
  * @param mm memory context
  * @return 0 or an errcode
  */
 KR_EXPORT
-int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, knot_mm_t *mm);
+int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift,
+		uint reorder, knot_mm_t *mm);
 
 /**
  * Insert RRSet into cache, replacing any existing data.
