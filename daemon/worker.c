@@ -275,10 +275,12 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 			if (uv_udp_getsockname((uv_udp_t *)handle, dst_addr, &addr_len) == 0) {
 				task->req.qsource.dst_addr = dst_addr;
 			}
+			task->req.qsource.tcp = false;
 		} else if (handle->type == UV_TCP) {
 			if (uv_tcp_getsockname((uv_tcp_t *)handle, dst_addr, &addr_len) == 0) {
 				task->req.qsource.dst_addr = dst_addr;
 			}
+			task->req.qsource.tcp = true;
 		}
 	}
 	worker->stats.concurrent += 1;
