@@ -35,6 +35,8 @@ $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libsystemd,227))
 $(eval $(call find_lib,gnutls))
 $(eval $(call find_lib,libedit))
+$(eval $(call find_lib,libprotobuf-c,1.2.1))
+$(eval $(call find_lib,libfstrm,0.2))
 
 # Lookup SONAME
 $(eval $(call find_soname,libknot))
@@ -69,6 +71,12 @@ ifneq ($(GO_PLATFORM),$(filter $(GO_PLATFORM),arm amd64))
 HAS_go := no
 endif
 endif
+endif
+
+# check for fstrm and protobuf for dnstap
+ifeq ($(HAS_libfstrm)&$(HAS_libprotobuf-c),yes&yes)
+BUILD_CFLAGS += -DENABLE_DNSTAP
+ENABLE_DNSTAP := yes
 endif
 
 # Overview
@@ -112,6 +120,8 @@ info:
 	$(info [$(HAS_ltn12)] Lua socket ltn12 (trust anchor bootstrapping))
 	$(info [$(HAS_ssl.https)] Lua ssl.https (trust anchor bootstrapping))
 	$(info [$(HAS_libedit)] libedit (client))
+	$(info [$(HAS_libfstrm)] libfstrm (modules/dnstap))
+	$(info [$(HAS_libprotobuf-c)] libprotobuf-c (modules/dnstap))
 	$(info )
 
 # Verify required dependencies are met, as listed above

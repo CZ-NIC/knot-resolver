@@ -6,7 +6,8 @@ contrib_SOURCES := \
 	contrib/ucw/mempool.c \
 	contrib/murmurhash3/murmurhash3.c \
 	contrib/base32hex.c \
-	contrib/base64.c
+	contrib/base64.c \
+	contrib/dnstap/dnstap.pb-c.c
 contrib_CFLAGS := -fPIC
 contrib_TARGET := $(abspath contrib)/contrib$(AREXT)
 
