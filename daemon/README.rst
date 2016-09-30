@@ -472,7 +472,7 @@ For when listening on ``localhost`` just doesn't cut it.
 
    Enable/disable using IPv4 for recursion.
 
-.. function:: net.listen(addressses, [port = 53, flags = {tls = (port == 853)}])
+.. function:: net.listen(addresses, [port = 53, flags = {tls = (port == 853)}])
 
    :return: boolean
 
