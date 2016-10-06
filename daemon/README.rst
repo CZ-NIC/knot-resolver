@@ -244,6 +244,16 @@ Another example would show how it is possible to bind to all interfaces, using i
 		net.listen(addr_list)
 	end
 
+.. tip:: Some users observed a considerable, close to 100%, performance gain in Docker containers when they bound the daemon to a single interface:ip address pair. One may expand the aforementioned example with browsing available addresses as:
+
+	.. code-block:: lua
+
+		addrpref = env.EXPECTED_ADDR_PREFIX
+		for k, v in pairs(addr_list["addr"]) do
+			if string.sub(v,1,string.len(addrpref)) == addrpref then
+				net.listen(v)
+		...
+
 You can also use third-party packages (available for example through LuaRocks_) as on this example
 to download cache from parent, to avoid cold-cache start.
 
@@ -565,8 +575,8 @@ For when listening on ``localhost`` just doesn't cut it.
 
    .. code-block:: lua
 
-      > net.tls_cert("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
-      > net.tls_cert()
+      > net.tls("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
+      > net.tls()
       ("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
       > net.listen("::", 853)
       > net.listen("::", 443, {tls = true})
