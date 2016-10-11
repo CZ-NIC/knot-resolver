@@ -454,6 +454,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	/* Follow canonical name as next SNAME. */
 	if (!knot_dname_is_equal(cname, query->sname)) {
 		/* Check if target record has been already copied */
+		query->flags |= QUERY_CNAME;
 		if (is_final) {
 			const knot_pktsection_t *an = knot_pkt_section(req->answer, KNOT_ANSWER);
 			for (unsigned i = 0; i < an->count; ++i) {

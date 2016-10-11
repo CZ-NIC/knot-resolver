@@ -29,7 +29,10 @@
 	uv_os_fd_t fd = 0; \
 	if (uv_fileno((uv_handle_t *)(handle), &fd) == 0) { \
 		int on = 1; \
-		setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)); \
+		int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)); \
+		if (ret) { \
+			return ret; \
+		} \
 	} \
   } while (0)
 /* libuv 1.7.0+ is able to assign fd immediately */
