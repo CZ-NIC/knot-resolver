@@ -11,9 +11,15 @@ endif
 ifeq ($(HAS_libmemcached),yes)
 modules_TARGETS += kmemcached
 endif
+
 # Redis
 ifeq ($(HAS_hiredis),yes)
 modules_TARGETS += redis
+endif
+
+# Client subnet
+ifeq ($(HAS_libmaxminddb),yes)
+modules_TARGETS += client_subnet
 endif
 
 # List of Lua modules

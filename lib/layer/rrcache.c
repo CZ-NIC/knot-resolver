@@ -34,36 +34,35 @@
 #define DEFAULT_MINTTL (5) /* Short-time "no data" retention to avoid bursts */
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
-static inline bool is_expiring(const knot_rrset_t *rr, uint32_t drift)
+static inline bool is_expiring(const struct kr_cache_entry *entry)
 {
-	return 100 * (drift + 5) > 99 * knot_rrset_ttl(rr);
+	return 100 * (entry->timestamp/*drift*/ + 5) > 99 * entry->ttl;
 }
 
 static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *name,
                   uint16_t rrclass, uint16_t rrtype, struct kr_query *qry,
-                  uint8_t *rank, uint8_t *flags, bool fetch_rrsig)
+                  struct kr_cache_entry *entry, bool fetch_rrsig)
 {
 	/* Check if record exists in cache */
 	int ret = 0;
-	uint32_t drift = qry->timestamp.tv_sec;
+	entry->timestamp = qry->timestamp.tv_sec;
 	knot_rrset_t cache_rr;
 	knot_rrset_init(&cache_rr, (knot_dname_t *)name, rrtype, rrclass);
 	if (fetch_rrsig) {
-		ret = kr_cache_peek_rrsig(cache, &cache_rr, rank, flags, &drift);
+		ret = kr_cache_peek_rrsig(cache, qry->ecs, &cache_rr, entry);
 	} else {
-		ret = kr_cache_peek_rr(cache, &cache_rr, rank, flags, &drift);
+		ret = kr_cache_peek_rr(cache, qry->ecs, &cache_rr, entry);
 	}
 	if (ret != 0) {
 		return ret;
 	}
 
 	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
-	if (is_expiring(&cache_rr, drift)) {
+	if (is_expiring(entry)) {
 		qry->flags |= QUERY_EXPIRING;
 	}
 
-	assert(flags != NULL);
-	if ((*flags) & KR_CACHE_FLAG_WCARD_PROOF) {
+	if (entry->flags & KR_CACHE_FLAG_WCARD_PROOF) {
 		/* Record was found, but wildcard answer proof is needed.
 		 * Do not update packet, try to fetch whole packet from pktcache instead. */
 		qry->flags |= QUERY_DNSSEC_WEXPAND;
@@ -77,12 +76,11 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 	}
 
 	/* Update packet answer */
-	knot_rrset_t rr_copy;
-	ret = kr_cache_materialize(&rr_copy, &cache_rr, drift, &pkt->mm);
+	ret = kr_cache_materialize(&cache_rr, entry, &pkt->mm);
 	if (ret == 0) {
-		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr_copy, KNOT_PF_FREE);
+		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &cache_rr, KNOT_PF_FREE);
 		if (ret != 0) {
-			knot_rrset_clear(&rr_copy, &pkt->mm);
+			knot_rrset_clear(&cache_rr, &pkt->mm);
 		}
 	}
 	return ret;
@@ -92,20 +90,19 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, uint16_t rrtype, bool dobit)
 {
 	/* Lookup direct match first */
-	uint8_t rank  = 0;
-	uint8_t flags = 0;
-	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, &flags, 0);
+	struct kr_cache_entry entry;
+	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry, &entry, false);
 	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) { /* Chase CNAME if no direct hit */
 		rrtype = KNOT_RRTYPE_CNAME;
-		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, &flags, 0);
+		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry, &entry, false);
 	}
 	/* Record is flagged as INSECURE => doesn't have RRSIG. */
-	if (ret == 0 && (rank & KR_RANK_INSECURE)) {
+	if (ret == 0 && (entry.rank & KR_RANK_INSECURE)) {
 		qry->flags |= QUERY_DNSSEC_INSECURE;
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	/* Record may have RRSIG, try to find it. */
 	} else if (ret == 0 && dobit) {
-		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry, &rank, &flags, true);
+		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry, &entry, true);
 	}
 	return ret;
 }
@@ -167,7 +164,8 @@ static int commit_rrsig(struct rrcache_baton *baton, uint8_t rank, uint8_t flags
 		return kr_ok();
 	}
 	/* Commit covering RRSIG to a separate cache namespace. */
-	return kr_cache_insert_rrsig(baton->cache, rr, rank, flags, baton->timestamp);
+	return kr_cache_insert_rrsig(baton->cache, baton->qry->ecs, rr, rank,
+					flags, baton->timestamp);
 }
 
 static int commit_rr(const char *key, void *val, void *data)
@@ -200,8 +198,11 @@ static int commit_rr(const char *key, void *val, void *data)
 	}
 	/* Accept only better rank (if not overriding) */
 	if (!(rank & KR_RANK_SECURE) && !(baton->qry->flags & QUERY_NO_CACHE)) {
-		int cached_rank = kr_cache_peek_rank(baton->cache, KR_CACHE_RR, rr->owner, rr->type, baton->timestamp);
-		if (cached_rank >= rank) {
+		struct kr_cache_entry cached;
+		cached.timestamp = baton->timestamp;
+		int err = kr_cache_peek(baton->cache, baton->qry->ecs,
+					KR_CACHE_RR, rr->owner, rr->type, &cached);
+		if (!err && cached.rank >= rank) {
 			return kr_ok();
 		}
 	}
@@ -210,7 +211,8 @@ static int commit_rr(const char *key, void *val, void *data)
 	if ((rank & KR_RANK_AUTH) && (baton->qry->flags & QUERY_DNSSEC_WEXPAND)) {
 		flags |= KR_CACHE_FLAG_WCARD_PROOF;
 	}
-	return kr_cache_insert_rr(baton->cache, rr, rank, flags, baton->timestamp);
+	return kr_cache_insert_rr(baton->cache, baton->qry->ecs, rr, rank,
+				  flags, baton->timestamp);
 }
 
 static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache *cache, struct kr_request *req)

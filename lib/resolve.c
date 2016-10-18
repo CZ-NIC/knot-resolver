@@ -143,7 +143,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 	if (!target || !cut_name)
 		return;
 
-	struct kr_cache_entry *entry = NULL;
+	struct kr_cache_entry entry;
 	/* @note: The non-terminal must be direct child of zone cut (e.g. label distance <= 2),
 	 *        otherwise this would risk leaking information to parent if the NODATA TTD > zone cut TTD. */
 	int labels = knot_dname_labels(target, NULL) - knot_dname_labels(cut_name, NULL);
@@ -152,7 +152,9 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 		--labels;
 	}
 	for (int i = 0; i < labels; ++i) {
-		int ret = kr_cache_peek(cache, KR_CACHE_PKT, target, KNOT_RRTYPE_NS, &entry, &timestamp);
+		entry.timestamp = timestamp;
+		int ret = kr_cache_peek(cache, qry->ecs, KR_CACHE_PKT, target,
+					KNOT_RRTYPE_NS, &entry);
 		if (ret == 0) { /* Either NXDOMAIN or NODATA, start here. */
 			/* @todo We could stop resolution here for NXDOMAIN, but we can't because of broken CDNs */
 			qry->flags |= QUERY_NO_MINIMIZE;

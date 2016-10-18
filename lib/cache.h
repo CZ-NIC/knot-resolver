@@ -20,6 +20,8 @@
 #include "lib/cdb.h"
 #include "lib/defines.h"
 
+typedef struct kr_ecs kr_ecs_t; // TODO
+
 /** Cache entry tag */
 enum kr_cache_tag {
 	KR_CACHE_RR   = 'R',
@@ -46,24 +48,28 @@ enum kr_cache_rank {
 
 /** Cache entry flags */
 enum kr_cache_flag {
-	KR_CACHE_FLAG_NONE	      = 0,
+	KR_CACHE_FLAG_NONE	  = 0,
 	KR_CACHE_FLAG_WCARD_PROOF = 1, /* Entry contains either packet with wildcard
-	                                * answer either record for which wildcard
+	                                * answer or record for which wildcard
 	                                * expansion proof is needed */
+	KR_CACHE_FLAG_ECS_SCOPE0  = 2, /* Returned from NS with ECS scope /0,
+       					* i.e. suitable for any location. */
 };
 
 
 /**
- * Serialized form of the RRSet with inception timestamp and maximum TTL.
+ * Data to be cached.
  */
 struct kr_cache_entry
 {
-	uint32_t timestamp;
-	uint32_t ttl;
-	uint16_t count;
-	uint8_t  rank;
-	uint8_t  flags;
-	uint8_t  data[];
+	uint32_t timestamp; /*!< Current time. (Seconds since epoch; overflows in 2106.)
+				To be replaced by drift when reading from cache. */
+	uint32_t ttl;   /*!< Remaining TTL in seconds, at query time.  During insertion,
+				you can leave it zeroed and it will be computed. */
+	uint8_t  rank;  /*!< See enum kr_cache_rank. */
+	uint8_t  flags; /*!< Or-combination of enum kr_cache_flag. */
+	uint16_t data_len; /*!< The byte-length of data. */
+	void    *data;     /*!< Non-interpreted data. */
 };
 
 /**
@@ -80,6 +86,7 @@ struct kr_cache
 		uint32_t delete;      /**< Number of deletions */
 	} stats;
 };
+
 
 /**
  * Open/create cache with provided storage options.
@@ -116,46 +123,51 @@ static inline bool kr_cache_is_open(struct kr_cache *cache)
 }
 
 /**
- * Peek the cache for asset (name, type, tag)
- * @note The 'drift' is the time passed between the inception time and now (in seconds).
+ * Peek the cache for asset (name, type, tag).
  * @param cache cache structure
+ * @param ecs client subnet specification (can be NULL)
  * @param tag  asset tag
  * @param name asset name
  * @param type asset type
- * @param entry cache entry, will be set to valid pointer or NULL
- * @param timestamp current time (will be replaced with drift if successful)
- * @return 0 or an errcode
+ * @param entry cache entry to be filled.  Set entry->timestamp before calling;
+ * 	it will be replaced with drift if successful, i.e. by the number
+ * 	of seconds passed between inception and now.
+ * @return 0 or an errcode, e.g. kr_error(ESTALE) if outdated.
  */
 KR_EXPORT
-int kr_cache_peek(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type,
-                  struct kr_cache_entry **entry, uint32_t *timestamp);
-
-
+int kr_cache_peek(struct kr_cache *cache, const kr_ecs_t *ecs,
+		  uint8_t tag, const knot_dname_t *name, uint16_t type,
+		  struct kr_cache_entry *entry);
 
 /**
  * Insert asset into cache, replacing any existing data.
  * @param cache cache structure
+ * @param ecs client subnet specification (can be NULL)
  * @param tag  asset tag
  * @param name asset name
  * @param type asset type
- * @param header filled entry header (count, ttl and timestamp)
- * @param data inserted data
+ * @param entry the stuff to store
  * @return 0 or an errcode
  */
 KR_EXPORT
-int kr_cache_insert(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type,
-                    struct kr_cache_entry *header, knot_db_val_t data);
+int kr_cache_insert(struct kr_cache *cache, const kr_ecs_t *ecs,
+		    uint8_t tag, const knot_dname_t *name, uint16_t type,
+		    const struct kr_cache_entry *entry);
 
 /**
  * Remove asset from cache.
  * @param cache cache structure
+ * @param ecs client subnet specification (can be NULL)
  * @param tag asset tag
  * @param name asset name
  * @param type record type
  * @return 0 or an errcode
+ *
+ * @note unused for now
  */
 KR_EXPORT
-int kr_cache_remove(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type);
+int kr_cache_remove(struct kr_cache *cache, const kr_ecs_t *ecs,
+		    uint8_t tag, const knot_dname_t *name, uint16_t type);
 
 /**
  * Clear all items from the cache.
@@ -173,49 +185,43 @@ int kr_cache_clear(struct kr_cache *cache);
  * @param vals array of values to store the result
  * @param valcnt maximum number of retrieved keys
  * @return number of retrieved keys or an error
+ *
+ * @note It will give strange/verbose results if ECS was used in the cache.
  */
 KR_EXPORT
 int kr_cache_match(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, knot_db_val_t *vals, int valcnt);
 
 /**
- * Peek the cache for given key and retrieve it's rank.
+ * Peek the cache for given RRSet; the RRs may have bogus TTL values.
  * @param cache cache structure
- * @param tag asset tag
- * @param name asset name
- * @param type record type
- * @param timestamp current time
- * @return rank (0 or positive), or an error (negative number)
+ * @param ecs client subnet specification (can be NULL)
+ * @param rr query RRSet (rr->rrs will be changed by read-only data if successful)
+ * @param entry cache entry to be filled.  Set entry->timestamp before calling;
+ * 	it will be replaced with drift if successful, i.e. by the number
+ * 	of seconds passed between inception and now.
+ * @return 0 or an errcode, e.g. kr_error(ESTALE) if outdated.
+ *
+ * @note rr->rrs.data will not be freed but plainly overwritten.
  */
 KR_EXPORT
-int kr_cache_peek_rank(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type, uint32_t timestamp);
+int kr_cache_peek_rr(struct kr_cache *cache, const kr_ecs_t *ecs, knot_rrset_t *rr,
+		     struct kr_cache_entry *entry);
 
 /**
- * Peek the cache for given RRSet (name, type)
- * @note The 'drift' is the time passed between the cache time of the RRSet and now (in seconds).
- * @param cache cache structure
- * @param rr query RRSet (its rdataset may be changed depending on the result)
- * @param rank entry rank will be stored in this variable
- * @param flags entry flags
- * @param timestamp current time (will be replaced with drift if successful)
- * @return 0 or an errcode
- */
-KR_EXPORT
-int kr_cache_peek_rr(struct kr_cache *cache, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp);
-
-/**
- * Clone read-only RRSet and adjust TTLs.
- * @param dst destination for materialized RRSet
- * @param src read-only RRSet (its rdataset may be changed depending on the result)
- * @param drift time passed between cache time and now
+ * Clone RRSet's read-only data and adjust TTLs.
+ * @param rr the RRSet; only rr->rrs.data will be replaced (not e.g. rr->owner)
+ * @param entry cache entry returned from successful kr_cache_peek_rr
  * @param mm memory context
  * @return 0 or an errcode
  */
 KR_EXPORT
-int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, knot_mm_t *mm);
+int kr_cache_materialize(knot_rrset_t *rr, const struct kr_cache_entry *entry,
+			 knot_mm_t *mm);
 
 /**
  * Insert RRSet into cache, replacing any existing data.
  * @param cache cache structure
+ * @param ecs client subnet specification (can be NULL)
  * @param rr inserted RRSet
  * @param rank rank of the data
  * @param flags additional flags for the data
@@ -223,30 +229,25 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
  * @return 0 or an errcode
  */
 KR_EXPORT
-int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp);
+int kr_cache_insert_rr(struct kr_cache *cache, const kr_ecs_t *ecs, const knot_rrset_t *rr,
+			uint8_t rank, uint8_t flags, uint32_t timestamp);
 
 /**
- * Peek the cache for the given RRset signature (name, type)
- * @note The RRset type must not be RRSIG but instead it must equal the type covered field of the sought RRSIG.
- * @param cache cache structure
- * @param rr query RRSET (its rdataset and type may be changed depending on the result)
- * @param rank entry rank will be stored in this variable
- * @param flags entry additional flags
- * @param timestamp current time (will be replaced with drift if successful)
- * @return 0 or an errcode
+ * Peek the cache for the given RRset signature (name, type).
+ * @note The RRset type befor calling must not be RRSIG but instead it must equal
+ * 	the type covered field of the sought RRSIG.
+ * 	Otherwise it's the same as kr_cache_peek_rr.
  */
 KR_EXPORT
-int kr_cache_peek_rrsig(struct kr_cache *cache, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp);
+int kr_cache_peek_rrsig(struct kr_cache *cache, const kr_ecs_t *ecs, knot_rrset_t *rr,
+			struct kr_cache_entry *entry);
 
 /**
- * Insert the selected RRSIG RRSet of the selected type covered into cache, replacing any existing data.
+ * Insert the selected RRSIG RRSet of the selected type covered into cache,
+ * 	replacing any existing data.
  * @note The RRSet must contain RRSIGS with only the specified type covered.
- * @param cache cache structure
- * @param rr inserted RRSIG RRSet
- * @param rank rank of the data
- * @param flags additional flags for the data
- * @param timestamp current time
- * @return 0 or an errcode
+ * 	Otherwise it's the same as kr_cache_insert_rr.
  */
 KR_EXPORT
-int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp);
+int kr_cache_insert_rrsig(struct kr_cache *cache, const kr_ecs_t *ecs, const knot_rrset_t *rr,
+			  uint8_t rank, uint8_t flags, uint32_t timestamp);

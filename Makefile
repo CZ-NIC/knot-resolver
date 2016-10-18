@@ -30,6 +30,7 @@ $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libdnssec))
 $(eval $(call find_lib,libsystemd,227))
 $(eval $(call find_lib,gnutls))
+$(eval $(call find_lib,libmaxminddb))
 
 # Find Go version and platform
 GO_VERSION := $(shell $(GO) version 2>/dev/null)
@@ -108,6 +109,7 @@ info:
 	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
 	$(info [$(HAS_libsystemd)] systemd (daemon))
+	$(info [$(HAS_libmaxminddb)] libmaxminddb (modules/client_subnet))
 	$(info )
 
 # Installation directories

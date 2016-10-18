@@ -301,16 +301,19 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 /** Fetch address for zone cut. */
 static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const knot_dname_t *ns, uint16_t rrtype, uint32_t timestamp)
 {
-	uint8_t rank = 0;
+	struct kr_cache_entry entry;
+	entry.timestamp = timestamp;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
-	if (kr_cache_peek_rr(cache, &cached_rr, &rank, NULL, &timestamp) != 0) {
+	if (kr_cache_peek_rr(cache, NULL, &cached_rr, &entry) != 0) {
 		return;
 	}
 
 	knot_rdata_t *rd = cached_rr.rrs.data;
 	for (uint16_t i = 0; i < cached_rr.rrs.rr_count; ++i) {
-		if (knot_rdata_ttl(rd) > timestamp) {
+		/* Note: dependency on kr_cache_materialize *implementation*. */
+		uint32_t ttl = knot_rdata_ttl(rd);
+		if (!ttl || ttl >= entry.timestamp/*drift*/) {
 			(void) kr_zonecut_add(cut, ns, rd);
 		}
 		rd = kr_rdataset_next(rd);
@@ -320,25 +323,28 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const kno
 /** Fetch best NS for zone cut. */
 static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, uint32_t timestamp, uint8_t * restrict rank)
 {
-	uint32_t drift = timestamp;
+	struct kr_cache_entry entry;
+       	entry.timestamp = timestamp;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-	int ret = kr_cache_peek_rr(&ctx->cache, &cached_rr, rank, NULL, &drift);
+	int ret = kr_cache_peek_rr(&ctx->cache, NULL, &cached_rr, &entry);
 	if (ret != 0) {
 		return ret;
 	}
+	if (rank) {
+		*rank = entry.rank;
+	}
 
 	/* Materialize as we'll going to do more cache lookups. */
-	knot_rrset_t rr_copy;
-	ret = kr_cache_materialize(&rr_copy, &cached_rr, drift, cut->pool);
+	ret = kr_cache_materialize(&cached_rr, &entry, cut->pool);
 	if (ret != 0) {
 		return ret;
 	}
 
 	/* Insert name servers for this zone cut, addresses will be looked up
 	 * on-demand (either from cache or iteratively) */
-	for (unsigned i = 0; i < rr_copy.rrs.rr_count; ++i) {
-		const knot_dname_t *ns_name = knot_ns_name(&rr_copy.rrs, i);
+	for (unsigned i = 0; i < cached_rr.rrs.rr_count; ++i) {
+		const knot_dname_t *ns_name = knot_ns_name(&cached_rr.rrs, i);
 		kr_zonecut_add(cut, ns_name, NULL);
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
 		unsigned *cached = lru_get(ctx->cache_rep, (const char *)ns_name, knot_dname_size(ns_name));
@@ -351,7 +357,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_d
 		}
 	}
 
-	knot_rrset_clear(&rr_copy, cut->pool);
+	knot_rrset_clear(&cached_rr, cut->pool);
 	return kr_ok();
 }
 
@@ -365,26 +371,30 @@ static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 		return kr_error(ENOENT);
 	}
 
-	uint8_t rank = 0;
-	uint32_t drift = timestamp;
+	struct kr_cache_entry entry;
+	entry.timestamp = timestamp;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)owner, type, KNOT_CLASS_IN);
-	int ret = kr_cache_peek_rr(cache, &cached_rr, &rank, NULL, &drift);
+	int ret = kr_cache_peek_rr(cache, NULL, &cached_rr, &entry);
 	if (ret != 0) {
 		return ret;
 	}
 
-	knot_rrset_free(rr, pool);
-	*rr = mm_alloc(pool, sizeof(knot_rrset_t));
 	if (*rr == NULL) {
-		return kr_error(ENOMEM);
+		*rr = mm_alloc(pool, sizeof(knot_rrset_t));
+		if (*rr == NULL) {
+			return kr_error(ENOMEM);
+		}
+	} else {
+		knot_rrset_clear(*rr, pool);
 	}
 
-	ret = kr_cache_materialize(*rr, &cached_rr, drift, pool);
+	ret = kr_cache_materialize(&cached_rr, &entry, pool);
 	if (ret != 0) {
-		knot_rrset_free(rr, pool);
+		knot_rrset_clear(&cached_rr, pool);
 		return ret;
 	}
+	**rr = cached_rr;
 
 	return kr_ok();
 }

@@ -64,6 +64,7 @@ static void query_free(knot_mm_t *pool, struct kr_query *qry)
 {
 	kr_zonecut_deinit(&qry->zone_cut);
 	mm_free(pool, qry->sname);
+	mm_free(pool, qry->ecs);
 	mm_free(pool, qry);
 }
 
@@ -132,6 +133,7 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	qry->ns.addr[0].ip.sa_family = AF_UNSPEC;
 	gettimeofday(&qry->timestamp, NULL);
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
+	qry->ecs = NULL;
 	array_push(rplan->pending, qry);
 
 	return qry;

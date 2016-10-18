@@ -76,6 +76,7 @@ struct kr_query {
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;
+	struct kr_ecs *ecs; /*!< Data related to client subnet EDNS. */
 };
 
 /** @cond internal Array of queries. */
