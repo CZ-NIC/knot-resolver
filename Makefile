@@ -31,6 +31,17 @@ $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libsystemd,227))
 $(eval $(call find_lib,gnutls))
 
+# Lookup SONAME
+$(eval $(call find_soname,libknot))
+$(eval $(call find_soname,libzscanner))
+
+ifeq ($(libknot_SONAME),)
+  $(error "Unable to resolve libknot_SONAME, update find_soname in platform.mk")
+endif
+ifeq ($(libzscanner_SONAME),)
+  $(error "Unable to resolve libzscanner_SONAME, update find_some in platform.mk")
+endif
+
 # Find Go version and platform
 GO_VERSION := $(shell $(GO) version 2>/dev/null)
 ifeq ($(GO_VERSION),)

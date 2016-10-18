@@ -177,3 +177,29 @@ endef
 define find_gopkg
 	HAS_$(1) := $(shell go list $(2) > /dev/null 2>&1 && echo yes || echo no)
 endef
+
+define find_soname
+
+# N/A on Windows
+ifeq ($(PLATFORM),Windows)
+	$(1)_SONAME = $(1).dll
+endif
+
+# Use otool -D on OS X
+ifeq ($(PLATFORM),Darwin)
+	$(1)_SONAME = $$(shell otool -D $$$$(pkg-config --variable=libdir $(1))/$(1)$(LIBEXT) | sed -ne 's,.*/\($(1)\.[0-9]*.$(LIBEXT)\),\1,p')
+endif
+
+# Use objdump -p on Linux and BSDs
+ifeq ($(PLATFORM),POSIX)
+ifeq ($(UNAME),OpenBSD)
+	$(1)_SONAME = $$(shell basename $$$$(readlink -f $$$$(pkg-config --variable=libdir $(1))/$(1)$(LIBEXT)) | cut -f 1-3 -d .)
+else
+	$(1)_SONAME = $$(shell objdump -p $$$$(pkg-config --variable=libdir $(1))/$(1)$(LIBEXT) | sed -ne 's/[[:space:]]*SONAME[[:space:]]*\($(1)\.so\.[0-4]*\)/\1/p')
+endif
+endif
+
+endef # find_soname
+
+# Use this on OpenBSD
+#	

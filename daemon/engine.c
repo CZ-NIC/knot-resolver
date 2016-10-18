@@ -129,26 +129,6 @@ static int l_setuser(lua_State *L)
 	return 1;
 }
 
-/** Return platform-specific versioned library name. */
-static int l_libpath(lua_State *L)
-{
-	int n = lua_gettop(L);
-	if (n < 2)
-		return 0;
-	auto_free char *lib_path = NULL;
-	const char *lib_name = lua_tostring(L, 1);
-	const char *lib_version = lua_tostring(L, 2);
-#if defined(__APPLE__)
-	lib_path = afmt("%s.%s.dylib", lib_name, lib_version);
-#elif _WIN32
-	lib_path = afmt("%s.dll", lib_name); /* Versioned in RC files */
-#else
-	lib_path = afmt("%s.so.%s", lib_name, lib_version);
-#endif
-	lua_pushstring(L, lib_path);
-	return 1;
-}
-
 /** Quit current executable. */
 static int l_quit(lua_State *L)
 {
@@ -508,8 +488,10 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_trustanchor);
 	lua_setglobal(engine->L, "trustanchor");
-	lua_pushcfunction(engine->L, l_libpath);
-	lua_setglobal(engine->L, "libpath");
+	lua_pushliteral(engine->L, libknot_SONAME);
+	lua_setglobal(engine->L, "libknot_SONAME");
+	lua_pushliteral(engine->L, libzscanner_SONAME);
+	lua_setglobal(engine->L, "libzscanner_SONAME");
 	lua_pushcfunction(engine->L, l_tojson);
 	lua_setglobal(engine->L, "tojson");
 	lua_pushcfunction(engine->L, l_map);

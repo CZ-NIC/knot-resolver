@@ -3,7 +3,7 @@
 --
 
 local ffi = require('ffi')
-local libzscanner = ffi.load(libpath('libzscanner', '1'))
+local libzscanner = ffi.load(libzscanner_SONAME)
 ffi.cdef[[
 void free(void *ptr);
 void *realloc(void *ptr, size_t size);

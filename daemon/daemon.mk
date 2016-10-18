@@ -23,7 +23,9 @@ endif
 bindings-install: $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 	$(INSTALL) -m 0644 $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 
-kresd_CFLAGS := -fPIE
+kresd_CFLAGS := -fPIE \
+		-Dlibknot_SONAME=\"$(libknot_SONAME)\" \
+		-Dlibzscanner_SONAME=\"$(libzscanner_SONAME)\"
 kresd_DEPEND := $(libkres) $(contrib)
 kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) \
               $(libzscanner_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS) \
