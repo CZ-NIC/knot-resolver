@@ -1,4 +1,3 @@
-
 ************************
 Knot DNS Resolver daemon 
 ************************
@@ -449,6 +448,7 @@ Environment
             -- Print matching records
             local records = pkt:section(kres.section.ANSWER)
             for i = 1, #records do
+               local rr = records[i]
                if rr.type == kres.type.AAAA then
                   print ('record:', kres.rr2str(rr))
                end
