@@ -60,7 +60,7 @@ local function parse(record)
     local version = parseVersion(str)
     local localVersion = getLocalVersion()
     if version ~= localVersion then
-        output = output .. string.format("[version] Newer version of Knot DNS Resolver is available. (Current: %s, Available: %s)\n", localVersion, version)
+        output = output .. string.format("[version] Current version of Knot DNS Resolver is different from the latest stable one available. (Current: %s, Latest stable: %s)\n", localVersion, version)
     end
     if CVE ~= "N/A" then
         output = output .. string.format("[version] CVE: %s\n", CVE)
@@ -79,8 +79,35 @@ local function request (answer)
     end
 end
 
-function M.init()
+local function callhome()
     resolve('et.knot-resolver.cz', kres.type.TXT, kres.class.IN, 0, request)
+end
+
+function M.config(period)
+    if period == nil then 
+        print("Expected number of miliseconds. Using default version.config(1*day)")
+        return
+    end
+    if type(period) ~= "number" then
+        print("Expected number of miliseconds. Using default version.config(1*day)")
+        return
+    end
+    version.period = period
+    print(period)
+    if M.ev then event.cancel(M.ev) end
+    M.ev = event.recurrent(M.period, callhome)
+end
+
+
+function M.init()
+    if period == nil then 
+        M.period = 1*day
+    end
+    M.ev = event.recurrent(M.period, callhome)
+end
+
+function M.deinit()
+    if M.ev then event.cancel(M.ev) end
 end
 
 return M

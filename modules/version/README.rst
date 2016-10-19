@@ -5,6 +5,13 @@ Version
 
 Module checks for new version and CVE_.
 
+Configuration
+^^^^^^^^^^^^^
+.. code-block:: lua
+
+	   version.config(2*day)
+       -- configure period of check (defaults to 1*day)
+
 Running
 ^^^^^^^
 
@@ -12,4 +19,4 @@ Running
 
 	   modules.load("version")
 
-.. _cves: https://cve.mitre.org/
+.. _cve: https://cve.mitre.org/
