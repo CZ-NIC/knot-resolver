@@ -21,15 +21,6 @@ local function hex2string(hex)
     return str
 end
 
---Runs "kresd -V" to get installed version
-local function getLocalVersion()
-    local file = io.popen("kresd -V")
-    local version = file:read('*all')
-    file:close()
-    version = getLastWord(version):sub(1,-2)
-    return version
-end
-
 local function parseCVE(str)
     local first
     local last
@@ -58,7 +49,7 @@ local function parse(record)
     str = hex2string(str)
     local CVE = parseCVE(str)
     local version = parseVersion(str)
-    local localVersion = getLocalVersion()
+    local localVersion = '@VERSION@'
     if version ~= localVersion then
         output = output .. string.format("[version] Current version of Knot DNS Resolver is different from the latest stable one available. (Current: %s, Latest stable: %s)\n", localVersion, version)
     end
