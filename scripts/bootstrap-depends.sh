@@ -1,5 +1,7 @@
-#!/bin/bash  
+#!/bin/bash -x
 #set -e
+
+SCRIPT_DIR=$(dirname $(pwd)/${0})
 
 CMOCKA_TAG="cmocka-0.4.1"
 CMOCKA_URL="git://git.cryptomilk.org/projects/cmocka.git"
@@ -24,6 +26,29 @@ LIBMEMCACHED_URL="https://launchpad.net/libmemcached/1.0/1.0.18/+download/libmem
 
 # prepare install prefix
 PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
+
+function bootstrap_cleanup {
+    if [ -n "$BOOTSTRAP_CLEANUP" ]; then
+	rm -rf "${PREFIX}"
+    else
+	echo "Bootstrap script has changed, you should cleanup ${PREFIX}"
+	echo "or rerun this script with BOOSTRAP_CLEANUP=1 env variable"
+    fi
+}
+
+if [ -f ${PREFIX}/.revision ]; then
+    cd ${SCRIPT_DIR}
+    if ! shasum -a 256 -c ${PREFIX}/.revision >/dev/null 2>/dev/null; then
+	# bootstrap script has changed, do a clean rebuild
+	bootstrap_cleanup
+    fi
+else
+    # failed build, etc...
+    if [ -d "${PREFIX}/" ]; then
+	bootstrap_cleanup
+    fi
+fi
+
 install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
 
 # prepare build env
@@ -82,8 +107,6 @@ function pkg {
 # travis-specific
 PIP_PKGS="dnspython==1.11 cpp-coveralls Jinja2"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
-	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
 	brew update
 	brew install --force makedepend python hiredis libmemcached || true
 	brew link --overwrite python || true
@@ -112,5 +135,12 @@ pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
 
+echo "Build success!"
+
 # remove on successful build
 rm -rf ${BUILD_DIR}
+
+cd ${SCRIPT_DIR}
+shasum -a 256 $(basename $0) > ${PREFIX}/.revision
+
+exit 0
