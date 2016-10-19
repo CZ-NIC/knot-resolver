@@ -26,7 +26,8 @@ modules_TARGETS += ketcd \
                    dns64 \
                    renumber \
                    http \
-                   daf
+                   daf \
+                   version
 endif
 
 # Make C module
