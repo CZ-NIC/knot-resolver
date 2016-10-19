@@ -91,6 +91,7 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	pip install ${PIP_PKGS}
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
+	pip install --user ${USER} --upgrade pip || true
 	pip install --user ${USER} ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
 	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} include/hiredis/hiredis.h install PREFIX=${PREFIX}
