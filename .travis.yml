@@ -38,7 +38,7 @@ script:
     - echo "quit()" | ./daemon/kresd -a 127.0.0.1#53535 .
     - make -j2 check-integration COVERAGE=1 PREFIX=${HOME}/.local
 after_success:
-    - test $TRAVIS_OS_NAME = linux && coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'
+    - if test $TRAVIS_OS_NAME = linux; then coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'; fi
 sudo: false
 cache:
     directories:

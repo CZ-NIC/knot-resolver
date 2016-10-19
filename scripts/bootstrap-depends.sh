@@ -3,20 +3,20 @@
 
 SCRIPT_DIR=$(dirname $(pwd)/${0})
 
-CMOCKA_TAG="cmocka-0.4.1"
+CMOCKA_TAG="cmocka-1.1.0"
 CMOCKA_URL="git://git.cryptomilk.org/projects/cmocka.git"
 LIBUV_TAG="v1.x"
 LIBUV_URL="https://github.com/libuv/libuv.git"
 KNOT_TAG="v2.3.1"
 KNOT_URL="https://github.com/CZ-NIC/knot.git"
-GMP_TAG="6.0.0"
+GMP_TAG="6.1.1"
 GMP_URL="https://gmplib.org/download/gmp/gmp-${GMP_TAG}.tar.xz"
-JANSSON_TAG="2.7"
+JANSSON_TAG="2.9"
 JANSSON_URL="http://www.digip.org/jansson/releases/jansson-${JANSSON_TAG}.tar.gz"
-NETTLE_TAG="2.7.1"
+NETTLE_TAG="3.3"
 NETTLE_URL="https://ftp.gnu.org/gnu/nettle/nettle-${NETTLE_TAG}.tar.gz"
-GNUTLS_TAG="3.3.12"
-GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
+GNUTLS_TAG="3.5.5"
+GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.5/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_TAG="v2.1.0-beta2"
 LUA_URL="https://github.com/LuaJIT/LuaJIT.git"
 HIREDIS_TAG="v0.13.3"
@@ -29,6 +29,7 @@ PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
 
 function bootstrap_cleanup {
     if [ -n "$BOOTSTRAP_CLEANUP" ]; then
+	echo "Bootstrap script has changed, cleaning up ${PREFIX}"
 	rm -rf "${PREFIX}"
     else
 	echo "Bootstrap script has changed, you should cleanup ${PREFIX}"
