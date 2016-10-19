@@ -259,6 +259,8 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->req.qsource.key = NULL;
 	task->req.qsource.addr = NULL;
 	task->req.qsource.dst_addr = NULL;
+	task->req.qsource.packet = NULL;
+	task->req.qsource.opt = NULL;
 	/* Remember query source addr */
 	if (addr) {
 		size_t addr_len = sizeof(struct sockaddr_in);
