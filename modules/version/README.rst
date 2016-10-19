@@ -3,7 +3,7 @@
 Version
 -------
 
-Module checks for new version and CVE_.
+Module checks for new version and CVE_, and issues warning messages.
 
 Configuration
 ^^^^^^^^^^^^^
