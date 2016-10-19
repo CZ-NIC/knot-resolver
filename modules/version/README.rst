@@ -3,7 +3,7 @@
 Version
 -------
 
-Module checks for new version and CVEs_.
+Module checks for new version and CVE_.
 
 Running
 ^^^^^^^

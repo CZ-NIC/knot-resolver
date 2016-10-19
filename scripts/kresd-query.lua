@@ -23,7 +23,7 @@ local function help()
 	name = 'kresd-query.lua'
 	print(string.format('Usage: %s [-t type] [-c class] [-C config] <name> <script>', name))
 	print('Execute a single-shot query and run a script on the result.')
-	print('There are two variable available: pkt (kres.pkt_t), req (kres.request_t)')
+	print('There are two variables available: pkt (kres.pkt_t), req (kres.request_t)')
 	print('See modules README to learn about their APIs.')
 	print('')
 	print('Options:')
