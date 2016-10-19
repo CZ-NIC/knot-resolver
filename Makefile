@@ -74,7 +74,7 @@ endif
 
 # Overview
 info:
-	$(info Target:     Knot DNS Resolver $(MAJOR).$(MINOR).$(PATCH)-$(PLATFORM))
+	$(info Target:     Knot DNS Resolver $(VERSION)-$(PLATFORM))
 	$(info Compiler:   $(CC) $(BUILD_CFLAGS))
 	$(info )
 	$(info Variables)
