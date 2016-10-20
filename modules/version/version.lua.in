@@ -51,10 +51,13 @@ local function parse(record)
     local version = parseVersion(str)
     local localVersion = '@VERSION@'
     if version ~= localVersion then
-        output = output .. string.format("[version] Current version of Knot DNS Resolver is different from the latest stable one available. (Current: %s, Latest stable: %s)\n", localVersion, version)
-    end
-    if CVE ~= "N/A" then
-        output = output .. string.format("[version] CVE: %s\n", CVE)
+        output = output .. string.format(
+			"[version] Current version of Knot DNS Resolver is different from the latest stable one available."
+				.. " (Current: %s, Latest stable: %s)\n",
+			localVersion, version)
+		if CVE ~= "N/A" then
+			output = output .. string.format("[version] CVE: %s\n", CVE)
+		end
     end
     io.write(output)
 end
