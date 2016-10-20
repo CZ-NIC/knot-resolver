@@ -128,7 +128,8 @@ pkg nettle ${NETTLE_URL} ${NETTLE_TAG} include/nettle \
 export GMP_CFLAGS="-I${PREFIX}/include"
 export GMP_LIBS="-L${PREFIX}/lib -lgmp"
 pkg gnutls ${GNUTLS_URL} ${GNUTLS_TAG} include/gnutls \
-	--disable-tests --disable-doc --disable-valgrind-tests --disable-static --with-included-libtasn1 --without-p11-kit
+    --disable-tests --disable-doc --disable-valgrind-tests --disable-static --with-included-libtasn1 --without-p11-kit \
+    --disable-tools --disable-cxx
 pkg jansson ${JANSSON_URL} ${JANSSON_TAG} include/jansson.h --disable-static
 pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 	--disable-static --with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
