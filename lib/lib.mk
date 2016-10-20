@@ -79,7 +79,7 @@ libkres.pc:
 	@echo 'Name: libkres' >> $@
 	@echo 'Description: Knot DNS Resolver library' >> $@
 	@echo 'URL: https://www.knot-resolver.cz' >> $@
-	@echo 'Version: $(MAJOR).$(MINOR).$(PATCH)' >> $@
+	@echo 'Version: $(VERSION)' >> $@
 	@echo 'Libs: -L$${libdir} -lkres' >> $@
 	@echo 'Cflags: -I$${includedir}' >> $@
 libkres-pcinstall: libkres.pc libkres-install
