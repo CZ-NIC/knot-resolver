@@ -177,7 +177,7 @@ static void ipc_activity(uv_poll_t* handle, int status, int events)
 	uint32_t len = 0;
 	if (ipc_readall(fd, (char *)&len, sizeof(len))) {
 		auto_free char *rbuf = NULL;
-		if (len < UINT_MAX) {
+		if (len < UINT32_MAX) {
 			rbuf = malloc(len + 1);
 		} else {
 			errno = EINVAL;
