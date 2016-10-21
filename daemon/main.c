@@ -55,11 +55,19 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	/* Set output streams */
 	FILE *out = stdout, *outerr = stderr;
 	uv_os_fd_t stream_fd = 0;
-	uv_fileno((uv_handle_t *)stream, &stream_fd);
+	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
+		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
+		if (buf) {
+			free(buf->base);
+		}
+		return;
+	}
 	if (stream_fd != STDIN_FILENO) {
 		if (nread <= 0) { /* Close if disconnected */
 			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-			free(buf->base);
+			if (buf) {
+				free(buf->base);
+			}
 			return;
 		}
 		uv_os_fd_t dup_fd = dup(stream_fd);
@@ -100,7 +108,9 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		lua_settop(L, 0);
 	}
 	fflush(out);
-	free(buf->base);
+	if (buf) {
+		free(buf->base);
+	}
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
 		fclose(out); /* outerr is the same */
@@ -166,7 +176,12 @@ static void ipc_activity(uv_poll_t* handle, int status, int events)
 	/* Read expression from IPC pipe */
 	uint32_t len = 0;
 	if (ipc_readall(fd, (char *)&len, sizeof(len))) {
-		auto_free char *rbuf = malloc(len + 1);
+		auto_free char *rbuf = NULL;
+		if (len < UINT_MAX) {
+			rbuf = malloc(len + 1);
+		} else {
+			errno = EINVAL;
+		}
 		if (!rbuf) {
 			kr_log_error("[system] ipc: %s\n", strerror(errno));
 			engine_stop(engine); /* Panic and stop this fork. */

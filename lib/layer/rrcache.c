@@ -351,7 +351,8 @@ static int rrcache_stash(knot_layer_t *ctx, knot_pkt_t *pkt)
 			ret = stash_authority(qry, pkt, &stash, &req->pool);
 		}
 	/* Cache authority only if chasing referral/cname chain */
-	} else if (!is_auth || qry != array_tail(req->rplan.pending)) {
+	} else if (knot_pkt_section(pkt, KNOT_ANSWER)->count == 0 ||
+		   qry->flags & QUERY_CNAME) {
 		ret = stash_authority(qry, pkt, &stash, &req->pool);
 	}
 	/* Cache DS records in referrals */

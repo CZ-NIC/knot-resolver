@@ -29,7 +29,10 @@
 	uv_os_fd_t fd = 0; \
 	if (uv_fileno((uv_handle_t *)(handle), &fd) == 0) { \
 		int on = 1; \
-		setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)); \
+		int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)); \
+		if (ret) { \
+			return ret; \
+		} \
 	} \
   } while (0)
 /* libuv 1.7.0+ is able to assign fd immediately */
@@ -140,7 +143,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 			return kr_error(ENOMEM);
 		}
 		memset(ep->udp, 0, sizeof(*ep->udp));
-		handle_init(udp, net->loop, ep->udp, sa->sa_family);
+		handle_init(udp, net->loop, ep->udp, sa->sa_family); /* can return! */
 		ret = udp_bind(ep->udp, sa);
 		if (ret != 0) {
 			return ret;
@@ -153,7 +156,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 			return kr_error(ENOMEM);
 		}
 		memset(ep->tcp, 0, sizeof(*ep->tcp));
-		handle_init(tcp, net->loop, ep->tcp, sa->sa_family);
+		handle_init(tcp, net->loop, ep->tcp, sa->sa_family); /* can return! */
 		if (flags & NET_TLS) {
 			ret = tcp_bind_tls(ep->tcp, sa);
 			ep->flags |= NET_TLS;

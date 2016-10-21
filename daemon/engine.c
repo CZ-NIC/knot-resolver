@@ -349,6 +349,7 @@ static int l_map(lua_State *L)
 		/* Read response */
 		uint32_t rlen = 0;
 		if (read(fd, &rlen, sizeof(rlen)) == sizeof(rlen)) {
+			expr_checked(rlen < UINT32_MAX);
 			auto_free char *rbuf = malloc(rlen + 1);
 			expr_checked(rbuf != NULL);
 			expr_checked(read(fd, rbuf, rlen) == rlen);
