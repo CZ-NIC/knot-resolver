@@ -143,7 +143,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 			return kr_error(ENOMEM);
 		}
 		memset(ep->udp, 0, sizeof(*ep->udp));
-		handle_init(udp, net->loop, ep->udp, sa->sa_family);
+		handle_init(udp, net->loop, ep->udp, sa->sa_family); /* can return! */
 		ret = udp_bind(ep->udp, sa);
 		if (ret != 0) {
 			return ret;
@@ -156,7 +156,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 			return kr_error(ENOMEM);
 		}
 		memset(ep->tcp, 0, sizeof(*ep->tcp));
-		handle_init(tcp, net->loop, ep->tcp, sa->sa_family);
+		handle_init(tcp, net->loop, ep->tcp, sa->sa_family); /* can return! */
 		if (flags & NET_TLS) {
 			ret = tcp_bind_tls(ep->tcp, sa);
 			ep->flags |= NET_TLS;
