@@ -14,7 +14,7 @@
 *.out
 *.6
 *.log
-*.inc
+/daemon/lua/*.inc
 *.mdb
 *.gcno
 *.gcda
@@ -54,3 +54,4 @@ kresd.amalg.c
 libkres.amalg.c
 /doc/kresd.8
 /libkres.pc
+/daemon/lua/sandbox.lua

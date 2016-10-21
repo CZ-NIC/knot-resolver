@@ -1,20 +1,22 @@
-#!/bin/bash  
+#!/bin/bash -x
 #set -e
 
-CMOCKA_TAG="cmocka-0.4.1"
+SCRIPT_DIR=$(dirname $(pwd)/${0})
+
+CMOCKA_TAG="cmocka-1.1.0"
 CMOCKA_URL="git://git.cryptomilk.org/projects/cmocka.git"
 LIBUV_TAG="v1.x"
 LIBUV_URL="https://github.com/libuv/libuv.git"
-KNOT_TAG="v2.3.0"
+KNOT_TAG="v2.3.1"
 KNOT_URL="https://github.com/CZ-NIC/knot.git"
-GMP_TAG="6.0.0"
+GMP_TAG="6.1.1"
 GMP_URL="https://gmplib.org/download/gmp/gmp-${GMP_TAG}.tar.xz"
-JANSSON_TAG="2.7"
+JANSSON_TAG="2.9"
 JANSSON_URL="http://www.digip.org/jansson/releases/jansson-${JANSSON_TAG}.tar.gz"
-NETTLE_TAG="2.7.1"
+NETTLE_TAG="3.3"
 NETTLE_URL="https://ftp.gnu.org/gnu/nettle/nettle-${NETTLE_TAG}.tar.gz"
-GNUTLS_TAG="3.3.12"
-GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-${GNUTLS_TAG}.tar.xz"
+GNUTLS_TAG="3.5.5"
+GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.5/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_TAG="v2.1.0-beta2"
 LUA_URL="https://github.com/LuaJIT/LuaJIT.git"
 HIREDIS_TAG="v0.13.3"
@@ -24,6 +26,30 @@ LIBMEMCACHED_URL="https://launchpad.net/libmemcached/1.0/1.0.18/+download/libmem
 
 # prepare install prefix
 PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
+
+function bootstrap_cleanup {
+    if [ -n "$BOOTSTRAP_CLEANUP" ]; then
+	echo "Bootstrap script has changed, cleaning up ${PREFIX}"
+	rm -rf "${PREFIX}"
+    else
+	echo "Bootstrap script has changed, you should cleanup ${PREFIX}"
+	echo "or rerun this script with BOOSTRAP_CLEANUP=1 env variable"
+    fi
+}
+
+if [ -f ${PREFIX}/.revision ]; then
+    cd ${SCRIPT_DIR}
+    if ! shasum -a 256 -c ${PREFIX}/.revision >/dev/null 2>/dev/null; then
+	# bootstrap script has changed, do a clean rebuild
+	bootstrap_cleanup
+    fi
+else
+    # failed build, etc...
+    if [ -d "${PREFIX}/" ]; then
+	bootstrap_cleanup
+    fi
+fi
+
 install -d ${PREFIX}/{lib,libexec,include,bin,sbin,man,share,etc,info,doc,var}
 
 # prepare build env
@@ -82,8 +108,6 @@ function pkg {
 # travis-specific
 PIP_PKGS="dnspython==1.11 cpp-coveralls Jinja2"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-	DEPEND_CACHE="https://dl.dropboxusercontent.com/u/2255176/resolver-${TRAVIS_OS_NAME}-cache.tar.gz"
-	curl "${DEPEND_CACHE}" > cache.tar.gz && tar -xz -C ${HOME} -f cache.tar.gz || true
 	brew update
 	brew install --force makedepend python hiredis libmemcached || true
 	brew link --overwrite python || true
@@ -91,6 +115,7 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	pip install ${PIP_PKGS}
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
+	pip install --user ${USER} --upgrade pip || true
 	pip install --user ${USER} ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
 	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} include/hiredis/hiredis.h install PREFIX=${PREFIX}
@@ -103,7 +128,8 @@ pkg nettle ${NETTLE_URL} ${NETTLE_TAG} include/nettle \
 export GMP_CFLAGS="-I${PREFIX}/include"
 export GMP_LIBS="-L${PREFIX}/lib -lgmp"
 pkg gnutls ${GNUTLS_URL} ${GNUTLS_TAG} include/gnutls \
-	--disable-tests --disable-doc --disable-valgrind-tests --disable-static --with-included-libtasn1
+    --disable-tests --disable-doc --disable-valgrind-tests --disable-static --with-included-libtasn1 --without-p11-kit \
+    --disable-tools --disable-cxx
 pkg jansson ${JANSSON_URL} ${JANSSON_TAG} include/jansson.h --disable-static
 pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 	--disable-static --with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
@@ -111,5 +137,12 @@ pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
 
+echo "Build success!"
+
 # remove on successful build
 rm -rf ${BUILD_DIR}
+
+cd ${SCRIPT_DIR}
+shasum -a 256 $(basename $0) > ${PREFIX}/.revision
+
+exit 0

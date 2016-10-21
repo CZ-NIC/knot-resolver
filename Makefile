@@ -15,21 +15,32 @@ BUILD_CFLAGS += --coverage
 endif
 
 # Dependencies
-$(eval $(call find_lib,libknot,2.2))
+$(eval $(call find_lib,libknot,2.3.1,yes))
+$(eval $(call find_lib,libdnssec,2.3.1,yes))
+$(eval $(call find_lib,libzscanner,2.3.1,yes))
 $(eval $(call find_lib,lmdb))
-$(eval $(call find_lib,libzscanner,2.1))
-$(eval $(call find_lib,libuv,1.0))
-$(eval $(call find_lib,nettle))
+$(eval $(call find_lib,libuv,1.0,yes))
+$(eval $(call find_lib,nettle,,yes))
 $(eval $(call find_alt,lua,luajit))
 $(eval $(call find_lib,cmocka))
 $(eval $(call find_bin,doxygen))
 $(eval $(call find_bin,sphinx-build))
 $(eval $(call find_lib,libmemcached,1.0))
-$(eval $(call find_lib,hiredis))
+$(eval $(call find_lib,hiredis,,yes))
 $(eval $(call find_lib,socket_wrapper))
-$(eval $(call find_lib,libdnssec))
 $(eval $(call find_lib,libsystemd,227))
 $(eval $(call find_lib,gnutls))
+
+# Lookup SONAME
+$(eval $(call find_soname,libknot))
+$(eval $(call find_soname,libzscanner))
+
+ifeq ($(libknot_SONAME),)
+  $(error "Unable to resolve libknot_SONAME, update find_soname in platform.mk")
+endif
+ifeq ($(libzscanner_SONAME),)
+  $(error "Unable to resolve libzscanner_SONAME, update find_some in platform.mk")
+endif
 
 # Find Go version and platform
 GO_VERSION := $(shell $(GO) version 2>/dev/null)
@@ -109,6 +120,19 @@ info:
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
 	$(info [$(HAS_libsystemd)] systemd (daemon))
 	$(info )
+
+ifeq ($(HAS_libknot),no)
+	$(error libknot >= 2.3.1 required)
+endif
+ifeq ($(HAS_libzscanner),no)
+	$(error libzscanner >= 2.3.1 required)
+endif
+ifeq ($(HAS_libdnssec),no)
+	$(error libdnssec >= 2.3.1 required)
+endif
+ifeq ($(HAS_libuv),no)
+	$(error libuv >= 1.0 required)
+endif
 
 # Installation directories
 $(DESTDIR)$(MODULEDIR):
