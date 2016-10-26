@@ -32,11 +32,11 @@ env:
 before_script:
     - BOOTSTRAP_CLEANUP=1 ./scripts/bootstrap-depends.sh ${HOME}/.local
 script:
-    - make -j2 install check V=1 COVERAGE=1 PREFIX=${HOME}/.local
+    - make -j2 install check V=1 COVERAGE=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
     - ./daemon/kresd -h
     - ./daemon/kresd -V
     - echo "quit()" | ./daemon/kresd -a 127.0.0.1#53535 .
-    - make -j2 check-integration COVERAGE=1 PREFIX=${HOME}/.local
+    - make -j2 check-integration COVERAGE=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
 after_success:
     - if test $TRAVIS_OS_NAME = linux; then coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'; fi
 sudo: false
