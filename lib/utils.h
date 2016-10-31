@@ -166,3 +166,12 @@ int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool);
  */
 KR_EXPORT
 char *kr_module_call(struct kr_context *ctx, const char *module, const char *prop, const char *input);
+
+/** Swap two places.  Note: the parameters need to be without side effects. */
+#define SWAP(x, y) do { /* http://stackoverflow.com/a/3982430/587396 */ \
+	unsigned char swap_temp[sizeof(x) == sizeof(y) ? (ssize_t)sizeof(x) : -1]; \
+	memcpy(swap_temp, &y, sizeof(x)); \
+	memcpy(&y,        &x, sizeof(x)); \
+	memcpy(&x, swap_temp, sizeof(x)); \
+	} while(0)
+

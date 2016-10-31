@@ -78,7 +78,7 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 
 	/* Update packet answer */
 	knot_rrset_t rr_copy;
-	ret = kr_cache_materialize(&rr_copy, &cache_rr, drift, &pkt->mm);
+	ret = kr_cache_materialize(&rr_copy, &cache_rr, drift, qry->reorder, &pkt->mm);
 	if (ret == 0) {
 		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr_copy, KNOT_PF_FREE);
 		if (ret != 0) {

@@ -326,7 +326,8 @@ int kr_cache_peek_rank(struct kr_cache *cache, uint8_t tag, const knot_dname_t *
 	return found->rank;
 }
 
-int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift, knot_mm_t *mm)
+int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift,
+		uint reorder, knot_mm_t *mm)
 {
 	if (!dst || !src || dst == src) {
 		return kr_error(EINVAL);
@@ -339,17 +340,36 @@ int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t dr
 		return kr_error(ENOMEM);
 	}
 
-	/* Copy valid records */
+	/* Find valid records */
+	knot_rdata_t **valid = malloc(sizeof(knot_rdata_t *) * src->rrs.rr_count);
+	uint16_t valid_count = 0;
 	knot_rdata_t *rd = src->rrs.data;
 	for (uint16_t i = 0; i < src->rrs.rr_count; ++i) {
 		if (knot_rdata_ttl(rd) >= drift) {
-			if (knot_rdataset_add(&dst->rrs, rd, mm) != 0) {
-				knot_rrset_clear(dst, mm);
-				return kr_error(ENOMEM);
-			}
+			valid[valid_count++] = rd;
 		}
 		rd = kr_rdataset_next(rd);
 	}
+
+	if (reorder && valid_count > 1) {
+		/* Reorder the valid part; it's a reversed rotation,
+		 * done by two array reversals. */
+		uint16_t shift = reorder % valid_count;
+		for (uint16_t i = 0; i < shift / 2; ++i) {
+			SWAP(valid[i], valid[shift - 1 - i]);
+		}
+		for (uint16_t i = 0; i < (valid_count - shift) / 2; ++i) {
+			SWAP(valid[shift + i], valid[valid_count - 1 - i]);
+		}
+	}
+
+	int err = knot_rdataset_gather(&dst->rrs, valid, valid_count, mm);
+	free(valid);
+	if (err) {
+		knot_rrset_clear(dst, mm);
+		return kr_error(err);
+	}
+
 	/* Fixup TTL by time passed */
 	rd = dst->rrs.data;
 	for (uint16_t i = 0; i < dst->rrs.rr_count; ++i) {

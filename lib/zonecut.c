@@ -330,7 +330,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_d
 
 	/* Materialize as we'll going to do more cache lookups. */
 	knot_rrset_t rr_copy;
-	ret = kr_cache_materialize(&rr_copy, &cached_rr, drift, cut->pool);
+	ret = kr_cache_materialize(&rr_copy, &cached_rr, drift, 0, cut->pool);
 	if (ret != 0) {
 		return ret;
 	}
@@ -380,7 +380,7 @@ static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 		return kr_error(ENOMEM);
 	}
 
-	ret = kr_cache_materialize(*rr, &cached_rr, drift, pool);
+	ret = kr_cache_materialize(*rr, &cached_rr, drift, 0, pool);
 	if (ret != 0) {
 		knot_rrset_free(rr, pool);
 		return ret;

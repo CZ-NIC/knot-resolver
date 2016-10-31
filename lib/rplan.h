@@ -48,7 +48,8 @@
 	X(PERMISSIVE,      1 << 20) /**< Permissive resolver mode. */ \
 	X(STRICT,          1 << 21) /**< Strict resolver mode. */ \
 	X(BADCOOKIE_AGAIN, 1 << 22) /**< Query again because bad cookie returned. */ \
-	X(CNAME,	   1 << 23) /**< Query response contains CNAME in answer section. */
+	X(CNAME,	   1 << 23) /**< Query response contains CNAME in answer section. */ \
+	X(REORDER_RR,      1 << 24) /**< Reorder cached RRs. */
 
 /** Query flags */
 enum kr_query_flag {
@@ -73,6 +74,7 @@ struct kr_query {
 	uint32_t flags;
 	uint32_t secret;
 	uint16_t fails;
+	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
