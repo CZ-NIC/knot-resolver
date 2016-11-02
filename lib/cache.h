@@ -19,6 +19,7 @@
 #include <libknot/rrset.h>
 #include "lib/cdb.h"
 #include "lib/defines.h"
+#include "contrib/ucw/config.h" /*uint*/
 
 /** Cache entry tag */
 enum kr_cache_tag {
