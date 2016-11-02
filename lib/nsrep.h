@@ -62,7 +62,7 @@ enum kr_ns_update_mode {
 /**
  * NS reputation/QoS tracking.
  */
-typedef lru_hash(unsigned) kr_nsrep_lru_t;
+typedef lru_t(unsigned) kr_nsrep_lru_t;
 
 /* Maximum count of addresses probed in one go (last is left empty) */
 #define KR_NSREP_MAXADDR 4

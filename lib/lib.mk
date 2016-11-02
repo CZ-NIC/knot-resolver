@@ -1,4 +1,5 @@
 libkres_SOURCES := \
+	lib/generic/lru.c      \
 	lib/generic/map.c      \
 	lib/layer/iterate.c    \
 	lib/layer/validate.c   \
@@ -20,6 +21,7 @@ libkres_SOURCES := \
 
 libkres_HEADERS := \
 	lib/generic/array.h    \
+	lib/generic/lru.h      \
 	lib/generic/map.h      \
 	lib/generic/set.h      \
 	lib/layer.h            \

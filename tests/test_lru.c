@@ -22,7 +22,7 @@
 #include "tests/test.h"
 #include "lib/generic/lru.h"
 
-typedef lru_hash(int) lru_int_t;
+typedef lru_t(int) lru_int_t;
 #define HASH_SIZE 1024
 #define KEY_LEN(x) (strlen(x) + 1)
 
@@ -61,10 +61,12 @@ static void test_insert(void **state)
 	int i;
 
 	for (i = 0; i < dict_size; i++) {
-		int *data = lru_set(lru, dict[i], KEY_LEN(dict[i]));
-		assert_non_null(data);
+		int *data = lru_get_new(lru, dict[i], KEY_LEN(dict[i]));
+		if (!data) {
+			continue;
+		}
 		*data = i;
-		assert_true(*lru_get(lru, dict[i], KEY_LEN(dict[i])) == i);
+		assert_true(*lru_get_try(lru, dict[i], KEY_LEN(dict[i])) == i);
 	}
 }
 
@@ -72,7 +74,7 @@ static void test_missing(void **state)
 {
 	lru_int_t *lru = *state;
 	const char *notin = "not in lru";
-	assert_true(lru_get(lru, notin, KEY_LEN(notin)) == NULL);
+	assert_true(lru_get_try(lru, notin, KEY_LEN(notin)) == NULL);
 }
 
 static void test_eviction(void **state)
@@ -81,12 +83,12 @@ static void test_eviction(void **state)
 	char key[16];
 	for (unsigned i = 0; i < HASH_SIZE; ++i) {
 		test_randstr(key, sizeof(key));
-		int *data = lru_set(lru, key, sizeof(key));
+		int *data = lru_get_new(lru, key, sizeof(key));
 		if (!data) {
-			assert_true(0);
+			continue;
 		}
 		*data = i;
-		if (*lru_get(lru, key, sizeof(key)) != i) {
+		if (*lru_get_try(lru, key, sizeof(key)) != i) {
 			assert_true(0);
 		}
 	}
@@ -94,18 +96,16 @@ static void test_eviction(void **state)
 
 static void test_init(void **state)
 {
-	lru_int_t *lru = malloc(lru_size(lru_int_t, HASH_SIZE));
+	lru_int_t *lru;
+	lru_create(&lru, HASH_SIZE, NULL, NULL);
 	assert_non_null(lru);
-	lru_init(lru, HASH_SIZE);
-	assert_int_equal(lru->size, HASH_SIZE);
 	*state = lru;
 }
 
 static void test_deinit(void **state)
 {
 	lru_int_t *lru = *state;
-	lru_deinit(lru);
-	free(lru);
+	lru_free(lru);
 }
 
 /* Program entry point */

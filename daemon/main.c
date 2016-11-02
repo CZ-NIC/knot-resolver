@@ -631,6 +631,7 @@ int main(int argc, char **argv)
 		}
 	}
 	/* Cleanup. */
+	free(keyfile);
 	engine_deinit(&engine);
 	worker_reclaim(worker);
 	mp_delete(pool.ctx);

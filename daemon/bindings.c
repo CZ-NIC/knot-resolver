@@ -660,12 +660,9 @@ static int cache_clear(lua_State *L)
 	}
 
 	/* Clear reputation tables */
-	lru_deinit(engine->resolver.cache_rtt);
-	lru_deinit(engine->resolver.cache_rep);
-	lru_init(engine->resolver.cache_rtt, LRU_RTT_SIZE);
-	lru_init(engine->resolver.cache_rep, LRU_REP_SIZE);
-	lru_deinit(engine->resolver.cache_cookie);
-	lru_init(engine->resolver.cache_cookie, LRU_COOKIES_SIZE);
+	lru_reset(engine->resolver.cache_rtt);
+	lru_reset(engine->resolver.cache_rep);
+	lru_reset(engine->resolver.cache_cookie);
 	lua_pushboolean(L, true);
 	return 1;
 }
