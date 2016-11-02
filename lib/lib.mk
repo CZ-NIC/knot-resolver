@@ -65,6 +65,10 @@ libkres_HEADERS += \
 libkres_LIBS += $(nettle_LIBS)
 endif
 
+lib/zonecut.c: lib/root-hints.inc
+lib/root-hints.inc: scripts/gen-root-hints.sh scripts/inet_pton.py
+	scripts/gen-root-hints.sh > $@
+
 # Make library
 ifeq ($(BUILDMODE), static)
 $(eval $(call make_static,libkres,lib,yes))
