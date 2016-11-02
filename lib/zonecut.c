@@ -34,39 +34,49 @@ struct hint_info {
 	const uint8_t *addr;
 };
 
-/* Initialize with SBELT name servers. */
 #define U8(x) (const uint8_t *)(x)
-#define I4 sizeof(struct in_addr)
-#define I6 sizeof(struct in6_addr)
-#define HINT_COUNT 24
-static const struct hint_info SBELT[HINT_COUNT] = {
-        { U8("\x01""j""\x0c""root-servers""\x03""net"), I4, U8("\xc0:\x80\x1e")    }, /* 192.58.128.30 */
-        { U8("\x01""k""\x0c""root-servers""\x03""net"), I4, U8("\xc1\x00\x0e\x81") }, /* 193.0.14.129 */
-        { U8("\x01""d""\x0c""root-servers""\x03""net"), I4, U8("\xc7\x07[\r")      }, /* 199.7.91.13 */
-        { U8("\x01""e""\x0c""root-servers""\x03""net"), I4, U8("\xc0\xcb\xe6\n")   }, /* 192.203.230.10 */
-        { U8("\x01""f""\x0c""root-servers""\x03""net"), I4, U8("\xc0\x05\x05\xf1") }, /* 192.5.5.241 */
-        { U8("\x01""g""\x0c""root-servers""\x03""net"), I4, U8("\xc0p$\x04")       }, /* 192.112.36.4 */
-        { U8("\x01""h""\x0c""root-servers""\x03""net"), I4, U8("\xc6\x61\xbe\x35") }, /* 198.97.190.53 */
-        { U8("\x01""i""\x0c""root-servers""\x03""net"), I4, U8("\xc0$\x94\x11")    }, /* 192.36.148.17 */
-        { U8("\x01""l""\x0c""root-servers""\x03""net"), I4, U8("\xc7\x07S*")       }, /* 199.7.83.42 */
-        { U8("\x01""m""\x0c""root-servers""\x03""net"), I4, U8("\xca\x0c\x1b!")    }, /* 202.12.27.33 */
-        { U8("\x01""b""\x0c""root-servers""\x03""net"), I4, U8("\xc0\xe4O\xc9")    }, /* 192.228.79.201 */
-        { U8("\x01""c""\x0c""root-servers""\x03""net"), I4, U8("\xc6)\x00\x04")    }, /* 192.33.4.12 */
-        { U8("\x01""a""\x0c""root-servers""\x03""net"), I4, U8("\xc6)\x00\x04")    }, /* 198.41.0.4 */
-	{ U8("\x01""a""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x05\x03\xba\x3e\x00\x00\x00\x00\x00\x00\x00\x02\x00\x30") }, /* 2001:503:ba3e::2:30 */
-	{ U8("\x01""b""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x05\x00\x00\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0b") }, /* 2001:500:84::b */
-	{ U8("\x01""c""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x05\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0c") }, /* 2001:500:2::c */
-	{ U8("\x01""d""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x05\x00\x00\x2d\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0d") }, /* 2001:500:2d::d */
-	{ U8("\x01""f""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x05\x00\x00\x2f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0f") }, /* 2001:500:2f::f */
-	{ U8("\x01""h""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x53") }, /* 2001:500:1::53 */
-	{ U8("\x01""i""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x07\xfe\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x53") }, /* 2001:7fe::53 */
-	{ U8("\x01""j""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x05\x03\x0c\x27\x00\x00\x00\x00\x00\x00\x00\x02\x00\x30") }, /* 2001:503:c27::2:30 */
-	{ U8("\x01""k""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x07\xfd\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01") }, /* 2001:7fd::1 */
-	{ U8("\x01""l""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x05\x00\x00\x9f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x42") }, /* 2001:500:9f::42 */
-	{ U8("\x01""m""\x0c""root-servers""\x03""net"), I6, U8("\x20\x01\x0d\xc3\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x35") }, /* 2001:dc3::35 */
+
+/* Initialize with SBELT name servers. */
+#include "lib/root-hints.inc"
+#define HINT_LEN_A sizeof(struct in_addr)
+#define HINT_LEN_AAAA sizeof(struct in6_addr)
+#define SBELT_LEN (sizeof(SBELT) / sizeof(SBELT[0]))
+static const struct hint_info SBELT[] = {
+	#define HINT(name,type) { \
+		U8("\x01" #name "\x0c""root-servers""\x03""net"), \
+		HINT_LEN_##type, \
+		U8(HINT_##name##_##type), \
+      	}
+	HINT(j, A),
+	HINT(k, A),
+	HINT(d, A),
+	HINT(e, A),
+	HINT(f, A),
+	HINT(g, A),
+	HINT(h, A),
+	HINT(i, A),
+	HINT(l, A),
+	HINT(m, A),
+	HINT(b, A),
+	HINT(c, A),
+	HINT(a, A),
+	HINT(a, AAAA),
+	HINT(b, AAAA),
+	HINT(c, AAAA),
+	HINT(d, AAAA),
+	HINT(e, AAAA),
+	HINT(f, AAAA),
+	HINT(g, AAAA),
+	HINT(h, AAAA),
+	HINT(i, AAAA),
+	HINT(j, AAAA),
+	HINT(k, AAAA),
+	HINT(l, AAAA),
+	HINT(m, AAAA),
+	#undef HINT
 };
-#undef I4
-#undef I6
+#undef HINT_LEN_A
+#undef HINT_LEN_AAAA
 
 
 static void update_cut_name(struct kr_zonecut *cut, const knot_dname_t *name)
@@ -286,7 +296,7 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 		ret = kr_zonecut_copy(cut, &ctx->root_hints);
 	} else {
 		/* Copy compiled-in root hints */
-		for (unsigned i = 0; i < HINT_COUNT; ++i) {
+		for (unsigned i = 0; i < SBELT_LEN; ++i) {
 			const struct hint_info *hint = &SBELT[i];
 			knot_rdata_init(rdata_arr, hint->len, hint->addr, 0);
 			ret = kr_zonecut_add(cut, hint->name, rdata_arr);
