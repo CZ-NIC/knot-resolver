@@ -84,6 +84,7 @@ Web interface
 
 If you have :ref:`HTTP/2 <mod-http>` loaded, the firewall automatically loads as a snippet.
 You can create, track, suspend and remove firewall rules from the web interface.
+If you load both modules, you have to load `daf` after `http`.
 
 RESTful interface
 ^^^^^^^^^^^^^^^^^
