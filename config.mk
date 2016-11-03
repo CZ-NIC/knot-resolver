@@ -23,7 +23,7 @@ ETCDIR ?= $(PREFIX)/etc/kresd
 CC	?= cc
 RM	:= rm -f
 LN      := ln -s
-XXD     := ./scripts/embed.sh
+XXD_LUA := ./scripts/embed-lua.sh
 INSTALL := install
 
 # Flags
