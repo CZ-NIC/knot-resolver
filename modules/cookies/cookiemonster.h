@@ -26,7 +26,7 @@
  * @param module_param module parameters
  * @return layer state
  */
-int check_request(knot_layer_t *ctx, void *module_param);
+int check_request(kr_layer_t *ctx, void *module_param);
 
 /**
  * @brief Checks cookies of received responses.
@@ -34,4 +34,4 @@ int check_request(knot_layer_t *ctx, void *module_param);
  * @param pkt response packet
  * @return layer state
  */
-int check_response(knot_layer_t *ctx, knot_pkt_t *pkt);
+int check_response(kr_layer_t *ctx, knot_pkt_t *pkt);

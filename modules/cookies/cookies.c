@@ -73,12 +73,12 @@ int cookies_deinit(struct kr_module *module)
 }
 
 KR_EXPORT
-const knot_layer_api_t *cookies_layer(struct kr_module *module)
+const kr_layer_api_t *cookies_layer(struct kr_module *module)
 {
 	/* The function answer_finalize() in resolver is called before any
 	 * .finish callback. Therefore this layer does not use it. */
 
-	static knot_layer_api_t _layer = {
+	static kr_layer_api_t _layer = {
 		.begin = &check_request,
 		.consume = &check_response
 	};

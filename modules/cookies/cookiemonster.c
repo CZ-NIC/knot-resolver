@@ -216,13 +216,13 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 }
 
 /** Process incoming response. */
-int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
+int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
 	struct kr_cookie_ctx *cookie_ctx = &req->ctx->cookie_ctx;
 
-	if (ctx->state & (KNOT_STATE_DONE | KNOT_STATE_FAIL)) {
+	if (ctx->state & (KR_STATE_DONE | KR_STATE_FAIL)) {
 		return ctx->state;
 	}
 
@@ -246,7 +246,7 @@ int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 		/* We haven't received any cookies although we should. */
 		DEBUG_MSG(NULL, "%s\n",
 		          "expected to receive a cookie but none received");
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
 	if (!pkt_cookie_opt) {
@@ -256,7 +256,7 @@ int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 
 	if (!check_cookie_content_and_cache(&cookie_ctx->clnt, req,
 	                                    pkt_cookie_opt, cookie_cache)) {
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
 	uint16_t rcode = knot_pkt_get_ext_rcode(pkt);
@@ -281,10 +281,10 @@ int check_response(knot_layer_t *ctx, knot_pkt_t *pkt)
 			 * we always expect that the server doesn't support TCP.
 			 */
 			qry->flags &= ~QUERY_BADCOOKIE_AGAIN;
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 
-		return KNOT_STATE_CONSUME;
+		return KR_STATE_CONSUME;
 	}
 
 	return ctx->state;
@@ -303,7 +303,7 @@ static inline uint8_t *req_cookie_option(struct kr_request *req)
  * @brief Returns resolver state and sets answer RCODE on missing or invalid
  *        server cookie.
  *
- * @note Caller should exit when only KNOT_STATE_FAIL is returned.
+ * @note Caller should exit when only KR_STATE_FAIL is returned.
  *
  * @param state            original resolver state
  * @param sc_present       true if server cookie is present
@@ -319,15 +319,15 @@ static int invalid_sc_status(int state, bool sc_present, bool ignore_badcookie,
 	const knot_pkt_t *pkt = req->qsource.packet;
 
 	if (!pkt) {
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
 	if (knot_wire_get_qdcount(pkt->wire) == 0) {
 		/* RFC7873 5.4 */
-		state = KNOT_STATE_DONE;
+		state = KR_STATE_DONE;
 		if (sc_present) {
 			kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
-			state |= KNOT_STATE_FAIL;
+			state |= KR_STATE_FAIL;
 		}
 	} else if (!ignore_badcookie) {
 		/* Generate BADCOOKIE response. */
@@ -338,23 +338,23 @@ static int invalid_sc_status(int state, bool sc_present, bool ignore_badcookie,
 			DEBUG_MSG(NULL, "%s\n",
 			          "missing EDNS section in prepared answer");
 			/* Caller should exit on this (and only this) state. */
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 		kr_pkt_set_ext_rcode(answer, KNOT_RCODE_BADCOOKIE);
-		state = KNOT_STATE_FAIL | KNOT_STATE_DONE;
+		state = KR_STATE_FAIL | KR_STATE_DONE;
 	}
 
 	return state;
 }
 
-int check_request(knot_layer_t *ctx, void *module_param)
+int check_request(kr_layer_t *ctx, void *module_param)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_cookie_settings *srvr_sett = &req->ctx->cookie_ctx.srvr;
 
 	knot_pkt_t *answer = req->answer;
 
-	if (ctx->state & (KNOT_STATE_DONE | KNOT_STATE_FAIL)) {
+	if (ctx->state & (KR_STATE_DONE | KR_STATE_FAIL)) {
 		return ctx->state;
 	}
 
@@ -378,7 +378,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		/* FORMERR -- malformed cookies. */
 		DEBUG_MSG(NULL, "%s\n", "request with malformed cookie");
 		knot_wire_set_rcode(answer->wire, KNOT_RCODE_FORMERR);
-		return KNOT_STATE_FAIL | KNOT_STATE_DONE;
+		return KR_STATE_FAIL | KR_STATE_DONE;
 	}
 
 	/*
@@ -392,7 +392,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 
 	if (!req->qsource.addr || !srvr_sett->current.secr || !current_sc_alg) {
 		DEBUG_MSG(NULL, "%s\n", "missing valid server cookie context");
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
 	int return_state = ctx->state;
@@ -419,7 +419,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		/* Request has no server cookie. */
 		return_state = invalid_sc_status(return_state, false,
 		                                 ignore_badcookie, req, answer);
-		if (return_state == KNOT_STATE_FAIL) {
+		if (return_state == KR_STATE_FAIL) {
 			return return_state;
 		}
 		goto answer_add_cookies;
@@ -445,7 +445,7 @@ int check_request(knot_layer_t *ctx, void *module_param)
 		/* Invalid server cookie. */
 		return_state = invalid_sc_status(return_state, true,
 		                                 ignore_badcookie, req, answer);
-		if (return_state == KNOT_STATE_FAIL) {
+		if (return_state == KR_STATE_FAIL) {
 			return return_state;
 		}
 		goto answer_add_cookies;
@@ -457,7 +457,7 @@ answer_add_cookies:
 	/* Add server cookie into response. */
 	ret = kr_answer_write_cookie(&sc_input, &nonce, current_sc_alg, answer);
 	if (ret != kr_ok()) {
-		return_state = KNOT_STATE_FAIL;
+		return_state = KR_STATE_FAIL;
 	}
 	return return_state;
 }

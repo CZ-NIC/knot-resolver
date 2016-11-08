@@ -48,7 +48,7 @@ struct rev_search_baton {
 	size_t addr_len;
 };
 
-static int begin(knot_layer_t *ctx, void *module_param)
+static int begin(kr_layer_t *ctx, void *module_param)
 {
 	ctx->data = module_param;
 	return ctx->state;
@@ -179,11 +179,11 @@ static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 	return put_answer(pkt, &rr);
 }
 
-static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
-	if (!qry || ctx->state & (KNOT_STATE_FAIL)) {
+	if (!qry || ctx->state & (KR_STATE_FAIL)) {
 		return ctx->state;
 	}
 
@@ -208,7 +208,7 @@ static int query(knot_layer_t *ctx, knot_pkt_t *pkt)
 	qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 	pkt->parsed = pkt->size;
 	knot_wire_set_qr(pkt->wire);
-	return KNOT_STATE_DONE;
+	return KR_STATE_DONE;
 }
 
 static int parse_addr_str(struct sockaddr_storage *sa, const char *addr)
@@ -439,9 +439,9 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
  */
 
 KR_EXPORT
-const knot_layer_api_t *hints_layer(struct kr_module *module)
+const kr_layer_api_t *hints_layer(struct kr_module *module)
 {
-	static knot_layer_api_t _layer = {
+	static kr_layer_api_t _layer = {
 		.begin = &begin,
 		.produce = &query,
 	};

@@ -274,7 +274,7 @@ static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 		DEBUG_MSG(qry, "<= parent: updating DNSKEY\n");
 		parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, parent->zone_cut.pool);
 		if (!parent->zone_cut.key) {
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 		break;
 	case KNOT_RRTYPE_DS:
@@ -285,7 +285,7 @@ static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 		} else { /* DS existence proven. */
 			parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
 			if (!parent->zone_cut.trust_anchor) {
-				return KNOT_STATE_FAIL;
+				return KR_STATE_FAIL;
 			}
 		}
 		break;
@@ -369,13 +369,13 @@ static const knot_dname_t *signature_authority(knot_pkt_t *pkt)
 	return NULL;
 }
 
-static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	int ret = 0;
 	struct kr_request *req = ctx->data;
 	struct kr_query *qry = req->current_query;
 	/* Ignore faulty or unprocessed responses. */
-	if (ctx->state & (KNOT_STATE_FAIL|KNOT_STATE_CONSUME)) {
+	if (ctx->state & (KR_STATE_FAIL|KR_STATE_CONSUME)) {
 		return ctx->state;
 	}
 
@@ -389,7 +389,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags & QUERY_CACHED) && !knot_pkt_has_dnssec(pkt) && !use_signatures) {
 		DEBUG_MSG(qry, "<= got insecure response\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
 	/* Track difference between current TA and signer name.
@@ -399,8 +399,8 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_dname_t *ta_name = qry->zone_cut.trust_anchor ? qry->zone_cut.trust_anchor->owner : NULL;
 	const knot_dname_t *signer = signature_authority(pkt);
 	if (track_pc_change && ta_name && (!signer || !knot_dname_is_equal(ta_name, signer))) {
-		if (ctx->state == KNOT_STATE_YIELD) { /* Already yielded for revalidation. */
-			return KNOT_STATE_FAIL;
+		if (ctx->state == KR_STATE_YIELD) { /* Already yielded for revalidation. */
+			return KR_STATE_FAIL;
 		}
 		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
 		if (!signer) {
@@ -419,7 +419,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 			}
 			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
 		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
-		return KNOT_STATE_YIELD;
+		return KR_STATE_YIELD;
 	}
 	
 	/* Check if this is a DNSKEY answer, check trust chain and store. */
@@ -431,7 +431,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret != 0) {
 			DEBUG_MSG(qry, "<= bad keys, broken trust chain\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 	}
 
@@ -446,7 +446,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret != 0) {
 			DEBUG_MSG(qry, "<= bad NXDOMAIN proof\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 	}
 
@@ -473,7 +473,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 				} else {
 					DEBUG_MSG(qry, "<= bad NODATA proof\n");
 					qry->flags |= QUERY_DNSSEC_BOGUS;
-					return KNOT_STATE_FAIL;
+					return KR_STATE_FAIL;
 				}
 			}
 		}
@@ -486,7 +486,7 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret != 0) {
 			DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 	}
 
@@ -503,21 +503,21 @@ static int validate(knot_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check and update current delegation point security status. */
 	ret = update_delegation(req, qry, pkt, has_nsec3);
 	if (ret != 0) {
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 	/* Update parent query zone cut */
 	if (qry->parent) {
 		if (update_parent_keys(qry, qtype) != 0) {
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 	}
 	DEBUG_MSG(qry, "<= answer valid, OK\n");
-	return KNOT_STATE_DONE;
+	return KR_STATE_DONE;
 }
 /** Module implementation. */
-const knot_layer_api_t *validate_layer(struct kr_module *module)
+const kr_layer_api_t *validate_layer(struct kr_module *module)
 {
-	static const knot_layer_api_t _layer = {
+	static const kr_layer_api_t _layer = {
 		.consume = &validate,
 	};
 	/* Store module reference */

@@ -107,7 +107,7 @@ static int l_ffi_init(struct kr_module *module)
 
 /** @internal Unregister layer callback reference from registry. */
 #define LAYER_UNREGISTER(L, api, name) do { \
-	int *cb_slot = (int *)((char *)api + sizeof(knot_layer_api_t)); \
+	int *cb_slot = (int *)((char *)api + sizeof(kr_layer_api_t)); \
 	if (cb_slot[SLOT_ ## name] > 0) \
 		luaL_unref(L, LUA_REGISTRYINDEX, cb_slot[SLOT_ ## name]); \
 } while(0)
@@ -121,7 +121,7 @@ static int l_ffi_deinit(struct kr_module *module)
 		ret = l_ffi_call(L, 1);
 	}
 	/* Free the layer API wrapper (unconst it) */
-	knot_layer_api_t* api = module->data;
+	kr_layer_api_t* api = module->data;
 	if (api) {
 		LAYER_UNREGISTER(L, api, begin);
 		LAYER_UNREGISTER(L, api, finish);
@@ -137,7 +137,7 @@ static int l_ffi_deinit(struct kr_module *module)
 
 /** @internal Helper for retrieving layer Lua function by name. */
 #define LAYER_FFI_CALL(ctx, slot) \
-	int *cb_slot = (int *)((char *)(ctx)->api + sizeof(knot_layer_api_t)); \
+	int *cb_slot = (int *)((char *)(ctx)->api + sizeof(kr_layer_api_t)); \
 	if (cb_slot[SLOT_ ## slot] <= 0) { \
 		return ctx->state; \
 	} \
@@ -146,21 +146,21 @@ static int l_ffi_deinit(struct kr_module *module)
 	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot[SLOT_ ## slot]); \
 	lua_pushnumber(L, ctx->state)
 
-static int l_ffi_layer_begin(knot_layer_t *ctx, void *module_param)
+static int l_ffi_layer_begin(kr_layer_t *ctx, void *module_param)
 {
 	LAYER_FFI_CALL(ctx, begin);
 	lua_pushlightuserdata(L, ctx->data);
 	return l_ffi_call(L, 2);
 }
 
-static int l_ffi_layer_reset(knot_layer_t *ctx)
+static int l_ffi_layer_reset(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, reset);
 	lua_pushlightuserdata(L, ctx->data);
 	return l_ffi_call(L, 2);
 }
 
-static int l_ffi_layer_finish(knot_layer_t *ctx)
+static int l_ffi_layer_finish(kr_layer_t *ctx)
 {
 	struct kr_request *req = ctx->data;
 	LAYER_FFI_CALL(ctx, finish);
@@ -169,9 +169,9 @@ static int l_ffi_layer_finish(knot_layer_t *ctx)
 	return l_ffi_call(L, 3);
 }
 
-static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	if (ctx->state & KNOT_STATE_FAIL) {
+	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
 	LAYER_FFI_CALL(ctx, consume);
@@ -180,9 +180,9 @@ static int l_ffi_layer_consume(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return l_ffi_call(L, 3);
 }
 
-static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	if (ctx->state & (KNOT_STATE_FAIL)) {
+	if (ctx->state & (KR_STATE_FAIL)) {
 		return ctx->state; /* Already failed or done, skip */
 	}
 	LAYER_FFI_CALL(ctx, produce);
@@ -195,7 +195,7 @@ static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 /** @internal Conditionally register layer trampoline
   * @warning Expects 'module.layer' to be on top of Lua stack. */
 #define LAYER_REGISTER(L, api, name) do { \
-	int *cb_slot = (int *)((char *)api + sizeof(knot_layer_api_t)); \
+	int *cb_slot = (int *)((char *)api + sizeof(kr_layer_api_t)); \
 	lua_getfield((L), -1, #name); \
 	if (!lua_isnil((L), -1)) { \
 		(api)->name = l_ffi_layer_ ## name; \
@@ -206,12 +206,12 @@ static int l_ffi_layer_produce(knot_layer_t *ctx, knot_pkt_t *pkt)
 } while(0)
 
 /** @internal Create C layer api wrapper. */
-static knot_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module)
+static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module)
 {
 	/* Fabricate layer API wrapping the Lua functions
 	 * reserve slots after it for references to Lua callbacks. */
-	const size_t api_length = sizeof(knot_layer_api_t) + (SLOT_count * SLOT_size);
-	knot_layer_api_t *api = malloc(api_length);
+	const size_t api_length = sizeof(kr_layer_api_t) + (SLOT_count * SLOT_size);
+	kr_layer_api_t *api = malloc(api_length);
 	if (api) {
 		memset(api, 0, api_length);
 		LAYER_REGISTER(L, api, begin);
@@ -227,10 +227,10 @@ static knot_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *modu
 }
 
 /** @internal Retrieve C layer api wrapper. */
-static const knot_layer_api_t *l_ffi_layer(struct kr_module *module)
+static const kr_layer_api_t *l_ffi_layer(struct kr_module *module)
 {
 	if (module) {
-		return (const knot_layer_api_t *)module->data;
+		return (const kr_layer_api_t *)module->data;
 	}
 	return NULL;
 }

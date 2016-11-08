@@ -705,7 +705,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	task->finished = true;
 	/* Send back answer */
 	(void) qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, task->req.answer);
-	return state == KNOT_STATE_DONE ? 0 : kr_error(EIO);
+	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 }
 
 static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *packet)
@@ -722,15 +722,15 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	task->addrlist_count = 0;
 	task->addrlist_turn = 0;
 	int state = kr_resolve_consume(&task->req, packet_source, packet);
-	while (state == KNOT_STATE_PRODUCE) {
+	while (state == KR_STATE_PRODUCE) {
 		state = kr_resolve_produce(&task->req, &task->addrlist, &sock_type, task->pktbuf);
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT || task->timeouts >= KR_TIMEOUT_LIMIT)) {
-			return qr_task_finalize(task, KNOT_STATE_FAIL);
+			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
 	}
 
 	/* We're done, no more iterations needed */
-	if (state & (KNOT_STATE_DONE|KNOT_STATE_FAIL)) {
+	if (state & (KR_STATE_DONE|KR_STATE_FAIL)) {
 		return qr_task_finalize(task, state);
 	} else if (!task->addrlist || sock_type < 0) {
 		return qr_task_step(task, NULL, NULL);
@@ -794,7 +794,7 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	/* Start next step with timeout, fatal if can't start a timer. */
 	if (ret != 0) {
 		subreq_finalize(task, packet_source, packet);
-		return qr_task_finalize(task, KNOT_STATE_FAIL);
+		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
 	return 0;
 }

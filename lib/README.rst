@@ -92,7 +92,7 @@ This structure contains pointers to resolution context, resolution plan and also
 
 .. code-block:: c
 
-	int consume(knot_layer_t *ctx, knot_pkt_t *pkt)
+	int consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 	{
 		struct kr_request *request = ctx->data;
 		struct kr_query *query = request->current_query;
@@ -102,7 +102,7 @@ This is only passive processing of the incoming answer. If you want to change th
 
 .. code-block:: c
 
-	int produce(knot_layer_t *ctx, knot_pkt_t *pkt)
+	int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	{
 		struct kr_request *request = ctx->data;
 		struct kr_query *cur = request->current_query;
@@ -112,7 +112,7 @@ This is only passive processing of the incoming answer. If you want to change th
 			/* This flag makes the resolver move the query
 			 * to the "resolved" list. */
 			cur->flags |= QUERY_RESOLVED;
-			return KNOT_STATE_DONE;
+			return KR_STATE_DONE;
 		}
 
 		/* Pass-through. */
@@ -123,7 +123,7 @@ It is possible to not only act during the query resolution, but also to view the
 
 .. code-block:: c
 
-	int finish(knot_layer_t *ctx)
+	int finish(kr_layer_t *ctx)
 	{
 		struct kr_request *request = ctx->data;
 		struct kr_rplan *rplan = request->rplan;
