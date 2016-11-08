@@ -112,8 +112,7 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query
 
 static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
-	struct kr_query *qry = req->current_query;
+	struct kr_query *qry = ctx->req->current_query;
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
@@ -125,7 +124,7 @@ static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * it may either be a CNAME chain or direct answer.
 	 * Only one step of the chain is resolved at a time.
 	 */
-	struct kr_cache *cache = &req->ctx->cache;
+	struct kr_cache *cache = &ctx->req->ctx->cache;
 	int ret = -1;
 	if (qry->stype != KNOT_RRTYPE_ANY) {
 		ret = loot_rrcache(cache, pkt, qry, qry->stype, (qry->flags & QUERY_DNSSEC_WANT));
@@ -322,7 +321,7 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, kno
 
 static int rrcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	if (!qry || ctx->state & KR_STATE_FAIL) {
 		return ctx->state;

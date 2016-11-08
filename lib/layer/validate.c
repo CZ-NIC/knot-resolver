@@ -372,7 +372,7 @@ static const knot_dname_t *signature_authority(knot_pkt_t *pkt)
 static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	int ret = 0;
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	/* Ignore faulty or unprocessed responses. */
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_CONSUME)) {

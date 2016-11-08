@@ -218,7 +218,7 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 /** Process incoming response. */
 int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	struct kr_cookie_ctx *cookie_ctx = &req->ctx->cookie_ctx;
 
@@ -347,9 +347,9 @@ static int invalid_sc_status(int state, bool sc_present, bool ignore_badcookie,
 	return state;
 }
 
-int check_request(kr_layer_t *ctx, void *module_param)
+int check_request(kr_layer_t *ctx)
 {
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	struct kr_cookie_settings *srvr_sett = &req->ctx->cookie_ctx.srvr;
 
 	knot_pkt_t *answer = req->answer;

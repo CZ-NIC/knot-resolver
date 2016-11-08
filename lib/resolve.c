@@ -43,7 +43,7 @@
  */
 static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	knot_pkt_t *pkt_copy = knot_pkt_new(NULL, pkt->size, &req->pool);
 	struct kr_layer_pickle *pickle = mm_alloc(&req->pool, sizeof(*pickle));
 	if (pickle && pkt_copy && knot_pkt_copy(pkt_copy, pkt) == 0) {
@@ -57,28 +57,28 @@ static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	return kr_error(ENOMEM);
 }
-static int begin_yield(kr_layer_t *ctx, void *module) { return kr_ok(); }
+static int begin_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int reset_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int finish_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int produce_yield(kr_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
 
 /** @internal Macro for iterating module layers. */
-#define RESUME_LAYERS(from, req, qry, func, ...) \
-    (req)->current_query = (qry); \
-	for (size_t i = (from); i < (req)->ctx->modules->len; ++i) { \
-		struct kr_module *mod = (req)->ctx->modules->at[i]; \
+#define RESUME_LAYERS(from, r, qry, func, ...) \
+    (r)->current_query = (qry); \
+	for (size_t i = (from); i < (r)->ctx->modules->len; ++i) { \
+		struct kr_module *mod = (r)->ctx->modules->at[i]; \
 		if (mod->layer) { \
-			struct kr_layer layer = {.state = (req)->state, .api = mod->layer(mod), .data = (req)}; \
+			struct kr_layer layer = {.state = (r)->state, .api = mod->layer(mod), .req = (r)}; \
 			if (layer.api && layer.api->func) { \
-				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
-				if ((req)->state == KR_STATE_YIELD) { \
+				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
+				if ((r)->state == KR_STATE_YIELD) { \
 					func ## _yield(&layer, ##__VA_ARGS__); \
 					break; \
 				} \
 			} \
 		} \
 	} /* Invalidate current query. */ \
-	(req)->current_query = NULL
+	(r)->current_query = NULL
 
 /** @internal Macro for starting module iteration. */
 #define ITERATE_LAYERS(req, qry, func, ...) RESUME_LAYERS(0, req, qry, func, ##__VA_ARGS__)
@@ -480,7 +480,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 
 	/* Expect answer, pop if satisfied immediately */
 	request->qsource.packet = packet;
-	ITERATE_LAYERS(request, qry, begin, request);
+	ITERATE_LAYERS(request, qry, begin);
 	request->qsource.packet = NULL;
 	if (request->state == KR_STATE_DONE) {
 		kr_rplan_pop(rplan, qry);

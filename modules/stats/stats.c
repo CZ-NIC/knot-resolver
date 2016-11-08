@@ -156,7 +156,7 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 
 static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	if (qry->flags & QUERY_CACHED || !req->upstream.addr) {
 		return ctx->state;
@@ -185,7 +185,7 @@ static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 static int collect(kr_layer_t *ctx)
 {
-	struct kr_request *param = ctx->data;
+	struct kr_request *param = ctx->req;
 	struct kr_module *module = ctx->api->data;
 	struct kr_rplan *rplan = &param->rplan;
 	struct stat_data *data = module->data;

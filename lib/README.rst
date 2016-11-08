@@ -94,8 +94,8 @@ This structure contains pointers to resolution context, resolution plan and also
 
 	int consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 	{
-		struct kr_request *request = ctx->data;
-		struct kr_query *query = request->current_query;
+		struct kr_request *req = ctx->req;
+		struct kr_query *qry = req->current_query;
 	}
 
 This is only passive processing of the incoming answer. If you want to change the course of resolution, say satisfy a query from a local cache before the library issues a query to the nameserver, you can use states (see the :ref:`Static hints <mod-hints>` for example).
@@ -104,14 +104,14 @@ This is only passive processing of the incoming answer. If you want to change th
 
 	int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	{
-		struct kr_request *request = ctx->data;
-		struct kr_query *cur = request->current_query;
+		struct kr_request *req = ctx->req;
+		struct kr_query *qry = req->current_query;
 		
 		/* Query can be satisfied locally. */
-		if (can_satisfy(cur)) {
+		if (can_satisfy(qry)) {
 			/* This flag makes the resolver move the query
 			 * to the "resolved" list. */
-			cur->flags |= QUERY_RESOLVED;
+			qry->flags |= QUERY_RESOLVED;
 			return KR_STATE_DONE;
 		}
 
@@ -125,8 +125,8 @@ It is possible to not only act during the query resolution, but also to view the
 
 	int finish(kr_layer_t *ctx)
 	{
-		struct kr_request *request = ctx->data;
-		struct kr_rplan *rplan = request->rplan;
+		struct kr_request *req = ctx->req;
+		struct kr_rplan *rplan = req->rplan;
 
 		/* Print the query sequence with start time. */
 		char qname_str[KNOT_DNAME_MAXLEN];

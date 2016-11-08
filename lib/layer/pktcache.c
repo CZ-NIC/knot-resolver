@@ -102,8 +102,7 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_quer
 
 static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
-	struct kr_query *qry = req->current_query;
+	struct kr_query *qry = ctx->req->current_query;
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
@@ -116,7 +115,7 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Fetch either answer to original or minimized query */
 	uint8_t flags = 0;
-	struct kr_cache *cache = &req->ctx->cache;
+	struct kr_cache *cache = &ctx->req->ctx->cache;
 	int ret = loot_pktcache(cache, pkt, qry, &flags);
 	if (ret == 0) {
 		DEBUG_MSG(qry, "=> satisfied from cache\n");
@@ -172,8 +171,7 @@ static uint32_t packet_ttl(knot_pkt_t *pkt, bool is_negative)
 
 static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
-	struct kr_query *qry = req->current_query;
+	struct kr_query *qry = ctx->req->current_query;
 	/* Cache only answers that make query resolved (i.e. authoritative)
 	 * that didn't fail during processing and are negative. */
 	if (qry->flags & QUERY_CACHED || ctx->state & KR_STATE_FAIL) {
@@ -220,7 +218,7 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Check if we can replace (allow current or better rank, SECURE is always accepted). */
-	struct kr_cache *cache = &req->ctx->cache;
+	struct kr_cache *cache = &ctx->req->ctx->cache;
 	if (header.rank < KR_RANK_SECURE) {
 		int cached_rank = kr_cache_peek_rank(cache, KR_CACHE_PKT, qname, qtype, header.timestamp);
 		if (cached_rank > header.rank) {

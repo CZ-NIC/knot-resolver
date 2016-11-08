@@ -507,7 +507,7 @@ static int resolve_error(knot_pkt_t *pkt, struct kr_request *req)
 static int reset(kr_layer_t *ctx)  { return KR_STATE_PRODUCE; }
 
 /* Set resolution context and parameters. */
-static int begin(kr_layer_t *ctx, void *module_param)
+static int begin(kr_layer_t *ctx)
 {
 	if (ctx->state & (KR_STATE_DONE|KR_STATE_FAIL)) {
 		return ctx->state;
@@ -519,8 +519,7 @@ static int begin(kr_layer_t *ctx, void *module_param)
 	 * Server cookie queries must be handled by the cookie module/layer
 	 * before this layer.
 	 */
-	const struct kr_request *req = ctx->data;
-	const knot_pkt_t *pkt = req->qsource.packet;
+	const knot_pkt_t *pkt = ctx->req->qsource.packet;
 	if (!pkt || knot_wire_get_qdcount(pkt->wire) == 0) {
 		return KR_STATE_FAIL;
 	}
@@ -550,8 +549,7 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct kr_request *req = ctx->data;
-	struct kr_query *query = req->current_query;
+	struct kr_query *query = ctx->req->current_query;
 	if (!query || ctx->state & (KR_STATE_DONE|KR_STATE_FAIL)) {
 		return ctx->state;
 	}
@@ -587,7 +585,7 @@ static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_que
 static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	struct kr_query *query = req->current_query;
 	if (!query || (query->flags & (QUERY_RESOLVED|QUERY_BADCOOKIE_AGAIN))) {
 		return ctx->state;

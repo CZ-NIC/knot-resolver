@@ -48,12 +48,6 @@ struct rev_search_baton {
 	size_t addr_len;
 };
 
-static int begin(kr_layer_t *ctx, void *module_param)
-{
-	ctx->data = module_param;
-	return ctx->state;
-}
-
 static int put_answer(knot_pkt_t *pkt, knot_rrset_t *rr)
 {
 	int ret = 0;
@@ -181,8 +175,7 @@ static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 
 static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
-	struct kr_query *qry = req->current_query;
+	struct kr_query *qry = ctx->req->current_query;
 	if (!qry || ctx->state & (KR_STATE_FAIL)) {
 		return ctx->state;
 	}
@@ -442,7 +435,6 @@ KR_EXPORT
 const kr_layer_api_t *hints_layer(struct kr_module *module)
 {
 	static kr_layer_api_t _layer = {
-		.begin = &begin,
 		.produce = &query,
 	};
 	/* Store module reference */

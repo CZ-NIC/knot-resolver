@@ -30,37 +30,49 @@
  #define QRDEBUG(query, cls, fmt, ...)
 #endif
 
-/*! Layer processing states.
+/** Layer processing states.  Only one value at a time (but see TODO).
+ *
  *  Each state represents the state machine transition,
  *  and determines readiness for the next action.
+ *  See struct kr_layer_api for the actions.
+ *
+ *  TODO: the cookie module sometimes sets (_FAIL | _DONE) on purpose (!)
  */
 enum kr_layer_state {
-	KR_STATE_NOOP    = 0,      /*!< N/A */
 	KR_STATE_CONSUME = 1 << 0, /*!< Consume data. */
 	KR_STATE_PRODUCE = 1 << 1, /*!< Produce data. */
-	KR_STATE_DONE    = 1 << 2, /*!< Finished. */
-	KR_STATE_FAIL    = 1 << 3  /*!< Error. */
+	KR_STATE_DONE    = 1 << 2, /*!< Finished successfully. */
+	KR_STATE_FAIL    = 1 << 3, /*!< Error. */
+	KR_STATE_YIELD   = 1 << 4, /*!< Paused, waiting for a sub-query. */
 };
 
 /* Forward declarations. */
 struct kr_layer_api;
 
-/*! \brief Packet processing context. */
+/** Packet processing context. */
 typedef struct kr_layer {
-	knot_mm_t *mm;   /* Processing memory context. */
-	uint16_t state;  /* Bitmap of enum kr_layer_state. */
-	void *data;      /* Module specific. */
+	int state; /*!< The current state; bitmap of enum kr_layer_state. */
+	struct kr_request *req; /*!< The corresponding request. */
 	const struct kr_layer_api *api;
 } kr_layer_t;
 
-/*! \brief Packet processing module API. */
+/** Packet processing module API.  All functions return the new kr_layer_state. */
 struct kr_layer_api {
-	int (*begin)(kr_layer_t *ctx, void *module_param);
+      	/** Start of processing the DNS request. */
+	int (*begin)(kr_layer_t *ctx);
+
 	int (*reset)(kr_layer_t *ctx);
+
+	/** Paired to begin, called both on successes and failures. */
 	int (*finish)(kr_layer_t *ctx);
+
+	/** Processing an answer from upstream or the answer to the request. */
 	int (*consume)(kr_layer_t *ctx, knot_pkt_t *pkt);
+
+	/** Produce either an answer to the request or a query for upstream (or fail). */
 	int (*produce)(kr_layer_t *ctx, knot_pkt_t *pkt);
-	int (*fail)(kr_layer_t *ctx, knot_pkt_t *pkt);
+
+	/** The module can store anything in here. */
 	void *data;
 };
 
@@ -74,5 +86,3 @@ struct kr_layer_pickle {
     unsigned state;
 };
 
-/* Repurpose layer states. */
-#define KR_STATE_YIELD KR_STATE_NOOP

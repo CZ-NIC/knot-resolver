@@ -146,23 +146,23 @@ static int l_ffi_deinit(struct kr_module *module)
 	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot[SLOT_ ## slot]); \
 	lua_pushnumber(L, ctx->state)
 
-static int l_ffi_layer_begin(kr_layer_t *ctx, void *module_param)
+static int l_ffi_layer_begin(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, begin);
-	lua_pushlightuserdata(L, ctx->data);
+	lua_pushlightuserdata(L, ctx->req);
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_reset(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, reset);
-	lua_pushlightuserdata(L, ctx->data);
+	lua_pushlightuserdata(L, ctx->req);
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_finish(kr_layer_t *ctx)
 {
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	LAYER_FFI_CALL(ctx, finish);
 	lua_pushlightuserdata(L, req);
 	lua_pushlightuserdata(L, req->answer);
@@ -175,7 +175,7 @@ static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Already failed, skip */
 	}
 	LAYER_FFI_CALL(ctx, consume);
-	lua_pushlightuserdata(L, ctx->data);
+	lua_pushlightuserdata(L, ctx->req);
 	lua_pushlightuserdata(L, pkt);
 	return l_ffi_call(L, 3);
 }
@@ -186,7 +186,7 @@ static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Already failed or done, skip */
 	}
 	LAYER_FFI_CALL(ctx, produce);
-	lua_pushlightuserdata(L, ctx->data);
+	lua_pushlightuserdata(L, ctx->req);
 	lua_pushlightuserdata(L, pkt);
 	return l_ffi_call(L, 3);
 }

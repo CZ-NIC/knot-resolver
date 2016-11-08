@@ -20,18 +20,8 @@
 
 #include "lib/layer.h"
 
-/**
- * @brief Checks cookies of inbound requests.
- * @param ctx layer context
- * @param module_param module parameters
- * @return layer state
- */
-int check_request(kr_layer_t *ctx, void *module_param);
+/** Checks cookies of inbound requests.  It's for kr_layer_api_t::begin. */
+int check_request(kr_layer_t *ctx);
 
-/**
- * @brief Checks cookies of received responses.
- * @param ctx layer context
- * @param pkt response packet
- * @return layer state
- */
+/** Checks cookies of received responses.  It's for kr_layer_api_t::consume. */
 int check_response(kr_layer_t *ctx, knot_pkt_t *pkt);
