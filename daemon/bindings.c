@@ -174,7 +174,6 @@ static int net_listen_addrs(lua_State *L, int port, int flags)
 	lua_getfield(L, -1, "addr");
 	if (!lua_isnil(L, -1)) {
 		lua_replace(L, -2);
-		kr_log_info("  .addr\n");
 	} else {
 		lua_pop(L, 1);
 	}
@@ -182,7 +181,6 @@ static int net_listen_addrs(lua_State *L, int port, int flags)
 	/* Case: string, representing a single address. */
 	const char *str = lua_tostring(L, -1);
 	if (str != NULL) {
-		kr_log_info("  string\n");
 		struct engine *engine = engine_luaget(L);
 		int ret = network_listen(&engine->net, str, port, flags);
 		if (ret != 0) {

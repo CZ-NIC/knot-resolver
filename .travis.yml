@@ -18,8 +18,6 @@ notifications:
         on_failure: always
 matrix:
     fast_finish: true
-    allow_failures:
-        - os: osx
 env:
     global:
         - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
