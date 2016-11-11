@@ -58,4 +58,15 @@ daemon/lua/kres-gen.lua: | $(libkres)
 	daemon/lua/kres-gen.sh > $@
 .DELETE_ON_ERROR: daemon/lua/kres-gen.lua
 
-.PHONY: daemon daemon-install daemon-clean
+# Client
+ifeq ($(HAS_libedit), yes)
+kresc_SOURCES := daemon/kresc.c
+kresc_CFLAGS += -fPIE $(libedit_CFLAGS)
+kresc_LIBS += $(libedit_LIBS)
+$(eval $(call make_sbin,kresc,daemon,yes))
+client: $(kresc)
+client-install: kresc-install
+client-clean: kresc-clean
+endif
+
+.PHONY: daemon daemon-install daemon-clean client client-install client-clean
