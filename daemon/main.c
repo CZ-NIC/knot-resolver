@@ -74,8 +74,10 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 	if (stream_fd != STDIN_FILENO) {
-		if (nread <= 0) { /* Close if disconnected */
+		if (nread < 0) { /* Close if disconnected */
 			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
+		}
+		if (nread <= 0) {
 			if (buf) {
 				free(buf->base);
 			}
@@ -92,13 +94,33 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		if (cmd[nread - 1] == '\n') {
 			cmd[nread - 1] = '\0';
 		}
-		struct engine *engine = stream->data;
+
+		/* Pseudo-command for switching to "binary output" */
+		bool is_binary = stream->data;
+		if (strcmp(cmd, "__binary") == 0) {
+			stream->data = (void *)(is_binary = true);
+			goto finish;
+		}
+
+		struct engine *engine = ((struct worker_ctx *)stream->loop->data)->engine;
 		lua_State *L = engine->L;
 		int ret = engine_cmd(L, cmd, false);
 		const char *message = "";
 		if (lua_gettop(L) > 0) {
 			message = lua_tostring(L, -1);
 		}
+
+		/* Simpler output in binary mode */
+		if (is_binary) {
+			size_t len_s = strlen(message);
+			if (len_s > UINT32_MAX)
+				goto finish;
+			uint32_t len = len_s;
+			fwrite(&len, sizeof(len), 1, out);
+			fwrite(message, len, 1, out);
+			goto finish;
+		}
+
 		/* Log to remote socket if connected */
 		const char *delim = g_quiet ? "" : "> ";
 		if (stream_fd != STDIN_FILENO) {
@@ -118,6 +140,7 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		fprintf(fp_out, "%s", delim);
 		lua_settop(L, 0);
 	}
+finish:
 	fflush(out);
 	if (buf) {
 		free(buf->base);
@@ -143,7 +166,7 @@ static void tty_accept(uv_stream_t *master, int status)
 			free(client);
 			return;
 		 }
-		 client->data = master->data;
+		 client->data = 0;
 		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_read);
 		 /* Write command line */
 		 if (!g_quiet) {
@@ -327,7 +350,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	auto_free char *sock_file = NULL;
 	uv_pipe_t pipe;
 	uv_pipe_init(loop, &pipe, 0);
-	pipe.data = engine;
+	pipe.data = 0;
 	if (g_interactive) {
 		if (!g_quiet)
 			printf("[system] interactive mode\n> ");
@@ -372,7 +395,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return kr_ok();
 }
 
-void free_sd_socket_names(char **socket_names, int count)
+static void free_sd_socket_names(char **socket_names, int count)
 {
 	for (int i = 0; i < count; i++) {
 		free(socket_names[i]);
