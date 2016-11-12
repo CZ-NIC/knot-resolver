@@ -120,8 +120,13 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 
 	struct network *net = &worker->engine->net;
 	if (!net->tls_credentials) {
-		kr_log_error("[tls] x509 credentials are missing; no TLS\n");
-		return NULL;
+		net->tls_credentials = tls_get_ephemeral_credentials(worker->engine);
+		if (!net->tls_credentials) {
+			kr_log_error("[tls] X.509 credentials are missing, and ephemeral credentials failed; no TLS\n");
+			return NULL;
+		}
+		kr_log_error("[tls] Using ephemeral TLS credentials:\n");
+		tls_credentials_log_pins(net->tls_credentials);
 	}
 
 	time_t now = time(NULL);
@@ -486,6 +491,9 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 	}
 	if (tls_credentials->tls_key) {
 		free(tls_credentials->tls_key);
+	}
+	if (tls_credentials->ephemeral_servicename) {
+		free(tls_credentials->ephemeral_servicename);
 	}
 	free(tls_credentials);
 }
