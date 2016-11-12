@@ -147,12 +147,56 @@ static int l_verbose(lua_State *L)
 	return 1;
 }
 
+char *engine_get_hostname(struct engine *engine) {
+	static char hostname_str[KNOT_DNAME_MAXLEN];
+	if (!engine) {
+		return NULL;
+	}
+
+	if (!engine->hostname) {
+		if (gethostname(hostname_str, sizeof(hostname_str)) != 0)
+			return NULL;
+		return hostname_str;
+	}
+	return engine->hostname;
+}
+
+int engine_set_hostname(struct engine *engine, const char *hostname) {
+	if (!engine || !hostname) {
+		return kr_error(EINVAL);
+	}
+
+	char *new_hostname = strdup(hostname);
+	if (!new_hostname) {
+		return kr_error(ENOMEM);
+	}
+	if (engine->hostname) {
+		free(engine->hostname);
+	}
+	engine->hostname = new_hostname;
+
+	return 0;
+}
+
 /** Return hostname. */
 static int l_hostname(lua_State *L)
 {
-	char host_str[KNOT_DNAME_MAXLEN];
-	gethostname(host_str, sizeof(host_str));
-	lua_pushstring(L, host_str);
+	struct engine *engine = engine_luaget(L);
+	if (lua_gettop(L) == 0) {
+		lua_pushstring(L, engine_get_hostname(engine));
+		return 1;
+	}
+	if ((lua_gettop(L) != 1) || !lua_isstring(L, 1)) {
+		lua_pushstring(L, "hostname takes at most one parameter: (\"fqdn\")");
+		lua_error(L);
+	}
+
+	if (engine_set_hostname(engine, lua_tostring(L, 1)) != 0) {
+		lua_pushstring(L, "setting hostname failed");
+		lua_error(L);
+	}
+
+	lua_pushstring(L, engine_get_hostname(engine));	
 	return 1;
 }
 

@@ -369,10 +369,15 @@ Environment
 
 	env.USER -- equivalent to $USER in shell
 
-.. function:: hostname()
+.. function:: hostname([fqdn])
 
    :return: Machine hostname.
 
+   If called with a parameter, it will set kresd's internal
+   hostname. If called without a parameter, it will return kresd's
+   internal hostname, or the system's POSIX hostname (see
+   gethostname(2)) if kresd's internal hostname is unset.
+	    
 .. function:: verbose(true | false)
 
    :return: Toggle verbose logging.
