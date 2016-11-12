@@ -30,6 +30,7 @@ struct tls_credentials {
 	char *tls_cert;
 	char *tls_key;
 	gnutls_certificate_credentials_t credentials;
+	time_t valid_until;
 };
 
 /*! Toggle verbose logging from TLS context. */
