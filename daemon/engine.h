@@ -59,6 +59,7 @@ struct engine {
     fd_array_t ipc_set;
     knot_mm_t *pool;
     uv_timer_t *updater;
+    char *hostname;
     struct lua_State *L;
 };
 
@@ -78,3 +79,7 @@ int engine_pcall(struct lua_State *L, int argc);
 
 /** Return engine light userdata. */
 struct engine *engine_luaget(struct lua_State *L);
+
+/** Set/get the per engine hostname */
+char *engine_get_hostname(struct engine *engine);
+int engine_set_hostname(struct engine *engine, const char *hostname);
