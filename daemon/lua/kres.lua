@@ -109,6 +109,9 @@ struct query_flag {
 	static const int ALWAYS_CUT  = 1 << 18;
 	static const int PERMISSIVE  = 1 << 20;
 	static const int STRICT      = 1 << 21;
+	static const int BADCOOKIE_AGAIN = 1 << 22;
+	static const int CNAME       = 1 << 23;
+	static const int REORDER_RR  = 1 << 24;
 };
 
 /*
