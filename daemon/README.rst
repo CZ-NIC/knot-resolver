@@ -594,6 +594,13 @@ For when listening on ``localhost`` just doesn't cut it.
       > net.listen("::", 853)
       > net.listen("::", 443, {tls = true})
 
+.. function:: net.tls_padding([padding])
+
+   Get/set EDNS(0) padding.  If set to value >= 2 it will pad the answers
+   to nearest *padding* boundary, e.g. if set to `64`, the answer will
+   have size of multiplies of 64 (64, 128, 192, ...).  Setting padding to
+   value < 2 will disable it.
+
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
 

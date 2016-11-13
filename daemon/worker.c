@@ -721,6 +721,7 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	task->addrlist = NULL;
 	task->addrlist_count = 0;
 	task->addrlist_turn = 0;
+	task->req.has_tls = (task->session && task->session->has_tls) ? true : false;
 	int state = kr_resolve_consume(&task->req, packet_source, packet);
 	while (state == KNOT_STATE_PRODUCE) {
 		state = kr_resolve_produce(&task->req, &task->addrlist, &sock_type, task->pktbuf);
@@ -881,7 +882,7 @@ int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle)
 	 * borrowed the task from parent session. */
 	struct session *session = handle->data;
 	if (session->outgoing) {
-		worker_submit(worker, (uv_handle_t *)handle, NULL, NULL);	
+		worker_submit(worker, (uv_handle_t *)handle, NULL, NULL);
 	} else {
 		discard_buffered(session);
 	}

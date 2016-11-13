@@ -394,6 +394,33 @@ static int net_tls(lua_State *L)
 	return 1;
 }
 
+static int net_tls_padding(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+
+	/* Only return current padding. */
+	if (lua_gettop(L) == 0) {
+		if (engine->resolver.tls_padding == 0) {
+			return -1;
+		}
+		lua_pushinteger(L, engine->resolver.tls_padding);
+		return 1;
+	}
+
+	if ((lua_gettop(L) != 1) || !lua_isnumber(L, 1)) {
+		lua_pushstring(L, "net.tls_padding takes one numeric parameter: (\"padding\")");
+		lua_error(L);
+	}
+	int padding = lua_tointeger(L, 1);
+	if ((padding < 0) || (padding > MAX_TLS_PADDING)) {
+		lua_pushstring(L, "net.tls_padding parameter has to be a number between <0, 4096>");
+		lua_error(L);
+	}
+	engine->resolver.tls_padding = padding;
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -404,6 +431,7 @@ int lib_net(lua_State *L)
 		{ "bufsize",      net_bufsize },
 		{ "tcp_pipeline", net_pipeline },
 		{ "tls",          net_tls },
+		{ "tls_padding",  net_tls_padding },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
