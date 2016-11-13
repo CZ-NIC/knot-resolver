@@ -1,7 +1,9 @@
 /*
  * Copyright (C) 2016 American Civil Liberties Union (ACLU)
+ *               2016 CZ.NIC, z.s.p.o
  * 
  * Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+ *                 Ondřej Surý <ondrej@sury.org>
  * 
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free
@@ -57,14 +59,12 @@ struct tls_ctx_t {
 #define DEBUG_MSG(fmt...)
 #endif
 
-static void
-kres_gnutls_log(int level, const char *message)
+static void kres_gnutls_log(int level, const char *message)
 {
 	kr_log_error("[tls] gnutls: (%d) %s", level, message);
 }
 
-void
-tls_setup_logging(bool verbose)
+void tls_setup_logging(bool verbose)
 {
 	gnutls_global_set_log_function(kres_gnutls_log);
 	gnutls_global_set_log_level(verbose ? 1 : 0);
@@ -174,7 +174,7 @@ void tls_free(struct tls_ctx_t *tls)
 	free(tls);
 }
 
-int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt)
+int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 {
 	if (!pkt || !handle || !handle->data) {
 		return kr_error(EINVAL);
