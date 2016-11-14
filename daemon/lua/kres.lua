@@ -153,7 +153,7 @@ typedef struct {
 	uint16_t pos;
 	uint16_t count;
 } knot_pktsection_t;
-typedef struct {
+typedef struct { /* some names differ now in knot */
 	uint8_t *wire;
 	size_t size;
 	size_t max_size;
@@ -164,6 +164,10 @@ typedef struct {
 	uint16_t flags;
 	knot_rrset_t *opt;
 	knot_rrset_t *tsig;
+	struct {
+		uint8_t *pos;
+		size_t len;
+	} tsig_wire;
 	knot_section_t _current;
 	knot_pktsection_t _sections[3];
 	size_t _rrset_allocd;
@@ -203,6 +207,7 @@ struct kr_query {
 	uint32_t flags;
 	uint32_t secret;
 	uint16_t fails;
+	uint16_t reorder;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	uint8_t _stub[]; /* Do not touch */
