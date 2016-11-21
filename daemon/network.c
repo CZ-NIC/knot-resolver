@@ -41,6 +41,13 @@ static int so_reuseport(uv_handle_t *handle) {
 	return 0;
 }
 
+/* Linux 3.15 supports IP_PMTUDISC_OMIT.
+ * Linux < 3.15 supports IP_PMTUDISC_DONT
+ * Set DF=0 to disable pmtud, and don't honor
+ * any path mtu information and not accepting
+ * new icmp notifications.
+ * It mitigates DNS fragmentation attack.
+ */
 static int no_pmtud(uv_handle_t *handle, sa_family_t family) {
 	uv_os_fd_t fd = 0;
 	if (uv_fileno(handle, &fd) == 0) {
@@ -50,6 +57,12 @@ static int no_pmtud(uv_handle_t *handle, sa_family_t family) {
 		if (family == AF_INET6) {
 #if defined(IPV6_MTU_DISCOVER) && defined(IPV6_PMTUDISC_OMIT)
 			int pmtud = IPV6_PMTUDISC_OMIT;
+			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_MTU_DISCOVER,
+						  &pmtud, sizeof(pmtud))) < 0) {
+				return kr_error(errno);
+			}
+#elif defined(IPV6_MTU_DISCOVER) && defined(IPV6_PMTUDISC_DONT)
+			int pmtud = IPV6_PMTUDISC_DONT;
 			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_MTU_DISCOVER,
 						  &pmtud, sizeof(pmtud))) < 0) {
 				return kr_error(errno);
@@ -69,19 +82,14 @@ static int no_pmtud(uv_handle_t *handle, sa_family_t family) {
 #endif
 		} /* family == AF_INET6 */
 		else if (family == AF_INET) {
-#if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_DONT)
-			/* Linux 3.15 supports IP_PMTUDISC_OMIT.
-			 * Linux < 3.15 supports IP_PMTUDISC_DONT
-			 * Set DF=0 to disable pmtud, and don't honor
-			 * any path mtu information and not accepting
-			 * new icmp notifications.
-			 * It mitigates DNS fragmentation attack.
-			 */
-#if defined(IP_PMTUDISC_OMIT)
+#if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_OMIT)
 			int pmtud = IP_PMTUDISC_OMIT;
-#else
+			if ((ret = setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER,
+						  &pmtud, sizeof(pmtud))) < 0) {
+				return kr_error(errno);
+			}
+#elif defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_DONT)
 			int pmtud = IP_PMTUDISC_DONT;
-#endif /* defined(IP_PMTUDISC_OMIT) */
 			if ((ret = setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER,
 						  &pmtud, sizeof(pmtud))) < 0) {
 				return kr_error(errno);
@@ -93,7 +101,7 @@ static int no_pmtud(uv_handle_t *handle, sa_family_t family) {
 						  &dontfrag_off, sizeof(dontfrag_off))) < 0) {
 				return kr_error(errno);
 			}
-#endif /* defined(IP_DONTFRAG) */
+#endif
 		} /* family == AF_INET */
 	}
 	return 0;
