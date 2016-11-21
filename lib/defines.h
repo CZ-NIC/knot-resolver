@@ -46,6 +46,10 @@ static inline int __attribute__((__cold__)) kr_error(int x) {
 }
 #define kr_strerror(x) strerror(abs(x))
 
+#if !defined(IPV6_MIN_MTU)
+#define IPV6_MIN_MTU 1280
+#endif
+
 /*
  * Connection limits.
  * @cond internal

@@ -16,35 +16,75 @@
 
 #include <unistd.h>
 #include <assert.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
 
+
+static int handle_init(uv_handle_t *handle, sa_family_t family) {
 /* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
-#if defined(UV_VERSION_HEX)
-#if (__linux__ && SO_REUSEPORT)
-  #define handle_init(type, loop, handle, family) do { \
-	uv_ ## type ## _init_ex((loop), (handle), (family)); \
-	uv_os_fd_t fd = 0; \
-	if (uv_fileno((uv_handle_t *)(handle), &fd) == 0) { \
-		int on = 1; \
-		int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)); \
-		if (ret) { \
-			return ret; \
-		} \
-	} \
-  } while (0)
-/* libuv 1.7.0+ is able to assign fd immediately */
-#else
-  #define handle_init(type, loop, handle, family) do { \
-	uv_ ## type ## _init_ex((loop), (handle), (family)); \
-  } while (0)
+
+	uv_os_fd_t fd = 0;
+	if (uv_fileno(handle, &fd) == 0) {
+		int on = 1;
+		int ret;
+
+#if defined(UV_VERSION_HEX) && (__linux__ && SO_REUSEPORT)
+		if ((ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT,
+					  &on, (socklen_t)sizeof(on))) < 0) {
+			return kr_error(ret);
+		}
 #endif
-#else
-  #define handle_init(type, loop, handle, family) \
-	uv_ ## type ## _init((loop), (handle))
+
+		if (family == AF_INET6) {
+		
+#if defined(IPV6_USE_MIN_MTU)
+			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
+						  (void*)&on, (socklen_t)sizeof(on))) < 0) {
+				return kr_errorr(ret);
+			}
+#elif defined(IPV6_MTU) /* defined(IPV6_USE_MIN_MTU */
+			/* fallback to IPV6_MTU if IPV6_USE_MIN_MTU not available */
+			int ipv6_min_mtu = IPV6_MIN_MTU;
+			if((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_MTU,
+						 &ipv6_min_mtu, sizeof(ipv6_min_mtu))) < 0) {
+				return kr_error(ret);
+			}
 #endif
+		} /* family == AF_INET6 */
+		else if (family == AF_INET) {
+#if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_DONT)
+			/* Linux 3.15 supports IP_PMTUDISC_OMIT.  
+			 * Linux < 3.15 supports IP_PMTUDISC_DONT
+			 * Set DF=0 to disable pmtud, and don't honor
+			 * any path mtu information and not accepting
+			 * new icmp notifications.
+			 * It mitigates DNS fragmentation attack.
+			 */
+#if defined(IP_PMTUDISC_OMIT)
+			int pmtud = IP_PMTUDISC_OMIT;
+#else
+			int pmtud = IP_PMTUDISC_DONT;
+#endif /* defined(IP_PMTUDISC_OMIT) */
+			if ((ret = setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER,
+						  &pmtud, sizeof(pmtud))) < 0) {
+				return kr_error(ret);
+			}
+#elif defined(IP_DONTFRAG)  /* !defined(IP_MTU_DISCOVER) || !(defined(IP_PMTUDISC_DONT) */
+			/* BSDs and others */
+			int dontfrag_off = 0;
+			if ((ret = setsockopt(fd, IPPROTO_IP, IP_DONTFRAG,
+						  &dontfrag_off, sizeof(dontfrag_off))) < 0) {
+				return kr_error(ret);
+			}
+#endif /* defined(IP_DONTFRAG) */
+		} /* family == AF_INET */
+	}	
+	return 0;
+}
 
 void network_init(struct network *net, uv_loop_t *loop)
 {
@@ -143,9 +183,13 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 			return kr_error(ENOMEM);
 		}
 		memset(ep->udp, 0, sizeof(*ep->udp));
-		handle_init(udp, net->loop, ep->udp, sa->sa_family); /* can return! */
-		ret = udp_bind(ep->udp, sa);
-		if (ret != 0) {
+		if ((ret = uv_udp_init_ex(net->loop, ep->udp, sa->sa_family)) != 0) {
+			return ret;
+		}
+		if ((ret = handle_init((uv_handle_t *)ep->udp, sa->sa_family)) != 0) {
+			return ret;
+		}
+		if ((ret = udp_bind(ep->udp, sa)) != 0) {
 			return ret;
 		}
 		ep->flags |= NET_UDP;
@@ -156,7 +200,12 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 			return kr_error(ENOMEM);
 		}
 		memset(ep->tcp, 0, sizeof(*ep->tcp));
-		handle_init(tcp, net->loop, ep->tcp, sa->sa_family); /* can return! */
+		if ((ret = uv_tcp_init_ex(net->loop, ep->tcp, sa->sa_family)) != 0) {
+			return ret;
+		}
+		if ((ret = handle_init((uv_handle_t *)ep->tcp, sa->sa_family)) != 0) {
+			return ret;
+		}
 		if (flags & NET_TLS) {
 			ret = tcp_bind_tls(ep->tcp, sa);
 			ep->flags |= NET_TLS;
