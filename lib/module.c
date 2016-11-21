@@ -24,10 +24,10 @@
 #include "lib/module.h"
 
 /* List of embedded modules */
-const knot_layer_api_t *iterate_layer(struct kr_module *module);
-const knot_layer_api_t *validate_layer(struct kr_module *module);
-const knot_layer_api_t *rrcache_layer(struct kr_module *module);
-const knot_layer_api_t *pktcache_layer(struct kr_module *module);
+const kr_layer_api_t *iterate_layer(struct kr_module *module);
+const kr_layer_api_t *validate_layer(struct kr_module *module);
+const kr_layer_api_t *rrcache_layer(struct kr_module *module);
+const kr_layer_api_t *pktcache_layer(struct kr_module *module);
 static const struct kr_module embedded_modules[] = {
 	{ "iterate",  NULL, NULL, NULL, iterate_layer, NULL, NULL, NULL },
 	{ "validate", NULL, NULL, NULL, validate_layer, NULL, NULL, NULL },

@@ -154,9 +154,9 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 	}
 }
 
-static int collect_rtt(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	if (qry->flags & QUERY_CACHED || !req->upstream.addr) {
 		return ctx->state;
@@ -183,9 +183,9 @@ static int collect_rtt(knot_layer_t *ctx, knot_pkt_t *pkt)
 	return ctx->state;
 }
 
-static int collect(knot_layer_t *ctx)
+static int collect(kr_layer_t *ctx)
 {
-	struct kr_request *param = ctx->data;
+	struct kr_request *param = ctx->req;
 	struct kr_module *module = ctx->api->data;
 	struct kr_rplan *rplan = &param->rplan;
 	struct stat_data *data = module->data;
@@ -427,9 +427,9 @@ static char* dump_upstreams(void *env, struct kr_module *module, const char *arg
  */
 
 KR_EXPORT
-const knot_layer_api_t *stats_layer(struct kr_module *module)
+const kr_layer_api_t *stats_layer(struct kr_module *module)
 {
-	static knot_layer_api_t _layer = {
+	static kr_layer_api_t _layer = {
 		.consume = &collect_rtt,
 		.finish = &collect,
 	};

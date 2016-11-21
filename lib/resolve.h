@@ -52,11 +52,11 @@
  * state = kr_resolve_consume(&req, query);
  *
  * // Generate answer
- * while (state == KNOT_STATE_PRODUCE) {
+ * while (state == KR_STATE_PRODUCE) {
  *
  *     // Additional query generate, do the I/O and pass back answer
  *     state = kr_resolve_produce(&req, &addr, &type, query);
- *     while (state == KNOT_STATE_CONSUME) {
+ *     while (state == KR_STATE_CONSUME) {
  *         int ret = sendrecv(addr, proto, query, resp);
  *
  *         // If I/O fails, make "resp" empty

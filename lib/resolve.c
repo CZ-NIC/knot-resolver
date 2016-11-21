@@ -41,9 +41,9 @@
  * @internal Defer execution of current query.
  * The current layer state and input will be pushed to a stack and resumed on next iteration.
  */
-static int consume_yield(knot_layer_t *ctx, knot_pkt_t *pkt)
+static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_request *req = ctx->data;
+	struct kr_request *req = ctx->req;
 	knot_pkt_t *pkt_copy = knot_pkt_new(NULL, pkt->size, &req->pool);
 	struct kr_layer_pickle *pickle = mm_alloc(&req->pool, sizeof(*pickle));
 	if (pickle && pkt_copy && knot_pkt_copy(pkt_copy, pkt) == 0) {
@@ -57,34 +57,34 @@ static int consume_yield(knot_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	return kr_error(ENOMEM);
 }
-static int begin_yield(knot_layer_t *ctx, void *module) { return kr_ok(); }
-static int reset_yield(knot_layer_t *ctx) { return kr_ok(); }
-static int finish_yield(knot_layer_t *ctx) { return kr_ok(); }
-static int produce_yield(knot_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
+static int begin_yield(kr_layer_t *ctx) { return kr_ok(); }
+static int reset_yield(kr_layer_t *ctx) { return kr_ok(); }
+static int finish_yield(kr_layer_t *ctx) { return kr_ok(); }
+static int produce_yield(kr_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
 
 /** @internal Macro for iterating module layers. */
-#define RESUME_LAYERS(from, req, qry, func, ...) \
-    (req)->current_query = (qry); \
-	for (size_t i = (from); i < (req)->ctx->modules->len; ++i) { \
-		struct kr_module *mod = (req)->ctx->modules->at[i]; \
+#define RESUME_LAYERS(from, r, qry, func, ...) \
+    (r)->current_query = (qry); \
+	for (size_t i = (from); i < (r)->ctx->modules->len; ++i) { \
+		struct kr_module *mod = (r)->ctx->modules->at[i]; \
 		if (mod->layer) { \
-			struct knot_layer layer = {.state = (req)->state, .api = mod->layer(mod), .data = (req)}; \
+			struct kr_layer layer = {.state = (r)->state, .api = mod->layer(mod), .req = (r)}; \
 			if (layer.api && layer.api->func) { \
-				(req)->state = layer.api->func(&layer, ##__VA_ARGS__); \
-				if ((req)->state == KNOT_STATE_YIELD) { \
+				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
+				if ((r)->state == KR_STATE_YIELD) { \
 					func ## _yield(&layer, ##__VA_ARGS__); \
 					break; \
 				} \
 			} \
 		} \
 	} /* Invalidate current query. */ \
-	(req)->current_query = NULL
+	(r)->current_query = NULL
 
 /** @internal Macro for starting module iteration. */
 #define ITERATE_LAYERS(req, qry, func, ...) RESUME_LAYERS(0, req, qry, func, ##__VA_ARGS__)
 
 /** @internal Find layer id matching API. */
-static inline size_t layer_id(struct kr_request *req, const struct knot_layer_api *api) {
+static inline size_t layer_id(struct kr_request *req, const struct kr_layer_api *api) {
 	module_array_t *modules = req->ctx->modules;
 	for (size_t i = 0; i < modules->len; ++i) {
 		struct kr_module *mod = modules->at[i];
@@ -357,7 +357,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	knot_pkt_t *answer = request->answer;
 
 	/* Always set SERVFAIL for bogus answers. */
-	if (state == KNOT_STATE_FAIL && rplan->pending.len > 0) {
+	if (state == KR_STATE_FAIL && rplan->pending.len > 0) {
 		struct kr_query *last = array_tail(rplan->pending);
 		if ((last->flags & QUERY_DNSSEC_WANT) && (last->flags & QUERY_DNSSEC_BOGUS)) {
 			return answer_fail(answer);
@@ -382,7 +382,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	/* Set AD=1 if succeeded and requested secured answer. */
 	const bool has_ad = knot_wire_get_ad(answer->wire);
 	knot_wire_clear_ad(answer->wire);
-	if (state == KNOT_STATE_DONE && rplan->resolved.len > 0) {
+	if (state == KR_STATE_DONE && rplan->resolved.len > 0) {
 		struct kr_query *last = array_tail(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
 		const bool secure = (last->flags & QUERY_DNSSEC_WANT) &&
@@ -428,14 +428,14 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->ctx = ctx;
 	request->answer = answer;
 	request->options = ctx->options;
-	request->state = KNOT_STATE_CONSUME;
+	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
 	array_init(request->authority);
 	array_init(request->additional);
 
 	/* Expect first query */
 	kr_rplan_init(&request->rplan, request, &request->pool);
-	return KNOT_STATE_CONSUME;
+	return KR_STATE_CONSUME;
 }
 
 static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
@@ -455,7 +455,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		qry = kr_rplan_push_empty(rplan, NULL);
 	}
 	if (!qry) {
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
 	/* Deferred zone cut lookup for this query. */
@@ -480,9 +480,9 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 
 	/* Expect answer, pop if satisfied immediately */
 	request->qsource.packet = packet;
-	ITERATE_LAYERS(request, qry, begin, request);
+	ITERATE_LAYERS(request, qry, begin);
 	request->qsource.packet = NULL;
-	if (request->state == KNOT_STATE_DONE) {
+	if (request->state == KR_STATE_DONE) {
 		kr_rplan_pop(rplan, qry);
 	}
 	return request->state;
@@ -551,7 +551,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 {
 	struct kr_context *ctx = request->ctx;
 	/* On sucessful answer, update preference list RTT and penalise timer  */
-	if (request->state != KNOT_STATE_FAIL) {
+	if (request->state != KR_STATE_FAIL) {
 		/* Update RTT information for preference list */
 		update_nslist_rtt(ctx, qry, src);
 		/* Do not complete NS address resolution on soft-fail. */
@@ -579,7 +579,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
 		if (answer_prepare(request->answer, packet, request) != 0) {
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 		return resolve_query(request, packet);
 	}
@@ -589,7 +589,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	bool tried_tcp = (qry->flags & QUERY_TCP);
 	if (!packet || packet->size == 0) {
 		if (tried_tcp) {
-			request->state = KNOT_STATE_FAIL;
+			request->state = KR_STATE_FAIL;
 		} else {
 			qry->flags |= QUERY_TCP;
 		}
@@ -599,7 +599,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		if (qname_raw && qry->secret != 0) {
 			randomized_qname_case(qname_raw, qry->secret);
 		}
-		request->state = KNOT_STATE_CONSUME;
+		request->state = KR_STATE_CONSUME;
 		if (qry->flags & QUERY_CACHED) {
 			ITERATE_LAYERS(request, qry, consume, packet);
 		} else {
@@ -620,18 +620,18 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		update_nslist_score(request, qry, src, packet);
 	}
 	/* Resolution failed, invalidate current NS. */
-	if (request->state == KNOT_STATE_FAIL) {
+	if (request->state == KR_STATE_FAIL) {
 		invalidate_ns(rplan, qry);
 		qry->flags &= ~QUERY_RESOLVED;
 	}
 
 	/* Pop query if resolved. */
-	if (request->state == KNOT_STATE_YIELD) {
-		return KNOT_STATE_PRODUCE; /* Requery */
+	if (request->state == KR_STATE_YIELD) {
+		return KR_STATE_PRODUCE; /* Requery */
 	} else if (qry->flags & QUERY_RESOLVED) {
 		kr_rplan_pop(rplan, qry);
 	} else if (!tried_tcp && (qry->flags & QUERY_TCP)) {
-		return KNOT_STATE_PRODUCE; /* Requery over TCP */
+		return KR_STATE_PRODUCE; /* Requery over TCP */
 	} else { /* Clear query flags for next attempt */
 		qry->flags &= ~(QUERY_CACHED|QUERY_TCP);
 	}
@@ -640,10 +640,10 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Do not finish with bogus answer. */
 	if (qry->flags & QUERY_DNSSEC_BOGUS)  {
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
-	return kr_rplan_empty(&request->rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
+	return kr_rplan_empty(&request->rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;
 }
 
 /** @internal Spawn subrequest in current zone cut (no minimization or lookup). */
@@ -701,10 +701,10 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);
 		if (!next) {
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
 		next->flags |= QUERY_AWAIT_CUT|QUERY_DNSSEC_WANT;
-		return KNOT_STATE_DONE;
+		return KR_STATE_DONE;
 	}
 	/* Try to fetch missing DNSKEY (either missing or above current cut).
 	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
@@ -713,12 +713,12 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	if (want_secured && refetch_key && !is_dnskey_subreq) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
-			return KNOT_STATE_FAIL;
+			return KR_STATE_FAIL;
 		}
-		return KNOT_STATE_DONE;
+		return KR_STATE_DONE;
 	}
 
-	return KNOT_STATE_PRODUCE;
+	return KR_STATE_PRODUCE;
 }
 
 /** @internal Check current zone cut status and credibility, spawn subrequests if needed. */
@@ -729,7 +729,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 
 	/* Stub mode, just forward and do not solve cut. */
 	if (qry->flags & QUERY_STUB) {
-		return KNOT_STATE_PRODUCE;
+		return KR_STATE_PRODUCE;
 	}
 
 	/* The query wasn't resolved from cache,
@@ -748,19 +748,19 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 			if (ret == kr_error(ENOENT)) {
 				ret = kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
 				if (ret != 0) {
-					return KNOT_STATE_FAIL;
+					return KR_STATE_FAIL;
 				}
 				DEBUG_MSG(qry, "=> using root hints\n");
 				qry->flags &= ~QUERY_AWAIT_CUT;
-				return KNOT_STATE_DONE;
+				return KR_STATE_DONE;
 			} else {
-				return KNOT_STATE_FAIL;
+				return KR_STATE_FAIL;
 			}
 		}
 		/* Update minimized QNAME if zone cut changed */
 		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
 			if (kr_make_query(qry, packet) != 0) {
-				return KNOT_STATE_FAIL;
+				return KR_STATE_FAIL;
 			}
 		}
 		qry->flags &= ~QUERY_AWAIT_CUT;
@@ -777,20 +777,20 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 	/* No query left for resolution */
 	if (kr_rplan_empty(rplan)) {
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 	/* If we have deferred answers, resume them. */
 	struct kr_query *qry = array_tail(rplan->pending);
 	if (qry->deferred != NULL) {
 		/* @todo: Refactoring validator, check trust chain before resuming. */
 		switch(trust_chain_check(request, qry)) {
-		case KNOT_STATE_FAIL: return KNOT_STATE_FAIL;
-		case KNOT_STATE_DONE: return KNOT_STATE_PRODUCE;
+		case KR_STATE_FAIL: return KR_STATE_FAIL;
+		case KR_STATE_DONE: return KR_STATE_PRODUCE;
 		default: break;
 		}
 		DEBUG_MSG(qry, "=> resuming yielded answer\n");
 		struct kr_layer_pickle *pickle = qry->deferred;
-		request->state = KNOT_STATE_YIELD;
+		request->state = KR_STATE_YIELD;
 		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
 		qry->deferred = pickle->next;
 	} else {
@@ -798,46 +798,46 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		 * this is normally not required, and incurrs another cache lookups for cached answer. */
 		if (qry->flags & QUERY_ALWAYS_CUT) {
 			switch(zone_cut_check(request, qry, packet)) {
-			case KNOT_STATE_FAIL: return KNOT_STATE_FAIL;
-			case KNOT_STATE_DONE: return KNOT_STATE_PRODUCE;
+			case KR_STATE_FAIL: return KR_STATE_FAIL;
+			case KR_STATE_DONE: return KR_STATE_PRODUCE;
 			default: break;
 			}
 		}
 		/* Resolve current query and produce dependent or finish */
-		request->state = KNOT_STATE_PRODUCE;
+		request->state = KR_STATE_PRODUCE;
 		ITERATE_LAYERS(request, qry, produce, packet);
-		if (request->state != KNOT_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
+		if (request->state != KR_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
 			/* Produced an answer, consume it. */
 			qry->secret = 0;
-			request->state = KNOT_STATE_CONSUME;
+			request->state = KR_STATE_CONSUME;
 			ITERATE_LAYERS(request, qry, consume, packet);
 		}
 	}
 	switch(request->state) {
-	case KNOT_STATE_FAIL: return request->state;
-	case KNOT_STATE_CONSUME: break;
-	case KNOT_STATE_DONE:
+	case KR_STATE_FAIL: return request->state;
+	case KR_STATE_CONSUME: break;
+	case KR_STATE_DONE:
 	default: /* Current query is done */
-		if (qry->flags & QUERY_RESOLVED && request->state != KNOT_STATE_YIELD) {
+		if (qry->flags & QUERY_RESOLVED && request->state != KR_STATE_YIELD) {
 			kr_rplan_pop(rplan, qry);
 		}
 		ITERATE_LAYERS(request, qry, reset);
-		return kr_rplan_empty(rplan) ? KNOT_STATE_DONE : KNOT_STATE_PRODUCE;
+		return kr_rplan_empty(rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;
 	}
 	
 
 	/* This query has RD=0 or is ANY, stop here. */
 	if (qry->stype == KNOT_RRTYPE_ANY || !knot_wire_get_rd(request->answer->wire)) {
 		DEBUG_MSG(qry, "=> qtype is ANY or RD=0, bail out\n");
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
 	/* Update zone cut, spawn new subrequests. */
 	if (!(qry->flags & QUERY_STUB)) {
 		int state = zone_cut_check(request, qry, packet);
 		switch(state) {
-		case KNOT_STATE_FAIL: return KNOT_STATE_FAIL;
-		case KNOT_STATE_DONE: return KNOT_STATE_PRODUCE;
+		case KR_STATE_FAIL: return KR_STATE_FAIL;
+		case KR_STATE_DONE: return KR_STATE_PRODUCE;
 		default: break;
 		}
 	}
@@ -850,7 +850,7 @@ ns_election:
 	 */
 	if(++ns_election_iter >= KR_ITER_LIMIT) {
 		DEBUG_MSG(qry, "=> couldn't converge NS selection, bail out\n");
-		return KNOT_STATE_FAIL;
+		return KR_STATE_FAIL;
 	}
 
 	const bool retry = (qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_BADCOOKIE_AGAIN));
@@ -867,7 +867,7 @@ ns_election:
 			DEBUG_MSG(qry, "=> no valid NS left\n");
 			ITERATE_LAYERS(request, qry, reset);
 			kr_rplan_pop(rplan, qry);
-			return KNOT_STATE_PRODUCE;
+			return KR_STATE_PRODUCE;
 		}
 	}
 
@@ -879,7 +879,7 @@ ns_election:
 			goto ns_election; /* Must try different NS */
 		}
 		ITERATE_LAYERS(request, qry, reset);
-		return KNOT_STATE_PRODUCE;
+		return KR_STATE_PRODUCE;
 	}
 
 	/* Randomize query case (if not in safemode) */
@@ -995,10 +995,10 @@ int kr_resolve_finish(struct kr_request *request, int state)
 #endif
 	/* Finalize answer */
 	if (answer_finalize(request, state) != 0) {
-		state = KNOT_STATE_FAIL;
+		state = KR_STATE_FAIL;
 	}
 	/* Error during procesing, internal failure */
-	if (state != KNOT_STATE_DONE) {
+	if (state != KR_STATE_DONE) {
 		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
@@ -1009,7 +1009,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	ITERATE_LAYERS(request, NULL, finish);
 	DEBUG_MSG(NULL, "finished: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
-	return KNOT_STATE_DONE;
+	return KR_STATE_DONE;
 }
 
 struct kr_rplan *kr_resolve_plan(struct kr_request *request)

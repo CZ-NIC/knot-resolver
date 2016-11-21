@@ -497,7 +497,7 @@ local kres = {
 	section = ffi.new('struct pkt_section'),
 	rcode = ffi.new('struct pkt_rcode'),
 	query = query_flag,
-	NOOP = 0, YIELD = 0, CONSUME = 1, PRODUCE = 2, DONE = 4, FAIL = 8,
+	CONSUME = 1, PRODUCE = 2, DONE = 4, FAIL = 8, YIELD = 16,
 	-- Metatypes
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,
 	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,

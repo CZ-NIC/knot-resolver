@@ -210,11 +210,11 @@ to avoid multiple declarations. Here's how the preface looks like:
 	#include "lib/layer.h"
 	#include "lib/module.h"
 	// Need a forward declaration of the function signature
-	int finish(knot_layer_t *);
+	int finish(kr_layer_t *);
 	// Workaround for layers composition
-	static inline const knot_layer_api_t *_layer(void)
+	static inline const kr_layer_api_t *_layer(void)
 	{
-		static const knot_layer_api_t api = {
+		static const kr_layer_api_t api = {
 			.finish = &finish
 		};
 		return &api;
@@ -228,7 +228,7 @@ Now we can add the implementations for the ``finish`` layer and finalize the mod
 .. code-block:: go
 
 	//export finish
-	func finish(ctx *C.knot_layer_t) C.int {
+	func finish(ctx *C.kr_layer_t) C.int {
 		// Since the context is unsafe.Pointer, we need to cast it
 		var param *C.struct_kr_request = (*C.struct_kr_request)(ctx.data)
 		// Now we can use the C API as well
@@ -237,7 +237,7 @@ Now we can add the implementations for the ``finish`` layer and finalize the mod
 	}
 
 	//export mymodule_layer
-	func mymodule_layer(module *C.struct_kr_module) *C.knot_layer_api_t {
+	func mymodule_layer(module *C.struct_kr_module) *C.kr_layer_api_t {
 		// Wrapping the inline trampoline function
 		return C._layer()
 	}

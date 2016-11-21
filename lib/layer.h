@@ -30,49 +30,59 @@
  #define QRDEBUG(query, cls, fmt, ...)
 #endif
 
-/*! Layer processing states.
+/** Layer processing states.  Only one value at a time (but see TODO).
+ *
  *  Each state represents the state machine transition,
  *  and determines readiness for the next action.
+ *  See struct kr_layer_api for the actions.
+ *
+ *  TODO: the cookie module sometimes sets (_FAIL | _DONE) on purpose (!)
  */
-enum knot_layer_state {
-	KNOT_STATE_NOOP    = 0,      /*!< N/A */
-	KNOT_STATE_CONSUME = 1 << 0, /*!< Consume data. */
-	KNOT_STATE_PRODUCE = 1 << 1, /*!< Produce data. */
-	KNOT_STATE_DONE    = 1 << 2, /*!< Finished. */
-	KNOT_STATE_FAIL    = 1 << 3  /*!< Error. */
+enum kr_layer_state {
+	KR_STATE_CONSUME = 1 << 0, /*!< Consume data. */
+	KR_STATE_PRODUCE = 1 << 1, /*!< Produce data. */
+	KR_STATE_DONE    = 1 << 2, /*!< Finished successfully. */
+	KR_STATE_FAIL    = 1 << 3, /*!< Error. */
+	KR_STATE_YIELD   = 1 << 4, /*!< Paused, waiting for a sub-query. */
 };
 
 /* Forward declarations. */
-struct knot_layer_api;
+struct kr_layer_api;
 
-/*! \brief Packet processing context. */
-typedef struct knot_layer {
-	knot_mm_t *mm;   /* Processing memory context. */
-	uint16_t state;  /* Bitmap of enum knot_layer_state. */
-	void *data;      /* Module specific. */
-	const struct knot_layer_api *api;
-} knot_layer_t;
+/** Packet processing context. */
+typedef struct kr_layer {
+	int state; /*!< The current state; bitmap of enum kr_layer_state. */
+	struct kr_request *req; /*!< The corresponding request. */
+	const struct kr_layer_api *api;
+} kr_layer_t;
 
-/*! \brief Packet processing module API. */
-struct knot_layer_api {
-	int (*begin)(knot_layer_t *ctx, void *module_param);
-	int (*reset)(knot_layer_t *ctx);
-	int (*finish)(knot_layer_t *ctx);
-	int (*consume)(knot_layer_t *ctx, knot_pkt_t *pkt);
-	int (*produce)(knot_layer_t *ctx, knot_pkt_t *pkt);
-	int (*fail)(knot_layer_t *ctx, knot_pkt_t *pkt);
+/** Packet processing module API.  All functions return the new kr_layer_state. */
+struct kr_layer_api {
+      	/** Start of processing the DNS request. */
+	int (*begin)(kr_layer_t *ctx);
+
+	int (*reset)(kr_layer_t *ctx);
+
+	/** Paired to begin, called both on successes and failures. */
+	int (*finish)(kr_layer_t *ctx);
+
+	/** Processing an answer from upstream or the answer to the request. */
+	int (*consume)(kr_layer_t *ctx, knot_pkt_t *pkt);
+
+	/** Produce either an answer to the request or a query for upstream (or fail). */
+	int (*produce)(kr_layer_t *ctx, knot_pkt_t *pkt);
+
+	/** The module can store anything in here. */
 	void *data;
 };
 
-typedef struct knot_layer_api knot_layer_api_t;
+typedef struct kr_layer_api kr_layer_api_t;
 
 /** Pickled layer state (api, input, state). */
 struct kr_layer_pickle {
     struct kr_layer_pickle *next;
-    const struct knot_layer_api *api;
+    const struct kr_layer_api *api;
     knot_pkt_t *pkt;
     unsigned state;
 };
 
-/* Repurpose layer states. */
-#define KNOT_STATE_YIELD KNOT_STATE_NOOP
