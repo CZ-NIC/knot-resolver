@@ -22,6 +22,7 @@
 #include "daemon/worker.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
+#include "lib/defines.h"
 
 
 static int handle_init(uv_handle_t *handle, sa_family_t family) {
@@ -35,7 +36,7 @@ static int handle_init(uv_handle_t *handle, sa_family_t family) {
 #if defined(UV_VERSION_HEX) && (__linux__ && SO_REUSEPORT)
 		if ((ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT,
 					  &on, (socklen_t)sizeof(on))) < 0) {
-			return kr_error(ret);
+			return kr_error(errno);
 		}
 #endif
 
@@ -44,20 +45,20 @@ static int handle_init(uv_handle_t *handle, sa_family_t family) {
 #if defined(IPV6_USE_MIN_MTU)
 			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
 						  (void*)&on, (socklen_t)sizeof(on))) < 0) {
-				return kr_errorr(ret);
+				return kr_error(errno);
 			}
 #elif defined(IPV6_MTU) /* defined(IPV6_USE_MIN_MTU */
 			/* fallback to IPV6_MTU if IPV6_USE_MIN_MTU not available */
 			int ipv6_min_mtu = IPV6_MIN_MTU;
 			if((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_MTU,
 						 &ipv6_min_mtu, sizeof(ipv6_min_mtu))) < 0) {
-				return kr_error(ret);
+				return kr_error(errno);
 			}
 #endif
 		} /* family == AF_INET6 */
 		else if (family == AF_INET) {
 #if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_DONT)
-			/* Linux 3.15 supports IP_PMTUDISC_OMIT.  
+			/* Linux 3.15 supports IP_PMTUDISC_OMIT.
 			 * Linux < 3.15 supports IP_PMTUDISC_DONT
 			 * Set DF=0 to disable pmtud, and don't honor
 			 * any path mtu information and not accepting
@@ -71,18 +72,18 @@ static int handle_init(uv_handle_t *handle, sa_family_t family) {
 #endif /* defined(IP_PMTUDISC_OMIT) */
 			if ((ret = setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER,
 						  &pmtud, sizeof(pmtud))) < 0) {
-				return kr_error(ret);
+				return kr_error(errno);
 			}
 #elif defined(IP_DONTFRAG)  /* !defined(IP_MTU_DISCOVER) || !(defined(IP_PMTUDISC_DONT) */
 			/* BSDs and others */
 			int dontfrag_off = 0;
 			if ((ret = setsockopt(fd, IPPROTO_IP, IP_DONTFRAG,
 						  &dontfrag_off, sizeof(dontfrag_off))) < 0) {
-				return kr_error(ret);
+				return kr_error(errno);
 			}
 #endif /* defined(IP_DONTFRAG) */
 		} /* family == AF_INET */
-	}	
+	}
 	return 0;
 }
 
