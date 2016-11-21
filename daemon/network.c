@@ -25,9 +25,7 @@
 #include "lib/defines.h"
 
 
-static int handle_init(uv_handle_t *handle, sa_family_t family) {
-/* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
-
+static int so_reuseport(uv_handle_t *handle) {
 	uv_os_fd_t fd = 0;
 	if (uv_fileno(handle, &fd) == 0) {
 		int on = 1;
@@ -39,6 +37,15 @@ static int handle_init(uv_handle_t *handle, sa_family_t family) {
 			return kr_error(errno);
 		}
 #endif
+	}
+	return 0;
+}
+
+static int no_pmtud(uv_handle_t *handle, sa_family_t family) {
+	uv_os_fd_t fd = 0;
+	if (uv_fileno(handle, &fd) == 0) {
+		int on = 1;
+		int ret;
 
 		if (family == AF_INET6) {
 		
@@ -187,7 +194,10 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		if ((ret = uv_udp_init_ex(net->loop, ep->udp, sa->sa_family)) != 0) {
 			return ret;
 		}
-		if ((ret = handle_init((uv_handle_t *)ep->udp, sa->sa_family)) != 0) {
+		if ((ret = so_reuseport((uv_handle_t *)ep->udp)) != 0) {
+			return ret;
+		}
+		if ((ret = no_pmtud((uv_handle_t *)ep->udp, sa->sa_family)) != 0) {
 			return ret;
 		}
 		if ((ret = udp_bind(ep->udp, sa)) != 0) {
@@ -204,7 +214,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		if ((ret = uv_tcp_init_ex(net->loop, ep->tcp, sa->sa_family)) != 0) {
 			return ret;
 		}
-		if ((ret = handle_init((uv_handle_t *)ep->tcp, sa->sa_family)) != 0) {
+		if ((ret = so_reuseport((uv_handle_t *)ep->tcp)) != 0) {
 			return ret;
 		}
 		if (flags & NET_TLS) {
@@ -237,8 +247,15 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		if (!ep->udp) {
 			return kr_error(ENOMEM);
 		}
-		uv_udp_init_ex(net->loop, ep->udp, sock_family);
-		handle_init(ep->udp, sock_family);
+		if ((ret = uv_udp_init_ex(net->loop, ep->udp, sock_family)) != 0) {
+			return ret;
+		}
+		if ((ret = so_reuseport(ep->udp)) != 0) {
+			return ret;
+		}
+		if ((ret = no_pmtud(ep->udp, sock_family)) != 0) {
+			return ret;
+		}
 		ret = udp_bindfd(ep->udp, fd);
 		if (ret != 0) {
 			close_handle((uv_handle_t *)ep->udp, false);
@@ -255,8 +272,12 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		if (!ep->tcp) {
 			return kr_error(ENOMEM);
 		}
-		uv_tcp_init_ex(net->loop, ep->tcp, sock_family);
-		handle_init(ep->tcp, sock_family);
+		if ((ret = uv_tcp_init_ex(net->loop, ep->tcp, sock_family)) != 0) {
+			return ret;
+		}
+		if ((ret = so_reuseport(ep->tcp)) != 0) {
+			return ret;
+		}
 		if (use_tls) {
 			ret = tcp_bindfd_tls(ep->tcp, fd);
 			ep->flags |= NET_TLS;
