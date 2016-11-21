@@ -33,7 +33,7 @@ static int handle_init(uv_handle_t *handle, sa_family_t family) {
 		int on = 1;
 		int ret;
 
-#if defined(UV_VERSION_HEX) && (__linux__ && SO_REUSEPORT)
+#if __linux__ && SO_REUSEPORT
 		if ((ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT,
 					  &on, (socklen_t)sizeof(on))) < 0) {
 			return kr_error(errno);

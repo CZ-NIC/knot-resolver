@@ -2,6 +2,7 @@ Knot Resolver 1.x.y (2016-xx-yy)
 ================================
 
 - It now requires knot >= 2.3.1 to link successfully.
+- It now requires libuv >= 1.7.
 
 Knot Resolver 1.1.1 (2016-08-24)
 ================================

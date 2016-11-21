@@ -19,7 +19,7 @@ $(eval $(call find_lib,libknot,2.3.1,yes))
 $(eval $(call find_lib,libdnssec,2.3.1,yes))
 $(eval $(call find_lib,libzscanner,2.3.1,yes))
 $(eval $(call find_lib,lmdb))
-$(eval $(call find_lib,libuv,1.0,yes))
+$(eval $(call find_lib,libuv,1.7,yes))
 $(eval $(call find_lib,nettle,,yes))
 $(eval $(call find_alt,lua,luajit))
 $(eval $(call find_lib,cmocka))
@@ -131,7 +131,7 @@ ifeq ($(HAS_libdnssec),no)
 	$(error libdnssec >= 2.3.1 required)
 endif
 ifeq ($(HAS_libuv),no)
-	$(error libuv >= 1.0 required)
+	$(error libuv >= 1.7 required)
 endif
 
 # Installation directories

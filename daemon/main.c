@@ -37,7 +37,7 @@
 #include "daemon/tls.h"
 
 /* We can fork early on Linux 3.9+ and do SO_REUSEPORT for better performance. */
-#if defined(UV_VERSION_HEX) && defined(SO_REUSEPORT) && defined(__linux__)
+#if defined(SO_REUSEPORT) && defined(__linux__)
  #define CAN_FORK_EARLY 1
 #endif
 
