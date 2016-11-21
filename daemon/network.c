@@ -222,7 +222,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 }
 
 /** Open fd as endpoint. */
-static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, int sock_type, bool use_tls)
+static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, int sock_type, sa_family_t sock_family, bool use_tls)
 {
 	int ret = kr_ok();
 	if (sock_type == SOCK_DGRAM) {
@@ -237,7 +237,8 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		if (!ep->udp) {
 			return kr_error(ENOMEM);
 		}
-		uv_udp_init(net->loop, ep->udp);
+		uv_udp_init_ex(net->loop, ep->udp, sock_family);
+		handle_init(ep->udp, sock_family);
 		ret = udp_bindfd(ep->udp, fd);
 		if (ret != 0) {
 			close_handle((uv_handle_t *)ep->udp, false);
@@ -254,7 +255,8 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		if (!ep->tcp) {
 			return kr_error(ENOMEM);
 		}
-		uv_tcp_init(net->loop, ep->tcp);
+		uv_tcp_init_ex(net->loop, ep->tcp, sock_family);
+		handle_init(ep->tcp, sock_family);
 		if (use_tls) {
 			ret = tcp_bindfd_tls(ep->tcp, fd);
 			ep->flags |= NET_TLS;
@@ -292,7 +294,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 	/* Extract local address and socket type. */
 	int sock_type = SOCK_DGRAM;
 	socklen_t len = sizeof(sock_type);
-	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);	
+	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);
 	if (ret != 0) {
 		return kr_error(EBADF);
 	}
@@ -332,7 +334,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 	struct endpoint *ep = ep_array->at[index];
 	assert(ep != NULL);
 	/* Create a libuv struct for this socket. */
-	return open_endpoint_fd(net, ep, fd, sock_type, use_tls);
+	return open_endpoint_fd(net, ep, fd, sock_type, ss.ss_family, use_tls);
 }
 
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags)
