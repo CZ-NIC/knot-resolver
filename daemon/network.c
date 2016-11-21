@@ -48,8 +48,13 @@ static int no_pmtud(uv_handle_t *handle, sa_family_t family) {
 		int ret;
 
 		if (family == AF_INET6) {
-		
-#if defined(IPV6_USE_MIN_MTU)
+#if defined(IPV6_MTU_DISCOVER) && defined(IPV6_PMTUDISC_OMIT)
+			int pmtud = IPV6_PMTUDISC_OMIT;
+			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_MTU_DISCOVER,
+						  &pmtud, sizeof(pmtud))) < 0) {
+				return kr_error(errno);
+			}			
+#elif defined(IPV6_USE_MIN_MTU)
 			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
 						  (void*)&on, (socklen_t)sizeof(on))) < 0) {
 				return kr_error(errno);
