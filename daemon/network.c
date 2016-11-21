@@ -263,10 +263,10 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		if ((ret = uv_udp_init_ex(net->loop, ep->udp, sock_family)) != 0) {
 			return ret;
 		}
-		if ((ret = so_reuseport(ep->udp)) != 0) {
+		if ((ret = so_reuseport((uv_handle_t *)ep->udp)) != 0) {
 			return ret;
 		}
-		if ((ret = no_pmtud(ep->udp, sock_family)) != 0) {
+		if ((ret = no_pmtud((uv_handle_t *)ep->udp, sock_family)) != 0) {
 			return ret;
 		}
 		ret = udp_bindfd(ep->udp, fd);
@@ -288,7 +288,7 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		if ((ret = uv_tcp_init_ex(net->loop, ep->tcp, sock_family)) != 0) {
 			return ret;
 		}
-		if ((ret = so_reuseport(ep->tcp)) != 0) {
+		if ((ret = so_reuseport((uv_handle_t *)ep->tcp)) != 0) {
 			return ret;
 		}
 		if (use_tls) {
