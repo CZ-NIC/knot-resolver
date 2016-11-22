@@ -42,7 +42,6 @@ static int so_reuseport(uv_handle_t *handle) {
 }
 
 /* Linux 3.15 supports IP_PMTUDISC_OMIT.
- * Linux < 3.15 supports IP_PMTUDISC_DONT
  * Set DF=0 to disable pmtud, and don't honor
  * any path mtu information and not accepting
  * new icmp notifications.
@@ -51,28 +50,22 @@ static int so_reuseport(uv_handle_t *handle) {
 static int no_pmtud(uv_handle_t *handle, sa_family_t family) {
 	uv_os_fd_t fd = 0;
 	if (uv_fileno(handle, &fd) == 0) {
-		int on = 1;
 		int ret;
 
 		if (family == AF_INET6) {
 #if defined(IPV6_MTU_DISCOVER) && defined(IPV6_PMTUDISC_OMIT)
 			int pmtud = IPV6_PMTUDISC_OMIT;
 			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_MTU_DISCOVER,
-						  &pmtud, sizeof(pmtud))) < 0) {
+					      &pmtud, sizeof(pmtud))) < 0) {
 				return kr_error(errno);
 			}
-#elif defined(IPV6_MTU_DISCOVER) && defined(IPV6_PMTUDISC_DONT)
-			int pmtud = IPV6_PMTUDISC_DONT;
-			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_MTU_DISCOVER,
-						  &pmtud, sizeof(pmtud))) < 0) {
-				return kr_error(errno);
-			}			
 #elif defined(IPV6_USE_MIN_MTU)
+			int use_min_mtu = 1;
 			if ((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
-						  (void*)&on, (socklen_t)sizeof(on))) < 0) {
+					      &use_min_mtu, sizeof(use_min_mtu))) < 0) {
 				return kr_error(errno);
 			}
-#elif defined(IPV6_MTU) /* defined(IPV6_USE_MIN_MTU */
+#elif defined(IPV6_MTU)
 			/* fallback to IPV6_MTU if IPV6_USE_MIN_MTU not available */
 			int ipv6_min_mtu = IPV6_MIN_MTU;
 			if((ret = setsockopt(fd, IPPROTO_IPV6, IPV6_MTU,
@@ -85,20 +78,14 @@ static int no_pmtud(uv_handle_t *handle, sa_family_t family) {
 #if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_OMIT)
 			int pmtud = IP_PMTUDISC_OMIT;
 			if ((ret = setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER,
-						  &pmtud, sizeof(pmtud))) < 0) {
+					      &pmtud, sizeof(pmtud))) < 0) {
 				return kr_error(errno);
 			}
-#elif defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_DONT)
-			int pmtud = IP_PMTUDISC_DONT;
-			if ((ret = setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER,
-						  &pmtud, sizeof(pmtud))) < 0) {
-				return kr_error(errno);
-			}
-#elif defined(IP_DONTFRAG)  /* !defined(IP_MTU_DISCOVER) || !(defined(IP_PMTUDISC_DONT) */
+#elif defined(IP_DONTFRAG)
 			/* BSDs and others */
 			int dontfrag_off = 0;
 			if ((ret = setsockopt(fd, IPPROTO_IP, IP_DONTFRAG,
-						  &dontfrag_off, sizeof(dontfrag_off))) < 0) {
+					      &dontfrag_off, sizeof(dontfrag_off))) < 0) {
 				return kr_error(errno);
 			}
 #endif
