@@ -66,7 +66,7 @@ libkres_LIBS += $(nettle_LIBS)
 endif
 
 lib/zonecut.c: lib/root-hints.inc
-lib/root-hints.inc: scripts/gen-root-hints.sh scripts/inet_pton.py
+lib/root-hints.inc:
 	scripts/gen-root-hints.sh > $@
 
 # Make library
