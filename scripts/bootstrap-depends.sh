@@ -17,7 +17,7 @@ NETTLE_TAG="3.3"
 NETTLE_URL="https://ftp.gnu.org/gnu/nettle/nettle-${NETTLE_TAG}.tar.gz"
 GNUTLS_TAG="3.5.5"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.5/gnutls-${GNUTLS_TAG}.tar.xz"
-LUA_TAG="v2.1.0-beta2"
+LUA_VER="2.1.0-beta2"
 LUA_URL="https://github.com/LuaJIT/LuaJIT.git"
 HIREDIS_TAG="v0.13.3"
 HIREDIS_URL="https://github.com/redis/hiredis.git"
@@ -135,7 +135,10 @@ pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 	--disable-static --with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
 pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
-pkg lua ${LUA_URL} ${LUA_TAG} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
+pkg lua ${LUA_URL} v${LUA_VER} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
+
+# development releases of luajit do NOT install bin/luajit
+ln -sf "luajit-${LUA_VER}" "${PREFIX}/bin/luajit"
 
 echo "Build success!"
 

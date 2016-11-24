@@ -20,10 +20,10 @@ MODULEDIR ?= $(LIBDIR)/kdns_modules
 ETCDIR ?= $(PREFIX)/etc/kresd
 
 # Tools
-CC	?= cc
-RM	:= rm -f
+CC      ?= cc
+RM      := rm -f
 LN      := ln -s
-XXD_LUA := ./scripts/embed-lua.sh
+LUA     := luajit -b -t h
 INSTALL := install
 
 # Flags

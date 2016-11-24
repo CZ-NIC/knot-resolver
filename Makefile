@@ -66,23 +66,6 @@ endif
 endif
 endif
 
-# Work around luajit on OS X
-ifeq ($(PLATFORM), Darwin)
-ifneq (,$(findstring luajit, $(lua_LIBS)))
-	lua_LIBS += -pagezero_size 10000 -image_base 100000000
-endif
-endif
-
-BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(nettle_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
-BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
-
-# Check if it has libknot 2.3.0 and nettle to support DNS cookies
-$(eval $(call find_alt,knot230,libknot,2.3))
-ifeq ($(HAS_nettle)|$(HAS_knot230),yes|yes)
-BUILD_CFLAGS += -DENABLE_COOKIES
-ENABLE_COOKIES := yes
-endif
-
 # Overview
 info:
 	$(info Target:     Knot DNS Resolver $(VERSION)-$(PLATFORM))
@@ -109,7 +92,6 @@ info:
 	$(info [$(HAS_lua)] luajit (daemon))
 	$(info [$(HAS_libuv)] libuv (daemon))
 	$(info [$(HAS_gnutls)] libgnutls (daemon))
-	$(info [$(HAS_nettle)] nettle (DNS cookies))
 	$(info )
 	$(info Optional)
 	$(info --------)
@@ -119,8 +101,10 @@ info:
 	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
 	$(info [$(HAS_libsystemd)] systemd (daemon))
+	$(info [$(HAS_nettle)] nettle (modules/cookies))
 	$(info )
 
+# Verify required dependencies are met, as listed above
 ifeq ($(HAS_libknot),no)
 	$(error libknot >= 2.3.1 required)
 endif
@@ -130,8 +114,32 @@ endif
 ifeq ($(HAS_libdnssec),no)
 	$(error libdnssec >= 2.3.1 required)
 endif
+ifeq ($(HAS_lua),no)
+	$(error luajit required)
+endif
 ifeq ($(HAS_libuv),no)
 	$(error libuv >= 1.0 required)
+endif
+ifeq ($(HAS_gnutls),no)
+	$(error gnutls required)
+endif
+
+
+BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(nettle_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
+BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
+
+# Work around luajit on OS X
+ifeq ($(PLATFORM), Darwin)
+ifneq (,$(findstring luajit, $(lua_LIBS)))
+	lua_LIBS += -pagezero_size 10000 -image_base 100000000
+endif
+endif
+
+# Check if it has libknot 2.3.0 and nettle to support DNS cookies
+$(eval $(call find_alt,knot230,libknot,2.3))
+ifeq ($(HAS_nettle)|$(HAS_knot230),yes|yes)
+BUILD_CFLAGS += -DENABLE_COOKIES
+ENABLE_COOKIES := yes
 endif
 
 # Installation directories
