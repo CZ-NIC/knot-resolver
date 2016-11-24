@@ -768,7 +768,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.count()
 
-   :return: Number of entries in the cache.
+   :return: Number of entries in the cache or nil on error.
 
 .. function:: cache.close()
 
