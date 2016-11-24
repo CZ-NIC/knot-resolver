@@ -430,10 +430,11 @@ static int cache_count(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	const struct kr_cdb_api *api = engine->resolver.cache.api;
 
-	/* First key is a version counter, omit it. */
 	struct kr_cache *cache = &engine->resolver.cache;
-	if (kr_cache_is_open(cache)) {
-		lua_pushinteger(L, api->count(cache->db) - 1);
+	int count = api->count(cache->db);
+	if (kr_cache_is_open(cache) && count >= 0) {
+		/* First key is a version counter, omit it if nonempty. */
+		lua_pushinteger(L, count ? count - 1 : 0);
 		return 1;
 	}
 	return 0;
