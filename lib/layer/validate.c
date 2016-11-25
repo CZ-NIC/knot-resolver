@@ -280,8 +280,14 @@ static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 	case KNOT_RRTYPE_DS:
 		DEBUG_MSG(qry, "<= parent: updating DS\n");
 		if (qry->flags & QUERY_DNSSEC_INSECURE) { /* DS non-existence proven. */
-			parent->flags &= ~QUERY_DNSSEC_WANT;
-			parent->flags |= QUERY_DNSSEC_INSECURE;
+			do {
+				parent->flags &= ~QUERY_DNSSEC_WANT;
+				parent->flags |= QUERY_DNSSEC_INSECURE;
+				if (parent->stype != KNOT_RRTYPE_DS) {
+					break;
+				}
+				parent = parent->parent;
+			} while (parent);
 		} else { /* DS existence proven. */
 			parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
 			if (!parent->zone_cut.trust_anchor) {
