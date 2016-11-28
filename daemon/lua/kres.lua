@@ -112,7 +112,6 @@ struct query_flag {
 	static const int BADCOOKIE_AGAIN = 1 << 22;
 	static const int CNAME       = 1 << 23;
 	static const int REORDER_RR  = 1 << 24;
-	static const int TLS         = 1 << 25;
 };
 
 /*

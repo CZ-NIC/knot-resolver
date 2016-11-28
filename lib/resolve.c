@@ -340,31 +340,36 @@ static void write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
 	}
 }
 
+/** @internal Add an EDNS padding RR into the answer if requested and required. */
 static int answer_padding(struct kr_request *request)
 {
+	if (!request || !request->answer || !request->ctx) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
 	uint16_t padding = request->ctx->tls_padding;
 	knot_pkt_t *answer = request->answer;
 	knot_rrset_t *opt_rr = answer->opt_rr;
-	
+
 	if (padding < 2) {
-		return true;
+		return kr_ok();
 	}
 	int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
-	
+
 	int32_t pad_bytes = MIN(knot_edns_alignment_size(answer->size, knot_rrset_size(opt_rr), padding),
 				max_pad_bytes);
 
-	if (pad_bytes > 0) {
-		uint8_t zeros[pad_bytes];
+	if (pad_bytes >= 0) {
+		uint8_t zeros[MAX(1, pad_bytes)];
 		memset(zeros, 0, sizeof(zeros));
 		int r = knot_edns_add_option(opt_rr, KNOT_EDNS_OPTION_PADDING,
 					     pad_bytes, zeros, &answer->mm);
 		if (r != KNOT_EOK) {
 			knot_rrset_clear(opt_rr, &answer->mm);
-			return false;
+			return kr_error(r);
 		}
 	}
-	return true;
+	return kr_ok();
 }
 
 static int answer_fail(struct kr_request *request)
@@ -377,7 +382,7 @@ static int answer_fail(struct kr_request *request)
 	if (ret == 0 && answer->opt_rr) {
 		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		answer_padding(request); /* Ignore failed padding in SERVFAIL answer a*/
+		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
 		ret = edns_put(answer);
 	}
 	return ret;
@@ -408,7 +413,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	int ret = 0;
 	if (answer->opt_rr) {
 		if (request->has_tls) {
-			if (!answer_padding(request)) {
+			if (answer_padding(request) != kr_ok()) {
 				return answer_fail(request);
 			}
 		}

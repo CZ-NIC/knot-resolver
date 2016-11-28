@@ -99,7 +99,7 @@ struct kr_context
 	 * module because of better access. */
 	struct kr_cookie_ctx cookie_ctx;
 	kr_cookie_lru_t *cache_cookie;
-	uint32_t tls_padding;
+	uint32_t tls_padding; /**< See net.tls_padding in ../daemon/README.rst */
 	knot_mm_t *pool;
 };
 
