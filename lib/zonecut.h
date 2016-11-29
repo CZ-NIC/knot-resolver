@@ -105,6 +105,15 @@ KR_EXPORT
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
 
 /**
+ * Delete all addresses associated with the given name.
+ * @param  cut
+ * @param  ns    name server name
+ * @return       0 or error code
+ */
+KR_EXPORT
+int kr_zonecut_del_all(struct kr_zonecut *cut, const knot_dname_t *ns);
+
+/**
  * Find nameserver address list in the zone cut.
  *
  * @note This can be used for membership test, a non-null pack is returned

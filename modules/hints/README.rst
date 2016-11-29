@@ -30,7 +30,7 @@ Properties
 
   :param string path:  path to hosts file, default: ``"/etc/hosts"``
   :return: ``{ result: bool }``
-  
+
   Load specified hosts file.
 
 .. function:: hints.get(hostname)
@@ -45,7 +45,14 @@ Properties
   :param string pair:  ``hostname address`` i.e. ``"localhost 127.0.0.1"``
   :return: ``{ result: bool }``
 
-  Set hostname - address pair hint.
+  Add a hostname - address pair hint.
+
+.. function:: hints.del(pair)
+
+  :param string pair:  ``hostname address`` i.e. ``"localhost 127.0.0.1"``, or just ``hostname``
+  :return: ``{ result: bool }``
+
+  Remove a hostname - address pair hint.  If address is omitted, all addresses for the given name are deleted.
 
 .. function:: hints.root()
 
@@ -76,4 +83,4 @@ Properties
     }
 
   .. tip:: A good rule of thumb is to select only a few fastest root hints. The server learns RTT and NS quality over time, and thus tries all servers available. You can help it by preselecting the candidates.
-  
+
