@@ -19,6 +19,9 @@
 #include <uv.h>
 #include <gnutls/gnutls.h>
 #include <libknot/packet/pkt.h>
+#include "lib/defines.h"
+
+#define MAX_TLS_PADDING KR_EDNS_PAYLOAD
 
 struct tls_ctx_t;
 struct tls_credentials;

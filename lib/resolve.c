@@ -308,6 +308,9 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 #endif /* defined(ENABLE_COOKIES) */
+	if (req->has_tls && req->ctx->tls_padding >= 2) {
+		wire_size += KNOT_EDNS_OPTION_HDRLEN + req->ctx->tls_padding;
+	}
 	return knot_pkt_reserve(pkt, wire_size);
 }
 
@@ -337,8 +340,41 @@ static void write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
 	}
 }
 
-static int answer_fail(knot_pkt_t *answer)
+/** @internal Add an EDNS padding RR into the answer if requested and required. */
+static int answer_padding(struct kr_request *request)
 {
+	if (!request || !request->answer || !request->ctx) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
+	uint16_t padding = request->ctx->tls_padding;
+	knot_pkt_t *answer = request->answer;
+	knot_rrset_t *opt_rr = answer->opt_rr;
+
+	if (padding < 2) {
+		return kr_ok();
+	}
+	int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
+
+	int32_t pad_bytes = MIN(knot_edns_alignment_size(answer->size, knot_rrset_size(opt_rr), padding),
+				max_pad_bytes);
+
+	if (pad_bytes >= 0) {
+		uint8_t zeros[MAX(1, pad_bytes)];
+		memset(zeros, 0, sizeof(zeros));
+		int r = knot_edns_add_option(opt_rr, KNOT_EDNS_OPTION_PADDING,
+					     pad_bytes, zeros, &answer->mm);
+		if (r != KNOT_EOK) {
+			knot_rrset_clear(opt_rr, &answer->mm);
+			return kr_error(r);
+		}
+	}
+	return kr_ok();
+}
+
+static int answer_fail(struct kr_request *request)
+{
+	knot_pkt_t *answer = request->answer;
 	int ret = kr_pkt_clear_payload(answer);
 	knot_wire_clear_ad(answer->wire);
 	knot_wire_clear_aa(answer->wire);
@@ -346,6 +382,7 @@ static int answer_fail(knot_pkt_t *answer)
 	if (ret == 0 && answer->opt_rr) {
 		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
+		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
 		ret = edns_put(answer);
 	}
 	return ret;
@@ -360,7 +397,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (state == KR_STATE_FAIL && rplan->pending.len > 0) {
 		struct kr_query *last = array_tail(rplan->pending);
 		if ((last->flags & QUERY_DNSSEC_WANT) && (last->flags & QUERY_DNSSEC_BOGUS)) {
-			return answer_fail(answer);
+			return answer_fail(request);
 		}
 	}
 
@@ -375,6 +412,11 @@ static int answer_finalize(struct kr_request *request, int state)
 	/* Write EDNS information */
 	int ret = 0;
 	if (answer->opt_rr) {
+		if (request->has_tls) {
+			if (answer_padding(request) != kr_ok()) {
+				return answer_fail(request);
+			}
+		}
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		ret = edns_put(answer);
 	}
