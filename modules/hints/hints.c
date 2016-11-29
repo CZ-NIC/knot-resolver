@@ -394,8 +394,9 @@ static JsonNode *pack_addrs(pack_t *pack)
 	return root;
 }
 
+static char* pack_hints(struct kr_zonecut *hints);
 /**
- * Retrieve address hint for given name.
+ * Retrieve address hints, either for given name or for all names.
  *
  * Input:  name
  * Output: { address1, address2, ... }
@@ -403,6 +404,11 @@ static JsonNode *pack_addrs(pack_t *pack)
 static char* hint_get(void *env, struct kr_module *module, const char *args)
 {
 	struct kr_zonecut *hints = module->data;
+
+	if (!args) {
+		return pack_hints(hints);
+	}
+
 	knot_dname_t key[KNOT_DNAME_MAXLEN];
 	pack_t *pack = NULL;
 	if (knot_dname_from_str(key, args, sizeof(key))) {
@@ -433,6 +439,17 @@ static int pack_hint(const char *k, void *v, void *baton)
 	}
 	json_append_member(root_node, nsname_str, addr_list);
 	return kr_ok();
+}
+
+/** @internal Pack all hints into serialized JSON. */
+static char* pack_hints(struct kr_zonecut *hints) {
+	char *result = NULL;
+	JsonNode *root_node = json_mkobject();
+	if (map_walk(&hints->nsset, pack_hint, root_node) == 0) {
+		result = json_encode(root_node);
+	}
+	json_delete(root_node);
+	return result;
 }
 
 static void unpack_hint(struct kr_zonecut *root_hints, JsonNode *table, const char *name)
@@ -467,13 +484,7 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 		json_delete(root_node);
 	}
 	/* Return current root hints */
-	char *result = NULL;
-	JsonNode *root_node = json_mkobject();
-	if (map_walk(&root_hints->nsset, pack_hint, root_node) == 0) {
-		result = json_encode(root_node);
-	}
-	json_delete(root_node);
-	return result;
+	return pack_hints(root_hints);
 }
 
 /*

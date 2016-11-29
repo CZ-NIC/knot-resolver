@@ -39,6 +39,7 @@ Properties
   :return: ``{ result: [address1, address2, ...] }``
 
   Return list of address record matching given name.
+  If no hostname is specified, all hints are returned in the table format used by ``hints.root()``.
 
 .. function:: hints.set(pair)
 
@@ -56,14 +57,14 @@ Properties
 
 .. function:: hints.root()
 
-  :return: ``{ ['a.root-servers.net'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
+  :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
 
   .. tip:: If no parameters are passed, returns current root hints set.
 
 .. function:: hints.root(root_hints)
 
   :param table root_hints: new set of root hints i.e. ``{['name'] = 'addr', ...}``
-  :return: ``{ ['a.root-servers.net'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
+  :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
 
   Replace current root hints and return the current table of root hints.
 
