@@ -690,9 +690,10 @@ static int engine_loadconf(struct engine *engine, const char *config_path)
 		lua_pop(engine->L, 1);
 	}
 	/* Init environment */
-	#include "daemon/lua/sandbox.inc"
-	if (l_dobytecode(engine->L, luaJIT_BC_sandbox,
-			 sizeof(luaJIT_BC_sandbox), "init") != 0) {
+	static const char sandbox_bytecode[] = {
+		#include "daemon/lua/sandbox.inc"
+	};
+	if (l_dobytecode(engine->L, sandbox_bytecode, sizeof(sandbox_bytecode), "init") != 0) {
 		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
@@ -706,9 +707,10 @@ static int engine_loadconf(struct engine *engine, const char *config_path)
 	}
 	if (ret == 0) {
 		/* Load defaults */
-		#include "daemon/lua/config.inc"
-		ret = l_dobytecode(engine->L, luaJIT_BC_config,
-				   sizeof(luaJIT_BC_config), "config");
+		static const char config_bytecode[] = {
+			#include "daemon/lua/config.inc"
+		};
+		ret = l_dobytecode(engine->L, config_bytecode, sizeof(config_bytecode), "config");
 	}
 
 	/* Evaluate */
