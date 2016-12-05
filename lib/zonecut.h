@@ -32,7 +32,7 @@ struct kr_zonecut {
 	knot_rrset_t* key;  /**< Zone cut DNSKEY. */
 	knot_rrset_t* trust_anchor; /**< Current trust anchor. */
 	struct kr_zonecut *parent; /**< Parent zone cut. */
-    map_t nsset;        /**< Map of nameserver => address_set. */
+	map_t nsset;        /**< Map of nameserver => address_set. */
 	knot_mm_t *pool;     /**< Memory pool. */
 };
 
@@ -103,6 +103,15 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
  */
 KR_EXPORT
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
+
+/**
+ * Delete all addresses associated with the given name.
+ * @param  cut
+ * @param  ns    name server name
+ * @return       0 or error code
+ */
+KR_EXPORT
+int kr_zonecut_del_all(struct kr_zonecut *cut, const knot_dname_t *ns);
 
 /**
  * Find nameserver address list in the zone cut.

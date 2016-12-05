@@ -267,6 +267,21 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	return ret;
 }
 
+int kr_zonecut_del_all(struct kr_zonecut *cut, const knot_dname_t *ns)
+{
+	if (!cut || !ns) {
+		return kr_error(EINVAL);
+	}
+
+	/* Find the address list; then free and remove it. */
+	pack_t *pack = kr_zonecut_find(cut, ns);
+	if (pack == NULL) {
+		return kr_error(ENOENT);
+	}
+	free_addr_set((const char *)ns, pack, cut->pool);
+	return map_del(&cut->nsset, (const char *)ns);
+}
+
 pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns)
 {
 	if (!cut || !ns) {

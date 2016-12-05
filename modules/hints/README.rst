@@ -30,7 +30,7 @@ Properties
 
   :param string path:  path to hosts file, default: ``"/etc/hosts"``
   :return: ``{ result: bool }``
-  
+
   Load specified hosts file.
 
 .. function:: hints.get(hostname)
@@ -39,24 +39,32 @@ Properties
   :return: ``{ result: [address1, address2, ...] }``
 
   Return list of address record matching given name.
+  If no hostname is specified, all hints are returned in the table format used by ``hints.root()``.
 
 .. function:: hints.set(pair)
 
   :param string pair:  ``hostname address`` i.e. ``"localhost 127.0.0.1"``
   :return: ``{ result: bool }``
 
-  Set hostname - address pair hint.
+  Add a hostname - address pair hint.
+
+.. function:: hints.del(pair)
+
+  :param string pair:  ``hostname address`` i.e. ``"localhost 127.0.0.1"``, or just ``hostname``
+  :return: ``{ result: bool }``
+
+  Remove a hostname - address pair hint.  If address is omitted, all addresses for the given name are deleted.
 
 .. function:: hints.root()
 
-  :return: ``{ ['a.root-servers.net'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
+  :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
 
   .. tip:: If no parameters are passed, returns current root hints set.
 
 .. function:: hints.root(root_hints)
 
   :param table root_hints: new set of root hints i.e. ``{['name'] = 'addr', ...}``
-  :return: ``{ ['a.root-servers.net'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
+  :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
 
   Replace current root hints and return the current table of root hints.
 
@@ -76,4 +84,4 @@ Properties
     }
 
   .. tip:: A good rule of thumb is to select only a few fastest root hints. The server learns RTT and NS quality over time, and thus tries all servers available. You can help it by preselecting the candidates.
-  
+

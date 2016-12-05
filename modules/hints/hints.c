@@ -216,6 +216,22 @@ static int parse_addr_str(struct sockaddr_storage *sa, const char *addr)
 	return 0;
 }
 
+/** @warning _NOT_ thread-safe; returns a pointer to static data! */
+static const knot_rdata_t * addr2rdata(const char *addr) {
+	/* Parse address string */
+	struct sockaddr_storage ss;
+	if (parse_addr_str(&ss, addr) != 0) {
+		return NULL;
+	}
+
+	/* Build RDATA */
+	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
+	size_t addr_len = kr_inaddr_len((struct sockaddr *)&ss);
+	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr((struct sockaddr *)&ss);
+	knot_rdata_init(rdata_arr, addr_len, raw_addr, 0);
+	return rdata_arr;
+}
+
 static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr)
 {
 	/* Build key */
@@ -223,20 +239,34 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 	if (!knot_dname_from_str(key, name, sizeof(key))) {
 		return kr_error(EINVAL);
 	}
-
-	/* Parse address string */
-	struct sockaddr_storage ss;
-	if (parse_addr_str(&ss, addr) != 0) {
+	const knot_rdata_t *rdata = addr2rdata(addr);
+	if (!rdata) {
 		return kr_error(EINVAL);
 	}
 
-	/* Build RDATA */
-	size_t addr_len = kr_inaddr_len((struct sockaddr *)&ss);
-	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr((struct sockaddr *)&ss);
-	/* @warning _NOT_ thread-safe */
-	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
-	knot_rdata_init(rdata_arr, addr_len, raw_addr, 0);
-	return kr_zonecut_add(hints, key, rdata_arr);
+	return kr_zonecut_add(hints, key, rdata);
+}
+
+/** For a given name, remove either one address or all of them (if == NULL). */
+static int del_pair(struct kr_zonecut *hints, const char *name, const char *addr)
+{
+	/* Build key */
+	knot_dname_t key[KNOT_DNAME_MAXLEN];
+	if (!knot_dname_from_str(key, name, sizeof(key))) {
+		return kr_error(EINVAL);
+	}
+
+        if (addr) {
+		/* Remove the pair. */
+		const knot_rdata_t *rdata = addr2rdata(addr);
+		if (!rdata) {
+			return kr_error(EINVAL);
+		}
+		return kr_zonecut_del(hints, key, rdata);
+	} else {
+		/* Remove the whole name. */
+		return kr_zonecut_del_all(hints, key);
+	}
 }
 
 static int load_map(struct kr_zonecut *hints, FILE *fp)
@@ -327,6 +357,25 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	return result;
 }
 
+static char* hint_del(void *env, struct kr_module *module, const char *args)
+{
+	struct kr_zonecut *hints = module->data;
+	auto_free char *args_copy = strdup(args);
+
+	int ret = -1;
+	char *addr = strchr(args_copy, ' ');
+	if (addr) {
+		*addr = '\0';
+		++addr;
+	}
+	ret = del_pair(hints, args_copy, addr);
+
+	char *result = NULL;
+	if (-1 == asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false"))
+		result = NULL;
+	return result;
+}
+
 /** @internal Pack address list into JSON array. */
 static JsonNode *pack_addrs(pack_t *pack)
 {
@@ -345,8 +394,9 @@ static JsonNode *pack_addrs(pack_t *pack)
 	return root;
 }
 
+static char* pack_hints(struct kr_zonecut *hints);
 /**
- * Retrieve address hint for given name.
+ * Retrieve address hints, either for given name or for all names.
  *
  * Input:  name
  * Output: { address1, address2, ... }
@@ -354,6 +404,11 @@ static JsonNode *pack_addrs(pack_t *pack)
 static char* hint_get(void *env, struct kr_module *module, const char *args)
 {
 	struct kr_zonecut *hints = module->data;
+
+	if (!args) {
+		return pack_hints(hints);
+	}
+
 	knot_dname_t key[KNOT_DNAME_MAXLEN];
 	pack_t *pack = NULL;
 	if (knot_dname_from_str(key, args, sizeof(key))) {
@@ -384,6 +439,17 @@ static int pack_hint(const char *k, void *v, void *baton)
 	}
 	json_append_member(root_node, nsname_str, addr_list);
 	return kr_ok();
+}
+
+/** @internal Pack all hints into serialized JSON. */
+static char* pack_hints(struct kr_zonecut *hints) {
+	char *result = NULL;
+	JsonNode *root_node = json_mkobject();
+	if (map_walk(&hints->nsset, pack_hint, root_node) == 0) {
+		result = json_encode(root_node);
+	}
+	json_delete(root_node);
+	return result;
 }
 
 static void unpack_hint(struct kr_zonecut *root_hints, JsonNode *table, const char *name)
@@ -418,13 +484,7 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 		json_delete(root_node);
 	}
 	/* Return current root hints */
-	char *result = NULL;
-	JsonNode *root_node = json_mkobject();
-	if (map_walk(&root_hints->nsset, pack_hint, root_node) == 0) {
-		result = json_encode(root_node);
-	}
-	json_delete(root_node);
-	return result;
+	return pack_hints(root_hints);
 }
 
 /*
@@ -471,6 +531,7 @@ struct kr_prop *hints_props(void)
 {
 	static struct kr_prop prop_list[] = {
 	    { &hint_set,    "set", "Set {name, address} hint.", },
+	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
 	    { &hint_get,    "get", "Retrieve hint for given name.", },
 	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
 	    { NULL, NULL, NULL }
