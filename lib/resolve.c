@@ -486,6 +486,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	const knot_dname_t *qname = knot_pkt_qname(packet);
 	uint16_t qclass = knot_pkt_qclass(packet);
 	uint16_t qtype = knot_pkt_qtype(packet);
+	bool cd_is_set = knot_wire_get_cd(packet->wire);
 	struct kr_query *qry = NULL;
 
 	if (qname != NULL) {
@@ -516,7 +517,10 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	knot_wire_clear_aa(answer->wire);
 	knot_wire_set_ra(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
-	if (qry->flags & QUERY_DNSSEC_WANT) {
+
+	if (cd_is_set) {
+		knot_wire_set_cd(answer->wire);
+	} else if (qry->flags & QUERY_DNSSEC_WANT) {
 		knot_wire_set_ad(answer->wire);
 	}
 
@@ -721,8 +725,11 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
 	/* Enable DNSSEC if enters a new island of trust. */
-	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT);
-	if (!want_secured && kr_ta_get(trust_anchors, qry->zone_cut.name)) {
+	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT) &&
+			    !knot_wire_get_cd(request->answer->wire);
+	if (!(qry->flags & QUERY_DNSSEC_WANT) &&
+	    !knot_wire_get_cd(request->answer->wire) &&
+	    kr_ta_get(trust_anchors, qry->zone_cut.name)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 		want_secured = true;
 		WITH_DEBUG {

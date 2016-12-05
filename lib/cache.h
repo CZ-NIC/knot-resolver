@@ -39,15 +39,16 @@ enum kr_cache_tag {
 enum kr_cache_rank {
 	KR_RANK_BAD       = 0,  /* BAD cache, do not use. */ 
 	KR_RANK_INSECURE  = 1,  /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
-	KR_RANK_NONAUTH   = 8,  /* Entry from authority section (i.e. parent-side) */
-	KR_RANK_AUTH      = 16, /* Entry from answer (authoritative data) */
+	KR_RANK_EXTRA     = 4,  /* Entry from additional section. */
+	KR_RANK_NONAUTH   = 8,  /* Entry from authority section (i.e. parent-side). */
+	KR_RANK_AUTH      = 16, /* Entry from answer (authoritative data). */
 	KR_RANK_SECURE    = 32, /* Entry is DNSSEC valid (e.g. RRSIG exists). */
 	/* @note Rank must not exceed 6 bits */
 };
 
 /** Cache entry flags */
 enum kr_cache_flag {
-	KR_CACHE_FLAG_NONE	      = 0,
+	KR_CACHE_FLAG_NONE	  = 0,
 	KR_CACHE_FLAG_WCARD_PROOF = 1, /* Entry contains either packet with wildcard
 	                                * answer either record for which wildcard
 	                                * expansion proof is needed */

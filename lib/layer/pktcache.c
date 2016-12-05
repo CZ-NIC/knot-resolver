@@ -48,12 +48,14 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 
 /** @internal Try to find a shortcut directly to searched packet. */
 static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
-			 struct kr_query *qry, uint8_t *flags)
+			 struct kr_request *req, uint8_t *flags)
 {
+	struct kr_query *qry = req->current_query;
 	uint32_t timestamp = qry->timestamp.tv_sec;
 	const knot_dname_t *qname = qry->sname;
 	uint16_t rrtype = qry->stype;
-	const bool want_secure = (qry->flags & QUERY_DNSSEC_WANT);
+	const bool want_secure = (qry->flags & QUERY_DNSSEC_WANT) &&
+				 !knot_wire_get_cd(req->answer->wire);
 
 	struct kr_cache_entry *entry = NULL;
 	int ret = kr_cache_peek(cache, KR_CACHE_PKT, qname,
@@ -105,8 +107,10 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 
 static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_query *qry = ctx->req->current_query;
-	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) ||
+	    (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
 	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
@@ -118,8 +122,8 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Fetch either answer to original or minimized query */
 	uint8_t flags = 0;
-	struct kr_cache *cache = &ctx->req->ctx->cache;
-	int ret = loot_pktcache(cache, pkt, qry, &flags);
+	struct kr_cache *cache = &req->ctx->cache;
+	int ret = loot_pktcache(cache, pkt, req, &flags);
 	if (ret == 0) {
 		DEBUG_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
@@ -174,7 +178,8 @@ static uint32_t packet_ttl(knot_pkt_t *pkt, bool is_negative)
 
 static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	struct kr_query *qry = ctx->req->current_query;
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
 	/* Cache only answers that make query resolved (i.e. authoritative)
 	 * that didn't fail during processing and are negative. */
 	if (qry->flags & QUERY_CACHED || ctx->state & KR_STATE_FAIL) {
@@ -199,6 +204,7 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qname) {
 		return ctx->state;
 	}
+
 	knot_db_val_t data = { pkt->wire, pkt->size };
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,
@@ -208,11 +214,17 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		.count = data.len
 	};
 
-	/* Set cache rank */
-	if (qry->flags & QUERY_DNSSEC_WANT) {
-		header.rank = KR_RANK_SECURE;
-	} else if (qry->flags & QUERY_DNSSEC_INSECURE) {
-		header.rank = KR_RANK_INSECURE;
+	/* Set cache rank.
+	 * If cd bit is set rank remains BAD.
+	 * Otherwise - depends on flags. */
+	if (!knot_wire_get_cd(req->answer->wire)) {
+		if (qry->flags & QUERY_DNSSEC_WANT) {
+			/* DNSSEC valid entry */
+			header.rank = KR_RANK_SECURE;
+		} else {
+			/* Don't care about DNSSEC */
+			header.rank = KR_RANK_INSECURE;
+		}
 	}
 
 	/* Set cache flags */

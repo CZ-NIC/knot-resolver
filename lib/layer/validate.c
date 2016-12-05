@@ -390,6 +390,10 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_STUB)) {
 		return ctx->state;
 	}
+	/* Pass-through if CD bit is set. */
+	if (knot_wire_get_cd(req->answer->wire)) {
+		return ctx->state;
+	}
 	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */
 	bool use_signatures = (knot_pkt_qtype(pkt) != KNOT_RRTYPE_RRSIG);
 	if (!(qry->flags & QUERY_CACHED) && !knot_pkt_has_dnssec(pkt) && !use_signatures) {
