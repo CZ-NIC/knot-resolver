@@ -46,11 +46,18 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 	}
 }
 
-static int loot_cache_pkt(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *qname,
-                          uint16_t rrtype, bool want_secure, uint32_t timestamp, uint8_t *flags)
+/** @internal Try to find a shortcut directly to searched packet. */
+static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
+			 struct kr_query *qry, uint8_t *flags)
 {
+	uint32_t timestamp = qry->timestamp.tv_sec;
+	const knot_dname_t *qname = qry->sname;
+	uint16_t rrtype = qry->stype;
+	const bool want_secure = (qry->flags & QUERY_DNSSEC_WANT);
+
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cache_peek(cache, KR_CACHE_PKT, qname, rrtype, &entry, &timestamp);
+	int ret = kr_cache_peek(cache, KR_CACHE_PKT, qname,
+				rrtype, &entry, &timestamp);
 	if (ret != 0) { /* Not in the cache */
 		return ret;
 	}
@@ -58,6 +65,12 @@ static int loot_cache_pkt(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dn
 	/* Check that we have secure rank. */
 	if (want_secure && entry->rank == KR_RANK_BAD) {
 		return kr_error(ENOENT);
+	}
+
+	/* Check if entry is insecure and setup query flags if needed. */
+	if (want_secure && entry->rank == KR_RANK_INSECURE) {
+		qry->flags |= QUERY_DNSSEC_INSECURE;
+		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
 
 	/* Copy answer, keep the original message id */
@@ -88,16 +101,6 @@ static int loot_cache_pkt(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dn
 	}
 
 	return ret;
-}
-
-/** @internal Try to find a shortcut directly to searched packet. */
-static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt, struct kr_query *qry, uint8_t *flags)
-{
-	uint32_t timestamp = qry->timestamp.tv_sec;
-	const knot_dname_t *qname = qry->sname;
-	uint16_t rrtype = qry->stype;
-	const bool want_secure = (qry->flags & QUERY_DNSSEC_WANT);
-	return loot_cache_pkt(cache, pkt, qname, rrtype, want_secure, timestamp, flags);
 }
 
 static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
