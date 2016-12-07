@@ -19,7 +19,7 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 
-#ifndef NDEBUG
+#ifndef NLOGDEBUG
  /** @internal Print a debug message related to resolution. */
  #define QRDEBUG(query, cls, fmt, ...) do { \
     unsigned _ind = 0; \

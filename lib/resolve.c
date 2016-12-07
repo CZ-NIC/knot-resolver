@@ -1032,7 +1032,7 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
-#ifndef NDEBUG
+#ifndef NLOGDEBUG
 	struct kr_rplan *rplan = &request->rplan;
 #endif
 	/* Finalize answer */

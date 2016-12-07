@@ -31,7 +31,7 @@
  */
 #define kr_log_info(fmt, ...) do { printf((fmt), ## __VA_ARGS__); fflush(stdout); } while(0)
 #define kr_log_error(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__)
-#ifndef NDEBUG
+#ifndef NLOGDEBUG
 /* Toggle debug messages */
 KR_EXPORT bool kr_debug_set(bool status);
 KR_EXPORT KR_PURE bool kr_debug_status(void);
