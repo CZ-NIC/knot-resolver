@@ -21,11 +21,11 @@
 
 #ifndef NLOGDEBUG
  /** @internal Print a debug message related to resolution. */
- #define QRDEBUG(query, cls, fmt, ...) do { \
+ #define QRDEBUG(query, cls, fmt, ...) WITH_DEBUG { \
     unsigned _ind = 0; \
     for (struct kr_query *q = (query); q; q = q->parent, _ind += 2); \
     kr_log_debug("[%s] %*s" fmt, cls, _ind, "", ##  __VA_ARGS__); \
-    } while (0)
+    }
 #else
  #define QRDEBUG(query, cls, fmt, ...)
 #endif

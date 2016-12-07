@@ -31,19 +31,27 @@
  */
 #define kr_log_info(fmt, ...) do { printf((fmt), ## __VA_ARGS__); fflush(stdout); } while(0)
 #define kr_log_error(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__)
-#ifndef NLOGDEBUG
-/* Toggle debug messages */
+
+/* Always export these, but override direct calls by macros conditionally. */
+/** Whether in --verbose mode.  Only use this for reading. */
+KR_EXPORT extern bool kr_debug_do_log;
+
+/** Set --verbose mode.  Not available if compiled with -DNLOGDEBUG. */
 KR_EXPORT bool kr_debug_set(bool status);
-KR_EXPORT KR_PURE bool kr_debug_status(void);
+
+/** Log a message if in --verbose mode. */
 KR_EXPORT void kr_log_debug(const char *fmt, ...);
-/* Debug block */
-#define WITH_DEBUG if(__builtin_expect(kr_debug_status(), 0))
-#else
-#define kr_debug_status() false
+
+#ifdef NLOGDEBUG
+/* Efficient compile-time disabling of debugging messages. */
+#define kr_debug_do_log false
 #define kr_debug_set(x)
-#define kr_log_debug(fmt, ...)
-#define WITH_DEBUG if(0)
 #endif
+
+/** Block run in --verbose mode; optimized when not run. */
+#define WITH_DEBUG if(__builtin_expect(kr_debug_do_log, false))
+#define kr_log_debug WITH_DEBUG kr_log_debug
+
 
 /* C11 compatibility, but without any implementation so far. */
 #ifndef static_assert
