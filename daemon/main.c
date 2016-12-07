@@ -298,7 +298,11 @@ static void help(int argc, char *argv[])
 	       " -k, --keyfile=[path] File containing trust anchors (DS or DNSKEY).\n"
 	       " -f, --forks=N        Start N forks sharing the configuration.\n"
 	       " -q, --quiet          Quiet output, no prompt in interactive mode.\n"
-	       " -v, --verbose        Run in verbose mode.\n"
+	       " -v, --verbose        Run in verbose mode."
+#ifdef NLOGDEBUG
+	           " (Recompile without -DNLOGDEBUG to activate.)"
+#endif
+	           "\n"
 	       " -V, --version        Print version of the server.\n"
 	       " -h, --help           Print help and usage.\n"
 	       "Options:\n"
@@ -456,6 +460,9 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			kr_debug_set(true);
+#ifdef NLOGDEBUG
+			kr_log_info("--verbose flag has no effect due to compilation with -DNLOGDEBUG.\n");
+#endif
 			break;
 		case 'q':
 			g_quiet = true;
