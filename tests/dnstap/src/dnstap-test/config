@@ -1,0 +1,10 @@
+verbose(true)
+modules = {
+	'hints',
+	dnstap = {
+		sockPath = "/tmp/dnstap.sock",
+	}
+}
+hints['fake1.localdomain'] = '1.2.3.4'
+hints['fake2.localdomain'] = '1.2.3.5'
+hints['fake3.localdomain'] = '1.2.3.6'
