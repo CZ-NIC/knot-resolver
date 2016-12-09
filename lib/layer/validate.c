@@ -388,6 +388,21 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Pass-through if user doesn't want secure answer or stub. */
 	/* @todo: Validating stub resolver mode. */
 	if (!(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_STUB)) {
+		/* Got validated insecure answer from cache
+		   Mark parent(s) as insecure */
+		if ((qry->flags & (QUERY_CACHED | QUERY_DNSSEC_INSECURE)) ==
+		    (QUERY_CACHED | QUERY_DNSSEC_INSECURE) &&
+		    qry->parent != NULL) {
+			/* if there is a chain of DS queries, mark all of them */
+			struct kr_query *parent = qry->parent;
+			do {
+				parent->flags &= ~QUERY_DNSSEC_WANT;
+				parent->flags |= QUERY_DNSSEC_INSECURE;
+				parent = parent->parent;
+			} while (parent && parent->stype == KNOT_RRTYPE_DS);
+			DEBUG_MSG(qry, "<= cached insecure response, going insecure\n");
+			ctx->state = KR_STATE_DONE;
+		}
 		return ctx->state;
 	}
 	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */
