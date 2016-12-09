@@ -402,8 +402,11 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
 		pending_cname = NULL;
-		/* If not secure, always follow cname chain. */
-		can_follow = !(query->flags & QUERY_DNSSEC_WANT) || (query->flags & QUERY_STUB);
+		/* If not secure or validation is disabled,
+		 * always follow cname chain. */
+		can_follow = !(query->flags & QUERY_DNSSEC_WANT) ||
+			     knot_wire_get_cd(req->answer->wire) ||
+			     (query->flags & QUERY_STUB);
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 			if (!knot_dname_is_equal(rr->owner, cname)) {
