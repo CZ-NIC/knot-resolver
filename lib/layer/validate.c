@@ -35,7 +35,7 @@
 #include "lib/defines.h"
 #include "lib/module.h"
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "vldr", fmt)
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "vldr", fmt)
 
 /**
  * Search in section for given type.
@@ -141,7 +141,7 @@ fail:
 static int validate_records(struct kr_query *qry, knot_pkt_t *answer, knot_mm_t *pool, bool has_nsec3)
 {
 	if (!qry->zone_cut.key) {
-		DEBUG_MSG(qry, "<= no DNSKEY, can't validate\n");
+		VERBOSE_MSG(qry, "<= no DNSKEY, can't validate\n");
 		return kr_error(EBADMSG);
 	}
 
@@ -271,14 +271,14 @@ static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 	assert(parent);
 	switch(answer_type) {
 	case KNOT_RRTYPE_DNSKEY:
-		DEBUG_MSG(qry, "<= parent: updating DNSKEY\n");
+		VERBOSE_MSG(qry, "<= parent: updating DNSKEY\n");
 		parent->zone_cut.key = knot_rrset_copy(qry->zone_cut.key, parent->zone_cut.pool);
 		if (!parent->zone_cut.key) {
 			return KR_STATE_FAIL;
 		}
 		break;
 	case KNOT_RRTYPE_DS:
-		DEBUG_MSG(qry, "<= parent: updating DS\n");
+		VERBOSE_MSG(qry, "<= parent: updating DS\n");
 		if (qry->flags & QUERY_DNSSEC_INSECURE) { /* DS non-existence proven. */
 			do {
 				parent->flags &= ~QUERY_DNSSEC_WANT;
@@ -345,10 +345,10 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 			}
 		}
 		if (ret != 0) {
-			DEBUG_MSG(qry, "<= bogus proof of DS non-existence\n");
+			VERBOSE_MSG(qry, "<= bogus proof of DS non-existence\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 		} else {
-			DEBUG_MSG(qry, "<= DS doesn't exist, going insecure\n");
+			VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 			qry->flags &= ~QUERY_DNSSEC_WANT;
 			qry->flags |= QUERY_DNSSEC_INSECURE;
 		}
@@ -356,7 +356,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 	}
 
 	/* Extend trust anchor */
-	DEBUG_MSG(qry, "<= DS: OK\n");
+	VERBOSE_MSG(qry, "<= DS: OK\n");
 	cut->trust_anchor = new_ds;
 	return ret;
 }
@@ -388,6 +388,21 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Pass-through if user doesn't want secure answer or stub. */
 	/* @todo: Validating stub resolver mode. */
 	if (!(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_STUB)) {
+		/* Got validated insecure answer from cache
+		   Mark parent(s) as insecure */
+		if ((qry->flags & (QUERY_CACHED | QUERY_DNSSEC_INSECURE)) ==
+		    (QUERY_CACHED | QUERY_DNSSEC_INSECURE) &&
+		    qry->parent != NULL) {
+			/* if there is a chain of DS queries, mark all of them */
+			struct kr_query *parent = qry->parent;
+			do {
+				parent->flags &= ~QUERY_DNSSEC_WANT;
+				parent->flags |= QUERY_DNSSEC_INSECURE;
+				parent = parent->parent;
+			} while (parent && parent->stype == KNOT_RRTYPE_DS);
+			VERBOSE_MSG(qry, "<= cached insecure response, going insecure\n");
+			ctx->state = KR_STATE_DONE;
+		}
 		return ctx->state;
 	}
 	/* Pass-through if CD bit is set. */
@@ -397,7 +412,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */
 	bool use_signatures = (knot_pkt_qtype(pkt) != KNOT_RRTYPE_RRSIG);
 	if (!(qry->flags & QUERY_CACHED) && !knot_pkt_has_dnssec(pkt) && !use_signatures) {
-		DEBUG_MSG(qry, "<= got insecure response\n");
+		VERBOSE_MSG(qry, "<= got insecure response\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
 		return KR_STATE_FAIL;
 	}
@@ -412,7 +427,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (ctx->state == KR_STATE_YIELD) { /* Already yielded for revalidation. */
 			return KR_STATE_FAIL;
 		}
-		DEBUG_MSG(qry, ">< cut changed, needs revalidation\n");
+		VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
 		if (!signer) {
 			/* Not a DNSSEC-signed response, ask parent for DS to prove transition to INSECURE. */
 		} else if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
@@ -439,7 +454,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
 		ret = validate_keyset(qry, pkt, has_nsec3);
 		if (ret != 0) {
-			DEBUG_MSG(qry, "<= bad keys, broken trust chain\n");
+			VERBOSE_MSG(qry, "<= bad keys, broken trust chain\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KR_STATE_FAIL;
 		}
@@ -454,7 +469,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}
 		if (ret != 0) {
-			DEBUG_MSG(qry, "<= bad NXDOMAIN proof\n");
+			VERBOSE_MSG(qry, "<= bad NXDOMAIN proof\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KR_STATE_FAIL;
 		}
@@ -477,11 +492,11 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 			if (ret != 0) {
 				if (has_nsec3 && (ret == kr_error(DNSSEC_NOT_FOUND))) {
-					DEBUG_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
+					VERBOSE_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
 					qry->flags &= ~QUERY_DNSSEC_WANT;
 					qry->flags |= QUERY_DNSSEC_INSECURE;
 				} else {
-					DEBUG_MSG(qry, "<= bad NODATA proof\n");
+					VERBOSE_MSG(qry, "<= bad NODATA proof\n");
 					qry->flags |= QUERY_DNSSEC_BOGUS;
 					return KR_STATE_FAIL;
 				}
@@ -494,7 +509,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags & QUERY_CACHED)) {
 		ret = validate_records(qry, pkt, req->rplan.pool, has_nsec3);
 		if (ret != 0) {
-			DEBUG_MSG(qry, "<= couldn't validate RRSIGs\n");
+			VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KR_STATE_FAIL;
 		}
@@ -521,7 +536,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return KR_STATE_FAIL;
 		}
 	}
-	DEBUG_MSG(qry, "<= answer valid, OK\n");
+	VERBOSE_MSG(qry, "<= answer valid, OK\n");
 	return KR_STATE_DONE;
 }
 /** Module implementation. */
@@ -541,4 +556,4 @@ int validate_init(struct kr_module *module)
 
 KR_MODULE_EXPORT(validate)
 
-#undef DEBUG_MSG
+#undef VERBOSE_MSG

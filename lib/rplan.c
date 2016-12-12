@@ -23,7 +23,7 @@
 #include "lib/defines.h"
 #include "lib/layer.h"
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "plan",  fmt)
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "plan",  fmt)
 #define QUERY_PROVIDES(q, name, cls, type) \
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
@@ -151,8 +151,8 @@ struct kr_query *kr_rplan_push_empty(struct kr_rplan *rplan, struct kr_query *pa
 		return NULL;
 	}
 
-	WITH_DEBUG {
-	DEBUG_MSG(parent, "plan '%s' type '%s'\n", "", "");
+	WITH_VERBOSE {
+	VERBOSE_MSG(parent, "plan '%s' type '%s'\n", "", "");
 	}
 	return qry;
 }
@@ -172,11 +172,11 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	qry->sclass = cls;
 	qry->stype = type;
 
-	WITH_DEBUG {
+	WITH_VERBOSE {
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 	knot_dname_to_str(name_str, name, sizeof(name_str));
 	knot_rrtype_to_string(type, type_str, sizeof(type_str));
-	DEBUG_MSG(parent, "plan '%s' type '%s'\n", name_str, type_str);
+	VERBOSE_MSG(parent, "plan '%s' type '%s'\n", name_str, type_str);
 	}
 	return qry;
 }
@@ -223,4 +223,4 @@ struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan)
 	return array_tail(rplan->resolved);
 }
 
-#undef DEBUG_MSG
+#undef VERBOSE_MSG

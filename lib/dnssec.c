@@ -35,8 +35,6 @@
 #include "lib/dnssec/signature.h"
 #include "lib/dnssec.h"
 
-#define DEBUG_MSG(fmt...) fprintf(stderr, fmt)
-
 void kr_crypto_init(void)
 {
 	dnssec_crypto_init();
@@ -378,6 +376,3 @@ void kr_dnssec_key_free(struct dseckey **key)
 	dnssec_key_free((dnssec_key_t *) *key);
 	*key = NULL;
 }
-
-#undef DEBUG_MSG
-

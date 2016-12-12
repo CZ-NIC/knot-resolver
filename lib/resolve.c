@@ -35,7 +35,7 @@
 #define KNOT_EDNS_OPTION_COOKIE 10
 #endif /* defined(ENABLE_COOKIES) */
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), "resl",  fmt)
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "resl",  fmt)
 
 /**
  * @internal Defer execution of current query.
@@ -186,7 +186,7 @@ static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t
 			check_empty_nonterms(qry, pkt, cache, qry->timestamp.tv_sec);
 			/* Go insecure if the zone cut is provably insecure */
 			if ((qry->flags & QUERY_DNSSEC_WANT) && !secured) {
-				DEBUG_MSG(qry, "=> NS is provably without DS, going insecure\n");
+				VERBOSE_MSG(qry, "=> NS is provably without DS, going insecure\n");
 				qry->flags &= ~QUERY_DNSSEC_WANT;
 				qry->flags |= QUERY_DNSSEC_INSECURE;
 			}
@@ -223,13 +223,13 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
 		/* Fall back to SBELT if root server query fails. */
 		if (!next_type && qry->zone_cut.name[0] == '\0') {
-			DEBUG_MSG(qry, "=> fallback to root hints\n");
+			VERBOSE_MSG(qry, "=> fallback to root hints\n");
 			kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
 			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
 			return kr_error(EAGAIN);
 		}
 		/* No IPv4 nor IPv6, flag server as unuseable. */
-		DEBUG_MSG(qry, "=> unresolvable NS address, bailing out\n");
+		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
 		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
 		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 		invalidate_ns(rplan, qry);
@@ -567,10 +567,10 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 		/* If this address is the source of the answer, update its RTT */
 		if (kr_inaddr_equal(src, addr)) {
 			kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_UPDATE);
-			WITH_DEBUG {
+			WITH_VERBOSE {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-				DEBUG_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, elapsed);
+				VERBOSE_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, elapsed);
 			}
 		} else {
 			/* Response didn't come from this IP, but we know the RTT must be at least
@@ -579,10 +579,10 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 			 * that 'b' didn't respond for at least 350 - (1 * 300) ms. We can't say that
 			 * its RTT is 50ms, but we can say that its score shouldn't be less than 50. */
 			 kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_MAX);
-			 WITH_DEBUG {
+			 WITH_VERBOSE {
 			 	char addr_str[INET6_ADDRSTRLEN];
 			 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-			 	DEBUG_MSG(qry, "<= server: '%s' rtt: >=%ld ms\n", addr_str, elapsed);
+			 	VERBOSE_MSG(qry, "<= server: '%s' rtt: >=%ld ms\n", addr_str, elapsed);
 			 }
 		}
 		/* Subtract query start time from elapsed time */
@@ -610,10 +610,10 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	/* Penalise resolution failures except validation failures. */
 	} else if (!(qry->flags & QUERY_DNSSEC_BOGUS)) {
 		kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt, KR_NS_RESET);
-		WITH_DEBUG {
+		WITH_VERBOSE {
 			char addr_str[INET6_ADDRSTRLEN];
 			inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
-			DEBUG_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
+			VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
 		}
 	}
 }
@@ -721,7 +721,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
-		DEBUG_MSG(qry, ">< negative TA, going insecure\n");
+		VERBOSE_MSG(qry, ">< negative TA, going insecure\n");
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
 	/* Enable DNSSEC if enters a new island of trust. */
@@ -732,10 +732,10 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	    kr_ta_get(trust_anchors, qry->zone_cut.name)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 		want_secured = true;
-		WITH_DEBUG {
+		WITH_VERBOSE {
 		char qname_str[KNOT_DNAME_MAXLEN];
 		knot_dname_to_str(qname_str, qry->zone_cut.name, sizeof(qname_str));
-		DEBUG_MSG(qry, ">< TA: '%s'\n", qname_str);
+		VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
 		}
 	}
 	if (want_secured && !qry->zone_cut.trust_anchor) {
@@ -799,7 +799,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 				if (ret != 0) {
 					return KR_STATE_FAIL;
 				}
-				DEBUG_MSG(qry, "=> using root hints\n");
+				VERBOSE_MSG(qry, "=> using root hints\n");
 				qry->flags &= ~QUERY_AWAIT_CUT;
 				return KR_STATE_DONE;
 			} else {
@@ -837,7 +837,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		case KR_STATE_DONE: return KR_STATE_PRODUCE;
 		default: break;
 		}
-		DEBUG_MSG(qry, "=> resuming yielded answer\n");
+		VERBOSE_MSG(qry, "=> resuming yielded answer\n");
 		struct kr_layer_pickle *pickle = qry->deferred;
 		request->state = KR_STATE_YIELD;
 		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
@@ -877,7 +877,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 	/* This query has RD=0 or is ANY, stop here. */
 	if (qry->stype == KNOT_RRTYPE_ANY || !knot_wire_get_rd(request->answer->wire)) {
-		DEBUG_MSG(qry, "=> qtype is ANY or RD=0, bail out\n");
+		VERBOSE_MSG(qry, "=> qtype is ANY or RD=0, bail out\n");
 		return KR_STATE_FAIL;
 	}
 
@@ -898,7 +898,7 @@ ns_election:
 	 * elect best address only, otherwise elect a completely new NS.
 	 */
 	if(++ns_election_iter >= KR_ITER_LIMIT) {
-		DEBUG_MSG(qry, "=> couldn't converge NS selection, bail out\n");
+		VERBOSE_MSG(qry, "=> couldn't converge NS selection, bail out\n");
 		return KR_STATE_FAIL;
 	}
 
@@ -913,7 +913,7 @@ ns_election:
 		}
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
-			DEBUG_MSG(qry, "=> no valid NS left\n");
+			VERBOSE_MSG(qry, "=> no valid NS left\n");
 			ITERATE_LAYERS(request, qry, reset);
 			kr_rplan_pop(rplan, qry);
 			return KR_STATE_PRODUCE;
@@ -1015,7 +1015,7 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 		return kr_error(EINVAL);
 	}
 
-	WITH_DEBUG {
+	WITH_VERBOSE {
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[INET6_ADDRSTRLEN], type_str[16];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
 	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
@@ -1029,7 +1029,7 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 			continue;
 		}
 		inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr[i]), ns_str, sizeof(ns_str));
-		DEBUG_MSG(qry, "=> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s' proto: '%s'\n",
+		VERBOSE_MSG(qry, "=> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s' proto: '%s'\n",
 			ns_str, qry->ns.score, zonecut_str, qname_str, type_str, (qry->flags & QUERY_TCP) ? "tcp" : "udp");
 		break;
 	}}
@@ -1039,7 +1039,7 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
-#ifndef NDEBUG
+#ifndef NOVERBOSELOG
 	struct kr_rplan *rplan = &request->rplan;
 #endif
 	/* Finalize answer */
@@ -1056,7 +1056,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 
 	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
-	DEBUG_MSG(NULL, "finished: %d, queries: %zu, mempool: %zu B\n",
+	VERBOSE_MSG(NULL, "finished: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
 	return KR_STATE_DONE;
 }
@@ -1077,5 +1077,4 @@ knot_mm_t *kr_resolve_pool(struct kr_request *request)
 	return NULL;
 }
 
-#undef DEBUG_MSG
-
+#undef VERBOSE_MSG

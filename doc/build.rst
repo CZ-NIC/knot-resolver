@@ -100,7 +100,9 @@ When you have all the dependencies ready, you can build and install.
    $ make PREFIX="/usr/local"
    $ make install PREFIX="/usr/local"
 
-.. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path. If you build the binary with ``-DNDEBUG``, verbose logging will be disabled as well.
+.. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path.
+    Production code should be compiled with ``-DNDEBUG``.
+    If you build the binary with ``-DNOVERBOSELOG``, verbose logging will be disabled as well.
 
 Alternatively you can build only specific parts of the project, i.e. ``library``.
 
