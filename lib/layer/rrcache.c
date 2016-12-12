@@ -30,7 +30,7 @@
 #include "lib/utils.h"
 #include "lib/resolve.h"
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), " rc ",  fmt)
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), " rc ",  fmt)
 #define DEFAULT_MINTTL (5) /* Short-time "no data" retention to avoid bursts */
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
@@ -139,7 +139,7 @@ static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 	if (ret == 0) {
-		DEBUG_MSG(qry, "=> satisfied from cache\n");
+		VERBOSE_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 		pkt->parsed = pkt->size;
 		knot_wire_set_qr(pkt->wire);
@@ -305,12 +305,12 @@ static int stash_answer(struct kr_query *qry, knot_pkt_t *pkt, map_t *stash, kno
 					char key[KR_RRKEY_LEN];
 					int ret = kr_rrkey(key, next_cname, rr->type, KR_RANK_AUTH);
 					if (ret != 0 || map_get(stash, key)) {
-						DEBUG_MSG(qry, "<= cname chain loop\n");
+						VERBOSE_MSG(qry, "<= cname chain loop\n");
 						next_cname = NULL;
 					}
 				}
 				if (cname_chain_len > answer->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
-					DEBUG_MSG(qry, "<= too long cname chain\n");
+					VERBOSE_MSG(qry, "<= too long cname chain\n");
 					next_cname = NULL;
 				}
 			}
@@ -388,4 +388,4 @@ const kr_layer_api_t *rrcache_layer(struct kr_module *module)
 
 KR_MODULE_EXPORT(rrcache)
 
-#undef DEBUG_MSG
+#undef VERBOSE_MSG

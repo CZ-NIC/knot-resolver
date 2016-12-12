@@ -35,12 +35,12 @@
 
 
 /* Always compile-in log symbols, even if disabled. */
-#undef kr_debug_do_log
-#undef kr_debug_set
-#undef kr_log_debug
+#undef kr_verbose_do_log
+#undef kr_verbose_set
+#undef kr_log_verbose
 
 /* Logging & debugging */
-bool kr_debug_do_log = false;
+bool kr_verbose_do_log = false;
 
 /** @internal CSPRNG context */
 static isaac_ctx ISAAC;
@@ -71,17 +71,17 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
  * Cleanup callbacks.
  */
 
-bool kr_debug_set(bool status)
+bool kr_verbose_set(bool status)
 {
-#ifndef NLOGDEBUG
-	kr_debug_do_log = status;
+#ifndef NOVERBOSELOG
+	kr_verbose_do_log = status;
 #endif
-	return kr_debug_do_log;
+	return kr_verbose_do_log;
 }
 
-void kr_log_debug(const char *fmt, ...)
+void kr_log_verbose(const char *fmt, ...)
 {
-	if (kr_debug_do_log) {
+	if (kr_verbose_do_log) {
 		va_list args;
 		va_start(args, fmt);
 		vprintf(fmt, args);

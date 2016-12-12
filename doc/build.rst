@@ -102,7 +102,7 @@ When you have all the dependencies ready, you can build and install.
 
 .. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path.
     Production code should be compiled with ``-DNDEBUG``.
-    If you build the binary with ``-DNLOGDEBUG``, verbose logging will be disabled as well.
+    If you build the binary with ``-DNOVERBOSELOG``, verbose logging will be disabled as well.
 
 Alternatively you can build only specific parts of the project, i.e. ``library``.
 

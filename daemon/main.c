@@ -299,8 +299,8 @@ static void help(int argc, char *argv[])
 	       " -f, --forks=N        Start N forks sharing the configuration.\n"
 	       " -q, --quiet          Quiet output, no prompt in interactive mode.\n"
 	       " -v, --verbose        Run in verbose mode."
-#ifdef NLOGDEBUG
-	           " (Recompile without -DNLOGDEBUG to activate.)"
+#ifdef NOVERBOSELOG
+	           " (Recompile without -DNOVERBOSELOG to activate.)"
 #endif
 	           "\n"
 	       " -V, --version        Print version of the server.\n"
@@ -347,7 +347,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	}
 	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 
-	tls_setup_logging(kr_debug_do_log);
+	tls_setup_logging(kr_verbose_do_log);
 	/* Notify supervisor. */
 #ifdef HAS_SYSTEMD
 	sd_notify(0, "READY=1");
@@ -459,9 +459,9 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'v':
-			kr_debug_set(true);
-#ifdef NLOGDEBUG
-			kr_log_info("--verbose flag has no effect due to compilation with -DNLOGDEBUG.\n");
+			kr_verbose_set(true);
+#ifdef NOVERBOSELOG
+			kr_log_info("--verbose flag has no effect due to compilation with -DNOVERBOSELOG.\n");
 #endif
 			break;
 		case 'q':

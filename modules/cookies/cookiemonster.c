@@ -32,7 +32,7 @@
 #include "lib/rplan.h"
 #include "modules/cookies/cookiemonster.h"
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "cookies",  fmt)
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "cookies",  fmt)
 
 /**
  * Obtain address from query/response context if if can be obtained.
@@ -185,7 +185,7 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 	                                     &pkt_cc, &pkt_cc_len,
 	                                     &pkt_sc, &pkt_sc_len);
 	if (ret != KNOT_EOK || !pkt_sc) {
-		DEBUG_MSG(NULL, "%s\n",
+		VERBOSE_MSG(NULL, "%s\n",
 		          "got malformed DNS cookie or server cookie missing");
 		return false;
 	}
@@ -196,7 +196,7 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 	ret = srvr_sockaddr_cc_check(srvr_sockaddr, pkt_cc, pkt_cc_len,
 	                             clnt_sett);
 	if (ret < 0) {
-		DEBUG_MSG(NULL, "%s\n", "could not match received cookie");
+		VERBOSE_MSG(NULL, "%s\n", "could not match received cookie");
 		return false;
 	}
 	assert(srvr_sockaddr);
@@ -206,9 +206,9 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 	    !is_cookie_cached(cache, srvr_sockaddr, pkt_cookie_opt)) {
 		ret = kr_cookie_lru_set(cache, srvr_sockaddr, pkt_cookie_opt);
 		if (ret != kr_ok()) {
-			DEBUG_MSG(NULL, "%s\n", "failed caching cookie");
+			VERBOSE_MSG(NULL, "%s\n", "failed caching cookie");
 		} else {
-			DEBUG_MSG(NULL, "%s\n", "cookie cached");
+			VERBOSE_MSG(NULL, "%s\n", "cookie cached");
 		}
 	}
 
@@ -244,7 +244,7 @@ int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!pkt_cookie_opt && srvr_sockaddr &&
 	    get_cookie_opt(cookie_cache, srvr_sockaddr)) {
 		/* We haven't received any cookies although we should. */
-		DEBUG_MSG(NULL, "%s\n",
+		VERBOSE_MSG(NULL, "%s\n",
 		          "expected to receive a cookie but none received");
 		return KR_STATE_FAIL;
 	}
@@ -270,7 +270,7 @@ int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 
 		if (next) {
-			DEBUG_MSG(NULL, "%s\n", "BADCOOKIE querying again");
+			VERBOSE_MSG(NULL, "%s\n", "BADCOOKIE querying again");
 			qry->flags |= QUERY_BADCOOKIE_AGAIN;
 		} else {
 			/*
@@ -331,11 +331,11 @@ static int invalid_sc_status(int state, bool sc_present, bool ignore_badcookie,
 		}
 	} else if (!ignore_badcookie) {
 		/* Generate BADCOOKIE response. */
-		DEBUG_MSG(NULL, "%s\n",
+		VERBOSE_MSG(NULL, "%s\n",
 		          !sc_present ? "request is missing server cookie" :
 		                        "request has invalid server cookie");
 		if (!knot_pkt_has_edns(answer)) {
-			DEBUG_MSG(NULL, "%s\n",
+			VERBOSE_MSG(NULL, "%s\n",
 			          "missing EDNS section in prepared answer");
 			/* Caller should exit on this (and only this) state. */
 			return KR_STATE_FAIL;
@@ -376,7 +376,7 @@ int check_request(kr_layer_t *ctx)
 	int ret = kr_parse_cookie_opt(req_cookie_opt, &cookies);
 	if (ret != kr_ok()) {
 		/* FORMERR -- malformed cookies. */
-		DEBUG_MSG(NULL, "%s\n", "request with malformed cookie");
+		VERBOSE_MSG(NULL, "%s\n", "request with malformed cookie");
 		knot_wire_set_rcode(answer->wire, KNOT_RCODE_FORMERR);
 		return KR_STATE_FAIL | KR_STATE_DONE;
 	}
@@ -391,7 +391,7 @@ int check_request(kr_layer_t *ctx)
 	const struct knot_sc_alg *current_sc_alg = kr_sc_alg_get(srvr_sett->current.alg_id);
 
 	if (!req->qsource.addr || !srvr_sett->current.secr || !current_sc_alg) {
-		DEBUG_MSG(NULL, "%s\n", "missing valid server cookie context");
+		VERBOSE_MSG(NULL, "%s\n", "missing valid server cookie context");
 		return KR_STATE_FAIL;
 	}
 
@@ -461,3 +461,5 @@ answer_add_cookies:
 	}
 	return return_state;
 }
+
+#undef VERBOSE_MSG

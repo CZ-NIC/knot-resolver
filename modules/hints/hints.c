@@ -35,7 +35,7 @@
 
 /* Defaults */
 #define DEFAULT_FILE "/etc/hosts"
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "hint",  fmt)
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "hint",  fmt)
 
 /* Structure for reverse search (address to domain) */
 struct rev_search_baton {
@@ -196,7 +196,7 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Ignore */
 	}
 
-	DEBUG_MSG(qry, "<= answered from hints\n");
+	VERBOSE_MSG(qry, "<= answered from hints\n");
 	qry->flags &= ~QUERY_DNSSEC_WANT; /* Never authenticated */
 	qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 	pkt->parsed = pkt->size;
@@ -290,7 +290,7 @@ static int load_map(struct kr_zonecut *hints, FILE *fp)
 		}
 	}
 
-	DEBUG_MSG(NULL, "loaded %zu hints\n", count);
+	VERBOSE_MSG(NULL, "loaded %zu hints\n", count);
 	return kr_ok();
 }
 
@@ -298,10 +298,10 @@ static int load(struct kr_module *module, const char *path)
 {
 	auto_fclose FILE *fp = fopen(path, "r");
 	if (fp == NULL) {
-		DEBUG_MSG(NULL, "reading '%s' failed: %s\n", path, strerror(errno));
+		VERBOSE_MSG(NULL, "reading '%s' failed: %s\n", path, strerror(errno));
 		return kr_error(errno);
 	} else {
-		DEBUG_MSG(NULL, "reading '%s'\n", path);
+		VERBOSE_MSG(NULL, "reading '%s'\n", path);
 	}
 
 	/* Create pool and copy itself */
@@ -540,3 +540,5 @@ struct kr_prop *hints_props(void)
 }
 
 KR_MODULE_EXPORT(hints);
+
+#undef VERBOSE_MSG

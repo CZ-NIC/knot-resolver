@@ -40,7 +40,7 @@
 #endif
 
 /* Defaults */
-#define DEBUG_MSG(qry, fmt...) QRDEBUG(qry, "stat",  fmt)
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "stat",  fmt)
 #define FREQUENT_PSAMPLE  10 /* Sampling rate, 1 in N */
 #ifdef LRU_REP_SIZE
  #define FREQUENT_COUNT LRU_REP_SIZE /* Size of frequent tables */
@@ -494,3 +494,5 @@ struct kr_prop *stats_props(void)
 }
 
 KR_MODULE_EXPORT(stats);
+
+#undef VERBOSE_MSG

@@ -141,9 +141,9 @@ static int l_quit(lua_State *L)
 static int l_verbose(lua_State *L)
 {
 	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
-		kr_debug_set(lua_toboolean(L, 1));
+		kr_verbose_set(lua_toboolean(L, 1));
 	}
-	lua_pushboolean(L, kr_debug_do_log);
+	lua_pushboolean(L, kr_verbose_do_log);
 	return 1;
 }
 

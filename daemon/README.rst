@@ -73,7 +73,7 @@ The daemon features a CLI interface, type ``help()`` to see the list of availabl
 Verbose output
 --------------
 
-If the debug logging is compiled in, i.e. not turned off by ``-DNLOGDEBUG``, you can turn on verbose tracing of server operation with the ``-v`` option.
+If the verbose logging is compiled in, i.e. not turned off by ``-DNOVERBOSELOG``, you can turn on verbose tracing of server operation with the ``-v`` option.
 You can also toggle it on runtime with ``verbose(true|false)`` command.
 
 .. code-block:: bash

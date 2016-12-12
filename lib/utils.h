@@ -34,23 +34,23 @@
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */
-KR_EXPORT extern bool kr_debug_do_log;
+KR_EXPORT extern bool kr_verbose_do_log;
 
-/** Set --verbose mode.  Not available if compiled with -DNLOGDEBUG. */
-KR_EXPORT bool kr_debug_set(bool status);
+/** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
+KR_EXPORT bool kr_verbose_set(bool status);
 
 /** Log a message if in --verbose mode. */
-KR_EXPORT void kr_log_debug(const char *fmt, ...);
+KR_EXPORT void kr_log_verbose(const char *fmt, ...);
 
-#ifdef NLOGDEBUG
-/* Efficient compile-time disabling of debugging messages. */
-#define kr_debug_do_log false
-#define kr_debug_set(x)
+#ifdef NOVERBOSELOG
+/* Efficient compile-time disabling of verbose messages. */
+#define kr_verbose_do_log false
+#define kr_verbose_set(x)
 #endif
 
 /** Block run in --verbose mode; optimized when not run. */
-#define WITH_DEBUG if(__builtin_expect(kr_debug_do_log, false))
-#define kr_log_debug WITH_DEBUG kr_log_debug
+#define WITH_VERBOSE if(__builtin_expect(kr_verbose_do_log, false))
+#define kr_log_verbose WITH_VERBOSE kr_log_verbose
 
 
 /* C11 compatibility, but without any implementation so far. */

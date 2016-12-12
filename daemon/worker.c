@@ -35,6 +35,8 @@
 #include "daemon/io.h"
 #include "daemon/tls.h"
 
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "wrkr", fmt)
+
 /* @internal Union of various libuv objects for freelist. */
 struct req
 {
@@ -50,13 +52,6 @@ struct req
 		uv_timer_t    timer;
 	} as;
 };
-
-/** @internal Debugging facility. */
-#ifdef DEBUG
-#define DEBUG_MSG(fmt...) printf("[daem] " fmt)
-#else
-#define DEBUG_MSG(fmt...)
-#endif
 
 /* Convenience macros */
 #define qr_task_ref(task) \
@@ -560,10 +555,10 @@ static void on_timeout(uv_timer_t *req)
 		struct sockaddr_in6 *addrlist = (struct sockaddr_in6 *)task->addrlist;
 		for (uint16_t i = 0; i < MIN(task->pending_count, task->addrlist_count); ++i) {
 			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
-			WITH_DEBUG {
+			WITH_VERBOSE {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
-				QRDEBUG(qry, "wrkr", "=> server: '%s' flagged as 'bad'\n", addr_str);
+				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
 			}
 			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_TIMEOUT,
 					    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
@@ -1103,4 +1098,4 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 	return worker;
 }
 
-#undef DEBUG_MSG
+#undef VERBOSE_MSG

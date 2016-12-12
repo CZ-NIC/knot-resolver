@@ -29,7 +29,7 @@
 #include "lib/module.h"
 #include "lib/dnssec/ta.h"
 
-#define DEBUG_MSG(fmt...) QRDEBUG(req->current_query, "iter", fmt)
+#define VERBOSE_MSG(fmt...) QRVERBOSE(req->current_query, "iter", fmt)
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
@@ -186,11 +186,11 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_reques
 			}
 		}
 	}
-	WITH_DEBUG {
+	WITH_VERBOSE {
 		char name_str[KNOT_DNAME_MAXLEN];
 		knot_dname_to_str(name_str, ns, sizeof(name_str));
 		if (used_glue) {
-			DEBUG_MSG("<= using glue for '%s'\n", name_str);
+			VERBOSE_MSG("<= using glue for '%s'\n", name_str);
 		}
 	}
 }
@@ -220,7 +220,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 	/* Authority MUST be at/below the authority of the nameserver, otherwise
 	 * possible cache injection attempt. */
 	if (!knot_dname_in(cut->name, rr->owner)) {
-		DEBUG_MSG("<= authority: ns outside bailiwick\n");
+		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
 #ifdef STRICT_MODE
 		return KR_STATE_FAIL;
 #else
@@ -257,7 +257,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 		int glue_records = has_glue(pkt, ns_name);
 		/* Glue is mandatory for NS below zone */
 		if (!glue_records && knot_dname_in(rr->owner, ns_name)) {
-			DEBUG_MSG("<= authority: missing mandatory glue, rejecting\n");
+			VERBOSE_MSG("<= authority: missing mandatory glue, rejecting\n");
 			continue;
 		}
 		kr_zonecut_add(cut, ns_name, NULL);
@@ -377,7 +377,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	int pkt_class = kr_response_classify(pkt);
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) &&
 	    (pkt_class & (PKT_NOERROR|PKT_NXDOMAIN|PKT_REFUSED|PKT_NODATA))) {
-		DEBUG_MSG("<= found cut, retrying with non-minimized name\n");
+		VERBOSE_MSG("<= found cut, retrying with non-minimized name\n");
 		query->flags |= QUERY_NO_MINIMIZE;
 		return KR_STATE_CONSUME;
 	}
@@ -385,7 +385,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
 	if (!(query->flags & QUERY_STUB) && !is_authoritative(pkt, query)) {
 		if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
-			DEBUG_MSG("<= lame response: non-auth sent negative response\n");
+			VERBOSE_MSG("<= lame response: non-auth sent negative response\n");
 			return KR_STATE_FAIL;
 		}
 	}
@@ -434,7 +434,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 				break;
 			}
 			if (cname_chain_len > an->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
-				DEBUG_MSG("<= too long cname chain\n");
+				VERBOSE_MSG("<= too long cname chain\n");
 				return KR_STATE_FAIL;
 			}
 			/* Don't use pending_cname immediately.
@@ -470,14 +470,14 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 				return KR_STATE_DONE;
 			}
 		}
-		DEBUG_MSG("<= cname chain, following\n");
+		VERBOSE_MSG("<= cname chain, following\n");
 		/* Check if the same query was already resolved */
 		for (int i = 0; i < req->rplan.resolved.len; ++i) {
 			struct kr_query * q = req->rplan.resolved.at[i];
 			if (q->sclass == query->sclass &&
 			    q->stype == query->stype   &&
 			    knot_dname_is_equal(q->sname, cname)) {
-				DEBUG_MSG("<= cname chain loop\n");
+				VERBOSE_MSG("<= cname chain loop\n");
 				return KR_STATE_FAIL;
 			}
 		}
@@ -595,20 +595,20 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * Note - we *MUST* check if it has at least a QUESTION,
 	 * otherwise it would crash on accessing QNAME. */
 	if (pkt->parsed < pkt->size || pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
-		DEBUG_MSG("<= malformed response\n");
+		VERBOSE_MSG("<= malformed response\n");
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
-		DEBUG_MSG("<= ignoring mismatching response\n");
+		VERBOSE_MSG("<= ignoring mismatching response\n");
 		/* Force TCP, to work around authoritatives messing up question
 		 * without yielding to spoofed responses. */
 		query->flags |= QUERY_TCP;
 		return resolve_badmsg(pkt, req, query);
 	} else if (knot_wire_get_tc(pkt->wire)) {
-		DEBUG_MSG("<= truncated response, failover to TCP\n");
+		VERBOSE_MSG("<= truncated response, failover to TCP\n");
 		if (query) {
 			/* Fail if already on TCP. */
 			if (query->flags & QUERY_TCP) {
-				DEBUG_MSG("<= TC=1 with TCP, bailing out\n");
+				VERBOSE_MSG("<= TC=1 with TCP, bailing out\n");
 				return resolve_error(pkt, req);
 			}
 			query->flags |= QUERY_TCP;
@@ -616,7 +616,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return KR_STATE_CONSUME;
 	}
 
-#ifndef NLOGDEBUG
+#ifndef NOVERBOSELOG
 	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 #endif
 
@@ -628,7 +628,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_SERVFAIL: {
 		if (query->flags & QUERY_STUB) { break; } /* Pass through in stub mode */
-		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		query->fails += 1;
 		if (query->fails >= KR_QUERY_NSRETRY_LIMIT) {
 			query->fails = 0; /* Reset per-query counter. */
@@ -640,10 +640,10 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	case KNOT_RCODE_FORMERR:
 	case KNOT_RCODE_NOTIMPL:
-		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_badmsg(pkt, req, query);
 	default:
-		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_error(pkt, req);
 	}
 
@@ -651,11 +651,11 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int state = process_authority(pkt, req);
 	switch(state) {
 	case KR_STATE_CONSUME: /* Not referral, process answer. */
-		DEBUG_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		state = process_answer(pkt, req);
 		break;
 	case KR_STATE_DONE: /* Referral */
-		DEBUG_MSG("<= referral response, follow\n");
+		VERBOSE_MSG("<= referral response, follow\n");
 		break;
 	default:
 		break;
@@ -678,4 +678,4 @@ const kr_layer_api_t *iterate_layer(struct kr_module *module)
 
 KR_MODULE_EXPORT(iterate)
 
-#undef DEBUG_MSG
+#undef VERBOSE_MSG
