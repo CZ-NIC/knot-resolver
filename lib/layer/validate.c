@@ -400,7 +400,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 				parent->flags |= QUERY_DNSSEC_INSECURE;
 				parent = parent->parent;
 			} while (parent && parent->stype == KNOT_RRTYPE_DS);
-			DEBUG_MSG(qry, "<= cached insecure response, going insecure\n");
+			VERBOSE_MSG(qry, "<= cached insecure response, going insecure\n");
 			ctx->state = KR_STATE_DONE;
 		}
 		return ctx->state;
