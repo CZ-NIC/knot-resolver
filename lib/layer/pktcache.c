@@ -24,7 +24,7 @@
 #include "lib/module.h"
 #include "lib/resolve.h"
 
-#define DEBUG_MSG(qry, fmt...) QRDEBUG((qry), " pc ",  fmt)
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), " pc ",  fmt)
 #define DEFAULT_MAXTTL (15 * 60)
 #define DEFAULT_NOTTL (5) /* Short-time "no data" retention to avoid bursts */
 
@@ -121,7 +121,7 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_cache *cache = &ctx->req->ctx->cache;
 	int ret = loot_pktcache(cache, pkt, qry, &flags);
 	if (ret == 0) {
-		DEBUG_MSG(qry, "=> satisfied from cache\n");
+		VERBOSE_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 		if (flags & KR_CACHE_FLAG_WCARD_PROOF) {
 			qry->flags |= QUERY_DNSSEC_WEXPAND;
@@ -232,7 +232,7 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Stash answer in the cache */
 	int ret = kr_cache_insert(cache, KR_CACHE_PKT, qname, qtype, &header, data);
 	if (ret == 0) {
-		DEBUG_MSG(qry, "=> answer cached for TTL=%u\n", ttl);
+		VERBOSE_MSG(qry, "=> answer cached for TTL=%u\n", ttl);
 	}
 	kr_cache_sync(cache);
 	return ctx->state;
@@ -251,4 +251,4 @@ const kr_layer_api_t *pktcache_layer(struct kr_module *module)
 
 KR_MODULE_EXPORT(pktcache)
 
-#undef DEBUG_MSG
+#undef VERBOSE_MSG

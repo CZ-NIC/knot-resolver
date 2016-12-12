@@ -19,15 +19,15 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 
-#ifndef NDEBUG
+#ifndef NOVERBOSELOG
  /** @internal Print a debug message related to resolution. */
- #define QRDEBUG(query, cls, fmt, ...) do { \
+ #define QRVERBOSE(query, cls, fmt, ...) WITH_VERBOSE { \
     unsigned _ind = 0; \
     for (struct kr_query *q = (query); q; q = q->parent, _ind += 2); \
-    kr_log_debug("[%s] %*s" fmt, cls, _ind, "", ##  __VA_ARGS__); \
-    } while (0)
+    kr_log_verbose("[%s] %*s" fmt, cls, _ind, "", ##  __VA_ARGS__); \
+    }
 #else
- #define QRDEBUG(query, cls, fmt, ...)
+ #define QRVERBOSE(query, cls, fmt, ...)
 #endif
 
 /** Layer processing states.  Only one value at a time (but see TODO).

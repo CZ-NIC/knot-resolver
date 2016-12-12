@@ -33,8 +33,14 @@
 #include "lib/module.h"
 #include "lib/resolve.h"
 
+
+/* Always compile-in log symbols, even if disabled. */
+#undef kr_verbose_status
+#undef kr_verbose_set
+#undef kr_log_verbose
+
 /* Logging & debugging */
-static bool _env_debug = false;
+bool kr_verbose_status = false;
 
 /** @internal CSPRNG context */
 static isaac_ctx ISAAC;
@@ -65,24 +71,17 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
  * Cleanup callbacks.
  */
 
-/* Always compile-in log symbols, even if disabled. */
-#undef kr_debug_set
-#undef kr_debug_status
-#undef kr_log_debug
-
-bool kr_debug_set(bool status)
+bool kr_verbose_set(bool status)
 {
-	return _env_debug = status;
+#ifndef NOVERBOSELOG
+	kr_verbose_status = status;
+#endif
+	return kr_verbose_status;
 }
 
-bool kr_debug_status(void)
+void kr_log_verbose(const char *fmt, ...)
 {
-	return _env_debug;
-}
-
-void kr_log_debug(const char *fmt, ...)
-{
-	if (_env_debug) {
+	if (kr_verbose_status) {
 		va_list args;
 		va_start(args, fmt);
 		vprintf(fmt, args);
