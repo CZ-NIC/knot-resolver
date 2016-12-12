@@ -93,7 +93,12 @@ $(2)/$(1)$(3): $$($(1)_OBJ) $$($(1)_DEPEND)
 ifeq ($(4),-$(ARTYPE))
 	$(call quiet,AR,$$@) rcs $$@ $$($(1)_OBJ)
 else
+ifneq ($(strip $(7)),)
+	$(call quiet,CCLD,$$@) $$($(1)_CFLAGS) $(BUILD_CFLAGS) $$($(1)_OBJ) $(call SOVER,$(7),$(7),$(1)) -o $(2)/$(1)$(call SOVER_EXT,$(7)) $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS) $$($(1)_LDFLAGS)
+	$(LN) -f $(1)$(call SOVER_EXT,$(7)) $$@
+else
 	$(call quiet,CCLD,$$@) $$($(1)_CFLAGS) $(BUILD_CFLAGS) $$($(1)_OBJ) $(call SOVER,$(7),$(7),$(1)) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS) $$($(1)_LDFLAGS)
+endif
 endif
 # Additional rules
 $(1)-clean:
@@ -108,7 +113,7 @@ ifneq ($(5),$(MODULEDIR))
 endif
 # Versioned library install
 ifneq ($(strip $(7)),)
-	$(INSTALL) $(2)/$(1)$(3) $(DESTDIR)$(5)/$(1)$(call SOVER_EXT,$(7))
+	$(INSTALL) $(2)/$(1)$(call SOVER_EXT,$(7)) $(DESTDIR)$(5)/
 	$(LN) -f $(1)$(call SOVER_EXT,$(7)) $(DESTDIR)$(5)/$(1)$(3)
 else
 	$(INSTALL) $(2)/$(1)$(3) $(DESTDIR)$(5)
