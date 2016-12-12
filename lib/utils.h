@@ -34,7 +34,7 @@
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */
-KR_EXPORT extern bool kr_verbose_do_log;
+KR_EXPORT extern bool kr_verbose_status;
 
 /** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
 KR_EXPORT bool kr_verbose_set(bool status);
@@ -44,12 +44,12 @@ KR_EXPORT void kr_log_verbose(const char *fmt, ...);
 
 #ifdef NOVERBOSELOG
 /* Efficient compile-time disabling of verbose messages. */
-#define kr_verbose_do_log false
+#define kr_verbose_status false
 #define kr_verbose_set(x)
 #endif
 
 /** Block run in --verbose mode; optimized when not run. */
-#define WITH_VERBOSE if(__builtin_expect(kr_verbose_do_log, false))
+#define WITH_VERBOSE if(__builtin_expect(kr_verbose_status, false))
 #define kr_log_verbose WITH_VERBOSE kr_log_verbose
 
 
