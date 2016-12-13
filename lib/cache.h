@@ -35,9 +35,11 @@ enum kr_cache_tag {
  * - AUTH must be > than NONAUTH
  * - AUTH INSECURE must be > than AUTH (because it attempted validation)
  * - NONAUTH SECURE must be > than AUTH (because it's valid)
+ *
+ * Ref: https://tools.ietf.org/html/rfc2181#section-5.4.1
  */
 enum kr_cache_rank {
-	KR_RANK_BAD       = 0,  /* BAD cache, do not use. */ 
+	KR_RANK_BAD       = 0,  /* BAD cache, do not use. */
 	KR_RANK_INSECURE  = 1,  /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
 	KR_RANK_EXTRA     = 4,  /* Entry from additional section. */
 	KR_RANK_NONAUTH   = 8,  /* Entry from authority section (i.e. parent-side). */
