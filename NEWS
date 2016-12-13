@@ -1,7 +1,11 @@
-Knot Resolver 1.x.y (2016-xx-yy)
+Knot Resolver 1.2.0 (2016-12-yy)
 ================================
 
+- Add module `version` that checks for updates and CVEs periodically.
+- Support RFC7830: EDNS(0) padding in responses over TLS.
+- Support CD flag on incoming requests.
 - It now requires knot >= 2.3.1 to link successfully.
+- The API+ABI for modules changed slightly.
 
 Knot Resolver 1.1.1 (2016-08-24)
 ================================
@@ -29,7 +33,7 @@ Knot Resolver 1.1.0 (2016-08-12)
 * Metrics exported in Prometheus
 * DNS firewall module
 * Explicit CNAME target fetching in strict mode
-* Query minimisation improvements 
+* Query minimisation improvements
 * Improved integration with systemd
 
 Knot Resolver 1.0.0 (2016-05-30)
