@@ -39,7 +39,8 @@
 	X(NO_CACHE,        1 << 11) /**< Do not use expiring cache for lookup. */ \
 	X(EXPIRING,        1 << 12) /**< Query response is cached, but expiring. */ \
 	X(ALLOW_LOCAL,     1 << 13) /**< Allow queries to local or private address ranges. */ \
-	X(DNSSEC_WANT,     1 << 14) /**< Want DNSSEC secured answer. */ \
+	X(DNSSEC_WANT,     1 << 14) /**< Want DNSSEC secured answer; exception: +cd, \
+				     *   i.e. knot_wire_set_cd(request->answer->wire). */ \
 	X(DNSSEC_BOGUS,    1 << 15) /**< Query response is DNSSEC bogus. */ \
 	X(DNSSEC_INSECURE, 1 << 16) /**< Query response is DNSSEC insecure. */ \
 	X(STUB,            1 << 17) /**< Stub resolution, accept received answer as solved. */ \
@@ -48,7 +49,7 @@
 	X(PERMISSIVE,      1 << 20) /**< Permissive resolver mode. */ \
 	X(STRICT,          1 << 21) /**< Strict resolver mode. */ \
 	X(BADCOOKIE_AGAIN, 1 << 22) /**< Query again because bad cookie returned. */ \
-	X(CNAME,	   1 << 23) /**< Query response contains CNAME in answer section. */ \
+	X(CNAME,           1 << 23) /**< Query response contains CNAME in answer section. */ \
 	X(REORDER_RR,      1 << 24) /**< Reorder cached RRs. */
 
 /** Query flags */
