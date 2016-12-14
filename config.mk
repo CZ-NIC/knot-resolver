@@ -1,12 +1,13 @@
 # Project
 MAJOR := 1
-MINOR := 1
-PATCH := 1
+MINOR := 2
+PATCH := 0
+EXTRA := -dev
 ABIVER := 2
 BUILDMODE := dynamic
 HARDENING := yes
 
-VERSION := $(MAJOR).$(MINOR).$(PATCH)
+VERSION := $(MAJOR).$(MINOR).$(PATCH)$(EXTRA)
 
 # Paths
 PREFIX ?= /usr/local
