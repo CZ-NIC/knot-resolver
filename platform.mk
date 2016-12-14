@@ -73,7 +73,7 @@ $(1): $(1:.o=.c)
 	$$(call quiet,CC,$$<) $(2) -MMD -MP -c $$< -o $$@
 endef
 
-# Make target (name,path,ext,ldflags,dst,amalgable)
+# Make target (name,path,ext,ldflags, 5:dst,amalgable,abiver)
 define make_target
 ifeq ($(AMALG)|$(6), yes|yes)
 $(1).amalg.c: $$($(1)_SOURCES)
