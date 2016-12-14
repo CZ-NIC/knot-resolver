@@ -72,6 +72,16 @@
  * @endcode
  */
 
+/** Validation rank */
+typedef enum kr_validation_rank {
+	KR_VLDRANK_INITIAL   = 0,   /* Entry was just added; not validated yet. */
+	KR_VLDRANK_INSECURE  = 1,   /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
+	KR_VLDRANK_BAD	     = 2,   /* Matching RRSIG found, but validation fails. */
+	KR_VLDRANK_MISMATCH  = 3,   /* RRSIG signer name is */
+	KR_VLDRANK_UNKNOWN   = 4,   /* Unknown */
+	KR_VLDRANK_SECURE    = 5    /* Entry is DNSSEC valid (e.g. RRSIG exists). */
+} kr_validation_rank_t;
+
 /** @cond internal Array of modules. */
 typedef array_t(struct kr_module *) module_array_t;
 /* @endcond */
@@ -114,27 +124,31 @@ struct kr_context
  * @note All data for this request must be allocated from the given pool.
  */
 struct kr_request {
-    struct kr_context *ctx;
-    knot_pkt_t *answer;
-    struct kr_query *current_query;    /**< Current evaluated query. */
-    struct {
-        const knot_rrset_t *key;
-        const struct sockaddr *addr;
-        const struct sockaddr *dst_addr;
-        const knot_pkt_t *packet;
-        const knot_rrset_t *opt;
-    } qsource;
-    struct {
-        unsigned rtt;                  /**< Current upstream RTT */
-        const struct sockaddr *addr;   /**< Current upstream address */
-    } upstream;                        /**< Upstream information, valid only in consume() phase */
-    uint32_t options;
-    int state;
-    rr_array_t authority;
-    rr_array_t additional;
-    struct kr_rplan rplan;
-    int has_tls;
-    knot_mm_t pool;
+	struct kr_context *ctx;
+	knot_pkt_t *answer;
+	struct kr_query *current_query;    /**< Current evaluated query. */
+	struct {
+		const knot_rrset_t *key;
+		const struct sockaddr *addr;
+		const struct sockaddr *dst_addr;
+		const knot_pkt_t *packet;
+		const knot_rrset_t *opt;
+	} qsource;
+	struct {
+		unsigned rtt;                  /**< Current upstream RTT */
+		const struct sockaddr *addr;   /**< Current upstream address */
+	} upstream;                        /**< Upstream information, valid only in consume() phase */
+	uint32_t options;
+	int state;
+	ranked_rr_array_t answ_selected;
+	ranked_rr_array_t auth_selected;
+	rr_array_t additional;
+	bool answ_validated;
+	bool auth_validated;
+	struct kr_rplan rplan;
+	int has_tls;
+	knot_mm_t pool;
+	uint32_t next_uid;
 };
 
 /**

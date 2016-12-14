@@ -254,6 +254,10 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 /* @internal DS is special and is present only parent-side */
 static void stash_ds(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
 {
+	ranked_rr_array_t *arr= &req->auth_selected;
+	if (!arr->len) {
+		return;
+	}
 	struct kr_query *qry = req->current_query;
 	uint8_t rank = KR_RANK_AUTH;
 	if (knot_wire_get_cd(req->answer->wire)) {
@@ -261,17 +265,29 @@ static void stash_ds(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot
 		 * save it to the BAD cache */
 		rank = KR_RANK_BAD;
 	}
-	const knot_pktsection_t *authority = knot_pkt_section(pkt, KNOT_AUTHORITY);
-	for (unsigned i = 0; i < authority->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(authority, i);
+	/* uncached entries are located at the end */
+	for (ssize_t i = arr->len - 1; i >= 0; --i) {
+		ranked_rr_array_entry_t *entry = arr->at[i];
+		const knot_rrset_t *rr = entry->rr;
+		if (entry->qry_uid != qry->uid) {
+			continue;
+		}
+		if (entry->cached) {
+			continue;
+		}
 		if (rr->type == KNOT_RRTYPE_DS || rr->type == KNOT_RRTYPE_RRSIG) {
 			kr_rrmap_add(stash, rr, rank, pool);
+			entry->cached = true;
 		}
 	}
 }
 
 static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
 {
+	ranked_rr_array_t *arr= &req->auth_selected;
+	if (!arr->len) {
+		return kr_ok();
+	}
 	struct kr_query *qry = req->current_query;
 	uint8_t rank = KR_RANK_NONAUTH;
 	if (knot_wire_get_cd(req->answer->wire)) {
@@ -279,11 +295,14 @@ static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash
 		 * save authority to the BAD cache */
 		rank = KR_RANK_BAD;
 	}
-	const knot_pktsection_t *authority = knot_pkt_section(pkt, KNOT_AUTHORITY);
-	for (unsigned i = 0; i < authority->count; ++i) {
-		const knot_rrset_t *rr = knot_pkt_rr(authority, i);
-		/* Cache in-bailiwick data only */
-		if (!knot_dname_in(qry->zone_cut.name, rr->owner)) {
+	/* uncached entries are located at the end */
+	for (ssize_t i = arr->len - 1; i >= 0; --i) {
+		ranked_rr_array_entry_t *entry = arr->at[i];
+		const knot_rrset_t *rr = entry->rr;
+		if (entry->qry_uid != qry->uid) {
+			continue;
+		}
+		if (entry->cached) {
 			continue;
 		}
 		/* Look up glue records for NS */
@@ -293,19 +312,18 @@ static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash
 				stash_glue(stash, pkt, ns_name, pool);
 			}
 		}
-		/* Stash record */
 		kr_rrmap_add(stash, rr, rank, pool);
+		entry->cached = true;
 	}
 	return kr_ok();
 }
 
 static int stash_answer(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
 {
+	ranked_rr_array_t *arr= &req->answ_selected;
 	struct kr_query *qry = req->current_query;
-	/* Work with QNAME, as minimised name data is cacheable. */
-	const knot_dname_t *cname_begin = knot_pkt_qname(pkt);
-	if (!cname_begin) {
-		cname_begin = qry->sname;
+	if (!arr->len) {
+		return kr_ok();
 	}
 	uint8_t rank = KR_RANK_AUTH;
 	if (knot_wire_get_cd(req->answer->wire)) {
@@ -313,44 +331,19 @@ static int stash_answer(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, k
 		 * Save answer to the BAD cache. */
 		rank = KR_RANK_BAD;
 	}
-	/* Stash direct answers (equal to current QNAME/CNAME),
-	 * accept out-of-order RRSIGS. */
-	const knot_pktsection_t *answer = knot_pkt_section(pkt, KNOT_ANSWER);
-	const knot_dname_t *cname = NULL;
-	const knot_dname_t *next_cname = cname_begin;
-	unsigned cname_chain_len = 0;
-	do {
-		cname = next_cname;
-		next_cname = NULL;
-		for (unsigned i = 0; i < answer->count; ++i) {
-			const knot_rrset_t *rr = knot_pkt_rr(answer, i);
-			if (!knot_dname_is_equal(rr->owner, cname)) {
-				continue;
-			}
-			kr_rrmap_add(stash, rr, rank, pool);
-			/* Follow CNAME chain in current cut (if SECURE). */
-			if ((qry->flags & QUERY_DNSSEC_WANT) && rr->type == KNOT_RRTYPE_CNAME) {
-				cname_chain_len += 1;
-				next_cname = knot_cname_name(&rr->rrs);
-				if (next_cname && !knot_dname_in(qry->zone_cut.name, next_cname)) {
-					next_cname = NULL;
-				}
-				/* Check if the same CNAME was already resolved */
-				if (next_cname) {
-					char key[KR_RRKEY_LEN];
-					int ret = kr_rrkey(key, next_cname, rr->type, rank);
-					if (ret != 0 || map_get(stash, key)) {
-						VERBOSE_MSG(qry, "<= cname chain loop\n");
-						next_cname = NULL;
-					}
-				}
-				if (cname_chain_len > answer->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
-					VERBOSE_MSG(qry, "<= too long cname chain\n");
-					next_cname = NULL;
-				}
-			}
+	/* uncached entries are located at the end */
+	for (ssize_t i = arr->len - 1; i >= 0; --i) {
+		ranked_rr_array_entry_t *entry = arr->at[i];
+		if (entry->qry_uid != qry->uid) {
+			continue;
 		}
-	} while (next_cname);
+		if (entry->cached) {
+			continue;
+		}
+		const knot_rrset_t *rr = entry->rr;
+		kr_rrmap_add(stash, rr, rank, pool);
+		entry->cached = true;
+	}
 	return kr_ok();
 }
 

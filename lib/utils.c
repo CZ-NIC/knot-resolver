@@ -25,6 +25,7 @@
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
 #include <libknot/rrtype/rrsig.h>
+#include <libknot/rrset-dump.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
@@ -411,6 +412,69 @@ int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool)
 	return kr_ok();
 }
 
+int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
+			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool)
+{
+	/* rr always has one record per rrset
+	 * check if another rrset with the same
+	 * rclass/type/owner combination exists within current query
+	 * and merge if needed */
+	for (ssize_t i = array->len - 1; i >= 0; --i) {
+		ranked_rr_array_entry_t *stashed = array->at[i];
+		if (stashed->yielded) {
+			break;
+		}
+		if (stashed->qry_uid != qry_uid) {
+			break;
+		}
+		if (stashed->rr->rclass == rr->rclass &&
+		    stashed->rr->type == rr->type &&
+		    knot_dname_is_equal(stashed->rr->owner, rr->owner)) {
+			assert(stashed->rank == rank &&
+			       stashed->cached == false &&
+			       stashed->to_wire == to_wire);
+			/* Merge */
+			return knot_rdataset_merge(&stashed->rr->rrs, &rr->rrs, pool);
+		}
+	}
+
+	/* No stashed rrset found, add */
+	int ret = array_reserve_mm(*array, array->len + 1, kr_memreserve, pool);
+	if (ret != 0) {
+		return kr_error(ENOMEM);
+	}
+
+	ranked_rr_array_entry_t *entry = mm_alloc(pool, sizeof(ranked_rr_array_entry_t));
+	if (!entry) {
+		return kr_error(ENOMEM);
+	}
+	knot_rrset_t *copy = knot_rrset_copy(rr, pool);
+	if (!copy) {
+		return kr_error(ENOMEM);
+	}
+
+	entry->qry_uid = qry_uid;
+	entry->rr = copy;
+	entry->rank = rank;
+	entry->cached = false;
+	entry->yielded = false;
+	entry->to_wire = to_wire;
+	array_push(*array, entry);
+	return kr_ok();
+}
+
+int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire, uint32_t qry_uid)
+{
+	for (size_t i = 0; i < array->len; ++i) {
+		ranked_rr_array_entry_t *entry = array->at[i];
+		if (entry->qry_uid == qry_uid) {
+			entry->to_wire = to_wire;
+		}
+	}
+	return kr_ok();
+}
+
+
 static char *callprop(struct kr_module *module, const char *prop, const char *input, void *env)
 {
 	if (!module || !prop) {
@@ -437,4 +501,62 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 		}
 	}
 	return NULL;
+}
+
+void kr_rrset_print(const knot_rrset_t *rr)
+{
+	char rrtext[KNOT_DNAME_MAXLEN * 2] = {0};
+	knot_rrset_txt_dump(rr, rrtext, sizeof(rrtext), &KNOT_DUMP_STYLE_DEFAULT);
+	printf("%s", rrtext);
+}
+
+void kr_pkt_print(knot_pkt_t *pkt)
+{
+	char snames[3][11] = {"ANSWER","AUTHORITY","ADDITIONAL"};
+	char rrtype[32];
+	char qname[KNOT_DNAME_MAXLEN];
+	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
+	const knot_lookup_t *rcode = NULL;
+	rcode = knot_lookup_by_id(knot_rcode_names, pkt_rcode);
+	printf("RCODE: %s FLAGS: ", rcode != NULL ? rcode->name : "unknown");
+	if (knot_wire_get_aa(pkt->wire))
+		printf("AA ");
+	if (knot_wire_get_rd(pkt->wire))
+		printf("RD ");
+	if (knot_wire_get_tc(pkt->wire))
+		printf("TC ");
+	if (knot_wire_get_qr(pkt->wire))
+		printf("QR ");
+	if (knot_wire_get_cd(pkt->wire))
+		printf("CD ");
+	if (knot_wire_get_ad(pkt->wire))
+		printf("AD ");
+	if (knot_wire_get_ra(pkt->wire))
+		printf("RA ");
+	printf("\n");
+	knot_dname_to_str(qname, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
+	knot_rrtype_to_string(knot_pkt_qtype(pkt), rrtype, sizeof(rrtype));
+	printf("QUESTION\n%s\t\t%s\n", qname, rrtype);
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		printf("%s\n", snames[i - KNOT_ANSWER]);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			kr_rrset_print(rr);
+		}
+	}
+}
+
+void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix)
+{
+	char str[KNOT_DNAME_MAXLEN];
+	knot_dname_to_str(str, name, KNOT_DNAME_MAXLEN);
+	printf ("%s%s%s", prefix, str, postfix);
+}
+
+void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix)
+{
+	char str[32];
+	knot_rrtype_to_string(rrtype, str, 32);
+	printf ("%s%s%s", prefix, str, postfix);
 }

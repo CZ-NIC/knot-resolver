@@ -37,6 +37,16 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "resl",  fmt)
 
+static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
+{
+	for (unsigned i = 0; i < array->len; ++i) {
+		ranked_rr_array_entry_t *entry = array->at[i];
+		if (entry->qry_uid == qry_uid) {
+			entry->yielded = yielded;
+		}
+	}
+}
+
 /**
  * @internal Defer execution of current query.
  * The current layer state and input will be pushed to a stack and resumed on next iteration.
@@ -53,6 +63,8 @@ static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
 		pickle->pkt = pkt_copy;
 		pickle->next = qry->deferred;
 		qry->deferred = pickle;
+		set_yield(&req->answ_selected, qry->uid, true);
+		set_yield(&req->auth_selected, qry->uid, true);
 		return kr_ok();
 	}
 	return kr_error(ENOMEM);
@@ -340,6 +352,23 @@ static void write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
 	}
 }
 
+static void write_extra_ranked_records(ranked_rr_array_t *arr, knot_pkt_t *answer)
+{
+	for (size_t i = 0; i < arr->len; ++i) {
+		ranked_rr_array_entry_t * entry = arr->at[i];
+		if (!entry->to_wire) {
+			continue;
+		}
+		knot_rrset_t *rr = entry->rr;
+		if (!knot_pkt_has_dnssec(answer)) {
+			if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
+				continue;
+			}
+		}
+		knot_pkt_put(answer, 0, rr, 0);
+	}
+}
+
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
 static int answer_padding(struct kr_request *request)
 {
@@ -401,11 +430,20 @@ static int answer_finalize(struct kr_request *request, int state)
 		}
 	}
 
+	if (request->answ_selected.len > 0) {
+		assert(answer->current <= KNOT_ANSWER);
+		/* Write answer records. */
+		if (answer->current < KNOT_ANSWER) {
+			knot_pkt_begin(answer, KNOT_ANSWER);
+		}
+		write_extra_ranked_records(&request->answ_selected, answer);
+	}
+
 	/* Write authority records. */
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	write_extra_records(&request->authority, answer);
+	write_extra_ranked_records(&request->auth_selected, answer);
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
 	write_extra_records(&request->additional, answer);
@@ -472,8 +510,11 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->options = ctx->options;
 	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
-	array_init(request->authority);
 	array_init(request->additional);
+	array_init(request->answ_selected);
+	array_init(request->auth_selected);
+	request->answ_validated = false;
+	request->auth_validated = false;
 
 	/* Expect first query */
 	kr_rplan_init(&request->rplan, request, &request->pool);
@@ -806,6 +847,15 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 				return KR_STATE_FAIL;
 			}
 		}
+		/* qry->zone_cut.name can change, check it again
+		 * to prevent unnecessary DS & DNSKEY queries */
+		if (!(qry->flags & QUERY_DNSSEC_INSECURE) &&
+		    !kr_ta_covers(negative_anchors, qry->zone_cut.name) &&
+		    kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
+			qry->flags |= QUERY_DNSSEC_WANT;
+		} else {
+			qry->flags &= ~QUERY_DNSSEC_WANT;
+		}
 		/* Update minimized QNAME if zone cut changed */
 		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
 			if (kr_make_query(qry, packet) != 0) {
@@ -840,6 +890,8 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		VERBOSE_MSG(qry, "=> resuming yielded answer\n");
 		struct kr_layer_pickle *pickle = qry->deferred;
 		request->state = KR_STATE_YIELD;
+		set_yield(&request->answ_selected, qry->uid, false);
+		set_yield(&request->auth_selected, qry->uid, false);
 		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
 		qry->deferred = pickle->next;
 	} else {

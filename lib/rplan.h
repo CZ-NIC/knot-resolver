@@ -81,6 +81,7 @@ struct kr_query {
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;
+	uint32_t uid;
 };
 
 /** @cond internal Array of queries. */
@@ -99,6 +100,7 @@ struct kr_rplan {
 	kr_qarray_t resolved;       /**< List of resolved queries. */
 	struct kr_request *request; /**< Parent resolution request. */
 	knot_mm_t *pool;             /**< Temporary memory pool. */
+	uint32_t next_uid;
 };
 
 /**

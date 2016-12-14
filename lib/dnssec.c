@@ -83,7 +83,7 @@ static int validate_rrsig_rr(int *flags, int cov_labels,
 	/* bullet 2 */
 	const knot_dname_t *signer_name = knot_rrsig_signer_name(&rrsigs->rrs, sig_pos);
 	if (!signer_name || !knot_dname_is_equal(signer_name, zone_name)) {
-		return kr_error(EINVAL);
+		return kr_error(EAGAIN);
 	}
 	/* bullet 4 */
 	{
@@ -174,10 +174,9 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 		--covered_labels;
 	}
 
-	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	for (unsigned i = 0; i < sec->count; ++i) {
+	for (uint16_t i = 0; i < vctx->rrs->len; ++i) {
 		/* Consider every RRSIG that matches owner and covers the class/type. */
-		const knot_rrset_t *rrsig = knot_pkt_rr(sec, i);
+		const knot_rrset_t *rrsig = vctx->rrs->at[i]->rr;
 		if (rrsig->type != KNOT_RRTYPE_RRSIG) {
 			continue;
 		}
@@ -190,9 +189,14 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 			if (knot_rrsig_type_covered(&rrsig->rrs, j) != covered->type) {
 				continue;
 			}
-			if (validate_rrsig_rr(&val_flgs, covered_labels, rrsig, j,
+			int ret = validate_rrsig_rr(&val_flgs, covered_labels, rrsig, j,
 			                      keys, key_pos, keytag,
-			                      zone_name, timestamp) != 0) {
+			                      zone_name, timestamp);
+			if (ret == kr_error(EAGAIN)) {
+				kr_dnssec_key_free(&created_key);
+				vctx->result = ret;
+				return ret;
+			} else if (ret != 0) {
 				continue;
 			}
 			if (val_flgs & FLG_WILDCARD_EXPANSION) {
@@ -202,6 +206,7 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				}
 			}
 			if (kr_check_signature(rrsig, j, (dnssec_key_t *) key, covered, trim_labels) != 0) {
+				kr_dnssec_key_free(&created_key);
 				continue;
 			}
 			if (val_flgs & FLG_WILDCARD_EXPANSION) {

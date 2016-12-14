@@ -40,7 +40,7 @@ const knot_lookup_t *kr_query_flag_names(void)
 	return query_flag_names;
 }
 
-static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name)
+static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name, uint32_t uid)
 {
 	struct kr_query *qry = mm_alloc(pool, sizeof(struct kr_query));
 	if (qry == NULL) {
@@ -57,6 +57,7 @@ static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name)
 	}
 
 	knot_dname_to_lower(qry->sname);
+	qry->uid = uid;
 	return qry;
 }
 
@@ -79,6 +80,7 @@ int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, knot_mm_t 
 	rplan->request = request;
 	array_init(rplan->pending);
 	array_init(rplan->resolved);
+	rplan->next_uid = 0;
 	return KNOT_EOK;
 }
 
@@ -121,10 +123,11 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 		return NULL;
 	}
 
-	struct kr_query *qry = query_create(rplan->pool, name);
+	struct kr_query *qry = query_create(rplan->pool, name, rplan->next_uid);
 	if (qry == NULL) {
 		return NULL;
 	}
+	rplan->next_uid += 1;
 	/* Class and type must be set outside this function. */
 	qry->flags = rplan->request->options;
 	qry->parent = parent;
