@@ -255,7 +255,7 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 static void stash_ds(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
 {
 	struct kr_query *qry = req->current_query;
-	uint8_t rank = KR_RANK_NONAUTH;
+	uint8_t rank = KR_RANK_AUTH;
 	if (knot_wire_get_cd(req->answer->wire)) {
 		/* Signature validation is disabled,
 		 * save it to the BAD cache */
