@@ -96,7 +96,7 @@
  */
 #define lru_create(ptable, max_slots, mm_ctx_array, mm_ctx) do { \
 	(void)(((__typeof__((*(ptable))->pdata_t))0) == (void *)0); /* typecheck lru_t */ \
-	*((struct lru **)(ptable)) = \
+	*(ptable) = (__typeof__(*(ptable))) \
 		lru_create_impl((max_slots), (mm_ctx_array), (mm_ctx)); \
 	} while (false)
 
