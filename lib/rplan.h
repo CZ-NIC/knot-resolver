@@ -51,6 +51,7 @@
 	X(BADCOOKIE_AGAIN, 1 << 22) /**< Query again because bad cookie returned. */ \
 	X(CNAME,           1 << 23) /**< Query response contains CNAME in answer section. */ \
 	X(REORDER_RR,      1 << 24) /**< Reorder cached RRs. */
+			/* 1 << 31       Used by ../modules/dns64/dns64.lua */
 
 /** Query flags */
 enum kr_query_flag {

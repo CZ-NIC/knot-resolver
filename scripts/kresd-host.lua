@@ -86,7 +86,7 @@ for i, qtype in ipairs(qtypes) do
 	local section = pkt:rrsets(kres.section.ANSWER)
 	for i = 1, #section do
 		local rr = section[i]
-		for k = 1, rr.rr.count do
+		for k = 1, rr.rrs.rr_count do
 			local rdata = rr:tostring(k - 1)
 			local owner = kres.dname2str(rr:owner())
 			if qverbose then

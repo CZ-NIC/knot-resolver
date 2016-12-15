@@ -250,7 +250,7 @@ You primarily need to retrieve currently processed query.
 		-- Print information about current query
 		local current = req:current()
 		print(kres.dname2str(current.owner))
-		print(current.type, current.class, current.id, current.flags)
+		print(current.stype, current.sclass, current.id, current.flags)
 	end
 
 In layers that either begin or finalize, you can walk the list of resolved queries.
@@ -258,7 +258,7 @@ In layers that either begin or finalize, you can walk the list of resolved queri
 .. code-block:: lua
 
 	local last = req:resolved()
-	print(last.type)
+	print(last.stype)
 
 As described in the layers, you can not only retrieve information about current query, but also push new ones or pop old ones.
 

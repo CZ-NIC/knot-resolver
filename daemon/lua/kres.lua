@@ -1,7 +1,8 @@
 -- LuaJIT ffi bindings for libkres, a DNS resolver library.
 -- @note Since it's statically compiled, it expects to find the symbols in the C namespace.
 
-local ffi_ok, ffi = pcall(require, 'ffi')
+local ffi_ok
+ffi_ok, ffi = pcall(require, 'ffi')
 if not ffi_ok then
 	local M = { error = 'FFI not available, resolver bindings disabled.' }
 	setmetatable(M, {__index = function(t,k,v) error(rawget(M, 'error')) end })
@@ -13,6 +14,7 @@ local band = bit.band
 local C = ffi.C
 local knot = ffi.load(libknot_SONAME)
 
+-- Various declarations that are very stable.
 ffi.cdef[[
 
 /*
@@ -76,7 +78,7 @@ struct rr_type {
 struct pkt_section {
 	static const int ANSWER     = 0;
 	static const int AUTHORITY  = 1;
-	static const int ADDITIONAL = 2;	
+	static const int ADDITIONAL = 2;
 };
 struct pkt_rcode {
 	static const int NOERROR    =  0;
@@ -91,27 +93,6 @@ struct pkt_rcode {
 	static const int NOTAUTH    =  9;
 	static const int NOTZONE    = 10;
 	static const int BADVERS    = 16;
-};
-struct query_flag {
-	static const int NO_MINIMIZE = 1 << 0;
-	static const int NO_THROTTLE = 1 << 1;
-	static const int NO_IPV6     = 1 << 2;
-	static const int NO_IPV4     = 1 << 3;
-	static const int RESOLVED    = 1 << 5;
-	static const int AWAIT_CUT   = 1 << 8;
-	static const int CACHED      = 1 << 10;
-	static const int NO_CACHE    = 1 << 11;
-	static const int EXPIRING    = 1 << 12;
-	static const int DNSSEC_WANT = 1 << 14;
-	static const int DNSSEC_BOGUS    = 1 << 15;
-	static const int DNSSEC_INSECURE = 1 << 16;
-	static const int STUB        = 1 << 17;
-	static const int ALWAYS_CUT  = 1 << 18;
-	static const int PERMISSIVE  = 1 << 20;
-	static const int STRICT      = 1 << 21;
-	static const int BADCOOKIE_AGAIN = 1 << 22;
-	static const int CNAME       = 1 << 23;
-	static const int REORDER_RR  = 1 << 24;
 };
 
 /*
@@ -129,194 +110,14 @@ struct sockaddr {
     uint8_t _stub[]; /* Do not touch */
 };
 
-/* libknot */
-typedef struct {
-	uint8_t _stub[]; /* Do not touch */
-} knot_dump_style_t;
-extern const knot_dump_style_t KNOT_DUMP_STYLE_DEFAULT;
-typedef int knot_section_t; /* Do not touch */
-typedef void knot_rrinfo_t; /* Do not touch */
-typedef uint8_t knot_dname_t;
-typedef uint8_t knot_rdata_t;
-typedef struct knot_rdataset {
-	uint16_t count;
-	knot_rdata_t *data;
-} knot_rdataset_t;
-typedef struct knot_rrset {
-	knot_dname_t *_owner;
-	uint16_t type;
-	uint16_t class;
-	knot_rdataset_t rr;
-} knot_rrset_t;
-typedef struct {
-	struct knot_pkt *pkt;
-	uint16_t pos;
-	uint16_t count;
-} knot_pktsection_t;
-typedef struct { /* some names differ now in knot */
-	uint8_t *wire;
-	size_t size;
-	size_t max_size;
-	size_t parsed;
-	uint16_t reserved;
-	uint16_t qname_size;
-	uint16_t rrset_count;
-	uint16_t flags;
-	knot_rrset_t *opt;
-	knot_rrset_t *tsig;
-	struct {
-		uint8_t *pos;
-		size_t len;
-	} tsig_wire;
-	knot_section_t _current;
-	knot_pktsection_t _sections[3];
-	size_t _rrset_allocd;
-	knot_rrinfo_t *_rr_info;
-	knot_rrset_t *_rr;
-	uint8_t _stub[]; /* Do not touch */
-} knot_pkt_t;
-
-/* generics */
-typedef void *(*map_alloc_f)(void *, size_t);
-typedef void (*map_free_f)(void *baton, void *ptr);
-typedef struct {
-	void *root;
-	map_alloc_f malloc;
-	map_free_f free;
-	void *baton;
-} map_t;
-
-/* libkres */
-typedef struct {
-	knot_rrset_t *at;
-	size_t len;
-	size_t cap;
-} rr_array_t;
-struct kr_zonecut {
-	knot_dname_t *name;
-	knot_rrset_t *key;
-	knot_rrset_t *trust_anchor;
-	uint8_t _stub[]; /* Do not touch */
-};
-struct kr_query {
-	struct kr_query *parent;
-	knot_dname_t *sname;
-	uint16_t type;
-	uint16_t class;
-	uint16_t id;
-	uint32_t flags;
-	uint32_t secret;
-	uint16_t fails;
-	uint16_t reorder;
-	struct timeval timestamp;
-	struct kr_zonecut zone_cut;
-	uint8_t _stub[]; /* Do not touch */
-};
-struct kr_rplan {
-	uint8_t _stub[]; /* Do not touch */
-};
-struct kr_request {
-	struct kr_context *ctx;
-	knot_pkt_t *answer;
-	struct kr_query *current_query;
-	struct {
-		const knot_rrset_t *key;
-		const struct sockaddr *addr;
-		const struct sockaddr *dst_addr;
-		const knot_pkt_t *packet;
-		const knot_rrset_t *opt;
-	} qsource;
-	struct {
-	    unsigned rtt;
-	    const struct sockaddr *addr;
-	} upstream;
-	uint32_t options;
-	int state;
-	rr_array_t authority;
-	rr_array_t additional;
-	uint8_t _stub[]; /* Do not touch */
-};
-struct kr_context
-{	
-	uint32_t options;
-	knot_rrset_t *opt_rr;
-	map_t trust_anchors;
-	map_t negative_anchors;
-	uint8_t _stub[]; /* Do not touch */
-};
-
 /*
  * libc APIs
  */
 void free(void *ptr);
 int inet_pton(int af, const char *src, void *dst);
-
-/*
- * libknot APIs
- */
-/* Domain names */
-int knot_dname_size(const knot_dname_t *name);
-knot_dname_t *knot_dname_from_str(uint8_t *dst, const char *name, size_t maxlen);
-char *knot_dname_to_str(char *dst, const knot_dname_t *name, size_t maxlen);
-/* Resource records */
-uint16_t knot_rdata_rdlen(const knot_rdata_t *rr);
-uint8_t *knot_rdata_data(const knot_rdata_t *rr);
-knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *rrs, size_t pos);
-uint32_t knot_rrset_ttl(const knot_rrset_t *rrset);
-int knot_rrset_txt_dump_data(const knot_rrset_t *rrset, size_t pos, char *dst, size_t maxlen, const knot_dump_style_t *style);
-int knot_rrset_txt_dump(const knot_rrset_t *rrset, char *dst, size_t maxlen, const knot_dump_style_t *style);
-
-/* Packet */
-const knot_dname_t *knot_pkt_qname(const knot_pkt_t *pkt);
-uint16_t knot_pkt_qtype(const knot_pkt_t *pkt);
-uint16_t knot_pkt_qclass(const knot_pkt_t *pkt);
-int knot_pkt_begin(knot_pkt_t *pkt, int section_id);
-int knot_pkt_put_question(knot_pkt_t *pkt, const knot_dname_t *qname, uint16_t qclass, uint16_t qtype);
-const knot_rrset_t *knot_pkt_rr(const knot_pktsection_t *section, uint16_t i);
-const knot_pktsection_t *knot_pkt_section(const knot_pkt_t *pkt,
-                                          knot_section_t section_id);
-
-/*
- * libkres API
- */
-/* Resolution request */
-struct kr_rplan *kr_resolve_plan(struct kr_request *request);
-void *kr_resolve_pool(struct kr_request *request);
-/* Resolution plan */
-struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
-                               const knot_dname_t *name, uint16_t cls, uint16_t type);
-int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry);
-struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
-struct kr_query *kr_rplan_next(struct kr_query *qry);
-/* Nameservers */
-int kr_nsrep_set(struct kr_query *qry, size_t index, uint8_t *addr, size_t addr_len, int port);
-/* Query */
-/* Utils */
-unsigned kr_rand_uint(unsigned max);
-int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
-               uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
-int kr_pkt_recycle(knot_pkt_t *pkt);
-const char *kr_inaddr(const struct sockaddr *addr);
-int kr_inaddr_family(const struct sockaddr *addr);
-int kr_inaddr_len(const struct sockaddr *addr);
-int kr_straddr_family(const char *addr);
-int kr_straddr_subnet(void *dst, const char *addr);
-int kr_bitcmp(const char *a, const char *b, int bits);
-int kr_family_len(int family);
-int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, void *pool);
-/* Trust anchors */
-knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name);
-int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
-               uint32_t ttl, const uint8_t *rdata, uint16_t rdlen);
-int kr_ta_del(map_t *trust_anchors, const knot_dname_t *name);
-void kr_ta_clear(map_t *trust_anchors);
-/* DNSSEC */
-bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata);
-bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
-int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen);
-int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
-                        const uint8_t *key_b_rdata, size_t key_b_rdlen);
 ]]
+
+require('kres-gen')
 
 -- Constants
 local query_flag = ffi.new('struct query_flag')
@@ -341,19 +142,19 @@ ffi.metatype( knot_rrset_t, {
 		owner = function(rr) return ffi.string(rr._owner, knot.knot_dname_size(rr._owner)) end,
 		ttl = function(rr) return tonumber(knot.knot_rrset_ttl(rr)) end,
 		rdata = function(rr, i)
-			local rdata = knot.knot_rdataset_at(rr.rr, i)
+			local rdata = knot.knot_rdataset_at(rr.rrs, i)
 			return ffi.string(knot.knot_rdata_data(rdata), knot.knot_rdata_rdlen(rdata))
 		end,
 		get = function(rr, i)
 			return {owner = rr:owner(),
 			        ttl = rr:ttl(),
-			        class = tonumber(rr.class),
+			        class = tonumber(rr.rclass),
 			        type = tonumber(rr.type),
 			        rdata = rr:rdata(i)}
 		end,
 		tostring = function(rr, i)
 			assert(ffi.istype(knot_rrset_t, rr))
-			if rr.rr.count > 0 then
+			if rr.rrs.rr_count > 0 then
 				local ret
 				if i ~= nil then
 					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
@@ -398,7 +199,7 @@ ffi.metatype( knot_pkt_t, {
 			local section = knot.knot_pkt_section(pkt, section_id)
 			for i = 1, section.count do
 				local rrset = knot.knot_pkt_rr(section, i - 1)
-				for k = 1, rrset.rr.count do
+				for k = 1, rrset.rrs.rr_count do
 					table.insert(records, rrset:get(k - 1))
 				end
 			end

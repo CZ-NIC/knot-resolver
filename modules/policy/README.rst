@@ -49,7 +49,7 @@ Example configuration
 	end)
 	-- Disallow ANY queries
 	policy.add(function (req, query)
-		if query.type == kres.type.ANY then
+		if query.stype == kres.type.ANY then
 			return policy.DROP
 		end
 	end)
