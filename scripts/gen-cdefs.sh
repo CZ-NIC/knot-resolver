@@ -35,19 +35,19 @@ fi
 
 GDB="gdb -n -quiet -batch -symbols=$library"
 
-grep -v '^#\|^$' | while read ident; do
+grep -v '^#\|^$' | while read -r ident; do
 	if [ "$2" = functions ]; then
-		output=$($GDB -iex "set width unlimited" --ex "info functions ^$ident\$" \
-				| sed '0,/^All functions/ d; /^File .*:$/ d')
+		output="$($GDB -iex "set width unlimited" --ex "info functions ^$ident\$" \
+				| sed '0,/^All functions/ d; /^File .*:$/ d')"
 	else # types
 		case "$ident" in
 			struct\ *|union\ *|enum\ *)
-				output=$($GDB -iex "set width unlimited" --ex "ptype $ident" \
-						| sed '0,/^type = /s/^type = /\n/; $ s/$/;/')
+				output="$($GDB -iex "set width unlimited" --ex "ptype $ident" \
+						| sed '0,/^type = /s/^type = /\n/; $ s/$/;/')"
 				;;
 			*)
-				output=$($GDB -iex "set width unlimited" --ex "info types ^$ident\$" \
-						| sed -e '0,/^File .*:$/ d' -e '/^File .*:$/,$ d')
+				output="$($GDB -iex "set width unlimited" --ex "info types ^$ident\$" \
+						| sed -e '0,/^File .*:$/ d' -e '/^File .*:$/,$ d')"
 						# we need to stop early to remove ^^ multiple matches
 				;;
 		esac
