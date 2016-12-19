@@ -197,14 +197,20 @@ local function ephemeralcert(host)
 	-- Import luaossl directly
 	local name = require('openssl.x509.name')
 	local altname = require('openssl.x509.altname')
+	local openssl_bignum = require('openssl.bignum')
+	local openssl_rand = require('openssl.rand')
 	-- Create self-signed certificate
 	host = host or hostname()
 	local crt = x509.new()
 	local now = os.time()
-	crt:setSerial(now)
+	crt:setVersion(3)
+	-- serial needs to be unique or browsers will show uninformative error messages
+	crt:setSerial(openssl_bignum.fromBinary(openssl_rand.bytes(16)))
+	-- use the host we're listening on as canonical name
 	local dn = name.new()
 	dn:add("CN", host)
 	crt:setSubject(dn)
+	crt:setIssuer(dn) -- should match subject for a self-signed
 	local alt = altname.new()
 	alt:add("DNS", host)
 	crt:setSubjectAlt(alt)
