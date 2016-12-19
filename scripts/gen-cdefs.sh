@@ -43,7 +43,7 @@ grep -v '^#\|^$' | while read ident; do
 		case "$ident" in
 			struct\ *|union\ *|enum\ *)
 				output=$($GDB -iex "set width unlimited" --ex "ptype $ident" \
-						| sed '0,/^type = /s/^type = /\n/' ; echo ";")
+						| sed '0,/^type = /s/^type = /\n/; $ s/$/;/')
 				;;
 			*)
 				output=$($GDB -iex "set width unlimited" --ex "info types ^$ident\$" \
