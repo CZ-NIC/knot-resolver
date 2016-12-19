@@ -147,7 +147,7 @@ end
 
 -- Web server service closure
 local function route(endpoints)
-	return function (stream)
+	return function (_, stream)
 		-- HTTP/2: We're only permitted to send in open/half-closed (remote)
 		local connection = stream.connection
 		if connection.version >= 2 then
@@ -188,7 +188,6 @@ local function route(endpoints)
 				end
 			end
 		end
-		stream:shutdown()
 	end
 end
 
@@ -291,22 +290,20 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 			panic('failed to load certificate "%s" - %s', crtfile, err or 'error')
 		end
 	end
+	-- Compose server handler
+	local routes = route(endpoints)
 	-- Create TLS context and start listening
 	local s, err = server.listen {
+		cq = cq;
 		host = host,
 		port = port,
 		client_timeout = 5,
 		ctx = crt and tlscontext(crt, key),
+		onstream = routes;
 	}
 	if not s then
 		panic('failed to listen on %s#%d: %s', host, port, err)
 	end
-	-- Compose server handler
-	local routes = route(endpoints)
-	cq:wrap(function ()
-		assert(s:run(routes))
-		s:close()
-	end)
 	table.insert(M.servers, s)
 	-- Create certificate renewal timer if ephemeral
 	if crt and ephemeral then
