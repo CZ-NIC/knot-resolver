@@ -13,6 +13,7 @@ local cqueues = require('cqueues')
 local server = require('http.server')
 local headers = require('http.headers')
 local websocket = require('http.websocket')
+local http_util = require "http.util"
 local x509, pkey = require('openssl.x509'), require('openssl.pkey')
 local has_mmdb, mmdb  = pcall(require, 'mmdb')
 
@@ -172,7 +173,7 @@ local function route(endpoints)
 			ws:close()
 			return
 		else
-			local ok, err, reason = pcall(serve, h, stream)
+			local ok, err, reason = http_util.yieldable_pcall(serve, h, stream)
 			if not ok or err then
 				if err ~= '404' then
 					log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
