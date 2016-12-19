@@ -54,7 +54,7 @@ local function enqueue(queries)
 	local nr_queries = #queries
 	for i = 1, nr_queries do
 		local entry = queries[i]
-		local key = string.format('%s %s', entry.type, entry.name)
+		local key = string.format('%s %s', entry.stype, entry.name)
 		if not predict.queue[key] then
 			predict.queue[key] = 1
 			queued = queued + 1
@@ -86,7 +86,7 @@ function predict.sample(epoch_now)
 	local nr_samples = #queries
 	for i = 1, nr_samples do
 		local entry = queries[i]
-		local key = string.format('%s %s', entry.type, entry.name)
+		local key = string.format('%s %s', entry.stype, entry.name)
 		current[key] = 1
 	end
 	predict.log[epoch_now] = current

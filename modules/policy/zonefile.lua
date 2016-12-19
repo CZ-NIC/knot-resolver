@@ -1,6 +1,6 @@
 -- LuaJIT ffi bindings for zscanner, a DNS zone parser.
 -- Author: Marek Vavrusa <marek.vavrusa@nic.cz>
---
+-- FIXME: generate
 
 local ffi = require('ffi')
 local libzscanner = ffi.load(libzscanner_SONAME)

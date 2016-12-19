@@ -8,7 +8,7 @@ kresd_SOURCES := \
 	daemon/tls.c         \
 	daemon/main.c
 
-kresd_DIST := daemon/lua/kres.lua daemon/lua/trust_anchors.lua
+kresd_DIST := daemon/lua/kres.lua daemon/lua/kres-gen.lua daemon/lua/trust_anchors.lua
 
 # Embedded resources
 %.inc: %.lua
@@ -44,7 +44,7 @@ endif
 
 # Targets
 date := $(shell date +%F)
-daemon: $(kresd)
+daemon: $(kresd) $(kresd_DIST)
 daemon-install: kresd-install bindings-install
 ifneq ($(SED),)
 	$(SED) -e "s/@VERSION@/$(VERSION)/" -e "s/@DATE@/$(date)/" doc/kresd.8.in > doc/kresd.8
@@ -53,5 +53,10 @@ ifneq ($(SED),)
 endif
 daemon-clean: kresd-clean
 	@$(RM) daemon/lua/*.inc
+
+daemon/lua/kres-gen.lua: | $(libkres)
+	@echo "WARNING: regenerating $@"
+	daemon/lua/kres-gen.sh > $@
+.DELETE_ON_ERROR: daemon/lua/kres-gen.lua
 
 .PHONY: daemon daemon-install daemon-clean
