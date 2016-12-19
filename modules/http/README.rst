@@ -246,7 +246,7 @@ Dependencies
 
     .. code-block:: bash
 
-       $ luarocks install --server=https://luarocks.org/dev http CC=cc
+       $ luarocks install http
 
 * `mmdblua <https://github.com/daurnimator/mmdblua>`_ available in LuaRocks
 
