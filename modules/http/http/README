@@ -1,5 +1,0 @@
-Embedded unstable APIs from https://github.com/daurnimator/lua-http under MIT license, see LICENSE.
-
-ChangeLog:
-* Marek Vavrusa <marek@vavrusa.com>:
-  - Modified h2_connection to reuse current cqueue context

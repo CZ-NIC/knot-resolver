@@ -10,9 +10,10 @@ if worker.id > 0 then return {} end
 -- One example is statistics module that can stream live metrics on the website,
 -- or publish metrics on request for Prometheus scraper.
 local cqueues = require('cqueues')
-local server = require('http.server')
-local headers = require('http.headers')
-local websocket = require('http.websocket')
+local http_server = require('http.server')
+local http_headers = require('http.headers')
+local http_websocket = require('http.websocket')
+local http_util = require "http.util"
 local x509, pkey = require('openssl.x509'), require('openssl.pkey')
 local has_mmdb, mmdb  = pcall(require, 'mmdb')
 
@@ -108,7 +109,7 @@ M.snippets = {}
 -- Serve known requests, for methods other than GET
 -- the endpoint must be a closure and not a preloaded string
 local function serve(h, stream)
-	local hsend = headers.new()
+	local hsend = http_headers.new()
 	local path = h:get(':path')
 	local entry = M.endpoints[path]
 	if not entry then -- Accept top-level path match
@@ -147,7 +148,7 @@ end
 
 -- Web server service closure
 local function route(endpoints)
-	return function (stream)
+	return function (_, stream)
 		-- HTTP/2: We're only permitted to send in open/half-closed (remote)
 		local connection = stream.connection
 		if connection.version >= 2 then
@@ -160,7 +161,7 @@ local function route(endpoints)
 		local m = h:get(':method')
 		local path = h:get(':path')
 		-- Upgrade connection to WebSocket
-		local ws = websocket.new_from_stream(h, stream)
+		local ws = http_websocket.new_from_stream(h, stream)
 		if ws then
 			assert(ws:accept { protocols = {'json'} })
 			-- Continue streaming results to client
@@ -172,13 +173,13 @@ local function route(endpoints)
 			ws:close()
 			return
 		else
-			local ok, err, reason = pcall(serve, h, stream)
+			local ok, err, reason = http_util.yieldable_pcall(serve, h, stream)
 			if not ok or err then
 				if err ~= '404' then
 					log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
 				end
 				-- Method is not supported
-				local hsend = headers.new()
+				local hsend = http_headers.new()
 				hsend:append(':status', err or '500')
 				if reason then
 					assert(stream:write_headers(hsend, false))
@@ -188,7 +189,6 @@ local function route(endpoints)
 				end
 			end
 		end
-		stream:shutdown()
 	end
 end
 
@@ -197,14 +197,20 @@ local function ephemeralcert(host)
 	-- Import luaossl directly
 	local name = require('openssl.x509.name')
 	local altname = require('openssl.x509.altname')
+	local openssl_bignum = require('openssl.bignum')
+	local openssl_rand = require('openssl.rand')
 	-- Create self-signed certificate
 	host = host or hostname()
 	local crt = x509.new()
 	local now = os.time()
-	crt:setSerial(now)
+	crt:setVersion(3)
+	-- serial needs to be unique or browsers will show uninformative error messages
+	crt:setSerial(openssl_bignum.fromBinary(openssl_rand.bytes(16)))
+	-- use the host we're listening on as canonical name
 	local dn = name.new()
 	dn:add("CN", host)
 	crt:setSubject(dn)
+	crt:setIssuer(dn) -- should match subject for a self-signed
 	local alt = altname.new()
 	alt:add("DNS", host)
 	crt:setSubjectAlt(alt)
@@ -285,22 +291,20 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 			panic('failed to load certificate "%s" - %s', crtfile, err or 'error')
 		end
 	end
+	-- Compose server handler
+	local routes = route(endpoints)
 	-- Create TLS context and start listening
-	local s, err = server.listen {
+	local s, err = http_server.listen {
+		cq = cq;
 		host = host,
 		port = port,
 		client_timeout = 5,
 		ctx = crt and tlscontext(crt, key),
+		onstream = routes;
 	}
 	if not s then
 		panic('failed to listen on %s#%d: %s', host, port, err)
 	end
-	-- Compose server handler
-	local routes = route(endpoints)
-	cq:wrap(function ()
-		assert(s:run(routes))
-		s:close()
-	end)
 	table.insert(M.servers, s)
 	-- Create certificate renewal timer if ephemeral
 	if crt and ephemeral then
@@ -322,7 +326,10 @@ end
 -- @function Cleanup module
 function M.deinit()
 	if M.ev then event.cancel(M.ev) end
-	M.servers = {}
+	for i, server in ipairs(M.servers) do
+		server:close()
+		M.servers[i] = nil
+	end
 	prometheus.deinit()
 end
 
