@@ -10,9 +10,9 @@ if worker.id > 0 then return {} end
 -- One example is statistics module that can stream live metrics on the website,
 -- or publish metrics on request for Prometheus scraper.
 local cqueues = require('cqueues')
-local server = require('http.server')
-local headers = require('http.headers')
-local websocket = require('http.websocket')
+local http_server = require('http.server')
+local http_headers = require('http.headers')
+local http_websocket = require('http.websocket')
 local http_util = require "http.util"
 local x509, pkey = require('openssl.x509'), require('openssl.pkey')
 local has_mmdb, mmdb  = pcall(require, 'mmdb')
@@ -109,7 +109,7 @@ M.snippets = {}
 -- Serve known requests, for methods other than GET
 -- the endpoint must be a closure and not a preloaded string
 local function serve(h, stream)
-	local hsend = headers.new()
+	local hsend = http_headers.new()
 	local path = h:get(':path')
 	local entry = M.endpoints[path]
 	if not entry then -- Accept top-level path match
@@ -161,7 +161,7 @@ local function route(endpoints)
 		local m = h:get(':method')
 		local path = h:get(':path')
 		-- Upgrade connection to WebSocket
-		local ws = websocket.new_from_stream(h, stream)
+		local ws = http_websocket.new_from_stream(h, stream)
 		if ws then
 			assert(ws:accept { protocols = {'json'} })
 			-- Continue streaming results to client
@@ -179,7 +179,7 @@ local function route(endpoints)
 					log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
 				end
 				-- Method is not supported
-				local hsend = headers.new()
+				local hsend = http_headers.new()
 				hsend:append(':status', err or '500')
 				if reason then
 					assert(stream:write_headers(hsend, false))
@@ -294,7 +294,7 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 	-- Compose server handler
 	local routes = route(endpoints)
 	-- Create TLS context and start listening
-	local s, err = server.listen {
+	local s, err = http_server.listen {
 		cq = cq;
 		host = host,
 		port = port,
