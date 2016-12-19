@@ -232,7 +232,7 @@ This way you can have different internal-facing and external-facing services at 
 Dependencies
 ^^^^^^^^^^^^
 
-* `lua-http <https://github.com/daurnimator/lua-http>`_ available in LuaRocks
+* `lua-http <https://github.com/daurnimator/lua-http>`_ (>= 0.1) available in LuaRocks
 
     If you're installing via Homebrew on OS X, you need OpenSSL too.
 
