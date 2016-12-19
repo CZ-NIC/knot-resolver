@@ -326,7 +326,10 @@ end
 -- @function Cleanup module
 function M.deinit()
 	if M.ev then event.cancel(M.ev) end
-	M.servers = {}
+	for i, server in ipairs(M.servers) do
+		server:close()
+		M.servers[i] = nil
+	end
 	prometheus.deinit()
 end
 
