@@ -7,12 +7,16 @@ if [ "$2" != types ] && [ "$2" != functions ]; then
 	exit 1
 fi
 
-if type -P gdb >/dev/null; then :; else
+if ! command -v gdb >/dev/null; then
 	echo "Failed to find gdb" >&2
 	exit 1
 fi
 
-library="$(PATH="$(pwd)/lib:$(pkg-config libknot --variable=libdir)" type -P "$1.so")"
+case "$1" in
+    libknot) library="$(PATH="$(pkg-config libknot --variable=libdir)" command -v "$1.so")" ;;
+    *) library="$(PATH="$(pwd)/lib" command -v "$1.so")"
+esac
+
 if [ -z "$library" ]; then
 	echo "$1 not found.  Note: only .so platforms work currently." >&2
 	exit 1
@@ -22,7 +26,7 @@ GDB="gdb -quiet -symbols=$library"
 
 grep -v '^#\|^$' | while read ident; do
 	output="$(
-		if [ "$2" == functions ]; then
+		if [ "$2" = functions ]; then
 			$GDB --ex "info functions ^$ident\$" --ex quit \
 				| sed '1,/^All functions/ d; /^File .*:$/ d'
 			continue
@@ -49,3 +53,4 @@ grep -v '^#\|^$' | while read ident; do
 	echo "$output" | grep -v '^$'
 done
 
+exit 0
