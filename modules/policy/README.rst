@@ -3,7 +3,7 @@
 Query policies 
 --------------
 
-This module can block, rewrite, or alter queries based on user-defined policies.
+This module can block, rewrite, or alter inbound queries based on user-defined policies.
 By default, it blocks queries to reverse lookups in private subnets as per :rfc:`1918`, :rfc:`5735` and :rfc:`5737`.
 You can however extend it to deflect `Slow drip DNS attacks <https://blog.secure64.com/?p=377>`_ for example, or gray-list resolution of misbehaving zones.
 
@@ -27,6 +27,8 @@ There are several defined actions:
 * ``FORWARD(ip)`` - forward query to given IP and proxy back response (stub mode)
 * ``MIRROR(ip)`` - mirror query to given IP and continue solving it (useful for partial snooping)
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
+
+.. warning:: The policy module only looks at the inbound DNS queries.  Thus the ``FORWARD(ip)`` policy does only forward inbound query to the specified IP address(es) and it doesn't and it can't do DNSSEC validation.  If you need DNSSEC validation, you either need to disable ``FORWARD(ip)`` policy or use an upstream DNSSEC-validating resolver.
 
 .. note:: The module (and ``kres``) expects domain names in wire format, not textual representation. So each label in name is prefixed with its length, e.g. "example.com" equals to ``"\7example\3com"``. You can use convenience function ``todname('example.com')`` for automatic conversion.
 
