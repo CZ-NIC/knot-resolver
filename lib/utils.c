@@ -503,6 +503,8 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 	return NULL;
 }
 
+#ifndef NDEBUG
+
 void kr_rrset_print(const knot_rrset_t *rr)
 {
 	char rrtext[KNOT_DNAME_MAXLEN * 2] = {0};
@@ -560,3 +562,6 @@ void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *post
 	knot_rrtype_to_string(rrtype, str, 32);
 	printf ("%s%s%s", prefix, str, postfix);
 }
+
+#endif /* !NDEBUG */
+
