@@ -161,7 +161,7 @@ local function route(endpoints)
 		local m = h:get(':method')
 		local path = h:get(':path')
 		-- Upgrade connection to WebSocket
-		local ws = http_websocket.new_from_stream(h, stream)
+		local ws = http_websocket.new_from_stream(stream, h)
 		if ws then
 			assert(ws:accept { protocols = {'json'} })
 			-- Continue streaming results to client
