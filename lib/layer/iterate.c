@@ -262,18 +262,6 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	return state;
 }
 
-static bool contains_owner(ranked_rr_array_t *arr, const knot_dname_t *owner)
-{
-	bool ret = false;
-	for (size_t i = 0; i < arr->len; ++i) {
-		if (knot_dname_in(owner, arr->at[i]->rr->owner)) {
-			ret = true;
-			break;
-		}
-	}
-	return ret;
-}
-
 static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 {
 	struct kr_query *qry = req->current_query;
@@ -291,8 +279,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (!knot_dname_in(zonecut_name, rr->owner) &&
-		    !contains_owner(&req->answ_selected, rr->owner)) {
+		if (!knot_dname_in(zonecut_name, rr->owner)) {
 			continue;
 		}
 		int ret = kr_ranked_rrarray_add(&req->auth_selected, rr,
