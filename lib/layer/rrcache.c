@@ -206,6 +206,7 @@ static int commit_rr(const char *key, void *val, void *data)
 		}
 	}
 	if (baton->qry->flags & QUERY_DNSSEC_INSECURE && rank != KR_RANK_BAD) {
+		rank &= ~KR_RANK_SECURE;
 		rank |= KR_RANK_INSECURE;
 	}
 	if (KEY_COVERING_RRSIG(key)) {
