@@ -318,7 +318,6 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		}
 	}
 #endif
-
 	/* Remember current bailiwick for NS processing. */
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
 	/* Update zone cut information. */
