@@ -36,6 +36,11 @@
 #define KR_COLD
 #endif
 
+#ifndef uint /* Redefining typedef is a C11 feature. */
+typedef unsigned int uint;
+#define uint uint
+#endif
+
 /*
  * Error codes.
  */

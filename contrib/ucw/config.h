@@ -38,7 +38,12 @@ typedef int32_t s32;			/** Exactly 32 bits, signed **/
 typedef uint64_t u64;			/** Exactly 64 bits, unsigned **/
 typedef int64_t s64;			/** Exactly 64 bits, signed **/
 
+
+#ifndef uint /* Redefining typedef is a C11 feature. */
 typedef unsigned int uint;		/** A better pronounceable alias for `unsigned int` **/
+#define uint uint
+#endif
+
 typedef s64 timestamp_t;		/** Milliseconds since an unknown epoch **/
 
 // FIXME: This should be removed soon
