@@ -151,7 +151,6 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				size_t key_pos, const struct dseckey *key)
 {
 	const knot_pkt_t *pkt         = vctx->pkt;
-	knot_section_t section_id     = vctx->section_id;
 	const knot_rrset_t *keys      = vctx->keys;
 	const knot_dname_t *zone_name = vctx->zone_name;
 	uint32_t timestamp            = vctx->timestamp;

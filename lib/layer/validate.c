@@ -74,17 +74,6 @@ static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
 	return section_has_type(knot_pkt_section(pkt, KNOT_ADDITIONAL), type);
 }
 
-static int validate_rrset(const char *key, void *val, void *data)
-{
-	knot_rrset_t *rr = val;
-	kr_rrset_validation_ctx_t *vctx = data;
-	if (vctx->result != 0) {
-		return vctx->result;
-	}
-
-	return kr_rrset_validate(vctx, rr);
-}
-
 static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 {
 	if (!vctx) {
@@ -96,7 +85,6 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 	 */
 	vctx->zone_name = vctx->keys ? vctx->keys->owner  : NULL;
 
-	int ret = 0;
 	int validation_result = 0;
 	for (ssize_t i = 0; i < vctx->rrs->len; ++i) {
 		ranked_rr_array_entry_t *entry = vctx->rrs->at[i];
@@ -187,7 +175,6 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 {
 	/* Merge DNSKEY records from answer that are below/at current cut. */
 	struct kr_query *qry = req->current_query;
-	const knot_dname_t *ta_name = qry->zone_cut.trust_anchor ? qry->zone_cut.trust_anchor->owner : NULL;
 	bool updated_key = false;
 	const knot_pktsection_t *an = knot_pkt_section(answer, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
