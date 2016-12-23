@@ -243,13 +243,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		/* Choose when to use glue records. */
 		if (qry->flags & QUERY_PERMISSIVE) {
 			fetch_glue(pkt, ns_name, req);
-		} else if ((qry->flags & (QUERY_STRICT | QUERY_DNSSEC_WANT)) ==
-			   QUERY_STRICT) {
-			/* Strict mode uses only mandatory glue for unsecure query.
-			 * If secure, we'll got circular dependency ->
-			 * we need to fetch DNSKEY,
-			 * so we need to fetch glue from authoritative ns,
-			 * but we can't validate glue due to DNSKEY absense */
+		} else if (qry->flags & QUERY_STRICT) {
 			if (knot_dname_in(cut->name, ns_name))
 				fetch_glue(pkt, ns_name, req);
 		} else {
