@@ -38,7 +38,7 @@
 #include <ccan/json/json.h>
 #include <fstrm.h>
 
-#define DEBUG_MSG(fmt, ...) kr_log_debug("[dnstap] " fmt, ##__VA_ARGS__);
+#define DEBUG_MSG(fmt, ...) kr_log_verbose("[dnstap] " fmt, ##__VA_ARGS__);
 #define CFG_SOCK_PATH "sockPath"
 #define CFG_LOG_RESP_PKT "logRespPkt"
 #define DEFAULT_SOCK_PATH "/tmp/dnstap.sock"
@@ -107,8 +107,8 @@ static void set_address(const struct sockaddr *sockaddr,
 }
 
 /* dnstap_log prepares dnstap message and sent it to fstrm */
-static int dnstap_log(knot_layer_t *ctx) {
-	struct kr_request *req = ctx->data;
+static int dnstap_log(kr_layer_t *ctx) {
+	struct kr_request *req = ctx->req;
 	struct kr_module *module = ctx->api->data;
 	struct kr_rplan *rplan = &req->rplan;
 	struct dnstap_data *dnstap_dt = module->data;
@@ -397,8 +397,8 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 }
 
 KR_EXPORT
-const knot_layer_api_t *dnstap_layer(struct kr_module *module) {
-	static knot_layer_api_t _layer = {
+const kr_layer_api_t *dnstap_layer(struct kr_module *module) {
+	static kr_layer_api_t _layer = {
 		.finish = &dnstap_log,
 	};
 	/* Store module reference */
