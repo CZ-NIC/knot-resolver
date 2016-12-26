@@ -6,8 +6,7 @@ contrib_SOURCES := \
 	contrib/ucw/mempool.c \
 	contrib/murmurhash3/murmurhash3.c \
 	contrib/base32hex.c \
-	contrib/base64.c \
-	contrib/dnstap/dnstap.pb-c.c
+	contrib/base64.c
 contrib_CFLAGS := -fPIC
 contrib_TARGET := $(abspath contrib)/contrib$(AREXT)
 
@@ -17,6 +16,10 @@ contrib_SOURCES += contrib/lmdb/mdb.c \
                    contrib/lmdb/midl.c
 contrib_CFLAGS  += -pthread
 contrib_LIBS    += -pthread
+endif
+
+ifeq ($(ENABLE_DNSTAP), yes)
+contrib_SOURCES += contrib/dnstap/dnstap.pb-c.c
 endif
 
 $(eval $(call make_static,contrib,contrib))
