@@ -9,7 +9,7 @@ WORKDIR=${2:-$(mktemp -d /tmp/knot-resolver.XXXXXX)}
 
 PREFIX=${PREFIX:-$WORKDIR} make clean
 
-CFLAGS=${CFLAGS:-"-O2 -g3"} PREFIX=${PREFIX:-$WORKDIR} make -j ${JOBS}
+CFLAGS=${CFLAGS:-"-O2 -g3"} PREFIX=${PREFIX:-$WORKDIR} make -j ${JOBS} V=1
 
 PREFIX=${PREFIX:-$WORKDIR} make install
 
