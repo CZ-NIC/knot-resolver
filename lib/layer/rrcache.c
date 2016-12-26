@@ -308,9 +308,12 @@ static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash
 		}
 		/* Look up glue records for NS */
 		if (rr->type == KNOT_RRTYPE_NS) {
-			const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, 0);
-			if (qry->flags & QUERY_PERMISSIVE || knot_dname_in(qry->zone_cut.name, ns_name)) {
-				stash_glue(stash, pkt, ns_name, pool);
+			for (size_t j = 0; j < rr->rrs.rr_count; ++j) {
+				const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, j);
+				if (qry->flags & QUERY_PERMISSIVE ||
+				    knot_dname_in(qry->zone_cut.name, ns_name)) {
+					stash_glue(stash, pkt, ns_name, pool);
+				}
 			}
 		}
 		kr_rrmap_add(stash, rr, rank, pool);
