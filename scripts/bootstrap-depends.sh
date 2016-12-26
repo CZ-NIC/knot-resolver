@@ -23,6 +23,12 @@ HIREDIS_TAG="v0.13.3"
 HIREDIS_URL="https://github.com/redis/hiredis.git"
 LIBMEMCACHED_TAG="1.0.18"
 LIBMEMCACHED_URL="https://launchpad.net/libmemcached/1.0/${LIBMEMCACHED_TAG}/+download/libmemcached-${LIBMEMCACHED_TAG}.tar.gz"
+PROTOBUF_URL="https://github.com/google/protobuf/archive/v3.1.0.tar.gz"
+PROTOBUF_VER="3.1.0"
+PROTOBUFC_URL="https://github.com/protobuf-c/protobuf-c/releases/download/v1.2.1/protobuf-c-1.2.1.tar.gz"
+PROTOBUFC_VER="1.2.1"
+FSTRM_URL="https://github.com/farsightsec/fstrm/archive/v0.3.0.tar.gz"
+FSTRM_VER="0.3.0"
 
 if command -v shasum >/dev/null; then
     SHASUM="shasum -a 256"
@@ -148,6 +154,9 @@ pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 pkg lua ${LUA_URL} v${LUA_VER} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
+pkg protobuf ${PROTOBUF_URL} ${PROTOBUF_VER} lib/pkgconfig/protobuf.pc
+pkg protobuf-c ${PROTOBUFC_URL} ${PROTOBUFC_VER} include/protobuf-c/protobuf-c.h
+pkg fstrm ${FSTRM_URL} ${FSTRM_VER} include/fstrm.h --with-library-only
 
 # development releases of luajit do NOT install bin/luajit
 ln -sf "luajit-${LUA_VER}" "${PREFIX}/bin/luajit"

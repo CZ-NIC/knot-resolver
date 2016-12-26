@@ -33,7 +33,7 @@ $(eval $(call find_lib,hiredis,,yes))
 $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libsystemd,227))
 $(eval $(call find_lib,gnutls))
-$(eval $(call find_lib,libprotobuf-c,1.2.1))
+$(eval $(call find_lib,libprotobuf-c,1))
 $(eval $(call find_lib,libfstrm,0.2))
 
 # Lookup SONAME
