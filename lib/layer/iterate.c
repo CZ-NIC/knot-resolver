@@ -211,7 +211,8 @@ static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns)
 	return 0;
 }
 
-static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request *req)
+static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
+		      struct kr_request *req, const knot_dname_t *current_cut)
 {
 	struct kr_query *qry = req->current_query;
 	struct kr_zonecut *cut = &qry->zone_cut;
@@ -233,8 +234,6 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr, struct kr_request
 #endif
 	}
 
-	/* Remember current bailiwick for NS processing. */
-	const knot_dname_t *current_cut = cut->name;
 	/* Update zone cut name */
 	if (!knot_dname_is_equal(rr->owner, cut->name)) {
 		/* Remember parent cut and descend to new (keep keys and TA). */
@@ -305,11 +304,13 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	}
 #endif
 
+	/* Remember current bailiwick for NS processing. */
+	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
-			int state = update_cut(pkt, rr, req);
+			int state = update_cut(pkt, rr, req, current_zone_cut);
 			switch(state) {
 			case KR_STATE_DONE: result = state; break;
 			case KR_STATE_FAIL: return state; break;
