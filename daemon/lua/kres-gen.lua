@@ -63,8 +63,8 @@ typedef struct {
     size_t cap;
 } rr_array_t;
 struct ranked_rr_array_entry {
-    uint8_t rank;
     uint32_t qry_uid;
+    uint8_t rank;
     _Bool cached;
     _Bool yielded;
     _Bool to_wire;

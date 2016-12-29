@@ -92,8 +92,8 @@ static inline long time_diff(struct timeval *begin, struct timeval *end) {
 struct kr_context;
 typedef array_t(knot_rrset_t *) rr_array_t;
 struct ranked_rr_array_entry {
-	uint8_t rank;
 	uint32_t qry_uid;
+	uint8_t rank;
 	bool cached;
 	bool yielded;
 	bool to_wire;
