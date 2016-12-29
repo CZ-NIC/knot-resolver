@@ -148,7 +148,6 @@ struct kr_request {
 	struct kr_rplan rplan;
 	int has_tls;
 	knot_mm_t pool;
-	uint32_t next_uid;
 };
 
 /**
