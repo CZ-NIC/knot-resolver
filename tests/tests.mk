@@ -5,7 +5,7 @@ else
 $(warning cmocka not found, skipping unit tests)
 endif
 
-ifeq ($(ENABLE_DNSTAP)&$(HAS_go),yes&yes)
+ifeq ($(ENABLE_DNSTAP)|$(HAS_go),yes|yes)
 include tests/dnstap/src/dnstap-test/dnstap.mk
 endif
 
@@ -28,7 +28,7 @@ check-integration: $(deckard_DIR)/Makefile
 deckard: check-integration
 
 # Targets
-tests: check-unit check-dnstap
-tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean clean-dnstap
+tests: check-unit
+tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean
 
-.PHONY: tests tests-clean check-integration deckard check-dnstap clean-dnstap
+.PHONY: tests tests-clean check-integration deckard
