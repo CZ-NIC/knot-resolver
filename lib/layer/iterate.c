@@ -67,7 +67,7 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 
 	return query->id      == knot_wire_get_id(answer->wire) &&
 	       knot_wire_get_qdcount(answer->wire) > 0 &&
-	       (query->sclass == KNOT_CLASS_ANY || query->sclass  == knot_pkt_qclass(answer)) &&
+	       query->sclass  == knot_pkt_qclass(answer) &&
 	       qtype          == knot_pkt_qtype(answer) &&
 	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
@@ -527,6 +527,14 @@ static int begin(kr_layer_t *ctx)
 	if (!pkt || knot_wire_get_qdcount(pkt->wire) == 0) {
 		return KR_STATE_FAIL;
 	}
+
+	struct kr_query *qry = ctx->req->current_query;
+	/* Avoid any other classes. */
+	if (qry->sclass != KNOT_CLASS_IN) {
+		knot_wire_set_rcode(ctx->req->answer->wire, KNOT_RCODE_NOTIMPL);
+		return KR_STATE_FAIL;
+	}
+
 	return reset(ctx);
 }
 
