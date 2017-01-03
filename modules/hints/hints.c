@@ -182,6 +182,9 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	struct kr_module *module = ctx->api->data;
 	struct kr_zonecut *hint_map = module->data;
+	if (!hint_map) { /* No valid file. */
+		return ctx->state;
+	}
 	switch(qry->stype) {
 	case KNOT_RRTYPE_A:
 	case KNOT_RRTYPE_AAAA: /* Find forward record hints */
