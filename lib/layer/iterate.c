@@ -523,6 +523,10 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 				if (state != kr_ok()) {
 					return KR_STATE_FAIL;
 				}
+				if (!req->answ_selected.at[i]->to_wire) {
+					/* TODO relocate this record at the end */
+					req->answ_selected.at[i]->to_wire = true;
+				}
 				finalize_answer(pkt, query, req);
 				return KR_STATE_DONE;
 			}
