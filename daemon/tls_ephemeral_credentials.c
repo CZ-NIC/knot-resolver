@@ -109,9 +109,7 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 		if ((err = gnutls_x509_privkey_import (privkey, &data, GNUTLS_X509_FMT_PEM)) < 0) {
 			kr_log_error("[tls] gnutls_x509_privkey_import() failed: %d (%s)\n",
 				     err, gnutls_strerror_name(err));
-			goto bad_data;
-		}
-		if (0) {
+			/* goto bad_data; */
 		bad_data:
 			close(datafd);
 			datafd = -1;
@@ -185,7 +183,7 @@ static gnutls_x509_crt_t get_ephemeral_cert(gnutls_x509_privkey_t privkey, const
 #undef gtx
 
 	return cert;
- bad:
+bad:
 	gnutls_x509_crt_deinit(cert);
 	return NULL;
 }
