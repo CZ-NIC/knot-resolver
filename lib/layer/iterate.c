@@ -469,6 +469,44 @@ static int process_referral_answer(knot_pkt_t *pkt, struct kr_request *req)
 	return state == kr_ok() ? KR_STATE_DONE : KR_STATE_FAIL;
 }
 
+static int process_final(knot_pkt_t *pkt, struct kr_request *req,
+			 const knot_dname_t *cname)
+{
+	const int pkt_class = kr_response_classify(pkt);
+	struct kr_query *query = req->current_query;
+	ranked_rr_array_t *array = &req->answ_selected;
+	for (size_t i = 0; i < array->len; ++i) {
+		const knot_rrset_t *rr = array->at[i]->rr;
+		if (!knot_dname_is_equal(rr->owner, cname)) {
+			continue;
+		}
+		if ((rr->rclass != query->sclass) ||
+		    (rr->type != query->stype)) {
+			continue;
+		}
+		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
+		const int state = pick_authority(pkt, req, to_wire);
+		if (state != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
+		if (!array->at[i]->to_wire) {
+			const size_t last_idx = array->len - 1;
+			size_t j = i;
+			ranked_rr_array_entry_t *entry = array->at[i];
+			/* Relocate record to the end, after current cname */
+			while (j < last_idx) {
+				array->at[j] = array->at[j + 1];
+				++j;
+			}
+			array->at[last_idx] = entry;
+			entry->to_wire = true;
+		}
+		finalize_answer(pkt, query, req);
+		return KR_STATE_DONE;
+	}
+	return kr_ok();
+}
+
 static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *query = req->current_query;
@@ -509,26 +547,9 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		/* Check if target record has been already copied */
 		query->flags |= QUERY_CNAME;
 		if (is_final) {
-			for (size_t i = 0; i < req->answ_selected.len; ++i) {
-				const knot_rrset_t *rr = req->answ_selected.at[i]->rr;
-				if (!knot_dname_is_equal(rr->owner, cname)) {
-					continue;
-				}
-				if ((rr->rclass != query->sclass) ||
-				    (rr->type != query->stype)) {
-					continue;
-				}
-				bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
-				state = pick_authority(pkt, req, to_wire);
-				if (state != kr_ok()) {
-					return KR_STATE_FAIL;
-				}
-				if (!req->answ_selected.at[i]->to_wire) {
-					/* TODO relocate this record at the end */
-					req->answ_selected.at[i]->to_wire = true;
-				}
-				finalize_answer(pkt, query, req);
-				return KR_STATE_DONE;
+			state = process_final(pkt, req, cname);
+			if (state != kr_ok()) {
+				return state;
 			}
 		}
 		VERBOSE_MSG("<= cname chain, following\n");
