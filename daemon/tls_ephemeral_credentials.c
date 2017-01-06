@@ -119,7 +119,11 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 	}
 	if (datafd == -1) {
 		/* if loading failed, then generate ... */
+#if GNUTLS_VERSION_NUMBER >= 0x030500
 		if ((err = gnutls_x509_privkey_generate(privkey, GNUTLS_PK_ECDSA, GNUTLS_CURVE_TO_BITS(GNUTLS_ECC_CURVE_SECP256R1), 0)) < 0) {
+#else
+		if ((err = gnutls_x509_privkey_generate(privkey, GNUTLS_PK_RSA, gnutls_sec_param_to_pk_bits(GNUTLS_PK_RSA, GNUTLS_SEC_PARAM_MEDIUM), 0)) < 0) {
+#endif
 			kr_log_error("[tls] gnutls_x509_privkey_init() failed: %d (%s)\n",
 				     err, gnutls_strerror_name(err));
 			gnutls_x509_privkey_deinit(privkey);
