@@ -174,6 +174,7 @@ int engine_set_hostname(struct engine *engine, const char *hostname) {
 		free(engine->hostname);
 	}
 	engine->hostname = new_hostname;
+	network_new_hostname(&engine->net, engine);
 
 	return 0;
 }

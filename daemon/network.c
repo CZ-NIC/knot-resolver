@@ -345,3 +345,19 @@ int network_close(struct network *net, const char *addr, uint16_t port)
 
 	return kr_ok();
 }
+
+void network_new_hostname(struct network *net, struct engine *engine)
+{
+	if (net->tls_credentials &&
+	    net->tls_credentials->ephemeral_servicename) {
+		struct tls_credentials *newcreds;
+		newcreds = tls_get_ephemeral_credentials(engine);
+		if (newcreds) {
+			tls_credentials_release(net->tls_credentials);
+			net->tls_credentials = newcreds;
+			kr_log_info("[tls] Updated ephemeral X.509 cert with new hostname\n");
+		} else {
+			kr_log_error("[tls] Failed to update ephemeral X.509 cert with new hostname, using existing one\n");
+		}
+	}
+}

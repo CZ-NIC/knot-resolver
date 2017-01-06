@@ -35,6 +35,8 @@
 #include "daemon/tls.h"
 #include "daemon/io.h"
 
+#define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
+
 static const char *priorities = "NORMAL";
 
 /* gnutls_record_recv and gnutls_record_send */
@@ -120,8 +122,36 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 
 	struct network *net = &worker->engine->net;
 	if (!net->tls_credentials) {
-		kr_log_error("[tls] x509 credentials are missing; no TLS\n");
-		return NULL;
+		net->tls_credentials = tls_get_ephemeral_credentials(worker->engine);
+		if (!net->tls_credentials) {
+			kr_log_error("[tls] X.509 credentials are missing, and ephemeral credentials failed; no TLS\n");
+			return NULL;
+		}
+		kr_log_info("[tls] Using ephemeral TLS credentials:\n");
+		tls_credentials_log_pins(net->tls_credentials);
+	}
+
+	time_t now = time(NULL);
+	if (net->tls_credentials->valid_until != GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION) {
+		if (net->tls_credentials->ephemeral_servicename) {
+			/* ephemeral cert: refresh if due to expire within a week */
+			if (now >= net->tls_credentials->valid_until - EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE) {
+				struct tls_credentials *newcreds = tls_get_ephemeral_credentials(worker->engine);
+				if (newcreds) {
+					tls_credentials_release(net->tls_credentials);
+					net->tls_credentials = newcreds;
+					kr_log_info("[tls] Renewed expiring ephemeral X.509 cert\n");
+				} else {
+					kr_log_error("[tls] Failed to renew expiring ephemeral X.509 cert, using existing one\n");
+				}				
+			}
+		} else {
+			/* non-ephemeral cert: warn once when certificate expires */
+			if (now >= net->tls_credentials->valid_until) {
+				kr_log_error("[tls] X.509 certificate has expired!\n");
+				net->tls_credentials->valid_until = GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
+			}
+		}
 	}
 
 	struct tls_ctx_t *tls = calloc(1, sizeof(struct tls_ctx_t));
@@ -318,7 +348,7 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 
 		if ((err = gnutls_certificate_get_x509_crt(tls_credentials->credentials, index, &certs, &cert_count)) != GNUTLS_E_SUCCESS) {
 			if (err != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
-				kr_log_error("[tls] could not get x509 certificates (%d) %s\n", err, gnutls_strerror_name(err));
+				kr_log_error("[tls] could not get X.509 certificates (%d) %s\n", err, gnutls_strerror_name(err));
 			}
 			return;
 		}
@@ -352,6 +382,37 @@ static int str_replace(char **where_ptr, const char *with)
 	free(*where_ptr);
 	*where_ptr = copy;
 	return kr_ok();
+}
+
+static time_t _get_end_entity_expiration(gnutls_certificate_credentials_t creds)
+{
+	gnutls_datum_t data;
+	gnutls_x509_crt_t cert = NULL;
+	int err;
+	time_t ret = GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
+
+	if ((err = gnutls_certificate_get_crt_raw(creds, 0, 0, &data)) < 0) {
+		kr_log_error("[tls] failed to get cert to check expiration: (%d) %s\n",
+			     err, gnutls_strerror_name(err));
+		goto done;
+	}
+	if ((err = gnutls_x509_crt_init(&cert)) < 0) {
+		kr_log_error("[tls] failed to initialize cert: (%d) %s\n",
+			     err, gnutls_strerror_name(err));
+		goto done;
+	}
+	if ((err = gnutls_x509_crt_import(cert, &data, GNUTLS_X509_FMT_DER)) < 0) {
+		kr_log_error("[tls] failed to construct cert while checking expiration: (%d) %s\n",
+			     err, gnutls_strerror_name(err));
+		goto done;
+	}
+
+	ret = gnutls_x509_crt_get_expiration_time (cert);
+ done:
+	/* do not free data; g_c_get_crt_raw() says to treat it as
+	 * constant. */
+	gnutls_x509_crt_deinit(cert);
+	return ret;
 }
 
 int tls_certificate_set(struct network *net, const char *tls_cert, const char *tls_key)
@@ -394,10 +455,13 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 			     tls_cert, tls_key, err, gnutls_strerror_name(err));
 		return kr_error(EINVAL);
 	}
-	// Exchange the x509 credentials
+	/* record the expiration date: */
+	tls_credentials->valid_until = _get_end_entity_expiration(tls_credentials->credentials);
+
+	/* Exchange the x509 credentials */
 	struct tls_credentials *old_credentials = net->tls_credentials;
 	
-	// Start using the new x509_credentials
+	/* Start using the new x509_credentials */
 	net->tls_credentials = tls_credentials;
 	tls_credentials_log_pins(net->tls_credentials);
 
@@ -444,6 +508,9 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 	}
 	if (tls_credentials->tls_key) {
 		free(tls_credentials->tls_key);
+	}
+	if (tls_credentials->ephemeral_servicename) {
+		free(tls_credentials->ephemeral_servicename);
 	}
 	free(tls_credentials);
 }

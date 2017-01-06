@@ -30,6 +30,8 @@ struct tls_credentials {
 	char *tls_cert;
 	char *tls_key;
 	gnutls_certificate_credentials_t credentials;
+	time_t valid_until;
+	char *ephemeral_servicename;
 };
 
 /*! Toggle verbose logging from TLS context. */
@@ -62,3 +64,6 @@ void tls_credentials_free(struct tls_credentials *tls_credentials);
 /*! Log DNS-over-TLS OOB key-pin form of current credentials:
  * https://tools.ietf.org/html/rfc7858#appendix-A */
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials);
+
+/*! Generate new ephemeral TLS credentials. */
+struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine);
