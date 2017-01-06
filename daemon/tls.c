@@ -35,6 +35,8 @@
 #include "daemon/tls.h"
 #include "daemon/io.h"
 
+#define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
+
 static const char *priorities = "NORMAL";
 
 /* gnutls_record_recv and gnutls_record_send */
@@ -125,7 +127,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 			kr_log_error("[tls] X.509 credentials are missing, and ephemeral credentials failed; no TLS\n");
 			return NULL;
 		}
-		kr_log_error("[tls] Using ephemeral TLS credentials:\n");
+		kr_log_info("[tls] Using ephemeral TLS credentials:\n");
 		tls_credentials_log_pins(net->tls_credentials);
 	}
 
@@ -133,7 +135,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 	if (net->tls_credentials->valid_until != GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION) {
 		if (net->tls_credentials->ephemeral_servicename) {
 			/* ephemeral cert: refresh if due to expire within a week */
-			if (now >= net->tls_credentials->valid_until - 60*60*24*7) {
+			if (now >= net->tls_credentials->valid_until - EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE) {
 				struct tls_credentials *newcreds = tls_get_ephemeral_credentials(worker->engine);
 				if (newcreds) {
 					tls_credentials_release(net->tls_credentials);
