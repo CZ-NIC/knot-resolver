@@ -224,7 +224,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 				uv_timer_start(&s->timeout, tcp_timeout_trigger, 1, KR_CONN_RTT_MAX/2);
 			}
 		}
-	/* Connection spawned more than one request, reset its deadline for next query. */
+	/* Connection spawned at least one request, reset its deadline for next query.
+	 * https://tools.ietf.org/html/rfc7766#section-6.2.3 */
 	} else if (ret > 0 && !s->outgoing) {
 		uv_timer_again(&s->timeout);
 	}
