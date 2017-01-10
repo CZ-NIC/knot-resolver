@@ -183,15 +183,18 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	map_t *negative_anchors = &req->ctx->negative_anchors;
 	/* Want DNSSEC if it's possible to secure this name
 	 * (e.g. is covered by any TA) */
-	bool secured = false;
 	if (!kr_ta_covers(negative_anchors, qry->zone_cut.name) &&
 	    kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
-		secured = true;
 	} else {
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
-	int ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, requested_name,
+	struct kr_zonecut cut_found = {0};
+	kr_zonecut_init(&cut_found, requested_name, req->rplan.pool);
+	/* Cut that has been found can differs from cut that has been requested
+	 * So try to fetch ta & keys anyway */
+	bool secured = true;
+	int ret = kr_zonecut_find_cached(req->ctx, &cut_found, requested_name,
 					 qry->timestamp.tv_sec, &secured);
 	if (ret == kr_error(ENOENT)) {
 		/* No cached cut found, start from SBELT
@@ -202,14 +205,12 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		}
 		VERBOSE_MSG(qry, "=> using root hints\n");
 		qry->flags &= ~QUERY_AWAIT_CUT;
+		kr_zonecut_deinit(&cut_found);
 		return KR_STATE_DONE;
 	} else if (ret != kr_ok()) {
+		kr_zonecut_deinit(&cut_found);
 		return KR_STATE_FAIL;
 	}
-
-	/* Check if there's a non-terminal between target and current cut. */
-	struct kr_cache *cache = &req->ctx->cache;
-	check_empty_nonterms(qry, pkt, cache, qry->timestamp.tv_sec);
 
 	/* Find out security status.
 	 * Go insecure if the zone cut is provably insecure */
@@ -221,25 +222,33 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	/* Zonecut name can change, check it again
 	 * to prevent unnecessary DS & DNSKEY queries */
 	if (!(qry->flags & QUERY_DNSSEC_INSECURE) &&
-	    !kr_ta_covers(negative_anchors, qry->zone_cut.name) &&
-	    kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
+	    !kr_ta_covers(negative_anchors, cut_found.name) &&
+	    kr_ta_covers(trust_anchors, cut_found.name)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	} else {
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
 	/* Check if any DNSKEY found for cached cut */
 	if ((qry->flags & QUERY_DNSSEC_WANT) &&
-	    (qry->zone_cut.key == NULL)) {
-		/* No DNSKEY found for cached cut.
-		 * In case if no glue records for the cut were fetched
+	    (cut_found.key == NULL)) {
+		/* No DNSKEY was found for cached cut.
+		 * If no glue were fetched for this cut,
 		 * we have got circular dependance - must fetch A\AAAA
 		 * from authoritative, but we have no key to verify it.
-		 * TODO - try to refetch cut only if no glue were fetched
-		 * So, discard DS found ... */
-		knot_rrset_free(&qry->zone_cut.trust_anchor, qry->zone_cut.pool);
-		/* ... and try next label */
+		 * TODO - try to refetch cut only if no glue were fetched */
+		kr_zonecut_deinit(&cut_found);
+		/* Try next label */
 		return KR_STATE_CONSUME;
 	}
+	/* Copy fetched name */
+	qry->zone_cut.name = knot_dname_copy(cut_found.name, qry->zone_cut.pool);
+	/* Copy fetched address set */
+	kr_zonecut_copy(&qry->zone_cut, &cut_found);
+	/* Copy fetched ta & keys */
+	kr_zonecut_copy_trust(&qry->zone_cut, &cut_found);
+	/* Check if there's a non-terminal between target and current cut. */
+	struct kr_cache *cache = &req->ctx->cache;
+	check_empty_nonterms(qry, pkt, cache, qry->timestamp.tv_sec);
 	/* Cut found */
 	return KR_STATE_PRODUCE;
 }
