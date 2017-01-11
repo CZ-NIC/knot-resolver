@@ -80,10 +80,17 @@ static struct session *session_borrow(struct worker_ctx *worker)
 	return s;
 }
 
-static void session_release(struct worker_ctx *worker, struct session *s)
+static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
 {
+	if (!worker || !handle) {
+		return;
+	}
+	struct session *s = handle->data;
 	if (!s) {
 		return;
+	}
+	if (!s->outgoing && handle->type == UV_TCP) {
+		worker_end_tcp(worker, handle); /* to free the buffering task */
 	}
 	if (worker->pool_sessions.len < MP_FREELIST_SIZE) {
 		session_clear(s);
@@ -224,7 +231,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 				uv_timer_start(&s->timeout, tcp_timeout_trigger, 1, KR_CONN_RTT_MAX/2);
 			}
 		}
-	/* Connection spawned more than one request, reset its deadline for next query. */
+	/* Connection spawned at least one request, reset its deadline for next query.
+	 * https://tools.ietf.org/html/rfc7766#section-6.2.3 */
 	} else if (ret > 0 && !s->outgoing) {
 		uv_timer_again(&s->timeout);
 	}
@@ -383,7 +391,7 @@ void io_deinit(uv_handle_t *handle)
 	uv_loop_t *loop = handle->loop;
 	if (loop && loop->data) {
 		struct worker_ctx *worker = loop->data;
-		session_release(worker, handle->data);
+		session_release(worker, handle);
 	} else {
 		session_free(handle->data);
 	}

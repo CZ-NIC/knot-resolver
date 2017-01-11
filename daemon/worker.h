@@ -41,7 +41,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *qu
  * Process incoming DNS/TCP message fragment(s).
  * If the fragment contains only a partial message, it is buffered.
  * If the fragment contains a complete query or completes current fragment, execute it.
- * @return 0 or an error code
+ * @return the number of newly-completed requests (>=0) or an error code
  */
 int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		const uint8_t *msg, ssize_t len);

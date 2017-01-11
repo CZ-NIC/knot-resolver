@@ -46,7 +46,9 @@ void tls_free(struct tls_ctx_t* tls);
 /*! Push new data to TLS context for sending */
 int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
 
-/*! Unwrap incoming data from a TLS stream and pass them to TCP session. */
+/*! Unwrap incoming data from a TLS stream and pass them to TCP session.
+ * @return the number of newly-completed requests (>=0) or an error code
+ */
 int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread);
 
 /*! Set TLS certificate and key from files. */
