@@ -450,6 +450,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	}
 	knot_rrset_t *copy = knot_rrset_copy(rr, pool);
 	if (!copy) {
+		mm_free(pool, entry);
 		return kr_error(ENOMEM);
 	}
 
