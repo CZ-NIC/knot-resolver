@@ -17,7 +17,7 @@ NETTLE_TAG="3.3"
 NETTLE_URL="https://ftp.gnu.org/gnu/nettle/nettle-${NETTLE_TAG}.tar.gz"
 GNUTLS_TAG="3.5.8"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.5/gnutls-${GNUTLS_TAG}.tar.xz"
-LUA_VER="v2.0.4"
+LUA_VER="2.0.4"
 LUA_URL="https://github.com/LuaJIT/LuaJIT.git"
 HIREDIS_TAG="v0.13.3"
 HIREDIS_URL="https://github.com/redis/hiredis.git"
@@ -150,6 +150,7 @@ pkg lua ${LUA_URL} v${LUA_VER} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic
 
 # development releases of luajit do NOT install bin/luajit
 ln -sf "luajit-${LUA_VER}" "${PREFIX}/bin/luajit"
+ln -sf "libluajit-5.1.so.${LUA_VER}" "${PREFIX}/lib/libluajit-5.1.so"
 
 echo "Build success!"
 
