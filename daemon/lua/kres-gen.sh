@@ -34,9 +34,9 @@ typedef void (*map_free_f)(void *baton, void *ptr);
 	map_t
 	# libkres
 	rr_array_t
-	#struct ranked_rr_array_entry # TODO: prepared for vld-refactoring
-	#ranked_rr_array_entry_t
-	#ranked_rr_array_t
+	struct ranked_rr_array_entry
+	ranked_rr_array_entry_t
+	ranked_rr_array_t
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan

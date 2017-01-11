@@ -697,7 +697,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 		 * Denial of existance can not be proven.
 		 * Set error code to proceed unsecure.
 		 */
-		ret = kr_error(DNSSEC_NOT_FOUND);
+		ret = kr_error(DNSSEC_OUT_OF_RANGE);
 	}
 	
 	return ret;
@@ -721,6 +721,7 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		if (ns->type != KNOT_RRTYPE_NS) {
 			continue;
 		}
+		bool nsec3_found = false;
 		flags = 0;
 		for (unsigned j = 0; j < sec->count; ++j) {
 			const knot_rrset_t *nsec3 = knot_pkt_rr(sec, j);
@@ -730,6 +731,7 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 			if (nsec3->type != KNOT_RRTYPE_NSEC3) {
 				continue;
 			}
+			nsec3_found = true;
 			/* nsec3 found, check if owner name matches
 			 * the delegation name
 			 */
@@ -757,6 +759,9 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 				return kr_ok();
 			}
 		}
+		if (!nsec3_found) {
+			return kr_error(DNSSEC_NOT_FOUND);
+		}
 		if (flags & FLG_NAME_MATCHED) {
 			/* nsec3 which owner matches
 			 * the delegation name was found,
@@ -777,7 +782,7 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		}
 
 		if (has_optout(covering_next_nsec3)) {
-			return kr_error(DNSSEC_NOT_FOUND);
+			return kr_error(DNSSEC_OUT_OF_RANGE);
 		} else {
 			return kr_error(EINVAL);
 		}

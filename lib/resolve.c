@@ -37,6 +37,16 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "resl",  fmt)
 
+static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
+{
+	for (unsigned i = 0; i < array->len; ++i) {
+		ranked_rr_array_entry_t *entry = array->at[i];
+		if (entry->qry_uid == qry_uid) {
+			entry->yielded = yielded;
+		}
+	}
+}
+
 /**
  * @internal Defer execution of current query.
  * The current layer state and input will be pushed to a stack and resumed on next iteration.
@@ -53,6 +63,8 @@ static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
 		pickle->pkt = pkt_copy;
 		pickle->next = qry->deferred;
 		qry->deferred = pickle;
+		set_yield(&req->answ_selected, qry->uid, true);
+		set_yield(&req->auth_selected, qry->uid, true);
 		return kr_ok();
 	}
 	return kr_error(ENOMEM);
@@ -164,37 +176,81 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 	}
 }
 
-static int ns_fetch_cut(struct kr_query *qry, struct kr_request *req, knot_pkt_t *pkt)
+static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name,
+			struct kr_request *req, knot_pkt_t *pkt)
 {
-	int ret = 0;
-
-	/* Find closest zone cut from cache */
-	struct kr_cache *cache = &req->ctx->cache;
-	if (kr_cache_is_open(cache)) {
-		/* If at/subdomain of parent zone cut, start from its encloser.
-		 * This is for case when we get to a dead end (and need glue from parent), or DS refetch. */
-		struct kr_query *parent = qry->parent;
-		bool secured = (qry->flags & QUERY_DNSSEC_WANT);
-		if (parent && parent->zone_cut.name[0] != '\0' && knot_dname_in(parent->zone_cut.name, qry->sname)) {
-			const knot_dname_t *encloser = knot_wire_next_label(parent->zone_cut.name, NULL);
-			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, encloser, qry->timestamp.tv_sec, &secured);
-		} else {
-			ret = kr_zonecut_find_cached(req->ctx, &qry->zone_cut, qry->sname, qry->timestamp.tv_sec, &secured);
-		}
-		/* Check if there's a non-terminal between target and current cut. */
-		if (ret == 0) {
-			check_empty_nonterms(qry, pkt, cache, qry->timestamp.tv_sec);
-			/* Go insecure if the zone cut is provably insecure */
-			if ((qry->flags & QUERY_DNSSEC_WANT) && !secured) {
-				VERBOSE_MSG(qry, "=> NS is provably without DS, going insecure\n");
-				qry->flags &= ~QUERY_DNSSEC_WANT;
-				qry->flags |= QUERY_DNSSEC_INSECURE;
-			}
-		}
+	map_t *trust_anchors = &req->ctx->trust_anchors;
+	map_t *negative_anchors = &req->ctx->negative_anchors;
+	/* Want DNSSEC if it's possible to secure this name
+	 * (e.g. is covered by any TA) */
+	if (!kr_ta_covers(negative_anchors, qry->zone_cut.name) &&
+	    kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
+		qry->flags |= QUERY_DNSSEC_WANT;
 	} else {
-		ret = kr_error(ENOENT);
+		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
-	return ret;
+	struct kr_zonecut cut_found = {0};
+	kr_zonecut_init(&cut_found, requested_name, req->rplan.pool);
+	/* Cut that has been found can differs from cut that has been requested
+	 * So try to fetch ta & keys anyway */
+	bool secured = true;
+	int ret = kr_zonecut_find_cached(req->ctx, &cut_found, requested_name,
+					 qry->timestamp.tv_sec, &secured);
+	if (ret == kr_error(ENOENT)) {
+		/* No cached cut found, start from SBELT
+		 * and issue priming query. */
+		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
+		if (ret != 0) {
+			return KR_STATE_FAIL;
+		}
+		VERBOSE_MSG(qry, "=> using root hints\n");
+		qry->flags &= ~QUERY_AWAIT_CUT;
+		kr_zonecut_deinit(&cut_found);
+		return KR_STATE_DONE;
+	} else if (ret != kr_ok()) {
+		kr_zonecut_deinit(&cut_found);
+		return KR_STATE_FAIL;
+	}
+
+	/* Find out security status.
+	 * Go insecure if the zone cut is provably insecure */
+	if ((qry->flags & QUERY_DNSSEC_WANT) && !secured) {
+		VERBOSE_MSG(qry, "=> NS is provably without DS, going insecure\n");
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+		qry->flags |= QUERY_DNSSEC_INSECURE;
+	}
+	/* Zonecut name can change, check it again
+	 * to prevent unnecessary DS & DNSKEY queries */
+	if (!(qry->flags & QUERY_DNSSEC_INSECURE) &&
+	    !kr_ta_covers(negative_anchors, cut_found.name) &&
+	    kr_ta_covers(trust_anchors, cut_found.name)) {
+		qry->flags |= QUERY_DNSSEC_WANT;
+	} else {
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+	}
+	/* Check if any DNSKEY found for cached cut */
+	if ((qry->flags & QUERY_DNSSEC_WANT) &&
+	    (cut_found.key == NULL)) {
+		/* No DNSKEY was found for cached cut.
+		 * If no glue were fetched for this cut,
+		 * we have got circular dependance - must fetch A\AAAA
+		 * from authoritative, but we have no key to verify it.
+		 * TODO - try to refetch cut only if no glue were fetched */
+		kr_zonecut_deinit(&cut_found);
+		/* Try next label */
+		return KR_STATE_CONSUME;
+	}
+	/* Copy fetched name */
+	qry->zone_cut.name = knot_dname_copy(cut_found.name, qry->zone_cut.pool);
+	/* Copy fetched address set */
+	kr_zonecut_copy(&qry->zone_cut, &cut_found);
+	/* Copy fetched ta & keys */
+	kr_zonecut_copy_trust(&qry->zone_cut, &cut_found);
+	/* Check if there's a non-terminal between target and current cut. */
+	struct kr_cache *cache = &req->ctx->cache;
+	check_empty_nonterms(qry, pkt, cache, qry->timestamp.tv_sec);
+	/* Cut found */
+	return KR_STATE_PRODUCE;
 }
 
 static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
@@ -340,6 +396,23 @@ static void write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
 	}
 }
 
+static void write_extra_ranked_records(ranked_rr_array_t *arr, knot_pkt_t *answer)
+{
+	for (size_t i = 0; i < arr->len; ++i) {
+		ranked_rr_array_entry_t * entry = arr->at[i];
+		if (!entry->to_wire) {
+			continue;
+		}
+		knot_rrset_t *rr = entry->rr;
+		if (!knot_pkt_has_dnssec(answer)) {
+			if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
+				continue;
+			}
+		}
+		knot_pkt_put(answer, 0, rr, 0);
+	}
+}
+
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
 static int answer_padding(struct kr_request *request)
 {
@@ -401,11 +474,20 @@ static int answer_finalize(struct kr_request *request, int state)
 		}
 	}
 
+	if (request->answ_selected.len > 0) {
+		assert(answer->current <= KNOT_ANSWER);
+		/* Write answer records. */
+		if (answer->current < KNOT_ANSWER) {
+			knot_pkt_begin(answer, KNOT_ANSWER);
+		}
+		write_extra_ranked_records(&request->answ_selected, answer);
+	}
+
 	/* Write authority records. */
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	write_extra_records(&request->authority, answer);
+	write_extra_ranked_records(&request->auth_selected, answer);
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
 	write_extra_records(&request->additional, answer);
@@ -472,8 +554,11 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->options = ctx->options;
 	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
-	array_init(request->authority);
 	array_init(request->additional);
+	array_init(request->answ_selected);
+	array_init(request->auth_selected);
+	request->answ_validated = false;
+	request->auth_validated = false;
 
 	/* Expect first query */
 	kr_rplan_init(&request->rplan, request, &request->pool);
@@ -773,47 +858,58 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 /** @internal Check current zone cut status and credibility, spawn subrequests if needed. */
 static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot_pkt_t *packet)
 {
-	map_t *trust_anchors = &request->ctx->trust_anchors;
-	map_t *negative_anchors = &request->ctx->negative_anchors;
-
 	/* Stub mode, just forward and do not solve cut. */
 	if (qry->flags & QUERY_STUB) {
 		return KR_STATE_PRODUCE;
 	}
 
+	if (!(qry->flags & QUERY_AWAIT_CUT)) {
+		/* The query was resolved from cache.
+		 * Spawn DS \ DNSKEY requests if needed and exit */
+		return trust_chain_check(request, qry);
+	}
+
 	/* The query wasn't resolved from cache,
 	 * now it's the time to look up closest zone cut from cache. */
-	if (qry->flags & QUERY_AWAIT_CUT) {
-		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
-		if (!kr_ta_covers(negative_anchors, qry->zone_cut.name) &&
-		    kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
-			qry->flags |= QUERY_DNSSEC_WANT;
-		} else {
-			qry->flags &= ~QUERY_DNSSEC_WANT;
-		}
-		int ret = ns_fetch_cut(qry, request, packet);
+	struct kr_cache *cache = &request->ctx->cache;
+	if (!kr_cache_is_open(cache)) {
+		int ret = kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
 		if (ret != 0) {
-			/* No cached cut found, start from SBELT and issue priming query. */
-			if (ret == kr_error(ENOENT)) {
-				ret = kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
-				if (ret != 0) {
-					return KR_STATE_FAIL;
-				}
-				VERBOSE_MSG(qry, "=> using root hints\n");
-				qry->flags &= ~QUERY_AWAIT_CUT;
-				return KR_STATE_DONE;
-			} else {
-				return KR_STATE_FAIL;
-			}
+			return KR_STATE_FAIL;
 		}
-		/* Update minimized QNAME if zone cut changed */
-		if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
-			if (kr_make_query(qry, packet) != 0) {
-				return KR_STATE_FAIL;
-			}
-		}
+		VERBOSE_MSG(qry, "=> using root hints\n");
 		qry->flags &= ~QUERY_AWAIT_CUT;
+		return KR_STATE_DONE;
 	}
+
+	const knot_dname_t *requested_name = qry->sname;
+	/* If at/subdomain of parent zone cut, start from its encloser.
+	 * This is for case when we get to a dead end
+	 * (and need glue from parent), or DS refetch. */
+	if (qry->parent) {
+		const knot_dname_t *parent = qry->parent->zone_cut.name;
+		if (parent[0] != '\0' && knot_dname_in(parent, qry->sname)) {
+			requested_name = knot_wire_next_label(parent, NULL);
+		}
+	}
+
+	int state = KR_STATE_FAIL;
+	do {
+		state = ns_fetch_cut(qry, requested_name, request, packet);
+		if (state == KR_STATE_DONE || state == KR_STATE_FAIL) {
+			return state;
+		} else if (state == KR_STATE_CONSUME) {
+			requested_name = knot_wire_next_label(requested_name, NULL);
+		}
+	} while (state == KR_STATE_CONSUME);
+
+	/* Update minimized QNAME if zone cut changed */
+	if (qry->zone_cut.name[0] != '\0' && !(qry->flags & QUERY_NO_MINIMIZE)) {
+		if (kr_make_query(qry, packet) != 0) {
+			return KR_STATE_FAIL;
+		}
+	}
+	qry->flags &= ~QUERY_AWAIT_CUT;
 
 	/* Check trust chain */
 	return trust_chain_check(request, qry);
@@ -840,6 +936,8 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		VERBOSE_MSG(qry, "=> resuming yielded answer\n");
 		struct kr_layer_pickle *pickle = qry->deferred;
 		request->state = KR_STATE_YIELD;
+		set_yield(&request->answ_selected, qry->uid, false);
+		set_yield(&request->auth_selected, qry->uid, false);
 		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
 		qry->deferred = pickle->next;
 	} else {

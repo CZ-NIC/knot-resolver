@@ -16,6 +16,7 @@
 
 #include <sys/time.h>
 #include <assert.h>
+#include <arpa/inet.h>
 
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
@@ -153,44 +154,28 @@ static int update_parent(const knot_rrset_t *rr, struct kr_query *qry)
 	return update_nsaddr(rr, qry->parent);
 }
 
-static int update_answer(const knot_rrset_t *rr, unsigned hint, knot_pkt_t *answer)
-{
-	/* Scrub DNSSEC records when not requested. */
-	if (!knot_pkt_has_dnssec(answer)) {
-		if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
-			return KR_STATE_DONE; /* Scrub */
-		}
-	}
-	/* Copy record, as it may be accessed after packet processing. */
-	knot_rrset_t *copy = knot_rrset_copy(rr, &answer->mm);
-	/* Write to final answer. */
-	int ret = knot_pkt_put(answer, hint, copy, KNOT_PF_FREE);
-	if (ret != KNOT_EOK) {
-		knot_wire_set_tc(answer->wire);
-		return KR_STATE_DONE;
-	}
-
-	return KR_STATE_DONE;
-}
-
 static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
 {
-	bool used_glue = false;
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
-			if (knot_dname_is_equal(ns, rr->owner)) {
-				(void) update_nsaddr(rr, req->current_query);
-				used_glue = true;
+			if (!knot_dname_is_equal(ns, rr->owner)) {
+				continue;
 			}
-		}
-	}
-	WITH_VERBOSE {
-		char name_str[KNOT_DNAME_MAXLEN];
-		knot_dname_to_str(name_str, ns, sizeof(name_str));
-		if (used_glue) {
-			VERBOSE_MSG("<= using glue for '%s'\n", name_str);
+			(void) update_nsaddr(rr, req->current_query);
+			WITH_VERBOSE {
+				char name_str[KNOT_DNAME_MAXLEN];
+				char addr_str[INET6_ADDRSTRLEN];
+				const void *addr = knot_rdata_data(rr->rrs.data);
+				const int addr_len = knot_rdata_rdlen(rr->rrs.data);
+				const int af = (addr_len == sizeof(struct in_addr)) ?
+					       AF_INET : AF_INET6;
+				knot_dname_to_str(name_str, ns, sizeof(name_str));
+				inet_ntop(af, addr, addr_str, sizeof(addr_str));
+				VERBOSE_MSG("<= using glue for '%s': '%s'\n",
+					    name_str, addr_str);
+			}
 		}
 	}
 }
@@ -264,7 +249,6 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		if (qry->flags & QUERY_PERMISSIVE) {
 			fetch_glue(pkt, ns_name, req);
 		} else if (qry->flags & QUERY_STRICT) {
-			/* Strict mode uses only mandatory glue. */
 			if (knot_dname_in(cut->name, ns_name))
 				fetch_glue(pkt, ns_name, req);
 		} else {
@@ -275,6 +259,36 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	}
 
 	return state;
+}
+
+static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
+{
+	struct kr_query *qry = req->current_query;
+	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	uint8_t rank = !(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_CACHED) ?
+			KR_VLDRANK_SECURE : KR_VLDRANK_INITIAL;
+	const knot_dname_t *zonecut_name = qry->zone_cut.name;
+	bool referral = !knot_wire_get_aa(pkt->wire);
+	if (referral) {
+		/* zone cut already updated by process_authority()
+		 * use parent zonecut name */
+		zonecut_name = qry->zone_cut.parent ? qry->zone_cut.parent->name : qry->zone_cut.name;
+		to_wire = false;
+	}
+
+	for (unsigned i = 0; i < ns->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
+		if (!knot_dname_in(zonecut_name, rr->owner)) {
+			continue;
+		}
+		int ret = kr_ranked_rrarray_add(&req->auth_selected, rr,
+						rank, to_wire, qry->uid, &req->pool);
+		if (ret != kr_ok()) {
+			return ret;
+		}
+	}
+
+	return kr_ok();
 }
 
 static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
@@ -303,7 +317,6 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		}
 	}
 #endif
-
 	/* Remember current bailiwick for NS processing. */
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
 	/* Update zone cut information. */
@@ -322,6 +335,13 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		}
 	}
 
+	if ((qry->flags & QUERY_DNSSEC_WANT) && (result == KR_STATE_CONSUME)) {
+		if (knot_wire_get_aa(pkt->wire) == 0 && knot_wire_get_ancount(pkt->wire) == 0) {
+			/* Prevent from validating as an autoritative answer */
+			result = KR_STATE_DONE;
+		}
+	}
+
 	/* CONSUME => Unhelpful referral.
 	 * DONE    => Zone cut updated.  */
 	return result;
@@ -332,26 +352,6 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 	/* Finalize header */
 	knot_pkt_t *answer = req->answer;
 	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
-
-	/* Fill in bailiwick records in authority */
-	const bool scrub_dnssec = !knot_pkt_has_dnssec(answer);
-	const uint16_t qtype = knot_pkt_qtype(answer);
-	struct kr_zonecut *cut = &qry->zone_cut;
-	int pkt_class = kr_response_classify(pkt);
-	if ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA))) {
-		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
-		for (unsigned i = 0; i < ns->count; ++i) {
-			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-			/* Scrub DNSSEC records when not requested. */
-			if (scrub_dnssec && rr->type != qtype && knot_rrtype_is_dnssec(rr->type)) {
-				continue;
-			}
-			/* Stash the authority records, they will be written to wire on answer finalization. */
-			if (knot_dname_in(cut->name, rr->owner)) {
-				kr_rrarray_add(&req->authority, rr, &answer->mm);
-			}
-		}
-	}
 }
 
 static bool is_rrsig_type_covered(const knot_rrset_t *rr, uint16_t type)
@@ -364,6 +364,152 @@ static bool is_rrsig_type_covered(const knot_rrset_t *rr, uint16_t type)
 		}
 	}
 	return ret;
+}
+
+static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, const knot_dname_t **cname_ret)
+{
+	struct kr_query *query = req->current_query;
+	/* Process answer type */
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+	const knot_dname_t *cname = NULL;
+	const knot_dname_t *pending_cname = query->sname;
+	unsigned cname_chain_len = 0;
+	uint8_t rank = !(query->flags & QUERY_DNSSEC_WANT) || (query->flags & QUERY_CACHED) ?
+			KR_VLDRANK_SECURE : KR_VLDRANK_INITIAL;
+	bool is_final = (query->parent == NULL);
+	bool can_follow = false;
+	bool strict_mode = (query->flags & QUERY_STRICT) && !(query->flags & QUERY_STUB);
+	do {
+		/* CNAME was found at previous iteration, but records may not follow the correct order.
+		 * Try to find records for pending_cname owner from section start. */
+		cname = pending_cname;
+		pending_cname = NULL;
+		/* If not secure, always follow cname chain. */
+		can_follow = !(query->flags & QUERY_DNSSEC_WANT) || (query->flags & QUERY_STUB);
+		for (unsigned i = 0; i < an->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(an, i);
+			if (!knot_dname_is_equal(rr->owner, cname)) {
+				continue;
+			}
+			/* Process records matching current SNAME */
+			unsigned hint = 0;
+			if(knot_dname_is_equal(cname, knot_pkt_qname(req->answer))) {
+				hint = KNOT_COMPR_HINT_QNAME;
+			}
+			int state = KR_STATE_FAIL;
+			bool to_wire = false;
+			if (is_final) {
+				/* if not referral, mark record to be written to final answer */
+				to_wire = !referral;
+			} else {
+				state = update_parent(rr, query);
+				if (state == KR_STATE_FAIL) {
+					return state;
+				}
+			}
+			state = kr_ranked_rrarray_add(&req->answ_selected, rr,
+						      rank, to_wire, query->uid, &req->pool);
+			if (state != kr_ok()) {
+				return KR_STATE_FAIL;
+			}
+			/* can_follow is false, therefore QUERY_DNSSEC_WANT flag is set.
+			 * Follow cname chain only if rrsig exists. */
+			if (!can_follow && rr->type == KNOT_RRTYPE_RRSIG &&
+			    is_rrsig_type_covered(rr, KNOT_RRTYPE_CNAME)) {
+				can_follow = true;
+			}
+			/* Jump to next CNAME target */
+			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
+				continue;
+			}
+			cname_chain_len += 1;
+			pending_cname = knot_cname_name(&rr->rrs);
+			if (!pending_cname) {
+				break;
+			}
+			if (cname_chain_len > an->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
+				VERBOSE_MSG("<= too long cname chain\n");
+				return KR_STATE_FAIL;
+			}
+			/* Don't use pending_cname immediately.
+			 * There are can be records for "old" cname. */
+		}
+		if (!pending_cname) {
+			break;
+		}
+		if (knot_dname_is_equal(cname, pending_cname)) {
+			VERBOSE_MSG("<= cname chain loop\n");
+			return KR_STATE_FAIL;
+		}
+		/* In strict mode, explicitly fetch each CNAME target. */
+		if (strict_mode) {
+			cname = pending_cname;
+			break;
+		}
+		/* try to unroll cname only within current zone */
+		const int pending_labels = knot_dname_labels(pending_cname, NULL);
+		const int cname_labels = knot_dname_labels(cname, NULL);
+		if (pending_labels != cname_labels) {
+			cname = pending_cname;
+			break;
+		}
+		if (knot_dname_matched_labels(pending_cname, cname) !=
+		    (cname_labels - 1)) {
+			cname = pending_cname;
+			break;
+		}
+	} while (can_follow);
+	*cname_ret = cname;
+	return kr_ok();
+}
+
+static int process_referral_answer(knot_pkt_t *pkt, struct kr_request *req)
+{
+	const knot_dname_t *cname = NULL;
+	int state = unroll_cname(pkt, req, true, &cname);
+	if (state != kr_ok()) {
+		return KR_STATE_FAIL;
+	}
+	state = pick_authority(pkt, req, false);
+	return state == kr_ok() ? KR_STATE_DONE : KR_STATE_FAIL;
+}
+
+static int process_final(knot_pkt_t *pkt, struct kr_request *req,
+			 const knot_dname_t *cname)
+{
+	const int pkt_class = kr_response_classify(pkt);
+	struct kr_query *query = req->current_query;
+	ranked_rr_array_t *array = &req->answ_selected;
+	for (size_t i = 0; i < array->len; ++i) {
+		const knot_rrset_t *rr = array->at[i]->rr;
+		if (!knot_dname_is_equal(rr->owner, cname)) {
+			continue;
+		}
+		if ((rr->rclass != query->sclass) ||
+		    (rr->type != query->stype)) {
+			continue;
+		}
+		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
+		const int state = pick_authority(pkt, req, to_wire);
+		if (state != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
+		if (!array->at[i]->to_wire) {
+			const size_t last_idx = array->len - 1;
+			size_t j = i;
+			ranked_rr_array_entry_t *entry = array->at[i];
+			/* Relocate record to the end, after current cname */
+			while (j < last_idx) {
+				array->at[j] = array->at[j + 1];
+				++j;
+			}
+			array->at[last_idx] = entry;
+			entry->to_wire = true;
+		}
+		finalize_answer(pkt, query, req);
+		return KR_STATE_DONE;
+	}
+	return kr_ok();
 }
 
 static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
@@ -391,66 +537,12 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		}
 	}
 
-	/* Process answer type */
-	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	const knot_dname_t *cname = NULL;
-	const knot_dname_t *pending_cname = query->sname;
-	unsigned cname_chain_len = 0;
-	bool can_follow = false;
-	bool strict_mode = (query->flags & QUERY_STRICT) && !(query->flags & QUERY_STUB);
-	do {
-		/* CNAME was found at previous iteration, but records may not follow the correct order.
-		 * Try to find records for pending_cname owner from section start. */
-		cname = pending_cname;
-		pending_cname = NULL;
-		/* If not secure or validation is disabled,
-		 * always follow cname chain. */
-		can_follow = !(query->flags & QUERY_DNSSEC_WANT) ||
-			     knot_wire_get_cd(req->answer->wire) ||
-			     (query->flags & QUERY_STUB);
-		for (unsigned i = 0; i < an->count; ++i) {
-			const knot_rrset_t *rr = knot_pkt_rr(an, i);
-			if (!knot_dname_is_equal(rr->owner, cname)) {
-				continue;
-			}
-			/* Process records matching current SNAME */
-			unsigned hint = 0;
-			if(knot_dname_is_equal(cname, knot_pkt_qname(req->answer))) {
-				hint = KNOT_COMPR_HINT_QNAME;
-			}
-			int state = is_final ? update_answer(rr, hint, req->answer) : update_parent(rr, query);
-			if (state == KR_STATE_FAIL) {
-				return state;
-			}
-			/* can_follow is false, therefore QUERY_DNSSEC_WANT flag is set.
-			 * Follow cname chain only if rrsig exists. */
-			if (!can_follow && rr->type == KNOT_RRTYPE_RRSIG &&
-			    is_rrsig_type_covered(rr, KNOT_RRTYPE_CNAME)) {
-				can_follow = true;
-			}
-			/* Jump to next CNAME target */
-			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
-				continue;
-			}
-			cname_chain_len += 1;
-			pending_cname = knot_cname_name(&rr->rrs);
-			if (!pending_cname || strict_mode) {
-				break;
-			}
-			if (cname_chain_len > an->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
-				VERBOSE_MSG("<= too long cname chain\n");
-				return KR_STATE_FAIL;
-			}
-			/* Don't use pending_cname immediately.
-			 * There are can be records for "old" cname. */
-		}
-		/* In strict mode, explicitly fetch each CNAME target. */
-		if (strict_mode && pending_cname) {
-			cname = pending_cname;
-			break;
-		}
-	} while (pending_cname && can_follow);
-
+	/* Process answer type */
+	int state = unroll_cname(pkt, req, false, &cname);
+	if (state != kr_ok()) {
+		return state;
+	}
 	/* Make sure that this is an authoritative answer (even with AA=0) for other layers */
 	knot_wire_set_aa(pkt->wire);
 	/* Either way it resolves current query. */
@@ -460,18 +552,9 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		/* Check if target record has been already copied */
 		query->flags |= QUERY_CNAME;
 		if (is_final) {
-			const knot_pktsection_t *an = knot_pkt_section(req->answer, KNOT_ANSWER);
-			for (unsigned i = 0; i < an->count; ++i) {
-				const knot_rrset_t *rr = knot_pkt_rr(an, i);
-				if (!knot_dname_is_equal(rr->owner, cname)) {
-					continue;
-				}
-				if ((rr->rclass != query->sclass) ||
-				    (rr->type != query->stype)) {
-					continue;
-				}
-				finalize_answer(pkt, query, req);
-				return KR_STATE_DONE;
+			state = process_final(pkt, req, cname);
+			if (state != kr_ok()) {
+				return state;
 			}
 		}
 		VERBOSE_MSG("<= cname chain, following\n");
@@ -495,8 +578,21 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		    !kr_ta_covers(&req->ctx->negative_anchors, cname)) {
 			next->flags |= QUERY_DNSSEC_WANT;
 		}
+		state = pick_authority(pkt, req, false);
+		if (state != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
 	} else if (!query->parent) {
+		state = pick_authority(pkt, req, true);
+		if (state != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
 		finalize_answer(pkt, query, req);
+	} else {
+		state = pick_authority(pkt, req, false);
+		if (state != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
 	}
 	return KR_STATE_DONE;
 }
@@ -561,7 +657,8 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
-	struct kr_query *query = ctx->req->current_query;
+	struct kr_request *req = ctx->req;
+	struct kr_query *query = req->current_query;
 	if (!query || ctx->state & (KR_STATE_DONE|KR_STATE_FAIL)) {
 		return ctx->state;
 	}
@@ -571,6 +668,9 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret != 0) {
 		return KR_STATE_FAIL;
 	}
+
+	query->uid = req->rplan.next_uid;
+	req->rplan.next_uid += 1;
 
 	return KR_STATE_CONSUME;
 }
@@ -667,6 +767,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		state = process_answer(pkt, req);
 		break;
 	case KR_STATE_DONE: /* Referral */
+		state = process_referral_answer(pkt,req);
 		VERBOSE_MSG("<= referral response, follow\n");
 		break;
 	default:

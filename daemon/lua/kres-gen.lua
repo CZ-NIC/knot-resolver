@@ -62,6 +62,20 @@ typedef struct {
     size_t len;
     size_t cap;
 } rr_array_t;
+struct ranked_rr_array_entry {
+    uint32_t qry_uid;
+    uint8_t rank;
+    _Bool cached;
+    _Bool yielded;
+    _Bool to_wire;
+    knot_rrset_t *rr;
+};
+typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
+typedef struct {
+    ranked_rr_array_entry_t **at;
+    size_t len;
+    size_t cap;
+} ranked_rr_array_t;
 struct kr_zonecut {
     knot_dname_t *name;
     knot_rrset_t *key;
@@ -80,6 +94,7 @@ struct kr_rplan {
     kr_qarray_t resolved;
     struct kr_request *request;
     knot_mm_t *pool;
+    uint32_t next_uid;
 };
 struct kr_request {
     struct kr_context *ctx;
@@ -98,8 +113,11 @@ struct kr_request {
     } upstream;
     uint32_t options;
     int state;
-    rr_array_t authority;
+    ranked_rr_array_t answ_selected;
+    ranked_rr_array_t auth_selected;
     rr_array_t additional;
+    _Bool answ_validated;
+    _Bool auth_validated;
     struct kr_rplan rplan;
     int has_tls;
     knot_mm_t pool;
