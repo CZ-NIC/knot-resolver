@@ -61,7 +61,8 @@ echo "build: ${BUILD_DIR}"
 echo "log:   ${LOG}" | tee ${LOG}
 
 function on_failure {
-	cat ${LOG}
+    cat ${LOG}
+    rm ${PREFIX}/.revision
 }
 trap on_failure ERR
 
