@@ -92,7 +92,7 @@ function build_pkg {
 		if [ ! -e ./configure ]; then
 			[ -e autogen.sh ] && sh autogen.sh || autoreconf -if
 		fi
-		./configure --prefix=${PREFIX} --enable-shared $*
+		./configure --prefix=${PREFIX} --enable-shared $* || find . -name config.log -exec cat {} \;
 		make ${MAKEOPTS}
 		make install
 	elif [ -f CMakeLists.txt ]; then
