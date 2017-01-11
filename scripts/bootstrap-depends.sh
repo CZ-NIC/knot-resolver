@@ -24,6 +24,15 @@ HIREDIS_URL="https://github.com/redis/hiredis.git"
 LIBMEMCACHED_TAG="1.0.18"
 LIBMEMCACHED_URL="https://launchpad.net/libmemcached/1.0/${LIBMEMCACHED_TAG}/+download/libmemcached-${LIBMEMCACHED_TAG}.tar.gz"
 
+if command -v shasum >/dev/null; then
+    SHASUM="shasum -a 256"
+elif command -v sha256sum >/dev/null; then
+    SHASUM="sha256sum"
+else
+    echo "Either shasum or sha256sum is needed."
+    exit 1
+fi
+
 # prepare install prefix
 PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
 
@@ -39,7 +48,7 @@ function bootstrap_cleanup {
 
 if [ -f ${PREFIX}/.revision ]; then
     cd ${SCRIPT_DIR}
-    if ! shasum -a 256 -c ${PREFIX}/.revision >/dev/null 2>/dev/null; then
+    if ! ${SHASUM} -c ${PREFIX}/.revision >/dev/null 2>/dev/null; then
 	# bootstrap script has changed, do a clean rebuild
 	bootstrap_cleanup
     fi
@@ -148,6 +157,6 @@ echo "Build success!"
 rm -rf ${BUILD_DIR}
 
 cd ${SCRIPT_DIR}
-shasum -a 256 $(basename $0) > ${PREFIX}/.revision
+${SHASUM} $(basename $0) > ${PREFIX}/.revision
 
 exit 0
