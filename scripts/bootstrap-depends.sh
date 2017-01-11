@@ -63,6 +63,7 @@ echo "log:   ${LOG}" | tee ${LOG}
 function on_failure {
     cat ${LOG}
     rm ${PREFIX}/.revision
+    exit 1
 }
 trap on_failure ERR
 
