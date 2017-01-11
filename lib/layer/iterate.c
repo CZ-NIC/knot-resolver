@@ -16,6 +16,7 @@
 
 #include <sys/time.h>
 #include <assert.h>
+#include <arpa/inet.h>
 
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
@@ -155,22 +156,26 @@ static int update_parent(const knot_rrset_t *rr, struct kr_query *qry)
 
 static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
 {
-	bool used_glue = false;
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
-			if (knot_dname_is_equal(ns, rr->owner)) {
-				(void) update_nsaddr(rr, req->current_query);
-				used_glue = true;
+			if (!knot_dname_is_equal(ns, rr->owner)) {
+				continue;
 			}
-		}
-	}
-	WITH_VERBOSE {
-		char name_str[KNOT_DNAME_MAXLEN];
-		knot_dname_to_str(name_str, ns, sizeof(name_str));
-		if (used_glue) {
-			VERBOSE_MSG("<= using glue for '%s'\n", name_str);
+			(void) update_nsaddr(rr, req->current_query);
+			WITH_VERBOSE {
+				char name_str[KNOT_DNAME_MAXLEN];
+				char addr_str[INET6_ADDRSTRLEN];
+				const void *addr = knot_rdata_data(rr->rrs.data);
+				const int addr_len = knot_rdata_rdlen(rr->rrs.data);
+				const int af = (addr_len == sizeof(struct in_addr)) ?
+					       AF_INET : AF_INET6;
+				knot_dname_to_str(name_str, ns, sizeof(name_str));
+				inet_ntop(af, addr, addr_str, sizeof(addr_str));
+				VERBOSE_MSG("<= using glue for '%s': '%s'\n",
+					    name_str, addr_str);
+			}
 		}
 	}
 }

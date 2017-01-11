@@ -589,8 +589,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		 * This indicates that the NS is auth for both parent-child,
 		 * and we must update DS/DNSKEY to validate it.
 		 */
-		const bool track_pc_change = !(qry->flags & QUERY_CACHED);
-		if (track_pc_change) {
+		if (!(qry->flags & QUERY_CACHED)) {
 			ret = check_signer(ctx, pkt);
 			if (ret != KR_STATE_DONE) {
 				return ret;
@@ -604,6 +603,14 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			VERBOSE_MSG(qry, "<= bad keys, broken trust chain\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KR_STATE_FAIL;
+		}
+	}
+
+	if (!(qry->flags & QUERY_CACHED) &&
+	    knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DS) {
+		ret = check_signer(ctx, pkt);
+		if (ret != KR_STATE_DONE) {
+			return ret;
 		}
 	}
 
