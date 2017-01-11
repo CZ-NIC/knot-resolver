@@ -3,6 +3,7 @@ os:
     - linux
     - osx
 compiler:
+    - gcc
     - clang
 notifications:
     email:
@@ -18,6 +19,11 @@ notifications:
         on_failure: always
 matrix:
     fast_finish: true
+    exclude:
+    - os: linux
+      compiler: clang
+    - os: osx
+      compiler: gcc
 env:
     global:
         - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
@@ -27,6 +33,7 @@ env:
         - MALLOC_CHECK_=3
         - MALLOC_PERTURB_=223
 before_script:
+    - echo $CFLAGS
     - BOOTSTRAP_CLEANUP=1 ./scripts/bootstrap-depends.sh ${HOME}/.local
 script:
     - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 install check V=1 COVERAGE=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
