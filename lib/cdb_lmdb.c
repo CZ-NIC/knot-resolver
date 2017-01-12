@@ -218,9 +218,13 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_opts *opts, knot_mm_t *pool)
 
 	/* Clear stale lockfiles. */
 	auto_free char *lockfile = kr_strcatdup(2, opts->path, "/.cachelock");
-	if (lockfile && access(lockfile, R_OK) == 0) {
-		kr_log_info("[system] cache: clearing stale lockfile '%s'\n", lockfile);
-		unlink(lockfile);
+	if (lockfile) {
+		if (unlink(lockfile) == 0) {
+			kr_log_info("[system] cache: cleared stale lockfile '%s'\n", lockfile);
+		} else if (errno != ENOENT) {
+			kr_log_info("[system] cache: failed to clear stale lockfile '%s': %s\n", lockfile,
+				    strerror(errno));
+		}
 	}
 
 	/* Open the database. */
@@ -283,11 +287,17 @@ static int cdb_clear(knot_db_t *db)
 
 	/* Check if the fd is pointing to the same file.
 	 * man open(2):
-	 * > Portable programs that want to perform atomic file locking using a lockfile,
-	 * > and need to avoid reliance on NFS support for O_EXCL, can create a unique
-	 * > file on the same file system (e.g., incorporating hostname and PID),
-	 * > and use link(2) to make a link to the lockfile.
-	 * > If link(2) returns 0, the lock is successful. */
+         * > Portable programs that want to perform atomic file
+         * > locking using a lockfile, and need to avoid reliance on
+         * > NFS support for O_EXCL, can create a unique file on the
+         * > same filesystem (e.g., incorporating hostname and PID),
+         * > and use link(2) to make a link to the lockfile.  If
+         * > link(2) returns 0, the lock is successful.  Otherwise,
+         * > use stat(2) on the unique file to check if its link count
+         * > has increased to 2, in which case the lock is also
+         * > successful.
+	 */
+
 	auto_free char *mdb_datafile = kr_strcatdup(2, path, "/data.mdb");
 	auto_free char *mdb_lockfile = kr_strcatdup(2, path, "/lock.mdb");
 	auto_free char *lockfile = kr_strcatdup(2, path, "/.cachelock");
@@ -296,7 +306,15 @@ static int cdb_clear(knot_db_t *db)
 	}
 	ret = link(mdb_lockfile, lockfile);
 	if (ret != 0) {
-		return kr_error(errno);
+		int lock_errno = errno;
+		struct stat lock_stat;
+		ret = stat(lockfile, &lock_stat);
+		if (ret != 0) {
+			return kr_error(errno);
+		}
+		if (lock_stat.st_nlink != 2) {
+			return kr_error(lock_errno);
+		}
 	}
 	struct stat old_stat, new_stat;
 	ret = fstat(fd, &new_stat);
@@ -314,6 +332,7 @@ static int cdb_clear(knot_db_t *db)
 	 * else has already removed the files.
 	 */
 	if (old_stat.st_dev == new_stat.st_dev && old_stat.st_ino == new_stat.st_ino) {
+		// coverity[toctou]
 		unlink(mdb_datafile);
 		unlink(mdb_lockfile);
 	}
