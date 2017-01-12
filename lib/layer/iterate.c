@@ -132,6 +132,7 @@ static bool is_valid_addr(const uint8_t *addr, size_t len)
 	return true;
 }
 
+/** @internal Update NS address from record \a rr.  Return _FAIL on error. */
 static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
@@ -149,11 +150,7 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 	return KR_STATE_CONSUME;
 }
 
-static int update_parent(const knot_rrset_t *rr, struct kr_query *qry)
-{
-	return update_nsaddr(rr, qry->parent);
-}
-
+/** @internal From \a pkt, fetch glue records for name \a ns, and update the cut etc. */
 static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
 {
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
@@ -196,6 +193,9 @@ static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns)
 	return 0;
 }
 
+/** @internal Update the cut with another NS(+glue) record.
+ * @param current_cut is cut name before this packet.
+ * @return _DONE if cut->name changes, _FAIL on error, and _CONSUME otherwise. */
 static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		      struct kr_request *req, const knot_dname_t *current_cut)
 {
@@ -203,9 +203,9 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	struct kr_zonecut *cut = &qry->zone_cut;
 	int state = KR_STATE_CONSUME;
 
-	/* Authority MUST be at/below the authority of the nameserver, otherwise
-	 * possible cache injection attempt. */
-	if (!knot_dname_in(cut->name, rr->owner)) {
+	/* New authority MUST be at/below the authority of the current cut;
+	 * otherwise it's a possible cache injection attempt. */
+	if (!knot_dname_in(current_cut, rr->owner)) {
 		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
 #ifdef STRICT_MODE
 		return KR_STATE_FAIL;
@@ -249,6 +249,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		if (qry->flags & QUERY_PERMISSIVE) {
 			fetch_glue(pkt, ns_name, req);
 		} else if (qry->flags & QUERY_STRICT) {
+			/* Strict mode uses only mandatory glue. */
 			if (knot_dname_in(cut->name, ns_name))
 				fetch_glue(pkt, ns_name, req);
 		} else {
@@ -402,7 +403,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				/* if not referral, mark record to be written to final answer */
 				to_wire = !referral;
 			} else {
-				state = update_parent(rr, query);
+				state = update_nsaddr(rr, query->parent);
 				if (state == KR_STATE_FAIL) {
 					return state;
 				}

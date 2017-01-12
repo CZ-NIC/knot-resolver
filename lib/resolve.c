@@ -37,6 +37,7 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "resl",  fmt)
 
+/** @internal Set @a yielded to all RRs with matching @a qry_uid. */
 static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
 {
 	for (unsigned i = 0; i < array->len; ++i) {
