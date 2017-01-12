@@ -626,8 +626,10 @@ static int begin(kr_layer_t *ctx)
 	}
 
 	struct kr_query *qry = ctx->req->current_query;
-	/* Avoid any other classes. */
-	if (qry->sclass != KNOT_CLASS_IN) {
+	/* Avoid any other classes, and avoid any meta-types ~~except for ANY~~. */
+	if (qry->sclass != KNOT_CLASS_IN
+	    || (knot_rrtype_is_metatype(qry->stype)
+		    /* && qry->stype != KNOT_RRTYPE_ANY hmm ANY seems broken ATM */)) {
 		knot_wire_set_rcode(ctx->req->answer->wire, KNOT_RCODE_NOTIMPL);
 		return KR_STATE_FAIL;
 	}
