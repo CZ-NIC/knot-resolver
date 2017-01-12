@@ -72,9 +72,21 @@ Most of the dependencies can be resolved from packages, here's an overview for s
    sudo apt-get install pkg-config libknot-dev libuv1-dev libcmocka-dev libluajit-5.1-dev
 
 * **Ubuntu** - unknown.
+* **Fedora**
+
+.. code-block:: bash
+
+   # minimal build
+   sudo dnf install @buildsys-build knot-devel libuv-devel luajit-devel
+   # unit tests
+   sudo dnf install libcmocka-devel
+   # integration tests
+   sudo dnf install cmake git python-dns python-jinja2
+   # optional features
+   sudo dnf install doxygen golang hiredis-devel libmemcached-devel systemd-devel
+
 * **RHEL/CentOS** - unknown.
 * **openSUSE** - there is an `experimental package <https://build.opensuse.org/package/show/server:dns/knot-resolver>`_.
-* **RHEL** - unknown.
 * **FreeBSD** - unknown.
 * **NetBSD** - unknown.
 * **OpenBSD** - unknown.
