@@ -23,7 +23,7 @@
  /** @internal Print a debug message related to resolution. */
  #define QRVERBOSE(query, cls, fmt, ...) WITH_VERBOSE { \
     unsigned _ind = 0; \
-    struct kr_query *q = (struct kr_query *)(query); \
+    struct kr_query *q = (query); \
     uint16_t _id = q ? q->id : 0; \
     for (; q; q = q->parent, _ind += 2); \
     kr_log_verbose("[%5hu][%s] %*s" fmt, _id, cls, _ind, "", ##  __VA_ARGS__); \
