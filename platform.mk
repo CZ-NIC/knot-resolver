@@ -183,6 +183,11 @@ define find_gopkg
 	HAS_$(1) := $(shell go list $(2) > /dev/null 2>&1 && echo yes || echo no)
 endef
 
+# Find Lua package
+define find_luapkg
+	HAS_$(1) := $(shell luajit -l $(1) -e "os.exit(0)"> /dev/null 2>&1 && echo yes || echo no)
+endef
+
 # Find Python package
 define find_pythonpkg
 	HAS_$(1) := $(shell python -c "import $(1)" > /dev/null 2>&1 && echo yes || echo no)

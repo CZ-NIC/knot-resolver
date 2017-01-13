@@ -22,6 +22,8 @@ $(eval $(call find_lib,lmdb))
 $(eval $(call find_lib,libuv,1.0,yes))
 $(eval $(call find_lib,nettle,,yes))
 $(eval $(call find_alt,lua,luajit))
+$(eval $(call find_luapkg,ltn12))
+$(eval $(call find_luapkg,ssl.https))
 $(eval $(call find_lib,cmocka))
 $(eval $(call find_bin,doxygen))
 $(eval $(call find_bin,sphinx-build))
@@ -105,6 +107,8 @@ info:
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
 	$(info [$(HAS_libsystemd)] systemd (daemon))
 	$(info [$(HAS_nettle)] nettle (modules/cookies))
+	$(info [$(HAS_ltn12)] Lua socket ltn12 (trust anchor bootstrapping))
+	$(info [$(HAS_ssl.https)] Lua ssl.https (trust anchor bootstrapping))
 	$(info )
 
 # Verify required dependencies are met, as listed above
