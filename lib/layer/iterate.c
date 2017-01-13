@@ -31,6 +31,7 @@
 #include "lib/dnssec/ta.h"
 
 #define VERBOSE_MSG(fmt...) QRVERBOSE(req->current_query, "iter", fmt)
+#define QVERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "iter", fmt)
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
@@ -393,10 +394,6 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				continue;
 			}
 			/* Process records matching current SNAME */
-			unsigned hint = 0;
-			if(knot_dname_is_equal(cname, knot_pkt_qname(req->answer))) {
-				hint = KNOT_COMPR_HINT_QNAME;
-			}
 			int state = KR_STATE_FAIL;
 			bool to_wire = false;
 			if (is_final) {
@@ -654,6 +651,13 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	query->id = kr_rand_uint(UINT16_MAX);
 	knot_wire_set_id(pkt->wire, query->id);
 	pkt->parsed = pkt->size;
+	WITH_VERBOSE {
+		char name_str[KNOT_DNAME_MAXLEN], type_str[16];
+		knot_dname_to_str(name_str, query->sname, sizeof(name_str));
+		knot_rrtype_to_string(query->stype, type_str, sizeof(type_str));
+		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %hu\n",
+			    name_str, type_str, query->parent ? query->parent->id : 0);
+	}
 	return kr_ok();
 }
 
