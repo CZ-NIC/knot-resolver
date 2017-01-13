@@ -483,7 +483,6 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		}
 	}
 	/* Send using given protocol */
-	ret = 0;
 	if (handle->type == UV_UDP) {
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->as.send.data = task;
