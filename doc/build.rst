@@ -83,7 +83,9 @@ Most of the dependencies can be resolved from packages, here's an overview for s
    # integration tests
    sudo dnf install cmake git python-dns python-jinja2
    # optional features
-   sudo dnf install doxygen golang hiredis-devel libmemcached-devel systemd-devel
+   sudo dnf install golang hiredis-devel libmemcached-devel systemd-devel
+   # docs
+   sudo dnf install doxygen python-breathe python-sphinx
 
 * **RHEL/CentOS** - unknown.
 * **openSUSE** - there is an `experimental package <https://build.opensuse.org/package/show/server:dns/knot-resolver>`_.
