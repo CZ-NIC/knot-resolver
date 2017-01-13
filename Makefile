@@ -107,8 +107,8 @@ info:
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
 	$(info [$(HAS_libsystemd)] systemd (daemon))
 	$(info [$(HAS_nettle)] nettle (modules/cookies))
-	$(info [$(HAS_ltn12)] Lua socket ltn12 (modules/trust_anchors))
-	$(info [$(HAS_ssl.https)] Lua ssl.https (modules/trust_anchors))
+	$(info [$(HAS_ltn12)] Lua socket ltn12 (trust anchor bootstrapping))
+	$(info [$(HAS_ssl.https)] Lua ssl.https (trust anchor bootstrapping))
 	$(info )
 
 # Verify required dependencies are met, as listed above
