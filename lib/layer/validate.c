@@ -255,6 +255,25 @@ static knot_rrset_t *update_ds(struct kr_zonecut *cut, const knot_pktsection_t *
 	return new_ds;	
 }
 
+static void mark_insecure_parents(const struct kr_query *qry)
+{
+	/* If there is a chain of DS queries mark all of them,
+	 * then mark first non-DS parent.
+	 * Stop if parent is waiting for ns address.
+	 * NS can be located at unsigned zone, but still will return
+	 * valid DNSSEC records for initial query. */
+	struct kr_query *parent = qry->parent;
+	const uint32_t cut_flags = (QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6);
+	while (parent && ((parent->flags & cut_flags) == 0)) {
+		parent->flags &= ~QUERY_DNSSEC_WANT;
+		parent->flags |= QUERY_DNSSEC_INSECURE;
+		if (parent->stype != KNOT_RRTYPE_DS) {
+			break;
+		}
+		parent = parent->parent;
+	}
+}
+
 static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 {
 	struct kr_query *parent = qry->parent;
@@ -270,14 +289,7 @@ static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 	case KNOT_RRTYPE_DS:
 		VERBOSE_MSG(qry, "<= parent: updating DS\n");
 		if (qry->flags & QUERY_DNSSEC_INSECURE) { /* DS non-existence proven. */
-			do {
-				parent->flags &= ~QUERY_DNSSEC_WANT;
-				parent->flags |= QUERY_DNSSEC_INSECURE;
-				if (parent->stype != KNOT_RRTYPE_DS) {
-					break;
-				}
-				parent = parent->parent;
-			} while (parent);
+			mark_insecure_parents(qry);
 		} else { /* DS existence proven. */
 			parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
 			if (!parent->zone_cut.trust_anchor) {
@@ -540,18 +552,12 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 	if (!(qry->flags & QUERY_DNSSEC_WANT)) {
-		/* Got validated insecure answer from cache
-		   Mark parent(s) as insecure */
-		if ((qry->flags & (QUERY_CACHED | QUERY_DNSSEC_INSECURE)) ==
-		    (QUERY_CACHED | QUERY_DNSSEC_INSECURE) &&
-		    qry->parent != NULL) {
-			/* if there is a chain of DS queries, mark all of them */
-			struct kr_query *parent = qry->parent;
-			do {
-				parent->flags &= ~QUERY_DNSSEC_WANT;
-				parent->flags |= QUERY_DNSSEC_INSECURE;
-				parent = parent->parent;
-			} while (parent && parent->stype == KNOT_RRTYPE_DS);
+		const uint32_t test_flags = (QUERY_CACHED | QUERY_DNSSEC_INSECURE);
+		const bool is_insec = ((qry->flags & test_flags) == test_flags);
+		if (is_insec && qry->parent != NULL) {
+			/* We have got insecure answer from cache.
+			 * Mark parent(s) as insecure. */
+			mark_insecure_parents(qry);
 			VERBOSE_MSG(qry, "<= cached insecure response, going insecure\n");
 			ctx->state = KR_STATE_DONE;
 		} else if (ctx->state == KR_STATE_YIELD) {
