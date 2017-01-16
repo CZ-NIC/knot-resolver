@@ -242,6 +242,10 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 	if (!knot_dname_from_str(key, name, sizeof(key))) {
 		return kr_error(EINVAL);
 	}
+	int ret = knot_dname_to_lower(key);
+	if (ret) {
+		return ret;
+	}
 	const knot_rdata_t *rdata = addr2rdata(addr);
 	if (!rdata) {
 		return kr_error(EINVAL);
