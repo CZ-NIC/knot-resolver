@@ -1,5 +1,6 @@
 local kres = require('kres')
 local bit = require('bit')
+local ffi = require('ffi')
 
 -- Counter of unique rules
 local nextid = 0
@@ -29,10 +30,6 @@ if has_socket then
 		end
 		return s
 	end
-end
-local has_ffi, ffi = pcall(require, 'ffi')
-if not has_ffi then
-	socket_client = function () return error("missing ffi library, required for this policy") end
 end
 
 local function parse_target(target)

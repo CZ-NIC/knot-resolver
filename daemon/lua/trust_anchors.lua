@@ -39,30 +39,8 @@ local function bootstrap(url, ca)
 	return rr
 end
 
--- Load the module (check for FFI)
-local ffi_ok, ffi = pcall(require, 'ffi')
-if not ffi_ok then
-	-- Simplified TA management, no RFC5011 automatics
-	return {
-		-- Reuse Lua/C global function
-		add = trustanchor,
-		-- Simplified trust anchor management
-		config = function (path)
-			if not path then return end
-			if not io.open(path, 'r') then
-				local rr, err = bootstrap()
-				if not rr then print(err) return false end
-				local keyfile = assert(io.open(path, 'w'))
-				keyfile:write(rr..'\n')
-			end
-			for line in io.lines(path) do
-				trustanchor(line)
-			end
-		end,
-		-- Disabled
-		set_insecure = function () error('[ ta ] FFI not available, this function is disabled') end,
-	}
-end
+-- Load the module
+local ffi = require 'ffi'
 local kres = require('kres')
 local C = ffi.C
 
