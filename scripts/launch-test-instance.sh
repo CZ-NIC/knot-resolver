@@ -21,4 +21,6 @@ echo "dig +dnssec +multi +time=60 +retry=1 -p ${PORT} @::1"
 
 LD_LIBRARY_PATH=${WORKDIR}/lib ${WORKDIR}/sbin/kresd -a 127.0.0.1#${PORT} -a ::1#${PORT} -v -k ${ROOT_KEY:-/usr/share/dns/root.key} ${WORKDIR}/run/kresd
 
-rm -r ${WORKDIR}
+if [ "${WORKDIR}" != "${2}" -a "${KEEP_WORKDIR}" != "yes" ]; then
+    rm -r ${WORKDIR}
+fi
