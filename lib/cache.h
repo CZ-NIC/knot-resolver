@@ -83,6 +83,8 @@ struct kr_cache
 		uint32_t insert;      /**< Number of insertions */
 		uint32_t delete;      /**< Number of deletions */
 	} stats;
+
+	uint32_t ttl_min, ttl_max; /**< Maximum TTL of inserted entries */
 };
 
 /**

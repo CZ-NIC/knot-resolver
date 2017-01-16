@@ -796,6 +796,43 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 	print('Insertions:', cache.stats().insert)
 
+.. function:: cache.max_ttl([ttl])
+
+  :param number ttl: maximum cache TTL (default: 6 days)
+  :return: current maximum TTL
+
+  Get or set maximum cache TTL.
+
+  .. note:: The `ttl` value must be in range `(min_ttl, 4294967295)`.
+  
+  .. warning:: This settings applies only to currently open cache, it will not persist if the cache is closed or reopened.
+
+  .. code-block:: lua
+     -- Get maximum TTL
+     cache.max_ttl()
+     518400
+     -- Set maximum TTL
+     cache.max_ttl(172800)
+     172800
+
+.. function:: cache.min_ttl([ttl])
+
+  :param number ttl: minimum cache TTL (default: 0)
+  :return: current maximum TTL
+
+  Get or set minimum cache TTL. Any entry inserted into cache with TTL lower than minimal will be overriden to minimum TTL. Forcing TTL higher than specified violates DNS standards, use with care.
+
+  .. note:: The `ttl` value must be in range `<0, max_ttl)`.
+  
+  .. warning:: This settings applies only to currently open cache, it will not persist if the cache is closed or reopened.
+
+  .. code-block:: lua
+     -- Get minimum TTL
+     cache.min_ttl()
+     0
+     -- Set minimum TTL
+     cache.min_ttl(5)
+     5
 
 .. function:: cache.prune([max_count])
 

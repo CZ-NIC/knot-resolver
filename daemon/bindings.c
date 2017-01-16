@@ -504,6 +504,53 @@ static const struct kr_cdb_api *cache_select(struct engine *engine, const char *
 	return NULL;
 }
 
+static int cache_max_ttl(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+
+	int n = lua_gettop(L);
+	if (n > 0) {
+		if (!lua_isnumber(L, 1)) {
+			format_error(L, "expected 'max_ttl(number ttl)'");
+			lua_error(L);
+		}
+		uint32_t min = cache->ttl_min;
+		int64_t ttl = lua_tonumber(L, 1);
+		if (ttl < 0 || ttl <= min || ttl > UINT32_MAX) {
+			format_error(L, "max_ttl must be larger than minimum TTL, and in range <1, UINT32_MAX>'");
+			lua_error(L);
+		}
+		cache->ttl_max = ttl;
+	}
+	lua_pushinteger(L, cache->ttl_max);
+	return 1;
+}
+
+
+static int cache_min_ttl(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+
+	int n = lua_gettop(L);
+	if (n > 0) {
+		if (!lua_isnumber(L, 1)) {
+			format_error(L, "expected 'min_ttl(number ttl)'");
+			lua_error(L);
+		}
+		uint32_t max = cache->ttl_max;
+		int64_t ttl = lua_tonumber(L, 1);
+		if (ttl < 0 || ttl >= max || ttl > UINT32_MAX) {
+			format_error(L, "min_ttl must be smaller than maximum TTL, and in range <0, UINT32_MAX>'");
+			lua_error(L);
+		}
+		cache->ttl_min = ttl;
+	}
+	lua_pushinteger(L, cache->ttl_min);
+	return 1;
+}
+
 /** Open cache */
 static int cache_open(lua_State *L)
 {
@@ -776,6 +823,8 @@ int lib_cache(lua_State *L)
 		{ "prune",  cache_prune },
 		{ "clear",  cache_clear },
 		{ "get",    cache_get },
+		{ "max_ttl", cache_max_ttl },
+		{ "min_ttl", cache_min_ttl },
 		{ NULL, NULL }
 	};
 
