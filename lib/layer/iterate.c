@@ -581,7 +581,8 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 	} else if (!query->parent) {
-		state = pick_authority(pkt, req, true);
+		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
+		state = pick_authority(pkt, req, to_wire);
 		if (state != kr_ok()) {
 			return KR_STATE_FAIL;
 		}
