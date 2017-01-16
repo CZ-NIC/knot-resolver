@@ -34,7 +34,6 @@
 #include "lib/layer.h"
 
 /* Defaults */
-#define DEFAULT_FILE "/etc/hosts"
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "hint",  fmt)
 
 /* Structure for reverse search (address to domain) */
@@ -301,7 +300,7 @@ static int load_map(struct kr_zonecut *hints, FILE *fp)
 	return kr_ok();
 }
 
-static int load(struct kr_module *module, const char *path)
+static int load_file(struct kr_module *module, const char *path)
 {
 	auto_fclose FILE *fp = fopen(path, "r");
 	if (fp == NULL) {
@@ -311,21 +310,8 @@ static int load(struct kr_module *module, const char *path)
 		VERBOSE_MSG(NULL, "reading '%s'\n", path);
 	}
 
-	/* Create pool and copy itself */
-	knot_mm_t _pool = {
-		.ctx = mp_new(4096),
-		.alloc = (knot_mm_alloc_t) mp_alloc
-	};
-	knot_mm_t *pool = mm_alloc(&_pool, sizeof(*pool));
-	if (!pool) {
-		return kr_error(ENOMEM);
-	}
-	memcpy(pool, &_pool, sizeof(*pool));
-
 	/* Load file to map */
-	struct kr_zonecut *hints = mm_alloc(pool, sizeof(*hints));
-	kr_zonecut_init(hints, (const uint8_t *)(""), pool);
-	module->data = hints;
+	struct kr_zonecut *hints = module->data;
 	return load_map(hints, fp);
 }
 
@@ -349,6 +335,8 @@ static void unload(struct kr_module *module)
 static char* hint_set(void *env, struct kr_module *module, const char *args)
 {
 	struct kr_zonecut *hints = module->data;
+	if (!args)
+		return NULL;
 	auto_free char *args_copy = strdup(args);
 
 	int ret = -1;
@@ -406,11 +394,15 @@ static char* pack_hints(struct kr_zonecut *hints);
  * Retrieve address hints, either for given name or for all names.
  *
  * Input:  name
- * Output: { address1, address2, ... }
+ * Output: NULL or "{ address1, address2, ... }"
  */
 static char* hint_get(void *env, struct kr_module *module, const char *args)
 {
 	struct kr_zonecut *hints = module->data;
+	if (!hints) {
+		assert(false);
+		return NULL;
+	}
 
 	if (!args) {
 		return pack_hints(hints);
@@ -509,21 +501,51 @@ const kr_layer_api_t *hints_layer(struct kr_module *module)
 	return &_layer;
 }
 
+
+/** Basic initialization: get a memory pool, etc. */
 KR_EXPORT
 int hints_init(struct kr_module *module)
 {
-	module->data = NULL;
-	return 0;
+	/* Create pool and copy itself */
+	knot_mm_t _pool = {
+		.ctx = mp_new(4096),
+		.alloc = (knot_mm_alloc_t) mp_alloc
+	};
+	knot_mm_t *pool = mm_alloc(&_pool, sizeof(*pool));
+	if (!pool) {
+		return kr_error(ENOMEM);
+	}
+	memcpy(pool, &_pool, sizeof(*pool));
+
+	struct kr_zonecut *hints = mm_alloc(pool, sizeof(*hints));
+	if (!hints) {
+		mp_delete(pool->ctx);
+		return kr_error(ENOMEM);
+	}
+	hints->pool = pool;
+	kr_zonecut_init(hints, (const uint8_t *)(""), pool);
+	module->data = hints;
+
+	return kr_ok();
 }
 
+/** Drop all hints, and load a hosts file if any was specified.
+ *
+ * It seems slightly strange to drop all, but keep doing that for now.
+ */
 KR_EXPORT
 int hints_config(struct kr_module *module, const char *conf)
 {
 	unload(module);
-	if (!conf || strlen(conf) < 1) {
-		conf = DEFAULT_FILE;
+	int err = hints_init(module);
+	if (err != kr_ok()) {
+		return err;
 	}
-	return load(module, conf);
+
+	if (conf && conf[0]) {
+		return load_file(module, conf);
+	}
+	return kr_ok();
 }
 
 KR_EXPORT
