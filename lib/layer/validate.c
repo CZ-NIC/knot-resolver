@@ -37,6 +37,8 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "vldr", fmt)
 
+#define MAX_REVALIDATION_CNT 2
+
 /**
  * Search in section for given type.
  * @param sec  Packet section.
@@ -255,6 +257,26 @@ static knot_rrset_t *update_ds(struct kr_zonecut *cut, const knot_pktsection_t *
 	return new_ds;	
 }
 
+static void mark_insecure_parents(const struct kr_query *qry)
+{
+	/* If there is a chain of DS queries mark all of them,
+	 * then mark first non-DS parent.
+	 * Stop if parent is waiting for ns address.
+	 * NS can be located at unsigned zone, but still will return
+	 * valid DNSSEC records for initial query. */
+	struct kr_query *parent = qry->parent;
+	const uint32_t cut_flags = (QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6);
+	while (parent && ((parent->flags & cut_flags) == 0)) {
+		parent->flags &= ~QUERY_DNSSEC_WANT;
+		parent->flags |= QUERY_DNSSEC_INSECURE;
+		if (parent->stype != KNOT_RRTYPE_DS &&
+		    parent->stype != KNOT_RRTYPE_RRSIG) {
+			break;
+		}
+		parent = parent->parent;
+	}
+}
+
 static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 {
 	struct kr_query *parent = qry->parent;
@@ -270,14 +292,7 @@ static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 	case KNOT_RRTYPE_DS:
 		VERBOSE_MSG(qry, "<= parent: updating DS\n");
 		if (qry->flags & QUERY_DNSSEC_INSECURE) { /* DS non-existence proven. */
-			do {
-				parent->flags &= ~QUERY_DNSSEC_WANT;
-				parent->flags |= QUERY_DNSSEC_INSECURE;
-				if (parent->stype != KNOT_RRTYPE_DS) {
-					break;
-				}
-				parent = parent->parent;
-			} while (parent);
+			mark_insecure_parents(qry);
 		} else { /* DS existence proven. */
 			parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
 			if (!parent->zone_cut.trust_anchor) {
@@ -394,13 +409,6 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
-	if (knot_dname_is_equal(rr->owner, qry->zone_cut.name) ||
-				ctx->state == KR_STATE_YIELD) {
-		/* Already yielded for revalidation. */
-		VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
-		qry->flags |= QUERY_DNSSEC_BOGUS;
-		return KR_STATE_FAIL;
-	}
 	VERBOSE_MSG(qry, ">< no RRSIGs found\n");
 	struct kr_zonecut *cut = &qry->zone_cut;
 	const knot_dname_t *cut_name_start = qry->zone_cut.name;
@@ -443,7 +451,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 	int ret = KR_STATE_DONE;
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
-	const ranked_rr_array_entry_t *invalid_entry = NULL;
+	ranked_rr_array_entry_t *invalid_entry = NULL;
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
 		if (entry->yielded) {
@@ -463,6 +471,13 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 
 	if (!invalid_entry) {
 		return ret;
+	}
+
+	if ((invalid_entry->rank != KR_VLDRANK_SECURE) &&
+	    (++(invalid_entry->revalidation_cnt) > MAX_REVALIDATION_CNT)) {
+		VERBOSE_MSG(qry, "<= continuous revalidation, fails\n");
+		qry->flags |= QUERY_DNSSEC_BOGUS;
+		return KR_STATE_FAIL;
 	}
 
 	const knot_rrset_t *rr = invalid_entry->rr;
@@ -504,7 +519,17 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
 		if (!signer) {
-			/* Not a DNSSEC-signed response, ask parent for DS to prove transition to INSECURE. */
+			/* Not a DNSSEC-signed response, ask parent for DS
+			 * to prove transition to INSECURE. */
+			const uint16_t qtype = knot_pkt_qtype(pkt);
+			const knot_dname_t *qname = knot_pkt_qname(pkt);
+			if (qtype == KNOT_RRTYPE_NS &&
+			    knot_dname_is_sub(qname, qry->zone_cut.name)) {
+				/* Server is authoritative
+				 * for both parent and child,
+				 * and child zone is not signed. */
+				qry->zone_cut.name = knot_dname_copy(qname, &req->pool);
+			}
 		} else if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
 			/* Key signer is below current cut, advance and refetch keys. */
 			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
@@ -540,18 +565,12 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 	if (!(qry->flags & QUERY_DNSSEC_WANT)) {
-		/* Got validated insecure answer from cache
-		   Mark parent(s) as insecure */
-		if ((qry->flags & (QUERY_CACHED | QUERY_DNSSEC_INSECURE)) ==
-		    (QUERY_CACHED | QUERY_DNSSEC_INSECURE) &&
-		    qry->parent != NULL) {
-			/* if there is a chain of DS queries, mark all of them */
-			struct kr_query *parent = qry->parent;
-			do {
-				parent->flags &= ~QUERY_DNSSEC_WANT;
-				parent->flags |= QUERY_DNSSEC_INSECURE;
-				parent = parent->parent;
-			} while (parent && parent->stype == KNOT_RRTYPE_DS);
+		const uint32_t test_flags = (QUERY_CACHED | QUERY_DNSSEC_INSECURE);
+		const bool is_insec = ((qry->flags & test_flags) == test_flags);
+		if (is_insec && qry->parent != NULL) {
+			/* We have got insecure answer from cache.
+			 * Mark parent(s) as insecure. */
+			mark_insecure_parents(qry);
 			VERBOSE_MSG(qry, "<= cached insecure response, going insecure\n");
 			ctx->state = KR_STATE_DONE;
 		} else if (ctx->state == KR_STATE_YIELD) {
@@ -584,17 +603,18 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const bool referral = (an->count == 0 && !knot_wire_get_aa(pkt->wire));
 	const bool no_data = (an->count == 0 && knot_wire_get_aa(pkt->wire));
 
-	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
+	if (!(qry->flags & QUERY_CACHED) && knot_wire_get_aa(pkt->wire)) {
 		/* Track difference between current TA and signer name.
 		 * This indicates that the NS is auth for both parent-child,
 		 * and we must update DS/DNSKEY to validate it.
 		 */
-		if (!(qry->flags & QUERY_CACHED)) {
-			ret = check_signer(ctx, pkt);
-			if (ret != KR_STATE_DONE) {
-				return ret;
-			}
+		ret = check_signer(ctx, pkt);
+		if (ret != KR_STATE_DONE) {
+			return ret;
 		}
+	}
+
+	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
 		ret = validate_keyset(req, pkt, has_nsec3);
 		if (ret == kr_error(EAGAIN)) {
 			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
@@ -603,14 +623,6 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			VERBOSE_MSG(qry, "<= bad keys, broken trust chain\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KR_STATE_FAIL;
-		}
-	}
-
-	if (!(qry->flags & QUERY_CACHED) &&
-	    knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DS) {
-		ret = check_signer(ctx, pkt);
-		if (ret != KR_STATE_DONE) {
-			return ret;
 		}
 	}
 
@@ -648,6 +660,10 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					VERBOSE_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
 					qry->flags &= ~QUERY_DNSSEC_WANT;
 					qry->flags |= QUERY_DNSSEC_INSECURE;
+					/* Could not return from here,
+					 * we must continue and
+					 * call update_parent_keys() to mark
+					 * parent queries as insecured */
 				} else {
 					VERBOSE_MSG(qry, "<= bad NODATA proof\n");
 					qry->flags |= QUERY_DNSSEC_BOGUS;
@@ -659,7 +675,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Validate all records, fail as bogus if it doesn't match.
 	 * Do not revalidate data from cache, as it's already trusted. */
-	if (!(qry->flags & QUERY_CACHED)) {
+	if (!(qry->flags & QUERY_CACHED) &&
+	     (qry->flags & QUERY_DNSSEC_WANT)) {
 		ret = validate_records(req, pkt, req->rplan.pool, has_nsec3);
 		if (ret != 0) {
 			/* something exceptional - no DNS key, empty pointers etc
@@ -690,24 +707,26 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Check and update current delegation point security status. */
-	ret = update_delegation(req, qry, pkt, has_nsec3);
-	if (ret == DNSSEC_NOT_FOUND && qry->stype != KNOT_RRTYPE_DS) {
-		if (ctx->state == KR_STATE_YIELD) {
-			VERBOSE_MSG(qry, "<= can't validate referral\n");
-			qry->flags |= QUERY_DNSSEC_BOGUS;
+	if (qry->flags & QUERY_DNSSEC_WANT) {
+		ret = update_delegation(req, qry, pkt, has_nsec3);
+		if (ret == DNSSEC_NOT_FOUND && qry->stype != KNOT_RRTYPE_DS) {
+			if (ctx->state == KR_STATE_YIELD) {
+				VERBOSE_MSG(qry, "<= can't validate referral\n");
+				qry->flags |= QUERY_DNSSEC_BOGUS;
+				return KR_STATE_FAIL;
+			} else {
+				/* Check the trust chain and query DS\DNSKEY if needed. */
+				VERBOSE_MSG(qry, "<= DS\\NSEC was not found, querying for DS\n");
+				return KR_STATE_YIELD;
+			}
+		} else if (ret != 0) {
 			return KR_STATE_FAIL;
-		} else {
-			/* Check the trust chain and query DS\DNSKEY if needed. */
-			VERBOSE_MSG(qry, "<= DS\\NSEC was not found, querying for DS\n");
-			return KR_STATE_YIELD;
+		} else if (pkt_rcode == KNOT_RCODE_NOERROR &&
+			   referral &&
+			   ((qry->flags & (QUERY_DNSSEC_WANT | QUERY_DNSSEC_INSECURE)) == QUERY_DNSSEC_INSECURE)) {
+			/* referral with proven DS non-existance */
+			qtype = KNOT_RRTYPE_DS;
 		}
-	} else if (ret != 0) {
-		return KR_STATE_FAIL;
-	} else if (pkt_rcode == KNOT_RCODE_NOERROR &&
-		   referral &&
-		   ((qry->flags & (QUERY_DNSSEC_WANT | QUERY_DNSSEC_INSECURE)) == QUERY_DNSSEC_INSECURE)) {
-		/* referral with proven DS non-existance */
-		qtype = KNOT_RRTYPE_DS;
 	}
 	/* Update parent query zone cut */
 	if (qry->parent) {

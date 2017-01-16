@@ -94,6 +94,7 @@ typedef array_t(knot_rrset_t *) rr_array_t;
 struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank;
+	uint8_t revalidation_cnt;
 	bool cached;
 	bool yielded;
 	bool to_wire;

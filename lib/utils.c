@@ -457,6 +457,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	entry->qry_uid = qry_uid;
 	entry->rr = copy;
 	entry->rank = rank;
+	entry->revalidation_cnt = 0;
 	entry->cached = false;
 	entry->yielded = false;
 	entry->to_wire = to_wire;
