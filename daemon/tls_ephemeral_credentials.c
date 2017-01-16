@@ -214,15 +214,17 @@ struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
 	creds->ephemeral_servicename = strdup(engine_get_hostname(engine));
 	if (creds->ephemeral_servicename == NULL) {
 		kr_log_error("[tls] could not get server's hostname, using '" INVALID_HOSTNAME "' instead\n");
-		creds->ephemeral_servicename = strdup(INVALID_HOSTNAME);
+		if ((creds->ephemeral_servicename = strdup(INVALID_HOSTNAME)) == NULL) {
+			kr_log_error("[tls] failed to allocate memory for ephemeral credentials\n");
+			goto failure;
+		}
 	}		
-	privkey = get_ephemeral_privkey();
-	if (!privkey)
+	if ((privkey = get_ephemeral_privkey()) == NULL) {
 		goto failure;
-	cert = get_ephemeral_cert(privkey, creds->ephemeral_servicename, now - 60*15, creds->valid_until);
-	if (!cert)
+	}
+	if ((cert = get_ephemeral_cert(privkey, creds->ephemeral_servicename, now - 60*15, creds->valid_until)) == NULL) {
 		goto failure;
-
+	}
 	if ((err = gnutls_certificate_set_x509_key(creds->credentials, &cert, 1, privkey)) < 0) {
 		kr_log_error("[tls] failed to set up ephemeral credentials\n");
 		goto failure;
