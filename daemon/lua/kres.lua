@@ -1,13 +1,7 @@
 -- LuaJIT ffi bindings for libkres, a DNS resolver library.
 -- @note Since it's statically compiled, it expects to find the symbols in the C namespace.
 
-local ffi_ok
-ffi_ok, ffi = pcall(require, 'ffi')
-if not ffi_ok then
-	local M = { error = 'FFI not available, resolver bindings disabled.' }
-	setmetatable(M, {__index = function(t,k,v) error(rawget(M, 'error')) end })
-	return M
-end
+ffi = require('ffi')
 local bit = require('bit')
 local bor = bit.bor
 local band = bit.band
