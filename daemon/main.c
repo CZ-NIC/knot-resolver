@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <libgen.h>
 #include <uv.h>
 #include <assert.h>
 #include <contrib/cleanup.h>
@@ -46,6 +47,16 @@
  */
 static bool g_quiet = false;
 static bool g_interactive = true;
+
+/* lua_pcall helper function */
+static inline char *lua_strerror(int lua_err) {
+	switch (lua_err) {
+	case LUA_ERRRUN: return "a runtime error";
+	case LUA_ERRMEM: return "memory allocation error.";
+	case LUA_ERRERR: return "error while running the error handler function.";
+	default: return "a unknown error";
+	}
+}
 
 /*
  * TTY control
@@ -381,7 +392,6 @@ int main(int argc, char **argv)
 	array_init(tls_fd_set);
 	char *keyfile = NULL;
 	const char *config = NULL;
-	char *keyfile_buf = NULL;
 	int control_fd = -1;
 
 	/* Long options. */
@@ -428,35 +438,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'k':
-			keyfile_buf = malloc(PATH_MAX);
-			if (!keyfile_buf) {
-				kr_log_error("[system] not enough memory\n");
-				return EXIT_FAILURE;
-			}
-			/* Check if the path is absolute */
-			if (optarg[0] == '/') {
-				keyfile = strdup(optarg);
-			} else {
-				/* Construct absolute path, the file may not exist */
-				keyfile = realpath(".", keyfile_buf);
-				if (keyfile) {
-					int len = strlen(keyfile);
-					int namelen = strlen(optarg);
-					if (len + namelen < PATH_MAX - 1) {
-						keyfile[len] = '/';
-						memcpy(keyfile + len + 1, optarg, namelen + 1);
-						keyfile = strdup(keyfile); /* Duplicate */
-					} else {
-						keyfile = NULL; /* Invalidate */
-					}
-				}
-			}
-			free(keyfile_buf);
-			if (!keyfile) {
-				kr_log_error("[system] keyfile '%s':"
-					"failed to construct absolute path\n", optarg);
-				return EXIT_FAILURE;
-			}
+			keyfile = optarg;
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -508,6 +490,7 @@ int main(int argc, char **argv)
 	/* Switch to rundir. */
 	if (optind < argc) {
 		const char *rundir = argv[optind];
+		/* FIXME: access isn't a good way if we start as root and drop privileges later */
 		if (access(rundir, W_OK) != 0) {
 			kr_log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
 			return EXIT_FAILURE;
@@ -607,6 +590,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (ret != 0) {
+		goto cleanup;
+	}
+
 	/* Block signals. */
 	uv_loop_t *loop = uv_default_loop();
 	uv_signal_t sigint, sigterm;
@@ -617,28 +604,99 @@ int main(int argc, char **argv)
 	/* Start the scripting engine */
 	worker->loop = loop;
 	loop->data = worker;
-	if (ret == 0) {
-		ret = engine_start(&engine, config ? config : "config");
-		if (ret == 0) {
-			if (keyfile) {
-				auto_free char *cmd = afmt("trust_anchors.config('%s')", keyfile);
-				if (!cmd) {
-					kr_log_error("[system] not enough memory\n");
-					return EXIT_FAILURE;
-				}
-				engine_cmd(engine.L, cmd, false);
-				lua_settop(engine.L, 0);
-			}
-			/* Run the event loop */
-			ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, control_fd);
-		}
-		if (ret != 0) {
-			perror("[system] worker failed");
-			ret = EXIT_FAILURE;
-		}
+
+	ret = engine_start(&engine, config ? config : "config");
+	if (ret != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
 	}
-	/* Cleanup. */
-	free(keyfile);
+
+	if (keyfile) {
+		auto_free char *dirname_storage = strdup(keyfile);
+		if (!dirname_storage) {
+			kr_log_error("[system] not enough memory: %s\n",
+				     strerror(errno));
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+		auto_free char *basename_storage = strdup(keyfile);
+		if (!basename_storage) {
+			kr_log_error("[system] not enough memory: %s\n",
+				     strerror(errno));
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		/* Resolve absolute path to the keyfile directory */
+		auto_free char *keyfile_dir = malloc(PATH_MAX);
+		if (realpath(dirname(dirname_storage), keyfile_dir) == NULL) {
+			kr_log_error("[ ta ]: keyfile '%s' directory: %s\n",
+				     keyfile, strerror(errno));
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		char *_filename = basename(basename_storage);
+		int dirlen = strlen(keyfile_dir);
+		int namelen = strlen(_filename);
+		if (dirlen + namelen >= PATH_MAX) {
+			kr_log_error("[ ta ]: keyfile '%s' PATH_MAX exceeded\n",
+				     keyfile);
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+		keyfile_dir[dirlen] = '/';
+
+		auto_free char *keyfile_path = malloc(dirlen + namelen + 1);
+		memcpy(keyfile_path, keyfile_dir, dirlen + 1);
+		memcpy(keyfile_path + dirlen + 1, _filename, namelen + 1);
+
+		int unmanaged = 0;
+
+		/* Note: config has been executed, so access() is OK,
+		 * as we've dropped privileges already if configured. */
+		if (access(keyfile_path, F_OK) != 0) {
+			kr_log_info("[ ta ] keyfile '%s': doesn't exist, bootstrapping\n", keyfile_path);
+			if (access(keyfile_dir, W_OK) != 0) {
+				kr_log_error("[ ta ] keyfile '%s': write access to '%s' needed\n", keyfile_path, keyfile_dir);
+				ret = EXIT_FAILURE;
+				goto cleanup;
+			}
+		} else if (access(keyfile_path, R_OK) == 0) {
+			if ((access(keyfile_path, W_OK) != 0) || (access(keyfile_dir, W_OK) != 0)) {
+				kr_log_error("[ ta ] keyfile '%s': not writeable, starting in unmanaged mode\n", keyfile_path);
+				unmanaged = 1;
+			}
+		} else {
+			kr_log_error("[ ta ] keyfile '%s': %s\n", keyfile_path, strerror(errno));
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		auto_free char *cmd = afmt("trust_anchors.config('%s',%s)", keyfile_path, unmanaged?"true":"nil");
+		if (!cmd) {
+			kr_log_error("[system] not enough memory\n");
+			ret =  EXIT_FAILURE;
+			goto cleanup;
+		}
+		int lua_ret = 0;
+		if ((lua_ret = engine_cmd(engine.L, cmd, false)) != 0) {
+			kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n", keyfile_path, lua_strerror(lua_ret));
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+		lua_settop(engine.L, 0);
+	}
+
+	/* Run the event loop */
+	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, control_fd);
+	if (ret != 0) {
+		perror("[system] worker failed");
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_reclaim(worker);
 	mp_delete(pool.ctx);

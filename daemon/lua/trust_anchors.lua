@@ -188,6 +188,8 @@ local function active_refresh(trust_anchors, pkt, bootstrap)
 		end
 		trust_anchors.update(keyset, bootstrap)
 		retry = false
+	else
+		print('[ ta ] active refresh failed, rcode: '..pkt:rcode())
 	end
 	-- Calculate refresh/retry timer (RFC 5011, 2.3)
 	local min_ttl = retry and day or 15 * day
@@ -269,19 +271,21 @@ local trust_anchors = {
 	config = function (path, unmanaged)
 		-- Bootstrap if requested and keyfile doesn't exist
 		if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
-		if not io.open(path, 'r') then
-			local rr, msg = bootstrap()
-			if not rr then
-				error('you MUST obtain the root TA manually, see: '..
-				      'https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec')
+		if not unmanaged then
+			if not io.open(path, 'r') then
+				local rr, msg = bootstrap()
+				if not rr then
+					error('you MUST obtain the root TA manually, see: '..
+					      'https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec')
+				end
+				trustanchor(rr)
+				-- Fetch DNSKEY immediately
+				trust_anchors.file_current = path
+				refresh_plan(trust_anchors, 0, active_refresh, true, true)
+				return
+			elseif path == trust_anchors.file_current then
+				return
 			end
-			trustanchor(rr)
-			-- Fetch DNSKEY immediately
-			trust_anchors.file_current = path
-			refresh_plan(trust_anchors, 0, active_refresh, true, true)
-			return
-		elseif path == trust_anchors.file_current then
-			return
 		end
 		-- Parse new keys, refresh eventually
 		local new_keys = require('zonefile').file(path)
