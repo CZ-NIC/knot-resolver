@@ -65,6 +65,7 @@ typedef struct {
 struct ranked_rr_array_entry {
     uint32_t qry_uid;
     uint8_t rank;
+    uint8_t revalidation_cnt;
     _Bool cached;
     _Bool yielded;
     _Bool to_wire;

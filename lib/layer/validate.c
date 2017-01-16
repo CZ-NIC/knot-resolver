@@ -37,6 +37,8 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "vldr", fmt)
 
+#define MAX_REVALIDATION_CNT 2
+
 /**
  * Search in section for given type.
  * @param sec  Packet section.
@@ -267,7 +269,8 @@ static void mark_insecure_parents(const struct kr_query *qry)
 	while (parent && ((parent->flags & cut_flags) == 0)) {
 		parent->flags &= ~QUERY_DNSSEC_WANT;
 		parent->flags |= QUERY_DNSSEC_INSECURE;
-		if (parent->stype != KNOT_RRTYPE_DS) {
+		if (parent->stype != KNOT_RRTYPE_DS &&
+		    parent->stype != KNOT_RRTYPE_RRSIG) {
 			break;
 		}
 		parent = parent->parent;
@@ -406,13 +409,6 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
-	if (knot_dname_is_equal(rr->owner, qry->zone_cut.name) ||
-				ctx->state == KR_STATE_YIELD) {
-		/* Already yielded for revalidation. */
-		VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
-		qry->flags |= QUERY_DNSSEC_BOGUS;
-		return KR_STATE_FAIL;
-	}
 	VERBOSE_MSG(qry, ">< no RRSIGs found\n");
 	struct kr_zonecut *cut = &qry->zone_cut;
 	const knot_dname_t *cut_name_start = qry->zone_cut.name;
@@ -455,7 +451,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 	int ret = KR_STATE_DONE;
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
-	const ranked_rr_array_entry_t *invalid_entry = NULL;
+	ranked_rr_array_entry_t *invalid_entry = NULL;
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
 		if (entry->yielded) {
@@ -475,6 +471,13 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 
 	if (!invalid_entry) {
 		return ret;
+	}
+
+	if ((invalid_entry->rank != KR_VLDRANK_SECURE) &&
+	    (++(invalid_entry->revalidation_cnt) > MAX_REVALIDATION_CNT)) {
+		VERBOSE_MSG(qry, "<= continuous revalidation, fails\n");
+		qry->flags |= QUERY_DNSSEC_BOGUS;
+		return KR_STATE_FAIL;
 	}
 
 	const knot_rrset_t *rr = invalid_entry->rr;
@@ -657,7 +660,10 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					VERBOSE_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
 					qry->flags &= ~QUERY_DNSSEC_WANT;
 					qry->flags |= QUERY_DNSSEC_INSECURE;
-					/* Could not return here, we must to update parent query */
+					/* Could not return from here,
+					 * we must continue and
+					 * call update_parent_keys() to mark
+					 * parent queries as insecured */
 				} else {
 					VERBOSE_MSG(qry, "<= bad NODATA proof\n");
 					qry->flags |= QUERY_DNSSEC_BOGUS;
