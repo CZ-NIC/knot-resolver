@@ -28,10 +28,11 @@ Properties
 
 .. function:: hints.config([path])
 
-  :param string path:  path to hosts file, default: ``"/etc/hosts"``
+  :param string path:  path to hosts file, default: no file
   :return: ``{ result: bool }``
 
-  Load specified hosts file.
+  Clear any configured hints and load specified hosts file.
+  (Root hints are not touched.)
 
 .. function:: hints.get(hostname)
 
