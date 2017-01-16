@@ -16,7 +16,8 @@ PREFIX=${PREFIX:-$WORKDIR} make install
 install -d -m 0700 ${WORKDIR}/run/kresd
 
 echo "Launching Knot Resolver on port: ${PORT}"
-echo "To debug, use: dig +time=60 +retry=1 -p ${PORT} @::1 <query>"
+echo "To debug, use:"
+echo "dig +dnssec +multi +time=60 +retry=1 -p ${PORT} @::1"
 
 LD_LIBRARY_PATH=${WORKDIR}/lib ${WORKDIR}/sbin/kresd -a 127.0.0.1#${PORT} -a ::1#${PORT} -v -k ${ROOT_KEY:-/usr/share/dns/root.key} ${WORKDIR}/run/kresd
 
