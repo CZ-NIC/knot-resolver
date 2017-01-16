@@ -188,6 +188,8 @@ local function active_refresh(trust_anchors, pkt, bootstrap)
 		end
 		trust_anchors.update(keyset, bootstrap)
 		retry = false
+	else
+		print('[ ta ] active refresh failed, rcode: '..pkt:rcode())
 	end
 	-- Calculate refresh/retry timer (RFC 5011, 2.3)
 	local min_ttl = retry and day or 15 * day
