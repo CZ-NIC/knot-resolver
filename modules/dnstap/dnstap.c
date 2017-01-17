@@ -37,6 +37,7 @@
 #include "contrib/dnstap/dnstap.pb-c.h"
 #include <ccan/json/json.h>
 #include <fstrm.h>
+#include "contrib/cleanup.h"
 
 #define DEBUG_MSG(fmt, ...) kr_log_verbose("[dnstap] " fmt, ##__VA_ARGS__);
 #define CFG_SOCK_PATH "sockPath"
@@ -44,6 +45,9 @@
 #define DEFAULT_SOCK_PATH "/tmp/dnstap.sock"
 #define DNSTAP_CONTENT_TYPE "protobuf:dnstap.Dnstap"
 #define DNSTAP_INITIAL_BUF_SIZE         256
+
+#define auto_destroy_uopts __attribute__((cleanup(fstrm_unix_writer_options_destroy)))
+#define auto_destroy_wopts __attribute__((cleanup(fstrm_writer_options_destroy)))
 
 /* Internal data structure */
 struct dnstap_data {
@@ -74,7 +78,7 @@ uint8_t* dt_pack(const Dnstap__Dnstap *d, uint8_t **buf, size_t *sz)
 	return *buf;
 }
 
-/* set_address fills in address deatail in dnstap_message 
+/* set_address fills in address detail in dnstap_message
  * https://gitlab.labs.nic.cz/labs/knot/blob/master/src/contrib/dnstap/message.c#L28
  */
 static void set_address(const struct sockaddr *sockaddr,
@@ -82,28 +86,18 @@ static void set_address(const struct sockaddr *sockaddr,
 		protobuf_c_boolean    *has_addr,
 		uint32_t              *port,
 		protobuf_c_boolean    *has_port) {
-	if (sockaddr == NULL) {
-		*has_addr = 0;
-		*has_port = 0;
+	const char *saddr = kr_inaddr(sockaddr);
+	if (saddr == NULL) {
+		*has_addr = false;
+		*has_port = false;
 		return;
 	}
 
+	addr->data = (uint8_t *)(saddr);
+	addr->len = kr_inaddr_len(sockaddr);
 	*has_addr = true;
+	*port = kr_inaddr_port(sockaddr);
 	*has_port = true;
-
-	if (sockaddr->sa_family == AF_INET) {
-		const struct sockaddr_in *sai;
-		sai = (const struct sockaddr_in *)sockaddr;
-		addr->len = sizeof(sai->sin_addr);
-		addr->data = (uint8_t *)&sai->sin_addr.s_addr;
-		*port = ntohs(sai->sin_port);
-	} else if (sockaddr->sa_family == AF_INET6) {
-		const struct sockaddr_in6 *sai6;
-		sai6 = (const struct sockaddr_in6 *)sockaddr;
-		addr->len = sizeof(sai6->sin6_addr);
-		addr->data = (uint8_t *)&sai6->sin6_addr.s6_addr;
-		*port = ntohs(sai6->sin6_port);
-	}
 }
 
 /* dnstap_log prepares dnstap message and sent it to fstrm */
@@ -114,7 +108,7 @@ static int dnstap_log(kr_layer_t *ctx) {
 	struct dnstap_data *dnstap_dt = module->data;
 
 	/* check if we have a valid iothread */
-	if (!dnstap_dt->iothread || !dnstap_dt->ioq ) {
+	if (!dnstap_dt->iothread || !dnstap_dt->ioq) {
 		DEBUG_MSG("dnstap_dt->iothread or dnstap_dt->ioq is NULL\n");
 		return kr_error(EFAULT);
 	}
@@ -175,25 +169,34 @@ static int dnstap_log(kr_layer_t *ctx) {
 	/* set query time to the timestamp of the first kr_query
 	 * set response time to now
 	 */
-	if (rplan->resolved.len > 0 ) {
+	if (rplan->resolved.len > 0) {
 		struct kr_query *first = rplan->resolved.at[0];
 
 		m.query_time_sec = first->timestamp.tv_sec;
 		m.has_query_time_sec = true;
-		m.query_time_nsec = first->timestamp.tv_sec * 1000;
+		m.query_time_nsec = first->timestamp.tv_usec * 1000;
 		m.has_query_time_nsec = true;
 	}
 
 	/* Response time */
 	m.response_time_sec = now.tv_sec;
 	m.has_response_time_sec = true;
-	m.response_time_nsec = now.tv_sec * 1000;
+	m.response_time_nsec = now.tv_usec * 1000;
 	m.has_response_time_nsec = true;
 
-	/* Qname */
-	m.query_zone.data = (uint8_t *)knot_pkt_qname(req->answer);
-	m.query_zone.len = req->answer->qname_size;
-	m.has_query_zone = true;
+	/* Query Zone */
+	if (rplan->resolved.len > 0) {
+		struct kr_query *last = array_tail(rplan->resolved);
+		/* Only add query_zone when not answered from cache */
+		if (!(last->flags & QUERY_CACHED)) {
+			const knot_dname_t *zone_cut_name = last->zone_cut.name;
+			if (zone_cut_name != NULL) {
+				m.query_zone.data = (uint8_t *)zone_cut_name;
+				m.query_zone.len = knot_dname_size(zone_cut_name);
+				m.has_query_zone = true;
+			}
+		}
+	}
 
 	/* Create a dnstap Message */
 	Dnstap__Dnstap dnstap = DNSTAP__DNSTAP__INIT;
@@ -252,17 +255,14 @@ int dnstap_deinit(struct kr_module *module) {
  * https://gitlab.labs.nic.cz/labs/knot/blob/master/src/knot/modules/dnstap.c#L159
  */
 static struct fstrm_writer* dnstap_unix_writer(const char *path) {
-	struct fstrm_unix_writer_options *opt = NULL;
-	struct fstrm_writer_options *wopt = NULL;
-	struct fstrm_writer *writer = NULL;
 
-	opt = fstrm_unix_writer_options_init();
+	auto_destroy_uopts struct fstrm_unix_writer_options *opt = fstrm_unix_writer_options_init();
 	if (!opt) {
 		return NULL;
 	}
 	fstrm_unix_writer_options_set_socket_path(opt, path);
 
-	wopt = fstrm_writer_options_init();
+	auto_destroy_wopts struct fstrm_writer_options *wopt = fstrm_writer_options_init();
 	if (!wopt) {
 		fstrm_unix_writer_options_destroy(&opt);
 		return NULL;
@@ -270,7 +270,7 @@ static struct fstrm_writer* dnstap_unix_writer(const char *path) {
 	fstrm_writer_options_add_content_type(wopt, DNSTAP_CONTENT_TYPE,
 			strlen(DNSTAP_CONTENT_TYPE));
 
-	writer = fstrm_unix_writer_init(opt, wopt);
+	struct fstrm_writer *writer = fstrm_unix_writer_init(opt, wopt);
 	fstrm_unix_writer_options_destroy(&opt);
 	fstrm_writer_options_destroy(&wopt);
 	if (!writer) {
@@ -294,7 +294,7 @@ static struct fstrm_writer* dnstap_unix_writer(const char *path) {
  * new string can be at most len bytes
  */
 static int find_string(const JsonNode *node, char **val, size_t len) {
-	if (!node || !node->key ) {
+	if (!node || !node->key) {
 		return kr_error(EINVAL);
 	}
 	assert(node->tag == JSON_STRING);
@@ -306,7 +306,7 @@ static int find_string(const JsonNode *node, char **val, size_t len) {
 /* find_int copies json int into val
  * node must be of type JSON_NUMBER */
 static int find_int(const JsonNode *node, int *val) {
-	if (!node || !node->key || !val ) {
+	if (!node || !node->key || !val) {
 		return kr_error(EINVAL);
 	}
 	assert(node->tag == JSON_NUMBER);
@@ -316,7 +316,7 @@ static int find_int(const JsonNode *node, int *val) {
 
 /* find_bool returns bool from json */
 static bool find_bool(const JsonNode *node) {
-	if (!node || !node->key ) {
+	if (!node || !node->key) {
 		return false;
 	}
 	assert(node->tag == JSON_BOOL);
@@ -327,8 +327,7 @@ static bool find_bool(const JsonNode *node) {
 KR_EXPORT
 int dnstap_config(struct kr_module *module, const char *conf) {
 	struct dnstap_data *data = module->data;
-	char *sock_path = NULL;
-	struct fstrm_writer *writer;
+	auto_free char *sock_path = NULL;
 
 	/* Empty conf passed, set default */
 	if (!conf || strlen(conf) < 1) {
@@ -344,7 +343,7 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 		JsonNode *node;
 		/* dnstapPath key */
 		node = json_find_member(root_node, CFG_SOCK_PATH);
-		if (!node || find_string(node, &sock_path, PATH_MAX) != kr_ok() ) {
+		if (!node || find_string(node, &sock_path, PATH_MAX) != kr_ok()) {
 			sock_path = strndup(DEFAULT_SOCK_PATH, PATH_MAX);
 		}
 
@@ -361,8 +360,7 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 	}
 
 	DEBUG_MSG("opening sock file %s\n",sock_path);
-	writer = dnstap_unix_writer(sock_path);
-	free(sock_path);
+	struct fstrm_writer *writer = dnstap_unix_writer(sock_path);
 	if (!writer) {
 		DEBUG_MSG("can't create unix writer\n");
 		return kr_error(EINVAL);
@@ -389,6 +387,7 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 	 */
 	data->ioq = fstrm_iothr_get_input_queue_idx(data->iothread, 0);
 	if (!data->ioq) {
+		fstrm_iothr_destroy(&data->iothread);
 		DEBUG_MSG("can't get fstrm queue\n");
 		return kr_error(EBUSY);
 	}

@@ -33,21 +33,26 @@ func qnameFromFrame(b []byte) (string, error) {
 	dt := &dnstap.Dnstap{}
 	var name string
 	if err := proto.Unmarshal(b, dt); err != nil {
-		log.Fatalf("dnstap proto.Unmarshal() failed: %s\n", err)
 		return name, err
 	}
 	m := dt.Message
 	if *m.Type != dnstap.Message_RESOLVER_RESPONSE {
-		return name, fmt.Errorf("Incorrect message type")
+		return name, fmt.Errorf("incorrect message type")
 	}
-	if m.QueryZone != nil {
-		sb, _, err := dns.UnpackDomainName(m.QueryZone, 0)
-		if err != nil {
-			return name, err
-		}
-		name = fmt.Sprintf("%s", sb)
+	if m.ResponseMessage == nil {
+		return name, fmt.Errorf("no message payload")
 	}
-	return name, nil
+	if err := dns.IsMsg(m.ResponseMessage); err != nil {
+		return name, err
+	}
+	var msg dns.Msg
+	if err := msg.Unpack(m.ResponseMessage); err != nil {
+		return name, err
+	}
+	if len(msg.Question) < 1 {
+		return name, fmt.Errorf("question empty")
+	}
+	return msg.Question[0].Name, nil
 }
 
 func listenOn() (net.Addr, *os.File, error) {

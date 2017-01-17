@@ -146,6 +146,9 @@ int kr_inaddr_family(const struct sockaddr *addr);
 /** Address length for given family. */
 KR_EXPORT KR_PURE
 int kr_inaddr_len(const struct sockaddr *addr);
+/** Port. */
+KR_EXPORT KR_PURE
+uint16_t kr_inaddr_port(const struct sockaddr *addr);
 /** Return address type for string. */
 KR_EXPORT KR_PURE
 int kr_straddr_family(const char *addr);

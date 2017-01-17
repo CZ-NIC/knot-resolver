@@ -3,6 +3,7 @@ modules = {
 	'hints',
 	dnstap = {
 		sockPath = "/tmp/dnstap.sock",
+		logRespPkt = true,
 	}
 }
 hints['fake1.localdomain'] = '1.2.3.4'
