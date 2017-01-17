@@ -825,6 +825,9 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	/* Load Lua module if not a binary */
 	if (ret == kr_error(ENOENT)) {
 		ret = ffimodule_register_lua(engine, module, name);
+	} else if (ret == kr_error(ENOTSUP)) {
+		/* Print a more helpful message when module is linked against an old resolver ABI. */
+		fprintf(stderr, "[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
 	if (ret != 0) {
 		free(module);
