@@ -24,7 +24,7 @@ Bugfixes:
 - Trust Anchor configuration is now more robust.
 - Correctly answer NOTIMPL for meta-types and non-IN RR classes.
 - Free TCP buffer on cancelled connection.
-- Fix crash in hints module on empty hints file.
+- Fix crash in hints module on empty hints file, and fix non-lowercase hints.
 
 Miscelaneous:
 -------------
