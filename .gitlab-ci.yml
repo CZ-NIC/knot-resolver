@@ -4,7 +4,7 @@ variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
   
-build_job:
+amd64_build:
   stage: build
   script:
     - make -k all
@@ -13,7 +13,7 @@ build_job:
     - linux
     - amd64
 
-test_job:
+amd64_test:
   stage: test
   script:
     - make -k check
@@ -22,7 +22,7 @@ test_job:
     - linux
     - amd64
 
-deckard_job:
+deckard:
   stage: test
   before_script:
     - git submodule update --init --recursive
@@ -34,3 +34,23 @@ deckard_job:
     - docker
     - linux
     - amd64
+
+#arm_build:
+#  image: cznic/armhf-ubuntu:16.04
+#  stage: build
+#  script:
+#    - make -k all
+#  tags:
+#    - docker
+#    - linux
+#    - arm
+
+#arm_test:
+#  image: armv7/armhf-ubuntu:16.04
+#  stage: test
+#  script:
+#    - make -k check
+#  tags:
+#    - docker
+#    - linux
+#    - arm
