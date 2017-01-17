@@ -1,13 +1,26 @@
-Knot Resolver 1.2.0 (2016-12-yy)
-================================
+Knot Resolver 1.2.0RC1 (2017-01-17)
+===================================
 
+Security:
+---------
+- In a policy.FORWARD() mode, the AD flag was copied from upstream
+  response.  It is now cleared, as the policy.FORWARD() doesn't do
+  DNSSEC validation yet.
+
+Improvements:
+-------------
+- The DNSSEC Validation has been refactored, fixing many resolving
+  failures.
 - Add module `version` that checks for updates and CVEs periodically.
 - Support RFC7830: EDNS(0) padding in responses over TLS.
 - Support CD flag on incoming requests.
-- It now requires knot >= 2.3.1 to link successfully.
-- The API+ABI for modules changed slightly.
 - hints module: previously /etc/hosts was loaded by default, but not anymore.
   Users can now actually avoid loading any file.
+
+Miscelaneous:
+-------------
+- It now requires knot >= 2.3.1 to link successfully.
+- The API+ABI for modules changed slightly.
 
 Knot Resolver 1.1.1 (2016-08-24)
 ================================
