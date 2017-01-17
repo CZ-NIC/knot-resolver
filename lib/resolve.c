@@ -525,7 +525,9 @@ static int answer_finalize(struct kr_request *request, int state)
 		/* Do not set AD for RRSIG query, as we can't validate it. */
 		const bool secure = (last->flags & QUERY_DNSSEC_WANT) &&
 		                   !(last->flags & QUERY_DNSSEC_INSECURE);
-		if (has_ad && secure && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
+		if (!(last->flags & QUERY_STUB) /* Never set AD if forwarding. */
+		    && has_ad && secure
+		    && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
 			knot_wire_set_ad(answer->wire);
 		}
 	}
