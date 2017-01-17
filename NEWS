@@ -15,11 +15,22 @@ Improvements:
 - Support CD flag on incoming requests.
 - hints module: previously /etc/hosts was loaded by default, but not anymore.
   Users can now actually avoid loading any file.
+- DNS over TLS now creates ephemeral certs.
+- Configurable cache.{min,max}_tll option, with max_ttl defaulting to 6 days.
+- Option to reorder RRs in the response.
+
+Bugfixes:
+---------
+- Trust Anchor configuration is now more robust.
+- Correctly answer NOTIMPL for meta-types and non-IN RR classes.
+- Free TCP buffer on cancelled connection.
+- Fix crash in hints module on empty hints file.
 
 Miscelaneous:
 -------------
 - It now requires knot >= 2.3.1 to link successfully.
 - The API+ABI for modules changed slightly.
+- New LRU implementation.
 
 Known problems pending in RC:
 ---------------------
