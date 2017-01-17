@@ -1,11 +1,10 @@
-Knot Resolver 1.2.0RC1 (2017-01-17)
-===================================
+Knot Resolver 1.2.0-rc1 (2017-01-17)
+====================================
 
 Security:
 ---------
-- In a policy.FORWARD() mode, the AD flag was copied from upstream
-  response.  It is now cleared, as the policy.FORWARD() doesn't do
-  DNSSEC validation yet.
+- In a policy.FORWARD() mode, the AD flag was being always set by mistake.
+  It is now cleared, as the policy.FORWARD() doesn't do DNSSEC validation yet.
 
 Improvements:
 -------------
@@ -21,6 +20,11 @@ Miscelaneous:
 -------------
 - It now requires knot >= 2.3.1 to link successfully.
 - The API+ABI for modules changed slightly.
+
+Known problems pending in RC:
+---------------------
+- In a policy.FORWARD() mode, CNAME resolution may work badly.
+
 
 Knot Resolver 1.1.1 (2016-08-24)
 ================================
@@ -39,19 +43,25 @@ Improvements:
  - systemd: Read EnvironmentFile and user $KRESD_ARGS
  - systemd: Update systemd units to be named after daemon
 
+
 Knot Resolver 1.1.0 (2016-08-12)
 ================================
 
-* RFC7873 DNS Cookies
-* RFC7858 DNS over TLS
-* HTTP/2 web interface, RESTful API
-* Metrics exported in Prometheus
-* DNS firewall module
-* Explicit CNAME target fetching in strict mode
-* Query minimisation improvements
-* Improved integration with systemd
+Improvements:
+-------------
+ - RFC7873 DNS Cookies
+ - RFC7858 DNS over TLS
+ - HTTP/2 web interface, RESTful API
+ - Metrics exported in Prometheus
+ - DNS firewall module
+ - Explicit CNAME target fetching in strict mode
+ - Query minimisation improvements
+ - Improved integration with systemd
+
 
 Knot Resolver 1.0.0 (2016-05-30)
 ================================
 
-* First release
+Initial release:
+----------------
+ - The first initial release
