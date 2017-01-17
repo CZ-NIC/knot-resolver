@@ -161,6 +161,10 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_reques
 			if (!knot_dname_is_equal(ns, rr->owner)) {
 				continue;
 			}
+			if ((rr->type != KNOT_RRTYPE_A) &&
+			    (rr->type != KNOT_RRTYPE_AAAA)) {
+				continue;
+			}
 			(void) update_nsaddr(rr, req->current_query);
 			WITH_VERBOSE {
 				char name_str[KNOT_DNAME_MAXLEN];
@@ -581,7 +585,8 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 	} else if (!query->parent) {
-		state = pick_authority(pkt, req, true);
+		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
+		state = pick_authority(pkt, req, to_wire);
 		if (state != kr_ok()) {
 			return KR_STATE_FAIL;
 		}
