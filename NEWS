@@ -32,10 +32,6 @@ Miscelaneous:
 - The API+ABI for modules changed slightly.
 - New LRU implementation.
 
-Known problems pending in RC:
----------------------
-- In a policy.FORWARD() mode, CNAME resolution may work badly.
-
 
 Knot Resolver 1.1.1 (2016-08-24)
 ================================

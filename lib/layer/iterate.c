@@ -299,14 +299,11 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 
 static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 {
-	int result = KR_STATE_CONSUME;
 	struct kr_query *qry = req->current_query;
-	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	assert(!(qry->flags & QUERY_STUB));
 
-	/* Stub resolution doesn't process authority */
-	if (qry->flags & QUERY_STUB) {
-		return KR_STATE_CONSUME;
-	}
+	int result = KR_STATE_CONSUME;
+	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
 #ifdef STRICT_MODE
 	/* AA, terminate resolution chain. */
@@ -375,6 +372,7 @@ static bool is_rrsig_type_covered(const knot_rrset_t *rr, uint16_t type)
 static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, const knot_dname_t **cname_ret)
 {
 	struct kr_query *query = req->current_query;
+	assert(!(query->flags & QUERY_STUB));
 	/* Process answer type */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	const knot_dname_t *cname = NULL;
@@ -384,14 +382,14 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			KR_VLDRANK_SECURE : KR_VLDRANK_INITIAL;
 	bool is_final = (query->parent == NULL);
 	bool can_follow = false;
-	bool strict_mode = (query->flags & QUERY_STRICT) && !(query->flags & QUERY_STUB);
+	bool strict_mode = (query->flags & QUERY_STRICT);
 	do {
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
 		pending_cname = NULL;
 		/* If not secure, always follow cname chain. */
-		can_follow = !(query->flags & QUERY_DNSSEC_WANT) || (query->flags & QUERY_STUB);
+		can_follow = !(query->flags & QUERY_DNSSEC_WANT);
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 			if (!knot_dname_is_equal(rr->owner, cname)) {
@@ -517,6 +515,7 @@ static int process_final(knot_pkt_t *pkt, struct kr_request *req,
 static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *query = req->current_query;
+
 	/* Response for minimized QNAME.
 	 * NODATA   => may be empty non-terminal, retry (found zone cut)
 	 * NOERROR  => found zone cut, retry
@@ -532,7 +531,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	}
 
 	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
-	if (!(query->flags & QUERY_STUB) && !is_authoritative(pkt, query)) {
+	if (!is_authoritative(pkt, query)) {
 		if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
 			VERBOSE_MSG("<= lame response: non-auth sent negative response\n");
 			return KR_STATE_FAIL;
@@ -599,6 +598,38 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	}
 	return KR_STATE_DONE;
 }
+
+/** @internal like process_answer() but for the forwarding mode. */
+static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
+{
+	struct kr_query *query = req->current_query;
+	assert(query->flags & QUERY_STUB);
+	/* Pick all answer RRs. */
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+	for (unsigned i = 0; i < an->count; ++i) {
+		const knot_rrset_t *rr = knot_pkt_rr(an, i);
+		int err = kr_ranked_rrarray_add(&req->answ_selected, rr,
+			      KR_VLDRANK_INITIAL, true, query->uid, &req->pool);
+		if (err != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
+	}
+
+	knot_wire_set_aa(pkt->wire);
+	query->flags |= QUERY_RESOLVED;
+
+	/* Pick authority RRs. */
+	int pkt_class = kr_response_classify(pkt);
+	const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
+	int err = pick_authority(pkt, req, to_wire);
+	if (err != kr_ok()) {
+		return KR_STATE_FAIL;
+	}
+
+	finalize_answer(pkt, query, req);
+	return KR_STATE_DONE;
+}
+
 
 /** Error handling, RFC1034 5.3.3, 4d. */
 static int resolve_error(knot_pkt_t *pkt, struct kr_request *req)
@@ -769,6 +800,11 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	default:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_error(pkt, req);
+	}
+
+	/* Forwarding/stub mode is special. */
+	if (query->flags & QUERY_STUB) {
+		return process_stub(pkt, req);
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
