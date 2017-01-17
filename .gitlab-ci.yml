@@ -1,0 +1,36 @@
+image: cznic/ubuntu:16.04
+
+variables:
+  DEBIAN_FRONTEND: noninteractive
+  LC_ALL: C.UTF-8
+  
+build_job:
+  stage: build
+  script:
+    - make -k all
+  tags:
+    - docker
+    - linux
+    - amd64
+
+test_job:
+  stage: test
+  script:
+    - make -k check
+  tags:
+    - docker
+    - linux
+    - amd64
+
+deckard_job:
+  stage: test
+  before_script:
+    - git submodule update --init --recursive
+  script:
+    - mkdir -p tests/deckard/contrib/libswrap/obj
+    - PREFIX=$(pwd)/.local make all install
+    - LD_LIBRARY_PATH=$(pwd)/.local/lib make -s -C tests/deckard/ TESTS=sets/resolver DAEMON=$(pwd)/.local/sbin/kresd
+  tags:
+    - docker
+    - linux
+    - amd64
