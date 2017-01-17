@@ -514,9 +514,6 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_dname_t *signer = signature_authority(req);
 	if (ta_name && (!signer || !knot_dname_is_equal(ta_name, signer))) {
 		/* check all newly added RRSIGs */
-		if (ctx->state == KR_STATE_YIELD) { /* Already yielded for revalidation. */
-			return KR_STATE_FAIL;
-		}
 		VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
 		if (!signer) {
 			/* Not a DNSSEC-signed response, ask parent for DS
