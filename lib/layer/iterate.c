@@ -161,6 +161,10 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_reques
 			if (!knot_dname_is_equal(ns, rr->owner)) {
 				continue;
 			}
+			if ((rr->type != KNOT_RRTYPE_A) &&
+			    (rr->type != KNOT_RRTYPE_AAAA)) {
+				continue;
+			}
 			(void) update_nsaddr(rr, req->current_query);
 			WITH_VERBOSE {
 				char name_str[KNOT_DNAME_MAXLEN];
