@@ -521,6 +521,7 @@ void kr_rrset_print(const knot_rrset_t *rr, const char *prefix)
 	printf("%s", rrtext);
 	free(rrtext);
 #endif
+	kr_log_verbose("%s%s", prefix, rrtext);
 }
 
 static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
@@ -577,7 +578,7 @@ void kr_pkt_print(knot_pkt_t *pkt)
 			kr_rrset_print(rr, "");
 		}
 	}
-	kr_log_verbose("\n");
+	kr_log_verbose("<<<<<<<<\n\n");
 }
 
 void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix)
