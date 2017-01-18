@@ -578,7 +578,7 @@ void kr_pkt_print(knot_pkt_t *pkt)
 			kr_rrset_print(rr, "");
 		}
 	}
-	kr_log_verbose("<<<<<<<<\n\n");
+	kr_log_verbose("\n");
 }
 
 void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix)
