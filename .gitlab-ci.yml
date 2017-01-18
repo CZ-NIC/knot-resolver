@@ -4,32 +4,38 @@ variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
   
-amd64_build:
+build:linux:amd64:
   stage: build
   script:
-    - make -k all
+    - PREFIX=$(pwd)/.local make -k all
+    - PREFIX=$(pwd)/.local make install
+  artifacts:
+    untracked: true
   tags:
     - docker
     - linux
     - amd64
 
-amd64_test:
+test:linux:amd64:
   stage: test
   script:
-    - make -k check
+    - PREFIX=$(pwd)/.local make -k check
+  dependencies:
+    - build:linux:amd64
   tags:
     - docker
     - linux
     - amd64
 
-deckard:
+deckard:linux:amd64:
   stage: test
   before_script:
     - git submodule update --init --recursive
   script:
     - mkdir -p tests/deckard/contrib/libswrap/obj
-    - PREFIX=$(pwd)/.local make all install
     - LD_LIBRARY_PATH=$(pwd)/.local/lib make -s -C tests/deckard/ TESTS=sets/resolver DAEMON=$(pwd)/.local/sbin/kresd
+  dependencies:
+    - build:linux:amd64
   tags:
     - docker
     - linux
