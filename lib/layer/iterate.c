@@ -756,6 +756,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	if (query->flags & QUERY_TRACE) {
+		VERBOSE_MSG("<= answer received:\n");
 		kr_pkt_print(pkt);
 	}
 
