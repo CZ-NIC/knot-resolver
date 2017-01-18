@@ -557,7 +557,7 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 
 void kr_pkt_print(knot_pkt_t *pkt)
 {
-	char snames[3][11] = {"ANSWER","AUTHORITY","ADDITIONAL"};
+	char snames[3][15] = {";; ANSWER",";; AUTHORITY",";; ADDITIONAL"};
 	char rrtype[32];
 	char flags[32];
 	char qname[KNOT_DNAME_MAXLEN];
@@ -567,9 +567,9 @@ void kr_pkt_print(knot_pkt_t *pkt)
 	flags_to_str(flags, pkt, sizeof(flags));
 	knot_dname_to_str(qname, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
 	knot_rrtype_to_string(knot_pkt_qtype(pkt), rrtype, sizeof(rrtype));
-	kr_log_verbose("\n>>>>>>>>\n RCODE: %s FLAGS: %s\n",
+	kr_log_verbose(";; Status: %s\n;; Flags: %s\n",
 		       rcode != NULL ? rcode->name : "unknown", flags);
-	kr_log_verbose("QUESTION\n%s\t\t%s\n", qname, rrtype);
+	kr_log_verbose(";; QUESTION\n%s\t\t%s\n", qname, rrtype);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		kr_log_verbose("%s\n", snames[i - KNOT_ANSWER]);
@@ -578,7 +578,7 @@ void kr_pkt_print(knot_pkt_t *pkt)
 			kr_rrset_print(rr, "");
 		}
 	}
-	kr_log_verbose("<<<<<<<<\n\n");
+	kr_log_verbose("\n");
 }
 
 void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix)
