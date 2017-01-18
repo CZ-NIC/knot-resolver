@@ -229,7 +229,7 @@ function policy.enforce(state, req, action)
 			return kres.DONE
 		end
 	elseif action == policy.QTRACE then
-		req.options = bit.band(bit.bor(req.options, kres.query.TRACE))
+		req.options = bit.bor(req.options, kres.query.TRACE)
 	elseif type(action) == 'function' then
 		return action(state, req)
 	end
