@@ -251,8 +251,18 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		 * from authoritative, but we have no key to verify it.
 		 * TODO - try to refetch cut only if no glue were fetched */
 		kr_zonecut_deinit(&cut_found);
-		/* Try next label */
-		return KR_STATE_CONSUME;
+		if (requested_name[0] != '\0' ) {
+			/* If not root - try next label */
+			return KR_STATE_CONSUME;
+		}
+		/* No cached cut & keys found, start from SBELT */
+		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
+		if (ret != 0) {
+			return KR_STATE_FAIL;
+		}
+		VERBOSE_MSG(qry, "=> using root hints\n");
+		qry->flags &= ~QUERY_AWAIT_CUT;
+		return KR_STATE_DONE;
 	}
 	/* Copy fetched name */
 	qry->zone_cut.name = knot_dname_copy(cut_found.name, qry->zone_cut.pool);
