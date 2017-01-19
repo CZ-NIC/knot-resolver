@@ -26,6 +26,7 @@
 #include <libknot/dname.h>
 #include <libknot/rrtype/rrsig.h>
 #include <libknot/rrset-dump.h>
+#include <libknot/version.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
@@ -509,9 +510,17 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 
 void kr_rrset_print(const knot_rrset_t *rr)
 {
+#if KNOT_VERSION_HEX < ((2 << 16) | (4 << 8))
 	char rrtext[KNOT_DNAME_MAXLEN * 2] = {0};
 	knot_rrset_txt_dump(rr, rrtext, sizeof(rrtext), &KNOT_DUMP_STYLE_DEFAULT);
 	printf("%s", rrtext);
+#else
+	size_t size = 4000;
+	char *rrtext = malloc(size);
+	knot_rrset_txt_dump(rr, &rrtext, &size, &KNOT_DUMP_STYLE_DEFAULT);
+	printf("%s", rrtext);
+	free(rrtext);
+#endif
 }
 
 void kr_pkt_print(knot_pkt_t *pkt)
