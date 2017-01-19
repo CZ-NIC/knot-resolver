@@ -259,7 +259,7 @@ int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return KR_STATE_FAIL;
 	}
 
-	uint16_t rcode = knot_pkt_get_ext_rcode(pkt);
+	uint16_t rcode = knot_pkt_ext_rcode(pkt);
 	if (rcode == KNOT_RCODE_BADCOOKIE) {
 		struct kr_query *next = NULL;
 		if (!(qry->flags & QUERY_BADCOOKIE_AGAIN)) {
