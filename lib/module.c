@@ -44,30 +44,6 @@ static const struct kr_module embedded_modules[] = {
  #define LIBEXT ".so"
 #endif
 
-/** Check ABI version, return error on mismatch. */
-#define ABI_CHECK(m, prefix, symname, required) do { \
-	module_api_cb *_api = NULL; \
-	*(void **) (&_api) = load_symbol((m)->lib, (prefix), (symname)); \
-	if (_api == NULL) { \
-		return kr_error(ENOENT); \
-	} \
-	if (_api() != (required)) { \
-		return kr_error(ENOTSUP); \
-	} \
-} while (0)
-
-/** Load ABI by symbol names. */
-#define ABI_LOAD(m, prefix, s_init, s_deinit, s_config, s_layer, s_prop) do { \
-	module_prop_cb *module_prop = NULL; \
-	*(void **) (&(m)->init)   = load_symbol((m)->lib, (prefix), (s_init)); \
-	*(void **) (&(m)->deinit) = load_symbol((m)->lib, (prefix), (s_deinit)); \
-	*(void **) (&(m)->config) = load_symbol((m)->lib, (prefix), (s_config)); \
-	*(void **) (&(m)->layer)  = load_symbol((m)->lib, (prefix), (s_layer)); \
-	*(void **) (&module_prop) = load_symbol((m)->lib, (prefix), (s_prop)); \
-	if (module_prop != NULL) { \
-		(m)->props = module_prop(); \
-	} \
-} while(0)
 
 /** Load prefixed symbol. */
 static void *load_symbol(void *lib, const char *prefix, const char *name)
@@ -115,9 +91,27 @@ static int load_sym_c(struct kr_module *module, uint32_t api_required)
 		}
 	}
 	/* Load dynamic library module */
-	auto_free char *module_prefix = kr_strcatdup(2, module->name, "_");
-	ABI_CHECK(module, module_prefix, "api", api_required);
-	ABI_LOAD(module, module_prefix, "init", "deinit", "config", "layer", "props");
+	auto_free char *m_prefix = kr_strcatdup(2, module->name, "_");
+
+	/* Check ABI version, return error on mismatch. */
+	module_api_cb *api = load_symbol(module->lib, m_prefix, "api");
+	if (api == NULL) {
+		return kr_error(ENOENT);
+	}
+	if (api() != api_required) {
+		return kr_error(ENOTSUP);
+	}
+
+	/* Load ABI by symbol names. */
+	#define ML(symname) module->symname = \
+		load_symbol(module->lib, m_prefix, #symname)
+	ML(init);
+	ML(deinit);
+	ML(config);
+	ML(layer);
+	ML(props);
+	#undef ML
+
 	return kr_ok();
 }
 
