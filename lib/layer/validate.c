@@ -658,7 +658,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					qry->flags &= ~QUERY_DNSSEC_WANT;
 					qry->flags |= QUERY_DNSSEC_INSECURE;
 					/* Could not return from here,
-					 * we must continue and
+					 * we must continue, validate NSEC\NSEC3 and
 					 * call update_parent_keys() to mark
 					 * parent queries as insecured */
 				} else {
@@ -672,8 +672,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Validate all records, fail as bogus if it doesn't match.
 	 * Do not revalidate data from cache, as it's already trusted. */
-	if (!(qry->flags & QUERY_CACHED) &&
-	     (qry->flags & QUERY_DNSSEC_WANT)) {
+	if (!(qry->flags & QUERY_CACHED)) {
 		ret = validate_records(req, pkt, req->rplan.pool, has_nsec3);
 		if (ret != 0) {
 			/* something exceptional - no DNS key, empty pointers etc
@@ -704,26 +703,24 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Check and update current delegation point security status. */
-	if (qry->flags & QUERY_DNSSEC_WANT) {
-		ret = update_delegation(req, qry, pkt, has_nsec3);
-		if (ret == DNSSEC_NOT_FOUND && qry->stype != KNOT_RRTYPE_DS) {
-			if (ctx->state == KR_STATE_YIELD) {
-				VERBOSE_MSG(qry, "<= can't validate referral\n");
-				qry->flags |= QUERY_DNSSEC_BOGUS;
-				return KR_STATE_FAIL;
-			} else {
-				/* Check the trust chain and query DS\DNSKEY if needed. */
-				VERBOSE_MSG(qry, "<= DS\\NSEC was not found, querying for DS\n");
-				return KR_STATE_YIELD;
-			}
-		} else if (ret != 0) {
+	ret = update_delegation(req, qry, pkt, has_nsec3);
+	if (ret == DNSSEC_NOT_FOUND && qry->stype != KNOT_RRTYPE_DS) {
+		if (ctx->state == KR_STATE_YIELD) {
+			VERBOSE_MSG(qry, "<= can't validate referral\n");
+			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KR_STATE_FAIL;
-		} else if (pkt_rcode == KNOT_RCODE_NOERROR &&
-			   referral &&
-			   ((qry->flags & (QUERY_DNSSEC_WANT | QUERY_DNSSEC_INSECURE)) == QUERY_DNSSEC_INSECURE)) {
-			/* referral with proven DS non-existance */
-			qtype = KNOT_RRTYPE_DS;
+		} else {
+			/* Check the trust chain and query DS\DNSKEY if needed. */
+			VERBOSE_MSG(qry, "<= DS\\NSEC was not found, querying for DS\n");
+			return KR_STATE_YIELD;
 		}
+	} else if (ret != 0) {
+		return KR_STATE_FAIL;
+	} else if (pkt_rcode == KNOT_RCODE_NOERROR &&
+		   referral &&
+		   ((qry->flags & (QUERY_DNSSEC_WANT | QUERY_DNSSEC_INSECURE)) == QUERY_DNSSEC_INSECURE)) {
+		/* referral with proven DS non-existance */
+		qtype = KNOT_RRTYPE_DS;
 	}
 	/* Update parent query zone cut */
 	if (qry->parent) {

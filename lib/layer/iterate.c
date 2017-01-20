@@ -562,7 +562,8 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		/* Check if the same query was already resolved */
 		for (int i = 0; i < req->rplan.resolved.len; ++i) {
 			struct kr_query * q = req->rplan.resolved.at[i];
-			if (q->sclass == query->sclass &&
+			if (q->parent == query->parent &&
+			    q->sclass == query->sclass &&
 			    q->stype == query->stype   &&
 			    knot_dname_is_equal(q->sname, cname)) {
 				VERBOSE_MSG("<= cname chain loop\n");
@@ -574,9 +575,13 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 		next->flags |= QUERY_AWAIT_CUT;
-		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
-		if (kr_ta_covers(&req->ctx->trust_anchors, cname) &&
+		if (query->flags & QUERY_DNSSEC_INSECURE) {
+			next->flags &= ~QUERY_DNSSEC_WANT;
+			next->flags |= QUERY_DNSSEC_INSECURE;
+		} else if (kr_ta_covers(&req->ctx->trust_anchors, cname) &&
 		    !kr_ta_covers(&req->ctx->negative_anchors, cname)) {
+			/* Want DNSSEC if it's posible to secure
+			 * this name (e.g. is covered by any TA) */
 			next->flags |= QUERY_DNSSEC_WANT;
 		}
 		state = pick_authority(pkt, req, false);
