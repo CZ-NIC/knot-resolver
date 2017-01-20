@@ -513,15 +513,14 @@ void kr_rrset_print(const knot_rrset_t *rr, const char *prefix)
 #if KNOT_VERSION_HEX < ((2 << 16) | (4 << 8))
 	char rrtext[KNOT_DNAME_MAXLEN * 2] = {0};
 	knot_rrset_txt_dump(rr, rrtext, sizeof(rrtext), &KNOT_DUMP_STYLE_DEFAULT);
-	printf("%s", rrtext);
+	kr_log_verbose("%s%s", prefix, rrtext);
 #else
 	size_t size = 4000;
 	char *rrtext = malloc(size);
 	knot_rrset_txt_dump(rr, &rrtext, &size, &KNOT_DUMP_STYLE_DEFAULT);
-	printf("%s", rrtext);
+	kr_log_verbose("%s%s", prefix, rrtext);
 	free(rrtext);
 #endif
-	kr_log_verbose("%s%s", prefix, rrtext);
 }
 
 static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
