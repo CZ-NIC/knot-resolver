@@ -754,12 +754,14 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!query) {
 		return ctx->state;
 	}
-#ifndef NDEBUG
+
+#ifndef NDEBUG /* These might be useful during debugging. */
 	if (query->flags & QUERY_TRACE) {
 		VERBOSE_MSG("<= answer received:\n");
 		kr_pkt_print(pkt);
 	}
 #endif
+
 	if (query->flags & (QUERY_RESOLVED|QUERY_BADCOOKIE_AGAIN)) {
 		return ctx->state;
 	}
