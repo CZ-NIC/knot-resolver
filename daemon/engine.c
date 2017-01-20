@@ -761,15 +761,20 @@ void engine_stop(struct engine *engine)
 	uv_stop(uv_default_loop());
 }
 
-/** Register module properties in Lua environment */
+/** Register module properties in Lua environment, if any. */
 static int register_properties(struct engine *engine, struct kr_module *module)
 {
+	if (!module->config && !module->props) {
+		return kr_ok();
+	}
 	lua_newtable(engine->L);
 	if (module->config != NULL) {
 		REGISTER_MODULE_CALL(engine->L, module, module->config, "config");
 	}
-	for (struct kr_prop *p = module->props; p && p->name; ++p) {
-		if (p->cb != NULL && p->name != NULL) {
+
+	const struct kr_prop *p = module->props == NULL ? NULL : module->props();
+	for (; p && p->name; ++p) {
+		if (p->cb != NULL) {
 			REGISTER_MODULE_CALL(engine->L, module, p->cb, p->name);
 		}
 	}
@@ -855,12 +860,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		}
 	}
 
-	/* Register properties */
-	if (module->props || module->config) {
-		return register_properties(engine, module);
-	}
-
-	return kr_ok();
+	return register_properties(engine, module);
 }
 
 int engine_unregister(struct engine *engine, const char *name)
