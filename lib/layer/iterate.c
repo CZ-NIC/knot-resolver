@@ -725,12 +725,16 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_query *query)
 {
+
 #ifndef STRICT_MODE
 	/* Work around broken auths/load balancers */
 	if (query->flags & QUERY_SAFEMODE) {
 		return resolve_error(pkt, req);
+	} else if (query->flags & QUERY_NO_MINIMIZE) {
+		query->flags | QUERY_SAFEMODE;
+		return KR_STATE_DONE;
 	} else {
-		query->flags |= QUERY_SAFEMODE;
+		query->flags |= QUERY_NO_MINIMIZE;
 		return KR_STATE_DONE;
 	}
 #else
