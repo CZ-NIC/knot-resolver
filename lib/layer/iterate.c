@@ -758,7 +758,13 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first.
 	 * Note - we *MUST* check if it has at least a QUESTION,
 	 * otherwise it would crash on accessing QNAME. */
-	if (pkt->parsed < pkt->size || pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
+#ifdef STRICT_MODE
+	if (pkt->parsed < pkt->size) {
+		VERBOSE_MSG("<= pkt contains excessive data\n");
+		return resolve_badmsg(pkt, req, query);
+	} else
+#endif
+	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		VERBOSE_MSG("<= malformed response\n");
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
