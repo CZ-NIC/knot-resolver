@@ -454,7 +454,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 	ranked_rr_array_entry_t *invalid_entry = NULL;
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
-		if (entry->yielded) {
+		if (entry->yielded || entry->qry_uid != qry->uid) {
 			continue;
 		}
 		if (entry->rank == KR_VLDRANK_MISMATCH) {
