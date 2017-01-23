@@ -619,7 +619,7 @@ void kr_pkt_print(knot_pkt_t *pkt)
 	}
 
 	kr_log_verbose(";; QUESTION SECTION\n%s\t\t%s\n\n", qname, rrtype);
-	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_AUTHORITY; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		if (sec->count == 0) {
 			continue;
@@ -631,6 +631,20 @@ void kr_pkt_print(knot_pkt_t *pkt)
 		}
 		kr_log_verbose("\n");
 	}
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ADDITIONAL);
+	bool header_was_printed = false;
+	for (unsigned k = 0; k < sec->count; ++k) {
+		const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+		if (rr->type == KNOT_RRTYPE_OPT) {
+			continue;
+		}
+		if (!header_was_printed) {
+			header_was_printed = true;
+			kr_log_verbose("%s\n", snames[KNOT_ADDITIONAL - KNOT_ANSWER]);
+		}
+		kr_rrset_print(rr, "");
+	}
+	kr_log_verbose("\n");
 }
 
 void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix)
