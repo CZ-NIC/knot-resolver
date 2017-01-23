@@ -28,11 +28,12 @@ There are several defined actions:
   it can be a single IP (string) or a list of up to four IPs.
 * ``MIRROR(ip)`` - mirror query to given IP and continue solving it (useful for partial snooping)
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
+* ``TRACE`` - pretty-print DNS response packets into the log (useful for debugging weird DNS servers)
 
 .. warning:: The policy module only looks at the inbound DNS queries.  Thus the ``FORWARD(ip)`` policy does only forward inbound query to the specified IP address(es) and it doesn't and it can't do DNSSEC validation.  If you need DNSSEC validation, you either need to disable ``FORWARD(ip)`` policy or use an upstream DNSSEC-validating resolver.
 
 .. note:: The module (and ``kres``) expects domain names in wire format, not textual representation. So each label in name is prefixed with its length, e.g. "example.com" equals to ``"\7example\3com"``. You can use convenience function ``todname('example.com')`` for automatic conversion.
-
+	  
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -43,7 +44,7 @@ Example configuration
 	-- Whitelist 'www[0-9].badboy.cz'
 	policy.add(policy.pattern(policy.PASS, '\4www[0-9]\6badboy\2cz'))
 	-- Block all names below badboy.cz
-	policy.add(policy.suffix(policy.DENY, {'\6badboy\2cz'}))
+	policy.add(policy.suffix(policy.DENY, {todname('badboy.cz.')}))
 	-- Custom rule
 	policy.add(function (req, query)
 		if query:qname():find('%d.%d.%d.224\7in-addr\4arpa') then
@@ -59,11 +60,13 @@ Example configuration
 	-- Enforce local RPZ
 	policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
 	-- Forward all queries below 'company.se' to given resolver
-	policy.add(policy.suffix(policy.FORWARD('192.168.1.1'), {'\7company\2se'}))
+	policy.add(policy.suffix(policy.FORWARD('192.168.1.1'), {todname('company.se')}))
 	-- Forward all queries matching pattern
 	policy.add(policy.pattern(policy.FORWARD('2001:DB8::1'), '\4bad[0-9]\2cz'))
 	-- Forward all queries (complete stub mode)
 	policy.add(policy.all(policy.FORWARD('2001:DB8::1')))
+	-- Print all responses with matching suffix
+	policy.add(policy.suffix(policy.TRACE, {todname('rhybar.cz.')}))
   -- Mirror all queries and retrieve information
   local rule = policy.add(policy.all(policy.MIRROR('127.0.0.2')))
   -- Print information about the rule
@@ -104,6 +107,10 @@ Properties
 .. envvar:: policy.REROUTE({{subnet,target}, ...})
 
    Reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55'.
+
+.. envvar:: policy.TRACE
+
+   Print pretty-formate (dig-like) DNS answers that Knot Resolver receive from upstream (authoritative) DNS servers.  Very useful when dealing with non-compliant DNS servers that violate DNS protocol.
 
 .. function:: policy.add(rule, postrule)
 
