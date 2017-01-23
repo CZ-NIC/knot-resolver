@@ -192,12 +192,10 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 
 int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire, uint32_t qry_uid);
 
-#ifndef NDEBUG /* These might be useful (again) during debugging. */
-void kr_rrset_print(const knot_rrset_t *rr);
+void kr_rrset_print(const knot_rrset_t *rr, const char *prefix);
 void kr_pkt_print(knot_pkt_t *pkt);
 void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix);
 void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix);
-#endif
 
 /**
  * Call module property.

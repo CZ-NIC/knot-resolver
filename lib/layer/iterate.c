@@ -751,7 +751,18 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->req;
 	struct kr_query *query = req->current_query;
-	if (!query || (query->flags & (QUERY_RESOLVED|QUERY_BADCOOKIE_AGAIN))) {
+	if (!query) {
+		return ctx->state;
+	}
+
+	WITH_VERBOSE {
+	if (query->flags & QUERY_TRACE) {
+		VERBOSE_MSG("<= answer received:\n");
+		kr_pkt_print(pkt);
+	}
+	}
+
+	if (query->flags & (QUERY_RESOLVED|QUERY_BADCOOKIE_AGAIN)) {
 		return ctx->state;
 	}
 

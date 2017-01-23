@@ -93,7 +93,7 @@ end
 
 local policy = {
 	-- Policies
-	PASS = 1, DENY = 2, DROP = 3, TC = 4, FORWARD = forward, REROUTE = reroute, MIRROR = mirror,
+	PASS = 1, DENY = 2, DROP = 3, TC = 4, QTRACE = 5, FORWARD = forward, REROUTE = reroute, MIRROR = mirror,
 	-- Special values
 	ANY = 0,
 }
@@ -228,6 +228,10 @@ function policy.enforce(state, req, action)
 			answer:tc(1) -- ^ Only UDP queries
 			return kres.DONE
 		end
+	elseif action == policy.QTRACE then
+		local qry = req:current()
+		req.options = bit.bor(req.options, kres.query.TRACE)
+		qry.flags = bit.bor(qry.flags, kres.query.TRACE)
 	elseif type(action) == 'function' then
 		return action(state, req)
 	end

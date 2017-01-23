@@ -506,73 +506,156 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 	return NULL;
 }
 
-#ifndef NDEBUG
-
-void kr_rrset_print(const knot_rrset_t *rr)
+void kr_rrset_print(const knot_rrset_t *rr, const char *prefix)
 {
 #if KNOT_VERSION_HEX < ((2 << 16) | (4 << 8))
 	char rrtext[KNOT_DNAME_MAXLEN * 2] = {0};
 	knot_rrset_txt_dump(rr, rrtext, sizeof(rrtext), &KNOT_DUMP_STYLE_DEFAULT);
-	printf("%s", rrtext);
+	kr_log_verbose("%s%s", prefix, rrtext);
 #else
 	size_t size = 4000;
 	char *rrtext = malloc(size);
 	knot_rrset_txt_dump(rr, &rrtext, &size, &KNOT_DUMP_STYLE_DEFAULT);
-	printf("%s", rrtext);
+	kr_log_verbose("%s%s", prefix, rrtext);
 	free(rrtext);
 #endif
 }
 
-void kr_pkt_print(knot_pkt_t *pkt)
+static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 {
-	char snames[3][11] = {"ANSWER","AUTHORITY","ADDITIONAL"};
-	char rrtype[32];
-	char qname[KNOT_DNAME_MAXLEN];
-	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
-	const knot_lookup_t *rcode = NULL;
-	rcode = knot_lookup_by_id(knot_rcode_names, pkt_rcode);
-	printf("RCODE: %s FLAGS: ", rcode != NULL ? rcode->name : "unknown");
-	if (knot_wire_get_aa(pkt->wire))
-		printf("AA ");
-	if (knot_wire_get_rd(pkt->wire))
-		printf("RD ");
-	if (knot_wire_get_tc(pkt->wire))
-		printf("TC ");
-	if (knot_wire_get_qr(pkt->wire))
-		printf("QR ");
-	if (knot_wire_get_cd(pkt->wire))
-		printf("CD ");
-	if (knot_wire_get_ad(pkt->wire))
-		printf("AD ");
-	if (knot_wire_get_ra(pkt->wire))
-		printf("RA ");
-	printf("\n");
-	knot_dname_to_str(qname, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
-	knot_rrtype_to_string(knot_pkt_qtype(pkt), rrtype, sizeof(rrtype));
-	printf("QUESTION\n%s\t\t%s\n", qname, rrtype);
-	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
-		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
-		printf("%s\n", snames[i - KNOT_ANSWER]);
-		for (unsigned k = 0; k < sec->count; ++k) {
-			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
-			kr_rrset_print(rr);
+	int offset = 0;
+	int ret = 0;
+	struct {
+		uint8_t (*get) (const uint8_t *packet);
+		char name[3];
+	} flag[7] = {
+		{knot_wire_get_qr, "qr"},
+		{knot_wire_get_aa, "aa"},
+		{knot_wire_get_rd, "rd"},
+		{knot_wire_get_ra, "ra"},
+		{knot_wire_get_tc, "tc"},
+		{knot_wire_get_cd, "cd"},
+		{knot_wire_get_ad, "ad"}
+	};
+	for (int i = 0; i < 7; ++i) {
+		if (!flag[i].get(pkt->wire)) {
+			continue;
+		}
+		ret = snprintf(dst + offset, maxlen, "%s ", flag[i].name);
+		if (ret <= 0 || ret >= maxlen) {
+			dst[0] = 0;
+			return;
+		}
+		offset += ret;
+		maxlen -= offset;
+	}
+	dst[offset] = 0;
+}
+
+static void print_section_opt(const knot_rrset_t *rr, const uint8_t rcode)
+{
+	uint8_t ercode = knot_edns_get_ext_rcode(rr);
+	uint16_t ext_rcode_id = knot_edns_whole_rcode(ercode, rcode);
+	const char *ext_rcode_str = "Unused";
+	const knot_lookup_t *ext_rcode;
+
+	if (ercode > 0) {
+		ext_rcode = knot_lookup_by_id(knot_rcode_names, ext_rcode_id);
+		if (ext_rcode != NULL) {
+			ext_rcode_str = ext_rcode->name;
+		} else {
+			ext_rcode_str = "Unknown";
 		}
 	}
+
+	kr_log_verbose(";; EDNS PSEUDOSECTION:\n;; "
+		       "Version: %u; flags: %s; UDP size: %u B; ext-rcode: %s\n\n",
+		       knot_edns_get_version(rr),
+		       (knot_edns_do(rr) != 0) ? "do" : "",
+		       knot_edns_get_payload(rr),
+		       ext_rcode_str);
+
+}
+
+void kr_pkt_print(knot_pkt_t *pkt)
+{
+	char *snames[] = {";; ANSWER SECTION",";; AUTHORITY SECTION",";; ADDITIONAL SECTION"};
+	char rrtype[32];
+	char flags[32];
+	char qname[KNOT_DNAME_MAXLEN];
+	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
+	uint8_t pkt_opcode = knot_wire_get_opcode(pkt->wire);
+	const char *rcode_str = "Unknown";
+	const char *opcode_str = "Unknown";
+	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, pkt_rcode);
+	const knot_lookup_t *opcode = knot_lookup_by_id(knot_opcode_names, pkt_opcode);
+	uint16_t qry_id = knot_wire_get_id(pkt->wire);
+
+	if (rcode != NULL) {
+		rcode_str = rcode->name;
+	}
+	if (opcode != NULL) {
+		opcode_str = opcode->name;
+	}
+	flags_to_str(flags, pkt, sizeof(flags));
+	knot_dname_to_str(qname, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
+	knot_rrtype_to_string(knot_pkt_qtype(pkt), rrtype, sizeof(rrtype));
+	kr_log_verbose(";; ->>HEADER<<- opcode: %s; status: %s; id: %hu\n",
+		       opcode_str, rcode_str, qry_id);
+
+	kr_log_verbose(";; Flags: %s QUERY: %hu; ANSWER: %hu; "
+		       "AUTHORITY: %hu; ADDITIONAL: %hu\n\n",
+		       flags,
+		       knot_wire_get_qdcount(pkt->wire),
+		       knot_wire_get_ancount(pkt->wire),
+		       knot_wire_get_nscount(pkt->wire),
+		       knot_wire_get_arcount(pkt->wire));
+
+	if (knot_pkt_has_edns(pkt)) {
+		print_section_opt(pkt->opt_rr,
+		                  knot_wire_get_rcode(pkt->wire));
+	}
+
+	kr_log_verbose(";; QUESTION SECTION\n%s\t\t%s\n\n", qname, rrtype);
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_AUTHORITY; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		if (sec->count == 0) {
+			continue;
+		}
+		kr_log_verbose("%s\n", snames[i - KNOT_ANSWER]);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			kr_rrset_print(rr, "");
+		}
+		kr_log_verbose("\n");
+	}
+	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ADDITIONAL);
+	bool header_was_printed = false;
+	for (unsigned k = 0; k < sec->count; ++k) {
+		const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+		if (rr->type == KNOT_RRTYPE_OPT) {
+			continue;
+		}
+		if (!header_was_printed) {
+			header_was_printed = true;
+			kr_log_verbose("%s\n", snames[KNOT_ADDITIONAL - KNOT_ANSWER]);
+		}
+		kr_rrset_print(rr, "");
+	}
+	kr_log_verbose("\n");
 }
 
 void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix)
 {
 	char str[KNOT_DNAME_MAXLEN];
 	knot_dname_to_str(str, name, KNOT_DNAME_MAXLEN);
-	printf ("%s%s%s", prefix, str, postfix);
+	kr_log_verbose ("%s%s%s", prefix, str, postfix);
 }
 
 void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix)
 {
 	char str[32];
 	knot_rrtype_to_string(rrtype, str, 32);
-	printf ("%s%s%s", prefix, str, postfix);
+	kr_log_verbose ("%s%s%s", prefix, str, postfix);
 }
-
-#endif /* !NDEBUG */
 
