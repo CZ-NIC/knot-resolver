@@ -731,7 +731,7 @@ static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_que
 	if (query->flags & QUERY_SAFEMODE) {
 		return resolve_error(pkt, req);
 	} else if (query->flags & QUERY_NO_MINIMIZE) {
-		query->flags | QUERY_SAFEMODE;
+		query->flags |= QUERY_SAFEMODE;
 		return KR_STATE_DONE;
 	} else {
 		query->flags |= QUERY_NO_MINIMIZE;
