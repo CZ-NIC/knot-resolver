@@ -110,7 +110,10 @@ Properties
 
 .. envvar:: policy.TRACE
 
-   Print pretty-formate (dig-like) DNS answers that Knot Resolver receive from upstream (authoritative) DNS servers.  Very useful when dealing with non-compliant DNS servers that violate DNS protocol.
+   Print pretty-formate (dig-like) DNS answers for current query and
+   all its subqueries that Knot Resolver receive from upstream
+   (authoritative) DNS servers.  Very useful when dealing with
+   non-compliant DNS servers that violate DNS protocol.
 
 .. function:: policy.add(rule, postrule)
 
