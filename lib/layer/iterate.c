@@ -311,9 +311,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		return KR_STATE_CONSUME;
 	}
 #else
+
 	/* Work around servers sending back CNAME with different delegation and no AA. */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
-	if (an->count > 0 && ns->count > 0) {
+	if (!knot_wire_get_aa(pkt->wire) && an->count > 0 && ns->count > 0) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, 0);
 		if (rr->type == KNOT_RRTYPE_CNAME) {
 			return KR_STATE_CONSUME;
