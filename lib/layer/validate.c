@@ -522,8 +522,8 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (ctx->state == KR_STATE_YIELD) {
 				/* Already yielded for revalidation.
 				 * It means that trust chain is OK and
-				 * transition to INSECURE was not occurs.
-				 * Let validation logic to ask about rrsig. */
+				 * transition to INSECURE hasn't occured.
+				 * Let the validation logic ask about RRSIG. */
 				return KR_STATE_DONE;
 			}
 			/* Ask parent for DS
