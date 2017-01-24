@@ -1095,7 +1095,7 @@ Example:
 .. _libuv: https://github.com/libuv/libuv
 .. _Lua: https://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
-.. _luasec: https://luarocks.org/modules/luarocks/luasec
+.. _luasec: https://luarocks.org/modules/brunoos/luasec
 .. _luasocket: https://luarocks.org/modules/luarocks/luasocket
 .. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
 .. _`systemd socket activation`: http://0pointer.de/blog/projects/socket-activation.html

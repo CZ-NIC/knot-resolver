@@ -281,7 +281,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot
 .. _cmocka: https://cmocka.org/
 .. _Python: https://www.python.org/
-.. _luasec: https://luarocks.org/modules/luarocks/luasec
+.. _luasec: https://luarocks.org/modules/brunoos/luasec
 .. _luasocket: https://luarocks.org/modules/luarocks/luasocket
 .. _lua-http: https://luarocks.org/modules/daurnimator/http
 
