@@ -91,7 +91,8 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 	for (ssize_t i = 0; i < vctx->rrs->len; ++i) {
 		ranked_rr_array_entry_t *entry = vctx->rrs->at[i];
 		const knot_rrset_t *rr = entry->rr;
-		if (entry->rank == KR_VLDRANK_SECURE || entry->yielded) {
+		if (entry->rank == KR_VLDRANK_SECURE ||
+		    entry->yielded || vctx->qry_uid != entry->qry_uid) {
 			continue;
 		}
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
@@ -138,6 +139,7 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 		.keys		= qry->zone_cut.key,
 		.zone_name	= qry->zone_cut.name,
 		.timestamp	= qry->timestamp.tv_sec,
+		.qry_uid	= qry->uid,
 		.has_nsec3	= has_nsec3,
 		.flags		= 0,
 		.err_cnt	= 0,
@@ -212,6 +214,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			.keys		= qry->zone_cut.key,
 			.zone_name	= qry->zone_cut.name,
 			.timestamp	= qry->timestamp.tv_sec,
+			.qry_uid	= qry->uid,
 			.has_nsec3	= has_nsec3,
 			.flags		= 0,
 			.result		= 0
@@ -514,9 +517,16 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_dname_t *signer = signature_authority(req);
 	if (ta_name && (!signer || !knot_dname_is_equal(ta_name, signer))) {
 		/* check all newly added RRSIGs */
-		VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
 		if (!signer) {
-			/* Not a DNSSEC-signed response, ask parent for DS
+			/* Not a DNSSEC-signed response. */
+			if (ctx->state == KR_STATE_YIELD) {
+				/* Already yielded for revalidation.
+				 * It means that trust chain is OK and
+				 * transition to INSECURE was not occurs.
+				 * Let validation logic to ask about rrsig. */
+				return KR_STATE_DONE;
+			}
+			/* Ask parent for DS
 			 * to prove transition to INSECURE. */
 			const uint16_t qtype = knot_pkt_qtype(pkt);
 			const knot_dname_t *qname = knot_pkt_qname(pkt);
@@ -541,6 +551,7 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
 		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
+		VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
 		return KR_STATE_YIELD;
 	}
 	return KR_STATE_DONE;
