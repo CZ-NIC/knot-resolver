@@ -53,6 +53,7 @@ struct kr_rrset_validation_ctx {
         const knot_dname_t *zone_name;	/*!< Name of the zone containing the RRSIG RRSet. */
 	uint32_t timestamp;		/*!< Validation time. */
         bool has_nsec3;			/*!< Whether to use NSEC3 validation. */
+	uint32_t qry_uid;		/*!< Current query uid. */
 	uint32_t flags;			/*!< Output - Flags. */
 	uint32_t err_cnt;		/*!< Output - Number of validation failures. */
 	int result;			/*!< Output - 0 or error code. */
