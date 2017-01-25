@@ -93,6 +93,8 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		char *cmd = buf->base;
 		if (cmd[nread - 1] == '\n') {
 			cmd[nread - 1] = '\0';
+		} else {
+			cmd[nread] = '\0';
 		}
 
 		/* Pseudo-command for switching to "binary output" */
