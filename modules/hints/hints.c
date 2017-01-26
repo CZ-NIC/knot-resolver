@@ -338,6 +338,8 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	if (!args)
 		return NULL;
 	auto_free char *args_copy = strdup(args);
+	if (!args_copy)
+		return NULL;
 
 	int ret = -1;
 	char *addr = strchr(args_copy, ' ');
@@ -355,7 +357,11 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 static char* hint_del(void *env, struct kr_module *module, const char *args)
 {
 	struct kr_zonecut *hints = module->data;
+	if (!args)
+		return NULL;
 	auto_free char *args_copy = strdup(args);
+	if (!args_copy)
+		return NULL;
 
 	int ret = -1;
 	char *addr = strchr(args_copy, ' ');
@@ -476,7 +482,7 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 	struct kr_context *ctx = &engine->resolver;
 	struct kr_zonecut *root_hints = &ctx->root_hints;
 	/* Replace root hints if parameter is set */
-	if (args && strlen(args) > 0) {
+	if (args && args[0] != '\0') {
 		JsonNode *root_node = json_decode(args);
 		kr_zonecut_set(root_hints, (const uint8_t *)"");
 		unpack_hint(root_hints, root_node, NULL);
