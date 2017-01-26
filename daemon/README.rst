@@ -804,10 +804,11 @@ daemons or manipulated from other processes, making for example synchronised loa
   Get or set maximum cache TTL.
 
   .. note:: The `ttl` value must be in range `(min_ttl, 4294967295)`.
-  
+
   .. warning:: This settings applies only to currently open cache, it will not persist if the cache is closed or reopened.
 
   .. code-block:: lua
+
      -- Get maximum TTL
      cache.max_ttl()
      518400
@@ -823,10 +824,11 @@ daemons or manipulated from other processes, making for example synchronised loa
   Get or set minimum cache TTL. Any entry inserted into cache with TTL lower than minimal will be overriden to minimum TTL. Forcing TTL higher than specified violates DNS standards, use with care.
 
   .. note:: The `ttl` value must be in range `<0, max_ttl)`.
-  
+
   .. warning:: This settings applies only to currently open cache, it will not persist if the cache is closed or reopened.
 
   .. code-block:: lua
+
      -- Get minimum TTL
      cache.min_ttl()
      0

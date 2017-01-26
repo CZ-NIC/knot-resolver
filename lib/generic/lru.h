@@ -245,4 +245,4 @@ static inline uint lru_capacity_impl(struct lru *lru)
 }
 
 /** @endcond */
-
+/** @} (addtogroup generics) */

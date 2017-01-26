@@ -26,12 +26,12 @@ It also supports indexed databases if you prefix the configuration string with `
 
 	> cache.storage = 'redis://9@127.0.0.1'
 
-.. warning:: The Redis client doesn't really support transactions nor pruning. Cache eviction policy shoud be left upon Redis server, see the `Using Redis as an LRU cache <redis-lru>`_.
+.. warning:: The Redis client doesn't really support transactions nor pruning. Cache eviction policy shoud be left upon Redis server, see the `Using Redis as an LRU cache <redis-lru_>`_.
 
 Build distributed cache
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-See `Redis Cluster` tutorial.
+See `Redis Cluster`_ tutorial.
 
 Dependencies
 ^^^^^^^^^^^^
