@@ -3,8 +3,10 @@
 Static hints
 ------------
 
-This is a module providing static hints from ``/etc/hosts`` like file for forward records (A/AAAA) and reverse records (PTR).
-You can also use it to change root hints that are used as a safety belt, or if the root NS
+This is a module providing static hints for forward records (A/AAAA) and reverse records (PTR).
+The records can be loaded from ``/etc/hosts``-like files and/or added directly.
+
+You can also use the module to change root hints that are used as a safety belt, or if the root NS
 drops out of cache.
 
 Examples
@@ -28,11 +30,17 @@ Properties
 
 .. function:: hints.config([path])
 
-  :param string path:  path to hosts file, default: no file
+  :param string path:  path to hosts-like file, default: no file
   :return: ``{ result: bool }``
 
-  Clear any configured hints and load specified hosts file.
+  Clear any configured hints, and optionally load a hosts-like file as in ``hints.add_hosts(path)``.
   (Root hints are not touched.)
+
+.. function:: hints.add_hosts([path])
+
+  :param string path:  path to hosts-like file, default: `/etc/hosts`
+
+  Add hints from a host-like file.
 
 .. function:: hints.get(hostname)
 
