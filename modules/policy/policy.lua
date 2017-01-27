@@ -42,6 +42,17 @@ local function parse_target(target)
 	return addr, port
 end
 
+local function parse_sock(target)
+	local addr, port = target:match '([^@]*)@?(.*)'
+	port = port and tonumber(port) or 53
+	sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port), ffi.C.free);
+
+	if sock == nil then
+		error("target '"..target..'" is not a valid IP address')
+	end
+	return sock
+end
+
 -- Mirror request elsewhere, and continue solving
 local function mirror(target)
 	local addr, port = parse_target(target)
@@ -63,11 +74,11 @@ local function forward(target)
 	local list = {}
 	if type(target) == 'table' then
 		for _, v in pairs(target) do
-			table.insert(list, {parse_target(v)})
+			table.insert(list, parse_sock(v))
 			assert(#list <= 4, 'at most 4 FORWARD targets are supported')
 		end
 	else
-		table.insert(list, {parse_target(target)})
+		table.insert(list, parse_sock(target))
 	end
 	return function(state, req)
 		req = kres.request_t(req)

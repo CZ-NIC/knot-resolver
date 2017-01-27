@@ -27,6 +27,7 @@
 #include <libknot/rrtype/rrsig.h>
 #include <libknot/rrset-dump.h>
 #include <libknot/version.h>
+#include <uv.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
@@ -288,6 +289,32 @@ int kr_family_len(int family)
 	case AF_INET:  return sizeof(struct in_addr);
 	case AF_INET6: return sizeof(struct in6_addr);
 	default:       return kr_error(EINVAL);
+	}
+}
+
+struct sockaddr * kr_straddr_socket(const char *addr, int port)
+{
+	switch (kr_straddr_family(addr)) {
+	case AF_INET: {
+		struct sockaddr_in *res = malloc(sizeof(*res));
+		if (uv_ip4_addr(addr, port, res) >= 0) {
+			return (struct sockaddr *)res;
+		} else {
+			free(res);
+			return NULL;
+		}
+	}
+	case AF_INET6: {
+		struct sockaddr_in6 *res = malloc(sizeof(*res));
+		if (uv_ip6_addr(addr, port, res) >= 0) {
+			return (struct sockaddr *)res;
+		} else {
+			free(res);
+			return NULL;
+		}
+	}
+	default:
+		return NULL;
 	}
 }
 
