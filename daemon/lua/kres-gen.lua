@@ -161,7 +161,6 @@ uint8_t *knot_rdata_data(const knot_rdata_t *);
 knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, size_t);
 uint32_t knot_rrset_ttl(const knot_rrset_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
-int knot_rrset_txt_dump(const knot_rrset_t *, char *, const size_t, const knot_dump_style_t *);
 const knot_dname_t *knot_pkt_qname(const knot_pkt_t *);
 uint16_t knot_pkt_qtype(const knot_pkt_t *);
 uint16_t knot_pkt_qclass(const knot_pkt_t *);

@@ -76,7 +76,6 @@ genResType "enum kr_query_flag" | sed -e 's/enum kr_query_flag/struct query_flag
 	knot_rdataset_at
 	knot_rrset_ttl
 	knot_rrset_txt_dump_data
-	knot_rrset_txt_dump
 # Packet
 	knot_pkt_qname
 	knot_pkt_qtype

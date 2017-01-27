@@ -153,7 +153,7 @@ ffi.metatype( knot_rrset_t, {
 				if i ~= nil then
 					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
 				else
-					ret = knot.knot_rrset_txt_dump(rr, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
+					ret = -1
 				end
 				return ret >= 0 and ffi.string(rrset_buf)
 			end
