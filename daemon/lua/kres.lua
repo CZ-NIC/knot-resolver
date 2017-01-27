@@ -227,11 +227,11 @@ ffi.metatype( kr_query_t, {
 		nslist = function(qry, list)
 			assert(#list <= 4, 'maximum of 4 addresses can be evaluated for each query')
 			for i, ns in ipairs(list) do
-				C.kr_nsrep_set(qry, i - 1, ffi.cast(ub_t, ns[1]), #ns[1], ns[2] or 53)
+				assert(C.kr_nsrep_set(qry, i - 1, ns) == 0);
 			end
 			-- If less than maximum NSs, insert guard to terminate the list
 			if #list < 4 then
-				C.kr_nsrep_set(qry, #list, nil, 0, 0)
+				assert(C.kr_nsrep_set(qry, #list, nil) == 0);
 			end
 		end,
 	},
