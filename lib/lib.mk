@@ -43,7 +43,8 @@ libkres_HEADERS := \
 # Dependencies
 libkres_DEPEND := $(contrib)
 libkres_CFLAGS := -fvisibility=hidden -fPIC $(lmdb_CFLAGS)
-libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS)
+libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS) \
+				$(libuv_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
 
 ifeq ($(ENABLE_COOKIES),yes)
