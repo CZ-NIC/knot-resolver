@@ -1058,8 +1058,9 @@ ns_election:
 		return KR_STATE_PRODUCE;
 	}
 
-	/* Randomize query case (if not in safemode) */
-	qry->secret = (qry->flags & QUERY_SAFEMODE) ? 0 : kr_rand_uint(UINT32_MAX);
+	/* Randomize query case (if not in safemode or turned off) */
+	qry->secret = (qry->flags & (QUERY_SAFEMODE | QUERY_NO_0X20))
+			? 0 : kr_rand_uint(UINT32_MAX);
 	knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(packet);
 	randomized_qname_case(qname_raw, qry->secret);
 
