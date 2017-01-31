@@ -130,6 +130,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 			uint32_t len_n = htonl(len_s);
 			fwrite(&len_n, sizeof(len_n), 1, out);
 			fwrite(message, len_s, 1, out);
+			lua_settop(L, 0);
 			goto finish;
 		}
 
