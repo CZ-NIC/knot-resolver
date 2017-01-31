@@ -13,6 +13,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+#include <arpa/inet.h>
 #include <assert.h>
 #include <contrib/ccan/asprintf/asprintf.h>
 #include <editline/readline.h>
@@ -309,6 +310,7 @@ static char *run_cmd(const char *cmd, size_t * out_len)
 	uint32_t len;
 	if (!fread(&len, sizeof(len), 1, g_tty))
 		return NULL;
+	len = ntohl(len);
 	char *msg = malloc(1 + (size_t) len);
 	if (!msg)
 		return NULL;

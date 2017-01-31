@@ -14,6 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
@@ -63,6 +64,7 @@ static inline char *lua_strerror(int lua_err) {
  *
  * - This is just basic read-eval-print; libedit is supported through krsec;
  * - stream->data represents a bool determining binary output mode (used by kresc);
+ * - binary output: uint32_t length in network order, followed by that many bytes;
  */
 static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
@@ -125,9 +127,9 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 			size_t len_s = strlen(message);
 			if (len_s > UINT32_MAX)
 				goto finish;
-			uint32_t len = len_s;
-			fwrite(&len, sizeof(len), 1, out);
-			fwrite(message, len, 1, out);
+			uint32_t len_n = htonl(len_s);
+			fwrite(&len_n, sizeof(len_n), 1, out);
+			fwrite(message, len_s, 1, out);
 			goto finish;
 		}
 
