@@ -62,9 +62,11 @@ static inline char *lua_strerror(int lua_err) {
 /**
  * TTY control: process input and free() the buffer.
  *
+ * For parameters see http://docs.libuv.org/en/v1.x/stream.html#c.uv_read_cb
+ *
  * - This is just basic read-eval-print; libedit is supported through krsec;
  * - stream->data represents a bool determining binary output mode (used by kresc);
- * - binary output: uint32_t length in network order, followed by that many bytes;
+ * - binary output: uint32_t length in network order, followed by that many bytes.
  */
 static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
@@ -107,7 +109,8 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 			cmd[nread] = '\0';
 		}
 
-		/* Pseudo-command for switching to "binary output" */
+		/* Pseudo-command for switching to "binary output";
+		 * beware: void* <-> bool */
 		bool is_binary = stream->data;
 		if (strcmp(cmd, "__binary") == 0) {
 			stream->data = (void *)(is_binary = true);
