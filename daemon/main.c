@@ -69,7 +69,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 	char *cmd = buf ? buf->base : NULL; /* To be free()d on return. */
 
 	/* Set output streams */
-	FILE *out = stdout, *outerr = stderr;
+	FILE *out = stdout;
 	uv_os_fd_t stream_fd = 0;
 	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
 		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
@@ -86,7 +86,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		}
 		uv_os_fd_t dup_fd = dup(stream_fd);
 		if (dup_fd >= 0) {
-			out = outerr = fdopen(dup_fd, "w");
+			out = fdopen(dup_fd, "w");
 		}
 	}
 
@@ -155,9 +155,8 @@ finish:
 	free(cmd);
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
-		fclose(out); /* outerr is the same */
+		fclose(out);
 	}
-
 }
 
 static void tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf) {
