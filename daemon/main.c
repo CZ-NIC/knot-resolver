@@ -58,19 +58,22 @@ static inline char *lua_strerror(int lua_err) {
 	}
 }
 
-/*
- * TTY control
+/**
+ * TTY control: process input and free() the buffer.
+ *
+ * - This is just basic read-eval-print; libedit is supported through krsec;
+ * - stream->data represents a bool determining binary output mode (used by kresc);
  */
-static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
+static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
+	char *cmd = buf ? buf->base : NULL; /* To be free()d on return. */
+
 	/* Set output streams */
 	FILE *out = stdout, *outerr = stderr;
 	uv_os_fd_t stream_fd = 0;
 	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
 		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		if (buf) {
-			free(buf->base);
-		}
+		free(cmd);
 		return;
 	}
 	if (stream_fd != STDIN_FILENO) {
@@ -78,9 +81,7 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
 		}
 		if (nread <= 0) {
-			if (buf) {
-				free(buf->base);
-			}
+			free(cmd);
 			return;
 		}
 		uv_os_fd_t dup_fd = dup(stream_fd);
@@ -88,12 +89,19 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			out = outerr = fdopen(dup_fd, "w");
 		}
 	}
+
 	/* Execute */
-	if (stream && buf && nread > 0) {
-		char *cmd = buf->base;
+	if (stream && cmd && nread > 0) {
+		/* Ensure cmd is 0-terminated */
 		if (cmd[nread - 1] == '\n') {
 			cmd[nread - 1] = '\0';
 		} else {
+			if (nread >= buf->len) { /* only equality should be possible */
+				char *newbuf = realloc(cmd, nread + 1);
+				if (!newbuf)
+					goto finish;
+				cmd = newbuf;
+			}
 			cmd[nread] = '\0';
 		}
 
@@ -144,9 +152,7 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	}
 finish:
 	fflush(out);
-	if (buf) {
-		free(buf->base);
-	}
+	free(cmd);
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
 		fclose(out); /* outerr is the same */
@@ -169,7 +175,7 @@ static void tty_accept(uv_stream_t *master, int status)
 			return;
 		 }
 		 client->data = 0;
-		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_read);
+		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_process_input);
 		 /* Write command line */
 		 if (!g_quiet) {
 		 	uv_buf_t buf = { "> ", 2 };
@@ -358,7 +364,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 			printf("[system] interactive mode\n> ");
 		fflush(stdout);
 		uv_pipe_open(&pipe, 0);
-		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_read);
+		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_process_input);
 	} else {
 		int pipe_ret = -1;
 		if (control_fd != -1) {
