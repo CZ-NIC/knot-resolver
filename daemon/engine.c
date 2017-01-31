@@ -376,6 +376,11 @@ static int l_tojson(lua_State *L)
 
 static int l_map(lua_State *L)
 {
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_pushliteral(L, "map('string with a lua expression')");
+		lua_error(L);
+	}
+
 	struct engine *engine = engine_luaget(L);
 	const char *cmd = lua_tostring(L, 1);
 	uint32_t len = strlen(cmd);
