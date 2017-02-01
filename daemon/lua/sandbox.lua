@@ -114,14 +114,18 @@ setmetatable(cache, {
 		return t.count()
 	end,
 	__index = function (t, k)
-		return rawget(t, k) or (rawget(t, 'current_size') and t.get(k))
+		if type(k) == 'number' then
+			return rawget(t, k) or (rawget(t, 'current_size') and t.get(k))
+		end
 	end,
 	__newindex = function (t,k,v)
 		-- Defaults
-		local storage = rawget(t, 'current_storage')
-		if not storage then storage = 'lmdb://' end
-		local size = rawget(t, 'current_size')
-		if not size then size = 10*MB end
+		if type(k) == number then
+			local storage = rawget(t, 'current_storage')
+			if not storage then storage = 'lmdb://' end
+			local size = rawget(t, 'current_size')
+			if not size then size = 10*MB end
+		end
 		-- Declarative interface for cache
 		if     k == 'size'    then t.open(v, storage)
 		elseif k == 'storage' then t.open(size, v)
