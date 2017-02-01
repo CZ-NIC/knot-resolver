@@ -28,7 +28,7 @@ There are several defined actions:
   it can be a single IP (string) or a list of up to four IPs.
 * ``MIRROR(ip)`` - mirror query to given IP and continue solving it (useful for partial snooping)
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
-* ``TRACE`` - pretty-print DNS response packets into the log (useful for debugging weird DNS servers)
+* ``QTRACE`` - pretty-print DNS response packets into the log (useful for debugging weird DNS servers)
 
 .. warning:: The policy module only looks at the inbound DNS queries.  Thus the ``FORWARD(ip)`` policy does only forward inbound query to the specified IP address(es) and it doesn't and it can't do DNSSEC validation.  If you need DNSSEC validation, you either need to disable ``FORWARD(ip)`` policy or use an upstream DNSSEC-validating resolver.
 
@@ -66,7 +66,9 @@ Example configuration
 	-- Forward all queries (complete stub mode)
 	policy.add(policy.all(policy.FORWARD('2001:DB8::1')))
 	-- Print all responses with matching suffix
-	policy.add(policy.suffix(policy.TRACE, {todname('rhybar.cz.')}))
+	policy.add(policy.suffix(policy.QTRACE, {todname('rhybar.cz.')}))
+	-- Print all responses
+	policy.add(policy.all(policy.QTRACE))
   -- Mirror all queries and retrieve information
   local rule = policy.add(policy.all(policy.MIRROR('127.0.0.2')))
   -- Print information about the rule
@@ -108,7 +110,7 @@ Properties
 
    Reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55'.
 
-.. envvar:: policy.TRACE
+.. envvar:: policy.QTRACE
 
    Print pretty-formate (dig-like) DNS answers for current query and
    all its subqueries that Knot Resolver receive from upstream
