@@ -1,7 +1,7 @@
 # Project
 MAJOR := 1
 MINOR := 2
-PATCH := 0
+PATCH := 1
 EXTRA :=
 ABIVER := 2
 BUILDMODE := dynamic
