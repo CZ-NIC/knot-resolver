@@ -7,6 +7,15 @@ Security:
   would be reused to construct response for non-CD queries, resulting
   in Insecure status instead of Bogus.  Only 1.2.0 release was affected.
 
+Documentation
+-------------
+- Update the typo in the documentation: The query trace policy is
+  named policy.QTRACE (and not policy.TRACE)
+
+Bugfixes:
+---------
+- lua: make the map command check its arguments
+
 Knot Resolver 1.2.0 (2017-01-24)
 ====================================
 
@@ -27,7 +36,7 @@ Improvements:
 - DNS over TLS now creates ephemeral certs.
 - Configurable cache.{min,max}_tll option, with max_ttl defaulting to 6 days.
 - Option to reorder RRs in the response.
-- New policy.TRACE() policy to print packet contents
+- New policy.QTRACE policy to print packet contents
 
 Bugfixes:
 ---------
