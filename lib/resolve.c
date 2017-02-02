@@ -917,6 +917,9 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		if (parent[0] != '\0' && knot_dname_in(parent, qry->sname)) {
 			requested_name = knot_wire_next_label(parent, NULL);
 		}
+	} else if ((qry->stype == KNOT_RRTYPE_DS) && (qry->sname[0] != '\0')) {
+		/* If this is explicit DS query, start from encloser too. */
+		requested_name = knot_wire_next_label(requested_name, NULL);
 	}
 
 	int state = KR_STATE_FAIL;
