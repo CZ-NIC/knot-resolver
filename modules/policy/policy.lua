@@ -238,6 +238,7 @@ function policy.enforce(state, req, action)
 		local qry = req:current()
 		req.options = bit.bor(req.options, kres.query.TRACE)
 		qry.flags = bit.bor(qry.flags, kres.query.TRACE)
+		return -- this allows to continue iterating over policy list
 	elseif type(action) == 'function' then
 		return action(state, req)
 	end
