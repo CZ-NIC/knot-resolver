@@ -232,6 +232,15 @@ static int l_option(lua_State *L)
 	return 1;
 }
 
+/** @internal for l_trustanchor: */
+static void ta_add(zs_scanner_t *zs)
+{
+	map_t *ta = zs->process.data;
+	if (!ta)
+		return;
+	if (kr_ta_add(ta, zs->r_owner, zs->r_type, zs->r_ttl, zs->r_data, zs->r_data_length))
+		zs->process.data = NULL; /* error signalling */
+}
 /** Enable/disable trust anchor. */
 static int l_trustanchor(lua_State *L)
 {
@@ -260,13 +269,11 @@ static int l_trustanchor(lua_State *L)
 		lua_pushstring(L, "not enough memory");
 		lua_error(L);
 	}
-	int ok = zs_set_input_string(zs, anchor, strlen(anchor)) == 0 &&
-	         zs_parse_all(zs) == 0;
-	/* Add it to TA set and cleanup */
-	if (ok) {
-		ok = kr_ta_add(&engine->resolver.trust_anchors,
-		               zs->r_owner, zs->r_type, zs->r_ttl, zs->r_data, zs->r_data_length) == 0;
-	}
+	zs_set_processing(zs, ta_add, NULL, &engine->resolver.trust_anchors);
+	bool ok = zs_set_input_string(zs, anchor, strlen(anchor)) == 0
+		&& zs_parse_all(zs) == 0;
+	ok = ok && zs->process.data; /* reset to NULL on error in ta_add */
+
 	zs_deinit(zs);
 	free(zs);
 	/* Report errors */

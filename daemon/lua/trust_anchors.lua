@@ -17,7 +17,7 @@ local function https_fetch(url, ca)
 	return resp[1]
 end
 
--- Fetch root anchors in XML over HTTPS
+-- Fetch root anchors in XML over HTTPS, returning a zone-file-style string.
 local function bootstrap(url, ca)
 	-- @todo ICANN certificate is verified against current CA
 	--       this is not ideal, as it should rather verify .xml signature which
@@ -28,11 +28,14 @@ local function bootstrap(url, ca)
 	if not xml then
 		return false, string.format('[ ta ] fetch of "%s" failed: %s', url, err)
 	end
-	-- Parse root trust anchor
-	local fields = {}
-	string.gsub(xml, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
-	local rrdata = string.format('%s %s %s %s', fields.KeyDigest, fields.Algorithm, fields.DigestType, fields.Digest)
-	local rr = string.format('%s 0 IN DS %s', fields.TrustAnchor, rrdata)
+	local rr = ''
+	-- Parse root trust anchor, one digest at a time, converting to a zone-file-style string.
+	string.gsub(xml, "<KeyDigest[^>]*>(.-)</KeyDigest>", function (xml1)
+		local fields = {}
+		string.gsub(xml1, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
+		rr = rr .. '\n' .. string.format('. 0 IN DS %s %s %s %s',
+			fields.KeyTag, fields.Algorithm, fields.DigestType, fields.Digest)
+	end)
 	-- Add to key set, create an empty keyset file to be filled
 	print('[ ta ] warning: root anchor bootstrapped, you SHOULD check the key manually, see: '..
 	      'https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs')
