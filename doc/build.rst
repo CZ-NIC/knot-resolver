@@ -33,8 +33,9 @@ The following is a list of software required to build Knot DNS Resolver from sou
    :header: "Requirement", "Required by", "Notes"
 
    "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
-   "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "C compiler", "*all*", "*(build only)* [#]_"
+   "`pkg-config`_", "*all*", "*(build only)* [#]_"
+   "hexdump or xxd", "``daemon``", "*(build only)*"
    "libknot_ 2.1+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
    "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
@@ -52,7 +53,7 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "Go_ 1.5+", "``modules``", "Build modules written in Go."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
-   "Sphinx_", "``documentation``", "Building this HTML/PDF documentation."
+   "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this HTML/PDF documentation."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
    "libsystemd_", "``daemon``", "Systemd socket activation support."
 
@@ -276,6 +277,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _Doxygen: https://www.stack.nl/~dimitri/doxygen/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
+.. _sphinx_rtd_theme: https://pypi.python.org/pypi/sphinx_rtd_theme
 .. _GNU Make: https://www.gnu.org/software/make/
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot
