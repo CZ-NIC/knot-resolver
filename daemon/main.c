@@ -640,17 +640,18 @@ int main(int argc, char **argv)
 		char *_filename = basename(basename_storage);
 		int dirlen = strlen(keyfile_dir);
 		int namelen = strlen(_filename);
-		if (dirlen + namelen >= PATH_MAX) {
+		if (dirlen + 1 + namelen >= PATH_MAX) {
 			kr_log_error("[ ta ]: keyfile '%s' PATH_MAX exceeded\n",
 				     keyfile);
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
-		keyfile_dir[dirlen] = '/';
+		keyfile_dir[dirlen++] = '/';
+		keyfile_dir[dirlen] = '\0';
 
 		auto_free char *keyfile_path = malloc(dirlen + namelen + 1);
-		memcpy(keyfile_path, keyfile_dir, dirlen + 1);
-		memcpy(keyfile_path + dirlen + 1, _filename, namelen + 1);
+		memcpy(keyfile_path, keyfile_dir, dirlen);
+		memcpy(keyfile_path + dirlen, _filename, namelen + 1);
 
 		int unmanaged = 0;
 
