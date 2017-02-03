@@ -36,6 +36,15 @@
 /* Defaults */
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "hint",  fmt)
 
+/** Useful for returning from module properties. */
+static char * bool2jsonstr(bool val)
+{
+	char *result = NULL;
+	if (-1 == asprintf(&result, "{ \"result\": %s }", val ? "true" : "false"))
+		result = NULL;
+	return result;
+}
+
 /* Structure for reverse search (address to domain) */
 struct rev_search_baton {
 	knot_pkt_t *pkt;
@@ -315,6 +324,14 @@ static int load_file(struct kr_module *module, const char *path)
 	return load_map(hints, fp);
 }
 
+static char* hint_add_hosts(void *env, struct kr_module *module, const char *args)
+{
+	if (!args)
+		args = "/etc/hosts";
+	int err = load_file(module, args);
+	return bool2jsonstr(err == kr_ok());
+}
+
 static void unload(struct kr_module *module)
 {
 	struct kr_zonecut *hints = module->data;
@@ -338,6 +355,8 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	if (!args)
 		return NULL;
 	auto_free char *args_copy = strdup(args);
+	if (!args_copy)
+		return NULL;
 
 	int ret = -1;
 	char *addr = strchr(args_copy, ' ');
@@ -346,16 +365,17 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 		ret = add_pair(hints, args_copy, addr + 1);
 	}
 
-	char *result = NULL;
-	if (-1 == asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false"))
-		result = NULL;
-	return result;
+	return bool2jsonstr(ret == 0);
 }
 
 static char* hint_del(void *env, struct kr_module *module, const char *args)
 {
 	struct kr_zonecut *hints = module->data;
+	if (!args)
+		return NULL;
 	auto_free char *args_copy = strdup(args);
+	if (!args_copy)
+		return NULL;
 
 	int ret = -1;
 	char *addr = strchr(args_copy, ' ');
@@ -365,10 +385,7 @@ static char* hint_del(void *env, struct kr_module *module, const char *args)
 	}
 	ret = del_pair(hints, args_copy, addr);
 
-	char *result = NULL;
-	if (-1 == asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false"))
-		result = NULL;
-	return result;
+	return bool2jsonstr(ret == 0);
 }
 
 /** @internal Pack address list into JSON array. */
@@ -476,7 +493,7 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 	struct kr_context *ctx = &engine->resolver;
 	struct kr_zonecut *root_hints = &ctx->root_hints;
 	/* Replace root hints if parameter is set */
-	if (args && strlen(args) > 0) {
+	if (args && args[0] != '\0') {
 		JsonNode *root_node = json_decode(args);
 		kr_zonecut_set(root_hints, (const uint8_t *)"");
 		unpack_hint(root_hints, root_node, NULL);
@@ -562,6 +579,7 @@ struct kr_prop *hints_props(void)
 	    { &hint_set,    "set", "Set {name, address} hint.", },
 	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
 	    { &hint_get,    "get", "Retrieve hint for given name.", },
+	    { &hint_add_hosts, "add_hosts", "Load a file with hosts-like formatting and add contents into hints.", },
 	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
 	    { NULL, NULL, NULL }
 	};
