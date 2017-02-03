@@ -114,14 +114,18 @@ setmetatable(cache, {
 		return t.count()
 	end,
 	__index = function (t, k)
-		return rawget(t, k) or (rawget(t, 'current_size') and t.get(k))
+		if type(k) == 'number' then
+			return rawget(t, k) or (rawget(t, 'current_size') and t.get(k))
+		end
 	end,
 	__newindex = function (t,k,v)
 		-- Defaults
-		local storage = rawget(t, 'current_storage')
-		if not storage then storage = 'lmdb://' end
-		local size = rawget(t, 'current_size')
-		if not size then size = 10*MB end
+		if type(k) == number then
+			local storage = rawget(t, 'current_storage')
+			if not storage then storage = 'lmdb://' end
+			local size = rawget(t, 'current_size')
+			if not size then size = 10*MB end
+		end
 		-- Declarative interface for cache
 		if     k == 'size'    then t.open(v, storage)
 		elseif k == 'storage' then t.open(size, v)
@@ -160,7 +164,14 @@ end
 -- Make sandboxed environment
 local function make_sandbox(defined)
 	local __protected = { modules = true, cache = true, net = true, trust_anchors = true }
-	return setmetatable({}, {
+
+	-- Compute and export the list of top-level names (hidden otherwise)
+	local nl = ""
+	for n in pairs(defined) do
+		nl = nl .. n .. "\n"
+	end
+
+	return setmetatable({ __orig_name_list = nl }, {
 		__index = defined,
 		__newindex = function (t, k, v)
 			if __protected[k] then

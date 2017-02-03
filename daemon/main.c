@@ -14,6 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
@@ -58,47 +59,84 @@ static inline char *lua_strerror(int lua_err) {
 	}
 }
 
-/*
- * TTY control
+/**
+ * TTY control: process input and free() the buffer.
+ *
+ * For parameters see http://docs.libuv.org/en/v1.x/stream.html#c.uv_read_cb
+ *
+ * - This is just basic read-eval-print; libedit is supported through krsec;
+ * - stream->data represents a bool determining binary output mode (used by kresc);
+ * - binary output: uint32_t length in network order, followed by that many bytes.
  */
-static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
+static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
+	char *cmd = buf ? buf->base : NULL; /* To be free()d on return. */
+
 	/* Set output streams */
-	FILE *out = stdout, *outerr = stderr;
+	FILE *out = stdout;
 	uv_os_fd_t stream_fd = 0;
 	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
 		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		if (buf) {
-			free(buf->base);
-		}
+		free(cmd);
 		return;
 	}
 	if (stream_fd != STDIN_FILENO) {
-		if (nread <= 0) { /* Close if disconnected */
+		if (nread < 0) { /* Close if disconnected */
 			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-			if (buf) {
-				free(buf->base);
-			}
+		}
+		if (nread <= 0) {
+			free(cmd);
 			return;
 		}
 		uv_os_fd_t dup_fd = dup(stream_fd);
 		if (dup_fd >= 0) {
-			out = outerr = fdopen(dup_fd, "w");
+			out = fdopen(dup_fd, "w");
 		}
 	}
+
 	/* Execute */
-	if (stream && buf && nread > 0) {
-		char *cmd = buf->base;
+	if (stream && cmd && nread > 0) {
+		/* Ensure cmd is 0-terminated */
 		if (cmd[nread - 1] == '\n') {
 			cmd[nread - 1] = '\0';
+		} else {
+			if (nread >= buf->len) { /* only equality should be possible */
+				char *newbuf = realloc(cmd, nread + 1);
+				if (!newbuf)
+					goto finish;
+				cmd = newbuf;
+			}
+			cmd[nread] = '\0';
 		}
-		struct engine *engine = stream->data;
+
+		/* Pseudo-command for switching to "binary output";
+		 * beware: void* <-> bool */
+		bool is_binary = stream->data;
+		if (strcmp(cmd, "__binary") == 0) {
+			stream->data = (void *)(is_binary = true);
+			goto finish;
+		}
+
+		struct engine *engine = ((struct worker_ctx *)stream->loop->data)->engine;
 		lua_State *L = engine->L;
 		int ret = engine_cmd(L, cmd, false);
 		const char *message = "";
 		if (lua_gettop(L) > 0) {
 			message = lua_tostring(L, -1);
 		}
+
+		/* Simpler output in binary mode */
+		if (is_binary) {
+			size_t len_s = strlen(message);
+			if (len_s > UINT32_MAX)
+				goto finish;
+			uint32_t len_n = htonl(len_s);
+			fwrite(&len_n, sizeof(len_n), 1, out);
+			fwrite(message, len_s, 1, out);
+			lua_settop(L, 0);
+			goto finish;
+		}
+
 		/* Log to remote socket if connected */
 		const char *delim = g_quiet ? "" : "> ";
 		if (stream_fd != STDIN_FILENO) {
@@ -118,15 +156,13 @@ static void tty_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		fprintf(fp_out, "%s", delim);
 		lua_settop(L, 0);
 	}
+finish:
 	fflush(out);
-	if (buf) {
-		free(buf->base);
-	}
+	free(cmd);
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
-		fclose(out); /* outerr is the same */
+		fclose(out);
 	}
-
 }
 
 static void tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf) {
@@ -143,8 +179,8 @@ static void tty_accept(uv_stream_t *master, int status)
 			free(client);
 			return;
 		 }
-		 client->data = master->data;
-		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_read);
+		 client->data = 0;
+		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_process_input);
 		 /* Write command line */
 		 if (!g_quiet) {
 		 	uv_buf_t buf = { "> ", 2 };
@@ -327,13 +363,13 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	auto_free char *sock_file = NULL;
 	uv_pipe_t pipe;
 	uv_pipe_init(loop, &pipe, 0);
-	pipe.data = engine;
+	pipe.data = 0;
 	if (g_interactive) {
 		if (!g_quiet)
 			printf("[system] interactive mode\n> ");
 		fflush(stdout);
 		uv_pipe_open(&pipe, 0);
-		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_read);
+		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_process_input);
 	} else {
 		int pipe_ret = -1;
 		if (control_fd != -1) {
@@ -372,7 +408,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return kr_ok();
 }
 
-void free_sd_socket_names(char **socket_names, int count)
+static void free_sd_socket_names(char **socket_names, int count)
 {
 	for (int i = 0; i < count; i++) {
 		free(socket_names[i]);
