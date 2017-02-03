@@ -250,6 +250,7 @@ static void signal_handler(uv_signal_t *handle, int signum)
 	uv_signal_stop(handle);
 }
 
+/** Split away port from the address. */
 static const char *set_addr(char *addr, int *port)
 {
 	char *p = strchr(addr, '#');

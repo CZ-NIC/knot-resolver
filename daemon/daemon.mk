@@ -39,9 +39,7 @@ kresd_LIBS += $(libsystemd_LIBS)
 endif
 
 # Make binary
-ifeq ($(HAS_lua)|$(HAS_libuv), yes|yes)
 $(eval $(call make_sbin,kresd,daemon,yes))
-endif
 
 # Targets
 date := $(shell date +%F -r NEWS)

@@ -108,6 +108,7 @@ EOF
 	kr_straddr_subnet
 	kr_bitcmp
 	kr_family_len
+	kr_straddr_socket
 	kr_rrarray_add
 # Trust anchors
 	kr_ta_get
