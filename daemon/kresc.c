@@ -142,7 +142,7 @@ static unsigned char complete(EditLine * el, int ch)
 		}
 		char *token = strtok(globals_tok, "\n");
 		int matches = 0;
-		char *lastmatch;
+		char *lastmatch = NULL;
 		while (token) {
 			if (argv[0] && starts_with(token, argv[0])) {
 				printf("\n%s (%s)", token,
@@ -207,7 +207,7 @@ static unsigned char complete(EditLine * el, int ch)
 			}
 			char *token = strtok(members_tok, "\n");
 			int matches = 0;
-			char *lastmatch;
+			char *lastmatch = NULL;
 			if (!dot || dot - argv[0] + 1 == strlen(argv[0])) {
 				//Prints all members.
 				while (token) {
