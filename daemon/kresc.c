@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #define HISTORY_FILE "kresc_history"
 #define PROGRAM_NAME "kresc"
@@ -275,23 +276,28 @@ static int init_tty(const char *path)
 	size_t plen = strlen(path);
 	if (plen + 1 > sizeof(addr.sun_path)) {
 		fprintf(stderr, "Path too long\n");
+		close(fd);
 		return 1;
 	}
 	memcpy(addr.sun_path, path, plen + 1);
 	if (connect(fd, (const struct sockaddr *)&addr, sizeof(addr))) {
 		perror("While connecting to daemon");
+		close(fd);
 		return 1;
 	}
 
 	g_tty = fdopen(fd, "r+");
 	if (!g_tty) {
 		perror("While opening TTY");
+		close(fd);
 		return 1;
 	}
 	// Switch to binary mode and consume the text "> ".
 	if (fprintf(g_tty, "__binary\n") < 0 || !fread(&addr, 2, 1, g_tty)
 	    || fflush(g_tty)) {
 		perror("While initializing TTY");
+		fclose(g_tty);
+		g_tty = NULL;
 		return 1;
 	}
 
