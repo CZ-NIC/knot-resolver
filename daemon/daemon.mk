@@ -51,7 +51,10 @@ ifneq ($(SED),)
 	$(INSTALL) -m 0644 doc/kresd.8 $(DESTDIR)$(MANDIR)/man8/
 endif
 daemon-clean: kresd-clean
-	@$(RM) daemon/lua/*.inc
+	@$(RM) daemon/lua/*.inc daemon/lua/trust_anchors.lua
+
+daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in
+	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g" $< > $@
 
 daemon/lua/kres-gen.lua: | $(libkres)
 	@echo "WARNING: regenerating $@"

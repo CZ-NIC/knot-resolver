@@ -550,8 +550,6 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "map");
 	lua_pushliteral(engine->L, MODULEDIR);
 	lua_setglobal(engine->L, "moduledir");
-	lua_pushliteral(engine->L, ETCDIR);
-	lua_setglobal(engine->L, "etcdir");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();

@@ -30,7 +30,7 @@ INSTALL := install
 # Flags
 BUILD_LDFLAGS += $(LDFLAGS)
 BUILD_CFLAGS := $(CFLAGS) -std=c99 -D_GNU_SOURCE -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib) -I$(abspath contrib/lmdb)
-BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\"" -DETCDIR="\"$(ETCDIR)\""
+BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 ifeq (,$(findstring -O,$(CFLAGS)))
 	BUILD_CFLAGS += -O2
 endif
