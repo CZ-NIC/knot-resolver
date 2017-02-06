@@ -129,15 +129,6 @@ setmetatable(cache, {
 	end
 })
 
--- Syntactic sugar for TA store
-setmetatable(trust_anchors, {
-	__newindex = function (t,k,v)
-	if     k == 'file' then t.config(v)
-	elseif k == 'negative' then t.set_insecure(v)
-	else   rawset(t, k, v) end
-	end,
-})
-
 -- Register module in Lua environment
 function modules_register(module)
 	-- Syntactic sugar for get() and set() properties

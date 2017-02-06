@@ -19,6 +19,7 @@ end
 
 -- Fetch root anchors in XML over HTTPS, returning a zone-file-style string.
 local function bootstrap(url, ca)
+	-- RFC 7958, sec. 2, but we don't do precise XML parsing.
 	-- @todo ICANN certificate is verified against current CA
 	--       this is not ideal, as it should rather verify .xml signature which
 	--       is signed by ICANN long-lived cert, but luasec has no PKCS7
@@ -166,7 +167,7 @@ local function refresh_plan(trust_anchors, timeout, refresh_cb, priming, bootstr
 			if trust_anchors.refresh_time ~= nil then
 				next_time = trust_anchors.refresh_time
 			end
-			print('[ ta ] next refresh: '..next_time)
+			print('[ ta ] next refresh in ' .. next_time/hour .. ' hours')
 			refresh_plan(trust_anchors, next_time, refresh_cb)
 			-- Priming query, prime root NS next
 			if priming ~= nil then
@@ -317,5 +318,14 @@ local trust_anchors = {
 		trust_anchors.insecure = list
 	end,
 }
+
+-- Syntactic sugar for TA store
+setmetatable(trust_anchors, {
+	__newindex = function (t,k,v)
+	if     k == 'file' then t.config(v)
+	elseif k == 'negative' then t.set_insecure(v)
+	else   rawset(t, k, v) end
+	end,
+})
 
 return trust_anchors
