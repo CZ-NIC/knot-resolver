@@ -143,8 +143,15 @@ static void complete_members(EditLine * el, const char *str,
 			//Prints all members.
 			while (token) {
 				char *member = afmt("%s.%s", table, token);
-				printf("\n%s (%s)", member,
-				       get_type_name(member));
+				const char *member_type = get_type_name(member);
+				if (member && member_type) {
+					printf("\n%s (%s)", member, member_type);
+					free(member);
+					free((void *)member_type);
+				} else if (member) {
+					printf("\n%s", member);
+					free(member);
+				}
 				token = strtok(NULL, "\n");
 				matches++;
 			}
@@ -159,6 +166,7 @@ static void complete_members(EditLine * el, const char *str,
 					if (member_type) {
 						printf("\n%s.%s (%s)", table,
 						       token, member_type);
+						free((void *)member_type);
 					} else {
 						printf("\n%s.%s", table, token);
 					}
@@ -184,6 +192,9 @@ static void complete_members(EditLine * el, const char *str,
 
 complete_members_exit:
 	free(table);
+	if(t_type) {
+		free((void*)t_type);
+	}
 }
 
 static void complete_globals(EditLine * el, const char *str, int str_len)
@@ -220,6 +231,7 @@ static void complete_globals(EditLine * el, const char *str, int str_len)
 		el_deletestr(el, str_len);
 		el_insertstr(el, lastmatch);
 	}
+	free(globals_tok);
 }
 
 static unsigned char complete(EditLine * el, int ch)
@@ -272,6 +284,9 @@ static unsigned char complete(EditLine * el, int ch)
 		//Current line is a function.
 		complete_function(el);
 	}
+	if (type) {
+		free((void *)type);
+	}
 
 complete_exit:
 	tok_reset(tok);
@@ -300,13 +315,13 @@ static int init_tty(const char *path)
 		close(fd);
 		return 1;
 	}
-
 	g_tty = fdopen(fd, "r+");
 	if (!g_tty) {
 		perror("While opening TTY");
 		close(fd);
 		return 1;
 	}
+
 	// Switch to binary mode and consume the text "> ".
 	if (fprintf(g_tty, "__binary\n") < 0 || !fread(&addr, 2, 1, g_tty)
 	    || fflush(g_tty)) {
