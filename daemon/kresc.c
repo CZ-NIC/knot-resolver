@@ -80,10 +80,145 @@ const char *get_type_name(const char *value)
 
 	if (starts_with(type, "[")) {
 		//Return "nil" on non-valid name.
+		free(type);
 		return "nil";
 	} else {
 		type[(strlen(type)) - 1] = '\0';
 		return type;
+	}
+}
+
+static void complete_function(EditLine * el)
+{
+	//Add left parenthesis to function name. 
+	el_insertstr(el, "(");
+}
+
+static void complete_members(EditLine * el, const char *str,
+			     const char *str_type, int str_len, char *dot)
+{
+	char *table = strdup(str);
+	if (!table) {
+		perror("While tab-completing");
+		return;
+	}
+	//Get only the table name (without partial member name).
+	if (dot) {
+		*(table + (dot - str)) = '\0';
+	}
+	//Insert a dot after the table name.
+	if (!strncmp(str_type, "table", 5)) {
+		el_insertstr(el, ".");
+		str_len++;
+	}
+	//Check if the substring before dot is a valid table name.
+	const char *t_type = get_type_name(table);
+	if (t_type && !strncmp("table", t_type, 5)) {
+		//Get string of members of the table.
+		char *cmd =
+		    afmt
+		    ("do local s=\"\"; for i in pairs(%s) do s=s..i..\"\\n\" end return(s) end",
+		     table);
+		if (!cmd) {
+			perror("While tab-completing.");
+			goto complete_members_exit;
+		}
+		size_t members_len;
+		char *members = run_cmd(cmd, &members_len);
+		free(cmd);
+		if (!members) {
+			perror("While communication with daemon");
+			goto complete_members_exit;
+		}
+		//Split members by newline.
+		char *members_tok = strdup(members);
+		free(members);
+		if (!members_tok) {
+			goto complete_members_exit;
+		}
+		char *token = strtok(members_tok, "\n");
+		int matches = 0;
+		char *lastmatch = NULL;
+		if (!dot || dot - str + 1 == strlen(str)) {
+			//Prints all members.
+			while (token) {
+				char *member = afmt("%s.%s", table, token);
+				printf("\n%s (%s)", member,
+				       get_type_name(member));
+				token = strtok(NULL, "\n");
+				matches++;
+			}
+		} else {
+			//Print members matching the current line.
+			while (token) {
+				if (str && starts_with(token, dot + 1)) {
+					const char *member_type =
+					    get_type_name(afmt
+							  ("%s.%s", table,
+							   token));
+					if (member_type) {
+						printf("\n%s.%s (%s)", table,
+						       token, member_type);
+					} else {
+						printf("\n%s.%s", table, token);
+					}
+					lastmatch = token;
+					matches++;
+				}
+				token = strtok(NULL, "\n");
+			}
+
+			//Complete matching member.
+			if (matches == 1) {
+				el_deletestr(el, str_len);
+				el_insertstr(el, table);
+				el_insertstr(el, ".");
+				el_insertstr(el, lastmatch);
+			}
+		}
+		if (matches > 1) {
+			printf("\n");
+		}
+		free(members_tok);
+	}
+
+complete_members_exit:
+	free(table);
+}
+
+static void complete_globals(EditLine * el, const char *str, int str_len)
+{
+	//Parse Lua globals.
+	size_t globals_len;
+	char *globals = run_cmd("_G.__orig_name_list", &globals_len);
+	if (!globals) {
+		perror("While tab-completing");
+		return;
+	}
+	//Show possible globals.
+	char *globals_tok = strdup(globals);
+	free(globals);
+	if (!globals_tok) {
+		return;
+	}
+	char *token = strtok(globals_tok, "\n");
+	int matches = 0;
+	char *lastmatch = NULL;
+	while (token) {
+		if (str && starts_with(token, str)) {
+			printf("\n%s (%s)", token, get_type_name(token));
+			lastmatch = token;
+			matches++;
+		}
+		token = strtok(NULL, "\n");
+	}
+	if (matches > 1) {
+		printf("\n");
+	}
+	//Complete matching global.
+	if (matches == 1) {
+		el_deletestr(el, str_len);
+		el_insertstr(el, lastmatch);
 	}
 }
 
@@ -126,136 +261,16 @@ static unsigned char complete(EditLine * el, int ch)
 	//Get position of last dot in current line (useful for parsing table).
 	char *dot = strrchr(argv[0], '.');
 
-	//Line is not a name of some table and there is no dot in it.
 	if (strncmp(type, "table", 5) && !dot) {
-		//Parse Lua globals.
-		size_t globals_len;
-		char *globals = run_cmd("_G.__orig_name_list", &globals_len);
-		if (!globals) {
-			perror("While tab-completing");
-			goto complete_exit;
-		}
-		//Show possible globals.
-		char *globals_tok = strdup(globals);
-		free(globals);
-		if (!globals_tok) {
-			goto complete_exit;
-		}
-		char *token = strtok(globals_tok, "\n");
-		int matches = 0;
-		char *lastmatch = NULL;
-		while (token) {
-			if (argv[0] && starts_with(token, argv[0])) {
-				printf("\n%s (%s)", token,
-				       get_type_name(token));
-				fflush(stdout);
-				lastmatch = token;
-				matches++;
-			}
-			token = strtok(NULL, "\n");
-		}
-		if (matches > 1) {
-			printf("\n");
-		}
-		//Complete matching global.
-		if (matches == 1) {
-			el_deletestr(el, pos);
-			el_insertstr(el, lastmatch);
-			pos = strlen(lastmatch);
-		}
-		free(globals_tok);
-
-		//Current line (or part of it) is a name of some table.
+		//Line is not a name of some table and there is no dot in it.
+		complete_globals(el, argv[0], pos);
 	} else if ((dot && !strncmp(type, "nil", 3))
 		   || !strncmp(type, "table", 5)) {
-		char *table = strdup(argv[0]);
-		if (!table) {
-			perror("While tab-completing");
-			goto complete_exit;
-		}
-		//Get only the table name (without partial member name).
-		if (dot) {
-			*(table + (dot - argv[0])) = '\0';
-		}
-		//Insert a dot after the table name.
-		if (!strncmp(type, "table", 5)) {
-			el_insertstr(el, ".");
-			pos++;
-		}
-		//Check if the substring before dot is a valid table name.
-		const char *t_type = get_type_name(table);
-		if (t_type && !strncmp("table", t_type, 5)) {
-			//Get string of members of the table.
-			char *cmd =
-			    afmt
-			    ("do local s=\"\"; for i in pairs(%s) do s=s..i..\"\\n\" end return(s) end",
-			     table);
-			if (!cmd) {
-				perror("While tab-completing.");
-				goto complete_exit;
-			}
-			size_t members_len;
-			char *members = run_cmd(cmd, &members_len);
-			free(cmd);
-			if (!members) {
-				perror("While communication with daemon");
-			}
-			//Split members by newline.
-			char *members_tok = strdup(members);
-			free(members);
-			if (!members_tok) {
-				goto complete_exit;
-			}
-			char *token = strtok(members_tok, "\n");
-			int matches = 0;
-			char *lastmatch = NULL;
-			if (!dot || dot - argv[0] + 1 == strlen(argv[0])) {
-				//Prints all members.
-				while (token) {
-					char *member =
-					    afmt("%s.%s", table, token);
-					printf("\n%s (%s)", member,
-					       get_type_name(member));
-					token = strtok(NULL, "\n");
-					matches++;
-				}
-			} else {
-				//Print members matching the current line.
-				while (token) {
-					if (argv[0]
-					    && starts_with(token, dot + 1)) {
-						printf("\n%s.%s (%s)", table,
-						       token,
-						       get_type_name(afmt
-								     ("%s.%s",
-								      table,
-								      token)));
-						lastmatch = token;
-						matches++;
-					}
-					token = strtok(NULL, "\n");
-				}
-
-				//Complete matching member.
-				if (matches == 1) {
-					el_deletestr(el, pos);
-					el_insertstr(el, table);
-					el_insertstr(el, ".");
-					el_insertstr(el, lastmatch);
-					pos =
-					    strlen(lastmatch) + strlen(table) +
-					    1;
-				}
-			}
-			if (matches > 1) {
-				printf("\n");
-			}
-			free(members_tok);
-		}
+		//Current line (or part of it) is a name of some table.
+		complete_members(el, argv[0], type, pos, dot);
 	} else if (!strncmp(type, "function", 8)) {
-		//Add left parenthesis to function name. 
-		el_insertstr(el, "(");
-		pos++;
+		//Current line is a function.
+		complete_function(el);
 	}
 
 complete_exit:
