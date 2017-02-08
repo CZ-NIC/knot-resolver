@@ -106,30 +106,26 @@ setmetatable(modules, {
 })
 
 -- Syntactic sugar for cache
--- `#cache -> cache.count()`
 -- `cache[x] -> cache.get(x)`
 -- `cache.{size|storage} = value`
 setmetatable(cache, {
-	__len = function (t)
-		return t.count()
-	end,
 	__index = function (t, k)
-		if type(k) == 'number' then
-			return rawget(t, k) or (rawget(t, 'current_size') and t.get(k))
-		end
+		local res = rawget(t, k)
+		if res and not rawget(t, 'current_size') then return res end
+		-- Beware: t.get returns empty table on failure to find.
+		-- That would be confusing here (breaking kresc), so return nil instead.
+		res = t.get(k)
+		if res and next(res) ~= nil then return res else return nil end
 	end,
 	__newindex = function (t,k,v)
 		-- Defaults
-		if type(k) == number then
-			local storage = rawget(t, 'current_storage')
-			if not storage then storage = 'lmdb://' end
-			local size = rawget(t, 'current_size')
-			if not size then size = 10*MB end
-		end
+		local storage = rawget(t, 'current_storage')
+		if not storage then storage = 'lmdb://' end
+		local size = rawget(t, 'current_size')
+		if not size then size = 10*MB end
 		-- Declarative interface for cache
 		if     k == 'size'    then t.open(v, storage)
-		elseif k == 'storage' then t.open(size, v)
-		else   rawset(t, k, v) end
+		elseif k == 'storage' then t.open(size, v) end
 	end
 })
 

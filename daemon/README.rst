@@ -711,29 +711,43 @@ The daemon provides an interface for dynamic loading of :ref:`daemon modules <mo
 Cache configuration
 ^^^^^^^^^^^^^^^^^^^
 
-The cache in Knot DNS Resolver is persistent with LMDB backend, this means that the daemon doesn't lose
+The default cache in Knot DNS Resolver is persistent with LMDB backend, this means that the daemon doesn't lose
 the cached data on restart or crash to avoid cold-starts. The cache may be reused between cache
 daemons or manipulated from other processes, making for example synchronised load-balanced recursors possible.
 
 .. envvar:: cache.size (number)
 
-   Get/set the cache maximum size in bytes. Note that this is only a hint to the backend,
+   Set the cache maximum size in bytes. Note that this is only a hint to the backend,
    which may or may not respect it. See :func:`cache.open()`.
 
    .. code-block:: lua
 
-	print(cache.size)
 	cache.size = 100 * MB -- equivalent to `cache.open(100 * MB)`
+
+.. envvar:: cache.current_size (number)
+
+   Get the maximum size in bytes.
+
+   .. code-block:: lua
+
+	print(cache.current_size)
 
 .. envvar:: cache.storage (string)
 
-   Get or change the cache storage backend configuration, see :func:`cache.backends()` for
+   Set the cache storage backend configuration, see :func:`cache.backends()` for
    more information. If the new storage configuration is invalid, it is not set.
 
    .. code-block:: lua
 
-	print(cache.storage)
 	cache.storage = 'lmdb://.'
+
+.. envvar:: cache.current_storage (string)
+
+   Get the storage backend configuration.
+
+   .. code-block:: lua
+
+	print(cache.storage)
 
 .. function:: cache.backends()
 
