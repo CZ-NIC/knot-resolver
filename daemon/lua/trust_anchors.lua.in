@@ -148,6 +148,13 @@ local function ta_missing(ta, hold_down_time)
 	if ta.state == key_state.Valid then
 		ta.state = key_state.Missing
 		ta.timer = os.time() + hold_down_time
+
+	-- Remove key that is missing for too long
+	elseif ta.state == key_state.Missing and os.difftime(ta.timer, os.time()) <= 0 then
+		ta.state = key_state.Removed
+		print('[ ta ] key: '..key_tag..' removed because missing for too long')
+		keep_ta = false
+
 	-- Purge pending key
 	elseif ta.state == key_state.AddPend then
 		print('[ ta ] key: '..key_tag..' purging')
