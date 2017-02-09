@@ -33,7 +33,7 @@ deckard:linux:amd64:
     - git submodule update --init --recursive
   script:
     - mkdir -p tests/deckard/contrib/libswrap/obj
-    - LD_LIBRARY_PATH=$(pwd)/.local/lib TESTS=sets/resolver DAEMON=$(pwd)/.local/sbin/kresd tests/deckard/kresd_run.sh
+    - MAKEFLAGS="-j $(nproc)" LD_LIBRARY_PATH=$(pwd)/.local/lib TESTS=sets/resolver DAEMON=$(pwd)/.local/sbin/kresd tests/deckard/kresd_run.sh
   dependencies:
     - build:linux:amd64
   tags:
