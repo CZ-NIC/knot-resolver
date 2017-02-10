@@ -313,15 +313,6 @@ static void qr_task_free(struct qr_task *task)
 	/* Return mempool to ring or free it if it's full */
 	pool_release(worker, task->req.pool.ctx);
 	/* @note The 'task' is invalidated from now on. */
-	/* Decommit memory every once in a while */
-	static int mp_delete_count = 0;
-	if (++mp_delete_count == 100000) {
-		lua_gc(worker->engine->L, LUA_GCCOLLECT, 0);
-#if defined(__GLIBC__) && defined(_GNU_SOURCE)
-		malloc_trim(0);
-#endif
-		mp_delete_count = 0;
-	}
 }
 
 static int qr_task_start(struct qr_task *task, knot_pkt_t *query)

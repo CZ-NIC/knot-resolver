@@ -523,7 +523,6 @@ static int init_state(struct engine *engine)
 		return kr_error(ENOMEM);
 	}
 	/* Initialize used libraries. */
-	lua_gc(engine->L, LUA_GCSTOP, 0);
 	luaL_openlibs(engine->L);
 	/* Global functions */
 	lua_pushcfunction(engine->L, l_help);
@@ -740,12 +739,8 @@ int engine_start(struct engine *engine, const char *config_path)
 		return ret;
 	}
 
-	/* Clean up stack and restart GC */
+	/* Clean up stack */
 	lua_settop(engine->L, 0);
-	lua_gc(engine->L, LUA_GCCOLLECT, 0);
-	lua_gc(engine->L, LUA_GCSETSTEPMUL, 50);
-	lua_gc(engine->L, LUA_GCSETPAUSE, 400);
-	lua_gc(engine->L, LUA_GCRESTART, 0);
 
 	/* Set up periodic update function */
 	uv_timer_t *timer = malloc(sizeof(*timer));
