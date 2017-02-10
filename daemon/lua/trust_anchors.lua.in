@@ -86,7 +86,7 @@ local function ta_find(keyset, rr)
 	return nil
 end
 
--- Evaluate TA status of a RR according to RFC5011
+-- Evaluate TA status of a RR according to RFC5011.  The time is in seconds.
 local function ta_present(keyset, rr, hold_down_time, force)
 	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
 		return false -- Ignore
@@ -140,7 +140,7 @@ local function ta_present(keyset, rr, hold_down_time, force)
 	return false
 end
 
--- TA is missing in the new key set
+-- TA is missing in the new key set.  The time is in seconds.
 local function ta_missing(ta, hold_down_time)
 	-- Key is removed (KeyRem)
 	local keep_ta = true
@@ -244,7 +244,9 @@ local trust_anchors = {
 		for i, ta in ipairs(trust_anchors.keyset) do
 			local keep = true
 			if not ta_find(new_keys, ta) then
-				keep = ta_missing(ta, hold_down)
+				-- Ad-hoc: RFC 5011 doesn't mention removing a Missing key.
+				-- Let's do it after a very long period has elapsed.
+				keep = ta_missing(ta, hold_down * 4)
 			end
 			-- Purge removed keys
 			if ta.state == key_state.Removed then
