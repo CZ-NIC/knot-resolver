@@ -289,7 +289,8 @@ local trust_anchors = {
 			if not io.open(path, 'r') then
 				local rr, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
 				if not rr then
-					error('you MUST obtain the root TA manually, see: '..
+					error(msg..
+					      ': you MUST obtain the root TA manually, see: '..
 					      'https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec')
 				end
 				trustanchor(rr)
