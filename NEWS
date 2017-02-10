@@ -8,6 +8,10 @@ Bugfixes:
 - hints: more NULL checks
 - Fix TA bootstrapping for multiple TAs in the IANA XML file
 
+Testing:
+--------
+- Update tests to run tests with and without QNAME minimization
+
 Knot Resolver 1.2.1 (2017-02-01)
 ====================================
 
