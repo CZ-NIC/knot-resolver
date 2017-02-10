@@ -23,6 +23,7 @@
 
 #include "lib/defines.h"
 #include "lib/dnssec/ta.h"
+#include "lib/utils.h"
 
 knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name)
 {
@@ -74,10 +75,13 @@ static int insert_ta(map_t *trust_anchors, const knot_dname_t *name,
 		knot_rrset_free(&ta_rr, NULL);
 		return kr_error(ENOMEM);
 	}
+	WITH_VERBOSE {
+		kr_rrset_print(ta_rr, "[ ta ]: new trust anchor state:\n");
+	}
 	if (is_new_key) {
 		return map_set(trust_anchors, (const char *)name, ta_rr);
 	}
-	return kr_ok();	
+	return kr_ok();
 }
 
 int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
