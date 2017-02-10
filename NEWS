@@ -1,3 +1,13 @@
+Knot Resolver 1.2.2 (2017-02-10)
+================================
+
+Bugfixes:
+---------
+- Fix -k argument processing to avoid out-of-bounds memory accesses
+- lib/resolve: fix zonecut fetching for explicit DS queries
+- hints: more NULL checks
+- Fix TA bootstrapping for multiple TAs in the IANA XML file
+
 Knot Resolver 1.2.1 (2017-02-01)
 ====================================
 
