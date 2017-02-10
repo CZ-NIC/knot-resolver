@@ -213,7 +213,7 @@ static int commit_rr(const char *key, void *val, void *data)
 		return commit_rrsig(baton, rank, KR_CACHE_FLAG_NONE, rr);
 	}
 	/* Accept only better rank (if not overriding) */
-	if (!(rank & KR_RANK_SECURE) && !(baton->qry->flags & QUERY_NO_CACHE)) {
+	if (!(rank & KR_RANK_SECURE)) {
 		int cached_rank = kr_cache_peek_rank(baton->cache, KR_CACHE_RR, rr->owner, rr->type, baton->timestamp);
 		if (cached_rank >= rank) {
 			return kr_ok();

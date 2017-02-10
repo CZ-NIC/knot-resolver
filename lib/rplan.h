@@ -36,7 +36,7 @@
 	X(AWAIT_CUT,       1 << 8) /**< Query is waiting for zone cut lookup */ \
 	X(SAFEMODE,        1 << 9) /**< Don't use fancy stuff (EDNS...) */ \
 	X(CACHED,          1 << 10) /**< Query response is cached. */ \
-	X(NO_CACHE,        1 << 11) /**< Do not use expiring cache for lookup. */ \
+	X(NO_CACHE,        1 << 11) /**< No cache for lookup; exception: finding NSs and subqueries. */ \
 	X(EXPIRING,        1 << 12) /**< Query response is cached, but expiring. */ \
 	X(ALLOW_LOCAL,     1 << 13) /**< Allow queries to local or private address ranges. */ \
 	X(DNSSEC_WANT,     1 << 14) /**< Want DNSSEC secured answer; exception: +cd, \
