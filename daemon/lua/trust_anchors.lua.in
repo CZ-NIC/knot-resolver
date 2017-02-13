@@ -17,7 +17,8 @@ local function https_fetch(url, ca)
 	return resp[1]
 end
 
--- Fetch root anchors in XML over HTTPS, returning a zone-file-style string.
+-- Fetch root anchors in XML over HTTPS, returning a zone-file-style string
+-- or false in case of error, and a message.
 local function bootstrap(url, ca)
 	-- RFC 7958, sec. 2, but we don't do precise XML parsing.
 	-- @todo ICANN certificate is verified against current CA
@@ -35,10 +36,13 @@ local function bootstrap(url, ca)
 		rr = rr .. '\n' .. string.format('. 0 IN DS %s %s %s %s',
 			fields.KeyTag, fields.Algorithm, fields.DigestType, fields.Digest)
 	end)
-	-- Add to key set, create an empty keyset file to be filled
-	print('[ ta ] warning: root anchor bootstrapped, you SHOULD check the key manually, see: '..
-	      'https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs')
-	return rr
+	if rr == '' then
+		return false, string.format('[ ta ] failed to get any record from "%s"', url)
+	end
+	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
+			 .. '       You may want to verify them manually, as described on:\n'
+			 .. '       https://data.iana.org/root-anchors/old/draft-icann-dnssec-trust-anchor.html#sigs'
+	return rr, msg
 end
 
 -- Load the module
@@ -291,9 +295,12 @@ local trust_anchors = {
 			if not io.open(path, 'r') then
 				local rr, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
 				if not rr then
-					error('you MUST obtain the root TA manually, see: '..
-					      'https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec')
+					msg = msg .. '\n'
+						.. '[ ta ] Failed to bootstrap root trust anchors; see:\n'
+					    .. '       https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec'
+					error(msg)
 				end
+				print(msg)
 				trustanchor(rr)
 				-- Fetch DNSKEY immediately
 				trust_anchors.file_current = path
