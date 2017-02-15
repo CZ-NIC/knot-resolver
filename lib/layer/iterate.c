@@ -471,6 +471,18 @@ static int process_referral_answer(knot_pkt_t *pkt, struct kr_request *req)
 	if (state != kr_ok()) {
 		return KR_STATE_FAIL;
 	}
+	struct kr_query *query = req->current_query;
+	if (!(query->flags & QUERY_CACHED)) {
+		/* If not cached (i.e. got from upstream)
+		 * make sure that this is not an authoritative answer
+		 * (even with AA=1) for other layers.
+		 * There can be answers with AA=1,
+		 * empty answer section and NS in authority.
+		 * Clearing of AA prevents them from
+		 * caching in the packet cache.
+		 * If packet already cached, don't touch him. */
+		knot_wire_clear_aa(pkt->wire);
+	}
 	state = pick_authority(pkt, req, false);
 	return state == kr_ok() ? KR_STATE_DONE : KR_STATE_FAIL;
 }
