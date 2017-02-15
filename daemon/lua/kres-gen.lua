@@ -130,6 +130,13 @@ struct knot_rrset {
     knot_rdataset_t rrs;
     void *additional;
 };
+struct kr_nsrep {
+    unsigned int score;
+    unsigned int reputation;
+    const knot_dname_t *name;
+    struct kr_context *ctx;
+	/* beware: hidden stub */
+};
 struct kr_query {
     struct kr_query *parent;
     knot_dname_t *sname;
@@ -142,6 +149,8 @@ struct kr_query {
     uint16_t reorder;
     struct timeval timestamp;
     struct kr_zonecut zone_cut;
+    struct kr_nsrep ns;
+	/* ^hidden stub^ */
 	char _stub[];
 };
 struct kr_context {
