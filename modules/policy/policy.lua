@@ -97,7 +97,7 @@ local function reroute(tbl, names)
 	return ren.rule(prefixes)
 end
 
--- Set and clear some query flags (TODO: documentation).
+-- Set and clear some query flags
 local function flags(opts_set, opts_clear)
 	return function(state, req)
 		req = kres.request_t(req)
