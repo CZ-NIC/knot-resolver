@@ -358,18 +358,6 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
 }
 
-static bool is_rrsig_type_covered(const knot_rrset_t *rr, uint16_t type)
-{
-	bool ret = false;
-	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
-		if (knot_rrsig_type_covered(&rr->rrs, i) == type) {
-			ret = true;
-			break;
-		}
-	}
-	return ret;
-}
-
 static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, const knot_dname_t **cname_ret)
 {
 	struct kr_query *query = req->current_query;
