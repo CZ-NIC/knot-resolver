@@ -382,15 +382,13 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 	uint8_t rank = !(query->flags & QUERY_DNSSEC_WANT) || (query->flags & QUERY_CACHED) ?
 			KR_VLDRANK_SECURE : KR_VLDRANK_INITIAL;
 	bool is_final = (query->parent == NULL);
-	bool can_follow = false;
+	uint32_t iter_count = 0;
 	bool strict_mode = (query->flags & QUERY_STRICT);
 	do {
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
 		pending_cname = NULL;
-		/* If not secure, always follow cname chain. */
-		can_follow = !(query->flags & QUERY_DNSSEC_WANT);
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 			if (!knot_dname_is_equal(rr->owner, cname)) {
@@ -412,12 +410,6 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 						      rank, to_wire, query->uid, &req->pool);
 			if (state != kr_ok()) {
 				return KR_STATE_FAIL;
-			}
-			/* can_follow is false, therefore QUERY_DNSSEC_WANT flag is set.
-			 * Follow cname chain only if rrsig exists. */
-			if (!can_follow && rr->type == KNOT_RRTYPE_RRSIG &&
-			    is_rrsig_type_covered(rr, KNOT_RRTYPE_CNAME)) {
-				can_follow = true;
 			}
 			/* Jump to next CNAME target */
 			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
@@ -459,7 +451,11 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			cname = pending_cname;
 			break;
 		}
-	} while (can_follow);
+	} while (++iter_count < KR_CNAME_CHAIN_LIMIT);
+	if (iter_count >= KR_CNAME_CHAIN_LIMIT) {
+		VERBOSE_MSG("<= too long cname chain\n");
+		return KR_STATE_FAIL;
+	}
 	*cname_ret = cname;
 	return kr_ok();
 }
