@@ -137,6 +137,13 @@ KR_EXPORT
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
 
+/** Simple storage for IPx address or AF_UNSPEC. */
+union inaddr {
+	struct sockaddr ip;
+	struct sockaddr_in ip4;
+	struct sockaddr_in6 ip6;
+};
+
 /** Address bytes for given family. */
 KR_EXPORT KR_PURE
 const char *kr_inaddr(const struct sockaddr *addr);
