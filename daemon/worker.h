@@ -78,6 +78,11 @@ struct worker_ctx {
 	int id;
 	int count;
 	unsigned tcp_pipeline_max;
+
+	/** Addresses to bind for outgoing connections or AF_UNSPEC. */
+	struct sockaddr_in out_addr4;
+	struct sockaddr_in6 out_addr6;
+
 #if __linux__
 	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
 #else
@@ -93,6 +98,7 @@ struct worker_ctx {
 		size_t dropped;
 		size_t timeout;
 	} stats;
+
 	map_t outgoing;
 	mp_freelist_t pool_mp;
 	mp_freelist_t pool_ioreq;
