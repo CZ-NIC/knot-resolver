@@ -393,9 +393,18 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		can_follow = !(query->flags & QUERY_DNSSEC_WANT);
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
-			if (!knot_dname_is_equal(rr->owner, cname)) {
+
+			/* Skip the RR if its owner+type doesn't interest us. */
+			const bool type_OK = rr->type == query->stype
+				|| rr->type == KNOT_RRTYPE_CNAME
+				|| rr->type == KNOT_RRTYPE_DNAME /* TODO: actually handle it */
+				|| (rr->type == KNOT_RRTYPE_RRSIG
+				    && knot_rrsig_type_covered(&rr->rrs, 0))
+				;
+			if (!type_OK || !knot_dname_is_equal(rr->owner, cname)) {
 				continue;
 			}
+
 			/* Process records matching current SNAME */
 			int state = KR_STATE_FAIL;
 			bool to_wire = false;
