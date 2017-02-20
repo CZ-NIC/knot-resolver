@@ -21,6 +21,7 @@
 
 #include "lib/cache.h"
 #include "lib/cdb.h"
+#include "lib/utils.h"
 #include "daemon/bindings.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
@@ -421,6 +422,63 @@ static int net_tls_padding(lua_State *L)
 	return 1;
 }
 
+static int net_outgoing(lua_State *L, int family)
+{
+	struct worker_ctx *worker = wrk_luaget(L);
+	union inaddr *addr;
+	if (family == AF_INET)
+		addr = (union inaddr*)&worker->out_addr4;
+	else
+		addr = (union inaddr*)&worker->out_addr6;
+
+	if (lua_gettop(L) == 0) { /* Return the current value. */
+		if (addr->ip.sa_family == AF_UNSPEC) {
+			lua_pushnil(L);
+			return 1;
+		}
+		if (addr->ip.sa_family != family) {
+			assert(false);
+			lua_error(L);
+		}
+		char addr_buf[INET6_ADDRSTRLEN];
+		int err;
+		if (family == AF_INET)
+			err = uv_ip4_name(&addr->ip4, addr_buf, sizeof(addr_buf));
+		else
+			err = uv_ip6_name(&addr->ip6, addr_buf, sizeof(addr_buf));
+		if (err)
+			lua_error(L);
+		lua_pushstring(L, addr_buf);
+		return 1;
+	}
+
+	if ((lua_gettop(L) != 1) || (!lua_isstring(L, 1) && !lua_isnil(L, 1))) {
+		format_error(L, "net.outgoing_vX takes one address string parameter or nil");
+		lua_error(L);
+	}
+
+	if (lua_isnil(L, 1)) {
+		addr->ip.sa_family = AF_UNSPEC;
+		return 1;
+	}
+
+	const char *addr_str = lua_tostring(L, 1);
+	int err;
+	if (family == AF_INET)
+		err = uv_ip4_addr(addr_str, 0, &addr->ip4);
+	else
+		err = uv_ip6_addr(addr_str, 0, &addr->ip6);
+	if (err) {
+		format_error(L, "net.outgoing_vX: failed to parse the address");
+		lua_error(L);
+	}
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+static int net_outgoing_v4(lua_State *L) { return net_outgoing(L, AF_INET); }
+static int net_outgoing_v6(lua_State *L) { return net_outgoing(L, AF_INET6); }
+
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -432,6 +490,8 @@ int lib_net(lua_State *L)
 		{ "tcp_pipeline", net_pipeline },
 		{ "tls",          net_tls },
 		{ "tls_padding",  net_tls_padding },
+		{ "outgoing_v4",  net_outgoing_v4 },
+		{ "outgoing_v6",  net_outgoing_v6 },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
