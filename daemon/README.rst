@@ -601,6 +601,11 @@ For when listening on ``localhost`` just doesn't cut it.
    have size of multiplies of 64 (64, 128, 192, ...).  Setting padding to
    value < 2 will disable it.
 
+.. function:: net.outgoing_v4([string address])
+
+   Get/set the IPv4 address used to perform queries.  There is also ``net.outgoing_v6`` for IPv6.
+   The default is ``nil``, which lets the OS choose any address.
+
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
