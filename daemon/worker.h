@@ -120,14 +120,8 @@ struct qr_task
 	worker_cb_t on_complete;
 	void *baton;
 	struct {
-		union {
-			struct sockaddr_in ip4;
-			struct sockaddr_in6 ip6;
-		} addr;
-		union {
-			struct sockaddr_in ip4;
-			struct sockaddr_in6 ip6;
-		} dst_addr;
+		union inaddr addr;
+		union inaddr dst_addr;
 		uv_handle_t *handle;
 	} source;
 	uint32_t refs;
