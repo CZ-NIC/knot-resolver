@@ -16,7 +16,7 @@ function M.config()
 	}))
 end
 
--- Issue #139: When asking NSs of certain turktelekom names for PTR, disable 0x20.
+-- Issue #139: When asking certain nameservers for PTR, disable 0x20.
 -- Just listing the *.in-addr.arpa suffixes would be tedious, as there are many.
 M.layer = {
 	produce = function (state, req)
@@ -29,13 +29,21 @@ M.layer = {
 		if qry:hasflag(kres.query.AWAIT_CUT) or qry.ns.name == nil
 			then return state end
 		local name = kres.dname2str(qry.ns.name)
-		-- The problematic nameservers: rdnsN.turktelekom.com.tr.
-		if name and string.sub(name, 6) == '.turktelekom.com.tr.' then
+		if not name then return state end
+
+		-- The problematic nameservers:
+		-- (1) rdnsN.turktelekom.com.tr.
+		if string.sub(name, 6) == '.turktelekom.com.tr.' then
 			qry.flags = bit.bor(qry.flags,
 							bit.bor(kres.query.NO_0X20, kres.query.NO_MINIMIZE))
 			-- ^ NO_MINIMIZE isn't required for success, as kresd will retry
 			-- after getting refused, but it will speed things up.
+
+		-- (2)
+		elseif name == 'dns1.edatel.net.co.' then
+			qry.flags = bit.bor(qry.flags, kres.query.NO_0X20)
 		end
+
 		return state
 	end,
 }
