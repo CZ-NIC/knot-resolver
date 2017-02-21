@@ -27,6 +27,7 @@ modules_TARGETS += ketcd \
                    renumber \
                    http \
                    daf \
+                   workarounds \
                    version
 endif
 

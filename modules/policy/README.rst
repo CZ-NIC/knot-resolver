@@ -28,12 +28,13 @@ There are several defined actions:
   it can be a single IP (string) or a list of up to four IPs.
 * ``MIRROR(ip)`` - mirror query to given IP and continue solving it (useful for partial snooping)
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
-* ``QTRACE`` - pretty-print DNS response packets into the log (useful for debugging weird DNS servers)
+* ``QTRACE`` - pretty-print DNS response packets into the log (useful for debugging weird DNS servers).
+* ``FLAGS(set, clear)`` - set and/or clear some flags for the query.  There can be multiple flags to set/clear, combined by ``bit.bor`` from ``kres.query.*`` values.
 
 .. warning:: The policy module only looks at the inbound DNS queries.  Thus the ``FORWARD(ip)`` policy does only forward inbound query to the specified IP address(es) and it doesn't and it can't do DNSSEC validation.  If you need DNSSEC validation, you either need to disable ``FORWARD(ip)`` policy or use an upstream DNSSEC-validating resolver.
 
 .. note:: The module (and ``kres``) expects domain names in wire format, not textual representation. So each label in name is prefixed with its length, e.g. "example.com" equals to ``"\7example\3com"``. You can use convenience function ``todname('example.com')`` for automatic conversion.
-	  
+
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 

@@ -52,8 +52,11 @@ genResType "struct knot_rrset" | sed 's/\<owner\>/_owner/'
 
 ## Some definitions would need too many deps, so shorten them.
 
-genResType "struct kr_query" | sed '/struct kr_nsrep/,$ d'
-printf "\tchar _stub[];\n};\n"
+genResType "struct kr_nsrep" | sed '/union/,$ d'
+printf "\t/* beware: hidden stub */\n};\n"
+
+genResType "struct kr_query" | sed '/struct kr_layer_pickle/,$ d'
+printf "\t/* ^hidden stub^ */\n\tchar _stub[];\n};\n"
 
 genResType "struct kr_context" | sed '/struct kr_cache/,$ d'
 printf "\tchar _stub[];\n};\n"
