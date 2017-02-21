@@ -13,6 +13,8 @@ function M.config()
 		todname('cdnga.com'), todname('cdngc.com'), todname('cdngd.com'),
 		todname('cdngl.com'), todname('cdngm.com'),
 		todname('cdngc.net'), todname('panthercdn.com'),
+
+		todname('magazine-fashion.net.'),
 	}))
 end
 
