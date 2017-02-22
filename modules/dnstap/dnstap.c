@@ -15,20 +15,6 @@
  * @file dnstap.c
  * @brief dnstap based query logging support
  *
- * dnstap module currently supports logging dns responses to a unix socket
- * in dnstap format using fstrm framing library. The unix socket and the
- * socket reader should be present before starting kresd
- *
- * Tunables:
- * sockpath: is the the unix socket file where dnstap messages will be send
- * logRespPkt: if true responses in wire format will be logged
- *
- * sample configuration for dnstap
- * dnstap = {
- *     sockPath = "/tmp/dnstap.sock",
- *     logRespPkt = true
- * }
- *
  */
 
 #include "lib/module.h"
