@@ -133,7 +133,7 @@ struct kr_request {
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
-		bool tcp; /* true if the query is on tcp */
+		bool tcp; /**< true if the request is on tcp; only meaningful if (dst_addr) */
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */

@@ -102,10 +102,10 @@ static void set_address(const struct sockaddr *sockaddr,
 
 /* dnstap_log prepares dnstap message and sent it to fstrm */
 static int dnstap_log(kr_layer_t *ctx) {
-	struct kr_request *req = ctx->req;
-	struct kr_module *module = ctx->api->data;
-	struct kr_rplan *rplan = &req->rplan;
-	struct dnstap_data *dnstap_dt = module->data;
+	const struct kr_request *req = ctx->req;
+	const struct kr_module *module = ctx->api->data;
+	const struct kr_rplan *rplan = &req->rplan;
+	const struct dnstap_data *dnstap_dt = module->data;
 
 	/* check if we have a valid iothread */
 	if (!dnstap_dt->iothread || !dnstap_dt->ioq) {
@@ -126,13 +126,6 @@ static int dnstap_log(kr_layer_t *ctx) {
 	/* Only handling response */
 	m.type = DNSTAP__MESSAGE__TYPE__RESOLVER_RESPONSE;
 
-	if (req->qsource.tcp) {
-		m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__TCP;
-	} else {
-		m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__UDP;
-	}
-	m.has_socket_protocol = true;
-
 	if (req->qsource.addr) {
 		set_address(req->qsource.addr,
 				&m.query_address,
@@ -142,6 +135,13 @@ static int dnstap_log(kr_layer_t *ctx) {
 	}
 
 	if (req->qsource.dst_addr) {
+		if (req->qsource.tcp) {
+			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__TCP;
+		} else {
+			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__UDP;
+		}
+		m.has_socket_protocol = true;
+
 		set_address(req->qsource.dst_addr,
 				&m.response_address,
 				&m.has_response_address,
@@ -300,17 +300,6 @@ static int find_string(const JsonNode *node, char **val, size_t len) {
 	assert(node->tag == JSON_STRING);
 	*val = strndup(node->string_, len);
 	assert(*val != NULL);
-	return kr_ok();
-}
-
-/* find_int copies json int into val
- * node must be of type JSON_NUMBER */
-static int find_int(const JsonNode *node, int *val) {
-	if (!node || !node->key || !val) {
-		return kr_error(EINVAL);
-	}
-	assert(node->tag == JSON_NUMBER);
-	*val = node->number_;
 	return kr_ok();
 }
 

@@ -234,7 +234,8 @@ The project can be built with code coverage tracking using the ``COVERAGE=1`` va
 Running unit and integration tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The unit tests require cmocka_ and are executed with ``make check``.
+The unit tests require cmocka_ and are executed by ``make check``.
+Tests for the dnstap module need go and are executed by ``make ckeck-dnstap``.
 
 The integration tests use Deckard, the `DNS test harness <deckard>`_.
 

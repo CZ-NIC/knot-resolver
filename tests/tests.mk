@@ -29,6 +29,6 @@ deckard: check-integration
 
 # Targets
 tests: check-unit
-tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean
+tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean clean-dnstap
 
 .PHONY: tests tests-clean check-integration deckard

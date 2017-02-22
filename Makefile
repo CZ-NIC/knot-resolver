@@ -75,7 +75,6 @@ endif
 
 # check for fstrm and protobuf for dnstap
 ifeq ($(HAS_libfstrm)|$(HAS_libprotobuf-c),yes|yes)
-BUILD_CFLAGS += -DENABLE_DNSTAP
 ENABLE_DNSTAP := yes
 endif
 
