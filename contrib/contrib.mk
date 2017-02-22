@@ -18,8 +18,4 @@ contrib_CFLAGS  += -pthread
 contrib_LIBS    += -pthread
 endif
 
-ifeq ($(ENABLE_DNSTAP), yes)
-contrib_SOURCES += contrib/dnstap/dnstap.pb-c.c
-endif
-
 $(eval $(call make_static,contrib,contrib))

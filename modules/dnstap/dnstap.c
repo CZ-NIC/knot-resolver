@@ -34,7 +34,7 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 #include "lib/resolve.h"
-#include "contrib/dnstap/dnstap.pb-c.h"
+#include "modules/dnstap/dnstap.pb-c.h"
 #include <ccan/json/json.h>
 #include <fstrm.h>
 #include "contrib/cleanup.h"
