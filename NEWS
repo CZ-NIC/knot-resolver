@@ -1,3 +1,14 @@
+Knot Resolver 1.2.3 (2017-02-23)
+================================
+
+Bugfixes
+--------
+- Disable storing GLUE records into the cache even in the
+  (non-default) QUERY_PERMISSIVE mode
+- iterate: skip answer RRs that don't match the query
+- layer/iterate: some additional processing for referrals
+- lib/resolve: zonecut fetching error was fixed
+
 Knot Resolver 1.2.2 (2017-02-10)
 ================================
 

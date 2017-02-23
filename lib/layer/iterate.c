@@ -393,9 +393,18 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		can_follow = !(query->flags & QUERY_DNSSEC_WANT);
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
-			if (!knot_dname_is_equal(rr->owner, cname)) {
+
+			/* Skip the RR if its owner+type doesn't interest us. */
+			const bool type_OK = rr->type == query->stype
+				|| rr->type == KNOT_RRTYPE_CNAME
+				|| rr->type == KNOT_RRTYPE_DNAME /* TODO: actually handle it */
+				|| (rr->type == KNOT_RRTYPE_RRSIG
+				    && knot_rrsig_type_covered(&rr->rrs, 0))
+				;
+			if (!type_OK || !knot_dname_is_equal(rr->owner, cname)) {
 				continue;
 			}
+
 			/* Process records matching current SNAME */
 			int state = KR_STATE_FAIL;
 			bool to_wire = false;
@@ -470,6 +479,18 @@ static int process_referral_answer(knot_pkt_t *pkt, struct kr_request *req)
 	int state = unroll_cname(pkt, req, true, &cname);
 	if (state != kr_ok()) {
 		return KR_STATE_FAIL;
+	}
+	struct kr_query *query = req->current_query;
+	if (!(query->flags & QUERY_CACHED)) {
+		/* If not cached (i.e. got from upstream)
+		 * make sure that this is not an authoritative answer
+		 * (even with AA=1) for other layers.
+		 * There can be answers with AA=1,
+		 * empty answer section and NS in authority.
+		 * Clearing of AA prevents them from
+		 * caching in the packet cache.
+		 * If packet already cached, don't touch him. */
+		knot_wire_clear_aa(pkt->wire);
 	}
 	state = pick_authority(pkt, req, false);
 	return state == kr_ok() ? KR_STATE_DONE : KR_STATE_FAIL;
