@@ -15,6 +15,7 @@
  */
 
 #include <assert.h>
+#include <stdint.h>
 #include <uv.h>
 #include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
@@ -563,7 +564,14 @@ static int cache_open(lua_State *L)
 
 	/* Select cache storage backend */
 	struct engine *engine = engine_luaget(L);
-	unsigned cache_size = lua_tonumber(L, 1);
+
+	lua_Number csize_lua = lua_tonumber(L, 1);
+	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
+		format_error(L, "invalid cache size specified");
+		lua_error(L);
+	}
+	size_t cache_size = csize_lua;
+
 	const char *conf = n > 1 ? lua_tostring(L, 2) : NULL;
 	const char *uri = conf;
 	const struct kr_cdb_api *api = cache_select(engine, &conf);
