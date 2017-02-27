@@ -493,12 +493,33 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	return kr_ok();
 }
 
-int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire, uint32_t qry_uid)
+int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
+			       uint32_t qry_uid, bool check_dups)
 {
 	for (size_t i = 0; i < array->len; ++i) {
 		ranked_rr_array_entry_t *entry = array->at[i];
-		if (entry->qry_uid == qry_uid) {
-			entry->to_wire = to_wire;
+		if (entry->qry_uid != qry_uid) {
+			continue;
+		}
+		entry->to_wire = to_wire;
+		if (!check_dups) {
+			continue;
+		}
+		knot_rrset_t *rr = entry->rr;
+		for (size_t j = 0; j < array->len; ++j) {
+			ranked_rr_array_entry_t *stashed = array->at[j];
+			if (stashed->qry_uid == qry_uid) {
+				continue;
+			}
+			if (stashed->rr->rclass != rr->rclass ||
+			    stashed->rr->type != rr->type) {
+				continue;
+			}
+			bool is_equal = knot_rrset_equal(rr, stashed->rr,
+							 KNOT_RRSET_COMPARE_WHOLE);
+			if (is_equal && to_wire) {
+				stashed->to_wire = false;
+			}
 		}
 	}
 	return kr_ok();
