@@ -11,9 +11,10 @@ TESTS := sets/resolver
 TEMPLATE := template/kresd.j2
 $(deckard_DIR)/Makefile:
 	@git submodule update --init --recursive
+
 check-integration: $(deckard_DIR)/Makefile
 	@mkdir -p $(deckard_DIR)/contrib/libswrap/obj
-	@$(MAKE) -s -C $(deckard_DIR) TESTS=$(TESTS) DAEMON=$(abspath daemon/kresd) TEMPLATE=$(TEMPLATE) DYLD_LIBRARY_PATH=$(DYLD_LIBRARY_PATH)
+	+TESTS=$(TESTS) DAEMON=$(abspath daemon/kresd) TEMPLATE=$(TEMPLATE) $(preload_syms) $(deckard_DIR)/kresd_run.sh
 deckard: check-integration
 
 # Targets
