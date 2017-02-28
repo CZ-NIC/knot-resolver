@@ -710,7 +710,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check if wildcard expansion detected for final query.
 	 * If yes, copy authority. */
 	if ((qry->parent == NULL) && (qry->flags & QUERY_DNSSEC_WEXPAND)) {
-		kr_ranked_rrarray_set_wire(&req->auth_selected, true, qry->uid);
+		kr_ranked_rrarray_set_wire(&req->auth_selected, true, qry->uid, true);
 	}
 
 	/* Check and update current delegation point security status. */
