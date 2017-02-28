@@ -190,6 +190,14 @@ int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool);
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool);
 
+/** @internal Mark the RRSets from particular query as
+ * "have (not) to be recorded in the final answer".
+ * @param array RRSet array.
+ * @param to_wire Records must be\must not be recorded in final answer.
+ * @param qry_uid Query uid.
+ * @param check_dups When to_wire is true, try to avoid duplicate RRSets.
+ * @return 0 or an error
+ */
 int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
 			       uint32_t qry_uid, bool check_dups);
 
