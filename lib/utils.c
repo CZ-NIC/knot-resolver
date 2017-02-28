@@ -502,7 +502,7 @@ int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
 			continue;
 		}
 		entry->to_wire = to_wire;
-		if (!check_dups) {
+		if (!to_wire || !check_dups) {
 			continue;
 		}
 		knot_rrset_t *rr = entry->rr;
@@ -517,7 +517,7 @@ int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
 			}
 			bool is_equal = knot_rrset_equal(rr, stashed->rr,
 							 KNOT_RRSET_COMPARE_WHOLE);
-			if (is_equal && to_wire) {
+			if (is_equal) {
 				stashed->to_wire = false;
 			}
 		}
