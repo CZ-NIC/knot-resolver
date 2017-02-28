@@ -507,6 +507,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		                          handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
 		                          pkt);
 		if (ret != kr_ok()) {
+			req_release(task->worker, send_req);
 			return ret;
 		}
 	}
@@ -937,7 +938,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	}
 
 	int submitted = 0;
-	ssize_t nbytes = 0;
 	struct qr_task *task = session->buffering;
 
 	/* If this is a new query, create a new task that we can use
@@ -979,7 +979,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	/* Finish reading DNS/TCP message length. */
 	if (task->bytes_remaining == 0 && pkt_buf->size == 1) {
 		pkt_buf->wire[1] = msg[0];
-		nbytes = msg_size(pkt_buf->wire);
+		ssize_t nbytes = msg_size(pkt_buf->wire);
 		len -= 1;
 		msg += 1;
 		/* Cut off fragment length and start reading DNS message. */

@@ -372,13 +372,15 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return kr_ok();
 }
 
-void free_sd_socket_names(char **socket_names, int count)
+#ifdef HAS_SYSTEMD
+static void free_sd_socket_names(char **socket_names, int count)
 {
 	for (int i = 0; i < count; i++) {
 		free(socket_names[i]);
 	}
 	free(socket_names);
 }
+#endif
 
 int main(int argc, char **argv)
 {
