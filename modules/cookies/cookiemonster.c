@@ -75,8 +75,6 @@ static int srvr_sockaddr_cc_check(const struct sockaddr *srvr_sa,
 		return -2;
 	}
 
-	const struct knot_cc_alg *cc_alg = NULL;
-
 	assert(clnt_sett->current.secr);
 
 	/* The address must correspond with the client cookie. */
@@ -87,7 +85,7 @@ static int srvr_sockaddr_cc_check(const struct sockaddr *srvr_sa,
 		.secret_len = clnt_sett->current.secr->size
 	};
 
-	cc_alg = kr_cc_alg_get(clnt_sett->current.alg_id);
+	const struct knot_cc_alg *cc_alg = kr_cc_alg_get(clnt_sett->current.alg_id);
 	if (!cc_alg) {
 		return -2;
 	}

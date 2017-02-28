@@ -302,10 +302,9 @@ static int net_interfaces(lua_State *L)
 		char *p = buf;
 		memset(buf, 0, sizeof(buf));
 		for (unsigned k = 0; k < sizeof(iface.phys_addr); ++k) {
-			sprintf(p, "%.2x:", iface.phys_addr[k] & 0xff);
+			sprintf(p, "%s%.2x", k > 0 ? ":" : "", iface.phys_addr[k] & 0xff);
 			p += 3;
 		}
-		*(p - 1) = '\0';
 		lua_pushstring(L, buf);
 		lua_setfield(L, -2, "mac");
 

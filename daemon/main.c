@@ -408,6 +408,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return kr_ok();
 }
 
+#ifdef HAS_SYSTEMD
 static void free_sd_socket_names(char **socket_names, int count)
 {
 	for (int i = 0; i < count; i++) {
@@ -415,6 +416,7 @@ static void free_sd_socket_names(char **socket_names, int count)
 	}
 	free(socket_names);
 }
+#endif
 
 int main(int argc, char **argv)
 {
