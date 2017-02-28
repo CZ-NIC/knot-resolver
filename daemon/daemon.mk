@@ -9,7 +9,8 @@ kresd_SOURCES := \
 	daemon/tls_ephemeral_credentials.c \
 	daemon/main.c
 
-kresd_DIST := daemon/lua/kres.lua daemon/lua/kres-gen.lua daemon/lua/trust_anchors.lua
+kresd_DIST := daemon/lua/kres.lua daemon/lua/kres-gen.lua \
+              daemon/lua/trust_anchors.lua daemon/lua/zonefile.lua
 
 # Embedded resources
 %.inc: %.lua
@@ -55,6 +56,11 @@ daemon-clean: kresd-clean
 
 daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in
 	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g" $< > $@
+
+LIBZSCANNER_COMMENTS := \
+	$(shell pkg-config libzscanner --atleast-version=2.4.2 && echo true || echo false)
+daemon/lua/zonefile.lua: daemon/lua/zonefile.lua.in
+	@$(call quiet,SED,$<) -e "s|@LIBZSCANNER_COMMENTS@|$(LIBZSCANNER_COMMENTS)|g" $< > $@
 
 daemon/lua/kres-gen.lua: | $(libkres)
 	@echo "WARNING: regenerating $@"

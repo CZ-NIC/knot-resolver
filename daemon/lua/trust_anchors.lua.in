@@ -17,7 +17,8 @@ local function https_fetch(url, ca)
 	return resp[1]
 end
 
--- Fetch root anchors in XML over HTTPS, returning a zone-file-style string.
+-- Fetch root anchors in XML over HTTPS, returning a zone-file-style string
+-- or false in case of error, and a message.
 local function bootstrap(url, ca)
 	-- RFC 7958, sec. 2, but we don't do precise XML parsing.
 	-- @todo ICANN certificate is verified against current CA
@@ -35,10 +36,13 @@ local function bootstrap(url, ca)
 		rr = rr .. '\n' .. string.format('. 0 IN DS %s %s %s %s',
 			fields.KeyTag, fields.Algorithm, fields.DigestType, fields.Digest)
 	end)
-	-- Add to key set, create an empty keyset file to be filled
-	print('[ ta ] warning: root anchor bootstrapped, you SHOULD check the key manually, see: '..
-	      'https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs')
-	return rr
+	if rr == '' then
+		return false, string.format('[ ta ] failed to get any record from "%s"', url)
+	end
+	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
+			 .. '       You may want to verify them manually, as described on:\n'
+			 .. '       https://data.iana.org/root-anchors/old/draft-icann-dnssec-trust-anchor.html#sigs'
+	return rr, msg
 end
 
 -- Load the module
@@ -86,8 +90,8 @@ local function ta_find(keyset, rr)
 	return nil
 end
 
--- Evaluate TA status of a RR according to RFC5011
-local function ta_present(keyset, rr, hold_down_time, force)
+-- Evaluate TA status of a RR according to RFC5011.  The time is in seconds.
+local function ta_present(keyset, rr, hold_down_time, force_valid)
 	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
 		return false -- Ignore
 	end
@@ -125,7 +129,7 @@ local function ta_present(keyset, rr, hold_down_time, force)
 		return true
 	elseif not key_revoked then -- First time seen (NewKey)
 		rr.key_tag = key_tag
-		if force then
+		if force_valid then
 			rr.state = key_state.Valid
 		else
 			rr.state = key_state.AddPend
@@ -140,7 +144,7 @@ local function ta_present(keyset, rr, hold_down_time, force)
 	return false
 end
 
--- TA is missing in the new key set
+-- TA is missing in the new key set.  The time is in seconds.
 local function ta_missing(ta, hold_down_time)
 	-- Key is removed (KeyRem)
 	local keep_ta = true
@@ -166,12 +170,12 @@ end
 
 local active_refresh -- forward
 -- Plan an event for refreshing the root DNSKEYs and re-scheduling itself
-local function refresh_plan(trust_anchors, timeout, priming, bootstrap)
+local function refresh_plan(trust_anchors, timeout, priming, is_initial)
 	trust_anchors.refresh_ev = event.after(timeout, function (ev)
 		resolve('.', kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE,
 		function (pkt)
 			-- Schedule itself with updated timeout
-			local next_time = active_refresh(trust_anchors, kres.pkt_t(pkt), bootstrap)
+			local next_time = active_refresh(trust_anchors, kres.pkt_t(pkt), is_initial)
 			if trust_anchors.refresh_time ~= nil then
 				next_time = trust_anchors.refresh_time
 			end
@@ -186,7 +190,7 @@ local function refresh_plan(trust_anchors, timeout, priming, bootstrap)
 end
 
 -- Refresh the root DNSKEYs from the packet, and return time to the next check.
-active_refresh = function (trust_anchors, pkt, bootstrap)
+active_refresh = function (trust_anchors, pkt, is_initial)
 	local retry = true
 	if pkt:rcode() == kres.rcode.NOERROR then
 		local records = pkt:section(kres.section.ANSWER)
@@ -196,7 +200,7 @@ active_refresh = function (trust_anchors, pkt, bootstrap)
 				table.insert(keyset, rr)
 			end
 		end
-		trust_anchors.update(keyset, bootstrap)
+		trust_anchors.update(keyset, is_initial)
 		retry = false
 	else
 		print('[ ta ] active refresh failed, rcode: '..pkt:rcode())
@@ -209,19 +213,92 @@ active_refresh = function (trust_anchors, pkt, bootstrap)
 	return math.max(hour, min_ttl)
 end
 
--- Write keyset to a file
+-- Write keyset to a file.  States and timers are stored in comments.
 local function keyset_write(keyset, path)
 	local file = assert(io.open(path..'.lock', 'w'))
 	for i = 1, #keyset do
 		local ta = keyset[i]
-		local rr_str = string.format('%s ; %s\n', kres.rr2str(ta), ta.state)
+		ta.comment = ' ' .. ta.state .. ':' .. (ta.timer or '')
+		local rr_str = kres.rr2str(ta) .. '\n'
 		if ta.state ~= key_state.Valid and ta.state ~= key_state.Missing then
-			rr_str = '; '..rr_str -- Invalidate key string
+			rr_str = '; '..rr_str -- Invalidate key string (for older kresd versions)
 		end
 		file:write(rr_str)
 	end
 	file:close()
 	os.rename(path..'.lock', path)
+	-- TODO: IO error handling
+end
+
+-- Search the values of a table and return the corrseponding key (or nil).
+local function table_search(t, val)
+	local k, v
+	for k, v in pairs(t) do
+		if v == val then
+			return k
+		end
+	end
+	return nil
+end
+
+-- For each RR, parse .state and .timer from .comment.
+local function keyset_parse_comments(tas, default_state)
+	local _k, ta
+	for _k, ta in pairs(tas) do
+		ta.state = default_state
+		if ta.comment then
+			string.gsub(ta.comment, '^%s*(%a+):(%d*)', function (state, time)
+				if table_search(key_state, state) then
+					ta.state = state
+				end
+				ta.timer = tonumber(time) -- nil on failure
+			end)
+			ta.comment = nil
+		end
+	end
+	return tas
+end
+
+-- Read keyset from a file.  (This includes the key states and timers.)
+local function keyset_read(path)
+	-- First load the regular entries, trusting them.
+	local zonefile = require('zonefile')
+	local tas = zonefile.file(path)
+	keyset_parse_comments(tas, key_state.Valid)
+
+	-- The untrusted keys are commented out but important to load.
+	local line
+	for line in io.lines(path) do
+		if line:sub(1, 2) == '; ' then
+			-- Ignore the line if it fails to parse including recognized .state.
+			local l_set = zonefile.string(line:sub(3))
+			if l_set and l_set[1] then
+				keyset_parse_comments(l_set)
+				if l_set[1].state then
+					table.insert(tas, l_set[1])
+				end
+			end
+		end
+	end
+	return tas
+end
+
+-- Replace current TAs by the "trusted" ones from passed keyset.
+-- Return the number of trusted keys.
+local function keyset_publish(keyset)
+	local store = kres.context().trust_anchors
+	local count = 0
+	C.kr_ta_clear(store)
+	if not next(keyset) then return 0 end
+	for i, ta in ipairs(keyset) do
+		-- Key MAY be used as a TA only in these two states (RFC5011, 4.2)
+		if ta.state == key_state.Valid or ta.state == key_state.Missing then
+			if C.kr_ta_add(store, ta.owner, ta.type, ta.ttl, ta.rdata, #ta.rdata) == 0 then
+				count = count + 1
+			end
+		end
+	end
+	return count
 end
 
 -- TA store management
@@ -234,8 +311,8 @@ local trust_anchors = {
 	bootstrap_ca = '@ETCDIR@/icann-ca.pem',
 
 	-- Update existing keyset; return true if successful.
-	-- Param `initial` (bool): force .NewKey states to .Valid, i.e. init empty keyset.
-	update = function (new_keys, initial)
+	-- Param `is_initial` (bool): force .NewKey states to .Valid, i.e. init empty keyset.
+	update = function (new_keys, is_initial)
 		if not new_keys then return false end
 		-- Filter TAs to be purged from the keyset (KeyRem)
 		local hold_down = trust_anchors.hold_down_time / 1000
@@ -244,7 +321,9 @@ local trust_anchors = {
 		for i, ta in ipairs(trust_anchors.keyset) do
 			local keep = true
 			if not ta_find(new_keys, ta) then
-				keep = ta_missing(ta, hold_down)
+				-- Ad-hoc: RFC 5011 doesn't mention removing a Missing key.
+				-- Let's do it after a very long period has elapsed.
+				keep = ta_missing(ta, hold_down * 4)
 			end
 			-- Purge removed keys
 			if ta.state == key_state.Removed then
@@ -261,26 +340,26 @@ local trust_anchors = {
 		-- Evaluate new TAs
 		for i, rr in ipairs(new_keys) do
 			if (rr.type == kres.type.DNSKEY or rr.type == kres.type.DS) and rr.rdata ~= nil then
-				ta_present(keyset, rr, hold_down, initial)
+				ta_present(keyset, rr, hold_down, is_initial)
 			end
 		end
-		-- Publish active TAs
-		local store = kres.context().trust_anchors
-		C.kr_ta_clear(store)
-		if next(keyset) == nil then return false end
-		for i, ta in ipairs(keyset) do
-			-- Key MAY be used as a TA only in these two states (RFC5011, 4.2)
-			if ta.state == key_state.Valid or ta.state == key_state.Missing then
-				C.kr_ta_add(store, ta.owner, ta.type, ta.ttl, ta.rdata, #ta.rdata)
-			end
-		end
-		trust_anchors.keyset = keyset
+
 		-- Store keyset in the file
 		if trust_anchors.file_current ~= nil then
 			keyset_write(keyset, trust_anchors.file_current)
 		end
+
+		-- Start using the new TAs.
+		trust_anchors.keyset = keyset
+		if keyset_publish(keyset) == 0 then
+			warn('[ ta ] ERROR: no root anchors are trusted!')
+			-- TODO: try to rebootstrap?
+			return false
+		end
+
 		return true
 	end,
+
 	-- Load keys from a file (managed)
 	config = function (path, unmanaged)
 		-- Bootstrap if requested and keyfile doesn't exist
@@ -289,9 +368,12 @@ local trust_anchors = {
 			if not io.open(path, 'r') then
 				local rr, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
 				if not rr then
-					error('you MUST obtain the root TA manually, see: '..
-					      'https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec')
+					msg = msg .. '\n'
+						.. '[ ta ] Failed to bootstrap root trust anchors; see:\n'
+					    .. '       https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec'
+					error(msg)
 				end
+				print(msg)
 				trustanchor(rr)
 				-- Fetch DNSKEY immediately
 				trust_anchors.file_current = path
@@ -301,18 +383,20 @@ local trust_anchors = {
 				return
 			end
 		end
-		-- Parse new keys, refresh eventually
-		local new_keys = require('zonefile').file(path)
 		if unmanaged then
 			trust_anchors.file_current = nil
 		else
 			trust_anchors.file_current = path
 		end
-		trust_anchors.keyset = {}
-		if trust_anchors.update(new_keys, true) then
-			refresh_plan(trust_anchors, 10 * sec, true, false)
+		-- Parse new keys, refresh eventually
+		trust_anchors.keyset = keyset_read(path)
+		if keyset_publish(trust_anchors.keyset) == 0 then
+			warn('[ ta ] ERROR: no root anchors are trusted!')
+			-- TODO: try to rebootstrap?
 		end
+		refresh_plan(trust_anchors, 10 * sec, true, false)
 	end,
+
 	-- Add DS/DNSKEY record(s) (unmanaged)
 	add = function (keystr)
 		return trustanchor(keystr)

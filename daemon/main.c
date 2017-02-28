@@ -717,9 +717,14 @@ int main(int argc, char **argv)
 			ret =  EXIT_FAILURE;
 			goto cleanup;
 		}
-		int lua_ret = 0;
-		if ((lua_ret = engine_cmd(engine.L, cmd, false)) != 0) {
-			kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n", keyfile_path, lua_strerror(lua_ret));
+		int lua_ret = engine_cmd(engine.L, cmd, false);
+		if (lua_ret != 0) {
+			if (lua_gettop(engine.L) > 0) {
+				kr_log_error("%s", lua_tostring(engine.L, -1));
+			} else {
+				kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n",
+						keyfile_path, lua_strerror(lua_ret));
+			}
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}

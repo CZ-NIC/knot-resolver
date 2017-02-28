@@ -156,22 +156,35 @@ ffi.metatype( zs_scanner_t, {
 		end,
 		current_rr = function(zs)
 			assert(ffi.istype(zs, zs_scanner_t))
-			return {owner = ffi.string(zs.r_owner, zs.r_owner_length),
-			        ttl = tonumber(zs.r_ttl),
-			        class = tonumber(zs.r_class),
-			        type = tonumber(zs.r_type), 
-			        rdata = ffi.string(zs.r_data, zs.r_data_length)}
+			return {
+				owner = ffi.string(zs.r_owner, zs.r_owner_length),
+				ttl = tonumber(zs.r_ttl),
+				class = tonumber(zs.r_class),
+				type = tonumber(zs.r_type),
+				rdata = ffi.string(zs.r_data, zs.r_data_length),
+				comment = zs:current_comment(),
+			}
 		end,
 		strerr = function(zs)
 			assert(ffi.istype(zs, zs_scanner_t))
 			return ffi.string(libzscanner.zs_strerror(zs.error.code))
 		end,
+		current_comment = function(zs)
+			if not @LIBZSCANNER_COMMENTS@ then return nil end -- support in libzscanner
+			if zs.buffer_length > 0 then
+				return ffi.string(zs.buffer, zs.buffer_length - 1)
+			else
+				return nil
+			end
+		end
 	},
 })
 
 -- Module API
 local rrparser = {
 	new = zs_scanner_t,
+
+	-- Parse a file into a list of RRs
 	file = function (path)
 		local zs = zs_scanner_t()
 		local ok, err = zs:open(path)
@@ -184,6 +197,20 @@ local rrparser = {
 		end
 		return results
 	end,
+
+	-- Parse a string into a list of RRs.
+	string = function (input)
+		local zs = zs_scanner_t()
+		local results = {}
+		local ok = zs:parse(input .. '\n') -- avoid problems with strings without newlines
+										   -- TODO: it's OK since libzscanner-2.4.2
+		while ok do
+			table.insert(results, zs:current_rr())
+			ok = zs:parse()
+		end
+		return results
+	end,
+
 	state = zs_state,
 }
 return rrparser

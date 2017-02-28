@@ -65,17 +65,23 @@ struct engine {
 
 int engine_init(struct engine *engine, knot_mm_t *pool);
 void engine_deinit(struct engine *engine);
-/** @warning This function leaves 1 string result on stack. */
+
+/** Perform a lua command within the sandbox.
+ *
+ *  @return zero on success.
+ *  The result will be returned on the lua stack - an error message in case of failure.
+ *  http://www.lua.org/manual/5.1/manual.html#lua_pcall */
 int engine_cmd(struct lua_State *L, const char *str, bool raw);
+
+/** Execute current chunk in the sandbox */
+int engine_pcall(struct lua_State *L, int argc);
+
 int engine_ipc(struct engine *engine, const char *expr);
 int engine_start(struct engine *engine, const char *config_path);
 void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *module, const char *precedence, const char* ref);
 int engine_unregister(struct engine *engine, const char *module);
 void engine_lualib(struct engine *engine, const char *name, int (*lib_cb) (struct lua_State *));
-
-/** Execute current chunk in the sandbox */
-int engine_pcall(struct lua_State *L, int argc);
 
 /** Return engine light userdata. */
 struct engine *engine_luaget(struct lua_State *L);

@@ -281,8 +281,10 @@ local function rr2str(rr)
 		end))
 	end
 	local rdata = hex_encode(rr.rdata)
-	return string.format('%s %d IN TYPE%d \\# %d %s',
+	res = string.format('%s %d IN TYPE%d \\# %d %s',
 		dname2str(rr.owner), rr.ttl, rr.type, #rr.rdata, rdata)
+	if rr.comment then res = res .. ';' .. rr.comment end
+	return res
 end
 
 -- Module API
