@@ -582,8 +582,8 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 		{knot_wire_get_rd, "rd"},
 		{knot_wire_get_ra, "ra"},
 		{knot_wire_get_tc, "tc"},
-		{knot_wire_get_cd, "cd"},
-		{knot_wire_get_ad, "ad"}
+		{knot_wire_get_ad, "ad"},
+		{knot_wire_get_cd, "cd"}
 	};
 	for (int i = 0; i < 7; ++i) {
 		if (!flag[i].get(pkt->wire)) {
@@ -595,7 +595,7 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 			return;
 		}
 		offset += ret;
-		maxlen -= offset;
+		maxlen -= ret;
 	}
 	dst[offset] = 0;
 }
