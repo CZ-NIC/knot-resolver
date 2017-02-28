@@ -78,11 +78,7 @@ struct kr_nsrep
 	unsigned reputation;             /**< NS reputation */
 	const knot_dname_t *name;        /**< NS name */
 	struct kr_context *ctx;          /**< Resolution context */
-	union {
-		struct sockaddr ip;
-		struct sockaddr_in ip4;
-		struct sockaddr_in6 ip6;
-	} addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
+	union inaddr addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
 };
 
 /** @internal Address bytes for given family. */
