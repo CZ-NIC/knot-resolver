@@ -188,9 +188,9 @@ int kr_cache_peek(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name,
 		return kr_error(ENOENT);
 	}
 
-	/* Check entry lifetime */
+	/* Check entry lifetime, optionally. */
 	*entry = found;
-	int ret = check_lifetime(found, timestamp);
+	int ret = timestamp ? check_lifetime(found, timestamp) : 0;
 	if (ret == 0) {
 		cache->stats.hit += 1;
 	} else {
@@ -299,7 +299,7 @@ int kr_cache_match(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name
 
 int kr_cache_peek_rr(struct kr_cache *cache, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp)
 {
-	if (!cache_isvalid(cache) || !rr || !timestamp) {
+	if (!cache_isvalid(cache) || !rr) {
 		return kr_error(EINVAL);
 	}
 

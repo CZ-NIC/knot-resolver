@@ -124,6 +124,19 @@ struct kr_request {
 	int has_tls;
 	knot_mm_t pool;
 };
+typedef void knot_db_t;
+struct kr_cache {
+	knot_db_t *db;
+	const struct kr_cdb_api *api;
+	struct {
+		uint32_t hit;
+		uint32_t miss;
+		uint32_t insert;
+		uint32_t delete;
+	} stats;
+	uint32_t ttl_min;
+	uint32_t ttl_max;
+};
 struct knot_rrset {
 	knot_dname_t *_owner;
 	uint16_t type;
@@ -160,6 +173,7 @@ struct kr_context {
 	map_t trust_anchors;
 	map_t negative_anchors;
 	struct kr_zonecut root_hints;
+	struct kr_cache cache;
 	char _stub[];
 };
 struct query_flag {static const int NO_MINIMIZE = 1; static const int NO_THROTTLE = 2; static const int NO_IPV6 = 4; static const int NO_IPV4 = 8; static const int TCP = 16; static const int RESOLVED = 32; static const int AWAIT_IPV4 = 64; static const int AWAIT_IPV6 = 128; static const int AWAIT_CUT = 256; static const int SAFEMODE = 512; static const int CACHED = 1024; static const int NO_CACHE = 2048; static const int EXPIRING = 4096; static const int ALLOW_LOCAL = 8192; static const int DNSSEC_WANT = 16384; static const int DNSSEC_BOGUS = 32768; static const int DNSSEC_INSECURE = 65536; static const int STUB = 131072; static const int ALWAYS_CUT = 262144; static const int DNSSEC_WEXPAND = 524288; static const int PERMISSIVE = 1048576; static const int STRICT = 2097152; static const int BADCOOKIE_AGAIN = 4194304; static const int CNAME = 8388608; static const int REORDER_RR = 16777216; static const int TRACE = 33554432; static const int NO_0X20 = 67108864; static const int DNSSEC_NODS = 134217728; static const int DNSSEC_OPTOUT = 268435456; static const int NONAUTH = 536870912;};
@@ -171,6 +185,8 @@ uint8_t *knot_rdata_data(const knot_rdata_t *);
 knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, size_t);
 int knot_rrset_add_rdata(knot_rrset_t *, const uint8_t *, const uint16_t, const uint32_t, knot_mm_t *);
 void knot_rrset_init_empty(knot_rrset_t *);
+knot_rrset_t *knot_rrset_new(const knot_dname_t *, uint16_t, uint16_t, knot_mm_t *);
+void knot_rrset_clear(knot_rrset_t *, knot_mm_t *);
 uint32_t knot_rrset_ttl(const knot_rrset_t *);
 int knot_rrset_txt_dump(const knot_rrset_t *, char **, size_t *, const knot_dump_style_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
@@ -200,6 +216,7 @@ int kr_bitcmp(const char *, const char *, int);
 int kr_family_len(int);
 struct sockaddr *kr_straddr_socket(const char *, int);
 int kr_rrarray_add(rr_array_t *, const knot_rrset_t *, knot_mm_t *);
+void kr_rrset_print(const knot_rrset_t *, const char *);
 knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
 int kr_ta_add(map_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t *, uint16_t);
 int kr_ta_del(map_t *, const knot_dname_t *);
@@ -208,4 +225,5 @@ _Bool kr_dnssec_key_ksk(const uint8_t *);
 _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);
+int kr_cache_peek_rr(struct kr_cache *, knot_rrset_t *, uint8_t *, uint8_t *, uint32_t *);
 ]]

@@ -133,6 +133,7 @@ ffi.metatype( sockaddr_t, {
 -- Metatype for RR set.  Beware, the indexing is 0-based (rdata, get, tostring).
 local rrset_buflen = (64 + 1) * 1024
 local rrset_buf = ffi.new('char[?]', rrset_buflen)
+
 local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
 	__index = {
@@ -196,7 +197,20 @@ ffi.metatype( knot_rrset_t, {
 				return result
 			end
 		end,
+
+		tolist = function(rr)
+			if not rr then return {} end
+			assert(ffi.istype(knot_rrset_t, rr))
+			local res = {}
+			local i = 0
+			while i < #rr do
+				table.insert(res, rr:get(i))
+				i = i + 1
+			end
+			return res
+		end,
 	},
+	__len = function(rr) return rr.rrs.rr_count end,
 })
 
 -- Metatype for packet
@@ -337,6 +351,7 @@ local function rr2str(rr, style)
 	return ret
 end
 
+
 -- Module API
 kres = {
 	-- Constants
@@ -364,5 +379,22 @@ kres = {
 	end,
 	context = function () return ffi.cast('struct kr_context *', __engine) end,
 }
+
+local function rrset_free(rrset)
+	if rrset then
+		--C.knot_rrset_clear(rrset, nil) FIXME: memory leak?
+		C.free(rrset)
+	end
+end
+
+-- Global!
+-- Get a cached RRset as knot_rrset_t, ignoring current time, its rank, etc.
+cache.peek_rr = function(name, rrtype)
+	local rrset = ffi.gc(
+		C.knot_rrset_new(kres.str2dname(name), rrtype or kres.type.A, kres.class.IN, nil),
+		rrset_free)
+	local err = C.kr_cache_peek_rr(kres.context().cache, rrset, nil, nil, nil)
+	if err == 0 then return rrset else return nil end
+end
 
 return kres

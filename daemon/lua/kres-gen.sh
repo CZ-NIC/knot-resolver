@@ -41,6 +41,8 @@ typedef void (*map_free_f)(void *baton, void *ptr);
 	kr_qarray_t
 	struct kr_rplan
 	struct kr_request
+	knot_db_t
+	struct kr_cache
 EOF
 
 genResType() {
@@ -58,7 +60,7 @@ printf "\t/* beware: hidden stub */\n};\n"
 genResType "struct kr_query" | sed '/struct kr_layer_pickle/,$ d'
 printf "\t/* ^hidden stub^ */\n\tchar _stub[];\n};\n"
 
-genResType "struct kr_context" | sed '/struct kr_cache/,$ d'
+genResType "struct kr_context" | sed '/cache_rtt/,$ d'
 printf "\tchar _stub[];\n};\n"
 
 # Getting struct query_flag is a bit complex.
@@ -79,6 +81,8 @@ genResType "enum kr_query_flag" | sed -e 's/enum kr_query_flag/struct query_flag
 	knot_rdataset_at
 	knot_rrset_add_rdata
 	knot_rrset_init_empty
+	knot_rrset_new
+	knot_rrset_clear
 	knot_rrset_ttl
 	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
@@ -117,6 +121,7 @@ EOF
 	kr_family_len
 	kr_straddr_socket
 	kr_rrarray_add
+	kr_rrset_print
 # Trust anchors
 	kr_ta_get
 	kr_ta_add
@@ -127,6 +132,8 @@ EOF
 	kr_dnssec_key_revoked
 	kr_dnssec_key_tag
 	kr_dnssec_key_match
+# Cache
+	kr_cache_peek_rr
 EOF
 
 printf "]]\n"

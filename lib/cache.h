@@ -194,7 +194,8 @@ int kr_cache_peek_rank(struct kr_cache *cache, uint8_t tag, const knot_dname_t *
  * @param rr query RRSet (its rdataset may be changed depending on the result)
  * @param rank entry rank will be stored in this variable
  * @param flags entry flags
- * @param timestamp current time (will be replaced with drift if successful)
+ * @param timestamp current time (will be replaced with drift if successful).
+ * 			Pass NULL to avoid checking the TTL.
  * @return 0 or an errcode
  */
 KR_EXPORT
