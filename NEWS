@@ -8,12 +8,15 @@ Improvements
 - module: document the API and simplify the code
 - policy.MIRROR: support IPv6 link-local addresses
 - policy.FORWARD: support IPv6 link-local addresses
+- add net.outgoing_{v4,v6} to allow specifying address to use for connections
 
 Bugfixes
 --------
 - layer/iterate: some improvements in cname chain unrolling
 - layer/validate: fix duplicate records in AUTHORITY section in case of WC expansion proof
 - lua: do *not* truncate cache size to unsigned
+- forwarding mode: correctly forward +cd flag
+- fix a potential memory leak
 
 
 Knot Resolver 1.2.3 (2017-02-23)
