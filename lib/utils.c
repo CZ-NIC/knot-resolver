@@ -27,6 +27,7 @@
 #include <libknot/rrtype/rrsig.h>
 #include <libknot/rrset-dump.h>
 #include <libknot/version.h>
+#include <uv.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
@@ -291,6 +292,32 @@ int kr_family_len(int family)
 	}
 }
 
+struct sockaddr * kr_straddr_socket(const char *addr, int port)
+{
+	switch (kr_straddr_family(addr)) {
+	case AF_INET: {
+		struct sockaddr_in *res = malloc(sizeof(*res));
+		if (uv_ip4_addr(addr, port, res) >= 0) {
+			return (struct sockaddr *)res;
+		} else {
+			free(res);
+			return NULL;
+		}
+	}
+	case AF_INET6: {
+		struct sockaddr_in6 *res = malloc(sizeof(*res));
+		if (uv_ip6_addr(addr, port, res) >= 0) {
+			return (struct sockaddr *)res;
+		} else {
+			free(res);
+			return NULL;
+		}
+	}
+	default:
+		return NULL;
+	}
+}
+
 int kr_straddr_subnet(void *dst, const char *addr)
 {
 	if (!dst || !addr) {
@@ -466,12 +493,33 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	return kr_ok();
 }
 
-int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire, uint32_t qry_uid)
+int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
+			       uint32_t qry_uid, bool check_dups)
 {
 	for (size_t i = 0; i < array->len; ++i) {
 		ranked_rr_array_entry_t *entry = array->at[i];
-		if (entry->qry_uid == qry_uid) {
-			entry->to_wire = to_wire;
+		if (entry->qry_uid != qry_uid) {
+			continue;
+		}
+		entry->to_wire = to_wire;
+		if (!to_wire || !check_dups) {
+			continue;
+		}
+		knot_rrset_t *rr = entry->rr;
+		for (size_t j = 0; j < array->len; ++j) {
+			ranked_rr_array_entry_t *stashed = array->at[j];
+			if (stashed->qry_uid == qry_uid) {
+				continue;
+			}
+			if (stashed->rr->rclass != rr->rclass ||
+			    stashed->rr->type != rr->type) {
+				continue;
+			}
+			bool is_equal = knot_rrset_equal(rr, stashed->rr,
+							 KNOT_RRSET_COMPARE_WHOLE);
+			if (is_equal) {
+				stashed->to_wire = false;
+			}
 		}
 	}
 	return kr_ok();
@@ -480,10 +528,10 @@ int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire, uint32_t 
 
 static char *callprop(struct kr_module *module, const char *prop, const char *input, void *env)
 {
-	if (!module || !prop) {
+	if (!module || !module->props || !prop) {
 		return NULL;
 	}
-	for (struct kr_prop *p = module->props; p && p->name; ++p) {
+	for (const struct kr_prop *p = module->props(); p && p->name; ++p) {
 		if (p->cb != NULL && strcmp(p->name, prop) == 0) {
 			return p->cb(env, module, input);
 		}
@@ -534,8 +582,8 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 		{knot_wire_get_rd, "rd"},
 		{knot_wire_get_ra, "ra"},
 		{knot_wire_get_tc, "tc"},
-		{knot_wire_get_cd, "cd"},
-		{knot_wire_get_ad, "ad"}
+		{knot_wire_get_ad, "ad"},
+		{knot_wire_get_cd, "cd"}
 	};
 	for (int i = 0; i < 7; ++i) {
 		if (!flag[i].get(pkt->wire)) {
@@ -547,7 +595,7 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 			return;
 		}
 		offset += ret;
-		maxlen -= offset;
+		maxlen -= ret;
 	}
 	dst[offset] = 0;
 }

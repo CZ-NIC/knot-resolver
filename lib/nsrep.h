@@ -78,11 +78,7 @@ struct kr_nsrep
 	unsigned reputation;             /**< NS reputation */
 	const knot_dname_t *name;        /**< NS name */
 	struct kr_context *ctx;          /**< Resolution context */
-	union {
-		struct sockaddr ip;
-		struct sockaddr_in ip4;
-		struct sockaddr_in6 ip6;
-	} addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
+	union inaddr addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
 };
 
 /** @internal Address bytes for given family. */
@@ -96,13 +92,11 @@ struct kr_nsrep
  * Set given NS address.
  * @param  qry      updated query
  * @param  index    index of the updated target
- * @param  addr     address bytes (struct in_addr or struct in6_addr)
- * @param  addr_len address bytes length (type will be derived from this)
- * @param  port     address port (if <= 0, 53 will be used)
+ * @param  sock     socket address to use (sockaddr_in or sockaddr_in6 or NULL)
  * @return          0 or an error code
  */
 KR_EXPORT
-int kr_nsrep_set(struct kr_query *qry, size_t index, uint8_t *addr, size_t addr_len, int port);
+int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock);
 
 /**
  * Elect best nameserver/address pair from the nsset.

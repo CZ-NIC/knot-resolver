@@ -172,7 +172,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	return kr_ok();
 }
 
-int kr_nsrep_set(struct kr_query *qry, size_t index, uint8_t *addr, size_t addr_len, int port)
+int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock)
 {
 	if (!qry) {
 		return kr_error(EINVAL);
@@ -186,17 +186,33 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, uint8_t *addr, size_t addr_
 		qry->ns.score = KR_NS_UNKNOWN;
 		qry->ns.reputation = 0;
 	}
-	/* Retrieve RTT from cache */
-	if (addr && addr_len > 0) {
-		struct kr_context *ctx = qry->ns.ctx;
-		unsigned *score = ctx
-			? lru_get_try(ctx->cache_rtt, (const char *)addr, addr_len)
-			: NULL;
-		if (score) {
-			qry->ns.score = MIN(qry->ns.score, *score);
-		}
+
+	if (!sock) {
+		qry->ns.addr[index].ip.sa_family = AF_UNSPEC;
+		return kr_ok();
 	}
-	update_nsrep(&qry->ns, index, addr, addr_len, port);
+
+	switch (sock->sa_family) {
+	case AF_INET:
+		qry->ns.addr[index].ip4 = *(const struct sockaddr_in *)sock;
+		break;
+	case AF_INET6:
+		qry->ns.addr[index].ip6 = *(const struct sockaddr_in6 *)sock;
+		break;
+	default:
+		qry->ns.addr[index].ip.sa_family = AF_UNSPEC;
+		return kr_error(EINVAL);
+	}
+
+	/* Retrieve RTT from cache */
+	struct kr_context *ctx = qry->ns.ctx;
+	unsigned *score = ctx
+		? lru_get_try(ctx->cache_rtt, kr_inaddr(sock), kr_family_len(sock->sa_family))
+		: NULL;
+	if (score) {
+		qry->ns.score = MIN(qry->ns.score, *score);
+	}
+
 	return kr_ok();
 }
 

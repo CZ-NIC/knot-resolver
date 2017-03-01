@@ -39,9 +39,7 @@ kresd_LIBS += $(libsystemd_LIBS)
 endif
 
 # Make binary
-ifeq ($(HAS_lua)|$(HAS_libuv), yes|yes)
 $(eval $(call make_sbin,kresd,daemon,yes))
-endif
 
 # Targets
 date := $(shell date +%F -r NEWS)
@@ -60,7 +58,8 @@ daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in
 
 daemon/lua/kres-gen.lua: | $(libkres)
 	@echo "WARNING: regenerating $@"
-	daemon/lua/kres-gen.sh > $@
+	@# the sed saves some space(s)
+	daemon/lua/kres-gen.sh | sed 's/    /\t/g' > $@
 .DELETE_ON_ERROR: daemon/lua/kres-gen.lua
 
 .PHONY: daemon daemon-install daemon-clean

@@ -250,6 +250,7 @@ static void signal_handler(uv_signal_t *handle, int signum)
 	uv_signal_stop(handle);
 }
 
+/** Split away port from the address. */
 static const char *set_addr(char *addr, int *port)
 {
 	char *p = strchr(addr, '#');
@@ -371,13 +372,15 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return kr_ok();
 }
 
-void free_sd_socket_names(char **socket_names, int count)
+#ifdef HAS_SYSTEMD
+static void free_sd_socket_names(char **socket_names, int count)
 {
 	for (int i = 0; i < count; i++) {
 		free(socket_names[i]);
 	}
 	free(socket_names);
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -680,9 +683,14 @@ int main(int argc, char **argv)
 			ret =  EXIT_FAILURE;
 			goto cleanup;
 		}
-		int lua_ret = 0;
-		if ((lua_ret = engine_cmd(engine.L, cmd, false)) != 0) {
-			kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n", keyfile_path, lua_strerror(lua_ret));
+		int lua_ret = engine_cmd(engine.L, cmd, false);
+		if (lua_ret != 0) {
+			if (lua_gettop(engine.L) > 0) {
+				kr_log_error("%s", lua_tostring(engine.L, -1));
+			} else {
+				kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n",
+						keyfile_path, lua_strerror(lua_ret));
+			}
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}

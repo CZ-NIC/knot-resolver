@@ -78,6 +78,11 @@ struct worker_ctx {
 	int id;
 	int count;
 	unsigned tcp_pipeline_max;
+
+	/** Addresses to bind for outgoing connections or AF_UNSPEC. */
+	struct sockaddr_in out_addr4;
+	struct sockaddr_in6 out_addr6;
+
 #if __linux__
 	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
 #else
@@ -93,6 +98,7 @@ struct worker_ctx {
 		size_t dropped;
 		size_t timeout;
 	} stats;
+
 	map_t outgoing;
 	mp_freelist_t pool_mp;
 	mp_freelist_t pool_ioreq;
@@ -120,14 +126,8 @@ struct qr_task
 	worker_cb_t on_complete;
 	void *baton;
 	struct {
-		union {
-			struct sockaddr_in ip4;
-			struct sockaddr_in6 ip6;
-		} addr;
-		union {
-			struct sockaddr_in ip4;
-			struct sockaddr_in6 ip6;
-		} dst_addr;
+		union inaddr addr;
+		union inaddr dst_addr;
 		uv_handle_t *handle;
 	} source;
 	uint32_t refs;

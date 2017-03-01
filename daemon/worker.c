@@ -94,9 +94,17 @@ static inline void req_release(struct worker_ctx *worker, struct req *req)
 	}
 }
 
-/*! @internal Create a UDP/TCP handle */
-static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype)
+/*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
+ *  socktype is SOCK_* */
+static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t family)
 {
+	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
+			&& (family == AF_INET  || family == AF_INET6);
+	if (!precond) {
+		assert(false);
+		return NULL;
+	}
+
 	if (task->pending_count >= MAX_PENDING) {
 		return NULL;
 	}
@@ -106,10 +114,30 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype)
 		return NULL;
 	}
 	io_create(task->worker->loop, handle, socktype);
+
+	/* Bind to outgoing address, according to IP v4/v6. */
+	union inaddr *addr;
+	if (family == AF_INET) {
+		addr = (union inaddr *)&task->worker->out_addr4;
+	} else {
+		addr = (union inaddr *)&task->worker->out_addr6;
+	}
+	int ret = 0;
+	if (addr->ip.sa_family != AF_UNSPEC) {
+		assert(addr->ip.sa_family == family);
+		if (socktype == SOCK_DGRAM) {
+			ret = uv_udp_bind((uv_udp_t *)handle, &addr->ip, 0);
+		} else {
+			ret = uv_tcp_bind((uv_tcp_t *)handle, &addr->ip, 0);
+		}
+	}
+
 	/* Set current handle as a subrequest type. */
 	struct session *session = handle->data;
-	session->outgoing = true;
-	int ret = array_push(session->tasks, task);
+	if (ret == 0) {
+		session->outgoing = true;
+		ret = array_push(session->tasks, task);
+	}
 	if (ret < 0) {
 		io_deinit(handle);
 		req_release(task->worker, (struct req *)handle);
@@ -479,6 +507,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		                          handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
 		                          pkt);
 		if (ret != kr_ok()) {
+			req_release(task->worker, send_req);
 			return ret;
 		}
 	}
@@ -575,9 +604,9 @@ static void on_timeout(uv_timer_t *req)
 static bool retransmit(struct qr_task *task)
 {
 	if (task && task->addrlist && task->addrlist_count > 0) {
-		uv_handle_t *subreq = ioreq_spawn(task, SOCK_DGRAM);
+		struct sockaddr_in6 *choice = &((struct sockaddr_in6 *)task->addrlist)[task->addrlist_turn];
+		uv_handle_t *subreq = ioreq_spawn(task, SOCK_DGRAM, choice->sin6_family);
 		if (subreq) { /* Create connection for iterative query */
-			struct sockaddr_in6 *choice = &((struct sockaddr_in6 *)task->addrlist)[task->addrlist_turn];
 			if (qr_task_send(task, subreq, (struct sockaddr *)choice, task->pktbuf) == 0) {
 				task->addrlist_turn = (task->addrlist_turn + 1) % task->addrlist_count; /* Round robin */
 				return true;
@@ -772,13 +801,15 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 		if (!conn) {
 			return qr_task_step(task, NULL, NULL);
 		}
-		uv_handle_t *client = ioreq_spawn(task, sock_type);
+		const struct sockaddr *addr =
+			packet_source ? packet_source : task->addrlist;
+		uv_handle_t *client = ioreq_spawn(task, sock_type, addr->sa_family);
 		if (!client) {
 			req_release(task->worker, (struct req *)conn);
 			return qr_task_step(task, NULL, NULL);
 		}
 		conn->data = task;
-		if (uv_tcp_connect(conn, (uv_tcp_t *)client, packet_source?packet_source:task->addrlist, on_connect) != 0) {
+		if (uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect) != 0) {
 			req_release(task->worker, (struct req *)conn);
 			return qr_task_step(task, NULL, NULL);
 		}
@@ -907,7 +938,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	}
 
 	int submitted = 0;
-	ssize_t nbytes = 0;
 	struct qr_task *task = session->buffering;
 
 	/* If this is a new query, create a new task that we can use
@@ -949,7 +979,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	/* Finish reading DNS/TCP message length. */
 	if (task->bytes_remaining == 0 && pkt_buf->size == 1) {
 		pkt_buf->wire[1] = msg[0];
-		nbytes = msg_size(pkt_buf->wire);
+		ssize_t nbytes = msg_size(pkt_buf->wire);
 		len -= 1;
 		msg += 1;
 		/* Cut off fragment length and start reading DNS message. */
@@ -1083,6 +1113,8 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 	worker->count = worker_count;
 	worker->engine = engine;
 	worker_reserve(worker, MP_FREELIST_SIZE);
+	worker->out_addr4.sin_family = AF_UNSPEC;
+	worker->out_addr6.sin6_family = AF_UNSPEC;
 	/* Register worker in Lua thread */
 	lua_pushlightuserdata(engine->L, worker);
 	lua_setglobal(engine->L, "__worker");

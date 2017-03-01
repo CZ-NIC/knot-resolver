@@ -1,3 +1,24 @@
+Knot Resolver 1.2.4-dev (2017-03-XX)
+================================
+
+Improvements
+------------
+- modules/policy: allow QTRACE policy to be chained with other policies
+- hints.add_hosts(path): a new property
+- module: document the API and simplify the code
+- policy.MIRROR: support IPv6 link-local addresses
+- policy.FORWARD: support IPv6 link-local addresses
+- add net.outgoing_{v4,v6} to allow specifying address to use for connections
+
+Bugfixes
+--------
+- layer/iterate: some improvements in cname chain unrolling
+- layer/validate: fix duplicate records in AUTHORITY section in case of WC expansion proof
+- lua: do *not* truncate cache size to unsigned
+- forwarding mode: correctly forward +cd flag
+- fix a potential memory leak
+
+
 Knot Resolver 1.2.3 (2017-02-23)
 ================================
 
@@ -8,6 +29,7 @@ Bugfixes
 - iterate: skip answer RRs that don't match the query
 - layer/iterate: some additional processing for referrals
 - lib/resolve: zonecut fetching error was fixed
+
 
 Knot Resolver 1.2.2 (2017-02-10)
 ================================
@@ -22,6 +44,7 @@ Bugfixes:
 Testing:
 --------
 - Update tests to run tests with and without QNAME minimization
+
 
 Knot Resolver 1.2.1 (2017-02-01)
 ====================================
@@ -40,6 +63,7 @@ Documentation
 Bugfixes:
 ---------
 - lua: make the map command check its arguments
+
 
 Knot Resolver 1.2.0 (2017-01-24)
 ====================================

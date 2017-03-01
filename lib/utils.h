@@ -137,6 +137,13 @@ KR_EXPORT
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
 
+/** Simple storage for IPx address or AF_UNSPEC. */
+union inaddr {
+	struct sockaddr ip;
+	struct sockaddr_in ip4;
+	struct sockaddr_in6 ip6;
+};
+
 /** Address bytes for given family. */
 KR_EXPORT KR_PURE
 const char *kr_inaddr(const struct sockaddr *addr);
@@ -152,6 +159,9 @@ int kr_straddr_family(const char *addr);
 /** Return address length in given family. */
 KR_EXPORT KR_CONST
 int kr_family_len(int family);
+/** Create a sockaddr* from string+port representation (also accepts IPv6 link-local). */
+KR_EXPORT
+struct sockaddr * kr_straddr_socket(const char *addr, int port);
 /** Parse address and return subnet length (bits).
   * @warning 'dst' must be at least `sizeof(struct in6_addr)` long. */
 KR_EXPORT
@@ -190,7 +200,16 @@ int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool);
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool);
 
-int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire, uint32_t qry_uid);
+/** @internal Mark the RRSets from particular query as
+ * "have (not) to be recorded in the final answer".
+ * @param array RRSet array.
+ * @param to_wire Records must be\must not be recorded in final answer.
+ * @param qry_uid Query uid.
+ * @param check_dups When to_wire is true, try to avoid duplicate RRSets.
+ * @return 0 or an error
+ */
+int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
+			       uint32_t qry_uid, bool check_dups);
 
 void kr_rrset_print(const knot_rrset_t *rr, const char *prefix);
 void kr_pkt_print(knot_pkt_t *pkt);

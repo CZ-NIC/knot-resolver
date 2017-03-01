@@ -36,6 +36,15 @@
 /* Defaults */
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "hint",  fmt)
 
+/** Useful for returning from module properties. */
+static char * bool2jsonstr(bool val)
+{
+	char *result = NULL;
+	if (-1 == asprintf(&result, "{ \"result\": %s }", val ? "true" : "false"))
+		result = NULL;
+	return result;
+}
+
 /* Structure for reverse search (address to domain) */
 struct rev_search_baton {
 	knot_pkt_t *pkt;
@@ -315,6 +324,14 @@ static int load_file(struct kr_module *module, const char *path)
 	return load_map(hints, fp);
 }
 
+static char* hint_add_hosts(void *env, struct kr_module *module, const char *args)
+{
+	if (!args)
+		args = "/etc/hosts";
+	int err = load_file(module, args);
+	return bool2jsonstr(err == kr_ok());
+}
+
 static void unload(struct kr_module *module)
 {
 	struct kr_zonecut *hints = module->data;
@@ -348,10 +365,7 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 		ret = add_pair(hints, args_copy, addr + 1);
 	}
 
-	char *result = NULL;
-	if (-1 == asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false"))
-		result = NULL;
-	return result;
+	return bool2jsonstr(ret == 0);
 }
 
 static char* hint_del(void *env, struct kr_module *module, const char *args)
@@ -371,10 +385,7 @@ static char* hint_del(void *env, struct kr_module *module, const char *args)
 	}
 	ret = del_pair(hints, args_copy, addr);
 
-	char *result = NULL;
-	if (-1 == asprintf(&result, "{ \"result\": %s }", ret == 0 ? "true" : "false"))
-		result = NULL;
-	return result;
+	return bool2jsonstr(ret == 0);
 }
 
 /** @internal Pack address list into JSON array. */
@@ -568,6 +579,7 @@ struct kr_prop *hints_props(void)
 	    { &hint_set,    "set", "Set {name, address} hint.", },
 	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
 	    { &hint_get,    "get", "Retrieve hint for given name.", },
+	    { &hint_add_hosts, "add_hosts", "Load a file with hosts-like formatting and add contents into hints.", },
 	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
 	    { NULL, NULL, NULL }
 	};

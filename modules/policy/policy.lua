@@ -32,19 +32,25 @@ if has_socket then
 	end
 end
 
-local function parse_target(target)
+local function addr_split_port(target)
 	local addr, port = target:match '([^@]*)@?(.*)'
 	port = port and tonumber(port) or 53
-	addr = kres.str2ip(addr)
-	if addr == nil then
+	return addr, port
+end
+
+-- String address@port -> sockaddr.
+local function addr2sock(target)
+	local addr, port = addr_split_port(target)
+	sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port), ffi.C.free);
+	if sock == nil then
 		error("target '"..target..'" is not a valid IP address')
 	end
-	return addr, port
+	return sock
 end
 
 -- Mirror request elsewhere, and continue solving
 local function mirror(target)
-	local addr, port = parse_target(target)
+	local addr, port = addr_split_port(target)
 	local sink, err = socket_client(addr, port)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
 	return function(state, req)
@@ -63,11 +69,11 @@ local function forward(target)
 	local list = {}
 	if type(target) == 'table' then
 		for _, v in pairs(target) do
-			table.insert(list, {parse_target(v)})
+			table.insert(list, addr2sock(v))
 			assert(#list <= 4, 'at most 4 FORWARD targets are supported')
 		end
 	else
-		table.insert(list, {parse_target(target)})
+		table.insert(list, addr2sock(target))
 	end
 	return function(state, req)
 		req = kres.request_t(req)
@@ -232,6 +238,7 @@ function policy.enforce(state, req, action)
 		local qry = req:current()
 		req.options = bit.bor(req.options, kres.query.TRACE)
 		qry.flags = bit.bor(qry.flags, kres.query.TRACE)
+		return -- this allows to continue iterating over policy list
 	elseif type(action) == 'function' then
 		return action(state, req)
 	end
