@@ -185,9 +185,11 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 
 	/* It can occur that here parent query already have
 	 * provably insecured zonecut which not in the cache yet. */
+	const uint32_t insec_flags = QUERY_DNSSEC_INSECURE | QUERY_DNSSEC_NODS;
+	const uint32_t cut_flags = QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6;
 	const bool is_insecured = ((qry->parent != NULL) &&
-				   (qry->parent->flags & (QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6)) == 0 &&
-				   (qry->parent->flags & QUERY_DNSSEC_INSECURE) != 0);
+				   (qry->parent->flags & cut_flags) == 0 &&
+				   (qry->parent->flags & insec_flags) != 0);
 
 	/* Want DNSSEC if it's possible to secure this name
 	 * (e.g. is covered by any TA) */

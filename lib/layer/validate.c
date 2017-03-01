@@ -294,7 +294,7 @@ static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 		break;
 	case KNOT_RRTYPE_DS:
 		VERBOSE_MSG(qry, "<= parent: updating DS\n");
-		if (qry->flags & QUERY_DNSSEC_INSECURE) { /* DS non-existence proven. */
+		if (qry->flags & (QUERY_DNSSEC_NODS | QUERY_DNSSEC_INSECURE)) { /* DS non-existence proven. */
 			mark_insecure_parents(qry);
 		} else { /* DS existence proven. */
 			parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
@@ -371,8 +371,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 		} else {
 			VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
-			qry->flags &= ~QUERY_DNSSEC_WANT;
-			qry->flags |= QUERY_DNSSEC_INSECURE;
+			qry->flags |= QUERY_DNSSEC_NODS;
 		}
 		return ret;
 	}
@@ -666,8 +665,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (ret != 0) {
 				if (has_nsec3 && (ret == kr_error(DNSSEC_OUT_OF_RANGE))) {
 					VERBOSE_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
-					qry->flags &= ~QUERY_DNSSEC_WANT;
-					qry->flags |= QUERY_DNSSEC_INSECURE;
+					qry->flags |= QUERY_DNSSEC_NODS;
 					/* Could not return from here,
 					 * we must continue, validate NSEC\NSEC3 and
 					 * call update_parent_keys() to mark
@@ -729,7 +727,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return KR_STATE_FAIL;
 	} else if (pkt_rcode == KNOT_RCODE_NOERROR &&
 		   referral &&
-		   ((qry->flags & (QUERY_DNSSEC_WANT | QUERY_DNSSEC_INSECURE)) == QUERY_DNSSEC_INSECURE)) {
+		   (((qry->flags & (QUERY_DNSSEC_WANT | QUERY_DNSSEC_INSECURE)) == QUERY_DNSSEC_INSECURE) ||
+		   (qry->flags & QUERY_DNSSEC_NODS))) {
 		/* referral with proven DS non-existance */
 		qtype = KNOT_RRTYPE_DS;
 	}
