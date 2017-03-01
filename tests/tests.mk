@@ -9,11 +9,18 @@ endif
 deckard_DIR := tests/deckard
 TESTS := sets/resolver
 TEMPLATE := template/kresd.j2
+
+REAL_PREFIX=$(realpath $(PREFIX))
+REAL_CURDIR=$(realpath $(CURDIR))
+
 $(deckard_DIR)/Makefile:
 	@git submodule update --init --recursive
+
 check-integration: $(deckard_DIR)/Makefile
+	$(if $(findstring $(REAL_CURDIR),$(REAL_PREFIX)),, $(warning Warning: PREFIX does not point into source directory; testing the installed version!))
 	@mkdir -p $(deckard_DIR)/contrib/libswrap/obj
-	@$(MAKE) -s -C $(deckard_DIR) TESTS=$(TESTS) DAEMON=$(abspath daemon/kresd) TEMPLATE=$(TEMPLATE) DYLD_LIBRARY_PATH=$(DYLD_LIBRARY_PATH)
+	+TESTS=$(TESTS) DAEMON=$(abspath $(SBINDIR)/kresd) TEMPLATE=$(TEMPLATE) $(preload_syms) $(deckard_DIR)/kresd_run.sh
+
 deckard: check-integration
 
 # Targets
