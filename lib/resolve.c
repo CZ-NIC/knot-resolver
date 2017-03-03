@@ -416,28 +416,39 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 	return kr_ok();
 }
 
-static void write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
+/** @return error code, ignoring if forced to truncate the packet. */
+static int write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
 {
 	for (size_t i = 0; i < arr->len; ++i) {
-		knot_pkt_put(answer, 0, arr->at[i], 0);
+		int err = knot_pkt_put(answer, 0, arr->at[i], 0);
+		if (err != KNOT_EOK) {
+			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
+		}
 	}
+	return kr_ok();
 }
 
-static void write_extra_ranked_records(ranked_rr_array_t *arr, knot_pkt_t *answer)
+/** @return error code, ignoring if forced to truncate the packet. */
+static int write_extra_ranked_records(ranked_rr_array_t *arr, knot_pkt_t *answer)
 {
+	const bool has_dnssec = knot_pkt_has_dnssec(answer);
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t * entry = arr->at[i];
 		if (!entry->to_wire) {
 			continue;
 		}
 		knot_rrset_t *rr = entry->rr;
-		if (!knot_pkt_has_dnssec(answer)) {
+		if (!has_dnssec) {
 			if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
 				continue;
 			}
 		}
-		knot_pkt_put(answer, 0, rr, 0);
+		int err = knot_pkt_put(answer, 0, rr, 0);
+		if (err != KNOT_EOK) {
+			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
+		}
 	}
+	return kr_ok();
 }
 
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
@@ -507,17 +518,23 @@ static int answer_finalize(struct kr_request *request, int state)
 		if (answer->current < KNOT_ANSWER) {
 			knot_pkt_begin(answer, KNOT_ANSWER);
 		}
-		write_extra_ranked_records(&request->answ_selected, answer);
+		if (write_extra_ranked_records(&request->answ_selected, answer)) {
+			return answer_fail(request);
+		}
 	}
 
 	/* Write authority records. */
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	write_extra_ranked_records(&request->auth_selected, answer);
+	if (write_extra_ranked_records(&request->auth_selected, answer)) {
+		return answer_fail(request);
+	}
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
-	write_extra_records(&request->additional, answer);
+	if (write_extra_records(&request->additional, answer)) {
+		return answer_fail(request);
+	}
 	/* Write EDNS information */
 	int ret = 0;
 	if (answer->opt_rr) {
