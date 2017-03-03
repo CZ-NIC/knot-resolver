@@ -973,7 +973,10 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		set_yield(&request->answ_selected, qry->uid, false);
 		set_yield(&request->auth_selected, qry->uid, false);
 		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
-		qry->deferred = pickle->next;
+		if (request->state != KR_STATE_YIELD) {
+			/* No new deferred answers, take the next */
+			qry->deferred = pickle->next;
+		}
 	} else {
 		/* Caller is interested in always tracking a zone cut, even if the answer is cached
 		 * this is normally not required, and incurrs another cache lookups for cached answer. */
