@@ -270,12 +270,26 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	return state;
 }
 
+/** Compute rank appropriate for RRs present in the packet. */
+static inline kr_validation_rank_t get_initial_rank(const struct kr_request *req)
+{
+	const uint32_t qflags = req->current_query->flags;
+	if ((qflags & QUERY_CACHED)
+	    && !knot_wire_get_cd(req->answer->wire)
+	    && (qflags & QUERY_DNSSEC_WANT)
+	    && !(qflags & (QUERY_DNSSEC_INSECURE|QUERY_DNSSEC_BOGUS)))
+		return KR_VLDRANK_SECURE;
+		/* TODO: make cache better signal real ranks of individual RRs. */
+	return KR_VLDRANK_INITIAL;
+}
+
 static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 {
 	struct kr_query *qry = req->current_query;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
-	uint8_t rank = !(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_CACHED) ?
-			KR_VLDRANK_SECURE : KR_VLDRANK_INITIAL;
+
+	kr_validation_rank_t rank = get_initial_rank(req);
+
 	const knot_dname_t *zonecut_name = qry->zone_cut.name;
 	bool referral = !knot_wire_get_aa(pkt->wire);
 	if (referral) {
@@ -375,8 +389,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 	const knot_dname_t *cname = NULL;
 	const knot_dname_t *pending_cname = query->sname;
 	unsigned cname_chain_len = 0;
-	uint8_t rank = !(query->flags & QUERY_DNSSEC_WANT) || (query->flags & QUERY_CACHED) ?
-			KR_VLDRANK_SECURE : KR_VLDRANK_INITIAL;
+	kr_validation_rank_t rank = get_initial_rank(req);
 	bool is_final = (query->parent == NULL);
 	uint32_t iter_count = 0;
 	bool strict_mode = (query->flags & QUERY_STRICT);

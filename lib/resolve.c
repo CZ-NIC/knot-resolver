@@ -417,7 +417,7 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 }
 
 /** @return error code, ignoring if forced to truncate the packet. */
-static int write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
+static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
 {
 	for (size_t i = 0; i < arr->len; ++i) {
 		int err = knot_pkt_put(answer, 0, arr->at[i], 0);
@@ -428,10 +428,18 @@ static int write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
 	return kr_ok();
 }
 
-/** @return error code, ignoring if forced to truncate the packet. */
-static int write_extra_ranked_records(ranked_rr_array_t *arr, knot_pkt_t *answer)
+/**
+ * \param all_secure optionally &&-combine security of written RRs into its value.
+ *		     (i.e. if you pass reference to false, it will always remain)
+ * @return error code, ignoring if forced to truncate the packet.
+ */
+static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *answer,
+				      bool *all_secure)
 {
 	const bool has_dnssec = knot_pkt_has_dnssec(answer);
+	bool all_sec = true;
+	int err = kr_ok();
+
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t * entry = arr->at[i];
 		if (!entry->to_wire) {
@@ -445,10 +453,21 @@ static int write_extra_ranked_records(ranked_rr_array_t *arr, knot_pkt_t *answer
 		}
 		int err = knot_pkt_put(answer, 0, rr, 0);
 		if (err != KNOT_EOK) {
-			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
+			if (err == KNOT_ESPACE) {
+				err = kr_ok();
+			}
+			break;
+		}
+
+		if (rr->type != KNOT_RRTYPE_RRSIG) {
+			all_sec = all_sec && entry->rank == KR_VLDRANK_SECURE;
 		}
 	}
-	return kr_ok();
+
+	if (all_secure) {
+		*all_secure = *all_secure && all_sec;
+	}
+	return err;
 }
 
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
@@ -512,13 +531,27 @@ static int answer_finalize(struct kr_request *request, int state)
 		}
 	}
 
+	struct kr_query *last = rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
+		/* TODO  ^^^^ this is slightly fragile */
+	bool secure = (last != NULL); /* suspicious otherwise */
+	if (last && (last->flags & QUERY_STUB)) {
+		secure = false; /* don't trust forwarding for now */
+	}
+	if (last && (last->flags & QUERY_CACHED)) {
+		secure = secure && last->flags & QUERY_DNSSEC_WANT
+			 && !(last->flags & (QUERY_DNSSEC_INSECURE|QUERY_DNSSEC_BOGUS));
+	}
+	if (last && (last->flags & QUERY_DNSSEC_OPTOUT)) {
+		secure = false; /* the last answer is insecure due to opt-out */
+	}
+
 	if (request->answ_selected.len > 0) {
 		assert(answer->current <= KNOT_ANSWER);
 		/* Write answer records. */
 		if (answer->current < KNOT_ANSWER) {
 			knot_pkt_begin(answer, KNOT_ANSWER);
 		}
-		if (write_extra_ranked_records(&request->answ_selected, answer)) {
+		if (write_extra_ranked_records(&request->answ_selected, answer, &secure)) {
 			return answer_fail(request);
 		}
 	}
@@ -527,7 +560,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	if (write_extra_ranked_records(&request->auth_selected, answer)) {
+	if (write_extra_ranked_records(&request->auth_selected, answer, &secure)) {
 		return answer_fail(request);
 	}
 	/* Write additional records. */
@@ -547,20 +580,10 @@ static int answer_finalize(struct kr_request *request, int state)
 		ret = edns_put(answer);
 	}
 
-	/* Set AD=1 if succeeded and requested secured answer. */
-	const bool has_ad = knot_wire_get_ad(answer->wire);
-	knot_wire_clear_ad(answer->wire);
-	if (state == KR_STATE_DONE && rplan->resolved.len > 0) {
-		struct kr_query *last = array_tail(rplan->resolved);
-		/* Do not set AD for RRSIG query, as we can't validate it. */
-		const bool secure = (last->flags & QUERY_DNSSEC_WANT) &&
-				    !(last->flags & QUERY_DNSSEC_INSECURE) &&
-				    !(last->flags & QUERY_DNSSEC_OPTOUT);
-		if (!(last->flags & QUERY_STUB) /* Never set AD if forwarding. */
-		    && has_ad && secure
-		    && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
-			knot_wire_set_ad(answer->wire);
-		}
+	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
+	if (!secure || state != KR_STATE_DONE
+	    || knot_pkt_qtype(answer) == KNOT_RRTYPE_RRSIG) {
+		knot_wire_clear_ad(answer->wire);
 	}
 
 	return ret;

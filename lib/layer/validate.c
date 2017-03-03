@@ -102,11 +102,11 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 				vctx->err_cnt += 1;
 				break;
 			}
-			entry->rank = KR_VLDRANK_SECURE;
+			entry->rank = KR_VLDRANK_SECURE; /* TODO: not good semantically for RRSIGs */
 			continue;
 		}
 		if ((rr->type == KNOT_RRTYPE_NS) && (vctx->section_id == KNOT_AUTHORITY)) {
-			entry->rank = KR_VLDRANK_SECURE;
+			entry->rank = KR_VLDRANK_SECURE; /* FIXME: dangerous, most likely */
 			continue;
 		}
 		validation_result = kr_rrset_validate(vctx, rr);
