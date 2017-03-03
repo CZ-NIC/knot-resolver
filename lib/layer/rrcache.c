@@ -300,12 +300,18 @@ static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash
 	for (ssize_t i = arr->len - 1; i >= 0; --i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
 		const knot_rrset_t *rr = entry->rr;
-		if (entry->qry_uid != qry->uid) {
+		if (entry->qry_uid != qry->uid || entry->cached) {
 			continue;
 		}
-		if (entry->cached) {
-			continue;
+
+		/* Skip NSEC3 RRs and their signatures.  We don't use them this way.
+		 * They would be stored under the hashed name, etc. */
+		if (rr->type == KNOT_RRTYPE_NSEC3
+		    || (rr->type == KNOT_RRTYPE_RRSIG
+			&& knot_rrsig_type_covered(&rr->rrs, 0) == KNOT_RRTYPE_NSEC3)) {
+		    continue;
 		}
+
 		/* Look up glue records for NS */
 		if (rr->type == KNOT_RRTYPE_NS) {
 			for (size_t j = 0; j < rr->rrs.rr_count; ++j) {
