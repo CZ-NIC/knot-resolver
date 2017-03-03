@@ -53,6 +53,7 @@
 	X(REORDER_RR,      1 << 24) /**< Reorder cached RRs. */ \
 	X(TRACE,	   1 << 25) /**< Log answer with kr_verbose_log(), unless -DNDEBUG. */ \
 	X(NO_0X20,	   1 << 26) /**< Disable query case randomization . */ \
+	X(DNSSEC_NODS,	   1 << 27) /**< DS non-existance is proven */ \
 			/* 1 << 31       Used by ../modules/dns64/dns64.lua */
 
 /** Query flags */
