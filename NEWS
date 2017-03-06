@@ -4,7 +4,8 @@ Knot Resolver 1.2.4-dev (2017-03-XX)
 Security
 --------
 - Knot Resolver 1.2.0 and higher could return AD flag for insecure
-  answer, if the same answer was validated three or more times.
+  answer if the daemon received answer with invalid RRSIG several times
+  in a row.
 
 Improvements
 ------------
