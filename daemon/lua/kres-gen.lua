@@ -107,6 +107,7 @@ struct kr_request {
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
+		_Bool tcp;
 	} qsource;
 	struct {
 		unsigned int rtt;

@@ -60,4 +60,5 @@ libkres.amalg.c
 /doc/kresd.8
 /libkres.pc
 /modules/version/version.lua
+/modules/dnstap/dnstap.pb-c.*
 /tags

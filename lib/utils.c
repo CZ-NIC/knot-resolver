@@ -272,6 +272,18 @@ int kr_inaddr_len(const struct sockaddr *addr)
 	return kr_family_len(addr->sa_family);
 }
 
+uint16_t kr_inaddr_port(const struct sockaddr *addr)
+{
+	if (!addr) {
+		return 0;
+	}
+	switch (addr->sa_family) {
+	case AF_INET:  return ntohs(((const struct sockaddr_in *)addr)->sin_port);
+	case AF_INET6: return ntohs(((const struct sockaddr_in6 *)addr)->sin6_port);
+	default:       return 0;
+	}
+}
+
 int kr_straddr_family(const char *addr)
 {
 	if (!addr) {
