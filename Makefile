@@ -37,6 +37,7 @@ $(eval $(call find_lib,gnutls))
 $(eval $(call find_lib,libedit))
 $(eval $(call find_lib,libprotobuf-c,1))
 $(eval $(call find_lib,libfstrm,0.2))
+$(eval $(call find_bin,protoc-c))
 
 # Lookup SONAME
 $(eval $(call find_soname,libknot))
@@ -74,7 +75,7 @@ endif
 endif
 
 # check for fstrm and protobuf for dnstap
-ifeq ($(HAS_libfstrm)|$(HAS_libprotobuf-c),yes|yes)
+ifeq ($(HAS_libfstrm)|$(HAS_libprotobuf-c)|$(HAS_protoc-c),yes|yes|yes)
 ENABLE_DNSTAP := yes
 endif
 
@@ -121,6 +122,7 @@ info:
 	$(info [$(HAS_libedit)] libedit (client))
 	$(info [$(HAS_libfstrm)] libfstrm (modules/dnstap))
 	$(info [$(HAS_libprotobuf-c)] libprotobuf-c (modules/dnstap))
+	$(info [$(HAS_protoc-c)] proto-c (modules/dnstap))
 	$(info )
 
 # Verify required dependencies are met, as listed above
