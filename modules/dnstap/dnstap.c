@@ -26,8 +26,8 @@
 #include "contrib/cleanup.h"
 
 #define DEBUG_MSG(fmt, ...) kr_log_verbose("[dnstap] " fmt, ##__VA_ARGS__);
-#define CFG_SOCK_PATH "sockPath"
-#define CFG_LOG_RESP_PKT "logRespPkt"
+#define CFG_SOCK_PATH "socket_path"
+#define CFG_LOG_RESP_PKT "log_responses"
 #define DEFAULT_SOCK_PATH "/tmp/dnstap.sock"
 #define DNSTAP_CONTENT_TYPE "protobuf:dnstap.Dnstap"
 #define DNSTAP_INITIAL_BUF_SIZE         256
@@ -211,7 +211,6 @@ static int dnstap_log(kr_layer_t *ctx) {
 
 KR_EXPORT
 int dnstap_init(struct kr_module *module) {
-	DEBUG_MSG("loading\n");
 	/* allocated memory for internal data */
 	struct dnstap_data *data = malloc(sizeof(*data));
 	if (!data) {
@@ -226,7 +225,6 @@ int dnstap_init(struct kr_module *module) {
 
 KR_EXPORT
 int dnstap_deinit(struct kr_module *module) {
-	DEBUG_MSG("unloading\n");
 	struct dnstap_data *data = module->data;
 	/* Free allocated memory */
 	if (data) {

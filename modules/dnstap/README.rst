@@ -11,14 +11,14 @@ Configuration
 ^^^^^^^^^^^^^
 Tunables:
 
-* ``sockpath``: the the unix socket file where dnstap messages will be sent
-* ``logRespPkt``: if true responses in wire format will be logged
+* ``socket_path``: the the unix socket file where dnstap messages will be sent
+* ``log_responses``: if true responses in wire format will be logged
 
 .. code-block:: lua
 
     modules = {
         dnstap = {
-            sockPath = "/tmp/dnstap.sock",
-            logRespPkt = true
+            socket_path = "/tmp/dnstap.sock",
+            log_responses = true
         }
     }

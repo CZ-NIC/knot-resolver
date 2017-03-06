@@ -2,8 +2,8 @@ verbose(true)
 modules = {
 	'hints',
 	dnstap = {
-		sockPath = "/tmp/dnstap.sock",
-		logRespPkt = true,
+		socket_path = "/tmp/dnstap.sock",
+		log_responses = true,
 	}
 }
 hints['fake1.localdomain'] = '1.2.3.4'
