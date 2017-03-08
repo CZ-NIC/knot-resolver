@@ -4,17 +4,19 @@ Knot Resolver 1.2.4-dev (2017-03-XX)
 Security
 --------
 - Knot Resolver 1.2.0 and higher could return AD flag for insecure
-  answer if the daemon received answer with invalid RRSIG several times
-  in a row.
+  answer if the daemon received answer with invalid RRSIG several
+  times in a row.
 
 Improvements
 ------------
-- modules/policy: allow QTRACE policy to be chained with other policies
+- modules/policy: allow QTRACE policy to be chained with other
+  policies
 - hints.add_hosts(path): a new property
 - module: document the API and simplify the code
 - policy.MIRROR: support IPv6 link-local addresses
 - policy.FORWARD: support IPv6 link-local addresses
-- add net.outgoing_{v4,v6} to allow specifying address to use for connections
+- add net.outgoing_{v4,v6} to allow specifying address to use for
+  connections
 
 Bugfixes
 --------
@@ -26,6 +28,8 @@ Bugfixes
 - fix a potential memory leak
 - don't treat answers that contain DS non-existance proof as insecure
 - don't store NSEC3 and their signatures in the cache
+- layer/iterate: when processing delegations, check if qname is at or
+  below new authority
 
 
 Knot Resolver 1.2.3 (2017-02-23)

@@ -209,8 +209,10 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	int state = KR_STATE_CONSUME;
 
 	/* New authority MUST be at/below the authority of the current cut;
+	 * also qname must be below new authority;
 	 * otherwise it's a possible cache injection attempt. */
-	if (!knot_dname_in(current_cut, rr->owner)) {
+	if (!knot_dname_in(current_cut, rr->owner) ||
+	    !knot_dname_in(rr->owner, qry->sname)) {
 		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
 #ifdef STRICT_MODE
 		return KR_STATE_FAIL;
