@@ -1,6 +1,12 @@
 Knot Resolver 1.2.4-dev (2017-03-XX)
 ================================
 
+Security
+--------
+- Knot Resolver 1.2.0 and higher could return AD flag for insecure
+  answer if the daemon received answer with invalid RRSIG several times
+  in a row.
+
 Improvements
 ------------
 - modules/policy: allow QTRACE policy to be chained with other policies
@@ -13,10 +19,13 @@ Improvements
 Bugfixes
 --------
 - layer/iterate: some improvements in cname chain unrolling
-- layer/validate: fix duplicate records in AUTHORITY section in case of WC expansion proof
+- layer/validate: fix duplicate records in AUTHORITY section in case
+  of WC expansion proof
 - lua: do *not* truncate cache size to unsigned
 - forwarding mode: correctly forward +cd flag
 - fix a potential memory leak
+- don't treat answers that contain DS non-existance proof as insecure
+- don't store NSEC3 and their signatures in the cache
 
 
 Knot Resolver 1.2.3 (2017-02-23)

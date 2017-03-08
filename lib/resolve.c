@@ -185,9 +185,11 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 
 	/* It can occur that here parent query already have
 	 * provably insecured zonecut which not in the cache yet. */
+	const uint32_t insec_flags = QUERY_DNSSEC_INSECURE | QUERY_DNSSEC_NODS;
+	const uint32_t cut_flags = QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6;
 	const bool is_insecured = ((qry->parent != NULL) &&
-				   (qry->parent->flags & (QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6)) == 0 &&
-				   (qry->parent->flags & QUERY_DNSSEC_INSECURE) != 0);
+				   (qry->parent->flags & cut_flags) == 0 &&
+				   (qry->parent->flags & insec_flags) != 0);
 
 	/* Want DNSSEC if it's possible to secure this name
 	 * (e.g. is covered by any TA) */
@@ -973,7 +975,10 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		set_yield(&request->answ_selected, qry->uid, false);
 		set_yield(&request->auth_selected, qry->uid, false);
 		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
-		qry->deferred = pickle->next;
+		if (request->state != KR_STATE_YIELD) {
+			/* No new deferred answers, take the next */
+			qry->deferred = pickle->next;
+		}
 	} else {
 		/* Caller is interested in always tracking a zone cut, even if the answer is cached
 		 * this is normally not required, and incurrs another cache lookups for cached answer. */

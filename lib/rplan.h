@@ -51,7 +51,8 @@
 	X(BADCOOKIE_AGAIN, 1 << 22) /**< Query again because bad cookie returned. */ \
 	X(CNAME,           1 << 23) /**< Query response contains CNAME in answer section. */ \
 	X(REORDER_RR,      1 << 24) /**< Reorder cached RRs. */ \
-	X(TRACE,	   1 << 25) /**< Log answer with kr_verbose_log(), unless -DNDEBUG. */
+	X(TRACE,	   1 << 25) /**< Log answer with kr_verbose_log(), unless -DNDEBUG. */ \
+	X(DNSSEC_NODS,	   1 << 27) /**< DS non-existance is proven */ \
 			/* 1 << 31       Used by ../modules/dns64/dns64.lua */
 
 /** Query flags */
