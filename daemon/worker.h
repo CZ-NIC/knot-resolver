@@ -54,7 +54,11 @@ int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
 
 /**
  * Schedule query for resolution.
+ *
  * @return 0 or an error code
+ *
+ * @note the options passed are |-combined with struct kr_context::options
+ * @todo maybe better semantics for this?
  */
 int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options,
 		worker_cb_t on_complete, void *baton);

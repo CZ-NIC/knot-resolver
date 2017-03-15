@@ -1049,9 +1049,12 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned option
 	}
 	task->baton = baton;
 	task->on_complete = on_complete;
-	task->req.options |= options;
 	/* Start task */
 	int ret = qr_task_start(task, query);
+
+	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
+	task->req.options |= options;
+
 	if (ret != 0) {
 		qr_task_unref(task);
 		return ret;
