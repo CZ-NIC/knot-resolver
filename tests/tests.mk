@@ -15,6 +15,7 @@ endif
 deckard_DIR := tests/deckard
 TESTS := sets/resolver
 TEMPLATE := template/kresd.j2
+SUBMODULES_DIRTY := $(shell git submodule status --recursive | cut -c 1 | grep -q '[^ ]' && echo $$?)
 
 REAL_PREFIX=$(realpath $(PREFIX))
 REAL_CURDIR=$(realpath $(CURDIR))
@@ -24,6 +25,7 @@ $(deckard_DIR)/Makefile:
 
 check-integration: $(deckard_DIR)/Makefile
 	$(if $(findstring $(REAL_CURDIR),$(REAL_PREFIX)),, $(warning Warning: PREFIX does not point into source directory; testing the installed version!))
+	$(if $(SUBMODULES_DIRTY), $(warning Warning: Git submodules are not up-to-date),)
 	@mkdir -p $(deckard_DIR)/contrib/libswrap/obj
 	+TESTS=$(TESTS) DAEMON=$(abspath $(SBINDIR)/kresd) TEMPLATE=$(TEMPLATE) $(preload_syms) $(deckard_DIR)/kresd_run.sh
 
