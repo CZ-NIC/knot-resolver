@@ -1,3 +1,5 @@
+local trust_anchors -- the public pseudo-module, exported as global variable
+
 -- Fetch over HTTPS with peert cert checked
 local function https_fetch(url, ca)
 	local ssl_ok, https = pcall(require, 'ssl.https')
@@ -168,7 +170,8 @@ local function ta_missing(ta, hold_down_time)
 	return keep_ta
 end
 
-local active_refresh -- forward
+local active_refresh, update -- forwards
+
 -- Plan an event for refreshing the root DNSKEYs and re-scheduling itself
 local function refresh_plan(trust_anchors, timeout, priming, is_initial)
 	trust_anchors.refresh_ev = event.after(timeout, function (ev)
@@ -200,7 +203,7 @@ active_refresh = function (trust_anchors, pkt, is_initial)
 				table.insert(keyset, rr)
 			end
 		end
-		trust_anchors.update(keyset, is_initial)
+		update(keyset, is_initial)
 		retry = false
 	else
 		print('[ ta ] active refresh failed, rcode: '..pkt:rcode())
@@ -307,101 +310,109 @@ local function keyset_publish(keyset)
 	return count
 end
 
+
+-- Update existing keyset; return true if successful.
+-- Param `is_initial` (bool): force .NewKey states to .Valid, i.e. init empty keyset.
+update = function (new_keys, is_initial)
+	if not new_keys then return false end
+	-- Filter TAs to be purged from the keyset (KeyRem)
+	local hold_down = trust_anchors.hold_down_time / 1000
+	local keyset = {}
+	local keep_removed = trust_anchors.keep_removed
+	for i, ta in ipairs(trust_anchors.keyset) do
+		local keep = true
+		if not ta_find(new_keys, ta) then
+			-- Ad-hoc: RFC 5011 doesn't mention removing a Missing key.
+			-- Let's do it after a very long period has elapsed.
+			keep = ta_missing(ta, hold_down * 4)
+		end
+		-- Purge removed keys
+		if ta.state == key_state.Removed then
+			if keep_removed > 0 then
+				keep_removed = keep_removed - 1
+			else
+				keep = false
+			end
+		end
+		if keep then
+			table.insert(keyset, ta)
+		end
+	end
+	-- Evaluate new TAs
+	for i, rr in ipairs(new_keys) do
+		if (rr.type == kres.type.DNSKEY or rr.type == kres.type.DS) and rr.rdata ~= nil then
+			ta_present(keyset, rr, hold_down, is_initial)
+		end
+	end
+
+	-- Store keyset in the file
+	if trust_anchors.file_current ~= nil then
+		keyset_write(keyset, trust_anchors.file_current)
+	end
+
+	-- Start using the new TAs.
+	trust_anchors.keyset = keyset
+	if keyset_publish(keyset) == 0 then
+		warn('[ ta ] ERROR: no root anchors are trusted!')
+		-- TODO: try to rebootstrap?
+		return false
+	end
+
+	return true
+end
+
+local config = function (path, unmanaged)
+	-- Bootstrap if requested and keyfile doesn't exist
+	if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
+	if not unmanaged then
+		if not io.open(path, 'r') then
+			local rr, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
+			if not rr then
+				msg = msg .. '\n'
+					.. '[ ta ] Failed to bootstrap root trust anchors; see:\n'
+					.. '       https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec'
+				error(msg)
+			end
+			print(msg)
+			trustanchor(rr)
+			-- Fetch DNSKEY immediately
+			trust_anchors.file_current = path
+			refresh_plan(trust_anchors, 0, true, true)
+			return
+		elseif path == trust_anchors.file_current then
+			return
+		end
+	end
+	if unmanaged then
+		trust_anchors.file_current = nil
+	else
+		trust_anchors.file_current = path
+	end
+	-- Parse new keys, refresh eventually
+	trust_anchors.keyset = keyset_read(path)
+	if keyset_publish(trust_anchors.keyset) == 0 then
+		warn('[ ta ] ERROR: no root anchors are trusted!')
+		-- TODO: try to rebootstrap?
+	end
+	refresh_plan(trust_anchors, 10 * sec, true, false)
+end
+
+
 -- TA store management
-local trust_anchors = {
+trust_anchors = {
 	keyset = {},
+	
+	-- Documented properties:
 	insecure = {},
 	hold_down_time = 30 * day,
+	refresh_time = nil,
 	keep_removed = 0,
+
 	bootstrap_url = 'https://data.iana.org/root-anchors/root-anchors.xml',
 	bootstrap_ca = '@ETCDIR@/icann-ca.pem',
 
-	-- Update existing keyset; return true if successful.
-	-- Param `is_initial` (bool): force .NewKey states to .Valid, i.e. init empty keyset.
-	update = function (new_keys, is_initial)
-		if not new_keys then return false end
-		-- Filter TAs to be purged from the keyset (KeyRem)
-		local hold_down = trust_anchors.hold_down_time / 1000
-		local keyset = {}
-		local keep_removed = trust_anchors.keep_removed
-		for i, ta in ipairs(trust_anchors.keyset) do
-			local keep = true
-			if not ta_find(new_keys, ta) then
-				-- Ad-hoc: RFC 5011 doesn't mention removing a Missing key.
-				-- Let's do it after a very long period has elapsed.
-				keep = ta_missing(ta, hold_down * 4)
-			end
-			-- Purge removed keys
-			if ta.state == key_state.Removed then
-				if keep_removed > 0 then
-					keep_removed = keep_removed - 1
-				else
-					keep = false
-				end
-			end
-			if keep then
-				table.insert(keyset, ta)
-			end
-		end
-		-- Evaluate new TAs
-		for i, rr in ipairs(new_keys) do
-			if (rr.type == kres.type.DNSKEY or rr.type == kres.type.DS) and rr.rdata ~= nil then
-				ta_present(keyset, rr, hold_down, is_initial)
-			end
-		end
-
-		-- Store keyset in the file
-		if trust_anchors.file_current ~= nil then
-			keyset_write(keyset, trust_anchors.file_current)
-		end
-
-		-- Start using the new TAs.
-		trust_anchors.keyset = keyset
-		if keyset_publish(keyset) == 0 then
-			warn('[ ta ] ERROR: no root anchors are trusted!')
-			-- TODO: try to rebootstrap?
-			return false
-		end
-
-		return true
-	end,
-
 	-- Load keys from a file (managed)
-	config = function (path, unmanaged)
-		-- Bootstrap if requested and keyfile doesn't exist
-		if trust_anchors.refresh_ev ~= nil then event.cancel(trust_anchors.refresh_ev) end
-		if not unmanaged then
-			if not io.open(path, 'r') then
-				local rr, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
-				if not rr then
-					msg = msg .. '\n'
-						.. '[ ta ] Failed to bootstrap root trust anchors; see:\n'
-					    .. '       https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec'
-					error(msg)
-				end
-				print(msg)
-				trustanchor(rr)
-				-- Fetch DNSKEY immediately
-				trust_anchors.file_current = path
-				refresh_plan(trust_anchors, 0, true, true)
-				return
-			elseif path == trust_anchors.file_current then
-				return
-			end
-		end
-		if unmanaged then
-			trust_anchors.file_current = nil
-		else
-			trust_anchors.file_current = path
-		end
-		-- Parse new keys, refresh eventually
-		trust_anchors.keyset = keyset_read(path)
-		if keyset_publish(trust_anchors.keyset) == 0 then
-			warn('[ ta ] ERROR: no root anchors are trusted!')
-			-- TODO: try to rebootstrap?
-		end
-		refresh_plan(trust_anchors, 10 * sec, true, false)
-	end,
+	config = config,
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
 	add = function (keystr)
