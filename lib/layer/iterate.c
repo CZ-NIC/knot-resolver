@@ -138,16 +138,29 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		const knot_rdata_t *rdata = rr->rrs.data;
+		const void *addr = knot_rdata_data(rdata);
+		const int addr_len = knot_rdata_rdlen(rdata);
+		char name_str[KNOT_DNAME_MAXLEN];
+		char addr_str[INET6_ADDRSTRLEN];
+		WITH_VERBOSE {
+			const int af = (addr_len == sizeof(struct in_addr)) ?
+				       AF_INET : AF_INET6;
+			knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
+			inet_ntop(af, addr, addr_str, sizeof(addr_str));
+		}
 		if (!(query->flags & QUERY_ALLOW_LOCAL) &&
-			!is_valid_addr(knot_rdata_data(rdata), knot_rdata_rdlen(rdata))) {
+			!is_valid_addr(addr, addr_len)) {
+			QVERBOSE_MSG(query, "<= ignoring invalid glue for "
+				     "'%s': '%s'\n", name_str, addr_str);
 			return KR_STATE_CONSUME; /* Ignore invalid addresses */
 		}
 		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata);
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
+		QVERBOSE_MSG(query, "<= using glue for "
+			     "'%s': '%s'\n", name_str, addr_str);
 	}
-
 	return KR_STATE_CONSUME;
 }
 
@@ -166,18 +179,6 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_reques
 				continue;
 			}
 			(void) update_nsaddr(rr, req->current_query);
-			WITH_VERBOSE {
-				char name_str[KNOT_DNAME_MAXLEN];
-				char addr_str[INET6_ADDRSTRLEN];
-				const void *addr = knot_rdata_data(rr->rrs.data);
-				const int addr_len = knot_rdata_rdlen(rr->rrs.data);
-				const int af = (addr_len == sizeof(struct in_addr)) ?
-					       AF_INET : AF_INET6;
-				knot_dname_to_str(name_str, ns, sizeof(name_str));
-				inet_ntop(af, addr, addr_str, sizeof(addr_str));
-				VERBOSE_MSG("<= using glue for '%s': '%s'\n",
-					    name_str, addr_str);
-			}
 		}
 	}
 }
