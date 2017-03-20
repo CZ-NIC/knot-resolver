@@ -360,17 +360,20 @@ static int prepend_asterisk(uint8_t *tgt, size_t maxlen, const knot_dname_t *nam
 /**
  * Closest encloser proof (RFC5155 7.2.1).
  * @note No RRSIGs are validated.
- * @param pkt                    Packet structure to be processed.
- * @param section_id             Packet section to be processed.
- * @param sname                  Name to be checked.
- * @param encloser_name          Returned matching encloser name, if found.
- * @param matching_ecloser_nsec3 Pointer to matching encloser NSEC RRSet.
- * @param covering_next_nsec3    Pointer to covering next closer NSEC3 RRSet.
- * @return                       0 or error code.
+ * @param pkt                     Packet structure to be processed.
+ * @param section_id              Packet section to be processed.
+ * @param sname                   Name to be checked.
+ * @param encloser_name           Returned matching encloser name, if found.
+ * @param matching_encloser_nsec3 Pointer to matching encloser NSEC RRSet.
+ * @param covering_next_nsec3     Pointer to covering next closer NSEC3 RRSet.
+ * @return                        0 or error code.
  */
-static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_id,
-                                  const knot_dname_t *sname, const knot_dname_t **encloser_name,
-                                  const knot_rrset_t **matching_ecloser_nsec3, const knot_rrset_t **covering_next_nsec3)
+static int closest_encloser_proof(const knot_pkt_t *pkt,
+				  knot_section_t section_id,
+				  const knot_dname_t *sname,
+				  const knot_dname_t **encloser_name,
+				  const knot_rrset_t **matching_encloser_nsec3,
+				  const knot_rrset_t **covering_next_nsec3)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
 	if (!sec || !sname) {
@@ -427,8 +430,8 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
 		if (encloser_name && next_closer[0]) {
 			*encloser_name = knot_wire_next_label(next_closer, NULL);
 		}
-		if (matching_ecloser_nsec3) {
-			*matching_ecloser_nsec3 = matching;
+		if (matching_encloser_nsec3) {
+			*matching_encloser_nsec3 = matching;
 		}
 		if (covering_next_nsec3) {
 			*covering_next_nsec3 = covering;
@@ -444,7 +447,10 @@ static int closest_encloser_proof(const knot_pkt_t *pkt, knot_section_t section_
  * @param pkt        Packet structure to be processed.
  * @param section_id Packet section to be processed.
  * @param encloser   Closest (provable) encloser domain name.
- * @return           0 or error code.
+ * @return           0 or error code:
+ *                   DNSSEC_OUT_OF_RANGE - NSEC3 RR (that covers a wildcard)
+ *                   has been found, but has opt-out flag set;
+ *                   otherwise - error.
  */
 static int covers_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section_t section_id,
                                             const knot_dname_t *encloser)
@@ -474,7 +480,8 @@ static int covers_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section_
 			return ret;
 		}
 		if (flags & FLG_NAME_COVERED) {
-			return kr_ok();
+			return has_optout(rrset) ?
+			       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
 		}
 	}
 
@@ -485,11 +492,23 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
                                        const knot_dname_t *sname)
 {
 	const knot_dname_t *encloser = NULL;
-	int ret = closest_encloser_proof(pkt, section_id, sname, &encloser, NULL, NULL);
+	const knot_rrset_t *covering_next_nsec3 = NULL;
+	int ret = closest_encloser_proof(pkt, section_id, sname,
+					 &encloser, NULL, &covering_next_nsec3);
 	if (ret != 0) {
 		return ret;
 	}
-	return covers_closest_encloser_wildcard(pkt, section_id, encloser);
+	ret = covers_closest_encloser_wildcard(pkt, section_id, encloser);
+	if (ret != 0) {
+		/* OK, but NSEC3 for wildcard at encloser has opt-out;
+		 * or error */
+		return ret;
+	}
+	/* Closest encloser proof is OK and
+	 * NSEC3 for wildcard has been found and optout flag is not set.
+	 * Now check if NSEC3 that covers next closer name has opt-out. */
+	return has_optout(covering_next_nsec3) ?
+	       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
 }
 
 /**

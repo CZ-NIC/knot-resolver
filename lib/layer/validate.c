@@ -641,7 +641,14 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		} else {
 			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}
-		if (ret != 0) {
+		if (has_nsec3 && (ret == kr_error(DNSSEC_OUT_OF_RANGE))) {
+			/* NXDOMAIN proof is OK,
+			 * but NSEC3 that covers next closer name
+			 * (or wildcard at next closer name) has opt-out flag.
+			 * RFC5155 9.2; AD flag can not be set */
+			qry->flags |= QUERY_DNSSEC_OPTOUT;
+			VERBOSE_MSG(qry, "<= can't prove NXDOMAIN due to optout, going insecure\n");
+		} else if (ret != 0) {
 			VERBOSE_MSG(qry, "<= bad NXDOMAIN proof\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KR_STATE_FAIL;
@@ -665,7 +672,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (ret != 0) {
 				if (has_nsec3 && (ret == kr_error(DNSSEC_OUT_OF_RANGE))) {
 					VERBOSE_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
-					qry->flags |= QUERY_DNSSEC_NODS;
+					qry->flags |= QUERY_DNSSEC_OPTOUT;
 					/* Could not return from here,
 					 * we must continue, validate NSEC\NSEC3 and
 					 * call update_parent_keys() to mark

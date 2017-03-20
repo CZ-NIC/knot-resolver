@@ -537,7 +537,8 @@ static int answer_finalize(struct kr_request *request, int state)
 		struct kr_query *last = array_tail(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
 		const bool secure = (last->flags & QUERY_DNSSEC_WANT) &&
-		                   !(last->flags & QUERY_DNSSEC_INSECURE);
+				    !(last->flags & QUERY_DNSSEC_INSECURE) &&
+				    !(last->flags & QUERY_DNSSEC_OPTOUT);
 		if (!(last->flags & QUERY_STUB) /* Never set AD if forwarding. */
 		    && has_ad && secure
 		    && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
