@@ -188,6 +188,7 @@ int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
 unsigned int kr_rand_uint(unsigned int);
+void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
 int kr_pkt_recycle(knot_pkt_t *);
 const char *kr_inaddr(const struct sockaddr *);
