@@ -634,7 +634,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/* Check if answer if not empty,
 		 * but iterator has not selected any records. */
 		if (!check_empty_answer(ctx, pkt)) {
-			VERBOSE_MSG(qry, "<= empty authoritative answer\n");
+			VERBOSE_MSG(qry, "<= no useful RR in authoritative answer\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;
 			return KR_STATE_FAIL;
 		}
