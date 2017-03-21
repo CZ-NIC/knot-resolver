@@ -219,6 +219,7 @@ local function keyset_write(keyset, path)
 	for i = 1, #keyset do
 		local ta = keyset[i]
 		ta.comment = ' ' .. ta.state .. ':' .. (ta.timer or '')
+					.. ' ; KeyTag:' .. ta.key_tag -- the tag is just for humans
 		local rr_str = kres.rr2str(ta) .. '\n'
 		if ta.state ~= key_state.Valid and ta.state ~= key_state.Missing then
 			rr_str = '; '..rr_str -- Invalidate key string (for older kresd versions)
@@ -279,6 +280,11 @@ local function keyset_read(path)
 				end
 			end
 		end
+	end
+
+	local _k, ta
+	for _k, ta in pairs(tas) do
+		ta.key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 	end
 	return tas
 end
