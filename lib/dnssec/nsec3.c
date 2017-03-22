@@ -669,7 +669,8 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 			return ret;
 		}
 		if (flags & FLG_NAME_COVERED) {
-			return kr_ok();
+			return has_optout(rrset) ?
+			       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
 		}
 	}
 
