@@ -326,10 +326,12 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 #endif
 	/* Remember current bailiwick for NS processing. */
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
+	bool ns_record_exists = false;
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
+			ns_record_exists = true;
 			int state = update_cut(pkt, rr, req, current_zone_cut);
 			switch(state) {
 			case KR_STATE_DONE: result = state; break;
@@ -343,8 +345,11 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	}
 
 	if ((qry->flags & QUERY_DNSSEC_WANT) && (result == KR_STATE_CONSUME)) {
-		if (knot_wire_get_aa(pkt->wire) == 0 && knot_wire_get_ancount(pkt->wire) == 0) {
-			/* Prevent from validating as an autoritative answer */
+		if (knot_wire_get_aa(pkt->wire) == 0 &&
+		    knot_wire_get_ancount(pkt->wire) == 0 &&
+		    ns_record_exists) {
+			/* Unhelpful referral
+			   Prevent from validating as an authoritative answer */
 			result = KR_STATE_DONE;
 		}
 	}

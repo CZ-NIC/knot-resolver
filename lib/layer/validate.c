@@ -508,6 +508,26 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 	return ret;
 }
 
+static bool check_empty_answer(kr_layer_t *ctx, knot_pkt_t *pkt)
+{
+	struct kr_request *req	= ctx->req;
+	struct kr_query *qry	= req->current_query;
+	ranked_rr_array_t *arr	= &req->answ_selected;
+	size_t num_entries = 0;
+	for (size_t i = 0; i < arr->len; ++i) {
+		ranked_rr_array_entry_t *entry = arr->at[i];
+		const knot_rrset_t *rr = entry->rr;
+		if (rr->type == KNOT_RRTYPE_RRSIG && qry->stype != KNOT_RRTYPE_RRSIG) {
+			continue;
+		}
+		if (entry->qry_uid == qry->uid) {
+			++num_entries;
+		}
+	}
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
+	return ((an->count != 0) && (num_entries == 0)) ? false : true;
+}
+
 static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
@@ -611,6 +631,13 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const bool no_data = (an->count == 0 && knot_wire_get_aa(pkt->wire));
 
 	if (!(qry->flags & QUERY_CACHED) && knot_wire_get_aa(pkt->wire)) {
+		/* Check if answer if not empty,
+		 * but iterator has not selected any records. */
+		if (!check_empty_answer(ctx, pkt)) {
+			VERBOSE_MSG(qry, "<= no useful RR in authoritative answer\n");
+			qry->flags |= QUERY_DNSSEC_BOGUS;
+			return KR_STATE_FAIL;
+		}
 		/* Track difference between current TA and signer name.
 		 * This indicates that the NS is auth for both parent-child,
 		 * and we must update DS/DNSKEY to validate it.
