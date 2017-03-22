@@ -376,7 +376,7 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 		return 1;
 	}
 
-	assert(a && b && bits >= 0  ||  bits == 0);
+	assert((a && b && bits >= 0)  ||  bits == 0);
 	/* Compare part byte-divisible part. */
 	const size_t chunk = bits / 8;
 	int ret = memcmp(a, b, chunk);
