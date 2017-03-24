@@ -89,13 +89,30 @@ static int nsec_nonamematch(const knot_rrset_t *nsec, const knot_dname_t *sname)
 #define FLG_NOEXIST_WILDCARD (1 << 2) /**< No wildcard covering <SNAME, SCLASS> exists. */
 #define FLG_NOEXIST_CLOSER (1 << 3) /**< Wildcard covering <SNAME, SCLASS> exists, but doesn't match STYPE. */
 
+
+/**
+ * According to set flags determine whether NSEC proving
+ * RRset or RRType non-existense has been found.
+ * @param f Flags to inspect.
+ * @return  True if required NSEC exists.
+ */
+#define kr_nsec_rrset_noexist(f) \
+        ((f) & (FLG_NOEXIST_RRTYPE | FLG_NOEXIST_RRSET))
+/**
+ * According to set flags determine whether wildcard non-existense
+ * has been proven.
+ * @param f Flags to inspect.
+ * @return  True if wildcard not exists.
+ */
+#define kr_nsec_wcard_noexist(f) ((f) & FLG_NOEXIST_WILDCARD)
+
 /**
  * According to set flags determine whether authenticated denial of existence has been proven.
  * @param f Flags to inspect.
  * @return  True if denial of existence proven.
  */
 #define kr_nsec_existence_denied(f) \
-	(((f) & (FLG_NOEXIST_RRTYPE | FLG_NOEXIST_RRSET)) && ((f) & FLG_NOEXIST_WILDCARD))
+	((kr_nsec_rrset_noexist(f)) && (kr_nsec_wcard_noexist(f)))
 
 /**
  * Name error response check (RFC4035 3.1.3.2; RFC4035 5.4, bullet 2).
@@ -254,6 +271,47 @@ static int no_data_wildcard_existence_check(int *flags, const knot_rrset_t *nsec
 	return kr_ok();
 }
 
+/**
+ * Perform check for NSEC wildcard existence that covers sname and
+ * have no stype bit set.
+ * @param pkt   Packet structure to be processed.
+ * @param sec   Packet section to work with.
+ * @param sname Queried domain name.
+ * @param stype Queried type.
+ * @return      0 or error code.
+ */
+static int wildcard_match_check(const knot_pkt_t *pkt, const knot_pktsection_t *sec,
+				const knot_dname_t *sname, uint16_t stype)
+{
+	if (!sec || !sname) {
+		return kr_error(EINVAL);
+	}
+
+	int flags = 0;
+	for (unsigned i = 0; i < sec->count; ++i) {
+		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
+		if (rrset->type != KNOT_RRTYPE_NSEC) {
+			continue;
+		}
+		if (!knot_dname_is_wildcard(rrset->owner)) {
+			continue;
+		}
+		int wcard_labels = knot_dname_labels(rrset->owner, NULL);
+		int common_labels = knot_dname_matched_labels(rrset->owner, sname);
+		int rrsig_labels = coverign_rrsig_labels(rrset, sec);
+		if (wcard_labels <= 1 ||
+		    common_labels != wcard_labels - 1 ||
+		    common_labels != rrsig_labels) {
+			continue;
+		}
+		int ret = no_data_response_check_rrtype(&flags, rrset, stype);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+	return (flags & FLG_NOEXIST_RRTYPE) ? kr_ok() : kr_error(ENOENT);
+}
+
 int kr_nsec_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
                                    const knot_dname_t *sname, uint16_t stype)
 {
@@ -323,8 +381,23 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 		}
 		no_data_wildcard_existence_check(&flags, rrset, sec);
 	}
-
-	return kr_nsec_existence_denied(flags) ? kr_ok() : kr_error(ENOENT);
+	if (kr_nsec_existence_denied(flags)) {
+		/* denial of existence proved accordignly to 4035 5.4 -
+		 * NSEC proving either rrset non-existance or
+		 * qtype non-existance has been found,
+		 * and no wildcard expansion occured.
+		 */
+		return kr_ok();
+	} else if (kr_nsec_rrset_noexist(flags)) {
+		/* NSEC proving either rrset non-existance or
+		 * qtype non-existance has been found,
+		 * but wildcard expansion occurs.
+		 * Try to find matching wildcard and check
+		 * corresponding types.
+		 */
+		return wildcard_match_check(pkt, sec, sname, stype);
+	}
+	return kr_error(ENOENT);
 }
 
 int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
