@@ -842,6 +842,14 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
 		VERBOSE_MSG(qry, ">< negative TA, going insecure\n");
 		qry->flags &= ~QUERY_DNSSEC_WANT;
+		qry->flags |= QUERY_DNSSEC_INSECURE;
+	}
+	if (qry->flags & QUERY_DNSSEC_NODS) {
+		/* This is the next query iteration with minimized qname.
+		 * At previous iteration DS non-existance has been proven */
+		qry->flags &= ~QUERY_DNSSEC_NODS;
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+		qry->flags |= QUERY_DNSSEC_INSECURE;
 	}
 	/* Enable DNSSEC if enters a new island of trust. */
 	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT) &&
