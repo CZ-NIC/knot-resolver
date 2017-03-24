@@ -166,10 +166,14 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 	}
 
 	/* Records were validated.
-	 * If there is wildcard expansion in answer, flag the query.
+	 * If there is wildcard expansion in answer,
+	 * or optout - flag the query.
          */
 	if (an_flags & KR_DNSSEC_VFLG_WEXPAND) {
 		qry->flags |= QUERY_DNSSEC_WEXPAND;
+	}
+	if (an_flags & KR_DNSSEC_VFLG_OPTOUT) {
+		qry->flags |= QUERY_DNSSEC_OPTOUT;
 	}
 
 	return ret;
@@ -225,9 +229,11 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			return ret;
 		}
 
-		if (vctx.flags & KR_DNSSEC_VFLG_WEXPAND)
-		{
+		if (vctx.flags & KR_DNSSEC_VFLG_WEXPAND) {
 			qry->flags |= QUERY_DNSSEC_WEXPAND;
+		}
+		if (vctx.flags & KR_DNSSEC_VFLG_OPTOUT) {
+			qry->flags |= QUERY_DNSSEC_OPTOUT;
 		}
 
 	}
