@@ -404,23 +404,39 @@ static int net_tls_padding(lua_State *L)
 
 	/* Only return current padding. */
 	if (lua_gettop(L) == 0) {
-		if (engine->resolver.tls_padding == 0) {
-			return -1;
+		if (engine->resolver.tls_padding < 0) {
+			lua_pushboolean(L, true);
+			return 1;
+		} else if (engine->resolver.tls_padding == 0) {
+			lua_pushboolean(L, false);
+			return 1;
 		}
 		lua_pushinteger(L, engine->resolver.tls_padding);
 		return 1;
 	}
 
-	if ((lua_gettop(L) != 1) || !lua_isnumber(L, 1)) {
-		lua_pushstring(L, "net.tls_padding takes one numeric parameter: (\"padding\")");
+	if ((lua_gettop(L) != 1)) {
+		lua_pushstring(L, "net.tls_padding takes one parameter: (\"padding\")");
 		lua_error(L);
 	}
-	int padding = lua_tointeger(L, 1);
-	if ((padding < 0) || (padding > MAX_TLS_PADDING)) {
-		lua_pushstring(L, "net.tls_padding parameter has to be a number between <0, " xstr(MAX_TLS_PADDING) ">");
+	if (lua_isboolean(L, 1)) {
+		bool x = lua_toboolean(L, 1);
+		if (x) {
+			engine->resolver.tls_padding = -1;
+		} else {
+			engine->resolver.tls_padding = 0;
+		}
+	} else if (lua_isnumber(L, 1)) {
+		int padding = lua_tointeger(L, 1);
+		if ((padding < 0) || (padding > MAX_TLS_PADDING)) {
+			lua_pushstring(L, "net.tls_padding parameter has to be true, false, or a number between <0, " xstr(MAX_TLS_PADDING) ">");
+			lua_error(L);
+		}
+		engine->resolver.tls_padding = padding;
+	} else {
+		lua_pushstring(L, "net.tls_padding parameter has to be true, false, or a number between <0, " xstr(MAX_TLS_PADDING) ">");
 		lua_error(L);
 	}
-	engine->resolver.tls_padding = padding;
 	lua_pushboolean(L, true);
 	return 1;
 }

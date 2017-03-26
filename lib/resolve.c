@@ -423,8 +423,14 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 #endif /* defined(ENABLE_COOKIES) */
-	if (req->has_tls && req->ctx->tls_padding >= 2) {
-		wire_size += KNOT_EDNS_OPTION_HDRLEN + req->ctx->tls_padding;
+	if (req->has_tls) {
+		if (req->ctx->tls_padding == -1)
+			/* FIXME: we do not know how to reserve space for the
+			 * default padding policy, since we can't predict what
+			 * it will select. So i'm just guessing :/ */
+			wire_size += KNOT_EDNS_OPTION_HDRLEN + 512;
+		if (req->ctx->tls_padding >= 2)
+			wire_size += KNOT_EDNS_OPTION_HDRLEN + req->ctx->tls_padding;
 	}
 	return knot_pkt_reserve(pkt, wire_size);
 }
@@ -509,17 +515,24 @@ static int answer_padding(struct kr_request *request)
 		assert(false);
 		return kr_error(EINVAL);
 	}
-	uint16_t padding = request->ctx->tls_padding;
+	int32_t padding = request->ctx->tls_padding;
 	knot_pkt_t *answer = request->answer;
 	knot_rrset_t *opt_rr = answer->opt_rr;
+	int32_t pad_bytes = -1;
 
-	if (padding < 2) {
-		return kr_ok();
+	if (padding == -1) { /* use the default padding policy from libknot */
+#if KNOT_VERSION_HEX < ((2 << 16) | (4 << 8) | 3)
+		/* no knot_edns_default_padding_size available in libknot */
+		padding = KR_DEFAULT_TLS_PADDING;
+#else
+		pad_bytes =  knot_edns_default_padding_size(answer, opt_rr);
+#endif
 	}
-	int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
-
-	int32_t pad_bytes = MIN(knot_edns_alignment_size(answer->size, knot_rrset_size(opt_rr), padding),
+	if (padding >= 2) {
+		int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
+		pad_bytes = MIN(knot_edns_alignment_size(answer->size, knot_rrset_size(opt_rr), padding),
 				max_pad_bytes);
+	}
 
 	if (pad_bytes >= 0) {
 		uint8_t zeros[MAX(1, pad_bytes)];
