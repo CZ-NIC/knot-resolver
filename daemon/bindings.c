@@ -27,6 +27,9 @@
 #include "daemon/worker.h"
 #include "daemon/tls.h"
 
+#define xstr(s) str(s)
+#define str(s) #s
+
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error (lua_State *L);
 
@@ -225,7 +228,7 @@ static int net_listen(lua_State *L)
 	int n = lua_gettop(L);
 	if (n < 1 || n > 3) {
 		format_error(L, "expected one to three arguments; usage:\n"
-			"net.listen(addressses, [port = 53, flags = {tls = (port == 853)}])\n");
+			     "net.listen(addressses, [port = " xstr(KR_DNS_PORT) ", flags = {tls = (port == " xstr(KR_DNS_TLS_PORT) ")}])\n");
 		lua_error(L);
 	}
 
@@ -327,7 +330,7 @@ static int net_bufsize(lua_State *L)
 	}
 	int bufsize = lua_tointeger(L, 1);
 	if (bufsize < 512 || bufsize > UINT16_MAX) {
-		format_error(L, "bufsize must be within <512, 65535>");
+		format_error(L, "bufsize must be within <512, " xstr(UINT16_MAX) ">");
 		lua_error(L);
 	}
 	knot_edns_set_payload(opt_rr, (uint16_t) bufsize);
@@ -347,7 +350,7 @@ static int net_pipeline(lua_State *L)
 	}
 	int len = lua_tointeger(L, 1);
 	if (len < 0 || len > UINT16_MAX) {
-		format_error(L, "tcp_pipeline must be within <0, 65535>");
+		format_error(L, "tcp_pipeline must be within <0, " xstr(UINT16_MAX) ">");
 		lua_error(L);
 	}
 	worker->tcp_pipeline_max = len;
@@ -414,7 +417,7 @@ static int net_tls_padding(lua_State *L)
 	}
 	int padding = lua_tointeger(L, 1);
 	if ((padding < 0) || (padding > MAX_TLS_PADDING)) {
-		lua_pushstring(L, "net.tls_padding parameter has to be a number between <0, 4096>");
+		lua_pushstring(L, "net.tls_padding parameter has to be a number between <0, " xstr(MAX_TLS_PADDING) ">");
 		lua_error(L);
 	}
 	engine->resolver.tls_padding = padding;
@@ -578,7 +581,7 @@ static int cache_max_ttl(lua_State *L)
 		uint32_t min = cache->ttl_min;
 		int64_t ttl = lua_tonumber(L, 1);
 		if (ttl < 0 || ttl <= min || ttl > UINT32_MAX) {
-			format_error(L, "max_ttl must be larger than minimum TTL, and in range <1, UINT32_MAX>'");
+			format_error(L, "max_ttl must be larger than minimum TTL, and in range <1, " xstr(UINT32_MAX) ">'");
 			lua_error(L);
 		}
 		cache->ttl_max = ttl;
@@ -602,7 +605,7 @@ static int cache_min_ttl(lua_State *L)
 		uint32_t max = cache->ttl_max;
 		int64_t ttl = lua_tonumber(L, 1);
 		if (ttl < 0 || ttl >= max || ttl > UINT32_MAX) {
-			format_error(L, "min_ttl must be smaller than maximum TTL, and in range <0, UINT32_MAX>'");
+			format_error(L, "min_ttl must be smaller than maximum TTL, and in range <0, " xstr(UINT32_MAX) ">'");
 			lua_error(L);
 		}
 		cache->ttl_min = ttl;
@@ -626,7 +629,7 @@ static int cache_open(lua_State *L)
 
 	lua_Number csize_lua = lua_tonumber(L, 1);
 	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
-		format_error(L, "invalid cache size specified");
+		format_error(L, "invalid cache size specified, it must be in range <8192, " xstr(SIZE_MAX)  ">");
 		lua_error(L);
 	}
 	size_t cache_size = csize_lua;
