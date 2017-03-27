@@ -371,9 +371,19 @@ int kr_straddr_subnet(void *dst, const char *addr)
 
 int kr_bitcmp(const char *a, const char *b, int bits)
 {
-	if (!a || !b || bits == 0) {
-		return kr_error(ENOMEM);
+	/* We're using the function from lua directly, so at least for now
+	 * we avoid crashing on bogus inputs.  Meaning: NULL is ordered before
+	 * anything else, and negative length is the same as zero.
+	 * TODO: review the call sites and probably remove the checks. */
+	if (bits <= 0 || (!a && !b)) {
+		return 0;
+	} else if (!a) {
+		return -1;
+	} else if (!b) {
+		return 1;
 	}
+
+	assert((a && b && bits >= 0)  ||  bits == 0);
 	/* Compare part byte-divisible part. */
 	const size_t chunk = bits / 8;
 	int ret = memcmp(a, b, chunk);

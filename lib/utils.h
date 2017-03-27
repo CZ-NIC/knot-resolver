@@ -173,7 +173,10 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port);
   * @warning 'dst' must be at least `sizeof(struct in6_addr)` long. */
 KR_EXPORT
 int kr_straddr_subnet(void *dst, const char *addr);
-/** Compare memory bitwise. */
+
+/** Compare memory bitwise.  The semantics is "the same" as for memcmp().
+ *  The partial byte is considered with more-significant bits first,
+ *  so this is e.g. suitable for comparing IP prefixes. */
 KR_EXPORT KR_PURE
 int kr_bitcmp(const char *a, const char *b, int bits);
 
