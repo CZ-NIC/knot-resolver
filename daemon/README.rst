@@ -393,11 +393,16 @@ Environment
    by DNSSEC, some of the strict checking actions are counter-productive.
 
    .. csv-table::
-    :header: "Action", "Modes"
+    :header: "Glue type", "Modes when it is accepted",   "Example glue [#example_glue]_"
 
-    "Use mandatory glue", "strict, normal, permissive"
-    "Use in-bailiwick glue", "normal, permissive"
-    "Use any glue records", "permissive"
+    "mandatory glue",     "strict, normal, permissive",  "ns1.example.org"
+    "in-bailiwick glue",  "normal, permissive",          "ns1.example2.org"
+    "any glue records",   "permissive",                  "ns1.example3.net"
+
+   .. [#example_glue] The examples show glue records acceptable from servers
+        authoritative for `org` zone when delegating to `example.org` zone.
+        Unacceptable or missing glue records trigger resolution of names listed
+        in NS records before following respective delegation.
 
 .. function:: reorder_RR([true | false])
 
