@@ -232,6 +232,7 @@ function policy.enforce(state, req, action)
 	if action == policy.DENY then
 		-- Write authority information
 		local answer = req.answer
+		ffi.C.kr_pkt_make_auth_header(answer)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
 		answer:put('\7blocked', 900, answer:qclass(), kres.type.SOA,
@@ -315,7 +316,8 @@ function policy.todnames(names)
 	return names
 end
 
--- RFC1918 Private, local, broadcast, test and special zones 
+-- RFC1918 Private, local, broadcast, test and special zones
+-- Considerations: RFC6761, sec 6.1.
 local private_zones = {
 	'10.in-addr.arpa.',
 	'16.172.in-addr.arpa.',
