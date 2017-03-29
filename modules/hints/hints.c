@@ -15,7 +15,7 @@
  */
 
 /**
- * @file hints.h
+ * @file hints.c
  * @brief Constructed zone cut from the hosts-like file, see @zonecut.h
  *
  * The module provides an override for queried address records.

@@ -14,6 +14,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file iterate.c
+ *
+ * This builtin module is mainly active in the consume phase.
+ * Primary responsibilities:
+ *  - Classify the packet as auth/nonauth and change its AA flag accordingly.
+ *  - Pick interesting RRs to kr_request::answ_selected and ::auth_selected,
+ *    NEW: and classify their rank, except for validation status.
+ *  - Update kr_query::zone_cut (in case of referral).
+ *  - Interpret CNAMEs.
+ *  - Prepare the followup query - either inline or as another kr_query
+ *    (CNAME jumps create a new "sibling" query).
+ */
+
 #include <sys/time.h>
 #include <assert.h>
 #include <arpa/inet.h>

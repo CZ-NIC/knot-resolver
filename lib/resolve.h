@@ -72,16 +72,38 @@
  * @endcode
  */
 
-/** Validation rank */
-typedef enum kr_validation_rank {
-	KR_VLDRANK_INITIAL   = 0,   /* No validated yet or no information about it. */
-	KR_VLDRANK_INSECURE  = 1,   /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
-	KR_VLDRANK_BAD       = 2,   /* Matching RRSIG found, but validation fails.  Unused?! */
-	KR_VLDRANK_MISMATCH  = 3,   /* RRSIG signer name is */
-	KR_VLDRANK_UNKNOWN   = 4,   /* Unknown */
-	KR_VLDRANK_SECURE    = 5    /* Entry is DNSSEC valid (e.g. RRSIG exists).
-				     * Note: it's also used for RRSIGs currently. */
-} kr_validation_rank_t;
+
+/**
+ * Cache entry rank.
+ *
+ * @note Be careful about chosen cache rank nominal values.
+ * - AUTH must be > than NONAUTH
+ * - AUTH INSECURE must be > than AUTH (because it attempted validation)
+ * - NONAUTH SECURE must be > than AUTH (because it's valid)
+ *
+ * See also:
+ *   https://tools.ietf.org/html/rfc2181#section-5.4.1
+ *   https://tools.ietf.org/html/rfc4035#section-4.3
+ */
+enum kr_rank {
+	KR_RANK_INITIAL = 0,
+
+	KR_RANK_BAD = 7,  /**< For simple manipulation with the four below. */
+	KR_RANK_OMIT = 1, /**< Do not validate. */
+	KR_RANK_INDET,    /**< Unable to determine whether it should be secure. */
+	KR_RANK_BOGUS,    /**< Ought to be secure but isn't. */
+	KR_RANK_MISMATCH,
+
+	KR_RANK_INSECURE = 8, /**< Proven to be insecure. */
+
+	/** Authoritative data flag; the chain of authority was "verified".
+	 *  Even if not set, only in-bailiwick stuff is acceptable,
+	 *  i.e. almost authoritative (example: mandatory glue and its NS RR). */
+	KR_RANK_AUTH = 16,
+
+	KR_RANK_SECURE = 32,  /**< Verified whole chain of trust from the closest TA. */
+	/* @note Rank must not exceed 6 bits */
+};
 
 /** @cond internal Array of modules. */
 typedef array_t(struct kr_module *) module_array_t;
