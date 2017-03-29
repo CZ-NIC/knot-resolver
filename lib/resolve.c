@@ -851,24 +851,28 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 		qry->flags |= QUERY_DNSSEC_INSECURE;
 	}
-	/* Enable DNSSEC if enters a new island of trust. */
+	/* Enable DNSSEC if entering a new (or different) island of trust,
+	 * and update the TA RRset if required. */
 	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT) &&
 			    !knot_wire_get_cd(request->answer->wire);
-	if (!(qry->flags & QUERY_DNSSEC_WANT) &&
-	    !knot_wire_get_cd(request->answer->wire) &&
-	    kr_ta_get(trust_anchors, qry->zone_cut.name)) {
+	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
+	if (!knot_wire_get_cd(request->answer->wire) && ta_rr) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 		want_secured = true;
-		WITH_VERBOSE {
-		char qname_str[KNOT_DNAME_MAXLEN];
-		knot_dname_to_str(qname_str, qry->zone_cut.name, sizeof(qname_str));
-		VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
+
+		if (qry->zone_cut.trust_anchor == NULL
+		    || !knot_dname_is_equal(qry->zone_cut.trust_anchor->owner, qry->zone_cut.name)) {
+			mm_free(qry->zone_cut.pool, qry->zone_cut.trust_anchor);
+			qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
+
+			WITH_VERBOSE {
+			char qname_str[KNOT_DNAME_MAXLEN];
+			knot_dname_to_str(qname_str, ta_rr->owner, sizeof(qname_str));
+			VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
+			}
 		}
 	}
-	if (want_secured && !qry->zone_cut.trust_anchor) {
-		knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
-		qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
-	}
+
 	/* Try to fetch missing DS (from above the cut). */
 	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
 	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);

@@ -17,13 +17,14 @@ To enable it, you need to provide trusted root keys. Bootstrapping of the keys i
 
 .. note:: Automatic bootstrap requires luasocket_ and luasec_ installed.
 
-.. code-block:: bash
+.. code-block:: none
 
-   $ kresd -k root.keys # File for root keys
-   [ ta ] bootstrapped root anchor "19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5"
-   [ ta ] warning: you SHOULD check the key manually, see: https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs
-   [ ta ] key: 19036 state: Valid
-   [ ta ] next refresh: 86400000
+   $ kresd -k root-new.keys # File for root keys
+   [ ta ] keyfile 'root-new.keys': doesn't exist, bootstrapping
+   [ ta ] Root trust anchors bootstrapped over https with pinned certificate.
+          You may want to verify them manually, as described on:
+          https://data.iana.org/root-anchors/old/draft-icann-dnssec-trust-anchor.html#sigs
+   [ ta ] next refresh for . in 23.912361111111 hours
 
 Alternatively, you can set it in configuration file with ``trust_anchors.file = 'root.keys'``. If the file doesn't exist, it will be automatically populated with root keys validated using root anchors retrieved over HTTPS.
 
@@ -36,6 +37,8 @@ This is equivalent to `using unbound-anchor <https://www.unbound.net/documentati
    $ unbound -c unbound.conf
 
 .. warning:: Bootstrapping of the root trust anchors is automatic, you are however **encouraged to check** the key over **secure channel**, as specified in `DNSSEC Trust Anchor Publication for the Root Zone <https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs>`_. This is a critical step where the whole infrastructure may be compromised, you will be warned in the server log.
+
+Configuration is described in :ref:`dnssec-config`.
 
 Manually providing root anchors
 -------------------------------
@@ -530,7 +533,7 @@ For when listening on ``localhost`` just doesn't cut it.
 
    Example output:
 
-   .. code-block:: lua
+   .. code-block:: none
 
 	[127.0.0.1] => {
 	    [port] => 53
@@ -544,7 +547,7 @@ For when listening on ``localhost`` just doesn't cut it.
 
    Example output:
 
-   .. code-block:: lua
+   .. code-block:: none
 
 	[lo0] => {
 	    [addr] => {
@@ -611,8 +614,39 @@ For when listening on ``localhost`` just doesn't cut it.
    Get/set the IPv4 address used to perform queries.  There is also ``net.outgoing_v6`` for IPv6.
    The default is ``nil``, which lets the OS choose any address.
 
+
+.. _dnssec-config:
+
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. function:: trust_anchors.config(keyfile, readonly)
+
+   Alias for `add_file`.  It is also equivalent to CLI parameter ``-k <keyfile>``
+   and ``trust_anchors.file = keyfile``.
+
+.. function:: trust_anchors.add_file(keyfile, readonly)
+
+   :param string keyfile: path to the file.
+   :param readonly: if true, do not attempt to update the file.
+
+   The format is standard zone file, though additional information may be persisted in comments.
+   Either DS or DNSKEY records can be used for TAs.
+   If the file does not exist, bootstrapping of *root* TA will be attempted.
+
+   Each file can only contain records for a single domain.
+   The TAs will be updated according to :rfc:`5011` and persisted in the file (if allowed).
+
+   Example output:
+
+   .. code-block:: lua
+
+      > trust_anchors.add_file('root.key')
+      [ ta ] new state of trust anchors for a domain:
+      .                       165488  DS      19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5
+      nil
+
+      [ ta ] key: 19036 state: Valid
 
 .. envvar:: trust_anchors.hold_down_time = 30 * day
 
@@ -635,18 +669,6 @@ Trust anchors and DNSSEC
    How many ``Removed`` keys should be held in history (and key file) before being purged.
    Note: all ``Removed`` keys will be purged from key file after restarting the process.
 
-.. function:: trust_anchors.config(keyfile)
-
-   :param string keyfile: File containing DNSKEY records, should be writeable.
-
-   You can use only DNSKEY records in managed mode. It is equivalent to CLI parameter ``-k <keyfile>`` or ``trust_anchors.file = keyfile``.
-
-   Example output:
-
-   .. code-block:: lua
-
-      > trust_anchors.config('root.keys')
-      [trust_anchors] key: 19036 state: Valid
 
 .. function:: trust_anchors.set_insecure(nta_set)
 
