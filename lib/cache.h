@@ -59,6 +59,9 @@ enum kr_cache_flag {
 					* that covers the "next closer" name
 					* has the Opt-Out bit set
 					*/
+	KR_CACHE_FLAG_NODS	  = 4, /* Entry contains NS rrset
+					* for which DS nonexistence is proven.
+					*/
 };
 
 

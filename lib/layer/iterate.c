@@ -178,6 +178,14 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_reques
 			    (rr->type != KNOT_RRTYPE_AAAA)) {
 				continue;
 			}
+			if ((rr->type == KNOT_RRTYPE_A) &&
+			    (req->ctx->options & QUERY_NO_IPV4)) {
+				continue;
+			}
+			if ((rr->type == KNOT_RRTYPE_AAAA) &&
+			    (req->ctx->options & QUERY_NO_IPV6)) {
+				continue;
+			}
 			(void) update_nsaddr(rr, req->current_query);
 		}
 	}
@@ -343,6 +351,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 		}
 	}
+
 
 	if ((qry->flags & QUERY_DNSSEC_WANT) && (result == KR_STATE_CONSUME)) {
 		if (knot_wire_get_aa(pkt->wire) == 0 &&
@@ -636,7 +645,6 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 
 	knot_wire_set_aa(pkt->wire);
 	query->flags |= QUERY_RESOLVED;
-
 	/* Pick authority RRs. */
 	int pkt_class = kr_response_classify(pkt);
 	const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
