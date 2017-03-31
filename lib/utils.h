@@ -21,7 +21,10 @@
 #include <stdbool.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <libknot/libknot.h>
 #include <libknot/packet/pkt.h>
+#include <libknot/rrset.h>
+#include <libknot/rrtype/rrsig.h>
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
 #include "lib/defines.h"
@@ -240,3 +243,12 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 	memcpy(&x, swap_temp, sizeof(x)); \
 	} while(0)
 
+/** Return the (covered) type of an nonempty RRset. */
+static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
+{
+	assert(rr && rr->rrs.rr_count && rr->rrs.data);
+	uint16_t type = rr->type;
+	if (type == KNOT_RRTYPE_RRSIG)
+		type = knot_rrsig_type_covered(&rr->rrs, 0);
+	return type;
+}

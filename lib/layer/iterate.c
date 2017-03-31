@@ -398,12 +398,10 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 
 			/* Skip the RR if its owner+type doesn't interest us. */
-			const bool type_OK = rr->type == query->stype
-				|| rr->type == KNOT_RRTYPE_CNAME
-				|| rr->type == KNOT_RRTYPE_DNAME /* TODO: actually handle it */
-				|| (rr->type == KNOT_RRTYPE_RRSIG
-				    && knot_rrsig_type_covered(&rr->rrs, 0))
-				;
+			const uint16_t type = kr_rrset_type_maysig(rr);
+			const bool type_OK = rr->type == query->stype || type == query->stype
+				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
+				/* TODO: actually handle DNAMEs */
 			if (!type_OK || !knot_dname_is_equal(rr->owner, cname)) {
 				continue;
 			}
