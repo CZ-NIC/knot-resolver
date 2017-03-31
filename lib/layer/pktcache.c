@@ -14,6 +14,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file pktcache.c
+ *
+ * This builtin module caches whole packets from/for negative answers.
+ *
+ * Note: it also persists some QUERY_DNSSEC_* flags.
+ * It may produce a packet with CD flag, meaning the contents is unverified.
+ * QUERY_CACHED flag is set in the query when a packet is loaded.
+ */
+
 #include <libknot/descriptor.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/soa.h>
@@ -62,15 +71,9 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		return ret;
 	}
 
-	/* Check that we have secure rank. */
-	if (!knot_wire_get_cd(req->answer->wire) && entry->rank == KR_RANK_BAD) {
-		return kr_error(ENOENT);
-	}
-
-	/* Check if entry is insecure and setup query flags if needed. */
-	if ((qry->flags & QUERY_DNSSEC_WANT) && entry->rank == KR_RANK_INSECURE) {
-		qry->flags |= QUERY_DNSSEC_INSECURE;
-		qry->flags &= ~QUERY_DNSSEC_WANT;
+	if (!knot_wire_get_cd(req->answer->wire)
+	    && (entry->rank & KR_RANK_BAD) && !(entry->rank & KR_RANK_OMIT)) {
+		return kr_error(ENOENT); /* it would fail anyway */
 	}
 
 	/* Copy answer, keep the original message id */
@@ -84,6 +87,17 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		knot_pkt_parse(pkt, 0);
 		/* Restore header bits */
 		knot_wire_set_id(pkt->wire, msgid);
+	}
+
+	/* Rank-related fixups. */
+	if (entry->rank & KR_RANK_INSECURE) {
+		qry->flags |= QUERY_DNSSEC_INSECURE;
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+	}
+	if (entry->rank & KR_RANK_BAD) {
+		/* clearly communicate that the contents is unchecked */
+		knot_wire_set_cd(pkt->wire);
+		knot_wire_clear_ad(pkt->wire);
 	}
 
 	/* Adjust TTL in records. */
@@ -210,21 +224,21 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,
 		.ttl = ttl,
-		.rank = KR_RANK_BAD,
+		.rank = KR_RANK_AUTH,
 		.flags = KR_CACHE_FLAG_NONE,
 		.count = data.len
 	};
 
-	/* Set cache rank.
-	 * If cd bit is set rank remains BAD.
-	 * Otherwise - depends on flags. */
-	if (!knot_wire_get_cd(req->answer->wire)) {
-		if (qry->flags & QUERY_DNSSEC_WANT) {
-			/* DNSSEC valid entry */
-			header.rank = KR_RANK_SECURE;
-		} else {
-			/* Don't care about DNSSEC */
-			header.rank = KR_RANK_INSECURE;
+	/* If cd bit is set, make rank bad, otherwise it depends on flags. */
+	if (knot_wire_get_cd(req->answer->wire)) {
+		header.rank |= KR_RANK_OMIT;
+	} else {
+		if (qry->flags & QUERY_DNSSEC_BOGUS) {
+			header.rank |= KR_RANK_BOGUS;
+		} else if (qry->flags & QUERY_DNSSEC_INSECURE) {
+			header.rank |= KR_RANK_INSECURE;
+		} else if (qry->flags & QUERY_DNSSEC_WANT) {
+			header.rank |= KR_RANK_SECURE;
 		}
 	}
 

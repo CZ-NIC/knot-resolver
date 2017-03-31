@@ -20,8 +20,8 @@
  *
  * Produce phase: if an RRset answering the query exists, the packet is filled
  * by it, including the corresponding RRSIGs (subject to some conditions).
- * Such a packet is recognizable: pkt->size == PKT_SIZE_NOWIRE.
- * The ranks are stored in *rrset->additional.
+ * Such a packet is recognizable: pkt->size == PKT_SIZE_NOWIRE, and QUERY_CACHED
+ * is set in the query.  The ranks are stored in *rrset->additional.
  *
  * TODO
  */
