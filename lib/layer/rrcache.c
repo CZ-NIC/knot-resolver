@@ -141,11 +141,13 @@ enomem:
 static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 			struct kr_query *qry, uint16_t rrtype, const bool cdbit)
 {
-	/* Lookup direct match first */
+	/* Lookup direct match first; only consider authoritative records,
+	 * even unvalidated, as rank handling is better to do in the iterator
+	 * (QUERY_DNSSEC_* flags). */
 	uint8_t rank  = 0;
 	uint8_t flags = 0;
-	uint8_t lowest_rank = cdbit ? KR_RANK_BAD : KR_RANK_INSECURE;
-	const bool dobit = (qry->flags & QUERY_DNSSEC_WANT);
+	uint8_t lowest_rank = KR_RANK_AUTH;
+
 	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			  &rank, &flags, 0, lowest_rank);
 	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) {
@@ -154,12 +156,12 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			      &rank, &flags, 0, lowest_rank);
 	}
-	/* Record is flagged as INSECURE => doesn't have RRSIG. */
-	if (ret == 0 && (rank & KR_RANK_INSECURE)) {
-		qry->flags |= QUERY_DNSSEC_INSECURE;
-		qry->flags &= ~QUERY_DNSSEC_WANT;
-	/* Record may have RRSIG, try to find it. */
-	} else if (ret == 0 && dobit) {
+	if (ret) {
+		return ret;
+	}
+	/* Record may have RRSIGs, try to find them. */
+	const bool dobit = (qry->flags & QUERY_DNSSEC_WANT);
+	if (cdbit || (dobit && (rank & KR_RANK_SECURE))) {
 		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			      &rank, &flags, true, lowest_rank);
 	}
