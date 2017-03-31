@@ -221,9 +221,16 @@ static int commit_rr(const char *key, void *val, void *data)
 	}
 
 	uint8_t flags = KR_CACHE_FLAG_NONE;
-	if ((rank & KR_RANK_AUTH) && (baton->qry->flags & QUERY_DNSSEC_WEXPAND)) {
-		flags |= KR_CACHE_FLAG_WCARD_PROOF;
+	if (rank & KR_RANK_AUTH) {
+		if (baton->qry->flags & QUERY_DNSSEC_WEXPAND) {
+			flags |= KR_CACHE_FLAG_WCARD_PROOF;
+		}
+		if ((rr->type == KNOT_RRTYPE_NS) &&
+		    (baton->qry->flags & QUERY_DNSSEC_NODS)) {
+			flags |= KR_CACHE_FLAG_NODS;
+		}
 	}
+
 	return kr_cache_insert_rr(baton->cache, rr, rank, flags, baton->timestamp);
 }
 

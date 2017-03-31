@@ -105,6 +105,7 @@ EOF
 	kr_nsrep_set
 # Utils
 	kr_rand_uint
+	kr_pkt_make_auth_header
 	kr_pkt_put
 	kr_pkt_recycle
 	kr_inaddr
