@@ -302,70 +302,36 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 		    !knot_dname_is_equal(rr->owner, ns_name)) {
 			continue;
 		}
-		kr_rrmap_add(stash, rr, KR_RANK_EXTRA, pool);
+		kr_rrmap_add(stash, rr, KR_RANK_OMIT, pool);
 	}
 }
 
-/* @internal DS is special and is present only parent-side */
-static void stash_ds(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
+static int stash_selected(struct kr_request *req, knot_pkt_t *pkt, map_t *stash,
+		 bool is_authority, knot_mm_t *pool)
 {
-	ranked_rr_array_t *arr= &req->auth_selected;
+	ranked_rr_array_t *arr = is_authority
+		? &req->auth_selected : &req->answ_selected;
+	const struct kr_query *qry = req->current_query;
 	if (!arr->len) {
-		return;
-	}
-	struct kr_query *qry = req->current_query;
-	uint8_t rank = KR_RANK_AUTH;
-	if (knot_wire_get_cd(req->answer->wire)) {
-		/* Signature validation is disabled,
-		 * save it to the BAD cache */
-		rank = KR_RANK_BAD;
+		return kr_ok();
 	}
 	/* uncached entries are located at the end */
 	for (ssize_t i = arr->len - 1; i >= 0; --i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
-		const knot_rrset_t *rr = entry->rr;
 		if (entry->qry_uid != qry->uid) {
-			continue;
+			continue; /* TODO: probably safe to break but maybe not worth it */
 		}
 		if (entry->cached) {
 			continue;
 		}
-		if (rr->type == KNOT_RRTYPE_DS || rr->type == KNOT_RRTYPE_RRSIG) {
-			kr_rrmap_add(stash, rr, rank, pool);
-			entry->cached = true;
-		}
-	}
-}
-
-static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
-{
-	ranked_rr_array_t *arr= &req->auth_selected;
-	if (!arr->len) {
-		return kr_ok();
-	}
-	struct kr_query *qry = req->current_query;
-	uint8_t rank = KR_RANK_NONAUTH;
-	if (knot_wire_get_cd(req->answer->wire)) {
-		/* Signature validation is disabled,
-		 * save authority to the BAD cache */
-		rank = KR_RANK_BAD;
-	}
-	/* uncached entries are located at the end */
-	for (ssize_t i = arr->len - 1; i >= 0; --i) {
-		ranked_rr_array_entry_t *entry = arr->at[i];
 		const knot_rrset_t *rr = entry->rr;
-		if (entry->qry_uid != qry->uid || entry->cached) {
-			continue;
-		}
-
 		/* Skip NSEC3 RRs and their signatures.  We don't use them this way.
 		 * They would be stored under the hashed name, etc. */
 		if (kr_rrset_type_maysig(rr) == KNOT_RRTYPE_NSEC3) {
-		    continue;
+			continue;
 		}
-
 		/* Look up glue records for NS */
-		if (rr->type == KNOT_RRTYPE_NS) {
+		if (is_authority && rr->type == KNOT_RRTYPE_NS) {
 			for (size_t j = 0; j < rr->rrs.rr_count; ++j) {
 				const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, j);
 				if (knot_dname_in(qry->zone_cut.name, ns_name)) {
@@ -373,36 +339,7 @@ static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash
 				}
 			}
 		}
-		kr_rrmap_add(stash, rr, rank, pool);
-		entry->cached = true;
-	}
-	return kr_ok();
-}
-
-static int stash_answer(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
-{
-	ranked_rr_array_t *arr= &req->answ_selected;
-	struct kr_query *qry = req->current_query;
-	if (!arr->len) {
-		return kr_ok();
-	}
-	uint8_t rank = KR_RANK_AUTH;
-	if (knot_wire_get_cd(req->answer->wire)) {
-		/* Signature validation is disabled.
-		 * Save answer to the BAD cache. */
-		rank = KR_RANK_BAD;
-	}
-	/* uncached entries are located at the end */
-	for (ssize_t i = arr->len - 1; i >= 0; --i) {
-		ranked_rr_array_entry_t *entry = arr->at[i];
-		if (entry->qry_uid != qry->uid) {
-			continue;
-		}
-		if (entry->cached) {
-			continue;
-		}
-		const knot_rrset_t *rr = entry->rr;
-		kr_rrmap_add(stash, rr, rank, pool);
+		kr_rrmap_add(stash, rr, entry->rank, pool);
 		entry->cached = true;
 	}
 	return kr_ok();
@@ -426,7 +363,7 @@ static int rrcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (qry->flags & QUERY_CACHED || knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR || !is_eligible) {
 		return ctx->state;
 	}
-	/* Stash in-bailiwick data from the AUTHORITY and ANSWER. */
+	/* Stash data selected by iterator from the last receieved packet. */
 	map_t stash = map_make();
 	stash.malloc = (map_alloc_f) mm_alloc;
 	stash.free = (map_free_f) mm_free;
@@ -434,18 +371,14 @@ static int rrcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = 0;
 	bool is_auth = knot_wire_get_aa(pkt->wire);
 	if (is_auth) {
-		ret = stash_answer(req, pkt, &stash, &req->pool);
-		if (ret == 0) {
-			ret = stash_authority(req, pkt, &stash, &req->pool);
-		}
-	/* Cache authority only if chasing referral/cname chain */
-	} else if (knot_pkt_section(pkt, KNOT_ANSWER)->count == 0 ||
-		   qry->flags & QUERY_CNAME) {
-		ret = stash_authority(req, pkt, &stash, &req->pool);
+		ret = stash_selected(req, pkt, &stash, false, &req->pool);
 	}
-	/* Cache DS records in referrals */
-	if (!is_auth && knot_pkt_has_dnssec(pkt)) {
-		stash_ds(req, pkt, &stash, &req->pool);
+	const bool want_authority = is_auth
+		|| knot_pkt_section(pkt, KNOT_ANSWER)->count == 0 /* referral */
+		|| qry->flags & QUERY_CNAME;
+	if (ret == 0 && want_authority) {
+		ret = stash_selected(req, pkt, &stash, true, &req->pool);
+		/* this also stashes DS records in referrals */
 	}
 	/* Cache stashed records */
 	if (ret == 0 && stash.root != NULL) {
