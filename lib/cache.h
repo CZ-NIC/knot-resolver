@@ -21,6 +21,9 @@
 #include "lib/defines.h"
 #include "contrib/ucw/config.h" /*uint*/
 
+/** When knot_pkt is passed from cache without ->wire, this is the ->size. */
+static const size_t PKT_SIZE_NOWIRE = -1;
+
 /** Cache entry tag */
 enum kr_cache_tag {
 	KR_CACHE_RR   = 'R',

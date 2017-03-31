@@ -14,6 +14,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file rrcache.c
+ *
+ * This builtin module caches resource records from/for positive answers.
+ *
+ * Produce phase: if an RRset answering the query exists, the packet is filled
+ * by it, including the corresponding RRSIGs (subject to some conditions).
+ * Such a packet is recognizable: pkt->size == PKT_SIZE_NOWIRE.
+ * The ranks are stored in *rrset->additional.
+ *
+ * TODO
+ */
+
 #include <assert.h>
 
 #include <libknot/descriptor.h>
@@ -43,6 +55,11 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
                   uint16_t rrclass, uint16_t rrtype, struct kr_query *qry,
                   uint8_t *rank, uint8_t *flags, bool fetch_rrsig, uint8_t lowest_rank)
 {
+	const bool precond = rank && flags;
+	if (!precond) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
 	/* Check if record exists in cache */
 	int ret = 0;
 	uint32_t drift = qry->timestamp.tv_sec;
@@ -57,7 +74,7 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		return ret;
 	}
 
-	if (rank && (*rank < lowest_rank)) {
+	if (*rank < lowest_rank) {
 		return kr_error(ENOENT);
 	}
 
@@ -66,7 +83,6 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		qry->flags |= QUERY_EXPIRING;
 	}
 
-	assert(flags != NULL);
 	if ((*flags) & KR_CACHE_FLAG_WCARD_PROOF) {
 		/* Record was found, but wildcard answer proof is needed.
 		 * Do not update packet, try to fetch whole packet from pktcache instead. */
@@ -83,13 +99,42 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 	/* Update packet answer */
 	knot_rrset_t rr_copy;
 	ret = kr_cache_materialize(&rr_copy, &cache_rr, drift, qry->reorder, &pkt->mm);
-	if (ret == 0) {
-		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr_copy, KNOT_PF_FREE);
-		if (ret != 0) {
-			knot_rrset_clear(&rr_copy, &pkt->mm);
-		}
+	if (ret) {
+		return ret;
 	}
+
+	uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
+	if (!rr_rank) {
+		goto enomem;
+	}
+	*rr_rank = *rank;
+	rr_copy.additional = rr_rank;
+	/* Ensure the pkt->rr array is long enough. */
+	if (pkt->rrset_count + 1 > pkt->rrset_allocd) {
+		size_t rrset_allocd = pkt->rrset_count + 2;
+		pkt->rr = mm_realloc(&pkt->mm, pkt->rr,
+					sizeof(pkt->rr[0]) * rrset_allocd,
+					sizeof(pkt->rr[0]) * pkt->rrset_allocd);
+		if (!pkt->rr) {
+			goto enomem;
+		}
+		pkt->rr_info = mm_realloc(&pkt->mm, pkt->rr,
+					sizeof(pkt->rr_info[0]) * rrset_allocd,
+					sizeof(pkt->rr_info[0]) * pkt->rrset_allocd);
+		if (!pkt->rr_info) {
+			goto enomem;
+		}
+		pkt->rrset_allocd = rrset_allocd;
+	}
+	/* Append the RR array. */
+	assert(pkt->sections[pkt->current].count == pkt->rrset_count);
+	pkt->rr[pkt->rrset_count] = rr_copy;
+	pkt->sections[pkt->current].count = ++pkt->rrset_count;
 	return ret;
+enomem:
+	knot_rrset_clear(&rr_copy, &pkt->mm);
+	mm_free(&pkt->mm, rr_rank);
+	return kr_error(ENOMEM);
 }
 
 /** @internal Try to find a shortcut directly to searched record. */
@@ -153,7 +198,7 @@ static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret == 0) {
 		VERBOSE_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
-		pkt->parsed = pkt->size;
+		pkt->parsed = pkt->size = PKT_SIZE_NOWIRE;
 		knot_wire_set_qr(pkt->wire);
 		knot_wire_set_aa(pkt->wire);
 		return KR_STATE_DONE;
