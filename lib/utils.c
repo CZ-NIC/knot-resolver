@@ -429,11 +429,10 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *
 	/* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
 	char key[KR_RRKEY_LEN];
 	uint8_t extra_flags = 0;
-	uint16_t rrtype = rr->type;
+	uint16_t rrtype = kr_rrset_type_maysig(rr);
 	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
 	 * This way it the stash won't merge RRSIGs together. */
 	if (rr->type == KNOT_RRTYPE_RRSIG) {
-		rrtype = knot_rrsig_type_covered(&rr->rrs, 0);
 		extra_flags |= KEY_FLAG_RRSIG;
 	}
 	int ret = kr_rrkey(key, rr->owner, rrtype, rank);

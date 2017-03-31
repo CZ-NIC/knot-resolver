@@ -360,9 +360,7 @@ static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash
 
 		/* Skip NSEC3 RRs and their signatures.  We don't use them this way.
 		 * They would be stored under the hashed name, etc. */
-		if (rr->type == KNOT_RRTYPE_NSEC3
-		    || (rr->type == KNOT_RRTYPE_RRSIG
-			&& knot_rrsig_type_covered(&rr->rrs, 0) == KNOT_RRTYPE_NSEC3)) {
+		if (kr_rrset_type_maysig(rr) == KNOT_RRTYPE_NSEC3) {
 		    continue;
 		}
 
