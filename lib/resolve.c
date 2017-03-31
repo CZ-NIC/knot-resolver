@@ -138,7 +138,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 		knot_rdata_init(rdata_arr, addr_len, addr, 0);
 		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata_arr);
 	} else {
-		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, NULL);
+		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
 	}
 }
 
@@ -250,7 +250,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	    (cut_found.key == NULL)) {
 		/* No DNSKEY was found for cached cut.
 		 * If no glue were fetched for this cut,
-		 * we have got circular dependance - must fetch A\AAAA
+		 * we have got circular dependancy - must fetch A\AAAA
 		 * from authoritative, but we have no key to verify it.
 		 * TODO - try to refetch cut only if no glue were fetched */
 		kr_zonecut_deinit(&cut_found);
@@ -292,10 +292,12 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	 * Prefer IPv6 and continue with IPv4 if not available.
 	 */
 	uint16_t next_type = 0;
-	if (!(qry->flags & QUERY_AWAIT_IPV6)) {
+	if (!(qry->flags & QUERY_AWAIT_IPV6) &&
+	    !(ctx->options & QUERY_NO_IPV6)) {
 		next_type = KNOT_RRTYPE_AAAA;
 		qry->flags |= QUERY_AWAIT_IPV6;
-	} else if (!(qry->flags & QUERY_AWAIT_IPV4)) {
+	} else if (!(qry->flags & QUERY_AWAIT_IPV4) &&
+		   !(ctx->options & QUERY_NO_IPV4)) {
 		next_type = KNOT_RRTYPE_A;
 		qry->flags |= QUERY_AWAIT_IPV4;
 		/* Hmm, no useable IPv6 then. */
@@ -318,10 +320,27 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}
-	/* Push new query to the resolution plan */
-	struct kr_query *next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
-	if (!next) {
-		return kr_error(ENOMEM);
+	struct kr_query *next = qry;
+	if (knot_dname_is_equal(qry->ns.name, qry->sname) &&
+	    qry->stype == next_type) {
+		if (!(qry->flags & QUERY_NO_MINIMIZE)) {
+			qry->flags |= QUERY_NO_MINIMIZE;
+			qry->flags &= ~QUERY_AWAIT_IPV6;
+			qry->flags &= ~QUERY_AWAIT_IPV4;
+			VERBOSE_MSG(qry, "=> circular dependepcy, retrying with non-minimized name\n");
+		} else {
+			qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
+			kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+			invalidate_ns(rplan, qry);
+			VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
+			return kr_error(EHOSTUNREACH);
+		}
+	} else {
+		/* Push new query to the resolution plan */
+		next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
+		if (!next) {
+			return kr_error(ENOMEM);
+		}
 	}
 	/* At the root level with no NS addresses, add SBELT subrequest. */
 	int ret = 0;
@@ -1075,6 +1094,7 @@ ns_election:
 		int ret = ns_resolve_addr(qry, request);
 		if (ret != 0) {
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
+			qry->ns.name = NULL;
 			goto ns_election; /* Must try different NS */
 		}
 		ITERATE_LAYERS(request, qry, reset);

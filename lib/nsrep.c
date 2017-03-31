@@ -139,10 +139,16 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 		/* If the server doesn't have IPv6, give it disadvantage. */
 		if (reputation & KR_NS_NOIP6) {
 			score += FAVOUR_IPV6;
-			/* If the server is unknown but has rep record, treat it as timeouted */
 			if (reputation & KR_NS_NOIP4) {
-				score = KR_NS_UNKNOWN;
-				reputation = 0; /* Start with clean slate */
+				/* Server is unknown but has rep record.
+				 * We can not distinguish if it happens either
+				 * due to timeout or due to other circumstances
+				 * (for example, we have ipv6-only network and
+				 * we are dealing with ipv4-only NS).
+				 * Don't use it for now.
+				 * TODO -
+				 * add explicit flag for timeouted servers */
+				score = KR_NS_MAX_SCORE + 1;
 			}
 		}
 	} else {

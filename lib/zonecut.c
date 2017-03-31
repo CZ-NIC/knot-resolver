@@ -343,12 +343,14 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const kno
 }
 
 /** Fetch best NS for zone cut. */
-static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name, uint32_t timestamp, uint8_t * restrict rank)
+static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
+		    const knot_dname_t *name, uint32_t timestamp,
+		    uint8_t * restrict rank, uint8_t * restrict flags)
 {
 	uint32_t drift = timestamp;
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, (knot_dname_t *)name, KNOT_RRTYPE_NS, KNOT_CLASS_IN);
-	int ret = kr_cache_peek_rr(&ctx->cache, &cached_rr, rank, NULL, &drift);
+	int ret = kr_cache_peek_rr(&ctx->cache, &cached_rr, rank, flags, &drift);
 	if (ret != 0) {
 		return ret;
 	}
@@ -446,11 +448,14 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	while (true) {
 		/* Fetch NS first and see if it's insecure. */
 		uint8_t rank = 0;
+		uint8_t flags = 0;
 		const bool is_root = (label[0] == '\0');
-		if (fetch_ns(ctx, cut, label, timestamp, &rank) == 0) {
+		if (fetch_ns(ctx, cut, label, timestamp, &rank, &flags) == 0) {
 			/* Flag as insecure if cached as this */
-			if (rank & KR_RANK_INSECURE)
+			if ((rank & KR_RANK_INSECURE) ||
+			    (flags & KR_CACHE_FLAG_NODS)) {
 				*secured = false;
+			}
 			/* Fetch DS if caller wants secure zone cut */
 			if (*secured || is_root) {
 				fetch_ta(cut, &ctx->cache, label, timestamp);
