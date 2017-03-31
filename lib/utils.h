@@ -66,11 +66,29 @@ static inline void *mm_alloc(knot_mm_t *mm, size_t size)
 }
 static inline void mm_free(knot_mm_t *mm, void *what)
 {
-	if (mm) { 
+	if (mm) {
 		if (mm->free)
 			mm->free(what);
 	}
 	else free(what);
+}
+static inline void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
+{
+	if (mm) {
+		void *p = mm->alloc(mm->ctx, size);
+		if (p == NULL) {
+			return NULL;
+		} else {
+			if (what) {
+				memcpy(p, what,
+				       prev_size < size ? prev_size : size);
+			}
+			mm_free(mm, what);
+			return p;
+		}
+	} else {
+		return realloc(what, size);
+	}
 }
 /* @endcond */
 
