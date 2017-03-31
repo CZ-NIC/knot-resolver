@@ -479,7 +479,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *
 		}
 
 		if (rr->type != KNOT_RRTYPE_RRSIG) {
-			all_sec = all_sec && entry->rank == KR_VLDRANK_SECURE;
+			all_sec = all_sec && (entry->rank & KR_RANK_SECURE);
 		}
 	}
 

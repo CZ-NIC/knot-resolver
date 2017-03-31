@@ -74,12 +74,12 @@
 
 
 /**
- * Cache entry rank.
+ * RRset rank - for cache and ranked_rr_*.
  *
  * @note Be careful about chosen cache rank nominal values.
- * - AUTH must be > than NONAUTH
+ * - AUTH must be > than !AUTH
  * - AUTH INSECURE must be > than AUTH (because it attempted validation)
- * - NONAUTH SECURE must be > than AUTH (because it's valid)
+ * - !AUTH SECURE must be > than AUTH (because it's valid)
  *
  * See also:
  *   https://tools.ietf.org/html/rfc2181#section-5.4.1
