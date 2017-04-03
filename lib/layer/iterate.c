@@ -298,9 +298,11 @@ static inline uint8_t get_initial_rank(const knot_rrset_t *rr,
 	const uint32_t qflags = qry->flags;
 	uint8_t rank = 0;
 	if (qflags & QUERY_CACHED) {
-		assert(rr->additional);
-		rank = *(uint8_t *)rr->additional;
-	} else if (answer) {
+		rank = rr->additional ? *(uint8_t *)rr->additional : KR_RANK_OMIT;
+		/* ^^ Current use case for "cached" RRs without rank: hints module. */
+	} else if (answer || rr->type == KNOT_RRTYPE_DS
+		   || rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3) {
+		/* TODO: this classifier of authoritativity may not be perfect yet. */
 		rank |= KR_RANK_AUTH;
 	}
 	return (uint8_t)rank;
