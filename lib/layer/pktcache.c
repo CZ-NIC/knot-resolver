@@ -19,8 +19,7 @@
  * This builtin module caches whole packets from/for negative answers.
  *
  * Note: it also persists some QUERY_DNSSEC_* flags.
- * It may produce a packet with CD flag, meaning the contents is unverified.
- * QUERY_CACHED flag is set in the query when a packet is loaded.
+ * The ranks are stored in *rrset->additional (all are the same for one packet).
  */
 
 #include <libknot/descriptor.h>
@@ -89,15 +88,19 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		knot_wire_set_id(pkt->wire, msgid);
 	}
 
-	/* Rank-related fixups. */
+	/* Rank-related fixups.  Add rank into the additional field. */
 	if (entry->rank & KR_RANK_INSECURE) {
 		qry->flags |= QUERY_DNSSEC_INSECURE;
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
-	if (entry->rank & KR_RANK_BAD) {
-		/* clearly communicate that the contents is unchecked */
-		knot_wire_set_cd(pkt->wire);
-		knot_wire_clear_ad(pkt->wire);
+	for (size_t i = 0; i < pkt->rrset_count; ++i) {
+		assert(!pkt->rr[i].additional);
+		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
+		if (!rr_rank) {
+			return kr_error(ENOMEM);
+		}
+		*rr_rank = entry->rank;
+		pkt->rr[i].additional = rr_rank;
 	}
 
 	/* Adjust TTL in records. */
