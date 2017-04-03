@@ -296,10 +296,11 @@ static inline uint8_t get_initial_rank(const knot_rrset_t *rr,
 				       const struct kr_query *qry, bool answer)
 {
 	const uint32_t qflags = qry->flags;
-	uintptr_t rank = (uintptr_t)rr->additional;
-	assert((((qflags & QUERY_CACHED) == 0) && (rr->additional == NULL)) ||
-	       (rank <= KR_RANK_SECURE));
-	if (((qflags & QUERY_CACHED) == 0) && answer) {
+	uint8_t rank = 0;
+	if (qflags & QUERY_CACHED) {
+		assert(rr->additional);
+		rank = *(uint8_t *)rr->additional;
+	} else if (answer) {
 		rank |= KR_RANK_AUTH;
 	}
 	return (uint8_t)rank;
