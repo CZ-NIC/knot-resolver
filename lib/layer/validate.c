@@ -100,7 +100,7 @@ static inline void rank_set_flag(uint8_t *rank, uint8_t flag)
 
 static inline bool rank_test_flag(uint8_t rank, uint8_t flag)
 {
-	return (rank | rank_get_flags(flag)) != 0;
+	return (flag & rank_get_flags(rank)) != 0;
 }
 
 static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
