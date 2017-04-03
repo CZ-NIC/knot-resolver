@@ -384,7 +384,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 }
 
 /**
- * Fetch RRSet of given type.
+ * Fetch RRSet of given type.  (and of reasonable trustworthiness)
  */
 static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
                        const knot_dname_t *owner, uint16_t type, knot_mm_t *pool, uint32_t timestamp)
@@ -400,6 +400,11 @@ static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	int ret = kr_cache_peek_rr(cache, &cached_rr, &rank, NULL, &drift);
 	if (ret != 0) {
 		return ret;
+	}
+	const bool rankOK = (rank & KR_RANK_SECURE)
+		|| ((rank & KR_RANK_INSECURE) && (rank & KR_RANK_AUTH));
+	if (!rankOK) {
+		return kr_error(ENOENT);
 	}
 
 	knot_rrset_free(rr, pool);
