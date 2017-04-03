@@ -417,21 +417,6 @@ static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	return kr_ok();
 }
 
-/**
- * Fetch trust anchors for zone cut.
- * @note The trust anchor can theoretically be a DNSKEY but for now lets use only DS.
- */
-static int fetch_ta(struct kr_zonecut *cut, struct kr_cache *cache, const knot_dname_t *name, uint32_t timestamp)
-{
-	return fetch_rrset(&cut->trust_anchor, cache, name, KNOT_RRTYPE_DS, cut->pool, timestamp);
-}
-
-/** Fetch DNSKEY for zone cut. */
-static int fetch_dnskey(struct kr_zonecut *cut, struct kr_cache *cache, const knot_dname_t *name, uint32_t timestamp)
-{
-	return fetch_rrset(&cut->key, cache, name, KNOT_RRTYPE_DNSKEY, cut->pool, timestamp);
-}
-
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
                            uint32_t timestamp, bool * restrict secured)
 {
@@ -456,10 +441,12 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 			    (flags & KR_CACHE_FLAG_NODS)) {
 				*secured = false;
 			}
-			/* Fetch DS if caller wants secure zone cut */
+			/* Fetch DS and DNSKEY if caller wants secure zone cut */
 			if (*secured || is_root) {
-				fetch_ta(cut, &ctx->cache, label, timestamp);
-				fetch_dnskey(cut, &ctx->cache, label, timestamp);
+				fetch_rrset(&cut->trust_anchor, &ctx->cache, label,
+					    KNOT_RRTYPE_DS, cut->pool, timestamp);
+				fetch_rrset(&cut->key, &ctx->cache, label,
+					    KNOT_RRTYPE_DNSKEY, cut->pool, timestamp);
 			}
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);
