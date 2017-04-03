@@ -19,7 +19,7 @@
  * This builtin module caches whole packets from/for negative answers.
  *
  * Note: it also persists some QUERY_DNSSEC_* flags.
- * The ranks are stored in *rrset->additional (all are the same for one packet).
+ * The ranks are stored in *(uint8_t *)rrset->additional (all are the same for one packet).
  */
 
 #include <libknot/descriptor.h>
