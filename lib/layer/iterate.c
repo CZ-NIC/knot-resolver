@@ -292,24 +292,23 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 }
 
 /** Compute rank appropriate for RRs present in the packet. */
-static inline kr_validation_rank_t get_initial_rank(const struct kr_request *req)
+static inline uint8_t get_initial_rank(const knot_rrset_t *rr,
+				       const struct kr_query *qry, bool answer)
 {
-	const uint32_t qflags = req->current_query->flags;
-	if ((qflags & QUERY_CACHED)
-	    && !knot_wire_get_cd(req->answer->wire)
-	    && (qflags & QUERY_DNSSEC_WANT)
-	    && !(qflags & (QUERY_DNSSEC_INSECURE|QUERY_DNSSEC_BOGUS)))
-		return KR_VLDRANK_SECURE;
-		/* TODO: make cache better signal real ranks of individual RRs. */
-	return KR_VLDRANK_INITIAL;
+	const uint32_t qflags = qry->flags;
+	uintptr_t rank = (uintptr_t)rr->additional;
+	assert((((qflags & QUERY_CACHED) == 0) && (rr->additional == NULL)) ||
+	       (rank <= KR_RANK_SECURE));
+	if (((qflags & QUERY_CACHED) == 0) && answer) {
+		rank |= KR_RANK_AUTH;
+	}
+	return (uint8_t)rank;
 }
 
 static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 {
 	struct kr_query *qry = req->current_query;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
-
-	kr_validation_rank_t rank = get_initial_rank(req);
 
 	const knot_dname_t *zonecut_name = qry->zone_cut.name;
 	bool referral = !knot_wire_get_aa(pkt->wire);
@@ -325,6 +324,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 		if (!knot_dname_in(zonecut_name, rr->owner)) {
 			continue;
 		}
+		uint8_t rank = get_initial_rank(rr, qry, false);
 		int ret = kr_ranked_rrarray_add(&req->auth_selected, rr,
 						rank, to_wire, qry->uid, &req->pool);
 		if (ret != kr_ok()) {
@@ -411,7 +411,6 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 	const knot_dname_t *cname = NULL;
 	const knot_dname_t *pending_cname = query->sname;
 	unsigned cname_chain_len = 0;
-	kr_validation_rank_t rank = get_initial_rank(req);
 	bool is_final = (query->parent == NULL);
 	uint32_t iter_count = 0;
 	bool strict_mode = (query->flags & QUERY_STRICT);
@@ -444,6 +443,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 					return state;
 				}
 			}
+			uint8_t rank = get_initial_rank(rr, query, true);
 			state = kr_ranked_rrarray_add(&req->answ_selected, rr,
 						      rank, to_wire, query->uid, &req->pool);
 			if (state != kr_ok()) {
@@ -661,7 +661,7 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
 		int err = kr_ranked_rrarray_add(&req->answ_selected, rr,
-			      KR_VLDRANK_INITIAL, true, query->uid, &req->pool);
+			      KR_RANK_INITIAL | KR_RANK_AUTH, true, query->uid, &req->pool);
 		if (err != kr_ok()) {
 			return KR_STATE_FAIL;
 		}

@@ -76,6 +76,33 @@ static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
 	return section_has_type(knot_pkt_section(pkt, KNOT_ADDITIONAL), type);
 }
 
+static inline uint8_t rank_get_value(uint8_t rank)
+{
+	return rank & 0x07;
+}
+
+static inline uint8_t rank_get_flags(uint8_t rank)
+{
+	return rank & ~0x07;
+}
+
+static inline void rank_set_value(uint8_t *rank, uint8_t value)
+{
+	assert(rank);
+	*rank = rank_get_flags(*rank) | rank_get_value(value);
+}
+
+static inline void rank_set_flag(uint8_t *rank, uint8_t flag)
+{
+	assert(rank);
+	*rank = rank_get_flags(flag) | rank_get_value(*rank);
+}
+
+static inline bool rank_test_flag(uint8_t rank, uint8_t flag)
+{
+	return (rank | rank_get_flags(flag)) != 0;
+}
+
 static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 {
 	if (!vctx) {
@@ -91,33 +118,34 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 	for (ssize_t i = 0; i < vctx->rrs->len; ++i) {
 		ranked_rr_array_entry_t *entry = vctx->rrs->at[i];
 		const knot_rrset_t *rr = entry->rr;
-		if (entry->rank == KR_VLDRANK_SECURE ||
+		assert((entry->rank & (KR_RANK_SECURE | KR_RANK_INSECURE)) != (KR_RANK_SECURE | KR_RANK_INSECURE));
+		if (rank_test_flag(entry->rank, KR_RANK_SECURE) ||
 		    entry->yielded || vctx->qry_uid != entry->qry_uid) {
 			continue;
 		}
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
 			const knot_dname_t *signer_name = knot_rrsig_signer_name(&rr->rrs, 0);
 			if (!knot_dname_is_equal(vctx->zone_name, signer_name)) {
-				entry->rank = KR_VLDRANK_MISMATCH;
+				rank_set_value(&entry->rank, KR_RANK_MISMATCH);
 				vctx->err_cnt += 1;
 				break;
 			}
-			entry->rank = KR_VLDRANK_SECURE; /* TODO: not good semantically for RRSIGs */
+			rank_set_value(&entry->rank, KR_RANK_OMIT);
 			continue;
 		}
 		if ((rr->type == KNOT_RRTYPE_NS) && (vctx->section_id == KNOT_AUTHORITY)) {
-			entry->rank = KR_VLDRANK_SECURE; /* FIXME: dangerous, most likely */
+			rank_set_value(&entry->rank, KR_RANK_OMIT);
 			continue;
 		}
 		validation_result = kr_rrset_validate(vctx, rr);
 		if (validation_result == kr_ok()) {
-			entry->rank = KR_VLDRANK_SECURE;
+			rank_set_flag(&entry->rank, KR_RANK_SECURE);
 		} else if (validation_result == kr_error(ENOENT)) {
 			/* no RRSIGs found */
-			entry->rank = KR_VLDRANK_INSECURE;
+			rank_set_flag(&entry->rank, KR_RANK_INSECURE);
 			vctx->err_cnt += 1;
 		} else {
-			entry->rank = KR_VLDRANK_UNKNOWN;
+			rank_set_value(&entry->rank, KR_RANK_BOGUS);
 			vctx->err_cnt += 1;
 		}
 	}
@@ -393,7 +421,7 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
 		const knot_rrset_t *rr = entry->rr;
-		if (entry->yielded || entry->rank != KR_VLDRANK_INITIAL) {
+		if (entry->yielded || rank_get_value(entry->rank) != KR_RANK_INITIAL) {
 			continue;
 		}
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
@@ -465,13 +493,13 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		if (entry->yielded || entry->qry_uid != qry->uid) {
 			continue;
 		}
-		if (entry->rank == KR_VLDRANK_MISMATCH) {
+		if (rank_get_value(entry->rank) == KR_RANK_MISMATCH) {
 			invalid_entry = entry;
 			break;
-		} else if (entry->rank == KR_VLDRANK_INSECURE &&
+		} else if (rank_test_flag(entry->rank, KR_RANK_INSECURE) &&
 			   !invalid_entry) {
 			invalid_entry = entry;
-		} else if (entry->rank != KR_VLDRANK_SECURE &&
+		} else if (!rank_test_flag(entry->rank, KR_RANK_SECURE) &&
 			   !invalid_entry) {
 			invalid_entry = entry;
 		}
@@ -481,7 +509,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		return ret;
 	}
 
-	if ((invalid_entry->rank != KR_VLDRANK_SECURE) &&
+	if (!rank_test_flag(invalid_entry->rank, KR_RANK_SECURE) &&
 	    (++(invalid_entry->revalidation_cnt) > MAX_REVALIDATION_CNT)) {
 		VERBOSE_MSG(qry, "<= continuous revalidation, fails\n");
 		qry->flags |= QUERY_DNSSEC_BOGUS;
@@ -489,7 +517,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 	}
 
 	const knot_rrset_t *rr = invalid_entry->rr;
-	if (invalid_entry->rank == KR_VLDRANK_MISMATCH) {
+	if (rank_get_value(invalid_entry->rank) == KR_RANK_MISMATCH) {
 		const knot_dname_t *signer_name = knot_rrsig_signer_name(&rr->rrs, 0);
 		if (knot_dname_is_sub(signer_name, qry->zone_cut.name)) {
 			qry->zone_cut.name = knot_dname_copy(signer_name, &req->pool);
@@ -504,9 +532,9 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		}
 		VERBOSE_MSG(qry, ">< cut changed (new signer), needs revalidation\n");
 		ret = KR_STATE_YIELD;
-	} else if (invalid_entry->rank == KR_VLDRANK_INSECURE) {
+	} else if (rank_test_flag(invalid_entry->rank, KR_RANK_INSECURE)) {
 		ret = rrsig_not_found(ctx, rr);
-	} else if (invalid_entry->rank != KR_VLDRANK_SECURE) {
+	} else if (!rank_test_flag(invalid_entry->rank, KR_RANK_SECURE)) {
 		qry->flags |= QUERY_DNSSEC_BOGUS;
 		ret = KR_STATE_FAIL;
 	}
