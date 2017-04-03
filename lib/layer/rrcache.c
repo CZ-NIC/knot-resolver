@@ -243,26 +243,13 @@ static int commit_rr(const char *key, void *val, void *data)
 
 	/* Save RRSIG in a special cache. */
 	uint8_t rank = KEY_FLAG_RANK(key);
-	/* Non-authoritative NSs should never be trusted,
-	 * it may be present in an otherwise secure answer but it
-	 * is only a hint for local state. */
-	if (rr->type != KNOT_RRTYPE_NS || (rank & KR_RANK_AUTH)) {
-		if (baton->qry->flags & QUERY_DNSSEC_WANT &&
-		    rank != KR_RANK_BAD) {
-			rank |= KR_RANK_SECURE;
-		}
-	}
-	if (baton->qry->flags & QUERY_DNSSEC_INSECURE && rank != KR_RANK_BAD) {
-		rank &= ~KR_RANK_SECURE;
-		rank |= KR_RANK_INSECURE;
-	}
 	if (KEY_COVERING_RRSIG(key)) {
 		return commit_rrsig(baton, rank, KR_CACHE_FLAG_NONE, rr);
 	}
-	/* Accept only better rank (if not overriding) */
+	/* Accept only better or equal rank if not secure */
 	if (!(rank & KR_RANK_SECURE)) {
 		int cached_rank = kr_cache_peek_rank(baton->cache, KR_CACHE_RR, rr->owner, rr->type, baton->timestamp);
-		if (cached_rank >= rank) {
+		if (cached_rank > rank) {
 			return kr_ok();
 		}
 	}
