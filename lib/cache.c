@@ -34,7 +34,7 @@
 #include "lib/utils.h"
 
 /* Cache version */
-#define KEY_VERSION "V\x03"
+#define KEY_VERSION "V\x04"
 /* Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
