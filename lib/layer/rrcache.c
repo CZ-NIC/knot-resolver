@@ -246,10 +246,13 @@ static int commit_rr(const char *key, void *val, void *data)
 	if (KEY_COVERING_RRSIG(key)) {
 		return commit_rrsig(baton, rank, KR_CACHE_FLAG_NONE, rr);
 	}
-	/* Accept only better or equal rank if not secure */
+	/* Accept only better rank if not secure. */
 	if (!(rank & KR_RANK_SECURE)) {
 		int cached_rank = kr_cache_peek_rank(baton->cache, KR_CACHE_RR, rr->owner, rr->type, baton->timestamp);
-		if (cached_rank > rank) {
+		/* If equal rank was accepted, spoofing a single answer would be enough
+		 * to e.g. override NS record in AUTHORITY section.
+		 * This way they would have to hit the first answer (whenever TTL expires). */
+		if (cached_rank >= rank) {
 			return kr_ok();
 		}
 	}
