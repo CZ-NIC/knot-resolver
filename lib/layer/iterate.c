@@ -330,6 +330,13 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		if (rr->type == KNOT_RRTYPE_CNAME) {
 			return KR_STATE_CONSUME;
 		}
+		/* Work around for these NSs which are authoritative both for
+		 * parent and child and mixes data from both zones in single answer */
+		if (knot_wire_get_aa(pkt->wire) &&
+		    (rr->type == qry->stype) &&
+		    (knot_dname_is_equal(rr->owner, qry->sname))) {
+			return KR_STATE_CONSUME;
+		}
 	}
 #endif
 	/* Remember current bailiwick for NS processing. */
@@ -612,6 +619,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 	} else if (!query->parent) {
+		/* Answer for initial query */
 		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
 		state = pick_authority(pkt, req, to_wire);
 		if (state != kr_ok()) {
@@ -619,9 +627,33 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		}
 		finalize_answer(pkt, query, req);
 	} else {
-		state = pick_authority(pkt, req, false);
-		if (state != kr_ok()) {
-			return KR_STATE_FAIL;
+		/* Answer for sub-query; DS, IP for NS etc.
+		 * It may contains NSEC \ NSEC3 records for
+		 * data non-existence or wc expansion proving.
+		 * If yes, they must be validated by validator.
+		 * If no, authority section is unuseful.
+		 * dnssec\nsec.c & dnssec\nsec3.c use
+		 * rrsets from incoming packet.
+		 * validator uses answer_selected & auth_selected.
+		 * So, if nsec\nsec3 records are present in authority,
+		 * pick_authority() must be called.
+		 * TODO refactor nsec\nsec3 modules to work with
+		 * answer_selected & auth_selected instead of incoming pkt. */
+		bool auth_is_unuseful = true;
+		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		for (unsigned i = 0; i < ns->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
+			if (rr->type == KNOT_RRTYPE_NSEC ||
+			    rr->type == KNOT_RRTYPE_NSEC3) {
+				auth_is_unuseful = false;
+				break;
+			}
+		}
+		if (!auth_is_unuseful) {
+			state = pick_authority(pkt, req, false);
+			if (state != kr_ok()) {
+				return KR_STATE_FAIL;
+			}
 		}
 	}
 	return KR_STATE_DONE;
