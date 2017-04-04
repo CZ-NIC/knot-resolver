@@ -1,3 +1,38 @@
+Knot Resolver 1.2.5 (2017-04-06)
+================================
+
+Security
+--------
+- layer/validate: clear AD if closest encloser proof has opt-outed
+  NSEC3 (#169)
+- layer/validate: check if NSEC3 records in wildcard expansion proof
+  has an opt-out
+- dnssec/nsec: missed wildcard no-data answers validation has been
+  implemented
+
+Improvements
+------------
+- modules/dnstap: a DNSTAP support module
+  (Contributed by Vicky Shrestha)
+- modules/workarounds: a module adding workaround for know
+  DNS protocol violators
+- layer/iterate: fix logging of glue addresses
+- allow bits=0 and consequently 0.0.0.0/0 matches in view and renumber
+  modules.
+- modules/padding: Improve default padding of responses
+  (Contributed by Daniel Kahn Gillmor)
+
+Bugfixes
+--------
+- trust anchors: Improve trust anchors storage format (#167)
+- trust anchors: support non-root TAs, one domain per file
+- policy.DENY: set AA flag and clear AD flag
+- lib/resolve: avoid unnecessary DS queries
+- lib/nsrep: don't treat servers with NOIP4 + NOIP6 flags as timeouted
+- layer/iterate: During packet classification (answer vs. referral)
+  don't analyze AUTHORITY section in authoritative answer in ANSWER
+  section contains records that have been requested
+
 Knot Resolver 1.2.4 (2017-03-09)
 ================================
 
