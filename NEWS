@@ -1,3 +1,64 @@
+Knot Resolver 1.2.4 (2017-03-09)
+================================
+
+Security
+--------
+- Knot Resolver 1.2.0 and higher could return AD flag for insecure
+  answer if the daemon received answer with invalid RRSIG several
+  times in a row.
+
+Improvements
+------------
+- modules/policy: allow QTRACE policy to be chained with other
+  policies
+- hints.add_hosts(path): a new property
+- module: document the API and simplify the code
+- policy.MIRROR: support IPv6 link-local addresses
+- policy.FORWARD: support IPv6 link-local addresses
+- add net.outgoing_{v4,v6} to allow specifying address to use for
+  connections
+
+Bugfixes
+--------
+- layer/iterate: some improvements in cname chain unrolling
+- layer/validate: fix duplicate records in AUTHORITY section in case
+  of WC expansion proof
+- lua: do *not* truncate cache size to unsigned
+- forwarding mode: correctly forward +cd flag
+- fix a potential memory leak
+- don't treat answers that contain DS non-existance proof as insecure
+- don't store NSEC3 and their signatures in the cache
+- layer/iterate: when processing delegations, check if qname is at or
+  below new authority
+
+
+Knot Resolver 1.2.3 (2017-02-23)
+================================
+
+Bugfixes
+--------
+- Disable storing GLUE records into the cache even in the
+  (non-default) QUERY_PERMISSIVE mode
+- iterate: skip answer RRs that don't match the query
+- layer/iterate: some additional processing for referrals
+- lib/resolve: zonecut fetching error was fixed
+
+
+Knot Resolver 1.2.2 (2017-02-10)
+================================
+
+Bugfixes:
+---------
+- Fix -k argument processing to avoid out-of-bounds memory accesses
+- lib/resolve: fix zonecut fetching for explicit DS queries
+- hints: more NULL checks
+- Fix TA bootstrapping for multiple TAs in the IANA XML file
+
+Testing:
+--------
+- Update tests to run tests with and without QNAME minimization
+
+
 Knot Resolver 1.2.1 (2017-02-01)
 ====================================
 
@@ -15,6 +76,7 @@ Documentation
 Bugfixes:
 ---------
 - lua: make the map command check its arguments
+
 
 Knot Resolver 1.2.0 (2017-01-24)
 ====================================
