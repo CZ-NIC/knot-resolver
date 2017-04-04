@@ -21,6 +21,7 @@ Improvements
   modules.
 - modules/padding: Improve default padding of responses
   (Contributed by Daniel Kahn Gillmor)
+- New kresc client utility (experimental; don't rely on the API yet)
 
 Bugfixes
 --------
