@@ -330,7 +330,11 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		if (rr->type == KNOT_RRTYPE_CNAME) {
 			return KR_STATE_CONSUME;
 		}
-		if (knot_wire_get_aa(pkt->wire) && (rr->type == qry->stype)) {
+		/* Work around for these NSs which are authoritative both for
+		 * parent and child and mixes data from both zones in single answer */
+		if (knot_wire_get_aa(pkt->wire) &&
+		    (rr->type == qry->stype) &&
+		    (knot_dname_is_equal(rr->owner, qry->sname))) {
 			return KR_STATE_CONSUME;
 		}
 	}
