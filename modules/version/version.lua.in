@@ -45,8 +45,7 @@ end
 --Parses version from server and compares it to the installed one
 local function parse(record)
     local output = ""
-    local str = getLastWord(kres.rr2str(record))
-    str = hex2string(str)
+    local str = record:tostring(0)
     local CVE = parseCVE(str)
     local version = parseVersion(str)
     local localVersion = '@VERSION@'
@@ -66,7 +65,7 @@ end
 local function request (answer)
     local pkt = kres.pkt_t(answer)
     if pkt:rcode() == kres.rcode.NOERROR then
-        parse(pkt:section(kres.section.ANSWER)[1])
+        parse(pkt:rrsets(kres.section.ANSWER)[1])
     else
         print ('Request for version ended with rcode: ', pkt:rcode())
         return

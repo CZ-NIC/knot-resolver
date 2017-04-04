@@ -52,8 +52,11 @@ genResType "struct knot_rrset" | sed 's/\<owner\>/_owner/'
 
 ## Some definitions would need too many deps, so shorten them.
 
-genResType "struct kr_query" | sed '/struct kr_nsrep/,$ d'
-printf "\tchar _stub[];\n};\n"
+genResType "struct kr_nsrep" | sed '/union/,$ d'
+printf "\t/* beware: hidden stub */\n};\n"
+
+genResType "struct kr_query" | sed '/struct kr_layer_pickle/,$ d'
+printf "\t/* ^hidden stub^ */\n\tchar _stub[];\n};\n"
 
 genResType "struct kr_context" | sed '/struct kr_cache/,$ d'
 printf "\tchar _stub[];\n};\n"
@@ -74,7 +77,10 @@ genResType "enum kr_query_flag" | sed -e 's/enum kr_query_flag/struct query_flag
 	knot_rdata_rdlen
 	knot_rdata_data
 	knot_rdataset_at
+	knot_rrset_add_rdata
+	knot_rrset_init_empty
 	knot_rrset_ttl
+	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
 # Packet
 	knot_pkt_qname
@@ -99,6 +105,7 @@ EOF
 	kr_nsrep_set
 # Utils
 	kr_rand_uint
+	kr_pkt_make_auth_header
 	kr_pkt_put
 	kr_pkt_recycle
 	kr_inaddr

@@ -128,6 +128,9 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (flags & KR_CACHE_FLAG_WCARD_PROOF) {
 			qry->flags |= QUERY_DNSSEC_WEXPAND;
 		}
+		if (flags & KR_CACHE_FLAG_OPTOUT) {
+			qry->flags |= QUERY_DNSSEC_OPTOUT;
+		}
 		pkt->parsed = pkt->size;
 		knot_wire_set_qr(pkt->wire);
 		knot_wire_set_aa(pkt->wire);
@@ -228,6 +231,9 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Set cache flags */
 	if (qry->flags & QUERY_DNSSEC_WEXPAND) {
 		header.flags |= KR_CACHE_FLAG_WCARD_PROOF;
+	}
+	if (qry->flags & QUERY_DNSSEC_OPTOUT) {
+		header.flags |= KR_CACHE_FLAG_OPTOUT;
 	}
 
 	/* Check if we can replace (allow current or better rank, SECURE is always accepted). */

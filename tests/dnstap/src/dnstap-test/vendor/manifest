@@ -1,0 +1,55 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/cloudflare/dns",
+			"repository": "https://github.com/cloudflare/dns",
+			"vcs": "git",
+			"revision": "e20ffa3da443071c7b3d164dec5b1f80dfb2ecf3",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/dnstap/golang-dnstap",
+			"repository": "https://github.com/dnstap/golang-dnstap",
+			"vcs": "git",
+			"revision": "0145fd8482619f9c04788c7ba4e96cdeef64a041",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/farsightsec/golang-framestream",
+			"repository": "https://github.com/farsightsec/golang-framestream",
+			"vcs": "git",
+			"revision": "b600ccf606747139c84b6d69b5c3988164db4d42",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/golang/protobuf/proto",
+			"repository": "https://github.com/golang/protobuf",
+			"vcs": "git",
+			"revision": "8ee79997227bf9b34611aee7946ae64735e6fd93",
+			"branch": "master",
+			"path": "/proto",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/golang/protobuf/ptypes/any",
+			"repository": "https://github.com/golang/protobuf",
+			"vcs": "git",
+			"revision": "8ee79997227bf9b34611aee7946ae64735e6fd93",
+			"branch": "master",
+			"path": "ptypes/any",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/miekg/dns",
+			"repository": "https://github.com/miekg/dns",
+			"vcs": "git",
+			"revision": "f4d2b086946a624202dc59e6a43f72e8f3f02bc1",
+			"branch": "master",
+			"notests": true
+		}
+	]
+}

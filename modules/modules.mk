@@ -7,6 +7,10 @@ ifeq ($(ENABLE_COOKIES),yes)
 modules_TARGETS += cookies
 endif
 
+ifeq ($(ENABLE_DNSTAP),yes)
+modules_TARGETS += dnstap
+endif
+
 # Memcached
 ifeq ($(HAS_libmemcached),yes)
 modules_TARGETS += kmemcached
@@ -27,6 +31,7 @@ modules_TARGETS += ketcd \
                    renumber \
                    http \
                    daf \
+                   workarounds \
                    version
 endif
 

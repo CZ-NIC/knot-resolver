@@ -137,6 +137,10 @@ KR_EXPORT
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
 
+/** Set packet header suitable for authoritative answer. (for policy module) */
+KR_EXPORT
+void kr_pkt_make_auth_header(knot_pkt_t *pkt);
+
 /** Simple storage for IPx address or AF_UNSPEC. */
 union inaddr {
 	struct sockaddr ip;
@@ -153,6 +157,9 @@ int kr_inaddr_family(const struct sockaddr *addr);
 /** Address length for given family. */
 KR_EXPORT KR_PURE
 int kr_inaddr_len(const struct sockaddr *addr);
+/** Port. */
+KR_EXPORT KR_PURE
+uint16_t kr_inaddr_port(const struct sockaddr *addr);
 /** Return address type for string. */
 KR_EXPORT KR_PURE
 int kr_straddr_family(const char *addr);
@@ -166,7 +173,10 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port);
   * @warning 'dst' must be at least `sizeof(struct in6_addr)` long. */
 KR_EXPORT
 int kr_straddr_subnet(void *dst, const char *addr);
-/** Compare memory bitwise. */
+
+/** Compare memory bitwise.  The semantics is "the same" as for memcmp().
+ *  The partial byte is considered with more-significant bits first,
+ *  so this is e.g. suitable for comparing IP prefixes. */
 KR_EXPORT KR_PURE
 int kr_bitcmp(const char *a, const char *b, int bits);
 

@@ -14,7 +14,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** @file module API definition and functions for (un)loading modules. */
+/** @file
+ * Module API definition and functions for (un)loading modules.
+ */
 
 #pragma once
 

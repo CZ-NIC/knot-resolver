@@ -54,6 +54,14 @@ enum kr_cache_flag {
 	KR_CACHE_FLAG_WCARD_PROOF = 1, /* Entry contains either packet with wildcard
 	                                * answer either record for which wildcard
 	                                * expansion proof is needed */
+	KR_CACHE_FLAG_OPTOUT	  = 2, /* Entry contains secured packet containing a
+					* closest  encloser proof in which the NSEC3 RR
+					* that covers the "next closer" name
+					* has the Opt-Out bit set
+					*/
+	KR_CACHE_FLAG_NODS	  = 4, /* Entry contains NS rrset
+					* for which DS nonexistence is proven.
+					*/
 };
 
 

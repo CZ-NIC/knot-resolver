@@ -43,6 +43,7 @@ void kr_crypto_reinit(void);
 struct dseckey;
 
 #define KR_DNSSEC_VFLG_WEXPAND 0x01
+#define KR_DNSSEC_VFLG_OPTOUT  0x02
 
 /** DNSSEC validation context. */
 struct kr_rrset_validation_ctx {

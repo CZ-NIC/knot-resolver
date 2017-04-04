@@ -107,6 +107,7 @@ struct kr_request {
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
+		_Bool tcp;
 	} qsource;
 	struct {
 		unsigned int rtt;
@@ -130,6 +131,13 @@ struct knot_rrset {
 	knot_rdataset_t rrs;
 	void *additional;
 };
+struct kr_nsrep {
+	unsigned int score;
+	unsigned int reputation;
+	const knot_dname_t *name;
+	struct kr_context *ctx;
+	/* beware: hidden stub */
+};
 struct kr_query {
 	struct kr_query *parent;
 	knot_dname_t *sname;
@@ -142,6 +150,8 @@ struct kr_query {
 	uint16_t reorder;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
+	struct kr_nsrep ns;
+	/* ^hidden stub^ */
 	char _stub[];
 };
 struct kr_context {
@@ -152,14 +162,17 @@ struct kr_context {
 	struct kr_zonecut root_hints;
 	char _stub[];
 };
-struct query_flag {static const int NO_MINIMIZE = 1; static const int NO_THROTTLE = 2; static const int NO_IPV6 = 4; static const int NO_IPV4 = 8; static const int TCP = 16; static const int RESOLVED = 32; static const int AWAIT_IPV4 = 64; static const int AWAIT_IPV6 = 128; static const int AWAIT_CUT = 256; static const int SAFEMODE = 512; static const int CACHED = 1024; static const int NO_CACHE = 2048; static const int EXPIRING = 4096; static const int ALLOW_LOCAL = 8192; static const int DNSSEC_WANT = 16384; static const int DNSSEC_BOGUS = 32768; static const int DNSSEC_INSECURE = 65536; static const int STUB = 131072; static const int ALWAYS_CUT = 262144; static const int DNSSEC_WEXPAND = 524288; static const int PERMISSIVE = 1048576; static const int STRICT = 2097152; static const int BADCOOKIE_AGAIN = 4194304; static const int CNAME = 8388608; static const int REORDER_RR = 16777216; static const int TRACE = 33554432;};
+struct query_flag {static const int NO_MINIMIZE = 1; static const int NO_THROTTLE = 2; static const int NO_IPV6 = 4; static const int NO_IPV4 = 8; static const int TCP = 16; static const int RESOLVED = 32; static const int AWAIT_IPV4 = 64; static const int AWAIT_IPV6 = 128; static const int AWAIT_CUT = 256; static const int SAFEMODE = 512; static const int CACHED = 1024; static const int NO_CACHE = 2048; static const int EXPIRING = 4096; static const int ALLOW_LOCAL = 8192; static const int DNSSEC_WANT = 16384; static const int DNSSEC_BOGUS = 32768; static const int DNSSEC_INSECURE = 65536; static const int STUB = 131072; static const int ALWAYS_CUT = 262144; static const int DNSSEC_WEXPAND = 524288; static const int PERMISSIVE = 1048576; static const int STRICT = 2097152; static const int BADCOOKIE_AGAIN = 4194304; static const int CNAME = 8388608; static const int REORDER_RR = 16777216; static const int TRACE = 33554432; static const int NO_0X20 = 67108864; static const int DNSSEC_NODS = 134217728; static const int DNSSEC_OPTOUT = 268435456;};
 int knot_dname_size(const knot_dname_t *);
 knot_dname_t *knot_dname_from_str(uint8_t *, const char *, size_t);
 char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
 uint16_t knot_rdata_rdlen(const knot_rdata_t *);
 uint8_t *knot_rdata_data(const knot_rdata_t *);
 knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, size_t);
+int knot_rrset_add_rdata(knot_rrset_t *, const uint8_t *, const uint16_t, const uint32_t, knot_mm_t *);
+void knot_rrset_init_empty(knot_rrset_t *);
 uint32_t knot_rrset_ttl(const knot_rrset_t *);
+int knot_rrset_txt_dump(const knot_rrset_t *, char **, size_t *, const knot_dump_style_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
 const knot_dname_t *knot_pkt_qname(const knot_pkt_t *);
 uint16_t knot_pkt_qtype(const knot_pkt_t *);
@@ -175,6 +188,7 @@ int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
 unsigned int kr_rand_uint(unsigned int);
+void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
 int kr_pkt_recycle(knot_pkt_t *);
 const char *kr_inaddr(const struct sockaddr *);

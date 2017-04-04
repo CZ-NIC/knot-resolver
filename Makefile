@@ -2,10 +2,11 @@ include config.mk
 include platform.mk
 
 # Targets
-all: info lib daemon modules
-install: lib-install daemon-install modules-install etc-install
+all: info lib daemon client modules
+install: lib-install daemon-install client-install modules-install etc-install
 check: all tests
-clean: contrib-clean lib-clean daemon-clean modules-clean tests-clean doc-clean bench-clean
+clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
+	tests-clean doc-clean bench-clean
 doc: doc-html
 .PHONY: all install check clean doc info
 
@@ -33,6 +34,10 @@ $(eval $(call find_lib,hiredis,,yes))
 $(eval $(call find_lib,socket_wrapper))
 $(eval $(call find_lib,libsystemd,227))
 $(eval $(call find_lib,gnutls))
+$(eval $(call find_lib,libedit))
+$(eval $(call find_lib,libprotobuf-c,1))
+$(eval $(call find_lib,libfstrm,0.2))
+$(eval $(call find_bin,protoc-c))
 
 # Lookup SONAME
 $(eval $(call find_soname,libknot))
@@ -67,6 +72,11 @@ ifneq ($(GO_PLATFORM),$(filter $(GO_PLATFORM),arm amd64))
 HAS_go := no
 endif
 endif
+endif
+
+# check for fstrm and protobuf for dnstap
+ifeq ($(HAS_libfstrm)|$(HAS_libprotobuf-c)|$(HAS_protoc-c),yes|yes|yes)
+ENABLE_DNSTAP := yes
 endif
 
 # Overview
@@ -109,6 +119,10 @@ info:
 	$(info [$(HAS_nettle)] nettle (modules/cookies))
 	$(info [$(HAS_ltn12)] Lua socket ltn12 (trust anchor bootstrapping))
 	$(info [$(HAS_ssl.https)] Lua ssl.https (trust anchor bootstrapping))
+	$(info [$(HAS_libedit)] libedit (client))
+	$(info [$(HAS_libfstrm)] libfstrm (modules/dnstap))
+	$(info [$(HAS_libprotobuf-c)] libprotobuf-c (modules/dnstap))
+	$(info [$(HAS_protoc-c)] proto-c (modules/dnstap))
 	$(info )
 
 # Verify required dependencies are met, as listed above

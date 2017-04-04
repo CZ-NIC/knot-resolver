@@ -133,7 +133,7 @@ Increase verbosity. If given multiple times, more information is logged.
 This is in addition to the verbosity (if any) from the config file.
 .TP
 .B \-c\fI config\fR, \fB\-\-config=\fI<config>
-Set the config file with settings for unbound to read instead of reading the
+Set the config file with settings for kresd to read instead of reading the
 file at the default location (\fIconfig\fR). The syntax is
 described in \fIdaemon/README.md\fR.
 .TP
