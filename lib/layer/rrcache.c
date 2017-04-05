@@ -141,12 +141,14 @@ enomem:
 static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 			struct kr_query *qry, uint16_t rrtype, const bool cdbit)
 {
-	/* Lookup direct match first; only consider authoritative records,
-	 * even unvalidated, as rank handling is better to do in the iterator
-	 * (QUERY_DNSSEC_* flags). */
+	/* Lookup direct match first; only consider authoritative records.
+	 * TODO: move rank handling into the iterator (QUERY_DNSSEC_* flags)? */
 	uint8_t rank  = 0;
 	uint8_t flags = 0;
 	uint8_t lowest_rank = KR_RANK_AUTH;
+	if (!cdbit) {
+		lowest_rank |= KR_RANK_INSECURE;
+	}
 
 	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			  &rank, &flags, 0, lowest_rank);
@@ -159,6 +161,11 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 	if (ret) {
 		return ret;
 	}
+	if (rank & KR_RANK_INSECURE) {
+		qry->flags |= QUERY_DNSSEC_INSECURE;
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+	}
+
 	/* Record may have RRSIGs, try to find them. */
 	const bool dobit = (qry->flags & QUERY_DNSSEC_WANT);
 	if (cdbit || (dobit && (rank & KR_RANK_SECURE))) {

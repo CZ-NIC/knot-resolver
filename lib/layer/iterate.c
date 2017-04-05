@@ -305,7 +305,7 @@ static inline uint8_t get_initial_rank(const knot_rrset_t *rr,
 		/* TODO: this classifier of authoritativity may not be perfect yet. */
 		rank |= KR_RANK_AUTH;
 	}
-	return (uint8_t)rank;
+	return rank;
 }
 
 static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)

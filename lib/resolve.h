@@ -89,12 +89,11 @@
  *   https://tools.ietf.org/html/rfc4035#section-4.3
  */
 enum kr_rank {
-	KR_RANK_INITIAL = 0,
-
-	KR_RANK_BAD = 7,  /**< For simpler manipulation with the four values below. */
-	KR_RANK_OMIT = 1, /**< Do not validate. */
-	KR_RANK_INDET,    /**< Unable to determine whether it should be secure. */
-	KR_RANK_BOGUS,    /**< Ought to be secure but isn't. */
+	KR_RANK_BAD = 7,     /**< For simpler manipulation with the values below. */
+	KR_RANK_INITIAL = 0, /**< Did not attempt to validate. */
+	KR_RANK_OMIT = 1,    /**< Do not attempt to validate. */
+	KR_RANK_INDET,       /**< Unable to determine whether it should be secure. */
+	KR_RANK_BOGUS,       /**< Ought to be secure but isn't. */
 	KR_RANK_MISMATCH,
 
 	KR_RANK_INSECURE = 8, /**< Proven to be insecure. */

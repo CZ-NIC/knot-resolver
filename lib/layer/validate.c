@@ -108,7 +108,8 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 		ranked_rr_array_entry_t *entry = vctx->rrs->at[i];
 		const knot_rrset_t *rr = entry->rr;
 		assert((entry->rank & (KR_RANK_SECURE | KR_RANK_INSECURE)) != (KR_RANK_SECURE | KR_RANK_INSECURE));
-		if (rank_test_flag(entry->rank, KR_RANK_SECURE) ||
+		if (rank_get_value(entry->rank) == KR_RANK_OMIT ||
+		    rank_test_flag(entry->rank, KR_RANK_SECURE) ||
 		    entry->yielded || vctx->qry_uid != entry->qry_uid) {
 			continue;
 		}

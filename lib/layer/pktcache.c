@@ -70,9 +70,9 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		return ret;
 	}
 
-	const uint8_t rank_val = rank_get_value(entry->rank);
-	if (!knot_wire_get_cd(req->answer->wire) && rank_val && rank_val != KR_RANK_OMIT) {
-		return kr_error(ENOENT); /* it would fail anyway */
+	if (!knot_wire_get_cd(req->answer->wire)
+	    && entry->rank < (KR_RANK_INSECURE|KR_RANK_AUTH)) {
+		return kr_error(ENOENT);
 	}
 
 	/* Copy answer, keep the original message id */
