@@ -70,8 +70,14 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		return ret;
 	}
 
-	if (!knot_wire_get_cd(req->answer->wire)
-	    && entry->rank < (KR_RANK_INSECURE|KR_RANK_AUTH)) {
+	uint8_t lowest_rank = KR_RANK_INITIAL;
+	if (!(qry->flags & QUERY_NOAUTH)) {
+		lowest_rank |= KR_RANK_AUTH;
+	}
+	if (!knot_wire_get_cd(req->answer->wire)) {
+		lowest_rank |= KR_RANK_INSECURE;
+	}
+	if (entry->rank < lowest_rank) {
 		return kr_error(ENOENT);
 	}
 

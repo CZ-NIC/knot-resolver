@@ -341,6 +341,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		if (!next) {
 			return kr_error(ENOMEM);
 		}
+		next->flags |= QUERY_NOAUTH;
 	}
 	/* At the root level with no NS addresses, add SBELT subrequest. */
 	int ret = 0;

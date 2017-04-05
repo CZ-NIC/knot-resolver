@@ -145,7 +145,10 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 	 * TODO: move rank handling into the iterator (QUERY_DNSSEC_* flags)? */
 	uint8_t rank  = 0;
 	uint8_t flags = 0;
-	uint8_t lowest_rank = KR_RANK_AUTH;
+	uint8_t lowest_rank = KR_RANK_INITIAL;
+	if (!(qry->flags & QUERY_NOAUTH)) {
+		lowest_rank |= KR_RANK_AUTH;
+	}
 	if (!cdbit) {
 		lowest_rank |= KR_RANK_INSECURE;
 	}
