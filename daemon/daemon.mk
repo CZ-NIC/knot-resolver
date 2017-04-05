@@ -9,7 +9,8 @@ kresd_SOURCES := \
 	daemon/tls_ephemeral_credentials.c \
 	daemon/main.c
 
-kresd_DIST := daemon/lua/kres.lua daemon/lua/kres-gen.lua daemon/lua/trust_anchors.lua
+kresd_DIST := daemon/lua/kres.lua daemon/lua/kres-gen.lua \
+              daemon/lua/trust_anchors.lua daemon/lua/zonefile.lua
 
 # Embedded resources
 %.inc: %.lua
@@ -51,10 +52,21 @@ ifneq ($(SED),)
 	$(INSTALL) -m 0644 doc/kresd.8 $(DESTDIR)$(MANDIR)/man8/
 endif
 daemon-clean: kresd-clean
-	@$(RM) daemon/lua/*.inc daemon/lua/trust_anchors.lua
+	@$(RM) daemon/lua/*.inc daemon/lua/kres.lua daemon/lua/trust_anchors.lua \
+		daemon/lua/zonefile.lua
+
+KNOT_RRSET_TXT_DUMP := \
+	$(shell pkg-config libknot --atleast-version=2.4.0 && echo true || echo false)
+daemon/lua/kres.lua: daemon/lua/kres.lua.in
+	@$(call quiet,SED,$<) -e "s|@KNOT_RRSET_TXT_DUMP@|$(KNOT_RRSET_TXT_DUMP)|g" $< > $@
 
 daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in
 	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g" $< > $@
+
+LIBZSCANNER_COMMENTS := \
+	$(shell pkg-config libzscanner --atleast-version=2.4.2 && echo true || echo false)
+daemon/lua/zonefile.lua: daemon/lua/zonefile.lua.in
+	@$(call quiet,SED,$<) -e "s|@LIBZSCANNER_COMMENTS@|$(LIBZSCANNER_COMMENTS)|g" $< > $@
 
 daemon/lua/kres-gen.lua: | $(libkres)
 	@echo "WARNING: regenerating $@"
@@ -62,4 +74,16 @@ daemon/lua/kres-gen.lua: | $(libkres)
 	daemon/lua/kres-gen.sh | sed 's/    /\t/g' > $@
 .DELETE_ON_ERROR: daemon/lua/kres-gen.lua
 
-.PHONY: daemon daemon-install daemon-clean
+# Client
+ifeq ($(HAS_libedit), yes)
+kresc_SOURCES := daemon/kresc.c
+kresc_CFLAGS += -fPIE $(libedit_CFLAGS)
+kresc_LIBS += $(contrib_TARGET) $(libedit_LIBS)
+kresc_DEPEND := $(libkres) $(contrib)
+$(eval $(call make_sbin,kresc,daemon,yes))
+client: $(kresc)
+client-install: kresc-install
+client-clean: kresc-clean
+endif
+
+.PHONY: daemon daemon-install daemon-clean client client-install client-clean

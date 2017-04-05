@@ -34,7 +34,7 @@
 	X(AWAIT_IPV4,      1 << 6) /**< Query is waiting for A address. */ \
 	X(AWAIT_IPV6,      1 << 7) /**< Query is waiting for AAAA address. */ \
 	X(AWAIT_CUT,       1 << 8) /**< Query is waiting for zone cut lookup */ \
-	X(SAFEMODE,        1 << 9) /**< Don't use fancy stuff (EDNS...) */ \
+	X(SAFEMODE,        1 << 9) /**< Don't use fancy stuff (EDNS, 0x20, ...) */ \
 	X(CACHED,          1 << 10) /**< Query response is cached. */ \
 	X(NO_CACHE,        1 << 11) /**< No cache for lookup; exception: finding NSs and subqueries. */ \
 	X(EXPIRING,        1 << 12) /**< Query response is cached, but expiring. */ \
@@ -52,7 +52,9 @@
 	X(CNAME,           1 << 23) /**< Query response contains CNAME in answer section. */ \
 	X(REORDER_RR,      1 << 24) /**< Reorder cached RRs. */ \
 	X(TRACE,	   1 << 25) /**< Log answer with kr_verbose_log(), unless -DNDEBUG. */ \
+	X(NO_0X20,	   1 << 26) /**< Disable query case randomization . */ \
 	X(DNSSEC_NODS,	   1 << 27) /**< DS non-existance is proven */ \
+	X(DNSSEC_OPTOUT,   1 << 28) /**< Closest encloser proof has optout */ \
 			/* 1 << 31       Used by ../modules/dns64/dns64.lua */
 
 /** Query flags */

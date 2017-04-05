@@ -76,7 +76,7 @@ static int insert_ta(map_t *trust_anchors, const knot_dname_t *name,
 		return kr_error(ENOMEM);
 	}
 	WITH_VERBOSE {
-		kr_rrset_print(ta_rr, "[ ta ] new state of root trust anchors:\n");
+		kr_rrset_print(ta_rr, "[ ta ] new state of trust anchors for a domain:\n");
 	}
 	if (is_new_key) {
 		return map_set(trust_anchors, (const char *)name, ta_rr);

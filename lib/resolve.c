@@ -138,7 +138,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 		knot_rdata_init(rdata_arr, addr_len, addr, 0);
 		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata_arr);
 	} else {
-		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, NULL);
+		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
 	}
 }
 
@@ -250,7 +250,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	    (cut_found.key == NULL)) {
 		/* No DNSKEY was found for cached cut.
 		 * If no glue were fetched for this cut,
-		 * we have got circular dependance - must fetch A\AAAA
+		 * we have got circular dependancy - must fetch A\AAAA
 		 * from authoritative, but we have no key to verify it.
 		 * TODO - try to refetch cut only if no glue were fetched */
 		kr_zonecut_deinit(&cut_found);
@@ -292,10 +292,12 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	 * Prefer IPv6 and continue with IPv4 if not available.
 	 */
 	uint16_t next_type = 0;
-	if (!(qry->flags & QUERY_AWAIT_IPV6)) {
+	if (!(qry->flags & QUERY_AWAIT_IPV6) &&
+	    !(ctx->options & QUERY_NO_IPV6)) {
 		next_type = KNOT_RRTYPE_AAAA;
 		qry->flags |= QUERY_AWAIT_IPV6;
-	} else if (!(qry->flags & QUERY_AWAIT_IPV4)) {
+	} else if (!(qry->flags & QUERY_AWAIT_IPV4) &&
+		   !(ctx->options & QUERY_NO_IPV4)) {
 		next_type = KNOT_RRTYPE_A;
 		qry->flags |= QUERY_AWAIT_IPV4;
 		/* Hmm, no useable IPv6 then. */
@@ -318,10 +320,27 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}
-	/* Push new query to the resolution plan */
-	struct kr_query *next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
-	if (!next) {
-		return kr_error(ENOMEM);
+	struct kr_query *next = qry;
+	if (knot_dname_is_equal(qry->ns.name, qry->sname) &&
+	    qry->stype == next_type) {
+		if (!(qry->flags & QUERY_NO_MINIMIZE)) {
+			qry->flags |= QUERY_NO_MINIMIZE;
+			qry->flags &= ~QUERY_AWAIT_IPV6;
+			qry->flags &= ~QUERY_AWAIT_IPV4;
+			VERBOSE_MSG(qry, "=> circular dependepcy, retrying with non-minimized name\n");
+		} else {
+			qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
+			kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+			invalidate_ns(rplan, qry);
+			VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
+			return kr_error(EHOSTUNREACH);
+		}
+	} else {
+		/* Push new query to the resolution plan */
+		next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
+		if (!next) {
+			return kr_error(ENOMEM);
+		}
 	}
 	/* At the root level with no NS addresses, add SBELT subrequest. */
 	int ret = 0;
@@ -537,7 +556,8 @@ static int answer_finalize(struct kr_request *request, int state)
 		struct kr_query *last = array_tail(rplan->resolved);
 		/* Do not set AD for RRSIG query, as we can't validate it. */
 		const bool secure = (last->flags & QUERY_DNSSEC_WANT) &&
-		                   !(last->flags & QUERY_DNSSEC_INSECURE);
+				    !(last->flags & QUERY_DNSSEC_INSECURE) &&
+				    !(last->flags & QUERY_DNSSEC_OPTOUT);
 		if (!(last->flags & QUERY_STUB) /* Never set AD if forwarding. */
 		    && has_ad && secure
 		    && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
@@ -841,25 +861,37 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
 		VERBOSE_MSG(qry, ">< negative TA, going insecure\n");
 		qry->flags &= ~QUERY_DNSSEC_WANT;
+		qry->flags |= QUERY_DNSSEC_INSECURE;
 	}
-	/* Enable DNSSEC if enters a new island of trust. */
+	if (qry->flags & QUERY_DNSSEC_NODS) {
+		/* This is the next query iteration with minimized qname.
+		 * At previous iteration DS non-existance has been proven */
+		qry->flags &= ~QUERY_DNSSEC_NODS;
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+		qry->flags |= QUERY_DNSSEC_INSECURE;
+	}
+	/* Enable DNSSEC if entering a new (or different) island of trust,
+	 * and update the TA RRset if required. */
 	bool want_secured = (qry->flags & QUERY_DNSSEC_WANT) &&
 			    !knot_wire_get_cd(request->answer->wire);
-	if (!(qry->flags & QUERY_DNSSEC_WANT) &&
-	    !knot_wire_get_cd(request->answer->wire) &&
-	    kr_ta_get(trust_anchors, qry->zone_cut.name)) {
+	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
+	if (!knot_wire_get_cd(request->answer->wire) && ta_rr) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 		want_secured = true;
-		WITH_VERBOSE {
-		char qname_str[KNOT_DNAME_MAXLEN];
-		knot_dname_to_str(qname_str, qry->zone_cut.name, sizeof(qname_str));
-		VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
+
+		if (qry->zone_cut.trust_anchor == NULL
+		    || !knot_dname_is_equal(qry->zone_cut.trust_anchor->owner, qry->zone_cut.name)) {
+			mm_free(qry->zone_cut.pool, qry->zone_cut.trust_anchor);
+			qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
+
+			WITH_VERBOSE {
+			char qname_str[KNOT_DNAME_MAXLEN];
+			knot_dname_to_str(qname_str, ta_rr->owner, sizeof(qname_str));
+			VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
+			}
 		}
 	}
-	if (want_secured && !qry->zone_cut.trust_anchor) {
-		knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
-		qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
-	}
+
 	/* Try to fetch missing DS (from above the cut). */
 	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
 	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
@@ -1062,14 +1094,16 @@ ns_election:
 		int ret = ns_resolve_addr(qry, request);
 		if (ret != 0) {
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
+			qry->ns.name = NULL;
 			goto ns_election; /* Must try different NS */
 		}
 		ITERATE_LAYERS(request, qry, reset);
 		return KR_STATE_PRODUCE;
 	}
 
-	/* Randomize query case (if not in safemode) */
-	qry->secret = (qry->flags & QUERY_SAFEMODE) ? 0 : kr_rand_uint(UINT32_MAX);
+	/* Randomize query case (if not in safemode or turned off) */
+	qry->secret = (qry->flags & (QUERY_SAFEMODE | QUERY_NO_0X20))
+			? 0 : kr_rand_uint(UINT32_MAX);
 	knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(packet);
 	randomized_qname_case(qname_raw, qry->secret);
 

@@ -151,7 +151,14 @@ end
 -- Make sandboxed environment
 local function make_sandbox(defined)
 	local __protected = { modules = true, cache = true, net = true, trust_anchors = true }
-	return setmetatable({}, {
+
+	-- Compute and export the list of top-level names (hidden otherwise)
+	local nl = ""
+	for n in pairs(defined) do
+		nl = nl .. n .. "\n"
+	end
+
+	return setmetatable({ __orig_name_list = nl }, {
 		__index = defined,
 		__newindex = function (t, k, v)
 			if __protected[k] then

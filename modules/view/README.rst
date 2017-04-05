@@ -40,6 +40,8 @@ Example configuration
 	view:addr('192.168.1.0/24', policy.rpz(policy.PASS, 'whitelist.rpz'))
 	-- Forward all queries from given subnet to proxy
 	view:addr('10.0.0.0/8', policy.all(policy.FORWARD('2001:DB8::1')))
+	-- Drop everything that hasn't matched
+	view:addr('0.0.0.0/0', function (req, qry) return policy.DROP end)
 
 Properties
 ^^^^^^^^^^

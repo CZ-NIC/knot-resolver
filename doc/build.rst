@@ -33,8 +33,9 @@ The following is a list of software required to build Knot DNS Resolver from sou
    :header: "Requirement", "Required by", "Notes"
 
    "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
-   "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "C compiler", "*all*", "*(build only)* [#]_"
+   "`pkg-config`_", "*all*", "*(build only)* [#]_"
+   "hexdump or xxd", "``daemon``", "*(build only)*"
    "libknot_ 2.1+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
    "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
@@ -52,9 +53,12 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "Go_ 1.5+", "``modules``", "Build modules written in Go."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
-   "Sphinx_", "``documentation``", "Building this HTML/PDF documentation."
+   "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this HTML/PDF documentation."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
    "libsystemd_", "``daemon``", "Systemd socket activation support."
+   "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for dnstap_."
+   "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
+   "libfstrm_ 0.2+", "``modules/dnstap``", "Frame Streams data transport protocol."
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
@@ -230,7 +234,8 @@ The project can be built with code coverage tracking using the ``COVERAGE=1`` va
 Running unit and integration tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The unit tests require cmocka_ and are executed with ``make check``.
+The unit tests require cmocka_ and are executed by ``make check``.
+Tests for the dnstap module need go and are executed by ``make ckeck-dnstap``.
 
 The integration tests use Deckard, the `DNS test harness <deckard>`_.
 
@@ -276,6 +281,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _Doxygen: https://www.stack.nl/~dimitri/doxygen/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
+.. _sphinx_rtd_theme: https://pypi.python.org/pypi/sphinx_rtd_theme
 .. _GNU Make: https://www.gnu.org/software/make/
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.labs.nic.cz/labs/knot
@@ -291,5 +297,9 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _deckard_doc: https://gitlab.labs.nic.cz/knot/resolver/blob/master/tests/README.rst
 
 .. _libsystemd: https://www.freedesktop.org/wiki/Software/systemd/
+.. _dnstap: http://dnstap.info/
+.. _libprotobuf: https://developers.google.com/protocol-buffers/
+.. _libprotobuf-c: https://github.com/protobuf-c/protobuf-c/wiki
+.. _libfstrm: https://github.com/farsightsec/fstrm
 
 .. _DESTDIR: https://www.gnu.org/prep/standards/html_node/DESTDIR.html

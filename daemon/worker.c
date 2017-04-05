@@ -303,10 +303,12 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 			if (uv_udp_getsockname((uv_udp_t *)handle, dst_addr, &addr_len) == 0) {
 				task->req.qsource.dst_addr = dst_addr;
 			}
+			task->req.qsource.tcp = false;
 		} else if (handle->type == UV_TCP) {
 			if (uv_tcp_getsockname((uv_tcp_t *)handle, dst_addr, &addr_len) == 0) {
 				task->req.qsource.dst_addr = dst_addr;
 			}
+			task->req.qsource.tcp = true;
 		}
 	}
 	worker->stats.concurrent += 1;
@@ -1047,9 +1049,12 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned option
 	}
 	task->baton = baton;
 	task->on_complete = on_complete;
-	task->req.options |= options;
 	/* Start task */
 	int ret = qr_task_start(task, query);
+
+	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
+	task->req.options |= options;
+
 	if (ret != 0) {
 		qr_task_unref(task);
 		return ret;

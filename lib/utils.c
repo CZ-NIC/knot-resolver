@@ -245,6 +245,13 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 	return knot_pkt_put(pkt, 0, &rr, KNOT_PF_FREE);
 }
 
+void kr_pkt_make_auth_header(knot_pkt_t *pkt)
+{
+	assert(pkt && pkt->wire);
+	knot_wire_clear_ad(pkt->wire);
+	knot_wire_set_aa(pkt->wire);
+}
+
 const char *kr_inaddr(const struct sockaddr *addr)
 {
 	if (!addr) {
@@ -270,6 +277,18 @@ int kr_inaddr_len(const struct sockaddr *addr)
 		return kr_error(EINVAL);
 	}
 	return kr_family_len(addr->sa_family);
+}
+
+uint16_t kr_inaddr_port(const struct sockaddr *addr)
+{
+	if (!addr) {
+		return 0;
+	}
+	switch (addr->sa_family) {
+	case AF_INET:  return ntohs(((const struct sockaddr_in *)addr)->sin_port);
+	case AF_INET6: return ntohs(((const struct sockaddr_in6 *)addr)->sin6_port);
+	default:       return 0;
+	}
 }
 
 int kr_straddr_family(const char *addr)
@@ -352,9 +371,19 @@ int kr_straddr_subnet(void *dst, const char *addr)
 
 int kr_bitcmp(const char *a, const char *b, int bits)
 {
-	if (!a || !b || bits == 0) {
-		return kr_error(ENOMEM);
+	/* We're using the function from lua directly, so at least for now
+	 * we avoid crashing on bogus inputs.  Meaning: NULL is ordered before
+	 * anything else, and negative length is the same as zero.
+	 * TODO: review the call sites and probably remove the checks. */
+	if (bits <= 0 || (!a && !b)) {
+		return 0;
+	} else if (!a) {
+		return -1;
+	} else if (!b) {
+		return 1;
 	}
+
+	assert((a && b && bits >= 0)  ||  bits == 0);
 	/* Compare part byte-divisible part. */
 	const size_t chunk = bits / 8;
 	int ret = memcmp(a, b, chunk);

@@ -1,6 +1,8 @@
 -- LuaJIT ffi bindings for libkres, a DNS resolver library.
 -- @note Since it's statically compiled, it expects to find the symbols in the C namespace.
 
+local kres -- the module
+
 ffi = require('ffi')
 local bit = require('bit')
 local bor = bit.bor
@@ -107,6 +109,7 @@ struct sockaddr {
 /*
  * libc APIs
  */
+void * malloc(size_t size);
 void free(void *ptr);
 int inet_pton(int af, const char *src, void *dst);
 ]]
@@ -127,7 +130,7 @@ ffi.metatype( sockaddr_t, {
 	}
 })
 
--- Metatype for RR set
+-- Metatype for RR set.  Beware, the indexing is 0-based (rdata, get, tostring).
 local rrset_buflen = (64 + 1) * 1024
 local rrset_buf = ffi.new('char[?]', rrset_buflen)
 local knot_rrset_t = ffi.typeof('knot_rrset_t')
@@ -158,7 +161,42 @@ ffi.metatype( knot_rrset_t, {
 				return ret >= 0 and ffi.string(rrset_buf)
 			end
 		end,
-	}
+
+		-- Dump the rrset in presentation format (dig-like).
+		txt_dump = function(rr, style)
+			if @KNOT_RRSET_TXT_DUMP@ then
+				local bufsize = 1024
+				local dump = ffi.new('char *[1]', C.malloc(bufsize))
+					-- ^ one pointer to a string
+				local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
+
+				local ret = knot.knot_rrset_txt_dump(rr, dump, size,
+								style or knot.KNOT_DUMP_STYLE_DEFAULT)
+				local result = nil
+				if ret >= 0 then
+					result = ffi.string(dump[0], ret)
+				end
+				C.free(dump[0])
+				return result
+			else
+				-- different _txt_dump ABI -> use old "binary" method
+				local function hex_encode(str)
+					return (str:gsub('.', function (c)
+						return string.format('%02X', string.byte(c))
+					end))
+				end
+				local result = ''
+				local i
+				for i = 0, rr.rrs.rr_count - 1 do
+					local rr1 = rr:get(i)
+					local rdata = hex_encode(rr1.rdata)
+					result = result .. string.format('%s %d IN TYPE%d \\# %d %s\n',
+						kres.dname2str(rr1.owner), rr1.ttl, rr1.type, #rr1.rdata, rdata)
+				end
+				return result
+			end
+		end,
+	},
 })
 
 -- Metatype for packet
@@ -273,20 +311,34 @@ local function dname2str(dname)
 	return ffi.string(ffi.gc(C.knot_dname_to_str(nil, dname, 0), C.free))
 end
 
--- Pretty print for RR
-local function rr2str(rr)
-	local function hex_encode(str)
-		return (str:gsub('.', function (c)
-			return string.format('%02X', string.byte(c))
-		end))
+-- Pretty-print a single RR (which is a table with .owner .ttl .type .rdata)
+-- Extension: append .comment if exists.
+local function rr2str(rr, style)
+	-- Construct a single-RR temporary set while minimizing copying.
+	local rrs = knot_rrset_t()
+	knot.knot_rrset_init_empty(rrs)
+	rrs._owner = ffi.cast('char *', rr.owner) -- explicit cast needed here
+	rrs.type = rr.type
+	rrs.rclass = kres.class.IN
+	knot.knot_rrset_add_rdata(rrs, rr.rdata, #rr.rdata, rr.ttl, nil)
+
+	local ret = rrs:txt_dump(style)
+	C.free(rrs.rrs.data)
+
+	-- Trim the newline and append comment (optionally).
+	if ret then
+		if ret:byte(-1) == string.byte('\n', -1) then
+			ret = ret:sub(1, -2)
+		end
+		if rr.comment then
+ 			ret = ret .. ' ;' .. rr.comment
+		end
 	end
-	local rdata = hex_encode(rr.rdata)
-	return string.format('%s %d IN TYPE%d \\# %d %s',
-		dname2str(rr.owner), rr.ttl, rr.type, #rr.rdata, rdata)
+	return ret
 end
 
 -- Module API
-local kres = {
+kres = {
 	-- Constants
 	class = ffi.new('struct rr_class'),
 	type = ffi.new('struct rr_type'),

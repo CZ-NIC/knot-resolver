@@ -138,16 +138,29 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		const knot_rdata_t *rdata = rr->rrs.data;
+		const void *addr = knot_rdata_data(rdata);
+		const int addr_len = knot_rdata_rdlen(rdata);
+		char name_str[KNOT_DNAME_MAXLEN];
+		char addr_str[INET6_ADDRSTRLEN];
+		WITH_VERBOSE {
+			const int af = (addr_len == sizeof(struct in_addr)) ?
+				       AF_INET : AF_INET6;
+			knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
+			inet_ntop(af, addr, addr_str, sizeof(addr_str));
+		}
 		if (!(query->flags & QUERY_ALLOW_LOCAL) &&
-			!is_valid_addr(knot_rdata_data(rdata), knot_rdata_rdlen(rdata))) {
+			!is_valid_addr(addr, addr_len)) {
+			QVERBOSE_MSG(query, "<= ignoring invalid glue for "
+				     "'%s': '%s'\n", name_str, addr_str);
 			return KR_STATE_CONSUME; /* Ignore invalid addresses */
 		}
 		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata);
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
+		QVERBOSE_MSG(query, "<= using glue for "
+			     "'%s': '%s'\n", name_str, addr_str);
 	}
-
 	return KR_STATE_CONSUME;
 }
 
@@ -165,19 +178,15 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_reques
 			    (rr->type != KNOT_RRTYPE_AAAA)) {
 				continue;
 			}
-			(void) update_nsaddr(rr, req->current_query);
-			WITH_VERBOSE {
-				char name_str[KNOT_DNAME_MAXLEN];
-				char addr_str[INET6_ADDRSTRLEN];
-				const void *addr = knot_rdata_data(rr->rrs.data);
-				const int addr_len = knot_rdata_rdlen(rr->rrs.data);
-				const int af = (addr_len == sizeof(struct in_addr)) ?
-					       AF_INET : AF_INET6;
-				knot_dname_to_str(name_str, ns, sizeof(name_str));
-				inet_ntop(af, addr, addr_str, sizeof(addr_str));
-				VERBOSE_MSG("<= using glue for '%s': '%s'\n",
-					    name_str, addr_str);
+			if ((rr->type == KNOT_RRTYPE_A) &&
+			    (req->ctx->options & QUERY_NO_IPV4)) {
+				continue;
 			}
+			if ((rr->type == KNOT_RRTYPE_AAAA) &&
+			    (req->ctx->options & QUERY_NO_IPV6)) {
+				continue;
+			}
+			(void) update_nsaddr(rr, req->current_query);
 		}
 	}
 }
@@ -321,14 +330,23 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		if (rr->type == KNOT_RRTYPE_CNAME) {
 			return KR_STATE_CONSUME;
 		}
+		/* Work around for these NSs which are authoritative both for
+		 * parent and child and mixes data from both zones in single answer */
+		if (knot_wire_get_aa(pkt->wire) &&
+		    (rr->type == qry->stype) &&
+		    (knot_dname_is_equal(rr->owner, qry->sname))) {
+			return KR_STATE_CONSUME;
+		}
 	}
 #endif
 	/* Remember current bailiwick for NS processing. */
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
+	bool ns_record_exists = false;
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
+			ns_record_exists = true;
 			int state = update_cut(pkt, rr, req, current_zone_cut);
 			switch(state) {
 			case KR_STATE_DONE: result = state; break;
@@ -341,9 +359,13 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		}
 	}
 
+
 	if ((qry->flags & QUERY_DNSSEC_WANT) && (result == KR_STATE_CONSUME)) {
-		if (knot_wire_get_aa(pkt->wire) == 0 && knot_wire_get_ancount(pkt->wire) == 0) {
-			/* Prevent from validating as an autoritative answer */
+		if (knot_wire_get_aa(pkt->wire) == 0 &&
+		    knot_wire_get_ancount(pkt->wire) == 0 &&
+		    ns_record_exists) {
+			/* Unhelpful referral
+			   Prevent from validating as an authoritative answer */
 			result = KR_STATE_DONE;
 		}
 	}
@@ -597,6 +619,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 	} else if (!query->parent) {
+		/* Answer for initial query */
 		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
 		state = pick_authority(pkt, req, to_wire);
 		if (state != kr_ok()) {
@@ -604,9 +627,33 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		}
 		finalize_answer(pkt, query, req);
 	} else {
-		state = pick_authority(pkt, req, false);
-		if (state != kr_ok()) {
-			return KR_STATE_FAIL;
+		/* Answer for sub-query; DS, IP for NS etc.
+		 * It may contains NSEC \ NSEC3 records for
+		 * data non-existence or wc expansion proving.
+		 * If yes, they must be validated by validator.
+		 * If no, authority section is unuseful.
+		 * dnssec\nsec.c & dnssec\nsec3.c use
+		 * rrsets from incoming packet.
+		 * validator uses answer_selected & auth_selected.
+		 * So, if nsec\nsec3 records are present in authority,
+		 * pick_authority() must be called.
+		 * TODO refactor nsec\nsec3 modules to work with
+		 * answer_selected & auth_selected instead of incoming pkt. */
+		bool auth_is_unuseful = true;
+		const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		for (unsigned i = 0; i < ns->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
+			if (rr->type == KNOT_RRTYPE_NSEC ||
+			    rr->type == KNOT_RRTYPE_NSEC3) {
+				auth_is_unuseful = false;
+				break;
+			}
+		}
+		if (!auth_is_unuseful) {
+			state = pick_authority(pkt, req, false);
+			if (state != kr_ok()) {
+				return KR_STATE_FAIL;
+			}
 		}
 	}
 	return KR_STATE_DONE;
@@ -630,7 +677,6 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 
 	knot_wire_set_aa(pkt->wire);
 	query->flags |= QUERY_RESOLVED;
-
 	/* Pick authority RRs. */
 	int pkt_class = kr_response_classify(pkt);
 	const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
