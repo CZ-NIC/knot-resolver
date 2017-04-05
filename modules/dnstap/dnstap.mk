@@ -6,7 +6,3 @@ $(call make_c_module,dnstap)
 
 modules/dnstap/dnstap.pb-c.c: modules/dnstap/dnstap.proto
 	protoc-c $< --c_out=.
-dnstap-clean-extra:
-	@$(call quiet,RM,modules/dnstap/dnstap.pb-c.*) modules/dnstap/dnstap.pb-c.*
-dnstap-clean: dnstap-clean-extra
-.PHONY: dnstap-clean-extra
