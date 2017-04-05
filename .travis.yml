@@ -28,6 +28,7 @@ env:
 before_script:
     - echo $CFLAGS
     - BOOTSTRAP_CLEANUP=1 ./scripts/bootstrap-depends.sh ${HOME}/.local
+    - rvm get stable || true
 script:
     - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 install check V=1 COVERAGE=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
     - ./daemon/kresd -h
