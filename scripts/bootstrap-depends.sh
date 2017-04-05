@@ -127,7 +127,7 @@ function pkg {
 PIP_PKGS="dnspython==1.11 cpp-coveralls Jinja2"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew update
-	brew install --force makedepend python hiredis libmemcached || true
+	brew install --force makedepend python hiredis libmemcached protobuf@2.6 protobuf-c cmocka jansson gnutls luajit libuv
 	brew link --overwrite python || true
 	pip install --upgrade pip || true
 	pip install ${PIP_PKGS}
@@ -138,24 +138,24 @@ if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	rm ${HOME}/.cache/pip/log/debug.log || true
 	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} include/hiredis/hiredis.h install PREFIX=${PREFIX}
 	pkg libmemcached ${LIBMEMCACHED_URL} ${LIBMEMCACHED_TAG} include/libmemcached/memcached.h
+	pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
+	pkg protobuf ${PROTOBUF_URL} ${PROTOBUF_VER} lib/pkgconfig/protobuf.pc
+	pkg protobuf-c ${PROTOBUFC_URL} ${PROTOBUFC_VER} include/protobuf-c/protobuf-c.h
+	pkg jansson ${JANSSON_URL} ${JANSSON_TAG} include/jansson.h --disable-static
+	pkg gmp ${GMP_URL} ${GMP_TAG} include/gmp.h --disable-static
+	pkg nettle ${NETTLE_URL} ${NETTLE_TAG} include/nettle \
+		--disable-documentation --with-lib-path=${PREFIX}/lib --with-include-path=${PREFIX}/include
+	export GMP_CFLAGS="-I${PREFIX}/include"
+	export GMP_LIBS="-L${PREFIX}/lib -lgmp"
+	pkg gnutls ${GNUTLS_URL} ${GNUTLS_TAG} include/gnutls \
+	    --disable-tests --disable-doc --disable-valgrind-tests --disable-static --with-included-libtasn1 --without-p11-kit \
+	    --disable-tools --disable-cxx --with-included-unistring
+	pkg lua ${LUA_URL} v${LUA_VER} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
+	pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
 fi
 
-pkg gmp ${GMP_URL} ${GMP_TAG} include/gmp.h --disable-static
-pkg nettle ${NETTLE_URL} ${NETTLE_TAG} include/nettle \
-	--disable-documentation --with-lib-path=${PREFIX}/lib --with-include-path=${PREFIX}/include
-export GMP_CFLAGS="-I${PREFIX}/include"
-export GMP_LIBS="-L${PREFIX}/lib -lgmp"
-pkg gnutls ${GNUTLS_URL} ${GNUTLS_TAG} include/gnutls \
-    --disable-tests --disable-doc --disable-valgrind-tests --disable-static --with-included-libtasn1 --without-p11-kit \
-    --disable-tools --disable-cxx --with-included-unistring
-pkg jansson ${JANSSON_URL} ${JANSSON_TAG} include/jansson.h --disable-static
 pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 	--disable-static --with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
-pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
-pkg libuv ${LIBUV_URL} ${LIBUV_TAG} include/uv.h --disable-static
-pkg lua ${LUA_URL} v${LUA_VER} lib/pkgconfig/luajit.pc install BUILDMODE=dynamic LDFLAGS=-lm PREFIX=${PREFIX}
-pkg protobuf ${PROTOBUF_URL} ${PROTOBUF_VER} lib/pkgconfig/protobuf.pc
-pkg protobuf-c ${PROTOBUFC_URL} ${PROTOBUFC_VER} include/protobuf-c/protobuf-c.h
 pkg fstrm ${FSTRM_URL} ${FSTRM_VER} include/fstrm.h --with-library-only
 
 # development releases of luajit do NOT install bin/luajit
