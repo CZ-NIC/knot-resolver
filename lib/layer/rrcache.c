@@ -145,12 +145,17 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 	 * TODO: move rank handling into the iterator (QUERY_DNSSEC_* flags)? */
 	uint8_t rank  = 0;
 	uint8_t flags = 0;
-	uint8_t lowest_rank = KR_RANK_INITIAL;
-	if (!(qry->flags & QUERY_NOAUTH)) {
-		lowest_rank |= KR_RANK_AUTH;
+	uint8_t lowest_rank = KR_RANK_AUTH | KR_RANK_INSECURE;
+	if (qry->flags & QUERY_NONAUTH) {
+		lowest_rank &= ~KR_RANK_AUTH;
+		lowest_rank &= ~KR_RANK_INSECURE;
+		/* Note: there's little sense in validation status for non-auth records.
+		 * In case of using NONAUTH to get NS IPs, knowing that you ask correct
+		 * IP doesn't matter much for security; it matters whether you can
+		 * validate the answers from the NS. */
 	}
-	if (!cdbit) {
-		lowest_rank |= KR_RANK_INSECURE;
+	if (cdbit) {
+		lowest_rank &= ~KR_RANK_INSECURE;
 	}
 
 	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,

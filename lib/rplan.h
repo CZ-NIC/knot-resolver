@@ -55,7 +55,7 @@
 	X(NO_0X20,	   1 << 26) /**< Disable query case randomization . */ \
 	X(DNSSEC_NODS,	   1 << 27) /**< DS non-existance is proven */ \
 	X(DNSSEC_OPTOUT,   1 << 28) /**< Closest encloser proof has optout */ \
-	X(NOAUTH,          1 << 29) /**< Non-authoritative in-bailiwick records are enough.
+	X(NONAUTH,         1 << 29) /**< Non-authoritative in-bailiwick records are enough.
 				     *   TODO: utilize this also outside cache. */ \
 			/* 1 << 31       Used by ../modules/dns64/dns64.lua */
 
