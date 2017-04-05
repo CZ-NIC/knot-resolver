@@ -14,11 +14,11 @@ Improvements
 ------------
 - modules/dnstap: a DNSTAP support module
   (Contributed by Vicky Shrestha)
-- modules/workarounds: a module adding workaround for know
+- modules/workarounds: a module adding workarounds for known
   DNS protocol violators
 - layer/iterate: fix logging of glue addresses
-- allow bits=0 and consequently 0.0.0.0/0 matches in view and renumber
-  modules.
+- kr_bitcmp: allow bits=0 and consequently 0.0.0.0/0 matches in view
+  and renumber modules.
 - modules/padding: Improve default padding of responses
   (Contributed by Daniel Kahn Gillmor)
 - New kresc client utility (experimental; don't rely on the API yet)
@@ -31,7 +31,7 @@ Bugfixes
 - lib/resolve: avoid unnecessary DS queries
 - lib/nsrep: don't treat servers with NOIP4 + NOIP6 flags as timeouted
 - layer/iterate: During packet classification (answer vs. referral)
-  don't analyze AUTHORITY section in authoritative answer in ANSWER
+  don't analyze AUTHORITY section in authoritative answer if ANSWER
   section contains records that have been requested
 
 Knot Resolver 1.2.4 (2017-03-09)
