@@ -70,8 +70,8 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		return ret;
 	}
 
-	if (!knot_wire_get_cd(req->answer->wire)
-	    && (entry->rank & KR_RANK_BAD) && !(entry->rank & KR_RANK_OMIT)) {
+	const uint8_t rank_val = rank_get_value(entry->rank);
+	if (!knot_wire_get_cd(req->answer->wire) && rank_val && rank_val != KR_RANK_OMIT) {
 		return kr_error(ENOENT); /* it would fail anyway */
 	}
 
@@ -234,10 +234,10 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* If cd bit is set, make rank bad, otherwise it depends on flags. */
 	if (knot_wire_get_cd(req->answer->wire)) {
-		header.rank |= KR_RANK_OMIT;
+		rank_set_value(&header.rank, KR_RANK_OMIT);
 	} else {
 		if (qry->flags & QUERY_DNSSEC_BOGUS) {
-			header.rank |= KR_RANK_BOGUS;
+			rank_set_value(&header.rank, KR_RANK_BOGUS);
 		} else if (qry->flags & QUERY_DNSSEC_INSECURE) {
 			header.rank |= KR_RANK_INSECURE;
 		} else if (qry->flags & QUERY_DNSSEC_WANT) {

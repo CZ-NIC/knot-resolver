@@ -76,20 +76,9 @@ static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
 	return section_has_type(knot_pkt_section(pkt, KNOT_ADDITIONAL), type);
 }
 
-static inline uint8_t rank_get_value(uint8_t rank)
-{
-	return rank & 0x07;
-}
-
 static inline uint8_t rank_get_flags(uint8_t rank)
 {
 	return rank & ~0x07;
-}
-
-static inline void rank_set_value(uint8_t *rank, uint8_t value)
-{
-	assert(rank);
-	*rank = rank_get_flags(*rank) | rank_get_value(value);
 }
 
 static inline void rank_set_flag(uint8_t *rank, uint8_t flag)
