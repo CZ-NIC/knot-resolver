@@ -202,9 +202,11 @@ KR_EXPORT KR_PURE
 int kr_bitcmp(const char *a, const char *b, int bits);
 
 /** @internal RR map flags. */
-#define KEY_FLAG_RRSIG 0x02
-#define KEY_FLAG_RANK(key) (key[0] >> 2)
-#define KEY_COVERING_RRSIG(key) (key[0] & KEY_FLAG_RRSIG)
+static const uint8_t KEY_FLAG_RRSIG = 0x02;
+static inline uint8_t KEY_FLAG_RANK(const char *key)
+	{ return ((uint8_t)(key[0])) >> 2; }
+static inline bool KEY_COVERING_RRSIG(const char *key)
+	{ return ((uint8_t)(key[0])) & KEY_FLAG_RRSIG; }
 
 /* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
 #define KR_RRKEY_LEN (9 + KNOT_DNAME_MAXLEN)
