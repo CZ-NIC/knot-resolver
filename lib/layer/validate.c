@@ -81,10 +81,17 @@ static inline uint8_t rank_get_flags(uint8_t rank)
 	return rank & ~0x07;
 }
 
-static inline void rank_set_flag(uint8_t *rank, uint8_t flag)
+static inline void rank_set_flag(uint8_t *rank, uint8_t flag_to_set)
 {
 	assert(rank);
-	*rank = rank_get_flags(flag) | rank_get_value(*rank);
+	*rank |= rank_get_flags(flag_to_set);
+}
+
+static inline void rank_clear_flag(uint8_t *rank, uint8_t flag_to_clear)
+{
+	assert(rank);
+	uint8_t flag = rank_get_flags(flag_to_clear);
+	*rank &= ~flag;
 }
 
 static inline bool rank_test_flag(uint8_t rank, uint8_t flag)
@@ -107,14 +114,25 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 	for (ssize_t i = 0; i < vctx->rrs->len; ++i) {
 		ranked_rr_array_entry_t *entry = vctx->rrs->at[i];
 		const knot_rrset_t *rr = entry->rr;
-		assert((entry->rank & (KR_RANK_SECURE | KR_RANK_INSECURE)) != (KR_RANK_SECURE | KR_RANK_INSECURE));
-		if (rank_get_value(entry->rank) == KR_RANK_OMIT ||
-		    rank_test_flag(entry->rank, KR_RANK_SECURE) ||
-		    entry->yielded || vctx->qry_uid != entry->qry_uid) {
+		const uint8_t rank_value = rank_get_value(entry->rank);
+
+		assert((rank_value & (KR_RANK_SECURE | KR_RANK_INSECURE)) != (KR_RANK_SECURE | KR_RANK_INSECURE));
+
+		if (entry->yielded || vctx->qry_uid != entry->qry_uid) {
 			continue;
 		}
+
+		if ((rank_value != KR_RANK_INITIAL && rank_value != KR_RANK_MISMATCH)) {
+			continue;
+		}
+
+		if (rank_test_flag(entry->rank, KR_RANK_SECURE)) {
+			continue;
+		}
+
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
 			const knot_dname_t *signer_name = knot_rrsig_signer_name(&rr->rrs, 0);
+			rank_clear_flag(&entry->rank, KR_RANK_SECURE | KR_RANK_INSECURE);
 			if (!knot_dname_is_equal(vctx->zone_name, signer_name)) {
 				rank_set_value(&entry->rank, KR_RANK_MISMATCH);
 				vctx->err_cnt += 1;
@@ -124,6 +142,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 			continue;
 		}
 		if ((rr->type == KNOT_RRTYPE_NS) && (vctx->section_id == KNOT_AUTHORITY)) {
+			rank_clear_flag(&entry->rank, KR_RANK_SECURE | KR_RANK_INSECURE);
 			rank_set_value(&entry->rank, KR_RANK_OMIT);
 			continue;
 		}
@@ -600,6 +619,45 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
+static void flag_records(kr_layer_t *ctx, uint8_t flag_to_set)
+{
+	struct kr_request *req	   = ctx->req;
+	struct kr_query *qry	   = req->current_query;
+	ranked_rr_array_t *ptrs[2] = { &req->answ_selected, &req->auth_selected };
+	for (size_t i = 0; i < 1; ++i) {
+		ranked_rr_array_t *arr = ptrs[i];
+		for (size_t j = 0; j < arr->len; ++j) {
+			ranked_rr_array_entry_t *entry = arr->at[j];
+			if (entry->qry_uid != qry->uid) {
+				continue;
+			}
+			if (rank_get_value(entry->rank) == KR_RANK_INITIAL) {
+				rank_set_flag(&entry->rank, flag_to_set);
+			}
+		}
+	}
+}
+
+static void rank_records(kr_layer_t *ctx, uint8_t rank_to_set)
+{
+	struct kr_request *req	= ctx->req;
+	struct kr_query *qry	= req->current_query;
+	ranked_rr_array_t *arr	= &req->answ_selected;
+	ranked_rr_array_t *ptrs[2] = { &req->answ_selected, &req->auth_selected };
+	for (size_t i = 0; i < 1; ++i) {
+		ranked_rr_array_t *arr = ptrs[i];
+		for (size_t j = 0; j < arr->len; ++j) {
+			ranked_rr_array_entry_t *entry = arr->at[j];
+			if (entry->qry_uid != qry->uid) {
+				continue;
+			}
+			if (rank_get_value(entry->rank) == KR_RANK_INITIAL) {
+				rank_set_value(&entry->rank, rank_to_set);
+			}
+		}
+	}
+}
+
 static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	int ret = 0;
@@ -613,11 +671,15 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Pass-through if user doesn't want secure answer or stub. */
 	/* @todo: Validating stub resolver mode. */
 	if (qry->flags & QUERY_STUB) {
+		rank_records(ctx, KR_RANK_OMIT);
 		return ctx->state;
 	}
 	if (!(qry->flags & QUERY_DNSSEC_WANT)) {
 		const uint32_t test_flags = (QUERY_CACHED | QUERY_DNSSEC_INSECURE);
 		const bool is_insec = ((qry->flags & test_flags) == test_flags);
+		if ((qry->flags & QUERY_DNSSEC_INSECURE)) {
+			flag_records(ctx, KR_RANK_INSECURE);
+		}
 		if (is_insec && qry->parent != NULL) {
 			/* We have got insecure answer from cache.
 			 * Mark parent(s) as insecure. */
@@ -636,6 +698,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Pass-through if CD bit is set. */
 	if (knot_wire_get_cd(req->answer->wire)) {
+		rank_records(ctx, KR_RANK_OMIT);
 		return ctx->state;
 	}
 	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */
