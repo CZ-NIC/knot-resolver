@@ -52,6 +52,14 @@ int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
 KR_EXPORT KR_PURE
 int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name);
 
+struct kr_context;
+/**
+ * A wrapper around kr_ta_covers that is aware of negative TA and types.
+ */
+KR_EXPORT KR_PURE
+bool kr_ta_covers_qry(struct kr_context *ctx, const knot_dname_t *name,
+		      const uint16_t type);
+
 /**
  * Remove TA from trust store.
  * @param  trust_anchors trust store

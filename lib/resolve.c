@@ -196,9 +196,6 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name,
 			struct kr_request *req, knot_pkt_t *pkt)
 {
-	map_t *trust_anchors = &req->ctx->trust_anchors;
-	map_t *negative_anchors = &req->ctx->negative_anchors;
-
 	/* It can occur that here parent query already have
 	 * provably insecured zonecut which not in the cache yet. */
 	const uint32_t insec_flags = QUERY_DNSSEC_INSECURE | QUERY_DNSSEC_NODS;
@@ -214,8 +211,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		 * even if cut name is covered by TA. */
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 		qry->flags |= QUERY_DNSSEC_INSECURE;
-	} else if (!kr_ta_covers(negative_anchors, qry->zone_cut.name) &&
-		   kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
+	} else if (kr_ta_covers_qry(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	} else {
 		qry->flags &= ~QUERY_DNSSEC_WANT;
@@ -255,8 +251,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	/* Zonecut name can change, check it again
 	 * to prevent unnecessary DS & DNSKEY queries */
 	if (!(qry->flags & QUERY_DNSSEC_INSECURE) &&
-	    !kr_ta_covers(negative_anchors, cut_found.name) &&
-	    kr_ta_covers(trust_anchors, cut_found.name)) {
+	    kr_ta_covers_qry(req->ctx, cut_found.name, KNOT_RRTYPE_NS)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	} else {
 		qry->flags &= ~QUERY_DNSSEC_WANT;
@@ -699,10 +694,8 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	/* Deferred zone cut lookup for this query. */
 	qry->flags |= QUERY_AWAIT_CUT;
 	/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
-	map_t *negative_anchors = &request->ctx->negative_anchors;
-	map_t *trust_anchors = &request->ctx->trust_anchors;
 	if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
-	    kr_ta_covers(trust_anchors, qname) && !kr_ta_covers(negative_anchors, qname)) {
+	    kr_ta_covers_qry(request->ctx, qname, qtype)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	}
 

@@ -634,8 +634,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (query->flags & QUERY_DNSSEC_INSECURE) {
 			next->flags &= ~QUERY_DNSSEC_WANT;
 			next->flags |= QUERY_DNSSEC_INSECURE;
-		} else if (kr_ta_covers(&req->ctx->trust_anchors, cname) &&
-		    !kr_ta_covers(&req->ctx->negative_anchors, cname)) {
+		} else if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
 			/* Want DNSSEC if it's posible to secure
 			 * this name (e.g. is covered by any TA) */
 			next->flags |= QUERY_DNSSEC_WANT;
