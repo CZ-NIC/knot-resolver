@@ -75,6 +75,8 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		return ret;
 	}
 
+	VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o\n", *rank, lowest_rank);
+
 	if (*rank < lowest_rank) {
 		return kr_error(ENOENT);
 	}
@@ -274,10 +276,15 @@ static int commit_rr(const char *key, void *val, void *data)
 		/* If equal rank was accepted, spoofing a single answer would be enough
 		 * to e.g. override NS record in AUTHORITY section.
 		 * This way they would have to hit the first answer (whenever TTL expires). */
-		if (cached_rank >= rank) {
-			return kr_ok();
+		if (cached_rank >= 0) {
+			VERBOSE_MSG(baton->qry, "=> orig. rank: 0%0.2o\n", cached_rank);
+			if (cached_rank >= rank) {
+				return kr_ok();
+			}
 		}
 	}
+
+	VERBOSE_MSG(baton->qry, "=> stashing rank: 0%0.2o\n", rank);
 
 	uint8_t flags = KR_CACHE_FLAG_NONE;
 	if (kr_rank_test(rank, KR_RANK_AUTH)) {
