@@ -45,6 +45,7 @@ bool kr_rank_check(uint8_t rank)
 	case KR_RANK_INDET:
 	case KR_RANK_BOGUS:
 	case KR_RANK_MISMATCH:
+	case KR_RANK_MISSING:
 	case KR_RANK_INSECURE:
 	case KR_RANK_SECURE:
 		return true;

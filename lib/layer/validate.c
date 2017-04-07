@@ -96,9 +96,9 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 			continue;
 		}
 
-		if (!kr_rank_test(entry->rank, KR_RANK_INITIAL)
-		    && !kr_rank_test(entry->rank, KR_RANK_MISMATCH)) {
-			continue;
+		if (kr_rank_test(entry->rank, KR_RANK_OMIT)
+		    || kr_rank_test(entry->rank, KR_RANK_SECURE)) {
+			continue; /* these are already OK */
 		}
 
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
@@ -120,7 +120,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
 		} else if (validation_result == kr_error(ENOENT)) {
 			/* no RRSIGs found */
-			kr_rank_set(&entry->rank, KR_RANK_INSECURE);
+			kr_rank_set(&entry->rank, KR_RANK_MISSING);
 			vctx->err_cnt += 1;
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
@@ -474,7 +474,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		if (kr_rank_test(entry->rank, KR_RANK_MISMATCH)) {
 			invalid_entry = entry;
 			break;
-		} else if (kr_rank_test(entry->rank, KR_RANK_INSECURE) &&
+		} else if (kr_rank_test(entry->rank, KR_RANK_MISSING) &&
 			   !invalid_entry) {
 			invalid_entry = entry;
 		} else if (!kr_rank_test(entry->rank, KR_RANK_SECURE) &&
@@ -510,7 +510,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		}
 		VERBOSE_MSG(qry, ">< cut changed (new signer), needs revalidation\n");
 		ret = KR_STATE_YIELD;
-	} else if (kr_rank_test(invalid_entry->rank, KR_RANK_INSECURE)) {
+	} else if (kr_rank_test(invalid_entry->rank, KR_RANK_MISSING)) {
 		ret = rrsig_not_found(ctx, rr);
 	} else if (!kr_rank_test(invalid_entry->rank, KR_RANK_SECURE)) {
 		qry->flags |= QUERY_DNSSEC_BOGUS;
