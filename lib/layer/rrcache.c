@@ -38,6 +38,7 @@
 
 #include "lib/layer/iterate.h"
 #include "lib/cache.h"
+#include "lib/dnssec/ta.h"
 #include "lib/module.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
@@ -138,14 +139,19 @@ enomem:
 }
 
 /** @internal Try to find a shortcut directly to searched record. */
-static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
+static int loot_rrcache(struct kr_context *ctx, knot_pkt_t *pkt,
 			struct kr_query *qry, uint16_t rrtype, const bool cdbit)
 {
+	/* Records not present under any TA don't have their security verified at all. */
+	const bool ta_covers = kr_ta_covers_qry(ctx, qry->sname, qry->stype);
+	/* ^ TODO: performance? */
+
 	/* Lookup direct match first; only consider authoritative records.
 	 * TODO: move rank handling into the iterator (QUERY_DNSSEC_* flags)? */
 	uint8_t rank  = 0;
 	uint8_t flags = 0;
-	uint8_t lowest_rank = KR_RANK_INSECURE | KR_RANK_AUTH;
+	uint8_t lowest_rank = (ta_covers ? KR_RANK_INSECURE : KR_RANK_INITIAL)
+		| KR_RANK_AUTH;
 	if (qry->flags & QUERY_NONAUTH) {
 		lowest_rank = KR_RANK_INITIAL;
 		/* Note: there's little sense in validation status for non-auth records.
@@ -157,6 +163,7 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		kr_rank_set(&lowest_rank, KR_RANK_INITIAL);
 	}
 
+	struct kr_cache *cache = &ctx->cache;
 	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			  &rank, &flags, 0, lowest_rank);
 	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) {
@@ -199,16 +206,15 @@ static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * it may either be a CNAME chain or direct answer.
 	 * Only one step of the chain is resolved at a time.
 	 */
-	struct kr_cache *cache = &req->ctx->cache;
 	int ret = -1;
 	if (qry->stype != KNOT_RRTYPE_ANY) {
-		ret = loot_rrcache(cache, pkt, qry, qry->stype, cd_is_set);
+		ret = loot_rrcache(req->ctx, pkt, qry, qry->stype, cd_is_set);
 	} else {
 		/* ANY query are used by either qmail or certain versions of Firefox.
 		 * Probe cache for a few interesting records. */
 		static uint16_t any_types[] = { KNOT_RRTYPE_A, KNOT_RRTYPE_AAAA, KNOT_RRTYPE_MX };
 		for (size_t i = 0; i < sizeof(any_types)/sizeof(any_types[0]); ++i) {
-			if (loot_rrcache(cache, pkt, qry, any_types[i], cd_is_set) == 0) {
+			if (loot_rrcache(req->ctx, pkt, qry, any_types[i], cd_is_set) == 0) {
 				ret = 0; /* At least single record matches */
 			}
 		}

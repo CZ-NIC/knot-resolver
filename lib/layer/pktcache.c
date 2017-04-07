@@ -29,6 +29,7 @@
 #include <contrib/ucw/lib.h>
 #include "lib/layer/iterate.h"
 #include "lib/cache.h"
+#include "lib/dnssec/ta.h"
 #include "lib/module.h"
 #include "lib/resolve.h"
 
@@ -55,7 +56,7 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 }
 
 /** @internal Try to find a shortcut directly to searched packet. */
-static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
+static int loot_pktcache(struct kr_context *ctx, knot_pkt_t *pkt,
 			 struct kr_request *req, uint8_t *flags)
 {
 	struct kr_query *qry = req->current_query;
@@ -64,16 +65,20 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 	uint16_t rrtype = qry->stype;
 
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cache_peek(cache, KR_CACHE_PKT, qname,
+	int ret = kr_cache_peek(&ctx->cache, KR_CACHE_PKT, qname,
 				rrtype, &entry, &timestamp);
 	if (ret != 0) { /* Not in the cache */
 		return ret;
 	}
 
 	uint8_t lowest_rank = KR_RANK_INITIAL | KR_RANK_AUTH;
+
+	/* Records not present under any TA don't have their security verified at all. */
+	const bool ta_covers = kr_ta_covers_qry(ctx, qry->sname, qry->stype);
+	/* ^ TODO: performance? */
+
 	/* There's probably little sense for NONAUTH in pktcache. */
-	if (!knot_wire_get_cd(req->answer->wire)) {
-		// FIXME: only if we can cover the name by a TA
+	if (!knot_wire_get_cd(req->answer->wire) && ta_covers) {
 		kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
 	}
 	if (entry->rank < lowest_rank) {
@@ -142,8 +147,7 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Fetch either answer to original or minimized query */
 	uint8_t flags = 0;
-	struct kr_cache *cache = &req->ctx->cache;
-	int ret = loot_pktcache(cache, pkt, req, &flags);
+	int ret = loot_pktcache(req->ctx, pkt, req, &flags);
 	if (ret == 0) {
 		VERBOSE_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
