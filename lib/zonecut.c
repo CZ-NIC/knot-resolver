@@ -401,8 +401,8 @@ static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	if (ret != 0) {
 		return ret;
 	}
-	const bool rankOK = (rank & KR_RANK_SECURE)
-		|| ((rank & KR_RANK_INSECURE) && (rank & KR_RANK_AUTH));
+	const bool rankOK = kr_rank_test(rank, KR_RANK_SECURE)
+		|| (kr_rank_test(rank, KR_RANK_INSECURE) && kr_rank_test(rank, KR_RANK_AUTH));
 	if (!rankOK) {
 		return kr_error(ENOENT);
 	}
@@ -442,7 +442,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 		const bool is_root = (label[0] == '\0');
 		if (fetch_ns(ctx, cut, label, timestamp, &rank, &flags) == 0) {
 			/* Flag as insecure if cached as this */
-			if ((rank & KR_RANK_INSECURE) ||
+			if (kr_rank_test(rank, KR_RANK_INSECURE) ||
 			    (flags & KR_CACHE_FLAG_NODS)) {
 				*secured = false;
 			}

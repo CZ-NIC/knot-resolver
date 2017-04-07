@@ -70,10 +70,11 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		return ret;
 	}
 
-	uint8_t lowest_rank = KR_RANK_AUTH | KR_RANK_INSECURE;
+	uint8_t lowest_rank = KR_RANK_INITIAL | KR_RANK_AUTH;
 	/* There's probably little sense for NONAUTH in pktcache. */
-	if (knot_wire_get_cd(req->answer->wire)) {
-		lowest_rank &= ~KR_RANK_INSECURE;
+	if (!knot_wire_get_cd(req->answer->wire)) {
+		// FIXME: only if we can cover the name by a TA
+		kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
 	}
 	if (entry->rank < lowest_rank) {
 		return kr_error(ENOENT);
@@ -93,7 +94,7 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 	}
 
 	/* Rank-related fixups.  Add rank into the additional field. */
-	if (entry->rank & KR_RANK_INSECURE) {
+	if (kr_rank_test(entry->rank, KR_RANK_INSECURE)) {
 		qry->flags |= QUERY_DNSSEC_INSECURE;
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
@@ -238,14 +239,14 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* If cd bit is set, make rank bad, otherwise it depends on flags. */
 	if (knot_wire_get_cd(req->answer->wire)) {
-		rank_set_value(&header.rank, KR_RANK_OMIT);
+		kr_rank_set(&header.rank, KR_RANK_OMIT);
 	} else {
 		if (qry->flags & QUERY_DNSSEC_BOGUS) {
-			rank_set_value(&header.rank, KR_RANK_BOGUS);
+			kr_rank_set(&header.rank, KR_RANK_BOGUS);
 		} else if (qry->flags & QUERY_DNSSEC_INSECURE) {
-			header.rank |= KR_RANK_INSECURE;
+			kr_rank_set(&header.rank, KR_RANK_INSECURE);
 		} else if (qry->flags & QUERY_DNSSEC_WANT) {
-			header.rank |= KR_RANK_SECURE;
+			kr_rank_set(&header.rank, KR_RANK_SECURE);
 		}
 	}
 

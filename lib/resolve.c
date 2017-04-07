@@ -37,6 +37,22 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "resl",  fmt)
 
+bool kr_rank_check(uint8_t rank)
+{
+	switch (rank & ~KR_RANK_AUTH) {
+	case KR_RANK_INITIAL:
+	case KR_RANK_OMIT:
+	case KR_RANK_INDET:
+	case KR_RANK_BOGUS:
+	case KR_RANK_MISMATCH:
+	case KR_RANK_INSECURE:
+	case KR_RANK_SECURE:
+		return true;
+	default:
+		return false;
+	}
+}
+
 /** @internal Set @a yielded to all RRs with matching @a qry_uid. */
 static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
 {

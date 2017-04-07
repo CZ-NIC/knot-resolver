@@ -145,17 +145,16 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 	 * TODO: move rank handling into the iterator (QUERY_DNSSEC_* flags)? */
 	uint8_t rank  = 0;
 	uint8_t flags = 0;
-	uint8_t lowest_rank = KR_RANK_AUTH | KR_RANK_INSECURE;
+	uint8_t lowest_rank = KR_RANK_INSECURE | KR_RANK_AUTH;
 	if (qry->flags & QUERY_NONAUTH) {
-		lowest_rank &= ~KR_RANK_AUTH;
-		lowest_rank &= ~KR_RANK_INSECURE;
+		lowest_rank = KR_RANK_INITIAL;
 		/* Note: there's little sense in validation status for non-auth records.
 		 * In case of using NONAUTH to get NS IPs, knowing that you ask correct
 		 * IP doesn't matter much for security; it matters whether you can
 		 * validate the answers from the NS. */
 	}
 	if (cdbit) {
-		lowest_rank &= ~KR_RANK_INSECURE;
+		kr_rank_set(&lowest_rank, KR_RANK_INITIAL);
 	}
 
 	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
@@ -169,14 +168,16 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 	if (ret) {
 		return ret;
 	}
-	if (rank & KR_RANK_INSECURE) {
+
+	if (kr_rank_test(rank, KR_RANK_INSECURE)) {
 		qry->flags |= QUERY_DNSSEC_INSECURE;
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 	}
 
 	/* Record may have RRSIGs, try to find them. */
 	const bool dobit = (qry->flags & QUERY_DNSSEC_WANT);
-	if (cdbit || (dobit && (rank & KR_RANK_SECURE))) {
+	if (cdbit || (dobit && kr_rank_test(rank, KR_RANK_SECURE))) {
+		kr_rank_set(&lowest_rank, KR_RANK_INITIAL); /* no security for RRSIGs */
 		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			      &rank, &flags, true, lowest_rank);
 	}
@@ -262,7 +263,7 @@ static int commit_rr(const char *key, void *val, void *data)
 		return commit_rrsig(baton, rank, KR_CACHE_FLAG_NONE, rr);
 	}
 	/* Accept only better rank if not secure. */
-	if (!(rank & KR_RANK_SECURE)) {
+	if (!kr_rank_test(rank, KR_RANK_SECURE)) {
 		int cached_rank = kr_cache_peek_rank(baton->cache, KR_CACHE_RR, rr->owner, rr->type, baton->timestamp);
 		/* If equal rank was accepted, spoofing a single answer would be enough
 		 * to e.g. override NS record in AUTHORITY section.
@@ -273,7 +274,7 @@ static int commit_rr(const char *key, void *val, void *data)
 	}
 
 	uint8_t flags = KR_CACHE_FLAG_NONE;
-	if (rank & KR_RANK_AUTH) {
+	if (kr_rank_test(rank, KR_RANK_AUTH)) {
 		if (baton->qry->flags & QUERY_DNSSEC_WEXPAND) {
 			flags |= KR_CACHE_FLAG_WCARD_PROOF;
 		}

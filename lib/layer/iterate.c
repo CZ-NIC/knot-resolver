@@ -295,17 +295,16 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 static inline uint8_t get_initial_rank(const knot_rrset_t *rr,
 				       const struct kr_query *qry, bool answer)
 {
-	const uint32_t qflags = qry->flags;
-	uint8_t rank = 0;
-	if (qflags & QUERY_CACHED) {
-		rank = rr->additional ? *(uint8_t *)rr->additional : KR_RANK_OMIT;
+	if (qry->flags & QUERY_CACHED) {
+		return rr->additional ? *(uint8_t *)rr->additional : KR_RANK_OMIT;
 		/* ^^ Current use case for "cached" RRs without rank: hints module. */
 	} else if (answer || rr->type == KNOT_RRTYPE_DS
 		   || rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3) {
 		/* TODO: this classifier of authoritativity may not be perfect yet. */
-		rank |= KR_RANK_AUTH;
+		return KR_RANK_INITIAL | KR_RANK_AUTH;
+	} else {
+		return KR_RANK_INITIAL;
 	}
-	return rank;
 }
 
 static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)

@@ -76,10 +76,12 @@
 /**
  * RRset rank - for cache and ranked_rr_*.
  *
- * The rank has three one-bit flags and additionally several values.
- * The values are best manipulated via rank_*_value functions.
+ * The rank meaning consists of one independent flag - KR_RANK_AUTH,
+ * and the rest have meaning of values where only one can hold at any time.
+ * You can use one of the enums as a safe initial value, optionally | KR_RANK_AUTH;
+ * otherwise it's best to manipulate ranks via the kr_rank_* functions.
  *
- * @note Be careful about chosen cache rank nominal values.
+ * @note The representation is complicated by restrictions on integer comparison:
  * - AUTH must be > than !AUTH
  * - AUTH INSECURE must be > than AUTH (because it attempted validation)
  * - !AUTH SECURE must be > than AUTH (because it's valid)
@@ -89,7 +91,6 @@
  *   https://tools.ietf.org/html/rfc4035#section-4.3
  */
 enum kr_rank {
-	KR_RANK_BAD = 7,     /**< For simpler manipulation with the values below. */
 	KR_RANK_INITIAL = 0, /**< Did not attempt to validate. */
 	KR_RANK_OMIT = 1,    /**< Do not attempt to validate. */
 	KR_RANK_INDET,       /**< Unable to determine whether it should be secure. */
@@ -107,15 +108,29 @@ enum kr_rank {
 	/* @note Rank must not exceed 6 bits */
 };
 
-static inline uint8_t rank_get_value(uint8_t rank)
+/** Check that a rank value is valid.  Meant for assertions. */
+bool kr_rank_check(uint8_t rank) KR_PURE;
+
+/** Test the presence of any flag/state in a rank, i.e. including KR_RANK_AUTH. */
+static inline bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
 {
-	return rank & KR_RANK_BAD;
+	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
+	if (kr_flag == KR_RANK_AUTH) {
+		return rank & KR_RANK_AUTH;
+	}
+	assert(!(kr_flag & KR_RANK_AUTH));
+	/* The rest are exclusive values - exactly one has to be set. */
+	return (rank & ~KR_RANK_AUTH) == kr_flag;
 }
-static inline void rank_set_value(uint8_t *rank, uint8_t val)
+
+/** Set the rank state. The _AUTH flag is kept as it was. */
+static inline void kr_rank_set(uint8_t *rank, uint8_t kr_flag)
 {
-	assert(rank && (val & KR_RANK_BAD) == val);
-	*rank = (*rank & ~KR_RANK_BAD) | val;
+	assert(rank && kr_rank_check(*rank));
+	assert(kr_rank_check(kr_flag) && !(kr_flag & KR_RANK_AUTH));
+	*rank = kr_flag | (*rank & KR_RANK_AUTH);
 }
+
 
 /** @cond internal Array of modules. */
 typedef array_t(struct kr_module *) module_array_t;
@@ -130,7 +145,7 @@ typedef array_t(struct kr_module *) module_array_t;
  *       be shared between threads.
  */
 struct kr_context
-{	
+{
 	uint32_t options;
 	knot_rrset_t *opt_rr;
 	map_t trust_anchors;
