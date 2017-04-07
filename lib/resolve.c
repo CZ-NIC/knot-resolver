@@ -569,10 +569,6 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (last && (last->flags & QUERY_STUB)) {
 		secure = false; /* don't trust forwarding for now */
 	}
-	if (last && (last->flags & QUERY_CACHED)) {
-		secure = secure && last->flags & QUERY_DNSSEC_WANT
-			 && !(last->flags & (QUERY_DNSSEC_INSECURE|QUERY_DNSSEC_BOGUS));
-	}
 	if (last && (last->flags & QUERY_DNSSEC_OPTOUT)) {
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
