@@ -303,7 +303,7 @@ static inline uint8_t get_initial_rank(const knot_rrset_t *rr,
 		/* TODO: this classifier of authoritativity may not be perfect yet. */
 		return KR_RANK_INITIAL | KR_RANK_AUTH;
 	} else {
-		return KR_RANK_INITIAL;
+		return rr->type == KNOT_RRTYPE_NS ? KR_RANK_OMIT : KR_RANK_INITIAL;
 	}
 }
 

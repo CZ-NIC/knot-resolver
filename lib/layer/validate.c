@@ -111,10 +111,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 			kr_rank_set(&entry->rank, KR_RANK_OMIT);
 			continue;
 		}
-		if ((rr->type == KNOT_RRTYPE_NS) && (vctx->section_id == KNOT_AUTHORITY)) {
-			kr_rank_set(&entry->rank, KR_RANK_OMIT);
-			continue;
-		}
+
 		validation_result = kr_rrset_validate(vctx, rr);
 		if (validation_result == kr_ok()) {
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
