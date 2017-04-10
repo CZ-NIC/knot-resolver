@@ -75,7 +75,11 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		return ret;
 	}
 
-	VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o\n", *rank, lowest_rank);
+	WITH_VERBOSE {
+		VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o, ", *rank, lowest_rank);
+		kr_rrtype_print(rrtype, "", " ");
+		kr_dname_print(name, "", "\n");
+	}
 
 	if (*rank < lowest_rank) {
 		return kr_error(ENOENT);
@@ -284,7 +288,11 @@ static int commit_rr(const char *key, void *val, void *data)
 		}
 	}
 
-	VERBOSE_MSG(baton->qry, "=> stashing rank: 0%0.2o\n", rank);
+	WITH_VERBOSE {
+		VERBOSE_MSG(baton->qry, "=> stashing rank: 0%0.2o, ", rank);
+		kr_rrtype_print(rr->type, "", " ");
+		kr_dname_print(rr->owner, "", "\n");
+	}
 
 	uint8_t flags = KR_CACHE_FLAG_NONE;
 	if (kr_rank_test(rank, KR_RANK_AUTH)) {
