@@ -68,6 +68,9 @@ static int loot_pktcache(struct kr_context *ctx, knot_pkt_t *pkt,
 	int ret = kr_cache_peek(&ctx->cache, KR_CACHE_PKT, qname,
 				rrtype, &entry, &timestamp);
 	if (ret != 0) { /* Not in the cache */
+		if (ret == kr_error(ESTALE)) {
+			VERBOSE_MSG(qry, "=> only stale entry found\n")
+		}
 		return ret;
 	}
 
@@ -81,7 +84,10 @@ static int loot_pktcache(struct kr_context *ctx, knot_pkt_t *pkt,
 	if (!knot_wire_get_cd(req->answer->wire) && ta_covers) {
 		kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
 	}
-	if (entry->rank < lowest_rank) {
+	const bool rank_enough = entry->rank >= lowest_rank;
+	VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o -> satisfied=%d\n",
+			entry->rank, lowest_rank, (int)rank_enough);
+	if (!rank_enough) {
 		return kr_error(ENOENT);
 	}
 
@@ -149,7 +155,6 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	uint8_t flags = 0;
 	int ret = loot_pktcache(req->ctx, pkt, req, &flags);
 	if (ret == 0) {
-		VERBOSE_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 		if (flags & KR_CACHE_FLAG_WCARD_PROOF) {
 			qry->flags |= QUERY_DNSSEC_WEXPAND;
@@ -253,6 +258,7 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 			kr_rank_set(&header.rank, KR_RANK_SECURE);
 		}
 	}
+	VERBOSE_MSG(qry, "=> candidate rank: 0%0.2o\n", header.rank);
 
 	/* Set cache flags */
 	if (qry->flags & QUERY_DNSSEC_WEXPAND) {
@@ -265,9 +271,13 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check if we can replace (allow current or better rank, SECURE is always accepted). */
 	struct kr_cache *cache = &ctx->req->ctx->cache;
 	if (header.rank < KR_RANK_SECURE) {
-		int cached_rank = kr_cache_peek_rank(cache, KR_CACHE_PKT, qname, qtype, header.timestamp);
-		if (cached_rank > header.rank) {
-			return ctx->state;
+		int cached_rank = kr_cache_peek_rank
+			(cache, KR_CACHE_PKT, qname, qtype, header.timestamp);
+		if (cached_rank >= 0) {
+			VERBOSE_MSG(qry, "=> cached rank:    0%0.2o\n", cached_rank);
+			if (cached_rank > header.rank) {
+				return ctx->state;
+			}
 		}
 	}
 
