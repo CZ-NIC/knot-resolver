@@ -1062,8 +1062,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 ns_election:
 
-	/* If the query has got REFUSED & SERVFAIL, retry with current src up to KR_QUERY_NSRETRY_LIMIT.
-	 * If the query has already selected a NS and is waiting for IPv4/IPv6 record,
+	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
 	 * elect best address only, otherwise elect a completely new NS.
 	 */
 	if(++ns_election_iter >= KR_ITER_LIMIT) {

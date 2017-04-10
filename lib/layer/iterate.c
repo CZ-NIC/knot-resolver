@@ -860,7 +860,6 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
-	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_SERVFAIL: {
 		if (query->flags & QUERY_STUB) { break; } /* Pass through in stub mode */
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
@@ -873,6 +872,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return KR_STATE_CONSUME;
 		}
 	}
+	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_FORMERR:
 	case KNOT_RCODE_NOTIMPL:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
