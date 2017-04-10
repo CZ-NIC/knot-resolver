@@ -608,6 +608,14 @@ static int answer_finalize(struct kr_request *request, int state)
 		ret = edns_put(answer);
 	}
 
+	/* AD: negative answers need more handling. */
+	if (kr_response_classify(answer) != PKT_NOERROR && last) {
+		const bool OK = (last->flags & QUERY_DNSSEC_WANT)
+			&& !(last->flags & (QUERY_DNSSEC_BOGUS | QUERY_DNSSEC_INSECURE));
+		if (!OK) {
+			secure = false;
+		}
+	}
 	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
 	if (!secure || state != KR_STATE_DONE
 	    || knot_pkt_qtype(answer) == KNOT_RRTYPE_RRSIG) {
