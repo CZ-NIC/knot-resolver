@@ -292,19 +292,32 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 }
 
 /** Compute rank appropriate for RRs present in the packet. */
-static inline uint8_t get_initial_rank(const knot_rrset_t *rr,
-				       const struct kr_query *qry, bool answer)
+static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *qry,
+				const bool answer, const bool is_referral)
 {
 	if (qry->flags & QUERY_CACHED) {
 		return rr->additional ? *(uint8_t *)rr->additional : KR_RANK_OMIT;
 		/* ^^ Current use case for "cached" RRs without rank: hints module. */
-	} else if (answer || rr->type == KNOT_RRTYPE_DS
-		   || rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3) {
-		/* TODO: this classifier of authoritativity may not be perfect yet. */
-		return KR_RANK_INITIAL | KR_RANK_AUTH;
-	} else {
-		return rr->type == KNOT_RRTYPE_NS ? KR_RANK_OMIT : KR_RANK_INITIAL;
 	}
+	if (answer || rr->type == KNOT_RRTYPE_DS
+	    || rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3) {
+		return KR_RANK_INITIAL | KR_RANK_AUTH;
+	}
+	if (rr->type == KNOT_RRTYPE_NS) {
+		/* Some servers add extra NS RRset, which allows us to refresh
+		 * cache "for free", potentially speeding up zone cut lookups
+		 * in future.  Still, it might theoretically cause some problems:
+		 * https://mailarchive.ietf.org/arch/msg/dnsop/CYjPDlwtpxzdQV_qycB-WfnW6CI
+		 */
+		if (!is_referral && knot_dname_is_equal(qry->zone_cut.name, rr->owner)) {
+			return KR_RANK_INITIAL | KR_RANK_AUTH;
+		} else {
+			return KR_RANK_OMIT;
+		}
+	}
+
+	return KR_RANK_INITIAL;
+	/* TODO: this classifier of authoritativity may not be perfect yet. */
 }
 
 static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
@@ -326,7 +339,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 		if (!knot_dname_in(zonecut_name, rr->owner)) {
 			continue;
 		}
-		uint8_t rank = get_initial_rank(rr, qry, false);
+		uint8_t rank = get_initial_rank(rr, qry, false, referral);
 		int ret = kr_ranked_rrarray_add(&req->auth_selected, rr,
 						rank, to_wire, qry->uid, &req->pool);
 		if (ret != kr_ok()) {
@@ -452,7 +465,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 					return state;
 				}
 			}
-			uint8_t rank = get_initial_rank(rr, query, true);
+			uint8_t rank = get_initial_rank(rr, query, true, referral);
 			state = kr_ranked_rrarray_add(&req->answ_selected, rr,
 						      rank, to_wire, query->uid, &req->pool);
 			if (state != kr_ok()) {
