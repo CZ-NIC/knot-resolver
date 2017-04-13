@@ -32,6 +32,8 @@
 #include "lib/utils.h"
 #include "lib/dnssec/signature.h"
 
+#include "contrib/wire.h"
+
 static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, uint8_t digest_type)
 {
 	/* Compute DS RDATA from the DNSKEY. */
@@ -173,6 +175,10 @@ static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
 static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *covered,
                                 uint32_t orig_ttl, int trim_labels)
 {
+	if (!ctx || !covered || trim_labels < 0) {
+		return kr_error(EINVAL);
+	}
+
 	// huge block of rrsets can be optionally created
 	static uint8_t wire_buffer[KNOT_WIRE_MAX_PKTSIZE];
 	int written = knot_rrset_to_wire(covered, wire_buffer, sizeof(wire_buffer), NULL);
@@ -186,24 +192,47 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 		return ret;
 	}
 
+	if (!trim_labels) {
+		const dnssec_binary_t wire_binary = {
+			.size = written,
+			.data = wire_buffer
+		};
+		return dnssec_sign_add(ctx, &wire_binary);
+	}
+
 	/* RFC4035 5.3.2
-	 * Remove leftmost labels and replace them with '*.'.
+	 * Remove leftmost labels and replace them with '*.'
+	 * for each RR in covered.
 	 */
 	uint8_t *beginp = wire_buffer;
-	if (trim_labels > 0) {
-		for (int i = 0; i < trim_labels; ++i) {
+	for (uint16_t i = 0; i < covered->rrs.rr_count; ++i) {
+		/* RR(i) = name | type | class | OrigTTL | RDATA length | RDATA */
+		for (int j = 0; j < trim_labels; ++j) {
 			assert(beginp[0]);
 			beginp = (uint8_t *) knot_wire_next_label(beginp, NULL);
 		}
 		*(--beginp) = '*';
 		*(--beginp) = 1;
+		const size_t rdatalen_offset = knot_dname_size(beginp) + /* name */
+			sizeof(uint16_t) + /* type */
+			sizeof(uint16_t) + /* class */
+			sizeof(uint32_t);  /* OrigTTL */
+		const uint8_t *rdatalen_ptr = beginp + rdatalen_offset;
+		const uint16_t rdata_size = wire_read_u16(rdatalen_ptr);
+		const size_t rr_size = rdatalen_offset +
+			sizeof(uint16_t) + /* RDATA length */
+			rdata_size;        /* RDATA */
+		const dnssec_binary_t wire_binary = {
+			.size = rr_size,
+			.data = beginp
+		};
+		ret = dnssec_sign_add(ctx, &wire_binary);
+		if (ret != 0) {
+			break;
+		}
+		beginp += rr_size;
 	}
-
-	dnssec_binary_t wire_binary = {
-		.size = written - (beginp - wire_buffer),
-		.data = beginp
-	};
-	return dnssec_sign_add(ctx, &wire_binary);
+	return ret;
 }
 
 /*!
