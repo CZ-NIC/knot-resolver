@@ -462,7 +462,7 @@ static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
 
 /**
  * \param all_secure optionally &&-combine security of written RRs into its value.
- *		     (i.e. if you pass reference to false, it will always remain)
+ *		     (i.e. if you pass a pointer to false, it will always remain)
  * @return error code, ignoring if forced to truncate the packet.
  */
 static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *answer,
@@ -492,7 +492,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *
 		}
 
 		if (rr->type != KNOT_RRTYPE_RRSIG) {
-			all_sec = all_sec && (entry->rank & KR_RANK_SECURE);
+			all_sec = all_sec && kr_rank_test(entry->rank, KR_RANK_SECURE);
 		}
 	}
 

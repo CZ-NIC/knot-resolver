@@ -291,7 +291,8 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	return state;
 }
 
-/** Compute rank appropriate for RRs present in the packet. */
+/** Compute rank appropriate for RRs present in the packet.
+ * @param answer whether the RR is from answer or authority section */
 static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *qry,
 				const bool answer, const bool is_referral)
 {
@@ -708,6 +709,9 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
 		int err = kr_ranked_rrarray_add(&req->answ_selected, rr,
 			      KR_RANK_INITIAL | KR_RANK_AUTH, true, query->uid, &req->pool);
+		/* KR_RANK_AUTH: we don't have the records directly from
+		 * an authoritative source, but we do trust the server and it's
+		 * supposed to only send us authoritative records. */
 		if (err != kr_ok()) {
 			return KR_STATE_FAIL;
 		}
