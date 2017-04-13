@@ -114,11 +114,11 @@ struct kr_context;
 typedef array_t(knot_rrset_t *) rr_array_t;
 struct ranked_rr_array_entry {
 	uint32_t qry_uid;
-	uint8_t rank; /* kr_validation_rank_t */
+	uint8_t rank; /**< enum kr_rank */
 	uint8_t revalidation_cnt;
-	bool cached;
+	bool cached;  /**< whether it has been stashed to cache already */
 	bool yielded;
-	bool to_wire;
+	bool to_wire; /**< whether to be put into the answer */
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
