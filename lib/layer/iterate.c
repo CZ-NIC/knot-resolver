@@ -644,13 +644,13 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 		next->flags |= QUERY_AWAIT_CUT;
-		if (query->flags & QUERY_DNSSEC_INSECURE) {
-			next->flags &= ~QUERY_DNSSEC_WANT;
-			next->flags |= QUERY_DNSSEC_INSECURE;
-		} else if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
-			/* Want DNSSEC if it's posible to secure
-			 * this name (e.g. is covered by any TA) */
+
+		/* Want DNSSEC if and only if it's posible to secure
+		 * this name (i.e. iff it is covered by a TA) */
+		if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
 			next->flags |= QUERY_DNSSEC_WANT;
+		} else {
+			next->flags &= ~QUERY_DNSSEC_WANT;
 		}
 		state = pick_authority(pkt, req, false);
 		if (state != kr_ok()) {
