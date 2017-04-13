@@ -133,7 +133,7 @@ bool kr_ta_covers_qry(struct kr_context *ctx, const knot_dname_t *name,
 		name = knot_wire_next_label(name, NULL);
 		if (!name) {
 			assert(false);
-			return kr_error(EINVAL);
+			return false;
 		}
 	}
 	return kr_ta_covers(&ctx->trust_anchors, name)
