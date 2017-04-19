@@ -702,6 +702,14 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 	                                         encloser_name, stype);
 	if (ret == 0) {
 		/* Satisfies RFC5155 8.7 */
+		if (has_optout(covering_next_nsec3)) {
+			/* Opt-out is detected.
+			 * Despite the fact that all records
+			 * in the packet can be properly signed,
+			 * AD bit must not be set due to rfc5155 9.2.
+			 * Return appropriate code to the caller */
+			ret = kr_error(DNSSEC_OUT_OF_RANGE);
+		}
 		return ret;
 	}
 
@@ -719,7 +727,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 		 */
 		ret = kr_error(DNSSEC_OUT_OF_RANGE);
 	}
-	
+
 	return ret;
 }
 
