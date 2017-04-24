@@ -415,10 +415,7 @@ static int rrcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (is_auth) {
 		ret = stash_selected(req, pkt, &stash, false, &req->pool);
 	}
-	const bool want_authority = is_auth
-		|| knot_pkt_section(pkt, KNOT_ANSWER)->count == 0 /* referral */
-		|| qry->flags & QUERY_CNAME;
-	if (ret == 0 && want_authority) {
+	if (ret == 0) {
 		ret = stash_selected(req, pkt, &stash, true, &req->pool);
 		/* this also stashes DS records in referrals */
 	}
