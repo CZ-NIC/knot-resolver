@@ -57,6 +57,7 @@ respdiff:linux:amd64:
     - docker
     - linux
     - amd64
+  allow_failure: true
 
 #arm_build:
 #  image: cznic/armhf-ubuntu:16.04
