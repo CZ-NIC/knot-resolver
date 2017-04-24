@@ -1,3 +1,24 @@
+Knot Resolver 1.2.6 (2017-04-24)
+================================
+
+Security
+--------
+- dnssec: don't set AD flag for NODATA answers if wildcard non-existence
+  is not guaranteed due to opt-out in NSEC3
+
+Improvements
+------------
+- layer/iterate: don't retry repeatedly if REFUSED
+
+Bugfixes
+--------
+- lib/nsrep: revert some changes to NS reputation tracking that caused
+  severe problems to some users of 1.2.5 (#178 and #179)
+- dnssec: fix verification of wildcarded non-singleton RRsets
+- dnssec: allow wildcards located directly under the root
+- layer/rrcache: avoid putting answer records into queries in some cases
+
+
 Knot Resolver 1.2.5 (2017-04-05)
 ================================
 
@@ -33,6 +54,7 @@ Bugfixes
 - layer/iterate: During packet classification (answer vs. referral)
   don't analyze AUTHORITY section in authoritative answer if ANSWER
   section contains records that have been requested
+
 
 Knot Resolver 1.2.4 (2017-03-09)
 ================================
