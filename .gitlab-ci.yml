@@ -39,6 +39,26 @@ deckard:linux:amd64:
     - linux
     - amd64
 
+respdiff:linux:amd64:
+  image: cznic/ubuntu-respdif:16.04
+  stage: test
+  script:
+    - LD_LIBRARY_PATH=$(pwd)/.local/lib /home/kresdbench/run.sh $(pwd)/.local/sbin/kresd
+    - /home/kresdbench/resolver-benchmarking/response_differences/nightly.sh
+    - cp -r /home/kresdbench/resolver-benchmarking/response_differences/results $(pwd)
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - results/*.json
+      - results/*.out
+      - results/*.log
+  tags:
+    - docker
+    - linux
+    - amd64
+  allow_failure: true
+
 #arm_build:
 #  image: cznic/armhf-ubuntu:16.04
 #  stage: build

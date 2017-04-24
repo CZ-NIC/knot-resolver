@@ -420,7 +420,7 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
-	VERBOSE_MSG(qry, ">< no RRSIGs found\n");
+	VERBOSE_MSG(qry, ">< no valid RRSIGs found\n");
 	struct kr_zonecut *cut = &qry->zone_cut;
 	const knot_dname_t *cut_name_start = qry->zone_cut.name;
 	bool use_cut = true;

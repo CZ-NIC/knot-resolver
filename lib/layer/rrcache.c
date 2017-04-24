@@ -193,6 +193,21 @@ static int loot_rrcache(struct kr_context *ctx, knot_pkt_t *pkt,
 		kr_rank_set(&lowest_rank, KR_RANK_INITIAL); /* no security for RRSIGs */
 		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			      &rank, &flags, true, lowest_rank);
+		if (ret) {
+			VERBOSE_MSG(qry, "=> RRSIG(s) expected but not found, skipping");
+			/* In some cases, e.g. due to bugs, this may fail.
+			 * A possible good example is that a cache backend
+			 * (such as redis) chose to evict RRSIG but not RRset.
+			 * Let's return cache failure, but the packet has been
+			 * updated already by the RRs!  Let's try to clear it.
+			 * The following command might theoretically fail again
+			 * while parsing question, but let's just log that
+			 * condition in non-debug mode (it might be non-fatal). */
+			if (kr_pkt_clear_payload(pkt)) {
+				kr_log_error("[ rc ] => ERROR: work-around failed\n");
+				assert(false);
+			}
+		}
 	}
 	return ret;
 }
@@ -416,7 +431,7 @@ static int rrcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret == kr_error(ENOSPC)) {
 			ret = kr_cache_clear(cache);
 			if (ret != 0 && ret != kr_error(EEXIST)) {
-				kr_log_error("[cache] failed to clear cache: %s\n", kr_strerror(ret));
+				kr_log_error("[ rc ] failed to clear cache: %s\n", kr_strerror(ret));
 			}
 		}
 		kr_cache_sync(cache);

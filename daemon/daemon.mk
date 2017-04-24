@@ -52,7 +52,8 @@ ifneq ($(SED),)
 	$(INSTALL) -m 0644 doc/kresd.8 $(DESTDIR)$(MANDIR)/man8/
 endif
 daemon-clean: kresd-clean
-	@$(RM) daemon/lua/*.inc daemon/lua/{kres,trust_anchors,zonefile}.lua
+	@$(RM) daemon/lua/*.inc daemon/lua/kres.lua daemon/lua/trust_anchors.lua \
+		daemon/lua/zonefile.lua
 
 KNOT_RRSET_TXT_DUMP := \
 	$(shell pkg-config libknot --atleast-version=2.4.0 && echo true || echo false)
