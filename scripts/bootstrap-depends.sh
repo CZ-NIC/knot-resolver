@@ -27,8 +27,8 @@ PROTOBUF_VER="2.6.1"
 PROTOBUF_URL="https://github.com/google/protobuf/archive/v${PROTOBUF_VER}.tar.gz"
 PROTOBUFC_VER="1.2.1"
 PROTOBUFC_URL="https://github.com/protobuf-c/protobuf-c/releases/download/v${PROTOBUFC_VER}/protobuf-c-${PROTOBUFC_VER}.tar.gz"
-FSTRM_URL="https://github.com/farsightsec/fstrm/archive/v0.3.0.tar.gz"
-FSTRM_VER="0.3.0"
+FSTRM_VER="0.3.2"
+FSTRM_URL="https://github.com/farsightsec/fstrm/archive/v${FSTRM_VER}.tar.gz"
 
 if command -v shasum >/dev/null; then
     SHASUM="shasum -a 256"
@@ -162,7 +162,7 @@ fi
 
 pkg libknot ${KNOT_URL} ${KNOT_TAG} include/libknot \
 	--disable-static --with-lmdb=no --disable-fastparser --disable-daemon --disable-utilities --disable-documentation
-pkg fstrm ${FSTRM_URL} ${FSTRM_VER} include/fstrm.h --with-library-only
+pkg fstrm ${FSTRM_URL} ${FSTRM_VER} include/fstrm.h --disable-programs
 
 # development releases of luajit do NOT install bin/luajit
 ln -sf "luajit-${LUA_VER}" "${PREFIX}/bin/luajit"
