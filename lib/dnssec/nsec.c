@@ -299,7 +299,7 @@ static int wildcard_match_check(const knot_pkt_t *pkt, const knot_pktsection_t *
 		int wcard_labels = knot_dname_labels(rrset->owner, NULL);
 		int common_labels = knot_dname_matched_labels(rrset->owner, sname);
 		int rrsig_labels = coverign_rrsig_labels(rrset, sec);
-		if (wcard_labels <= 1 ||
+		if (wcard_labels < 1 ||
 		    common_labels != wcard_labels - 1 ||
 		    common_labels != rrsig_labels) {
 			continue;
