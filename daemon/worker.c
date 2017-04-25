@@ -387,7 +387,7 @@ static int qr_task_start(struct qr_task *task, knot_pkt_t *query)
 	worker->stats.queries += 1;
 	/* Throttle outbound queries only when high pressure */
 	if (worker->stats.concurrent < QUERY_RATE_THRESHOLD) {
-		task->req.options |= QUERY_NO_THROTTLE;
+		task->req.options.NO_THROTTLE = true;
 	}
 	return 0;
 }

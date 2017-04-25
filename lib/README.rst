@@ -33,7 +33,7 @@ This is the *driver*. The driver is not meant to know *"how"* the query resolves
 
 On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a *produce* layer generates query, a *consume* layer validates answer.
 
-.. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``QUERY_AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``QUERY_RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query.
+.. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query.
 
 Layers can also change course of resolution, for example by appending additional queries.
 

@@ -200,11 +200,13 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 {
 	/* It can occur that here parent query already have
 	 * provably insecured zonecut which not in the cache yet. */
-	const uint32_t insec_flags = QUERY_DNSSEC_INSECURE | QUERY_DNSSEC_NODS;
-	const uint32_t cut_flags = QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6;
-	const bool is_insecured = ((qry->parent != NULL) &&
-				   (qry->parent->flags & cut_flags) == 0 &&
-				   (qry->parent->flags & insec_flags) != 0);
+	struct kr_qflags pflags;
+	if (qry->parent) {
+		pflags = qry->parent->flags;
+	}
+	const bool is_insecured = qry->parent != NULL
+		&& !(pflags.AWAIT_IPV4 || pflags.AWAIT_IPV6)
+		&& (pflags.DNSSEC_INSECURE || pflags.DNSSEC_NODS);
 
 	/* Want DNSSEC if it's possible to secure this name
 	 * (e.g. is covered by any TA) */
@@ -642,8 +644,8 @@ static int answer_finalize(struct kr_request *request, int state)
 		     * as those would also be PKT_NOERROR. */
 		    || (answ_all_cnames && knot_pkt_qtype(answer) != KNOT_RRTYPE_CNAME))
 		{
-			secure = secure && (last->flags.DNSSEC_WANT)
-				&& !(last->flags & (QUERY_DNSSEC_BOGUS | QUERY_DNSSEC_INSECURE));
+			secure = secure && last->flags.DNSSEC_WANT
+				&& !last->flags.DNSSEC_BOGUS && !last->flags.DNSSEC_INSECURE;
 		}
 	}
 	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
@@ -841,7 +843,8 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 		/* Do not complete NS address resolution on soft-fail. */
 		const int rcode = packet ? knot_wire_get_rcode(packet->wire) : 0;
 		if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
-			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4);
+			qry->flags.AWAIT_IPV6 = false;
+			qry->flags.AWAIT_IPV4 = false;
 		} else { /* Penalize SERVFAILs. */
 			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
 		}
@@ -917,7 +920,8 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	} else if (!tried_tcp && (qry->flags.TCP)) {
 		return KR_STATE_PRODUCE; /* Requery over TCP */
 	} else { /* Clear query flags for next attempt */
-		qry->flags &= ~(QUERY_CACHED|QUERY_TCP);
+		qry->flags.CACHED = false;
+		qry->flags.TCP = false;
 	}
 
 	ITERATE_LAYERS(request, qry, reset);
@@ -1197,7 +1201,8 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 		if (!next) {
 			return KR_STATE_FAIL;
 		}
-		next->flags |= (QUERY_AWAIT_CUT | QUERY_DNSSEC_WANT);
+		next->flags.AWAIT_CUT = true;
+		next->flags.DNSSEC_WANT = true;
 		return KR_STATE_DONE;
 	}
 	/* Try to fetch missing DNSKEY (either missing or above current cut).
@@ -1345,7 +1350,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	case KR_STATE_CONSUME: break;
 	case KR_STATE_DONE:
 	default: /* Current query is done */
-		if (qry->flags & QUERY_RESOLVED && request->state != KR_STATE_YIELD) {
+		if (qry->flags.RESOLVED && request->state != KR_STATE_YIELD) {
 			kr_rplan_pop(rplan, qry);
 		}
 		ITERATE_LAYERS(request, qry, reset);
@@ -1379,10 +1384,11 @@ ns_election:
 		return KR_STATE_FAIL;
 	}
 
-	const bool retry = (qry->flags & (QUERY_TCP|QUERY_BADCOOKIE_AGAIN));
-	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
+	const struct kr_qflags qflg = qry->flags;
+	const bool retry = qflg.TCP || qflg.BADCOOKIE_AGAIN;
+	if (qflg.AWAIT_IPV4 || qflg.AWAIT_IPV6) {
 		kr_nsrep_elect_addr(qry, request->ctx);
-	} else if (qry->flags & (QUERY_FORWARD|QUERY_STUB)) {
+	} else if (qflg.FORWARD || qflg.STUB) {
 		kr_nsrep_sort(&qry->ns, request->ctx->cache_rtt);
 	} else if (!qry->ns.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
@@ -1403,7 +1409,9 @@ ns_election:
 	if (qry->ns.addr[0].ip.sa_family == AF_UNSPEC) {
 		int ret = ns_resolve_addr(qry, request);
 		if (ret != 0) {
-			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
+			qry->flags.AWAIT_IPV6 = false;
+			qry->flags.AWAIT_IPV4 = false;
+			qry->flags.TCP = false;
 			qry->ns.name = NULL;
 			goto ns_election; /* Must try different NS */
 		}
@@ -1412,7 +1420,7 @@ ns_election:
 	}
 
 	/* Randomize query case (if not in safemode or turned off) */
-	qry->secret = (qry->flags & (QUERY_SAFEMODE | QUERY_NO_0X20))
+	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)
 			? 0 : kr_rand_uint(UINT32_MAX);
 	knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(packet);
 	randomized_qname_case(qname_raw, qry->secret);

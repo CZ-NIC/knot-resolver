@@ -17,9 +17,9 @@
 /** @file pktcache.c
  *
  * This builtin module caches whole packets from/for negative answers
- * or answers where wildcard expansion has occured (QUERY_DNSSEC_WEXPAND).
+ * or answers where wildcard expansion has occured (.DNSSEC_WEXPAND).
  *
- * Note: it also persists some QUERY_DNSSEC_* flags.
+ * Note: it also persists some DNSSEC_* flags.
  * The ranks are stored in *(uint8_t *)rrset->additional (all are the same for one packet).
  */
 
@@ -160,7 +160,8 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	uint8_t flags = 0;
 	int ret = loot_pktcache(req->ctx, pkt, req, &flags);
 	if (ret == 0) {
-		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
+		qry->flags.CACHED = true;
+		qry->flags.NO_MINIMIZE = true;
 		if (flags & KR_CACHE_FLAG_WCARD_PROOF) {
 			qry->flags.DNSSEC_WEXPAND = true;
 		}
@@ -231,8 +232,7 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const bool is_eligible = (knot_rrtype_is_metatype(qtype) || qtype == KNOT_RRTYPE_RRSIG);
 	bool is_negative = kr_response_classify(pkt) & (PKT_NODATA|PKT_NXDOMAIN);
 	bool wcard_expansion = (qry->flags.DNSSEC_WEXPAND);
-	if (is_negative && ((qry->flags & (QUERY_FORWARD | QUERY_CNAME)) ==
-	    (QUERY_FORWARD | QUERY_CNAME))) {
+	if (is_negative && qry->flags.FORWARD && qry->flags.CNAME) {
 		/* Don't cache CNAME'ed NXDOMAIN answer in forwarding mode
 		   since it can contain records
 		   which have not been validated by validator */

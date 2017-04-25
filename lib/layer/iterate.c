@@ -54,7 +54,7 @@ static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qty
 {
 	/* Minimization disabled. */
 	const knot_dname_t *qname = query->sname;
-	if (qname[0] == '\0' || query->flags & (QUERY_NO_MINIMIZE|QUERY_STUB)) {
+	if (qname[0] == '\0' || query->flags.NO_MINIMIZE || query->flags.STUB) {
 		return qname;
 	}
 
@@ -893,7 +893,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	}
 
-	if (query->flags & (QUERY_RESOLVED|QUERY_BADCOOKIE_AGAIN)) {
+	if (query->flags.RESOLVED || query->flags.BADCOOKIE_AGAIN) {
 		return ctx->state;
 	}
 
@@ -939,7 +939,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break; /* OK */
 	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_SERVFAIL: {
-		if (query->flags & (QUERY_STUB | QUERY_FORWARD)) {
+		if (query->flags.STUB || query->flags.FORWARD) {
 			 /* Pass through in stub mode */
 			break;
 		}

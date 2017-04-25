@@ -277,8 +277,7 @@ static void mark_insecure_parents(const struct kr_query *qry)
 	 * NS can be located at unsigned zone, but still will return
 	 * valid DNSSEC records for initial query. */
 	struct kr_query *parent = qry->parent;
-	const uint32_t cut_flags = (QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6);
-	while (parent && ((parent->flags & cut_flags) == 0)) {
+	while (parent && !parent->flags.AWAIT_IPV4 && !parent->flags.AWAIT_IPV6) {
 		parent->flags.DNSSEC_WANT = false;
 		parent->flags.DNSSEC_INSECURE = true;
 		if (parent->stype != KNOT_RRTYPE_DS &&
@@ -304,9 +303,9 @@ static int update_parent_keys(struct kr_request *req, uint16_t answer_type)
 		break;
 	case KNOT_RRTYPE_DS:
 		VERBOSE_MSG(qry, "<= parent: updating DS\n");
-		if (qry->flags & (QUERY_DNSSEC_INSECURE)) { /* DS non-existence proven. */
+		if (qry->flags.DNSSEC_INSECURE) { /* DS non-existence proven. */
 			mark_insecure_parents(qry);
-		} else if ((qry->flags & (QUERY_DNSSEC_NODS | QUERY_FORWARD)) == QUERY_DNSSEC_NODS) {
+		} else if (qry->flags.DNSSEC_NODS && !qry->flags.FORWARD) {
 			if (qry->flags.DNSSEC_OPTOUT) {
 				mark_insecure_parents(qry);
 			} else {
@@ -316,8 +315,7 @@ static int update_parent_keys(struct kr_request *req, uint16_t answer_type)
 					mark_insecure_parents(qry);
 				}
 			}
-		} else if ((qry->flags & (QUERY_DNSSEC_NODS | QUERY_FORWARD)) ==
-			   (QUERY_DNSSEC_NODS | QUERY_FORWARD)) {
+		} else if (qry->flags.DNSSEC_NODS && qry->flags.FORWARD) {
 			int ret = kr_dnssec_matches_name_and_type(&req->auth_selected, qry->uid,
 								  qry->sname, KNOT_RRTYPE_NS);
 			if (ret == kr_ok()) {
@@ -404,7 +402,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 			qry->flags.DNSSEC_NODS = true;
 		}
 		return ret;
-	} else if (qry->flags & QUERY_FORWARD && qry->parent) {
+	} else if (qry->flags.FORWARD && qry->parent) {
 		struct kr_query *parent = qry->parent;
 		parent->zone_cut.name = knot_dname_copy(qry->sname, parent->zone_cut.pool);
 	}
@@ -813,8 +811,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	if (!(qry->flags.DNSSEC_WANT)) {
-		const uint32_t test_flags = (QUERY_CACHED | QUERY_DNSSEC_INSECURE);
-		const bool is_insec = ((qry->flags & test_flags) == test_flags);
+		const bool is_insec = qry->flags.CACHED && qry->flags.DNSSEC_INSECURE;
 		if ((qry->flags.DNSSEC_INSECURE)) {
 			rank_records(ctx, KR_RANK_INSECURE);
 		}
@@ -876,8 +873,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret != KR_STATE_DONE) {
 			return ret;
 		}
-		if ((qry->flags & (QUERY_FORWARD | QUERY_DNSSEC_INSECURE)) ==
-			(QUERY_FORWARD | QUERY_DNSSEC_INSECURE)) {
+		if (qry->flags.FORWARD && qry->flags.DNSSEC_INSECURE) {
 			return KR_STATE_DONE;
 		}
 	}
@@ -903,8 +899,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Validate non-existence proof if not positive answer. */
-	if (!(qry->flags.CACHED) && pkt_rcode == KNOT_RCODE_NXDOMAIN &&
-	    ((qry->flags & (QUERY_FORWARD | QUERY_CNAME)) != (QUERY_FORWARD | QUERY_CNAME))) {
+	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NXDOMAIN &&
+	    (!qry->flags.FORWARD || !qry->flags.CNAME)) {
 		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
@@ -928,8 +924,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* @todo WTH, this needs API that just tries to find a proof and the caller
 	 * doesn't have to worry about NSEC/NSEC3
 	 * @todo rework this */
-	if (!(qry->flags.CACHED) && (pkt_rcode == KNOT_RCODE_NOERROR) &&
-	    ((qry->flags & (QUERY_FORWARD | QUERY_CNAME)) != (QUERY_FORWARD | QUERY_CNAME))) {
+	if (!qry->flags.CACHED && (pkt_rcode == KNOT_RCODE_NOERROR) &&
+	    (!qry->flags.FORWARD || !qry->flags.CNAME)) {
 		bool no_data = (an->count == 0 && knot_wire_get_aa(pkt->wire));
 		if (no_data) {
 			/* @todo
@@ -1006,7 +1002,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return KR_STATE_FAIL;
 	} else if (pkt_rcode == KNOT_RCODE_NOERROR &&
 		   referral &&
-		   (((qry->flags & (QUERY_DNSSEC_WANT | QUERY_DNSSEC_INSECURE)) == QUERY_DNSSEC_INSECURE) ||
+		   ((!qry->flags.DNSSEC_WANT && qry->flags.DNSSEC_INSECURE) ||
 		   (qry->flags.DNSSEC_NODS))) {
 		/* referral with proven DS non-existance */
 		qtype = KNOT_RRTYPE_DS;
@@ -1018,7 +1014,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	if (qry->flags & QUERY_FORWARD && qry->parent) {
+	if (qry->flags.FORWARD && qry->parent) {
 		if (pkt_rcode == KNOT_RCODE_NXDOMAIN) {
 			qry->parent->forward_flags.NO_MINIMIZE = true;
 		}
