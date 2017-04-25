@@ -27,18 +27,6 @@
 #define QUERY_PROVIDES(q, name, cls, type) \
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
-/** @internal LUT of query flag names. */
-const knot_lookup_t query_flag_names[] = { // FIXME
-	//#define X(flag, _) { QUERY_ ## flag, #flag },
-	//QUERY_FLAGS(X)
-	//#undef X
-	{ 0, NULL }
-};
-
-const knot_lookup_t *kr_query_flag_names(void)
-{
-	return query_flag_names;
-}
 
 static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name, uint32_t uid)
 {

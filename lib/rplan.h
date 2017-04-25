@@ -67,9 +67,6 @@ struct kr_qflags {
 	#undef X
 };
 
-/** Query flag names table */
-KR_EXPORT KR_CONST
-const knot_lookup_t *kr_query_flag_names(void);
 
 /**
  * Single query representation.

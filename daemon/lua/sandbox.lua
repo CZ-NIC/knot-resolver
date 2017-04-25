@@ -54,6 +54,20 @@ function reorder_RR(val)
 	return option('REORDER_RR', val)
 end
 
+-- Get/set resolver options via name (string)
+function option(name, val)
+	local flags = kres.context().options;
+	-- Note: no way to test existence of flags[name] but we want error anyway.
+	name = string.upper(name) -- convenience
+	if val ~= nil then
+		if (val ~= true) and (val ~= false) then
+			panic('invalid option value: ' .. tostring(val))
+		end
+		flags[name] = val;
+	end
+	return flags[name];
+end
+
 -- Function aliases
 -- `env.VAR returns os.getenv(VAR)`
 env = {}
