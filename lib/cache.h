@@ -21,31 +21,15 @@
 #include "lib/defines.h"
 #include "contrib/ucw/config.h" /*uint*/
 
+/** When knot_pkt is passed from cache without ->wire, this is the ->size. */
+static const size_t PKT_SIZE_NOWIRE = -1;
+
 /** Cache entry tag */
 enum kr_cache_tag {
 	KR_CACHE_RR   = 'R',
 	KR_CACHE_PKT  = 'P',
 	KR_CACHE_SIG  = 'G',
 	KR_CACHE_USER = 0x80
-};
-
-/**
- * Cache entry rank.
- * @note Be careful about chosen cache rank nominal values.
- * - AUTH must be > than NONAUTH
- * - AUTH INSECURE must be > than AUTH (because it attempted validation)
- * - NONAUTH SECURE must be > than AUTH (because it's valid)
- *
- * Ref: https://tools.ietf.org/html/rfc2181#section-5.4.1
- */
-enum kr_cache_rank {
-	KR_RANK_BAD       = 0,  /* BAD cache, do not use. */
-	KR_RANK_INSECURE  = 1,  /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
-	KR_RANK_EXTRA     = 4,  /* Entry from additional section. */
-	KR_RANK_NONAUTH   = 8,  /* Entry from authority section (i.e. parent-side). */
-	KR_RANK_AUTH      = 16, /* Entry from answer (authoritative data). */
-	KR_RANK_SECURE    = 32, /* Entry is DNSSEC valid (e.g. RRSIG exists). */
-	/* @note Rank must not exceed 6 bits */
 };
 
 /** Cache entry flags */

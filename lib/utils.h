@@ -21,7 +21,10 @@
 #include <stdbool.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <libknot/libknot.h>
 #include <libknot/packet/pkt.h>
+#include <libknot/rrset.h>
+#include <libknot/rrtype/rrsig.h>
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
 #include "lib/defines.h"
@@ -66,11 +69,29 @@ static inline void *mm_alloc(knot_mm_t *mm, size_t size)
 }
 static inline void mm_free(knot_mm_t *mm, void *what)
 {
-	if (mm) { 
+	if (mm) {
 		if (mm->free)
 			mm->free(what);
 	}
 	else free(what);
+}
+static inline void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
+{
+	if (mm) {
+		void *p = mm->alloc(mm->ctx, size);
+		if (p == NULL) {
+			return NULL;
+		} else {
+			if (what) {
+				memcpy(p, what,
+				       prev_size < size ? prev_size : size);
+			}
+			mm_free(mm, what);
+			return p;
+		}
+	} else {
+		return realloc(what, size);
+	}
 }
 /* @endcond */
 
@@ -93,11 +114,11 @@ struct kr_context;
 typedef array_t(knot_rrset_t *) rr_array_t;
 struct ranked_rr_array_entry {
 	uint32_t qry_uid;
-	uint8_t rank;
+	uint8_t rank; /**< enum kr_rank */
 	uint8_t revalidation_cnt;
-	bool cached;
+	bool cached;  /**< whether it has been stashed to cache already */
 	bool yielded;
-	bool to_wire;
+	bool to_wire; /**< whether to be put into the answer */
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -181,9 +202,11 @@ KR_EXPORT KR_PURE
 int kr_bitcmp(const char *a, const char *b, int bits);
 
 /** @internal RR map flags. */
-#define KEY_FLAG_RRSIG 0x02
-#define KEY_FLAG_RANK(key) (key[0] >> 2)
-#define KEY_COVERING_RRSIG(key) (key[0] & KEY_FLAG_RRSIG)
+static const uint8_t KEY_FLAG_RRSIG = 0x02;
+static inline uint8_t KEY_FLAG_RANK(const char *key)
+	{ return ((uint8_t)(key[0])) >> 2; }
+static inline bool KEY_COVERING_RRSIG(const char *key)
+	{ return ((uint8_t)(key[0])) & KEY_FLAG_RRSIG; }
 
 /* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
 #define KR_RRKEY_LEN (9 + KNOT_DNAME_MAXLEN)
@@ -240,3 +263,12 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 	memcpy(&x, swap_temp, sizeof(x)); \
 	} while(0)
 
+/** Return the (covered) type of an nonempty RRset. */
+static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
+{
+	assert(rr && rr->rrs.rr_count && rr->rrs.data);
+	uint16_t type = rr->type;
+	if (type == KNOT_RRTYPE_RRSIG)
+		type = knot_rrsig_type_covered(&rr->rrs, 0);
+	return type;
+}

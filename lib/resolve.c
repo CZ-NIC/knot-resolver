@@ -37,6 +37,23 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "resl",  fmt)
 
+bool kr_rank_check(uint8_t rank)
+{
+	switch (rank & ~KR_RANK_AUTH) {
+	case KR_RANK_INITIAL:
+	case KR_RANK_OMIT:
+	case KR_RANK_INDET:
+	case KR_RANK_BOGUS:
+	case KR_RANK_MISMATCH:
+	case KR_RANK_MISSING:
+	case KR_RANK_INSECURE:
+	case KR_RANK_SECURE:
+		return true;
+	default:
+		return false;
+	}
+}
+
 /** @internal Set @a yielded to all RRs with matching @a qry_uid. */
 static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
 {
@@ -180,9 +197,6 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name,
 			struct kr_request *req, knot_pkt_t *pkt)
 {
-	map_t *trust_anchors = &req->ctx->trust_anchors;
-	map_t *negative_anchors = &req->ctx->negative_anchors;
-
 	/* It can occur that here parent query already have
 	 * provably insecured zonecut which not in the cache yet. */
 	const uint32_t insec_flags = QUERY_DNSSEC_INSECURE | QUERY_DNSSEC_NODS;
@@ -198,8 +212,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		 * even if cut name is covered by TA. */
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 		qry->flags |= QUERY_DNSSEC_INSECURE;
-	} else if (!kr_ta_covers(negative_anchors, qry->zone_cut.name) &&
-		   kr_ta_covers(trust_anchors, qry->zone_cut.name)) {
+	} else if (kr_ta_covers_qry(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	} else {
 		qry->flags &= ~QUERY_DNSSEC_WANT;
@@ -239,8 +252,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	/* Zonecut name can change, check it again
 	 * to prevent unnecessary DS & DNSKEY queries */
 	if (!(qry->flags & QUERY_DNSSEC_INSECURE) &&
-	    !kr_ta_covers(negative_anchors, cut_found.name) &&
-	    kr_ta_covers(trust_anchors, cut_found.name)) {
+	    kr_ta_covers_qry(req->ctx, cut_found.name, KNOT_RRTYPE_NS)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	} else {
 		qry->flags &= ~QUERY_DNSSEC_WANT;
@@ -341,6 +353,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		if (!next) {
 			return kr_error(ENOMEM);
 		}
+		next->flags |= QUERY_NONAUTH;
 	}
 	/* At the root level with no NS addresses, add SBELT subrequest. */
 	int ret = 0;
@@ -435,28 +448,58 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 	return kr_ok();
 }
 
-static void write_extra_records(rr_array_t *arr, knot_pkt_t *answer)
+/** @return error code, ignoring if forced to truncate the packet. */
+static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
 {
 	for (size_t i = 0; i < arr->len; ++i) {
-		knot_pkt_put(answer, 0, arr->at[i], 0);
+		int err = knot_pkt_put(answer, 0, arr->at[i], 0);
+		if (err != KNOT_EOK) {
+			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
+		}
 	}
+	return kr_ok();
 }
 
-static void write_extra_ranked_records(ranked_rr_array_t *arr, knot_pkt_t *answer)
+/**
+ * \param all_secure optionally &&-combine security of written RRs into its value.
+ *		     (i.e. if you pass a pointer to false, it will always remain)
+ * @return error code, ignoring if forced to truncate the packet.
+ */
+static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *answer,
+				      bool *all_secure)
 {
+	const bool has_dnssec = knot_pkt_has_dnssec(answer);
+	bool all_sec = true;
+	int err = kr_ok();
+
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t * entry = arr->at[i];
 		if (!entry->to_wire) {
 			continue;
 		}
 		knot_rrset_t *rr = entry->rr;
-		if (!knot_pkt_has_dnssec(answer)) {
+		if (!has_dnssec) {
 			if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
 				continue;
 			}
 		}
-		knot_pkt_put(answer, 0, rr, 0);
+		int err = knot_pkt_put(answer, 0, rr, 0);
+		if (err != KNOT_EOK) {
+			if (err == KNOT_ESPACE) {
+				err = kr_ok();
+			}
+			break;
+		}
+
+		if (rr->type != KNOT_RRTYPE_RRSIG) {
+			all_sec = all_sec && kr_rank_test(entry->rank, KR_RANK_SECURE);
+		}
 	}
+
+	if (all_secure) {
+		*all_secure = *all_secure && all_sec;
+	}
+	return err;
 }
 
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
@@ -520,23 +563,39 @@ static int answer_finalize(struct kr_request *request, int state)
 		}
 	}
 
+	struct kr_query *last = rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
+		/* TODO  ^^^^ this is slightly fragile */
+	bool secure = (last != NULL); /* suspicious otherwise */
+	if (last && (last->flags & QUERY_STUB)) {
+		secure = false; /* don't trust forwarding for now */
+	}
+	if (last && (last->flags & QUERY_DNSSEC_OPTOUT)) {
+		secure = false; /* the last answer is insecure due to opt-out */
+	}
+
 	if (request->answ_selected.len > 0) {
 		assert(answer->current <= KNOT_ANSWER);
 		/* Write answer records. */
 		if (answer->current < KNOT_ANSWER) {
 			knot_pkt_begin(answer, KNOT_ANSWER);
 		}
-		write_extra_ranked_records(&request->answ_selected, answer);
+		if (write_extra_ranked_records(&request->answ_selected, answer, &secure)) {
+			return answer_fail(request);
+		}
 	}
 
 	/* Write authority records. */
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	write_extra_ranked_records(&request->auth_selected, answer);
+	if (write_extra_ranked_records(&request->auth_selected, answer, &secure)) {
+		return answer_fail(request);
+	}
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
-	write_extra_records(&request->additional, answer);
+	if (write_extra_records(&request->additional, answer)) {
+		return answer_fail(request);
+	}
 	/* Write EDNS information */
 	int ret = 0;
 	if (answer->opt_rr) {
@@ -549,20 +608,18 @@ static int answer_finalize(struct kr_request *request, int state)
 		ret = edns_put(answer);
 	}
 
-	/* Set AD=1 if succeeded and requested secured answer. */
-	const bool has_ad = knot_wire_get_ad(answer->wire);
-	knot_wire_clear_ad(answer->wire);
-	if (state == KR_STATE_DONE && rplan->resolved.len > 0) {
-		struct kr_query *last = array_tail(rplan->resolved);
-		/* Do not set AD for RRSIG query, as we can't validate it. */
-		const bool secure = (last->flags & QUERY_DNSSEC_WANT) &&
-				    !(last->flags & QUERY_DNSSEC_INSECURE) &&
-				    !(last->flags & QUERY_DNSSEC_OPTOUT);
-		if (!(last->flags & QUERY_STUB) /* Never set AD if forwarding. */
-		    && has_ad && secure
-		    && knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG) {
-			knot_wire_set_ad(answer->wire);
+	/* AD: negative answers need more handling. */
+	if (kr_response_classify(answer) != PKT_NOERROR && last) {
+		const bool OK = (last->flags & QUERY_DNSSEC_WANT)
+			&& !(last->flags & (QUERY_DNSSEC_BOGUS | QUERY_DNSSEC_INSECURE));
+		if (!OK) {
+			secure = false;
 		}
+	}
+	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
+	if (!secure || state != KR_STATE_DONE
+	    || knot_pkt_qtype(answer) == KNOT_RRTYPE_RRSIG) {
+		knot_wire_clear_ad(answer->wire);
 	}
 
 	return ret;
@@ -642,10 +699,8 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	/* Deferred zone cut lookup for this query. */
 	qry->flags |= QUERY_AWAIT_CUT;
 	/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
-	map_t *negative_anchors = &request->ctx->negative_anchors;
-	map_t *trust_anchors = &request->ctx->trust_anchors;
 	if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
-	    kr_ta_covers(trust_anchors, qname) && !kr_ta_covers(negative_anchors, qname)) {
+	    kr_ta_covers_qry(request->ctx, qname, qtype)) {
 		qry->flags |= QUERY_DNSSEC_WANT;
 	}
 
@@ -1025,7 +1080,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		request->state = KR_STATE_PRODUCE;
 		ITERATE_LAYERS(request, qry, produce, packet);
 		if (request->state != KR_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
-			/* Produced an answer, consume it. */
+			/* Produced an answer from cache, consume it. */
 			qry->secret = 0;
 			request->state = KR_STATE_CONSUME;
 			ITERATE_LAYERS(request, qry, consume, packet);

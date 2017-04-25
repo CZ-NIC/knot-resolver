@@ -72,15 +72,66 @@
  * @endcode
  */
 
-/** Validation rank */
-typedef enum kr_validation_rank {
-	KR_VLDRANK_INITIAL   = 0,   /* Entry was just added; not validated yet. */
-	KR_VLDRANK_INSECURE  = 1,   /* Entry is DNSSEC insecure (e.g. RRSIG not exists). */
-	KR_VLDRANK_BAD	     = 2,   /* Matching RRSIG found, but validation fails. */
-	KR_VLDRANK_MISMATCH  = 3,   /* RRSIG signer name is */
-	KR_VLDRANK_UNKNOWN   = 4,   /* Unknown */
-	KR_VLDRANK_SECURE    = 5    /* Entry is DNSSEC valid (e.g. RRSIG exists). */
-} kr_validation_rank_t;
+
+/**
+ * RRset rank - for cache and ranked_rr_*.
+ *
+ * The rank meaning consists of one independent flag - KR_RANK_AUTH,
+ * and the rest have meaning of values where only one can hold at any time.
+ * You can use one of the enums as a safe initial value, optionally | KR_RANK_AUTH;
+ * otherwise it's best to manipulate ranks via the kr_rank_* functions.
+ *
+ * @note The representation is complicated by restrictions on integer comparison:
+ * - AUTH must be > than !AUTH
+ * - AUTH INSECURE must be > than AUTH (because it attempted validation)
+ * - !AUTH SECURE must be > than AUTH (because it's valid)
+ *
+ * See also:
+ *   https://tools.ietf.org/html/rfc2181#section-5.4.1
+ *   https://tools.ietf.org/html/rfc4035#section-4.3
+ */
+enum kr_rank {
+	KR_RANK_INITIAL = 0, /**< Did not attempt to validate. */
+	KR_RANK_OMIT = 1,    /**< Do not attempt to validate. (And don't consider it a validation failure.) */
+	KR_RANK_INDET,       /**< Unable to determine whether it should be secure. */
+	KR_RANK_BOGUS,       /**< Ought to be secure but isn't. */
+	KR_RANK_MISMATCH,
+	KR_RANK_MISSING,     /**< Unable to obtain a good signature. */
+
+	KR_RANK_INSECURE = 8, /**< Proven to be insecure. */
+
+	/** Authoritative data flag; the chain of authority was "verified".
+	 *  Even if not set, only in-bailiwick stuff is acceptable,
+	 *  i.e. almost authoritative (example: mandatory glue and its NS RR). */
+	KR_RANK_AUTH = 16,
+
+	KR_RANK_SECURE = 32,  /**< Verified whole chain of trust from the closest TA. */
+	/* @note Rank must not exceed 6 bits */
+};
+
+/** Check that a rank value is valid.  Meant for assertions. */
+bool kr_rank_check(uint8_t rank) KR_PURE;
+
+/** Test the presence of any flag/state in a rank, i.e. including KR_RANK_AUTH. */
+static inline bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
+{
+	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
+	if (kr_flag == KR_RANK_AUTH) {
+		return rank & KR_RANK_AUTH;
+	}
+	assert(!(kr_flag & KR_RANK_AUTH));
+	/* The rest are exclusive values - exactly one has to be set. */
+	return (rank & ~KR_RANK_AUTH) == kr_flag;
+}
+
+/** Set the rank state. The _AUTH flag is kept as it was. */
+static inline void kr_rank_set(uint8_t *rank, uint8_t kr_flag)
+{
+	assert(rank && kr_rank_check(*rank));
+	assert(kr_rank_check(kr_flag) && !(kr_flag & KR_RANK_AUTH));
+	*rank = kr_flag | (*rank & KR_RANK_AUTH);
+}
+
 
 /** @cond internal Array of modules. */
 typedef array_t(struct kr_module *) module_array_t;
@@ -95,7 +146,7 @@ typedef array_t(struct kr_module *) module_array_t;
  *       be shared between threads.
  */
 struct kr_context
-{	
+{
 	uint32_t options;
 	knot_rrset_t *opt_rr;
 	map_t trust_anchors;

@@ -14,6 +14,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file pktcache.c
+ *
+ * This builtin module caches whole packets from/for negative answers.
+ *
+ * Note: it also persists some QUERY_DNSSEC_* flags.
+ * The ranks are stored in *(uint8_t *)rrset->additional (all are the same for one packet).
+ */
+
 #include <libknot/descriptor.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/soa.h>
@@ -21,6 +29,7 @@
 #include <contrib/ucw/lib.h>
 #include "lib/layer/iterate.h"
 #include "lib/cache.h"
+#include "lib/dnssec/ta.h"
 #include "lib/module.h"
 #include "lib/resolve.h"
 
@@ -47,7 +56,7 @@ static void adjust_ttl(knot_rrset_t *rr, uint32_t drift)
 }
 
 /** @internal Try to find a shortcut directly to searched packet. */
-static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
+static int loot_pktcache(struct kr_context *ctx, knot_pkt_t *pkt,
 			 struct kr_request *req, uint8_t *flags)
 {
 	struct kr_query *qry = req->current_query;
@@ -56,21 +65,30 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 	uint16_t rrtype = qry->stype;
 
 	struct kr_cache_entry *entry = NULL;
-	int ret = kr_cache_peek(cache, KR_CACHE_PKT, qname,
+	int ret = kr_cache_peek(&ctx->cache, KR_CACHE_PKT, qname,
 				rrtype, &entry, &timestamp);
 	if (ret != 0) { /* Not in the cache */
+		if (ret == kr_error(ESTALE)) {
+			VERBOSE_MSG(qry, "=> only stale entry found\n")
+		}
 		return ret;
 	}
 
-	/* Check that we have secure rank. */
-	if (!knot_wire_get_cd(req->answer->wire) && entry->rank == KR_RANK_BAD) {
-		return kr_error(ENOENT);
-	}
+	uint8_t lowest_rank = KR_RANK_INITIAL | KR_RANK_AUTH;
 
-	/* Check if entry is insecure and setup query flags if needed. */
-	if ((qry->flags & QUERY_DNSSEC_WANT) && entry->rank == KR_RANK_INSECURE) {
-		qry->flags |= QUERY_DNSSEC_INSECURE;
-		qry->flags &= ~QUERY_DNSSEC_WANT;
+	/* Records not present under any TA don't have their security verified at all. */
+	const bool ta_covers = kr_ta_covers_qry(ctx, qry->sname, qry->stype);
+	/* ^ TODO: performance? */
+
+	/* There's probably little sense for NONAUTH in pktcache. */
+	if (!knot_wire_get_cd(req->answer->wire) && ta_covers) {
+		kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
+	}
+	const bool rank_enough = entry->rank >= lowest_rank;
+	VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o -> satisfied=%d\n",
+			entry->rank, lowest_rank, (int)rank_enough);
+	if (!rank_enough) {
+		return kr_error(ENOENT);
 	}
 
 	/* Copy answer, keep the original message id */
@@ -84,6 +102,21 @@ static int loot_pktcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		knot_pkt_parse(pkt, 0);
 		/* Restore header bits */
 		knot_wire_set_id(pkt->wire, msgid);
+	}
+
+	/* Rank-related fixups.  Add rank into the additional field. */
+	if (kr_rank_test(entry->rank, KR_RANK_INSECURE)) {
+		qry->flags |= QUERY_DNSSEC_INSECURE;
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+	}
+	for (size_t i = 0; i < pkt->rrset_count; ++i) {
+		assert(!pkt->rr[i].additional);
+		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
+		if (!rr_rank) {
+			return kr_error(ENOMEM);
+		}
+		*rr_rank = entry->rank;
+		pkt->rr[i].additional = rr_rank;
 	}
 
 	/* Adjust TTL in records. */
@@ -120,10 +153,8 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Fetch either answer to original or minimized query */
 	uint8_t flags = 0;
-	struct kr_cache *cache = &req->ctx->cache;
-	int ret = loot_pktcache(cache, pkt, req, &flags);
+	int ret = loot_pktcache(req->ctx, pkt, req, &flags);
 	if (ret == 0) {
-		VERBOSE_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 		if (flags & KR_CACHE_FLAG_WCARD_PROOF) {
 			qry->flags |= QUERY_DNSSEC_WEXPAND;
@@ -210,23 +241,24 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_cache_entry header = {
 		.timestamp = qry->timestamp.tv_sec,
 		.ttl = ttl,
-		.rank = KR_RANK_BAD,
+		.rank = KR_RANK_AUTH,
 		.flags = KR_CACHE_FLAG_NONE,
 		.count = data.len
 	};
 
-	/* Set cache rank.
-	 * If cd bit is set rank remains BAD.
-	 * Otherwise - depends on flags. */
-	if (!knot_wire_get_cd(req->answer->wire)) {
-		if (qry->flags & QUERY_DNSSEC_WANT) {
-			/* DNSSEC valid entry */
-			header.rank = KR_RANK_SECURE;
-		} else {
-			/* Don't care about DNSSEC */
-			header.rank = KR_RANK_INSECURE;
+	/* If cd bit is set, make rank bad, otherwise it depends on flags. */
+	if (knot_wire_get_cd(req->answer->wire)) {
+		kr_rank_set(&header.rank, KR_RANK_OMIT);
+	} else {
+		if (qry->flags & QUERY_DNSSEC_BOGUS) {
+			kr_rank_set(&header.rank, KR_RANK_BOGUS);
+		} else if (qry->flags & QUERY_DNSSEC_INSECURE) {
+			kr_rank_set(&header.rank, KR_RANK_INSECURE);
+		} else if (qry->flags & QUERY_DNSSEC_WANT) {
+			kr_rank_set(&header.rank, KR_RANK_SECURE);
 		}
 	}
+	VERBOSE_MSG(qry, "=> candidate rank: 0%0.2o\n", header.rank);
 
 	/* Set cache flags */
 	if (qry->flags & QUERY_DNSSEC_WEXPAND) {
@@ -239,9 +271,13 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check if we can replace (allow current or better rank, SECURE is always accepted). */
 	struct kr_cache *cache = &ctx->req->ctx->cache;
 	if (header.rank < KR_RANK_SECURE) {
-		int cached_rank = kr_cache_peek_rank(cache, KR_CACHE_PKT, qname, qtype, header.timestamp);
-		if (cached_rank > header.rank) {
-			return ctx->state;
+		int cached_rank = kr_cache_peek_rank
+			(cache, KR_CACHE_PKT, qname, qtype, header.timestamp);
+		if (cached_rank >= 0) {
+			VERBOSE_MSG(qry, "=> cached rank:    0%0.2o\n", cached_rank);
+			if (cached_rank > header.rank) {
+				return ctx->state;
+			}
 		}
 	}
 

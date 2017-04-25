@@ -14,6 +14,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file rrcache.c
+ *
+ * This builtin module caches resource records from/for positive answers.
+ *
+ * Produce phase: if an RRset answering the query exists, the packet is filled
+ * by it, including the corresponding RRSIGs (subject to some conditions).
+ * Such a packet is recognizable: pkt->size == PKT_SIZE_NOWIRE, and QUERY_CACHED
+ * is set in the query.  The ranks are stored in *(uint8_t *)rrset->additional.
+ *
+ * TODO
+ */
+
 #include <assert.h>
 
 #include <libknot/descriptor.h>
@@ -26,6 +38,7 @@
 
 #include "lib/layer/iterate.h"
 #include "lib/cache.h"
+#include "lib/dnssec/ta.h"
 #include "lib/module.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
@@ -43,6 +56,11 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
                   uint16_t rrclass, uint16_t rrtype, struct kr_query *qry,
                   uint8_t *rank, uint8_t *flags, bool fetch_rrsig, uint8_t lowest_rank)
 {
+	const bool precond = rank && flags;
+	if (!precond) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
 	/* Check if record exists in cache */
 	int ret = 0;
 	uint32_t drift = qry->timestamp.tv_sec;
@@ -57,7 +75,13 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		return ret;
 	}
 
-	if (rank && (*rank < lowest_rank)) {
+	WITH_VERBOSE {
+		VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o, ", *rank, lowest_rank);
+		kr_rrtype_print(rrtype, "", " ");
+		kr_dname_print(name, "", "\n");
+	}
+
+	if (*rank < lowest_rank) {
 		return kr_error(ENOENT);
 	}
 
@@ -66,7 +90,6 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		qry->flags |= QUERY_EXPIRING;
 	}
 
-	assert(flags != NULL);
 	if ((*flags) & KR_CACHE_FLAG_WCARD_PROOF) {
 		/* Record was found, but wildcard answer proof is needed.
 		 * Do not update packet, try to fetch whole packet from pktcache instead. */
@@ -83,24 +106,70 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 	/* Update packet answer */
 	knot_rrset_t rr_copy;
 	ret = kr_cache_materialize(&rr_copy, &cache_rr, drift, qry->reorder, &pkt->mm);
-	if (ret == 0) {
-		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &rr_copy, KNOT_PF_FREE);
-		if (ret != 0) {
-			knot_rrset_clear(&rr_copy, &pkt->mm);
-		}
+	if (ret) {
+		return ret;
 	}
+
+	uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
+	if (!rr_rank) {
+		goto enomem;
+	}
+	*rr_rank = *rank;
+	rr_copy.additional = rr_rank;
+	/* Ensure the pkt->rr array is long enough. */
+	if (pkt->rrset_count + 1 > pkt->rrset_allocd) {
+		size_t rrset_allocd = pkt->rrset_count + 2;
+		pkt->rr = mm_realloc(&pkt->mm, pkt->rr,
+					sizeof(pkt->rr[0]) * rrset_allocd,
+					sizeof(pkt->rr[0]) * pkt->rrset_allocd);
+		if (!pkt->rr) {
+			goto enomem;
+		}
+		pkt->rr_info = mm_realloc(&pkt->mm, pkt->rr,
+					sizeof(pkt->rr_info[0]) * rrset_allocd,
+					sizeof(pkt->rr_info[0]) * pkt->rrset_allocd);
+		if (!pkt->rr_info) {
+			goto enomem;
+		}
+		pkt->rrset_allocd = rrset_allocd;
+	}
+	/* Append the RR array. */
+	assert(pkt->sections[pkt->current].count == pkt->rrset_count);
+	pkt->rr[pkt->rrset_count] = rr_copy;
+	pkt->sections[pkt->current].count = ++pkt->rrset_count;
 	return ret;
+enomem:
+	knot_rrset_clear(&rr_copy, &pkt->mm);
+	mm_free(&pkt->mm, rr_rank);
+	return kr_error(ENOMEM);
 }
 
 /** @internal Try to find a shortcut directly to searched record. */
-static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
+static int loot_rrcache(struct kr_context *ctx, knot_pkt_t *pkt,
 			struct kr_query *qry, uint16_t rrtype, const bool cdbit)
 {
-	/* Lookup direct match first */
+	/* Records not present under any TA don't have their security verified at all. */
+	const bool ta_covers = kr_ta_covers_qry(ctx, qry->sname, qry->stype);
+	/* ^ TODO: performance? */
+
+	/* Lookup direct match first; only consider authoritative records.
+	 * TODO: move rank handling into the iterator (QUERY_DNSSEC_* flags)? */
 	uint8_t rank  = 0;
 	uint8_t flags = 0;
-	uint8_t lowest_rank = cdbit ? KR_RANK_BAD : KR_RANK_INSECURE;
-	const bool dobit = (qry->flags & QUERY_DNSSEC_WANT);
+	uint8_t lowest_rank = (ta_covers ? KR_RANK_INSECURE : KR_RANK_INITIAL)
+		| KR_RANK_AUTH;
+	if (qry->flags & QUERY_NONAUTH) {
+		lowest_rank = KR_RANK_INITIAL;
+		/* Note: there's little sense in validation status for non-auth records.
+		 * In case of using NONAUTH to get NS IPs, knowing that you ask correct
+		 * IP doesn't matter much for security; it matters whether you can
+		 * validate the answers from the NS. */
+	}
+	if (cdbit) {
+		kr_rank_set(&lowest_rank, KR_RANK_INITIAL);
+	}
+
+	struct kr_cache *cache = &ctx->cache;
 	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			  &rank, &flags, 0, lowest_rank);
 	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) {
@@ -109,12 +178,19 @@ static int loot_rrcache(struct kr_cache *cache, knot_pkt_t *pkt,
 		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			      &rank, &flags, 0, lowest_rank);
 	}
-	/* Record is flagged as INSECURE => doesn't have RRSIG. */
-	if (ret == 0 && (rank & KR_RANK_INSECURE)) {
+	if (ret) {
+		return ret;
+	}
+
+	if (kr_rank_test(rank, KR_RANK_INSECURE)) {
 		qry->flags |= QUERY_DNSSEC_INSECURE;
 		qry->flags &= ~QUERY_DNSSEC_WANT;
-	/* Record may have RRSIG, try to find it. */
-	} else if (ret == 0 && dobit) {
+	}
+
+	/* Record may have RRSIGs, try to find them. */
+	const bool dobit = (qry->flags & QUERY_DNSSEC_WANT);
+	if (cdbit || (dobit && kr_rank_test(rank, KR_RANK_SECURE))) {
+		kr_rank_set(&lowest_rank, KR_RANK_INITIAL); /* no security for RRSIGs */
 		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			      &rank, &flags, true, lowest_rank);
 		if (ret) {
@@ -151,16 +227,15 @@ static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * it may either be a CNAME chain or direct answer.
 	 * Only one step of the chain is resolved at a time.
 	 */
-	struct kr_cache *cache = &req->ctx->cache;
 	int ret = -1;
 	if (qry->stype != KNOT_RRTYPE_ANY) {
-		ret = loot_rrcache(cache, pkt, qry, qry->stype, cd_is_set);
+		ret = loot_rrcache(req->ctx, pkt, qry, qry->stype, cd_is_set);
 	} else {
 		/* ANY query are used by either qmail or certain versions of Firefox.
 		 * Probe cache for a few interesting records. */
 		static uint16_t any_types[] = { KNOT_RRTYPE_A, KNOT_RRTYPE_AAAA, KNOT_RRTYPE_MX };
 		for (size_t i = 0; i < sizeof(any_types)/sizeof(any_types[0]); ++i) {
-			if (loot_rrcache(cache, pkt, qry, any_types[i], cd_is_set) == 0) {
+			if (loot_rrcache(req->ctx, pkt, qry, any_types[i], cd_is_set) == 0) {
 				ret = 0; /* At least single record matches */
 			}
 		}
@@ -168,7 +243,7 @@ static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret == 0) {
 		VERBOSE_MSG(qry, "=> satisfied from cache\n");
 		qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
-		pkt->parsed = pkt->size;
+		pkt->parsed = pkt->size = PKT_SIZE_NOWIRE;
 		knot_wire_set_qr(pkt->wire);
 		knot_wire_set_aa(pkt->wire);
 		return KR_STATE_DONE;
@@ -211,32 +286,31 @@ static int commit_rr(const char *key, void *val, void *data)
 
 	/* Save RRSIG in a special cache. */
 	uint8_t rank = KEY_FLAG_RANK(key);
-	/* Non-authoritative NSs should never be trusted,
-	 * it may be present in an otherwise secure answer but it
-	 * is only a hint for local state. */
-	if (rr->type != KNOT_RRTYPE_NS || (rank & KR_RANK_AUTH)) {
-		if (baton->qry->flags & QUERY_DNSSEC_WANT &&
-		    rank != KR_RANK_BAD) {
-			rank |= KR_RANK_SECURE;
-		}
-	}
-	if (baton->qry->flags & QUERY_DNSSEC_INSECURE && rank != KR_RANK_BAD) {
-		rank &= ~KR_RANK_SECURE;
-		rank |= KR_RANK_INSECURE;
-	}
 	if (KEY_COVERING_RRSIG(key)) {
 		return commit_rrsig(baton, rank, KR_CACHE_FLAG_NONE, rr);
 	}
-	/* Accept only better rank (if not overriding) */
-	if (!(rank & KR_RANK_SECURE)) {
+	/* Accept only better rank if not secure. */
+	if (!kr_rank_test(rank, KR_RANK_SECURE)) {
 		int cached_rank = kr_cache_peek_rank(baton->cache, KR_CACHE_RR, rr->owner, rr->type, baton->timestamp);
-		if (cached_rank >= rank) {
-			return kr_ok();
+		/* If equal rank was accepted, spoofing a single answer would be enough
+		 * to e.g. override NS record in AUTHORITY section.
+		 * This way they would have to hit the first answer (whenever TTL expires). */
+		if (cached_rank >= 0) {
+			VERBOSE_MSG(baton->qry, "=> orig. rank: 0%0.2o\n", cached_rank);
+			if (cached_rank >= rank) {
+				return kr_ok();
+			}
 		}
 	}
 
+	WITH_VERBOSE {
+		VERBOSE_MSG(baton->qry, "=> stashing rank: 0%0.2o, ", rank);
+		kr_rrtype_print(rr->type, "", " ");
+		kr_dname_print(rr->owner, "", "\n");
+	}
+
 	uint8_t flags = KR_CACHE_FLAG_NONE;
-	if (rank & KR_RANK_AUTH) {
+	if (kr_rank_test(rank, KR_RANK_AUTH)) {
 		if (baton->qry->flags & QUERY_DNSSEC_WEXPAND) {
 			flags |= KR_CACHE_FLAG_WCARD_PROOF;
 		}
@@ -270,72 +344,36 @@ static void stash_glue(map_t *stash, knot_pkt_t *pkt, const knot_dname_t *ns_nam
 		    !knot_dname_is_equal(rr->owner, ns_name)) {
 			continue;
 		}
-		kr_rrmap_add(stash, rr, KR_RANK_EXTRA, pool);
+		kr_rrmap_add(stash, rr, KR_RANK_OMIT, pool);
 	}
 }
 
-/* @internal DS is special and is present only parent-side */
-static void stash_ds(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
+static int stash_selected(struct kr_request *req, knot_pkt_t *pkt, map_t *stash,
+		 bool is_authority, knot_mm_t *pool)
 {
-	ranked_rr_array_t *arr= &req->auth_selected;
+	ranked_rr_array_t *arr = is_authority
+		? &req->auth_selected : &req->answ_selected;
+	const struct kr_query *qry = req->current_query;
 	if (!arr->len) {
-		return;
-	}
-	struct kr_query *qry = req->current_query;
-	uint8_t rank = KR_RANK_AUTH;
-	if (knot_wire_get_cd(req->answer->wire)) {
-		/* Signature validation is disabled,
-		 * save it to the BAD cache */
-		rank = KR_RANK_BAD;
+		return kr_ok();
 	}
 	/* uncached entries are located at the end */
 	for (ssize_t i = arr->len - 1; i >= 0; --i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
-		const knot_rrset_t *rr = entry->rr;
 		if (entry->qry_uid != qry->uid) {
-			continue;
+			continue; /* TODO: probably safe to break but maybe not worth it */
 		}
 		if (entry->cached) {
 			continue;
 		}
-		if (rr->type == KNOT_RRTYPE_DS || rr->type == KNOT_RRTYPE_RRSIG) {
-			kr_rrmap_add(stash, rr, rank, pool);
-			entry->cached = true;
-		}
-	}
-}
-
-static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
-{
-	ranked_rr_array_t *arr= &req->auth_selected;
-	if (!arr->len) {
-		return kr_ok();
-	}
-	struct kr_query *qry = req->current_query;
-	uint8_t rank = KR_RANK_NONAUTH;
-	if (knot_wire_get_cd(req->answer->wire)) {
-		/* Signature validation is disabled,
-		 * save authority to the BAD cache */
-		rank = KR_RANK_BAD;
-	}
-	/* uncached entries are located at the end */
-	for (ssize_t i = arr->len - 1; i >= 0; --i) {
-		ranked_rr_array_entry_t *entry = arr->at[i];
 		const knot_rrset_t *rr = entry->rr;
-		if (entry->qry_uid != qry->uid || entry->cached) {
-			continue;
-		}
-
 		/* Skip NSEC3 RRs and their signatures.  We don't use them this way.
 		 * They would be stored under the hashed name, etc. */
-		if (rr->type == KNOT_RRTYPE_NSEC3
-		    || (rr->type == KNOT_RRTYPE_RRSIG
-			&& knot_rrsig_type_covered(&rr->rrs, 0) == KNOT_RRTYPE_NSEC3)) {
-		    continue;
+		if (kr_rrset_type_maysig(rr) == KNOT_RRTYPE_NSEC3) {
+			continue;
 		}
-
 		/* Look up glue records for NS */
-		if (rr->type == KNOT_RRTYPE_NS) {
+		if (is_authority && rr->type == KNOT_RRTYPE_NS) {
 			for (size_t j = 0; j < rr->rrs.rr_count; ++j) {
 				const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, j);
 				if (knot_dname_in(qry->zone_cut.name, ns_name)) {
@@ -343,36 +381,7 @@ static int stash_authority(struct kr_request *req, knot_pkt_t *pkt, map_t *stash
 				}
 			}
 		}
-		kr_rrmap_add(stash, rr, rank, pool);
-		entry->cached = true;
-	}
-	return kr_ok();
-}
-
-static int stash_answer(struct kr_request *req, knot_pkt_t *pkt, map_t *stash, knot_mm_t *pool)
-{
-	ranked_rr_array_t *arr= &req->answ_selected;
-	struct kr_query *qry = req->current_query;
-	if (!arr->len) {
-		return kr_ok();
-	}
-	uint8_t rank = KR_RANK_AUTH;
-	if (knot_wire_get_cd(req->answer->wire)) {
-		/* Signature validation is disabled.
-		 * Save answer to the BAD cache. */
-		rank = KR_RANK_BAD;
-	}
-	/* uncached entries are located at the end */
-	for (ssize_t i = arr->len - 1; i >= 0; --i) {
-		ranked_rr_array_entry_t *entry = arr->at[i];
-		if (entry->qry_uid != qry->uid) {
-			continue;
-		}
-		if (entry->cached) {
-			continue;
-		}
-		const knot_rrset_t *rr = entry->rr;
-		kr_rrmap_add(stash, rr, rank, pool);
+		kr_rrmap_add(stash, rr, entry->rank, pool);
 		entry->cached = true;
 	}
 	return kr_ok();
@@ -396,7 +405,7 @@ static int rrcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (qry->flags & QUERY_CACHED || knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR || !is_eligible) {
 		return ctx->state;
 	}
-	/* Stash in-bailiwick data from the AUTHORITY and ANSWER. */
+	/* Stash data selected by iterator from the last receieved packet. */
 	map_t stash = map_make();
 	stash.malloc = (map_alloc_f) mm_alloc;
 	stash.free = (map_free_f) mm_free;
@@ -404,18 +413,11 @@ static int rrcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = 0;
 	bool is_auth = knot_wire_get_aa(pkt->wire);
 	if (is_auth) {
-		ret = stash_answer(req, pkt, &stash, &req->pool);
-		if (ret == 0) {
-			ret = stash_authority(req, pkt, &stash, &req->pool);
-		}
-	/* Cache authority only if chasing referral/cname chain */
-	} else if (knot_pkt_section(pkt, KNOT_ANSWER)->count == 0 ||
-		   qry->flags & QUERY_CNAME) {
-		ret = stash_authority(req, pkt, &stash, &req->pool);
+		ret = stash_selected(req, pkt, &stash, false, &req->pool);
 	}
-	/* Cache DS records in referrals */
-	if (!is_auth && knot_pkt_has_dnssec(pkt)) {
-		stash_ds(req, pkt, &stash, &req->pool);
+	if (ret == 0) {
+		ret = stash_selected(req, pkt, &stash, true, &req->pool);
+		/* this also stashes DS records in referrals */
 	}
 	/* Cache stashed records */
 	if (ret == 0 && stash.root != NULL) {

@@ -14,6 +14,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file iterate.c
+ *
+ * This builtin module is mainly active in the consume phase.
+ * Primary responsibilities:
+ *  - Classify the packet as auth/nonauth and change its AA flag accordingly.
+ *  - Pick interesting RRs to kr_request::answ_selected and ::auth_selected,
+ *    NEW: and classify their rank, except for validation status.
+ *  - Update kr_query::zone_cut (in case of referral).
+ *  - Interpret CNAMEs.
+ *  - Prepare the followup query - either inline or as another kr_query
+ *    (CNAME jumps create a new "sibling" query).
+ */
+
 #include <sys/time.h>
 #include <assert.h>
 #include <arpa/inet.h>
@@ -278,12 +291,41 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	return state;
 }
 
+/** Compute rank appropriate for RRs present in the packet.
+ * @param answer whether the RR is from answer or authority section */
+static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *qry,
+				const bool answer, const bool is_referral)
+{
+	if (qry->flags & QUERY_CACHED) {
+		return rr->additional ? *(uint8_t *)rr->additional : KR_RANK_OMIT;
+		/* ^^ Current use case for "cached" RRs without rank: hints module. */
+	}
+	if (answer || rr->type == KNOT_RRTYPE_DS
+	    || rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3) {
+		return KR_RANK_INITIAL | KR_RANK_AUTH;
+	}
+	if (rr->type == KNOT_RRTYPE_NS) {
+		/* Some servers add extra NS RRset, which allows us to refresh
+		 * cache "for free", potentially speeding up zone cut lookups
+		 * in future.  Still, it might theoretically cause some problems:
+		 * https://mailarchive.ietf.org/arch/msg/dnsop/CYjPDlwtpxzdQV_qycB-WfnW6CI
+		 */
+		if (!is_referral && knot_dname_is_equal(qry->zone_cut.name, rr->owner)) {
+			return KR_RANK_INITIAL | KR_RANK_AUTH;
+		} else {
+			return KR_RANK_OMIT;
+		}
+	}
+
+	return KR_RANK_INITIAL;
+	/* TODO: this classifier of authoritativity may not be perfect yet. */
+}
+
 static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 {
 	struct kr_query *qry = req->current_query;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
-	uint8_t rank = !(qry->flags & QUERY_DNSSEC_WANT) || (qry->flags & QUERY_CACHED) ?
-			KR_VLDRANK_SECURE : KR_VLDRANK_INITIAL;
+
 	const knot_dname_t *zonecut_name = qry->zone_cut.name;
 	bool referral = !knot_wire_get_aa(pkt->wire);
 	if (referral) {
@@ -298,6 +340,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 		if (!knot_dname_in(zonecut_name, rr->owner)) {
 			continue;
 		}
+		uint8_t rank = get_initial_rank(rr, qry, false, referral);
 		int ret = kr_ranked_rrarray_add(&req->auth_selected, rr,
 						rank, to_wire, qry->uid, &req->pool);
 		if (ret != kr_ok()) {
@@ -391,8 +434,6 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 	const knot_dname_t *cname = NULL;
 	const knot_dname_t *pending_cname = query->sname;
 	unsigned cname_chain_len = 0;
-	uint8_t rank = !(query->flags & QUERY_DNSSEC_WANT) || (query->flags & QUERY_CACHED) ?
-			KR_VLDRANK_SECURE : KR_VLDRANK_INITIAL;
 	bool is_final = (query->parent == NULL);
 	uint32_t iter_count = 0;
 	bool strict_mode = (query->flags & QUERY_STRICT);
@@ -405,12 +446,10 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 
 			/* Skip the RR if its owner+type doesn't interest us. */
-			const bool type_OK = rr->type == query->stype
-				|| rr->type == KNOT_RRTYPE_CNAME
-				|| rr->type == KNOT_RRTYPE_DNAME /* TODO: actually handle it */
-				|| (rr->type == KNOT_RRTYPE_RRSIG
-				    && knot_rrsig_type_covered(&rr->rrs, 0))
-				;
+			const uint16_t type = kr_rrset_type_maysig(rr);
+			const bool type_OK = rr->type == query->stype || type == query->stype
+				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
+				/* TODO: actually handle DNAMEs */
 			if (!type_OK || !knot_dname_is_equal(rr->owner, cname)) {
 				continue;
 			}
@@ -427,6 +466,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 					return state;
 				}
 			}
+			uint8_t rank = get_initial_rank(rr, query, true, referral);
 			state = kr_ranked_rrarray_add(&req->answ_selected, rr,
 						      rank, to_wire, query->uid, &req->pool);
 			if (state != kr_ok()) {
@@ -605,14 +645,13 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 		next->flags |= QUERY_AWAIT_CUT;
-		if (query->flags & QUERY_DNSSEC_INSECURE) {
-			next->flags &= ~QUERY_DNSSEC_WANT;
-			next->flags |= QUERY_DNSSEC_INSECURE;
-		} else if (kr_ta_covers(&req->ctx->trust_anchors, cname) &&
-		    !kr_ta_covers(&req->ctx->negative_anchors, cname)) {
-			/* Want DNSSEC if it's posible to secure
-			 * this name (e.g. is covered by any TA) */
+
+		/* Want DNSSEC if and only if it's posible to secure
+		 * this name (i.e. iff it is covered by a TA) */
+		if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
 			next->flags |= QUERY_DNSSEC_WANT;
+		} else {
+			next->flags &= ~QUERY_DNSSEC_WANT;
 		}
 		state = pick_authority(pkt, req, false);
 		if (state != kr_ok()) {
@@ -669,7 +708,10 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
 		int err = kr_ranked_rrarray_add(&req->answ_selected, rr,
-			      KR_VLDRANK_INITIAL, true, query->uid, &req->pool);
+			      KR_RANK_INITIAL | KR_RANK_AUTH, true, query->uid, &req->pool);
+		/* KR_RANK_AUTH: we don't have the records directly from
+		 * an authoritative source, but we do trust the server and it's
+		 * supposed to only send us authoritative records. */
 		if (err != kr_ok()) {
 			return KR_STATE_FAIL;
 		}
