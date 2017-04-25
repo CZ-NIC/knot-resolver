@@ -61,8 +61,8 @@
 	X(DNS64_MARK,	   1u << 31) /**< Internal to ../modules/dns64/dns64.lua */
 
 /** Query flags */
-enum kr_query_flag {
-	#define X(flag, val) QUERY_ ## flag = val,
+struct kr_qflags {
+	#define X(flag, val) bool flag : 1;
 	QUERY_FLAGS(X)
 	#undef X
 };
@@ -80,7 +80,7 @@ struct kr_query {
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;
-	uint32_t flags;
+	struct kr_qflags flags, forward_flags;
 	uint32_t secret;
 	uint16_t fails;
 	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
@@ -89,7 +89,6 @@ struct kr_query {
 	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
-	uint32_t forward_flags;
 	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
 };

@@ -147,7 +147,7 @@ typedef array_t(struct kr_module *) module_array_t;
  */
 struct kr_context
 {
-	uint32_t options;
+	struct kr_qflags options;
 	knot_rrset_t *opt_rr;
 	map_t trust_anchors;
 	map_t negative_anchors;
@@ -190,7 +190,7 @@ struct kr_request {
 		unsigned rtt;                  /**< Current upstream RTT */
 		const struct sockaddr *addr;   /**< Current upstream address */
 	} upstream;                        /**< Upstream information, valid only in consume() phase */
-	uint32_t options;
+	struct kr_qflags options;
 	int state;
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;

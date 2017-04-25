@@ -1036,7 +1036,8 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	return submitted;
 }
 
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options, worker_cb_t on_complete, void *baton)
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options,
+		   worker_cb_t on_complete, void *baton)
 {
 	if (!worker || !query) {
 		return kr_error(EINVAL);

@@ -82,7 +82,8 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 
 #undef ADDR_SET
 
-static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score, uint8_t *addr[], uint32_t opts)
+static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score,
+				uint8_t *addr[], struct kr_qflags opts)
 {
 	/* Name server is better candidate if it has address record. */
 	uint8_t *it = pack_head(*addr_set);
