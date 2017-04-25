@@ -176,7 +176,7 @@ local active_refresh, update -- forwards
 local function refresh_plan(keyset, delay, priming, is_initial)
 	local owner_str = kres.dname2str(keyset.owner) -- maybe fix converting back and forth?
 	keyset.refresh_ev = event.after(delay, function (ev)
-		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE,
+		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
 		function (pkt)
 			-- Schedule itself with updated timeout
 			local delay_new = active_refresh(keyset, kres.pkt_t(pkt), is_initial)

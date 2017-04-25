@@ -27,6 +27,38 @@
 #define QUERY_PROVIDES(q, name, cls, type) \
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
+void kr_qflags_set(struct kr_qflags *fl1, struct kr_qflags fl2)
+{
+	if (!fl1) abort();
+	typedef uint32_t ui;
+	union {
+		struct kr_qflags flags;
+		ui uints[sizeof(struct kr_qflags) / sizeof(ui)];
+	} tmp1, tmp2;
+	/* The compiler should be able to optimize all this into simple ORs. */
+	tmp1.flags = *fl1;
+	tmp2.flags = fl2;
+	for (size_t i = 0; i < sizeof(tmp1.uints) / sizeof(tmp1.uints[0]); ++i) {
+		tmp1.uints[i] |= tmp2.uints[i];
+	}
+	*fl1 = tmp1.flags;
+}
+void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2)
+{
+	if (!fl1) abort();
+	typedef uint32_t ui;
+	union {
+		struct kr_qflags flags;
+		ui uints[sizeof(struct kr_qflags) / sizeof(ui)];
+	} tmp1, tmp2;
+	/* The compiler should be able to optimize all this into simple ORs. */
+	tmp1.flags = *fl1;
+	tmp2.flags = fl2;
+	for (size_t i = 0; i < sizeof(tmp1.uints) / sizeof(tmp1.uints[0]); ++i) {
+		tmp1.uints[i] &= ~tmp2.uints[i];
+	}
+	*fl1 = tmp1.flags;
+}
 
 static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name, uint32_t uid)
 {

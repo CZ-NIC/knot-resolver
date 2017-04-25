@@ -22,7 +22,7 @@ mod.layer = {
 		end
 		-- Synthetic AAAA from marked A responses
 		local answer = pkt:section(kres.section.ANSWER)
-		if bit.band(qry.flags, kres.query.DNS64_MARK) ~= 0 then -- Marked request
+		if qry.flags.DNS64_MARK then -- Marked request
 			local section = ffi.C.knot_pkt_section(pkt, kres.section.ANSWER)
 			for i = 1, section.count do
 				local orig = ffi.C.knot_pkt_rr(section, i - 1)
@@ -52,10 +52,10 @@ mod.layer = {
 		else -- Observe AAAA NODATA responses
 			local is_nodata = (pkt:rcode() == kres.rcode.NOERROR) and (#answer == 0)
 			if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name() and qry:final() then
-				local extraFlags = bit.bor(
-					bit.band(qry.flags, kres.query.DNSSEC_WANT),
-					bit.bor(kres.query.DNS64_MARK, kres.query.AWAIT_CUT)
-					)
+				local extraFlags = kres.mk_qflags({})
+				extraFlags.DNSSEC_WANT = qry.flags.DNSSEC_WANT
+				extraFlags.AWAIT_CUT = true
+				extraFlags.DNS64_MARK = true
 				local next = req:push(pkt:qname(), kres.type.A, kres.class.IN, extraFlags, qry)
 			end
 		end

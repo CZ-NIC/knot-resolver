@@ -1054,7 +1054,7 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflag
 	int ret = qr_task_start(task, query);
 
 	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
-	task->req.options |= options;
+	kr_qflags_set(&task->req.options, options);
 
 	if (ret != 0) {
 		qr_task_unref(task);

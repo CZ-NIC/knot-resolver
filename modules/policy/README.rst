@@ -31,7 +31,7 @@ There are several defined actions:
 * ``MIRROR(ip)`` - mirror query to given IP and continue solving it (useful for partial snooping)
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
 * ``QTRACE`` - pretty-print DNS response packets into the log (useful for debugging weird DNS servers).
-* ``FLAGS(set, clear)`` - set and/or clear some flags for the query.  There can be multiple flags to set/clear, combined by ``bit.bor`` from ``kres.query.*`` values.
+* ``FLAGS(set, clear)`` - set and/or clear some flags for the query.  There can be multiple flags to set/clear.  You can just pass a single flag name (string) or a set of names.
 
 .. warning:: The policy module currently only looks at whole DNS requests.  The rules won't be re-applied e.g. when following CNAMEs.
 

@@ -44,7 +44,7 @@ Layers can also change course of resolution, for example by appending additional
 		if answer:qtype() == kres.type.NS then
 			req = kres.request_t(req)
 			local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
-			qry.flags = kres.query.AWAIT_CUT
+			qry.flags.AWAIT_CUT = true
 		end
 		return state
 	end
@@ -62,7 +62,7 @@ This **doesn't** block currently processed query, and the newly created sub-requ
 			if answer:qtype() == kres.type.NS then
 				req = kres.request_t(req)
 				local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
-				qry.flags = kres.query.AWAIT_CUT
+				qry.flags.AWAIT_CUT = true
 				print('planned SOA query, yielding')
 				return kres.YIELD
 			end
@@ -268,7 +268,7 @@ As described in the layers, you can not only retrieve information about current 
 
 		-- Push new query
 		local qry = req:push(pkt:qname(), kres.type.SOA, kres.class.IN)
-		qry.flags = kres.query.AWAIT_CUT
+		qry.flags.AWAIT_CUT = true
 
 		-- Pop the query, this will erase it from resolution plan
 		req:pop(qry)

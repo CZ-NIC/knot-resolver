@@ -24,10 +24,16 @@ end
 -- Resolver bindings
 kres = require('kres')
 trust_anchors = require('trust_anchors')
-resolve = worker.resolve
 if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
+
+-- Compat. wrapper for query flags.
+worker.resolve = function (p1, p2, p3, options, p5)
+	options = kres.mk_qflags(options)
+	return worker.resolve_unwrapped (p1, p2, p3, options, p5)
+end
+resolve = worker.resolve
 
 -- Shorthand for aggregated per-worker information
 worker.info = function ()

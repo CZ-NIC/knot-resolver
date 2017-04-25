@@ -31,7 +31,7 @@ function predict.drain(ev)
 	local deleted = 0
 	for key, val in pairs(predict.queue) do
 		local qtype, qname = key:match('(%S*)%s(.*)')
-		worker.resolve(qname, kres.type[qtype], kres.class.IN, kres.query.NO_CACHE)
+		worker.resolve(qname, kres.type[qtype], kres.class.IN, 'NO_CACHE')
 		predict.queue[key] = nil
 		deleted = deleted + 1
 		if deleted >= predict.batch then
@@ -187,8 +187,8 @@ predict.layer = {
 		local qrys = req.rplan.resolved
 		for i = 0, (tonumber(qrys.len) - 1) do -- size_t doesn't work for some reason
 			local qry = qrys.at[i]
-			if bit.band(qry.flags, kres.query.EXPIRING) ~= 0 then
-				worker.resolve(kres.dname2str(qry.sname), qry.stype, qry.sclass, kres.query.NO_CACHE)
+			if qry.flags.EXPIRING == true then
+				worker.resolve(kres.dname2str(qry.sname), qry.stype, qry.sclass, 'NO_CACHE')
 			end
 		end
 	end

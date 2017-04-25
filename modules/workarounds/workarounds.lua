@@ -4,7 +4,7 @@ if not policy then modules.load('policy') end
 local M = {} -- the module
 
 function M.config()
-	policy.add(policy.suffix(policy.FLAGS(kres.query.NO_0X20), {
+	policy.add(policy.suffix(policy.FLAGS('NO_0X20'), {
 	--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0003.md
 		todname('avqs.mcafee.com'), todname('avts.mcafee.com'),
 
@@ -28,7 +28,7 @@ M.layer = {
 			or bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0
 			then return state -- quick exit in most cases
 		end
-		if qry:hasflag(kres.query.AWAIT_CUT) or qry.ns.name == nil
+		if qry.flags.AWAIT_CUT or qry.ns.name == nil
 			then return state end
 		local name = kres.dname2str(qry.ns.name)
 		if not name then return state end
@@ -36,14 +36,14 @@ M.layer = {
 		-- The problematic nameservers:
 		-- (1) rdnsN.turktelekom.com.tr.
 		if string.sub(name, 6) == '.turktelekom.com.tr.' then
-			qry.flags = bit.bor(qry.flags,
-							bit.bor(kres.query.NO_0X20, kres.query.NO_MINIMIZE))
+			qry.flags.NO_0X20 = true
+			qry.flags.NO_MINIMIZE = true
 			-- ^ NO_MINIMIZE isn't required for success, as kresd will retry
 			-- after getting refused, but it will speed things up.
 
 		-- (2)
 		elseif name == 'dns1.edatel.net.co.' then
-			qry.flags = bit.bor(qry.flags, kres.query.NO_0X20)
+			qry.flags.NO_0X20 = true
 		end
 
 		return state

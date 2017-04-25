@@ -472,7 +472,7 @@ Environment
    .. code-block:: lua
 
       -- Send query for root DNSKEY, ignore cache
-      resolve('.', kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE)
+      resolve('.', kres.type.DNSKEY, kres.class.IN, 'NO_CACHE')
 
       -- Query for AAAA record
       resolve('example.com', kres.type.AAAA, kres.class.IN, 0,
@@ -1149,7 +1149,7 @@ Example:
 
 	$ kresd-query.lua www.sub.nic.cz 'assert(kres.dname2str(req:resolved().zone_cut.name) == "nic.cz.")' && echo "yes"
 	yes
-	$ kresd-query.lua -C 'trust_anchors.config("root.keys")' nic.cz 'assert(req:resolved():hasflag(kres.query.DNSSEC_WANT))'
+	$ kresd-query.lua -C 'trust_anchors.config("root.keys")' nic.cz 'assert(req:resolved().flags.DNSSEC_WANT)'
 	$ echo $?
 	0
 

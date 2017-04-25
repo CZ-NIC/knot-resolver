@@ -77,7 +77,8 @@ local function stub(target)
 	return function(state, req)
 		local qry = req:current()
 		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
-		qry.flags = bit.band(bit.bor(qry.flags, kres.query.STUB), bit.bnot(kres.query.ALWAYS_CUT))
+		qry.flags.STUB = true
+		qry.flags.ALWAYS_CUT = false
 		qry:nslist(list)
 		return state
 	end
@@ -96,10 +97,12 @@ local function forward(target)
 	end
 	return function(state, req)
 		local qry = req:current()
-		req.options = bit.bor(bit.bor(req.options, kres.query.FORWARD), kres.query.NO_MINIMIZE)
-		qry.flags = bit.band(bit.bor(qry.flags, kres.query.FORWARD), bit.bnot(kres.query.ALWAYS_CUT))
-		qry.flags = bit.bor(qry.flags, kres.query.NO_MINIMIZE)
-		qry.flags = bit.bor(qry.flags, kres.query.AWAIT_CUT)
+		req.options.FORWARD = true
+		req.options.NO_MINIMIZE = true
+		qry.flags.FORWARD = true
+		qry.flags.ALWAYS_CUT = false
+		qry.flags.NO_MINIMIZE = true
+		qry.flags.AWAIT_CUT = true
 		qry:nslist(list)
 		return state
 	end
@@ -121,7 +124,8 @@ end
 local function flags(opts_set, opts_clear)
 	return function(state, req)
 		local qry = req:current()
-		qry.flags = bit.band(bit.bor(qry.flags, opts_set or 0), bit.bnot(opts_clear or 0))
+		ffi.C.kr_qflags_set  (qry.flags, kres.mk_qflags(opts_set   or {}))
+		ffi.C.kr_qflags_clear(qry.flags, kres.mk_qflags(opts_clear or {}))
 		return nil -- chain rule
 	end
 end
@@ -267,8 +271,8 @@ function policy.enforce(state, req, action)
 		end
 	elseif action == policy.QTRACE then
 		local qry = req:current()
-		req.options = bit.bor(req.options, kres.query.TRACE)
-		qry.flags = bit.bor(qry.flags, kres.query.TRACE)
+		req.options.TRACE = true
+		qry.flags.TRACE = true
 		return -- this allows to continue iterating over policy list
 	elseif type(action) == 'function' then
 		return action(state, req)
