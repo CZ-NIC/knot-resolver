@@ -55,7 +55,6 @@ local function mirror(target)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
 	return function(state, req)
 		if state == kres.FAIL then return state end
-		req = kres.request_t(req)
 		local query = req.qsource.packet
 		if query ~= nil then
 			sink:send(ffi.string(query.wire, query.size))
@@ -76,7 +75,6 @@ local function stub(target)
 		table.insert(list, addr2sock(target))
 	end
 	return function(state, req)
-		req = kres.request_t(req)
 		local qry = req:current()
 		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
 		qry.flags = bit.band(bit.bor(qry.flags, kres.query.STUB), bit.bnot(kres.query.ALWAYS_CUT))
@@ -97,7 +95,6 @@ local function forward(target)
 		table.insert(list, addr2sock(target))
 	end
 	return function(state, req)
-		req = kres.request_t(req)
 		local qry = req:current()
 		req.options = bit.bor(bit.bor(req.options, kres.query.FORWARD), kres.query.NO_MINIMIZE)
 		qry.flags = bit.band(bit.bor(qry.flags, kres.query.FORWARD), bit.bnot(kres.query.ALWAYS_CUT))
@@ -122,7 +119,6 @@ end
 -- Set and clear some query flags
 local function flags(opts_set, opts_clear)
 	return function(state, req)
-		req = kres.request_t(req)
 		local qry = req:current()
 		qry.flags = bit.band(bit.bor(qry.flags, opts_set or 0), bit.bnot(opts_clear or 0))
 		return nil -- chain rule
