@@ -1,3 +1,14 @@
+Knot Resolver 1.3.0 ? (2017-05-??)
+================================
+
+Security
+--------
+- Refactor handling of AD flag and security status of resource records.
+  In some cases it was possible for secure domains to get cached as
+  insecure, even for a TLD, leading to disabled validation.
+  It also fixes answering with non-authoritative data about nameservers.
+
+
 Knot Resolver 1.2.6 (2017-04-24)
 ================================
 
