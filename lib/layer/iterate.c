@@ -362,6 +362,18 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	int result = KR_STATE_CONSUME;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
+	if (qry->flags & QUERY_FORWARD) {
+		for (unsigned i = 0; i < ns->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(ns, i);
+			if (rr->type == KNOT_RRTYPE_SOA || rr->type == KNOT_RRTYPE_NS) {
+				if (knot_dname_in(rr->owner, knot_pkt_qname(pkt))) {
+					qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
+				}
+			}
+		}
+		return KR_STATE_CONSUME;
+	}
+
 #ifdef STRICT_MODE
 	/* AA, terminate resolution chain. */
 	if (knot_wire_get_aa(pkt->wire)) {
@@ -605,7 +617,8 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 
 	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
 	if (!is_authoritative(pkt, query)) {
-		if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+		if (!(query->flags & QUERY_FORWARD) &&
+		    pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
 			VERBOSE_MSG("<= lame response: non-auth sent negative response\n");
 			return KR_STATE_FAIL;
 		}
@@ -647,8 +660,15 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (!next) {
 			return KR_STATE_FAIL;
 		}
-		next->flags |= QUERY_AWAIT_CUT;
-
+		if (query->flags & QUERY_FORWARD) {
+			next->flags |= QUERY_FORWARD;
+			state = kr_nsrep_copy_set(&next->ns, &query->ns);
+			if (state != kr_ok()) {
+				return KR_STATE_FAIL;
+			}
+		} else {
+			next->flags |= QUERY_AWAIT_CUT;
+		}
 		/* Want DNSSEC if and only if it's posible to secure
 		 * this name (i.e. iff it is covered by a TA) */
 		if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {

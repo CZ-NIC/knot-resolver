@@ -142,3 +142,11 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
  */
 KR_EXPORT
 int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t *cache);
+/**
+ * Copy NSSET reputation information and resets score.
+ *
+ * @param  dst          updated NS representation
+ * @param  src          source NS representation
+ * @return              0 on success, error code on failure
+ */
+int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src);

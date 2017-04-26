@@ -384,6 +384,9 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 			qry->flags |= QUERY_DNSSEC_NODS;
 		}
 		return ret;
+	} else if (qry->flags & QUERY_FORWARD && qry->parent) {
+		struct kr_query *parent = qry->parent;
+		parent->zone_cut.name = knot_dname_copy(qry->sname, parent->zone_cut.pool);
 	}
 
 	/* Extend trust anchor */
@@ -453,6 +456,13 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 		kr_zonecut_copy_trust(&next->zone_cut, cut);
 	} else {
 		next->flags |= QUERY_AWAIT_CUT;
+	}
+	if (qry->flags & QUERY_FORWARD) {
+		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
+		if (state != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
+		next->flags &= ~QUERY_AWAIT_CUT;
 	}
 	next->flags |= QUERY_DNSSEC_WANT;
 	return KR_STATE_YIELD;
@@ -538,6 +548,104 @@ static bool check_empty_answer(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return ((an->count != 0) && (num_entries == 0)) ? false : true;
 }
 
+static void unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
+{
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+	const uint16_t qtype = knot_pkt_qtype(pkt);
+
+	if (qtype != KNOT_RRTYPE_DS) {
+		struct kr_rplan *rplan = &req->rplan;
+		struct kr_query *next = kr_rplan_push(rplan, qry, qry->sname, qry->sclass, KNOT_RRTYPE_DS);
+		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
+		if (state != kr_ok()) {
+			return;
+		}
+		kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
+		kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
+		next->flags |= QUERY_DNSSEC_WANT;
+		return;
+	}
+	return;
+
+
+	/* We are in forwarding mode and have got unsigned answer.
+	 * Check if answer is empty or not */
+	if ((qtype == KNOT_RRTYPE_DS) || (qtype == KNOT_RRTYPE_RRSIG)) {
+		/* We are already trying to detect zone security status.
+		 * Answer for DS \ RRSIG query can contains
+		 * CNAME instead of target qtype.
+		 * Ask for DS for parent zone in this case */
+		if ((knot_pkt_section(pkt, KNOT_ANSWER)->count != 0) &&
+		    !(qry->flags & QUERY_CNAME)) {
+			/* Answer isn't empty and doesn't contain CNAME.
+			 * Do nothing */
+			return;
+		}
+	} else if ((knot_pkt_section(pkt, KNOT_ANSWER)->count != 0) &&
+		    !(qry->flags & QUERY_CNAME)) {
+		/* Answer isn't empty. */
+		return;
+	}
+
+	/* AUTHORITY can contain SOA */
+	if (knot_pkt_section(pkt, KNOT_AUTHORITY)->count > 1) {
+		return;
+	}
+
+	const knot_dname_t *qname  = NULL;
+	bool has_soa  = false;
+	if (knot_pkt_section(pkt, KNOT_AUTHORITY)->count == 1) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		const knot_rrset_t *rr = knot_pkt_rr(sec, 0);
+		if (rr->type != KNOT_RRTYPE_SOA) {
+			return;
+		}
+		qname = rr->owner;
+		has_soa = true;
+	}
+
+	/* check_signer() is going to return KR_STATE_YIELD.
+	 * This will cause refetching DS for current zone name by check_trust_chain()
+	 * (i.e. - we do not receive RRSIG at all and
+	 * want to figure out with zone security status).
+	 * Here we set current zone name. When qtype is :
+	 * 1) RRSIG + SOA - use SOA owner
+	 * 2) RRSIG	  - use qname
+	 * 3) DS + SOA	  - next-label(SOA owner)
+	 * 4) DS	  - use next-label(qname) */
+	if (qtype != KNOT_RRTYPE_DS) {
+		/* We have got empty answer.
+		 * It is necessary to figure out with zone security status.
+		 * If there is SOA. use SOA owner since it is exact zone name.
+		 * If no, try the owner of packet qname. */
+		if (!has_soa) {
+			qname = knot_pkt_qname(pkt);
+		}
+	} else {
+		/* We already trying to figure out with security status.
+		 * In previous steps DS query was spawned.
+		 * Here we have got empty answer for DS query.
+		 * If there is SOA. use next-label (SOA owner),
+		 * otherwise use next-label (packet qname) */
+		if (has_soa) {
+			if (knot_dname_is_equal(qname, knot_pkt_qname(pkt)) && qname[0] != '\0') {
+				qname = knot_wire_next_label(qname, NULL);
+			}
+		} else {
+			qname = knot_pkt_qname(pkt);
+			if (qname[0] != '\0') {
+				qname = knot_wire_next_label(qname, NULL);
+			}
+		}
+	}
+	if (qname[0] != '\0') {
+		qry->zone_cut.name = knot_dname_copy(qname, &req->pool);
+	}
+
+	return;
+}
+
 static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
@@ -565,6 +673,9 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 				 * for both parent and child,
 				 * and child zone is not signed. */
 				qry->zone_cut.name = knot_dname_copy(qname, &req->pool);
+			} else if (qry->flags & QUERY_FORWARD) {
+				unsigned_forward(ctx, pkt);
+				return KR_STATE_YIELD;
 			}
 		} else if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
 			/* Key signer is below current cut, advance and refetch keys. */
@@ -580,8 +691,11 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
 		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
-		VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
-		return KR_STATE_YIELD;
+		if (qry->stype != KNOT_RRTYPE_DS) {
+			/* zone cut matches, but DS/DNSKEY doesn't => refetch. */
+			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
+			return KR_STATE_YIELD;
+		}
 	}
 	return KR_STATE_DONE;
 }
@@ -803,7 +917,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		qtype = KNOT_RRTYPE_DS;
 	}
 	/* Update parent query zone cut */
-	if (qry->parent) {
+	if (qry->parent && pkt_rcode != KNOT_RCODE_NXDOMAIN) {
 		if (update_parent_keys(qry, qtype) != 0) {
 			return KR_STATE_FAIL;
 		}

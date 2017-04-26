@@ -57,6 +57,7 @@
 	X(DNSSEC_OPTOUT,   1 << 28) /**< Closest encloser proof has optout */ \
 	X(NONAUTH,         1 << 29) /**< Non-authoritative in-bailiwick records are enough.
 				     *   TODO: utilize this also outside cache. */ \
+	X(FORWARD,	   1 << 30) /**< Forward all queries to upstream; validate answers */ \
 			/* 1 << 31       Used by ../modules/dns64/dns64.lua */
 
 /** Query flags */
