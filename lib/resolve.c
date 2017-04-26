@@ -929,8 +929,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	map_t *negative_anchors = &request->ctx->negative_anchors;
 
 	assert(qry->flags & QUERY_FORWARD);
-	printf("QUERY_RESOLVED? %i\n", (qry->flags & QUERY_RESOLVED));
-	printf("QUERY_NO_MINIMIZE? %i\n", (qry->flags & QUERY_NO_MINIMIZE));
 
 	if (qry->flags & QUERY_DNSSEC_INSECURE) {
 		return KR_STATE_PRODUCE;
@@ -949,8 +947,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		nods = (wanted_name == qry->sname);
 	}
 
-	kr_dname_print(qry->zone_cut.name, "zone_cut : ", "\n");
-	kr_dname_print(wanted_name, "wanted_name : ", "\n");
 	for (int i = 0; i < request->rplan.resolved.len; ++i) {
 		struct kr_query *q = request->rplan.resolved.at[i];
 		if (q->parent == qry &&
@@ -1020,8 +1016,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
 	const bool is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
 	const bool refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
-	printf("has_ta %i\n", has_ta);
-	printf("want_secured %i refetch_key %i is_dnskey_subreq %i\n", want_secured, refetch_key, is_dnskey_subreq);
 	if (want_secured && refetch_key && !is_dnskey_subreq) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
