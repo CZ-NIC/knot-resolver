@@ -75,14 +75,15 @@ static int loot_pktcache(struct kr_context *ctx, knot_pkt_t *pkt,
 	}
 
 	uint8_t lowest_rank = KR_RANK_INITIAL | KR_RANK_AUTH;
-
-	/* Records not present under any TA don't have their security verified at all. */
-	const bool ta_covers = kr_ta_covers_qry(ctx, qry->sname, qry->stype);
-	/* ^ TODO: performance? */
-
 	/* There's probably little sense for NONAUTH in pktcache. */
-	if (!knot_wire_get_cd(req->answer->wire) && ta_covers) {
-		kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
+
+	if (!knot_wire_get_cd(req->answer->wire) && !(qry->flags & QUERY_STUB)) {
+		/* Records not present under any TA don't have their security verified at all. */
+		bool ta_covers = kr_ta_covers_qry(ctx, qry->sname, qry->stype);
+		/* ^ TODO: performance? */
+		if (ta_covers) {
+			kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
+		}
 	}
 	const bool rank_enough = entry->rank >= lowest_rank;
 	VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o -> satisfied=%d\n",
@@ -144,9 +145,12 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	    (qry->flags & QUERY_NO_CACHE)) {
 		return ctx->state; /* Already resolved/failed */
 	}
-	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
-		return ctx->state; /* Only lookup before asking a query */
-	}
+	/* Both caches only peek for qry->sname and that would be useless
+	 * to repeat on every iteration, so disable it from now on.
+	 * Note: it's important to skip this if rrcache sets KR_STATE_DONE,
+	 * as CNAME chains need more iterations to get fetched. */
+	qry->flags |= QUERY_NO_CACHE;
+
 	if (knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		return ctx->state; /* Only IN class */
 	}
@@ -246,8 +250,9 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		.count = data.len
 	};
 
-	/* If cd bit is set, make rank bad, otherwise it depends on flags. */
-	if (knot_wire_get_cd(req->answer->wire)) {
+	/* If cd bit is set or we got answer via non-validated forwarding,
+	 * make the rank bad; otherwise it depends on flags. */
+	if (knot_wire_get_cd(req->answer->wire) || qry->flags & QUERY_STUB) {
 		kr_rank_set(&header.rank, KR_RANK_OMIT);
 	} else {
 		if (qry->flags & QUERY_DNSSEC_BOGUS) {

@@ -8,6 +8,10 @@ Security
   insecure, even for a TLD, leading to disabled validation.
   It also fixes answering with non-authoritative data about nameservers.
 
+Improvements
+------------
+- allow answering from cache in non-iterative modes (#122)
+
 
 Knot Resolver 1.2.6 (2017-04-24)
 ================================
