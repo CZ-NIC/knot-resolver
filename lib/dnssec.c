@@ -205,7 +205,6 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				}
 			}
 			if (kr_check_signature(rrsig, j, (dnssec_key_t *) key, covered, trim_labels) != 0) {
-				kr_dnssec_key_free(&created_key);
 				continue;
 			}
 			if (val_flgs & FLG_WILDCARD_EXPANSION) {
