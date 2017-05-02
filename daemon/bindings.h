@@ -34,6 +34,9 @@
 	lua_objlen((L), (obj))
 #define register_lib(L, name, lib) \
 	luaL_openlib((L), (name), (lib), 0)
+#endif
+
+#if !LUA_HAS_SETFUNCS
 /* Adapted from Lua 5.2.0 */
 static inline void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
   luaL_checkstack(L, nup+1, "too many upvalues");

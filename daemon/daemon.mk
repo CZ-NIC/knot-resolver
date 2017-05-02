@@ -25,9 +25,13 @@ endif
 bindings-install: $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 	$(INSTALL) -m 0644 $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 
+LUA_HAS_SETFUNCS := \
+	$(shell pkg-config luajit --atleast-version=2.1.0-beta3 && echo 1 || echo 0)
+
 kresd_CFLAGS := -fPIE \
 		-Dlibknot_SONAME=\"$(libknot_SONAME)\" \
-		-Dlibzscanner_SONAME=\"$(libzscanner_SONAME)\"
+		-Dlibzscanner_SONAME=\"$(libzscanner_SONAME)\" \
+		-DLUA_HAS_SETFUNCS="$(LUA_HAS_SETFUNCS)"
 kresd_DEPEND := $(libkres) $(contrib)
 kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) \
               $(libzscanner_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS) \
