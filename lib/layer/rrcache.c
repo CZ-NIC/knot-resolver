@@ -77,6 +77,9 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 
 	WITH_VERBOSE {
 		VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o, ", *rank, lowest_rank);
+		if (fetch_rrsig) {
+			kr_log_verbose("RRSIG for ");
+		}
 		kr_rrtype_print(rrtype, "", " ");
 		kr_dname_print(name, "", "\n");
 	}
