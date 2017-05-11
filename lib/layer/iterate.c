@@ -821,6 +821,33 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	return kr_ok();
 }
 
+int kr_make_query2(struct kr_query *query, knot_pkt_t *pkt, uint16_t qtype_minimized)
+{
+	/* Minimize QNAME (if possible). */
+	uint16_t qtype = qtype_minimized;
+	const knot_dname_t *qname = minimized_qname(query, &qtype);
+
+	/* Form a query for the authoritative. */
+	knot_pkt_clear(pkt);
+	int ret = knot_pkt_put_question(pkt, qname, query->sclass, qtype);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	/* Query built, expect answer. */
+	query->id = kr_rand_uint(UINT16_MAX);
+	knot_wire_set_id(pkt->wire, query->id);
+	pkt->parsed = pkt->size;
+	WITH_VERBOSE {
+		char name_str[KNOT_DNAME_MAXLEN], type_str[16];
+		knot_dname_to_str(name_str, query->sname, sizeof(name_str));
+		knot_rrtype_to_string(query->stype, type_str, sizeof(type_str));
+		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %hu\n",
+			    name_str, type_str, query->parent ? query->parent->id : 0);
+	}
+	return kr_ok();
+}
+
 static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	assert(pkt && ctx);
