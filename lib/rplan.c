@@ -226,4 +226,20 @@ struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan)
 	return array_tail(rplan->resolved);
 }
 
+struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query *parent,
+                               const knot_dname_t *name, uint16_t cls, uint16_t type)
+{
+	struct kr_query *ret = NULL;
+	for (int i = 0; i < rplan->resolved.len; ++i) {
+		struct kr_query *q = rplan->resolved.at[i];
+		if (q->stype == type && q->sclass == cls &&
+		    (parent == NULL || q->parent == parent) &&
+		    knot_dname_is_equal(q->sname, name)) {
+			ret = q;
+			break;
+		}
+	}
+	return ret;
+}
+
 #undef VERBOSE_MSG

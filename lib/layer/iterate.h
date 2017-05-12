@@ -33,7 +33,3 @@ int kr_response_classify(knot_pkt_t *pkt);
 
 /** Make next iterative query. */
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt);
-
-/** Make next iterative query. If qname is minimized,
- *  qtype is set to qtype_minimized */
-int kr_make_query2(struct kr_query *query, knot_pkt_t *pkt, uint16_t qtype_minimized);

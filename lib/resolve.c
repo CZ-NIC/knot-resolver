@@ -922,7 +922,7 @@ static struct kr_query *zone_cut_subreq(struct kr_rplan *rplan, struct kr_query 
 	return next;
 }
 
-static int forward_trust_chain_check(struct kr_request *request, struct kr_query *qry, bool resume, knot_pkt_t *packet)
+static int forward_trust_chain_check(struct kr_request *request, struct kr_query *qry, bool resume)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	map_t *trust_anchors = &request->ctx->trust_anchors;
@@ -934,36 +934,28 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
-//	if (qry->parent != NULL) {
-//		return KR_STATE_PRODUCE;
-//	}
-
 	bool nods = false;
 	bool ds_req = false;
 	bool ns_req = false;
 	bool minimized = false;
-//	const knot_dname_t* wanted_name = qry->zone_cut.name;
 	const knot_dname_t* wanted_name = NULL;
 	int name_offset = 1;
-	while (1) {
-	wanted_name = qry->sname;
-	nods = false;
-	ds_req = false;
-	ns_req = false;
-	minimized = false;
-	kr_dname_print(qry->zone_cut.name, "cut_name: ", " ");
-	kr_dname_print(qry->sname, "sname: ", " ");
-	kr_rrtype_print(qry->stype, "type: ", "\n");
-	if (qry->parent == NULL /* && !resume */) {
-//		wanted_name = qry->sname;
-		int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
-		int wanted_name_labels = knot_dname_labels(wanted_name, NULL);
-		while(wanted_name[0] && wanted_name_labels > cut_labels + name_offset) {
-			wanted_name = knot_wire_next_label(wanted_name, NULL);
-			wanted_name_labels -= 1;
+	do {
+		wanted_name = qry->sname;
+		nods = false;
+		ds_req = false;
+		ns_req = false;
+		minimized = false;
+
+		if (qry->parent == NULL) {
+			int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
+			int wanted_name_labels = knot_dname_labels(wanted_name, NULL);
+			while (wanted_name[0] && wanted_name_labels > cut_labels + name_offset) {
+				wanted_name = knot_wire_next_label(wanted_name, NULL);
+				wanted_name_labels -= 1;
+			}
+			minimized = (wanted_name != qry->sname);
 		}
-		minimized = (wanted_name != qry->sname);
-	}
 
 		for (int i = 0; i < request->rplan.resolved.len; ++i) {
 			struct kr_query *q = request->rplan.resolved.at[i];
@@ -982,11 +974,10 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			}
 		}
 
-	if (qry->parent == NULL /* && !resume */) {
-		printf("initial request ds_req %i ns_req %i\n", ds_req, ns_req);
-
-		if (ds_req && !ns_req && minimized) {
-			struct kr_query *next = kr_rplan_push(rplan, qry, wanted_name, qry->sclass, KNOT_RRTYPE_NS);
+		if (qry->parent == NULL &&
+		    ds_req && !ns_req && minimized) {
+			struct kr_query *next = kr_rplan_push(rplan, qry, wanted_name,
+							      qry->sclass, KNOT_RRTYPE_NS);
 			if (!next) {
 				return KR_STATE_FAIL;
 			}
@@ -999,31 +990,19 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			next->flags |= QUERY_DNSSEC_WANT;
 			return KR_STATE_DONE;
 		}
-	}
-	kr_dname_print(wanted_name, "wanted_name: ", " ");
-	printf("resume? %i\n", resume);
 
-	if ((qry->stype == KNOT_RRTYPE_DS) &&
-            knot_dname_is_equal(wanted_name, qry->sname)) {
-		printf("if1\n");
-		nods = true;
-	} else if (resume && !ds_req) {
-		printf("if2\n");
-		nods = false;
-	} else if (!minimized) {
-		printf("if3\n");
-		nods = true;
-	} else {
-		printf("if4\n");
-		nods = ds_req;
-	}
-		if (ds_req && ns_req) {
-			name_offset += 1;
+		if ((qry->stype == KNOT_RRTYPE_DS) &&
+	            knot_dname_is_equal(wanted_name, qry->sname)) {
+			nods = true;
+		} else if (resume && !ds_req) {
+			nods = false;
+		} else if (!minimized) {
+			nods = true;
 		} else {
-			break;
+			nods = ds_req;
 		}
-	}
-	printf("ds_req %i ns_req %i nods? %i\n",  ds_req, ns_req, nods);
+		name_offset += 1;
+	} while (ds_req && ns_req);
 
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, wanted_name)){
@@ -1181,7 +1160,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	 * Since forwarding targets already are in qry->ns -
 	 * cut fetching is not needed. */
 	if (qry->flags & QUERY_FORWARD) {
-		return forward_trust_chain_check(request, qry, false, packet);
+		return forward_trust_chain_check(request, qry, false);
 	}
 	if (!(qry->flags & QUERY_AWAIT_CUT)) {
 		/* The query was resolved from cache.
@@ -1252,7 +1231,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	if (qry->deferred != NULL) {
 		/* @todo: Refactoring validator, check trust chain before resuming. */
 		int state = (qry->flags & QUERY_FORWARD) ?
-			    forward_trust_chain_check(request, qry, true, packet) :
+			    forward_trust_chain_check(request, qry, true) :
 			    trust_chain_check(request, qry);
 		switch(state) {
 		case KR_STATE_FAIL: return KR_STATE_FAIL;

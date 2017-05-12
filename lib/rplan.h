@@ -179,3 +179,19 @@ bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint
 KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 
+/** Return query predecessor. */
+KR_EXPORT KR_PURE
+struct kr_query *kr_rplan_next(struct kr_query *qry);
+
+/**
+ * Check if a given query already resolved.
+ * @param rplan plan instance
+ * @param parent query parent (or NULL)
+ * @param name resolved name
+ * @param cls  resolved class
+ * @param type resolved type
+ * @return query instance or NULL
+ */
+KR_EXPORT KR_PURE
+struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query *parent,
+                               const knot_dname_t *name, uint16_t cls, uint16_t type);

@@ -556,56 +556,25 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 	const uint16_t qtype = knot_pkt_qtype(pkt);
 
-	printf("unsigned forward\n");
-
-/*
-	if (qtype != KNOT_RRTYPE_DS) {
-		struct kr_rplan *rplan = &req->rplan;
-		struct kr_query *next = kr_rplan_push(rplan, qry, qry->sname, qry->sclass, KNOT_RRTYPE_DS);
-		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-		if (state != kr_ok()) {
-			return;
+	bool nods = false;
+	for (int i = 0; i < req->rplan.resolved.len; ++i) {
+		struct kr_query *q = req->rplan.resolved.at[i];
+		if (q->sclass == qry->sclass &&
+		    q->stype == KNOT_RRTYPE_DS &&
+		    knot_dname_is_equal(q->sname, qry->sname)) {
+			nods = true;
 		}
-		kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
-		kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
-		next->flags |= QUERY_DNSSEC_WANT;
-		return;
 	}
-	return;
-*/
-//	if (qtype == KNOT_RRTYPE_NS) {
-		printf("KNOT_RRTYPE_NS\n");
-		bool nods = false;
-		bool ds_req = false;
-		for (int i = 0; i < req->rplan.resolved.len; ++i) {
-			struct kr_query *q = req->rplan.resolved.at[i];
-			kr_dname_print(q->sname, "q: ", " ");
-			kr_dname_print(qry->sname, "qry: ", " ");
-			kr_rrtype_print(q->stype, "type: ", "\n");
-			if (/* q->parent == qry && */
-			    q->sclass == qry->sclass &&
-			    q->stype == KNOT_RRTYPE_DS &&
-			    knot_dname_is_equal(q->sname, qry->sname)) {
-				ds_req = true;
-				printf("DSREQ\n");
-				if (q->flags & QUERY_DNSSEC_NODS) {
-					printf("NODS\n");
-					nods = true;
-				}
-			}
-		}
 
-		if (nods) {
-			printf("NODS return\n");
-			qry->flags &= ~QUERY_DNSSEC_WANT;
-			qry->flags |= QUERY_DNSSEC_INSECURE;
-			if (qry->parent) {
-				qry->parent->flags &= ~QUERY_DNSSEC_WANT;
-				qry->parent->flags |= QUERY_DNSSEC_INSECURE;
-			}
-			return KR_STATE_DONE;
+	if (nods) {
+		qry->flags &= ~QUERY_DNSSEC_WANT;
+		qry->flags |= QUERY_DNSSEC_INSECURE;
+		if (qry->parent) {
+			qry->parent->flags &= ~QUERY_DNSSEC_WANT;
+			qry->parent->flags |= QUERY_DNSSEC_INSECURE;
 		}
-//	}
+		return KR_STATE_DONE;
+	}
 
 	if (qtype != KNOT_RRTYPE_DS) {
 		struct kr_rplan *rplan = &req->rplan;
@@ -618,6 +587,7 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 		kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
 		next->flags |= QUERY_DNSSEC_WANT;
 	}
+
 	return KR_STATE_YIELD;
 }
 
@@ -639,7 +609,6 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 				 * It means that trust chain is OK and
 				 * transition to INSECURE hasn't occured.
 				 * Let the validation logic ask about RRSIG. */
-				printf("already yielded\n");
 				return KR_STATE_DONE;
 			}
 			/* Ask parent for DS
@@ -654,25 +623,19 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 				qry->zone_cut.name = knot_dname_copy(qname, &req->pool);
 			}
 		} else if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
-			/* Key signer is below current cut, advance and refetch keys. */
 			if (!(qry->flags & QUERY_FORWARD)) {
+				/* Key signer is below current cut, advance and refetch keys. */
 				qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
 			} else {
-				for (int i = 0; i < req->rplan.resolved.len; ++i) {
-					struct kr_query *q = req->rplan.resolved.at[i];
-					if (/* q->parent == qry && */
-					    q->sclass == qry->sclass &&
-					    q->stype == KNOT_RRTYPE_DS &&
-					    knot_dname_is_equal(q->sname, signer)) {
-						printf("DSREQQQQ\n");
-						if (q->flags & QUERY_DNSSEC_NODS) {
-							qry->flags &= ~QUERY_DNSSEC_WANT;
-							qry->flags |= QUERY_DNSSEC_INSECURE;
-							if (qry->parent) {
-								qry->parent->flags &= ~QUERY_DNSSEC_WANT;
-								qry->parent->flags |= QUERY_DNSSEC_INSECURE;
-							}
-						}
+				/* Check if DS does not exist. */
+				struct kr_query *q = kr_rplan_find_resolved(&req->rplan, NULL,
+									    signer, qry->sclass, KNOT_RRTYPE_DS);
+				if (q && q->flags & QUERY_DNSSEC_NODS) {
+					qry->flags &= ~QUERY_DNSSEC_WANT;
+					qry->flags |= QUERY_DNSSEC_INSECURE;
+					if (qry->parent) {
+						qry->parent->flags &= ~QUERY_DNSSEC_WANT;
+						qry->parent->flags |= QUERY_DNSSEC_INSECURE;
 					}
 				}
 			}
@@ -689,7 +652,6 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
 		if (qry->stype != KNOT_RRTYPE_DS) {
 			/* zone cut matches, but DS/DNSKEY doesn't => refetch. */
-			printf("sheck_signer\n");
 			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
 			return KR_STATE_YIELD;
 		}
@@ -802,7 +764,6 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
 		ret = validate_keyset(req, pkt, has_nsec3);
 		if (ret == kr_error(EAGAIN)) {
-			printf("validate\n");
 			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
 			return KR_STATE_YIELD;
 		} else if (ret != 0) {
@@ -925,7 +886,12 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
+
 	if (qry->flags & QUERY_FORWARD) {
+		if (qry->parent &&
+		    qtype == KNOT_RRTYPE_NS) {
+			printf("NS NODATA\n");
+		}
 		if (qry->parent &&
 		    qtype == KNOT_RRTYPE_NS &&
 		    !no_data &&
