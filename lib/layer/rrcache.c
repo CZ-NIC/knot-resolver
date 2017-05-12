@@ -77,6 +77,9 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 
 	WITH_VERBOSE {
 		VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o, ", *rank, lowest_rank);
+		if (fetch_rrsig) {
+			kr_log_verbose("RRSIG for ");
+		}
 		kr_rrtype_print(rrtype, "", " ");
 		kr_dname_print(name, "", "\n");
 	}
@@ -145,35 +148,43 @@ enomem:
 }
 
 /** @internal Try to find a shortcut directly to searched record. */
-static int loot_rrcache(struct kr_context *ctx, knot_pkt_t *pkt,
-			struct kr_query *qry, uint16_t rrtype, const bool cdbit)
+static int loot_rrcache(struct kr_request *req, knot_pkt_t *pkt,
+			struct kr_query *qry, uint16_t rrtype)
 {
-	/* Records not present under any TA don't have their security verified at all. */
-	const bool ta_covers = kr_ta_covers_qry(ctx, qry->sname, qry->stype);
-	/* ^ TODO: performance? */
-
+	const bool allow_unverified = knot_wire_get_cd(req->answer->wire)
+					|| qry->flags & QUERY_STUB;
 	/* Lookup direct match first; only consider authoritative records.
 	 * TODO: move rank handling into the iterator (QUERY_DNSSEC_* flags)? */
 	uint8_t rank  = 0;
 	uint8_t flags = 0;
-	uint8_t lowest_rank = (ta_covers ? KR_RANK_INSECURE : KR_RANK_INITIAL)
-		| KR_RANK_AUTH;
+	uint8_t lowest_rank = KR_RANK_INITIAL | KR_RANK_AUTH;
 	if (qry->flags & QUERY_NONAUTH) {
 		lowest_rank = KR_RANK_INITIAL;
 		/* Note: there's little sense in validation status for non-auth records.
 		 * In case of using NONAUTH to get NS IPs, knowing that you ask correct
 		 * IP doesn't matter much for security; it matters whether you can
-		 * validate the answers from the NS. */
-	}
-	if (cdbit) {
-		kr_rank_set(&lowest_rank, KR_RANK_INITIAL);
+		 * validate the answers from the NS.
+		 */
+	} else if (!allow_unverified) {
+				/* ^^ in stub mode we don't trust RRs anyway */
+		/* Records not present under any TA don't have their security
+		 * verified at all, so we also accept low ranks in that case. */
+		const bool ta_covers = kr_ta_covers_qry(req->ctx, qry->sname, rrtype);
+		/* ^ TODO: performance? */
+		if (ta_covers) {
+			kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
+		}
 	}
 
-	struct kr_cache *cache = &ctx->cache;
+	struct kr_cache *cache = &req->ctx->cache;
 	int ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			  &rank, &flags, 0, lowest_rank);
-	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME) {
-		/* Chase CNAME if no direct hit */
+	if (ret != 0 && rrtype != KNOT_RRTYPE_CNAME
+	    && !(qry->flags & QUERY_STUB)) {
+		/* Chase CNAME if no direct hit.
+		 * We avoid this in STUB mode because the current iterator
+		 * (process_stub()) is unable to iterate in STUB mode to follow
+		 * the CNAME chain. */
 		rrtype = KNOT_RRTYPE_CNAME;
 		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			      &rank, &flags, 0, lowest_rank);
@@ -188,13 +199,19 @@ static int loot_rrcache(struct kr_context *ctx, knot_pkt_t *pkt,
 	}
 
 	/* Record may have RRSIGs, try to find them. */
-	const bool dobit = (qry->flags & QUERY_DNSSEC_WANT);
-	if (cdbit || (dobit && kr_rank_test(rank, KR_RANK_SECURE))) {
+	if (allow_unverified
+	    || ((qry->flags & QUERY_DNSSEC_WANT) && kr_rank_test(rank, KR_RANK_SECURE))) {
 		kr_rank_set(&lowest_rank, KR_RANK_INITIAL); /* no security for RRSIGs */
 		ret = loot_rr(cache, pkt, qry->sname, qry->sclass, rrtype, qry,
 			      &rank, &flags, true, lowest_rank);
+		if (allow_unverified) {
+			/* TODO: in STUB mode, if we cached from a query without
+			 * DO bit, we will return without RRSIGs even if they
+			 * would be contained in upstream answer with DO. */
+			ret = 0;
+		}
 		if (ret) {
-			VERBOSE_MSG(qry, "=> RRSIG(s) expected but not found, skipping");
+			VERBOSE_MSG(qry, "=> RRSIG(s) expected but not found, skipping\n");
 			/* In some cases, e.g. due to bugs, this may fail.
 			 * A possible good example is that a cache backend
 			 * (such as redis) chose to evict RRSIG but not RRset.
@@ -217,25 +234,21 @@ static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || (qry->flags & QUERY_NO_CACHE)) {
-		return ctx->state; /* Already resolved/failed */
+		return ctx->state; /* Already resolved/failed or already tried, etc. */
 	}
-	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
-		return ctx->state; /* Only lookup before asking a query */
-	}
-	const bool cd_is_set = knot_wire_get_cd(req->answer->wire);
 	/* Reconstruct the answer from the cache,
 	 * it may either be a CNAME chain or direct answer.
 	 * Only one step of the chain is resolved at a time.
 	 */
 	int ret = -1;
 	if (qry->stype != KNOT_RRTYPE_ANY) {
-		ret = loot_rrcache(req->ctx, pkt, qry, qry->stype, cd_is_set);
+		ret = loot_rrcache(req, pkt, qry, qry->stype);
 	} else {
 		/* ANY query are used by either qmail or certain versions of Firefox.
 		 * Probe cache for a few interesting records. */
 		static uint16_t any_types[] = { KNOT_RRTYPE_A, KNOT_RRTYPE_AAAA, KNOT_RRTYPE_MX };
 		for (size_t i = 0; i < sizeof(any_types)/sizeof(any_types[0]); ++i) {
-			if (loot_rrcache(req->ctx, pkt, qry, any_types[i], cd_is_set) == 0) {
+			if (loot_rrcache(req, pkt, qry, any_types[i]) == 0) {
 				ret = 0; /* At least single record matches */
 			}
 		}
