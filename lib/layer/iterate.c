@@ -661,7 +661,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 		if (query->flags & QUERY_FORWARD) {
-			next->flags |= QUERY_FORWARD;
+			next->flags |= (QUERY_FORWARD | QUERY_AWAIT_CUT);
 			state = kr_nsrep_copy_set(&next->ns, &query->ns);
 			if (state != kr_ok()) {
 				return KR_STATE_FAIL;

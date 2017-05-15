@@ -930,18 +930,34 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 
 	assert(qry->flags & QUERY_FORWARD);
 
-	if (qry->flags & QUERY_DNSSEC_INSECURE) {
+	if (!trust_anchors) {
+		qry->flags &= ~QUERY_AWAIT_CUT;
 		return KR_STATE_PRODUCE;
+	}
+
+	if (qry->flags & QUERY_DNSSEC_INSECURE) {
+		qry->flags &= ~QUERY_AWAIT_CUT;
+		return KR_STATE_PRODUCE;
+	}
+
+	const knot_dname_t *wanted_name = NULL;
+	const knot_dname_t *start_name = qry->sname;
+	if (qry->flags & QUERY_AWAIT_CUT) {
+		const knot_dname_t *longest_ta = kr_ta_get_longest_name(trust_anchors, qry->sname);
+		if (longest_ta) {
+			start_name = longest_ta;
+			qry->zone_cut.name = knot_dname_copy(start_name, qry->zone_cut.pool);
+		}
+		qry->flags &= ~QUERY_AWAIT_CUT;
 	}
 
 	bool nods = false;
 	bool ds_req = false;
 	bool ns_req = false;
 	bool minimized = false;
-	const knot_dname_t* wanted_name = NULL;
 	int name_offset = 1;
 	do {
-		wanted_name = qry->sname;
+		wanted_name = start_name;
 		nods = false;
 		ds_req = false;
 		ns_req = false;
@@ -1031,7 +1047,9 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			char name[] = "\0";
 			ta_rr = kr_ta_get(trust_anchors, (knot_dname_t*)name);
 		}
-		qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
+		if (ta_rr) {
+			qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
+		}
 	}
 
 	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);

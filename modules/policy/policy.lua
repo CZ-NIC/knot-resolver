@@ -99,6 +99,7 @@ local function forward(target)
 		req.options = bit.bor(bit.bor(req.options, kres.query.FORWARD), kres.query.NO_MINIMIZE)
 		qry.flags = bit.band(bit.bor(qry.flags, kres.query.FORWARD), bit.bnot(kres.query.ALWAYS_CUT))
 		qry.flags = bit.bor(qry.flags, kres.query.NO_MINIMIZE)
+		qry.flags = bit.bor(qry.flags, kres.query.AWAIT_CUT)
 		qry:nslist(list)
 		return state
 	end
