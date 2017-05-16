@@ -889,10 +889,6 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	if (qry->flags & QUERY_FORWARD) {
 		if (qry->parent &&
-		    qtype == KNOT_RRTYPE_NS) {
-			printf("NS NODATA\n");
-		}
-		if (qry->parent &&
 		    qtype == KNOT_RRTYPE_NS &&
 		    !no_data &&
 		    pkt_rcode == KNOT_RCODE_NOERROR) {
