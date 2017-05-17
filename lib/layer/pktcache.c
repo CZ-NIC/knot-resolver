@@ -16,7 +16,8 @@
 
 /** @file pktcache.c
  *
- * This builtin module caches whole packets from/for negative answers.
+ * This builtin module caches whole packets from/for negative answers
+ * or answers where wildcard expansion has occured (QUERY_DNSSEC_WEXPAND).
  *
  * Note: it also persists some QUERY_DNSSEC_* flags.
  * The ranks are stored in *(uint8_t *)rrset->additional (all are the same for one packet).

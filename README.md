@@ -6,12 +6,12 @@
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
 
-The Knot DNS Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
-a state-machine like API for extensions. There are three of those built-in - *iterator*, *cache*, *validator*, and most of the [rich features](https://knot-resolver.readthedocs.io/en/latest/modules.html) are written in LuaJIT, Go and C. Batteries are included, but optional. 
+Knot DNS Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
+a state-machine like API for extensions. There are four of those built-in - *iterator*, *validator* and two caching modules. Most of the [rich features](https://knot-resolver.readthedocs.io/en/latest/modules.html) are written in Lua(JIT) and C. Batteries are included, but optional.
 
-The LuaJIT modules, support for DNS privacy and DNSSEC, and persistent cache with low memory footprint make it a great personal DNS resolver or a research tool to tap into DNS data. TL;DR it's the [OpenResty][openresty] of DNS.
+The LuaJIT modules, support DNS privacy and DNSSEC, and persistent cache with low memory footprint make it a great personal DNS resolver or a research tool to tap into DNS data. TL;DR it's the [OpenResty][openresty] of DNS.
 
-Several cache backends (LMDB, Redis and Memcached), strong filtering rules, and auto-configuration with etcd make it a great large-scale resolver solution. 
+Several cache backends (LMDB, Redis and Memcached), strong filtering rules, and auto-configuration with etcd make it a great large-scale resolver solution.
 
 The server adopts a [different scaling strategy][scaling] than the rest of the DNS recursors - no threading, shared-nothing architecture (except MVCC cache that may be shared) that allows you to pin instances on available CPU cores and grow by self-replication. You can start and stop additional nodes depending on the contention without downtime.
 
@@ -19,12 +19,20 @@ It also has strong support for DNS over TCP, notably TCP Fast-Open, query pipeli
 
 ### Packages
 
-Knot Resolver is packaged for Debian, Fedora, Ubuntu and [openSUSE](https://build.opensuse.org/package/show/server:dns/knot-resolver).
-See [project page](https://www.knot-resolver.cz/pages/try.html) for more information.
+Knot Resolver is packaged for
+[Debian](https://packages.debian.org/sid/knot-resolver),
+[Fedora](https://apps.fedoraproject.org/packages/knot-resolver/),
+[Ubuntu](https://packages.ubuntu.com/zesty/knot-resolver),
+[Homebrew](https://github.com/Homebrew/homebrew-core/blob/master/Formula/knot-resolver.rb) and
+[NixOS/Nixpkgs](https://hydra.nixos.org/search?query=knot-resolver).
+You can also find it as the default DNS resolver in our open-source router [Turris Omnia](https://omnia.turris.cz).
+See the [Knot-resolver homepage](https://www.knot-resolver.cz/pages/try.html) for more information.
+
+<!-- [openSUSE](https://build.opensuse.org/package/show/server:dns/knot-resolver), (it seems to be in a bad shape) -->
 
 ### Building from sources
 
-The Knot DNS Resolver [depends][depends] on the 2.1 version of the Knot DNS library, [LuaJIT][luajit] and [libuv][libuv].
+Knot DNS Resolver mainly [depends][depends] on Knot DNS libraries, [LuaJIT][luajit] and [libuv][libuv].
 See the [Building project][depends] documentation page for more information.
 
 ### Docker image
@@ -51,8 +59,8 @@ See the documentation at [knot-resolver.readthedocs.io][doc] for more options.
 [doc]: https://knot-resolver.readthedocs.io/en/latest/index.html
 [scaling]: https://knot-resolver.readthedocs.io/en/latest/daemon.html#scaling-out
 [deckard]: https://gitlab.labs.nic.cz/knot/deckard
-[luajit]: http://luajit.org/
-[libuv]: https://github.com/libuv/libuv
+[luajit]: https://luajit.org/
+[libuv]: http://libuv.org
 [openresty]: https://openresty.org/
 
 ### Contacting us

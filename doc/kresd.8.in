@@ -83,7 +83,7 @@ online documentation.
 # Create a basic forwarder configuration 
 $ cat << EOF > config
 modules = { 'policy' }
-policy:add(policy.all(policy.FORWARD('192.168.1.1')))
+policy.add(policy.all(policy.FORWARD('192.168.1.1')))
 $ kresd -a 127.0.0.1 -k root.keys
 EOF
 .RE

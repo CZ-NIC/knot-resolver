@@ -178,6 +178,3 @@ bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint
 KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 
-/** Return query predecessor. */
-KR_EXPORT KR_PURE
-struct kr_query *kr_rplan_next(struct kr_query *qry);
