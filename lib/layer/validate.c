@@ -590,7 +590,7 @@ static void rank_records(kr_layer_t *ctx, uint8_t rank_to_set)
 	struct kr_request *req	   = ctx->req;
 	struct kr_query *qry	   = req->current_query;
 	ranked_rr_array_t *ptrs[2] = { &req->answ_selected, &req->auth_selected };
-	for (size_t i = 0; i < 1; ++i) {
+	for (size_t i = 0; i < 2; ++i) {
 		ranked_rr_array_t *arr = ptrs[i];
 		for (size_t j = 0; j < arr->len; ++j) {
 			ranked_rr_array_entry_t *entry = arr->at[j];
