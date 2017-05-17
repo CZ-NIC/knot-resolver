@@ -303,7 +303,7 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 		onstream = routes;
 	}
 	if not s then
-		panic('failed to listen on %s#%d: %s', host, port, err)
+		panic('failed to listen on %s@%d: %s', host, port, err)
 	end
 	table.insert(M.servers, s)
 	-- Create certificate renewal timer if ephemeral

@@ -2,12 +2,12 @@
 if not next(net.list()) then
 	local ok, err = pcall(net.listen, '127.0.0.1')
 	if not ok then
-		error('bind to 127.0.0.1#53 '..err)
+		error('bind to 127.0.0.1@53 '..err)
 	end
 	-- IPv6 loopback may fail
 	ok, err = pcall(net.listen, '::1')
 	if not ok and verbose() then
-		print('bind to ::1#53 '..err)
+		print('bind to ::1@53 '..err)
 	end
 end
 -- Open cache if not set/disabled

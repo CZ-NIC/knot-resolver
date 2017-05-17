@@ -11,6 +11,7 @@ Security
 Improvements
 ------------
 - allow answering from cache in non-iterative modes (#122)
+- command line: specify ports via @ but still support # for compatibility
 
 
 Knot Resolver 1.2.6 (2017-04-24)

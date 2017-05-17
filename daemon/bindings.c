@@ -189,7 +189,7 @@ static int net_listen_addrs(lua_State *L, int port, int flags)
 		struct engine *engine = engine_luaget(L);
 		int ret = network_listen(&engine->net, str, port, flags);
 		if (ret != 0) {
-			kr_log_info("[system] bind to '%s#%d' %s\n",
+			kr_log_info("[system] bind to '%s@%d' %s\n",
 					str, port, kr_strerror(ret));
 		}
 		return ret == 0;

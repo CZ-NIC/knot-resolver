@@ -13,7 +13,7 @@
 .SH "SYNOPSIS"
 .B kresd
 .RB [ \-a | \-\-addr
-.IR addr[#port] ]
+.IR addr[@port] ]
 .RB [ \-S | \-\-fd
 .IR fd ]
 .RB [ \-c | \-\-config
@@ -92,11 +92,11 @@ EOF
 .P
 The available CLI options are:
 .TP
-.B \-a\fI addr[#port]\fR, \fB\-\-addr=\fI<addr[#port]>
+.B \-a\fI addr[@port]\fR, \fB\-\-addr=\fI<addr[@port]>
 Listen on given address (and port) pair. If no port is given, \fI53\fR is used as a default.
 Option may be passed multiple times to listen on more addresses.
 .TP
-.B \-t\fI addr[#port]\fR, \fB\-\-tls=\fI<addr[#port]>
+.B \-t\fI addr[@port]\fR, \fB\-\-tls=\fI<addr[@port]>
 Listen using TLS on given address (and port) pair. If no port is
 given, \fI853\fR is used as a default.  Option may be passed multiple
 times to listen on more addresses.

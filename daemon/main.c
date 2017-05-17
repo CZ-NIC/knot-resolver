@@ -289,7 +289,10 @@ static void signal_handler(uv_signal_t *handle, int signum)
 /** Split away port from the address. */
 static const char *set_addr(char *addr, int *port)
 {
-	char *p = strchr(addr, '#');
+	char *p = strchr(addr, '@');
+	if (!p) {
+		p = strchr(addr, '#');
+	}
 	if (p) {
 		*port = atoi(p + 1);
 		*p = '\0';
@@ -338,7 +341,7 @@ static void help(int argc, char *argv[])
 {
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
-	       " -a, --addr=[addr]    Server address (default: localhost#53).\n"
+	       " -a, --addr=[addr]    Server address (default: localhost@53).\n"
 	       " -t, --tls=[addr]     Server address for TLS (default: off).\n"
 	       " -S, --fd=[fd]        Listen on given fd (handed out by supervisor).\n"
 	       " -T, --tlsfd=[fd]     Listen using TLS on given fd (handed out by supervisor).\n"
@@ -609,7 +612,7 @@ int main(int argc, char **argv)
 			const char *addr = set_addr(addr_set.at[i], &port);
 			ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
 			if (ret != 0) {
-				kr_log_error("[system] bind to '%s#%d' %s\n", addr, port, kr_strerror(ret));
+				kr_log_error("[system] bind to '%s@%d' %s\n", addr, port, kr_strerror(ret));
 				ret = EXIT_FAILURE;
 				break;
 			}
@@ -622,7 +625,7 @@ int main(int argc, char **argv)
 			const char *addr = set_addr(tls_set.at[i], &port);
 			ret = network_listen(&engine.net, addr, (uint16_t)port, NET_TCP|NET_TLS);
 			if (ret != 0) {
-				kr_log_error("[system] bind to '%s#%d' (TLS) %s\n", addr, port, kr_strerror(ret));
+				kr_log_error("[system] bind to '%s@%d' (TLS) %s\n", addr, port, kr_strerror(ret));
 				ret = EXIT_FAILURE;
 				break;
 			}
