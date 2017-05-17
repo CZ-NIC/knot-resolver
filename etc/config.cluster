@@ -38,7 +38,7 @@ hints.root({
 })
 
 -- Apply RPZ for all clients, default rule is DENY
-policy:add(policy.rpz(policy.DENY, 'blacklist.rpz'))
+policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
 
 -- Optional: use Redis/Memcached as a cache backend which may be distributed between nodes
 -- cache.storage = 'redis://127.0.0.1:6398'
