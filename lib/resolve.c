@@ -1330,8 +1330,7 @@ ns_election:
 		kr_nsrep_elect_addr(qry, request->ctx);
 	} else if (!qry->ns.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
-		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY
-		    && !(qry->stype | QUERY_FORWARD)) {
+		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
 			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
 		}
