@@ -680,6 +680,37 @@ static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
 	}
 }
 
+static void check_wildcard(kr_layer_t *ctx)
+{
+	struct kr_request *req	   = ctx->req;
+	struct kr_query *qry	   = req->current_query;
+	ranked_rr_array_t *ptrs[2] = { &req->answ_selected, &req->auth_selected };
+
+	for (int i = 0; i < 2; ++i) {
+		ranked_rr_array_t *arr = ptrs[i];
+		for (ssize_t j = 0; j < arr->len; ++j) {
+			ranked_rr_array_entry_t *entry = arr->at[j];
+			const knot_rrset_t *rrsigs = entry->rr;
+
+			if (qry->uid != entry->qry_uid) {
+				continue;
+			}
+
+			if (rrsigs->type != KNOT_RRTYPE_RRSIG) {
+				continue;
+			}
+
+			int owner_labels = knot_dname_labels(rrsigs->owner, NULL);
+
+			for (int k = 0; k < rrsigs->rrs.rr_count; ++k) {
+				if (knot_rrsig_labels(&rrsigs->rrs, k) != owner_labels) {
+					qry->flags |= QUERY_DNSSEC_WEXPAND;
+				}
+			}
+		}
+	}
+}
+
 static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	int ret = 0;
@@ -720,6 +751,13 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Pass-through if CD bit is set. */
 	if (knot_wire_get_cd(req->answer->wire)) {
+		check_wildcard(ctx);
+		/* Check if wildcard expansion happens.
+		 * If yes, copy authority. */
+		if ((qry->parent == NULL) &&
+		    (qry->flags & QUERY_DNSSEC_WEXPAND)) {
+			kr_ranked_rrarray_set_wire(&req->auth_selected, true, qry->uid, true);
+		}
 		rank_records(ctx, KR_RANK_OMIT);
 		return ctx->state;
 	}
