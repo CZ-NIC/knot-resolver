@@ -27,7 +27,10 @@ while len(unparsed) > 0:
 	# Parse address
 	addr = unparsed.pop(0)
 	try:
-		if '#' in addr:
+		if '@' in addr:
+			addr, port = addr.split('@')
+			port = int(port)
+		elif '#' in addr:
 			addr, port = addr.split('#')
 			port = int(port)
 		else:

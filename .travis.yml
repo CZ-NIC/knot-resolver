@@ -33,7 +33,7 @@ script:
     - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 install check V=1 COVERAGE=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
     - ./daemon/kresd -h
     - ./daemon/kresd -V
-    - echo "quit()" | ./daemon/kresd -a 127.0.0.1#53535 .
+    - echo "quit()" | ./daemon/kresd -a 127.0.0.1@53535 .
     - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 check-integration COVERAGE=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
 after_success:
     - if test $TRAVIS_OS_NAME = linux; then coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'; fi

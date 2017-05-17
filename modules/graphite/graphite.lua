@@ -66,7 +66,7 @@ local function publish_table(metrics, prefix, now)
 				local tcp = M.cli[i]['connect'] ~= nil
 				local host = M.info[i]
 				if tcp and host.seen + 2 * M.interval / 1000 <= now then
-					print(string.format('[graphite] reconnecting: %s#%d reason: %s',
+					print(string.format('[graphite] reconnecting: %s@%d reason: %s',
 						  host.addr, host.port, err))
 					M.cli[i] = make_tcp(host.addr, host.port)
 					host.seen = now
