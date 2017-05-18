@@ -12,6 +12,7 @@ Improvements
 ------------
 - allow answering from cache in non-iterative modes (#122)
 - command line: specify ports via @ but still support # for compatibility
+- policy: recognize 100.64.0.0/10 as local addresses
 
 
 Knot Resolver 1.2.6 (2017-04-24)
