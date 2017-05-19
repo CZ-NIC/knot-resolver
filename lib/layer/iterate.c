@@ -296,15 +296,18 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *qry,
 				const bool answer, const bool is_referral)
 {
+	/* For RRSIGs, ensure the KR_RANK_AUTH flag corresponds to the signed RR. */
+	uint16_t type = kr_rrset_type_maysig(rr);
+
 	if (qry->flags & QUERY_CACHED) {
 		return rr->additional ? *(uint8_t *)rr->additional : KR_RANK_OMIT;
 		/* ^^ Current use case for "cached" RRs without rank: hints module. */
 	}
-	if (answer || rr->type == KNOT_RRTYPE_DS
-	    || rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3) {
+	if (answer || type == KNOT_RRTYPE_DS
+	    || type == KNOT_RRTYPE_NSEC || type == KNOT_RRTYPE_NSEC3) {
 		return KR_RANK_INITIAL | KR_RANK_AUTH;
 	}
-	if (rr->type == KNOT_RRTYPE_NS) {
+	if (type == KNOT_RRTYPE_NS) {
 		/* Some servers add extra NS RRset, which allows us to refresh
 		 * cache "for free", potentially speeding up zone cut lookups
 		 * in future.  Still, it might theoretically cause some problems:
