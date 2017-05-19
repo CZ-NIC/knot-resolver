@@ -486,6 +486,13 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		if (stashed->rr->rclass == rr->rclass &&
 		    stashed->rr->type == rr->type &&
 		    knot_dname_is_equal(stashed->rr->owner, rr->owner)) {
+			/* Don't merge RRSIGs covering different types.
+			 * Cache-related code relies on that. */
+			if (rr->type == KNOT_RRTYPE_RRSIG &&
+			    knot_rrsig_type_covered(&rr->rrs, 0)
+					!= knot_rrsig_type_covered(&stashed->rr->rrs, 0)) {
+				continue;
+			}
 			assert(stashed->rank == rank &&
 			       stashed->cached == false &&
 			       stashed->to_wire == to_wire);
