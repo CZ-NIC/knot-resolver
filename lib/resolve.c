@@ -993,7 +993,8 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		}
 
 		if (qry->parent == NULL &&
-		    ds_req && !ns_req && (minimized || resume)) {
+		    ds_req && !ns_req && (minimized || resume) &&
+		    !knot_dname_is_equal(qry->zone_cut.name, wanted_name)) {
 			struct kr_query *next = kr_rplan_push(rplan, qry, wanted_name,
 							      qry->sclass, KNOT_RRTYPE_NS);
 			if (!next) {

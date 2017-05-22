@@ -639,6 +639,8 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 						qry->parent->flags &= ~QUERY_DNSSEC_WANT;
 						qry->parent->flags |= QUERY_DNSSEC_INSECURE;
 					}
+				} else {
+					qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
 				}
 			}
 		} else if (!knot_dname_is_equal(signer, qry->zone_cut.name)) {
