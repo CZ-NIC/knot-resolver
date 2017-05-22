@@ -14,6 +14,9 @@ Improvements
 - command line: specify ports via @ but still support # for compatibility
 - policy: recognize 100.64.0.0/10 as local addresses
 
+Bugfixes
+--------
+- validate: fix insufficient caching for some cases (relatively rare)
 
 Knot Resolver 1.2.6 (2017-04-24)
 ================================

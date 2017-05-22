@@ -585,7 +585,8 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
-static void rank_records(kr_layer_t *ctx, uint8_t rank_to_set)
+/** Change ranks of RRs from this single iteration: _INITIAL or _MISSING -> rank_to_set. */
+static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
 {
 	struct kr_request *req	   = ctx->req;
 	struct kr_query *qry	   = req->current_query;
@@ -597,7 +598,8 @@ static void rank_records(kr_layer_t *ctx, uint8_t rank_to_set)
 			if (entry->qry_uid != qry->uid) {
 				continue;
 			}
-			if (kr_rank_test(entry->rank, KR_RANK_INITIAL)) {
+			if (kr_rank_test(entry->rank, KR_RANK_INITIAL)
+			    || kr_rank_test(entry->rank, KR_RANK_MISSING)) {
 				kr_rank_set(&entry->rank, rank_to_set);
 			}
 		}
