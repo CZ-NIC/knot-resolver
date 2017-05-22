@@ -402,7 +402,9 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
 		const knot_rrset_t *rr = entry->rr;
-		if (entry->yielded || !kr_rank_test(entry->rank, KR_RANK_INITIAL)) {
+		if (entry->yielded ||
+		    (!kr_rank_test(entry->rank, KR_RANK_INITIAL) &&
+		    !kr_rank_test(entry->rank, KR_RANK_MISMATCH))) {
 			continue;
 		}
 		if (rr->type == KNOT_RRTYPE_RRSIG) {

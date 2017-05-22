@@ -940,9 +940,9 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
-	const knot_dname_t *wanted_name = NULL;
+	const knot_dname_t *wanted_name = qry->sname;
 	const knot_dname_t *start_name = qry->sname;
-	if (qry->flags & QUERY_AWAIT_CUT) {
+	if ((qry->flags & QUERY_AWAIT_CUT) && !resume) {
 		const knot_dname_t *longest_ta = kr_ta_get_longest_name(trust_anchors, qry->sname);
 		if (longest_ta) {
 			start_name = longest_ta;
@@ -963,7 +963,9 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		ns_req = false;
 		minimized = false;
 
-		if (qry->parent == NULL) {
+		if (resume) {
+			wanted_name = qry->zone_cut.name;
+		} else if (qry->parent == NULL) {
 			int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
 			int wanted_name_labels = knot_dname_labels(wanted_name, NULL);
 			while (wanted_name[0] && wanted_name_labels > cut_labels + name_offset) {
@@ -991,7 +993,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		}
 
 		if (qry->parent == NULL &&
-		    ds_req && !ns_req && minimized) {
+		    ds_req && !ns_req && (minimized || resume)) {
 			struct kr_query *next = kr_rplan_push(rplan, qry, wanted_name,
 							      qry->sclass, KNOT_RRTYPE_NS);
 			if (!next) {
@@ -1018,7 +1020,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			nods = ds_req;
 		}
 		name_offset += 1;
-	} while (ds_req && ns_req);
+	} while (ds_req && ns_req && !resume);
 
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, wanted_name)){
