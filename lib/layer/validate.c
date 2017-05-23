@@ -330,7 +330,8 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 	unsigned section = KNOT_ANSWER;
 	if (!knot_wire_get_aa(answer->wire)) { /* Referral */
 		section = KNOT_AUTHORITY;
-	} else if (knot_pkt_qtype(answer) == KNOT_RRTYPE_DS) { /* Subrequest */
+	} else if (knot_pkt_qtype(answer) == KNOT_RRTYPE_DS &&
+		   !(qry->flags & QUERY_CNAME)) {
 		section = KNOT_ANSWER;
 	} else { /* N/A */
 		return kr_ok();
