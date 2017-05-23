@@ -341,15 +341,16 @@ static void help(int argc, char *argv[])
 {
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
 	printf("\nParameters:\n"
-	       " -a, --addr=[addr]    Server address (default: localhost@53).\n"
-	       " -t, --tls=[addr]     Server address for TLS (default: off).\n"
-	       " -S, --fd=[fd]        Listen on given fd (handed out by supervisor).\n"
-	       " -T, --tlsfd=[fd]     Listen using TLS on given fd (handed out by supervisor).\n"
-	       " -c, --config=[path]  Config file path (relative to [rundir]) (default: config).\n"
-	       " -k, --keyfile=[path] File containing trust anchors (DS or DNSKEY).\n"
-	       " -f, --forks=N        Start N forks sharing the configuration.\n"
-	       " -q, --quiet          Quiet output, no prompt in interactive mode.\n"
-	       " -v, --verbose        Run in verbose mode."
+	       " -a, --addr=[addr]      Server address (default: localhost@53).\n"
+	       " -t, --tls=[addr]       Server address for TLS (default: off).\n"
+	       " -S, --fd=[fd]          Listen on given fd (handed out by supervisor).\n"
+	       " -T, --tlsfd=[fd]       Listen using TLS on given fd (handed out by supervisor).\n"
+	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
+	       " -k, --keyfile=[path]   File containing trust anchors (DS or DNSKEY).\n"
+	       " -m, --moduledir=[path] Override the default module path (" MODULEDIR ").\n"
+	       " -f, --forks=N          Start N forks sharing the configuration.\n"
+	       " -q, --quiet            Quiet output, no prompt in interactive mode.\n"
+	       " -v, --verbose          Run in verbose mode."
 #ifdef NOVERBOSELOG
 	           " (Recompile without -DNOVERBOSELOG to activate.)"
 #endif
@@ -433,6 +434,7 @@ int main(int argc, char **argv)
 	array_t(int) tls_fd_set;
 	array_init(tls_fd_set);
 	char *keyfile = NULL;
+	char *moduledir = MODULEDIR;
 	const char *config = NULL;
 	int control_fd = -1;
 
@@ -446,13 +448,14 @@ int main(int argc, char **argv)
 		{"config", required_argument, 0, 'c'},
 		{"keyfile",required_argument, 0, 'k'},
 		{"forks",required_argument,   0, 'f'},
+		{"moduledir", required_argument, 0, 'm'},
 		{"verbose",    no_argument,   0, 'v'},
 		{"quiet",      no_argument,   0, 'q'},
 		{"version",   no_argument,    0, 'V'},
 		{"help",      no_argument,    0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -481,6 +484,9 @@ int main(int argc, char **argv)
 			break;
 		case 'k':
 			keyfile = optarg;
+			break;
+		case 'm':
+			moduledir = optarg;
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -636,6 +642,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	engine_set_moduledir(&engine, moduledir);
+	
 	/* Block signals. */
 	uv_loop_t *loop = uv_default_loop();
 	uv_signal_t sigint, sigterm;

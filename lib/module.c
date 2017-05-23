@@ -132,12 +132,8 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 
 	/* Search for module library, use current namespace if not found. */
 	if (load_library(module, name, path) != 0) {
-		/* Expand HOME env variable, as the linker may not expand it. */
-		auto_free char *local_path = kr_strcatdup(2, getenv("HOME"), "/.local/lib/kdns_modules");
-		if (load_library(module, name, local_path) != 0) {
-			if (load_library(module, name, MODULEDIR) != 0) {
-				module->lib = RTLD_DEFAULT;
-			}
+		if (load_library(module, name, MODULEDIR) != 0) {
+			module->lib = RTLD_DEFAULT;
 		}
 	}
 
