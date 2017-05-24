@@ -496,8 +496,8 @@ static int init_resolver(struct engine *engine)
 		return kr_error(ENOMEM);
 	}
 	knot_edns_init(engine->resolver.opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
-	/* Set default TLS padding */
-	engine->resolver.tls_padding = KR_DEFAULT_TLS_PADDING;
+	/* Use default TLS padding */
+	engine->resolver.tls_padding = -1;
 	/* Set default root hints */
 	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
 	kr_zonecut_set_sbelt(&engine->resolver, &engine->resolver.root_hints);
