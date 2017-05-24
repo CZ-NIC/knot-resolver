@@ -69,7 +69,7 @@ static void kres_gnutls_log(int level, const char *message)
 void tls_setup_logging(bool verbose)
 {
 	gnutls_global_set_log_function(kres_gnutls_log);
-	gnutls_global_set_log_level(verbose ? 1 : 0);
+	gnutls_global_set_log_level(verbose ? 5 : 0);
 }
 
 static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
