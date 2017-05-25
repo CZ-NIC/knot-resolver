@@ -708,6 +708,8 @@ void engine_deinit(struct engine *engine)
 	array_clear(engine->ipc_set);
 	kr_ta_clear(&engine->resolver.trust_anchors);
 	kr_ta_clear(&engine->resolver.negative_anchors);
+	free(engine->hostname);
+	free(engine->moduledir);
 }
 
 int engine_pcall(lua_State *L, int argc)
