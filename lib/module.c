@@ -126,11 +126,9 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 		return kr_error(ENOMEM);
 	}
 
-	/* Search for module library, use current namespace if not found. */
+	/* Search for module library. */
 	if (!path || load_library(module, name, path) != 0) {
-		if (load_library(module, name, MODULEDIR) != 0) {
-			module->lib = RTLD_DEFAULT;
-		}
+		module->lib = RTLD_DEFAULT;
 	}
 
 	/* Try to load module ABI. */
