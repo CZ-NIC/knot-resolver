@@ -54,13 +54,9 @@ static void *load_symbol(void *lib, const char *prefix, const char *name)
 
 static int load_library(struct kr_module *module, const char *name, const char *path)
 {
+	assert(module && name && path);
 	/* Absolute or relative path (then only library search path is used). */
-	auto_free char *lib_path = NULL;
-	if (path != NULL) {
-		lib_path = kr_strcatdup(4, path, "/", name, LIBEXT);
-	} else {
-		lib_path = kr_strcatdup(2, name, LIBEXT);
-	}
+	auto_free char *lib_path = kr_strcatdup(4, path, "/", name, LIBEXT);
 	if (lib_path == NULL) {
 		return kr_error(ENOMEM);
 	}
@@ -131,7 +127,7 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 	}
 
 	/* Search for module library, use current namespace if not found. */
-	if (load_library(module, name, path) != 0) {
+	if (!path || load_library(module, name, path) != 0) {
 		if (load_library(module, name, MODULEDIR) != 0) {
 			module->lib = RTLD_DEFAULT;
 		}
