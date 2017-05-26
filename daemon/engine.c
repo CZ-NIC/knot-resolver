@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <grp.h>
 #include <pwd.h>
+#include <sys/param.h>
 #include <zscanner/scanner.h>
 
 #include "daemon/engine.h"
@@ -42,6 +43,13 @@ KR_NORETURN int lua_error (lua_State *L);
 
 /* Cleanup engine state every 5 minutes */
 const size_t CLEANUP_TIMER = 5*60*1000;
+
+/* Execute byte code */
+#define l_dobytecode(L, arr, len, name) \
+	(luaL_loadbuffer((L), (arr), (len), (name)) || lua_pcall((L), 0, LUA_MULTRET, 0))
+/** Load file in a sandbox environment. */
+#define l_dosandboxfile(L, filename) \
+	(luaL_loadfile((L), (filename)) || engine_pcall((L), 0))
 
 /*
  * Global bindings.
@@ -198,6 +206,63 @@ static int l_hostname(lua_State *L)
 	}
 
 	lua_pushstring(L, engine_get_hostname(engine));	
+	return 1;
+}
+
+char *engine_get_moduledir(struct engine *engine) {
+	return engine->moduledir;
+}
+
+int engine_set_moduledir(struct engine *engine, const char *moduledir) {
+	if (!engine || !moduledir) {
+		return kr_error(EINVAL);
+	}
+
+	char *new_moduledir = strdup(moduledir);
+	if (!new_moduledir) {
+		return kr_error(ENOMEM);
+	}
+	if (engine->moduledir) {
+		free(engine->moduledir);
+	}
+	engine->moduledir = new_moduledir;
+
+	/* Use module path for including Lua scripts */
+	char l_paths[MAXPATHLEN] = { 0 };
+	/* Save original package.path to package._path */
+	snprintf(l_paths, MAXPATHLEN - 1,
+		 "if package._path == nil then package._path = package.path end\n"
+		 "package.path = '%s/?.lua;%s/?/init.lua;'..package._path\n",
+		 new_moduledir,
+		 new_moduledir);
+
+	int ret = l_dobytecode(engine->L, l_paths, strlen(l_paths), "");
+	if (ret != 0) {
+		lua_pop(engine->L, 1);
+		return ret;
+	}
+	return 0;
+}
+
+/** Return hostname. */
+static int l_moduledir(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (lua_gettop(L) == 0) {
+		lua_pushstring(L, engine_get_moduledir(engine));
+		return 1;
+	}
+	if ((lua_gettop(L) != 1) || !lua_isstring(L, 1)) {
+		lua_pushstring(L, "moduledir takes at most one parameter: (\"directory\")");
+		lua_error(L);
+	}
+
+	if (engine_set_moduledir(engine, lua_tostring(L, 1)) != 0) {
+		lua_pushstring(L, "setting moduledir failed");
+		lua_error(L);
+	}
+
+	lua_pushstring(L, engine_get_moduledir(engine));
 	return 1;
 }
 
@@ -532,6 +597,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "quit");
 	lua_pushcfunction(engine->L, l_hostname);
 	lua_setglobal(engine->L, "hostname");
+	lua_pushcfunction(engine->L, l_moduledir);
+	lua_setglobal(engine->L, "moduledir");
 	lua_pushcfunction(engine->L, l_verbose);
 	lua_setglobal(engine->L, "verbose");
 	lua_pushcfunction(engine->L, l_option);
@@ -548,8 +615,6 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "tojson");
 	lua_pushcfunction(engine->L, l_map);
 	lua_setglobal(engine->L, "map");
-	lua_pushliteral(engine->L, MODULEDIR);
-	lua_setglobal(engine->L, "moduledir");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
@@ -643,6 +708,8 @@ void engine_deinit(struct engine *engine)
 	array_clear(engine->ipc_set);
 	kr_ta_clear(&engine->resolver.trust_anchors);
 	kr_ta_clear(&engine->resolver.negative_anchors);
+	free(engine->hostname);
+	free(engine->moduledir);
 }
 
 int engine_pcall(lua_State *L, int argc)
@@ -685,21 +752,9 @@ int engine_ipc(struct engine *engine, const char *expr)
 	}
 }
 
-/* Execute byte code */
-#define l_dobytecode(L, arr, len, name) \
-	(luaL_loadbuffer((L), (arr), (len), (name)) || lua_pcall((L), 0, LUA_MULTRET, 0))
-/** Load file in a sandbox environment. */
-#define l_dosandboxfile(L, filename) \
-	(luaL_loadfile((L), (filename)) || engine_pcall((L), 0))
-
 static int engine_loadconf(struct engine *engine, const char *config_path)
 {
-	/* Use module path for including Lua scripts */
-	static const char l_paths[] = "package.path = '" MODULEDIR "/?.lua;'..package.path";
-	int ret = l_dobytecode(engine->L, l_paths, sizeof(l_paths) - 1, "");
-	if (ret != 0) {
-		lua_pop(engine->L, 1);
-	}
+	int ret = 0;
 	/* Init environment */
 	static const char sandbox_bytecode[] = {
 		#include "daemon/lua/sandbox.inc"
@@ -836,7 +891,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		return kr_error(ENOMEM);
 	}
 	module->data = engine;
-	int ret = kr_module_load(module, name, NULL);
+	int ret = kr_module_load(module, name, engine->moduledir);
 	/* Load Lua module if not a binary */
 	if (ret == kr_error(ENOENT)) {
 		ret = ffimodule_register_lua(engine, module, name);

@@ -84,7 +84,7 @@ struct kr_prop {
 
 
 /**
- * Load module instance into memory.
+ * Load a C module instance into memory.
  *
  * @param module module structure
  * @param name module name

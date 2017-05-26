@@ -175,11 +175,11 @@ All paths are prefixed with ``PREFIX`` variable by default if not specified othe
    "library", "``LIBDIR``", "``$(PREFIX)/lib``", "pkg-config is auto-generated [#]_"
    "daemon",  "``SBINDIR``", "``$(PREFIX)/sbin``", ""
    "configuration", "``ETCDIR``", "``$(PREFIX)/etc/kresd``", "Configuration file, templates."
-   "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "[#]_"
+   "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "Runtime directory for loading dynamic modules [#]_."
    "work directory", "", "``$(PREFIX)/var/run/kresd``", "Run directory for daemon."
 
 .. [#] The ``libkres.pc`` is installed in ``$(LIBDIR)/pkgconfig``.
-.. [#] Users may install additional modules in ``~/.local/lib/kdns_modules`` or in the rundir of a specific instance.
+.. [#] The default moduledir can be changed with `-m` option to `kresd` daemon or by calling `moduledir()` function from lua.
 
 .. note:: Each module is self-contained and may install additional bundled files within ``$(MODULEDIR)/$(modulename)``. These files should be read-only, non-executable.
 

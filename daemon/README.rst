@@ -380,7 +380,15 @@ Environment
    hostname. If called without a parameter, it will return kresd's
    internal hostname, or the system's POSIX hostname (see
    gethostname(2)) if kresd's internal hostname is unset.
-	    
+
+.. function:: moduledir([dir])
+
+   :return: Modules directory.
+
+   If called with a parameter, it will change kresd's directory for
+   looking up the dynamic modules.  If called without a parameter, it
+   will return kresd's modules directory.
+   
 .. function:: verbose(true | false)
 
    :return: Toggle verbose logging.
