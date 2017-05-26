@@ -14,12 +14,18 @@
 .B kresd
 .RB [ \-a | \-\-addr
 .IR addr[@port] ]
+.RB [ \-t | \-\-tls
+.IR addr[@port] ]
 .RB [ \-S | \-\-fd
+.IR fd ]
+.RB [ \-T | \-\-tlsfd
 .IR fd ]
 .RB [ \-c | \-\-config
 .IR config ]
 .RB [ \-k | \-\-keyfile
 .IR keyfile ]
+.RB [ \-m | \-\-moduledir
+.IR path ]
 .RB [ \-f | \-\-forks
 .IR N ]
 .RB [ \-q | \-\-quiet ]
@@ -109,11 +115,19 @@ Option may be passed multiple times to listen on more file descriptors.
 Listen using TLS on given file descriptor(s), passed by supervisor.
 Option may be passed multiple times to listen on more file descriptors.
 .TP
+.B \-c\fI config\fR, \fB\-\-config=\fI<config>
+Set the config file with settings for kresd to read instead of reading the
+file at the default location (\fIconfig\fR). The syntax is
+described in \fIdaemon/README.md\fR.
+.TP
 .B \-k\fI keyfile\fR, \fB\-\-keyfile=\fI<keyfile>
 Use given for keeping root trust anchors. If the file doesn't exist, it will be
 automatically boostrapped from IANA and warning for you will be issued to check it
 before trusting it. The file contains DNSKEY/DS records in presentation format,
 and is compatible with Unbound or BIND9 root key files.
+.TP
+.B \-m\fI path\fR, \fB\-\-moduledir=\fI<path>
+Override the directory that is searched for modules.  Default: @MODULEDIR@
 .TP
 .B \-f\fI N\fR, \fB\-\-forks=\fI<N>
 With this option, the daemon is started in non-interactive mode and instead creates a
@@ -132,13 +146,8 @@ Daemon will refrain from printing any informative messages, not even a prompt.
 Increase verbosity. If given multiple times, more information is logged.
 This is in addition to the verbosity (if any) from the config file.
 .TP
-.B \-c\fI config\fR, \fB\-\-config=\fI<config>
-Set the config file with settings for kresd to read instead of reading the
-file at the default location (\fIconfig\fR). The syntax is
-described in \fIdaemon/README.md\fR.
-.TP
 .B \-h
-Show the version and commandline option help.
+Show short commandline option help.
 .TP
 .B \-V
 Show the version.
