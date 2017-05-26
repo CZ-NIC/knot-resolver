@@ -305,7 +305,7 @@ static int update_parent_keys(struct kr_query *qry, uint16_t answer_type)
 		VERBOSE_MSG(qry, "<= parent: updating DS\n");
 		if (qry->flags & (QUERY_DNSSEC_INSECURE)) { /* DS non-existence proven. */
 			mark_insecure_parents(qry);
-		} if ((qry->flags & (QUERY_DNSSEC_NODS | QUERY_FORWARD)) == QUERY_DNSSEC_NODS) {
+		} else if ((qry->flags & (QUERY_DNSSEC_NODS | QUERY_FORWARD)) == QUERY_DNSSEC_NODS) {
 			mark_insecure_parents(qry);
 		} else { /* DS existence proven. */
 			parent->zone_cut.trust_anchor = knot_rrset_copy(qry->zone_cut.trust_anchor, parent->zone_cut.pool);
@@ -557,7 +557,7 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	const uint16_t qtype = knot_pkt_qtype(pkt);
-
+	const uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 	bool nods = false;
 	for (int i = 0; i < req->rplan.resolved.len; ++i) {
 		struct kr_query *q = req->rplan.resolved.at[i];
@@ -568,17 +568,36 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	if (nods) {
+	if (nods && qtype == KNOT_RRTYPE_NS && !(qry->flags & QUERY_CNAME)) {
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 		qry->flags |= QUERY_DNSSEC_INSECURE;
-		if (qry->parent) {
-			qry->parent->flags &= ~QUERY_DNSSEC_WANT;
-			qry->parent->flags |= QUERY_DNSSEC_INSECURE;
+		if (qry->forward_flags & QUERY_CNAME) {
+			assert(qry->cname_parent);
+			qry->cname_parent->flags &= ~QUERY_DNSSEC_WANT;
+			qry->cname_parent->flags |= QUERY_DNSSEC_INSECURE;
+		} else if (pkt_rcode == KNOT_RCODE_NOERROR && qry->parent != NULL) {
+			const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ANSWER);
+			const knot_rrset_t *rr = knot_pkt_rr(sec, 0);
+			if (rr->type == KNOT_RRTYPE_NS) {
+				qry->parent->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
+				qry->parent->flags &= ~QUERY_DNSSEC_WANT;
+				qry->parent->flags |= QUERY_DNSSEC_INSECURE;
+			}
+		}
+		while (qry->parent) {
+			qry = qry->parent;
+			qry->flags &= ~QUERY_DNSSEC_WANT;
+			qry->flags |= QUERY_DNSSEC_INSECURE;
+			if (qry->forward_flags & QUERY_CNAME) {
+				assert(qry->cname_parent);
+				qry->cname_parent->flags &= ~QUERY_DNSSEC_WANT;
+				qry->cname_parent->flags |= QUERY_DNSSEC_INSECURE;
+			}
 		}
 		return KR_STATE_DONE;
 	}
 
-	if (qtype != KNOT_RRTYPE_DS) {
+	if (!nods && qtype != KNOT_RRTYPE_DS) {
 		struct kr_rplan *rplan = &req->rplan;
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->sname, qry->sclass, KNOT_RRTYPE_DS);
 		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
@@ -639,8 +658,16 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 						qry->parent->flags &= ~QUERY_DNSSEC_WANT;
 						qry->parent->flags |= QUERY_DNSSEC_INSECURE;
 					}
-				} else {
-					qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
+				} else if (qry->stype != KNOT_RRTYPE_DS) {
+					struct kr_rplan *rplan = &req->rplan;
+					struct kr_query *next = kr_rplan_push(rplan, qry, qry->sname, qry->sclass, KNOT_RRTYPE_DS);
+					int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
+					if (state != kr_ok()) {
+						return KR_STATE_FAIL;
+					}
+					kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
+					kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
+					next->flags |= QUERY_DNSSEC_WANT;
 				}
 			}
 		} else if (!knot_dname_is_equal(signer, qry->zone_cut.name)) {
@@ -731,6 +758,21 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		rank_records(ctx, KR_RANK_OMIT);
 		return ctx->state;
 	}
+	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
+	if ((qry->flags & QUERY_FORWARD) &&
+	    pkt_rcode != KNOT_RCODE_NOERROR &&
+	    pkt_rcode != KNOT_RCODE_NXDOMAIN) {
+		do {
+			qry->flags |= QUERY_DNSSEC_BOGUS;
+			if (qry->cname_parent) {
+				qry->cname_parent->flags |= QUERY_DNSSEC_BOGUS;
+			}
+			qry = qry->parent;
+		} while (qry);
+		ctx->state = KR_STATE_DONE;
+		return ctx->state;
+	}
+
 	if (!(qry->flags & QUERY_DNSSEC_WANT)) {
 		const uint32_t test_flags = (QUERY_CACHED | QUERY_DNSSEC_INSECURE);
 		const bool is_insec = ((qry->flags & test_flags) == test_flags);
@@ -774,7 +816,6 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Check if this is a DNSKEY answer, check trust chain and store. */
-	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 	uint16_t qtype = knot_pkt_qtype(pkt);
 	bool has_nsec3 = pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
@@ -922,25 +963,15 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		qtype = KNOT_RRTYPE_DS;
 	}
 	/* Update parent query zone cut */
-	if (qry->parent && pkt_rcode != KNOT_RCODE_NXDOMAIN) {
+	if (qry->parent) {
 		if (update_parent_keys(qry, qtype) != 0) {
 			return KR_STATE_FAIL;
 		}
 	}
 
-
-	if (qry->flags & QUERY_FORWARD) {
-		if (qry->parent &&
-		    qtype == KNOT_RRTYPE_NS &&
-		    !no_data &&
-		    pkt_rcode == KNOT_RCODE_NOERROR) {
-			const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ANSWER);
-			const knot_rrset_t *rr = knot_pkt_rr(sec, 0);
-			if (rr->type == KNOT_RRTYPE_NS) {
-				qry->parent->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
-				qry->parent->flags &= ~QUERY_DNSSEC_WANT;
-				qry->parent->flags |= QUERY_DNSSEC_INSECURE;
-			}
+	if (qry->flags & QUERY_FORWARD && qry->parent) {
+		if (pkt_rcode == KNOT_RCODE_NXDOMAIN) {
+			qry->parent->forward_flags |= QUERY_NO_MINIMIZE;
 		}
 	}
 	VERBOSE_MSG(qry, "<= answer valid, OK\n");

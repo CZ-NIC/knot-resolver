@@ -928,6 +928,12 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	map_t *trust_anchors = &request->ctx->trust_anchors;
 	map_t *negative_anchors = &request->ctx->negative_anchors;
 
+	if (qry->parent != NULL &&
+	    !(qry->forward_flags & QUERY_CNAME) &&
+	    knot_dname_in(qry->parent->zone_cut.name, qry->zone_cut.name)) {
+		return KR_STATE_PRODUCE;
+	}
+
 	assert(qry->flags & QUERY_FORWARD);
 
 	if (!trust_anchors) {
@@ -940,15 +946,41 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
+	if (qry->forward_flags & QUERY_NO_MINIMIZE) {
+		qry->flags &= ~QUERY_AWAIT_CUT;
+		return KR_STATE_PRODUCE;
+	}
+
 	const knot_dname_t *wanted_name = qry->sname;
 	const knot_dname_t *start_name = qry->sname;
 	if ((qry->flags & QUERY_AWAIT_CUT) && !resume) {
+		qry->flags &= ~QUERY_AWAIT_CUT;
 		const knot_dname_t *longest_ta = kr_ta_get_longest_name(trust_anchors, qry->sname);
 		if (longest_ta) {
 			start_name = longest_ta;
 			qry->zone_cut.name = knot_dname_copy(start_name, qry->zone_cut.pool);
+			qry->flags |= QUERY_DNSSEC_WANT;
+		} else {
+			qry->flags &= ~QUERY_DNSSEC_WANT;
+			return KR_STATE_PRODUCE;
 		}
-		qry->flags &= ~QUERY_AWAIT_CUT;
+	}
+
+	bool has_ta = (qry->zone_cut.trust_anchor != NULL);
+	knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
+	bool refetch_ta = (!has_ta || !knot_dname_is_equal(qry->zone_cut.name, ta_name));
+	bool is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
+	bool refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
+	if (refetch_key && !is_dnskey_subreq) {
+		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
+		if (!next) {
+			return KR_STATE_FAIL;
+		}
+		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
+		if (state != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
+		return KR_STATE_DONE;
 	}
 
 	bool nods = false;
@@ -963,17 +995,13 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		ns_req = false;
 		minimized = false;
 
-		if (resume) {
-			wanted_name = qry->zone_cut.name;
-		} else if (qry->parent == NULL) {
-			int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
-			int wanted_name_labels = knot_dname_labels(wanted_name, NULL);
-			while (wanted_name[0] && wanted_name_labels > cut_labels + name_offset) {
-				wanted_name = knot_wire_next_label(wanted_name, NULL);
-				wanted_name_labels -= 1;
-			}
-			minimized = (wanted_name != qry->sname);
+		int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
+		int wanted_name_labels = knot_dname_labels(wanted_name, NULL);
+		while (wanted_name[0] && wanted_name_labels > cut_labels + name_offset) {
+			wanted_name = knot_wire_next_label(wanted_name, NULL);
+			wanted_name_labels -= 1;
 		}
+		minimized = (wanted_name != qry->sname);
 
 		for (int i = 0; i < request->rplan.resolved.len; ++i) {
 			struct kr_query *q = request->rplan.resolved.at[i];
@@ -992,9 +1020,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			}
 		}
 
-		if (qry->parent == NULL &&
-		    ds_req && !ns_req && (minimized || resume) &&
-		    !knot_dname_is_equal(qry->zone_cut.name, wanted_name)) {
+		if (ds_req && !ns_req && (minimized || resume)) {
 			struct kr_query *next = kr_rplan_push(rplan, qry, wanted_name,
 							      qry->sclass, KNOT_RRTYPE_NS);
 			if (!next) {
@@ -1021,7 +1047,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			nods = ds_req;
 		}
 		name_offset += 1;
-	} while (ds_req && ns_req && !resume);
+	} while (ds_req && ns_req /* && !resume */ && minimized);
 
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, wanted_name)){
@@ -1055,9 +1081,9 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		}
 	}
 
-	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
-	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
-	const bool refetch_ta = (!has_ta || !knot_dname_is_equal(wanted_name, ta_name));
+	has_ta = (qry->zone_cut.trust_anchor != NULL);
+	ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
+	refetch_ta = (!has_ta || !knot_dname_is_equal(wanted_name, ta_name));
 	if (!nods && want_secured && refetch_ta) {
 		struct kr_query *next = kr_rplan_push(rplan, qry, wanted_name, qry->sclass, KNOT_RRTYPE_DS);
 		if (!next) {
@@ -1075,8 +1101,8 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 
 	/* Try to fetch missing DNSKEY.
 	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
-	const bool is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
-	const bool refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
+	is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
+	refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
 	if (want_secured && refetch_key && !is_dnskey_subreq) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
@@ -1088,6 +1114,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		}
 		return KR_STATE_DONE;
 	}
+
 	return KR_STATE_PRODUCE;
 }
 

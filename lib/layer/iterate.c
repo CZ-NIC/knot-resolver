@@ -654,6 +654,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		}
 		if (query->flags & QUERY_FORWARD) {
 			next->flags |= (QUERY_FORWARD | QUERY_AWAIT_CUT);
+			next->forward_flags |= QUERY_CNAME;
 			state = kr_nsrep_copy_set(&next->ns, &query->ns);
 			if (state != kr_ok()) {
 				return KR_STATE_FAIL;
@@ -661,6 +662,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		} else {
 			next->flags |= QUERY_AWAIT_CUT;
 		}
+		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's posible to secure
 		 * this name (i.e. iff it is covered by a TA) */
 		if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
@@ -919,7 +921,10 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break; /* OK */
 	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_SERVFAIL: {
-		if (query->flags & QUERY_STUB) { break; } /* Pass through in stub mode */
+		if (query->flags & (QUERY_STUB | QUERY_FORWARD)) {
+			 /* Pass through in stub mode */
+			break;
+		}
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		query->fails += 1;
 		if (query->fails >= KR_QUERY_NSRETRY_LIMIT) {
