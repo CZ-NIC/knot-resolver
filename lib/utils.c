@@ -468,6 +468,51 @@ int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool)
 	return kr_ok();
 }
 
+/** Return whether two RRsets match, i.e. would form the same set; see ranked_rr_array_t */
+static inline bool rrsets_match(const knot_rrset_t *rr1, const knot_rrset_t *rr2)
+{
+	bool match = rr1->type == rr2->type && rr1->rclass == rr2->rclass;
+	if (match && rr2->type == KNOT_RRTYPE_RRSIG) {
+		match = match && knot_rrsig_type_covered(&rr1->rrs, 0)
+				  == knot_rrsig_type_covered(&rr2->rrs, 0);
+	}
+	match = match && knot_dname_is_equal(rr1->owner, rr2->owner);
+	return match;
+}
+
+/** Ensure that an index in a ranked array won't cause "duplicate" RRsets on wire.
+ *
+ * Other entries that would form the same RRset get to_wire = false.
+ * See also rrsets_match.
+ */
+static int to_wire_ensure_unique(ranked_rr_array_t *array, size_t index)
+{
+	bool ok = array && index < array->len;
+	if (!ok) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
+
+	const struct ranked_rr_array_entry *e0 = array->at[index];
+	if (!e0->to_wire) {
+		return kr_ok();
+	}
+
+	for (ssize_t i = array->len - 1; i >= 0; --i) {
+		/* ^ iterate backwards, as the end is more likely in CPU caches */
+		struct ranked_rr_array_entry *ei = array->at[i];
+		if (ei->qry_uid == e0->qry_uid /* assumption: no duplicates within qry */
+		    || !ei->to_wire /* no use for complex comparison if @to_wire */
+		   ) {
+			continue;
+		}
+		if (rrsets_match(ei->rr, e0->rr)) {
+			ei->to_wire = false;
+		}
+	}
+	return kr_ok();
+}
+
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool)
 {
@@ -483,22 +528,18 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		if (stashed->qry_uid != qry_uid) {
 			break;
 		}
-		if (stashed->rr->rclass == rr->rclass &&
-		    stashed->rr->type == rr->type &&
-		    knot_dname_is_equal(stashed->rr->owner, rr->owner)) {
-			/* Don't merge RRSIGs covering different types.
-			 * Cache-related code relies on that. */
-			if (rr->type == KNOT_RRTYPE_RRSIG &&
-			    knot_rrsig_type_covered(&rr->rrs, 0)
-					!= knot_rrsig_type_covered(&stashed->rr->rrs, 0)) {
-				continue;
-			}
-			assert(stashed->rank == rank &&
-			       stashed->cached == false &&
-			       stashed->to_wire == to_wire);
-			/* Merge */
-			return knot_rdataset_merge(&stashed->rr->rrs, &rr->rrs, pool);
+		if (!rrsets_match(stashed->rr, rr)) {
+			continue;
 		}
+		/* Found the entry to merge with.  Check consistency and merge. */
+		bool ok = stashed->rank == rank
+			&& !stashed->cached
+			&& stashed->to_wire == to_wire;
+		if (!ok) {
+			assert(false);
+			return kr_error(EEXIST);
+		}
+		return knot_rdataset_merge(&stashed->rr->rrs, &rr->rrs, pool);
 	}
 
 	/* No stashed rrset found, add */
@@ -525,7 +566,8 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	entry->yielded = false;
 	entry->to_wire = to_wire;
 	array_push(*array, entry);
-	return kr_ok();
+
+	return to_wire_ensure_unique(array, array->len - 1);
 }
 
 int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
@@ -537,24 +579,9 @@ int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
 			continue;
 		}
 		entry->to_wire = to_wire;
-		if (!to_wire || !check_dups) {
-			continue;
-		}
-		knot_rrset_t *rr = entry->rr;
-		for (size_t j = 0; j < array->len; ++j) {
-			ranked_rr_array_entry_t *stashed = array->at[j];
-			if (stashed->qry_uid == qry_uid) {
-				continue;
-			}
-			if (stashed->rr->rclass != rr->rclass ||
-			    stashed->rr->type != rr->type) {
-				continue;
-			}
-			bool is_equal = knot_rrset_equal(rr, stashed->rr,
-							 KNOT_RRSET_COMPARE_WHOLE);
-			if (is_equal) {
-				stashed->to_wire = false;
-			}
+		if (check_dups) {
+			int ret = to_wire_ensure_unique(array, i);
+			if (ret) return ret;
 		}
 	}
 	return kr_ok();

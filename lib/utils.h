@@ -111,6 +111,7 @@ static inline long time_diff(struct timeval *begin, struct timeval *end) {
 
 /** @cond internal Array types */
 struct kr_context;
+
 typedef array_t(knot_rrset_t *) rr_array_t;
 struct ranked_rr_array_entry {
 	uint32_t qry_uid;
@@ -122,6 +123,14 @@ struct ranked_rr_array_entry {
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
+
+/** Array of RRsets coming from multiple queries; for struct kr_request.
+ *
+ * Notes:
+ *  - RRSIGs are only considered to form an RRset when the types covered match;
+ *    cache-related code relies on that!
+ *  - RRsets from the same packet (qry_uid) get merged.
+ */
 typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 /* @endcond */
 
