@@ -1030,13 +1030,13 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			nods = true;
 		} else if (resume && !ds_req) {
 			nods = false;
-		} else if (!minimized) {
+		} else if (!minimized && qry->stype != KNOT_RRTYPE_DNSKEY) {
 			nods = true;
 		} else {
 			nods = ds_req;
 		}
 		name_offset += 1;
-	} while (ds_req && ns_req /* && !resume */ && minimized);
+	} while (ds_req && ns_req && minimized);
 
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, wanted_name)){
