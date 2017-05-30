@@ -462,10 +462,6 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 		next->flags |= QUERY_AWAIT_CUT;
 	}
 	if (qry->flags & QUERY_FORWARD) {
-		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-		if (state != kr_ok()) {
-			return KR_STATE_FAIL;
-		}
 		next->flags &= ~QUERY_AWAIT_CUT;
 	}
 	next->flags |= QUERY_DNSSEC_WANT;
@@ -600,8 +596,7 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!nods && qtype != KNOT_RRTYPE_DS) {
 		struct kr_rplan *rplan = &req->rplan;
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->sname, qry->sclass, KNOT_RRTYPE_DS);
-		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-		if (state != kr_ok()) {
+		if (!next) {
 			return KR_STATE_FAIL;
 		}
 		kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
@@ -660,9 +655,9 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 					}
 				} else if (qry->stype != KNOT_RRTYPE_DS) {
 					struct kr_rplan *rplan = &req->rplan;
-					struct kr_query *next = kr_rplan_push(rplan, qry, qry->sname, qry->sclass, KNOT_RRTYPE_DS);
-					int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-					if (state != kr_ok()) {
+					struct kr_query *next = kr_rplan_push(rplan, qry, qry->sname,
+									      qry->sclass, KNOT_RRTYPE_DS);
+					if (!next) {
 						return KR_STATE_FAIL;
 					}
 					kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);

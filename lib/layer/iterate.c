@@ -639,7 +639,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		VERBOSE_MSG("<= cname chain, following\n");
 		/* Check if the same query was already resolved */
 		for (int i = 0; i < req->rplan.resolved.len; ++i) {
-			struct kr_query * q = req->rplan.resolved.at[i];
+			struct kr_query *q = req->rplan.resolved.at[i];
 			if (q->parent == query->parent &&
 			    q->sclass == query->sclass &&
 			    q->stype == query->stype   &&
@@ -652,15 +652,15 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (!next) {
 			return KR_STATE_FAIL;
 		}
+		next->flags |= QUERY_AWAIT_CUT;
 		if (query->flags & QUERY_FORWARD) {
-			next->flags |= (QUERY_FORWARD | QUERY_AWAIT_CUT);
 			next->forward_flags |= QUERY_CNAME;
-			state = kr_nsrep_copy_set(&next->ns, &query->ns);
-			if (state != kr_ok()) {
-				return KR_STATE_FAIL;
+			if (query->parent == NULL) {
+				state = kr_nsrep_copy_set(&next->ns, &query->ns);
+				if (state != kr_ok()) {
+					return KR_STATE_FAIL;
+				}
 			}
-		} else {
-			next->flags |= QUERY_AWAIT_CUT;
 		}
 		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's posible to secure

@@ -138,6 +138,15 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	qry->reorder = qry->flags & QUERY_REORDER_RR
 		? knot_wire_get_id(rplan->request->answer->wire)
 		: 0;
+
+	/* When forwarding, keep the nameserver addresses. */
+	if (parent && (parent->flags & qry->flags & QUERY_FORWARD)) {
+		ret = kr_nsrep_copy_set(&qry->ns, &parent->ns);
+		if (ret) {
+			return NULL;
+		}
+	}
+
 	array_push(rplan->pending, qry);
 
 	return qry;

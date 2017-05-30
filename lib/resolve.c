@@ -976,10 +976,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		if (!next) {
 			return KR_STATE_FAIL;
 		}
-		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-		if (state != kr_ok()) {
-			return KR_STATE_FAIL;
-		}
 		return KR_STATE_DONE;
 	}
 
@@ -1021,18 +1017,11 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		}
 
 		if (ds_req && !ns_req && (minimized || resume)) {
-			struct kr_query *next = kr_rplan_push(rplan, qry, wanted_name,
-							      qry->sclass, KNOT_RRTYPE_NS);
+			struct kr_query *next = zone_cut_subreq(rplan, qry, wanted_name,
+								KNOT_RRTYPE_NS);
 			if (!next) {
 				return KR_STATE_FAIL;
 			}
-			int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-			if (state != kr_ok()) {
-				return KR_STATE_FAIL;
-			}
-			kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
-			kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
-			next->flags |= QUERY_DNSSEC_WANT;
 			return KR_STATE_DONE;
 		}
 
@@ -1085,17 +1074,11 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
 	refetch_ta = (!has_ta || !knot_dname_is_equal(wanted_name, ta_name));
 	if (!nods && want_secured && refetch_ta) {
-		struct kr_query *next = kr_rplan_push(rplan, qry, wanted_name, qry->sclass, KNOT_RRTYPE_DS);
+		struct kr_query *next = zone_cut_subreq(rplan, qry, wanted_name,
+							KNOT_RRTYPE_DS);
 		if (!next) {
 			return KR_STATE_FAIL;
 		}
-		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-		if (state != kr_ok()) {
-			return KR_STATE_FAIL;
-		}
-		kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
-		kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
-		next->flags |= QUERY_DNSSEC_WANT;
 		return KR_STATE_DONE;
 	}
 
@@ -1106,10 +1089,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	if (want_secured && refetch_key && !is_dnskey_subreq) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
-			return KR_STATE_FAIL;
-		}
-		int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-		if (state != kr_ok()) {
 			return KR_STATE_FAIL;
 		}
 		return KR_STATE_DONE;
@@ -1170,15 +1149,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 		if (!next) {
 			return KR_STATE_FAIL;
 		}
-		if (qry->flags & QUERY_FORWARD) {
-			int state = kr_nsrep_copy_set(&next->ns, &qry->ns);
-			if (state != kr_ok()) {
-				return KR_STATE_FAIL;
-			}
-		} else {
-			next->flags |= QUERY_AWAIT_CUT;
-		}
-		next->flags |= QUERY_DNSSEC_WANT;
+		next->flags |= (QUERY_AWAIT_CUT | QUERY_DNSSEC_WANT);
 		return KR_STATE_DONE;
 	}
 	/* Try to fetch missing DNSKEY (either missing or above current cut).
