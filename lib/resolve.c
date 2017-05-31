@@ -27,6 +27,7 @@
 #include "lib/rplan.h"
 #include "lib/layer/iterate.h"
 #include "lib/dnssec/ta.h"
+#include "lib/dnssec.h"
 #if defined(ENABLE_COOKIES)
 #include "lib/cookies/control.h"
 #include "lib/cookies/helper.h"
@@ -982,6 +983,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	bool nods = false;
 	bool ds_req = false;
 	bool ns_req = false;
+	bool ns_exist = true;
 	bool minimized = false;
 	int name_offset = 1;
 	do {
@@ -990,6 +992,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		ds_req = false;
 		ns_req = false;
 		minimized = false;
+		ns_exist = true;
 
 		int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
 		int wanted_name_labels = knot_dname_labels(wanted_name, NULL);
@@ -1010,13 +1013,18 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 					if (qry->flags & QUERY_DNSSEC_NODS) {
 						nods = true;
 					}
+					if (!(q->flags & QUERY_DNSSEC_OPTOUT)) {
+						int ret = kr_dnssec_matches_name_and_type(&request->auth_selected, q->uid,
+											  wanted_name, KNOT_RRTYPE_NS);
+						ns_exist = (ret == kr_ok());
+					}
 				} else {
 					ns_req = true;
 				}
 			}
 		}
 
-		if (ds_req && !ns_req && (minimized || resume)) {
+		if (ds_req && ns_exist && !ns_req && (minimized || resume)) {
 			struct kr_query *next = zone_cut_subreq(rplan, qry, wanted_name,
 								KNOT_RRTYPE_NS);
 			if (!next) {
@@ -1036,7 +1044,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			nods = ds_req;
 		}
 		name_offset += 1;
-	} while (ds_req && ns_req && minimized);
+	} while (ds_req && (ns_req || !ns_exist) && minimized);
 
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, wanted_name)){

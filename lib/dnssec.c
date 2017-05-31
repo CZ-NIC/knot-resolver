@@ -34,6 +34,7 @@
 #include "lib/dnssec/nsec3.h"
 #include "lib/dnssec/signature.h"
 #include "lib/dnssec.h"
+#include "lib/resolve.h"
 
 void kr_crypto_init(void)
 {
@@ -382,4 +383,35 @@ void kr_dnssec_key_free(struct dseckey **key)
 
 	dnssec_key_free((dnssec_key_t *) *key);
 	*key = NULL;
+}
+
+int kr_dnssec_matches_name_and_type(const ranked_rr_array_t *rrs, uint32_t qry_uid,
+				    const knot_dname_t *name, uint16_t type)
+{
+	int ret = kr_error(ENOENT);
+	for (size_t i = 0; i < rrs->len; ++i) {
+		const ranked_rr_array_entry_t *entry = rrs->at[i];
+		const knot_rrset_t *nsec = entry->rr;
+		if (entry->qry_uid != qry_uid || entry->yielded) {
+			continue;
+		}
+		if (nsec->type != KNOT_RRTYPE_NSEC &&
+		    nsec->type != KNOT_RRTYPE_NSEC3) {
+			continue;
+		}
+		if (!kr_rank_test(entry->rank, KR_RANK_SECURE)) {
+			continue;
+		}
+		if (nsec->type == KNOT_RRTYPE_NSEC) {
+			ret = kr_nsec_matches_name_and_type(nsec, name, type);
+		} else {
+			ret = kr_nsec3_matches_name_and_type(nsec, name, type);
+		}
+		if (ret == kr_ok()) {
+			return kr_ok();
+		} else if (ret != kr_error(ENOENT)) {
+			return ret;
+		}
+	}
+	return ret;
 }
