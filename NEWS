@@ -1,4 +1,4 @@
-Knot Resolver 1.3.0 ? (2017-05-??)
+Knot Resolver 1.3.0 (2017-06-??)
 ================================
 
 Security
@@ -10,7 +10,9 @@ Security
 
 Improvements
 ------------
-- allow answering from cache in non-iterative modes (#122)
+- major feature: support for forwarding with validation (#112).
+  The old policy.FORWARD action now does that; the previous non-validating
+  mode is still avaliable as policy.STUB except that also uses caching (#122).
 - command line: specify ports via @ but still support # for compatibility
 - policy: recognize 100.64.0.0/10 as local addresses
 - layer/iterate: *do* retry repeatedly if REFUSED, as we can't yet easily
