@@ -18,6 +18,9 @@ Improvements
 - modules: allow changing the directory where modules are found,
   and do not search the default library path anymore.
 
+Bugfixes
+--------
+- validate: fix insufficient caching for some cases (relatively rare)
 
 Knot Resolver 1.2.6 (2017-04-24)
 ================================
