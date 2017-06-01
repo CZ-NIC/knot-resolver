@@ -21,6 +21,8 @@ Improvements
 Bugfixes
 --------
 - validate: fix insufficient caching for some cases (relatively rare)
+- avoid putting "duplicate" record-sets into the answer (#198)
+
 
 Knot Resolver 1.2.6 (2017-04-24)
 ================================
