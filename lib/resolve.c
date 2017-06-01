@@ -980,6 +980,10 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_DONE;
 	}
 
+	if (qry->parent == NULL && (qry->flags & QUERY_CNAME)) {
+		return KR_STATE_PRODUCE;
+	}
+
 	bool nods = false;
 	bool ds_req = false;
 	bool ns_req = false;
