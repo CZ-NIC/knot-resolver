@@ -195,8 +195,8 @@ struct kr_request {
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;
 	rr_array_t additional;
-	bool answ_validated;
-	bool auth_validated;
+	bool answ_validated; /**< internal to validator; beware of caching, etc. */
+	bool auth_validated; /**< see answ_validated ^^ ; TODO */
 	struct kr_rplan rplan;
 	int has_tls;
 	knot_mm_t pool;
