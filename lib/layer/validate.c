@@ -350,12 +350,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 	const bool referral = !knot_wire_get_aa(answer->wire);
 	if (referral) {
 		section = KNOT_AUTHORITY;
-	} /* else if  {
-		 Not referral, but RCODE is NXDOMAIN.
-		 * Since we are here NXDOMAIN is proved above,
-		 * so do nothing and exit.
-		return kr_ok();
-	} */ else if (knot_pkt_qtype(answer) == KNOT_RRTYPE_DS &&
+	} else if (knot_pkt_qtype(answer) == KNOT_RRTYPE_DS &&
 		   !(qry->flags & QUERY_CNAME) &&
 		   (knot_wire_get_rcode(answer->wire) != KNOT_RCODE_NXDOMAIN)) {
 		section = KNOT_ANSWER;
