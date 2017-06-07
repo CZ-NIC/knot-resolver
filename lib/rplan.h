@@ -57,6 +57,7 @@
 	X(DNSSEC_OPTOUT,   1 << 28) /**< Closest encloser proof has optout */ \
 	X(NONAUTH,         1 << 29) /**< Non-authoritative in-bailiwick records are enough.
 				     *   TODO: utilize this also outside cache. */ \
+	X(FORWARD,	   1 << 30) /**< Forward all queries to upstream; validate answers */ \
 			/* 1 << 31       Used by ../modules/dns64/dns64.lua */
 
 /** Query flags */
@@ -88,6 +89,8 @@ struct kr_query {
 	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
+	uint32_t forward_flags;
+	struct kr_query *cname_parent;
 };
 
 /** @cond internal Array of queries. */
@@ -178,3 +181,19 @@ bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint
 KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 
+/** Return query predecessor. */
+KR_EXPORT KR_PURE
+struct kr_query *kr_rplan_next(struct kr_query *qry);
+
+/**
+ * Check if a given query already resolved.
+ * @param rplan plan instance
+ * @param parent query parent (or NULL)
+ * @param name resolved name
+ * @param cls  resolved class
+ * @param type resolved type
+ * @return query instance or NULL
+ */
+KR_EXPORT KR_PURE
+struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query *parent,
+                               const knot_dname_t *name, uint16_t cls, uint16_t type);

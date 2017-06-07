@@ -321,3 +321,17 @@ int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t
 	}
 	return kr_ok();
 }
+
+int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src)
+{
+	if (!dst || !src ) {
+		return kr_error(EINVAL);
+	}
+
+	memcpy(dst, src, sizeof(struct kr_nsrep));
+	dst->name = (const uint8_t *)"";
+	dst->score = KR_NS_UNKNOWN;
+	dst->reputation = 0;
+
+	return kr_ok();
+}

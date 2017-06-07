@@ -138,3 +138,14 @@ int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, con
  * @param key Pointer to freed key.
  */
 void kr_dnssec_key_free(struct dseckey **key);
+
+/**
+ * Checks whether NSEC/NSEC3 RR selected by iterator matches the supplied name and type.
+ * @param rrs     Records selected by iterator.
+ * @param qry_uid Query unique identifier where NSEC/NSEC3 belongs to.
+ * @param name    Name to be checked.
+ * @param type    Type to be checked.
+ * @return        0 or error code.
+ */
+int kr_dnssec_matches_name_and_type(const ranked_rr_array_t *rrs, uint32_t qry_uid,
+				    const knot_dname_t *name, uint16_t type);

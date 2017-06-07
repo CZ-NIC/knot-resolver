@@ -70,3 +70,13 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
  *                   EINVAL - bogus.
  */
 int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt);
+
+/**
+ * Checks whether supplied NSEC3 RR matches the supplied name and type.
+ * @param nsec3 NSEC3 RR.
+ * @param name  Name to be checked.
+ * @param type  Type to be checked.
+ * @return      0 or error code.
+ */
+int kr_nsec3_matches_name_and_type(const knot_rrset_t *nsec3,
+				   const knot_dname_t *name, uint16_t type);

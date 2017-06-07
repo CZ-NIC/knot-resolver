@@ -138,6 +138,15 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	qry->reorder = qry->flags & QUERY_REORDER_RR
 		? knot_wire_get_id(rplan->request->answer->wire)
 		: 0;
+
+	/* When forwarding, keep the nameserver addresses. */
+	if (parent && (parent->flags & qry->flags & QUERY_FORWARD)) {
+		ret = kr_nsrep_copy_set(&qry->ns, &parent->ns);
+		if (ret) {
+			return NULL;
+		}
+	}
+
 	array_push(rplan->pending, qry);
 
 	return qry;
@@ -224,6 +233,22 @@ struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan)
 		return NULL;
 	}
 	return array_tail(rplan->resolved);
+}
+
+struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query *parent,
+                               const knot_dname_t *name, uint16_t cls, uint16_t type)
+{
+	struct kr_query *ret = NULL;
+	for (int i = 0; i < rplan->resolved.len; ++i) {
+		struct kr_query *q = rplan->resolved.at[i];
+		if (q->stype == type && q->sclass == cls &&
+		    (parent == NULL || q->parent == parent) &&
+		    knot_dname_is_equal(q->sname, name)) {
+			ret = q;
+			break;
+		}
+	}
+	return ret;
 }
 
 #undef VERBOSE_MSG

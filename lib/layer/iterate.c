@@ -360,6 +360,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	assert(!(qry->flags & QUERY_STUB));
 
 	int result = KR_STATE_CONSUME;
+	if (qry->flags & QUERY_FORWARD) {
+		return result;
+	}
+
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
 #ifdef STRICT_MODE
@@ -605,7 +609,8 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 
 	/* This answer didn't improve resolution chain, therefore must be authoritative (relaxed to negative). */
 	if (!is_authoritative(pkt, query)) {
-		if (pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+		if (!(query->flags & QUERY_FORWARD) &&
+		    pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
 			VERBOSE_MSG("<= lame response: non-auth sent negative response\n");
 			return KR_STATE_FAIL;
 		}
@@ -634,7 +639,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		VERBOSE_MSG("<= cname chain, following\n");
 		/* Check if the same query was already resolved */
 		for (int i = 0; i < req->rplan.resolved.len; ++i) {
-			struct kr_query * q = req->rplan.resolved.at[i];
+			struct kr_query *q = req->rplan.resolved.at[i];
 			if (q->parent == query->parent &&
 			    q->sclass == query->sclass &&
 			    q->stype == query->stype   &&
@@ -648,7 +653,16 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 		next->flags |= QUERY_AWAIT_CUT;
-
+		if (query->flags & QUERY_FORWARD) {
+			next->forward_flags |= QUERY_CNAME;
+			if (query->parent == NULL) {
+				state = kr_nsrep_copy_set(&next->ns, &query->ns);
+				if (state != kr_ok()) {
+					return KR_STATE_FAIL;
+				}
+			}
+		}
+		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's posible to secure
 		 * this name (i.e. iff it is covered by a TA) */
 		if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
@@ -907,7 +921,10 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break; /* OK */
 	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_SERVFAIL: {
-		if (query->flags & QUERY_STUB) { break; } /* Pass through in stub mode */
+		if (query->flags & (QUERY_STUB | QUERY_FORWARD)) {
+			 /* Pass through in stub mode */
+			break;
+		}
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		query->fails += 1;
 		if (query->fails >= KR_QUERY_NSRETRY_LIMIT) {

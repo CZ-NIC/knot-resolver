@@ -31,6 +31,20 @@ knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name)
 	return map_get(trust_anchors, (const char *)name);
 }
 
+const knot_dname_t *kr_ta_get_longest_name(map_t *trust_anchors, const knot_dname_t *name)
+{
+	while(name) {
+		if (kr_ta_get(trust_anchors, name)) {
+			return name;
+		}
+		if (name[0] == '\0') {
+			break;
+		}
+		name = knot_wire_next_label(name, NULL);
+	}
+	return NULL;
+}
+
 /* @internal Create DS from DNSKEY, caller MUST free dst if successful. */
 static int dnskey2ds(dnssec_binary_t *dst, const knot_dname_t *owner, const uint8_t *rdata, uint16_t rdlen)
 {

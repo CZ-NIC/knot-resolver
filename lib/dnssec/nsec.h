@@ -82,3 +82,13 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
  *		     EINVAL - bogus.
  */
 int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt);
+
+/**
+ * Checks whether supplied NSEC RR matches the supplied name and type.
+ * @param nsec  NSEC RR.
+ * @param name  Name to be checked.
+ * @param type  Type to be checked.
+ * @return      0 or error code.
+ */
+int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
+				   const knot_dname_t *name, uint16_t type);

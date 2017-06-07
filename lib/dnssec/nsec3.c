@@ -818,3 +818,14 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 	return kr_error(EINVAL);
 }
 
+int kr_nsec3_matches_name_and_type(const knot_rrset_t *nsec3,
+				   const knot_dname_t *name, uint16_t type)
+{
+	int flags = 0;
+	int ret = matches_name_and_type(&flags, nsec3, name, type);
+	if (ret != kr_ok()) {
+		return ret;
+	}
+	return ((flags & (FLG_NAME_MATCHED | FLG_TYPE_BIT_MISSING)) != FLG_NAME_MATCHED) ?
+	       kr_error(ENOENT) : kr_ok();
+}

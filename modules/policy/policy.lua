@@ -55,7 +55,6 @@ local function mirror(target)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
 	return function(state, req)
 		if state == kres.FAIL then return state end
-		req = kres.request_t(req)
 		local query = req.qsource.packet
 		if query ~= nil then
 			sink:send(ffi.string(query.wire, query.size))
@@ -65,6 +64,26 @@ local function mirror(target)
 end
 
 -- Forward request, and solve as stub query
+local function stub(target)
+	local list = {}
+	if type(target) == 'table' then
+		for _, v in pairs(target) do
+			table.insert(list, addr2sock(v))
+			assert(#list <= 4, 'at most 4 STUB targets are supported')
+		end
+	else
+		table.insert(list, addr2sock(target))
+	end
+	return function(state, req)
+		local qry = req:current()
+		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
+		qry.flags = bit.band(bit.bor(qry.flags, kres.query.STUB), bit.bnot(kres.query.ALWAYS_CUT))
+		qry:nslist(list)
+		return state
+	end
+end
+
+-- Forward request and all subrequests to upstream; validate answers
 local function forward(target)
 	local list = {}
 	if type(target) == 'table' then
@@ -76,10 +95,11 @@ local function forward(target)
 		table.insert(list, addr2sock(target))
 	end
 	return function(state, req)
-		req = kres.request_t(req)
 		local qry = req:current()
-		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
-		qry.flags = bit.band(bit.bor(qry.flags, kres.query.STUB), bit.bnot(kres.query.ALWAYS_CUT))
+		req.options = bit.bor(bit.bor(req.options, kres.query.FORWARD), kres.query.NO_MINIMIZE)
+		qry.flags = bit.band(bit.bor(qry.flags, kres.query.FORWARD), bit.bnot(kres.query.ALWAYS_CUT))
+		qry.flags = bit.bor(qry.flags, kres.query.NO_MINIMIZE)
+		qry.flags = bit.bor(qry.flags, kres.query.AWAIT_CUT)
 		qry:nslist(list)
 		return state
 	end
@@ -100,7 +120,6 @@ end
 -- Set and clear some query flags
 local function flags(opts_set, opts_clear)
 	return function(state, req)
-		req = kres.request_t(req)
 		local qry = req:current()
 		qry.flags = bit.band(bit.bor(qry.flags, opts_set or 0), bit.bnot(opts_clear or 0))
 		return nil -- chain rule
@@ -110,7 +129,7 @@ end
 local policy = {
 	-- Policies
 	PASS = 1, DENY = 2, DROP = 3, TC = 4, QTRACE = 5,
-	FORWARD = forward, REROUTE = reroute, MIRROR = mirror, FLAGS = flags,
+	FORWARD = forward, STUB = stub, REROUTE = reroute, MIRROR = mirror, FLAGS = flags,
 	-- Special values
 	ANY = 0,
 }

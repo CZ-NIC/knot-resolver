@@ -757,14 +757,14 @@ void kr_pkt_print(knot_pkt_t *pkt)
 
 void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix)
 {
-	char str[KNOT_DNAME_MAXLEN];
+	char str[KNOT_DNAME_MAXLEN] = {0};
 	knot_dname_to_str(str, name, KNOT_DNAME_MAXLEN);
 	kr_log_verbose ("%s%s%s", prefix, str, postfix);
 }
 
 void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix)
 {
-	char str[32];
+	char str[32] = {0};
 	knot_rrtype_to_string(rrtype, str, 32);
 	kr_log_verbose ("%s%s%s", prefix, str, postfix);
 }

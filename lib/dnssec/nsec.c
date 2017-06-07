@@ -462,3 +462,24 @@ int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
 
 	return kr_error(EINVAL);
 }
+
+int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
+				   const knot_dname_t *name, uint16_t type)
+{
+	if (!nsec || !name) {
+		return (EINVAL);
+	}
+	if (!knot_dname_is_equal(nsec->owner, name)) {
+		return (ENOENT);
+	}
+	uint8_t *bm = NULL;
+	uint16_t bm_size = 0;
+	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+	if (!bm) {
+		return kr_error(EINVAL);
+	}
+	if (!kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+		return (ENOENT);
+	}
+	return kr_ok();
+}
