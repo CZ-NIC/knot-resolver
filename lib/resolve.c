@@ -467,15 +467,17 @@ static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
 }
 
 /**
- * \param all_secure optionally &&-combine security of written RRs into its value.
+ * @param all_secure optionally &&-combine security of written RRs into its value.
  *		     (i.e. if you pass a pointer to false, it will always remain)
+ * @param all_cname optionally output if all written RRs are CNAMEs and RRSIGs of CNAMEs
  * @return error code, ignoring if forced to truncate the packet.
  */
 static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *answer,
-				      bool *all_secure)
+				      bool *all_secure, bool *all_cname)
 {
 	const bool has_dnssec = knot_pkt_has_dnssec(answer);
 	bool all_sec = true;
+	bool all_cn = (all_cname != NULL); /* optim.: init as false if not needed */
 	int err = kr_ok();
 
 	for (size_t i = 0; i < arr->len; ++i) {
@@ -500,10 +502,14 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *
 		if (rr->type != KNOT_RRTYPE_RRSIG) {
 			all_sec = all_sec && kr_rank_test(entry->rank, KR_RANK_SECURE);
 		}
+		all_cn = all_cn && kr_rrset_type_maysig(entry->rr) == KNOT_RRTYPE_CNAME;
 	}
 
 	if (all_secure) {
 		*all_secure = *all_secure && all_sec;
+	}
+	if (all_cname) {
+		*all_cname = all_cn;
 	}
 	return err;
 }
@@ -578,6 +584,10 @@ static int answer_finalize(struct kr_request *request, int state)
 
 	struct kr_query *last = rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
 		/* TODO  ^^^^ this is slightly fragile */
+
+	/* AD flag.  We can only change `secure` from true to false.
+	 * Be conservative.  Primary approach: check ranks of all RRs in wire.
+	 * Only "negative answers" need special handling. */
 	bool secure = (last != NULL); /* suspicious otherwise */
 	if (last && (last->flags & QUERY_STUB)) {
 		secure = false; /* don't trust forwarding for now */
@@ -586,13 +596,16 @@ static int answer_finalize(struct kr_request *request, int state)
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
+	bool answ_all_cnames = false/*arbitrary*/;
 	if (request->answ_selected.len > 0) {
 		assert(answer->current <= KNOT_ANSWER);
 		/* Write answer records. */
 		if (answer->current < KNOT_ANSWER) {
 			knot_pkt_begin(answer, KNOT_ANSWER);
 		}
-		if (write_extra_ranked_records(&request->answ_selected, answer, &secure)) {
+		if (write_extra_ranked_records(&request->answ_selected, answer,
+						&secure, &answ_all_cnames))
+		{
 			return answer_fail(request);
 		}
 	}
@@ -601,7 +614,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	if (write_extra_ranked_records(&request->auth_selected, answer, &secure)) {
+	if (write_extra_ranked_records(&request->auth_selected, answer, &secure, NULL)) {
 		return answer_fail(request);
 	}
 	/* Write additional records. */
@@ -621,12 +634,15 @@ static int answer_finalize(struct kr_request *request, int state)
 		ret = edns_put(answer);
 	}
 
-	/* AD: negative answers need more handling. */
-	if (kr_response_classify(answer) != PKT_NOERROR && last) {
-		const bool OK = (last->flags & QUERY_DNSSEC_WANT)
-			&& !(last->flags & (QUERY_DNSSEC_BOGUS | QUERY_DNSSEC_INSECURE));
-		if (!OK) {
-			secure = false;
+	/* AD: "negative answers" need more handling. */
+	if (last && secure) {
+		if (kr_response_classify(answer) != PKT_NOERROR
+		    /* Additionally check for CNAME chains that "end in NODATA",
+		     * as those would also be PKT_NOERROR. */
+		    || (answ_all_cnames && knot_pkt_qtype(answer) != KNOT_RRTYPE_CNAME))
+		{
+			secure = secure && (last->flags & QUERY_DNSSEC_WANT)
+				&& !(last->flags & (QUERY_DNSSEC_BOGUS | QUERY_DNSSEC_INSECURE));
 		}
 	}
 	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
