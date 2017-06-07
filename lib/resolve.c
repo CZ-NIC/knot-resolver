@@ -636,6 +636,17 @@ static int answer_finalize(struct kr_request *request, int state)
 		knot_wire_clear_ad(answer->wire);
 	}
 
+	if (last) {
+		struct kr_query *cname_parent = last->cname_parent;
+		while (cname_parent != NULL) {
+			if (cname_parent->flags & QUERY_DNSSEC_OPTOUT) {
+				knot_wire_clear_ad(answer->wire);
+				break;
+			}
+			cname_parent = cname_parent->cname_parent;
+		}
+	}
+
 	return ret;
 }
 
