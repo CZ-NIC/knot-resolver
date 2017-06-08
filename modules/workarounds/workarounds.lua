@@ -6,7 +6,7 @@ local M = {} -- the module
 function M.config()
 	policy.add(policy.suffix(policy.FLAGS(kres.query.NO_0X20), {
 	--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0003.md
-		todname('avqs.mcafee.com'),
+		todname('avqs.mcafee.com'), todname('avts.mcafee.com'),
 
 	--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0006.md
 	--  Obtained via a reverse search on {ns1,ns3}.panthercdn.com.
