@@ -703,20 +703,23 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 				qry->flags |= QUERY_AWAIT_CUT;
 			}
 			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
-		} /* else zone cut matches, but DS/DNSKEY doesn't => refetch. */
-		if (qry->stype != KNOT_RRTYPE_DS) {
-			/* zone cut matches, but DS/DNSKEY doesn't => refetch. */
-			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
-			if (qry->flags & QUERY_FORWARD) {
-				struct kr_rplan *rplan = &req->rplan;
-				struct kr_query *next = kr_rplan_push(rplan, qry, signer, qry->sclass, KNOT_RRTYPE_DS);
-				if (!next) {
-					return KR_STATE_FAIL;
-				}
-				kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
-				kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
-				next->flags |= QUERY_DNSSEC_WANT;
+		}
+
+		/* zone cut matches, but DS/DNSKEY doesn't => refetch. */
+		VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
+		if ((qry->flags & QUERY_FORWARD) && qry->stype != KNOT_RRTYPE_DS) {
+			struct kr_rplan *rplan = &req->rplan;
+			struct kr_query *next = kr_rplan_push(rplan, qry, signer,
+							qry->sclass, KNOT_RRTYPE_DS);
+			if (!next) {
+				return KR_STATE_FAIL;
 			}
+			kr_zonecut_set(&next->zone_cut, qry->zone_cut.name);
+			kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
+			next->flags |= QUERY_DNSSEC_WANT;
+			return KR_STATE_YIELD;
+		}
+		if (!(qry->flags & QUERY_FORWARD)) {
 			return KR_STATE_YIELD;
 		}
 	}
