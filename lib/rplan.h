@@ -90,6 +90,7 @@ struct kr_query {
 	struct kr_layer_pickle *deferred;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 	uint32_t forward_flags;
+	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
 };
 

@@ -637,11 +637,10 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			}
 		}
 		VERBOSE_MSG("<= cname chain, following\n");
-		/* Check if the same query was already resolved */
-		for (int i = 0; i < req->rplan.resolved.len; ++i) {
-			struct kr_query *q = req->rplan.resolved.at[i];
-			if (q->parent == query->parent &&
-			    q->sclass == query->sclass &&
+		/* Check if the same query was followed in the same CNAME chain. */
+		for (const struct kr_query *q = query->cname_parent; q != NULL;
+				q = q->cname_parent) {
+			if (q->sclass == query->sclass &&
 			    q->stype == query->stype   &&
 			    knot_dname_is_equal(q->sname, cname)) {
 				VERBOSE_MSG("<= cname chain loop\n");
