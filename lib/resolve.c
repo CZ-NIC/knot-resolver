@@ -1288,9 +1288,14 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	struct kr_query *qry = array_tail(rplan->pending);
 	if (qry->deferred != NULL) {
 		/* @todo: Refactoring validator, check trust chain before resuming. */
-		int state = (qry->flags & QUERY_FORWARD) ?
-			    forward_trust_chain_check(request, qry, true) :
-			    trust_chain_check(request, qry);
+		int state = 0;
+		if (((qry->flags & QUERY_FORWARD) == 0) ||
+		    ((qry->stype == KNOT_RRTYPE_DS) && (qry->flags & QUERY_CNAME))) {
+			state = trust_chain_check(request, qry);
+		} else {
+			state = forward_trust_chain_check(request, qry, true);
+		}
+
 		switch(state) {
 		case KR_STATE_FAIL: return KR_STATE_FAIL;
 		case KR_STATE_DONE: return KR_STATE_PRODUCE;

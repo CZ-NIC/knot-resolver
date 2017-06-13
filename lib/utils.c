@@ -759,13 +759,22 @@ void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *po
 {
 	char str[KNOT_DNAME_MAXLEN] = {0};
 	knot_dname_to_str(str, name, KNOT_DNAME_MAXLEN);
-	kr_log_verbose ("%s%s%s", prefix, str, postfix);
+	kr_log_verbose("%s%s%s", prefix, str, postfix);
 }
 
 void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix)
 {
 	char str[32] = {0};
 	knot_rrtype_to_string(rrtype, str, 32);
-	kr_log_verbose ("%s%s%s", prefix, str, postfix);
+	kr_log_verbose("%s%s%s", prefix, str, postfix);
+}
+
+void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *postfix)
+{
+	char str[6] = {0};
+	knot_rrclass_to_string(qry->sclass, str, sizeof(str));
+	kr_dname_print(qry->sname, prefix, " ");
+	kr_log_verbose("%s",str);
+	kr_rrtype_print(qry->stype, " ", postfix);
 }
 
