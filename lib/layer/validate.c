@@ -503,6 +503,8 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		} else if (kr_rank_test(entry->rank, KR_RANK_MISSING) &&
 			   !invalid_entry) {
 			invalid_entry = entry;
+		} else if (kr_rank_test(entry->rank, KR_RANK_OMIT)) {
+			continue;
 		} else if (!kr_rank_test(entry->rank, KR_RANK_SECURE) &&
 			   !invalid_entry) {
 			invalid_entry = entry;
