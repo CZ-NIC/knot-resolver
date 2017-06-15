@@ -1044,6 +1044,10 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 					if (qry->flags & QUERY_DNSSEC_NODS) {
 						nods = true;
 					}
+					if (qry->flags & QUERY_CNAME) {
+						nods = true;
+						ns_req = true;
+					}
 					if (!(q->flags & QUERY_DNSSEC_OPTOUT)) {
 						int ret = kr_dnssec_matches_name_and_type(&request->auth_selected, q->uid,
 											  wanted_name, KNOT_RRTYPE_NS);
