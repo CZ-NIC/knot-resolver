@@ -83,7 +83,7 @@ static int satisfy_reverse(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 	knot_rrset_init(&rr, qname, KNOT_RRTYPE_PTR, KNOT_CLASS_IN);
 
 	/* Append address records from hints */
-	uint8_t *addr = pack_head(*addr_set);
+	uint8_t *addr = pack_last(*addr_set);
 	if (addr != NULL) {
 		size_t len = pack_obj_len(addr);
 		void *addr_val = pack_obj_val(addr);
@@ -334,8 +334,12 @@ static int load_map(struct hints_data *data, FILE *fp)
 			continue;
 		}
 		char *name_tok = strtok_r(NULL, " \t\n", &saveptr);
+		bool canonical_name = true;
 		while (name_tok != NULL) {
-			add_reverse_pair(&data->reverse_hints, name_tok, tok);
+			if (canonical_name) {
+				add_reverse_pair(&data->reverse_hints, name_tok, tok);
+				canonical_name = false;
+			}
 			if (add_pair(&data->hints, name_tok, tok) == 0) {
 				count += 1;
 			}
