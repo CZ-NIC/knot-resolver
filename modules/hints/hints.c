@@ -50,17 +50,6 @@ static char * bool2jsonstr(bool val)
 	return result;
 }
 
-/* Structure for reverse search (address to domain) */
-struct rev_search_baton {
-	knot_pkt_t *pkt;
-	const knot_dname_t *name;
-	union {
-		struct in_addr ip4;
-		struct in6_addr ip6;
-	} addr;
-	size_t addr_len;
-};
-
 static int put_answer(knot_pkt_t *pkt, knot_rrset_t *rr)
 {
 	int ret = 0;
@@ -79,13 +68,6 @@ static int put_answer(knot_pkt_t *pkt, knot_rrset_t *rr)
 	if (ret != 0) {
 		knot_rrset_clear(rr, &pkt->mm);
 	}
-	return ret;
-}
-
-static inline uint8_t label2num(const uint8_t **src, int base)
-{
-	uint8_t ret = strtoul((const char *)(*src + 1), NULL, base) & 0xff; /* ord(0-64) => labels are separators */
-	*src = knot_wire_next_label(*src, NULL);
 	return ret;
 }
 
