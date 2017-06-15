@@ -19,6 +19,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <libknot/libknot.h>
