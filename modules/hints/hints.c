@@ -134,6 +134,8 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!data) { /* No valid file. */
 		return ctx->state;
 	}
+	/* FIXME: putting directly into packet breaks ordering in case the hint
+	 * is applied after a CNAME jump. */
 	switch(qry->stype) {
 	case KNOT_RRTYPE_A:
 	case KNOT_RRTYPE_AAAA: /* Find forward record hints */
@@ -264,7 +266,7 @@ static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const ch
 	knot_dname_t ptr_name[KNOT_DNAME_MAXLEN];
 	if (!knot_dname_from_str(ptr_name, name, sizeof(ptr_name))) {
 		return kr_error(EINVAL);
-	}	
+	}
 
 	/* Build RDATA */
 	knot_rdata_t rdata[RDATA_ARR_MAX];
@@ -273,7 +275,10 @@ static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const ch
 	return kr_zonecut_add(hints, key, rdata);
 }
 
-/** For a given name, remove either one address or all of them (if == NULL). */
+/** For a given name, remove either one address or all of them (if == NULL).
+ *
+ * Also remove the corresponding reverse records.
+ */
 static int del_pair(struct hints_data *data, const char *name, const char *addr)
 {
 	/* Build key */
@@ -289,10 +294,10 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 		const knot_rdata_t *rdata = addr2rdata(addr);
 		if (!rdata) {
 			return kr_error(EINVAL);
-		}	
+		}
 		const knot_dname_t *reverse_key = addr2reverse(addr);
-		return kr_zonecut_del(&data->hints, key, rdata) | 
-		       kr_zonecut_del(&data->reverse_hints, reverse_key, ptr_rdata);
+		kr_zonecut_del(&data->reverse_hints, reverse_key, ptr_rdata);
+		return kr_zonecut_del(&data->hints, key, rdata);
 	} else {
 		/* Find a matching name */
 		pack_t *addr_set = kr_zonecut_find(&data->hints, key);
@@ -300,7 +305,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 			return kr_error(ENOENT);
 		}
 
-		/* Append address records from hints */
+		/* Remove address records in hints from reverse_hints. */
 		uint8_t *addr = pack_head(*addr_set);
 		while (addr != pack_tail(*addr_set)) {
 			void *addr_val = pack_obj_val(addr);
@@ -322,13 +327,13 @@ static int load_map(struct hints_data *data, FILE *fp)
 	size_t count = 0;
 	auto_free char *line = NULL;
 
-	while(getline(&line, &line_len, fp) > 0) {
+	while (getline(&line, &line_len, fp) > 0) {
 		char *saveptr = NULL;
 		char *tok = strtok_r(line, " \t\r", &saveptr);
 		if (tok == NULL || strchr(tok, '#') || strlen(tok) == 0) {
 			continue;
 		}
-		char *name_tok = strtok_r(NULL, " \t\n", &saveptr);		
+		char *name_tok = strtok_r(NULL, " \t\n", &saveptr);
 		while (name_tok != NULL) {
 			add_reverse_pair(&data->reverse_hints, name_tok, tok);
 			if (add_pair(&data->hints, name_tok, tok) == 0) {
@@ -385,8 +390,13 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	char *addr = strchr(args_copy, ' ');
 	if (addr) {
 		*addr = '\0';
-		add_reverse_pair(&data->reverse_hints, args_copy, addr + 1);
-		ret = add_pair(&data->hints, args_copy, addr + 1);
+		++addr;
+		ret = add_reverse_pair(&data->reverse_hints, args_copy, addr);
+		if (ret) {
+			del_pair(data, args_copy, addr);
+		} else {
+			ret = add_pair(&data->hints, args_copy, addr);
+		}
 	}
 
 	return bool2jsonstr(ret == 0);
@@ -563,15 +573,14 @@ int hints_init(struct kr_module *module)
 		mp_delete(pool->ctx);
 		return kr_error(ENOMEM);
 	}
-	data->hints.pool = pool;
 	kr_zonecut_init(&data->hints, (const uint8_t *)(""), pool);
-	data->reverse_hints.pool = pool;
 	kr_zonecut_init(&data->reverse_hints, (const uint8_t *)(""), pool);
 	module->data = data;
 
 	return kr_ok();
 }
 
+/** Release all resources. */
 KR_EXPORT
 int hints_deinit(struct kr_module *module)
 {
