@@ -185,50 +185,53 @@ static const knot_rdata_t * addr2rdata(const char *addr) {
 }
 
 /** @warning _NOT_ thread-safe; returns a pointer to static data! */
-static const knot_dname_t * raw_addr2reverse(const uint8_t *raw_addr, int family) 
+static const knot_dname_t * raw_addr2reverse(const union inaddr *addr)
 {
-	char reverse_addr[KNOT_DNAME_MAXLEN];
-	static knot_dname_t dname[KNOT_DNAME_MAXLEN];
-	if (family == AF_INET) {
-		snprintf(reverse_addr, KNOT_DNAME_MAXLEN, "%d.%d.%d.%d.in-addr.arpa.",
-		         raw_addr[3], raw_addr[2], raw_addr[1], raw_addr[0]
-		);
+	#define REV_MAXLEN (4*16 + 16 /* the suffix, terminator, etc. */)
+	char reverse_addr[REV_MAXLEN];
+	static knot_dname_t dname[REV_MAXLEN];
+	#undef REV_MAXLEN
+
+	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr(&addr->ip);
+	if (addr->ip.sa_family == AF_INET) {
+		snprintf(reverse_addr, sizeof(reverse_addr),
+			 "%d.%d.%d.%d.in-addr.arpa.",
+		         raw_addr[3], raw_addr[2], raw_addr[1], raw_addr[0]);
+	} else if (addr->ip.sa_family == AF_INET6) {
+		char *ra_it = reverse_addr;
+		for (int i = 15; i >= 0; --i) {
+			ssize_t free_space = reverse_addr + sizeof(reverse_addr) - ra_it;
+			int written = snprintf(ra_it, free_space, "%x.%x.",
+						raw_addr[i] & 0x0f, raw_addr[i] >> 4);
+			if (written >= free_space) {
+				assert(false);
+				return NULL;
+			}
+			ra_it += written;
+		}
+		ssize_t free_space = reverse_addr + sizeof(reverse_addr) - ra_it;
+		if (snprintf(ra_it, free_space, "ip6.arpa.") >= free_space) {
+			return NULL;
+		}
 	} else {
-		snprintf(reverse_addr, KNOT_DNAME_MAXLEN,
-		         "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.in-addr6.arpa.",
-		         raw_addr[7] & 0x0f, (raw_addr[7] > 4),
-			 raw_addr[6] & 0x0f, (raw_addr[6] > 4),
-			 raw_addr[5] & 0x0f, (raw_addr[5] > 4),
-			 raw_addr[4] & 0x0f, (raw_addr[4] > 4),
-			 raw_addr[3] & 0x0f, (raw_addr[3] > 4),
-			 raw_addr[2] & 0x0f, (raw_addr[2] > 4),
-			 raw_addr[1] & 0x0f, (raw_addr[1] > 4),
-			 raw_addr[0] & 0x0f, (raw_addr[0] > 4)
-		);
+		return NULL;
 	}
 	
 	if (!knot_dname_from_str(dname, reverse_addr, sizeof(dname))) {
-		return NULL;
-	}
-	if (knot_dname_to_lower(dname) != KNOT_EOK) {
 		return NULL;
 	}
 	return dname;
 }
 
 /** @warning _NOT_ thread-safe; returns a pointer to static data! */
-static const knot_dname_t * addr2reverse(const char *addr) 
+static const knot_dname_t * addr2reverse(const char *addr)
 {
 	/* Parse address string */
 	struct sockaddr_storage ss;
 	if (parse_addr_str(&ss, addr) != 0) {
 		return NULL;
 	}
-	
-	// Convert ip address to reverse order
-	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr((struct sockaddr *)&ss);
-	int family = kr_inaddr_family((struct sockaddr *)&ss);
-	return raw_addr2reverse(raw_addr, family);
+	return raw_addr2reverse((union inaddr *)(struct sockaddr *)&ss);
 }
 
 static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr)
@@ -301,8 +304,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 		uint8_t *addr = pack_head(*addr_set);
 		while (addr != pack_tail(*addr_set)) {
 			void *addr_val = pack_obj_val(addr);
-			int family = pack_obj_len(addr) == kr_family_len(AF_INET) ? AF_INET : AF_INET6;
-			const knot_dname_t *reverse_key = raw_addr2reverse(addr_val, family);
+			const knot_dname_t *reverse_key = raw_addr2reverse((union inaddr *)addr_val);
 			if (reverse_key != NULL) {
 				kr_zonecut_del(&data->reverse_hints, reverse_key, ptr_rdata);
 			}
