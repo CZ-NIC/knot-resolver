@@ -365,17 +365,6 @@ static char* hint_add_hosts(void *env, struct kr_module *module, const char *arg
 	return bool2jsonstr(err == kr_ok());
 }
 
-static void unload(struct kr_module *module)
-{
-	struct hints_data *data = module->data;
-	if (data) {
-		kr_zonecut_deinit(&data->hints);
-		kr_zonecut_deinit(&data->reverse_hints);
-		mp_delete(data->hints.pool->ctx);
-		module->data = NULL;
-	}
-}
-
 /**
  * Set name => address hint.
  *
@@ -583,6 +572,19 @@ int hints_init(struct kr_module *module)
 	return kr_ok();
 }
 
+KR_EXPORT
+int hints_deinit(struct kr_module *module)
+{
+	struct hints_data *data = module->data;
+	if (data) {
+		kr_zonecut_deinit(&data->hints);
+		kr_zonecut_deinit(&data->reverse_hints);
+		mp_delete(data->hints.pool->ctx);
+		module->data = NULL;
+	}
+	return kr_ok();
+}
+
 /** Drop all hints, and load a hosts file if any was specified.
  *
  * It seems slightly strange to drop all, but keep doing that for now.
@@ -590,7 +592,7 @@ int hints_init(struct kr_module *module)
 KR_EXPORT
 int hints_config(struct kr_module *module, const char *conf)
 {
-	unload(module);
+	hints_deinit(module);
 	int err = hints_init(module);
 	if (err != kr_ok()) {
 		return err;
@@ -599,13 +601,6 @@ int hints_config(struct kr_module *module, const char *conf)
 	if (conf && conf[0]) {
 		return load_file(module, conf);
 	}
-	return kr_ok();
-}
-
-KR_EXPORT
-int hints_deinit(struct kr_module *module)
-{
-	unload(module);
 	return kr_ok();
 }
 
