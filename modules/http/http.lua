@@ -34,9 +34,10 @@ local mime_types = {
 -- Preload static contents, nothing on runtime will touch the disk
 local function pgload(relpath, modname)
 	if not modname then modname = 'http' end
-	local fp, err = io.open(string.format('%s/%s/%s', moduledir, modname, relpath), 'r')
+	local mdir = moduledir()
+	local fp, err = io.open(string.format('%s/%s/%s', mdir, modname, relpath), 'r')
 	if not fp then
-		fp, err = io.open(string.format('%s/%s/static/%s', moduledir, modname, relpath), 'r')
+		fp, err = io.open(string.format('%s/%s/static/%s', mdir, modname, relpath), 'r')
 	end
 	if not fp then error(err) end
 	local data = fp:read('*all')
