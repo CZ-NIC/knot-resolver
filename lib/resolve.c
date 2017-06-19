@@ -1044,6 +1044,10 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 					if (qry->flags & QUERY_DNSSEC_NODS) {
 						nods = true;
 					}
+					if (qry->flags & QUERY_CNAME) {
+						nods = true;
+						ns_req = true;
+					}
 					if (!(q->flags & QUERY_DNSSEC_OPTOUT)) {
 						int ret = kr_dnssec_matches_name_and_type(&request->auth_selected, q->uid,
 											  wanted_name, KNOT_RRTYPE_NS);
@@ -1288,9 +1292,14 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	struct kr_query *qry = array_tail(rplan->pending);
 	if (qry->deferred != NULL) {
 		/* @todo: Refactoring validator, check trust chain before resuming. */
-		int state = (qry->flags & QUERY_FORWARD) ?
-			    forward_trust_chain_check(request, qry, true) :
-			    trust_chain_check(request, qry);
+		int state = 0;
+		if (((qry->flags & QUERY_FORWARD) == 0) ||
+		    ((qry->stype == KNOT_RRTYPE_DS) && (qry->flags & QUERY_CNAME))) {
+			state = trust_chain_check(request, qry);
+		} else {
+			state = forward_trust_chain_check(request, qry, true);
+		}
+
 		switch(state) {
 		case KR_STATE_FAIL: return KR_STATE_FAIL;
 		case KR_STATE_DONE: return KR_STATE_PRODUCE;

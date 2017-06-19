@@ -30,6 +30,8 @@
 #include "lib/generic/array.h"
 #include "lib/defines.h"
 
+struct kr_query;
+
 /*
  * Logging and debugging.
  */
@@ -255,6 +257,7 @@ int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
 			       uint32_t qry_uid, bool check_dups);
 
 void kr_rrset_print(const knot_rrset_t *rr, const char *prefix);
+void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *postfix);
 void kr_pkt_print(knot_pkt_t *pkt);
 void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix);
 void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix);
