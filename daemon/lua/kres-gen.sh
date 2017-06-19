@@ -55,6 +55,7 @@ typedef void (*map_free_f)(void *baton, void *ptr);
 	kr_qarray_t
 	struct kr_rplan
 	struct kr_request
+	enum kr_rank
 EOF
 
 genResType() {
@@ -69,7 +70,7 @@ genResType "struct knot_rrset" | sed 's/\<owner\>/_owner/'
 genResType "struct kr_nsrep" | sed '/union/,$ d'
 printf "\t/* beware: hidden stub */\n};\n"
 
-genResType "struct kr_query" | sed '/struct kr_layer_pickle/,$ d'
+genResType "struct kr_query" | sed '/uint32_t forward_flags/,$ d'
 printf "\t/* ^hidden stub^ */\n\tchar _stub[];\n};\n"
 
 genResType "struct kr_context" | sed '/struct kr_cache/,$ d'
@@ -130,7 +131,7 @@ EOF
 	kr_bitcmp
 	kr_family_len
 	kr_straddr_socket
-	kr_rrarray_add
+	kr_ranked_rrarray_add
 # Trust anchors
 	kr_ta_get
 	kr_ta_add

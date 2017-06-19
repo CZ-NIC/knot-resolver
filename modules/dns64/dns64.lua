@@ -24,13 +24,28 @@ mod.layer = {
 		-- Synthetic AAAA from marked A responses
 		local answer = pkt:section(kres.section.ANSWER)
 		if bit.band(qry.flags, MARK_DNS64) ~= 0 then -- Marked request
-			for i = 1, #answer do
-				local rr = answer[i]
-				-- Synthesise AAAA from A
-				if rr.type == kres.type.A then
-					ffi.copy(addr_buf, mod.proxy, 16)
-					ffi.copy(addr_buf + 12, rr.rdata, 4)
-					req.answer:put(rr.owner, rr.ttl, rr.class, kres.type.AAAA, ffi.string(addr_buf, 16))
+			local section = ffi.C.knot_pkt_section(pkt, kres.section.ANSWER)
+			for i = 1, section.count do
+				local orig = ffi.C.knot_pkt_rr(section, i - 1)
+				if orig.type == kres.type.A then
+					local rrs = ffi.typeof('knot_rrset_t')()
+					ffi.C.knot_rrset_init_empty(rrs)
+					rrs._owner = ffi.cast('char *', orig:owner()) -- explicit cast needed here
+					rrs.type = kres.type.AAAA
+					rrs.rclass = orig.rclass
+					for k = 1, orig.rrs.rr_count do
+						local rdata = orig:rdata( k - 1 )
+						ffi.copy(addr_buf, mod.proxy, 16)
+						ffi.copy(addr_buf + 12, rdata, 4)
+						ffi.C.knot_rrset_add_rdata(rrs, ffi.string(addr_buf, 16), 16, orig:ttl(), req.pool)
+					end
+					ffi.C.kr_ranked_rrarray_add(
+						req.answ_selected,
+						rrs,
+						ffi.C.KR_RANK_OMIT,
+						true,
+						qry.uid,
+						req.pool)
 				end
 			end
 		else -- Observe AAAA NODATA responses

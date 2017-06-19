@@ -124,6 +124,7 @@ struct kr_request {
 	int has_tls;
 	knot_mm_t pool;
 };
+enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_INDET, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE = 8, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct knot_rrset {
 	knot_dname_t *_owner;
 	uint16_t type;
@@ -151,6 +152,8 @@ struct kr_query {
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
+	struct kr_layer_pickle *deferred;
+	uint32_t uid;
 	/* ^hidden stub^ */
 	char _stub[];
 };
@@ -199,7 +202,7 @@ int kr_straddr_subnet(void *, const char *);
 int kr_bitcmp(const char *, const char *, int);
 int kr_family_len(int);
 struct sockaddr *kr_straddr_socket(const char *, int);
-int kr_rrarray_add(rr_array_t *, const knot_rrset_t *, knot_mm_t *);
+int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
 int kr_ta_add(map_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t *, uint16_t);
 int kr_ta_del(map_t *, const knot_dname_t *);
