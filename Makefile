@@ -10,6 +10,9 @@ clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 doc: doc-html
 .PHONY: all install check clean doc info
 
+#FIXME: implement these
+.PHONY: client client-install client-clean
+
 # Options
 ifdef COVERAGE
 BUILD_CFLAGS += --coverage

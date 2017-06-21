@@ -13,11 +13,11 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include "engine.h"
+
+//TODO: cleanup, etc.
 #include <arpa/inet.h>
+#include <lib/defines.h>
 #include <assert.h>
-#include <contrib/ccan/asprintf/asprintf.h>
-#include <editline/readline.h>
 #include <errno.h>
 #include <histedit.h>
 #include <stdbool.h>
@@ -34,7 +34,7 @@
 FILE *g_tty = NULL;		//!< connection to the daemon
 
 //! Initialize connection to the daemon; return 0 on success.
-static int init_tty(const char *path)
+KR_EXPORT int kr_init_tty(const char *path)
 {
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
@@ -74,7 +74,7 @@ static int init_tty(const char *path)
 }
 
 //! Run a command on the daemon; return the answer or NULL on failure, puts answer length to out_len.
-static char *run_cmd(const char *cmd, size_t * out_len)
+KR_EXPORT char *kr_run_cmd(const char *cmd, size_t * out_len)
 {
 	if (!g_tty || !cmd) {
 		assert(false);
@@ -98,20 +98,3 @@ static char *run_cmd(const char *cmd, size_t * out_len)
 	return msg;
 }
 
-/*
-int main(int argc, char **argv)
-{
-	if (argc != 2) {
-		fprintf(stderr, "Usage: %s tty/xxxxx\n", argv[0]);
-		return 1;
-	}
-
-	int res = init_tty(argv[1]);
-
-	if (!res)
-		res = interact();
-
-	if (g_tty)
-		fclose(g_tty);
-	return res;
-}*/
