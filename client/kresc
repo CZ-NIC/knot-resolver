@@ -1,0 +1,42 @@
+#! /usr/bin/env luajit
+
+function init()
+  ffi = require("ffi")
+  ffi.cdef[[
+  int kr_init_tty(const char *path);
+  char *kr_run_cmd(const char *cmd, size_t * out_len);
+  ]]
+  kresc = ffi.load(libkres_SONAME) -- FIXME in makefile
+  kresc.kr_init_tty(arg[1])
+end
+
+function run_cmd(cmd)
+  local len = ffi.new("uint64_t[1]")
+  test = kresc.kr_run_cmd(cmd, len)
+  return ffi.string(test)
+end
+
+init()
+local L = require 'linenoise'
+
+local function completion (c, s)
+  if s:sub(1, 1) == 'h' then
+    print("\nhi")
+    L.addcompletion(c, 'hello')
+    L.addcompletion(c, 'hello there')
+  end
+end
+
+L.setcompletion(completion)
+L.historysetmaxlen(100)
+
+local history = 'history.txt'
+L.historyload(history)
+
+for line in L.lines('kresc> ') do
+  if line ~= '' then
+    print(run_cmd(line))
+    L.historyadd(line)
+    L.historysave(history)
+  end
+end

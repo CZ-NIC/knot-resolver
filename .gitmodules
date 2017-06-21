@@ -1,3 +1,9 @@
 [submodule "tests/deckard"]
 	path = tests/deckard
 	url = https://gitlab.labs.nic.cz/knot/deckard.git
+[submodule "client/ljlinenoise"]
+	path = client/ljlinenoise
+	url = https://github.com/fperrad/ljlinenoise.git
+[submodule "client/ljsyscall"]
+	path = client/ljsyscall
+	url = https://github.com/justincormack/ljsyscall.git
