@@ -449,6 +449,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
 		pending_cname = NULL;
+		const int cname_labels = knot_dname_labels(cname, NULL);
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 
@@ -459,6 +460,16 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				/* TODO: actually handle DNAMEs */
 			if (!type_OK || !knot_dname_is_equal(rr->owner, cname)) {
 				continue;
+			}
+
+			if (rr->type == KNOT_RRTYPE_RRSIG) {
+				int rrsig_labels = knot_rrsig_labels(&rr->rrs, 0);
+				if (rrsig_labels > cname_labels) {
+					return KR_STATE_FAIL;
+				}
+				if (rrsig_labels < cname_labels) {
+					query->flags |= QUERY_DNSSEC_WEXPAND;
+				}
 			}
 
 			/* Process records matching current SNAME */
@@ -509,7 +520,6 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		}
 		/* try to unroll cname only within current zone */
 		const int pending_labels = knot_dname_labels(pending_cname, NULL);
-		const int cname_labels = knot_dname_labels(cname, NULL);
 		if (pending_labels != cname_labels) {
 			cname = pending_cname;
 			break;
@@ -675,9 +685,12 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		} else {
 			next->flags &= ~QUERY_DNSSEC_WANT;
 		}
-		state = pick_authority(pkt, req, false);
-		if (state != kr_ok()) {
-			return KR_STATE_FAIL;
+		if (!(query->flags & QUERY_FORWARD) ||
+		    (query->flags & QUERY_DNSSEC_WEXPAND)) {
+			state = pick_authority(pkt, req, false);
+			if (state != kr_ok()) {
+				return KR_STATE_FAIL;
+			}
 		}
 	} else if (!query->parent) {
 		/* Answer for initial query */
