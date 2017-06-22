@@ -1007,10 +1007,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_DONE;
 	}
 
-	if (qry->parent == NULL && (qry->flags & QUERY_CNAME)) {
-		return KR_STATE_PRODUCE;
-	}
-
 	bool nods = false;
 	bool ds_req = false;
 	bool ns_req = false;
@@ -1041,19 +1037,22 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			    knot_dname_is_equal(q->sname, wanted_name)) {
 				if (q->stype == KNOT_RRTYPE_DS) {
 					ds_req = true;
-					if (qry->flags & QUERY_DNSSEC_NODS) {
+					if (q->flags & QUERY_DNSSEC_NODS) {
 						nods = true;
 					}
-					if (qry->flags & QUERY_CNAME) {
+					if (q->flags & QUERY_CNAME) {
 						nods = true;
-						ns_req = true;
-					}
-					if (!(q->flags & QUERY_DNSSEC_OPTOUT)) {
+						ns_exist = false;
+					} else if (!(q->flags & QUERY_DNSSEC_OPTOUT)) {
 						int ret = kr_dnssec_matches_name_and_type(&request->auth_selected, q->uid,
 											  wanted_name, KNOT_RRTYPE_NS);
 						ns_exist = (ret == kr_ok());
 					}
 				} else {
+					if (q->flags & QUERY_CNAME) {
+						nods = true;
+						ns_exist = false;
+					}
 					ns_req = true;
 				}
 			}
@@ -1066,6 +1065,11 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 				return KR_STATE_FAIL;
 			}
 			return KR_STATE_DONE;
+		}
+
+		if (qry->parent == NULL && (qry->flags & QUERY_CNAME) &&
+		    ds_req && ns_req) {
+			return KR_STATE_PRODUCE;
 		}
 
 		if ((qry->stype == KNOT_RRTYPE_DS) &&

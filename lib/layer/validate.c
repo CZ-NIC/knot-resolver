@@ -316,7 +316,7 @@ static int update_parent_keys(struct kr_request *req, uint16_t answer_type)
 					mark_insecure_parents(qry);
 				}
 			}
-		} else if ((qry->flags & (QUERY_DNSSEC_NODS | QUERY_FORWARD | QUERY_DNSSEC_OPTOUT)) ==
+		} else if ((qry->flags & (QUERY_DNSSEC_NODS | QUERY_FORWARD)) ==
 			   (QUERY_DNSSEC_NODS | QUERY_FORWARD)) {
 			int ret = kr_dnssec_matches_name_and_type(&req->auth_selected, qry->uid,
 								  qry->sname, KNOT_RRTYPE_NS);
