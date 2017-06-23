@@ -93,7 +93,7 @@ Most of the dependencies can be resolved from packages, here's an overview for s
 
 * **RHEL/CentOS** - unknown.
 * **openSUSE** - there is an `experimental package <https://build.opensuse.org/package/show/server:dns/knot-resolver>`_.
-* **FreeBSD** - unknown.
+* **FreeBSD** - when installing from ports all dependencies will install automaticly, corresponding to selected options.
 * **NetBSD** - unknown.
 * **OpenBSD** - unknown.
 * **Mac OS X** - most of the dependencies can be found through `Homebrew <http://brew.sh/>`_, with the exception of libknot.
