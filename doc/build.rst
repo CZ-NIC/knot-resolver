@@ -4,7 +4,9 @@ Building project
 Installing from packages
 ------------------------
 
-The resolver is packaged for Debian, Fedora, Ubuntu and openSUSE Linux distributions.
+The resolver is packaged for Debian, Fedora+EPEL, Ubuntu, Docker, NixOS/NixPkgs, FreeBSD, HomeBrew, and Turris Omnia.
+Some of these are maintained directly by the knot-resolver team.
+
 Refer to `project page <https://www.knot-resolver.cz/pages/try.html>`_ for information about
 installing from packages. If packages are not available for your OS, see following sections
 to see how you can build it from sources (or package it), or use official `Docker images`_.
@@ -15,14 +17,15 @@ Platform considerations
 .. csv-table::
    :header: "Project", "Platforms", "Compatibility notes"
 
-   "``daemon``", "UNIX-like [#]_, Microsoft Windows", "C99, libuv_ provides portable I/O"
-   "``library``", "UNIX-like, Microsoft Windows [#]_ ", "MSVC_ not supported, needs MinGW_"
+   "``daemon``", "UNIX-like [#]_", "C99, libuv_ provides portable I/O"
+   "``library``", "UNIX-like", "MSVC_ not supported, needs MinGW_"
    "``modules``", "*varies*", ""
    "``tests/unit``", "*equivalent to library*", ""
    "``tests/integration``", "UNIX-like", "Depends on library injection (see [2]_)"
 
 .. [#] Known to be running (not exclusively) on FreeBSD, Linux and OS X.
-.. [#] Modules are not supported yet, as the PE/DLL loading is different. Library injection is working with ELF *(or Mach-O flat namespace)* only.
+
+.. Windows status??? Modules are not supported yet, as the PE/DLL loading is different. Library injection is working with ELF *(or Mach-O flat namespace)* only.
 
 Requirements
 ------------
@@ -36,7 +39,7 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "C compiler", "*all*", "*(build only)* [#]_"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "hexdump or xxd", "``daemon``", "*(build only)*"
-   "libknot_ 2.1+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
+   "libknot_ 2.3.1+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
    "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
 
@@ -93,10 +96,10 @@ Most of the dependencies can be resolved from packages, here's an overview for s
 
 * **RHEL/CentOS** - unknown.
 * **openSUSE** - there is an `experimental package <https://build.opensuse.org/package/show/server:dns/knot-resolver>`_.
-* **FreeBSD** - unknown.
+* **FreeBSD** - when installing from ports, all dependencies will install automatically, corresponding to the selected options.
 * **NetBSD** - unknown.
 * **OpenBSD** - unknown.
-* **Mac OS X** - most of the dependencies can be found through `Homebrew <http://brew.sh/>`_, with the exception of libknot.
+* **Mac OS X** - the dependencies can be found through `Homebrew <http://brew.sh/>`_.
 
 .. code-block:: bash
 
@@ -120,7 +123,7 @@ When you have all the dependencies ready, you can build and install.
 
 .. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path.
     Production code should be compiled with ``-DNDEBUG``.
-    If you build the binary with ``-DNOVERBOSELOG``, verbose logging will be disabled as well.
+    If you build the binary with ``-DNOVERBOSELOG``, it won't be possible to turn on verbose logging; we advise packagers against using that flag.
 
 Alternatively you can build only specific parts of the project, i.e. ``library``.
 
@@ -152,14 +155,17 @@ You can also disable linker hardening when it's unsupported with ``make HARDENIN
 Building for packages
 ~~~~~~~~~~~~~~~~~~~~~
 
-The build system supports both DESTDIR_ and `amalgamated builds <https://www.sqlite.org/amalgamation.html>`_.
+The build system supports DESTDIR_
+
+.. Our amalgamation has fallen into an unmaintained state and probably doesn't work.
+.. and `amalgamated builds <https://www.sqlite.org/amalgamation.html>`_.
 
 .. code-block:: bash
 
-   $ make install DESTDIR=/tmp/stage # Staged install
-   $ make all install AMALG=yes # Amalgamated build
+   $ make install DESTDIR=/tmp/stage
+..   $ make all install AMALG=yes # Amalgamated build
 
-Amalgamated build assembles everything in one source file and compiles it. It is useful for packages, as the compiler sees the whole program and is able to produce a smaller and faster binary. On the other hand, it complicates debugging.
+.. Amalgamated build assembles everything in one source file and compiles it. It is useful for packages, as the compiler sees the whole program and is able to produce a smaller and faster binary. On the other hand, it complicates debugging.
 
 .. tip:: There is a template for service file and AppArmor profile to help you kickstart the package.
 
@@ -176,7 +182,7 @@ All paths are prefixed with ``PREFIX`` variable by default if not specified othe
    "daemon",  "``SBINDIR``", "``$(PREFIX)/sbin``", ""
    "configuration", "``ETCDIR``", "``$(PREFIX)/etc/kresd``", "Configuration file, templates."
    "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "Runtime directory for loading dynamic modules [#]_."
-   "work directory", "", "``$(PREFIX)/var/run/kresd``", "Run directory for daemon."
+   "work directory", "", "the current directory", "Run directory for daemon. (Only relevant during run time, not e.g. during installation.)"
 
 .. [#] The ``libkres.pc`` is installed in ``$(LIBDIR)/pkgconfig``.
 .. [#] The default moduledir can be changed with `-m` option to `kresd` daemon or by calling `moduledir()` function from lua.
