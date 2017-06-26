@@ -335,3 +335,56 @@ int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src)
 
 	return kr_ok();
 }
+
+int kr_nsrep_elect_min_rtt(struct kr_query *qry)
+{
+	/* TODO - sorting instead of searching minimum? */
+	struct kr_nsrep *ns = &qry->ns;
+
+	if (ns->addr[0].ip.sa_family == AF_UNSPEC) {
+		return kr_error(EINVAL);
+	}
+
+	if (ns->addr[1].ip.sa_family == AF_UNSPEC) {
+		/* We have only one entry here, do nothing */
+		return kr_ok();
+	}
+
+	const struct kr_context *ctx = ns->ctx;
+	if (!ctx) {
+		return kr_ok();
+	}
+
+	const struct sockaddr *sock = (const struct sockaddr *)(&ns->addr[0]);
+	unsigned *score = lru_get_try(ctx->cache_rtt, kr_inaddr(sock),
+				      kr_family_len(sock->sa_family));
+	unsigned minimal_score = (score) ? *score : KR_NS_MAX_SCORE + 1;
+	int i = 1;
+	sock = (const struct sockaddr *)(&ns->addr[i]);
+	do {
+		score = lru_get_try(ctx->cache_rtt, kr_inaddr(sock),
+				    kr_family_len(sock->sa_family));
+		if (score) {
+			if (*score < minimal_score) {
+				union inaddr temp_addr = ns->addr[0];
+				ns->addr[0] = ns->addr[i];
+				ns->addr[i] = temp_addr;
+				ns->score = *score;
+				ns->reputation = 0;
+				minimal_score = ns->score;
+			} else if ((kr_rand_uint(100) < 10) &&
+			    (kr_rand_uint(KR_NS_MAX_SCORE) >= *score)) {
+				/* long distance probe */
+				union inaddr temp_addr = ns->addr[0];
+				ns->addr[0] = ns->addr[i];
+				ns->addr[i] = temp_addr;
+				ns->score = *score;
+				ns->reputation = 0;
+				break;
+			}
+		}
+		sock = (const struct sockaddr *)(&ns->addr[++i]);
+	} while ((i < KR_NSREP_MAXADDR) && (sock->sa_family != AF_UNSPEC));
+
+	return kr_ok();
+}

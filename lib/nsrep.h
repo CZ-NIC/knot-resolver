@@ -150,3 +150,12 @@ int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t
  * @return              0 on success, error code on failure
  */
 int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src);
+
+/**
+ * Elect address with minimal rtt within current query nsrep list
+ * @note   ns reputation is zeroed
+ * @param  qry          updated query
+ * @return              0 or an error code
+ */
+KR_EXPORT
+int kr_nsrep_elect_min_rtt(struct kr_query *qry);
