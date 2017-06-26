@@ -23,7 +23,8 @@
  * Performs referral authentication according to RFC4035 5.2, bullet 2
  * @param ref Referral RRSet. Currently only DS can be used.
  * @param key Already parsed key.
- * @return    0 or error code.
+ * @return    0 or error code.  In particular: DNSSEC_INVALID_DS_ALGORITHM
+ *            in case *all* DSs in ref use an unimplemented algorithm.
  */
 int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key);
 
