@@ -765,10 +765,10 @@ static int engine_loadconf(struct engine *engine, const char *config_path)
 		return kr_error(ENOEXEC);
 	}
 	/* Load config file */
-	if (strcmp(config_path, "-") == 0) {
-		return ret; /* No config, no defaults. */
-	}
-	if(access(config_path, F_OK ) != -1 ) {
+	if (config_path) {
+		if (strcmp(config_path, "-") == 0) {
+			return ret; /* No config and no defaults. */
+		}
 		ret = l_dosandboxfile(engine->L, config_path);
 	}
 	if (ret == 0) {
