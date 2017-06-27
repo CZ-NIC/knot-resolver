@@ -450,8 +450,14 @@ policy.rules = {}
 policy.postrules = {}
 policy.special_names = {
 	{
-		id=0,
-		cb=policy.suffix_common(policy.DENY, private_zones, '\4arpa\0'),
+		cb=policy.suffix_common(policy.DENY, private_zones, todname('arpa.')),
+		count=0
+	},
+	{
+		cb=policy.suffix(policy.DENY, {
+			todname('test.'),
+			todname('invalid.'),
+			}),
 		count=0
 	}
 }
