@@ -243,7 +243,7 @@ function policy.evaluate(rules, req, query, state)
 			end
 		end
 	end
-	return state
+	return
 end
 
 -- Enforce policy action
@@ -284,11 +284,13 @@ end
 policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
-		return policy.evaluate(policy.rules, req, req:current(), state)
-	end,
+		return policy.evaluate(policy.rules, req, req:current(), state) or 
+		       policy.evaluate(policy.special_names, req, req:current(), state) or
+		       state
+	end,	
 	finish = function(state, req)
 		req = kres.request_t(req)
-		return policy.evaluate(policy.postrules, req, req:current(), state)
+		return policy.evaluate(policy.postrules, req, req:current(), state) or state
 	end
 }
 
@@ -446,6 +448,12 @@ policy.todnames(private_zones)
 -- @var Default rules
 policy.rules = {}
 policy.postrules = {}
-policy.add(policy.suffix_common(policy.DENY, private_zones, '\4arpa\0'))
+policy.special_names = {
+	{
+		id=0,
+		cb=policy.suffix_common(policy.DENY, private_zones, '\4arpa\0'),
+		count=0
+	}
+}
 
 return policy
