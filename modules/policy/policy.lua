@@ -126,6 +126,25 @@ local function flags(opts_set, opts_clear)
 	end
 end
 
+local function localhost(state, req)
+	local qry = req:current()
+	local answer = req.answer
+	ffi.C.kr_pkt_make_auth_header(answer)
+	if qry.stype == kres.type.AAAA then
+		answer:begin(kres.section.ANSWER)
+		answer:put(qry.sname, 900, answer:qclass(), kres.type.AAAA, '\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1')
+	elseif qry.stype == kres.type.A then
+		answer:begin(kres.section.ANSWER)
+		answer:put(qry.sname, 900, answer:qclass(), kres.type.A, '\127\0\0\1')	
+	else
+		answer:rcode(kres.rcode.NXDOMAIN)
+		answer:begin(kres.section.AUTHORITY)
+		answer:put('\7blocked', 900, answer:qclass(), kres.type.SOA,
+			'\7blocked\0\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
+	end
+	return kres.DONE
+end
+
 local policy = {
 	-- Policies
 	PASS = 1, DENY = 2, DROP = 3, TC = 4, QTRACE = 5,
@@ -458,6 +477,10 @@ policy.special_names = {
 			todname('test.'),
 			todname('invalid.'),
 			}),
+		count=0
+	},
+	{
+		cb=policy.suffix(localhost, {todname('localhost.')}),
 		count=0
 	}
 }
