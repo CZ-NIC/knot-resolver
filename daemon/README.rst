@@ -144,6 +144,12 @@ The watchdog process must notify kresd about active file descriptors, and kresd 
 
 The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
 
+To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a single fork. For example:
+
+.. code-block:: bash
+   $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 &
+
+
 Configuration
 =============
 
