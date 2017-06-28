@@ -237,7 +237,14 @@ static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
 
 	if (!kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
 		/* The type is not listed in the NSEC bitmap. */
-		*flags |= FLG_NOEXIST_RRTYPE;
+		/* Security feature: in case of DS also check for SOA
+		 * non-existence to be more certain that we don't hold
+		 * a child-side NSEC by some mistake (e.g. when forwarding).
+		 * See RFC4035 5.2, next-to-last paragraph. */
+		if (type != KNOT_RRTYPE_DS
+		    || !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
+			*flags |= FLG_NOEXIST_RRTYPE;
+		}
 	}
 
 	return kr_ok();
