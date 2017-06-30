@@ -44,11 +44,14 @@ PREFIX=${1}; [ -z ${PREFIX} ] && export PREFIX="${HOME}/.local"
 
 function bootstrap_cleanup {
     if [ -n "$BOOTSTRAP_CLEANUP" ]; then
-	echo "Bootstrap script has changed, cleaning up ${PREFIX}"
-	rm -rf "${PREFIX}"
+		echo "Bootstrap script has changed, cleaning up ${PREFIX}"
+		rm -rf "${PREFIX}"
     else
-	echo "Bootstrap script has changed, you should cleanup ${PREFIX}"
-	echo "or rerun this script with BOOSTRAP_CLEANUP=1 env variable"
+		echo "Bootstrap script has changed, you should cleanup ${PREFIX}"
+		echo "or rerun this script with BOOSTRAP_CLEANUP=1 env variable."
+		if [ "$PREFIX" = "$HOME/.local" ]; then
+			echo "BEWARE: e.g. your ~/.local/share may contain something unrelated."
+		fi
     fi
 }
 
