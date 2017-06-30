@@ -81,13 +81,6 @@ struct kr_nsrep
 	union inaddr addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
 };
 
-/** @internal Address bytes for given family. */
-#define kr_nsrep_inaddr(addr) \
-	((addr).ip.sa_family == AF_INET ? (void *)&((addr).ip4.sin_addr) : (void *)&((addr).ip6.sin6_addr))
-/** @internal Address length for given family. */
-#define kr_nsrep_inaddr_len(addr) \
-	((addr).ip.sa_family == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr))
-
 /**
  * Set given NS address.
  * @param  qry      updated query

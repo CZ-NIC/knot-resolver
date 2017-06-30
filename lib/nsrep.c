@@ -269,8 +269,8 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 		return kr_error(EINVAL);
 	}
 
-	const char *addr_in = kr_nsrep_inaddr(ns->addr[0]);
-	size_t addr_len = kr_nsrep_inaddr_len(ns->addr[0]);
+	const char *addr_in = kr_inaddr(&ns->addr[0].ip);
+	size_t addr_len = kr_inaddr_len(&ns->addr[0].ip);
 	if (addr) { /* Caller provided specific address */
 		if (addr->sa_family == AF_INET) {
 			addr_in = (const char *)&((struct sockaddr_in *)addr)->sin_addr;
