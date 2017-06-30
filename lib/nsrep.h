@@ -145,10 +145,13 @@ int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t
 int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src);
 
 /**
- * Elect address with minimal rtt within current query nsrep list
- * @note   ns reputation is zeroed
- * @param  qry          updated query
+ * Sort addresses in the query nsrep list
+ * @param  ns           updated kr_nsrep
+ * @param  cache        RTT cache
  * @return              0 or an error code
+ * @note   ns reputation is zeroed, as KR_NS_NOIP{4,6} flags are useless
+ * 		in STUB/FORWARD mode.
  */
 KR_EXPORT
-int kr_nsrep_elect_min_rtt(struct kr_query *qry);
+int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_lru_t *cache);
+
