@@ -149,11 +149,11 @@ static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
 	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
-		uint8_t *addr = kr_nsrep_inaddr(qry->ns.addr[0]);
-		size_t addr_len = kr_nsrep_inaddr_len(qry->ns.addr[0]);
+		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
+		size_t addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
 		/* @warning _NOT_ thread-safe */
 		static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
-		knot_rdata_init(rdata_arr, addr_len, addr, 0);
+		knot_rdata_init(rdata_arr, addr_len, (const uint8_t *)addr, 0);
 		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata_arr);
 	} else {
 		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
@@ -1378,9 +1378,11 @@ ns_election:
 		return KR_STATE_FAIL;
 	}
 
-	const bool retry = (qry->flags & (QUERY_TCP|QUERY_STUB|QUERY_FORWARD|QUERY_BADCOOKIE_AGAIN));
+	const bool retry = (qry->flags & (QUERY_TCP|QUERY_BADCOOKIE_AGAIN));
 	if (qry->flags & (QUERY_AWAIT_IPV4|QUERY_AWAIT_IPV6)) {
 		kr_nsrep_elect_addr(qry, request->ctx);
+	} else if (qry->flags & (QUERY_FORWARD|QUERY_STUB)) {
+		kr_nsrep_sort(&qry->ns, request->ctx->cache_rtt);
 	} else if (!qry->ns.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
@@ -1506,7 +1508,7 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 		if (!kr_inaddr_equal(dst, addr)) {
 			continue;
 		}
-		inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr[i]), ns_str, sizeof(ns_str));
+		inet_ntop(addr->sa_family, kr_inaddr(&qry->ns.addr[i].ip), ns_str, sizeof(ns_str));
 		VERBOSE_MSG(qry, "=> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s' proto: '%s'\n",
 			ns_str, qry->ns.score, zonecut_str, qname_str, type_str, (qry->flags & QUERY_TCP) ? "tcp" : "udp");
 		break;
