@@ -565,7 +565,12 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	entry->cached = false;
 	entry->yielded = false;
 	entry->to_wire = to_wire;
-	array_push(*array, entry);
+	if (array_push(*array, entry) < 0) {
+		/* Silence coverity.  It shouldn't be possible to happen,
+		 * due to the array_reserve_mm call above. */
+		mm_free(pool, entry);
+		return kr_error(ENOMEM);
+	}
 
 	return to_wire_ensure_unique(array, array->len - 1);
 }
