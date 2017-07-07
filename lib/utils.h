@@ -242,6 +242,7 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *
 int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool);
 
 /** @internal Add RRSet copy to ranked RR array. */
+KR_EXPORT
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool);
 
