@@ -2,7 +2,6 @@
 local ffi = require('ffi')
 local bit = require('bit')
 local mod = {}
-local MARK_DNS64 = bit.lshift(1, 31)
 local addr_buf = ffi.new('char[16]')
 -- Config
 function mod.config (confstr)
@@ -23,7 +22,7 @@ mod.layer = {
 		end
 		-- Synthetic AAAA from marked A responses
 		local answer = pkt:section(kres.section.ANSWER)
-		if bit.band(qry.flags, MARK_DNS64) ~= 0 then -- Marked request
+		if bit.band(qry.flags, kres.query.DNS64_MARK) ~= 0 then -- Marked request
 			local section = ffi.C.knot_pkt_section(pkt, kres.section.ANSWER)
 			for i = 1, section.count do
 				local orig = ffi.C.knot_pkt_rr(section, i - 1)
@@ -55,7 +54,7 @@ mod.layer = {
 			if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name() and qry:final() then
 				local extraFlags = bit.bor(
 					bit.band(qry.flags, kres.query.DNSSEC_WANT),
-					bit.bor(MARK_DNS64, kres.query.AWAIT_CUT)
+					bit.bor(kres.query.DNS64_MARK, kres.query.AWAIT_CUT)
 					)
 				local next = req:push(pkt:qname(), kres.type.A, kres.class.IN, extraFlags, qry)
 			end
