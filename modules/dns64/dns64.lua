@@ -30,7 +30,7 @@ mod.layer = {
 				if orig.type == kres.type.A then
 					local rrs = ffi.typeof('knot_rrset_t')()
 					ffi.C.knot_rrset_init_empty(rrs)
-					rrs._owner = ffi.cast('char *', orig:owner()) -- explicit cast needed here
+					rrs._owner = ffi.cast('knot_dname_t *', orig:owner()) -- explicit cast needed here
 					rrs.type = kres.type.AAAA
 					rrs.rclass = orig.rclass
 					for k = 1, orig.rrs.rr_count do
@@ -39,6 +39,8 @@ mod.layer = {
 						ffi.copy(addr_buf + 12, rdata, 4)
 						ffi.C.knot_rrset_add_rdata(rrs, ffi.string(addr_buf, 16), 16, orig:ttl(), req.pool)
 					end
+					-- All referred memory is copied within the function,
+					-- so it doesn't matter that lua GCs our variables.
 					ffi.C.kr_ranked_rrarray_add(
 						req.answ_selected,
 						rrs,
