@@ -53,8 +53,11 @@ mod.layer = {
 		else -- Observe AAAA NODATA responses
 			local is_nodata = (pkt:rcode() == kres.rcode.NOERROR) and (#answer == 0)
 			if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name() and qry:final() then
-				local next = req:push(pkt:qname(), kres.type.A, kres.class.IN, 0, qry)
-				next.flags = bit.band(qry.flags, kres.query.DNSSEC_WANT) + kres.query.AWAIT_CUT + MARK_DNS64
+				local extraFlags = bit.bor(
+					bit.band(qry.flags, kres.query.DNSSEC_WANT),
+					bit.bor(MARK_DNS64, kres.query.AWAIT_CUT)
+					)
+				local next = req:push(pkt:qname(), kres.type.A, kres.class.IN, extraFlags, qry)
 			end
 		end
 		return state
