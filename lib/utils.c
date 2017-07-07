@@ -454,20 +454,6 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *
 	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
 }
 
-int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool)
-{
-	int ret = array_reserve_mm(*array, array->len + 1, kr_memreserve, pool);
-	if (ret != 0) {
-		return kr_error(ENOMEM);
-	}
-	knot_rrset_t *copy = knot_rrset_copy(rr, pool);
-	if (!copy) {
-		return kr_error(ENOMEM);
-	}
-	array_push(*array, copy);
-	return kr_ok();
-}
-
 /** Return whether two RRsets match, i.e. would form the same set; see ranked_rr_array_t */
 static inline bool rrsets_match(const knot_rrset_t *rr1, const knot_rrset_t *rr2)
 {
