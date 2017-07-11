@@ -555,6 +555,7 @@ policy.special_names = {
 		cb=policy.suffix(policy.DENY, {
 			todname('test.'),
 			todname('invalid.'),
+			todname('onion.'), -- RFC7686, 2.4
 			}),
 		count=0
 	},
