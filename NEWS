@@ -1,6 +1,11 @@
 Knot Resolver 1.3.2 (2017-07-xx)
 ================================
 
+Security
+--------
+- fix possible opportunities to use insecure data from cache as keys
+  for validation
+
 Bugfixes
 --------
 - daemon: check existence of config file even if rundir isn't specified
