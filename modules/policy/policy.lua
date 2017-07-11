@@ -145,25 +145,18 @@ local function localhost(state, req)
 	ffi.C.kr_pkt_make_auth_header(answer)
 
 	local is_exact = ffi.C.knot_dname_is_equal(qry.sname, dname_localhost)
-	if not is_exact then
-		answer:rcode(kres.rcode.NXDOMAIN)
-		answer:begin(kres.section.AUTHORITY)
-		mkauth_soa(answer, dname_localhost)
-		return kres.DONE
-	end
 
 	answer:rcode(kres.rcode.NOERROR)
 	answer:begin(kres.section.ANSWER)
 	if qry.stype == kres.type.AAAA then
-		answer:put(dname_localhost, 900, answer:qclass(), kres.type.AAAA,
+		answer:put(qry.sname, 900, answer:qclass(), kres.type.AAAA,
 			'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1')
 	elseif qry.stype == kres.type.A then
-		answer:put(dname_localhost, 900, answer:qclass(), kres.type.A, '\127\0\0\1')
-	elseif qry.stype == kres.type.SOA then
+		answer:put(qry.sname, 900, answer:qclass(), kres.type.A, '\127\0\0\1')
+	elseif is_exact and qry.stype == kres.type.SOA then
 		mkauth_soa(answer, dname_localhost)
-	elseif qry.stype == kres.type.NS then
-		answer:put(dname_localhost, 900, answer:qclass(), kres.type.NS,
-			dname_localhost)
+	elseif is_exact and qry.stype == kres.type.NS then
+		answer:put(dname_localhost, 900, answer:qclass(), kres.type.NS, dname_localhost)
 	else
 		answer:begin(kres.section.AUTHORITY)
 		mkauth_soa(answer, dname_localhost)
