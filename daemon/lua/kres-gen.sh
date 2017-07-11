@@ -84,8 +84,11 @@ genResType "enum kr_query_flag" | sed -e 's/enum kr_query_flag/struct query_flag
 ## libknot API
 ./scripts/gen-cdefs.sh libknot functions <<-EOF
 # Domain names
-	knot_dname_size
 	knot_dname_from_str
+	knot_dname_is_equal
+	knot_dname_is_sub
+	knot_dname_labels
+	knot_dname_size
 	knot_dname_to_str
 # Resource records
 	knot_rdata_rdlen
