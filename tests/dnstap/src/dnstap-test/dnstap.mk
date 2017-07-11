@@ -14,6 +14,6 @@ check-dnstap: daemon
 	$(GOPATH)/bin/$(DNSTAP_TEST) -c $(CONFIG) -cmd $(CMD) -q $(ZONES) -t $(TIMEOUT)
 
 clean-dnstap:
-	rm -rf $(GOPATH)/bin $(GOPATH)/pkg
+	rm -rf $(GOPATH)/{bin,pkg,src/dnstap-test/vendor/github.com,src/github.com}
 
 .PHONY: check-dnstap clean-dnstap

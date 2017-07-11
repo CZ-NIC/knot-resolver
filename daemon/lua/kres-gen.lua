@@ -124,6 +124,7 @@ struct kr_request {
 	int has_tls;
 	knot_mm_t pool;
 };
+enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_INDET, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE = 8, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct knot_rrset {
 	knot_dname_t *_owner;
 	uint16_t type;
@@ -151,6 +152,8 @@ struct kr_query {
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
+	struct kr_layer_pickle *deferred;
+	uint32_t uid;
 	/* ^hidden stub^ */
 	char _stub[];
 };
@@ -162,7 +165,7 @@ struct kr_context {
 	struct kr_zonecut root_hints;
 	char _stub[];
 };
-struct query_flag {static const int NO_MINIMIZE = 1; static const int NO_THROTTLE = 2; static const int NO_IPV6 = 4; static const int NO_IPV4 = 8; static const int TCP = 16; static const int RESOLVED = 32; static const int AWAIT_IPV4 = 64; static const int AWAIT_IPV6 = 128; static const int AWAIT_CUT = 256; static const int SAFEMODE = 512; static const int CACHED = 1024; static const int NO_CACHE = 2048; static const int EXPIRING = 4096; static const int ALLOW_LOCAL = 8192; static const int DNSSEC_WANT = 16384; static const int DNSSEC_BOGUS = 32768; static const int DNSSEC_INSECURE = 65536; static const int STUB = 131072; static const int ALWAYS_CUT = 262144; static const int DNSSEC_WEXPAND = 524288; static const int PERMISSIVE = 1048576; static const int STRICT = 2097152; static const int BADCOOKIE_AGAIN = 4194304; static const int CNAME = 8388608; static const int REORDER_RR = 16777216; static const int TRACE = 33554432; static const int NO_0X20 = 67108864; static const int DNSSEC_NODS = 134217728; static const int DNSSEC_OPTOUT = 268435456; static const int NONAUTH = 536870912; static const int FORWARD = 1073741824;};
+struct query_flag {static const int NO_MINIMIZE = 1; static const int NO_THROTTLE = 2; static const int NO_IPV6 = 4; static const int NO_IPV4 = 8; static const int TCP = 16; static const int RESOLVED = 32; static const int AWAIT_IPV4 = 64; static const int AWAIT_IPV6 = 128; static const int AWAIT_CUT = 256; static const int SAFEMODE = 512; static const int CACHED = 1024; static const int NO_CACHE = 2048; static const int EXPIRING = 4096; static const int ALLOW_LOCAL = 8192; static const int DNSSEC_WANT = 16384; static const int DNSSEC_BOGUS = 32768; static const int DNSSEC_INSECURE = 65536; static const int STUB = 131072; static const int ALWAYS_CUT = 262144; static const int DNSSEC_WEXPAND = 524288; static const int PERMISSIVE = 1048576; static const int STRICT = 2097152; static const int BADCOOKIE_AGAIN = 4194304; static const int CNAME = 8388608; static const int REORDER_RR = 16777216; static const int TRACE = 33554432; static const int NO_0X20 = 67108864; static const int DNSSEC_NODS = 134217728; static const int DNSSEC_OPTOUT = 268435456; static const int NONAUTH = 536870912; static const int FORWARD = 1073741824; static const int DNS64_MARK = 2147483648;};
 knot_dname_t *knot_dname_from_str(uint8_t *, const char *, size_t);
 _Bool knot_dname_is_equal(const knot_dname_t *, const knot_dname_t *);
 _Bool knot_dname_is_sub(const knot_dname_t *, const knot_dname_t *);
@@ -202,7 +205,7 @@ int kr_straddr_subnet(void *, const char *);
 int kr_bitcmp(const char *, const char *, int);
 int kr_family_len(int);
 struct sockaddr *kr_straddr_socket(const char *, int);
-int kr_rrarray_add(rr_array_t *, const knot_rrset_t *, knot_mm_t *);
+int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
 int kr_ta_add(map_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t *, uint16_t);
 int kr_ta_del(map_t *, const knot_dname_t *);

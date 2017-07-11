@@ -2,7 +2,7 @@ FROM alpine:edge
 MAINTAINER Marek Vavrusa <marek.vavrusa@nic.cz>
 
 # Environment
-ENV BUILD_PKGS build-base automake autoconf libtool pkgconfig git luajit-dev libuv-dev gnutls-dev jansson-dev userspace-rcu-dev
+ENV BUILD_PKGS build-base automake autoconf libtool pkgconfig git luajit-dev libuv-dev gnutls-dev jansson-dev userspace-rcu-dev curl
 ENV RUN_PKGS luajit libuv gnutls jansson bash
 ENV BUILD_IGNORE gmp nettle jansson gnutls lua libuv cmocka
 ENV PKG_CONFIG_PATH /usr/local/lib/pkgconfig

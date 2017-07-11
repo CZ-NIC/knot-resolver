@@ -57,6 +57,8 @@ _obj
 /tests/test_set
 /tests/test_utils
 /tests/test_zonecut
+/tests/dnstap/src/dnstap-test/vendor/github.com/
+/tests/dnstap/src/github.com/
 kresd.amalg.c
 libkres.amalg.c
 /doc/kresd.8

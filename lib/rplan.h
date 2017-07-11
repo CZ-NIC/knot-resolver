@@ -58,7 +58,7 @@
 	X(NONAUTH,         1 << 29) /**< Non-authoritative in-bailiwick records are enough.
 				     *   TODO: utilize this also outside cache. */ \
 	X(FORWARD,	   1 << 30) /**< Forward all queries to upstream; validate answers */ \
-			/* 1 << 31       Used by ../modules/dns64/dns64.lua */
+	X(DNS64_MARK,	   1u << 31) /**< Internal to ../modules/dns64/dns64.lua */
 
 /** Query flags */
 enum kr_query_flag {

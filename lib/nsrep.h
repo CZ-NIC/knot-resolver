@@ -81,13 +81,6 @@ struct kr_nsrep
 	union inaddr addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
 };
 
-/** @internal Address bytes for given family. */
-#define kr_nsrep_inaddr(addr) \
-	((addr).ip.sa_family == AF_INET ? (void *)&((addr).ip4.sin_addr) : (void *)&((addr).ip6.sin6_addr))
-/** @internal Address length for given family. */
-#define kr_nsrep_inaddr_len(addr) \
-	((addr).ip.sa_family == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr))
-
 /**
  * Set given NS address.
  * @param  qry      updated query
@@ -150,3 +143,15 @@ int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t
  * @return              0 on success, error code on failure
  */
 int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src);
+
+/**
+ * Sort addresses in the query nsrep list
+ * @param  ns           updated kr_nsrep
+ * @param  cache        RTT cache
+ * @return              0 or an error code
+ * @note   ns reputation is zeroed, as KR_NS_NOIP{4,6} flags are useless
+ * 		in STUB/FORWARD mode.
+ */
+KR_EXPORT
+int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_lru_t *cache);
+
