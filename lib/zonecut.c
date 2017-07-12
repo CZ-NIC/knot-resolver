@@ -354,6 +354,10 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 	if (ret != 0) {
 		return ret;
 	}
+	/* Note: we accept *any* rank from the cache.  We assume that nothing
+	 * completely untrustworthy could get into the cache, e.g out-of-bailiwick
+	 * records that weren't validated.
+	 */
 
 	/* Materialize as we'll going to do more cache lookups. */
 	knot_rrset_t rr_copy;
@@ -384,10 +388,10 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 }
 
 /**
- * Fetch RRSet of given type.  (and of reasonable trustworthiness)
+ * Fetch secure RRSet of given type.
  */
-static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
-                       const knot_dname_t *owner, uint16_t type, knot_mm_t *pool, uint32_t timestamp)
+static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
+	const knot_dname_t *owner, uint16_t type, knot_mm_t *pool, uint32_t timestamp)
 {
 	if (!rr) {
 		return kr_error(ENOENT);
@@ -401,8 +405,7 @@ static int fetch_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	if (ret != 0) {
 		return ret;
 	}
-	const bool rankOK = kr_rank_test(rank, KR_RANK_SECURE)
-		|| (kr_rank_test(rank, KR_RANK_INSECURE) && kr_rank_test(rank, KR_RANK_AUTH));
+	const bool rankOK = kr_rank_test(rank, KR_RANK_SECURE);
 	if (!rankOK) {
 		return kr_error(ENOENT);
 	}
@@ -448,9 +451,9 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 			}
 			/* Fetch DS and DNSKEY if caller wants secure zone cut */
 			if (*secured || is_root) {
-				fetch_rrset(&cut->trust_anchor, &ctx->cache, label,
+				fetch_secure_rrset(&cut->trust_anchor, &ctx->cache, label,
 					    KNOT_RRTYPE_DS, cut->pool, timestamp);
-				fetch_rrset(&cut->key, &ctx->cache, label,
+				fetch_secure_rrset(&cut->key, &ctx->cache, label,
 					    KNOT_RRTYPE_DNSKEY, cut->pool, timestamp);
 			}
 			update_cut_name(cut, label);
