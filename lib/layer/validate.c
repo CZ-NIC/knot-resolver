@@ -316,7 +316,7 @@ static int update_parent_keys(struct kr_request *req, uint16_t answer_type)
 					mark_insecure_parents(qry);
 				}
 			}
-		} else if ((qry->flags & (QUERY_DNSSEC_NODS | QUERY_FORWARD | QUERY_DNSSEC_OPTOUT)) ==
+		} else if ((qry->flags & (QUERY_DNSSEC_NODS | QUERY_FORWARD)) ==
 			   (QUERY_DNSSEC_NODS | QUERY_FORWARD)) {
 			int ret = kr_dnssec_matches_name_and_type(&req->auth_selected, qry->uid,
 								  qry->sname, KNOT_RRTYPE_NS);
@@ -503,6 +503,8 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		} else if (kr_rank_test(entry->rank, KR_RANK_MISSING) &&
 			   !invalid_entry) {
 			invalid_entry = entry;
+		} else if (kr_rank_test(entry->rank, KR_RANK_OMIT)) {
+			continue;
 		} else if (!kr_rank_test(entry->rank, KR_RANK_SECURE) &&
 			   !invalid_entry) {
 			invalid_entry = entry;
@@ -588,7 +590,7 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	if (nods && ns_exist && qtype == KNOT_RRTYPE_NS && !(qry->flags & QUERY_CNAME)) {
+	if (nods && ns_exist && qtype == KNOT_RRTYPE_NS) {
 		qry->flags &= ~QUERY_DNSSEC_WANT;
 		qry->flags |= QUERY_DNSSEC_INSECURE;
 		if (qry->forward_flags & QUERY_CNAME) {
@@ -857,7 +859,6 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	bool has_nsec3 = pkt_has_type(pkt, KNOT_RRTYPE_NSEC3);
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	const bool referral = (an->count == 0 && !knot_wire_get_aa(pkt->wire));
-	const bool no_data = (an->count == 0 && knot_wire_get_aa(pkt->wire));
 
 	if (!(qry->flags & QUERY_CACHED) && knot_wire_get_aa(pkt->wire)) {
 		/* Check if answer if not empty,
@@ -894,7 +895,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Validate non-existence proof if not positive answer. */
-	if (!(qry->flags & QUERY_CACHED) && pkt_rcode == KNOT_RCODE_NXDOMAIN) {
+	if (!(qry->flags & QUERY_CACHED) && pkt_rcode == KNOT_RCODE_NXDOMAIN &&
+	    ((qry->flags & (QUERY_FORWARD | QUERY_CNAME)) != (QUERY_FORWARD | QUERY_CNAME))) {
 		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
@@ -918,8 +920,10 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* @todo WTH, this needs API that just tries to find a proof and the caller
 	 * doesn't have to worry about NSEC/NSEC3
 	 * @todo rework this */
-	if (!(qry->flags & QUERY_CACHED)) {
-		if (pkt_rcode == KNOT_RCODE_NOERROR && no_data) {
+	if (!(qry->flags & QUERY_CACHED) && (pkt_rcode == KNOT_RCODE_NOERROR) &&
+	    ((qry->flags & (QUERY_FORWARD | QUERY_CNAME)) != (QUERY_FORWARD | QUERY_CNAME))) {
+		bool no_data = (an->count == 0 && knot_wire_get_aa(pkt->wire));
+		if (no_data) {
 			/* @todo
 			 * ? quick mechanism to determine which check to preform first
 			 * ? merge the functionality together to share code/resources

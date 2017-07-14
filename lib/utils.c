@@ -454,20 +454,6 @@ int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *
 	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
 }
 
-int kr_rrarray_add(rr_array_t *array, const knot_rrset_t *rr, knot_mm_t *pool)
-{
-	int ret = array_reserve_mm(*array, array->len + 1, kr_memreserve, pool);
-	if (ret != 0) {
-		return kr_error(ENOMEM);
-	}
-	knot_rrset_t *copy = knot_rrset_copy(rr, pool);
-	if (!copy) {
-		return kr_error(ENOMEM);
-	}
-	array_push(*array, copy);
-	return kr_ok();
-}
-
 /** Return whether two RRsets match, i.e. would form the same set; see ranked_rr_array_t */
 static inline bool rrsets_match(const knot_rrset_t *rr1, const knot_rrset_t *rr2)
 {
@@ -565,7 +551,12 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	entry->cached = false;
 	entry->yielded = false;
 	entry->to_wire = to_wire;
-	array_push(*array, entry);
+	if (array_push(*array, entry) < 0) {
+		/* Silence coverity.  It shouldn't be possible to happen,
+		 * due to the array_reserve_mm call above. */
+		mm_free(pool, entry);
+		return kr_error(ENOMEM);
+	}
 
 	return to_wire_ensure_unique(array, array->len - 1);
 }
@@ -759,13 +750,22 @@ void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *po
 {
 	char str[KNOT_DNAME_MAXLEN] = {0};
 	knot_dname_to_str(str, name, KNOT_DNAME_MAXLEN);
-	kr_log_verbose ("%s%s%s", prefix, str, postfix);
+	kr_log_verbose("%s%s%s", prefix, str, postfix);
 }
 
 void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix)
 {
 	char str[32] = {0};
 	knot_rrtype_to_string(rrtype, str, 32);
-	kr_log_verbose ("%s%s%s", prefix, str, postfix);
+	kr_log_verbose("%s%s%s", prefix, str, postfix);
+}
+
+void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *postfix)
+{
+	char str[6] = {0};
+	knot_rrclass_to_string(qry->sclass, str, sizeof(str));
+	kr_dname_print(qry->sname, prefix, " ");
+	kr_log_verbose("%s",str);
+	kr_rrtype_print(qry->stype, " ", postfix);
 }
 

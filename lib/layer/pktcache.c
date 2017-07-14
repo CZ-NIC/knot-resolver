@@ -229,8 +229,16 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Cache only NODATA/NXDOMAIN or metatype/RRSIG or wildcard expanded answers. */
 	const uint16_t qtype = knot_pkt_qtype(pkt);
 	const bool is_eligible = (knot_rrtype_is_metatype(qtype) || qtype == KNOT_RRTYPE_RRSIG);
-	const bool is_negative = kr_response_classify(pkt) & (PKT_NODATA|PKT_NXDOMAIN);
-	if (!(is_eligible || is_negative || (qry->flags & QUERY_DNSSEC_WEXPAND))) {
+	bool is_negative = kr_response_classify(pkt) & (PKT_NODATA|PKT_NXDOMAIN);
+	bool wcard_expansion = (qry->flags & QUERY_DNSSEC_WEXPAND);
+	if (is_negative && ((qry->flags & (QUERY_FORWARD | QUERY_CNAME)) ==
+	    (QUERY_FORWARD | QUERY_CNAME))) {
+		/* Don't cache CNAME'ed NXDOMAIN answer in forwarding mode
+		   since it can contain records
+		   which have not been validated by validator */
+		return ctx->state;
+	}
+	if (!(is_eligible || is_negative || wcard_expansion)) {
 		return ctx->state;
 	}
 	uint32_t ttl = packet_ttl(pkt, is_negative);

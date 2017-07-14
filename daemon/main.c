@@ -548,12 +548,16 @@ int main(int argc, char **argv)
 			kr_log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
-		if(config && strcmp(config, "-") != 0 && access(config, R_OK) != 0) {
-			kr_log_error("[system] rundir '%s'\n", rundir);
-			kr_log_error("[system] config '%s': %s\n", config, strerror(errno));
-			return EXIT_FAILURE;
-		}
 	}
+
+	if (config && strcmp(config, "-") != 0 && access(config, R_OK) != 0) {
+		kr_log_error("[system] config '%s': %s\n", config, strerror(errno));
+		return EXIT_FAILURE;
+	}
+	if (!config && access("config", R_OK) == 0) {
+		config = "config";
+	}
+
 #ifndef CAN_FORK_EARLY
 	/* Forking is currently broken with libuv. We need libuv to bind to
 	 * sockets etc. before forking, but at the same time can't touch it before
@@ -655,7 +659,7 @@ int main(int argc, char **argv)
 	worker->loop = loop;
 	loop->data = worker;
 
-	ret = engine_start(&engine, config ? config : "config");
+	ret = engine_start(&engine, config);
 	if (ret != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;

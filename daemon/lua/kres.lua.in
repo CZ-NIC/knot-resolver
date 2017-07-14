@@ -135,6 +135,8 @@ local rrset_buflen = (64 + 1) * 1024
 local rrset_buf = ffi.new('char[?]', rrset_buflen)
 local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
+	-- beware: `owner` and `rdata` are typed as a plain lua strings
+	--         and not the real types they represent.
 	__index = {
 		owner = function(rr) return ffi.string(rr._owner, knot.knot_dname_size(rr._owner)) end,
 		ttl = function(rr) return tonumber(knot.knot_rrset_ttl(rr)) end,
@@ -317,7 +319,7 @@ local function rr2str(rr, style)
 	-- Construct a single-RR temporary set while minimizing copying.
 	local rrs = knot_rrset_t()
 	knot.knot_rrset_init_empty(rrs)
-	rrs._owner = ffi.cast('char *', rr.owner) -- explicit cast needed here
+	rrs._owner = ffi.cast('knot_dname_t *', rr.owner) -- explicit cast needed here
 	rrs.type = rr.type
 	rrs.rclass = kres.class.IN
 	knot.knot_rrset_add_rdata(rrs, rr.rdata, #rr.rdata, rr.ttl, nil)

@@ -19,6 +19,8 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#include <arpa/inet.h>
+
 #include "lib/nsrep.h"
 #include "lib/rplan.h"
 #include "lib/resolve.h"
@@ -269,8 +271,8 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 		return kr_error(EINVAL);
 	}
 
-	const char *addr_in = kr_nsrep_inaddr(ns->addr[0]);
-	size_t addr_len = kr_nsrep_inaddr_len(ns->addr[0]);
+	const char *addr_in = kr_inaddr(&ns->addr[0].ip);
+	size_t addr_len = kr_inaddr_len(&ns->addr[0].ip);
 	if (addr) { /* Caller provided specific address */
 		if (addr->sa_family == AF_INET) {
 			addr_in = (const char *)&((struct sockaddr_in *)addr)->sin_addr;
@@ -333,5 +335,71 @@ int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src)
 	dst->score = KR_NS_UNKNOWN;
 	dst->reputation = 0;
 
+	return kr_ok();
+}
+
+int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_lru_t *cache)
+{
+	if (!ns || !cache) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
+
+	if (ns->addr[0].ip.sa_family == AF_UNSPEC) {
+		return kr_error(EINVAL);
+	}
+
+	if (ns->addr[1].ip.sa_family == AF_UNSPEC) {
+		/* We have only one entry here, do nothing */
+		return kr_ok();
+	}
+
+	/* Compute the scores.  Unfortunately there's no space for scores
+	 * along the addresses. */
+	unsigned scores[KR_NSREP_MAXADDR];
+	int i;
+	for (i = 0; i < KR_NSREP_MAXADDR; ++i) {
+		const struct sockaddr *sa = &ns->addr[i].ip;
+		if (sa->sa_family == AF_UNSPEC) {
+			break;
+		}
+		unsigned *score = lru_get_try(cache, kr_inaddr(sa),
+						kr_family_len(sa->sa_family));
+		if (!score) {
+			scores[i] = 1; /* prefer unknown to probe RTT */
+		} else if ((kr_rand_uint(100) < 10)
+				&& (kr_rand_uint(KR_NS_MAX_SCORE) >= *score)) {
+			/* some probability to bump bad ones up for re-probe */
+			scores[i] = 1;
+		} else {
+			scores[i] = *score;
+		}
+		WITH_VERBOSE {
+			char sa_str[INET6_ADDRSTRLEN];
+			inet_ntop(sa->sa_family, kr_inaddr(sa), sa_str, sizeof(sa_str));
+			kr_log_verbose("[     ][nsre] score %d for %s;\t cached RTT: %d\n",
+					scores[i], sa_str, score ? *score : -1);
+		}
+	}
+
+	/* Select-sort the addresses. */
+	const int count = i;
+	for (i = 0; i < count - 1; ++i) {
+		/* find min from i onwards */
+		int min_i = i;
+		for (int j = i + 1; j < count; ++j) {
+			if (scores[j] < scores[min_i]) {
+				min_i = j;
+			}
+		}
+		/* swap the indices */
+		if (min_i != i) {
+			SWAP(scores[min_i], scores[i]);
+			SWAP(ns->addr[min_i], ns->addr[i]);
+		}
+	}
+
+	ns->score = scores[0];
+	ns->reputation = 0;
 	return kr_ok();
 }
