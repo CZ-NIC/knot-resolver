@@ -11,6 +11,7 @@ Bugfixes
 - daemon: check existence of config file even if rundir isn't specified
 - policy.FORWARD and STUB: use RTT tracking to choose servers (#125, #208)
 - dns64: fix CNAME problems (#203)  It still won't work with query policies.
+- hints: better interpretation of hosts-like files (#204)
 
 Improvements
 ------------
