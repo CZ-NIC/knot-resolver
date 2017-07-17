@@ -958,6 +958,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 
 	if (qry->parent != NULL &&
 	    !(qry->forward_flags & QUERY_CNAME) &&
+	    !(qry->flags & QUERY_DNS64_MARK) &&
 	    knot_dname_in(qry->parent->zone_cut.name, qry->zone_cut.name)) {
 		return KR_STATE_PRODUCE;
 	}
