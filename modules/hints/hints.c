@@ -342,6 +342,7 @@ static int load_file(struct kr_module *module, const char *path)
 	size_t count = 0;
 	size_t line_count = 0;
 	auto_free char *line = NULL;
+	int ret = kr_ok();
 
 	while (getline(&line, &line_len, fp) > 0) {
 		++line_count;
@@ -352,26 +353,40 @@ static int load_file(struct kr_module *module, const char *path)
 		}
 		const char *canonical_name = strtok_r(NULL, " \t\n", &saveptr);
 		if (canonical_name == NULL) {
-			ERR_MSG("%s:%zu: invalid syntax\n", path, line_count);
-			continue;
+			ret = -1;
+			goto error;
 		}
 		/* Since the last added PTR records takes preference,
 		 * we add canonical name as the last one. */
 		const char *name_tok;
 		while ((name_tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
-			if (add_pair(&data->hints, name_tok, addr) == 0) {
-				count += 1;
+			ret = add_pair(&data->hints, name_tok, addr);
+			if (!ret) {
+				ret = add_reverse_pair(&data->reverse_hints, name_tok, addr);
 			}
-			add_reverse_pair(&data->reverse_hints, name_tok, addr);
-		}
-		if (add_pair(&data->hints, canonical_name, addr) == 0) {
+			if (ret) {
+				ret = -1;
+				goto error;
+			}
 			count += 1;
 		}
-		add_reverse_pair(&data->reverse_hints, canonical_name, addr);
+		ret = add_pair(&data->hints, canonical_name, addr);
+		if (!ret) {
+			ret = add_reverse_pair(&data->reverse_hints, canonical_name, addr);
+		}
+		if (ret) {
+			ret = -1;
+			goto error;
+		}
+		count += 1;
 	}
-
+error:
+	if (ret) {
+		ret = kr_error(ret);
+		ERR_MSG("%s:%zu: invalid syntax\n", path, line_count);
+	}
 	VERBOSE_MSG(NULL, "loaded %zu hints\n", count);
-	return kr_ok();
+	return ret;
 }
 
 static char* hint_add_hosts(void *env, struct kr_module *module, const char *args)
