@@ -187,19 +187,18 @@ static const knot_rdata_t * addr2rdata(const char *addr) {
 }
 
 /** @warning _NOT_ thread-safe; returns a pointer to static data! */
-static const knot_dname_t * raw_addr2reverse(const union inaddr *addr)
+static const knot_dname_t * raw_addr2reverse(const uint8_t *raw_addr, int family)
 {
 	#define REV_MAXLEN (4*16 + 16 /* the suffix, terminator, etc. */)
 	char reverse_addr[REV_MAXLEN];
 	static knot_dname_t dname[REV_MAXLEN];
 	#undef REV_MAXLEN
 
-	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr(&addr->ip);
-	if (addr->ip.sa_family == AF_INET) {
+	if (family == AF_INET) {
 		snprintf(reverse_addr, sizeof(reverse_addr),
 			 "%d.%d.%d.%d.in-addr.arpa.",
 		         raw_addr[3], raw_addr[2], raw_addr[1], raw_addr[0]);
-	} else if (addr->ip.sa_family == AF_INET6) {
+	} else if (family == AF_INET6) {
 		char *ra_it = reverse_addr;
 		for (int i = 15; i >= 0; --i) {
 			ssize_t free_space = reverse_addr + sizeof(reverse_addr) - ra_it;
@@ -233,7 +232,10 @@ static const knot_dname_t * addr2reverse(const char *addr)
 	if (parse_addr_str(&ss, addr) != 0) {
 		return NULL;
 	}
-	return raw_addr2reverse((union inaddr *)(struct sockaddr *)&ss);
+	const struct sockaddr *sa = (const struct sockaddr *)&ss;
+	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr(sa);
+	int family = kr_inaddr_family(sa);
+	return raw_addr2reverse(raw_addr, family);
 }
 
 static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr)
@@ -309,7 +311,9 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 		uint8_t *addr = pack_head(*addr_set);
 		while (addr != pack_tail(*addr_set)) {
 			void *addr_val = pack_obj_val(addr);
-			const knot_dname_t *reverse_key = raw_addr2reverse((union inaddr *)addr_val);
+			int family = pack_obj_len(addr) == kr_family_len(AF_INET)
+					? AF_INET : AF_INET6;
+			const knot_dname_t *reverse_key = raw_addr2reverse(addr_val, family);
 			if (reverse_key != NULL) {
 				kr_zonecut_del(&data->reverse_hints, reverse_key, ptr_rdata);
 			}
