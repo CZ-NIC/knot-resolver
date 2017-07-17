@@ -35,6 +35,7 @@
 
 /* Defaults */
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "hint",  fmt)
+#define ERR_MSG(fmt, ...) kr_log_error("[     ][hint] " fmt, ## __VA_ARGS__)
 
 struct hints_data {
 	struct kr_zonecut hints;
@@ -325,41 +326,11 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 	}
 }
 
-static int load_map(struct hints_data *data, FILE *fp)
-{
-	size_t line_len = 0;
-	size_t count = 0;
-	auto_free char *line = NULL;
-
-	while (getline(&line, &line_len, fp) > 0) {
-		char *saveptr = NULL;
-		char *tok = strtok_r(line, " \t\r", &saveptr);
-		if (tok == NULL || strchr(tok, '#') || strlen(tok) == 0) {
-			continue;
-		}
-		char *name_tok = strtok_r(NULL, " \t\n", &saveptr);
-		bool canonical_name = true;
-		while (name_tok != NULL) {
-			if (canonical_name) {
-				add_reverse_pair(&data->reverse_hints, name_tok, tok);
-				canonical_name = false;
-			}
-			if (add_pair(&data->hints, name_tok, tok) == 0) {
-				count += 1;
-			}
-			name_tok = strtok_r(NULL, " \t\n", &saveptr);
-		}
-	}
-
-	VERBOSE_MSG(NULL, "loaded %zu hints\n", count);
-	return kr_ok();
-}
-
 static int load_file(struct kr_module *module, const char *path)
 {
 	auto_fclose FILE *fp = fopen(path, "r");
 	if (fp == NULL) {
-		VERBOSE_MSG(NULL, "reading '%s' failed: %s\n", path, strerror(errno));
+		ERR_MSG("reading '%s' failed: %s\n", path, strerror(errno));
 		return kr_error(errno);
 	} else {
 		VERBOSE_MSG(NULL, "reading '%s'\n", path);
@@ -367,7 +338,40 @@ static int load_file(struct kr_module *module, const char *path)
 
 	/* Load file to map */
 	struct hints_data *data = module->data;
-	return load_map(data, fp);
+	size_t line_len = 0;
+	size_t count = 0;
+	size_t line_count = 0;
+	auto_free char *line = NULL;
+
+	while (getline(&line, &line_len, fp) > 0) {
+		++line_count;
+		char *saveptr = NULL;
+		const char *addr = strtok_r(line, " \t\n", &saveptr);
+		if (addr == NULL || strchr(addr, '#') || strlen(addr) == 0) {
+			continue;
+		}
+		const char *canonical_name = strtok_r(NULL, " \t\n", &saveptr);
+		if (canonical_name == NULL) {
+			ERR_MSG("%s:%zu: invalid syntax\n", path, line_count);
+			continue;
+		}
+		/* Since the last added PTR records takes preference,
+		 * we add canonical name as the last one. */
+		const char *name_tok;
+		while ((name_tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
+			if (add_pair(&data->hints, name_tok, addr) == 0) {
+				count += 1;
+			}
+			add_reverse_pair(&data->reverse_hints, name_tok, addr);
+		}
+		if (add_pair(&data->hints, canonical_name, addr) == 0) {
+			count += 1;
+		}
+		add_reverse_pair(&data->reverse_hints, canonical_name, addr);
+	}
+
+	VERBOSE_MSG(NULL, "loaded %zu hints\n", count);
+	return kr_ok();
 }
 
 static char* hint_add_hosts(void *env, struct kr_module *module, const char *args)
