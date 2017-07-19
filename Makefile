@@ -123,6 +123,7 @@ info:
 	$(info [$(HAS_libfstrm)] libfstrm (modules/dnstap))
 	$(info [$(HAS_libprotobuf-c)] libprotobuf-c (modules/dnstap))
 	$(info [$(HAS_protoc-c)] proto-c (modules/dnstap))
+	$(info [$(HAS_ahocorasick)] ahocorasick (modules/policy))
 	$(info )
 
 # Verify required dependencies are met, as listed above

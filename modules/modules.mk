@@ -48,7 +48,8 @@ endef
 
 # Lua target definition
 define lua_target
-$(1) := $$(addprefix $(2)/,$$($(1)_SOURCES))
+$(1) := $(1) $$(addprefix $(2)/,$$($(1)_SOURCES))
+$(1) : $$($(1)_DEPEND)
 $(1)-clean:
 ifeq ($$(strip $$($(1)_INSTALL)),)
 $(1)-dist:

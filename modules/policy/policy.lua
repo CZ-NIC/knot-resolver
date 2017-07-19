@@ -141,11 +141,11 @@ end
 
 -- Requests which QNAME matches given zone list (i.e. suffix match)
 function policy.suffix(action, zone_list)
-	local AC = require('aho-corasick')
-	local tree = AC.build(zone_list)
+	local AC = require('ahocorasick')
+	local tree = AC.create(zone_list)
 	return function(req, query)
 		local match = AC.match(tree, query:name(), false)
-		if match[1] ~= nil then
+		if match ~= nil then
 			return action
 		end
 		return nil
