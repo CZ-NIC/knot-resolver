@@ -181,3 +181,4 @@ include tests/tests.mk
 include doc/doc.mk
 include etc/etc.mk
 include bench/bench.mk
+include client/client.mk
