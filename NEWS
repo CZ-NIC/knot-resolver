@@ -13,6 +13,7 @@ Bugfixes
 - dns64: fix CNAME problems (#203)  It still won't work with policy.STUB.
 - hints: better interpretation of hosts-like files (#204)
          also, error out if a bad entry is encountered in the file
+- dnssec: handle unknown DNSKEY/DS algorithms (#210)
 
 Improvements
 ------------
