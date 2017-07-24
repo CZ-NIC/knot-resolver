@@ -6,7 +6,7 @@ function init()
   int kr_init_tty(const char *path);
   char *kr_run_cmd(const char *cmd, size_t * out_len);
   ]]
-  kresc = ffi.load(@libkres_SONAME@) -- FIXME in makefile
+  kresc = ffi.load('@libkres_SONAME@')
   kresc.kr_init_tty(arg[1])
 end
 

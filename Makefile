@@ -10,9 +10,6 @@ clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 doc: doc-html
 .PHONY: all install check clean doc info
 
-#FIXME: implement these
-.PHONY: client client-install client-clean
-
 # Options
 ifdef COVERAGE
 BUILD_CFLAGS += --coverage
@@ -50,7 +47,7 @@ ifeq ($(libknot_SONAME),)
   $(error "Unable to resolve libknot_SONAME, update find_soname in platform.mk")
 endif
 ifeq ($(libzscanner_SONAME),)
-  $(error "Unable to resolve libzscanner_SONAME, update find_some in platform.mk")
+  $(error "Unable to resolve libzscanner_SONAME, update find_soname in platform.mk")
 endif
 
 # Find Go version and platform

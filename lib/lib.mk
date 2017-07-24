@@ -80,6 +80,8 @@ else
 $(eval $(call make_lib,libkres,lib,yes,$(ABIVER)))
 endif
 
+libkres_SONAME := libkres$(call SOVER_EXT,$(ABIVER))
+
 # Generate pkg-config file
 libkres.pc:
 	@echo 'prefix='$(PREFIX) > $@

@@ -36,6 +36,8 @@ FILE *g_tty = NULL;		//!< connection to the daemon
 //! Initialize connection to the daemon; return 0 on success.
 KR_EXPORT int kr_init_tty(const char *path)
 {
+	if (!path)
+		return 1;
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
 		return 1;
