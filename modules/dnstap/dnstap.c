@@ -44,7 +44,7 @@ struct dnstap_data {
 
 /*
  * dt_pack packs the dnstap message for transport
- * https://gitlab.labs.nic.cz/labs/knot/blob/master/src/contrib/dnstap/dnstap.c#L24
+ * https://gitlab.labs.nic.cz/knot/knot-dns/blob/master/src/contrib/dnstap/dnstap.c#L24
  * */
 uint8_t* dt_pack(const Dnstap__Dnstap *d, uint8_t **buf, size_t *sz)
 {
@@ -65,7 +65,7 @@ uint8_t* dt_pack(const Dnstap__Dnstap *d, uint8_t **buf, size_t *sz)
 }
 
 /* set_address fills in address detail in dnstap_message
- * https://gitlab.labs.nic.cz/labs/knot/blob/master/src/contrib/dnstap/message.c#L28
+ * https://gitlab.labs.nic.cz/knot/knot-dns/blob/master/src/contrib/dnstap/message.c#L28
  */
 static void set_address(const struct sockaddr *sockaddr,
 		ProtobufCBinaryData   *addr,
@@ -236,7 +236,7 @@ int dnstap_deinit(struct kr_module *module) {
 }
 
 /* dnstap_unix_writer returns a unix fstream writer
- * https://gitlab.labs.nic.cz/labs/knot/blob/master/src/knot/modules/dnstap.c#L159
+ * https://gitlab.labs.nic.cz/knot/knot-dns/blob/master/src/knot/modules/dnstap.c#L159
  */
 static struct fstrm_writer* dnstap_unix_writer(const char *path) {
 

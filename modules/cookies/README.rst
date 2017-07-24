@@ -51,4 +51,4 @@ Dependencies
 ^^^^^^^^^^^^
 
 * `Nettle <https://www.lysator.liu.se/~nisse/nettle/>`_ required for HMAC-SHA256
-* development version of `libknot (master branch) <https://gitlab.labs.nic.cz/labs/knot/tree/master>`_ for DNS cookies handling
+
