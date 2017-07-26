@@ -290,7 +290,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _sphinx_rtd_theme: https://pypi.python.org/pypi/sphinx_rtd_theme
 .. _GNU Make: https://www.gnu.org/software/make/
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
-.. _libknot: https://gitlab.labs.nic.cz/labs/knot
+.. _libknot: https://gitlab.labs.nic.cz/knot/knot-dns
 .. _cmocka: https://cmocka.org/
 .. _Python: https://www.python.org/
 .. _luasec: https://luarocks.org/modules/brunoos/luasec
@@ -300,7 +300,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _boot2docker: http://boot2docker.io/
 
 .. _deckard: https://gitlab.labs.nic.cz/knot/deckard
-.. _deckard_doc: https://gitlab.labs.nic.cz/knot/resolver/blob/master/tests/README.rst
+.. _deckard_doc: https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/tests/README.rst
 
 .. _libsystemd: https://www.freedesktop.org/wiki/Software/systemd/
 .. _dnstap: http://dnstap.info/

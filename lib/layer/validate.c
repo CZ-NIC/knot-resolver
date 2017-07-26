@@ -887,6 +887,14 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret == kr_error(EAGAIN)) {
 			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
 			return KR_STATE_YIELD;
+		} else if (ret == kr_error(DNSSEC_INVALID_DS_ALGORITHM)) {
+			VERBOSE_MSG(qry, ">< all DS entries use unsupported algorithm pairs, going insecure\n");
+			/* ^ the message is a bit imprecise to avoid being too verbose */
+			qry->flags &= ~QUERY_DNSSEC_WANT;
+			qry->flags |= QUERY_DNSSEC_INSECURE;
+			rank_records(ctx, KR_RANK_INSECURE);
+			mark_insecure_parents(qry);
+			return KR_STATE_DONE;
 		} else if (ret != 0) {
 			VERBOSE_MSG(qry, "<= bad keys, broken trust chain\n");
 			qry->flags |= QUERY_DNSSEC_BOGUS;

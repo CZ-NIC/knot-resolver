@@ -40,7 +40,6 @@ static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, u
 	dnssec_binary_t computed_ds = {0, };
 	int ret = dnssec_key_create_ds(key, digest_type, &computed_ds);
 	if (ret != DNSSEC_EOK) {
-		ret = kr_error(ENOMEM);
 		goto fail;
 	}
 
@@ -53,7 +52,7 @@ static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, u
 
 fail:
 	dnssec_binary_free(&computed_ds);
-	return ret;
+	return kr_error(ret);
 }
 
 int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
@@ -73,11 +72,12 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 		};
 		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(&ref->rrs, i));
 		if (ret == 0) { /* Found a good DS */
-			break;
+			return kr_ok();
 		}
 		rd = kr_rdataset_next(rd);
 	}
-	return ret;
+
+	return kr_error(ret);
 }
 
 /**

@@ -76,7 +76,9 @@ it means that it yielded before and now it is resumed. This is useful in a situa
 Writing layers
 ==============
 
-The resolver :ref:`library <lib_index>` leverages the `processing API`_ from the libknot to separate packet processing code into layers.
+.. warning::  FIXME: this dev-docs section is outdated!  Better see comments in files instead, for now.
+
+The resolver :ref:`library <lib_index>` leverages the processing API from the libknot to separate packet processing code into layers.
 
 .. note:: This is only crash-course in the library internals, see the resolver :ref:`library <lib_index>` documentation for the complete overview of the services.
 
@@ -272,8 +274,7 @@ As described in the layers, you can not only retrieve information about current 
 		req:pop(qry)
 
 
-.. _libknot: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot
-.. _`processing API`: https://gitlab.labs.nic.cz/labs/knot/tree/master/src/libknot/processing
-.. _bindings: https://gitlab.labs.nic.cz/knot/resolver/blob/master/daemon/lua/kres.lua#L361
+.. _libknot:  https://gitlab.labs.nic.cz/knot/knot-dns/tree/master/src/libknot
+.. _bindings: https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/daemon/lua/kres.lua.in
 
 .. |---| unicode:: U+02014 .. em dash

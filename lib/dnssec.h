@@ -85,9 +85,11 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				size_t key_pos, const struct dseckey *key);
 /**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
- * @param vctx Pointer to validation context.
- * @param ta   Trust anchor RRSet against which to validate the DNSKEY RRSet.
- * @return     0 or error code, same as vctx->result.
+ * @param vctx  Pointer to validation context.
+ * @param ta    Trust anchor RRSet against which to validate the DNSKEY RRSet.
+ * @return      0 or error code, same as vctx->result.  In particular,
+ * 		DNSSEC_INVALID_DS_ALGORITHM if *each* DS records is unusable
+ * 		due to unimplemented DNSKEY or DS algorithm.
  */
 int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta);
 
@@ -130,6 +132,7 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
  * @param kown  DNSKEY owner name.
  * @param rdata DNSKEY RDATA
  * @param rdlen DNSKEY RDATA length
+ * @return 0 or error code; in particular: DNSSEC_INVALID_KEY_ALGORITHM
  */
 int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen);
 
