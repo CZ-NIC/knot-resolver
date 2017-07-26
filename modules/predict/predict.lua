@@ -103,10 +103,9 @@ end
 local function generate(epoch_now)
 	if not epoch_now then return 0 end
 	local queued = 0
-	local period = predict.period + 1
 	for i = 1, predict.period / 2 - 1 do
-		local current = predict.log[(epoch_now - i) % period]
-		local past = predict.log[(epoch_now - 2*i) % period]
+		local current = predict.log[(epoch_now - i - 1) % predict.period + 1]
+		local past = predict.log[(epoch_now - 2*i - 1) % predict.period + 1]
 		if current and past then
 			for k, v in pairs(current) do
 				if past[k] ~= nil and not predict.queue[k] then
