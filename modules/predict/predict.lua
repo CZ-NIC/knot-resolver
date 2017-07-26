@@ -31,7 +31,7 @@ function predict.drain(ev)
 	local deleted = 0
 	for key, val in pairs(predict.queue) do
 		local qtype, qname = key:match('(%S*)%s(.*)')
-		worker.resolve(qname, kres.type[qtype], 1, kres.query.NO_CACHE)
+		worker.resolve(qname, kres.type[qtype], kres.class.IN, kres.query.NO_CACHE)
 		predict.queue[key] = nil
 		deleted = deleted + 1
 		if deleted >= predict.batch then
