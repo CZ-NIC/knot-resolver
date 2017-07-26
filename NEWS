@@ -14,6 +14,7 @@ Bugfixes
 - hints: better interpretation of hosts-like files (#204)
          also, error out if a bad entry is encountered in the file
 - dnssec: handle unknown DNSKEY/DS algorithms (#210)
+- predict: fix the module, broken since 1.2.0 (#154)
 
 Improvements
 ------------

@@ -54,13 +54,26 @@ local function enqueue(queries)
 	local nr_queries = #queries
 	for i = 1, nr_queries do
 		local entry = queries[i]
-		local key = string.format('%s %s', entry.stype, entry.name)
+		local key = string.format('%s %s', entry.type, entry.name)
 		if not predict.queue[key] then
 			predict.queue[key] = 1
 			queued = queued + 1
 		end
 	end
 	return queued	
+end
+
+-- Enqueue queries from same format as predict.queue or predict.log 
+local function enqueue_from_log(current)
+	if not current then return 0 end
+	queued = 0
+	for key, val in pairs(current) do 
+		if val and not predict.queue[key] then
+			predict.queue[key] = val
+			queued = queued + 1
+		end
+	end
+	return queued
 end
 
 -- Prefetch soon-to-expire records
@@ -73,34 +86,26 @@ end
 -- Sample current epoch, return number of sampled queries
 function predict.sample(epoch_now)
 	if not epoch_now then return 0, 0 end
+	local current = predict.log[epoch_now] or {}	
 	local queries = stats.frequent()
 	stats.clear_frequent()
-	local queued = 0
-	local current = predict.log[epoch_now]
-	if predict.epoch ~= epoch_now or current == nil then
-		if current ~= nil then
-			queued = enqueue(current)
-		end
-		current = {}
-	end
 	local nr_samples = #queries
 	for i = 1, nr_samples do
 		local entry = queries[i]
-		local key = string.format('%s %s', entry.stype, entry.name)
+		local key = string.format('%s %s', entry.type, entry.name)
 		current[key] = 1
 	end
 	predict.log[epoch_now] = current
-	return nr_samples, queued
+	return nr_samples
 end
 
 -- Predict queries for the upcoming epoch
 local function generate(epoch_now)
 	if not epoch_now then return 0 end
 	local queued = 0
-	local period = predict.period + 1
 	for i = 1, predict.period / 2 - 1 do
-		local current = predict.log[(epoch_now - i) % period]
-		local past = predict.log[(epoch_now - 2*i) % period]
+		local current = predict.log[(epoch_now - i - 1) % predict.period + 1]
+		local past = predict.log[(epoch_now - 2*i - 1) % predict.period + 1]
 		if current and past then
 			for k, v in pairs(current) do
 				if past[k] ~= nil and not predict.queue[k] then
@@ -118,13 +123,23 @@ function predict.process(ev)
 	-- Start a new epoch, or continue sampling
 	predict.ev_sample = nil
 	local epoch_now = current_epoch()
-	local nr_learned, nr_queued = predict.sample(epoch_now)
-	-- End of epoch, predict next
+	local nr_queued = 0
+
+	-- End of epoch 
 	if predict.epoch ~= epoch_now then
 		stats['predict.epoch'] = epoch_now
 		predict.epoch = epoch_now
+		-- enqueue records from upcoming epoch	
+		nr_queued = enqueue_from_log(predict.log[epoch_now])
+		-- predict next epoch
 		nr_queued = nr_queued + generate(epoch_now)
+		-- clear log for new epoch
+		predict.log[epoch_now] = {}
 	end
+	
+	-- Sample current epoch
+	local nr_learned = predict.sample(epoch_now)
+	
 	-- Prefetch expiring records
 	nr_queued = nr_queued + predict.prefetch()
 	-- Dispatch predicted queries
