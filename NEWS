@@ -3,6 +3,7 @@ Knot Resolver 2.X.Y (2018-0M-DD)
 
 Incompatible changes
 --------------------
+- stats: remove tracking of expiring records (predict uses another way)
 - systemd: more chages in default unit files (TODO)
 - ta_sentinel: implement protocol draft-ietf-dnsop-kskroll-sentinel-01
   (our draft-ietf-dnsop-kskroll-sentinel-00 implementation had inverted logic)
@@ -15,6 +16,7 @@ Bugfixes
 - cache: fix broken refresh of insecure records that were about to expire
 - fix the hints module on some systems, e.g. Fedora (came back on 2.0.0)
 - build with older gnutls (conditionally disable features)
+- fix the predict module to work with insecure records & cleanup code
 
 
 Knot Resolver 2.0.0 (2018-01-31)
