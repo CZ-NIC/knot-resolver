@@ -130,15 +130,11 @@ function pkg {
 PIP_PKGS="dnspython==1.11 cpp-coveralls Jinja2"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew update
-	brew unlink python
-	brew install python
-	brew link --overwrite python || true
-	for p in python makedepend hiredis libmemcached protobuf-c cmocka jansson gnutls luajit libuv; do
+	for p in makedepend hiredis libmemcached protobuf-c cmocka jansson gnutls luajit libuv; do
 		echo "BEGIN $p";
 		brew install $p
 		echo "END $p";
 	done
-	pip install --upgrade pip || true
 	pip install ${PIP_PKGS}
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
