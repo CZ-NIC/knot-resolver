@@ -76,13 +76,6 @@ local function enqueue_from_log(current)
 	return queued
 end
 
--- Prefetch soon-to-expire records
-function predict.prefetch()
-	local queries = stats.expiring()
-	stats.clear_expiring()
-	return enqueue(queries)
-end
-
 -- Sample current epoch, return number of sampled queries
 function predict.sample(epoch_now)
 	if not epoch_now then return 0, 0 end
@@ -119,7 +112,9 @@ local function generate(epoch_now)
 end
 
 function predict.process(ev)
-	if not stats then error("'stats' module required") end
+	if (predict.period or 0) ~= 0 and not stats then
+		error("'stats' module required")
+	end
 	-- Start a new epoch, or continue sampling
 	predict.ev_sample = nil
 	local epoch_now = current_epoch()
@@ -140,8 +135,6 @@ function predict.process(ev)
 	-- Sample current epoch
 	local nr_learned = predict.sample(epoch_now)
 	
-	-- Prefetch expiring records
-	nr_queued = nr_queued + predict.prefetch()
 	-- Dispatch predicted queries
 	if nr_queued > 0 then
 		predict.queue_len = predict.queue_len + nr_queued
@@ -151,8 +144,10 @@ function predict.process(ev)
 		end
 	end
 	predict.ev_sample = event.after(next_event(), predict.process)
-	stats['predict.queue'] = predict.queue_len
-	stats['predict.learned'] = nr_learned
+	if stats then
+		stats['predict.queue'] = predict.queue_len
+		stats['predict.learned'] = nr_learned
+	end
 	collectgarbage()
 end
 
@@ -183,5 +178,20 @@ function predict.config(config)
 	predict.deinit()
 	predict.init()
 end
+
+predict.layer = {
+	-- Prefetch all expiring (sub-)queries immediately after the request finishes.
+	-- Doing that immediately is simplest and avoids creating (new) large bursts of activity.
+	finish = function (state, req)
+		req = kres.request_t(req)
+		local qrys = req.rplan.resolved
+		for i = 0, (tonumber(qrys.len) - 1) do -- size_t doesn't work for some reason
+			local qry = qrys.at[i]
+			if bit.band(qry.flags, kres.query.EXPIRING) ~= 0 then
+				worker.resolve(kres.dname2str(qry.sname), qry.stype, qry.sclass, kres.query.NO_CACHE)
+			end
+		end
+	end
+}
 
 return predict
