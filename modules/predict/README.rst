@@ -3,7 +3,7 @@
 Prefetching records
 -------------------
 
-The module refreshes records that are about to expire when they're used (having less than 1% of original TTL).
+The module refreshes records that are about to expire when they're used (having less than 7% of original TTL).
 This improves latency for frequently used records, as they are fetched in advance.
 
 It is also able to learn usage patterns and repetitive queries that the server makes. For example, if

@@ -44,12 +44,22 @@
 #include "lib/resolve.h"
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), " rc ",  fmt)
-#define DEFAULT_MINTTL (5) /* Short-time "no data" retention to avoid bursts */
 
-/** Record is expiring if it has less than 1% TTL (or less than 5s) */
+static inline const uint32_t get_min_ttl(const struct kr_cache *cache)
+{
+	/* Short-time "no data" retention to avoid bursts */
+	return MAX(5, cache->ttl_min);
+}
+
+/** Record is expiring if it has roughly less than 7% of original TTL.
+ *
+ * Example expirations: < 5s always, < ~9s for 60s TTL,
+ * 	< 3.8 min. with 1h TTL, < 6.25% TTL asymptotically.
+ * Sync: ../../modules/predict/README.rst
+ */
 static inline bool is_expiring(const knot_rrset_t *rr, uint32_t drift)
 {
-	return 100 * (drift + 5) > 99 * knot_rrset_ttl(rr);
+	return (drift + 5) > knot_rrset_ttl(rr) * 15 / 16;
 }
 
 static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *name,
@@ -90,6 +100,7 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 
 	if (is_expiring(&cache_rr, drift)) {
 		qry->flags |= QUERY_EXPIRING;
+		/* TODO: also set this when negative cache is used */
 	}
 
 	if ((*flags) & KR_CACHE_FLAG_WCARD_PROOF) {
@@ -372,7 +383,7 @@ static int stash_selected(struct kr_request *req, knot_pkt_t *pkt, map_t *stash,
 		return kr_ok();
 	}
 
-	uint32_t min_ttl = MAX(DEFAULT_MINTTL, req->ctx->cache.ttl_min);
+	uint32_t min_ttl = get_min_ttl(&req->ctx->cache);
 	/* uncached entries are located at the end */
 	for (ssize_t i = arr->len - 1; i >= 0; --i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
