@@ -1188,7 +1188,10 @@ static int wrk_resolve(lua_State *L)
 		lua_error(L);
 	}
 	uint8_t dname[KNOT_DNAME_MAXLEN];
-	knot_dname_from_str(dname, lua_tostring(L, 1), sizeof(dname));
+	if (!knot_dname_from_str(dname, lua_tostring(L, 1), sizeof(dname))) {
+		lua_pushstring(L, "invalid qname");
+		lua_error(L);
+	};
 	/* Check class and type */
 	uint16_t rrtype = lua_tointeger(L, 2);
 	if (!lua_isnumber(L, 2)) {

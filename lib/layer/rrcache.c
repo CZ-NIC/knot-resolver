@@ -88,7 +88,6 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		return kr_error(ENOENT);
 	}
 
-	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
 	if (is_expiring(&cache_rr, drift)) {
 		qry->flags |= QUERY_EXPIRING;
 	}
@@ -301,7 +300,19 @@ static int commit_rr(const char *key, void *val, void *data)
 		 * This way they would have to hit the first answer (whenever TTL expires). */
 		if (cached_rank >= 0) {
 			VERBOSE_MSG(baton->qry, "=> orig. rank: 0%0.2o\n", cached_rank);
-			if (cached_rank >= rank) {
+			bool accept = rank > cached_rank;
+			/* Additionally accept equal rank if the cached RR is expiring.
+			 * This is primarily for prefetching from predict module. */
+			if (rank == cached_rank) {
+				uint32_t drift = baton->timestamp;
+				knot_rrset_t cache_rr;
+				knot_rrset_init(&cache_rr, rr->owner, rr->type, rr->rclass);
+				int ret = kr_cache_peek_rr(baton->cache, &cache_rr, NULL, NULL, &drift);
+				if (ret != kr_ok() || is_expiring(&cache_rr, drift)) {
+					accept = true;
+				}
+			}
+			if (!accept) {
 				return kr_ok();
 			}
 		}

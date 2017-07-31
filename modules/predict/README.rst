@@ -3,7 +3,7 @@
 Prefetching records
 -------------------
 
-The module tracks expiring records (having less than 5% of original TTL) and batches them for predict.
+The module refreshes records that are about to expire when they're used (having less than 1% of original TTL).
 This improves latency for frequently used records, as they are fetched in advance.
 
 It is also able to learn usage patterns and repetitive queries that the server makes. For example, if
@@ -29,6 +29,7 @@ Example configuration
 Defaults are 15 minutes window, 6 hours period.
 
 .. tip:: Use period 0 to turn off prediction and just do prefetching of expiring records.
+    That works even without the 'stats' module.
 
 Exported metrics
 ^^^^^^^^^^^^^^^^

@@ -16,9 +16,10 @@ BUILD_CFLAGS += --coverage
 endif
 
 # Dependencies
-$(eval $(call find_lib,libknot,2.3.1,yes))
-$(eval $(call find_lib,libdnssec,2.3.1,yes))
-$(eval $(call find_lib,libzscanner,2.3.1,yes))
+KNOT_MINVER := 2.3.1
+$(eval $(call find_lib,libknot,$(KNOT_MINVER),yes))
+$(eval $(call find_lib,libdnssec,$(KNOT_MINVER),yes))
+$(eval $(call find_lib,libzscanner,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,lmdb))
 $(eval $(call find_lib,libuv,1.0,yes))
 $(eval $(call find_lib,nettle,,yes))
@@ -128,13 +129,13 @@ info:
 
 # Verify required dependencies are met, as listed above
 ifeq ($(HAS_libknot),no)
-	$(error libknot >= 2.3.1 required)
+	$(error libknot >= $(KNOT_MINVER) required)
 endif
 ifeq ($(HAS_libzscanner),no)
-	$(error libzscanner >= 2.3.1 required)
+	$(error libzscanner >= $(KNOT_MINVER) required)
 endif
 ifeq ($(HAS_libdnssec),no)
-	$(error libdnssec >= 2.3.1 required)
+	$(error libdnssec >= $(KNOT_MINVER) required)
 endif
 ifeq ($(HAS_lua),no)
 	$(error luajit required)

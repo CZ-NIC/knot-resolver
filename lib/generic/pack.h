@@ -23,6 +23,8 @@
  * backed by an array.
  *
  * @note Maximum object size is 2^16 bytes, see  ::pack_objlen_t
+ * @TODO If some mistake happens somewhere, the access may end up in an infinite loop.
+ *       (equality comparison on pointers)
  *
  * # Example usage:
  *
@@ -111,6 +113,23 @@ static inline uint8_t *pack_obj_val(uint8_t *it)
 static inline uint8_t *pack_obj_next(uint8_t *it)
 {
 	return pack_obj_val(it) + pack_obj_len(it);
+}
+
+/** Return pointer to the last packed object. */
+static inline uint8_t *pack_last(pack_t pack)
+{
+	if (pack.len == 0) {
+		return NULL;
+	}
+	uint8_t *it = pack_head(pack);
+	uint8_t *tail = pack_tail(pack);
+	while (true) {
+		uint8_t *next = pack_obj_next(it);
+		if (next == tail) {
+			return it;
+		}
+		it = next;
+	}
 }
 
 /** Push object to the end of the pack

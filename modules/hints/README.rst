@@ -6,7 +6,7 @@ Static hints
 This is a module providing static hints for forward records (A/AAAA) and reverse records (PTR).
 The records can be loaded from ``/etc/hosts``-like files and/or added directly.
 
-You can also use the module to change root hints that are used as a safety belt, or if the root NS
+You can also use the module to change root hints.  They are used as a safety belt or if the root NS
 drops out of cache.
 
 Examples
@@ -22,7 +22,7 @@ Examples
     hints.root({
       ['j.root-servers.net.'] = { '2001:503:c27::2:30', '192.58.128.30' }
     })
-    -- Set custom hint
+    -- Add a custom hint
     hints['localhost'] = '127.0.0.1'
 
 Properties
@@ -56,6 +56,12 @@ Properties
   :return: ``{ result: bool }``
 
   Add a hostname - address pair hint.
+
+  .. note::
+
+    If multiple addresses have been added for a name, all are returned in a forward query.
+    If multiple names have been added to an address, the last one defined is returned
+    in a corresponding PTR query.
 
 .. function:: hints.del(pair)
 
