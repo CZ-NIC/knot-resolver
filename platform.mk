@@ -43,7 +43,7 @@ else
 		SOVER = $(if $(1), -compatibility_version $(2) -current_version $(1),)
 	else
 		PLATFORM := POSIX
-		LDFLAGS += -pthread -lm -Wl,-E
+		LDFLAGS += -pthread -lm -Wl,-E "-Wl,-rpath=$(LIBDIR)"
                 # ELF hardening options
 		ifneq ($(HARDENING),no)
 			BINFLAGS += -pie
