@@ -113,7 +113,7 @@ This is only passive processing of the incoming answer. If you want to change th
 		if (can_satisfy(qry)) {
 			/* This flag makes the resolver move the query
 			 * to the "resolved" list. */
-			qry->flags |= QUERY_RESOLVED;
+			qry->flags.RESOLVED = true;
 			return KR_STATE_DONE;
 		}
 

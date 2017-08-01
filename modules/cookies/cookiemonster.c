@@ -225,7 +225,7 @@ int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	if (!cookie_ctx->clnt.enabled || (qry->flags & QUERY_TCP)) {
+	if (!cookie_ctx->clnt.enabled || (qry->flags.TCP)) {
 		return ctx->state;
 	}
 
@@ -265,7 +265,7 @@ int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 #endif
 	if (rcode == KNOT_RCODE_BADCOOKIE) {
 		struct kr_query *next = NULL;
-		if (!(qry->flags & QUERY_BADCOOKIE_AGAIN)) {
+		if (!(qry->flags.BADCOOKIE_AGAIN)) {
 			/* Received first BADCOOKIE, regenerate query. */
 			next = kr_rplan_push(&req->rplan, qry->parent,
 			                     qry->sname,  qry->sclass,
@@ -274,7 +274,7 @@ int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 		if (next) {
 			VERBOSE_MSG(NULL, "%s\n", "BADCOOKIE querying again");
-			qry->flags |= QUERY_BADCOOKIE_AGAIN;
+			qry->flags.BADCOOKIE_AGAIN = true;
 		} else {
 			/*
 			 * Either the planning of the second request failed or
@@ -283,7 +283,7 @@ int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 * RFC7873 5.3 says that TCP should be used. Currently
 			 * we always expect that the server doesn't support TCP.
 			 */
-			qry->flags &= ~QUERY_BADCOOKIE_AGAIN;
+			qry->flags.BADCOOKIE_AGAIN = false;
 			return KR_STATE_FAIL;
 		}
 

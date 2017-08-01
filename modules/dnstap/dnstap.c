@@ -174,7 +174,7 @@ static int dnstap_log(kr_layer_t *ctx) {
 	if (rplan->resolved.len > 0) {
 		struct kr_query *last = array_tail(rplan->resolved);
 		/* Only add query_zone when not answered from cache */
-		if (!(last->flags & QUERY_CACHED)) {
+		if (!(last->flags.CACHED)) {
 			const knot_dname_t *zone_cut_name = last->zone_cut.name;
 			if (zone_cut_name != NULL) {
 				m.query_zone.data = (uint8_t *)zone_cut_name;

@@ -140,7 +140,7 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 		: 0;
 
 	/* When forwarding, keep the nameserver addresses. */
-	if (parent && (parent->flags & qry->flags & QUERY_FORWARD)) {
+	if (parent && (parent->flags & qry->flags.FORWARD)) {
 		ret = kr_nsrep_copy_set(&qry->ns, &parent->ns);
 		if (ret) {
 			query_free(rplan->pool, qry);

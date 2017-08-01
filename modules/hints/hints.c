@@ -152,7 +152,7 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	VERBOSE_MSG(qry, "<= answered from hints\n");
-	qry->flags &= ~QUERY_DNSSEC_WANT; /* Never authenticated */
+	qry->flags.DNSSEC_WANT = false; /* Never authenticated */
 	qry->flags |= QUERY_CACHED|QUERY_NO_MINIMIZE;
 	pkt->parsed = pkt->size;
 	knot_wire_set_qr(pkt->wire);

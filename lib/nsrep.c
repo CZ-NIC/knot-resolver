@@ -94,10 +94,10 @@ static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsign
 		bool is_valid = false;
 		/* Check if the address isn't disabled. */
 		if (len == sizeof(struct in6_addr)) {
-			is_valid = !(opts & QUERY_NO_IPV6);
+			is_valid = !(opts.NO_IPV6);
 			favour = FAVOUR_IPV6;
 		} else {
-			is_valid = !(opts & QUERY_NO_IPV4);
+			is_valid = !(opts.NO_IPV4);
 		}
 		/* Get RTT for this address (if known) */
 		if (is_valid) {
@@ -146,10 +146,10 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 			if (reputation & KR_NS_NOIP4) {
 				score = KR_NS_UNKNOWN;
 				/* Try to start with clean slate */
-				if (!(ctx->options & QUERY_NO_IPV6)) {
+				if (!(ctx->options.NO_IPV6)) {
 					reputation &= ~KR_NS_NOIP6;
 				}
-				if (!(ctx->options & QUERY_NO_IPV4)) {
+				if (!(ctx->options.NO_IPV4)) {
 					reputation &= ~KR_NS_NOIP4;
 				}
 			}
@@ -162,7 +162,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
 	 * at the same time long distance scouts probe other sources (low probability).
 	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
-	if (score <= ns->score && (qry->flags & QUERY_NO_THROTTLE || score < KR_NS_TIMEOUT)) {
+	if (score <= ns->score && (qry->flags.NO_THROTTLE || score < KR_NS_TIMEOUT)) {
 		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
 		ns->reputation = reputation;
 	} else {
@@ -170,7 +170,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 		if ((kr_rand_uint(100) < 10) && (kr_rand_uint(KR_NS_MAX_SCORE) >= score)) {
 			/* If this is a low-reliability probe, go with TCP to get ICMP reachability check. */
 			if (score >= KR_NS_LONG) {
-				qry->flags |= QUERY_TCP;
+				qry->flags.TCP = true;
 			}
 			update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
 			ns->reputation = reputation;
