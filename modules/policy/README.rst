@@ -13,7 +13,7 @@ There are several policies implemented:
   - applies action if QNAME matches `regular expression <http://lua-users.org/wiki/PatternsTutorial>`_
 * ``suffix``
   - applies action if QNAME suffix matches given list of suffixes (useful for "is domain in zone" rules),
-  uses `Aho-Corasick`_ string matching algorithm implemented by `@jgrahamc`_ (CloudFlare, Inc.) (BSD 3-clause)
+  uses `Aho-Corasick`_ string matching algorithm `from CloudFlare <https://github.com/cloudflare/lua-aho-corasick>`_ (BSD 3-clause)
 * ``rpz``
   - implementes a subset of the RPZ_ format. Currently it can be used with a zonefile, a binary database support is on the way. Binary database can be updated by an external process on the fly.
 * custom filter function
