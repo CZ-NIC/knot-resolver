@@ -739,8 +739,21 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	if (!task || task->finished) {
 		return kr_error(ESTALE);
 	}
+
+	/* Answer with NOTIMPL to all OPCODEs but QUERY bypassing resolve.c */
+	if(packet && knot_wire_get_opcode(packet->wire) != KNOT_OPCODE_QUERY) {
+		knot_wire_set_rcode(packet->wire, KNOT_RCODE_NOTIMPL);
+		/* We need the packet finalized so qr_task_send does not try to resolve upon it. */
+		knot_wire_set_qr(packet->wire);
+		task->finished = true;
+		/* Send back answer */
+		(void) qr_task_send(task, task->source.handle, (struct sockaddr *)&task->source.addr, packet);
+		return KR_STATE_DONE;
+	}
+
 	/* Close pending I/O requests */
 	subreq_finalize(task, packet_source, packet);
+
 	/* Consume input and produce next query */
 	int sock_type = -1;
 	task->addrlist = NULL;
