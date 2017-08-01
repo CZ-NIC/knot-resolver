@@ -125,12 +125,6 @@ When you have all the dependencies ready, you can build and install.
     Production code should be compiled with ``-DNDEBUG``.
     If you build the binary with ``-DNOVERBOSELOG``, it won't be possible to turn on verbose logging; we advise packagers against using that flag.
 
-.. note:: If you build with ``PREFIX``, you may need to also set the ``LDFLAGS`` for the libraries:
-
-.. code-block:: bash
-
-   make LDFLAGS="-Wl,-rpath=/usr/local/lib" PREFIX="/usr/local"
-
 Alternatively you can build only specific parts of the project, i.e. ``library``.
 
 .. code-block:: bash
