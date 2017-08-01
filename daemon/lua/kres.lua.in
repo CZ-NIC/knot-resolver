@@ -252,9 +252,6 @@ local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
 		name = function(qry) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
-		final = function(qry)
-			return qry.flags.RESOLVED and (qry.parent == nil)
-		end,
 		nslist = function(qry, list)
 			assert(#list <= 4, 'maximum of 4 addresses can be evaluated for each query')
 			for i, ns in ipairs(list) do
