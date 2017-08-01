@@ -17,7 +17,7 @@ mod.layer = {
 		req = kres.request_t(req)
 		qry = req:current()
 		-- Observe only authoritative answers
-		if mod.proxy == nil or not qry:resolved() then
+		if mod.proxy == nil or not qry.flags.RESOLVED then
 			return state
 		end
 		-- Synthetic AAAA from marked A responses

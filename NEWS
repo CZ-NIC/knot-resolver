@@ -3,11 +3,10 @@ Knot Resolver 1.4.0 (2017-0x-yy)
 
 Incompatible changes
 --------------------
-
 - lua: query flag-sets are no longer represented as plain integers.
-  Using bit operations directly on kres.query.* no longer works,
-  but other use cases should work as before.  Still, it is recommended
-  to instead write code like qry.flags.NO_0X20 = true.
+  kres.query.* no longer works, and kr_query_t lost trivial methods
+  'hasflag' and 'resolved'.
+  You can instead write code like qry.flags.NO_0X20 = true.
 
 
 Knot Resolver 1.3.2 (2017-07-28)
