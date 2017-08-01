@@ -63,6 +63,17 @@ local function mirror(target)
 	end
 end
 
+-- Override the list of nameservers (forwarders)
+local function set_nslist(qry, list)
+	for i, ns in ipairs(list) do
+		assert(ffi.C.kr_nsrep_set(qry, i - 1, ns) == 0);
+	end
+	-- If less than maximum NSs, insert guard to terminate the list
+	if #list < 4 then
+		assert(ffi.C.kr_nsrep_set(qry, #list, nil) == 0);
+	end
+end
+
 -- Forward request, and solve as stub query
 local function stub(target)
 	local list = {}
@@ -79,7 +90,7 @@ local function stub(target)
 		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
 		qry.flags.STUB = true
 		qry.flags.ALWAYS_CUT = false
-		qry:nslist(list)
+		set_nslist(qry, list)
 		return state
 	end
 end
@@ -103,7 +114,7 @@ local function forward(target)
 		qry.flags.ALWAYS_CUT = false
 		qry.flags.NO_MINIMIZE = true
 		qry.flags.AWAIT_CUT = true
-		qry:nslist(list)
+		set_nslist(qry, list)
 		return state
 	end
 end
