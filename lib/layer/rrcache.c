@@ -88,7 +88,6 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		return kr_error(ENOENT);
 	}
 
-	/* Mark as expiring if it has less than 1% TTL (or less than 5s) */
 	if (is_expiring(&cache_rr, drift)) {
 		qry->flags |= QUERY_EXPIRING;
 	}
@@ -271,7 +270,6 @@ struct rrcache_baton
 	struct kr_query *qry;
 	struct kr_cache *cache;
 	unsigned timestamp;
-	uint32_t min_ttl;
 };
 
 static int commit_rrsig(struct rrcache_baton *baton, uint8_t rank, uint8_t flags, knot_rrset_t *rr)
@@ -288,14 +286,6 @@ static int commit_rr(const char *key, void *val, void *data)
 {
 	knot_rrset_t *rr = val;
 	struct rrcache_baton *baton = data;
-	/* Ensure minimum TTL */
-	knot_rdata_t *rd = rr->rrs.data;
-	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
-		if (knot_rdata_ttl(rd) < baton->min_ttl) {
-			knot_rdata_set_ttl(rd, baton->min_ttl);
-		}
-		rd = kr_rdataset_next(rd);
-	}
 
 	/* Save RRSIG in a special cache. */
 	uint8_t rank = KEY_FLAG_RANK(key);
@@ -310,7 +300,19 @@ static int commit_rr(const char *key, void *val, void *data)
 		 * This way they would have to hit the first answer (whenever TTL expires). */
 		if (cached_rank >= 0) {
 			VERBOSE_MSG(baton->qry, "=> orig. rank: 0%0.2o\n", cached_rank);
-			if (cached_rank >= rank) {
+			bool accept = rank > cached_rank;
+			/* Additionally accept equal rank if the cached RR is expiring.
+			 * This is primarily for prefetching from predict module. */
+			if (rank == cached_rank) {
+				uint32_t drift = baton->timestamp;
+				knot_rrset_t cache_rr;
+				knot_rrset_init(&cache_rr, rr->owner, rr->type, rr->rclass);
+				int ret = kr_cache_peek_rr(baton->cache, &cache_rr, NULL, NULL, &drift);
+				if (ret != kr_ok() || is_expiring(&cache_rr, drift)) {
+					accept = true;
+				}
+			}
+			if (!accept) {
 				return kr_ok();
 			}
 		}
@@ -343,7 +345,6 @@ static int stash_commit(map_t *stash, struct kr_query *qry, struct kr_cache *cac
 		.qry = qry,
 		.cache = cache,
 		.timestamp = qry->timestamp.tv_sec,
-		.min_ttl = MAX(DEFAULT_MINTTL, cache->ttl_min),
 	};
 	return map_walk(stash, &commit_rr, &baton);
 }
@@ -370,6 +371,8 @@ static int stash_selected(struct kr_request *req, knot_pkt_t *pkt, map_t *stash,
 	if (!arr->len) {
 		return kr_ok();
 	}
+
+	uint32_t min_ttl = MAX(DEFAULT_MINTTL, req->ctx->cache.ttl_min);
 	/* uncached entries are located at the end */
 	for (ssize_t i = arr->len - 1; i >= 0; --i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
@@ -379,7 +382,17 @@ static int stash_selected(struct kr_request *req, knot_pkt_t *pkt, map_t *stash,
 		if (entry->cached) {
 			continue;
 		}
-		const knot_rrset_t *rr = entry->rr;
+		knot_rrset_t *rr = entry->rr;
+		
+		/* Ensure minimum TTL */
+		knot_rdata_t *rd = rr->rrs.data;
+		for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
+			if (knot_rdata_ttl(rd) < min_ttl) {
+				knot_rdata_set_ttl(rd, min_ttl);
+			}
+			rd = kr_rdataset_next(rd);
+		}
+
 		/* Skip NSEC3 RRs and their signatures.  We don't use them this way.
 		 * They would be stored under the hashed name, etc. */
 		if (kr_rrset_type_maysig(rr) == KNOT_RRTYPE_NSEC3) {

@@ -20,7 +20,7 @@ CMD ["/usr/local/sbin/kresd"]
 RUN \
 apk --update add ${RUN_PKGS} && \
 apk add --virtual build-dep ${BUILD_PKGS} && \
-git clone https://gitlab.labs.nic.cz/knot/resolver.git /tmp/build && \
+git clone https://gitlab.labs.nic.cz/knot/knot-resolver.git /tmp/build && \
 cd /tmp/build && \
 ./scripts/bootstrap-depends.sh /usr/local && \
 make -j4 install && \

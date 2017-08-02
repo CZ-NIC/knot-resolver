@@ -236,13 +236,68 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	return vctx->result;
 }
 
+/* Fallbacks: implemented in newer libdnssec.
+ * Note: changing some from true to false is NOT enough to fully remove the support. */
+#if KNOT_VERSION_HEX < ((2 << 16) | (6 << 8) | 0)
+	static bool dnssec_algorithm_key_support(dnssec_key_algorithm_t algo)
+	{
+		switch (algo) {
+		case DNSSEC_KEY_ALGORITHM_DSA_SHA1:
+		case DNSSEC_KEY_ALGORITHM_DSA_SHA1_NSEC3:
+		case DNSSEC_KEY_ALGORITHM_RSA_SHA1:
+		case DNSSEC_KEY_ALGORITHM_RSA_SHA1_NSEC3:
+		case DNSSEC_KEY_ALGORITHM_RSA_SHA256:
+		case DNSSEC_KEY_ALGORITHM_RSA_SHA512:
+		case DNSSEC_KEY_ALGORITHM_ECDSA_P256_SHA256:
+		case DNSSEC_KEY_ALGORITHM_ECDSA_P384_SHA384:
+			return true;
+		//case DNSSEC_KEY_ALGORITHM_ED25519:
+		//case DNSSEC_KEY_ALGORITHM_ED448:
+		default:
+			return false;
+		}
+	}
+
+	static bool dnssec_algorithm_digest_support(dnssec_key_digest_t algo)
+	{
+		switch (algo) {
+		case DNSSEC_KEY_DIGEST_SHA1:
+		case DNSSEC_KEY_DIGEST_SHA256:
+		case DNSSEC_KEY_DIGEST_SHA384:
+			return true;
+		default:
+			return false;
+		};
+	}
+#endif
+
+static bool kr_ds_algo_support(const knot_rrset_t *ta)
+{
+	for (uint16_t i = 0; i < ta->rrs.rr_count; ++i) {
+		if (dnssec_algorithm_digest_support(knot_ds_digest_type(&ta->rrs, i))
+		    && dnssec_algorithm_key_support(knot_ds_alg(&ta->rrs, i))) {
+			return true;
+		}
+	}
+	return false;
+}
+
 int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 {
 	const knot_pkt_t *pkt         = vctx->pkt;
 	const knot_rrset_t *keys      = vctx->keys;
 
-	if (!pkt || !keys || !ta) {
+	const bool ok = pkt && keys && ta && ta->rrs.rr_count && ta->rrs.data
+			&& ta->type == KNOT_RRTYPE_DS;
+	if (!ok) {
+		assert(false);
 		return kr_error(EINVAL);
+	}
+
+	/* Check if at least one DS has a usable algorithm pair. */
+	if (!kr_ds_algo_support(ta)) {
+		/* See RFC6840 5.2. */
+		return vctx->result = kr_error(DNSSEC_INVALID_DS_ALGORITHM);
 	}
 
 	/* RFC4035 5.2, bullet 1
@@ -273,6 +328,7 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 		assert (vctx->result == 0);
 		return vctx->result;
 	}
+
 	/* No useable key found */
 	vctx->result = kr_error(ENOENT);
 	return vctx->result;
@@ -363,7 +419,7 @@ int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, con
 	ret = dnssec_key_set_rdata(new_key, &binary_key);
 	if (ret != DNSSEC_EOK) {
 		dnssec_key_free(new_key);
-		return kr_error(ENOMEM);
+		return kr_error(ret);
 	}
 	if (kown) {
 		ret = dnssec_key_set_dname(new_key, kown);

@@ -1,11 +1,20 @@
-Knot Resolver 1.3.2 (2017-07-xx)
+Knot Resolver 1.3.2 (2017-07-28)
 ================================
+
+Security
+--------
+- fix possible opportunities to use insecure data from cache as keys
+  for validation
 
 Bugfixes
 --------
 - daemon: check existence of config file even if rundir isn't specified
 - policy.FORWARD and STUB: use RTT tracking to choose servers (#125, #208)
-- dns64: fix CNAME problems (#203)  It still won't work with query policies.
+- dns64: fix CNAME problems (#203)  It still won't work with policy.STUB.
+- hints: better interpretation of hosts-like files (#204)
+         also, error out if a bad entry is encountered in the file
+- dnssec: handle unknown DNSKEY/DS algorithms (#210)
+- predict: fix the module, broken since 1.2.0 (#154)
 
 Improvements
 ------------

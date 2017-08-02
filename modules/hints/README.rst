@@ -22,7 +22,7 @@ Examples
     hints.root({
       ['j.root-servers.net.'] = { '2001:503:c27::2:30', '192.58.128.30' }
     })
-    -- Set a custom hint
+    -- Add a custom hint
     hints['foo.bar'] = '127.0.0.1'
 
 .. note:: The ``policy`` module applies before ``hints``, meaning e.g. that hints for special names (:rfc:`6761#section-6`) like ``localhost`` or ``test`` will get shadowed by ``policy`` rules by default.
@@ -59,6 +59,12 @@ Properties
   :return: ``{ result: bool }``
 
   Add a hostname - address pair hint.
+
+  .. note::
+
+    If multiple addresses have been added for a name, all are returned in a forward query.
+    If multiple names have been added to an address, the last one defined is returned
+    in a corresponding PTR query.
 
 .. function:: hints.del(pair)
 
