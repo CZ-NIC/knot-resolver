@@ -30,7 +30,8 @@ test:linux:amd64:
 deckard:linux:amd64:
   stage: test
   script:
-    - git submodule update --init --recursive
+    - LC_ALL=C.UTF-8 add-apt-repository ppa:raphink/augeas -y
+    - apt-get install -y python-yaml python-augeas
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
   dependencies:
     - build:linux:amd64
