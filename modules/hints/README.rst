@@ -6,7 +6,7 @@ Static hints
 This is a module providing static hints for forward records (A/AAAA) and reverse records (PTR).
 The records can be loaded from ``/etc/hosts``-like files and/or added directly.
 
-You can also use the module to change root hints that are used as a safety belt, or if the root NS
+You can also use the module to change the root hints; they are used as a safety belt or if the root NS
 drops out of cache.
 
 Examples
@@ -14,16 +14,19 @@ Examples
 
 .. code-block:: lua
 
-    -- Load hints after iterator
+    -- Load hints after iterator (so hints take precedence before caches)
     modules = { 'hints > iterate' }
-    -- Load hints before rrcache, custom hosts file
-    modules = { ['hints < rrcache'] = 'hosts.custom' }
-    -- Add root hints
+    -- Add a custom hosts file
+    hints.add_hosts('hosts.custom')
+    -- Override the root hints
     hints.root({
       ['j.root-servers.net.'] = { '2001:503:c27::2:30', '192.58.128.30' }
     })
-    -- Set custom hint
-    hints['localhost'] = '127.0.0.1'
+    -- Set a custom hint
+    hints['foo.bar'] = '127.0.0.1'
+
+.. note:: The ``policy`` module applies before ``hints``, meaning e.g. that hints for special names (:rfc:`6761#section-6`) like ``localhost`` or ``test`` will get shadowed by ``policy`` rules by default.
+    That can be worked around e.g. by explicit ``policy.PASS`` action.
 
 Properties
 ^^^^^^^^^^
@@ -38,7 +41,7 @@ Properties
 
 .. function:: hints.add_hosts([path])
 
-  :param string path:  path to hosts-like file, default: `/etc/hosts`
+  :param string path:  path to hosts-like file, default: ``/etc/hosts``
 
   Add hints from a host-like file.
 
