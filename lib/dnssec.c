@@ -36,6 +36,10 @@
 #include "lib/dnssec.h"
 #include "lib/resolve.h"
 
+/* forward */
+static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
+	const knot_rrset_t *covered, size_t key_pos, const struct dseckey *key);
+
 void kr_crypto_init(void)
 {
 	dnssec_crypto_init();
@@ -147,7 +151,16 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *cover
 	return kr_error(ENOENT);
 }
 
-int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
+/**
+ * Validate RRSet using a specific key.
+ * @param vctx    Pointer to validation context.
+ * @param covered RRSet covered by a signature. It must be in canonical format.
+ * @param key_pos Position of the key to be validated with.
+ * @param key     Key to be used to validate.
+ *		  If NULL, then key from DNSKEY RRSet is used.
+ * @return        0 or error code, same as vctx->result.
+ */
+static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				const knot_rrset_t *covered,
 				size_t key_pos, const struct dseckey *key)
 {

@@ -72,18 +72,6 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx,
 			const knot_rrset_t *covered);
 
 /**
- * Validate RRSet using a specific key.
- * @param vctx    Pointer to validation context.
- * @param covered RRSet covered by a signature. It must be in canonical format.
- * @param key_pos Position of the key to be validated with.
- * @param key     Key to be used to validate.
- *		  If NULL, then key from DNSKEY RRSet is used.
- * @return        0 or error code, same as vctx->result.
- */
-int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
-				const knot_rrset_t *covered,
-				size_t key_pos, const struct dseckey *key);
-/**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
  * @param vctx  Pointer to validation context.
  * @param ta    Trust anchor RRSet against which to validate the DNSKEY RRSet.
