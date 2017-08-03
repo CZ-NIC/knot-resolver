@@ -414,7 +414,7 @@ int check_request(kr_layer_t *ctx)
 	};
 
 	struct kr_nonce_input nonce = {
-		.rand = kr_rand_uint(UINT32_MAX),
+		.rand = kr_rand_uint(0),
 		.time = req->current_query->timestamp.tv_sec
 	};
 
