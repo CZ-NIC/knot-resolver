@@ -1,6 +1,10 @@
 Knot Resolver 1.3.3 (2017-0_-__)
 ================================
 
+Bugfixes
+--------
+- iterate: skip RRSIGs with bad label count instead of immediate SERVFAIL
+
 Improvements
 ------------
 - policy: implement remaining special-use domain names from RFC6761 (#205),

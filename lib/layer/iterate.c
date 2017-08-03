@@ -465,7 +465,10 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			if (rr->type == KNOT_RRTYPE_RRSIG) {
 				int rrsig_labels = knot_rrsig_labels(&rr->rrs, 0);
 				if (rrsig_labels > cname_labels) {
-					return KR_STATE_FAIL;
+					/* clearly wrong RRSIG, don't pick it.
+					 * don't fail immediately,
+					 * let validator work. */
+					continue;
 				}
 				if (rrsig_labels < cname_labels) {
 					query->flags |= QUERY_DNSSEC_WEXPAND;
