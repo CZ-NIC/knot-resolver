@@ -157,6 +157,14 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	uint32_t timestamp            = vctx->timestamp;
 	bool has_nsec3		      = vctx->has_nsec3;
 	struct dseckey *created_key = NULL;
+
+	/* It's just caller's approximation that the RR is in that particular zone.
+	 * We MUST guard against attempts of zones signing out-of-bailiwick records. */
+	if (!knot_dname_in(zone_name, covered->owner)) {
+		vctx->result = kr_error(ENOENT);
+		return vctx->result;
+	}
+
 	if (key == NULL) {
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, key_pos);
 		int ret = kr_dnssec_key_from_rdata(&created_key, keys->owner,
