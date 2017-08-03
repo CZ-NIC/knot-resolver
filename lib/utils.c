@@ -168,13 +168,15 @@ int kr_rand_reseed(void)
 	return kr_ok();
 }
 
-unsigned kr_rand_uint(unsigned max)
+uint32_t kr_rand_uint(uint32_t max)
 {
-	if (!isaac_seeded) {
+	if (unlikely(!isaac_seeded)) {
 		kr_rand_reseed();
 		isaac_seeded = true;
 	}
-	return isaac_next_uint(&ISAAC, max);
+	return max == 0
+		? isaac_next_uint32(&ISAAC)
+		: isaac_next_uint(&ISAAC, max);
 }
 
 int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
