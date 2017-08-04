@@ -127,16 +127,25 @@ char* kr_strcatdup(unsigned n, ...)
 	return result;
 }
 
-static int seed_file(FILE *fp, char *buf, size_t buflen)
+static int seed_file(const char *fname, char *buf, size_t buflen)
 {
+	auto_fclose FILE *fp = fopen(fname, "r");
 	if (!fp) {
-		return -1;
+		return kr_error(EINVAL);
 	}
-	/* Read whole buffer even if interrupted */
-	ssize_t readb = 0;
-	while (!ferror(fp) && readb < buflen) {
-		readb += fread(buf, 1, buflen - readb, fp);
-	}
+	/* Disable buffering to conserve randomness but ignore failing to do so. */
+	setvbuf(fp, NULL, _IONBF, 0);
+	do {
+		if (feof(fp)) {
+			return kr_error(ENOENT);
+		}
+		if (ferror(fp)) {
+			return kr_error(ferror(fp));
+		}
+		if (fread(buf, buflen, 1, fp)) { /* read in one chunk for simplicity */
+			return kr_ok();
+		}
+	} while (true);
 	return 0;
 }
 
@@ -147,13 +156,13 @@ static int randseed(char *buf, size_t buflen)
         "/dev/srandom", "/dev/urandom", "/dev/random", NULL
     };
     for (unsigned i = 0; filenames[i]; ++i) {
-        auto_fclose FILE *fp = fopen(filenames[i], "r");
-        if (seed_file(fp, buf, buflen) == 0) {
+        if (seed_file(filenames[i], buf, buflen) == 0) {
             return 0;
         }
     }
 
     /* Seed from time, this is not going to be secure. */
+    kr_log_error("failed to obtain randomness, falling back to current time\n");
     struct timeval tv;
     gettimeofday(&tv, NULL);
     memcpy(buf, &tv, buflen < sizeof(tv) ? buflen : sizeof(tv));
