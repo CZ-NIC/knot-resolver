@@ -142,7 +142,7 @@ static int seed_file(const char *fname, char *buf, size_t buflen)
 		if (ferror(fp)) {
 			return kr_error(ferror(fp));
 		}
-		if (fread(buf, buflen, 1, fp)) { /* read in one chunk for simplicity */
+		if (fread(buf, buflen, 1, fp) == 1) { /* read in one chunk for simplicity */
 			return kr_ok();
 		}
 	} while (true);
