@@ -5,6 +5,7 @@ Bugfixes
 --------
 - iterate: skip RRSIGs with bad label count instead of immediate SERVFAIL
 - utils: fix possible incorrect seeding of the random generator
+- modules/http: fix compatibility with the Prometheus text format
 
 Improvements
 ------------

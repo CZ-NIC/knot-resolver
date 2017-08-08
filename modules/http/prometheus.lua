@@ -133,11 +133,11 @@ local function serve_prometheus()
 		-- as a timeout (3000ms) for metrics purposes
 		count = count + e[2]
 		sum = sum + e[2] * (math.min(tonumber(e[1]), 3000.0))
-		table.insert(render, string.format('latency_bucket{le=%s} %f', e[1], count))
+		table.insert(render, string.format('latency_bucket{le="%s"} %f', e[1], count))
 	end
 	table.insert(render, string.format('latency_count %f', count))
 	table.insert(render, string.format('latency_sum %f', sum))
-	return table.concat(render, '\n')
+	return table.concat(render, '\n') .. '\n'
 end
 
 -- Export endpoints
