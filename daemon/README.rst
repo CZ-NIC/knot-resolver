@@ -147,6 +147,7 @@ The daemon also supports `systemd socket activation`_, it is automatically detec
 To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a single fork. For example:
 
 .. code-block:: bash
+
    $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 &
 
 

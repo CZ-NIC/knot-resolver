@@ -465,7 +465,10 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			if (rr->type == KNOT_RRTYPE_RRSIG) {
 				int rrsig_labels = knot_rrsig_labels(&rr->rrs, 0);
 				if (rrsig_labels > cname_labels) {
-					return KR_STATE_FAIL;
+					/* clearly wrong RRSIG, don't pick it.
+					 * don't fail immediately,
+					 * let validator work. */
+					continue;
 				}
 				if (rrsig_labels < cname_labels) {
 					query->flags.DNSSEC_WEXPAND = true;
@@ -820,7 +823,8 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	}
 
 	/* Query built, expect answer. */
-	query->id = kr_rand_uint(UINT16_MAX);
+	uint32_t rnd = kr_rand_uint(0);
+	query->id = rnd ^ (rnd >> 16); /* cheap way to strengthen unpredictability */
 	knot_wire_set_id(pkt->wire, query->id);
 	pkt->parsed = pkt->size;
 	WITH_VERBOSE {

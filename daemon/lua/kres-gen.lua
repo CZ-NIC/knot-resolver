@@ -199,8 +199,11 @@ struct kr_context {
 	struct kr_zonecut root_hints;
 	char _stub[];
 };
-int knot_dname_size(const knot_dname_t *);
 knot_dname_t *knot_dname_from_str(uint8_t *, const char *, size_t);
+_Bool knot_dname_is_equal(const knot_dname_t *, const knot_dname_t *);
+_Bool knot_dname_is_sub(const knot_dname_t *, const knot_dname_t *);
+int knot_dname_labels(const uint8_t *, const uint8_t *);
+int knot_dname_size(const knot_dname_t *);
 char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
 uint16_t knot_rdata_rdlen(const knot_rdata_t *);
 uint8_t *knot_rdata_data(const knot_rdata_t *);
@@ -223,7 +226,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_
 int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
-unsigned int kr_rand_uint(unsigned int);
+uint32_t kr_rand_uint(uint32_t);
 void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
 int kr_pkt_recycle(knot_pkt_t *);
