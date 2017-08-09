@@ -36,6 +36,10 @@
 #include "lib/dnssec.h"
 #include "lib/resolve.h"
 
+/* forward */
+static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
+	const knot_rrset_t *covered, size_t key_pos, const struct dseckey *key);
+
 void kr_crypto_init(void)
 {
 	dnssec_crypto_init();
@@ -147,7 +151,16 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *cover
 	return kr_error(ENOENT);
 }
 
-int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
+/**
+ * Validate RRSet using a specific key.
+ * @param vctx    Pointer to validation context.
+ * @param covered RRSet covered by a signature. It must be in canonical format.
+ * @param key_pos Position of the key to be validated with.
+ * @param key     Key to be used to validate.
+ *		  If NULL, then key from DNSKEY RRSet is used.
+ * @return        0 or error code, same as vctx->result.
+ */
+static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				const knot_rrset_t *covered,
 				size_t key_pos, const struct dseckey *key)
 {
@@ -157,6 +170,14 @@ int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	uint32_t timestamp            = vctx->timestamp;
 	bool has_nsec3		      = vctx->has_nsec3;
 	struct dseckey *created_key = NULL;
+
+	/* It's just caller's approximation that the RR is in that particular zone.
+	 * We MUST guard against attempts of zones signing out-of-bailiwick records. */
+	if (!knot_dname_in(zone_name, covered->owner)) {
+		vctx->result = kr_error(ENOENT);
+		return vctx->result;
+	}
+
 	if (key == NULL) {
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, key_pos);
 		int ret = kr_dnssec_key_from_rdata(&created_key, keys->owner,
