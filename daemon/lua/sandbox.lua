@@ -24,10 +24,16 @@ end
 -- Resolver bindings
 kres = require('kres')
 trust_anchors = require('trust_anchors')
-resolve = worker.resolve
 if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
+
+-- Compat. wrapper for query flags.
+worker.resolve = function (p1, p2, p3, options, p5)
+	options = kres.mk_qflags(options)
+	return worker.resolve_unwrapped (p1, p2, p3, options, p5)
+end
+resolve = worker.resolve
 
 -- Shorthand for aggregated per-worker information
 worker.info = function ()
@@ -52,6 +58,20 @@ end
 -- Trivial option alias
 function reorder_RR(val)
 	return option('REORDER_RR', val)
+end
+
+-- Get/set resolver options via name (string)
+function option(name, val)
+	local flags = kres.context().options;
+	-- Note: no way to test existence of flags[name] but we want error anyway.
+	name = string.upper(name) -- convenience
+	if val ~= nil then
+		if (val ~= true) and (val ~= false) then
+			panic('invalid option value: ' .. tostring(val))
+		end
+		flags[name] = val;
+	end
+	return flags[name];
 end
 
 -- Function aliases

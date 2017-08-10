@@ -137,11 +137,11 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 	for (size_t i = 0; i < rplan->resolved.len; ++i) {
 		/* Sample queries leading to iteration or expiring */
 		struct kr_query *qry = rplan->resolved.at[i];
-		if ((qry->flags & QUERY_CACHED) && !(qry->flags & QUERY_EXPIRING)) {
+		if ((qry->flags.CACHED) && !(qry->flags.EXPIRING)) {
 			continue;
 		}
 		int key_len = collect_key(key, qry->sname, qry->stype);
-		if (qry->flags & QUERY_EXPIRING) {
+		if (qry->flags.EXPIRING) {
 			unsigned *count = lru_get_new(data->queries.expiring, key, key_len);
 			if (count)
 				*count += 1;
@@ -158,7 +158,7 @@ static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
-	if (qry->flags & QUERY_CACHED || !req->upstream.addr) {
+	if (qry->flags.CACHED || !req->upstream.addr) {
 		return ctx->state;
 	}
 
@@ -221,7 +221,7 @@ static int collect(kr_layer_t *ctx)
 		}
 		/* Observe the final query. */
 		struct kr_query *last = array_tail(rplan->resolved);
-		if (last->flags & QUERY_CACHED) {
+		if (last->flags.CACHED) {
 			stat_const_add(data, metric_answer_cached, 1);
 		}
 	}

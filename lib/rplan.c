@@ -27,17 +27,37 @@
 #define QUERY_PROVIDES(q, name, cls, type) \
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
-/** @internal LUT of query flag names. */
-const knot_lookup_t query_flag_names[] = {
-	#define X(flag, _) { QUERY_ ## flag, #flag },
-	QUERY_FLAGS(X)
-	#undef X
-	{ 0, NULL }
-};
-
-const knot_lookup_t *kr_query_flag_names(void)
+void kr_qflags_set(struct kr_qflags *fl1, struct kr_qflags fl2)
 {
-	return query_flag_names;
+	if (!fl1) abort();
+	typedef uint32_t ui;
+	union {
+		struct kr_qflags flags;
+		ui uints[sizeof(struct kr_qflags) / sizeof(ui)];
+	} tmp1, tmp2;
+	/* The compiler should be able to optimize all this into simple ORs. */
+	tmp1.flags = *fl1;
+	tmp2.flags = fl2;
+	for (size_t i = 0; i < sizeof(tmp1.uints) / sizeof(tmp1.uints[0]); ++i) {
+		tmp1.uints[i] |= tmp2.uints[i];
+	}
+	*fl1 = tmp1.flags;
+}
+void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2)
+{
+	if (!fl1) abort();
+	typedef uint32_t ui;
+	union {
+		struct kr_qflags flags;
+		ui uints[sizeof(struct kr_qflags) / sizeof(ui)];
+	} tmp1, tmp2;
+	/* The compiler should be able to optimize all this into simple ORs. */
+	tmp1.flags = *fl1;
+	tmp2.flags = fl2;
+	for (size_t i = 0; i < sizeof(tmp1.uints) / sizeof(tmp1.uints[0]); ++i) {
+		tmp1.uints[i] &= ~tmp2.uints[i];
+	}
+	*fl1 = tmp1.flags;
 }
 
 static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name, uint32_t uid)
@@ -135,12 +155,12 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	qry->ns.addr[0].ip.sa_family = AF_UNSPEC;
 	gettimeofday(&qry->timestamp, NULL);
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
-	qry->reorder = qry->flags & QUERY_REORDER_RR
+	qry->reorder = qry->flags.REORDER_RR
 		? knot_wire_get_id(rplan->request->answer->wire)
 		: 0;
 
 	/* When forwarding, keep the nameserver addresses. */
-	if (parent && (parent->flags & qry->flags & QUERY_FORWARD)) {
+	if (parent && parent->flags.FORWARD && qry->flags.FORWARD) {
 		ret = kr_nsrep_copy_set(&qry->ns, &parent->ns);
 		if (ret) {
 			query_free(rplan->pool, qry);

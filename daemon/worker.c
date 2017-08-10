@@ -387,7 +387,7 @@ static int qr_task_start(struct qr_task *task, knot_pkt_t *query)
 	worker->stats.queries += 1;
 	/* Throttle outbound queries only when high pressure */
 	if (worker->stats.concurrent < QUERY_RATE_THRESHOLD) {
-		task->req.options |= QUERY_NO_THROTTLE;
+		task->req.options.NO_THROTTLE = true;
 	}
 	return 0;
 }
@@ -1036,7 +1036,8 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	return submitted;
 }
 
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned options, worker_cb_t on_complete, void *baton)
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options,
+		   worker_cb_t on_complete, void *baton)
 {
 	if (!worker || !query) {
 		return kr_error(EINVAL);
@@ -1053,7 +1054,7 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, unsigned option
 	int ret = qr_task_start(task, query);
 
 	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
-	task->req.options |= options;
+	kr_qflags_set(&task->req.options, options);
 
 	if (ret != 0) {
 		qr_task_unref(task);

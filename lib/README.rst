@@ -33,7 +33,7 @@ This is the *driver*. The driver is not meant to know *"how"* the query resolves
 
 On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a *produce* layer generates query, a *consume* layer validates answer.
 
-.. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``QUERY_AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``QUERY_RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query.
+.. tip:: Layers are executed asynchronously by the driver. If you need some asset beforehand, you can signalize the driver using returning state or current query flags. For example, setting a flag ``AWAIT_CUT`` forces driver to fetch zone cut information before the packet is consumed; setting a ``RESOLVED`` flag makes it pop a query after the current set of layers is finished; returning ``FAIL`` state makes it fail current query.
 
 Layers can also change course of resolution, for example by appending additional queries.
 
@@ -44,7 +44,7 @@ Layers can also change course of resolution, for example by appending additional
 		if answer:qtype() == kres.type.NS then
 			req = kres.request_t(req)
 			local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
-			qry.flags = kres.query.AWAIT_CUT
+			qry.flags.AWAIT_CUT = true
 		end
 		return state
 	end
@@ -62,7 +62,7 @@ This **doesn't** block currently processed query, and the newly created sub-requ
 			if answer:qtype() == kres.type.NS then
 				req = kres.request_t(req)
 				local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
-				qry.flags = kres.query.AWAIT_CUT
+				qry.flags.AWAIT_CUT = true
 				print('planned SOA query, yielding')
 				return kres.YIELD
 			end
@@ -113,7 +113,7 @@ This is only passive processing of the incoming answer. If you want to change th
 		if (can_satisfy(qry)) {
 			/* This flag makes the resolver move the query
 			 * to the "resolved" list. */
-			qry->flags |= QUERY_RESOLVED;
+			qry->flags.RESOLVED = true;
 			return KR_STATE_DONE;
 		}
 
@@ -268,7 +268,7 @@ As described in the layers, you can not only retrieve information about current 
 
 		-- Push new query
 		local qry = req:push(pkt:qname(), kres.type.SOA, kres.class.IN)
-		qry.flags = kres.query.AWAIT_CUT
+		qry.flags.AWAIT_CUT = true
 
 		-- Pop the query, this will erase it from resolution plan
 		req:pop(qry)

@@ -1208,17 +1208,21 @@ static int wrk_resolve(lua_State *L)
 	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
 	if (!pkt->opt_rr) {
 		return kr_error(ENOMEM);
-	}	
+	}
 	/* Add completion callback */
 	int ret = 0;
-	unsigned options = lua_tointeger(L, 4);
+	const struct kr_qflags *options = lua_topointer(L, 4);
+	if (!options) { /* but we rely on the lua wrapper when dereferencing non-NULL */
+		lua_pushstring(L, "invalid options");
+		lua_error(L);
+	}
 	if (lua_isfunction(L, 5)) {
 		/* Store callback in registry */
 		lua_pushvalue(L, 5);
 		int cb = luaL_ref(L, LUA_REGISTRYINDEX);
-		ret = worker_resolve(worker, pkt, options, resolve_callback, (void *) (intptr_t)cb);
+		ret = worker_resolve(worker, pkt, *options, resolve_callback, (void *) (intptr_t)cb);
 	} else {
-		ret = worker_resolve(worker, pkt, options, NULL, NULL);
+		ret = worker_resolve(worker, pkt, *options, NULL, NULL);
 	}
 	
 	knot_rrset_free(&pkt->opt_rr, NULL);
@@ -1282,7 +1286,7 @@ static int wrk_stats(lua_State *L)
 int lib_worker(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
-		{ "resolve",  wrk_resolve },
+		{ "resolve_unwrapped",  wrk_resolve },
 		{ "stats",    wrk_stats },
 		{ NULL, NULL }
 	};

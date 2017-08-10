@@ -35,7 +35,7 @@ There are several actions available in the ``policy.`` table:
 * ``MIRROR(ip)`` - mirror query to given IP and continue solving it (useful for partial snooping); it's a chain action
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
 * ``QTRACE`` - pretty-print DNS response packets into the log for the query and its sub-queries.  It's useful for debugging weird DNS servers.  It's a chain action.
-* ``FLAGS(set, clear)`` - set and/or clear some flags for the query.  There can be multiple flags to set/clear, combined by ``bit.bor`` from ``kres.query.*`` values.  It's a chain action.
+* ``FLAGS(set, clear)`` - set and/or clear some flags for the query.  There can be multiple flags to set/clear.  You can just pass a single flag name (string) or a set of names.  It's a chain action.
 
 Most actions stop the policy matching on the query, but "chain actions" allow to keep trying to match other rules, until a non-chain action is triggered.
 
