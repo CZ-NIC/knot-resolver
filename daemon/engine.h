@@ -83,12 +83,13 @@ int engine_pcall(struct lua_State *L, int argc);
 
 int engine_ipc(struct engine *engine, const char *expr);
 
-/** Start the lua engine and execute the config.
- *
- * @note Special path "-" means that even default config won't be done
- *       (like listening on localhost).
- */
-int engine_start(struct engine *engine, const char *config_path);
+
+int engine_load_sandbox(struct engine *engine);
+int engine_loadconf(struct engine *engine, const char *config_path);
+int engine_load_defaults(struct engine *engine);
+
+/** Start the lua engine and execute the config. */
+int engine_start(struct engine *engine);
 void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref);
 int engine_unregister(struct engine *engine, const char *name);

@@ -39,6 +39,7 @@
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
 #include "daemon/tls.h"
+#include "lib/dnssec/ta.h"
 
 /* We can fork early on Linux 3.9+ and do SO_REUSEPORT for better performance. */
 #if defined(UV_VERSION_HEX) && defined(SO_REUSEPORT) && defined(__linux__)
@@ -347,7 +348,8 @@ static void help(int argc, char *argv[])
 	       " -S, --fd=[fd]          Listen on given fd (handed out by supervisor).\n"
 	       " -T, --tlsfd=[fd]       Listen using TLS on given fd (handed out by supervisor).\n"
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
-	       " -k, --keyfile=[path]   File containing trust anchors (DS or DNSKEY).\n"
+	       " -k, --keyfile=[path]   File with root domain trust anchors (DS or DNSKEY), automatically updated.\n"
+	       " -K, --keyfile-ro=[path] File with read-only root domain trust anchors, for use with an external updater.\n"
 	       " -m, --moduledir=[path] Override the default module path (" MODULEDIR ").\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
 	       " -q, --quiet            Quiet output, no prompt in interactive mode.\n"
@@ -422,79 +424,21 @@ static void free_sd_socket_names(char **socket_names, int count)
 }
 #endif
 
-static int init_keyfile(struct engine *engine, const char *keyfile)
+static int init_keyfile(struct engine *engine, const char *keyfile, bool keyfile_unmanaged)
 {
-	auto_free char *dirname_storage = strdup(keyfile);
-	if (!dirname_storage) {
-		return kr_error(ENOMEM);
-	}
-
-	/* Resolve absolute path to the keyfile directory */
-	auto_free char *keyfile_dir = malloc(PATH_MAX);
-	if (!keyfile_dir) {
-		return kr_error(ENOMEM);
-	}
-	if (realpath(dirname(dirname_storage), keyfile_dir) == NULL) {
-		kr_log_error("[ ta ]: keyfile '%s' directory: %s\n", keyfile, strerror(errno));
-		return kr_error(ENOTDIR);
-	}
-
-	auto_free char *basename_storage = strdup(keyfile);
-	if (!basename_storage) {
-		return kr_error(ENOMEM);
-	}
-
-	char *_filename = basename(basename_storage);
-	int dirlen = strlen(keyfile_dir);
-	int namelen = strlen(_filename);
-	if (dirlen + 1 + namelen >= PATH_MAX) {
-		kr_log_error("[ ta ]: keyfile '%s' PATH_MAX exceeded\n",
-			     keyfile);
-		return kr_error(ENAMETOOLONG);
-	}
-	keyfile_dir[dirlen++] = '/';
-	keyfile_dir[dirlen] = '\0';
-
-	auto_free char *keyfile_path = malloc(dirlen + namelen + 1);
-	if (!keyfile_path) {
-		return kr_error(ENOMEM);
-	}
-	memcpy(keyfile_path, keyfile_dir, dirlen);
-	memcpy(keyfile_path + dirlen, _filename, namelen + 1);
-
-	int unmanaged = 0;
-
-	/* Note: config has been executed, so access() is OK,
-	 * as we've dropped privileges already if configured. */
-	if (access(keyfile_path, F_OK) != 0) {
-		kr_log_info("[ ta ] keyfile '%s': doesn't exist, bootstrapping\n", keyfile_path);
-		if (access(keyfile_dir, W_OK) != 0) {
-			kr_log_error("[ ta ] keyfile '%s': write access to '%s' needed\n", keyfile_path, keyfile_dir);
-			return kr_error(EPERM);
-		}
-	} else if (access(keyfile_path, R_OK) == 0) {
-		if ((access(keyfile_path, W_OK) != 0) || (access(keyfile_dir, W_OK) != 0)) {
-			kr_log_error("[ ta ] keyfile '%s': not writeable, starting in unmanaged mode\n", keyfile_path);
-			unmanaged = 1;
-		}
-	} else {
-		kr_log_error("[ ta ] keyfile '%s': %s\n", keyfile_path, strerror(errno));
-		return kr_error(EPERM);
-	}
-
-	auto_free char *cmd = afmt("trust_anchors.config('%s',%s)", keyfile_path, unmanaged?"true":"nil");
+	auto_free char *cmd = afmt("trust_anchors.config('%s',%s)",
+				   keyfile, keyfile_unmanaged ? "true" : "nil");
 	if (!cmd) {
+		kr_log_error("[system] not enough memory\n");
 		return kr_error(ENOMEM);
 	}
-
 	int lua_ret = engine_cmd(engine->L, cmd, false);
 	if (lua_ret != 0) {
 		if (lua_gettop(engine->L) > 0) {
-			kr_log_error("%s", lua_tostring(engine->L, -1));
-			lua_settop(engine->L, 0);
+			kr_log_error("%s\n", lua_tostring(engine->L, -1));
 		} else {
 			kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n",
-					keyfile_path, lua_strerror(lua_ret));
+					keyfile, lua_strerror(lua_ret));
 		}
 		return kr_error(EIO);
 	}
@@ -515,6 +459,7 @@ int main(int argc, char **argv)
 	array_t(int) tls_fd_set;
 	array_init(tls_fd_set);
 	char *keyfile = NULL;
+	int keyfile_unmanaged = 0;
 	char *moduledir = MODULEDIR;
 	const char *config = NULL;
 	int control_fd = -1;
@@ -528,6 +473,7 @@ int main(int argc, char **argv)
 		{"tlsfd", required_argument,  0, 'T'},
 		{"config", required_argument, 0, 'c'},
 		{"keyfile",required_argument, 0, 'k'},
+		{"keyfile-ro",required_argument, 0, 'K'},
 		{"forks",required_argument,   0, 'f'},
 		{"moduledir", required_argument, 0, 'm'},
 		{"verbose",    no_argument,   0, 'v'},
@@ -536,7 +482,7 @@ int main(int argc, char **argv)
 		{"help",      no_argument,    0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:K:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -563,7 +509,13 @@ int main(int argc, char **argv)
 				return EXIT_FAILURE;
 			}
 			break;
+		case 'K':
+			keyfile_unmanaged = 1;
 		case 'k':
+			if (keyfile != NULL) {
+				kr_log_error("[system] error only one of '--keyfile' and '--keyfile-ro' allowed\n");
+				return EXIT_FAILURE;
+			}
 			keyfile = optarg;
 			break;
 		case 'm':
@@ -748,19 +700,38 @@ int main(int argc, char **argv)
 	worker->loop = loop;
 	loop->data = worker;
 
-	ret = engine_start(&engine, config);
+	ret = engine_load_sandbox(&engine);
+	if (ret == 0 && config != NULL && strcmp(config, "-") !=0) {
+		ret = engine_loadconf(&engine, config);
+	}
+
 	if (ret != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
 
 	if (keyfile) {
-		ret = init_keyfile(&engine, keyfile);
+		ret = init_keyfile(&engine, keyfile, keyfile_unmanaged);
 		if (ret != 0) {
 			kr_log_error("[system] failed to initialized keyfile: %s\n", kr_strerror(ret));
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
+	}
+
+	if (config == NULL || strcmp(config, "-") !=0) {
+		ret = engine_load_defaults(&engine);
+	}
+
+	if (ret != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	ret = engine_start(&engine);
+	if (ret != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
 	}
 
 	/* Run the event loop */

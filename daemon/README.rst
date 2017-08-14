@@ -58,6 +58,8 @@ The root anchors bootstrap may fail for various reasons, in this case you need t
 
 You've just enabled DNSSEC!
 
+.. note:: Bootstrapping and automatic update need write access to keyfile direcory. If you want to manage root anchors manually you should use ``trust_anchors.add_file('root.keys', true)``.
+
 CLI interface
 =============
 

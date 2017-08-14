@@ -367,9 +367,16 @@ update = function (keyset, new_keys, is_initial)
 end
 
 local add_file = function (path, unmanaged)
-	-- Bootstrap if requested and keyfile doesn't exist
+	if not unmanaged then
+		if not io.open(path .. '.lock', 'w') then
+			error("[ ta ] ERROR: write access needed to keyfile dir '"..path.."'")
+		end
+		os.remove(path .. ".lock")
+	end
 
+	-- Bootstrap if requested and keyfile doesn't exist
 	if not unmanaged and not io.open(path, 'r') then
+		log("[ ta ] keyfile '%s': doesn't exist, bootstrapping", path);
 		local tas, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
 		if not tas then
 			msg = msg .. '\n'
@@ -394,14 +401,15 @@ local add_file = function (path, unmanaged)
 	end
 
 	-- Parse the file and check its sanity
-	local keyset, err = keyset_read(path)
-	if not unmanaged then keyset.filename = path end
+	local keyset, err = keyset_read(path)	
 	if not keyset then
 		panic("[ ta ] ERROR: failed to read anchors from '%s' (%s)", path, err)
 	end
+	if not unmanaged then keyset.filename = path end
 	if not keyset[1] then
 		panic("[ ta ] ERROR: failed to read anchors from '%s'", path)
 	end
+	if not unmanaged then keyset.filename = path end
 	local owner = keyset[1].owner
 	for _, ta in ipairs(keyset) do
 		if ta.owner ~= owner then
@@ -446,6 +454,8 @@ trust_anchors = {
 
 	bootstrap_url = 'https://data.iana.org/root-anchors/root-anchors.xml',
 	bootstrap_ca = '@ETCDIR@/icann-ca.pem',
+	-- change empty string to nil
+	keyfile_default = ('@KEYFILE_DEFAULT@' ~= '' and '@KEYFILE_DEFAULT@') or nil,
 
 	-- Load keys from a file, 5011-managed by default.
 	-- If managed and the file doesn't exist, try bootstrapping the root into it.

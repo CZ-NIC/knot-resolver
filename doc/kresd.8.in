@@ -24,6 +24,8 @@
 .IR config ]
 .RB [ \-k | \-\-keyfile
 .IR keyfile ]
+.RB [ \-K | \-\-keyfile-ro
+.IR keyfile ]
 .RB [ \-m | \-\-moduledir
 .IR path ]
 .RB [ \-f | \-\-forks
@@ -121,10 +123,20 @@ file at the default location (\fIconfig\fR). The syntax is
 described in \fIdaemon/README.md\fR.
 .TP
 .B \-k\fI keyfile\fR, \fB\-\-keyfile=\fI<keyfile>
-Use given for keeping root trust anchors. If the file doesn't exist, it will be
-automatically boostrapped from IANA and warning for you will be issued to check it
-before trusting it. The file contains DNSKEY/DS records in presentation format,
-and is compatible with Unbound or BIND9 root key files.
+(Recommended!) Automatically managed root trust anchors file.
+Root trust anchors in this file are managed using standard RFC 5011 (Automated Updates of DNS Security Trust Anchors).
+Kresd needs write access to the directory containing the keyfile.
+
+If the file does not exist, it will be automatically boostrapped from IANA using HTTPS protocol
+and warning that you need to to check the key before trusting it will be issued.
+
+The file contains DNSKEY/DS records in presentation format,
+and is compatible with Unbound and BIND 9 root key files.
+.TP
+.B \-K\fI keyfile\fR, \fB\-\-keyfile-ro=\fI<keyfile>
+(Discouraged) Static root trust anchors file. The file is not updated by kresd. Use of this option is discouraged because it will break your installation when the trust anchor key changes!
+
+Default: "@KEYFILE_DEFAULT@" (can be empty if your distribution did not provide one)
 .TP
 .B \-m\fI path\fR, \fB\-\-moduledir=\fI<path>
 Override the directory that is searched for modules.  Default: @MODULEDIR@
