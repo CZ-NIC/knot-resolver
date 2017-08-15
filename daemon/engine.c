@@ -232,8 +232,9 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir) {
 	/* Save original package.path to package._path */
 	snprintf(l_paths, MAXPATHLEN - 1,
 		 "if package._path == nil then package._path = package.path end\n"
-		 "package.path = '%s/?.lua;%s/?/init.lua;'..package._path\n",
-		 new_moduledir,
+		 "package.path = '%1$s/?.lua;%1$s/?/init.lua;'..package._path\n"
+		 "if package._cpath == nil then package._cpath = package.cpath end\n"
+		 "package.cpath = '%1$s/?.so;'..package._cpath\n",
 		 new_moduledir);
 
 	int ret = l_dobytecode(engine->L, l_paths, strlen(l_paths), "");

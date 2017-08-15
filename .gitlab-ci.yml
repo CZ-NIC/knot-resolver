@@ -3,10 +3,11 @@ image: cznic/ubuntu:16.04
 variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
-  
+
 build:linux:amd64:
   stage: build
   script:
+    - git submodule update --init --recursive
     - PREFIX=$(pwd)/.local make -k all
     - PREFIX=$(pwd)/.local make install
   artifacts:

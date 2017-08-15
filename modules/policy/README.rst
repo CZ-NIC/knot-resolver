@@ -16,7 +16,7 @@ There are several policy filters available in the ``policy.`` table:
   - applies the action if QNAME matches a `regular expression <http://lua-users.org/wiki/PatternsTutorial>`_
 * ``suffix(action, table)``
   - applies the action if QNAME suffix matches one of suffixes in the table (useful for "is domain in zone" rules),
-  uses `Aho-Corasick`_ string matching algorithm implemented by `@jgrahamc`_ (CloudFlare, Inc.) (BSD 3-clause)
+  uses `Aho-Corasick`_ string matching algorithm `from CloudFlare <https://github.com/cloudflare/lua-aho-corasick>`_ (BSD 3-clause)
 * :any:`policy.suffix_common`
 * ``rpz``
   - implements a subset of RPZ_ in zonefile format.  See below for details: :any:`policy.rpz`.

@@ -8,6 +8,10 @@ Incompatible changes
   'hasflag' and 'resolved'.
   You can instead write code like qry.flags.NO_0X20 = true.
 
+Improvements
+------------
+- policy.suffix: update the aho-corasick code (#200)
+
 
 Knot Resolver 1.3.3 (2017-08-09)
 ================================
