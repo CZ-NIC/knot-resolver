@@ -2,6 +2,8 @@ local kres = require('kres')
 local bit = require('bit')
 local ffi = require('ffi')
 
+local todname = kres.str2dname -- not available during module load otherwise
+
 -- Counter of unique rules
 local nextid = 0
 local function getruleid()
@@ -63,6 +65,17 @@ local function mirror(target)
 	end
 end
 
+-- Override the list of nameservers (forwarders)
+local function set_nslist(qry, list)
+	for i, ns in ipairs(list) do
+		assert(ffi.C.kr_nsrep_set(qry, i - 1, ns) == 0);
+	end
+	-- If less than maximum NSs, insert guard to terminate the list
+	if #list < 4 then
+		assert(ffi.C.kr_nsrep_set(qry, #list, nil) == 0);
+	end
+end
+
 -- Forward request, and solve as stub query
 local function stub(target)
 	local list = {}
@@ -77,8 +90,9 @@ local function stub(target)
 	return function(state, req)
 		local qry = req:current()
 		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
-		qry.flags = bit.band(bit.bor(qry.flags, kres.query.STUB), bit.bnot(kres.query.ALWAYS_CUT))
-		qry:nslist(list)
+		qry.flags.STUB = true
+		qry.flags.ALWAYS_CUT = false
+		set_nslist(qry, list)
 		return state
 	end
 end
@@ -96,11 +110,13 @@ local function forward(target)
 	end
 	return function(state, req)
 		local qry = req:current()
-		req.options = bit.bor(bit.bor(req.options, kres.query.FORWARD), kres.query.NO_MINIMIZE)
-		qry.flags = bit.band(bit.bor(qry.flags, kres.query.FORWARD), bit.bnot(kres.query.ALWAYS_CUT))
-		qry.flags = bit.bor(qry.flags, kres.query.NO_MINIMIZE)
-		qry.flags = bit.bor(qry.flags, kres.query.AWAIT_CUT)
-		qry:nslist(list)
+		req.options.FORWARD = true
+		req.options.NO_MINIMIZE = true
+		qry.flags.FORWARD = true
+		qry.flags.ALWAYS_CUT = false
+		qry.flags.NO_MINIMIZE = true
+		qry.flags.AWAIT_CUT = true
+		set_nslist(qry, list)
 		return state
 	end
 end
@@ -121,9 +137,101 @@ end
 local function flags(opts_set, opts_clear)
 	return function(state, req)
 		local qry = req:current()
-		qry.flags = bit.band(bit.bor(qry.flags, opts_set or 0), bit.bnot(opts_clear or 0))
+		ffi.C.kr_qflags_set  (qry.flags, kres.mk_qflags(opts_set   or {}))
+		ffi.C.kr_qflags_clear(qry.flags, kres.mk_qflags(opts_clear or {}))
 		return nil -- chain rule
 	end
+end
+
+local function mkauth_soa(answer, dname, mname)
+	if mname == nil then
+		mname = dname
+	end
+	return answer:put(dname, 900, answer:qclass(), kres.type.SOA,
+		mname .. '\6nobody\7invalid\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
+end
+
+local dname_localhost = todname('localhost.')
+
+-- Rule for localhost. zone; see RFC6303, sec. 3
+local function localhost(state, req)
+	local qry = req:current()
+	local answer = req.answer
+	ffi.C.kr_pkt_make_auth_header(answer)
+
+	local is_exact = ffi.C.knot_dname_is_equal(qry.sname, dname_localhost)
+
+	answer:rcode(kres.rcode.NOERROR)
+	answer:begin(kres.section.ANSWER)
+	if qry.stype == kres.type.AAAA then
+		answer:put(qry.sname, 900, answer:qclass(), kres.type.AAAA,
+			'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1')
+	elseif qry.stype == kres.type.A then
+		answer:put(qry.sname, 900, answer:qclass(), kres.type.A, '\127\0\0\1')
+	elseif is_exact and qry.stype == kres.type.SOA then
+		mkauth_soa(answer, dname_localhost)
+	elseif is_exact and qry.stype == kres.type.NS then
+		answer:put(dname_localhost, 900, answer:qclass(), kres.type.NS, dname_localhost)
+	else
+		answer:begin(kres.section.AUTHORITY)
+		mkauth_soa(answer, dname_localhost)
+	end
+	return kres.DONE
+end
+
+local dname_rev4_localhost = todname('1.0.0.127.in-addr.arpa');
+local dname_rev4_localhost_apex = todname('127.in-addr.arpa');
+
+-- Rule for reverse localhost.
+-- Answer with locally served minimal 127.in-addr.arpa domain, only having
+-- a PTR record in 1.0.0.127.in-addr.arpa, and with 1.0...0.ip6.arpa. zone.
+-- TODO: much of this would better be left to the hints module (or coordinated).
+local function localhost_reversed(state, req)
+	local qry = req:current()
+	local answer = req.answer
+
+	-- classify qry.sname:
+	local is_exact   -- exact dname for localhost
+	local is_apex    -- apex of a locally-served localhost zone
+	local is_nonterm -- empty non-terminal name
+	if ffi.C.knot_dname_is_sub(qry.sname, todname('ip6.arpa.')) then
+		-- exact ::1 query (relying on the calling rule)
+		is_exact = true
+		is_apex = true
+	else
+		-- within 127.in-addr.arpa.
+		local labels = ffi.C.knot_dname_labels(qry.sname, nil)
+		if labels == 3 then
+			is_exact = false
+			is_apex = true
+		elseif labels == 4+2 and ffi.C.knot_dname_is_equal(
+					qry.sname, dname_rev4_localhost) then
+			is_exact = true
+		else
+			is_exact = false
+			is_apex = false
+			is_nonterm = ffi.C.knot_dname_is_sub(dname_rev4_localhost, qry.sname)
+		end
+	end
+
+	ffi.C.kr_pkt_make_auth_header(answer)
+	answer:rcode(kres.rcode.NOERROR)
+	answer:begin(kres.section.ANSWER)
+	if is_exact and qry.stype == kres.type.PTR then
+		answer:put(qry.sname, 900, answer:qclass(), kres.type.PTR, dname_localhost)
+	elseif is_apex and qry.stype == kres.type.SOA then
+		mkauth_soa(answer, dname_rev4_localhost_apex, dname_localhost)
+	elseif is_apex and qry.stype == kres.type.NS then
+		answer:put(dname_rev4_localhost_apex, 900, answer:qclass(), kres.type.NS,
+			dname_localhost)
+	else
+		if not is_nonterm then
+			answer:rcode(kres.rcode.NXDOMAIN)
+		end
+		answer:begin(kres.section.AUTHORITY)
+		mkauth_soa(answer, dname_rev4_localhost_apex, dname_localhost)
+	end
+	return kres.DONE
 end
 
 local policy = {
@@ -243,7 +351,7 @@ function policy.evaluate(rules, req, query, state)
 			end
 		end
 	end
-	return state
+	return
 end
 
 -- Enforce policy action
@@ -254,8 +362,7 @@ function policy.enforce(state, req, action)
 		ffi.C.kr_pkt_make_auth_header(answer)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
-		answer:put('\7blocked', 900, answer:qclass(), kres.type.SOA,
-			'\7blocked\0\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
+		mkauth_soa(answer, '\7blocked\0')
 		return kres.DONE
 	elseif action == policy.DROP then
 		return kres.FAIL
@@ -267,8 +374,8 @@ function policy.enforce(state, req, action)
 		end
 	elseif action == policy.QTRACE then
 		local qry = req:current()
-		req.options = bit.bor(req.options, kres.query.TRACE)
-		qry.flags = bit.bor(qry.flags, kres.query.TRACE)
+		req.options.TRACE = true
+		qry.flags.TRACE = true
 		return -- this allows to continue iterating over policy list
 	elseif type(action) == 'function' then
 		return action(state, req)
@@ -284,11 +391,13 @@ end
 policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
-		return policy.evaluate(policy.rules, req, req:current(), state)
-	end,
+		return policy.evaluate(policy.rules, req, req:current(), state) or 
+		       policy.evaluate(policy.special_names, req, req:current(), state) or
+		       state
+	end,	
 	finish = function(state, req)
 		req = kres.request_t(req)
-		return policy.evaluate(policy.postrules, req, req:current(), state)
+		return policy.evaluate(policy.postrules, req, req:current(), state) or state
 	end
 }
 
@@ -359,7 +468,6 @@ local private_zones = {
 	'31.172.in-addr.arpa.',
 	'168.192.in-addr.arpa.',
 	'0.in-addr.arpa.',
-	'127.in-addr.arpa.',
 	'254.169.in-addr.arpa.',
 	'2.0.192.in-addr.arpa.',
 	'100.51.198.in-addr.arpa.',
@@ -432,8 +540,8 @@ local private_zones = {
 	'127.100.in-addr.arpa.',
 
 	-- RFC6303
+	-- localhost_reversed handles ::1
 	'0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.',
-	'1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.',
 	'd.f.ip6.arpa.',
 	'8.e.f.ip6.arpa.',
 	'9.e.f.ip6.arpa.',
@@ -446,6 +554,31 @@ policy.todnames(private_zones)
 -- @var Default rules
 policy.rules = {}
 policy.postrules = {}
-policy.add(policy.suffix_common(policy.DENY, private_zones, '\4arpa\0'))
+policy.special_names = {
+	{
+		cb=policy.suffix_common(policy.DENY, private_zones, todname('arpa.')),
+		count=0
+	},
+	{
+		cb=policy.suffix(policy.DENY, {
+			todname('test.'),
+			todname('invalid.'),
+			todname('onion.'), -- RFC7686, 2.4
+			}),
+		count=0
+	},
+	{
+		cb=policy.suffix(localhost, {dname_localhost}),
+		count=0
+	},
+	{
+		cb=policy.suffix_common(localhost_reversed, {
+			todname('127.in-addr.arpa.'),
+			todname('1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.')},
+			todname('arpa.')),
+		count=0
+	},
+	
+}
 
 return policy

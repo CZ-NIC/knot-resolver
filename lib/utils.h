@@ -149,9 +149,12 @@ char* kr_strcatdup(unsigned n, ...);
 /** Reseed CSPRNG context. */
 int kr_rand_reseed(void);
 
-/** Get pseudo-random value. */
+/** Get pseudo-random value between zero and max-1 (inclusive).
+ *
+ * Passing zero means that any uint32_t should be returned (it's also faster).
+ */
 KR_EXPORT
-unsigned kr_rand_uint(unsigned max);
+uint32_t kr_rand_uint(uint32_t max);
 
 /** Memory reservation routine for knot_mm_t */
 KR_EXPORT

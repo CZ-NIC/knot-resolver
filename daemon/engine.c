@@ -267,37 +267,6 @@ static int l_moduledir(lua_State *L)
 	return 1;
 }
 
-/** Get/set context option. */
-static int l_option(lua_State *L)
-{
-	struct engine *engine = engine_luaget(L);
-	/* Look up option name */
-	unsigned opt_code = 0;
-	if (lua_isstring(L, 1)) {
-		const char *opt = lua_tostring(L, 1);
-		for (const knot_lookup_t *it = kr_query_flag_names(); it->name; ++it) {
-			if (strcmp(it->name, opt) == 0) {
-				opt_code = it->id;
-				break;
-			}
-		}
-		if (!opt_code) {
-			lua_pushstring(L, "invalid option name");
-			lua_error(L);
-		}
-	}
-	/* Get or set */
-	if (lua_isboolean(L, 2) || lua_isnumber(L, 2)) {
-		if (lua_toboolean(L, 2)) {
-			engine->resolver.options |= opt_code;
-		} else {
-			engine->resolver.options &= ~opt_code; 
-		}
-	}
-	lua_pushboolean(L, engine->resolver.options & opt_code);
-	return 1;
-}
-
 /** @internal for l_trustanchor: */
 static void ta_add(zs_scanner_t *zs)
 {
@@ -602,8 +571,6 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "moduledir");
 	lua_pushcfunction(engine->L, l_verbose);
 	lua_setglobal(engine->L, "verbose");
-	lua_pushcfunction(engine->L, l_option);
-	lua_setglobal(engine->L, "option");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_trustanchor);

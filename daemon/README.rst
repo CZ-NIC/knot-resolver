@@ -144,6 +144,13 @@ The watchdog process must notify kresd about active file descriptors, and kresd 
 
 The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
 
+To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a single fork. For example:
+
+.. code-block:: bash
+
+   $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 &
+
+
 Configuration
 =============
 
@@ -466,7 +473,7 @@ Environment
    .. code-block:: lua
 
       -- Send query for root DNSKEY, ignore cache
-      resolve('.', kres.type.DNSKEY, kres.class.IN, kres.query.NO_CACHE)
+      resolve('.', kres.type.DNSKEY, kres.class.IN, 'NO_CACHE')
 
       -- Query for AAAA record
       resolve('example.com', kres.type.AAAA, kres.class.IN, 0,
@@ -1143,7 +1150,7 @@ Example:
 
 	$ kresd-query.lua www.sub.nic.cz 'assert(kres.dname2str(req:resolved().zone_cut.name) == "nic.cz.")' && echo "yes"
 	yes
-	$ kresd-query.lua -C 'trust_anchors.config("root.keys")' nic.cz 'assert(req:resolved():hasflag(kres.query.DNSSEC_WANT))'
+	$ kresd-query.lua -C 'trust_anchors.config("root.keys")' nic.cz 'assert(req:resolved().flags.DNSSEC_WANT)'
 	$ echo $?
 	0
 

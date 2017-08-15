@@ -90,8 +90,7 @@ for i, qtype in ipairs(qtypes) do
 			local rdata = rr:tostring(k - 1)
 			local owner = kres.dname2str(rr:owner())
 			if qverbose then
-				if not qry:hasflag(kres.query.DNSSEC_WANT) or
-				   qry:hasflag(kres.query.DNSSEC_INSECURE) then
+				if not qry.flags.DNSSEC_WANT or qry.flags.DNSSEC_INSECURE then
 						rdata = rdata .. " (insecure)"
 				else
 						rdata = rdata .. " (secure)"

@@ -116,9 +116,6 @@ int inet_pton(int af, const char *src, void *dst);
 
 require('kres-gen')
 
--- Constants
-local query_flag = ffi.new('struct query_flag')
-
 -- Metatype for sockaddr
 local addr_buf = ffi.new('char[16]')
 local sockaddr_t = ffi.typeof('struct sockaddr')
@@ -255,25 +252,6 @@ local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
 		name = function(qry) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
-		hasflag = function(qry, flag)
-			return band(qry.flags, flag) ~= 0
-		end,
-		resolved = function(qry)
-			return qry:hasflag(query_flag.RESOLVED)
-		end,
-		final = function(qry)
-			return qry:resolved() and (qry.parent == nil)
-		end,
-		nslist = function(qry, list)
-			assert(#list <= 4, 'maximum of 4 addresses can be evaluated for each query')
-			for i, ns in ipairs(list) do
-				assert(C.kr_nsrep_set(qry, i - 1, ns) == 0);
-			end
-			-- If less than maximum NSs, insert guard to terminate the list
-			if #list < 4 then
-				assert(C.kr_nsrep_set(qry, #list, nil) == 0);
-			end
-		end,
 	},
 })
 -- Metatype for request
@@ -294,10 +272,11 @@ ffi.metatype( kr_request_t, {
 		end,
 		push = function(req, qname, qtype, qclass, flags, parent)
 			assert(req)
+			flags = kres.mk_qflags(flags) -- compatibility
 			local rplan = C.kr_resolve_plan(req)
 			local qry = C.kr_rplan_push(rplan, parent, qname, qclass, qtype)
 			if qry ~= nil and flags ~= nil then
-				qry.flags = bor(qry.flags, flags)
+				C.kr_qflags_set(qry.flags, flags)
 			end
 			return qry
 		end,
@@ -346,7 +325,25 @@ kres = {
 	type = ffi.new('struct rr_type'),
 	section = ffi.new('struct pkt_section'),
 	rcode = ffi.new('struct pkt_rcode'),
-	query = query_flag,
+
+	-- Create a struct kr_qflags from a single flag name or a list of names.
+	mk_qflags = function (names)
+		local kr_qflags = ffi.typeof('struct kr_qflags')
+		if names == 0 or names == nil then -- compatibility: nil is common in lua
+			names = {}
+		elseif type(names) == 'string' then
+			names = {names}
+		elseif ffi.istype(kr_qflags, names) then
+			return names
+		end
+
+		local fs = ffi.new(kr_qflags)
+		for k_, name in pairs(names) do
+			fs[name] = true
+		end
+		return fs
+	end,
+
 	CONSUME = 1, PRODUCE = 2, DONE = 4, FAIL = 8, YIELD = 16,
 	-- Metatypes.  Beware that any pointer will be cast silently...
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,
