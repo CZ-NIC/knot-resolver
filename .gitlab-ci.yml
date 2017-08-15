@@ -3,11 +3,11 @@ image: cznic/ubuntu:16.04
 variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
+  GIT_SUBMODULE_STRATEGY: recursive
 
 build:linux:amd64:
   stage: build
   script:
-    - git submodule update --init --recursive
     - PREFIX=$(pwd)/.local make -k all
     - PREFIX=$(pwd)/.local make install
   artifacts:
@@ -33,10 +33,9 @@ deckard:linux:amd64:
   script:
     - apt purge -y python-dnspython python3-dnspython
     - apt update
-    - apt install python-pip libffi-dev libaugeas-dev -y
-    - apt-get install -y python-yaml python3-yaml
+    - apt install -y python-pip python-yaml libffi-dev libaugeas-dev
     - pip install --upgrade pip
-    - pip install --user dnspython pyyaml python-augeas
+    - pip install --user dnspython python-augeas
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
   dependencies:
     - build:linux:amd64
