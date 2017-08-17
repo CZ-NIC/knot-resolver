@@ -478,3 +478,81 @@ int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_
 	knot_db_val_t data = { rr->rrs.data, knot_rdataset_size(&rr->rrs) };
 	return kr_cache_insert(cache, KR_CACHE_SIG, rr->owner, covered, &header, data);
 }
+
+#include "lib/rplan.h"
+
+int read_lmdb(struct kr_cache *cache, const struct kr_query *qry) {
+	uint8_t keybuf[KNOT_DNAME_MAXLEN + 100]; // TODO
+	int ret = knot_dname_lf(keybuf, qry->sname, NULL);
+	if (ret) {
+		return kr_error(ret);
+	}
+	uint8_t kname_len = keybuf[0]; /**< current length of the name in keybuf */
+	keybuf[kname_len + 1] = 0; /* make sure different names can never match */
+
+	/** 1. check if the name exists in the cache, not considering wildcards
+	 *  1a. exact name+type match
+	 */
+	uint16_t ktype = qry->stype;
+	if (ktype == KNOT_RRTYPE_CNAME || ktype == KNOT_RRTYPE_DNAME) {
+		ktype = KNOT_RRTYPE_NS;
+	}
+	memcpy(keybuf + kname_len + 2, &ktype, 2);
+	/* dname_lf + 0 + RRTYPE */
+	knot_db_val_t key = { keybuf + 1, kname_len + 3 };
+	knot_db_val_t val = { NULL, 0 };
+	ret = cache_op(cache, read, &key, &val, 1);
+	switch (ret) {
+	case 0:
+		// FIXME: check time and rank (and type if stype == xNAME),
+		// return result if OK, otherwise fall through to break;
+	case (-abs(ENOENT)):
+		break;
+	default:
+		return kr_error(ret);
+	}
+
+	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank).
+	 * 	We store xNAME at NS type to lower the number of searches.
+	 * 	CNAME is only considered for equal name, of course.
+	 * 	We also store NSEC* parameters at NS type; probably the latest two will be kept.
+	 */
+	const knot_dname_t *cut = qry->sname;
+	bool exact_match = true;
+	do {
+		ktype = KNOT_RRTYPE_NS;
+		memcpy(keybuf + kname_len + 2, &ktype, 2);
+
+		key = { keybuf + 1, kname_len + 3 };
+		val = { NULL, 0 };
+		ret = cache_op(cache, read, &key, &val, 1);
+		switch (ret) {
+		case 0:
+			// FIXME: check time and rank, and more complex stuff
+			ktype = exact_match ? KNOT_RRTYPE_CNAME : KNOT_RRTYPE_DNAME;
+		case (-abs(ENOENT)):
+			break;
+		default:
+			return kr_error(ret);
+		}
+
+		/* remove one more label */
+		exact_match = false;
+		if (cut[0] == 0) {
+			// FIXME: missing root NS
+		}
+		kname_len -= (cut[0] + 1);
+		cut += (cut[0] + 1);
+		keybuf[kname_len + 1] = 0
+	} while (true);
+cut_found:
+
+	return kr_ok();
+}
+
+
+
+
+
+
+
