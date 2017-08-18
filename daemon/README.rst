@@ -595,13 +595,14 @@ For when listening on ``localhost`` just doesn't cut it.
 
 .. function:: net.tcp_pipeline([len])
 
-   Get/set per-client TCP pipeline limit (number of outstanding queries that a single client connection can make in parallel). Default is 50.
+   Get/set per-client TCP pipeline limit, i.e. the number of outstanding queries that a single client connection can make in parallel.  Default is 100.
 
    .. code-block:: lua
 
       > net.tcp_pipeline()
+      100
+      > net.tcp_pipeline(50)
       50
-      > net.tcp_pipeline(100)
 
 .. function:: net.tls([cert_path], [key_path])
 
