@@ -52,6 +52,7 @@ static int lmdb_error(int error)
 	case ENOSPC:
 		return kr_error(ENOSPC);
 	default:
+		kr_log_info("[cache] LMDB error: %s\n", mdb_strerror(error));
 		return -abs(error);
 	}
 }
@@ -220,9 +221,9 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_opts *opts, knot_mm_t *pool)
 	auto_free char *lockfile = kr_strcatdup(2, opts->path, "/.cachelock");
 	if (lockfile) {
 		if (unlink(lockfile) == 0) {
-			kr_log_info("[system] cache: cleared stale lockfile '%s'\n", lockfile);
+			kr_log_info("[cache] cleared stale lockfile '%s'\n", lockfile);
 		} else if (errno != ENOENT) {
-			kr_log_info("[system] cache: failed to clear stale lockfile '%s': %s\n", lockfile,
+			kr_log_info("[cache] failed to clear stale lockfile '%s': %s\n", lockfile,
 				    strerror(errno));
 		}
 	}
