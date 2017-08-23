@@ -63,7 +63,7 @@ static int assert_right_version(struct kr_cache *cache)
 		/* Version doesn't match. Recreate cache and write version key. */
 		ret = cache_op(cache, count);
 		if (ret != 0) { /* Non-empty cache, purge it. */
-			kr_log_info("[cache] purging cache\n");
+			kr_log_info("[cache] incompatible cache database detected, purging\n");
 			ret = cache_purge(cache);
 		}
 		/* Either purged or empty. */

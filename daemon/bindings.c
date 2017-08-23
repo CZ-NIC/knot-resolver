@@ -668,8 +668,12 @@ static int cache_open(lua_State *L)
 	};
 	int ret = kr_cache_open(&engine->resolver.cache, api, &opts, engine->pool);
 	if (ret != 0) {
-		format_error(L, "can't open cache");
-		lua_error(L);
+		char cwd[PATH_MAX];
+		if(getcwd(cwd, sizeof(cwd)) == NULL) {
+			const char errprefix[] = "<invalid working directory>";
+			strncpy(cwd, errprefix, sizeof(cwd));
+		}
+		return luaL_error(L, "can't open cache path '%s'; working directory '%s'", opts.path, cwd);
 	}
 
 	/* Store current configuration */
