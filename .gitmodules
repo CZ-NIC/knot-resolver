@@ -3,4 +3,4 @@
 	url = https://gitlab.labs.nic.cz/knot/deckard.git
 [submodule "modules/policy/lua-aho-corasick"]
 	path = modules/policy/lua-aho-corasick
-	url = https://github.com/cloudflare/lua-aho-corasick.git
+	url = git://github.com/cloudflare/lua-aho-corasick.git
