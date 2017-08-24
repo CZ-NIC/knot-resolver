@@ -209,7 +209,7 @@ static bool ipc_readall(int fd, char *dst, size_t len)
 	return true;
 }
 
-static void ipc_activity(uv_poll_t* handle, int status, int events)
+static void ipc_activity(uv_poll_t *handle, int status, int events)
 {
 	struct engine *engine = handle->data;
 	if (status != 0) {
@@ -222,40 +222,41 @@ static void ipc_activity(uv_poll_t* handle, int status, int events)
 	(void) uv_fileno((uv_handle_t *)(handle), &fd);
 	/* Read expression from IPC pipe */
 	uint32_t len = 0;
-	if (ipc_readall(fd, (char *)&len, sizeof(len))) {
-		auto_free char *rbuf = NULL;
-		if (len < UINT32_MAX) {
-			rbuf = malloc(len + 1);
-		} else {
-			errno = EINVAL;
-		}
-		if (!rbuf) {
-			kr_log_error("[system] ipc: %s\n", strerror(errno));
-			engine_stop(engine); /* Panic and stop this fork. */
-			return;
-		}
-		if (ipc_readall(fd, rbuf, len)) {
-			rbuf[len] = '\0';
-			/* Run expression */
-			const char *message = "";
-			int ret = engine_ipc(engine, rbuf);
-			if (ret > 0) {
-				message = lua_tostring(engine->L, -1);
-			}
-			/* Send response back */
-			len = strlen(message);
-			if (write(fd, &len, sizeof(len)) != sizeof(len) ||
-				write(fd, message, len) != len) {
-				kr_log_error("[system] ipc: %s\n", strerror(errno));
-			}
-			/* Clear the Lua stack */
-			lua_settop(engine->L, 0);
-		} else {
-			kr_log_error("[system] ipc: %s\n", strerror(errno));
-		}
+	auto_free char *rbuf = NULL;
+	if (!ipc_readall(fd, (char *)&len, sizeof(len))) {
+		goto failure;
+	}
+	if (len < UINT32_MAX) {
+		rbuf = malloc(len + 1);
 	} else {
+		errno = EINVAL;
+	}
+	if (!rbuf) {
+		kr_log_error("[system] ipc: %s\n", strerror(errno));
+		engine_stop(engine); /* Panic and stop this fork. */
+		return;
+	}
+	if (!ipc_readall(fd, rbuf, len)) {
+		goto failure;
+	}
+	rbuf[len] = '\0';
+	/* Run expression */
+	const char *message = "";
+	int ret = engine_ipc(engine, rbuf);
+	if (ret > 0) {
+		message = lua_tostring(engine->L, -1);
+	}
+	/* Send response back */
+	len = strlen(message);
+	if (write(fd, &len, sizeof(len)) != sizeof(len) ||
+		write(fd, message, len) != len) {
 		kr_log_error("[system] ipc: %s\n", strerror(errno));
 	}
+	/* Clear the Lua stack */
+	lua_settop(engine->L, 0);
+	return;
+failure:
+	kr_log_error("[system] ipc: %s\n", strerror(errno));
 }
 
 static bool ipc_watch(uv_loop_t *loop, struct engine *engine, int fd)
