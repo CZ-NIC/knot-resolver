@@ -254,6 +254,7 @@ failure:
 	 */
 	kr_log_error("[system] stopping ipc because of: %s\n", strerror(errno));
 	uv_poll_stop(handle);
+	uv_close((uv_handle_t *)handle, (uv_close_cb)free);
 }
 
 static bool ipc_watch(uv_loop_t *loop, struct engine *engine, int fd)
