@@ -37,7 +37,7 @@ $(1)_LIBS := $(tests_LIBS)
 $(1)_DEPEND := $(tests_DEPEND)
 $(call make_bin,$(1),tests)
 $(1): $$($(1))
-	@$(preload_syms) $$<
+	@$(preload_syms) $(DEBUGGER) $$<
 .PHONY: $(1)
 endef
 

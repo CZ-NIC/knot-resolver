@@ -28,6 +28,7 @@ test:linux:amd64:
     - linux
     - amd64
 
+
 deckard:linux:amd64:
   stage: test
   script:
@@ -37,6 +38,18 @@ deckard:linux:amd64:
     - pip3 install --upgrade pip
     - pip3 install --user dnspython python-augeas
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
+  dependencies:
+    - build:linux:amd64
+  tags:
+    - docker
+    - linux
+    - amd64
+
+test:linux:amd64:valgrind:
+  image: cznic/ubuntu-valgrind:16.04
+  stage: test
+  script:
+    - PREFIX=$(pwd)/.local DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet" make -k check
   dependencies:
     - build:linux:amd64
   tags:
