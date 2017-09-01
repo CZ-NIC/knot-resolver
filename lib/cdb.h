@@ -37,6 +37,8 @@ struct kr_cdb_api {
 	void (*close)(knot_db_t *db);
 	int (*count)(knot_db_t *db);
 	int (*clear)(knot_db_t *db);
+
+	/** Run after a row of operations to release transaction/lock if needed. */
 	int (*sync)(knot_db_t *db);
 
 	/* Data access */

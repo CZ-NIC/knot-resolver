@@ -252,6 +252,7 @@ static int rrcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 		}
 	}
+	kr_cache_sync(&req->ctx->cache);
 	if (ret == 0) {
 		VERBOSE_MSG(qry, "=> satisfied from cache\n");
 		qry->flags.CACHED = true;
@@ -451,14 +452,21 @@ static int rrcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/* Open write transaction */
 		struct kr_cache *cache = &req->ctx->cache;
 		ret = stash_commit(&stash, qry, cache, req);
+		if (ret == 0) {
+			ret = kr_cache_sync(cache);
+		} else {
+			kr_cache_sync(cache);
+		}
 		/* Clear if full */
 		if (ret == kr_error(ENOSPC)) {
+			kr_log_info("[cache] clearing because overfull\n");
 			ret = kr_cache_clear(cache);
 			if (ret != 0 && ret != kr_error(EEXIST)) {
-				kr_log_error("[ rc ] failed to clear cache: %s\n", kr_strerror(ret));
+				kr_log_error("[cache] failed to clear cache: %s\n", kr_strerror(ret));
 			}
+		} else if (ret) {
+			VERBOSE_MSG(qry, "=> stashing failed: %d\n", ret);
 		}
-		kr_cache_sync(cache);
 	}
 	return ctx->state;
 }

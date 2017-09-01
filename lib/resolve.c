@@ -188,11 +188,12 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 			/* @todo We could stop resolution here for NXDOMAIN, but we can't because of broken CDNs */
 			qry->flags.NO_MINIMIZE = true;
 			kr_make_query(qry, pkt);
-			return;
+			break;
 		}
 		assert(target[0]);
 		target = knot_wire_next_label(target, NULL);
 	}
+	kr_cache_sync(cache);
 }
 
 static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name,

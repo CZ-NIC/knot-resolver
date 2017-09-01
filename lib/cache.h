@@ -98,12 +98,9 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 KR_EXPORT
 void kr_cache_close(struct kr_cache *cache);
 
-/**
- * Synchronise cache with the backing store.
- * @param cache structure
- */
+/** Run after a row of operations to release transaction/lock if needed. */
 KR_EXPORT
-void kr_cache_sync(struct kr_cache *cache);
+int kr_cache_sync(struct kr_cache *cache);
 
 /**
  * Return true if cache is open and enabled.
