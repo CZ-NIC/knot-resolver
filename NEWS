@@ -8,6 +8,10 @@ Incompatible changes
   'hasflag' and 'resolved'.
   You can instead write code like qry.flags.NO_0X20 = true.
 
+Bugfixes
+--------
+- fix exiting one of multiple forks (#150)
+
 Improvements
 ------------
 - policy.suffix: update the aho-corasick code (#200)

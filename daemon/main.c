@@ -189,11 +189,6 @@ static void tty_accept(uv_stream_t *master, int status)
 	}
 }
 
-static void ipc_close(uv_handle_t *handle)
-{
-	free(handle);
-}
-
 /* @internal AF_LOCAL reads may still be interrupted, loop it. */
 static bool ipc_readall(int fd, char *dst, size_t len)
 {
@@ -209,12 +204,11 @@ static bool ipc_readall(int fd, char *dst, size_t len)
 	return true;
 }
 
-static void ipc_activity(uv_poll_t* handle, int status, int events)
+static void ipc_activity(uv_poll_t *handle, int status, int events)
 {
 	struct engine *engine = handle->data;
 	if (status != 0) {
 		kr_log_error("[system] ipc: %s\n", uv_strerror(status));
-		ipc_close((uv_handle_t *)handle);
 		return;
 	}
 	/* Get file descriptor from handle */
@@ -222,40 +216,45 @@ static void ipc_activity(uv_poll_t* handle, int status, int events)
 	(void) uv_fileno((uv_handle_t *)(handle), &fd);
 	/* Read expression from IPC pipe */
 	uint32_t len = 0;
-	if (ipc_readall(fd, (char *)&len, sizeof(len))) {
-		auto_free char *rbuf = NULL;
-		if (len < UINT32_MAX) {
-			rbuf = malloc(len + 1);
-		} else {
-			errno = EINVAL;
-		}
-		if (!rbuf) {
-			kr_log_error("[system] ipc: %s\n", strerror(errno));
-			engine_stop(engine); /* Panic and stop this fork. */
-			return;
-		}
-		if (ipc_readall(fd, rbuf, len)) {
-			rbuf[len] = '\0';
-			/* Run expression */
-			const char *message = "";
-			int ret = engine_ipc(engine, rbuf);
-			if (ret > 0) {
-				message = lua_tostring(engine->L, -1);
-			}
-			/* Send response back */
-			len = strlen(message);
-			if (write(fd, &len, sizeof(len)) != sizeof(len) ||
-				write(fd, message, len) != len) {
-				kr_log_error("[system] ipc: %s\n", strerror(errno));
-			}
-			/* Clear the Lua stack */
-			lua_settop(engine->L, 0);
-		} else {
-			kr_log_error("[system] ipc: %s\n", strerror(errno));
-		}
-	} else {
-		kr_log_error("[system] ipc: %s\n", strerror(errno));
+	auto_free char *rbuf = NULL;
+	if (!ipc_readall(fd, (char *)&len, sizeof(len))) {
+		goto failure;
 	}
+	if (len < UINT32_MAX) {
+		rbuf = malloc(len + 1);
+	} else {
+		errno = EINVAL;
+	}
+	if (!rbuf) {
+		goto failure;
+	}
+	if (!ipc_readall(fd, rbuf, len)) {
+		goto failure;
+	}
+	rbuf[len] = '\0';
+	/* Run expression */
+	const char *message = "";
+	int ret = engine_ipc(engine, rbuf);
+	if (ret > 0) {
+		message = lua_tostring(engine->L, -1);
+	}
+	/* Clear the Lua stack */
+	lua_settop(engine->L, 0);
+	/* Send response back */
+	len = strlen(message);
+	if (write(fd, &len, sizeof(len)) != sizeof(len) ||
+		write(fd, message, len) != len) {
+		goto failure;
+	}
+	return; /* success! */
+failure:
+	/* Note that if the piped command got read or written partially,
+	 * we would get out of sync and only receive rubbish now.
+	 * Therefore we prefer to stop IPC, but we try to continue with all else.
+	 */
+	kr_log_error("[system] stopping ipc because of: %s\n", strerror(errno));
+	uv_poll_stop(handle);
+	uv_close((uv_handle_t *)handle, (uv_close_cb)free);
 }
 
 static bool ipc_watch(uv_loop_t *loop, struct engine *engine, int fd)
