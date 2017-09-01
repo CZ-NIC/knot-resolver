@@ -87,6 +87,40 @@ static int set_mapsize(MDB_env *env, size_t map_size)
 	return 0;
 }
 
+#define FLAG_RENEW (2*MDB_RDONLY)
+/** mdb_txn_begin or _renew + handle MDB_MAP_RESIZED.
+ *
+ * The retrying logic for MDB_MAP_RESIZED is so ugly that it has its own function.
+ * \note this assumes no transactions are active
+ * \return MDB_ errcode, not usual kr_error(...)
+ */
+static int txn_get_noresize(struct lmdb_env *env, unsigned int flag, MDB_txn **txn)
+{
+	assert(!env->txn.rw && (!env->txn.ro || !env->txn.ro_active));
+	int ret;
+	if (flag == FLAG_RENEW) {
+		ret = mdb_txn_renew(*txn);
+	} else {
+		ret = mdb_txn_begin(env->env, NULL, flag, txn);
+	}
+	if (ret != MDB_MAP_RESIZED) {
+		return ret;
+	}
+	//:unlikely
+	/* Another process increased the size; let's try to recover. */
+	kr_log_info("[cache] detected size increased by another process\n");
+	ret = mdb_env_set_mapsize(env->env, 0);
+	if (ret != MDB_SUCCESS) {
+		return ret;
+	}
+	if (flag == FLAG_RENEW) {
+		ret = mdb_txn_renew(*txn);
+	} else {
+		ret = mdb_txn_begin(env->env, NULL, flag, txn);
+	}
+	return ret;
+}
+
 /** Obtain a transaction.  (they're cached in env->txn) */
 static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 {
@@ -105,7 +139,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 			mdb_txn_reset(env->txn.ro);
 			env->txn.ro_active = false;
 		}
-		int ret = mdb_txn_begin(env->env, NULL, 0/*RW*/, &env->txn.rw);
+		int ret = txn_get_noresize(env, 0/*RW*/, &env->txn.rw);
 		if (ret == MDB_SUCCESS) {
 			*txn = env->txn.rw;
 			assert(*txn);
@@ -114,16 +148,14 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	}
 
 	/* Get an active RO txn and return it. */
+	int ret = MDB_SUCCESS;
 	if (!env->txn.ro) { //:unlikely
-		int ret = mdb_txn_begin(env->env, NULL, MDB_RDONLY, &env->txn.ro);
-		if (ret != MDB_SUCCESS) {
-			return lmdb_error(ret);
-		}
+		ret = txn_get_noresize(env, MDB_RDONLY, &env->txn.ro);
 	} else if (!env->txn.ro_active) {
-		int ret = mdb_txn_renew(env->txn.ro);
-		if (ret != MDB_SUCCESS) {
-			return lmdb_error(ret);
-		}
+		ret = txn_get_noresize(env, FLAG_RENEW, &env->txn.ro);
+	}
+	if (ret != MDB_SUCCESS) {
+		return lmdb_error(ret);
 	}
 	env->txn.ro_active = true;
 	*txn = env->txn.ro;
