@@ -327,6 +327,22 @@ static int cdb_clear(knot_db_t *db)
 	/* Always attempt to commit write transactions in-flight. */
 	(void) cdb_sync(db);
 
+	/* First try mdb_drop() to clear the DB; this may fail with ENOSPC. */
+	{
+		MDB_txn *txn = NULL;
+		int ret = txn_get(env, &txn, false);
+		if (ret == kr_ok()) {
+			ret = lmdb_error(mdb_drop(txn, env->dbi, 0));
+			if (ret == kr_ok()) {
+				ret = cdb_sync(db);
+			}
+			if (ret == kr_ok()) {
+				return ret;
+			}
+		}
+		kr_log_info("[cache] clearing error, falling back\n");
+	}
+
 	/* Since there is no guarantee that there will be free
 	 * pages to hold whole dirtied db for transaction-safe clear,
 	 * we simply remove the database files and reopen.
