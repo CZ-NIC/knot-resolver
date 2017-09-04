@@ -326,9 +326,6 @@ static int cdb_count(knot_db_t *db)
 static int cdb_clear(knot_db_t *db)
 {
 	struct lmdb_env *env = db;
-	/* Always attempt to commit write transactions in-flight. */
-	(void) cdb_sync(db);
-
 	/* First try mdb_drop() to clear the DB; this may fail with ENOSPC. */
 	{
 		MDB_txn *txn = NULL;
@@ -343,6 +340,13 @@ static int cdb_clear(knot_db_t *db)
 			}
 		}
 		kr_log_info("[cache] clearing error, falling back\n");
+	}
+
+	/* We are about to switch to a different file, so end all txns, to be sure. */
+	(void) cdb_sync(db);
+	if (env->txn.ro) {
+		mdb_txn_abort(env->txn.ro);
+		env->txn.ro = NULL;
 	}
 
 	/* Since there is no guarantee that there will be free
