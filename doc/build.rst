@@ -7,7 +7,7 @@ Installing from packages
 The resolver is packaged for Debian, Fedora+EPEL, Ubuntu, Docker, NixOS/NixPkgs, FreeBSD, HomeBrew, and Turris Omnia.
 Some of these are maintained directly by the knot-resolver team.
 
-Refer to `project page <https://www.knot-resolver.cz/pages/try.html>`_ for information about
+Refer to `project page <https://www.knot-resolver.cz/download>`_ for information about
 installing from packages. If packages are not available for your OS, see following sections
 to see how you can build it from sources (or package it), or use official `Docker images`_.
 
