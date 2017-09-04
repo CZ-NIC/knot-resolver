@@ -26,7 +26,7 @@ Knot Resolver is packaged for
 [Homebrew](https://github.com/Homebrew/homebrew-core/blob/master/Formula/knot-resolver.rb) and
 [NixOS/Nixpkgs](https://hydra.nixos.org/search?query=knot-resolver).
 You can also find it as the default DNS resolver in our open-source router [Turris Omnia](https://omnia.turris.cz).
-See the [Knot-resolver homepage](https://www.knot-resolver.cz/pages/try.html) for more information.
+See the [Knot-resolver homepage](https://www.knot-resolver.cz/download/) for more information.
 
 <!-- [openSUSE](https://build.opensuse.org/package/show/server:dns/knot-resolver), (it seems to be in a bad shape) -->
 
