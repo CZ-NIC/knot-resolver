@@ -56,7 +56,7 @@ struct lmdb_env
 static int lmdb_error(int error)
 {
 	switch (error) {
-	case MDB_SUCCESS:  return 0;
+	case MDB_SUCCESS:  return kr_ok();
 	case MDB_NOTFOUND: return kr_error(ENOENT);
 	case MDB_MAP_FULL: /* Fallthrough */
 	case MDB_TXN_FULL: /* Fallthrough */
@@ -65,7 +65,7 @@ static int lmdb_error(int error)
 	default:
 		kr_log_error("[cache] LMDB error: %s\n", mdb_strerror(error));
 		assert(false);
-		return -abs(error);
+		return kr_error(error);
 	}
 }
 
@@ -327,6 +327,10 @@ static int cdb_clear(knot_db_t *db)
 {
 	struct lmdb_env *env = db;
 	/* First try mdb_drop() to clear the DB; this may fail with ENOSPC. */
+	/* If we didn't do this, explicit cache.clear() ran on an instance
+	 * would lead to the instance detaching from the cache of others,
+	 * until they reopened cache explicitly or cleared it for some reason.
+	 */
 	{
 		MDB_txn *txn = NULL;
 		int ret = txn_get(env, &txn, false);
