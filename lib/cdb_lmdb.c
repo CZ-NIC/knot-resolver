@@ -15,10 +15,12 @@
 */
 
 #include <assert.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <lmdb.h>
 
@@ -360,57 +362,39 @@ static int cdb_clear(knot_db_t *db)
 		return lmdb_error(ret);
 	}
 
-	/* Check if the fd is pointing to the same file.
-	 * man open(2):
-         * > Portable programs that want to perform atomic file
-         * > locking using a lockfile, and need to avoid reliance on
-         * > NFS support for O_EXCL, can create a unique file on the
-         * > same filesystem (e.g., incorporating hostname and PID),
-         * > and use link(2) to make a link to the lockfile.  If
-         * > link(2) returns 0, the lock is successful.  Otherwise,
-         * > use stat(2) on the unique file to check if its link count
-         * > has increased to 2, in which case the lock is also
-         * > successful.
-	 */
-
 	auto_free char *mdb_datafile = kr_strcatdup(2, path, "/data.mdb");
 	auto_free char *mdb_lockfile = kr_strcatdup(2, path, "/lock.mdb");
 	auto_free char *lockfile = kr_strcatdup(2, path, "/.cachelock");
 	if (!mdb_datafile || !mdb_lockfile || !lockfile) {
 		return kr_error(ENOMEM);
 	}
-	ret = link(mdb_lockfile, lockfile);
-	if (ret != 0) {
-		int lock_errno = errno;
-		struct stat lock_stat;
-		ret = stat(lockfile, &lock_stat);
-		if (ret != 0) {
-			return kr_error(errno);
-		}
-		if (lock_stat.st_nlink != 2) {
-			return kr_error(lock_errno);
-		}
+	/* Find if we get a lock on lockfile. */
+	ret = open(lockfile, O_CREAT|O_EXCL|O_RDONLY, S_IRUSR);
+	if (ret == -1) {
+		kr_log_error("[cache] clearing failed to get ./.cachelock; retry later\n");
+		/* As we're out of space (almost certainly - mdb_drop didn't work),
+		 * we will retry on the next failing write operation. */
+		return kr_error(errno);
 	}
+	close(ret);
+	/* We aquired lockfile.  Now find whether *.mdb are what we have open now. */
 	struct stat old_stat, new_stat;
-	ret = fstat(fd, &new_stat);
-	if (ret != 0) {
+	if (fstat(fd, &new_stat) || stat(mdb_datafile, &old_stat)) {
+		ret = errno;
 		unlink(lockfile);
-		return kr_error(errno);
-	}
-	ret = stat(mdb_datafile, &old_stat);
-	if (ret != 0) {
-		unlink(lockfile);
-		return kr_error(errno);
+		return kr_error(ret);
 	}
 	/* Remove underlying files only if current open environment
 	 * points to file on the disk. Otherwise just reopen as someone
 	 * else has already removed the files.
 	 */
 	if (old_stat.st_dev == new_stat.st_dev && old_stat.st_ino == new_stat.st_ino) {
+		kr_log_verbose("[cache] clear: identical files, unlinking\n");
 		// coverity[toctou]
 		unlink(mdb_datafile);
 		unlink(mdb_lockfile);
-	}
+	} else
+		kr_log_verbose("[cache] clear: not identical files, reopening\n");
 	/* Keep copy as it points to current handle internals. */
 	auto_free char *path_copy = strdup(path);
 	size_t mapsize = env->mapsize;
