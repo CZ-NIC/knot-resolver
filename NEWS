@@ -11,6 +11,8 @@ Incompatible changes
 Bugfixes
 --------
 - fix exiting one of multiple forks (#150)
+- cache: change the way of using LMDB transactions.  That in particular
+  fixes some cases of using too much space with multiple kresd forks (#240).
 
 Improvements
 ------------

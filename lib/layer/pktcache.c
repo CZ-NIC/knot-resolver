@@ -159,6 +159,7 @@ static int pktcache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Fetch either answer to original or minimized query */
 	uint8_t flags = 0;
 	int ret = loot_pktcache(req->ctx, pkt, req, &flags);
+	kr_cache_sync(&req->ctx->cache);
 	if (ret == 0) {
 		qry->flags.CACHED = true;
 		qry->flags.NO_MINIMIZE = true;
@@ -296,11 +297,13 @@ static int pktcache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Stash answer in the cache */
-	int ret = kr_cache_insert(cache, KR_CACHE_PKT, qname, qtype, &header, data);
-	if (ret == 0) {
+	int ret1 = kr_cache_insert(cache, KR_CACHE_PKT, qname, qtype, &header, data);
+	int ret2 = kr_cache_sync(cache);
+	if (!ret1 && !ret2) {
 		VERBOSE_MSG(qry, "=> answer cached for TTL=%u\n", ttl);
+	} else {
+		VERBOSE_MSG(qry, "=> stashing failed; codes: %d and %d\n", ret1, ret2);
 	}
-	kr_cache_sync(cache);
 	return ctx->state;
 }
 

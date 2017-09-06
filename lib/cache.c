@@ -109,11 +109,15 @@ void kr_cache_close(struct kr_cache *cache)
 	}
 }
 
-void kr_cache_sync(struct kr_cache *cache)
+int kr_cache_sync(struct kr_cache *cache)
 {
-	if (cache_isvalid(cache) && cache->api->sync) {
-		cache_op(cache, sync);
+	if (!cache_isvalid(cache)) {
+		return kr_error(EINVAL);
 	}
+	if (cache->api->sync) {
+		return cache_op(cache, sync);
+	}
+	return kr_ok();
 }
 
 /**
@@ -237,7 +241,6 @@ int kr_cache_insert(struct kr_cache *cache, uint8_t tag, const knot_dname_t *nam
 			return ret;
 		}
 		entry_write(entry.data, header, data);
-		ret = cache_op(cache, sync); /* Make sure the entry is comitted. */
 	} else {
 		/* Other backends must prepare contiguous data first */
 		auto_free char *buffer = malloc(entry.len);

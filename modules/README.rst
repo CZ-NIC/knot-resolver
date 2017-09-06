@@ -279,20 +279,11 @@ Here's an example how a module can expose its property:
 	{
 		/* Get cache from engine. */
 		struct engine *engine = env;
-		namedb_t *cache = engine->resolver.cache;
-
-		/* Open read transaction */
-		struct kr_cache_txn txn;
-		int ret = kr_cache_txn_begin(cache, &txn, NAMEDB_RDONLY);
-		if (ret != 0) {
-			return NULL;
-		}
-
+        struct kr_cache *cache = &engine->resolver.cache;
 		/* Read item count */
+        int count = (cache->api)->count(cache->db);
 		char *result = NULL;
-		const namedb_api_t *api = kr_cache_storage();
-		asprintf(&result, "{ \"result\": %d }", api->count(&txn));
-		kr_cache_txn_abort(&txn);
+		asprintf(&result, "{ \"result\": %d }", count);
 		
 		return result;
 	}

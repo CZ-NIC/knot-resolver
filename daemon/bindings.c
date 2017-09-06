@@ -726,7 +726,9 @@ static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_
 	}
 
 	/* Start prefix search */
-	return kr_cache_match(cache, namespace, buf, results, maxresults);
+	int ret = kr_cache_match(cache, namespace, buf, results, maxresults);
+	kr_cache_sync(cache);
+	return ret;
 }
 
 /** @internal Delete iterated key. */
@@ -752,6 +754,7 @@ static int cache_remove_prefix(struct kr_cache *cache, const char *args)
 		result_set[i].data = dst;
 	}
 	cache->api->remove(cache->db, result_set, ret);
+	kr_cache_sync(cache);
 	/* Free keys */
 	for (int i = 0; i < ret; ++i) {
 		free(result_set[i].data);

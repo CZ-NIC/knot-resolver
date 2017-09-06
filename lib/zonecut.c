@@ -458,6 +458,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 			}
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);
+			kr_cache_sync(&ctx->cache);
 			return kr_ok();
 		}
 		/* Subtract label from QNAME. */
@@ -467,6 +468,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 			break;
 		}
 	}
+	kr_cache_sync(&ctx->cache);
 	mm_free(cut->pool, qname);
 	return kr_error(ENOENT);
 }
