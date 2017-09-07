@@ -59,7 +59,7 @@ ifneq ($(SED),)
 endif
 daemon-clean: kresd-clean
 	@$(RM) daemon/lua/*.inc daemon/lua/kres.lua daemon/lua/trust_anchors.lua \
-		daemon/lua/zonefile.lua
+		daemon/lua/zonefile.lua daemon/lua/config.lua
 
 KNOT_RRSET_TXT_DUMP := \
 	$(shell pkg-config libknot --atleast-version=2.4.0 && echo true || echo false)
@@ -68,6 +68,9 @@ daemon/lua/kres.lua: daemon/lua/kres.lua.in
 
 daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in
 	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g" $< > $@
+
+daemon/lua/config.lua: daemon/lua/config.lua.in
+	@$(call quiet,SED,$<) -e "s|@ROOTHINTS@|$(ROOTHINTS)|g" $< > $@
 
 LIBZSCANNER_COMMENTS := \
 	$(shell pkg-config libzscanner --atleast-version=2.4.2 && echo true || echo false)

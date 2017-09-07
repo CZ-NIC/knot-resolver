@@ -19,6 +19,7 @@ MANDIR ?= $(PREFIX)/share/man
 INCLUDEDIR ?= $(PREFIX)/include
 MODULEDIR ?= $(LIBDIR)/kdns_modules
 ETCDIR ?= $(PREFIX)/etc/kresd
+ROOTHINTS ?= $(ETCDIR)/hints.zone
 
 # Tools
 CC      ?= cc
