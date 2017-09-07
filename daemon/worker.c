@@ -101,7 +101,8 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
 			&& (family == AF_INET  || family == AF_INET6);
 	if (!precond) {
-		assert(false);
+		/* assert(false); see #245 */
+		kr_log_verbose("[work] ioreq_spawn: pre-condition failed\n");
 		return NULL;
 	}
 
