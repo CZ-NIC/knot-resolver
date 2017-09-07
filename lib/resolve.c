@@ -860,6 +860,37 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	}
 }
 
+bool check_resolution_time(struct kr_query *qry, struct timeval *now)
+{
+	unsigned resolving_time = time_diff(&qry->creation_time, now);
+	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
+		WITH_VERBOSE {
+			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
+		}
+		return false;
+	}
+
+	/* If this is a subquery, check overall resolution time for parent */
+	if (!qry->parent) {
+		return true;
+	}
+
+	while (qry->parent) {
+		qry = qry->parent;
+	}
+
+	/* qry here is an oldest ancestor */
+	resolving_time = time_diff(&qry->creation_time, now);
+	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
+		/* oldest ancestor is too old */
+		WITH_VERBOSE {
+			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
+		}
+		return false;
+	}
+	return true;
+}
+
 int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
@@ -876,11 +907,8 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	struct kr_query *qry = array_tail(rplan->pending);
 	struct timeval now;
 	gettimeofday(&now, NULL);
-	unsigned resolving_time = time_diff(&qry->creation_time, &now);
-	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "query resolution time limit exceeded %i\n", resolving_time);
-		}
+	/* Check overall resolution time */
+	if (!check_resolution_time(qry, &now)) {
 		return KR_STATE_FAIL;
 	}
 	bool tried_tcp = (qry->flags.TCP);
