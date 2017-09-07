@@ -83,6 +83,7 @@ struct kr_query {
 	uint32_t secret;
 	uint16_t fails;
 	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
+	struct timeval creation_time;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
