@@ -16,5 +16,5 @@ if not cache.current_size then
 end
 
 if kres.context().root_hints.nsset.root == nil then
-	roothints('@ROOTHINTS@')
+	_hint_root_file()
 end

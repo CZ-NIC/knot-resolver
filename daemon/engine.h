@@ -101,3 +101,10 @@ int engine_set_hostname(struct engine *engine, const char *hostname);
 /** Set/get the per engine moduledir */
 char *engine_get_moduledir(struct engine *engine);
 int engine_set_moduledir(struct engine *engine, const char *moduledir);
+
+/** Load root hints from a zonefile (or config-time default if NULL).
+ *
+ * @return error message or NULL (statically allocated)
+ */
+const char* lua_hint_root_file(struct kr_context *ctx, const char *file);
+

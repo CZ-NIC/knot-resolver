@@ -3,14 +3,14 @@ etc_SOURCES := icann-ca.pem \
 	config.isp \
 	config.personal \
 	config.splitview \
-	hints.zone
+	root.hints
 
 etc-install: $(DESTDIR)$(ETCDIR)
 	$(INSTALL) -m 0640 $(addprefix etc/,$(etc_SOURCES)) $(DESTDIR)$(ETCDIR)
 
-etc: etc/hints.zone
+etc: etc/root.hints
 
-etc/hints.zone:
+etc/root.hints:
 	wget -O $@  https://www.internic.net/domain/named.root
 
 .PHONY: etc-install

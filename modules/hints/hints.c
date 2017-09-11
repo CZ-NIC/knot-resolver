@@ -565,6 +565,13 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 	return pack_hints(root_hints);
 }
 
+static char* hint_root_file(void *env, struct kr_module *module, const char *args)
+{
+	struct engine *engine = env;
+	struct kr_context *ctx = &engine->resolver;
+	return (char*)lua_hint_root_file(ctx, args);
+}
+
 /*
  * Module implementation.
  */
@@ -650,6 +657,7 @@ struct kr_prop *hints_props(void)
 	    { &hint_get,    "get", "Retrieve hint for given name.", },
 	    { &hint_add_hosts, "add_hosts", "Load a file with hosts-like formatting and add contents into hints.", },
 	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
+	    { &hint_root_file, "root_file", "Replace root hints set from a zonefile.", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;

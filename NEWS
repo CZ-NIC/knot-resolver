@@ -11,6 +11,8 @@ Incompatible changes
 Improvements
 ------------
 - policy.suffix: update the aho-corasick code (#200)
+- root hints are now loaded from a zonefile; exposed as hints.root_file().
+  You can override the path by defining ROOTHINTS during compilation.
 
 
 Knot Resolver 1.3.3 (2017-08-09)
