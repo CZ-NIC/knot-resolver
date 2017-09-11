@@ -869,25 +869,6 @@ bool check_resolution_time(struct kr_query *qry, struct timeval *now)
 		}
 		return false;
 	}
-
-	/* If this is a subquery, check overall resolution time for parent */
-	if (!qry->parent) {
-		return true;
-	}
-
-	while (qry->parent) {
-		qry = qry->parent;
-	}
-
-	/* qry here is an oldest ancestor */
-	resolving_time = time_diff(&qry->creation_time, now);
-	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
-		/* oldest ancestor is too old */
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
-		}
-		return false;
-	}
 	return true;
 }
 
