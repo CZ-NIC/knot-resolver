@@ -860,6 +860,18 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	}
 }
 
+bool check_resolution_time(struct kr_query *qry, struct timeval *now)
+{
+	unsigned resolving_time = time_diff(&qry->creation_time, now);
+	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
+		WITH_VERBOSE {
+			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
+		}
+		return false;
+	}
+	return true;
+}
+
 int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
@@ -874,6 +886,12 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	/* Check overall resolution time */
+	if (!check_resolution_time(qry, &now)) {
+		return KR_STATE_FAIL;
+	}
 	bool tried_tcp = (qry->flags.TCP);
 	if (!packet || packet->size == 0) {
 		if (tried_tcp) {
@@ -891,8 +909,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		if (qry->flags.CACHED) {
 			ITERATE_LAYERS(request, qry, consume, packet);
 		} else {
-			struct timeval now;
-			gettimeofday(&now, NULL);
 			/* Fill in source and latency information. */
 			request->upstream.rtt = time_diff(&qry->timestamp, &now);
 			request->upstream.addr = src;
