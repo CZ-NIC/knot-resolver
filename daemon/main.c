@@ -398,7 +398,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	}
 	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 
-	tls_setup_logging(kr_verbose_status);
 	/* Notify supervisor. */
 #ifdef HAS_SYSTEMD
 	sd_notify(0, "READY=1");
