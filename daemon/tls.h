@@ -34,9 +34,6 @@ struct tls_credentials {
 	char *ephemeral_servicename;
 };
 
-/*! Toggle verbose logging from TLS context. */
-void tls_setup_logging(bool verbose);
-
 /*! Create an empty TLS context in query context */
 struct tls_ctx_t* tls_new(struct worker_ctx *worker);
 
