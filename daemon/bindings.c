@@ -398,6 +398,107 @@ static int net_tls(lua_State *L)
 	return 1;
 }
 
+static int print_tls_param(const char *key, void *val, void *data)
+{
+	if (!val) {
+		return 0;
+	}
+
+	struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)val;
+
+	lua_State *L = (lua_State *)data;
+
+	lua_newtable(L);
+	lua_newtable(L);
+
+	lua_newtable(L);
+	for (size_t i = 0; i < entry->pins.len; ++i) {
+		lua_pushnumber(L, i + 1);
+		lua_pushstring(L, entry->pins.at[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, -2, "pins");
+	lua_newtable(L);
+	for (size_t i = 0; i < entry->ca_files.len; ++i) {
+		lua_pushnumber(L, i + 1);
+		lua_pushstring(L, entry->ca_files.at[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, -2, "ca files");
+	lua_setfield(L, -2, key);
+
+	return 0;
+}
+
+static int print_tls_client_params(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+	struct network *net = &engine->net;
+	if (!net) {
+		return 0;
+	}
+	if (net->tls_client_params.root == 0 ) {
+		return 0;
+	}
+	map_walk(&net->tls_client_params, print_tls_param, (void *)L);
+	return 1;
+}
+
+
+static int net_tls_client(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+	struct network *net = &engine->net;
+	if (!net) {
+		return 0;
+	}
+
+	/* Only return current credentials. */
+	if (lua_gettop(L) == 0) {
+		return print_tls_client_params(L);
+	}
+
+	const char *full_addr = NULL;
+	const char *ca_file = NULL;
+	const char *pin = NULL;
+	if ((lua_gettop(L) == 1) && lua_isstring(L, 1)) {
+		full_addr = lua_tostring(L, 1);
+	} else if ((lua_gettop(L) == 3) && lua_isstring(L, 1) && lua_isstring(L, 2) && lua_isstring(L, 3)) {
+		full_addr = lua_tostring(L, 1);
+		ca_file = lua_tostring(L, 2);
+		pin = lua_tostring(L, 3);
+	} else {
+		format_error(L, "net.tls_client either takes one parameter (\"address\") either takes three ones: (\"address\", \"ca_file\", \"pin\")");
+		lua_error(L);
+	}
+
+	char addr[INET6_ADDRSTRLEN];
+	uint16_t port = 0;
+	if (kr_straddr_split(full_addr, addr, sizeof(addr), &port) != kr_ok()) {
+		format_error(L, "invalid IP address");
+		lua_error(L);
+	}
+
+	if (port == 0) {
+		port = 53;
+	}
+
+	int r = tls_client_params_set(&net->tls_client_params, addr, port, ca_file, pin);
+	if (r != 0) {
+		lua_pushstring(L, strerror(ENOMEM));
+		lua_error(L);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 static int net_tls_padding(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
@@ -508,6 +609,8 @@ int lib_net(lua_State *L)
 		{ "bufsize",      net_bufsize },
 		{ "tcp_pipeline", net_pipeline },
 		{ "tls",          net_tls },
+		{ "tls_server",   net_tls },
+		{ "tls_client",   net_tls_client },
 		{ "tls_padding",  net_tls_padding },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },

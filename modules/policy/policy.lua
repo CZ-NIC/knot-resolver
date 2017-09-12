@@ -120,6 +120,32 @@ local function forward(target)
 	end
 end
 
+-- Forward request and all subrequests to upstream over TCP; validate answers
+local function tcp_forward(target)
+	local list = {}
+	if type(target) == 'table' then
+		for _, v in pairs(target) do
+			table.insert(list, addr2sock(v))
+			assert(#list <= 4, 'at most 4 TCP_FORWARD targets are supported')
+		end
+	else
+		table.insert(list, addr2sock(target))
+	end
+	return function(state, req)
+		local qry = req:current()
+		req.options.FORWARD = true
+		req.options.NO_MINIMIZE = true
+		qry.flags.FORWARD = true
+		qry.flags.ALWAYS_CUT = false
+		qry.flags.NO_MINIMIZE = true
+		qry.flags.AWAIT_CUT = true
+		req.options.TCP = true
+		qry.flags.TCP = true
+		set_nslist(qry, list)
+		return state
+	end
+end
+
 -- Rewrite records in packet
 local function reroute(tbl, names)
 	-- Import renumbering rules
@@ -236,7 +262,8 @@ end
 local policy = {
 	-- Policies
 	PASS = 1, DENY = 2, DROP = 3, TC = 4, QTRACE = 5,
-	FORWARD = forward, STUB = stub, REROUTE = reroute, MIRROR = mirror, FLAGS = flags,
+	FORWARD = forward, TCP_FORWARD = tcp_forward,
+	STUB = stub, REROUTE = reroute, MIRROR = mirror, FLAGS = flags,
 	-- Special values
 	ANY = 0,
 }

@@ -18,22 +18,35 @@
 
 #include <uv.h>
 #include <libknot/packet/pkt.h>
+#include <gnutls/gnutls.h>
 #include "lib/generic/array.h"
+#include "daemon/worker.h"
 
-struct qr_task;
 struct tls_ctx_t;
+struct tls_client_ctx_t;
 
 /* Per-session (TCP or UDP) persistent structure,
  * that exists between remote counterpart and a local socket.
  */
 struct session {
-	bool outgoing;
+	bool outgoing; /**< True: to upstream; false: from a client. */
 	bool throttled;
 	bool has_tls;
+	bool connected;
+	bool closing;
+	union inaddr peer;
+	uv_handle_t *handle;
 	uv_timer_t timeout;
 	struct qr_task *buffering; /**< Worker buffers the incomplete TCP query here. */
 	struct tls_ctx_t *tls_ctx;
-	array_t(struct qr_task *) tasks;
+	struct tls_client_ctx_t *tls_client_ctx;
+
+	uint8_t msg_hdr[4];  /**< Buffer for DNS message header. */
+	ssize_t msg_hdr_idx; /**< The number of bytes in msg_hdr filled so far. */
+
+	qr_tasklist_t tasks;
+	qr_tasklist_t waiting;
+	ssize_t bytes_to_skip;
 };
 
 void session_free(struct session *s);

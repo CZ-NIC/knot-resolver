@@ -48,15 +48,18 @@ static void check_bufsize(uv_handle_t* handle)
 
 static void session_clear(struct session *s)
 {
-	assert(s->outgoing || s->tasks.len == 0);
+	assert(s->tasks.len == 0 && s->waiting.len == 0);
 	array_clear(s->tasks);
+	array_clear(s->waiting);
 	tls_free(s->tls_ctx);
+	tls_client_ctx_free(s->tls_client_ctx);
 	memset(s, 0, sizeof(*s));
 }
 
 void session_free(struct session *s)
 {
 	if (s) {
+		assert(s->tasks.len == 0 && s->waiting.len == 0);
 		session_clear(s);
 		free(s);
 	}
@@ -89,6 +92,8 @@ static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
 	if (!s) {
 		return;
 	}
+	assert(s->waiting.len == 0 && s->tasks.len == 0);
+	assert(s->buffering == NULL);
 	if (!s->outgoing && handle->type == UV_TCP) {
 		worker_end_tcp(worker, handle); /* to free the buffering task */
 	}
@@ -158,8 +163,10 @@ static int udp_bind_finalize(uv_handle_t *handle)
 {
 	check_bufsize((uv_handle_t *)handle);
 	/* Handle is already created, just create context. */
-	handle->data = session_new();
-	assert(handle->data);
+	struct session *session = session_new();
+	assert(session);
+	session->handle = handle;
+	handle->data = session;
 	return io_start_read((uv_handle_t *)handle);
 }
 
@@ -189,20 +196,14 @@ int udp_bindfd(uv_udp_t *handle, int fd)
 	return udp_bind_finalize((uv_handle_t *)handle);
 }
 
-static void tcp_timeout(uv_handle_t *timer)
-{
-	uv_handle_t *handle = timer->data;
-	uv_close(handle, io_free);
-}
-
 static void tcp_timeout_trigger(uv_timer_t *timer)
 {
-	uv_handle_t *handle = timer->data;
-	struct session *session = handle->data;
+	struct session *session = timer->data;
 	if (session->tasks.len > 0) {
 		uv_timer_again(timer);
 	} else {
-		uv_close((uv_handle_t *)timer, tcp_timeout);
+		uv_timer_stop(timer);
+		worker_session_close(session);
 	}
 }
 
@@ -210,12 +211,16 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
 	uv_loop_t *loop = handle->loop;
 	struct session *s = handle->data;
+	if (s->closing) {
+		return;
+	}
 	struct worker_ctx *worker = loop->data;
 	/* TCP pipelining is rather complicated and requires cooperation from the worker
 	 * so the whole message reassembly and demuxing logic is inside worker */
 	int ret = 0;
 	if (s->has_tls) {
-		ret = tls_process(worker, handle, (const uint8_t *)buf->base, nread);
+		ret = s->outgoing ? tls_client_process(worker, handle, (const uint8_t *)buf->base, nread) :
+		                    tls_process(worker, handle, (const uint8_t *)buf->base, nread);
 	} else {
 		ret = worker_process_tcp(worker, handle, (const uint8_t *)buf->base, nread);
 	}
@@ -226,7 +231,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		if (!s->outgoing && !uv_is_closing((uv_handle_t *)&s->timeout)) {
 			uv_timer_stop(&s->timeout);
 			if (s->tasks.len == 0) {
-				uv_close((uv_handle_t *)&s->timeout, tcp_timeout);
+				worker_session_close(s);
 			} else { /* If there are tasks running, defer until they finish. */
 				uv_timer_start(&s->timeout, tcp_timeout_trigger, 1, KR_CONN_RTT_MAX/2);
 			}
@@ -265,7 +270,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	}
 	uv_timer_t *timer = &session->timeout;
 	uv_timer_init(master->loop, timer);
-	timer->data = client;
+	timer->data = session;
 	uv_timer_start(timer, tcp_timeout_trigger, KR_CONN_RTT_MAX/2, KR_CONN_RTT_MAX/2);
 	io_start_read((uv_handle_t *)client);
 }
@@ -379,8 +384,12 @@ void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)
 	}
 
 	struct worker_ctx *worker = loop->data;
-	handle->data = session_borrow(worker);
-	assert(handle->data);
+	struct session *session = session_borrow(worker);
+	assert(session);
+	session->handle = handle;
+	handle->data = session;
+	session->timeout.data = session;
+	uv_timer_init(worker->loop, &session->timeout);
 }
 
 void io_deinit(uv_handle_t *handle)
@@ -388,6 +397,7 @@ void io_deinit(uv_handle_t *handle)
 	if (!handle) {
 		return;
 	}
+	struct session *session = handle->data;
 	uv_loop_t *loop = handle->loop;
 	if (loop && loop->data) {
 		struct worker_ctx *worker = loop->data;
