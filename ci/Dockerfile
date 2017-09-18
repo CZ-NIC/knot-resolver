@@ -34,3 +34,6 @@ RUN rm -rf respdiff.zip resolver-benchmarking*
 #build knot
 RUN git clone https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
 RUN cd /tmp/knot && autoreconf -if && ./configure && make && make install && ldconfig
+
+#prepare for valgrind
+RUN wget https://raw.githubusercontent.com/LuaDist/luajit/2.0.3/src/lj.supp -O /lj.supp

@@ -40,6 +40,26 @@ deckard:linux:amd64:
     - linux
     - amd64
 
+
+deckard:linux:amd64:valgrind:
+  stage: test
+  script:
+    - export PREFIX=$(pwd)/.local
+    - export LD_LIBRARY_PATH=$PREFIX/lib
+    - apt purge -y python-dnspython python3-dnspython
+    - apt update
+    - apt install -y python3-jinja2 python3-pip python3-yaml libffi-dev libaugeas-dev
+    - pip3 install --upgrade pip
+    - pip3 install --user dnspython python-augeas
+    - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd" MAKEFLAGS="-j $(nproc) --keep-going" make
+  dependencies:
+    - build:linux:amd64
+  tags:
+    - docker
+    - linux
+    - amd64
+
+
 test:linux:amd64:valgrind:
   stage: test
   script:
