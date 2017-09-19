@@ -36,49 +36,6 @@ struct hint_info {
 
 #define U8(x) (const uint8_t *)(x)
 
-/* Initialize with SBELT name servers. */
-#include "lib/root-hints.inc"
-#define HINT_LEN_A sizeof(struct in_addr)
-#define HINT_LEN_AAAA sizeof(struct in6_addr)
-#define SBELT_LEN (sizeof(SBELT) / sizeof(SBELT[0]))
-static const struct hint_info SBELT[] = {
-	#define HINT(name,type) { \
-		U8("\x01" #name "\x0c""root-servers""\x03""net"), \
-		HINT_LEN_##type, \
-		U8(HINT_##name##_##type), \
-      	}
-	HINT(j, A),
-	HINT(k, A),
-	HINT(d, A),
-	HINT(e, A),
-	HINT(f, A),
-	HINT(g, A),
-	HINT(h, A),
-	HINT(i, A),
-	HINT(l, A),
-	HINT(m, A),
-	HINT(b, A),
-	HINT(c, A),
-	HINT(a, A),
-	HINT(a, AAAA),
-	HINT(b, AAAA),
-	HINT(c, AAAA),
-	HINT(d, AAAA),
-	HINT(e, AAAA),
-	HINT(f, AAAA),
-	HINT(g, AAAA),
-	HINT(h, AAAA),
-	HINT(i, AAAA),
-	HINT(j, AAAA),
-	HINT(k, AAAA),
-	HINT(l, AAAA),
-	HINT(m, AAAA),
-	#undef HINT
-};
-#undef HINT_LEN_A
-#undef HINT_LEN_AAAA
-
-
 static void update_cut_name(struct kr_zonecut *cut, const knot_dname_t *name)
 {
 	if (knot_dname_is_equal(name, cut->name)) {
@@ -309,16 +266,6 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 	int ret = 0;
 	if (ctx->root_hints.nsset.root) {
 		ret = kr_zonecut_copy(cut, &ctx->root_hints);
-	} else {
-		/* Copy compiled-in root hints */
-		for (unsigned i = 0; i < SBELT_LEN; ++i) {
-			const struct hint_info *hint = &SBELT[i];
-			knot_rdata_init(rdata_arr, hint->len, hint->addr, 0);
-			ret = kr_zonecut_add(cut, hint->name, rdata_arr);
-			if (ret != 0) {
-				break;
-			}
-		}
 	}
 	return ret;
 }

@@ -2,7 +2,7 @@ include config.mk
 include platform.mk
 
 # Targets
-all: info lib daemon client modules
+all: info lib daemon client modules etc
 install: lib-install daemon-install client-install modules-install etc-install
 check: all tests
 clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \

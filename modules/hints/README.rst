@@ -79,6 +79,10 @@ Properties
 
   .. tip:: If no parameters are passed, returns current root hints set.
 
+.. function:: hints.root_file(path)
+
+  Replace current root hints from a zonefile.  If the path is omitted, the compiled-in path is used, i.e. the root hints are reset to the default.
+
 .. function:: hints.root(root_hints)
 
   :param table root_hints: new set of root hints i.e. ``{['name'] = 'addr', ...}``

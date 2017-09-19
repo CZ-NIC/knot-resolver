@@ -66,12 +66,6 @@ libkres_HEADERS += \
 libkres_LIBS += $(nettle_LIBS)
 endif
 
-lib/zonecut.c: lib/root-hints.inc
-lib/root-hints.inc:
-	@echo "WARNING: regenerating $@"
-	scripts/gen-root-hints.sh > $@
-.DELETE_ON_ERROR: lib/root-hints.inc
-
 # Make library
 ifeq ($(BUILDMODE), static)
 $(eval $(call make_static,libkres,lib,yes))

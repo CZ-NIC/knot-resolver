@@ -31,6 +31,7 @@ LUA_HAS_SETFUNCS := \
 kresd_CFLAGS := -fPIE \
 		-Dlibknot_SONAME=\"$(libknot_SONAME)\" \
 		-Dlibzscanner_SONAME=\"$(libzscanner_SONAME)\" \
+		-DROOTHINTS=\"$(ROOTHINTS)\" \
 		-DLUA_HAS_SETFUNCS="$(LUA_HAS_SETFUNCS)"
 kresd_DEPEND := $(libkres) $(contrib)
 kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) \

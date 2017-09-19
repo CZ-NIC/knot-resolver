@@ -14,3 +14,7 @@ end
 if not cache.current_size then
 	cache.size = 100 * MB
 end
+
+if kres.context().root_hints.nsset.root == nil then
+	_hint_root_file()
+end

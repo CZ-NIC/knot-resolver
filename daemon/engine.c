@@ -319,6 +319,62 @@ static int l_trustanchor(lua_State *L)
 	lua_pushboolean(L, true);
 	return 1;
 }
+
+/** @internal for l_hints_root_file */
+static void roothints_add(zs_scanner_t *zs)
+{
+	struct kr_zonecut *hints = zs->process.data;
+	if (!hints) {
+		return;
+	}
+	if (zs->r_type == KNOT_RRTYPE_A || zs->r_type == KNOT_RRTYPE_AAAA) {
+		knot_rdata_t rdata[RDATA_ARR_MAX];
+		knot_rdata_init(rdata, zs->r_data_length, zs->r_data, zs->r_ttl);
+		kr_zonecut_add(hints, zs->r_owner, rdata);
+	}
+}
+
+/** Load root hints from zonefile. */
+static int l_hint_root_file(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_context *ctx = &engine->resolver;
+	const char *file = lua_tostring(L, 1);
+
+	const char *err = lua_hint_root_file(ctx, file);
+	if (err) {
+		lua_pushstring(L, err);
+		lua_error(L);
+	} else {
+		lua_pushboolean(L, true);
+		return 1;
+	}
+}
+
+const char* lua_hint_root_file(struct kr_context *ctx, const char *file)
+{
+	if (!file) {
+		file = ROOTHINTS;
+	}
+	if (strlen(file) == 0 || !ctx) {
+		return "invalid parameters";
+	}
+	struct kr_zonecut *root_hints = &ctx->root_hints;
+
+	zs_scanner_t zs;
+	if (zs_init(&zs, ".", 1, 0) != 0) {
+		return "not enough memory";
+	}
+	if (zs_set_input_file(&zs, file) != 0) {
+		return "failed to open root hints file";
+	}
+
+	kr_zonecut_set(root_hints, (const uint8_t *)"");
+	zs_set_processing(&zs, roothints_add, NULL, root_hints);
+	zs_parse_all(&zs);
+	return NULL;
+}
+
 /** Unpack JSON object to table */
 static void l_unpack_json(lua_State *L, JsonNode *table)
 {
@@ -575,6 +631,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_trustanchor);
 	lua_setglobal(engine->L, "trustanchor");
+	lua_pushcfunction(engine->L, l_hint_root_file);
+	lua_setglobal(engine->L, "_hint_root_file");
 	lua_pushliteral(engine->L, libknot_SONAME);
 	lua_setglobal(engine->L, "libknot_SONAME");
 	lua_pushliteral(engine->L, libzscanner_SONAME);
