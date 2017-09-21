@@ -792,7 +792,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 	/* Calculate total resolution time from the time the query was generated. */
 	struct timeval now;
 	gettimeofday(&now, NULL);
-	unsigned elapsed = time_diff(&qry->timestamp, &now);
+	long elapsed = time_diff(&qry->timestamp, &now);
 
 	/* NSs in the preference list prior to the one who responded will be penalised
 	 * with the RETRY timer interval. This is because we know they didn't respond
@@ -823,7 +823,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 			 WITH_VERBOSE {
 			 	char addr_str[INET6_ADDRSTRLEN];
 			 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-			 	VERBOSE_MSG(qry, "<= server: '%s' rtt: >=%ld ms\n", addr_str, elapsed);
+				VERBOSE_MSG(qry, "<= server: '%s' rtt: >=%ld ms\n", addr_str, elapsed);
 			 }
 		}
 		/* Subtract query start time from elapsed time */
@@ -862,7 +862,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 
 bool check_resolution_time(struct kr_query *qry, struct timeval *now)
 {
-	unsigned resolving_time = time_diff(&qry->creation_time, now);
+	long resolving_time = time_diff(&qry->creation_time, now);
 	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
 		WITH_VERBOSE {
 			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
