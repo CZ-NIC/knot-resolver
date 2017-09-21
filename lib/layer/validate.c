@@ -444,7 +444,6 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
-	VERBOSE_MSG(qry, ">< no valid RRSIGs found\n");
 	struct kr_zonecut *cut = &qry->zone_cut;
 	const knot_dname_t *cut_name_start = qry->zone_cut.name;
 	bool use_cut = true;
@@ -537,6 +536,11 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		VERBOSE_MSG(qry, ">< cut changed (new signer), needs revalidation\n");
 		ret = KR_STATE_YIELD;
 	} else if (kr_rank_test(invalid_entry->rank, KR_RANK_MISSING)) {
+		WITH_VERBOSE {
+			VERBOSE_MSG(qry, ">< no valid RRSIGs found for ");
+			kr_rrtype_print(invalid_entry->rr->type, "", " ");
+			kr_dname_print(invalid_entry->rr->owner, "", "\n");
+		}
 		ret = rrsig_not_found(ctx, rr);
 	} else if (!kr_rank_test(invalid_entry->rank, KR_RANK_SECURE)) {
 		qry->flags.DNSSEC_BOGUS = true;
@@ -778,6 +782,27 @@ static void check_wildcard(kr_layer_t *ctx)
 	}
 }
 
+/** Just for wildcard_adjust_to_wire() */
+static bool rr_is_for_wildcard(const ranked_rr_array_entry_t *entry)
+{
+	switch (kr_rrset_type_maysig(entry->rr)) {
+	case KNOT_RRTYPE_NSEC:
+	case KNOT_RRTYPE_NSEC3:
+		return true;
+	default:
+		return false;
+	}
+}
+/** In case of wildcard expansion, mark required authority RRs by to_wire. */
+static int wildcard_adjust_to_wire(struct kr_request *req, const struct kr_query *qry)
+{
+	if (!qry->parent && qry->flags.DNSSEC_WEXPAND) {
+		return kr_ranked_rrarray_set_wire(&req->auth_selected, true,
+				qry->uid, true, &rr_is_for_wildcard);
+	}
+	return kr_ok();
+}
+
 static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	int ret = 0;
@@ -834,12 +859,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Pass-through if CD bit is set. */
 	if (knot_wire_get_cd(req->answer->wire)) {
 		check_wildcard(ctx);
-		/* Check if wildcard expansion happens.
-		 * If yes, copy authority. */
-		if ((qry->parent == NULL) &&
-		    (qry->flags.DNSSEC_WEXPAND)) {
-			kr_ranked_rrarray_set_wire(&req->auth_selected, true, qry->uid, true);
-		}
+		wildcard_adjust_to_wire(req, qry);
 		rank_records(ctx, KR_RANK_OMIT);
 		return ctx->state;
 	}
@@ -980,11 +1000,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	/* Check if wildcard expansion detected for final query.
-	 * If yes, copy authority. */
-	if ((qry->parent == NULL) && (qry->flags.DNSSEC_WEXPAND)) {
-		kr_ranked_rrarray_set_wire(&req->auth_selected, true, qry->uid, true);
-	}
+	wildcard_adjust_to_wire(req, qry);
 
 	/* Check and update current delegation point security status. */
 	ret = update_delegation(req, qry, pkt, has_nsec3);

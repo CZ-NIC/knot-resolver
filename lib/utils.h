@@ -252,10 +252,12 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
  * @param to_wire Records must be\must not be recorded in final answer.
  * @param qry_uid Query uid.
  * @param check_dups When to_wire is true, try to avoid duplicate RRSets.
+ * @param extraCheck optional function checking whether to consider the record
  * @return 0 or an error
  */
 int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
-			       uint32_t qry_uid, bool check_dups);
+			       uint32_t qry_uid, bool check_dups,
+			       bool (*extraCheck)(const ranked_rr_array_entry_t *));
 
 void kr_rrset_print(const knot_rrset_t *rr, const char *prefix);
 void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *postfix);
