@@ -320,7 +320,24 @@ static int l_trustanchor(lua_State *L)
 	return 1;
 }
 
-/** @internal for l_hints_root_file */
+/** Load root hints from zonefile. */
+static int l_hint_root_file(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_context *ctx = &engine->resolver;
+	const char *file = lua_tostring(L, 1);
+
+	const char *err = engine_hint_root_file(ctx, file);
+	if (err) {
+		lua_pushstring(L, err);
+		lua_error(L);
+	} else {
+		lua_pushboolean(L, true);
+		return 1;
+	}
+}
+
+/** @internal for engine_hint_root_file */
 static void roothints_add(zs_scanner_t *zs)
 {
 	struct kr_zonecut *hints = zs->process.data;
@@ -333,25 +350,7 @@ static void roothints_add(zs_scanner_t *zs)
 		kr_zonecut_add(hints, zs->r_owner, rdata);
 	}
 }
-
-/** Load root hints from zonefile. */
-static int l_hint_root_file(lua_State *L)
-{
-	struct engine *engine = engine_luaget(L);
-	struct kr_context *ctx = &engine->resolver;
-	const char *file = lua_tostring(L, 1);
-
-	const char *err = lua_hint_root_file(ctx, file);
-	if (err) {
-		lua_pushstring(L, err);
-		lua_error(L);
-	} else {
-		lua_pushboolean(L, true);
-		return 1;
-	}
-}
-
-const char* lua_hint_root_file(struct kr_context *ctx, const char *file)
+const char* engine_hint_root_file(struct kr_context *ctx, const char *file)
 {
 	if (!file) {
 		file = ROOTHINTS;
