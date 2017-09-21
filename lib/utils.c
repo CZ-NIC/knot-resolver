@@ -586,11 +586,15 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 }
 
 int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
-			       uint32_t qry_uid, bool check_dups)
+			       uint32_t qry_uid, bool check_dups,
+			       bool (*extraCheck)(const ranked_rr_array_entry_t *))
 {
 	for (size_t i = 0; i < array->len; ++i) {
 		ranked_rr_array_entry_t *entry = array->at[i];
 		if (entry->qry_uid != qry_uid) {
+			continue;
+		}
+		if (extraCheck != NULL && !extraCheck(entry)) {
 			continue;
 		}
 		entry->to_wire = to_wire;

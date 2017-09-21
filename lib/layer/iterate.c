@@ -739,7 +739,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	return KR_STATE_DONE;
 }
 
-/** @internal like process_answer() but for the forwarding mode. */
+/** @internal like process_answer() but for the STUB mode. */
 static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *query = req->current_query;
