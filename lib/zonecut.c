@@ -255,8 +255,6 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 	if (!ctx || !cut) {
 		return kr_error(EINVAL);
 	}
-	/* @warning _NOT_ thread-safe */
-	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
 
 	update_cut_name(cut, U8(""));
 	map_walk(&cut->nsset, free_addr_set, cut->pool);

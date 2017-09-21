@@ -106,5 +106,5 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir);
  *
  * @return error message or NULL (statically allocated)
  */
-const char* lua_hint_root_file(struct kr_context *ctx, const char *file);
+const char* engine_hint_root_file(struct kr_context *ctx, const char *file);
 
