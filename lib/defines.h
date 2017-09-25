@@ -46,7 +46,7 @@ typedef unsigned int uint;
  */
 #define kr_ok() 0
 /* Mark as cold to mark all branches as unlikely. */
-static inline int __attribute__((__cold__)) kr_error(int x) {
+static inline int KR_COLD kr_error(int x) {
 	return -abs(x);
 }
 #define kr_strerror(x) strerror(abs(x))
