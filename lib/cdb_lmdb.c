@@ -69,6 +69,17 @@ static int lmdb_error(int error)
 	}
 }
 
+/** Conversion between knot and lmdb structs for values. */
+static inline knot_db_val_t val_mdb2knot(MDB_val v)
+{
+	return (knot_db_val_t){ .len = v.mv_size, .data = v.mv_data };
+}
+static inline MDB_val val_knot2mdb(knot_db_val_t v)
+{
+	return (MDB_val){ .mv_size = v.len, .mv_data = v.data };
+}
+
+
 /*! \brief Set the environment map size.
  * \note This also sets the maximum database size, see \fn mdb_env_set_mapsize
  */
@@ -424,15 +435,14 @@ static int cdb_readv(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 
 	for (int i = 0; i < maxcount; ++i) {
 		/* Convert key structs */
-		MDB_val _key = { .mv_size = key[i].len, .mv_data = key[i].data };
-		MDB_val _val = { .mv_size = val[i].len, .mv_data = val[i].data };
+		MDB_val _key = val_knot2mdb(key[i]);
+		MDB_val _val = val_knot2mdb(val[i]);
 		ret = mdb_get(txn, env->dbi, &_key, &_val);
 		if (ret != MDB_SUCCESS) {
 			return lmdb_error(ret);
 		}
 		/* Update the result. */
-		val[i].data = _val.mv_data;
-		val[i].len = _val.mv_size;
+		val[i] = val_mdb2knot(_val);
 	}
 	return kr_ok();
 }
@@ -440,8 +450,8 @@ static int cdb_readv(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 static int cdb_write(struct lmdb_env *env, MDB_txn **txn, knot_db_val_t *key, knot_db_val_t *val, unsigned flags)
 {
 	/* Convert key structs and write */
-	MDB_val _key = { key->len, key->data };
-	MDB_val _val = { val->len, val->data };
+	MDB_val _key = val_knot2mdb(*key);
+	MDB_val _val = val_knot2mdb(*val);
 	int ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
 
 	/* Try to recover from doing too much writing in a single transaction. */
@@ -493,8 +503,8 @@ static int cdb_remove(knot_db_t *db, knot_db_val_t *key, int maxcount)
 	int ret = txn_get(env, &txn, false);
 
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
-		MDB_val _key = { key[i].len, key[i].data };
-		MDB_val val = { 0, NULL };
+		MDB_val _key = val_knot2mdb(key[i]);
+		MDB_val val = { };
 		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, &val));
 	}
 
@@ -522,7 +532,8 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 		return lmdb_error(ret);
 	}
 
-	MDB_val cur_key = { key->len, key->data }, cur_val = { 0, NULL };
+	MDB_val cur_key = val_knot2mdb(*key);
+	MDB_val cur_val = { };
 	ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_SET_RANGE);
 	if (ret != MDB_SUCCESS) {
 		mdb_cursor_close(cur);
@@ -537,8 +548,7 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 		}
 		/* Add to result set */
 		if (results < maxcount) {
-			val[results].len = cur_key.mv_size;
-			val[results].data = cur_key.mv_data;
+			val[results] = val_mdb2knot(cur_key);
 			++results;
 		} else {
 			break;
