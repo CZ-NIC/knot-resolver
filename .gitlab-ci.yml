@@ -32,11 +32,6 @@ test:linux:amd64:
 deckard:linux:amd64:
   stage: test
   script:
-    - apt purge -y python-dnspython python3-dnspython
-    - apt update
-    - apt install -y python3-jinja2 python3-pip python3-yaml libffi-dev libaugeas-dev
-    - pip3 install --upgrade pip
-    - pip3 install --user dnspython python-augeas
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
   dependencies:
     - build:linux:amd64
