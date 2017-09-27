@@ -42,10 +42,6 @@ primary_domain = 'c'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-# If true, SmartyPants will be used to convert quotes and dashes to
-# typographically correct entities.
-html_use_smartypants = True
-
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'apidoc'
 
