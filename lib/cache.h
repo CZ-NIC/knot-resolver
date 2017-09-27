@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <libknot/consts.h>
 #include <libknot/rrset.h>
 #include "lib/cdb.h"
 #include "lib/defines.h"
@@ -23,6 +24,9 @@
 
 /** When knot_pkt is passed from cache without ->wire, this is the ->size. */
 static const size_t PKT_SIZE_NOWIRE = -1;
+
+// TODO
+#define KR_CACHE_KEY_MAXLEN (KNOT_DNAME_MAXLEN + 100)
 
 /** Cache entry tag */
 enum kr_cache_tag {

@@ -47,8 +47,9 @@ struct lmdb_env
 	 * - non-NULL .rw is always active
 	 */
 	struct {
-		bool ro_active;
+		bool ro_active, ro_curs_active;
 		MDB_txn *ro, *rw;
+		MDB_cursor *ro_curs;
 	} txn;
 };
 
@@ -151,6 +152,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 		if (env->txn.ro && env->txn.ro_active) {
 			mdb_txn_reset(env->txn.ro);
 			env->txn.ro_active = false;
+			env->txn.ro_curs_active = false;
 		}
 		int ret = txn_get_noresize(env, 0/*RW*/, &env->txn.rw);
 		if (ret == MDB_SUCCESS) {
@@ -190,8 +192,51 @@ static int cdb_sync(knot_db_t *db)
 	} else if (env->txn.ro && env->txn.ro_active) {
 		mdb_txn_reset(env->txn.ro);
 		env->txn.ro_active = false;
+		env->txn.ro_curs_active = false;
 	}
 	return ret;
+}
+
+/** Obtain a read-only cursor (and a read-only transaction). */
+static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs)
+{
+	assert(env && curs);
+	if (env->txn.ro_curs_active) {
+		goto success;
+	}
+	/* Only in a read-only txn; TODO: it's a bit messy/coupled */
+	if (env->txn.rw) {
+		int ret = cdb_sync(env);
+		if (ret) return ret;
+	}
+	MDB_txn *txn = NULL;
+	int ret = txn_get(env, &txn, true);
+	if (ret) return ret;
+
+	if (env->txn.ro_curs) {
+		ret = mdb_cursor_renew(txn, env->txn.ro_curs);
+	} else {
+		ret = mdb_cursor_open(txn, env->dbi, &env->txn.ro_curs);
+	}
+	if (ret) return ret;
+success:
+	assert(env->txn.ro_curs_active && env->txn.ro && env->txn.ro_active
+		&& !env->txn.rw);
+	*curs = env->txn.ro_curs;
+	assert(*curs);
+	return kr_ok();
+}
+
+static void free_txn_ro(struct lmdb_env *env)
+{
+	if (env->txn.ro) {
+		mdb_txn_abort(env->txn.ro);
+		env->txn.ro = NULL;
+	}
+	if (env->txn.ro_curs) {
+		mdb_cursor_close(env->txn.ro_curs);
+		env->txn.ro_curs = NULL;
+	}
 }
 
 /*! \brief Close the database. */
@@ -201,10 +246,7 @@ static void cdb_close_env(struct lmdb_env *env)
 
 	/* Get rid of any transactions. */
 	cdb_sync(env);
-	if (env->txn.ro) {
-		mdb_txn_abort(env->txn.ro);
-		env->txn.ro = NULL;
-	}
+	free_txn_ro(env);
 
 	mdb_env_sync(env->env, 1);
 	mdb_dbi_close(env->env, env->dbi);
@@ -359,10 +401,7 @@ static int cdb_clear(knot_db_t *db)
 
 	/* We are about to switch to a different file, so end all txns, to be sure. */
 	(void) cdb_sync(db);
-	if (env->txn.ro) {
-		mdb_txn_abort(env->txn.ro);
-		env->txn.ro = NULL;
-	}
+	free_txn_ro(db);
 
 	/* Since there is no guarantee that there will be free
 	 * pages to hold whole dirtied db for transaction-safe clear,
@@ -612,13 +651,43 @@ static int cdb_prune(knot_db_t *db, int limit)
 	return ret < 0 ? ret : results;
 }
 
+static int cdb_read_leq(knot_db_t *env, knot_db_val_t *key, knot_db_val_t *val)
+{
+	assert(env && key && key->data && val);
+	MDB_cursor *curs = NULL;
+	int ret = txn_curs_get(env, &curs);
+	if (ret) return ret;
+
+	MDB_val key2_m = val_knot2mdb(*key);
+	MDB_val val2_m = { };
+	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_SET_RANGE);
+	if (ret) return lmdb_error(ret);
+	/* test for equality //:unlikely */
+	if (key2_m.mv_size == key->len
+	    && memcmp(key2_m.mv_data, key->data, key->len) == 0) {
+		ret = 0; /* equality */
+		goto success;
+	}
+	/* we must be greater than key; do one step to smaller */
+	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_PREV);
+	if (ret) return lmdb_error(ret);
+	ret = 1;
+success:
+	/* finalize the output */
+	*key = val_mdb2knot(key2_m);
+	*val = val_mdb2knot(val2_m);
+	return ret;
+}
+
+
 const struct kr_cdb_api *kr_cdb_lmdb(void)
 {
 	static const struct kr_cdb_api api = {
 		"lmdb",
 		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_sync,
 		cdb_readv, cdb_writev, cdb_remove,
-		cdb_match, cdb_prune
+		cdb_match, cdb_prune,
+		cdb_read_leq
 	};
 
 	return &api;

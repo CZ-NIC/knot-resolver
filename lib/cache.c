@@ -481,55 +481,151 @@ int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_
 
 #include "lib/rplan.h"
 
+
+/** Cache entry header */
+struct entry_h {
+	uint32_t time;	/**< The time of inception. */
+	uint32_t ttl;	/**< TTL at inception moment. */
+	uint8_t  rank;	/**< See enum kr_rank */
+	uint8_t  flags;	/**< TODO */
+	uint8_t data[];
+};
+
+
+struct key {
+	const knot_dname_t *dname; /**< corresponding dname (points within qry->sname) */
+	uint8_t name_len; /**< current length of the name in buf */
+	uint8_t buf[KR_CACHE_KEY_MAXLEN];
+};
+
+static int closest_NS(struct kr_cache *cache, struct key *k);
+
+/** TODO */
+static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
+{
+	k->buf[k->name_len + 1] = 0; /* make sure different names can never match */
+	k->buf[k->name_len + 2] = 'E'; /* tag for exact name+type matches */
+	memcpy(k->buf + k->name_len + 3, &ktype, 2);
+	/* key == dname_lf + '0' + 'E' + RRTYPE */
+	return (knot_db_val_t){ k->buf + 1, k->name_len + 4 };
+}
+
 int read_lmdb(struct kr_cache *cache, const struct kr_query *qry) {
-	uint8_t keybuf[KNOT_DNAME_MAXLEN + 100]; // TODO
-	int ret = knot_dname_lf(keybuf, qry->sname, NULL);
+	struct key k_storage, *k = &k_storage;
+	int ret = knot_dname_lf(k->buf, qry->sname, NULL);
 	if (ret) {
 		return kr_error(ret);
 	}
-	uint8_t kname_len = keybuf[0]; /**< current length of the name in keybuf */
-	keybuf[kname_len + 1] = 0; /* make sure different names can never match */
+	k->name_len = k->buf[0];
 
 	/** 1. check if the name exists in the cache, not considering wildcards
-	 *  1a. exact name+type match
+	 *  1a. exact name+type match (can be negative answer in insecure zones)
 	 */
 	uint16_t ktype = qry->stype;
 	if (ktype == KNOT_RRTYPE_CNAME || ktype == KNOT_RRTYPE_DNAME) {
 		ktype = KNOT_RRTYPE_NS;
 	}
-	memcpy(keybuf + kname_len + 2, &ktype, 2);
-	/* dname_lf + 0 + RRTYPE */
-	knot_db_val_t key = { keybuf + 1, kname_len + 3 };
-	knot_db_val_t val = { NULL, 0 };
+	knot_db_val_t key = key_exact_type(k, ktype);
+	knot_db_val_t val = { };
 	ret = cache_op(cache, read, &key, &val, 1);
 	switch (ret) {
-	case 0:
+	case 0: {
+		if (val.len < sizeof(struct entry_h)) {
+			assert(false); // TODO: correct length, recovery, etc.
+			return kr_error(EILSEQ);
+		}
+		const struct entry_h *eh = val.data;
 		// FIXME: check time and rank (and type if stype == xNAME),
 		// return result if OK, otherwise fall through to break;
+		// insecure zones might have a negative-answer packet here
+		}
 	case (-abs(ENOENT)):
 		break;
 	default:
 		return kr_error(ret);
 	}
 
-	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank).
-	 * 	We store xNAME at NS type to lower the number of searches.
-	 * 	CNAME is only considered for equal name, of course.
-	 * 	We also store NSEC* parameters at NS type; probably the latest two will be kept.
-	 */
-	const knot_dname_t *cut = qry->sname;
-	bool exact_match = true;
-	do {
-		ktype = KNOT_RRTYPE_NS;
-		memcpy(keybuf + kname_len + 2, &ktype, 2);
+	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
+	k->dname = qry->sname;
+	ret = closest_NS(cache, k);
+	if (ret != kr_ok()) {
+		return ret;
+	}
 
-		key = { keybuf + 1, kname_len + 3 };
-		val = { NULL, 0 };
-		ret = cache_op(cache, read, &key, &val, 1);
+	/* Note: up to here we can run on any cache backend,
+	 * without touching the code. */
+
+	/* FIXME:
+  	 *	- Update the notion of current zone cut accordingly.
+	 *	- find NSEC* parameters
+	 *	- insecure zone -> return (nothing more to find)
+	 */
+
+	/** 2. closest (provable) encloser.
+	 * iterate over all NSEC* chain parameters
+	 */
+	while (true) { //for (int i_nsecp = 0; i
+		int nsec = 1;
+		switch (nsec) {
+		case 1: {
+ 			/* find a previous-or-equal name+NSEC in cache covering
+			 * the QNAME, checking TTL etc. */
+			
+			//nsec_leq()
+			/* we basically need dname_lf with two bytes added
+			 * on a correct place within the name (the cut) */
+			int ret = knot_dname_lf(k->buf, qry->sname, NULL);
+			if (ret) {
+				return kr_error(ret);
+			}
+			uint8_t *begin = k->buf + k->name_len + 1; /* one byte after zone's zero */
+			uint8_t *end = k->buf + k->buf[0] - 1; /* we don't need final zero */
+			memmove(begin + 2, begin, end - begin);
+			begin[0] = 0;
+			begin[1] = '1'; /* tag for NSEC1 */
+			knot_db_val_t key = { k->buf + 1, k->buf[0] + 1 };
+			knot_db_val_t val = { };
+			/* key == zone's dname_lf + 0 + '1' + dname_lf of the name
+			 * within the zone without the final 0 */
+			ret = cache_op(cache, read_leq, &key, &val);
+			// FIXME: check that it covers the name
+			// 	- check validity, etc.
+
+			break;
+			}
+		case 3:
+			//FIXME
+			break;
+		default:
+			assert(false);
+		}
+	}
+	
+	return kr_ok();
+}
+
+
+
+
+/** Find the longest prefix NS/xNAME (with OK time+rank).
+ * We store xNAME at NS type to lower the number of searches.
+ * CNAME is only considered for equal name, of course.
+ * We also store NSEC* parameters at NS type; probably the latest two will be kept.
+ */
+static int closest_NS(struct kr_cache *cache, struct key *k)
+{
+	bool exact_match = true;
+	// LATER(optim): if stype is NS, we check the same value again
+	do {
+		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
+		knot_db_val_t val = { };
+		int ret = cache_op(cache, read, &key, &val, 1);
 		switch (ret) {
-		case 0:
+		case 0: {
 			// FIXME: check time and rank, and more complex stuff
-			ktype = exact_match ? KNOT_RRTYPE_CNAME : KNOT_RRTYPE_DNAME;
+			uint16_t ktype = exact_match ? KNOT_RRTYPE_CNAME : KNOT_RRTYPE_DNAME;
+			// return kr_ok();
+			}
 		case (-abs(ENOENT)):
 			break;
 		default:
@@ -538,19 +634,14 @@ int read_lmdb(struct kr_cache *cache, const struct kr_query *qry) {
 
 		/* remove one more label */
 		exact_match = false;
-		if (cut[0] == 0) {
+		if (k->dname[0] == 0) {
 			// FIXME: missing root NS
 		}
-		kname_len -= (cut[0] + 1);
-		cut += (cut[0] + 1);
-		keybuf[kname_len + 1] = 0
+		k->name_len -= (k->dname[0] + 1);
+		k->dname += (k->dname[0] + 1);
+		k->buf[k->name_len + 1] = 0;
 	} while (true);
-cut_found:
-
-	return kr_ok();
 }
-
-
 
 
 
