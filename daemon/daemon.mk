@@ -49,7 +49,7 @@ endif
 $(eval $(call make_sbin,kresd,daemon,yes))
 
 # Targets
-date := $(shell date +%F -r NEWS)
+date := $(shell date -r NEWS +%F)
 daemon: $(kresd) $(kresd_DIST)
 daemon-install: kresd-install bindings-install
 ifneq ($(SED),)
