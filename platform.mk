@@ -9,7 +9,6 @@ GO := go
 CAT := cat
 SED := sed
 LIBEXT := .so
-MODEXT := $(LIBEXT)
 AREXT  := .a
 LIBTYPE := shared
 MODTYPE := shared
@@ -130,7 +129,6 @@ make_bin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(BINDIR),$(3))
 make_sbin = $(call make_target,$(1),$(2),$(BINEXT),$(BINFLAGS),$(SBINDIR),$(3))
 make_lib = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(LIBDIR),$(3),$(4))
 make_module = $(call make_target,$(1),$(2),$(LIBEXT),-$(LIBTYPE),$(MODULEDIR),$(3))
-make_shared = $(call make_target,$(1),$(2),$(MODEXT),-$(MODTYPE),$(LIBDIR),$(3))
 make_static = $(call make_target,$(1),$(2),$(AREXT),-$(ARTYPE),$(LIBDIR),$(3))
 
 # Find library (pkg-config)

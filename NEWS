@@ -1,3 +1,11 @@
+Knot Resolver 1.4.1 (2017-10-xx)
+================================
+
+Bugfixes
+--------
+- fix loading modules on Darwin
+
+
 Knot Resolver 1.4.0 (2017-09-22)
 ================================
 
