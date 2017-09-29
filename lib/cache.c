@@ -479,16 +479,18 @@ int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_
 	return kr_cache_insert(cache, KR_CACHE_SIG, rr->owner, covered, &header, data);
 }
 
+#include "lib/dnssec/ta.h"
+#include "lib/resolve.h"
 #include "lib/rplan.h"
 
 
 /** Cache entry header */
 struct entry_h {
 	uint32_t time;	/**< The time of inception. */
-	uint32_t ttl;	/**< TTL at inception moment. */
+	uint32_t ttl;	/**< TTL at inception moment.  Assuming it fits into int32_t ATM. */
 	uint8_t  rank;	/**< See enum kr_rank */
-	uint8_t  flags;	/**< TODO */
-	uint8_t data[];
+	bool is_negative : 1;	/**< TODO */
+	uint8_t  data[];
 };
 
 
@@ -499,6 +501,7 @@ struct key {
 };
 
 static int closest_NS(struct kr_cache *cache, struct key *k);
+static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry);
 
 /** TODO */
 static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
@@ -510,13 +513,43 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
 	return (knot_db_val_t){ k->buf + 1, k->name_len + 4 };
 }
 
-int read_lmdb(struct kr_cache *cache, const struct kr_query *qry) {
+
+
+
+static int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
+{
+	int32_t diff = current_time - entry->time;
+	if (diff < 0) {
+		/* We may have obtained the record *after* the request started. */
+		diff = 0;
+	}
+	return entry->ttl - diff;
+}
+
+/** Record is expiring if it has less than 1% TTL (or less than 5s) */
+static bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
+{
+	int64_t nttl = new_ttl; /* avoid potential over/under-flow */
+	return 100 * (nttl - 5) < orig_ttl;
+}
+
+
+int read_lmdb(struct kr_request *req, struct kr_query *qry) {
+	/* TODO: output
+	 *	- list of records to materialize?
+	 * */
+	bool expiring = false;
+
+
+	struct kr_cache *cache = &req->ctx->cache;
 	struct key k_storage, *k = &k_storage;
 	int ret = knot_dname_lf(k->buf, qry->sname, NULL);
 	if (ret) {
 		return kr_error(ret);
 	}
 	k->name_len = k->buf[0];
+
+	const uint8_t lowest_rank = get_lowest_rank(req, qry);
 
 	/** 1. check if the name exists in the cache, not considering wildcards
 	 *  1a. exact name+type match (can be negative answer in insecure zones)
@@ -535,15 +568,32 @@ int read_lmdb(struct kr_cache *cache, const struct kr_query *qry) {
 			return kr_error(EILSEQ);
 		}
 		const struct entry_h *eh = val.data;
-		// FIXME: check time and rank (and type if stype == xNAME),
-		// return result if OK, otherwise fall through to break;
-		// insecure zones might have a negative-answer packet here
+
+		int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+		if (new_ttl < 0 || eh->rank < lowest_rank) {
+			/* Positive record with stale TTL or bad rank.
+			 * It's unlikely that we find a negative one,
+			 * so we might theoretically return instead. */
+			break;
+		}
+		expiring = expiring || is_expiring(eh->ttl, new_ttl);
+
+		if (eh->is_negative) {
+			// insecure zones might have a negative-answer packet here
+		}
+		if (ktype == KNOT_RRTYPE_NS) {
+			// FIXME: check type
+			// if (wrong) break; or pehaps optimize the zone cut search
+		}
+
 		}
 	case (-abs(ENOENT)):
 		break;
 	default:
 		return kr_error(ret);
 	}
+
+	expiring = false; /* in case we dismissed the record at a later stage */
 
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->dname = qry->sname;
@@ -588,22 +638,33 @@ int read_lmdb(struct kr_cache *cache, const struct kr_query *qry) {
 			/* key == zone's dname_lf + 0 + '1' + dname_lf of the name
 			 * within the zone without the final 0 */
 			ret = cache_op(cache, read_leq, &key, &val);
+			const struct entry_h *eh = val.data;
 			// FIXME: check that it covers the name
-			// 	- check validity, etc.
+
+			int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+			if (new_ttl < 0 || eh->rank < lowest_rank) {
+				break; // continue?
+			}
+			expiring = expiring || is_expiring(eh->ttl, new_ttl);
 
 			break;
 			}
 		case 3:
-			//FIXME
+			//FIXME NSEC3
 			break;
 		default:
 			assert(false);
 		}
 	}
+
+	/** 3. wildcard checks.  FIXME
+	 */
+
+
+	qry->flags.EXPIRING = expiring;
 	
 	return kr_ok();
 }
-
 
 
 
@@ -643,6 +704,33 @@ static int closest_NS(struct kr_cache *cache, struct key *k)
 	} while (true);
 }
 
+
+static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry)
+{
+	const bool allow_unverified = knot_wire_get_cd(req->answer->wire)
+					|| qry->flags.STUB;
+	/* TODO: move rank handling into the iterator (DNSSEC_* flags)? */
+	uint8_t rank  = 0;
+	uint8_t lowest_rank = KR_RANK_INITIAL | KR_RANK_AUTH;
+	if (qry->flags.NONAUTH) {
+		lowest_rank = KR_RANK_INITIAL;
+		/* Note: there's little sense in validation status for non-auth records.
+		 * In case of using NONAUTH to get NS IPs, knowing that you ask correct
+		 * IP doesn't matter much for security; it matters whether you can
+		 * validate the answers from the NS.
+		 */
+	} else if (!allow_unverified) {
+				/* ^^ in stub mode we don't trust RRs anyway */
+		/* Records not present under any TA don't have their security
+		 * verified at all, so we also accept low ranks in that case. */
+		const bool ta_covers = kr_ta_covers_qry(req->ctx, qry->sname, qry->stype);
+		/* ^ TODO: performance?  TODO: stype - call sites */
+		if (ta_covers) {
+			kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
+		}
+	}
+	return lowest_rank;
+}
 
 
 
