@@ -26,6 +26,7 @@
 #include <libknot/packet/pkt.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/rrsig.h>
+#include <lua.h>
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
 #include "lib/defines.h"
@@ -288,3 +289,14 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 		type = knot_rrsig_type_covered(&rr->rrs, 0);
 	return type;
 }
+
+/** Printf onto the lua stack, avoiding additional copy (thin wrapper). */
+static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	const char *ret = lua_pushvfstring(L, fmt, args);
+	va_end(args);
+	return ret;
+}
+

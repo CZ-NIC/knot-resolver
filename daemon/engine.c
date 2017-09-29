@@ -329,7 +329,10 @@ static int l_hint_root_file(lua_State *L)
 
 	const char *err = engine_hint_root_file(ctx, file);
 	if (err) {
-		lua_pushstring(L, err);
+		if (!file) {
+			file = ROOTHINTS;
+		}
+		lua_push_printf(L, "error when opening '%s': %s", file, err);
 		lua_error(L);
 	} else {
 		lua_pushboolean(L, true);
