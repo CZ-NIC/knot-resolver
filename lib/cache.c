@@ -33,6 +33,8 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "cach",  fmt)
+
 /* Cache version */
 #define KEY_VERSION "V\x04"
 /* Key size */
@@ -484,6 +486,122 @@ int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_
 #include "lib/rplan.h"
 
 
+
+
+
+
+/* TODO: move this and pkt_* functions into a separate c-file. */
+/** Materialize a knot_rdataset_t from cache with given TTL.
+ * Return the number of bytes consumed or an error code.
+ */
+static int rdataset_materialize(knot_rdataset_t *rds, const uint8_t *data,
+		const uint8_t *data_bound, uint32_t ttl, knot_mm_t *pool)
+{
+	assert(rds && data && !rds->data);
+	const uint8_t *d = data; /* iterates over the cache data */
+	rds->rr_count = *d++;
+	/* First sum up the sizes for wire format length. */
+	size_t rdata_len_sum = 0;
+	for (int i = 0; i < rds->rr_count; ++i) {
+		if (d + 2 > data_bound) {
+			return kr_error(EILSEQ);
+		}
+		uint16_t len;
+		memcpy(&len, d, sizeof(len));
+		d += 2 + len;
+		rdata_len_sum += len;
+	}
+	/* Each item in knot_rdataset_t needs TTL (4B) + rdlength (2B) + rdata */
+	rds->data = mm_alloc(pool, rdata_len_sum + ((size_t)rds->rr_count) * (4 + 2));
+	if (!rds->data) {
+		return kr_error(ENOMEM);
+	}
+	/* Construct the output, one "RR" at a time. */
+	d = data + 1;
+	knot_rdata_t *d_out = rds->data; /* iterates over the output being materialized */
+	for (int i = 0; i < rds->rr_count; ++i) {
+		uint16_t len;
+		memcpy(&len, d, sizeof(len));
+		knot_rdata_init(d_out, len, d, ttl);
+		d += 2 + len;
+	}
+	return d - data;
+}
+
+/**
+ */
+int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
+{
+	/* Update packet question if needed. */
+	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)
+	    || knot_pkt_qtype(pkt) != type || knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
+		int ret = kr_pkt_recycle(pkt);
+		if (ret) return kr_error(ret);
+		ret = knot_pkt_put_question(pkt, name, KNOT_CLASS_IN, type);
+		if (ret) return kr_error(ret);
+	}
+
+	pkt->parsed = pkt->size = PKT_SIZE_NOWIRE;
+	knot_wire_set_qr(pkt->wire);
+	knot_wire_set_aa(pkt->wire);
+	return kr_ok();
+}
+
+/** Reserve space for additional `count` RRsets.
+ * \note pkt->rr_info gets correct length but is always zeroed
+ */
+int pkt_alloc_space(knot_pkt_t *pkt, int count)
+{
+	size_t allocd_orig = pkt->rrset_allocd;
+	if (pkt->rrset_count + count <= allocd_orig) {
+		return kr_ok();
+	}
+	/* A simple growth strategy, amortized O(count). */
+	pkt->rrset_allocd = MAX(
+			pkt->rrset_count + count,
+			pkt->rrset_count + allocd_orig);
+
+	pkt->rr = mm_realloc(&pkt->mm, pkt->rr,
+				sizeof(pkt->rr[0]) * pkt->rrset_allocd,
+				sizeof(pkt->rr[0]) * allocd_orig);
+	if (!pkt->rr) {
+		return kr_error(ENOMEM);
+	}
+	/* Allocate pkt->rr_info to be certain, but just leave it zeroed. */
+	mm_free(&pkt->mm, pkt->rr_info);
+	pkt->rr_info = mm_alloc(&pkt->mm, sizeof(pkt->rr_info[0]) * pkt->rrset_allocd);
+	if (!pkt->rr_info) {
+		return kr_error(ENOMEM);
+	}
+	memset(pkt->rr_info, 0, sizeof(pkt->rr_info[0]) * pkt->rrset_allocd);
+	return kr_ok();
+}
+
+/** Append an RRset into the current section (*shallow* copy), with given rank. */
+int pkt_append(knot_pkt_t *pkt, const knot_rrset_t *rrset, uint8_t rank)
+{
+	/* allocate space, to be sure */
+	int ret = pkt_alloc_space(pkt, 1);
+	if (ret) return kr_error(ret);
+	/* allocate rank */
+	uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
+	if (!rr_rank) return kr_error(ENOMEM);
+	*rr_rank = rank;
+	/* append the RR array */
+	pkt->rr[pkt->rrset_count] = *rrset;
+	pkt->rr[pkt->rrset_count].additional = rr_rank;
+	++pkt->rrset_count;
+	++(pkt->sections[pkt->current].count);
+	return kr_ok();
+}
+
+/* end of TODO */
+
+
+
+
+
+
 /** Cache entry header */
 struct entry_h {
 	uint32_t time;	/**< The time of inception. */
@@ -500,8 +618,15 @@ struct key {
 	uint8_t buf[KR_CACHE_KEY_MAXLEN];
 };
 
-static int closest_NS(struct kr_cache *cache, struct key *k);
+
+/* forwards for larger chunks of code */
+
 static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry);
+static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
+			   uint8_t lowest_rank);
+static int closest_NS(struct kr_cache *cache, struct key *k);
+
+
 
 /** TODO */
 static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
@@ -509,12 +634,9 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
 	k->buf[k->name_len + 1] = 0; /* make sure different names can never match */
 	k->buf[k->name_len + 2] = 'E'; /* tag for exact name+type matches */
 	memcpy(k->buf + k->name_len + 3, &ktype, 2);
-	/* key == dname_lf + '0' + 'E' + RRTYPE */
+	/* key == dname_lf + '\0' + 'E' + RRTYPE */
 	return (knot_db_val_t){ k->buf + 1, k->name_len + 4 };
 }
-
-
-
 
 static int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
 {
@@ -534,12 +656,16 @@ static bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 }
 
 
-int read_lmdb(struct kr_request *req, struct kr_query *qry) {
-	/* TODO: output
-	 *	- list of records to materialize?
-	 * */
-	bool expiring = false;
 
+/* function for .produce phase */
+int read_lmdb(kr_layer_t *ctx, knot_pkt_t *pkt)
+{
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || (qry->flags.NO_CACHE)
+	    || qry->sclass != KNOT_CLASS_IN) {
+		return ctx->state; /* Already resolved/failed or already tried, etc. */
+	}
 
 	struct kr_cache *cache = &req->ctx->cache;
 	struct key k_storage, *k = &k_storage;
@@ -550,8 +676,9 @@ int read_lmdb(struct kr_request *req, struct kr_query *qry) {
 	k->name_len = k->buf[0];
 
 	const uint8_t lowest_rank = get_lowest_rank(req, qry);
+	// FIXME: the whole approach to +cd answers
 
-	/** 1. check if the name exists in the cache, not considering wildcards
+	/** 1. find the name or the closest (available) zone, not considering wildcards
 	 *  1a. exact name+type match (can be negative answer in insecure zones)
 	 */
 	uint16_t ktype = qry->stype;
@@ -562,38 +689,23 @@ int read_lmdb(struct kr_request *req, struct kr_query *qry) {
 	knot_db_val_t val = { };
 	ret = cache_op(cache, read, &key, &val, 1);
 	switch (ret) {
-	case 0: {
-		if (val.len < sizeof(struct entry_h)) {
-			assert(false); // TODO: correct length, recovery, etc.
-			return kr_error(EILSEQ);
-		}
-		const struct entry_h *eh = val.data;
-
-		int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
-		if (new_ttl < 0 || eh->rank < lowest_rank) {
-			/* Positive record with stale TTL or bad rank.
-			 * It's unlikely that we find a negative one,
-			 * so we might theoretically return instead. */
+	case 0: /* found an entry: test conditions, materialize into pkt, etc. */
+		ret = found_exact_hit(ctx, pkt, val, lowest_rank);
+		if (ret == -abs(ENOENT)) {
 			break;
+		} else if (ret) {
+			return ctx->state;
 		}
-		expiring = expiring || is_expiring(eh->ttl, new_ttl);
-
-		if (eh->is_negative) {
-			// insecure zones might have a negative-answer packet here
-		}
-		if (ktype == KNOT_RRTYPE_NS) {
-			// FIXME: check type
-			// if (wrong) break; or pehaps optimize the zone cut search
-		}
-
-		}
+		VERBOSE_MSG(qry, "=> satisfied from cache (direct positive hit)\n");
+		return KR_STATE_DONE;
 	case (-abs(ENOENT)):
 		break;
 	default:
-		return kr_error(ret);
+		assert(false);
+		return ctx->state;
 	}
 
-	expiring = false; /* in case we dismissed the record at a later stage */
+	bool expiring = false;
 
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->dname = qry->sname;
@@ -666,6 +778,88 @@ int read_lmdb(struct kr_request *req, struct kr_query *qry) {
 	return kr_ok();
 }
 
+
+/** FIXME: description; see the single call site for now. */
+static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
+			   uint8_t lowest_rank)
+{
+#define CHECK_RET(ret) do { \
+	if ((ret) < 0) { assert(false); return kr_error((ret)); } \
+} while (false)
+
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+
+	if (val.len < sizeof(struct entry_h)) {
+		CHECK_RET(-EILSEQ);
+		// TODO: correct length, recovery, etc.
+	}
+	const struct entry_h *eh = val.data;
+
+	int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+	if (new_ttl < 0 || eh->rank < lowest_rank) {
+		/* Positive record with stale TTL or bad rank.
+		 * It's unlikely that we find a negative one,
+		 * so we might theoretically skip all the cache code. */
+		CHECK_RET(-ENOENT);
+	}
+
+	if (eh->is_negative) {
+		// insecure zones might have a negative-answer packet here
+		assert(!kr_rank_test(eh->rank, KR_RANK_SECURE));
+		//FIXME
+	}
+	/*
+	if (ktype == KNOT_RRTYPE_NS) {
+		// FIXME: check type
+		// if (wrong) break; or pehaps optimize the zone cut search
+	}
+	*/
+
+	/* All OK, so start constructing the (pseudo-)packet. */
+	int ret = pkt_renew(pkt, qry->sname, qry->stype);
+	CHECK_RET(ret);
+	/* Materialize the base RRset for the answer in (pseudo-)packet. */
+	knot_rrset_t rrset = {};
+	rrset.owner = knot_dname_copy(qry->sname, &pkt->mm); /* well, not needed, really */
+	if (!rrset.owner) CHECK_RET(-EILSEQ); /* there could be various reasons for error */
+	rrset.type = qry->stype;
+	rrset.rclass = KNOT_CLASS_IN;
+	const uint8_t *eh_data_bound = val.data + val.len;
+	ret = rdataset_materialize(&rrset.rrs, eh->data,
+				   eh_data_bound, new_ttl, &pkt->mm);
+	CHECK_RET(ret);
+	size_t data_off = ret;
+	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet. */
+	bool has_rrsigs = (eh->data + ret < eh_data_bound);
+	assert(has_rrsigs == kr_rank_test(eh->rank, KR_RANK_SECURE));
+			//^^ TODO: only _SECURE has RRSIGs ATM, right?
+	knot_rrset_t rrsigs = {};
+	if (has_rrsigs) {
+		rrsigs.owner = knot_dname_copy(qry->sname, &pkt->mm); /* well, not needed, really */
+		if (!rrsigs.owner) CHECK_RET(-EILSEQ);
+		rrsigs.type = KNOT_RRTYPE_RRSIG;
+		rrsigs.rclass = KNOT_CLASS_IN;
+		ret = rdataset_materialize(&rrsigs.rrs, eh->data + data_off,
+					   eh_data_bound, new_ttl, &pkt->mm);
+		/* sanity check: we consumed exactly all data */
+		if (ret < 0 || eh->data + data_off + ret != eh_data_bound) {
+			CHECK_RET(-EILSEQ);
+		}
+	}
+	ret = pkt_alloc_space(pkt, rrset.rrs.rr_count + rrsigs.rrs.rr_count);
+	CHECK_RET(ret);
+	ret = pkt_append(pkt, &rrset, eh->rank);
+	CHECK_RET(ret);
+	ret = pkt_append(pkt, &rrsigs, KR_RANK_INITIAL);
+	CHECK_RET(ret);
+	/* Finishing touches. */
+	qry->flags.EXPIRING = is_expiring(eh->ttl, new_ttl);
+	qry->flags.CACHED = true;
+	qry->flags.NO_MINIMIZE = true;
+	return kr_ok();
+#undef CHECK_RET
+}
 
 
 /** Find the longest prefix NS/xNAME (with OK time+rank).
