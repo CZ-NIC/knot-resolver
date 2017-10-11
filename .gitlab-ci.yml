@@ -1,4 +1,4 @@
-image: cznic/ubuntu:16.04
+image: cznic/ci-debian-kresd
 
 variables:
   DEBIAN_FRONTEND: noninteractive
