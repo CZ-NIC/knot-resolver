@@ -46,7 +46,6 @@ deckard:linux:amd64:
     - amd64
 
 test:linux:amd64:valgrind:
-  image: cznic/ubuntu-valgrind:16.04
   stage: test
   script:
     - PREFIX=$(pwd)/.local DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet" make -k check
