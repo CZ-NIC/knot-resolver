@@ -36,7 +36,7 @@
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "cach",  fmt)
 
 /* Cache version */
-#define KEY_VERSION "V\x04"
+static const uint16_t CACHE_VERSION = 1;
 /* Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
@@ -46,7 +46,7 @@
 #define cache_op(cache, op, ...) (cache)->api->op((cache)->db, ## __VA_ARGS__)
 
 /** @internal Removes all records from cache. */
-static inline int cache_purge(struct kr_cache *cache)
+static inline int cache_clear(struct kr_cache *cache)
 {
 	cache->stats.delete += 1;
 	return cache_op(cache, clear);
@@ -56,24 +56,25 @@ static inline int cache_purge(struct kr_cache *cache)
 static int assert_right_version(struct kr_cache *cache)
 {
 	/* Check cache ABI version */
-	knot_db_val_t key = { KEY_VERSION, 2 };
-	knot_db_val_t val = { KEY_VERSION, 2 };
+	uint8_t key_str[] = "\x00\x00V"; /* CACHE_KEY */
+	knot_db_val_t key = { .data = key_str, .len = sizeof(key) };
+	knot_db_val_t val = { };
 	int ret = cache_op(cache, read, &key, &val, 1);
-	if (ret == 0) {
+	if (ret == 0 && val.len == sizeof(CACHE_VERSION)
+	    && memcmp(val.data, &CACHE_VERSION, sizeof(CACHE_VERSION)) == 0) {
 		ret = kr_error(EEXIST);
 	} else {
 		/* Version doesn't match. Recreate cache and write version key. */
 		ret = cache_op(cache, count);
 		if (ret != 0) { /* Non-empty cache, purge it. */
 			kr_log_info("[cache] incompatible cache database detected, purging\n");
-			ret = cache_purge(cache);
+			ret = cache_clear(cache);
 		}
 		/* Either purged or empty. */
 		if (ret == 0) {
 			/* Key/Val is invalidated by cache purge, recreate it */
-			key.data = KEY_VERSION;
-			key.len = 2;
-			val = key;
+			val.data = /*const-cast*/(void *)&CACHE_VERSION;
+			val.len = sizeof(CACHE_VERSION);
 			ret = cache_op(cache, write, &key, &val, 1);
 		}
 	}
@@ -275,7 +276,7 @@ int kr_cache_clear(struct kr_cache *cache)
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
-	int ret = cache_purge(cache);
+	int ret = cache_clear(cache);
 	if (ret == 0) {
 		ret = assert_right_version(cache);
 	}
@@ -482,6 +483,7 @@ int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_
 }
 
 #include "lib/dnssec/ta.h"
+#include "lib/layer/iterate.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
 
@@ -701,7 +703,8 @@ int pkt_append(knot_pkt_t *pkt, const knot_rrset_t *rrset, uint8_t rank)
 
 
 
-/** TODO */
+/** TODO
+ * CACHE_KEY */
 static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
 {
 	k->buf[k->name_len + 1] = 0; /* make sure different names can never match */
@@ -732,7 +735,7 @@ static bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 
 
 /** function for .produce phase */
-int read_lmdb(kr_layer_t *ctx, knot_pkt_t *pkt)
+int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
@@ -746,7 +749,7 @@ int read_lmdb(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct key k_storage, *k = &k_storage;
 	int ret = knot_dname_lf(k->buf, qry->sname, NULL);
 	if (ret) {
-		return kr_error(ret);
+		return KR_STATE_FAIL;
 	}
 	k->name_len = k->buf[0];
 
@@ -787,8 +790,11 @@ int read_lmdb(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const struct entry_h *eh = closest_NS(ctx, k);
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
-		if (ret) return kr_error(ret);
+		if (ret) return KR_STATE_FAIL;
 		assert(!qry->zone_cut.parent);
+
+		//VERBOSE_MSG(qry, "=> using root hints\n");
+		//qry->flags.AWAIT_CUT = false;
 		return kr_ok();
 	}
 	switch (k->type) {
@@ -804,6 +810,9 @@ int read_lmdb(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * and that's the only place to start - we may either find
 	 * a negative proof or we may query upstream from that point. */
 	kr_zonecut_set(&qry->zone_cut, k->dname);
+	ret = kr_make_query(qry, pkt); // FIXME: probably not yet - qname minimization
+	if (ret) return KR_STATE_FAIL;
+
 
 	/* Note: up to here we can run on any cache backend,
 	 * without touching the code. */
@@ -999,6 +1008,7 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 
+	// FIXME: DS is parent-side record
 	bool exact_match = true;
 	// LATER(optim): if stype is NS, we check the same value again
 	do {

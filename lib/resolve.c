@@ -165,6 +165,8 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
  */
 static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct kr_cache *cache, uint32_t timestamp)
 {
+	return; // FIXME cleanup, etc.
+#if 0
 	if (qry->flags.NO_MINIMIZE) {
 		return;
 	}
@@ -194,6 +196,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 		target = knot_wire_next_label(target, NULL);
 	}
 	kr_cache_sync(cache);
+#endif
 }
 
 static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name,
@@ -1239,6 +1242,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 
 /** @internal Check current zone cut status and credibility, spawn subrequests if needed. */
 static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot_pkt_t *packet)
+/* TODO: using cache on this point in this way just isn't nice; remove in time */
 {
 	/* Stub mode, just forward and do not solve cut. */
 	if (qry->flags.STUB) {

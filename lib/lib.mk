@@ -3,8 +3,7 @@ libkres_SOURCES := \
 	lib/generic/map.c      \
 	lib/layer/iterate.c    \
 	lib/layer/validate.c   \
-	lib/layer/rrcache.c    \
-	lib/layer/pktcache.c   \
+	lib/layer/cache_lmdb.c \
 	lib/dnssec/nsec.c      \
 	lib/dnssec/nsec3.c     \
 	lib/dnssec/signature.c \

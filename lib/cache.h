@@ -83,6 +83,12 @@ struct kr_cache
 	uint32_t ttl_min, ttl_max; /**< Maximum TTL of inserted entries */
 };
 
+
+
+#include "lib/module.h"
+int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
+
+
 /**
  * Open/create cache with provided storage options.
  * @param cache cache structure to be initialized
@@ -114,6 +120,7 @@ static inline bool kr_cache_is_open(struct kr_cache *cache)
 	return cache->db != NULL;
 }
 
+#if 0
 /**
  * Peek the cache for asset (name, type, tag)
  * @note The 'drift' is the time passed between the inception time and now (in seconds).
@@ -156,6 +163,7 @@ int kr_cache_insert(struct kr_cache *cache, uint8_t tag, const knot_dname_t *nam
 KR_EXPORT
 int kr_cache_remove(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, uint16_t type);
 
+#endif
 /**
  * Clear all items from the cache.
  * @param cache cache structure
@@ -163,6 +171,7 @@ int kr_cache_remove(struct kr_cache *cache, uint8_t tag, const knot_dname_t *nam
  */
 KR_EXPORT
 int kr_cache_clear(struct kr_cache *cache);
+#if 0
 
 /**
  * Prefix scan on cached items.
@@ -251,3 +260,5 @@ int kr_cache_peek_rrsig(struct kr_cache *cache, knot_rrset_t *rr, uint8_t *rank,
  */
 KR_EXPORT
 int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_t rank, uint8_t flags, uint32_t timestamp);
+
+#endif

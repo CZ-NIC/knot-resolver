@@ -26,13 +26,11 @@
 /* List of embedded modules */
 const kr_layer_api_t *iterate_layer(struct kr_module *module);
 const kr_layer_api_t *validate_layer(struct kr_module *module);
-const kr_layer_api_t *rrcache_layer(struct kr_module *module);
-const kr_layer_api_t *pktcache_layer(struct kr_module *module);
+const kr_layer_api_t *cache_lmdb_layer(struct kr_module *module);
 static const struct kr_module embedded_modules[] = {
 	{ "iterate",  NULL, NULL, NULL, iterate_layer, NULL, NULL, NULL },
 	{ "validate", NULL, NULL, NULL, validate_layer, NULL, NULL, NULL },
-	{ "rrcache",  NULL, NULL, NULL, rrcache_layer, NULL, NULL, NULL },
-	{ "pktcache", NULL, NULL, NULL, pktcache_layer, NULL, NULL, NULL },
+	{ "cache_lmdb", NULL, NULL, NULL, cache_lmdb_layer, NULL, NULL, NULL },
 };
 
 /** Library extension. */
