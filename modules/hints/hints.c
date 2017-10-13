@@ -569,7 +569,8 @@ static char* hint_root_file(void *env, struct kr_module *module, const char *arg
 {
 	struct engine *engine = env;
 	struct kr_context *ctx = &engine->resolver;
-	return strdup(engine_hint_root_file(ctx, args));
+	const char *err_msg = engine_hint_root_file(ctx, args);
+	return strdup(err_msg ? err_msg : "");
 }
 
 /*

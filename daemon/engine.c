@@ -368,12 +368,14 @@ const char* engine_hint_root_file(struct kr_context *ctx, const char *file)
 		return "not enough memory";
 	}
 	if (zs_set_input_file(&zs, file) != 0) {
+		zs_deinit(&zs);
 		return "failed to open root hints file";
 	}
 
 	kr_zonecut_set(root_hints, (const uint8_t *)"");
 	zs_set_processing(&zs, roothints_add, NULL, root_hints);
 	zs_parse_all(&zs);
+	zs_deinit(&zs);
 	return NULL;
 }
 
