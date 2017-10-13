@@ -35,11 +35,14 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "cach",  fmt)
 
-/* Cache version */
+/** Cache version */
 static const uint16_t CACHE_VERSION = 1;
-/* Key size */
+/** Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
+
+/** Short-time "no data" retention to avoid bursts */
+static const uint32_t DEFAULT_MINTTL = 5;
 
 /* Shorthand for operations on cache backend */
 #define cache_isvalid(cache) ((cache) && (cache)->api && (cache)->db)
@@ -56,18 +59,28 @@ static inline int cache_clear(struct kr_cache *cache)
 static int assert_right_version(struct kr_cache *cache)
 {
 	/* Check cache ABI version */
-	uint8_t key_str[] = "\x00\x00V"; /* CACHE_KEY */
-	knot_db_val_t key = { .data = key_str, .len = sizeof(key) };
+	uint8_t key_str[] = "\x00\x00V"; /* CACHE_KEY; zero-term. but we don't care */
+	knot_db_val_t key = { .data = key_str, .len = sizeof(key_str) };
 	knot_db_val_t val = { };
 	int ret = cache_op(cache, read, &key, &val, 1);
 	if (ret == 0 && val.len == sizeof(CACHE_VERSION)
 	    && memcmp(val.data, &CACHE_VERSION, sizeof(CACHE_VERSION)) == 0) {
 		ret = kr_error(EEXIST);
 	} else {
+		int oldret = ret;
 		/* Version doesn't match. Recreate cache and write version key. */
 		ret = cache_op(cache, count);
 		if (ret != 0) { /* Non-empty cache, purge it. */
-			kr_log_info("[cache] incompatible cache database detected, purging\n");
+			kr_log_info("[     ][cach] incompatible cache database detected, purging\n");
+			if (oldret) {
+				kr_log_verbose("bad ret: %d\n", oldret);
+			} else if (val.len != sizeof(CACHE_VERSION)) {
+				kr_log_verbose("bad length: %d\n", (int)val.len);
+			} else {
+				uint16_t ver;
+				memcpy(&ver, val.data, sizeof(ver));
+				kr_log_verbose("bad version: %d\n", (int)ver);
+			}
 			ret = cache_clear(cache);
 		}
 		/* Either purged or empty. */
@@ -341,7 +354,7 @@ int kr_cache_peek_rank(struct kr_cache *cache, uint8_t tag, const knot_dname_t *
 	return found->rank;
 }
 
-int kr_cache_materialize(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift,
+int kr_cache_materialize_x(knot_rrset_t *dst, const knot_rrset_t *src, uint32_t drift,
 		uint reorder, knot_mm_t *mm)
 {
 	if (!dst || !src || dst == src) {
@@ -523,7 +536,7 @@ struct nsec_p {
  * \note only exact hits are really considered ATM. */
 static struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 {
-	if (data.len < sizeof(struct entry_h))
+	if (data.len < offsetof(struct entry_h, data))
 		return NULL;
 	const struct entry_h *eh = data.data;
 	bool ok = true;
@@ -559,7 +572,7 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k);
 /** Materialize a knot_rdataset_t from cache with given TTL.
  * Return the number of bytes consumed or an error code.
  */
-static int rdataset_materialize(knot_rdataset_t *rds, const void *data,
+static int rdataset_materialize(knot_rdataset_t * restrict rds, const void *data,
 		const void *data_bound, uint32_t ttl, knot_mm_t *pool)
 {
 	assert(rds && data && data_bound && data_bound > data && !rds->data);
@@ -577,7 +590,7 @@ static int rdataset_materialize(knot_rdataset_t *rds, const void *data,
 		}
 		uint16_t len;
 		memcpy(&len, d, sizeof(len));
-		d += 2 + len;
+		d += sizeof(len) + len;
 		rdata_len_sum += len;
 	}
 	/* Each item in knot_rdataset_t needs TTL (4B) + rdlength (2B) + rdata */
@@ -586,15 +599,52 @@ static int rdataset_materialize(knot_rdataset_t *rds, const void *data,
 		return kr_error(ENOMEM);
 	}
 	/* Construct the output, one "RR" at a time. */
-	d = data + 1;
+	d = data + 1/*sizeof(rr_count)*/;
 	knot_rdata_t *d_out = rds->data; /* iterates over the output being materialized */
 	for (int i = 0; i < rds->rr_count; ++i) {
 		uint16_t len;
 		memcpy(&len, d, sizeof(len));
+		d += sizeof(len);
 		knot_rdata_init(d_out, len, d, ttl);
-		d += 2 + len;
+		d += len;
+		//d_out = kr_rdataset_next(d_out);
+		d_out += 4 + 2 + len; /* TTL + rdlen + rdata */
 	}
 	return d - data;
+}
+
+int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
+			 uint32_t new_ttl, knot_mm_t *pool)
+{
+	return rdataset_materialize(dst, ref->data, ref->data_bound, new_ttl, pool);
+}
+
+/** Compute size of dematerialized rdataset.  NULL is accepted as empty set. */
+static int rdataset_dematerialize_size(const knot_rdataset_t *rds)
+{
+	return 1/*sizeof(rr_count)*/ + (rds
+		? knot_rdataset_size(rds) - 4 * rds->rr_count /*TTLs*/
+		: 0);
+}
+/** Dematerialize a rdataset. */
+static int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
+{
+	assert(data);
+	if (rds && rds->rr_count > 255) {
+		return kr_error(ENOSPC);
+	}
+	uint8_t rr_count = rds ? rds->rr_count : 0;
+	memcpy(data++, &rr_count, sizeof(rr_count));
+
+	knot_rdata_t *rd = rds->data;
+	for (int i = 0; i < rr_count; ++i, rd = kr_rdataset_next(rd)) {
+		uint16_t len = knot_rdata_rdlen(rd);
+		memcpy(data, &len, sizeof(len));
+		data += sizeof(len);
+		memcpy(data, knot_rdata_data(rd), len);
+		data += len;
+	}
+	return kr_ok();
 }
 
 /** Given a valid entry header, find the next one (and check it).
@@ -724,6 +774,11 @@ static int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
 	}
 	return entry->ttl - diff;
 }
+int32_t kr_cache_ttl(const struct kr_cache_p *peek, uint32_t current_time)
+{
+	const struct entry_h e = { .time = peek->time, .ttl = peek->ttl };
+	return get_new_ttl(&e, current_time);
+}
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
 static bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
@@ -745,6 +800,12 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state; /* Already resolved/failed or already tried, etc. */
 	}
+	/* ATM cache only peeks for qry->sname and that would be useless
+	 * to repeat on every iteration, so disable it from now on.
+	 * TODO Note: it's important to skip this if rrcache sets KR_STATE_DONE,
+	 * as CNAME chains need more iterations to get fetched. */
+	qry->flags.NO_CACHE = true;
+
 
 	struct key k_storage, *k = &k_storage;
 	int ret = knot_dname_lf(k->buf, qry->sname, NULL);
@@ -795,7 +856,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 		//VERBOSE_MSG(qry, "=> using root hints\n");
 		//qry->flags.AWAIT_CUT = false;
-		return kr_ok();
+		return ctx->state;
 	}
 	switch (k->type) {
 	// FIXME xNAME: return/generate whatever is required
@@ -822,6 +883,8 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 *	- insecure zone -> return (nothing more to find)
 	 */
 
+	return ctx->state;
+
 	/** 2. closest (provable) encloser.
 	 * iterate over all NSEC* chain parameters
 	 */
@@ -836,9 +899,8 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			/* we basically need dname_lf with two bytes added
 			 * on a correct place within the name (the cut) */
 			int ret = knot_dname_lf(k->buf, qry->sname, NULL);
-			if (ret) {
-				return kr_error(ret);
-			}
+			if (ret) return KR_STATE_FAIL;
+
 			uint8_t *begin = k->buf + k->name_len + 1; /* one byte after zone's zero */
 			uint8_t *end = k->buf + k->buf[0] - 1; /* we don't need final zero */
 			memmove(begin + 2, begin, end - begin);
@@ -874,7 +936,160 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	qry->flags.EXPIRING = expiring;
 	
-	return kr_ok();
+	return ctx->state;
+}
+
+int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
+{
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+	struct kr_cache *cache = &req->ctx->cache;
+
+	if (!qry || ctx->state & KR_STATE_FAIL || qry->flags.CACHED) {
+		return ctx->state;
+	}
+	/* Do not cache truncated answers, at least for now. */
+	if (knot_wire_get_tc(pkt->wire)) {
+		return ctx->state;
+	}
+
+	/* FIXME FIXME FIXME: (mandatory) glue isn't stashed.
+	 * => no valid NS left for DNSKEY on TLDs
+	 * Perhaps let iterator pick it to auth_selected, for simplicity.
+	 */
+
+	const uint32_t min_ttl = MAX(DEFAULT_MINTTL, req->ctx->cache.ttl_min);
+	for (int psec = KNOT_ANSWER; psec <= KNOT_AUTHORITY; ++psec) {
+		const ranked_rr_array_t *arr = psec == KNOT_ANSWER
+			? &req->answ_selected : &req->auth_selected;
+		/* uncached entries are located at the end */
+		for (ssize_t i = arr->len - 1; i >= 0; --i) {
+			ranked_rr_array_entry_t *entry = arr->at[i];
+			if (entry->qry_uid != qry->uid) {
+				continue;
+				/* TODO: probably safe to break but maybe not worth it */
+			}
+			if (entry->cached) {
+				continue;
+			}
+			knot_rrset_t *rr = entry->rr;
+
+			// for now; TODO
+			switch (rr->type) {
+			case KNOT_RRTYPE_RRSIG:
+			case KNOT_RRTYPE_NSEC:
+			case KNOT_RRTYPE_NSEC3:
+				continue;
+			default:
+				break;
+			}
+
+			/* Find corresponding signatures.  LATER(optim.): speed. */
+			const knot_rrset_t *rr_sigs = NULL;
+			if (kr_rank_test(entry->rank, KR_RANK_SECURE)) {
+				for (ssize_t j = arr->len - 1; j >= 0; --j) {
+					/* TODO: ATM we assume that some properties are the same
+					 * for all RRSIGs in the set (esp. label count). */
+					ranked_rr_array_entry_t *e = arr->at[j];
+					if (e->qry_uid != qry->uid || e->cached
+					    || e->rr->type != KNOT_RRTYPE_RRSIG
+					    || knot_rrsig_type_covered(&e->rr->rrs, 0) != rr->type
+					    || !knot_dname_is_equal(rr->owner, e->rr->owner))
+					{
+						continue;
+					}
+					bool is_wild = knot_rrsig_labels(&e->rr->rrs, 0)
+						!= knot_dname_labels(e->rr->owner, NULL);
+					if (is_wild) {
+						continue; // FIXME
+					}
+					rr_sigs = e->rr;
+					break;
+				}
+			}
+
+			struct key k_storage, *k = &k_storage;
+			int ret = knot_dname_lf(k->buf, rr->owner, NULL);
+			if (ret) {
+				kr_cache_sync(cache);
+				return KR_STATE_FAIL;
+			}
+			k->name_len = k->buf[0];
+
+			uint16_t ktype = rr->type;
+			if (ktype == KNOT_RRTYPE_CNAME || ktype == KNOT_RRTYPE_DNAME) {
+				assert(false); // FIXME NOTIMPL ATM
+				ktype = KNOT_RRTYPE_NS;
+			}
+			knot_db_val_t key = key_exact_type(k, ktype);
+
+			if (!kr_rank_test(entry->rank, KR_RANK_SECURE)) {
+				/* If equal rank was accepted, spoofing a single answer would be enough
+				 * to e.g. override NS record in AUTHORITY section.
+				 * This way they would have to hit the first answer
+				 * (whenever TTL nears expiration). */
+				knot_db_val_t val = { };
+				ret = cache_op(cache, read, &key, &val, 1);
+				struct entry_h *eh;
+				if (ret == 0 && (eh = entry_h_consistent(val, ktype))) {
+					int32_t old_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+					if (old_ttl > 0 && !is_expiring(old_ttl, eh->ttl)
+					    && entry->rank <= eh->rank) {
+						WITH_VERBOSE {
+							VERBOSE_MSG(qry, "=> not overwriting ");
+							kr_rrtype_print(rr->type, "", " ");
+							kr_dname_print(rr->owner, "", "\n");
+						}
+						continue;
+					}
+				}
+			}
+
+			const knot_rdataset_t *rds_sigs = rr_sigs ? &rr_sigs->rrs : NULL;
+			/* Compute TTL, just in case they weren't equal. */
+			uint32_t ttl = -1;
+			const knot_rdataset_t *rdatasets[] = { &rr->rrs, rds_sigs, NULL };
+			for (int j = 0; rdatasets[j]; ++j) {
+				knot_rdata_t *rd = rdatasets[j]->data;
+				for (uint16_t l = 0; l < rdatasets[j]->rr_count; ++l) {
+					ttl = MIN(ttl, knot_rdata_ttl(rd));
+					rd = kr_rdataset_next(rd);
+				}
+			} /* TODO: consider expirations of RRSIGs as well, just in case. */
+			ttl = MAX(ttl, min_ttl);
+
+			int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
+			int storage_size = offsetof(struct entry_h, data) + rr_ssize
+				+ rdataset_dematerialize_size(rds_sigs);
+
+			knot_db_val_t val = { .len = storage_size, .data = NULL };
+			ret = cache_op(cache, write, &key, &val, 1);
+			if (ret) continue;
+			struct entry_h *eh = val.data;
+			*eh = (struct entry_h){
+				.time = qry->timestamp.tv_sec,
+				.ttl  = ttl,
+				.rank = entry->rank,
+				.has_ns = rr->type == KNOT_RRTYPE_NS,
+			};
+			if (rdataset_dematerialize(&rr->rrs, eh->data)
+			    || rdataset_dematerialize(rds_sigs, eh->data + rr_ssize)) {
+				/* minimize the damage from incomplete write; TODO: better */
+				eh->ttl = 0;
+				eh->rank = 0;
+				assert(false);
+			}
+			WITH_VERBOSE {
+				VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, ", entry->rank);
+				kr_rrtype_print(rr->type, "", " ");
+				kr_dname_print(rr->owner, "", " ");
+				kr_log_verbose("(%d B)\n", (int)storage_size);
+			}
+		}
+	}
+
+	kr_cache_sync(cache);
+	return ctx->state;
 }
 
 
@@ -900,7 +1115,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		/* Positive record with stale TTL or bad rank.
 		 * It's unlikely that we find a negative one,
 		 * so we might theoretically skip all the cache code. */
-		CHECK_RET(-ENOENT);
+		return kr_error(ENOENT);
 	}
 
 	void *eh_data_bound = val.data + val.len;
@@ -923,7 +1138,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 			CHECK_RET(-EINVAL);
 		}
 		if (!present) {
-			return -ENOENT;
+			return kr_error(ENOENT);
 			// LATER(optim): pehaps optimize the zone cut search
 		}
 		/* we may need to skip some RRset in eh_data */
@@ -961,6 +1176,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	ret = rdataset_materialize(&rrset.rrs, eh->data,
 				   eh_data_bound, new_ttl, &pkt->mm);
 	CHECK_RET(ret);
+	VERBOSE_MSG(qry, "materialized from %d B\n", ret);
 	size_t data_off = ret;
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet. */
 	bool want_rrsigs = kr_rank_test(eh->rank, KR_RANK_SECURE);
@@ -974,10 +1190,12 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		ret = rdataset_materialize(&rrsigs.rrs, eh->data + data_off,
 					   eh_data_bound, new_ttl, &pkt->mm);
 		/* sanity check: we consumed exactly all data */
-		if (ret < 0 || (ktype != KNOT_RRTYPE_NS
-				&& eh->data + data_off + ret != eh_data_bound)) {
+		CHECK_RET(ret);
+		VERBOSE_MSG(qry, "materialized from %d B\n", ret);
+		int unused_bytes = eh_data_bound - (void *)eh->data - data_off - ret;
+		if (ktype != KNOT_RRTYPE_NS && unused_bytes) {
 			/* ^^ it doesn't have to hold in multi-RRset entries; LATER: more checks? */
-			CHECK_RET(-EILSEQ);
+			VERBOSE_MSG(qry, "BAD?  Unused bytes: %d\n", unused_bytes);
 		}
 	}
 	/* Put links to the materialized data into the pkt. */
@@ -995,6 +1213,40 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 #undef CHECK_RET
 }
 
+int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+			struct kr_cache_p *peek)
+{
+	struct key k_storage, *k = &k_storage;
+	int ret = knot_dname_lf(k->buf, name, NULL);
+	if (ret) {
+		return KR_STATE_FAIL;
+	}
+	k->name_len = k->buf[0];
+
+	uint16_t ktype = type;
+	if (ktype == KNOT_RRTYPE_CNAME || ktype == KNOT_RRTYPE_DNAME) {
+		assert(false); // FIXME NOTIMPL ATM
+		ktype = KNOT_RRTYPE_NS;
+	}
+	knot_db_val_t key = key_exact_type(k, ktype);
+	knot_db_val_t val = { };
+	ret = cache_op(cache, read, &key, &val, 1);
+	if (ret) {
+		return ret;
+	}
+	const struct entry_h *eh = entry_h_consistent(val, ktype);
+	if (!eh || (type == KNOT_RRTYPE_NS && !eh->has_ns)) {
+		return kr_error(ENOENT);
+	}
+	*peek = (struct kr_cache_p){
+		.time = eh->time,
+		.ttl  = eh->ttl,
+		.rank = eh->rank,
+		.data = val.data,
+		.data_bound = val.data + val.len,
+	};
+	return kr_ok();
+}
 
 /** Find the longest prefix NS/xNAME (with OK time+rank).
  * We store xNAME at NS type to lower the number of searches.

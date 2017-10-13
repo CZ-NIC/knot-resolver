@@ -87,7 +87,7 @@ struct kr_cache
 
 #include "lib/module.h"
 int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
-
+int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
 
 /**
  * Open/create cache with provided storage options.
@@ -171,6 +171,29 @@ int kr_cache_remove(struct kr_cache *cache, uint8_t tag, const knot_dname_t *nam
  */
 KR_EXPORT
 int kr_cache_clear(struct kr_cache *cache);
+
+
+/* ** This interface is temporary. ** */
+
+struct kr_cache_p {
+	uint32_t time;	/**< The time of inception. */
+	uint32_t ttl;	/**< TTL at inception moment.  Assuming it fits into int32_t ATM. */
+	uint8_t  rank;	/**< See enum kr_rank */
+	struct {
+		uint8_t *data, *data_bound;
+	};
+};
+KR_EXPORT
+int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+			struct kr_cache_p *peek);
+KR_EXPORT
+int32_t kr_cache_ttl(const struct kr_cache_p *peek, uint32_t current_time);
+/*TODO: reorder*/
+KR_EXPORT
+int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
+			 uint32_t new_ttl, knot_mm_t *pool);
+
+
 #if 0
 
 /**
