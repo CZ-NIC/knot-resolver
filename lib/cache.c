@@ -849,6 +849,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->dname = qry->sname;
 	const struct entry_h *eh = closest_NS(ctx, k);
+#if 0
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
 		if (ret) return KR_STATE_FAIL;
@@ -858,6 +859,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		//qry->flags.AWAIT_CUT = false;
 		return ctx->state;
 	}
+#endif
 	switch (k->type) {
 	// FIXME xNAME: return/generate whatever is required
 	case KNOT_RRTYPE_NS:
@@ -867,12 +869,14 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
+#if 0
 	/* Now `eh` points to the closest NS record that we've found,
 	 * and that's the only place to start - we may either find
 	 * a negative proof or we may query upstream from that point. */
 	kr_zonecut_set(&qry->zone_cut, k->dname);
 	ret = kr_make_query(qry, pkt); // FIXME: probably not yet - qname minimization
 	if (ret) return KR_STATE_FAIL;
+#endif
 
 
 	/* Note: up to here we can run on any cache backend,
@@ -959,9 +963,9 @@ int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 */
 
 	const uint32_t min_ttl = MAX(DEFAULT_MINTTL, req->ctx->cache.ttl_min);
+	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (int psec = KNOT_ANSWER; psec <= KNOT_AUTHORITY; ++psec) {
-		const ranked_rr_array_t *arr = psec == KNOT_ANSWER
-			? &req->answ_selected : &req->auth_selected;
+		const ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
 		for (ssize_t i = arr->len - 1; i >= 0; --i) {
 			ranked_rr_array_entry_t *entry = arr->at[i];
@@ -1217,8 +1221,16 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 			struct kr_cache_p *peek)
 {
 	struct key k_storage, *k = &k_storage;
+
+	WITH_VERBOSE {
+		VERBOSE_MSG(NULL, "_peek_exact: ");
+		kr_rrtype_print(type, "", " ");
+		kr_dname_print(name, "", " ");
+	}
+
 	int ret = knot_dname_lf(k->buf, name, NULL);
 	if (ret) {
+		kr_log_verbose("ERROR!\n");
 		return KR_STATE_FAIL;
 	}
 	k->name_len = k->buf[0];
@@ -1232,10 +1244,12 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 	knot_db_val_t val = { };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (ret) {
+		kr_log_verbose("miss\n");
 		return ret;
 	}
 	const struct entry_h *eh = entry_h_consistent(val, ktype);
 	if (!eh || (type == KNOT_RRTYPE_NS && !eh->has_ns)) {
+		kr_log_verbose("miss\n");
 		return kr_error(ENOENT);
 	}
 	*peek = (struct kr_cache_p){
@@ -1245,6 +1259,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 		.data = val.data,
 		.data_bound = val.data + val.len,
 	};
+	kr_log_verbose("hit\n");
 	return kr_ok();
 }
 
@@ -1275,11 +1290,12 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 			if (new_ttl < 0) break;
 			// FIXME: xNAME
 			//uint16_t ktype = exact_match ? KNOT_RRTYPE_CNAME : KNOT_RRTYPE_DNAME;
-			if (eh->has_ns && !eh->is_negative) {
-				/* any kr_rank is accepted, as insecure or even nonauth is OK */
-				k->type = KNOT_RRTYPE_NS;
-				return eh;
+			if (!eh->has_ns || eh->is_negative) {
+				break;
 			}
+			/* any kr_rank is accepted, as insecure or even nonauth is OK */
+			k->type = KNOT_RRTYPE_NS;
+			return eh;
 			}
 		case (-abs(ENOENT)):
 			break;

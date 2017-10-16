@@ -718,6 +718,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	array_init(request->additional);
 	array_init(request->answ_selected);
 	array_init(request->auth_selected);
+	array_init(request->add_selected);
 	request->answ_validated = false;
 	request->auth_validated = false;
 
@@ -1419,7 +1420,11 @@ ns_election:
 		}
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
-			VERBOSE_MSG(qry, "=> no valid NS left\n");
+			if (!qry->zone_cut.nsset.root) {
+				VERBOSE_MSG(qry, "=> no NS with an address\n");
+			} else {
+				VERBOSE_MSG(qry, "=> no valid NS left\n");
+			}
 			ITERATE_LAYERS(request, qry, reset);
 			kr_rplan_pop(rplan, qry);
 			return KR_STATE_PRODUCE;
