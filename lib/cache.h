@@ -180,7 +180,8 @@ struct kr_cache_p {
 	uint32_t ttl;	/**< TTL at inception moment.  Assuming it fits into int32_t ATM. */
 	uint8_t  rank;	/**< See enum kr_rank */
 	struct {
-		uint8_t *data, *data_bound;
+		/* internal: pointer to eh struct */
+		void *raw_data, *raw_bound;
 	};
 };
 KR_EXPORT

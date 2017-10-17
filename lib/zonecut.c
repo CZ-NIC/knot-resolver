@@ -284,7 +284,9 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const kno
 
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, /*const-cast*/(knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
-	kr_cache_materialize(&cached_rr.rrs, &peek, new_ttl, cut->pool);
+	if (kr_cache_materialize(&cached_rr.rrs, &peek, new_ttl, cut->pool) < 0) {
+		return;
+	}
 	knot_rdata_t *rd = cached_rr.rrs.data;
 	for (uint16_t i = 0; i < cached_rr.rrs.rr_count; ++i) {
 		(void) kr_zonecut_add(cut, ns, rd);
@@ -313,7 +315,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 	/* Materialize the rdataset temporarily, for simplicity. */
 	knot_rdataset_t ns_rds = {};
 	ret = kr_cache_materialize(&ns_rds, &peek, new_ttl, cut->pool);
-	if (ret != 0) {
+	if (ret < 0) {
 		return ret;
 	}
 
@@ -374,7 +376,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	}
 	knot_rrset_init(*rr, /*const-cast*/(knot_dname_t *)owner, type, KNOT_CLASS_IN);
 	ret = kr_cache_materialize(&(*rr)->rrs, &peek, new_ttl, pool);
-	if (ret != 0) {
+	if (ret < 0) {
 		knot_rrset_free(rr, pool);
 		return ret;
 	}
@@ -385,6 +387,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
                            uint32_t timestamp, bool * restrict secured)
 {
+	kr_log_verbose("[     ][ *c ] kr_zonecut_find_cached\n");
 	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
 	}
@@ -416,6 +419,9 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);
 			kr_cache_sync(&ctx->cache);
+			WITH_VERBOSE {
+				kr_dname_print(label, "[     ][ *c ] and found cut: ", "\n");
+			}
 			return kr_ok();
 		}
 		/* Subtract label from QNAME. */

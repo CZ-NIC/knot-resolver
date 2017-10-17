@@ -586,6 +586,7 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const void *data
 	size_t rdata_len_sum = 0;
 	for (int i = 0; i < rds->rr_count; ++i) {
 		if (d + 2 > data_bound) {
+			VERBOSE_MSG(NULL, "materialize: EILSEQ!\n");
 			return kr_error(EILSEQ);
 		}
 		uint16_t len;
@@ -610,13 +611,15 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const void *data
 		//d_out = kr_rdataset_next(d_out);
 		d_out += 4 + 2 + len; /* TTL + rdlen + rdata */
 	}
+	VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
 	return d - data;
 }
 
 int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
 			 uint32_t new_ttl, knot_mm_t *pool)
 {
-	return rdataset_materialize(dst, ref->data, ref->data_bound, new_ttl, pool);
+	struct entry_h *eh = ref->raw_data;
+	return rdataset_materialize(dst, eh->data, ref->raw_bound, new_ttl, pool);
 }
 
 /** Compute size of dematerialized rdataset.  NULL is accepted as empty set. */
@@ -727,9 +730,13 @@ int pkt_alloc_space(knot_pkt_t *pkt, int count)
 	return kr_ok();
 }
 
-/** Append an RRset into the current section (*shallow* copy), with given rank. */
+/** Append an RRset into the current section (*shallow* copy), with given rank.
+ * \note it works with empty set as well (skipped). */
 int pkt_append(knot_pkt_t *pkt, const knot_rrset_t *rrset, uint8_t rank)
 {
+	if (!rrset->rrs.rr_count) {
+		return kr_ok();
+	}
 	/* allocate space, to be sure */
 	int ret = pkt_alloc_space(pkt, 1);
 	if (ret) return kr_error(ret);
@@ -772,12 +779,14 @@ static int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
 		/* We may have obtained the record *after* the request started. */
 		diff = 0;
 	}
-	return entry->ttl - diff;
+	int32_t res = entry->ttl - diff;
+	VERBOSE_MSG(NULL, "TTL remains: %d\n", (int)res);
+	return res;
 }
 int32_t kr_cache_ttl(const struct kr_cache_p *peek, uint32_t current_time)
 {
-	const struct entry_h e = { .time = peek->time, .ttl = peek->ttl };
-	return get_new_ttl(&e, current_time);
+	const struct entry_h *eh = peek->raw_data;
+	return get_new_ttl(eh, current_time);
 }
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
@@ -957,14 +966,9 @@ int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	/* FIXME FIXME FIXME: (mandatory) glue isn't stashed.
-	 * => no valid NS left for DNSKEY on TLDs
-	 * Perhaps let iterator pick it to auth_selected, for simplicity.
-	 */
-
 	const uint32_t min_ttl = MAX(DEFAULT_MINTTL, req->ctx->cache.ttl_min);
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
-	for (int psec = KNOT_ANSWER; psec <= KNOT_AUTHORITY; ++psec) {
+	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 		const ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
 		for (ssize_t i = arr->len - 1; i >= 0; --i) {
@@ -1180,7 +1184,6 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	ret = rdataset_materialize(&rrset.rrs, eh->data,
 				   eh_data_bound, new_ttl, &pkt->mm);
 	CHECK_RET(ret);
-	VERBOSE_MSG(qry, "materialized from %d B\n", ret);
 	size_t data_off = ret;
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet. */
 	bool want_rrsigs = kr_rank_test(eh->rank, KR_RANK_SECURE);
@@ -1195,7 +1198,6 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 					   eh_data_bound, new_ttl, &pkt->mm);
 		/* sanity check: we consumed exactly all data */
 		CHECK_RET(ret);
-		VERBOSE_MSG(qry, "materialized from %d B\n", ret);
 		int unused_bytes = eh_data_bound - (void *)eh->data - data_off - ret;
 		if (ktype != KNOT_RRTYPE_NS && unused_bytes) {
 			/* ^^ it doesn't have to hold in multi-RRset entries; LATER: more checks? */
@@ -1256,8 +1258,8 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 		.time = eh->time,
 		.ttl  = eh->ttl,
 		.rank = eh->rank,
-		.data = val.data,
-		.data_bound = val.data + val.len,
+		.raw_data = val.data,
+		.raw_bound = val.data + val.len,
 	};
 	kr_log_verbose("hit\n");
 	return kr_ok();
