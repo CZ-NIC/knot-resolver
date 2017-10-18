@@ -797,3 +797,8 @@ void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *po
 	kr_rrtype_print(qry->stype, " ", postfix);
 }
 
+int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf)
+{
+	//FIXME
+	assert(false);
+}

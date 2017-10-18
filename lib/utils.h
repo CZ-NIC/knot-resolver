@@ -120,9 +120,10 @@ struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank; /**< enum kr_rank */
 	uint8_t revalidation_cnt;
-	bool cached;  /**< whether it has been stashed to cache already */
-	bool yielded;
-	bool to_wire; /**< whether to be put into the answer */
+	bool cached : 1;  /**< whether it has been stashed to cache already */
+	bool yielded : 1;
+	bool to_wire : 1; /**< whether to be put into the answer */
+	bool expiring : 1; /**< low remaining TTL; see is_expiring; only used in cache ATM */
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -288,3 +289,10 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 		type = knot_rrsig_type_covered(&rr->rrs, 0);
 	return type;
 }
+
+/** Convert name from lookup format to wire.  See knot_dname_lf
+ *
+ * \note len bytes are read and len+1 are written.
+ */
+int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf);
+
