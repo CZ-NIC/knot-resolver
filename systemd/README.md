@@ -6,6 +6,11 @@ by systemd (or any supervisor that provides equivalent file descriptor
 initialization via the interface supported by
 sd_listen_fds_with_names(3)).
 
+Distributors of systems using systemd may wish to place
+./90-kresd.preset in /lib/systemd/systemd-preset/90-kresd.preset if
+they want to delay daemon launch until it is accessed. (see
+systemd.preset(5)).
+
 When run in this configuration:
 
  * it will be run under a non-privileged user, which means it will not
