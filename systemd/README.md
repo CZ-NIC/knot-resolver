@@ -26,3 +26,16 @@ When run in this configuration:
 
    If you have a useful systemd generator for multiple concurrent
    processes, please contribute it upstream!
+
+Administrators who wish to make kresd listen on a public network
+interface can use:
+
+    systemctl edit kresd.socket
+
+to add an override file that indicates where they want it to listen.
+For example:
+
+    # /etc/systemd/system/kresd.socket.d/override.conf
+    [Socket]
+    ListenDatagram=192.0.2.115:53
+    ListenStream=192.0.2.115:53
