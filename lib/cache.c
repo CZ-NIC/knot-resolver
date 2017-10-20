@@ -144,7 +144,7 @@ int kr_cache_sync(struct kr_cache *cache)
 static size_t cache_key(uint8_t *buf, uint8_t tag, const knot_dname_t *name, uint16_t rrtype)
 {
 	/* Convert to lookup format */
-	int ret = knot_dname_lf(buf, name, NULL);
+	int ret = kr_dname_lf(buf, name, NULL);
 	if (ret != 0) {
 		return 0;
 	}
@@ -507,7 +507,7 @@ int kr_cache_insert_rrsig(struct kr_cache *cache, const knot_rrset_t *rr, uint8_
  *
  * 'E' entry (exact hit):
  *	- ktype == NS: multiple chained entry_h, based on has_* : 1 flags;
- *		FIXME: NSEC* chain descriptors
+ *		FIXME: NSEC3 chain descriptors (iff nsec3_cnt > 0)
  *	- is_negative: uint16_t length, otherwise opaque ATM;
  *	- otherwise RRset + its RRSIG set (possibly empty).
  * */
@@ -517,6 +517,9 @@ struct entry_h {
 	uint8_t  rank;	/**< See enum kr_rank */
 
 	bool is_negative : 1;	/**< Negative-answer packet for insecure/bogus name. */
+
+	unsigned nsec1_pos : 2;	/**< Only used for NS ktype. */
+	unsigned nsec3_cnt : 2;	/**< Only used for NS ktype. */
 	bool has_ns : 1;	/**< Only used for NS ktype. */
 	bool has_cname : 1;	/**< Only used for NS ktype. */
 	bool has_dname : 1;	/**< Only used for NS ktype. */
@@ -696,6 +699,7 @@ static int entry2answer(struct answer *ans, int id,
 	int ret = rdataset_materialize(&rr->rrs, eh->data, eh_bound, new_ttl, ans->mm);
 	if (ret < 0) goto fail;
 	size_t data_off = ret;
+	ans->rrsets[id].set.rank = eh->rank;
 	ans->rrsets[id].set.expiring = is_expiring(eh->ttl, new_ttl);
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet. */
 	bool want_rrsigs = kr_rank_test(eh->rank, KR_RANK_SECURE);
@@ -852,9 +856,12 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 		if (!rr_rank) return kr_error(ENOMEM);
 		*rr_rank = (i == 0) ? rank : (KR_RANK_INITIAL | KR_RANK_AUTH);
 			/* rank for RRSIGs isn't really useful: ^^ */
+		if (i == 0) {
+			pkt->rr[pkt->rrset_count] = *rrset->set.rr;
+			pkt->rr[pkt->rrset_count].additional = rr_rank;
+		} else {
 		/* append the RR array */
-		pkt->rr[pkt->rrset_count] = (i == 0) ? *rrset->set.rr
-			: (knot_rrset_t){
+			pkt->rr[pkt->rrset_count] = (knot_rrset_t){
 				.owner = knot_dname_copy(rrset->set.rr->owner, &pkt->mm),
 					/* ^^ well, another copy isn't really needed */
 				.type = KNOT_RRTYPE_RRSIG,
@@ -862,6 +869,7 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 				.rrs = *rdss[i],
 				.additional = rr_rank,
 			};
+		}
 		++pkt->rrset_count;
 		++(pkt->sections[pkt->current].count);
 	}
@@ -892,14 +900,27 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, int zone
 {
 	/* we basically need dname_lf with two bytes added
 	 * on a correct place within the name (the cut) */
-	int ret = knot_dname_lf(k->buf, name, NULL);
-	if (ret) {
+	int ret;
+	const bool ok = k && name
+		&& !(ret = kr_dname_lf(k->buf, name, NULL));
+	if (!ok) {
 		assert(false);
 		return (knot_db_val_t){};
 	}
-	uint8_t *begin = k->buf + zonename_len + 1; /* one byte after zone's zero */
-	uint8_t *end = k->buf + k->buf[0] - 1; /* we don't need final zero */
-	memmove(begin + 2, begin, end - begin);
+
+	VERBOSE_MSG(NULL, "<> key_NSEC1; ");
+	kr_dname_print(name, "name: ", " ");
+	kr_log_verbose("(zone name LF length: %d)\n", zonename_len);
+
+	uint8_t *begin = k->buf + 1 + zonename_len; /* one byte after zone's zero */
+	uint8_t *end = k->buf + 1 + k->buf[0]; /* we don't use the final zero in key,
+						* but move it anyway */
+	if (end < begin) {
+		assert(false);
+		return (knot_db_val_t){};
+	}
+	if (end > begin)
+		memmove(begin + 2, begin, end - begin);
 	begin[0] = 0;
 	begin[1] = '1'; /* tag for NSEC1 */
 	/* CACHE_KEY_DEF: key == zone's dname_lf + 0 + '1' + dname_lf
@@ -928,7 +949,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 
 	struct key k_storage, *k = &k_storage;
-	int ret = knot_dname_lf(k->buf, qry->sname, NULL);
+	int ret = kr_dname_lf(k->buf, qry->sname, NULL);
 	if (ret) {
 		return KR_STATE_FAIL;
 	}
@@ -953,6 +974,8 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret == -abs(ENOENT)) {
 			break;
 		} else if (ret) {
+			VERBOSE_MSG(qry, "=> exact hit but error: %d %s\n",
+					ret, strerror(abs(ret)));
 			return ctx->state;
 		}
 		VERBOSE_MSG(qry, "=> satisfied from cache (direct positive hit)\n");
@@ -967,7 +990,15 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->dname = qry->sname;
+	kr_dname_lf(k->buf, qry->sname, NULL); /* LATER(optim.): probably remove */
+	k->name_len = k->buf[0];
 	const struct entry_h *eh = closest_NS(ctx, k);
+	if (!eh) {
+		VERBOSE_MSG(qry, "=> not even root NS in cache\n");
+		return ctx->state; /* nothing to do without any NS at all */
+	}
+	VERBOSE_MSG(qry, "=> trying zone: ");
+	kr_dname_print(k->dname, "", "\n");
 #if 0
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
@@ -1001,12 +1032,12 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Note: up to here we can run on any cache backend,
 	 * without touching the code. */
 
-	/* FIXME:
-	 *	- find NSEC* parameters
-	 *	- insecure zone -> return (nothing more to find)
-	 */
-
-	return ctx->state;
+	if (!eh->nsec1_pos) {
+		/* No NSEC1 RRs for this zone in cache. */
+		/* TODO: NSEC3 */
+		//VERBOSE_MSG(qry, "   no NSEC1\n");
+		//return ctx->state;
+	}
 
 	/* collecting multiple NSEC* + RRSIG records, in preparation for the answer
 	 *  + track the progress
@@ -1018,80 +1049,129 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * iterate over all NSEC* chain parameters
 	 */
 	//while (true) { //for (int i_nsecp = 0; i
+		assert(eh->nsec1_pos <= 1);
 		int nsec = 1;
 		switch (nsec) {
 		case 1: {
  			/* find a previous-or-equal name+NSEC in cache covering
 			 * the QNAME, checking TTL etc. */
 			
+			ans.nsec_v = 1;
 			//nsec_leq()
-			knot_db_val_t key = key_NSEC1(k, qry->sname, k->name_len);
+			const int zname_lf_len = k->name_len; /* zone name lf length */
+			knot_db_val_t key = key_NSEC1(k, qry->sname, zname_lf_len);
+			const int sname_lf_len = k->buf[0];
 			if (!key.data) break; /* FIXME: continue?
 				similarly: other breaks here - also invalidate ans AR_NSEC */
 			knot_db_val_t val = { };
 			ret = cache_op(cache, read_leq, &key, &val);
-			if (ret < 0) break;
+			if (ret < 0) {
+				VERBOSE_MSG(qry, "=> NSEC: range search miss\n");
+				break;
+			}
 			bool exact_match = (ret == 0);
 			const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NSEC);
 			void *eh_data_bound = val.data + val.len;
 			if (!eh) break;
 			int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
 			if (new_ttl < 0 || !kr_rank_test(eh->rank, KR_RANK_SECURE)) {
+				VERBOSE_MSG(qry, "=> NSEC: range search found stale entry\n");
+				// TODO: remove the stale record *and* retry
 				break;
 			}
 
-			size_t nwz_off = k->name_len + 2;
+			knot_dname_t dname_buf[KNOT_DNAME_MAXLEN];
+			size_t nwz_off = zname_lf_len + 2;
 				/* CACHE_KEY_DEF: zone name lf + 0 '1' + name within zone */
+
 			if (!exact_match) {
-				/* FIXME: check that it's still in the zone and covers the name */
+				/* The NSEC starts strictly before our target name;
+				 * check that it's still within the zone and that
+				 * it ends strictly after the sought name
+				 * (or points to origin). */
 				bool in_zone = key.len >= nwz_off
 					/* CACHE_KEY_DEF */
-					&& !memcmp(k->buf + 1, key.data, k->name_len + 2);
-				if (!in_zone) break;
+					&& memcmp(k->buf + 1, key.data, nwz_off) == 0;
+				if (!in_zone) {
+					VERBOSE_MSG(qry, "=> NSEC: range search miss (!in_zone)\n");
+					break;
+				}
+				const knot_dname_t *next = eh->data + 3; /* it's *full* name ATM */
+				if (!eh->data[0]) {
+					assert(false);
+					break;
+					/* TODO: more checks?  Also, `data + 3` is kinda messy. */
+				}
+				WITH_VERBOSE {
+					VERBOSE_MSG(qry, "=> NSEC: next name: ");
+					kr_dname_print(next, "", "\n");
+				}
+				uint8_t *next_lf = dname_buf;
+				ret = kr_dname_lf(next_lf, next, NULL);
+				if (ret) break;
+				int next_nwz_len = next_lf[0] - zname_lf_len;
+				next_lf += 1 + zname_lf_len; /* skip the zone name */
+				assert(next_nwz_len >= 0);
+				bool covers = next_nwz_len == 0
+					/* CACHE_KEY_DEF */
+					|| memcmp(k->buf + 1 + nwz_off, next_lf,
+						  MIN(sname_lf_len - zname_lf_len, next_nwz_len)
+						) < 0;
+				if (!covers) {
+					VERBOSE_MSG(qry, "=> NSEC: range search miss (!covers)\n");
+					break;
+				}
 			}
 
 			/* Get owner name of the record. */
 			const knot_dname_t *owner;
-			knot_dname_t owner_buf[KNOT_DNAME_MAXLEN];
 			if (exact_match) {
 				owner = qry->sname;
 			} else {
 				/* Reconstruct from key: first the ending, then zone name. */
-				ret = knot_dname_lf2wire(owner_buf, key.len - nwz_off,
+				ret = knot_dname_lf2wire(dname_buf, key.len - nwz_off,
 							 key.data + nwz_off);
 					/* CACHE_KEY_DEF */
 				if (ret) break;
-				ret = knot_dname_lf2wire(owner_buf + (key.len - nwz_off),
-							 key.len, key.data);
-				if (ret) break;
+				ret = knot_dname_to_wire(dname_buf + (key.len - nwz_off), k->dname,
+								/* TODO: messy zone name ^^ */
+						   KNOT_DNAME_MAXLEN - (key.len-nwz_off));
+				if (ret != zname_lf_len + 1) {
+					assert(false);
+					break;
+				}
+				owner = dname_buf;
 			}
+			VERBOSE_MSG(qry, "=> NSEC: LF2wire OK\n");
 
 			/* Basic checks OK -> materialize data. */
 			ret = entry2answer(&ans, AR_NSEC, eh, eh_data_bound,
 					   owner, KNOT_RRTYPE_NSEC, new_ttl);
 			if (ret) break;
+			VERBOSE_MSG(qry, "=> NSEC: materialized OK\n");
 
 			if (exact_match) {
 				uint8_t *bm = NULL;
 				uint16_t bm_size;
 				knot_nsec_bitmap(&ans.rrsets[AR_NSEC].set.rr->rrs,
 						 &bm, &bm_size);
-				if (!bm) break;
-				if (kr_nsec_bitmap_contains_type(bm, bm_size, qry->stype)) {
+				if (!bm || kr_nsec_bitmap_contains_type(bm, bm_size, qry->stype)) {
+					//FIXME: clear the answer?
+					VERBOSE_MSG(qry, "=> NSEC: exact match, but failed type check\n");
 					break; /* exact positive answer should exist! */
 				}
-				/* NODATA proven; just add SOA+RRSIG */
-				//FIXME
-
-			} else { /* inexact match */
-				//FIXME
+				/* NODATA proven; just need to add SOA+RRSIG later */
+				VERBOSE_MSG(qry, "=> NSEC: exact match proved NODATA\n");
+				ans.rcode = PKT_NODATA;
+				break;
+			} else { /* inexact match; NXDOMAIN proven *except* for wildcards */
+				VERBOSE_MSG(qry, "=> NSEC: exact match covered\n");
+				ans.rcode = PKT_NXDOMAIN;
+				break;
 			}
 
-			break;
 			}
-		case 3:
-			//FIXME NSEC3
-			break;
+		case 3: //TODO NSEC3
 		default:
 			assert(false);
 		}
@@ -1099,12 +1179,80 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/** 3. wildcard checks.  FIXME
 	 */
+	if (ans.nsec_v == 1 && ans.rcode == PKT_NODATA) {
+		// no wildcard checks needed
+	}
+
+	/** 4. add SOA iff needed
+	 */
+	if (ans.rcode != PKT_NOERROR) {
+		/* assuming k->buf still starts with zone's prefix */
+		key = key_exact_type(k, KNOT_RRTYPE_SOA);
+		knot_db_val_t val = { };
+		ret = cache_op(cache, read, &key, &val, 1);
+		const struct entry_h *eh;
+		if (ret || !(eh = entry_h_consistent(val, ktype))) {
+			return ctx->state;
+		}
+		void *eh_data_bound = val.data + val.len;
+
+		int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_negative) {
+			return ctx->state;
+		}
+		ret = entry2answer(&ans, AR_SOA, eh, eh_data_bound,
+				   k->dname, KNOT_RRTYPE_SOA, new_ttl);
+		if (ret) return ctx->state;
+	}
+
+
+	/* Find our target RCODE. */
+	int real_rcode;
+	switch (ans.rcode) {
+	case PKT_NODATA:
+		real_rcode = KNOT_RCODE_NOERROR;
+		break;
+	case PKT_NXDOMAIN:
+		real_rcode = KNOT_RCODE_NXDOMAIN;
+		break;
+	default:
+		assert(false);
+	case 0: /* i.e. PKT_NOERROR; nothing was found */
+		/* LATER(optim.): zone cut? */
+		VERBOSE_MSG(qry, "=> negative cache miss\n");
+		return ctx->state;
+	}
+
+	if (pkt_renew(pkt, qry->sname, qry->stype)
+	    || knot_pkt_begin(pkt, KNOT_ANSWER)
+	   ) {
+		assert(false);
+		return ctx->state;
+	}
+	knot_wire_set_rcode(pkt->wire, real_rcode);
 
 
 	bool expiring = false; // TODO
+	VERBOSE_MSG(qry, "=> writing RRsets: ");
+	for (int i = 0; i < sizeof(ans.rrsets) / sizeof(ans.rrsets[0]); ++i) {
+		if (i == 1) knot_pkt_begin(pkt, KNOT_AUTHORITY);
+		if (!ans.rrsets[i].set.rr) continue;
+		expiring = expiring || ans.rrsets[i].set.expiring;
+		ret = pkt_append(pkt, &ans.rrsets[i], ans.rrsets[i].set.rank);
+		if (ret) {
+			assert(false);
+			return ctx->state;
+		}
+		kr_log_verbose(kr_rank_test(ans.rrsets[i].set.rank, KR_RANK_SECURE)
+				? "+" : "-");
+	}
+	kr_log_verbose("\n");
+	/* Finishing touches. */
 	qry->flags.EXPIRING = expiring;
+	qry->flags.CACHED = true;
+	qry->flags.NO_MINIMIZE = true;
 	
-	return ctx->state;
+	return KR_STATE_DONE;
 }
 
 
@@ -1120,7 +1268,7 @@ int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qry || ctx->state & KR_STATE_FAIL || qry->flags.CACHED) {
 		return ctx->state;
 	}
-	/* Do not cache truncated answers, at least for now. */
+	/* Do not cache truncated answers, at least for now.  LATER */
 	if (knot_wire_get_tc(pkt->wire)) {
 		return ctx->state;
 	}
@@ -1138,10 +1286,10 @@ int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				/* TODO: probably safe to break but maybe not worth it */
 			}
 			int ret = stash_rrset(arr, i, min_ttl, qry, cache);
-			if (ret) goto error;
+			if (ret) goto finally;
 		}
 	}
-error:
+finally:
 	kr_cache_sync(cache);
 	return ret ? ret : ctx->state;
 }
@@ -1156,17 +1304,28 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		return kr_ok();
 	}
 	knot_rrset_t *rr = entry->rr;
+	if (!rr) {
+		assert(false);
+		return KR_STATE_FAIL;
+	}
+
+
+	WITH_VERBOSE {
+		VERBOSE_MSG(qry, "=> considering to stash ");
+		kr_rrtype_print(rr->type, "", " ");
+		kr_dname_print(rr->owner, "", "\n");
+	}
 
 	switch (rr->type) {
 	case KNOT_RRTYPE_RRSIG:
-	// for now; FIXME
 	case KNOT_RRTYPE_NSEC3:
+		// for now; FIXME
 		return kr_ok();
 	default:
 		break;
 	}
 
-	/* Find corresponding signatures.  LATER(optim.): speed. */
+	/* Find corresponding signatures, if validated.  LATER(optim.): speed. */
 	const knot_rrset_t *rr_sigs = NULL;
 	if (kr_rank_test(entry->rank, KR_RANK_SECURE)) {
 		for (ssize_t j = arr->len - 1; j >= 0; --j) {
@@ -1178,11 +1337,12 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			    || knot_rrsig_type_covered(&e->rr->rrs, 0) != rr->type
 			    || !knot_dname_is_equal(rr->owner, e->rr->owner))
 			{
-				return kr_ok();
+				continue;
 			}
 			bool is_wild = knot_rrsig_labels(&e->rr->rrs, 0)
 				!= knot_dname_labels(e->rr->owner, NULL);
 			if (is_wild) {
+				VERBOSE_MSG(qry, "   2\n");
 				return kr_ok(); // FIXME, especially for NSEC1!
 			}
 			rr_sigs = e->rr;
@@ -1197,18 +1357,24 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 	knot_db_val_t key;
 	switch (ktype) {
 	case KNOT_RRTYPE_NSEC:
-		assert(rr_sigs->rrs.rr_count);
-		int zone_len = knot_dname_size(
-			knot_rrsig_signer_name(&rr_sigs->rrs, 0));
-		key = key_NSEC1(k, rr->owner, zone_len);
+		if (!rr_sigs || !rr_sigs->rrs.rr_count || !rr_sigs->rrs.data) {
+			assert(false);
+			return KR_STATE_FAIL;
+		}
+		const int zone_lf_len = knot_dname_size(
+			knot_rrsig_signer_name(&rr_sigs->rrs, 0)) - 1;
+		key = key_NSEC1(k, rr->owner, zone_lf_len);
 		break;
 	case KNOT_RRTYPE_CNAME:
 	case KNOT_RRTYPE_DNAME:
 		assert(false); // FIXME NOTIMPL ATM
 		ktype = KNOT_RRTYPE_NS; // fallthrough
 	default:
-		ret = knot_dname_lf(k->buf, rr->owner, NULL);
-		if (ret) return KR_STATE_FAIL;
+		ret = kr_dname_lf(k->buf, rr->owner, NULL);
+		if (ret) {
+			VERBOSE_MSG(qry, "   3\n");
+			return KR_STATE_FAIL;
+		}
 		k->name_len = k->buf[0];
 
 		key = key_exact_type(k, ktype);
@@ -1383,7 +1549,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 		kr_dname_print(name, "", " ");
 	}
 
-	int ret = knot_dname_lf(k->buf, name, NULL);
+	int ret = kr_dname_lf(k->buf, name, NULL);
 	if (ret) {
 		kr_log_verbose("ERROR!\n");
 		return KR_STATE_FAIL;
@@ -1440,6 +1606,7 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 		switch (ret) {
 		case 0: {
 			const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NS);
+			assert(eh);
 			if (!eh) break; // do something about EILSEQ?
 			int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
 			if (new_ttl < 0) break;
@@ -1455,7 +1622,14 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 		case (-abs(ENOENT)):
 			break;
 		default:
+			assert(false);
 			return NULL; // TODO: do something with kr_error(ret)?
+		}
+
+		WITH_VERBOSE {
+			VERBOSE_MSG(qry, "NS ");
+			kr_dname_print(k->dname, "", " NOT found, ");
+			kr_log_verbose("name length in LF: %d\n", k->name_len);
 		}
 
 		/* remove one more label */

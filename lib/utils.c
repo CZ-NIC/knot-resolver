@@ -799,6 +799,31 @@ void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *po
 
 int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf)
 {
-	//FIXME
-	assert(false);
+	bool ok = dst && (len == 0 || lf);
+	if (!ok) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
+	if (lf[len]) /* we allow the final zero byte to be omitted */
+		++len;
+	int label_end = len; /* index of the zero byte after the current label */
+	while (label_end >= 0) {
+		/* find label_start */
+		int i = len - 1;
+		while (i >= 0 && lf[i])
+			--i;
+		int label_start = i + 1; /* index of the first byte of the current label */
+		int label_len = label_end - label_start;
+		if (label_len > 63 || label_len == 0)
+			return kr_error(EILSEQ);
+		/* write the label */
+		*dst = label_len;
+		++dst;
+		memcpy(dst, lf + label_start, label_len);
+		dst += label_len;
+		/* next label */
+		label_end = i;
+	}
+	*dst = 0; /* the final zero */
+	return kr_ok();
 }

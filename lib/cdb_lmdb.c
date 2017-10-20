@@ -219,6 +219,7 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs)
 		ret = mdb_cursor_open(txn, env->dbi, &env->txn.ro_curs);
 	}
 	if (ret) return ret;
+	env->txn.ro_curs_active = true;
 success:
 	assert(env->txn.ro_curs_active && env->txn.ro && env->txn.ro_active
 		&& !env->txn.rw);

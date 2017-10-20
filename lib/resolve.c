@@ -596,6 +596,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	 * Be conservative.  Primary approach: check ranks of all RRs in wire.
 	 * Only "negative answers" need special handling. */
 	bool secure = (last != NULL); /* suspicious otherwise */
+	VERBOSE_MSG(NULL, "AD: secure (start)\n");
 	if (last && (last->flags.STUB)) {
 		secure = false; /* don't trust forwarding for now */
 	}
@@ -617,6 +618,7 @@ static int answer_finalize(struct kr_request *request, int state)
 		}
 	}
 
+	VERBOSE_MSG(NULL, "AD: secure (between ANS and AUTH)\n");
 	/* Write authority records. */
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
@@ -643,6 +645,7 @@ static int answer_finalize(struct kr_request *request, int state)
 
 	/* AD: "negative answers" need more handling. */
 	if (last && secure) {
+		VERBOSE_MSG(NULL, "AD: secure (1)\n");
 		if (kr_response_classify(answer) != PKT_NOERROR
 		    /* Additionally check for CNAME chains that "end in NODATA",
 		     * as those would also be PKT_NOERROR. */

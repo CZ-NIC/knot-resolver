@@ -292,7 +292,18 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 
 /** Convert name from lookup format to wire.  See knot_dname_lf
  *
- * \note len bytes are read and len+1 are written.
+ * \note len bytes are read and len+1 are written with *normal* LF,
+ * 	 but it's also allowed that the final zero byte is omitted in LF.
+ * \return error code
  */
 int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf);
 
+/** Patched knot_dname_lf.  LF for "." has length zero instead of one, for consistency.
+ */
+static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, const uint8_t *pkt)
+{
+	int ret = knot_dname_lf(dst, src, pkt);
+	if (!ret && dst[0] == 1)
+		dst[0] = 0;
+	return ret;
+};
