@@ -797,16 +797,23 @@ void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *po
 	kr_rrtype_print(qry->stype, " ", postfix);
 }
 
-int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf)
+int knot_dname_lf2wire(knot_dname_t *dst0, uint8_t len, const uint8_t *lf)
 {
+	knot_dname_t *dst = dst0;
 	bool ok = dst && (len == 0 || lf);
 	if (!ok) {
 		assert(false);
 		return kr_error(EINVAL);
 	}
-	if (lf[len]) /* we allow the final zero byte to be omitted */
+	/* we allow the final zero byte to be omitted */
+	if (!len) {
+		goto finish;
+	}
+	if (lf[len - 1]) {
 		++len;
-	int label_end = len; /* index of the zero byte after the current label */
+	}
+	/* convert the name, one label at a time */
+	int label_end = len - 1; /* index of the zero byte after the current label */
 	while (label_end >= 0) {
 		/* find label_start */
 		int i = len - 1;
@@ -824,6 +831,8 @@ int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf)
 		/* next label */
 		label_end = i;
 	}
+finish:
 	*dst = 0; /* the final zero */
-	return kr_ok();
+	++dst;
+	return dst - dst0;
 }

@@ -161,7 +161,7 @@ int kr_cache_clear(struct kr_cache *cache)
  *
  * 'E' entry (exact hit):
  *	- ktype == NS: multiple chained entry_h, based on has_* : 1 flags;
- *		FIXME: NSEC3 chain descriptors (iff nsec3_cnt > 0)
+ *		TODO: NSEC3 chain descriptors (iff nsec3_cnt > 0)
  *	- is_negative: uint16_t length, otherwise opaque ATM;
  *	- otherwise RRset + its RRSIG set (possibly empty).
  * */
@@ -562,10 +562,6 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, int zone
 		return (knot_db_val_t){};
 	}
 
-	VERBOSE_MSG(NULL, "<> key_NSEC1; ");
-	kr_dname_print(name, "name: ", " ");
-	kr_log_verbose("(zone name LF length: %d)\n", zonename_len);
-
 	uint8_t *begin = k->buf + 1 + zonename_len; /* one byte after zone's zero */
 	uint8_t *end = k->buf + 1 + k->buf[0]; /* we don't use the final zero in key,
 						* but move it anyway */
@@ -573,13 +569,26 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, int zone
 		assert(false);
 		return (knot_db_val_t){};
 	}
-	if (end > begin)
+	int key_len;
+	if (end > begin) {
 		memmove(begin + 2, begin, end - begin);
+		key_len = k->buf[0] + 1;
+	} else {
+		key_len = k->buf[0] + 2;
+	}
+	/* CACHE_KEY_DEF: key == zone's dname_lf + 0 + '1' + dname_lf
+	 * of the name within the zone without the final 0.  Iff the latter is empty,
+	 * there's no zero to cut and thus the key_len difference.
+	 */
 	begin[0] = 0;
 	begin[1] = '1'; /* tag for NSEC1 */
-	/* CACHE_KEY_DEF: key == zone's dname_lf + 0 + '1' + dname_lf
-	 * of the name within the zone without the final 0 */
-	return (knot_db_val_t){ k->buf + 1, k->buf[0] + 1 };
+
+	VERBOSE_MSG(NULL, "<> key_NSEC1; ");
+	kr_dname_print(name, "name: ", " ");
+	kr_log_verbose("(zone name LF length: %d; total key length: %d)\n",
+			zonename_len, key_len);
+
+	return (knot_db_val_t){ k->buf + 1, key_len };
 }
 
 
@@ -786,17 +795,17 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 				ret = knot_dname_lf2wire(dname_buf, key.len - nwz_off,
 							 key.data + nwz_off);
 					/* CACHE_KEY_DEF */
-				if (ret) break;
-				ret = knot_dname_to_wire(dname_buf + (key.len - nwz_off), k->dname,
-								/* TODO: messy zone name ^^ */
-						   KNOT_DNAME_MAXLEN - (key.len-nwz_off));
+				VERBOSE_MSG(qry, "=> NSEC: LF2wire ret = %d\n", ret);
+				if (ret < 0) break;
+				ret = knot_dname_to_wire(dname_buf + ret, k->dname,
+						/* TODO: messy zone name ^^ */
+						KNOT_DNAME_MAXLEN - (key.len-nwz_off));
 				if (ret != zname_lf_len + 1) {
 					assert(false);
 					break;
 				}
 				owner = dname_buf;
 			}
-			VERBOSE_MSG(qry, "=> NSEC: LF2wire OK\n");
 
 			/* Basic checks OK -> materialize data. */
 			ret = entry2answer(&ans, AR_NSEC, eh, eh_data_bound,
@@ -1100,7 +1109,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 }
 
 
-/** FIXME: description; see the single call site for now. */
+/** TODO: description; see the single call site for now. */
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 			   uint8_t lowest_rank, uint16_t ktype)
 {

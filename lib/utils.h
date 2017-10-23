@@ -294,7 +294,7 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
  *
  * \note len bytes are read and len+1 are written with *normal* LF,
  * 	 but it's also allowed that the final zero byte is omitted in LF.
- * \return error code
+ * \return the number of bytes written (>0) or error code (<0)
  */
 int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf);
 
