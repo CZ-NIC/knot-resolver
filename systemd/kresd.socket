@@ -8,6 +8,7 @@ ListenStream=[::1]:53
 ListenDatagram=[::1]:53
 ListenStream=127.0.0.1:53
 ListenDatagram=127.0.0.1:53
+FreeBind=true
 
 [Install]
 WantedBy=sockets.target
