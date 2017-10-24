@@ -215,12 +215,18 @@ static struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 
 
 struct key {
-	const knot_dname_t *dname; /**< corresponding dname (points within qry->sname) */
+	const knot_dname_t *zname; /**< current zone name (points within qry->sname) */
+	uint8_t zlf_len; /**< length of current zone's lookup format */
+
 	uint16_t type; /**< corresponding type */
-	uint8_t name_len; /**< current length of the name in buf */
 	uint8_t buf[KR_CACHE_KEY_MAXLEN];
 };
 
+static inline size_t key_nwz_off(const struct key *k)
+{
+	/* CACHE_KEY_DEF: zone name lf + 0 '1' + name within zone */
+	return k->zlf_len + 2;
+}
 
 
 static int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
@@ -549,16 +555,20 @@ static bool check_dname_for_lf(const knot_dname_t *n)
 /** TODO */
 static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
 {
-	k->buf[k->name_len + 1] = 0; /* make sure different names can never match */
-	k->buf[k->name_len + 2] = 'E'; /* tag for exact name+type matches */
-	memcpy(k->buf + k->name_len + 3, &ktype, 2);
+	int name_len = k->buf[0];
+	k->buf[name_len + 1] = 0; /* make sure different names can never match */
+	k->buf[name_len + 2] = 'E'; /* tag for exact name+type matches */
+	memcpy(k->buf + name_len + 3, &ktype, 2);
 	k->type = ktype;
 	/* CACHE_KEY_DEF: key == dname_lf + '\0' + 'E' + RRTYPE */
-	return (knot_db_val_t){ k->buf + 1, k->name_len + 4 };
+	return (knot_db_val_t){ k->buf + 1, name_len + 4 };
 }
 
-/** TODO */
-static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, int zonename_len)
+/** TODO
+ * \param add_wildcard Whether to extend the name by "*."
+ */
+static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name,
+				bool add_wildcard)
 {
 	/* we basically need dname_lf with two bytes added
 	 * on a correct place within the name (the cut) */
@@ -570,7 +580,7 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, int zone
 		return (knot_db_val_t){};
 	}
 
-	uint8_t *begin = k->buf + 1 + zonename_len; /* one byte after zone's zero */
+	uint8_t *begin = k->buf + 1 + k->zlf_len; /* one byte after zone's zero */
 	uint8_t *end = k->buf + 1 + k->buf[0]; /* we don't use the final zero in key,
 						* but move it anyway */
 	if (end < begin) {
@@ -584,6 +594,13 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, int zone
 	} else {
 		key_len = k->buf[0] + 2;
 	}
+	if (add_wildcard) {
+		if (end > begin) {
+			/* not directly under zone name -> need separator */
+			k->buf[1 + key_len++] = 0;
+		}
+		k->buf[1 + key_len++] = '*';
+	}
 	/* CACHE_KEY_DEF: key == zone's dname_lf + 0 + '1' + dname_lf
 	 * of the name within the zone without the final 0.  Iff the latter is empty,
 	 * there's no zero to cut and thus the key_len difference.
@@ -594,11 +611,129 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, int zone
 	VERBOSE_MSG(NULL, "<> key_NSEC1; ");
 	kr_dname_print(name, "name: ", " ");
 	kr_log_verbose("(zone name LF length: %d; total key length: %d)\n",
-			zonename_len, key_len);
+			k->zlf_len, key_len);
 
 	return (knot_db_val_t){ k->buf + 1, key_len };
 }
 
+/**
+ * \note k1.data may be NULL, meaning the lower bound shouldn't be checked
+ */
+static bool kwz_between(knot_db_val_t k1, knot_db_val_t k2, knot_db_val_t k3)
+{
+	assert(k2.data && k3.data);
+	/* CACHE_KEY_DEF */
+	return (!k1.data || memcmp(k1.data, k2.data, MIN(k1.len, k2.len)) < 0)
+		&& (k3.len == 0 /* wrap-around */
+			|| memcmp(k2.data, k3.data, MIN(k2.len, k3.len)) < 0
+		   );
+}
+
+/** NSEC1 range search.
+ *
+ * \param key Pass output of key_NSEC1(k, ...)
+ * \param exact_match[out] Whether the key was matched exactly or just covered (optional).
+ * \param kwz_low[out] Output the low end of covering NSEC, pointing within `key` (optional).
+ * \param kwz_high[in,out] Storage for the end of covering NSEC (optional).
+ * \return Error message or NULL.
+ */
+static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query *qry,
+			knot_db_val_t key, const struct key *k, bool *exact_match,
+			knot_db_val_t *kwz_low, knot_db_val_t *kwz_high)
+{
+	/* Do the cache operation. */
+	const size_t nwz_off = key_nwz_off(k);
+	if (!key.data || key.len < nwz_off) {
+		assert(false);
+		return "range search ERROR";
+	}
+	knot_db_val_t val = { };
+	int ret = cache_op(cache, read_leq, &key, &val);
+	if (ret < 0) {
+		if (ret == kr_error(ENOENT)) {
+			return "range search miss";
+		} else {
+			assert(false);
+			return "range search ERROR";
+		}
+	}
+	/* Check consistency, TTL, rank. */
+	const bool is_exact = (ret == 0);
+	if (exact_match) {
+		*exact_match = is_exact;
+	}
+	const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NSEC);
+	void *eh_data_bound = val.data + val.len;
+	if (!eh) {
+		assert(false);
+		return "range search found inconsistent entry";
+	}
+	int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+	if (new_ttl < 0 || !kr_rank_test(eh->rank, KR_RANK_SECURE)) {
+		return "range search found stale entry";
+		// TODO: remove the stale record *and* retry
+	}
+	if (is_exact) {
+		/* Nothing else to do. */
+		return NULL;
+	}
+	/* The NSEC starts strictly before our target name;
+	 * check that it's still within the zone and that
+	 * it ends strictly after the sought name
+	 * (or points to origin). */
+	bool in_zone = key.len >= nwz_off
+		/* CACHE_KEY_DEF */
+		&& memcmp(k->buf + 1, key.data, nwz_off) == 0;
+	if (!in_zone) {
+		return "range search miss (!in_zone)";
+	}
+	/* We know it starts before sname, so let's check the other end.
+	 * 1. construct the key for the next name - kwz_hi. */
+	const knot_dname_t *next = eh->data + 3; /* it's *full* name ATM */
+	if (!eh->data[0]) {
+		assert(false);
+		return "ERROR";
+		/* TODO: more checks?  Also, `data + 3` is kinda messy. */
+	}
+	WITH_VERBOSE {
+		VERBOSE_MSG(qry, "=> NSEC: next name: ");
+		kr_dname_print(next, "", "\n");
+	}
+	knot_dname_t ch_buf[KNOT_DNAME_MAXLEN];
+	knot_dname_t *chs = kwz_high ? kwz_high->data : ch_buf;
+	ret = kr_dname_lf(chs, next, NULL);
+	if (ret) {
+		assert(false);
+		return "ERROR";
+	}
+	knot_db_val_t kwz_hi = { /* skip the zone name */
+		.data = chs + 1 + k->zlf_len,
+		.len = chs[0] - k->zlf_len,
+	};
+	assert((ssize_t)(kwz_hi.len) >= 0);
+	/* 2. do the actual range check. */
+	const knot_db_val_t kwz_sname = {
+		.data = (void *)k->buf + 1 + nwz_off,
+		.len = k->buf[0] - k->zlf_len,
+	};
+	assert((ssize_t)(kwz_sname.len) >= 0);
+	bool covers = kwz_between((knot_db_val_t){} /*we know it's before*/,
+				  kwz_sname, kwz_hi);
+	if (!covers) {
+		return "range search miss (!covers)";
+	}
+	/* Output data. */
+	if (kwz_low) {
+		*kwz_low = (knot_db_val_t){
+			.data = key.data + nwz_off,
+			.len = key.len - nwz_off,
+		};	/* CACHE_KEY_DEF */
+	}
+	if (kwz_high) {
+		*kwz_high = kwz_hi;
+	}
+	return NULL;
+}
 
 
 /** function for .produce phase */
@@ -627,7 +762,6 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret) {
 		return KR_STATE_FAIL;
 	}
-	k->name_len = k->buf[0];
 
 	const uint8_t lowest_rank = get_lowest_rank(req, qry);
 	// FIXME: the whole approach to +cd answers
@@ -663,16 +797,15 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
-	k->dname = qry->sname;
+	k->zname = qry->sname;
 	kr_dname_lf(k->buf, qry->sname, NULL); /* LATER(optim.): probably remove */
-	k->name_len = k->buf[0];
 	const struct entry_h *eh = closest_NS(ctx, k);
 	if (!eh) {
 		VERBOSE_MSG(qry, "=> not even root NS in cache\n");
 		return ctx->state; /* nothing to do without any NS at all */
 	}
 	VERBOSE_MSG(qry, "=> trying zone: ");
-	kr_dname_print(k->dname, "", "\n");
+	kr_dname_print(k->zname, "", "\n");
 #if 0
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
@@ -697,7 +830,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Now `eh` points to the closest NS record that we've found,
 	 * and that's the only place to start - we may either find
 	 * a negative proof or we may query upstream from that point. */
-	kr_zonecut_set(&qry->zone_cut, k->dname);
+	kr_zonecut_set(&qry->zone_cut, k->zname);
 	ret = kr_make_query(qry, pkt); // FIXME: probably not yet - qname minimization
 	if (ret) return KR_STATE_FAIL;
 #endif
@@ -719,9 +852,15 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct answer ans = {};
 	ans.mm = &pkt->mm;
 
+	/* Start of NSEC* covering the sname;
+	 * it's part of key - the one within zone (read only) */
+	knot_db_val_t cover_low_kwz = {}, cover_hi_kwz = {};
+	knot_dname_t cover_hi_storage[KNOT_DNAME_MAXLEN];
+
 	/** 2. closest (provable) encloser.
 	 * iterate over all NSEC* chain parameters
 	 */
+	int clencl_labels = -1;
 	//while (true) { //for (int i_nsecp = 0; i
 		assert(eh->nsec1_pos <= 1);
 		int nsec = 1;
@@ -732,8 +871,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			
 			ans.nsec_v = 1;
 			//nsec_leq()
-			const int zname_lf_len = k->name_len; /* zone name lf length */
-			knot_db_val_t key = key_NSEC1(k, qry->sname, zname_lf_len);
+			knot_db_val_t key = key_NSEC1(k, qry->sname, false);
 			const int sname_lf_len = k->buf[0];
 			if (!key.data) break; /* FIXME: continue?
 				similarly: other breaks here - also invalidate ans AR_NSEC */
@@ -754,15 +892,12 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 				break;
 			}
 
-			knot_dname_t dname_buf[KNOT_DNAME_MAXLEN];
-			size_t nwz_off = zname_lf_len + 2;
-				/* CACHE_KEY_DEF: zone name lf + 0 '1' + name within zone */
-
 			if (!exact_match) {
 				/* The NSEC starts strictly before our target name;
 				 * check that it's still within the zone and that
 				 * it ends strictly after the sought name
 				 * (or points to origin). */
+				const size_t nwz_off = key_nwz_off(k);
 				bool in_zone = key.len >= nwz_off
 					/* CACHE_KEY_DEF */
 					&& memcmp(k->buf + 1, key.data, nwz_off) == 0;
@@ -770,6 +905,11 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 					VERBOSE_MSG(qry, "=> NSEC: range search miss (!in_zone)\n");
 					break;
 				}
+				cover_low_kwz = (knot_db_val_t){ //WILD: not useful
+					.data = key.data + nwz_off,
+					.len = key.len - nwz_off,
+				};	/* CACHE_KEY_DEF */
+				/* We know it starts before sname, so let's check the other end. */
 				const knot_dname_t *next = eh->data + 3; /* it's *full* name ATM */
 				if (!eh->data[0]) {
 					assert(false);
@@ -780,42 +920,44 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 					VERBOSE_MSG(qry, "=> NSEC: next name: ");
 					kr_dname_print(next, "", "\n");
 				}
-				uint8_t *next_lf = dname_buf;
-				ret = kr_dname_lf(next_lf, next, NULL);
+				ret = kr_dname_lf(cover_hi_storage, next, NULL);
 				if (ret) break;
-				int next_nwz_len = next_lf[0] - zname_lf_len;
-				next_lf += 1 + zname_lf_len; /* skip the zone name */
-				assert(next_nwz_len >= 0);
-				bool covers = next_nwz_len == 0
-					/* CACHE_KEY_DEF */
-					|| memcmp(k->buf + 1 + nwz_off, next_lf,
-						  MIN(sname_lf_len - zname_lf_len, next_nwz_len)
-						) < 0;
+				cover_hi_kwz = (knot_db_val_t){ /* skip the zone name */
+					.data = cover_hi_storage + 1 + k->zlf_len,
+					.len = cover_hi_storage[0] - k->zlf_len,
+				}; //WILD: ^^ not useful
+				assert((ssize_t)(cover_hi_kwz.len) >= 0);
+				const knot_db_val_t sname_kwz = {
+					.data = k->buf + 1 + nwz_off,
+					.len = sname_lf_len - k->zlf_len,
+				};
+				bool covers = kwz_between((knot_db_val_t){} /*we know it's before*/,
+							sname_kwz, cover_hi_kwz);
 				if (!covers) {
 					VERBOSE_MSG(qry, "=> NSEC: range search miss (!covers)\n");
+					cover_low_kwz = cover_hi_kwz = (knot_db_val_t){};
 					break;
 				}
 			}
 
-			/* Get owner name of the record. */
+			/* Get owner name of the record. */ //WILD: different, expanded owner
 			const knot_dname_t *owner;
+			knot_dname_t owner_buf[KNOT_DNAME_MAXLEN];
 			if (exact_match) {
 				owner = qry->sname;
 			} else {
 				/* Reconstruct from key: first the ending, then zone name. */
-				ret = knot_dname_lf2wire(dname_buf, key.len - nwz_off,
-							 key.data + nwz_off);
-					/* CACHE_KEY_DEF */
+				ret = knot_dname_lf2wire(owner_buf, cover_low_kwz.len,
+							 cover_low_kwz.data);
 				VERBOSE_MSG(qry, "=> NSEC: LF2wire ret = %d\n", ret);
 				if (ret < 0) break;
-				ret = knot_dname_to_wire(dname_buf + ret, k->dname,
-						/* TODO: messy zone name ^^ */
-						KNOT_DNAME_MAXLEN - (key.len-nwz_off));
-				if (ret != zname_lf_len + 1) {
+				ret = knot_dname_to_wire(owner_buf + ret, k->zname,
+						KNOT_DNAME_MAXLEN - cover_low_kwz.len);
+				if (ret != k->zlf_len + 1) {
 					assert(false);
 					break;
 				}
-				owner = dname_buf;
+				owner = owner_buf;
 			}
 
 			/* Basic checks OK -> materialize data. */
@@ -824,10 +966,11 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (ret) break;
 			VERBOSE_MSG(qry, "=> NSEC: materialized OK\n");
 
+			const knot_rrset_t *nsec_rr = ans.rrsets[AR_NSEC].set.rr;
 			if (exact_match) {
 				uint8_t *bm = NULL;
 				uint16_t bm_size;
-				knot_nsec_bitmap(&ans.rrsets[AR_NSEC].set.rr->rrs,
+				knot_nsec_bitmap(&nsec_rr->rrs,
 						 &bm, &bm_size);
 				if (!bm || kr_nsec_bitmap_contains_type(bm, bm_size, qry->stype)) {
 					//FIXME: clear the answer?
@@ -841,6 +984,15 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			} else { /* inexact match; NXDOMAIN proven *except* for wildcards */
 				VERBOSE_MSG(qry, "=> NSEC: exact match covered\n");
 				ans.rcode = PKT_NXDOMAIN;
+				/* Find label count of the closest encloser.
+				 * Both points in an NSEC do exist and any prefixes
+				 * of those names as well (empty non-terminals),
+				 * but nothing else does inside this "triangle".
+				 */
+				clencl_labels = MAX(
+					knot_dname_matched_labels(nsec_rr->owner, qry->sname),
+					knot_dname_matched_labels(qry->sname, knot_nsec_next(&nsec_rr->rrs))
+					);
 				break;
 			}
 
@@ -851,16 +1003,53 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	//}
 
-	/** 3. wildcard checks.  FIXME
+
+	/** 3. wildcard checks, in case we found non-existence.
 	 */
-	if (ans.nsec_v == 1 && ans.rcode == PKT_NODATA) {
-		// no wildcard checks needed
+	if (ans.rcode == PKT_NODATA) {
+		/* no wildcard checks needed */
+		assert(ans.nsec_v == 1); // for now
+
+	} else if (ans.nsec_v == 1 && ans.rcode == PKT_NXDOMAIN) {
+		/* First try to prove that source of synthesis doesn't exist either. */
+		/* Construct key for the source of synthesis. */
+		const knot_dname_t *ss_name = qry->sname;
+		for (int l = knot_dname_labels(qry->sname, NULL); l > clencl_labels; --l)
+			ss_name = knot_wire_next_label(ss_name, NULL);
+		key = key_NSEC1(k, ss_name, true);
+		const size_t nwz_off = key_nwz_off(k);
+		if (!key.data || key.len < nwz_off) {
+			assert(false);
+			return ctx->state;
+		}
+		knot_db_val_t kwz = {
+			.data = key.data + nwz_off,
+			.len = key.len - nwz_off,
+		};
+		/* If our covering NSEC already covers it as well, we're fine. */
+		if (kwz_between(cover_low_kwz, kwz, cover_hi_kwz)) {
+			VERBOSE_MSG(qry, "=> NSEC: covering RR covers also wildcard\n");
+			goto do_soa;
+		}
+		/* Try to find the NSEC */
+		knot_db_val_t val = { };
+		ret = cache_op(cache, read_leq, &key, &val);
+		if (ret < 0) {
+			VERBOSE_MSG(qry, "=> NSEC: wildcard proof miss\n");
+			return ctx->state;
+		}
+		//FIXME
+	} else {
+		//TODO NSEC3
+		assert(false);
 	}
 
 	/** 4. add SOA iff needed
 	 */
+do_soa:
 	if (ans.rcode != PKT_NOERROR) {
 		/* assuming k->buf still starts with zone's prefix */
+		k->buf[0] = k->zlf_len;
 		key = key_exact_type(k, KNOT_RRTYPE_SOA);
 		knot_db_val_t val = { };
 		ret = cache_op(cache, read, &key, &val, 1);
@@ -875,8 +1064,9 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return ctx->state;
 		}
 		ret = entry2answer(&ans, AR_SOA, eh, eh_data_bound,
-				   k->dname, KNOT_RRTYPE_SOA, new_ttl);
+				   k->zname, KNOT_RRTYPE_SOA, new_ttl);
 		if (ret) return ctx->state;
+		VERBOSE_MSG(qry, "=> added SOA\n");
 	}
 
 
@@ -1042,9 +1232,8 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			assert(false);
 			return KR_STATE_FAIL;
 		}
-		const int zone_lf_len = knot_dname_size(
-			knot_rrsig_signer_name(&rr_sigs->rrs, 0)) - 1;
-		key = key_NSEC1(k, rr->owner, zone_lf_len);
+		k->zlf_len = knot_dname_size(knot_rrsig_signer_name(&rr_sigs->rrs, 0)) - 1;
+		key = key_NSEC1(k, rr->owner, false);
 		break;
 	case KNOT_RRTYPE_CNAME:
 	case KNOT_RRTYPE_DNAME:
@@ -1056,8 +1245,6 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			VERBOSE_MSG(qry, "   3\n");
 			return KR_STATE_FAIL;
 		}
-		k->name_len = k->buf[0];
-
 		key = key_exact_type(k, ktype);
 	}
 
@@ -1235,7 +1422,6 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 		kr_log_verbose("ERROR!\n");
 		return KR_STATE_FAIL;
 	}
-	k->name_len = k->buf[0];
 
 	uint16_t ktype = type;
 	if (ktype == KNOT_RRTYPE_CNAME || ktype == KNOT_RRTYPE_DNAME) {
@@ -1277,6 +1463,8 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 
+	int zlf_len = k->buf[0];
+
 	// FIXME: DS is parent-side record
 	bool exact_match = true;
 	// LATER(optim): if stype is NS, we check the same value again
@@ -1298,6 +1486,7 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 			}
 			/* any kr_rank is accepted, as insecure or even nonauth is OK */
 			k->type = KNOT_RRTYPE_NS;
+			k->zlf_len = zlf_len;
 			return eh;
 			}
 		case (-abs(ENOENT)):
@@ -1309,18 +1498,18 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 
 		WITH_VERBOSE {
 			VERBOSE_MSG(qry, "NS ");
-			kr_dname_print(k->dname, "", " NOT found, ");
-			kr_log_verbose("name length in LF: %d\n", k->name_len);
+			kr_dname_print(k->zname, "", " NOT found, ");
+			kr_log_verbose("name length in LF: %d\n", k->zlf_len);
 		}
 
 		/* remove one more label */
 		exact_match = false;
-		if (k->dname[0] == 0) { /* missing root NS in cache */
+		if (k->zname[0] == 0) { /* missing root NS in cache */
 			return NULL;
 		}
-		k->name_len -= (k->dname[0] + 1);
-		k->dname += (k->dname[0] + 1);
-		k->buf[k->name_len + 1] = 0;
+		zlf_len -= (k->zname[0] + 1);
+		k->zname += (k->zname[0] + 1);
+		k->buf[zlf_len + 1] = 0;
 	} while (true);
 }
 
