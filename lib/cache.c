@@ -534,8 +534,16 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 
 
 
-
-
+/** Check that no label contains a zero character.
+ *
+ * We refuse to work with those, as LF and our cache keys might become ambiguous.
+ * Assuming uncompressed name, as usual.
+ * CACHE_KEY_DEF
+ */
+static bool check_dname_for_lf(const knot_dname_t *n)
+{
+	return knot_dname_size(n) == strlen((const char *)n) + 1;
+}
 
 
 /** TODO */
@@ -612,6 +620,9 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 
 	struct key k_storage, *k = &k_storage;
+	if (!check_dname_for_lf(qry->sname)) {
+		return ctx->state;
+	}
 	int ret = kr_dname_lf(k->buf, qry->sname, NULL);
 	if (ret) {
 		return KR_STATE_FAIL;
@@ -970,6 +981,13 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 	if (!rr) {
 		assert(false);
 		return KR_STATE_FAIL;
+	}
+	if (!check_dname_for_lf(rr->owner)) {
+		WITH_VERBOSE {
+			VERBOSE_MSG(qry, "=> skipping zero-containing name ");
+			kr_dname_print(rr->owner, "", "\n");
+		}
+		return kr_ok();
 	}
 
 
