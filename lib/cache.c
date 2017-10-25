@@ -622,11 +622,18 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name,
 static bool kwz_between(knot_db_val_t k1, knot_db_val_t k2, knot_db_val_t k3)
 {
 	assert(k2.data && k3.data);
-	/* CACHE_KEY_DEF */
-	return (!k1.data || memcmp(k1.data, k2.data, MIN(k1.len, k2.len)) < 0)
-		&& (k3.len == 0 /* wrap-around */
-			|| memcmp(k2.data, k3.data, MIN(k2.len, k3.len)) < 0
-		   );
+	/* CACHE_KEY_DEF; we need to beware of one key being a prefix of another */
+	if (k1.data) {
+		int cmp12 = memcmp(k1.data, k2.data, MIN(k1.len, k2.len));
+		bool ok = cmp12 < 0 || (cmp12 == 0 && k1.len < k2.len);
+		if (!ok) return false;
+	}
+	if (k3.len == 0) { /* wrap-around */
+		return k2.len > 0;
+	} else {
+		int cmp23 = memcmp(k2.data, k3.data, MIN(k2.len, k3.len));
+		return cmp23 < 0 || (cmp23 == 0 && k2.len < k3.len);
+	}
 }
 
 /** NSEC1 range search.
