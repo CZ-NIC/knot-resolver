@@ -273,12 +273,14 @@ struct answer {
 	struct answer_rrset {
 		ranked_rr_array_entry_t set;	/**< set+rank for the main data */
 		knot_rdataset_t sig_rds;	/**< RRSIG data, if any */
-	} rrsets[1+1+3]; /**< answer, SOA, 3*NSECx (at most, all optional) */
+	} rrsets[1+1+3]; /**< see AR_ANSWER and friends; only required records are filled */
 };
 enum {
-	AR_ANSWER = 0,
-	AR_SOA,
-	AR_NSEC,
+	AR_ANSWER = 0,	/**< Positive answer record.  It might be wildcard-expanded. */
+	AR_SOA, 	/**< SOA record. */
+	AR_NSEC,	/**< NSEC* covering the SNAME. */
+	AR_WILD,	/**< NSEC* covering or matching the source of synthesis. */
+	AR_CPE, 	/**< NSEC3 matching the closest provable encloser. */
 };
 
 
@@ -565,7 +567,7 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
 }
 
 /** TODO
- * \param add_wildcard Whether to extend the name by "*."
+ * \param add_wildcard Act as if the name was extended by "*."
  */
 static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name,
 				bool add_wildcard)
@@ -600,6 +602,7 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name,
 			k->buf[1 + key_len++] = 0;
 		}
 		k->buf[1 + key_len++] = '*';
+		k->buf[0] += 2;
 	}
 	/* CACHE_KEY_DEF: key == zone's dname_lf + 0 + '1' + dname_lf
 	 * of the name within the zone without the final 0.  Iff the latter is empty,
@@ -639,14 +642,16 @@ static bool kwz_between(knot_db_val_t k1, knot_db_val_t k2, knot_db_val_t k3)
 /** NSEC1 range search.
  *
  * \param key Pass output of key_NSEC1(k, ...)
+ * \param val[out] The raw data of the NSEC cache record (optional; consistency checked).
  * \param exact_match[out] Whether the key was matched exactly or just covered (optional).
  * \param kwz_low[out] Output the low end of covering NSEC, pointing within `key` (optional).
- * \param kwz_high[in,out] Storage for the end of covering NSEC (optional).
+ * \param kwz_high[in,out] Storage for the high end of covering NSEC (optional).
  * \return Error message or NULL.
  */
 static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query *qry,
-			knot_db_val_t key, const struct key *k, bool *exact_match,
-			knot_db_val_t *kwz_low, knot_db_val_t *kwz_high)
+			knot_db_val_t key, const struct key *k, knot_db_val_t *value,
+			bool *exact_match, knot_db_val_t *kwz_low, knot_db_val_t *kwz_high,
+			uint32_t *new_ttl)
 {
 	/* Do the cache operation. */
 	const size_t nwz_off = key_nwz_off(k);
@@ -664,6 +669,9 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 			return "range search ERROR";
 		}
 	}
+	if (value) {
+		*value = val;
+	}
 	/* Check consistency, TTL, rank. */
 	const bool is_exact = (ret == 0);
 	if (exact_match) {
@@ -675,10 +683,13 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		assert(false);
 		return "range search found inconsistent entry";
 	}
-	int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
-	if (new_ttl < 0 || !kr_rank_test(eh->rank, KR_RANK_SECURE)) {
+	int32_t new_ttl_ = get_new_ttl(eh, qry->creation_time.tv_sec);
+	if (new_ttl_ < 0 || !kr_rank_test(eh->rank, KR_RANK_SECURE)) {
 		return "range search found stale entry";
 		// TODO: remove the stale record *and* retry
+	}
+	if (new_ttl) {
+		*new_ttl = new_ttl_;
 	}
 	if (is_exact) {
 		/* Nothing else to do. */
@@ -708,6 +719,10 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	}
 	knot_dname_t ch_buf[KNOT_DNAME_MAXLEN];
 	knot_dname_t *chs = kwz_high ? kwz_high->data : ch_buf;
+	if (!chs) {
+		assert(false);
+		return "EINVAL";
+	}
 	ret = kr_dname_lf(chs, next, NULL);
 	if (ret) {
 		assert(false);
@@ -742,6 +757,24 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	return NULL;
 }
 
+/** Reconstruct a name into a buffer (assuming length at least KNOT_DNAME_MAXLEN). */
+int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
+			   knot_db_val_t kwz)
+{
+	/* Reconstruct from key: first the ending, then zone name. */
+	int ret = knot_dname_lf2wire(buf, kwz.len, kwz.data);
+	if (ret < 0) {
+		VERBOSE_MSG(NULL, "=> NSEC: LF2wire ret = %d\n", ret);
+		assert(false);
+		return ret;
+	}
+	ret = knot_dname_to_wire(buf + ret, k->zname, KNOT_DNAME_MAXLEN - kwz.len);
+	if (ret != k->zlf_len + 1) {
+		assert(false);
+		return ret < 0 ? ret : kr_error(EILSEQ);
+	}
+	return kr_ok();
+}
 
 /** function for .produce phase */
 int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -861,14 +894,20 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Start of NSEC* covering the sname;
 	 * it's part of key - the one within zone (read only) */
-	knot_db_val_t cover_low_kwz = {}, cover_hi_kwz = {};
 	knot_dname_t cover_hi_storage[KNOT_DNAME_MAXLEN];
+	knot_db_val_t cover_low_kwz = {};
+	knot_db_val_t cover_hi_kwz = {
+		.data = cover_hi_storage,
+		.len = sizeof(cover_hi_storage),
+	};
 
 	/** 2. closest (provable) encloser.
 	 * iterate over all NSEC* chain parameters
 	 */
 	int clencl_labels = -1;
 	//while (true) { //for (int i_nsecp = 0; i
+	// TODO(NSEC3): better signalling when to "continue;" and when to "break;"
+	// incl. clearing partial answers in `ans`
 		assert(eh->nsec1_pos <= 1);
 		int nsec = 1;
 		switch (nsec) {
@@ -879,73 +918,18 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			ans.nsec_v = 1;
 			//nsec_leq()
 			knot_db_val_t key = key_NSEC1(k, qry->sname, false);
-			const int sname_lf_len = k->buf[0];
-			if (!key.data) break; /* FIXME: continue?
-				similarly: other breaks here - also invalidate ans AR_NSEC */
-			knot_db_val_t val = { };
-			ret = cache_op(cache, read_leq, &key, &val);
-			if (ret < 0) {
-				VERBOSE_MSG(qry, "=> NSEC: range search miss\n");
-				break;
-			}
-			bool exact_match = (ret == 0);
-			const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NSEC);
-			void *eh_data_bound = val.data + val.len;
-			if (!eh) break;
-			int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
-			if (new_ttl < 0 || !kr_rank_test(eh->rank, KR_RANK_SECURE)) {
-				VERBOSE_MSG(qry, "=> NSEC: range search found stale entry\n");
-				// TODO: remove the stale record *and* retry
+			knot_db_val_t val = {};
+			bool exact_match;
+			uint32_t new_ttl;
+			const char *err = find_leq_NSEC1(cache, qry, key, k, &val,
+					&exact_match, &cover_low_kwz, &cover_hi_kwz, &new_ttl);
+			if (err) {
+				VERBOSE_MSG(qry, "=> NSEC: %s\n", err);
 				break;
 			}
 
-			if (!exact_match) {
-				/* The NSEC starts strictly before our target name;
-				 * check that it's still within the zone and that
-				 * it ends strictly after the sought name
-				 * (or points to origin). */
-				const size_t nwz_off = key_nwz_off(k);
-				bool in_zone = key.len >= nwz_off
-					/* CACHE_KEY_DEF */
-					&& memcmp(k->buf + 1, key.data, nwz_off) == 0;
-				if (!in_zone) {
-					VERBOSE_MSG(qry, "=> NSEC: range search miss (!in_zone)\n");
-					break;
-				}
-				cover_low_kwz = (knot_db_val_t){ //WILD: not useful
-					.data = key.data + nwz_off,
-					.len = key.len - nwz_off,
-				};	/* CACHE_KEY_DEF */
-				/* We know it starts before sname, so let's check the other end. */
-				const knot_dname_t *next = eh->data + 3; /* it's *full* name ATM */
-				if (!eh->data[0]) {
-					assert(false);
-					break;
-					/* TODO: more checks?  Also, `data + 3` is kinda messy. */
-				}
-				WITH_VERBOSE {
-					VERBOSE_MSG(qry, "=> NSEC: next name: ");
-					kr_dname_print(next, "", "\n");
-				}
-				ret = kr_dname_lf(cover_hi_storage, next, NULL);
-				if (ret) break;
-				cover_hi_kwz = (knot_db_val_t){ /* skip the zone name */
-					.data = cover_hi_storage + 1 + k->zlf_len,
-					.len = cover_hi_storage[0] - k->zlf_len,
-				}; //WILD: ^^ not useful
-				assert((ssize_t)(cover_hi_kwz.len) >= 0);
-				const knot_db_val_t sname_kwz = {
-					.data = k->buf + 1 + nwz_off,
-					.len = sname_lf_len - k->zlf_len,
-				};
-				bool covers = kwz_between((knot_db_val_t){} /*we know it's before*/,
-							sname_kwz, cover_hi_kwz);
-				if (!covers) {
-					VERBOSE_MSG(qry, "=> NSEC: range search miss (!covers)\n");
-					cover_low_kwz = cover_hi_kwz = (knot_db_val_t){};
-					break;
-				}
-			}
+			const struct entry_h *nsec_eh = val.data;
+			const void *nsec_eh_bound = val.data + val.len;
 
 			/* Get owner name of the record. */ //WILD: different, expanded owner
 			const knot_dname_t *owner;
@@ -953,22 +937,13 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (exact_match) {
 				owner = qry->sname;
 			} else {
-				/* Reconstruct from key: first the ending, then zone name. */
-				ret = knot_dname_lf2wire(owner_buf, cover_low_kwz.len,
-							 cover_low_kwz.data);
-				VERBOSE_MSG(qry, "=> NSEC: LF2wire ret = %d\n", ret);
-				if (ret < 0) break;
-				ret = knot_dname_to_wire(owner_buf + ret, k->zname,
-						KNOT_DNAME_MAXLEN - cover_low_kwz.len);
-				if (ret != k->zlf_len + 1) {
-					assert(false);
-					break;
-				}
+				ret = dname_wire_reconstruct(owner_buf, k, cover_low_kwz);
+				if (ret) break;
 				owner = owner_buf;
 			}
 
 			/* Basic checks OK -> materialize data. */
-			ret = entry2answer(&ans, AR_NSEC, eh, eh_data_bound,
+			ret = entry2answer(&ans, AR_NSEC, nsec_eh, nsec_eh_bound,
 					   owner, KNOT_RRTYPE_NSEC, new_ttl);
 			if (ret) break;
 			VERBOSE_MSG(qry, "=> NSEC: materialized OK\n");
@@ -980,7 +955,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 				knot_nsec_bitmap(&nsec_rr->rrs,
 						 &bm, &bm_size);
 				if (!bm || kr_nsec_bitmap_contains_type(bm, bm_size, qry->stype)) {
-					//FIXME: clear the answer?
+					assert(bm);
 					VERBOSE_MSG(qry, "=> NSEC: exact match, but failed type check\n");
 					break; /* exact positive answer should exist! */
 				}
@@ -1010,6 +985,10 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	//}
 
+	if (!ans.rcode) {
+		/* Nothing suitable found. */
+		return ctx->state;
+	}
 
 	/** 3. wildcard checks, in case we found non-existence.
 	 */
@@ -1033,23 +1012,75 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			.data = key.data + nwz_off,
 			.len = key.len - nwz_off,
 		};
+		assert((ssize_t)(kwz.len) >= 0);
 		/* If our covering NSEC already covers it as well, we're fine. */
 		if (kwz_between(cover_low_kwz, kwz, cover_hi_kwz)) {
 			VERBOSE_MSG(qry, "=> NSEC: covering RR covers also wildcard\n");
 			goto do_soa;
 		}
 		/* Try to find the NSEC */
-		knot_db_val_t val = { };
-		ret = cache_op(cache, read_leq, &key, &val);
-		if (ret < 0) {
-			VERBOSE_MSG(qry, "=> NSEC: wildcard proof miss\n");
+		knot_db_val_t val = {};
+		knot_db_val_t wild_low_kwz = {};
+		bool exact_match;
+		uint32_t new_ttl;
+		const char *err = find_leq_NSEC1(cache, qry, key, k, &val,
+				&exact_match, &wild_low_kwz, NULL, &new_ttl);
+		if (err) {
+			VERBOSE_MSG(qry, "=> NSEC: wildcard proof - %s\n", err);
 			return ctx->state;
 		}
-		//FIXME
+		/* Materialize the record into answer (speculatively). */
+		const struct entry_h *nsec_eh = val.data;
+		const void *nsec_eh_bound = val.data + val.len;
+		knot_dname_t owner[KNOT_DNAME_MAXLEN];
+		ret = dname_wire_reconstruct(owner, k, wild_low_kwz);
+		if (ret) return ctx->state;
+		ret = entry2answer(&ans, AR_WILD, nsec_eh, nsec_eh_bound,
+				   owner, KNOT_RRTYPE_NSEC, new_ttl);
+		if (ret) return ctx->state;
+		if (!exact_match) {
+			/* We have a record proving wildcard non-existence. */
+			VERBOSE_MSG(qry, "=> NSEC: wildcard non-existence proof materialized OK\n");
+			goto do_soa; /* decrease indentation */
+		}
+		/* The wildcard exists.  Find if it's NODATA. */
+		const knot_rrset_t *nsec_rr = ans.rrsets[AR_WILD].set.rr;
+		uint8_t *bm = NULL;
+		uint16_t bm_size;
+		knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
+		if (!bm) {
+			assert(false);
+			return ctx->state;
+		}
+		if (!kr_nsec_bitmap_contains_type(bm, bm_size, qry->stype)) {
+			/* NODATA proven; just need to add SOA+RRSIG later */
+			VERBOSE_MSG(qry, "=> NSEC: exact match proved NODATA\n");
+			ans.rcode = PKT_NODATA;
+		} else {
+			/* The data should exist -> don't add this NSEC
+			 * and (later) try to find the real wildcard data */
+			VERBOSE_MSG(qry, "=> NSEC: wildcard should exist\n");
+			knot_rrset_free(&ans.rrsets[AR_WILD].set.rr, &pkt->mm);
+			knot_rdataset_clear(&ans.rrsets[AR_WILD].sig_rds, &pkt->mm);
+			ans.rcode = PKT_NOERROR;
+		}
+
 	} else {
 		//TODO NSEC3
 		assert(false);
 	}
+
+
+	/** We need to find wildcarded answer. (common for NSEC*)
+	 */
+	if (ans.rcode == PKT_NOERROR) {
+		//TODO let's say we don't support that for now
+		return ctx->state;
+		/* Construct key for exact qry->stype + source of synthesis. */
+		/* Find the record and put it into answer. */
+		/* Possibly reuse/generalize (parts of) found_exact_hit(). */
+	}
+
 
 	/** 4. add SOA iff needed
 	 */
@@ -1476,6 +1507,7 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 	bool exact_match = true;
 	// LATER(optim): if stype is NS, we check the same value again
 	do {
+		k->buf[0] = zlf_len;
 		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
 		knot_db_val_t val = { };
 		int ret = cache_op(cache, read, &key, &val, 1);
@@ -1506,7 +1538,7 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 		WITH_VERBOSE {
 			VERBOSE_MSG(qry, "NS ");
 			kr_dname_print(k->zname, "", " NOT found, ");
-			kr_log_verbose("name length in LF: %d\n", k->zlf_len);
+			kr_log_verbose("name length in LF: %d\n", zlf_len);
 		}
 
 		/* remove one more label */
