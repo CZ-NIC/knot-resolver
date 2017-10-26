@@ -177,6 +177,7 @@ struct entry_h {
 	bool has_ns : 1;	/**< Only used for NS ktype. */
 	bool has_cname : 1;	/**< Only used for NS ktype. */
 	bool has_dname : 1;	/**< Only used for NS ktype. */
+	/* ENTRY_H_FLAGS */
 
 	uint8_t data[];
 };
@@ -420,35 +421,101 @@ static int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict da
 	return kr_ok();
 }
 
-/** Given a valid entry header, find the next one (and check it).
- * \note It's const-polymorphic, really. */
-static struct entry_h *entry_h_next(struct entry_h *eh, const void *data_bound)
+/** Given a valid entry header, find its length (i.e. offset of the next entry).
+ * \param val The beginning of the data and the bound (read only).
+ */
+static int entry_h_len(const knot_db_val_t val)
 {
-	assert(eh && data_bound);
-	void *d = eh->data; /* iterates over the cache data */
-	if (d >= data_bound) return NULL;
+	const bool ok = val.data && ((ssize_t)val.len) > 0;
+	if (!ok) return kr_error(EINVAL);
+	const struct entry_h *eh = val.data;
+	const void *d = eh->data; /* iterates over the data in entry */
+	const void *data_bound = val.data + val.len;
+	if (d >= data_bound) return kr_error(EILSEQ);
 	if (!eh->is_negative) { /* Positive RRset + its RRsig set (may be empty). */
 		int sets = 2;
 		while (sets-- > 0) {
-			if (d + 1 > data_bound) return NULL;
+			if (d + 1 > data_bound) return kr_error(EILSEQ);
 			uint8_t rr_count;
 			memcpy(&rr_count, d++, sizeof(rr_count));
 			for (int i = 0; i < rr_count; ++i) {
-				if (d + 2 > data_bound) return NULL;
+				if (d + 2 > data_bound) return kr_error(EILSEQ);
 				uint16_t len;
 				memcpy(&len, d, sizeof(len));
 				d += 2 + len;
 			}
 		}
 	} else { /* A "packet" (opaque ATM). */
-		if (d + 2 > data_bound) return NULL;
+		if (d + 2 > data_bound) return kr_error(EILSEQ);
 		uint16_t len;
 		memcpy(&len, d, sizeof(len));
 		d += 2 + len;
 	}
-	if (d > data_bound) return NULL;
-	knot_db_val_t val = { .data = d, .len = data_bound - d };
-	return entry_h_consistent(val, KNOT_RRTYPE_NS);
+	if (d > data_bound) return kr_error(EILSEQ);
+	return d - val.data;
+}
+
+/** There may be multiple entries within, so rewind `val` to the one we want.
+ *
+ * ATM there are multiple types only for the NS ktype.
+ */
+static int entry_h_seek(knot_db_val_t *val, uint16_t type)
+{
+	uint16_t ktype;
+	switch (type) {
+	case KNOT_RRTYPE_NS:
+	case KNOT_RRTYPE_CNAME:
+	case KNOT_RRTYPE_DNAME:
+		ktype = KNOT_RRTYPE_NS;
+	default:
+		ktype = type;
+	}
+	if (ktype != KNOT_RRTYPE_NS) {
+		return kr_ok();
+	}
+	const struct entry_h *eh = entry_h_consistent(*val, ktype);
+	if (!eh) {
+		return kr_error(EILSEQ);
+	}
+
+	bool present;
+	switch (type) {
+	case KNOT_RRTYPE_NS:
+		present = eh->has_ns;
+		break;
+	case KNOT_RRTYPE_CNAME:
+		present = eh->has_cname;
+		break;
+	case KNOT_RRTYPE_DNAME:
+		present = eh->has_dname;
+		break;
+	default:
+		return kr_error(EINVAL);
+	}
+	if (!present) {
+		return kr_error(ENOENT);
+	}
+	/* count how many entries to skip */
+	int to_skip = 0;
+	switch (type) {
+	case KNOT_RRTYPE_DNAME:
+		to_skip += eh->has_cname;
+	case KNOT_RRTYPE_CNAME:
+		to_skip += eh->has_ns;
+	case KNOT_RRTYPE_NS:
+		break;
+	}
+	/* advance `val` and `eh` */
+	while (to_skip-- > 0) {
+		int len = entry_h_len(*val);
+		if (len < 0 || len > val->len) {
+			return kr_error(len < 0 ? len : EILSEQ);
+		}
+		val->data += len;
+		val->len -= len;
+		// LATER: recovery, perhaps via removing the entry?
+	}
+	return kr_ok();
 }
 
 /**
@@ -512,7 +579,8 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 	if (ret) return kr_error(ret);
 	/* write both sets */
 	const knot_rdataset_t *rdss[2] = { &rrset->set.rr->rrs, &rrset->sig_rds };
-	for (int i = 0; i < 2; ++i) {
+	for (int i = 0; i < rrset_cnt; ++i) {
+		assert(rdss[i]->rr_count);
 		/* allocate rank */
 		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
 		if (!rr_rank) return kr_error(ENOMEM);
@@ -557,6 +625,19 @@ static bool check_dname_for_lf(const knot_dname_t *n)
 /** TODO */
 static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
 {
+	/* Sanity check: forbidden types represented in other way(s). */
+	switch (ktype) {
+	case KNOT_RRTYPE_RRSIG:
+	case KNOT_RRTYPE_CNAME:
+	case KNOT_RRTYPE_DNAME:
+	case KNOT_RRTYPE_NSEC:
+	case KNOT_RRTYPE_NSEC3:
+		assert(false);
+		return (knot_db_val_t){};
+	default:
+		break;
+	}
+
 	int name_len = k->buf[0];
 	k->buf[name_len + 1] = 0; /* make sure different names can never match */
 	k->buf[name_len + 2] = 'E'; /* tag for exact name+type matches */
@@ -680,13 +761,15 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NSEC);
 	void *eh_data_bound = val.data + val.len;
 	if (!eh) {
-		assert(false);
+		/* This might be just finding something else than NSEC1 entry,
+		 * in case we searched before the very first one in the zone. */
 		return "range search found inconsistent entry";
 	}
 	int32_t new_ttl_ = get_new_ttl(eh, qry->creation_time.tv_sec);
 	if (new_ttl_ < 0 || !kr_rank_test(eh->rank, KR_RANK_SECURE)) {
-		return "range search found stale entry";
-		// TODO: remove the stale record *and* retry
+		return "range search found stale or insecure entry";
+		/* TODO: remove the stale record *and* retry,
+		 * in case we haven't run off.  Perhaps start by in_zone check. */
 	}
 	if (new_ttl) {
 		*new_ttl = new_ttl_;
@@ -1241,13 +1324,11 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			/* TODO: ATM we assume that some properties are the same
 			 * for all RRSIGs in the set (esp. label count). */
 			ranked_rr_array_entry_t *e = arr->at[j];
-			if (e->qry_uid != qry->uid || e->cached
-			    || e->rr->type != KNOT_RRTYPE_RRSIG
-			    || knot_rrsig_type_covered(&e->rr->rrs, 0) != rr->type
-			    || !knot_dname_is_equal(rr->owner, e->rr->owner))
-			{
-				continue;
-			}
+			bool ok = e->qry_uid == qry->uid && !e->cached
+				&& e->rr->type == KNOT_RRTYPE_RRSIG
+				&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
+				&& knot_dname_is_equal(rr->owner, e->rr->owner);
+			if (!ok) continue;
 			bool is_wild = knot_rrsig_labels(&e->rr->rrs, 0)
 				!= knot_dname_labels(e->rr->owner, NULL);
 			if (is_wild) {
@@ -1266,6 +1347,10 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 	knot_db_val_t key;
 	switch (ktype) {
 	case KNOT_RRTYPE_NSEC:
+		if (!kr_rank_test(entry->rank, KR_RANK_SECURE)) {
+			/* Skip any NSECs that aren't validated. */
+			return kr_ok();
+		}
 		if (!rr_sigs || !rr_sigs->rrs.rr_count || !rr_sigs->rrs.data) {
 			assert(false);
 			return KR_STATE_FAIL;
@@ -1275,7 +1360,6 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		break;
 	case KNOT_RRTYPE_CNAME:
 	case KNOT_RRTYPE_DNAME:
-		assert(false); // FIXME NOTIMPL ATM
 		ktype = KNOT_RRTYPE_NS; // fallthrough
 	default:
 		ret = kr_dname_lf(k->buf, rr->owner, NULL);
@@ -1286,25 +1370,45 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		key = key_exact_type(k, ktype);
 	}
 
-	if (!kr_rank_test(entry->rank, KR_RANK_SECURE)) {
-		/* If equal rank was accepted, spoofing a single answer would be enough
-		 * to e.g. override NS record in AUTHORITY section.
+	/* Find the whole entry-set and the particular entry within. */
+	knot_db_val_t val_orig_all = { }, val_orig_entry = { };
+	const struct entry_h *eh_orig = NULL;
+	if (!kr_rank_test(entry->rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
+		ret = cache_op(cache, read, &key, &val_orig_all, 1);
+		if (ret) val_orig_all = (knot_db_val_t){ };
+		val_orig_entry = val_orig_all;
+		switch (entry_h_seek(&val_orig_entry, rr->type)) {
+		case 0:
+			ret = entry_h_len(val_orig_entry);
+			if (ret >= 0) {
+				val_orig_entry.len = ret;
+				eh_orig = entry_h_consistent(val_orig_entry, rr->type);
+				if (eh_orig) {
+					break;
+				}
+			} /* otherwise fall through */
+		default:
+			val_orig_entry = val_orig_all = (knot_db_val_t){};
+		case -ENOENT:
+			val_orig_entry.len = 0;
+			break;
+		};
+	}
+
+	if (!kr_rank_test(entry->rank, KR_RANK_SECURE) && eh_orig) {
+		/* If equal rank was accepted, spoofing a *single* answer would be
+		 * enough to e.g. override NS record in AUTHORITY section.
 		 * This way they would have to hit the first answer
 		 * (whenever TTL nears expiration). */
-		knot_db_val_t val = { };
-		ret = cache_op(cache, read, &key, &val, 1);
-		struct entry_h *eh;
-		if (ret == 0 && (eh = entry_h_consistent(val, ktype))) {
-			int32_t old_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
-			if (old_ttl > 0 && !is_expiring(old_ttl, eh->ttl)
-			    && entry->rank <= eh->rank) {
-				WITH_VERBOSE {
-					VERBOSE_MSG(qry, "=> not overwriting ");
-					kr_rrtype_print(rr->type, "", " ");
-					kr_dname_print(rr->owner, "", "\n");
-				}
-				return kr_ok();
+		int32_t old_ttl = get_new_ttl(eh_orig, qry->creation_time.tv_sec);
+		if (old_ttl > 0 && !is_expiring(old_ttl, eh_orig->ttl)
+		    && entry->rank <= eh_orig->rank) {
+			WITH_VERBOSE {
+				VERBOSE_MSG(qry, "=> not overwriting ");
+				kr_rrtype_print(rr->type, "", " ");
+				kr_dname_print(rr->owner, "", "\n");
 			}
+			return kr_ok();
 		}
 	}
 
@@ -1314,26 +1418,37 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 	const knot_rdataset_t *rdatasets[] = { &rr->rrs, rds_sigs, NULL };
 	for (int j = 0; rdatasets[j]; ++j) {
 		knot_rdata_t *rd = rdatasets[j]->data;
+		assert(rdatasets[j]->rr_count);
 		for (uint16_t l = 0; l < rdatasets[j]->rr_count; ++l) {
 			ttl = MIN(ttl, knot_rdata_ttl(rd));
 			rd = kr_rdataset_next(rd);
 		}
 	} /* TODO: consider expirations of RRSIGs as well, just in case. */
 	ttl = MAX(ttl, min_ttl);
-
-	int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
-	int storage_size = offsetof(struct entry_h, data) + rr_ssize
+	/* Compute materialized sizes of the new data, and combine with remaining size. */
+	const int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
+	const int entry_size = offsetof(struct entry_h, data) + rr_ssize
 		+ rdataset_dematerialize_size(rds_sigs);
-
+	size_t storage_size = val_orig_all.len - val_orig_entry.len + entry_size;
+	/* Obtain new storage from LMDB.  Note: this does NOT invalidate val_orig.data. */
 	knot_db_val_t val = { .len = storage_size, .data = NULL };
 	ret = cache_op(cache, write, &key, &val, 1);
-	if (ret) return kr_ok();
-	struct entry_h *eh = val.data;
+	if (ret || !val.data || !val.len) {
+		assert(ret); /* otherwise "succeeding" but `val` is bad */
+		return kr_ok();
+	}
+	/* Write original data before entry, if any. */
+	const ssize_t len_before = val_orig_entry.data - val_orig_all.data;
+	assert(len_before >= 0);
+	if (len_before) {
+		memcpy(val.data, val_orig_all.data, len_before);
+	}
+	/* Write the entry itself. */
+	struct entry_h *eh = val.data + len_before;
 	*eh = (struct entry_h){
 		.time = qry->timestamp.tv_sec,
 		.ttl  = ttl,
 		.rank = entry->rank,
-		.has_ns = rr->type == KNOT_RRTYPE_NS,
 	};
 	if (rdataset_dematerialize(&rr->rrs, eh->data)
 	    || rdataset_dematerialize(rds_sigs, eh->data + rr_ssize)) {
@@ -1341,6 +1456,37 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		eh->ttl = 0;
 		eh->rank = 0;
 		assert(false);
+	}
+	/* Write original data after entry, if any. */
+	const ssize_t len_after = val_orig_all.len - val_orig_entry.len;
+	assert(len_after >= 0);
+	if (len_after) {
+		memcpy(val.data + len_before + entry_size,
+			val_orig_entry.data + val_orig_entry.len, len_after);
+	}
+	/* The multi-entry type needs adjusting the flags. */
+	if (ktype == KNOT_RRTYPE_NS) {
+		eh = val.data;
+		if (val_orig_all.len) {
+			const struct entry_h *eh0 = val_orig_all.data;
+			/* ENTRY_H_FLAGS */
+			eh->nsec1_pos = eh0->nsec1_pos;
+			eh->nsec3_cnt = eh0->nsec3_cnt;
+			eh->has_ns    = eh0->has_ns;
+			eh->has_cname = eh0->has_cname;
+			eh->has_dname = eh0->has_dname;
+		}
+		/* we just added/replaced some type */
+		switch (rr->type) {
+		case KNOT_RRTYPE_NS:
+			eh->has_ns = true;  break;
+		case KNOT_RRTYPE_CNAME:
+			eh->has_cname = true;  break;
+		case KNOT_RRTYPE_DNAME:
+			eh->has_dname = true;  break;
+		default:
+			assert(false);
+		}
 	}
 	WITH_VERBOSE {
 		VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, ", entry->rank);
@@ -1363,50 +1509,15 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
-	const struct entry_h *eh = entry_h_consistent(val, ktype);
+	int ret = entry_h_seek(&val, qry->stype);
+	if (ret) return ret;
+	const struct entry_h *eh = entry_h_consistent(val, qry->stype);
 	if (!eh) {
-		CHECK_RET(-EILSEQ);
-		// LATER: recovery, perhaps via removing the entry?
+		return kr_error(ENOENT);
+		// LATER: recovery in case of error, perhaps via removing the entry?
+		// LATER(optim): pehaps optimize the zone cut search
 	}
-	void *eh_data_bound = val.data + val.len;
-
-	/* In case of NS ktype, there may be multiple types within.
-	 * Find the one we want. */
-	if (ktype == KNOT_RRTYPE_NS) {
-		bool present;
-		switch (qry->stype) {
-		case KNOT_RRTYPE_NS:
-			present = eh->has_ns;
-			break;
-		case KNOT_RRTYPE_CNAME:
-			present = eh->has_cname;
-			break;
-		case KNOT_RRTYPE_DNAME:
-			present = eh->has_dname;
-			break;
-		default:
-			CHECK_RET(-EINVAL);
-		}
-		if (!present) {
-			return kr_error(ENOENT);
-			// LATER(optim): pehaps optimize the zone cut search
-		}
-		/* we may need to skip some RRset in eh_data */
-		int sets_to_skip = 0;
-		switch (qry->stype) {
-		case KNOT_RRTYPE_DNAME:
-			sets_to_skip += eh->has_cname;
-		case KNOT_RRTYPE_CNAME:
-			sets_to_skip += eh->has_ns;
-		case KNOT_RRTYPE_NS:
-			break;
-		}
-		while (sets_to_skip-- > 0) {
-			eh = entry_h_next(/*const-cast*/(struct entry_h *)eh, eh_data_bound);
-			if (!eh) CHECK_RET(-EILSEQ);
-			// LATER: recovery, perhaps via removing the entry?
-		}
-	}
+	void *eh_bound = val.data + val.len;
 
 	int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
@@ -1423,12 +1534,12 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	}
 
 	/* All OK, so start constructing the (pseudo-)packet. */
-	int ret = pkt_renew(pkt, qry->sname, qry->stype);
+	ret = pkt_renew(pkt, qry->sname, qry->stype);
 	CHECK_RET(ret);
 
 	/* Materialize the sets for the answer in (pseudo-)packet. */
 	struct answer ans = {};
-	ret = entry2answer(&ans, AR_ANSWER, eh, eh_data_bound,
+	ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
 			   qry->sname, qry->stype, new_ttl);
 	CHECK_RET(ret);
 	/* Put links to the materialized data into the pkt. */
