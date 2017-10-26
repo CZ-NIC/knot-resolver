@@ -261,8 +261,8 @@ static bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 
 static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry);
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
-			   uint8_t lowest_rank, uint16_t ktype);
-static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k);
+			   uint8_t lowest_rank);
+static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
 
 
 
@@ -458,6 +458,7 @@ static int entry_h_len(const knot_db_val_t val)
 /** There may be multiple entries within, so rewind `val` to the one we want.
  *
  * ATM there are multiple types only for the NS ktype.
+ * \return error code
  */
 static int entry_h_seek(knot_db_val_t *val, uint16_t type)
 {
@@ -623,17 +624,19 @@ static bool check_dname_for_lf(const knot_dname_t *n)
 
 
 /** TODO */
-static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
+static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 {
+	switch (type) {
 	/* Sanity check: forbidden types represented in other way(s). */
-	switch (ktype) {
 	case KNOT_RRTYPE_RRSIG:
-	case KNOT_RRTYPE_CNAME:
-	case KNOT_RRTYPE_DNAME:
 	case KNOT_RRTYPE_NSEC:
 	case KNOT_RRTYPE_NSEC3:
 		assert(false);
 		return (knot_db_val_t){};
+	/* xNAME lumped into NS. */
+	case KNOT_RRTYPE_CNAME:
+	case KNOT_RRTYPE_DNAME:
+		type = KNOT_RRTYPE_NS;
 	default:
 		break;
 	}
@@ -641,8 +644,8 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t ktype)
 	int name_len = k->buf[0];
 	k->buf[name_len + 1] = 0; /* make sure different names can never match */
 	k->buf[name_len + 2] = 'E'; /* tag for exact name+type matches */
-	memcpy(k->buf + name_len + 3, &ktype, 2);
-	k->type = ktype;
+	memcpy(k->buf + name_len + 3, &type, 2);
+	k->type = type;
 	/* CACHE_KEY_DEF: key == dname_lf + '\0' + 'E' + RRTYPE */
 	return (knot_db_val_t){ k->buf + 1, name_len + 4 };
 }
@@ -859,6 +862,10 @@ int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
 	return kr_ok();
 }
 
+
+static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
+
 /** function for .produce phase */
 int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
@@ -892,16 +899,15 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/** 1. find the name or the closest (available) zone, not considering wildcards
 	 *  1a. exact name+type match (can be negative answer in insecure zones)
 	 */
-	uint16_t ktype = qry->stype;
-	if (ktype == KNOT_RRTYPE_CNAME || ktype == KNOT_RRTYPE_DNAME) {
-		ktype = KNOT_RRTYPE_NS;
+	if (qry->stype == KNOT_RRTYPE_RRSIG) {
+		return ctx->state; /* LATER: some other behavior for this STYPE? */
 	}
-	knot_db_val_t key = key_exact_type(k, ktype);
+	knot_db_val_t key = key_exact_type(k, qry->stype);
 	knot_db_val_t val = { };
 	ret = cache_op(cache, read, &key, &val, 1);
 	switch (ret) {
 	case 0: /* found an entry: test conditions, materialize into pkt, etc. */
-		ret = found_exact_hit(ctx, pkt, val, lowest_rank, ktype);
+		ret = found_exact_hit(ctx, pkt, val, lowest_rank);
 		if (ret == -abs(ENOENT)) {
 			break;
 		} else if (ret) {
@@ -921,14 +927,42 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;
-	kr_dname_lf(k->buf, qry->sname, NULL); /* LATER(optim.): probably remove */
-	const struct entry_h *eh = closest_NS(ctx, k);
-	if (!eh) {
+	if (qry->stype == KNOT_RRTYPE_DS) { /* DS is parent-side. */
+		k->zname = knot_wire_next_label(k->zname, NULL);
+		if (!k->zname) {
+			return ctx->state; /* can't go above root */
+		}
+	}
+	kr_dname_lf(k->buf, k->zname, NULL); /* LATER(optim.): probably remove */
+	const knot_db_val_t val_cut = closest_NS(ctx, k);
+	if (!val_cut.data) {
 		VERBOSE_MSG(qry, "=> not even root NS in cache\n");
 		return ctx->state; /* nothing to do without any NS at all */
 	}
-	VERBOSE_MSG(qry, "=> trying zone: ");
-	kr_dname_print(k->zname, "", "\n");
+	switch (k->type) {
+	case KNOT_RRTYPE_NS:
+		VERBOSE_MSG(qry, "=> trying zone: ");
+		kr_dname_print(k->zname, "", "\n");
+		break;
+	case KNOT_RRTYPE_CNAME:
+		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, val_cut.data,
+				val_cut.data + val_cut.len,
+				get_new_ttl(val_cut.data, qry->creation_time.tv_sec));
+		/* TODO: ^^ cumbersome code */
+		if (ret == kr_ok()) {
+			VERBOSE_MSG(qry, "=> satisfied by CNAME\n");
+			return KR_STATE_DONE;
+		} else {
+			return ctx->state;
+		}
+
+	case KNOT_RRTYPE_DNAME:
+		VERBOSE_MSG(qry, "=> DNAME not supported yet\n"); // LATER
+		return ctx->state;
+	default:
+		assert(false);
+	}
+
 #if 0
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
@@ -939,35 +973,23 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		//qry->flags.AWAIT_CUT = false;
 		return ctx->state;
 	}
-#endif
-	switch (k->type) {
-	// FIXME xNAME: return/generate whatever is required
-	case KNOT_RRTYPE_NS:
-		break;
-	default:
-		assert(false);
-		return ctx->state;
-	}
 
-#if 0
 	/* Now `eh` points to the closest NS record that we've found,
 	 * and that's the only place to start - we may either find
 	 * a negative proof or we may query upstream from that point. */
 	kr_zonecut_set(&qry->zone_cut, k->zname);
 	ret = kr_make_query(qry, pkt); // FIXME: probably not yet - qname minimization
 	if (ret) return KR_STATE_FAIL;
-#endif
-
 
 	/* Note: up to here we can run on any cache backend,
 	 * without touching the code. */
-
 	if (!eh->nsec1_pos) {
 		/* No NSEC1 RRs for this zone in cache. */
 		/* TODO: NSEC3 */
 		//VERBOSE_MSG(qry, "   no NSEC1\n");
 		//return ctx->state;
 	}
+#endif
 
 	/* collecting multiple NSEC* + RRSIG records, in preparation for the answer
 	 *  + track the progress
@@ -991,7 +1013,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	//while (true) { //for (int i_nsecp = 0; i
 	// TODO(NSEC3): better signalling when to "continue;" and when to "break;"
 	// incl. clearing partial answers in `ans`
-		assert(eh->nsec1_pos <= 1);
+		//assert(eh->nsec1_pos <= 1);
 		int nsec = 1;
 		switch (nsec) {
 		case 1: {
@@ -1175,7 +1197,7 @@ do_soa:
 		knot_db_val_t val = { };
 		ret = cache_op(cache, read, &key, &val, 1);
 		const struct entry_h *eh;
-		if (ret || !(eh = entry_h_consistent(val, ktype))) {
+		if (ret || !(eh = entry_h_consistent(val, KNOT_RRTYPE_SOA))) {
 			return ctx->state;
 		}
 		void *eh_data_bound = val.data + val.len;
@@ -1342,10 +1364,9 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 
 	int ret = 0;
 	/* Construct the key under which RRs will be stored. */
-	uint16_t ktype = rr->type;
 	struct key k_storage, *k = &k_storage;
 	knot_db_val_t key;
-	switch (ktype) {
+	switch (rr->type) {
 	case KNOT_RRTYPE_NSEC:
 		if (!kr_rank_test(entry->rank, KR_RANK_SECURE)) {
 			/* Skip any NSECs that aren't validated. */
@@ -1358,22 +1379,19 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		k->zlf_len = knot_dname_size(knot_rrsig_signer_name(&rr_sigs->rrs, 0)) - 1;
 		key = key_NSEC1(k, rr->owner, false);
 		break;
-	case KNOT_RRTYPE_CNAME:
-	case KNOT_RRTYPE_DNAME:
-		ktype = KNOT_RRTYPE_NS; // fallthrough
 	default:
 		ret = kr_dname_lf(k->buf, rr->owner, NULL);
 		if (ret) {
 			VERBOSE_MSG(qry, "   3\n");
 			return KR_STATE_FAIL;
 		}
-		key = key_exact_type(k, ktype);
+		key = key_exact_type(k, rr->type);
 	}
 
 	/* Find the whole entry-set and the particular entry within. */
 	knot_db_val_t val_orig_all = { }, val_orig_entry = { };
 	const struct entry_h *eh_orig = NULL;
-	if (!kr_rank_test(entry->rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
+	if (!kr_rank_test(entry->rank, KR_RANK_SECURE) || k->type == KNOT_RRTYPE_NS) {
 		ret = cache_op(cache, read, &key, &val_orig_all, 1);
 		if (ret) val_orig_all = (knot_db_val_t){ };
 		val_orig_entry = val_orig_all;
@@ -1465,7 +1483,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			val_orig_entry.data + val_orig_entry.len, len_after);
 	}
 	/* The multi-entry type needs adjusting the flags. */
-	if (ktype == KNOT_RRTYPE_NS) {
+	if (k->type == KNOT_RRTYPE_NS) {
 		eh = val.data;
 		if (val_orig_all.len) {
 			const struct entry_h *eh0 = val_orig_all.data;
@@ -1492,20 +1510,49 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, ", entry->rank);
 		kr_rrtype_print(rr->type, "", " ");
 		kr_dname_print(rr->owner, "", " ");
-		kr_log_verbose("(%d B)\n", (int)storage_size);
+		int sigs = rr_sigs ? rr_sigs->rrs.rr_count : 0;
+		kr_log_verbose("(%d B total, incl. %d RRSIGs)\n", (int)storage_size, sigs);
 	}
+	return kr_ok();
+}
+
+
+#define CHECK_RET(ret) do { \
+	if ((ret) < 0) { assert(false); return kr_error((ret)); } \
+} while (false)
+
+static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
+{
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+
+	/* All OK, so start constructing the (pseudo-)packet. */
+	int ret = pkt_renew(pkt, qry->sname, qry->stype);
+	CHECK_RET(ret);
+
+	/* Materialize the sets for the answer in (pseudo-)packet. */
+	struct answer ans = {};
+	ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
+			   qry->sname, type, new_ttl);
+	CHECK_RET(ret);
+	/* Put links to the materialized data into the pkt. */
+	ret = pkt_alloc_space(pkt, 1 + (ans.rrsets[AR_ANSWER].sig_rds.rr_count > 0));
+	CHECK_RET(ret);
+	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER], eh->rank);
+	CHECK_RET(ret);
+	/* Finishing touches. */
+	qry->flags.EXPIRING = is_expiring(eh->ttl, new_ttl);
+	qry->flags.CACHED = true;
+	qry->flags.NO_MINIMIZE = true;
 	return kr_ok();
 }
 
 
 /** TODO: description; see the single call site for now. */
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
-			   uint8_t lowest_rank, uint16_t ktype)
+			   uint8_t lowest_rank)
 {
-#define CHECK_RET(ret) do { \
-	if ((ret) < 0) { assert(false); return kr_error((ret)); } \
-} while (false)
-
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
@@ -1532,28 +1579,9 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		//FIXME
 		assert(false);
 	}
-
-	/* All OK, so start constructing the (pseudo-)packet. */
-	ret = pkt_renew(pkt, qry->sname, qry->stype);
-	CHECK_RET(ret);
-
-	/* Materialize the sets for the answer in (pseudo-)packet. */
-	struct answer ans = {};
-	ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
-			   qry->sname, qry->stype, new_ttl);
-	CHECK_RET(ret);
-	/* Put links to the materialized data into the pkt. */
-	ret = pkt_alloc_space(pkt, 1 + (ans.rrsets[AR_ANSWER].sig_rds.rr_count > 0));
-	CHECK_RET(ret);
-	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER], eh->rank);
-	CHECK_RET(ret);
-	/* Finishing touches. */
-	qry->flags.EXPIRING = is_expiring(eh->ttl, new_ttl);
-	qry->flags.CACHED = true;
-	qry->flags.NO_MINIMIZE = true;
-	return kr_ok();
-#undef CHECK_RET
+	return answer_simple_hit(ctx, pkt, qry->stype, eh, eh_bound, new_ttl);
 }
+#undef CHECK_RET
 
 int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
@@ -1572,20 +1600,16 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 		return KR_STATE_FAIL;
 	}
 
-	uint16_t ktype = type;
-	if (ktype == KNOT_RRTYPE_CNAME || ktype == KNOT_RRTYPE_DNAME) {
-		assert(false); // FIXME NOTIMPL ATM
-		ktype = KNOT_RRTYPE_NS;
-	}
-	knot_db_val_t key = key_exact_type(k, ktype);
+	knot_db_val_t key = key_exact_type(k, type);
 	knot_db_val_t val = { };
 	ret = cache_op(cache, read, &key, &val, 1);
+	if (!ret) ret = entry_h_seek(&val, type);
 	if (ret) {
-		kr_log_verbose("miss\n");
+		kr_log_verbose("miss (ret: %d)\n", ret);
 		return ret;
 	}
-	const struct entry_h *eh = entry_h_consistent(val, ktype);
-	if (!eh || (type == KNOT_RRTYPE_NS && !eh->has_ns)) {
+	const struct entry_h *eh = entry_h_consistent(val, type);
+	if (!eh) {
 		kr_log_verbose("miss\n");
 		return kr_error(ENOENT);
 	}
@@ -1605,18 +1629,22 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
  * CNAME is only considered for equal name, of course.
  * We also store NSEC* parameters at NS type; probably the latest two will be kept.
  * Found type is returned via k->type.
+ *
+ * \param exact_match Whether exact match is considered special.
  */
-static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
+static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 {
+	static const knot_db_val_t NOTHING = {};
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 
 	int zlf_len = k->buf[0];
 
-	// FIXME: DS is parent-side record
-	bool exact_match = true;
+	// FIXME: review xNAME + DS, ranks, etc.
+	uint8_t rank_min = KR_RANK_INSECURE | KR_RANK_AUTH;
 	// LATER(optim): if stype is NS, we check the same value again
+	bool exact_match = true;
 	do {
 		k->buf[0] = zlf_len;
 		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
@@ -1624,30 +1652,71 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 		int ret = cache_op(cache, read, &key, &val, 1);
 		switch (ret) {
 		case 0: {
-			const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NS);
+			/* Check consistency, find any type.
+			 * "break;" goes to shortening by another label */
+			const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NS),
+			      	*eh_orig = eh;
+			const knot_db_val_t val_orig = val;
 			assert(eh);
 			if (!eh) break; // do something about EILSEQ?
-			int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
-			if (new_ttl < 0) break;
-			// FIXME: xNAME
-			//uint16_t ktype = exact_match ? KNOT_RRTYPE_CNAME : KNOT_RRTYPE_DNAME;
-			if (!eh->has_ns || eh->is_negative) {
-				break;
+			/* More types are possible; try in order. */
+			uint16_t type = 0;
+			while (type != KNOT_RRTYPE_DNAME) {
+				/* Determine the next type to try. */
+				switch (type) {
+				case 0:
+					type = KNOT_RRTYPE_NS;
+					if (!eh_orig->has_ns) continue;
+					break;
+				case KNOT_RRTYPE_NS:
+					type = KNOT_RRTYPE_CNAME;
+					/* CNAME is interesting only if we
+					 * directly hit the name that was asked */
+					if (!exact_match || !eh_orig->has_cname)
+						continue;
+					break;
+				case KNOT_RRTYPE_CNAME:
+					type = KNOT_RRTYPE_DNAME;
+					/* DNAME is interesting only if we did NOT
+					 * directly hit the name that was asked */
+					if (exact_match || !eh_orig->has_dname)
+						continue;
+					break;
+				default:
+					assert(false);
+					return NOTHING;
+				}
+				/* Find the entry for the type, check positivity, TTL
+				 * For non-fatal failures just "continue;" to try the next type. */
+				val = val_orig;
+				ret = entry_h_seek(&val, type);
+				if (ret || !(eh = entry_h_consistent(val, KNOT_RRTYPE_CNAME))) {
+					assert(false);
+					break;
+				}
+				if (eh->is_negative) continue;
+				int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+				if (new_ttl < 0) continue;
+				if (type != KNOT_RRTYPE_NS && eh->rank < rank_min) {
+					continue;
+					/* For NS any kr_rank is accepted,
+					 * as insecure or even nonauth is OK */
+				}
+				/* We found our match. */
+				k->type = type;
+				k->zlf_len = zlf_len;
+				return val;
 			}
-			/* any kr_rank is accepted, as insecure or even nonauth is OK */
-			k->type = KNOT_RRTYPE_NS;
-			k->zlf_len = zlf_len;
-			return eh;
 			}
 		case (-abs(ENOENT)):
 			break;
 		default:
 			assert(false);
-			return NULL; // TODO: do something with kr_error(ret)?
+			return NOTHING; // TODO: do something with kr_error(ret)?
 		}
 
 		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "NS ");
+			VERBOSE_MSG(qry, "NS/xNAME ");
 			kr_dname_print(k->zname, "", " NOT found, ");
 			kr_log_verbose("name length in LF: %d\n", zlf_len);
 		}
@@ -1655,7 +1724,7 @@ static const struct entry_h *closest_NS(kr_layer_t *ctx, struct key *k)
 		/* remove one more label */
 		exact_match = false;
 		if (k->zname[0] == 0) { /* missing root NS in cache */
-			return NULL;
+			return NOTHING;
 		}
 		zlf_len -= (k->zname[0] + 1);
 		k->zname += (k->zname[0] + 1);
