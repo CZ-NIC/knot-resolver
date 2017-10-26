@@ -121,9 +121,10 @@ struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank; /**< enum kr_rank */
 	uint8_t revalidation_cnt;
-	bool cached;  /**< whether it has been stashed to cache already */
-	bool yielded;
-	bool to_wire; /**< whether to be put into the answer */
+	bool cached : 1;  /**< whether it has been stashed to cache already */
+	bool yielded : 1;
+	bool to_wire : 1; /**< whether to be put into the answer */
+	bool expiring : 1; /**< low remaining TTL; see is_expiring; only used in cache ATM */
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -300,3 +301,20 @@ static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
 	return ret;
 }
 
+/** Convert name from lookup format to wire.  See knot_dname_lf
+ *
+ * \note len bytes are read and len+1 are written with *normal* LF,
+ * 	 but it's also allowed that the final zero byte is omitted in LF.
+ * \return the number of bytes written (>0) or error code (<0)
+ */
+int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf);
+
+/** Patched knot_dname_lf.  LF for "." has length zero instead of one, for consistency.
+ */
+static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, const uint8_t *pkt)
+{
+	int ret = knot_dname_lf(dst, src, pkt);
+	if (!ret && dst[0] == 1)
+		dst[0] = 0;
+	return ret;
+};

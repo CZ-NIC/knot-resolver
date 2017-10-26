@@ -604,8 +604,7 @@ static int init_resolver(struct engine *engine)
 	/* Load basic modules */
 	engine_register(engine, "iterate", NULL, NULL);
 	engine_register(engine, "validate", NULL, NULL);
-	engine_register(engine, "rrcache", NULL, NULL);
-	engine_register(engine, "pktcache", NULL, NULL);
+	engine_register(engine, "cache_lmdb", NULL, NULL);
 
 	return array_push(engine->backends, kr_cdb_lmdb());
 }

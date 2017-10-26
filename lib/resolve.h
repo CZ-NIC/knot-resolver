@@ -194,6 +194,7 @@ struct kr_request {
 	int state;
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;
+	ranked_rr_array_t add_selected;
 	rr_array_t additional;
 	bool answ_validated; /**< internal to validator; beware of caching, etc. */
 	bool auth_validated; /**< see answ_validated ^^ ; TODO */
@@ -201,6 +202,13 @@ struct kr_request {
 	int has_tls;
 	knot_mm_t pool;
 };
+
+/** Initializer for an array of *_selected. */
+#define kr_request_selected(req) { \
+	[KNOT_ANSWER] = &(req)->answ_selected, \
+	[KNOT_AUTHORITY] = &(req)->auth_selected, \
+	[KNOT_ADDITIONAL] = &(req)->add_selected, \
+	}
 
 /**
  * Begin name resolution.

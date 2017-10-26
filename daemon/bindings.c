@@ -708,6 +708,7 @@ static int cache_close(lua_State *L)
 	return 1;
 }
 
+#if 0
 /** @internal Prefix walk. */
 static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_t *results, int maxresults)
 {
@@ -761,6 +762,7 @@ static int cache_remove_prefix(struct kr_cache *cache, const char *args)
 	}
 	return ret;
 }
+#endif
 
 /** Prune expired/invalid records. */
 static int cache_prune(lua_State *L)
@@ -810,7 +812,7 @@ static int cache_clear(lua_State *L)
 
 	/* Clear a sub-tree in cache. */
 	if (args && strlen(args) > 0) {
-		int ret = cache_remove_prefix(cache, args);
+		int ret = kr_error(ENOSYS); // FIXME cache_remove_prefix(cache, args);
 		if (ret < 0) {
 			format_error(L, kr_strerror(ret));
 			lua_error(L);
@@ -892,7 +894,7 @@ static int cache_get(lua_State *L)
 	const char *args = lua_tostring(L, 1);
 	/* Retrieve set of keys */
 	static knot_db_val_t result_set[100];
-	int ret = cache_prefixed(cache, args, result_set, 100);
+	int ret = kr_error(ENOSYS); // FIXME cache_prefixed(cache, args, result_set, 100);
 	if (ret < 0) {
 		format_error(L, kr_strerror(ret));
 		lua_error(L);
