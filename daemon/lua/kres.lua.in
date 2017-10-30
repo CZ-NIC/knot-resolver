@@ -27,6 +27,7 @@ struct rr_type {
 	static const int NS         =   2;
 	static const int CNAME      =   5;
 	static const int SOA        =   6;
+	static const int NULL       =  10;
 	static const int PTR        =  12;
 	static const int HINFO      =  13;
 	static const int MINFO      =  14;
