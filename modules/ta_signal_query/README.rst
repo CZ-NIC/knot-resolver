@@ -18,12 +18,5 @@ of new keys. This is of particular interest for the DNS root zone in the event
 of key and/or algorithm rollovers that rely on RFC 5011 to automatically
 update a validating DNS resolver’s trust anchor.
 
-.. tip:: It is recommended to always keep this module enabled.
-
-Example configuration
-^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: lua
-
-	-- Signal trust anchor keys configured in the validator
-	modules = { 'ta_signal_query' }
+This module is enabled by default. You may use modules.unload('ta_signal_query')
+in your configuration.

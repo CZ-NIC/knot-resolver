@@ -200,6 +200,9 @@ else -- Lua 5.2+
 	_SANDBOX = make_sandbox(_ENV)
 end
 
+-- Load embedded modules
+modules.load('ta_signal_query')
+
 -- Interactive command evaluation
 function eval_cmd(line, raw)
 	-- Compatibility sandbox code loading
