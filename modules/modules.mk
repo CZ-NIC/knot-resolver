@@ -33,7 +33,8 @@ modules_TARGETS += ketcd \
                    daf \
                    workarounds \
                    version \
-                   ta_signal_query
+                   ta_signal_query \
+                   priming
 endif
 
 # Make C module
