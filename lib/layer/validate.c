@@ -76,7 +76,8 @@ static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
 	return section_has_type(knot_pkt_section(pkt, KNOT_ADDITIONAL), type);
 }
 
-static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
+static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_query *qry,
+			    knot_mm_t *pool)
 {
 	if (!vctx) {
 		return kr_error(EINVAL);
@@ -85,7 +86,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 	/* Can't use qry->zone_cut.name directly, as this name can
 	 * change when updating cut information before validation.
 	 */
-	vctx->zone_name = vctx->keys ? vctx->keys->owner  : NULL;
+	vctx->zone_name = vctx->keys ? vctx->keys->owner : NULL;
 
 	int validation_result = 0;
 	for (ssize_t i = 0; i < vctx->rrs->len; ++i) {
@@ -112,13 +113,28 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, knot_mm_t *pool)
 			continue;
 		}
 
+		uint8_t rank_orig = entry->rank;
 		validation_result = kr_rrset_validate(vctx, rr);
 		if (validation_result == kr_ok()) {
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
+
+		} else if (kr_rank_test(rank_orig, KR_RANK_TRY)) {
+			WITH_VERBOSE {
+				VERBOSE_MSG(qry, ">< failed to validate but skipping: ");
+				kr_rrtype_print(rr->type, "", " ");
+				kr_dname_print(rr->owner, "", "\n");
+			}
+			vctx->result = kr_ok();
+			kr_rank_set(&entry->rank, KR_RANK_TRY);
+			/* ^^ BOGUS would be more accurate, but it might change
+			 * to MISMATCH on revalidation, e.g. in test val_referral_nods :-/
+			 */
+
 		} else if (validation_result == kr_error(ENOENT)) {
 			/* no RRSIGs found */
 			kr_rank_set(&entry->rank, KR_RANK_MISSING);
 			vctx->err_cnt += 1;
+
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
 			vctx->err_cnt += 1;
@@ -149,7 +165,7 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 		.result		= 0
 	};
 
-	int ret = validate_section(&vctx, pool);
+	int ret = validate_section(&vctx, qry, pool);
 	req->answ_validated = (vctx.err_cnt == 0);
 	if (ret != kr_ok()) {
 		return ret;
@@ -162,7 +178,7 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 	vctx.err_cnt	  = 0;
 	vctx.result	  = 0;
 
-	ret = validate_section(&vctx, pool);
+	ret = validate_section(&vctx, qry, pool);
 	req->auth_validated = (vctx.err_cnt == 0);
 	if (ret != kr_ok()) {
 		return ret;
@@ -420,7 +436,8 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
 		const knot_rrset_t *rr = entry->rr;
 		if (entry->yielded ||
 		    (!kr_rank_test(entry->rank, KR_RANK_INITIAL) &&
-		    !kr_rank_test(entry->rank, KR_RANK_MISMATCH))) {
+		     !kr_rank_test(entry->rank, KR_RANK_TRY) &&
+		     !kr_rank_test(entry->rank, KR_RANK_MISMATCH))) {
 			continue;
 		}
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
@@ -744,6 +761,7 @@ static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
 				continue;
 			}
 			if (kr_rank_test(entry->rank, KR_RANK_INITIAL)
+			    || kr_rank_test(entry->rank, KR_RANK_TRY)
 			    || kr_rank_test(entry->rank, KR_RANK_MISSING)) {
 				kr_rank_set(&entry->rank, rank_to_set);
 			}

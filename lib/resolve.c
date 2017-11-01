@@ -43,6 +43,7 @@ bool kr_rank_check(uint8_t rank)
 	switch (rank & ~KR_RANK_AUTH) {
 	case KR_RANK_INITIAL:
 	case KR_RANK_OMIT:
+	case KR_RANK_TRY:
 	case KR_RANK_INDET:
 	case KR_RANK_BOGUS:
 	case KR_RANK_MISMATCH:
