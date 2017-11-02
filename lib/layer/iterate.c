@@ -306,22 +306,11 @@ static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *q
 	}
 	if (answer || type == KNOT_RRTYPE_DS
 	    || type == KNOT_RRTYPE_NSEC || type == KNOT_RRTYPE_NSEC3) {
+		/* We almost always want these validated, and it should be possible. */
 		return KR_RANK_INITIAL | KR_RANK_AUTH;
 	}
-	if (type == KNOT_RRTYPE_NS) {
-		/* Some servers add extra NS RRset, which allows us to refresh
-		 * cache "for free", potentially speeding up zone cut lookups
-		 * in future.  Still, it might theoretically cause some problems:
-		 * https://mailarchive.ietf.org/arch/msg/dnsop/CYjPDlwtpxzdQV_qycB-WfnW6CI
-		 */
-		if (!is_nonauth && knot_dname_is_equal(qry->zone_cut.name, rr->owner)) {
-			return KR_RANK_INITIAL | KR_RANK_AUTH;
-		} else {
-			return KR_RANK_OMIT;
-		}
-	}
-
-	return KR_RANK_INITIAL;
+	/* Be aggressive: try to validate anything else (almost never extra latency). */
+	return KR_RANK_TRY;
 	/* TODO: this classifier of authoritativity may not be perfect yet. */
 }
 
@@ -749,7 +738,7 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
 		int err = kr_ranked_rrarray_add(&req->answ_selected, rr,
-			      KR_RANK_INITIAL | KR_RANK_AUTH, true, query->uid, &req->pool);
+			      KR_RANK_OMIT | KR_RANK_AUTH, true, query->uid, &req->pool);
 		/* KR_RANK_AUTH: we don't have the records directly from
 		 * an authoritative source, but we do trust the server and it's
 		 * supposed to only send us authoritative records. */

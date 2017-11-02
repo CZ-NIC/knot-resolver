@@ -1,4 +1,4 @@
-Knot Resolver 1.5.0 (2017-11-xx)
+Knot Resolver 1.5.0 (2017-11-02)
 ================================
 
 Bugfixes
@@ -9,6 +9,8 @@ Improvements
 ------------
 - new module ta_signal_query supporting Signaling Trust Anchor Knowledge
   using Keytag Query (RFC 8145 section 5)
+- attempt validation for more records but require it for fewer of them
+  (e.g. avoids SERVFAIL when server adds extra records but omits RRSIGs)
 
 
 Knot Resolver 1.4.0 (2017-09-22)
