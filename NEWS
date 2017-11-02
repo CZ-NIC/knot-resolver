@@ -1,9 +1,14 @@
-Knot Resolver 1.4.1 (2017-10-xx)
+Knot Resolver 1.5.0 (2017-11-xx)
 ================================
 
 Bugfixes
 --------
 - fix loading modules on Darwin
+
+Improvements
+------------
+- new module ta_signal_query supporting Signaling Trust Anchor Knowledge
+  using Keytag Query (RFC 8145 section 5)
 
 
 Knot Resolver 1.4.0 (2017-09-22)
