@@ -108,6 +108,12 @@ Most of the dependencies can be resolved from packages, here's an overview for s
 Building from sources 
 ---------------------
 
+Initialize git submodules first.
+
+.. code-block:: bash
+
+    $ git submodule update --init --recursive
+
 The Knot DNS Resolver depends on the the Knot DNS library, recent version of libuv_, and LuaJIT_.
 
 .. code-block:: bash
