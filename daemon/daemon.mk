@@ -32,6 +32,7 @@ kresd_CFLAGS := -fPIE \
 		-Dlibknot_SONAME=\"$(libknot_SONAME)\" \
 		-Dlibzscanner_SONAME=\"$(libzscanner_SONAME)\" \
 		-DROOTHINTS=\"$(ROOTHINTS)\" \
+		-DLIBEXT=\"$(LIBEXT)\" \
 		-DLUA_HAS_SETFUNCS="$(LUA_HAS_SETFUNCS)"
 kresd_DEPEND := $(libkres) $(contrib)
 kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) \
@@ -48,7 +49,7 @@ endif
 $(eval $(call make_sbin,kresd,daemon,yes))
 
 # Targets
-date := $(shell date +%F -r NEWS)
+date := $(shell date -r NEWS +%F)
 daemon: $(kresd) $(kresd_DIST)
 daemon-install: kresd-install bindings-install
 ifneq ($(SED),)

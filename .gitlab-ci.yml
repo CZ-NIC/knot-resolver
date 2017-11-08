@@ -1,4 +1,4 @@
-image: cznic/ubuntu:16.04
+image: cznic/ci-debian-kresd
 
 variables:
   DEBIAN_FRONTEND: noninteractive
@@ -32,11 +32,6 @@ test:linux:amd64:
 deckard:linux:amd64:
   stage: test
   script:
-    - apt purge -y python-dnspython python3-dnspython
-    - apt update
-    - apt install -y python3-jinja2 python3-pip python3-yaml libffi-dev libaugeas-dev
-    - pip3 install --upgrade pip
-    - pip3 install --user dnspython python-augeas
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
   dependencies:
     - build:linux:amd64
@@ -45,11 +40,32 @@ deckard:linux:amd64:
     - linux
     - amd64
 
-test:linux:amd64:valgrind:
-  image: cznic/ubuntu-valgrind:16.04
+
+deckard:linux:amd64:valgrind:
   stage: test
   script:
-    - PREFIX=$(pwd)/.local DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet" make -k check
+    - export PREFIX=$(pwd)/.local
+    - export LD_LIBRARY_PATH=$PREFIX/lib
+    - apt purge -y python-dnspython python3-dnspython
+    - apt update
+    - apt install -y python3-jinja2 python3-pip python3-yaml libffi-dev libaugeas-dev
+    - pip3 install --upgrade pip
+    - pip3 install --user dnspython python-augeas
+    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
+    - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd" MAKEFLAGS="-j $(nproc) --keep-going" make
+  dependencies:
+    - build:linux:amd64
+  tags:
+    - docker
+    - linux
+    - amd64
+
+
+test:linux:amd64:valgrind:
+  stage: test
+  script:
+    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
+    - PREFIX=$(pwd)/.local DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
   dependencies:
     - build:linux:amd64
   tags:
@@ -58,7 +74,6 @@ test:linux:amd64:valgrind:
     - amd64
 
 respdiff:linux:amd64:
-  image: cznic/ubuntu-respdif:16.04
   stage: test
   script:
     - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
@@ -66,6 +81,8 @@ respdiff:linux:amd64:
     - cat ./results/respdiff.txt
     - echo 'test if mismatch rate >= 1 %'
     - grep -q '^target diagrees.*0\.[0-9][0-9] %' ./results/respdiff.txt
+  dependencies:
+    - build:linux:amd64
   artifacts:
     when: always
     expire_in: '1 week'
@@ -75,8 +92,6 @@ respdiff:linux:amd64:
     - docker
     - linux
     - amd64
-  dependencies:
-    - build:linux:amd64
 
 #arm_build:
 #  image: cznic/armhf-ubuntu:16.04

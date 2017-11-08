@@ -1,9 +1,18 @@
+# Platform-specific library injection
+ifeq ($(PLATFORM),Darwin)
+	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH="$(DYLD_LIBRARY_PATH):$(abspath lib)"
+else
+	preload_syms := LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):$(abspath lib)"
+endif
+
 # Unit tests
 ifeq ($(HAS_cmocka), yes)
 include tests/unit.mk
 else
 $(warning cmocka not found, skipping unit tests)
 endif
+
+include tests/config/test_config.mk
 
 CLEAN_DNSTAP :=
 ifeq ($(ENABLE_DNSTAP)|$(HAS_go),yes|yes)
@@ -32,7 +41,7 @@ check-integration: $(deckard_DIR)/Makefile
 deckard: check-integration
 
 # Targets
-tests: check-unit
+tests: check-unit check-config
 tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean $(CLEAN_DNSTAP)
 
 .PHONY: tests tests-clean check-integration deckard

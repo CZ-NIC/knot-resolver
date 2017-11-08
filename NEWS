@@ -1,3 +1,18 @@
+Knot Resolver 1.5.0 (2017-11-02)
+================================
+
+Bugfixes
+--------
+- fix loading modules on Darwin
+
+Improvements
+------------
+- new module ta_signal_query supporting Signaling Trust Anchor Knowledge
+  using Keytag Query (RFC 8145 section 5); it is enabled by default
+- attempt validation for more records but require it for fewer of them
+  (e.g. avoids SERVFAIL when server adds extra records but omits RRSIGs)
+
+
 Knot Resolver 1.99.1-alpha (2017-10-26)
 =======================================
 This is an experimental release meant for testing aggressive caching.

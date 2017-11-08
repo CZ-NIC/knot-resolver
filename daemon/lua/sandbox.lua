@@ -113,7 +113,7 @@ setmetatable(modules, {
 		if type(k) == 'number' then k = v v = nil end
 		if not rawget(_G, k) then
 			modules.load(k)
-			k = string.match(k, '%w+')
+			k = string.match(k, '[%w_]+')
 			local mod = _G[k]
 			local config = mod and rawget(mod, 'config')
 			if mod ~= nil and config ~= nil then
@@ -199,6 +199,9 @@ if setfenv then -- Lua 5.1 and less
 else -- Lua 5.2+
 	_SANDBOX = make_sandbox(_ENV)
 end
+
+-- Load embedded modules
+modules.load('ta_signal_query')
 
 -- Interactive command evaluation
 function eval_cmd(line, raw)

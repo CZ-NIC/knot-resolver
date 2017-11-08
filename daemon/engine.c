@@ -234,8 +234,8 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir) {
 		 "if package._path == nil then package._path = package.path end\n"
 		 "package.path = '%1$s/?.lua;%1$s/?/init.lua;'..package._path\n"
 		 "if package._cpath == nil then package._cpath = package.cpath end\n"
-		 "package.cpath = '%1$s/?.so;'..package._cpath\n",
-		 new_moduledir);
+		 "package.cpath = '%1$s/?%2$s;'..package._cpath\n",
+		 new_moduledir, LIBEXT);
 
 	int ret = l_dobytecode(engine->L, l_paths, strlen(l_paths), "");
 	if (ret != 0) {
@@ -329,7 +329,10 @@ static int l_hint_root_file(lua_State *L)
 
 	const char *err = engine_hint_root_file(ctx, file);
 	if (err) {
-		lua_pushstring(L, err);
+		if (!file) {
+			file = ROOTHINTS;
+		}
+		lua_push_printf(L, "error when opening '%s': %s", file, err);
 		lua_error(L);
 	} else {
 		lua_pushboolean(L, true);
@@ -365,12 +368,14 @@ const char* engine_hint_root_file(struct kr_context *ctx, const char *file)
 		return "not enough memory";
 	}
 	if (zs_set_input_file(&zs, file) != 0) {
+		zs_deinit(&zs);
 		return "failed to open root hints file";
 	}
 
 	kr_zonecut_set(root_hints, (const uint8_t *)"");
 	zs_set_processing(&zs, roothints_add, NULL, root_hints);
 	zs_parse_all(&zs);
+	zs_deinit(&zs);
 	return NULL;
 }
 
