@@ -162,7 +162,7 @@ int kr_cache_clear(struct kr_cache *cache)
  * 'E' entry (exact hit):
  *	- ktype == NS: multiple chained entry_h, based on has_* : 1 flags;
  *		TODO: NSEC3 chain descriptors (iff nsec3_cnt > 0)
- *	- is_negative: uint16_t length, otherwise opaque ATM;
+ *	- is_packet: uint16_t length, otherwise opaque ATM;
  *	- otherwise RRset + its RRSIG set (possibly empty).
  * */
 struct entry_h {
@@ -170,7 +170,7 @@ struct entry_h {
 	uint32_t ttl;	/**< TTL at inception moment.  Assuming it fits into int32_t ATM. */
 	uint8_t  rank;	/**< See enum kr_rank */
 
-	bool is_negative : 1;	/**< Negative-answer packet for insecure/bogus name. */
+	bool is_packet : 1;	/**< Negative-answer packet for insecure/bogus name. */
 
 	unsigned nsec1_pos : 2;	/**< Only used for NS ktype. */
 	unsigned nsec3_cnt : 2;	/**< Only used for NS ktype. */
@@ -200,13 +200,16 @@ static struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 	const struct entry_h *eh = data.data;
 	bool ok = true;
 
+	ok = ok && (!kr_rank_test(eh->rank, KR_RANK_BOGUS)
+		    || eh->is_packet);
+
 	switch (ktype) {
 	case KNOT_RRTYPE_NSEC:
-		ok = ok && !(eh->is_negative || eh->has_ns || eh->has_cname
+		ok = ok && !(eh->is_packet || eh->has_ns || eh->has_cname
 				|| eh->has_dname);
 		break;
 	default:
-		if (eh->is_negative)
+		if (eh->is_packet)
 			ok = ok && !kr_rank_test(eh->rank, KR_RANK_SECURE);
 	}
 
@@ -432,7 +435,7 @@ static int entry_h_len(const knot_db_val_t val)
 	const void *d = eh->data; /* iterates over the data in entry */
 	const void *data_bound = val.data + val.len;
 	if (d >= data_bound) return kr_error(EILSEQ);
-	if (!eh->is_negative) { /* Positive RRset + its RRsig set (may be empty). */
+	if (!eh->is_packet) { /* Positive RRset + its RRsig set (may be empty). */
 		int sets = 2;
 		while (sets-- > 0) {
 			if (d + 1 > data_bound) return kr_error(EILSEQ);
@@ -511,10 +514,10 @@ static int entry_h_seek(knot_db_val_t *val, uint16_t type)
 		int len = entry_h_len(*val);
 		if (len < 0 || len > val->len) {
 			return kr_error(len < 0 ? len : EILSEQ);
+			// LATER: recovery, perhaps via removing the entry?
 		}
 		val->data += len;
 		val->len -= len;
-		// LATER: recovery, perhaps via removing the entry?
 	}
 	return kr_ok();
 }
@@ -622,15 +625,12 @@ static bool check_dname_for_lf(const knot_dname_t *n)
 	return knot_dname_size(n) == strlen((const char *)n) + 1;
 }
 
-
-/** TODO */
-static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
+/** Like key_exact_type() but omits a couple checks not holding for pkt cache. */
+static knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 {
+	assert(!knot_rrtype_is_metatype(type));
 	switch (type) {
-	/* Sanity check: forbidden types represented in other way(s). */
-	case KNOT_RRTYPE_RRSIG:
-	case KNOT_RRTYPE_NSEC:
-	case KNOT_RRTYPE_NSEC3:
+	case KNOT_RRTYPE_RRSIG: /* no RRSIG query caching, at least for now */
 		assert(false);
 		return (knot_db_val_t){};
 	/* xNAME lumped into NS. */
@@ -648,6 +648,19 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 	k->type = type;
 	/* CACHE_KEY_DEF: key == dname_lf + '\0' + 'E' + RRTYPE */
 	return (knot_db_val_t){ k->buf + 1, name_len + 4 };
+}
+
+/** TODO */
+static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
+{
+	switch (type) {
+	/* Sanity check: forbidden types represented in other way(s). */
+	case KNOT_RRTYPE_NSEC:
+	case KNOT_RRTYPE_NSEC3:
+		assert(false);
+		return (knot_db_val_t){};
+	}
+	return key_exact_type_maypkt(k, type);
 }
 
 /** TODO
@@ -762,7 +775,6 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		*exact_match = is_exact;
 	}
 	const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NSEC);
-	void *eh_data_bound = val.data + val.len;
 	if (!eh) {
 		/* This might be just finding something else than NSEC1 entry,
 		 * in case we searched before the very first one in the zone. */
@@ -873,7 +885,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 
-	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || (qry->flags.NO_CACHE)
+	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || qry->flags.NO_CACHE
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state; /* Already resolved/failed or already tried, etc. */
 	}
@@ -882,7 +894,6 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * TODO Note: it's important to skip this if rrcache sets KR_STATE_DONE,
 	 * as CNAME chains need more iterations to get fetched. */
 	qry->flags.NO_CACHE = true;
-
 
 	struct key k_storage, *k = &k_storage;
 	if (!check_dname_for_lf(qry->sname)) {
@@ -902,7 +913,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (qry->stype == KNOT_RRTYPE_RRSIG) {
 		return ctx->state; /* LATER: some other behavior for this STYPE? */
 	}
-	knot_db_val_t key = key_exact_type(k, qry->stype);
+	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
 	knot_db_val_t val = { };
 	ret = cache_op(cache, read, &key, &val, 1);
 	switch (ret) {
@@ -915,7 +926,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 					ret, strerror(abs(ret)));
 			return ctx->state;
 		}
-		VERBOSE_MSG(qry, "=> satisfied from cache (direct positive hit)\n");
+		VERBOSE_MSG(qry, "=> satisfied from cache (direct hit)\n");
 		return KR_STATE_DONE;
 	case (-abs(ENOENT)):
 		break;
@@ -1019,7 +1030,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		case 1: {
  			/* find a previous-or-equal name+NSEC in cache covering
 			 * the QNAME, checking TTL etc. */
-			
+
 			ans.nsec_v = 1;
 			//nsec_leq()
 			knot_db_val_t key = key_NSEC1(k, qry->sname, false);
@@ -1203,7 +1214,7 @@ do_soa:
 		void *eh_data_bound = val.data + val.len;
 
 		int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
-		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_negative) {
+		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 			return ctx->state;
 		}
 		ret = entry2answer(&ans, AR_SOA, eh, eh_data_bound,
@@ -1258,8 +1269,179 @@ do_soa:
 	qry->flags.EXPIRING = expiring;
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
-	
+
 	return KR_STATE_DONE;
+}
+
+
+/** Prepare space to insert an entry.
+ *
+ * Some checks are performed (rank, TTL), the current entry in cache is copied
+ * with a hole ready for the new entry (old one of the same type is cut out).
+ *
+ * \param val_new_entry The only changing parameter; ->len is read, ->data written.
+ * Beware: the entry_h in *val_new_entry->data is zeroed, and in some cases it has
+ * some flags set - and in those cases you can't just overwrite those flags.
+ * All flags except is_packet are sensitive in this way.
+ */
+static int entry_h_splice(
+	knot_db_val_t *val_new_entry, uint8_t rank,
+	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
+	const knot_dname_t *owner/*log only*/,
+	const struct kr_query *qry, struct kr_cache *cache)
+{
+	/* Find the whole entry-set and the particular entry within. */
+	knot_db_val_t val_orig_all = { }, val_orig_entry = { };
+	const struct entry_h *eh_orig = NULL;
+	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
+		int ret = cache_op(cache, read, &key, &val_orig_all, 1);
+		if (ret) val_orig_all = (knot_db_val_t){ };
+		val_orig_entry = val_orig_all;
+		switch (entry_h_seek(&val_orig_entry, type)) {
+		case 0:
+			ret = entry_h_len(val_orig_entry);
+			if (ret >= 0) {
+				val_orig_entry.len = ret;
+				eh_orig = entry_h_consistent(val_orig_entry, type);
+				if (eh_orig) {
+					break;
+				}
+			} /* otherwise fall through */
+		default:
+			val_orig_entry = val_orig_all = (knot_db_val_t){};
+		case -ENOENT:
+			val_orig_entry.len = 0;
+			break;
+		};
+	}
+
+	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
+		/* If equal rank was accepted, spoofing a *single* answer would be
+		 * enough to e.g. override NS record in AUTHORITY section.
+		 * This way they would have to hit the first answer
+		 * (whenever TTL nears expiration). */
+		int32_t old_ttl = get_new_ttl(eh_orig, qry->creation_time.tv_sec);
+		if (old_ttl > 0 && !is_expiring(old_ttl, eh_orig->ttl)
+		    && rank <= eh_orig->rank) {
+			WITH_VERBOSE {
+				VERBOSE_MSG(qry, "=> not overwriting ");
+				kr_rrtype_print(type, "", " ");
+				kr_dname_print(owner, "", "\n");
+			}
+			return kr_error(EEXIST);
+		}
+	}
+
+	/* Obtain new storage from LMDB.
+	 * Note: this does NOT invalidate val_orig_all.data. */
+	ssize_t storage_size = val_orig_all.len - val_orig_entry.len
+				+ val_new_entry->len;
+	assert(storage_size > 0);
+	knot_db_val_t val = { .len = storage_size, .data = NULL };
+	int ret = cache_op(cache, write, &key, &val, 1);
+	if (ret || !val.data || !val.len) {
+		assert(ret); /* otherwise "succeeding" but `val` is bad */
+		VERBOSE_MSG(qry, "=> failed LMDB write, ret = %d\n", ret);
+		return kr_error(ret ? ret : ENOSPC);
+	}
+
+	/* Write original data before entry, if any. */
+	const ssize_t len_before = val_orig_entry.data - val_orig_all.data;
+	assert(len_before >= 0);
+	if (len_before) {
+		memcpy(val.data, val_orig_all.data, len_before);
+	}
+	/* Write original data after entry, if any. */
+	const ssize_t len_after = val_orig_all.len - val_orig_entry.len;
+	assert(len_after >= 0);
+	if (len_after) {
+		memcpy(val.data + len_before + val_new_entry->len,
+			val_orig_entry.data + val_orig_entry.len, len_after);
+	}
+
+	val_new_entry->data = val.data + len_before;
+	{
+		struct entry_h *eh = val_new_entry->data;
+		memset(eh, 0, offsetof(struct entry_h, data));
+		/* In case (len_before == 0 && ktype == KNOT_RRTYPE_NS) the *eh
+		 * set below would be uninitialized and the caller wouldn't be able
+		 * to do it after return, as that would overwrite what we do below. */
+	}
+	/* The multi-entry type needs adjusting the flags. */
+	if (ktype == KNOT_RRTYPE_NS) {
+		struct entry_h *eh = val.data;
+		if (!len_before) {
+		}
+		if (val_orig_all.len) {
+			const struct entry_h *eh0 = val_orig_all.data;
+			/* ENTRY_H_FLAGS */
+			eh->nsec1_pos = eh0->nsec1_pos;
+			eh->nsec3_cnt = eh0->nsec3_cnt;
+			eh->has_ns    = eh0->has_ns;
+			eh->has_cname = eh0->has_cname;
+			eh->has_dname = eh0->has_dname;
+		}
+		/* we just added/replaced some type */
+		switch (type) {
+		case KNOT_RRTYPE_NS:
+			eh->has_ns = true;  break;
+		case KNOT_RRTYPE_CNAME:
+			eh->has_cname = true;  break;
+		case KNOT_RRTYPE_DNAME:
+			eh->has_dname = true;  break;
+		default:
+			assert(false);
+		}
+	}
+	return kr_ok();
+}
+
+
+static const uint32_t DEFAULT_MAXTTL = 15 * 60,
+	DEFAULT_NOTTL = 5; /* Short-time "no data" retention to avoid bursts */
+
+static inline uint32_t limit_ttl(uint32_t ttl)
+{
+	/* @todo Configurable limit */
+	return (ttl > DEFAULT_MAXTTL) ? DEFAULT_MAXTTL : ttl;
+}
+/** Compute TTL for a packet.  Generally it's minimum TTL, with extra conditions. */
+static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
+{
+	bool has_ttl = false;
+	uint32_t ttl = UINT32_MAX;
+	/* Find minimum entry TTL in the packet or SOA minimum TTL. */
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (is_negative) {
+				/* Use SOA minimum TTL for negative answers. */
+				if (rr->type == KNOT_RRTYPE_SOA) {
+					return limit_ttl(MIN(knot_rrset_ttl(rr), knot_soa_minimum(&rr->rrs)));
+				} else {
+					continue; /* Use SOA only for negative answers. */
+				}
+			}
+			if (knot_rrtype_is_metatype(rr->type)) {
+				continue; /* Skip metatypes. */
+			}
+			/* Find minimum TTL in the record set */
+			knot_rdata_t *rd = rr->rrs.data;
+			for (uint16_t j = 0; j < rr->rrs.rr_count; ++j) {
+				if (knot_rdata_ttl(rd) < ttl) {
+					ttl = limit_ttl(knot_rdata_ttl(rd));
+					has_ttl = true;
+				}
+				rd = kr_rdataset_next(rd);
+			}
+		}
+	}
+	/* Get default if no valid TTL present */
+	if (!has_ttl) {
+		ttl = DEFAULT_NOTTL;
+	}
+	return limit_ttl(ttl);
 }
 
 
@@ -1272,14 +1454,19 @@ int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 
-	if (!qry || ctx->state & KR_STATE_FAIL || qry->flags.CACHED) {
+	uint16_t pkt_type = knot_pkt_qtype(pkt);
+	const bool type_bad = knot_rrtype_is_metatype(pkt_type)
+				|| pkt_type == KNOT_RRTYPE_RRSIG;
+	/* Note: we cache even in KR_STATE_FAIL.  For example,
+	 * BOGUS answer can go to +cd cache even without +cd request. */
+	if (!qry || qry->flags.CACHED || type_bad || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state;
 	}
 	/* Do not cache truncated answers, at least for now.  LATER */
 	if (knot_wire_get_tc(pkt->wire)) {
 		return ctx->state;
 	}
-
+	/* Stash individual records. */
 	const uint32_t min_ttl = MAX(DEFAULT_MINTTL, req->ctx->cache.ttl_min);
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	int ret = 0;
@@ -1292,14 +1479,90 @@ int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				continue;
 				/* TODO: probably safe to break but maybe not worth it */
 			}
-			int ret = stash_rrset(arr, i, min_ttl, qry, cache);
+			ret = stash_rrset(arr, i, min_ttl, qry, cache);
 			if (ret) goto finally;
+			/* LATER(optim.): maybe filter out some type-rank combinations
+			 * that won't be useful as separate RRsets. */
 		}
 	}
+
+	/* In some cases, stash also the packet. */
+	const bool is_negative = kr_response_classify(pkt)
+				& (PKT_NODATA|PKT_NXDOMAIN);
+	const bool want_pkt = qry->flags.DNSSEC_BOGUS
+		|| (is_negative && qry->flags.DNSSEC_INSECURE);
+	if (!want_pkt || !knot_wire_get_aa(pkt->wire)) {
+		goto finally;
+	}
+	
+	const uint16_t pkt_size = pkt->size;
+	knot_db_val_t val_new_entry = {
+		.data = NULL,
+		.len = offsetof(struct entry_h, data) + sizeof(pkt_size) + pkt->size,
+	};
+
+	/* Compute rank.  If cd bit is set or we got answer via non-validated
+	 * forwarding, make the rank bad; otherwise it depends on flags.
+	 * TODO: probably make validator attempt validation even with +cd. */
+	uint8_t rank = KR_RANK_AUTH;
+	const bool risky_vldr = is_negative && qry->flags.FORWARD && qry->flags.CNAME;
+		/* ^^ CNAME'ed NXDOMAIN answer in forwarding mode can contain
+		 * unvalidated records; original commit: d6e22f476. */
+	if (knot_wire_get_cd(req->answer->wire) || qry->flags.STUB || risky_vldr) {
+		kr_rank_set(&rank, KR_RANK_OMIT);
+	} else {
+		if (qry->flags.DNSSEC_BOGUS) {
+			kr_rank_set(&rank, KR_RANK_BOGUS);
+		} else if (qry->flags.DNSSEC_INSECURE) {
+			kr_rank_set(&rank, KR_RANK_INSECURE);
+		} else assert(false);
+	}
+
+	const knot_dname_t *owner = knot_pkt_qname(pkt); /* qname can't be compressed */
+	WITH_VERBOSE {
+		VERBOSE_MSG(qry, "=> stashing packet: rank 0%0.2o, ", rank);
+		kr_rrtype_print(pkt_type, "", " ");
+		kr_dname_print(owner, "", " ");
+		kr_log_verbose("(%d B)\n", (int)val_new_entry.len);
+	}
+
+	// TODO: nothing exists under NXDOMAIN
+#if 0
+	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN
+	 /* && !qry->flags.DNSSEC_INSECURE */ ) {
+		pkt_type = KNOT_RRTYPE_NS;
+	}
+#endif
+
+	/* Construct the key under which the pkt will be stored. */
+	struct key k_storage, *k = &k_storage;
+	knot_db_val_t key;
+	ret = kr_dname_lf(k->buf, owner, NULL);
+	if (ret) {
+		assert(!ret);
+		goto finally;
+	}
+	key = key_exact_type_maypkt(k, pkt_type);
+
+	/* Prepare raw memory for the new entry and fill it. */
+	ret = entry_h_splice(&val_new_entry, rank, key, k->type, pkt_type,
+				owner, qry, cache);
+	if (ret) goto finally; /* some aren't really errors */
+	assert(val_new_entry.data);
+	struct entry_h *eh = val_new_entry.data;
+	eh->time = qry->timestamp.tv_sec;
+	eh->ttl  = packet_ttl(pkt, is_negative);
+	eh->rank = rank;
+	eh->is_packet = true;
+	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
+	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
+
 finally:
 	kr_cache_sync(cache);
-	return ret ? ret : ctx->state;
+	return ctx->state; /* we ignore cache-stashing errors */
 }
+
+
 
 /** It's simply inside of cycle taken out to decrease indentation.
  * \return kr_ok() or KR_STATE_FAIL */
@@ -1310,7 +1573,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 	if (entry->cached) {
 		return kr_ok();
 	}
-	knot_rrset_t *rr = entry->rr;
+	const knot_rrset_t *rr = entry->rr;
 	if (!rr) {
 		assert(false);
 		return KR_STATE_FAIL;
@@ -1323,7 +1586,6 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		return kr_ok();
 	}
 
-
 	WITH_VERBOSE {
 		VERBOSE_MSG(qry, "=> considering to stash ");
 		kr_rrtype_print(rr->type, "", " ");
@@ -1333,7 +1595,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 	switch (rr->type) {
 	case KNOT_RRTYPE_RRSIG:
 	case KNOT_RRTYPE_NSEC3:
-		// for now; FIXME
+		// for now; LATER NSEC3
 		return kr_ok();
 	default:
 		break;
@@ -1388,49 +1650,21 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		key = key_exact_type(k, rr->type);
 	}
 
-	/* Find the whole entry-set and the particular entry within. */
-	knot_db_val_t val_orig_all = { }, val_orig_entry = { };
-	const struct entry_h *eh_orig = NULL;
-	if (!kr_rank_test(entry->rank, KR_RANK_SECURE) || k->type == KNOT_RRTYPE_NS) {
-		ret = cache_op(cache, read, &key, &val_orig_all, 1);
-		if (ret) val_orig_all = (knot_db_val_t){ };
-		val_orig_entry = val_orig_all;
-		switch (entry_h_seek(&val_orig_entry, rr->type)) {
-		case 0:
-			ret = entry_h_len(val_orig_entry);
-			if (ret >= 0) {
-				val_orig_entry.len = ret;
-				eh_orig = entry_h_consistent(val_orig_entry, rr->type);
-				if (eh_orig) {
-					break;
-				}
-			} /* otherwise fall through */
-		default:
-			val_orig_entry = val_orig_all = (knot_db_val_t){};
-		case -ENOENT:
-			val_orig_entry.len = 0;
-			break;
-		};
-	}
-
-	if (!kr_rank_test(entry->rank, KR_RANK_SECURE) && eh_orig) {
-		/* If equal rank was accepted, spoofing a *single* answer would be
-		 * enough to e.g. override NS record in AUTHORITY section.
-		 * This way they would have to hit the first answer
-		 * (whenever TTL nears expiration). */
-		int32_t old_ttl = get_new_ttl(eh_orig, qry->creation_time.tv_sec);
-		if (old_ttl > 0 && !is_expiring(old_ttl, eh_orig->ttl)
-		    && entry->rank <= eh_orig->rank) {
-			WITH_VERBOSE {
-				VERBOSE_MSG(qry, "=> not overwriting ");
-				kr_rrtype_print(rr->type, "", " ");
-				kr_dname_print(rr->owner, "", "\n");
-			}
-			return kr_ok();
-		}
-	}
-
+	/* Compute materialized sizes of the new data. */
 	const knot_rdataset_t *rds_sigs = rr_sigs ? &rr_sigs->rrs : NULL;
+	const int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
+	knot_db_val_t val_new_entry = {
+		.data = NULL,
+		.len = offsetof(struct entry_h, data) + rr_ssize
+			+ rdataset_dematerialize_size(rds_sigs),
+	};
+
+	/* Prepare raw memory for the new entry. */
+	ret = entry_h_splice(&val_new_entry, entry->rank, key, k->type, rr->type,
+				rr->owner, qry, cache);
+	if (ret) return kr_ok(); /* some aren't really errors */
+	assert(val_new_entry.data);
+
 	/* Compute TTL, just in case they weren't equal. */
 	uint32_t ttl = -1;
 	const knot_rdataset_t *rdatasets[] = { &rr->rrs, rds_sigs, NULL };
@@ -1443,31 +1677,12 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		}
 	} /* TODO: consider expirations of RRSIGs as well, just in case. */
 	ttl = MAX(ttl, min_ttl);
-	/* Compute materialized sizes of the new data, and combine with remaining size. */
-	const int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
-	const int entry_size = offsetof(struct entry_h, data) + rr_ssize
-		+ rdataset_dematerialize_size(rds_sigs);
-	size_t storage_size = val_orig_all.len - val_orig_entry.len + entry_size;
-	/* Obtain new storage from LMDB.  Note: this does NOT invalidate val_orig.data. */
-	knot_db_val_t val = { .len = storage_size, .data = NULL };
-	ret = cache_op(cache, write, &key, &val, 1);
-	if (ret || !val.data || !val.len) {
-		assert(ret); /* otherwise "succeeding" but `val` is bad */
-		return kr_ok();
-	}
-	/* Write original data before entry, if any. */
-	const ssize_t len_before = val_orig_entry.data - val_orig_all.data;
-	assert(len_before >= 0);
-	if (len_before) {
-		memcpy(val.data, val_orig_all.data, len_before);
-	}
+
 	/* Write the entry itself. */
-	struct entry_h *eh = val.data + len_before;
-	*eh = (struct entry_h){
-		.time = qry->timestamp.tv_sec,
-		.ttl  = ttl,
-		.rank = entry->rank,
-	};
+	struct entry_h *eh = val_new_entry.data;
+	eh->time = qry->timestamp.tv_sec;
+	eh->ttl  = ttl;
+	eh->rank = entry->rank;
 	if (rdataset_dematerialize(&rr->rrs, eh->data)
 	    || rdataset_dematerialize(rds_sigs, eh->data + rr_ssize)) {
 		/* minimize the damage from incomplete write; TODO: better */
@@ -1475,54 +1690,25 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		eh->rank = 0;
 		assert(false);
 	}
-	/* Write original data after entry, if any. */
-	const ssize_t len_after = val_orig_all.len - val_orig_entry.len;
-	assert(len_after >= 0);
-	if (len_after) {
-		memcpy(val.data + len_before + entry_size,
-			val_orig_entry.data + val_orig_entry.len, len_after);
-	}
-	/* The multi-entry type needs adjusting the flags. */
-	if (k->type == KNOT_RRTYPE_NS) {
-		eh = val.data;
-		if (val_orig_all.len) {
-			const struct entry_h *eh0 = val_orig_all.data;
-			/* ENTRY_H_FLAGS */
-			eh->nsec1_pos = eh0->nsec1_pos;
-			eh->nsec3_cnt = eh0->nsec3_cnt;
-			eh->has_ns    = eh0->has_ns;
-			eh->has_cname = eh0->has_cname;
-			eh->has_dname = eh0->has_dname;
-		}
-		/* we just added/replaced some type */
-		switch (rr->type) {
-		case KNOT_RRTYPE_NS:
-			eh->has_ns = true;  break;
-		case KNOT_RRTYPE_CNAME:
-			eh->has_cname = true;  break;
-		case KNOT_RRTYPE_DNAME:
-			eh->has_dname = true;  break;
-		default:
-			assert(false);
-		}
-	}
+
 	WITH_VERBOSE {
 		VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, ", entry->rank);
 		kr_rrtype_print(rr->type, "", " ");
 		kr_dname_print(rr->owner, "", " ");
-		int sigs = rr_sigs ? rr_sigs->rrs.rr_count : 0;
-		kr_log_verbose("(%d B total, incl. %d RRSIGs)\n", (int)storage_size, sigs);
+		kr_log_verbose("(%d B total, incl. %d RRSIGs)\n",
+				(int)val_new_entry.len,
+				(int)(rr_sigs ? rr_sigs->rrs.rr_count : 0)
+				);
 	}
 	return kr_ok();
 }
 
 
+static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
 #define CHECK_RET(ret) do { \
 	if ((ret) < 0) { assert(false); return kr_error((ret)); } \
 } while (false)
-
-static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
-		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
@@ -1545,9 +1731,78 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	qry->flags.EXPIRING = is_expiring(eh->ttl, new_ttl);
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
+	qry->flags.DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
+	if (qry->flags.DNSSEC_INSECURE) {
+		qry->flags.DNSSEC_WANT = false;
+	}
 	return kr_ok();
 }
+#undef CHECK_RET
 
+static int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
+{
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+
+	uint16_t pkt_len;
+	memcpy(&pkt_len, eh->data, sizeof(pkt_len));
+		/* TODO: more length checks somewhere, maybe entry_h_consistent */
+	if (pkt_len > pkt->max_size) {
+		return kr_error(ENOENT);
+	}
+
+	/* Copy answer and reparse it, but keep the original message id. */
+	uint16_t msgid = knot_wire_get_id(pkt->wire);
+	knot_pkt_clear(pkt);
+	memcpy(pkt->wire, eh->data + 2, pkt_len);
+	pkt->size = pkt_len;
+	int ret = knot_pkt_parse(pkt, 0);
+	if (ret != KNOT_EOK) {
+		return kr_error(ret);
+	}
+	knot_wire_set_id(pkt->wire, msgid);
+
+	/* Rank-related fixups.  Add rank into the additional field. */
+	if (kr_rank_test(eh->rank, KR_RANK_INSECURE)) {
+		qry->flags.DNSSEC_INSECURE = true;
+		qry->flags.DNSSEC_WANT = false;
+	}
+	for (size_t i = 0; i < pkt->rrset_count; ++i) {
+		assert(!pkt->rr[i].additional);
+		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
+		if (!rr_rank) {
+			return kr_error(ENOMEM);
+		}
+		*rr_rank = eh->rank;
+		pkt->rr[i].additional = rr_rank;
+	}
+
+	/* Adjust TTL in records.  We know that no RR has expired yet. */
+	const uint32_t drift = eh->ttl - new_ttl;
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			knot_rdata_t *rd = rr->rrs.data;
+			for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
+				knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
+				rd = kr_rdataset_next(rd);
+			}
+		}
+	}
+
+	/* Finishing touches. TODO: perhaps factor out */
+	qry->flags.EXPIRING = is_expiring(eh->ttl, new_ttl);
+	qry->flags.CACHED = true;
+	qry->flags.NO_MINIMIZE = true;
+	qry->flags.DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
+	qry->flags.DNSSEC_BOGUS = kr_rank_test(eh->rank, KR_RANK_BOGUS);
+	if (qry->flags.DNSSEC_INSECURE || qry->flags.DNSSEC_BOGUS) {
+		qry->flags.DNSSEC_WANT = false;
+	}
+	return kr_ok();
+}
 
 /** TODO: description; see the single call site for now. */
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
@@ -1569,19 +1824,20 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
 		/* Positive record with stale TTL or bad rank.
-		 * It's unlikely that we find a negative one,
+		 * LATER(optim.): It's unlikely that we find a negative one,
 		 * so we might theoretically skip all the cache code. */
 		return kr_error(ENOENT);
 	}
 
-	if (eh->is_negative) {
-		// insecure zones might have a negative-answer packet here
-		//FIXME
-		assert(false);
+	if (eh->is_packet) {
+		/* Note: we answer here immediately, even if it's (theoretically)
+		 * possible that we could generate a higher-security negative proof.
+		 * Rank is high-enough so we take it to save time searching. */
+		return answer_from_pkt  (ctx, pkt, qry->stype, eh, eh_bound, new_ttl);
+	} else {
+		return answer_simple_hit(ctx, pkt, qry->stype, eh, eh_bound, new_ttl);
 	}
-	return answer_simple_hit(ctx, pkt, qry->stype, eh, eh_bound, new_ttl);
 }
-#undef CHECK_RET
 
 int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
@@ -1655,7 +1911,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			/* Check consistency, find any type.
 			 * "break;" goes to shortening by another label */
 			const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NS),
-			      	*eh_orig = eh;
+				*eh_orig = eh;
 			const knot_db_val_t val_orig = val;
 			assert(eh);
 			if (!eh) break; // do something about EILSEQ?
@@ -1694,7 +1950,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 					assert(false);
 					break;
 				}
-				if (eh->is_negative) continue;
+				if (eh->is_packet) continue;
 				int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
 				if (new_ttl < 0) continue;
 				if (type != KNOT_RRTYPE_NS && eh->rank < rank_min) {
@@ -1738,7 +1994,6 @@ static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_que
 	const bool allow_unverified = knot_wire_get_cd(req->answer->wire)
 					|| qry->flags.STUB;
 	/* TODO: move rank handling into the iterator (DNSSEC_* flags)? */
-	uint8_t rank  = 0;
 	uint8_t lowest_rank = KR_RANK_INITIAL | KR_RANK_AUTH;
 	if (qry->flags.NONAUTH) {
 		lowest_rank = KR_RANK_INITIAL;
