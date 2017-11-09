@@ -43,8 +43,10 @@ struct kr_cdb_api {
 
 	/* Data access */
 
-	int (*read)(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount);
-	int (*write)(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount);
+	int (*read)(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val,
+			int maxcount);
+	int (*write)(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val,
+			int maxcount);
 	int (*remove)(knot_db_t *db, knot_db_val_t *key, int maxcount);
 
 	/* Specialised operations */

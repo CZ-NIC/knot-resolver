@@ -464,7 +464,8 @@ static int cdb_clear(knot_db_t *db)
 	return ret;
 }
 
-static int cdb_readv(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount)
+static int cdb_readv(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val,
+		     int maxcount)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
@@ -487,7 +488,8 @@ static int cdb_readv(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 	return kr_ok();
 }
 
-static int cdb_write(struct lmdb_env *env, MDB_txn **txn, knot_db_val_t *key, knot_db_val_t *val, unsigned flags)
+static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *key,
+			knot_db_val_t *val, unsigned flags)
 {
 	/* Convert key structs and write */
 	MDB_val _key = val_knot2mdb(*key);
@@ -514,7 +516,8 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, knot_db_val_t *key, kn
 	return kr_ok();
 }
 
-static int cdb_writev(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount)
+static int cdb_writev(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val,
+			int maxcount)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;

@@ -221,7 +221,8 @@ static int cdb_clear(knot_db_t *cache)
 	return kr_ok();
 }
 
-static int cdb_readv(knot_db_t *cache, knot_db_val_t *key, knot_db_val_t *val, int maxcount)
+static int cdb_readv(knot_db_t *cache, const knot_db_val_t *key, knot_db_val_t *val,
+		     int maxcount)
 {
 	if (!cache || !key || !val) {
 		return kr_error(EINVAL);
@@ -256,7 +257,8 @@ static int cdb_readv(knot_db_t *cache, knot_db_val_t *key, knot_db_val_t *val, i
 	return kr_ok();
 }
 
-static int cdb_writev(knot_db_t *cache, knot_db_val_t *key, knot_db_val_t *val, int maxcount)
+static int cdb_writev(knot_db_t *cache, const knot_db_val_t *key, knot_db_val_t *val,
+			int maxcount)
 {
 	if (!cache || !key || !val) {
 		return kr_error(EINVAL);
