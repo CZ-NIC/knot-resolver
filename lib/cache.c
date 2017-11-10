@@ -195,11 +195,23 @@ struct nsec_p {
  * \note only exact hits and NSEC1 are really considered ATM. */
 static struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 {
+	/* Length checks. */
 	if (data.len < offsetof(struct entry_h, data))
 		return NULL;
 	const struct entry_h *eh = data.data;
-	bool ok = true;
+	if (eh->is_packet) {
+		uint16_t pkt_len;
+		if (data.len < offsetof(struct entry_h, data) + sizeof(pkt_len)) {
+			return NULL;
+		}
+		memcpy(&pkt_len, eh->data, sizeof(pkt_len));
+		if (data.len < offsetof(struct entry_h, data) + sizeof(pkt_len)
+				+ pkt_len) {
+			return NULL;
+		}
+	}
 
+	bool ok = true;
 	ok = ok && (!kr_rank_test(eh->rank, KR_RANK_BOGUS)
 		    || eh->is_packet);
 
@@ -916,25 +928,19 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
 	knot_db_val_t val = { };
 	ret = cache_op(cache, read, &key, &val, 1);
-	switch (ret) {
-	case 0: /* found an entry: test conditions, materialize into pkt, etc. */
+	if (!ret) {
+		/* found an entry: test conditions, materialize into pkt, etc. */
 		ret = found_exact_hit(ctx, pkt, val, lowest_rank);
-		if (ret == -abs(ENOENT)) {
-			break;
-		} else if (ret) {
-			VERBOSE_MSG(qry, "=> exact hit but error: %d %s\n",
-					ret, strerror(abs(ret)));
-			return ctx->state;
-		}
-		VERBOSE_MSG(qry, "=> satisfied from cache (direct hit)\n");
-		return KR_STATE_DONE;
-	case (-abs(ENOENT)):
-		break;
-	default:
+	}
+	if (ret && ret != -abs(ENOENT)) {
+		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n",
+				ret, strerror(abs(ret)));
 		assert(false);
 		return ctx->state;
+	} else if (!ret) {
+		VERBOSE_MSG(qry, "=> satisfied from cache (direct hit)\n");
+		return KR_STATE_DONE;
 	}
-
 
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;
@@ -1747,7 +1753,6 @@ static int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 
 	uint16_t pkt_len;
 	memcpy(&pkt_len, eh->data, sizeof(pkt_len));
-		/* TODO: more length checks somewhere, maybe entry_h_consistent */
 	if (pkt_len > pkt->max_size) {
 		return kr_error(ENOENT);
 	}
@@ -1819,7 +1824,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		// LATER: recovery in case of error, perhaps via removing the entry?
 		// LATER(optim): pehaps optimize the zone cut search
 	}
-	void *eh_bound = val.data + val.len;
+	const void *eh_bound = val.data + val.len;
 
 	int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
@@ -1906,71 +1911,69 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
 		knot_db_val_t val = { };
 		int ret = cache_op(cache, read, &key, &val, 1);
-		switch (ret) {
-		case 0: {
-			/* Check consistency, find any type.
-			 * "break;" goes to shortening by another label */
-			const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NS),
-				*eh_orig = eh;
-			const knot_db_val_t val_orig = val;
-			assert(eh);
-			if (!eh) break; // do something about EILSEQ?
-			/* More types are possible; try in order. */
-			uint16_t type = 0;
-			while (type != KNOT_RRTYPE_DNAME) {
-				/* Determine the next type to try. */
-				switch (type) {
-				case 0:
-					type = KNOT_RRTYPE_NS;
-					if (!eh_orig->has_ns) continue;
-					break;
-				case KNOT_RRTYPE_NS:
-					type = KNOT_RRTYPE_CNAME;
-					/* CNAME is interesting only if we
-					 * directly hit the name that was asked */
-					if (!exact_match || !eh_orig->has_cname)
-						continue;
-					break;
-				case KNOT_RRTYPE_CNAME:
-					type = KNOT_RRTYPE_DNAME;
-					/* DNAME is interesting only if we did NOT
-					 * directly hit the name that was asked */
-					if (exact_match || !eh_orig->has_dname)
-						continue;
-					break;
-				default:
-					assert(false);
-					return NOTHING;
-				}
-				/* Find the entry for the type, check positivity, TTL
-				 * For non-fatal failures just "continue;" to try the next type. */
-				val = val_orig;
-				ret = entry_h_seek(&val, type);
-				if (ret || !(eh = entry_h_consistent(val, KNOT_RRTYPE_CNAME))) {
-					assert(false);
-					break;
-				}
-				if (eh->is_packet) continue;
-				int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
-				if (new_ttl < 0) continue;
-				if (type != KNOT_RRTYPE_NS && eh->rank < rank_min) {
-					continue;
-					/* For NS any kr_rank is accepted,
-					 * as insecure or even nonauth is OK */
-				}
-				/* We found our match. */
-				k->type = type;
-				k->zlf_len = zlf_len;
-				return val;
-			}
-			}
-		case (-abs(ENOENT)):
-			break;
-		default:
-			assert(false);
+		if (ret == -abs(ENOENT)) goto next_label;
+		if (ret) {
+			assert(!ret);
 			return NOTHING; // TODO: do something with kr_error(ret)?
 		}
 
+		/* Check consistency, find any type;
+		 * using `goto` for shortening by another label. */
+		const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NS),
+			*eh_orig = eh;
+		const knot_db_val_t val_orig = val;
+		assert(eh);
+		if (!eh) goto next_label; // do something about EILSEQ?
+		/* More types are possible; try in order. */
+		uint16_t type = 0;
+		while (type != KNOT_RRTYPE_DNAME) {
+			/* Determine the next type to try. */
+			switch (type) {
+			case 0:
+				type = KNOT_RRTYPE_NS;
+				if (!eh_orig->has_ns) continue;
+				break;
+			case KNOT_RRTYPE_NS:
+				type = KNOT_RRTYPE_CNAME;
+				/* CNAME is interesting only if we
+				 * directly hit the name that was asked */
+				if (!exact_match || !eh_orig->has_cname)
+					continue;
+				break;
+			case KNOT_RRTYPE_CNAME:
+				type = KNOT_RRTYPE_DNAME;
+				/* DNAME is interesting only if we did NOT
+				 * directly hit the name that was asked */
+				if (exact_match || !eh_orig->has_dname)
+					continue;
+				break;
+			default:
+				assert(false);
+				return NOTHING;
+			}
+			/* Find the entry for the type, check positivity, TTL
+			 * For non-fatal failures just "continue;" to try the next type. */
+			val = val_orig;
+			ret = entry_h_seek(&val, type);
+			if (ret || !(eh = entry_h_consistent(val, KNOT_RRTYPE_CNAME))) {
+				assert(false);
+				goto next_label;
+			}
+			if (eh->is_packet) continue;
+			int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+			if (new_ttl < 0) continue;
+			if (type != KNOT_RRTYPE_NS && eh->rank < rank_min) {
+				continue;
+				/* For NS any kr_rank is accepted,
+				 * as insecure or even nonauth is OK */
+			}
+			/* We found our match. */
+			k->type = type;
+			k->zlf_len = zlf_len;
+			return val;
+		}
+
+	next_label:
 		WITH_VERBOSE {
 			VERBOSE_MSG(qry, "NS/xNAME ");
 			kr_dname_print(k->zname, "", " NOT found, ");
