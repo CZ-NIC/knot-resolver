@@ -33,6 +33,14 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 
+#include "lib/dnssec/nsec.h"
+#include "lib/dnssec/ta.h"
+#include "lib/layer/iterate.h"
+#include "lib/resolve.h"
+#include "lib/rplan.h"
+
+#include "lib/cache/impl.h"
+
 
 /** Cache version */
 static const uint16_t CACHE_VERSION = 1;
@@ -40,9 +48,6 @@ static const uint16_t CACHE_VERSION = 1;
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
 
-/* Shorthand for operations on cache backend */
-#define cache_isvalid(cache) ((cache) && (cache)->api && (cache)->db)
-#define cache_op(cache, op, ...) (cache)->api->op((cache)->db, ## __VA_ARGS__)
 
 /** @internal Removes all records from cache. */
 static inline int cache_clear(struct kr_cache *cache)
@@ -113,6 +118,9 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	return 0;
 }
 
+
+#define cache_isvalid(cache) ((cache) && (cache)->api && (cache)->db)
+
 void kr_cache_close(struct kr_cache *cache)
 {
 	if (cache_isvalid(cache)) {
@@ -145,13 +153,6 @@ int kr_cache_clear(struct kr_cache *cache)
 }
 
 
-#include "lib/dnssec/nsec.h"
-#include "lib/dnssec/ta.h"
-#include "lib/layer/iterate.h"
-#include "lib/resolve.h"
-#include "lib/rplan.h"
-
-#include "lib/cache/impl.h"
 
 
 
@@ -164,9 +165,7 @@ struct nsec_p {
 	uint8_t *salt;
 };
 
-/** Check basic consistency of entry_h, not looking into ->data.
- * \note only exact hits and NSEC1 are really considered ATM. */
-static struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
+struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 {
 	/* Length checks. */
 	if (data.len < offsetof(struct entry_h, data))
@@ -205,7 +204,7 @@ static struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 
 
 
-static int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
+int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
 {
 	int32_t diff = current_time - entry->time;
 	if (diff < 0) {
@@ -255,7 +254,7 @@ enum {
 
 
 
-/* TODO: move rdataset_* and pkt_* functions into a separate c-file. */
+/* TODO: move rdataset_* and pkt_* and entry2answer functions into a separate c-file. */
 /** Materialize a knot_rdataset_t from cache with given TTL.
  * Return the number of bytes consumed or an error code.
  */
@@ -390,103 +389,6 @@ static int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict da
 	return kr_ok();
 }
 
-/** Given a valid entry header, find its length (i.e. offset of the next entry).
- * \param val The beginning of the data and the bound (read only).
- */
-static int entry_h_len(const knot_db_val_t val)
-{
-	const bool ok = val.data && ((ssize_t)val.len) > 0;
-	if (!ok) return kr_error(EINVAL);
-	const struct entry_h *eh = val.data;
-	const void *d = eh->data; /* iterates over the data in entry */
-	const void *data_bound = val.data + val.len;
-	if (d >= data_bound) return kr_error(EILSEQ);
-	if (!eh->is_packet) { /* Positive RRset + its RRsig set (may be empty). */
-		int sets = 2;
-		while (sets-- > 0) {
-			if (d + 1 > data_bound) return kr_error(EILSEQ);
-			uint8_t rr_count;
-			memcpy(&rr_count, d++, sizeof(rr_count));
-			for (int i = 0; i < rr_count; ++i) {
-				if (d + 2 > data_bound) return kr_error(EILSEQ);
-				uint16_t len;
-				memcpy(&len, d, sizeof(len));
-				d += 2 + len;
-			}
-		}
-	} else { /* A "packet" (opaque ATM). */
-		if (d + 2 > data_bound) return kr_error(EILSEQ);
-		uint16_t len;
-		memcpy(&len, d, sizeof(len));
-		d += 2 + len;
-	}
-	if (d > data_bound) return kr_error(EILSEQ);
-	return d - val.data;
-}
-
-/** There may be multiple entries within, so rewind `val` to the one we want.
- *
- * ATM there are multiple types only for the NS ktype.
- * \return error code
- */
-static int entry_h_seek(knot_db_val_t *val, uint16_t type)
-{
-	uint16_t ktype;
-	switch (type) {
-	case KNOT_RRTYPE_NS:
-	case KNOT_RRTYPE_CNAME:
-	case KNOT_RRTYPE_DNAME:
-		ktype = KNOT_RRTYPE_NS;
-	default:
-		ktype = type;
-	}
-	if (ktype != KNOT_RRTYPE_NS) {
-		return kr_ok();
-	}
-	const struct entry_h *eh = entry_h_consistent(*val, ktype);
-	if (!eh) {
-		return kr_error(EILSEQ);
-	}
-
-	bool present;
-	switch (type) {
-	case KNOT_RRTYPE_NS:
-		present = eh->has_ns;
-		break;
-	case KNOT_RRTYPE_CNAME:
-		present = eh->has_cname;
-		break;
-	case KNOT_RRTYPE_DNAME:
-		present = eh->has_dname;
-		break;
-	default:
-		return kr_error(EINVAL);
-	}
-	if (!present) {
-		return kr_error(ENOENT);
-	}
-	/* count how many entries to skip */
-	int to_skip = 0;
-	switch (type) {
-	case KNOT_RRTYPE_DNAME:
-		to_skip += eh->has_cname;
-	case KNOT_RRTYPE_CNAME:
-		to_skip += eh->has_ns;
-	case KNOT_RRTYPE_NS:
-		break;
-	}
-	/* advance `val` and `eh` */
-	while (to_skip-- > 0) {
-		int len = entry_h_len(*val);
-		if (len < 0 || len > val->len) {
-			return kr_error(len < 0 ? len : EILSEQ);
-			// LATER: recovery, perhaps via removing the entry?
-		}
-		val->data += len;
-		val->len -= len;
-	}
-	return kr_ok();
-}
 
 /**
  */
@@ -1232,122 +1134,6 @@ do_soa:
 
 	return KR_STATE_DONE;
 }
-
-
-/* See the header file. */
-int entry_h_splice(
-	knot_db_val_t *val_new_entry, uint8_t rank,
-	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
-	const knot_dname_t *owner/*log only*/,
-	const struct kr_query *qry, struct kr_cache *cache)
-{
-	/* Find the whole entry-set and the particular entry within. */
-	knot_db_val_t val_orig_all = { }, val_orig_entry = { };
-	const struct entry_h *eh_orig = NULL;
-	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
-		int ret = cache_op(cache, read, &key, &val_orig_all, 1);
-		if (ret) val_orig_all = (knot_db_val_t){ };
-		val_orig_entry = val_orig_all;
-		switch (entry_h_seek(&val_orig_entry, type)) {
-		case 0:
-			ret = entry_h_len(val_orig_entry);
-			if (ret >= 0) {
-				val_orig_entry.len = ret;
-				eh_orig = entry_h_consistent(val_orig_entry, type);
-				if (eh_orig) {
-					break;
-				}
-			} /* otherwise fall through */
-		default:
-			val_orig_entry = val_orig_all = (knot_db_val_t){};
-		case -ENOENT:
-			val_orig_entry.len = 0;
-			break;
-		};
-	}
-
-	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
-		/* If equal rank was accepted, spoofing a *single* answer would be
-		 * enough to e.g. override NS record in AUTHORITY section.
-		 * This way they would have to hit the first answer
-		 * (whenever TTL nears expiration). */
-		int32_t old_ttl = get_new_ttl(eh_orig, qry->creation_time.tv_sec);
-		if (old_ttl > 0 && !is_expiring(old_ttl, eh_orig->ttl)
-		    && rank <= eh_orig->rank) {
-			WITH_VERBOSE {
-				VERBOSE_MSG(qry, "=> not overwriting ");
-				kr_rrtype_print(type, "", " ");
-				kr_dname_print(owner, "", "\n");
-			}
-			return kr_error(EEXIST);
-		}
-	}
-
-	/* Obtain new storage from LMDB.
-	 * Note: this does NOT invalidate val_orig_all.data. */
-	ssize_t storage_size = val_orig_all.len - val_orig_entry.len
-				+ val_new_entry->len;
-	assert(storage_size > 0);
-	knot_db_val_t val = { .len = storage_size, .data = NULL };
-	int ret = cache_op(cache, write, &key, &val, 1);
-	if (ret || !val.data || !val.len) {
-		assert(ret); /* otherwise "succeeding" but `val` is bad */
-		VERBOSE_MSG(qry, "=> failed LMDB write, ret = %d\n", ret);
-		return kr_error(ret ? ret : ENOSPC);
-	}
-
-	/* Write original data before entry, if any. */
-	const ssize_t len_before = val_orig_entry.data - val_orig_all.data;
-	assert(len_before >= 0);
-	if (len_before) {
-		memcpy(val.data, val_orig_all.data, len_before);
-	}
-	/* Write original data after entry, if any. */
-	const ssize_t len_after = val_orig_all.len - val_orig_entry.len;
-	assert(len_after >= 0);
-	if (len_after) {
-		memcpy(val.data + len_before + val_new_entry->len,
-			val_orig_entry.data + val_orig_entry.len, len_after);
-	}
-
-	val_new_entry->data = val.data + len_before;
-	{
-		struct entry_h *eh = val_new_entry->data;
-		memset(eh, 0, offsetof(struct entry_h, data));
-		/* In case (len_before == 0 && ktype == KNOT_RRTYPE_NS) the *eh
-		 * set below would be uninitialized and the caller wouldn't be able
-		 * to do it after return, as that would overwrite what we do below. */
-	}
-	/* The multi-entry type needs adjusting the flags. */
-	if (ktype == KNOT_RRTYPE_NS) {
-		struct entry_h *eh = val.data;
-		if (!len_before) {
-		}
-		if (val_orig_all.len) {
-			const struct entry_h *eh0 = val_orig_all.data;
-			/* ENTRY_H_FLAGS */
-			eh->nsec1_pos = eh0->nsec1_pos;
-			eh->nsec3_cnt = eh0->nsec3_cnt;
-			eh->has_ns    = eh0->has_ns;
-			eh->has_cname = eh0->has_cname;
-			eh->has_dname = eh0->has_dname;
-		}
-		/* we just added/replaced some type */
-		switch (type) {
-		case KNOT_RRTYPE_NS:
-			eh->has_ns = true;  break;
-		case KNOT_RRTYPE_CNAME:
-			eh->has_cname = true;  break;
-		case KNOT_RRTYPE_DNAME:
-			eh->has_dname = true;  break;
-		default:
-			assert(false);
-		}
-	}
-	return kr_ok();
-}
-
-
 
 
 

@@ -18,6 +18,7 @@
  * Header internal for cache implementation(s).
  * Only LMDB works for now.
  */
+#pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -26,6 +27,7 @@
 #include <libknot/db/db.h>
 #include <libknot/dname.h>
 
+#include "lib/cdb.h"
 #include "lib/resolve.h"
 
 /** Cache entry header
@@ -54,6 +56,13 @@ struct entry_h {
 };
 
 
+/** Check basic consistency of entry_h, not looking into ->data.
+ * (for is_packet the length of data is checked)
+ * \note only exact hits and NSEC1 are really considered ATM.
+ */
+struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype);
+
+
 // TODO
 #define KR_CACHE_KEY_MAXLEN (KNOT_DNAME_MAXLEN + 100)
 
@@ -75,6 +84,14 @@ static inline size_t key_nwz_off(const struct key *k)
 knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
 
 
+/* entry_h chaining; implementation in ./entry_list.c */
+
+/** There may be multiple entries within, so rewind `val` to the one we want.
+ *
+ * ATM there are multiple types only for the NS ktype.
+ * \return error code
+ */
+int entry_h_seek(knot_db_val_t *val, uint16_t type);
 
 /** Prepare space to insert an entry.
  *
@@ -91,7 +108,6 @@ int entry_h_splice(
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache);
-
 
 
 /* Packet caching; implementation in ./entry_pkt.c */
@@ -119,6 +135,12 @@ static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 	return 100 * (nttl - 5) < orig_ttl;
 }
 
+int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time);
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "cach",  fmt)
+
+
+
+/** Shorthand for operations on cache backend */
+#define cache_op(cache, op, ...) (cache)->api->op((cache)->db, ## __VA_ARGS__)
 
