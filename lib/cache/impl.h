@@ -80,7 +80,9 @@ static inline size_t key_nwz_off(const struct key *k)
 	return k->zlf_len + 2;
 }
 
-
+/** Finish constructing string key for for exact search.
+ * It's assumed that kr_dname_lf(k->buf, owner, NULL) had been ran.
+ */
 knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
 
 

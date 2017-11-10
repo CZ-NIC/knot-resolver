@@ -208,7 +208,7 @@ int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
 		diff = 0;
 	}
 	int32_t res = entry->ttl - diff;
-	VERBOSE_MSG(NULL, "TTL remains: %d\n", (int)res);
+	//VERBOSE_MSG(NULL, "TTL remains: %d\n", (int)res);
 	return res;
 }
 int32_t kr_cache_ttl(const struct kr_cache_p *peek, uint32_t current_time)
@@ -219,12 +219,6 @@ int32_t kr_cache_ttl(const struct kr_cache_p *peek, uint32_t current_time)
 
 
 
-/* forwards for larger chunks of code */
-
-static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry);
-static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
-			   uint8_t lowest_rank);
-static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
 
 
 
@@ -264,7 +258,7 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 	return (knot_db_val_t){ k->buf + 1, name_len + 4 };
 }
 
-/** TODO */
+/** Like key_exact_type_maypkt but with extra checks if used for RRs only. */
 static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 {
 	switch (type) {
@@ -489,6 +483,11 @@ static int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
 }
 
 
+/* Forwards for larger chunks of code.  All just for cache_lmbd_peek. */
+static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry);
+static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
+			   uint8_t lowest_rank);
+static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 

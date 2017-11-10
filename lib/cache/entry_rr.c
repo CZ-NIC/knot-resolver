@@ -83,7 +83,7 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const void *data
 		//d_out = kr_rdataset_next(d_out);
 		d_out += 4 + 2 + len; /* TTL + rdlen + rdata */
 	}
-	VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
+	//VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
 	return d - data;
 }
 
