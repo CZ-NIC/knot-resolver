@@ -177,6 +177,18 @@ int entry2answer(struct answer *ans, int id,
 		const knot_dname_t *owner, uint16_t type, uint32_t new_ttl);
 
 
+/* Preparing knot_pkt_t for cache answer from RRs; implementation in ./knot_pkt.c */
+
+/** Prepare answer packet to be filled by RRs (without RR data in wire). */
+int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type);
+
+/** Append RRset + its RRSIGs into the current section (*shallow* copy), with given rank.
+ * \note it works with empty set as well (skipped)
+ * \note pkt->wire is not updated in any way
+ * \note KNOT_CLASS_IN is assumed
+ */
+int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank);
+
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "cach",  fmt)
 

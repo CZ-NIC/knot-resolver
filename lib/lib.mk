@@ -18,7 +18,8 @@ libkres_SOURCES := \
 	lib/cache.c            \
 	lib/cache/entry_list.c \
 	lib/cache/entry_pkt.c  \
-	lib/cache/entry_rr.c  \
+	lib/cache/entry_rr.c   \
+	lib/cache/knot_pkt.c   \
 	lib/cdb_lmdb.c
 
 libkres_HEADERS := \

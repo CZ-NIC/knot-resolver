@@ -234,108 +234,6 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
 
 
 
-
-
-
-
-/* TODO: move rdataset_* and pkt_* and entry2answer functions into a separate c-file. */
-
-
-
-
-
-
-/** Prepare answer packet to be filled by RRs (without RR data in wire). */
-static int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
-{
-	/* Update packet question if needed. */
-	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)
-	    || knot_pkt_qtype(pkt) != type || knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
-		int ret = kr_pkt_recycle(pkt);
-		if (ret) return kr_error(ret);
-		ret = knot_pkt_put_question(pkt, name, KNOT_CLASS_IN, type);
-		if (ret) return kr_error(ret);
-	}
-
-	pkt->parsed = pkt->size = PKT_SIZE_NOWIRE;
-	knot_wire_set_qr(pkt->wire);
-	knot_wire_set_aa(pkt->wire);
-	return kr_ok();
-}
-
-/** Reserve space for additional `count` RRsets.
- * \note pkt->rr_info gets correct length but is always zeroed
- */
-static int pkt_alloc_space(knot_pkt_t *pkt, int count)
-{
-	size_t allocd_orig = pkt->rrset_allocd;
-	if (pkt->rrset_count + count <= allocd_orig) {
-		return kr_ok();
-	}
-	/* A simple growth strategy, amortized O(count). */
-	pkt->rrset_allocd = MAX(
-			pkt->rrset_count + count,
-			pkt->rrset_count + allocd_orig);
-
-	pkt->rr = mm_realloc(&pkt->mm, pkt->rr,
-				sizeof(pkt->rr[0]) * pkt->rrset_allocd,
-				sizeof(pkt->rr[0]) * allocd_orig);
-	if (!pkt->rr) {
-		return kr_error(ENOMEM);
-	}
-	/* Allocate pkt->rr_info to be certain, but just leave it zeroed. */
-	mm_free(&pkt->mm, pkt->rr_info);
-	pkt->rr_info = mm_alloc(&pkt->mm, sizeof(pkt->rr_info[0]) * pkt->rrset_allocd);
-	if (!pkt->rr_info) {
-		return kr_error(ENOMEM);
-	}
-	memset(pkt->rr_info, 0, sizeof(pkt->rr_info[0]) * pkt->rrset_allocd);
-	return kr_ok();
-}
-
-/** Append RRset + its RRSIGs into the current section (*shallow* copy), with given rank.
- * \note it works with empty set as well (skipped).
- * \note KNOT_CLASS_IN is assumed
- */
-static int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
-{
-	/* allocate space, to be sure */
-	int rrset_cnt = (rrset->set.rr->rrs.rr_count > 0) + (rrset->sig_rds.rr_count > 0);
-	int ret = pkt_alloc_space(pkt, rrset_cnt);
-	if (ret) return kr_error(ret);
-	/* write both sets */
-	const knot_rdataset_t *rdss[2] = { &rrset->set.rr->rrs, &rrset->sig_rds };
-	for (int i = 0; i < rrset_cnt; ++i) {
-		assert(rdss[i]->rr_count);
-		/* allocate rank */
-		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
-		if (!rr_rank) return kr_error(ENOMEM);
-		*rr_rank = (i == 0) ? rank : (KR_RANK_INITIAL | KR_RANK_AUTH);
-			/* rank for RRSIGs isn't really useful: ^^ */
-		if (i == 0) {
-			pkt->rr[pkt->rrset_count] = *rrset->set.rr;
-			pkt->rr[pkt->rrset_count].additional = rr_rank;
-		} else {
-		/* append the RR array */
-			pkt->rr[pkt->rrset_count] = (knot_rrset_t){
-				.owner = knot_dname_copy(rrset->set.rr->owner, &pkt->mm),
-					/* ^^ well, another copy isn't really needed */
-				.type = KNOT_RRTYPE_RRSIG,
-				.rclass = KNOT_CLASS_IN,
-				.rrs = *rdss[i],
-				.additional = rr_rank,
-			};
-		}
-		++pkt->rrset_count;
-		++(pkt->sections[pkt->current].count);
-	}
-	return kr_ok();
-}
-
-/* end of TODO */
-
-
-
 /** Check that no label contains a zero character.
  *
  * We refuse to work with those, as LF and our cache keys might become ambiguous.
@@ -578,8 +476,8 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 }
 
 /** Reconstruct a name into a buffer (assuming length at least KNOT_DNAME_MAXLEN). */
-int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
-			   knot_db_val_t kwz)
+static int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
+		 knot_db_val_t kwz)
 {
 	/* Reconstruct from key: first the ending, then zone name. */
 	int ret = knot_dname_lf2wire(buf, kwz.len, kwz.data);
@@ -1200,8 +1098,6 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 			   qry->sname, type, new_ttl);
 	CHECK_RET(ret);
 	/* Put links to the materialized data into the pkt. */
-	ret = pkt_alloc_space(pkt, 1 + (ans.rrsets[AR_ANSWER].sig_rds.rr_count > 0));
-	CHECK_RET(ret);
 	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER], eh->rank);
 	CHECK_RET(ret);
 	/* Finishing touches. */
