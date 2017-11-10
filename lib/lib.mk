@@ -16,6 +16,7 @@ libkres_SOURCES := \
 	lib/zonecut.c          \
 	lib/rplan.c            \
 	lib/cache.c            \
+	lib/cache/entry_pkt.c  \
 	lib/cdb_lmdb.c
 
 libkres_HEADERS := \

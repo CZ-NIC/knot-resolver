@@ -111,7 +111,7 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	return false;
 }
 
-int kr_response_classify(knot_pkt_t *pkt)
+int kr_response_classify(const knot_pkt_t *pkt)
 {
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	switch (knot_wire_get_rcode(pkt->wire)) {

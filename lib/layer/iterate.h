@@ -29,7 +29,7 @@ enum {
 };
 
 /** Classify response by type. */
-int kr_response_classify(knot_pkt_t *pkt);
+int kr_response_classify(const knot_pkt_t *pkt);
 
 /** Make next iterative query. */
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt);
