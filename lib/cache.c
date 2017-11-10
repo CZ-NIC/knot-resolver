@@ -888,7 +888,7 @@ do_soa:
 }
 
 
-
+/** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
 static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl,
 			const struct kr_query *qry, struct kr_cache *cache);
 
@@ -924,7 +924,10 @@ int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				/* TODO: probably safe to break but maybe not worth it */
 			}
 			ret = stash_rrset(arr, i, min_ttl, qry, cache);
-			if (ret) goto finally;
+			if (ret) {
+				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
+				goto finally;
+			}
 			/* LATER(optim.): maybe filter out some type-rank combinations
 			 * that won't be useful as separate RRsets. */
 		}
@@ -937,10 +940,6 @@ finally:
 	return ctx->state; /* we ignore cache-stashing errors */
 }
 
-
-
-/** It's simply inside of cycle taken out to decrease indentation.
- * \return kr_ok() or KR_STATE_FAIL */
 static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl,
 			const struct kr_query *qry, struct kr_cache *cache)
 {
@@ -950,8 +949,8 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 	}
 	const knot_rrset_t *rr = entry->rr;
 	if (!rr) {
-		assert(false);
-		return KR_STATE_FAIL;
+		assert(!EINVAL);
+		return kr_error(EINVAL);
 	}
 	if (!check_dname_for_lf(rr->owner)) {
 		WITH_VERBOSE {
@@ -961,11 +960,13 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 		return kr_ok();
 	}
 
+	#if 0
 	WITH_VERBOSE {
 		VERBOSE_MSG(qry, "=> considering to stash ");
 		kr_rrtype_print(rr->type, "", " ");
 		kr_dname_print(rr->owner, "", "\n");
 	}
+	#endif
 
 	switch (rr->type) {
 	case KNOT_RRTYPE_RRSIG:
@@ -991,7 +992,6 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			bool is_wild = knot_rrsig_labels(&e->rr->rrs, 0)
 				!= knot_dname_labels(e->rr->owner, NULL);
 			if (is_wild) {
-				VERBOSE_MSG(qry, "   2\n");
 				return kr_ok(); // FIXME, especially for NSEC1!
 			}
 			rr_sigs = e->rr;
@@ -1010,8 +1010,8 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			return kr_ok();
 		}
 		if (!rr_sigs || !rr_sigs->rrs.rr_count || !rr_sigs->rrs.data) {
-			assert(false);
-			return KR_STATE_FAIL;
+			assert(!EINVAL);
+			return kr_error(EINVAL);
 		}
 		k->zlf_len = knot_dname_size(knot_rrsig_signer_name(&rr_sigs->rrs, 0)) - 1;
 		key = key_NSEC1(k, rr->owner, false);
@@ -1019,8 +1019,8 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 	default:
 		ret = kr_dname_lf(k->buf, rr->owner, NULL);
 		if (ret) {
-			VERBOSE_MSG(qry, "   3\n");
-			return KR_STATE_FAIL;
+			assert(!ret);
+			return kr_error(ret);
 		}
 		key = key_exact_type(k, rr->type);
 	}

@@ -84,6 +84,7 @@ struct kr_cache
 
 
 #include "lib/module.h"
+/* Prototypes for the cache_lmdb module implementation. */
 int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
 int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
 
