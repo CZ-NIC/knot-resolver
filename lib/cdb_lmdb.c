@@ -606,6 +606,8 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 
 static int cdb_prune(knot_db_t *db, int limit)
 {
+	return -1;
+#if 0
 	/* Sync in-flight transactions */
 	cdb_sync(db);
 
@@ -653,6 +655,7 @@ static int cdb_prune(knot_db_t *db, int limit)
 	}
 	mdb_cursor_close(cur);
 	return ret < 0 ? ret : results;
+#endif
 }
 
 static int cdb_read_leq(knot_db_t *env, knot_db_val_t *key, knot_db_val_t *val)

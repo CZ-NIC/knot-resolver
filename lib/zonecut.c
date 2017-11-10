@@ -296,7 +296,7 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const kno
 /** Fetch best NS for zone cut. */
 static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		    const knot_dname_t *name, uint32_t timestamp,
-		    uint8_t * restrict rank, uint8_t * restrict flags)
+		    uint8_t * restrict rank)
 {
 	struct kr_cache_p peek = {};
 	int ret = kr_cache_peek_exact(&ctx->cache, name, KNOT_RRTYPE_NS, &peek);
@@ -400,12 +400,10 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 	while (true) {
 		/* Fetch NS first and see if it's insecure. */
 		uint8_t rank = 0;
-		uint8_t flags = 0;
 		const bool is_root = (label[0] == '\0');
-		if (fetch_ns(ctx, cut, label, timestamp, &rank, &flags) == 0) {
+		if (fetch_ns(ctx, cut, label, timestamp, &rank) == 0) {
 			/* Flag as insecure if cached as this */
-			if (kr_rank_test(rank, KR_RANK_INSECURE) ||
-			    (flags & KR_CACHE_FLAG_NODS)) {
+			if (kr_rank_test(rank, KR_RANK_INSECURE)) {
 				*secured = false;
 			}
 			/* Fetch DS and DNSKEY if caller wants secure zone cut */

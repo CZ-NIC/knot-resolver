@@ -154,8 +154,6 @@ int kr_cache_clear(struct kr_cache *cache)
 
 
 
-
-
 struct nsec_p {
 	struct {
 		uint8_t salt_len;
@@ -202,8 +200,6 @@ struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 }
 
 
-
-
 int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time)
 {
 	int32_t diff = current_time - entry->time;
@@ -220,8 +216,6 @@ int32_t kr_cache_ttl(const struct kr_cache_p *peek, uint32_t current_time)
 	const struct entry_h *eh = peek->raw_data;
 	return get_new_ttl(eh, current_time);
 }
-
-
 
 
 
