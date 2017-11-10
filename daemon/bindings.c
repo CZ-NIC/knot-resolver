@@ -891,7 +891,7 @@ static int cache_get(lua_State *L)
 	}
 
 	/* Clear a sub-tree in cache. */
-	const char *args = lua_tostring(L, 1);
+	//const char *args = lua_tostring(L, 1);
 	/* Retrieve set of keys */
 	static knot_db_val_t result_set[100];
 	int ret = kr_error(ENOSYS); // FIXME cache_prefixed(cache, args, result_set, 100);

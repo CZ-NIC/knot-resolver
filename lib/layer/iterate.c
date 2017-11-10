@@ -284,7 +284,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 			continue;
 		}
 		int ret = kr_zonecut_add(cut, ns_name, NULL);
-		assert(!ret);
+		assert(!ret); (void)ret;
 
 		/* Choose when to use glue records. */
 		bool in_bailiwick = knot_dname_in(current_cut, ns_name);

@@ -272,7 +272,6 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const knot_dname_t *ns, uint16_t rrtype, uint32_t timestamp)
 // LATER(optim.): excessive data copying
 {
-	uint8_t rank = 0;
 	struct kr_cache_p peek = {};
 	if (kr_cache_peek_exact(cache, ns, rrtype, &peek) != 0) {
 		return;
