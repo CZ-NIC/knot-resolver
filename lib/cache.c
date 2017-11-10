@@ -235,164 +235,18 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
 
 
 
-struct answer {
-	int rcode;	/**< PKT_NODATA, etc. ?? */
-	uint8_t nsec_v;	/**< 1 or 3 */
-	knot_mm_t *mm;	/**< Allocator for rrsets */
-	struct answer_rrset {
-		ranked_rr_array_entry_t set;	/**< set+rank for the main data */
-		knot_rdataset_t sig_rds;	/**< RRSIG data, if any */
-	} rrsets[1+1+3]; /**< see AR_ANSWER and friends; only required records are filled */
-};
-enum {
-	AR_ANSWER = 0,	/**< Positive answer record.  It might be wildcard-expanded. */
-	AR_SOA, 	/**< SOA record. */
-	AR_NSEC,	/**< NSEC* covering the SNAME. */
-	AR_WILD,	/**< NSEC* covering or matching the source of synthesis. */
-	AR_CPE, 	/**< NSEC3 matching the closest provable encloser. */
-};
 
 
 
 /* TODO: move rdataset_* and pkt_* and entry2answer functions into a separate c-file. */
-/** Materialize a knot_rdataset_t from cache with given TTL.
- * Return the number of bytes consumed or an error code.
- */
-static int rdataset_materialize(knot_rdataset_t * restrict rds, const void *data,
-		const void *data_bound, uint32_t ttl, knot_mm_t *pool)
-{
-	assert(rds && data && data_bound && data_bound > data && !rds->data);
-	const void *d = data; /* iterates over the cache data */
-	{
-		uint8_t rr_count;
-		memcpy(&rr_count, d++, sizeof(rr_count));
-		rds->rr_count = rr_count;
-	}
-	/* First sum up the sizes for wire format length. */
-	size_t rdata_len_sum = 0;
-	for (int i = 0; i < rds->rr_count; ++i) {
-		if (d + 2 > data_bound) {
-			VERBOSE_MSG(NULL, "materialize: EILSEQ!\n");
-			return kr_error(EILSEQ);
-		}
-		uint16_t len;
-		memcpy(&len, d, sizeof(len));
-		d += sizeof(len) + len;
-		rdata_len_sum += len;
-	}
-	/* Each item in knot_rdataset_t needs TTL (4B) + rdlength (2B) + rdata */
-	rds->data = mm_alloc(pool, rdata_len_sum + ((size_t)rds->rr_count) * (4 + 2));
-	if (!rds->data) {
-		return kr_error(ENOMEM);
-	}
-	/* Construct the output, one "RR" at a time. */
-	d = data + 1/*sizeof(rr_count)*/;
-	knot_rdata_t *d_out = rds->data; /* iterates over the output being materialized */
-	for (int i = 0; i < rds->rr_count; ++i) {
-		uint16_t len;
-		memcpy(&len, d, sizeof(len));
-		d += sizeof(len);
-		knot_rdata_init(d_out, len, d, ttl);
-		d += len;
-		//d_out = kr_rdataset_next(d_out);
-		d_out += 4 + 2 + len; /* TTL + rdlen + rdata */
-	}
-	VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
-	return d - data;
-}
-
-int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
-			 uint32_t new_ttl, knot_mm_t *pool)
-{
-	struct entry_h *eh = ref->raw_data;
-	return rdataset_materialize(dst, eh->data, ref->raw_bound, new_ttl, pool);
-}
-
-
-/** Materialize RRset + RRSIGs into ans->rrsets[id].
- * LATER(optim.): it's slightly wasteful that we allocate knot_rrset_t for the packet
- */
-static int entry2answer(struct answer *ans, int id,
-		const struct entry_h *eh, const void *eh_bound,
-		const knot_dname_t *owner, uint16_t type, uint32_t new_ttl)
-{
-	/* We assume it's zeroed.  Do basic sanity check. */
-	if (ans->rrsets[id].set.rr || ans->rrsets[id].sig_rds.data
-	    || (type == KNOT_RRTYPE_NSEC && ans->nsec_v != 1)
-	    || (type == KNOT_RRTYPE_NSEC3 && ans->nsec_v != 3)) {
-		assert(false);
-		return kr_error(EINVAL);
-	}
-	/* Materialize the base RRset. */
-	knot_rrset_t *rr = ans->rrsets[id].set.rr
-		= knot_rrset_new(owner, type, KNOT_CLASS_IN, ans->mm);
-	if (!rr) return kr_error(ENOMEM);
-	int ret = rdataset_materialize(&rr->rrs, eh->data, eh_bound, new_ttl, ans->mm);
-	if (ret < 0) goto fail;
-	size_t data_off = ret;
-	ans->rrsets[id].set.rank = eh->rank;
-	ans->rrsets[id].set.expiring = is_expiring(eh->ttl, new_ttl);
-	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet. */
-	bool want_rrsigs = kr_rank_test(eh->rank, KR_RANK_SECURE);
-			//^^ TODO: vague; function parameter instead?
-	if (want_rrsigs) {
-		ret = rdataset_materialize(&ans->rrsets[id].sig_rds, eh->data + data_off,
-					   eh_bound, new_ttl, ans->mm);
-		if (ret < 0) goto fail;
-
-		// TODO
-		#if 0
-		/* sanity check: we consumed exactly all data */
-		int unused_bytes = eh_bound - (void *)eh->data - data_off - ret;
-		if (ktype != KNOT_RRTYPE_NS && unused_bytes) {
-			/* ^^ it doesn't have to hold in multi-RRset entries; LATER: more checks? */
-			VERBOSE_MSG(qry, "BAD?  Unused bytes: %d\n", unused_bytes);
-		}
-		#endif
-	}
-	return kr_ok();
-fail:
-	/* Cleanup the item that we might've (partially) written to. */
-	knot_rrset_free(&ans->rrsets[id].set.rr, ans->mm);
-	knot_rdataset_clear(&ans->rrsets[id].sig_rds, ans->mm);
-	memset(&ans->rrsets[id], 0, sizeof(ans->rrsets[id]));
-	return kr_error(ret);
-}
 
 
 
-/** Compute size of dematerialized rdataset.  NULL is accepted as empty set. */
-static int rdataset_dematerialize_size(const knot_rdataset_t *rds)
-{
-	return 1/*sizeof(rr_count)*/ + (rds
-		? knot_rdataset_size(rds) - 4 * rds->rr_count /*TTLs*/
-		: 0);
-}
-/** Dematerialize a rdataset. */
-static int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
-{
-	assert(data);
-	if (rds && rds->rr_count > 255) {
-		return kr_error(ENOSPC);
-	}
-	uint8_t rr_count = rds ? rds->rr_count : 0;
-	memcpy(data++, &rr_count, sizeof(rr_count));
-
-	knot_rdata_t *rd = rds->data;
-	for (int i = 0; i < rr_count; ++i, rd = kr_rdataset_next(rd)) {
-		uint16_t len = knot_rdata_rdlen(rd);
-		memcpy(data, &len, sizeof(len));
-		data += sizeof(len);
-		memcpy(data, knot_rdata_data(rd), len);
-		data += len;
-	}
-	return kr_ok();
-}
 
 
-/**
- */
-int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
+
+/** Prepare answer packet to be filled by RRs (without RR data in wire). */
+static int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
 {
 	/* Update packet question if needed. */
 	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)
@@ -412,7 +266,7 @@ int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
 /** Reserve space for additional `count` RRsets.
  * \note pkt->rr_info gets correct length but is always zeroed
  */
-int pkt_alloc_space(knot_pkt_t *pkt, int count)
+static int pkt_alloc_space(knot_pkt_t *pkt, int count)
 {
 	size_t allocd_orig = pkt->rrset_allocd;
 	if (pkt->rrset_count + count <= allocd_orig) {
@@ -443,7 +297,7 @@ int pkt_alloc_space(knot_pkt_t *pkt, int count)
  * \note it works with empty set as well (skipped).
  * \note KNOT_CLASS_IN is assumed
  */
-int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
+static int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 {
 	/* allocate space, to be sure */
 	int rrset_cnt = (rrset->set.rr->rrs.rr_count > 0) + (rrset->sig_rds.rr_count > 0);

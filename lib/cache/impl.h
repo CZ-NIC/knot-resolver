@@ -137,6 +137,47 @@ static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 
 int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time);
 
+
+/* RRset (de)materialization; implementation in ./entry_rr.c */
+
+/** Compute size of dematerialized rdataset.  NULL is accepted as empty set. */
+static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
+{
+	return 1/*sizeof(rr_count)*/ + (rds
+		? knot_rdataset_size(rds) - 4 * rds->rr_count /*TTLs*/
+		: 0);
+}
+
+/** Dematerialize a rdataset. */
+int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data);
+
+/** Partially constructed answer when gathering RRsets from cache. */
+struct answer {
+	int rcode;	/**< PKT_NODATA, etc. ?? */
+	uint8_t nsec_v;	/**< 1 or 3 */
+	knot_mm_t *mm;	/**< Allocator for rrsets */
+	struct answer_rrset {
+		ranked_rr_array_entry_t set;	/**< set+rank for the main data */
+		knot_rdataset_t sig_rds;	/**< RRSIG data, if any */
+	} rrsets[1+1+3]; /**< see AR_ANSWER and friends; only required records are filled */
+};
+enum {
+	AR_ANSWER = 0,	/**< Positive answer record.  It might be wildcard-expanded. */
+	AR_SOA, 	/**< SOA record. */
+	AR_NSEC,	/**< NSEC* covering the SNAME. */
+	AR_WILD,	/**< NSEC* covering or matching the source of synthesis. */
+	AR_CPE, 	/**< NSEC3 matching the closest provable encloser. */
+};
+
+/** Materialize RRset + RRSIGs into ans->rrsets[id].
+ * LATER(optim.): it's slightly wasteful that we allocate knot_rrset_t for the packet
+ */
+int entry2answer(struct answer *ans, int id,
+		const struct entry_h *eh, const void *eh_bound,
+		const knot_dname_t *owner, uint16_t type, uint32_t new_ttl);
+
+
+
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "cach",  fmt)
 
 
