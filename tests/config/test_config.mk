@@ -8,7 +8,7 @@
 tests_lua := \
 	hints
 
-check-config:
+check-config: check-install-precond
 	$(foreach test,$(tests_lua), \
 		@echo "config-test: $(test)" ;\
 		export TMP_RUNDIR=`mktemp -d` ;\
