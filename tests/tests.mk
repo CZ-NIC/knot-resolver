@@ -1,8 +1,8 @@
 # Platform-specific library injection
 ifeq ($(PLATFORM),Darwin)
-	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH="$(DYLD_LIBRARY_PATH):$(abspath lib)"
+	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH="$(abspath lib):$(DYLD_LIBRARY_PATH)"
 else
-	preload_syms := LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):$(abspath lib)"
+	preload_syms := LD_LIBRARY_PATH="$(abspath lib):$(LD_LIBRARY_PATH)"
 endif
 
 # Unit tests
@@ -32,8 +32,11 @@ REAL_CURDIR=$(realpath $(CURDIR))
 $(deckard_DIR)/Makefile:
 	@git submodule update --init --recursive
 
-check-integration: $(deckard_DIR)/Makefile
-	$(if $(findstring $(REAL_CURDIR),$(REAL_PREFIX)),, $(warning Warning: PREFIX does not point into source directory; testing the installed version!))
+check-install-precond:
+	$(if $(findstring $(REAL_CURDIR),$(REAL_PREFIX)),, $(warning Warning: PREFIX does not point into source directory; testing version in $(PREFIX)!))
+
+# Deckard requires additional depedencies so it is not part of installcheck
+check-integration: check-install-precond $(deckard_DIR)/Makefile
 	$(if $(SUBMODULES_DIRTY), $(warning Warning: Git submodules are not up-to-date),)
 	@mkdir -p $(deckard_DIR)/contrib/libswrap/obj
 	+TESTS=$(TESTS) DAEMON=$(abspath $(SBINDIR)/kresd) TEMPLATE=$(TEMPLATE) $(preload_syms) $(deckard_DIR)/kresd_run.sh
@@ -41,7 +44,10 @@ check-integration: $(deckard_DIR)/Makefile
 deckard: check-integration
 
 # Targets
-tests: check-unit check-config
+tests: check-unit
+# installcheck requires kresd to be installed in its final destination
+# (DESTDIR is not supported right now because module path gets hardcoded)
+installcheck: check-config
 tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean $(CLEAN_DNSTAP)
 
-.PHONY: tests tests-clean check-integration deckard
+.PHONY: check-integration deckard installcheck tests tests-clean
