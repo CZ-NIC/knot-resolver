@@ -35,7 +35,7 @@ struct kr_cache_entry global_fake_ce;
 uint8_t namedb_data[NAMEDB_DATA_SIZE];
 knot_db_val_t global_namedb_data = {namedb_data, NAMEDB_DATA_SIZE};
 
-#define CACHE_SIZE 10 * 4096
+#define CACHE_SIZE (64 * CPU_PAGE_SIZE)
 #define CACHE_TTL 10
 #define CACHE_TIME 0
 
