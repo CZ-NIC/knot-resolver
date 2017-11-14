@@ -643,7 +643,7 @@ int main(int argc, char **argv)
 
 	/* Workaround for https://github.com/libuv/libuv/issues/45
 	 * (Write after ECONNRESET crash.) */
-	if (ret && signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
+	if (ret == 0 && signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
 		kr_log_error("[system] can't block SIGPIPE signal: %s\n",
 				strerror(errno));
 		ret = EXIT_FAILURE;
