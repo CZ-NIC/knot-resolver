@@ -70,7 +70,11 @@ struct key {
 	const knot_dname_t *zname; /**< current zone name (points within qry->sname) */
 	uint8_t zlf_len; /**< length of current zone's lookup format */
 
-	uint16_t type; /**< corresponding type */
+	/** Corresponding key type; e.g. NS for CNAME.
+	 * Note: NSEC type is ambiguous (exact and range key). */
+	uint16_t type;
+	/** The key data start at buf+1, and buf[0] contains some length.
+	 * For details see key_exact* and key_NSEC* functions. */
 	uint8_t buf[KR_CACHE_KEY_MAXLEN];
 };
 
@@ -90,7 +94,9 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
 
 /** There may be multiple entries within, so rewind `val` to the one we want.
  *
- * ATM there are multiple types only for the NS ktype.
+ * ATM there are multiple types only for the NS ktype - it also accomodates xNAMEs.
+ * \note `val->len` represents the bound of the whole list, not of a single entry.
+ * \note in case of ENOENT, `val` is still rewound to the beginning of the next entry.
  * \return error code
  */
 int entry_h_seek(knot_db_val_t *val, uint16_t type);
@@ -137,6 +143,7 @@ static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 	return 100 * (nttl - 5) < orig_ttl;
 }
 
+/** Returns signed result so you can inspect how much stale the RR is. */
 int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time);
 
 

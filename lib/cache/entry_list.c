@@ -64,6 +64,7 @@ int entry_h_seek(knot_db_val_t *val, uint16_t type)
 	case KNOT_RRTYPE_CNAME:
 	case KNOT_RRTYPE_DNAME:
 		ktype = KNOT_RRTYPE_NS;
+		break;
 	default:
 		ktype = type;
 	}
@@ -89,9 +90,6 @@ int entry_h_seek(knot_db_val_t *val, uint16_t type)
 	default:
 		return kr_error(EINVAL);
 	}
-	if (!present) {
-		return kr_error(ENOENT);
-	}
 	/* count how many entries to skip */
 	int to_skip = 0;
 	switch (type) {
@@ -112,7 +110,7 @@ int entry_h_seek(knot_db_val_t *val, uint16_t type)
 		val->data += len;
 		val->len -= len;
 	}
-	return kr_ok();
+	return present ? kr_ok() : kr_error(ENOENT);
 }
 
 
@@ -165,7 +163,7 @@ int entry_h_splice(
 		}
 	}
 
-	/* Obtain new storage from LMDB.
+	/* Obtain new storage from cache.
 	 * Note: this does NOT invalidate val_orig_all.data. */
 	ssize_t storage_size = val_orig_all.len - val_orig_entry.len
 				+ val_new_entry->len;
@@ -174,7 +172,7 @@ int entry_h_splice(
 	int ret = cache_op(cache, write, &key, &val, 1);
 	if (ret || !val.data || !val.len) {
 		assert(ret); /* otherwise "succeeding" but `val` is bad */
-		VERBOSE_MSG(qry, "=> failed LMDB write, ret = %d\n", ret);
+		VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
 		return kr_error(ret ? ret : ENOSPC);
 	}
 
@@ -203,8 +201,6 @@ int entry_h_splice(
 	/* The multi-entry type needs adjusting the flags. */
 	if (ktype == KNOT_RRTYPE_NS) {
 		struct entry_h *eh = val.data;
-		if (!len_before) {
-		}
 		if (val_orig_all.len) {
 			const struct entry_h *eh0 = val_orig_all.data;
 			/* ENTRY_H_FLAGS */

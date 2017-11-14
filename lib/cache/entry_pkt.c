@@ -113,12 +113,6 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 
 	const uint16_t pkt_type = knot_pkt_qtype(pkt);
 	const knot_dname_t *owner = knot_pkt_qname(pkt); /* qname can't be compressed */
-	WITH_VERBOSE {
-		VERBOSE_MSG(qry, "=> stashing packet: rank 0%0.2o, ", rank);
-		kr_rrtype_print(pkt_type, "", " ");
-		kr_dname_print(owner, "", " ");
-		kr_log_verbose("(%d B)\n", (int)val_new_entry.len);
-	}
 
 	// LATER: nothing exists under NXDOMAIN.  Implement that (optionally)?
 #if 0
@@ -151,6 +145,14 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	eh->is_packet = true;
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
 	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
+
+	WITH_VERBOSE {
+		VERBOSE_MSG(qry, "=> stashed packet: rank 0%0.2o, TTL %d, ",
+				eh->rank, eh->ttl);
+		kr_rrtype_print(pkt_type, "", " ");
+		kr_dname_print(owner, "", " ");
+		kr_log_verbose("(%d B)\n", (int)val_new_entry.len);
+	}
 }
 
 
@@ -215,6 +217,8 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	if (qry->flags.DNSSEC_INSECURE || qry->flags.DNSSEC_BOGUS) {
 		qry->flags.DNSSEC_WANT = false;
 	}
+	VERBOSE_MSG(qry, "=> satisfied by exact packet: rank 0%0.2o, new TTL %d\n",
+			eh->rank, new_ttl);
 	return kr_ok();
 }
 

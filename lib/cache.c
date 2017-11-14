@@ -309,17 +309,20 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name,
 		k->buf[1 + key_len++] = '*';
 		k->buf[0] += 2;
 	}
-	/* CACHE_KEY_DEF: key == zone's dname_lf + 0 + '1' + dname_lf
+	/* CACHE_KEY_DEF: key == zone's dname_lf + '\0' + '1' + dname_lf
 	 * of the name within the zone without the final 0.  Iff the latter is empty,
 	 * there's no zero to cut and thus the key_len difference.
 	 */
 	begin[0] = 0;
 	begin[1] = '1'; /* tag for NSEC1 */
+	k->type = KNOT_RRTYPE_NSEC;
 
+	/*
 	VERBOSE_MSG(NULL, "<> key_NSEC1; ");
 	kr_dname_print(name, "name: ", " ");
 	kr_log_verbose("(zone name LF length: %d; total key length: %d)\n",
 			k->zlf_len, key_len);
+	*/
 
 	return (knot_db_val_t){ k->buf + 1, key_len };
 }
@@ -504,12 +507,15 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	/* ATM cache only peeks for qry->sname and that would be useless
 	 * to repeat on every iteration, so disable it from now on.
-	 * TODO Note: it's important to skip this if rrcache sets KR_STATE_DONE,
-	 * as CNAME chains need more iterations to get fetched. */
+	 * LATER(optim.): assist with more precise QNAME minimization. */
 	qry->flags.NO_CACHE = true;
 
 	struct key k_storage, *k = &k_storage;
 	if (!check_dname_for_lf(qry->sname)) {
+		WITH_VERBOSE {
+			VERBOSE_MSG(qry, "=> skipping zero-containing name ");
+			kr_dname_print(qry->sname, "", "\n");
+		}
 		return ctx->state;
 	}
 	int ret = kr_dname_lf(k->buf, qry->sname, NULL);
@@ -518,7 +524,6 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	const uint8_t lowest_rank = get_lowest_rank(req, qry);
-	// FIXME: the whole approach to +cd answers
 
 	/** 1. find the name or the closest (available) zone, not considering wildcards
 	 *  1a. exact name+type match (can be negative answer in insecure zones)
@@ -539,7 +544,6 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(false);
 		return ctx->state;
 	} else if (!ret) {
-		VERBOSE_MSG(qry, "=> satisfied from cache (direct hit)\n");
 		return KR_STATE_DONE;
 	}
 
@@ -559,8 +563,10 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	switch (k->type) {
 	case KNOT_RRTYPE_NS:
-		VERBOSE_MSG(qry, "=> trying zone: ");
-		kr_dname_print(k->zname, "", "\n");
+		WITH_VERBOSE {
+			VERBOSE_MSG(qry, "=> trying zone: ");
+			kr_dname_print(k->zname, "", "\n");
+		}
 		break;
 	case KNOT_RRTYPE_CNAME:
 		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, val_cut.data,
@@ -568,7 +574,6 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 				get_new_ttl(val_cut.data, qry->creation_time.tv_sec));
 		/* TODO: ^^ cumbersome code */
 		if (ret == kr_ok()) {
-			VERBOSE_MSG(qry, "=> satisfied by CNAME\n");
 			return KR_STATE_DONE;
 		} else {
 			return ctx->state;
@@ -596,7 +601,7 @@ int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * and that's the only place to start - we may either find
 	 * a negative proof or we may query upstream from that point. */
 	kr_zonecut_set(&qry->zone_cut, k->zname);
-	ret = kr_make_query(qry, pkt); // FIXME: probably not yet - qname minimization
+	ret = kr_make_query(qry, pkt); // TODO: probably not yet - qname minimization
 	if (ret) return KR_STATE_FAIL;
 
 	/* Note: up to here we can run on any cache backend,
@@ -1101,6 +1106,8 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	if (qry->flags.DNSSEC_INSECURE) {
 		qry->flags.DNSSEC_WANT = false;
 	}
+	VERBOSE_MSG(qry, "=> satisfied by exact RR: rank 0%0.2o, new TTL %d\n",
+			eh->rank, new_ttl);
 	return kr_ok();
 }
 #undef CHECK_RET
@@ -1117,6 +1124,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	if (ret) return ret;
 	const struct entry_h *eh = entry_h_consistent(val, qry->stype);
 	if (!eh) {
+		assert(false);
 		return kr_error(ENOENT);
 		// LATER: recovery in case of error, perhaps via removing the entry?
 		// LATER(optim): pehaps optimize the zone cut search
@@ -1128,6 +1136,9 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		/* Positive record with stale TTL or bad rank.
 		 * LATER(optim.): It's unlikely that we find a negative one,
 		 * so we might theoretically skip all the cache code. */
+
+		VERBOSE_MSG(qry, "=> skipping exact %s: rank 0%0.2o, new TTL %d\n",
+				eh->is_packet ? "packet" : "RR", eh->rank, new_ttl);
 		return kr_error(ENOENT);
 	}
 
@@ -1182,7 +1193,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 	return kr_ok();
 }
 
-/** Find the longest prefix NS/xNAME (with OK time+rank).
+/** Find the longest prefix NS/xNAME (with OK time+rank), starting at k->*.
  * We store xNAME at NS type to lower the number of searches.
  * CNAME is only considered for equal name, of course.
  * We also store NSEC* parameters at NS type; probably the latest two will be kept.
@@ -1199,10 +1210,13 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 
 	int zlf_len = k->buf[0];
 
-	// FIXME: review xNAME + DS, ranks, etc.
+	/* FIXME re-review:
+	 * 	- exact_match for DS; probably start with false already
+	 */
 	uint8_t rank_min = KR_RANK_INSECURE | KR_RANK_AUTH;
 	// LATER(optim): if stype is NS, we check the same value again
 	bool exact_match = true;
+	/* Inspect the NS/xNAME entries, shortening by a label on each iteration. */
 	do {
 		k->buf[0] = zlf_len;
 		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
@@ -1221,7 +1235,8 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 		const knot_db_val_t val_orig = val;
 		assert(eh);
 		if (!eh) goto next_label; // do something about EILSEQ?
-		/* More types are possible; try in order. */
+		/* More types are possible; try in order.
+		 * For non-fatal failures just "continue;" to try the next type. */
 		uint16_t type = 0;
 		while (type != KNOT_RRTYPE_DNAME) {
 			/* Determine the next type to try. */
@@ -1248,21 +1263,29 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 				assert(false);
 				return NOTHING;
 			}
-			/* Find the entry for the type, check positivity, TTL
-			 * For non-fatal failures just "continue;" to try the next type. */
+			/* Find the entry for the type, check positivity, TTL */
 			val = val_orig;
 			ret = entry_h_seek(&val, type);
-			if (ret || !(eh = entry_h_consistent(val, KNOT_RRTYPE_CNAME))) {
+			if (ret || !(eh = entry_h_consistent(val, type))) {
 				assert(false);
 				goto next_label;
 			}
-			if (eh->is_packet) continue;
 			int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
-			if (new_ttl < 0) continue;
-			if (type != KNOT_RRTYPE_NS && eh->rank < rank_min) {
+			if (new_ttl < 0
+			    /* Not interested in negative or bogus. */
+			    || eh->is_packet
+			    /* For NS any kr_rank is accepted,
+			     * as insecure or even nonauth is OK */
+			    || (type != KNOT_RRTYPE_NS && eh->rank < rank_min)) {
+
+				WITH_VERBOSE {
+					VERBOSE_MSG(qry, "=> skipping unfit ");
+					kr_rrtype_print(type, "",
+							eh->is_packet ? " packet" : " RR");
+					kr_log_verbose(": rank 0%0.2o, new TTL %d\n",
+							eh->rank, new_ttl);
+				}
 				continue;
-				/* For NS any kr_rank is accepted,
-				 * as insecure or even nonauth is OK */
 			}
 			/* We found our match. */
 			k->type = type;
@@ -1272,9 +1295,9 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 
 	next_label:
 		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "NS/xNAME ");
-			kr_dname_print(k->zname, "", " NOT found, ");
-			kr_log_verbose("name length in LF: %d\n", zlf_len);
+			VERBOSE_MSG(qry, "=> NS/xNAME ");
+			kr_dname_print(k->zname, "", " NOT found\n");
+			//kr_log_verbose("name length in LF: %d\n", zlf_len);
 		}
 
 		/* remove one more label */

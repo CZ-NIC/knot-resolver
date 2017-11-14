@@ -54,7 +54,7 @@ struct kr_cdb_api {
 	int (*match)(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount);
 	int (*prune)(knot_db_t *db, int maxcount);
 
-	/* new WIP
+	/** Less-or-equal search (lexicographic ordering).
 	 * On successful return, key->data and val->data point to DB-owned data.
 	 * return: 0 for equality, > 0 for less, < 0 kr_error */
 	int (*read_leq)(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val);

@@ -316,7 +316,6 @@ static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *q
 	uint16_t type = kr_rrset_type_maysig(rr);
 
 	if (qry->flags.CACHED) {
-		assert(rr->additional); // FIXME TMP
 		return rr->additional ? *(uint8_t *)rr->additional : KR_RANK_OMIT;
 		/* ^^ Current use case for "cached" RRs without rank: hints module. */
 	}
