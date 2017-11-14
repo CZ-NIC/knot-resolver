@@ -27,6 +27,7 @@ struct qr_task;
 struct worker_ctx;
 /** Transport session (opaque). */
 struct session;
+/** Union of various libuv objects for freelist. */
 /** Worker callback */
 typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, void *baton);
 
@@ -79,6 +80,11 @@ void worker_reclaim(struct worker_ctx *worker);
 
 /** Closes given session */
 void worker_session_close(struct session *session);
+
+void *worker_iohandle_borrow(struct worker_ctx *worker);
+
+void worker_iohandle_release(struct worker_ctx *worker, void *h);
+
 
 
 /** @cond internal */
@@ -135,11 +141,31 @@ struct worker_ctx {
 	map_t tcp_waiting;
 	map_t outgoing;
 	mp_freelist_t pool_mp;
-	mp_freelist_t pool_ioreq;
+	mp_freelist_t pool_ioreqs;
 	mp_freelist_t pool_sessions;
+	mp_freelist_t pool_iohandles;
 	knot_mm_t pkt_pool;
 };
 
+/* @internal Union of derivatives from libuv uv_handle_t for freelist.
+ * These have session as their `handle->data` and own it. */
+union uv_handles {
+	uv_handle_t   handle;
+	uv_stream_t   stream;
+	uv_udp_t      udp;
+	uv_tcp_t      tcp;
+	uv_timer_t    timer;
+};
+
+/* @internal Union of derivatives from uv_req_t libuv request handles for freelist.
+ * These have only a reference to the task they're operating on. */
+union uv_reqs {
+	uv_req_t      req;
+	uv_shutdown_t sdown;
+	uv_write_t    write;
+	uv_connect_t  connect;
+	uv_udp_send_t send;
+};
 
 /** @endcond */
 

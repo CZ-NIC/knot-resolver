@@ -33,6 +33,8 @@
 	} \
 } while (0)
 
+void io_release(uv_handle_t *handle);
+
 static void check_bufsize(uv_handle_t* handle)
 {
 	/* We want to buffer at least N waves in advance.
@@ -108,12 +110,23 @@ static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
 
 static uv_stream_t *handle_alloc(uv_loop_t *loop)
 {
-	uv_stream_t *handle = calloc(1, sizeof(*handle));
+	uv_stream_t *handle = calloc(1, sizeof(union uv_handles));
 	if (!handle) {
 		return NULL;
 	}
 
 	return handle;
+}
+
+static uv_stream_t *handle_borrow(uv_loop_t *loop)
+{
+	struct worker_ctx *worker = loop->data;
+	void *req = worker_iohandle_borrow(worker);
+	if (!req) {
+		return NULL;
+	}
+
+	return (uv_stream_t *)req;
 }
 
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
@@ -144,6 +157,10 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 {
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
+	struct session *s = handle->data;
+	if (s->closing) {
+		return;
+	}
 	if (nread <= 0) {
 		if (nread < 0) { /* Error response, notify resolver */
 			worker_submit(worker, (uv_handle_t *)handle, NULL, addr);
@@ -165,6 +182,7 @@ static int udp_bind_finalize(uv_handle_t *handle)
 	/* Handle is already created, just create context. */
 	struct session *session = session_new();
 	assert(session);
+	session->outgoing = false;
 	session->handle = handle;
 	handle->data = session;
 	return io_start_read((uv_handle_t *)handle);
@@ -249,14 +267,14 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	if (status != 0) {
 		return;
 	}
-	uv_stream_t *client = handle_alloc(master->loop);
+	uv_stream_t *client = handle_borrow(master->loop);
 	if (!client) {
 		return;
 	}
 	memset(client, 0, sizeof(*client));
 	io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM);
 	if (uv_accept(master, client) != 0) {
-		uv_close((uv_handle_t *)client, io_free);
+		uv_close((uv_handle_t *)client, io_release);
 		return;
 	}
 
@@ -264,13 +282,12 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
 	struct session *session = client->data;
+	assert(session->outgoing == false);
 	session->has_tls = tls;
 	if (tls && !session->tls_ctx) {
 		session->tls_ctx = tls_new(master->loop->data);
 	}
 	uv_timer_t *timer = &session->timeout;
-	uv_timer_init(master->loop, timer);
-	timer->data = session;
 	uv_timer_start(timer, tcp_timeout_trigger, KR_CONN_RTT_MAX/2, KR_CONN_RTT_MAX/2);
 	io_start_read((uv_handle_t *)client);
 }
@@ -376,13 +393,14 @@ int tcp_bindfd_tls(uv_tcp_t *handle, int fd)
 
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)
 {
+	int ret = -1;
 	if (type == SOCK_DGRAM) {
-		uv_udp_init(loop, (uv_udp_t *)handle);
-	} else {
-		uv_tcp_init(loop, (uv_tcp_t *)handle);
+		ret = uv_udp_init(loop, (uv_udp_t *)handle);
+	} else if (type == SOCK_STREAM) {
+		ret = uv_tcp_init(loop, (uv_tcp_t *)handle);
 		uv_tcp_nodelay((uv_tcp_t *)handle, 1);
 	}
-
+	assert(ret == 0);
 	struct worker_ctx *worker = loop->data;
 	struct session *session = session_borrow(worker);
 	assert(session);
@@ -417,13 +435,25 @@ void io_free(uv_handle_t *handle)
 	free(handle);
 }
 
+void io_release(uv_handle_t *handle)
+{
+	if (!handle) {
+		return;
+	}
+	uv_loop_t *loop = handle->loop;
+	struct worker_ctx *worker = loop->data;
+	io_deinit(handle);
+	worker_iohandle_release(worker, handle);
+}
+
 int io_start_read(uv_handle_t *handle)
 {
 	if (handle->type == UV_UDP) {
 		return uv_udp_recv_start((uv_udp_t *)handle, &handle_getbuf, &udp_recv);
-	} else {
+	} else if (handle->type == UV_TCP) {
 		return uv_read_start((uv_stream_t *)handle, &handle_getbuf, &tcp_recv);
 	}
+	assert(false);
 }
 
 int io_stop_read(uv_handle_t *handle)
