@@ -167,7 +167,9 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		} /* nread == 0 is for freeing buffers, we don't need to do this */
 		return;
 	}
-
+	if (addr->sa_family == AF_UNSPEC) {
+		return;
+	}
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, &worker->pkt_pool);
 	if (query) {
 		query->max_size = KNOT_WIRE_MAX_PKTSIZE;
@@ -267,6 +269,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	if (status != 0) {
 		return;
 	}
+
 	uv_stream_t *client = handle_borrow(master->loop);
 	if (!client) {
 		return;
@@ -283,6 +286,15 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	 * is idle and should be terminated, this is an educated guess. */
 	struct session *session = client->data;
 	assert(session->outgoing == false);
+
+	struct sockaddr *addr = &(session->peer.ip);
+	int addr_len = sizeof(union inaddr);
+	int ret = uv_tcp_getpeername((uv_tcp_t *)client, addr, &addr_len);
+	if (ret || addr->sa_family == AF_UNSPEC) {
+		worker_session_close(session);
+		return;
+	}
+
 	session->has_tls = tls;
 	if (tls && !session->tls_ctx) {
 		session->tls_ctx = tls_new(master->loop->data);

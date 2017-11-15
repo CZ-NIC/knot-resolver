@@ -962,7 +962,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 			worker->stats.tcp += 1;
 		if (addr->sa_family == AF_INET6)
 			worker->stats.ipv6 += 1;
-		else
+		else if (addr->sa_family == AF_INET)
 			worker->stats.ipv4 += 1;
 	}
 	return ret;
@@ -1313,7 +1313,6 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		uv_handle_t *handle = ctx->source.session->handle;
 		assert(ctx->source.session->closing == false);
 		assert(handle->data == ctx->source.session);
-		assert(!uv_is_closing(handle));
 		assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
 		(void) qr_task_send(task, handle,
 				    (struct sockaddr *)&ctx->source.addr,
@@ -1911,13 +1910,8 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		if (!session->outgoing) {
 			/* This is a new query, create a new task that we can use
 			 * to buffer incoming message until it's complete. */
-			struct sockaddr_storage addr_storage;
-			struct sockaddr *addr = (struct sockaddr *)&addr_storage;
-			int addr_len = sizeof(addr_storage);
-			int ret = uv_tcp_getpeername((uv_tcp_t *)handle, addr, &addr_len);
-			if (ret) {
-				addr = NULL; /* fallback */
-			}
+			struct sockaddr *addr = &(session->peer.ip);
+			assert(addr->sa_family != AF_UNSPEC);
 			struct request_ctx *ctx = request_create(worker,
 								 (uv_handle_t *)handle,
 								 addr);
