@@ -477,7 +477,10 @@ static int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
 		assert(false);
 		return ret;
 	}
-	ret = knot_dname_to_wire(buf + ret, k->zname, KNOT_DNAME_MAXLEN - kwz.len);
+		/* The last written byte is the zero label for root -> overwrite. */
+	knot_dname_t *zone_start = buf + ret - 1;
+	assert(*zone_start == '\0');
+	ret = knot_dname_to_wire(zone_start, k->zname, KNOT_DNAME_MAXLEN - kwz.len);
 	if (ret != k->zlf_len + 1) {
 		assert(false);
 		return ret < 0 ? ret : kr_error(EILSEQ);
