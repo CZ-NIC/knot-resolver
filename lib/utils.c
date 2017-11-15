@@ -114,13 +114,16 @@ char* kr_strcatdup(unsigned n, ...)
 	va_start(vl, n);
 	for (unsigned i = 0; i < n; ++i) {
 		char *item = va_arg(vl, char *);
-		total_len += strlen_safe(item);
+		const size_t new_len = total_len + strlen_safe(item);
+		if (unlikely(new_len < total_len)) return NULL;
+		total_len = new_len;
 	}
 	va_end(vl);
 
 	/* Allocate result and fill */
 	char *result = NULL;
 	if (total_len > 0) {
+		if (unlikely(total_len + 1 == 0)) return NULL;
 		result = malloc(total_len + 1);
 	}
 	if (result) {
