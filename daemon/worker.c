@@ -1807,24 +1807,25 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		while (session->waiting.len > 0) {
 			struct qr_task *task = session->waiting.at[0];
 			array_del(session->waiting, 0);
+			assert(task->refs > 1);
 			qr_task_unref(task);
-			session_del_tasks(session, task);
 			if (session->outgoing) {
 				qr_task_step(task, task->addrlist, NULL);
 			} else {
 				assert(task->ctx->source.session == session);
 				task->ctx->source.session = NULL;
 			}
+			session_del_tasks(session, task);
 		}
 		while (session->tasks.len > 0) {
 			struct qr_task *task = session->tasks.at[0];
-			session_del_tasks(session, task);
 			if (session->outgoing) {
 				qr_task_step(task, task->addrlist, NULL);
 			} else {
 				assert(task->ctx->source.session == session);
 				task->ctx->source.session = NULL;
 			}
+			session_del_tasks(session, task);
 		}
 		session_close(session);
 		return kr_error(ECONNRESET);
@@ -1973,6 +1974,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 	/* Message is too long, can't process it. */
 	ssize_t to_read = MIN(len, task->bytes_remaining);
 	if (pkt_buf->size + to_read > pkt_buf->max_size) {
+		// TODO reallocate pkt_buf
 		pkt_buf->size = 0;
 		session->bytes_to_skip = task->bytes_remaining - to_read;
 		task->bytes_remaining = 0;
