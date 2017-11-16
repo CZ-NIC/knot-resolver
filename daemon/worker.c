@@ -1043,7 +1043,7 @@ static void on_connect(uv_connect_t *req, int status)
 			struct qr_task *task = session->waiting.at[0];
 			session_del_tasks(session, task);
 			array_del(session->waiting, 0);
-			qr_task_finalize(task, KR_STATE_FAIL);
+			qr_task_step(task, task->addrlist, NULL);
 			qr_task_unref(task);
 		}
 		assert(session->tasks.len == 0);
