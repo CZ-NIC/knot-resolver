@@ -1043,6 +1043,15 @@ static void on_connect(uv_connect_t *req, int status)
 			struct qr_task *task = session->waiting.at[0];
 			session_del_tasks(session, task);
 			array_del(session->waiting, 0);
+			/* TODO fixme
+			 * Daemon should not have direct access to rplan */
+			struct request_ctx *ctx = task->ctx;
+			assert(ctx);
+			struct kr_request *req = &ctx->req;
+			struct kr_rplan *rplan = &req->rplan;
+			struct kr_query *qry = array_tail(rplan->pending);
+			/* Prevent from KR_STATE_FAIL in kr_resolve_consume() */
+			qry->flags.TCP = false;
 			qr_task_step(task, task->addrlist, NULL);
 			qr_task_unref(task);
 		}
@@ -1810,6 +1819,15 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			assert(task->refs > 1);
 			qr_task_unref(task);
 			if (session->outgoing) {
+				/* TODO fixme
+				 * Daemon should not have direct access to rplan */
+				struct request_ctx *ctx = task->ctx;
+				assert(ctx);
+				struct kr_request *req = &ctx->req;
+				struct kr_rplan *rplan = &req->rplan;
+				struct kr_query *qry = array_tail(rplan->pending);
+				/* Prevent from KR_STATE_FAIL in kr_resolve_consume() */
+				qry->flags.TCP = false;
 				qr_task_step(task, task->addrlist, NULL);
 			} else {
 				assert(task->ctx->source.session == session);
@@ -1820,6 +1838,15 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		while (session->tasks.len > 0) {
 			struct qr_task *task = session->tasks.at[0];
 			if (session->outgoing) {
+				/* TODO fixme
+				 * Daemon should not have direct access to rplan */
+				struct request_ctx *ctx = task->ctx;
+				assert(ctx);
+				struct kr_request *req = &ctx->req;
+				struct kr_rplan *rplan = &req->rplan;
+				struct kr_query *qry = array_tail(rplan->pending);
+				/* Prevent from KR_STATE_FAIL in kr_resolve_consume() */
+				qry->flags.TCP = false;
 				qr_task_step(task, task->addrlist, NULL);
 			} else {
 				assert(task->ctx->source.session == session);
