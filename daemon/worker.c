@@ -1801,27 +1801,30 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		 */
 		uv_timer_t *timer = &session->timeout;
 		uv_timer_stop(timer);
+		struct sockaddr *peer = &session->peer.ip;
+		worker_del_tcp_connected(worker, peer);
+		session->connected = false;
 		while (session->waiting.len > 0) {
 			struct qr_task *task = session->waiting.at[0];
-			if (session->outgoing) {
-				qr_task_finalize(task, KR_STATE_FAIL);
-			} else {
-				assert(task->ctx->source.session == session);
-				task->ctx->source.session = NULL;
-			}
 			array_del(session->waiting, 0);
 			qr_task_unref(task);
 			session_del_tasks(session, task);
-		}
-		while (session->tasks.len > 0) {
-			struct qr_task *task = session->tasks.at[0];
 			if (session->outgoing) {
-				qr_task_finalize(task, KR_STATE_FAIL);
+				qr_task_step(task, task->addrlist, NULL);
 			} else {
 				assert(task->ctx->source.session == session);
 				task->ctx->source.session = NULL;
 			}
+		}
+		while (session->tasks.len > 0) {
+			struct qr_task *task = session->tasks.at[0];
 			session_del_tasks(session, task);
+			if (session->outgoing) {
+				qr_task_step(task, task->addrlist, NULL);
+			} else {
+				assert(task->ctx->source.session == session);
+				task->ctx->source.session = NULL;
+			}
 		}
 		session_close(session);
 		return kr_error(ECONNRESET);
