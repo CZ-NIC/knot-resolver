@@ -722,6 +722,7 @@ void kr_pkt_print(knot_pkt_t *pkt)
 	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, pkt_rcode);
 	const knot_lookup_t *opcode = knot_lookup_by_id(knot_opcode_names, pkt_opcode);
 	uint16_t qry_id = knot_wire_get_id(pkt->wire);
+	uint16_t qdcount = knot_wire_get_qdcount(pkt->wire);
 
 	if (rcode != NULL) {
 		rcode_str = rcode->name;
@@ -730,15 +731,13 @@ void kr_pkt_print(knot_pkt_t *pkt)
 		opcode_str = opcode->name;
 	}
 	flags_to_str(flags, pkt, sizeof(flags));
-	knot_dname_to_str(qname, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
-	knot_rrtype_to_string(knot_pkt_qtype(pkt), rrtype, sizeof(rrtype));
 	kr_log_verbose(";; ->>HEADER<<- opcode: %s; status: %s; id: %hu\n",
 		       opcode_str, rcode_str, qry_id);
 
 	kr_log_verbose(";; Flags: %s QUERY: %hu; ANSWER: %hu; "
 		       "AUTHORITY: %hu; ADDITIONAL: %hu\n\n",
 		       flags,
-		       knot_wire_get_qdcount(pkt->wire),
+		       qdcount,
 		       knot_wire_get_ancount(pkt->wire),
 		       knot_wire_get_nscount(pkt->wire),
 		       knot_wire_get_arcount(pkt->wire));
@@ -748,7 +747,13 @@ void kr_pkt_print(knot_pkt_t *pkt)
 		                  knot_wire_get_rcode(pkt->wire));
 	}
 
-	kr_log_verbose(";; QUESTION SECTION\n%s\t\t%s\n\n", qname, rrtype);
+	if (qdcount == 1) {
+		knot_dname_to_str(qname, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
+		knot_rrtype_to_string(knot_pkt_qtype(pkt), rrtype, sizeof(rrtype));
+		kr_log_verbose(";; QUESTION SECTION\n%s\t\t%s\n\n", qname, rrtype);
+	} else if (qdcount > 1) {
+		kr_log_verbose(";; Warning: unsupported QDCOUNT %hu\n", qdcount);
+	}
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_AUTHORITY; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		if (sec->count == 0) {
