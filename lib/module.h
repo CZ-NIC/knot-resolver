@@ -102,3 +102,9 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 KR_EXPORT
 void kr_module_unload(struct kr_module *module);
 
+/**
+ * Get embedded module prototype by name (or NULL).
+ */
+KR_EXPORT
+const struct kr_module * kr_module_embedded(const char *name);
+

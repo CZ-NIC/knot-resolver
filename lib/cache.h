@@ -27,9 +27,9 @@ static const size_t PKT_SIZE_NOWIRE = -1;
 
 
 #include "lib/module.h"
-/* Prototypes for the cache_lmdb module implementation. */
-int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
-int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
+/* Prototypes for the 'cache' module implementation. */
+int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
+int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
 
 
 /**

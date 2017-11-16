@@ -18,14 +18,14 @@
 #include "lib/cache.h"
 
 /** Module implementation. */
-const kr_layer_api_t *cache_lmdb_layer(struct kr_module *module)
+const kr_layer_api_t *cache_layer(struct kr_module *module)
 {
 	static const kr_layer_api_t _layer = {
-		.produce = &cache_lmdb_peek,
-		.consume = &cache_lmdb_stash,
+		.produce = &cache_peek,
+		.consume = &cache_stash,
 	};
 
 	return &_layer;
 }
 
-KR_MODULE_EXPORT(cache_lmdb)
+KR_MODULE_EXPORT(cache)

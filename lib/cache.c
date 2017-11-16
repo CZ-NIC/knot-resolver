@@ -498,7 +498,7 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 
 /** function for .produce phase */
-int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
+int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
@@ -893,7 +893,7 @@ do_soa:
 static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl,
 			const struct kr_query *qry, struct kr_cache *cache);
 
-int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
+int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
