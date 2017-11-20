@@ -125,7 +125,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	/* Construct the key under which the pkt will be stored. */
 	struct key k_storage, *k = &k_storage;
 	knot_db_val_t key;
-	int ret = kr_dname_lf(k->buf, owner, NULL);
+	int ret = kr_dname_lf(k->buf, owner, false);
 	if (ret) {
 		assert(!ret);
 		return;

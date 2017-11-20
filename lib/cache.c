@@ -281,7 +281,7 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name,
 	 * on a correct place within the name (the cut) */
 	int ret;
 	const bool ok = k && name
-		&& !(ret = kr_dname_lf(k->buf, name, NULL));
+		&& !(ret = kr_dname_lf(k->buf, name, add_wildcard));
 	if (!ok) {
 		assert(false);
 		return (knot_db_val_t){};
@@ -300,14 +300,6 @@ static knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name,
 		key_len = k->buf[0] + 1;
 	} else {
 		key_len = k->buf[0] + 2;
-	}
-	if (add_wildcard) {
-		if (end > begin) {
-			/* not directly under zone name -> need separator */
-			k->buf[1 + key_len++] = 0;
-		}
-		k->buf[1 + key_len++] = '*';
-		k->buf[0] += 2;
 	}
 	/* CACHE_KEY_DEF: key == zone's dname_lf + '\0' + '1' + dname_lf
 	 * of the name within the zone without the final 0.  Iff the latter is empty,
@@ -434,7 +426,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		assert(false);
 		return "EINVAL";
 	}
-	ret = kr_dname_lf(chs, next, NULL);
+	ret = kr_dname_lf(chs, next, false);
 	if (ret) {
 		assert(false);
 		return "ERROR";
@@ -523,7 +515,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		return ctx->state;
 	}
-	int ret = kr_dname_lf(k->buf, qry->sname, NULL);
+	int ret = kr_dname_lf(k->buf, qry->sname, false);
 	if (ret) {
 		return KR_STATE_FAIL;
 	}
@@ -560,7 +552,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return ctx->state; /* can't go above root */
 		}
 	}
-	kr_dname_lf(k->buf, k->zname, NULL); /* LATER(optim.): probably remove */
+	kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
 	const knot_db_val_t val_cut = closest_NS(ctx, k);
 	if (!val_cut.data) {
 		VERBOSE_MSG(qry, "=> not even root NS in cache\n");
@@ -1017,14 +1009,19 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 				&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
 				&& knot_dname_is_equal(rr->owner, e->rr->owner);
 			if (!ok) continue;
-			bool is_wild = knot_rrsig_labels(&e->rr->rrs, 0)
-				!= knot_dname_labels(e->rr->owner, NULL);
-			if (is_wild) {
-				return kr_ok(); // FIXME, especially for NSEC1!
-			}
 			rr_sigs = e->rr;
 			break;
 		}
+	}
+
+	const int wild_labels = rr_sigs == NULL ? 0 :
+	       knot_dname_labels(rr->owner, NULL) - knot_rrsig_labels(&rr_sigs->rrs, 0);
+	if (wild_labels < 0) {
+		return kr_ok();
+	}
+	const knot_dname_t *encloser = rr->owner;
+	for (int i = 0; i < wild_labels; ++i) {
+		encloser = knot_wire_next_label(encloser, NULL);
 	}
 
 	int ret = 0;
@@ -1042,10 +1039,10 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			return kr_error(EINVAL);
 		}
 		k->zlf_len = knot_dname_size(knot_rrsig_signer_name(&rr_sigs->rrs, 0)) - 1;
-		key = key_NSEC1(k, rr->owner, false);
+		key = key_NSEC1(k, encloser, wild_labels);
 		break;
 	default:
-		ret = kr_dname_lf(k->buf, rr->owner, NULL);
+		ret = kr_dname_lf(k->buf, rr->owner, wild_labels);
 		if (ret) {
 			assert(!ret);
 			return kr_error(ret);
@@ -1193,7 +1190,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 		kr_dname_print(name, "", " ");
 	}
 
-	int ret = kr_dname_lf(k->buf, name, NULL);
+	int ret = kr_dname_lf(k->buf, name, false);
 	if (ret) {
 		kr_log_verbose("ERROR!\n");
 		return KR_STATE_FAIL;

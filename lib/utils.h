@@ -310,11 +310,25 @@ static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
 int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf);
 
 /** Patched knot_dname_lf.  LF for "." has length zero instead of one, for consistency.
+ * (TODO: consistency?)
+ * \param add_wildcard append the wildcard label
+ * \note packet is always NULL
  */
-static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, const uint8_t *pkt)
+static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wildcard)
 {
-	int ret = knot_dname_lf(dst, src, pkt);
-	if (!ret && dst[0] == 1)
-		dst[0] = 0;
-	return ret;
+	int ret = knot_dname_lf(dst, src, NULL);
+	if (ret)
+		return ret;
+	int len = dst[0];
+	if (len == 1)
+		len = 0;
+	if (add_wildcard) {
+		if (len + 2 > KNOT_DNAME_MAXLEN)
+			return kr_error(ENOSPC);
+		dst[len + 1] = '*';
+		dst[len + 2] = '\0';
+		len += 2;
+	}
+	dst[0] = len;
+	return KNOT_EOK;
 };
