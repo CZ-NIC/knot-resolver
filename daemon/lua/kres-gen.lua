@@ -49,7 +49,7 @@ struct knot_pkt {
 	knot_rrinfo_t *rr_info;
 	knot_rrset_t *rr;
 	knot_mm_t mm;
-	knot_compr_t compr;
+	char _stub[]; /* TMP: do NOT replace yet (changed in libknot-2.6.0) */
 };
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
