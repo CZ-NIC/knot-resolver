@@ -639,6 +639,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * iterate over all NSEC* chain parameters
 	 */
 	int clencl_labels = -1;
+	const int sname_labels = knot_dname_labels(qry->sname, NULL);
 	//while (true) { //for (int i_nsecp = 0; i
 	// TODO(NSEC3): better signalling when to "continue;" and when to "break;"
 	// incl. clearing partial answers in `ans`
@@ -697,14 +698,13 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 						new_ttl);
 				ans.rcode = PKT_NODATA;
 				break;
-			} else { /* inexact match; NXDOMAIN proven *except* for wildcards */
+			} else { /* inexact match; proven *except* for wildcards */
 				WITH_VERBOSE {
 					VERBOSE_MSG(qry, "=> NSEC qname: covered: ");
 					kr_dname_print(nsec_rr->owner, "", " -> ");
 					kr_dname_print(knot_nsec_next(&nsec_rr->rrs), "", ", ");
 					kr_log_verbose("new TTL %d\n", new_ttl);
 				}
-				ans.rcode = PKT_NXDOMAIN;
 				/* Find label count of the closest encloser.
 				 * Both points in an NSEC do exist and any prefixes
 				 * of those names as well (empty non-terminals),
@@ -714,6 +714,14 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 					knot_dname_matched_labels(nsec_rr->owner, qry->sname),
 					knot_dname_matched_labels(qry->sname, knot_nsec_next(&nsec_rr->rrs))
 					);
+				/* Empty non-terminals don't need to have
+				 * a matching NSEC record. */
+				if (sname_labels == clencl_labels) {
+					ans.rcode = PKT_NODATA;
+					VERBOSE_MSG(qry, "=> NSEC qname: empty non-terminal by the same RR\n");
+				} else {
+					ans.rcode = PKT_NXDOMAIN;
+				}
 				break;
 			}
 
@@ -732,14 +740,14 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/** 3. wildcard checks, in case we found non-existence.
 	 */
 	if (ans.rcode == PKT_NODATA) {
-		/* no wildcard checks needed */
+		/* No wildcard checks needed, as we proved that sname exists. */
 		assert(ans.nsec_v == 1); // for now
 
 	} else if (ans.nsec_v == 1 && ans.rcode == PKT_NXDOMAIN) {
 		/* First try to prove that source of synthesis doesn't exist either. */
 		/* Construct key for the source of synthesis. */
 		const knot_dname_t *ss_name = qry->sname;
-		for (int l = knot_dname_labels(qry->sname, NULL); l > clencl_labels; --l)
+		for (int l = sname_labels; l > clencl_labels; --l)
 			ss_name = knot_wire_next_label(ss_name, NULL);
 		key = key_NSEC1(k, ss_name, true);
 		const size_t nwz_off = key_nwz_off(k);
