@@ -49,6 +49,7 @@ struct knot_pkt {
 	knot_rrinfo_t *rr_info;
 	knot_rrset_t *rr;
 	knot_mm_t mm;
+	knot_compr_t compr;
 };
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
@@ -158,7 +159,7 @@ struct kr_request {
 	int has_tls;
 	knot_mm_t pool;
 };
-enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_INDET, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE = 8, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
+enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct knot_rrset {
 	knot_dname_t *_owner;
 	uint16_t type;
@@ -184,6 +185,7 @@ struct kr_query {
 	uint32_t secret;
 	uint16_t fails;
 	uint16_t reorder;
+	struct timeval creation_time;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;

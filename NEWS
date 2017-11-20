@@ -5,6 +5,8 @@ Bugfixes
 --------
 - fix SIGPIPE crashes
 - tests: work around out-of-space for platforms with larger memory pages
+- lua: fix mistakes in bindings affecting 1.4.0 and 1.5.0 (and 1.99.1-alpha),
+  potentially causing problems in dns64 and workarounds modules
 
 
 Knot Resolver 1.5.0 (2017-11-02)
