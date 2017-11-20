@@ -46,8 +46,14 @@ deckard:linux:amd64:valgrind:
   script:
     - export PREFIX=$(pwd)/.local
     - export LD_LIBRARY_PATH=$PREFIX/lib
+    - export TMPDIR=$(pwd)
     # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
     - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd" MAKEFLAGS="-j $(nproc) --keep-going" make
+  artifacts:
+    when: on_failure
+    expire_in: 1 week
+    paths:
+      - tmpdeckard*
   dependencies:
     - build:linux:amd64
   tags:
@@ -60,13 +66,19 @@ test:linux:amd64:valgrind:
   stage: test
   script:
     # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
-    - PREFIX=$(pwd)/.local DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
+    - TMPDIR=$(pwd) PREFIX=$(pwd)/.local DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
   dependencies:
     - build:linux:amd64
   tags:
     - docker
     - linux
     - amd64
+  artifacts:
+    when: on_failure
+    expire_in: 1 week
+    paths:
+      - tmpdeckard*
+
 
 respdiff:linux:amd64:
   stage: test
