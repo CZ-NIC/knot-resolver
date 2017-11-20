@@ -816,12 +816,13 @@ int knot_dname_lf2wire(knot_dname_t *dst0, uint8_t len, const uint8_t *lf)
 	int label_end = len - 1; /* index of the zero byte after the current label */
 	while (label_end >= 0) {
 		/* find label_start */
-		int i = len - 1;
+		int i = label_end - 1;
 		while (i >= 0 && lf[i])
 			--i;
-		int label_start = i + 1; /* index of the first byte of the current label */
-		int label_len = label_end - label_start;
-		if (label_len > 63 || label_len == 0)
+		const int label_start = i + 1; /* index of the first byte of the current label */
+		const int label_len = label_end - label_start;
+		assert(label_len >= 0);
+		if (label_len > 63 || label_len <= 0)
 			return kr_error(EILSEQ);
 		/* write the label */
 		*dst = label_len;
@@ -829,7 +830,7 @@ int knot_dname_lf2wire(knot_dname_t *dst0, uint8_t len, const uint8_t *lf)
 		memcpy(dst, lf + label_start, label_len);
 		dst += label_len;
 		/* next label */
-		label_end = i;
+		label_end = label_start - 1;
 	}
 finish:
 	*dst = 0; /* the final zero */
