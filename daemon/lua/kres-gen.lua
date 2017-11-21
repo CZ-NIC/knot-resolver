@@ -100,9 +100,10 @@ struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank;
 	uint8_t revalidation_cnt;
-	_Bool cached;
-	_Bool yielded;
-	_Bool to_wire;
+	_Bool cached : 1;
+	_Bool yielded : 1;
+	_Bool to_wire : 1;
+	_Bool expiring : 1;
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -151,6 +152,7 @@ struct kr_request {
 	int state;
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;
+	ranked_rr_array_t add_selected;
 	rr_array_t additional;
 	_Bool answ_validated;
 	_Bool auth_validated;
@@ -158,7 +160,7 @@ struct kr_request {
 	int has_tls;
 	knot_mm_t pool;
 };
-enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_INDET, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE = 8, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
+enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct knot_rrset {
 	knot_dname_t *_owner;
 	uint16_t type;
@@ -184,6 +186,7 @@ struct kr_query {
 	uint32_t secret;
 	uint16_t fails;
 	uint16_t reorder;
+	struct timeval creation_time;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
