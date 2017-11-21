@@ -180,6 +180,8 @@ enum {
 
 /** Materialize RRset + RRSIGs into ans->rrsets[id].
  * LATER(optim.): it's slightly wasteful that we allocate knot_rrset_t for the packet
+ *
+ * \return error code.  They are all bad conditions and "guarded" by assert.
  */
 int entry2answer(struct answer *ans, int id,
 		const struct entry_h *eh, const void *eh_bound,
@@ -197,6 +199,30 @@ int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type);
  * \note KNOT_CLASS_IN is assumed
  */
 int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank);
+
+
+/* NSEC (1) stuff.  Implementation in ./nsec1.c */
+
+
+/** Construct a string key for for NSEC (1) predecessor-search.
+ * \param add_wildcard Act as if the name was extended by "*." */
+knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildcard);
+
+/** Closest encloser check for NSEC (1).
+ * To understand the interface, see the call point.
+ * \return 0: success;  >0: try other (NSEC3);  <0: exit cache immediately. */
+int nsec1_encloser(struct key *k, struct answer *ans,
+		   const int sname_labels, int *clencl_labels,
+		   knot_db_val_t *cover_low_kwz, knot_db_val_t *cover_hi_kwz,
+		   const struct kr_query *qry, struct kr_cache *cache);
+
+/** Source of synthesis check for NSEC (1).
+ * To understand the interface, see the call point.
+ * \return 0: continue;  AR_SOA: skip to adding SOA;  <0: exit cache immediately. */
+int nsec1_src_synth(struct key *k, struct answer *ans,
+		    const int sname_labels, int clencl_labels,
+		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
+		    const struct kr_query *qry, struct kr_cache *cache);
 
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "cach",  fmt)

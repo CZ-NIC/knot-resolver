@@ -109,7 +109,10 @@ int entry2answer(struct answer *ans, int id,
 	/* Materialize the base RRset. */
 	knot_rrset_t *rr = ans->rrsets[id].set.rr
 		= knot_rrset_new(owner, type, KNOT_CLASS_IN, ans->mm);
-	if (!rr) return kr_error(ENOMEM);
+	if (!rr) {
+		assert(!ENOMEM);
+		return kr_error(ENOMEM);
+	}
 	int ret = rdataset_materialize(&rr->rrs, eh->data, eh_bound, new_ttl, ans->mm);
 	if (ret < 0) goto fail;
 	size_t data_off = ret;
