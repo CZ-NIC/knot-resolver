@@ -69,7 +69,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	const bool is_negative = kr_response_classify(pkt)
 				& (PKT_NODATA|PKT_NXDOMAIN);
 	const bool want_pkt = qry->flags.DNSSEC_BOGUS
-		|| (is_negative && qry->flags.DNSSEC_INSECURE);
+		|| (is_negative && (qry->flags.DNSSEC_INSECURE || !qry->flags.DNSSEC_WANT));
 	if (!want_pkt || !knot_wire_get_aa(pkt->wire)) {
 		return;
 	}
@@ -95,6 +95,8 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 			kr_rank_set(&rank, KR_RANK_BOGUS);
 		} else if (qry->flags.DNSSEC_INSECURE) {
 			kr_rank_set(&rank, KR_RANK_INSECURE);
+		} else if (!qry->flags.DNSSEC_WANT) {
+			/* no TAs at all, leave _RANK_AUTH */
 		} else assert(false);
 	}
 
