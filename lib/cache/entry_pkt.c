@@ -25,15 +25,6 @@
 #include "lib/cache/impl.h"
 
 
-/* TTL handling (local to this file). */
-
-static const uint32_t DEFAULT_MAXTTL = 15 * 60;
-
-static inline uint32_t limit_ttl(uint32_t ttl)
-{
-	/* @todo Configurable limit */
-	return (ttl > DEFAULT_MAXTTL) ? DEFAULT_MAXTTL : ttl;
-}
 /** Compute TTL for a packet.  Generally it's minimum TTL, with extra conditions. */
 static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 {
@@ -47,7 +38,8 @@ static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 			if (is_negative) {
 				/* Use SOA minimum TTL for negative answers. */
 				if (rr->type == KNOT_RRTYPE_SOA) {
-					return limit_ttl(MIN(knot_rrset_ttl(rr), knot_soa_minimum(&rr->rrs)));
+					return MIN(knot_rrset_ttl(rr),
+						   knot_soa_minimum(&rr->rrs));
 				} else {
 					continue; /* Use SOA only for negative answers. */
 				}
@@ -58,19 +50,14 @@ static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 			/* Find minimum TTL in the record set */
 			knot_rdata_t *rd = rr->rrs.data;
 			for (uint16_t j = 0; j < rr->rrs.rr_count; ++j) {
-				if (knot_rdata_ttl(rd) < ttl) {
-					ttl = limit_ttl(knot_rdata_ttl(rd));
-					has_ttl = true;
-				}
+				has_ttl = true;
+				ttl = MIN(ttl, knot_rdata_ttl(rd));
 				rd = kr_rdataset_next(rd);
 			}
 		}
 	}
-	/* Get default if no valid TTL present */
-	if (!has_ttl) {
-		ttl = DEFAULT_MINTTL;
-	}
-	return limit_ttl(ttl);
+	/* If no valid TTL present, go with zero (will get clamped to minimum). */
+	return has_ttl ? ttl : 0;
 }
 
 
@@ -140,7 +127,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	assert(val_new_entry.data);
 	struct entry_h *eh = val_new_entry.data;
 	eh->time = qry->timestamp.tv_sec;
-	eh->ttl  = packet_ttl(pkt, is_negative);
+	eh->ttl  = MAX(MIN(packet_ttl(pkt, is_negative), cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;
 	eh->is_packet = true;
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));

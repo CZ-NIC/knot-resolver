@@ -110,8 +110,8 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		return ret;
 	}
 	memset(&cache->stats, 0, sizeof(cache->stats));
-	cache->ttl_min = 0;
-	cache->ttl_max = KR_CACHE_DEFAULT_MAXTTL;
+	cache->ttl_min = KR_CACHE_DEFAULT_TTL_MIN;
+	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	/* Check cache ABI version */
 	(void) assert_right_version(cache);
 	return 0;
@@ -561,7 +561,7 @@ do_soa:
 
 
 /** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
-static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl,
+static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache);
 
 int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -583,7 +583,6 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 	/* Stash individual records. */
-	const uint32_t min_ttl = MAX(DEFAULT_MINTTL, req->ctx->cache.ttl_min);
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	int ret = 0;
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
@@ -595,7 +594,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				continue;
 				/* TODO: probably safe to break but maybe not worth it */
 			}
-			ret = stash_rrset(arr, i, min_ttl, qry, cache);
+			ret = stash_rrset(arr, i, qry, cache);
 			if (ret) {
 				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
 				goto finally;
@@ -612,7 +611,7 @@ finally:
 	return ctx->state; /* we ignore cache-stashing errors */
 }
 
-static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl,
+static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache)
 {
 	const ranked_rr_array_entry_t *entry = arr->at[arr_i];
@@ -729,12 +728,11 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i, uint32_t min_ttl
 			rd = kr_rdataset_next(rd);
 		}
 	} /* TODO: consider expirations of RRSIGs as well, just in case. */
-	ttl = MAX(ttl, min_ttl);
 
 	/* Write the entry itself. */
 	struct entry_h *eh = val_new_entry.data;
 	eh->time = qry->timestamp.tv_sec;
-	eh->ttl  = ttl;
+	eh->ttl  = MAX(MIN(ttl, cache->ttl_max), cache->ttl_min);
 	eh->rank = entry->rank;
 	if (rdataset_dematerialize(&rr->rrs, eh->data)
 	    || rdataset_dematerialize(rds_sigs, eh->data + rr_ssize)) {

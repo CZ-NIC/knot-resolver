@@ -133,9 +133,6 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 
 
-/** Don't go under this TTL, to avoid bursts of queries. */
-static const uint32_t DEFAULT_MINTTL = 5;
-
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
 static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 {
