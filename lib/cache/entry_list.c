@@ -164,7 +164,8 @@ int entry_h_splice(
 	}
 
 	/* Obtain new storage from cache.
-	 * Note: this does NOT invalidate val_orig_all.data. */
+	 * Note: this does NOT invalidate val_orig_all.data.
+	 * FIXME: possibly wrong, as transaction may be switched RO->RW */
 	ssize_t storage_size = val_orig_all.len - val_orig_entry.len
 				+ val_new_entry->len;
 	assert(storage_size > 0);
@@ -180,12 +181,16 @@ int entry_h_splice(
 	const ssize_t len_before = val_orig_entry.data - val_orig_all.data;
 	assert(len_before >= 0);
 	if (len_before) {
+		assert(ktype == KNOT_RRTYPE_NS);
 		memcpy(val.data, val_orig_all.data, len_before);
 	}
 	/* Write original data after entry, if any. */
-	const ssize_t len_after = val_orig_all.len - val_orig_entry.len;
+	const ssize_t len_after = val_orig_all.len - len_before - val_orig_entry.len;
 	assert(len_after >= 0);
+	assert(len_before + val_orig_entry.len + len_after == val_orig_all.len
+		&& len_before + val_new_entry->len + len_after == storage_size);
 	if (len_after) {
+		assert(ktype == KNOT_RRTYPE_NS);
 		memcpy(val.data + len_before + val_new_entry->len,
 			val_orig_entry.data + val_orig_entry.len, len_after);
 	}
