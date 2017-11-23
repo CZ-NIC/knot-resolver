@@ -3,7 +3,7 @@
 
 local kres -- the module
 
-ffi = require('ffi')
+local ffi = require('ffi')
 local bit = require('bit')
 local bor = bit.bor
 local band = bit.band
@@ -229,7 +229,7 @@ ffi.metatype( knot_pkt_t, {
 				end
 			end
 			return records
-		end, 
+		end,
 		begin = function (pkt, section) return knot.knot_pkt_begin(pkt, section) end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
 			return C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, #rdata)
@@ -241,7 +241,6 @@ ffi.metatype( knot_pkt_t, {
 	},
 })
 -- Metatype for query
-local ub_t = ffi.typeof('unsigned char *')
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
@@ -306,7 +305,7 @@ local function rr2str(rr, style)
 			ret = ret:sub(1, -2)
 		end
 		if rr.comment then
- 			ret = ret .. ' ;' .. rr.comment
+			ret = ret .. ' ;' .. rr.comment
 		end
 	end
 	return ret
@@ -332,7 +331,7 @@ kres = {
 		end
 
 		local fs = ffi.new(kr_qflags)
-		for k_, name in pairs(names) do
+		for _, name in pairs(names) do
 			fs[name] = true
 		end
 		return fs

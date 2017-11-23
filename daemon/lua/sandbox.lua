@@ -78,7 +78,7 @@ end
 -- `env.VAR returns os.getenv(VAR)`
 env = {}
 setmetatable(env, {
-	__index = function (t, k) return os.getenv(k) end
+	__index = function (_, k) return os.getenv(k) end
 })
 
 -- Quick access to interfaces
@@ -109,8 +109,10 @@ setmetatable(net, {
 -- Syntactic sugar for module loading
 -- `modules.<name> = <config>`
 setmetatable(modules, {
-	__newindex = function (t,k,v)
-		if type(k) == 'number' then k = v v = nil end
+	__newindex = function (_, k, v)
+		if type(k) == 'number' then
+			k, v = v, nil
+		end
 		if not rawget(_G, k) then
 			modules.load(k)
 			k = string.match(k, '[%w_]+')
@@ -180,7 +182,7 @@ local function make_sandbox(defined)
 
 	return setmetatable({ __orig_name_list = nl }, {
 		__index = defined,
-		__newindex = function (t, k, v)
+		__newindex = function (_, k, v)
 			if __protected[k] then
 				for k2,v2 in pairs(v) do
 					defined[k][k2] = v2
@@ -213,7 +215,7 @@ function eval_cmd(line, raw)
 	        return load(code, nil, 't', _ENV)
 	    end
 	end
-	local status, err, chunk
+	local err, chunk
 	chunk, err = load_code(raw and 'return '..line or 'return table_print('..line..')')
 	if err then
 		chunk, err = load_code(line)
@@ -229,7 +231,7 @@ end
 function table_print (tt, indent, done)
 	done = done or {}
 	indent = indent or 0
-	result = ""
+	local result = ""
 	-- Convert to printable string (escape unprintable)
 	local function printable(value)
 		value = tostring(value)
