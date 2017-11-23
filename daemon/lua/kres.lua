@@ -175,37 +175,19 @@ ffi.metatype( knot_rrset_t, {
 
 		-- Dump the rrset in presentation format (dig-like).
 		txt_dump = function(rr, style)
-			if @KNOT_RRSET_TXT_DUMP@ then
-				local bufsize = 1024
-				local dump = ffi.new('char *[1]', C.malloc(bufsize))
-					-- ^ one pointer to a string
-				local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
+			local bufsize = 1024
+			local dump = ffi.new('char *[1]', C.malloc(bufsize))
+				-- ^ one pointer to a string
+			local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
 
-				local ret = knot.knot_rrset_txt_dump(rr, dump, size,
-								style or knot.KNOT_DUMP_STYLE_DEFAULT)
-				local result = nil
-				if ret >= 0 then
-					result = ffi.string(dump[0], ret)
-				end
-				C.free(dump[0])
-				return result
-			else
-				-- different _txt_dump ABI -> use old "binary" method
-				local function hex_encode(str)
-					return (str:gsub('.', function (c)
-						return string.format('%02X', string.byte(c))
-					end))
-				end
-				local result = ''
-				local i
-				for i = 0, rr.rrs.rr_count - 1 do
-					local rr1 = rr:get(i)
-					local rdata = hex_encode(rr1.rdata)
-					result = result .. string.format('%s %d IN TYPE%d \\# %d %s\n',
-						kres.dname2str(rr1.owner), rr1.ttl, rr1.type, #rr1.rdata, rdata)
-				end
-				return result
+			local ret = knot.knot_rrset_txt_dump(rr, dump, size,
+							style or knot.KNOT_DUMP_STYLE_DEFAULT)
+			local result = nil
+			if ret >= 0 then
+				result = ffi.string(dump[0], ret)
 			end
+			C.free(dump[0])
+			return result
 		end,
 	},
 })

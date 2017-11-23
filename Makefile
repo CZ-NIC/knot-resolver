@@ -18,7 +18,7 @@ BUILD_CFLAGS += --coverage
 endif
 
 # Dependencies
-KNOT_MINVER := 2.3.1
+KNOT_MINVER := 2.4.0
 $(eval $(call find_lib,libknot,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libdnssec,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libzscanner,$(KNOT_MINVER),yes))
