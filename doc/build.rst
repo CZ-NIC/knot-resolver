@@ -62,6 +62,7 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for dnstap_."
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
    "libfstrm_ 0.2+", "``modules/dnstap``", "Frame Streams data transport protocol."
+   "luacheck_", "``lint``", "Syntax and static analysis checker for Lua."
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
@@ -252,6 +253,7 @@ The project can be built with code coverage tracking using the ``COVERAGE=1`` va
 Running unit and integration tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The linter requires luacheck_ and is executed by ``make lint``.
 The unit tests require cmocka_ and are executed by ``make check``.
 Tests for the dnstap module need go and are executed by ``make ckeck-dnstap``.
 
@@ -319,5 +321,6 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _libprotobuf: https://developers.google.com/protocol-buffers/
 .. _libprotobuf-c: https://github.com/protobuf-c/protobuf-c/wiki
 .. _libfstrm: https://github.com/farsightsec/fstrm
+.. _luacheck: http://luacheck.readthedocs.io
 
 .. _DESTDIR: https://www.gnu.org/prep/standards/html_node/DESTDIR.html
