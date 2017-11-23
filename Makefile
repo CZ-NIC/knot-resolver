@@ -8,6 +8,8 @@ check: all tests
 clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 	tests-clean doc-clean bench-clean
 doc: doc-html
+lint:
+	luacheck --codes .
 .PHONY: all install check clean doc info
 
 # Options
