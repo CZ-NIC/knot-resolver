@@ -279,18 +279,29 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
+static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt);
 
 /** function for .produce phase */
 int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
-	struct kr_cache *cache = &req->ctx->cache;
 
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || qry->flags.NO_CACHE
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state; /* Already resolved/failed or already tried, etc. */
 	}
+	int ret = cache_peek_real(ctx, pkt);
+	kr_cache_sync(&req->ctx->cache);
+	return ret;
+}
+
+static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
+{
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+	struct kr_cache *cache = &req->ctx->cache;
+
 	/* ATM cache only peeks for qry->sname and that would be useless
 	 * to repeat on every iteration, so disable it from now on.
 	 * LATER(optim.): assist with more precise QNAME minimization. */
