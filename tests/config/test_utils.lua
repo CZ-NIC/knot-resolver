@@ -28,3 +28,24 @@ function contains(table, value)
 	end
 	return false
 end
+
+-- Emulate busted testing interface
+local assert_builtin = assert
+assert = setmetatable({}, {
+	__call = function (_, ...)
+		return assert_builtin(...)
+	end,
+	__index = {
+		truthy = function (expr)
+			assert_builtin(expr)
+		end,
+		falsy = function (expr)
+			assert_builtin(not expr)
+		end,
+		same = function (a, b)
+			if a ~= b then
+				assert_builtin(false, string.format('expected: %s got: %s', a, b))
+			end
+		end,
+	}
+})
