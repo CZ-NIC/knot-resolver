@@ -12,7 +12,7 @@ tests_config := \
 
 define make_config_test
 test-config-$(1): tests/config/$(1)/test.cfg check-install-precond
-	@$(preload_syms) $(DEBUGGER) ./tests/config/runtest.sh $(abspath $(SBINDIR)/kresd) $(1)
+	@$(preload_syms) ./tests/config/runtest.sh $(abspath $(SBINDIR)/kresd) $(1)
 .PHONY: test-$(1)
 endef
 
