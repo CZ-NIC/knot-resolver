@@ -39,7 +39,7 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "C compiler", "*all*", "*(build only)* [#]_"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "hexdump or xxd", "``daemon``", "*(build only)*"
-   "libknot_ 2.3.1+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
+   "libknot_ 2.4.0+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
    "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
 

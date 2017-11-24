@@ -11,16 +11,16 @@ local view = {
 }
 
 -- @function View based on TSIG key name.
-function view.tsig(view, tsig, policy)
-	view.key[tsig] = policy
+function view.tsig(_, tsig, rules)
+	view.key[tsig] = rules
 end
 
 -- @function View based on source IP subnet.
-function view.addr(view, subnet, policy, dst)
+function view.addr(_, subnet, rules, dst)
 	local subnet_cd = ffi.new('char[16]')
 	local family = C.kr_straddr_family(subnet)
 	local bitlen = C.kr_straddr_subnet(subnet_cd, subnet)
-	local t = {family, subnet_cd, bitlen, policy}
+	local t = {family, subnet_cd, bitlen, rules}
 	table.insert(dst and view.dst or view.src, t)
 	return t
 end
@@ -31,7 +31,7 @@ local function match_subnet(family, subnet, bitlen, addr)
 end
 
 -- @function Find view for given request
-local function evaluate(view, req)
+local function evaluate(_, req)
 	local client_key = req.qsource.key
 	local match_cb = (client_key ~= nil) and view.key[client_key:owner()] or nil
 	-- Search subnets otherwise

@@ -6,6 +6,7 @@
 # Check return code of kresd. Passed test have to call quit().
 
 tests_config := \
+	basic \
 	hints \
 	predict
 

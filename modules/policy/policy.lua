@@ -1,5 +1,4 @@
 local kres = require('kres')
-local bit = require('bit')
 local ffi = require('ffi')
 
 local todname = kres.str2dname -- not available during module load otherwise
@@ -43,7 +42,7 @@ end
 -- String address@port -> sockaddr.
 local function addr2sock(target)
 	local addr, port = addr_split_port(target)
-	sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port), ffi.C.free);
+	local sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port), ffi.C.free);
 	if sock == nil then
 		error("target '"..target..'" is not a valid IP address')
 	end
@@ -135,7 +134,7 @@ end
 
 -- Set and clear some query flags
 local function flags(opts_set, opts_clear)
-	return function(state, req)
+	return function(_, req)
 		local qry = req:current()
 		ffi.C.kr_qflags_set  (qry.flags, kres.mk_qflags(opts_set   or {}))
 		ffi.C.kr_qflags_clear(qry.flags, kres.mk_qflags(opts_clear or {}))
@@ -154,7 +153,7 @@ end
 local dname_localhost = todname('localhost.')
 
 -- Rule for localhost. zone; see RFC6303, sec. 3
-local function localhost(state, req)
+local function localhost(_, req)
 	local qry = req:current()
 	local answer = req.answer
 	ffi.C.kr_pkt_make_auth_header(answer)
@@ -186,7 +185,7 @@ local dname_rev4_localhost_apex = todname('127.in-addr.arpa');
 -- Answer with locally served minimal 127.in-addr.arpa domain, only having
 -- a PTR record in 1.0.0.127.in-addr.arpa, and with 1.0...0.ip6.arpa. zone.
 -- TODO: much of this would better be left to the hints module (or coordinated).
-local function localhost_reversed(state, req)
+local function localhost_reversed(_, req)
 	local qry = req:current()
 	local answer = req.answer
 
@@ -244,14 +243,14 @@ local policy = {
 
 -- All requests
 function policy.all(action)
-	return function(req, query) return action end
+	return function(_, _) return action end
 end
 
 -- Requests which QNAME matches given zone list (i.e. suffix match)
 function policy.suffix(action, zone_list)
 	local AC = require('ahocorasick')
 	local tree = AC.create(zone_list)
-	return function(req, query)
+	return function(_, query)
 		local match = AC.match(tree, query:name(), false)
 		if match ~= nil then
 			return action
@@ -264,7 +263,7 @@ end
 function policy.suffix_common(action, suffix_list, common_suffix)
 	local common_len = string.len(common_suffix)
 	local suffix_count = #suffix_list
-	return function(req, query)
+	return function(_, query)
 		-- Preliminary check
 		local qname = query:name()
 		if not string.find(qname, common_suffix, -common_len, true) then
@@ -283,7 +282,7 @@ end
 
 -- Filter QNAME pattern
 function policy.pattern(action, pattern)
-	return function(req, query)
+	return function(_, query)
 		if string.find(query:name(), pattern) then
 			return action
 		end
@@ -306,10 +305,10 @@ local function rpz_parse(action, path)
 	if not parser:open(path) then error(string.format('failed to parse "%s"', path)) end
 	while parser:parse() do
 		local name = ffi.string(parser.r_owner, parser.r_owner_length)
-		local action = ffi.string(parser.r_data, parser.r_data_length)
-		rules[name] = action_map[action]
+		local name_action = ffi.string(parser.r_data, parser.r_data_length)
+		rules[name] = action_map[name_action]
 		-- Warn when NYI
-		if #name > 1 and not action_map[action] then
+		if #name > 1 and not action_map[name_action] then
 			print(string.format('[ rpz ] %s:%d: unsupported policy action', path, tonumber(parser.line_counter)))
 		end
 	end
@@ -320,14 +319,14 @@ end
 local function rpz_zonefile(action, path)
 	local rules = rpz_parse(action, path)
 	collectgarbage()
-	return function(req, query)
+	return function(_, query)
 		local label = query:name()
-		local action = rules[label]
-		while action == nil and string.len(label) > 0 do
+		local rule = rules[label]
+		while rule == nil and string.len(label) > 0 do
 			label = string.sub(label, string.byte(label) + 2)
-			action = rules['\1*'..label]
+			rule = rules['\1*'..label]
 		end
-		return action
+		return rule
 	end
 end
 
@@ -391,10 +390,10 @@ end
 policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
-		return policy.evaluate(policy.rules, req, req:current(), state) or 
+		return policy.evaluate(policy.rules, req, req:current(), state) or
 		       policy.evaluate(policy.special_names, req, req:current(), state) or
 		       state
-	end,	
+	end,
 	finish = function(state, req)
 		req = kres.request_t(req)
 		return policy.evaluate(policy.postrules, req, req:current(), state) or state
@@ -578,7 +577,6 @@ policy.special_names = {
 			todname('arpa.')),
 		count=0
 	},
-	
 }
 
 return policy
