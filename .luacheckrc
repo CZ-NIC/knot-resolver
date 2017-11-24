@@ -74,3 +74,4 @@ files['daemon/lua'].ignore = {'111', '121', '122'}
 -- Tests and scripts can use global variables
 files['scripts'].ignore = {'111', '112', '113'}
 files['tests'].ignore = {'111', '112', '113'}
+files['tests/config/test_utils.lua'].ignore = {'121'}
