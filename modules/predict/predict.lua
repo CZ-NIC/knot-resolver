@@ -16,17 +16,17 @@ local predict = {
 -- Load dependent modules
 if not stats then modules.load('stats') end
 
--- Calculate current epoch (which window fits current time)
-local function current_epoch()
-	if not predict.period or predict.period <= 1 then return nil end
-	return (os.date('%H')*(60/predict.window) +
-		math.floor(os.date('%M')/predict.window)) % predict.period + 1
-end
-
 -- Calculate next sample with jitter [1-2/5 of window]
 local function next_event()
 	local jitter = (predict.window * minute) / 5;
 	return math.random(jitter, 2 * jitter)
+end
+
+-- Calculate current epoch (which window fits current time)
+function predict.epoch()
+	if not predict.period or predict.period <= 1 then return nil end
+	return (os.date('%H')*(60/predict.window) +
+		math.floor(os.date('%M')/predict.window)) % predict.period + 1
 end
 
 -- Resolve queued records and flush the queue
@@ -37,10 +37,13 @@ function predict.drain()
 		worker.resolve(qname, kres.type[qtype], kres.class.IN, 'NO_CACHE')
 		predict.queue[key] = nil
 		deleted = deleted + 1
-		if deleted >= predict.batch then
+		-- Resolve smaller batches at a time
+		if predict.batch > 0 and deleted >= predict.batch then
 			break
 		end
 	end
+	-- Schedule prefetch of another batch if not complete
+	if predict.ev_drain then event.cancel(predict.ev_drain) end
 	predict.ev_drain = nil
 	if deleted > 0 then
 		predict.ev_drain = event.after((predict.window * 3) * sec, predict.drain)
@@ -101,14 +104,13 @@ end
 
 function predict.process()
 	-- Start a new epoch, or continue sampling
-	predict.ev_sample = nil
-	local epoch_now = current_epoch()
+	local epoch_now = predict.epoch()
 	local nr_queued = 0
 
 	-- End of epoch
-	if predict.epoch ~= epoch_now then
+	if predict.current_epoch ~= epoch_now then
 		stats['predict.epoch'] = epoch_now
-		predict.epoch = epoch_now
+		predict.current_epoch = epoch_now
 		-- enqueue records from upcoming epoch
 		nr_queued = enqueue_from_log(predict.log[epoch_now])
 		-- predict next epoch
@@ -128,6 +130,8 @@ function predict.process()
 			predict.ev_drain = event.after(0, predict.drain)
 		end
 	end
+
+	if predict.ev_sample then event.cancel(predict.ev_sample) end
 	predict.ev_sample = event.after(next_event(), predict.process)
 	if stats then
 		stats['predict.queue'] = predict.queue_len
@@ -138,7 +142,7 @@ end
 
 function predict.init()
 	if predict.window > 0 then
-		predict.epoch = current_epoch()
+		predict.current_epoch = predict.epoch()
 		predict.ev_sample = event.after(next_event(), predict.process)
 	end
 end
