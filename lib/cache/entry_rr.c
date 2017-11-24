@@ -23,6 +23,7 @@
 
 int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
 {
+	//const void *data0 = data;
 	assert(data);
 	if (rds && rds->rr_count > 255) {
 		return kr_error(ENOSPC);
@@ -38,6 +39,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
 		memcpy(data, knot_rdata_data(rd), len);
 		data += len;
 	}
+	//return data - data0;
 	return kr_ok();
 }
 

@@ -133,7 +133,7 @@ int entry_h_splice(
 			ret = entry_h_len(val_orig_entry);
 			if (ret >= 0) {
 				val_orig_entry.len = ret;
-				eh_orig = entry_h_consistent(val_orig_entry, type);
+				eh_orig = entry_h_consistent(val_orig_entry, ktype);
 				if (eh_orig) {
 					break;
 				}
@@ -144,6 +144,8 @@ int entry_h_splice(
 			val_orig_entry.len = 0;
 			break;
 		};
+		assert(val_orig_entry.data + val_orig_entry.len
+			<= val_orig_all.data + val_orig_all.len);
 	}
 
 	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {

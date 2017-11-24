@@ -74,13 +74,6 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 		return;
 	}
 
-	/* For now we stash the full packet byte-exactly as it came from upstream. */
-	const uint16_t pkt_size = pkt->size;
-	knot_db_val_t val_new_entry = {
-		.data = NULL,
-		.len = offsetof(struct entry_h, data) + sizeof(pkt_size) + pkt->size,
-	};
-
 	/* Compute rank.  If cd bit is set or we got answer via non-validated
 	 * forwarding, make the rank bad; otherwise it depends on flags.
 	 * TODO: probably make validator attempt validation even with +cd. */
@@ -121,6 +114,12 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	}
 	key = key_exact_type_maypkt(k, pkt_type);
 
+	/* For now we stash the full packet byte-exactly as it came from upstream. */
+	const uint16_t pkt_size = pkt->size;
+	knot_db_val_t val_new_entry = {
+		.data = NULL,
+		.len = offsetof(struct entry_h, data) + sizeof(pkt_size) + pkt->size,
+	};
 	/* Prepare raw memory for the new entry and fill it. */
 	struct kr_cache *cache = &req->ctx->cache;
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, pkt_type,
@@ -164,6 +163,7 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	pkt->size = pkt_len;
 	int ret = knot_pkt_parse(pkt, 0);
 	if (ret != KNOT_EOK) {
+		assert(!ret);
 		return kr_error(ret);
 	}
 	knot_wire_set_id(pkt->wire, msgid);

@@ -288,6 +288,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || qry->flags.NO_CACHE
+	    || qry->stype == KNOT_RRTYPE_RRSIG /* LATER: some other behavior for this STYPE? */
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state; /* Already resolved/failed or already tried, etc. */
 	}
@@ -296,6 +297,9 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return ret;
 }
 
+/**
+ * \note we don't transition to KR_STATE_FAIL even in case of  "unexpected errors".
+ */
 static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
@@ -317,7 +321,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	int ret = kr_dname_lf(k->buf, qry->sname, false);
 	if (ret) {
-		return KR_STATE_FAIL;
+		return ctx->state;
 	}
 
 	const uint8_t lowest_rank = get_lowest_rank(req, qry);
@@ -325,9 +329,6 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/** 1. find the name or the closest (available) zone, not considering wildcards
 	 *  1a. exact name+type match (can be negative answer in insecure zones)
 	 */
-	if (qry->stype == KNOT_RRTYPE_RRSIG) {
-		return ctx->state; /* LATER: some other behavior for this STYPE? */
-	}
 	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
 	knot_db_val_t val = { };
 	ret = cache_op(cache, read, &key, &val, 1);
@@ -386,7 +387,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 #if 0
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
-		if (ret) return KR_STATE_FAIL;
+		if (ret) return ctx->state;
 		assert(!qry->zone_cut.parent);
 
 		//VERBOSE_MSG(qry, "=> using root hints\n");
@@ -399,7 +400,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * a negative proof or we may query upstream from that point. */
 	kr_zonecut_set(&qry->zone_cut, k->zname);
 	ret = kr_make_query(qry, pkt); // TODO: probably not yet - qname minimization
-	if (ret) return KR_STATE_FAIL;
+	if (ret) return ctx->state;
 
 	/* Note: up to here we can run on any cache backend,
 	 * without touching the code. */
@@ -855,7 +856,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 	int ret = kr_dname_lf(k->buf, name, false);
 	if (ret) {
 		kr_log_verbose("ERROR!\n");
-		return KR_STATE_FAIL;
+		return kr_error(ret);
 	}
 
 	knot_db_val_t key = key_exact_type(k, type);
