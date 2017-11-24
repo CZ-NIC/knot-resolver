@@ -25,8 +25,8 @@ Usage: %s [-vdh46D] [-c class] [-t type]
     -h          show this usage help.]],
     arg[0]))
 	return rc
-	
 end
+
 -- Parse CLI arguments
 if #arg < 1 then
 	return help(1)
@@ -76,7 +76,7 @@ if #qtypes == 0 then
 	qtypes = {'A', 'AAAA', 'MX'}
 end
 -- Assemble config/query
-for i, qtype in ipairs(qtypes) do
+for _, qtype in ipairs(qtypes) do
 	query = string.format('-t %s -c %s %s', qtype, qclass, qname)
 	capture = string.format([[
 	local qname = "%s"

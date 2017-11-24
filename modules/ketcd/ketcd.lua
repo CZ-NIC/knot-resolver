@@ -4,7 +4,7 @@ local ketcd = {}
 -- @function update subtree configuration
 local function update_subtree(tree)
 	if not tree then return end
-	for i,k in pairs(tree) do
+	for _, k in pairs(tree) do
 		if k.dir then
 			update_subtree(k.nodes)
 		else
@@ -18,20 +18,19 @@ end
 
 -- @function reload whole configuration
 function ketcd.reload()
-	local ketcd = _G['ketcd']
 	local res, err = ketcd.cli:readdir('/', true)
 	if err then
 		error(err)
 	end
-	update_subtree(res.body.node.nodes)	
+	update_subtree(res.body.node.nodes)
 end
 
-function ketcd.init(module)
+function ketcd.init()
 	ketcd.Etcd = require('etcd.luasocket')
 	ketcd.defaults = { prefix = '/kresd' }
 end
 
-function ketcd.deinit(module)
+function ketcd.deinit()
 	if ketcd.ev then event.cancel(ketcd.ev) end
 end
 
@@ -43,7 +42,7 @@ function ketcd.config(conf)
 	-- create connection
 	local cli, err = ketcd.Etcd.new(options)
 	if err then
-		error(err) 
+		error(err)
 	end
 	ketcd.cli = cli
 	-- schedule recurrent polling

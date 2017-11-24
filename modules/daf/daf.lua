@@ -105,7 +105,7 @@ local function parse_query(g)
 	if type(action) == 'function' then
 		action = action(g)
 	end
-	return actid, action, filter 
+	return actid, action, filter
 end
 
 -- Compile a rule described by query language
@@ -157,7 +157,7 @@ function M.add(rule)
 			return filter(req, qry) and action
 		end
 	else
-		p = function (req, qry)
+		p = function ()
 			return action
 		end
 	end
@@ -174,7 +174,7 @@ end
 
 -- @function Remove a rule
 function M.del(id)
-	for i, r in ipairs(M.rules) do
+	for _, r in ipairs(M.rules) do
 		if r.rule.id == id then
 			policy.del(id)
 			table.remove(M.rules, id)
@@ -185,7 +185,7 @@ end
 
 -- @function Find a rule
 function M.get(id)
-	for i, r in ipairs(M.rules) do
+	for _, r in ipairs(M.rules) do
 		if r.rule.id == id then
 			return r
 		end
@@ -194,7 +194,7 @@ end
 
 -- @function Enable/disable a rule
 function M.toggle(id, val)
-	for i, r in ipairs(M.rules) do
+	for _, r in ipairs(M.rules) do
 		if r.rule.id == id then
 			r.rule.suspended = not val
 			return true
@@ -203,10 +203,10 @@ function M.toggle(id, val)
 end
 
 -- @function Enable/disable a rule
-function M.disable(id, val)
+function M.disable(id)
 	return M.toggle(id, false)
 end
-function M.enable(id, val)
+function M.enable(id)
 	return M.toggle(id, true)
 end
 
@@ -295,7 +295,7 @@ local function getmatches()
 end
 
 -- @function Publish DAF statistics
-local function publish(h, ws)
+local function publish(_, ws)
 	local cqueues = require('cqueues')
 	local ok, last = true, nil
 	while ok do
@@ -323,7 +323,7 @@ local function publish(h, ws)
 end
 
 -- @function Configure module
-function M.config(conf)
+function M.config()
 	if not http or not http.endpoints then return end
 	-- Export API and data publisher
 	http.endpoints['/daf.js'] = http.page('daf.js', 'daf')
