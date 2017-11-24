@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/bash -e
 export TMP_RUNDIR="$(mktemp -d)"
 function finish {
   rm -rf "${TMP_RUNDIR}"
