@@ -1,5 +1,5 @@
 -- Listen on localhost
-if not next(net.list()) and not env.TEST then
+if not next(net.list()) and not env.KRESD_NO_LISTEN then
 	local ok, err = pcall(net.listen, '127.0.0.1')
 	if not ok then
 		error('bind to 127.0.0.1@53 '..err)
