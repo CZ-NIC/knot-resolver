@@ -73,8 +73,7 @@ deckard:linux:amd64:valgrind:
 test:linux:amd64:valgrind:
   stage: test
   script:
-    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
-    - TMPDIR=$(pwd) PREFIX=$(pwd)/.local DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
+    - TMPDIR=$(pwd) PREFIX=$(pwd)/.local DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
   dependencies:
     - build:linux:amd64
   tags:
