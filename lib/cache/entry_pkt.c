@@ -70,7 +70,23 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 				& (PKT_NODATA|PKT_NXDOMAIN);
 	const bool want_pkt = qry->flags.DNSSEC_BOGUS
 		|| (is_negative && (qry->flags.DNSSEC_INSECURE || !qry->flags.DNSSEC_WANT));
-	if (!want_pkt || !knot_wire_get_aa(pkt->wire)) {
+
+	/* TMP: also stash packets that contain an NSEC3.
+	 * To be removed when aggressive NSEC3 works. */
+	bool with_nsec3 = false;
+	if (!want_pkt && qry->flags.DNSSEC_WANT && !qry->flags.DNSSEC_BOGUS
+	    && !qry->flags.DNSSEC_INSECURE) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		for (unsigned k = 0; k < sec->count; ++k) {
+			if (knot_pkt_rr(sec, k)->type == KNOT_RRTYPE_NSEC3) {
+				with_nsec3 = true;
+				VERBOSE_MSG(qry, "NSEC3 found\n");
+				break;
+			}
+		}
+	}
+
+	if (!(want_pkt || with_nsec3) || !knot_wire_get_aa(pkt->wire)) {
 		return;
 	}
 
@@ -90,6 +106,8 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 			kr_rank_set(&rank, KR_RANK_INSECURE);
 		} else if (!qry->flags.DNSSEC_WANT) {
 			/* no TAs at all, leave _RANK_AUTH */
+		} else if (with_nsec3) {
+			// FIXME: not optimal, but safer choice and possibly OK for now.
 		} else assert(false);
 	}
 

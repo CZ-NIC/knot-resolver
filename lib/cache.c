@@ -190,8 +190,11 @@ struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 				|| eh->has_dname);
 		break;
 	default:
+		/* doesn't hold, because of temporary NSEC3 packet caching
 		if (eh->is_packet)
 			ok = ok && !kr_rank_test(eh->rank, KR_RANK_SECURE);
+		*/
+		break;
 	}
 
 	//LATER: rank sanity
