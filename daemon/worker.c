@@ -989,7 +989,27 @@ static int session_tls_hs_cb(struct session *session, int status)
 {
 	VERBOSE_MSG(NULL, "=> server: '%s' TLS handshake has %s\n",
 		    kr_straddr(&session->peer.ip), status ? "failed" : "completed");
+
+	struct worker_ctx *worker = get_worker();
+	union inaddr *peer = &session->peer;
+	int deletion_res = worker_del_tcp_waiting(worker, &peer->ip);
+
 	if (status == 0) {
+		if (deletion_res != 0) {
+			/* session isn't in list of waiting queries, *
+			 * something gone wrong */
+			while (session->waiting.len > 0) {
+				struct qr_task *task = session->waiting.at[0];
+				session_del_tasks(session, task);
+				array_del(session->waiting, 0);
+				qr_task_finalize(task, KR_STATE_FAIL);
+				qr_task_unref(task);
+			}
+			assert(session->tasks.len == 0);
+			session_close(session);
+			return kr_ok();
+		}
+
 		int ret = session_next_waiting_send(session);
 		if (ret == kr_ok()) {
 			struct worker_ctx *worker = get_worker();
@@ -1024,23 +1044,8 @@ static void on_connect(uv_connect_t *req, int status)
 		return;
 	}
 
-	if (worker_del_tcp_waiting(worker, &peer->ip) != 0) {
-		/* session isn't in list of waiting queries, *
-		 * something gone wrong */
-		while (session->waiting.len > 0) {
-			struct qr_task *task = session->waiting.at[0];
-			session_del_tasks(session, task);
-			array_del(session->waiting, 0);
-			qr_task_finalize(task, KR_STATE_FAIL);
-			qr_task_unref(task);
-		}
-		assert(session->tasks.len == 0);
-		iorequest_release(worker, req);
-		session_close(session);
-		return;
-	}
-
 	if (status != 0) {
+		worker_del_tcp_waiting(worker, &peer->ip);
 		while (session->waiting.len > 0) {
 			struct qr_task *task = session->waiting.at[0];
 			session_del_tasks(session, task);
@@ -1053,6 +1058,26 @@ static void on_connect(uv_connect_t *req, int status)
 		iorequest_release(worker, req);
 		session_close(session);
 		return;
+	}
+
+	if (!session->has_tls) {
+		/* if there is a TLS, session still waiting for handshake,
+		 * otherwise remove it from waiting list */
+		if (worker_del_tcp_waiting(worker, &peer->ip) != 0) {
+			/* session isn't in list of waiting queries, *
+			 * something gone wrong */
+			while (session->waiting.len > 0) {
+				struct qr_task *task = session->waiting.at[0];
+				session_del_tasks(session, task);
+				array_del(session->waiting, 0);
+				qr_task_finalize(task, KR_STATE_FAIL);
+				qr_task_unref(task);
+			}
+			assert(session->tasks.len == 0);
+			iorequest_release(worker, req);
+			session_close(session);
+			return;
+		}
 	}
 
 	WITH_VERBOSE {
@@ -1825,17 +1850,41 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		 * @warning Do not modify task if this is outgoing request
 		 * as it is shared with originator.
 		 */
+		WITH_VERBOSE {
+			char addr_str[INET6_ADDRSTRLEN];
+			inet_ntop(session->peer.ip.sa_family, kr_inaddr(&session->peer.ip),
+				  addr_str, sizeof(addr_str));
+			VERBOSE_MSG(NULL, "=> connection to '%s' closed by peer\n", addr_str);
+		}
+
 		uv_timer_t *timer = &session->timeout;
 		uv_timer_stop(timer);
 		struct sockaddr *peer = &session->peer.ip;
 		worker_del_tcp_connected(worker, peer);
 		session->connected = false;
+
+		if (session->tls_client_ctx) {
+			/* Avoid gnutls_bye() call */
+			tls_client_set_hs_state(session->tls_client_ctx,
+						TLS_HS_NOT_STARTED);
+		}
+
 		while (session->waiting.len > 0) {
 			struct qr_task *task = session->waiting.at[0];
 			array_del(session->waiting, 0);
 			assert(task->refs > 1);
 			session_del_tasks(session, task);
 			if (session->outgoing) {
+				if (task->ctx->req.options.FORWARD) {
+					/* We are in TCP_FORWARD mode.
+					 * To prevent failing at kr_resolve_consume()
+					 * qry.flags.TCP must be cleared.
+					 * TODO - refactoring is needed. */
+					struct kr_request *req = &task->ctx->req;
+					struct kr_rplan *rplan = &req->rplan;
+					struct kr_query *qry = array_tail(rplan->pending);
+					qry->flags.TCP = false;
+				}
 				qr_task_step(task, NULL, NULL);
 			} else {
 				assert(task->ctx->source.session == session);
@@ -1846,6 +1895,12 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		while (session->tasks.len > 0) {
 			struct qr_task *task = session->tasks.at[0];
 			if (session->outgoing) {
+				if (task->ctx->req.options.FORWARD) {
+					struct kr_request *req = &task->ctx->req;
+					struct kr_rplan *rplan = &req->rplan;
+					struct kr_query *qry = array_tail(rplan->pending);
+					qry->flags.TCP = false;
+				}
 				qr_task_step(task, NULL, NULL);
 			} else {
 				assert(task->ctx->source.session == session);

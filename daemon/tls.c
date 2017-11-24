@@ -971,6 +971,15 @@ tls_client_hs_state_t tls_client_get_hs_state(const struct tls_client_ctx_t *ctx
 	return ctx->handshake_state;
 }
 
+int tls_client_set_hs_state(struct tls_client_ctx_t *ctx, tls_client_hs_state_t state)
+{
+	if (state >= TLS_HS_LAST) {
+		return kr_error(EINVAL);
+	}
+	ctx->handshake_state = state;
+	return kr_ok();
+}
+
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
 			      const struct tls_client_paramlist_entry *entry)
 {

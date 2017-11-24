@@ -45,7 +45,8 @@ struct tls_client_paramlist_entry {
 typedef enum tls_client_hs_state {
 	TLS_HS_NOT_STARTED = 0,
 	TLS_HS_IN_PROGRESS,
-	TLS_HS_DONE
+	TLS_HS_DONE,
+	TLS_HS_LAST
 } tls_client_hs_state_t;
 
 typedef int (*tls_handshake_cb) (struct session *session, int status);
@@ -108,6 +109,8 @@ void tls_client_close(struct tls_client_ctx_t *ctx);
 int tls_client_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt);
 
 tls_client_hs_state_t tls_client_get_hs_state(const struct tls_client_ctx_t *ctx);
+
+int tls_client_set_hs_state(struct tls_client_ctx_t *ctx, tls_client_hs_state_t state);
 
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
 			      const struct tls_client_paramlist_entry *entry);
