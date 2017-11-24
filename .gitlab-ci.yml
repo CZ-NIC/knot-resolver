@@ -36,6 +36,16 @@ test:linux:amd64:
     - linux
     - amd64
 
+installcheck:linux:amd64:
+  stage: test
+  script:
+    - PREFIX=$(pwd)/.local make -k installcheck
+  dependencies:
+    - build:linux:amd64
+  tags:
+    - docker
+    - linux
+    - amd64
 
 deckard:linux:amd64:
   stage: test
@@ -48,6 +58,16 @@ deckard:linux:amd64:
     - linux
     - amd64
 
+installcheck:valgrind:linux:amd64:
+  stage: test
+  script:
+    - DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" PREFIX=$(pwd)/.local make -k installcheck
+  dependencies:
+    - build:linux:amd64
+  tags:
+    - docker
+    - linux
+    - amd64
 
 # temporarily disabled - we need to fix issues first
 #deckard:linux:amd64:valgrind:
