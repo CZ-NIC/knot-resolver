@@ -5,11 +5,11 @@ local M = {} -- the module
 
 function M.config()
 	policy.add(policy.suffix(policy.FLAGS('NO_0X20'), {
-	--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0003.md
+		--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0003.md
 		todname('avqs.mcafee.com'), todname('avts.mcafee.com'),
 
-	--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0006.md
-	--  Obtained via a reverse search on {ns1,ns3}.panthercdn.com.
+		--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0006.md
+		--  Obtained via a reverse search on {ns1,ns3}.panthercdn.com.
 		todname('cdnga.com'), todname('cdngc.com'), todname('cdngd.com'),
 		todname('cdngl.com'), todname('cdngm.com'),
 		todname('cdngc.net'), todname('panthercdn.com'),
@@ -22,7 +22,7 @@ end
 -- Just listing the *.in-addr.arpa suffixes would be tedious, as there are many.
 M.layer = {
 	produce = function (state, req)
-		local req = kres.request_t(req)
+		req = kres.request_t(req)
 		local qry = req:current()
 		if qry.stype ~= kres.type.PTR
 			or bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0

@@ -71,9 +71,9 @@ local pages = {
 local function serve_root()
 	local data = pgload('main.tpl')[2]
 	data = data
-	        :gsub('{{ title }}', title or ('kresd @ ' .. hostname()))
+	        :gsub('{{ title }}', M.title or ('kresd @ ' .. hostname()))
 	        :gsub('{{ host }}', hostname())
-	return function (h, stream)
+	return function (_, stream)
 		-- Render snippets
 		local rsnippets = {}
 		for _,v in pairs(M.snippets) do
@@ -289,7 +289,7 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 		end
 		-- Check loaded certificate
 		if not crt or not key then
-			panic('failed to load certificate "%s" - %s', crtfile, err or 'error')
+			panic('failed to load certificate "%s"', crtfile)
 		end
 	end
 	-- Compose server handler
@@ -311,7 +311,7 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 	if crt and ephemeral then
 		local _, expiry = crt:getLifetime()
 		expiry = math.max(0, expiry - (os.time() - 3 * 24 * 3600))
-		event.after(expiry, function (ev)
+		event.after(expiry, function ()
 			log('[http] refreshed ephemeral certificate')
 			crt, key = updatecert(crtfile, keyfile)
 			s.ctx = tlscontext(crt, key)

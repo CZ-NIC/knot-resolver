@@ -26,13 +26,13 @@ local function getstats()
 	return t
 end
 
-local function snapshot_end(h, ws)
+local function snapshot_end()
 	snapshots_count = false
 end
 
 -- Function to sort frequency list
-local function snapshot_start(h, ws)
-	local ok, prev = true, getstats()
+local function snapshot_start()
+	local prev = getstats()
 	while snapshots_count do
 		local is_empty = true
 		-- Get current snapshot
@@ -66,7 +66,13 @@ local function snapshot_start(h, ws)
 		local wdata = {}
 		for _, info in pairs(map 'worker.info()') do
 			if type(info) == 'table' then
-				wdata[tostring(info.pid)] = {rss=info.rss, usertime=info.usertime, systime=info.systime, pagefaults=info.pagefaults, queries=info.queries}
+				wdata[tostring(info.pid)] = {
+					rss = info.rss,
+					usertime = info.usertime,
+					systime = info.systime,
+					pagefaults = info.pagefaults,
+					queries = info.queries
+				}
 			end
 		end
 		-- Publish stats updates periodically
@@ -82,7 +88,7 @@ local function snapshot_start(h, ws)
 end
 
 -- Function to sort frequency list
-local function stream_stats(h, ws)
+local function stream_stats(_, ws)
 	-- Initially, stream history
 	local ok, last = true, nil
 	local batch = {}
