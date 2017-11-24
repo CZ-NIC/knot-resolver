@@ -1,4 +1,4 @@
-image: cznic/ci-debian-kresd
+image: cznic/ci-debian-kresd:beta
 
 variables:
   DEBIAN_FRONTEND: noninteractive
@@ -16,6 +16,14 @@ build:linux:amd64:
     - docker
     - linux
     - amd64
+
+lint:lua:
+  stage: test
+  dependencies: []  # do not download build artifacts
+  script:
+    - make lint
+  tags:
+    - docker
 
 test:linux:amd64:
   stage: test
