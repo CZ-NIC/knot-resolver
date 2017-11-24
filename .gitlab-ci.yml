@@ -49,25 +49,26 @@ deckard:linux:amd64:
     - amd64
 
 
-deckard:linux:amd64:valgrind:
-  stage: test
-  script:
-    - export PREFIX=$(pwd)/.local
-    - export LD_LIBRARY_PATH=$PREFIX/lib
-    - export TMPDIR=$(pwd)
-    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
-    - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd -f 1" MAKEFLAGS="-j $(nproc) --keep-going" make
-  artifacts:
-    when: on_failure
-    expire_in: 1 week
-    paths:
-      - tmpdeckard*
-  dependencies:
-    - build:linux:amd64
-  tags:
-    - docker
-    - linux
-    - amd64
+# temporarily disabled - we need to fix issues first
+#deckard:linux:amd64:valgrind:
+#  stage: test
+#  script:
+#    - export PREFIX=$(pwd)/.local
+#    - export LD_LIBRARY_PATH=$PREFIX/lib
+#    - export TMPDIR=$(pwd)
+#    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
+#    - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd -f 1" MAKEFLAGS="-j $(nproc) --keep-going" make
+#  artifacts:
+#    when: on_failure
+#    expire_in: 1 week
+#    paths:
+#      - tmpdeckard*
+#  dependencies:
+#    - build:linux:amd64
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
 
 
 test:linux:amd64:valgrind:
