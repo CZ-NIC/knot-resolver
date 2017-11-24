@@ -457,6 +457,11 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
+	/* Name of the closest (provable) encloser. */
+	const knot_dname_t *clencl_name = qry->sname;
+	for (int l = sname_labels; l > clencl_labels; --l)
+		clencl_name = knot_wire_next_label(clencl_name, NULL);
+
 	/** 3. source of synthesis checks, in case sname was covered.
 	 *
 	 * 3a. We want to query for NSEC* of source of synthesis (SS) or its predecessor,
@@ -467,7 +472,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(ans.nsec_v == 1); // for now
 
 	} else if (ans.nsec_v == 1 && ans.rcode == PKT_NXDOMAIN) {
-		int ret = nsec1_src_synth(k, &ans, sname_labels, clencl_labels,
+		int ret = nsec1_src_synth(k, &ans, clencl_name,
 					  cover_low_kwz, cover_hi_kwz, qry, cache);
 		if (ret < 0) return ctx->state;
 		if (ret == AR_SOA) goto do_soa;
@@ -483,11 +488,46 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * (common for NSEC*)
 	 */
 	if (ans.rcode == PKT_NOERROR) {
-		//TODO LATER(wild): positive wildcard answers
-		return ctx->state;
 		/* Construct key for exact qry->stype + source of synthesis. */
-		/* Find the record and put it into answer. */
-		/* Possibly reuse/generalize (parts of) found_exact_hit(). */
+		int ret = kr_dname_lf(k->buf, clencl_name, true);
+		if (ret) return ctx->state;
+		knot_db_val_t key = key_exact_type(k, qry->stype);
+		/* Find the record. */
+		knot_db_val_t val = { };
+		ret = cache_op(cache, read, &key, &val, 1);
+		if (ret) {
+			if (ret != -abs(ENOENT)) {
+				VERBOSE_MSG(qry, "=> wildcard: hit error %d %s\n",
+						ret, strerror(abs(ret)));
+				assert(false);
+			}
+			WITH_VERBOSE {
+				VERBOSE_MSG(qry, "=> wildcard: not found: ");
+				kr_dname_print(clencl_name, "*.", "\n");
+			}
+			return ctx->state;
+		}
+		ret = entry_h_seek(&val, qry->stype);
+		if (ret) return ctx->state;
+		/* Check if the record is OK. */
+		const struct entry_h *eh = entry_h_consistent(val, qry->stype);
+		if (!eh) {
+			assert(false);
+			return ctx->state;
+			// LATER: recovery in case of error, perhaps via removing the entry?
+		}
+		int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
+			/* Wildcard record with stale TTL, bad rank or packet.  */
+			VERBOSE_MSG(qry, "=> wildcard: skipping %s, rank 0%0.2o, new TTL %d\n",
+					eh->is_packet ? "packet" : "RR", eh->rank, new_ttl);
+			return ctx->state;
+		}
+		/* Add the RR into the answer. */
+		const void *eh_bound = val.data + val.len;
+		ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
+				   qry->sname, qry->stype, new_ttl);
+		if (ret) return ctx->state;
 	}
 
 
@@ -506,8 +546,7 @@ do_soa:
 			VERBOSE_MSG(qry, "=> SOA missed\n");
 			return ctx->state;
 		}
-		void *eh_data_bound = val.data + val.len;
-
+		/* Check if the record is OK. */
 		int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
 		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 			VERBOSE_MSG(qry, "=> SOA unfit %s: ",
@@ -516,6 +555,8 @@ do_soa:
 					eh->rank, new_ttl);
 			return ctx->state;
 		}
+		/* Add the SOA into the answer. */
+		void *eh_data_bound = val.data + val.len;
 		ret = entry2answer(&ans, AR_SOA, eh, eh_data_bound,
 				   k->zname, KNOT_RRTYPE_SOA, new_ttl);
 		if (ret) return ctx->state;
@@ -526,6 +567,7 @@ do_soa:
 	int real_rcode;
 	switch (ans.rcode) {
 	case PKT_NODATA:
+	case PKT_NOERROR: /* positive wildcarded response */
 		real_rcode = KNOT_RCODE_NOERROR;
 		break;
 	case PKT_NXDOMAIN:
@@ -706,7 +748,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 		key = key_NSEC1(k, encloser, wild_labels);
 		break;
 	default:
-		ret = kr_dname_lf(k->buf, rr->owner, wild_labels);
+		ret = kr_dname_lf(k->buf, encloser, wild_labels);
 		if (ret) {
 			assert(!ret);
 			return kr_error(ret);
@@ -757,7 +799,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 	WITH_VERBOSE {
 		VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, ", entry->rank);
 		kr_rrtype_print(rr->type, "", " ");
-		kr_dname_print(rr->owner, "", " ");
+		kr_dname_print(encloser, wild_labels ? "*." : "", " ");
 		kr_log_verbose("(%d B total, incl. %d RRSIGs)\n",
 				(int)val_new_entry.len,
 				(int)(rr_sigs ? rr_sigs->rrs.rr_count : 0)
@@ -819,7 +861,6 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		// LATER: recovery in case of error, perhaps via removing the entry?
 		// LATER(optim): pehaps optimize the zone cut search
 	}
-	const void *eh_bound = val.data + val.len;
 
 	int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
@@ -832,6 +873,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		return kr_error(ENOENT);
 	}
 
+	const void *eh_bound = val.data + val.len;
 	if (eh->is_packet) {
 		/* Note: we answer here immediately, even if it's (theoretically)
 		 * possible that we could generate a higher-security negative proof.

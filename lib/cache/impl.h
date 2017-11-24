@@ -216,8 +216,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 /** Source of synthesis check for NSEC (1).
  * To understand the interface, see the call point.
  * \return 0: continue;  AR_SOA: skip to adding SOA;  <0: exit cache immediately. */
-int nsec1_src_synth(struct key *k, struct answer *ans,
-		    const int sname_labels, int clencl_labels,
+int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
 		    const struct kr_query *qry, struct kr_cache *cache);
 

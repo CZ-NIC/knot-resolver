@@ -338,16 +338,12 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 }
 
 
-int nsec1_src_synth(struct key *k, struct answer *ans,
-		    const int sname_labels, int clencl_labels,
+int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
 		    const struct kr_query *qry, struct kr_cache *cache)
 {
 	/* Construct key for the source of synthesis. */
-	const knot_dname_t *ss_name = qry->sname;
-	for (int l = sname_labels; l > clencl_labels; --l)
-		ss_name = knot_wire_next_label(ss_name, NULL);
-	knot_db_val_t key = key_NSEC1(k, ss_name, true);
+	knot_db_val_t key = key_NSEC1(k, clencl_name, true);
 	const size_t nwz_off = key_nwz_off(k);
 	if (!key.data || key.len < nwz_off) {
 		assert(false);
