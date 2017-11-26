@@ -9,7 +9,19 @@ clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 	tests-clean doc-clean bench-clean
 doc: doc-html
 lint:
-	luacheck --codes .
+	luacheck --codes --formatter TAP .
+coverage: $(wildcard */*/luacov.stats.out)
+	@echo "# C coverage in gcov.c.info"
+	@lcov --no-external --capture --directory . --output-file gcov.c.info > /dev/null
+	@if [ ! -z "$^" ]; then \
+		echo "# Lua coverage in luacov.stats.out and gcov.lua.info"; \
+		cat $^ > luacov.stats.out; \
+		./scripts/luacov_to_info.lua $^ > gcov.lua.info; \
+		lcov --add-tracefile gcov.c.info --add-tracefile gcov.lua.info --output-file gcov.total.info; \
+	else \
+		lcov --add-tracefile gcov.c.info --output-file gcov.total.info; \
+	fi
+
 .PHONY: all install check clean doc info
 
 # Options
