@@ -4,6 +4,7 @@ variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
   GIT_SUBMODULE_STRATEGY: recursive
+  COVERAGE: '1'
 
 build:linux:amd64:
   stage: build
@@ -29,8 +30,13 @@ test:linux:amd64:
   stage: test
   script:
     - PREFIX=$(pwd)/.local make -k check
+    - make coverage-c COVERAGE_STAGE=gcov-check
   dependencies:
     - build:linux:amd64
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - ./*.info
   tags:
     - docker
     - linux
@@ -40,8 +46,13 @@ installcheck:linux:amd64:
   stage: test
   script:
     - PREFIX=$(pwd)/.local make -k installcheck
+    - make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck
   dependencies:
     - build:linux:amd64
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - ./*.info
   tags:
     - docker
     - linux
@@ -51,8 +62,13 @@ deckard:linux:amd64:
   stage: test
   script:
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
+    - make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
   dependencies:
     - build:linux:amd64
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - ./*.info
   tags:
     - docker
     - linux
@@ -123,6 +139,20 @@ respdiff:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+  tags:
+    - docker
+    - linux
+    - amd64
+
+coverage:linux:amd64:
+  stage: deploy
+  script:
+    - make coverage
+  coverage: '/lines\.+:\s(\d+.\d+\%)/'
+  dependencies:
+    - test:linux:amd64
+    - installcheck:linux:amd64
+    - deckard:linux:amd64
   tags:
     - docker
     - linux

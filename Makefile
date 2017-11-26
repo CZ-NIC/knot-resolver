@@ -10,17 +10,14 @@ clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 doc: doc-html
 lint: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 	luacheck --codes --formatter TAP .
-coverage: $(wildcard */*/luacov.stats.out)
-	@echo "# C coverage in gcov.c.info"
-	@lcov --no-external --capture --directory . --output-file gcov.c.info > /dev/null
-	@if [ ! -z "$^" ]; then \
-		echo "# Lua coverage in luacov.stats.out and gcov.lua.info"; \
-		cat $^ > luacov.stats.out; \
-		./scripts/luacov_to_info.lua $^ > gcov.lua.info; \
-		lcov --add-tracefile gcov.c.info --add-tracefile gcov.lua.info --output-file gcov.total.info; \
-	else \
-		lcov --add-tracefile gcov.c.info --output-file gcov.total.info; \
-	fi
+coverage-c:
+	@echo "# C coverage in $(COVERAGE_STAGE).c.info"
+	@$(LCOV) --no-external --capture --directory . --output-file $(COVERAGE_STAGE).c.info > /dev/null
+coverage-lua: $(wildcard */*/luacov.stats.out)
+	@echo "# Lua coverage in $(COVERAGE_STAGE).lua.info"
+	@if [ ! -z "$^" ]; then ./scripts/luacov_to_info.lua $^ > $(COVERAGE_STAGE).lua.info; fi
+coverage:
+	@$(LCOV) $(addprefix --add-tracefile ,$(wildcard $(COVERAGE_STAGE)*.info)) --output-file coverage.info
 
 .PHONY: all install check clean doc info
 
