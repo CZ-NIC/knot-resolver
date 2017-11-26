@@ -171,9 +171,8 @@ ifneq (,$(findstring luajit, $(lua_LIBS)))
 endif
 endif
 
-# Check if it has libknot 2.3.0 and nettle to support DNS cookies
-$(eval $(call find_alt,knot230,libknot,2.3))
-ifeq ($(HAS_nettle)|$(HAS_knot230),yes|yes)
+# Check if it has nettle to support DNS cookies
+ifeq ($(HAS_nettle), yes)
 BUILD_CFLAGS += -DENABLE_COOKIES
 ENABLE_COOKIES := yes
 endif
