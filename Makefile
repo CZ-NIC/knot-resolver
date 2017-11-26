@@ -8,7 +8,7 @@ check: all tests
 clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 	tests-clean doc-clean bench-clean
 doc: doc-html
-lint:
+lint: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 	luacheck --codes --formatter TAP .
 coverage: $(wildcard */*/luacov.stats.out)
 	@echo "# C coverage in gcov.c.info"
