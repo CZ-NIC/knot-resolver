@@ -1,18 +1,16 @@
-function fail(fmt, ...)
-	io.stderr:write(string.format(fmt..'\n', ...))
-	os.exit(2)
-end
+local M = {}
 
-function test(f, ...)
+function M.test(f, ...)
 	local res, exception = pcall(f, ...)
 	if not res then
 		local trace = debug.getinfo(2)
-		fail('%s:%d %s', trace.source, trace.currentline, exception)
+		io.stderr:write(string.format('%s:%d %s\n', trace.source, trace.currentline, exception))
+		os.exit(2)
 	end
 	return res
 end
 
-function table_keys_to_lower(table)
+function M.table_keys_to_lower(table)
 	local res = {}
 	for k, v in pairs(table) do
 		res[k:lower()] = v
@@ -20,32 +18,24 @@ function table_keys_to_lower(table)
 	return res
 end
 
-function contains(table, value)
+local function contains(pass, fail, table, value, message)
+	message = message or string.format('table contains "%s"', value)
 	for _, v in pairs(table) do
 		if v == value then
-			return true
+			pass(message)
+			return
 		end
 	end
-	return false
+	fail(message)
+	return
 end
 
--- Emulate busted testing interface
-local assert_builtin = assert
-assert = setmetatable({}, {
-	__call = function (_, ...)
-		return assert_builtin(...)
-	end,
-	__index = {
-		truthy = function (expr)
-			assert_builtin(expr)
-		end,
-		falsy = function (expr)
-			assert_builtin(not expr)
-		end,
-		same = function (a, b)
-			if a ~= b then
-				assert_builtin(false, string.format('expected: %s got: %s', a, b))
-			end
-		end,
-	}
-})
+function M.contains(table, value, message)
+	return contains(pass, fail, table, value, message)
+end
+
+function M.not_contains(table, value, message)
+	return contains(fail, pass, table, value, message)
+end
+
+return M
