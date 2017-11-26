@@ -8,7 +8,7 @@ local function test_default()
 	-- get loaded root hints and change names to lowercase
 	hints_data = utils.table_keys_to_lower(hints.root())
 
-	-- root hints loaded from default location 
+	-- root hints loaded from default location
 	-- check correct ip address of a.root-server.net
 	utils.contains(hints_data['a.root-servers.net.'], '198.41.0.4', 'has IP address for a.root-servers.net.')
 end
@@ -24,8 +24,10 @@ local function test_custom()
 	isnt(hints_data['a.root-servers.net.'], nil, 'can retrieve root hints')
 
 	-- check loaded ip address of a.root-server.net
-	utils.not_contains(hints_data['a.root-servers.net.'], '198.41.0.4', 'real IP address for a.root-servers.net. is replaced')
-	utils.contains(hints_data['a.root-servers.net.'], '10.0.0.1', 'real IP address for a.root-servers.net. is correct')
+	utils.not_contains(hints_data['a.root-servers.net.'], '198.41.0.4',
+		'real IP address for a.root-servers.net. is replaced')
+	utils.contains(hints_data['a.root-servers.net.'], '10.0.0.1',
+		'real IP address for a.root-servers.net. is correct')
 end
 
 return {
