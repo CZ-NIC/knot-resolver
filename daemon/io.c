@@ -219,6 +219,9 @@ int udp_bindfd(uv_udp_t *handle, int fd)
 static void tcp_timeout_trigger(uv_timer_t *timer)
 {
 	struct session *session = timer->data;
+	struct worker_ctx *worker = timer->loop->data;
+
+	assert(session->outgoing == false);
 	if (session->tasks.len > 0) {
 		uv_timer_again(timer);
 	} else {
@@ -258,7 +261,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		}
 	/* Connection spawned at least one request, reset its deadline for next query.
 	 * https://tools.ietf.org/html/rfc7766#section-6.2.3 */
-	} else if (ret > 0 && !s->outgoing) {
+	} else if (ret > 0 && !s->outgoing && !s->closing) {
 		uv_timer_again(&s->timeout);
 	}
 	mp_flush(worker->pkt_pool.ctx);
