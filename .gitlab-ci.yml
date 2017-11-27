@@ -1,4 +1,4 @@
-image: cznic/ci-debian-kresd:beta
+image: cznic/ci-debian-kresd
 
 variables:
   DEBIAN_FRONTEND: noninteractive
