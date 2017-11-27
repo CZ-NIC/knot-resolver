@@ -32,6 +32,7 @@ typedef struct knot_mm {
 
 typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
+typedef void (*trace_log_f) (const struct kr_query *, const char *, const char *);
 "
 
 ./scripts/gen-cdefs.sh libkres types <<-EOF

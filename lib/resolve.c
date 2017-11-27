@@ -718,6 +718,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	array_init(request->auth_selected);
 	request->answ_validated = false;
 	request->auth_validated = false;
+	request->trace_log = NULL;
 
 	/* Expect first query */
 	kr_rplan_init(&request->rplan, request, &request->pool);
