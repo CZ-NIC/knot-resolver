@@ -1188,40 +1188,46 @@ static int wrk_resolve(lua_State *L)
 	if (!worker) {
 		return 0;
 	}
-	/* Create query packet */
-	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
-	if (!pkt) {
-		lua_pushstring(L, strerror(ENOMEM));
-		lua_error(L);
-	}
+
 	uint8_t dname[KNOT_DNAME_MAXLEN];
 	if (!knot_dname_from_str(dname, lua_tostring(L, 1), sizeof(dname))) {
 		lua_pushstring(L, "invalid qname");
 		lua_error(L);
 	};
+
 	/* Check class and type */
 	uint16_t rrtype = lua_tointeger(L, 2);
 	if (!lua_isnumber(L, 2)) {
 		lua_pushstring(L, "invalid RR type");
 		lua_error(L);
 	}
+
 	uint16_t rrclass = lua_tointeger(L, 3);
 	if (!lua_isnumber(L, 3)) { /* Default class is IN */
 		rrclass = KNOT_CLASS_IN;
 	}
-	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
-	knot_wire_set_rd(pkt->wire);
-	/* Add OPT RR */
-	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
-	if (!pkt->opt_rr) {
-		return kr_error(ENOMEM);
-	}
-	/* Add completion callback */
-	int ret = 0;
+
+	/* Add query options */
 	const struct kr_qflags *options = lua_topointer(L, 4);
 	if (!options) { /* but we rely on the lua wrapper when dereferencing non-NULL */
 		lua_pushstring(L, "invalid options");
 		lua_error(L);
+	}
+
+	/* Create query packet */
+	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
+	if (!pkt) {
+		lua_pushstring(L, strerror(ENOMEM));
+		lua_error(L);
+	}
+	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
+	knot_wire_set_rd(pkt->wire);
+
+	/* Add OPT RR */
+	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
+	if (!pkt->opt_rr) {
+		knot_pkt_free(&pkt);
+		return kr_error(ENOMEM);
 	}
 	if (options->DNSSEC_WANT) {
 		knot_edns_set_do(pkt->opt_rr);
