@@ -4,6 +4,7 @@ contrib_SOURCES := \
 	contrib/ccan/isaac/isaac.c \
 	contrib/ccan/json/json.c \
 	contrib/ucw/mempool.c \
+	contrib/ucw/mempool-fmt.c \
 	contrib/murmurhash3/murmurhash3.c \
 	contrib/base32hex.c \
 	contrib/base64.c

@@ -587,7 +587,7 @@ static void on_timeout(uv_timer_t *req)
 		struct sockaddr_in6 *addrlist = (struct sockaddr_in6 *)task->addrlist;
 		for (uint16_t i = 0; i < MIN(task->pending_count, task->addrlist_count); ++i) {
 			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
-			WITH_VERBOSE {
+			WITH_VERBOSE(qry) {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
 				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);

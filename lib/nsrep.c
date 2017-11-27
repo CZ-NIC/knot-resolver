@@ -375,7 +375,7 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_lru_t *cache)
 		} else {
 			scores[i] = *score;
 		}
-		WITH_VERBOSE {
+		if (VERBOSE_STATUS) {
 			char sa_str[INET6_ADDRSTRLEN];
 			inet_ntop(sa->sa_family, kr_inaddr(sa), sa_str, sizeof(sa_str));
 			kr_log_verbose("[     ][nsre] score %d for %s;\t cached RTT: %d\n",

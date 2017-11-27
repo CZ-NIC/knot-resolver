@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <contrib/cleanup.h>
 #include <libknot/packet/wire.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
@@ -119,10 +120,10 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
 
 		} else if (kr_rank_test(rank_orig, KR_RANK_TRY)) {
-			WITH_VERBOSE {
-				VERBOSE_MSG(qry, ">< failed to validate but skipping: ");
-				kr_rrtype_print(rr->type, "", " ");
-				kr_dname_print(rr->owner, "", "\n");
+			WITH_VERBOSE(qry) {
+				auto_free char *name_text = kr_dname_text(rr->owner);
+				auto_free char *type_text = kr_rrtype_text(rr->type);
+				VERBOSE_MSG(qry, ">< failed to validate but skipping: %s %s\n", name_text, type_text);
 			}
 			vctx->result = kr_ok();
 			kr_rank_set(&entry->rank, KR_RANK_TRY);
@@ -553,10 +554,10 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		VERBOSE_MSG(qry, ">< cut changed (new signer), needs revalidation\n");
 		ret = KR_STATE_YIELD;
 	} else if (kr_rank_test(invalid_entry->rank, KR_RANK_MISSING)) {
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, ">< no valid RRSIGs found for ");
-			kr_rrtype_print(invalid_entry->rr->type, "", " ");
-			kr_dname_print(invalid_entry->rr->owner, "", "\n");
+		WITH_VERBOSE(qry) {
+			auto_free char *name_text = kr_dname_text(invalid_entry->rr->owner);
+			auto_free char *type_text = kr_rrtype_text(invalid_entry->rr->type);
+			VERBOSE_MSG(qry, ">< no valid RRSIGs found for %s %s\n", name_text, type_text);
 		}
 		ret = rrsig_not_found(ctx, rr);
 	} else if (!kr_rank_test(invalid_entry->rank, KR_RANK_SECURE)) {

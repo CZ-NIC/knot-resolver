@@ -21,13 +21,17 @@
 
 #ifndef NOVERBOSELOG
  /** @internal Print a debug message related to resolution. */
- #define QRVERBOSE(query, cls, fmt, ...) WITH_VERBOSE { \
-    unsigned _ind = 0; \
+ #define QRVERBOSE(query, cls, fmt, ...) { \
     const struct kr_query *q = (query); \
-    uint16_t _id = q ? q->id : 0; \
-    for (; q; q = q->parent, _ind += 2); \
-    kr_log_verbose("[%5hu][%s] %*s" fmt, _id, cls, _ind, "", ##  __VA_ARGS__); \
-    }
+    if (kr_log_trace_enabled(q)) { \
+        kr_log_trace(q, cls, fmt, ##  __VA_ARGS__); \
+    } else WITH_VERBOSE(q) { \
+        unsigned _ind = 0; \
+        uint16_t _id = q ? q->id : 0; \
+        for (; q; q = q->parent, _ind += 2); \
+        kr_log_verbose("[%5hu][%s] %*s" fmt, _id, cls, _ind, "", ##  __VA_ARGS__); \
+    } \
+}
 #else
  #define QRVERBOSE(query, cls, fmt, ...)
 #endif
