@@ -93,6 +93,7 @@ struct kr_query {
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
+	struct kr_request *request; /**< Parent resolution request. */
 };
 
 /** @cond internal Array of queries. */
