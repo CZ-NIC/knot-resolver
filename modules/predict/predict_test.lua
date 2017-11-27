@@ -5,7 +5,7 @@ modules = { 'predict' }
 local resolve_count = 0
 local current_epoch = 0
 
-worker.resolve = function ()
+resolve = function ()
 	resolve_count = resolve_count + 1
 end
 

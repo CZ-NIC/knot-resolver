@@ -23,6 +23,7 @@
 
 /** Worker state (opaque). */
 struct worker_ctx;
+struct qr_task;
 /** Worker callback */
 typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, void *baton);
 
@@ -51,6 +52,21 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
  * which may be freely closed afterwards.
  */
 int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
+
+/**
+ * Start query resolution with given query.
+ *
+ * @return task or NULL
+ */
+struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options);
+
+/**
+ * Execute a request with given query.
+ * It expects task to be created with \fn worker_resolve_start.
+ *
+ * @return 0 or an error code
+ */
+int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query);
 
 /**
  * Schedule query for resolution.

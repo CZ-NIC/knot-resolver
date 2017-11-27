@@ -1226,18 +1226,36 @@ static int wrk_resolve(lua_State *L)
 	if (options->DNSSEC_WANT) {
 		knot_edns_set_do(pkt->opt_rr);
 	}
+
+	/* Create task and start with a first question */
+	struct qr_task *task = worker_resolve_start(worker, pkt, *options);
+	if (!task) {
+		knot_rrset_free(&pkt->opt_rr, NULL);
+		knot_pkt_free(&pkt);
+		lua_pushstring(L, "couldn't create a resolution request");
+		lua_error(L);
+	}
+
+	/* Store completion callback in registry */
 	if (lua_isfunction(L, 5)) {
-		/* Store callback in registry */
 		lua_pushvalue(L, 5);
 		int cb = luaL_ref(L, LUA_REGISTRYINDEX);
-		ret = worker_resolve(worker, pkt, *options, resolve_callback, (void *) (intptr_t)cb);
-	} else {
-		ret = worker_resolve(worker, pkt, *options, NULL, NULL);
+		task->on_complete = resolve_callback;
+		task->baton = (void *) (intptr_t)cb;
 	}
-	
+
+	/* Add initialisation callback */
+	if (lua_isfunction(L, 6)) {
+		lua_pushvalue(L, 6);
+		lua_pushlightuserdata(L, &task->req);
+		(void) execute_callback(L, 1);
+	}
+
+	/* Start execution */
+	int ret = worker_resolve_exec(task, pkt);
+	lua_pushboolean(L, ret == 0);
 	knot_rrset_free(&pkt->opt_rr, NULL);
 	knot_pkt_free(&pkt);
-	lua_pushboolean(L, ret == 0);
 	return 1;
 }
 
