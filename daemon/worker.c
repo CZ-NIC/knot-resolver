@@ -57,7 +57,7 @@ struct req
 #define qr_task_ref(task) \
 	do { ++(task)->refs; } while(0)
 #define qr_task_unref(task) \
-	do { if (--(task)->refs == 0) { qr_task_free(task); } } while (0)
+	do { if (task && --(task)->refs == 0) { qr_task_free(task); } } while (0)
 #define qr_valid_handle(task, checked) \
 	(!uv_is_closing((checked)) || (task)->source.handle == (checked))
 
@@ -280,6 +280,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->source.handle = handle;
 	task->timeout = NULL;
 	task->on_complete = NULL;
+	task->baton = NULL;
 	task->req.qsource.key = NULL;
 	task->req.qsource.addr = NULL;
 	task->req.qsource.dst_addr = NULL;
@@ -1037,6 +1038,36 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	return submitted;
 }
 
+struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options)
+{
+	if (!worker || !query) {
+		return NULL;
+	}
+
+	struct qr_task *task = qr_task_create(worker, NULL, NULL);
+	if (!task) {
+		return NULL;
+	}
+
+	int ret = qr_task_start(task, query);
+	if (ret != 0) {
+		qr_task_unref(task);
+		return NULL;
+	}
+
+	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
+	kr_qflags_set(&task->req.options, options);
+	return task;
+}
+
+int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query)
+{
+	if (!task) {
+		return kr_error(EINVAL);
+	}
+	return qr_task_step(task, NULL, query);
+}
+
 int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options,
 		   worker_cb_t on_complete, void *baton)
 {
@@ -1045,23 +1076,15 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflag
 	}
 
 	/* Create task */
-	struct qr_task *task = qr_task_create(worker, NULL, NULL);
+	struct qr_task *task = worker_resolve_start(worker, query, options);
 	if (!task) {
 		return kr_error(ENOMEM);
 	}
+
+	/* Install completion handler */
 	task->baton = baton;
 	task->on_complete = on_complete;
-	/* Start task */
-	int ret = qr_task_start(task, query);
-
-	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
-	kr_qflags_set(&task->req.options, options);
-
-	if (ret != 0) {
-		qr_task_unref(task);
-		return ret;
-	}
-	return qr_task_step(task, NULL, query);
+	return worker_resolve_exec(task, query);
 }
 
 /** Reserve worker buffers */

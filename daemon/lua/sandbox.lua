@@ -23,16 +23,27 @@ end
 
 -- Resolver bindings
 kres = require('kres')
-trust_anchors = require('trust_anchors')
 if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
 
--- Compat. wrapper for query flags.
-worker.resolve = function (p1, p2, p3, options, p5)
+-- Compatibility wrapper for query flags.
+worker.resolve = function (qname, qtype, qclass, options, finish, begin)
+	-- Alternatively use named arguments
+	if type(qname) == 'table' then
+		local t = qname
+		qname = t.name
+		qtype = t.type or kres.type.A
+		qclass = t.class or kres.class.IN
+		options = t.options
+		finish = t.finish
+		begin = t.begin
+	end
+	-- Translate options and resolve
 	options = kres.mk_qflags(options)
-	return worker.resolve_unwrapped (p1, p2, p3, options, p5)
+	return worker.resolve_unwrapped(qname, qtype, qclass, options, finish, begin)
 end
+
 resolve = worker.resolve
 
 -- Shorthand for aggregated per-worker information
@@ -172,7 +183,7 @@ end
 
 -- Make sandboxed environment
 local function make_sandbox(defined)
-	local __protected = { modules = true, cache = true, net = true, trust_anchors = true }
+	local __protected = { worker = true, env = true, modules = true, cache = true, net = true, trust_anchors = true }
 
 	-- Compute and export the list of top-level names (hidden otherwise)
 	local nl = ""
@@ -203,6 +214,7 @@ else -- Lua 5.2+
 end
 
 -- Load embedded modules
+trust_anchors = require('trust_anchors')
 modules.load('ta_signal_query')
 modules.load('priming')
 modules.load('detect_time_skew')
