@@ -21,6 +21,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <contrib/cleanup.h>
+#include <contrib/ccan/asprintf/asprintf.h>
 #include <ccan/isaac/isaac.h>
 #include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
@@ -104,6 +105,28 @@ void kr_log_verbose(const char *fmt, ...)
 		va_end(args);
 		fflush(stdout);
 	}
+}
+
+bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...)
+{
+	if (!kr_log_trace_enabled(query)) {
+		return false;
+	}
+
+	auto_free char *msg = NULL;
+
+	va_list args;
+	va_start(args, fmt);
+	int len = vasprintf(&msg, fmt, args);
+	va_end(args);
+
+	/* Check formatting result before logging */
+	if (len < 0) {
+		return false;
+	}
+
+	query->request->trace_log(query, source, msg);
+	return true;
 }
 
 char* kr_strcatdup(unsigned n, ...)

@@ -36,6 +36,10 @@ struct kr_query;
 /*
  * Logging and debugging.
  */
+
+/** @brief Callback for request logging handler. */
+typedef void *(*trace_log_f)(const struct kr_query *query, const char *source, const char *msg);
+
 #define kr_log_info(fmt, ...) do { printf((fmt), ## __VA_ARGS__); fflush(stdout); } while(0)
 #define kr_log_error(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__)
 
@@ -48,6 +52,20 @@ KR_EXPORT bool kr_verbose_set(bool status);
 
 /** Log a message if in --verbose mode. */
 KR_EXPORT void kr_log_verbose(const char *fmt, ...);
+
+/**
+ * @brief Return true if the query has request log handler installed.
+ */
+#define kr_log_trace_enabled(query) ((query) && (query)->request && (query)->request->trace_log)
+
+/**
+ * Log a message through the request log handler.
+ * @param  query current query
+ * @param  source message source
+ * @param  fmt message format
+ * @return true if the message was logged
+ */
+KR_EXPORT bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...);
 
 #ifdef NOVERBOSELOG
 /* Efficient compile-time disabling of verbose messages. */
