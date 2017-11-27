@@ -14,6 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
@@ -90,8 +91,9 @@ static int insert_ta(map_t *trust_anchors, const knot_dname_t *name,
 		knot_rrset_free(&ta_rr, NULL);
 		return kr_error(ENOMEM);
 	}
-	WITH_VERBOSE {
-		kr_rrset_print(ta_rr, "[ ta ] new state of trust anchors for a domain:\n");
+	if(VERBOSE_STATUS) {
+		auto_free char *rr_text = kr_rrset_text(ta_rr);
+		kr_log_verbose("[ ta ] new state of trust anchors for a domain: %s\n", rr_text);
 	}
 	if (is_new_key) {
 		return map_set(trust_anchors, (const char *)name, ta_rr);
