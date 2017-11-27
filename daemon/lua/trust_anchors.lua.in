@@ -173,7 +173,7 @@ end
 local active_refresh, update -- forwards
 
 -- Plan an event for refreshing the root DNSKEYs and re-scheduling itself
-local function refresh_plan(keyset, delay, priming, is_initial)
+local function refresh_plan(keyset, delay, is_initial)
 	local owner_str = kres.dname2str(keyset.owner) -- maybe fix converting back and forth?
 	keyset.refresh_ev = event.after(delay, function ()
 		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
@@ -184,10 +184,6 @@ local function refresh_plan(keyset, delay, priming, is_initial)
 			log('[ ta ] next refresh for ' .. owner_str .. ' in '
 					.. delay_new/hour .. ' hours')
 			refresh_plan(keyset, delay_new)
-			-- Priming query, prime root NS next
-			if priming ~= nil then
-				resolve(owner_str, kres.type.NS, kres.class.IN)
-			end
 		end)
 	end)
 end
@@ -387,7 +383,7 @@ local add_file = function (path, unmanaged)
 		local keyset = trust_anchors.keysets['\0']
 		keyset.filename = path
 		if keyset.refresh_ev then event.cancel(keyset.refresh_ev) end
-		refresh_plan(keyset, 0, true, true)
+		refresh_plan(keyset, 0, true)
 		return
 	end
 	if not unmanaged and path == (trust_anchors.keysets['\0'] or {}).filename then
@@ -421,7 +417,7 @@ local add_file = function (path, unmanaged)
 		warn('[ ta ] ERROR: anchors are trusted for ' .. owner_str .. ' !')
 		-- TODO: try to rebootstrap?
 	end
-	refresh_plan(keyset, 10 * sec, true, false)
+	refresh_plan(keyset, 10 * sec, false)
 end
 
 
