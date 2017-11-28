@@ -436,6 +436,7 @@ int main(int argc, char **argv)
 	char *moduledir = MODULEDIR;
 	const char *config = NULL;
 	int control_fd = -1;
+	uv_loop_t *loop = NULL;
 
 	/* Long options. */
 	int c = 0, li = 0, ret = 0;
@@ -656,7 +657,7 @@ int main(int argc, char **argv)
 	engine_set_moduledir(&engine, moduledir);
 	
 	/* Block signals. */
-	uv_loop_t *loop = uv_default_loop();
+	loop = uv_default_loop();
 	uv_signal_t sigint, sigterm;
 	uv_signal_init(loop, &sigint);
 	uv_signal_init(loop, &sigterm);
@@ -766,6 +767,9 @@ int main(int argc, char **argv)
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_reclaim(worker);
+	if (loop != NULL) {
+		uv_loop_close(loop);	
+	}
 	mp_delete(pool.ctx);
 	array_clear(addr_set);
 	array_clear(tls_set);
