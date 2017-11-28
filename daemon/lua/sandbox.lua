@@ -204,6 +204,7 @@ end
 
 -- Load embedded modules
 modules.load('ta_signal_query')
+modules.load('priming')
 
 -- Interactive command evaluation
 function eval_cmd(line, raw)

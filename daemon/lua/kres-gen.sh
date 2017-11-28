@@ -89,6 +89,7 @@ printf "\tchar _stub[];\n};\n"
 # Resource records
 	knot_rdata_rdlen
 	knot_rdata_data
+	knot_rdata_array_size
 	knot_rdataset_at
 	knot_rrset_add_rdata
 	knot_rrset_init_empty
@@ -132,6 +133,8 @@ EOF
 	kr_ranked_rrarray_add
 	kr_qflags_set
 	kr_qflags_clear
+	kr_zonecut_add
+	kr_zonecut_set
 # Trust anchors
 	kr_ta_get
 	kr_ta_add
