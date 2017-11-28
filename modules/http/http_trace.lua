@@ -21,8 +21,9 @@ local function serve_trace(h, _)
 
 	-- Create logging handler callback
 	local buffer = {}
-	local buffer_log_cb = ffi.cast('trace_log_f', function (_, source, msg)
-		local message = string.format('%4s | %s', ffi.string(source), ffi.string(msg))
+	local buffer_log_cb = ffi.cast('trace_log_f', function (query, source, msg)
+		local message = string.format('[%5u] [%s] %s',
+			tonumber(query.id), ffi.string(source), ffi.string(msg))
 		table.insert(buffer, message)
 	end)
 
