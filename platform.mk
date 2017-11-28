@@ -8,6 +8,7 @@ CGO := go tool cgo
 GO := go
 CAT := cat
 SED := sed
+LCOV := lcov
 LIBEXT := .so
 AREXT  := .a
 LIBTYPE := shared

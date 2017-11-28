@@ -61,6 +61,7 @@ end
 -- Ignore test files
 exclude_files = {
 	'modules/policy/lua-aho-corasick', -- Vendored
+	'tests/config/tapered',
 }
 
 -- Ignore some pedantic checks
@@ -75,4 +76,4 @@ files['daemon/lua/kres-gen.lua'].ignore = {'631'} -- Allow overly long lines
 -- Tests and scripts can use global variables
 files['scripts'].ignore = {'111', '112', '113'}
 files['tests'].ignore = {'111', '112', '113'}
-files['tests/config/test_utils.lua'].ignore = {'121'}
+files['modules/*/*_test.lua'].ignore = {'111', '112', '113', '122'}

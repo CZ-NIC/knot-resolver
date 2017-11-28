@@ -63,6 +63,7 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
    "libfstrm_ 0.2+", "``modules/dnstap``", "Frame Streams data transport protocol."
    "luacheck_", "``lint``", "Syntax and static analysis checker for Lua."
+   "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
@@ -250,6 +251,12 @@ Building extras
 
 The project can be built with code coverage tracking using the ``COVERAGE=1`` variable.
 
+The `make coverage` target gathers both gcov code coverage for C files, and luacov_ code coverage for Lua files and merges it for analysis. It requires lcov_ to be installed.
+
+.. code-block:: bash
+
+   $ make coverage
+
 Running unit and integration tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -322,5 +329,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _libprotobuf-c: https://github.com/protobuf-c/protobuf-c/wiki
 .. _libfstrm: https://github.com/farsightsec/fstrm
 .. _luacheck: http://luacheck.readthedocs.io
+.. _luacov: https://keplerproject.github.io/luacov/
+.. _lcov: http://ltp.sourceforge.net/coverage/lcov.php
 
 .. _DESTDIR: https://www.gnu.org/prep/standards/html_node/DESTDIR.html

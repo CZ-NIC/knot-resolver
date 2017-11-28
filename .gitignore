@@ -18,6 +18,8 @@
 *.gcno
 *.gcda
 *.gcov
+*.info
+luacov.*.out
 .dirstamp
 .libs
 .deps

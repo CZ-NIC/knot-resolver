@@ -8,8 +8,17 @@ check: all tests
 clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 	tests-clean doc-clean bench-clean
 doc: doc-html
-lint:
-	luacheck --codes .
+lint: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
+	luacheck --codes --formatter TAP .
+coverage-c:
+	@echo "# C coverage in $(COVERAGE_STAGE).c.info"
+	@$(LCOV) --no-external --capture --directory . --output-file $(COVERAGE_STAGE).c.info > /dev/null
+coverage-lua: $(wildcard */*/luacov.stats.out)
+	@echo "# Lua coverage in $(COVERAGE_STAGE).lua.info"
+	@if [ ! -z "$^" ]; then ./scripts/luacov_to_info.lua $^ > $(COVERAGE_STAGE).lua.info; fi
+coverage:
+	@$(LCOV) $(addprefix --add-tracefile ,$(wildcard $(COVERAGE_STAGE)*.info)) --output-file coverage.info
+
 .PHONY: all install check clean doc info
 
 # Options
@@ -41,6 +50,8 @@ $(eval $(call find_lib,libedit))
 $(eval $(call find_lib,libprotobuf-c,1))
 $(eval $(call find_lib,libfstrm,0.2))
 $(eval $(call find_bin,protoc-c))
+$(eval $(call find_bin,lcov))
+$(eval $(call find_bin,luacov))
 
 # Lookup SONAME
 $(eval $(call find_soname,libknot))
@@ -126,6 +137,8 @@ info:
 	$(info [$(HAS_libfstrm)] libfstrm (modules/dnstap))
 	$(info [$(HAS_libprotobuf-c)] libprotobuf-c (modules/dnstap))
 	$(info [$(HAS_protoc-c)] proto-c (modules/dnstap))
+	$(info [$(HAS_lcov)] lcov (code coverage))
+	$(info [$(HAS_luacov)] luacov (code coverage))
 	$(info )
 
 # Verify required dependencies are met, as listed above
@@ -159,9 +172,8 @@ ifneq (,$(findstring luajit, $(lua_LIBS)))
 endif
 endif
 
-# Check if it has libknot 2.3.0 and nettle to support DNS cookies
-$(eval $(call find_alt,knot230,libknot,2.3))
-ifeq ($(HAS_nettle)|$(HAS_knot230),yes|yes)
+# Check if it has nettle to support DNS cookies
+ifeq ($(HAS_nettle), yes)
 BUILD_CFLAGS += -DENABLE_COOKIES
 ENABLE_COOKIES := yes
 endif

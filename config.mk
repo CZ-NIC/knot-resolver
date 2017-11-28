@@ -20,6 +20,7 @@ INCLUDEDIR ?= $(PREFIX)/include
 MODULEDIR ?= $(LIBDIR)/kdns_modules
 ETCDIR ?= $(PREFIX)/etc/kresd
 ROOTHINTS ?= $(ETCDIR)/root.hints
+COVERAGE_STAGE ?= gcov
 
 # Tools
 CC      ?= cc
