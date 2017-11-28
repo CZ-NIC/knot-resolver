@@ -50,6 +50,8 @@ $(eval $(call find_lib,libedit))
 $(eval $(call find_lib,libprotobuf-c,1))
 $(eval $(call find_lib,libfstrm,0.2))
 $(eval $(call find_bin,protoc-c))
+$(eval $(call find_bin,lcov))
+$(eval $(call find_bin,luacov))
 
 # Lookup SONAME
 $(eval $(call find_soname,libknot))
@@ -135,6 +137,8 @@ info:
 	$(info [$(HAS_libfstrm)] libfstrm (modules/dnstap))
 	$(info [$(HAS_libprotobuf-c)] libprotobuf-c (modules/dnstap))
 	$(info [$(HAS_protoc-c)] proto-c (modules/dnstap))
+	$(info [$(HAS_lcov)] lcov (code coverage))
+	$(info [$(HAS_luacov)] luacov (code coverage))
 	$(info )
 
 # Verify required dependencies are met, as listed above
