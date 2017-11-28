@@ -85,6 +85,7 @@ The HTTP module has several built-in services to use.
  "``/stats``", "Statistics/metrics", "Exported metrics in JSON."
  "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_"
  "``/feed``", "Most frequent queries", "List of most frequent queries in JSON."
+  "``/trace/:name/:type``", "Tracking", "Trace resolution of the query and return the verbose logs."
 
 Enabling Prometheus metrics endpoint
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -107,6 +108,30 @@ You can use it out of the box:
 	latency_count 2.000000
 	latency_sum 11.000000
 
+Tracing requests
+^^^^^^^^^^^^^^^^
+
+With the ``/trace`` endpoint you can trace various aspects of the request execution.
+The basic mode allows you to resolve a query and trace verbose logs (and messages received):
+
+.. code-block:: bash
+
+   $ curl http://localhost:8080/trace/e.root-servers.net
+   iter | 'e.root-servers.net.' type 'A' created outbound query, parent id 0
+    rc  | => rank: 020, lowest 020, e.root-servers.net. A
+    rc  | => satisfied from cache
+   iter | <= answer received:
+   ;; ->>HEADER<<- opcode: QUERY; status: NOERROR; id: 14771
+   ;; Flags: qr aa  QUERY: 1; ANSWER: 0; AUTHORITY: 0; ADDITIONAL: 0
+
+   ;; QUESTION SECTION
+   e.root-servers.net.		A
+
+   ;; ANSWER SECTION
+   e.root-servers.net. 	3599821	A	192.203.230.10
+
+   iter | <= rcode: NOERROR
+   resl | finished: 4, queries: 1, mempool: 81952 B
 
 How to expose services over HTTP
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
