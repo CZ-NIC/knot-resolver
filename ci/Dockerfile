@@ -11,6 +11,10 @@ RUN apt-get upgrade -y -qqq
 # Knot and Knot Resolver dependecies
 RUN apt-get install -y -qqq make cmake pkg-config git build-essential bsdmainutils libtool autoconf make pkg-config liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev pkg-config libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http
 
+# Optional dependencies (http)
+RUN apt-get install luarocks -y -qqq
+RUN luarocks install --server=http://luarocks.org/dev http
+
 # Python packags required for Deckard CI
 # Python: grab latest versions from PyPi
 # (dnspython and Augeas binding in Debian packages are slow and buggy)
@@ -42,7 +46,6 @@ RUN wget https://raw.githubusercontent.com/LuaJIT/LuaJIT/v2.0.4/src/lj.supp -O /
 # TODO: rebuild LuaJIT with Valgrind support
 
 # Lua lint for kresd CI
-RUN apt-get install luarocks -y -qqq
 RUN luarocks install luacheck
 
 # respdiff for kresd CI
