@@ -104,6 +104,13 @@ for k, v in pairs(prometheus.endpoints) do
 end
 M.prometheus = prometheus
 
+-- Export built-in trace interface
+local http_trace = require('http_trace')
+for k, v in pairs(http_trace.endpoints) do
+	M.endpoints[k] = v
+end
+M.trace = http_trace
+
 -- Export HTTP service page snippets
 M.snippets = {}
 
@@ -138,6 +145,7 @@ local function serve(h, stream)
 		-- Serve content type appropriately
 		hsend:append(':status', '200')
 		hsend:append('content-type', mime)
+		hsend:append('content-length', tostring(#data))
 		local ttl = entry and entry[4]
 		if ttl then
 			hsend:append('cache-control', string.format('max-age=%d', ttl))
@@ -296,14 +304,18 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 	local routes = route(endpoints)
 	-- Create TLS context and start listening
 	local s, err = http_server.listen {
-		cq = cq;
+		cq = cq,
 		host = host,
 		port = port,
 		client_timeout = 5,
 		ctx = crt and tlscontext(crt, key),
-		onstream = routes;
+		onstream = routes,
 	}
-	if not s then
+	-- Manually call :listen() so that we are bound before calling :localname()
+	if s then
+		err = select(2, s:listen())
+	end
+	if err then
 		panic('failed to listen on %s@%d: %s', host, port, err)
 	end
 	table.insert(M.servers, s)
@@ -364,8 +376,8 @@ function M.config(conf)
 		-- Reschedule timeout or create new one
 		local timeout = cq:timeout()
 		if timeout then
-			-- Throttle web requests
-			if timeout == 0 then timeout = 0.001 end
+			-- Throttle web requests (at most 100000 req/s)
+			if timeout == 0 then timeout = 0.00001 end
 			-- Convert from seconds to duration
 			timeout = timeout * sec
 			if not M.timeout then
