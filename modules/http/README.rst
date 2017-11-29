@@ -26,11 +26,15 @@ for starters?
 	-- Load HTTP module with defaults
 	modules = {
 		http = {
-			host = 'localhost',
-			port = 8053,
+			host = 'localhost', -- Default: 'localhost'
+			port = 8053,        -- Default: 8053
 			geoip = 'GeoLite2-City.mmdb' -- Optional, see
 			-- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
 			-- and install mmdblua library
+			reuseport = true,   -- Set SO_REUSEPORT, default: true
+			reuseaddr = nil,    -- Set SO_REUSEADDR, default: not set
+			v6only = nil,       -- Disable IPv6/IPv4 dualstack, default: not set
+			client_timeout = 5, -- Client I/O timeout (seconds), default: 5
 		}
 	}
 
@@ -49,8 +53,6 @@ Major drawback is that current browsers won't do HTTP/2 over insecure connection
 .. code-block:: lua
 
 	http = {
-		host = 'localhost',
-		port = 8053,
 		cert = false,
 	}
 
@@ -59,8 +61,6 @@ If you want to provide your own certificate and key, you're welcome to do so:
 .. code-block:: lua
 
 	http = {
-		host = 'localhost',
-		port = 8053,
 		cert = 'mycert.crt',
 		key  = 'mykey.key',
 	}
@@ -249,10 +249,18 @@ Services exposed in the previous part share the same external interface. This me
 
 .. code-block:: lua
 
-	http.interface('127.0.0.1', 8080, {
-		['/conf'] = {'application/json', function (h, stream) print('configuration API') end},
-		['/private'] = {'text/html', static_page},
-	})
+	http.add_interface {
+		endpoints = {
+			['/conf'] = {
+				'application/json', function (h, stream)
+					return 'configuration API\n'
+				end
+			},
+		},
+		-- Same options as the config() method
+		host = 'localhost',
+		port = '8054',
+	}
 
 This way you can have different internal-facing and external-facing services at the same time.
 

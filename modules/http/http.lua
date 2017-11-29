@@ -1,9 +1,6 @@
 -- Load dependent modules
 if not stats then modules.load('stats') end
 
--- This is leader-only module
-if worker.id > 0 then return {} end
-
 -- This is a module that does the heavy lifting to provide an HTTP/2 enabled
 -- server that supports TLS by default and provides endpoint for other modules
 -- in order to enable them to export restful APIs and websocket streams.
@@ -116,12 +113,12 @@ M.snippets = {}
 
 -- Serve known requests, for methods other than GET
 -- the endpoint must be a closure and not a preloaded string
-local function serve(h, stream)
+local function serve(h, stream, endpoints)
 	local hsend = http_headers.new()
 	local path = h:get(':path')
-	local entry = M.endpoints[path]
+	local entry = endpoints[path]
 	if not entry then -- Accept top-level path match
-		entry = M.endpoints[path:match '^/[^/]*']
+		entry = endpoints[path:match '^/[^/]*']
 	end
 	-- Unpack MIME and data
 	local mime, data, err
@@ -182,9 +179,9 @@ local function route(endpoints)
 			ws:close()
 			return
 		else
-			local ok, err, reason = http_util.yieldable_pcall(serve, h, stream)
+			local ok, err, reason = http_util.yieldable_pcall(serve, h, stream, endpoints)
 			if not ok or err then
-				if err ~= '404' then
+				if err ~= '404' and debug() then
 					log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
 				end
 				-- Method is not supported
@@ -272,42 +269,51 @@ local function updatecert(crtfile, keyfile)
 end
 
 -- @function Listen on given HTTP(s) host
-function M.interface(host, port, endpoints, crtfile, keyfile)
+function M.add_interface(conf)
 	local crt, key, ephemeral
-	if crtfile ~= false then
+	if conf.crtfile ~= false then
 		-- Check if the cert file exists
-		if not crtfile then
-			crtfile = 'self.crt'
-			keyfile = 'self.key'
+		if not conf.crtfile then
+			conf.crtfile = 'self.crt'
+			conf.keyfile = 'self.key'
 			ephemeral = true
 		else error('certificate provided, but missing key') end
 		-- Read or create self-signed x509 certificate
-		local f = io.open(crtfile, 'r')
+		local f = io.open(conf.crtfile, 'r')
 		if f then
 			crt = assert(x509.new(f:read('*all')))
 			f:close()
 			-- Continue reading key file
 			if crt then
-				f = io.open(keyfile, 'r')
+				f = io.open(conf.keyfile, 'r')
 				key = assert(pkey.new(f:read('*all')))
 				f:close()
 			end
 		elseif ephemeral then
-			crt, key = updatecert(crtfile, keyfile)
+			crt, key = updatecert(conf.crtfile, conf.keyfile)
 		end
 		-- Check loaded certificate
 		if not crt or not key then
-			panic('failed to load certificate "%s"', crtfile)
+			panic('failed to load certificate "%s"', conf.crtfile)
 		end
 	end
 	-- Compose server handler
-	local routes = route(endpoints)
+	local routes = route(conf.endpoints or M.endpoints)
+	-- Enable SO_REUSEPORT by default (unless explicitly turned off)
+	local reuseport = (conf.reuseport ~= nil) and conf.reuseport or true
+	if not reuseport and worker.id > 0 then
+		warn('[http] the "reuseport" option is disabled and multiple forks are used, ' ..
+			 'port binding will fail on some instances')
+	end
 	-- Create TLS context and start listening
 	local s, err = http_server.listen {
 		cq = cq,
-		host = host,
-		port = port,
-		client_timeout = 5,
+		host = conf.host or 'localhost',
+		port = conf.port or 8053,
+		v6only = conf.v6only,
+		reuseaddr = conf.reuseaddr,
+		reuseport = reuseport,
+		client_timeout = conf.client_timeout or 5,
 		ctx = crt and tlscontext(crt, key),
 		onstream = routes,
 	}
@@ -316,7 +322,7 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 		err = select(2, s:listen())
 	end
 	if err then
-		panic('failed to listen on %s@%d: %s', host, port, err)
+		panic('failed to listen on %s@%d: %s', conf.host, conf.port, err)
 	end
 	table.insert(M.servers, s)
 	-- Create certificate renewal timer if ephemeral
@@ -325,7 +331,7 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 		expiry = math.max(0, expiry - (os.time() - 3 * 24 * 3600))
 		event.after(expiry, function ()
 			log('[http] refreshed ephemeral certificate')
-			crt, key = updatecert(crtfile, keyfile)
+			crt, key = updatecert(conf.crtfile, conf.keyfile)
 			s.ctx = tlscontext(crt, key)
 		end)
 	end
@@ -362,8 +368,6 @@ function M.config(conf)
 	if conf == true then conf = {} end
 	assert(type(conf) == 'table', 'config { host = "...", port = 443, cert = "...", key = "..." }')
 	-- Configure web interface for resolver
-	if not conf.port then conf.port = 8053 end
-	if not conf.host then conf.host = 'localhost' end
 	if conf.geoip then
 		if has_mmdb then
 			M.geoip = mmdb.open(conf.geoip)
@@ -371,7 +375,7 @@ function M.config(conf)
 			error('[http] mmdblua library not found, please remove GeoIP configuration')
 		end
 	end
-	M.interface(conf.host, conf.port, M.endpoints, conf.cert, conf.key)
+	M.add_interface(conf)
 	-- TODO: configure DNS/HTTP(s) interface
 	if M.ev then return end
 	-- Schedule both I/O activity notification and timeouts
