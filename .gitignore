@@ -48,7 +48,6 @@ _obj
 /doc/html
 /daemon/kresd
 /daemon/lua/*.inc
-/daemon/lua/kres.lua
 /daemon/lua/trust_anchors.lua
 /daemon/lua/zonefile.lua
 /tests/test_array
@@ -67,3 +66,4 @@ libkres.amalg.c
 /libkres.pc
 /modules/version/version.lua
 /tags
+/coverage
