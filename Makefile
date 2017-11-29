@@ -12,14 +12,15 @@ lint: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 	luacheck --codes --formatter TAP .
 coverage-c:
 	@echo "# C coverage in $(COVERAGE_STAGE).c.info"
-	@$(LCOV) --no-external --capture --directory . --output-file $(COVERAGE_STAGE).c.info > /dev/null
+	@$(LCOV) --no-external --capture -d lib -d daemon -d modules -o $(COVERAGE_STAGE).c.info > /dev/null
 coverage-lua: $(wildcard */*/luacov.stats.out)
 	@echo "# Lua coverage in $(COVERAGE_STAGE).lua.info"
 	@if [ ! -z "$^" ]; then ./scripts/luacov_to_info.lua $^ > $(COVERAGE_STAGE).lua.info; fi
 coverage:
 	@$(LCOV) $(addprefix --add-tracefile ,$(wildcard $(COVERAGE_STAGE)*.info)) --output-file coverage.info
+	@$(GENHTML) -q --ignore-errors source -o coverage -p $(realpath $(CURDIR)) -t "Knot DNS Resolver $(VERSION)-$(PLATFORM) coverage report" --legend coverage.info
 
-.PHONY: all install check clean doc info
+.PHONY: all install check clean doc info coverage
 
 # Options
 ifdef COVERAGE
