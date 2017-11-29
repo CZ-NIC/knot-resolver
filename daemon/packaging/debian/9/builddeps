@@ -1,0 +1,9 @@
+make
+pkg-config
+libknot-dev
+gcc
+g++
+libluajit-5.1-dev
+libuv1-dev
+liblmdb-dev
+bsdmainutils
