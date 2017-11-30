@@ -228,9 +228,9 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 	}
 
 	/* Find the query, it will likely be on top */
-	for (size_t i = rplan->pending.len; i --> 0;) {
-		if (rplan->pending.at[i] == qry) {
-			array_del(rplan->pending, i);
+	for (size_t i = rplan->pending.len; i > 0; i--) {
+		if (rplan->pending.at[i - 1] == qry) {
+			array_del(rplan->pending, i - 1);
 			array_push(rplan->resolved, qry);
 			break;
 		}
