@@ -153,6 +153,26 @@ local const_rcode = {
 	BADCOOKIE  = 23,
 }
 
+-- This corresponds to `enum kr_rank`, it's not possible to do this without introspection unfortunately
+local const_rank = {
+	INITIAL = 0,
+	OMIT = 1,
+	TRY = 2,
+	INDET = 4,
+	BOGUS = 5,
+	MISMATCH = 6,
+	MISSING = 7,
+	INSECURE = 8,
+	AUTH = 16,
+	SECURE = 32
+}
+
+-- Create inverse table
+local const_rank_tostring = {}
+for k, v in pairs(const_rank) do
+	const_rank_tostring[v] = k
+end
+
 -- Metatype for RR types to allow anonymous types
 setmetatable(const_type, {
 	__index = function (t, k)
@@ -185,6 +205,7 @@ local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
 	-- beware: `owner` and `rdata` are typed as a plain lua strings
 	--         and not the real types they represent.
+	__tostring = function(rr) return rr:txt_dump() end,
 	__index = {
 		owner = function(rr) return ffi.string(rr._owner, knot.knot_dname_size(rr._owner)) end,
 		ttl = function(rr) return tonumber(knot.knot_rrset_ttl(rr)) end,
@@ -319,6 +340,30 @@ ffi.metatype( kr_request_t, {
 	},
 })
 
+-- C array iterator
+local function c_array_iter(t, i)
+	i = i + 1
+	if i >= t.len then return end
+	return i, t.at[i][0]
+end
+
+-- Metatype for ranked record array
+local ranked_rr_array_t = ffi.typeof('ranked_rr_array_t')
+ffi.metatype(ranked_rr_array_t, {
+	__len = function(self)
+		return tonumber(self.len)
+	end,
+	__ipairs = function (self)
+		return c_array_iter, self, -1
+	end,
+	__index = {
+		get = function (self, i)
+			if i < 0 or i > self.len then return nil end
+			return self.at[i][0]
+		end,
+	}
+})
+
 -- Pretty print for domain name
 local function dname2str(dname)
 	return ffi.string(ffi.gc(C.knot_dname_to_str(nil, dname, 0), C.free))
@@ -357,6 +402,8 @@ kres = {
 	type = const_type,
 	section = const_section,
 	rcode = const_rcode,
+	rank = const_rank,
+	rank_tostring = const_rank_tostring,
 
 	-- Create a struct kr_qflags from a single flag name or a list of names.
 	mk_qflags = function (names)

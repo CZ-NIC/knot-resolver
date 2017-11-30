@@ -1,5 +1,31 @@
 local ffi = require('ffi')
+local bit = require('bit')
 local condition = require('cqueues.condition')
+
+-- Buffer selected record information to a table
+local function add_selected_records(dst, records)
+	for _, rec in ipairs(records) do
+		local rank = rec.rank
+		-- Separate the referral chain verified flag
+		local verified = bit.band(rec.rank, kres.rank.AUTH)
+		if verified then
+			rank = bit.band(rank, bit.bnot(kres.rank.AUTH))
+		end
+		local rank_name = kres.rank_tostring[rank] or tostring(rank)
+		-- Write out each individual RR
+		for rr in tostring(rec.rr):gmatch('[^\n]+\n?') do
+			local row = string.format('cached: %s, rank: %s, record: %s',
+				rec.cached, rank_name:lower(), rr)
+			table.insert(dst, row)
+		end
+	end
+end
+
+local function format_selected_records(header, records)
+	if #records == 0 then return '' end
+	return string.format('%s\n%s\n', header, string.rep('-', #header))
+	       .. table.concat(records, '') .. '\n'
+end
 
 -- Trace execution of DNS queries
 local function serve_trace(h, _)
@@ -34,6 +60,7 @@ local function serve_trace(h, _)
 	local done = false
 
 	-- Resolve query and buffer logs into table
+	local answers, authority = {}, {}
 	resolve {
 		name = qname,
 		type = qtype,
@@ -42,7 +69,10 @@ local function serve_trace(h, _)
 			req = kres.request_t(req)
 			req.trace_log = buffer_log_cb
 		end,
-		finish = function ()
+		finish = function (_, req)
+			req = kres.request_t(req)
+			add_selected_records(answers, req.answ_selected)
+			add_selected_records(authority, req.auth_selected)
 			cond:signal()
 			done = true
 		end
@@ -56,8 +86,11 @@ local function serve_trace(h, _)
 	end
 	buffer_log_cb:free()
 
-	-- Return buffered data
+	-- Build the result
 	local result = table.concat(buffer, '') .. '\n'
+	               .. format_selected_records('Used records from answer:', answers)
+	               .. format_selected_records('Used records from authority:', authority)
+	-- Return buffered data
 	if not done then
 		return 504, result
 	end
