@@ -1,0 +1,10 @@
+bash
+bsdmainutils
+coreutils
+gdb
+git
+luajit
+pkg-config
+sed
+tar
+xz
