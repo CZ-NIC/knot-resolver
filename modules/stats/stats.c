@@ -197,9 +197,7 @@ static int collect(kr_layer_t *ctx)
 	if (rplan->resolved.len > 0) {
 		/* Histogram of answer latency. */
 		struct kr_query *first = rplan->resolved.at[0];
-		struct timeval now;
-		gettimeofday(&now, NULL);
-		long elapsed = time_diff(&first->timestamp, &now);
+		uint64_t elapsed = kr_now() - first->timestamp_mono;
 		if (elapsed <= 1) {
 			stat_const_add(data, metric_answer_1ms, 1);
 		} else if (elapsed <= 10) {

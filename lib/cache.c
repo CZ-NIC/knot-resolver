@@ -50,6 +50,13 @@ static inline int cache_purge(struct kr_cache *cache)
 	return cache_op(cache, clear);
 }
 
+/** @internal Set time when clearing cache. */
+static void reset_time(struct kr_cache *cache)
+{
+	cache->last_clear_monotime = kr_now();
+	gettimeofday(&cache->last_clear_timestamp, NULL);
+}
+
 /** @internal Open cache db transaction and check internal data version. */
 static int assert_right_version(struct kr_cache *cache)
 {

@@ -805,3 +805,8 @@ void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *po
 	kr_rrtype_print(qry->stype, " ", postfix);
 }
 
+uint64_t kr_now()
+{
+	return uv_now(uv_default_loop());
+}
+

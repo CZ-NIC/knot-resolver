@@ -15,6 +15,7 @@
  */
 
 #include <ctype.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <assert.h>
@@ -791,10 +792,9 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 	}
 
 	/* Calculate total resolution time from the time the query was generated. */
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	long elapsed = time_diff(&qry->timestamp, &now);
-
+	uint64_t elapsed = kr_now() - qry->timestamp_mono;
+	elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
+ 
 	/* NSs in the preference list prior to the one who responded will be penalised
 	 * with the RETRY timer interval. This is because we know they didn't respond
 	 * for N retries, so their RTT must be at least N * RETRY.
@@ -812,7 +812,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 			WITH_VERBOSE {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "<= server: '%s' rtt: %ld ms\n", addr_str, elapsed);
+				VERBOSE_MSG(qry, "<= server: '%s' rtt: "PRIu64" ms\n", addr_str, elapsed);
 			}
 		} else {
 			/* Response didn't come from this IP, but we know the RTT must be at least
@@ -824,7 +824,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 			 WITH_VERBOSE {
 			 	char addr_str[INET6_ADDRSTRLEN];
 			 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "<= server: '%s' rtt: >=%ld ms\n", addr_str, elapsed);
+				VERBOSE_MSG(qry, "<= server: '%s' rtt: >="PRIu64" ms\n", addr_str, elapsed);
 			 }
 		}
 		/* Subtract query start time from elapsed time */
@@ -861,16 +861,16 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	}
 }
 
-bool check_resolution_time(struct kr_query *qry, struct timeval *now)
+bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
 {
-	long resolving_time = time_diff(&qry->creation_time, now);
+	uint64_t resolving_time = now - qry->creation_time_mono;
 	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
 		WITH_VERBOSE {
 			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
 		}
-		return false;
+		return true;
 	}
-	return true;
+	return false;
 }
 
 int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet)
@@ -887,10 +887,8 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
-	struct timeval now;
-	gettimeofday(&now, NULL);
 	/* Check overall resolution time */
-	if (!check_resolution_time(qry, &now)) {
+	if (resolution_time_exceeded(qry, kr_now())) {
 		return KR_STATE_FAIL;
 	}
 	bool tried_tcp = (qry->flags.TCP);
@@ -911,7 +909,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 			ITERATE_LAYERS(request, qry, consume, packet);
 		} else {
 			/* Fill in source and latency information. */
-			request->upstream.rtt = time_diff(&qry->timestamp, &now);
+			request->upstream.rtt = kr_now() - qry->timestamp_mono;
 			request->upstream.addr = src;
 			ITERATE_LAYERS(request, qry, consume, packet);
 			/* Clear temporary information */
@@ -1447,8 +1445,7 @@ ns_election:
 	 * Additional query is going to be finalised when calling
 	 * kr_resolve_checkout().
 	 */
-
-	gettimeofday(&qry->timestamp, NULL);
+	qry->timestamp_mono = kr_now();
 	*dst = &qry->ns.addr[0].ip;
 	*type = (qry->flags.TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return request->state;

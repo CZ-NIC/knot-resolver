@@ -300,3 +300,6 @@ static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
 	return ret;
 }
 
+KR_EXPORT
+uint64_t kr_now();
+
