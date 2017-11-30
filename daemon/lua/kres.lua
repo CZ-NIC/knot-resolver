@@ -45,6 +45,7 @@ local const_class = {
 	ANY        = 255,
 }
 local const_type = {
+	NULL       =   0,
 	A          =   1,
 	NS         =   2,
 	CNAME      =   5,
