@@ -13,7 +13,7 @@ endif
 
 # Memcached
 ifeq ($(HAS_libmemcached),yes)
-modules_TARGETS += kmemcached
+modules_TARGETS += memcached
 endif
 # Redis
 ifeq ($(HAS_hiredis),yes)
