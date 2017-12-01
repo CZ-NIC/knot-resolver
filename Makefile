@@ -187,6 +187,7 @@ $(DESTDIR)$(ETCDIR):
 # Sub-targets
 include contrib/contrib.mk
 include lib/lib.mk
+include client/client.mk
 include daemon/daemon.mk
 include modules/modules.mk
 include tests/tests.mk
