@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+'''
 Generate minimal Dockefile to build, install, run, and test kresd and modules.
 
 It merges data from two sources:
@@ -16,7 +16,7 @@ It merges data from two sources:
    <distribution name>/<distribution version>.
    Files common for all distributions (like tests) are right in
    in packaging/ directory of given component.
-"""
+'''
 
 import argparse
 import logging
@@ -24,15 +24,13 @@ from pathlib import Path
 import os
 import sys
 
-PACKAGING_PATH_TODO='packaging'
-
 
 class TestEnv():
-    """
+    '''
     Abstract way to schedule commands using different interpreters
 
     Reformat commands for different interpreters, e.g. Dockerfile, BASH, etc.
-    """
+    '''
     def __init__(self, image):
         self.image = image
 
@@ -47,9 +45,9 @@ class TestEnv():
 
 
 class DockerBuildEnv(TestEnv):
-    """
+    '''
     Schedule commands as part of Docker build (Dockerfile)
-    """
+    '''
     def __init__(self, image, srcdir):
         super().__init__(image)
         self.header = 'WORKDIR /root\nCOPY {} /root\n'.format(srcdir)
@@ -65,9 +63,9 @@ class DockerBuildEnv(TestEnv):
 
 
 class Image():
-    """
+    '''
     Abstraction to hide differences between distributions and their versions
-    """
+    '''
     def __init__(self, img_path, name, version):
         self.img_path = img_path  # scripts/distros/debian/9
         self.img_relpath = os.path.join(name, version)  # debian/9
@@ -77,16 +75,16 @@ class Image():
         self.cmds = []
         self._init_cmds()
         # fill in Dockerfile with image preparation commands
-        self.cmds_fromfile(self._img_path('prep.sh'))
+        self.img_script('prep.sh')
 
     def _img_path(self, filename):
-        """Append distro-specific path before filename"""
+        '''Prepend distro-specific path before filename'''
         return os.path.join(self.img_path, filename)
 
     def _init_cmds(self):
-        """
+        '''
         Read commands for image modification from
-        """
+        '''
         for cmd in os.listdir(self.img_path):
             if cmd == 'prep':  # multi-line commands are handled somewhere else
                 continue
@@ -97,19 +95,19 @@ class Image():
         return '# image: {0}:{1}\n'.format(self.name, self.version) + '\n'.join(self.cmds)
 
     def action(self, action, arg):
-        """
+        '''
         Schedule action with given argument, e.g. install package
 
         E.g. action "pkg_install" with argument "gcc" will schedule command
         read from image-specific file "distro/version/pkg_install" and append
         argument "arg". Result is like "apt-get install -y gcc".
-        """
+        '''
         self.cmds.append('{0} {1}'.format(self.actions[action], arg))
 
     def action_arglist(self, action, cmpimgpath, filename):
-        """
+        '''
         Plan single command with argumets equal to content of given text file
-        """
+        '''
         try:
             with open(os.path.join(cmpimgpath, filename)) as listf:
                 self.action(action, ' '.join(item.strip() for item in listf))
@@ -117,21 +115,26 @@ class Image():
             pass
 
     def cmd(self, cmd):
-        """Schedule single command"""
+        '''Schedule single command'''
+        assert cmd
         self.cmds.append(cmd)
 
-    def cmds_fromfile(self, cmdfilename):
-        """Schedule all commands from given text file"""
-        try:
-            with open(cmdfilename) as cmdfile:
-                for cmd in cmdfile:
-                    cmd = cmd.strip()
-                    if cmd:
-                        self.cmds.append(cmd)
-        except FileNotFoundError:
-            pass
+    def img_script(self, script):
+        '''Schedule script from image's directory'''
+        path = self._img_path(script)
+        assert os.path.isfile(path)
+        self.cmds.append(path)
 
-class Component:
+
+class Component():
+    '''
+    API for single component of software (daemon etc.) independent on image
+
+    comp_path must contain subtree <distribution name>/<distribution version>
+    with files containing command specific for particular distribution
+
+    image must be Image to work with
+    '''
     def __init__(self, comp_path, image):
         self.comp_path = comp_path
         self.compimg_path = os.path.join(comp_path, image.img_relpath)
@@ -149,29 +152,16 @@ class Component:
         self.image.action_arglist('pkg_install', self.compimg_path, 'rundeps')
 
     def test(self):
-        configcmdpath = os.path.join(self.comp_path, 'test.command')
+        configcmdpath = os.path.join(self.comp_path, 'test')
         configtestpath = os.path.join(self.comp_path, 'test.config')
         if os.path.exists(configcmdpath):
-            self.image.cmds_fromfile(os.path.join(self.comp_path, 'test.command'))
+            self.image.cmd(os.path.join(self.comp_path, 'test'))
         elif os.path.exists(configtestpath):
             self.image.cmd('kresd -f 1 -c {}'.format(configtestpath))
 
-#def test_component(component, comppath, images):
-#    log = logging.getLogger(component)
-#    log.debug('component start: path %s', comppath)
-#
-#    for distro in os.listdir(comppath):
-#        distropath = os.path.join(comppath, distro)
-#        try:
-#            for version in os.listdir(distropath):
-#                cmpimgpath = os.path.join(distropath, version)
-#                image = deepcopy(images[distro][version])
-#                test_component_in_image(component, comppath, image, cmpimgpath)
-#        except NotADirectoryError:
-#            pass
-
 
 def foreach_component(components, action):
+    '''Execute action for each component'''
     for comp in components:
         getattr(comp, action)()
 
@@ -228,9 +218,9 @@ Examples:
     if args.builddeps:
         foreach_component(components, 'install_builddeps')
     if args.build:
-        image.cmds_fromfile(os.path.join(PACKAGING_PATH_TODO, 'build.sh'))
+        image.img_script('build.sh')
     if args.install:
-        image.cmds_fromfile(os.path.join(PACKAGING_PATH_TODO, 'install.sh'))
+        image.img_script('install.sh')
     if args.remove_builddeps:
         foreach_component(components, 'remove_builddeps')
     if args.rundeps:
@@ -239,4 +229,5 @@ Examples:
         foreach_component(components, 'test')
     print(DockerBuildEnv(image, args.srcdir))
 
-main()
+if __name__ == '__main__':
+    main()
