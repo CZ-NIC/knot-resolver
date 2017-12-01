@@ -13,7 +13,7 @@ endif
 
 # Memcached
 ifeq ($(HAS_libmemcached),yes)
-modules_TARGETS += kmemcached
+modules_TARGETS += memcached
 endif
 # Redis
 ifeq ($(HAS_hiredis),yes)
@@ -22,7 +22,7 @@ endif
 
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
-modules_TARGETS += ketcd \
+modules_TARGETS += etcd \
                    graphite \
                    policy \
                    view \

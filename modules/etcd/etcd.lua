@@ -1,5 +1,5 @@
---- @module ketcd
-local ketcd = {}
+--- @module etcd
+local etcd = {}
 
 -- @function update subtree configuration
 local function update_subtree(tree)
@@ -17,39 +17,39 @@ local function update_subtree(tree)
 end
 
 -- @function reload whole configuration
-function ketcd.reload()
-	local res, err = ketcd.cli:readdir('/', true)
+function etcd.reload()
+	local res, err = etcd.cli:readdir('/', true)
 	if err then
 		error(err)
 	end
 	update_subtree(res.body.node.nodes)
 end
 
-function ketcd.init()
-	ketcd.Etcd = require('etcd.luasocket')
-	ketcd.defaults = { prefix = '/kresd' }
+function etcd.init()
+	etcd.Etcd = require('etcd.luasocket')
+	etcd.defaults = { prefix = '/kresd' }
 end
 
-function ketcd.deinit()
-	if ketcd.ev then event.cancel(ketcd.ev) end
+function etcd.deinit()
+	if etcd.ev then event.cancel(etcd.ev) end
 end
 
-function ketcd.config(conf)
-	local options = ketcd.defaults
+function etcd.config(conf)
+	local options = etcd.defaults
 	if type(conf) == 'table' then
 		for k,v in pairs(conf) do options[k] = v end
 	end
 	-- create connection
-	local cli, err = ketcd.Etcd.new(options)
+	local cli, err = etcd.Etcd.new(options)
 	if err then
 		error(err)
 	end
-	ketcd.cli = cli
+	etcd.cli = cli
 	-- schedule recurrent polling
 	-- @todo: the etcd has watch() API, but this requires
 	--        coroutines on socket operations
-	if ketcd.ev then event.cancel(ketcd.ev) end
-	ketcd.ev = event.recurrent(5 * sec, ketcd.reload)
+	if etcd.ev then event.cancel(etcd.ev) end
+	etcd.ev = event.recurrent(5 * sec, etcd.reload)
 end
 
-return ketcd
+return etcd

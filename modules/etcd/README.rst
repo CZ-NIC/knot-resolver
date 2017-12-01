@@ -27,7 +27,7 @@ Example configuration
 .. code-block:: lua
 
 	modules = {
-		ketcd = {
+		etcd = {
 			prefix = '/kresd',
 			peer = 'http://127.0.0.1:7001'
 		}

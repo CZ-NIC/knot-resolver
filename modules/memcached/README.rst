@@ -8,7 +8,7 @@ After loading you can see the storage backend registered and useable.
 
 .. code-block:: lua
 
-	> modules.load 'kmemcached'
+	> modules.load 'memcached'
 	> cache.backends()
 	[memcached://] => true
 
