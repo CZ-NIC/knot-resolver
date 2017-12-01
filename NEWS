@@ -3,6 +3,7 @@ Knot Resolver 2.0.0 (2018-xx-yy)
 Incompatible changes
 --------------------
 - script supervisor.py was removed, please migrate to a real process manager
+- module ketcd was renamed to etcd for consistency
 - module kmemcached was renamed to memcached for consistency
 
 Knot Resolver 1.5.1 (2017-1x-yy)

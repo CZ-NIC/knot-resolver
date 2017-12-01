@@ -22,7 +22,7 @@ endif
 
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
-modules_TARGETS += ketcd \
+modules_TARGETS += etcd \
                    graphite \
                    policy \
                    view \

@@ -18,7 +18,7 @@ Knot DNS Resolver modules
 .. include:: ../modules/graphite/README.rst
 .. include:: ../modules/memcached/README.rst
 .. include:: ../modules/redis/README.rst
-.. include:: ../modules/ketcd/README.rst
+.. include:: ../modules/etcd/README.rst
 .. include:: ../modules/dns64/README.rst
 .. include:: ../modules/renumber/README.rst
 .. include:: ../modules/cookies/README.rst
