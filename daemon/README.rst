@@ -83,6 +83,13 @@ You can also toggle it on runtime with ``verbose(true|false)`` command.
 
    $ kresd -v
 
+To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a single fork. For example:
+
+.. code-block:: bash
+
+   $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 -v &
+
+
 Scaling out
 ===========
 
@@ -108,7 +115,7 @@ You can add, start and stop processes during runtime based on the load.
 
 .. _daemon-reuseport:
 
-.. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, you can :ref:`use supervisor <daemon-supervised>` that is going to bind to sockets before starting multiple processes.
+.. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, use only one daemon process.
 
 Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
 
@@ -131,25 +138,9 @@ Running supervised
 
 Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to the resolver daemon. If the resolver terminates or is killed, the sockets remain open and no queries are dropped.
 
-The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. There's a tiny supervisor script for convenience, but you should have a look at `real process managers`_.
-
-.. code-block:: bash
-
-   $ python scripts/supervisor.py ./daemon/kresd -a 127.0.0.1
-   $ [system] interactive mode
-   > quit()
-   > [2016-03-28 16:06:36.795879] process finished, pid = 99342, status = 0, uptime = 0:00:01.720612
-   [system] interactive mode
-   >
+The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. You should have a look at `real process managers`_.
 
 The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
-
-To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a single fork. For example:
-
-.. code-block:: bash
-
-   $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 &
-
 
 Configuration
 =============
