@@ -142,8 +142,21 @@ class Component():
         # Some components do not have external depedencies at the moment so
         # compimg_path may not exist. That is okay, we will just run their tests.
 
+    def _comp_script(self, script):
+        path = os.path.join(self.comp_path, script)
+        if os.path.exists(path):
+            self.image.cmd(path)
+
     def install_builddeps(self):
         self.image.action_arglist('pkg_install', self.compimg_path, 'builddeps')
+
+    def build(self):
+        '''Schedule component-specific image-independent build script'''
+        self._comp_script('build.sh')
+
+    def install(self):
+        '''Schedule component-specific image-independent install script'''
+        self._comp_script('install.sh')
 
     def remove_builddeps(self):
         self.image.action_arglist('pkg_remove', self.compimg_path, 'builddeps')
@@ -152,10 +165,10 @@ class Component():
         self.image.action_arglist('pkg_install', self.compimg_path, 'rundeps')
 
     def test(self):
-        configcmdpath = os.path.join(self.comp_path, 'test')
+        configcmdpath = os.path.join(self.comp_path, 'test.sh')
         configtestpath = os.path.join(self.comp_path, 'test.config')
         if os.path.exists(configcmdpath):
-            self.image.cmd(os.path.join(self.comp_path, 'test'))
+            self._comp_script('test.sh')
         elif os.path.exists(configtestpath):
             self.image.cmd('kresd -f 1 -c {}'.format(configtestpath))
 
@@ -219,6 +232,7 @@ Examples:
         foreach_component(components, 'install_builddeps')
     if args.build:
         image.img_script('build.sh')
+        foreach_component(components, 'build')
     if args.install:
         image.img_script('install.sh')
     if args.remove_builddeps:
