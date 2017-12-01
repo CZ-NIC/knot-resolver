@@ -10,5 +10,5 @@ client: $(kresc)
 client-install: kresc-install
 client-clean: kresc-clean
 
-.PHONY: client client-install client-clean
 endif
+.PHONY: client client-install client-clean
