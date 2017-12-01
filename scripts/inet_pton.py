@@ -1,19 +1,20 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+"""
+Print IP address to binary representation in Python hex format \x12
+"""
 
-from socket import inet_pton,AF_INET6,AF_INET
+from socket import inet_pton, AF_INET6, AF_INET
 import sys
 from binascii import hexlify
-from string import find
 
-if find(sys.argv[1], ":") == -1:
-    addr_type = AF_INET
-else:
+try:
+    arg = sys.argv[1]
+except:
+    sys.exit('Usage: inet_pton.py <IPv4 or IPv6 address>')
+
+if ':' in arg:
     addr_type = AF_INET6
+else:
+    addr_type = AF_INET
 
-x = hexlify(inet_pton(addr_type, sys.argv[1]))
-
-out = ""
-for i in range(0, len(x) / 2):
-    out += "\\x" + x[i*2] + x[i*2+1]
-
-print out
+print(repr(inet_pton(addr_type, arg)).strip("'"))
