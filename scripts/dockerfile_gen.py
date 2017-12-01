@@ -1,4 +1,23 @@
 #!/usr/bin/env python3
+"""
+Generate minimal Dockefile to build, install, run, and test kresd and modules.
+
+It merges data from two sources:
+
+1. Distribution specific commands for package installation etc.
+   These come from distros/ subtree with two-level hierarchy:
+   <distribution name>/<distribution version>
+   The name and version must match respective names of Docker images.
+
+2. Component-specific data like build and run-time dependencies etc.
+   These come from packaging/ subtree of particular component.
+   E.g. data for "daemon" component are in subtree daemon/packaging/.
+   The structure again has structure
+   <distribution name>/<distribution version>.
+   Files common for all distributions (like tests) are right in
+   in packaging/ directory of given component.
+"""
+
 import argparse
 import logging
 from pathlib import Path
@@ -7,19 +26,20 @@ import sys
 
 PACKAGING_PATH_TODO='packaging'
 
+
 class TestEnv():
     """
-    Abstract way to execute commands using different interpreters
+    Abstract way to schedule commands using different interpreters
 
     Reformat commands for different interpreters, e.g. Dockerfile, BASH, etc.
     """
     def __init__(self, image):
         self.image = image
 
-    def _load_image(self):
+    def load_image(self):
         raise NotImplementedError()
 
-    def _run_cmds(self):
+    def run_cmds(self):
         raise NotImplementedError()
 
     def __str__(self):
@@ -28,7 +48,7 @@ class TestEnv():
 
 class DockerBuildEnv(TestEnv):
     """
-    Execute commands as part of Docker build (Dockerfile)
+    Schedule commands as part of Docker build (Dockerfile)
     """
     def __init__(self, image, srcdir):
         super().__init__(image)
@@ -46,62 +66,62 @@ class DockerBuildEnv(TestEnv):
 
 class Image():
     """
-    Abstract interface for maintaining image of particular distro version
+    Abstraction to hide differences between distributions and their versions
     """
-    def __init__(self, imgpath, name, version):
-        self.imgpath = imgpath
+    def __init__(self, img_path, name, version):
+        self.img_path = img_path  # scripts/distros/debian/9
+        self.img_relpath = os.path.join(name, version)  # debian/9
         self.name = name
         self.version = version
         self.actions = {}
         self.cmds = []
         self._init_cmds()
-        self._read_prep()
+        # fill in Dockerfile with image preparation commands
+        self.cmds_fromfile(self._img_path('prep.sh'))
 
-    def _distrofile(self, filename):
-        return open(os.path.join(self.imgpath, filename))
-
-    def _read_prep(self):
-        """
-        Fill Dockerfile with preparation commands.
-
-        name == docker image name, e.g. debian
-        version == docker image tag, e.g. 9
-        """
-        with self._distrofile('prep') as prepfile:
-                for cmd in prepfile:
-                    self.cmds.append(cmd.strip())
+    def _img_path(self, filename):
+        """Append distro-specific path before filename"""
+        return os.path.join(self.img_path, filename)
 
     def _init_cmds(self):
         """
-        Read commands for image modification
+        Read commands for image modification from
         """
-        for cmd in os.listdir(self.imgpath):
+        for cmd in os.listdir(self.img_path):
             if cmd == 'prep':  # multi-line commands are handled somewhere else
                 continue
-            with self._distrofile(cmd) as cmdfile:
+            with open(self._img_path(cmd)) as cmdfile:
                 self.actions[cmd] = cmdfile.read().strip()
 
     def __str__(self):
         return '# image: {0}:{1}\n'.format(self.name, self.version) + '\n'.join(self.cmds)
 
-    @property
-    def comp_path(self):
-        return os.path.join(self.name, self.version)
-
     def action(self, action, arg):
+        """
+        Schedule action with given argument, e.g. install package
+
+        E.g. action "pkg_install" with argument "gcc" will schedule command
+        read from image-specific file "distro/version/pkg_install" and append
+        argument "arg". Result is like "apt-get install -y gcc".
+        """
         self.cmds.append('{0} {1}'.format(self.actions[action], arg))
 
     def action_arglist(self, action, cmpimgpath, filename):
+        """
+        Plan single command with argumets equal to content of given text file
+        """
         try:
             with open(os.path.join(cmpimgpath, filename)) as listf:
-                    self.action(action, ' '.join(item.strip() for item in listf))
+                self.action(action, ' '.join(item.strip() for item in listf))
         except FileNotFoundError:
             pass
 
     def cmd(self, cmd):
+        """Schedule single command"""
         self.cmds.append(cmd)
 
     def cmds_fromfile(self, cmdfilename):
+        """Schedule all commands from given text file"""
         try:
             with open(cmdfilename) as cmdfile:
                 for cmd in cmdfile:
@@ -114,7 +134,7 @@ class Image():
 class Component:
     def __init__(self, comp_path, image):
         self.comp_path = comp_path
-        self.compimg_path = os.path.join(comp_path, image.comp_path)
+        self.compimg_path = os.path.join(comp_path, image.img_relpath)
         self.image = image
         # Some components do not have external depedencies at the moment so
         # compimg_path may not exist. That is okay, we will just run their tests.
@@ -157,25 +177,51 @@ def foreach_component(components, action):
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
+    argparser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+        description='''Generate Dockerfile to build/install/test given components.
+
+Examples:
+* Install build deps, build, install, remove build deps, and test kresd daemon:
+ $ {n} debian 9 daemon/packaging > Dockerfile
+
+* Install build and run-time deps to prepare development image:
+ $ find -name packaging | xargs {n} \\
+    --build=false --install=false --remove-builddeps=false --test=false \\
+        debian 9 > Dockerfile
+'''.format(n=sys.argv[0])
+        )
+    argparser.add_argument(
+        '--builddeps', default=True, type=bool, help='default: true')
+    argparser.add_argument(
+        '--build', default=True, type=bool, help='default: true')
+    argparser.add_argument(
+        '--install', default=True, type=bool, help='default: true')
+    argparser.add_argument(
+        '--remove-builddeps', default=True, type=bool, help='default: true')
+    argparser.add_argument(
+        '--rundeps', default=True, type=bool, help='default: true')
+    argparser.add_argument(
+        '--test', default=True, type=bool, help='default: true')
+    argparser.add_argument(
+        '--srcdir', default=os.getcwd(), type=Path,
+        help='directory to copy into new Docker image; default: .')
+    argparser.add_argument(
+        'distro', help='name of distribution image, e.g. "debian"')
+    argparser.add_argument(
+        'version', help='distribution version, e.g. 9')
+    argparser.add_argument(
+        'components', nargs='+',
+        help='one or more components to process; order is respected')
+    args = argparser.parse_args()
+
     # all paths must be relative to toplevel Git dir
     if not os.path.exists('.luacheckrc') or not os.path.exists('NEWS'):
         sys.exit('This script must be executed from top of distribution tree!')
 
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument('--builddeps', default=True, type=bool)
-    argparser.add_argument('--build', default=True, type=bool)
-    argparser.add_argument('--install', default=True, type=bool)
-    argparser.add_argument('--remove-builddeps', default=True, type=bool)
-    argparser.add_argument('--rundeps', default=True, type=bool)
-    argparser.add_argument('--test', default=True, type=bool)
-    argparser.add_argument('--srcdir', default=os.getcwd(), type=Path)
-    argparser.add_argument('distro')
-    argparser.add_argument('version')
-    argparser.add_argument('components', nargs='+')
-    args = argparser.parse_args()
 
     # load images from disk
-    imgpath = os.path.join('packaging/distros', args.distro, args.version)
+    imgpath = os.path.join('scripts/distros', args.distro, args.version)
     image = Image(imgpath, args.distro, args.version)
 
     components = [Component(comppath, image) for comppath in args.components]
