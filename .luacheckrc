@@ -3,6 +3,7 @@ new_read_globals = {
 	'help',
 	'quit',
 	'hostname',
+	'package_version',
 	'moduledir',
 	'user',
 	'verbose',
