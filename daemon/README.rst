@@ -509,7 +509,7 @@ For when listening on ``localhost`` just doesn't cut it.
 
    Enable/disable using IPv4 for recursion.
 
-.. function:: net.listen(addresses, [port = 53, flags = {tls = (port == 853)}])
+.. function:: net.listen(addresses, [port = 53, flags = {tls = true|false, tcp = true|false, udp = true|false}])
 
    :return: boolean
 
@@ -519,13 +519,17 @@ For when listening on ``localhost`` just doesn't cut it.
    The command can be given multiple times, but note that it silently skips
    any addresses that have already been bound.
 
+   The DNS over TLS is implicitly enabled if the port is equal to 853.
+   Otherwise both UDP and TCP are enabled unless explicitly disabled in flags.
+
    Examples:
 
    .. code-block:: lua
 
-	net.listen('::1')
-	net.listen(net.lo, 5353)
-	net.listen({net.eth0, '127.0.0.1'}, 53853, {tls = true})
+  net.listen('::1')
+  net.listen(net.lo, 5353)
+  net.listen({net.eth0, '127.0.0.1'}, 53853, {tls = true})
+  net.listen({net.eth0, '127.0.0.1'}, 53853, {tcp = true, udp = false})
 
 .. function:: net.close(address, [port = 53])
 

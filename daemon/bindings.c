@@ -228,7 +228,7 @@ static int net_listen(lua_State *L)
 	int n = lua_gettop(L);
 	if (n < 1 || n > 3) {
 		format_error(L, "expected one to three arguments; usage:\n"
-			     "net.listen(addressses, [port = " xstr(KR_DNS_PORT) ", flags = {tls = (port == " xstr(KR_DNS_TLS_PORT) ")}])\n");
+		                "net.listen(addresses, [port = " xstr(KR_DNS_PORT) ", flags = {tls = true|false, udp = true|false, tcp = true|false}])\n");
 		lua_error(L);
 	}
 
@@ -237,11 +237,26 @@ static int net_listen(lua_State *L)
 		port = lua_tointeger(L, 2);
 	}
 
+	int flags = 0;
 	bool tls = (port == KR_DNS_TLS_PORT);
 	if (n > 2 && lua_istable(L, 3)) {
-		tls = table_get_flag(L, 3, "tls", tls);
+		// DNS over TLS is mutually exclusive with either "udp" or "tcp"
+		// It's not possible to listen on both encrypted and non-encrypted traffic on the same port
+		if (table_get_flag(L, 3, "tls", false)) {
+			flags = NET_TCP|NET_TLS;
+		} else {
+			// Both UDP and TCP are enabled unless explicitly disabled
+			if (table_get_flag(L, 3, "udp", true)) {
+				flags |= NET_UDP;
+			}
+			if (table_get_flag(L, 3, "tcp", true)) {
+				flags |= NET_TCP;
+			}
+		}
+	} else {
+		// If the flags are not specified, decide default based on port number
+		flags = tls ? (NET_TCP|NET_TLS) : (NET_TCP|NET_UDP);
 	}
-	int flags = tls ? (NET_TCP|NET_TLS) : (NET_TCP|NET_UDP);
 	
 	/* Now focus on the first argument. */
 	lua_pop(L, n - 1);
