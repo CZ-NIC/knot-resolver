@@ -2,7 +2,7 @@
 MAJOR := 2
 MINOR := 3
 PATCH := 0
-EXTRA :=
+EXTRA ?=
 ABIVER := 7
 BUILDMODE := dynamic
 HARDENING := yes
@@ -37,7 +37,7 @@ BUILD_LDFLAGS += $(LDFLAGS)
 BUILD_CFLAGS := $(CFLAGS) $(CPPFLAGS) -std=c99 -D_GNU_SOURCE
 BUILD_CFLAGS += -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall
 BUILD_CFLAGS += -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
-BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
+BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DVERSION_MAJOR="$(MAJOR)" -DVERSION_MINOR="$(MINOR)" -DVERSION_PATCH="$(PATCH)" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 BUILD_CFLAGS += -fvisibility=hidden
 
 ifeq (,$(findstring -O,$(CFLAGS)))
