@@ -263,7 +263,10 @@ end
 local function keyset_read(path)
 	-- First load the regular entries, trusting them.
 	local zonefile = require('zonefile')
-	local tas = zonefile.file(path)
+	local tas, err = zonefile.file(path)
+	if not tas then
+		return tas, err
+	end
 	keyset_parse_comments(tas, key_state.Valid)
 
 	-- The untrusted keys are commented out but important to load.
@@ -391,15 +394,18 @@ local add_file = function (path, unmanaged)
 	end
 
 	-- Parse the file and check its sanity
-	local keyset = keyset_read(path)
+	local keyset, err = keyset_read(path)
 	if not unmanaged then keyset.filename = path end
+	if not keyset then
+		panic("[ ta ] ERROR: failed to read anchors from '%s' (%s)", path, err)
+	end
 	if not keyset[1] then
-		error('[ ta ] ERROR: failed to read anchors from path ' .. path)
+		panic("[ ta ] ERROR: failed to read anchors from '%s'", path)
 	end
 	local owner = keyset[1].owner
 	for _, ta in ipairs(keyset) do
 		if ta.owner ~= owner then
-			error('[ ta ] ERROR: mixed owner names found in path ' .. path)
+			panic("[ ta ] ERROR: mixed owner names found in '%s'", path)
 		end
 	end
 	keyset.owner = owner
