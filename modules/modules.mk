@@ -35,7 +35,8 @@ modules_TARGETS += etcd \
                    version \
                    ta_signal_query \
                    priming \
-                   detect_time_skew
+                   detect_time_skew \
+                   detect_time_jump
 endif
 
 # Make C module

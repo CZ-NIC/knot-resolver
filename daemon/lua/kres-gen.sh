@@ -137,6 +137,7 @@ EOF
 	kr_qflags_clear
 	kr_zonecut_add
 	kr_zonecut_set
+	kr_now
 # Trust anchors
 	kr_ta_get
 	kr_ta_add
