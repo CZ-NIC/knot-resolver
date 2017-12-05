@@ -181,6 +181,20 @@ local function tls_forward(target)
 			pins[upstream_addr] = pins_local
 		end
 	end
+
+	-- Update the global table of authentication data.
+	for _, v in pairs(addr_list) do
+		if (pins[v] == nil and ca_files[v] == nil) then
+			net.tls_client(v)
+		elseif (pins[v] ~= nil and ca_files[v] == nil) then
+			net.tls_client(v, pins[v])
+		elseif (pins[v] == nil and ca_files[v] ~= nil) then
+			net.tls_client(v, ca_files[v], hostnames[v])
+		else
+			net.tls_client(v, pins[v], ca_files[v], hostnames[v])
+		end
+	end
+
 	return function(state, req)
 		local qry = req:current()
 		req.options.FORWARD = true
@@ -192,17 +206,6 @@ local function tls_forward(target)
 		req.options.TCP = true
 		qry.flags.TCP = true
 		set_nslist(qry, sockaddr_list)
-		for _, v in pairs(addr_list) do
-			if (pins[v] == nil and ca_files[v] == nil) then
-				net.tls_client(v)
-			elseif (pins[v] ~= nil and ca_files[v] == nil) then
-				net.tls_client(v, pins[v])
-			elseif (pins[v] == nil and ca_files[v] ~= nil) then
-				net.tls_client(v, ca_files[v], hostnames[v])
-			else
-				net.tls_client(v, pins[v], ca_files[v], hostnames[v])
-			end
-		end
 		return state
 	end
 end
