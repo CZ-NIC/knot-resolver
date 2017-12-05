@@ -54,7 +54,7 @@ function M.layer.consume(state, req, _)
 	req = kres.request_t(req)
 	local qry = req:current()
 	if qry.stype == kres.type.DNSKEY and not qry.flags.CACHED then
-		send_ta_query(qry:name())
+		send_ta_query(qry.name():towire())
 	end
 	return state  -- do not interfere with normal query processing
 end

@@ -4,37 +4,10 @@
 local kres -- the module
 
 local ffi = require('ffi')
-local bit = require('bit')
-local bor = bit.bor
-local band = bit.band
 local C = ffi.C
 local knot = ffi.load(libknot_SONAME)
 
 -- Various declarations that are very stable.
-ffi.cdef[[
-/*
- * Data structures
- */
-
-/* stdlib */
-typedef long time_t;
-struct timeval {
-	time_t tv_sec;
-	time_t tv_usec;
-};
-struct sockaddr {
-    uint16_t sa_family;
-    uint8_t _stub[]; /* Do not touch */
-};
-
-/*
- * libc APIs
- */
-void * malloc(size_t size);
-void free(void *ptr);
-int inet_pton(int af, const char *src, void *dst);
-]]
-
 require('kres-gen')
 
 -- Constant tables
@@ -160,113 +133,11 @@ ffi.metatype( sockaddr_t, {
 	}
 })
 
--- Metatype for RR set.  Beware, the indexing is 0-based (rdata, get, tostring).
-local rrset_buflen = (64 + 1) * 1024
-local rrset_buf = ffi.new('char[?]', rrset_buflen)
-local knot_rrset_t = ffi.typeof('knot_rrset_t')
-ffi.metatype( knot_rrset_t, {
-	-- beware: `owner` and `rdata` are typed as a plain lua strings
-	--         and not the real types they represent.
-	__tostring = function(rr) return rr:txt_dump() end,
-	__index = {
-		owner = function(rr) return ffi.string(rr._owner, knot.knot_dname_size(rr._owner)) end,
-		ttl = function(rr) return tonumber(knot.knot_rrset_ttl(rr)) end,
-		rdata = function(rr, i)
-			local rdata = knot.knot_rdataset_at(rr.rrs, i)
-			return ffi.string(knot.knot_rdata_data(rdata), knot.knot_rdata_rdlen(rdata))
-		end,
-		get = function(rr, i)
-			return {owner = rr:owner(),
-			        ttl = rr:ttl(),
-			        class = tonumber(rr.rclass),
-			        type = tonumber(rr.type),
-			        rdata = rr:rdata(i)}
-		end,
-		tostring = function(rr, i)
-			assert(ffi.istype(knot_rrset_t, rr))
-			if rr.rrs.rr_count > 0 then
-				local ret
-				if i ~= nil then
-					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
-				else
-					ret = -1
-				end
-				return ret >= 0 and ffi.string(rrset_buf)
-			end
-		end,
-
-		-- Dump the rrset in presentation format (dig-like).
-		txt_dump = function(rr, style)
-			local bufsize = 1024
-			local dump = ffi.new('char *[1]', C.malloc(bufsize))
-				-- ^ one pointer to a string
-			local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
-
-			local ret = knot.knot_rrset_txt_dump(rr, dump, size,
-							style or knot.KNOT_DUMP_STYLE_DEFAULT)
-			local result = nil
-			if ret >= 0 then
-				result = ffi.string(dump[0], ret)
-			end
-			C.free(dump[0])
-			return result
-		end,
-	},
-})
-
--- Metatype for packet
-local knot_pkt_t = ffi.typeof('knot_pkt_t')
-ffi.metatype( knot_pkt_t, {
-	__index = {
-		qname = function(pkt)
-			local qname = knot.knot_pkt_qname(pkt)
-			return ffi.string(qname, knot.knot_dname_size(qname))
-		end,
-		qclass = function(pkt) return knot.knot_pkt_qclass(pkt) end,
-		qtype  = function(pkt) return knot.knot_pkt_qtype(pkt) end,
-		rcode = function (pkt, val)
-			pkt.wire[3] = (val) and bor(band(pkt.wire[3], 0xf0), val) or pkt.wire[3]
-			return band(pkt.wire[3], 0x0f)
-		end,
-		tc = function (pkt, val)
-			pkt.wire[2] = bor(pkt.wire[2], (val) and 0x02 or 0x00)
-			return band(pkt.wire[2], 0x02)
-		end,
-		rrsets = function (pkt, section_id)
-			local records = {}
-			local section = knot.knot_pkt_section(pkt, section_id)
-			for i = 1, section.count do
-				local rrset = knot.knot_pkt_rr(section, i - 1)
-				table.insert(records, rrset)
-			end
-			return records
-		end,
-		section = function (pkt, section_id)
-			local records = {}
-			local section = knot.knot_pkt_section(pkt, section_id)
-			for i = 1, section.count do
-				local rrset = knot.knot_pkt_rr(section, i - 1)
-				for k = 1, rrset.rrs.rr_count do
-					table.insert(records, rrset:get(k - 1))
-				end
-			end
-			return records
-		end,
-		begin = function (pkt, section) return knot.knot_pkt_begin(pkt, section) end,
-		put = function (pkt, owner, ttl, rclass, rtype, rdata)
-			return C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, #rdata)
-		end,
-		clear = function (pkt) return C.kr_pkt_recycle(pkt) end,
-		question = function(pkt, qname, qclass, qtype)
-			return C.knot_pkt_put_question(pkt, qname, qclass, qtype)
-		end,
-	},
-})
 -- Metatype for query
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
-		name = function(qry) return ffi.string(qry.sname, knot.knot_dname_size(qry.sname)) end,
+		name = function(qry) return qry.sname end,
 	},
 })
 -- Metatype for request
@@ -326,7 +197,7 @@ ffi.metatype(ranked_rr_array_t, {
 	}
 })
 
--- Pretty print for domain name
+--- Pretty print for domain name
 local function dname2str(dname)
 	return ffi.string(ffi.gc(C.knot_dname_to_str(nil, dname, 0), C.free))
 end

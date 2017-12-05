@@ -1,6 +1,5 @@
 -- Module interface
 local ffi = require('ffi')
-local knot = ffi.load(libknot_SONAME)
 
 local priming = {}
 priming.retry_time = 10 * sec -- retry time when priming fail
@@ -19,10 +18,10 @@ internal.event = nil -- stores event id
 local function publish_hints(nsset)
 	local roothints = kres.context().root_hints
 	-- reset zone cut and clear address list
-	ffi.C.kr_zonecut_set(roothints, kres.str2dname("."))
-	for dname, addresses in pairs(nsset) do
+	ffi.C.kr_zonecut_set(roothints, dns.dname.parse("."))
+	for name, addresses in pairs(nsset) do
 		for _, rdata_addr in pairs(addresses) do
-			ffi.C.kr_zonecut_add(roothints, dname, rdata_addr)
+			ffi.C.kr_zonecut_add(roothints, dns.dname(name), rdata_addr)
 		end
 	end
 end
@@ -46,14 +45,11 @@ local function address_callback(pkt, req)
 	if pkt:rcode() ~= kres.rcode.NOERROR then
 		warn("[priming] cannot resolve address '%s', type: %d", kres.dname2str(pkt:qname()), pkt:qtype())
 	else
-		local section = pkt:rrsets(kres.section.ANSWER)
-		for i = 1, #section do
-			local rr = section[i]
-			if rr.type == kres.type.A or rr.type == kres.type.AAAA then
-				for k = 0, rr.rrs.rr_count-1 do
-					local rdata = knot.knot_rdataset_at(rr.rrs, k)
-					rdata = ffi.string(rdata, knot.knot_rdata_array_size(knot.knot_rdata_rdlen(rdata)))
-					table.insert(internal.nsset[rr:owner()], rdata)
+		for _, rr in ipairs(pkt) do
+			if rr:type() == kres.type.A or rr:type() == kres.type.AAAA then
+				local name = rr:owner():towire()
+				for _, rdata in ipairs(rr) do
+					table.insert(internal.nsset[name], tostring(rdata))
 				end
 			end
 		end
@@ -78,23 +74,21 @@ end
 -- These new queries should be resolved from cache.
 -- luacheck: no unused args
 local function priming_callback(pkt, req)
-	pkt = kres.pkt_t(pkt)
+	pkt = dns.topacket(pkt)
 	-- req = kres.request_t(req)
 	if pkt:rcode() ~= kres.rcode.NOERROR then
 		warn("[priming] cannot resolve '.' NS, next priming query in %d seconds", priming.retry_time / sec)
 		internal.event = event.after(priming.retry_time, internal.prime)
 		return nil
 	end
-	local section = pkt:rrsets(kres.section.ANSWER)
-	for i = 1, #section do
-		local rr = section[i]
-		if rr.type == kres.type.NS then
+	for i, rr in ipairs(pkt) do
+		if rr:type() == kres.type.NS then
 			internal.min_ttl = math.min(internal.min_ttl, rr:ttl())
 			internal.to_resolve = internal.to_resolve + 2 * rr.rrs.rr_count
-			for k = 0, rr.rrs.rr_count-1 do
+			for k = 0, rr:count() - 1 do
+				local rdata_wire = rr:rdata(k)
 				local nsname_text = rr:tostring(k)
-				local nsname_wire = rr:rdata(k)
-				internal.nsset[nsname_wire] = {}
+				internal.nsset[rdata_wire] = {}
 				resolve(nsname_text, kres.type.A, kres.class.IN, 0, address_callback)
 				resolve(nsname_text, kres.type.AAAA, kres.class.IN, 0, address_callback)
 			end

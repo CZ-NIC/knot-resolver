@@ -35,6 +35,7 @@ new_read_globals = {
 	'reorder_RR',
 	'option',
 	'env',
+	'dns',
 	'kres',
 	'trustanchor',
 	'libknot_SONAME',

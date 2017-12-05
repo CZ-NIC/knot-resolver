@@ -21,6 +21,10 @@ function log(fmt, ...)
         print(string.format(fmt, ...))
 end
 
+-- DNS library bindings
+libknot_CDEFS = 'kres-gen'
+dns = require('dns')
+
 -- Resolver bindings
 kres = require('kres')
 if rawget(kres, 'str2dname') ~= nil then

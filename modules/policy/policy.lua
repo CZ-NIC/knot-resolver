@@ -251,7 +251,7 @@ function policy.suffix(action, zone_list)
 	local AC = require('ahocorasick')
 	local tree = AC.create(zone_list)
 	return function(_, query)
-		local match = AC.match(tree, query:name(), false)
+		local match = AC.match(tree, query:name():towire(), false)
 		if match ~= nil then
 			return action
 		end
@@ -265,7 +265,7 @@ function policy.suffix_common(action, suffix_list, common_suffix)
 	local suffix_count = #suffix_list
 	return function(_, query)
 		-- Preliminary check
-		local qname = query:name()
+		local qname = query:name():towire()
 		if not string.find(qname, common_suffix, -common_len, true) then
 			return nil
 		end
@@ -283,7 +283,7 @@ end
 -- Filter QNAME pattern
 function policy.pattern(action, pattern)
 	return function(_, query)
-		if string.find(query:name(), pattern) then
+		if string.find(query:name():towire(), pattern) then
 			return action
 		end
 		return nil
@@ -320,7 +320,7 @@ local function rpz_zonefile(action, path)
 	local rules = rpz_parse(action, path)
 	collectgarbage()
 	return function(_, query)
-		local label = query:name()
+		local label = query:name():towire()
 		local rule = rules[label]
 		while rule == nil and string.len(label) > 0 do
 			label = string.sub(label, string.byte(label) + 2)

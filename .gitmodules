@@ -7,3 +7,6 @@
 [submodule "tests/config/tapered"]
 	path = tests/config/tapered
 	url = https://github.com/telemachus/tapered.git
+[submodule "contrib/ljdns"]
+	path = contrib/ljdns
+	url = https://github.com/vavrusa/ljdns.git

@@ -50,7 +50,7 @@ mod.layer = {
 			end
 		else -- Observe AAAA NODATA responses
 			local is_nodata = (pkt:rcode() == kres.rcode.NOERROR) and (#answer == 0)
-			if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name()
+			if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname():equals(qry:name())
 					and (qry.flags.RESOLVED and qry.parent == nil) then
 				local extraFlags = kres.mk_qflags({})
 				extraFlags.DNSSEC_WANT = qry.flags.DNSSEC_WANT
