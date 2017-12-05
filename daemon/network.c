@@ -140,7 +140,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 {
 	int ret = 0;
 	if (flags & NET_UDP) {
-		ep->udp = malloc(sizeof(union uv_handles));
+		ep->udp = malloc(sizeof(uv_handles_t));
 		if (!ep->udp) {
 			return kr_error(ENOMEM);
 		}
@@ -153,7 +153,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		ep->flags |= NET_UDP;
 	}
 	if (flags & NET_TCP) {
-		ep->tcp = malloc(sizeof(union uv_handles));
+		ep->tcp = malloc(sizeof(uv_handles_t));
 		if (!ep->tcp) {
 			return kr_error(ENOMEM);
 		}
@@ -185,7 +185,7 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		if (ep->udp) {
 			return kr_error(EEXIST);
 		}
-		ep->udp = malloc(sizeof(union uv_handles));// malloc(sizeof(*ep->udp));
+		ep->udp = malloc(sizeof(uv_handles_t));// malloc(sizeof(*ep->udp));
 		if (!ep->udp) {
 			return kr_error(ENOMEM);
 		}
@@ -201,7 +201,7 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		if (ep->tcp) {
 			return kr_error(EEXIST);
 		}
-		ep->tcp = malloc(sizeof(union uv_handles));
+		ep->tcp = malloc(sizeof(uv_handles_t));
 		if (!ep->tcp) {
 			return kr_error(ENOMEM);
 		}

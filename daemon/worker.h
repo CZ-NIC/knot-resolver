@@ -147,8 +147,9 @@ struct worker_ctx {
 	knot_mm_t pkt_pool;
 };
 
-/* @internal Union of derivatives from libuv uv_handle_t for freelist.
- * These have session as their `handle->data` and own it. */
+/* @internal Union of some libuv handles for freelist.
+ * These have session as their `handle->data` and own it.
+ * Subset of uv_any_handle. */
 union uv_handles {
 	uv_handle_t   handle;
 	uv_stream_t   stream;
@@ -156,9 +157,11 @@ union uv_handles {
 	uv_tcp_t      tcp;
 	uv_timer_t    timer;
 };
+typedef union uv_any_handle uv_handles_t;
 
 /* @internal Union of derivatives from uv_req_t libuv request handles for freelist.
- * These have only a reference to the task they're operating on. */
+ * These have only a reference to the task they're operating on.
+ * Subset of uv_any_req. */
 union uv_reqs {
 	uv_req_t      req;
 	uv_shutdown_t sdown;
@@ -166,6 +169,7 @@ union uv_reqs {
 	uv_connect_t  connect;
 	uv_udp_send_t send;
 };
+typedef union uv_reqs uv_reqs_t;
 
 /** @endcond */
 

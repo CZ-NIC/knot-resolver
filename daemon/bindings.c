@@ -425,6 +425,13 @@ static int print_tls_param(const char *key, void *val, void *data)
 		lua_settable(L, -3);
 	}
 	lua_setfield(L, -2, "ca files");
+	lua_newtable(L);
+	for (size_t i = 0; i < entry->hostnames.len; ++i) {
+		lua_pushnumber(L, i + 1);
+		lua_pushstring(L, entry->hostnames.at[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, -2, "hostnames");
 	lua_setfield(L, -2, key);
 
 	return 0;
@@ -465,16 +472,24 @@ static int net_tls_client(lua_State *L)
 	}
 
 	const char *full_addr = NULL;
-	const char *ca_file = NULL;
-	const char *pin = NULL;
+	bool pin_exists = false;
+	bool ca_file_exists = false;
+	printf("%i\n", lua_gettop(L));
 	if ((lua_gettop(L) == 1) && lua_isstring(L, 1)) {
 		full_addr = lua_tostring(L, 1);
-	} else if ((lua_gettop(L) == 3) && lua_isstring(L, 1) && lua_isstring(L, 2) && lua_isstring(L, 3)) {
+	} else if ((lua_gettop(L) == 2) && lua_isstring(L, 1) && lua_istable(L, 2)) {
 		full_addr = lua_tostring(L, 1);
-		ca_file = lua_tostring(L, 2);
-		pin = lua_tostring(L, 3);
+		pin_exists = true;
+	} else if ((lua_gettop(L) == 3) && lua_isstring(L, 1) && lua_istable(L, 2)) {
+		full_addr = lua_tostring(L, 1);
+		ca_file_exists = true;
+	} else if ((lua_gettop(L) == 4) && lua_isstring(L, 1) &&
+		    lua_istable(L, 2) && lua_istable(L, 3)) {
+		full_addr = lua_tostring(L, 1);
+		pin_exists = true;
+		ca_file_exists = true;
 	} else {
-		format_error(L, "net.tls_client either takes one parameter (\"address\") either takes three ones: (\"address\", \"ca_file\", \"pin\")");
+		format_error(L, "net.tls_client takes one parameter (\"address\"), two parameters (\"address\",\"pin\"), three parameters (\"address\", \"ca_file\", \"hostname\") or four ones: (\"address\", \"pin\", \"ca_file\", \"hostname\")");
 		lua_error(L);
 	}
 
@@ -486,13 +501,76 @@ static int net_tls_client(lua_State *L)
 	}
 
 	if (port == 0) {
-		port = 53;
+		port = 853;
 	}
 
-	int r = tls_client_params_set(&net->tls_client_params, addr, port, ca_file, pin);
-	if (r != 0) {
-		lua_pushstring(L, strerror(ENOMEM));
-		lua_error(L);
+	if (!pin_exists && !ca_file_exists) {
+		int r = tls_client_params_set(&net->tls_client_params,
+					      addr, port, NULL, NULL, NULL);
+		if (r != 0) {
+			lua_pushstring(L, strerror(ENOMEM));
+			lua_error(L);
+		}
+
+		lua_pushboolean(L, true);
+		return 1;
+	}
+
+	if (pin_exists) {
+		/* iterate over table with pins
+		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
+		lua_pushnil(L); /* first key */
+		while (lua_next(L, 2)) {  /* pin table is in stack at index 2 */
+			/* pin now at index -1, key at index -2*/
+			const char *pin = lua_tostring(L, -1);
+			int r = tls_client_params_set(&net->tls_client_params,
+						      addr, port, NULL, NULL, pin);
+			if (r != 0) {
+				lua_pushstring(L, strerror(ENOMEM));
+				lua_error(L);
+			}
+			lua_pop(L, 1);
+		}
+	}
+
+	int ca_table_index = 2;
+	int hostname_table_index = 3;
+	if (ca_file_exists) {
+		if (pin_exists) {
+			ca_table_index = 3;
+			hostname_table_index = 4;
+		}
+	} else {
+		lua_pushboolean(L, true);
+		return 1;
+	}
+
+	/* iterate over ca filenames */
+	lua_pushnil(L);
+	while (lua_next(L, ca_table_index)) {
+		const char *ca_file = lua_tostring(L, -1);
+		int r = tls_client_params_set(&net->tls_client_params,
+					      addr, port, ca_file, NULL, NULL);
+		if (r != 0) {
+			lua_pushstring(L, strerror(ENOMEM));
+			lua_error(L);
+		}
+		/* removes 'value'; keeps 'key' for next iteration */
+		lua_pop(L, 1);
+	}
+
+	/* iterate over hostnames */
+	lua_pushnil(L);
+	while (lua_next(L, hostname_table_index)) {
+		const char *hostname = lua_tostring(L, -1);
+		int r = tls_client_params_set(&net->tls_client_params,
+					      addr, port, NULL, hostname, NULL);
+		if (r != 0) {
+			lua_pushstring(L, strerror(ENOMEM));
+			lua_error(L);
+		}
+		/* removes 'value'; keeps 'key' for next iteration */
+		lua_pop(L, 1);
 	}
 
 	lua_pushboolean(L, true);

@@ -551,7 +551,7 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 
 int tls_client_params_set(map_t *tls_client_paramlist,
 			  const char *addr, uint16_t port,
-			  const char *ca_file, const char *pin)
+			  const char *ca_file, const char *hostname, const char *pin)
 {
 	if (!tls_client_paramlist || !addr) {
 		return kr_error(EINVAL);
@@ -587,7 +587,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 		bool already_exists = false;
 		for (size_t i = 0; i < entry->ca_files.len; ++i) {
 			if (strcmp(entry->ca_files.at[i], ca_file) == 0) {
-				kr_log_error("[tls client] error: ca file for address %s already was set, ignoring\n", key);
+				kr_log_error("[tls client] error: ca file '%s'for address '%s' already was set, ignoring\n", ca_file, key);
 				already_exists = true;
 				break;
 			}
@@ -612,10 +612,30 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 		}
 	}
 
+	if ((ret == kr_ok()) && hostname && hostname[0] != 0) {
+		bool already_exists = false;
+		for (size_t i = 0; i < entry->hostnames.len; ++i) {
+			if (strcmp(entry->hostnames.at[i], hostname) == 0) {
+				kr_log_error("[tls client] error: hostname '%s' for address '%s' already was set, ignoring\n", hostname, key);
+				already_exists = true;
+				break;
+			}
+		}
+		if (!already_exists) {
+			const char *value = strdup(hostname);
+			if (!value) {
+				ret = kr_error(ENOMEM);
+			} else if (array_push(entry->hostnames, value) < 0) {
+				free ((void *)value);
+				ret = kr_error(ENOMEM);
+			}
+		}
+	}
+
 	if ((ret == kr_ok()) && pin && pin[0] != 0) {
 		for (size_t i = 0; i < entry->pins.len; ++i) {
 			if (strcmp(entry->pins.at[i], pin) == 0) {
-				kr_log_error("[tls client] warning: pin for address %s already was set, ignoring\n", key);
+				kr_log_error("[tls client] warning: pin '%s' for address '%s' already was set, ignoring\n", pin, key);
 				return kr_ok();
 			}
 		}
@@ -659,7 +679,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 	struct tls_client_ctx_t *ctx = gnutls_session_get_ptr(tls_session);
 	assert(ctx->params != NULL);
 
-	if (ctx->params->pins.len == 0 && ctx->params->ca_files.len) {
+	if (ctx->params->pins.len == 0 && ctx->params->ca_files.len == 0) {
 		return GNUTLS_E_SUCCESS;
 	}
 
@@ -716,26 +736,38 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		}
 	}
 
+	/* pins were set, but no one was not matched */
+	kr_log_error("[tls_client] certificate PIN check failed\n");
+
 skip_pins:
 
 	if (ctx->params->ca_files.len == 0) {
-		DEBUG_MSG("[tls_client] skipping certificate verification\n");
-		return GNUTLS_E_SUCCESS;
-	}
-
-	gnutls_typed_vdata_st data[2] = {
-		{ .type = GNUTLS_DT_KEY_PURPOSE_OID,
-		  .data = (void *)GNUTLS_KP_TLS_WWW_SERVER }
-	};
-	size_t data_count = 1;
-	unsigned int status;
-	int ret = gnutls_certificate_verify_peers(ctx->tls_session, data, data_count, &status);
-	if (ret != GNUTLS_E_SUCCESS) {
-		kr_log_error("[tls_client] failed to verify peer certificate\n");
+		DEBUG_MSG("[tls_client] empty CA files list\n");
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
-	return GNUTLS_E_SUCCESS;
+	if (ctx->params->hostnames.len == 0) {
+		DEBUG_MSG("[tls_client] empty hostname list\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	for (size_t i = 0; i < ctx->params->hostnames.len; ++i) {
+		gnutls_typed_vdata_st data[2] = {
+			{ .type = GNUTLS_DT_KEY_PURPOSE_OID,
+			  .data = (void *)GNUTLS_KP_TLS_WWW_SERVER },
+			{ .type = GNUTLS_DT_DNS_HOSTNAME,
+			  .data = (void *)ctx->params->hostnames.at[i] }
+		};
+		size_t data_count = 2;
+		unsigned int status;
+		int ret = gnutls_certificate_verify_peers(ctx->tls_session, data, data_count, &status);
+		if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
+			return GNUTLS_E_SUCCESS;
+		}
+	}
+
+	kr_log_error("[tls_client] failed to verify peer certificate\n");
+	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 
 static ssize_t kres_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len)

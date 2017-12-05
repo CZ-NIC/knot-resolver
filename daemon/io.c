@@ -110,7 +110,7 @@ static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
 
 static uv_stream_t *handle_alloc(uv_loop_t *loop)
 {
-	uv_stream_t *handle = calloc(1, sizeof(union uv_handles));
+	uv_stream_t *handle = calloc(1, sizeof(uv_handles_t));
 	if (!handle) {
 		return NULL;
 	}

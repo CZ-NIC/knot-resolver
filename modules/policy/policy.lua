@@ -121,15 +121,65 @@ local function forward(target)
 end
 
 -- Forward request and all subrequests to upstream over TCP; validate answers
-local function tcp_forward(target)
-	local list = {}
-	if type(target) == 'table' then
-		for _, v in pairs(target) do
-			table.insert(list, addr2sock(v))
-			assert(#list <= 4, 'at most 4 TCP_FORWARD targets are supported')
+local function tls_forward(target)
+	local sockaddr_list = {}
+	local addr_list = {}
+	local ca_files = {}
+	local hostnames = {}
+	local pins = {}
+	if type(target) ~= 'table' then
+		assert(false, 'wrong TLS_FORWARD target')
+	end
+	for _, upstream_list_entry in pairs(target) do
+		upstream_addr = upstream_list_entry[1]
+		if type(upstream_addr) ~= 'string' then
+			assert(false, 'bad IP address in TLS_FORWARD target')
 		end
-	else
-		table.insert(list, addr2sock(target))
+		table.insert(sockaddr_list, addr2sock(upstream_addr))
+		table.insert(addr_list, upstream_addr)
+		ca_file = upstream_list_entry['ca_file']
+		if ca_file ~= nil then
+			hostname = upstream_list_entry['hostname']
+			if hostname == nil then
+				assert(false, 'hostname(s) is absent in TLS_FORWARD target')
+			end
+			ca_files_local = {}
+			if type(ca_file) == 'table' then
+				for _, v in pairs(ca_file) do
+					table.insert(ca_files_local, v)
+				end
+			else
+				table.insert(ca_files_local, ca_file)
+			end
+			hostnames_local = {}
+			if type(hostname) == 'table' then
+				for _, v in pairs(hostname) do
+					table.insert(hostnames_local, v)
+				end
+			else
+				table.insert(hostnames_local, hostname)
+			end
+			if next(ca_files_local) then
+				ca_files[upstream_addr] = ca_files_local
+			end
+			if next(hostnames_local) then
+				hostnames[upstream_addr] = hostnames_local
+			end
+		end
+		pin = upstream_list_entry['pin']
+		pins_local = {}
+		if pin ~= nil then
+			if type(pin) == 'table' then
+				for _, v in pairs(pin) do
+					table.insert(pins_local, v)
+				end
+			else
+				table.insert(pins_local, pin)
+			end
+		end
+		if next(pins_local) then
+			pins[upstream_addr] = pins_local
+		end
 	end
 	return function(state, req)
 		local qry = req:current()
@@ -141,7 +191,18 @@ local function tcp_forward(target)
 		qry.flags.AWAIT_CUT = true
 		req.options.TCP = true
 		qry.flags.TCP = true
-		set_nslist(qry, list)
+		set_nslist(qry, sockaddr_list)
+		for _, v in pairs(addr_list) do
+			if (pins[v] == nil and ca_files[v] == nil) then
+				net.tls_client(v)
+			elseif (pins[v] ~= nil and ca_files[v] == nil) then
+				net.tls_client(v, pins[v])
+			elseif (pins[v] == nil and ca_files[v] ~= nil) then
+				net.tls_client(v, ca_files[v], hostnames[v])
+			else
+				net.tls_client(v, pins[v], ca_files[v], hostnames[v])
+			end
+		end
 		return state
 	end
 end
@@ -262,7 +323,7 @@ end
 local policy = {
 	-- Policies
 	PASS = 1, DENY = 2, DROP = 3, TC = 4, QTRACE = 5,
-	FORWARD = forward, TCP_FORWARD = tcp_forward,
+	FORWARD = forward, TLS_FORWARD = tls_forward,
 	STUB = stub, REROUTE = reroute, MIRROR = mirror, FLAGS = flags,
 	-- Special values
 	ANY = 0,

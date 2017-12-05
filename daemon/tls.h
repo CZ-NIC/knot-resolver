@@ -38,6 +38,7 @@ struct tls_credentials {
 
 struct tls_client_paramlist_entry {
 	array_t(const char *) ca_files;
+	array_t(const char *) hostnames;
 	array_t(const char *) pins;
 	gnutls_certificate_credentials_t credentials;
 };
@@ -87,7 +88,7 @@ struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine);
 /*! Set TLS authentication parameters for given address. */
 int tls_client_params_set(map_t *tls_client_paramlist,
 			  const char *addr, uint16_t port,
-			  const char *ca_file, const char *pin);
+			  const char *ca_file, const char *hostname, const char *pin);
 
 /*! Free TLS authentication parameters. */
 int tls_client_params_free(map_t *tls_client_paramlist);

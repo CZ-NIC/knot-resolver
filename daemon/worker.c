@@ -133,7 +133,7 @@ static inline void *iohandle_borrow(struct worker_ctx *worker)
 {
 	void *h = NULL;
 
-	const size_t size = sizeof(union uv_handles);
+	const size_t size = sizeof(uv_handles_t);
 	if (worker->pool_iohandles.len > 0) {
 		h = array_tail(worker->pool_iohandles);
 		array_pop(worker->pool_iohandles);
@@ -149,7 +149,7 @@ static inline void iohandle_release(struct worker_ctx *worker, void *h)
 {
 	assert(h);
 
-	const size_t size = sizeof(union uv_handles);
+	const size_t size = sizeof(uv_handles_t);
 	if (worker->pool_iohandles.len < MP_FREELIST_SIZE) {
 		array_push(worker->pool_iohandles, h);
 		kr_asan_poison(h, size);
@@ -172,7 +172,7 @@ static inline void *iorequest_borrow(struct worker_ctx *worker)
 {
 	void *r = NULL;
 
-	const size_t size = sizeof(union uv_reqs);
+	const size_t size = sizeof(uv_reqs_t);
 	if (worker->pool_ioreqs.len > 0) {
 		r = array_tail(worker->pool_ioreqs);
 		array_pop(worker->pool_ioreqs);
@@ -188,7 +188,7 @@ static inline void iorequest_release(struct worker_ctx *worker, void *r)
 {
 	assert(r);
 
-	const size_t size = sizeof(union uv_reqs);
+	const size_t size = sizeof(uv_reqs_t);
 	if (worker->pool_ioreqs.len < MP_FREELIST_SIZE) {
 		array_push(worker->pool_ioreqs, r);
 		kr_asan_poison(r, size);
@@ -2231,8 +2231,8 @@ static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 void worker_reclaim(struct worker_ctx *worker)
 {
 	reclaim_freelist(worker->pool_mp, struct mempool, mp_delete);
-	reclaim_freelist(worker->pool_ioreqs, union uv_reqs, free);
-	reclaim_freelist(worker->pool_iohandles, union uv_handles, free);
+	reclaim_freelist(worker->pool_ioreqs, uv_reqs_t, free);
+	reclaim_freelist(worker->pool_iohandles, uv_handles_t, free);
 	reclaim_freelist(worker->pool_sessions, struct session, session_free);
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
