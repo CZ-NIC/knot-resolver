@@ -96,6 +96,8 @@ printf "\tchar _stub[];\n};\n"
 	knot_rrset_ttl
 	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
+	knot_rrsig_sig_expiration
+	knot_rrsig_sig_inception
 # Packet
 	knot_pkt_qname
 	knot_pkt_qtype

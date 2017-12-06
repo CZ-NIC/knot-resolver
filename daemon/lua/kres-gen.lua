@@ -77,6 +77,7 @@ struct kr_qflags {
 	_Bool DNSSEC_WANT : 1;
 	_Bool DNSSEC_BOGUS : 1;
 	_Bool DNSSEC_INSECURE : 1;
+	_Bool DNSSEC_CD : 1;
 	_Bool STUB : 1;
 	_Bool ALWAYS_CUT : 1;
 	_Bool DNSSEC_WEXPAND : 1;
@@ -217,6 +218,8 @@ void knot_rrset_init_empty(knot_rrset_t *);
 uint32_t knot_rrset_ttl(const knot_rrset_t *);
 int knot_rrset_txt_dump(const knot_rrset_t *, char **, size_t *, const knot_dump_style_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
+uint32_t knot_rrsig_sig_expiration(const knot_rdataset_t *, size_t);
+uint32_t knot_rrsig_sig_inception(const knot_rdataset_t *, size_t);
 const knot_dname_t *knot_pkt_qname(const knot_pkt_t *);
 uint16_t knot_pkt_qtype(const knot_pkt_t *);
 uint16_t knot_pkt_qclass(const knot_pkt_t *);
