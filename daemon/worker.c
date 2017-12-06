@@ -1004,7 +1004,14 @@ static int session_tls_hs_cb(struct session *session, int status)
 	union inaddr *peer = &session->peer;
 	int deletion_res = worker_del_tcp_waiting(worker, &peer->ip);
 
-	if (status == 0) {
+	if (status) {
+		for (size_t i = 0; i < session->waiting.len; ++i) {
+			struct qr_task *task = session->waiting.at[0];
+			struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
+			kr_nsrep_update_rtt(&qry->ns, &peer->ip, KR_NS_TIMEOUT,
+					    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
+		}
+	} else {
 		if (deletion_res != 0) {
 			/* session isn't in list of waiting queries, *
 			 * something gone wrong */
