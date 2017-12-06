@@ -1124,7 +1124,7 @@ void worker_reclaim(struct worker_ctx *worker)
 }
 
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
-		int worker_id, int worker_count)
+		int worker_id, int worker_count, int control_fd)
 {
 	/* Load bindings */
 	engine_lualib(engine, "modules", lib_modules);
@@ -1153,6 +1153,12 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 	lua_setfield(engine->L, -2, "id");
 	lua_pushnumber(engine->L, getpid());
 	lua_setfield(engine->L, -2, "pid");
+	if (control_fd >= 0) {
+		lua_pushnumber(engine->L, control_fd);
+		lua_setfield(engine->L, -2, "control_fd");
+	}
+	lua_pushstring(engine->L, CONTROLDIR);
+	lua_setfield(engine->L, -2, "controldir");
 	lua_pushnumber(engine->L, worker_count);
 	lua_setfield(engine->L, -2, "count");
 	lua_pop(engine->L, 1);

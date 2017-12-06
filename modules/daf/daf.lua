@@ -212,7 +212,7 @@ end
 
 local function consensus(op, ...)
 	local ret = true
-	local results = map(string.format(op, ...))
+	local results = worker.map(string.format(op, ...))
 	for _, r in ipairs(results) do
 		ret = ret and r
 	end
@@ -284,7 +284,7 @@ end
 
 local function getmatches()
 	local update = {}
-	for _, rules in ipairs(map 'daf.rules') do
+	for _, rules in ipairs(worker.map('daf.rules')) do
 		for _, r in ipairs(rules) do
 			local id = tostring(r.rule.id)
 			-- Must have string keys for JSON object and not an array
@@ -296,7 +296,6 @@ end
 
 -- @function Publish DAF statistics
 local function publish(_, ws)
-	local cqueues = require('cqueues')
 	local ok, last = true, nil
 	while ok do
 		-- Check if we have new rule matches
@@ -318,7 +317,7 @@ local function publish(_, ws)
 		else
 			ok = ws:send_ping()
 		end
-		cqueues.sleep(1)
+		worker.sleep(1)
 	end
 end
 

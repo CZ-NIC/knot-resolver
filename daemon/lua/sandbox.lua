@@ -279,3 +279,187 @@ function table_print (tt, indent, done)
 	end
 	return result
 end
+
+--
+-- Implement handlers for remote commands
+--
+
+local ffi = require('ffi')
+local bit = require('bit')
+
+-- Byte swap if host byte-order ~= network byte-order
+local function n32 (x) return x end
+if ffi.abi('le') then
+	n32 = bit.bswap
+end
+
+local function remote_msg_write (sock, msg)
+	if not msg then msg = '' end
+	-- Expressions are prefixed with 4B length
+	local header = ffi.new('uint32_t [1]', n32(#msg))
+	sock:write(ffi.string(header, ffi.sizeof(header)) .. msg)
+end
+
+local function remote_msg_read (sock)
+	local header = ffi.new('uint32_t [1]', 0)
+	local hlen = ffi.sizeof(header)
+	-- Read 4B header length
+	local msg = sock:read(hlen)
+	if msg and #msg == hlen then
+		ffi.copy(header, msg, hlen)
+	end
+	-- Read the rest of the message
+	local len = tonumber(n32(header[0]))
+	if len > 0 then
+		return sock:read(len)
+	end
+end
+
+local function remote_send (sock, expr)
+	-- Exchange messages
+	remote_msg_write(sock, expr)
+	local msg = remote_msg_read(sock)
+	-- Unpack and append to table
+	if msg then
+		return fromjson(msg) or msg
+	end
+end
+
+local function remote_handle (sock)
+	-- Exchange messages
+	local msg = remote_msg_read(sock)
+	if msg then
+		-- Evaluate and return response
+		local _, resp = pcall(eval_cmd, msg, true)
+		resp = tojson(resp) or resp
+		remote_msg_write(sock, resp)
+	else
+		sock:shutdown()
+	end
+end
+
+--
+-- This extends the worker module to allow asynchronous execution of functions and nonblocking I/O.
+-- The current implementation combines cqueues for Lua interface, and event.socket() in order to not
+-- block resolver engine while waiting for I/O or timers.
+--
+local has_cqueues, cqueues = pcall(require, 'cqueues')
+if has_cqueues then
+
+	-- Import additional modules
+	local socket = require('cqueues.socket')
+
+	-- Export the asynchronous sleep function
+	worker.sleep = cqueues.sleep
+
+	-- Create metatable for workers to define the API
+	-- It can schedule multiple cqueues and yield execution when there's a wait for blocking I/O or timer
+	local asynchronous_worker_mt = {
+		work = function (self)
+			local ok, err, _, co = self.cq:step(0)
+			if not ok then
+				warn('[%s] error: %s %s', self.name or 'worker', err, debug.traceback(co))
+			end
+			-- Reschedule timeout or create new one
+			local timeout = self.cq:timeout()
+			if timeout then
+				-- Throttle timeouts to avoid too frequent wakeups
+				if timeout == 0 then timeout = 0.00001 end
+				-- Convert from seconds to duration
+				timeout = timeout * sec
+				if not self.next_timeout then
+					self.next_timeout = event.after(timeout, self.on_step)
+				else
+					event.reschedule(self.next_timeout, timeout)
+				end
+			else -- Cancel running timeout when there is no next deadline
+				if self.next_timeout then
+					event.cancel(self.next_timeout)
+					self.next_timeout = nil
+				end
+			end
+		end,
+		wrap = function (self, f)
+			self.cq:wrap(f)
+		end,
+		loop = function (self)
+			self.on_step = function () self:work() end
+			self.event_fd = event.socket(self.cq:pollfd(), self.on_step)
+		end,
+		close = function (self)
+			if self.event_fd then
+				event.cancel(self.event_fd)
+				self.event_fd = nil
+			end
+		end,
+	}
+
+	-- Implement the coroutine worker with cqueues
+	local function worker_new (name)
+		return setmetatable({name = name, cq = cqueues.new()}, { __index = asynchronous_worker_mt })
+	end
+
+	-- Create a default background worker
+	worker.bg_worker = worker_new('worker.background')
+	worker.bg_worker:loop()
+
+	-- Wrap a function for asynchronous execution
+	function worker.coroutine (f)
+		worker.bg_worker:wrap(f)
+	end
+
+	-- Export support for running commands across all forks
+	function worker.map (expr)
+		-- If there are no control sockets, evaluate locally
+		local control_sockets = worker.control_sockets()
+		if #control_sockets == 0 then
+			return {eval_cmd(expr, true)}
+		end
+		-- Send command to all control sockets
+		local results = {}
+		for _, path in ipairs(control_sockets) do
+			-- Open socket in binary mode
+			local sock = socket.connect { path = path }
+			sock:setmode('bn', 'bn')
+			local ok, result = pcall(remote_send, sock, expr)
+			sock:close()
+			if ok then
+				table.insert(results, result)
+			else
+				warn('[worker] failed to send command to "%s": %s', path, result)
+			end
+		end
+		return results
+	end
+
+	-- Handle IPC events asynchronously
+	worker.coroutine(function ()
+		-- Either take pre-bound socket or listen on control socket path
+		local sock
+		if worker.control_fd then
+			sock = socket.fdopen(worker.control_fd)
+		else
+			sock = socket.listen{path = string.format('%s/%d', worker.controldir, worker.pid), unlink = true }
+		end
+		-- Start serving clients
+		for c in sock:clients() do
+			c:setmode('bn', 'bn')
+			-- Multiplex clients
+			worker.coroutine(function()
+				while not c:eof() do
+					local ok, err = pcall(remote_handle, c)
+					if not ok then
+						warn('[worker] failed to handle remote command: %s', err)
+					end
+				end
+				c:close()
+			end)
+		end
+	end)
+else
+	-- Disable asynchronous execution
+	local function disabled () error('cqueues are required for asynchronous execution') end
+	worker.sleep = disabled
+	worker.map = disabled
+	worker.coroutine = disabled
+end

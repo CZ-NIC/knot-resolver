@@ -1,4 +1,3 @@
-local cqueues = require('cqueues')
 local snapshots, snapshots_count = {}, 120
 
 -- Gauge metrics
@@ -20,9 +19,9 @@ end
 
 local function getstats()
 	local t = {}
-	merge(t, map 'stats.list()', '')
-	merge(t, map 'cache.stats()', 'cache.')
-	merge(t, map 'worker.stats()', 'worker.')
+	merge(t, worker.map 'stats.list()', '')
+	merge(t, worker.map 'cache.stats()', 'cache.')
+	merge(t, worker.map 'worker.stats()', 'worker.')
 	return t
 end
 
@@ -64,7 +63,7 @@ local function snapshot_start()
 		end
 		-- Aggregate per-worker metrics
 		local wdata = {}
-		for _, info in pairs(map 'worker.info()') do
+		for _, info in pairs(worker.map 'worker.info()') do
 			if type(info) == 'table' then
 				wdata[tostring(info.pid)] = {
 					rss = info.rss,
@@ -83,7 +82,7 @@ local function snapshot_start()
 				table.remove(snapshots, 1)
 			end
 		end
-		cqueues.sleep(1)
+		worker.sleep(1)
 	end
 end
 
@@ -108,7 +107,7 @@ local function stream_stats(_, ws)
 			last = snapshots[id].time
 			ok = ws:send(push)
 		end
-		cqueues.sleep(1)
+		worker.sleep(1)
 	end
 end
 

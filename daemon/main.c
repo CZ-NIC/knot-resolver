@@ -66,34 +66,10 @@ static inline char *lua_strerror(int lua_err) {
  * For parameters see http://docs.libuv.org/en/v1.x/stream.html#c.uv_read_cb
  *
  * - This is just basic read-eval-print; libedit is supported through krsec;
- * - stream->data represents a bool determining binary output mode (used by kresc);
- * - binary output: uint32_t length in network order, followed by that many bytes.
  */
 static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
-	char *cmd = buf ? buf->base : NULL; /* To be free()d on return. */
-
-	/* Set output streams */
-	FILE *out = stdout;
-	uv_os_fd_t stream_fd = 0;
-	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
-		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		free(cmd);
-		return;
-	}
-	if (stream_fd != STDIN_FILENO) {
-		if (nread < 0) { /* Close if disconnected */
-			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		}
-		if (nread <= 0) {
-			free(cmd);
-			return;
-		}
-		uv_os_fd_t dup_fd = dup(stream_fd);
-		if (dup_fd >= 0) {
-			out = fdopen(dup_fd, "w");
-		}
-	}
+	auto_free char *cmd = buf ? buf->base : NULL; /* To be free()d on return. */
 
 	/* Execute */
 	if (stream && cmd && nread > 0) {
@@ -104,18 +80,10 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 			if (nread >= buf->len) { /* only equality should be possible */
 				char *newbuf = realloc(cmd, nread + 1);
 				if (!newbuf)
-					goto finish;
+					return;
 				cmd = newbuf;
 			}
 			cmd[nread] = '\0';
-		}
-
-		/* Pseudo-command for switching to "binary output";
-		 * beware: void* <-> bool */
-		bool is_binary = stream->data;
-		if (strcmp(cmd, "__binary") == 0) {
-			stream->data = (void *)(is_binary = true);
-			goto finish;
 		}
 
 		struct engine *engine = ((struct worker_ctx *)stream->loop->data)->engine;
@@ -125,159 +93,22 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		if (lua_gettop(L) > 0) {
 			message = lua_tostring(L, -1);
 		}
-
-		/* Simpler output in binary mode */
-		if (is_binary) {
-			size_t len_s = strlen(message);
-			if (len_s > UINT32_MAX)
-				goto finish;
-			uint32_t len_n = htonl(len_s);
-			fwrite(&len_n, sizeof(len_n), 1, out);
-			fwrite(message, len_s, 1, out);
-			lua_settop(L, 0);
-			goto finish;
-		}
-
-		/* Log to remote socket if connected */
-		const char *delim = g_quiet ? "" : "> ";
-		if (stream_fd != STDIN_FILENO) {
-			fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
-			if (message)
-				fprintf(out, "%s", message); /* Duplicate output to sender */
-			if (message || !g_quiet)
-				fprintf(out, "\n");
-			fprintf(out, "%s", delim);
-		}
 		/* Log to standard streams */
+		const char *delim = g_quiet ? "" : "> ";
 		FILE *fp_out = ret ? stderr : stdout;
 		if (message)
 			fprintf(fp_out, "%s", message);
 		if (message || !g_quiet)
 			fprintf(fp_out, "\n");
 		fprintf(fp_out, "%s", delim);
+		fflush(fp_out);
 		lua_settop(L, 0);
-	}
-finish:
-	fflush(out);
-	free(cmd);
-	/* Close if redirected */
-	if (stream_fd != STDIN_FILENO) {
-		fclose(out);
 	}
 }
 
 static void tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf) {
 	buf->len = suggested;
 	buf->base = malloc(suggested);
-}
-
-static void tty_accept(uv_stream_t *master, int status)
-{
-	uv_tcp_t *client = malloc(sizeof(*client));
-	if (client) {
-		 uv_tcp_init(master->loop, client);
-		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
-			free(client);
-			return;
-		 }
-		 client->data = 0;
-		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_process_input);
-		 /* Write command line */
-		 if (!g_quiet) {
-		 	uv_buf_t buf = { "> ", 2 };
-		 	uv_try_write((uv_stream_t *)client, &buf, 1);
-		 }
-	}
-}
-
-/* @internal AF_LOCAL reads may still be interrupted, loop it. */
-static bool ipc_readall(int fd, char *dst, size_t len)
-{
-	while (len > 0) {
-		int rb = read(fd, dst, len);
-		if (rb > 0) {
-			dst += rb;
-			len -= rb;
-		} else if (errno != EAGAIN && errno != EINTR) {
-			return false;
-		}
-	}
-	return true;
-}
-
-static void ipc_activity(uv_poll_t *handle, int status, int events)
-{
-	struct engine *engine = handle->data;
-	if (status != 0) {
-		kr_log_error("[system] ipc: %s\n", uv_strerror(status));
-		return;
-	}
-	/* Get file descriptor from handle */
-	uv_os_fd_t fd = 0;
-	(void) uv_fileno((uv_handle_t *)(handle), &fd);
-	/* Read expression from IPC pipe */
-	uint32_t len = 0;
-	auto_free char *rbuf = NULL;
-	if (!ipc_readall(fd, (char *)&len, sizeof(len))) {
-		goto failure;
-	}
-	if (len < UINT32_MAX) {
-		rbuf = malloc(len + 1);
-	} else {
-		errno = EINVAL;
-	}
-	if (!rbuf) {
-		goto failure;
-	}
-	if (!ipc_readall(fd, rbuf, len)) {
-		goto failure;
-	}
-	rbuf[len] = '\0';
-	/* Run expression */
-	const char *message = "";
-	int ret = engine_ipc(engine, rbuf);
-	if (ret > 0) {
-		message = lua_tostring(engine->L, -1);
-	}
-	/* Clear the Lua stack */
-	lua_settop(engine->L, 0);
-	/* Send response back */
-	len = strlen(message);
-	if (write(fd, &len, sizeof(len)) != sizeof(len) ||
-		write(fd, message, len) != len) {
-		goto failure;
-	}
-	return; /* success! */
-failure:
-	/* Note that if the piped command got read or written partially,
-	 * we would get out of sync and only receive rubbish now.
-	 * Therefore we prefer to stop IPC, but we try to continue with all else.
-	 */
-	kr_log_error("[system] stopping ipc because of: %s\n", strerror(errno));
-	uv_poll_stop(handle);
-	uv_close((uv_handle_t *)handle, (uv_close_cb)free);
-}
-
-static bool ipc_watch(uv_loop_t *loop, struct engine *engine, int fd)
-{
-	uv_poll_t *poller = malloc(sizeof(*poller));
-	if (!poller) {
-		return false;
-	}
-	int ret = uv_poll_init(loop, poller, fd);
-	if (ret != 0) {
-		free(poller);
-		return false;
-	}
-	poller->data = engine;
-	ret = uv_poll_start(poller, UV_READABLE, ipc_activity);
-	if (ret != 0) {
-		free(poller);
-		return false;
-	}
-	/* libuv sets O_NONBLOCK whether we want it or not */
-	(void) fcntl(fd, F_SETFD, fcntl(fd, F_GETFL) & ~O_NONBLOCK);
-	return true;
 }
 
 static void signal_handler(uv_signal_t *handle, int signum)
@@ -305,15 +136,10 @@ static const char *set_addr(char *addr, int *port)
  * Server operation.
  */
 
-static int fork_workers(fd_array_t *ipc_set, int forks)
+static int fork_workers(int forks)
 {
 	/* Fork subprocesses if requested */
-	while (--forks > 0) {
-		int sv[2] = {-1, -1};
-		if (socketpair(AF_LOCAL, SOCK_STREAM, 0, sv) < 0) {
-			perror("[system] socketpair");
-			return kr_error(errno);
-		}
+	for (int id = 1; id < forks; ++id) {
 		int pid = fork();
 		if (pid < 0) {
 			perror("[system] fork");
@@ -322,18 +148,11 @@ static int fork_workers(fd_array_t *ipc_set, int forks)
 
 		/* Forked process */
 		if (pid == 0) {
-			array_clear(*ipc_set);
-			array_push(*ipc_set, sv[0]);
-			close(sv[1]);
-			return forks;
-		/* Parent process */
-		} else {
-			array_push(*ipc_set, sv[1]);
-			/* Do not share parent-end with other forks. */
-			(void) fcntl(sv[1], F_SETFD, FD_CLOEXEC);
-			close(sv[0]);
+			return id;
 		}
 	}
+
+	/* Parent process */
 	return 0;
 }
 
@@ -361,53 +180,28 @@ static void help(int argc, char *argv[])
 	       " [rundir]             Path to the working directory (default: .)\n");
 }
 
-static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader, int control_fd)
+static int run_worker(uv_loop_t *loop, struct engine *engine)
 {
 	/* Control sockets or TTY */
-	auto_free char *sock_file = NULL;
-	uv_pipe_t pipe;
-	uv_pipe_init(loop, &pipe, 0);
-	pipe.data = 0;
 	if (g_interactive) {
 		if (!g_quiet)
 			printf("[system] interactive mode\n> ");
 		fflush(stdout);
+
+		uv_pipe_t pipe;
+		uv_pipe_init(loop, &pipe, 0);
+		pipe.data = 0;
 		uv_pipe_open(&pipe, 0);
 		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_process_input);
-	} else {
-		int pipe_ret = -1;
-		if (control_fd != -1) {
-			pipe_ret = uv_pipe_open(&pipe, control_fd);
-		} else {
-			(void) mkdir("tty", S_IRWXU|S_IRWXG);
-			sock_file = afmt("tty/%ld", getpid());
-			if (sock_file) {
-				pipe_ret = uv_pipe_bind(&pipe, sock_file);
-			}
-		}
-		if (!pipe_ret)
-			uv_listen((uv_stream_t *) &pipe, 16, tty_accept);
 	}
-	/* Watch IPC pipes (or just assign them if leading the pgroup). */
-	if (!leader) {
-		for (size_t i = 0; i < ipc_set->len; ++i) {
-			if (!ipc_watch(loop, engine, ipc_set->at[i])) {
-				kr_log_error("[system] failed to create poller: %s\n", strerror(errno));
-				close(ipc_set->at[i]);
-			}
-		}
-	}
-	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 
 	/* Notify supervisor. */
 #ifdef HAS_SYSTEMD
 	sd_notify(0, "READY=1");
 #endif
+
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
-	if (sock_file) {
-		unlink(sock_file);
-	}
 	return kr_ok();
 }
 
@@ -558,6 +352,35 @@ int main(int argc, char **argv)
 		config = "config";
 	}
 
+	/* Create control socket directory if not running in managed mode */
+	auto_free char *sock_file = NULL;
+	if (control_fd < 0) {
+		(void) mkdir(CONTROLDIR, S_IRWXU|S_IRWXG);
+		sock_file = afmt(CONTROLDIR "/%ld", getpid());
+	}
+
+	/* Clear stale control sockets from control directory */
+	DIR *dir = opendir(CONTROLDIR);
+	if (dir != NULL) {
+		struct dirent *result = NULL;
+		while ((result = readdir(dir)) != NULL) {
+			/* Select only UNIX sockets (if supported by the FS) */
+			if (result->d_type != DT_SOCK && result->d_type != DT_UNKNOWN) {
+				continue;
+			}
+			/* Remove stale sockets (without live PID) */
+			auto_free char *stale_socket = afmt(CONTROLDIR "/%s", result->d_name);
+			if (stale_socket) {
+				long pid = atol(result->d_name);
+				if (pid > 0 && getpgid(pid) < 0) {
+					kr_log_info("[system] clearing stale control socket '%s'\n", stale_socket);
+					unlink(stale_socket);	
+				}
+			}
+		}
+		closedir(dir);
+	}
+
 #ifndef CAN_FORK_EARLY
 	/* Forking is currently broken with libuv. We need libuv to bind to
 	 * sockets etc. before forking, but at the same time can't touch it before
@@ -569,11 +392,8 @@ int main(int argc, char **argv)
 	 }
 #endif
 
-	/* Connect forks with local socket */
-	fd_array_t ipc_set;
-	array_init(ipc_set);
 	/* Fork subprocesses if requested */
-	int fork_id = fork_workers(&ipc_set, forks);
+	int fork_id = fork_workers(forks);
 	if (fork_id < 0) {
 		return EXIT_FAILURE;
 	}
@@ -591,8 +411,9 @@ int main(int argc, char **argv)
 		kr_log_error("[system] failed to initialize engine: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
+
 	/* Create worker */
-	struct worker_ctx *worker = worker_create(&engine, &pool, fork_id, forks);
+	struct worker_ctx *worker = worker_create(&engine, &pool, fork_id, forks, control_fd);
 	if (!worker) {
 		kr_log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
@@ -655,7 +476,7 @@ int main(int argc, char **argv)
 	}
 
 	engine_set_moduledir(&engine, moduledir);
-	
+
 	/* Block signals. */
 	loop = uv_default_loop();
 	uv_signal_t sigint, sigterm;
@@ -757,7 +578,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Run the event loop */
-	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, control_fd);
+	ret = run_worker(loop, &engine);
 	if (ret != 0) {
 		perror("[system] worker failed");
 		ret = EXIT_FAILURE;
@@ -774,5 +595,8 @@ cleanup:/* Cleanup. */
 	array_clear(addr_set);
 	array_clear(tls_set);
 	kr_crypto_cleanup();
+	if (sock_file) {
+		unlink(sock_file);
+	}
 	return ret;
 }

@@ -1,0 +1,15 @@
+version: "2"
+
+services:
+  resolver:
+    build:
+      dockerfile: scripts/Dockerfile.dev
+      context: .
+    ports:
+      - "1053:53/tcp"
+      - "1053:53/udp"
+      - "1853:853"
+      - "1080:1080"
+    command: valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp kresd -f 2 -a 0.0.0.0@53
+    volumes:
+      - ./:/src

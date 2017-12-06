@@ -38,6 +38,9 @@
 #ifndef MAX_PIPELINED
 #define MAX_PIPELINED 100
 #endif
+#ifndef CONTROLDIR
+#define CONTROLDIR "tty"
+#endif
 
 /*
  * @internal These are forward decls to allow building modules with engine but without Lua.
@@ -56,7 +59,6 @@ struct engine {
     struct network net;
     module_array_t modules;
     array_t(const struct kr_cdb_api *) backends;
-    fd_array_t ipc_set;
     knot_mm_t *pool;
     uv_timer_t *updater;
     char *hostname;

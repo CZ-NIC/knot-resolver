@@ -472,61 +472,24 @@ static int l_tojson(lua_State *L)
 	return 1;
 }
 
-/** @internal Throw Lua error if expr is false */
-#define expr_checked(expr) \
-	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_rawlen(L, -2) + 1); continue; }
-
-static int l_map(lua_State *L)
+static int l_fromjson(lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_pushliteral(L, "map('string with a lua expression')");
+		lua_pushliteral(L, "expected fromjson(string)");
 		lua_error(L);
 	}
 
-	struct engine *engine = engine_luaget(L);
-	const char *cmd = lua_tostring(L, 1);
-	uint32_t len = strlen(cmd);
-	lua_newtable(L);
-
-	/* Execute on leader instance */
-	int ntop = lua_gettop(L);
-	engine_cmd(L, cmd, true);
-	lua_settop(L, ntop + 1); /* Push only one return value to table */
-	lua_rawseti(L, -2, 1);
-
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		int fd = engine->ipc_set.at[i];
-		/* Send command */
-		expr_checked(write(fd, &len, sizeof(len)) == sizeof(len));
-		expr_checked(write(fd, cmd, len) == len);
-		/* Read response */
-		uint32_t rlen = 0;
-		if (read(fd, &rlen, sizeof(rlen)) == sizeof(rlen)) {
-			expr_checked(rlen < UINT32_MAX);
-			auto_free char *rbuf = malloc(rlen + 1);
-			expr_checked(rbuf != NULL);
-			expr_checked(read(fd, rbuf, rlen) == rlen);
-			rbuf[rlen] = '\0';
-			/* Unpack from JSON */
-			JsonNode *root_node = json_decode(rbuf);
-			if (root_node) {
-				l_unpack_json(L, root_node);
-			} else {
-				lua_pushlstring(L, rbuf, rlen);
-			}
-			json_delete(root_node);
-			lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
-			continue;
-		}
-		/* Didn't respond */
-		lua_pushboolean(L, false);
-		lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+	const char *str = lua_tostring(L, 1);
+	JsonNode *root_node = json_decode(str);
+	if (root_node) {
+		l_unpack_json(L, root_node);
+		json_delete(root_node);
+	} else {
+		lua_pushstring(L, str);
 	}
+	
 	return 1;
 }
-
-#undef expr_checked
-
 
 /** Trampoline function for module properties. */
 static int l_trampoline(lua_State *L)
@@ -643,8 +606,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "libzscanner_SONAME");
 	lua_pushcfunction(engine->L, l_tojson);
 	lua_setglobal(engine->L, "tojson");
-	lua_pushcfunction(engine->L, l_map);
-	lua_setglobal(engine->L, "map");
+	lua_pushcfunction(engine->L, l_fromjson);
+	lua_setglobal(engine->L, "fromjson");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
@@ -719,11 +682,6 @@ void engine_deinit(struct engine *engine)
 	lru_free(engine->resolver.cache_rep);
 	lru_free(engine->resolver.cache_cookie);
 
-	/* Clear IPC pipes */
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		close(engine->ipc_set.at[i]);
-	}
-
 	/* Unload modules and engine. */
 	for (size_t i = 0; i < engine->modules.len; ++i) {
 		engine_unload(engine, engine->modules.at[i]);
@@ -735,7 +693,6 @@ void engine_deinit(struct engine *engine)
 	/* Free data structures */
 	array_clear(engine->modules);
 	array_clear(engine->backends);
-	array_clear(engine->ipc_set);
 	kr_ta_clear(&engine->resolver.trust_anchors);
 	kr_ta_clear(&engine->resolver.negative_anchors);
 	free(engine->hostname);

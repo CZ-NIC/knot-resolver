@@ -15,6 +15,9 @@
  */
 #include <arpa/inet.h>
 #include <assert.h>
+#include <ctype.h>
+#include <ccan/json/json.h>
+#include <contrib/cleanup.h>
 #include <contrib/ccan/asprintf/asprintf.h>
 #include <editline/readline.h>
 #include <errno.h>
@@ -322,15 +325,6 @@ static int init_tty(const char *path)
 		return 1;
 	}
 
-	// Switch to binary mode and consume the text "> ".
-	if (fprintf(g_tty, "__binary\n") < 0 || !fread(&addr, 2, 1, g_tty)
-	    || fflush(g_tty)) {
-		perror("While initializing TTY");
-		fclose(g_tty);
-		g_tty = NULL;
-		return 1;
-	}
-
 	return 0;
 }
 
@@ -341,13 +335,41 @@ static char *run_cmd(const char *cmd, size_t * out_len)
 		assert(false);
 		return NULL;
 	}
-	if (fprintf(g_tty, "%s", cmd) < 0 || fflush(g_tty))
+
+	/* Check if it's empty */
+	bool empty = true;
+	for (size_t i = 0; i < strlen(cmd); ++i) {
+		if (!isspace(cmd[i]) || isprint(cmd[i])) {
+			empty = false;
+			break;
+		}
+	}
+
+	if (empty) {
+		*out_len = 0;
+		return strdup("");
+	}
+
+	/* Format the output to get the same look as in the console */
+	auto_free char *formatted_cmd = NULL;
+	if (strstr(cmd, "end ")) {
+		formatted_cmd = strdup(cmd); /* Statements cannot be formatted */
+	} else {
+		formatted_cmd = afmt("table_print(%s)", cmd);
+	}
+
+	uint32_t len = htonl(strlen(formatted_cmd));
+	if (fwrite(&len, sizeof(len), 1, g_tty) != 1) {
 		return NULL;
-	uint32_t len;
+	}
+
+	if (fprintf(g_tty, "%s", formatted_cmd) < 0 || fflush(g_tty))
+		return NULL;
+
 	if (!fread(&len, sizeof(len), 1, g_tty))
 		return NULL;
 	len = ntohl(len);
-	char *msg = malloc(1 + (size_t) len);
+	auto_free char *msg = malloc(1 + (size_t) len);
 	if (!msg)
 		return NULL;
 	if (len && !fread(msg, len, 1, g_tty)) {
@@ -355,8 +377,20 @@ static char *run_cmd(const char *cmd, size_t * out_len)
 		return NULL;
 	}
 	msg[len] = '\0';
-	*out_len = len;
-	return msg;
+
+	/* Decode response */
+	char *result = NULL;
+	JsonNode *node = json_decode(msg);
+	switch(node->tag) {
+		case JSON_STRING: result = strdup(node->string_); break;
+		case JSON_NUMBER: result = afmt("%d", node->number_); break;
+		case JSON_BOOL:   result = afmt("%s", node->bool_ ? "true" : "false"); break;
+		default: break;
+	}
+	json_delete(node);
+
+	*out_len = strlen(result);
+	return result;
 }
 
 static int interact()

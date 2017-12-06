@@ -1292,6 +1292,32 @@ static inline double getseconds(uv_timeval_t *tv)
 	return (double)tv->tv_sec + 0.000001*((double)tv->tv_usec);
 }
 
+static int wrk_control_sockets(lua_State *L)
+{
+	lua_newtable(L);
+	DIR *dir = opendir(CONTROLDIR);
+	if (dir == NULL) {
+		return 1;
+	}
+
+	size_t position = 1;
+	struct dirent *result = NULL;
+	while ((result = readdir(dir)) != NULL) {
+		/* Select only UNIX sockets (if supported by the FS) */
+		if (result->d_type != DT_SOCK && result->d_type != DT_UNKNOWN) {
+			continue;
+		}
+
+		/* Prepend control socket path to each file */
+		lua_push_printf(L, "%s/%s", CONTROLDIR, result->d_name);
+		lua_rawseti(L, -2, position);
+		++position;
+	}
+
+	closedir(dir);
+	return 1;
+}
+
 /** Return worker statistics. */
 static int wrk_stats(lua_State *L)
 {
@@ -1299,6 +1325,7 @@ static int wrk_stats(lua_State *L)
 	if (!worker) {
 		return 0;
 	}
+
 	lua_newtable(L);
 	lua_pushnumber(L, worker->stats.concurrent);
 	lua_setfield(L, -2, "concurrent");
@@ -1344,6 +1371,7 @@ int lib_worker(lua_State *L)
 	static const luaL_Reg lib[] = {
 		{ "resolve_unwrapped",  wrk_resolve },
 		{ "stats",    wrk_stats },
+		{ "control_sockets",    wrk_control_sockets },
 		{ NULL, NULL }
 	};
 	register_lib(L, "worker", lib);

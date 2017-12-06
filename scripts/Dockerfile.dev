@@ -1,0 +1,23 @@
+FROM cznic/ci-debian-kresd
+
+# install luajit 2.1
+RUN apt-get remove -y luajit libluajit-5.1-dev && \
+	wget -c http://luajit.org/download/LuaJIT-2.1.0-beta3.tar.gz \
+	-O - | tar xzf - && \
+	cd LuaJIT-* && \
+	make install INSTALL_TNAME=luajit CCDEBUG=-g XCFLAGS='-DLUAJIT_USE_VALGRIND -O2' && \
+	ldconfig
+
+# vendor extra modules
+RUN apt-get install -y libssl-dev && \
+	luarocks install --tree=/usr/local --server=http://luarocks.org/dev cqueues && \
+    luarocks install --tree=/usr/local --server=http://luarocks.org/dev http
+
+ADD ./ /src
+WORKDIR /src
+
+# build and install binary
+RUN make -k all -j2 CFLAGS="-O0 -g" && \
+    make install && \
+    make installcheck && \
+    ldconfig

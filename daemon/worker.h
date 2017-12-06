@@ -29,7 +29,7 @@ typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, v
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
-		int worker_id, int worker_count);
+		int worker_id, int worker_count, int control_fd);
 
 /**
  * Process incoming packet (query or answer to subrequest).
