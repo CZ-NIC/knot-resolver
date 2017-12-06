@@ -530,6 +530,13 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 		array_del(entry->ca_files, 0);
 	}
 
+	while (entry->hostnames.len > 0) {
+		if (entry->hostnames.at[0] != NULL) {
+			free((void *)entry->hostnames.at[0]);
+		}
+		array_del(entry->hostnames, 0);
+	}
+
 	while (entry->pins.len > 0) {
 		if (entry->pins.at[0] != NULL) {
 			free((void *)entry->pins.at[0]);
@@ -538,6 +545,7 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 	}
 
 	array_clear(entry->ca_files);
+	array_clear(entry->hostnames);
 	array_clear(entry->pins);
 
 	if (entry->credentials) {
