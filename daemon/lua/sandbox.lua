@@ -279,3 +279,77 @@ function table_print (tt, indent, done)
 	end
 	return result
 end
+
+--
+-- This extends the worker module to allow asynchronous execution of functions and nonblocking I/O.
+-- The current implementation combines cqueues for Lua interface, and event.socket() in order to not
+-- block resolver engine while waiting for I/O or timers.
+--
+local has_cqueues, cqueues = pcall(require, 'cqueues')
+if has_cqueues then
+
+	-- Export the asynchronous sleep function
+	worker.sleep = cqueues.sleep
+
+	-- Create metatable for workers to define the API
+	-- It can schedule multiple cqueues and yield execution when there's a wait for blocking I/O or timer
+	local asynchronous_worker_mt = {
+		work = function (self)
+			local ok, err, _, co = self.cq:step(0)
+			if not ok then
+				warn('[%s] error: %s %s', self.name or 'worker', err, debug.traceback(co))
+			end
+			-- Reschedule timeout or create new one
+			local timeout = self.cq:timeout()
+			if timeout then
+				-- Throttle timeouts to avoid too frequent wakeups
+				if timeout == 0 then timeout = 0.00001 end
+				-- Convert from seconds to duration
+				timeout = timeout * sec
+				if not self.next_timeout then
+					self.next_timeout = event.after(timeout, self.on_step)
+				else
+					event.reschedule(self.next_timeout, timeout)
+				end
+			else -- Cancel running timeout when there is no next deadline
+				if self.next_timeout then
+					event.cancel(self.next_timeout)
+					self.next_timeout = nil
+				end
+			end
+		end,
+		wrap = function (self, f)
+			self.cq:wrap(f)
+		end,
+		loop = function (self)
+			self.on_step = function () self:work() end
+			self.event_fd = event.socket(self.cq:pollfd(), self.on_step)
+		end,
+		close = function (self)
+			if self.event_fd then
+				event.cancel(self.event_fd)
+				self.event_fd = nil
+			end
+		end,
+	}
+
+	-- Implement the coroutine worker with cqueues
+	local function worker_new (name)
+		return setmetatable({name = name, cq = cqueues.new()}, { __index = asynchronous_worker_mt })
+	end
+
+	-- Create a default background worker
+	worker.bg_worker = worker_new('worker.background')
+	worker.bg_worker:loop()
+
+	-- Wrap a function for asynchronous execution
+	function worker.coroutine (f)
+		worker.bg_worker:wrap(f)
+	end
+else
+	-- Disable asynchronous execution
+	local function disabled () error('cqueues are required for asynchronous execution') end
+	worker.sleep = disabled
+	worker.map = disabled
+	worker.coroutine = disabled
+end

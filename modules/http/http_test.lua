@@ -3,13 +3,8 @@ local supports_http = pcall(require, 'http') and pcall(require, 'http.request')
 if not supports_http then
 	pass('skipping http module test because its not installed')
 	done()
-end
-
--- load dependencies
-if supports_http then
-	local test_utils = require('test_utils')
+else
 	local request = require('http.request')
-	local cqueues = require('cqueues')
 
 	-- setup resolver
 	modules = {
@@ -23,19 +18,6 @@ if supports_http then
 	ok(server ~= nil, 'creates server instance')
 	local _, host, port = server:localname()
 	ok(host and port, 'binds to an interface')
-
-	-- constructor for asynchronously executed functions
-	local function asynchronous(cb)
-		local cq = cqueues.new()
-		cq:wrap(cb)
-		event.socket(cq:pollfd(), function (ev)
-			cq:step(0)
-			if cq:empty() then
-				event.cancel(ev)
-			end
-		end)
-		return cq
-	end
 
 	-- helper for returning useful values to test on
 	local function http_get(uri)
@@ -84,7 +66,8 @@ if supports_http then
 	}
 
 	-- run tests asynchronously
-	asynchronous(function ()
+	local test_utils = require('test_utils')
+	worker.coroutine(function ()
 		for _, t in ipairs(tests) do
 			test_utils.test(t)
 		end
