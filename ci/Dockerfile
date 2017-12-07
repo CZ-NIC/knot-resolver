@@ -27,7 +27,7 @@ RUN pip3 install -r /tmp/deckard-req.txt
 
 # build and install latest version of Knot DNS
 # (kresd depends on libknot and libdnssec)
-RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
+RUN git clone --depth=1 --branch=2.6 https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
 WORKDIR /tmp/knot
 RUN pwd
 RUN autoreconf -if
