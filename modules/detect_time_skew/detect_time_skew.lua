@@ -14,6 +14,7 @@ local function check_time_callback(pkt, req)
 		warn("[detect_time_skew] cannot resolve '.' NS")
 		return nil
 	end
+	local seen_rrsigs = 0
 	local valid_rrsigs = 0
 	local section = pkt:rrsets(kres.section.ANSWER)
 	local now = os.time()
@@ -24,6 +25,7 @@ local function check_time_callback(pkt, req)
 		local rr = section[i]
 		if rr.type == kres.type.RRSIG then
 			for k = 0, rr.rrs.rr_count - 1 do
+				seen_rrsigs = seen_rrsigs + 1
 				inception = knot.knot_rrsig_sig_inception(rr.rrs, k)
 				expiration = knot.knot_rrsig_sig_expiration(rr.rrs, k)
 				if now > expiration then
@@ -38,7 +40,12 @@ local function check_time_callback(pkt, req)
 			end
 		end
 	end
-	if valid_rrsigs == 0 then
+	if seen_rrsigs == 0 then
+		if verbose() then
+			log("[detect_time_skew] No RRSIGs received! "..
+			    "You really should configure DNSSEC trust anchor for the root.")
+		end
+	elseif valid_rrsigs == 0 then
 		warn("[detect_time_skew] Local system time %q seems to be at "..
 		     "least %u seconds in the %s. DNSSEC signatures for '.' NS "..
 		     "are not valid %s. Please check your system clock!",
