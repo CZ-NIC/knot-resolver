@@ -27,37 +27,58 @@
 #define QUERY_PROVIDES(q, name, cls, type) \
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
-void kr_qflags_set(struct kr_qflags *fl1, struct kr_qflags fl2)
+inline static unsigned char chars_or(const unsigned char a, const unsigned char b)
+{
+	return a | b;
+}
+
+/** Bits set to 1 in variable b will be set to zero in variable a. */
+inline static unsigned char chars_mask(const unsigned char a, const unsigned char b)
+{
+	return a & ~b;
+}
+
+/** Apply mod(a, b) to every byte a, b from fl1, fl2 and return result in fl1. */
+inline static void kr_qflags_mod(struct kr_qflags *fl1, struct kr_qflags fl2,
+			unsigned char mod(const unsigned char a, const unsigned char b))
 {
 	if (!fl1) abort();
-	typedef uint32_t ui;
 	union {
 		struct kr_qflags flags;
-		ui uints[sizeof(struct kr_qflags) / sizeof(ui)];
+		/* C99 section 6.5.3.4: sizeof(char) == 1 */
+		unsigned char chars[sizeof(struct kr_qflags)];
 	} tmp1, tmp2;
 	/* The compiler should be able to optimize all this into simple ORs. */
 	tmp1.flags = *fl1;
 	tmp2.flags = fl2;
-	for (size_t i = 0; i < sizeof(tmp1.uints) / sizeof(tmp1.uints[0]); ++i) {
-		tmp1.uints[i] |= tmp2.uints[i];
+	for (size_t i = 0; i < sizeof(struct kr_qflags); ++i) {
+		tmp1.chars[i] = mod(tmp1.chars[i], tmp2.chars[i]);
 	}
 	*fl1 = tmp1.flags;
 }
+
+/**
+ * Set bits from variable fl2 in variable fl1.
+ * Bits which are not set in fl2 are not modified in fl1.
+ *
+ * @param[in,out] fl1
+ * @param[in] fl2
+ */
+void kr_qflags_set(struct kr_qflags *fl1, struct kr_qflags fl2)
+{
+	kr_qflags_mod(fl1, fl2, chars_or);
+}
+
+/**
+ * Clear bits from variable fl2 in variable fl1.
+ * Bits which are not set in fl2 are not modified in fl1.
+ *
+ * @param[in,out] fl1
+ * @param[in] fl2
+ */
 void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2)
 {
-	if (!fl1) abort();
-	typedef uint32_t ui;
-	union {
-		struct kr_qflags flags;
-		ui uints[sizeof(struct kr_qflags) / sizeof(ui)];
-	} tmp1, tmp2;
-	/* The compiler should be able to optimize all this into simple ORs. */
-	tmp1.flags = *fl1;
-	tmp2.flags = fl2;
-	for (size_t i = 0; i < sizeof(tmp1.uints) / sizeof(tmp1.uints[0]); ++i) {
-		tmp1.uints[i] &= ~tmp2.uints[i];
-	}
-	*fl1 = tmp1.flags;
+	kr_qflags_mod(fl1, fl2, chars_mask);
 }
 
 static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name, uint32_t uid)
