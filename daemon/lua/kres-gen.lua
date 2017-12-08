@@ -187,7 +187,8 @@ struct kr_query {
 	uint32_t secret;
 	uint16_t fails;
 	uint16_t reorder;
-	struct timeval creation_time;
+	uint64_t creation_time_mono;
+	uint64_t timestamp_mono;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
@@ -250,6 +251,7 @@ void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
 void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
 int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const knot_rdata_t *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
+uint64_t kr_now();
 knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
 int kr_ta_add(map_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t *, uint16_t);
 int kr_ta_del(map_t *, const knot_dname_t *);
