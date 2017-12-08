@@ -205,6 +205,7 @@ end
 -- Load embedded modules
 modules.load('ta_signal_query')
 modules.load('priming')
+modules.load('detect_time_skew')
 
 -- Interactive command evaluation
 function eval_cmd(line, raw)

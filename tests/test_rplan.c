@@ -56,11 +56,31 @@ static void test_rplan_push(void **state)
 	kr_rplan_deinit(&rplan);
 }
 
+/**
+ * Set and clear must not omit any bit, especially around byte boundaries.
+ */
+static void test_rplan_flags(void **state)
+{
+	static struct kr_qflags f1, f2, ones, zeros; /* static => initialized to zeroes */
+	assert_true(memcmp(&f1, &f2, sizeof(f1)) == 0); /* sanity check */
+	memset(&ones, 0xff, sizeof(ones)); /* all ones */
+
+	/* test set */
+	kr_qflags_set(&f1, ones);
+	assert_true(memcmp(&f1, &ones, sizeof(f1)) == 0);  /* 1 == 1 */
+
+	/* test clear */
+	memset(&f2, 0xff, sizeof(f2)); /* all ones */
+	kr_qflags_clear(&f2, ones);
+	assert_true(memcmp(&f2, &zeros, sizeof(f1)) == 0);  /* 0 == 0 */
+}
+
 int main(void)
 {
 	const UnitTest tests[] = {
 	        unit_test(test_rplan_params),
-	        unit_test(test_rplan_push)
+	        unit_test(test_rplan_push),
+	        unit_test(test_rplan_flags)
 	};
 
 	return run_tests(tests);

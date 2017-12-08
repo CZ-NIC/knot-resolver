@@ -1226,6 +1226,10 @@ static int wrk_resolve(lua_State *L)
 	if (options->DNSSEC_WANT) {
 		knot_edns_set_do(pkt->opt_rr);
 	}
+	if (options->DNSSEC_CD) {
+		knot_wire_set_cd(pkt->wire);
+	}
+
 	if (lua_isfunction(L, 5)) {
 		/* Store callback in registry */
 		lua_pushvalue(L, 5);
