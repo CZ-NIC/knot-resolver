@@ -22,7 +22,7 @@ end
 if not trust_anchors.keysets['\0'] and trust_anchors.keyfile_default then
 	if io.open(trust_anchors.keyfile_default, 'r') then
 		trust_anchors.config(trust_anchors.keyfile_default, true)
-	else 
+	else
 		panic("cannot open default trust anchor file:'%s'",
 		      trust_anchors.keyfile_default
 		)

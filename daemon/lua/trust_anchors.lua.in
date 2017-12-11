@@ -401,7 +401,7 @@ local add_file = function (path, unmanaged)
 	end
 
 	-- Parse the file and check its sanity
-	local keyset, err = keyset_read(path)	
+	local keyset, err = keyset_read(path)
 	if not keyset then
 		panic("[ ta ] ERROR: failed to read anchors from '%s' (%s)", path, err)
 	end
