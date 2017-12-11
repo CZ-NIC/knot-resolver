@@ -4,7 +4,7 @@ System time skew detector
 -------------------------
 
 This module compares local system time with inception and expiration time
-bounds in DNSSEC signatures for `. NS` records. If the local system time is
+bounds in DNSSEC signatures for ``. NS`` records. If the local system time is
 outside of these bounds, it is likely a misconfiguration which will cause
 all DNSSEC validation (and resolution) to fail.
 
@@ -18,4 +18,4 @@ further diagnostics.
 This module is useful for debugging purposes. It runs only once during resolver
 start does not anything after that. It is enabled by default.
 You may disable the module by appending
-`modules.unload('detect_time_skew')` to your configuration.
+``modules.unload('detect_time_skew')`` to your configuration.

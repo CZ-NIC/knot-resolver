@@ -11,4 +11,4 @@ These change can affect cache records as they store timestamp and TTL in real
 time.
 
 If you want to preserve cache during time travel you should disable
-this module by modules.unload('detect_time_jump').
+this module by ``modules.unload('detect_time_jump')``.
