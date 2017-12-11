@@ -14,7 +14,6 @@ local function check_time()
 	local cache_timeshift = clear_time.walltime.sec * 1000 - clear_time.monotime
 	local actual_timeshift = os.time() * 1000 - tonumber(ffi.C.kr_now())
 	local time_diff = math.abs(cache_timeshift - actual_timeshift)
-	log("check_time, %d", time_diff)
 	if time_diff > mod.threshold then
 		log("Detected time change, clearing cache\n" ..
 		"But what does that mean? It means your future hasn't been written yet."
