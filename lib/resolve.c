@@ -812,7 +812,8 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 			WITH_VERBOSE {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "<= server: '%s' rtt: "PRIu64" ms\n", addr_str, elapsed);
+				VERBOSE_MSG(qry, "<= server: '%s' rtt: %"PRIu64" ms\n",
+						addr_str, elapsed);
 			}
 		} else {
 			/* Response didn't come from this IP, but we know the RTT must be at least
@@ -824,7 +825,8 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 			 WITH_VERBOSE {
 			 	char addr_str[INET6_ADDRSTRLEN];
 			 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "<= server: '%s' rtt: >="PRIu64" ms\n", addr_str, elapsed);
+				VERBOSE_MSG(qry, "<= server: '%s' rtt: >= %"PRIu64" ms\n",
+						addr_str, elapsed);
 			 }
 		}
 		/* Subtract query start time from elapsed time */

@@ -78,7 +78,7 @@ struct kr_cache
 
 	uint32_t ttl_min, ttl_max; /**< Maximum TTL of inserted entries */
 	struct timeval last_clear_walltime; /**< Time of last cache clear */
-	uint64_t last_clear_monotime;  /**< Last cache clear in monotonic time */
+	uint64_t last_clear_monotime;  /**< Last cache clear in monotonic milliseconds */
 };
 
 /**
