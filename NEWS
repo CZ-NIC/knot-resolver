@@ -1,20 +1,25 @@
-Knot Resolver 2.0.0 (2018-xx-yy)
+Knot Resolver 1.5.1 (2017-12-12)
 ================================
+
 Incompatible changes
 --------------------
 - script supervisor.py was removed, please migrate to a real process manager
 - module ketcd was renamed to etcd for consistency
 - module kmemcached was renamed to memcached for consistency
 
-Knot Resolver 1.5.1 (2017-1x-yy)
-================================
-
 Bugfixes
 --------
-- fix SIGPIPE crashes
+- fix SIGPIPE crashes (#271)
 - tests: work around out-of-space for platforms with larger memory pages
 - lua: fix mistakes in bindings affecting 1.4.0 and 1.5.0 (and 1.99.1-alpha),
   potentially causing problems in dns64 and workarounds modules
+- predict module: various fixes (!399)
+
+Improvements
+------------
+- add priming module to implement RFC 8109, enabled by default (#220)
+- add modules helping with system time problems, enabled by default;
+  for details see documentation of detect_time_skew and detect_time_jump
 
 
 Knot Resolver 1.5.0 (2017-11-02)
