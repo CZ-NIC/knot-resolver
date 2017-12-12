@@ -14,4 +14,4 @@ TTL expires.
 
 This module is enabled by default and it is not recommended to disable it.
 For debugging purposes you may disable the module by appending
-`modules.unload('priming')` to your configuration.
+``modules.unload('priming')`` to your configuration.
