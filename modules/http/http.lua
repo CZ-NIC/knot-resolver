@@ -352,7 +352,13 @@ function M.config(conf)
 	-- Configure web interface for resolver
 	if not conf.port then conf.port = 8053 end
 	if not conf.host then conf.host = 'localhost' end
-	if conf.geoip and has_mmdb then M.geoip = mmdb.open(conf.geoip) end
+	if conf.geoip then
+		if has_mmdb then
+			M.geoip = mmdb.open(conf.geoip)
+		else
+			error('[http] mmdblua library not found, please remove GeoIP configuration')
+		end
+	end
 	M.interface(conf.host, conf.port, M.endpoints, conf.cert, conf.key)
 	-- TODO: configure DNS/HTTP(s) interface
 	if M.ev then return end
