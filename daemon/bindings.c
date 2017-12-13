@@ -477,7 +477,6 @@ static int net_tls_client(lua_State *L)
 	const char *full_addr = NULL;
 	bool pin_exists = false;
 	bool ca_file_exists = false;
-	printf("%i\n", lua_gettop(L));
 	if ((lua_gettop(L) == 1) && lua_isstring(L, 1)) {
 		full_addr = lua_tostring(L, 1);
 	} else if ((lua_gettop(L) == 2) && lua_isstring(L, 1) && lua_istable(L, 2)) {

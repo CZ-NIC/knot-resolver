@@ -33,15 +33,23 @@ if has_socket then
 	end
 end
 
-local function addr_split_port(target)
+local function addr_split_port(target, default_port)
+	assert(default_port)
+	assert(type(default_port) == 'number')
 	local addr, port = target:match '([^@]*)@?(.*)'
-	port = port and tonumber(port) or 53
-	return addr, port
+	local nport
+	if port ~= "" then
+		nport = tonumber(port)
+		if not nport or nport < 1 or nport > 65535 then
+			error('port "'.. port  ..'" is not valid')
+		end
+	end
+	return addr, nport or default_port
 end
 
 -- String address@port -> sockaddr.
-local function addr2sock(target)
-	local addr, port = addr_split_port(target)
+local function addr2sock(target, default_port)
+	local addr, port = addr_split_port(target, default_port)
 	local sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port), ffi.C.free);
 	if sock == nil then
 		error("target '"..target..'" is not a valid IP address')
@@ -51,7 +59,7 @@ end
 
 -- Mirror request elsewhere, and continue solving
 local function mirror(target)
-	local addr, port = addr_split_port(target)
+	local addr, port = addr_split_port(target, 53)
 	local sink, err = socket_client(addr, port)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
 	return function(state, req)
@@ -80,11 +88,11 @@ local function stub(target)
 	local list = {}
 	if type(target) == 'table' then
 		for _, v in pairs(target) do
-			table.insert(list, addr2sock(v))
+			table.insert(list, addr2sock(v, 53))
 			assert(#list <= 4, 'at most 4 STUB targets are supported')
 		end
 	else
-		table.insert(list, addr2sock(target))
+		table.insert(list, addr2sock(target, 53))
 	end
 	return function(state, req)
 		local qry = req:current()
@@ -101,11 +109,11 @@ local function forward(target)
 	local list = {}
 	if type(target) == 'table' then
 		for _, v in pairs(target) do
-			table.insert(list, addr2sock(v))
+			table.insert(list, addr2sock(v, 53))
 			assert(#list <= 4, 'at most 4 FORWARD targets are supported')
 		end
 	else
-		table.insert(list, addr2sock(target))
+		table.insert(list, addr2sock(target, 53))
 	end
 	return function(state, req)
 		local qry = req:current()
@@ -135,7 +143,7 @@ local function tls_forward(target)
 		if type(upstream_addr) ~= 'string' then
 			assert(false, 'bad IP address in TLS_FORWARD target')
 		end
-		table.insert(sockaddr_list, addr2sock(upstream_addr))
+		table.insert(sockaddr_list, addr2sock(upstream_addr, 853))
 		table.insert(addr_list, upstream_addr)
 		local ca_file = upstream_list_entry['ca_file']
 		if ca_file ~= nil then
