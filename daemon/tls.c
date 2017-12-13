@@ -925,6 +925,9 @@ int tls_client_process(struct worker_ctx *worker, uv_stream_t *handle, const uin
 		if (ret < 0) {
 			return ret;
 		}
+		if (count == 0) {
+			break;
+		}
 		submitted += ret;
 	}
 	return submitted;
