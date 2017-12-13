@@ -131,15 +131,15 @@ local function tls_forward(target)
 		assert(false, 'wrong TLS_FORWARD target')
 	end
 	for _, upstream_list_entry in pairs(target) do
-		upstream_addr = upstream_list_entry[1]
+		local upstream_addr = upstream_list_entry[1]
 		if type(upstream_addr) ~= 'string' then
 			assert(false, 'bad IP address in TLS_FORWARD target')
 		end
 		table.insert(sockaddr_list, addr2sock(upstream_addr))
 		table.insert(addr_list, upstream_addr)
-		ca_file = upstream_list_entry['ca_file']
+		local ca_file = upstream_list_entry['ca_file']
 		if ca_file ~= nil then
-			hostname = upstream_list_entry['hostname']
+			local hostname = upstream_list_entry['hostname']
 			if hostname == nil then
 				assert(false, 'hostname(s) is absent in TLS_FORWARD target')
 			end
@@ -151,7 +151,7 @@ local function tls_forward(target)
 			else
 				table.insert(ca_files_local, ca_file)
 			end
-			hostnames_local = {}
+			local hostnames_local = {}
 			if type(hostname) == 'table' then
 				for _, v in pairs(hostname) do
 					table.insert(hostnames_local, v)
@@ -166,8 +166,8 @@ local function tls_forward(target)
 				hostnames[upstream_addr] = hostnames_local
 			end
 		end
-		pin = upstream_list_entry['pin']
-		pins_local = {}
+		local pin = upstream_list_entry['pin']
+		local pins_local = {}
 		if pin ~= nil then
 			if type(pin) == 'table' then
 				for _, v in pairs(pin) do
