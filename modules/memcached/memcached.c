@@ -25,7 +25,7 @@
 const struct kr_cdb_api *cdb_memcached(void);
 
 KR_EXPORT
-int kmemcached_init(struct kr_module *module)
+int memcached_init(struct kr_module *module)
 {
 	struct engine *engine = module->data;
 	array_push(engine->backends, cdb_memcached());
@@ -33,7 +33,7 @@ int kmemcached_init(struct kr_module *module)
 }
 
 KR_EXPORT
-int kmemcached_deinit(struct kr_module *module)
+int memcached_deinit(struct kr_module *module)
 {
 	struct engine *engine = module->data;
 	/* It was currently loaded, close cache */
@@ -51,4 +51,4 @@ int kmemcached_deinit(struct kr_module *module)
 	return 0;
 }
 
-KR_MODULE_EXPORT(kmemcached);
+KR_MODULE_EXPORT(memcached);
