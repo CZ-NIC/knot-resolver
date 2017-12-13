@@ -24,6 +24,7 @@
 #include "lib/generic/map.h"
 
 #define MAX_TLS_PADDING KR_EDNS_PAYLOAD
+#define TLS_MAX_UNCORK_RETRIES 100
 
 struct tls_ctx_t;
 struct tls_client_ctx_t;

@@ -231,6 +231,7 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 	}
 
 	ssize_t submitted = 0;
+	ssize_t retries = 0;
 	do {
 		count = gnutls_record_uncork(tls_p->session, 0);
 		if (count < 0) {
@@ -239,7 +240,13 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 				             gnutls_strerror_name(count), count);
 				return kr_error(EIO);
 			}
+			if (++retries > TLS_MAX_UNCORK_RETRIES) {
+				kr_log_error("[tls] gnutls_record_uncork: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
+				             retries, gnutls_strerror_name(count), count);
+				return kr_error(EIO);
+			}
 		} else {
+			retries = 0;
 			submitted += count;
 			if (count == 0 && submitted != sizeof(pkt_size) + pkt->size) {
 				kr_log_error("[tls] gnutls_record_uncork didn't send all data: %s (%zd)\n",
