@@ -143,7 +143,7 @@ local function tls_forward(target)
 			if hostname == nil then
 				assert(false, 'hostname(s) is absent in TLS_FORWARD target')
 			end
-			ca_files_local = {}
+			local ca_files_local = {}
 			if type(ca_file) == 'table' then
 				for _, v in pairs(ca_file) do
 					table.insert(ca_files_local, v)
