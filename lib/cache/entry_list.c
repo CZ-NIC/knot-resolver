@@ -121,6 +121,12 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache)
 {
+	const bool ok = val_new_entry && val_new_entry->len > 0;
+	if (!ok) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+
 	/* Find the whole entry-set and the particular entry within. */
 	knot_db_val_t val_orig_all = { }, val_orig_entry = { };
 	const struct entry_h *eh_orig = NULL;

@@ -110,6 +110,7 @@ int entry_h_seek(knot_db_val_t *val, uint16_t type);
  * Beware: the entry_h in *val_new_entry->data is zeroed, and in some cases it has
  * some flags set - and in those cases you can't just overwrite those flags.
  * All flags except is_packet are sensitive in this way.
+ * \return error code
  */
 int entry_h_splice(
 	knot_db_val_t *val_new_entry, uint8_t rank,
