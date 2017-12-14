@@ -913,7 +913,8 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 		return ret;
 	}
 	const struct entry_h *eh = entry_h_consistent(val, type);
-	if (!eh) {
+	if (!eh || eh->is_packet) {
+		// TODO: no packets, but better get rid of whole kr_cache_peek_exact().
 		kr_log_verbose("miss\n");
 		return kr_error(ENOENT);
 	}

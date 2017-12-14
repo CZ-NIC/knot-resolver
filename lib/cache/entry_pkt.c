@@ -86,7 +86,9 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 		}
 	}
 
-	if (!(want_pkt || with_nsec3) || !knot_wire_get_aa(pkt->wire)) {
+	if (!(want_pkt || with_nsec3) || !knot_wire_get_aa(pkt->wire)
+	    || pkt->parsed != pkt->size /* malformed packet; still can't detect KNOT_EFEWDATA */
+	   ) {
 		return;
 	}
 
@@ -180,6 +182,9 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	memcpy(pkt->wire, eh->data + 2, pkt_len);
 	pkt->size = pkt_len;
 	int ret = knot_pkt_parse(pkt, 0);
+	if (ret == KNOT_EFEWDATA) {
+		return kr_error(ENOENT); /* LATER(opt): avoid stashing such packets */
+	}
 	if (ret != KNOT_EOK) {
 		assert(!ret);
 		return kr_error(ret);

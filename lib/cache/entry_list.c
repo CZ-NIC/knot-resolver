@@ -171,9 +171,13 @@ int entry_h_splice(
 		}
 	}
 
+	/* LATER: enable really having multiple entries. */
+	val_orig_all = val_orig_entry = (knot_db_val_t){ };
+
 	/* Obtain new storage from cache.
 	 * Note: this does NOT invalidate val_orig_all.data.
-	 * FIXME: possibly wrong, as transaction may be switched RO->RW */
+	 * FIX ME LATER: possibly wrong, as transaction may be switched RO->RW
+	 * (conditioned on allowing multiple entries above) */
 	ssize_t storage_size = val_orig_all.len - val_orig_entry.len
 				+ val_new_entry->len;
 	assert(storage_size > 0);
