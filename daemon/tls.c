@@ -69,7 +69,7 @@ struct tls_client_ctx_t {
 
 /** @internal Debugging facility. */
 #ifdef DEBUG
-#define DEBUG_MSG(fmt...) fprintf(stderr, "[tls] " fmt)
+#define DEBUG_MSG(fmt...) kr_log_verbose("[tls] " fmt)
 #else
 #define DEBUG_MSG(fmt...)
 #endif
