@@ -145,6 +145,7 @@ struct kr_request {
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
 		_Bool tcp;
+		size_t size;
 	} qsource;
 	struct {
 		unsigned int rtt;
