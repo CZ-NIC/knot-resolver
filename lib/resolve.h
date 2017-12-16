@@ -189,6 +189,7 @@ struct kr_request {
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
 		bool tcp; /**< true if the request is on tcp; only meaningful if (dst_addr) */
+		size_t size; /* query packet size */
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */

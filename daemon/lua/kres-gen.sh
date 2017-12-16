@@ -39,6 +39,8 @@ typedef void (*trace_callback_f)(struct kr_request *);
 ./scripts/gen-cdefs.sh libkres types <<-EOF
 	knot_section_t
 	knot_rrinfo_t
+	knot_compr_t
+	struct knot_compr
 	knot_dname_t
 	knot_rdata_t
 	knot_rdataset_t

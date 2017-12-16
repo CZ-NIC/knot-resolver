@@ -280,6 +280,7 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->session = NULL;
 	task->source.handle = handle;
 	task->timeout = NULL;
+
 	/* Remember query source addr */
 	if (addr) {
 		size_t addr_len = sizeof(struct sockaddr_in);
@@ -359,6 +360,9 @@ static int qr_task_start(struct qr_task *task, knot_pkt_t *query)
 	} else if (knot_pkt_has_edns(query)) { /* EDNS */
 		answer_max = MAX(knot_edns_get_payload(query->opt_rr), KNOT_WIRE_MIN_PKTSIZE);
 	}
+
+	/* Remember query packet size */
+	task->req.qsource.size = query->size;
 
 	knot_pkt_t *answer = knot_pkt_new(NULL, answer_max, &task->req.pool);
 	if (!answer) {

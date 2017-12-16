@@ -18,6 +18,15 @@ typedef struct {
 	uint16_t flags;
 	uint16_t compress_ptr[16];
 } knot_rrinfo_t;
+typedef struct knot_compr knot_compr_t;
+struct knot_compr {
+	uint8_t *wire;
+	knot_rrinfo_t *rrinfo;
+	struct {
+		uint16_t pos;
+		uint8_t labels;
+	} suffix;
+};
 typedef unsigned char knot_dname_t;
 typedef unsigned char knot_rdata_t;
 typedef struct knot_rdataset knot_rdataset_t;
@@ -52,7 +61,7 @@ struct knot_pkt {
 	knot_rrinfo_t *rr_info;
 	knot_rrset_t *rr;
 	knot_mm_t mm;
-	char _stub[]; /* TMP: do NOT replace yet (changed in libknot-2.6.0) */
+	knot_compr_t compr;
 };
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
@@ -147,6 +156,7 @@ struct kr_request {
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
 		_Bool tcp;
+		size_t size;
 	} qsource;
 	struct {
 		unsigned int rtt;
