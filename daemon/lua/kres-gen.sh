@@ -37,6 +37,8 @@ typedef void (*map_free_f)(void *baton, void *ptr);
 ./scripts/gen-cdefs.sh libkres types <<-EOF
 	knot_section_t
 	knot_rrinfo_t
+	knot_compr_t
+	struct knot_compr
 	knot_dname_t
 	knot_rdata_t
 	knot_rdataset_t
