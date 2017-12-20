@@ -13,12 +13,16 @@ lint: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 coverage-c:
 	@echo "# C coverage in $(COVERAGE_STAGE).c.info"
 	@$(LCOV) --no-external --capture -d lib -d daemon -d modules -o $(COVERAGE_STAGE).c.info > /dev/null
-coverage-lua: $(wildcard */*/luacov.stats.out)
+coverage-lua: $(shell find -type f -name 'luacov.stats.out')
+	# map install paths to source paths
+	@$(MAKE) PREFIX=$(PREFIX) install --dry-run --always-make | scripts/map_install_src.lua --sed > .luacov_path_map
+	@find -type f -name 'luacov.stats.out' | xargs sed -i -f .luacov_path_map
+	@rm .luacov_path_map
 	@echo "# Lua coverage in $(COVERAGE_STAGE).lua.info"
-	@if [ ! -z "$^" ]; then ./scripts/luacov_to_info.lua $^ > $(COVERAGE_STAGE).lua.info; fi
+	@scripts/luacov_to_info.lua $^ > $(COVERAGE_STAGE).lua.info
 coverage:
 	@$(LCOV) $(addprefix --add-tracefile ,$(wildcard $(COVERAGE_STAGE)*.info)) --output-file coverage.info
-	@$(GENHTML) -q --ignore-errors source -o coverage -p $(realpath $(CURDIR)) -t "Knot DNS Resolver $(VERSION)-$(PLATFORM) coverage report" --legend coverage.info
+	@$(GENHTML) --no-function-coverage --no-branch-coverage -q -o coverage -p $(realpath $(CURDIR)) -t "Knot DNS Resolver $(VERSION)-$(PLATFORM) coverage report" --legend coverage.info
 
 .PHONY: all install check clean doc info coverage
 
