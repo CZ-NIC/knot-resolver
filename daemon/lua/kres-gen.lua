@@ -197,6 +197,7 @@ struct kr_query {
 	struct kr_layer_pickle *deferred;
 	uint32_t uid;
 	struct kr_query *cname_parent;
+	struct kr_request *request;
 };
 struct kr_context {
 	struct kr_qflags options;
