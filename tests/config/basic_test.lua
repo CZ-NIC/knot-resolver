@@ -1,7 +1,6 @@
 -- test if constants work properly
 local function test_constants()
 	same(kres.class.IN, 1, 'class constants work')
-	same(kres.type.NULL, 0, 'NULL type works')
 	same(kres.type.NS, 2, 'record type constants work')
 	same(kres.type.TYPE2, 2, 'unnamed record type constants work')
 	same(kres.type.BADTYPE, nil, 'non-existent type constants are checked')
