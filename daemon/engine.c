@@ -663,6 +663,34 @@ static void update_state(uv_timer_t *handle)
 	lru_apply(engine->resolver.cache_rtt, update_stat_item, NULL);
 }
 
+/**
+ * Start luacov measurement and store results to file specified by
+ * KRESD_COVERAGE_STATS environment variable.
+ * Do nothing if the variable is not set.
+ */
+static void init_measurement(struct engine *engine)
+{
+	const char * const statspath = getenv("KRESD_COVERAGE_STATS");
+	if (!statspath)
+		return;
+
+	char * snippet = NULL;
+	int ret = asprintf(&snippet,
+		"_luacov_runner = require('luacov.runner')\n"
+		"_luacov_runner.init({\n"
+		"	statsfile = '%s',\n"
+		"	exclude = {'test', 'tapered', 'lua/5.1'},\n"
+		"})\n"
+		"jit.off()\n", statspath
+	);
+	assert(ret > 0);
+
+	ret = luaL_loadstring(engine->L, snippet);
+	assert(ret == 0);
+	lua_call(engine->L, 0, 0);
+	free(snippet);
+}
+
 int engine_init(struct engine *engine, knot_mm_t *pool)
 {
 	if (engine == NULL) {
@@ -677,6 +705,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 	if (ret != 0) {
 		engine_deinit(engine);
 	}
+	init_measurement(engine);
 	/* Initialize resolver */
 	ret = init_resolver(engine);
 	if (ret != 0) {
