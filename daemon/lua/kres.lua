@@ -174,6 +174,7 @@ ffi.metatype( sockaddr_t, {
 		len = function(sa) return C.kr_inaddr_len(sa) end,
 		ip = function (sa) return C.kr_inaddr(sa) end,
 		family = function (sa) return C.kr_inaddr_family(sa) end,
+		port = function (sa) return C.kr_inaddr_port(sa) end,
 	}
 })
 
@@ -248,6 +249,14 @@ ffi.metatype( knot_pkt_t, {
 			pkt.wire[2] = bor(pkt.wire[2], (val) and 0x02 or 0x00)
 			return band(pkt.wire[2], 0x02)
 		end,
+		rd = function (pkt, val)
+			pkt.wire[2] = bor(pkt.wire[2], (val) and 0x01 or 0x00)
+			return band(pkt.wire[2],0x01)
+		end,
+		ad = function (pkt, val)
+			pkt.wire[3] = bor(pkt.wire[3], (val) and 0x20 or 0x00)
+			return band(pkt.wire[3],0x20)
+		end,
 		rrsets = function (pkt, section_id)
 			local records = {}
 			local section = knot.knot_pkt_section(pkt, section_id)
@@ -299,7 +308,13 @@ ffi.metatype( kr_request_t, {
 			local qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))
 			if qry == nil then return nil end
 			return qry
-
+		end,
+		-- returns first resolved sub query for a request
+		first_resolved = function(req)
+			assert(req)
+			local rplan = C.kr_resolve_plan(req)
+			if not rplan or rplan.resolved.len < 1 then return nil end
+			return rplan.resolved.at[0]
 		end,
 		push = function(req, qname, qtype, qclass, flags, parent)
 			assert(req)

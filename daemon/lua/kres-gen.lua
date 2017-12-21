@@ -242,6 +242,7 @@ int kr_pkt_recycle(knot_pkt_t *);
 const char *kr_inaddr(const struct sockaddr *);
 int kr_inaddr_family(const struct sockaddr *);
 int kr_inaddr_len(const struct sockaddr *);
+uint16_t kr_inaddr_port(const struct sockaddr *);
 int kr_straddr_family(const char *);
 int kr_straddr_subnet(void *, const char *);
 int kr_bitcmp(const char *, const char *, int);
