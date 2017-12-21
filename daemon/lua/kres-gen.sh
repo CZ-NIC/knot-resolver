@@ -129,6 +129,7 @@ EOF
 	kr_inaddr
 	kr_inaddr_family
 	kr_inaddr_len
+	kr_inaddr_port
 	kr_straddr_family
 	kr_straddr_subnet
 	kr_bitcmp
