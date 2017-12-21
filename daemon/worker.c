@@ -970,6 +970,15 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	knot_pkt_t *pkt_buf = task->pktbuf;
 	if (task->bytes_remaining == 0 && pkt_buf->size == 0) {
 		knot_pkt_clear(pkt_buf);
+		/* Make sure we can process maximum packet sizes over TCP for outbound queries.
+		 * Previous packet is allocated with mempool, so there's no need to free it manually. */
+		if (session->outgoing && pkt_buf->max_size < KNOT_WIRE_MAX_PKTSIZE) {
+			pkt_buf = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, &task->req.pool);
+			if (!pkt_buf) {
+				return kr_error(ENOMEM);
+			}
+			task->pktbuf = pkt_buf;
+		}
 		/* Read only one byte as TCP fragment may end at a 1B boundary
 		 * which would lead to OOB read or improper reassembly length. */
 		pkt_buf->size = 1;
