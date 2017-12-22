@@ -127,6 +127,7 @@ test:linux:amd64:valgrind:
 respdiff:iter:udp:linux:amd64:
   stage: test
   script:
+    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
     - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh udp
     - cat results/respdiff.txt
@@ -150,6 +151,7 @@ respdiff:iter:udp:linux:amd64:
 respdiff:iter:tcp:linux:amd64:
   stage: test
   script:
+    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tcp" --export)
     - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh tcp
     - cat results/respdiff.txt
@@ -173,6 +175,7 @@ respdiff:iter:tcp:linux:amd64:
 respdiff:iter:tls:linux:amd64:
   stage: test
   script:
+    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tls" --export)
     - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh tls
     - cat results/respdiff.txt
