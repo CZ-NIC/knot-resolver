@@ -29,7 +29,7 @@ local function write_lcov_info(files)
 		print('TN:')
 		print(string.format('SF:%s', fname))
 		for i, hits in pairs(finfo.coverage) do
-			print(string.format('DA:%d,%d', i - 1, hits))
+			print(string.format('DA:%d,%d', i, hits))
 			instrumented = instrumented + 1
 			if hits > 0 then
 				nonzero = nonzero + 1

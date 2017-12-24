@@ -39,7 +39,7 @@ check-install-precond:
 check-integration: check-install-precond $(deckard_DIR)/Makefile
 	$(if $(SUBMODULES_DIRTY), $(warning Warning: Git submodules are not up-to-date),)
 	@mkdir -p $(deckard_DIR)/contrib/libswrap/obj
-	+TESTS=$(TESTS) DAEMON=$(abspath $(SBINDIR)/kresd) TEMPLATE=$(TEMPLATE) $(preload_syms) $(deckard_DIR)/kresd_run.sh
+	+TESTS=$(TESTS) DAEMON=$(abspath $(SBINDIR)/kresd) TEMPLATE=$(TEMPLATE) COVERAGE_ENV_SCRIPT=$(TOPSRCDIR)/scripts/coverage_env.sh DAEMONSRCDIR=$(TOPSRCDIR) COVERAGE_STATSDIR=$(COVERAGE_STATSDIR)/deckard $(preload_syms) $(deckard_DIR)/kresd_run.sh
 
 deckard: check-integration
 

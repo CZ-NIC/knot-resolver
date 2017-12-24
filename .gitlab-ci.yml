@@ -30,7 +30,7 @@ test:linux:amd64:
   stage: test
   script:
     - PREFIX=$(pwd)/.local make -k check
-    - make coverage-c COVERAGE_STAGE=gcov-check
+    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c COVERAGE_STAGE=gcov-check
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -45,8 +45,8 @@ test:linux:amd64:
 installcheck:linux:amd64:
   stage: test
   script:
-    - PREFIX=$(pwd)/.local make -k installcheck
-    - make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck
+    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
+    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -62,7 +62,7 @@ deckard:linux:amd64:
   stage: test
   script:
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
-    - make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
+    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -127,11 +127,14 @@ test:linux:amd64:valgrind:
 respdiff:iter:udp:linux:amd64:
   stage: test
   script:
+    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
     - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh udp
     - cat results/respdiff.txt
     - echo 'test if mismatch rate >= 1 %'
     - grep -q '^target diagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+    - killall --wait kresd
+    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -139,6 +142,7 @@ respdiff:iter:udp:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - ./*.info
   tags:
     - docker
     - linux
@@ -147,11 +151,14 @@ respdiff:iter:udp:linux:amd64:
 respdiff:iter:tcp:linux:amd64:
   stage: test
   script:
+    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tcp" --export)
     - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh tcp
     - cat results/respdiff.txt
     - echo 'test if mismatch rate >= 1 %'
     - grep -q '^target diagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+    - killall --wait kresd
+    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -159,6 +166,7 @@ respdiff:iter:tcp:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - ./*.info
   tags:
     - docker
     - linux
@@ -167,11 +175,14 @@ respdiff:iter:tcp:linux:amd64:
 respdiff:iter:tls:linux:amd64:
   stage: test
   script:
+    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tls" --export)
     - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh tls
     - cat results/respdiff.txt
     - echo 'test if mismatch rate >= 1 %'
     - grep -q '^target diagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+    - killall --wait kresd
+    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -179,20 +190,30 @@ respdiff:iter:tls:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - ./*.info
   tags:
     - docker
     - linux
     - amd64
 
-coverage:linux:amd64:
+pages:
   stage: deploy
   script:
-    - make coverage
+    - PREFIX=$(pwd)/.local make coverage
+    - mv coverage/ public/
   coverage: '/lines\.+:\s(\d+.\d+\%)/'
   dependencies:
+    - build:linux:amd64
     - test:linux:amd64
     - installcheck:linux:amd64
     - deckard:linux:amd64
+    - respdiff:iter:udp:linux:amd64
+    - respdiff:iter:tcp:linux:amd64
+    - respdiff:iter:tls:linux:amd64
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - public
   tags:
     - docker
     - linux

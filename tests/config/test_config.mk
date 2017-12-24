@@ -11,13 +11,10 @@ tests_config := \
 
 define make_config_test
 $(1): check-install-precond
-	@$(preload_syms) ./tests/config/runtest.sh $(abspath $(SBINDIR)/kresd) $(abspath $(1))
-$(1)-clean:
-	@$(RM) $(dir $(1))/luacov.stats.out
+	@$(shell ./scripts/coverage_env.sh "$(TOPSRCDIR)" "$(COVERAGE_STATSDIR)/tests_config" "$(1)") $(preload_syms) ./tests/config/runtest.sh $(abspath $(SBINDIR)/kresd) $(abspath $(1))
 .PHONY: $(1)
 endef
 
 $(foreach test,$(tests_config),$(eval $(call make_config_test,$(test))))
 check-config: $(tests_config)
-check-config-clean: $(foreach test,$(tests_config),$(test)-clean)
 .PHONY: check-config
