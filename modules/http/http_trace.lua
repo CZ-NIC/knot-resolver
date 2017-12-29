@@ -48,43 +48,47 @@ local function serve_trace(h, _)
 	-- Create logging handler callback
 	local buffer = {}
 	local buffer_log_cb = ffi.cast('trace_log_f', function (query, source, msg)
-		local message = string.format('[%5u] [%s] %s',
-			tonumber(query.id), ffi.string(source), ffi.string(msg))
+		local message = string.format('[%5s] [%s] %s',
+			query.id, ffi.string(source), ffi.string(msg))
 		table.insert(buffer, message)
 	end)
 
 	-- Wait for the result of the query
 	-- Note: We can't do non-blocking write to stream directly from resolve callbacks
 	-- because they don't run inside cqueue.
+	local answers, authority = {}, {}
 	local cond = condition.new()
-	local done = false
+	local waiting, done = false, false
+	local finish_cb = ffi.cast('trace_callback_f', function (req)
+		req = kres.request_t(req)
+		add_selected_records(answers, req.answ_selected)
+		add_selected_records(authority, req.auth_selected)
+		if waiting then
+			cond:signal()
+		end
+		done = true
+	end)
 
 	-- Resolve query and buffer logs into table
-	local answers, authority = {}, {}
 	resolve {
 		name = qname,
 		type = qtype,
 		options = {'TRACE'},
-		begin = function (req)
+		init = function (req)
 			req = kres.request_t(req)
 			req.trace_log = buffer_log_cb
-		end,
-		finish = function (_, req)
-			req = kres.request_t(req)
-			add_selected_records(answers, req.answ_selected)
-			add_selected_records(authority, req.auth_selected)
-			cond:signal()
-			done = true
+			req.trace_finish = finish_cb
 		end
 	}
 
 	-- Wait for asynchronous query and free callbacks
-	if done then
-		cond:wait(0) -- Must pick up the signal
-	else
+	if not done then
+		waiting = true
 		cond:wait()
 	end
+
 	buffer_log_cb:free()
+	finish_cb:free()
 
 	-- Build the result
 	local result = table.concat(buffer, '') .. '\n'

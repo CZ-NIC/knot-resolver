@@ -256,6 +256,8 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		mp_delete(pool.ctx);
 		return NULL;
 	}
+	memset(&task->req, 0, sizeof(task->req));
+
 	/* Create packet buffers for answer and subrequests */
 	task->req.pool = pool;
 	knot_pkt_t *pktbuf = knot_pkt_new(NULL, pktbuf_max, &task->req.pool);
@@ -264,7 +266,6 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 		return NULL;
 	}
 	pktbuf->size = 0;
-	task->req.answer = NULL;
 	task->pktbuf = pktbuf;
 	array_init(task->waiting);
 	task->addrlist = NULL;
@@ -279,13 +280,6 @@ static struct qr_task *qr_task_create(struct worker_ctx *worker, uv_handle_t *ha
 	task->session = NULL;
 	task->source.handle = handle;
 	task->timeout = NULL;
-	task->on_complete = NULL;
-	task->baton = NULL;
-	task->req.qsource.key = NULL;
-	task->req.qsource.addr = NULL;
-	task->req.qsource.dst_addr = NULL;
-	task->req.qsource.packet = NULL;
-	task->req.qsource.opt = NULL;
 	/* Remember query source addr */
 	if (addr) {
 		size_t addr_len = sizeof(struct sockaddr_in);
@@ -420,15 +414,10 @@ static int qr_task_register(struct qr_task *task, struct session *session)
 
 static void qr_task_complete(struct qr_task *task)
 {
-	struct worker_ctx *worker = task->worker;
 	/* Kill pending I/O requests */
 	ioreq_killall(task);
 	assert(task->waiting.len == 0);
 	assert(task->leading == false);
-	/* Run the completion callback. */
-	if (task->on_complete) {
-		task->on_complete(worker, &task->req, task->baton);
-	}
 	/* Release primary reference to task. */
 	qr_task_unref(task);
 }
@@ -1077,8 +1066,7 @@ int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query)
 	return qr_task_step(task, NULL, query);
 }
 
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options,
-		   worker_cb_t on_complete, void *baton)
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options)
 {
 	if (!worker || !query) {
 		return kr_error(EINVAL);
@@ -1090,9 +1078,6 @@ int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflag
 		return kr_error(ENOMEM);
 	}
 
-	/* Install completion handler */
-	task->baton = baton;
-	task->on_complete = on_complete;
 	return worker_resolve_exec(task, query);
 }
 

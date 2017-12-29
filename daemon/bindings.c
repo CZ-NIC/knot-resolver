@@ -1185,21 +1185,6 @@ int lib_event(lua_State *L)
 	return 1;
 }
 
-/* @internal Call the Lua callback stored in baton. */
-static void resolve_callback(struct worker_ctx *worker, struct kr_request *req, void *baton)
-{
-	assert(worker);
-	assert(req);
-	assert(baton);
-	lua_State *L = worker->engine->L;
-	intptr_t cb_ref = (intptr_t) baton;
-	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_ref);
-	luaL_unref(L, LUA_REGISTRYINDEX, cb_ref);
-	lua_pushlightuserdata(L, req->answer);
-	lua_pushlightuserdata(L, req);
-	(void) execute_callback(L, 2);
-}
-
 static int wrk_resolve(lua_State *L)
 {
 	struct worker_ctx *worker = wrk_luaget(L);
@@ -1264,17 +1249,9 @@ static int wrk_resolve(lua_State *L)
 		lua_error(L);
 	}
 
-	/* Store completion callback in registry */
+	/* Add initialisation callback */
 	if (lua_isfunction(L, 5)) {
 		lua_pushvalue(L, 5);
-		int cb = luaL_ref(L, LUA_REGISTRYINDEX);
-		task->on_complete = resolve_callback;
-		task->baton = (void *) (intptr_t)cb;
-	}
-
-	/* Add initialisation callback */
-	if (lua_isfunction(L, 6)) {
-		lua_pushvalue(L, 6);
 		lua_pushlightuserdata(L, &task->req);
 		(void) execute_callback(L, 1);
 	}

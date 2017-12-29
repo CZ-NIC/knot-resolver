@@ -11,6 +11,7 @@ typedef struct knot_mm {
 typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
 typedef void (*trace_log_f) (const struct kr_query *, const char *, const char *);
+typedef void (*trace_callback_f)(struct kr_request *);
 typedef enum {KNOT_ANSWER, KNOT_AUTHORITY, KNOT_ADDITIONAL} knot_section_t;
 typedef struct {
 	uint16_t pos;
@@ -161,6 +162,7 @@ struct kr_request {
 	struct kr_rplan rplan;
 	int has_tls;
 	trace_log_f trace_log;
+	trace_callback_f trace_finish;
 	knot_mm_t pool;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};

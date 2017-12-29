@@ -433,14 +433,13 @@ Environment
       > user('root')
       Operation not permitted
 
-.. function:: resolve(name, type[, class = kres.class.IN, options = 0, finish = nil, begin = nil])
+.. function:: resolve(name, type[, class = kres.class.IN, options = 0, finish = nil])
 
    :param string name: Query name (e.g. 'com.')
    :param number type: Query type (e.g. ``kres.type.NS``)
    :param number class: Query class *(optional)* (e.g. ``kres.class.IN``)
    :param number options: Resolution options (see query flags)
    :param function finish: Callback to be executed when resolution completes (e.g. `function cb (pkt, req) end`). The callback gets a packet containing the final answer and doesn't have to return anything.
-   :param function begin: Callback to be executed when the request is created.
    :return: boolean
 
    The function can also be executed with a table of arguments instead. This is useful if you'd like to skip some arguments, for example:
@@ -450,8 +449,7 @@ Environment
       resolve {
          name = 'example.com',
          type = kres.type.AAAA,
-         finish = function ()
-             print('done')
+         init = function (req)
          end,
       }
 
