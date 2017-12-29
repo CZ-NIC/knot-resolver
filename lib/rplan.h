@@ -187,6 +187,13 @@ bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint
 KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 
+/**
+  * Return last query (either currently being solved or last resolved).
+  * This is necessary to retrieve the last query in case of resolution failures (e.g. time limit reached).
+  */
+KR_EXPORT KR_PURE
+struct kr_query *kr_rplan_last(struct kr_rplan *rplan);
+
 /** Return query predecessor. */
 KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_next(struct kr_query *qry);

@@ -865,7 +865,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	}
 }
 
-bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
+static bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
 {
 	uint64_t resolving_time = now - qry->creation_time_mono;
 	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
@@ -1565,7 +1565,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
 
-	struct kr_query *last = rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
+	struct kr_query *last = kr_rplan_last(rplan);
 	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
 

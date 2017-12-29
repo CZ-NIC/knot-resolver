@@ -280,6 +280,15 @@ struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan)
 	return array_tail(rplan->resolved);
 }
 
+struct kr_query *kr_rplan_last(struct kr_rplan *rplan)
+{
+	if (!kr_rplan_empty(rplan)) {
+		return array_tail(rplan->pending);
+	}
+
+	return kr_rplan_resolved(rplan);
+}
+
 struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
