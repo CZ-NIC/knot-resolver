@@ -11,7 +11,7 @@ local function add_selected_records(dst, records)
 		if verified then
 			rank = bit.band(rank, bit.bnot(kres.rank.AUTH))
 		end
-		local rank_name = kres.rank_tostring[rank] or tostring(rank)
+		local rank_name = kres.tostring.rank[rank] or tostring(rank)
 		-- Write out each individual RR
 		for rr in tostring(rec.rr):gmatch('[^\n]+\n?') do
 			local row = string.format('cached: %s, rank: %s, record: %s',

@@ -81,6 +81,8 @@ printf "\tchar _stub[];\n};\n"
 
 ## libknot API
 ./scripts/gen-cdefs.sh libknot functions <<-EOF
+# Utils
+	knot_strerror
 # Domain names
 	knot_dname_from_str
 	knot_dname_is_equal
@@ -108,6 +110,9 @@ printf "\tchar _stub[];\n};\n"
 	knot_pkt_put_question
 	knot_pkt_rr
 	knot_pkt_section
+	knot_pkt_new
+	knot_pkt_free
+	knot_pkt_parse
 EOF
 
 ## libkres API
