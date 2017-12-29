@@ -65,12 +65,5 @@ else
 		test_builtin_pages,
 	}
 
-	-- run tests asynchronously
-	local test_utils = require('test_utils')
-	worker.coroutine(function ()
-		for _, t in ipairs(tests) do
-			test_utils.test(t)
-		end
-		done()
-	end)
+	return tests
 end
