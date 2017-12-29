@@ -218,7 +218,7 @@ static int collect(kr_layer_t *ctx)
 			stat_const_add(data, metric_answer_slow, 1);
 		}
 		/* Observe the final query. */
-		struct kr_query *last = array_tail(rplan->resolved);
+		struct kr_query *last = kr_rplan_last(rplan);
 		if (last->flags.CACHED) {
 			stat_const_add(data, metric_answer_cached, 1);
 		}
