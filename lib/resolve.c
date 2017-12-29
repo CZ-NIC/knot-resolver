@@ -720,6 +720,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->answ_validated = false;
 	request->auth_validated = false;
 	request->trace_log = NULL;
+	request->trace_finish = NULL;
 
 	/* Expect first query */
 	kr_rplan_init(&request->rplan, request, &request->pool);
@@ -1567,6 +1568,16 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	struct kr_query *last = rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
 	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
+
+	/* Trace request finish */
+	if (request->trace_finish) {
+		request->trace_finish(request);
+	}
+
+	/* Uninstall all tracepoints */
+	request->trace_finish = NULL;
+	request->trace_log = NULL;
+
 	return KR_STATE_DONE;
 }
 

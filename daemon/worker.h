@@ -24,8 +24,6 @@
 /** Worker state (opaque). */
 struct worker_ctx;
 struct qr_task;
-/** Worker callback */
-typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, void *baton);
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
@@ -76,8 +74,7 @@ int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query);
  * @note the options passed are |-combined with struct kr_context::options
  * @todo maybe better semantics for this?
  */
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options,
-		   worker_cb_t on_complete, void *baton);
+int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options);
 
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);
@@ -143,8 +140,6 @@ struct qr_task
 	uint16_t bytes_remaining;
 	struct sockaddr *addrlist;
 	uv_timer_t *timeout;
-	worker_cb_t on_complete;
-	void *baton;
 	struct {
 		union inaddr addr;
 		union inaddr dst_addr;

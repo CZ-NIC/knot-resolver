@@ -1,3 +1,5 @@
+local ffi = require('ffi')
+
 -- Units
 kB = 1024
 MB = 1024*kB
@@ -28,7 +30,7 @@ if rawget(kres, 'str2dname') ~= nil then
 end
 
 -- Compatibility wrapper for query flags.
-worker.resolve = function (qname, qtype, qclass, options, finish, begin)
+worker.resolve = function (qname, qtype, qclass, options, finish, init)
 	-- Alternatively use named arguments
 	if type(qname) == 'table' then
 		local t = qname
@@ -37,11 +39,28 @@ worker.resolve = function (qname, qtype, qclass, options, finish, begin)
 		qclass = t.class or kres.class.IN
 		options = t.options
 		finish = t.finish
-		begin = t.begin
+		init = t.init
 	end
+
+	local init_cb, finish_cb = init, nil
+	if finish then
+		-- Create callback for finalization
+		finish_cb = ffi.cast('trace_callback_f', function (req)
+			req = kres.request_t(req)
+			finish(req.answer, req)
+			finish_cb:free()
+		end)
+		-- Wrap initialiser to install finish callback
+		init_cb = function (req)
+			req = kres.request_t(req)
+			if init then init(req) end
+			req.trace_finish = finish_cb
+		end
+	end
+
 	-- Translate options and resolve
 	options = kres.mk_qflags(options)
-	return worker.resolve_unwrapped(qname, qtype, qclass, options, finish, begin)
+	return worker.resolve_unwrapped(qname, qtype, qclass, options, init_cb)
 end
 
 resolve = worker.resolve
@@ -280,7 +299,6 @@ function table_print (tt, indent, done)
 	return result
 end
 
---
 -- This extends the worker module to allow asynchronous execution of functions and nonblocking I/O.
 -- The current implementation combines cqueues for Lua interface, and event.socket() in order to not
 -- block resolver engine while waiting for I/O or timers.
