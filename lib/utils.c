@@ -542,13 +542,16 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			continue;
 		}
 		/* Found the entry to merge with.  Check consistency and merge. */
-		bool ok = stashed->rank == rank
-			&& !stashed->cached
-			&& stashed->to_wire == to_wire;
+		bool ok = stashed->rank == rank && !stashed->cached;
 		if (!ok) {
 			assert(false);
 			return kr_error(EEXIST);
 		}
+		/* It may happen that an RRset is first considered useful
+		 * (to_wire = false, e.g. due to being part of glue),
+		 * and later we may find we also want it in the answer. */
+		stashed->to_wire = stashed->to_wire || to_wire;
+
 		return knot_rdataset_merge(&stashed->rr->rrs, &rr->rrs, pool);
 	}
 
