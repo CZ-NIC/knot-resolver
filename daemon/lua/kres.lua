@@ -203,6 +203,15 @@ setmetatable(const_type, {
 	end
 })
 
+-- Metatype for RR types to allow anonymous string types
+setmetatable(const_type_str, {
+	__index = function (t, k)
+		local v = rawget(t, k)
+		if v then return v end
+		return string.format('TYPE%d', k)
+	end
+})
+
 -- Metatype for sockaddr
 local addr_buf = ffi.new('char[16]')
 local sockaddr_t = ffi.typeof('struct sockaddr')

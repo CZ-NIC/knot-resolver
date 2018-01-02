@@ -10,6 +10,7 @@ local function test_constants()
 	-- Test inverset tables to convert constants to text
 	same(kres.tostring.class[1], 'IN', 'text class constants work')
 	same(kres.tostring.type[2], 'NS', 'text record type constants work')
+	same(kres.tostring.type[65535], 'TYPE65535', 'text record type undefined constants work')
 	same(kres.tostring.section[0], 'ANSWER', 'text section constants work')
 	same(kres.tostring.rcode[2], 'SERVFAIL', 'text rcode constants work')
 	same(kres.tostring.opcode[5], 'UPDATE', 'text opcode constants work')
