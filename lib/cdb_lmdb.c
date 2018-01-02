@@ -57,12 +57,19 @@ struct lmdb_env
 static int lmdb_error(int error)
 {
 	switch (error) {
-	case MDB_SUCCESS:  return kr_ok();
-	case MDB_NOTFOUND: return kr_error(ENOENT);
-	case MDB_MAP_FULL: /* Fallthrough */
-	case MDB_TXN_FULL: /* Fallthrough */
+	case MDB_SUCCESS:
+		return kr_ok();
+	case MDB_NOTFOUND:
+		return kr_error(ENOENT);
+
 	case ENOSPC:
+	case MDB_MAP_FULL:
+	case MDB_TXN_FULL:
+	case MDB_BAD_TXN:
+		/* _BAD_TXN in practice happens with overfull DB,
+		 * even during mdb_get with a single fork :-/ */
 		return kr_error(ENOSPC);
+
 	default:
 		kr_log_error("[cache] LMDB error: %s\n", mdb_strerror(error));
 		assert(false);
@@ -183,11 +190,7 @@ static int cdb_sync(knot_db_t *db)
 	struct lmdb_env *env = db;
 	int ret = kr_ok();
 	if (env->txn.rw) {
-		ret = mdb_txn_commit(env->txn.rw);
-		if (ret != MDB_BAD_TXN) {
-			/* _BAD_TXN happens during overfull clear with multiple forks :-/ */
-			ret = lmdb_error(ret);
-		}
+		ret = lmdb_error(mdb_txn_commit(env->txn.rw));
 		env->txn.rw = NULL; /* the transaction got freed even in case of errors */
 	} else if (env->txn.ro && env->txn.ro_active) {
 		mdb_txn_reset(env->txn.ro);
@@ -480,7 +483,12 @@ static int cdb_readv(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val
 		MDB_val _val = val_knot2mdb(val[i]);
 		ret = mdb_get(txn, env->dbi, &_key, &_val);
 		if (ret != MDB_SUCCESS) {
-			return lmdb_error(ret);
+			ret = lmdb_error(ret);
+			if (ret == kr_error(ENOSPC)) {
+				/* we're likely to be forced to cache clear anyway */
+				ret = kr_error(ENOENT);
+			}
+			return ret;
 		}
 		/* Update the result. */
 		val[i] = val_mdb2knot(_val);
