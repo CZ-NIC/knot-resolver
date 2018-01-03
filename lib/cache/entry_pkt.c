@@ -129,7 +129,8 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	knot_db_val_t key;
 	int ret = kr_dname_lf(k->buf, owner, false);
 	if (ret) {
-		assert(!ret);
+		/* A server might (incorrectly) reply with QDCOUNT=0. */
+		assert(owner == NULL);
 		return;
 	}
 	key = key_exact_type_maypkt(k, pkt_type);
