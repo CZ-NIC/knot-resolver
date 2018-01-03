@@ -6,6 +6,12 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
   COVERAGE: '1'
 
+stages:
+  - build
+  - test
+  - coverage
+  - deploy
+
 build:linux:amd64:
   stage: build
   script:
@@ -196,11 +202,15 @@ respdiff:iter:tls:linux:amd64:
     - linux
     - amd64
 
-pages:
-  stage: deploy
+# compute coverage for all runs
+coverage:
+  stage: coverage
   script:
     - PREFIX=$(pwd)/.local make coverage
-    - mv coverage/ public/
+  artifacts:
+    expire_in: '1 week'
+    paths:
+      - coverage
   coverage: '/lines\.+:\s(\d+.\d+\%)/'
   dependencies:
     - build:linux:amd64
@@ -210,14 +220,24 @@ pages:
     - respdiff:iter:udp:linux:amd64
     - respdiff:iter:tcp:linux:amd64
     - respdiff:iter:tls:linux:amd64
-  artifacts:
-    expire_in: 30 days
-    paths:
-      - public
   tags:
     - docker
     - linux
     - amd64
+
+# publish coverage only for master branch
+pages:
+  stage: deploy
+  only:
+    - master
+  dependencies:
+    - coverage
+  script:
+    - mv coverage/ public/
+  artifacts:
+    expire_in: '30 days'
+    paths:
+      - public
 
 #arm_build:
 #  image: cznic/armhf-ubuntu:16.04
