@@ -453,6 +453,8 @@ static int interact()
 
 int main(int argc, char **argv)
 {
+	fprintf(stderr, "Warning! %s is highly experimental, use at own risk.\n", argv[0]);
+	fprintf(stderr, "Please tell authors what features you expect from client utility.\n");
 	if (argc != 2) {
 		fprintf(stderr, "Usage: %s tty/xxxxx\n", argv[0]);
 		return 1;

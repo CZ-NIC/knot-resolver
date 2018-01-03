@@ -301,6 +301,13 @@ static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
 	return ret;
 }
 
+/** The current time in monotonic milliseconds.
+ *
+ * \note it may be outdated in case of long callbacks; see uv_now().
+ */
+KR_EXPORT
+uint64_t kr_now();
+
 /** Convert name from lookup format to wire.  See knot_dname_lf
  *
  * \note len bytes are read and len+1 are written with *normal* LF,

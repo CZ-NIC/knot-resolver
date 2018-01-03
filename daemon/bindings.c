@@ -547,6 +547,23 @@ static int cache_count(lua_State *L)
 	return 0;
 }
 
+/** Return time of last cache clear */
+static int cache_last_clear(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	lua_newtable(L);
+	lua_pushnumber(L, cache->last_clear_monotime);
+	lua_setfield(L, -2, "monotime");
+	lua_newtable(L);
+	lua_pushnumber(L, cache->last_clear_walltime.tv_sec);
+	lua_setfield(L, -2, "sec");
+	lua_pushnumber(L, cache->last_clear_walltime.tv_usec);
+	lua_setfield(L, -2, "usec");
+	lua_setfield(L, -2, "walltime");
+	return 1;
+}
+
 /** Return cache statistics. */
 static int cache_stats(lua_State *L)
 {
@@ -912,6 +929,7 @@ int lib_cache(lua_State *L)
 		{ "backends", cache_backends },
 		{ "count",  cache_count },
 		{ "stats",  cache_stats },
+		{ "last_clear",  cache_last_clear },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
 		{ "prune",  cache_prune },
@@ -1224,6 +1242,13 @@ static int wrk_resolve(lua_State *L)
 		lua_pushstring(L, "invalid options");
 		lua_error(L);
 	}
+	if (options->DNSSEC_WANT) {
+		knot_edns_set_do(pkt->opt_rr);
+	}
+	if (options->DNSSEC_CD) {
+		knot_wire_set_cd(pkt->wire);
+	}
+
 	if (lua_isfunction(L, 5)) {
 		/* Store callback in registry */
 		lua_pushvalue(L, 5);

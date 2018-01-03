@@ -1,7 +1,5 @@
 -- Module interface
-local policy = require('policy')
 local ffi = require('ffi')
-local bit = require('bit')
 local prefixes = {}
 
 -- Create subnet prefix rule
@@ -54,22 +52,20 @@ local function renumber_record(tbl, rr)
 			local rdlen = #rr.rdata
 			if rdlen < chunks then return rr end -- Address length mismatch
 			ffi.copy(addr_buf, rr.rdata, rdlen)
-			ffi.copy(addr_buf, prefix[3], chunks)
-			-- @todo: CIDR not supported
-			to_copy = to_copy - chunks * 8
+			ffi.copy(addr_buf, prefix[3], chunks) -- Rewrite prefix
 			rr.rdata = ffi.string(addr_buf, rdlen)
 			return rr
 		end
-	end	
+	end
 	return nil
 end
 
 -- Renumber addresses based on config
-local function rule(prefixes)
+local function rule()
 	return function (state, req)
 		if state == kres.FAIL then return state end
 		req = kres.request_t(req)
-		pkt = kres.pkt_t(req.answer)
+		local pkt = kres.pkt_t(req.answer)
 		-- Only successful answers
 		local records = pkt:section(kres.section.ANSWER)
 		local ancount = #records
@@ -123,7 +119,7 @@ end
 
 -- Layers
 M.layer = {
-	finish = rule(prefixes),
+	finish = rule(),
 }
 
 return M

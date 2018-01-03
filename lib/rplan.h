@@ -44,6 +44,7 @@ struct kr_qflags {
 				  * i.e. knot_wire_set_cd(request->answer->wire). */
 	bool DNSSEC_BOGUS : 1;   /**< Query response is DNSSEC bogus. */
 	bool DNSSEC_INSECURE : 1;/**< Query response is DNSSEC insecure. */
+	bool DNSSEC_CD : 1;      /**< CD bit in query */
 	bool STUB : 1;           /**< Stub resolution, accept received answer as solved. */
 	bool ALWAYS_CUT : 1;     /**< Always recover zone cut (even if cached). */
 	bool DNSSEC_WEXPAND : 1; /**< Query response has wildcard expansion. */
@@ -83,9 +84,11 @@ struct kr_query {
 	uint32_t secret;
 	uint16_t fails;
 	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
-	struct timeval creation_time; /* The time of query's creation.
-				       * Or time of creation of an oldest
-				       * ancestor if it is a subquery. */
+	uint64_t creation_time_mono; /* The time of query's creation (milliseconds).
+				 * Or time of creation of an oldest
+				 * ancestor if it is a subquery. */
+	uint64_t timestamp_mono; /**< Time of query created or time of
+	                           * query to upstream resolver (milliseconds). */
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;

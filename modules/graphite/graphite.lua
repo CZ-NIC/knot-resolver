@@ -76,7 +76,7 @@ local function publish_table(metrics, prefix, now)
 	end
 end
 
-function M.init(module)
+function M.init()
 	M.ev = nil
 	M.cli = {}
 	M.info = {}
@@ -85,7 +85,7 @@ function M.init(module)
 	return 0
 end
 
-function M.deinit(module)
+function M.deinit()
 	if M.ev then event.cancel(M.ev) end
 	return 0
 end
@@ -103,8 +103,13 @@ function M.publish()
 end
 
 -- @function Make connection to Graphite server.
-function M.add_server(graphite, host, port, tcp)
-	local s, err = tcp and make_tcp(host, port) or make_udp(host, port)
+function M.add_server(_, host, port, tcp)
+	local s, err
+	if tcp then
+		s, err = make_tcp(host, port)
+	else
+		s, err = make_udp(host, port)
+	end
 	if not s then
 		error(err)
 	end
@@ -121,11 +126,11 @@ function M.config(conf)
 	if conf.prefix then M.prefix = conf.prefix end
 	-- connect to host(s)
 	if type(conf.host) == 'table' then
-		for key, val in pairs(conf.host) do
-			graphite:add_server(val, conf.port, conf.tcp)
+		for _, val in pairs(conf.host) do
+			M:add_server(val, conf.port, conf.tcp)
 		end
 	else
-		graphite:add_server(conf.host, conf.port, conf.tcp)
+		M:add_server(conf.host, conf.port, conf.tcp)
 	end
 	-- start publishing stats
 	if M.ev then event.cancel(M.ev) end

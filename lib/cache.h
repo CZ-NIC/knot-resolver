@@ -18,6 +18,7 @@
 
 #include <libknot/consts.h>
 #include <libknot/rrset.h>
+#include <sys/time.h>
 #include "lib/cdb.h"
 #include "lib/defines.h"
 #include "contrib/ucw/config.h" /*uint*/
@@ -47,6 +48,8 @@ struct kr_cache
 	} stats;
 
 	uint32_t ttl_min, ttl_max; /**< TTL limits */
+	struct timeval last_clear_walltime; /**< Time of last cache clear */
+	uint64_t last_clear_monotime;  /**< Last cache clear in monotonic milliseconds */
 };
 
 /**

@@ -5,19 +5,19 @@
 # Run kresd in temp directory and use config test.cfg
 # Check return code of kresd. Passed test have to call quit().
 
-tests_lua := \
-	hints
+tests_config := \
+	$(wildcard modules/*/*_test.lua) \
+	$(wildcard tests/config/*_test.lua)
 
-check-config:
-	$(foreach test,$(tests_lua), \
-		@echo "config-test: $(test)" ;\
-		export TMP_RUNDIR=`mktemp -d` ;\
-		cp "tests/config/$(test)"/* $${TMP_RUNDIR} ;\
-		cp tests/config/test_utils.lua $${TMP_RUNDIR} ;\
-		$(preload_syms) $(DEBUGGER) $(abspath $(SBINDIR)/kresd) -c test.cfg $${TMP_RUNDIR} > /dev/null ;\
-		export retval=$$? ;\
-		rm -rf $${TMP_RUNDIR} ;\
-		test $${retval} -eq 0 ;\
-	)
+define make_config_test
+$(1): check-install-precond
+	@$(preload_syms) ./tests/config/runtest.sh $(abspath $(SBINDIR)/kresd) $(abspath $(1))
+$(1)-clean:
+	@$(RM) $(dir $(1))/luacov.stats.out
+.PHONY: $(1)
+endef
 
+$(foreach test,$(tests_config),$(eval $(call make_config_test,$(test))))
+check-config: $(tests_config)
+check-config-clean: $(foreach test,$(tests_config),$(test)-clean)
 .PHONY: check-config

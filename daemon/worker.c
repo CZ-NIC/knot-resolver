@@ -678,8 +678,8 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 	}
 	/* Notify waiting tasks. */
 	struct kr_query *leader_qry = array_tail(task->req.rplan.pending);
-	for (size_t i = task->waiting.len; i --> 0;) {
-		struct qr_task *follower = task->waiting.at[i];
+	for (size_t i = task->waiting.len; i > 0; i--) {
+		struct qr_task *follower = task->waiting.at[i - 1];
 		/* Reuse MSGID and 0x20 secret */
 		if (follower->req.rplan.pending.len > 0) {
 			struct kr_query *qry = array_tail(follower->req.rplan.pending);

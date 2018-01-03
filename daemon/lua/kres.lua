@@ -3,7 +3,7 @@
 
 local kres -- the module
 
-ffi = require('ffi')
+local ffi = require('ffi')
 local bit = require('bit')
 local bor = bit.bor
 local band = bit.band
@@ -12,86 +12,6 @@ local knot = ffi.load(libknot_SONAME)
 
 -- Various declarations that are very stable.
 ffi.cdef[[
-
-/*
- * Record types and classes.
- */
-struct rr_class {
-	static const int IN         =   1;
-	static const int CH         =   3;
-	static const int NONE       = 254;
-	static const int ANY        = 255;
-};
-struct rr_type {
-	static const int A          =   1;
-	static const int NS         =   2;
-	static const int CNAME      =   5;
-	static const int SOA        =   6;
-	static const int NULL       =  10;
-	static const int PTR        =  12;
-	static const int HINFO      =  13;
-	static const int MINFO      =  14;
-	static const int MX         =  15;
-	static const int TXT        =  16;
-	static const int RP         =  17;
-	static const int AFSDB      =  18;
-	static const int RT         =  21;
-	static const int SIG        =  24;
-	static const int KEY        =  25;
-	static const int AAAA       =  28;
-	static const int LOC        =  29;
-	static const int SRV        =  33;
-	static const int NAPTR      =  35;
-	static const int KX         =  36;
-	static const int CERT       =  37;
-	static const int DNAME      =  39;
-	static const int OPT        =  41;
-	static const int APL        =  42;
-	static const int DS         =  43;
-	static const int SSHFP      =  44;
-	static const int IPSECKEY   =  45;
-	static const int RRSIG      =  46;
-	static const int NSEC       =  47;
-	static const int DNSKEY     =  48;
-	static const int DHCID      =  49;
-	static const int NSEC3      =  50;
-	static const int NSEC3PARAM =  51;
-	static const int TLSA       =  52;
-	static const int CDS        =  59;
-	static const int CDNSKEY    =  60;
-	static const int SPF        =  99;
-	static const int NID        = 104;
-	static const int L32        = 105;
-	static const int L64        = 106;
-	static const int LP         = 107;
-	static const int EUI48      = 108;
-	static const int EUI64      = 109;
-	static const int TKEY       = 249;
-	static const int TSIG       = 250;
-	static const int IXFR       = 251;
-	static const int AXFR       = 252;
-	static const int ANY        = 255;
-};
-struct pkt_section {
-	static const int ANSWER     = 0;
-	static const int AUTHORITY  = 1;
-	static const int ADDITIONAL = 2;
-};
-struct pkt_rcode {
-	static const int NOERROR    =  0;
-	static const int FORMERR    =  1;
-	static const int SERVFAIL   =  2;
-	static const int NXDOMAIN   =  3;
-	static const int NOTIMPL    =  4;
-	static const int REFUSED    =  5;
-	static const int YXDOMAIN   =  6;
-	static const int YXRRSET    =  7;
-	static const int NXRRSET    =  8;
-	static const int NOTAUTH    =  9;
-	static const int NOTZONE    = 10;
-	static const int BADVERS    = 16;
-};
-
 /*
  * Data structures
  */
@@ -116,6 +36,135 @@ int inet_pton(int af, const char *src, void *dst);
 ]]
 
 require('kres-gen')
+
+-- Constant tables
+local const_class = {
+	IN         =   1,
+	CH         =   3,
+	NONE       = 254,
+	ANY        = 255,
+}
+local const_type = {
+	A          =   1,
+	NS         =   2,
+	MD         =   3,
+	MF         =   4,
+	CNAME      =   5,
+	SOA        =   6,
+	MB         =   7,
+	MG         =   8,
+	MR         =   9,
+	NULL       =  10,
+	WKS        =  11,
+	PTR        =  12,
+	HINFO      =  13,
+	MINFO      =  14,
+	MX         =  15,
+	TXT        =  16,
+	RP         =  17,
+	AFSDB      =  18,
+	X25        =  19,
+	ISDN       =  20,
+	RT         =  21,
+	NSAP       =  22,
+	['NSAP-PTR']   =  23,
+	SIG        =  24,
+	KEY        =  25,
+	PX         =  26,
+	GPOS       =  27,
+	AAAA       =  28,
+	LOC        =  29,
+	NXT        =  30,
+	EID        =  31,
+	NIMLOC     =  32,
+	SRV        =  33,
+	ATMA       =  34,
+	NAPTR      =  35,
+	KX         =  36,
+	CERT       =  37,
+	A6         =  38,
+	DNAME      =  39,
+	SINK       =  40,
+	OPT        =  41,
+	APL        =  42,
+	DS         =  43,
+	SSHFP      =  44,
+	IPSECKEY   =  45,
+	RRSIG      =  46,
+	NSEC       =  47,
+	DNSKEY     =  48,
+	DHCID      =  49,
+	NSEC3      =  50,
+	NSEC3PARAM =  51,
+	TLSA       =  52,
+	SMIMEA     =  53,
+	HIP        =  55,
+	NINFO      =  56,
+	RKEY       =  57,
+	TALINK     =  58,
+	CDS        =  59,
+	CDNSKEY    =  60,
+	OPENPGPKEY =  61,
+	CSYNC      =  62,
+	SPF        =  99,
+	UINFO      = 100,
+	UID        = 101,
+	GID        = 102,
+	UNSPEC     = 103,
+	NID        = 104,
+	L32        = 105,
+	L64        = 106,
+	LP         = 107,
+	EUI48      = 108,
+	EUI64      = 109,
+	TKEY       = 249,
+	TSIG       = 250,
+	IXFR       = 251,
+	AXFR       = 252,
+	MAILB      = 253,
+	MAILA      = 254,
+	ANY        = 255,
+	URI        = 256,
+	CAA        = 257,
+	AVC        = 258,
+	DOA        = 259,
+	TA         = 32768,
+	DLV        = 32769,
+}
+local const_section = {
+	ANSWER     = 0,
+	AUTHORITY  = 1,
+	ADDITIONAL = 2,
+}
+local const_rcode = {
+	NOERROR    =  0,
+	FORMERR    =  1,
+	SERVFAIL   =  2,
+	NXDOMAIN   =  3,
+	NOTIMPL    =  4,
+	REFUSED    =  5,
+	YXDOMAIN   =  6,
+	YXRRSET    =  7,
+	NXRRSET    =  8,
+	NOTAUTH    =  9,
+	NOTZONE    = 10,
+	BADVERS    = 16,
+	BADCOOKIE  = 23,
+}
+
+-- Metatype for RR types to allow anonymous types
+setmetatable(const_type, {
+	__index = function (t, k)
+		local v = rawget(t, k)
+		if v then return v end
+		-- Allow TYPE%d notation
+		if string.find(k, 'TYPE', 1, true) then
+			return tonumber(k:sub(5))
+		end
+		-- Unknown type
+		return
+	end
+})
 
 -- Metatype for sockaddr
 local addr_buf = ffi.new('char[16]')
@@ -164,37 +213,19 @@ ffi.metatype( knot_rrset_t, {
 
 		-- Dump the rrset in presentation format (dig-like).
 		txt_dump = function(rr, style)
-			if @KNOT_RRSET_TXT_DUMP@ then
-				local bufsize = 1024
-				local dump = ffi.new('char *[1]', C.malloc(bufsize))
-					-- ^ one pointer to a string
-				local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
+			local bufsize = 1024
+			local dump = ffi.new('char *[1]', C.malloc(bufsize))
+				-- ^ one pointer to a string
+			local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
 
-				local ret = knot.knot_rrset_txt_dump(rr, dump, size,
-								style or knot.KNOT_DUMP_STYLE_DEFAULT)
-				local result = nil
-				if ret >= 0 then
-					result = ffi.string(dump[0], ret)
-				end
-				C.free(dump[0])
-				return result
-			else
-				-- different _txt_dump ABI -> use old "binary" method
-				local function hex_encode(str)
-					return (str:gsub('.', function (c)
-						return string.format('%02X', string.byte(c))
-					end))
-				end
-				local result = ''
-				local i
-				for i = 0, rr.rrs.rr_count - 1 do
-					local rr1 = rr:get(i)
-					local rdata = hex_encode(rr1.rdata)
-					result = result .. string.format('%s %d IN TYPE%d \\# %d %s\n',
-						kres.dname2str(rr1.owner), rr1.ttl, rr1.type, #rr1.rdata, rdata)
-				end
-				return result
+			local ret = knot.knot_rrset_txt_dump(rr, dump, size,
+							style or knot.KNOT_DUMP_STYLE_DEFAULT)
+			local result = nil
+			if ret >= 0 then
+				result = ffi.string(dump[0], ret)
 			end
+			C.free(dump[0])
+			return result
 		end,
 	},
 })
@@ -236,7 +267,7 @@ ffi.metatype( knot_pkt_t, {
 				end
 			end
 			return records
-		end, 
+		end,
 		begin = function (pkt, section) return knot.knot_pkt_begin(pkt, section) end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
 			return C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, #rdata)
@@ -248,7 +279,6 @@ ffi.metatype( knot_pkt_t, {
 	},
 })
 -- Metatype for query
-local ub_t = ffi.typeof('unsigned char *')
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
@@ -313,7 +343,7 @@ local function rr2str(rr, style)
 			ret = ret:sub(1, -2)
 		end
 		if rr.comment then
- 			ret = ret .. ' ;' .. rr.comment
+			ret = ret .. ' ;' .. rr.comment
 		end
 	end
 	return ret
@@ -322,10 +352,10 @@ end
 -- Module API
 kres = {
 	-- Constants
-	class = ffi.new('struct rr_class'),
-	type = ffi.new('struct rr_type'),
-	section = ffi.new('struct pkt_section'),
-	rcode = ffi.new('struct pkt_rcode'),
+	class = const_class,
+	type = const_type,
+	section = const_section,
+	rcode = const_rcode,
 
 	-- Create a struct kr_qflags from a single flag name or a list of names.
 	mk_qflags = function (names)
@@ -339,7 +369,7 @@ kres = {
 		end
 
 		local fs = ffi.new(kr_qflags)
-		for k_, name in pairs(names) do
+		for _, name in pairs(names) do
 			fs[name] = true
 		end
 		return fs

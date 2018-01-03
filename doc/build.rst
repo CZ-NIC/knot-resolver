@@ -39,7 +39,7 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "C compiler", "*all*", "*(build only)* [#]_"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "hexdump or xxd", "``daemon``", "*(build only)*"
-   "libknot_ 2.3.1+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
+   "libknot_ 2.4.0+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
    "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
 
@@ -62,6 +62,8 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for dnstap_."
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
    "libfstrm_ 0.2+", "``modules/dnstap``", "Frame Streams data transport protocol."
+   "luacheck_", "``lint``", "Syntax and static analysis checker for Lua."
+   "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
@@ -107,6 +109,12 @@ Most of the dependencies can be resolved from packages, here's an overview for s
 
 Building from sources 
 ---------------------
+
+Initialize git submodules first.
+
+.. code-block:: bash
+
+    $ git submodule update --init --recursive
 
 The Knot DNS Resolver depends on the the Knot DNS library, recent version of libuv_, and LuaJIT_.
 
@@ -243,9 +251,16 @@ Building extras
 
 The project can be built with code coverage tracking using the ``COVERAGE=1`` variable.
 
+The `make coverage` target gathers both gcov code coverage for C files, and luacov_ code coverage for Lua files and merges it for analysis. It requires lcov_ to be installed.
+
+.. code-block:: bash
+
+   $ make coverage
+
 Running unit and integration tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The linter requires luacheck_ and is executed by ``make lint``.
 The unit tests require cmocka_ and are executed by ``make check``.
 Tests for the dnstap module need go and are executed by ``make ckeck-dnstap``.
 
@@ -313,5 +328,8 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _libprotobuf: https://developers.google.com/protocol-buffers/
 .. _libprotobuf-c: https://github.com/protobuf-c/protobuf-c/wiki
 .. _libfstrm: https://github.com/farsightsec/fstrm
+.. _luacheck: http://luacheck.readthedocs.io
+.. _luacov: https://keplerproject.github.io/luacov/
+.. _lcov: http://ltp.sourceforge.net/coverage/lcov.php
 
 .. _DESTDIR: https://www.gnu.org/prep/standards/html_node/DESTDIR.html

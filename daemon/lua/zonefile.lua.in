@@ -125,7 +125,6 @@ const char* zs_strerror(const int code);
 local zs_state = ffi.new('struct zs_state')
 
 -- Wrap scanner context
-local const_char_t = ffi.typeof('const char *')
 local zs_scanner_t = ffi.typeof('struct scanner')
 ffi.metatype( zs_scanner_t, {
 	__gc = function(zs) return libzscanner.zs_deinit(zs) end,

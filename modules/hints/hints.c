@@ -27,6 +27,7 @@
 #include <ccan/json/json.h>
 #include <ucw/mempool.h>
 #include <contrib/cleanup.h>
+#include <lauxlib.h>
 
 #include "daemon/engine.h"
 #include "lib/zonecut.h"
@@ -570,6 +571,9 @@ static char* hint_root_file(void *env, struct kr_module *module, const char *arg
 	struct engine *engine = env;
 	struct kr_context *ctx = &engine->resolver;
 	const char *err_msg = engine_hint_root_file(ctx, args);
+	if (err_msg) {
+		luaL_error(engine->L, "error when opening '%s': %s", args, err_msg);
+	}
 	return strdup(err_msg ? err_msg : "");
 }
 

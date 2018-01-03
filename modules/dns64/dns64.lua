@@ -1,6 +1,5 @@
 -- Module interface
 local ffi = require('ffi')
-local bit = require('bit')
 local mod = {}
 local addr_buf = ffi.new('char[16]')
 -- Config
@@ -15,7 +14,7 @@ mod.layer = {
 		if state == kres.FAIL then return state end
 		pkt = kres.pkt_t(pkt)
 		req = kres.request_t(req)
-		qry = req:current()
+		local qry = req:current()
 		-- Observe only authoritative answers
 		if mod.proxy == nil or not qry.flags.RESOLVED then
 			return state
@@ -57,7 +56,7 @@ mod.layer = {
 				extraFlags.DNSSEC_WANT = qry.flags.DNSSEC_WANT
 				extraFlags.AWAIT_CUT = true
 				extraFlags.DNS64_MARK = true
-				local next = req:push(pkt:qname(), kres.type.A, kres.class.IN, extraFlags, qry)
+				req:push(pkt:qname(), kres.type.A, kres.class.IN, extraFlags, qry)
 			end
 		end
 		return state

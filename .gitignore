@@ -18,6 +18,8 @@
 *.gcno
 *.gcda
 *.gcov
+*.info
+luacov.*.out
 .dirstamp
 .libs
 .deps
@@ -41,9 +43,9 @@ _obj
 /aclocal.m4
 /ltmain.sh
 /ylwrap
+/client/kresc
 /doc/doxyxml
 /doc/html
-/daemon/kresc
 /daemon/kresd
 /daemon/lua/*.inc
 /daemon/lua/kres.lua
