@@ -87,6 +87,11 @@ local function test_packet_functions()
 	same(parsed:id(), pkt:id(), 'parsed packet has same MSGID')
 	same(parsed:ancount(), pkt:ancount(), 'parsed packet has same answer count')
 	same(parsed:tostring(), pkt:tostring(), 'parsed packet is equal to source packet')
+	-- Test recycling of packets
+	ok(pkt:recycle(), 'recycle() works')
+	is(pkt:ancount(), 0, 'recycle() clears records')
+	is(pkt:qname(), nil, 'recycle() clears question')
+	is(#pkt:towire(), 12, 'recycle() clears the packet wireformat')
 end
 
 return {
