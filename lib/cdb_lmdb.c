@@ -56,20 +56,21 @@ struct lmdb_env
 /** @brief Convert LMDB error code. */
 static int lmdb_error(int error)
 {
+	/* _BAD_TXN may happen with overfull DB,
+	 * even during mdb_get with a single fork :-/ */
+	if (error == MDB_BAD_TXN) {
+		kr_log_info("[cache] MDB_BAD_TXN, probably overfull\n");
+		error = ENOSPC;
+	}
 	switch (error) {
 	case MDB_SUCCESS:
 		return kr_ok();
 	case MDB_NOTFOUND:
 		return kr_error(ENOENT);
-
 	case ENOSPC:
 	case MDB_MAP_FULL:
 	case MDB_TXN_FULL:
-	case MDB_BAD_TXN:
-		/* _BAD_TXN in practice happens with overfull DB,
-		 * even during mdb_get with a single fork :-/ */
 		return kr_error(ENOSPC);
-
 	default:
 		kr_log_error("[cache] LMDB error: %s\n", mdb_strerror(error));
 		assert(false);

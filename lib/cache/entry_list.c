@@ -184,6 +184,19 @@ int entry_h_splice(
 	knot_db_val_t val = { .len = storage_size, .data = NULL };
 	int ret = cache_op(cache, write, &key, &val, 1);
 	if (ret || !val.data || !val.len) {
+		/* Clear cache if overfull.  It's nontrivial to do better with LMDB.
+		 * LATER: some garbage-collection mechanism. */
+		if (ret == kr_error(ENOSPC)) {
+			ret = kr_cache_clear(cache);
+			const char *msg = "[cache] clearing because overfull, ret = %d\n";
+			if (ret) {
+				kr_log_error(msg, ret);
+			} else {
+				kr_log_info(msg, ret);
+				ret = kr_error(ENOSPC);
+			}
+			return ret;
+		}
 		assert(ret); /* otherwise "succeeding" but `val` is bad */
 		VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
 		return kr_error(ret ? ret : ENOSPC);
