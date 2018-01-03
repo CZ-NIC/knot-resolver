@@ -89,7 +89,7 @@ struct kr_query {
 				 * ancestor if it is a subquery. */
 	uint64_t timestamp_mono; /**< Time of query created or time of
 	                           * query to upstream resolver (milliseconds). */
-	struct timeval timestamp;
+	struct timeval timestamp; /**< Real time for TTL+DNSSEC checks (.tv_sec only). */
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;

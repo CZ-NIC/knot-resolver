@@ -159,7 +159,7 @@ int entry_h_splice(
 		 * enough to e.g. override NS record in AUTHORITY section.
 		 * This way they would have to hit the first answer
 		 * (whenever TTL nears expiration). */
-		int32_t old_ttl = get_new_ttl(eh_orig, qry->creation_time.tv_sec);
+		int32_t old_ttl = get_new_ttl(eh_orig, qry->timestamp.tv_sec);
 		if (old_ttl > 0 && !is_expiring(old_ttl, eh_orig->ttl)
 		    && rank <= eh_orig->rank) {
 			WITH_VERBOSE {

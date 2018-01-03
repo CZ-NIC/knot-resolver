@@ -166,7 +166,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		 * in case we searched before the very first one in the zone. */
 		return "range search found inconsistent entry";
 	}
-	int32_t new_ttl_ = get_new_ttl(eh, qry->creation_time.tv_sec);
+	int32_t new_ttl_ = get_new_ttl(eh, qry->timestamp.tv_sec);
 	if (new_ttl_ < 0 || !kr_rank_test(eh->rank, KR_RANK_SECURE)) {
 		return "range search found stale or insecure entry";
 		/* TODO: remove the stale record *and* retry,

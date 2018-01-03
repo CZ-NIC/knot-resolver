@@ -382,7 +382,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RRTYPE_CNAME:
 		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, val_cut.data,
 				val_cut.data + val_cut.len,
-				get_new_ttl(val_cut.data, qry->creation_time.tv_sec));
+				get_new_ttl(val_cut.data, qry->timestamp.tv_sec));
 		/* TODO: ^^ cumbersome code */
 		if (ret == kr_ok()) {
 			return KR_STATE_DONE;
@@ -529,7 +529,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return ctx->state;
 			// LATER: recovery in case of error, perhaps via removing the entry?
 		}
-		int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+		int32_t new_ttl = get_new_ttl(eh, qry->timestamp.tv_sec);
 		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 			/* Wildcard record with stale TTL, bad rank or packet.  */
 			VERBOSE_MSG(qry, "=> wildcard: skipping %s, rank 0%0.2o, new TTL %d\n",
@@ -560,7 +560,7 @@ do_soa:
 			return ctx->state;
 		}
 		/* Check if the record is OK. */
-		int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+		int32_t new_ttl = get_new_ttl(eh, qry->timestamp.tv_sec);
 		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 			VERBOSE_MSG(qry, "=> SOA unfit %s: ",
 					eh->is_packet ? "packet" : "RR");
@@ -875,7 +875,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		// LATER(optim): pehaps optimize the zone cut search
 	}
 
-	int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+	int32_t new_ttl = get_new_ttl(eh, qry->timestamp.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
 		/* Positive record with stale TTL or bad rank.
 		 * LATER(optim.): It's unlikely that we find a negative one,
@@ -1016,7 +1016,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 				assert(false);
 				goto next_label;
 			}
-			int32_t new_ttl = get_new_ttl(eh, qry->creation_time.tv_sec);
+			int32_t new_ttl = get_new_ttl(eh, qry->timestamp.tv_sec);
 			if (new_ttl < 0
 			    /* Not interested in negative or bogus. */
 			    || eh->is_packet
