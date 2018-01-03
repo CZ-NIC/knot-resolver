@@ -268,7 +268,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	}
 
 	tls_p->buf = buf;
-	tls_p->nread = nread;
+	tls_p->nread = nread >= 0 ? nread : 0;
 	tls_p->handle = handle;
 	tls_p->consumed = 0;	/* TODO: doesn't handle split TLS records */
 
@@ -300,6 +300,9 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
 		if (ret < 0) {
 			return ret;
+		}
+		if (count == 0) {
+			break;
 		}
 		submitted += ret;
 	}
@@ -851,12 +854,18 @@ int tls_client_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 	}
 
 	ssize_t submitted = 0;
+	ssize_t retries = 0;
 	do {
 		count = gnutls_record_uncork(ctx->tls_session, 0);
 		if (count < 0) {
 			if (gnutls_error_is_fatal(count)) {
 				kr_log_error("[tls_client] gnutls_record_uncork failed: %s (%zd)\n",
 				             gnutls_strerror_name(count), count);
+				return kr_error(EIO);
+			}
+			if (++retries > TLS_MAX_UNCORK_RETRIES) {
+				kr_log_error("[tls] gnutls_record_uncork: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
+				             retries, gnutls_strerror_name(count), count);
 				return kr_error(EIO);
 			}
 		} else {
@@ -884,7 +893,7 @@ int tls_client_process(struct worker_ctx *worker, uv_stream_t *handle, const uin
 	       ctx->handshake_state == TLS_HS_DONE);
 
 	ctx->buf = buf;
-	ctx->nread = nread;
+	ctx->nread = nread >= 0 ? nread : 0;
 	ctx->session = session;
 	ctx->consumed = 0;
 

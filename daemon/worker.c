@@ -1374,6 +1374,9 @@ static bool subreq_enqueue(struct qr_task *task)
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	assert(task && task->leading == false);
+	if (task->finished) {
+		return 0;
+	}
 	struct request_ctx *ctx = task->ctx;
 	kr_resolve_finish(&ctx->req, state);
 	task->finished = true;

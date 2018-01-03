@@ -237,6 +237,14 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	if (s->closing) {
 		return;
 	}
+	/* nread might be 0, which does not indicate an error or EOF.
+	 * This is equivalent to EAGAIN or EWOULDBLOCK under read(2). */
+	if (nread == 0) {
+		return;
+	}
+	if (nread == UV_EOF) {
+		nread = 0;
+	}
 	struct worker_ctx *worker = loop->data;
 	/* TCP pipelining is rather complicated and requires cooperation from the worker
 	 * so the whole message reassembly and demuxing logic is inside worker */
