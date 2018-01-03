@@ -120,6 +120,14 @@ static int kwz_between(knot_db_val_t k1, knot_db_val_t k2, knot_db_val_t k3)
 	}
 }
 
+static struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
+{
+	/* ATM it's enough to just extend the checks for exact entries. */
+	const struct entry_h *eh = entry_h_consistent(data, KNOT_RRTYPE_NSEC);
+	bool ok = eh != NULL;
+	ok = ok && !(eh->is_packet || eh->has_ns || eh->has_cname || eh->has_dname);
+	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
+}
 
 /** NSEC1 range search.
  *
@@ -160,7 +168,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	if (exact_match) {
 		*exact_match = is_exact;
 	}
-	const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NSEC);
+	const struct entry_h *eh = entry_h_consistent_NSEC(val);
 	if (!eh) {
 		/* This might be just finding something else than NSEC1 entry,
 		 * in case we searched before the very first one in the zone. */

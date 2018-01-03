@@ -37,6 +37,9 @@
  *		TODO: NSEC3 chain descriptors (iff nsec3_cnt > 0)
  *	- is_packet: uint16_t length, otherwise opaque and handled by ./entry_pkt.c
  *	- otherwise RRset + its RRSIG set (possibly empty).
+ * '1' entry (NSEC1)
+ *	- contents is the same as for exact hit for NSEC
+ *	- flags don't make sense there
  * */
 struct entry_h {
 	uint32_t time;	/**< The time of inception. */
@@ -56,9 +59,8 @@ struct entry_h {
 };
 
 
-/** Check basic consistency of entry_h, not looking into ->data.
+/** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
  * (for is_packet the length of data is checked)
- * \note only exact hits and NSEC1 are really considered ATM.
  */
 struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype);
 

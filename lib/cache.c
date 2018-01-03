@@ -172,8 +172,10 @@ struct nsec_p {
 	uint8_t *salt;
 };
 
+/* When going stricter, BEWARE of breaking entry_h_consistent_NSEC() */
 struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 {
+	(void) ktype; /* unused, for now */
 	/* Length checks. */
 	if (data.len < offsetof(struct entry_h, data))
 		return NULL;
@@ -194,18 +196,10 @@ struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 	ok = ok && (!kr_rank_test(eh->rank, KR_RANK_BOGUS)
 		    || eh->is_packet);
 
-	switch (ktype) {
-	case KNOT_RRTYPE_NSEC:
-		ok = ok && !(eh->is_packet || eh->has_ns || eh->has_cname
-				|| eh->has_dname);
-		break;
-	default:
-		/* doesn't hold, because of temporary NSEC3 packet caching
-		if (eh->is_packet)
-			ok = ok && !kr_rank_test(eh->rank, KR_RANK_SECURE);
-		*/
-		break;
-	}
+	/* doesn't hold, because of temporary NSEC3 packet caching
+	if (eh->is_packet)
+		ok = ok && !kr_rank_test(eh->rank, KR_RANK_SECURE);
+	*/
 
 	//LATER: rank sanity
 	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
