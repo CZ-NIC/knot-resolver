@@ -127,15 +127,15 @@ function pkg {
 }
 
 # travis-specific
-PIP_PKGS="dnspython==1.11 cpp-coveralls Jinja2"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew update
-	for p in makedepend hiredis libmemcached protobuf-c cmocka jansson gnutls luajit libuv python3; do
+	for p in makedepend hiredis libmemcached protobuf-c cmocka jansson gnutls \
+			luajit libuv python3 libyaml augeas; do
 		echo "BEGIN $p";
 		brew install "$p" || brew upgrade "$p" # install fails on installed packages
 		echo "END $p";
 	done
-	pip3 install ${PIP_PKGS}
+	pip3 install -r "${TRAVIS_BUILD_DIR}/tests/deckard/requirements.txt"
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pip install --user --upgrade pip || true
