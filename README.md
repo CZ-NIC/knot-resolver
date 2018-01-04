@@ -1,9 +1,10 @@
 # Knot DNS Resolver
 
-[![Build Status](https://img.shields.io/travis/CZ-NIC/knot-resolver/master.svg)](https://travis-ci.org/CZ-NIC/knot-resolver)
-[![Coverage Status](https://img.shields.io/coveralls/CZ-NIC/knot-resolver.svg)](https://coveralls.io/r/CZ-NIC/knot-resolver)
+[![Build Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/master/pipeline.svg?x)](https://gitlab.labs.nic.cz/knot/knot-resolver/commits/master)
+[![Coverage Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/master/coverage.svg?x)](https://knot.pages.labs.nic.cz/knot-resolver/)
 [![Coverity](https://img.shields.io/coverity/scan/3912.svg)](https://scan.coverity.com/projects/3912)
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
+[![Join the chat at gitter.im/CZ-NIC/knot-resolver](https://badges.gitter.im/Join%20Chat.svg?x)](https://gitter.im/CZ-NIC/knot-resolver?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
 Knot DNS Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
