@@ -71,8 +71,8 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	const bool want_pkt = qry->flags.DNSSEC_BOGUS
 		|| (is_negative && (qry->flags.DNSSEC_INSECURE || !qry->flags.DNSSEC_WANT));
 
-	/* TMP: also stash packets that contain an NSEC3.
-	 * To be removed when aggressive NSEC3 works. */
+	/* Also stash packets that contain an NSEC3.
+	 * LATER(NSEC3): remove when aggressive NSEC3 works. */
 	bool with_nsec3 = false;
 	if (!want_pkt && qry->flags.DNSSEC_WANT && !qry->flags.DNSSEC_BOGUS
 	    && !qry->flags.DNSSEC_INSECURE) {
@@ -109,7 +109,9 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 		} else if (!qry->flags.DNSSEC_WANT) {
 			/* no TAs at all, leave _RANK_AUTH */
 		} else if (with_nsec3) {
-			// FIXME: not optimal, but safer choice and possibly OK for now.
+			/* All bad cases should be filtered above,
+			 * at least the same way as pktcache in kresd 1.5.x. */
+			kr_rank_set(&rank, KR_RANK_SECURE);
 		} else assert(false);
 	}
 
@@ -152,6 +154,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	eh->ttl  = MAX(MIN(packet_ttl(pkt, is_negative), cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;
 	eh->is_packet = true;
+	eh->has_optout = qry->flags.DNSSEC_OPTOUT;
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
 	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
 
@@ -230,6 +233,7 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	if (qry->flags.DNSSEC_INSECURE || qry->flags.DNSSEC_BOGUS) {
 		qry->flags.DNSSEC_WANT = false;
 	}
+	qry->flags.DNSSEC_OPTOUT = eh->has_optout;
 	VERBOSE_MSG(qry, "=> satisfied by exact packet: rank 0%0.2o, new TTL %d\n",
 			eh->rank, new_ttl);
 	return kr_ok();

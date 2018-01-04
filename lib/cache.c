@@ -43,7 +43,7 @@
 
 
 /** Cache version */
-static const uint16_t CACHE_VERSION = 1;
+static const uint16_t CACHE_VERSION = 2;
 /** Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
@@ -195,6 +195,7 @@ struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
 	bool ok = true;
 	ok = ok && (!kr_rank_test(eh->rank, KR_RANK_BOGUS)
 		    || eh->is_packet);
+	ok = ok && (eh->is_packet || !eh->has_optout);
 
 	/* doesn't hold, because of temporary NSEC3 packet caching
 	if (eh->is_packet)
@@ -875,8 +876,8 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		 * LATER(optim.): It's unlikely that we find a negative one,
 		 * so we might theoretically skip all the cache code. */
 
-		VERBOSE_MSG(qry, "=> skipping exact %s: rank 0%0.2o, new TTL %d\n",
-				eh->is_packet ? "packet" : "RR", eh->rank, new_ttl);
+		VERBOSE_MSG(qry, "=> skipping exact %s: rank 0%0.2o (min. 0%0.2o), new TTL %d\n",
+				eh->is_packet ? "packet" : "RR", eh->rank, lowest_rank, new_ttl);
 		return kr_error(ENOENT);
 	}
 

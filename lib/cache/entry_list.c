@@ -239,6 +239,7 @@ int entry_h_splice(
 			eh->has_ns    = eh0->has_ns;
 			eh->has_cname = eh0->has_cname;
 			eh->has_dname = eh0->has_dname;
+			eh->has_optout = eh0->has_optout;
 		}
 		/* we just added/replaced some type */
 		switch (type) {

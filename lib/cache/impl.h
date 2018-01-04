@@ -53,6 +53,7 @@ struct entry_h {
 	bool has_ns : 1;	/**< Only used for NS ktype. */
 	bool has_cname : 1;	/**< Only used for NS ktype. */
 	bool has_dname : 1;	/**< Only used for NS ktype. */
+	bool has_optout : 1;	/**< Only for packets with NSEC3. */
 	/* ENTRY_H_FLAGS */
 
 	uint8_t data[];
