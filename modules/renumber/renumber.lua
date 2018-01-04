@@ -88,7 +88,7 @@ local function rule()
 		local qname = pkt:qname()
 		local qclass = pkt:qclass()
 		local qtype = pkt:qtype()
-		pkt:clear()
+		pkt:recycle()
 		pkt:question(qname, qclass, qtype)
 		for i = 1, ancount do
 			local rr = records[i]

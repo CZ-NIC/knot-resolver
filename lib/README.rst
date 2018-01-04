@@ -227,7 +227,7 @@ e.g. you can't write to ANSWER after writing AUTHORITY, it's like stages where y
 
 		pkt:rcode(kres.rcode.NXDOMAIN)
 		-- Clear answer and write QUESTION
-		pkt:clear()
+		pkt:recycle()
 		pkt:question('\7blocked', kres.class.IN, kres.type.SOA)
 		-- Start writing data
 		pkt:begin(kres.section.ANSWER)
