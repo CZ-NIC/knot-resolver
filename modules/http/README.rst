@@ -28,7 +28,9 @@ for starters?
 		http = {
 			host = 'localhost',
 			port = 8053,
-			geoip = 'GeoLite2-City.mmdb' -- Optional
+			geoip = 'GeoLite2-City.mmdb' -- Optional, see
+			-- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
+			-- and install mmdblua library
 		}
 	}
 

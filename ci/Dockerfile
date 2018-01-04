@@ -1,5 +1,5 @@
 FROM debian:stable
-MAINTAINER Knot DNS <knot-dns@labs.nic.cz>
+MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 
 WORKDIR /root
 CMD ["/bin/bash"]

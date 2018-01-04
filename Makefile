@@ -6,25 +6,12 @@ all: info lib daemon client modules etc
 install: lib-install daemon-install client-install modules-install etc-install
 check: all tests
 clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
-	tests-clean doc-clean bench-clean
+	tests-clean doc-clean bench-clean coverage-clean
 doc: doc-html
 lint: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 	luacheck --codes --formatter TAP .
-coverage-c:
-	@echo "# C coverage in $(COVERAGE_STAGE).c.info"
-	@$(LCOV) --no-external --capture --directory . --output-file $(COVERAGE_STAGE).c.info > /dev/null
-coverage-lua: $(wildcard */*/luacov.stats.out)
-	@echo "# Lua coverage in $(COVERAGE_STAGE).lua.info"
-	@if [ ! -z "$^" ]; then ./scripts/luacov_to_info.lua $^ > $(COVERAGE_STAGE).lua.info; fi
-coverage:
-	@$(LCOV) $(addprefix --add-tracefile ,$(wildcard $(COVERAGE_STAGE)*.info)) --output-file coverage.info
 
-.PHONY: all install check clean doc info
-
-# Options
-ifdef COVERAGE
-BUILD_CFLAGS += --coverage
-endif
+.PHONY: all install check clean doc info lint
 
 # Dependencies
 KNOT_MINVER := 2.4.0
@@ -186,6 +173,7 @@ $(DESTDIR)$(ETCDIR):
 
 # Sub-targets
 include contrib/contrib.mk
+include coverage.mk
 include lib/lib.mk
 include client/client.mk
 include daemon/daemon.mk
