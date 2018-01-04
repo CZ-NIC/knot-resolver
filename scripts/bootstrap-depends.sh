@@ -3,20 +3,20 @@
 
 SCRIPT_DIR=$(dirname $(pwd)/${0})
 
-CMOCKA_TAG="cmocka-1.1.0"
+CMOCKA_TAG="cmocka-1.1.1"
 CMOCKA_URL="git://git.cryptomilk.org/projects/cmocka.git"
-LIBUV_TAG="v1.13.1"
+LIBUV_TAG="v1.18.0"
 LIBUV_URL="https://github.com/libuv/libuv.git"
-KNOT_TAG="v2.5.3"
+KNOT_TAG="v2.6.4"
 KNOT_URL="https://github.com/CZ-NIC/knot.git"
 GMP_TAG="6.1.1" # GMP 6.1.2 is broken on Travis-CI
 GMP_URL="https://gmplib.org/download/gmp/gmp-${GMP_TAG}.tar.xz"
 JANSSON_TAG="2.9"
 JANSSON_URL="http://www.digip.org/jansson/releases/jansson-${JANSSON_TAG}.tar.gz"
-NETTLE_TAG="3.3"
+NETTLE_TAG="3.4"
 NETTLE_URL="https://ftp.gnu.org/gnu/nettle/nettle-${NETTLE_TAG}.tar.gz"
-GNUTLS_TAG="3.5.14"
-GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.5/gnutls-${GNUTLS_TAG}.tar.xz"
+GNUTLS_TAG="3.6.1"
+GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.6/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_VER="2.1.0-beta3"
 LUA_URL="https://github.com/LuaJIT/LuaJIT.git"
 HIREDIS_TAG="v0.13.3"
@@ -127,15 +127,15 @@ function pkg {
 }
 
 # travis-specific
-PIP_PKGS="dnspython==1.11 cpp-coveralls Jinja2"
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew update
-	for p in makedepend hiredis libmemcached protobuf-c cmocka jansson gnutls luajit libuv python3; do
+	for p in makedepend hiredis libmemcached protobuf-c cmocka jansson gnutls \
+			luajit libuv python3 libyaml augeas; do
 		echo "BEGIN $p";
 		brew install "$p" || brew upgrade "$p" # install fails on installed packages
 		echo "END $p";
 	done
-	pip3 install ${PIP_PKGS}
+	pip3 install -r "${TRAVIS_BUILD_DIR}/tests/deckard/requirements.txt"
 fi
 if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pip install --user --upgrade pip || true
