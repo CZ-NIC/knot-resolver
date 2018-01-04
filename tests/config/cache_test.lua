@@ -31,8 +31,17 @@ local function test_resize()
 	is(cache.current_size, 50 * MB, 'cache was shrunk')
 end
 
+-- test access to cache through context
+local function test_context_cache()
+	local c = kres.context().cache
+	is(type(c), 'cdata', 'context has a cache object')
+	local s = c.stats
+	same({s.hit, s.miss, s.insert, s.delete}, {0, 0, 0, 0}, 'context cache stats works')
+end
+
 return {
 	test_properties,
 	test_stats,
 	test_resize,
+	test_context_cache,
 }
