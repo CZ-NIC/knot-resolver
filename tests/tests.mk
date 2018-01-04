@@ -48,6 +48,6 @@ tests: check-unit
 # installcheck requires kresd to be installed in its final destination
 # (DESTDIR is not supported right now because module path gets hardcoded)
 installcheck: check-config
-tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean $(CLEAN_DNSTAP) check-config-clean
+tests-clean: $(foreach test,$(tests_BIN),$(test)-clean) mock_cmodule-clean $(CLEAN_DNSTAP)
 
 .PHONY: check-integration deckard installcheck tests tests-clean

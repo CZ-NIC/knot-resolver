@@ -16,7 +16,7 @@ coverage-c: coverage-c-combine-gcda
 	@$(LCOV) -q $(addprefix --add-tracefile ,$(wildcard $(COVERAGE_STATSDIR)/tmp.c/*.info)) --output-file '$(COVERAGE_STAGE).c.info'
 	@$(RM) -r '$(COVERAGE_STATSDIR)/tmp.c'
 
-LUA_STATS_OUT := $(shell find '$(COVERAGE_STATSDIR)' -type f -name 'luacov.stats.out')
+LUA_STATS_OUT := $(shell find '$(COVERAGE_STATSDIR)' -type f -name 'luacov.stats.out' 2> /dev/null)
 LUA_INFOS_OUT := $(patsubst %.stats.out,%.lua.info,$(LUA_STATS_OUT))
 
 coverage-lua-fix-paths: $(LUA_STATS_OUT)
