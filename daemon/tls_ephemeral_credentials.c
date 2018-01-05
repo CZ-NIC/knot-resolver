@@ -114,6 +114,8 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 		bad_data:
 			close(datafd);
 			datafd = -1;
+		}
+		if (data.data != NULL) {
 			gnutls_free(data.data);
 			data.data = NULL;
 		}
@@ -150,8 +152,12 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 	}
  done:
 	_lock_unlock(&lock, EPHEMERAL_PRIVKEY_FILENAME ".lock");
-	if (datafd != -1)
+	if (datafd != -1) {
 		close(datafd);
+	}
+	if (data.data != NULL) {
+		gnutls_free(data.data);
+	}
 	return privkey;
 }
 
