@@ -30,6 +30,7 @@
 bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t type)
 {
 	if (!bm || bm_size == 0) {
+		assert(bm);
 		return false;
 	}
 
@@ -59,29 +60,52 @@ bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t 
 	return false;
 }
 
+int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
+{
+	if (!bm) {
+		return kr_error(EINVAL);
+	}
+	const bool parent_side =
+		kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_DNAME)
+		|| (kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_NS)
+		    && !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)
+		);
+	return parent_side ? abs(ENOENT) : kr_ok();
+	/* LATER: after refactoring, probably also check if signer name equals owner,
+	 * but even without that it's not possible to attack *correctly* signed zones.
+	 */
+}
+
 /**
  * Check whether the NSEC RR proves that there is no closer match for <SNAME, SCLASS>.
  * @param nsec  NSEC RRSet.
  * @param sname Searched name.
- * @return      0 or error code.
+ * @return      0 if proves, >0 if not (abs(ENOENT)), or error code (<0).
  */
-static int nsec_nonamematch(const knot_rrset_t *nsec, const knot_dname_t *sname)
+static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
 	assert(nsec && sname);
 	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
-	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
-	const bool is_last_nsec = (knot_dname_cmp(nsec->owner, next) >= 0);
-	if (is_last_nsec) { /* SNAME is after owner => provably doesn't exist */
-		if (knot_dname_cmp(nsec->owner, sname) < 0) {
-			return kr_ok();
-		}
-	} else {
-		/* Prove that SNAME is between 'owner' and 'next' */
-		if ((knot_dname_cmp(nsec->owner, sname) < 0) && (knot_dname_cmp(sname, next) < 0)) {
-			return kr_ok();
-		}
+	if (knot_dname_cmp(sname, nsec->owner) <= 0) {
+		return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */
 	}
-	return kr_error(EINVAL);
+	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
+	const bool is_last_nsec = knot_dname_cmp(nsec->owner, next) >= 0;
+	const bool in_range = is_last_nsec || knot_dname_cmp(sname, next) < 0;
+	if (!in_range) {
+		return abs(ENOENT);
+	}
+	/* Before returning kr_ok(), we have to check a special case:
+	 * sname might be under delegation from owner and thus
+	 * not in the zone of this NSEC at all.
+	 */
+	if (!knot_dname_is_sub(sname, nsec->owner)) {
+		return kr_ok();
+	}
+	uint8_t *bm = NULL;
+	uint16_t bm_size = 0;
+	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+	return kr_nsec_children_in_zone_check(bm, bm_size);
 }
 
 #define FLG_NOEXIST_RRTYPE (1 << 0) /**< <SNAME, SCLASS> exists, <SNAME, SCLASS, STYPE> does not exist. */
@@ -128,7 +152,7 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 {
 	assert(flags && nsec && name);
 
-	if (nsec_nonamematch(nsec, name) == 0) {
+	if (nsec_covers(nsec, name) == 0) {
 		*flags |= FLG_NOEXIST_RRSET;
 	}
 
@@ -144,7 +168,7 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 		*(--ptr) = '*';
 		*(--ptr) = 1;
 		/* True if this wildcard provably doesn't exist. */
-		if (nsec_nonamematch(nsec, ptr) == 0) {
+		if (nsec_covers(nsec, ptr) == 0) {
 			*flags |= FLG_NOEXIST_WILDCARD;
 			break;
 		}
@@ -391,7 +415,7 @@ int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t
 		if (rrset->type != KNOT_RRTYPE_NSEC) {
 			continue;
 		}
-		if (nsec_nonamematch(rrset, sname) == 0) {
+		if (nsec_covers(rrset, sname) == 0) {
 			return kr_ok();
 		}
 	}
