@@ -869,6 +869,7 @@ int tls_client_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 				return kr_error(EIO);
 			}
 		} else {
+			retries = 0;
 			submitted += count;
 			if (count == 0 && submitted != sizeof(pkt_size) + pkt->size) {
 				kr_log_error("[tls_client] gnutls_record_uncork didn't send all data: %s (%zd)\n",

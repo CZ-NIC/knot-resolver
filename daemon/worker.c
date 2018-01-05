@@ -804,9 +804,21 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 			if (session->closing) {
 				return status;
 			}
+			/* Finalize the task, if any errors.
+			 * We can't add it to the end of waiting list for retrying
+			 * since it may lead endless loop in some circumstances
+			 * (for instance: tls; send->tls_push->too many non-critical errors->
+			 * on_send with nonzero status->re-add to waiting->send->etc).*/
 			if (status != 0) {
-				/* Add to the end for retry */
-				session_add_waiting(session, task);
+				qr_task_finalize(task, KR_STATE_FAIL);
+				if (session->outgoing) {
+					qr_task_finalize(task, KR_STATE_FAIL);
+				} else {
+					assert(task->ctx->source.session == session);
+					task->ctx->source.session = NULL;
+				}
+				session_del_tasks(session, task);
+				qr_task_unref(task);
 			}
 			if (session->waiting.len > 0) {
 				struct qr_task *t = session->waiting.at[0];
