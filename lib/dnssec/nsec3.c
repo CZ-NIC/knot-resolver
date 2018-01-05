@@ -391,6 +391,18 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
 		if (rrset->type != KNOT_RRTYPE_NSEC3) {
 			continue;
 		}
+		/* Also skip the NSEC3-to-match an ancestor of sname if it's
+		 * a parent-side delegation, as that would mean the owner
+		 * does not really exist (authoritatively in this zone,
+		 * even in case of opt-out).
+		 */
+		uint8_t *bm = NULL;
+		uint16_t bm_size;
+		knot_nsec3_bitmap(&rrset->rrs, 0, &bm, &bm_size);
+		if (kr_nsec_children_in_zone_check(bm, bm_size) != 0) {
+			continue; /* no fatal errors from bad RRs */
+		}
+		/* Match the NSEC3 to sname or one of its ancestors. */
 		unsigned skipped = 0;
 		flags = 0;
 		int ret = closest_encloser_match(&flags, rrset, sname, &skipped);
@@ -401,6 +413,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
 			continue;
 		}
 		matching = rrset;
+		/* Construct the next closer name and try to cover it. */
 		--skipped;
 		next_closer = sname;
 		for (unsigned j = 0; j < skipped; ++j) {
