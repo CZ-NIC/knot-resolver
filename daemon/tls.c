@@ -1041,12 +1041,14 @@ int tls_client_set_hs_state(struct tls_client_ctx_t *ctx, tls_client_hs_state_t 
 }
 
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      const struct tls_client_paramlist_entry *entry)
+			      const struct tls_client_paramlist_entry *entry,
+			      struct session *session)
 {
 	if (!ctx) {
 		return kr_error(EINVAL);
 	}
 	ctx->params = entry;
+	ctx->session = session;
 	return kr_ok();
 }
 

@@ -115,4 +115,5 @@ tls_client_hs_state_t tls_client_get_hs_state(const struct tls_client_ctx_t *ctx
 int tls_client_set_hs_state(struct tls_client_ctx_t *ctx, tls_client_hs_state_t state);
 
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      const struct tls_client_paramlist_entry *entry);
+			      const struct tls_client_paramlist_entry *entry,
+			      struct session *session);

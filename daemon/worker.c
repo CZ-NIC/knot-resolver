@@ -1627,7 +1627,7 @@ static int qr_task_step(struct qr_task *task,
 					subreq_finalize(task, packet_source, packet);
 					return qr_task_step(task, NULL, NULL);
 				}
-				tls_client_ctx_set_params(tls_ctx, entry);
+				tls_client_ctx_set_params(tls_ctx, entry, session);
 				session->tls_client_ctx = tls_ctx;
 				session->has_tls = true;
 			}
