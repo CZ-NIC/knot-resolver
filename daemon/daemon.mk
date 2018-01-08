@@ -28,7 +28,7 @@ bindings-install: $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 LUA_HAS_SETFUNCS := \
 	$(shell pkg-config luajit --atleast-version=2.1.0-beta3 && echo 1 || echo 0)
 
-kresd_CFLAGS := -fPIE \
+kresd_CFLAGS := -Werror -fPIE \
 		-Dlibknot_SONAME=\"$(libknot_SONAME)\" \
 		-Dlibzscanner_SONAME=\"$(libzscanner_SONAME)\" \
 		-DROOTHINTS=\"$(ROOTHINTS)\" \
