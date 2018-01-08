@@ -1520,7 +1520,6 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	if (ret != 0) {
 		return kr_error(EINVAL);
 	}
-
 	WITH_VERBOSE {
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[INET6_ADDRSTRLEN], type_str[16];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));

@@ -46,6 +46,7 @@ struct network {
 	uv_loop_t *loop;
 	map_t endpoints;
 	struct tls_credentials *tls_credentials;
+	map_t tls_client_params;
 };
 
 void network_init(struct network *net, uv_loop_t *loop);

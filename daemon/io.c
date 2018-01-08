@@ -33,6 +33,8 @@
 	} \
 } while (0)
 
+void io_release(uv_handle_t *handle);
+
 static void check_bufsize(uv_handle_t* handle)
 {
 	/* We want to buffer at least N waves in advance.
@@ -48,15 +50,18 @@ static void check_bufsize(uv_handle_t* handle)
 
 static void session_clear(struct session *s)
 {
-	assert(s->outgoing || s->tasks.len == 0);
+	assert(s->tasks.len == 0 && s->waiting.len == 0);
 	array_clear(s->tasks);
+	array_clear(s->waiting);
 	tls_free(s->tls_ctx);
+	tls_client_ctx_free(s->tls_client_ctx);
 	memset(s, 0, sizeof(*s));
 }
 
 void session_free(struct session *s)
 {
 	if (s) {
+		assert(s->tasks.len == 0 && s->waiting.len == 0);
 		session_clear(s);
 		free(s);
 	}
@@ -89,6 +94,8 @@ static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
 	if (!s) {
 		return;
 	}
+	assert(s->waiting.len == 0 && s->tasks.len == 0);
+	assert(s->buffering == NULL);
 	if (!s->outgoing && handle->type == UV_TCP) {
 		worker_end_tcp(worker, handle); /* to free the buffering task */
 	}
@@ -103,12 +110,23 @@ static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
 
 static uv_stream_t *handle_alloc(uv_loop_t *loop)
 {
-	uv_stream_t *handle = calloc(1, sizeof(*handle));
+	uv_stream_t *handle = calloc(1, sizeof(uv_handles_t));
 	if (!handle) {
 		return NULL;
 	}
 
 	return handle;
+}
+
+static uv_stream_t *handle_borrow(uv_loop_t *loop)
+{
+	struct worker_ctx *worker = loop->data;
+	void *req = worker_iohandle_borrow(worker);
+	if (!req) {
+		return NULL;
+	}
+
+	return (uv_stream_t *)req;
 }
 
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
@@ -139,13 +157,19 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 {
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
+	struct session *s = handle->data;
+	if (s->closing) {
+		return;
+	}
 	if (nread <= 0) {
 		if (nread < 0) { /* Error response, notify resolver */
 			worker_submit(worker, (uv_handle_t *)handle, NULL, addr);
 		} /* nread == 0 is for freeing buffers, we don't need to do this */
 		return;
 	}
-
+	if (addr->sa_family == AF_UNSPEC) {
+		return;
+	}
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, &worker->pkt_pool);
 	if (query) {
 		query->max_size = KNOT_WIRE_MAX_PKTSIZE;
@@ -158,8 +182,11 @@ static int udp_bind_finalize(uv_handle_t *handle)
 {
 	check_bufsize((uv_handle_t *)handle);
 	/* Handle is already created, just create context. */
-	handle->data = session_new();
-	assert(handle->data);
+	struct session *session = session_new();
+	assert(session);
+	session->outgoing = false;
+	session->handle = handle;
+	handle->data = session;
 	return io_start_read((uv_handle_t *)handle);
 }
 
@@ -189,20 +216,17 @@ int udp_bindfd(uv_udp_t *handle, int fd)
 	return udp_bind_finalize((uv_handle_t *)handle);
 }
 
-static void tcp_timeout(uv_handle_t *timer)
-{
-	uv_handle_t *handle = timer->data;
-	uv_close(handle, io_free);
-}
-
 static void tcp_timeout_trigger(uv_timer_t *timer)
 {
-	uv_handle_t *handle = timer->data;
-	struct session *session = handle->data;
+	struct session *session = timer->data;
+	struct worker_ctx *worker = timer->loop->data;
+
+	assert(session->outgoing == false);
 	if (session->tasks.len > 0) {
 		uv_timer_again(timer);
 	} else {
-		uv_close((uv_handle_t *)timer, tcp_timeout);
+		uv_timer_stop(timer);
+		worker_session_close(session);
 	}
 }
 
@@ -210,12 +234,24 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
 	uv_loop_t *loop = handle->loop;
 	struct session *s = handle->data;
+	if (s->closing) {
+		return;
+	}
+	/* nread might be 0, which does not indicate an error or EOF.
+	 * This is equivalent to EAGAIN or EWOULDBLOCK under read(2). */
+	if (nread == 0) {
+		return;
+	}
+	if (nread == UV_EOF) {
+		nread = 0;
+	}
 	struct worker_ctx *worker = loop->data;
 	/* TCP pipelining is rather complicated and requires cooperation from the worker
 	 * so the whole message reassembly and demuxing logic is inside worker */
 	int ret = 0;
 	if (s->has_tls) {
-		ret = tls_process(worker, handle, (const uint8_t *)buf->base, nread);
+		ret = s->outgoing ? tls_client_process(worker, handle, (const uint8_t *)buf->base, nread) :
+		                    tls_process(worker, handle, (const uint8_t *)buf->base, nread);
 	} else {
 		ret = worker_process_tcp(worker, handle, (const uint8_t *)buf->base, nread);
 	}
@@ -226,14 +262,14 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		if (!s->outgoing && !uv_is_closing((uv_handle_t *)&s->timeout)) {
 			uv_timer_stop(&s->timeout);
 			if (s->tasks.len == 0) {
-				uv_close((uv_handle_t *)&s->timeout, tcp_timeout);
+				worker_session_close(s);
 			} else { /* If there are tasks running, defer until they finish. */
 				uv_timer_start(&s->timeout, tcp_timeout_trigger, 1, KR_CONN_RTT_MAX/2);
 			}
 		}
 	/* Connection spawned at least one request, reset its deadline for next query.
 	 * https://tools.ietf.org/html/rfc7766#section-6.2.3 */
-	} else if (ret > 0 && !s->outgoing) {
+	} else if (ret > 0 && !s->outgoing && !s->closing) {
 		uv_timer_again(&s->timeout);
 	}
 	mp_flush(worker->pkt_pool.ctx);
@@ -244,14 +280,15 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	if (status != 0) {
 		return;
 	}
-	uv_stream_t *client = handle_alloc(master->loop);
+
+	uv_stream_t *client = handle_borrow(master->loop);
 	if (!client) {
 		return;
 	}
 	memset(client, 0, sizeof(*client));
 	io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM);
 	if (uv_accept(master, client) != 0) {
-		uv_close((uv_handle_t *)client, io_free);
+		uv_close((uv_handle_t *)client, io_release);
 		return;
 	}
 
@@ -259,13 +296,21 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
 	struct session *session = client->data;
+	assert(session->outgoing == false);
+
+	struct sockaddr *addr = &(session->peer.ip);
+	int addr_len = sizeof(union inaddr);
+	int ret = uv_tcp_getpeername((uv_tcp_t *)client, addr, &addr_len);
+	if (ret || addr->sa_family == AF_UNSPEC) {
+		worker_session_close(session);
+		return;
+	}
+
 	session->has_tls = tls;
 	if (tls && !session->tls_ctx) {
 		session->tls_ctx = tls_new(master->loop->data);
 	}
 	uv_timer_t *timer = &session->timeout;
-	uv_timer_init(master->loop, timer);
-	timer->data = client;
 	uv_timer_start(timer, tcp_timeout_trigger, KR_CONN_RTT_MAX/2, KR_CONN_RTT_MAX/2);
 	io_start_read((uv_handle_t *)client);
 }
@@ -371,16 +416,21 @@ int tcp_bindfd_tls(uv_tcp_t *handle, int fd)
 
 void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)
 {
+	int ret = -1;
 	if (type == SOCK_DGRAM) {
-		uv_udp_init(loop, (uv_udp_t *)handle);
-	} else {
-		uv_tcp_init(loop, (uv_tcp_t *)handle);
+		ret = uv_udp_init(loop, (uv_udp_t *)handle);
+	} else if (type == SOCK_STREAM) {
+		ret = uv_tcp_init(loop, (uv_tcp_t *)handle);
 		uv_tcp_nodelay((uv_tcp_t *)handle, 1);
 	}
-
+	assert(ret == 0);
 	struct worker_ctx *worker = loop->data;
-	handle->data = session_borrow(worker);
-	assert(handle->data);
+	struct session *session = session_borrow(worker);
+	assert(session);
+	session->handle = handle;
+	handle->data = session;
+	session->timeout.data = session;
+	uv_timer_init(worker->loop, &session->timeout);
 }
 
 void io_deinit(uv_handle_t *handle)
@@ -388,6 +438,7 @@ void io_deinit(uv_handle_t *handle)
 	if (!handle) {
 		return;
 	}
+	struct session *session = handle->data;
 	uv_loop_t *loop = handle->loop;
 	if (loop && loop->data) {
 		struct worker_ctx *worker = loop->data;
@@ -407,13 +458,25 @@ void io_free(uv_handle_t *handle)
 	free(handle);
 }
 
+void io_release(uv_handle_t *handle)
+{
+	if (!handle) {
+		return;
+	}
+	uv_loop_t *loop = handle->loop;
+	struct worker_ctx *worker = loop->data;
+	io_deinit(handle);
+	worker_iohandle_release(worker, handle);
+}
+
 int io_start_read(uv_handle_t *handle)
 {
 	if (handle->type == UV_UDP) {
 		return uv_udp_recv_start((uv_udp_t *)handle, &handle_getbuf, &udp_recv);
-	} else {
+	} else if (handle->type == UV_TCP) {
 		return uv_read_start((uv_stream_t *)handle, &handle_getbuf, &tcp_recv);
 	}
+	assert(false);
 }
 
 int io_stop_read(uv_handle_t *handle)

@@ -54,12 +54,27 @@ struct tls_ctx_t {
 	struct tls_credentials *credentials;
 };
 
+struct tls_client_ctx_t {
+	gnutls_session_t tls_session;
+	tls_client_hs_state_t handshake_state;
+
+	struct session *session;
+	tls_handshake_cb handshake_cb;
+	const uint8_t *buf;
+	ssize_t nread;
+	ssize_t consumed;
+	uint8_t recv_buf[4096];
+	const struct tls_client_paramlist_entry *params;
+};
+
 /** @internal Debugging facility. */
 #ifdef DEBUG
-#define DEBUG_MSG(fmt...) fprintf(stderr, "[tls] " fmt)
+#define DEBUG_MSG(fmt...) kr_log_verbose("[tls] " fmt)
 #else
 #define DEBUG_MSG(fmt...)
 #endif
+
+static int client_verify_certificate(gnutls_session_t tls_session);
 
 static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
@@ -216,6 +231,7 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 	}
 
 	ssize_t submitted = 0;
+	ssize_t retries = 0;
 	do {
 		count = gnutls_record_uncork(tls_p->session, 0);
 		if (count < 0) {
@@ -224,7 +240,13 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 				             gnutls_strerror_name(count), count);
 				return kr_error(EIO);
 			}
+			if (++retries > TLS_MAX_UNCORK_RETRIES) {
+				kr_log_error("[tls] gnutls_record_uncork: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
+				             retries, gnutls_strerror_name(count), count);
+				return kr_error(EIO);
+			}
 		} else {
+			retries = 0;
 			submitted += count;
 			if (count == 0 && submitted != sizeof(pkt_size) + pkt->size) {
 				kr_log_error("[tls] gnutls_record_uncork didn't send all data: %s (%zd)\n",
@@ -246,7 +268,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	}
 
 	tls_p->buf = buf;
-	tls_p->nread = nread;
+	tls_p->nread = nread >= 0 ? nread : 0;
 	tls_p->handle = handle;
 	tls_p->consumed = 0;	/* TODO: doesn't handle split TLS records */
 
@@ -278,6 +300,9 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
 		if (ret < 0) {
 			return ret;
+		}
+		if (count == 0) {
+			break;
 		}
 		submitted += ret;
 	}
@@ -502,6 +527,529 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 		free(tls_credentials->ephemeral_servicename);
 	}
 	free(tls_credentials);
+}
+
+static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
+{
+	struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)v;
+
+	while (entry->ca_files.len > 0) {
+		if (entry->ca_files.at[0] != NULL) {
+			free((void *)entry->ca_files.at[0]);
+		}
+		array_del(entry->ca_files, 0);
+	}
+
+	while (entry->hostnames.len > 0) {
+		if (entry->hostnames.at[0] != NULL) {
+			free((void *)entry->hostnames.at[0]);
+		}
+		array_del(entry->hostnames, 0);
+	}
+
+	while (entry->pins.len > 0) {
+		if (entry->pins.at[0] != NULL) {
+			free((void *)entry->pins.at[0]);
+		}
+		array_del(entry->pins, 0);
+	}
+
+	array_clear(entry->ca_files);
+	array_clear(entry->hostnames);
+	array_clear(entry->pins);
+
+	if (entry->credentials) {
+		gnutls_certificate_free_credentials(entry->credentials);
+	}
+
+	free(entry);
+
+	return 0;
+}
+
+int tls_client_params_set(map_t *tls_client_paramlist,
+			  const char *addr, uint16_t port,
+			  const char *ca_file, const char *hostname, const char *pin)
+{
+	if (!tls_client_paramlist || !addr) {
+		return kr_error(EINVAL);
+	}
+
+	char key[INET6_ADDRSTRLEN + 6];
+	size_t keylen = sizeof(key);
+	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
+		kr_log_error("[tls client] warning: '%s' is not a valid ip address, ignoring\n", addr);
+		return kr_ok();
+	}
+
+	bool is_first_entry = false;
+	struct tls_client_paramlist_entry *entry = map_get(tls_client_paramlist, key);
+	if (entry == NULL) {
+		entry = calloc(1, sizeof(struct tls_client_paramlist_entry));
+		if (entry == NULL) {
+			return kr_error(ENOMEM);
+		}
+		is_first_entry  = true;
+		int ret = gnutls_certificate_allocate_credentials(&entry->credentials);
+		if (ret != GNUTLS_E_SUCCESS) {
+			free(entry);
+			kr_log_error("[tls client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
+				     gnutls_strerror_name(ret));
+			return kr_error(ENOMEM);
+		}
+		gnutls_certificate_set_verify_function(entry->credentials, client_verify_certificate);
+	}
+
+	int ret = kr_ok();
+	if (ca_file && ca_file[0] != 0) {
+		bool already_exists = false;
+		for (size_t i = 0; i < entry->ca_files.len; ++i) {
+			if (strcmp(entry->ca_files.at[i], ca_file) == 0) {
+				kr_log_error("[tls client] error: ca file '%s'for address '%s' already was set, ignoring\n", ca_file, key);
+				already_exists = true;
+				break;
+			}
+		}
+		if (!already_exists) {
+			const char *value = strdup(ca_file);
+			if (!value) {
+				ret = kr_error(ENOMEM);
+			} else if (array_push(entry->ca_files, value) < 0) {
+				free ((void *)value);
+				ret = kr_error(ENOMEM);
+			} else {
+				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
+										 GNUTLS_X509_FMT_PEM);
+				if (res < 0) {
+					kr_log_error("[tls client], failed to import certificate file '%s' (%s)\n",
+						     value, gnutls_strerror_name(res));
+					/* value will be freed at cleanup */
+					ret = kr_error(EINVAL);
+				}
+			}
+		}
+	}
+
+	if ((ret == kr_ok()) && hostname && hostname[0] != 0) {
+		bool already_exists = false;
+		for (size_t i = 0; i < entry->hostnames.len; ++i) {
+			if (strcmp(entry->hostnames.at[i], hostname) == 0) {
+				kr_log_error("[tls client] error: hostname '%s' for address '%s' already was set, ignoring\n", hostname, key);
+				already_exists = true;
+				break;
+			}
+		}
+		if (!already_exists) {
+			const char *value = strdup(hostname);
+			if (!value) {
+				ret = kr_error(ENOMEM);
+			} else if (array_push(entry->hostnames, value) < 0) {
+				free ((void *)value);
+				ret = kr_error(ENOMEM);
+			}
+		}
+	}
+
+	if ((ret == kr_ok()) && pin && pin[0] != 0) {
+		for (size_t i = 0; i < entry->pins.len; ++i) {
+			if (strcmp(entry->pins.at[i], pin) == 0) {
+				kr_log_error("[tls client] warning: pin '%s' for address '%s' already was set, ignoring\n", pin, key);
+				return kr_ok();
+			}
+		}
+		const void *value = strdup(pin);
+		if (!value) {
+			ret = kr_error(ENOMEM);
+		} else if (array_push(entry->pins, value) < 0) {
+			free ((void *)value);
+			ret = kr_error(ENOMEM);
+		}
+	}
+
+	if ((ret == kr_ok()) && is_first_entry) {
+		bool fail = (map_set(tls_client_paramlist, key, entry) != 0);
+		if (fail) {
+			ret = kr_error(ENOMEM);
+		}
+	}
+
+	if ((ret != kr_ok()) && is_first_entry) {
+		client_paramlist_entry_clear(NULL, (void *)entry, NULL);
+	}
+
+	return ret;
+}
+
+int tls_client_params_free(map_t *tls_client_paramlist)
+{
+	if (!tls_client_paramlist) {
+		return kr_error(EINVAL);
+	}
+
+	map_walk(tls_client_paramlist, client_paramlist_entry_clear, NULL);
+	map_clear(tls_client_paramlist);
+
+	return kr_ok();
+}
+
+static int client_verify_certificate(gnutls_session_t tls_session)
+{
+	struct tls_client_ctx_t *ctx = gnutls_session_get_ptr(tls_session);
+	assert(ctx->params != NULL);
+
+	if (ctx->params->pins.len == 0 && ctx->params->ca_files.len == 0) {
+		return GNUTLS_E_SUCCESS;
+	}
+
+	gnutls_certificate_type_t cert_type = gnutls_certificate_type_get(tls_session);
+	if (cert_type != GNUTLS_CRT_X509) {
+		kr_log_error("[tls_client] invalid certificate type %i has been received\n",
+			     cert_type);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+	unsigned int cert_list_size = 0;
+	const gnutls_datum_t *cert_list =
+		gnutls_certificate_get_peers(tls_session, &cert_list_size);
+	if (cert_list == NULL || cert_list_size == 0) {
+		kr_log_error("[tls_client] empty certificate list\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	if (ctx->params->pins.len == 0) {
+		DEBUG_MSG("[tls_client] skipping certificate PIN check\n");
+		goto skip_pins;
+	}
+
+	for (int i = 0; i < cert_list_size; i++) {
+		gnutls_x509_crt_t cert;
+		int ret = gnutls_x509_crt_init(&cert);
+		if (ret != GNUTLS_E_SUCCESS) {
+			return ret;
+		}
+
+		ret = gnutls_x509_crt_import(cert, &cert_list[i], GNUTLS_X509_FMT_DER);
+		if (ret != GNUTLS_E_SUCCESS) {
+			gnutls_x509_crt_deinit(cert);
+			return ret;
+		}
+
+		char cert_pin[PINLEN] = { 0 };
+		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin));
+
+		gnutls_x509_crt_deinit(cert);
+
+		if (ret != GNUTLS_E_SUCCESS) {
+			return ret;
+		}
+
+		DEBUG_MSG("[tls_client] received pin  : %s\n", cert_pin);
+		for (size_t i = 0; i < ctx->params->pins.len; ++i) {
+			const char *pin = ctx->params->pins.at[i];
+			bool match = (strcmp(cert_pin, pin) == 0);
+			DEBUG_MSG("[tls_client] configured pin: %s matches? %s\n",
+				  pin, match ? "yes" : "no");
+			if (match) {
+				return GNUTLS_E_SUCCESS;
+			}
+		}
+	}
+
+	/* pins were set, but no one was not matched */
+	kr_log_error("[tls_client] certificate PIN check failed\n");
+
+skip_pins:
+
+	if (ctx->params->ca_files.len == 0) {
+		DEBUG_MSG("[tls_client] empty CA files list\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	if (ctx->params->hostnames.len == 0) {
+		DEBUG_MSG("[tls_client] empty hostname list\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	for (size_t i = 0; i < ctx->params->hostnames.len; ++i) {
+		gnutls_typed_vdata_st data[2] = {
+			{ .type = GNUTLS_DT_KEY_PURPOSE_OID,
+			  .data = (void *)GNUTLS_KP_TLS_WWW_SERVER },
+			{ .type = GNUTLS_DT_DNS_HOSTNAME,
+			  .data = (void *)ctx->params->hostnames.at[i] }
+		};
+		size_t data_count = 2;
+		unsigned int status;
+		int ret = gnutls_certificate_verify_peers(ctx->tls_session, data, data_count, &status);
+		if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
+			return GNUTLS_E_SUCCESS;
+		}
+	}
+
+	kr_log_error("[tls_client] failed to verify peer certificate\n");
+	return GNUTLS_E_CERTIFICATE_ERROR;
+}
+
+static ssize_t kres_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
+{
+	struct tls_client_ctx_t *t = (struct tls_client_ctx_t *)h;
+	const uv_buf_t ub = {(void *)buf, len};
+
+	DEBUG_MSG("[tls_client] push %zu <%p>\n", len, h);
+	if (t == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	int ret = uv_try_write((uv_stream_t *)t->session->handle, &ub, 1);
+	if (ret > 0) {
+		return (ssize_t) ret;
+	}
+	if (ret == UV_EAGAIN) {
+		errno = EAGAIN;
+	} else {
+		kr_log_error("[tls_client] uv_try_write: %s\n", uv_strerror(ret));
+		errno = EIO;
+	}
+	return -1;
+}
+
+
+static ssize_t kres_gnutls_client_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
+{
+	struct tls_client_ctx_t *t = (struct tls_client_ctx_t *)h;
+	assert(t != NULL);
+
+	ssize_t	avail = t->nread - t->consumed;
+	DEBUG_MSG("[tls] pull wanted: %zu available: %zu\n", len, avail);
+	if (t->nread <= t->consumed) {
+		errno = EAGAIN;
+		return -1;
+	}
+
+	ssize_t	transfer = MIN(avail, len);
+	memcpy(buf, t->buf + t->consumed, transfer);
+	t->consumed += transfer;
+	return transfer;
+}
+
+int tls_client_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
+{
+	if (!pkt || !handle || !handle->data) {
+		return kr_error(EINVAL);
+	}
+
+	struct session *session = handle->data;
+	const uint16_t pkt_size = htons(pkt->size);
+	struct tls_client_ctx_t *ctx = session->tls_client_ctx;
+	if (!ctx) {
+		kr_log_error("[tls_client] no tls context on push\n");
+		return kr_error(ENOENT);
+	}
+
+	gnutls_record_cork(ctx->tls_session);
+	ssize_t count = 0;
+	if ((count = gnutls_record_send(ctx->tls_session, &pkt_size, sizeof(pkt_size)) < 0) ||
+	    (count = gnutls_record_send(ctx->tls_session, pkt->wire, pkt->size) < 0)) {
+		kr_log_error("[tls_client] gnutls_record_send failed: %s (%zd)\n", gnutls_strerror_name(count), count);
+		return kr_error(EIO);
+	}
+
+	ssize_t submitted = 0;
+	ssize_t retries = 0;
+	do {
+		count = gnutls_record_uncork(ctx->tls_session, 0);
+		if (count < 0) {
+			if (gnutls_error_is_fatal(count)) {
+				kr_log_error("[tls_client] gnutls_record_uncork failed: %s (%zd)\n",
+				             gnutls_strerror_name(count), count);
+				return kr_error(EIO);
+			}
+			if (++retries > TLS_MAX_UNCORK_RETRIES) {
+				kr_log_error("[tls] gnutls_record_uncork: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
+				             retries, gnutls_strerror_name(count), count);
+				return kr_error(EIO);
+			}
+		} else {
+			retries = 0;
+			submitted += count;
+			if (count == 0 && submitted != sizeof(pkt_size) + pkt->size) {
+				kr_log_error("[tls_client] gnutls_record_uncork didn't send all data: %s (%zd)\n",
+				             gnutls_strerror_name(count), count);
+				return kr_error(EIO);
+			}
+		}
+	} while (submitted != sizeof(pkt_size) + pkt->size);
+
+	return kr_ok();
+}
+
+int tls_client_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread)
+{
+	struct session *session = handle->data;
+	struct tls_client_ctx_t *ctx = session->tls_client_ctx;
+	if (!ctx) {
+		return kr_error(ENOSYS);
+	}
+
+	assert(ctx->handshake_state == TLS_HS_IN_PROGRESS ||
+	       ctx->handshake_state == TLS_HS_DONE);
+
+	ctx->buf = buf;
+	ctx->nread = nread >= 0 ? nread : 0;
+	ctx->session = session;
+	ctx->consumed = 0;
+
+	if (ctx->handshake_state == TLS_HS_IN_PROGRESS) {
+		int err = gnutls_handshake(ctx->tls_session);
+		if (err == GNUTLS_E_SUCCESS) {
+			ctx->handshake_state = TLS_HS_DONE;
+		} else if (err == GNUTLS_E_AGAIN) {
+			return 0;
+		} else if (err < 0 && gnutls_error_is_fatal(err)) {
+			kr_log_error("[tls_client] gnutls_handshake failed: %s (%d)\n",
+			             gnutls_strerror_name(err), err);
+			if (ctx->handshake_cb) {
+				ctx->handshake_cb(ctx->session, -1);
+			}
+			return kr_error(err);
+		}
+		if (ctx->handshake_cb) {
+			ctx->handshake_cb(ctx->session, 0);
+		}
+		DEBUG_MSG("[tls_client] TLS handshake with %s has completed.\n", kr_straddr(&session->peer.ip));
+	}
+
+	int submitted = 0;
+	while (true) {
+		ssize_t count = gnutls_record_recv(ctx->tls_session, ctx->recv_buf, sizeof(ctx->recv_buf));
+		if (count == GNUTLS_E_AGAIN) {
+			break;    /* No data available */
+		} else if (count == GNUTLS_E_INTERRUPTED) {
+			continue; /* Try reading again */
+		} else if (count < 0) {
+			kr_log_error("[tls_client] gnutls_record_recv failed: %s (%zd)\n",
+			             gnutls_strerror_name(count), count);
+			return kr_error(EIO);
+		}
+		DEBUG_MSG("[tls_client] submitting %zd data to worker\n", count);
+		int ret = worker_process_tcp(worker, handle, ctx->recv_buf, count);
+		if (ret < 0) {
+			return ret;
+		}
+		if (count == 0) {
+			break;
+		}
+		submitted += ret;
+	}
+	return submitted;
+}
+
+struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_entry *entry)
+{
+	struct tls_client_ctx_t *ctx = calloc(1, sizeof (struct tls_client_ctx_t));
+	if (!ctx) {
+		return NULL;
+	}
+
+	int ret = gnutls_init(&ctx->tls_session, GNUTLS_CLIENT | GNUTLS_NONBLOCK);
+	if (ret != GNUTLS_E_SUCCESS) {
+		tls_client_ctx_free(ctx);
+		return NULL;
+	}
+
+	ret = gnutls_set_default_priority(ctx->tls_session);
+	if (ret != GNUTLS_E_SUCCESS) {
+		tls_client_ctx_free(ctx);
+		return NULL;
+	}
+
+	ret = gnutls_credentials_set(ctx->tls_session, GNUTLS_CRD_CERTIFICATE,
+	                             entry->credentials);
+	if (ret != GNUTLS_E_SUCCESS) {
+		tls_client_ctx_free(ctx);
+		return NULL;
+	}
+
+	gnutls_transport_set_pull_function(ctx->tls_session, kres_gnutls_client_pull);
+	gnutls_transport_set_push_function(ctx->tls_session, kres_gnutls_client_push);
+	gnutls_transport_set_ptr(ctx->tls_session, ctx);
+	return ctx;
+}
+
+void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
+{
+	if (ctx == NULL) {
+		return;
+	}
+
+	if (ctx->session != NULL) {
+		gnutls_deinit(ctx->tls_session);
+	}
+
+	free (ctx);
+}
+
+int tls_client_connect_start(struct tls_client_ctx_t *ctx,
+			     struct session *session,
+			     tls_handshake_cb handshake_cb)
+{
+	if (session == NULL || ctx == NULL) {
+		return kr_error(EINVAL);
+	}
+
+	assert(session->outgoing && session->handle->type == UV_TCP);
+
+	gnutls_session_set_ptr(ctx->tls_session, ctx);
+	gnutls_handshake_set_timeout(ctx->tls_session, 5000);
+	session->tls_client_ctx = ctx;
+	ctx->handshake_cb = handshake_cb;
+	ctx->handshake_state = TLS_HS_IN_PROGRESS;
+	ctx->session = session;
+
+	int ret = gnutls_handshake(ctx->tls_session);
+	if (ret == GNUTLS_E_SUCCESS) {
+		return kr_ok();
+	} else if (gnutls_error_is_fatal(ret) != 0) {
+		kr_log_error("[tls client] handshake failed (%s)\n", gnutls_strerror(ret));
+		return kr_error(ECONNABORTED);
+	}
+	return kr_error(EAGAIN);
+}
+
+void tls_client_close(struct tls_client_ctx_t *ctx)
+{
+	if (ctx == NULL || ctx->session == NULL) {
+		return;
+	}
+
+	if (ctx->handshake_state == TLS_HS_DONE) {
+		gnutls_bye(ctx->tls_session, GNUTLS_SHUT_RDWR);
+	}
+}
+
+tls_client_hs_state_t tls_client_get_hs_state(const struct tls_client_ctx_t *ctx)
+{
+	return ctx->handshake_state;
+}
+
+int tls_client_set_hs_state(struct tls_client_ctx_t *ctx, tls_client_hs_state_t state)
+{
+	if (state >= TLS_HS_LAST) {
+		return kr_error(EINVAL);
+	}
+	ctx->handshake_state = state;
+	return kr_ok();
+}
+
+int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
+			      const struct tls_client_paramlist_entry *entry,
+			      struct session *session)
+{
+	if (!ctx) {
+		return kr_error(EINVAL);
+	}
+	ctx->params = entry;
+	ctx->session = session;
+	return kr_ok();
 }
 
 #undef DEBUG_MSG

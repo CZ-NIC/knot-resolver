@@ -318,6 +318,31 @@ uint16_t kr_inaddr_port(const struct sockaddr *addr)
 	}
 }
 
+int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen)
+{
+	int ret = kr_ok();
+	if (!addr || !buf || !buflen) {
+		return kr_error(EINVAL);
+	}
+
+	char str[INET6_ADDRSTRLEN + 6];
+	if (!inet_ntop(addr->sa_family, kr_inaddr(addr), str, sizeof(str))) {
+		return kr_error(errno);
+	}
+	int len = strlen(str);
+	str[len] = '#';
+	u16tostr((uint8_t *)&str[len + 1], kr_inaddr_port(addr));
+	len += 6;
+	str[len] = 0;
+	if (len >= *buflen) {
+		ret = kr_error(ENOSPC);
+	} else {
+		memcpy(buf, str, len + 1);
+	}
+	*buflen = len;
+	return ret;
+}
+
 int kr_straddr_family(const char *addr)
 {
 	if (!addr) {
@@ -394,6 +419,84 @@ int kr_straddr_subnet(void *dst, const char *addr)
 	}
 
 	return bit_len;
+}
+
+int kr_straddr_split(const char *addr, char *buf, size_t buflen, uint16_t *port)
+{
+	const int base = 10;
+	long p = 0;
+	size_t addrlen = strlen(addr);
+	char *p_start = strchr(addr, '@');
+	char *p_end;
+
+	if (!p_start) {
+		p_start = strchr(addr, '#');
+	}
+
+	if (p_start) {
+		if (p_start[1] != '\0'){
+			p = strtol(p_start + 1, &p_end, base);
+			if (*p_end != '\0' || p <= 0 || p > UINT16_MAX) {
+				return kr_error(EINVAL);
+			}
+		}
+		addrlen = p_start - addr;
+	}
+
+	/* Check if address is valid. */
+	if (addrlen >= INET6_ADDRSTRLEN) {
+		return kr_error(EINVAL);
+	}
+
+	char str[INET6_ADDRSTRLEN];
+	struct sockaddr_storage ss;
+
+	memcpy(str, addr, addrlen); str[addrlen] = '\0';
+
+	int family = kr_straddr_family(str);
+	if (family == kr_error(EINVAL) || !inet_pton(family, str, &ss)) {
+		return kr_error(EINVAL);
+	}
+
+	/* Address and port contains valid values, return it to caller */
+	if (buf) {
+		if (addrlen >= buflen) {
+			return kr_error(ENOSPC);
+		}
+		memcpy(buf, addr, addrlen); buf[addrlen] = '\0';
+	}
+	if (port) {
+		*port = (uint16_t)p;
+	}
+
+	return kr_ok();
+}
+
+int kr_straddr_join(const char *addr, uint16_t port, char *buf, size_t *buflen)
+{
+	if (!addr || !buf || !buflen) {
+		return kr_error(EINVAL);
+	}
+
+	struct sockaddr_storage ss;
+	int family = kr_straddr_family(addr);
+	if (family == kr_error(EINVAL) || !inet_pton(family, addr, &ss)) {
+		return kr_error(EINVAL);
+	}
+
+	int len = strlen(addr);
+	if (len + 6 >= *buflen) {
+		return kr_error(ENOSPC);
+	}
+
+	memcpy(buf, addr, len + 1);
+	buf[len] = '#';
+	u16tostr((uint8_t *)&buf[len + 1], port);
+	len += 6;
+	buf[len] = 0;
+	*buflen = len;
+
+	return kr_ok();
 }
 
 int kr_bitcmp(const char *a, const char *b, int bits)
