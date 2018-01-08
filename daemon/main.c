@@ -18,6 +18,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <getopt.h>
 #include <libgen.h>
 #include <uv.h>

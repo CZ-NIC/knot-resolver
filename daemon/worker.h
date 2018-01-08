@@ -21,23 +21,32 @@
 #include "lib/generic/map.h"
 
 
+/** Query resolution task (opaque). */
+struct qr_task;
 /** Worker state (opaque). */
 struct worker_ctx;
-struct qr_task;
+/** Transport session (opaque). */
+struct session;
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 		int worker_id, int worker_count);
 
 /**
- * Process incoming packet (query or answer to subrequest).
+ * Process an incoming packet (query from a client or answer from upstream).
+ *
+ * @param worker the singleton worker
+ * @param handle socket through which the request came
+ * @param query  the packet, or NULL on an error from the transport layer
+ * @param addr   the address from which the packet came (or NULL, possibly, on error)
  * @return 0 or an error code
  */
 int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query,
 		const struct sockaddr* addr);
 
 /**
- * Process incoming DNS/TCP message fragment(s).
+ * Process incoming DNS message fragment(s) that arrived over a stream (TCP, TLS).
+ *
  * If the fragment contains only a partial message, it is buffered.
  * If the fragment contains a complete query or completes current fragment, execute it.
  * @return the number of newly-completed requests (>=0) or an error code
@@ -66,18 +75,19 @@ struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *quer
  */
 int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query);
 
-/**
- * Schedule query for resolution.
- *
- * @return 0 or an error code
- *
- * @note the options passed are |-combined with struct kr_context::options
- * @todo maybe better semantics for this?
- */
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options);
+/** @return struct kr_request associated with opaque task */
+struct kr_request *worker_task_request(struct qr_task *task);
 
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);
+
+/** Closes given session */
+void worker_session_close(struct session *session);
+
+void *worker_iohandle_borrow(struct worker_ctx *worker);
+
+void worker_iohandle_release(struct worker_ctx *worker, void *h);
+
 
 
 /** @cond internal */
@@ -85,8 +95,17 @@ void worker_reclaim(struct worker_ctx *worker);
 /** Number of request within timeout window. */
 #define MAX_PENDING KR_NSREP_MAXADDR
 
+/** Maximum response time from TCP upstream, milliseconds */
+#define MAX_TCP_INACTIVITY 10000
+
 /** Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
+
+/** List of query resolution tasks. */
+typedef array_t(struct qr_task *) qr_tasklist_t;
+
+/** Session list. */
+typedef array_t(struct session *) qr_sessionlist_t;
 
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
@@ -107,6 +126,7 @@ struct worker_ctx {
 #endif
 	struct {
 		size_t concurrent;
+		size_t rconcurrent;
 		size_t udp;
 		size_t tcp;
 		size_t ipv4;
@@ -116,39 +136,43 @@ struct worker_ctx {
 		size_t timeout;
 	} stats;
 
+	bool too_many_open;
+	size_t rconcurrent_highwatermark;
+	/* List of active outbound TCP sessions */
+	map_t tcp_connected;
+	/* List of outbound TCP sessions waiting to be accepted */
+	map_t tcp_waiting;
 	map_t outgoing;
 	mp_freelist_t pool_mp;
-	mp_freelist_t pool_ioreq;
+	mp_freelist_t pool_ioreqs;
 	mp_freelist_t pool_sessions;
+	mp_freelist_t pool_iohandles;
 	knot_mm_t pkt_pool;
 };
 
-/** Query resolution task. */
-struct qr_task
-{
-	struct kr_request req;
-	struct worker_ctx *worker;
-	struct session *session;
-	knot_pkt_t *pktbuf;
-	array_t(struct qr_task *) waiting;
-	uv_handle_t *pending[MAX_PENDING];
-	uint16_t pending_count;
-	uint16_t addrlist_count;
-	uint16_t addrlist_turn;
-	uint16_t timeouts;
-	uint16_t iter_count;
-	uint16_t bytes_remaining;
-	struct sockaddr *addrlist;
-	uv_timer_t *timeout;
-	struct {
-		union inaddr addr;
-		union inaddr dst_addr;
-		uv_handle_t *handle;
-	} source;
-	uint32_t refs;
-	bool finished : 1;
-	bool leading  : 1;
+/* @internal Union of some libuv handles for freelist.
+ * These have session as their `handle->data` and own it.
+ * Subset of uv_any_handle. */
+union uv_handles {
+	uv_handle_t   handle;
+	uv_stream_t   stream;
+	uv_udp_t      udp;
+	uv_tcp_t      tcp;
+	uv_timer_t    timer;
 };
+typedef union uv_any_handle uv_handles_t;
+
+/* @internal Union of derivatives from uv_req_t libuv request handles for freelist.
+ * These have only a reference to the task they're operating on.
+ * Subset of uv_any_req. */
+union uv_reqs {
+	uv_req_t      req;
+	uv_shutdown_t sdown;
+	uv_write_t    write;
+	uv_connect_t  connect;
+	uv_udp_send_t send;
+};
+typedef union uv_reqs uv_reqs_t;
 
 /** @endcond */
 

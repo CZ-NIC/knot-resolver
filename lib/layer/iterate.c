@@ -824,7 +824,7 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 		char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 		knot_dname_to_str(name_str, query->sname, sizeof(name_str));
 		knot_rrtype_to_string(query->stype, type_str, sizeof(type_str));
-		QVERBOSE_MSG(query, "'%s' type '%s' created outbound query, parent id %hu\n",
+		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %hu\n",
 			    name_str, type_str, query->parent ? query->parent->id : 0);
 	}
 	return kr_ok();

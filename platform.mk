@@ -9,6 +9,7 @@ GO := go
 CAT := cat
 SED := sed
 LCOV := lcov
+GENHTML := genhtml
 LIBEXT := .so
 AREXT  := .a
 LIBTYPE := shared
