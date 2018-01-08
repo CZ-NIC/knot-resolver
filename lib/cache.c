@@ -1049,28 +1049,27 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 
 static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry)
 {
-	const bool allow_unverified = knot_wire_get_cd(req->answer->wire)
-					|| qry->flags.STUB;
 	/* TODO: move rank handling into the iterator (DNSSEC_* flags)? */
-	uint8_t lowest_rank = KR_RANK_INITIAL | KR_RANK_AUTH;
+	const bool allow_unverified =
+		knot_wire_get_cd(req->answer->wire) || qry->flags.STUB;
+		/* in stub mode we don't trust RRs anyway ^^ */
 	if (qry->flags.NONAUTH) {
-		lowest_rank = KR_RANK_INITIAL;
+		return KR_RANK_INITIAL;
 		/* Note: there's little sense in validation status for non-auth records.
 		 * In case of using NONAUTH to get NS IPs, knowing that you ask correct
 		 * IP doesn't matter much for security; it matters whether you can
 		 * validate the answers from the NS.
 		 */
 	} else if (!allow_unverified) {
-				/* ^^ in stub mode we don't trust RRs anyway */
 		/* Records not present under any TA don't have their security
 		 * verified at all, so we also accept low ranks in that case. */
 		const bool ta_covers = kr_ta_covers_qry(req->ctx, qry->sname, qry->stype);
 		/* ^ TODO: performance?  TODO: stype - call sites */
 		if (ta_covers) {
-			kr_rank_set(&lowest_rank, KR_RANK_INSECURE);
-		}
+			return KR_RANK_INSECURE | KR_RANK_AUTH;
+		} /* else falltrhough */
 	}
-	return lowest_rank;
+	return KR_RANK_INITIAL | KR_RANK_AUTH;
 }
 
 
