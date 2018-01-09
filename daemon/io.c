@@ -108,16 +108,6 @@ static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
 	}
 }
 
-static uv_stream_t *handle_alloc(uv_loop_t *loop)
-{
-	uv_stream_t *handle = calloc(1, sizeof(uv_handles_t));
-	if (!handle) {
-		return NULL;
-	}
-
-	return handle;
-}
-
 static uv_stream_t *handle_borrow(uv_loop_t *loop)
 {
 	struct worker_ctx *worker = loop->data;
@@ -219,7 +209,6 @@ int udp_bindfd(uv_udp_t *handle, int fd)
 static void tcp_timeout_trigger(uv_timer_t *timer)
 {
 	struct session *session = timer->data;
-	struct worker_ctx *worker = timer->loop->data;
 
 	assert(session->outgoing == false);
 	if (session->tasks.len > 0) {
@@ -438,7 +427,6 @@ void io_deinit(uv_handle_t *handle)
 	if (!handle) {
 		return;
 	}
-	struct session *session = handle->data;
 	uv_loop_t *loop = handle->loop;
 	if (loop && loop->data) {
 		struct worker_ctx *worker = loop->data;
