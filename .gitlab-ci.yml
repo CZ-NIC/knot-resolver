@@ -15,10 +15,20 @@ stages:
 build:linux:amd64:
   stage: build
   script:
-    - PREFIX=$(pwd)/.local make -k all
-    - PREFIX=$(pwd)/.local make install
+    - PREFIX=$(pwd)/.local make -k all CFLAGS=-Werror
+    - PREFIX=$(pwd)/.local make install CFLAGS=-Werror
   artifacts:
     untracked: true
+  tags:
+    - docker
+    - linux
+    - amd64
+
+build:clang:linux:amd64:
+  stage: build
+  script:
+    - CXX=clang++ CC=clang PREFIX=$(pwd)/.local make -k all CFLAGS=-Werror
+    - CXX=clang++ CC=clang PREFIX=$(pwd)/.local make install CFLAGS=-Werror
   tags:
     - docker
     - linux
