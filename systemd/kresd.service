@@ -11,6 +11,3 @@ User=knot-resolver
 Restart=on-failure
 # CAP_NET_BIND_SERVICE capability is needed for manual service activation
 AmbientCapabilities=CAP_NET_BIND_SERVICE
-
-[Install]
-WantedBy=sockets.target
