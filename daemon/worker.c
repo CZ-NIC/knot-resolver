@@ -149,10 +149,9 @@ static inline void iohandle_release(struct worker_ctx *worker, void *h)
 {
 	assert(h);
 
-	const size_t size = sizeof(uv_handles_t);
 	if (worker->pool_iohandles.len < MP_FREELIST_SIZE) {
 		array_push(worker->pool_iohandles, h);
-		kr_asan_poison(h, size);
+		kr_asan_poison(h, sizeof(uv_handles_t));
 	} else {
 		free(h);
 	}
@@ -188,10 +187,9 @@ static inline void iorequest_release(struct worker_ctx *worker, void *r)
 {
 	assert(r);
 
-	const size_t size = sizeof(uv_reqs_t);
 	if (worker->pool_ioreqs.len < MP_FREELIST_SIZE) {
 		array_push(worker->pool_ioreqs, r);
-		kr_asan_poison(r, size);
+		kr_asan_poison(r, sizeof(uv_reqs_t));
 	} else {
 		free(r);
 	}
@@ -1344,7 +1342,6 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 			qry->secret = leader_qry->secret;
 			leader_qry->secret = 0; /* Next will be already decoded */
 		}
-		struct session *follower_source_session = follower->ctx->source.session;
 		qr_task_step(follower, packet_source, pkt);
 		qr_task_unref(follower);
 	}
