@@ -206,11 +206,13 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank);
 
 
 /** Construct a string key for for NSEC (1) predecessor-search.
- * \param add_wildcard Act as if the name was extended by "*." */
+ * \param add_wildcard Act as if the name was extended by "*."
+ * \note k->zlf_len is assumed to have been correctly set */
 knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildcard);
 
 /** Closest encloser check for NSEC (1).
  * To understand the interface, see the call point.
+ * \param k	space to store key + input: zname and zlf_len
  * \return 0: success;  >0: try other (NSEC3);  <0: exit cache immediately. */
 int nsec1_encloser(struct key *k, struct answer *ans,
 		   const int sname_labels, int *clencl_labels,

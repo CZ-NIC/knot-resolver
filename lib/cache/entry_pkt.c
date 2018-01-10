@@ -195,11 +195,7 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	}
 	knot_wire_set_id(pkt->wire, msgid);
 
-	/* Rank-related fixups.  Add rank into the additional field. */
-	if (kr_rank_test(eh->rank, KR_RANK_INSECURE)) {
-		qry->flags.DNSSEC_INSECURE = true;
-		qry->flags.DNSSEC_WANT = false;
-	}
+	/* Add rank into the additional field. */
 	for (size_t i = 0; i < pkt->rrset_count; ++i) {
 		assert(!pkt->rr[i].additional);
 		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));

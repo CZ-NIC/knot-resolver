@@ -306,7 +306,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /**
- * \note we don't transition to KR_STATE_FAIL even in case of  "unexpected errors".
+ * \note we don't transition to KR_STATE_FAIL even in case of "unexpected errors".
  */
 static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
@@ -379,11 +379,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 				val_cut.data + val_cut.len,
 				get_new_ttl(val_cut.data, qry->timestamp.tv_sec));
 		/* TODO: ^^ cumbersome code */
-		if (ret == kr_ok()) {
-			return KR_STATE_DONE;
-		} else {
-			return ctx->state;
-		}
+		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
 
 	case KNOT_RRTYPE_DNAME:
 		VERBOSE_MSG(qry, "=> DNAME not supported yet\n"); // LATER

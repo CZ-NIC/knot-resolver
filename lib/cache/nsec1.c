@@ -133,15 +133,16 @@ static struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
 /** NSEC1 range search.
  *
  * \param key Pass output of key_NSEC1(k, ...)
- * \param val[out] The raw data of the NSEC cache record (optional; consistency checked).
+ * \param value[out] The raw data of the NSEC cache record (optional; consistency checked).
  * \param exact_match[out] Whether the key was matched exactly or just covered (optional).
  * \param kwz_low[out] Output the low end of covering NSEC, pointing within DB (optional).
  * \param kwz_high[in,out] Storage for the high end of covering NSEC (optional).
  * 		It's only set if !exact_match.
+ * \param new_ttl[out] New TTL of the NSEC (optional).
  * \return Error message or NULL.
  */
 static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query *qry,
-			knot_db_val_t key, const struct key *k, knot_db_val_t *value,
+			const knot_db_val_t key, const struct key *k, knot_db_val_t *value,
 			bool *exact_match, knot_db_val_t *kwz_low, knot_db_val_t *kwz_high,
 			uint32_t *new_ttl)
 {
@@ -151,8 +152,9 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		assert(false);
 		return "range search ERROR";
 	}
+	knot_db_val_t key_nsec = key;
 	knot_db_val_t val = { };
-	int ret = cache_op(cache, read_leq, &key, &val);
+	int ret = cache_op(cache, read_leq, &key_nsec, &val);
 	if (ret < 0) {
 		if (ret == kr_error(ENOENT)) {
 			return "range search miss";
@@ -186,8 +188,8 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	}
 	if (kwz_low) {
 		*kwz_low = (knot_db_val_t){
-			.data = key.data + nwz_off,
-			.len = key.len - nwz_off,
+			.data = key_nsec.data + nwz_off,
+			.len = key_nsec.len - nwz_off,
 		};	/* CACHE_KEY_DEF */
 	}
 	if (is_exact) {
@@ -195,15 +197,12 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		return NULL;
 	}
 	/* The NSEC starts strictly before our target name;
-	 * check that it's still within the zone and that
-	 * it ends strictly after the sought name
-	 * (or points to origin). */
-	bool in_zone = key.len >= nwz_off
+	 * now check that it still belongs into that zone. */
+	const bool nsec_in_zone = key_nsec.len >= nwz_off
 		/* CACHE_KEY_DEF */
-		&& memcmp(k->buf + 1, key.data, nwz_off) == 0;
-	if (!in_zone) {
-		//kr_log_verbose("key.len = %d\n", (int)key.len);
-		return "range search miss (!in_zone)";
+		&& memcmp(key.data, key_nsec.data, nwz_off) == 0;
+	if (!nsec_in_zone) {
+		return "range search miss (!nsec_in_zone)";
 	}
 	/* We know it starts before sname, so let's check the other end.
 	 * 1. construct the key for the next name - kwz_hi. */
@@ -267,8 +266,8 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 		return kr_error(EINVAL);
 	}
 	
-	/* find a previous-or-equal name+NSEC in cache covering
-	 * the QNAME, checking TTL etc. */
+	/* Find a previous-or-equal name+NSEC in cache covering the QNAME,
+	 * checking TTL etc. */
 	knot_db_val_t key = key_NSEC1(k, qry->sname, false);
 	knot_db_val_t val = {};
 	bool exact_match;
@@ -308,7 +307,8 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 		knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
 		if (!bm || kr_nsec_bitmap_contains_type(bm, bm_size, qry->stype)) {
 			assert(bm);
-			VERBOSE_MSG(qry, "=> NSEC sname: match but failed type check\n");
+			VERBOSE_MSG(qry,
+				"=> NSEC sname: match but failed type check\n");
 			return ESKIP; /* exact positive answer should exist! */
 		}
 		/* NODATA proven; just need to add SOA+RRSIG later */
@@ -316,34 +316,34 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 				new_ttl);
 		ans->rcode = PKT_NODATA;
 		return kr_ok();
+	} /* else */
 
-	} else { /* Inexact match; NXDOMAIN proven *except* for wildcards. */
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "=> NSEC sname: covered by: ");
-			kr_dname_print(nsec_rr->owner, "", " -> ");
-			kr_dname_print(knot_nsec_next(&nsec_rr->rrs), "", ", ");
-			kr_log_verbose("new TTL %d\n", new_ttl);
-		}
-		/* Find label count of the closest encloser.
-		 * Both points in an NSEC do exist and any prefixes
-		 * of those names as well (empty non-terminals),
-		 * but nothing else does inside this "triangle".
-		 */
-		*clencl_labels = MAX(
-			knot_dname_matched_labels(nsec_rr->owner, qry->sname),
-			knot_dname_matched_labels(qry->sname, knot_nsec_next(&nsec_rr->rrs))
-			);
-		/* Empty non-terminals don't need to have
-		 * a matching NSEC record. */
-		if (sname_labels == *clencl_labels) {
-			ans->rcode = PKT_NODATA;
-			VERBOSE_MSG(qry,
-				"=> NSEC sname: empty non-terminal by the same RR\n");
-		} else {
-			ans->rcode = PKT_NXDOMAIN;
-		}
-		return kr_ok();
+	/* Inexact match; NXDOMAIN proven *except* for wildcards. */
+	WITH_VERBOSE {
+		VERBOSE_MSG(qry, "=> NSEC sname: covered by: ");
+		kr_dname_print(nsec_rr->owner, "", " -> ");
+		kr_dname_print(knot_nsec_next(&nsec_rr->rrs), "", ", ");
+		kr_log_verbose("new TTL %d\n", new_ttl);
 	}
+	/* Find label count of the closest encloser.
+	 * Both points in an NSEC do exist and any prefixes
+	 * of those names as well (empty non-terminals),
+	 * but nothing else does inside this "triangle".
+	 */
+	*clencl_labels = MAX(
+		knot_dname_matched_labels(nsec_rr->owner, qry->sname),
+		knot_dname_matched_labels(qry->sname, knot_nsec_next(&nsec_rr->rrs))
+		);
+	/* Empty non-terminals don't need to have
+	 * a matching NSEC record. */
+	if (sname_labels == *clencl_labels) {
+		ans->rcode = PKT_NODATA;
+		VERBOSE_MSG(qry,
+			"=> NSEC sname: empty non-terminal by the same RR\n");
+	} else {
+		ans->rcode = PKT_NXDOMAIN;
+	}
+	return kr_ok();
 }
 
 
