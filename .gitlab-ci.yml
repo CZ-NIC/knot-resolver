@@ -26,9 +26,10 @@ build:linux:amd64:
 
 build:clang:linux:amd64:
   stage: build
+  image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
   script:
-    - CXX=clang++ CC=clang PREFIX=$(pwd)/.local make -k all CFLAGS=-Werror
-    - CXX=clang++ CC=clang PREFIX=$(pwd)/.local make install CFLAGS=-Werror
+    - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make -k all CFLAGS=-Werror
+    - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make install CFLAGS=-Werror
   tags:
     - docker
     - linux
@@ -38,7 +39,16 @@ lint:lua:
   stage: test
   dependencies: []  # do not download build artifacts
   script:
-    - make lint
+    - make lint-lua
+  tags:
+    - docker
+
+lint:c:
+  stage: test
+  image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
+  dependencies: []  # do not download build artifacts
+  script:
+    - make lint-c CLANG_TIDY="clang-tidy-5.0 -quiet"
   tags:
     - docker
 

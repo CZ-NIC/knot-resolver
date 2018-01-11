@@ -69,6 +69,3 @@ RUN luarocks install luacov
 
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
-
-# clang for kresd CI
-RUN apt-get install -y -qqq clang

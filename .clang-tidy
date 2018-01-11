@@ -1,0 +1,11 @@
+---
+Checks: 'bugprone-*,cert-*,-clang-analyzer-unix.Malloc,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-valist.Uninitialized,-readability-*,-readability-braces-*,-readability-else-after-return,google-readability-casting,misc-*,-misc-macro-parentheses,-misc-unused-parameters'
+WarningsAsErrors: 'cert-*,misc-*,readability-*,clang-analyzer-*,-readability-non-const-parameter'
+HeaderFilterRegex: 'contrib/ucw/*.h'
+CheckOptions:
+  - key:             readability-identifier-naming
+    value:           'lower_case'
+  - key:             readability-function-size.StatementThreshold
+    value:           '400'
+  - key:             readability-function-size.LineThreshold
+    value:           '500'
