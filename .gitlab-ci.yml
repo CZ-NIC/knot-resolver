@@ -1,4 +1,4 @@
-image: cznic/ci-debian-kresd
+image: $CI_REGISTRY/knot/knot-resolver/ci:debian-stable
 
 variables:
   DEBIAN_FRONTEND: noninteractive
