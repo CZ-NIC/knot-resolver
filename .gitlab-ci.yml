@@ -32,6 +32,21 @@ lint:lua:
   tags:
     - docker
 
+lint:clang-scan-build:
+  allow_failure: true  # for now it is just informative
+  stage: test
+  image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
+  dependencies: []  # do not download build artifacts
+  script:
+    - MAKEFLAGS="-k -j$(nproc)" /usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs make
+  artifacts:
+    when: on_failure
+    expire_in: '1 day'
+    paths:
+      - scan-results
+  tags:
+    - docker
+
 test:linux:amd64:
   stage: test
   script:
