@@ -3,6 +3,7 @@ Description=Knot DNS Resolver TLS network listener
 Documentation=man:kresd(8)
 Before=sockets.target
 PartOf=kresd.socket
+Alias=knot-resolver-tls.socket
 
 [Socket]
 ListenStream=853

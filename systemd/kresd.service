@@ -1,6 +1,7 @@
 [Unit]
 Description=Knot DNS Resolver daemon
 Documentation=man:kresd(8)
+Alias=knot-resolver.service
 
 [Service]
 Type=notify
