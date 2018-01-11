@@ -4,7 +4,7 @@ Documentation=man:kresd(8)
 
 [Service]
 Type=notify
-WorkingDirectory=/run/knot-resolver/cache
+WorkingDirectory=/var/cache/knot-resolver
 EnvironmentFile=-/etc/default/kresd
 ExecStart=/usr/sbin/kresd $KRESD_ARGS
 User=knot-resolver

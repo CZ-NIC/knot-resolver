@@ -65,7 +65,7 @@ The daemon features a CLI interface, type ``help()`` to see the list of availabl
 
 .. code-block:: bash
 
-   $ kresd /var/run/knot-resolver
+   $ kresd /var/cache/knot-resolver
    [system] started in interactive mode, type 'help()'
    > cache.count()
    53
@@ -155,7 +155,7 @@ comfortable in the current working directory.
 
 .. code-block:: sh
 
-	$ kresd /var/run/kresd
+	$ kresd /var/cache/knot-resolver
 
 And you're good to go for most use cases! If you want to use modules or configure daemon behavior, read on.
 
