@@ -8,7 +8,7 @@
 net = { '127.0.0.1', '::1', '192.168.1.1' }
 
 -- Drop root privileges
-user('kresd', 'kresd')
+user('knot-resolver', 'knot-resolver')
 
 -- Auto-maintain root TA
 trust_anchors.file = 'root.keys'
@@ -16,7 +16,7 @@ trust_anchors.file = 'root.keys'
 -- Large cache size, so we don't need to flush ever
 -- This can be larger than available RAM, least frequently accessed
 -- records will be paged out as long as there's enough disk space to back it
-cache.size = 100 * GB 
+cache.size = 100 * GB
 
 -- Load Useful modules
 modules = {

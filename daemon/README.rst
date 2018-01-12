@@ -434,7 +434,7 @@ Environment
 
       > user('baduser')
       invalid user name
-      > user('kresd', 'netgrp')
+      > user('knot-resolver', 'netgrp')
       true
       > user('root')
       Operation not permitted
@@ -605,9 +605,9 @@ For when listening on ``localhost`` just doesn't cut it.
 
    .. code-block:: lua
 
-      > net.tls("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
+      > net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
       > net.tls()
-      ("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
+      ("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
       > net.listen("::", 853)
       > net.listen("::", 443, {tls = true})
 

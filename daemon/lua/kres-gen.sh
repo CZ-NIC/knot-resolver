@@ -6,7 +6,7 @@
 # (Avoid typos, accidental mismatches, etc.)
 #
 # To regenerate the C definitions for lua:
-# - you need to have debugging symbols for knot-dns and kresd;
+# - you need to have debugging symbols for knot-dns and knot-resolver;
 #   you get those by compiling with -g; for knot-dns it might be enough
 #   to just install it with debugging symbols included (in your distro way)
 # - remove file ./kres-gen.lua and run make as usual

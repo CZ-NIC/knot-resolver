@@ -7,7 +7,7 @@
   capability net_bind_service,
   capability setgid,
   capability setuid,
-  # seems to be needed during start to read /var/lib/kresd
+  # seems to be needed during start to read /var/lib/knot-resolver
   # while we still run as root.
   capability dac_override,
 
@@ -15,9 +15,9 @@
   network udp,
 
   /proc/sys/net/core/somaxconn r,
-  /etc/kresd/* r, 
-  /var/lib/kresd/ r,
-  /var/lib/kresd/** rwlk,
+  /etc/knot-resolver/* r,
+  /var/lib/knot-resolver/ r,
+  /var/lib/knot-resolver/** rwlk,
 
   # modules
   /usr/lib{,64}/kdns_modules/*.lua r,

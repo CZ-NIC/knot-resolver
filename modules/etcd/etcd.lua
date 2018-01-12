@@ -27,7 +27,7 @@ end
 
 function etcd.init()
 	etcd.Etcd = require('etcd.luasocket')
-	etcd.defaults = { prefix = '/kresd' }
+	etcd.defaults = { prefix = '/knot-resolver' }
 end
 
 function etcd.deinit()
