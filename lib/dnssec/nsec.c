@@ -141,6 +141,9 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 	while (ptr[0]) {
 		/* Remove leftmost label and replace it with '\1*'. */
 		ptr = (uint8_t *) knot_wire_next_label(ptr, NULL);
+		if (!ptr) {
+			return kr_error(EINVAL);
+		}
 		*(--ptr) = '*';
 		*(--ptr) = 1;
 		/* True if this wildcard provably doesn't exist. */

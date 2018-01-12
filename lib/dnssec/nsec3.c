@@ -222,7 +222,7 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 	uint8_t *next_hash = NULL;
 	knot_nsec3_next_hashed(&nsec3->rrs, 0, &next_hash, &next_size);
 
-	if ((owner_hash.size == next_size) && (name_hash.size == next_size)) {
+	if ((next_size > 0) && (owner_hash.size == next_size) && (name_hash.size == next_size)) {
 		/* All hash lengths must be same. */
 		const uint8_t *ownrd = owner_hash.data;
 		const uint8_t *nextd = next_hash;

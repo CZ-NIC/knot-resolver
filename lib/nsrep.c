@@ -400,6 +400,8 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_lru_t *cache)
 		}
 	}
 
+	/* At least two addresses must be in the address list */
+	assert(count > 0);
 	ns->score = scores[0];
 	ns->reputation = 0;
 	return kr_ok();

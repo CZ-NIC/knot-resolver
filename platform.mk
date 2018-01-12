@@ -4,6 +4,7 @@
 
 # Platform-dependent stuff checks
 CCLD := $(CC)
+CLANG_TIDY ?= clang-tidy -quiet
 CGO := go tool cgo
 GO := go
 CAT := cat
@@ -101,6 +102,9 @@ else
 	$(call quiet,CCLD,$$@) $$($(1)_CFLAGS) $(BUILD_CFLAGS) $$($(1)_OBJ) $(call SOVER,$(7),$(7),$(1)) -o $$@ $(4) $$($(1)_LIBS) $(BUILD_LDFLAGS) $$($(1)_LDFLAGS)
 endif
 endif
+# Linter rules
+$(1)-lint: $$($(1)_SOURCES)
+	$(call quiet,CLANG_TIDY,$(1)) $$($(1)_SOURCES) -- $(BUILD_CFLAGS) $$($(1)_CFLAGS) -DMP_FREELIST_SIZE=0 -D__clang_analyzer__
 # Additional rules
 $(1)-clean:
 	$(RM) $$($(1)_OBJ) $$($(1)_DEP) $(2)/$(1)$(3)
