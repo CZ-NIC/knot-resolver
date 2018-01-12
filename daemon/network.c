@@ -248,7 +248,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 		return kr_error(EBADF);
 	}
 	/* Extract local address for this socket. */
-	struct sockaddr_storage ss;
+	struct sockaddr_storage ss = { .ss_family = AF_UNSPEC };
 	socklen_t addr_len = sizeof(ss);
 	ret = getsockname(fd, (struct sockaddr *)&ss, &addr_len);
 	if (ret != 0) {

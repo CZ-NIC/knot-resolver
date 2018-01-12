@@ -19,6 +19,7 @@ ifeq ($(AMALG), yes)
 kresd.amalg.c: daemon/lua/sandbox.inc daemon/lua/config.inc
 else
 daemon/engine.o: daemon/lua/sandbox.inc daemon/lua/config.inc
+kresd-lint: daemon/lua/sandbox.inc daemon/lua/config.inc
 endif
 
 # Installed FFI bindings
