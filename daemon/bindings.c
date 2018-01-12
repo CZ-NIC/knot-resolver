@@ -913,7 +913,7 @@ static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_
 {
 	/* Decode parameters */
 	uint8_t namespace = 'R';
-	char *extra = (char *)strchr(args, ' ');
+	char *extra = strchr(args, ' ');
 	if (extra != NULL) {
 		extra[0] = '\0';
 		namespace = extra[1];

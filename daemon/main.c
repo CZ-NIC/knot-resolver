@@ -295,7 +295,7 @@ static const char *set_addr(char *addr, int *port)
 		p = strchr(addr, '#');
 	}
 	if (p) {
-		*port = atoi(p + 1);
+		*port = strtol(p + 1, NULL, 10);
 		*p = '\0';
 	}
 
@@ -465,17 +465,17 @@ int main(int argc, char **argv)
 			array_push(tls_set, optarg);
 			break;
 		case 'S':
-			array_push(fd_set,  atoi(optarg));
+			array_push(fd_set, strtol(optarg, NULL, 10));
 			break;
 		case 'T':
-			array_push(tls_fd_set,  atoi(optarg));
+			array_push(tls_fd_set, strtol(optarg, NULL, 10));
 			break;
 		case 'c':
 			config = optarg;
 			break;
 		case 'f':
 			g_interactive = false;
-			forks = atoi(optarg);
+			forks = strtol(optarg, NULL, 10);
 			if (forks <= 0) {
 				kr_log_error("[system] error '-f' requires a positive"
 						" number, not '%s'\n", optarg);

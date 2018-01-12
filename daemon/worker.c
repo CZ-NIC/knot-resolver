@@ -820,8 +820,7 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 			}
 			if (session->waiting.len > 0) {
 				struct qr_task *t = session->waiting.at[0];
-				int ret = qr_task_send(t, (uv_handle_t *)handle,
-						       &session->peer.ip, t->pktbuf);
+				int ret = qr_task_send(t, handle, &session->peer.ip, t->pktbuf);
 				if (ret == kr_ok()) {
 					uv_timer_t *timer = &session->timeout;
 					uv_timer_stop(timer);
@@ -1055,7 +1054,7 @@ static void on_connect(uv_connect_t *req, int status)
 	struct session *session = handle->data;
 
 	union inaddr *peer = &session->peer;
-	uv_timer_stop((uv_timer_t *)&session->timeout);
+	uv_timer_stop(&session->timeout);
 
 	if (status == UV_ECANCELED) {
 		worker_del_tcp_waiting(worker, &peer->ip);
@@ -1308,7 +1307,7 @@ static void on_retransmit(uv_timer_t *req)
 static int timer_start(struct session *session, uv_timer_cb cb,
 		       uint64_t timeout, uint64_t repeat)
 {
-	uv_timer_t *timer = (uv_timer_t *)&session->timeout;
+	uv_timer_t *timer = &session->timeout;
 	assert(timer->data == session);
 	int ret = uv_timer_start(timer, cb, timeout, repeat);
 	if (ret != 0) {
@@ -1863,7 +1862,7 @@ int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle)
 	 * borrowed the task from parent session. */
 	struct session *session = handle->data;
 	if (session->outgoing) {
-		worker_submit(worker, (uv_handle_t *)handle, NULL, NULL);
+		worker_submit(worker, handle, NULL, NULL);
 	} else {
 		discard_buffered(session);
 	}

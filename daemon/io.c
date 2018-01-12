@@ -170,14 +170,14 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 
 static int udp_bind_finalize(uv_handle_t *handle)
 {
-	check_bufsize((uv_handle_t *)handle);
+	check_bufsize(handle);
 	/* Handle is already created, just create context. */
 	struct session *session = session_new();
 	assert(session);
 	session->outgoing = false;
 	session->handle = handle;
 	handle->data = session;
-	return io_start_read((uv_handle_t *)handle);
+	return io_start_read(handle);
 }
 
 int udp_bind(uv_udp_t *handle, struct sockaddr *addr)
