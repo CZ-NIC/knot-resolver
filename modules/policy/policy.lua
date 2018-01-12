@@ -128,20 +128,25 @@ local function forward(target)
 	end
 end
 
--- Forward request and all subrequests to upstream over TCP; validate answers
+-- Forward request and all subrequests to upstream over TLS; validate answers
 local function tls_forward(target)
 	local sockaddr_list = {}
 	local addr_list = {}
 	local ca_files = {}
 	local hostnames = {}
 	local pins = {}
-	if type(target) ~= 'table' then
-		assert(false, 'wrong TLS_FORWARD target')
+	if type(target) ~= 'table' or #target < 1 then
+		error('TLS_FORWARD argument must be a non-empty table')
 	end
-	for _, upstream_list_entry in pairs(target) do
+	for idx, upstream_list_entry in pairs(target) do
+		if type(upstream_list_entry) ~= 'table' then
+			error('TLS_FORWARD target must be a non-empty table (found '
+			      .. type(upstream_list_entry) .. ' at position ' .. idx .. ')')
+		end
 		local upstream_addr = upstream_list_entry[1]
 		if type(upstream_addr) ~= 'string' then
-			assert(false, 'bad IP address in TLS_FORWARD target')
+			error('TLS_FORWARD target must start with an IP address (found '
+			      .. type(upstream_addr) .. ' at the beginning of target position ' .. idx .. ')')
 		end
 		table.insert(sockaddr_list, addr2sock(upstream_addr, 853))
 		table.insert(addr_list, upstream_addr)
