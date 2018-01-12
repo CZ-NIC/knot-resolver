@@ -216,12 +216,58 @@ static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection
 	return ret;
 }
 
+
+int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type)
+{
+	const int NO_PROOF = abs(ENOENT);
+	if (!bm) {
+		return kr_error(EINVAL);
+	}
+	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+		return NO_PROOF;
+	}
+
+	if (type != KNOT_RRTYPE_CNAME
+	    && kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_CNAME)) {
+		return NO_PROOF;
+	}
+	/* Special behavior around zone cuts. */
+	switch (type) {
+	case KNOT_RRTYPE_DS:
+		/* Security feature: in case of DS also check for SOA
+		 * non-existence to be more certain that we don't hold
+		 * a child-side NSEC by some mistake (e.g. when forwarding).
+		 * See RFC4035 5.2, next-to-last paragraph. */
+		if (kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
+			return NO_PROOF;
+		}
+		break;
+	case KNOT_RRTYPE_CNAME:
+		/* Exception from the `default` rule.  It's perhaps disputable,
+		 * but existence of CNAME at zone apex is not allowed, so we
+		 * consider a parent-side record to be enough to prove non-existence. */
+		break;
+	default:
+		/* Parent-side delegation record isn't authoritative for non-DS;
+		 * see RFC6840 4.1. */
+		if (kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_NS)
+		    && !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
+			return NO_PROOF;
+		}
+		/* LATER(opt): perhaps short-circuit test if we repeat it here. */
+	}
+
+	return kr_ok();
+}
+
 /**
- * Perform check of RR type existence denial according to RFC4035 5.4, bullet 1.
+ * Attempt to prove NODATA given a matching NSEC.
  * @param flags Flags to be set according to check outcome.
  * @param nsec  NSEC RR.
  * @param type  Type to be checked.
- * @return      0 or error code.
+ * @return      0 on success, abs(ENOENT) for no proof, or error code (<0).
+ * @note        It's not a *full* proof, of course (wildcards, etc.)
+ * @TODO returning result via `flags` is just ugly.
  */
 static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
                                          uint16_t type)
@@ -229,25 +275,13 @@ static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
 	assert(flags && nsec);
 
 	uint8_t *bm = NULL;
-	uint16_t bm_size;
+	uint16_t bm_size = 0;
 	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
-	if (!bm) {
-		return kr_error(EINVAL);
+	int ret = kr_nsec_bitmap_nodata_check(bm, bm_size, type);
+	if (ret == kr_ok()) {
+		*flags |= FLG_NOEXIST_RRTYPE;
 	}
-
-	if (!kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
-		/* The type is not listed in the NSEC bitmap. */
-		/* Security feature: in case of DS also check for SOA
-		 * non-existence to be more certain that we don't hold
-		 * a child-side NSEC by some mistake (e.g. when forwarding).
-		 * See RFC4035 5.2, next-to-last paragraph. */
-		if (type != KNOT_RRTYPE_DS
-		    || !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
-			*flags |= FLG_NOEXIST_RRTYPE;
-		}
-	}
-
-	return kr_ok();
+	return ret <= 0 ? ret : kr_ok();
 }
 
 /**
@@ -473,11 +507,15 @@ int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
 int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
 				   const knot_dname_t *name, uint16_t type)
 {
-	if (!nsec || !name) {
-		return (EINVAL);
+	/* It's not secure enough to just check a single bit for (some) other types,
+	 * but we don't (currently) only use this API for NS.  See RFC 6840 sec. 4.
+	 */
+	if (type != KNOT_RRTYPE_NS || !nsec || !name) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
 	}
 	if (!knot_dname_is_equal(nsec->owner, name)) {
-		return (ENOENT);
+		return kr_error(ENOENT);
 	}
 	uint8_t *bm = NULL;
 	uint16_t bm_size = 0;
@@ -485,8 +523,9 @@ int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
 	if (!bm) {
 		return kr_error(EINVAL);
 	}
-	if (!kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
-		return (ENOENT);
+	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+		return kr_ok();
+	} else {
+		return kr_error(ENOENT);
 	}
-	return kr_ok();
 }

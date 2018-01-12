@@ -28,6 +28,16 @@
 bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t type);
 
 /**
+ * Check an NSEC or NSEC3 bitmap for NODATA for a type.
+ * @param bm      Bitmap.
+ * @param bm_size Bitmap size.
+ * @param type    RR type to check.
+ * @note This includes special checks for zone cuts, e.g. from RFC 6840 sec. 4.
+ * @return 0, abs(ENOENT) (no proof), kr_error(EINVAL)
+ */
+int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type);
+
+/**
  * Name error response check (RFC4035 3.1.3.2; RFC4035 5.4, bullet 2).
  * @note No RRSIGs are validated.
  * @param pkt        Packet structure to be processed.
@@ -87,7 +97,7 @@ int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt);
  * Checks whether supplied NSEC RR matches the supplied name and type.
  * @param nsec  NSEC RR.
  * @param name  Name to be checked.
- * @param type  Type to be checked.
+ * @param type  Type to be checked.  Only use with NS!  TODO (+copy&paste NSEC3)
  * @return      0 or error code.
  */
 int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
