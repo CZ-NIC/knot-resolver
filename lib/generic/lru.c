@@ -152,7 +152,7 @@ KR_EXPORT void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
 		if (g->hashes[i] == khash_top) {
 			it = g->items[i];
 			if (likely(it && it->key_len == key_len
-					&& memcmp(it->data, key, key_len) == 0))
+					&& (key_len == 0 || memcmp(it->data, key, key_len) == 0)))
 				goto found; // to reduce huge nesting depth
 		}
 	}
@@ -200,7 +200,9 @@ insert: // insert into position i (incl. key)
 	}
 	it->key_len = key_len;
 	it->val_len = val_len;
-	memcpy(it->data, key, key_len);
+	if (key_len > 0) {
+		memcpy(it->data, key, key_len);
+	}
 	memset(item_val(it), 0, val_len); // clear the value
 found: // key and hash OK on g->items[i]; now update stamps
 	assert(i < LRU_ASSOC);
