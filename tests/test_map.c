@@ -90,6 +90,17 @@ static void test_delete(void **state)
 	assert_int_equal(map_del(tree, "most likely not in tree"), 1);
 }
 
+/* Test null value existence */
+static void test_null_value(void **state)
+{
+	map_t *tree = *state;
+	char *key = "foo";
+
+	assert_int_equal(map_set(tree, key, (void *)0), 0);
+	assert_true(map_contains(tree, key));
+	assert_int_equal(map_del(tree, key), 0);
+}
+
 static void test_init(void **state)
 {
 	static map_t tree;
@@ -112,6 +123,7 @@ int main(int argc, char **argv)
 	        unit_test(test_insert),
 		unit_test(test_get),
 		unit_test(test_delete),
+		unit_test(test_null_value),
 	        group_test_teardown(test_deinit)
 	};
 
