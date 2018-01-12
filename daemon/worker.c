@@ -1123,6 +1123,7 @@ static void on_connect(uv_connect_t *req, int status)
 		if (ret == kr_error(EAGAIN)) {
 			iorequest_release(worker, req);
 			io_start_read(session->handle);
+			timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 			return;
 		}
 	}
@@ -1194,6 +1195,9 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 	struct worker_ctx *worker = get_worker();
 
 	if (session->outgoing) {
+		if (session->has_tls) {
+			worker_del_tcp_waiting(worker, &session->peer.ip);
+		}
 		worker_del_tcp_connected(worker, &session->peer.ip);
 
 		while (session->waiting.len > 0) {
