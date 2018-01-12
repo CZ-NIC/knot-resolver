@@ -104,14 +104,14 @@ static int worker_add_tcp_connected(struct worker_ctx *worker,
 static int worker_del_tcp_connected(struct worker_ctx *worker,
 				    const struct sockaddr *addr);
 static struct session* worker_find_tcp_connected(struct worker_ctx *worker,
-						 const struct sockaddr *srv);
+						 const struct sockaddr *addr);
 static int worker_add_tcp_waiting(struct worker_ctx *worker,
 				  const struct sockaddr *addr,
 				  struct session *session);
 static int worker_del_tcp_waiting(struct worker_ctx *worker,
 				  const struct sockaddr *addr);
 static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
-					       const struct sockaddr *srv);
+					       const struct sockaddr *addr);
 static int session_add_waiting(struct session *session, struct qr_task *task);
 static int session_del_waiting(struct session *session, struct qr_task *task);
 static int session_add_tasks(struct session *session, struct qr_task *task);
@@ -1700,7 +1700,7 @@ static struct qr_task* find_task(const struct session *session, uint16_t msg_id)
 
 
 int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
-		  knot_pkt_t *msg, const struct sockaddr* addr)
+		  knot_pkt_t *query, const struct sockaddr* addr)
 {
 	bool OK = worker && handle && handle->data;
 	if (!OK) {
@@ -1711,15 +1711,15 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 	struct session *session = handle->data;
 
 	/* Parse packet */
-	int ret = parse_packet(msg);
+	int ret = parse_packet(query);
 
 	/* Start new task on listening sockets,
 	 * or resume if this is subrequest */
 	struct qr_task *task = NULL;
 	if (!session->outgoing) { /* request from a client */
 		/* Ignore badly formed queries or responses. */
-		if (!msg || ret != 0 || knot_wire_get_qr(msg->wire)) {
-			if (msg) worker->stats.dropped += 1;
+		if (!query || ret != 0 || knot_wire_get_qr(query->wire)) {
+			if (query) worker->stats.dropped += 1;
 			return kr_error(EILSEQ);
 		}
 		struct request_ctx *ctx = request_create(worker, handle, addr);
@@ -1727,7 +1727,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 			return kr_error(ENOMEM);
 		}
 
-		ret = request_start(ctx, msg);
+		ret = request_start(ctx, query);
 		if (ret != 0) {
 			request_free(ctx);
 			return kr_error(ENOMEM);
@@ -1738,8 +1738,8 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 			request_free(ctx);
 			return kr_error(ENOMEM);
 		}
-	} else if (msg) { /* response from upstream */
-		task = find_task(session, knot_wire_get_id(msg->wire));
+	} else if (query) { /* response from upstream */
+		task = find_task(session, knot_wire_get_id(query->wire));
 		if (task == NULL) {
 			return kr_error(ENOENT);
 		}
@@ -1748,7 +1748,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 	assert(uv_is_closing(session->handle) == false);
 
 	/* Consume input and produce next message */
-	return qr_task_step(task, NULL, msg);
+	return qr_task_step(task, NULL, query);
 }
 
 static int map_add_tcp_session(map_t *map, const struct sockaddr* addr,

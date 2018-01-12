@@ -48,7 +48,7 @@ typedef struct {
 } cb_node_t;
 
 /* Return true if ptr is internal node. */
-static inline int ref_is_internal(uint8_t *p)
+static inline int ref_is_internal(const uint8_t *p)
 {
 	return 1 & (intptr_t)p;
 }
@@ -168,7 +168,7 @@ EXPORT void *map_get(map_t *map, const char *str)
 }
 
 /*! Inserts str into map, returns 0 on success */
-EXPORT int map_set(map_t *map, const char *str, void *value)
+EXPORT int map_set(map_t *map, const char *str, void *val)
 {
 	const uint8_t *const ubytes = (void *)str;
 	const size_t ulen = strlen(str);
@@ -182,7 +182,7 @@ EXPORT int map_set(map_t *map, const char *str, void *value)
 	void **wherep = NULL;
 
 	if (p == NULL) {
-		map->root = cbt_make_data(map, (const uint8_t *)str, ulen + 1, value);
+		map->root = cbt_make_data(map, (const uint8_t *)str, ulen + 1, val);
 		if (map->root == NULL) {
 			return ENOMEM;
 		}
@@ -212,7 +212,7 @@ EXPORT int map_set(map_t *map, const char *str, void *value)
 		newotherbits = data->key[newbyte];
 		goto different_byte_found;
 	}
-	data->value = value;
+	data->value = val;
 	return 1;
 
 different_byte_found:
@@ -228,7 +228,7 @@ different_byte_found:
 		return ENOMEM;
 	}
 
-	x = (uint8_t *)cbt_make_data(map, ubytes, ulen + 1, value);
+	x = (uint8_t *)cbt_make_data(map, ubytes, ulen + 1, val);
 	if (x == NULL) {
 		map->free(map->baton, newnode);
 		return ENOMEM;

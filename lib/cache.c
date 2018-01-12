@@ -290,7 +290,7 @@ int kr_cache_clear(struct kr_cache *cache)
 	return ret;
 }
 
-int kr_cache_match(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, knot_db_val_t *val, int maxcount)
+int kr_cache_match(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name, knot_db_val_t *vals, int valcnt)
 {
 	if (!cache_isvalid(cache) || !name ) {
 		return kr_error(EINVAL);
@@ -307,7 +307,7 @@ int kr_cache_match(struct kr_cache *cache, uint8_t tag, const knot_dname_t *name
 
 	/* Trim type from the search key */ 
 	knot_db_val_t key = { keybuf, key_len - 2 };
-	return cache_op(cache, match, &key, val, maxcount);
+	return cache_op(cache, match, &key, vals, valcnt);
 }
 
 int kr_cache_peek_rr(struct kr_cache *cache, knot_rrset_t *rr, uint8_t *rank, uint8_t *flags, uint32_t *timestamp)

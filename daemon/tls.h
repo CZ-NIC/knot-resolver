@@ -71,7 +71,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 int tls_certificate_set(struct network *net, const char *tls_cert, const char *tls_key);
 
 /*! Borrow TLS credentials for context. */
-struct tls_credentials *tls_credentials_reserve(struct tls_credentials *worker);
+struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials);
 
 /*! Release TLS credentials for context (decrements refcount or frees). */
 int tls_credentials_release(struct tls_credentials *tls_credentials);

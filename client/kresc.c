@@ -35,7 +35,7 @@
 
 FILE *g_tty = NULL;		//!< connection to the daemon
 
-static char *run_cmd(const char *cmd, size_t * msg_len);
+static char *run_cmd(const char *cmd, size_t * out_len);
 
 const char *prompt(EditLine * e)
 {
