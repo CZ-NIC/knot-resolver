@@ -326,10 +326,14 @@ EXPORT void map_clear(map_t *map)
 EXPORT int map_walk_prefixed(map_t *map, const char *prefix,
 	int (*callback)(const char *, void *, void *), void *baton)
 {
+	if (!map) {
+		return 0;
+	}
+
 	const uint8_t *ubytes = (void *)prefix;
 	const size_t ulen = strlen(prefix);
 	uint8_t *p = map->root;
-	uint8_t *top = (uint8_t *)p;
+	uint8_t *top = p;
 	cb_data_t *data = NULL;
 
 	if (p == NULL) {

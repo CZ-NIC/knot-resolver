@@ -210,6 +210,7 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 		for (int j = 0; j < trim_labels; ++j) {
 			assert(beginp[0]);
 			beginp = (uint8_t *) knot_wire_next_label(beginp, NULL);
+			assert(beginp != NULL);
 		}
 		*(--beginp) = '*';
 		*(--beginp) = 1;

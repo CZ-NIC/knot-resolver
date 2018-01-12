@@ -108,6 +108,10 @@ void kr_log_verbose(const char *fmt, ...)
 
 char* kr_strcatdup(unsigned n, ...)
 {
+	if (n < 1) {
+		return NULL;
+	}
+
 	/* Calculate total length */
 	size_t total_len = 0;
 	va_list vl;
@@ -402,7 +406,7 @@ int kr_straddr_subnet(void *dst, const char *addr)
 	if (subnet) {
 		*subnet = '\0';
 		subnet += 1;
-		bit_len = atoi(subnet);
+		bit_len = strtol(subnet, NULL, 10);
 		/* Check client subnet length */
 		const int max_len = (family == AF_INET6) ? 128 : 32;
 		if (bit_len < 0 || bit_len > max_len) {
