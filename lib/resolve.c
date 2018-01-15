@@ -500,7 +500,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *
 				continue;
 			}
 		}
-		int err = knot_pkt_put(answer, 0, rr, 0);
+		err = knot_pkt_put(answer, 0, rr, 0);
 		if (err != KNOT_EOK) {
 			if (err == KNOT_ESPACE) {
 				err = kr_ok();
