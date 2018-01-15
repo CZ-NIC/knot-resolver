@@ -269,14 +269,16 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 }
 
 /** Fetch address for zone cut.  Any rank is accepted (i.e. glue as well). */
-static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const knot_dname_t *ns, uint16_t rrtype, uint32_t timestamp)
+static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache,
+			const knot_dname_t *ns, uint16_t rrtype,
+			const struct kr_query *qry)
 // LATER(optim.): excessive data copying
 {
 	struct kr_cache_p peek = {};
 	if (kr_cache_peek_exact(cache, ns, rrtype, &peek) != 0) {
 		return;
 	}
-	int32_t new_ttl = kr_cache_ttl(&peek, timestamp);
+	int32_t new_ttl = kr_cache_ttl(&peek, qry, ns, rrtype);
 	if (new_ttl < 0) {
 		return;
 	}
@@ -295,7 +297,7 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache, const kno
 
 /** Fetch best NS for zone cut. */
 static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
-		    const knot_dname_t *name, uint32_t timestamp,
+		    const knot_dname_t *name, const struct kr_query *qry,
 		    uint8_t * restrict rank)
 {
 	struct kr_cache_p peek = {};
@@ -303,7 +305,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 	if (ret != 0) {
 		return ret;
 	}
-	int32_t new_ttl = kr_cache_ttl(&peek, timestamp);
+	int32_t new_ttl = kr_cache_ttl(&peek, qry, name, KNOT_RRTYPE_NS);
 	if (new_ttl < 0) {
 		return kr_error(ESTALE);
 	}
@@ -328,10 +330,10 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 				(const char *)ns_name, knot_dname_size(ns_name));
 		unsigned reputation = (cached) ? *cached : 0;
 		if (!(reputation & KR_NS_NOIP4) && !(ctx->options.NO_IPV4)) {
-			fetch_addr(cut, &ctx->cache, ns_name, KNOT_RRTYPE_A, timestamp);
+			fetch_addr(cut, &ctx->cache, ns_name, KNOT_RRTYPE_A, qry);
 		}
 		if (!(reputation & KR_NS_NOIP6) && !(ctx->options.NO_IPV6)) {
-			fetch_addr(cut,  &ctx->cache, ns_name, KNOT_RRTYPE_AAAA, timestamp);
+			fetch_addr(cut,  &ctx->cache, ns_name, KNOT_RRTYPE_AAAA, qry);
 		}
 	}
 
@@ -343,7 +345,8 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
  * Fetch secure RRSet of given type.
  */
 static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
-	const knot_dname_t *owner, uint16_t type, knot_mm_t *pool, uint32_t timestamp)
+	const knot_dname_t *owner, uint16_t type, knot_mm_t *pool,
+	const struct kr_query *qry)
 {
 	if (!rr) {
 		return kr_error(ENOENT);
@@ -357,7 +360,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	if (!kr_rank_test(peek.rank, KR_RANK_SECURE)) {
 		return kr_error(ENOENT);
 	}
-	int32_t new_ttl = kr_cache_ttl(&peek, timestamp);
+	int32_t new_ttl = kr_cache_ttl(&peek, qry, owner, type);
 	if (new_ttl < 0) {
 		return kr_error(ESTALE);
 	}
@@ -383,8 +386,9 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	return kr_ok();
 }
 
-int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const knot_dname_t *name,
-                           uint32_t timestamp, bool * restrict secured)
+int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
+			   const knot_dname_t *name, const struct kr_query *qry,
+			   bool * restrict secured)
 {
 	kr_log_verbose("[     ][ *c ] kr_zonecut_find_cached\n");
 	if (!ctx || !cut || !name) {
@@ -401,7 +405,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 		/* Fetch NS first and see if it's insecure. */
 		uint8_t rank = 0;
 		const bool is_root = (label[0] == '\0');
-		if (fetch_ns(ctx, cut, label, timestamp, &rank) == 0) {
+		if (fetch_ns(ctx, cut, label, qry, &rank) == 0) {
 			/* Flag as insecure if cached as this */
 			if (kr_rank_test(rank, KR_RANK_INSECURE)) {
 				*secured = false;
@@ -409,9 +413,9 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut, const
 			/* Fetch DS and DNSKEY if caller wants secure zone cut */
 			if (*secured || is_root) {
 				fetch_secure_rrset(&cut->trust_anchor, &ctx->cache, label,
-					    KNOT_RRTYPE_DS, cut->pool, timestamp);
+					    KNOT_RRTYPE_DS, cut->pool, qry);
 				fetch_secure_rrset(&cut->key, &ctx->cache, label,
-					    KNOT_RRTYPE_DNSKEY, cut->pool, timestamp);
+					    KNOT_RRTYPE_DNSKEY, cut->pool, qry);
 			}
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);

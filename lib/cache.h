@@ -106,8 +106,10 @@ struct kr_cache_p {
 KR_EXPORT
 int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek);
+/* Parameters (qry, name, type) are used for timestamp and stale-serving decisions. */
 KR_EXPORT
-int32_t kr_cache_ttl(const struct kr_cache_p *peek, uint32_t current_time);
+int32_t kr_cache_ttl(const struct kr_cache_p *peek, const struct kr_query *qry,
+		     const knot_dname_t *name, uint16_t type);
 /*TODO: reorder*/
 KR_EXPORT
 int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,

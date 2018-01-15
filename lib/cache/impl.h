@@ -144,9 +144,14 @@ static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 	return 100 * (nttl - 5) < orig_ttl;
 }
 
-/** Returns signed result so you can inspect how much stale the RR is. */
-int32_t get_new_ttl(const struct entry_h *entry, uint32_t current_time);
-
+/** Returns signed result so you can inspect how much stale the RR is.
+ *
+ * @param owner name for stale-serving decisions.  You may pass NULL to disable stale.
+ * FIXME: NSEC uses zone name ATM.
+ * @param type for stale-serving.
+ */
+int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
+		    const knot_dname_t *owner, uint16_t type);
 
 /* RRset (de)materialization; implementation in ./entry_rr.c */
 

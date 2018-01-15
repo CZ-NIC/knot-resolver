@@ -234,7 +234,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	 * try to fetch ta & keys even if initial cut name not covered by TA */
 	bool secured = !is_insecured;
 	int ret = kr_zonecut_find_cached(req->ctx, &cut_found, requested_name,
-					 qry->timestamp.tv_sec, &secured);
+					 qry, &secured);
 	if (ret == kr_error(ENOENT)) {
 		/* No cached cut found, start from SBELT
 		 * and issue priming query. */
