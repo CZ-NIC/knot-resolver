@@ -97,6 +97,7 @@ struct kr_qflags {
 	_Bool NONAUTH : 1;
 	_Bool FORWARD : 1;
 	_Bool DNS64_MARK : 1;
+	_Bool CACHE_TRIED : 1;
 };
 typedef struct {
 	knot_rrset_t **at;
@@ -185,6 +186,9 @@ struct kr_cache {
 	struct timeval last_clear_walltime;
 	uint64_t last_clear_monotime;
 };
+
+typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
+				const struct kr_query *qry);
 struct knot_rrset {
 	knot_dname_t *_owner;
 	uint16_t type;
@@ -219,6 +223,7 @@ struct kr_query {
 	uint32_t uid;
 	struct kr_query *cname_parent;
 	struct kr_request *request;
+	kr_stale_cb stale_cb;
 };
 struct kr_context {
 	struct kr_qflags options;
@@ -280,6 +285,7 @@ struct sockaddr *kr_straddr_socket(const char *, int);
 int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
 void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
+void kr_query_set_stale_cb(struct kr_query *, kr_stale_cb);
 int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const knot_rdata_t *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
 uint64_t kr_now();

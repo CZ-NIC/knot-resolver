@@ -61,6 +61,7 @@ struct kr_qflags {
 				  * TODO: utilize this also outside cache. */
 	bool FORWARD : 1;        /**< Forward all queries to upstream; validate answers. */
 	bool DNS64_MARK : 1;     /**< Internal mark for dns64 module. */
+	bool CACHE_TRIED : 1;    /**< Internal to cache module. */
 };
 
 /** Combine flags together.  This means set union for simple flags. */
@@ -70,6 +71,17 @@ void kr_qflags_set(struct kr_qflags *fl1, struct kr_qflags fl2);
 /** Remove flags.  This means set-theoretic difference. */
 KR_EXPORT
 void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2);
+
+/** Callback for serve-stale decisions.
+ * @param ttl the expired TTL (i.e. it's < 0)
+ * @return the adjusted TTL (typically 1) or < 0.
+ */
+typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
+				const struct kr_query *qry);
+/** Trivial wrapper to set kr_query::stale_cb.
+ * For some unknown reason, direct setting via lua doesn't work. */
+KR_EXPORT
+void kr_query_set_stale_cb(struct kr_query *qry, kr_stale_cb cb);
 
 /**
  * Single query representation.
@@ -97,6 +109,7 @@ struct kr_query {
 	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
 	struct kr_request *request; /**< Parent resolution request. */
+	kr_stale_cb stale_cb; /**< See the type */
 };
 
 /** @cond internal Array of queries. */
