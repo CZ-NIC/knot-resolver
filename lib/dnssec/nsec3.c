@@ -677,7 +677,6 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 
 int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 {
-	int ret = kr_error(EINVAL);
 	int flags = 0;
 	uint8_t *bm = NULL;
 	uint16_t bm_size = 0;
@@ -739,8 +738,8 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		 */
 		const knot_dname_t *encloser_name = NULL;
 		const knot_rrset_t *covering_next_nsec3 = NULL;
-		ret = closest_encloser_proof(pkt, KNOT_AUTHORITY, ns->owner, &encloser_name,
-                                     NULL, &covering_next_nsec3);
+		int ret = closest_encloser_proof(pkt, KNOT_AUTHORITY, ns->owner,
+				&encloser_name, NULL, &covering_next_nsec3);
 		if (ret != 0) {
 			return kr_error(EINVAL);
 		}
