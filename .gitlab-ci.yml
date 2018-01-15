@@ -184,6 +184,7 @@ respdiff:iter:udp:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
     - docker
@@ -208,6 +209,7 @@ respdiff:iter:tcp:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
     - docker
@@ -232,6 +234,7 @@ respdiff:iter:tls:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
     - docker

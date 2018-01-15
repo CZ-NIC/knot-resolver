@@ -46,6 +46,7 @@ RUN apt-get install luarocks -y -qqq
 RUN luarocks install luacheck
 
 # respdiff for kresd CI
+RUN apt-get install lmdb-utils -y -qqq
 RUN pip3 install dnspython python-augeas
 RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/resolver-benchmarking.git /tmp/resolver-benchmarking
 RUN mv /tmp/resolver-benchmarking/response_differences/respdiff /var/opt/respdiff
