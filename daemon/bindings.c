@@ -398,6 +398,187 @@ static int net_tls(lua_State *L)
 	return 1;
 }
 
+static int print_tls_param(const char *key, void *val, void *data)
+{
+	if (!val) {
+		return 0;
+	}
+
+	struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)val;
+
+	lua_State *L = (lua_State *)data;
+
+	lua_createtable(L, 0, 3);
+
+	lua_createtable(L, entry->pins.len, 0);
+	for (size_t i = 0; i < entry->pins.len; ++i) {
+		lua_pushnumber(L, i + 1);
+		lua_pushstring(L, entry->pins.at[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, -2, "pins");
+
+	lua_createtable(L, entry->ca_files.len, 0);
+	for (size_t i = 0; i < entry->ca_files.len; ++i) {
+		lua_pushnumber(L, i + 1);
+		lua_pushstring(L, entry->ca_files.at[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, -2, "ca_files");
+
+	lua_createtable(L, entry->hostnames.len, 0);
+	for (size_t i = 0; i < entry->hostnames.len; ++i) {
+		lua_pushnumber(L, i + 1);
+		lua_pushstring(L, entry->hostnames.at[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, -2, "hostnames");
+
+	lua_setfield(L, -2, key);
+
+	return 0;
+}
+
+static int print_tls_client_params(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+	struct network *net = &engine->net;
+	if (!net) {
+		return 0;
+	}
+	if (net->tls_client_params.root == 0 ) {
+		return 0;
+	}
+	lua_newtable(L);
+	map_walk(&net->tls_client_params, print_tls_param, (void *)L);
+	return 1;
+}
+
+
+static int net_tls_client(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+	struct network *net = &engine->net;
+	if (!net) {
+		return 0;
+	}
+
+	/* Only return current credentials. */
+	if (lua_gettop(L) == 0) {
+		return print_tls_client_params(L);
+	}
+
+	const char *full_addr = NULL;
+	bool pin_exists = false;
+	bool ca_file_exists = false;
+	if ((lua_gettop(L) == 1) && lua_isstring(L, 1)) {
+		full_addr = lua_tostring(L, 1);
+	} else if ((lua_gettop(L) == 2) && lua_isstring(L, 1) && lua_istable(L, 2)) {
+		full_addr = lua_tostring(L, 1);
+		pin_exists = true;
+	} else if ((lua_gettop(L) == 3) && lua_isstring(L, 1) && lua_istable(L, 2)) {
+		full_addr = lua_tostring(L, 1);
+		ca_file_exists = true;
+	} else if ((lua_gettop(L) == 4) && lua_isstring(L, 1) &&
+		    lua_istable(L, 2) && lua_istable(L, 3)) {
+		full_addr = lua_tostring(L, 1);
+		pin_exists = true;
+		ca_file_exists = true;
+	} else {
+		format_error(L, "net.tls_client takes one parameter (\"address\"), two parameters (\"address\",\"pin\"), three parameters (\"address\", \"ca_file\", \"hostname\") or four ones: (\"address\", \"pin\", \"ca_file\", \"hostname\")");
+		lua_error(L);
+	}
+
+	char addr[INET6_ADDRSTRLEN];
+	uint16_t port = 0;
+	if (kr_straddr_split(full_addr, addr, sizeof(addr), &port) != kr_ok()) {
+		format_error(L, "invalid IP address");
+		lua_error(L);
+	}
+
+	if (port == 0) {
+		port = 853;
+	}
+
+	if (!pin_exists && !ca_file_exists) {
+		int r = tls_client_params_set(&net->tls_client_params,
+					      addr, port, NULL, NULL, NULL);
+		if (r != 0) {
+			lua_pushstring(L, strerror(ENOMEM));
+			lua_error(L);
+		}
+
+		lua_pushboolean(L, true);
+		return 1;
+	}
+
+	if (pin_exists) {
+		/* iterate over table with pins
+		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
+		lua_pushnil(L); /* first key */
+		while (lua_next(L, 2)) {  /* pin table is in stack at index 2 */
+			/* pin now at index -1, key at index -2*/
+			const char *pin = lua_tostring(L, -1);
+			int r = tls_client_params_set(&net->tls_client_params,
+						      addr, port, NULL, NULL, pin);
+			if (r != 0) {
+				lua_pushstring(L, strerror(ENOMEM));
+				lua_error(L);
+			}
+			lua_pop(L, 1);
+		}
+	}
+
+	int ca_table_index = 2;
+	int hostname_table_index = 3;
+	if (ca_file_exists) {
+		if (pin_exists) {
+			ca_table_index = 3;
+			hostname_table_index = 4;
+		}
+	} else {
+		lua_pushboolean(L, true);
+		return 1;
+	}
+
+	/* iterate over ca filenames */
+	lua_pushnil(L);
+	while (lua_next(L, ca_table_index)) {
+		const char *ca_file = lua_tostring(L, -1);
+		int r = tls_client_params_set(&net->tls_client_params,
+					      addr, port, ca_file, NULL, NULL);
+		if (r != 0) {
+			lua_pushstring(L, strerror(ENOMEM));
+			lua_error(L);
+		}
+		/* removes 'value'; keeps 'key' for next iteration */
+		lua_pop(L, 1);
+	}
+
+	/* iterate over hostnames */
+	lua_pushnil(L);
+	while (lua_next(L, hostname_table_index)) {
+		const char *hostname = lua_tostring(L, -1);
+		int r = tls_client_params_set(&net->tls_client_params,
+					      addr, port, NULL, hostname, NULL);
+		if (r != 0) {
+			lua_pushstring(L, strerror(ENOMEM));
+			lua_error(L);
+		}
+		/* removes 'value'; keeps 'key' for next iteration */
+		lua_pop(L, 1);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 static int net_tls_padding(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
@@ -508,6 +689,8 @@ int lib_net(lua_State *L)
 		{ "bufsize",      net_bufsize },
 		{ "tcp_pipeline", net_pipeline },
 		{ "tls",          net_tls },
+		{ "tls_server",   net_tls },
+		{ "tls_client",   net_tls_client },
 		{ "tls_padding",  net_tls_padding },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
@@ -731,7 +914,7 @@ static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_
 {
 	/* Decode parameters */
 	uint8_t namespace = 'R';
-	char *extra = (char *)strchr(args, ' ');
+	char *extra = strchr(args, ' ');
 	if (extra != NULL) {
 		extra[0] = '\0';
 		namespace = extra[1];

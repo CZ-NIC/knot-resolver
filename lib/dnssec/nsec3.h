@@ -72,10 +72,10 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt);
 
 /**
- * Checks whether supplied NSEC3 RR matches the supplied name and type.
+ * Checks whether supplied NSEC3 RR matches the supplied name and NS type.
  * @param nsec3 NSEC3 RR.
  * @param name  Name to be checked.
- * @param type  Type to be checked.
+ * @param type  Type to be checked.  Only use with NS!  TODO
  * @return      0 or error code.
  */
 int kr_nsec3_matches_name_and_type(const knot_rrset_t *nsec3,

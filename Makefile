@@ -8,7 +8,9 @@ check: all tests
 clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 	tests-clean doc-clean bench-clean coverage-clean
 doc: doc-html
-lint: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
+lint: lint-lua lint-c
+lint-c: libkres-lint kresd-lint kresc-lint
+lint-lua: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 	luacheck --codes --formatter TAP .
 
 .PHONY: all install check clean doc info lint

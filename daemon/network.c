@@ -51,6 +51,7 @@ void network_init(struct network *net, uv_loop_t *loop)
 	if (net != NULL) {
 		net->loop = loop;
 		net->endpoints = map_make();
+		net->tls_client_params = map_make();
 	}
 }
 
@@ -106,6 +107,7 @@ void network_deinit(struct network *net)
 		map_walk(&net->endpoints, free_key, 0);
 		map_clear(&net->endpoints);
 		tls_credentials_free(net->tls_credentials);
+		tls_client_params_free(&net->tls_client_params);
 		net->tls_credentials = NULL;
 	}
 }
@@ -195,8 +197,7 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		}
 		ep->flags |= NET_UDP;
 		return kr_ok();
-	}
-	if (sock_type == SOCK_STREAM) {
+	} else if (sock_type == SOCK_STREAM) {
 		if (ep->tcp) {
 			return kr_error(EEXIST);
 		}
@@ -247,7 +248,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 		return kr_error(EBADF);
 	}
 	/* Extract local address for this socket. */
-	struct sockaddr_storage ss;
+	struct sockaddr_storage ss = { .ss_family = AF_UNSPEC };
 	socklen_t addr_len = sizeof(ss);
 	ret = getsockname(fd, (struct sockaddr *)&ss, &addr_len);
 	if (ret != 0) {

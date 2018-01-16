@@ -1,5 +1,5 @@
 ************************
-Knot DNS Resolver daemon 
+Knot DNS Resolver daemon
 ************************
 
 The server is in the `daemon` directory, it works out of the box without any configuration.
@@ -65,7 +65,7 @@ The daemon features a CLI interface, type ``help()`` to see the list of availabl
 
 .. code-block:: bash
 
-   $ kresd /var/run/knot-resolver
+   $ kresd /var/cache/knot-resolver
    [system] started in interactive mode, type 'help()'
    > cache.count()
    53
@@ -155,7 +155,7 @@ comfortable in the current working directory.
 
 .. code-block:: sh
 
-	$ kresd /var/run/kresd
+	$ kresd /var/cache/knot-resolver
 
 And you're good to go for most use cases! If you want to use modules or configure daemon behavior, read on.
 
@@ -264,7 +264,7 @@ to download cache from parent, to avoid cold-cache start.
 
 	if cache.count() == 0 then
 		-- download cache from parent
-		http.request { 
+		http.request {
 			url = 'http://parent/cache.mdb',
 			sink = ltn12.sink.file(io.open('cache.mdb', 'w'))
 		}
@@ -386,7 +386,7 @@ Environment
    If called with a parameter, it will change kresd's directory for
    looking up the dynamic modules.  If called without a parameter, it
    will return kresd's modules directory.
-   
+
 .. function:: verbose(true | false)
 
    :return: Toggle verbose logging.
@@ -839,7 +839,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
    Close the cache.
 
-   .. note:: This may or may not clear the cache, depending on the used backend. See :func:`cache.clear()`. 
+   .. note:: This may or may not clear the cache, depending on the used backend. See :func:`cache.clear()`.
 
 .. function:: cache.stats()
 
@@ -944,7 +944,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 Timers and events
 ^^^^^^^^^^^^^^^^^
 
-The timer represents exactly the thing described in the examples - it allows you to execute closures 
+The timer represents exactly the thing described in the examples - it allows you to execute closures
 after specified time, or event recurrent events. Time is always described in milliseconds,
 but there are convenient variables that you can use - ``sec, minute, hour``.
 For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
@@ -966,14 +966,14 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
    :return: event id
 
-   Similar to :func:`event.after()`, periodically execute function after ``interval`` passes. 
+   Similar to :func:`event.after()`, periodically execute function after ``interval`` passes.
 
    Example:
 
    .. code-block:: lua
 
       msg_count = 0
-      event.recurrent(5 * sec, function(e) 
+      event.recurrent(5 * sec, function(e)
          msg_count = msg_count + 1
          print('Hi #'..msg_count)
       end)

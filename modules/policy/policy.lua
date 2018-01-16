@@ -33,15 +33,23 @@ if has_socket then
 	end
 end
 
-local function addr_split_port(target)
+local function addr_split_port(target, default_port)
+	assert(default_port)
+	assert(type(default_port) == 'number')
 	local addr, port = target:match '([^@]*)@?(.*)'
-	port = port and tonumber(port) or 53
-	return addr, port
+	local nport
+	if port ~= "" then
+		nport = tonumber(port)
+		if not nport or nport < 1 or nport > 65535 then
+			error('port "'.. port  ..'" is not valid')
+		end
+	end
+	return addr, nport or default_port
 end
 
 -- String address@port -> sockaddr.
-local function addr2sock(target)
-	local addr, port = addr_split_port(target)
+local function addr2sock(target, default_port)
+	local addr, port = addr_split_port(target, default_port)
 	local sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port), ffi.C.free);
 	if sock == nil then
 		error("target '"..target..'" is not a valid IP address')
@@ -51,7 +59,7 @@ end
 
 -- Mirror request elsewhere, and continue solving
 local function mirror(target)
-	local addr, port = addr_split_port(target)
+	local addr, port = addr_split_port(target, 53)
 	local sink, err = socket_client(addr, port)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
 	return function(state, req)
@@ -80,11 +88,11 @@ local function stub(target)
 	local list = {}
 	if type(target) == 'table' then
 		for _, v in pairs(target) do
-			table.insert(list, addr2sock(v))
+			table.insert(list, addr2sock(v, 53))
 			assert(#list <= 4, 'at most 4 STUB targets are supported')
 		end
 	else
-		table.insert(list, addr2sock(target))
+		table.insert(list, addr2sock(target, 53))
 	end
 	return function(state, req)
 		local qry = req:current()
@@ -101,11 +109,11 @@ local function forward(target)
 	local list = {}
 	if type(target) == 'table' then
 		for _, v in pairs(target) do
-			table.insert(list, addr2sock(v))
+			table.insert(list, addr2sock(v, 53))
 			assert(#list <= 4, 'at most 4 FORWARD targets are supported')
 		end
 	else
-		table.insert(list, addr2sock(target))
+		table.insert(list, addr2sock(target, 53))
 	end
 	return function(state, req)
 		local qry = req:current()
@@ -116,6 +124,96 @@ local function forward(target)
 		qry.flags.NO_MINIMIZE = true
 		qry.flags.AWAIT_CUT = true
 		set_nslist(qry, list)
+		return state
+	end
+end
+
+-- Forward request and all subrequests to upstream over TCP; validate answers
+local function tls_forward(target)
+	local sockaddr_list = {}
+	local addr_list = {}
+	local ca_files = {}
+	local hostnames = {}
+	local pins = {}
+	if type(target) ~= 'table' then
+		assert(false, 'wrong TLS_FORWARD target')
+	end
+	for _, upstream_list_entry in pairs(target) do
+		local upstream_addr = upstream_list_entry[1]
+		if type(upstream_addr) ~= 'string' then
+			assert(false, 'bad IP address in TLS_FORWARD target')
+		end
+		table.insert(sockaddr_list, addr2sock(upstream_addr, 853))
+		table.insert(addr_list, upstream_addr)
+		local ca_file = upstream_list_entry['ca_file']
+		if ca_file ~= nil then
+			local hostname = upstream_list_entry['hostname']
+			if hostname == nil then
+				assert(false, 'hostname(s) is absent in TLS_FORWARD target')
+			end
+			local ca_files_local = {}
+			if type(ca_file) == 'table' then
+				for _, v in pairs(ca_file) do
+					table.insert(ca_files_local, v)
+				end
+			else
+				table.insert(ca_files_local, ca_file)
+			end
+			local hostnames_local = {}
+			if type(hostname) == 'table' then
+				for _, v in pairs(hostname) do
+					table.insert(hostnames_local, v)
+				end
+			else
+				table.insert(hostnames_local, hostname)
+			end
+			if next(ca_files_local) then
+				ca_files[upstream_addr] = ca_files_local
+			end
+			if next(hostnames_local) then
+				hostnames[upstream_addr] = hostnames_local
+			end
+		end
+		local pin = upstream_list_entry['pin']
+		local pins_local = {}
+		if pin ~= nil then
+			if type(pin) == 'table' then
+				for _, v in pairs(pin) do
+					table.insert(pins_local, v)
+				end
+			else
+				table.insert(pins_local, pin)
+			end
+		end
+		if next(pins_local) then
+			pins[upstream_addr] = pins_local
+		end
+	end
+
+	-- Update the global table of authentication data.
+	for _, v in pairs(addr_list) do
+		if (pins[v] == nil and ca_files[v] == nil) then
+			net.tls_client(v)
+		elseif (pins[v] ~= nil and ca_files[v] == nil) then
+			net.tls_client(v, pins[v])
+		elseif (pins[v] == nil and ca_files[v] ~= nil) then
+			net.tls_client(v, ca_files[v], hostnames[v])
+		else
+			net.tls_client(v, pins[v], ca_files[v], hostnames[v])
+		end
+	end
+
+	return function(state, req)
+		local qry = req:current()
+		req.options.FORWARD = true
+		req.options.NO_MINIMIZE = true
+		qry.flags.FORWARD = true
+		qry.flags.ALWAYS_CUT = false
+		qry.flags.NO_MINIMIZE = true
+		qry.flags.AWAIT_CUT = true
+		req.options.TCP = true
+		qry.flags.TCP = true
+		set_nslist(qry, sockaddr_list)
 		return state
 	end
 end
@@ -236,7 +334,8 @@ end
 local policy = {
 	-- Policies
 	PASS = 1, DENY = 2, DROP = 3, TC = 4, QTRACE = 5,
-	FORWARD = forward, STUB = stub, REROUTE = reroute, MIRROR = mirror, FLAGS = flags,
+	FORWARD = forward, TLS_FORWARD = tls_forward,
+	STUB = stub, REROUTE = reroute, MIRROR = mirror, FLAGS = flags,
 	-- Special values
 	ANY = 0,
 }

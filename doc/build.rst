@@ -62,7 +62,8 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for dnstap_."
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
    "libfstrm_ 0.2+", "``modules/dnstap``", "Frame Streams data transport protocol."
-   "luacheck_", "``lint``", "Syntax and static analysis checker for Lua."
+   "luacheck_", "``lint-lua``", "Syntax and static analysis checker for Lua."
+   "`clang-tidy`_", "``lint-c``", "Syntax and static analysis checker for C."
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
@@ -260,7 +261,7 @@ The `make coverage` target gathers both gcov code coverage for C files, and luac
 Running unit and integration tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The linter requires luacheck_ and is executed by ``make lint``.
+The linter requires luacheck_ and `clang-tidy`_ and is executed by ``make lint``.
 The unit tests require cmocka_ and are executed by ``make check``.
 Tests for the dnstap module need go and are executed by ``make ckeck-dnstap``.
 
@@ -329,6 +330,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _libprotobuf-c: https://github.com/protobuf-c/protobuf-c/wiki
 .. _libfstrm: https://github.com/farsightsec/fstrm
 .. _luacheck: http://luacheck.readthedocs.io
+.. _clang-tidy: http://clang.llvm.org/extra/clang-tidy/index.html
 .. _luacov: https://keplerproject.github.io/luacov/
 .. _lcov: http://ltp.sourceforge.net/coverage/lcov.php
 

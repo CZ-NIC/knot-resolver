@@ -198,10 +198,13 @@ int kr_inaddr_len(const struct sockaddr *addr);
 /** Port. */
 KR_EXPORT KR_PURE
 uint16_t kr_inaddr_port(const struct sockaddr *addr);
+/** String representation for given address as "<addr>#<port>" */
+KR_EXPORT
+int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen);
 /** Return address type for string. */
 KR_EXPORT KR_PURE
 int kr_straddr_family(const char *addr);
-/** Return address length in given family. */
+/** Return address length in given family (struct in*_addr). */
 KR_EXPORT KR_CONST
 int kr_family_len(int family);
 /** Create a sockaddr* from string+port representation (also accepts IPv6 link-local). */
@@ -211,6 +214,26 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port);
   * @warning 'dst' must be at least `sizeof(struct in6_addr)` long. */
 KR_EXPORT
 int kr_straddr_subnet(void *dst, const char *addr);
+
+/** Splits ip address specified as "addr@port" or "addr#port" into addr and port
+  * and performs validation.
+  * @note if #port part isn't present, then port will be set to 0.
+  *       buf and\or port can be set to NULL.
+  * @return kr_error(EINVAL) - addr part doesn't contains valid ip address or
+  *                            #port part is out-of-range (either < 0 either > UINT16_MAX)
+  *         kr_error(ENOSP)  - buflen is too small
+  */
+KR_EXPORT
+int kr_straddr_split(const char *addr, char *buf, size_t buflen, uint16_t *port);
+/** Formats ip address and port in "addr#port" format.
+  * and performs validation.
+  * @note Port always formatted as five-character string with leading zeros.
+  * @return kr_error(EINVAL) - addr or buf is NULL or buflen is 0 or
+  *                            addr doesn't contain a valid ip address
+  *         kr_error(ENOSP)  - buflen is too small
+  */
+KR_EXPORT
+int kr_straddr_join(const char *addr, uint16_t port, char *buf, size_t *buflen);
 
 /** Compare memory bitwise.  The semantics is "the same" as for memcmp().
  *  The partial byte is considered with more-significant bits first,
@@ -299,6 +322,19 @@ static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
 	const char *ret = lua_pushvfstring(L, fmt, args);
 	va_end(args);
 	return ret;
+}
+
+/** @internal Return string representation of addr.
+ *  @note return pointer to static string
+ */
+static inline char *kr_straddr(const struct sockaddr *addr)
+{
+	assert(addr != NULL);
+	/* We are the sinle-threaded application */
+	static char str[INET6_ADDRSTRLEN + 6];
+	size_t len = sizeof(str);
+	int ret = kr_inaddr_str(addr, str, &len);
+	return ret != kr_ok() || len == 0 ? NULL : str;
 }
 
 /** The current time in monotonic milliseconds.
