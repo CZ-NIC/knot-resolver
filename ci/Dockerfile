@@ -52,6 +52,9 @@ RUN mv /tmp/resolver-benchmarking/response_differences/respdiff /var/opt/respdif
 RUN pip3 install -r /tmp/resolver-benchmarking/requirements.txt
 RUN rm -rf /tmp/resolver-benchmarking
 
+# Python static analysis for respdiff
+RUN pip3 install mypy
+
 # Unbound for respdiff
 RUN apt-get install unbound unbound-anchor -y -qqq
 RUN printf "server:\n interface: 127.0.0.1@53535\n use-syslog: yes\nremote-control:\n control-enable: no\n" >> /etc/unbound/unbound.conf
@@ -69,3 +72,6 @@ RUN luarocks install luacov
 
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
+
+# infer for static analysis
+RUN wget -q -O - https://github.com/facebook/infer/releases/download/v0.13.0/infer-linux64-v0.13.0.tar.xz | tar xJ && mv infer-linux64* /var/opt/infer
