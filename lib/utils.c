@@ -920,10 +920,10 @@ uint64_t kr_now()
 	return uv_now(uv_default_loop());
 }
 
-int knot_dname_lf2wire(knot_dname_t *dst0, uint8_t len, const uint8_t *lf)
+int knot_dname_lf2wire(knot_dname_t * const dst, uint8_t len, const uint8_t *lf)
 {
-	knot_dname_t *dst = dst0;
-	bool ok = dst && (len == 0 || lf);
+	knot_dname_t *d = dst; /* moving "cursor" as we write it out */
+	bool ok = d && (len == 0 || lf);
 	if (!ok) {
 		assert(false);
 		return kr_error(EINVAL);
@@ -948,15 +948,15 @@ int knot_dname_lf2wire(knot_dname_t *dst0, uint8_t len, const uint8_t *lf)
 		if (label_len > 63 || label_len <= 0)
 			return kr_error(EILSEQ);
 		/* write the label */
-		*dst = label_len;
-		++dst;
-		memcpy(dst, lf + label_start, label_len);
-		dst += label_len;
+		*d = label_len;
+		++d;
+		memcpy(d, lf + label_start, label_len);
+		d += label_len;
 		/* next label */
 		label_end = label_start - 1;
 	}
 finish:
-	*dst = 0; /* the final zero */
-	++dst;
-	return dst - dst0;
+	*d = 0; /* the final zero */
+	++d;
+	return d - dst;
 }
