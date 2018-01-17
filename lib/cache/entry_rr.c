@@ -31,7 +31,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
 	uint8_t rr_count = rds ? rds->rr_count : 0;
 	memcpy(data++, &rr_count, sizeof(rr_count));
 
-	knot_rdata_t *rd = rds->data;
+	knot_rdata_t *rd = rds ? rds->data : NULL;
 	for (int i = 0; i < rr_count; ++i, rd = kr_rdataset_next(rd)) {
 		uint16_t len = knot_rdata_rdlen(rd);
 		memcpy(data, &len, sizeof(len));
@@ -46,7 +46,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
 /** Materialize a knot_rdataset_t from cache with given TTL.
  * Return the number of bytes consumed or an error code.
  */
-static int rdataset_materialize(knot_rdataset_t * restrict rds, const void *data,
+static int rdataset_materialize(knot_rdataset_t * restrict rds, const void * const data,
 		const void *data_bound, uint32_t ttl, knot_mm_t *pool)
 {
 	assert(rds && data && data_bound && data_bound > data && !rds->data);
@@ -55,6 +55,9 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const void *data
 		uint8_t rr_count;
 		memcpy(&rr_count, d++, sizeof(rr_count));
 		rds->rr_count = rr_count;
+		if (!rr_count) { /* avoid mm_alloc(pool, 0); etc. */
+			return d - data;
+		}
 	}
 	/* First sum up the sizes for wire format length. */
 	size_t rdata_len_sum = 0;
