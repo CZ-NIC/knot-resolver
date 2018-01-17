@@ -509,6 +509,8 @@ For when listening on ``localhost`` just doesn't cut it.
 
    Enable/disable using IPv4 for recursion.
 
+.. _tls-server-config:
+
 .. function:: net.listen(addresses, [port = 53, flags = {tls = (port == 853)}])
 
    :return: boolean
