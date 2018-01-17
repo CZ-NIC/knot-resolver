@@ -818,7 +818,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 		kr_dname_print(encloser, wild_labels ? "*." : "", " ");
 		kr_log_verbose("(%d B total, incl. %d RRSIGs)\n",
 				(int)val_new_entry.len,
-				(int)(rr_sigs ? rr_sigs->rrs.rr_count : 0)
+				(rr_sigs ? rr_sigs->rrs.rr_count : 0)
 				);
 	}
 	return kr_ok();

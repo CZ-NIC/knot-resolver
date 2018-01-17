@@ -167,7 +167,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
  */
 static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct kr_cache *cache, uint32_t timestamp)
 {
-	return; // FIXME cleanup, etc.
+	// FIXME cleanup, etc.
 #if 0
 	if (qry->flags.NO_MINIMIZE) {
 		return;
