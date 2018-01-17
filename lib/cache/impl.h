@@ -63,7 +63,7 @@ struct entry_h {
 /** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
  * (for is_packet the length of data is checked)
  */
-struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype);
+struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type);
 
 
 // TODO

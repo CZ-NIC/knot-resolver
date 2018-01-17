@@ -173,9 +173,9 @@ struct nsec_p {
 };
 
 /* When going stricter, BEWARE of breaking entry_h_consistent_NSEC() */
-struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t ktype)
+struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type)
 {
-	(void) ktype; /* unused, for now */
+	(void) type; /* unused, for now */
 	/* Length checks. */
 	if (data.len < offsetof(struct entry_h, data))
 		return NULL;
@@ -810,6 +810,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 		eh->rank = 0;
 		assert(false);
 	}
+	assert(entry_h_consistent(val_new_entry, rr->type));
 
 	WITH_VERBOSE {
 		VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, ", entry->rank);
