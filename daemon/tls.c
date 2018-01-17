@@ -578,7 +578,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 	char key[INET6_ADDRSTRLEN + 6];
 	size_t keylen = sizeof(key);
 	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
-		kr_log_error("[tls client] warning: '%s' is not a valid ip address, ignoring\n", addr);
+		kr_log_error("[tls_client] warning: '%s' is not a valid ip address, ignoring\n", addr);
 		return kr_ok();
 	}
 
@@ -593,7 +593,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 		int ret = gnutls_certificate_allocate_credentials(&entry->credentials);
 		if (ret != GNUTLS_E_SUCCESS) {
 			free(entry);
-			kr_log_error("[tls client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
+			kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
 				     gnutls_strerror_name(ret));
 			return kr_error(ENOMEM);
 		}
@@ -605,7 +605,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 		bool already_exists = false;
 		for (size_t i = 0; i < entry->ca_files.len; ++i) {
 			if (strcmp(entry->ca_files.at[i], ca_file) == 0) {
-				kr_log_error("[tls client] error: ca file '%s'for address '%s' already was set, ignoring\n", ca_file, key);
+				kr_log_error("[tls_client] error: ca file '%s'for address '%s' already was set, ignoring\n", ca_file, key);
 				already_exists = true;
 				break;
 			}
@@ -621,7 +621,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
 										 GNUTLS_X509_FMT_PEM);
 				if (res < 0) {
-					kr_log_error("[tls client] failed to import certificate file '%s' (%s)\n",
+					kr_log_error("[tls_client] failed to import certificate file '%s' (%s)\n",
 						     value, gnutls_strerror_name(res));
 					/* value will be freed at cleanup */
 					ret = kr_error(EINVAL);
@@ -634,7 +634,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 		bool already_exists = false;
 		for (size_t i = 0; i < entry->hostnames.len; ++i) {
 			if (strcmp(entry->hostnames.at[i], hostname) == 0) {
-				kr_log_error("[tls client] error: hostname '%s' for address '%s' already was set, ignoring\n", hostname, key);
+				kr_log_error("[tls_client] error: hostname '%s' for address '%s' already was set, ignoring\n", hostname, key);
 				already_exists = true;
 				break;
 			}
@@ -653,7 +653,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 	if ((ret == kr_ok()) && pin && pin[0] != 0) {
 		for (size_t i = 0; i < entry->pins.len; ++i) {
 			if (strcmp(entry->pins.at[i], pin) == 0) {
-				kr_log_error("[tls client] warning: pin '%s' for address '%s' already was set, ignoring\n", pin, key);
+				kr_log_error("[tls_client] warning: pin '%s' for address '%s' already was set, ignoring\n", pin, key);
 				return kr_ok();
 			}
 		}
@@ -1009,7 +1009,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *ctx,
 	if (ret == GNUTLS_E_SUCCESS) {
 		return kr_ok();
 	} else if (gnutls_error_is_fatal(ret) != 0) {
-		kr_log_error("[tls client] handshake failed (%s)\n", gnutls_strerror(ret));
+		kr_log_error("[tls_client] handshake failed (%s)\n", gnutls_strerror(ret));
 		return kr_error(ECONNABORTED);
 	}
 	return kr_error(EAGAIN);
