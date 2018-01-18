@@ -620,7 +620,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 			} else {
 				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
 										 GNUTLS_X509_FMT_PEM);
-				if (res < 0) {
+				if (res <= 0) {
 					kr_log_error("[tls_client] failed to import certificate file '%s' (%s)\n",
 						     value, gnutls_strerror_name(res));
 					/* value will be freed at cleanup */
