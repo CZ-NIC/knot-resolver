@@ -37,7 +37,7 @@
 static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, uint8_t digest_type)
 {
 	/* Compute DS RDATA from the DNSKEY. */
-	dnssec_binary_t computed_ds = {0, };
+	dnssec_binary_t computed_ds = { 0, };
 	int ret = dnssec_key_create_ds(key, digest_type, &computed_ds);
 	if (ret != DNSSEC_EOK) {
 		goto fail;
@@ -139,9 +139,10 @@ static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
 
 	// static header
 
-	dnssec_binary_t header = { 0 };
-	header.data = (uint8_t *)rdata;
-	header.size = RRSIG_RDATA_SIGNER_OFFSET;
+	dnssec_binary_t header = {
+		.data = (uint8_t *)rdata,
+		.size = RRSIG_RDATA_SIGNER_OFFSET,
+	};
 
 	result = dnssec_sign_add(ctx, &header);
 	if (result != DNSSEC_EOK) {
@@ -272,7 +273,7 @@ int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
 
 	int ret = 0;
 	dnssec_sign_ctx_t *sign_ctx = NULL;
-	dnssec_binary_t signature = {0, };
+	dnssec_binary_t signature = { 0, NULL };
 
 	knot_rrsig_signature(&rrsigs->rrs, pos, &signature.data, &signature.size);
 	if (!signature.data || !signature.size) {

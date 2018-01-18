@@ -429,7 +429,8 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* collecting multiple NSEC* + RRSIG records, in preparation for the answer
 	 *  + track the progress
 	 */
-	struct answer ans = {};
+	struct answer ans;
+	memset(&ans, 0, sizeof(ans));
 	ans.mm = &pkt->mm;
 
 	/** Start of NSEC* covering the sname;
@@ -839,7 +840,8 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	CHECK_RET(ret);
 
 	/* Materialize the sets for the answer in (pseudo-)packet. */
-	struct answer ans = {};
+	struct answer ans;
+	memset(&ans, 0, sizeof(ans));
 	ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
 			   qry->sname, type, new_ttl);
 	CHECK_RET(ret);

@@ -375,7 +375,8 @@ int check_request(kr_layer_t *ctx)
 		return ctx->state; /* Don't do anything without cookies. */
 	}
 
-	struct knot_dns_cookies cookies = { 0, };
+	struct knot_dns_cookies cookies;
+	memset(&cookies, 0, sizeof(cookies));
 	int ret = kr_parse_cookie_opt(req_cookie_opt, &cookies);
 	if (ret != kr_ok()) {
 		/* FORMERR -- malformed cookies. */

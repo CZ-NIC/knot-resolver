@@ -227,7 +227,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		qry->flags.DNSSEC_WANT = false;
 	}
 
-	struct kr_zonecut cut_found = {0};
+	struct kr_zonecut cut_found;
 	kr_zonecut_init(&cut_found, requested_name, req->rplan.pool);
 	/* Cut that has been found can differs from cut that has been requested.
 	 * So if not already insecured,

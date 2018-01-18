@@ -556,7 +556,7 @@ static int cdb_remove(knot_db_t *db, knot_db_val_t *key, int maxcount)
 
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
 		MDB_val _key = val_knot2mdb(key[i]);
-		MDB_val val = { };
+		MDB_val val = { 0, NULL };
 		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, &val));
 	}
 
@@ -585,7 +585,7 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 	}
 
 	MDB_val cur_key = val_knot2mdb(*key);
-	MDB_val cur_val = { };
+	MDB_val cur_val = { 0, NULL };
 	ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_SET_RANGE);
 	if (ret != MDB_SUCCESS) {
 		mdb_cursor_close(cur);
@@ -675,7 +675,7 @@ static int cdb_read_leq(knot_db_t *env, knot_db_val_t *key, knot_db_val_t *val)
 	if (ret) return ret;
 
 	MDB_val key2_m = val_knot2mdb(*key);
-	MDB_val val2_m = { };
+	MDB_val val2_m = { 0, NULL };
 	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_SET_RANGE);
 	if (ret) return lmdb_error(ret);
 	/* test for equality //:unlikely */

@@ -53,9 +53,10 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 
 	/* Every NSEC3 RR contains data from NSEC3PARAMS. */
 	const size_t SALT_OFFSET = 5; /* First 5 octets contain { Alg, Flags, Iterations, Salt length } */
-	dnssec_binary_t rdata = {0, };
-	rdata.size = SALT_OFFSET + (size_t) knot_nsec3_salt_length(&nsec3->rrs, 0);
-	rdata.data = knot_rdata_data(rr);
+	dnssec_binary_t rdata = {
+		.size = SALT_OFFSET + (size_t) knot_nsec3_salt_length(&nsec3->rrs, 0),
+		.data = knot_rdata_data(rr),
+	};
 	if (rdata.size > knot_rdata_rdlen(rr))
 		return kr_error(EMSGSIZE);
 
@@ -81,9 +82,10 @@ static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
 	if (!name)
 		return kr_error(EINVAL);
 
-	dnssec_binary_t dname = {0, };
-	dname.size = knot_dname_size(name);
-	dname.data = (uint8_t *) name;
+	dnssec_binary_t dname = {
+		.size = knot_dname_size(name),
+		.data = (uint8_t *) name,
+	};
 
 	int ret = dnssec_nsec3_hash(&dname, params, hash);
 	if (ret != DNSSEC_EOK) {
@@ -128,11 +130,10 @@ static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
 {
 	assert(flags && nsec3 && name && skipped);
 
-	dnssec_binary_t owner_hash = {0, };
 	uint8_t hash_data[MAX_HASH_BYTES] = {0, };
-	owner_hash.data = hash_data;
-	dnssec_nsec3_params_t params = {0, };
-	dnssec_binary_t name_hash = {0, };
+	dnssec_binary_t owner_hash = { 0, hash_data };
+	dnssec_nsec3_params_t params = { 0, };
+	dnssec_binary_t name_hash = { 0, };
 
 	int ret = read_owner_hash(&owner_hash, MAX_HASH_BYTES, nsec3);
 	if (ret != 0) {
@@ -197,11 +198,10 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 {
 	assert(flags && nsec3 && name);
 
-	dnssec_binary_t owner_hash = {0, };
-	uint8_t hash_data[MAX_HASH_BYTES] = {0, };
-	owner_hash.data = hash_data;
-	dnssec_nsec3_params_t params = {0, };
-	dnssec_binary_t name_hash = {0, };
+	uint8_t hash_data[MAX_HASH_BYTES] = { 0, };
+	dnssec_binary_t owner_hash = { 0, hash_data };
+	dnssec_nsec3_params_t params = { 0, };
+	dnssec_binary_t name_hash = { 0, };
 
 	int ret = read_owner_hash(&owner_hash, MAX_HASH_BYTES, nsec3);
 	if (ret != 0) {
@@ -305,11 +305,10 @@ static int matches_name(const knot_rrset_t *nsec3, const knot_dname_t *name)
 {
 	assert(nsec3 && name);
 
-	dnssec_binary_t owner_hash = {0, };
-	uint8_t hash_data[MAX_HASH_BYTES] = {0, };
-	owner_hash.data = hash_data;
-	dnssec_nsec3_params_t params = {0, };
-	dnssec_binary_t name_hash = {0, };
+	uint8_t hash_data[MAX_HASH_BYTES] = { 0, };
+	dnssec_binary_t owner_hash = { 0, hash_data };
+	dnssec_nsec3_params_t params = { 0, };
+	dnssec_binary_t name_hash = { 0, };
 
 	int ret = read_owner_hash(&owner_hash, MAX_HASH_BYTES, nsec3);
 	if (ret != 0) {

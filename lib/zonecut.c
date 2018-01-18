@@ -274,7 +274,7 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache,
 			const struct kr_query *qry)
 // LATER(optim.): excessive data copying
 {
-	struct kr_cache_p peek = {};
+	struct kr_cache_p peek;
 	if (kr_cache_peek_exact(cache, ns, rrtype, &peek) != 0) {
 		return;
 	}
@@ -300,7 +300,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		    const knot_dname_t *name, const struct kr_query *qry,
 		    uint8_t * restrict rank)
 {
-	struct kr_cache_p peek = {};
+	struct kr_cache_p peek;
 	int ret = kr_cache_peek_exact(&ctx->cache, name, KNOT_RRTYPE_NS, &peek);
 	if (ret != 0) {
 		return ret;
@@ -314,7 +314,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 	 * records that weren't validated.
 	 */
 	/* Materialize the rdataset temporarily, for simplicity. */
-	knot_rdataset_t ns_rds = {};
+	knot_rdataset_t ns_rds = { 0, NULL };
 	ret = kr_cache_materialize(&ns_rds, &peek, new_ttl, cut->pool);
 	if (ret < 0) {
 		return ret;
@@ -352,7 +352,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 		return kr_error(ENOENT);
 	}
 	/* peek, check rank and TTL */
-	struct kr_cache_p peek = {};
+	struct kr_cache_p peek;
 	int ret = kr_cache_peek_exact(cache, owner, type, &peek);
 	if (ret != 0) {
 		return ret;

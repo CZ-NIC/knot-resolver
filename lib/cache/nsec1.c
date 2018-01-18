@@ -161,7 +161,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		return "range search ERROR";
 	}
 	knot_db_val_t key_nsec = key;
-	knot_db_val_t val = { };
+	knot_db_val_t val = { NULL, 0 };
 	int ret = cache_op(cache, read_leq, &key_nsec, &val);
 	if (ret < 0) {
 		if (ret == kr_error(ENOENT)) {
@@ -279,7 +279,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	/* Find a previous-or-equal name+NSEC in cache covering the QNAME,
 	 * checking TTL etc. */
 	knot_db_val_t key = key_NSEC1(k, qry->sname, false);
-	knot_db_val_t val = {};
+	knot_db_val_t val = { NULL, 0 };
 	bool exact_match;
 	uint32_t new_ttl;
 	const char *err = find_leq_NSEC1(cache, qry, key, k, &val,
@@ -408,8 +408,8 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		nsec_rr = ans->rrsets[AR_NSEC].set.rr;
 	} else {
 		/* Try to find the NSEC for SS. */
-		knot_db_val_t val = {};
-		knot_db_val_t wild_low_kwz = {};
+		knot_db_val_t val = { NULL, 0 };
+		knot_db_val_t wild_low_kwz = { NULL, 0 };
 		uint32_t new_ttl;
 		const char *err = find_leq_NSEC1(cache, qry, key, k, &val,
 				&exact_match, &wild_low_kwz, NULL, &new_ttl);
