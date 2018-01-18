@@ -46,11 +46,13 @@ Most actions stop the policy matching on the query, but "chain actions" allow to
 
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Policy `TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides content of your queries before attacker observing network traffic. Further details about this protocol can be found in `RFC 7858`_ and `IETF draft dprive-dtls-and-tls-profiles`_.
+Policy `TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in `RFC 7858`_ and `IETF draft dprive-dtls-and-tls-profiles`_.
 
-Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to configuration, the resolution will fail.
+Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
 
 To test this feature you need to either :ref:`configure Knot Resolver as DNS-over-TLS server <tls-server-config>`, or pick some public DNS-over-TLS server. Please see `DNS Privacy Project`_ homepage for list of public servers.
+
+When multiple servers are specified, the one with the lowest round-trip time is used.
 
 TLS Examples
 ~~~~~~~~~~~~
@@ -63,6 +65,8 @@ TLS Examples
 	-- for brevity, other TLS examples omit policy.add(policy.all())
 	-- single server authenticated using its certificate pin
 	  policy.TLS_FORWARD({{'192.0.2.1', pin='YQ=='}})  -- pin is base64-encoded
+	-- single server using non-standard port
+	  policy.TLS_FORWARD({{'192.0.2.1@443', pin='YQ=='}})  -- use @ or # to specify port
 	-- single server with multiple valid pins (e.g. anycast)
 	  policy.TLS_FORWARD({{'192.0.2.1', pin={'YQ==', 'Wg=='}})
 	-- multiple servers, each with own authenticator
