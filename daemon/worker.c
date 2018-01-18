@@ -936,7 +936,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 		ret = kr_resolve_checkout(req, NULL, addr,
 		                          handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
 		                          pkt);
-		if (ret != kr_ok()) {
+		if (ret != 0) {
 			iorequest_release(worker, ioreq);
 			return ret;
 		}
@@ -2162,6 +2162,9 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		if (ret == 0) {
 			const struct sockaddr *addr = session->outgoing ? &session->peer.ip : NULL;
 			ret = qr_task_step(task, addr, pkt_buf);
+			if (ret != 0) {
+				return ret;
+			}
 		}
 		if (len > 0) {
 			/* TODO: this is simple via iteration; recursion doesn't really help */

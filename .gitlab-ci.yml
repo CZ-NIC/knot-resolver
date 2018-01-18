@@ -58,7 +58,7 @@ lint:clang-scan-build:
   image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
-    - MAKEFLAGS="-k -j$(nproc)" /usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs make
+    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="/usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
   artifacts:
     when: on_failure
     expire_in: '1 day'
