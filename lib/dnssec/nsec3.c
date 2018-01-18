@@ -677,9 +677,6 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 
 int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 {
-	int flags = 0;
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	if (!sec) {
 		return kr_error(EINVAL);
@@ -692,8 +689,9 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		if (ns->type != KNOT_RRTYPE_NS) {
 			continue;
 		}
+
+		int flags = 0;
 		bool nsec3_found = false;
-		flags = 0;
 		for (unsigned j = 0; j < sec->count; ++j) {
 			const knot_rrset_t *nsec3 = knot_pkt_rr(sec, j);
 			if (nsec3->type == KNOT_RRTYPE_DS) {
@@ -708,6 +706,9 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 			if (matches_name(nsec3, ns->owner) != kr_ok()) {
 				continue;
 			}
+
+			uint8_t *bm = NULL;
+			uint16_t bm_size = 0;
 			knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
 			if (!bm) {
 				return kr_error(EINVAL);

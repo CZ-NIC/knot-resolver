@@ -703,6 +703,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 	int ret = init_state(engine);
 	if (ret != 0) {
 		engine_deinit(engine);
+		return ret;
 	}
 	init_measurement(engine);
 	/* Initialize resolver */

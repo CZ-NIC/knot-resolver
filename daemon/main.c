@@ -422,6 +422,87 @@ static void free_sd_socket_names(char **socket_names, int count)
 }
 #endif
 
+static int init_keyfile(struct engine *engine, const char *keyfile)
+{
+	auto_free char *dirname_storage = strdup(keyfile);
+	if (!dirname_storage) {
+		return kr_error(ENOMEM);
+	}
+
+	/* Resolve absolute path to the keyfile directory */
+	auto_free char *keyfile_dir = malloc(PATH_MAX);
+	if (!keyfile_dir) {
+		return kr_error(ENOMEM);
+	}
+	if (realpath(dirname(dirname_storage), keyfile_dir) == NULL) {
+		kr_log_error("[ ta ]: keyfile '%s' directory: %s\n", keyfile, strerror(errno));
+		return kr_error(ENOTDIR);
+	}
+
+	auto_free char *basename_storage = strdup(keyfile);
+	if (!basename_storage) {
+		return kr_error(ENOMEM);
+	}
+
+	char *_filename = basename(basename_storage);
+	int dirlen = strlen(keyfile_dir);
+	int namelen = strlen(_filename);
+	if (dirlen + 1 + namelen >= PATH_MAX) {
+		kr_log_error("[ ta ]: keyfile '%s' PATH_MAX exceeded\n",
+			     keyfile);
+		return kr_error(ENAMETOOLONG);
+	}
+	keyfile_dir[dirlen++] = '/';
+	keyfile_dir[dirlen] = '\0';
+
+	auto_free char *keyfile_path = malloc(dirlen + namelen + 1);
+	if (!keyfile_path) {
+		return kr_error(ENOMEM);
+	}
+	memcpy(keyfile_path, keyfile_dir, dirlen);
+	memcpy(keyfile_path + dirlen, _filename, namelen + 1);
+
+	int unmanaged = 0;
+
+	/* Note: config has been executed, so access() is OK,
+	 * as we've dropped privileges already if configured. */
+	if (access(keyfile_path, F_OK) != 0) {
+		kr_log_info("[ ta ] keyfile '%s': doesn't exist, bootstrapping\n", keyfile_path);
+		if (access(keyfile_dir, W_OK) != 0) {
+			kr_log_error("[ ta ] keyfile '%s': write access to '%s' needed\n", keyfile_path, keyfile_dir);
+			return kr_error(EPERM);
+		}
+	} else if (access(keyfile_path, R_OK) == 0) {
+		if ((access(keyfile_path, W_OK) != 0) || (access(keyfile_dir, W_OK) != 0)) {
+			kr_log_error("[ ta ] keyfile '%s': not writeable, starting in unmanaged mode\n", keyfile_path);
+			unmanaged = 1;
+		}
+	} else {
+		kr_log_error("[ ta ] keyfile '%s': %s\n", keyfile_path, strerror(errno));
+		return kr_error(EPERM);
+	}
+
+	auto_free char *cmd = afmt("trust_anchors.config('%s',%s)", keyfile_path, unmanaged?"true":"nil");
+	if (!cmd) {
+		return kr_error(ENOMEM);
+	}
+
+	int lua_ret = engine_cmd(engine->L, cmd, false);
+	if (lua_ret != 0) {
+		if (lua_gettop(engine->L) > 0) {
+			kr_log_error("%s", lua_tostring(engine->L, -1));
+			lua_settop(engine->L, 0);
+		} else {
+			kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n",
+					keyfile_path, lua_strerror(lua_ret));
+		}
+		return kr_error(EIO);
+	}
+
+	lua_settop(engine->L, 0);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	int forks = 1;
@@ -674,86 +755,12 @@ int main(int argc, char **argv)
 	}
 
 	if (keyfile) {
-		auto_free char *dirname_storage = strdup(keyfile);
-		if (!dirname_storage) {
-			kr_log_error("[system] not enough memory: %s\n",
-				     strerror(errno));
+		ret = init_keyfile(&engine, keyfile);
+		if (ret != 0) {
+			kr_log_error("[system] failed to initialized keyfile: %s\n", kr_strerror(ret));
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
-		auto_free char *basename_storage = strdup(keyfile);
-		if (!basename_storage) {
-			kr_log_error("[system] not enough memory: %s\n",
-				     strerror(errno));
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		/* Resolve absolute path to the keyfile directory */
-		auto_free char *keyfile_dir = malloc(PATH_MAX);
-		if (realpath(dirname(dirname_storage), keyfile_dir) == NULL) {
-			kr_log_error("[ ta ]: keyfile '%s' directory: %s\n",
-				     keyfile, strerror(errno));
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		char *_filename = basename(basename_storage);
-		int dirlen = strlen(keyfile_dir);
-		int namelen = strlen(_filename);
-		if (dirlen + 1 + namelen >= PATH_MAX) {
-			kr_log_error("[ ta ]: keyfile '%s' PATH_MAX exceeded\n",
-				     keyfile);
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-		keyfile_dir[dirlen++] = '/';
-		keyfile_dir[dirlen] = '\0';
-
-		auto_free char *keyfile_path = malloc(dirlen + namelen + 1);
-		memcpy(keyfile_path, keyfile_dir, dirlen);
-		memcpy(keyfile_path + dirlen, _filename, namelen + 1);
-
-		int unmanaged = 0;
-
-		/* Note: config has been executed, so access() is OK,
-		 * as we've dropped privileges already if configured. */
-		if (access(keyfile_path, F_OK) != 0) {
-			kr_log_info("[ ta ] keyfile '%s': doesn't exist, bootstrapping\n", keyfile_path);
-			if (access(keyfile_dir, W_OK) != 0) {
-				kr_log_error("[ ta ] keyfile '%s': write access to '%s' needed\n", keyfile_path, keyfile_dir);
-				ret = EXIT_FAILURE;
-				goto cleanup;
-			}
-		} else if (access(keyfile_path, R_OK) == 0) {
-			if ((access(keyfile_path, W_OK) != 0) || (access(keyfile_dir, W_OK) != 0)) {
-				kr_log_error("[ ta ] keyfile '%s': not writeable, starting in unmanaged mode\n", keyfile_path);
-				unmanaged = 1;
-			}
-		} else {
-			kr_log_error("[ ta ] keyfile '%s': %s\n", keyfile_path, strerror(errno));
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		auto_free char *cmd = afmt("trust_anchors.config('%s',%s)", keyfile_path, unmanaged?"true":"nil");
-		if (!cmd) {
-			kr_log_error("[system] not enough memory\n");
-			ret =  EXIT_FAILURE;
-			goto cleanup;
-		}
-		int lua_ret = engine_cmd(engine.L, cmd, false);
-		if (lua_ret != 0) {
-			if (lua_gettop(engine.L) > 0) {
-				kr_log_error("%s", lua_tostring(engine.L, -1));
-			} else {
-				kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n",
-						keyfile_path, lua_strerror(lua_ret));
-			}
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-		lua_settop(engine.L, 0);
 	}
 
 	/* Run the event loop */

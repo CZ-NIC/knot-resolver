@@ -128,78 +128,114 @@ local function forward(target)
 	end
 end
 
--- Forward request and all subrequests to upstream over TCP; validate answers
+-- object must be non-empty string or non-empty table of non-empty strings
+local function is_nonempty_string_or_table(object)
+	if type(object) == 'string' then
+		return #object ~= 0
+	elseif type(object) ~= 'table' or not next(object) then
+		return false
+	end
+	for _, val in pairs(object) do
+		if type(val) ~= 'string' or #val == 0 then
+			return false
+		end
+	end
+	return true
+end
+
+local function insert_from_string_or_table(source, destination)
+	if type(source) == 'table' then
+		for _, v in pairs(source) do
+			table.insert(destination, v)
+		end
+	else
+		table.insert(destination, source)
+	end
+end
+
+-- Check for allowed authentication types and return type for the current target
+local function tls_forward_target_authtype(idx, target)
+	if (target.pin_sha256 and not (target.ca_file or target.hostname or target.insecure)) then
+		if not is_nonempty_string_or_table(target.pin_sha256) then
+			error('TLS_FORWARD target authentication is invalid at position '
+			      .. idx .. '; pin_sha256 must be string or list of strings')
+		end
+		return 'pin_sha256'
+	elseif (target.insecure and not (target.ca_file or target.hostname or target.pin_sha256)) then
+		return 'insecure'
+	elseif (target.ca_file and target.hostname and not (target.insecure or target.pin_sha256)) then
+		if not (is_nonempty_string_or_table(target.hostname)
+			and is_nonempty_string_or_table(target.ca_file)) then
+			error('TLS_FORWARD target authentication is invalid at position '
+			      .. idx .. '; hostname and ca_file must be string or list of strings')
+		end
+		return 'cert'
+	else
+		error('TLS_FORWARD authentication options at position ' .. idx
+		      .. ' are invalid; specify one of: pin_sha256 / hostname+ca_file / insecure')
+	end
+end
+
+local function tls_forward_target_check_syntax(idx, list_entry)
+	if type(list_entry) ~= 'table' then
+		error('TLS_FORWARD target must be a non-empty table (found '
+		      .. type(list_entry) .. ' at position ' .. idx .. ')')
+	end
+	if type(list_entry[1]) ~= 'string' then
+		error('TLS_FORWARD target must start with an IP address (found '
+		      .. type(list_entry[1]) .. ' at the beginning of target position ' .. idx .. ')')
+	end
+end
+
+-- Forward request and all subrequests to upstream over TLS; validate answers
 local function tls_forward(target)
-	local sockaddr_list = {}
-	local addr_list = {}
+	local sockaddr_c_list = {}
+	local sockaddr_config = {}  -- items: { string_addr=<addr string>, auth_type=<auth type> }
 	local ca_files = {}
 	local hostnames = {}
 	local pins = {}
-	if type(target) ~= 'table' then
-		assert(false, 'wrong TLS_FORWARD target')
+	if type(target) ~= 'table' or #target < 1 then
+		error('TLS_FORWARD argument must be a non-empty table')
 	end
-	for _, upstream_list_entry in pairs(target) do
-		local upstream_addr = upstream_list_entry[1]
-		if type(upstream_addr) ~= 'string' then
-			assert(false, 'bad IP address in TLS_FORWARD target')
+	for idx, upstream_list_entry in pairs(target) do
+		tls_forward_target_check_syntax(idx, upstream_list_entry)
+		local auth_type = tls_forward_target_authtype(idx, upstream_list_entry)
+		local string_addr = upstream_list_entry[1]
+		local sockaddr_c = addr2sock(string_addr, 853)
+		local sockaddr_lua = ffi.string(sockaddr_c, ffi.C.kr_inaddr_len(sockaddr_c))
+		if sockaddr_config[sockaddr_lua] then
+			error('TLS_FORWARD configuration cannot declare two configs for IP address ' .. string_addr)
 		end
-		table.insert(sockaddr_list, addr2sock(upstream_addr, 853))
-		table.insert(addr_list, upstream_addr)
-		local ca_file = upstream_list_entry['ca_file']
-		if ca_file ~= nil then
-			local hostname = upstream_list_entry['hostname']
-			if hostname == nil then
-				assert(false, 'hostname(s) is absent in TLS_FORWARD target')
-			end
-			local ca_files_local = {}
-			if type(ca_file) == 'table' then
-				for _, v in pairs(ca_file) do
-					table.insert(ca_files_local, v)
-				end
-			else
-				table.insert(ca_files_local, ca_file)
-			end
-			local hostnames_local = {}
-			if type(hostname) == 'table' then
-				for _, v in pairs(hostname) do
-					table.insert(hostnames_local, v)
-				end
-			else
-				table.insert(hostnames_local, hostname)
-			end
-			if next(ca_files_local) then
-				ca_files[upstream_addr] = ca_files_local
-			end
-			if next(hostnames_local) then
-				hostnames[upstream_addr] = hostnames_local
-			end
-		end
-		local pin = upstream_list_entry['pin']
-		local pins_local = {}
-		if pin ~= nil then
-			if type(pin) == 'table' then
-				for _, v in pairs(pin) do
-					table.insert(pins_local, v)
-				end
-			else
-				table.insert(pins_local, pin)
-			end
-		end
-		if next(pins_local) then
-			pins[upstream_addr] = pins_local
+		table.insert(sockaddr_c_list, sockaddr_c)
+		sockaddr_config[sockaddr_lua] = {string_addr=string_addr, auth_type=auth_type}
+		if auth_type == 'cert' then
+			ca_files[sockaddr_lua] = {}
+			hostnames[sockaddr_lua] = {}
+			insert_from_string_or_table(upstream_list_entry.ca_file, ca_files[sockaddr_lua])
+			insert_from_string_or_table(upstream_list_entry.hostname, hostnames[sockaddr_lua])
+		elseif auth_type == 'pin_sha256' then
+			pins[sockaddr_lua] = {}
+			insert_from_string_or_table(upstream_list_entry.pin_sha256, pins[sockaddr_lua])
+		elseif auth_type ~= 'insecure' then
+			-- insecure does nothing, user does not want authentication
+			assert(false, 'unsupported auth_type')
 		end
 	end
 
-	-- Update the global table of authentication data.
-	for _, v in pairs(addr_list) do
-		if (pins[v] == nil and ca_files[v] == nil) then
-			net.tls_client(v)
-		elseif (pins[v] ~= nil and ca_files[v] == nil) then
-			net.tls_client(v, pins[v])
-		elseif (pins[v] == nil and ca_files[v] ~= nil) then
-			net.tls_client(v, ca_files[v], hostnames[v])
+	-- Update the global table of authentication data only if all checks above passed
+	for sockaddr_lua, config in pairs(sockaddr_config) do
+		assert(#config.string_addr > 0)
+		if config.auth_type == 'insecure' then
+			net.tls_client(config.string_addr)
+		elseif config.auth_type == 'pin_sha256' then
+			assert(#pins[sockaddr_lua] > 0)
+			net.tls_client(config.string_addr, pins[sockaddr_lua])
+		elseif config.auth_type == 'cert' then
+			assert(#ca_files[sockaddr_lua] > 0)
+			assert(#hostnames[sockaddr_lua] > 0)
+			net.tls_client(config.string_addr, ca_files[sockaddr_lua], hostnames[sockaddr_lua])
 		else
-			net.tls_client(v, pins[v], ca_files[v], hostnames[v])
+			assert(false, 'unsupported auth_type')
 		end
 	end
 
@@ -213,7 +249,7 @@ local function tls_forward(target)
 		qry.flags.AWAIT_CUT = true
 		req.options.TCP = true
 		qry.flags.TCP = true
-		set_nslist(qry, sockaddr_list)
+		set_nslist(qry, sockaddr_c_list)
 		return state
 	end
 end

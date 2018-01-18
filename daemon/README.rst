@@ -595,6 +595,8 @@ For when listening on ``localhost`` just doesn't cut it.
       > net.tcp_pipeline(50)
       50
 
+.. _tls-server-config:
+
 .. function:: net.tls([cert_path], [key_path])
 
    Get/set path to a server TLS certificate and private key for DNS/TLS.
