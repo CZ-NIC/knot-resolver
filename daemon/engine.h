@@ -27,7 +27,11 @@
 #define LRU_COOKIES_SIZE LRU_RTT_SIZE /**< DNS cookies cache size. */
 #endif
 #ifndef MP_FREELIST_SIZE
-#define MP_FREELIST_SIZE 64 /**< Maximum length of the worker mempool freelist */
+# ifdef __clang_analyzer__
+#  define MP_FREELIST_SIZE 0
+# else
+#  define MP_FREELIST_SIZE 64 /**< Maximum length of the worker mempool freelist */
+# endif
 #endif
 #ifndef RECVMMSG_BATCH
 #define RECVMMSG_BATCH 4
