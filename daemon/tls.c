@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 American Civil Liberties Union (ACLU)
- *               2016 CZ.NIC, z.s.p.o
+ *               2016-2018 CZ.NIC, z.s.p.o
  * 
  * Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
  *                 Ondřej Surý <ondrej@sury.org>
@@ -36,8 +36,6 @@
 #include "daemon/io.h"
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
-
-static const char *priorities = "NORMAL";
 
 /* gnutls_record_recv and gnutls_record_send */
 struct tls_ctx_t {
@@ -75,6 +73,26 @@ struct tls_client_ctx_t {
 #endif
 
 static int client_verify_certificate(gnutls_session_t tls_session);
+
+/**
+ * Set mandatory security settings from
+ * https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles-11#section-9
+ * Performance optimizations are not implemented at the moment.
+ */
+static int kres_gnutls_set_priority(gnutls_session_t session) {
+	static const char * const priorities =
+		"NORMAL:" /* GnuTLS defaults */
+		"-VERS-TLS1.0:-VERS-TLS1.1:" /* TLS 1.2 and higher */
+		"-COMP-ALL:+COMP-NULL"; /* no compression*/
+	const char *errpos = NULL;
+	int err = gnutls_priority_set_direct(session, priorities, &errpos);
+	if (err != GNUTLS_E_SUCCESS) {
+		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
+			     priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
+	}
+	return err;
+}
+
 
 static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
@@ -165,23 +183,19 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 	}
 
 	int err = gnutls_init(&tls->session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
-	if (err < 0) {
+	if (err != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] gnutls_init(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
 	tls->credentials = tls_credentials_reserve(net->tls_credentials);
 	err = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE, tls->credentials->credentials);
-	if (err < 0) {
+	if (err != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] gnutls_credentials_set(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
-	const char *errpos = NULL;
-	err = gnutls_priority_set_direct(tls->session, priorities, &errpos);
-	if (err < 0) {
-		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
-			     priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
+	if (kres_gnutls_set_priority(tls->session) != GNUTLS_E_SUCCESS) {
 		tls_free(tls);
 		return NULL;
 	}
@@ -279,7 +293,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 			tls_p->handshake_done = true;
 		} else if (err == GNUTLS_E_AGAIN) {
 			return 0; /* No data, bail out */
-		} else if (err < 0 && gnutls_error_is_fatal(err)) {
+		} else if (gnutls_error_is_fatal(err)) {
 			return kr_error(err);
 		}
 	}
@@ -329,7 +343,7 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	gnutls_pubkey_t key;
 	gnutls_datum_t datum = { .size = 0 };
 
-	if ((err = gnutls_pubkey_init(&key)) < 0) {
+	if ((err = gnutls_pubkey_init(&key)) != GNUTLS_E_SUCCESS) {
 		return err;
 	}
 
@@ -405,17 +419,17 @@ static time_t _get_end_entity_expiration(gnutls_certificate_credentials_t creds)
 	int err;
 	time_t ret = GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
 
-	if ((err = gnutls_certificate_get_crt_raw(creds, 0, 0, &data)) < 0) {
+	if ((err = gnutls_certificate_get_crt_raw(creds, 0, 0, &data)) != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] failed to get cert to check expiration: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		goto done;
 	}
-	if ((err = gnutls_x509_crt_init(&cert)) < 0) {
+	if ((err = gnutls_x509_crt_init(&cert)) != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] failed to initialize cert: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		goto done;
 	}
-	if ((err = gnutls_x509_crt_import(cert, &data, GNUTLS_X509_FMT_DER)) < 0) {
+	if ((err = gnutls_x509_crt_import(cert, &data, GNUTLS_X509_FMT_DER)) != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] failed to construct cert while checking expiration: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		goto done;
@@ -441,7 +455,7 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 	}
 
 	int err = 0;
-	if ((err = gnutls_certificate_allocate_credentials(&tls_credentials->credentials)) < 0) {
+	if ((err = gnutls_certificate_allocate_credentials(&tls_credentials->credentials)) != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		tls_credentials_free(tls_credentials);
@@ -463,7 +477,7 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 	}
 	
 	if ((err = gnutls_certificate_set_x509_key_file(tls_credentials->credentials,
-							tls_cert, tls_key, GNUTLS_X509_FMT_PEM)) < 0) {
+							tls_cert, tls_key, GNUTLS_X509_FMT_PEM)) != GNUTLS_E_SUCCESS) {
 		tls_credentials_free(tls_credentials);
 		kr_log_error("[tls] gnutls_certificate_set_x509_key_file(%s,%s) failed: %d (%s)\n",
 			     tls_cert, tls_key, err, gnutls_strerror_name(err));
@@ -620,7 +634,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 			} else {
 				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
 										 GNUTLS_X509_FMT_PEM);
-				if (res < 0) {
+				if (res <= 0) {
 					kr_log_error("[tls_client] failed to import certificate file '%s' (%s)\n",
 						     value, gnutls_strerror_name(res));
 					/* value will be freed at cleanup */
@@ -904,7 +918,7 @@ int tls_client_process(struct worker_ctx *worker, uv_stream_t *handle, const uin
 			ctx->handshake_state = TLS_HS_DONE;
 		} else if (err == GNUTLS_E_AGAIN) {
 			return 0;
-		} else if (err < 0 && gnutls_error_is_fatal(err)) {
+		} else if (gnutls_error_is_fatal(err)) {
 			kr_log_error("[tls_client] gnutls_handshake failed: %s (%d)\n",
 			             gnutls_strerror_name(err), err);
 			if (ctx->handshake_cb) {
@@ -956,7 +970,7 @@ struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_en
 		return NULL;
 	}
 
-	ret = gnutls_set_default_priority(ctx->tls_session);
+	ret = kres_gnutls_set_priority(ctx->tls_session);
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
