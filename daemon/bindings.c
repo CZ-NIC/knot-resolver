@@ -391,7 +391,7 @@ static int net_tls(lua_State *L)
 
 	int r = tls_certificate_set(net, lua_tostring(L, 1), lua_tostring(L, 2));
 	if (r != 0) {
-		lua_pushstring(L, strerror(ENOMEM));
+		lua_pushstring(L, kr_strerror(r));
 		lua_error(L);
 	}
 
@@ -511,7 +511,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, NULL, NULL, NULL);
 		if (r != 0) {
-			lua_pushstring(L, strerror(ENOMEM));
+			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
 		}
 
@@ -529,7 +529,7 @@ static int net_tls_client(lua_State *L)
 			int r = tls_client_params_set(&net->tls_client_params,
 						      addr, port, NULL, NULL, pin);
 			if (r != 0) {
-				lua_pushstring(L, strerror(ENOMEM));
+				lua_pushstring(L, kr_strerror(r));
 				lua_error(L);
 			}
 			lua_pop(L, 1);
@@ -555,7 +555,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, ca_file, NULL, NULL);
 		if (r != 0) {
-			lua_pushstring(L, strerror(ENOMEM));
+			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
 		}
 		/* removes 'value'; keeps 'key' for next iteration */
@@ -569,7 +569,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, NULL, hostname, NULL);
 		if (r != 0) {
-			lua_pushstring(L, strerror(ENOMEM));
+			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
 		}
 		/* removes 'value'; keeps 'key' for next iteration */
@@ -1393,7 +1393,7 @@ static int wrk_resolve(lua_State *L)
 	/* Create query packet */
 	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
 	if (!pkt) {
-		lua_pushstring(L, strerror(ENOMEM));
+		lua_pushstring(L, kr_strerror(ENOMEM));
 		lua_error(L);
 	}
 	uint8_t dname[KNOT_DNAME_MAXLEN];
