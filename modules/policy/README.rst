@@ -61,17 +61,17 @@ TLS Examples
 
 	modules = { 'policy' }
 	-- forward all queries over TLS to the specified server
-	policy.add(policy.all(policy.TLS_FORWARD({{'192.0.2.1', pin='YQ=='}})))
+	policy.add(policy.all(policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})))
 	-- for brevity, other TLS examples omit policy.add(policy.all())
-	-- single server authenticated using its certificate pin
-	  policy.TLS_FORWARD({{'192.0.2.1', pin='YQ=='}})  -- pin is base64-encoded
+	-- single server authenticated using its certificate pin_sha256
+	  policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})  -- pin_sha256 is base64-encoded
 	-- single server using non-standard port
-	  policy.TLS_FORWARD({{'192.0.2.1@443', pin='YQ=='}})  -- use @ or # to specify port
+	  policy.TLS_FORWARD({{'192.0.2.1@443', pin_sha256='YQ=='}})  -- use @ or # to specify port
 	-- single server with multiple valid pins (e.g. anycast)
-	  policy.TLS_FORWARD({{'192.0.2.1', pin={'YQ==', 'Wg=='}})
+	  policy.TLS_FORWARD({{'192.0.2.1', pin_sha256={'YQ==', 'Wg=='}})
 	-- multiple servers, each with own authenticator
 	  policy.TLS_FORWARD({ -- please note that { here starts list of servers
-		{'192.0.2.1', pin='Wg=='},
+		{'192.0.2.1', pin_sha256='Wg=='},
 		-- server must present certificate issued by specified CA and hostname must match
 		{'2001:DB8::d0c', hostname='res.example.', ca_file='/etc/knot-resolver/tlsca.crt'}
 	})

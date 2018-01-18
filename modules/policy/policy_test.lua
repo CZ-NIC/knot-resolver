@@ -21,13 +21,13 @@ local function test_tls_forward()
 			       {'100:dead::@443', insecure=true}
 			   }), 'TLS_FORWARD with duplicate IP addresses but different ports is allowed')
 
-	boom(policy.TLS_FORWARD, {{{'::1', pin=''}}}, 'TLS_FORWARD with empty pin')
-	-- boom(policy.TLS_FORWARD, {{{'::1', pin='č'}}}, 'TLS_FORWARD with bad pin')
+	boom(policy.TLS_FORWARD, {{{'::1', pin_sha256=''}}}, 'TLS_FORWARD with empty pin_sha256')
+	-- boom(policy.TLS_FORWARD, {{{'::1', pin_sha256='č'}}}, 'TLS_FORWARD with bad pin_sha256')
 	ok(policy.TLS_FORWARD({
-			{'::1', pin='ZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQ=='}
-		}), 'TLS_FORWARD with base64 pin')
+			{'::1', pin_sha256='ZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQ=='}
+		}), 'TLS_FORWARD with base64 pin_sha256')
 	ok(policy.TLS_FORWARD({
-		{'::1', pin={
+		{'::1', pin_sha256={
 			'ZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQ==',
 			'MTcwYWUzMGNjZDlmYmE2MzBhZjhjZGE2ODQxZTAwYzZiNjU3OWNlYzc3NmQ0MTllNzAyZTIwYzY5YzQ4OGZmOA=='
 		}}}), 'TLS_FORWARD with table of pins')

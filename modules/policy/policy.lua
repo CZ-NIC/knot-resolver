@@ -155,15 +155,15 @@ end
 
 -- Check for allowed authentication types and return type for the current target
 local function tls_forward_target_authtype(idx, target)
-	if (target.pin and not (target.ca_file or target.hostname or target.insecure)) then
-		if not is_nonempty_string_or_table(target.pin) then
+	if (target.pin_sha256 and not (target.ca_file or target.hostname or target.insecure)) then
+		if not is_nonempty_string_or_table(target.pin_sha256) then
 			error('TLS_FORWARD target authentication is invalid at position '
-			      .. idx .. '; pin must be string or list of strings')
+			      .. idx .. '; pin_sha256 must be string or list of strings')
 		end
-		return 'pin'
-	elseif (target.insecure and not (target.ca_file or target.hostname or target.pin)) then
+		return 'pin_sha256'
+	elseif (target.insecure and not (target.ca_file or target.hostname or target.pin_sha256)) then
 		return 'insecure'
-	elseif (target.ca_file and target.hostname and not (target.insecure or target.pin)) then
+	elseif (target.ca_file and target.hostname and not (target.insecure or target.pin_sha256)) then
 		if not (is_nonempty_string_or_table(target.hostname)
 			and is_nonempty_string_or_table(target.ca_file)) then
 			error('TLS_FORWARD target authentication is invalid at position '
@@ -172,7 +172,7 @@ local function tls_forward_target_authtype(idx, target)
 		return 'cert'
 	else
 		error('TLS_FORWARD authentication options at position ' .. idx
-		      .. ' are invalid; specify one of: pin / hostname+ca_file / insecure')
+		      .. ' are invalid; specify one of: pin_sha256 / hostname+ca_file / insecure')
 	end
 end
 
@@ -213,9 +213,9 @@ local function tls_forward(target)
 			hostnames[sockaddr_lua] = {}
 			insert_from_string_or_table(upstream_list_entry.ca_file, ca_files[sockaddr_lua])
 			insert_from_string_or_table(upstream_list_entry.hostname, hostnames[sockaddr_lua])
-		elseif auth_type == 'pin' then
+		elseif auth_type == 'pin_sha256' then
 			pins[sockaddr_lua] = {}
-			insert_from_string_or_table(upstream_list_entry.pin, pins[sockaddr_lua])
+			insert_from_string_or_table(upstream_list_entry.pin_sha256, pins[sockaddr_lua])
 		elseif auth_type ~= 'insecure' then
 			-- insecure does nothing, user does not want authentication
 			assert(false, 'unsupported auth_type')
@@ -227,7 +227,7 @@ local function tls_forward(target)
 		assert(#config.string_addr > 0)
 		if config.auth_type == 'insecure' then
 			net.tls_client(config.string_addr)
-		elseif config.auth_type == 'pin' then
+		elseif config.auth_type == 'pin_sha256' then
 			assert(#pins[sockaddr_lua] > 0)
 			net.tls_client(config.string_addr, pins[sockaddr_lua])
 		elseif config.auth_type == 'cert' then
