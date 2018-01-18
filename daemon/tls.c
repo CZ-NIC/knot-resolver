@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 American Civil Liberties Union (ACLU)
- *               2016 CZ.NIC, z.s.p.o
+ *               2016-2018 CZ.NIC, z.s.p.o
  * 
  * Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
  *                 Ondřej Surý <ondrej@sury.org>
@@ -37,7 +37,13 @@
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
 
-static const char *priorities = "NORMAL";
+/* Mandatory security settings from
+ * https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles-11#section-9
+ * Performance optimizations are not implemented at the moment. */
+static const char *priorities = "@SYSTEM:" /* GnuTLS system-wide settings*/
+				"-VERS-DTLS-ALL:" /* we do not support DTLS yet */
+				"-VERS-TLS1.0:-VERS-TLS1.1:" /* TLS 1.2 and higher */
+				"-COMP-ALL:+COMP-NULL"; /* no compression*/
 
 /* gnutls_record_recv and gnutls_record_send */
 struct tls_ctx_t {
