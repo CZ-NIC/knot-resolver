@@ -808,7 +808,6 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 			 * (for instance: tls; send->tls_push->too many non-critical errors->
 			 * on_send with nonzero status->re-add to waiting->send->etc).*/
 			if (status != 0) {
-				qr_task_finalize(task, KR_STATE_FAIL);
 				if (session->outgoing) {
 					qr_task_finalize(task, KR_STATE_FAIL);
 				} else {
@@ -816,7 +815,6 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 					task->ctx->source.session = NULL;
 				}
 				session_del_tasks(session, task);
-				qr_task_unref(task);
 			}
 			if (session->waiting.len > 0) {
 				struct qr_task *t = session->waiting.at[0];
