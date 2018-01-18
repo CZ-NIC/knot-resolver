@@ -81,8 +81,7 @@ static int client_verify_certificate(gnutls_session_t tls_session);
  */
 static int kres_gnutls_set_priority(gnutls_session_t session) {
 	static const char * const priorities =
-		"@SYSTEM:" /* GnuTLS system-wide settings */
-		"-VERS-DTLS-ALL:" /* we do not support DTLS yet */
+		"NORMAL:" /* GnuTLS defaults */
 		"-VERS-TLS1.0:-VERS-TLS1.1:" /* TLS 1.2 and higher */
 		"-COMP-ALL:+COMP-NULL"; /* no compression*/
 	const char *errpos = NULL;
