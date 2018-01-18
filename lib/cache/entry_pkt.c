@@ -186,8 +186,9 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	memcpy(pkt->wire, eh->data + 2, pkt_len);
 	pkt->size = pkt_len;
 	int ret = knot_pkt_parse(pkt, 0);
-	if (ret == KNOT_EFEWDATA) {
-		return kr_error(ENOENT); /* LATER(opt): avoid stashing such packets */
+	if (ret == KNOT_EFEWDATA || ret == KNOT_EMALF) {
+		return kr_error(ENOENT);
+		/* LATER(opt): try harder to avoid stashing such packets */
 	}
 	if (ret != KNOT_EOK) {
 		assert(!ret);
