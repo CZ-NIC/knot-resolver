@@ -85,7 +85,7 @@ static int mod_load(lua_State *L)
 		lua_error(L);
 	}
 	/* Parse precedence declaration */
-	auto_free char *declaration = strdup(lua_tostring(L, 1));
+	char *declaration = strdup(lua_tostring(L, 1));
 	if (!declaration) {
 		return kr_error(ENOMEM);
 	}
@@ -95,6 +95,7 @@ static int mod_load(lua_State *L)
 	/* Load engine module */
 	struct engine *engine = engine_luaget(L);
 	int ret = engine_register(engine, name, precedence, ref);
+	free(declaration);
 	if (ret != 0) {
 		if (ret == kr_error(EIDRM)) {
 			format_error(L, "referenced module not found");
