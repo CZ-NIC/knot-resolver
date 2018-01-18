@@ -56,7 +56,7 @@ knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildca
 		&& !(ret = kr_dname_lf(k->buf, name, add_wildcard));
 	if (!ok) {
 		assert(false);
-		return (knot_db_val_t){};
+		return (knot_db_val_t){ NULL, 0 };
 	}
 
 	uint8_t *begin = k->buf + 1 + k->zlf_len; /* one byte after zone's zero */
@@ -64,7 +64,7 @@ knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildca
 						* but move it anyway */
 	if (end < begin) {
 		assert(false);
-		return (knot_db_val_t){};
+		return (knot_db_val_t){ NULL, 0 };
 	}
 	int key_len;
 	if (end > begin) {

@@ -121,6 +121,7 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache)
 {
+	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 	const bool ok = val_new_entry && val_new_entry->len > 0;
 	if (!ok) {
 		assert(!EINVAL);
@@ -128,11 +129,11 @@ int entry_h_splice(
 	}
 
 	/* Find the whole entry-set and the particular entry within. */
-	knot_db_val_t val_orig_all = { }, val_orig_entry = { };
+	knot_db_val_t val_orig_all = VAL_EMPTY, val_orig_entry = VAL_EMPTY;
 	const struct entry_h *eh_orig = NULL;
 	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
 		int ret = cache_op(cache, read, &key, &val_orig_all, 1);
-		if (ret) val_orig_all = (knot_db_val_t){ };
+		if (ret) val_orig_all = VAL_EMPTY;
 		val_orig_entry = val_orig_all;
 		switch (entry_h_seek(&val_orig_entry, type)) {
 		case 0:
@@ -145,7 +146,7 @@ int entry_h_splice(
 				}
 			} /* otherwise fall through */
 		default:
-			val_orig_entry = val_orig_all = (knot_db_val_t){};
+			val_orig_entry = val_orig_all = VAL_EMPTY;
 		case -ENOENT:
 			val_orig_entry.len = 0;
 			break;
@@ -174,7 +175,7 @@ int entry_h_splice(
 	}
 
 	/* LATER: enable really having multiple entries. */
-	val_orig_all = val_orig_entry = (knot_db_val_t){ };
+	val_orig_all = val_orig_entry = VAL_EMPTY;
 
 	/* Obtain new storage from cache.
 	 * Note: this does NOT invalidate val_orig_all.data.

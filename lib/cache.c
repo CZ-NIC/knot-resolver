@@ -69,7 +69,7 @@ static int assert_right_version(struct kr_cache *cache)
 	/* Check cache ABI version */
 	uint8_t key_str[] = "\x00\x00V"; /* CACHE_KEY_DEF; zero-term. but we don't care */
 	knot_db_val_t key = { .data = key_str, .len = sizeof(key_str) };
-	knot_db_val_t val = { };
+	knot_db_val_t val = { NULL, 0 };
 	int ret = cache_op(cache, read, &key, &val, 1);
 	if (ret == 0 && val.len == sizeof(CACHE_VERSION)
 	    && memcmp(val.data, &CACHE_VERSION, sizeof(CACHE_VERSION)) == 0) {
@@ -255,7 +255,7 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 	switch (type) {
 	case KNOT_RRTYPE_RRSIG: /* no RRSIG query caching, at least for now */
 		assert(false);
-		return (knot_db_val_t){};
+		return (knot_db_val_t){ NULL, 0 };
 	/* xNAME lumped into NS. */
 	case KNOT_RRTYPE_CNAME:
 	case KNOT_RRTYPE_DNAME:
@@ -281,7 +281,7 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 	case KNOT_RRTYPE_NSEC:
 	case KNOT_RRTYPE_NSEC3:
 		assert(false);
-		return (knot_db_val_t){};
+		return (knot_db_val_t){ NULL, 0 };
 	}
 	return key_exact_type_maypkt(k, type);
 }
@@ -346,7 +346,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 *  1a. exact name+type match (can be negative answer in insecure zones)
 	 */
 	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
-	knot_db_val_t val = { };
+	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (!ret) {
 		/* found an entry: test conditions, materialize into pkt, etc. */
@@ -434,7 +434,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/** Start of NSEC* covering the sname;
 	 * it's part of key - the one within zone (read only) */
-	knot_db_val_t cover_low_kwz = {};
+	knot_db_val_t cover_low_kwz = { NULL, 0 };
 	knot_dname_t cover_hi_storage[KNOT_DNAME_MAXLEN];
 	/** End of NSEC* covering the sname. */
 	knot_db_val_t cover_hi_kwz = {
@@ -507,7 +507,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret) return ctx->state;
 		knot_db_val_t key = key_exact_type(k, qry->stype);
 		/* Find the record. */
-		knot_db_val_t val = { };
+		knot_db_val_t val = { NULL, 0 };
 		ret = cache_op(cache, read, &key, &val, 1);
 		if (ret) {
 			if (ret != -abs(ENOENT)) {
@@ -553,7 +553,7 @@ do_soa:
 		/* assuming k->buf still starts with zone's prefix */
 		k->buf[0] = k->zlf_len;
 		key = key_exact_type(k, KNOT_RRTYPE_SOA);
-		knot_db_val_t val = { };
+		knot_db_val_t val = { NULL, 0 };
 		ret = cache_op(cache, read, &key, &val, 1);
 		const struct entry_h *eh;
 		if (ret || !(eh = entry_h_consistent(val, KNOT_RRTYPE_SOA))) {
@@ -918,7 +918,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 	}
 
 	knot_db_val_t key = key_exact_type(k, type);
-	knot_db_val_t val = { };
+	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (!ret) ret = entry_h_seek(&val, type);
 	if (ret) {
@@ -952,7 +952,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
  */
 static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 {
-	static const knot_db_val_t NOTHING = {};
+	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
@@ -969,12 +969,12 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 	do {
 		k->buf[0] = zlf_len;
 		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
-		knot_db_val_t val = { };
+		knot_db_val_t val = VAL_EMPTY;
 		int ret = cache_op(cache, read, &key, &val, 1);
 		if (ret == -abs(ENOENT)) goto next_label;
 		if (ret) {
 			assert(!ret);
-			return NOTHING; // TODO: do something with kr_error(ret)?
+			return VAL_EMPTY; // TODO: do something with kr_error(ret)?
 		}
 
 		/* Check consistency, find any type;
@@ -1010,7 +1010,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 				break;
 			default:
 				assert(false);
-				return NOTHING;
+				return VAL_EMPTY;
 			}
 			/* Find the entry for the type, check positivity, TTL */
 			val = val_orig;
@@ -1046,7 +1046,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 		/* remove one more label */
 		exact_match = false;
 		if (k->zname[0] == 0) { /* missing root NS in cache */
-			return NOTHING;
+			return VAL_EMPTY;
 		}
 		zlf_len -= (k->zname[0] + 1);
 		k->zname += (k->zname[0] + 1);
