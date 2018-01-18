@@ -37,14 +37,6 @@
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
 
-/* Mandatory security settings from
- * https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles-11#section-9
- * Performance optimizations are not implemented at the moment. */
-static const char *priorities = "@SYSTEM:" /* GnuTLS system-wide settings*/
-				"-VERS-DTLS-ALL:" /* we do not support DTLS yet */
-				"-VERS-TLS1.0:-VERS-TLS1.1:" /* TLS 1.2 and higher */
-				"-COMP-ALL:+COMP-NULL"; /* no compression*/
-
 /* gnutls_record_recv and gnutls_record_send */
 struct tls_ctx_t {
 	gnutls_session_t session;
@@ -81,6 +73,27 @@ struct tls_client_ctx_t {
 #endif
 
 static int client_verify_certificate(gnutls_session_t tls_session);
+
+/**
+ * Set mandatory security settings from
+ * https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles-11#section-9
+ * Performance optimizations are not implemented at the moment.
+ */
+static int kres_gnutls_set_priority(gnutls_session_t session) {
+	static const char * const priorities =
+		"@SYSTEM:" /* GnuTLS system-wide settings */
+		"-VERS-DTLS-ALL:" /* we do not support DTLS yet */
+		"-VERS-TLS1.0:-VERS-TLS1.1:" /* TLS 1.2 and higher */
+		"-COMP-ALL:+COMP-NULL"; /* no compression*/
+	const char *errpos = NULL;
+	int err = gnutls_priority_set_direct(session, priorities, &errpos);
+	if (err != GNUTLS_E_SUCCESS) {
+		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
+			     priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
+	}
+	return err;
+}
+
 
 static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
@@ -183,11 +196,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 		tls_free(tls);
 		return NULL;
 	}
-	const char *errpos = NULL;
-	err = gnutls_priority_set_direct(tls->session, priorities, &errpos);
-	if (err != GNUTLS_E_SUCCESS) {
-		kr_log_error("[tls] setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
-			     priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
+	if (kres_gnutls_set_priority(tls->session) != GNUTLS_E_SUCCESS) {
 		tls_free(tls);
 		return NULL;
 	}
@@ -962,7 +971,7 @@ struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_en
 		return NULL;
 	}
 
-	ret = gnutls_set_default_priority(ctx->tls_session);
+	ret = kres_gnutls_set_priority(ctx->tls_session);
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
