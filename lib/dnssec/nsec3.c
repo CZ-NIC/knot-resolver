@@ -733,14 +733,11 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 
 int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 {
-	int ret = kr_error(EINVAL);
-	int flags = 0;
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	if (!sec) {
 		return kr_error(EINVAL);
 	}
+
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *ns = knot_pkt_rr(sec, i);
 		if (ns->type == KNOT_RRTYPE_DS) {
@@ -749,8 +746,10 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		if (ns->type != KNOT_RRTYPE_NS) {
 			continue;
 		}
+
+		int flags = 0;
 		bool nsec3_found = false;
-		flags = 0;
+
 		for (unsigned j = 0; j < sec->count; ++j) {
 			const knot_rrset_t *nsec3 = knot_pkt_rr(sec, j);
 			if (nsec3->type == KNOT_RRTYPE_DS) {
@@ -763,7 +762,7 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 			/* nsec3 found, check if owner name matches
 			 * the delegation name
 			 */
-			ret = matches_name(&flags, nsec3, ns->owner);
+			int ret = matches_name(&flags, nsec3, ns->owner);
 			if (ret != 0) {
 				return kr_error(EINVAL);
 			}
@@ -773,6 +772,9 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 				 */
 				continue;
 			}
+
+			uint8_t *bm = NULL;
+			uint16_t bm_size = 0;
 			knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
 			if (!bm) {
 				return kr_error(EINVAL);
@@ -803,7 +805,7 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		 */
 		const knot_dname_t *encloser_name = NULL;
 		const knot_rrset_t *covering_next_nsec3 = NULL;
-		ret = closest_encloser_proof(pkt, KNOT_AUTHORITY, ns->owner, &encloser_name,
+		int ret = closest_encloser_proof(pkt, KNOT_AUTHORITY, ns->owner, &encloser_name,
                                      NULL, &covering_next_nsec3);
 		if (ret != 0) {
 			return kr_error(EINVAL);
