@@ -505,11 +505,17 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ans.rcode == PKT_NOERROR) {
 		/* Construct key for exact qry->stype + source of synthesis. */
 		int ret = kr_dname_lf(k->buf, clencl_name, true);
-		if (ret) return ctx->state;
+		if (ret) {
+			assert(!ret);
+			return ctx->state;
+		}
 		knot_db_val_t key = key_exact_type(k, qry->stype);
 		/* Find the record. */
 		knot_db_val_t val = { NULL, 0 };
 		ret = cache_op(cache, read, &key, &val, 1);
+		if (!ret) {
+			ret = entry_h_seek(&val, qry->stype);
+		}
 		if (ret) {
 			if (ret != -abs(ENOENT)) {
 				VERBOSE_MSG(qry, "=> wildcard: hit error %d %s\n",
@@ -522,8 +528,6 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 			return ctx->state;
 		}
-		ret = entry_h_seek(&val, qry->stype);
-		if (ret) return ctx->state;
 		/* Check if the record is OK. */
 		const struct entry_h *eh = entry_h_consistent(val, qry->stype);
 		if (!eh) {
@@ -551,14 +555,15 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 */
 do_soa:
 	if (ans.rcode != PKT_NOERROR) {
-		/* assuming k->buf still starts with zone's prefix */
+		/* Assuming k->buf still starts with zone's prefix,
+		 * look up the SOA in cache. */
 		k->buf[0] = k->zlf_len;
 		key = key_exact_type(k, KNOT_RRTYPE_SOA);
 		knot_db_val_t val = { NULL, 0 };
 		ret = cache_op(cache, read, &key, &val, 1);
 		const struct entry_h *eh;
 		if (ret || !(eh = entry_h_consistent(val, KNOT_RRTYPE_SOA))) {
-			assert(ret);
+			assert(ret); /* only want to catch `eh` failures */
 			VERBOSE_MSG(qry, "=> SOA missed\n");
 			return ctx->state;
 		}
@@ -591,9 +596,9 @@ do_soa:
 		break;
 	default:
 		assert(false);
-	case 0: /* i.e. PKT_NOERROR; nothing was found */
+	case 0: /* i.e. nothing was found */
 		/* LATER(optim.): zone cut? */
-		VERBOSE_MSG(qry, "=> negative cache miss\n");
+		VERBOSE_MSG(qry, "=> cache miss\n");
 		return ctx->state;
 	}
 
