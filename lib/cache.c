@@ -363,12 +363,6 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;
-	if (qry->stype == KNOT_RRTYPE_DS) { /* DS is parent-side. */
-		k->zname = knot_wire_next_label(k->zname, NULL);
-		if (!k->zname) {
-			return ctx->state; /* can't go above root */
-		}
-	}
 	kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
 	const knot_db_val_t val_cut = closest_NS(ctx, k);
 	if (!val_cut.data) {
@@ -966,9 +960,6 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 
 	int zlf_len = k->buf[0];
 
-	/* FIXME re-review:
-	 * 	- exact_match for DS; probably start with false already
-	 */
 	uint8_t rank_min = KR_RANK_INSECURE | KR_RANK_AUTH;
 	// LATER(optim): if stype is NS, we check the same value again
 	bool exact_match = true;
@@ -999,20 +990,25 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			switch (type) {
 			case 0:
 				type = KNOT_RRTYPE_NS;
-				if (!eh_orig->has_ns) continue;
+				if (!eh_orig->has_ns
+				    /* On a zone cut we want DS from the parent zone. */
+				    || (exact_match && qry->stype == KNOT_RRTYPE_DS)) {
+					continue;
+				}
 				break;
 			case KNOT_RRTYPE_NS:
 				type = KNOT_RRTYPE_CNAME;
 				/* CNAME is interesting only if we
-				 * directly hit the name that was asked */
-				if (!exact_match || !eh_orig->has_cname)
+				 * directly hit the name that was asked.
+				 * Note that we want it even in the DS case. */
+				if (!eh_orig->has_cname || !exact_match)
 					continue;
 				break;
 			case KNOT_RRTYPE_CNAME:
 				type = KNOT_RRTYPE_DNAME;
 				/* DNAME is interesting only if we did NOT
-				 * directly hit the name that was asked */
-				if (exact_match || !eh_orig->has_dname)
+				 * directly hit the name that was asked. */
+				if (!eh_orig->has_dname || exact_match)
 					continue;
 				break;
 			default:
