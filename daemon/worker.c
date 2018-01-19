@@ -1569,7 +1569,6 @@ static int qr_task_step(struct qr_task *task,
 				ret = timer_start(session, on_tcp_watchdog_timeout,
 						  KR_CONN_RTT_MAX, 0);
 				if (ret < 0) {
-					assert(false);
 					session_del_waiting(session, task);
 					session_del_tasks(session, task);
 					subreq_finalize(task, packet_source, packet);
@@ -1970,7 +1969,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		if (len < 0 || session->bytes_to_skip < 0) {
 			/* Something gone wrong.
 			 * Better kill the connection */
-			assert(false);
 			return kr_error(EILSEQ);
 		}
 		if (len == 0) {
@@ -2046,12 +2044,10 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 								 (uv_handle_t *)handle,
 								 addr);
 			if (!ctx) {
-				assert(false);
 				return kr_error(ENOMEM);
 			}
 			task = qr_task_create(ctx);
 			if (!task) {
-				assert(false);
 				request_free(ctx);
 				return kr_error(ENOMEM);
 			}
@@ -2074,7 +2070,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 				if (len < 0 || session->bytes_to_skip < 0) {
 					/* Something gone wrong.
 					 * Better kill the connection */
-					assert(false);
 					return kr_error(EILSEQ);
 				}
 				if (len == 0) {
@@ -2168,7 +2163,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			/* TODO: this is simple via iteration; recursion doesn't really help */
 			ret = worker_process_tcp(worker, handle, msg, len);
 			if (ret < 0) {
-				assert(false);
 				return ret;
 			}
 			submitted += ret;
