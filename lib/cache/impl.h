@@ -168,7 +168,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data);
 
 /** Partially constructed answer when gathering RRsets from cache. */
 struct answer {
-	int rcode;	/**< PKT_NODATA, etc. ?? */
+	int rcode;	/**< PKT_NODATA, etc. */
 	uint8_t nsec_v;	/**< 1 or 3 */
 	knot_mm_t *mm;	/**< Allocator for rrsets */
 	struct answer_rrset {
@@ -224,9 +224,10 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 		   knot_db_val_t *cover_low_kwz, knot_db_val_t *cover_hi_kwz,
 		   const struct kr_query *qry, struct kr_cache *cache);
 
-/** Source of synthesis check for NSEC (1).
+/** Source of synthesis (SS) check for NSEC (1).
  * To understand the interface, see the call point.
- * \return 0: continue;  AR_SOA: skip to adding SOA;  <0: exit cache immediately. */
+ * \return 0: continue; <0: exit cache immediately;
+ * 	AR_SOA: skip to adding SOA (SS was covered or matched for NODATA). */
 int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
 		    const struct kr_query *qry, struct kr_cache *cache);

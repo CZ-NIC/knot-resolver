@@ -420,9 +420,8 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 #endif
 
-	/* collecting multiple NSEC* + RRSIG records, in preparation for the answer
-	 *  + track the progress
-	 */
+	/** Collecting multiple NSEC* + RRSIG records, in preparation for the answer
+	 *  + track the progress */
 	struct answer ans;
 	memset(&ans, 0, sizeof(ans));
 	ans.mm = &pkt->mm;
@@ -461,12 +460,14 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	//}
 
-	if (!ans.rcode) {
-		/* Nothing suitable found. */
+	if (ans.rcode != PKT_NODATA && ans.rcode != PKT_NXDOMAIN) {
+		assert(ans.rcode == 0); /* Nothing suitable found. */
 		return ctx->state;
 	}
+	/* At this point, sname was either covered or matched. */
+	const bool sname_covered = ans.rcode == PKT_NXDOMAIN;
 
-	/* Name of the closest (provable) encloser. */
+	/** Name of the closest (provable) encloser. */
 	const knot_dname_t *clencl_name = qry->sname;
 	for (int l = sname_labels; l > clencl_labels; --l)
 		clencl_name = knot_wire_next_label(clencl_name, NULL);
@@ -476,15 +477,15 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * 3a. We want to query for NSEC* of source of synthesis (SS) or its predecessor,
 	 * providing us with a proof of its existence or non-existence.
 	 */
-	if (ans.rcode == PKT_NODATA) {
+	if (!sname_covered) {
 		/* No wildcard checks needed, as we proved that sname exists. */
 		assert(ans.nsec_v == 1); // for now
 
-	} else if (ans.nsec_v == 1 && ans.rcode == PKT_NXDOMAIN) {
+	} else if (ans.nsec_v == 1 && sname_covered) {
 		int ret = nsec1_src_synth(k, &ans, clencl_name,
 					  cover_low_kwz, cover_hi_kwz, qry, cache);
 		if (ret < 0) return ctx->state;
-		if (ret == AR_SOA) goto do_soa;
+		if (ret == AR_SOA) goto do_soa; /* SS was covered or matched for NODATA */
 		assert(ret == 0);
 
 	} else {
@@ -493,10 +494,10 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 
-	/** 3b. We need to find wildcarded answer, if SS wasn't covered.
-	 * (common for NSEC*)
+	/** 3b. We need to find wildcarded answer, if sname was covered
+	 * and we don't have a full proof yet.  (common for NSEC*)
 	 */
-	if (ans.rcode == PKT_NOERROR) {
+	if (sname_covered) {
 		/* Construct key for exact qry->stype + source of synthesis. */
 		int ret = kr_dname_lf(k->buf, clencl_name, true);
 		if (ret) {
@@ -541,7 +542,10 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		const void *eh_bound = val.data + val.len;
 		ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
 				   qry->sname, qry->stype, new_ttl);
+		VERBOSE_MSG(qry, "=> NSEC wildcard: answer expanded, ret = %d, new TTL %d\n",
+				ret, (int)new_ttl);
 		if (ret) return ctx->state;
+		ans.rcode = PKT_NOERROR;
 	}
 
 

@@ -415,7 +415,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 				&exact_match, &wild_low_kwz, NULL, &new_ttl);
 		if (err) {
 			VERBOSE_MSG(qry, "=> NSEC wildcard: %s\n", err);
-			return -ABS(ENOENT);
+			return kr_ok();
 		}
 		/* Materialize the record into answer (speculatively). */
 		const struct entry_h *nsec_eh = val.data;
@@ -452,7 +452,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		if (is_sub && kr_nsec_children_in_zone_check(bm, bm_size) != 0) {
 			VERBOSE_MSG(qry,
 				"=> NSEC wildcard: covered but delegated (or error)\n");
-			ret = -ABS(ENOENT);
+			ret = kr_ok();
 			goto clean_wild;
 		}
 		/* We have a record proving wildcard non-existence. */
@@ -479,7 +479,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 			}
 		}
 		ans->rcode = PKT_NODATA;
-		return kr_ok();
+		return AR_SOA;
 
 	} /* else */
 	/* The data probably exists -> don't add this NSEC
