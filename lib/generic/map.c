@@ -118,6 +118,7 @@ static cb_data_t *cbt_make_data(map_t *map, const uint8_t *str, size_t len, void
 	return x;
 }
 
+/*! Like map_contains, but also set the value, if passed and found. */
 static int cbt_get(map_t *map, const char *str, void **value)
 {
 	const uint8_t *ubytes = (void *)str;
