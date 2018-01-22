@@ -204,6 +204,7 @@ end
 
 -- Load embedded modules
 modules.load('ta_signal_query')
+modules.load('policy')
 modules.load('priming')
 modules.load('detect_time_skew')
 modules.load('detect_time_jump')
