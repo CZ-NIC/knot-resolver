@@ -132,6 +132,7 @@ EOF
 	kr_pkt_make_auth_header
 	kr_pkt_put
 	kr_pkt_recycle
+	kr_pkt_clear_payload
 	kr_inaddr
 	kr_inaddr_family
 	kr_inaddr_len
