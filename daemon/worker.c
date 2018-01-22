@@ -1739,6 +1739,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 			request_free(ctx);
 			return kr_error(ENOMEM);
 		}
+		addr = NULL;
 	} else if (query) { /* response from upstream */
 		task = find_task(session, knot_wire_get_id(query->wire));
 		if (task == NULL) {
@@ -1749,7 +1750,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 	assert(uv_is_closing(session->handle) == false);
 
 	/* Consume input and produce next message */
-	return qr_task_step(task, NULL, query);
+	return qr_task_step(task, addr, query);
 }
 
 static int map_add_tcp_session(map_t *map, const struct sockaddr* addr,
