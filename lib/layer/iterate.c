@@ -951,7 +951,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break; /* OK */
 	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_SERVFAIL: {
-		if (query->flags.STUB || query->flags.FORWARD) {
+		if (query->flags.STUB) {
 			 /* Pass through in stub mode */
 			break;
 		}
@@ -961,7 +961,9 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			query->fails = 0; /* Reset per-query counter. */
 			return resolve_error(pkt, req);
 		} else {
-			query->flags.NO_MINIMIZE = true; /* Drop minimisation as a safe-guard. */
+			if (!query->flags.FORWARD) {
+				query->flags.NO_MINIMIZE = true; /* Drop minimisation as a safe-guard. */
+			}
 			return KR_STATE_CONSUME;
 		}
 	}

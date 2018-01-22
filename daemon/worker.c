@@ -808,7 +808,6 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 			 * (for instance: tls; send->tls_push->too many non-critical errors->
 			 * on_send with nonzero status->re-add to waiting->send->etc).*/
 			if (status != 0) {
-				qr_task_finalize(task, KR_STATE_FAIL);
 				if (session->outgoing) {
 					qr_task_finalize(task, KR_STATE_FAIL);
 				} else {
@@ -816,7 +815,6 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 					task->ctx->source.session = NULL;
 				}
 				session_del_tasks(session, task);
-				qr_task_unref(task);
 			}
 			if (session->waiting.len > 0) {
 				struct qr_task *t = session->waiting.at[0];
@@ -1571,7 +1569,6 @@ static int qr_task_step(struct qr_task *task,
 				ret = timer_start(session, on_tcp_watchdog_timeout,
 						  KR_CONN_RTT_MAX, 0);
 				if (ret < 0) {
-					assert(false);
 					session_del_waiting(session, task);
 					session_del_tasks(session, task);
 					subreq_finalize(task, packet_source, packet);
@@ -1742,6 +1739,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 			request_free(ctx);
 			return kr_error(ENOMEM);
 		}
+		addr = NULL;
 	} else if (query) { /* response from upstream */
 		task = find_task(session, knot_wire_get_id(query->wire));
 		if (task == NULL) {
@@ -1752,7 +1750,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 	assert(uv_is_closing(session->handle) == false);
 
 	/* Consume input and produce next message */
-	return qr_task_step(task, NULL, query);
+	return qr_task_step(task, addr, query);
 }
 
 static int map_add_tcp_session(map_t *map, const struct sockaddr* addr,
@@ -1972,7 +1970,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		if (len < 0 || session->bytes_to_skip < 0) {
 			/* Something gone wrong.
 			 * Better kill the connection */
-			assert(false);
 			return kr_error(EILSEQ);
 		}
 		if (len == 0) {
@@ -2048,12 +2045,10 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 								 (uv_handle_t *)handle,
 								 addr);
 			if (!ctx) {
-				assert(false);
 				return kr_error(ENOMEM);
 			}
 			task = qr_task_create(ctx);
 			if (!task) {
-				assert(false);
 				request_free(ctx);
 				return kr_error(ENOMEM);
 			}
@@ -2076,7 +2071,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 				if (len < 0 || session->bytes_to_skip < 0) {
 					/* Something gone wrong.
 					 * Better kill the connection */
-					assert(false);
 					return kr_error(EILSEQ);
 				}
 				if (len == 0) {
@@ -2161,16 +2155,14 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		}
 		if (ret == 0) {
 			const struct sockaddr *addr = session->outgoing ? &session->peer.ip : NULL;
-			ret = qr_task_step(task, addr, pkt_buf);
-			if (ret != 0) {
-				return ret;
-			}
+			/* since there can be next dns message, we must to proceed
+			 * even if qr_task_step() returns error */
+			qr_task_step(task, addr, pkt_buf);
 		}
 		if (len > 0) {
 			/* TODO: this is simple via iteration; recursion doesn't really help */
 			ret = worker_process_tcp(worker, handle, msg, len);
 			if (ret < 0) {
-				assert(false);
 				return ret;
 			}
 			submitted += ret;
