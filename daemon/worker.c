@@ -2154,10 +2154,9 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		}
 		if (ret == 0) {
 			const struct sockaddr *addr = session->outgoing ? &session->peer.ip : NULL;
-			ret = qr_task_step(task, addr, pkt_buf);
-			if (ret != 0) {
-				return ret;
-			}
+			/* since there can be next dns message, we must to proceed
+			 * even if qr_task_step() returns error */
+			qr_task_step(task, addr, pkt_buf);
 		}
 		if (len > 0) {
 			/* TODO: this is simple via iteration; recursion doesn't really help */
