@@ -208,6 +208,7 @@ modules.load('policy')
 modules.load('priming')
 modules.load('detect_time_skew')
 modules.load('detect_time_jump')
+modules.load('ta_sentinel')
 
 -- Interactive command evaluation
 function eval_cmd(line, raw)
