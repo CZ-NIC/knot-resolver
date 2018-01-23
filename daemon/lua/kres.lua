@@ -460,6 +460,12 @@ ffi.metatype( knot_pkt_t, {
 			if ret ~= 0 then return nil, knot_strerror(ret) end
 			return true
 		end,
+		clear_payload = function (pkt)
+			assert(pkt ~= nil)
+			local ret = C.kr_pkt_clear_payload(pkt)
+			if ret ~= 0 then return nil, knot_strerror(ret) end
+			return true
+		end,
 		question = function(pkt, qname, qclass, qtype)
 			assert(pkt ~= nil)
 			assert(qclass ~= nil, string.format('invalid class: %s', qclass))

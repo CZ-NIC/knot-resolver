@@ -23,6 +23,7 @@ endif
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
 modules_TARGETS += etcd \
+                   ta_sentinel \
                    graphite \
                    policy \
                    view \
