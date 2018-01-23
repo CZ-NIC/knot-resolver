@@ -19,6 +19,7 @@ ifeq ($(AMALG), yes)
 kresd.amalg.c: daemon/lua/sandbox.inc daemon/lua/config.inc
 else
 daemon/engine.o: daemon/lua/sandbox.inc daemon/lua/config.inc
+kresd-lint: daemon/lua/sandbox.inc daemon/lua/config.inc
 endif
 
 # Installed FFI bindings
@@ -55,6 +56,7 @@ daemon-install: kresd-install bindings-install
 ifneq ($(SED),)
 	$(SED) -e "s/@VERSION@/$(VERSION)/" -e "s/@DATE@/$(date)/" \
 		-e "s|@MODULEDIR@|$(MODULEDIR)|" \
+		-e "s|@KEYFILE_DEFAULT@|$(KEYFILE_DEFAULT)|" \
 		doc/kresd.8.in > doc/kresd.8
 	$(INSTALL) -d -m 0755 $(DESTDIR)$(MANDIR)/man8/
 	$(INSTALL) -m 0644 doc/kresd.8 $(DESTDIR)$(MANDIR)/man8/
@@ -64,7 +66,7 @@ daemon-clean: kresd-clean
 		daemon/lua/zonefile.lua
 
 daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in
-	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g" $< > $@
+	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g;s|@KEYFILE_DEFAULT@|$(KEYFILE_DEFAULT)|g" $< > $@
 
 LIBZSCANNER_COMMENTS := \
 	$(shell pkg-config libzscanner --atleast-version=2.4.2 && echo true || echo false)

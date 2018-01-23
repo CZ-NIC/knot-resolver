@@ -28,7 +28,8 @@ There are several actions available in the ``policy.`` table:
 * ``DENY`` - reply NXDOMAIN authoritatively
 * ``DROP`` - terminate query resolution and return SERVFAIL to the requestor
 * ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
-* ``FORWARD(ip)`` - solve a query via forwarding to an IP while validating and caching locally;
+* ``FORWARD(ip)`` - resolve a query via forwarding to an IP while validating and caching locally;
+* ``TLS_FORWARD({{ip, authentication}})`` - resolve a query via TLS connection forwarding to an IP while validating and caching locally;
   the parameter can be a single IP (string) or a lua list of up to four IPs.
 * ``STUB(ip)`` - similar to ``FORWARD(ip)`` but *without* attempting DNSSEC validation.
   Each request may be either answered from cache or simply sent to one of the IPs with proxying back the answer.
@@ -43,8 +44,41 @@ Most actions stop the policy matching on the query, but "chain actions" allow to
 
 .. note:: The module (and ``kres``) expects domain names in wire format, not textual representation. So each label in name is prefixed with its length, e.g. "example.com" equals to ``"\7example\3com"``. You can use convenience function ``todname('example.com')`` for automatic conversion.
 
-Examples
-^^^^^^^^
+Forwarding over TLS protocol (DNS-over-TLS)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Policy `TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in `RFC 7858`_ and `IETF draft dprive-dtls-and-tls-profiles`_.
+
+Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
+
+To test this feature you need to either :ref:`configure Knot Resolver as DNS-over-TLS server <tls-server-config>`, or pick some public DNS-over-TLS server. Please see `DNS Privacy Project`_ homepage for list of public servers.
+
+When multiple servers are specified, the one with the lowest round-trip time is used.
+
+TLS Examples
+~~~~~~~~~~~~
+
+.. code-block:: lua
+
+	modules = { 'policy' }
+	-- forward all queries over TLS to the specified server
+	policy.add(policy.all(policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})))
+	-- for brevity, other TLS examples omit policy.add(policy.all())
+	-- single server authenticated using its certificate pin_sha256
+	  policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})  -- pin_sha256 is base64-encoded
+	-- single server using non-standard port
+	  policy.TLS_FORWARD({{'192.0.2.1@443', pin_sha256='YQ=='}})  -- use @ or # to specify port
+	-- single server with multiple valid pins (e.g. anycast)
+	  policy.TLS_FORWARD({{'192.0.2.1', pin_sha256={'YQ==', 'Wg=='}})
+	-- multiple servers, each with own authenticator
+	  policy.TLS_FORWARD({ -- please note that { here starts list of servers
+		{'192.0.2.1', pin_sha256='Wg=='},
+		-- server must present certificate issued by specified CA and hostname must match
+		{'2001:DB8::d0c', hostname='res.example.', ca_file='/etc/knot-resolver/tlsca.crt'}
+	})
+
+
+Other examples
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -159,8 +193,15 @@ Most properties (actions, filters) are described above.
       policy.todnames({'example.com', 'me.cz'})
       { '\7example\3com\0', '\2me\2cz\0' }
 
+This module is enabled by default because it implements mandatory :rfc:`6761` logic. For debugging purposes you can add ``modules.unload('policy')`` to your config to unload the module.
+
+
 .. _`Aho-Corasick`: https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
 .. _`@jgrahamc`: https://github.com/jgrahamc/aho-corasick-lua
 .. _RPZ: https://dnsrpz.info/
 .. _`Pro DNS and BIND`: http://www.zytrax.com/books/dns/ch7/rpz.html
 .. _`Jan-Piet Mens's post`: http://jpmens.net/2011/04/26/how-to-configure-your-bind-resolvers-to-lie-using-response-policy-zones-rpz/
+.. _`Transport Layer Security`: https://en.wikipedia.org/wiki/Transport_Layer_Security
+.. _`DNS Privacy Project`: https://dnsprivacy.org/
+.. _`RFC 7858`: https://tools.ietf.org/html/rfc7858
+.. _`IETF draft dprive-dtls-and-tls-profiles`: https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles

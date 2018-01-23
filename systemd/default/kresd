@@ -1,0 +1,5 @@
+# Used for systemd activation
+KRESD_ARGS="--config=/etc/knot-resolver/kresd.conf --verbose --forks=1 /var/cache/knot-resolver"
+
+# Standalone daemon arguments
+DAEMON_ARGS="--addr=127.0.0.1#53 --addr=::1#53 $KRESD_ARGS"

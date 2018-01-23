@@ -76,7 +76,7 @@ map_t map_make(void);
 /** Returns non-zero if map contains str */
 int map_contains(map_t *map, const char *str);
 
-/** Returns value if map contains str */
+/** Returns value if map contains str.  Note: NULL may mean two different things. */
 void *map_get(map_t *map, const char *str);
 
 /** Inserts str into map, returns 0 on suceess */

@@ -52,6 +52,10 @@ RUN mv /tmp/resolver-benchmarking/response_differences/respdiff /var/opt/respdif
 RUN pip3 install -r /tmp/resolver-benchmarking/requirements.txt
 RUN rm -rf /tmp/resolver-benchmarking
 
+# Python static analysis for respdiff
+RUN pip3 install mypy
+RUN pip3 install flake8
+
 # Unbound for respdiff
 RUN apt-get install unbound unbound-anchor -y -qqq
 RUN printf "server:\n interface: 127.0.0.1@53535\n use-syslog: yes\nremote-control:\n control-enable: no\n" >> /etc/unbound/unbound.conf

@@ -1,3 +1,27 @@
+Knot Resolver 1.5.3 (2018-01-23)
+================================
+
+Bugfixes
+--------
+- fix the hints module on some systems, e.g. Fedora.
+  Symptom: `undefined symbol: engine_hint_root_file`
+
+
+Knot Resolver 1.5.2 (2018-01-22)
+================================
+
+Security
+--------
+- fix CVE-2018-1000002: insufficient DNSSEC validation, allowing
+  attackers to deny existence of some data by forging packets.
+  Some combinations pointed out in RFC 6840 sections 4.1 and 4.3
+  were not taken into account.
+
+Bugfixes
+--------
+- memcached: fix fallout from module rename in 1.5.1
+
+
 Knot Resolver 1.5.1 (2017-12-12)
 ================================
 

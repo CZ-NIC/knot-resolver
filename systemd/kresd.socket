@@ -2,6 +2,7 @@
 Description=Knot DNS Resolver network listeners
 Documentation=man:kresd(8)
 Before=sockets.target
+Alias=knot-resolver.socket
 
 [Socket]
 ListenStream=[::1]:53

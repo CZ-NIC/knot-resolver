@@ -333,7 +333,7 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 			continue;
 		}
 		
-		struct dseckey *key;
+		struct dseckey *key = NULL;
 		if (kr_dnssec_key_from_rdata(&key, keys->owner, key_data, knot_rdata_rdlen(krr)) != 0) {
 			continue;
 		}

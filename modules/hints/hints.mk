@@ -1,4 +1,4 @@
-hints_CFLAGS := -fvisibility=hidden -fPIC
+hints_CFLAGS := -fPIC
 # We use a symbol that's not in libkres but the daemon.
 # On darwin this isn't accepted by default.
 hints_LDFLAGS := -Wl,-undefined -Wl,dynamic_lookup

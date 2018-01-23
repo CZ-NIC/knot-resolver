@@ -62,7 +62,8 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for dnstap_."
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
    "libfstrm_ 0.2+", "``modules/dnstap``", "Frame Streams data transport protocol."
-   "luacheck_", "``lint``", "Syntax and static analysis checker for Lua."
+   "luacheck_", "``lint-lua``", "Syntax and static analysis checker for Lua."
+   "`clang-tidy`_", "``lint-c``", "Syntax and static analysis checker for C."
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
@@ -196,10 +197,12 @@ All paths are prefixed with ``PREFIX`` variable by default if not specified othe
    "daemon",  "``SBINDIR``", "``$(PREFIX)/sbin``", ""
    "configuration", "``ETCDIR``", "``$(PREFIX)/etc/kresd``", "Configuration file, templates."
    "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "Runtime directory for loading dynamic modules [#]_."
+   "trust anchor file", "``KEYFILE_DEFAULT``", "*(none)*", "Path to read-only trust anchor file, which is used as fallback when no other file is specified. [#]_"
    "work directory", "", "the current directory", "Run directory for daemon. (Only relevant during run time, not e.g. during installation.)"
 
 .. [#] The ``libkres.pc`` is installed in ``$(LIBDIR)/pkgconfig``.
 .. [#] The default moduledir can be changed with `-m` option to `kresd` daemon or by calling `moduledir()` function from lua.
+.. [#] If no other trust anchor is specified by user, the compiled-in path ``KEYFILE_DEFAULT`` must contain a valid trust anchor. This is typically used by distributions which provide DNSSEC root trust anchors as part of distribution package. Users can disable the built-in trust anchor by adding ``trust_anchors.keyfile_default = nil`` to their configuration.
 
 .. note:: Each module is self-contained and may install additional bundled files within ``$(MODULEDIR)/$(modulename)``. These files should be read-only, non-executable.
 
@@ -260,7 +263,7 @@ The `make coverage` target gathers both gcov code coverage for C files, and luac
 Running unit and integration tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The linter requires luacheck_ and is executed by ``make lint``.
+The linter requires luacheck_ and `clang-tidy`_ and is executed by ``make lint``.
 The unit tests require cmocka_ and are executed by ``make check``.
 Tests for the dnstap module need go and are executed by ``make ckeck-dnstap``.
 
@@ -329,6 +332,7 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _libprotobuf-c: https://github.com/protobuf-c/protobuf-c/wiki
 .. _libfstrm: https://github.com/farsightsec/fstrm
 .. _luacheck: http://luacheck.readthedocs.io
+.. _clang-tidy: http://clang.llvm.org/extra/clang-tidy/index.html
 .. _luacov: https://keplerproject.github.io/luacov/
 .. _lcov: http://ltp.sourceforge.net/coverage/lcov.php
 

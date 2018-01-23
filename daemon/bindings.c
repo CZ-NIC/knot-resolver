@@ -85,7 +85,7 @@ static int mod_load(lua_State *L)
 		lua_error(L);
 	}
 	/* Parse precedence declaration */
-	auto_free char *declaration = strdup(lua_tostring(L, 1));
+	char *declaration = strdup(lua_tostring(L, 1));
 	if (!declaration) {
 		return kr_error(ENOMEM);
 	}
@@ -95,6 +95,7 @@ static int mod_load(lua_State *L)
 	/* Load engine module */
 	struct engine *engine = engine_luaget(L);
 	int ret = engine_register(engine, name, precedence, ref);
+	free(declaration);
 	if (ret != 0) {
 		if (ret == kr_error(EIDRM)) {
 			format_error(L, "referenced module not found");
@@ -390,7 +391,7 @@ static int net_tls(lua_State *L)
 
 	int r = tls_certificate_set(net, lua_tostring(L, 1), lua_tostring(L, 2));
 	if (r != 0) {
-		lua_pushstring(L, strerror(ENOMEM));
+		lua_pushstring(L, kr_strerror(r));
 		lua_error(L);
 	}
 
@@ -510,7 +511,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, NULL, NULL, NULL);
 		if (r != 0) {
-			lua_pushstring(L, strerror(ENOMEM));
+			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
 		}
 
@@ -528,7 +529,7 @@ static int net_tls_client(lua_State *L)
 			int r = tls_client_params_set(&net->tls_client_params,
 						      addr, port, NULL, NULL, pin);
 			if (r != 0) {
-				lua_pushstring(L, strerror(ENOMEM));
+				lua_pushstring(L, kr_strerror(r));
 				lua_error(L);
 			}
 			lua_pop(L, 1);
@@ -554,7 +555,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, ca_file, NULL, NULL);
 		if (r != 0) {
-			lua_pushstring(L, strerror(ENOMEM));
+			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
 		}
 		/* removes 'value'; keeps 'key' for next iteration */
@@ -568,7 +569,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, NULL, hostname, NULL);
 		if (r != 0) {
-			lua_pushstring(L, strerror(ENOMEM));
+			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
 		}
 		/* removes 'value'; keeps 'key' for next iteration */
@@ -913,7 +914,7 @@ static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_
 {
 	/* Decode parameters */
 	uint8_t namespace = 'R';
-	char *extra = (char *)strchr(args, ' ');
+	char *extra = strchr(args, ' ');
 	if (extra != NULL) {
 		extra[0] = '\0';
 		namespace = extra[1];
@@ -1403,7 +1404,7 @@ static int wrk_resolve(lua_State *L)
 	/* Create query packet */
 	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
 	if (!pkt) {
-		lua_pushstring(L, strerror(ENOMEM));
+		lua_pushstring(L, kr_strerror(ENOMEM));
 		lua_error(L);
 	}
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);

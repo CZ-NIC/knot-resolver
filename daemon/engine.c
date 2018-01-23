@@ -704,6 +704,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 	int ret = init_state(engine);
 	if (ret != 0) {
 		engine_deinit(engine);
+		return ret;
 	}
 	init_measurement(engine);
 	/* Initialize resolver */
@@ -811,9 +812,8 @@ int engine_ipc(struct engine *engine, const char *expr)
 	}
 }
 
-static int engine_loadconf(struct engine *engine, const char *config_path)
+int engine_load_sandbox(struct engine *engine)
 {
-	int ret = 0;
 	/* Init environment */
 	static const char sandbox_bytecode[] = {
 		#include "daemon/lua/sandbox.inc"
@@ -823,22 +823,13 @@ static int engine_loadconf(struct engine *engine, const char *config_path)
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
-	/* Load config file */
-	if (config_path) {
-		if (strcmp(config_path, "-") == 0) {
-			return ret; /* No config and no defaults. */
-		}
-		ret = l_dosandboxfile(engine->L, config_path);
-	}
-	if (ret == 0) {
-		/* Load defaults */
-		static const char config_bytecode[] = {
-			#include "daemon/lua/config.inc"
-		};
-		ret = l_dobytecode(engine->L, config_bytecode, sizeof(config_bytecode), "config");
-	}
+	return kr_ok();
+}
 
-	/* Evaluate */
+int engine_loadconf(struct engine *engine, const char *config_path)
+{
+	assert(config_path != NULL);
+	int ret = l_dosandboxfile(engine->L, config_path);
 	if (ret != 0) {
 		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
@@ -846,14 +837,22 @@ static int engine_loadconf(struct engine *engine, const char *config_path)
 	return ret;
 }
 
-int engine_start(struct engine *engine, const char *config_path)
+int engine_load_defaults(struct engine *engine)
 {
-	/* Load configuration. */
-	int ret = engine_loadconf(engine, config_path);
+	/* Load defaults */
+	static const char config_bytecode[] = {
+		#include "daemon/lua/config.inc"
+	};
+	int ret = l_dobytecode(engine->L, config_bytecode, sizeof(config_bytecode), "config");
 	if (ret != 0) {
-		return ret;
+		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
+		lua_pop(engine->L, 1);
 	}
+	return ret;
+}
 
+int engine_start(struct engine *engine)
+{
 	/* Clean up stack and restart GC */
 	lua_settop(engine->L, 0);
 	lua_gc(engine->L, LUA_GCCOLLECT, 0);

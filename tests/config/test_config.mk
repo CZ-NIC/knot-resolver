@@ -6,8 +6,10 @@
 # Check return code of kresd. Passed test have to call quit().
 
 tests_config := \
-	$(wildcard modules/*/*_test.lua) \
-	$(wildcard tests/config/*_test.lua)
+	$(wildcard modules/*/*.test.lua) \
+	$(wildcard modules/*/*/*.test.lua) \
+	$(wildcard tests/config/*.test.lua) \
+	$(wildcard tests/config/*/*.test.lua)
 
 define make_config_test
 $(1): check-install-precond

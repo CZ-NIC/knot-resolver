@@ -18,7 +18,6 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <getopt.h>
 #include <libgen.h>
 #include <uv.h>
@@ -39,17 +38,32 @@
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
 #include "daemon/tls.h"
+#include "lib/dnssec/ta.h"
 
 /* We can fork early on Linux 3.9+ and do SO_REUSEPORT for better performance. */
 #if defined(UV_VERSION_HEX) && defined(SO_REUSEPORT) && defined(__linux__)
  #define CAN_FORK_EARLY 1
 #endif
 
-/*
- * Globals
- */
-static bool g_quiet = false;
-static bool g_interactive = true;
+/* @internal Array of ip address shorthand. */
+typedef array_t(char*) addr_array_t;
+
+struct args {
+	int forks;
+	addr_array_t addr_set;
+	addr_array_t tls_set;
+	fd_array_t fd_set;
+	fd_array_t tls_fd_set;
+	char *keyfile;
+	int keyfile_unmanaged;
+	const char *moduledir;
+	const char *config;
+	int control_fd;
+	const char *rundir;
+	bool interactive;
+	bool quiet;
+	bool tty_binary_output;
+};
 
 /* lua_pcall helper function */
 static inline char *lua_strerror(int lua_err) {
@@ -66,9 +80,8 @@ static inline char *lua_strerror(int lua_err) {
  *
  * For parameters see http://docs.libuv.org/en/v1.x/stream.html#c.uv_read_cb
  *
- * - This is just basic read-eval-print; libedit is supported through krsec;
- * - stream->data represents a bool determining binary output mode (used by kresc);
- * - binary output: uint32_t length in network order, followed by that many bytes.
+ * - This is just basic read-eval-print; libedit is supported through kresc;
+ * - stream->data contains program arguments (struct args);
  */
 static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
@@ -77,6 +90,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 	/* Set output streams */
 	FILE *out = stdout;
 	uv_os_fd_t stream_fd = 0;
+	struct args *args = stream->data;
 	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
 		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
 		free(cmd);
@@ -111,11 +125,9 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 			cmd[nread] = '\0';
 		}
 
-		/* Pseudo-command for switching to "binary output";
-		 * beware: void* <-> bool */
-		bool is_binary = stream->data;
+		/* Pseudo-command for switching to "binary output"; */
 		if (strcmp(cmd, "__binary") == 0) {
-			stream->data = (void *)(is_binary = true);
+			args->tty_binary_output = true;
 			goto finish;
 		}
 
@@ -128,7 +140,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		}
 
 		/* Simpler output in binary mode */
-		if (is_binary) {
+		if (args->tty_binary_output) {
 			size_t len_s = strlen(message);
 			if (len_s > UINT32_MAX)
 				goto finish;
@@ -140,12 +152,12 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		}
 
 		/* Log to remote socket if connected */
-		const char *delim = g_quiet ? "" : "> ";
+		const char *delim = args->quiet ? "" : "> ";
 		if (stream_fd != STDIN_FILENO) {
 			fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
 			if (message)
 				fprintf(out, "%s", message); /* Duplicate output to sender */
-			if (message || !g_quiet)
+			if (message || !args->quiet)
 				fprintf(out, "\n");
 			fprintf(out, "%s", delim);
 		}
@@ -153,7 +165,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		FILE *fp_out = ret ? stderr : stdout;
 		if (message)
 			fprintf(fp_out, "%s", message);
-		if (message || !g_quiet)
+		if (message || !args->quiet)
 			fprintf(fp_out, "\n");
 		fprintf(fp_out, "%s", delim);
 		lua_settop(L, 0);
@@ -175,16 +187,17 @@ static void tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf) {
 static void tty_accept(uv_stream_t *master, int status)
 {
 	uv_tcp_t *client = malloc(sizeof(*client));
+	struct args *args = master->data;
 	if (client) {
 		 uv_tcp_init(master->loop, client);
 		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
 			free(client);
 			return;
 		 }
-		 client->data = 0;
+		 client->data = args;
 		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_process_input);
 		 /* Write command line */
-		 if (!g_quiet) {
+		 if (!args->quiet) {
 		 	uv_buf_t buf = { "> ", 2 };
 		 	uv_try_write((uv_stream_t *)client, &buf, 1);
 		 }
@@ -295,7 +308,7 @@ static const char *set_addr(char *addr, int *port)
 		p = strchr(addr, '#');
 	}
 	if (p) {
-		*port = atoi(p + 1);
+		*port = strtol(p + 1, NULL, 10);
 		*p = '\0';
 	}
 
@@ -347,7 +360,8 @@ static void help(int argc, char *argv[])
 	       " -S, --fd=[fd]          Listen on given fd (handed out by supervisor).\n"
 	       " -T, --tlsfd=[fd]       Listen using TLS on given fd (handed out by supervisor).\n"
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
-	       " -k, --keyfile=[path]   File containing trust anchors (DS or DNSKEY).\n"
+	       " -k, --keyfile=[path]   File with root domain trust anchors (DS or DNSKEY), automatically updated.\n"
+	       " -K, --keyfile-ro=[path] File with read-only root domain trust anchors, for use with an external updater.\n"
 	       " -m, --moduledir=[path] Override the default module path (" MODULEDIR ").\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
 	       " -q, --quiet            Quiet output, no prompt in interactive mode.\n"
@@ -362,23 +376,23 @@ static void help(int argc, char *argv[])
 	       " [rundir]             Path to the working directory (default: .)\n");
 }
 
-static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader, int control_fd)
+static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader, struct args *args)
 {
 	/* Control sockets or TTY */
 	auto_free char *sock_file = NULL;
 	uv_pipe_t pipe;
 	uv_pipe_init(loop, &pipe, 0);
-	pipe.data = 0;
-	if (g_interactive) {
-		if (!g_quiet)
+	pipe.data = args;
+	if (args->interactive) {
+		if (!args->quiet)
 			printf("[system] interactive mode\n> ");
 		fflush(stdout);
 		uv_pipe_open(&pipe, 0);
 		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_process_input);
 	} else {
 		int pipe_ret = -1;
-		if (control_fd != -1) {
-			pipe_ret = uv_pipe_open(&pipe, control_fd);
+		if (args->control_fd != -1) {
+			pipe_ret = uv_pipe_open(&pipe, args->control_fd);
 		} else {
 			(void) mkdir("tty", S_IRWXU|S_IRWXG);
 			sock_file = afmt("tty/%ld", getpid());
@@ -422,25 +436,49 @@ static void free_sd_socket_names(char **socket_names, int count)
 }
 #endif
 
-int main(int argc, char **argv)
+static int set_keyfile(struct engine *engine, char *keyfile, bool unmanaged)
 {
-	int forks = 1;
-	array_t(char*) addr_set;
-	array_t(char*) tls_set;
-	array_init(addr_set);
-	array_init(tls_set);
-	array_t(int) fd_set;
-	array_init(fd_set);
-	array_t(int) tls_fd_set;
-	array_init(tls_fd_set);
-	char *keyfile = NULL;
-	char *moduledir = MODULEDIR;
-	const char *config = NULL;
-	int control_fd = -1;
-	uv_loop_t *loop = NULL;
+	assert(keyfile != NULL);
+	auto_free char *cmd = afmt("trust_anchors.config('%s',%s)",
+				   keyfile, unmanaged ? "true" : "nil");
+	if (!cmd) {
+		kr_log_error("[system] not enough memory\n");
+		return kr_error(ENOMEM);
+	}
+	int lua_ret = engine_cmd(engine->L, cmd, false);
+	if (lua_ret != 0) {
+		if (lua_gettop(engine->L) > 0) {
+			kr_log_error("%s\n", lua_tostring(engine->L, -1));
+		} else {
+			kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n",
+					keyfile, lua_strerror(lua_ret));
+		}
+		return lua_ret;
+	}
 
+	lua_settop(engine->L, 0);
+	return kr_ok();
+}
+
+
+static void args_init(struct args *args)
+{
+	memset(args, 0, sizeof(struct args));
+	args->forks = -1;
+	array_init(args->addr_set);
+	array_init(args->tls_set);
+	array_init(args->fd_set);
+	array_init(args->tls_fd_set);
+	args->moduledir = MODULEDIR;
+	args->control_fd = -1;
+	args->interactive = true;
+	args->quiet = false;
+}
+
+int parse_args(int argc, char **argv, struct args *args)
+{
 	/* Long options. */
-	int c = 0, li = 0, ret = 0;
+	int c = 0, li = 0;
 	struct option opts[] = {
 		{"addr", required_argument,   0, 'a'},
 		{"tls",  required_argument,   0, 't'},
@@ -448,6 +486,7 @@ int main(int argc, char **argv)
 		{"tlsfd", required_argument,  0, 'T'},
 		{"config", required_argument, 0, 'c'},
 		{"keyfile",required_argument, 0, 'k'},
+		{"keyfile-ro",required_argument, 0, 'K'},
 		{"forks",required_argument,   0, 'f'},
 		{"moduledir", required_argument, 0, 'm'},
 		{"verbose",    no_argument,   0, 'v'},
@@ -456,38 +495,44 @@ int main(int argc, char **argv)
 		{"help",      no_argument,    0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:K:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
-			array_push(addr_set, optarg);
+			array_push(args->addr_set, optarg);
 			break;
 		case 't':
-			array_push(tls_set, optarg);
+			array_push(args->tls_set, optarg);
 			break;
 		case 'S':
-			array_push(fd_set,  atoi(optarg));
+			array_push(args->fd_set, strtol(optarg, NULL, 10));
 			break;
 		case 'T':
-			array_push(tls_fd_set,  atoi(optarg));
+			array_push(args->tls_fd_set, strtol(optarg, NULL, 10));
 			break;
 		case 'c':
-			config = optarg;
+			args->config = optarg;
 			break;
 		case 'f':
-			g_interactive = false;
-			forks = atoi(optarg);
-			if (forks <= 0) {
+			args->interactive = false;
+			args->forks = strtol(optarg, NULL, 10);
+			if (args->forks <= 0) {
 				kr_log_error("[system] error '-f' requires a positive"
 						" number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
 			break;
+		case 'K':
+			args->keyfile_unmanaged = 1;
 		case 'k':
-			keyfile = optarg;
+			if (args->keyfile != NULL) {
+				kr_log_error("[system] error only one of '--keyfile' and '--keyfile-ro' allowed\n");
+				return EXIT_FAILURE;
+			}
+			args->keyfile = optarg;
 			break;
 		case 'm':
-			moduledir = optarg;
+			args->moduledir = optarg;
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -496,7 +541,7 @@ int main(int argc, char **argv)
 #endif
 			break;
 		case 'q':
-			g_quiet = true;
+			args->quiet = true;
 			break;
 		case 'V':
 			kr_log_info("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
@@ -509,6 +554,49 @@ int main(int argc, char **argv)
 			help(argc, argv);
 			return EXIT_FAILURE;
 		}
+	}	
+	if (optind < argc) {
+		args->rundir = argv[optind];
+	}
+	return EXIT_SUCCESS;
+}
+
+static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
+	int ret = 0;
+	for (size_t i = 0; i < fd_set->len; ++i) {
+		ret = network_listen_fd(net, fd_set->at[i], tls);
+		if (ret != 0) {
+			kr_log_error("[system] %slisten on fd=%d %s\n",
+				 tls ? "TLS " : "", fd_set->at[i], kr_strerror(ret));
+			break;
+		}
+	}
+	return ret;
+}
+
+static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {	
+	uint32_t flags = tls ? NET_TCP|NET_TLS : NET_UDP|NET_TCP;
+	int ret = 0;
+	for (size_t i = 0; i < addr_set->len; ++i) {
+		int port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
+		const char *addr = set_addr(addr_set->at[i], &port);
+		ret = network_listen(net, addr, (uint16_t)port, flags);
+		if (ret != 0) {
+			kr_log_error("[system] bind to '%s@%d' %s%s\n", 
+				addr, port, tls ? "(TLS) " : "", kr_strerror(ret));
+			break;
+		}
+	}
+	return ret;
+}
+
+int main(int argc, char **argv)
+{
+	int ret = 0;
+	struct args args;
+	args_init(&args);
+	if ((ret = parse_args(argc, argv, &args)) != EXIT_SUCCESS) {
+		return ret;
 	}
 
 #ifdef HAS_SYSTEMD
@@ -518,45 +606,44 @@ int main(int argc, char **argv)
 	for (int i = 0; i < sd_nsocks; ++i) {
 		int fd = SD_LISTEN_FDS_START + i;
 		/* when run under systemd supervision, do not use interactive mode */
-		g_interactive = false;
-		if (forks != 1) {
+		args.interactive = false;
+		if (args.forks != 1) {
 			kr_log_error("[system] when run under systemd-style supervision, "
-				     "use single-process only (bad: --fork=%d).\n", forks);
+				     "use single-process only (bad: --fork=%d).\n", args.forks);
 			free_sd_socket_names(socket_names, sd_nsocks);
 			return EXIT_FAILURE;
 		}
 		if (!strcasecmp("control",socket_names[i])) {
-			control_fd = fd;
+			args.control_fd = fd;
 		} else if (!strcasecmp("tls",socket_names[i])) {
-			array_push(tls_fd_set, fd);
+			array_push(args.tls_fd_set, fd);
 		} else {
-			array_push(fd_set, fd);
+			array_push(args.fd_set, fd);
 		}
 	}
 	free_sd_socket_names(socket_names, sd_nsocks);
 #endif
 
 	/* Switch to rundir. */
-	if (optind < argc) {
-		const char *rundir = argv[optind];
+	if (args.rundir != NULL) {
 		/* FIXME: access isn't a good way if we start as root and drop privileges later */
-		if (access(rundir, W_OK) != 0) {
-			kr_log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
+		if (access(args.rundir, W_OK) != 0) {
+			kr_log_error("[system] rundir '%s': %s\n", args.rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
-		ret = chdir(rundir);
+		ret = chdir(args.rundir);
 		if (ret != 0) {
-			kr_log_error("[system] rundir '%s': %s\n", rundir, strerror(errno));
+			kr_log_error("[system] rundir '%s': %s\n", args.rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
 
-	if (config && strcmp(config, "-") != 0 && access(config, R_OK) != 0) {
-		kr_log_error("[system] config '%s': %s\n", config, strerror(errno));
+	if (args.config && strcmp(args.config, "-") != 0 && access(args.config, R_OK) != 0) {
+		kr_log_error("[system] config '%s': %s\n", args.config, strerror(errno));
 		return EXIT_FAILURE;
 	}
-	if (!config && access("config", R_OK) == 0) {
-		config = "config";
+	if (!args.config && access("config", R_OK) == 0) {
+		args.config = "config";
 	}
 
 #ifndef CAN_FORK_EARLY
@@ -574,7 +661,7 @@ int main(int argc, char **argv)
 	fd_array_t ipc_set;
 	array_init(ipc_set);
 	/* Fork subprocesses if requested */
-	int fork_id = fork_workers(&ipc_set, forks);
+	int fork_id = fork_workers(&ipc_set, args.forks);
 	if (fork_id < 0) {
 		return EXIT_FAILURE;
 	}
@@ -593,54 +680,21 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Create worker */
-	struct worker_ctx *worker = worker_create(&engine, &pool, fork_id, forks);
+	struct worker_ctx *worker = worker_create(&engine, &pool, fork_id, args.forks);
 	if (!worker) {
 		kr_log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
 	}
-	/* Bind to passed fds and run */
-	for (size_t i = 0; i < fd_set.len; ++i) {
-		ret = network_listen_fd(&engine.net, fd_set.at[i], false);
-		if (ret != 0) {
-			kr_log_error("[system] listen on fd=%d %s\n", fd_set.at[i], kr_strerror(ret));
-			ret = EXIT_FAILURE;
-			break;
-		}
-	}
-	/* Do the same for TLS */
-	for (size_t i = 0; i < tls_fd_set.len; ++i) {
-		ret = network_listen_fd(&engine.net, tls_fd_set.at[i], true);
-		if (ret != 0) {
-			kr_log_error("[system] TLS listen on fd=%d %s\n", tls_fd_set.at[i], kr_strerror(ret));
-			ret = EXIT_FAILURE;
-			break;
-		}
-	}
-	/* Bind to sockets and run */
-	if (ret == 0) {
-		for (size_t i = 0; i < addr_set.len; ++i) {
-			int port = 53;
-			const char *addr = set_addr(addr_set.at[i], &port);
-			ret = network_listen(&engine.net, addr, (uint16_t)port, NET_UDP|NET_TCP);
-			if (ret != 0) {
-				kr_log_error("[system] bind to '%s@%d' %s\n", addr, port, kr_strerror(ret));
-				ret = EXIT_FAILURE;
-				break;
-			}
-		}
-	}
-	/* Bind to TLS sockets */
-	if (ret == 0) {
-		for (size_t i = 0; i < tls_set.len; ++i) {
-			int port = KR_DNS_TLS_PORT;
-			const char *addr = set_addr(tls_set.at[i], &port);
-			ret = network_listen(&engine.net, addr, (uint16_t)port, NET_TCP|NET_TLS);
-			if (ret != 0) {
-				kr_log_error("[system] bind to '%s@%d' (TLS) %s\n", addr, port, kr_strerror(ret));
-				ret = EXIT_FAILURE;
-				break;
-			}
-		}
+
+	uv_loop_t *loop = NULL;
+	/* Bind to passed fds and sockets*/
+	if (bind_fds(&engine.net, &args.fd_set, false) != 0 ||
+	    bind_fds(&engine.net, &args.tls_fd_set, true) != 0 ||
+	    bind_sockets(&engine.net, &args.addr_set, false) != 0 ||
+	    bind_sockets(&engine.net, &args.tls_set, true) != 0
+	) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
 	}
 
 	/* Workaround for https://github.com/libuv/libuv/issues/45
@@ -655,7 +709,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	engine_set_moduledir(&engine, moduledir);
+	engine_set_moduledir(&engine, args.moduledir);
 	
 	/* Block signals. */
 	loop = uv_default_loop();
@@ -668,97 +722,34 @@ int main(int argc, char **argv)
 	worker->loop = loop;
 	loop->data = worker;
 
-	ret = engine_start(&engine, config);
-	if (ret != 0) {
+	if (engine_load_sandbox(&engine) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
-
-	if (keyfile) {
-		auto_free char *dirname_storage = strdup(keyfile);
-		if (!dirname_storage) {
-			kr_log_error("[system] not enough memory: %s\n",
-				     strerror(errno));
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-		auto_free char *basename_storage = strdup(keyfile);
-		if (!basename_storage) {
-			kr_log_error("[system] not enough memory: %s\n",
-				     strerror(errno));
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		/* Resolve absolute path to the keyfile directory */
-		auto_free char *keyfile_dir = malloc(PATH_MAX);
-		if (realpath(dirname(dirname_storage), keyfile_dir) == NULL) {
-			kr_log_error("[ ta ]: keyfile '%s' directory: %s\n",
-				     keyfile, strerror(errno));
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		char *_filename = basename(basename_storage);
-		int dirlen = strlen(keyfile_dir);
-		int namelen = strlen(_filename);
-		if (dirlen + 1 + namelen >= PATH_MAX) {
-			kr_log_error("[ ta ]: keyfile '%s' PATH_MAX exceeded\n",
-				     keyfile);
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-		keyfile_dir[dirlen++] = '/';
-		keyfile_dir[dirlen] = '\0';
-
-		auto_free char *keyfile_path = malloc(dirlen + namelen + 1);
-		memcpy(keyfile_path, keyfile_dir, dirlen);
-		memcpy(keyfile_path + dirlen, _filename, namelen + 1);
-
-		int unmanaged = 0;
-
-		/* Note: config has been executed, so access() is OK,
-		 * as we've dropped privileges already if configured. */
-		if (access(keyfile_path, F_OK) != 0) {
-			kr_log_info("[ ta ] keyfile '%s': doesn't exist, bootstrapping\n", keyfile_path);
-			if (access(keyfile_dir, W_OK) != 0) {
-				kr_log_error("[ ta ] keyfile '%s': write access to '%s' needed\n", keyfile_path, keyfile_dir);
-				ret = EXIT_FAILURE;
-				goto cleanup;
-			}
-		} else if (access(keyfile_path, R_OK) == 0) {
-			if ((access(keyfile_path, W_OK) != 0) || (access(keyfile_dir, W_OK) != 0)) {
-				kr_log_error("[ ta ] keyfile '%s': not writeable, starting in unmanaged mode\n", keyfile_path);
-				unmanaged = 1;
-			}
-		} else {
-			kr_log_error("[ ta ] keyfile '%s': %s\n", keyfile_path, strerror(errno));
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		auto_free char *cmd = afmt("trust_anchors.config('%s',%s)", keyfile_path, unmanaged?"true":"nil");
-		if (!cmd) {
-			kr_log_error("[system] not enough memory\n");
-			ret =  EXIT_FAILURE;
-			goto cleanup;
-		}
-		int lua_ret = engine_cmd(engine.L, cmd, false);
-		if (lua_ret != 0) {
-			if (lua_gettop(engine.L) > 0) {
-				kr_log_error("%s", lua_tostring(engine.L, -1));
-			} else {
-				kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n",
-						keyfile_path, lua_strerror(lua_ret));
-			}
+	if (args.config != NULL && strcmp(args.config, "-") != 0) {
+		if(engine_loadconf(&engine, args.config) != 0) {
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
 		lua_settop(engine.L, 0);
 	}
+	if (args.keyfile != NULL && set_keyfile(&engine, args.keyfile, args.keyfile_unmanaged) != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+	if (args.config == NULL || strcmp(args.config, "-") !=0) {
+		if(engine_load_defaults(&engine) != 0) {
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+	}
+	if (engine_start(&engine) != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
 
 	/* Run the event loop */
-	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, control_fd);
+	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, &args);
 	if (ret != 0) {
 		perror("[system] worker failed");
 		ret = EXIT_FAILURE;
@@ -772,8 +763,8 @@ cleanup:/* Cleanup. */
 		uv_loop_close(loop);	
 	}
 	mp_delete(pool.ctx);
-	array_clear(addr_set);
-	array_clear(tls_set);
+	array_clear(args.addr_set);
+	array_clear(args.tls_set);
 	kr_crypto_cleanup();
 	return ret;
 }

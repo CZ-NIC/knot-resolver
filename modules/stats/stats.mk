@@ -1,4 +1,4 @@
-stats_CFLAGS := -fvisibility=hidden -fPIC
+stats_CFLAGS := -fPIC
 stats_SOURCES := modules/stats/stats.c
 stats_DEPEND := $(libkres)
 stats_LIBS := $(contrib_TARGET) $(libkres_TARGET) $(libkres_LIBS)

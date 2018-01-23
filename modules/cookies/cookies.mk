@@ -1,4 +1,4 @@
-cookies_CFLAGS := -fvisibility=hidden -fPIC
+cookies_CFLAGS := -fPIC
 cookies_SOURCES := \
 	modules/cookies/cookiectl.c \
 	modules/cookies/cookiemonster.c \

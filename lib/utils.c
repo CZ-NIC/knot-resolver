@@ -79,7 +79,7 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
 
 static void kres_gnutls_log(int level, const char *message)
 {
-	kr_log_verbose("gnutls: (%d) %s", level, message);
+	kr_log_verbose("[gnutls] (%d) %s", level, message);
 }
 
 bool kr_verbose_set(bool status)
@@ -132,6 +132,10 @@ bool kr_log_trace(const struct kr_query *query, const char *source, const char *
 
 char* kr_strcatdup(unsigned n, ...)
 {
+	if (n < 1) {
+		return NULL;
+	}
+
 	/* Calculate total length */
 	size_t total_len = 0;
 	va_list vl;
@@ -426,7 +430,7 @@ int kr_straddr_subnet(void *dst, const char *addr)
 	if (subnet) {
 		*subnet = '\0';
 		subnet += 1;
-		bit_len = atoi(subnet);
+		bit_len = strtol(subnet, NULL, 10);
 		/* Check client subnet length */
 		const int max_len = (family == AF_INET6) ? 128 : 32;
 		if (bit_len < 0 || bit_len > max_len) {

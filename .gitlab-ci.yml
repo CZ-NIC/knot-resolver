@@ -1,4 +1,4 @@
-image: cznic/ci-debian-kresd
+image: $CI_REGISTRY/knot/knot-resolver/ci:debian-stable
 
 variables:
   DEBIAN_FRONTEND: noninteractive
@@ -15,10 +15,21 @@ stages:
 build:linux:amd64:
   stage: build
   script:
-    - PREFIX=$(pwd)/.local make -k all
-    - PREFIX=$(pwd)/.local make install
+    - PREFIX=$(pwd)/.local make -k all CFLAGS=-Werror
+    - PREFIX=$(pwd)/.local make install CFLAGS=-Werror
   artifacts:
     untracked: true
+  tags:
+    - docker
+    - linux
+    - amd64
+
+build:clang:linux:amd64:
+  stage: build
+  image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
+  script:
+    - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument"
+    - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make install CFLAGS=-Werror
   tags:
     - docker
     - linux
@@ -28,7 +39,31 @@ lint:lua:
   stage: test
   dependencies: []  # do not download build artifacts
   script:
-    - make lint
+    - make lint-lua
+  tags:
+    - docker
+
+lint:c:
+  stage: test
+  image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
+  dependencies: []  # do not download build artifacts
+  script:
+    - make lint-c CLANG_TIDY="clang-tidy-5.0 -quiet"
+  tags:
+    - docker
+
+lint:clang-scan-build:
+  allow_failure: true  # for now it is just informative
+  stage: test
+  image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
+  dependencies: []  # do not download build artifacts
+  script:
+    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="/usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
+  artifacts:
+    when: on_failure
+    expire_in: '1 day'
+    paths:
+      - scan-results
   tags:
     - docker
 

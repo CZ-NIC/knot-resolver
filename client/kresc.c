@@ -35,7 +35,7 @@
 
 FILE *g_tty = NULL;		//!< connection to the daemon
 
-static char *run_cmd(const char *cmd, size_t * msg_len);
+static char *run_cmd(const char *cmd, size_t * out_len);
 
 const char *prompt(EditLine * e)
 {
@@ -273,14 +273,14 @@ static unsigned char complete(EditLine * el, int ch)
 	//Get position of last dot in current line (useful for parsing table).
 	char *dot = strrchr(argv[0], '.');
 
-	if (strncmp(type, "table", 5) && !dot) {
+	if (strncmp(type, "table", 5) != 0 && !dot) {
 		//Line is not a name of some table and there is no dot in it.
 		complete_globals(el, argv[0], pos);
-	} else if ((dot && !strncmp(type, "nil", 3))
-		   || !strncmp(type, "table", 5)) {
+	} else if ((dot && strncmp(type, "nil", 3) == 0)
+		   || strncmp(type, "table", 5) == 0) {
 		//Current line (or part of it) is a name of some table.
 		complete_members(el, argv[0], type, pos, dot);
-	} else if (!strncmp(type, "function", 8)) {
+	} else if (strncmp(type, "function", 8) == 0) {
 		//Current line is a function.
 		complete_function(el);
 	}

@@ -48,7 +48,7 @@ typedef struct {
 } cb_node_t;
 
 /* Return true if ptr is internal node. */
-static inline int ref_is_internal(uint8_t *p)
+static inline int ref_is_internal(const uint8_t *p)
 {
 	return 1 & (intptr_t)p;
 }
@@ -118,24 +118,8 @@ static cb_data_t *cbt_make_data(map_t *map, const uint8_t *str, size_t len, void
 	return x;
 }
 
-/*! Creates a new, empty critbit map */
-EXPORT map_t map_make(void)
-{
-	map_t map;
-	map.root = NULL;
-	map.malloc = &malloc_std;
-	map.free = &free_std;
-	map.baton = NULL;
-	return map;
-}
-
-/*! Returns non-zero if map contains str */
-EXPORT int map_contains(map_t *map, const char *str)
-{
-	return map_get(map, str) != NULL;
-}
-
-EXPORT void *map_get(map_t *map, const char *str)
+/*! Like map_contains, but also set the value, if passed and found. */
+static int cbt_get(map_t *map, const char *str, void **value)
 {
 	const uint8_t *ubytes = (void *)str;
 	const size_t ulen = strlen(str);
@@ -143,7 +127,7 @@ EXPORT void *map_get(map_t *map, const char *str)
 	cb_data_t *x = NULL;
 
 	if (p == NULL) {
-		return NULL;
+		return 0;
 	}
 
 	while (ref_is_internal(p)) {
@@ -161,14 +145,41 @@ EXPORT void *map_get(map_t *map, const char *str)
 
 	x = (cb_data_t *)p;
 	if (strcmp(str, (const char *)x->key) == 0) {
-		return x->value;
+		if (value != NULL) {
+			*value = x->value;
+		}
+		return 1;
 	}
 
-	return NULL;
+	return 0;
+}
+
+/*! Creates a new, empty critbit map */
+EXPORT map_t map_make(void)
+{
+	map_t map;
+	map.root = NULL;
+	map.malloc = &malloc_std;
+	map.free = &free_std;
+	map.baton = NULL;
+	return map;
+}
+
+/*! Returns non-zero if map contains str */
+EXPORT int map_contains(map_t *map, const char *str)
+{
+	return cbt_get(map, str, NULL);
+}
+
+EXPORT void *map_get(map_t *map, const char *str)
+{
+	void *v = NULL;
+	cbt_get(map, str, &v);
+	return v;
 }
 
 /*! Inserts str into map, returns 0 on success */
-EXPORT int map_set(map_t *map, const char *str, void *value)
+EXPORT int map_set(map_t *map, const char *str, void *val)
 {
 	const uint8_t *const ubytes = (void *)str;
 	const size_t ulen = strlen(str);
@@ -182,7 +193,7 @@ EXPORT int map_set(map_t *map, const char *str, void *value)
 	void **wherep = NULL;
 
 	if (p == NULL) {
-		map->root = cbt_make_data(map, (const uint8_t *)str, ulen + 1, value);
+		map->root = cbt_make_data(map, (const uint8_t *)str, ulen + 1, val);
 		if (map->root == NULL) {
 			return ENOMEM;
 		}
@@ -212,7 +223,7 @@ EXPORT int map_set(map_t *map, const char *str, void *value)
 		newotherbits = data->key[newbyte];
 		goto different_byte_found;
 	}
-	data->value = value;
+	data->value = val;
 	return 1;
 
 different_byte_found:
@@ -228,7 +239,7 @@ different_byte_found:
 		return ENOMEM;
 	}
 
-	x = (uint8_t *)cbt_make_data(map, ubytes, ulen + 1, value);
+	x = (uint8_t *)cbt_make_data(map, ubytes, ulen + 1, val);
 	if (x == NULL) {
 		map->free(map->baton, newnode);
 		return ENOMEM;
@@ -326,10 +337,14 @@ EXPORT void map_clear(map_t *map)
 EXPORT int map_walk_prefixed(map_t *map, const char *prefix,
 	int (*callback)(const char *, void *, void *), void *baton)
 {
+	if (!map) {
+		return 0;
+	}
+
 	const uint8_t *ubytes = (void *)prefix;
 	const size_t ulen = strlen(prefix);
 	uint8_t *p = map->root;
-	uint8_t *top = (uint8_t *)p;
+	uint8_t *top = p;
 	cb_data_t *data = NULL;
 
 	if (p == NULL) {

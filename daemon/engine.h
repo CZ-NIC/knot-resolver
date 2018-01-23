@@ -27,7 +27,11 @@
 #define LRU_COOKIES_SIZE LRU_RTT_SIZE /**< DNS cookies cache size. */
 #endif
 #ifndef MP_FREELIST_SIZE
-#define MP_FREELIST_SIZE 64 /**< Maximum length of the worker mempool freelist */
+# ifdef __clang_analyzer__
+#  define MP_FREELIST_SIZE 0
+# else
+#  define MP_FREELIST_SIZE 64 /**< Maximum length of the worker mempool freelist */
+# endif
 #endif
 #ifndef RECVMMSG_BATCH
 #define RECVMMSG_BATCH 4
@@ -79,15 +83,16 @@ int engine_pcall(struct lua_State *L, int argc);
 
 int engine_ipc(struct engine *engine, const char *expr);
 
-/** Start the lua engine and execute the config.
- *
- * @note Special path "-" means that even default config won't be done
- *       (like listening on localhost).
- */
-int engine_start(struct engine *engine, const char *config_path);
+
+int engine_load_sandbox(struct engine *engine);
+int engine_loadconf(struct engine *engine, const char *config_path);
+int engine_load_defaults(struct engine *engine);
+
+/** Start the lua engine and execute the config. */
+int engine_start(struct engine *engine);
 void engine_stop(struct engine *engine);
-int engine_register(struct engine *engine, const char *module, const char *precedence, const char* ref);
-int engine_unregister(struct engine *engine, const char *module);
+int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref);
+int engine_unregister(struct engine *engine, const char *name);
 void engine_lualib(struct engine *engine, const char *name, int (*lib_cb) (struct lua_State *));
 
 
@@ -105,6 +110,8 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir);
 /** Load root hints from a zonefile (or config-time default if NULL).
  *
  * @return error message or NULL (statically allocated)
+ * @note exported to be usable from the hints module.
  */
+KR_EXPORT
 const char* engine_hint_root_file(struct kr_context *ctx, const char *file);
 

@@ -3,6 +3,7 @@ Description=Knot DNS Resolver control socket
 Documentation=man:kresd(8)
 Before=sockets.target
 PartOf=kresd.socket
+Alias=knot-resolver-control.socket
 
 [Socket]
 ListenStream=/run/knot-resolver/control
