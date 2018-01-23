@@ -5,7 +5,7 @@ modules = { 'predict' }
 local resolve_count = 0
 local current_epoch = 0
 
-worker.resolve = function ()
+resolve = function ()
 	resolve_count = resolve_count + 1
 end
 
@@ -22,6 +22,7 @@ end
 
 -- test if draining of prefetch queue works
 local function test_predict_drain()
+	resolve_count = 0
 	predict.queue_len = 2
 	predict.queue['TYPE65535 example.com'] = 1
 	predict.queue['SOA example.com'] = 1

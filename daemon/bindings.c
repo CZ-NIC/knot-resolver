@@ -1369,81 +1369,82 @@ int lib_event(lua_State *L)
 	return 1;
 }
 
-/* @internal Call the Lua callback stored in baton. */
-static void resolve_callback(struct worker_ctx *worker, struct kr_request *req, void *baton)
-{
-	assert(worker);
-	assert(req);
-	assert(baton);
-	lua_State *L = worker->engine->L;
-	intptr_t cb_ref = (intptr_t) baton;
-	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_ref);
-	luaL_unref(L, LUA_REGISTRYINDEX, cb_ref);
-	lua_pushlightuserdata(L, req->answer);
-	lua_pushlightuserdata(L, req);
-	(void) execute_callback(L, 2);
-}
-
 static int wrk_resolve(lua_State *L)
 {
 	struct worker_ctx *worker = wrk_luaget(L);
 	if (!worker) {
 		return 0;
 	}
-	/* Create query packet */
-	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
-	if (!pkt) {
-		lua_pushstring(L, kr_strerror(ENOMEM));
-		lua_error(L);
-	}
+
 	uint8_t dname[KNOT_DNAME_MAXLEN];
 	if (!knot_dname_from_str(dname, lua_tostring(L, 1), sizeof(dname))) {
 		lua_pushstring(L, "invalid qname");
 		lua_error(L);
 	};
+
 	/* Check class and type */
 	uint16_t rrtype = lua_tointeger(L, 2);
 	if (!lua_isnumber(L, 2)) {
 		lua_pushstring(L, "invalid RR type");
 		lua_error(L);
 	}
+
 	uint16_t rrclass = lua_tointeger(L, 3);
 	if (!lua_isnumber(L, 3)) { /* Default class is IN */
 		rrclass = KNOT_CLASS_IN;
 	}
-	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
-	knot_wire_set_rd(pkt->wire);
-	/* Add OPT RR */
-	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
-	if (!pkt->opt_rr) {
-		return kr_error(ENOMEM);
-	}
-	/* Add completion callback */
-	int ret = 0;
+
+	/* Add query options */
 	const struct kr_qflags *options = lua_topointer(L, 4);
 	if (!options) { /* but we rely on the lua wrapper when dereferencing non-NULL */
 		lua_pushstring(L, "invalid options");
 		lua_error(L);
 	}
+
+	/* Create query packet */
+	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
+	if (!pkt) {
+		lua_pushstring(L, kr_strerror(ENOMEM));
+		lua_error(L);
+	}
+	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
+	knot_wire_set_rd(pkt->wire);
+
+	/* Add OPT RR */
+	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
+	if (!pkt->opt_rr) {
+		knot_pkt_free(&pkt);
+		return kr_error(ENOMEM);
+	}
 	if (options->DNSSEC_WANT) {
 		knot_edns_set_do(pkt->opt_rr);
 	}
+
 	if (options->DNSSEC_CD) {
 		knot_wire_set_cd(pkt->wire);
 	}
 
-	if (lua_isfunction(L, 5)) {
-		/* Store callback in registry */
-		lua_pushvalue(L, 5);
-		int cb = luaL_ref(L, LUA_REGISTRYINDEX);
-		ret = worker_resolve(worker, pkt, *options, resolve_callback, (void *) (intptr_t)cb);
-	} else {
-		ret = worker_resolve(worker, pkt, *options, NULL, NULL);
+	/* Create task and start with a first question */
+	struct qr_task *task = worker_resolve_start(worker, pkt, *options);
+	if (!task) {
+		knot_rrset_free(&pkt->opt_rr, NULL);
+		knot_pkt_free(&pkt);
+		lua_pushstring(L, "couldn't create a resolution request");
+		lua_error(L);
 	}
-	
+
+	/* Add initialisation callback */
+	if (lua_isfunction(L, 5)) {
+		lua_pushvalue(L, 5);
+		lua_pushlightuserdata(L, worker_task_request(task));
+		(void) execute_callback(L, 1);
+	}
+
+	/* Start execution */
+	int ret = worker_resolve_exec(task, pkt);
+	lua_pushboolean(L, ret == 0);
 	knot_rrset_free(&pkt->opt_rr, NULL);
 	knot_pkt_free(&pkt);
-	lua_pushboolean(L, ret == 0);
 	return 1;
 }
 

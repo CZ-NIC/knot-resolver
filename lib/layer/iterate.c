@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <arpa/inet.h>
 
+#include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
@@ -155,7 +156,7 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 		const int addr_len = knot_rdata_rdlen(rdata);
 		char name_str[KNOT_DNAME_MAXLEN];
 		char addr_str[INET6_ADDRSTRLEN];
-		WITH_VERBOSE {
+		WITH_VERBOSE(query) {
 			const int af = (addr_len == sizeof(struct in_addr)) ?
 				       AF_INET : AF_INET6;
 			knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
@@ -819,11 +820,11 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	query->id = rnd ^ (rnd >> 16); /* cheap way to strengthen unpredictability */
 	knot_wire_set_id(pkt->wire, query->id);
 	pkt->parsed = pkt->size;
-	WITH_VERBOSE {
+	WITH_VERBOSE(query) {
 		char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 		knot_dname_to_str(name_str, query->sname, sizeof(name_str));
 		knot_rrtype_to_string(query->stype, type_str, sizeof(type_str));
-		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %u\n",
+		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %hu\n",
 			    name_str, type_str, query->parent ? query->parent->id : 0);
 	}
 	return kr_ok();
@@ -882,11 +883,11 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	WITH_VERBOSE {
-	if (query->flags.TRACE) {
-		VERBOSE_MSG("<= answer received:\n");
-		kr_pkt_print(pkt);
-	}
+	WITH_VERBOSE(query) {
+		if (query->flags.TRACE) {
+			auto_free char *pkt_text = kr_pkt_text(pkt);
+			VERBOSE_MSG("<= answer received: \n%s\n", pkt_text);
+		}
 	}
 
 	if (query->flags.RESOLVED || query->flags.BADCOOKIE_AGAIN) {

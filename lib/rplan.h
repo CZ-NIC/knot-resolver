@@ -96,6 +96,7 @@ struct kr_query {
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
+	struct kr_request *request; /**< Parent resolution request. */
 };
 
 /** @cond internal Array of queries. */
@@ -185,6 +186,13 @@ bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint
 /** Return last resolved query. */
 KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
+
+/**
+  * Return last query (either currently being solved or last resolved).
+  * This is necessary to retrieve the last query in case of resolution failures (e.g. time limit reached).
+  */
+KR_EXPORT KR_PURE
+struct kr_query *kr_rplan_last(struct kr_rplan *rplan);
 
 /** Return query predecessor. */
 KR_EXPORT KR_PURE

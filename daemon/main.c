@@ -685,7 +685,8 @@ int main(int argc, char **argv)
 		kr_log_error("[system] not enough memory\n");
 		return EXIT_FAILURE;
 	}
-	
+
+	uv_loop_t *loop = NULL;
 	/* Bind to passed fds and sockets*/
 	if (bind_fds(&engine.net, &args.fd_set, false) != 0 ||
 	    bind_fds(&engine.net, &args.tls_fd_set, true) != 0 ||
@@ -711,7 +712,7 @@ int main(int argc, char **argv)
 	engine_set_moduledir(&engine, args.moduledir);
 	
 	/* Block signals. */
-	uv_loop_t *loop = uv_default_loop();
+	loop = uv_default_loop();
 	uv_signal_t sigint, sigterm;
 	uv_signal_init(loop, &sigint);
 	uv_signal_init(loop, &sigterm);
@@ -758,6 +759,9 @@ int main(int argc, char **argv)
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_reclaim(worker);
+	if (loop != NULL) {
+		uv_loop_close(loop);	
+	}
 	mp_delete(pool.ctx);
 	array_clear(args.addr_set);
 	array_clear(args.tls_set);

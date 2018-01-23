@@ -32,10 +32,17 @@
 #include "lib/defines.h"
 
 struct kr_query;
+struct kr_request;
 
 /*
  * Logging and debugging.
  */
+
+/** @brief Callback for request events. */
+typedef void (*trace_callback_f)(struct kr_request *request);
+/** @brief Callback for request logging handler. */
+typedef void (*trace_log_f)(const struct kr_query *query, const char *source, const char *msg);
+
 #define kr_log_info(fmt, ...) do { printf((fmt), ## __VA_ARGS__); fflush(stdout); } while(0)
 #define kr_log_error(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__)
 
@@ -49,6 +56,20 @@ KR_EXPORT bool kr_verbose_set(bool status);
 /** Log a message if in --verbose mode. */
 KR_EXPORT void kr_log_verbose(const char *fmt, ...);
 
+/**
+ * @brief Return true if the query has request log handler installed.
+ */
+#define kr_log_trace_enabled(query) ((query) && (query)->request && (query)->request->trace_log)
+
+/**
+ * Log a message through the request log handler.
+ * @param  query current query
+ * @param  source message source
+ * @param  fmt message format
+ * @return true if the message was logged
+ */
+KR_EXPORT bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...);
+
 #ifdef NOVERBOSELOG
 /* Efficient compile-time disabling of verbose messages. */
 #define kr_verbose_status false
@@ -56,8 +77,9 @@ KR_EXPORT void kr_log_verbose(const char *fmt, ...);
 #endif
 
 /** Block run in --verbose mode; optimized when not run. */
-#define WITH_VERBOSE if(__builtin_expect(kr_verbose_status, false))
-#define kr_log_verbose WITH_VERBOSE kr_log_verbose
+#define VERBOSE_STATUS __builtin_expect(kr_verbose_status, false)
+#define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_trace_enabled(query), false))
+#define kr_log_verbose if(VERBOSE_STATUS) kr_log_verbose
 
 
 /* C11 compatibility, but without any implementation so far. */
@@ -283,11 +305,23 @@ int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
 			       uint32_t qry_uid, bool check_dups,
 			       bool (*extraCheck)(const ranked_rr_array_entry_t *));
 
-void kr_rrset_print(const knot_rrset_t *rr, const char *prefix);
-void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *postfix);
-void kr_pkt_print(knot_pkt_t *pkt);
-void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix);
-void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix);
+KR_PURE
+char *kr_pkt_text(const knot_pkt_t *pkt);
+
+KR_PURE
+char *kr_rrset_text(const knot_rrset_t *rr);
+
+KR_PURE
+static inline char *kr_dname_text(const knot_dname_t *name) {
+	return knot_dname_to_str_alloc(name);
+}
+
+KR_CONST
+static inline char *kr_rrtype_text(const uint16_t rrtype) {
+	char type_str[32] = {0};
+	knot_rrtype_to_string(rrtype, type_str, sizeof(type_str));
+	return strdup(type_str);
+}
 
 /**
  * Call module property.

@@ -719,6 +719,8 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	array_init(request->auth_selected);
 	request->answ_validated = false;
 	request->auth_validated = false;
+	request->trace_log = NULL;
+	request->trace_finish = NULL;
 
 	/* Expect first query */
 	kr_rplan_init(&request->rplan, request, &request->pool);
@@ -809,7 +811,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 		/* If this address is the source of the answer, update its RTT */
 		if (kr_inaddr_equal(src, addr)) {
 			kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_UPDATE);
-			WITH_VERBOSE {
+			WITH_VERBOSE(qry) {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
 				VERBOSE_MSG(qry, "<= server: '%s' rtt: %"PRIu64" ms\n",
@@ -822,7 +824,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 			 * that 'b' didn't respond for at least 350 - (1 * 300) ms. We can't say that
 			 * its RTT is 50ms, but we can say that its score shouldn't be less than 50. */
 			 kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_MAX);
-			 WITH_VERBOSE {
+			 WITH_VERBOSE(qry) {
 			 	char addr_str[INET6_ADDRSTRLEN];
 			 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
 				VERBOSE_MSG(qry, "<= server: '%s' rtt: >= %"PRIu64" ms\n",
@@ -855,7 +857,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	/* Penalise resolution failures except validation failures. */
 	} else if (!(qry->flags.DNSSEC_BOGUS)) {
 		kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt, KR_NS_RESET);
-		WITH_VERBOSE {
+		WITH_VERBOSE(qry) {
 			char addr_str[INET6_ADDRSTRLEN];
 			inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
 			VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
@@ -863,11 +865,11 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	}
 }
 
-bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
+static bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
 {
 	uint64_t resolving_time = now - qry->creation_time_mono;
 	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
-		WITH_VERBOSE {
+		WITH_VERBOSE(qry) {
 			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
 		}
 		return true;
@@ -1122,7 +1124,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	    kr_ta_get(trust_anchors, wanted_name)) {
 		qry->flags.DNSSEC_WANT = true;
 		want_secured = true;
-		WITH_VERBOSE {
+		WITH_VERBOSE(qry) {
 		char qname_str[KNOT_DNAME_MAXLEN];
 		knot_dname_to_str(qname_str, wanted_name, sizeof(qname_str));
 		VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
@@ -1201,7 +1203,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 			mm_free(qry->zone_cut.pool, qry->zone_cut.trust_anchor);
 			qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
 
-			WITH_VERBOSE {
+			WITH_VERBOSE(qry) {
 			char qname_str[KNOT_DNAME_MAXLEN];
 			knot_dname_to_str(qname_str, ta_rr->owner, sizeof(qname_str));
 			VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
@@ -1520,7 +1522,8 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	if (ret != 0) {
 		return kr_error(EINVAL);
 	}
-	WITH_VERBOSE {
+
+	WITH_VERBOSE(qry) {
 	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[INET6_ADDRSTRLEN], type_str[16];
 	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
 	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
@@ -1561,8 +1564,20 @@ int kr_resolve_finish(struct kr_request *request, int state)
 
 	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
-	VERBOSE_MSG(NULL, "finished: %d, queries: %zu, mempool: %zu B\n",
+
+	struct kr_query *last = kr_rplan_last(rplan);
+	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
+
+	/* Trace request finish */
+	if (request->trace_finish) {
+		request->trace_finish(request);
+	}
+
+	/* Uninstall all tracepoints */
+	request->trace_finish = NULL;
+	request->trace_log = NULL;
+
 	return KR_STATE_DONE;
 }
 

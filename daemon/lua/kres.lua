@@ -181,6 +181,19 @@ local const_rcode = {
 	BADVERS    = 16,
 	BADCOOKIE  = 23,
 }
+-- This corresponds to `enum kr_rank`, it's not possible to do this without introspection unfortunately
+local const_rank = {
+	INITIAL = 0,
+	OMIT = 1,
+	TRY = 2,
+	INDET = 4,
+	BOGUS = 5,
+	MISMATCH = 6,
+	MISSING = 7,
+	INSECURE = 8,
+	AUTH = 16,
+	SECURE = 32
+}
 
 -- Constant tables
 local const_class_str = itable(const_class)
@@ -188,6 +201,7 @@ local const_type_str = itable(const_type)
 local const_rcode_str = itable(const_rcode)
 local const_opcode_str = itable(const_opcode)
 local const_section_str = itable(const_section)
+local const_rank_str = itable(const_rank)
 
 -- Metatype for RR types to allow anonymous types
 setmetatable(const_type, {
@@ -242,6 +256,7 @@ local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
 	-- beware: `owner` and `rdata` are typed as a plain lua strings
 	--         and not the real types they represent.
+	__tostring = function(rr) return rr:txt_dump() end,
 	__index = {
 		owner = function(rr) return dname2wire(rr._owner) end,
 		ttl = function(rr) return tonumber(knot.knot_rrset_ttl(rr)) end,
@@ -535,6 +550,30 @@ ffi.metatype( kr_request_t, {
 	},
 })
 
+-- C array iterator
+local function c_array_iter(t, i)
+	i = i + 1
+	if i >= t.len then return end
+	return i, t.at[i][0]
+end
+
+-- Metatype for ranked record array
+local ranked_rr_array_t = ffi.typeof('ranked_rr_array_t')
+ffi.metatype(ranked_rr_array_t, {
+	__len = function(self)
+		return tonumber(self.len)
+	end,
+	__ipairs = function (self)
+		return c_array_iter, self, -1
+	end,
+	__index = {
+		get = function (self, i)
+			if i < 0 or i > self.len then return nil end
+			return self.at[i][0]
+		end,
+	}
+})
+
 -- Pretty-print a single RR (which is a table with .owner .ttl .type .rdata)
 -- Extension: append .comment if exists.
 local function rr2str(rr, style)
@@ -569,6 +608,7 @@ kres = {
 	section = const_section,
 	rcode = const_rcode,
 	opcode = const_opcode,
+	rank = const_rank,
 
 	-- Constants to strings
 	tostring = {
@@ -577,6 +617,7 @@ kres = {
 		section = const_section_str,
 		rcode = const_rcode_str,
 		opcode = const_opcode_str,
+		rank = const_rank_str,
 	},
 
 	-- Create a struct kr_qflags from a single flag name or a list of names.

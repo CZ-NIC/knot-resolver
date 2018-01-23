@@ -28,6 +28,7 @@
 
 #include <assert.h>
 
+#include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
 #include <libknot/errcode.h>
 #include <libknot/rrset.h>
@@ -75,13 +76,11 @@ static int loot_rr(struct kr_cache *cache, knot_pkt_t *pkt, const knot_dname_t *
 		return ret;
 	}
 
-	WITH_VERBOSE {
-		VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o, ", *rank, lowest_rank);
-		if (fetch_rrsig) {
-			kr_log_verbose("RRSIG for ");
-		}
-		kr_rrtype_print(rrtype, "", " ");
-		kr_dname_print(name, "", "\n");
+	WITH_VERBOSE(qry) {
+		auto_free char *name_text = kr_dname_text(name);
+		auto_free char *type_text = kr_rrtype_text(rrtype);
+		VERBOSE_MSG(qry, "=> rank: 0%0.2o, lowest 0%0.2o, %s%s %s\n",
+			*rank, lowest_rank, fetch_rrsig ? "RRSIG for " : "", name_text, type_text);
 	}
 
 	if (*rank < lowest_rank) {
@@ -320,10 +319,10 @@ static int commit_rr(const char *key, void *val, void *data)
 		}
 	}
 
-	WITH_VERBOSE {
-		VERBOSE_MSG(baton->qry, "=> stashing rank: 0%0.2o, ", rank);
-		kr_rrtype_print(rr->type, "", " ");
-		kr_dname_print(rr->owner, "", "\n");
+	WITH_VERBOSE(baton->qry) {
+		auto_free char *name_text = kr_dname_text(rr->owner);
+		auto_free char *type_text = kr_rrtype_text(rr->type);
+		VERBOSE_MSG(baton->qry, "=> stashing rank: 0%0.2o, %s %s\n", rank, name_text, type_text);
 	}
 
 	uint8_t flags = KR_CACHE_FLAG_NONE;

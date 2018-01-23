@@ -9,7 +9,6 @@ if worker.id > 0 then return {} end
 -- in order to enable them to export restful APIs and websocket streams.
 -- One example is statistics module that can stream live metrics on the website,
 -- or publish metrics on request for Prometheus scraper.
-local cqueues = require('cqueues')
 local http_server = require('http.server')
 local http_headers = require('http.headers')
 local http_websocket = require('http.websocket')
@@ -18,7 +17,6 @@ local x509, pkey = require('openssl.x509'), require('openssl.pkey')
 local has_mmdb, mmdb  = pcall(require, 'mmdb')
 
 -- Module declaration
-local cq = cqueues.new()
 local M = {
 	servers = {},
 }
@@ -104,6 +102,13 @@ for k, v in pairs(prometheus.endpoints) do
 end
 M.prometheus = prometheus
 
+-- Export built-in trace interface
+local http_trace = require('http_trace')
+for k, v in pairs(http_trace.endpoints) do
+	M.endpoints[k] = v
+end
+M.trace = http_trace
+
 -- Export HTTP service page snippets
 M.snippets = {}
 
@@ -138,6 +143,7 @@ local function serve(h, stream)
 		-- Serve content type appropriately
 		hsend:append(':status', '200')
 		hsend:append('content-type', mime)
+		hsend:append('content-length', tostring(#data))
 		local ttl = entry and entry[4]
 		if ttl then
 			hsend:append('cache-control', string.format('max-age=%d', ttl))
@@ -176,7 +182,7 @@ local function route(endpoints)
 		else
 			local ok, err, reason = http_util.yieldable_pcall(serve, h, stream)
 			if not ok or err then
-				if err ~= '404' then
+				if err ~= '404' and verbose() then
 					log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
 				end
 				-- Method is not supported
@@ -296,14 +302,18 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 	local routes = route(endpoints)
 	-- Create TLS context and start listening
 	local s, err = http_server.listen {
-		cq = cq;
+		cq = worker.bg_worker.cq,
 		host = host,
 		port = port,
 		client_timeout = 5,
 		ctx = crt and tlscontext(crt, key),
-		onstream = routes;
+		onstream = routes,
 	}
-	if not s then
+	-- Manually call :listen() so that we are bound before calling :localname()
+	if s then
+		err = select(2, s:listen())
+	end
+	if err then
 		panic('failed to listen on %s@%d: %s', host, port, err)
 	end
 	table.insert(M.servers, s)
@@ -321,28 +331,16 @@ end
 
 -- @function Init module
 function M.init()
-	cq:wrap(prometheus.init)
+	worker.coroutine(prometheus.init)
 end
 
 -- @function Cleanup module
 function M.deinit()
-	if M.ev then event.cancel(M.ev) end
 	for i, server in ipairs(M.servers) do
 		server:close()
 		M.servers[i] = nil
 	end
 	prometheus.deinit()
-end
-
--- @function Module runnable
-function M.step(timeout)
-	local ok, err = cq:step(timeout)
-	return ok, err, cq:timeout()
-end
-
--- @function Module pollable fd
-function M.pollfd()
-	return cq:pollfd()
 end
 
 -- @function Configure module
@@ -360,33 +358,6 @@ function M.config(conf)
 		end
 	end
 	M.interface(conf.host, conf.port, M.endpoints, conf.cert, conf.key)
-	-- TODO: configure DNS/HTTP(s) interface
-	if M.ev then return end
-	-- Schedule both I/O activity notification and timeouts
-	local poll_step
-	poll_step = function ()
-		local ok, err, _, co = cq:step(0)
-		if not ok then warn('[http] error: %s %s', err, debug.traceback(co)) end
-		-- Reschedule timeout or create new one
-		local timeout = cq:timeout()
-		if timeout then
-			-- Throttle web requests
-			if timeout == 0 then timeout = 0.001 end
-			-- Convert from seconds to duration
-			timeout = timeout * sec
-			if not M.timeout then
-				M.timeout = event.after(timeout, poll_step)
-			else
-				event.reschedule(M.timeout, timeout)
-			end
-		else -- Cancel running timeout when there is no next deadline
-			if M.timeout then
-				event.cancel(M.timeout)
-				M.timeout = nil
-			end
-		end
-	end
-	M.ev = event.socket(cq:pollfd(), poll_step)
 end
 
 return M

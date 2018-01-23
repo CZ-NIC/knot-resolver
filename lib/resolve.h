@@ -204,6 +204,8 @@ struct kr_request {
 	bool auth_validated; /**< see answ_validated ^^ ; TODO */
 	struct kr_rplan rplan;
 	int has_tls;
+	trace_log_f trace_log; /**< Logging tracepoint */
+	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	knot_mm_t pool;
 };
 

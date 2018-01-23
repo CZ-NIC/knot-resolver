@@ -296,7 +296,6 @@ end
 
 -- @function Publish DAF statistics
 local function publish(_, ws)
-	local cqueues = require('cqueues')
 	local ok, last = true, nil
 	while ok do
 		-- Check if we have new rule matches
@@ -318,7 +317,7 @@ local function publish(_, ws)
 		else
 			ok = ws:send_ping()
 		end
-		cqueues.sleep(1)
+		worker.sleep(1)
 	end
 end
 

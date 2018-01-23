@@ -1,4 +1,3 @@
-local cqueues = require('cqueues')
 local snapshots, snapshots_count = {}, 120
 
 -- Gauge metrics
@@ -83,7 +82,7 @@ local function snapshot_start()
 				table.remove(snapshots, 1)
 			end
 		end
-		cqueues.sleep(1)
+		worker.sleep(1)
 	end
 end
 
@@ -108,7 +107,7 @@ local function stream_stats(_, ws)
 			last = snapshots[id].time
 			ok = ws:send(push)
 		end
-		cqueues.sleep(1)
+		worker.sleep(1)
 	end
 end
 
