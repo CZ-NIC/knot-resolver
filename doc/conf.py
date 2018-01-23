@@ -2,6 +2,8 @@
 
 import sys, os, re, subprocess
 
+import sphinx_rtd_theme
+
 # -- General configuration -----------------------------------------------------
 
 if os.environ.get('READTHEDOCS', None) == 'True':
@@ -47,6 +49,7 @@ htmlhelp_basename = 'apidoc'
 
 # Theme
 html_theme = 'sphinx_rtd_theme'
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # -- Options for LaTeX output --------------------------------------------------
 
