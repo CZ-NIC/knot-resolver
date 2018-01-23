@@ -43,7 +43,9 @@ local function bootstrap(url, ca)
 	end
 	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
 			 .. '       You may want to verify them manually, as described on:\n'
-			 .. '       https://data.iana.org/root-anchors/old/draft-icann-dnssec-trust-anchor.html#sigs'
+			 .. '       https://data.iana.org/root-anchors/old/draft-icann-dnssec-trust-anchor.html#sigs\n'
+			 .. '[ ta ] Current root trust anchors are:'
+			 .. rr
 	return rr, msg
 end
 
