@@ -22,8 +22,8 @@ To enable it, you need to provide trusted root keys. Bootstrapping of the keys i
    $ kresd -k root-new.keys # File for root keys
    [ ta ] keyfile 'root-new.keys': doesn't exist, bootstrapping
    [ ta ] Root trust anchors bootstrapped over https with pinned certificate.
-          You may want to verify them manually, as described on:
-          https://data.iana.org/root-anchors/old/draft-icann-dnssec-trust-anchor.html#sigs
+          You SHOULD verify them manually against original source:
+          https://www.iana.org/dnssec/files
    [ ta ] Current root trust anchors are:
    . 0 IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5
    . 0 IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D

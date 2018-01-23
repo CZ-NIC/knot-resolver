@@ -42,8 +42,8 @@ local function bootstrap(url, ca)
 		return false, string.format('[ ta ] failed to get any record from "%s"', url)
 	end
 	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
-			 .. '       You may want to verify them manually, as described on:\n'
-			 .. '       https://data.iana.org/root-anchors/old/draft-icann-dnssec-trust-anchor.html#sigs\n'
+			 .. '       You SHOULD verify them manually against original source:\n'
+			 .. '       https://www.iana.org/dnssec/files\n'
 			 .. '[ ta ] Current root trust anchors are:'
 			 .. rr
 	return rr, msg
