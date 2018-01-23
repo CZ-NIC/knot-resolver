@@ -28,7 +28,7 @@ build:clang:linux:amd64:
   stage: build
   image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
   script:
-    - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make -k all CFLAGS=-Werror
+    - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument"
     - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make install CFLAGS=-Werror
   tags:
     - docker

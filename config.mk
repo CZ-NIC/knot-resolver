@@ -41,6 +41,7 @@ BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMO
 BUILD_CFLAGS += -fvisibility=hidden
 
 # Otherwise Fedora is making kresd symbols inaccessible for modules
+# TODO: clang needs different flag name, etc.
 BUILD_CFLAGS += -rdynamic
 BUILD_LDFLAGS += -export-dynamic
 
