@@ -23,6 +23,7 @@ ROOTHINTS ?= $(ETCDIR)/root.hints
 COVERAGE_STAGE ?= gcov
 COVERAGE_STATSDIR ?= $(CURDIR)/coverage.stats
 TOPSRCDIR := $(CURDIR)
+KEYFILE_DEFAULT ?=
 
 # Tools
 CC      ?= cc

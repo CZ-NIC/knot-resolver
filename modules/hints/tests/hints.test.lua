@@ -6,7 +6,7 @@ modules = { 'hints' }
 -- test for default configuration
 local function test_default()
 	-- get loaded root hints and change names to lowercase
-	hints_data = utils.table_keys_to_lower(hints.root())
+	local hints_data = utils.table_keys_to_lower(hints.root())
 
 	-- root hints loaded from default location
 	-- check correct ip address of a.root-server.net
@@ -16,11 +16,11 @@ end
 -- test loading from config file
 local function test_custom()
 	-- load custom root hints file with fake ip address for a.root-server.net
-	err_msg = hints.root_file(TEST_DIR .. 'hints_test.zone')
+	local err_msg = hints.root_file(TEST_DIR .. 'hints_test.zone')
 	same(err_msg, '', 'load root hints from file')
 
 	-- get loaded root hints and change names to lowercase
-	hints_data = utils.table_keys_to_lower(hints.root())
+	local hints_data = utils.table_keys_to_lower(hints.root())
 	isnt(hints_data['a.root-servers.net.'], nil, 'can retrieve root hints')
 
 	-- check loaded ip address of a.root-server.net
