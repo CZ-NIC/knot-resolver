@@ -105,6 +105,8 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir);
 /** Load root hints from a zonefile (or config-time default if NULL).
  *
  * @return error message or NULL (statically allocated)
+ * @note exported to be usable from the hints module.
  */
+KR_EXPORT
 const char* engine_hint_root_file(struct kr_context *ctx, const char *file);
 

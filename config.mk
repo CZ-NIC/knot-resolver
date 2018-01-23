@@ -33,6 +33,7 @@ INSTALL := install
 BUILD_LDFLAGS += $(LDFLAGS)
 BUILD_CFLAGS := $(CFLAGS) -std=c99 -D_GNU_SOURCE -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib) -I$(abspath contrib/lmdb)
 BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
+BUILD_CFLAGS += -fvisibility=hidden
 ifeq (,$(findstring -O,$(CFLAGS)))
 	BUILD_CFLAGS += -O2
 endif
