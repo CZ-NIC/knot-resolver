@@ -1,5 +1,5 @@
 -- setup resolver
-modules = { 'policy' }
+-- policy module should be loaded by default, do not load it explicitly
 
 -- test for default configuration
 local function test_tls_forward()
