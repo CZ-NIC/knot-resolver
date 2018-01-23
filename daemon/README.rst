@@ -277,10 +277,10 @@ to download cache from parent, to avoid cold-cache start.
 		cache.size = 100*MB
 	end
 
-Events and services
+Asynchronous events
 ^^^^^^^^^^^^^^^^^^^
 
-The Lua supports a concept called closures_, this is extremely useful for scripting actions upon various events,
+Lua supports a concept called closures_, this is extremely useful for scripting actions upon various events,
 say for example - prune the cache within minute after loading, publish statistics each 5 minutes and so on.
 Here's an example of an anonymous function with :func:`event.recurrent()`:
 
@@ -319,9 +319,8 @@ event loops or monitor open files and then fire a callback when an activity is d
 This allows you to build persistent services like HTTP servers or monitoring probes that cooperate
 well with the daemon internal operations. See :func:`event.socket()`
 
-* File watchers
 
-This is possible with :func:`worker.coroutine()` and cqueues_, see the cqueues documentation for more information.
+File watchers are possible with :func:`worker.coroutine()` and cqueues_, see the cqueues documentation for more information.
 
 .. code-block:: lua
 
@@ -440,7 +439,7 @@ Environment
       > user('root')
       Operation not permitted
 
-.. function:: resolve(name, type[, class = kres.class.IN, options = 0, finish = nil])
+.. function:: resolve(name, type[, class = kres.class.IN, options = {}, finish = nil])
 
    :param string name: Query name (e.g. 'com.')
    :param number type: Query type (e.g. ``kres.type.NS``)

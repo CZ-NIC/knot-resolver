@@ -834,7 +834,9 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 
 	struct mempool *mp = mp_new(512);
 
-	static char *snames[] = {";; ANSWER SECTION",";; AUTHORITY SECTION",";; ADDITIONAL SECTION"};
+	static const char * snames[] = {
+		";; ANSWER SECTION", ";; AUTHORITY SECTION", ";; ADDITIONAL SECTION"
+	};
 	char rrtype[32];
 	char flags[32];
 	char qname[KNOT_DNAME_MAXLEN];
@@ -881,6 +883,7 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		if (sec->count == 0 || knot_pkt_rr(sec, 0)->type == KNOT_RRTYPE_OPT) {
+			/* OPT RRs are _supposed_ to be the last ^^, if they appear */
 			continue;
 		}
 
@@ -908,8 +911,8 @@ char *kr_rrset_text(const knot_rrset_t *rr)
 	}
 
 	/* Note: knot_rrset_txt_dump will double the size until the rrset fits */
-	char *buf = malloc(128);
-	size_t bufsize = sizeof(128);
+	size_t bufsize = 128;
+	char *buf = malloc(bufsize);
 	int ret = knot_rrset_txt_dump(rr, &buf, &bufsize, &KNOT_DUMP_STYLE_DEFAULT);
 	if (ret < 0) {
 		free(buf);

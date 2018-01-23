@@ -2190,6 +2190,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options)
 {
 	if (!worker || !query) {
+		assert(!EINVAL);
 		return NULL;
 	}
 
