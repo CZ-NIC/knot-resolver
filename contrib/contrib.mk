@@ -16,6 +16,7 @@ contrib_SOURCES += contrib/lmdb/mdb.c \
                    contrib/lmdb/midl.c
 contrib_CFLAGS  += -pthread
 contrib_LIBS    += -pthread
+lmdb_CFLAGS     += -I$(abspath contrib/lmdb)
 endif
 
 $(eval $(call make_static,contrib,contrib))
