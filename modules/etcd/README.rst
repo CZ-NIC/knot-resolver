@@ -4,15 +4,15 @@ Etcd module
 -----------
 
 The module connects to Etcd peers and watches for configuration change.
-By default, the module looks for the subtree under ``/kresd`` directory,
+By default, the module looks for the subtree under ``/knot-resolver`` directory,
 but you can change this `in the configuration <https://github.com/mah0x211/lua-etcd#cli-err--etcdnew-optiontable->`_.
 
 The subtree structure corresponds to the configuration variables in the declarative style.
 
 .. code-block:: bash
 
-	$ etcdctl set /kresd/net/127.0.0.1 53
-	$ etcdctl set /kresd/cache/size 10000000
+	$ etcdctl set /knot-resolvevr/net/127.0.0.1 53
+	$ etcdctl set /knot-resolver/cache/size 10000000
 
 Configures all listening nodes to following configuration:
 
@@ -28,7 +28,7 @@ Example configuration
 
 	modules = {
 		etcd = {
-			prefix = '/kresd',
+			prefix = '/knot-resolver',
 			peer = 'http://127.0.0.1:7001'
 		}
 	}

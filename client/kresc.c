@@ -90,7 +90,7 @@ const char *get_type_name(const char *value)
 
 static void complete_function(EditLine * el)
 {
-	//Add left parenthesis to function name. 
+	//Add left parenthesis to function name.
 	el_insertstr(el, "(");
 }
 
@@ -392,7 +392,7 @@ static int interact()
 		//Create necessary folders.
 		char *dirs[3] =
 		    { afmt("%s/.local", home), afmt("%s/.local/share", home),
-			afmt("%s/.local/share/kresd/", home)
+			afmt("%s/.local/share/knot-resolver/", home)
 		};
 		bool ok = true;
 		for (int i = 0; i < 3; i++) {
@@ -403,12 +403,12 @@ static int interact()
 		}
 		if (ok) {
 			hist_file =
-			    afmt("%s/.local/share/kresd/" HISTORY_FILE, home);
+			    afmt("%s/.local/share/knot-resolver/" HISTORY_FILE, home);
 		}
 	} else {
-		if (!mkdir(afmt("%s/kresd/", data_home), 0755)
+		if (!mkdir(afmt("%s/knot-resolver/", data_home), 0755)
 		    || errno == EEXIST) {
-			hist_file = afmt("%s/kresd/" HISTORY_FILE, data_home);
+			hist_file = afmt("%s/knot-resolver/" HISTORY_FILE, data_home);
 		}
 	}
 

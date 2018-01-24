@@ -5,7 +5,7 @@
 net = { '127.0.0.1', '::1', '192.168.1.1' }
 
 -- Drop root privileges
-user('kresd', 'kresd')
+user('knot-resolver', 'knot-resolver')
 
 -- Auto-maintain root TA
 trust_anchors.file = 'root.keys'
@@ -28,7 +28,7 @@ modules = {
 -- Large cache size, so we don't need to flush often
 -- This can be larger than available RAM, least frequently accessed
 -- records will be paged out
-cache.size = 4 * GB 
+cache.size = 4 * GB
 
 -- Forward everything below `company.cz` to `192.168.1.3`
 policy.add(policy.suffix(policy.FORWARD('192.168.1.3'), {todname('company.cz')}))
