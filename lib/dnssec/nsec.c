@@ -85,13 +85,25 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
 	assert(nsec && sname);
-	// FIXME needs explicit lower-casing with libknot >= 2.7
-	// see also RFC 6840 5.1.
-	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
 	if (knot_dname_cmp(sname, nsec->owner) <= 0) {
 		return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */
 	}
+
 	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
+#if KNOT_VERSION_HEX < ((2 << 16) | (7 << 8) | 0)
+	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
+#else
+	/* We have to lower-case it with libknot >= 2.7; see also RFC 6840 5.1. */
+	knot_dname_t next[KNOT_DNAME_MAXLEN];
+	int ret = knot_dname_to_wire(next, knot_nsec_next(&nsec->rrs), sizeof(next));
+	if (ret >= 0) {
+		ret = knot_dname_to_lower(next);
+	}
+	if (ret < 0) {
+		assert(!ret);
+		return kr_error(ret);
+	}
+#endif
 	const bool is_last_nsec = knot_dname_cmp(nsec->owner, next) >= 0;
 	const bool in_range = is_last_nsec || knot_dname_cmp(sname, next) < 0;
 	if (!in_range) {

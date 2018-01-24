@@ -235,7 +235,12 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		return "EINVAL";
 	}
 	ret = kr_dname_lf(chs, next, false);
-	// FIXME lower-case with libknot-2.7
+#if KNOT_VERSION_HEX >= ((2 << 16) | (7 << 8) | 0)
+	/* We have to lower-case it with libknot >= 2.7; see also RFC 6840 5.1. */
+	if (!ret) {
+		ret = knot_dname_to_lower(next);
+	}
+#endif
 	if (ret) {
 		assert(false);
 		return "ERROR";
