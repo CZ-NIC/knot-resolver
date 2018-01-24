@@ -85,6 +85,8 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
 	assert(nsec && sname);
+	// FIXME needs explicit lower-casing with libknot >= 2.7
+	// see also RFC 6840 5.1.
 	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
 	if (knot_dname_cmp(sname, nsec->owner) <= 0) {
 		return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */

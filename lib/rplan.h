@@ -76,7 +76,7 @@ void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2);
  */
 struct kr_query {
 	struct kr_query *parent;
-	knot_dname_t *sname;
+	knot_dname_t *sname; /**< The name to resolve - lower-cased, uncompressed. */
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;

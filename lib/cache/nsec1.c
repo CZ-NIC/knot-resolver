@@ -235,6 +235,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		return "EINVAL";
 	}
 	ret = kr_dname_lf(chs, next, false);
+	// FIXME lower-case with libknot-2.7
 	if (ret) {
 		assert(false);
 		return "ERROR";
@@ -343,15 +344,30 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 		kr_dname_print(knot_nsec_next(&nsec_rr->rrs), "", ", ");
 		kr_log_verbose("new TTL %d\n", new_ttl);
 	}
+
 	/* Find label count of the closest encloser.
-	 * Both points in an NSEC do exist and any prefixes
-	 * of those names as well (empty non-terminals),
-	 * but nothing else does inside this "triangle".
+	 * Both endpoints in an NSEC do exist (though possibly in a child zone)
+	 * and any prefixes of those names as well (empty non-terminals),
+	 * but nothing else exists inside this "triangle".
+	 *
+	 * Note that we have to lower-case the next name for comparison,
+	 * even though we have canonicalized NSEC already; see RFC 6840 5.1.
+	 * LATER(optim.): it might be faster to use the LFs we already have.
 	 */
+	knot_dname_t next[KNOT_DNAME_MAXLEN];
+	int ret = knot_dname_to_wire(next, knot_nsec_next(&nsec_rr->rrs), sizeof(next));
+	if (ret >= 0) {
+		ret = knot_dname_to_lower(next);
+	}
+	if (ret < 0) {
+		assert(!ret);
+		return kr_error(ret);
+	}
 	*clencl_labels = MAX(
 		nsec_matched,
-		knot_dname_matched_labels(qry->sname, knot_nsec_next(&nsec_rr->rrs))
+		knot_dname_matched_labels(qry->sname, next)
 		);
+
 	/* Empty non-terminals don't need to have
 	 * a matching NSEC record. */
 	if (sname_labels == *clencl_labels) {
