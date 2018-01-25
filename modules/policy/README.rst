@@ -26,6 +26,7 @@ There are several actions available in the ``policy.`` table:
 
 * ``PASS`` - let the query pass through; it's useful to make exceptions before wider rules
 * ``DENY`` - reply NXDOMAIN authoritatively
+* ``DENY_MSG(msg)`` - reply NXDOMAIN authoritatively and add explanatory message to additional section
 * ``DROP`` - terminate query resolution and return SERVFAIL to the requestor
 * ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
 * ``FORWARD(ip)`` - resolve a query via forwarding to an IP while validating and caching locally;
