@@ -148,7 +148,7 @@ static bool is_valid_addr(const uint8_t *addr, size_t len)
 }
 
 /** @internal Update NS address from record \a rr.  Return _FAIL on error. */
-static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
+static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *glue_cnt)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		const knot_rdata_t *rdata = rr->rrs.data;
@@ -172,15 +172,21 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
-		QVERBOSE_MSG(query, "<= using glue for "
+
+		++*glue_cnt; /* reduced verbosity */
+		/* QVERBOSE_MSG(query, "<= using glue for "
 			     "'%s': '%s'\n", name_str, addr_str);
+		*/
 	}
 	return KR_STATE_CONSUME;
 }
 
-/** @internal From \a pkt, fetch glue records for name \a ns, and update the cut etc. */
+/** @internal From \a pkt, fetch glue records for name \a ns, and update the cut etc.
+ *
+ * \param glue_cnt the number of accepted addresses (to be incremented)
+ */
 static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, bool in_bailiwick,
-			struct kr_request *req, const struct kr_query *qry)
+			struct kr_request *req, const struct kr_query *qry, int *glue_cnt)
 {
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
@@ -208,7 +214,7 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, bool in_bailiwic
 			    (req->ctx->options.NO_IPV6)) {
 				continue;
 			}
-			(void) update_nsaddr(rr, req->current_query);
+			(void) update_nsaddr(rr, req->current_query, glue_cnt);
 		}
 	}
 }
@@ -233,7 +239,8 @@ static bool has_glue(knot_pkt_t *pkt, const knot_dname_t *ns)
  * @param current_cut is cut name before this packet.
  * @return _DONE if cut->name changes, _FAIL on error, and _CONSUME otherwise. */
 static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
-		      struct kr_request *req, const knot_dname_t *current_cut)
+		      struct kr_request *req, const knot_dname_t *current_cut,
+		      int *glue_cnt)
 {
 	struct kr_query *qry = req->current_query;
 	struct kr_zonecut *cut = &qry->zone_cut;
@@ -302,7 +309,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 			do_fetch = in_bailiwick;
 		}
 		if (do_fetch) {
-			fetch_glue(pkt, ns_name, in_bailiwick, req, qry);
+			fetch_glue(pkt, ns_name, in_bailiwick, req, qry, glue_cnt);
 		}
 	}
 
@@ -402,12 +409,13 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	/* Remember current bailiwick for NS processing. */
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
 	bool ns_record_exists = false;
+	int glue_cnt = 0;
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
 			ns_record_exists = true;
-			int state = update_cut(pkt, rr, req, current_zone_cut);
+			int state = update_cut(pkt, rr, req, current_zone_cut, &glue_cnt);
 			switch(state) {
 			case KR_STATE_DONE: result = state; break;
 			case KR_STATE_FAIL: return state; break;
@@ -417,6 +425,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			/* SOA below cut in authority indicates different authority, but same NS set. */
 			qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 		}
+	}
+
+	if (glue_cnt) {
+		VERBOSE_MSG("<= loaded %d glue addresses\n", glue_cnt);
 	}
 
 
@@ -492,7 +504,8 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				/* if not referral, mark record to be written to final answer */
 				to_wire = !referral;
 			} else {
-				state = update_nsaddr(rr, query->parent);
+				int cnt_ = 0;
+				state = update_nsaddr(rr, query->parent, &cnt_);
 				if (state == KR_STATE_FAIL) {
 					return state;
 				}

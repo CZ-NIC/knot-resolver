@@ -393,7 +393,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			   const knot_dname_t *name, const struct kr_query *qry,
 			   bool * restrict secured)
 {
-	VERBOSE_MSG(qry, "_find_cached\n");
+	//VERBOSE_MSG(qry, "_find_cached\n");
 	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
 	}
@@ -425,7 +425,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			kr_cache_sync(&ctx->cache);
 			WITH_VERBOSE(qry) {
 				auto_free char *label_str = kr_dname_text(label);
-				VERBOSE_MSG(qry, "  and found cut: %s\n", label_str);
+				VERBOSE_MSG(qry, "found cut: %s\n", label_str);
 			}
 			return kr_ok();
 		}

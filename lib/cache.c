@@ -635,7 +635,8 @@ do_soa:
 
 /** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
 static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
-			const struct kr_query *qry, struct kr_cache *cache);
+			const struct kr_query *qry, struct kr_cache *cache,
+			int *unauth_cnt);
 
 int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
@@ -658,6 +659,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Stash individual records. */
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	int ret = 0;
+	int unauth_cnt = 0;
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 		const ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
@@ -667,7 +669,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				continue;
 				/* TODO: probably safe to break but maybe not worth it */
 			}
-			ret = stash_rrset(arr, i, qry, cache);
+			ret = stash_rrset(arr, i, qry, cache, &unauth_cnt);
 			if (ret) {
 				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
 				goto finally;
@@ -680,12 +682,16 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	stash_pkt(pkt, qry, req);
 
 finally:
+	if (unauth_cnt) {
+		VERBOSE_MSG(qry, "=> stashed also %d nonauth RRs\n", unauth_cnt);
+	};
 	kr_cache_sync(cache);
 	return ctx->state; /* we ignore cache-stashing errors */
 }
 
 static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
-			const struct kr_query *qry, struct kr_cache *cache)
+			const struct kr_query *qry, struct kr_cache *cache,
+			int *unauth_cnt)
 {
 	const ranked_rr_array_entry_t *entry = arr->at[arr_i];
 	if (entry->cached) {
@@ -818,9 +824,14 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 	assert(entry_h_consistent(val_new_entry, rr->type));
 
 	WITH_VERBOSE(qry) {
+		/* Reduce verbosity. */
+		if (!kr_rank_test(entry->rank, KR_RANK_AUTH)) {
+			++*unauth_cnt;
+			return kr_ok();
+		}
 		auto_free char *type_str = kr_rrtype_text(rr->type),
 			*encl_str = kr_dname_text(encloser);
-		VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, %s %s%s"
+		VERBOSE_MSG(qry, "=> stashed rank: 0%.2o, %s %s%s "
 			"(%d B total, incl. %d RRSIGs)\n",
 			entry->rank, type_str, (wild_labels ? "*." : ""), encl_str,
 			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.rr_count : 0)
@@ -938,7 +949,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 			struct kr_cache_p *peek)
 {	/* Just wrap with extra verbose logging. */
 	const int ret = peek_exact_real(cache, name, type, peek);
-	if (VERBOSE_STATUS) {
+	if (false && VERBOSE_STATUS) { /* too noisy for usual --verbose */
 		auto_free char *type_str = kr_rrtype_text(type),
 			*name_str = kr_dname_text(name);
 		const char *result_str = (ret == kr_ok() ? "hit" :
