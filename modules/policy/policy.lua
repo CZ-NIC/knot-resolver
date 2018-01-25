@@ -287,8 +287,8 @@ local function mkauth_soa(answer, dname, mname)
 	if mname == nil then
 		mname = dname
 	end
-	return answer:put(dname, 900, answer:qclass(), kres.type.SOA,
-		mname .. '\6nobody\7invalid\0\0\0\0\0\0\0\14\16\0\0\3\132\0\9\58\128\0\0\3\132')
+	return answer:put(dname, 10800, answer:qclass(), kres.type.SOA,
+		mname .. '\6nobody\7invalid\0\0\0\0\1\0\0\14\16\0\0\4\176\0\9\58\128\0\0\42\48')
 end
 
 local dname_localhost = todname('localhost.')
@@ -475,10 +475,10 @@ function policy.DENY_MSG(msg)
 		ffi.C.kr_pkt_make_auth_header(answer)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
-		mkauth_soa(answer, '\7blocked\0')
+		mkauth_soa(answer, answer:qname())
 		if msg then
 			answer:begin(kres.section.ADDITIONAL)
-			answer:put('\11explanation\7invalid', 900, answer:qclass(), kres.type.TXT,
+			answer:put('\11explanation\7invalid', 10800, answer:qclass(), kres.type.TXT,
 				   string.char(#msg) .. msg)
 
 		end
