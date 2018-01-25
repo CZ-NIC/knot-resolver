@@ -172,6 +172,7 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	/* Class and type must be set outside this function. */
 	qry->flags = rplan->request->options;
 	qry->parent = parent;
+	qry->request = rplan->request;
 	qry->ns.ctx = rplan->request->ctx;
 	qry->ns.addr[0].ip.sa_family = AF_UNSPEC;
 	gettimeofday(&qry->timestamp, NULL);
@@ -207,8 +208,8 @@ struct kr_query *kr_rplan_push_empty(struct kr_rplan *rplan, struct kr_query *pa
 		return NULL;
 	}
 
-	WITH_VERBOSE {
-	VERBOSE_MSG(parent, "plan '%s' type '%s'\n", "", "");
+	WITH_VERBOSE(qry) {
+	VERBOSE_MSG(qry, "plan '%s' type '%s'\n", "", "");
 	}
 	return qry;
 }
@@ -228,7 +229,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	qry->sclass = cls;
 	qry->stype = type;
 
-	WITH_VERBOSE {
+	WITH_VERBOSE(qry) {
 	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 	knot_dname_to_str(name_str, name, sizeof(name_str));
 	knot_rrtype_to_string(type, type_str, sizeof(type_str));
@@ -277,6 +278,15 @@ struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan)
 		return NULL;
 	}
 	return array_tail(rplan->resolved);
+}
+
+struct kr_query *kr_rplan_last(struct kr_rplan *rplan)
+{
+	if (!kr_rplan_empty(rplan)) {
+		return array_tail(rplan->pending);
+	}
+
+	return kr_rplan_resolved(rplan);
 }
 
 struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query *parent,

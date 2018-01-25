@@ -21,7 +21,9 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <contrib/cleanup.h>
+#include <contrib/ccan/asprintf/asprintf.h>
 #include <ccan/isaac/isaac.h>
+#include <ucw/mempool.h>
 #include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
@@ -104,6 +106,28 @@ void kr_log_verbose(const char *fmt, ...)
 		va_end(args);
 		fflush(stdout);
 	}
+}
+
+bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...)
+{
+	if (!kr_log_trace_enabled(query)) {
+		return false;
+	}
+
+	auto_free char *msg = NULL;
+
+	va_list args;
+	va_start(args, fmt);
+	int len = vasprintf(&msg, fmt, args);
+	va_end(args);
+
+	/* Check formatting result before logging */
+	if (len < 0) {
+		return false;
+	}
+
+	query->request->trace_log(query, source, msg);
+	return true;
 }
 
 char* kr_strcatdup(unsigned n, ...)
@@ -748,21 +772,6 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 	return NULL;
 }
 
-void kr_rrset_print(const knot_rrset_t *rr, const char *prefix)
-{
-#if KNOT_VERSION_HEX < ((2 << 16) | (4 << 8))
-	char rrtext[KNOT_DNAME_MAXLEN * 2] = {0};
-	knot_rrset_txt_dump(rr, rrtext, sizeof(rrtext), &KNOT_DUMP_STYLE_DEFAULT);
-	kr_log_verbose("%s%s", prefix, rrtext);
-#else
-	size_t size = 4000;
-	char *rrtext = malloc(size);
-	knot_rrset_txt_dump(rr, &rrtext, &size, &KNOT_DUMP_STYLE_DEFAULT);
-	kr_log_verbose("%s%s", prefix, rrtext);
-	free(rrtext);
-#endif
-}
-
 static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 {
 	int offset = 0;
@@ -794,7 +803,7 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 	dst[offset] = 0;
 }
 
-static void print_section_opt(const knot_rrset_t *rr, const uint8_t rcode)
+static char *print_section_opt(struct mempool *mp, char *endp, const knot_rrset_t *rr, const uint8_t rcode)
 {
 	uint8_t ercode = knot_edns_get_ext_rcode(rr);
 	uint16_t ext_rcode_id = knot_edns_whole_rcode(ercode, rcode);
@@ -810,18 +819,27 @@ static void print_section_opt(const knot_rrset_t *rr, const uint8_t rcode)
 		}
 	}
 
-	kr_log_verbose(";; EDNS PSEUDOSECTION:\n;; "
-		       "Version: %u; flags: %s; UDP size: %u B; ext-rcode: %s\n\n",
-		       knot_edns_get_version(rr),
-		       (knot_edns_do(rr) != 0) ? "do" : "",
-		       knot_edns_get_payload(rr),
-		       ext_rcode_str);
+	return mp_printf_append(mp, endp,
+		";; EDNS PSEUDOSECTION:\n;; "
+		"Version: %u; flags: %s; UDP size: %u B; ext-rcode: %s\n\n",
+		knot_edns_get_version(rr),
+		(knot_edns_do(rr) != 0) ? "do" : "",
+		knot_edns_get_payload(rr),
+		ext_rcode_str);
 
 }
 
-void kr_pkt_print(knot_pkt_t *pkt)
+char *kr_pkt_text(const knot_pkt_t *pkt)
 {
-	char *snames[] = {";; ANSWER SECTION",";; AUTHORITY SECTION",";; ADDITIONAL SECTION"};
+	if (!pkt) {
+		return NULL;
+	}
+
+	struct mempool *mp = mp_new(512);
+
+	static const char * snames[] = {
+		";; ANSWER SECTION", ";; AUTHORITY SECTION", ";; ADDITIONAL SECTION"
+	};
 	char rrtype[32];
 	char flags[32];
 	char qname[KNOT_DNAME_MAXLEN];
@@ -841,78 +859,70 @@ void kr_pkt_print(knot_pkt_t *pkt)
 		opcode_str = opcode->name;
 	}
 	flags_to_str(flags, pkt, sizeof(flags));
-	kr_log_verbose(";; ->>HEADER<<- opcode: %s; status: %s; id: %hu\n",
-		       opcode_str, rcode_str, qry_id);
 
-	kr_log_verbose(";; Flags: %s QUERY: %hu; ANSWER: %hu; "
-		       "AUTHORITY: %hu; ADDITIONAL: %hu\n\n",
-		       flags,
-		       qdcount,
-		       knot_wire_get_ancount(pkt->wire),
-		       knot_wire_get_nscount(pkt->wire),
-		       knot_wire_get_arcount(pkt->wire));
+	char *ptr = mp_printf(mp,
+		";; ->>HEADER<<- opcode: %s; status: %s; id: %hu\n"
+		";; Flags: %s QUERY: %hu; ANSWER: %hu; "
+		"AUTHORITY: %hu; ADDITIONAL: %hu\n\n",
+		opcode_str, rcode_str, qry_id,
+		flags,
+		qdcount,
+		knot_wire_get_ancount(pkt->wire),
+		knot_wire_get_nscount(pkt->wire),
+		knot_wire_get_arcount(pkt->wire));
 
 	if (knot_pkt_has_edns(pkt)) {
-		print_section_opt(pkt->opt_rr,
-		                  knot_wire_get_rcode(pkt->wire));
+		ptr = print_section_opt(mp, ptr, pkt->opt_rr, knot_wire_get_rcode(pkt->wire));
 	}
 
 	if (qdcount == 1) {
 		knot_dname_to_str(qname, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
 		knot_rrtype_to_string(knot_pkt_qtype(pkt), rrtype, sizeof(rrtype));
-		kr_log_verbose(";; QUESTION SECTION\n%s\t\t%s\n\n", qname, rrtype);
+		ptr = mp_printf_append(mp, ptr, ";; QUESTION SECTION\n%s\t\t%s\n", qname, rrtype);
 	} else if (qdcount > 1) {
-		kr_log_verbose(";; Warning: unsupported QDCOUNT %hu\n", qdcount);
+		ptr = mp_printf_append(mp, ptr, ";; Warning: unsupported QDCOUNT %hu\n", qdcount);
 	}
-	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_AUTHORITY; ++i) {
+
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
-		if (sec->count == 0) {
+		if (sec->count == 0 || knot_pkt_rr(sec, 0)->type == KNOT_RRTYPE_OPT) {
+			/* OPT RRs are _supposed_ to be the last ^^, if they appear */
 			continue;
 		}
-		kr_log_verbose("%s\n", snames[i - KNOT_ANSWER]);
+
+		ptr = mp_printf_append(mp, ptr, "\n%s\n", snames[i - KNOT_ANSWER]);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
-			kr_rrset_print(rr, "");
+			if (rr->type == KNOT_RRTYPE_OPT) {
+				continue;
+			}
+			auto_free char *rr_text = kr_rrset_text(rr);
+			ptr = mp_printf_append(mp, ptr, "%s", rr_text);
 		}
-		kr_log_verbose("\n");
 	}
-	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ADDITIONAL);
-	bool header_was_printed = false;
-	for (unsigned k = 0; k < sec->count; ++k) {
-		const knot_rrset_t *rr = knot_pkt_rr(sec, k);
-		if (rr->type == KNOT_RRTYPE_OPT) {
-			continue;
-		}
-		if (!header_was_printed) {
-			header_was_printed = true;
-			kr_log_verbose("%s\n", snames[KNOT_ADDITIONAL - KNOT_ANSWER]);
-		}
-		kr_rrset_print(rr, "");
+
+	/* Close growing buffer and duplicate result before deleting */
+	char *result = strdup(ptr);
+	mp_delete(mp);
+	return result;
+}
+
+char *kr_rrset_text(const knot_rrset_t *rr)
+{
+	if (!rr) {
+		return NULL;
 	}
-	kr_log_verbose("\n");
-}
 
-void kr_dname_print(const knot_dname_t *name, const char *prefix, const char *postfix)
-{
-	char str[KNOT_DNAME_MAXLEN] = {0};
-	knot_dname_to_str(str, name, KNOT_DNAME_MAXLEN);
-	kr_log_verbose("%s%s%s", prefix, str, postfix);
-}
+	/* Note: knot_rrset_txt_dump will double the size until the rrset fits */
+	size_t bufsize = 128;
+	char *buf = malloc(bufsize);
+	int ret = knot_rrset_txt_dump(rr, &buf, &bufsize, &KNOT_DUMP_STYLE_DEFAULT);
+	if (ret < 0) {
+		free(buf);
+		return NULL;
+	}
 
-void kr_rrtype_print(const uint16_t rrtype, const char *prefix, const char *postfix)
-{
-	char str[32] = {0};
-	knot_rrtype_to_string(rrtype, str, 32);
-	kr_log_verbose("%s%s%s", prefix, str, postfix);
-}
-
-void kr_qry_print(const struct kr_query *qry, const char *prefix, const char *postfix)
-{
-	char str[6] = {0};
-	knot_rrclass_to_string(qry->sclass, str, sizeof(str));
-	kr_dname_print(qry->sname, prefix, " ");
-	kr_log_verbose("%s",str);
-	kr_rrtype_print(qry->stype, " ", postfix);
+	return buf;
 }
 
 uint64_t kr_now()

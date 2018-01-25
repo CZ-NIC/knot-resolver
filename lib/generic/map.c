@@ -118,24 +118,8 @@ static cb_data_t *cbt_make_data(map_t *map, const uint8_t *str, size_t len, void
 	return x;
 }
 
-/*! Creates a new, empty critbit map */
-EXPORT map_t map_make(void)
-{
-	map_t map;
-	map.root = NULL;
-	map.malloc = &malloc_std;
-	map.free = &free_std;
-	map.baton = NULL;
-	return map;
-}
-
-/*! Returns non-zero if map contains str */
-EXPORT int map_contains(map_t *map, const char *str)
-{
-	return map_get(map, str) != NULL;
-}
-
-EXPORT void *map_get(map_t *map, const char *str)
+/*! Like map_contains, but also set the value, if passed and found. */
+static int cbt_get(map_t *map, const char *str, void **value)
 {
 	const uint8_t *ubytes = (void *)str;
 	const size_t ulen = strlen(str);
@@ -143,7 +127,7 @@ EXPORT void *map_get(map_t *map, const char *str)
 	cb_data_t *x = NULL;
 
 	if (p == NULL) {
-		return NULL;
+		return 0;
 	}
 
 	while (ref_is_internal(p)) {
@@ -161,10 +145,37 @@ EXPORT void *map_get(map_t *map, const char *str)
 
 	x = (cb_data_t *)p;
 	if (strcmp(str, (const char *)x->key) == 0) {
-		return x->value;
+		if (value != NULL) {
+			*value = x->value;
+		}
+		return 1;
 	}
 
-	return NULL;
+	return 0;
+}
+
+/*! Creates a new, empty critbit map */
+EXPORT map_t map_make(void)
+{
+	map_t map;
+	map.root = NULL;
+	map.malloc = &malloc_std;
+	map.free = &free_std;
+	map.baton = NULL;
+	return map;
+}
+
+/*! Returns non-zero if map contains str */
+EXPORT int map_contains(map_t *map, const char *str)
+{
+	return cbt_get(map, str, NULL);
+}
+
+EXPORT void *map_get(map_t *map, const char *str)
+{
+	void *v = NULL;
+	cbt_get(map, str, &v);
+	return v;
 }
 
 /*! Inserts str into map, returns 0 on success */

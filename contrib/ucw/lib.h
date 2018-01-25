@@ -15,6 +15,7 @@
 
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #ifdef CONFIG_UCW_CLEAN_ABI
 #define assert_failed ucw_assert_failed

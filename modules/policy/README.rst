@@ -193,6 +193,9 @@ Most properties (actions, filters) are described above.
       policy.todnames({'example.com', 'me.cz'})
       { '\7example\3com\0', '\2me\2cz\0' }
 
+This module is enabled by default because it implements mandatory :rfc:`6761` logic. For debugging purposes you can add ``modules.unload('policy')`` to your config to unload the module.
+
+
 .. _`Aho-Corasick`: https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
 .. _`@jgrahamc`: https://github.com/jgrahamc/aho-corasick-lua
 .. _RPZ: https://dnsrpz.info/

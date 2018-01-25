@@ -34,7 +34,7 @@ function predict.drain()
 	local deleted = 0
 	for key, _ in pairs(predict.queue) do
 		local qtype, qname = key:match('(%S*)%s(.*)')
-		worker.resolve(qname, kres.type[qtype], kres.class.IN, 'NO_CACHE')
+		resolve(qname, kres.type[qtype], kres.class.IN, {'NO_CACHE'})
 		predict.queue[key] = nil
 		deleted = deleted + 1
 		-- Resolve smaller batches at a time
@@ -177,7 +177,7 @@ predict.layer = {
 		for i = 0, (tonumber(qrys.len) - 1) do -- size_t doesn't work for some reason
 			local qry = qrys.at[i]
 			if qry.flags.EXPIRING == true then
-				worker.resolve(kres.dname2str(qry.sname), qry.stype, qry.sclass, 'NO_CACHE')
+				resolve(kres.dname2str(qry.sname), qry.stype, qry.sclass, {'NO_CACHE'})
 			end
 		end
 	end

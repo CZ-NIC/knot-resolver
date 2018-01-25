@@ -1,3 +1,5 @@
+local ffi = require('ffi')
+
 -- Units
 kB = 1024
 MB = 1024*kB
@@ -23,16 +25,44 @@ end
 
 -- Resolver bindings
 kres = require('kres')
-trust_anchors = require('trust_anchors')
 if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
 
--- Compat. wrapper for query flags.
-worker.resolve = function (p1, p2, p3, options, p5)
+-- Compatibility wrapper for query flags.
+worker.resolve = function (qname, qtype, qclass, options, finish, init)
+	-- Alternatively use named arguments
+	if type(qname) == 'table' then
+		local t = qname
+		qname = t.name
+		qtype = t.type or kres.type.A
+		qclass = t.class or kres.class.IN
+		options = t.options
+		finish = t.finish
+		init = t.init
+	end
+
+	local init_cb, finish_cb = init, nil
+	if finish then
+		-- Create callback for finalization
+		finish_cb = ffi.cast('trace_callback_f', function (req)
+			req = kres.request_t(req)
+			finish(req.answer, req)
+			finish_cb:free()
+		end)
+		-- Wrap initialiser to install finish callback
+		init_cb = function (req)
+			req = kres.request_t(req)
+			if init then init(req) end
+			req.trace_finish = finish_cb
+		end
+	end
+
+	-- Translate options and resolve
 	options = kres.mk_qflags(options)
-	return worker.resolve_unwrapped (p1, p2, p3, options, p5)
+	return worker.resolve_unwrapped(qname, qtype, qclass, options, init_cb)
 end
+
 resolve = worker.resolve
 
 -- Shorthand for aggregated per-worker information
@@ -172,7 +202,7 @@ end
 
 -- Make sandboxed environment
 local function make_sandbox(defined)
-	local __protected = { modules = true, cache = true, net = true, trust_anchors = true }
+	local __protected = { worker = true, env = true, modules = true, cache = true, net = true, trust_anchors = true }
 
 	-- Compute and export the list of top-level names (hidden otherwise)
 	local nl = ""
@@ -203,10 +233,13 @@ else -- Lua 5.2+
 end
 
 -- Load embedded modules
+trust_anchors = require('trust_anchors')
 modules.load('ta_signal_query')
+modules.load('policy')
 modules.load('priming')
 modules.load('detect_time_skew')
 modules.load('detect_time_jump')
+modules.load('ta_sentinel')
 
 -- Interactive command evaluation
 function eval_cmd(line, raw)
@@ -266,4 +299,77 @@ function table_print (tt, indent, done)
 		result = result .. tostring(tt) .. "\n"
 	end
 	return result
+end
+
+-- This extends the worker module to allow asynchronous execution of functions and nonblocking I/O.
+-- The current implementation combines cqueues for Lua interface, and event.socket() in order to not
+-- block resolver engine while waiting for I/O or timers.
+--
+local has_cqueues, cqueues = pcall(require, 'cqueues')
+if has_cqueues then
+
+	-- Export the asynchronous sleep function
+	worker.sleep = cqueues.sleep
+
+	-- Create metatable for workers to define the API
+	-- It can schedule multiple cqueues and yield execution when there's a wait for blocking I/O or timer
+	local asynchronous_worker_mt = {
+		work = function (self)
+			local ok, err, _, co = self.cq:step(0)
+			if not ok then
+				warn('[%s] error: %s %s', self.name or 'worker', err, debug.traceback(co))
+			end
+			-- Reschedule timeout or create new one
+			local timeout = self.cq:timeout()
+			if timeout then
+				-- Throttle timeouts to avoid too frequent wakeups
+				if timeout == 0 then timeout = 0.00001 end
+				-- Convert from seconds to duration
+				timeout = timeout * sec
+				if not self.next_timeout then
+					self.next_timeout = event.after(timeout, self.on_step)
+				else
+					event.reschedule(self.next_timeout, timeout)
+				end
+			else -- Cancel running timeout when there is no next deadline
+				if self.next_timeout then
+					event.cancel(self.next_timeout)
+					self.next_timeout = nil
+				end
+			end
+		end,
+		wrap = function (self, f)
+			self.cq:wrap(f)
+		end,
+		loop = function (self)
+			self.on_step = function () self:work() end
+			self.event_fd = event.socket(self.cq:pollfd(), self.on_step)
+		end,
+		close = function (self)
+			if self.event_fd then
+				event.cancel(self.event_fd)
+				self.event_fd = nil
+			end
+		end,
+	}
+
+	-- Implement the coroutine worker with cqueues
+	local function worker_new (name)
+		return setmetatable({name = name, cq = cqueues.new()}, { __index = asynchronous_worker_mt })
+	end
+
+	-- Create a default background worker
+	worker.bg_worker = worker_new('worker.background')
+	worker.bg_worker:loop()
+
+	-- Wrap a function for asynchronous execution
+	function worker.coroutine (f)
+		worker.bg_worker:wrap(f)
+	end
+else
+	-- Disable asynchronous execution
+	local function disabled () error('cqueues are required for asynchronous execution') end
+	worker.sleep = disabled
+	worker.map = disabled
+	worker.coroutine = disabled
 end

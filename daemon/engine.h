@@ -83,12 +83,13 @@ int engine_pcall(struct lua_State *L, int argc);
 
 int engine_ipc(struct engine *engine, const char *expr);
 
-/** Start the lua engine and execute the config.
- *
- * @note Special path "-" means that even default config won't be done
- *       (like listening on localhost).
- */
-int engine_start(struct engine *engine, const char *config_path);
+
+int engine_load_sandbox(struct engine *engine);
+int engine_loadconf(struct engine *engine, const char *config_path);
+int engine_load_defaults(struct engine *engine);
+
+/** Start the lua engine and execute the config. */
+int engine_start(struct engine *engine);
 void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref);
 int engine_unregister(struct engine *engine, const char *name);
@@ -109,6 +110,8 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir);
 /** Load root hints from a zonefile (or config-time default if NULL).
  *
  * @return error message or NULL (statically allocated)
+ * @note exported to be usable from the hints module.
  */
+KR_EXPORT
 const char* engine_hint_root_file(struct kr_context *ctx, const char *file);
 

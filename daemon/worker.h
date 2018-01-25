@@ -27,9 +27,6 @@ struct qr_task;
 struct worker_ctx;
 /** Transport session (opaque). */
 struct session;
-/** Union of various libuv objects for freelist. */
-/** Worker callback */
-typedef void (*worker_cb_t)(struct worker_ctx *worker, struct kr_request *req, void *baton);
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
@@ -64,16 +61,22 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
 
 /**
- * Schedule query for resolution.
+ * Start query resolution with given query.
  *
- * After resolution finishes, invoke on_complete with baton.
- * @return 0 or an error code
- *
- * @note the options passed are |-combined with struct kr_context::options
- * @todo maybe better semantics for this?
+ * @return task or NULL
  */
-int worker_resolve(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options,
-		   worker_cb_t on_complete, void *baton);
+struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options);
+
+/**
+ * Execute a request with given query.
+ * It expects task to be created with \fn worker_resolve_start.
+ *
+ * @return 0 or an error code
+ */
+int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query);
+
+/** @return struct kr_request associated with opaque task */
+struct kr_request *worker_task_request(struct qr_task *task);
 
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);
