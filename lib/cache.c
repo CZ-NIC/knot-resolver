@@ -332,6 +332,10 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	qry->flags.NO_CACHE = true;
 
 	struct key k_storage, *k = &k_storage;
+	if (qry->stype == KNOT_RRTYPE_NSEC) {
+		VERBOSE_MSG(qry, "=> skipping stype NSEC\n");
+		return ctx->state;
+	}
 	if (!check_dname_for_lf(qry->sname)) {
 		WITH_VERBOSE(qry) {
 			auto_free char *sname_str = kr_dname_text(qry->sname);
