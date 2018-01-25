@@ -54,7 +54,8 @@ KR_EXPORT extern bool kr_verbose_status;
 KR_EXPORT bool kr_verbose_set(bool status);
 
 /** Log a message if in --verbose mode. */
-KR_EXPORT void kr_log_verbose(const char *fmt, ...);
+KR_EXPORT KR_PRINTF(1)
+void kr_log_verbose(const char *fmt, ...);
 
 /**
  * @brief Return true if the query has request log handler installed.
@@ -68,7 +69,8 @@ KR_EXPORT void kr_log_verbose(const char *fmt, ...);
  * @param  fmt message format
  * @return true if the message was logged
  */
-KR_EXPORT bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...);
+KR_EXPORT KR_PRINTF(3)
+bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...);
 
 #ifdef NOVERBOSELOG
 /* Efficient compile-time disabling of verbose messages. */
@@ -349,6 +351,7 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 }
 
 /** Printf onto the lua stack, avoiding additional copy (thin wrapper). */
+KR_PRINTF(2)
 static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
 {
 	va_list args;

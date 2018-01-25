@@ -535,7 +535,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 			/* ^^ here we use the *expanded* wildcard name */
 		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 			/* Wildcard record with stale TTL, bad rank or packet.  */
-			VERBOSE_MSG(qry, "=> wildcard: skipping %s, rank 0%0.2o, new TTL %d\n",
+			VERBOSE_MSG(qry, "=> wildcard: skipping %s, rank 0%.2o, new TTL %d\n",
 					eh->is_packet ? "packet" : "RR", eh->rank, new_ttl);
 			return ctx->state;
 		}
@@ -569,7 +569,7 @@ do_soa:
 		/* Check if the record is OK. */
 		int32_t new_ttl = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_SOA);
 		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
-			VERBOSE_MSG(qry, "=> SOA unfit %s: rank 0%0.2o, new TTL %d\n",
+			VERBOSE_MSG(qry, "=> SOA unfit %s: rank 0%.2o, new TTL %d\n",
 					(eh->is_packet ? "packet" : "RR"),
 					eh->rank, new_ttl);
 			return ctx->state;
@@ -871,7 +871,7 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	if (qry->flags.DNSSEC_INSECURE) {
 		qry->flags.DNSSEC_WANT = false;
 	}
-	VERBOSE_MSG(qry, "=> satisfied by exact RR or CNAME: rank 0%0.2o, new TTL %d\n",
+	VERBOSE_MSG(qry, "=> satisfied by exact RR or CNAME: rank 0%.2o, new TTL %d\n",
 			eh->rank, new_ttl);
 	return kr_ok();
 }
@@ -901,7 +901,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		 * LATER(optim.): It's unlikely that we find a negative one,
 		 * so we might theoretically skip all the cache code. */
 
-		VERBOSE_MSG(qry, "=> skipping exact %s: rank 0%0.2o (min. 0%0.2o), new TTL %d\n",
+		VERBOSE_MSG(qry, "=> skipping exact %s: rank 0%.2o (min. 0%.2o), new TTL %d\n",
 				eh->is_packet ? "packet" : "RR", eh->rank, lowest_rank, new_ttl);
 		return kr_error(ENOENT);
 	}
@@ -1053,7 +1053,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 					const char *packet_str =
 						eh->is_packet ? "packet" : "RR";
 					VERBOSE_MSG(qry, "=> skipping unfit %s %s: "
-						"rank 0%0.2o, new TTL %d\n",
+						"rank 0%.2o, new TTL %d\n",
 						type_str, packet_str,
 						eh->rank, new_ttl);
 				}
