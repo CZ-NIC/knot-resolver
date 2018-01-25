@@ -329,9 +329,9 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	struct key k_storage, *k = &k_storage;
 	if (!check_dname_for_lf(qry->sname)) {
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "=> skipping zero-containing name ");
-			kr_dname_print(qry->sname, "", "\n");
+		WITH_VERBOSE(qry) {
+			auto_free char *sname_str = kr_dname_text(qry->sname);
+			VERBOSE_MSG(qry, "=> skipping zero-containing sname %s\n", sname_str);
 		}
 		return ctx->state;
 	}
@@ -371,9 +371,9 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	switch (k->type) {
 	case KNOT_RRTYPE_NS:
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "=> trying zone: ");
-			kr_dname_print(k->zname, "", "\n");
+		WITH_VERBOSE(qry) {
+			auto_free char *zname_str = kr_dname_text(k->zname);
+			VERBOSE_MSG(qry, "=> trying zone: %s\n", zname_str);
 		}
 		break;
 	case KNOT_RRTYPE_CNAME: {
@@ -517,9 +517,10 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 						ret, strerror(abs(ret)));
 				assert(false);
 			}
-			WITH_VERBOSE {
-				VERBOSE_MSG(qry, "=> wildcard: not found: ");
-				kr_dname_print(clencl_name, "*.", "\n");
+			WITH_VERBOSE(qry) {
+				auto_free char *clencl_str = kr_dname_text(clencl_name);
+				VERBOSE_MSG(qry, "=> wildcard: not found: *.%s\n",
+						clencl_str);
 			}
 			return ctx->state;
 		}
@@ -568,9 +569,8 @@ do_soa:
 		/* Check if the record is OK. */
 		int32_t new_ttl = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_SOA);
 		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
-			VERBOSE_MSG(qry, "=> SOA unfit %s: ",
-					eh->is_packet ? "packet" : "RR");
-			kr_log_verbose("rank 0%0.2o, new TTL %d\n",
+			VERBOSE_MSG(qry, "=> SOA unfit %s: rank 0%0.2o, new TTL %d\n",
+					(eh->is_packet ? "packet" : "RR"),
 					eh->rank, new_ttl);
 			return ctx->state;
 		}
@@ -697,9 +697,10 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 		return kr_error(EINVAL);
 	}
 	if (!check_dname_for_lf(rr->owner)) {
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "=> skipping zero-containing name ");
-			kr_dname_print(rr->owner, "", "\n");
+		WITH_VERBOSE(qry) {
+			auto_free char *owner_str = kr_dname_text(rr->owner);
+			VERBOSE_MSG(qry, "=> skipping zero-containing name %s\n",
+					owner_str);
 		}
 		return kr_ok();
 	}
@@ -816,14 +817,14 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 	}
 	assert(entry_h_consistent(val_new_entry, rr->type));
 
-	WITH_VERBOSE {
-		VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, ", entry->rank);
-		kr_rrtype_print(rr->type, "", " ");
-		kr_dname_print(encloser, wild_labels ? "*." : "", " ");
-		kr_log_verbose("(%d B total, incl. %d RRSIGs)\n",
-				(int)val_new_entry.len,
-				(rr_sigs ? rr_sigs->rrs.rr_count : 0)
-				);
+	WITH_VERBOSE(qry) {
+		auto_free char *type_str = kr_rrtype_text(rr->type),
+			*encl_str = kr_dname_text(encloser);
+		VERBOSE_MSG(qry, "=> stashed rank: 0%0.2o, %s %s%s"
+			"(%d B total, incl. %d RRSIGs)\n",
+			entry->rank, type_str, (wild_labels ? "*." : ""), encl_str,
+			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.rr_count : 0)
+			);
 	}
 	return kr_ok();
 }
@@ -905,35 +906,23 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	}
 }
 
-int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
 {
 	struct key k_storage, *k = &k_storage;
 
-	WITH_VERBOSE {
-		VERBOSE_MSG(NULL, "_peek_exact: ");
-		kr_rrtype_print(type, "", " ");
-		kr_dname_print(name, "", " ");
-	}
-
 	int ret = kr_dname_lf(k->buf, name, false);
-	if (ret) {
-		kr_log_verbose("ERROR!\n");
-		return kr_error(ret);
-	}
+	if (ret) return kr_error(ret);
 
 	knot_db_val_t key = key_exact_type(k, type);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (!ret) ret = entry_h_seek(&val, type);
-	if (ret) {
-		kr_log_verbose("miss (ret: %d)\n", ret);
-		return ret;
-	}
+	if (ret) return kr_error(ret);
+
 	const struct entry_h *eh = entry_h_consistent(val, type);
 	if (!eh || eh->is_packet) {
 		// TODO: no packets, but better get rid of whole kr_cache_peek_exact().
-		kr_log_verbose("miss\n");
 		return kr_error(ENOENT);
 	}
 	*peek = (struct kr_cache_p){
@@ -943,8 +932,21 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 		.raw_data = val.data,
 		.raw_bound = val.data + val.len,
 	};
-	kr_log_verbose("hit\n");
 	return kr_ok();
+}
+int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+			struct kr_cache_p *peek)
+{	/* Just wrap with extra verbose logging. */
+	const int ret = peek_exact_real(cache, name, type, peek);
+	if (VERBOSE_STATUS) {
+		auto_free char *type_str = kr_rrtype_text(type),
+			*name_str = kr_dname_text(name);
+		const char *result_str = (ret == kr_ok() ? "hit" :
+				(ret == kr_error(ENOENT) ? "miss" : "error"));
+		VERBOSE_MSG(NULL, "_peek_exact: %s %s %s (ret: %d)",
+				type_str, name_str, result_str, ret);
+	}
+	return ret;
 }
 
 /** Find the longest prefix NS/xNAME (with OK time+rank), starting at k->*.
@@ -1034,12 +1036,15 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			     * as insecure or even nonauth is OK */
 			    || (type != KNOT_RRTYPE_NS && eh->rank < rank_min)) {
 
-				WITH_VERBOSE {
-					VERBOSE_MSG(qry, "=> skipping unfit ");
-					kr_rrtype_print(type, "",
-							eh->is_packet ? " packet" : " RR");
-					kr_log_verbose(": rank 0%0.2o, new TTL %d\n",
-							eh->rank, new_ttl);
+				WITH_VERBOSE(qry) {
+					auto_free char *type_str =
+						kr_rrtype_text(type);
+					const char *packet_str =
+						eh->is_packet ? "packet" : "RR";
+					VERBOSE_MSG(qry, "=> skipping unfit %s %s: "
+						"rank 0%0.2o, new TTL %d\n",
+						type_str, packet_str,
+						eh->rank, new_ttl);
 				}
 				continue;
 			}

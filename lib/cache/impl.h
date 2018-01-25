@@ -27,6 +27,7 @@
 #include <libknot/db/db.h>
 #include <libknot/dname.h>
 
+#include "contrib/cleanup.h"
 #include "lib/cdb.h"
 #include "lib/resolve.h"
 

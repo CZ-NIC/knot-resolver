@@ -22,10 +22,13 @@
 
 #include "lib/zonecut.h"
 #include "lib/rplan.h"
+#include "contrib/cleanup.h"
 #include "lib/defines.h"
 #include "lib/layer.h"
 #include "lib/resolve.h"
 #include "lib/generic/pack.h"
+
+#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "zcut", fmt)
 
 /* Root hint descriptor. */
 struct hint_info {
@@ -390,7 +393,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			   const knot_dname_t *name, const struct kr_query *qry,
 			   bool * restrict secured)
 {
-	kr_log_verbose("[     ][ *c ] kr_zonecut_find_cached\n");
+	VERBOSE_MSG(qry, "_find_cached\n");
 	if (!ctx || !cut || !name) {
 		return kr_error(EINVAL);
 	}
@@ -420,8 +423,9 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);
 			kr_cache_sync(&ctx->cache);
-			WITH_VERBOSE {
-				kr_dname_print(label, "[     ][ *c ] and found cut: ", "\n");
+			WITH_VERBOSE(qry) {
+				auto_free char *label_str = kr_dname_text(label);
+				VERBOSE_MSG(qry, "  and found cut: %s\n", label_str);
 			}
 			return kr_ok();
 		}

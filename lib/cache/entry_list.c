@@ -19,6 +19,7 @@
  */
 
 #include "lib/cache/impl.h"
+#include "lib/utils.h"
 
 
 /** Given a valid entry header, find its length (i.e. offset of the next entry).
@@ -165,10 +166,11 @@ int entry_h_splice(
 		int32_t old_ttl = get_new_ttl(eh_orig, qry, NULL, 0);
 		if (old_ttl > 0 && !is_expiring(old_ttl, eh_orig->ttl)
 		    && rank <= eh_orig->rank) {
-			WITH_VERBOSE {
-				VERBOSE_MSG(qry, "=> not overwriting ");
-				kr_rrtype_print(type, "", " ");
-				kr_dname_print(owner, "", "\n");
+			WITH_VERBOSE(qry) {
+				auto_free char *type_str = kr_rrtype_text(type),
+					*owner_str = kr_dname_text(owner);
+				VERBOSE_MSG(qry, "=> not overwriting %s %s\n",
+						type_str, owner_str);
 			}
 			return kr_error(EEXIST);
 		}

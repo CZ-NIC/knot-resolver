@@ -343,11 +343,11 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 		return ESKIP;
 	}
 	/* NXDOMAIN proven *except* for wildcards. */
-	WITH_VERBOSE {
-		VERBOSE_MSG(qry, "=> NSEC sname: covered by: ");
-		kr_dname_print(nsec_rr->owner, "", " -> ");
-		kr_dname_print(knot_nsec_next(&nsec_rr->rrs), "", ", ");
-		kr_log_verbose("new TTL %d\n", new_ttl);
+	WITH_VERBOSE(qry) {
+		auto_free char *owner_str = kr_dname_text(nsec_rr->owner),
+			  *next_str = kr_dname_text(knot_nsec_next(&nsec_rr->rrs));
+		VERBOSE_MSG(qry, "=> NSEC sname: covered by: %s -> %s, new TTL %d\n",
+				owner_str, next_str, new_ttl);
 	}
 
 	/* Find label count of the closest encloser.
@@ -477,11 +477,11 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 			goto clean_wild;
 		}
 		/* We have a record proving wildcard non-existence. */
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "=> NSEC wildcard: covered by: ");
-			kr_dname_print(nsec_rr->owner, "", " -> ");
-			kr_dname_print(knot_nsec_next(&nsec_rr->rrs), "", ", ");
-			kr_log_verbose("new TTL %d\n", new_ttl_log);
+		WITH_VERBOSE(qry) {
+			auto_free char *owner_str = kr_dname_text(nsec_rr->owner),
+				  *next_str = kr_dname_text(knot_nsec_next(&nsec_rr->rrs));
+			VERBOSE_MSG(qry, "=> NSEC wildcard: covered by: %s -> %s, new TTL %d\n",
+					owner_str, next_str, new_ttl_log);
 		}
 		return AR_SOA;
 	}
@@ -489,14 +489,15 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	/* The wildcard exists.  Find if it's NODATA - check type bitmap. */
 	if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype) == 0) {
 		/* NODATA proven; just need to add SOA+RRSIG later */
-		WITH_VERBOSE {
-			VERBOSE_MSG(qry, "=> NSEC wildcard: match proved NODATA");
+		WITH_VERBOSE(qry) {
+			const char *msg_start = "=> NSEC wildcard: match proved NODATA";
 			if (arw->set.rr) {
-				/* ^^ don't repeat the RR if it's the same */
-				kr_dname_print(nsec_rr->owner, ": ", ", ");
-				kr_log_verbose("new TTL %d\n", new_ttl_log);
+				auto_free char *owner_str = kr_dname_text(nsec_rr->owner);
+				VERBOSE_MSG(qry, "%s: %s, new TTL %d\n",
+						msg_start, owner_str, new_ttl_log);
 			} else {
-				kr_log_verbose(", by the same RR\n");
+				/* don't repeat the RR if it's the same */
+				VERBOSE_MSG(qry, "%s, by the same RR\n", msg_start);
 			}
 		}
 		ans->rcode = PKT_NODATA;

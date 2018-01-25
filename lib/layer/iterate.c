@@ -278,9 +278,11 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
 		/* Glue is mandatory for NS below zone */
 		if (knot_dname_in(rr->owner, ns_name) && !has_glue(pkt, ns_name)) {
-			VERBOSE_MSG("<= authority: missing mandatory glue, skipping NS ");
-			WITH_VERBOSE {
-				kr_dname_print(ns_name, "", "\n");
+			const char *msg =
+				"<= authority: missing mandatory glue, skipping NS\n";
+			WITH_VERBOSE(qry) {
+				auto_free char *ns_str = kr_dname_text(ns_name);
+				VERBOSE_MSG("%s%s", msg, ns_str);
 			}
 			continue;
 		}

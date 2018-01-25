@@ -158,12 +158,13 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
 	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
 
-	WITH_VERBOSE {
-		VERBOSE_MSG(qry, "=> stashed packet: rank 0%0.2o, TTL %d, ",
-				eh->rank, eh->ttl);
-		kr_rrtype_print(pkt_type, "", " ");
-		kr_dname_print(owner, "", " ");
-		kr_log_verbose("(%d B)\n", (int)val_new_entry.len);
+	WITH_VERBOSE(qry) {
+		auto_free char *type_str = kr_rrtype_text(pkt_type),
+			*owner_str = kr_dname_text(owner);
+		VERBOSE_MSG(qry, "=> stashed packet: rank 0%0.2o, TTL %d, "
+				"%s %s (%d B)\n",
+				eh->rank, eh->ttl,
+				type_str, owner_str, (int)val_new_entry.len);
 	}
 }
 
