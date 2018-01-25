@@ -2,13 +2,12 @@
 Description=Knot DNS Resolver control socket
 Documentation=man:kresd(8)
 Before=sockets.target
-PartOf=kresd.socket
-Alias=knot-resolver-control.socket
+Service=kresd@%i.service
+PartOf=kresd@%i.service
 
 [Socket]
-ListenStream=/run/knot-resolver/control
+ListenStream=/run/knot-resolver/control@%i
 FileDescriptorName=control
-Service=kresd.service
 SocketMode=0660
 
 [Install]

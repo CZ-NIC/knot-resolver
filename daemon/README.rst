@@ -1012,6 +1012,8 @@ The watchdog process must notify kresd about active file descriptors, and kresd 
 
 The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
 
+See ``kresd.systemd(8)`` for details.
+
 Enabling DNSSEC
 ===============
 

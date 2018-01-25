@@ -1,0 +1,148 @@
+.TH "kresd.systemd" "8" "2018-01-30" "CZ.NIC" "Knot DNS Resolver Systemd Units"
+.\"
+.\" kresd.systemd.8 -- man page for systemd units for kresd
+.\"
+.\" Copyright (c) 2018, CZ.NIC. All rights reserved.
+.\"
+.\" See COPYING for the license.
+.\"
+.\"
+.SH "NAME"
+kresd.systemd
+\- managing Knot DNS Resolver through systemd.
+
+.SH "SYNOPSIS"
+.nf
+kresd@.service
+kresd@.socket
+kresd-tls@.socket
+kresd-control@.socket
+.fi
+
+.SH "DESCRIPTION"
+.P
+This manual page describes how to manage \fBkresd\fR using \fBsystemd\fR
+units. Depending on your distribution, this can be either be done with
+socket-based activation or without it. The following assumes socket-based activation.
+For differences see \fINOTES\fR below.
+
+\fBkresd\fR daemon can be executed in multiple independent processes, which can be
+managed with \fBsystemd\fR via systemd templates (see \fBsystemd.unit\fR(5)).
+Each \fBsystemd\fR service instance of \fBkresd\fR (\fIkresd@.service\fR) represents a
+single, independent kresd process.
+
+Each instance of \fIkresd@.service\fR has three systemd sockets (see
+\fBsystemd.socket(5)\fR) associated with it:
+
+.nf
+.RS
+\fIkresd@.socket\fR - UDP/TCP network socket (default: localhost:53)
+\fIkresd-tls@.socket\fR - network socket for DNS-over-TLS (default: localhost:853)
+\fIkresd-control@.socket\fR - UNIX socket with control terminal
+.RE
+.fi
+
+.B Configuring network interfaces
+
+When using socket-based activation, the daemon doesn't require root privileges
+nor any capabilities, because the sockets are created by \fBsystemd\fR and
+passed to \fBkresd\fR. This means \fBkresd\fR can't bind to ports below 1024 when
+configured in \fI/etc/knot-resolver/kresd.conf\fR.
+
+To configure \fBkresd\fR to listen on public interfaces, drop-in files (see
+\fBsystemd.unit\fR(5)) should be used. These can be created with:
+
+.nf
+.RS 4n
+.B systemctl edit kresd@.socket
+.B systemctl edit kresd-tls@.socket
+.RE
+.fi
+
+For example, to configure \fBkresd\fR to listen on 192.0.2.115 on ports 53 and
+853, the drop-in files would look like:
+
+.nf
+.RS 4n
+# /etc/systemd/system/kresd@.socket.d/override.conf
+[Socket]
+ListenDatagram=192.0.2.115:53
+ListenStream=192.0.2.115:53
+
+# /etc/systemd/system/kresd-tls@.socket.d/override.conf
+[Socket]
+ListenStream=192.0.2.115:853
+.RE
+.fi
+
+.SH "NOTES"
+
+.IP * 2
+When \fIkresd@.service\fR is started, stopped or restarted, its associated
+sockets are also automatically started, stopped or restarted.
+
+.IP * 2
+If your distribution doesn't use socket-based activation, you can configure the
+network interfaces for \fBkresd\fR in \fI/etc/knot-resolver/kresd.conf\fR.  The
+service can be started or enabled in the same way as in the examples below, but
+it doesn't have any sockets associated with it.
+
+.SH "EXAMPLES"
+
+.B Single instance
+.RS 4n
+
+To start the service:
+.nf
+.RS 4n
+.B systemctl start kresd@1.service
+.RE
+.fi
+
+To start the service at boot:
+.nf
+.RS 4n
+.B systemctl enable kresd@1.service
+.RE
+.fi
+
+To delay the service startup until some traffic arrives, start (or enable) just
+the sockets:
+.nf
+.RS 4n
+.B systemctl start kresd@1.socket
+.B systemctl start kresd-tls@1.socket
+.RE
+.fi
+
+To disable the TLS socket, you can mask it:
+
+.RS 4n
+.B systemctl mask kresd-tls@1.socket
+.RE
+
+.RE
+
+.B Multiple instances
+.RS 4n
+
+Multiple instances can be handled with the use of \fIBrace Expansion\fR (see
+\fBbash\fR(1)).
+
+To start multiple instances, for example 16:
+.nf
+.RS
+.B systemctl start kresd@{1..16}.service
+.RE
+.fi
+
+.RE
+
+.SH "SEE ALSO"
+\fIkresd(8)\fR,
+\fIsystemd.unit(5)\fR,
+\fIsystemd.socket(5)\fR,
+\fIhttps://knot-resolver.readthedocs.io\fR
+
+.SH "AUTHORS"
+.B kresd developers are mentioned in the AUTHORS file in the distribution.

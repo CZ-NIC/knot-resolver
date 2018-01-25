@@ -3,4 +3,4 @@
 # associated sockets *are* enabled however, so the kresd service will
 # be started as soon as anything connects to one of the listening
 # sockets.
-disable kresd.service
+disable kresd@1.service
