@@ -4,11 +4,15 @@ Query policies
 --------------
 
 This module can block, rewrite, or alter inbound queries based on user-defined policies.
-By default, if no rule applies to a query, rules for special-use domain names are applied, as required by :rfc:`6761`.
 
-You can however extend it e.g. to deflect `Slow drip DNS attacks <https://secure64.com/water-torture-slow-drip-dns-ddos-attack>`_ or gray-list resolution of misbehaving zones.
+Each policy *rule* has two parts: a *filter* and an *action*. A *filter* selects which queries will be affected by the policy, and *action* which modifies queries matching the associated filter. Typically a rule is defined as follows: ``filter(action(action parameters), filter parameters)``. For example, a filter can be ``suffix`` which matches queries whose suffix part is in specified set, and one of possible actions is ``DENY``, which denies resolution. These are combined together into ``policy.suffix(policy.DENY, {todname('badguy.example.')})``. The rule is effective when it is added into rule table using ``policy.add()``, please see `Policy examples`_.
 
-There are several policy filters available in the ``policy.`` table:
+By default, if no rule applies to a query, built-in rules for `special-use <https://www.iana.org/assignments/special-use-domain-names/special-use-domain-names.xhtml>`_ and `locally-served <http://www.iana.org/assignments/locally-served-dns-zone>`_ domain names are applied. These built-in rules can be overriden using action ``PASS``, see `Policy examples`_ below.
+
+
+Filters
+^^^^^^^
+A *filter* selects which queries will be affected by specified *action*. There are several policy filters available in the ``policy.`` table:
 
 * ``all(action)``
   - always applies the action
@@ -22,10 +26,13 @@ There are several policy filters available in the ``policy.`` table:
   - implements a subset of RPZ_ in zonefile format.  See below for details: :any:`policy.rpz`.
 * custom filter function
 
-There are several actions available in the ``policy.`` table:
+Actions
+^^^^^^^
+An *action* is function which modifies DNS query. There are several actions available in the ``policy.`` table:
 
 * ``PASS`` - let the query pass through; it's useful to make exceptions before wider rules
 * ``DENY`` - reply NXDOMAIN authoritatively
+* ``DENY_MSG(msg)`` - reply NXDOMAIN authoritatively and add explanatory message to additional section
 * ``DROP`` - terminate query resolution and return SERVFAIL to the requestor
 * ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
 * ``FORWARD(ip)`` - resolve a query via forwarding to an IP while validating and caching locally;
@@ -39,6 +46,8 @@ There are several actions available in the ``policy.`` table:
 * ``FLAGS(set, clear)`` - set and/or clear some flags for the query.  There can be multiple flags to set/clear.  You can just pass a single flag name (string) or a set of names.  It's a chain action.
 
 Most actions stop the policy matching on the query, but "chain actions" allow to keep trying to match other rules, until a non-chain action is triggered.
+
+Also, it is possible to write your own action (i.e. Lua function). It is possible to implement complex heuristics, e.g. to deflect `Slow drip DNS attacks <https://secure64.com/water-torture-slow-drip-dns-ddos-attack>`_ or gray-list resolution of misbehaving zones.
 
 .. warning:: The policy module currently only looks at whole DNS requests.  The rules won't be re-applied e.g. when following CNAMEs.
 
@@ -76,14 +85,13 @@ TLS Examples
 		{'2001:DB8::d0c', hostname='res.example.', ca_file='/etc/knot-resolver/tlsca.crt'}
 	})
 
+.. _policy_examples:
 
-Other examples
-^^^^^^^^^^^^^^
+Policy examples
+^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-	-- Load default policies
-	modules = { 'policy' }
 	-- Whitelist 'www[0-9].badboy.cz'
 	policy.add(policy.pattern(policy.PASS, '\4www[0-9]\6badboy\2cz'))
 	-- Block all names below badboy.cz

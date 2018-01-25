@@ -99,6 +99,20 @@ installcheck:linux:amd64:
     - linux
     - amd64
 
+doc:
+  stage: test
+  script:
+    - SPHINXFLAGS="-W" make doc
+  dependencies: []
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - ./doc/*
+  tags:
+    - docker
+
+
+
 deckard:linux:amd64:
   stage: test
   script:

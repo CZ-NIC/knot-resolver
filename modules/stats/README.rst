@@ -7,7 +7,7 @@ This modules gathers various counters from the query resolution and server inter
 and offers them as a key-value storage. Any module may update the metrics or simply hook
 in new ones.
 
-.. code-block:: lua
+.. code-block:: none
 
 	-- Enumerate metrics
 	> stats.list()
