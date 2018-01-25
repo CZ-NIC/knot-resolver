@@ -296,6 +296,9 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt);
+static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
+		    const uint16_t type, const uint8_t lowest_rank,
+		    const struct kr_query *qry, struct kr_cache *cache);
 
 /** function for .produce phase */
 int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -312,6 +315,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	kr_cache_sync(&req->ctx->cache);
 	return ret;
 }
+
 
 /**
  * \note we don't transition to KR_STATE_FAIL even in case of "unexpected errors".
@@ -504,49 +508,19 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 			assert(!ret);
 			return ctx->state;
 		}
-		knot_db_val_t key = key_exact_type(k, qry->stype);
-		/* Find the record. */
-		knot_db_val_t val = { NULL, 0 };
-		ret = cache_op(cache, read, &key, &val, 1);
-		if (!ret) {
-			ret = entry_h_seek(&val, qry->stype);
-		}
-		if (ret) {
-			if (ret != -abs(ENOENT)) {
-				VERBOSE_MSG(qry, "=> wildcard: hit error %d %s\n",
-						ret, strerror(abs(ret)));
+		const uint16_t types[] = { qry->stype, KNOT_RRTYPE_CNAME };
+		for (int i = 0; i < (2 - (qry->stype == KNOT_RRTYPE_CNAME)); ++i) {
+			ret = try_wild(k, &ans, clencl_name, types[i],
+					lowest_rank, qry, cache);
+			if (ret == kr_ok()) {
+				break;
+			} else if (ret != -ABS(ENOENT) && ret != -ABS(ESTALE)) {
 				assert(false);
+				return ctx->state;
 			}
-			WITH_VERBOSE(qry) {
-				auto_free char *clencl_str = kr_dname_text(clencl_name);
-				VERBOSE_MSG(qry, "=> wildcard: not found: *.%s\n",
-						clencl_str);
-			}
-			return ctx->state;
+			/* else continue */
 		}
-		/* Check if the record is OK. */
-		const struct entry_h *eh = entry_h_consistent(val, qry->stype);
-		if (!eh) {
-			assert(false);
-			return ctx->state;
-			// LATER: recovery in case of error, perhaps via removing the entry?
-		}
-		int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype);
-			/* ^^ here we use the *expanded* wildcard name */
-		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
-			/* Wildcard record with stale TTL, bad rank or packet.  */
-			VERBOSE_MSG(qry, "=> wildcard: skipping %s, rank 0%.2o, new TTL %d\n",
-					eh->is_packet ? "packet" : "RR", eh->rank, new_ttl);
-			return ctx->state;
-		}
-		/* Add the RR into the answer. */
-		const void *eh_bound = val.data + val.len;
-		ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
-				   qry->sname, qry->stype, new_ttl);
-		VERBOSE_MSG(qry, "=> NSEC wildcard: answer expanded, ret = %d, new TTL %d\n",
-				ret, (int)new_ttl);
-		if (ret) return ctx->state;
-		ans.rcode = PKT_NOERROR;
+		if (ret) return ctx->state; /* neither attempt succeeded */
 	}
 
 
@@ -916,6 +890,59 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		return answer_simple_hit(ctx, pkt, qry->stype, eh, eh_bound, new_ttl);
 	}
 }
+
+
+/** Try to satisfy via wildcard.  See the single call site. */
+static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
+		    const uint16_t type, const uint8_t lowest_rank,
+		    const struct kr_query *qry, struct kr_cache *cache)
+{
+	knot_db_val_t key = key_exact_type(k, type);
+	/* Find the record. */
+	knot_db_val_t val = { NULL, 0 };
+	int ret = cache_op(cache, read, &key, &val, 1);
+	if (!ret) {
+		ret = entry_h_seek(&val, type);
+	}
+	if (ret) {
+		if (ret != -ABS(ENOENT)) {
+			VERBOSE_MSG(qry, "=> wildcard: hit error %d %s\n",
+					ret, strerror(abs(ret)));
+			assert(false);
+		}
+		WITH_VERBOSE(qry) {
+			auto_free char *clencl_str = kr_dname_text(clencl_name),
+				*type_str = kr_rrtype_text(type);
+			VERBOSE_MSG(qry, "=> wildcard: not found: *.%s %s\n",
+					clencl_str, type_str);
+		}
+		return ret;
+	}
+	/* Check if the record is OK. */
+	const struct entry_h *eh = entry_h_consistent(val, type);
+	if (!eh) {
+		assert(false);
+		return kr_error(ret);
+		// LATER: recovery in case of error, perhaps via removing the entry?
+	}
+	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, type);
+		/* ^^ here we use the *expanded* wildcard name */
+	if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
+		/* Wildcard record with stale TTL, bad rank or packet.  */
+		VERBOSE_MSG(qry, "=> wildcard: skipping %s, rank 0%.2o, new TTL %d\n",
+				eh->is_packet ? "packet" : "RR", eh->rank, new_ttl);
+		return -ABS(ESTALE);
+	}
+	/* Add the RR into the answer. */
+	const void *eh_bound = val.data + val.len;
+	ret = entry2answer(ans, AR_ANSWER, eh, eh_bound, qry->sname, type, new_ttl);
+	VERBOSE_MSG(qry, "=> NSEC wildcard: answer expanded, ret = %d, new TTL %d\n",
+			ret, (int)new_ttl);
+	if (ret) return kr_error(ret);
+	ans->rcode = PKT_NOERROR;
+	return kr_ok();
+}
+
 
 static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
