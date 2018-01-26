@@ -41,6 +41,14 @@
 
 #include "lib/cache/impl.h"
 
+/* TODO:
+ *	- Reconsider when RRSIGs are put in and retrieved from the cache.
+ *	  Currently it's always done, which _might_ be spurious, depending
+ *	  on how kresd will use the returned result.
+ *	  There's also the "problem" that kresd ATM does _not_ ask upstream
+ *	  with DO bit in some cases.
+ */
+
 
 /** Cache version */
 static const uint16_t CACHE_VERSION = 2;
@@ -706,21 +714,19 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 		break;
 	}
 
-	/* Find corresponding signatures, if validated.  LATER(optim.): speed. */
+	/* Try to find corresponding signatures, always.  LATER(optim.): speed. */
 	const knot_rrset_t *rr_sigs = NULL;
-	if (kr_rank_test(entry->rank, KR_RANK_SECURE)) {
-		for (ssize_t j = arr->len - 1; j >= 0; --j) {
-			/* TODO: ATM we assume that some properties are the same
-			 * for all RRSIGs in the set (esp. label count). */
-			ranked_rr_array_entry_t *e = arr->at[j];
-			bool ok = e->qry_uid == qry->uid && !e->cached
-				&& e->rr->type == KNOT_RRTYPE_RRSIG
-				&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
-				&& knot_dname_is_equal(rr->owner, e->rr->owner);
-			if (!ok) continue;
-			rr_sigs = e->rr;
-			break;
-		}
+	for (ssize_t j = arr->len - 1; j >= 0; --j) {
+		/* TODO: ATM we assume that some properties are the same
+		 * for all RRSIGs in the set (esp. label count). */
+		ranked_rr_array_entry_t *e = arr->at[j];
+		bool ok = e->qry_uid == qry->uid && !e->cached
+			&& e->rr->type == KNOT_RRTYPE_RRSIG
+			&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
+			&& knot_dname_is_equal(rr->owner, e->rr->owner);
+		if (!ok) continue;
+		rr_sigs = e->rr;
+		break;
 	}
 
 	const int wild_labels = rr_sigs == NULL ? 0 :

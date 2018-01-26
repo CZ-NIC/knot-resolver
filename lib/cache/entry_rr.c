@@ -124,8 +124,7 @@ int entry2answer(struct answer *ans, int id,
 	ans->rrsets[id].set.rank = eh->rank;
 	ans->rrsets[id].set.expiring = is_expiring(eh->ttl, new_ttl);
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet. */
-	bool want_rrsigs = kr_rank_test(eh->rank, KR_RANK_SECURE);
-			//^^ TODO: vague; function parameter instead?
+	bool want_rrsigs = true; // TODO
 	if (want_rrsigs) {
 		ret = rdataset_materialize(&ans->rrsets[id].sig_rds, eh->data + data_off,
 					   eh_bound, new_ttl, ans->mm);
