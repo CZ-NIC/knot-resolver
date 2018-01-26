@@ -50,6 +50,7 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const void * con
 		const void *data_bound, uint32_t ttl, knot_mm_t *pool)
 {
 	assert(rds && data && data_bound && data_bound > data && !rds->data);
+	assert(pool); /* not required, but that's our current usage; guard leaks */
 	const void *d = data; /* iterates over the cache data */
 	{
 		uint8_t rr_count;

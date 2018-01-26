@@ -841,6 +841,7 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	/* Materialize the sets for the answer in (pseudo-)packet. */
 	struct answer ans;
 	memset(&ans, 0, sizeof(ans));
+	ans.mm = &pkt->mm;
 	ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
 			   qry->sname, type, new_ttl);
 	CHECK_RET(ret);
