@@ -15,7 +15,7 @@
  */
 
 #include "lib/module.h"
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 
 /** Module implementation. */
 const kr_layer_api_t *cache_layer(struct kr_module *module)

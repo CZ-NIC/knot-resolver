@@ -19,7 +19,7 @@
 #include "lib/generic/map.h"
 #include "lib/generic/pack.h"
 #include "lib/defines.h"
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 
 struct kr_rplan;
 struct kr_context;

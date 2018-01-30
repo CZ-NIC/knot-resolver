@@ -20,8 +20,8 @@
 #include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
 
-#include "lib/cache.h"
-#include "lib/cdb.h"
+#include "lib/cache/api.h"
+#include "lib/cache/cdb_api.h"
 #include "lib/utils.h"
 #include "daemon/bindings.h"
 #include "daemon/worker.h"

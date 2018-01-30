@@ -27,8 +27,8 @@
 #include "contrib/cleanup.h"
 
 #include "lib/generic/array.h"
-#include "lib/cdb.h"
-#include "lib/cache.h"
+#include "lib/cache/cdb_api.h"
+#include "lib/cache/api.h"
 #include "lib/utils.h"
 
 /* memcached client */

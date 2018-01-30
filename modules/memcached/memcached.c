@@ -17,9 +17,9 @@
 #include <contrib/cleanup.h>
 
 #include "daemon/engine.h"
-#include "lib/cdb.h"
+#include "lib/cache/cdb_api.h"
 #include "lib/module.h"
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 
 /** @internal Redis API */
 const struct kr_cdb_api *cdb_memcached(void);

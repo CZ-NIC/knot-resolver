@@ -19,7 +19,7 @@
 #include <libknot/consts.h>
 #include <libknot/rrset.h>
 #include <sys/time.h>
-#include "lib/cdb.h"
+#include "lib/cache/cdb_api.h"
 #include "lib/defines.h"
 #include "contrib/ucw/config.h" /*uint*/
 

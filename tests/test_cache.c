@@ -21,7 +21,7 @@
 
 #include "tests/test.h"
 #include "lib/cache.h"
-#include "lib/cdb_lmdb.h"
+#include "lib/cache/cdb_lmdb.h"
 
 
 

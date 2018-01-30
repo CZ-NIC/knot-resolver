@@ -28,7 +28,7 @@
 #include "contrib/ucw/lib.h"
 
 
-#include "lib/cdb.h"
+#include "lib/cache/cdb_api.h"
 #include "lib/cache.h"
 #include "lib/utils.h"
 #include "lib/defines.h"

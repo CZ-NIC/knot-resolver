@@ -20,7 +20,7 @@
 #include <libknot/dname.h>
 #include <libknot/codes.h>
 
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 #include "lib/zonecut.h"
 #include "lib/nsrep.h"
 

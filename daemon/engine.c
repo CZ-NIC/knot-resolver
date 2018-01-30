@@ -28,9 +28,9 @@
 #include "daemon/bindings.h"
 #include "daemon/ffimodule.h"
 #include "lib/nsrep.h"
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 #include "lib/defines.h"
-#include "lib/cdb_lmdb.h"
+#include "lib/cache/cdb_lmdb.h"
 #include "lib/dnssec/ta.h"
 
 /** @internal Compatibility wrapper for Lua < 5.2 */

@@ -28,7 +28,7 @@
 #include "lib/nsrep.h"
 #include "lib/rplan.h"
 #include "lib/module.h"
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 
 /**
  * @file resolve.h

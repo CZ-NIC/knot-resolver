@@ -25,8 +25,8 @@
 #include <lmdb.h>
 
 #include "contrib/cleanup.h"
-#include "lib/cdb_lmdb.h"
-#include "lib/cache.h"
+#include "lib/cache/cdb_lmdb.h"
+#include "lib/cache/api.h"
 #include "lib/utils.h"
 
 

@@ -28,7 +28,7 @@
 #include <libknot/dname.h>
 
 #include "contrib/cleanup.h"
-#include "lib/cdb.h"
+#include "lib/cache/cdb_api.h"
 #include "lib/resolve.h"
 
 /** Cache entry header
