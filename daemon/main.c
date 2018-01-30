@@ -475,7 +475,10 @@ static void args_init(struct args *args)
 	args->quiet = false;
 }
 
-int parse_args(int argc, char **argv, struct args *args)
+/** Process arguments into struct args.
+ * @return >=0 if main() should be exited immediately.
+ */
+static int parse_args(int argc, char **argv, struct args *args)
 {
 	/* Long options. */
 	int c = 0, li = 0;
@@ -554,11 +557,11 @@ int parse_args(int argc, char **argv, struct args *args)
 			help(argc, argv);
 			return EXIT_FAILURE;
 		}
-	}	
+	}
 	if (optind < argc) {
 		args->rundir = argv[optind];
 	}
-	return EXIT_SUCCESS;
+	return -1;
 }
 
 static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
@@ -595,7 +598,7 @@ int main(int argc, char **argv)
 	int ret = 0;
 	struct args args;
 	args_init(&args);
-	if ((ret = parse_args(argc, argv, &args)) != EXIT_SUCCESS) {
+	if ((ret = parse_args(argc, argv, &args)) >= 0) {
 		return ret;
 	}
 
@@ -651,7 +654,7 @@ int main(int argc, char **argv)
 	 * sockets etc. before forking, but at the same time can't touch it before
 	 * forking otherwise it crashes, so it's a chicken and egg problem.
 	 * Disabling until https://github.com/libuv/libuv/pull/846 is done. */
-	 if (forks > 1 && fd_set.len == 0 && tls_fd_set.len == 0) {
+	 if (args.forks > 1 && args.fd_set.len == 0 && args.tls_fd_set.len == 0) {
 	 	kr_log_error("[system] forking >1 workers supported only on Linux 3.9+ or with supervisor\n");
 	 	return EXIT_FAILURE;
 	 }
