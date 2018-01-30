@@ -9,10 +9,10 @@ Modular architecture of the library keeps the core tiny and efficient, and provi
 .. toctree::
    :maxdepth: 2
 
-   build
-   lib
    daemon
    modules
+   build
+   lib
    modules_api
 
 
