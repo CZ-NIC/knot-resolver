@@ -305,7 +305,7 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt);
 static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
-		    const uint16_t type, const uint8_t lowest_rank,
+		    uint16_t type, uint8_t lowest_rank,
 		    const struct kr_query *qry, struct kr_cache *cache);
 
 /** function for .produce phase */
