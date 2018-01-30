@@ -651,7 +651,7 @@ int main(int argc, char **argv)
 	 * sockets etc. before forking, but at the same time can't touch it before
 	 * forking otherwise it crashes, so it's a chicken and egg problem.
 	 * Disabling until https://github.com/libuv/libuv/pull/846 is done. */
-	 if (forks > 1 && fd_set.len == 0 && tls_fd_set.len == 0) {
+	 if (args.forks > 1 && args.fd_set.len == 0 && args.tls_fd_set.len == 0) {
 	 	kr_log_error("[system] forking >1 workers supported only on Linux 3.9+ or with supervisor\n");
 	 	return EXIT_FAILURE;
 	 }
