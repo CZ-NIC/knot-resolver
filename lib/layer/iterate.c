@@ -286,10 +286,10 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		/* Glue is mandatory for NS below zone */
 		if (knot_dname_in(rr->owner, ns_name) && !has_glue(pkt, ns_name)) {
 			const char *msg =
-				"<= authority: missing mandatory glue, skipping NS\n";
+				"<= authority: missing mandatory glue, skipping NS";
 			WITH_VERBOSE(qry) {
 				auto_free char *ns_str = kr_dname_text(ns_name);
-				VERBOSE_MSG("%s%s", msg, ns_str);
+				VERBOSE_MSG("%s %s\n", msg, ns_str);
 			}
 			continue;
 		}
