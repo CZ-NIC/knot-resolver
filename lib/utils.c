@@ -679,13 +679,16 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			continue;
 		}
 		/* Found the entry to merge with.  Check consistency and merge. */
-		bool ok = stashed->rank == rank
-			&& !stashed->cached
-			&& stashed->to_wire == to_wire;
+		bool ok = stashed->rank == rank && !stashed->cached;
 		if (!ok) {
 			assert(false);
 			return kr_error(EEXIST);
 		}
+		/* It may happen that an RRset is first considered useful
+		 * (to_wire = false, e.g. due to being part of glue),
+		 * and later we may find we also want it in the answer. */
+		stashed->to_wire = stashed->to_wire || to_wire;
+
 		return knot_rdataset_merge(&stashed->rr->rrs, &rr->rrs, pool);
 	}
 
@@ -928,4 +931,45 @@ char *kr_rrset_text(const knot_rrset_t *rr)
 uint64_t kr_now()
 {
 	return uv_now(uv_default_loop());
+}
+
+int knot_dname_lf2wire(knot_dname_t * const dst, uint8_t len, const uint8_t *lf)
+{
+	knot_dname_t *d = dst; /* moving "cursor" as we write it out */
+	bool ok = d && (len == 0 || lf);
+	if (!ok) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
+	/* we allow the final zero byte to be omitted */
+	if (!len) {
+		goto finish;
+	}
+	if (lf[len - 1]) {
+		++len;
+	}
+	/* convert the name, one label at a time */
+	int label_end = len - 1; /* index of the zero byte after the current label */
+	while (label_end >= 0) {
+		/* find label_start */
+		int i = label_end - 1;
+		while (i >= 0 && lf[i])
+			--i;
+		const int label_start = i + 1; /* index of the first byte of the current label */
+		const int label_len = label_end - label_start;
+		assert(label_len >= 0);
+		if (label_len > 63 || label_len <= 0)
+			return kr_error(EILSEQ);
+		/* write the label */
+		*d = label_len;
+		++d;
+		memcpy(d, lf + label_start, label_len);
+		d += label_len;
+		/* next label */
+		label_end = label_start - 1;
+	}
+finish:
+	*d = 0; /* the final zero */
+	++d;
+	return d - dst;
 }

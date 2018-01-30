@@ -70,14 +70,14 @@ the modules use as the :ref:`input configuration <mod-properties>`.
 
 .. warning:: Modules specified including their configuration may not load exactly in the same order as specified.
 
-Modules are inherently ordered by their declaration. Some modules are built-in, so it would be normally impossible to place for example *hints* before *rrcache*. You can enforce specific order by precedence operators **>** and **<**.
+Modules are inherently ordered by their declaration. Some modules are built-in, so it would be normally impossible to place for example *hints* before *cache*. You can enforce specific order by precedence operators **>** and **<**.
 
 .. code-block:: lua
 
    modules = {
       'hints  > iterate', -- Hints AFTER iterate
       'policy > hints',   -- Policy AFTER hints
-      'view   < rrcache'  -- View BEFORE rrcache
+      'view   < cache'    -- View BEFORE cache
    }
    modules.list() -- Check module call order
 

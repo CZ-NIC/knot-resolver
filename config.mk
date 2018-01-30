@@ -1,8 +1,8 @@
 # Project
 MAJOR := 1
-MINOR := 5
+MINOR := 99
 PATCH := 2
-EXTRA :=
+EXTRA := -alpha
 ABIVER := 4
 BUILDMODE := dynamic
 HARDENING := yes

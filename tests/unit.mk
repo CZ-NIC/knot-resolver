@@ -10,9 +10,9 @@ tests_BIN := \
 	test_lru \
 	test_utils \
 	test_module \
-	test_cache \
 	test_zonecut \
 	test_rplan
+	#test_cache TODO: re-consider how best to test cache
 
 mock_cmodule_CFLAGS := -fPIC
 mock_cmodule_SOURCES := tests/mock_cmodule.c

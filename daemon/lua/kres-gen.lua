@@ -107,9 +107,10 @@ struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank;
 	uint8_t revalidation_cnt;
-	_Bool cached;
-	_Bool yielded;
-	_Bool to_wire;
+	_Bool cached : 1;
+	_Bool yielded : 1;
+	_Bool to_wire : 1;
+	_Bool expiring : 1;
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -159,6 +160,7 @@ struct kr_request {
 	int state;
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;
+	ranked_rr_array_t add_selected;
 	rr_array_t additional;
 	_Bool answ_validated;
 	_Bool auth_validated;

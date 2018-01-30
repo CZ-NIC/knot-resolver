@@ -1,44 +1,52 @@
 libkres_SOURCES := \
-	lib/generic/lru.c      \
-	lib/generic/map.c      \
-	lib/layer/iterate.c    \
-	lib/layer/validate.c   \
-	lib/layer/rrcache.c    \
-	lib/layer/pktcache.c   \
-	lib/dnssec/nsec.c      \
-	lib/dnssec/nsec3.c     \
+	lib/cache/api.c \
+	lib/cache/cdb_lmdb.c \
+	lib/cache/entry_list.c \
+	lib/cache/entry_pkt.c \
+	lib/cache/entry_rr.c \
+	lib/cache/knot_pkt.c \
+	lib/cache/nsec1.c \
+	lib/dnssec.c \
+	lib/dnssec/nsec.c \
+	lib/dnssec/nsec3.c \
 	lib/dnssec/signature.c \
-	lib/dnssec/ta.c        \
-	lib/dnssec.c           \
-	lib/utils.c            \
-	lib/nsrep.c            \
-	lib/module.c           \
-	lib/resolve.c          \
-	lib/zonecut.c          \
-	lib/rplan.c            \
-	lib/cache.c            \
-	lib/cdb_lmdb.c
+	lib/dnssec/ta.c \
+	lib/generic/lru.c \
+	lib/generic/map.c \
+	lib/layer/cache.c \
+	lib/layer/iterate.c \
+	lib/layer/validate.c \
+	lib/module.c \
+	lib/nsrep.c \
+	lib/resolve.c \
+	lib/rplan.c \
+	lib/utils.c \
+	lib/zonecut.c
 
 libkres_HEADERS := \
-	lib/generic/array.h    \
-	lib/generic/lru.h      \
-	lib/generic/map.h      \
-	lib/generic/set.h      \
-	lib/layer.h            \
-	lib/dnssec/nsec.h      \
-	lib/dnssec/nsec3.h     \
+	lib/cache/api.h \
+	lib/cache/cdb_api.h \
+	lib/cache/cdb_lmdb.h \
+	lib/cache/impl.h \
+	lib/defines.h \
+	lib/dnssec.h \
+	lib/dnssec/nsec.h \
+	lib/dnssec/nsec3.h \
 	lib/dnssec/signature.h \
-	lib/dnssec/ta.h        \
-	lib/dnssec.h           \
-	lib/utils.h            \
-	lib/nsrep.h            \
-	lib/module.h           \
-	lib/resolve.h          \
-	lib/zonecut.h          \
-	lib/rplan.h            \
-	lib/cache.h            \
-	lib/cdb.h              \
-	lib/cdb_lmdb.h
+	lib/dnssec/ta.h \
+	lib/generic/array.h \
+	lib/generic/lru.h \
+	lib/generic/map.h \
+	lib/generic/pack.h \
+	lib/generic/set.h \
+	lib/layer.h \
+	lib/layer/iterate.h \
+	lib/module.h \
+	lib/nsrep.h \
+	lib/resolve.h \
+	lib/rplan.h \
+	lib/utils.h \
+	lib/zonecut.h
 
 # Dependencies
 libkres_DEPEND := $(contrib)

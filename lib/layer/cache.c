@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,22 +14,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "lib/module.h"
+#include "lib/cache/api.h"
 
-#include "lib/layer.h"
-#include "lib/rplan.h"
+/** Module implementation. */
+const kr_layer_api_t *cache_layer(struct kr_module *module)
+{
+	static const kr_layer_api_t _layer = {
+		.produce = &cache_peek,
+		.consume = &cache_stash,
+	};
 
-/* Packet classification. */
-enum {
-	PKT_NOERROR   = 1 << 0, /* Positive response */
-	PKT_NODATA    = 1 << 1, /* No data response */
-	PKT_NXDOMAIN  = 1 << 2, /* Negative response */
-	PKT_REFUSED   = 1 << 3, /* Refused response */
-	PKT_ERROR     = 1 << 4  /* Bad message */
-};
+	return &_layer;
+}
 
-/** Classify response by type. */
-int kr_response_classify(const knot_pkt_t *pkt);
-
-/** Make next iterative query. */
-int kr_make_query(struct kr_query *query, knot_pkt_t *pkt);
+KR_MODULE_EXPORT(cache)

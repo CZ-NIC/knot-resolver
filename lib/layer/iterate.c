@@ -112,7 +112,7 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	return false;
 }
 
-int kr_response_classify(knot_pkt_t *pkt)
+int kr_response_classify(const knot_pkt_t *pkt)
 {
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	switch (knot_wire_get_rcode(pkt->wire)) {
@@ -148,7 +148,7 @@ static bool is_valid_addr(const uint8_t *addr, size_t len)
 }
 
 /** @internal Update NS address from record \a rr.  Return _FAIL on error. */
-static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
+static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *glue_cnt)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		const knot_rdata_t *rdata = rr->rrs.data;
@@ -172,15 +172,23 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query)
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
-		QVERBOSE_MSG(query, "<= using glue for "
+
+		++*glue_cnt; /* reduced verbosity */
+		/* QVERBOSE_MSG(query, "<= using glue for "
 			     "'%s': '%s'\n", name_str, addr_str);
+		*/
 	}
 	return KR_STATE_CONSUME;
 }
 
-/** @internal From \a pkt, fetch glue records for name \a ns, and update the cut etc. */
-static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_request *req)
+/** @internal From \a pkt, fetch glue records for name \a ns, and update the cut etc.
+ *
+ * \param glue_cnt the number of accepted addresses (to be incremented)
+ */
+static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, bool in_bailiwick,
+			struct kr_request *req, const struct kr_query *qry, int *glue_cnt)
 {
+	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
@@ -192,6 +200,12 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_reques
 			    (rr->type != KNOT_RRTYPE_AAAA)) {
 				continue;
 			}
+
+			uint8_t rank = (in_bailiwick && i == KNOT_ANSWER)
+				? (KR_RANK_INITIAL | KR_RANK_AUTH) : KR_RANK_OMIT;
+			(void) kr_ranked_rrarray_add(selected[i], rr, rank,
+							false, qry->uid, &req->pool);
+
 			if ((rr->type == KNOT_RRTYPE_A) &&
 			    (req->ctx->options.NO_IPV4)) {
 				continue;
@@ -200,13 +214,13 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, struct kr_reques
 			    (req->ctx->options.NO_IPV6)) {
 				continue;
 			}
-			(void) update_nsaddr(rr, req->current_query);
+			(void) update_nsaddr(rr, req->current_query, glue_cnt);
 		}
 	}
 }
 
 /** Attempt to find glue for given nameserver name (best effort). */
-static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns)
+static bool has_glue(knot_pkt_t *pkt, const knot_dname_t *ns)
 {
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
@@ -214,18 +228,19 @@ static int has_glue(knot_pkt_t *pkt, const knot_dname_t *ns)
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
 			if (knot_dname_is_equal(ns, rr->owner) &&
 			    (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA)) {
-				return 1;
+				return true;
 			}
 		}
 	}
-	return 0;
+	return false;
 }
 
 /** @internal Update the cut with another NS(+glue) record.
  * @param current_cut is cut name before this packet.
  * @return _DONE if cut->name changes, _FAIL on error, and _CONSUME otherwise. */
 static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
-		      struct kr_request *req, const knot_dname_t *current_cut)
+		      struct kr_request *req, const knot_dname_t *current_cut,
+		      int *glue_cnt)
 {
 	struct kr_query *qry = req->current_query;
 	struct kr_zonecut *cut = &qry->zone_cut;
@@ -268,24 +283,33 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	/* Fetch glue for each NS */
 	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
-		int glue_records = has_glue(pkt, ns_name);
 		/* Glue is mandatory for NS below zone */
-		if (!glue_records && knot_dname_in(rr->owner, ns_name)) {
-			VERBOSE_MSG("<= authority: missing mandatory glue, rejecting\n");
+		if (knot_dname_in(rr->owner, ns_name) && !has_glue(pkt, ns_name)) {
+			const char *msg =
+				"<= authority: missing mandatory glue, skipping NS";
+			WITH_VERBOSE(qry) {
+				auto_free char *ns_str = kr_dname_text(ns_name);
+				VERBOSE_MSG("%s %s\n", msg, ns_str);
+			}
 			continue;
 		}
-		kr_zonecut_add(cut, ns_name, NULL);
+		int ret = kr_zonecut_add(cut, ns_name, NULL);
+		assert(!ret); (void)ret;
+
 		/* Choose when to use glue records. */
+		bool in_bailiwick = knot_dname_in(current_cut, ns_name);
+		bool do_fetch;
 		if (qry->flags.PERMISSIVE) {
-			fetch_glue(pkt, ns_name, req);
+			do_fetch = true;
 		} else if (qry->flags.STRICT) {
 			/* Strict mode uses only mandatory glue. */
-			if (knot_dname_in(cut->name, ns_name))
-				fetch_glue(pkt, ns_name, req);
+			do_fetch = knot_dname_in(cut->name, ns_name);
 		} else {
 			/* Normal mode uses in-bailiwick glue. */
-			if (knot_dname_in(current_cut, ns_name))
-				fetch_glue(pkt, ns_name, req);
+			do_fetch = in_bailiwick;
+		}
+		if (do_fetch) {
+			fetch_glue(pkt, ns_name, in_bailiwick, req, qry, glue_cnt);
 		}
 	}
 
@@ -306,6 +330,7 @@ static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *q
 		/* ^^ Current use case for "cached" RRs without rank: hints module. */
 	}
 	if (answer || type == KNOT_RRTYPE_DS
+	    || type == KNOT_RRTYPE_SOA /* needed for aggressive negative caching */
 	    || type == KNOT_RRTYPE_NSEC || type == KNOT_RRTYPE_NSEC3) {
 		/* We almost always want these validated, and it should be possible. */
 		return KR_RANK_INITIAL | KR_RANK_AUTH;
@@ -384,12 +409,13 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	/* Remember current bailiwick for NS processing. */
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
 	bool ns_record_exists = false;
+	int glue_cnt = 0;
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
 		if (rr->type == KNOT_RRTYPE_NS) {
 			ns_record_exists = true;
-			int state = update_cut(pkt, rr, req, current_zone_cut);
+			int state = update_cut(pkt, rr, req, current_zone_cut, &glue_cnt);
 			switch(state) {
 			case KR_STATE_DONE: result = state; break;
 			case KR_STATE_FAIL: return state; break;
@@ -399,6 +425,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			/* SOA below cut in authority indicates different authority, but same NS set. */
 			qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 		}
+	}
+
+	if (glue_cnt) {
+		VERBOSE_MSG("<= loaded %d glue addresses\n", glue_cnt);
 	}
 
 
@@ -474,7 +504,8 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				/* if not referral, mark record to be written to final answer */
 				to_wire = !referral;
 			} else {
-				state = update_nsaddr(rr, query->parent);
+				int cnt_ = 0;
+				state = update_nsaddr(rr, query->parent, &cnt_);
 				if (state == KR_STATE_FAIL) {
 					return state;
 				}
@@ -824,7 +855,7 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 		char name_str[KNOT_DNAME_MAXLEN], type_str[16];
 		knot_dname_to_str(name_str, query->sname, sizeof(name_str));
 		knot_rrtype_to_string(query->stype, type_str, sizeof(type_str));
-		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %hu\n",
+		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %u\n",
 			    name_str, type_str, query->parent ? query->parent->id : 0);
 	}
 	return kr_ok();

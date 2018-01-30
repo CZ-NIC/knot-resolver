@@ -13,11 +13,11 @@ endif
 
 # Memcached
 ifeq ($(HAS_libmemcached),yes)
-modules_TARGETS += memcached
+#modules_TARGETS += memcached
 endif
 # Redis
 ifeq ($(HAS_hiredis),yes)
-modules_TARGETS += redis
+#modules_TARGETS += redis
 endif
 
 # List of Lua modules

@@ -28,12 +28,14 @@
 #define KR_PURE __attribute__((__pure__))
 #define KR_NORETURN __attribute__((__noreturn__))
 #define KR_COLD __attribute__((__cold__))
+#define KR_PRINTF(n) __attribute__((format (printf, n, (n+1))))
 #else
 #define KR_EXPORT
 #define KR_CONST
 #define KR_PURE
 #define KR_NORETURN
 #define KR_COLD
+#define KR_PRINTF(n)
 #endif
 
 #ifndef uint /* Redefining typedef is a C11 feature. */
@@ -71,7 +73,8 @@ static inline int KR_COLD kr_error(int x) {
 #define KR_EDNS_VERSION 0
 #define KR_EDNS_PAYLOAD 4096 /* Default UDP payload (max unfragmented UDP is 1452B) */
 #define KR_DEFAULT_TLS_PADDING 468 /* Default EDNS(0) Padding is 468 */
-#define KR_CACHE_DEFAULT_MAXTTL (6 * 24 * 3600) /* 6 days, like the root NS TTL */
+#define KR_CACHE_DEFAULT_TTL_MIN (5) /* avoid bursts of queries */
+#define KR_CACHE_DEFAULT_TTL_MAX (6 * 24 * 3600) /* 6 days, like the root NS TTL */
 
 /*
  * Address sanitizer hints.

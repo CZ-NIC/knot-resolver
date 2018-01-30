@@ -61,6 +61,33 @@ Improvements
   (e.g. avoids SERVFAIL when server adds extra records but omits RRSIGs)
 
 
+Knot Resolver 1.99.1-alpha (2017-10-26)
+=======================================
+This is an experimental release meant for testing aggressive caching.
+It contains some regressions and might (theoretically) be even vulnerable.
+The current focus is to minimize queries into the root zone.
+
+Improvements
+------------
+- negative answers from validated NSEC (NXDOMAIN, NODATA)
+- verbose log is very chatty around cache operations (maybe too much)
+
+Regressions
+-----------
+- dropped support for alternative cache backends
+  and for some specific cache operations
+- caching doesn't yet work for various cases:
+    * negative answers without NSEC (i.e. with NSEC3 or insecure)
+	* +cd queries (needs other internal changes)
+	* positive wildcard answers
+- spurious SERVFAIL on specific combinations of cached records, printing:
+	<= bad keys, broken trust chain
+- make check
+- a few Deckard tests are broken, probably due to some problems above
++ unknown ones?
+
+
+
 Knot Resolver 1.4.0 (2017-09-22)
 ================================
 

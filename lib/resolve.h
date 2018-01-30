@@ -28,7 +28,7 @@
 #include "lib/nsrep.h"
 #include "lib/rplan.h"
 #include "lib/module.h"
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 
 /**
  * @file resolve.h
@@ -91,18 +91,23 @@
  *   https://tools.ietf.org/html/rfc4035#section-4.3
  */
 enum kr_rank {
+	/* Initial-like states.  No validation has been attempted (yet). */
 	KR_RANK_INITIAL = 0, /**< Did not attempt to validate. It's assumed
 					compulsory to validate (or prove insecure). */
 	KR_RANK_OMIT,        /**< Do not attempt to validate.
 					(And don't consider it a validation failure.) */
 	KR_RANK_TRY,         /**< Attempt to validate, but failures are non-fatal. */
 
+	/* Failure states.  These have higher value because they have more information. */
 	KR_RANK_INDET = 4,   /**< Unable to determine whether it should be secure. */
 	KR_RANK_BOGUS,       /**< Ought to be secure but isn't. */
 	KR_RANK_MISMATCH,
 	KR_RANK_MISSING,     /**< Unable to obtain a good signature. */
 
-	KR_RANK_INSECURE = 8, /**< Proven to be insecure. */
+	/** Proven to be insecure, i.e. we have a chain of trust from TAs
+	 * that cryptographically denies the possibility of existence
+	 * of a positive chain of trust from the TAs to the record. */
+	KR_RANK_INSECURE = 8,
 
 	/** Authoritative data flag; the chain of authority was "verified".
 	 *  Even if not set, only in-bailiwick stuff is acceptable,
@@ -199,6 +204,7 @@ struct kr_request {
 	int state;
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;
+	ranked_rr_array_t add_selected;
 	rr_array_t additional;
 	bool answ_validated; /**< internal to validator; beware of caching, etc. */
 	bool auth_validated; /**< see answ_validated ^^ ; TODO */
@@ -208,6 +214,13 @@ struct kr_request {
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	knot_mm_t pool;
 };
+
+/** Initializer for an array of *_selected. */
+#define kr_request_selected(req) { \
+	[KNOT_ANSWER] = &(req)->answ_selected, \
+	[KNOT_AUTHORITY] = &(req)->auth_selected, \
+	[KNOT_ADDITIONAL] = &(req)->add_selected, \
+	}
 
 /**
  * Begin name resolution.

@@ -27,8 +27,8 @@
 #include "contrib/cleanup.h"
 
 #include "lib/generic/array.h"
-#include "lib/cdb.h"
-#include "lib/cache.h"
+#include "lib/cache/cdb_api.h"
+#include "lib/cache/api.h"
 #include "lib/utils.h"
 
 /* memcached client */
@@ -106,7 +106,8 @@ static int cdb_clear(knot_db_t *db)
 	return 0;
 }
 
-static int cdb_readv(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount)
+static int cdb_readv(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val,
+		     int maxcount)
 {
 	if (!db || !key || !val) {
 		return kr_error(EINVAL);
@@ -138,7 +139,8 @@ static int cdb_readv(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 	return 0;
 }
 
-static int cdb_writev(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount)
+static int cdb_writev(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val,
+			int maxcount)
 {
 	if (!db || !key || !val) {
 		return kr_error(EINVAL);

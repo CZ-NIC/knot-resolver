@@ -20,7 +20,7 @@
 #include <libknot/dname.h>
 #include <libknot/codes.h>
 
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 #include "lib/zonecut.h"
 #include "lib/nsrep.h"
 
@@ -76,7 +76,7 @@ void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2);
  */
 struct kr_query {
 	struct kr_query *parent;
-	knot_dname_t *sname;
+	knot_dname_t *sname; /**< The name to resolve - lower-cased, uncompressed. */
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;
@@ -89,7 +89,7 @@ struct kr_query {
 				 * ancestor if it is a subquery. */
 	uint64_t timestamp_mono; /**< Time of query created or time of
 	                           * query to upstream resolver (milliseconds). */
-	struct timeval timestamp;
+	struct timeval timestamp; /**< Real time for TTL+DNSSEC checks (.tv_sec only). */
 	struct kr_zonecut zone_cut;
 	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;

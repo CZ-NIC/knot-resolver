@@ -19,7 +19,7 @@
 
 #include "lib/rplan.h"
 #include "lib/resolve.h"
-#include "lib/cache.h"
+#include "lib/cache/api.h"
 #include "lib/defines.h"
 #include "lib/layer.h"
 

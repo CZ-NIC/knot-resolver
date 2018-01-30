@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "lib/cdb.h"
+#include "lib/cache/cdb_api.h"
 #include "lib/defines.h"
 
 KR_EXPORT KR_CONST

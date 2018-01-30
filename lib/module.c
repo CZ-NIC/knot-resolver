@@ -26,13 +26,11 @@
 /* List of embedded modules */
 const kr_layer_api_t *iterate_layer(struct kr_module *module);
 const kr_layer_api_t *validate_layer(struct kr_module *module);
-const kr_layer_api_t *rrcache_layer(struct kr_module *module);
-const kr_layer_api_t *pktcache_layer(struct kr_module *module);
+const kr_layer_api_t *cache_layer(struct kr_module *module);
 static const struct kr_module embedded_modules[] = {
-	{ "iterate",  NULL, NULL, NULL, iterate_layer, NULL, NULL, NULL },
+	{ "iterate",  NULL, NULL, NULL, iterate_layer,  NULL, NULL, NULL },
 	{ "validate", NULL, NULL, NULL, validate_layer, NULL, NULL, NULL },
-	{ "rrcache",  NULL, NULL, NULL, rrcache_layer, NULL, NULL, NULL },
-	{ "pktcache", NULL, NULL, NULL, pktcache_layer, NULL, NULL, NULL },
+	{ "cache",    NULL, NULL, NULL, cache_layer,    NULL, NULL, NULL },
 };
 
 /** Library extension. */
@@ -71,20 +69,27 @@ static int load_library(struct kr_module *module, const char *name, const char *
 	return kr_error(ENOENT);
 }
 
+const struct kr_module * kr_module_embedded(const char *name)
+{
+	for (unsigned i = 0; i < sizeof(embedded_modules)/sizeof(embedded_modules[0]); ++i) {
+		if (strcmp(name, embedded_modules[i].name) == 0)
+			return embedded_modules + i;
+	}
+	return NULL;
+}
+
 /** Load C module symbols. */
 static int load_sym_c(struct kr_module *module, uint32_t api_required)
 {
 	/* Check if it's embedded first */
-	for (unsigned i = 0; i < sizeof(embedded_modules)/sizeof(embedded_modules[0]); ++i) {
-		const struct kr_module *embedded = &embedded_modules[i];
-		if (strcmp(module->name, embedded->name) == 0) {
-			module->init = embedded->init;
-			module->deinit = embedded->deinit;
-			module->config = embedded->config;
-			module->layer = embedded->layer;
-			module->props = embedded->props;
-			return kr_ok();
-		}
+	const struct kr_module *embedded = kr_module_embedded(module->name);
+	if (embedded) {
+		module->init = embedded->init;
+		module->deinit = embedded->deinit;
+		module->config = embedded->config;
+		module->layer = embedded->layer;
+		module->props = embedded->props;
+		return kr_ok();
 	}
 	/* Load dynamic library module */
 	auto_free char *m_prefix = kr_strcatdup(2, module->name, "_");
