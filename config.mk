@@ -40,11 +40,6 @@ BUILD_CFLAGS += -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
 BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 BUILD_CFLAGS += -fvisibility=hidden
 
-# Otherwise Fedora is making kresd symbols inaccessible for modules
-# TODO: clang needs different flag name, etc.
-BUILD_CFLAGS += -rdynamic
-BUILD_LDFLAGS += -export-dynamic
-
 ifeq (,$(findstring -O,$(CFLAGS)))
 	BUILD_CFLAGS += -O2
 endif
