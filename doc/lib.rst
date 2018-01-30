@@ -24,7 +24,7 @@ Name resolution
 Cache
 -----
 
-.. doxygenfile:: cache.h
+.. doxygenfile:: cache/api.h
    :project: libkres
 
 .. _lib_api_nameservers:
