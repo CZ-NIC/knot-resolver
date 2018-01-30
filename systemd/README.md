@@ -6,36 +6,33 @@ by systemd (or any supervisor that provides equivalent file descriptor
 initialization via the interface supported by
 sd_listen_fds_with_names(3)).
 
-Distributors of systems using systemd may wish to place
-./90-kresd.preset in /lib/systemd/systemd-preset/90-kresd.preset if
-they want to delay daemon launch until it is accessed. (see
-systemd.preset(5)).
+Usage and Configuration
+-----------------------
 
-When run in this configuration:
+See kresd.systemd(8) for details.
 
- * it will be run under a non-privileged user, which means it will not
-   be able to open any new non-privileged ports.
+Manual activation
+-----------------
 
- * it will use a single process (implicitly uses --forks=1, and will
-   fail if that configuration variable is set to a different value).
-   If you want multiple daemons to listen on these ports publicly
-   concurrently, you'll need the supervisor to manage them
-   differently, for example via a systemd generator:
+If you wish to use manual activation without sockets, you have to grant
+the service the capability to bind to well-known ports. You can use a drop-in
+file.
 
-     https://www.freedesktop.org/software/systemd/man/systemd.generator.html
+    # /etc/systemd/system/kresd@.service.d/override.conf
+    [Service]
+    AmbientCapabilities=CAP_NET_BIND_SERVICE
 
-   If you have a useful systemd generator for multiple concurrent
-   processes, please contribute it upstream!
+Notes
+-----
 
-Administrators who wish to make kresd listen on a public network
-interface can use:
+*  If you're using systemd prior to version 227, use a drop-in file to change
+   the service type to simple. See drop-in/systemd-compat.conf.
 
-    systemctl edit kresd.socket
+*  Distributors of systems using systemd may wish to place
+   ./90-kresd.preset in /lib/systemd/systemd-preset/90-kresd.preset if
+   they want to delay daemon launch until it is accessed. (see
+   systemd.preset(5)).
 
-to add an override file that indicates where they want it to listen.
-For example:
-
-    # /etc/systemd/system/kresd.socket.d/override.conf
-    [Socket]
-    ListenDatagram=192.0.2.115:53
-    ListenStream=192.0.2.115:53
+*  Symlinks pointing from @1 to the systemd template are not necessary. They
+   are only useful to provide users unfamiliar with kresd instances a hint
+   when using bash completion.

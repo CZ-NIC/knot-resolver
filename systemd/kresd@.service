@@ -1,7 +1,9 @@
 [Unit]
 Description=Knot DNS Resolver daemon
 Documentation=man:kresd(8)
-Alias=knot-resolver.service
+Wants=kresd@%i.socket
+Wants=kresd-control@%i.socket
+Wants=kresd-tls@%i.socket
 
 [Service]
 Type=notify
@@ -10,5 +12,3 @@ EnvironmentFile=-/etc/default/kresd
 ExecStart=/usr/sbin/kresd $KRESD_ARGS
 User=knot-resolver
 Restart=on-failure
-# CAP_NET_BIND_SERVICE capability is needed for manual service activation
-AmbientCapabilities=CAP_NET_BIND_SERVICE

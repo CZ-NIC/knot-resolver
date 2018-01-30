@@ -88,7 +88,7 @@ online documentation.
 .PP
 .nf
 .RS 6n
-# Create a basic forwarder configuration 
+# Create a basic forwarder configuration
 $ cat << EOF > config
 modules = { 'policy' }
 policy.add(policy.all(policy.FORWARD('192.168.1.1')))
@@ -164,7 +164,7 @@ Show short commandline option help.
 .B \-V
 Show the version.
 .SH "SEE ALSO"
-\fIdaemon/README.md\fR,
+\fIkresd.systemd(8)\fR,
 \fIhttps://knot-resolver.readthedocs.io\fR
 .SH "AUTHORS"
 .B kresd

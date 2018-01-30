@@ -2,14 +2,16 @@
 Description=Knot DNS Resolver network listeners
 Documentation=man:kresd(8)
 Before=sockets.target
-Alias=knot-resolver.socket
+Service=kresd@%i.service
+PartOf=kresd@%i.service
 
 [Socket]
-ListenStream=[::1]:53
-ListenDatagram=[::1]:53
-ListenStream=127.0.0.1:53
-ListenDatagram=127.0.0.1:53
+ReusePort=true
 FreeBind=true
+ListenDatagram=[::1]:53
+ListenStream=[::1]:53
+ListenDatagram=127.0.0.1:53
+ListenStream=127.0.0.1:53
 
 [Install]
 WantedBy=sockets.target
