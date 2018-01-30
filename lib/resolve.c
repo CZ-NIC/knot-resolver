@@ -692,13 +692,12 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 					knot_wire_set_cd(pkt->wire);
 				}
 			/* Full resolution (ask for +cd and +do) */
-			} else if (qry->flags.FORWARD) {
-				knot_wire_set_rd(pkt->wire);
+			} else {
 				knot_edns_set_do(pkt->opt_rr);
 				knot_wire_set_cd(pkt->wire);
-			} else if (qry->flags.DNSSEC_WANT) {
-				knot_edns_set_do(pkt->opt_rr);
-				knot_wire_set_cd(pkt->wire);
+				if (qry->flags.FORWARD) {
+					knot_wire_set_rd(pkt->wire);
+				}
 			}
 		}
 	}
