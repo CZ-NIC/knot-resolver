@@ -143,7 +143,10 @@ char* kr_strcatdup(unsigned n, ...)
 	for (unsigned i = 0; i < n; ++i) {
 		char *item = va_arg(vl, char *);
 		const size_t new_len = total_len + strlen_safe(item);
-		if (unlikely(new_len < total_len)) return NULL;
+		if (unlikely(new_len < total_len)) {
+			va_end(vl);
+			return NULL;
+		}
 		total_len = new_len;
 	}
 	va_end(vl);

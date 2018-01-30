@@ -108,7 +108,7 @@ Most of the dependencies can be resolved from packages, here's an overview for s
 
    brew install pkg-config libuv luajit cmocka
 
-Building from sources 
+Building from sources
 ---------------------
 
 Initialize git submodules first.
@@ -195,7 +195,7 @@ All paths are prefixed with ``PREFIX`` variable by default if not specified othe
 
    "library", "``LIBDIR``", "``$(PREFIX)/lib``", "pkg-config is auto-generated [#]_"
    "daemon",  "``SBINDIR``", "``$(PREFIX)/sbin``", ""
-   "configuration", "``ETCDIR``", "``$(PREFIX)/etc/kresd``", "Configuration file, templates."
+   "configuration", "``ETCDIR``", "``$(PREFIX)/etc/knot-resolver``", "Configuration file, templates."
    "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "Runtime directory for loading dynamic modules [#]_."
    "trust anchor file", "``KEYFILE_DEFAULT``", "*(none)*", "Path to read-only trust anchor file, which is used as fallback when no other file is specified. [#]_"
    "work directory", "", "the current directory", "Run directory for daemon. (Only relevant during run time, not e.g. during installation.)"
@@ -216,7 +216,7 @@ By default the resolver library is built as a dynamic library with versioned ABI
    $ make BUILDMODE=dynamic # Default, create dynamic library
    $ make BUILDMODE=static  # Create static library
 
-When the library is linked statically, it usually produces a smaller binary. However linking it to various C modules might violate ODR and increase the size. 
+When the library is linked statically, it usually produces a smaller binary. However linking it to various C modules might violate ODR and increase the size.
 
 Resolving dependencies
 ~~~~~~~~~~~~~~~~~~~~~~

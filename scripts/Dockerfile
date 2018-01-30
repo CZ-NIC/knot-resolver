@@ -1,23 +1,25 @@
 FROM alpine:edge
-MAINTAINER Marek Vavrusa <marek.vavrusa@nic.cz>
+MAINTAINER Knot Resolver team <knot-resolver-users@lists.nic.cz>
 
 # Environment
 ENV BUILD_PKGS build-base automake autoconf libtool pkgconfig git luajit-dev libuv-dev gnutls-dev jansson-dev userspace-rcu-dev curl vim bsd-compat-headers
-ENV RUN_PKGS luajit libuv gnutls jansson bash
+ENV RUN_PKGS luajit libuv gnutls jansson bash libstdc++ lua5.1-cqueues lua5.1-http lua5.1-sec lua5.1-socket
 ENV BUILD_IGNORE gmp nettle jansson gnutls lua libuv cmocka
 ENV PKG_CONFIG_PATH /usr/local/lib/pkgconfig
 ENV CFLAGS -O2 -ftree-vectorize -fstack-protector -g
 ENV LDFLAGS -Wl,--as-needed
 
-# Expose port
-EXPOSE 53
+# export DNS over UDP & TCP, DNS-over-TLS, web interface
+EXPOSE 53/UDP 53/TCP 853/TCP 8053/TCP
 
 # Select entrypoint
 WORKDIR /data
-CMD ["/usr/local/sbin/kresd"]
+COPY "config.docker" "/data"
+CMD ["/usr/local/sbin/kresd", "-c", "/data/config.docker"]
 
 # Install dependencies and sources
 RUN \
+apk add -t lua5.1-compat5.3 lua5.1-compat53 && \
 apk --update add ${RUN_PKGS} && \
 apk add --virtual build-dep ${BUILD_PKGS} && \
 git clone --depth 1 --recurse-submodules=modules/policy/lua-aho-corasick \

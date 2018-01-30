@@ -7,7 +7,7 @@
 -- net = { '127.0.0.1', '::1' }
 
 -- Drop root privileges
-user('kresd', 'kresd')
+user('knot-resolver', 'knot-resolver')
 
 -- Auto-maintain root TA
 trust_anchors.file = 'root.keys'

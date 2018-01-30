@@ -99,6 +99,20 @@ installcheck:linux:amd64:
     - linux
     - amd64
 
+doc:
+  stage: test
+  script:
+    - SPHINXFLAGS="-W" make doc
+  dependencies: []
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - ./doc/*
+  tags:
+    - docker
+
+
+
 deckard:linux:amd64:
   stage: test
   script:
@@ -184,6 +198,7 @@ respdiff:iter:udp:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
     - docker
@@ -208,6 +223,7 @@ respdiff:iter:tcp:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
     - docker
@@ -232,6 +248,7 @@ respdiff:iter:tls:linux:amd64:
     expire_in: '1 week'
     paths:
       - results/*.txt
+      - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
     - docker

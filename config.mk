@@ -18,7 +18,7 @@ PKGCONFIGDIR ?= $(LIBDIR)/pkgconfig
 MANDIR ?= $(PREFIX)/share/man
 INCLUDEDIR ?= $(PREFIX)/include
 MODULEDIR ?= $(LIBDIR)/kdns_modules
-ETCDIR ?= $(PREFIX)/etc/kresd
+ETCDIR ?= $(PREFIX)/etc/knot-resolver
 ROOTHINTS ?= $(ETCDIR)/root.hints
 COVERAGE_STAGE ?= gcov
 COVERAGE_STATSDIR ?= $(CURDIR)/coverage.stats
@@ -39,11 +39,6 @@ BUILD_CFLAGS += -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall
 BUILD_CFLAGS += -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
 BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 BUILD_CFLAGS += -fvisibility=hidden
-
-# Otherwise Fedora is making kresd symbols inaccessible for modules
-# TODO: clang needs different flag name, etc.
-BUILD_CFLAGS += -rdynamic
-BUILD_LDFLAGS += -export-dynamic
 
 ifeq (,$(findstring -O,$(CFLAGS)))
 	BUILD_CFLAGS += -O2

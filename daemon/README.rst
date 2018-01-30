@@ -9,144 +9,6 @@ The server is in the `daemon` directory, it works out of the box without any con
    $ kresd -h # Get help
    $ kresd -a ::1
 
-Enabling DNSSEC
-===============
-
-The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
-To enable it, you need to provide trusted root keys. Bootstrapping of the keys is automated, and kresd fetches root trust anchors set `over a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_ from IANA. From there, it can perform :rfc:`5011` automatic updates for you.
-
-.. note:: Automatic bootstrap requires luasocket_ and luasec_ installed.
-
-.. code-block:: none
-
-   $ kresd -k root-new.keys # File for root keys
-   [ ta ] keyfile 'root-new.keys': doesn't exist, bootstrapping
-   [ ta ] Root trust anchors bootstrapped over https with pinned certificate.
-          You SHOULD verify them manually against original source:
-          https://www.iana.org/dnssec/files
-   [ ta ] Current root trust anchors are:
-   . 0 IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5
-   . 0 IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D
-   [ ta ] next refresh for . in 24 hours
-
-Alternatively, you can set it in configuration file with ``trust_anchors.file = 'root.keys'``. If the file doesn't exist, it will be automatically populated with root keys validated using root anchors retrieved over HTTPS.
-
-This is equivalent to `using unbound-anchor <https://www.unbound.net/documentation/howto_anchor.html>`_:
-
-.. code-block:: bash
-
-   $ unbound-anchor -a "root.keys" || echo "warning: check the key at this point"
-   $ echo "auto-trust-anchor-file: \"root.keys\"" >> unbound.conf
-   $ unbound -c unbound.conf
-
-.. warning:: Bootstrapping of the root trust anchors is automatic, you are however **encouraged to check** the key over **secure channel**, as specified in `DNSSEC Trust Anchor Publication for the Root Zone <https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs>`_. This is a critical step where the whole infrastructure may be compromised, you will be warned in the server log.
-
-Configuration is described in :ref:`dnssec-config`.
-
-Manually providing root anchors
--------------------------------
-
-The root anchors bootstrap may fail for various reasons, in this case you need to provide IANA or alternative root anchors. The format of the keyfile is the same as for Unbound or BIND and contains DS/DNSKEY records.
-
-1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
-2. Fetch current keys (DNSKEY), verify digests
-3. Deploy them
-
-.. code-block:: bash
-
-   $ kdig DNSKEY . @k.root-servers.net +noall +answer | grep "DNSKEY[[:space:]]257" > root.keys
-   $ ldns-key2ds -n root.keys # Only print to stdout
-   ... verify that digest matches TA published by IANA ...
-   $ kresd -k root.keys
-
-You've just enabled DNSSEC!
-
-.. note:: Bootstrapping and automatic update need write access to keyfile direcory. If you want to manage root anchors manually you should use ``trust_anchors.add_file('root.keys', true)``.
-
-CLI interface
-=============
-
-The daemon features a CLI interface, type ``help()`` to see the list of available commands.
-
-.. code-block:: bash
-
-   $ kresd /var/cache/knot-resolver
-   [system] started in interactive mode, type 'help()'
-   > cache.count()
-   53
-
-.. role:: lua(code)
-   :language: lua
-
-Verbose output
---------------
-
-If the verbose logging is compiled in, i.e. not turned off by ``-DNOVERBOSELOG``, you can turn on verbose tracing of server operation with the ``-v`` option.
-You can also toggle it on runtime with ``verbose(true|false)`` command.
-
-.. code-block:: bash
-
-   $ kresd -v
-
-To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a single fork. For example:
-
-.. code-block:: bash
-
-   $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 -v &
-
-
-Scaling out
-===========
-
-The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
-Multiple processes can serve different addresses, but still share the same working directory and cache.
-You can add, start and stop processes during runtime based on the load.
-
-.. code-block:: bash
-
-   $ kresd -f 4 rundir > kresd.log &
-   $ kresd -f 2 rundir > kresd_2.log & # Extra instances
-   $ pstree $$ -g
-   bash(3533)─┬─kresd(19212)─┬─kresd(19212)
-              │              ├─kresd(19212)
-              │              └─kresd(19212)
-              ├─kresd(19399)───kresd(19399)
-              └─pstree(19411)
-   $ kill 19399 # Kill group 2, former will continue to run
-   bash(3533)─┬─kresd(19212)─┬─kresd(19212)
-              │              ├─kresd(19212)
-              │              └─kresd(19212)
-              └─pstree(19460)
-
-.. _daemon-reuseport:
-
-.. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, use only one daemon process.
-
-Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
-
-.. code-block:: bash
-
-	$ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
-	> cache.count()
-	53
-
-The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
-Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
-
-This is also a way to enumerate and test running instances, the list of files in ``tty`` corresponds to the list
-of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
-
-.. _daemon-supervised:
-
-Running supervised
-==================
-
-Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to the resolver daemon. If the resolver terminates or is killed, the sockets remain open and no queries are dropped.
-
-The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. You should have a look at `real process managers`_.
-
-The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
-
 Configuration
 =============
 
@@ -434,7 +296,7 @@ Environment
 
       > user('baduser')
       invalid user name
-      > user('kresd', 'netgrp')
+      > user('knot-resolver', 'netgrp')
       true
       > user('root')
       Operation not permitted
@@ -605,9 +467,9 @@ For when listening on ``localhost`` just doesn't cut it.
 
    .. code-block:: lua
 
-      > net.tls("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
+      > net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
       > net.tls()
-      ("/etc/kresd/server-cert.pem", "/etc/kresd/server-key.pem")
+      ("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
       > net.listen("::", 853)
       > net.listen("::", 443, {tls = true})
 
@@ -1140,6 +1002,144 @@ specified worker count and process rank.
    .. code-block:: lua
 
 	print(worker.stats().concurrent)
+
+Running supervised
+==================
+
+Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to the resolver daemon. If the resolver terminates or is killed, the sockets remain open and no queries are dropped.
+
+The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. You should have a look at `real process managers`_.
+
+The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
+
+Enabling DNSSEC
+===============
+
+The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
+To enable it, you need to provide trusted root keys. Bootstrapping of the keys is automated, and kresd fetches root trust anchors set `over a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_ from IANA. From there, it can perform :rfc:`5011` automatic updates for you.
+
+.. note:: Automatic bootstrap requires luasocket_ and luasec_ installed.
+
+.. code-block:: none
+
+   $ kresd -k root-new.keys # File for root keys
+   [ ta ] keyfile 'root-new.keys': doesn't exist, bootstrapping
+   [ ta ] Root trust anchors bootstrapped over https with pinned certificate.
+          You SHOULD verify them manually against original source:
+          https://www.iana.org/dnssec/files
+   [ ta ] Current root trust anchors are:
+   . 0 IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5
+   . 0 IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D
+   [ ta ] next refresh for . in 24 hours
+
+Alternatively, you can set it in configuration file with ``trust_anchors.file = 'root.keys'``. If the file doesn't exist, it will be automatically populated with root keys validated using root anchors retrieved over HTTPS.
+
+This is equivalent to `using unbound-anchor <https://www.unbound.net/documentation/howto_anchor.html>`_:
+
+.. code-block:: bash
+
+   $ unbound-anchor -a "root.keys" || echo "warning: check the key at this point"
+   $ echo "auto-trust-anchor-file: \"root.keys\"" >> unbound.conf
+   $ unbound -c unbound.conf
+
+.. warning:: Bootstrapping of the root trust anchors is automatic, you are however **encouraged to check** the key over **secure channel**, as specified in `DNSSEC Trust Anchor Publication for the Root Zone <https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs>`_. This is a critical step where the whole infrastructure may be compromised, you will be warned in the server log.
+
+Configuration is described in :ref:`dnssec-config`.
+
+Manually providing root anchors
+-------------------------------
+
+The root anchors bootstrap may fail for various reasons, in this case you need to provide IANA or alternative root anchors. The format of the keyfile is the same as for Unbound or BIND and contains DS/DNSKEY records.
+
+1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
+2. Fetch current keys (DNSKEY), verify digests
+3. Deploy them
+
+.. code-block:: bash
+
+   $ kdig DNSKEY . @k.root-servers.net +noall +answer | grep "DNSKEY[[:space:]]257" > root.keys
+   $ ldns-key2ds -n root.keys # Only print to stdout
+   ... verify that digest matches TA published by IANA ...
+   $ kresd -k root.keys
+
+You've just enabled DNSSEC!
+
+.. note:: Bootstrapping and automatic update need write access to keyfile direcory. If you want to manage root anchors manually you should use ``trust_anchors.add_file('root.keys', true)``.
+
+CLI interface
+=============
+
+The daemon features a CLI interface, type ``help()`` to see the list of available commands.
+
+.. code-block:: bash
+
+   $ kresd /var/cache/knot-resolver
+   [system] started in interactive mode, type 'help()'
+   > cache.count()
+   53
+
+.. role:: lua(code)
+   :language: lua
+
+Verbose output
+--------------
+
+If the verbose logging is compiled in, i.e. not turned off by ``-DNOVERBOSELOG``, you can turn on verbose tracing of server operation with the ``-v`` option.
+You can also toggle it on runtime with ``verbose(true|false)`` command.
+
+.. code-block:: bash
+
+   $ kresd -v
+
+To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a single fork. For example:
+
+.. code-block:: bash
+
+   $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 -v &
+
+
+Scaling out
+===========
+
+The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
+Multiple processes can serve different addresses, but still share the same working directory and cache.
+You can add, start and stop processes during runtime based on the load.
+
+.. code-block:: bash
+
+   $ kresd -f 4 rundir > kresd.log &
+   $ kresd -f 2 rundir > kresd_2.log & # Extra instances
+   $ pstree $$ -g
+   bash(3533)─┬─kresd(19212)─┬─kresd(19212)
+              │              ├─kresd(19212)
+              │              └─kresd(19212)
+              ├─kresd(19399)───kresd(19399)
+              └─pstree(19411)
+   $ kill 19399 # Kill group 2, former will continue to run
+   bash(3533)─┬─kresd(19212)─┬─kresd(19212)
+              │              ├─kresd(19212)
+              │              └─kresd(19212)
+              └─pstree(19460)
+
+.. _daemon-reuseport:
+
+.. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, use only one daemon process.
+
+Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
+
+.. code-block:: bash
+
+	$ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
+	> cache.count()
+	53
+
+The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
+Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
+
+This is also a way to enumerate and test running instances, the list of files in ``tty`` corresponds to the list
+of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
+
+.. _daemon-supervised:
 
 Using CLI tools
 ===============

@@ -1,5 +1,4 @@
 local kres = require('kres')
-local policy = require('policy')
 local ffi = require('ffi')
 local C = ffi.C
 
@@ -91,7 +90,12 @@ view.layer = {
 		local match_cb = evaluate(view, req)
 		if match_cb ~= nil then
 			local action = match_cb(req, req:current())
-			return policy.enforce(state, req, action) or state
+			if action then
+				local next_state = action(state, req)
+				if next_state then    -- Not a chain rule,
+					return next_state -- stop on first match
+				end
+			end
 		end
 		return state
 	end

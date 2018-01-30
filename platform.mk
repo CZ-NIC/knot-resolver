@@ -36,6 +36,7 @@ else
 		PLATFORM := Darwin
 		LIBEXT := .dylib
 		MODTYPE := dynamiclib
+		LDFLAGS += -Wl,-export_dynamic
                 # OS X specific hardening since -pie doesn't work
 		ifneq ($(HARDENING),no)
 			BINFLAGS += -Wl,-pie
@@ -45,14 +46,18 @@ else
 		SOVER = $(if $(1), -compatibility_version $(2) -current_version $(1),)
 	else
 		PLATFORM := POSIX
-		LDFLAGS += -pthread -lm -Wl,-E
+		LDFLAGS += -pthread -lm -Wl,--export-dynamic
                 # ELF hardening options
 		ifneq ($(HARDENING),no)
 			BINFLAGS += -pie
 			LDFLAGS += -Wl,-z,relro,-z,now
 		endif
 		ifeq ($(UNAME),Linux)
-		LDFLAGS += -ldl
+			LDFLAGS += -ldl
+		endif
+		ifeq ($(firstword $(shell $(CC) --version)),gcc)
+			# Otherwise Fedora is making kresd symbols inaccessible for modules?
+			CFLAGS += -rdynamic
 		endif
 	endif
 endif
