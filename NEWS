@@ -1,3 +1,40 @@
+Knot Resolver 2.0.0 (2018-01-31)
+================================
+
+Incompatible changes
+--------------------
+- systemd: change unit files to allow running multiple instances,
+  deployments with single instance now must use `kresd@1.service`
+  instead of `kresd.service`; see kresd.systemd(8) for details
+- systemd: the directory for cache is now /var/cache/knot-resolver
+- unify default directory and user to `knot-resolver`
+- directory with trust anchor file specified by -k option must be writeable
+- policy module is now loaded by default to enforce RFC 6761;
+  see documentation for policy.PASS if you use locally-served DNS zones
+- drop support for alternative cache backends memcached, redis,
+  and for Lua bindings for some specific cache operations
+- REORDER_RR option is not implemented (temporarily)
+
+New features
+------------
+- aggressive caching of validated records (RFC 8198) for NSEC zones;
+  thanks to ICANN for sponsoring this work.
+- forwarding over TLS, authenticated by SPKI pin or certificate.
+  policy.TLS_FORWARD pipelines queries out-of-order over shared TLS connection
+  Beware: Some resolvers do not support out-of-order query processing.
+  TLS forwarding to such resolvers will lead to slower resolution or failures.
+- trust anchors: you may specify a read-only file via -K or --keyfile-ro
+- trust anchors: at build-time you may set KEYFILE_DEFAULT (read-only)
+- ta_sentinel module implements draft ietf-dnsop-kskroll-sentinel-00,
+  enabled by default
+- serve_stale module is prototype, subject to change
+- extended API for Lua modules
+
+Bugfixes
+--------
+- fix build on osx - regressed in 1.5.3 (different linker option name)
+
+
 Knot Resolver 1.5.3 (2018-01-23)
 ================================
 
