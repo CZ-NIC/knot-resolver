@@ -603,6 +603,7 @@ static int answer_finalize(struct kr_request *request, int state)
 		secure = false; /* don't trust forwarding for now */
 	}
 	if (last && (last->flags.DNSSEC_OPTOUT)) {
+		VERBOSE_MSG(NULL, "AD: opt-out\n");
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 

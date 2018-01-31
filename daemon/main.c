@@ -483,19 +483,19 @@ static int parse_args(int argc, char **argv, struct args *args)
 	/* Long options. */
 	int c = 0, li = 0;
 	struct option opts[] = {
-		{"addr", required_argument,   0, 'a'},
-		{"tls",  required_argument,   0, 't'},
-		{"fd",   required_argument,   0, 'S'},
-		{"tlsfd", required_argument,  0, 'T'},
-		{"config", required_argument, 0, 'c'},
-		{"keyfile",required_argument, 0, 'k'},
-		{"keyfile-ro",required_argument, 0, 'K'},
-		{"forks",required_argument,   0, 'f'},
-		{"moduledir", required_argument, 0, 'm'},
-		{"verbose",    no_argument,   0, 'v'},
-		{"quiet",      no_argument,   0, 'q'},
-		{"version",   no_argument,    0, 'V'},
-		{"help",      no_argument,    0, 'h'},
+		{"addr",       required_argument, 0, 'a'},
+		{"tls",        required_argument, 0, 't'},
+		{"fd",         required_argument, 0, 'S'},
+		{"tlsfd",      required_argument, 0, 'T'},
+		{"config",     required_argument, 0, 'c'},
+		{"keyfile",    required_argument, 0, 'k'},
+		{"keyfile-ro", required_argument, 0, 'K'},
+		{"forks",      required_argument, 0, 'f'},
+		{"moduledir",  required_argument, 0, 'm'},
+		{"verbose",          no_argument, 0, 'v'},
+		{"quiet",            no_argument, 0, 'q'},
+		{"version",          no_argument, 0, 'V'},
+		{"help",             no_argument, 0, 'h'},
 		{0, 0, 0, 0}
 	};
 	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:K:k:vqVh", opts, &li)) != -1) {
