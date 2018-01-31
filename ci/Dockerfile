@@ -61,10 +61,11 @@ RUN pip3 install flake8
 
 # Unbound for respdiff
 RUN apt-get install unbound unbound-anchor -y -qqq
-RUN printf "server:\n interface: 127.0.0.1@53535\n use-syslog: yes\nremote-control:\n control-enable: no\n" >> /etc/unbound/unbound.conf
+RUN printf "server:\n interface: 127.0.0.1@53535\n use-syslog: yes\n do-ip6: no\nremote-control:\n control-enable: no\n" >> /etc/unbound/unbound.conf
 
 # BIND for respdiff
 RUN apt-get install bind9 -y -qqq
+RUN printf '\nOPTIONS="-4 $OPTIONS"' >> /etc/default/bind9
 RUN printf 'options {\n directory "/var/cache/bind";\n listen-on port 53533 { 127.0.0.1; };\n listen-on-v6 port 53533 { ::1; };\n};\n' > /etc/bind/named.conf.options
 
 # PowerDNS Recursor for Deckard CI
