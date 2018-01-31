@@ -65,6 +65,11 @@ typedef void (*trace_callback_f)(struct kr_request *);
 	struct kr_cache
 EOF
 
+printf "
+typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
+				const struct kr_query *qry);
+"
+
 genResType() {
 	echo "$1" | ./scripts/gen-cdefs.sh libkres types
 }
@@ -147,6 +152,7 @@ EOF
 	kr_ranked_rrarray_add
 	kr_qflags_set
 	kr_qflags_clear
+	kr_query_set_stale_cb
 	kr_zonecut_add
 	kr_zonecut_set
 	kr_now

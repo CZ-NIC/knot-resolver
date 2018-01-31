@@ -97,6 +97,7 @@ struct kr_qflags {
 	_Bool NONAUTH : 1;
 	_Bool FORWARD : 1;
 	_Bool DNS64_MARK : 1;
+	_Bool CACHE_TRIED : 1;
 };
 typedef struct {
 	knot_rrset_t **at;
@@ -171,8 +172,7 @@ struct kr_request {
 	knot_mm_t pool;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
-struct kr_cache
-{
+struct kr_cache {
 	knot_db_t *db;
 	const struct kr_cdb_api *api;
 	struct {
@@ -181,11 +181,14 @@ struct kr_cache
 		uint32_t insert;
 		uint32_t delete;
 	} stats;
-
-	uint32_t ttl_min, ttl_max;
+	uint32_t ttl_min;
+	uint32_t ttl_max;
 	struct timeval last_clear_walltime;
 	uint64_t last_clear_monotime;
 };
+
+typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
+				const struct kr_query *qry);
 struct knot_rrset {
 	knot_dname_t *_owner;
 	uint16_t type;
@@ -220,6 +223,7 @@ struct kr_query {
 	uint32_t uid;
 	struct kr_query *cname_parent;
 	struct kr_request *request;
+	kr_stale_cb stale_cb;
 };
 struct kr_context {
 	struct kr_qflags options;
@@ -230,7 +234,7 @@ struct kr_context {
 	struct kr_cache cache;
 	char _stub[];
 };
-const char *knot_strerror(int code);
+const char *knot_strerror(int);
 knot_dname_t *knot_dname_from_str(uint8_t *, const char *, size_t);
 _Bool knot_dname_is_equal(const knot_dname_t *, const knot_dname_t *);
 _Bool knot_dname_is_sub(const knot_dname_t *, const knot_dname_t *);
@@ -255,9 +259,9 @@ int knot_pkt_begin(knot_pkt_t *, knot_section_t);
 int knot_pkt_put_question(knot_pkt_t *, const knot_dname_t *, uint16_t, uint16_t);
 const knot_rrset_t *knot_pkt_rr(const knot_pktsection_t *, uint16_t);
 const knot_pktsection_t *knot_pkt_section(const knot_pkt_t *, knot_section_t);
-knot_pkt_t *knot_pkt_new(void *wire, uint16_t len, knot_mm_t *mm);
-void knot_pkt_free(knot_pkt_t **pkt);
-int knot_pkt_parse(knot_pkt_t *pkt, unsigned flags);
+knot_pkt_t *knot_pkt_new(void *, uint16_t, knot_mm_t *);
+void knot_pkt_free(knot_pkt_t **);
+int knot_pkt_parse(knot_pkt_t *, unsigned int);
 struct kr_rplan *kr_resolve_plan(struct kr_request *);
 knot_mm_t *kr_resolve_pool(struct kr_request *);
 struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_dname_t *, uint16_t, uint16_t);
@@ -281,6 +285,7 @@ struct sockaddr *kr_straddr_socket(const char *, int);
 int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
 void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
+void kr_query_set_stale_cb(struct kr_query *, kr_stale_cb);
 int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const knot_rdata_t *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
 uint64_t kr_now();

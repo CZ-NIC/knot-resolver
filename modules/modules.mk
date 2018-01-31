@@ -36,6 +36,7 @@ modules_TARGETS += etcd \
                    version \
                    ta_signal_query \
                    priming \
+                   serve_stale \
                    detect_time_skew \
                    detect_time_jump
 endif

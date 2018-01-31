@@ -57,8 +57,8 @@ static inline int KR_COLD kr_error(int x) {
  * Connection limits.
  * @cond internal
  */
-#define KR_CONN_RTT_MAX 3000 /* Timeout for network activity */
-#define KR_CONN_RETRY 250    /* Retry interval for network activity */
+#define KR_CONN_RTT_MAX 2000 /* Timeout for network activity */
+#define KR_CONN_RETRY 200    /* Retry interval for network activity */
 #define KR_ITER_LIMIT 100    /* Built-in iterator limit */
 #define KR_RESOLVE_TIME_LIMIT 10000 /* Upper limit for resolution time of single query, ms */
 #define KR_CNAME_CHAIN_LIMIT 40 /* Built-in maximum CNAME chain length */
