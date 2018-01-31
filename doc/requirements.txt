@@ -1,2 +1,2 @@
 Sphinx
-breathe<=3.2.0
+breathe
