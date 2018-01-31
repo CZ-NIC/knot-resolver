@@ -1412,6 +1412,11 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		(void) qr_task_send(task, handle,
 				    (struct sockaddr *)&ctx->source.addr,
 				    ctx->req.answer);
+		if (handle->type == UV_TCP) {
+			/* Don't try to close source session at least
+			 * retry_interval_for_timeout_timer milliseconds */
+			uv_timer_again(&ctx->source.session->timeout);
+		}
 	} else {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 	}

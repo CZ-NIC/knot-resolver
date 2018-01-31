@@ -213,7 +213,7 @@ static void tcp_timeout_trigger(uv_timer_t *timer)
 	assert(session->outgoing == false);
 	if (session->tasks.len > 0) {
 		uv_timer_again(timer);
-	} else {
+	} else if (!session->closing) {
 		uv_timer_stop(timer);
 		worker_session_close(session);
 	}
