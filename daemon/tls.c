@@ -1,20 +1,20 @@
 /*
  * Copyright (C) 2016 American Civil Liberties Union (ACLU)
  *               2016-2018 CZ.NIC, z.s.p.o
- * 
+ *
  * Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
  *                 Ondřej Surý <ondrej@sury.org>
- * 
+ *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free
  * Software Foundation, either version 3 of the License, or (at your option)
  * any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -36,6 +36,7 @@
 #include "daemon/io.h"
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
+#define GNUTLS_PIN_MIN_VERSION  0x030400
 
 /* gnutls_record_recv and gnutls_record_send */
 struct tls_ctx_t {
@@ -165,7 +166,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 					kr_log_info("[tls] Renewed expiring ephemeral X.509 cert\n");
 				} else {
 					kr_log_error("[tls] Failed to renew expiring ephemeral X.509 cert, using existing one\n");
-				}				
+				}
 			}
 		} else {
 			/* non-ephemeral cert: warn once when certificate expires */
@@ -269,7 +270,7 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 			}
 		}
 	} while (submitted != sizeof(pkt_size) + pkt->size);
-	
+
 	return kr_ok();
 }
 
@@ -323,14 +324,14 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	return submitted;
 }
 
-#if GNUTLS_VERSION_NUMBER >= 0x030400
+#if GNUTLS_VERSION_NUMBER >= GNUTLS_PIN_MIN_VERSION
 
 /*
   DNS-over-TLS Out of band key-pinned authentication profile uses the
   same form of pins as HPKP:
-  
+
   e.g.  pin-sha256="FHkyLhvI0n70E47cJlRTamTrnYVcsYdjUGbr79CfAVI="
-  
+
   DNS-over-TLS OOB key-pins: https://tools.ietf.org/html/rfc7858#appendix-A
   HPKP pin reference:        https://tools.ietf.org/html/rfc7469#appendix-A
 */
@@ -475,7 +476,7 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 		tls_credentials_free(tls_credentials);
 		return kr_error(ENOMEM);
 	}
-	
+
 	if ((err = gnutls_certificate_set_x509_key_file(tls_credentials->credentials,
 							tls_cert, tls_key, GNUTLS_X509_FMT_PEM)) != GNUTLS_E_SUCCESS) {
 		tls_credentials_free(tls_credentials);
@@ -488,7 +489,7 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 
 	/* Exchange the x509 credentials */
 	struct tls_credentials *old_credentials = net->tls_credentials;
-	
+
 	/* Start using the new x509_credentials */
 	net->tls_credentials = tls_credentials;
 	tls_credentials_log_pins(net->tls_credentials);
@@ -729,6 +730,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
+#if GNUTLS_VERSION_NUMBER >= GNUTLS_PIN_MIN_VERSION
 	if (ctx->params->pins.len == 0) {
 		DEBUG_MSG("[tls_client] skipping certificate PIN check\n");
 		goto skip_pins;
@@ -770,6 +772,12 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 
 	/* pins were set, but no one was not matched */
 	kr_log_error("[tls_client] certificate PIN check failed\n");
+#else
+	if (ctx->params->pins.len != 0) {
+		ERR_MSG("[tls_client] newer gnutls is required to use PIN check\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+#endif
 
 skip_pins:
 
