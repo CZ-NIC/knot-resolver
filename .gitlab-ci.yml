@@ -197,6 +197,7 @@ respdiff:iter:udp:linux:amd64:
     when: always
     expire_in: '1 week'
     paths:
+      - kresd.log.xz
       - results/*.txt
       - results/respdiff.db/data.mdb.xz
       - ./*.info
@@ -222,6 +223,7 @@ respdiff:iter:tcp:linux:amd64:
     when: always
     expire_in: '1 week'
     paths:
+      - kresd.log.xz
       - results/*.txt
       - results/respdiff.db/data.mdb.xz
       - ./*.info
@@ -247,6 +249,7 @@ respdiff:iter:tls:linux:amd64:
     when: always
     expire_in: '1 week'
     paths:
+      - kresd.log.xz
       - results/*.txt
       - results/respdiff.db/data.mdb.xz
       - ./*.info
