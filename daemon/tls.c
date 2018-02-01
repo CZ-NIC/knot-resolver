@@ -774,7 +774,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 	kr_log_error("[tls_client] certificate PIN check failed\n");
 #else
 	if (ctx->params->pins.len != 0) {
-		ERR_MSG("[tls_client] newer gnutls is required to use PIN check\n");
+		kr_log_error("[tls_client] newer gnutls is required to use PIN check\n");
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 #endif
