@@ -731,20 +731,30 @@ static int cache_count(lua_State *L)
 	return 0;
 }
 
-/** Return time of last cache clear */
-static int cache_last_clear(lua_State *L)
+/** Return time of last checkpoint, or re-set it if passed `true`. */
+static int cache_checkpoint(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	struct kr_cache *cache = &engine->resolver.cache;
-	lua_newtable(L);
-	lua_pushnumber(L, cache->last_clear_monotime);
-	lua_setfield(L, -2, "monotime");
-	lua_newtable(L);
-	lua_pushnumber(L, cache->last_clear_walltime.tv_sec);
-	lua_setfield(L, -2, "sec");
-	lua_pushnumber(L, cache->last_clear_walltime.tv_usec);
-	lua_setfield(L, -2, "usec");
-	lua_setfield(L, -2, "walltime");
+
+	if (lua_gettop(L) == 0) { /* Return the current value. */
+		lua_newtable(L);
+		lua_pushnumber(L, cache->checkpoint_monotime);
+		lua_setfield(L, -2, "monotime");
+		lua_newtable(L);
+		lua_pushnumber(L, cache->checkpoint_walltime.tv_sec);
+		lua_setfield(L, -2, "sec");
+		lua_pushnumber(L, cache->checkpoint_walltime.tv_usec);
+		lua_setfield(L, -2, "usec");
+		lua_setfield(L, -2, "walltime");
+		return 1;
+	}
+
+	if (lua_gettop(L) != 1 || !lua_isboolean(L, 1) || !lua_toboolean(L, 1)) {
+		format_error(L, "cache.checkpoint() takes no parameters or a true value");
+		lua_error(L);
+	}
+	kr_cache_make_checkpoint(cache);
 	return 1;
 }
 
@@ -1113,7 +1123,7 @@ int lib_cache(lua_State *L)
 		{ "backends", cache_backends },
 		{ "count",  cache_count },
 		{ "stats",  cache_stats },
-		{ "last_clear",  cache_last_clear },
+		{ "checkpoint", cache_checkpoint },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
 		{ "prune",  cache_prune },

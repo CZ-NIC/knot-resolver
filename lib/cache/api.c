@@ -64,13 +64,6 @@ static inline int cache_clear(struct kr_cache *cache)
 	return cache_op(cache, clear);
 }
 
-/** @internal Set time when clearing cache. */
-static void reset_timestamps(struct kr_cache *cache)
-{
-	cache->last_clear_monotime = kr_now();
-	gettimeofday(&cache->last_clear_walltime, NULL);
-}
-
 /** @internal Open cache db transaction and check internal data version. */
 static int assert_right_version(struct kr_cache *cache)
 {
@@ -129,7 +122,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	cache->ttl_min = KR_CACHE_DEFAULT_TTL_MIN;
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	/* Check cache ABI version */
-	reset_timestamps(cache);
+	kr_cache_make_checkpoint(cache);
 	(void) assert_right_version(cache);
 	return 0;
 }
@@ -163,7 +156,7 @@ int kr_cache_clear(struct kr_cache *cache)
 	}
 	int ret = cache_clear(cache);
 	if (ret == 0) {
-		reset_timestamps(cache);
+		kr_cache_make_checkpoint(cache);
 		ret = assert_right_version(cache);
 	}
 	return ret;
