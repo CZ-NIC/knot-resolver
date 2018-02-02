@@ -382,8 +382,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
 	const knot_db_val_t val_cut = closest_NS(ctx, k);
 	if (!val_cut.data) {
-		VERBOSE_MSG(qry, "=> not even root NS in cache\n");
-		return ctx->state; /* nothing to do without any NS at all */
+		VERBOSE_MSG(qry, "=> not even root NS in cache, but let's try NSEC\n");
 	}
 	switch (k->type) {
 	case KNOT_RRTYPE_NS:
@@ -1106,7 +1105,11 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 	next_label:
 		/* remove one more label */
 		exact_match = false;
-		if (k->zname[0] == 0) { /* missing root NS in cache */
+		if (k->zname[0] == 0) {
+			/* We miss root NS in cache, but let's at least assume it exists. */
+			k->type = KNOT_RRTYPE_NS;
+			k->zlf_len = zlf_len;
+			assert(zlf_len == 0);
 			return VAL_EMPTY;
 		}
 		zlf_len -= (k->zname[0] + 1);
