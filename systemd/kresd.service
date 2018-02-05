@@ -1,0 +1,14 @@
+[Unit]
+Description=Knot DNS Resolver daemon (meta-service, see "systemctl status 'kresd@*.service'")
+Documentation=man:kresd(8)
+Documentation=man:kresd.systemd(7)
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecReload=/bin/true
+Slice=system-kresd.slice
+
+[Install]
+WantedBy=multi-user.target

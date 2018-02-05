@@ -9,6 +9,7 @@ Service=kresd@%i.service
 ListenStream=/run/knot-resolver/control@%i
 FileDescriptorName=control
 SocketMode=0660
+Slice=system-kresd.slice
 
 [Install]
 WantedBy=sockets.target
