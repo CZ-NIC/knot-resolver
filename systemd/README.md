@@ -32,7 +32,3 @@ Notes
    ./90-kresd.preset in /lib/systemd/systemd-preset/90-kresd.preset if
    they want to delay daemon launch until it is accessed. (see
    systemd.preset(5)).
-
-*  Symlinks pointing from @1 to the systemd template are not necessary. They
-   are only useful to provide users unfamiliar with kresd instances a hint
-   when using bash completion.
