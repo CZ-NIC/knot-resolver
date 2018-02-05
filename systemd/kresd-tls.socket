@@ -4,7 +4,6 @@ Documentation=man:kresd(8)
 Before=sockets.target
 
 [Socket]
-ReusePort=true
 FreeBind=true
 FileDescriptorName=tls
 ListenStream=[::1]:853

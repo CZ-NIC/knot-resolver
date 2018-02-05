@@ -4,7 +4,6 @@ Documentation=man:kresd(8)
 Before=sockets.target
 
 [Socket]
-ReusePort=true
 FreeBind=true
 ListenDatagram=[::1]:53
 ListenStream=[::1]:53
