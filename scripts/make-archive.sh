@@ -11,5 +11,5 @@ git submodule status --recursive | grep -q '^[^ ]' && \
 
 # 'git ls-files --recurse-submodules' works only if modules are initialized
 name="knot-resolver-$ver"
-tar caf "$name.tar.xz" --no-recursion --transform "s|^|$name/|" -- $(git ls-files --recurse-submodules)
+tar caf "$name.tar.xz" -h --no-recursion --transform "s|^|$name/|" -- $(git ls-files --recurse-submodules)
 echo "$name.tar.xz"
