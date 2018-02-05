@@ -96,7 +96,7 @@ void worker_iohandle_release(struct worker_ctx *worker, void *h);
 #define MAX_PENDING KR_NSREP_MAXADDR
 
 /** Maximum response time from TCP upstream, milliseconds */
-#define MAX_TCP_INACTIVITY 10000
+#define MAX_TCP_INACTIVITY (KR_RESOLVE_TIME_LIMIT + KR_CONN_RTT_MAX)
 
 /** Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
