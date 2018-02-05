@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <gnutls/gnutls.h>
+
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
@@ -88,7 +90,7 @@ void *worker_iohandle_borrow(struct worker_ctx *worker);
 
 void worker_iohandle_release(struct worker_ctx *worker, void *h);
 
-
+ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
 
 /** @cond internal */
 

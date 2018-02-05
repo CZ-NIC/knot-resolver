@@ -44,6 +44,26 @@ struct tls_client_paramlist_entry {
 	gnutls_certificate_credentials_t credentials;
 };
 
+struct worker_ctx;
+struct qr_task;
+
+/* gnutls_record_recv and gnutls_record_send */
+struct tls_ctx_t {
+	gnutls_session_t session;
+	bool handshake_done;
+
+	uv_stream_t *handle;
+
+	/* for reading from the network */
+	const uint8_t *buf;
+	ssize_t nread;
+	ssize_t consumed;
+	uint8_t recv_buf[4096];
+	struct tls_credentials *credentials;
+	struct worker_ctx *worker;
+	struct qr_task *task;
+};
+
 typedef enum tls_client_hs_state {
 	TLS_HS_NOT_STARTED = 0,
 	TLS_HS_IN_PROGRESS,

@@ -870,7 +870,7 @@ static void on_send(uv_udp_send_t *req, int status)
 	iorequest_release(worker, req);
 }
 
-static void on_write(uv_write_t *req, int status)
+void on_write(uv_write_t *req, int status)
 {
 	uv_handle_t *handle = (uv_handle_t *)(req->handle);
 	uv_loop_t *loop = handle->loop;
@@ -880,6 +880,71 @@ static void on_write(uv_write_t *req, int status)
 	qr_task_on_send(task, handle, status);
 	qr_task_unref(task);
 	iorequest_release(worker, req);
+}
+
+ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
+{
+	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
+	const uv_buf_t ub = {(void *)buf, len};
+
+	VERBOSE_MSG(NULL,"[tls] push %zu <%p>\n", len, h);
+	if (t == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	assert(t->handle);
+	assert(t->handle->type == UV_TCP);
+
+	if (!t->handshake_done) {
+		int ret = uv_try_write(t->handle, &ub, 1);
+		if (ret > 0) {
+			return (ssize_t) ret;
+		}
+		if (ret == UV_EAGAIN) {
+			errno = EAGAIN;
+		} else {
+			kr_log_error("[tls] uv_try_write: %s\n", uv_strerror(ret));
+			errno = EIO;
+		}
+		return -1;
+	}
+
+	struct worker_ctx *worker = t->worker;
+	struct qr_task *task = t->task;
+
+	assert(worker && task);
+
+	void *ioreq = worker_iohandle_borrow(worker);
+	if (!ioreq) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	uv_write_t *write_req = (uv_write_t *)ioreq;
+	uv_buf_t uv_buf[1] = {
+		{ (char *)buf, len }
+	};
+
+	write_req->data = task;
+
+	ssize_t ret = -1;
+	int res = uv_write(write_req, t->handle, uv_buf, 1, &on_write);
+	if (res == 0) {
+		qr_task_ref(task); /* Pending ioreq on current task */
+		if (worker->too_many_open &&
+		    worker->stats.rconcurrent <
+			worker->rconcurrent_highwatermark - 10) {
+			worker->too_many_open = false;
+		}
+		ret = len;
+	} else {
+		VERBOSE_MSG(NULL,"[tls] uv_write: %s\n", uv_strerror(res));
+		iorequest_release(worker, ioreq);
+		errno = EIO;
+		/* TODO ret == UV_EMFILE */
+	}
+	return ret;
 }
 
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
@@ -904,7 +969,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 			}
 			ret = tls_client_push(task, handle, pkt);
 		}
-		return qr_task_on_send(task, handle, ret);
+		return ret;
 	}
 
 	int ret = 0;

@@ -38,21 +38,6 @@
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
 #define GNUTLS_PIN_MIN_VERSION  0x030400
 
-/* gnutls_record_recv and gnutls_record_send */
-struct tls_ctx_t {
-	gnutls_session_t session;
-	bool handshake_done;
-
-	uv_stream_t *handle;
-
-	/* for reading from the network */
-	const uint8_t *buf;
-	ssize_t nread;
-	ssize_t consumed;
-	uint8_t recv_buf[4096];
-	struct tls_credentials *credentials;
-};
-
 struct tls_client_ctx_t {
 	gnutls_session_t tls_session;
 	tls_client_hs_state_t handshake_state;
@@ -201,8 +186,10 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 		return NULL;
 	}
 
+	tls->worker = worker;
+
 	gnutls_transport_set_pull_function(tls->session, kres_gnutls_pull);
-	gnutls_transport_set_push_function(tls->session, kres_gnutls_push);
+	gnutls_transport_set_push_function(tls->session, worker_gnutls_push);
 	gnutls_transport_set_ptr(tls->session, tls);
 	return tls;
 }
@@ -237,6 +224,10 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 		return kr_error(ENOENT);
 	}
 
+	assert(gnutls_record_check_corked(tls_p->session) == 0);
+
+	tls_p->task = task;
+
 	gnutls_record_cork(tls_p->session);
 	ssize_t count = 0;
 	if ((count = gnutls_record_send(tls_p->session, &pkt_size, sizeof(pkt_size)) < 0) ||
@@ -260,14 +251,19 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 				             retries, gnutls_strerror_name(count), count);
 				return kr_error(EIO);
 			}
-		} else {
-			retries = 0;
+		} else if (count != 0) {
 			submitted += count;
-			if (count == 0 && submitted != sizeof(pkt_size) + pkt->size) {
-				kr_log_error("[tls] gnutls_record_uncork didn't send all data: %s (%zd)\n",
-				             gnutls_strerror_name(count), count);
+			retries = 0;
+		} else if (gnutls_record_check_corked(tls_p->session) != 0) {
+			if (++retries > TLS_MAX_UNCORK_RETRIES) {
+				kr_log_error("[tls] gnutls_record_uncork: too many retries (%zd)\n",
+				             retries);
 				return kr_error(EIO);
 			}
+		} else if (submitted != sizeof(pkt_size) + pkt->size) {
+			kr_log_error("[tls] gnutls_record_uncork didn't send all data(%zd of %zd)\n",
+			             submitted, sizeof(pkt_size) + pkt->size);
+			return kr_error(EIO);
 		}
 	} while (submitted != sizeof(pkt_size) + pkt->size);
 
