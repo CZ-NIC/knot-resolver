@@ -80,7 +80,7 @@ genResType "struct knot_rrset" | sed 's/\<owner\>/_owner/'
 ## Some definitions would need too many deps, so shorten them.
 
 genResType "struct kr_nsrep" | sed '/union/,$ d'
-printf "\t/* beware: hidden stub */\n};\n"
+printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 genResType "struct kr_query"
 
@@ -153,7 +153,6 @@ EOF
 	kr_ranked_rrarray_add
 	kr_qflags_set
 	kr_qflags_clear
-	kr_query_set_stale_cb
 	kr_zonecut_add
 	kr_zonecut_set
 	kr_now

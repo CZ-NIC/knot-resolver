@@ -201,7 +201,7 @@ struct kr_nsrep {
 	unsigned int reputation;
 	const knot_dname_t *name;
 	struct kr_context *ctx;
-	/* beware: hidden stub */
+	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
 };
 struct kr_query {
 	struct kr_query *parent;
@@ -218,12 +218,12 @@ struct kr_query {
 	uint64_t timestamp_mono;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
-	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;
 	uint32_t uid;
 	struct kr_query *cname_parent;
 	struct kr_request *request;
 	kr_stale_cb stale_cb;
+	struct kr_nsrep ns;
 };
 struct kr_context {
 	struct kr_qflags options;
@@ -286,7 +286,6 @@ struct sockaddr *kr_straddr_socket(const char *, int);
 int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
 void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
-void kr_query_set_stale_cb(struct kr_query *, kr_stale_cb);
 int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const knot_rdata_t *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
 uint64_t kr_now();
