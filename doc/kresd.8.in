@@ -164,7 +164,7 @@ Show short commandline option help.
 .B \-V
 Show the version.
 .SH "SEE ALSO"
-\fIkresd.systemd(8)\fR,
+\fIkresd.systemd(7)\fR,
 \fIhttps://knot-resolver.readthedocs.io\fR
 .SH "AUTHORS"
 .B kresd

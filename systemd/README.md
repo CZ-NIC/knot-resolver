@@ -9,7 +9,7 @@ sd_listen_fds_with_names(3)).
 Usage and Configuration
 -----------------------
 
-See kresd.systemd(8) for details.
+See kresd.systemd(7) for details.
 
 Manual activation
 -----------------
