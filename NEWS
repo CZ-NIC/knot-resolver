@@ -5,7 +5,7 @@ Incompatible changes
 --------------------
 - systemd: change unit files to allow running multiple instances,
   deployments with single instance now must use `kresd@1.service`
-  instead of `kresd.service`; see kresd.systemd(8) for details
+  instead of `kresd.service`; see kresd.systemd(7) for details
 - systemd: the directory for cache is now /var/cache/knot-resolver
 - unify default directory and user to `knot-resolver`
 - directory with trust anchor file specified by -k option must be writeable
