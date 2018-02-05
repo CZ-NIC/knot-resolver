@@ -1,6 +1,0 @@
-# kresd is fully socket-activated, so it does not need to be enabled
-# in the systemd sense (automatically started at boot).  The
-# associated sockets *are* enabled however, so the kresd service will
-# be started as soon as anything connects to one of the listening
-# sockets.
-disable kresd@1.service

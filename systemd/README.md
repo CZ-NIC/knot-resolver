@@ -27,8 +27,3 @@ Notes
 
 *  If you're using systemd prior to version 227, use a drop-in file to change
    the service type to simple. See drop-in/systemd-compat.conf.
-
-*  Distributors of systems using systemd may wish to place
-   ./90-kresd.preset in /lib/systemd/systemd-preset/90-kresd.preset if
-   they want to delay daemon launch until it is accessed. (see
-   systemd.preset(5)).
