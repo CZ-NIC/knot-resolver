@@ -93,7 +93,7 @@ struct tls_client_ctx_t {
 struct tls_ctx_t* tls_new(struct worker_ctx *worker);
 
 /*! Close a TLS context (call gnutls_bye()) */
-void tls_close(struct tls_ctx_t *tls);
+void tls_close(struct tls_ctx_t *ctx);
 
 /*! Release a TLS context */
 void tls_free(struct tls_ctx_t* tls);
