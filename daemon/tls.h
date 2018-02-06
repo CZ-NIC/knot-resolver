@@ -49,10 +49,10 @@ struct qr_task;
 
 /* gnutls_record_recv and gnutls_record_send */
 struct tls_ctx_t {
-	gnutls_session_t session;
+	gnutls_session_t tls_session;
 	bool handshake_done;
 
-	uv_stream_t *handle;
+	struct session *session;
 
 	/* for reading from the network */
 	const uint8_t *buf;
@@ -68,19 +68,39 @@ typedef enum tls_client_hs_state {
 	TLS_HS_NOT_STARTED = 0,
 	TLS_HS_IN_PROGRESS,
 	TLS_HS_DONE,
+	TLS_HS_CLOSING,
 	TLS_HS_LAST
 } tls_client_hs_state_t;
 
 typedef int (*tls_handshake_cb) (struct session *session, int status);
 
+struct tls_client_ctx_t {
+	gnutls_session_t tls_session;
+	tls_client_hs_state_t handshake_state;
+
+	struct session *session;
+	tls_handshake_cb handshake_cb;
+	const uint8_t *buf;
+	ssize_t nread;
+	ssize_t consumed;
+	uint8_t recv_buf[4096];
+	const struct tls_client_paramlist_entry *params;
+	struct worker_ctx *worker;
+	struct qr_task *task;
+};
+
 /*! Create an empty TLS context in query context */
 struct tls_ctx_t* tls_new(struct worker_ctx *worker);
 
-/*! Close a TLS context */
+/*! Close a TLS context (call gnutls_bye()) */
+void tls_close(struct tls_ctx_t *tls);
+
+/*! Release a TLS context */
 void tls_free(struct tls_ctx_t* tls);
 
 /*! Push new data to TLS context for sending */
-int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
+int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt,
+	     bool server_side);
 
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
@@ -115,7 +135,8 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 int tls_client_params_free(map_t *tls_client_paramlist);
 
 /*! Allocate new client TLS context */
-struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_entry *entry);
+struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_entry *entry,
+					    struct worker_ctx *worker);
 
 int tls_client_process(struct worker_ctx *worker, uv_stream_t *handle,
 		       const uint8_t *buf, ssize_t nread);

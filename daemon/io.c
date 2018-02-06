@@ -298,6 +298,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	session->has_tls = tls;
 	if (tls && !session->tls_ctx) {
 		session->tls_ctx = tls_new(master->loop->data);
+		session->tls_ctx->session = session;
 	}
 	uv_timer_t *timer = &session->timeout;
 	uv_timer_start(timer, tcp_timeout_trigger, KR_CONN_RTT_MAX/2, KR_CONN_RTT_MAX/2);

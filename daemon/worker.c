@@ -369,6 +369,10 @@ static void session_close(struct session *session)
 		if (session->tls_client_ctx) {
 			tls_client_close(session->tls_client_ctx);
 		}
+		if (session->tls_ctx) {
+			tls_close(session->tls_ctx);
+		}
+
 		session->timeout.data = session;
 		uv_close((uv_handle_t *)&session->timeout, on_session_timer_close);
 	}
@@ -870,7 +874,7 @@ static void on_send(uv_udp_send_t *req, int status)
 	iorequest_release(worker, req);
 }
 
-void on_write(uv_write_t *req, int status)
+static void on_task_write(uv_write_t *req, int status)
 {
 	uv_handle_t *handle = (uv_handle_t *)(req->handle);
 	uv_loop_t *loop = handle->loop;
@@ -882,10 +886,21 @@ void on_write(uv_write_t *req, int status)
 	iorequest_release(worker, req);
 }
 
+static void on_nontask_write(uv_write_t *req, int status)
+{
+	uv_handle_t *handle = (uv_handle_t *)(req->handle);
+	uv_loop_t *loop = handle->loop;
+	struct worker_ctx *worker = loop->data;
+	assert(worker == get_worker());
+	iorequest_release(worker, req);
+}
+
 ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
-	const uv_buf_t ub = {(void *)buf, len};
+	const uv_buf_t uv_buf[1] = {
+		{ (char *)buf, len }
+	};
 
 	VERBOSE_MSG(NULL,"[tls] push %zu <%p>\n", len, h);
 	if (t == NULL) {
@@ -893,27 +908,11 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 		return -1;
 	}
 
-	assert(t->handle);
-	assert(t->handle->type == UV_TCP);
-
-	if (!t->handshake_done) {
-		int ret = uv_try_write(t->handle, &ub, 1);
-		if (ret > 0) {
-			return (ssize_t) ret;
-		}
-		if (ret == UV_EAGAIN) {
-			errno = EAGAIN;
-		} else {
-			kr_log_error("[tls] uv_try_write: %s\n", uv_strerror(ret));
-			errno = EIO;
-		}
-		return -1;
-	}
+	assert(t->session && t->session->handle &&
+	       t->session->handle->type == UV_TCP);
 
 	struct worker_ctx *worker = t->worker;
-	struct qr_task *task = t->task;
-
-	assert(worker && task);
+	assert(worker);
 
 	void *ioreq = worker_iohandle_borrow(worker);
 	if (!ioreq) {
@@ -922,16 +921,24 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 	}
 
 	uv_write_t *write_req = (uv_write_t *)ioreq;
-	uv_buf_t uv_buf[1] = {
-		{ (char *)buf, len }
-	};
+
+	struct qr_task *task = t->task;
+	uv_write_cb write_cb = on_task_write;
+	if (t->handshake_done) {
+		assert(task);
+	} else {
+		task = NULL;
+		write_cb = on_nontask_write;
+	}
 
 	write_req->data = task;
 
 	ssize_t ret = -1;
-	int res = uv_write(write_req, t->handle, uv_buf, 1, &on_write);
+	int res = uv_write(write_req, (uv_stream_t *)t->session->handle, uv_buf, 1, write_cb);
 	if (res == 0) {
-		qr_task_ref(task); /* Pending ioreq on current task */
+		if (task) {
+			qr_task_ref(task); /* Pending ioreq on current task */
+		}
 		if (worker->too_many_open &&
 		    worker->stats.rconcurrent <
 			worker->rconcurrent_highwatermark - 10) {
@@ -940,6 +947,64 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 		ret = len;
 	} else {
 		VERBOSE_MSG(NULL,"[tls] uv_write: %s\n", uv_strerror(res));
+		iorequest_release(worker, ioreq);
+		errno = EIO;
+		/* TODO ret == UV_EMFILE */
+	}
+	return ret;
+}
+
+ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
+{
+	struct tls_client_ctx_t *t = (struct tls_client_ctx_t *)h;
+	const uv_buf_t uv_buf[1] = {
+		{ (char *)buf, len }
+	};
+
+	VERBOSE_MSG(NULL,"[tls client] push %zu <%p>\n", len, h);
+	if (t == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+	assert(t->session && t->session->handle &&
+	       t->session->handle->type == UV_TCP);
+
+	struct worker_ctx *worker = t->worker;
+	assert(worker);
+
+	void *ioreq = worker_iohandle_borrow(worker);
+	if (!ioreq) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	uv_write_t *write_req = (uv_write_t *)ioreq;
+
+	struct qr_task *task = t->task;
+	uv_write_cb write_cb = on_task_write;
+	if (t->handshake_state == TLS_HS_DONE) {
+		assert(task);
+	} else {
+		task = NULL;
+		write_cb = on_nontask_write;
+	}
+
+	write_req->data = task;
+
+	ssize_t ret = -1;
+	int res = uv_write(write_req, (uv_stream_t *)t->session->handle, uv_buf, 1, write_cb);
+	if (res == 0) {
+		if (task) {
+			qr_task_ref(task); /* Pending ioreq on current task */
+		}
+		if (worker->too_many_open &&
+		    worker->stats.rconcurrent <
+			worker->rconcurrent_highwatermark - 10) {
+			worker->too_many_open = false;
+		}
+		ret = len;
+	} else {
+		VERBOSE_MSG(NULL,"[tls_client] uv_write: %s\n", uv_strerror(res));
 		iorequest_release(worker, ioreq);
 		errno = EIO;
 		/* TODO ret == UV_EMFILE */
@@ -958,18 +1023,14 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	assert(session->closing == false);
 	if (session->has_tls) {
 		struct kr_request *req = &task->ctx->req;
-		int ret = kr_ok();
-		if (!session->outgoing) {
-			ret = tls_push(task, handle, pkt);
-		} else {
-			ret = kr_resolve_checkout(req, NULL, addr,
-					          SOCK_STREAM, pkt);
+		if (session->outgoing) {
+			int ret = kr_resolve_checkout(req, NULL, addr,
+						      SOCK_STREAM, pkt);
 			if (ret != kr_ok()) {
 				return ret;
 			}
-			ret = tls_client_push(task, handle, pkt);
 		}
-		return ret;
+		return tls_push(task, handle, pkt, !session->outgoing);
 	}
 
 	int ret = 0;
@@ -1015,7 +1076,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 			{ (char *)pkt->wire, pkt->size }
 		};
 		write_req->data = task;
-		ret = uv_write(write_req, (uv_stream_t *)handle, buf, 2, &on_write);
+		ret = uv_write(write_req, (uv_stream_t *)handle, buf, 2, &on_task_write);
 	} else {
 		assert(false);
 	}
@@ -1698,7 +1759,7 @@ static int qr_task_step(struct qr_task *task,
 			struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
 			if (entry) {
 				assert(session->tls_client_ctx == NULL);
-				struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(entry);
+				struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(entry, worker);
 				if (!tls_ctx) {
 					session_del_tasks(session, task);
 					session_del_waiting(session, task);
