@@ -45,6 +45,9 @@
 #define DEBUG_MSG(fmt...)
 #endif
 
+static char const server_logstring[] = "tls";
+static char const client_logstring[] = "tls-client";
+
 static int client_verify_certificate(gnutls_session_t tls_session);
 
 /**
@@ -68,11 +71,12 @@ static int kres_gnutls_set_priority(gnutls_session_t session) {
 
 static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 {
-	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
+	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
 	assert(t != NULL);
 
 	ssize_t	avail = t->nread - t->consumed;
-	DEBUG_MSG("[tls] pull wanted: %zu available: %zu\n", len, avail);
+	DEBUG_MSG("[%s] pull wanted: %zu available: %zu\n",
+		  t->client_side ? "tls_client" : "tls", len, avail);
 	if (t->nread <= t->consumed) {
 		errno = EAGAIN;
 		return -1;
@@ -129,33 +133,35 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 		return NULL;
 	}
 
-	int err = gnutls_init(&tls->tls_session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
+	int err = gnutls_init(&tls->c.tls_session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
 	if (err != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] gnutls_init(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
 	tls->credentials = tls_credentials_reserve(net->tls_credentials);
-	err = gnutls_credentials_set(tls->tls_session, GNUTLS_CRD_CERTIFICATE, tls->credentials->credentials);
+	err = gnutls_credentials_set(tls->c.tls_session, GNUTLS_CRD_CERTIFICATE,
+				     tls->credentials->credentials);
 	if (err != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] gnutls_credentials_set(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
-	if (kres_gnutls_set_priority(tls->tls_session) != GNUTLS_E_SUCCESS) {
+	if (kres_gnutls_set_priority(tls->c.tls_session) != GNUTLS_E_SUCCESS) {
 		tls_free(tls);
 		return NULL;
 	}
 
-	tls->worker = worker;
+	tls->c.worker = worker;
+	tls->c.client_side = false;
 
-	gnutls_transport_set_pull_function(tls->tls_session, kres_gnutls_pull);
-	gnutls_transport_set_push_function(tls->tls_session, worker_gnutls_push);
-	gnutls_transport_set_ptr(tls->tls_session, tls);
+	gnutls_transport_set_pull_function(tls->c.tls_session, kres_gnutls_pull);
+	gnutls_transport_set_push_function(tls->c.tls_session, worker_gnutls_push);
+	gnutls_transport_set_ptr(tls->c.tls_session, tls);
 	return tls;
 }
 
-void tls_close(struct tls_ctx_t *ctx)
+void tls_close(struct tls_common_ctx *ctx)
 {
 	if (ctx == NULL || ctx->tls_session == NULL) {
 		return;
@@ -163,10 +169,11 @@ void tls_close(struct tls_ctx_t *ctx)
 
 	assert(ctx->session);
 
-	if (ctx->handshake_done) {
-		DEBUG_MSG("[tls] closing tls connection to `%s`\n",
-			  kr_straddr(&ctx->session->peer.ip));
-		ctx->handshake_done = false;
+	if (ctx->handshake_state == TLS_HS_DONE) {
+		kr_log_verbose("[%s] closing tls connection to `%s`\n",
+			       ctx->client_side ? "tls-client" : "tls",
+			       kr_straddr(&ctx->session->peer.ip));
+		ctx->handshake_state = TLS_HS_CLOSING;
 		gnutls_bye(ctx->tls_session, GNUTLS_SHUT_RDWR);
 	}
 }
@@ -177,46 +184,34 @@ void tls_free(struct tls_ctx_t *tls)
 		return;
 	}
 
-	if (tls->session) {
+	if (tls->c.tls_session) {
 		/* Don't terminate TLS connection, just tear it down */
-		gnutls_deinit(tls->tls_session);
-		tls->tls_session = NULL;
+		gnutls_deinit(tls->c.tls_session);
+		tls->c.tls_session = NULL;
 	}
 
 	tls_credentials_release(tls->credentials);
 	free(tls);
 }
 
-int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt,
-	     bool server_side)
+int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 {
 	if (!pkt || !handle || !handle->data) {
 		return kr_error(EINVAL);
 	}
 
 	struct session *session = handle->data;
-	const uint16_t pkt_size = htons(pkt->size);
-	static char const server_logstring[] = "tls";
-	static char const client_logstring[] = "tls-client";
-	const char *logstring = client_logstring;
-	gnutls_session_t tls_session = NULL;
+	struct tls_common_ctx *tls_ctx = session->outgoing ? &session->tls_client_ctx->c :
+							     &session->tls_ctx->c;
 
-	if (server_side) {
-		logstring = server_logstring;
-		if (!session->tls_ctx) {
-			kr_log_error("[%s] no tls context on push\n", logstring);
-			return kr_error(ENOENT);
-		}
-		session->tls_ctx->task = task;
-		tls_session = session->tls_ctx->tls_session;
-	} else {
-		if (!session->tls_client_ctx) {
-			kr_log_error("[%s] no tls context on push\n", logstring);
-			return kr_error(ENOENT);
-		}
-		session->tls_client_ctx->task = task;
-		tls_session = session->tls_client_ctx->tls_session;
-	}
+	assert (tls_ctx);
+	assert (session->outgoing == tls_ctx->client_side);
+
+	const uint16_t pkt_size = htons(pkt->size);
+	const char *logstring = tls_ctx->client_side ? client_logstring : server_logstring;
+	gnutls_session_t tls_session = tls_ctx->tls_session;
+
+	tls_ctx->task = task;
 
 	assert(gnutls_record_check_corked(tls_session) == 0);
 
@@ -266,27 +261,39 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt,
 int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread)
 {
 	struct session *session = handle->data;
-	struct tls_ctx_t *tls_p = session->tls_ctx;
+	struct tls_common_ctx *tls_p = session->outgoing ? &session->tls_client_ctx->c :
+							   &session->tls_ctx->c;
 	if (!tls_p) {
 		return kr_error(ENOSYS);
 	}
 
 	assert(tls_p->session == session);
 
+	const char *logstring = tls_p->client_side ? client_logstring : server_logstring;
+
 	tls_p->buf = buf;
 	tls_p->nread = nread >= 0 ? nread : 0;
-	tls_p->consumed = 0;	/* TODO: doesn't handle split TLS records */
+	tls_p->consumed = 0;
 
 	/* Ensure TLS handshake is performed before receiving data. */
-	while (!tls_p->handshake_done) {
+	while (tls_p->handshake_state == TLS_HS_IN_PROGRESS) {
 		int err = gnutls_handshake(tls_p->tls_session);
 		if (err == GNUTLS_E_SUCCESS) {
-			DEBUG_MSG("[tls] TLS handshake with %s has completed\n",
-				  kr_straddr(&session->peer.ip));
-			tls_p->handshake_done = true;
+			tls_p->handshake_state = TLS_HS_DONE;
+			if (tls_p->handshake_cb) {
+				tls_p->handshake_cb(tls_p->session, 0);
+			}
+			kr_log_verbose("[%s] TLS handshake with %s has completed\n",
+				       logstring,  kr_straddr(&session->peer.ip));
 		} else if (err == GNUTLS_E_AGAIN) {
-			return 0; /* No data, bail out */
+			return 0;
 		} else if (gnutls_error_is_fatal(err)) {
+			kr_log_error("[%s] gnutls_handshake failed: %s (%d)\n",
+				     logstring,
+			             gnutls_strerror_name(err), err);
+			if (tls_p->handshake_cb) {
+				tls_p->handshake_cb(tls_p->session, -1);
+			}
 			return kr_error(err);
 		}
 	}
@@ -299,11 +306,11 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 		} else if (count == GNUTLS_E_INTERRUPTED) {
 			continue; /* Try reading again */
 		} else if (count < 0) {
-			kr_log_error("[tls] gnutls_record_recv failed: %s (%zd)\n",
-			             gnutls_strerror_name(count), count);
+			kr_log_error("[%s] gnutls_record_recv failed: %s (%zd)\n",
+				     logstring, gnutls_strerror_name(count), count);
 			return kr_error(EIO);
 		}
-		DEBUG_MSG("[tls] submitting %zd data to worker\n", count);
+		DEBUG_MSG("[%s] submitting %zd data to worker\n", logstring, count);
 		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
 		if (ret < 0) {
 			return ret;
@@ -792,7 +799,8 @@ skip_pins:
 		};
 		size_t data_count = 2;
 		unsigned int status;
-		int ret = gnutls_certificate_verify_peers(ctx->tls_session, data, data_count, &status);
+		int ret = gnutls_certificate_verify_peers(ctx->c.tls_session, data,
+							  data_count, &status);
 		if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
 			return GNUTLS_E_SUCCESS;
 		}
@@ -800,137 +808,6 @@ skip_pins:
 
 	kr_log_error("[tls_client] failed to verify peer certificate\n");
 	return GNUTLS_E_CERTIFICATE_ERROR;
-}
-
-static ssize_t kres_gnutls_client_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
-{
-	struct tls_client_ctx_t *t = (struct tls_client_ctx_t *)h;
-	assert(t != NULL);
-
-	ssize_t	avail = t->nread - t->consumed;
-	DEBUG_MSG("[tls_client] pull wanted: %zu available: %zu\n", len, avail);
-	if (t->nread <= t->consumed) {
-		errno = EAGAIN;
-		return -1;
-	}
-
-	ssize_t	transfer = MIN(avail, len);
-	memcpy(buf, t->buf + t->consumed, transfer);
-	t->consumed += transfer;
-	return transfer;
-}
-
-int tls_client_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
-{
-	if (!pkt || !handle || !handle->data) {
-		return kr_error(EINVAL);
-	}
-
-	struct session *session = handle->data;
-	const uint16_t pkt_size = htons(pkt->size);
-	struct tls_client_ctx_t *ctx = session->tls_client_ctx;
-	if (!ctx) {
-		kr_log_error("[tls_client] no tls context on push\n");
-		return kr_error(ENOENT);
-	}
-
-	gnutls_record_cork(ctx->tls_session);
-	ssize_t count = 0;
-	if ((count = gnutls_record_send(ctx->tls_session, &pkt_size, sizeof(pkt_size)) < 0) ||
-	    (count = gnutls_record_send(ctx->tls_session, pkt->wire, pkt->size) < 0)) {
-		kr_log_error("[tls_client] gnutls_record_send failed: %s (%zd)\n", gnutls_strerror_name(count), count);
-		return kr_error(EIO);
-	}
-
-	ssize_t submitted = 0;
-	ssize_t retries = 0;
-	do {
-		count = gnutls_record_uncork(ctx->tls_session, 0);
-		if (count < 0) {
-			if (gnutls_error_is_fatal(count)) {
-				kr_log_error("[tls_client] gnutls_record_uncork failed: %s (%zd)\n",
-				             gnutls_strerror_name(count), count);
-				return kr_error(EIO);
-			}
-			if (++retries > TLS_MAX_UNCORK_RETRIES) {
-				kr_log_error("[tls] gnutls_record_uncork: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
-				             retries, gnutls_strerror_name(count), count);
-				return kr_error(EIO);
-			}
-		} else {
-			retries = 0;
-			submitted += count;
-			if (count == 0 && submitted != sizeof(pkt_size) + pkt->size) {
-				kr_log_error("[tls_client] gnutls_record_uncork didn't send all data: %s (%zd)\n",
-				             gnutls_strerror_name(count), count);
-				return kr_error(EIO);
-			}
-		}
-	} while (submitted != sizeof(pkt_size) + pkt->size);
-
-	return kr_ok();
-}
-
-int tls_client_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread)
-{
-	struct session *session = handle->data;
-	struct tls_client_ctx_t *ctx = session->tls_client_ctx;
-	if (!ctx) {
-		return kr_error(ENOSYS);
-	}
-
-	assert(ctx->handshake_state == TLS_HS_IN_PROGRESS ||
-	       ctx->handshake_state == TLS_HS_DONE);
-
-	ctx->buf = buf;
-	ctx->nread = nread >= 0 ? nread : 0;
-	ctx->session = session;
-	ctx->consumed = 0;
-
-	if (ctx->handshake_state == TLS_HS_IN_PROGRESS) {
-		int err = gnutls_handshake(ctx->tls_session);
-		if (err == GNUTLS_E_SUCCESS) {
-			ctx->handshake_state = TLS_HS_DONE;
-		} else if (err == GNUTLS_E_AGAIN) {
-			return 0;
-		} else if (gnutls_error_is_fatal(err)) {
-			kr_log_error("[tls_client] gnutls_handshake failed: %s (%d)\n",
-			             gnutls_strerror_name(err), err);
-			if (ctx->handshake_cb) {
-				ctx->handshake_cb(ctx->session, -1);
-			}
-			return kr_error(err);
-		}
-		if (ctx->handshake_cb) {
-			ctx->handshake_cb(ctx->session, 0);
-		}
-		DEBUG_MSG("[tls_client] TLS handshake with %s has completed.\n",
-			  kr_straddr(&session->peer.ip));
-	}
-
-	int submitted = 0;
-	while (true) {
-		ssize_t count = gnutls_record_recv(ctx->tls_session, ctx->recv_buf, sizeof(ctx->recv_buf));
-		if (count == GNUTLS_E_AGAIN) {
-			break;    /* No data available */
-		} else if (count == GNUTLS_E_INTERRUPTED) {
-			continue; /* Try reading again */
-		} else if (count < 0) {
-			kr_log_error("[tls_client] gnutls_record_recv failed: %s (%zd)\n",
-			             gnutls_strerror_name(count), count);
-			return kr_error(EIO);
-		}
-		DEBUG_MSG("[tls_client] submitting %zd data to worker\n", count);
-		int ret = worker_process_tcp(worker, handle, ctx->recv_buf, count);
-		if (ret < 0) {
-			return ret;
-		}
-		if (count == 0) {
-			break;
-		}
-		submitted += ret;
-	}
-	return submitted;
 }
 
 struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_entry *entry,
@@ -941,30 +818,31 @@ struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_en
 		return NULL;
 	}
 
-	int ret = gnutls_init(&ctx->tls_session, GNUTLS_CLIENT | GNUTLS_NONBLOCK);
+	int ret = gnutls_init(&ctx->c.tls_session, GNUTLS_CLIENT | GNUTLS_NONBLOCK);
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
 	}
 
-	ret = kres_gnutls_set_priority(ctx->tls_session);
+	ret = kres_gnutls_set_priority(ctx->c.tls_session);
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
 	}
 
-	ret = gnutls_credentials_set(ctx->tls_session, GNUTLS_CRD_CERTIFICATE,
+	ret = gnutls_credentials_set(ctx->c.tls_session, GNUTLS_CRD_CERTIFICATE,
 	                             entry->credentials);
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
 	}
 
-	ctx->worker = worker;
+	ctx->c.worker = worker;
+	ctx->c.client_side = true;
 
-	gnutls_transport_set_pull_function(ctx->tls_session, kres_gnutls_client_pull);
-	gnutls_transport_set_push_function(ctx->tls_session, worker_gnutls_client_push);
-	gnutls_transport_set_ptr(ctx->tls_session, ctx);
+	gnutls_transport_set_pull_function(ctx->c.tls_session, kres_gnutls_pull);
+	gnutls_transport_set_push_function(ctx->c.tls_session, worker_gnutls_push);
+	gnutls_transport_set_ptr(ctx->c.tls_session, ctx);
 	return ctx;
 }
 
@@ -974,27 +852,29 @@ void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
 		return;
 	}
 
-	if (ctx->tls_session != NULL) {
-		gnutls_deinit(ctx->tls_session);
-		ctx->tls_session = NULL;
+	if (ctx->c.tls_session != NULL) {
+		gnutls_deinit(ctx->c.tls_session);
+		ctx->c.tls_session = NULL;
 	}
 
 	free (ctx);
 }
 
-int tls_client_connect_start(struct tls_client_ctx_t *ctx,
+int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 			     struct session *session,
 			     tls_handshake_cb handshake_cb)
 {
-	if (session == NULL || ctx == NULL) {
+	if (session == NULL || client_ctx == NULL) {
 		return kr_error(EINVAL);
 	}
 
 	assert(session->outgoing && session->handle->type == UV_TCP);
 
-	gnutls_session_set_ptr(ctx->tls_session, ctx);
+	struct tls_common_ctx *ctx = &client_ctx->c;
+
+	gnutls_session_set_ptr(ctx->tls_session, client_ctx);
 	gnutls_handshake_set_timeout(ctx->tls_session, 5000);
-	session->tls_client_ctx = ctx;
+	session->tls_client_ctx = client_ctx;
 	ctx->handshake_cb = handshake_cb;
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
 	ctx->session = session;
@@ -1009,28 +889,12 @@ int tls_client_connect_start(struct tls_client_ctx_t *ctx,
 	return kr_error(EAGAIN);
 }
 
-void tls_client_close(struct tls_client_ctx_t *ctx)
-{
-	if (ctx == NULL || ctx->tls_session == NULL) {
-		return;
-	}
-
-	assert(ctx->session);
-
-	if (ctx->handshake_state == TLS_HS_DONE) {
-		DEBUG_MSG("[tls client] closing tls connection to `%s`\n",
-			  kr_straddr(&ctx->session->peer.ip));
-		ctx->handshake_state = TLS_HS_CLOSING;
-		gnutls_bye(ctx->tls_session, GNUTLS_SHUT_RDWR);
-	}
-}
-
-tls_client_hs_state_t tls_client_get_hs_state(const struct tls_client_ctx_t *ctx)
+tls_hs_state_t tls_get_hs_state(const struct tls_common_ctx *ctx)
 {
 	return ctx->handshake_state;
 }
 
-int tls_client_set_hs_state(struct tls_client_ctx_t *ctx, tls_client_hs_state_t state)
+int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state)
 {
 	if (state >= TLS_HS_LAST) {
 		return kr_error(EINVAL);
@@ -1047,7 +911,7 @@ int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
 		return kr_error(EINVAL);
 	}
 	ctx->params = entry;
-	ctx->session = session;
+	ctx->c.session = session;
 	return kr_ok();
 }
 

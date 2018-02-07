@@ -367,10 +367,10 @@ static void session_close(struct session *session)
 	if (!uv_is_closing((uv_handle_t *)&session->timeout)) {
 		uv_timer_stop(&session->timeout);
 		if (session->tls_client_ctx) {
-			tls_client_close(session->tls_client_ctx);
+			tls_close(&session->tls_client_ctx->c);
 		}
 		if (session->tls_ctx) {
-			tls_close(session->tls_ctx);
+			tls_close(&session->tls_ctx->c);
 		}
 
 		session->timeout.data = session;
@@ -897,12 +897,11 @@ static void on_nontask_write(uv_write_t *req, int status)
 
 ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
-	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
+	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
 	const uv_buf_t uv_buf[1] = {
 		{ (char *)buf, len }
 	};
 
-	VERBOSE_MSG(NULL,"[tls] push %zu <%p>\n", len, h);
 	if (t == NULL) {
 		errno = EFAULT;
 		return -1;
@@ -911,63 +910,8 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 	assert(t->session && t->session->handle &&
 	       t->session->handle->type == UV_TCP);
 
-	struct worker_ctx *worker = t->worker;
-	assert(worker);
-
-	void *ioreq = worker_iohandle_borrow(worker);
-	if (!ioreq) {
-		errno = EFAULT;
-		return -1;
-	}
-
-	uv_write_t *write_req = (uv_write_t *)ioreq;
-
-	struct qr_task *task = t->task;
-	uv_write_cb write_cb = on_task_write;
-	if (t->handshake_done) {
-		assert(task);
-	} else {
-		task = NULL;
-		write_cb = on_nontask_write;
-	}
-
-	write_req->data = task;
-
-	ssize_t ret = -1;
-	int res = uv_write(write_req, (uv_stream_t *)t->session->handle, uv_buf, 1, write_cb);
-	if (res == 0) {
-		if (task) {
-			qr_task_ref(task); /* Pending ioreq on current task */
-		}
-		if (worker->too_many_open &&
-		    worker->stats.rconcurrent <
-			worker->rconcurrent_highwatermark - 10) {
-			worker->too_many_open = false;
-		}
-		ret = len;
-	} else {
-		VERBOSE_MSG(NULL,"[tls] uv_write: %s\n", uv_strerror(res));
-		iorequest_release(worker, ioreq);
-		errno = EIO;
-		/* TODO ret == UV_EMFILE */
-	}
-	return ret;
-}
-
-ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
-{
-	struct tls_client_ctx_t *t = (struct tls_client_ctx_t *)h;
-	const uv_buf_t uv_buf[1] = {
-		{ (char *)buf, len }
-	};
-
-	VERBOSE_MSG(NULL,"[tls client] push %zu <%p>\n", len, h);
-	if (t == NULL) {
-		errno = EFAULT;
-		return -1;
-	}
-	assert(t->session && t->session->handle &&
-	       t->session->handle->type == UV_TCP);
+	VERBOSE_MSG(NULL,"[%s] push %zu <%p>\n",
+		    t->client_side ? "tls-client" : "tls", len, h);
 
 	struct worker_ctx *worker = t->worker;
 	assert(worker);
@@ -1004,7 +948,8 @@ ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, siz
 		}
 		ret = len;
 	} else {
-		VERBOSE_MSG(NULL,"[tls_client] uv_write: %s\n", uv_strerror(res));
+		VERBOSE_MSG(NULL,"[%s] uv_write: %s\n",
+			    t->client_side ? "tls-client" : "tls", uv_strerror(res));
 		iorequest_release(worker, ioreq);
 		errno = EIO;
 		/* TODO ret == UV_EMFILE */
@@ -1012,7 +957,8 @@ ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, siz
 	return ret;
 }
 
-static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
+static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
+			struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	if (!handle) {
 		return qr_task_on_send(task, handle, kr_error(EIO));
@@ -1030,7 +976,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 				return ret;
 			}
 		}
-		return tls_push(task, handle, pkt, !session->outgoing);
+		return tls_push(task, handle, pkt);
 	}
 
 	int ret = 0;
@@ -1127,9 +1073,6 @@ static int session_next_waiting_send(struct session *session)
 
 static int session_tls_hs_cb(struct session *session, int status)
 {
-	VERBOSE_MSG(NULL, "=> server: '%s' TLS handshake has %s\n",
-		    kr_straddr(&session->peer.ip), status ? "failed" : "completed");
-
 	struct worker_ctx *worker = get_worker();
 	union inaddr *peer = &session->peer;
 	int deletion_res = worker_del_tcp_waiting(worker, &peer->ip);
@@ -2050,8 +1993,14 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 
 		if (session->tls_client_ctx) {
 			/* Avoid gnutls_bye() call */
-			tls_client_set_hs_state(session->tls_client_ctx,
-						TLS_HS_NOT_STARTED);
+			tls_set_hs_state(&session->tls_client_ctx->c,
+					 TLS_HS_NOT_STARTED);
+		}
+
+		if (session->tls_ctx) {
+			/* Avoid gnutls_bye() call */
+			tls_set_hs_state(&session->tls_ctx->c,
+					 TLS_HS_NOT_STARTED);
 		}
 
 		if (session->outgoing && session->buffering) {

@@ -47,60 +47,62 @@ struct tls_client_paramlist_entry {
 struct worker_ctx;
 struct qr_task;
 
-/* gnutls_record_recv and gnutls_record_send */
-struct tls_ctx_t {
-	gnutls_session_t tls_session;
-	bool handshake_done;
-
-	struct session *session;
-
-	/* for reading from the network */
-	const uint8_t *buf;
-	ssize_t nread;
-	ssize_t consumed;
-	uint8_t recv_buf[4096];
-	struct tls_credentials *credentials;
-	struct worker_ctx *worker;
-	struct qr_task *task;
-};
-
 typedef enum tls_client_hs_state {
 	TLS_HS_NOT_STARTED = 0,
 	TLS_HS_IN_PROGRESS,
 	TLS_HS_DONE,
 	TLS_HS_CLOSING,
 	TLS_HS_LAST
-} tls_client_hs_state_t;
+} tls_hs_state_t;
 
 typedef int (*tls_handshake_cb) (struct session *session, int status);
 
-struct tls_client_ctx_t {
+struct tls_common_ctx {
+	bool client_side;
 	gnutls_session_t tls_session;
-	tls_client_hs_state_t handshake_state;
-
+	tls_hs_state_t handshake_state;
 	struct session *session;
-	tls_handshake_cb handshake_cb;
+	/* for reading from the network */
 	const uint8_t *buf;
 	ssize_t nread;
 	ssize_t consumed;
 	uint8_t recv_buf[4096];
-	const struct tls_client_paramlist_entry *params;
+	tls_handshake_cb handshake_cb;
 	struct worker_ctx *worker;
 	struct qr_task *task;
+};
+
+struct tls_ctx_t {
+	/*
+	 * Since pointer to tls_ctx_t needs to be casted
+	 * to  tls_ctx_common in some functions,
+	 * this field must be always at first position
+	 */
+	struct tls_common_ctx c;
+	struct tls_credentials *credentials;
+};
+
+struct tls_client_ctx_t {
+	/*
+	 * Since pointer to tls_client_ctx_t needs to be casted
+	 * to  tls_ctx_common in some functions,
+	 * this field must be always at first position
+	 */
+	struct tls_common_ctx c;
+	const struct tls_client_paramlist_entry *params;
 };
 
 /*! Create an empty TLS context in query context */
 struct tls_ctx_t* tls_new(struct worker_ctx *worker);
 
 /*! Close a TLS context (call gnutls_bye()) */
-void tls_close(struct tls_ctx_t *ctx);
+void tls_close(struct tls_common_ctx *ctx);
 
 /*! Release a TLS context */
 void tls_free(struct tls_ctx_t* tls);
 
 /*! Push new data to TLS context for sending */
-int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt,
-	     bool server_side);
+int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
 
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
@@ -126,6 +128,12 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials);
 /*! Generate new ephemeral TLS credentials. */
 struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine);
 
+/*! Get TLS handshake state. */
+tls_hs_state_t tls_get_hs_state(const struct tls_common_ctx *ctx);
+
+/*! Set TLS handshake state. */
+int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
+
 /*! Set TLS authentication parameters for given address. */
 int tls_client_params_set(map_t *tls_client_paramlist,
 			  const char *addr, uint16_t port,
@@ -138,22 +146,12 @@ int tls_client_params_free(map_t *tls_client_paramlist);
 struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_entry *entry,
 					    struct worker_ctx *worker);
 
-int tls_client_process(struct worker_ctx *worker, uv_stream_t *handle,
-		       const uint8_t *buf, ssize_t nread);
-
 /*! Free client TLS context */
 void tls_client_ctx_free(struct tls_client_ctx_t *ctx);
 
-int tls_client_connect_start(struct tls_client_ctx_t *ctx, struct session *session,
+int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
+			     struct session *session,
 			     tls_handshake_cb handshake_cb);
-
-void tls_client_close(struct tls_client_ctx_t *ctx);
-
-int tls_client_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt);
-
-tls_client_hs_state_t tls_client_get_hs_state(const struct tls_client_ctx_t *ctx);
-
-int tls_client_set_hs_state(struct tls_client_ctx_t *ctx, tls_client_hs_state_t state);
 
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
 			      const struct tls_client_paramlist_entry *entry,
