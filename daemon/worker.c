@@ -952,7 +952,6 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 			    t->client_side ? "tls-client" : "tls", uv_strerror(res));
 		iorequest_release(worker, ioreq);
 		errno = EIO;
-		/* TODO ret == UV_EMFILE */
 	}
 	return ret;
 }
