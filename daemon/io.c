@@ -459,12 +459,15 @@ void io_release(uv_handle_t *handle)
 
 int io_start_read(uv_handle_t *handle)
 {
-	if (handle->type == UV_UDP) {
+	switch (handle->type) {
+	case UV_UDP:
 		return uv_udp_recv_start((uv_udp_t *)handle, &handle_getbuf, &udp_recv);
-	} else if (handle->type == UV_TCP) {
+	case UV_TCP:
 		return uv_read_start((uv_stream_t *)handle, &handle_getbuf, &tcp_recv);
+	default:
+		assert(!EINVAL);
+		return kr_error(EINVAL);
 	}
-	assert(false);
 }
 
 int io_stop_read(uv_handle_t *handle)

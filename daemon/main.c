@@ -464,7 +464,7 @@ static int set_keyfile(struct engine *engine, char *keyfile, bool unmanaged)
 static void args_init(struct args *args)
 {
 	memset(args, 0, sizeof(struct args));
-	args->forks = -1;
+	args->forks = 1;
 	array_init(args->addr_set);
 	array_init(args->tls_set);
 	array_init(args->fd_set);
@@ -612,7 +612,7 @@ int main(int argc, char **argv)
 		args.interactive = false;
 		if (args.forks != 1) {
 			kr_log_error("[system] when run under systemd-style supervision, "
-				     "use single-process only (bad: --fork=%d).\n", args.forks);
+				     "use single-process only (bad: --forks=%d).\n", args.forks);
 			free_sd_socket_names(socket_names, sd_nsocks);
 			return EXIT_FAILURE;
 		}

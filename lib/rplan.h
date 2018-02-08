@@ -207,9 +207,6 @@ struct kr_query *kr_rplan_resolved(struct kr_rplan *rplan);
 KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_last(struct kr_rplan *rplan);
 
-/** Return query predecessor. */
-KR_EXPORT KR_PURE
-struct kr_query *kr_rplan_next(struct kr_query *qry);
 
 /**
  * Check if a given query already resolved.
