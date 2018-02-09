@@ -239,8 +239,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	 * so the whole message reassembly and demuxing logic is inside worker */
 	int ret = 0;
 	if (s->has_tls) {
-		ret = s->outgoing ? tls_client_process(worker, handle, (const uint8_t *)buf->base, nread) :
-		                    tls_process(worker, handle, (const uint8_t *)buf->base, nread);
+		ret = tls_process(worker, handle, (const uint8_t *)buf->base, nread);
 	} else {
 		ret = worker_process_tcp(worker, handle, (const uint8_t *)buf->base, nread);
 	}
@@ -298,6 +297,8 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	session->has_tls = tls;
 	if (tls && !session->tls_ctx) {
 		session->tls_ctx = tls_new(master->loop->data);
+		session->tls_ctx->c.session = session;
+		session->tls_ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
 	}
 	uv_timer_t *timer = &session->timeout;
 	uv_timer_start(timer, tcp_timeout_trigger, KR_CONN_RTT_MAX/2, KR_CONN_RTT_MAX/2);
