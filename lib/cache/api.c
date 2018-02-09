@@ -312,6 +312,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
+	/* We first check various exit-conditions and then call the _real function. */
 
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || qry->flags.NO_CACHE
 	    || (qry->flags.CACHE_TRIED && !qry->stale_cb)
@@ -319,6 +320,23 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state; /* Already resolved/failed or already tried, etc. */
 	}
+	/* ATM cache only peeks for qry->sname and that would be useless
+	 * to repeat on every iteration, so disable it from now on.
+	 * LATER(optim.): assist with more precise QNAME minimization. */
+	qry->flags.CACHE_TRIED = true;
+
+	if (qry->stype == KNOT_RRTYPE_NSEC) {
+		VERBOSE_MSG(qry, "=> skipping stype NSEC\n");
+		return ctx->state;
+	}
+	if (!check_dname_for_lf(qry->sname)) {
+		WITH_VERBOSE(qry) {
+			auto_free char *sname_str = kr_dname_text(qry->sname);
+			VERBOSE_MSG(qry, "=> skipping zero-containing sname %s\n", sname_str);
+		}
+		return ctx->state;
+	}
+
 	int ret = cache_peek_real(ctx, pkt);
 	kr_cache_sync(&req->ctx->cache);
 	return ret;
@@ -334,23 +352,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 
-	/* ATM cache only peeks for qry->sname and that would be useless
-	 * to repeat on every iteration, so disable it from now on.
-	 * LATER(optim.): assist with more precise QNAME minimization. */
-	qry->flags.CACHE_TRIED = true;
-
 	struct key k_storage, *k = &k_storage;
-	if (qry->stype == KNOT_RRTYPE_NSEC) {
-		VERBOSE_MSG(qry, "=> skipping stype NSEC\n");
-		return ctx->state;
-	}
-	if (!check_dname_for_lf(qry->sname)) {
-		WITH_VERBOSE(qry) {
-			auto_free char *sname_str = kr_dname_text(qry->sname);
-			VERBOSE_MSG(qry, "=> skipping zero-containing sname %s\n", sname_str);
-		}
-		return ctx->state;
-	}
 	int ret = kr_dname_lf(k->buf, qry->sname, false);
 	if (ret) {
 		return ctx->state;
