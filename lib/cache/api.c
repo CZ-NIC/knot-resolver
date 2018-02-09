@@ -51,7 +51,7 @@
 
 
 /** Cache version */
-static const uint16_t CACHE_VERSION = 2;
+static const uint16_t CACHE_VERSION = 3;
 /** Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
@@ -407,6 +407,8 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(false);
 	}
 
+	const struct entry_apex *ea = val_cut.data ? entry_apex_consistent(val_cut) : NULL;
+
 #if 0
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
@@ -457,7 +459,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int clencl_labels = -1;
 	const int sname_labels = knot_dname_labels(qry->sname, NULL);
 	//while (true) { //for (int i_nsecp = 0; i
-	// TODO(NSEC3): better signalling when to "continue;" and when to "break;"
+	// XXX(NSEC3): better signalling when to "continue;" and when to "break;"
 	// incl. clearing partial answers in `ans`
 		//assert(eh->nsec1_pos <= 1);
 		int nsec = 1;
@@ -469,7 +471,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (ret < 0) return ctx->state;
 			//if (ret > 0) continue; // NSEC3
 			break;
-		case 3: //TODO NSEC3
+		case 3: //XXX NSEC3
 		default:
 			assert(false);
 		}
@@ -509,7 +511,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 
-	/** 3b. We need to find wildcarded answer, if sname was covered
+	/** 3b. find wildcarded answer, if sname was covered
 	 * and we don't have a full proof yet.  (common for NSEC*)
 	 */
 	if (sname_covered) {
@@ -678,6 +680,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
 			int *unauth_cnt)
 {
+	//FIXME review entry_h
 	const ranked_rr_array_entry_t *entry = arr->at[arr_i];
 	if (entry->cached) {
 		return kr_ok();
@@ -1004,6 +1007,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
  * Found type is returned via k->type.
  *
  * \param exact_match Whether exact match is considered special.
+ * \return raw entry from cache (for NS) or rewound entry (xNAME)
  */
 static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 {
@@ -1031,11 +1035,12 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 
 		/* Check consistency, find any type;
 		 * using `goto` for shortening by another label. */
-		const struct entry_h *eh = entry_h_consistent(val, KNOT_RRTYPE_NS),
-			*eh_orig = eh;
+		const struct entry_apex *ea = entry_apex_consistent(val);
 		const knot_db_val_t val_orig = val;
-		assert(eh);
-		if (!eh) goto next_label; // do something about EILSEQ?
+		if (unlikely(!ea)) {
+			assert(!EILSEQ); // do something about it?
+			goto next_label;
+		}
 		/* More types are possible; try in order.
 		 * For non-fatal failures just "continue;" to try the next type. */
 		uint16_t type = 0;
@@ -1044,7 +1049,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			switch (type) {
 			case 0:
 				type = KNOT_RRTYPE_NS;
-				if (!eh_orig->has_ns
+				if (!ea->has_ns
 				    /* On a zone cut we want DS from the parent zone. */
 				    || (exact_match && qry->stype == KNOT_RRTYPE_DS)) {
 					continue;
@@ -1055,14 +1060,14 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 				/* CNAME is interesting only if we
 				 * directly hit the name that was asked.
 				 * Note that we want it even in the DS case. */
-				if (!eh_orig->has_cname || !exact_match)
+				if (!ea->has_cname || !exact_match)
 					continue;
 				break;
 			case KNOT_RRTYPE_CNAME:
 				type = KNOT_RRTYPE_DNAME;
 				/* DNAME is interesting only if we did NOT
 				 * directly hit the name that was asked. */
-				if (!eh_orig->has_dname || exact_match)
+				if (!ea->has_dname || exact_match)
 					continue;
 				break;
 			default:
@@ -1072,6 +1077,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			/* Find the entry for the type, check positivity, TTL */
 			val = val_orig;
 			ret = entry_h_seek(&val, type);
+			const struct entry_h *eh;
 			if (ret || !(eh = entry_h_consistent(val, type))) {
 				assert(false);
 				goto next_label;
@@ -1099,7 +1105,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			/* We found our match. */
 			k->type = type;
 			k->zlf_len = zlf_len;
-			return val;
+			return type == KNOT_RRTYPE_NS ? val_orig : val;
 		}
 
 	next_label:

@@ -34,8 +34,7 @@
 /** Cache entry header
  *
  * 'E' entry (exact hit):
- *	- ktype == NS: multiple chained entry_h, based on has_* : 1 flags;
- *		TODO: NSEC3 chain descriptors (iff nsec3_cnt > 0)
+ *	- ktype == NS: entry_apex and multiple chained entry_h, based on has_* : 1 flags;
  *	- is_packet: uint16_t length, otherwise opaque and handled by ./entry_pkt.c
  *	- otherwise RRset + its RRSIG set (possibly empty).
  * '1' entry (NSEC1)
@@ -45,19 +44,25 @@
 struct entry_h {
 	uint32_t time;	/**< The time of inception. */
 	uint32_t ttl;	/**< TTL at inception moment.  Assuming it fits into int32_t ATM. */
-	uint8_t  rank;	/**< See enum kr_rank */
-
+	uint8_t  rank : 6;	/**< See enum kr_rank */
 	bool is_packet : 1;	/**< Negative-answer packet for insecure/bogus name. */
-
-	unsigned nsec1_pos : 2;	/**< Only used for NS ktype. */
-	unsigned nsec3_cnt : 2;	/**< Only used for NS ktype. */
-	bool has_ns : 1;	/**< Only used for NS ktype. */
-	bool has_cname : 1;	/**< Only used for NS ktype. */
-	bool has_dname : 1;	/**< Only used for NS ktype. */
 	bool has_optout : 1;	/**< Only for packets with NSEC3. */
-	/* ENTRY_H_FLAGS */
-
 	uint8_t data[];
+};
+
+enum { ENTRY_APEX_NSECS_CNT = 2 };
+
+struct entry_apex {
+	/* ENTRY_H_FLAGS */
+	bool has_ns : 1;
+	bool has_cname : 1;
+	bool has_dname : 1;
+
+	uint8_t pad_;
+	int8_t nsecs[ENTRY_APEX_NSECS_CNT]; /**< values:  0: none, 1: NSEC, 3: NSEC3 */
+	uint8_t data[];
+	/* XXX: if not first, stamp of last being the first?
+	 * Purpose: save cache operations if rolled the algo/params long ago. */
 };
 
 
@@ -66,6 +71,7 @@ struct entry_h {
  */
 struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type);
 
+struct entry_apex * entry_apex_consistent(knot_db_val_t data);
 
 // TODO
 #define KR_CACHE_KEY_MAXLEN (KNOT_DNAME_MAXLEN + 100)

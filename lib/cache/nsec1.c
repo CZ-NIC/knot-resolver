@@ -132,8 +132,7 @@ static struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
 	/* ATM it's enough to just extend the checks for exact entries. */
 	const struct entry_h *eh = entry_h_consistent(data, KNOT_RRTYPE_NSEC);
 	bool ok = eh != NULL;
-	ok = ok && !(eh->is_packet || eh->has_ns || eh->has_cname || eh->has_dname
-		     || eh->has_optout);
+	ok = ok && !(eh->is_packet || eh->has_optout);
 	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
 }
 
