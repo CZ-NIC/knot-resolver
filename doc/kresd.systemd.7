@@ -18,7 +18,6 @@ kresd.socket
 kresd-tls.socket
 kresd-control@.socket
 system-kresd.slice
-kresd.service
 .fi
 
 .SH "DESCRIPTION"
@@ -36,10 +35,8 @@ single, independent kresd process.
 The systemd-managed \fBkresd\fR service set is grouped in the
 \fIsystem-kresd.slice\fR slice.  The slice includes one or more
 running daemons (instances of \fIkresd@.service\fR), public listening
-sockets (the same listening sockets are shared by all daemons), a
-dedicated control socket for each running daemon, and one meta-service
-(\fIkresd.service\fR) which can be used to stop or restart all the
-daemons.
+sockets (the same listening sockets are shared by all daemons) and a
+dedicated control socket for each running daemon.
 
 Each instance of \fIkresd@.service\fR has three systemd sockets (see
 \fBsystemd.socket(5)\fR) associated with it:
