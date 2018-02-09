@@ -86,6 +86,7 @@ endif
 info:
 	$(info Target:     Knot DNS Resolver $(VERSION)-$(PLATFORM))
 	$(info Compiler:   $(CC) $(BUILD_CFLAGS))
+	$(info Linker:     $(CCLD) $(BUILD_LDFLAGS))
 	$(info )
 	$(info Variables)
 	$(info ---------)
