@@ -294,7 +294,7 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 }
 
 
-
+// TODO: move all these and cache_peek_real into a separate c-file that only exposes cache_peek_real
 /* Forwards for larger chunks of code.  All just for cache_peek. */
 static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry);
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
@@ -302,10 +302,14 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
-static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt);
+static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt);
 static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    uint16_t type, uint8_t lowest_rank,
 		    const struct kr_query *qry, struct kr_cache *cache);
+
+static int peek_encloser(
+	struct key *k, struct answer *ans, const uint8_t *nsec_p, const int sname_labels,
+	uint8_t lowest_rank, const struct kr_query *qry, struct kr_cache *cache);
 
 /** function for .produce phase */
 int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -337,16 +341,70 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	int ret = cache_peek_real(ctx, pkt);
+	int ret = peek_nosync(ctx, pkt);
 	kr_cache_sync(&req->ctx->cache);
 	return ret;
 }
+
+/** See the call site. */
+static int get_nsec_plist(const knot_db_val_t val_cut,
+			  const uint8_t **nsec_plist, int *nsec_plen, /*< output */
+			  const struct kr_query *qry, const knot_dname_t *zname /*< logging*/)
+{
+	if (true || !val_cut.data) {
+	//  ^^^^ XXX VERBOSE_MSG(qry, "=> not even root NS in cache, but let's try NSEC\n");
+		nsec_plist[0] = NULL;
+		*nsec_plen = 1;
+		return kr_ok();
+	}
+
+	*nsec_plen = 0;
+	const struct entry_apex *ea = entry_apex_consistent(val_cut);
+	const uint8_t *data_it = ea->data;
+	int data_stride; /*< length of the current item in entry_apex data */
+	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i, data_it += data_stride) {
+		int ver = ea->nsecs[i];
+		/* get data_stride */
+		switch (ver) {
+		case 0:
+			data_stride = 0;
+			continue;
+		case 1:
+			data_stride = sizeof(uint32_t); /* just the stamp */
+			break;
+		case 3:
+			data_stride = sizeof(uint32_t) + 5 + data_it[4];
+			break;
+		default:
+			return kr_error(EILSEQ);
+		}
+		/* OK iff the stamp is in future */
+		uint32_t stamp;
+		memcpy(&stamp, data_it, sizeof(stamp));
+		const int32_t remains = stamp - qry->timestamp.tv_sec; /* using SOA serial arith. */
+		if (remains < 0) continue;
+		/* append the params */
+		nsec_plist[*nsec_plen] = ver == 1 ? NULL : (data_it + sizeof(stamp));
+		++*nsec_plen;
+	}
+	WITH_VERBOSE(qry) {
+		auto_free char *zname_str = kr_dname_text(zname);
+		if (!*nsec_plen) {
+			VERBOSE_MSG(qry, "=> no NSEC* cached for zone: %s\n", zname_str);
+		} else {
+			VERBOSE_MSG(qry, "=> trying zone: %s (first %s)\n", zname_str,
+					(nsec_plist[0] ? "NSEC3" : "NSEC"));
+		}
+	}
+	return kr_ok();
+}
+
 
 
 /**
  * \note we don't transition to KR_STATE_FAIL even in case of "unexpected errors".
  */
-static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
@@ -354,15 +412,15 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	struct key k_storage, *k = &k_storage;
 	int ret = kr_dname_lf(k->buf, qry->sname, false);
-	if (ret) {
+	if (unlikely(ret)) {
+		assert(false);
 		return ctx->state;
 	}
 
 	const uint8_t lowest_rank = get_lowest_rank(req, qry);
 
-	/** 1. find the name or the closest (available) zone, not considering wildcards
-	 *  1a. exact name+type match (can be negative answer in insecure zones)
-	 */
+	/**** 1. find the name or the closest (available) zone, not considering wildcards
+	 **** 1a. exact name+type match (can be negative answer in insecure zones) */
 	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
@@ -371,27 +429,23 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		ret = found_exact_hit(ctx, pkt, val, lowest_rank);
 	}
 	if (ret && ret != -abs(ENOENT)) {
-		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n",
-				ret, strerror(abs(ret)));
+		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
 		assert(false);
 		return ctx->state;
 	} else if (!ret) {
 		return KR_STATE_DONE;
 	}
 
-	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
+	/**** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;
-	kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
-	const knot_db_val_t val_cut = closest_NS(ctx, k);
-	if (!val_cut.data) {
-		VERBOSE_MSG(qry, "=> not even root NS in cache, but let's try NSEC\n");
+	ret = kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
+	if (unlikely(ret)) {
+		assert(false);
+		return ctx->state;
 	}
+	const knot_db_val_t val_cut = closest_NS(ctx, k);
 	switch (k->type) {
 	case KNOT_RRTYPE_NS:
-		WITH_VERBOSE(qry) {
-			auto_free char *zname_str = kr_dname_text(k->zname);
-			VERBOSE_MSG(qry, "=> trying zone: %s\n", zname_str);
-		}
 		break;
 	case KNOT_RRTYPE_CNAME: {
 		const uint32_t new_ttl = get_new_ttl(val_cut.data, qry,
@@ -407,9 +461,8 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	default:
 		assert(false);
+		return ctx->state;
 	}
-
-	const struct entry_apex *ea = val_cut.data ? entry_apex_consistent(val_cut) : NULL;
 
 #if 0
 	if (!eh) { /* fall back to root hints? */
@@ -428,15 +481,6 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	kr_zonecut_set(&qry->zone_cut, k->zname);
 	ret = kr_make_query(qry, pkt); // TODO: probably not yet - qname minimization
 	if (ret) return ctx->state;
-
-	/* Note: up to here we can run on any cache backend,
-	 * without touching the code. */
-	if (!eh->nsec1_pos) {
-		/* No NSEC1 RRs for this zone in cache. */
-		/* TODO: NSEC3 */
-		//VERBOSE_MSG(qry, "   no NSEC1\n");
-		//return ctx->state;
-	}
 #endif
 
 	/** Collecting multiple NSEC* + RRSIG records, in preparation for the answer
@@ -444,104 +488,33 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct answer ans;
 	memset(&ans, 0, sizeof(ans));
 	ans.mm = &pkt->mm;
-
-	/** Start of NSEC* covering the sname;
-	 * it's part of key - the one within zone (read only) */
-	knot_db_val_t cover_low_kwz = { NULL, 0 };
-	knot_dname_t cover_hi_storage[KNOT_DNAME_MAXLEN];
-	/** End of NSEC* covering the sname. */
-	knot_db_val_t cover_hi_kwz = {
-		.data = cover_hi_storage,
-		.len = sizeof(cover_hi_storage),
-	};
-
-	/** 2. Find a closest (provable) encloser (of sname).
-	 * iterate over all NSEC* chain parameters
-	 */
-	int clencl_labels = -1;
 	const int sname_labels = knot_dname_labels(qry->sname, NULL);
-	//while (true) { //for (int i_nsecp = 0; i
-	// XXX(NSEC3): better signalling when to "continue;" and when to "break;"
-	// incl. clearing partial answers in `ans`
-		//assert(eh->nsec1_pos <= 1);
-		int nsec = 1;
-		switch (nsec) {
-		case 1:
-			ans.nsec_v = 1;
-			ret = nsec1_encloser(k, &ans, sname_labels, &clencl_labels,
-					     &cover_low_kwz, &cover_hi_kwz, qry, cache);
-			if (ret < 0) return ctx->state;
-			//if (ret > 0) continue; // NSEC3
-			break;
-		case 3: //XXX NSEC3
-		default:
-			assert(false);
-		}
-	//}
 
-	if (ans.rcode != PKT_NODATA && ans.rcode != PKT_NXDOMAIN) {
-		assert(ans.rcode == 0); /* Nothing suitable found. */
-		return ctx->state;
-	}
-	/* At this point, sname was either covered or matched. */
-	const bool sname_covered = ans.rcode == PKT_NXDOMAIN;
-
-	/** Name of the closest (provable) encloser. */
-	const knot_dname_t *clencl_name = qry->sname;
-	for (int l = sname_labels; l > clencl_labels; --l)
-		clencl_name = knot_wire_next_label(clencl_name, NULL);
-
-	/** 3. source of synthesis checks, in case sname was covered.
-	 *
-	 * 3a. We want to query for NSEC* of source of synthesis (SS) or its predecessor,
-	 * providing us with a proof of its existence or non-existence.
-	 */
-	if (!sname_covered) {
-		/* No wildcard checks needed, as we proved that sname exists. */
-		assert(ans.nsec_v == 1); // for now
-
-	} else if (ans.nsec_v == 1 && sname_covered) {
-		int ret = nsec1_src_synth(k, &ans, clencl_name,
-					  cover_low_kwz, cover_hi_kwz, qry, cache);
+	/* Obtain nsec_p*: the list of usable NSEC* parameters;
+	 * it's list of pointers to NSEC3PARAM data (NULL for NSEC). */
+	const uint8_t * nsec_plist[ENTRY_APEX_NSECS_CNT];
+	int nsec_plen = 0;
+	ret = get_nsec_plist(val_cut, nsec_plist, &nsec_plen, qry, k->zname);
+	if (ret) return ctx->state;
+	/* Try the NSEC* parameters in order, until success.
+	 * Let's not mix different parameters for NSEC* RRs in a single proof. */
+	for (int i = 0; ;) {
+		const uint8_t *nsec_p = nsec_plist[i];
+		/**** 2. and 3. inside */
+		ret = peek_encloser(k, &ans, nsec_p, sname_labels, lowest_rank, qry, cache);
+		if (!ret) break;
 		if (ret < 0) return ctx->state;
-		if (ret == AR_SOA) goto do_soa; /* SS was covered or matched for NODATA */
-		assert(ret == 0);
-
-	} else {
-		//TODO NSEC3
-		assert(false);
-	}
-
-
-	/** 3b. find wildcarded answer, if sname was covered
-	 * and we don't have a full proof yet.  (common for NSEC*)
-	 */
-	if (sname_covered) {
-		/* Construct key for exact qry->stype + source of synthesis. */
-		int ret = kr_dname_lf(k->buf, clencl_name, true);
-		if (ret) {
-			assert(!ret);
+		/* Otherwise we try another nsec_p, if available. */
+		if (++i == nsec_plen) {
 			return ctx->state;
 		}
-		const uint16_t types[] = { qry->stype, KNOT_RRTYPE_CNAME };
-		for (int i = 0; i < (2 - (qry->stype == KNOT_RRTYPE_CNAME)); ++i) {
-			ret = try_wild(k, &ans, clencl_name, types[i],
-					lowest_rank, qry, cache);
-			if (ret == kr_ok()) {
-				break;
-			} else if (ret != -ABS(ENOENT) && ret != -ABS(ESTALE)) {
-				assert(false);
-				return ctx->state;
-			}
-			/* else continue */
-		}
-		if (ret) return ctx->state; /* neither attempt succeeded */
+		/* clear possible partial answers in `ans` (no need to deallocate) */
+		ans.rcode = 0;
+		memset(&ans.rrsets, 0, sizeof(ans.rrsets));
 	}
 
 
-	/** 4. add SOA iff needed
-	 */
-do_soa:
+	/**** 4. add SOA iff needed */
 	if (ans.rcode != PKT_NOERROR) {
 		/* Assuming k->buf still starts with zone's prefix,
 		 * look up the SOA in cache. */
@@ -619,6 +592,99 @@ do_soa:
 	qry->flags.NO_MINIMIZE = true;
 
 	return KR_STATE_DONE;
+}
+
+/**
+ * This is where the high-level "business logic" of aggressive cache is.
+ * \return 0: success (may need SOA);  >0: try other nsec_p;  <0: exit cache immediately.
+ */
+static int peek_encloser(
+	struct key *k, struct answer *ans, const uint8_t *nsec_p, const int sname_labels,
+	uint8_t lowest_rank, const struct kr_query *qry, struct kr_cache *cache)
+{
+	ans->nsec_v = nsec_p ? 3 : 1;
+
+	/** Start of NSEC* covering the sname;
+	 * it's part of key - the one within zone (read only) */
+	knot_db_val_t cover_low_kwz = { NULL, 0 };
+	knot_dname_t cover_hi_storage[KNOT_DNAME_MAXLEN];
+	/** End of NSEC* covering the sname. */
+	knot_db_val_t cover_hi_kwz = {
+		.data = cover_hi_storage,
+		.len = sizeof(cover_hi_storage),
+	};
+
+	/**** 2. Find a closest (provable) encloser (of sname). */
+	int clencl_labels = -1;
+	if (!nsec_p) { /* NSEC */
+		int ret = nsec1_encloser(k, ans, sname_labels, &clencl_labels,
+					 &cover_low_kwz, &cover_hi_kwz, qry, cache);
+		if (ret) return ret;
+	} else { //XXX NSEC3
+		int ret = nsec3_encloser(k, ans, sname_labels, &clencl_labels,
+					 &cover_low_kwz, &cover_hi_kwz, qry, cache);
+		if (ret) return ret;
+	}
+
+	/* We should have either a match or a cover at this point. */
+	if (ans->rcode != PKT_NODATA && ans->rcode != PKT_NXDOMAIN) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
+	const bool sname_covered = ans->rcode == PKT_NXDOMAIN;
+
+	/** Name of the closest (provable) encloser. */
+	const knot_dname_t *clencl_name = qry->sname;
+	for (int l = sname_labels; l > clencl_labels; --l)
+		clencl_name = knot_wire_next_label(clencl_name, NULL);
+
+	/**** 3. source of synthesis checks, in case sname was covered.
+	 **** 3a. We want to query for NSEC* of source of synthesis (SS) or its
+	 * predecessor, providing us with a proof of its existence or non-existence. */
+	if (sname_covered && !nsec_p) {
+		int ret = nsec1_src_synth(k, ans, clencl_name,
+					  cover_low_kwz, cover_hi_kwz, qry, cache);
+		if (ret == AR_SOA) return 0;
+		assert(ret <= 0);
+		if (ret) return ret;
+
+	} else if (sname_covered && nsec_p) {
+		//XXX NSEC3
+		int ret = nsec3_src_synth(k, ans, clencl_name,
+					  cover_low_kwz, cover_hi_kwz, qry, cache);
+		if (ret == AR_SOA) return 0;
+		assert(ret <= 0);
+		if (ret) return ret;
+
+	} /* else (!sname_covered) so no wildcard checks needed,
+	   * as we proved that sname exists. */
+
+	/**** 3b. find wildcarded answer, if sname was covered
+	 * and we don't have a full proof yet.  (common for NSEC*) */
+	if (!sname_covered)
+		return kr_ok(); /* decrease indentation */
+	/* Construct key for exact qry->stype + source of synthesis. */
+	int ret = kr_dname_lf(k->buf, clencl_name, true);
+	if (ret) {
+		assert(!ret);
+		return kr_error(ret);
+	}
+	const uint16_t types[] = { qry->stype, KNOT_RRTYPE_CNAME };
+	for (int i = 0; i < (2 - (qry->stype == KNOT_RRTYPE_CNAME)); ++i) {
+		ret = try_wild(k, ans, clencl_name, types[i],
+				lowest_rank, qry, cache);
+		if (ret == kr_ok()) {
+			return kr_ok();
+		} else if (ret != -ABS(ENOENT) && ret != -ABS(ESTALE)) {
+			assert(false);
+			return kr_error(ret);
+		}
+		/* else continue */
+	}
+	/* Neither attempt succeeded, but the NSEC* proofs were found,
+	 * so skip trying other parameters, as it seems very unlikely
+	 * to turn out differently than by the same wildcard search. */
+	return -ABS(ENOENT);
 }
 
 

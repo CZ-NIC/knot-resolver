@@ -128,6 +128,12 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache);
 
+/* XXX
+/ ** Copy entries and reserve space for new apex. * /
+int entry_apex_reserve(knot_db_val_t *new_apex, knot_db_val_t entries
+			const knot_db_val_t key, struct kr_cache *cache);
+ */
+
 
 /* Packet caching; implementation in ./entry_pkt.c */
 
@@ -176,7 +182,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data);
 /** Partially constructed answer when gathering RRsets from cache. */
 struct answer {
 	int rcode;	/**< PKT_NODATA, etc. */
-	uint8_t nsec_v;	/**< 1 or 3 */
+	uint8_t nsec_v;	/**< 1 or 3; Let's avoid mixing NSEC with NSEC3 in one answer. */
 	knot_mm_t *mm;	/**< Allocator for rrsets */
 	struct answer_rrset {
 		ranked_rr_array_entry_t set;	/**< set+rank for the main data */
@@ -214,8 +220,8 @@ int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type);
 int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank);
 
 
-/* NSEC (1) stuff.  Implementation in ./nsec1.c */
 
+/* NSEC (1) stuff.  Implementation in ./nsec1.c */
 
 /** Construct a string key for for NSEC (1) predecessor-search.
  * \param add_wildcard Act as if the name was extended by "*."
@@ -236,6 +242,20 @@ int nsec1_encloser(struct key *k, struct answer *ans,
  * \return 0: continue; <0: exit cache immediately;
  * 	AR_SOA: skip to adding SOA (SS was covered or matched for NODATA). */
 int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
+		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
+		    const struct kr_query *qry, struct kr_cache *cache);
+
+
+/* NSEC3 stuff.  Implementation in ./nsec3.c */
+
+/** TODO.  See nsec1_encloser(...) */
+int nsec3_encloser(struct key *k, struct answer *ans,
+		   const int sname_labels, int *clencl_labels,
+		   knot_db_val_t *cover_low_kwz, knot_db_val_t *cover_hi_kwz,
+		   const struct kr_query *qry, struct kr_cache *cache);
+
+/** TODO.  See nsec1_src_synth(...) */
+int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
 		    const struct kr_query *qry, struct kr_cache *cache);
 
