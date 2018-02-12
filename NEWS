@@ -1,11 +1,17 @@
 Knot Resolver 2.X.Y (2018-0M-DD)
 ================================
 
+Incompatible changes
+--------------------
+- systemd: more chages in default unit files (TODO)
+
 Bugfixes
 --------
 - detect_time_jump module: don't clear cache on suspend-resume (#284)
 - stats module: fix stats.list() returning nothing, regressed in 2.0.0
 - policy.TLS_FORWARD: refusal when configuring with multiple IPs (#306)
+- fix the hints module on some systems, e.g. Fedora (came back on 2.0.0)
+- build with older gnutls (conditionally disable features)
 
 
 Knot Resolver 2.0.0 (2018-01-31)
