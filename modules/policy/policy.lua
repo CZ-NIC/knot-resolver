@@ -209,7 +209,7 @@ function policy.TLS_FORWARD(target)
 		local auth_type = tls_forward_target_authtype(idx, upstream_list_entry)
 		local string_addr = upstream_list_entry[1]
 		local sockaddr_c = addr2sock(string_addr, 853)
-		local sockaddr_lua = ffi.string(sockaddr_c, ffi.C.kr_inaddr_len(sockaddr_c))
+		local sockaddr_lua = ffi.string(sockaddr_c, ffi.C.kr_sockaddr_len(sockaddr_c))
 		if sockaddr_config[sockaddr_lua] then
 			error('TLS_FORWARD configuration cannot declare two configs for IP address ' .. string_addr)
 		end

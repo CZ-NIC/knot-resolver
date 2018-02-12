@@ -216,9 +216,12 @@ const char *kr_inaddr(const struct sockaddr *addr);
 /** Address family. */
 KR_EXPORT KR_PURE
 int kr_inaddr_family(const struct sockaddr *addr);
-/** Address length for given family. */
+/** Address length for given family, i.e. sizeof(struct in*_addr). */
 KR_EXPORT KR_PURE
 int kr_inaddr_len(const struct sockaddr *addr);
+/** Sockaddr length for given family, i.e. sizeof(struct sockaddr_in*). */
+KR_EXPORT KR_PURE
+int kr_sockaddr_len(const struct sockaddr *addr);
 /** Port. */
 KR_EXPORT KR_PURE
 uint16_t kr_inaddr_port(const struct sockaddr *addr);

@@ -1,6 +1,11 @@
+Knot Resolver 2.X.Y (2018-0M-DD)
+================================
 
+Bugfixes
+--------
 - detect_time_jump module: don't clear cache on suspend-resume (#284)
 - stats module: fix stats.list() returning nothing, regressed in 2.0.0
+- policy.TLS_FORWARD: refusal when configuring with multiple IPs (#306)
 
 
 Knot Resolver 2.0.0 (2018-01-31)
