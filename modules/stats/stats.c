@@ -313,7 +313,7 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 	size_t args_len = args ? strlen(args) : 0;
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		struct const_metric_elm *elm = &const_metrics[i];
-		if (args && strncmp(elm->key, args, args_len) == 0) {
+		if (!args || strncmp(elm->key, args, args_len) == 0) {
 			json_append_member(root, elm->key, json_mknumber(elm->val));
 		}
 	}
