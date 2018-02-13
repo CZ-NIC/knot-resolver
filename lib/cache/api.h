@@ -48,8 +48,10 @@ struct kr_cache
 	} stats;
 
 	uint32_t ttl_min, ttl_max; /**< TTL limits */
-	struct timeval last_clear_walltime; /**< Time of last cache clear */
-	uint64_t last_clear_monotime;  /**< Last cache clear in monotonic milliseconds */
+
+	/* A pair of stamps for detection of real-time shifts during runtime. */
+	struct timeval checkpoint_walltime; /**< Wall time on the last check-point. */
+	uint64_t checkpoint_monotime; /**< Monotonic milliseconds on the last check-point. */
 };
 
 /**
@@ -82,6 +84,14 @@ static inline bool kr_cache_is_open(struct kr_cache *cache)
 {
 	return cache->db != NULL;
 }
+
+/** (Re)set the time pair to the current values. */
+static inline void kr_cache_make_checkpoint(struct kr_cache *cache)
+{
+	cache->checkpoint_monotime = kr_now();
+	gettimeofday(&cache->checkpoint_walltime, NULL);
+}
+
 
 /**
  * Clear all items from the cache.

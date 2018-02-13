@@ -10,15 +10,18 @@ local event_id = nil
 -- time. In ideal case these differences should be almost same.
 -- If they differ more than mod.threshold value then clear cache.
 local function check_time()
-	local clear_time = cache.last_clear()
-	local cache_timeshift = clear_time.walltime.sec * 1000 - clear_time.monotime
+	local checkpoint = cache.checkpoint()
+	local cache_timeshift = checkpoint.walltime.sec * 1000 - checkpoint.monotime
 	local actual_timeshift = os.time() * 1000 - tonumber(ffi.C.kr_now())
-	local time_diff = math.abs(cache_timeshift - actual_timeshift)
-	if time_diff > mod.threshold then
-		log("Detected time change, clearing cache\n" ..
+	local jump_backward = cache_timeshift - actual_timeshift
+	if jump_backward > mod.threshold then
+		log("Detected backwards time jump, clearing cache.\n" ..
 		"But what does that mean? It means your future hasn't been written yet."
 		)
 		cache.clear()
+	elseif -jump_backward > mod.threshold then
+		log("Detected forward time jump.  (Suspend-resume, possibly.)")
+		cache.checkpoint(true)
 	end
 end
 
