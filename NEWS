@@ -1,5 +1,6 @@
 
 - detect_time_jump module: don't clear cache on suspend-resume (#284)
+- stats module: fix stats.list() returning nothing, regressed in 2.0.0
 
 
 Knot Resolver 2.0.0 (2018-01-31)
