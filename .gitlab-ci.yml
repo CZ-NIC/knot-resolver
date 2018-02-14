@@ -345,6 +345,24 @@ pages:
     paths:
       - public
 
+# trigger obs build for master branch
+obs:
+  stage: deploy
+  only:
+    - master
+  dependencies: []
+  script:
+    - scripts/make-archive.sh
+    - scripts/make-spec.sh
+    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC\npass = $OBS_PASSWORD" > /root/.oscrc
+    - osc co home:CZ-NIC:knot-devel knot-resolver
+    - cd home\:CZ-NIC\:knot-devel/knot-resolver/
+    - osc del *
+    - cp ../../*.tar.xz ./
+    - cp -r ../../distro/fedora/* ./
+    - osc addremove
+    - osc ci -n
+
 #arm_build:
 #  image: cznic/armhf-ubuntu:16.04
 #  stage: build
