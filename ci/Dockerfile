@@ -77,3 +77,6 @@ RUN luarocks install luacov
 
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
+
+# OpenBuildService CLI tool
+RUN apt-get install -y osc
