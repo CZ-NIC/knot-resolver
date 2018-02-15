@@ -337,6 +337,18 @@ int kr_inaddr_len(const struct sockaddr *addr)
 	return kr_family_len(addr->sa_family);
 }
 
+int kr_sockaddr_len(const struct sockaddr *addr)
+{
+	if (!addr) {
+		return kr_error(EINVAL);
+	}
+	switch (addr->sa_family) {
+	case AF_INET:  return sizeof(struct sockaddr_in);
+	case AF_INET6: return sizeof(struct sockaddr_in6);
+	default:       return kr_error(EINVAL);
+	}
+}
+
 uint16_t kr_inaddr_port(const struct sockaddr *addr)
 {
 	if (!addr) {
