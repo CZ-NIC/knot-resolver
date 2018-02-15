@@ -4,6 +4,8 @@ Knot Resolver 2.X.Y (2018-0M-DD)
 Incompatible changes
 --------------------
 - systemd: more chages in default unit files (TODO)
+- ta_sentinel: implement protocol draft-ietf-dnsop-kskroll-sentinel-01
+  (our draft-ietf-dnsop-kskroll-sentinel-00 implementation had inverted logic)
 
 Bugfixes
 --------

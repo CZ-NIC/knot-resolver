@@ -52,8 +52,8 @@ function M.layer.finish(state, req, pkt)
 		end
 	end
 
-	if (found and sentype == 'is')
-	   or (not found and sentype == 'not') then
+	if (sentype == 'is' and not found)       -- expected key is not there
+	   or (sentype == 'not' and found) then  -- unexpected key is there
 		kpkt:clear_payload()
 		kpkt:rcode(2)
 		kpkt:ad(false)
