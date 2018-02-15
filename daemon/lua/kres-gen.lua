@@ -183,8 +183,8 @@ struct kr_cache {
 	} stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
-	struct timeval last_clear_walltime;
-	uint64_t last_clear_monotime;
+	struct timeval checkpoint_walltime;
+	uint64_t checkpoint_monotime;
 };
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
