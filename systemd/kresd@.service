@@ -1,5 +1,6 @@
 [Unit]
 Description=Knot DNS Resolver daemon
+Documentation=man:kresd.systemd(7)
 Documentation=man:kresd(8)
 
 [Service]
