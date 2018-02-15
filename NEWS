@@ -7,6 +7,7 @@ Incompatible changes
 - systemd: more chages in default unit files (TODO)
 - ta_sentinel: implement protocol draft-ietf-dnsop-kskroll-sentinel-01
   (our draft-ietf-dnsop-kskroll-sentinel-00 implementation had inverted logic)
+- libknot: require version 2.6.4 or newer to get bugfixes for DNS-over-TLS
 
 Bugfixes
 --------
