@@ -21,13 +21,13 @@ function M.layer.finish(state, req, pkt)
 	if not (kpkt:qclass() == kres.class.IN) then
 		return state end
 
-	local qname = kres.dname2str(qry:name())
-	local sentype, hexkeytag = qname:match('^_([iI][sS])%-[tT][aA]%-(%x+).')
+	local qname = kres.dname2str(qry:name()):lower()
+	local sentype, hexkeytag = qname:match('^kskroll%-sentinel%-(is)%-ta%-(%x+)%.')
 	if not sentype then
-		sentype, hexkeytag = qname:match('^_([nN][oO][tT])%-[tT][aA]%-(%x+).')
+		sentype, hexkeytag = qname:match('^kskroll%-sentinel%-(not)%-ta%-(%x+)%.')
 	end
 	if not sentype or not hexkeytag then
-		return state end -- regex did not match, exit
+		return state end -- pattern did not match, exit
 	-- end of hot path
 
 	local qkeytag = tonumber(hexkeytag, 16)
@@ -36,7 +36,6 @@ function M.layer.finish(state, req, pkt)
 
 	if (qkeytag < 0) or (qkeytag > 0xffff) then
 		return state end -- invalid keytag?!, exit
-	sentype = sentype:lower()
 	if verbose() then
 		log('[ta_sentinel] key tag: ' .. qkeytag .. ', sentinel: ' .. sentype)
 	end
