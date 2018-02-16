@@ -21,3 +21,8 @@ be packaged, because they won't be used.
 Notes
 -----
 
+*  If you're using the upstream systemd unit files, don't forget to also include
+   doc/kresd.systemd.7 manual page in the package.
+*  Distributions using systemd-sysv-generator should mask kresd.service to
+   be consistent with other distributions. Any use of kresd.service instead of
+   kresd@N.service is discouraged to avoid confusing the users.
