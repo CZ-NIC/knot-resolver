@@ -1,10 +1,10 @@
-Knot Resolver 2.X.Y (2018-0M-DD)
+Knot Resolver 2.1.0 (2018-02-16)
 ================================
 
 Incompatible changes
 --------------------
 - stats: remove tracking of expiring records (predict uses another way)
-- systemd: more chages in default unit files (TODO)
+- systemd: re-use a single kresd.socket and kresd-tls.socket
 - ta_sentinel: implement protocol draft-ietf-dnsop-kskroll-sentinel-01
   (our draft-ietf-dnsop-kskroll-sentinel-00 implementation had inverted logic)
 - libknot: require version 2.6.4 or newer to get bugfixes for DNS-over-TLS
