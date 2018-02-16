@@ -1,14 +1,17 @@
 [Unit]
 Description=Knot DNS Resolver daemon
+Documentation=man:kresd.systemd(7)
 Documentation=man:kresd(8)
-Wants=kresd@%i.socket
-Wants=kresd-control@%i.socket
-Wants=kresd-tls@%i.socket
 
 [Service]
 Type=notify
 WorkingDirectory=/var/cache/knot-resolver
-EnvironmentFile=-/etc/default/kresd
-ExecStart=/usr/sbin/kresd $KRESD_ARGS
+ExecStart=/usr/sbin/kresd --config=/etc/knot-resolver/kresd.conf
 User=knot-resolver
 Restart=on-failure
+Sockets=kresd.socket
+Sockets=kresd-tls.socket
+Sockets=kresd-control@%i.socket
+
+[Install]
+WantedBy=multi-user.target
