@@ -6,7 +6,7 @@ mod.threshold = 10 * min
 local event_id = nil
 
 -- Get time of last cache clear. Compute difference between realtime
--- adn monotonic time. Compute difference of actual realtime and monotonic
+-- and monotonic time. Compute difference of actual realtime and monotonic
 -- time. In ideal case these differences should be almost same.
 -- If they differ more than mod.threshold value then clear cache.
 local function check_time()

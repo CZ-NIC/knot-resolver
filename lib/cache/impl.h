@@ -98,7 +98,7 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
 
 /** There may be multiple entries within, so rewind `val` to the one we want.
  *
- * ATM there are multiple types only for the NS ktype - it also accomodates xNAMEs.
+ * ATM there are multiple types only for the NS ktype - it also accommodates xNAMEs.
  * \note `val->len` represents the bound of the whole list, not of a single entry.
  * \note in case of ENOENT, `val` is still rewound to the beginning of the next entry.
  * \return error code

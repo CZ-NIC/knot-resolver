@@ -467,7 +467,7 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 		/* denial of existence proved accordignly to 4035 5.4 -
 		 * NSEC proving either rrset non-existance or
 		 * qtype non-existance has been found,
-		 * and no wildcard expansion occured.
+		 * and no wildcard expansion occurred.
 		 */
 		return kr_ok();
 	} else if (kr_nsec_rrset_noexist(flags)) {

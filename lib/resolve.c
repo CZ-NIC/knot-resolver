@@ -271,7 +271,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	    (cut_found.key == NULL)) {
 		/* No DNSKEY was found for cached cut.
 		 * If no glue were fetched for this cut,
-		 * we have got circular dependancy - must fetch A\AAAA
+		 * we have got circular dependency - must fetch A\AAAA
 		 * from authoritative, but we have no key to verify it.
 		 * TODO - try to refetch cut only if no glue were fetched */
 		kr_zonecut_deinit(&cut_found);
@@ -334,7 +334,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
 			return kr_error(EAGAIN);
 		}
-		/* No IPv4 nor IPv6, flag server as unuseable. */
+		/* No IPv4 nor IPv6, flag server as unusable. */
 		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
 		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
 		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
@@ -850,7 +850,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 static void update_nslist_score(struct kr_request *request, struct kr_query *qry, const struct sockaddr *src, knot_pkt_t *packet)
 {
 	struct kr_context *ctx = request->ctx;
-	/* On sucessful answer, update preference list RTT and penalise timer  */
+	/* On successful answer, update preference list RTT and penalise timer  */
 	if (request->state != KR_STATE_FAIL) {
 		/* Update RTT information for preference list */
 		update_nslist_rtt(ctx, qry, src);

@@ -239,7 +239,7 @@ Improvements
 ------------
 - major feature: support for forwarding with validation (#112).
   The old policy.FORWARD action now does that; the previous non-validating
-  mode is still avaliable as policy.STUB except that also uses caching (#122).
+  mode is still available as policy.STUB except that also uses caching (#122).
 - command line: specify ports via @ but still support # for compatibility
 - policy: recognize 100.64.0.0/10 as local addresses
 - layer/iterate: *do* retry repeatedly if REFUSED, as we can't yet easily
@@ -420,8 +420,8 @@ Bugfixes:
 - Free TCP buffer on cancelled connection.
 - Fix crash in hints module on empty hints file, and fix non-lowercase hints.
 
-Miscelaneous:
--------------
+Miscellaneous:
+--------------
 - It now requires knot >= 2.3.1 to link successfully.
 - The API+ABI for modules changed slightly.
 - New LRU implementation.
