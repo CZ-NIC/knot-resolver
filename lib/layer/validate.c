@@ -673,7 +673,7 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (ctx->state == KR_STATE_YIELD) {
 				/* Already yielded for revalidation.
 				 * It means that trust chain is OK and
-				 * transition to INSECURE hasn't occured.
+				 * transition to INSECURE hasn't occurred.
 				 * Let the validation logic ask about RRSIG. */
 				return KR_STATE_DONE;
 			}
@@ -867,7 +867,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			ctx->state = KR_STATE_DONE;
 		} else if (ctx->state == KR_STATE_YIELD) {
 			/* Transition to unsecure state
-			   was occured during revalidation.
+			   occurred during revalidation.
 			   if state remains YIELD, answer will not be cached.
 			   Let cache layers to work. */
 			ctx->state = KR_STATE_DONE;

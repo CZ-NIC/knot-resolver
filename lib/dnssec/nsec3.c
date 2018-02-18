@@ -665,7 +665,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 		 * Also satisfies ERRATA 3441 8.5 (QTYPE != DS), 3rd paragraph.
 		 * - (wildcard) empty nonterminal
 		 * derived from unsecure delegation.
-		 * Denial of existance can not be proven.
+		 * Denial of existence can not be proven.
 		 * Set error code to proceed unsecure.
 		 */
 		ret = kr_error(DNSSEC_OUT_OF_RANGE);

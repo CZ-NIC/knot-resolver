@@ -204,7 +204,7 @@ struct lru_item;
 #define LRU_TRACKED ((64 - sizeof(size_t) * LRU_ASSOC) / 4 - 1)
 
 struct lru_group {
-	uint16_t counts[LRU_TRACKED+1]; /*!< Occurence counters; the last one is special. */
+	uint16_t counts[LRU_TRACKED+1]; /*!< Occurrence counters; the last one is special. */
 	uint16_t hashes[LRU_TRACKED+1]; /*!< Top halves of hashes; the last one is unused. */
 	struct lru_item *items[LRU_ASSOC]; /*!< The full items. */
 } CACHE_ALIGNED;
