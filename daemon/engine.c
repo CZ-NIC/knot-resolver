@@ -581,8 +581,8 @@ static int l_trampoline(lua_State *L)
 static int init_resolver(struct engine *engine)
 {
 	/* Open resolution context */
-	engine->resolver.trust_anchors = map_make();
-	engine->resolver.negative_anchors = map_make();
+	engine->resolver.trust_anchors = map_make(NULL);
+	engine->resolver.negative_anchors = map_make(NULL);
 	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
 	/* Create OPT RR */
