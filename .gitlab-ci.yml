@@ -359,7 +359,8 @@ obs:
     - cd home\:CZ-NIC\:knot-devel/knot-resolver/
     - osc del *
     - cp ../../*.tar.xz ./
-    - cp -r ../../distro/fedora/* ./
+    - cp -rL ../../distro/fedora/* ./
+    - cp -rL ../../distro/arch/* ./
     - osc addremove
     - osc ci -n
 
