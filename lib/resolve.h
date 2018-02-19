@@ -132,6 +132,13 @@ static inline bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
 	/* The rest are exclusive values - exactly one has to be set. */
 	return (rank & ~KR_RANK_AUTH) == kr_flag;
 }
+static inline bool kr_rank_test_noassert(uint8_t rank, uint8_t kr_flag)
+{ // TODO: copy&paste
+	if (kr_flag == KR_RANK_AUTH) {
+		return rank & KR_RANK_AUTH;
+	}
+	return (rank & ~KR_RANK_AUTH) == kr_flag;
+}
 
 /** Set the rank state. The _AUTH flag is kept as it was. */
 static inline void kr_rank_set(uint8_t *rank, uint8_t kr_flag)
