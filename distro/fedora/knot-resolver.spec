@@ -2,18 +2,16 @@
 
 %define GPG_CHECK 0
 %define VERSION DYNAMIC
-# comment out this define using #%% if it is not a pre-release version
-#%% define PRERELEASE
-%define repodir %{_builddir}/%{name}-%{version}%{?PRERELEASE:-}%{?PRERELEASE}
+%define repodir %{_builddir}/%{name}-%{version}
 
 Name:           knot-resolver
 Version:        %{VERSION}
-Release:        %{?PRERELEASE}%{?PRERELEASE:.}1%{?dist}
+Release:        1%{?dist}
 Summary:        Caching full DNS Resolver
 
 License:        GPLv3
 URL:            https://www.knot-resolver.cz/
-Source0:        knot-resolver-%{version}%{?PRERELEASE:-}%{?PRERELEASE}.tar.xz
+Source0:        knot-resolver-%{version}.tar.xz
 
 # LuaJIT only on these arches
 %if 0%{?rhel}
@@ -27,7 +25,7 @@ Source2:        kresd.conf
 Source3:        root.keys
 
 %if 0%{GPG_CHECK}
-Source1:        knot-resolver-%{version}%{?PRERELEASE:-}%{?PRERELEASE}.tar.xz.asc
+Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
 # Export with --armor using command from https://fedoraproject.org/wiki/PackagingDrafts:GPGSignatures
 # Don't forget to update %%prep section when adding/removing keys
@@ -112,7 +110,7 @@ mkdir ${GNUPGHOME}
 gpg2 --import %{SOURCE100} %{SOURCE101} %{SOURCE102}
 gpg2 --verify %{SOURCE1} %{SOURCE0}
 %endif
-%setup -q -n %{name}-%{version}%{?PRERELEASE:-}%{?PRERELEASE}
+%setup -q -n %{name}-%{version}
 
 rm -v scripts/bootstrap-depends.sh
 
