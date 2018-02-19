@@ -35,6 +35,22 @@ build:clang:linux:amd64:
     - linux
     - amd64
 
+srpm:
+  stage: build
+  allow_failure: true  # don't block testing pipeline in case of failure
+  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  script:
+    - scripts/make-srpm.sh
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - "*.src.rpm"
+  tags:
+    - docker
+    - linux
+    - amd64
+
 lint:lua:
   stage: test
   dependencies: []  # do not download build artifacts
@@ -257,6 +273,40 @@ respdiff:iter:tls:linux:amd64:
     - docker
     - linux
     - amd64
+
+distro:fedora-27:
+  stage: test
+  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  dependencies:
+    - srpm
+  script:
+    - mock --old-chroot -r fedora-27-x86_64 --rebuild *.src.rpm
+  after_script:
+    - mv /var/lib/mock/fedora-27-x86_64/result fedora-27-x86_64
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - fedora-27-x86_64/
+  tags:
+    - privileged
+
+distro:epel-7:
+  stage: test
+  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  dependencies:
+    - srpm
+  script:
+    - mock --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm
+  after_script:
+    - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - epel-7-x86_64/
+  tags:
+    - privileged
 
 # compute coverage for all runs
 coverage:
