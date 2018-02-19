@@ -59,9 +59,7 @@ struct knot_pkt {
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
 	void *root;
-	map_alloc_f malloc;
-	map_free_f free;
-	void *baton;
+	struct knot_mm *pool;
 } map_t;
 struct kr_qflags {
 	_Bool NO_MINIMIZE : 1;

@@ -50,8 +50,8 @@ void network_init(struct network *net, uv_loop_t *loop)
 {
 	if (net != NULL) {
 		net->loop = loop;
-		net->endpoints = map_make();
-		net->tls_client_params = map_make();
+		net->endpoints = map_make(NULL);
+		net->tls_client_params = map_make(NULL);
 	}
 }
 

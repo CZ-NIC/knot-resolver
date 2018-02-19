@@ -2263,9 +2263,9 @@ static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 	memset(&worker->pkt_pool, 0, sizeof(worker->pkt_pool));
 	worker->pkt_pool.ctx = mp_new (4 * sizeof(knot_pkt_t));
 	worker->pkt_pool.alloc = (knot_mm_alloc_t) mp_alloc;
-	worker->outgoing = map_make();
-	worker->tcp_connected = map_make();
-	worker->tcp_waiting = map_make();
+	worker->outgoing = map_make(NULL);
+	worker->tcp_connected = map_make(NULL);
+	worker->tcp_waiting = map_make(NULL);
 	worker->tcp_pipeline_max = MAX_PIPELINED;
 	memset(&worker->stats, 0, sizeof(worker->stats));
 	return kr_ok();

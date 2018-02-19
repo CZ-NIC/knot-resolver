@@ -444,7 +444,7 @@ int stats_init(struct kr_module *module)
 		return kr_error(ENOMEM);
 	}
 	memset(data, 0, sizeof(*data));
-	data->map = map_make();
+	data->map = map_make(NULL);
 	module->data = data;
 	lru_create(&data->queries.frequent, FREQUENT_COUNT, NULL, NULL);
 	lru_create(&data->queries.expiring, FREQUENT_COUNT, NULL, NULL);
