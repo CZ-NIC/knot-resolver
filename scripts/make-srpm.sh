@@ -4,7 +4,7 @@
 
 cd "$(git rev-parse --show-toplevel)"
 scripts/make-archive.sh
-scripts/make-spec.sh
+scripts/make-distrofiles.sh
 mv knot-resolver-*.tar.xz distro/fedora/
 cd distro/fedora
 rpkg srpm
