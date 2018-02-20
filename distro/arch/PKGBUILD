@@ -2,7 +2,7 @@
 # Contributor:	Ondřej Surý <ondrej@sury.org>
 
 pkgname=knot-resolver
-pkgver=VERSION
+pkgver=__VERSION__
 pkgrel=1
 pkgdesc='full caching DNS resolver implementation'
 url='https://www.knot-resolver.cz/'
@@ -10,7 +10,7 @@ arch=('x86_64')
 license=('GPL3')
 install=install
 depends=('libuv' 'knot>=2.6.4' 'luajit' 'cmocka' 'lua51-sec' 'lua51-socket' 'hiredis' 'libmemcached' 'libsystemd')
-source=("knot-resolver-${pkgver}.tar.xz"
+source=("knot-resolver_${pkgver}.orig.tar.xz"
 	"kresd.conf"
 	"root.keys")
 

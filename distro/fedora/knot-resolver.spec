@@ -1,7 +1,7 @@
 %global _hardened_build 1
 
 %define GPG_CHECK 0
-%define VERSION DYNAMIC
+%define VERSION __VERSION__
 %define repodir %{_builddir}/%{name}-%{version}
 
 Name:           knot-resolver
@@ -11,7 +11,7 @@ Summary:        Caching full DNS Resolver
 
 License:        GPLv3
 URL:            https://www.knot-resolver.cz/
-Source0:        knot-resolver-%{version}.tar.xz
+Source0:        knot-resolver_%{version}.orig.tar.xz
 
 # LuaJIT only on these arches
 %if 0%{?rhel}

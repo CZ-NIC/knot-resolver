@@ -1,0 +1,6 @@
+usr/lib/knot-resolver/http.lua
+usr/lib/knot-resolver/http/*.css
+usr/lib/knot-resolver/http/*.ico
+usr/lib/knot-resolver/http/*.js
+usr/lib/knot-resolver/http/*.tpl
+usr/lib/knot-resolver/http/*.woff2
