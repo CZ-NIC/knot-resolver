@@ -352,7 +352,6 @@ obs:
     - master
   dependencies: []
   script:
-    - scripts/make-archive.sh
     - scripts/make-distrofiles.sh
     - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC\npass = $OBS_PASSWORD" > /root/.oscrc
     - osc co home:CZ-NIC:knot-devel knot-resolver
@@ -361,6 +360,8 @@ obs:
     - cp ../../*.tar.xz ./
     - cp -rL ../../distro/fedora/* ./
     - cp -rL ../../distro/arch/* ./
+    - cp ../../distro/debian/*.debian.tar.xz ./
+    - cp ../../distro/debian/knot-resolver.dsc ./
     - osc addremove
     - osc ci -n
 
