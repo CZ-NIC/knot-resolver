@@ -308,14 +308,16 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 	if (ret != 0) {
 		return ret;
 	}
-	int32_t new_ttl = kr_cache_ttl(&peek, qry, name, KNOT_RRTYPE_NS);
-	if (new_ttl < 0) {
-		return kr_error(ESTALE);
-	}
 	/* Note: we accept *any* rank from the cache.  We assume that nothing
 	 * completely untrustworthy could get into the cache, e.g out-of-bailiwick
 	 * records that weren't validated.
 	 */
+	*rank = peek.rank;
+
+	int32_t new_ttl = kr_cache_ttl(&peek, qry, name, KNOT_RRTYPE_NS);
+	if (new_ttl < 0) {
+		return kr_error(ESTALE);
+	}
 	/* Materialize the rdataset temporarily, for simplicity. */
 	knot_rdataset_t ns_rds = { 0, NULL };
 	ret = kr_cache_materialize(&ns_rds, &peek, new_ttl, cut->pool);
