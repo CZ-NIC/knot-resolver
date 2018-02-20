@@ -267,8 +267,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		qry->flags.DNSSEC_WANT = false;
 	}
 	/* Check if any DNSKEY found for cached cut */
-	if ((qry->flags.DNSSEC_WANT) &&
-	    (cut_found.key == NULL)) {
+	if ((qry->flags.DNSSEC_WANT) && (cut_found.key == NULL)) {
 		/* No DNSKEY was found for cached cut.
 		 * If no glue were fetched for this cut,
 		 * we have got circular dependency - must fetch A\AAAA
@@ -1277,7 +1276,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
-		VERBOSE_MSG(qry, "=> using root hints\n");
+		VERBOSE_MSG(qry, "=> no cache open, using root hints\n");
 		qry->flags.AWAIT_CUT = false;
 		return KR_STATE_DONE;
 	}

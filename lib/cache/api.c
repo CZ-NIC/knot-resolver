@@ -801,7 +801,8 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 
 	WITH_VERBOSE(qry) {
 		/* Reduce verbosity. */
-		if (!kr_rank_test(entry->rank, KR_RANK_AUTH)) {
+		if (!kr_rank_test(entry->rank, KR_RANK_AUTH)
+		    && rr->type != KNOT_RRTYPE_NS) {
 			++*unauth_cnt;
 			return kr_ok();
 		}

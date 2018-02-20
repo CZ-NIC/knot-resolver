@@ -354,7 +354,8 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	const struct kr_query *qry)
 {
 	if (!rr) {
-		return kr_error(ENOENT);
+		assert(!EINVAL);
+		return kr_error(EINVAL);
 	}
 	/* peek, check rank and TTL */
 	struct kr_cache_p peek;
@@ -416,18 +417,21 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 				*secured = false;
 			}
 			/* Fetch DS and DNSKEY if caller wants secure zone cut */
+			int ret_ds = 1, ret_dnskey = 1;
 			if (*secured || is_root) {
-				fetch_secure_rrset(&cut->trust_anchor, &ctx->cache, label,
-					    KNOT_RRTYPE_DS, cut->pool, qry);
-				fetch_secure_rrset(&cut->key, &ctx->cache, label,
-					    KNOT_RRTYPE_DNSKEY, cut->pool, qry);
+				ret_ds = fetch_secure_rrset(&cut->trust_anchor, &ctx->cache,
+						label, KNOT_RRTYPE_DS, cut->pool, qry);
+				ret_dnskey = fetch_secure_rrset(&cut->key, &ctx->cache,
+						label, KNOT_RRTYPE_DNSKEY, cut->pool, qry);
 			}
 			update_cut_name(cut, label);
 			mm_free(cut->pool, qname);
 			kr_cache_sync(&ctx->cache);
 			WITH_VERBOSE(qry) {
 				auto_free char *label_str = kr_dname_text(label);
-				VERBOSE_MSG(qry, "found cut: %s\n", label_str);
+				VERBOSE_MSG(qry,
+					"found cut: %s (return codes: DS %d, DNSKEY %d)\n",
+					label_str, ret_ds, ret_dnskey);
 			}
 			return kr_ok();
 		}

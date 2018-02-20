@@ -764,7 +764,8 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
-/** Change ranks of RRs from this single iteration: _INITIAL or _MISSING -> rank_to_set. */
+/** Change ranks of RRs from this single iteration:
+ * _INITIAL or _TRY or _MISSING -> rank_to_set. */
 static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
 {
 	struct kr_request *req	   = ctx->req;
