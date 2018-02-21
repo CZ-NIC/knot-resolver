@@ -5,6 +5,7 @@ Bugfixes
 --------
 - when iterating, avoid unnecessary queries for NS in insecure parent.
   This problem worsened in 2.0.0. (#246)
+- fix the hints module also on some other systems, e.g. Gentoo.
 
 
 Knot Resolver 2.1.0 (2018-02-16)
