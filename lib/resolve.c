@@ -948,7 +948,9 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		return KR_STATE_PRODUCE; /* Requery over TCP */
 	} else { /* Clear query flags for next attempt */
 		qry->flags.CACHED = false;
-		qry->flags.TCP = false;
+		if (!request->options.TCP) {
+			qry->flags.TCP = false;
+		}
 	}
 
 	ITERATE_LAYERS(request, qry, reset);
