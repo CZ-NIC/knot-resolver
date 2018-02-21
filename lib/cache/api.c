@@ -292,7 +292,7 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry);
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 			   uint8_t lowest_rank);
-static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
+static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k, knot_pkt_t *pkt);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt);
@@ -373,7 +373,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;
 	kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
-	const knot_db_val_t val_cut = closest_NS(ctx, k);
+	const knot_db_val_t val_cut = closest_NS(ctx, k, pkt);
 	if (!val_cut.data) {
 		VERBOSE_MSG(qry, "=> not even root NS in cache, but let's try NSEC\n");
 	}
@@ -999,7 +999,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
  *
  * \param exact_match Whether exact match is considered special.
  */
-static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
+static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k, knot_pkt_t *pkt)
 {
 	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 	struct kr_request *req = ctx->req;
@@ -1071,22 +1071,33 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 				goto next_label;
 			}
 			int32_t new_ttl = get_new_ttl(eh, qry, k->zname, type);
-			if (new_ttl < 0
-			    /* Not interested in negative or bogus. */
-			    || eh->is_packet
-			    /* For NS any kr_rank is accepted,
-			     * as insecure or even nonauth is OK */
-			    || (type != KNOT_RRTYPE_NS && eh->rank < rank_min)) {
-
+			bool skip = new_ttl < 0
+				/* For NS any kr_rank is accepted,
+				 * as insecure or even nonauth is OK */
+				|| (type != KNOT_RRTYPE_NS && eh->rank < rank_min);
+			bool log_no_min = false;
+			if (!skip && eh->is_packet) {
+				/* Not interested in negative answers, but we want
+				 * to optimize the following iteration, if any.
+				 * LATER: improve whole QNAME minimization. */
+				skip = true;
+				if (type == KNOT_RRTYPE_NS && !qry->flags.NO_MINIMIZE) {
+					qry->flags.NO_MINIMIZE = true;
+					kr_make_query(qry, pkt);
+					log_no_min = true;
+				}
+			}
+			if (skip) {
 				WITH_VERBOSE(qry) {
 					auto_free char *type_str =
 						kr_rrtype_text(type);
 					const char *packet_str =
 						eh->is_packet ? "packet" : "RR";
 					VERBOSE_MSG(qry, "=> skipping unfit %s %s: "
-						"rank 0%.2o, new TTL %d\n",
+						"rank 0%.2o, new TTL %d%s\n",
 						type_str, packet_str,
-						eh->rank, new_ttl);
+						eh->rank, new_ttl,
+						log_no_min ? " (NO_MINIMIZE->true)" : "");
 				}
 				continue;
 			}
