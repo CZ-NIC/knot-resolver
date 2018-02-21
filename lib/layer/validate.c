@@ -417,6 +417,22 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 		} else {
 			VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 			qry->flags.DNSSEC_NODS = true;
+			/* Rank the corresponding nonauth NS as insecure. */
+			for (int i = 0; i < req->auth_selected.len; ++i) {
+				ranked_rr_array_entry_t *ns = req->auth_selected.at[i];
+				if (ns->qry_uid != qry->uid || !ns->rr
+				    || ns->rr->type != KNOT_RRTYPE_NS) {
+					continue;
+				}
+				/* Found the record.  Note: this is slightly fragile
+				 * in case there were more NS records in the packet.
+				 * As it is now, kr_nsec*_ref_to_unsigned consider
+				 * (only) the first NS record in the packet. */
+				if (!kr_rank_test(ns->rank, KR_RANK_AUTH)) { /* sanity */
+					ns->rank = KR_RANK_INSECURE;
+				}
+				break;
+			}
 		}
 		return ret;
 	} else if (qry->flags.FORWARD && qry->parent) {
@@ -748,7 +764,8 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
-/** Change ranks of RRs from this single iteration: _INITIAL or _MISSING -> rank_to_set. */
+/** Change ranks of RRs from this single iteration:
+ * _INITIAL or _TRY or _MISSING -> rank_to_set. */
 static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
 {
 	struct kr_request *req	   = ctx->req;

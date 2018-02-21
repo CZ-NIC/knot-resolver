@@ -1,3 +1,12 @@
+Knot Resolver 2.x.y (2018-02-zz)
+================================
+
+Bugfixes
+--------
+- when iterating, avoid unnecessary queries for NS in insecure parent.
+  This problem worsened in 2.0.0. (#246)
+
+
 Knot Resolver 2.1.0 (2018-02-16)
 ================================
 
