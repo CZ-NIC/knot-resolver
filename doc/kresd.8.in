@@ -153,7 +153,7 @@ processes supervised in this way, they should be supervised independently (see
 \fBkresd.systemd(7)\fR).
 .TP
 .B \-q\fR, \fB\-\-quiet
-Daemon will refrain from printing any informative messages, not even a prompt.
+Daemon will refrain from printing the command prompt.
 .TP
 .B \-v\fR, \fB\-\-verbose
 Increase verbosity. If given multiple times, more information is logged.
