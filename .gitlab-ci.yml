@@ -346,15 +346,16 @@ pages:
       - public
 
 # trigger obs build for master branch
-obs:
+obs:devel:
   stage: deploy
   only:
     - master
   dependencies: []
   script:
+    - scripts/make-archive.sh
     - scripts/make-distrofiles.sh
     - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC\npass = $OBS_PASSWORD" > /root/.oscrc
-    - scripts/build-in-obs.sh knot-devel
+    - scripts/build-in-obs.sh knot-dns-devel
     - scripts/build-in-obs.sh knot-resolver-devel
 
 #arm_build:

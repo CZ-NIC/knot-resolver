@@ -1,24 +1,30 @@
 #!/bin/bash -e
 
-scripts/make-archive.sh
+package=knot-resolver
 
 cd "$(git rev-parse --show-toplevel)"
-VERSION=$(scripts/show-version.sh)
+version=$(ls ${package}*.tar.xz | sed "s/${package}-\(.*\).tar.xz/\1/")
+
+# Check version for invalid characters
+if [[ $(echo "${version}" | grep '^[[:alnum:].]$') -ne 0 ]]; then
+	echo "Invalid version number: may contain only alphanumeric characters and dots"
+	exit 1
+fi
 
 # Fill in VERSION field in distribution specific files
-files='distro/fedora/knot-resolver.spec distro/arch/PKGBUILD distro/debian/debian/changelog distro/debian/knot-resolver.dsc'
-for file in $files; do
-	sed -i "s/__VERSION__/$VERSION/g" "$file"
+files="distro/fedora/${package}.spec distro/debian/debian/changelog distro/debian/${package}.dsc distro/arch/PKGBUILD"
+for file in ${files}; do
+	sed -i "s/__VERSION__/${version}/g" "${file}"
 done
 
 # Rename archive to debian format
-mv knot-resolver-$VERSION.tar.xz knot-resolver_$VERSION.orig.tar.xz
+mv "${package}-${version}.tar.xz" "${package}_${version}.orig.tar.xz"
 
 # Create debian archive and dsc
 pushd distro/debian
-tar -chaf knot-resolver_$VERSION-1.debian.tar.xz debian
-archive=knot-resolver_$VERSION-1.debian.tar.xz
-echo " $(md5sum $archive | cut -d' ' -f1) $(wc -c $archive)" >> knot-resolver.dsc
+tar -chaf "${package}_${version}-1.debian.tar.xz" debian
+archive=${package}_${version}-1.debian.tar.xz
+echo " $(md5sum ${archive} | cut -d' ' -f1) $(wc -c ${archive})" >> ${package}.dsc
 popd
-archive=knot-resolver_$VERSION.orig.tar.xz
-echo " $(md5sum $archive | cut -d' ' -f1) $(wc -c $archive)" >> distro/debian/knot-resolver.dsc
+archive=${package}_${version}.orig.tar.xz
+echo " $(md5sum ${archive} | cut -d' ' -f1) $(wc -c ${archive})" >> distro/debian/${package}.dsc

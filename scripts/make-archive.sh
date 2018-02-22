@@ -1,7 +1,7 @@
 #!/bin/sh -e
 # Create a distribution tarball, like 'make dist' from autotools.
 cd "$(git rev-parse --show-toplevel)"
-ver="$(scripts/show-version.sh)"
+ver=$(git describe | sed 's/^v//' | sed 's/-/\./g')
 test 0 -ne $(git status --porcelain | wc -l) && \
 	echo "Git working tree is dirty, make it clean first" && \
 	exit 1

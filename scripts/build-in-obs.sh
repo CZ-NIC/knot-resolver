@@ -1,18 +1,21 @@
 #!/bin/bash -e
 
 # Example usage:
-# scripts/make-distrofiles.sh
-# scripts/build-in-obs.sh knot-resolver-devel
+# 1. place tarball to be released in git root dir
+# 2. scripts/make-distrofiles.sh
+# 3. scripts/build-in-obs.sh knot-resolver-latest
 
-repo=home:CZ-NIC:$1
+project=home:CZ-NIC:$1
+package=knot-resolver
 
-osc co "$repo" knot-resolver
-cd "$repo/knot-resolver"
-osc del *
+osc co "${project}" "${package}"
+pushd "${project}/${package}"
+osc del * ||:
 cp ../../*.tar.xz ./
 cp -rL ../../distro/fedora/* ./
 cp -rL ../../distro/arch/* ./
 cp ../../distro/debian/*.debian.tar.xz ./
-cp ../../distro/debian/knot-resolver.dsc ./
+cp "../../distro/debian/${package}.dsc" ./
 osc addremove
 osc ci -n
+popd
