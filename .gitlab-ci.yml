@@ -354,16 +354,8 @@ obs:
   script:
     - scripts/make-distrofiles.sh
     - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC\npass = $OBS_PASSWORD" > /root/.oscrc
-    - osc co home:CZ-NIC:knot-devel knot-resolver
-    - cd home\:CZ-NIC\:knot-devel/knot-resolver/
-    - osc del *
-    - cp ../../*.tar.xz ./
-    - cp -rL ../../distro/fedora/* ./
-    - cp -rL ../../distro/arch/* ./
-    - cp ../../distro/debian/*.debian.tar.xz ./
-    - cp ../../distro/debian/knot-resolver.dsc ./
-    - osc addremove
-    - osc ci -n
+    - scripts/build-in-obs.sh knot-devel
+    - scripts/build-in-obs.sh knot-resolver-devel
 
 #arm_build:
 #  image: cznic/armhf-ubuntu:16.04
