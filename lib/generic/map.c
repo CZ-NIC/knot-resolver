@@ -157,7 +157,6 @@ EXPORT void *map_get(map_t *map, const char *str)
 	return v;
 }
 
-/*! Inserts str into map, returns 0 on success */
 EXPORT int map_set(map_t *map, const char *str, void *val)
 {
 	const uint8_t *const ubytes = (void *)str;
