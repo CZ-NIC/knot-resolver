@@ -6,7 +6,7 @@ etc_SOURCES := icann-ca.pem \
 	root.hints
 
 etc-install: $(DESTDIR)$(ETCDIR)
-	$(INSTALL) -m 0640 $(addprefix etc/,$(etc_SOURCES)) $(DESTDIR)$(ETCDIR)
+	$(INSTALL) -m 0644 $(addprefix etc/,$(etc_SOURCES)) $(DESTDIR)$(ETCDIR)
 
 etc: etc/root.hints
 

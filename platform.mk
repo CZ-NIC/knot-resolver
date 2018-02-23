@@ -55,7 +55,7 @@ else
 		ifeq ($(UNAME),Linux)
 			LDFLAGS += -ldl
 		endif
-		ifeq (GCC,$(shell $(CC) --version | grep -q '\<GCC\>' && echo GCC))
+		ifeq (GCC,$(shell $(CC) --version | grep -q -i '\<gcc\>' && echo GCC))
 			# Otherwise Fedora is making kresd symbols inaccessible for modules.
 			# Clang doesn't support this flag, so we hackily detect gcc.
 			BUILD_CFLAGS += -rdynamic

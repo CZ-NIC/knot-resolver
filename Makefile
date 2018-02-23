@@ -172,7 +172,7 @@ endif
 $(DESTDIR)$(MODULEDIR):
 	$(INSTALL) -d $@
 $(DESTDIR)$(ETCDIR):
-	$(INSTALL) -m 0750 -d $@
+	$(INSTALL) -m 0755 -d $@
 
 # Sub-targets
 include contrib/contrib.mk
