@@ -9,10 +9,10 @@ option less scary-sounding, as it is the default.
  doc/kresd.8.in | 13 ++++++++-----
  1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/doc/kresd.8.in b/doc/kresd.8.in
-index cbf7252..7f73876 100644
---- a/doc/kresd.8.in
-+++ b/doc/kresd.8.in
+Index: knot-resolver/doc/kresd.8.in
+===================================================================
+--- knot-resolver.orig/doc/kresd.8.in
++++ knot-resolver/doc/kresd.8.in
 @@ -24,7 +24,7 @@
  .IR config ]
  .RB [ \-k | \-\-keyfile
@@ -22,7 +22,7 @@ index cbf7252..7f73876 100644
  .IR keyfile ]
  .RB [ \-m | \-\-moduledir
  .IR path ]
-@@ -123,7 +123,7 @@ file at the default location (\fIconfig\fR). The syntax is
+@@ -123,7 +123,7 @@ file at the default location (\fIconfig\
  described in \fIdaemon/README.md\fR.
  .TP
  .B \-k\fI keyfile\fR, \fB\-\-keyfile=\fI<keyfile>
@@ -31,7 +31,7 @@ index cbf7252..7f73876 100644
  Root trust anchors in this file are managed using standard RFC 5011 (Automated Updates of DNS Security Trust Anchors).
  Kresd needs write access to the directory containing the keyfile.
  
-@@ -133,10 +133,13 @@ and warning that you need to to check the key before trusting it will be issued.
+@@ -133,10 +133,13 @@ and warning that you need to to check th
  The file contains DNSKEY/DS records in presentation format,
  and is compatible with Unbound and BIND 9 root key files.
  .TP

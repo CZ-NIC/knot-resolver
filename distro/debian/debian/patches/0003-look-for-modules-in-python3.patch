@@ -8,10 +8,10 @@ python 2.7. This is what the executable is named in debian.
  platform.mk | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/platform.mk b/platform.mk
-index 170269c..63a305d 100644
---- a/platform.mk
-+++ b/platform.mk
+Index: knot-resolver/platform.mk
+===================================================================
+--- knot-resolver.orig/platform.mk
++++ knot-resolver/platform.mk
 @@ -200,7 +200,7 @@ endef
  
  # Find Python package
