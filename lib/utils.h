@@ -287,12 +287,6 @@ static inline bool KEY_COVERING_RRSIG(const char *key)
 KR_EXPORT
 int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank);
 
-/** @internal Merges RRSets with matching owner name and type together.
- * @note RRSIG RRSets are merged according the type covered fields.
- * @return 0 or an error
- */
-int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *pool);
-
 /** @internal Add RRSet copy to ranked RR array. */
 KR_EXPORT
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
