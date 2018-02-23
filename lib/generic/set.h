@@ -77,7 +77,7 @@ typedef int (set_walk_cb)(const char *, void *);
 #define set_contains(set, str) \
 	map_contains((set), (str))
 
-/*! Inserts str into set, returns 0 on suceess */
+/*! Inserts str into set.  Returns 0 if new, 1 if already present, or ENOMEM. */
 #define set_add(set, str) \
 	map_set((set), (str), (void *)1)
 
