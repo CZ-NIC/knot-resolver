@@ -661,7 +661,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 finally:
 	if (unauth_cnt) {
-		VERBOSE_MSG(qry, "=> stashed also %d nonauth RRs\n", unauth_cnt);
+		VERBOSE_MSG(qry, "=> stashed also %d nonauth RRsets\n", unauth_cnt);
 	};
 	kr_cache_sync(cache);
 	return ctx->state; /* we ignore cache-stashing errors */
