@@ -12,7 +12,7 @@ if [[ $(echo "${version}" | grep '^[[:alnum:].]$') -ne 0 ]]; then
 fi
 
 # Fill in VERSION field in distribution specific files
-files="distro/fedora/${package}.spec distro/debian/debian/changelog distro/debian/${package}.dsc distro/arch/PKGBUILD"
+files="distro/rpm/${package}.spec distro/deb/debian/changelog distro/deb/${package}.dsc distro/arch/PKGBUILD"
 for file in ${files}; do
 	sed -i "s/__VERSION__/${version}/g" "${file}"
 done
@@ -21,10 +21,10 @@ done
 mv "${package}-${version}.tar.xz" "${package}_${version}.orig.tar.xz"
 
 # Create debian archive and dsc
-pushd distro/debian
+pushd distro/deb
 tar -chaf "${package}_${version}-1.debian.tar.xz" debian
 archive=${package}_${version}-1.debian.tar.xz
 echo " $(md5sum ${archive} | cut -d' ' -f1) $(wc -c ${archive})" >> ${package}.dsc
 popd
 archive=${package}_${version}.orig.tar.xz
-echo " $(md5sum ${archive} | cut -d' ' -f1) $(wc -c ${archive})" >> distro/debian/${package}.dsc
+echo " $(md5sum ${archive} | cut -d' ' -f1) $(wc -c ${archive})" >> distro/deb/${package}.dsc
