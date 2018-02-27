@@ -289,7 +289,7 @@ distro:fedora-27:
     paths:
       - fedora-27-x86_64/
   tags:
-    - privileged
+    - privileged  # mock requires additional capabilities (e.g. mount)
 
 distro:epel-7:
   stage: test
@@ -306,7 +306,7 @@ distro:epel-7:
     paths:
       - epel-7-x86_64/
   tags:
-    - privileged
+    - privileged  # mock require additional capabilities (e.g. mount)
 
 # compute coverage for all runs
 coverage:
@@ -355,8 +355,8 @@ obs:devel:
     - scripts/make-archive.sh
     - scripts/make-distrofiles.sh
     - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC\npass = $OBS_PASSWORD" > /root/.oscrc
-    - scripts/build-in-obs.sh knot-dns-devel
-    - scripts/build-in-obs.sh knot-resolver-devel
+    - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
+    - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
 
 #arm_build:
 #  image: cznic/armhf-ubuntu:16.04
