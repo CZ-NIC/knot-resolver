@@ -8,6 +8,14 @@
 project=home:CZ-NIC:$1
 package=knot-resolver
 
+if ! [[ "$1" == *-devel ]]; then
+	read -p "Pushing to '$project', are you sure? [y/N]: " yn
+	case $yn in
+		[Yy]* ) break;;
+		* ) exit 1; break;;
+	esac
+fi
+
 osc co "${project}" "${package}"
 pushd "${project}/${package}"
 osc del * ||:
