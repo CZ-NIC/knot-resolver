@@ -35,6 +35,7 @@
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
+#include "daemon/zimport.h"
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "wrkr", fmt)
 
@@ -2385,6 +2386,11 @@ struct kr_request *worker_task_request(struct qr_task *task)
 	return &task->ctx->req;
 }
 
+int worker_task_finalize(struct qr_task *task, int state)
+{
+	return qr_task_finalize(task, state);
+}
+
 void worker_session_close(struct session *session)
 {
 	session_close(session);
@@ -2434,6 +2440,10 @@ void worker_reclaim(struct worker_ctx *worker)
 	worker->subreq_out = NULL;
 	map_clear(&worker->tcp_connected);
 	map_clear(&worker->tcp_waiting);
+	if (worker->z_import != NULL) {
+		zi_free(worker->z_import);
+		worker->z_import = NULL;
+	}
 }
 
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,

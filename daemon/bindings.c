@@ -26,6 +26,7 @@
 #include "daemon/bindings.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
+#include "daemon/zimport.h"
 
 #define xstr(s) str(s)
 #define str(s) #s
@@ -1149,6 +1150,73 @@ static int cache_ns_tout(lua_State *L)
 	return 1;
 }
 
+/** Zone import completion callback.
+ * Deallocates zone import context. */
+static void cache_zone_import_cb(int state, void *param)
+{
+	assert (param);
+	(void)state;
+	struct worker_ctx *worker = (struct worker_ctx *)param;
+	assert (worker->z_import);
+	zi_free(worker->z_import);
+	worker->z_import = NULL;
+}
+
+/** Import zone from file. */
+static int cache_zone_import(lua_State *L)
+{
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (!worker) {
+		return 0;
+	}
+
+	if (worker->z_import && zi_import_started(worker->z_import)) {
+		format_error(L, "import has already started");
+		lua_error(L);
+	}
+
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+	struct kr_cache *cache = &engine->resolver.cache;
+	if (!kr_cache_is_open(cache)) {
+		return 0;
+	}
+
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 1 || !lua_isstring(L, 1)) {
+		format_error(L, "expected 'cache.zone_import(string key)'");
+		lua_error(L);
+	}
+
+	/* Parse zone file */
+	const char *zone_file = lua_tostring(L, 1);
+
+	const char *default_origin = NULL; /* TODO */
+	uint16_t default_rclass = 1;
+	uint32_t default_ttl = 0;
+
+	if (worker->z_import == NULL) {
+		worker->z_import = zi_allocate(worker, cache_zone_import_cb, worker);
+		if (worker->z_import == NULL) {
+			format_error(L, "can't allocate zone import context");
+			lua_error(L);
+		}
+	}
+
+	int ret = zi_zone_import(worker->z_import, zone_file, default_origin,
+				 default_rclass, default_ttl);
+
+	if (ret != 0) {
+		format_error(L, "error parsing zone file");
+		lua_error(L);
+	}
+
+	lua_pushstring(L, "zone file successfully parsed, import started");
+	return 1;
+}
 
 int lib_cache(lua_State *L)
 {
@@ -1165,6 +1233,7 @@ int lib_cache(lua_State *L)
 		{ "max_ttl", cache_max_ttl },
 		{ "min_ttl", cache_min_ttl },
 		{ "ns_tout", cache_ns_tout },
+		{ "zone_import", cache_zone_import },
 		{ NULL, NULL }
 	};
 

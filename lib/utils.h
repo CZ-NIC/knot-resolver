@@ -298,6 +298,21 @@ static inline bool KEY_COVERING_RRSIG(const char *key)
 KR_EXPORT
 int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank);
 
+/* Stash key = {[5] class, [1-255] owner, [5] type, [5] additional, [1] \x00 } */
+#define KR_RRKEY2_LEN (16 + KNOT_DNAME_MAXLEN)
+/** Create unique null-terminated string key for RR.
+  * @param key Destination buffer for key size, MUST be KR_RRKEY2_LEN or larger.
+  * @param class RR class.
+  * @param owner RR owner name.
+  * @param type RR type.
+  * @param additional flags (for instance can be used for storing covered type
+  *	   when RR type is RRSIG).
+  * @return key length if successful or an error
+  * */
+KR_EXPORT
+int kr_rrkey2(char *key, uint16_t class, const knot_dname_t *owner,
+	      uint16_t type, uint16_t additional);
+
 /** @internal Add RRSet copy to ranked RR array. */
 KR_EXPORT
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,

@@ -29,6 +29,8 @@ struct qr_task;
 struct worker_ctx;
 /** Transport session (opaque). */
 struct session;
+/** Zone import context (opaque). */
+struct zone_import_ctx;
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
@@ -140,6 +142,7 @@ struct worker_ctx {
 		size_t timeout;
 	} stats;
 
+	struct zone_import_ctx* z_import;
 	bool too_many_open;
 	size_t rconcurrent_highwatermark;
 	/** List of active outbound TCP sessions */

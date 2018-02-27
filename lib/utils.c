@@ -600,6 +600,37 @@ int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank)
 	return (char *)&key_buf[ret] - key;
 }
 
+int kr_rrkey2(char *key, uint16_t class, const knot_dname_t *owner,
+	      uint16_t type, uint16_t additional)
+{
+	if (!key || !owner) {
+		return kr_error(EINVAL);
+	}
+	uint8_t *key_buf = (uint8_t *)key;
+	int ret = u16tostr(key_buf, class);
+	if (ret <= 0) {
+		return ret;
+	}
+	key_buf += ret;
+	ret = knot_dname_to_wire(key_buf, owner, KNOT_DNAME_MAXLEN);
+	if (ret <= 0) {
+		return ret;
+	}
+	knot_dname_to_lower(key_buf);
+	key_buf += ret - 1;
+	ret = u16tostr(key_buf, type);
+	if (ret <= 0) {
+		return ret;
+	}
+	key_buf += ret;
+	ret = u16tostr(key_buf, additional);
+	if (ret <= 0) {
+		return ret;
+	}
+	key_buf[ret] = '\0';
+	return (char *)&key_buf[ret] - key;
+}
+
 /** Return whether two RRsets match, i.e. would form the same set; see ranked_rr_array_t */
 static inline bool rrsets_match(const knot_rrset_t *rr1, const knot_rrset_t *rr2)
 {
