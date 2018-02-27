@@ -200,7 +200,7 @@ endef
 
 # Find Python package
 define find_pythonpkg
-	HAS_$(1) := $(shell python -c "import $(1)" > /dev/null 2>&1 && echo yes || echo no)
+	HAS_$(1) := $(shell python3 -c "import $(1)" > /dev/null 2>&1 && echo yes || echo no)
 endef
 
 define find_soname
@@ -227,4 +227,4 @@ endif
 endef # find_soname
 
 # Use this on OpenBSD
-#	
+#
