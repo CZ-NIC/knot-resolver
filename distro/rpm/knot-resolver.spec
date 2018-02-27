@@ -36,7 +36,7 @@ BuildRequires:  gnupg2
 %endif
 
 BuildRequires:  pkgconfig(libknot) >= 2.6.4
-BuildRequires:  pkgconfig(libzscanner) >= 2.3.1
+BuildRequires:  pkgconfig(libzscanner) >= 2.4.2
 BuildRequires:  pkgconfig(libdnssec) >= 2.3.1
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
@@ -145,11 +145,11 @@ mkdir -p %{buildroot}%{_mandir}/man7
 install -m 0644 -p %{repodir}/doc/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
 
 %if 0%{?rhel}
+# no socket activation for CentOS 7 (requires systemd.227)
 mkdir -p %{buildroot}%{_unitdir}/kresd@.service.d
 install -m 0644 -p %{repodir}/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
 %endif
 %if 0%{?fedora}
-# no socket activation for CentOS 7 (requires systemd.227)
 install -m 0644 -p %{repodir}/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
 install -m 0644 -p %{repodir}/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
 install -m 0644 -p %{repodir}/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
@@ -159,7 +159,7 @@ install -m 0644 -p %{repodir}/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/k
 mkdir -p %{buildroot}%{_tmpfilesdir}
 install -m 0644 -p %{repodir}/systemd/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
 mkdir -p %{buildroot}%{_rundir}
-install -m 0751 -d %{buildroot}%{_rundir}/knot-resolver
+install -m 750 -d %{buildroot}%{_rundir}/knot-resolver
 
 # install cache
 mkdir -p %{buildroot}%{_localstatedir}/cache
