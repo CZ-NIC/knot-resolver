@@ -38,6 +38,7 @@ _obj
 /compile
 /compile_commands.json
 /depcomp
+/distro/tests/*/.vagrant
 /install-sh
 /stamp-h1
 /aclocal.m4

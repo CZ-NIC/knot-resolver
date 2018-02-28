@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "remove" ] && [ -x "/bin/systemctl" ]; then
+    systemctl stop system-kresd.slice || true
+fi
+
+#DEBHELPER#

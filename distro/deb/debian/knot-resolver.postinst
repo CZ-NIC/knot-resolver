@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    adduser --quiet --system --group --no-create-home --home /var/cache/knot-resolver knot-resolver
+fi
+
+# Restart any running kresd instances if the root key is updated.
+# Note: if knot-resolver upstream watches this file and reloads it
+# upon a change, we can and should remove this trigger.
+if [ "$1" = "triggered" ]; then
+    if [ "$2" = "/usr/share/dns/root.key" ]; then
+        # systemctl of the sub-services is the preferred method to restart
+        systemctl try-restart 'kresd@*.service' || true
+        # but if we are running sysvinit, we can try to restart that process anyway
+        # (kresd.service is masked on systems that use systemd)
+        invoke-rc.d kresd try-restart || true
+    fi
+    exit 0
+fi
+
+#DEBHELPER#
