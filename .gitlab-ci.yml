@@ -354,7 +354,7 @@ obs:devel:
   script:
     - scripts/make-archive.sh
     - scripts/make-distrofiles.sh
-    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC\npass = $OBS_PASSWORD" > /root/.oscrc
+    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > /root/.oscrc
     - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
     - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
 
