@@ -104,7 +104,7 @@ static void test_null_value(void **state)
 static void test_init(void **state)
 {
 	static map_t tree;
-	tree = map_make();
+	tree = map_make(NULL);
 	*state = &tree;
 	assert_non_null(*state);
 }

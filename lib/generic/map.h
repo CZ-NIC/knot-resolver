@@ -12,7 +12,7 @@
  * # Example usage:
  *
  * @code{.c}
- *      map_t map = map_make();
+ *      map_t map = map_make(NULL);
  *
  *      // Custom allocator (optional)
  *      map.malloc = &mymalloc;
@@ -59,19 +59,19 @@
 extern "C" {
 #endif
 
-typedef void *(*map_alloc_f)(void *, size_t);
-typedef void (*map_free_f)(void *baton, void *ptr);
+struct knot_mm; /* avoid the unnecessary include */
 
 /** Main data structure */
 typedef struct {
 	void *root;
-	map_alloc_f malloc;
-	map_free_f free;
-	void *baton; /** Passed to malloc() and free() */
+	struct knot_mm *pool;
 } map_t;
 
-/** Creates an new, empty critbit map */
-map_t map_make(void);
+/** Creates an new empty critbit map.  Pass NULL for malloc+free. */
+static inline map_t map_make(struct knot_mm *pool)
+{
+	return (map_t){ .root = NULL, .pool = pool };
+}
 
 /** Returns non-zero if map contains str */
 int map_contains(map_t *map, const char *str);
@@ -79,7 +79,7 @@ int map_contains(map_t *map, const char *str);
 /** Returns value if map contains str.  Note: NULL may mean two different things. */
 void *map_get(map_t *map, const char *str);
 
-/** Inserts str into map, returns 0 on suceess */
+/** Inserts str into map.  Returns 0 if new, 1 if replaced, or ENOMEM. */
 int map_set(map_t *map, const char *str, void *val);
 
 /** Deletes str from the map, returns 0 on suceess */
@@ -96,7 +96,9 @@ void map_clear(map_t *map);
 	map_walk_prefixed((map), "", (callback), (baton))
 
 /**
- * Calls callback for all strings in map with the given prefix
+ * Calls callback for all strings in map with the given prefix.
+ * Returns value immediately if a callback returns nonzero.
+ *
  * @param map
  * @param prefix   required string prefix (empty => all strings)
  * @param callback callback parameters are (key, value, baton)

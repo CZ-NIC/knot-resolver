@@ -11,6 +11,7 @@
 
 #include "tests/test.h"
 #include "lib/generic/set.h"
+#include "lib/utils.h"
 
 
 /*
@@ -134,8 +135,8 @@ static void test_delete_all(void **state)
 static void *fake_malloc(void *b, size_t s) { return NULL; }
 static void test_allocator(void **state)
 {
-	set_t set = set_make();
-	set.malloc = fake_malloc;
+	knot_mm_t fake_pool = { .ctx = NULL, .alloc = fake_malloc, .free = NULL };
+	set_t set = set_make(&fake_pool);
 	assert_int_equal(set_add(&set, dict[0]), ENOMEM);
 }
 
@@ -181,7 +182,7 @@ static void test_clear(void **state)
 static void test_init(void **state)
 {
 	static set_t set;
-	set = set_make();
+	set = set_make(NULL);
 	*state = &set;
 	assert_non_null(*state);
 }

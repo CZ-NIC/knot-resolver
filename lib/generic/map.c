@@ -16,6 +16,7 @@
 #include <stdlib.h>
 
 #include "map.h"
+#include "lib/utils.h"
 
  /* Exports */
 #if defined _WIN32 || defined __CYGWIN__
@@ -59,17 +60,6 @@ static inline cb_node_t *ref_get_internal(uint8_t *p)
 	return (cb_node_t *)(p - 1);
 }
 
-/* Standard memory allocation functions */
-static void *malloc_std(void *baton, size_t size) {
-	(void)baton; /* Prevent compiler warnings */
-	return malloc(size);
-}
-
-static void free_std(void *baton, void *ptr) {
-	(void)baton; /* Prevent compiler warnings */
-	free(ptr);
-}
-
 /* Static helper functions */
 static void cbt_traverse_delete(map_t *map, void *top)
 {
@@ -78,9 +68,9 @@ static void cbt_traverse_delete(map_t *map, void *top)
 		cb_node_t *q = ref_get_internal(p);
 		cbt_traverse_delete(map, q->child[0]);
 		cbt_traverse_delete(map, q->child[1]);
-		map->free(map->baton, q);
+		mm_free(map->pool, q);
 	} else {
-		map->free(map->baton, p);
+		mm_free(map->pool, p);
 	}
 }
 
@@ -110,7 +100,7 @@ static int cbt_traverse_prefixed(void *top,
 
 static cb_data_t *cbt_make_data(map_t *map, const uint8_t *str, size_t len, void *value)
 {
-	cb_data_t *x = map->malloc(map->baton, sizeof(cb_data_t) + len);
+	cb_data_t *x = mm_alloc(map->pool, sizeof(cb_data_t) + len);
 	if (x != NULL) {
 		x->value = value;
 		memcpy(x->key, str, len);
@@ -154,17 +144,6 @@ static int cbt_get(map_t *map, const char *str, void **value)
 	return 0;
 }
 
-/*! Creates a new, empty critbit map */
-EXPORT map_t map_make(void)
-{
-	map_t map;
-	map.root = NULL;
-	map.malloc = &malloc_std;
-	map.free = &free_std;
-	map.baton = NULL;
-	return map;
-}
-
 /*! Returns non-zero if map contains str */
 EXPORT int map_contains(map_t *map, const char *str)
 {
@@ -178,7 +157,6 @@ EXPORT void *map_get(map_t *map, const char *str)
 	return v;
 }
 
-/*! Inserts str into map, returns 0 on success */
 EXPORT int map_set(map_t *map, const char *str, void *val)
 {
 	const uint8_t *const ubytes = (void *)str;
@@ -234,14 +212,14 @@ different_byte_found:
 	c = data->key[newbyte];
 	newdirection = (1 + (newotherbits | c)) >> 8;
 
-	newnode = map->malloc(map->baton, sizeof(cb_node_t));
+	newnode = mm_alloc(map->pool, sizeof(cb_node_t));
 	if (newnode == NULL) {
 		return ENOMEM;
 	}
 
 	x = (uint8_t *)cbt_make_data(map, ubytes, ulen + 1, val);
 	if (x == NULL) {
-		map->free(map->baton, newnode);
+		mm_free(map->pool, newnode);
 		return ENOMEM;
 	}
 
@@ -312,7 +290,7 @@ EXPORT int map_del(map_t *map, const char *str)
 	if (strcmp(str, (const char *)data->key) != 0) {
 		return 1;
 	}
-	map->free(map->baton, p);
+	mm_free(map->pool, p);
 
 	if (!whereq) {
 		map->root = NULL;
@@ -320,7 +298,7 @@ EXPORT int map_del(map_t *map, const char *str)
 	}
 
 	*whereq = q->child[1 - direction];
-	map->free(map->baton, q);
+	mm_free(map->pool, q);
 	return 0;
 }
 

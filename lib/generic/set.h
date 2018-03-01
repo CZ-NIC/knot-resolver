@@ -23,7 +23,7 @@
  * # Example usage:
  *
  * @code{.c}
- *      set_t set = set_make();
+ *      set_t set = set_make(NULL);
  *
  *      // Insert keys
  *      if (set_add(&set, "princess") != 0 ||
@@ -70,14 +70,14 @@ typedef map_t set_t;
 typedef int (set_walk_cb)(const char *, void *);
 
 /*! Creates an new, empty critbit set */
-#define set_make() \
-	map_make()
+#define set_make \
+	map_make
 
 /*! Returns non-zero if set contains str */
 #define set_contains(set, str) \
 	map_contains((set), (str))
 
-/*! Inserts str into set, returns 0 on suceess */
+/*! Inserts str into set.  Returns 0 if new, 1 if already present, or ENOMEM. */
 #define set_add(set, str) \
 	map_set((set), (str), (void *)1)
 
