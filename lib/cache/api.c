@@ -1029,7 +1029,7 @@ static int stash_nsec_p(const char *dname, void *nsec_p_v, void *request)
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
-	entry_list_memcpy(el, val.data);
+	entry_list_memcpy(val.data, el);
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed (refresh by %d)\n", log_refresh_by);
 	} else {

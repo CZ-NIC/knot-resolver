@@ -25,7 +25,7 @@
 static int entry_h_len(const knot_db_val_t val);
 
 
-void entry_list_memcpy(entry_list_t list, struct entry_apex *ea)
+void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
 {
 	assert(ea);
 	memset(ea, 0, offsetof(struct entry_apex, data));
@@ -176,6 +176,28 @@ int entry_h_seek(knot_db_val_t *val, uint16_t type)
 	return val->len ? kr_ok() : kr_error(ENOENT);
 }
 
+static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key,
+				knot_db_val_t *val, const struct kr_query *qry)
+{
+	int ret = cache_op(cache, write, key, val, 1);
+	if (!ret) return kr_ok();
+	/* Clear cache if overfull.  It's nontrivial to do better with LMDB.
+	 * LATER: some garbage-collection mechanism. */
+	if (ret == kr_error(ENOSPC)) {
+		ret = kr_cache_clear(cache);
+		const char *msg = "[cache] clearing because overfull, ret = %d\n";
+		if (ret) {
+			kr_log_error(msg, ret);
+		} else {
+			kr_log_info(msg, ret);
+			ret = kr_error(ENOSPC);
+		}
+		return ret;
+	}
+	VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
+	return kr_error(ret ? ret : ENOSPC);
+}
+
 
 /* See the header file. */
 int entry_h_splice(
@@ -184,8 +206,7 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache)
 {
-	//TODO: rework, perhaps incuding the API
-
+	//TODO: another review, perhaps incuding the API
 	const bool ok = val_new_entry && val_new_entry->len > 0;
 	if (!ok) {
 		assert(!EINVAL);
@@ -195,18 +216,17 @@ int entry_h_splice(
 	/* Find the whole entry-set and the particular entry within. */
 	entry_list_t el;
 	int ret = -1;
-	void *orig = NULL;
 	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
 		knot_db_val_t val;
 		ret = cache_op(cache, read, &key, &val, 1);
 		if (!ret) ret = entry_list_parse(val, el);
-		orig = val.data;
 	}
 	if (ret) memset(el, 0, sizeof(el));
 
+	/* Compatibility map: the simple case -> the multi entry case. */
 	int i_type;
 	switch (type) {
-	case KNOT_RRTYPE_NS:	i_type = EL_NS;	break;
+	case KNOT_RRTYPE_NS:	i_type = EL_NS;		break;
 	case KNOT_RRTYPE_CNAME:	i_type = EL_CNAME;	break;
 	case KNOT_RRTYPE_DNAME:	i_type = EL_DNAME;	break;
 	default:		i_type = 0;
@@ -234,56 +254,26 @@ int entry_h_splice(
 			return kr_error(EEXIST);
 		}
 	}
-
-	*val_type = *val_new_entry;
+	/* Now we're in trouble.  In some cases, parts of data to be written
+	 * is an lmdb entry that may be invalidated by our write request.
+	 * (lmdb even does in-place updates!) Therefore we copy all into a buffer.
+	 * (We don't bother deallocating from the mempool.)
+	 * LATER(optim.): do this only when neccessary, or perhaps another approach.
+	 * This is also complicated by the fact that the val_new_entry part
+	 * is to be written *afterwards* by the caller.
+	 */
+	val_type->len = val_new_entry->len;
 	val_type->data = NULL; /* perhaps unclear in the entry_h_splice() API */
-
-	/* Obtain new storage from cache.
-	 * Note: this does NOT invalidate val_orig_all.data.
-	 * FIX ME LATER: possibly wrong, as transaction may be switched RO->RW
-	 * (conditioned on allowing multiple entries above) */
 	knot_db_val_t val = {
 		.len = i_type ? entry_list_serial_size(el) : val_type->len,
 		.data = NULL,
 	};
-	assert(val.len > 0);
-	ret = cache_op(cache, write, &key, &val, 1);
-	// TODO: factor this `if` out
-	if (ret || !val.data || !val.len) {
-		/* Clear cache if overfull.  It's nontrivial to do better with LMDB.
-		 * LATER: some garbage-collection mechanism. */
-		if (ret == kr_error(ENOSPC)) {
-			ret = kr_cache_clear(cache);
-			const char *msg = "[cache] clearing because overfull, ret = %d\n";
-			if (ret) {
-				kr_log_error(msg, ret);
-			} else {
-				kr_log_info(msg, ret);
-				ret = kr_error(ENOSPC);
-			}
-			return ret;
-		}
-		assert(ret); /* otherwise "succeeding" but `val` is bad */
-		VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
-		return kr_error(ret ? ret : ENOSPC);
-	}
-
-	if (i_type) {
-		void *target = val.data;
-		if (val.data == orig) {
-			/* LMDB decided for in-place update.  TODO: not nice. */
-			target = mm_alloc(&qry->request->pool, val.len);
-		}
-		/* Write everything but the new entry itself. */
-		entry_list_memcpy(el, target);
-		if (val.data == orig) {
-			memcpy(val.data, target, val.len);
-		}
-		val_new_entry->data = val.data + (el[i_type].data - target);
-	} else {
-		val_new_entry->data = val.data;
-	}
-
+	void *buf = mm_alloc(&qry->request->pool, val.len);
+	entry_list_memcpy(buf, el);
+	ret = cache_write_or_clear(cache, &key, &val, qry);
+	if (ret) return kr_error(ret);
+	memcpy(val.data, buf, val.len);
+	val_new_entry->data = val.data + (el[i_type].data - buf);
 	return kr_ok();
 }
 

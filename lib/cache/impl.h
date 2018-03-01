@@ -158,7 +158,7 @@ static inline int entry_list_serial_size(const entry_list_t list)
  *
  * @note NULL pointers are overwritten - caller may like to fill the space later.
  */
-void entry_list_memcpy(entry_list_t list, struct entry_apex *ea);
+void entry_list_memcpy(struct entry_apex *ea, entry_list_t list);
 
 
 /* Packet caching; implementation in ./entry_pkt.c */

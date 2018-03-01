@@ -28,12 +28,12 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
 	if (rds && rds->rr_count > 255) {
 		return kr_error(ENOSPC);
 	}
-	uint8_t rr_count = rds ? rds->rr_count : 0;
+	const uint8_t rr_count = rds ? rds->rr_count : 0;
 	memcpy(data++, &rr_count, sizeof(rr_count));
 
 	knot_rdata_t *rd = rds ? rds->data : NULL;
 	for (int i = 0; i < rr_count; ++i, rd = kr_rdataset_next(rd)) {
-		uint16_t len = knot_rdata_rdlen(rd);
+		const uint16_t len = knot_rdata_rdlen(rd);
 		memcpy(data, &len, sizeof(len));
 		data += sizeof(len);
 		memcpy(data, knot_rdata_data(rd), len);
