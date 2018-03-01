@@ -267,12 +267,12 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		qry->flags.DNSSEC_WANT = false;
 	}
 	/* Check if any DNSKEY found for cached cut */
-	if ((qry->flags.DNSSEC_WANT) && (cut_found.key == NULL)) {
-		/* No DNSKEY was found for cached cut.
-		 * If no glue were fetched for this cut,
-		 * we have got circular dependency - must fetch A\AAAA
-		 * from authoritative, but we have no key to verify it.
-		 * TODO - try to refetch cut only if no glue were fetched */
+	if (qry->flags.DNSSEC_WANT && cut_found.key == NULL &&
+	    !kr_zonecut_is_any_glue(&cut_found)) {
+		/* Cut found and there are no proofs of zone insecurity.
+		 * But no DNSKEY found and no glue fetched.
+		 * We have got circular dependency - must fetch A\AAAA
+		 * from authoritative, but we have no key to verify it. */
 		kr_zonecut_deinit(&cut_found);
 		if (requested_name[0] != '\0' ) {
 			/* If not root - try next label */
