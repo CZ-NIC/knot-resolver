@@ -65,6 +65,22 @@ struct entry_apex {
 	 * Purpose: save cache operations if rolled the algo/params long ago. */
 };
 
+/** Indices for decompressed entry_list_t. */
+enum EL {
+	EL_NS = ENTRY_APEX_NSECS_CNT,
+	EL_CNAME,
+	EL_DNAME,
+	EL_LENGTH
+};
+/** Note: arrays are passed "by reference" to functions (in C99). */
+typedef knot_db_val_t entry_list_t[EL_LENGTH];
+
+static inline int nsec_p_rdlen(const uint8_t *rdata)
+{
+	//TODO: the zero case?
+	return rdata ? 5 + rdata[4] : 0; /* rfc5155 4.2 and 3.2. */
+}
+static const int NSEC_P_MAXLEN = sizeof(uint32_t) + 5 + 255;
 
 /** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
  * (for is_packet the length of data is checked)
@@ -108,6 +124,7 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
  * \note `val->len` represents the bound of the whole list, not of a single entry.
  * \note in case of ENOENT, `val` is still rewound to the beginning of the next entry.
  * \return error code
+ * TODO: maybe get rid of this API?
  */
 int entry_h_seek(knot_db_val_t *val, uint16_t type);
 
@@ -117,9 +134,6 @@ int entry_h_seek(knot_db_val_t *val, uint16_t type);
  * with a hole ready for the new entry (old one of the same type is cut out).
  *
  * \param val_new_entry The only changing parameter; ->len is read, ->data written.
- * Beware: the entry_h in *val_new_entry->data is zeroed, and in some cases it has
- * some flags set - and in those cases you can't just overwrite those flags.
- * All flags except is_packet are sensitive in this way.
  * \return error code
  */
 int entry_h_splice(
@@ -128,11 +142,23 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache);
 
-/* XXX
-/ ** Copy entries and reserve space for new apex. * /
-int entry_apex_reserve(knot_db_val_t *new_apex, knot_db_val_t entries
-			const knot_db_val_t key, struct kr_cache *cache);
+/** Parse an entry_apex into individual items. */
+int entry_list_parse(const knot_db_val_t val, entry_list_t list);
+
+static inline int entry_list_serial_size(const entry_list_t list)
+{
+	int size = offsetof(struct entry_apex, data);
+	for (int i = 0; i < EL_LENGTH; ++i) {
+		size += list[i].len;
+	}
+	return size;
+}
+
+/** Fill contents of an entry_apex.
+ *
+ * @note NULL pointers are overwritten - caller may like to fill the space later.
  */
+void entry_list_memcpy(entry_list_t list, struct entry_apex *ea);
 
 
 /* Packet caching; implementation in ./entry_pkt.c */

@@ -150,6 +150,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	if (ret) return; /* some aren't really errors */
 	assert(val_new_entry.data);
 	struct entry_h *eh = val_new_entry.data;
+	memset(eh, 0, offsetof(struct entry_h, data));
 	eh->time = qry->timestamp.tv_sec;
 	eh->ttl  = MAX(MIN(packet_ttl(pkt, is_negative), cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;

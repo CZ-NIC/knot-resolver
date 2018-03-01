@@ -346,6 +346,48 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return ret;
 }
 
+
+/** Find equivalent nsec_p in entry_apex, if any. */
+static knot_db_val_t search_plist(const knot_db_val_t val_cut, const uint8_t *nsec_p)
+{
+	const int nsec_p_dlen = nsec_p_rdlen(nsec_p);
+	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
+	const struct entry_apex *ea = entry_apex_consistent(val_cut);
+	if (!ea) return VAL_EMPTY;
+	const uint8_t *data_it = ea->data;
+	int data_stride; /*< length of the current item in entry_apex data */
+	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i, data_it += data_stride) {
+		int ver = ea->nsecs[i];
+		/* get data_stride */
+		int data_stride_n;
+		switch (ver) {
+		case 0:
+			data_stride = 0;
+			continue;
+		case 1:
+			data_stride_n = 0; /* just the stamp */
+			break;
+		case 3:
+			data_stride_n = nsec_p_rdlen(data_it);
+			break;
+		default:
+			return VAL_EMPTY;
+		}
+		data_stride = sizeof(uint32_t) + data_stride_n;
+
+		if ((!nsec_p && ver == 1)
+		    || (nsec_p && ver == 3 && nsec_p_dlen == data_stride_n
+			&& memcmp(nsec_p, data_it, data_stride_n) == 0)
+		   ) {
+			return (knot_db_val_t){
+				.data = (void *)data_it,
+				.len = data_stride,
+			};
+		}
+	}
+	return VAL_EMPTY;
+}
+
 /** See the call site. */
 static int get_nsec_plist(const knot_db_val_t val_cut,
 			  const uint8_t **nsec_plist, int *nsec_plen, /*< output */
@@ -373,7 +415,7 @@ static int get_nsec_plist(const knot_db_val_t val_cut,
 			data_stride = sizeof(uint32_t); /* just the stamp */
 			break;
 		case 3:
-			data_stride = sizeof(uint32_t) + 5 + data_it[4];
+			data_stride = sizeof(uint32_t) + nsec_p_rdlen(data_it);
 			break;
 		default:
 			return kr_error(EILSEQ);
@@ -425,6 +467,7 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (!ret) {
+		VERBOSE_MSG(qry, "=> read OK\n");
 		/* found an entry: test conditions, materialize into pkt, etc. */
 		ret = found_exact_hit(ctx, pkt, val, lowest_rank);
 	}
@@ -691,7 +734,11 @@ static int peek_encloser(
 /** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
 static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
-			int *unauth_cnt);
+			int *unauth_cnt, map_t *nsec_pmap);
+/** Stash a single nsec_p.  \return 0 (errors are ignored). */
+static int stash_nsec_p(const char *key_str, void *nsec_p_v, void *request);
+
+
 
 int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
@@ -713,8 +760,8 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	/* Stash individual records. */
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
-	int ret = 0;
 	int unauth_cnt = 0;
+	map_t nsec_pmap = map_make(&req->pool);
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 		const ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
@@ -724,7 +771,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				continue;
 				/* TODO: probably safe to break but maybe not worth it */
 			}
-			ret = stash_rrset(arr, i, qry, cache, &unauth_cnt);
+			int ret = stash_rrset(arr, i, qry, cache, &unauth_cnt, &nsec_pmap);
 			if (ret) {
 				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
 				goto finally;
@@ -733,6 +780,10 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 * that won't be useful as separate RRsets. */
 		}
 	}
+
+	// map_walk(&nsec_pmap, stash_nsec_p, req); // FIXME XXX
+	/* LATER(optim.): typically we also have corresponding NS record in the list,
+	 * so we might save a cache operation. */
 
 	stash_pkt(pkt, qry, req);
 
@@ -746,7 +797,7 @@ finally:
 
 static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
-			int *unauth_cnt)
+			int *unauth_cnt, map_t *nsec_pmap)
 {
 	//FIXME review entry_h
 	const ranked_rr_array_entry_t *entry = arr->at[arr_i];
@@ -809,6 +860,10 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 	for (int i = 0; i < wild_labels; ++i) {
 		encloser = knot_wire_next_label(encloser, NULL);
 	}
+	if (!check_dname_for_lf(encloser)) {
+		/* They would break uniqueness. */
+		return kr_ok();
+	}
 
 	int ret = 0;
 	/* Construct the key under which RRs will be stored. */
@@ -824,8 +879,13 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 			assert(!EINVAL);
 			return kr_error(EINVAL);
 		}
-		k->zlf_len = knot_dname_size(knot_rrsig_signer_name(&rr_sigs->rrs, 0)) - 1;
+		const knot_dname_t *signer = knot_rrsig_signer_name(&rr_sigs->rrs, 0);
+		k->zlf_len = knot_dname_size(signer) - 1;
 		key = key_NSEC1(k, encloser, wild_labels);
+
+		if (likely(check_dname_for_lf(signer))) {
+			map_set(nsec_pmap, (const char *)signer, NULL);
+		}
 		break;
 	default:
 		ret = kr_dname_lf(k->buf, encloser, wild_labels);
@@ -865,6 +925,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 
 	/* Write the entry itself. */
 	struct entry_h *eh = val_new_entry.data;
+	memset(eh, 0, offsetof(struct entry_h, data));
 	eh->time = qry->timestamp.tv_sec;
 	eh->ttl  = MAX(MIN(ttl, cache->ttl_max), cache->ttl_min);
 	eh->rank = entry->rank;
@@ -890,6 +951,89 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 			entry->rank, type_str, (wild_labels ? "*." : ""), encl_str,
 			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.rr_count : 0)
 			);
+	}
+	return kr_ok();
+}
+
+static int stash_nsec_p(const char *dname, void *nsec_p_v, void *request)
+{
+	const struct kr_request *req = request;
+	const struct kr_query *qry = req->current_query;
+	struct kr_cache *cache = &req->ctx->cache;
+	uint32_t valid_until = qry->timestamp.tv_sec + cache->ttl_max;
+		/* LATER(optim.): be more precise here ^^ and reduce calls. */
+	static const int32_t ttl_margin = 3600;
+	const uint8_t *nsec_p = (const uint8_t *)nsec_p_v;
+	int data_stride = sizeof(uint32_t) + nsec_p_rdlen(nsec_p);
+	/* Find what's in the cache. */
+	struct key k_storage, *k = &k_storage;
+	int ret = kr_dname_lf(k->buf, (const knot_dname_t *)dname, false);
+	if (ret) return kr_error(ret);
+	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
+	knot_db_val_t val_orig = { NULL, 0 };
+	ret = cache_op(cache, read, &key, &val_orig, 1);
+	if (ret && ret != -ABS(ENOENT)) {
+		VERBOSE_MSG(qry, "=> EL read failed (ret: %d)\n", ret);
+		return kr_ok();
+	}
+	/* Prepare new entry_list_t so we can just write at el[0]. */
+	entry_list_t el;
+	int log_refresh_by = 0;
+	if (ret == -ABS(ENOENT)) {
+		memset(el, 0, sizeof(el));
+	} else {
+		ret = entry_list_parse(val_orig, el);
+		if (ret) {
+			VERBOSE_MSG(qry, "=> EL parse failed (ret: %d)\n", ret);
+			return kr_error(0);
+		}
+		/* Find the index to replace. */
+		int i_replace = ENTRY_APEX_NSECS_CNT - 1;
+		for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i) {
+			if (el[i].len != data_stride) continue;
+			if (nsec_p && memcmp(nsec_p, el[i].data + sizeof(uint32_t),
+						data_stride - sizeof(uint32_t)) != 0) {
+				continue;
+			}
+			/* Save a cache operation if TTL extended only a little. */
+			uint32_t valid_orig;
+			memcpy(&valid_orig, el[i].data, sizeof(valid_orig));
+			const int32_t ttl_extended_by = valid_until - valid_orig;
+			if (ttl_extended_by < ttl_margin) {
+				VERBOSE_MSG(qry, "=> nsec_p stash skipped (extra TTL: %d)\n",
+						ttl_extended_by);
+				return kr_ok();
+			}
+			i_replace = i;
+			log_refresh_by = ttl_extended_by;
+			break;
+		}
+		/* Shift the other indices: move the first `i` blocks by one position. */
+		if (i_replace) {
+			memmove(&el[1], &el[0], sizeof(el[0]) * i_replace);
+		}
+	}
+	/* Prepare the new data chunk */
+	uint8_t buf[NSEC_P_MAXLEN];
+	memcpy(buf, &valid_until, sizeof(valid_until));
+	memcpy(buf + sizeof(valid_until), nsec_p, data_stride - sizeof(valid_until));
+	el[0].data = buf;
+	el[0].len = data_stride;
+	/* Write it all to the cache */
+	knot_db_val_t val = {
+		.data = NULL,
+		.len = entry_list_serial_size(el),
+	};
+	ret = cache_op(cache, write, &key, &val, 1);
+	if (ret || !val.data) {
+		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
+		return kr_ok();
+	}
+	entry_list_memcpy(el, val.data);
+	if (log_refresh_by) {
+		VERBOSE_MSG(qry, "=> nsec_p stashed (refresh by %d)\n", log_refresh_by);
+	} else {
+		VERBOSE_MSG(qry, "=> nsec_p stashed (new)\n");
 	}
 	return kr_ok();
 }
@@ -942,6 +1086,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 
 	int ret = entry_h_seek(&val, qry->stype);
 	if (ret) return ret;
+	VERBOSE_MSG(qry, "=> FEH seek OK \n");
 	const struct entry_h *eh = entry_h_consistent(val, qry->stype);
 	if (!eh) {
 		assert(false);
@@ -949,6 +1094,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		// LATER: recovery in case of error, perhaps via removing the entry?
 		// LATER(optim): pehaps optimize the zone cut search
 	}
+	VERBOSE_MSG(qry, "=> FEH consistent OK \n");
 
 	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
@@ -1147,6 +1293,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			ret = entry_h_seek(&val, type);
 			const struct entry_h *eh;
 			if (ret || !(eh = entry_h_consistent(val, type))) {
+				VERBOSE_MSG(qry, "=> EH seek ret: %d\n", ret);
 				assert(false);
 				goto next_label;
 			}

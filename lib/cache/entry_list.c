@@ -22,6 +22,102 @@
 #include "lib/utils.h"
 
 
+static int entry_h_len(const knot_db_val_t val);
+
+
+void entry_list_memcpy(entry_list_t list, struct entry_apex *ea)
+{
+	assert(ea);
+	memset(ea, 0, offsetof(struct entry_apex, data));
+	ea->has_ns	= list[EL_NS	].len;
+	ea->has_cname	= list[EL_CNAME	].len;
+	ea->has_dname	= list[EL_DNAME	].len;
+	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i) {
+		ea->nsecs[i] =   list[i].len == 0 ? 0 :
+				(list[i].len == 4 ? 1 : 3);
+	}
+	uint8_t *it = ea->data;
+	for (int i = 0; i < EL_LENGTH; ++i) {
+		if (list[i].data) {
+			memcpy(it, list[i].data, list[i].len);
+			/* LATER(optim.): coalesce consecutive writes? */
+		} else {
+			list[i].data = it;
+		}
+		it += list[i].len;
+	}
+}
+
+int entry_list_parse(const knot_db_val_t val, entry_list_t list)
+{
+	if (!list) {
+		//FIXME allow empty val?
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+	/* Parse the apex itself (nsec parameters). */
+	const struct entry_apex *ea = entry_apex_consistent(val);
+	if (!ea) {
+		return kr_error(EILSEQ);
+	}
+	const uint8_t *it = ea->data,
+		*it_bound = val.data + val.len;
+	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i) {
+		if (it > it_bound) {
+			return kr_error(EILSEQ);
+		}
+		list[i].data = (void *)it;
+		switch (ea->nsecs[i]) {
+		case 0:
+			list[i].len = 0;
+			break;
+		case 1:
+			list[i].len = sizeof(uint32_t); /* just timestamp */
+			break;
+		case 3: { /* timestamp + NSEC3PARAM wire */
+			if (it + sizeof(uint32_t) + 4 > it_bound) {
+				return kr_error(EILSEQ);
+			}
+			list[i].len = sizeof(uint32_t)
+				+ nsec_p_rdlen(it + sizeof(uint32_t));
+			break;
+			}
+		default:
+			return kr_error(EILSEQ);
+		};
+		it += list[i].len;
+	}
+	/* Parse every entry_h. */
+	for (int i = ENTRY_APEX_NSECS_CNT; i < EL_LENGTH; ++i) {
+		list[i].data = (void *)it;
+		bool has_type;
+		switch (i) {
+		case EL_NS:	has_type = ea->has_ns;		break;
+		case EL_CNAME:	has_type = ea->has_cname;	break;
+		case EL_DNAME:	has_type = ea->has_dname;	break;
+		default: assert(false); return kr_error(EINVAL); /* something very bad */
+		}
+		if (!has_type) {
+			list[i].len = 0;
+			continue;
+		}
+		if (it >= it_bound) {
+			assert(!EILSEQ);
+			return kr_error(EILSEQ);
+		}
+		const int len = entry_h_len(
+			(knot_db_val_t){ .data = (void *)it, .len = it_bound - it });
+		if (len < 0) {
+			assert(false);
+			return kr_error(len);
+		}
+		list[i].len = len;
+		it += len;
+	}
+	assert(it == it_bound);
+	return kr_ok();
+}
+
 /** Given a valid entry header, find its length (i.e. offset of the next entry).
  * \param val The beginning of the data and the bound (read only).
  */
@@ -56,100 +152,28 @@ static int entry_h_len(const knot_db_val_t val)
 	return d - val.data;
 }
 
-struct entry_apex * entry_apex_consistent(knot_db_val_t data)
+struct entry_apex * entry_apex_consistent(knot_db_val_t val)
 {
 	//XXX: check lengths, etc.
-	return data.data;
+	return val.data;
 }
 
 /* See the header file. */
 int entry_h_seek(knot_db_val_t *val, uint16_t type)
 {
-	uint16_t ktype;
+	int i = -1;
 	switch (type) {
-	case KNOT_RRTYPE_NS:
-	case KNOT_RRTYPE_CNAME:
-	case KNOT_RRTYPE_DNAME:
-		ktype = KNOT_RRTYPE_NS;
-		break;
-	default:
-		ktype = type;
+	case KNOT_RRTYPE_NS:	i = EL_NS;	break;
+	case KNOT_RRTYPE_CNAME:	i = EL_CNAME;	break;
+	case KNOT_RRTYPE_DNAME:	i = EL_DNAME;	break;
+	default:		return kr_ok();
 	}
-	if (ktype != KNOT_RRTYPE_NS) {
-		return kr_ok();
-	}
-	const struct entry_apex *ea = entry_apex_consistent(*val);
-	if (!ea) {
-		return kr_error(EILSEQ);
-	}
-	/* measure the size of the apex record */
-	size_t alen = sizeof(struct entry_apex);
-	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i) {
-		if (alen > val->len) {
-			return kr_error(EILSEQ);
-		}
-		switch (ea->nsecs[i]) {
-		case 0:
-			continue;
-		case 1:
-			alen += sizeof(uint32_t); /* just timestamp */
-			break;
-		case 3: { /* timestamp + NSEC3PARAM wire */
-			alen += sizeof(uint32_t);
-			uint8_t salt_len;
-			if (alen + 4 + sizeof(salt_len) > val->len) {
-				return kr_error(EILSEQ);
-			}
-			memcpy(&salt_len, val->data + alen + 4, sizeof(salt_len));
-			alen += 5 + salt_len;
-			break;
-			}
-		default:
-			return kr_error(EILSEQ);
-		};
-	}
-	/* skip the apex record */
-	if (alen > val->len) {
-		return kr_error(EILSEQ);
-	}
-	val->data += alen;
-	val->len -= alen;
 
-	bool present;
-	switch (type) {
-	case KNOT_RRTYPE_NS:
-		present = ea->has_ns;
-		break;
-	case KNOT_RRTYPE_CNAME:
-		present = ea->has_cname;
-		break;
-	case KNOT_RRTYPE_DNAME:
-		present = ea->has_dname;
-		break;
-	default:
-		return kr_error(EINVAL);
-	}
-	/* count how many entries to skip */
-	int to_skip = 0;
-	switch (type) {
-	case KNOT_RRTYPE_DNAME:
-		to_skip += ea->has_cname;
-	case KNOT_RRTYPE_CNAME:
-		to_skip += ea->has_ns;
-	case KNOT_RRTYPE_NS:
-		break;
-	}
-	/* skip the entries (advance `val`) */
-	while (to_skip-- > 0) {
-		int len = entry_h_len(*val);
-		if (len < 0 || len > val->len) {
-			return kr_error(len < 0 ? len : EILSEQ);
-			// LATER: recovery, perhaps via removing the entry?
-		}
-		val->data += len;
-		val->len -= len;
-	}
-	return present ? kr_ok() : kr_error(ENOENT);
+	entry_list_t el;
+	int ret = entry_list_parse(*val, el);
+	if (ret) return ret;
+	*val = el[i];
+	return val->len ? kr_ok() : kr_error(ENOENT);
 }
 
 
@@ -160,9 +184,8 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache)
 {
-	//XXX rework, perhaps incuding the API; really copy some old data
+	//TODO: rework, perhaps incuding the API
 
-	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 	const bool ok = val_new_entry && val_new_entry->len > 0;
 	if (!ok) {
 		assert(!EINVAL);
@@ -170,31 +193,27 @@ int entry_h_splice(
 	}
 
 	/* Find the whole entry-set and the particular entry within. */
-	knot_db_val_t val_orig_all = VAL_EMPTY, val_orig_entry = VAL_EMPTY;
-	const struct entry_h *eh_orig = NULL;
+	entry_list_t el;
+	int ret = -1;
+	void *orig = NULL;
 	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
-		int ret = cache_op(cache, read, &key, &val_orig_all, 1);
-		if (ret) val_orig_all = VAL_EMPTY;
-		val_orig_entry = val_orig_all;
-		switch (entry_h_seek(&val_orig_entry, type)) {
-		case 0:
-			ret = entry_h_len(val_orig_entry);
-			if (ret >= 0) {
-				val_orig_entry.len = ret;
-				eh_orig = entry_h_consistent(val_orig_entry, ktype);
-				if (eh_orig) {
-					break;
-				}
-			} /* otherwise fall through */
-		default:
-			val_orig_entry = val_orig_all = VAL_EMPTY;
-		case -ENOENT:
-			val_orig_entry.len = 0;
-			break;
-		};
-		assert(val_orig_entry.data + val_orig_entry.len
-			<= val_orig_all.data + val_orig_all.len);
+		knot_db_val_t val;
+		ret = cache_op(cache, read, &key, &val, 1);
+		if (!ret) ret = entry_list_parse(val, el);
+		orig = val.data;
 	}
+	if (ret) memset(el, 0, sizeof(el));
+
+	int i_type;
+	switch (type) {
+	case KNOT_RRTYPE_NS:	i_type = EL_NS;	break;
+	case KNOT_RRTYPE_CNAME:	i_type = EL_CNAME;	break;
+	case KNOT_RRTYPE_DNAME:	i_type = EL_DNAME;	break;
+	default:		i_type = 0;
+	}
+	knot_db_val_t *const val_type = &el[i_type];
+	const struct entry_h *eh_orig = val_type->data ?
+		entry_h_consistent(*val_type, type) : NULL;
 
 	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
 		/* If equal rank was accepted, spoofing a *single* answer would be
@@ -216,20 +235,20 @@ int entry_h_splice(
 		}
 	}
 
-	/* LATER: enable really having multiple entries. */
-	val_orig_all = val_orig_entry = VAL_EMPTY;
+	*val_type = *val_new_entry;
+	val_type->data = NULL; /* perhaps unclear in the entry_h_splice() API */
 
 	/* Obtain new storage from cache.
 	 * Note: this does NOT invalidate val_orig_all.data.
 	 * FIX ME LATER: possibly wrong, as transaction may be switched RO->RW
 	 * (conditioned on allowing multiple entries above) */
-	const ssize_t apex_size = ktype == KNOT_RRTYPE_NS
-		? offsetof(struct entry_apex, data) : 0;
-	const ssize_t storage_size = val_orig_all.len - val_orig_entry.len
-				+ val_new_entry->len + apex_size;
-	assert(storage_size > 0);
-	knot_db_val_t val = { .len = storage_size, .data = NULL };
-	int ret = cache_op(cache, write, &key, &val, 1);
+	knot_db_val_t val = {
+		.len = i_type ? entry_list_serial_size(el) : val_type->len,
+		.data = NULL,
+	};
+	assert(val.len > 0);
+	ret = cache_op(cache, write, &key, &val, 1);
+	// TODO: factor this `if` out
 	if (ret || !val.data || !val.len) {
 		/* Clear cache if overfull.  It's nontrivial to do better with LMDB.
 		 * LATER: some garbage-collection mechanism. */
@@ -249,62 +268,22 @@ int entry_h_splice(
 		return kr_error(ret ? ret : ENOSPC);
 	}
 
-	/* Write original data before entry, if any. */
-	const ssize_t len_before = val_orig_entry.data - val_orig_all.data;
-	assert(len_before >= 0);
-	if (len_before) {
-		assert(ktype == KNOT_RRTYPE_NS);
-		memcpy(val.data, val_orig_all.data, len_before);
-	}
-	/* Write original data after entry, if any. */
-	const ssize_t len_after = val_orig_all.len - len_before - val_orig_entry.len;
-	assert(len_after >= 0);
-	assert(len_before + val_orig_entry.len + len_after == val_orig_all.len
-		&& len_before + val_new_entry->len + len_after + apex_size == storage_size);
-	if (len_after) {
-		assert(ktype == KNOT_RRTYPE_NS);
-		memcpy(val.data + len_before + val_new_entry->len,
-			val_orig_entry.data + val_orig_entry.len, len_after);
+	if (i_type) {
+		void *target = val.data;
+		if (val.data == orig) {
+			/* LMDB decided for in-place update.  TODO: not nice. */
+			target = mm_alloc(&qry->request->pool, val.len);
+		}
+		/* Write everything but the new entry itself. */
+		entry_list_memcpy(el, target);
+		if (val.data == orig) {
+			memcpy(val.data, target, val.len);
+		}
+		val_new_entry->data = val.data + (el[i_type].data - target);
+	} else {
+		val_new_entry->data = val.data;
 	}
 
-	val_new_entry->data = val.data + len_before + apex_size;
-	{
-		struct entry_h *eh = val_new_entry->data;
-		memset(eh, 0, offsetof(struct entry_h, data));
-		/* XXX In case (len_before == 0 && ktype == KNOT_RRTYPE_NS) the *eh
-		 * set below would be uninitialized and the caller wouldn't be able
-		 * to do it after return, as that would overwrite what we do below. */
-	}
-	/* The multi-entry type needs adjusting the flags. */
-	if (ktype == KNOT_RRTYPE_NS) {
-		struct entry_apex *ea = val.data;
-		memset(ea, 0, apex_size);
-		#if 0
-		if (val_orig_all.len) {
-			const struct entry_h *eh0 = val_orig_all.data;
-			/* ENTRY_H_FLAGS */
-			eh->nsec1_pos = eh0->nsec1_pos;
-			eh->nsec3_cnt = eh0->nsec3_cnt;
-			eh->has_ns    = eh0->has_ns;
-			eh->has_cname = eh0->has_cname;
-			eh->has_dname = eh0->has_dname;
-			eh->has_optout = eh0->has_optout;
-		}
-		#endif
-		/* we just added/replaced some type */
-		switch (type) {
-		case KNOT_RRTYPE_NS:
-			ea->has_ns = true;  break;
-		case KNOT_RRTYPE_CNAME:
-			ea->has_cname = true;  break;
-		case KNOT_RRTYPE_DNAME:
-			ea->has_dname = true;  break;
-		default:
-			assert(false);
-		}
-		ea->nsecs[0] = 0;
-		ea->nsecs[1] = 0;
-	}
 	return kr_ok();
 }
 
