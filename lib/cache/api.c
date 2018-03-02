@@ -782,7 +782,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	// map_walk(&nsec_pmap, stash_nsec_p, req); // FIXME XXX
+	map_walk(&nsec_pmap, stash_nsec_p, req);
 	/* LATER(optim.): typically we also have corresponding NS record in the list,
 	 * so we might save a cache operation. */
 
@@ -974,14 +974,14 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 
 static int stash_nsec_p(const char *dname, void *nsec_p_v, void *request)
 {
-	const struct kr_request *req = request;
+	struct kr_request *req = request;
 	const struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 	uint32_t valid_until = qry->timestamp.tv_sec + cache->ttl_max;
 		/* LATER(optim.): be more precise here ^^ and reduce calls. */
 	static const int32_t ttl_margin = 3600;
 	const uint8_t *nsec_p = (const uint8_t *)nsec_p_v;
-	int data_stride = sizeof(uint32_t) + nsec_p_rdlen(nsec_p);
+	int data_stride = sizeof(valid_until) + nsec_p_rdlen(nsec_p);
 	/* Find what's in the cache. */
 	struct key k_storage, *k = &k_storage;
 	int ret = kr_dname_lf(k->buf, (const knot_dname_t *)dname, false);
@@ -1030,23 +1030,25 @@ static int stash_nsec_p(const char *dname, void *nsec_p_v, void *request)
 			memmove(&el[1], &el[0], sizeof(el[0]) * i_replace);
 		}
 	}
-	/* Prepare the new data chunk */
-	uint8_t buf[NSEC_P_MAXLEN];
-	memcpy(buf, &valid_until, sizeof(valid_until));
-	memcpy(buf + sizeof(valid_until), nsec_p, data_stride - sizeof(valid_until));
-	el[0].data = buf;
+	/* Prepare old data into a buffer.  See entry_h_splice() for why.  LATER(optim.) */
 	el[0].len = data_stride;
+	el[0].data = NULL;
+	knot_db_val_t val;
+	val.len = entry_list_serial_size(el),
+	val.data = mm_alloc(&req->pool, val.len),
+	entry_list_memcpy(val.data, el);
+	/* Prepare the new data chunk */
+	memcpy(el[0].data, &valid_until, sizeof(valid_until));
+	if (nsec_p) {
+		memcpy(el[0].data + sizeof(valid_until), nsec_p,
+			data_stride - sizeof(valid_until));
+	}
 	/* Write it all to the cache */
-	knot_db_val_t val = {
-		.data = NULL,
-		.len = entry_list_serial_size(el),
-	};
 	ret = cache_op(cache, write, &key, &val, 1);
 	if (ret || !val.data) {
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
-	entry_list_memcpy(val.data, el);
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed (refresh by %d)\n", log_refresh_by);
 	} else {
