@@ -250,7 +250,7 @@ pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns)
 	return map_get(nsset, key);
 }
 
-static int is_any_glue(const char *k, void *v, void *baton)
+static int has_glue(const char *k, void *v, void *baton)
 {
 	bool *glue_found = (bool *)baton;
 	if (*glue_found) {
@@ -265,7 +265,7 @@ static int is_any_glue(const char *k, void *v, void *baton)
 	return kr_ok();
 }
 
-bool kr_zonecut_is_any_glue(struct kr_zonecut *cut)
+bool kr_zonecut_has_glue(struct kr_zonecut *cut)
 {
 	if (!cut) {
 		return false;
@@ -274,7 +274,7 @@ bool kr_zonecut_is_any_glue(struct kr_zonecut *cut)
 	bool glue_found = false;
 	map_t *nsset = &cut->nsset;
 
-	map_walk(nsset, is_any_glue, &glue_found);
+	map_walk(nsset, has_glue, &glue_found);
 	return glue_found;
 }
 

@@ -268,7 +268,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	}
 	/* Check if any DNSKEY found for cached cut */
 	if (qry->flags.DNSSEC_WANT && cut_found.key == NULL &&
-	    !kr_zonecut_is_any_glue(&cut_found)) {
+	    !kr_zonecut_has_glue(&cut_found)) {
 		/* Cut found and there are no proofs of zone insecurity.
 		 * But no DNSKEY found and no glue fetched.
 		 * We have got circular dependency - must fetch A\AAAA
