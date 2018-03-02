@@ -485,6 +485,18 @@ static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)
 	}
 }
 
+/** Create a key for an outgoing subrequest: qname, qclass, qtype.
+ * @param key Destination buffer for key size, MUST be SUBREQ_KEY_LEN or larger.
+ * @return key length if successful or an error
+ */
+static const size_t SUBREQ_KEY_LEN = KR_RRKEY_LEN;
+static int subreq_key(char *dst, knot_pkt_t *pkt)
+{
+	assert(pkt);
+	return kr_rrkey(dst, knot_pkt_qclass(pkt), knot_pkt_qname(pkt),
+			knot_pkt_qtype(pkt), knot_pkt_qtype(pkt));
+}
+
 /** Create and initialize a request_ctx (on a fresh mempool).
  *
  * handle and addr point to the source of the request, and they are NULL
@@ -1403,35 +1415,6 @@ static int timer_start(struct session *session, uv_timer_cb cb,
 	}
 	return 0;
 }
-
-/** Create a key for an outgoing subrequest: qname, qclass, qtype.
- * @param key Destination buffer for key size, MUST be SUBREQ_KEY_LEN or larger.
- * @return key length if successful or an error
- */
-static int subreq_key(char *dst, knot_pkt_t *pkt)
-{
-	assert(dst && pkt);
-	const char * const dst_begin = dst;
-
-	int ret = knot_dname_to_wire((uint8_t *)dst, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
-	if (ret <= 0) {
-		assert(false); /*EINVAL*/
-		return kr_error(ret);
-	}
-	knot_dname_to_lower((knot_dname_t *)dst);
-	dst += ret;
-
-	const uint16_t qclass = knot_pkt_qclass(pkt);
-	memcpy(dst, &qclass, sizeof(qclass));
-	dst += sizeof(qclass);
-
-	const uint16_t qtype = knot_pkt_qtype(pkt);
-	memcpy(dst, &qtype, sizeof(qtype));
-	dst += sizeof(qtype);
-
-	return dst - dst_begin;
-}
-static const size_t SUBREQ_KEY_LEN = KNOT_DNAME_MAXLEN + 2 * sizeof(uint16_t);
 
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt)
 {

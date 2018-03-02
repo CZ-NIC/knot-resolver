@@ -176,13 +176,13 @@ static int zi_put_supplementary(struct zone_import_ctx *z_import,
 {
 	assert(supp_type != KNOT_RRTYPE_RRSIG);
 
-	char key[KR_RRKEY2_LEN];
-	int err = kr_rrkey2(key, class, owner, supp_type, supp_type);
+	char key[KR_RRKEY_LEN];
+	int err = kr_rrkey(key, class, owner, supp_type, supp_type);
 	if (err <= 0) {
 		return -1;
 	}
 	knot_rrset_t *additional_rr = map_get(&z_import->rrset_sorted, key);
-	err = kr_rrkey2(key, class, owner, KNOT_RRTYPE_RRSIG, supp_type);
+	err = kr_rrkey(key, class, owner, KNOT_RRTYPE_RRSIG, supp_type);
 	if (err <= 0) {
 		return -1;
 	}
@@ -255,7 +255,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	struct kr_request *request = worker_task_request(task);
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *qry = kr_rplan_push(rplan, NULL, dname, rrclass, rrtype);
-	char key[KR_RRKEY2_LEN];
+	char key[KR_RRKEY_LEN];
 	int err = 0;
 	int state = KR_STATE_FAIL;
 	bool origin_is_owner = knot_dname_is_equal(rr->owner, z_import->origin);
@@ -283,7 +283,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	}
 	zi_rrset_mark_as_imported(rr);
 
-	err = kr_rrkey2(key, rr->rclass, rr->owner, KNOT_RRTYPE_RRSIG, rr->type);
+	err = kr_rrkey(key, rr->rclass, rr->owner, KNOT_RRTYPE_RRSIG, rr->type);
 	if (err <= 0) {
 		goto cleanup;
 	}
@@ -413,9 +413,9 @@ static void zi_zone_process(uv_timer_t* handle)
 	/* TA have been found, zone is secured.
 	 * DNSKEY must be somewhere amongst the imported records. Find it.
 	 * TODO - For those zones that provenly do not have TA this step must be skipped. */
-	char key[KR_RRKEY2_LEN];
-	int err = kr_rrkey2(key, KNOT_CLASS_IN, z_import->origin,
-			    KNOT_RRTYPE_DNSKEY, KNOT_RRTYPE_DNSKEY);
+	char key[KR_RRKEY_LEN];
+	int err = kr_rrkey(key, KNOT_CLASS_IN, z_import->origin,
+			   KNOT_RRTYPE_DNSKEY, KNOT_RRTYPE_DNSKEY);
 	if (err <= 0) {
 		failed = 1;
 		goto finish;
@@ -563,11 +563,11 @@ static int zi_record_store(zs_scanner_t *s)
 		return -1;
 	}
 
-	char key[KR_RRKEY2_LEN];
+	char key[KR_RRKEY_LEN];
 	uint16_t additional_key_field = kr_rrset_type_maysig(new_rr);
 
-	ret = kr_rrkey2(key, new_rr->rclass, new_rr->owner, new_rr->type,
-			additional_key_field);
+	ret = kr_rrkey(key, new_rr->rclass, new_rr->owner, new_rr->type,
+		       additional_key_field);
 	if (ret <= 0) {
 		kr_log_error("[zscanner] line %lu: error constructing rrkey\n", s->line_counter);
 		return -1;
