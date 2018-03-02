@@ -300,7 +300,7 @@ static knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry);
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 			   uint8_t lowest_rank);
-static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k);
+static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt);
@@ -347,103 +347,6 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return ret;
 }
 
-
-/** Find equivalent nsec_p in entry_apex, if any. */
-static knot_db_val_t search_plist(const knot_db_val_t val_cut, const uint8_t *nsec_p)
-{
-	const int nsec_p_dlen = nsec_p_rdlen(nsec_p);
-	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
-	const struct entry_apex *ea = entry_apex_consistent(val_cut);
-	if (!ea) return VAL_EMPTY;
-	const uint8_t *data_it = ea->data;
-	int data_stride; /*< length of the current item in entry_apex data */
-	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i, data_it += data_stride) {
-		int ver = ea->nsecs[i];
-		/* get data_stride */
-		int data_stride_n;
-		switch (ver) {
-		case 0:
-			data_stride = 0;
-			continue;
-		case 1:
-			data_stride_n = 0; /* just the stamp */
-			break;
-		case 3:
-			data_stride_n = nsec_p_rdlen(data_it);
-			break;
-		default:
-			return VAL_EMPTY;
-		}
-		data_stride = sizeof(uint32_t) + data_stride_n;
-
-		if ((!nsec_p && ver == 1)
-		    || (nsec_p && ver == 3 && nsec_p_dlen == data_stride_n
-			&& memcmp(nsec_p, data_it, data_stride_n) == 0)
-		   ) {
-			return (knot_db_val_t){
-				.data = (void *)data_it,
-				.len = data_stride,
-			};
-		}
-	}
-	return VAL_EMPTY;
-}
-
-/** See the call site. */
-static int get_nsec_plist(const knot_db_val_t val_cut,
-			  const uint8_t **nsec_plist, int *nsec_plen, /*< output */
-			  const struct kr_query *qry, const knot_dname_t *zname /*< logging*/)
-{
-	if (true || !val_cut.data) {
-	//  ^^^^ XXX VERBOSE_MSG(qry, "=> not even root NS in cache, but let's try NSEC\n");
-		nsec_plist[0] = NULL;
-		*nsec_plen = 1;
-		return kr_ok();
-	}
-
-	*nsec_plen = 0;
-	const struct entry_apex *ea = entry_apex_consistent(val_cut);
-	const uint8_t *data_it = ea->data;
-	int data_stride; /*< length of the current item in entry_apex data */
-	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i, data_it += data_stride) {
-		int ver = ea->nsecs[i];
-		/* get data_stride */
-		switch (ver) {
-		case 0:
-			data_stride = 0;
-			continue;
-		case 1:
-			data_stride = sizeof(uint32_t); /* just the stamp */
-			break;
-		case 3:
-			data_stride = sizeof(uint32_t) + nsec_p_rdlen(data_it);
-			break;
-		default:
-			return kr_error(EILSEQ);
-		}
-		/* OK iff the stamp is in future */
-		uint32_t stamp;
-		memcpy(&stamp, data_it, sizeof(stamp));
-		const int32_t remains = stamp - qry->timestamp.tv_sec; /* using SOA serial arith. */
-		if (remains < 0) continue;
-		/* append the params */
-		nsec_plist[*nsec_plen] = ver == 1 ? NULL : (data_it + sizeof(stamp));
-		++*nsec_plen;
-	}
-	WITH_VERBOSE(qry) {
-		auto_free char *zname_str = kr_dname_text(zname);
-		if (!*nsec_plen) {
-			VERBOSE_MSG(qry, "=> no NSEC* cached for zone: %s\n", zname_str);
-		} else {
-			VERBOSE_MSG(qry, "=> trying zone: %s (first %s)\n", zname_str,
-					(nsec_plist[0] ? "NSEC3" : "NSEC"));
-		}
-	}
-	return kr_ok();
-}
-
-
-
 /**
  * \note we don't transition to KR_STATE_FAIL even in case of "unexpected errors".
  */
@@ -487,25 +390,38 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(false);
 		return ctx->state;
 	}
-	const knot_db_val_t val_cut = closest_NS(ctx, k);
+	entry_list_t el;
+	ret = closest_NS(ctx, k, el);
+	if (ret) {
+		assert(ret == kr_error(ENOENT));
+		if (ret != kr_error(ENOENT) || !el[0].len) {
+			return ctx->state;
+		}
+	}
 	switch (k->type) {
-	case KNOT_RRTYPE_NS:
-		break;
 	case KNOT_RRTYPE_CNAME: {
-		const uint32_t new_ttl = get_new_ttl(val_cut.data, qry,
+		const knot_db_val_t v = el[EL_CNAME];
+		const uint32_t new_ttl = get_new_ttl(v.data, qry,
 						     qry->sname, KNOT_RRTYPE_CNAME);
-		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, val_cut.data,
-					val_cut.data + val_cut.len, new_ttl);
+		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, v.data,
+					v.data + v.len, new_ttl);
 		/* TODO: ^^ cumbersome code; we also recompute the TTL */
 		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
 		}
-
 	case KNOT_RRTYPE_DNAME:
 		VERBOSE_MSG(qry, "=> DNAME not supported yet\n"); // LATER
 		return ctx->state;
-	default:
-		assert(false);
-		return ctx->state;
+	}
+
+	/* We have to try proving from NSEC*. */
+	WITH_VERBOSE(qry) {
+		auto_free char *zname_str = kr_dname_text(k->zname);
+		if (!el[0].len) {
+			VERBOSE_MSG(qry, "=> no NSEC* cached for zone: %s\n", zname_str);
+		} else {
+			VERBOSE_MSG(qry, "=> trying zone: %s (first %s)\n", zname_str,
+					(el[0].len == 4 ? "NSEC" : "NSEC3"));
+		}
 	}
 
 #if 0
@@ -534,29 +450,29 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	ans.mm = &pkt->mm;
 	const int sname_labels = knot_dname_labels(qry->sname, NULL);
 
-	/* Obtain nsec_p*: the list of usable NSEC* parameters;
-	 * it's list of pointers to NSEC3PARAM data (NULL for NSEC). */
-	const uint8_t * nsec_plist[ENTRY_APEX_NSECS_CNT];
-	int nsec_plen = 0;
-	ret = get_nsec_plist(val_cut, nsec_plist, &nsec_plen, qry, k->zname);
-	if (ret) return ctx->state;
 	/* Try the NSEC* parameters in order, until success.
 	 * Let's not mix different parameters for NSEC* RRs in a single proof. */
 	for (int i = 0; ;) {
-		const uint8_t *nsec_p = nsec_plist[i];
+		if (!el[i].len) goto cont;
+		/* OK iff the stamp is in future */
+		uint32_t stamp;
+		memcpy(&stamp, el[i].data, sizeof(stamp));
+		const int32_t remains = stamp - qry->timestamp.tv_sec; /* using SOA serial arith. */
+		if (remains < 0) goto cont;
+		const uint8_t *nsec_p = el[i].len > sizeof(stamp) ?
+			el[i].data + sizeof(stamp) : NULL;
 		/**** 2. and 3. inside */
-		ret = peek_encloser(k, &ans, nsec_p, sname_labels, lowest_rank, qry, cache);
+		ret = peek_encloser(k, &ans, nsec_p, sname_labels,
+					lowest_rank, qry, cache);
 		if (!ret) break;
 		if (ret < 0) return ctx->state;
+	cont:
 		/* Otherwise we try another nsec_p, if available. */
-		if (++i == nsec_plen) {
-			return ctx->state;
-		}
+		if (++i == ENTRY_APEX_NSECS_CNT) return ctx->state;
 		/* clear possible partial answers in `ans` (no need to deallocate) */
 		ans.rcode = 0;
 		memset(&ans.rrsets, 0, sizeof(ans.rrsets));
 	}
-
 
 	/**** 4. add SOA iff needed */
 	if (ans.rcode != PKT_NOERROR) {
@@ -1239,12 +1155,10 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
  * We also store NSEC* parameters at NS type; probably the latest two will be kept.
  * Found type is returned via k->type.
  *
- * \param exact_match Whether exact match is considered special.
- * \return raw entry from cache (for NS) or rewound entry (xNAME)
+ * \return raw entry from cache (for NS) or rewound entry (xNAME) FIXME
  */
-static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
+static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
 {
-	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
@@ -1254,64 +1168,50 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 	uint8_t rank_min = KR_RANK_INSECURE | KR_RANK_AUTH;
 	// LATER(optim): if stype is NS, we check the same value again
 	bool exact_match = true;
+	bool need_zero = true;
 	/* Inspect the NS/xNAME entries, shortening by a label on each iteration. */
 	do {
 		k->buf[0] = zlf_len;
 		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
-		knot_db_val_t val = VAL_EMPTY;
+		knot_db_val_t val;
 		int ret = cache_op(cache, read, &key, &val, 1);
 		if (ret == -abs(ENOENT)) goto next_label;
 		if (ret) {
 			assert(!ret);
-			return VAL_EMPTY; // TODO: do something with kr_error(ret)?
+			if (need_zero) memset(el, 0, sizeof(entry_list_t));
+			return kr_error(ret);
 		}
 
 		/* Check consistency, find any type;
 		 * using `goto` for shortening by another label. */
-		const struct entry_apex *ea = entry_apex_consistent(val);
-		const knot_db_val_t val_orig = val;
-		if (unlikely(!ea)) {
-			assert(!EILSEQ); // do something about it?
+		ret = entry_list_parse(val, el);
+		if (ret) {
+			assert(!ret); // do something about it?
 			goto next_label;
 		}
+		need_zero = false;
 		/* More types are possible; try in order.
 		 * For non-fatal failures just "continue;" to try the next type. */
-		uint16_t type = 0;
-		while (type != KNOT_RRTYPE_DNAME) {
-			/* Determine the next type to try. */
-			switch (type) {
-			case 0:
-				type = KNOT_RRTYPE_NS;
-				if (!ea->has_ns
-				    /* On a zone cut we want DS from the parent zone. */
-				    || (exact_match && qry->stype == KNOT_RRTYPE_DS)) {
-					continue;
-				}
-				break;
-			case KNOT_RRTYPE_NS:
-				type = KNOT_RRTYPE_CNAME;
+		for (int i = ENTRY_APEX_NSECS_CNT; i < EL_LENGTH; ++i) {
+			if (!el[i].len
+				/* On a zone cut we want DS from the parent zone. */
+				|| (i == EL_NS && exact_match && qry->stype == KNOT_RRTYPE_DS)
 				/* CNAME is interesting only if we
 				 * directly hit the name that was asked.
 				 * Note that we want it even in the DS case. */
-				if (!ea->has_cname || !exact_match)
-					continue;
-				break;
-			case KNOT_RRTYPE_CNAME:
-				type = KNOT_RRTYPE_DNAME;
+				|| (i == EL_CNAME && !exact_match)
 				/* DNAME is interesting only if we did NOT
 				 * directly hit the name that was asked. */
-				if (!ea->has_dname || exact_match)
-					continue;
-				break;
-			default:
-				assert(false);
-				return VAL_EMPTY;
+				|| (i == EL_DNAME && exact_match)
+			   ) {
+				continue;
 			}
+				/* ^^ LATER(optim.): not having NS but having
+				 * non-timeouted nsec_p is also OK for a zone cut. */
 			/* Find the entry for the type, check positivity, TTL */
-			val = val_orig;
-			ret = entry_h_seek(&val, type);
-			const struct entry_h *eh;
-			if (ret || !(eh = entry_h_consistent(val, type))) {
+			const uint16_t type = EL2RRTYPE(i);
+			const struct entry_h *eh = entry_h_consistent(el[i], type);
+			if (!eh) {
 				VERBOSE_MSG(qry, "=> EH seek ret: %d\n", ret);
 				assert(false);
 				goto next_label;
@@ -1339,7 +1239,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			/* We found our match. */
 			k->type = type;
 			k->zlf_len = zlf_len;
-			return type == KNOT_RRTYPE_NS ? val_orig : val;
+			return kr_ok();
 		}
 
 	next_label:
@@ -1350,7 +1250,8 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 			k->type = KNOT_RRTYPE_NS;
 			k->zlf_len = zlf_len;
 			assert(zlf_len == 0);
-			return VAL_EMPTY;
+			if (need_zero) memset(el, 0, sizeof(entry_list_t));
+			return kr_error(ENOENT);
 		}
 		zlf_len -= (k->zname[0] + 1);
 		k->zname += (k->zname[0] + 1);

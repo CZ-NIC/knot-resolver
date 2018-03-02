@@ -75,6 +75,16 @@ enum EL {
 /** Note: arrays are passed "by reference" to functions (in C99). */
 typedef knot_db_val_t entry_list_t[EL_LENGTH];
 
+static inline uint16_t EL2RRTYPE(enum EL i)
+{
+	switch (i) {
+	case EL_NS:	return KNOT_RRTYPE_NS;
+	case EL_CNAME:	return KNOT_RRTYPE_CNAME;
+	case EL_DNAME:	return KNOT_RRTYPE_DNAME;
+	default:	assert(false);  return 0;
+	}
+}
+
 static inline int nsec_p_rdlen(const uint8_t *rdata)
 {
 	//TODO: the zero case?
@@ -142,7 +152,7 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache);
 
-/** Parse an entry_apex into individual items. */
+/** Parse an entry_apex into individual items.  @return error code. */
 int entry_list_parse(const knot_db_val_t val, entry_list_t list);
 
 static inline int entry_list_serial_size(const entry_list_t list)
