@@ -213,17 +213,6 @@ int entry_h_splice(
 		return kr_error(EINVAL);
 	}
 
-	/* Find the whole entry-set and the particular entry within. */
-	entry_list_t el;
-	int ret = -1;
-	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
-		knot_db_val_t val;
-		ret = cache_op(cache, read, &key, &val, 1);
-		if (!ret) ret = entry_list_parse(val, el);
-	}
-	if (ret) memset(el, 0, sizeof(el));
-
-	/* Compatibility map: the simple case -> the multi entry case. */
 	int i_type;
 	switch (type) {
 	case KNOT_RRTYPE_NS:	i_type = EL_NS;		break;
@@ -231,9 +220,26 @@ int entry_h_splice(
 	case KNOT_RRTYPE_DNAME:	i_type = EL_DNAME;	break;
 	default:		i_type = 0;
 	}
-	knot_db_val_t *const val_type = &el[i_type];
-	const struct entry_h *eh_orig = val_type->data ?
-		entry_h_consistent(*val_type, type) : NULL;
+
+	/* Get eh_orig (original entry), and also el list if multi-entry case. */
+	const struct entry_h *eh_orig = NULL;
+	entry_list_t el;
+	int ret = -1;
+	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
+		knot_db_val_t val;
+		ret = cache_op(cache, read, &key, &val, 1);
+		if (i_type) {
+			if (!ret) ret = entry_list_parse(val, el);
+			if (ret) memset(el, 0, sizeof(el));
+			val = el[i_type];
+		}
+		/* val is on the entry, in either case (or error) */
+		if (!ret) {
+			eh_orig = entry_h_consistent(val, type);
+		}
+	} else {
+		memset(el, 0, sizeof(el));
+	}
 
 	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
 		/* If equal rank was accepted, spoofing a *single* answer would be
@@ -254,25 +260,32 @@ int entry_h_splice(
 			return kr_error(EEXIST);
 		}
 	}
+
+	if (!i_type) {
+		/* The non-list types are trivial now. */
+		return cache_write_or_clear(cache, &key, val_new_entry, qry);
+	}
 	/* Now we're in trouble.  In some cases, parts of data to be written
 	 * is an lmdb entry that may be invalidated by our write request.
-	 * (lmdb even does in-place updates!) Therefore we copy all into a buffer.
+	 * (lmdb does even in-place updates!) Therefore we copy all into a buffer.
 	 * (We don't bother deallocating from the mempool.)
 	 * LATER(optim.): do this only when neccessary, or perhaps another approach.
 	 * This is also complicated by the fact that the val_new_entry part
 	 * is to be written *afterwards* by the caller.
 	 */
-	val_type->len = val_new_entry->len;
-	val_type->data = NULL; /* perhaps unclear in the entry_h_splice() API */
+	el[i_type] = (knot_db_val_t){
+		.len = val_new_entry->len,
+		.data = NULL, /* perhaps unclear in the entry_h_splice() API */
+	};
 	knot_db_val_t val = {
-		.len = i_type ? entry_list_serial_size(el) : val_type->len,
+		.len = entry_list_serial_size(el),
 		.data = NULL,
 	};
 	void *buf = mm_alloc(&qry->request->pool, val.len);
 	entry_list_memcpy(buf, el);
 	ret = cache_write_or_clear(cache, &key, &val, qry);
 	if (ret) return kr_error(ret);
-	memcpy(val.data, buf, val.len);
+	memcpy(val.data, buf, val.len); /* we also copy the "empty" space, but well... */
 	val_new_entry->data = val.data + (el[i_type].data - buf);
 	return kr_ok();
 }

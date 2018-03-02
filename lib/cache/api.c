@@ -184,6 +184,7 @@ struct nsec_p {
 struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type)
 {
 	(void) type; /* unused, for now */
+	if (!data.data) return NULL;
 	/* Length checks. */
 	if (data.len < offsetof(struct entry_h, data))
 		return NULL;
@@ -937,6 +938,22 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 		assert(false);
 	}
 	assert(entry_h_consistent(val_new_entry, rr->type));
+
+	{
+	#ifndef NDEBUG
+		struct answer ans;
+		memset(&ans, 0, sizeof(ans));
+		ans.mm = &qry->request->pool;
+		ret = entry2answer(&ans, AR_ANSWER, eh,
+				   val_new_entry.data + val_new_entry.len,
+				   rr->owner, rr->type, 0);
+		/*
+		VERBOSE_MSG(qry, "=> sanity: written %d and read %d\n",
+				(int)val_new_entry.len, ret);
+		assert(ret == val_new_entry.len);
+		*/
+	#endif
+	}
 
 	WITH_VERBOSE(qry) {
 		/* Reduce verbosity. */
