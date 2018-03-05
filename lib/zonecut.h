@@ -156,5 +156,4 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
  * @param cut zone cut to check
  * @return true/false
  */
-KR_EXPORT
 bool kr_zonecut_has_glue(struct kr_zonecut *cut);

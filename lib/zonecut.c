@@ -254,12 +254,14 @@ static int has_glue(const char *k, void *v, void *baton)
 {
 	bool *glue_found = (bool *)baton;
 	if (*glue_found) {
-		return kr_ok();
+		assert(false);
+		return 1; /* short-circuit */
 	}
 
 	pack_t *pack = (pack_t *)v;
 	if (pack != NULL && pack->len != 0) {
 		*glue_found = true;
+		return 1; /* short-circuit */
 	}
 
 	return kr_ok();
