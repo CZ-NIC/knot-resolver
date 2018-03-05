@@ -145,8 +145,10 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(false);
 		return ctx->state;
 	} else if (!ret) {
+		cache->stats.hit += 1;
 		return KR_STATE_DONE;
 	}
+	cache->stats.miss += 1;
 
 	/**** 1b. otherwise, find the longest prefix zone/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;
