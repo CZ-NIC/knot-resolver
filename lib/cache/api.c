@@ -316,6 +316,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG(qry, "=> skipping stype NSEC\n");
 		return ctx->state;
 	}
+
 	if (!check_dname_for_lf(qry->sname, qry)) {
 		return ctx->state;
 	}
@@ -378,6 +379,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
 				goto finally;
 			}
+			cache->stats.insert += 1;
 			/* LATER(optim.): maybe filter out some type-rank combinations
 			 * that won't be useful as separate RRsets. */
 		}
