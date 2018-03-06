@@ -1165,30 +1165,36 @@ static void cache_zone_import_cb(int state, void *param)
 /** Import zone from file. */
 static int cache_zone_import(lua_State *L)
 {
+	int ret = -1;
+	char msg[128];
+
 	struct worker_ctx *worker = wrk_luaget(L);
 	if (!worker) {
-		return 0;
+		strncpy(msg, "internal error, empty worker pointer", sizeof(msg));
+		goto finish;
 	}
 
 	if (worker->z_import && zi_import_started(worker->z_import)) {
-		format_error(L, "import has already started");
-		lua_error(L);
+		strncpy(msg, "import already started", sizeof(msg));
+		goto finish;
 	}
 
 	struct engine *engine = engine_luaget(L);
 	if (!engine) {
-		return 0;
+		strncpy(msg, "internal error, empty engine pointer", sizeof(msg));
+		goto finish;
 	}
 	struct kr_cache *cache = &engine->resolver.cache;
 	if (!kr_cache_is_open(cache)) {
-		return 0;
+		strncpy(msg, "cache isn't open", sizeof(msg));
+		goto finish;
 	}
 
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n < 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected 'cache.zone_import(string key)'");
-		lua_error(L);
+		strncpy(msg, "expected 'cache.zone_import(path to zone file)'", sizeof(msg));
+		goto finish;
 	}
 
 	/* Parse zone file */
@@ -1201,20 +1207,31 @@ static int cache_zone_import(lua_State *L)
 	if (worker->z_import == NULL) {
 		worker->z_import = zi_allocate(worker, cache_zone_import_cb, worker);
 		if (worker->z_import == NULL) {
-			format_error(L, "can't allocate zone import context");
-			lua_error(L);
+			strncpy(msg, "can't allocate zone import context", sizeof(msg));
+			goto finish;
 		}
 	}
 
-	int ret = zi_zone_import(worker->z_import, zone_file, default_origin,
-				 default_rclass, default_ttl);
+	ret = zi_zone_import(worker->z_import, zone_file, default_origin,
+			     default_rclass, default_ttl);
 
-	if (ret != 0) {
-		format_error(L, "error parsing zone file");
-		lua_error(L);
+	lua_newtable(L);
+	if (ret == 0) {
+		strncpy(msg, "zone file successfully parsed, import started", sizeof(msg));
+	} else if (ret == 1) {
+		strncpy(msg, "TA not found", sizeof(msg));
+	} else {
+		strncpy(msg, "error parsing zone file", sizeof(msg));
 	}
 
-	lua_pushstring(L, "zone file successfully parsed, import started");
+finish:
+	msg[sizeof(msg) - 1] = 0;
+	lua_newtable(L);
+	lua_pushstring(L, msg);
+	lua_setfield(L, -2, "msg");
+	lua_pushnumber(L, ret);
+	lua_setfield(L, -2, "code");
+
 	return 1;
 }
 
