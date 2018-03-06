@@ -391,12 +391,7 @@ function M.config(conf)
 		end
 	end
 
-	-- Add endpoints to default endpoints
-	local endpoints = conf.endpoints or {}
-	for k, v in pairs(M.endpoints) do
-		endpoints[k] = v
-	end
-	M.interface(conf.host, conf.port, endpoints, conf.cert, conf.key)
+	M.add_interface(conf)
 end
 
 return M
