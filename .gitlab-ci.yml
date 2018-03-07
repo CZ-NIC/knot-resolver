@@ -277,6 +277,8 @@ respdiff:iter:tls:linux:amd64:
 distro:fedora-27:
   stage: test
   image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  only:
+    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
   dependencies:
     - srpm
   script:
@@ -294,6 +296,8 @@ distro:fedora-27:
 distro:epel-7:
   stage: test
   image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  only:
+    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
   dependencies:
     - srpm
   script:
