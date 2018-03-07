@@ -96,6 +96,7 @@ struct kr_qflags {
 	_Bool FORWARD : 1;
 	_Bool DNS64_MARK : 1;
 	_Bool CACHE_TRIED : 1;
+	_Bool NO_NS_FOUND : 1;
 };
 typedef struct {
 	knot_rrset_t **at;

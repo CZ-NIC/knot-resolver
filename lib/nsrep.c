@@ -162,10 +162,10 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
 	 * at the same time long distance scouts probe other sources (low probability).
 	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
-	if (score <= ns->score && (qry->flags.NO_THROTTLE || score < KR_NS_TIMEOUT)) {
+	if (score <= ns->score && (score < KR_NS_LONG  || (qry->flags.NO_THROTTLE && (score < KR_NS_TIMEOUT)))) {
 		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
 		ns->reputation = reputation;
-	} else {
+	} else if (score < KR_NS_TIMEOUT) {
 		/* With 10% chance, probe server with a probability given by its RTT / MAX_RTT */
 		if ((kr_rand_uint(100) < 10) && (kr_rand_uint(KR_NS_MAX_SCORE) >= score)) {
 			/* If this is a low-reliability probe, go with TCP to get ICMP reachability check. */

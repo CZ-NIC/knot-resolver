@@ -1329,7 +1329,7 @@ static void on_udp_timeout(uv_timer_t *timer)
 				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
 			}
 			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_TIMEOUT,
-					    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
+					    worker->engine->resolver.cache_rtt, KR_NS_RESET);
 		}
 	}
 	task->timeouts += 1;
