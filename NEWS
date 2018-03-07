@@ -1,3 +1,6 @@
+
+- don't magically -D_FORTIFY_SOURCE=2 in some cases
+
 Knot Resolver 2.1.1 (2018-02-23)
 ================================
 
