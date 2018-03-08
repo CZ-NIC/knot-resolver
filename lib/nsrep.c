@@ -161,21 +161,27 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	/* Probabilistic bee foraging strategy (naive).
 	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
 	 * at the same time long distance scouts probe other sources (low probability).
-	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
-	if (score <= ns->score && (score < KR_NS_LONG  || (qry->flags.NO_THROTTLE && (score < KR_NS_TIMEOUT)))) {
+	 * Servers on TIMEOUT will not have probed at all.
+	 * Servers with score above KR_NS_LONG will have periodically removed from
+	 * reputation cache, so that kresd can reprobe them. */
+	if (score >= KR_NS_TIMEOUT) {
+		return kr_ok();
+	} else if (score <= ns->score &&
+		   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
 		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
 		ns->reputation = reputation;
-	} else if (score < KR_NS_TIMEOUT) {
-		/* With 10% chance, probe server with a probability given by its RTT / MAX_RTT */
-		if ((kr_rand_uint(100) < 10) && (kr_rand_uint(KR_NS_MAX_SCORE) >= score)) {
-			/* If this is a low-reliability probe, go with TCP to get ICMP reachability check. */
-			if (score >= KR_NS_LONG) {
-				qry->flags.TCP = true;
-			}
-			update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
-			ns->reputation = reputation;
-			return 1; /* Stop evaluation */
-		}
+	} else if ((kr_rand_uint(100) < 10) &&
+		   (kr_rand_uint(KR_NS_MAX_SCORE) >= score)) {
+		/* With 10% chance probe server with a probability
+		 * given by its RTT / MAX_RTT. */
+		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
+		ns->reputation = reputation;
+		return 1; /* Stop evaluation */
+	} else if (ns->score > KR_NS_MAX_SCORE) {
+		/* Check if any server was already selected.
+		 * If no, pick current server and continue evaluation. */
+		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
+		ns->reputation = reputation;
 	}
 
 	return kr_ok();
@@ -240,7 +246,13 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 
 	struct kr_nsrep *ns = &qry->ns;
 	ELECT_INIT(ns, ctx);
-	return map_walk(&qry->zone_cut.nsset, eval_nsrep, qry);
+	int ret = map_walk(&qry->zone_cut.nsset, eval_nsrep, qry);
+	if (qry->ns.score <= KR_NS_MAX_SCORE && qry->ns.score >= KR_NS_LONG) {
+		/* This is a low-reliability probe,
+		 * go with TCP to get ICMP reachability check. */
+		qry->flags.TCP = true;
+	}
+	return ret;
 }
 
 int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
