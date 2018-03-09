@@ -280,7 +280,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 			unsigned score, kr_nsrep_lru_t *cache, int umode)
 {
-	if (!cache) {
+	if (!cache || umode > KR_NS_MAX) {
 		return kr_error(EINVAL);
 	}
 
@@ -309,10 +309,6 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	if (!cur) {
 		return kr_ok();
 	}
-	/* Score limits */
-	if (score > KR_NS_MAX_SCORE) {
-		score = KR_NS_MAX_SCORE;
-	}
 	if (score <= KR_NS_GLUED) {
 		score = KR_NS_GLUED + 1;
 	}
@@ -320,14 +316,20 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	if (*cur == 0) {
 		umode = KR_NS_RESET;
 	}
+	unsigned new_score = 0;
 	/* Update score, by default smooth over last two measurements. */
 	switch (umode) {
-	case KR_NS_UPDATE: *cur = (*cur + score) / 2; break;
-	case KR_NS_RESET:  *cur = score; break;
-	case KR_NS_ADD:    *cur = MIN(KR_NS_MAX_SCORE - 1, *cur + score); break;
-	case KR_NS_MAX:    *cur = MAX(*cur, score); break;
+	case KR_NS_UPDATE: new_score = (*cur + score) / 2; break;
+	case KR_NS_RESET:  new_score = score; break;
+	case KR_NS_ADD:    new_score = MIN(KR_NS_MAX_SCORE - 1, *cur + score); break;
+	case KR_NS_MAX:    new_score = MAX(*cur, score); break;
 	default: break;
 	}
+	/* Score limits */
+	if (new_score > KR_NS_MAX_SCORE) {
+		new_score = KR_NS_MAX_SCORE;
+	}
+	*cur = new_score;
 	return kr_ok();
 }
 

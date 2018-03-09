@@ -1077,8 +1077,8 @@ static int session_tls_hs_cb(struct session *session, int status)
 	int deletion_res = worker_del_tcp_waiting(worker, &peer->ip);
 
 	if (status) {
-		kr_nsrep_update_rtt(NULL, &peer->ip, KR_NS_TIMEOUT,
-				    worker->engine->resolver.cache_rtt, KR_NS_RESET);
+		kr_nsrep_update_rtt(NULL, &peer->ip, KR_NS_DEAD,
+				    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
 	} else {
 		if (deletion_res != 0) {
 			/* session isn't in list of waiting queries, *
@@ -1244,8 +1244,8 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 		VERBOSE_MSG(qry, "=> connection to '%s' failed\n", addr_str);
 	}
 
-	kr_nsrep_update_rtt(NULL, &peer->ip, KR_NS_TIMEOUT,
-			    worker->engine->resolver.cache_rtt, KR_NS_RESET);
+	kr_nsrep_update_rtt(NULL, &peer->ip, KR_NS_DEAD,
+			    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
 
 	while (session->waiting.len > 0) {
 		struct qr_task *task = session->waiting.at[0];
@@ -1327,8 +1327,8 @@ static void on_udp_timeout(uv_timer_t *timer)
 				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
 				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
 			}
-			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_TIMEOUT,
-					    worker->engine->resolver.cache_rtt, KR_NS_RESET);
+			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_DEAD,
+					    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
 		}
 	}
 	task->timeouts += 1;
