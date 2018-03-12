@@ -54,7 +54,6 @@ static const uint16_t CACHE_VERSION = 5;
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
 
-
 /** @internal Forward declarations of the implementation details
  * \param optout[out] Set *optout = true; when encountering an opt-out NSEC3 (optional). */
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
