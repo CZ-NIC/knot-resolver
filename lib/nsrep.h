@@ -43,7 +43,7 @@ enum kr_ns_score {
 /**
  *  See kr_nsrep_update_rtt()
  */
-#define KR_NS_DEAD ((KR_NS_TIMEOUT * 4) / 3)
+#define KR_NS_DEAD (((KR_NS_TIMEOUT * 4) + 3) / 3)
 
 /**
  * NS QoS flags.
@@ -56,12 +56,17 @@ enum kr_ns_rep {
 
 /**
  * NS RTT update modes.
+ * First update is always KR_NS_RESET unless
+ * KR_NS_UPDATE_NORESET mode had choosen.
  */
 enum kr_ns_update_mode {
-	KR_NS_UPDATE = 0, /**< Update as smooth over last two measurements */
-	KR_NS_RESET,      /**< Set to given value */
-	KR_NS_ADD,        /**< Increment current value */
-	KR_NS_MAX         /**< Set to maximum of current/proposed value. */
+	KR_NS_UPDATE = 0,     /**< Update as smooth over last two measurements */
+	KR_NS_UPDATE_NORESET, /**< Same as KR_NS_UPDATE, but disable fallback to
+			       *   KR_NS_RESET on newly added entries.
+			       *   Zero is used as initial value. */
+	KR_NS_RESET,          /**< Set to given value */
+	KR_NS_ADD,            /**< Increment current value */
+	KR_NS_MAX             /**< Set to maximum of current/proposed value. */
 };
 
 /**

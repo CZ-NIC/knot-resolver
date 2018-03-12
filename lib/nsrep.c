@@ -305,21 +305,30 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 
 	assert(addr_in != NULL && addr_len > 0);
 
-	unsigned *cur = lru_get_new(cache, addr_in, addr_len);
+	bool is_new_entry = false;
+	unsigned *cur = lru_get_new(cache, addr_in, addr_len, (&is_new_entry));
 	if (!cur) {
 		return kr_ok();
 	}
 	if (score <= KR_NS_GLUED) {
 		score = KR_NS_GLUED + 1;
 	}
-	/* First update is always set. */
-	if (*cur == 0) {
-		umode = KR_NS_RESET;
+	/* First update is always set unless KR_NS_UPDATE_NORESET mode used. */
+	if (is_new_entry) {
+		if (umode == KR_NS_UPDATE_NORESET) {
+			/* Zero initial value. */
+			*cur = 0;
+		} else {
+			/* Force KR_NS_RESET otherwise. */
+			umode = KR_NS_RESET;
+		}
 	}
 	unsigned new_score = 0;
 	/* Update score, by default smooth over last two measurements. */
 	switch (umode) {
-	case KR_NS_UPDATE: new_score = (*cur + score) / 2; break;
+	case KR_NS_UPDATE:
+	case KR_NS_UPDATE_NORESET:
+		new_score = (*cur + score) / 2; break;
 	case KR_NS_RESET:  new_score = score; break;
 	case KR_NS_ADD:    new_score = MIN(KR_NS_MAX_SCORE - 1, *cur + score); break;
 	case KR_NS_MAX:    new_score = MAX(*cur, score); break;
@@ -342,7 +351,8 @@ int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t
 	/* Store in the struct */
 	ns->reputation = reputation;
 	/* Store reputation in the LRU cache */
-	unsigned *cur = lru_get_new(cache, (const char *)ns->name, knot_dname_size(ns->name));
+	unsigned *cur = lru_get_new(cache, (const char *)ns->name,
+				    knot_dname_size(ns->name), NULL);
 	if (cur) {
 		*cur = reputation;
 	}
