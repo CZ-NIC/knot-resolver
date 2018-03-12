@@ -1,3 +1,5 @@
+local ffi = require('ffi')
+
 -- test if constants work properly
 local function test_constants()
 	same(kres.class.IN, 1, 'class constants work')
@@ -34,6 +36,17 @@ local function test_rrset_functions()
 	local rr_text = tostring(kres.rr2str(rr))
 	same(rr_text:gsub('%s+', ' '), 'com. 1 TXT "hello"', 'rrset to text works')
 	same(kres.dname2str(todname('com.')), 'com.', 'domain name conversion works')
+	-- test creating rrset
+	rr = kres.rrset(kres.str2dname('com.'), kres.type.A, kres.class.IN)
+	ok(ffi.istype(kres.rrset, rr), 'created an empty RR')
+	same(rr:owner(), '\3com\0', 'created RR has correct owner')
+	same(rr.rclass, kres.class.IN, 'created RR has correct class')
+	same(rr.type, kres.type.A, 'created RR has correct type')
+	-- test adding rdata
+	local rdata = '\1\2\3\4'
+	ok(rr:add_rdata(rdata, #rdata, 66), 'adding RDATA works')
+	-- test conversion to text
+	same(rr:txt_dump(), 'com.                	66	A	1.2.3.4\n', 'RR to text works')
 end
 
 -- test dns library packet interface

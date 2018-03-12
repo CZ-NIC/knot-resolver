@@ -93,6 +93,7 @@ printf "\tchar _stub[];\n};\n"
 # Utils
 	knot_strerror
 # Domain names
+	knot_dname_copy
 	knot_dname_from_str
 	knot_dname_is_equal
 	knot_dname_is_sub

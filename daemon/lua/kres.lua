@@ -249,11 +249,26 @@ local function dname2wire(name)
 	return ffi.string(name, knot.knot_dname_size(name))
 end
 
+-- RR sets created in Lua must have a destructor to release allocated memory
+local function rrset_free(rr)
+	if rr._owner ~= nil then ffi.C.free(rr._owner) end
+	if rr.rrs.rr_count > 0 then ffi.C.free(rr.rrs.data) end
+end
+
 -- Metatype for RR set.  Beware, the indexing is 0-based (rdata, get, tostring).
 local rrset_buflen = (64 + 1) * 1024
 local rrset_buf = ffi.new('char[?]', rrset_buflen)
 local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
+	-- Create a new empty RR set object with an allocated owner and a destructor
+	__new = function (ct, owner, rrtype, rrclass)
+		local rr = ffi.new(ct)
+		knot.knot_rrset_init_empty(rr)
+		rr._owner = owner and knot.knot_dname_copy(owner, nil)
+		rr.type = rrtype or 0
+		rr.rclass = rrclass or const_class.IN
+		return ffi.gc(rr, rrset_free)
+	end,
 	-- beware: `owner` and `rdata` are typed as a plain lua strings
 	--         and not the real types they represent.
 	__tostring = function(rr) return rr:txt_dump() end,
@@ -299,6 +314,13 @@ ffi.metatype( knot_rrset_t, {
 			end
 			C.free(dump[0])
 			return result
+		end,
+		-- Add binary RDATA to the RR set
+		add_rdata = function (rr, rdata, rdlen, ttl)
+			assert(ffi.istype(knot_rrset_t, rr))
+			local ret = knot.knot_rrset_add_rdata(rr, rdata, tonumber(rdlen), tonumber(ttl or 0), nil)
+			if ret ~= 0 then return nil, knot_strerror(ret) end
+			return true
 		end,
 	},
 })
@@ -578,15 +600,12 @@ ffi.metatype(ranked_rr_array_t, {
 -- Extension: append .comment if exists.
 local function rr2str(rr, style)
 	-- Construct a single-RR temporary set while minimizing copying.
-	local rrs = knot_rrset_t()
-	knot.knot_rrset_init_empty(rrs)
-	rrs._owner = ffi.cast('knot_dname_t *', rr.owner) -- explicit cast needed here
-	rrs.type = rr.type
-	rrs.rclass = kres.class.IN
-	knot.knot_rrset_add_rdata(rrs, rr.rdata, #rr.rdata, rr.ttl, nil)
-
-	local ret = rrs:txt_dump(style)
-	C.free(rrs.rrs.data)
+	local ret
+	do
+		local rrs = knot_rrset_t(rr.owner, rr.type, kres.class.IN)
+		rrs:add_rdata(rr.rdata, #rr.rdata, rr.ttl)
+		ret = rrs:txt_dump(style)
+	end
 
 	-- Trim the newline and append comment (optionally).
 	if ret then

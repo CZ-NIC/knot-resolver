@@ -235,6 +235,7 @@ struct kr_context {
 	char _stub[];
 };
 const char *knot_strerror(int);
+knot_dname_t *knot_dname_copy(const knot_dname_t *, knot_mm_t *);
 knot_dname_t *knot_dname_from_str(uint8_t *, const char *, size_t);
 _Bool knot_dname_is_equal(const knot_dname_t *, const knot_dname_t *);
 _Bool knot_dname_is_sub(const knot_dname_t *, const knot_dname_t *);
