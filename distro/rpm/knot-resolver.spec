@@ -77,12 +77,7 @@ a state-machine like API for extensions.
 
 The package is pre-configured as local caching resolver.
 To start using it, start a single kresd instance:
-# systemctl start kresd@1.service
-
-If you run into issues with activation of the service or its sockets, either
-update your selinux-policy package or turn off selinux (setenforce 0).
-https://bugzilla.redhat.com/show_bug.cgi?id=1366968
-https://bugzilla.redhat.com/show_bug.cgi?id=1543049
+$ systemctl start kresd@1.service
 
 %package devel
 Summary:        Development headers for Knot DNS Resolver
@@ -159,7 +154,7 @@ install -m 0644 -p %{repodir}/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/k
 mkdir -p %{buildroot}%{_tmpfilesdir}
 install -m 0644 -p %{repodir}/systemd/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
 mkdir -p %{buildroot}%{_rundir}
-install -m 750 -d %{buildroot}%{_rundir}/knot-resolver
+install -m 0750 -d %{buildroot}%{_rundir}/knot-resolver
 
 # install cache
 mkdir -p %{buildroot}%{_localstatedir}/cache

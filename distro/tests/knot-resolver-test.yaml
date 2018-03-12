@@ -82,10 +82,10 @@
         name: "{{ dig_package[ansible_distribution] }}"
         state: present
 
-    - name: turn off SELinux
-      selinux:
-        policy: targeted
-        state: permissive
+    - name: update selinux-policy
+      package:
+        name: selinux-policy
+        state: latest
       when: ansible_distribution in ['RedHat', 'Fedora']
 
     - name: start kresd@1.service
