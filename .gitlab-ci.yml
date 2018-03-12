@@ -215,6 +215,7 @@ respdiff:iter:udp:linux:amd64:
     paths:
       - kresd.log.xz
       - results/*.txt
+      - results/*.svg
       - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
@@ -241,6 +242,7 @@ respdiff:iter:tcp:linux:amd64:
     paths:
       - kresd.log.xz
       - results/*.txt
+      - results/*.svg
       - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
@@ -267,6 +269,7 @@ respdiff:iter:tls:linux:amd64:
     paths:
       - kresd.log.xz
       - results/*.txt
+      - results/*.svg
       - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
