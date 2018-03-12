@@ -51,6 +51,7 @@ struct sockaddr {
 void * malloc(size_t size);
 void free(void *ptr);
 int inet_pton(int af, const char *src, void *dst);
+int gettimeofday(struct timeval *tv, struct timezone *tz);
 ]]
 
 require('kres-gen')
@@ -226,6 +227,9 @@ setmetatable(const_type_str, {
 	end
 })
 
+-- Metatype for timeval
+local timeval_t = ffi.typeof('struct timeval')
+
 -- Metatype for sockaddr
 local addr_buf = ffi.new('char[16]')
 local sockaddr_t = ffi.typeof('struct sockaddr')
@@ -258,6 +262,7 @@ end
 -- Metatype for RR set.  Beware, the indexing is 0-based (rdata, get, tostring).
 local rrset_buflen = (64 + 1) * 1024
 local rrset_buf = ffi.new('char[?]', rrset_buflen)
+local knot_rrset_pt = ffi.typeof('knot_rrset_t *')
 local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
 	-- Create a new empty RR set object with an allocated owner and a destructor
@@ -275,6 +280,13 @@ ffi.metatype( knot_rrset_t, {
 	__index = {
 		owner = function(rr) return dname2wire(rr._owner) end,
 		ttl = function(rr) return tonumber(knot.knot_rrset_ttl(rr)) end,
+		class = function(rr, val)
+			assert(ffi.istype(knot_rrset_t, rr))
+			if val then
+				rr.rclass = val
+			end
+			return tonumber(rr.rclass)
+		end,
 		rdata = function(rr, i)
 			local rdata = knot.knot_rdataset_at(rr.rrs, i)
 			return ffi.string(knot.knot_rdata_data(rdata), knot.knot_rdata_rdlen(rdata))
@@ -321,6 +333,19 @@ ffi.metatype( knot_rrset_t, {
 			local ret = knot.knot_rrset_add_rdata(rr, rdata, tonumber(rdlen), tonumber(ttl or 0), nil)
 			if ret ~= 0 then return nil, knot_strerror(ret) end
 			return true
+		end,
+		-- Return type covered by this RRSIG
+		type_covered = function(rr, pos)
+			assert(ffi.istype(knot_rrset_t, rr))
+			if rr.type ~= const_type.RRSIG then return end
+			return tonumber(knot.knot_rrsig_type_covered(rr.rrs, pos or 0))
+		end,
+		-- Check whether a RRSIG is covering current RR set
+		is_covered_by = function(rr, rrsig)
+			assert(ffi.istype(knot_rrset_t, rr))
+			assert(ffi.istype(knot_rrset_t, rrsig))
+			assert(rrsig.type == const_type.RRSIG)
+			return (rr.type == rrsig:type_covered() and rr:owner() == rrsig:owner())
 		end,
 	},
 })
@@ -462,7 +487,7 @@ ffi.metatype( knot_pkt_t, {
 			local section = knot.knot_pkt_section(pkt, section_id)
 			for i = 1, section.count do
 				local rrset = knot.knot_pkt_rr(section, i - 1)
-				table.insert(records, rrset)
+				table.insert(records, ffi.cast(knot_rrset_pt, rrset))
 			end
 			return records
 		end,
@@ -594,6 +619,34 @@ ffi.metatype(ranked_rr_array_t, {
 			return self.at[i][0]
 		end,
 	}
+})
+
+-- Cache metatype
+local kr_cache_t = ffi.typeof('struct kr_cache')
+ffi.metatype( kr_cache_t, {
+	__index = {
+		insert = function (self, rr, rrsig, rank, timestamp)
+			assert(self ~= nil)
+			assert(ffi.istype(knot_rrset_t, rr), 'rr must be a rrset type')
+			assert(not rrsig or ffi.istype(knot_rrset_t, rrsig), 'rrsig must be nil or of the rrset type')
+			-- Get current timestamp
+			if not timestamp then
+				local now = timeval_t()
+				C.gettimeofday(now, nil)
+				timestamp = tonumber(now.tv_sec)
+			end
+			-- Insert record into cache
+			local ret = C.kr_cache_insert_rr(self, rr, rrsig, tonumber(rank or 0), timestamp)
+			if ret ~= 0 then return nil, knot_strerror(ret) end
+			return true
+		end,
+		sync = function (self)
+			assert(self ~= nil)
+			local ret = C.kr_cache_sync(self)
+			if ret ~= 0 then return nil, knot_strerror(ret) end
+			return true
+		end,
+	},
 })
 
 -- Pretty-print a single RR (which is a table with .owner .ttl .type .rdata)

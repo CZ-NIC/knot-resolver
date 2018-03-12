@@ -110,6 +110,7 @@ printf "\tchar _stub[];\n};\n"
 	knot_rrset_ttl
 	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
+	knot_rrsig_type_covered
 	knot_rrsig_sig_expiration
 	knot_rrsig_sig_inception
 # Packet
@@ -169,6 +170,9 @@ EOF
 	kr_dnssec_key_revoked
 	kr_dnssec_key_tag
 	kr_dnssec_key_match
+# Cache
+	kr_cache_insert_rr
+	kr_cache_sync
 EOF
 
 printf "]]\n"

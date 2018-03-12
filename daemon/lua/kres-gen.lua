@@ -251,6 +251,7 @@ void knot_rrset_init_empty(knot_rrset_t *);
 uint32_t knot_rrset_ttl(const knot_rrset_t *);
 int knot_rrset_txt_dump(const knot_rrset_t *, char **, size_t *, const knot_dump_style_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
+uint16_t knot_rrsig_type_covered(const knot_rdataset_t *, size_t);
 uint32_t knot_rrsig_sig_expiration(const knot_rdataset_t *, size_t);
 uint32_t knot_rrsig_sig_inception(const knot_rdataset_t *, size_t);
 const knot_dname_t *knot_pkt_qname(const knot_pkt_t *);
@@ -299,4 +300,6 @@ _Bool kr_dnssec_key_ksk(const uint8_t *);
 _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);
+int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t);
+int kr_cache_sync(struct kr_cache *);
 ]]

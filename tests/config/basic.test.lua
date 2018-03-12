@@ -40,13 +40,21 @@ local function test_rrset_functions()
 	rr = kres.rrset(kres.str2dname('com.'), kres.type.A, kres.class.IN)
 	ok(ffi.istype(kres.rrset, rr), 'created an empty RR')
 	same(rr:owner(), '\3com\0', 'created RR has correct owner')
-	same(rr.rclass, kres.class.IN, 'created RR has correct class')
+	same(rr:class(), kres.class.IN, 'created RR has correct class')
+	same(rr:class(kres.class.CH), kres.class.CH, 'can set a different class')
+	same(rr:class(kres.class.IN), kres.class.IN, 'can restore a class')
 	same(rr.type, kres.type.A, 'created RR has correct type')
 	-- test adding rdata
 	local rdata = '\1\2\3\4'
 	ok(rr:add_rdata(rdata, #rdata, 66), 'adding RDATA works')
 	-- test conversion to text
 	same(rr:txt_dump(), 'com.                	66	A	1.2.3.4\n', 'RR to text works')
+	-- create a dummy rrsig
+	local rrsig = kres.rrset(kres.str2dname('com.'), kres.type.RRSIG, kres.class.IN)
+	rrsig:add_rdata('\0\1', 2, 0)
+	-- check rrsig matching
+	same(rr.type, rrsig:type_covered(), 'rrsig type covered matches covered RR type')
+	ok(rr:is_covered_by(rrsig), 'rrsig is covering a record')
 end
 
 -- test dns library packet interface
