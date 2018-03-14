@@ -692,6 +692,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
+
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed (refresh by %d)\n", log_refresh_by);
 	} else {
@@ -746,4 +747,3 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 	}
 	return ret;
 }
-

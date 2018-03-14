@@ -239,8 +239,6 @@ static inline int entry_list_serial_size(const entry_list_t list)
  */
 void entry_list_memcpy(struct entry_apex *ea, entry_list_t list);
 
-
-
 /* Packet caching; implementation in ./entry_pkt.c */
 
 /** Stash the packet into cache (if suitable, etc.)
@@ -272,7 +270,6 @@ static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
  */
 int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
                     const knot_dname_t *owner, uint16_t type, uint32_t now);
-
 
 /* RRset (de)materialization; implementation in ./entry_rr.c */
 
