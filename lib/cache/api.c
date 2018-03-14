@@ -226,17 +226,16 @@ struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type)
 	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
 }
 
-
 int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
-		    const knot_dname_t *owner, uint16_t type)
+                    const knot_dname_t *owner, uint16_t type, uint32_t now)
 {
-	int32_t diff = qry->timestamp.tv_sec - entry->time;
+	int32_t diff = now - entry->time;
 	if (diff < 0) {
 		/* We may have obtained the record *after* the request started. */
 		diff = 0;
 	}
 	int32_t res = entry->ttl - diff;
-	if (res < 0 && owner && qry->stale_cb) {
+	if (res < 0 && owner && qry && qry->stale_cb) {
 		/* Stale-serving decision.  FIXME: modularize or make configurable, etc. */
 		int res_stale = qry->stale_cb(res, owner, type, qry);
 		if (res_stale >= 0)
@@ -244,17 +243,13 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 	}
 	return res;
 }
+
 int32_t kr_cache_ttl(const struct kr_cache_p *peek, const struct kr_query *qry,
 		     const knot_dname_t *name, uint16_t type)
 {
 	const struct entry_h *eh = peek->raw_data;
-	return get_new_ttl(eh, qry, name, type);
+	return get_new_ttl(eh, qry, name, type, qry->timestamp.tv_sec);
 }
-
-
-
-
-
 
 /** Check that no label contains a zero character, incl. a log trace.
  *
@@ -417,8 +412,8 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		break;
 	case KNOT_RRTYPE_CNAME: {
-		const uint32_t new_ttl = get_new_ttl(val_cut.data, qry,
-						     qry->sname, KNOT_RRTYPE_CNAME);
+		int32_t new_ttl = get_new_ttl(val_cut.data, 
+			qry, qry->sname, KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
 		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, val_cut.data,
 					val_cut.data + val_cut.len, new_ttl);
 		/* TODO: ^^ cumbersome code; we also recompute the TTL */
@@ -577,7 +572,7 @@ do_soa:
 			return ctx->state;
 		}
 		/* Check if the record is OK. */
-		int32_t new_ttl = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_SOA);
+		int32_t new_ttl = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_SOA, qry->timestamp.tv_sec);
 		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 			VERBOSE_MSG(qry, "=> SOA unfit %s: rank 0%.2o, new TTL %d\n",
 					(eh->is_packet ? "packet" : "RR"),
@@ -718,7 +713,8 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 	return 1/*proceed*/;
 }
 
-static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank)
+static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr,
+	                       const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank)
 {
 	assert(stash_rrset_precond(rr, qry) > 0);
 	if (!cache) {
@@ -774,7 +770,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 
 	/* Prepare raw memory for the new entry. */
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
-				rr->owner, qry, cache);
+				rr->owner, qry, cache, timestamp);
 	if (ret) return kr_ok(); /* some aren't really errors */
 	assert(val_new_entry.data);
 
@@ -923,7 +919,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		// LATER(optim): pehaps optimize the zone cut search
 	}
 
-	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype);
+	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype, qry->timestamp.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
 		/* Positive record with stale TTL or bad rank.
 		 * LATER(optim.): It's unlikely that we find a negative one,
@@ -979,7 +975,7 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		return kr_error(ret);
 		// LATER: recovery in case of error, perhaps via removing the entry?
 	}
-	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, type);
+	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, type, qry->timestamp.tv_sec);
 		/* ^^ here we use the *expanded* wildcard name */
 	if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 		/* Wildcard record with stale TTL, bad rank or packet.  */
@@ -1123,7 +1119,7 @@ static knot_db_val_t closest_NS(kr_layer_t *ctx, struct key *k)
 				assert(false);
 				goto next_label;
 			}
-			int32_t new_ttl = get_new_ttl(eh, qry, k->zname, type);
+			int32_t new_ttl = get_new_ttl(eh, qry, k->zname, type, qry->timestamp.tv_sec);
 			if (new_ttl < 0
 			    /* Not interested in negative or bogus. */
 			    || eh->is_packet

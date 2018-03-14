@@ -120,7 +120,7 @@ int entry_h_splice(
 	knot_db_val_t *val_new_entry, uint8_t rank,
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
-	const struct kr_query *qry, struct kr_cache *cache);
+	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp);
 
 
 /* Packet caching; implementation in ./entry_pkt.c */
@@ -152,7 +152,7 @@ static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
  * @param type for stale-serving.
  */
 int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
-		    const knot_dname_t *owner, uint16_t type);
+                    const knot_dname_t *owner, uint16_t type, uint32_t now);
 
 /* RRset (de)materialization; implementation in ./entry_rr.c */
 
