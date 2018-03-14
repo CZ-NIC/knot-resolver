@@ -45,16 +45,23 @@ local function test_rrset_functions()
 	same(rr:class(kres.class.IN), kres.class.IN, 'can restore a class')
 	same(rr.type, kres.type.A, 'created RR has correct type')
 	-- test adding rdata
-	local rdata = '\1\2\3\4'
-	ok(rr:add_rdata(rdata, #rdata, 66), 'adding RDATA works')
+	ok(rr:add_rdata('\1\2\3\4', 4, 66), 'adding RDATA works')
 	-- test conversion to text
-	same(rr:txt_dump(), 'com.                	66	A	1.2.3.4\n', 'RR to text works')
+	local expect = 'com.                	66	A	1.2.3.4\n'
+	same(rr:txt_dump(), expect, 'RR to text works')
 	-- create a dummy rrsig
 	local rrsig = kres.rrset(kres.str2dname('com.'), kres.type.RRSIG, kres.class.IN)
 	rrsig:add_rdata('\0\1', 2, 0)
 	-- check rrsig matching
 	same(rr.type, rrsig:type_covered(), 'rrsig type covered matches covered RR type')
 	ok(rr:is_covered_by(rrsig), 'rrsig is covering a record')
+	-- test rrset merging
+	local copy = kres.rrset(rr:owner(), rr.type)
+	ok(copy:add_rdata('\4\3\2\1', 4, 66), 'adding second RDATA works')
+	ok(rr:merge_rdata(copy), 'merge_rdata works')
+	expect = 'com.                	66	A	1.2.3.4\n' ..
+	         'com.                	66	A	4.3.2.1\n'
+	same(rr:txt_dump(), expect, 'merge_rdata actually merged RDATA')
 end
 
 -- test dns library packet interface

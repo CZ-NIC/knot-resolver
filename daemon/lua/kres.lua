@@ -334,6 +334,14 @@ ffi.metatype( knot_rrset_t, {
 			if ret ~= 0 then return nil, knot_strerror(ret) end
 			return true
 		end,
+		-- Merge data from another RR set into the current one
+		merge_rdata = function (rr, source)
+			assert(ffi.istype(knot_rrset_t, rr))
+			assert(ffi.istype(knot_rrset_t, source))
+			local ret = knot.knot_rdataset_merge(rr.rrs, source.rrs, nil)
+			if ret ~= 0 then return nil, knot_strerror(ret) end
+			return true
+		end,
 		-- Return type covered by this RRSIG
 		type_covered = function(rr, pos)
 			assert(ffi.istype(knot_rrset_t, rr))
