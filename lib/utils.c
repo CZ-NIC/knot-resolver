@@ -365,6 +365,33 @@ int kr_sockaddr_len(const struct sockaddr *addr)
 	}
 }
 
+int kr_sockaddr_cmp(const struct sockaddr *left, const struct sockaddr *right)
+{
+	if (!left || !right) {
+		return kr_error(EINVAL);
+	}
+	if (left->sa_family != right->sa_family) {
+		return kr_error(EFAULT);
+	}
+	if (left->sa_family == AF_INET) {
+		struct sockaddr_in *left_in = (struct sockaddr_in *)left;
+		struct sockaddr_in *right_in = (struct sockaddr_in *)right;
+		if (left_in->sin_addr.s_addr != right_in->sin_addr.s_addr) {
+			return kr_error(EFAULT);
+		}
+	} else if (left->sa_family == AF_INET6) {
+		struct sockaddr_in6 *left_in6 = (struct sockaddr_in6 *)left;
+		struct sockaddr_in6 *right_in6 = (struct sockaddr_in6 *)right;
+		if (memcmp(&left_in6->sin6_addr, &right_in6->sin6_addr,
+			   sizeof(struct in6_addr)) != 0) {
+			return kr_error(EFAULT);
+		}
+	} else {
+		return kr_error(ENOENT);
+	}
+	return kr_ok();
+}
+
 uint16_t kr_inaddr_port(const struct sockaddr *addr)
 {
 	if (!addr) {

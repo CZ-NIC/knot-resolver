@@ -1384,8 +1384,15 @@ static uv_handle_t *retransmit(struct qr_task *task)
 			return ret;
 		}
 		ret = ioreq_spawn(task, SOCK_DGRAM, choice->sin6_family);
-		if (ret &&
-		    qr_task_send(task, ret, (struct sockaddr *)choice,
+		if (!ret) {
+			return ret;
+		}
+		struct sockaddr *addr = (struct sockaddr *)choice;
+		struct session *session = ret->data;
+		assert (session->peer.ip.sa_family == AF_UNSPEC);
+		session->outgoing = true;
+		memcpy(&session->peer, addr, sizeof(session->peer));
+		if (qr_task_send(task, ret, (struct sockaddr *)choice,
 				 task->pktbuf) == 0) {
 			task->addrlist_turn = (task->addrlist_turn + 1) %
 					      task->addrlist_count; /* Round robin */
