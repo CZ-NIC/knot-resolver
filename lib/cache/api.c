@@ -705,6 +705,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
+
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (refresh by %d, hash: %x)\n",
 				log_dname, log_refresh_by, log_hash);
@@ -870,4 +871,3 @@ cleanup:
 	}
 	return ret;
 }
-
