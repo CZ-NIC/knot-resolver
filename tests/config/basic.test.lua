@@ -32,12 +32,12 @@ end
 
 -- test if dns library functions work
 local function test_rrset_functions()
-	local rr = {owner = '\3com', ttl = 1, type = kres.type.TXT, rdata = '\5hello'}
+	local rr = {owner = '\3com\0', ttl = 1, type = kres.type.TXT, rdata = '\5hello'}
 	local rr_text = tostring(kres.rr2str(rr))
 	same(rr_text:gsub('%s+', ' '), 'com. 1 TXT "hello"', 'rrset to text works')
 	same(kres.dname2str(todname('com.')), 'com.', 'domain name conversion works')
 	-- test creating rrset
-	rr = kres.rrset(kres.str2dname('com.'), kres.type.A, kres.class.IN)
+	rr = kres.rrset(todname('com.'), kres.type.A, kres.class.IN)
 	ok(ffi.istype(kres.rrset, rr), 'created an empty RR')
 	same(rr:owner(), '\3com\0', 'created RR has correct owner')
 	same(rr:class(), kres.class.IN, 'created RR has correct class')
@@ -50,7 +50,7 @@ local function test_rrset_functions()
 	local expect = 'com.                	66	A	1.2.3.4\n'
 	same(rr:txt_dump(), expect, 'RR to text works')
 	-- create a dummy rrsig
-	local rrsig = kres.rrset(kres.str2dname('com.'), kres.type.RRSIG, kres.class.IN)
+	local rrsig = kres.rrset(todname('com.'), kres.type.RRSIG, kres.class.IN)
 	rrsig:add_rdata('\0\1', 2, 0)
 	-- check rrsig matching
 	same(rr.type, rrsig:type_covered(), 'rrsig type covered matches covered RR type')

@@ -276,10 +276,19 @@ ffi.metatype( knot_rrset_t, {
 	end,
 	-- beware: `owner` and `rdata` are typed as a plain lua strings
 	--         and not the real types they represent.
-	__tostring = function(rr) return rr:txt_dump() end,
+	__tostring = function(rr)
+		assert(ffi.istype(knot_rrset_t, rr))
+		return rr:txt_dump()
+	end,
 	__index = {
-		owner = function(rr) return dname2wire(rr._owner) end,
-		ttl = function(rr) return tonumber(knot.knot_rrset_ttl(rr)) end,
+		owner = function(rr)
+			assert(ffi.istype(knot_rrset_t, rr))
+			return dname2wire(rr._owner)
+		end,
+		ttl = function(rr)
+			assert(ffi.istype(knot_rrset_t, rr))
+			return tonumber(knot.knot_rrset_ttl(rr))
+		end,
 		class = function(rr, val)
 			assert(ffi.istype(knot_rrset_t, rr))
 			if val then
@@ -288,10 +297,12 @@ ffi.metatype( knot_rrset_t, {
 			return tonumber(rr.rclass)
 		end,
 		rdata = function(rr, i)
+			assert(ffi.istype(knot_rrset_t, rr))
 			local rdata = knot.knot_rdataset_at(rr.rrs, i)
 			return ffi.string(knot.knot_rdata_data(rdata), knot.knot_rdata_rdlen(rdata))
 		end,
 		get = function(rr, i)
+			assert(ffi.istype(knot_rrset_t, rr))
 			return {owner = rr:owner(),
 			        ttl = rr:ttl(),
 			        class = tonumber(rr.rclass),
@@ -313,6 +324,7 @@ ffi.metatype( knot_rrset_t, {
 
 		-- Dump the rrset in presentation format (dig-like).
 		txt_dump = function(rr, style)
+			assert(ffi.istype(knot_rrset_t, rr))
 			local bufsize = 1024
 			local dump = ffi.new('char *[1]', C.malloc(bufsize))
 				-- ^ one pointer to a string
@@ -359,6 +371,7 @@ ffi.metatype( knot_rrset_t, {
 })
 
 -- Destructor for packet accepts pointer to pointer
+local knot_pkt_t = ffi.typeof('knot_pkt_t')
 local packet_ptr = ffi.new('knot_pkt_t *[1]')
 local function pkt_free(pkt)
 	packet_ptr[0] = pkt
@@ -367,6 +380,7 @@ end
 
 -- Helpers for reading/writing 16-bit numbers from packet wire
 local function pkt_u16(pkt, off, val)
+	assert(ffi.istype(knot_pkt_t, pkt))
 	local ptr = ffi.cast(u16_p, pkt.wire + off)
 	if val ~= nil then ptr[0] = htons(val) end
 	return (htons(ptr[0]))
@@ -429,7 +443,6 @@ local function packet_tostring(pkt)
 end
 
 -- Metatype for packet
-local knot_pkt_t = ffi.typeof('knot_pkt_t')
 ffi.metatype( knot_pkt_t, {
 	__new = function (_, size, wire)
 		if size < 12 or size > 65535 then
@@ -455,7 +468,8 @@ ffi.metatype( knot_pkt_t, {
 		return pkt:tostring()
 	end,
 	__len = function(pkt)
-		assert(pkt ~= nil) return pkt.size
+		assert(ffi.istype(knot_pkt_t, pkt))
+		return tonumber(pkt.size)
 	end,
 	__ipairs = function(self)
 		return ipairs(self:section(const_section.ANSWER))
@@ -468,11 +482,12 @@ ffi.metatype( knot_pkt_t, {
 		nscount = function(pkt, val) return pkt_u16(pkt, 8,  val) end,
 		arcount = function(pkt, val) return pkt_u16(pkt, 10, val) end,
 		opcode = function (pkt, val)
-			assert(pkt ~= nil)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			pkt.wire[2] = (val) and bit.bor(bit.band(pkt.wire[2], 0x78), 8 * val) or pkt.wire[2]
 			return (bit.band(pkt.wire[2], 0x78) / 8)
 		end,
 		rcode = function (pkt, val)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			pkt.wire[3] = (val) and bor(band(pkt.wire[3], 0xf0), val) or pkt.wire[3]
 			return band(pkt.wire[3], 0x0f)
 		end,
@@ -485,12 +500,20 @@ ffi.metatype( knot_pkt_t, {
 		ra = function (pkt, val) return pkt_bit(pkt, 3, 0x80, val) end,
 		-- Question
 		qname = function(pkt)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			local qname = knot.knot_pkt_qname(pkt)
 			return dname2wire(qname)
 		end,
-		qclass = function(pkt) return knot.knot_pkt_qclass(pkt) end,
-		qtype  = function(pkt) return knot.knot_pkt_qtype(pkt) end,
+		qclass = function(pkt)
+			assert(ffi.istype(knot_pkt_t, pkt))
+			return knot.knot_pkt_qclass(pkt)
+		end,
+		qtype  = function(pkt)
+			assert(ffi.istype(knot_pkt_t, pkt))
+			return knot.knot_pkt_qtype(pkt)
+		end,
 		rrsets = function (pkt, section_id)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			local records = {}
 			local section = knot.knot_pkt_section(pkt, section_id)
 			for i = 1, section.count do
@@ -500,6 +523,7 @@ ffi.metatype( knot_pkt_t, {
 			return records
 		end,
 		section = function (pkt, section_id)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			local records = {}
 			local section = knot.knot_pkt_section(pkt, section_id)
 			for i = 1, section.count do
@@ -511,7 +535,7 @@ ffi.metatype( knot_pkt_t, {
 			return records
 		end,
 		begin = function (pkt, section)
-			assert(pkt ~= nil)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			assert(section >= pkt.current, 'cannot rewind to already written section')
 			assert(const_section_str[section], string.format('invalid section: %s', section))
 			local ret = knot.knot_pkt_begin(pkt, section)
@@ -519,25 +543,25 @@ ffi.metatype( knot_pkt_t, {
 			return true
 		end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
-			assert(pkt ~= nil)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, #rdata)
 			if ret ~= 0 then return nil, knot_strerror(ret) end
 			return true
 		end,
 		recycle = function (pkt)
-			assert(pkt ~= nil)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = C.kr_pkt_recycle(pkt)
 			if ret ~= 0 then return nil, knot_strerror(ret) end
 			return true
 		end,
 		clear_payload = function (pkt)
-			assert(pkt ~= nil)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = C.kr_pkt_clear_payload(pkt)
 			if ret ~= 0 then return nil, knot_strerror(ret) end
 			return true
 		end,
 		question = function(pkt, qname, qclass, qtype)
-			assert(pkt ~= nil)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			assert(qclass ~= nil, string.format('invalid class: %s', qclass))
 			assert(qtype ~= nil, string.format('invalid type: %s', qtype))
 			local ret = C.knot_pkt_put_question(pkt, qname, qclass, qtype)
@@ -545,14 +569,16 @@ ffi.metatype( knot_pkt_t, {
 			return true
 		end,
 		towire = function (pkt)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			return ffi.string(pkt.wire, pkt.size)
 		end,
 		tostring = function(pkt)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			return packet_tostring(pkt)
 		end,
 		-- Packet manipulation
 		parse = function (pkt)
-			assert(pkt ~= nil)
+			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = knot.knot_pkt_parse(pkt, 0)
 			if ret ~= 0 then return nil, knot_strerror(ret) end
 			return true
@@ -563,7 +589,10 @@ ffi.metatype( knot_pkt_t, {
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
-		name = function(qry) return dname2wire(qry.sname) end,
+		name = function(qry)
+			assert(ffi.istype(kr_query_t, qry))
+			return dname2wire(qry.sname)
+		end,
 	},
 })
 -- Metatype for request
@@ -571,25 +600,25 @@ local kr_request_t = ffi.typeof('struct kr_request')
 ffi.metatype( kr_request_t, {
 	__index = {
 		current = function(req)
-			assert(req)
+			assert(ffi.istype(kr_request_t, req))
 			if req.current_query == nil then return nil end
 			return req.current_query
 		end,
 		resolved = function(req)
-			assert(req)
+			assert(ffi.istype(kr_request_t, req))
 			local qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))
 			if qry == nil then return nil end
 			return qry
 		end,
 		-- returns first resolved sub query for a request
 		first_resolved = function(req)
-			assert(req)
+			assert(ffi.istype(kr_request_t, req))
 			local rplan = C.kr_resolve_plan(req)
 			if not rplan or rplan.resolved.len < 1 then return nil end
 			return rplan.resolved.at[0]
 		end,
 		push = function(req, qname, qtype, qclass, flags, parent)
-			assert(req)
+			assert(ffi.istype(kr_request_t, req))
 			flags = kres.mk_qflags(flags) -- compatibility
 			local rplan = C.kr_resolve_plan(req)
 			local qry = C.kr_rplan_push(rplan, parent, qname, qclass, qtype)
@@ -599,7 +628,7 @@ ffi.metatype( kr_request_t, {
 			return qry
 		end,
 		pop = function(req, qry)
-			assert(req)
+			assert(ffi.istype(kr_request_t, req))
 			return C.kr_rplan_pop(C.kr_resolve_plan(req), qry)
 		end,
 	},
@@ -634,9 +663,9 @@ local kr_cache_t = ffi.typeof('struct kr_cache')
 ffi.metatype( kr_cache_t, {
 	__index = {
 		insert = function (self, rr, rrsig, rank, timestamp)
-			assert(self ~= nil)
-			assert(ffi.istype(knot_rrset_t, rr), 'rr must be a rrset type')
-			assert(not rrsig or ffi.istype(knot_rrset_t, rrsig), 'rrsig must be nil or of the rrset type')
+			assert(ffi.istype(kr_cache_t, self))
+			assert(ffi.istype(knot_rrset_t, rr), 'RR must be a rrset type')
+			assert(not rrsig or ffi.istype(knot_rrset_t, rrsig), 'RRSIG must be nil or of the rrset type')
 			-- Get current timestamp
 			if not timestamp then
 				local now = timeval_t()
@@ -649,7 +678,7 @@ ffi.metatype( kr_cache_t, {
 			return true
 		end,
 		sync = function (self)
-			assert(self ~= nil)
+			assert(ffi.istype(kr_cache_t, self))
 			local ret = C.kr_cache_sync(self)
 			if ret ~= 0 then return nil, knot_strerror(ret) end
 			return true
