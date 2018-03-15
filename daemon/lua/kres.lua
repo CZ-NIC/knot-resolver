@@ -44,6 +44,9 @@ struct sockaddr {
     uint16_t sa_family;
     uint8_t _stub[]; /* Do not touch */
 };
+struct knot_error {
+	int code;
+};
 
 /*
  * libc APIs
@@ -56,10 +59,14 @@ int gettimeofday(struct timeval *tv, struct timezone *tz);
 
 require('kres-gen')
 
--- Convert libknot error strings
-local function knot_strerror(r)
-	return ffi.string(knot.knot_strerror(r))
-end
+-- Error code representation
+local knot_error_t = ffi.typeof('struct knot_error')
+ffi.metatype(knot_error_t, {
+	-- Convert libknot error strings
+	__tostring = function(self)
+		return ffi.string(knot.knot_strerror(self.code))
+	end,
+});
 
 -- Constant tables
 local const_class = {
@@ -348,7 +355,7 @@ ffi.metatype( knot_rrset_t, {
 		add_rdata = function (rr, rdata, rdlen, ttl)
 			assert(ffi.istype(knot_rrset_t, rr))
 			local ret = knot.knot_rrset_add_rdata(rr, rdata, tonumber(rdlen), tonumber(ttl or 0), nil)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 		-- Merge data from another RR set into the current one
@@ -356,7 +363,7 @@ ffi.metatype( knot_rrset_t, {
 			assert(ffi.istype(knot_rrset_t, rr))
 			assert(ffi.istype(knot_rrset_t, source))
 			local ret = knot.knot_rdataset_merge(rr.rrs, source.rrs, nil)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 		-- Return type covered by this RRSIG
@@ -544,25 +551,25 @@ ffi.metatype( knot_pkt_t, {
 			assert(section >= pkt.current, 'cannot rewind to already written section')
 			assert(const_section_str[section], string.format('invalid section: %s', section))
 			local ret = knot.knot_pkt_begin(pkt, section)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 		put = function (pkt, owner, ttl, rclass, rtype, rdata)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = C.kr_pkt_put(pkt, owner, ttl, rclass, rtype, rdata, #rdata)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 		recycle = function (pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = C.kr_pkt_recycle(pkt)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 		clear_payload = function (pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = C.kr_pkt_clear_payload(pkt)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 		question = function(pkt, qname, qclass, qtype)
@@ -570,7 +577,7 @@ ffi.metatype( knot_pkt_t, {
 			assert(qclass ~= nil, string.format('invalid class: %s', qclass))
 			assert(qtype ~= nil, string.format('invalid type: %s', qtype))
 			local ret = C.knot_pkt_put_question(pkt, qname, qclass, qtype)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 		towire = function (pkt)
@@ -585,7 +592,7 @@ ffi.metatype( knot_pkt_t, {
 		parse = function (pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = knot.knot_pkt_parse(pkt, 0)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 	},
@@ -679,13 +686,13 @@ ffi.metatype( kr_cache_t, {
 			end
 			-- Insert record into cache
 			local ret = C.kr_cache_insert_rr(self, rr, rrsig, tonumber(rank or 0), timestamp)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 		sync = function (self)
 			assert(ffi.istype(kr_cache_t, self))
 			local ret = C.kr_cache_sync(self)
-			if ret ~= 0 then return nil, knot_strerror(ret) end
+			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
 	},
