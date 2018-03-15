@@ -45,7 +45,9 @@ local function test_rrset_functions()
 	same(rr:class(kres.class.IN), kres.class.IN, 'can restore a class')
 	same(rr.type, kres.type.A, 'created RR has correct type')
 	-- test adding rdata
+	same(rr:wire_size(), 0, 'empty RR wire size is zero')
 	ok(rr:add_rdata('\1\2\3\4', 4, 66), 'adding RDATA works')
+	same(rr:wire_size(), 5 + 4 + 4 + 2 + 4, 'RR wire size works after adding RDATA')
 	-- test conversion to text
 	local expect = 'com.                	66	A	1.2.3.4\n'
 	same(rr:txt_dump(), expect, 'RR to text works')
@@ -104,7 +106,9 @@ local function test_packet_functions()
 	boom(pkt.begin, {pkt, 10}, 'switching to invalid section doesnt work')
 	ok(pkt:begin(kres.section.ADDITIONAL), 'switching to different section works')
 	boom(pkt.begin, {pkt, 0}, 'rewinding sections doesnt work')
+	local before_insert = pkt:remaining_bytes()
 	ok(pkt:put(pkt:qname(), 900, pkt:qclass(), kres.type.A, '\4\3\2\1'), 'adding rrsets to different section works')
+	same(pkt:remaining_bytes(), before_insert - (2 + 4 + 4 + 2 + 4), 'remaining bytes count goes down with insertions')
 	-- Test conversions to text
 	like(pkt:tostring(), '->>HEADER<<-', 'packet to text works')
 	-- Test deserialization
@@ -125,6 +129,15 @@ local function test_packet_functions()
 	same(parsed:nscount(), pkt:nscount(), 'parsed packet has same authority count')
 	same(parsed:arcount(), pkt:arcount(), 'parsed packet has same additional count')
 	same(parsed:tostring(), pkt:tostring(), 'parsed packet is equal to source packet')
+
+	-- Test adding RR sets directly
+	local copy = kres.packet(512)
+	copy:question(todname('hello'), kres.class.IN, kres.type.A)
+	copy:begin(kres.section.ANSWER)
+	local rr = kres.rrset(pkt:qname(), kres.type.A)
+	rr:add_rdata('\4\3\2\1', 4, 66)
+	ok(copy:put_rr(rr), 'adding RR sets directly works')
+	ok(copy:recycle())
 
 	-- Test recycling of packets
 	-- Clear_payload keeps header + question intact

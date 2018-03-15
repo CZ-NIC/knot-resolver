@@ -379,6 +379,11 @@ ffi.metatype( knot_rrset_t, {
 			assert(rrsig.type == const_type.RRSIG)
 			return (rr.type == rrsig:type_covered() and rr:owner() == rrsig:owner())
 		end,
+		-- Return RR set wire size
+		wire_size = function(rr)
+			assert(ffi.istype(knot_rrset_t, rr))
+			return tonumber(knot.knot_rrset_size(rr))
+		end,
 	},
 })
 
@@ -560,6 +565,15 @@ ffi.metatype( knot_pkt_t, {
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
+		-- Put an RR set in the packet
+		-- Note: the packet doesn't take ownership of the RR set
+		put_rr = function (pkt, rr)
+			assert(ffi.istype(knot_pkt_t, pkt))
+			assert(ffi.istype(knot_rrset_t, rr))
+			local ret = C.knot_pkt_put(pkt, 0, rr, 0)
+			if ret ~= 0 then return nil, knot_error_t(ret) end
+			return true
+		end,
 		recycle = function (pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = C.kr_pkt_recycle(pkt)
@@ -587,6 +601,14 @@ ffi.metatype( knot_pkt_t, {
 		tostring = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			return packet_tostring(pkt)
+		end,
+		-- Return number of remaining empty bytes in the packet
+		-- This is generally useful to check if there's enough space
+		remaining_bytes = function (pkt)
+			assert(ffi.istype(knot_pkt_t, pkt))
+			local occupied = pkt.size + pkt.reserved
+			assert(pkt.max_size >= occupied)
+			return tonumber(pkt.max_size - occupied)
 		end,
 		-- Packet manipulation
 		parse = function (pkt)

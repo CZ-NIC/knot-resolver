@@ -111,6 +111,7 @@ printf "\tchar _stub[];\n};\n"
 	knot_rrset_ttl
 	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
+	knot_rrset_size
 	knot_rrsig_type_covered
 	knot_rrsig_sig_expiration
 	knot_rrsig_sig_inception
@@ -120,6 +121,7 @@ printf "\tchar _stub[];\n};\n"
 	knot_pkt_qclass
 	knot_pkt_begin
 	knot_pkt_put_question
+	knot_pkt_put
 	knot_pkt_rr
 	knot_pkt_section
 	knot_pkt_new
