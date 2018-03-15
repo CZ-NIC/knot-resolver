@@ -52,6 +52,7 @@ local function test_rrset_functions()
 	-- create a dummy rrsig
 	local rrsig = kres.rrset(todname('com.'), kres.type.RRSIG, kres.class.IN)
 	rrsig:add_rdata('\0\1', 2, 0)
+	same(rr:rdcount(), 1, 'add_rdata really added RDATA')
 	-- check rrsig matching
 	same(rr.type, rrsig:type_covered(), 'rrsig type covered matches covered RR type')
 	ok(rr:is_covered_by(rrsig), 'rrsig is covering a record')
@@ -59,6 +60,7 @@ local function test_rrset_functions()
 	local copy = kres.rrset(rr:owner(), rr.type)
 	ok(copy:add_rdata('\4\3\2\1', 4, 66), 'adding second RDATA works')
 	ok(rr:merge_rdata(copy), 'merge_rdata works')
+	same(rr:rdcount(), 2, 'RDATA count is correct after merge_rdata')
 	expect = 'com.                	66	A	1.2.3.4\n' ..
 	         'com.                	66	A	4.3.2.1\n'
 	same(rr:txt_dump(), expect, 'merge_rdata actually merged RDATA')

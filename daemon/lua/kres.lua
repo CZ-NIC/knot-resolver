@@ -256,7 +256,7 @@ end
 -- RR sets created in Lua must have a destructor to release allocated memory
 local function rrset_free(rr)
 	if rr._owner ~= nil then ffi.C.free(rr._owner) end
-	if rr.rrs.rr_count > 0 then ffi.C.free(rr.rrs.data) end
+	if rr:rdcount() > 0 then ffi.C.free(rr.rrs.data) end
 end
 
 -- Metatype for RR set.  Beware, the indexing is 0-based (rdata, get, tostring).
@@ -311,7 +311,7 @@ ffi.metatype( knot_rrset_t, {
 		end,
 		tostring = function(rr, i)
 			assert(ffi.istype(knot_rrset_t, rr))
-			if rr.rrs.rr_count > 0 then
+			if rr:rdcount() > 0 then
 				local ret
 				if i ~= nil then
 					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
@@ -338,6 +338,11 @@ ffi.metatype( knot_rrset_t, {
 			end
 			C.free(dump[0])
 			return result
+		end,
+		-- Return RDATA count for this RR set
+		rdcount = function(rr)
+			assert(ffi.istype(knot_rrset_t, rr))
+			return tonumber(rr.rrs.rr_count)
 		end,
 		-- Add binary RDATA to the RR set
 		add_rdata = function (rr, rdata, rdlen, ttl)
@@ -528,7 +533,7 @@ ffi.metatype( knot_pkt_t, {
 			local section = knot.knot_pkt_section(pkt, section_id)
 			for i = 1, section.count do
 				local rrset = knot.knot_pkt_rr(section, i - 1)
-				for k = 1, rrset.rrs.rr_count do
+				for k = 1, rrset:rdcount() do
 					table.insert(records, rrset:get(k - 1))
 				end
 			end
