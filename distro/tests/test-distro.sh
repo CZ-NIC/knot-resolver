@@ -1,9 +1,26 @@
 #!/bin/bash -x
 
-# Configure which repos to use in knot-resolver-test.yaml (vars - repos)
-# Example usage: ./test-distro.sh debian9
+# ./test-distro.sh {devel|latest} {distro}
+# Example usage: ./test-distro.sh devel debian9
 
-cd "$1"
+distro=$2
+repo=$1
+
+# Select repos
+echo -e 'repos:\n  - knot-resolver-latest' > repos.yaml  # latest is needed for knot
+case "$repo" in
+	devel)
+		echo -e '  - knot-resolver-devel' >> repos.yaml
+		;;
+	latest)
+		;;
+	*)
+		echo "Unknown repo, choose devel|latest"
+		exit 1
+		;;
+esac
+
+cd "$distro"
 vagrant destroy &>/dev/null
 vagrant up
 ret=$?

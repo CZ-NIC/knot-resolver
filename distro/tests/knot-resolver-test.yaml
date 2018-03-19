@@ -5,9 +5,6 @@
   become: true
 
   vars:
-    repos:
-      - knot-resolver-latest
-      # - knot-resolver-devel  # enable to test development builds
     ansible_python_interpreter: /usr/bin/python2
     dig_package:
       Debian: dnsutils
@@ -31,6 +28,19 @@
         wget -nv https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/xUbuntu_16.04/Release.key -O Release.key &&
         apt-key add - < Release.key &&
         apt-get update
+    show_package_version:
+      Archlinux:
+        pacman -Qi knot-resolver | grep '^Version'
+      Fedora: |
+        rpm -qi knot-resolver | grep '^Version'
+      CentOS: |
+        rpm -qi knot-resolver | grep '^Version'
+      Debian:
+        dpkg -s knot-resolver | grep '^Version'
+      Ubuntu: |
+        dpkg -s knot-resolver | grep '^Version'
+  vars_files:
+    - repos.yaml
 
   # HACK: Ansible requires Python 2, but it's not installed by default in all distros
   gather_facts: false
@@ -77,6 +87,10 @@
         name: knot-resolver
         state: latest
 
+    - name: get installed package version
+      shell: "{{ show_package_version[ansible_distribution] }}"
+      register: package_version
+
     - name: install dig
       package:
         name: "{{ dig_package[ansible_distribution] }}"
@@ -88,25 +102,31 @@
         state: latest
       when: ansible_distribution in ['RedHat', 'Fedora']
 
-    - name: start kresd@1.service
-      service:
-        name: kresd@1.service
-        state: restarted
-
-    - name: resolve nic.cz
-      shell: dig @127.0.0.1 nic.cz
-      register: res
-      failed_when: '"status: NOERROR" not in res.stdout'
-
-    - name: test dnssec is turned on
+    - name: testing block
       block:
-        - name: test dnssec-failed.org +cd returns NOERROR
-          shell: dig +cd @127.0.0.1 dnssec-failed.org
+        - name: start kresd@1.service
+          service:
+            name: kresd@1.service
+            state: restarted
+
+        - name: resolve nic.cz
+          shell: dig @127.0.0.1 nic.cz
           register: res
           failed_when: '"status: NOERROR" not in res.stdout'
 
-        - name: test dnssec-failed.org returns SERVFAIL
-          shell: dig @127.0.0.1 dnssec-failed.org
-          register: res
-          failed_when: '"status: SERVFAIL" not in res.stdout'
+        - name: test dnssec is turned on
+          block:
+            - name: test dnssec-failed.org +cd returns NOERROR
+              shell: dig +cd @127.0.0.1 dnssec-failed.org
+              register: res
+              failed_when: '"status: NOERROR" not in res.stdout'
 
+            - name: test dnssec-failed.org returns SERVFAIL
+              shell: dig @127.0.0.1 dnssec-failed.org
+              register: res
+              failed_when: '"status: SERVFAIL" not in res.stdout'
+
+      always:
+        - name: show installed version
+          debug:
+            var: package_version.stdout
