@@ -2,7 +2,7 @@
 
 # Example usage:
 # 1. place tarball to be released in git root dir
-# 2. scripts/make-distrofiles.sh
+# 2. scripts/make-distrofiles.sh -s
 # 3. scripts/build-in-obs.sh knot-resolver-latest
 
 project=home:CZ-NIC:$1
