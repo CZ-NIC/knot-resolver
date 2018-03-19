@@ -379,11 +379,17 @@ int kr_sockaddr_cmp(const struct sockaddr *left, const struct sockaddr *right)
 		if (left_in->sin_addr.s_addr != right_in->sin_addr.s_addr) {
 			return kr_error(EFAULT);
 		}
+		if (left_in->sin_port != right_in->sin_port) {
+			return kr_error(EFAULT);
+		}
 	} else if (left->sa_family == AF_INET6) {
 		struct sockaddr_in6 *left_in6 = (struct sockaddr_in6 *)left;
 		struct sockaddr_in6 *right_in6 = (struct sockaddr_in6 *)right;
 		if (memcmp(&left_in6->sin6_addr, &right_in6->sin6_addr,
 			   sizeof(struct in6_addr)) != 0) {
+			return kr_error(EFAULT);
+		}
+		if (left_in6->sin6_port != right_in6->sin6_port) {
 			return kr_error(EFAULT);
 		}
 	} else {

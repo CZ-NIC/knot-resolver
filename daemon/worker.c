@@ -1389,8 +1389,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		}
 		struct sockaddr *addr = (struct sockaddr *)choice;
 		struct session *session = ret->data;
-		assert (session->peer.ip.sa_family == AF_UNSPEC);
-		session->outgoing = true;
+		assert (session->peer.ip.sa_family == AF_UNSPEC && session->outgoing);
 		memcpy(&session->peer, addr, sizeof(session->peer));
 		if (qr_task_send(task, ret, (struct sockaddr *)choice,
 				 task->pktbuf) == 0) {
