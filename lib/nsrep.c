@@ -82,8 +82,8 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 
 #undef ADDR_SET
 
-static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score,
-				uint8_t *addr[], struct kr_qflags opts)
+static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_rtt_lru_t *rtt_cache,
+			      unsigned score, uint8_t *addr[], struct kr_qflags opts)
 {
 	/* Name server is better candidate if it has address record. */
 	uint8_t *it = pack_head(*addr_set);
@@ -101,8 +101,24 @@ static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsign
 		}
 		/* Get RTT for this address (if known) */
 		if (is_valid) {
-			unsigned *cached = rttcache ? lru_get_try(rttcache, val, len) : NULL;
-			unsigned addr_score = (cached) ? *cached : KR_NS_GLUED;
+			kr_nsrep_rtt_lru_entry_t *cached = rtt_cache ?
+							   lru_get_try(rtt_cache, val, len) :
+							   NULL;
+			unsigned addr_score = KR_NS_GLUED;
+			if (cached) {
+				uint64_t elapsed = kr_now() - cached->tout_timestamp;
+				elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
+				/* If NS once was marked as "timeouted",
+				 * it won't participate in NS elections
+				 * at least KR_NS_TIMEOUT_RETRY_INTERVAL milliseconds. */
+				addr_score = cached->score;
+				if (cached->score >= KR_NS_TIMEOUT &&
+				    elapsed > KR_NS_TIMEOUT_RETRY_INTERVAL) {
+					addr_score = KR_NS_LONG - 1;
+					cached->score = addr_score;
+					cached->tout_timestamp = 0;
+				}
+			}
 			if (addr_score < score + favour) {
 				/* Shake down previous contenders */
 				for (size_t i = KR_NSREP_MAXADDR - 1; i > 0; --i)
@@ -128,7 +144,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	/* Fetch NS reputation */
 	if (ctx->cache_rep) {
 		unsigned *cached = lru_get_try(ctx->cache_rep, k,
-					knot_dname_size((const uint8_t *)k));
+					       knot_dname_size((const uint8_t *)k));
 		if (cached) {
 			reputation = *cached;
 		}
@@ -167,7 +183,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	if (score >= KR_NS_TIMEOUT) {
 		return kr_ok();
 	} else if (score <= ns->score &&
-		   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
+	   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
 		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
 		ns->reputation = reputation;
 	} else if ((kr_rand_uint(100) < 10) &&
@@ -221,11 +237,11 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock
 
 	/* Retrieve RTT from cache */
 	struct kr_context *ctx = qry->ns.ctx;
-	unsigned *score = ctx
+	kr_nsrep_rtt_lru_entry_t *rtt_cache_entry = ctx
 		? lru_get_try(ctx->cache_rtt, kr_inaddr(sock), kr_family_len(sock->sa_family))
 		: NULL;
-	if (score) {
-		qry->ns.score = MIN(qry->ns.score, *score);
+	if (rtt_cache_entry) {
+		qry->ns.score = MIN(qry->ns.score, rtt_cache_entry->score);
 	}
 
 	return kr_ok();
@@ -278,7 +294,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 #undef ELECT_INIT
 
 int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
-			unsigned score, kr_nsrep_lru_t *cache, int umode)
+			unsigned score, kr_nsrep_rtt_lru_t *cache, int umode)
 {
 	if (!cache || umode > KR_NS_MAX) {
 		return kr_error(EINVAL);
@@ -306,7 +322,8 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	assert(addr_in != NULL && addr_len > 0);
 
 	bool is_new_entry = false;
-	unsigned *cur = lru_get_new(cache, addr_in, addr_len, (&is_new_entry));
+	kr_nsrep_rtt_lru_entry_t  *cur = lru_get_new(cache, addr_in, addr_len,
+						     (&is_new_entry));
 	if (!cur) {
 		return kr_ok();
 	}
@@ -317,7 +334,7 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	if (is_new_entry) {
 		if (umode == KR_NS_UPDATE_NORESET) {
 			/* Zero initial value. */
-			*cur = 0;
+			cur->score = 0;
 		} else {
 			/* Force KR_NS_RESET otherwise. */
 			umode = KR_NS_RESET;
@@ -328,17 +345,21 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	switch (umode) {
 	case KR_NS_UPDATE:
 	case KR_NS_UPDATE_NORESET:
-		new_score = (*cur + score) / 2; break;
+		new_score = (cur->score + score) / 2; break;
 	case KR_NS_RESET:  new_score = score; break;
-	case KR_NS_ADD:    new_score = MIN(KR_NS_MAX_SCORE - 1, *cur + score); break;
-	case KR_NS_MAX:    new_score = MAX(*cur, score); break;
+	case KR_NS_ADD:    new_score = MIN(KR_NS_MAX_SCORE - 1, cur->score + score); break;
+	case KR_NS_MAX:    new_score = MAX(cur->score, score); break;
 	default: break;
 	}
 	/* Score limits */
 	if (new_score > KR_NS_MAX_SCORE) {
 		new_score = KR_NS_MAX_SCORE;
 	}
-	*cur = new_score;
+	if (new_score >= KR_NS_TIMEOUT && cur->score < KR_NS_TIMEOUT) {
+		/* Set the timestamp only when NS became "timeouted" */
+		cur->tout_timestamp = kr_now();
+	}
+	cur->score = new_score;
 	return kr_ok();
 }
 
@@ -373,9 +394,9 @@ int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src)
 	return kr_ok();
 }
 
-int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_lru_t *cache)
+int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 {
-	if (!ns || !cache) {
+	if (!ns || !rtt_cache) {
 		assert(false);
 		return kr_error(EINVAL);
 	}
@@ -398,22 +419,24 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_lru_t *cache)
 		if (sa->sa_family == AF_UNSPEC) {
 			break;
 		}
-		unsigned *score = lru_get_try(cache, kr_inaddr(sa),
-						kr_family_len(sa->sa_family));
-		if (!score) {
+		kr_nsrep_rtt_lru_entry_t *rtt_cache_entry = lru_get_try(rtt_cache,
+									kr_inaddr(sa),
+									kr_family_len(sa->sa_family));
+		if (!rtt_cache_entry) {
 			scores[i] = 1; /* prefer unknown to probe RTT */
-		} else if ((kr_rand_uint(100) < 10)
-				&& (kr_rand_uint(KR_NS_MAX_SCORE) >= *score)) {
+		} else if ((kr_rand_uint(100) < 10) &&
+			   (kr_rand_uint(KR_NS_MAX_SCORE) >= rtt_cache_entry->score)) {
 			/* some probability to bump bad ones up for re-probe */
 			scores[i] = 1;
 		} else {
-			scores[i] = *score;
+			scores[i] = rtt_cache_entry->score;
 		}
 		if (VERBOSE_STATUS) {
 			char sa_str[INET6_ADDRSTRLEN];
 			inet_ntop(sa->sa_family, kr_inaddr(sa), sa_str, sizeof(sa_str));
 			kr_log_verbose("[     ][nsre] score %d for %s;\t cached RTT: %d\n",
-					scores[i], sa_str, score ? *score : -1);
+					scores[i], sa_str,
+					rtt_cache_entry ? rtt_cache_entry->score : -1);
 		}
 	}
 

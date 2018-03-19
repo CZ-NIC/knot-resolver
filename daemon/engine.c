@@ -650,9 +650,10 @@ static int init_state(struct engine *engine)
 }
 
 static enum lru_apply_do update_stat_item(const char *key, uint len,
-						unsigned *rtt, void *baton)
+					  kr_nsrep_rtt_lru_entry_t *rtt_cache_entry,
+					  void *baton)
 {
-	return *rtt > KR_NS_LONG ? LRU_APPLY_DO_EVICT : LRU_APPLY_DO_NOTHING;
+	return rtt_cache_entry->score > KR_NS_LONG ? LRU_APPLY_DO_EVICT : LRU_APPLY_DO_NOTHING;
 }
 /** @internal Walk RTT table, clearing all entries with bad score
  *    to compensate for intermittent network issues or temporary bad behaviour. */

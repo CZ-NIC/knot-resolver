@@ -162,7 +162,7 @@ struct kr_context
 	map_t negative_anchors;
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
-	kr_nsrep_lru_t *cache_rtt;
+	kr_nsrep_rtt_lru_t *cache_rtt;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
 	/* The cookie context structure should not be held within the cookies

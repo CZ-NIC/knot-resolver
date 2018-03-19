@@ -45,6 +45,10 @@ enum kr_ns_score {
  */
 #define KR_NS_DEAD (((KR_NS_TIMEOUT * 4) + 3) / 3)
 
+/* If once NS was marked as "timeouted", it won't participate in NS elections
+ * at least KR_NS_TIMEOUT_RETRY_INTERVAL milliseconds. */
+#define KR_NS_TIMEOUT_RETRY_INTERVAL 60000
+
 /**
  * NS QoS flags.
  */
@@ -69,8 +73,22 @@ enum kr_ns_update_mode {
 	KR_NS_MAX             /**< Set to maximum of current/proposed value. */
 };
 
+struct kr_nsrep_rtt_lru_entry {
+	unsigned score;	          /* combined rtt */
+	uint64_t tout_timestamp;  /* The time when score became
+				   * greater or equal then KR_NS_TIMEOUT.
+				   * Is meaningful only when score >= KR_NS_TIMEOUT */
+};
+
+typedef struct kr_nsrep_rtt_lru_entry kr_nsrep_rtt_lru_entry_t;
+
 /**
- * NS reputation/QoS tracking.
+ * NS QoS tracking.
+ */
+typedef lru_t(kr_nsrep_rtt_lru_entry_t) kr_nsrep_rtt_lru_t;
+
+/**
+ * NS reputation tracking.
  */
 typedef lru_t(unsigned) kr_nsrep_lru_t;
 
@@ -129,13 +147,13 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
  * @param  score        new score (i.e. RTT), see enum kr_ns_score
  *                      after two calls with score = KR_NS_DEAD and umode = KR_NS_UPDATE
  *                      server will be guaranteed to have KR_NS_TIMEOUTED score
- * @param  cache        LRU cache
+ * @param  cache        RTT LRU cache
  * @param  umode        update mode (KR_NS_UPDATE or KR_NS_RESET or KR_NS_ADD)
  * @return              0 on success, error code on failure
  */
 KR_EXPORT
 int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
-			unsigned score, kr_nsrep_lru_t *cache, int umode);
+			unsigned score, kr_nsrep_rtt_lru_t *cache, int umode);
 
 /**
  * Update NSSET reputation information.
@@ -159,11 +177,11 @@ int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src);
 /**
  * Sort addresses in the query nsrep list
  * @param  ns           updated kr_nsrep
- * @param  cache        RTT cache
+ * @param  rtt_cache    RTT LRU cache
  * @return              0 or an error code
  * @note   ns reputation is zeroed, as KR_NS_NOIP{4,6} flags are useless
- * 		in STUB/FORWARD mode.
+ * 	   in STUB/FORWARD mode.
  */
 KR_EXPORT
-int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_lru_t *cache);
+int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache);
 

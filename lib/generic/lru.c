@@ -132,11 +132,12 @@ static void group_inc_count(lru_group_t *g, int i) {
 
 /** @internal Implementation of both getting and insertion.
  * Note: val_len is only meaningful if do_insert.
- *       *res is only meaningful when return value isn't NULL,
- *	 if return value is NULL, *res remains untouched.
+ *       *is_new is only meaningful when return value isn't NULL, contains
+ *	 true when returned lru entry has been allocated right now
+ *	 if return value is NULL, *is_new remains untouched.
  */
 KR_EXPORT void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
-			      uint val_len, bool do_insert, bool *res)
+			      uint val_len, bool do_insert, bool *is_new)
 {
 	bool ok = lru && (key || !key_len) && key_len <= UINT16_MAX
 		   && (!do_insert || val_len <= UINT16_MAX);
@@ -212,8 +213,8 @@ insert: // insert into position i (incl. key)
 found: // key and hash OK on g->items[i]; now update stamps
 	assert(i < LRU_ASSOC);
 	group_inc_count(g, i);
-	if (res) {
-		*res = is_new_entry;
+	if (is_new) {
+		*is_new = is_new_entry;
 	}
 	return item_val(g->items[i]);
 }

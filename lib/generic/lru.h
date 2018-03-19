@@ -191,7 +191,7 @@ struct lru;
 void lru_free_items_impl(struct lru *lru);
 struct lru * lru_create_impl(uint max_slots, knot_mm_t *mm_array, knot_mm_t *mm);
 void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
-		    uint val_len, bool do_insert, bool *res);
+		    uint val_len, bool do_insert, bool *is_new);
 void lru_apply_impl(struct lru *lru, lru_apply_fun f, void *baton);
 
 struct lru_item;
