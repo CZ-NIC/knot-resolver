@@ -62,7 +62,6 @@ struct engine {
     array_t(const struct kr_cdb_api *) backends;
     fd_array_t ipc_set;
     knot_mm_t *pool;
-    uv_timer_t *updater;
     char *hostname;
     struct lua_State *L;
     char *moduledir;

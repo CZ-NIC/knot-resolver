@@ -649,20 +649,6 @@ static int init_state(struct engine *engine)
 	return kr_ok();
 }
 
-static enum lru_apply_do update_stat_item(const char *key, uint len,
-					  kr_nsrep_rtt_lru_entry_t *rtt_cache_entry,
-					  void *baton)
-{
-	return rtt_cache_entry->score > KR_NS_LONG ? LRU_APPLY_DO_EVICT : LRU_APPLY_DO_NOTHING;
-}
-/** @internal Walk RTT table, clearing all entries with bad score
- *    to compensate for intermittent network issues or temporary bad behaviour. */
-static void update_state(uv_timer_t *handle)
-{
-	struct engine *engine = handle->data;
-	lru_apply(engine->resolver.cache_rtt, update_stat_item, NULL);
-}
-
 /**
  * Start luacov measurement and store results to file specified by
  * KRESD_COVERAGE_STATS environment variable.
@@ -860,15 +846,6 @@ int engine_start(struct engine *engine)
 	lua_gc(engine->L, LUA_GCSETPAUSE, 400);
 	lua_gc(engine->L, LUA_GCRESTART, 0);
 
-	/* Set up periodic update function */
-	uv_timer_t *timer = malloc(sizeof(*timer));
-	if (timer) {
-		uv_timer_init(uv_default_loop(), timer);
-		timer->data = engine;
-		engine->updater = timer;
-		uv_timer_start(timer, update_state, CLEANUP_TIMER, CLEANUP_TIMER);
-	}
-
 	return kr_ok();
 }
 
@@ -876,10 +853,6 @@ void engine_stop(struct engine *engine)
 {
 	if (!engine) {
 		return;
-	}
-	if (engine->updater) {
-		uv_timer_stop(engine->updater);
-		uv_close((uv_handle_t *)engine->updater, (uv_close_cb) free);
 	}
 	uv_stop(uv_default_loop());
 }
