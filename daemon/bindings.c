@@ -1117,6 +1117,39 @@ static int cache_get(lua_State *L)
 	return 1;
 }
 
+/** Set time interval for cleaning rtt cache.
+ * Servers with score >= KR_NS_TIMEOUTED will be cleaned after
+ * this interval ended up, so that they will be able to participate
+ * in NS elections again. */
+static int cache_touted_ns_clean_interval(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_context *ctx = &engine->resolver;
+
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 1) {
+		lua_pushinteger(L, ctx->cache_rtt_tout_retry_interval);
+		return 1;
+	}
+
+	if (!lua_isnumber(L, 1)) {
+		format_error(L, "expected 'cache.ns_tout(interval in ms)'");
+		lua_error(L);
+	}
+
+	lua_Number interval_lua = lua_tonumber(L, 1);
+	if (!(interval_lua >= 0 && interval_lua < UINT_MAX)) {
+		format_error(L, "invalid interval specified, it must be in range > 0, < " xstr(UINT_MAX));
+		lua_error(L);
+	}
+
+	ctx->cache_rtt_tout_retry_interval = interval_lua;
+	lua_pushinteger(L, ctx->cache_rtt_tout_retry_interval);
+	return 1;
+}
+
+
 int lib_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -1131,6 +1164,7 @@ int lib_cache(lua_State *L)
 		{ "get",    cache_get },
 		{ "max_ttl", cache_max_ttl },
 		{ "min_ttl", cache_min_ttl },
+		{ "ns_tout", cache_touted_ns_clean_interval },
 		{ NULL, NULL }
 	};
 

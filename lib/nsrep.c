@@ -82,9 +82,11 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 
 #undef ADDR_SET
 
-static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_rtt_lru_t *rtt_cache,
-			      unsigned score, uint8_t *addr[], struct kr_qflags opts)
+static unsigned eval_addr_set(pack_t *addr_set, struct kr_context *ctx,
+			      unsigned score, uint8_t *addr[])
 {
+	kr_nsrep_rtt_lru_t *rtt_cache = ctx->cache_rtt;
+	struct kr_qflags opts = ctx->options;
 	/* Name server is better candidate if it has address record. */
 	uint8_t *it = pack_head(*addr_set);
 	while (it != pack_tail(*addr_set)) {
@@ -110,10 +112,10 @@ static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_rtt_lru_t *rtt_cache,
 				elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
 				/* If NS once was marked as "timeouted",
 				 * it won't participate in NS elections
-				 * at least KR_NS_TIMEOUT_RETRY_INTERVAL milliseconds. */
+				 * at least ctx->cache_rtt_tout_retry_interval milliseconds. */
 				addr_score = cached->score;
 				if (cached->score >= KR_NS_TIMEOUT &&
-				    elapsed > KR_NS_TIMEOUT_RETRY_INTERVAL) {
+				    elapsed > ctx->cache_rtt_tout_retry_interval) {
 					addr_score = KR_NS_LONG - 1;
 					cached->score = addr_score;
 					cached->tout_timestamp = 0;
@@ -171,7 +173,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 			}
 		}
 	} else {
-		score = eval_addr_set(addr_set, ctx->cache_rtt, score, addr_choice, ctx->options);
+		score = eval_addr_set(addr_set, ctx, score, addr_choice);
 	}
 
 	/* Probabilistic bee foraging strategy (naive).
@@ -286,7 +288,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 	}
 	/* Evaluate addr list */
 	uint8_t *addr_choice[KR_NSREP_MAXADDR] = { NULL, };
-	unsigned score = eval_addr_set(addr_set, ctx->cache_rtt, ns->score, addr_choice, ctx->options);
+	unsigned score = eval_addr_set(addr_set, ctx, ns->score, addr_choice);
 	update_nsrep_set(ns, ns->name, addr_choice, score);
 	return kr_ok();
 }

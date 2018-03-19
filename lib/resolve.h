@@ -163,6 +163,7 @@ struct kr_context
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	kr_nsrep_rtt_lru_t *cache_rtt;
+	unsigned cache_rtt_tout_retry_interval;
 	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
 	/* The cookie context structure should not be held within the cookies
