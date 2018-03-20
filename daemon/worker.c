@@ -2154,6 +2154,16 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			/* FIXME: on high load over one connection, it's likely
 			 * that we will get multiple matches sooner or later (!) */
 			if (task) {
+				/* Make sure we can process maximum packet sizes over TCP for outbound queries.
+				 * Previous packet is allocated with mempool, so there's no need to free it manually. */
+				if (task->pktbuf->max_size < KNOT_WIRE_MAX_PKTSIZE) {
+						knot_mm_t *pool = &task->pktbuf->mm;
+						pkt_buf = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
+						if (!pkt_buf) {
+								return kr_error(ENOMEM);
+						}
+						task->pktbuf = pkt_buf;
+				}
 				knot_pkt_clear(task->pktbuf);
 				assert(task->leading == false);
 			} else	{
