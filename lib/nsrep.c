@@ -108,7 +108,8 @@ static unsigned eval_addr_set(pack_t *addr_set, struct kr_context *ctx,
 							   NULL;
 			unsigned addr_score = KR_NS_GLUED;
 			if (cached) {
-				uint64_t elapsed = kr_now() - cached->tout_timestamp;
+				uint64_t now = kr_now();
+				uint64_t elapsed = now - cached->tout_timestamp;
 				elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
 				/* If NS once was marked as "timeouted",
 				 * it won't participate in NS elections
@@ -116,9 +117,18 @@ static unsigned eval_addr_set(pack_t *addr_set, struct kr_context *ctx,
 				addr_score = cached->score;
 				if (cached->score >= KR_NS_TIMEOUT &&
 				    elapsed > ctx->cache_rtt_tout_retry_interval) {
+					/* Select this NS for probing in this particular query,
+					 * but don't change the cached score.
+					 * For other queries this NS will remain "timeouted". */
 					addr_score = KR_NS_LONG - 1;
-					cached->score = addr_score;
-					cached->tout_timestamp = 0;
+					if (VERBOSE_STATUS) {
+						char sa_str[INET6_ADDRSTRLEN];
+						int af = (len == sizeof(struct in6_addr)) ? AF_INET6 : AF_INET;
+						inet_ntop(af, val, sa_str, sizeof(sa_str));
+						kr_log_verbose("[     ][nsre] probing timeouted NS: %s, score %i\n",
+							       sa_str, addr_score);
+					}
+					cached->tout_timestamp = now;
 				}
 			}
 			if (addr_score < score + favour) {
