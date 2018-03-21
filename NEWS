@@ -21,6 +21,8 @@ Bugfixes
 Improvements
 ------------
 - Dockerfile: rework, basing on Debian instead of Alpine
+- policy.{FORWARD,TLS_FORWARD,STUB}: give advantage to IPv6
+  when choosing whom to ask, just as for iteration
 
 
 Knot Resolver 3.1.0 (2018-11-02)
