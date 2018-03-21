@@ -509,6 +509,9 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 			scores[i] = 1;
 		} else {
 			scores[i] = rtt_cache_entry->score;
+			if (sa->sa_family == AF_INET) {
+				scores[i] += FAVOUR_IPV6;
+			}
 		}
 		if (VERBOSE_STATUS) {
 			char sa_str[INET6_ADDRSTRLEN];
