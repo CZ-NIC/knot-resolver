@@ -5,17 +5,13 @@ if not has_http then
 	done()
 else
 	local request = require('http.request')
-	local endpoints = require('http').endpoints
-
-	-- custom endpoints
-	endpoints['/test'] = {'text/custom', function () return 'hello' end}
 
 	-- setup resolver
 	modules = {
 		http = {
 			port = 0, -- Select random port
 			cert = false,
-			endpoints = endpoints,
+			endpoints = { ['/test'] = {'text/custom', function () return 'hello' end} },
 		}
 	}
 
