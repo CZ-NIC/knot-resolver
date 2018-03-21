@@ -8,6 +8,8 @@ Incompatible changes
 Improvements
 ------------
 - cache: handle out-of-space SIGBUS slightly better (#197)
+- policy.{FORWARD,TLS_FORWARD,STUB}: give advantage to IPv6
+  when choosing whom to ask, just as for iteration
 
 
 Knot Resolver 3.0.0 (2018-08-20)
