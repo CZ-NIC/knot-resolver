@@ -125,14 +125,14 @@
  * @param table pointer to LRU
  * @param key_ lookup key
  * @param len_ key lengthkeys
- * @param res  pointer to bool to store result of operation
+ * @param is_new pointer to bool to store result of operation
  *             (true if entry is newly added, false otherwise; can be NULL).
  * @return pointer to data or NULL (can be even if memory could be allocated!)
  */
-#define lru_get_new(table, key_, len_, res) \
+#define lru_get_new(table, key_, len_, is_new) \
 	(__typeof__((table)->pdata_t)) \
 		lru_get_impl(&(table)->lru, (key_), (len_), \
-		sizeof(*(table)->pdata_t), true, res)
+		sizeof(*(table)->pdata_t), true, is_new)
 
 /**
  * @brief Apply a function to every item in LRU.
