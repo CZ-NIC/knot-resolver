@@ -282,6 +282,7 @@ knot_mm_t *kr_resolve_pool(struct kr_request *);
 struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_dname_t *, uint16_t, uint16_t);
 int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
+struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
 uint32_t kr_rand_uint(uint32_t);
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt);

@@ -702,6 +702,13 @@ ffi.metatype( kr_request_t, {
 			if req.current_query == nil then return nil end
 			return req.current_query
 		end,
+		-- Return last query on the resolution plan
+		last = function(req)
+			assert(ffi.istype(kr_request_t, req))
+			local query = C.kr_rplan_last(C.kr_resolve_plan(req))
+			if query == nil then return end
+			return query
+		end,
 		resolved = function(req)
 			assert(ffi.istype(kr_request_t, req))
 			local qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))

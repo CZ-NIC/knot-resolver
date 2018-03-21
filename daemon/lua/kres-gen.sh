@@ -141,6 +141,7 @@ EOF
 	kr_rplan_push
 	kr_rplan_pop
 	kr_rplan_resolved
+	kr_rplan_last
 # Nameservers
 	kr_nsrep_set
 # Utils

@@ -114,21 +114,27 @@ M.snippets = {}
 
 -- Serve known requests, for methods other than GET
 -- the endpoint must be a closure and not a preloaded string
-local function serve(h, stream)
+local function serve(endpoints, h, stream)
 	local hsend = http_headers.new()
 	local path = h:get(':path')
-	local entry = M.endpoints[path]
+	local entry = endpoints[path]
 	if not entry then -- Accept top-level path match
-		entry = M.endpoints[path:match '^/[^/]*']
+		entry = endpoints[path:match '^/[^/?]*']
 	end
 	-- Unpack MIME and data
-	local mime, data, err
+	local data, mime, ttl, err
 	if entry then
-		mime, data = unpack(entry)
+		mime = entry[1]
+		data = entry[2]
+		ttl = entry[4]
 	end
 	-- Get string data out of service endpoint
 	if type(data) == 'function' then
-		data, err = data(h, stream)
+		local set_mime, set_ttl
+		data, err, set_mime, set_ttl = data(h, stream)
+		-- Override default endpoint mime/TTL
+		if set_mime then mime = set_mime end
+		if set_ttl then ttl = set_ttl end
 		-- Handler doesn't provide any data
 		if data == false then return end
 		if type(data) == 'number' then return tostring(data), err end
@@ -144,7 +150,6 @@ local function serve(h, stream)
 		hsend:append(':status', '200')
 		hsend:append('content-type', mime)
 		hsend:append('content-length', tostring(#data))
-		local ttl = entry and entry[4]
 		if ttl then
 			hsend:append('cache-control', string.format('max-age=%d', ttl))
 		end
@@ -180,7 +185,7 @@ local function route(endpoints)
 			ws:close()
 			return
 		else
-			local ok, err, reason = http_util.yieldable_pcall(serve, h, stream)
+			local ok, err, reason = http_util.yieldable_pcall(serve, endpoints, h, stream)
 			if not ok or err then
 				if err ~= '404' and verbose() then
 					log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
@@ -357,7 +362,12 @@ function M.config(conf)
 			error('[http] mmdblua library not found, please remove GeoIP configuration')
 		end
 	end
-	M.interface(conf.host, conf.port, M.endpoints, conf.cert, conf.key)
+	-- Add endpoints to default endpoints
+	local endpoints = conf.endpoints or {}
+	for k, v in pairs(M.endpoints) do
+		endpoints[k] = v
+	end
+	M.interface(conf.host, conf.port, endpoints, conf.cert, conf.key)
 end
 
 return M
