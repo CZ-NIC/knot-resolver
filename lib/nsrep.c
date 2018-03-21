@@ -94,8 +94,8 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 	uint64_t now = kr_now();
 
 	/* Name server is better candidate if it has address record. */
-	uint8_t *it = pack_head(*addr_set);
-	while (it != pack_tail(*addr_set)) {
+	for (uint8_t *it = pack_head(*addr_set); it != pack_tail(*addr_set);
+						it = pack_obj_next(it)) {
 		void *val = pack_obj_val(it);
 		size_t len = pack_obj_len(it);
 		unsigned favour = 0;
@@ -112,10 +112,10 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		}
 
 		if (!is_valid) {
-			goto get_next_iterator;
+			continue;
 		}
 
-		/* Get RTT for this address (if known) */
+		/* Get score for the current address. */
 		kr_nsrep_rtt_lru_entry_t *cached = rtt_cache ?
 						   lru_get_try(rtt_cache, val, len) :
 						   NULL;
@@ -167,8 +167,6 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 				break;
 			}
 		}
-	get_next_iterator:
-		it = pack_obj_next(it);
 	}
 
 	/* At this point, rtt_cache_entry_ptr contains up to KR_NSREP_MAXADDR
@@ -380,7 +378,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 			unsigned score, kr_nsrep_rtt_lru_t *cache, int umode)
 {
-	if (!cache || umode > KR_NS_MAX) {
+	if (!cache || umode > KR_NS_MAX || umode < 0) {
 		return kr_error(EINVAL);
 	}
 
@@ -409,15 +407,10 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	if (score <= KR_NS_GLUED) {
 		score = KR_NS_GLUED + 1;
 	}
-	/* First update is always set unless KR_NS_UPDATE_NORESET mode used. */
-	if (is_new_entry) {
-		if (umode == KR_NS_UPDATE_NORESET) {
-			/* Zero initial value. */
-			cur->score = 0;
-		} else {
-			/* Force KR_NS_RESET otherwise. */
-			umode = KR_NS_RESET;
-		}
+	/* If there's nothing to update, we reset it unless KR_NS_UPDATE_NORESET
+	 * mode was requested.  New items are zeroed by LRU automatically. */
+	if (is_new_entry && umode != KR_NS_UPDATE_NORESET) {
+		umode = KR_NS_RESET;
 	}
 	unsigned new_score = 0;
 	/* Update score, by default smooth over last two measurements. */
@@ -428,7 +421,7 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	case KR_NS_RESET:  new_score = score; break;
 	case KR_NS_ADD:    new_score = MIN(KR_NS_MAX_SCORE - 1, cur->score + score); break;
 	case KR_NS_MAX:    new_score = MAX(cur->score, score); break;
-	default: break;
+	default:           return kr_error(EINVAL);
 	}
 	/* Score limits */
 	if (new_score > KR_NS_MAX_SCORE) {
