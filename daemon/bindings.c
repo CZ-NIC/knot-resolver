@@ -1242,8 +1242,8 @@ static int cache_ns_tout(lua_State *L)
 		lua_error(L);
 	}
 
-	lua_Number interval_lua = lua_tonumber(L, 1);
-	if (!(interval_lua >= 0 && interval_lua < UINT_MAX)) {
+	lua_Integer interval_lua = lua_tointeger(L, 1);
+	if (!(interval_lua > 0 && interval_lua < UINT_MAX)) {
 		format_error(L, "invalid interval specified, it must be in range > 0, < " xstr(UINT_MAX));
 		lua_error(L);
 	}
