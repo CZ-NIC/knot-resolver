@@ -380,7 +380,13 @@ function M.config(conf)
 			error('[http] mmdblua library not found, please remove GeoIP configuration')
 		end
 	end
-	M.add_interface(conf)
+
+	-- Add endpoints to default endpoints
+	local endpoints = conf.endpoints or {}
+	for k, v in pairs(M.endpoints) do
+		endpoints[k] = v
+	end
+	M.interface(conf.host, conf.port, endpoints, conf.cert, conf.key)
 end
 
 return M
