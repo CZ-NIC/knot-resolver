@@ -251,7 +251,11 @@ ffi.metatype( sockaddr_t, {
 
 -- Pretty print for domain name
 local function dname2str(dname)
-	return ffi.string(ffi.gc(C.knot_dname_to_str(nil, dname, 0), C.free))
+	if dname == nil then return end
+	local text_name = ffi.gc(C.knot_dname_to_str(nil, dname, 0), C.free)
+	if text_name ~= nil then
+		return ffi.string(text_name)
+	end
 end
 
 -- Convert dname pointer to wireformat string
