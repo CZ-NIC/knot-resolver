@@ -88,7 +88,7 @@ static unsigned eval_addr_set(pack_t *addr_set, struct kr_context *ctx,
 	kr_nsrep_rtt_lru_t *rtt_cache = ctx->cache_rtt;
 	struct kr_qflags opts = ctx->options;
 	kr_nsrep_rtt_lru_entry_t *rtt_cache_entry_ptr[KR_NSREP_MAXADDR] = { NULL, };
-	assert (KR_NS_MAX_SCORE >= 2);
+	assert (KR_NSREP_MAXADDR >= 2);
 	unsigned rtt_cache_entry_score[KR_NSREP_MAXADDR] = { score, KR_NS_MAX_SCORE + 1, };
 	uint64_t now = kr_now();
 
