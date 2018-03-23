@@ -638,7 +638,7 @@ do_soa:
 }
 
 /** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
-static int stash_rrarray_entry(const ranked_rr_array_t *arr, int arr_i,
+static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
 			int *unauth_cnt);
 
@@ -663,7 +663,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = 0;
 	int unauth_cnt = 0;
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
-		const ranked_rr_array_t *arr = selected[psec];
+		ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
 		for (ssize_t i = arr->len - 1; i >= 0; --i) {
 			ranked_rr_array_entry_t *entry = arr->at[i];
@@ -821,11 +821,11 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 	return (ssize_t) val_new_entry.len;
 }
 
-static int stash_rrarray_entry(const ranked_rr_array_t *arr, int arr_i,
+static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
 			int *unauth_cnt)
 {
-	const ranked_rr_array_entry_t *entry = arr->at[arr_i];
+	ranked_rr_array_entry_t *entry = arr->at[arr_i];
 	if (entry->cached) {
 		return kr_ok();
 	}
@@ -836,6 +836,7 @@ static int stash_rrarray_entry(const ranked_rr_array_t *arr, int arr_i,
 	}
 
 	/* Try to find corresponding signatures, always.  LATER(optim.): speed. */
+	ranked_rr_array_entry_t *entry_rrsigs = NULL;
 	const knot_rrset_t *rr_sigs = NULL;
 	for (ssize_t j = arr->len - 1; j >= 0; --j) {
 		/* TODO: ATM we assume that some properties are the same
@@ -846,6 +847,7 @@ static int stash_rrarray_entry(const ranked_rr_array_t *arr, int arr_i,
 			&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
 			&& knot_dname_is_equal(rr->owner, e->rr->owner);
 		if (!ok) continue;
+		entry_rrsigs = e;
 		rr_sigs = e->rr;
 		break;
 	}
@@ -856,6 +858,11 @@ static int stash_rrarray_entry(const ranked_rr_array_t *arr, int arr_i,
 	}
 
 	if (written > 0) {
+		/* Mark entry as cached for the rest of the query processing */
+		entry->cached = true;
+		if (entry_rrsigs) {
+			entry_rrsigs->cached = true;
+		}
 		if (!kr_rank_test(entry->rank, KR_RANK_AUTH) && rr->type != KNOT_RRTYPE_NS) {
 			*unauth_cnt += 1;
 		}
