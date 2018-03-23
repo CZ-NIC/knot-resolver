@@ -288,7 +288,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 		} else if (err == GNUTLS_E_AGAIN) {
 			return 0;
 		} else if (gnutls_error_is_fatal(err)) {
-			kr_log_error("[%s] gnutls_handshake failed: %s (%d)\n",
+			kr_log_verbose("[%s] gnutls_handshake failed: %s (%d)\n",
 				     logstring,
 			             gnutls_strerror_name(err), err);
 			if (tls_p->handshake_cb) {
@@ -306,7 +306,7 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 		} else if (count == GNUTLS_E_INTERRUPTED) {
 			continue; /* Try reading again */
 		} else if (count < 0) {
-			kr_log_error("[%s] gnutls_record_recv failed: %s (%zd)\n",
+			kr_log_verbose("[%s] gnutls_record_recv failed: %s (%zd)\n",
 				     logstring, gnutls_strerror_name(count), count);
 			return kr_error(EIO);
 		}
@@ -883,7 +883,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 	if (ret == GNUTLS_E_SUCCESS) {
 		return kr_ok();
 	} else if (gnutls_error_is_fatal(ret) != 0) {
-		kr_log_error("[tls_client] handshake failed (%s)\n", gnutls_strerror(ret));
+		kr_log_verbose("[tls_client] handshake failed (%s)\n", gnutls_strerror(ret));
 		return kr_error(ECONNABORTED);
 	}
 	return kr_error(EAGAIN);
