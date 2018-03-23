@@ -652,6 +652,8 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
 				goto finally;
 			}
+			/* Mark entry as cached for the rest of the query processing */
+			entry->cached = true;
 			/* LATER(optim.): maybe filter out some type-rank combinations
 			 * that won't be useful as separate RRsets. */
 		}
@@ -712,7 +714,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 		/* TODO: ATM we assume that some properties are the same
 		 * for all RRSIGs in the set (esp. label count). */
 		ranked_rr_array_entry_t *e = arr->at[j];
-		bool ok = e->qry_uid == qry->uid && !e->cached
+		bool ok = e->qry_uid == qry->uid
 			&& e->rr->type == KNOT_RRTYPE_RRSIG
 			&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
 			&& knot_dname_is_equal(rr->owner, e->rr->owner);

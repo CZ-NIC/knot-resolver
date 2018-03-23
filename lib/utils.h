@@ -145,7 +145,7 @@ struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank; /**< enum kr_rank */
 	uint8_t revalidation_cnt;
-	bool cached : 1;  /**< whether it has been stashed to cache already */
+	bool cached : 1;  /**< Set to true if the entry was written into cache */
 	bool yielded : 1;
 	bool to_wire : 1; /**< whether to be put into the answer */
 	bool expiring : 1; /**< low remaining TTL; see is_expiring; only used in cache ATM */
