@@ -1,3 +1,8 @@
+-- Module implementation
+local M = {
+	namespace = '',
+}
+
 local snapshots, snapshots_count = {}, 120
 
 -- Gauge metrics
@@ -126,33 +131,35 @@ local function serve_prometheus()
 		elseif k == 'answer_slow' then
 			table.insert(latency, {'+Inf', v})
 		-- Counter as a fallback
-		else table.insert(render, string.format(counter, k, k, v)) end
+		else
+			local key = M.namespace .. k
+			table.insert(render, string.format(counter, key, key, v))
+		end
 	end
 	-- Fill in latency histogram
 	local function kweight(x) return tonumber(x) or math.huge end
 	table.sort(latency, function (a,b) return kweight(a[1]) < kweight(b[1]) end)
-	table.insert(render, '# TYPE latency histogram')
+	table.insert(render, string.format('# TYPE %slatency histogram', M.namespace))
 	local count, sum = 0.0, 0.0
 	for _,e in ipairs(latency) do
 		-- The information about the %Inf bin is lost, so we treat it
 		-- as a timeout (3000ms) for metrics purposes
 		count = count + e[2]
 		sum = sum + e[2] * (math.min(tonumber(e[1]), 3000.0))
-		table.insert(render, string.format('latency_bucket{le="%s"} %f', e[1], count))
+		table.insert(render, string.format('%slatency_bucket{le="%s"} %f', M.namespace, e[1], count))
 	end
-	table.insert(render, string.format('latency_count %f', count))
-	table.insert(render, string.format('latency_sum %f', sum))
+	table.insert(render, string.format('%slatency_count %f', M.namespace, count))
+	table.insert(render, string.format('%slatency_sum %f', M.namespace, sum))
 	return table.concat(render, '\n') .. '\n'
 end
 
--- Export endpoints
-return {
-	init = snapshot_start,
-	deinit = snapshot_end,
-	gauges = gauges,
-	endpoints = {
-		['/stats']     = {'application/json', getstats, stream_stats},
-		['/frequent']  = {'application/json', function () return stats.frequent() end},
-		['/metrics']   = {'text/plain; version=0.0.4', serve_prometheus},
-	}
+-- Export module interface
+M.init = snapshot_start
+M.deinit = snapshot_end
+M.endpoints = {
+	['/stats']     = {'application/json', getstats, stream_stats},
+	['/frequent']  = {'application/json', function () return stats.frequent() end},
+	['/metrics']   = {'text/plain; version=0.0.4', serve_prometheus},
 }
+
+return M

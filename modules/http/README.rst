@@ -109,6 +109,17 @@ You can use it out of the box:
 	latency_count 2.000000
 	latency_sum 11.000000
 
+You can namespace the metrics in configuration, using `http.prometheus.namespace` attribute:
+
+.. code-block:: lua
+
+	http = {
+		host = 'localhost',
+	}
+
+	-- Set Prometheus namespace
+	http.prometheus.namespace = 'resolver_'
+
 Tracing requests
 ^^^^^^^^^^^^^^^^
 
