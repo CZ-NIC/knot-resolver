@@ -1316,8 +1316,8 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		}
 	} while (state == KR_STATE_CONSUME);
 
-	/* Update minimized QNAME if zone cut changed */
-	if (qry->zone_cut.name && qry->zone_cut.name[0] != '\0' && !(qry->flags.NO_MINIMIZE)) {
+	/* Update QNAME if zone cut changed */
+	if (qry->zone_cut.name && qry->zone_cut.name[0] != '\0') {
 		if (kr_make_query(qry, packet) != 0) {
 			return KR_STATE_FAIL;
 		}
