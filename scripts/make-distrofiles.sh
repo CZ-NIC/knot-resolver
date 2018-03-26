@@ -1,6 +1,21 @@
 #!/bin/bash -e
 
+# Run with -s to include *.symbols files.
+
 package=knot-resolver
+withsymbols=false
+
+while getopts "s" o; do
+	case "${o}" in
+		s)
+			withsymbols=true
+			;;
+		*)
+			;;
+	esac
+done
+shift $((OPTIND-1))
+
 
 cd "$(git rev-parse --show-toplevel)"
 version=$(ls ${package}*.tar.xz | sed "s/${package}-\(.*\).tar.xz/\1/")
@@ -16,6 +31,11 @@ files="distro/rpm/${package}.spec distro/deb/debian/changelog distro/deb/${packa
 for file in ${files}; do
 	sed -i "s/__VERSION__/${version}/g" "${file}"
 done
+
+# Optionally remove symbols file
+if [ "$withsymbols" = false ]; then
+	rm distro/deb/debian/*.symbols
+fi
 
 # Rename archive to debian format
 mv "${package}-${version}.tar.xz" "${package}_${version}.orig.tar.xz"
