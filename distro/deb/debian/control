@@ -35,7 +35,7 @@ Architecture: any
 Depends:
  adduser,
  dns-root-data,
- libkres6 (= ${binary:Version}),
+ libkres7 (= ${binary:Version}),
  lua-sec,
  lua-socket,
  ${misc:Depends},
@@ -99,7 +99,7 @@ Description: Documentation for Knot Resolver
  .
  This package contains Knot Resolver Documentation.
 
-Package: libkres6
+Package: libkres7
 Architecture: any
 Section: libs
 Depends:
@@ -123,7 +123,7 @@ Package: libkres-dev
 Architecture: any
 Section: libdevel
 Depends:
- libkres6 (= ${binary:Version}),
+ libkres7 (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends},
 Breaks:
