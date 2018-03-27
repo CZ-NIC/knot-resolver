@@ -1,5 +1,19 @@
+Knot Resolver 2.2.0 (2018-03-28)
+================================
 
+New features
+------------
+- cache server unavailability to prevent flooding unreachable servers
+  (Please note that caching algorithm needs further optimization
+   and will change in further versions but we need to gather operational
+   experience first.)
+
+Bugfixes
+--------
 - don't magically -D_FORTIFY_SOURCE=2 in some cases
+- allow large responses for outbound over TCP
+- fix crash with RR sets with over 255 records
+
 
 Knot Resolver 2.1.1 (2018-02-23)
 ================================
