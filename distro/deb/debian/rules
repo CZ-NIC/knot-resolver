@@ -43,6 +43,8 @@ override_dh_auto_build-indep:
 
 override_dh_auto_install-arch:
 	dh_auto_install --destdir=debian/tmp -- V=1
+	rm debian/tmp/etc/knot-resolver/icann-ca.pem
+	rm debian/tmp/etc/knot-resolver/root.hints
 
 override_dh_auto_install-indep:
 # install just the http/2 module
