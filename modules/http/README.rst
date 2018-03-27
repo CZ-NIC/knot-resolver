@@ -120,6 +120,19 @@ You can namespace the metrics in configuration, using `http.prometheus.namespace
 	-- Set Prometheus namespace
 	http.prometheus.namespace = 'resolver_'
 
+You can also add custom metrics or rewrite existing metrics before they are returned to Prometheus client.
+
+.. code-block:: lua
+
+	http = {
+		host = 'localhost',
+	}
+
+	-- Add an arbitrary metric to Prometheus
+	http.prometheus.finalize = function (metrics)
+		table.insert(metrics, 'build_info{version="1.2.3"} 1')
+	end
+
 Tracing requests
 ^^^^^^^^^^^^^^^^
 

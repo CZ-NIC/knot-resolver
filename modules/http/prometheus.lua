@@ -1,6 +1,7 @@
 -- Module implementation
 local M = {
 	namespace = '',
+	finalize = function (_ --[[metrics]]) end,
 }
 
 local snapshots, snapshots_count = {}, 120
@@ -150,6 +151,10 @@ local function serve_prometheus()
 	end
 	table.insert(render, string.format('%slatency_count %f', M.namespace, count))
 	table.insert(render, string.format('%slatency_sum %f', M.namespace, sum))
+	-- Finalize metrics table before rendering
+	if type(M.finalize) == 'function' then
+		M.finalize(render)
+	end
 	return table.concat(render, '\n') .. '\n'
 end
 
