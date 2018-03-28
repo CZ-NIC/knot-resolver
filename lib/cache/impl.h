@@ -156,10 +156,13 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 
 /* RRset (de)materialization; implementation in ./entry_rr.c */
 
+/** Size of the RR count field */
+#define KR_CACHE_RR_COUNT_SIZE sizeof(uint16_t)
+
 /** Compute size of dematerialized rdataset.  NULL is accepted as empty set. */
 static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 {
-	return 1/*sizeof(rr_count)*/ + (rds
+	return KR_CACHE_RR_COUNT_SIZE + (rds
 		? knot_rdataset_size(rds) - 4 * rds->rr_count /*TTLs*/
 		: 0);
 }
