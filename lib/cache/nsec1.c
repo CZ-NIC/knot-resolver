@@ -216,7 +216,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	}
 	/* We know it starts before sname, so let's check the other end.
 	 * 1. construct the key for the next name - kwz_hi. */
-	const knot_dname_t *next = eh->data + 3; /* it's *full* name ATM */
+	const knot_dname_t *next = eh->data + 2 * KR_CACHE_RR_COUNT_SIZE; /* it's *full* name ATM */
 	if (!eh->data[0]) {
 		assert(false);
 		return "ERROR";

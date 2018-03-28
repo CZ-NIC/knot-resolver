@@ -36,9 +36,10 @@ static int entry_h_len(const knot_db_val_t val)
 	if (!eh->is_packet) { /* Positive RRset + its RRsig set (may be empty). */
 		int sets = 2;
 		while (sets-- > 0) {
-			if (d + 1 > data_bound) return kr_error(EILSEQ);
-			uint8_t rr_count;
-			memcpy(&rr_count, d++, sizeof(rr_count));
+			if (d + 2 > data_bound) return kr_error(EILSEQ);
+			uint16_t rr_count;
+			memcpy(&rr_count, d, sizeof(rr_count));
+			d += sizeof(rr_count);
 			for (int i = 0; i < rr_count; ++i) {
 				if (d + 2 > data_bound) return kr_error(EILSEQ);
 				uint16_t len;
