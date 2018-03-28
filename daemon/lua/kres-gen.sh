@@ -84,7 +84,7 @@ printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 genResType "struct kr_query"
 
-genResType "struct kr_context" | sed '/kr_nsrep_lru_t/,$ d'
+genResType "struct kr_context" | sed '/kr_nsrep_rtt_lru_t/,$ d'
 printf "\tchar _stub[];\n};\n"
 
 ## libknot API
