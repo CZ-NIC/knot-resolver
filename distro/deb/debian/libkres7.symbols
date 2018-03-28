@@ -1,4 +1,4 @@
-libkres.so.6 libkres6 #MINVER#
+libkres.so.7 libkres7 #MINVER#
  cache_api@Base 2.1.0
  iterate_api@Base 2.1.0
  kr_answer_write_cookie@Base 2.1.0
@@ -111,7 +111,6 @@ libkres.so.6 libkres6 #MINVER#
  map_contains@Base 2.1.0
  map_del@Base 2.1.0
  map_get@Base 2.1.0
- map_make@Base 2.1.0
  map_set@Base 2.1.0
  map_walk_prefixed@Base 2.1.0
  validate_api@Base 2.1.0

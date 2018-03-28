@@ -1,6 +1,6 @@
 Format: 3.0 (quilt)
 Source: knot-resolver
-Binary: knot-resolver, knot-resolver-module-http, knot-resolver-doc, libkres6, libkres-dev
+Binary: knot-resolver, knot-resolver-module-http, knot-resolver-doc, libkres7, libkres-dev
 Architecture: any all
 Version: __VERSION__-1
 Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
@@ -14,5 +14,5 @@ Package-List:
  knot-resolver-doc deb doc optional arch=all
  knot-resolver-module-http deb net optional arch=all
  libkres-dev deb libdevel optional arch=any
- libkres6 deb libs optional arch=any
+ libkres7 deb libs optional arch=any
 Files:
