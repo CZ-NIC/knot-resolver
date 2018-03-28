@@ -585,6 +585,7 @@ static int init_resolver(struct engine *engine)
 	engine->resolver.negative_anchors = map_make(NULL);
 	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
+	engine->resolver.cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
 	engine->resolver.opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
 	if (!engine->resolver.opt_rr) {
@@ -647,19 +648,6 @@ static int init_state(struct engine *engine)
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
-}
-
-static enum lru_apply_do update_stat_item(const char *key, uint len,
-						unsigned *rtt, void *baton)
-{
-	return *rtt > KR_NS_LONG ? LRU_APPLY_DO_EVICT : LRU_APPLY_DO_NOTHING;
-}
-/** @internal Walk RTT table, clearing all entries with bad score
- *    to compensate for intermittent network issues or temporary bad behaviour. */
-static void update_state(uv_timer_t *handle)
-{
-	struct engine *engine = handle->data;
-	lru_apply(engine->resolver.cache_rtt, update_stat_item, NULL);
 }
 
 /**
@@ -859,15 +847,6 @@ int engine_start(struct engine *engine)
 	lua_gc(engine->L, LUA_GCSETPAUSE, 400);
 	lua_gc(engine->L, LUA_GCRESTART, 0);
 
-	/* Set up periodic update function */
-	uv_timer_t *timer = malloc(sizeof(*timer));
-	if (timer) {
-		uv_timer_init(uv_default_loop(), timer);
-		timer->data = engine;
-		engine->updater = timer;
-		uv_timer_start(timer, update_state, CLEANUP_TIMER, CLEANUP_TIMER);
-	}
-
 	return kr_ok();
 }
 
@@ -875,10 +854,6 @@ void engine_stop(struct engine *engine)
 {
 	if (!engine) {
 		return;
-	}
-	if (engine->updater) {
-		uv_timer_stop(engine->updater);
-		uv_close((uv_handle_t *)engine->updater, (uv_close_cb) free);
 	}
 	uv_stop(uv_default_loop());
 }

@@ -1,4 +1,4 @@
-/*  Copyright (C) 2016-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2016-2018 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -131,9 +131,13 @@ static void group_inc_count(lru_group_t *g, int i) {
 }
 
 /** @internal Implementation of both getting and insertion.
- * Note: val_len is only meaningful if do_insert. */
+ * Note: val_len is only meaningful if do_insert.
+ *       *is_new is only meaningful when return value isn't NULL, contains
+ *	 true when returned lru entry has been allocated right now
+ *	 if return value is NULL, *is_new remains untouched.
+ */
 KR_EXPORT void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
-				uint val_len, bool do_insert)
+			      uint val_len, bool do_insert, bool *is_new)
 {
 	bool ok = lru && (key || !key_len) && key_len <= UINT16_MAX
 		   && (!do_insert || val_len <= UINT16_MAX);
@@ -141,6 +145,7 @@ KR_EXPORT void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
 		assert(false);
 		return NULL; // reasonable fallback when not debugging
 	}
+	bool is_new_entry = false;
 	// find the right group
 	uint32_t khash = hash(key, key_len);
 	uint16_t khash_top = khash >> 16;
@@ -204,9 +209,13 @@ insert: // insert into position i (incl. key)
 		memcpy(it->data, key, key_len);
 	}
 	memset(item_val(it), 0, val_len); // clear the value
+	is_new_entry = true;
 found: // key and hash OK on g->items[i]; now update stamps
 	assert(i < LRU_ASSOC);
 	group_inc_count(g, i);
+	if (is_new) {
+		*is_new = is_new_entry;
+	}
 	return item_val(g->items[i]);
 }
 

@@ -146,7 +146,7 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 				assert(false);
 				continue;
 			}
-			unsigned *count = lru_get_new(data->queries.frequent, key, key_len);
+			unsigned *count = lru_get_new(data->queries.frequent, key, key_len, NULL);
 			if (count)
 				*count += 1;
 		}

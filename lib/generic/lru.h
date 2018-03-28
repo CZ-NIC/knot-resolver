@@ -1,4 +1,4 @@
-/*  Copyright (C) 2016-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2016-2018 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -118,7 +118,7 @@
  */
 #define lru_get_try(table, key_, len_) \
 	(__typeof__((table)->pdata_t)) \
-		lru_get_impl(&(table)->lru, (key_), (len_), -1, false)
+		lru_get_impl(&(table)->lru, (key_), (len_), -1, false, NULL)
 
 /**
  * @brief Return pointer to value, inserting if needed (zeroed).
@@ -126,12 +126,14 @@
  * @param table pointer to LRU
  * @param key_ lookup key
  * @param len_ key lengthkeys
+ * @param res  pointer to bool to store result of operation
+ *             (true if entry is newly added, false otherwise; can be NULL).
  * @return pointer to data or NULL (can be even if memory could be allocated!)
  */
-#define lru_get_new(table, key_, len_) \
+#define lru_get_new(table, key_, len_, res) \
 	(__typeof__((table)->pdata_t)) \
-		lru_get_impl(&(table)->lru, (key_), (len_), sizeof(*(table)->pdata_t), true)
-
+		lru_get_impl(&(table)->lru, (key_), (len_), \
+		sizeof(*(table)->pdata_t), true, res)
 
 /**
  * @brief Apply a function to every item in LRU.
@@ -189,7 +191,7 @@ struct lru;
 void lru_free_items_impl(struct lru *lru);
 struct lru * lru_create_impl(uint max_slots, knot_mm_t *mm_array, knot_mm_t *mm);
 void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
-			uint val_len, bool do_insert);
+		    uint val_len, bool do_insert, bool *is_new);
 void lru_apply_impl(struct lru *lru, lru_apply_fun f, void *baton);
 
 struct lru_item;
