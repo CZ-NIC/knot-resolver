@@ -107,3 +107,10 @@ Properties
 
   .. tip:: A good rule of thumb is to select only a few fastest root hints. The server learns RTT and NS quality over time, and thus tries all servers available. You can help it by preselecting the candidates.
 
+.. function:: hints.use_nodata(toggle)
+
+  :param bool toggle: true if enabling NODATA synthesis, false if disabling
+  :return: ``{ result: bool }``
+
+  If set to true, NODATA will be synthesised for matching hint name, but mismatching type (e.g. AAAA query when only A hint exists).
+

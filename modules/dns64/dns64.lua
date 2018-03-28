@@ -1,22 +1,24 @@
 -- Module interface
 local ffi = require('ffi')
-local mod = {}
+local M = {}
 local addr_buf = ffi.new('char[16]')
+
 -- Config
-function mod.config (confstr)
+function M.config (confstr)
 	if confstr == nil then return end
-	mod.proxy = kres.str2ip(confstr)
-	if mod.proxy == nil then error('[dns64] "'..confstr..'" is not a valid address') end
+	M.proxy = kres.str2ip(confstr)
+	if M.proxy == nil then error('[dns64] "'..confstr..'" is not a valid address') end
 end
+
 -- Layers
-mod.layer = {
+M.layer = {
 	consume = function (state, req, pkt)
 		if state == kres.FAIL then return state end
 		pkt = kres.pkt_t(pkt)
 		req = kres.request_t(req)
 		local qry = req:current()
 		-- Observe only authoritative answers
-		if mod.proxy == nil or not qry.flags.RESOLVED then
+		if M.proxy == nil or not qry.flags.RESOLVED then
 			return state
 		end
 		-- Synthetic AAAA from marked A responses
@@ -31,7 +33,7 @@ mod.layer = {
 					rrs._owner = ffi.cast('knot_dname_t *', orig:owner()) -- explicit cast needed here
 					for k = 1, orig.rrs.rr_count do
 						local rdata = orig:rdata( k - 1 )
-						ffi.copy(addr_buf, mod.proxy, 16)
+						ffi.copy(addr_buf, M.proxy, 16)
 						ffi.copy(addr_buf + 12, rdata, 4)
 						ffi.C.knot_rrset_add_rdata(rrs, ffi.string(addr_buf, 16), 16, orig:ttl(), req.pool)
 					end
@@ -60,4 +62,5 @@ mod.layer = {
 		return state
 	end
 }
-return mod
+
+return M

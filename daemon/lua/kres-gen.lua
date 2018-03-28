@@ -178,6 +178,7 @@ struct kr_request {
 	int has_tls;
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
+	int vars_ref;
 	knot_mm_t pool;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
