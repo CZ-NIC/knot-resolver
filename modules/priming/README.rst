@@ -4,7 +4,7 @@ Priming module
 --------------
 
 The module for Initializing a DNS Resolver with Priming Queries implemented
-according to RFC 8109. Purpose of the module is to keep up-to-date list of
+according to :rfc:`8109`. Purpose of the module is to keep up-to-date list of
 root DNS servers and associated IP addresses.
 
 Result of successful priming query replaces root hints distributed with

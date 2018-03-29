@@ -25,7 +25,7 @@ Examples
     -- Add a custom hint
     hints['foo.bar'] = '127.0.0.1'
 
-.. note:: The ``policy`` module applies before ``hints``, meaning e.g. that hints for special names (:rfc:`6761#section-6`) like ``localhost`` or ``test`` will get shadowed by ``policy`` rules by default.
+.. note:: The :ref:`policy <mod-policy>` module applies before hints, meaning e.g. that hints for special names (:rfc:`6761#section-6`) like ``localhost`` or ``test`` will get shadowed by policy rules by default.
     That can be worked around e.g. by explicit ``policy.PASS`` action.
 
 Properties

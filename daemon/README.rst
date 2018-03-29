@@ -762,7 +762,7 @@ daemons or manipulated from other processes, making for example synchronised loa
   :return: current timeout
 
   Get or set time interval for which a nameserver address will be ignored after determining that it doesn't return (useful) answers.
-  The intention is to avoid waiting if there's little hope; instead, kresd can immediately SERVFAIL or immediately use stale records (with ``serve_stale`` module).
+  The intention is to avoid waiting if there's little hope; instead, kresd can immediately SERVFAIL or immediately use stale records (with :ref:`serve_stale <mod-serve_stale>` module).
 
   .. warning:: This settings applies only to the current kresd process.
 
