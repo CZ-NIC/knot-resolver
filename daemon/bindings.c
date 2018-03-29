@@ -1121,7 +1121,7 @@ static int cache_get(lua_State *L)
  * Servers with score >= KR_NS_TIMEOUTED will be cleaned after
  * this interval ended up, so that they will be able to participate
  * in NS elections again. */
-static int cache_touted_ns_clean_interval(lua_State *L)
+static int cache_ns_tout(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	struct kr_context *ctx = &engine->resolver;
@@ -1164,7 +1164,7 @@ int lib_cache(lua_State *L)
 		{ "get",    cache_get },
 		{ "max_ttl", cache_max_ttl },
 		{ "min_ttl", cache_min_ttl },
-		{ "ns_tout", cache_touted_ns_clean_interval },
+		{ "ns_tout", cache_ns_tout },
 		{ NULL, NULL }
 	};
 
