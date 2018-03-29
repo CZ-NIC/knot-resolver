@@ -794,23 +794,36 @@ skip_pins:
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
+	int ret;
+	unsigned int status;
 	for (size_t i = 0; i < ctx->params->hostnames.len; ++i) {
-		gnutls_typed_vdata_st data[2] = {
-			{ .type = GNUTLS_DT_KEY_PURPOSE_OID,
-			  .data = (void *)GNUTLS_KP_TLS_WWW_SERVER },
-			{ .type = GNUTLS_DT_DNS_HOSTNAME,
-			  .data = (void *)ctx->params->hostnames.at[i] }
-		};
-		size_t data_count = 2;
-		unsigned int status;
-		int ret = gnutls_certificate_verify_peers(ctx->c.tls_session, data,
-							  data_count, &status);
+		ret = gnutls_certificate_verify_peers3(
+				ctx->c.tls_session,
+				ctx->params->hostnames.at[i],
+				&status);
 		if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
 			return GNUTLS_E_SUCCESS;
 		}
 	}
 
-	kr_log_error("[tls_client] failed to verify peer certificate\n");
+	if (ret == GNUTLS_E_SUCCESS) {
+		gnutls_datum_t msg;
+		ret = gnutls_certificate_verification_status_print(
+			status, gnutls_certificate_type_get(ctx->c.tls_session), &msg, 0);
+		if (ret == GNUTLS_E_SUCCESS) {
+			kr_log_error("[tls_client] failed to verify peer certificate: "
+					"%s\n", msg.data);
+			gnutls_free(msg.data);
+		} else {
+			kr_log_error("[tls_client] failed to verify peer certificate: "
+					"unable to print reason: %s (%s)\n",
+					gnutls_strerror(ret), gnutls_strerror_name(ret));
+		} /* gnutls_certificate_verification_status_print end */
+	} else {
+		kr_log_error("[tls_client] failed to verify peer certificate: "
+			     "gnutls_certificate_verify_peers3 error: %s (%s)\n",
+			     gnutls_strerror(ret), gnutls_strerror_name(ret));
+	} /* gnutls_certificate_verify_peers3 end */
 	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 
