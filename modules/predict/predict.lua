@@ -13,8 +13,6 @@ local predict = {
 	log = {},
 }
 
--- Load dependent modules
-if not stats then modules.load('stats') end
 
 -- Calculate next sample with jitter [1-2/5 of window]
 local function next_event()
@@ -163,6 +161,8 @@ function predict.config(config)
 	if type(config) ~= 'table' then return end
 	if config.window then predict.window = config.window end
 	if config.period then predict.period = config.period end
+	-- Load dependent modules
+	if (predict.period or 0) ~= 0 and not stats then modules.load('stats') end
 	-- Reinitialize to reset timers
 	predict.deinit()
 	predict.init()
