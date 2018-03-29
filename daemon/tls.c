@@ -639,6 +639,10 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 						     value, gnutls_strerror_name(res));
 					/* value will be freed at cleanup */
 					ret = kr_error(EINVAL);
+				} else {
+					kr_log_verbose("[tls_client] imported %d certs from file '%s'\n",
+							res, value);
+
 				}
 			}
 		}
