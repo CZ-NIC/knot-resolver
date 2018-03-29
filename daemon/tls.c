@@ -46,7 +46,7 @@
 #endif
 
 static char const server_logstring[] = "tls";
-static char const client_logstring[] = "tls-client";
+static char const client_logstring[] = "tls_client";
 
 static int client_verify_certificate(gnutls_session_t tls_session);
 
@@ -171,7 +171,7 @@ void tls_close(struct tls_common_ctx *ctx)
 
 	if (ctx->handshake_state == TLS_HS_DONE) {
 		kr_log_verbose("[%s] closing tls connection to `%s`\n",
-			       ctx->client_side ? "tls-client" : "tls",
+			       ctx->client_side ? "tls_client" : "tls",
 			       kr_straddr(&ctx->session->peer.ip));
 		ctx->handshake_state = TLS_HS_CLOSING;
 		gnutls_bye(ctx->tls_session, GNUTLS_SHUT_RDWR);
