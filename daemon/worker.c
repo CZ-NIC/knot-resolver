@@ -1069,6 +1069,22 @@ static int session_next_waiting_send(struct session *session)
 	return ret;
 }
 
+static inline void pop_timeouted_waiting_task(struct worker_ctx *worker, struct session *session, bool fail)
+{
+	struct qr_task *task = session->waiting.at[0];
+	array_del(session->waiting, 0);
+	task->timeouts += 1;
+	worker->stats.timeout += 1;
+	assert(task->refs > 1);
+	if (fail) {
+		qr_task_finalize(task, KR_STATE_FAIL);
+	} else {
+		qr_task_step(task, NULL, NULL);
+	}
+	session_del_tasks(session, task);
+	qr_task_unref(task);
+}
+
 static int session_tls_hs_cb(struct session *session, int status)
 {
 	struct worker_ctx *worker = get_worker();
@@ -1095,11 +1111,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		 * or addition to the list of connected sessions failed,
 		 * or write to upstream failed. */
 		while (session->waiting.len > 0) {
-			struct qr_task *task = session->waiting.at[0];
-			session_del_tasks(session, task);
-			array_del(session->waiting, 0);
-			qr_task_finalize(task, KR_STATE_FAIL);
-			qr_task_unref(task);
+			pop_timeouted_waiting_task(worker, session, true);
 		}
 		worker_del_tcp_connected(worker, &peer->ip);
 		assert(session->tasks.len == 0);
@@ -1148,12 +1160,7 @@ static void on_connect(uv_connect_t *req, int status)
 	if (status != 0) {
 		worker_del_tcp_waiting(worker, &peer->ip);
 		while (session->waiting.len > 0) {
-			struct qr_task *task = session->waiting.at[0];
-			session_del_tasks(session, task);
-			array_del(session->waiting, 0);
-			assert(task->refs > 1);
-			qr_task_unref(task);
-			qr_task_step(task, NULL, NULL);
+			pop_timeouted_waiting_task(worker, session, false);
 		}
 		assert(session->tasks.len == 0);
 		iorequest_release(worker, req);
@@ -1168,11 +1175,7 @@ static void on_connect(uv_connect_t *req, int status)
 			/* session isn't in list of waiting queries, *
 			 * something gone wrong */
 			while (session->waiting.len > 0) {
-				struct qr_task *task = session->waiting.at[0];
-				session_del_tasks(session, task);
-				array_del(session->waiting, 0);
-				qr_task_finalize(task, KR_STATE_FAIL);
-				qr_task_unref(task);
+				pop_timeouted_waiting_task(worker, session, true);
 			}
 			assert(session->tasks.len == 0);
 			iorequest_release(worker, req);
@@ -1214,11 +1217,7 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	while (session->waiting.len > 0) {
-		struct qr_task *task = session->waiting.at[0];
-		session_del_tasks(session, task);
-		array_del(session->waiting, 0);
-		qr_task_finalize(task, KR_STATE_FAIL);
-		qr_task_unref(task);
+		pop_timeouted_waiting_task(worker, session, true);
 	}
 
 	assert(session->tasks.len == 0);
@@ -1251,16 +1250,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 			    KR_NS_UPDATE_NORESET);
 
 	while (session->waiting.len > 0) {
-		struct qr_task *task = session->waiting.at[0];
-		struct request_ctx *ctx = task->ctx;
-		assert(ctx);
-		task->timeouts += 1;
-		worker->stats.timeout += 1;
-		session_del_tasks(session, task);
-		array_del(session->waiting, 0);
-		assert(task->refs > 1);
-		qr_task_unref(task);
-		qr_task_step(task, NULL, NULL);
+		pop_timeouted_waiting_task(worker, session, false);
 	}
 
 	assert (session->tasks.len == 0);
@@ -1282,13 +1272,7 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 		worker_del_tcp_connected(worker, &session->peer.ip);
 
 		while (session->waiting.len > 0) {
-			struct qr_task *task = session->waiting.at[0];
-			task->timeouts += 1;
-			worker->stats.timeout += 1;
-			array_del(session->waiting, 0);
-			session_del_tasks(session, task);
-			qr_task_finalize(task, KR_STATE_FAIL);
-			qr_task_unref(task);
+			pop_timeouted_waiting_task(worker, session, true);
 		}
 	}
 
@@ -1302,6 +1286,7 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 		qr_task_unref(task);
 	}
 
+	assert (session->tasks.len == 0);
 	session_close(session);
 }
 
