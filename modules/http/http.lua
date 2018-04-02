@@ -322,6 +322,16 @@ function M.add_interface(conf)
 		ctx = crt and tlscontext(crt, key),
 		tls = conf.tls,
 		onstream = routes,
+		-- Log errors, but do not throw
+		onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
+			local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
+			if err then
+				msg = msg .. ': ' .. tostring(err)
+			end
+			if verbose() then
+				log(msg)
+			end
+		end,
 	}
 	-- Manually call :listen() so that we are bound before calling :localname()
 	if s then
