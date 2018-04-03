@@ -796,6 +796,7 @@ kres = {
 	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,
 	-- Global API functions
 	str2dname = function(name)
+		if type(name) ~= 'string' then return end
 		local dname = ffi.gc(C.knot_dname_from_str(nil, name, 0), C.free)
 		return dname2wire(dname)
 	end,
