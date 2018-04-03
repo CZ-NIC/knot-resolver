@@ -954,9 +954,11 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	/* Validate non-existence proof if not positive answer. */
-	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NXDOMAIN &&
-	    (!qry->flags.FORWARD || !qry->flags.CNAME)) {
+	/* Validate non-existence proof if not positive answer.
+	 * In case of CNAME, iterator scheduled a sibling query for the target,
+	 * so we just drop the negative piece of information and don't try to prove it.
+	 * TODO: not ideal; with aggressive cache we'll at least avoid the extra packet. */
+	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NXDOMAIN && !qry->flags.CNAME) {
 		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
@@ -979,9 +981,9 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* @todo WTH, this needs API that just tries to find a proof and the caller
 	 * doesn't have to worry about NSEC/NSEC3
-	 * @todo rework this */
-	if (!qry->flags.CACHED && (pkt_rcode == KNOT_RCODE_NOERROR) &&
-	    (!qry->flags.FORWARD || !qry->flags.CNAME)) {
+	 * @todo rework this
+	 * CNAME: same as the NXDOMAIN case above */
+	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NOERROR && !qry->flags.CNAME) {
 		bool no_data = (an->count == 0 && knot_wire_get_aa(pkt->wire));
 		if (no_data) {
 			/* @todo
