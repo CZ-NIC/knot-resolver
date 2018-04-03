@@ -383,7 +383,8 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 
 static int edns_put(knot_pkt_t *pkt)
 {
-	if (!pkt->opt_rr) {
+	/* Don't append EDNS to garbage packets */
+	if (!pkt->opt_rr || knot_pkt_qname(pkt) == NULL) {
 		return kr_ok();
 	}
 	/* Reclaim reserved size. */
