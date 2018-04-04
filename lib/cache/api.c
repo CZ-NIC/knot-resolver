@@ -237,21 +237,38 @@ int32_t kr_cache_ttl(const struct kr_cache_p *peek, const struct kr_query *qry,
 
 
 
-/** Check that no label contains a zero character.
+/** Check that no label contains a zero character, incl. a log trace.
  *
  * We refuse to work with those, as LF and our cache keys might become ambiguous.
  * Assuming uncompressed name, as usual.
  * CACHE_KEY_DEF
  */
-static bool check_dname_for_lf(const knot_dname_t *n)
+static bool check_dname_for_lf(const knot_dname_t *n, const struct kr_query *qry/*logging*/)
 {
-	return knot_dname_size(n) == strlen((const char *)n) + 1;
+	const bool ret = knot_dname_size(n) == strlen((const char *)n) + 1;
+	if (!ret) { WITH_VERBOSE(qry) {
+		auto_free char *n_str = kr_dname_text(n);
+		VERBOSE_MSG(qry, "=> skipping zero-containing name %s\n", n_str);
+	} }
+	return ret;
+}
+
+/** Return false on types to be ignored.  Meant both for sname and direct cache requests. */
+static bool check_rrtype(uint16_t type, const struct kr_query *qry/*logging*/)
+{
+	const bool ret = !knot_rrtype_is_metatype(type)
+			&& type != KNOT_RRTYPE_RRSIG;
+	if (!ret) { WITH_VERBOSE(qry) {
+		auto_free char *type_str = kr_rrtype_text(type);
+		VERBOSE_MSG(qry, "=> skipping RR type %s\n", type_str);
+	} }
+	return ret;
 }
 
 /** Like key_exact_type() but omits a couple checks not holding for pkt cache. */
 knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 {
-	assert(!knot_rrtype_is_metatype(type));
+	assert(check_rrtype(type, NULL));
 	switch (type) {
 	case KNOT_RRTYPE_RRSIG: /* no RRSIG query caching, at least for now */
 		assert(false);
@@ -308,7 +325,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || qry->flags.NO_CACHE
 	    || (qry->flags.CACHE_TRIED && !qry->stale_cb)
-	    || qry->stype == KNOT_RRTYPE_RRSIG /* LATER: some other behavior for this STYPE? */
+	    || !check_rrtype(qry->stype, qry) /* LATER: some other behavior for some of these? */
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state; /* Already resolved/failed or already tried, etc. */
 	}
@@ -337,11 +354,7 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG(qry, "=> skipping stype NSEC\n");
 		return ctx->state;
 	}
-	if (!check_dname_for_lf(qry->sname)) {
-		WITH_VERBOSE(qry) {
-			auto_free char *sname_str = kr_dname_text(qry->sname);
-			VERBOSE_MSG(qry, "=> skipping zero-containing sname %s\n", sname_str);
-		}
+	if (!check_dname_for_lf(qry->sname, qry)) {
 		return ctx->state;
 	}
 	int ret = kr_dname_lf(k->buf, qry->sname, false);
@@ -610,7 +623,6 @@ do_soa:
 	return KR_STATE_DONE;
 }
 
-
 /** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
 static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
@@ -622,12 +634,10 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 
-	const uint16_t pkt_type = knot_pkt_qtype(pkt);
-	const bool type_bad = knot_rrtype_is_metatype(pkt_type)
-				|| pkt_type == KNOT_RRTYPE_RRSIG;
 	/* Note: we cache even in KR_STATE_FAIL.  For example,
 	 * BOGUS answer can go to +cd cache even without +cd request. */
-	if (!qry || qry->flags.CACHED || type_bad || qry->sclass != KNOT_CLASS_IN) {
+	if (!qry || qry->flags.CACHED || !check_rrtype(knot_pkt_qtype(pkt), qry)
+	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state;
 	}
 	/* Do not cache truncated answers, at least for now.  LATER */
@@ -676,17 +686,9 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 		return kr_ok();
 	}
 	const knot_rrset_t *rr = entry->rr;
-	if (!rr) {
+	if (!rr || rr->rclass != KNOT_CLASS_IN) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
-	}
-	if (!check_dname_for_lf(rr->owner)) {
-		WITH_VERBOSE(qry) {
-			auto_free char *owner_str = kr_dname_text(rr->owner);
-			VERBOSE_MSG(qry, "=> skipping zero-containing name %s\n",
-					owner_str);
-		}
-		return kr_ok();
 	}
 
 	#if 0
@@ -697,13 +699,9 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 	}
 	#endif
 
-	switch (rr->type) {
-	case KNOT_RRTYPE_RRSIG:
-	case KNOT_RRTYPE_NSEC3:
-		// for now; LATER NSEC3
+	if (!check_dname_for_lf(rr->owner, qry) || !check_rrtype(rr->type, qry)
+	    || rr->type == KNOT_RRTYPE_NSEC3 /*for now; LATER NSEC3*/) {
 		return kr_ok();
-	default:
-		break;
 	}
 
 	/* Try to find corresponding signatures, always.  LATER(optim.): speed. */
@@ -951,6 +949,9 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
 {
+	if (!check_rrtype(type, NULL) || !check_dname_for_lf(name, NULL)) {
+		return kr_error(ENOTSUP);
+	}
 	struct key k_storage, *k = &k_storage;
 
 	int ret = kr_dname_lf(k->buf, name, false);
