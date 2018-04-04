@@ -63,16 +63,10 @@ ifneq ($(SED),)
 	$(INSTALL) -m 0644 doc/kresd.8 $(DESTDIR)$(MANDIR)/man8/
 endif
 daemon-clean: kresd-clean
-	@$(RM) daemon/lua/*.inc daemon/lua/trust_anchors.lua \
-		daemon/lua/zonefile.lua
+	@$(RM) daemon/lua/*.inc daemon/lua/trust_anchors.lua
 
 daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in
 	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g;s|@KEYFILE_DEFAULT@|$(KEYFILE_DEFAULT)|g" $< > $@
-
-LIBZSCANNER_COMMENTS := \
-	$(shell pkg-config libzscanner --atleast-version=2.4.2 && echo true || echo false)
-daemon/lua/zonefile.lua: daemon/lua/zonefile.lua.in
-	@$(call quiet,SED,$<) -e "s|@LIBZSCANNER_COMMENTS@|$(LIBZSCANNER_COMMENTS)|g" $< > $@
 
 daemon/lua/kres-gen.lua: | $(libkres)
 	@echo "WARNING: regenerating $@"

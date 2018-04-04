@@ -50,7 +50,6 @@ _obj
 /daemon/kresd
 /daemon/lua/*.inc
 /daemon/lua/trust_anchors.lua
-/daemon/lua/zonefile.lua
 /tests/test_array
 /tests/test_lru
 /tests/test_map

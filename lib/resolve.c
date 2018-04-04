@@ -536,12 +536,7 @@ static int answer_padding(struct kr_request *request)
 	int32_t pad_bytes = -1;
 
 	if (padding == -1) { /* use the default padding policy from libknot */
-#if KNOT_VERSION_HEX < ((2 << 16) | (4 << 8) | 3)
-		/* no knot_edns_default_padding_size available in libknot */
-		padding = KR_DEFAULT_TLS_PADDING;
-#else
 		pad_bytes =  knot_edns_default_padding_size(answer, opt_rr);
-#endif
 	}
 	if (padding >= 2) {
 		int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
