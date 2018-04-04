@@ -756,6 +756,16 @@ daemons or manipulated from other processes, making for example synchronised loa
      cache.min_ttl(5)
      5
 
+.. function:: cache.ns_tout([timeout])
+
+  :param timeout: number of milliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
+  :return: current timeout
+
+  Get or set time interval for which a nameserver address will be ignored after determining that it doesn't return (useful) answers.
+  The intention is to avoid waiting if there's little hope; instead, kresd can immediately SERVFAIL or immediately use stale records (with :ref:`serve_stale <mod-serve_stale>` module).
+
+  .. warning:: This settings applies only to the current kresd process.
+
 .. function:: cache.prune([max_count])
 
   :param number max_count:  maximum number of items to be pruned at once (default: 65536)

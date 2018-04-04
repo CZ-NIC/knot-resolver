@@ -55,7 +55,7 @@ Also, it is possible to write your own action (i.e. Lua function). It is possibl
 
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Policy `TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in `RFC 7858`_ and `IETF draft dprive-dtls-and-tls-profiles`_.
+Policy `TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in :rfc:`7858` and `IETF draft dprive-dtls-and-tls-profiles`_.
 
 Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
 
@@ -211,5 +211,4 @@ This module is enabled by default because it implements mandatory :rfc:`6761` lo
 .. _`Jan-Piet Mens's post`: http://jpmens.net/2011/04/26/how-to-configure-your-bind-resolvers-to-lie-using-response-policy-zones-rpz/
 .. _`Transport Layer Security`: https://en.wikipedia.org/wiki/Transport_Layer_Security
 .. _`DNS Privacy Project`: https://dnsprivacy.org/
-.. _`RFC 7858`: https://tools.ietf.org/html/rfc7858
 .. _`IETF draft dprive-dtls-and-tls-profiles`: https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles
