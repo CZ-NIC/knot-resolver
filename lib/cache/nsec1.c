@@ -324,7 +324,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
 
 	if (exact_match) {
-		if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype) != 0) {
+		if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) != 0) {
 			assert(bm);
 			VERBOSE_MSG(qry,
 				"=> NSEC sname: match but failed type check\n");
@@ -489,7 +489,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	}
 
 	/* The wildcard exists.  Find if it's NODATA - check type bitmap. */
-	if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype) == 0) {
+	if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) == 0) {
 		/* NODATA proven; just need to add SOA+RRSIG later */
 		WITH_VERBOSE(qry) {
 			const char *msg_start = "=> NSEC wildcard: match proved NODATA";

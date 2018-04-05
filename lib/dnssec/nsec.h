@@ -41,10 +41,11 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size);
  * @param bm      Bitmap.
  * @param bm_size Bitmap size.
  * @param type    RR type to check.
+ * @param owner   NSEC record owner.
  * @note This includes special checks for zone cuts, e.g. from RFC 6840 sec. 4.
  * @return 0, abs(ENOENT) (no proof), kr_error(EINVAL)
  */
-int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type);
+int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type, const knot_dname_t *owner);
 
 /**
  * Name error response check (RFC4035 3.1.3.2; RFC4035 5.4, bullet 2).

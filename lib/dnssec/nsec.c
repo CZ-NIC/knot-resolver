@@ -258,10 +258,10 @@ static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection
 }
 
 
-int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type)
+int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type, const knot_dname_t *owner)
 {
 	const int NO_PROOF = abs(ENOENT);
-	if (!bm) {
+	if (!bm || !owner) {
 		return kr_error(EINVAL);
 	}
 	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
@@ -278,8 +278,10 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 		/* Security feature: in case of DS also check for SOA
 		 * non-existence to be more certain that we don't hold
 		 * a child-side NSEC by some mistake (e.g. when forwarding).
-		 * See RFC4035 5.2, next-to-last paragraph. */
-		if (kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
+		 * See RFC4035 5.2, next-to-last paragraph.
+		 * This doesn't apply for root DS as it doesn't exist in DNS hierarchy.
+		 */
+		if (owner[0] != '\0' && kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
 			return NO_PROOF;
 		}
 		break;
@@ -318,7 +320,7 @@ static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
 	uint8_t *bm = NULL;
 	uint16_t bm_size = 0;
 	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
-	int ret = kr_nsec_bitmap_nodata_check(bm, bm_size, type);
+	int ret = kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec->owner);
 	if (ret == kr_ok()) {
 		*flags |= FLG_NOEXIST_RRTYPE;
 	}

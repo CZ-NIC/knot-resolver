@@ -554,7 +554,7 @@ static int nodata_find(const knot_pkt_t *pkt, knot_section_t section_id,
 		uint8_t *bm = NULL;
 		uint16_t bm_size;
 		knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
-		if (kr_nsec_bitmap_nodata_check(bm, bm_size, type) == kr_ok()) {
+		if (kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec3->owner) == kr_ok()) {
 			return kr_ok();
 		}
 	}
