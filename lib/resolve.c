@@ -747,10 +747,10 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 
 	if (qname != NULL) {
 		qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
-	} else if (cookie_ctx->srvr.enabled &&
+	} else if (cookie_ctx && cookie_ctx->srvr.enabled &&
 		   knot_wire_get_qdcount(packet->wire) == 0 &&
-                   knot_pkt_has_edns(packet) &&
-                   knot_edns_has_option(packet->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
+		   knot_pkt_has_edns(packet) &&
+		   knot_edns_has_option(packet->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
 		/* Plan empty query only for cookies. */
 		qry = kr_rplan_push_empty(rplan, NULL);
 	}
