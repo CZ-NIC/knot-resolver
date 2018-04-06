@@ -310,6 +310,7 @@ void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
 int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const knot_rdata_t *);
 _Bool kr_zonecut_is_empty(struct kr_zonecut *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
+const knot_dname_t *kr_zonecut_find_nsname(struct kr_zonecut *);
 uint64_t kr_now();
 void lru_free_items_impl(struct lru *);
 struct lru *lru_create_impl(unsigned int, knot_mm_t *, knot_mm_t *);
