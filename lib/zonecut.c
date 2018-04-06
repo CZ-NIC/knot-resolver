@@ -458,3 +458,21 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 	mm_free(cut->pool, qname);
 	return kr_error(ENOENT);
 }
+
+static int select_first_ns(const char *k, void *v, void *baton)
+{
+	assert(baton);
+	*((const knot_dname_t **)baton) = (const knot_dname_t *)k;
+	return 1;
+}
+
+const knot_dname_t *kr_zonecut_find_nsname(struct kr_zonecut *cut)
+{
+	if (!cut) {
+		return NULL;
+	}
+
+	const knot_dname_t *result = NULL;
+	map_walk(&cut->nsset, select_first_ns, &result);
+	return result;
+}

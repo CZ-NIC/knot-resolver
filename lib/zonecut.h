@@ -161,3 +161,10 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 KR_EXPORT
 bool kr_zonecut_is_empty(struct kr_zonecut *cut);
 
+/**
+ * Return first NS name in the zone cut.
+ * @param cut zone cut used
+ * @return name or NULL if empty
+ */
+KR_EXPORT
+const knot_dname_t *kr_zonecut_find_nsname(struct kr_zonecut *cut);
