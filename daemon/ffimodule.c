@@ -36,6 +36,7 @@ enum {
 	SLOT_finish,
 	SLOT_consume,
 	SLOT_produce,
+	SLOT_checkout,
 	SLOT_count
 };
 #define SLOT_size sizeof(int)
@@ -127,6 +128,7 @@ static int l_ffi_deinit(struct kr_module *module)
 		LAYER_UNREGISTER(L, api, finish);
 		LAYER_UNREGISTER(L, api, consume);
 		LAYER_UNREGISTER(L, api, produce);
+		LAYER_UNREGISTER(L, api, checkout);
 		LAYER_UNREGISTER(L, api, reset);
 		free(api);
 	}
@@ -190,6 +192,19 @@ static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	lua_pushlightuserdata(L, pkt);
 	return l_ffi_call(L, 3);
 }
+
+static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockaddr *dst, int type)
+{
+	if (ctx->state & (KR_STATE_FAIL)) {
+		return ctx->state; /* Already failed or done, skip */
+	}
+	LAYER_FFI_CALL(ctx, checkout);
+	lua_pushlightuserdata(L, ctx->req);
+	lua_pushlightuserdata(L, pkt);
+	lua_pushlightuserdata(L, dst);
+	lua_pushboolean(L, type == SOCK_STREAM);
+	return l_ffi_call(L, 5);
+}
 #undef LAYER_FFI_CALL
 
 /** @internal Conditionally register layer trampoline
@@ -218,6 +233,7 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 		LAYER_REGISTER(L, api, finish);
 		LAYER_REGISTER(L, api, consume);
 		LAYER_REGISTER(L, api, produce);
+		LAYER_REGISTER(L, api, checkout);
 		LAYER_REGISTER(L, api, reset);
 		/* Begin is always set, as it initializes layer baton. */
 		api->begin = l_ffi_layer_begin;

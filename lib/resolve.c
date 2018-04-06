@@ -94,6 +94,7 @@ static int begin_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int reset_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int finish_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int produce_yield(kr_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
+static int checkout_yield(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type) { return kr_ok(); }
 
 /** @internal Macro for iterating module layers. */
 #define RESUME_LAYERS(from, r, qry, func, ...) \
@@ -1531,6 +1532,14 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 		return kr_error(EINVAL);
 	}
 	struct kr_query *qry = array_tail(rplan->pending);
+
+	/* Run the checkout layers and cancel on failure. */
+	int state = request->state;
+	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
+	if (request->state == KR_STATE_FAIL) {
+		request->state = state; /* Restore */
+		return kr_error(ECANCELED);
+	}
 
 #if defined(ENABLE_COOKIES)
 	/* Update DNS cookies in request. */
