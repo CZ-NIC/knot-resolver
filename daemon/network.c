@@ -46,7 +46,7 @@
 	uv_ ## type ## _init((loop), (handle))
 #endif
 
-void network_init(struct network *net, uv_loop_t *loop)
+void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 {
 	if (net != NULL) {
 		net->loop = loop;
@@ -55,6 +55,7 @@ void network_init(struct network *net, uv_loop_t *loop)
 		net->tls_session_ticket_ctx = /* unsync. random, by default */
 			tls_session_ticket_ctx_create(loop, NULL, 0);
 		net->tcp.in_idle_timeout = 10000;
+		net->tcp_backlog = tcp_backlog;
 	}
 }
 
@@ -165,10 +166,10 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		memset(ep->tcp, 0, sizeof(*ep->tcp));
 		handle_init(tcp, net->loop, ep->tcp, sa->sa_family); /* can return! */
 		if (flags & NET_TLS) {
-			ret = tcp_bind_tls(ep->tcp, sa);
+			ret = tcp_bind_tls(ep->tcp, sa, net->tcp_backlog);
 			ep->flags |= NET_TLS;
 		} else {
-			ret = tcp_bind(ep->tcp, sa);
+			ret = tcp_bind(ep->tcp, sa, net->tcp_backlog);
 		}
 		if (ret != 0) {
 			return ret;
@@ -212,10 +213,10 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 		}
 		uv_tcp_init(net->loop, ep->tcp);
 		if (use_tls) {
-			ret = tcp_bindfd_tls(ep->tcp, fd);
+			ret = tcp_bindfd_tls(ep->tcp, fd, net->tcp_backlog);
 			ep->flags |= NET_TLS;
 		} else {
-			ret = tcp_bindfd(ep->tcp, fd);
+			ret = tcp_bindfd(ep->tcp, fd, net->tcp_backlog);
 		}
 		if (ret != 0) {
 			close_handle((uv_handle_t *)ep->tcp, false);

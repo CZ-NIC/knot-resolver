@@ -42,6 +42,9 @@
 #ifndef MAX_PIPELINED
 #define MAX_PIPELINED 100
 #endif
+#ifndef TCP_BACKLOG_DEFAULT
+#define TCP_BACKLOG_DEFAULT 511 /**< Maximum number of incomplete TCP connections in queue. Default is from Redis and Apache. */
+#endif
 
 /*
  * @internal These are forward decls to allow building modules with engine but without Lua.
