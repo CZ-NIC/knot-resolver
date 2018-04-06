@@ -708,6 +708,13 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_FAIL;
 		}
 		next->flags.AWAIT_CUT = true;
+
+		/* Copy transitive flags from original query to CNAME followup. */
+		next->flags.TRACE = query->flags.TRACE;
+		next->flags.ALWAYS_CUT = query->flags.ALWAYS_CUT;
+		next->flags.NO_MINIMIZE = query->flags.NO_MINIMIZE;
+		next->flags.NO_THROTTLE = query->flags.NO_THROTTLE;
+
 		if (query->flags.FORWARD) {
 			next->forward_flags.CNAME = true;
 			if (query->parent == NULL) {
