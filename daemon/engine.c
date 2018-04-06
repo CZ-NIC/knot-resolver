@@ -722,7 +722,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 		return ret;
 	}
 	/* Initialize network */
-	network_init(&engine->net, uv_default_loop());
+	network_init(&engine->net, uv_default_loop(), TCP_BACKLOG_DEFAULT);
 
 	return ret;
 }

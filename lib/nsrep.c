@@ -100,10 +100,10 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		bool is_valid = false;
 		/* Check if the address isn't disabled. */
 		if (len == sizeof(struct in6_addr)) {
-			is_valid = !(opts->NO_IPV6);
+			is_valid = !(opts.NO_IPV6);
 			favour = FAVOUR_IPV6;
 		} else {
-			is_valid = !(opts->NO_IPV4);
+			is_valid = !(opts.NO_IPV4);
 		}
 
 		if (!is_valid) {
