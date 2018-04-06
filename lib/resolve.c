@@ -1537,7 +1537,9 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	}
 	struct kr_query *qry = array_tail(rplan->pending);
 
-	/* Run the checkout layers and cancel on failure. */
+	/* Run the checkout layers and cancel on failure.
+	 * The checkout layer doesn't persist the state, so canceled subrequests
+	 * don't affect the resolution or rest of the processing. */
 	int state = request->state;
 	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
 	if (request->state == KR_STATE_FAIL) {
