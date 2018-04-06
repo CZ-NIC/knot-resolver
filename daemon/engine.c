@@ -53,6 +53,12 @@
 #define lua_rawlen(L, obj) lua_objlen((L), (obj))
 #endif
 
+/**@internal Maximum number of incomplete TCP connections in queue.
+* Default is from Redis and Apache. */
+#ifndef TCP_BACKLOG_DEFAULT
+#define TCP_BACKLOG_DEFAULT 511
+#endif
+
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error (lua_State *L);
 
@@ -748,7 +754,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 		return ret;
 	}
 	/* Initialize network */
-	network_init(&engine->net, uv_default_loop());
+	network_init(&engine->net, uv_default_loop(), TCP_BACKLOG_DEFAULT);
 
 	return ret;
 }
