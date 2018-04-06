@@ -142,6 +142,7 @@ EOF
 	kr_nsrep_set
 # Utils
 	kr_rand_uint
+	kr_make_query
 	kr_pkt_make_auth_header
 	kr_pkt_put
 	kr_pkt_recycle
@@ -162,6 +163,7 @@ EOF
 	kr_zonecut_add
 	kr_zonecut_is_empty
 	kr_zonecut_set
+	kr_zonecut_find_nsname
 	kr_now
 # Trust anchors
 	kr_ta_get

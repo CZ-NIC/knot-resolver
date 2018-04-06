@@ -83,10 +83,9 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 #undef ADDR_SET
 
 static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
-			      unsigned score, uint8_t *addr[])
+			      struct kr_qflags opts, unsigned score, uint8_t *addr[])
 {
 	kr_nsrep_rtt_lru_t *rtt_cache = ctx->cache_rtt;
-	struct kr_qflags opts = ctx->options;
 	kr_nsrep_rtt_lru_entry_t *rtt_cache_entry_ptr[KR_NSREP_MAXADDR] = { NULL, };
 	assert (KR_NSREP_MAXADDR >= 2);
 	unsigned rtt_cache_entry_score[KR_NSREP_MAXADDR] = { score, KR_NS_MAX_SCORE + 1, };
@@ -237,16 +236,16 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 			if (reputation & KR_NS_NOIP4) {
 				score = KR_NS_UNKNOWN;
 				/* Try to start with clean slate */
-				if (!(ctx->options.NO_IPV6)) {
+				if (!(qry->flags.NO_IPV6)) {
 					reputation &= ~KR_NS_NOIP6;
 				}
-				if (!(ctx->options.NO_IPV4)) {
+				if (!(qry->flags.NO_IPV4)) {
 					reputation &= ~KR_NS_NOIP4;
 				}
 			}
 		}
 	} else {
-		score = eval_addr_set(addr_set, ctx, score, addr_choice);
+		score = eval_addr_set(addr_set, ctx, qry->flags, score, addr_choice);
 	}
 
 	/* Probabilistic bee foraging strategy (naive).
@@ -372,7 +371,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 	}
 	/* Evaluate addr list */
 	uint8_t *addr_choice[KR_NSREP_MAXADDR] = { NULL, };
-	unsigned score = eval_addr_set(addr_set, ctx, ns->score, addr_choice);
+	unsigned score = eval_addr_set(addr_set, ctx, qry->flags, ns->score, addr_choice);
 	update_nsrep_set(ns, ns->name, addr_choice, score);
 	return kr_ok();
 }
