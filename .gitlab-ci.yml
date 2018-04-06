@@ -128,14 +128,12 @@ doc:
   tags:
     - docker
 
-
-
 deckard:linux:amd64:
   stage: test
   except:
     - schedules  # prevent unstable test from cancelling nightly OBS build
   script:
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
+    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" DECKARDFLAGS="-n $(nproc)" make check-integration
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
   dependencies:
     - build:linux:amd64
