@@ -347,7 +347,7 @@ static int tcp_bind_finalize(uv_handle_t *handle)
 	return 0;
 }
 
-static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb connection)
+static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb connection, int tcp_backlog)
 {
 	unsigned flags = 0;
 	if (addr->sa_family == AF_INET6) {
@@ -366,7 +366,7 @@ static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb c
 	}
 #endif
 
-	ret = uv_listen((uv_stream_t *)handle, 16, connection);
+	ret = uv_listen((uv_stream_t *)handle, tcp_backlog, connection);
 	if (ret != 0) {
 		return ret;
 	}
@@ -374,17 +374,17 @@ static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb c
 	return tcp_bind_finalize((uv_handle_t *)handle);
 }
 
-int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr)
+int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, int tcp_backlog)
 {
-	return _tcp_bind(handle, addr, tcp_accept);
+	return _tcp_bind(handle, addr, tcp_accept, tcp_backlog);
 }
 
-int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr)
+int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr, int tcp_backlog)
 {
-	return _tcp_bind(handle, addr, tls_accept);
+	return _tcp_bind(handle, addr, tls_accept, tcp_backlog);
 }
 
-static int _tcp_bindfd(uv_tcp_t *handle, int fd, uv_connection_cb connection)
+static int _tcp_bindfd(uv_tcp_t *handle, int fd, uv_connection_cb connection, int tcp_backlog)
 {
 	if (!handle) {
 		return kr_error(EINVAL);
@@ -395,21 +395,21 @@ static int _tcp_bindfd(uv_tcp_t *handle, int fd, uv_connection_cb connection)
 		return ret;
 	}
 
-	ret = uv_listen((uv_stream_t *)handle, 16, connection);
+	ret = uv_listen((uv_stream_t *)handle, tcp_backlog, connection);
 	if (ret != 0) {
 		return ret;
 	}
 	return tcp_bind_finalize((uv_handle_t *)handle);
 }
 
-int tcp_bindfd(uv_tcp_t *handle, int fd)
+int tcp_bindfd(uv_tcp_t *handle, int fd, int tcp_backlog)
 {
-	return _tcp_bindfd(handle, fd, tcp_accept);
+	return _tcp_bindfd(handle, fd, tcp_accept, tcp_backlog);
 }
 
-int tcp_bindfd_tls(uv_tcp_t *handle, int fd)
+int tcp_bindfd_tls(uv_tcp_t *handle, int fd, int tcp_backlog)
 {
-	return _tcp_bindfd(handle, fd, tls_accept);
+	return _tcp_bindfd(handle, fd, tls_accept, tcp_backlog);
 }
 
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)

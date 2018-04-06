@@ -55,9 +55,10 @@ struct network {
 	map_t tls_client_params;
 	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
 	struct net_tcp_param tcp;
+	int tcp_backlog;
 };
 
-void network_init(struct network *net, uv_loop_t *loop);
+void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog);
 void network_deinit(struct network *net);
 int network_listen_fd(struct network *net, int fd, bool use_tls);
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags);
