@@ -150,3 +150,10 @@ KR_EXPORT
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			   const knot_dname_t *name, const struct kr_query *qry,
 			   bool * restrict secured);
+/**
+ * Check if any glue addresses are present in zone cut
+ *
+ * @param cut zone cut to check
+ * @return true/false
+ */
+bool kr_zonecut_has_glue(struct kr_zonecut *cut);

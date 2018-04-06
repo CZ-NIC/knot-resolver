@@ -250,6 +250,36 @@ pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns)
 	return map_get(nsset, key);
 }
 
+static int has_glue(const char *k, void *v, void *baton)
+{
+	bool *glue_found = (bool *)baton;
+	if (*glue_found) {
+		assert(false);
+		return 1; /* short-circuit */
+	}
+
+	pack_t *pack = (pack_t *)v;
+	if (pack != NULL && pack->len != 0) {
+		*glue_found = true;
+		return 1; /* short-circuit */
+	}
+
+	return kr_ok();
+}
+
+bool kr_zonecut_has_glue(struct kr_zonecut *cut)
+{
+	if (!cut) {
+		return false;
+	}
+
+	bool glue_found = false;
+	map_t *nsset = &cut->nsset;
+
+	map_walk(nsset, has_glue, &glue_found);
+	return glue_found;
+}
+
 int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 {
 	if (!ctx || !cut) {
