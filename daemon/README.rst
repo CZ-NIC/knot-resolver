@@ -16,7 +16,7 @@ Configuration
    :depth: 2
    :local:
 
-In it's simplest form it requires just a working directory in which it can set up persistent files like
+In its simplest form the server requires just a working directory in which it can set up persistent files like
 cache and the process state. If you don't provide the working directory by parameter, it is going to make itself
 comfortable in the current working directory.
 
