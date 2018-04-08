@@ -427,6 +427,19 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		}
 	}
 
+	/* Nameserver is authoritative for both parent side and the child side of the
+	 * delegation may respond with an NS record in the answer section, and still update
+	 * the zone cut (e.g. what a.gtld-servers.net would respond for `com NS`) */
+	if (!ns_record_exists && knot_wire_get_aa(pkt->wire)) {
+		for (unsigned i = 0; i < an->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(an, i);
+			if (rr->type == KNOT_RRTYPE_NS && knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
+				/* NS below cut in authority indicates different authority, but same NS set. */
+				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
+			}
+		}
+	}
+
 	if (glue_cnt) {
 		VERBOSE_MSG("<= loaded %d glue addresses\n", glue_cnt);
 	}
