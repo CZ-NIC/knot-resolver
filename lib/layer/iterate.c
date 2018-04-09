@@ -382,6 +382,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	}
 
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 
 #ifdef STRICT_MODE
 	/* AA, terminate resolution chain. */
@@ -389,9 +390,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		return KR_STATE_CONSUME;
 	}
 #else
-
 	/* Work around servers sending back CNAME with different delegation and no AA. */
-	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	if (an->count > 0 && ns->count > 0) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, 0);
 		if (rr->type == KNOT_RRTYPE_CNAME) {
