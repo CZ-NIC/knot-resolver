@@ -109,6 +109,12 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 		return true;
 	}
 #endif
+
+	/* Some authoritative servers are hopelessly broken, allow lame answers in permissive mode. */
+	if (query->flags.PERMISSIVE) {
+		return true;
+	}
+
 	return false;
 }
 
