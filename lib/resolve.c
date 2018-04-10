@@ -707,7 +707,6 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 				knot_edns_set_do(pkt->opt_rr);
 				knot_wire_set_cd(pkt->wire);
 			}
-			ret = edns_put(pkt);
 		}
 	}
 	return ret;
@@ -1534,16 +1533,6 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	}
 	struct kr_query *qry = array_tail(rplan->pending);
 
-	/* Run the checkout layers and cancel on failure.
-	 * The checkout layer doesn't persist the state, so canceled subrequests
-	 * don't affect the resolution or rest of the processing. */
-	int state = request->state;
-	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
-	if (request->state == KR_STATE_FAIL) {
-		request->state = state; /* Restore */
-		return kr_error(ECANCELED);
-	}
-
 #if defined(ENABLE_COOKIES)
 	/* Update DNS cookies in request. */
 	if (type == SOCK_DGRAM) { /* @todo: Add cookies also over TCP? */
@@ -1561,6 +1550,24 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	int ret = query_finalize(request, qry, packet);
 	if (ret != 0) {
 		return kr_error(EINVAL);
+	}
+
+	/* Run the checkout layers and cancel on failure.
+	 * The checkout layer doesn't persist the state, so canceled subrequests
+	 * don't affect the resolution or rest of the processing. */
+	int state = request->state;
+	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
+	if (request->state == KR_STATE_FAIL) {
+		request->state = state; /* Restore */
+		return kr_error(ECANCELED);
+	}
+
+	/* Write down OPT unless in safemode */
+	if (!(qry->flags.SAFEMODE)) {
+		ret = edns_put(packet);
+		if (ret != 0) {
+			return kr_error(EINVAL);
+		}
 	}
 
 	WITH_VERBOSE(qry) {

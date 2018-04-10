@@ -99,10 +99,13 @@ static inline void kr_cache_make_checkpoint(struct kr_cache *cache)
  * @param rrsig RRSIG for inserted RRSet (optional)
  * @param rank rank of the data
  * @param timestamp current time
+ * @param scope scope of the record
+ * @param scope_len_bits scope of the record in bits
  * @return 0 or an errcode
  */
 KR_EXPORT
-int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const knot_rrset_t *rrsig, uint8_t rank, uint32_t timestamp);
+int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const knot_rrset_t *rrsig,
+                       uint8_t rank, uint32_t timestamp, const uint8_t *scope, int scope_len_bits);
 
 /**
  * Clear all items from the cache.
