@@ -76,7 +76,8 @@ int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val);
 /*!
  * \brief Apply a function to every trie_val_t, in order.
  *
- * \return KNOT_EOK if success or KNOT_E* if error.
+ * \param d Parameter passed as the second argument to f().
+ * \return First nonzero from f() or zero (i.e. KNOT_EOK).
  */
 int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d);
 
@@ -107,7 +108,7 @@ void trie_it_free(trie_it_t *it);
 /*!
  * \brief Return pointer to the key of the current element.
  *
- * \note The len is uint32_t internally but size_t is better for our usage
+ * \note The optional len is uint32_t internally but size_t is better for our usage,
  *       as it is without an additional type conversion.
  */
 const char* trie_it_key(trie_it_t *it, size_t *len);
