@@ -49,6 +49,7 @@ typedef void (*trace_callback_f)(struct kr_request *);
 	knot_pktsection_t
 	struct knot_pkt
 	knot_pkt_t
+	knot_edns_client_subnet_t
 	# generics
 	map_t
 	# libkres
@@ -127,6 +128,17 @@ printf "\tchar _stub[];\n};\n"
 	knot_pkt_new
 	knot_pkt_free
 	knot_pkt_parse
+	knot_pkt_reserve
+# OPT
+	knot_edns_get_version
+	knot_edns_get_payload
+	knot_edns_has_option
+	knot_edns_get_option
+	knot_edns_add_option
+	knot_edns_client_subnet_size
+	knot_edns_client_subnet_write
+	knot_edns_client_subnet_parse
+	knot_edns_client_subnet_set_addr
 EOF
 
 ## libkres API

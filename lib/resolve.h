@@ -215,6 +215,8 @@ struct kr_request {
 	int has_tls;
 	trace_log_f trace_log; /**< Logging tracepoint */
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
+	int cache_scope_len_bits; /**< Cache scope length (bits) */
+	const uint8_t *cache_scope; /**< Cache scope for the request */
 	knot_mm_t pool;
 };
 
