@@ -75,21 +75,31 @@ typedef array_t(uint8_t) pack_t;
 /** Zero-initialize the pack. */
 #define pack_init(pack) \
 	array_init(pack)
-/** Free and the pack. */
+
+/** Make the pack empty and free pointed-to memory (plain malloc/free). */
 #define pack_clear(pack) \
 	array_clear(pack)
-/** @internal Clear pack with a callback. */
+
+/** Make the pack empty and free pointed-to memory.
+ * Mempool usage: pass mm_free and a knot_mm_t* . */
 #define pack_clear_mm(pack, free, baton) \
 	array_clear_mm((pack), (free), (baton))
-/** Incrementally reserve objects in the pack. */
+
+/** Reserve space for *additional* objects in the pack (plain malloc/free).
+ * @return 0 if success, <0 on failure */
 #define pack_reserve(pack, objs_count, objs_len) \
 	pack_reserve_mm((pack), (objs_count), (objs_len), array_std_reserve, NULL)
-/** @internal Reservation with a callback. */
+
+/** Reserve space for *additional* objects in the pack.
+ * Mempool usage: pass kr_memreserve and a knot_mm_t* .
+ * @return 0 if success, <0 on failure */
 #define pack_reserve_mm(pack, objs_count, objs_len, reserve, baton) \
 	array_reserve_mm((pack), (pack).len + (sizeof(pack_objlen_t)*(objs_count) + (objs_len)), (reserve), (baton))
+
 /** Return pointer to first packed object. */
 #define pack_head(pack) \
 	((pack).len > 0 ? &((pack).at[0]) : NULL)
+
 /** Return pack end pointer. */
 #define pack_tail(pack) \
 	&((pack).at[(pack).len])
