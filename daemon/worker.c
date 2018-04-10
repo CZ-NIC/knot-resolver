@@ -1473,23 +1473,32 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	struct request_ctx *ctx = task->ctx;
 	kr_resolve_finish(&ctx->req, state);
 	task->finished = true;
-	/* Send back answer */
-	if (ctx->source.session != NULL) {
-		uv_handle_t *handle = ctx->source.session->handle;
-		assert(ctx->source.session->closing == false);
-		assert(handle && handle->data == ctx->source.session);
-		assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
-		(void) qr_task_send(task, handle,
-				    (struct sockaddr *)&ctx->source.addr,
-				    ctx->req.answer);
-		if (handle->type == UV_TCP) {
-			/* Don't try to close source session at least
-			 * retry_interval_for_timeout_timer milliseconds */
-			uv_timer_again(&ctx->source.session->timeout);
-		}
-	} else {
+	if (ctx->source.session == NULL) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
+		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 	}
+
+	/* Send back answer */
+	struct session *source_session = ctx->source.session;
+	uv_handle_t *handle = source_session->handle;
+	assert(source_session->closing == false);
+	assert(handle && handle->data == ctx->source.session);
+	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
+	int res = qr_task_send(task, handle,
+			       (struct sockaddr *)&ctx->source.addr,
+			        ctx->req.answer);
+	if (res != kr_ok()) {
+		while (source_session->tasks.len > 0) {
+			struct qr_task *t = source_session->tasks.at[0];
+			(void) qr_task_on_send(t, NULL, kr_error(EIO));
+		}
+		session_close(source_session);
+	} else if (handle->type == UV_TCP) {
+		/* Don't try to close source session at least
+		 * retry_interval_for_timeout_timer milliseconds */
+		uv_timer_again(&ctx->source.session->timeout);
+	}
+
 	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 }
 
@@ -1651,7 +1660,13 @@ static int qr_task_step(struct qr_task *task,
 				if (ret < 0) {
 					session_del_waiting(session, task);
 					session_del_tasks(session, task);
+					while (session->tasks.len != 0) {
+						struct qr_task *t = session->tasks.at[0];
+						qr_task_finalize(t, KR_STATE_FAIL);
+						session_del_tasks(session, t);
+					}
 					subreq_finalize(task, packet_source, packet);
+					session_close(session);
 					return qr_task_finalize(task, KR_STATE_FAIL);
 				}
 				ret = timer_start(session, on_tcp_watchdog_timeout,
@@ -1659,7 +1674,13 @@ static int qr_task_step(struct qr_task *task,
 				if (ret < 0) {
 					session_del_waiting(session, task);
 					session_del_tasks(session, task);
+					while (session->tasks.len != 0) {
+						struct qr_task *t = session->tasks.at[0];
+						qr_task_finalize(t, KR_STATE_FAIL);
+						session_del_tasks(session, t);
+					}
 					subreq_finalize(task, packet_source, packet);
+					session_close(session);
 					return qr_task_finalize(task, KR_STATE_FAIL);
 				}
 			}
