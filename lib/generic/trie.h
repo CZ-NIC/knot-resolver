@@ -20,6 +20,7 @@
 #include <stdint.h>
 
 #include <libknot/mm_ctx.h>
+#include "lib/defines.h"
 
 /*!
  * \brief Native API of QP-tries:
@@ -31,7 +32,7 @@
  *
  * XXX EDITORS: trie.{h,c} are synced from
  * https://gitlab.labs.nic.cz/knot/knot-dns/tree/68352fc969/src/contrib/qp-trie
- * only with tiny adjustments, mostly #includes.
+ * only with tiny adjustments, mostly #includes and KR_EXPORT.
  */
 
 /*! \brief Element value. */
@@ -89,6 +90,7 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d);
 int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val);
 
 /*! \brief Create a new iterator pointing to the first element (if any). */
+KR_EXPORT
 trie_it_t* trie_it_begin(trie_t *tbl);
 
 /*!
@@ -97,12 +99,15 @@ trie_it_t* trie_it_begin(trie_t *tbl);
  * Iteration is in ascending lexicographical order.
  * In particular, the empty string would be considered as the very first.
  */
+KR_EXPORT
 void trie_it_next(trie_it_t *it);
 
 /*! \brief Test if the iterator has gone past the last element. */
+KR_EXPORT
 bool trie_it_finished(trie_it_t *it);
 
 /*! \brief Free any resources of the iterator. It's OK to call it on NULL. */
+KR_EXPORT
 void trie_it_free(trie_it_t *it);
 
 /*!
@@ -111,7 +116,9 @@ void trie_it_free(trie_it_t *it);
  * \note The optional len is uint32_t internally but size_t is better for our usage,
  *       as it is without an additional type conversion.
  */
+KR_EXPORT
 const char* trie_it_key(trie_it_t *it, size_t *len);
 
 /*! \brief Return pointer to the value of the current element (writable). */
+KR_EXPORT
 trie_val_t* trie_it_val(trie_it_t *it);
