@@ -39,7 +39,6 @@ libkres_HEADERS := \
 	lib/generic/lru.h \
 	lib/generic/map.h \
 	lib/generic/pack.h \
-	lib/generic/set.h \
 	lib/generic/trie.h \
 	lib/layer.h \
 	lib/layer/iterate.h \
