@@ -31,7 +31,7 @@
  *
  * XXX EDITORS: trie.{h,c} are synced from
  * https://gitlab.labs.nic.cz/knot/knot-dns/tree/68352fc969/src/contrib/qp-trie
- * only with #includes adjusted.
+ * only with tiny adjustments, mostly #includes.
  */
 
 /*! \brief Element value. */

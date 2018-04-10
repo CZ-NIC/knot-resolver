@@ -47,7 +47,10 @@
 #endif
 
 typedef unsigned char byte;
+#ifndef uint
 typedef unsigned int uint;
+#define uint uint
+#endif
 typedef uint bitmap_t; /*! Bit-maps, using the range of 1<<0 to 1<<16 (inclusive). */
 
 typedef struct {
