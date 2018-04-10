@@ -268,7 +268,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	}
 	/* Check if any DNSKEY found for cached cut */
 	if (qry->flags.DNSSEC_WANT && cut_found.key == NULL &&
-	    !kr_zonecut_has_glue(&cut_found)) {
+	    kr_zonecut_is_empty(&cut_found)) {
 		/* Cut found and there are no proofs of zone insecurity.
 		 * But no DNSKEY found and no glue fetched.
 		 * We have got circular dependency - must fetch A\AAAA
@@ -1428,7 +1428,7 @@ ns_election:
 		}
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
-			if (!qry->zone_cut.nsset.root) {
+			if (kr_zonecut_is_empty(&qry->zone_cut)) {
 				VERBOSE_MSG(qry, "=> no NS with an address\n");
 			} else {
 				VERBOSE_MSG(qry, "=> no valid NS left\n");

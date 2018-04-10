@@ -57,6 +57,7 @@ typedef void (*trace_callback_f)(struct kr_request *);
 	struct ranked_rr_array_entry
 	ranked_rr_array_entry_t
 	ranked_rr_array_t
+	trie_t
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan
@@ -154,6 +155,7 @@ EOF
 	kr_qflags_set
 	kr_qflags_clear
 	kr_zonecut_add
+	kr_zonecut_is_empty
 	kr_zonecut_set
 	kr_now
 # Trust anchors

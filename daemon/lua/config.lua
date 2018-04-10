@@ -19,7 +19,8 @@ if not cache.current_size then
 	cache.size = 100 * MB
 end
 
-if kres.context().root_hints.nsset.root == nil then
+-- If no addresses for root servers are set, load them from the default file
+if require('ffi').C.kr_zonecut_is_empty(kres.context().root_hints) then
 	_hint_root_file()
 end
 

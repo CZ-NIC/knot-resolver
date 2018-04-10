@@ -82,7 +82,7 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 
 #undef ADDR_SET
 
-static unsigned eval_addr_set(pack_t *addr_set, struct kr_context *ctx,
+static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 			      unsigned score, uint8_t *addr[])
 {
 	kr_nsrep_rtt_lru_t *rtt_cache = ctx->cache_rtt;
@@ -209,9 +209,8 @@ get_next_iterator :
 	return rtt_cache_entry_score[0];
 }
 
-static int eval_nsrep(const char *k, void *v, void *baton)
+static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct kr_query *qry)
 {
-	struct kr_query *qry = baton;
 	struct kr_nsrep *ns = &qry->ns;
 	struct kr_context *ctx = ns->ctx;
 	unsigned score = KR_NS_MAX_SCORE;
@@ -220,8 +219,8 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 
 	/* Fetch NS reputation */
 	if (ctx->cache_rep) {
-		unsigned *cached = lru_get_try(ctx->cache_rep, k,
-					       knot_dname_size((const uint8_t *)k));
+		unsigned *cached = lru_get_try(ctx->cache_rep, (const char *)owner,
+					       knot_dname_size(owner));
 		if (cached) {
 			reputation = *cached;
 		}
@@ -229,7 +228,6 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 
 	/* Favour nameservers with unknown addresses to probe them,
 	 * otherwise discover the current best address for the NS. */
-	pack_t *addr_set = (pack_t *)v;
 	if (addr_set->len == 0) {
 		score = KR_NS_UNKNOWN;
 		/* If the server doesn't have IPv6, give it disadvantage. */
@@ -261,19 +259,19 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 		return kr_ok();
 	} else if (score <= ns->score &&
 	   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
-		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
+		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
 	} else if ((kr_rand_uint(100) < 10) &&
 		   (kr_rand_uint(KR_NS_MAX_SCORE) >= score)) {
 		/* With 10% chance probe server with a probability
 		 * given by its RTT / MAX_RTT. */
-		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
+		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
 		return 1; /* Stop evaluation */
 	} else if (ns->score > KR_NS_MAX_SCORE) {
 		/* Check if any server was already selected.
 		 * If no, pick current server and continue evaluation. */
-		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
+		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
 	}
 
@@ -339,7 +337,18 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 
 	struct kr_nsrep *ns = &qry->ns;
 	ELECT_INIT(ns, ctx);
-	int ret = map_walk(&qry->zone_cut.nsset, eval_nsrep, qry);
+
+	int ret = kr_ok();
+	trie_it_t *it;
+	for (it = trie_it_begin(qry->zone_cut.nsset); !trie_it_finished(it);
+							trie_it_next(it)) {
+		ret = eval_nsrep(/* we trust it's a correct dname */
+				 (const knot_dname_t *)trie_it_key(it, NULL),
+				 (const pack_t *)*trie_it_val(it), qry);
+		if (ret) break;
+	}
+	trie_it_free(it);
+
 	if (qry->ns.score <= KR_NS_MAX_SCORE && qry->ns.score >= KR_NS_LONG) {
 		/* This is a low-reliability probe,
 		 * go with TCP to get ICMP reachability check. */
@@ -357,7 +366,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 	/* Get address list for this NS */
 	struct kr_nsrep *ns = &qry->ns;
 	ELECT_INIT(ns, ctx);
-	pack_t *addr_set = map_get(&qry->zone_cut.nsset, (const char *)ns->name);
+	pack_t *addr_set = kr_zonecut_find(&qry->zone_cut, ns->name);
 	if (!addr_set) {
 		return kr_error(ENOENT);
 	}
