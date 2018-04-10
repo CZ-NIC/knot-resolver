@@ -182,6 +182,25 @@ static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t l
 	return -1;
 }
 
+/** Clone a pack into a mempool (can be NULL).
+ * @return NULL on allocation failure. */
+static inline pack_t * pack_clone(const pack_t *src, knot_mm_t *pool)
+{
+	pack_t *dst = mm_alloc(pool, sizeof(pack_t));
+	if (!dst) return dst;
+	pack_init(*dst);
+	/* Clone data only if needed */
+	if (!pack_head(*src)) return dst;
+	int ret = array_reserve_mm(*dst, src->len, kr_memreserve, pool);
+	if (ret < 0) {
+		mm_free(pool, dst);
+		return NULL;
+	}
+	memcpy(dst->at, src->at, src->len);
+	dst->len = src->len;
+	return dst;
+}
+
 #ifdef __cplusplus
 }
 #endif
