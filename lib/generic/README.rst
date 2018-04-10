@@ -11,6 +11,7 @@ as long as it comes with a test case in `tests/test_generics.c`.
 * set_ - set abstraction implemented on top of ``map``.
 * pack_ - length-prefixed list of objects (i.e. array-list).
 * lru_ - LRU-like hash table
+* trie_ - a trie-based key-value map, taken from knot-dns
 
 array
 ~~~~~
@@ -41,5 +42,12 @@ lru
 
 .. doxygenfile:: lru.h
    :project: libkres
+
+trie
+~~~~
+
+.. doxygenfile:: trie.h
+   :project: libkres
+
 
 .. _`Crit-bit tree`: https://cr.yp.to/critbit.html 
