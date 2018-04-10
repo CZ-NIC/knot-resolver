@@ -16,6 +16,10 @@ Security
   (!550, !558, security!2, security!4)
 - increase resilience against slow lorris attack (security!5)
 
+New features
+------------
+- new policy.REFUSE to reply REFUSED to clients
+
 Bugfixes
 --------
 - validation: fix SERVFAIL in case of CNAME to NXDOMAIN in a single zone (!538)

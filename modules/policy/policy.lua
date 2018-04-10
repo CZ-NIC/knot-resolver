@@ -491,6 +491,12 @@ function policy.DROP(_, _)
 	return kres.FAIL
 end
 
+function policy.REFUSE(_, req)
+	local answer = req.answer
+	answer:rcode(kres.rcode.REFUSED)
+	return kres.DONE
+end
+
 function policy.TC(state, req)
 	local answer = req.answer
 	if answer.max_size ~= 65535 then
