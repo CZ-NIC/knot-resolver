@@ -226,6 +226,8 @@ struct kr_request {
 	trace_log_f trace_log; /**< Logging tracepoint */
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
+	int cache_scope_len_bits; /**< Cache scope length (bits) */
+	const uint8_t *cache_scope; /**< Cache scope for the request */
 	knot_mm_t pool;
 };
 

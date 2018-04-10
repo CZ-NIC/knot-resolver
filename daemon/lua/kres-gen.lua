@@ -81,6 +81,12 @@ struct knot_pkt {
 	knot_compr_t compr;
 };
 typedef struct {
+	uint16_t family;
+	uint8_t source_len;
+	uint8_t scope_len;
+	uint8_t address[16];
+} knot_edns_client_subnet_t;
+typedef struct {
 	void *root;
 	struct knot_mm *pool;
 } map_t;
@@ -194,6 +200,8 @@ struct kr_request {
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
 	int vars_ref;
+	int cache_scope_len_bits;
+	const uint8_t *cache_scope;
 	knot_mm_t pool;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
@@ -275,6 +283,15 @@ int knot_pkt_put_rotate(knot_pkt_t *, uint16_t, const knot_rrset_t *, uint16_t, 
 knot_pkt_t *knot_pkt_new(void *, uint16_t, knot_mm_t *);
 void knot_pkt_free(knot_pkt_t *);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
+int knot_pkt_reserve(knot_pkt_t *pkt, uint16_t size);
+uint8_t knot_edns_get_version(const knot_rrset_t *);
+uint16_t knot_edns_get_payload(const knot_rrset_t *);
+bool knot_edns_has_option(const knot_rrset_t *, uint16_t);
+uint8_t *knot_edns_get_option(const knot_rrset_t *, uint16_t);
+int knot_edns_add_option(knot_rrset_t *, uint16_t, uint16_t, const uint8_t *, knot_mm_t *);
+uint16_t knot_edns_client_subnet_size(const knot_edns_client_subnet_t *);
+int knot_edns_client_subnet_write(uint8_t *, uint16_t, const knot_edns_client_subnet_t *);
+int knot_edns_client_subnet_parse(knot_edns_client_subnet_t *, const uint8_t *, uint16_t);
 struct kr_rplan *kr_resolve_plan(struct kr_request *);
 knot_mm_t *kr_resolve_pool(struct kr_request *);
 struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_dname_t *, uint16_t, uint16_t);

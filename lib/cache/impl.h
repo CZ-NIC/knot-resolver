@@ -138,13 +138,39 @@ static inline size_t key_nsec3_hash_off(const struct key *k)
 static const int NSEC3_HASH_LEN = 20,
 		 NSEC3_HASH_TXT_LEN = 32;
 
+/**
+ * This does not exactly implement https://datatracker.ietf.org/doc/rfc7871/ as in 7.3.1.
+ * The section says that only DNSSEC records and records from non-answer sections must be scoped to given network.
+ * However, ECS is used almost exclusively just for traffic engineering, many types are not meant for that.
+ * The NS record can also show up in the answer section in parent-child setup, but it should not be scoped.
+ */
+static inline bool is_scopable_type(uint16_t type)
+{
+	return type == KNOT_RRTYPE_A || type == KNOT_RRTYPE_AAAA || type == KNOT_RRTYPE_CNAME;
+}
+
+/**
+ * Write cache key scope after the formatted lookup key.
+ * The cache key looks roughly like this:
+ *   off -- len (bytes)
+ *     0 .. 1   domain name len (d)
+ *     1 .. 1   tag (E or 1)
+ *     2 .. d   domain name (d = 0 .. 255)
+ *       .. 1   terminator \x00
+ *
+ *  The E tag has additional information:
+ *       .. t   type in text (e.g AAAA, t = 1 .. 9 (as of now))
+ *       .. s   cache scope (e.g. [192 168 1], s = 0 .. 16)
+ */
+int cache_key_write_scope(struct key *k, size_t off, const uint8_t *scope, int scope_len_bits);
+
 /** Finish constructing string key for for exact search.
  * It's assumed that kr_dname_lf(k->buf, owner, *) had been ran.
  */
-knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
+knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type, const uint8_t *scope, int scope_len_bits);
 
 /** Like key_exact_type_maypkt but with extra checks if used for RRs only. */
-static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type)
+static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type, const uint8_t *scope, int scope_len_bits)
 {
 	switch (type) {
 	/* Sanity check: forbidden types represented in other way(s). */
@@ -153,7 +179,7 @@ static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 		assert(false);
 		return (knot_db_val_t){ NULL, 0 };
 	}
-	return key_exact_type_maypkt(k, type);
+	return key_exact_type_maypkt(k, type, scope, scope_len_bits);
 }
 
 
