@@ -1080,29 +1080,31 @@ static int session_tls_hs_cb(struct session *session, int status)
 		kr_nsrep_update_rtt(NULL, &peer->ip, KR_NS_DEAD,
 				    worker->engine->resolver.cache_rtt,
 				    KR_NS_UPDATE_NORESET);
-	} else {
-		if (deletion_res != 0) {
-			/* session isn't in list of waiting queries, *
-			 * something gone wrong */
-			while (session->waiting.len > 0) {
-				struct qr_task *task = session->waiting.at[0];
-				session_del_tasks(session, task);
-				array_del(session->waiting, 0);
-				qr_task_finalize(task, KR_STATE_FAIL);
-				qr_task_unref(task);
-			}
-			assert(session->tasks.len == 0);
-			session_close(session);
-			return kr_ok();
-		}
+		return kr_ok();
+	}
 
-		int ret = session_next_waiting_send(session);
-		if (ret == kr_ok()) {
-			struct worker_ctx *worker = get_worker();
-			union inaddr *peer = &session->peer;
-			int ret = worker_add_tcp_connected(worker, &peer->ip, session);
-			assert(ret == 0);
+	int ret = worker_add_tcp_connected(worker, &peer->ip, session);
+	if (deletion_res == kr_ok() && ret == kr_ok()) {
+		ret = session_next_waiting_send(session);
+	} else {
+		ret = kr_error(EINVAL);
+	}
+
+	if (ret != kr_ok()) {
+		/* Something went wrong.
+		 * Session isn't in the list of waiting sessions,
+		 * or addition to the list of connected sessions failed,
+		 * or write to upstream failed. */
+		while (session->waiting.len > 0) {
+			struct qr_task *task = session->waiting.at[0];
+			session_del_tasks(session, task);
+			array_del(session->waiting, 0);
+			qr_task_finalize(task, KR_STATE_FAIL);
+			qr_task_unref(task);
 		}
+		worker_del_tcp_connected(worker, &peer->ip);
+		assert(session->tasks.len == 0);
+		session_close(session);
 	}
 	return kr_ok();
 }
