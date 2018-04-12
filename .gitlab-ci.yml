@@ -4,6 +4,7 @@ variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
   GIT_SUBMODULE_STRATEGY: recursive
+  GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
   COVERAGE: '1'
 
 stages:
