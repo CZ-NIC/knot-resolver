@@ -284,6 +284,7 @@ knot_pkt_t *knot_pkt_new(void *, uint16_t, knot_mm_t *);
 void knot_pkt_free(knot_pkt_t *);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
 int knot_pkt_reserve(knot_pkt_t *pkt, uint16_t size);
+int knot_pkt_reclaim(knot_pkt_t *pkt, uint16_t size);
 uint8_t knot_edns_get_version(const knot_rrset_t *);
 uint16_t knot_edns_get_payload(const knot_rrset_t *);
 bool knot_edns_has_option(const knot_rrset_t *, uint16_t);
@@ -344,6 +345,7 @@ int kr_cache_closest_apex(struct kr_cache *, const knot_dname_t *, _Bool, knot_d
 int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t);
 int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
+int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t, const uint8_t *, int);
 int kr_cache_sync(struct kr_cache *);
 typedef struct {
 	uint8_t bitmap[32];
