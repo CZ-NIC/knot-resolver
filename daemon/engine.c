@@ -594,9 +594,8 @@ static int init_resolver(struct engine *engine)
 	knot_edns_init(engine->resolver.opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
 	/* Use default TLS padding */
 	engine->resolver.tls_padding = -1;
-	/* Set default root hints */
+	/* Empty init; filled via ./lua/config.lua */
 	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
-	kr_zonecut_set_sbelt(&engine->resolver, &engine->resolver.root_hints);
 	/* Open NS rtt + reputation cache */
 	lru_create(&engine->resolver.cache_rtt, LRU_RTT_SIZE, engine->pool, NULL);
 	lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, engine->pool, NULL);

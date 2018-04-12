@@ -121,6 +121,17 @@ static inline void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t pr
 		return realloc(what, size);
 	}
 }
+
+/** Trivial malloc() wrapper. */
+void *mm_malloc(void *ctx, size_t n);
+
+/** Initialize mm with standard malloc+free. */
+static inline void mm_ctx_init(knot_mm_t *mm)
+{
+	mm->ctx = NULL;
+	mm->alloc = mm_malloc;
+	mm->free = free;
+}
 /* @endcond */
 
 /** Return time difference in miliseconds.

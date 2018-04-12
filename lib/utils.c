@@ -53,6 +53,13 @@ static isaac_ctx ISAAC;
 static bool isaac_seeded = false;
 #define SEED_SIZE 256
 
+
+void *mm_malloc(void *ctx, size_t n)
+{
+	(void)ctx;
+	return malloc(n);
+}
+
 /*
  * Macros.
  */

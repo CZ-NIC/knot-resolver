@@ -60,15 +60,25 @@ int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, knot_mm_t 
 	cut->key  = NULL;
 	cut->trust_anchor = NULL;
 	cut->parent = NULL;
-	cut->nsset = map_make(pool);
-	return kr_ok();
+	cut->nsset = trie_create(pool);
+	return cut->name && cut->nsset ? kr_ok() : kr_error(ENOMEM);
 }
 
-static int free_addr_set(const char *k, void *v, void *baton)
+/** Completely free a pack_t. */
+static inline void free_addr_set(pack_t *pack, knot_mm_t *pool)
 {
-	pack_t *pack = v;
-	pack_clear_mm(*pack, mm_free, baton);
-	mm_free(baton, pack);
+	if (unlikely(!pack)) {
+		/* promised we don't store NULL packs */
+		assert(false);
+		return;
+	}
+	pack_clear_mm(*pack, mm_free, pool);
+	mm_free(pool, pack);
+}
+/** Trivial wrapper for use in trie_apply, due to ugly casting. */
+static int free_addr_set_cb(trie_val_t *v, void *pool)
+{
+	free_addr_set(*v, pool);
 	return kr_ok();
 }
 
@@ -78,8 +88,11 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 		return;
 	}
 	mm_free(cut->pool, cut->name);
-	map_walk(&cut->nsset, free_addr_set, cut->pool);
-	map_clear(&cut->nsset);
+	if (cut->nsset) {
+		trie_apply(cut->nsset, free_addr_set_cb, cut->pool);
+		trie_free(cut->nsset);
+		cut->nsset = NULL;
+	}
 	knot_rrset_free(&cut->key, cut->pool);
 	knot_rrset_free(&cut->trust_anchor, cut->pool);
 	cut->name = NULL;
@@ -99,43 +112,31 @@ void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
 	cut->trust_anchor = ta;
 }
 
-static int copy_addr_set(const char *k, void *v, void *baton)
-{
-	pack_t *addr_set = v;
-	struct kr_zonecut *dst = baton;
-	/* Clone addr_set pack */
-	pack_t *new_set = mm_alloc(dst->pool, sizeof(*new_set));
-	if (!new_set) {
-		return kr_error(ENOMEM);
-	}
-	pack_init(*new_set);
-	/* Clone data only if needed */
-	if (addr_set->len > 0) {
-		new_set->at = mm_alloc(dst->pool, addr_set->len);
-		if (!new_set->at) {
-			mm_free(dst->pool, new_set);
-			return kr_error(ENOMEM);
-		}
-		memcpy(new_set->at, addr_set->at, addr_set->len);
-		new_set->len = addr_set->len;
-		new_set->cap = addr_set->len;
-	}
-	/* Reinsert */
-	if (map_set(&dst->nsset, k, new_set) != 0) {
-		pack_clear_mm(*new_set, mm_free, dst->pool);
-		mm_free(dst->pool, new_set);
-		return kr_error(ENOMEM);
-	}
-	return kr_ok();
-}
-
 int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src)
 {
 	if (!dst || !src) {
 		return kr_error(EINVAL);
 	}
-	/* We're not touching src nsset, I promise */
-	return map_walk((map_t *)&src->nsset, copy_addr_set, dst);
+	if (!dst->nsset) {
+		dst->nsset = trie_create(dst->pool);
+	}
+	/* Copy the contents, one by one. */
+	int ret = kr_ok();
+	trie_it_t *it;
+	for (it = trie_it_begin(src->nsset); !trie_it_finished(it); trie_it_next(it)) {
+		size_t klen;
+		const char * const k = trie_it_key(it, &klen);
+		pack_t **new_pack = (pack_t **)trie_get_ins(dst->nsset, k, klen);
+		if (!new_pack) {
+			ret = kr_error(ENOMEM);
+			break;
+		}
+		const pack_t *old_pack = *trie_it_val(it);
+		ret = pack_clone(new_pack, old_pack, dst->pool);
+		if (ret) break;
+	}
+	trie_it_free(it);
+	return ret;
 }
 
 int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
@@ -168,18 +169,16 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
 
 int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
 {
-	if (!cut || !ns) {
+	if (!cut || !ns || !cut->nsset) {
 		return kr_error(EINVAL);
 	}
-	/* Fetch/insert nameserver. */
-	pack_t *pack = kr_zonecut_find(cut, ns);
-	if (pack == NULL) {
-		pack = mm_alloc(cut->pool, sizeof(*pack));
-		if (!pack || (map_set(&cut->nsset, (const char *)ns, pack) != 0)) {
-			mm_free(cut->pool, pack);
-			return kr_error(ENOMEM);
-		}
-		pack_init(*pack);
+	/* Get a pack_t for the ns. */
+	pack_t **pack = (pack_t **)trie_get_ins(cut->nsset, (const char *)ns, knot_dname_size(ns));
+	if (!pack) return kr_error(ENOMEM);
+	if (*pack == NULL) {
+		*pack = mm_alloc(cut->pool, sizeof(pack_t));
+		if (*pack == NULL) return kr_error(ENOMEM);
+		pack_init(**pack);
 	}
 	/* Insert data (if has any) */
 	if (rdata == NULL) {
@@ -188,15 +187,15 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	/* Check for duplicates */
 	uint16_t rdlen = knot_rdata_rdlen(rdata);
 	uint8_t *raw_addr = knot_rdata_data(rdata);
-	if (pack_obj_find(pack, raw_addr, rdlen)) {
+	if (pack_obj_find(*pack, raw_addr, rdlen)) {
 		return kr_ok();
 	}
 	/* Push new address */
-	int ret = pack_reserve_mm(*pack, 1, rdlen, kr_memreserve, cut->pool);
+	int ret = pack_reserve_mm(**pack, 1, rdlen, kr_memreserve, cut->pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}
-	return pack_obj_push(pack, raw_addr, rdlen);
+	return pack_obj_push(*pack, raw_addr, rdlen);
 }
 
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
@@ -217,8 +216,10 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	}
 	/* No servers left, remove NS from the set. */
 	if (pack->len == 0) {
-		free_addr_set((const char *)ns, pack, cut->pool);
-		return map_del(&cut->nsset, (const char *)ns);
+		free_addr_set(pack, cut->pool);
+		ret = trie_del(cut->nsset, (const char *)ns, knot_dname_size(ns), NULL);
+		assert(ret == 0); /* only KNOT_ENOENT and that *can't* happen */
+		return (ret == 0) ? kr_ok() : kr_error(ret);
 	}
 
 	return ret;
@@ -231,12 +232,15 @@ int kr_zonecut_del_all(struct kr_zonecut *cut, const knot_dname_t *ns)
 	}
 
 	/* Find the address list; then free and remove it. */
-	pack_t *pack = kr_zonecut_find(cut, ns);
-	if (pack == NULL) {
+	pack_t *pack;
+	int ret = trie_del(cut->nsset, (const char *)ns, knot_dname_size(ns),
+			   (trie_val_t *)&pack);
+	if (ret) { /* deletion failed */
+		assert(ret == KNOT_ENOENT);
 		return kr_error(ENOENT);
 	}
-	free_addr_set((const char *)ns, pack, cut->pool);
-	return map_del(&cut->nsset, (const char *)ns);
+	free_addr_set(pack, cut->pool);
+	return kr_ok();
 }
 
 pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns)
@@ -244,58 +248,39 @@ pack_t *kr_zonecut_find(struct kr_zonecut *cut, const knot_dname_t *ns)
 	if (!cut || !ns) {
 		return NULL;
 	}
-
-	const char *key = (const char *)ns;
-	map_t *nsset = &cut->nsset;
-	return map_get(nsset, key);
+	trie_val_t *val = trie_get_try(cut->nsset, (const char *)ns, knot_dname_size(ns));
+	/* we get pointer to the pack_t pointer */
+	return val ? (pack_t *)*val : NULL;
 }
 
-static int has_glue(const char *k, void *v, void *baton)
+static int has_address(trie_val_t *v, void *baton_)
 {
-	bool *glue_found = (bool *)baton;
-	if (*glue_found) {
+	const pack_t *pack = *v;
+	const bool found = pack != NULL && pack->len != 0;
+	return found;
+}
+
+bool kr_zonecut_is_empty(struct kr_zonecut *cut)
+{
+	if (!cut || !cut->nsset) {
 		assert(false);
-		return 1; /* short-circuit */
+		return true;
 	}
-
-	pack_t *pack = (pack_t *)v;
-	if (pack != NULL && pack->len != 0) {
-		*glue_found = true;
-		return 1; /* short-circuit */
-	}
-
-	return kr_ok();
-}
-
-bool kr_zonecut_has_glue(struct kr_zonecut *cut)
-{
-	if (!cut) {
-		return false;
-	}
-
-	bool glue_found = false;
-	map_t *nsset = &cut->nsset;
-
-	map_walk(nsset, has_glue, &glue_found);
-	return glue_found;
+	return !trie_apply(cut->nsset, has_address, NULL);
 }
 
 int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 {
-	if (!ctx || !cut) {
+	if (!ctx || !cut || !ctx->root_hints.nsset) {
 		return kr_error(EINVAL);
 	}
 
-	update_cut_name(cut, U8(""));
-	map_walk(&cut->nsset, free_addr_set, cut->pool);
-	map_clear(&cut->nsset);
+	trie_apply(cut->nsset, free_addr_set_cb, cut->pool);
+	trie_clear(cut->nsset);
 
+	update_cut_name(cut, U8(""));
 	/* Copy root hints from resolution context. */
-	int ret = 0;
-	if (ctx->root_hints.nsset.root) {
-		ret = kr_zonecut_copy(cut, &ctx->root_hints);
-	}
-	return ret;
+	return kr_zonecut_copy(cut, &ctx->root_hints);
 }
 
 /** Fetch address for zone cut.  Any rank is accepted (i.e. glue as well). */

@@ -506,27 +506,24 @@ static char* hint_get(void *env, struct kr_module *module, const char *args)
 	return result;
 }
 
-/** Retrieve hint list. */
-static int pack_hint(const char *k, void *v, void *baton)
-{
-	char nsname_str[KNOT_DNAME_MAXLEN] = {'\0'};
-	knot_dname_to_str(nsname_str, (const uint8_t *)k, sizeof(nsname_str));
-	JsonNode *root_node = baton;
-	JsonNode *addr_list = pack_addrs((pack_t *)v);
-	if (!addr_list) {
-		return kr_error(ENOMEM);
-	}
-	json_append_member(root_node, nsname_str, addr_list);
-	return kr_ok();
-}
-
 /** @internal Pack all hints into serialized JSON. */
 static char* pack_hints(struct kr_zonecut *hints) {
 	char *result = NULL;
 	JsonNode *root_node = json_mkobject();
-	if (map_walk(&hints->nsset, pack_hint, root_node) == 0) {
-		result = json_encode(root_node);
+	trie_it_t *it;
+	for (it = trie_it_begin(hints->nsset); !trie_it_finished(it); trie_it_next(it)) {
+		char nsname_str[KNOT_DNAME_MAXLEN] = {'\0'};
+		knot_dname_to_str(nsname_str,
+					/* here we trust that it's a correct dname */
+					(const knot_dname_t *)trie_it_key(it, NULL),
+					sizeof(nsname_str));
+		JsonNode *addr_list = pack_addrs((pack_t *)*trie_it_val(it));
+		if (!addr_list) goto error;
+		json_append_member(root_node, nsname_str, addr_list);
 	}
+	result = json_encode(root_node);
+error:
+	trie_it_free(it);
 	json_delete(root_node);
 	return result;
 }

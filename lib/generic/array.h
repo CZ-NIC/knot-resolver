@@ -104,25 +104,28 @@ static inline void array_std_free(void *baton, void *p)
 /** Zero-initialize the array. */
 #define array_init(array) ((array).at = NULL, (array).len = (array).cap = 0)
 
-/** Free and zero-initialize the array. */
+/** Free and zero-initialize the array (plain malloc/free). */
 #define array_clear(array) \
 	array_clear_mm(array, array_std_free, NULL)
-/** @internal Clear array with a callback. */
+
+/** Make the array empty and free pointed-to memory.
+ * Mempool usage: pass mm_free and a knot_mm_t* . */
 #define array_clear_mm(array, free, baton) \
 	(free)((baton), (array).at), array_init(array)
 
-/**
- * Reserve capacity up to 'n' bytes.
- * @return 0 if success, <0 on failure
- */
+/** Reserve capacity for at least n elements.
+ * @return 0 if success, <0 on failure */
 #define array_reserve(array, n) \
 	array_reserve_mm(array, n, array_std_reserve, NULL)
-/** @internal Reserve capacity using callback. */
+
+/** Reserve capacity for at least n elements.
+ * Mempool usage: pass kr_memreserve and a knot_mm_t* .
+ * @return 0 if success, <0 on failure */
 #define array_reserve_mm(array, n, reserve, baton) \
 	(reserve)((baton), (char **) &(array).at, sizeof((array).at[0]), (n), &(array).cap)
 
 /**
- * Push value at the end of the array, resize it if necessary.
+ * Push value at the end of the array, resize it if necessary (malloc/free).
  * @note May fail if the capacity is not reserved.
  * @return element index on success, <0 on failure
  */

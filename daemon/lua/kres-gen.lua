@@ -119,12 +119,13 @@ typedef struct {
 	size_t len;
 	size_t cap;
 } ranked_rr_array_t;
+typedef struct trie trie_t;
 struct kr_zonecut {
 	knot_dname_t *name;
 	knot_rrset_t *key;
 	knot_rrset_t *trust_anchor;
 	struct kr_zonecut *parent;
-	map_t nsset;
+	trie_t *nsset;
 	knot_mm_t *pool;
 };
 typedef struct {
@@ -286,6 +287,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _B
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
 void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
 int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const knot_rdata_t *);
+_Bool kr_zonecut_is_empty(struct kr_zonecut *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
 uint64_t kr_now();
 knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
