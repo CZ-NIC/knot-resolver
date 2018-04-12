@@ -414,7 +414,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 		} else if (ret != 0) {
 			VERBOSE_MSG(qry, "<= bogus proof of DS non-existence\n");
 			qry->flags.DNSSEC_BOGUS = true;
-		} else {
+		} else if (proved_name[0] != '\0') { /* don't go to insecure for . DS */
 			VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 			qry->flags.DNSSEC_NODS = true;
 			/* Rank the corresponding nonauth NS as insecure. */
