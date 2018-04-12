@@ -439,9 +439,13 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	if (!ns_record_exists && knot_wire_get_aa(pkt->wire)) {
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
+			struct kr_query *qry = req->current_query;
 			if (rr->type == KNOT_RRTYPE_NS && knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
 				/* NS below cut in authority indicates different authority, but same NS set. */
 				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
+				/* Process as referral unless the NS is actually the target of the current query. */
+				if (!knot_dname_is_equal(rr->owner, qry->sname))
+					result = KR_STATE_DONE;
 			}
 		}
 	}
@@ -1067,6 +1071,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
+	bool is_referral_and_auth = knot_wire_get_aa(pkt->wire);
 	int state = process_authority(pkt, req);
 	switch(state) {
 	case KR_STATE_CONSUME: /* Not referral, process answer. */
@@ -1075,6 +1080,11 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	case KR_STATE_DONE: /* Referral */
 		state = process_referral_answer(pkt,req);
+		/* Continue with the server when switching from parent to child zone
+		 * side of the delegation on the same nameserver. */
+		if (state == KR_STATE_DONE && is_referral_and_auth) {
+			state = KR_STATE_CONSUME;
+		}
 		VERBOSE_MSG("<= referral response, follow\n");
 		break;
 	default:
