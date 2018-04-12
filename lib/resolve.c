@@ -874,11 +874,18 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 		}
 	/* Penalise resolution failures except validation failures. */
 	} else if (!(qry->flags.DNSSEC_BOGUS)) {
-		kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt, KR_NS_UPDATE);
+		const bool is_timeout = (packet == NULL);
+		/* Select whichever is worse - penalty or RTT */
+		unsigned rtt = kr_now() - qry->timestamp_mono;
+		unsigned score = is_timeout ? KR_NS_TIMEOUT : (KR_NS_LONG - 1);
+		if (score < rtt) {
+			score = rtt;
+		}
+		kr_nsrep_update_rtt(&qry->ns, src, score, ctx->cache_rtt, KR_NS_UPDATE);
 		WITH_VERBOSE(qry) {
 			char addr_str[INET6_ADDRSTRLEN];
 			inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
-			VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
+			VERBOSE_MSG(qry, "=> server: '%s' flagged as '%s'\n", addr_str, is_timeout ? "timeout" : "bad");
 		}
 	}
 }

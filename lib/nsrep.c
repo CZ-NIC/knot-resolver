@@ -424,7 +424,7 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	case KR_NS_UPDATE_NORESET:
 		new_score = (cur->score + score) / 2; break;
 	case KR_NS_RESET:  new_score = score; break;
-	case KR_NS_ADD:    new_score = MIN(KR_NS_MAX_SCORE - 1, cur->score + score); break;
+	case KR_NS_ADD:    new_score = MIN(KR_NS_LONG - 1, cur->score + score); break;
 	case KR_NS_MAX:    new_score = MAX(cur->score, score); break;
 	default: break;
 	}
