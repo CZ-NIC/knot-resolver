@@ -133,6 +133,7 @@ printf "\tchar _stub[];\n};\n"
 	knot_pkt_free
 	knot_pkt_parse
 	knot_pkt_reserve
+	knot_pkt_reclaim
 # OPT
 	knot_edns_get_version
 	knot_edns_get_payload

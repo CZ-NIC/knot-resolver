@@ -288,6 +288,7 @@ knot_pkt_t *knot_pkt_new(void *, uint16_t, knot_mm_t *);
 void knot_pkt_free(knot_pkt_t **);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
 int knot_pkt_reserve(knot_pkt_t *pkt, uint16_t size);
+int knot_pkt_reclaim(knot_pkt_t *pkt, uint16_t size);
 uint8_t knot_edns_get_version(const knot_rrset_t *);
 uint16_t knot_edns_get_payload(const knot_rrset_t *);
 bool knot_edns_has_option(const knot_rrset_t *, uint16_t);
@@ -339,6 +340,6 @@ _Bool kr_dnssec_key_ksk(const uint8_t *);
 _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);
-int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t);
+int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t, const uint8_t *, int);
 int kr_cache_sync(struct kr_cache *);
 ]]
