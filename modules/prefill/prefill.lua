@@ -148,7 +148,8 @@ function prefill.config(config)
 		dir_obj:close()
 	end
 	rz_ca_dir = config.ca_dir
-	log('[prefill] refresh interval: %i s', rz_default_interval)
+	log('[prefill] first download in %i s; refresh interval %s (randomized)',
+		rz_initial_interval, display_delay(rz_default_interval))
 
 	-- ability to change intervals
 	prefill.deinit()
