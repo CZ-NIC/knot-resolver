@@ -63,6 +63,18 @@ To test this feature you need to either :ref:`configure Knot Resolver as DNS-ove
 
 When multiple servers are specified, the one with the lowest round-trip time is used.
 
+CA+hostname authentication
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Traditional PKI authentication requires server to present certificate with specified hostname, which is issued by one of trusted CAs. Example policy is:
+
+.. code-block:: lua
+
+        policy.TLS_FORWARD({
+                {'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}})
+
+- `hostname` must exactly match hostname in server's certificate, i.e. in most cases it must not contain trailing dot (`res.example.com`).
+- `ca_file` must be path to CA certificate (or certificate bundle) in `PEM format`_.
+
 TLS Examples
 ~~~~~~~~~~~~
 
@@ -82,7 +94,7 @@ TLS Examples
 	  policy.TLS_FORWARD({ -- please note that { here starts list of servers
 		{'192.0.2.1', pin_sha256='Wg=='},
 		-- server must present certificate issued by specified CA and hostname must match
-		{'2001:DB8::d0c', hostname='res.example.', ca_file='/etc/knot-resolver/tlsca.crt'}
+		{'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}
 	})
 
 .. _policy_examples:
@@ -207,6 +219,7 @@ This module is enabled by default because it implements mandatory :rfc:`6761` lo
 .. _`Aho-Corasick`: https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
 .. _`@jgrahamc`: https://github.com/jgrahamc/aho-corasick-lua
 .. _RPZ: https://dnsrpz.info/
+.. _`PEM format`: https://en.wikipedia.org/wiki/Privacy-enhanced_Electronic_Mail
 .. _`Pro DNS and BIND`: http://www.zytrax.com/books/dns/ch7/rpz.html
 .. _`Jan-Piet Mens's post`: http://jpmens.net/2011/04/26/how-to-configure-your-bind-resolvers-to-lie-using-response-policy-zones-rpz/
 .. _`Transport Layer Security`: https://en.wikipedia.org/wiki/Transport_Layer_Security

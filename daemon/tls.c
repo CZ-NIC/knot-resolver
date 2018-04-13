@@ -46,7 +46,7 @@
 #endif
 
 static char const server_logstring[] = "tls";
-static char const client_logstring[] = "tls-client";
+static char const client_logstring[] = "tls_client";
 
 static int client_verify_certificate(gnutls_session_t tls_session);
 
@@ -171,7 +171,7 @@ void tls_close(struct tls_common_ctx *ctx)
 
 	if (ctx->handshake_state == TLS_HS_DONE) {
 		kr_log_verbose("[%s] closing tls connection to `%s`\n",
-			       ctx->client_side ? "tls-client" : "tls",
+			       ctx->client_side ? "tls_client" : "tls",
 			       kr_straddr(&ctx->session->peer.ip));
 		ctx->handshake_state = TLS_HS_CLOSING;
 		gnutls_bye(ctx->tls_session, GNUTLS_SHUT_RDWR);
@@ -639,6 +639,10 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 						     value, gnutls_strerror_name(res));
 					/* value will be freed at cleanup */
 					ret = kr_error(EINVAL);
+				} else {
+					kr_log_verbose("[tls_client] imported %d certs from file '%s'\n",
+							res, value);
+
 				}
 			}
 		}
@@ -790,23 +794,36 @@ skip_pins:
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
+	int ret;
+	unsigned int status;
 	for (size_t i = 0; i < ctx->params->hostnames.len; ++i) {
-		gnutls_typed_vdata_st data[2] = {
-			{ .type = GNUTLS_DT_KEY_PURPOSE_OID,
-			  .data = (void *)GNUTLS_KP_TLS_WWW_SERVER },
-			{ .type = GNUTLS_DT_DNS_HOSTNAME,
-			  .data = (void *)ctx->params->hostnames.at[i] }
-		};
-		size_t data_count = 2;
-		unsigned int status;
-		int ret = gnutls_certificate_verify_peers(ctx->c.tls_session, data,
-							  data_count, &status);
+		ret = gnutls_certificate_verify_peers3(
+				ctx->c.tls_session,
+				ctx->params->hostnames.at[i],
+				&status);
 		if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
 			return GNUTLS_E_SUCCESS;
 		}
 	}
 
-	kr_log_error("[tls_client] failed to verify peer certificate\n");
+	if (ret == GNUTLS_E_SUCCESS) {
+		gnutls_datum_t msg;
+		ret = gnutls_certificate_verification_status_print(
+			status, gnutls_certificate_type_get(ctx->c.tls_session), &msg, 0);
+		if (ret == GNUTLS_E_SUCCESS) {
+			kr_log_error("[tls_client] failed to verify peer certificate: "
+					"%s\n", msg.data);
+			gnutls_free(msg.data);
+		} else {
+			kr_log_error("[tls_client] failed to verify peer certificate: "
+					"unable to print reason: %s (%s)\n",
+					gnutls_strerror(ret), gnutls_strerror_name(ret));
+		} /* gnutls_certificate_verification_status_print end */
+	} else {
+		kr_log_error("[tls_client] failed to verify peer certificate: "
+			     "gnutls_certificate_verify_peers3 error: %s (%s)\n",
+			     gnutls_strerror(ret), gnutls_strerror_name(ret));
+	} /* gnutls_certificate_verify_peers3 end */
 	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 

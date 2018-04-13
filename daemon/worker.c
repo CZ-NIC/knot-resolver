@@ -904,7 +904,7 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 	       t->session->handle->type == UV_TCP);
 
 	VERBOSE_MSG(NULL,"[%s] push %zu <%p>\n",
-		    t->client_side ? "tls-client" : "tls", len, h);
+		    t->client_side ? "tls_client" : "tls", len, h);
 
 	struct worker_ctx *worker = t->worker;
 	assert(worker);
@@ -948,7 +948,7 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 			worker->stats.ipv4 += 1;
 	} else {
 		VERBOSE_MSG(NULL,"[%s] uv_write: %s\n",
-			    t->client_side ? "tls-client" : "tls", uv_strerror(res));
+			    t->client_side ? "tls_client" : "tls", uv_strerror(res));
 		iorequest_release(worker, ioreq);
 		errno = EIO;
 	}
