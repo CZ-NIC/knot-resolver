@@ -48,6 +48,8 @@ typedef void (*trace_callback_f)(struct kr_request *);
 	struct knot_rdataset
 	knot_rrset_t
 	knot_pktsection_t
+	struct knot_compr
+	knot_compr_t
 	struct knot_pkt
 	knot_pkt_t
 	# generics
