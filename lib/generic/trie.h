@@ -45,21 +45,27 @@ typedef struct trie trie_t;
 typedef struct trie_it trie_it_t;
 
 /*! \brief Create a trie instance. */
+KR_EXPORT
 trie_t* trie_create(knot_mm_t *mm);
 
 /*! \brief Free a trie instance. */
+KR_EXPORT
 void trie_free(trie_t *tbl);
 
 /*! \brief Clear a trie instance (make it empty). */
+KR_EXPORT
 void trie_clear(trie_t *tbl);
 
 /*! \brief Return the number of keys in the trie. */
+KR_EXPORT
 size_t trie_weight(const trie_t *tbl);
 
 /*! \brief Search the trie, returning NULL on failure. */
+KR_EXPORT
 trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len);
 
 /*! \brief Search the trie, inserting NULL trie_val_t on failure. */
+KR_EXPORT
 trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len);
 
 /*!
@@ -87,6 +93,7 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d);
  *
  * If val!=NULL and deletion succeeded, the deleted value is set.
  */
+KR_EXPORT
 int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val);
 
 /*! \brief Create a new iterator pointing to the first element (if any). */

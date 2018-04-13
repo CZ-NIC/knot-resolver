@@ -142,11 +142,12 @@ struct worker_ctx {
 
 	bool too_many_open;
 	size_t rconcurrent_highwatermark;
-	/* List of active outbound TCP sessions */
+	/** List of active outbound TCP sessions */
 	map_t tcp_connected;
-	/* List of outbound TCP sessions waiting to be accepted */
+	/** List of outbound TCP sessions waiting to be accepted */
 	map_t tcp_waiting;
-	map_t outgoing;
+	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
+	trie_t *subreq_out;
 	mp_freelist_t pool_mp;
 	mp_freelist_t pool_ioreqs;
 	mp_freelist_t pool_sessions;
