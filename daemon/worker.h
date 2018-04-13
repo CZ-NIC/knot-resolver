@@ -138,6 +138,7 @@ struct worker_ctx {
 		size_t rconcurrent;
 		size_t udp;
 		size_t tcp;
+		size_t tls;
 		size_t ipv4;
 		size_t ipv6;
 		size_t queries;
