@@ -39,7 +39,7 @@ local function send_ta_query(domain)
 	local qname = prepare_query_name(keyset, domain)
 	if qname ~= nil then
 		if verbose() then
-			log("[ta_query_signal] signalling query trigered: %s", qname)
+			log("[ta_signal_query] signalling query trigered: %s", qname)
 		end
 		-- asynchronous query
 		-- we do not care about result or from where it was obtained
