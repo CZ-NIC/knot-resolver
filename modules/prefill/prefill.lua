@@ -18,7 +18,7 @@ local rz_next_refresh = 86400
 local rz_interval_threshold = 5
 local rz_interval_min = 3600
 
-local prefetch = {
+local prefill = {
 }
 
 
@@ -118,7 +118,7 @@ local function check_time()
 	return
 end
 
-function prefetch.init()
+function prefill.init()
 	if rz_event_id then
 		error('[prefill] module is already loaded.')
 	end
@@ -126,14 +126,14 @@ function prefetch.init()
 	rz_event_id = event.after(rz_initial_interval * sec , check_time)
 end
 
-function prefetch.deinit()
+function prefill.deinit()
 	if rz_event_id then
 		event.cancel(rz_event_id)
 		rz_event_id = nil
 	end
 end
 
-function prefetch.config(config)
+function prefill.config(config)
 	if config and config.interval then
 		rz_default_interval = config.interval
 		if rz_default_interval < rz_interval_min then
@@ -154,4 +154,4 @@ function prefetch.config(config)
 	end
 end
 
-return prefetch
+return prefill
