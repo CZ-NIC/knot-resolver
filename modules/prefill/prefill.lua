@@ -6,7 +6,6 @@ local rz_url = "https://www.internic.net/domain/root.zone"
 local rz_local_fname = "root.zone"
 local rz_ca_path = nil
 local rz_event_id = nil
-local rz_auth = false
 
 local rz_default_interval = 86400
 local rz_https_fail_interval = 600
@@ -23,18 +22,15 @@ local prefill = {
 
 
 -- Fetch over HTTPS with peert cert checked
-local function https_fetch(auth, url, ca)
+local function https_fetch(url, ca_dir)
+	assert(string.match(url, '^https://'))
+	assert(ca_dir)
+
 	local resp = {}
-	local verify = {'none'}
-        local capath = nil
-	if auth then
-		verify = {'peer', 'fail_if_no_peer_cert' }
-		capath = ca
-	end
 	local r, c = https.request{
 	       url = url,
-	       verify = verify,
-	       capath = capath,
+	       verify = {'peer', 'fail_if_no_peer_cert' },
+	       capath = ca_dir,
 	       protocol = 'tlsv1_2',
 	       sink = ltn12.sink.table(resp),
 	}
@@ -87,7 +83,7 @@ local function check_time()
 	end
 
 	log("[prefill] downloading root zone...")
-	local rzone, err = https_fetch(rz_auth, rz_url, rz_ca_path)
+	local rzone, err = https_fetch(true, rz_url, rz_ca_path)
 	if rzone == nil then
 		log(string.format("[prefill] fetch of `%s` failed: %s", rz_url, err))
 		rz_cur_interval = rz_https_fail_interval;
@@ -119,11 +115,7 @@ local function check_time()
 end
 
 function prefill.init()
-	if rz_event_id then
-		error('[prefill] module is already loaded.')
-	end
 	math.randomseed(os.time())
-	rz_event_id = event.after(rz_initial_interval * sec , check_time)
 end
 
 function prefill.deinit()
@@ -134,24 +126,30 @@ function prefill.deinit()
 end
 
 function prefill.config(config)
-	if config and config.interval then
-		rz_default_interval = config.interval
-		if rz_default_interval < rz_interval_min then
-			log("[prefill] too small refresh interval (%d s), use default value",
-			    rz_default_interval)
-			rz_default_interval = rz_interval_min
+	if not config or type(config) ~= 'table' then
+		error('[prefill] configuration must be in table')
+	end
+	if config.interval then
+		config.interval = tonumber(config.interval)
+		if config.interval < rz_interval_min then
+			error('[prefill] refresh interval %d s is too short, '
+				.. 'minimal interval is %d s',
+				config.interval, rz_interval_min)
 		end
-		rz_cur_interval = rz_default_interval
+		rz_default_interval = config.interval
+		rz_cur_interval = config.interval
 	end
-	if config and config.ca_path then
-		rz_ca_path = config.ca_path
-		rz_auth = true
+
+	if not config.ca_path then
+		error('[prefill] option ca_dir must point '
+			.. 'to a directory with CA certificates in PEM format')
 	end
-	log("[prefill] refresh interval: %i s; authentication: %s",
-	    rz_default_interval, tostring(rz_auth))
-	if rz_auth then
-		log("[prefill] ca path: %s", rz_ca_path)
-	end
+	rz_ca_path = config.ca_path
+	log('[prefill] refresh interval: %i s', rz_default_interval)
+
+	-- ability to change intervals
+	prefill.deinit()
+	rz_event_id = event.after(rz_initial_interval * sec , check_time)
 end
 
 return prefill
