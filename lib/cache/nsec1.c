@@ -158,7 +158,6 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		if (ret == kr_error(ENOENT)) {
 			return "range search miss";
 		} else {
-			assert(false);
 			return "range search ERROR";
 		}
 	}
