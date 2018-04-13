@@ -125,13 +125,22 @@ static inline void array_std_free(void *baton, void *p)
 	(reserve)((baton), (char **) &(array).at, sizeof((array).at[0]), (n), &(array).cap)
 
 /**
- * Push value at the end of the array, resize it if necessary (malloc/free).
+ * Push value at the end of the array, resize it if necessary (plain malloc/free).
  * @note May fail if the capacity is not reserved.
  * @return element index on success, <0 on failure
  */
 #define array_push(array, val) \
+	array_push_mm(array, val, array_std_reserve, NULL)
+
+/**
+ * Push value at the end of the array, resize it if necessary.
+ * Mempool usage: pass kr_memreserve and a knot_mm_t* .
+ * @note May fail if the capacity is not reserved.
+ * @return element index on success, <0 on failure
+ */
+#define array_push_mm(array, val, reserve, baton) \
 	(int)((array).len < (array).cap ? ((array).at[(array).len] = val, (array).len++) \
-		: (array_reserve(array, ((array).cap + 1)) < 0 ? -1 \
+		: (array_reserve_mm(array, ((array).cap + 1), reserve, baton) < 0 ? -1 \
 			: ((array).at[(array).len] = val, (array).len++)))
 
 /**
