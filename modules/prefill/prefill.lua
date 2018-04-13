@@ -4,7 +4,7 @@ local lfs = require('lfs')
 
 local rz_url = "https://www.internic.net/domain/root.zone"
 local rz_local_fname = "root.zone"
-local rz_ca_path = nil
+local rz_ca_dir = nil
 local rz_event_id = nil
 
 local rz_default_interval = 86400
@@ -83,7 +83,7 @@ local function check_time()
 	end
 
 	log("[prefill] downloading root zone...")
-	local rzone, err = https_fetch(true, rz_url, rz_ca_path)
+	local rzone, err = https_fetch(rz_url, rz_ca_dir)
 	if rzone == nil then
 		log(string.format("[prefill] fetch of `%s` failed: %s", rz_url, err))
 		rz_cur_interval = rz_https_fail_interval;
@@ -140,11 +140,14 @@ function prefill.config(config)
 		rz_cur_interval = config.interval
 	end
 
-	if not config.ca_path then
+	if not config.ca_dir then
 		error('[prefill] option ca_dir must point '
 			.. 'to a directory with CA certificates in PEM format')
+	else
+		local _, dir_obj = lfs.dir(config.ca_dir)
+		dir_obj:close()
 	end
-	rz_ca_path = config.ca_path
+	rz_ca_dir = config.ca_dir
 	log('[prefill] refresh interval: %i s', rz_default_interval)
 
 	-- ability to change intervals
