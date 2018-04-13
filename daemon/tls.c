@@ -280,11 +280,11 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 		int err = gnutls_handshake(tls_p->tls_session);
 		if (err == GNUTLS_E_SUCCESS) {
 			tls_p->handshake_state = TLS_HS_DONE;
+			kr_log_verbose("[%s] TLS handshake with %s has completed\n",
+				       logstring,  kr_straddr(&session->peer.ip));
 			if (tls_p->handshake_cb) {
 				tls_p->handshake_cb(tls_p->session, 0);
 			}
-			kr_log_verbose("[%s] TLS handshake with %s has completed\n",
-				       logstring,  kr_straddr(&session->peer.ip));
 		} else if (err == GNUTLS_E_AGAIN) {
 			return 0;
 		} else if (gnutls_error_is_fatal(err)) {
