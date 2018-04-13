@@ -947,6 +947,12 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 			worker->too_many_open = false;
 		}
 		ret = len;
+		struct sockaddr *addr = &t->session->peer.ip;
+		worker->stats.tcp += 1;
+		if (addr->sa_family == AF_INET6)
+			worker->stats.ipv6 += 1;
+		else if (addr->sa_family == AF_INET)
+			worker->stats.ipv4 += 1;
 	} else {
 		VERBOSE_MSG(NULL,"[%s] uv_write: %s\n",
 			    t->client_side ? "tls-client" : "tls", uv_strerror(res));
