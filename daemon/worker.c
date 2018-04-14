@@ -1528,11 +1528,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			       (struct sockaddr *)&ctx->source.addr,
 			        ctx->req.answer);
 	if (res != kr_ok()) {
-		while (source_session->tasks.len > 0) {
-			struct qr_task *t = source_session->tasks.at[0];
-			(void) qr_task_on_send(t, NULL, kr_error(EIO));
-		}
-		session_close(source_session);
+		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 	} else if (handle->type == UV_TCP) {
 		/* Don't try to close source session at least
 		 * retry_interval_for_timeout_timer milliseconds */
