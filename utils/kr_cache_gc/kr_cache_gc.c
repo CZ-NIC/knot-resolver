@@ -12,7 +12,31 @@
 #include <lib/cache/impl.h>
 #include <lib/defines.h>
 
+#define KR_CACHE_GC_VERSION "0.1"
+
+// TODO remove and use time(NULL) ! this is just for debug with pre-generated cache
 int64_t now = 1523701784;
+
+// section: timer
+// TODO replace/move to contrib
+
+typedef struct timespec gc_timer_t;
+static gc_timer_t gc_timer_internal = { 0 };
+
+static void gc_timer_start(gc_timer_t *t)
+{
+	(void)clock_gettime(CLOCK_MONOTONIC, t == NULL ? &gc_timer_internal : t);
+}
+
+static double gc_timer_end(gc_timer_t *t)
+{
+	gc_timer_t *start = t == NULL ? &gc_timer_internal : t;
+	gc_timer_t end = { 0 };
+	(void)clock_gettime(CLOCK_MONOTONIC, &end);
+	return (((double)end.tv_sec - (double)start->tv_sec) + ((double)end.tv_nsec - (double)start->tv_nsec) / 1e9);
+}
+
+// section: function key_consistent
 
 static const uint16_t *key_consistent(knot_db_val_t key)
 {
@@ -37,6 +61,8 @@ static const uint16_t *key_consistent(knot_db_val_t key)
 		return NULL;
 	}
 }
+
+// section: converting struct lmdb_env from resolver-format to libknot-format
 
 struct libknot_lmdb_env
 {
@@ -67,11 +93,44 @@ static knot_db_t *knot_db_t_kres2libknot(const knot_db_t *db)
 	return libknot_db;
 }
 
-dynarray_declare(entry, knot_db_val_t, static, 256);
-dynarray_define(entry, knot_db_val_t, static);
+// section: rrtype list
+
+dynarray_declare(rrtype, uint16_t, DYNARRAY_VISIBILITY_STATIC, 64);
+dynarray_define(rrtype, uint16_t, DYNARRAY_VISIBILITY_STATIC);
+
+static void rrtypelist_add(rrtype_dynarray_t *arr, uint16_t add_type)
+{
+	bool already_present = false;
+	dynarray_foreach(rrtype, uint16_t, i, *arr) {
+		if (*i == add_type) {
+			already_present = true;
+			break;
+		}
+	}
+	if (!already_present) {
+		rrtype_dynarray_add(arr, &add_type);
+	}
+}
+
+static void rrtypelist_print(rrtype_dynarray_t *arr)
+{
+	char type_s[32] = { 0 };
+	dynarray_foreach(rrtype, uint16_t, i, *arr) {
+		knot_rrtype_to_string(*i, type_s, sizeof(type_s));
+		printf(" %s", type_s);
+	}
+	printf("\n");
+}
+
+// section: main
+
+dynarray_declare(entry, knot_db_val_t, DYNARRAY_VISIBILITY_STATIC, 256);
+dynarray_define(entry, knot_db_val_t, DYNARRAY_VISIBILITY_STATIC);
+
 
 int main(int argc, char *argv[])
 {
+	printf("Knot Resolver Cache Garbage Collector v. %s\n", KR_CACHE_GC_VERSION);
 	if (argc < 2 || argv[1][0] == '-') {
 		printf("Usage: %s <path/to/kres/cache>\n", argv[0]);
 		return 0;
@@ -107,6 +166,9 @@ int main(int argc, char *argv[])
 		goto fail;
 	}
 
+	size_t real_size = knot_db_lmdb_get_mapsize(db), usage = knot_db_lmdb_get_usage(db);
+	printf("Cache size: %zu, Usage: %zu (%.2lf%%)\n", real_size, usage, (double)usage / real_size * 100.0);
+
 	ret = api->txn_begin(db, &txn, 0);
 	if (ret != KNOT_EOK) {
 		printf("Error starting DB transaction (%s).\n", knot_strerror(ret));
@@ -122,6 +184,9 @@ int main(int argc, char *argv[])
 	}
 
 	entry_dynarray_t to_del = { 0 };
+	rrtype_dynarray_t cache_rrtypes = { 0 };
+	gc_timer_start(NULL);
+	size_t cache_records = 0, deleted_records = 0;
 
 	while (it != NULL) {
 		knot_db_val_t key = { 0 }, val = { 0 };
@@ -130,15 +195,13 @@ int main(int argc, char *argv[])
 			printf("Warning: skipping a key due to error (%s).\n", knot_strerror(ret));
 		}
 		const uint16_t *entry_type = ret == KNOT_EOK ? key_consistent(key) : NULL;
-		if (entry_type == NULL) {
-			printf("Inconsistent entry.\n");
-		} else {
-			char type_s[32] = { 0 };
-			knot_rrtype_to_string(*entry_type, type_s, sizeof(type_s));
+		if (entry_type != NULL) {
+			cache_records++;
+			rrtypelist_add(&cache_rrtypes, *entry_type);
+
 			struct entry_h *entry = entry_h_consistent(val, *entry_type);
 			int64_t over = entry->time + entry->ttl;
 			over -= now;
-			printf("%s time=%u ttl=%u rel=%ld\n", type_s, entry->time, entry->ttl, over);
 			if (over < 0) {
 				entry_dynarray_add(&to_del, &key);
 			}
@@ -147,12 +210,28 @@ int main(int argc, char *argv[])
 		it = api->iter_next(it);
 	}
 
+	printf("Cache analyzed in %.2lf secs, %zu records types", gc_timer_end(NULL), cache_records);
+	rrtypelist_print(&cache_rrtypes);
+	rrtype_dynarray_free(&cache_rrtypes);
+
+	gc_timer_start(NULL);
+	rrtype_dynarray_t deleted_rrtypes = { 0 };
+
 	dynarray_foreach(entry, knot_db_val_t, i, to_del) {
 		ret = api->del(&txn, i);
 		if (ret != KNOT_EOK) {
 			printf("Warning: skipping deleting because of error (%s)\n", knot_strerror(ret));
+		} else {
+			deleted_records++;
+			const uint16_t *entry_type = ret == KNOT_EOK ? key_consistent(*i) : NULL;
+			assert(entry_type != NULL);
+			rrtypelist_add(&deleted_rrtypes, *entry_type);
 		}
 	}
+
+	printf("Deleted in %.2lf secs %zu records types", gc_timer_end(NULL), deleted_records);
+	rrtypelist_print(&deleted_rrtypes);
+	rrtype_dynarray_free(&deleted_rrtypes);
 
 	entry_dynarray_free(&to_del);
 
@@ -172,5 +251,3 @@ fail:
 
 	return (ret ? 10 : 0);
 }
-
-
