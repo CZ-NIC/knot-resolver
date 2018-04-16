@@ -42,15 +42,12 @@ end
 
 -- Write root zone to a file.
 local function rzone_write(rzone)
-	local tmp_rz_fname = os.tmpname()
-	local file = assert(io.open(tmp_rz_fname, 'w'))
+	local file = assert(io.open(rz_local_fname, 'w'))
 	for i = 1, #rzone do
 		local rzone_chunk = rzone[i]
 		file:write(rzone_chunk)
 	end
 	file:close()
-	os.rename(tmp_rz_fname, rz_local_fname)
-	-- TODO: IO error handling
 end
 
 local function display_delay(time)
