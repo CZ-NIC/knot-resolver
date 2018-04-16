@@ -726,18 +726,18 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 	 * so don't print error code as it meaningless. */
 	int res = zs_init(s, origin, rclass, ttl);
 	if (res != 0) {
-		free(s);
 		kr_log_error("[zscanner] error initializing zone scanner instance, error: %i (%s)\n",
 			     s->error.code, zs_strerror(s->error.code));
+		free(s);
 		return -1;
 	}
 
 	res = zs_set_input_file(s, zone_file);
 	if (res != 0) {
-		zs_deinit(s);
-		free(s);
 		kr_log_error("[zscanner] error opening zone file `%s`, error: %i (%s)\n",
 			     zone_file, s->error.code, zs_strerror(s->error.code));
+		zs_deinit(s);
+		free(s);
 		return -1;
 	}
 
@@ -745,9 +745,11 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 	 * Parsing as well error processing will be performed in zi_state_parsing().
 	 * Store pointer to zone import context for further use. */
 	if (zs_set_processing(s, NULL, NULL, (void *)z_import) != 0) {
+		kr_log_error("[zscanner] zs_set_processing() failed for zone file `%s`, "
+				"error: %i (%s)\n",
+				zone_file, s->error.code, zs_strerror(s->error.code));
 		zs_deinit(s);
 		free(s);
-		kr_log_error("[zscanner] zs_set_input_file() fails\n");
 		return -1;
 	}
 
