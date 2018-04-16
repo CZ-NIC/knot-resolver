@@ -10,7 +10,6 @@ local rz_event_id = nil
 local rz_default_interval = 86400
 local rz_https_fail_interval = 600
 local rz_no_ta_interval = 600
-local rz_initial_interval = 15
 local rz_cur_interval = rz_default_interval
 local rz_interval_randomizator_limit = 10
 local rz_interval_threshold = 5
@@ -175,12 +174,10 @@ function prefill.config(config)
 		dir_obj:close()
 	end
 	rz_ca_dir = config.ca_dir
-	log('[prefill] first download in %i s; refresh interval %s (randomized)',
-		rz_initial_interval, display_delay(rz_default_interval))
 
 	-- ability to change intervals
 	prefill.deinit()
-	rz_event_id = event.after(rz_initial_interval * sec , timer)
+	rz_event_id = event.after(0, timer)
 end
 
 return prefill
