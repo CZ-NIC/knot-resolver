@@ -230,6 +230,8 @@ Environment
    internal hostname, or the system's POSIX hostname (see
    gethostname(2)) if kresd's internal hostname is unset.
 
+   This affects ephemeral certificates for kresd serving DNS over TLS.
+
 .. function:: moduledir([dir])
 
    :return: Modules directory.
