@@ -13,7 +13,6 @@ local rz_no_ta_interval = 600
 local rz_initial_interval = 15
 local rz_cur_interval = rz_default_interval
 local rz_interval_randomizator_limit = 10
-local rz_next_refresh = 86400
 local rz_interval_threshold = 5
 local rz_interval_min = 3600
 
@@ -40,12 +39,16 @@ local function https_fetch(url, ca_dir)
 	return resp, "[prefill] "..url.." downloaded"
 end
 
--- Write root zone to a file.
-local function rzone_write(rzone)
-	local file = assert(io.open(rz_local_fname, 'w'))
-	for i = 1, #rzone do
-		local rzone_chunk = rzone[i]
-		file:write(rzone_chunk)
+-- Write zone to a file
+local function zone_write(zone, fname)
+	local file, errmsg = io.open(fname, 'w')
+	if not file then
+		error(string.format("[prefill] unable to open file %s (%s)",
+			fname, errmsg))
+	end
+	for i = 1, #zone do
+		local zone_chunk = zone[i]
+		file:write(zone_chunk)
 	end
 	file:close()
 end
@@ -65,50 +68,77 @@ local function display_delay(time)
 	return string.format("%02d seconds", seconds)
 end
 
-local function check_time()
-	local expected_refresh = rz_next_refresh
-	local attrs = lfs.attributes(rz_local_fname)
+-- returns: number of seconds the file is valid for
+-- 0 indicates immediate download
+local function get_file_ttl(fname)
+	local attrs = lfs.attributes(fname)
 	if attrs then
-		expected_refresh = attrs.modification + rz_cur_interval
+		local age = os.time() - attrs.modification
+		return math.max(
+			rz_cur_interval - age,
+			0)
+	else
+		return 0  -- file does not exist, download now
 	end
+end
 
-	local delay = expected_refresh - os.time()
-	if (delay > rz_interval_threshold) then
-		log("[prefill] next refresh for . in %s" , display_delay(delay))
-		event.reschedule(rz_event_id, delay * sec)
-		return
-	end
-
+local function download(url, fname)
 	log("[prefill] downloading root zone...")
-	local rzone, err = https_fetch(rz_url, rz_ca_dir)
+	local rzone, err = https_fetch(url, rz_ca_dir)
 	if rzone == nil then
-		log(string.format("[prefill] fetch of `%s` failed: %s", rz_url, err))
-		rz_cur_interval = rz_https_fail_interval;
-		rz_next_refresh = os.time() + rz_cur_interval
-		event.reschedule(rz_event_id, rz_cur_interval * sec)
-		log("[prefill] next refresh for . in %s", display_delay(rz_cur_interval))
-		return
+		error(string.format("[prefill] fetch of `%s` failed: %s", url, err))
 	end
 
 	log("[prefill] saving root zone...")
-	rzone_write(rzone)
-	local res  = cache.zone_import('root.zone')
+	zone_write(rzone, fname)
+end
+
+local function import(fname)
+	local res = cache.zone_import(fname)
 	if res.code == 1 then -- no TA found, wait
-		log("[prefill] no TA found for root zone")
-		rz_cur_interval = rz_no_ta_interval
+		error("[prefill] no trust anchor found for root zone, import aborted")
 	elseif res.code == 0 then
 		log("[prefill] root zone successfully parsed, import started")
-		rz_cur_interval = rz_default_interval
 	else
-		log("[prefill] root zone import failed (%s)", res.msg)
-		rz_cur_interval = rz_default_interval
+		error(string.format("[prefill] root zone import failed (%s)", res.msg))
 	end
+end
 
-	rz_cur_interval = rz_cur_interval + math.random(rz_interval_randomizator_limit)
-	rz_next_refresh = os.time() + rz_cur_interval
+local function timer()
+	local file_ttl = get_file_ttl(rz_local_fname)
+
+	if file_ttl > rz_interval_threshold then
+		log("[prefill] root zone file valid for %s, reusing data from disk",
+			display_delay(file_ttl))
+	else
+		local ok, errmsg = pcall(download, rz_url, rz_local_fname)
+		if not ok then
+			rz_cur_interval = rz_https_fail_interval
+						- math.random(rz_interval_randomizator_limit)
+			log("[prefill] cannot download new zone (%s), "
+				.. "will retry root zone download in %s",
+				errmsg, display_delay(rz_cur_interval))
+			event.reschedule(rz_event_id, rz_cur_interval * sec)
+			return
+		end
+		file_ttl = rz_default_interval
+	end
+	-- file is up to date, import
+	-- import/filter function gets executed after resolver/module
+	local ok, errmsg = pcall(import, rz_local_fname)
+	if not ok then
+		rz_cur_interval = rz_no_ta_interval
+					- math.random(rz_interval_randomizator_limit)
+		log("[prefill] root zone import failed (%s), retry in %s",
+			errmsg, display_delay(rz_cur_interval))
+	else
+		-- re-download before TTL expires
+		rz_cur_interval = (file_ttl - rz_interval_threshold
+					- math.random(rz_interval_randomizator_limit))
+		log("[prefill] root zone refresh in %s",
+			display_delay(rz_cur_interval))
+	end
 	event.reschedule(rz_event_id, rz_cur_interval * sec)
-	log("[prefill] next refresh for . in %s", display_delay(rz_cur_interval))
-	return
 end
 
 function prefill.init()
@@ -129,9 +159,9 @@ function prefill.config(config)
 	if config.interval then
 		config.interval = tonumber(config.interval)
 		if config.interval < rz_interval_min then
-			error('[prefill] refresh interval %d s is too short, '
+			error(string.format('[prefill] refresh interval %d s is too short, '
 				.. 'minimal interval is %d s',
-				config.interval, rz_interval_min)
+				config.interval, rz_interval_min))
 		end
 		rz_default_interval = config.interval
 		rz_cur_interval = config.interval
@@ -150,7 +180,7 @@ function prefill.config(config)
 
 	-- ability to change intervals
 	prefill.deinit()
-	rz_event_id = event.after(rz_initial_interval * sec , check_time)
+	rz_event_id = event.after(rz_initial_interval * sec , timer)
 end
 
 return prefill
