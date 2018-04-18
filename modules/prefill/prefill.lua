@@ -174,6 +174,13 @@ local function config_zone(zone_cfg)
 		dir_obj:close()
 	end
 	rz_ca_dir = zone_cfg.ca_dir
+
+	if not zone_cfg.url or not string.match(zone_cfg.url, '^https://') then
+		error('[prefill] option url must contain a '
+			.. 'https:// URL of a zone file')
+	else
+		rz_url = zone_cfg.url
+	end
 end
 
 function prefill.config(config)
