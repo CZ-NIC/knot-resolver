@@ -472,6 +472,26 @@ static int l_tojson(lua_State *L)
 	return 1;
 }
 
+static int l_fromjson(lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_pushliteral(L, "a JSON string is required");
+		lua_error(L);
+	}
+
+	const char *json_str = lua_tostring(L, 1);
+	JsonNode *root_node = json_decode(json_str);
+
+	if (!root_node) {
+		lua_pushliteral(L, "invalid JSON string");
+		lua_error(L);
+	}
+	l_unpack_json(L, root_node);
+	json_delete(root_node);
+
+	return 1;
+}
+
 /** @internal Throw Lua error if expr is false */
 #define expr_checked(expr) \
 	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_rawlen(L, -2) + 1); continue; }
@@ -642,6 +662,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "libzscanner_SONAME");
 	lua_pushcfunction(engine->L, l_tojson);
 	lua_setglobal(engine->L, "tojson");
+	lua_pushcfunction(engine->L, l_fromjson);
+	lua_setglobal(engine->L, "fromjson");
 	lua_pushcfunction(engine->L, l_map);
 	lua_setglobal(engine->L, "map");
 	lua_pushlightuserdata(engine->L, engine);

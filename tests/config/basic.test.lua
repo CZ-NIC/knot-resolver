@@ -122,9 +122,32 @@ local function test_packet_functions()
 	is(#pkt:towire(), 12, 'recycle() clears the packet wireformat')
 end
 
+-- test JSON encode/decode functions
+local function test_json_functions()
+	for msg, obj in pairs({
+			['number'] = 0,
+			['string'] = 'ok',
+			['list'] = {1, 2, 3},
+			['map'] = {foo='bar'},
+			['nest structure'] = {foo='bar', baz={1,2,3}},
+	}) do
+		same(fromjson(tojson(obj)), obj, 'json test: ' .. msg)
+	end
+
+	for _, str in ipairs({
+			'{', '}',
+			'[', ']',
+			'x,',
+			'[1,2,3,]',
+	}) do
+		boom(fromjson, {'{'}, 'json test: invalid \'' .. str .. '\'')
+	end
+end
+
 return {
 	test_constants,
 	test_globals,
 	test_rrset_functions,
 	test_packet_functions,
+	test_json_functions,
 }
