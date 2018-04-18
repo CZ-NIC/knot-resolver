@@ -1024,6 +1024,8 @@ The daemon also supports `systemd socket activation`_, it is automatically detec
 
 See ``kresd.systemd(7)`` for details.
 
+.. _enabling-dnssec:
+
 Enabling DNSSEC
 ===============
 

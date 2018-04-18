@@ -29,6 +29,8 @@ struct qr_task;
 struct worker_ctx;
 /** Transport session (opaque). */
 struct session;
+/** Zone import context (opaque). */
+struct zone_import_ctx;
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
@@ -94,6 +96,9 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 
 ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
 
+/** Finalize given task */
+int worker_task_finalize(struct qr_task *task, int state);
+
 /** @cond internal */
 
 /** Number of request within timeout window. */
@@ -140,6 +145,7 @@ struct worker_ctx {
 		size_t timeout;
 	} stats;
 
+	struct zone_import_ctx* z_import;
 	bool too_many_open;
 	size_t rconcurrent_highwatermark;
 	/** List of active outbound TCP sessions */

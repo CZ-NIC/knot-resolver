@@ -31,3 +31,4 @@ Knot DNS Resolver modules
 .. include:: ../modules/serve_stale/README.rst
 .. include:: ../modules/detect_time_skew/README.rst
 .. include:: ../modules/detect_time_jump/README.rst
+.. include:: ../modules/prefill/README.rst

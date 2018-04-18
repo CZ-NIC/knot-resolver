@@ -581,21 +581,33 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 	return ret;
 }
 
-int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank)
+int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
+	     uint16_t type, uint16_t additional)
 {
 	if (!key || !owner) {
 		return kr_error(EINVAL);
 	}
-	key[0] = (rank << 2) | 0x01; /* Must be non-zero */
-	uint8_t *key_buf = (uint8_t *)key + 1;
-	int ret = knot_dname_to_wire(key_buf, owner, KNOT_DNAME_MAXLEN);
+	uint8_t *key_buf = (uint8_t *)key;
+	int ret = u16tostr(key_buf, class);
+	if (ret <= 0) {
+		return ret;
+	}
+	key_buf += ret;
+	ret = knot_dname_to_wire(key_buf, owner, KNOT_DNAME_MAXLEN);
 	if (ret <= 0) {
 		return ret;
 	}
 	knot_dname_to_lower(key_buf);
 	key_buf += ret - 1;
-	/* Must convert to string, as the key must not contain 0x00 */
 	ret = u16tostr(key_buf, type);
+	if (ret <= 0) {
+		return ret;
+	}
+	key_buf += ret;
+	ret = u16tostr(key_buf, additional);
+	if (ret <= 0) {
+		return ret;
+	}
 	key_buf[ret] = '\0';
 	return (char *)&key_buf[ret] - key;
 }
