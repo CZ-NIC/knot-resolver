@@ -4,7 +4,7 @@ local lfs = require('lfs')
 
 local rz_url = "https://www.internic.net/domain/root.zone"
 local rz_local_fname = "root.zone"
-local rz_ca_dir = nil
+local rz_ca_file = nil
 local rz_event_id = nil
 
 local rz_default_interval = 86400
@@ -20,15 +20,15 @@ local prefill = {
 
 
 -- Fetch over HTTPS with peert cert checked
-local function https_fetch(url, ca_dir)
+local function https_fetch(url, ca_file)
 	assert(string.match(url, '^https://'))
-	assert(ca_dir)
+	assert(ca_file)
 
 	local resp = {}
 	local r, c = https.request{
 	       url = url,
 	       verify = {'peer', 'fail_if_no_peer_cert' },
-	       capath = ca_dir,
+	       cafile = ca_file,
 	       protocol = 'tlsv1_2',
 	       sink = ltn12.sink.table(resp),
 	}
@@ -83,7 +83,7 @@ end
 
 local function download(url, fname)
 	log("[prefill] downloading root zone...")
-	local rzone, err = https_fetch(url, rz_ca_dir)
+	local rzone, err = https_fetch(url, rz_ca_file)
 	if rzone == nil then
 		error(string.format("[prefill] fetch of `%s` failed: %s", url, err))
 	end
@@ -166,14 +166,14 @@ local function config_zone(zone_cfg)
 		rz_cur_interval = zone_cfg.interval
 	end
 
-	if not zone_cfg.ca_dir then
-		error('[prefill] option ca_dir must point '
+	if not zone_cfg.ca_file then
+		error('[prefill] option ca_file must point '
 			.. 'to a directory with CA certificates in PEM format')
 	else
-		local _, dir_obj = lfs.dir(zone_cfg.ca_dir)
+		local _, dir_obj = lfs.dir(zone_cfg.ca_file)
 		dir_obj:close()
 	end
-	rz_ca_dir = zone_cfg.ca_dir
+	rz_ca_file = zone_cfg.ca_file
 
 	if not zone_cfg.url or not string.match(zone_cfg.url, '^https://') then
 		error('[prefill] option url must contain a '
