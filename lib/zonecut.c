@@ -119,7 +119,7 @@ int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src)
 	}
 	/* Copy the contents, one by one. */
 	int ret = kr_ok();
-	trie_it_t *it;
+	trie_it_t *it = NULL;
 	for (it = trie_it_begin(src->nsset); !trie_it_finished(it); trie_it_next(it)) {
 		size_t klen;
 		const char * const k = trie_it_key(it, &klen);
@@ -473,12 +473,14 @@ const knot_dname_t *kr_zonecut_find_nsname(struct kr_zonecut *cut)
 		return NULL;
 	}
 
+	trie_it_t *it = NULL;
 	const knot_dname_t *result = NULL;
-	trie_it_t *it;
 	for (it = trie_it_begin(cut->nsset); !trie_it_finished(it); trie_it_next(it)) {
-		result = (const knot_dname_t *)trie_it_key(it, NULL);
+		size_t klen;
+		result = (const knot_dname_t *) trie_it_key(it, &klen);
 		break;
 	}
 	trie_it_free(it);
+
 	return result;
 }
