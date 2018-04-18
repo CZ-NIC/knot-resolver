@@ -151,29 +151,50 @@ function prefill.deinit()
 	end
 end
 
-function prefill.config(config)
-	if not config or type(config) ~= 'table' then
-		error('[prefill] configuration must be in table')
-	end
-	if config.interval then
-		config.interval = tonumber(config.interval)
-		if config.interval < rz_interval_min then
+-- process one item from configuration table
+-- right now it supports only root zone because
+-- prefill module uses global variables
+local function config_zone(zone_cfg)
+	if zone_cfg.interval then
+		zone_cfg.interval = tonumber(zone_cfg.interval)
+		if zone_cfg.interval < rz_interval_min then
 			error(string.format('[prefill] refresh interval %d s is too short, '
 				.. 'minimal interval is %d s',
-				config.interval, rz_interval_min))
+				zone_cfg.interval, rz_interval_min))
 		end
-		rz_default_interval = config.interval
-		rz_cur_interval = config.interval
+		rz_default_interval = zone_cfg.interval
+		rz_cur_interval = zone_cfg.interval
 	end
 
-	if not config.ca_dir then
+	if not zone_cfg.ca_dir then
 		error('[prefill] option ca_dir must point '
 			.. 'to a directory with CA certificates in PEM format')
 	else
-		local _, dir_obj = lfs.dir(config.ca_dir)
+		local _, dir_obj = lfs.dir(zone_cfg.ca_dir)
 		dir_obj:close()
 	end
-	rz_ca_dir = config.ca_dir
+	rz_ca_dir = zone_cfg.ca_dir
+end
+
+function prefill.config(config)
+	local root_configured = false
+	if not config or type(config) ~= 'table' then
+		error('[prefill] configuration must be in table '
+			.. '{owner name = {per-zone config}}')
+	end
+	for owner, zone_cfg in pairs(config) do
+		if owner ~= '.' then
+			error('[prefill] only root zone can be imported '
+				.. 'at the moment')
+		else
+			config_zone(zone_cfg)
+			root_configured = true
+		end
+	end
+	if not root_configured then
+		error('[prefill] this module version requires configuration '
+			.. 'for root zone')
+	end
 
 	-- ability to change intervals
 	prefill.deinit()
