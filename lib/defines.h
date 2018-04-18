@@ -62,8 +62,12 @@ static inline int KR_COLD kr_error(int x) {
 #define KR_ITER_LIMIT 100    /* Built-in iterator limit */
 #define KR_RESOLVE_TIME_LIMIT 10000 /* Upper limit for resolution time of single query, ms */
 #define KR_CNAME_CHAIN_LIMIT 40 /* Built-in maximum CNAME chain length */
+#ifndef KR_TIMEOUT_LIMIT
 #define KR_TIMEOUT_LIMIT 4   /* Maximum number of retries after timeout. */
+#endif
+#ifndef KR_QUERY_NSRETRY_LIMIT
 #define KR_QUERY_NSRETRY_LIMIT 4 /* Maximum number of retries per query. */
+#endif
 
 /*
  * Defines.
