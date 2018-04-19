@@ -1139,9 +1139,7 @@ static void on_connect(uv_connect_t *req, int status)
 	struct worker_ctx *worker = get_worker();
 	uv_stream_t *handle = req->handle;
 	struct session *session = handle->data;
-
 	union inaddr *peer = &session->peer;
-	uv_timer_stop(&session->timeout);
 
 	if (status == UV_ECANCELED) {
 		worker_del_tcp_waiting(worker, &peer->ip);
@@ -1156,6 +1154,8 @@ static void on_connect(uv_connect_t *req, int status)
 		iorequest_release(worker, req);
 		return;
 	}
+
+	uv_timer_stop(&session->timeout);
 
 	if (status != 0) {
 		worker_del_tcp_waiting(worker, &peer->ip);
@@ -1183,6 +1183,8 @@ static void on_connect(uv_connect_t *req, int status)
 				struct qr_task *task = session->waiting.at[0];
 				session_del_tasks(session, task);
 				array_del(session->waiting, 0);
+				ioreq_kill_pending(task);
+				assert(task->pending_count == 0);
 				qr_task_finalize(task, KR_STATE_FAIL);
 				qr_task_unref(task);
 			}
@@ -1230,6 +1232,8 @@ static void on_connect(uv_connect_t *req, int status)
 		struct qr_task *task = session->waiting.at[0];
 		session_del_tasks(session, task);
 		array_del(session->waiting, 0);
+		ioreq_kill_pending(task);
+		assert(task->pending_count == 0);
 		qr_task_finalize(task, KR_STATE_FAIL);
 		qr_task_unref(task);
 	}
@@ -1299,6 +1303,8 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 			worker->stats.timeout += 1;
 			array_del(session->waiting, 0);
 			session_del_tasks(session, task);
+			ioreq_kill_pending(task);
+			assert(task->pending_count == 0);
 			qr_task_finalize(task, KR_STATE_FAIL);
 			qr_task_unref(task);
 		}
@@ -1310,6 +1316,8 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 		worker->stats.timeout += 1;
 		assert(task->refs > 1);
 		array_del(session->tasks, 0);
+		ioreq_kill_pending(task);
+		assert(task->pending_count == 0);
 		qr_task_finalize(task, KR_STATE_FAIL);
 		qr_task_unref(task);
 	}
@@ -1644,6 +1652,9 @@ static int qr_task_step(struct qr_task *task,
 				subreq_finalize(task, packet_source, packet);
 				return qr_task_finalize(task, KR_STATE_FAIL);
 			}
+			assert(task->pending_count == 0);
+			task->pending[task->pending_count] = session->handle;
+			task->pending_count += 1;
 		} else if ((session = worker_find_tcp_connected(ctx->worker, addr)) != NULL) {
 			/* Connection has been already established */
 			assert(session->outgoing);
@@ -1706,6 +1717,7 @@ static int qr_task_step(struct qr_task *task,
 					return qr_task_finalize(task, KR_STATE_FAIL);
 				}
 			}
+			assert(task->pending_count == 0);
 			task->pending[task->pending_count] = session->handle;
 			task->pending_count += 1;
 		} else {
@@ -2279,6 +2291,8 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		session->buffering = NULL;
 		session->msg_hdr_idx = 0;
 		if (session->outgoing) {
+			assert ((task->pending_count == 1) && (task->pending[0] == session->handle));
+			task->pending_count = 0;
 			session_del_tasks(session, task);
 		}
 		/* Parse the packet and start resolving complete query */
