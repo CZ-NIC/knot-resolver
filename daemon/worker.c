@@ -2301,8 +2301,8 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			if (session->outgoing) {
 				/* To prevent slow lorris attack restart watchdog only after
 				* the whole message was successfully assembled and parsed */
-				uv_timer_stop(&session->timeout);
 				if (session->tasks.len > 0 || session->waiting.len > 0) {
+					uv_timer_stop(&session->timeout);
 					timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 				}
 			} else {
