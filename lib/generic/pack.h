@@ -96,13 +96,17 @@ typedef array_t(uint8_t) pack_t;
 #define pack_reserve_mm(pack, objs_count, objs_len, reserve, baton) \
 	array_reserve_mm((pack), (pack).len + (sizeof(pack_objlen_t)*(objs_count) + (objs_len)), (reserve), (baton))
 
-/** Return pointer to first packed object. */
+/** Return pointer to first packed object.
+ *
+ * Recommended way to iterate:
+ *   for (uint8_t *it = pack_head(pack); it != pack_tail(pack); it = pack_ob_next(it))
+ */
 #define pack_head(pack) \
-	((pack).len > 0 ? &((pack).at[0]) : NULL)
+	(&(pack).at[0])
 
 /** Return pack end pointer. */
 #define pack_tail(pack) \
-	&((pack).at[(pack).len])
+	(&(pack).at[(pack).len])
 
 /** Return packed object length. */
 static inline pack_objlen_t pack_obj_len(uint8_t *it)
