@@ -99,7 +99,7 @@ typedef array_t(uint8_t) pack_t;
 /** Return pointer to first packed object.
  *
  * Recommended way to iterate:
- *   for (uint8_t *it = pack_head(pack); it != pack_tail(pack); it = pack_ob_next(it))
+ *   for (uint8_t *it = pack_head(pack); it != pack_tail(pack); it = pack_obj_next(it))
  */
 #define pack_head(pack) \
 	(&(pack).at[0])
@@ -151,9 +151,13 @@ static inline uint8_t *pack_last(pack_t pack)
   */
 static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
+	if (pack == NULL || obj == NULL) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
 	size_t packed_len = len + sizeof(len);
-	if (pack == NULL || (pack->len + packed_len) > pack->cap) {
-		return -1;
+	if (pack->len + packed_len > pack->cap) {
+		return kr_error(ENOSPC);
 	}
 
 	uint8_t *endp = pack_tail(*pack);
@@ -168,6 +172,10 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
   */
 static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
+		if (pack == NULL || obj == NULL) {
+			assert(false);
+			return NULL;
+		}
 		uint8_t *endp = pack_tail(*pack);
 		uint8_t *it = pack_head(*pack);
 		while (it != endp) {
@@ -185,6 +193,10 @@ static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objl
   */
 static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
+	if (pack == NULL || obj == NULL) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
 	uint8_t *endp = pack_tail(*pack);
 	uint8_t *it = pack_obj_find(pack, obj, len);
 	if (it) {
