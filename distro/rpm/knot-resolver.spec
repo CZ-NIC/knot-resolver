@@ -50,10 +50,14 @@ BuildRequires:  pkgconfig(cmocka)
 
 BuildRequires:  systemd
 
+%if 0%{?fedora}
+# dependencies for doc package; disable in EPEL (missing fonts)
+# https://bugzilla.redhat.com/show_bug.cgi?id=1492884
 BuildRequires:  doxygen
-BuildRequires:  breathe
-BuildRequires:  python-sphinx
-BuildRequires:  python-sphinx_rtd_theme
+BuildRequires:  python2-breathe
+BuildRequires:  python2-sphinx
+BuildRequires:  python2-sphinx_rtd_theme
+%endif
 
 # Lua 5.1 version of the libraries have different package names
 %if 0%{?rhel}
@@ -87,8 +91,6 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 The package contains development headers for Knot DNS Resolver.
 
 %if 0%{?fedora}
-# Disable doc package in EPEL - it missing fonts in sphinx_rtd_theme
-# https://bugzilla.redhat.com/show_bug.cgi?id=1492884
 %package doc
 Summary:        Documentation for Knot DNS Resolver
 BuildArch:      noarch
