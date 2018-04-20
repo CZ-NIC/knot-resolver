@@ -184,6 +184,7 @@ static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objl
 			assert(obj != NULL);
 			return NULL;
 		}
+
 		uint8_t *endp = pack_tail(*pack);
 		uint8_t *it = pack_head(*pack);
 		while (it != endp) {
@@ -205,6 +206,7 @@ static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t l
 		assert(obj != NULL);
 		return kr_error(EINVAL);
 	}
+
 	uint8_t *endp = pack_tail(*pack);
 	uint8_t *it = pack_obj_find(pack, obj, len);
 	if (it) {
