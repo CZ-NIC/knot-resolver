@@ -12,8 +12,6 @@
 #include <lib/cache/impl.h>
 #include <lib/defines.h>
 
-#define KR_CACHE_GC_VERSION "0.1"
-
 // TODO remove and use time(NULL) ! this is just for debug with pre-generated cache
 int64_t now = 1523701784;
 
@@ -128,22 +126,15 @@ dynarray_declare(entry, knot_db_val_t, DYNARRAY_VISIBILITY_STATIC, 256);
 dynarray_define(entry, knot_db_val_t, DYNARRAY_VISIBILITY_STATIC);
 
 
-int main(int argc, char *argv[])
+int kr_cache_gc(const char *cache)
 {
-	printf("Knot Resolver Cache Garbage Collector v. %s\n", KR_CACHE_GC_VERSION);
-	if (argc < 2 || argv[1][0] == '-') {
-		printf("Usage: %s <path/to/kres/cache>\n", argv[0]);
-		return 0;
-	}
-
-	const char *cache = argv[1];
 	char cache_data[strlen(cache) + 10];
 	snprintf(cache_data, sizeof(cache_data), "%s/data.mdb", cache);
 
 	struct stat st = { 0 };
 	if (stat(cache, &st) || !(st.st_mode & S_IFDIR) || stat(cache_data, &st)) {
 		printf("Error: %s does not exist or is not a LMDB.\n", cache);
-		return 1;
+		return -ENOENT;
 	}
 
 	size_t cache_size = st.st_size;
@@ -154,7 +145,7 @@ int main(int argc, char *argv[])
 	int ret = kr_cache_open(&krc, NULL, &opts, NULL);
 	if (ret || krc.db == NULL) {
 		printf("Error opening Resolver cache (%s).\n", kr_strerror(ret));
-		return 2;
+		return -EINVAL;
 	}
 
 	const knot_db_api_t *api = knot_db_lmdb_api();
@@ -249,5 +240,5 @@ fail:
 	free(db);
 	kr_cache_close(&krc);
 
-	return (ret ? 10 : 0);
+	return ret;
 }
