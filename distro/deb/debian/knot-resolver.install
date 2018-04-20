@@ -19,6 +19,7 @@ usr/lib/knot-resolver/kres-gen.lua
 usr/lib/knot-resolver/kres.lua
 usr/lib/knot-resolver/policy.lua
 usr/lib/knot-resolver/predict.lua
+usr/lib/knot-resolver/prefill.lua
 usr/lib/knot-resolver/priming.lua
 usr/lib/knot-resolver/prometheus.lua
 usr/lib/knot-resolver/renumber.lua
