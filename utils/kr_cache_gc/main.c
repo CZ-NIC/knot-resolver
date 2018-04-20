@@ -28,7 +28,13 @@ static void got_killed(int signum)
 
 static void print_help()
 {
-	printf("Usage: kr_cache_gc -c <resolver_cache> [ -d <garbage_interval(ms)> ]\n");
+	printf("Usage: kr_cache_gc -c <resolver_cache> [ optional params... ]\n");
+	printf("Optional params:\n");
+	printf(" -d <garbage_interval(millis)>\n");
+	printf(" -l <deletes_per_txn>\n");
+	printf(" -m <rw_txn_duration(usecs)>\n");
+	printf(" -w <wait_next_rw_txn(usecs)>\n");
+	printf(" -t <temporary_memory(MBytes)>\n");
 }
 
 int main(int argc, char *argv[])
@@ -41,22 +47,33 @@ int main(int argc, char *argv[])
 	signal(SIGCHLD, got_killed);
 	signal(SIGINT, got_killed);
 
-	const char *cache_path = NULL;
-	unsigned long interval = 0;
+	kr_cache_gc_cfg_t cfg = { 0 };
 
 	int o;
-	while ((o = getopt(argc, argv, "hc:d:")) != -1) {
+	while ((o = getopt(argc, argv, "hc:d:l:m:w:t:")) != -1) {
 		switch (o) {
 		case 'c':
-			cache_path = optarg;
+			cfg.cache_path = optarg;
 			break;
+#define get_nonneg_optarg(to) do { if (atol(optarg) < 0) { print_help(); return 2; } to = atol(optarg); } while (0)
 		case 'd':
-			if (atol(optarg) < 0) {
-				print_help();
-				return 2;
-			}
-			interval = atol(optarg) * 1000;
+			get_nonneg_optarg(cfg.gc_interval);
+			cfg.gc_interval *= 1000;
 			break;
+		case 'l':
+			get_nonneg_optarg(cfg.rw_txn_items);
+			break;
+		case 'm':
+			get_nonneg_optarg(cfg.rw_txn_duration);
+			break;
+		case 'w':
+			get_nonneg_optarg(cfg.rw_txn_delay);
+			break;
+		case 't':
+			get_nonneg_optarg(cfg.temp_keys_space);
+			cfg.temp_keys_space *= 1048576;
+			break;
+#undef get_nonneg_optarg
 		case ':':
 		case '?':
 		case 'h':
@@ -67,20 +84,20 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (cache_path == NULL) {
+	if (cfg.cache_path == NULL) {
 		print_help();
 		return 1;
 	}
 
 	do {
-		int ret = kr_cache_gc(cache_path);
+		int ret = kr_cache_gc(&cfg);
 		if (ret) {
 			printf("Error (%s)\n", kr_strerror(ret));
 			return 10;
 		}
 
-		usleep(interval);
-	} while (interval > 0 && !killed);
+		usleep(cfg.gc_interval);
+	} while (cfg.gc_interval > 0 && !killed);
 
 	return 0;
 }
