@@ -221,8 +221,6 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 
 	tls_ctx->task = task;
 
-	assert(gnutls_record_check_corked(tls_session) == 0);
-
 	gnutls_record_cork(tls_session);
 	ssize_t count = 0;
 	if ((count = gnutls_record_send(tls_session, &pkt_size, sizeof(pkt_size)) < 0) ||
