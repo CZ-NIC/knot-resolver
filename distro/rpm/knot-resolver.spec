@@ -58,9 +58,9 @@ Requires:       lua-sec-compat
 # dependencies for doc package; disable in EPEL (missing fonts)
 # https://bugzilla.redhat.com/show_bug.cgi?id=1492884
 BuildRequires:  doxygen
-BuildRequires:  python2-breathe
-BuildRequires:  python2-sphinx
-BuildRequires:  python2-sphinx_rtd_theme
+BuildRequires:  python3-breathe
+BuildRequires:  python3-sphinx
+BuildRequires:  python3-sphinx_rtd_theme
 %endif
 
 Requires(pre):		shadow-utils
