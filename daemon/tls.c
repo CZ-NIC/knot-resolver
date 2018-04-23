@@ -890,7 +890,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 	struct tls_common_ctx *ctx = &client_ctx->c;
 
 	gnutls_session_set_ptr(ctx->tls_session, client_ctx);
-	gnutls_handshake_set_timeout(ctx->tls_session, 5000);
+	gnutls_handshake_set_timeout(ctx->tls_session, KR_CONN_RTT_MAX * 3);
 	session->tls_client_ctx = client_ctx;
 	ctx->handshake_cb = handshake_cb;
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;

@@ -252,7 +252,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			if (s->tasks.len == 0) {
 				worker_session_close(s);
 			} else { /* If there are tasks running, defer until they finish. */
-				uv_timer_start(&s->timeout, tcp_timeout_trigger, 1, KR_CONN_RTT_MAX/2);
+				uv_timer_start(&s->timeout, tcp_timeout_trigger,
+					       MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 			}
 		}
 	/* Connection spawned at least one request, reset its deadline for next query.
@@ -294,14 +295,18 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
+	uint64_t timeout = KR_CONN_RTT_MAX / 2;
 	session->has_tls = tls;
-	if (tls && !session->tls_ctx) {
-		session->tls_ctx = tls_new(master->loop->data);
-		session->tls_ctx->c.session = session;
-		session->tls_ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
+	if (tls) {
+		timeout += KR_CONN_RTT_MAX * 3;
+		if (!session->tls_ctx) {
+			session->tls_ctx = tls_new(master->loop->data);
+			session->tls_ctx->c.session = session;
+			session->tls_ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
+		}
 	}
 	uv_timer_t *timer = &session->timeout;
-	uv_timer_start(timer, tcp_timeout_trigger, KR_CONN_RTT_MAX/2, KR_CONN_RTT_MAX/2);
+	uv_timer_start(timer, tcp_timeout_trigger, timeout, timeout);
 	io_start_read((uv_handle_t *)client);
 }
 
