@@ -57,6 +57,11 @@ static const uint16_t CACHE_VERSION = 3;
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
 
 
+/** @internal Forward declarations of the implementation details */
+static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank);
+/** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
+static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
+
 /** @internal Removes all records from cache. */
 static inline int cache_clear(struct kr_cache *cache)
 {
@@ -147,6 +152,20 @@ int kr_cache_sync(struct kr_cache *cache)
 		return cache_op(cache, sync);
 	}
 	return kr_ok();
+}
+
+int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const knot_rrset_t *rrsig, uint8_t rank, uint32_t timestamp)
+{
+	int err = stash_rrset_precond(rr, NULL);
+	if (err <= 0) {
+		return kr_ok();
+	}
+	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank);
+	if (written >= 0) {
+		return kr_ok();
+	}
+
+	return (int) written;
 }
 
 int kr_cache_clear(struct kr_cache *cache)
@@ -624,7 +643,7 @@ do_soa:
 }
 
 /** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
-static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
+static int stash_rrarray_entry(const ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
 			int *unauth_cnt);
 
@@ -657,7 +676,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				continue;
 				/* TODO: probably safe to break but maybe not worth it */
 			}
-			ret = stash_rrset(arr, i, qry, cache, &unauth_cnt);
+			ret = stash_rrarray_entry(arr, i, qry, cache, &unauth_cnt);
 			if (ret) {
 				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
 				goto finally;
@@ -677,46 +696,34 @@ finally:
 	return ctx->state; /* we ignore cache-stashing errors */
 }
 
-static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
-			const struct kr_query *qry, struct kr_cache *cache,
-			int *unauth_cnt)
+/** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
+static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/)
 {
-	const ranked_rr_array_entry_t *entry = arr->at[arr_i];
-	if (entry->cached) {
-		return kr_ok();
-	}
-	const knot_rrset_t *rr = entry->rr;
 	if (!rr || rr->rclass != KNOT_CLASS_IN) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
-
-	#if 0
-	WITH_VERBOSE {
-		VERBOSE_MSG(qry, "=> considering to stash ");
-		kr_rrtype_print(rr->type, "", " ");
-		kr_dname_print(rr->owner, "", "\n");
-	}
-	#endif
-
-	if (!check_dname_for_lf(rr->owner, qry) || !check_rrtype(rr->type, qry)
+	if (!check_rrtype(rr->type, qry)
 	    || rr->type == KNOT_RRTYPE_NSEC3 /*for now; LATER NSEC3*/) {
 		return kr_ok();
 	}
+	if (!check_dname_for_lf(rr->owner, qry)) {
+		WITH_VERBOSE(qry) {
+			auto_free char *owner_str = kr_dname_text(rr->owner);
+			VERBOSE_MSG(qry, "=> skipping zero-containing name %s\n",
+					owner_str);
+		}
+		return kr_ok();
+	}
+	return 1/*proceed*/;
+}
 
-	/* Try to find corresponding signatures, always.  LATER(optim.): speed. */
-	const knot_rrset_t *rr_sigs = NULL;
-	for (ssize_t j = arr->len - 1; j >= 0; --j) {
-		/* TODO: ATM we assume that some properties are the same
-		 * for all RRSIGs in the set (esp. label count). */
-		ranked_rr_array_entry_t *e = arr->at[j];
-		bool ok = e->qry_uid == qry->uid && !e->cached
-			&& e->rr->type == KNOT_RRTYPE_RRSIG
-			&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
-			&& knot_dname_is_equal(rr->owner, e->rr->owner);
-		if (!ok) continue;
-		rr_sigs = e->rr;
-		break;
+static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank)
+{
+	assert(stash_rrset_precond(rr, qry) > 0);
+	if (!cache) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
 	}
 
 	const int wild_labels = rr_sigs == NULL ? 0 :
@@ -736,7 +743,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 	knot_db_val_t key;
 	switch (rr->type) {
 	case KNOT_RRTYPE_NSEC:
-		if (!kr_rank_test(entry->rank, KR_RANK_SECURE)) {
+		if (!kr_rank_test(rank, KR_RANK_SECURE)) {
 			/* Skip any NSECs that aren't validated. */
 			return kr_ok();
 		}
@@ -766,7 +773,7 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 	};
 
 	/* Prepare raw memory for the new entry. */
-	ret = entry_h_splice(&val_new_entry, entry->rank, key, k->type, rr->type,
+	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
 				rr->owner, qry, cache);
 	if (ret) return kr_ok(); /* some aren't really errors */
 	assert(val_new_entry.data);
@@ -785,9 +792,9 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 
 	/* Write the entry itself. */
 	struct entry_h *eh = val_new_entry.data;
-	eh->time = qry->timestamp.tv_sec;
+	eh->time = timestamp;
 	eh->ttl  = MAX(MIN(ttl, cache->ttl_max), cache->ttl_min);
-	eh->rank = entry->rank;
+	eh->rank = rank;
 	if (rdataset_dematerialize(&rr->rrs, eh->data)
 	    || rdataset_dematerialize(rds_sigs, eh->data + rr_ssize)) {
 		/* minimize the damage from incomplete write; TODO: better */
@@ -797,24 +804,69 @@ static int stash_rrset(const ranked_rr_array_t *arr, int arr_i,
 	}
 	assert(entry_h_consistent(val_new_entry, rr->type));
 
+	/* Update metrics */
+	cache->stats.insert += 1;
+
 	WITH_VERBOSE(qry) {
 		/* Reduce verbosity. */
-		if (!kr_rank_test(entry->rank, KR_RANK_AUTH)
+		if (!kr_rank_test(rank, KR_RANK_AUTH)
 		    && rr->type != KNOT_RRTYPE_NS) {
-			++*unauth_cnt;
-			return kr_ok();
+			return (ssize_t) val_new_entry.len;
 		}
 		auto_free char *type_str = kr_rrtype_text(rr->type),
 			*encl_str = kr_dname_text(encloser);
 		VERBOSE_MSG(qry, "=> stashed rank: 0%.2o, %s %s%s "
 			"(%d B total, incl. %d RRSIGs)\n",
-			entry->rank, type_str, (wild_labels ? "*." : ""), encl_str,
+			rank, type_str, (wild_labels ? "*." : ""), encl_str,
 			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.rr_count : 0)
 			);
 	}
-	return kr_ok();
+
+	return (ssize_t) val_new_entry.len;
 }
 
+static int stash_rrarray_entry(const ranked_rr_array_t *arr, int arr_i,
+			const struct kr_query *qry, struct kr_cache *cache,
+			int *unauth_cnt)
+{
+	const ranked_rr_array_entry_t *entry = arr->at[arr_i];
+	if (entry->cached) {
+		return kr_ok();
+	}
+	const knot_rrset_t *rr = entry->rr;
+	int ret = stash_rrset_precond(rr, qry);
+	if (ret <= 0) {
+		return ret;
+	}
+
+	/* Try to find corresponding signatures, always.  LATER(optim.): speed. */
+	const knot_rrset_t *rr_sigs = NULL;
+	for (ssize_t j = arr->len - 1; j >= 0; --j) {
+		/* TODO: ATM we assume that some properties are the same
+		 * for all RRSIGs in the set (esp. label count). */
+		ranked_rr_array_entry_t *e = arr->at[j];
+		bool ok = e->qry_uid == qry->uid && !e->cached
+			&& e->rr->type == KNOT_RRTYPE_RRSIG
+			&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
+			&& knot_dname_is_equal(rr->owner, e->rr->owner);
+		if (!ok) continue;
+		rr_sigs = e->rr;
+		break;
+	}
+
+	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec, entry->rank);
+	if (written < 0) {
+		return (int) written;
+	}
+
+	if (written > 0) {
+		if (!kr_rank_test(entry->rank, KR_RANK_AUTH) && rr->type != KNOT_RRTYPE_NS) {
+			*unauth_cnt += 1;
+		}
+	}
+
+	return kr_ok();
+}
 
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
