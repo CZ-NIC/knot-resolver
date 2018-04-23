@@ -1,3 +1,5 @@
+local ffi = require('ffi')
+
 -- test if constants work properly
 local function test_constants()
 	same(kres.class.IN, 1, 'class constants work')
@@ -30,10 +32,40 @@ end
 
 -- test if dns library functions work
 local function test_rrset_functions()
-	local rr = {owner = '\3com', ttl = 1, type = kres.type.TXT, rdata = '\5hello'}
+	local rr = {owner = '\3com\0', ttl = 1, type = kres.type.TXT, rdata = '\5hello'}
 	local rr_text = tostring(kres.rr2str(rr))
 	same(rr_text:gsub('%s+', ' '), 'com. 1 TXT "hello"', 'rrset to text works')
 	same(kres.dname2str(todname('com.')), 'com.', 'domain name conversion works')
+	-- test creating rrset
+	rr = kres.rrset(todname('com.'), kres.type.A, kres.class.IN)
+	ok(ffi.istype(kres.rrset, rr), 'created an empty RR')
+	same(rr:owner(), '\3com\0', 'created RR has correct owner')
+	same(rr:class(), kres.class.IN, 'created RR has correct class')
+	same(rr:class(kres.class.CH), kres.class.CH, 'can set a different class')
+	same(rr:class(kres.class.IN), kres.class.IN, 'can restore a class')
+	same(rr.type, kres.type.A, 'created RR has correct type')
+	-- test adding rdata
+	same(rr:wire_size(), 0, 'empty RR wire size is zero')
+	ok(rr:add_rdata('\1\2\3\4', 4, 66), 'adding RDATA works')
+	same(rr:wire_size(), 5 + 4 + 4 + 2 + 4, 'RR wire size works after adding RDATA')
+	-- test conversion to text
+	local expect = 'com.                	66	A	1.2.3.4\n'
+	same(rr:txt_dump(), expect, 'RR to text works')
+	-- create a dummy rrsig
+	local rrsig = kres.rrset(todname('com.'), kres.type.RRSIG, kres.class.IN)
+	rrsig:add_rdata('\0\1', 2, 0)
+	same(rr:rdcount(), 1, 'add_rdata really added RDATA')
+	-- check rrsig matching
+	same(rr.type, rrsig:type_covered(), 'rrsig type covered matches covered RR type')
+	ok(rr:is_covered_by(rrsig), 'rrsig is covering a record')
+	-- test rrset merging
+	local copy = kres.rrset(rr:owner(), rr.type)
+	ok(copy:add_rdata('\4\3\2\1', 4, 66), 'adding second RDATA works')
+	ok(rr:merge_rdata(copy), 'merge_rdata works')
+	same(rr:rdcount(), 2, 'RDATA count is correct after merge_rdata')
+	expect = 'com.                	66	A	1.2.3.4\n' ..
+	         'com.                	66	A	4.3.2.1\n'
+	same(rr:txt_dump(), expect, 'merge_rdata actually merged RDATA')
 end
 
 -- test dns library packet interface
@@ -66,11 +98,17 @@ local function test_packet_functions()
 	same(pkt:qclass(), kres.class.IN, 'reading QCLASS works')
 	-- Test manipulating sections
 	ok(pkt:begin(kres.section.ANSWER), 'switching sections works')
+	local res, err = pkt:put(nil, 0, 0, 0, '')
+	isnt(res, 'inserting nil entry doesnt work')
+	isnt(err.code, 0, 'error code is non-zero')
+	isnt(tostring(res), '', 'inserting nil returns invalid parameter')
 	ok(pkt:put(pkt:qname(), 900, pkt:qclass(), kres.type.A, '\1\2\3\4'), 'adding rrsets works')
 	boom(pkt.begin, {pkt, 10}, 'switching to invalid section doesnt work')
 	ok(pkt:begin(kres.section.ADDITIONAL), 'switching to different section works')
 	boom(pkt.begin, {pkt, 0}, 'rewinding sections doesnt work')
+	local before_insert = pkt:remaining_bytes()
 	ok(pkt:put(pkt:qname(), 900, pkt:qclass(), kres.type.A, '\4\3\2\1'), 'adding rrsets to different section works')
+	same(pkt:remaining_bytes(), before_insert - (2 + 4 + 4 + 2 + 4), 'remaining bytes count goes down with insertions')
 	-- Test conversions to text
 	like(pkt:tostring(), '->>HEADER<<-', 'packet to text works')
 	-- Test deserialization
@@ -91,6 +129,15 @@ local function test_packet_functions()
 	same(parsed:nscount(), pkt:nscount(), 'parsed packet has same authority count')
 	same(parsed:arcount(), pkt:arcount(), 'parsed packet has same additional count')
 	same(parsed:tostring(), pkt:tostring(), 'parsed packet is equal to source packet')
+
+	-- Test adding RR sets directly
+	local copy = kres.packet(512)
+	copy:question(todname('hello'), kres.class.IN, kres.type.A)
+	copy:begin(kres.section.ANSWER)
+	local rr = kres.rrset(pkt:qname(), kres.type.A)
+	rr:add_rdata('\4\3\2\1', 4, 66)
+	ok(copy:put_rr(rr), 'adding RR sets directly works')
+	ok(copy:recycle())
 
 	-- Test recycling of packets
 	-- Clear_payload keeps header + question intact

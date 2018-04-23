@@ -121,7 +121,7 @@ int entry_h_splice(
 	knot_db_val_t *val_new_entry, uint8_t rank,
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
-	const struct kr_query *qry, struct kr_cache *cache)
+	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp)
 {
 	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 	const bool ok = val_new_entry && val_new_entry->len > 0;
@@ -164,7 +164,7 @@ int entry_h_splice(
 		 * (whenever TTL nears expiration).
 		 * Stale-serving is NOT considered, but TTL 1 would be considered
 		 * as expiring anyway, ... */
-		int32_t old_ttl = get_new_ttl(eh_orig, qry, NULL, 0);
+		int32_t old_ttl = get_new_ttl(eh_orig, qry, NULL, 0, timestamp);
 		if (old_ttl > 0 && !is_expiring(eh_orig->ttl, old_ttl)
 		    && rank <= eh_orig->rank) {
 			WITH_VERBOSE(qry) {
