@@ -627,9 +627,18 @@ ffi.metatype( knot_pkt_t, {
 local kr_query_t = ffi.typeof('struct kr_query')
 ffi.metatype( kr_query_t, {
 	__index = {
+		-- Return query domain name
 		name = function(qry)
 			assert(ffi.istype(kr_query_t, qry))
 			return dname2wire(qry.sname)
+		end,
+		-- Write this query into packet
+		write = function(qry, pkt)
+			assert(ffi.istype(kr_query_t, qry))
+			assert(ffi.istype(knot_pkt_t, pkt))
+			local ret = C.kr_make_query(qry, pkt)
+			if ret ~= 0 then return nil, knot_error_t(ret) end
+			return true
 		end,
 	},
 })
@@ -796,6 +805,7 @@ kres = {
 	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,
 	-- Global API functions
 	str2dname = function(name)
+		if type(name) ~= 'string' then return end
 		local dname = ffi.gc(C.knot_dname_from_str(nil, name, 0), C.free)
 		return dname2wire(dname)
 	end,

@@ -78,6 +78,11 @@ struct kr_layer_api {
 	/** Produce either an answer to the request or a query for upstream (or fail). */
 	int (*produce)(kr_layer_t *ctx, knot_pkt_t *pkt);
 
+	/** Finalises the outbound query packet with the knowledge of the IP addresses.
+	 * The checkout layer doesn't persist the state, so canceled subrequests
+	 * don't affect the resolution or rest of the processing. */
+	int (*checkout)(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type);
+
 	/** The module can store anything in here. */
 	void *data;
 };
