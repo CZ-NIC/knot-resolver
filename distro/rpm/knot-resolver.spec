@@ -36,12 +36,10 @@ BuildRequires:  gnupg2
 %endif
 
 BuildRequires:  pkgconfig(cmocka)
-BuildRequires:  pkgconfig(hiredis)
 BuildRequires:  pkgconfig(libedit)
 BuildRequires:  pkgconfig(libknot) >= 2.6.4
 BuildRequires:  pkgconfig(libzscanner) >= 2.4.2
 BuildRequires:  pkgconfig(libdnssec) >= 2.3.1
-BuildRequires:  pkgconfig(libmemcached) >= 1.0
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0

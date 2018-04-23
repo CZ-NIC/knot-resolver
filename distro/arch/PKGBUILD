@@ -12,9 +12,7 @@ backup=('etc/knot-resolver/kresd.conf')
 options=(debug strip)
 install=install
 depends=('cmocka'
-	 'hiredis'
          'knot>=2.6.4'
-	 'libmemcached'
 	 'libsystemd'
          'libuv'
 	 'lua51-sec'
