@@ -7,11 +7,6 @@ Security
   (!550, !558, security!2, security!4)
 - increase resilience against slow lorris attack (security!5)
 
-Incompatible changes
---------------------
-- rename serve stale configuration option cache_touted_ns_clean_interval
-  to cache_ns_tout (!537)
-
 Bugfixes
 --------
 - validation: fix SERVFAIL in case of CNAME to NXDOMAIN in a single zone (!538)
@@ -25,7 +20,6 @@ Improvements
 - prefill: new module to periodically import root zone into cache
   (replacement for RFC 7706, !511)
 - network_listen_fd: always create end point for supervisor supplied file descriptor
-- daemon: improved TLS error handling
 - use CPPFLAGS build environment variable if set (!547)
 
 
