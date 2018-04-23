@@ -19,7 +19,6 @@ Build-Depends:
  libedit-dev,
  libgeoip-dev,
  libgnutls28-dev,
- libjansson-dev,
  libknot-dev (>= 2.6.4),
  liblmdb-dev,
  libluajit-5.1-dev,
@@ -27,7 +26,6 @@ Build-Depends:
  libuv1-dev,
  luajit,
  pkg-config,
- python3
 Build-Depends-Indep:
  doxygen,
  python3-breathe,
