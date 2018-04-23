@@ -36,6 +36,7 @@ BuildRequires:  gnupg2
 %endif
 
 BuildRequires:  pkgconfig(cmocka)
+BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libedit)
 BuildRequires:  pkgconfig(libknot) >= 2.6.4
 BuildRequires:  pkgconfig(libzscanner) >= 2.4.2
@@ -45,11 +46,13 @@ BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  pkgconfig(systemd)
 
-# Lua 5.1 version of the libraries have different package names
 %if 0%{?rhel}
+BuildRequires:  lmdb-devel
+# Lua 5.1 version of the libraries have different package names
 Requires:       lua-socket
 Requires:       lua-sec
 %else
+BuildRequires:  pkgconfig(lmdb)
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
 %endif
