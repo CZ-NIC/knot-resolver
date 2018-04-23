@@ -1,3 +1,5 @@
+.. _mod-prefill:
+
 Cache prefilling
 ----------------
 

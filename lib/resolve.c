@@ -742,12 +742,15 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	uint16_t qtype = knot_pkt_qtype(packet);
 	bool cd_is_set = knot_wire_get_cd(packet->wire);
 	struct kr_query *qry = NULL;
+	struct kr_context *ctx = request->ctx;
+	struct kr_cookie_ctx *cookie_ctx = ctx ? &ctx->cookie_ctx : NULL;
 
 	if (qname != NULL) {
 		qry = kr_rplan_push(rplan, NULL, qname, qclass, qtype);
-	} else if (knot_wire_get_qdcount(packet->wire) == 0 &&
-                   knot_pkt_has_edns(packet) &&
-                   knot_edns_has_option(packet->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
+	} else if (cookie_ctx && cookie_ctx->srvr.enabled &&
+		   knot_wire_get_qdcount(packet->wire) == 0 &&
+		   knot_pkt_has_edns(packet) &&
+		   knot_edns_has_option(packet->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
 		/* Plan empty query only for cookies. */
 		qry = kr_rplan_push_empty(rplan, NULL);
 	}
@@ -755,12 +758,14 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		return KR_STATE_FAIL;
 	}
 
-	/* Deferred zone cut lookup for this query. */
-	qry->flags.AWAIT_CUT = true;
-	/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
-	if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
-	    kr_ta_covers_qry(request->ctx, qname, qtype)) {
-		qry->flags.DNSSEC_WANT = true;
+	if (qname != NULL) {
+		/* Deferred zone cut lookup for this query. */
+		qry->flags.AWAIT_CUT = true;
+		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
+		if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
+		    kr_ta_covers_qry(request->ctx, qname, qtype)) {
+			qry->flags.DNSSEC_WANT = true;
+		}
 	}
 
 	/* Initialize answer packet */
@@ -780,8 +785,13 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	request->qsource.packet = packet;
 	ITERATE_LAYERS(request, qry, begin);
 	request->qsource.packet = NULL;
-	if (request->state == KR_STATE_DONE) {
+	if ((request->state & KR_STATE_DONE) != 0) {
 		kr_rplan_pop(rplan, qry);
+	} else if (qname == NULL) {
+		/* it is an empty query which must be resolved by
+		   `begin` layer of cookie module.
+		   If query isn't resolved, fail. */
+		request->state = KR_STATE_FAIL;
 	}
 	return request->state;
 }

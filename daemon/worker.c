@@ -826,14 +826,7 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 			if (session->waiting.len > 0) {
 				struct qr_task *t = session->waiting.at[0];
 				int ret = qr_task_send(t, handle, &session->peer.ip, t->pktbuf);
-				if (ret == kr_ok()) {
-					uv_timer_t *timer = &session->timeout;
-					uv_timer_stop(timer);
-					session->timeout.data = session;
-					timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
-				} else {
-					uv_timer_t *timer = &session->timeout;
-					uv_timer_stop(timer);
+				if (ret != kr_ok()) {
 					while (session->waiting.len > 0) {
 						struct qr_task *t = session->waiting.at[0];
 						if (session->outgoing) {
@@ -1081,8 +1074,6 @@ static int session_next_waiting_send(struct session *session)
 		struct qr_task *task = session->waiting.at[0];
 		ret = qr_task_send(task, session->handle, &peer->ip, task->pktbuf);
 	}
-	session->timeout.data = session;
-	timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 	return ret;
 }
 
@@ -1121,6 +1112,10 @@ static int session_tls_hs_cb(struct session *session, int status)
 		worker_del_tcp_connected(worker, &peer->ip);
 		assert(session->tasks.len == 0);
 		session_close(session);
+	} else {
+		uv_timer_stop(&session->timeout);
+		session->timeout.data = session;
+		timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 	}
 	return kr_ok();
 }
@@ -1144,9 +1139,7 @@ static void on_connect(uv_connect_t *req, int status)
 	struct worker_ctx *worker = get_worker();
 	uv_stream_t *handle = req->handle;
 	struct session *session = handle->data;
-
 	union inaddr *peer = &session->peer;
-	uv_timer_stop(&session->timeout);
 
 	if (status == UV_ECANCELED) {
 		worker_del_tcp_waiting(worker, &peer->ip);
@@ -1161,6 +1154,8 @@ static void on_connect(uv_connect_t *req, int status)
 		iorequest_release(worker, req);
 		return;
 	}
+
+	uv_timer_stop(&session->timeout);
 
 	if (status != 0) {
 		worker_del_tcp_waiting(worker, &peer->ip);
@@ -1188,6 +1183,8 @@ static void on_connect(uv_connect_t *req, int status)
 				struct qr_task *task = session->waiting.at[0];
 				session_del_tasks(session, task);
 				array_del(session->waiting, 0);
+				ioreq_kill_pending(task);
+				assert(task->pending_count == 0);
 				qr_task_finalize(task, KR_STATE_FAIL);
 				qr_task_unref(task);
 			}
@@ -1224,6 +1221,7 @@ static void on_connect(uv_connect_t *req, int status)
 	if (ret == kr_ok()) {
 		ret = session_next_waiting_send(session);
 		if (ret == kr_ok()) {
+			timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 			worker_add_tcp_connected(worker, &session->peer.ip, session);
 			iorequest_release(worker, req);
 			return;
@@ -1234,6 +1232,8 @@ static void on_connect(uv_connect_t *req, int status)
 		struct qr_task *task = session->waiting.at[0];
 		session_del_tasks(session, task);
 		array_del(session->waiting, 0);
+		ioreq_kill_pending(task);
+		assert(task->pending_count == 0);
 		qr_task_finalize(task, KR_STATE_FAIL);
 		qr_task_unref(task);
 	}
@@ -1291,7 +1291,6 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 	assert(session->outgoing);
 	uv_timer_stop(timer);
 	struct worker_ctx *worker = get_worker();
-
 	if (session->outgoing) {
 		if (session->has_tls) {
 			worker_del_tcp_waiting(worker, &session->peer.ip);
@@ -1304,6 +1303,8 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 			worker->stats.timeout += 1;
 			array_del(session->waiting, 0);
 			session_del_tasks(session, task);
+			ioreq_kill_pending(task);
+			assert(task->pending_count == 0);
 			qr_task_finalize(task, KR_STATE_FAIL);
 			qr_task_unref(task);
 		}
@@ -1315,6 +1316,8 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 		worker->stats.timeout += 1;
 		assert(task->refs > 1);
 		array_del(session->tasks, 0);
+		ioreq_kill_pending(task);
+		assert(task->pending_count == 0);
 		qr_task_finalize(task, KR_STATE_FAIL);
 		qr_task_unref(task);
 	}
@@ -1649,6 +1652,9 @@ static int qr_task_step(struct qr_task *task,
 				subreq_finalize(task, packet_source, packet);
 				return qr_task_finalize(task, KR_STATE_FAIL);
 			}
+			assert(task->pending_count == 0);
+			task->pending[task->pending_count] = session->handle;
+			task->pending_count += 1;
 		} else if ((session = worker_find_tcp_connected(ctx->worker, addr)) != NULL) {
 			/* Connection has been already established */
 			assert(session->outgoing);
@@ -1693,8 +1699,11 @@ static int qr_task_step(struct qr_task *task,
 					session_close(session);
 					return qr_task_finalize(task, KR_STATE_FAIL);
 				}
-				ret = timer_start(session, on_tcp_watchdog_timeout,
-						  KR_CONN_RTT_MAX, 0);
+				if (session->tasks.len == 1) {
+					uv_timer_stop(&session->timeout);
+					ret = timer_start(session, on_tcp_watchdog_timeout,
+							  MAX_TCP_INACTIVITY, 0);
+				}
 				if (ret < 0) {
 					session_del_waiting(session, task);
 					session_del_tasks(session, task);
@@ -1708,6 +1717,7 @@ static int qr_task_step(struct qr_task *task,
 					return qr_task_finalize(task, KR_STATE_FAIL);
 				}
 			}
+			assert(task->pending_count == 0);
 			task->pending[task->pending_count] = session->handle;
 			task->pending_count += 1;
 		} else {
@@ -2097,11 +2107,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		return kr_ok();
 	}
 
-	if (session->outgoing) {
-		uv_timer_stop(&session->timeout);
-		timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
-	}
-
 	if (session->bytes_to_skip) {
 		assert(session->buffering == NULL);
 		ssize_t min_len = MIN(session->bytes_to_skip, len);
@@ -2286,23 +2291,34 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		session->buffering = NULL;
 		session->msg_hdr_idx = 0;
 		if (session->outgoing) {
+			assert ((task->pending_count == 1) && (task->pending[0] == session->handle));
+			task->pending_count = 0;
 			session_del_tasks(session, task);
 		}
 		/* Parse the packet and start resolving complete query */
 		int ret = parse_packet(pkt_buf);
-		if (ret == 0 && !session->outgoing) {
-			/* Start only new queries,
-			 * not subrequests that are already pending */
-			ret = request_start(task->ctx, pkt_buf);
-			assert(ret == 0);
-			if (ret == 0) {
-				ret = qr_task_register(task, session);
-			}
-			if (ret == 0) {
-				submitted += 1;
-			}
-			if (task->leading) {
-				assert(false);
+		if (ret == 0) {
+			if (session->outgoing) {
+				/* To prevent slow lorris attack restart watchdog only after
+				* the whole message was successfully assembled and parsed */
+				if (session->tasks.len > 0 || session->waiting.len > 0) {
+					uv_timer_stop(&session->timeout);
+					timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
+				}
+			} else {
+				/* Start only new queries,
+				 * not subrequests that are already pending */
+				ret = request_start(task->ctx, pkt_buf);
+				assert(ret == 0);
+				if (ret == 0) {
+					ret = qr_task_register(task, session);
+				}
+				if (ret == 0) {
+					submitted += 1;
+				}
+				if (task->leading) {
+					assert(false);
+				}
 			}
 		}
 		if (ret == 0) {

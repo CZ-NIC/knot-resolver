@@ -1,8 +1,26 @@
+Knot Resolver 2.3.0 (2018-04-23)
+================================
+
+Security
+--------
+- fix CVE-2018-1110: denial of service triggered by malformed DNS messages
+  (!550, !558, security!2, security!4)
+- increase resilience against slow lorris attack (security!5)
 
 Bugfixes
 --------
-- validation: fix SERVFAIL in case of CNAME to NXDOMAIN in a single zone
-- validation: fix SERVFAIL for DS . query
+- validation: fix SERVFAIL in case of CNAME to NXDOMAIN in a single zone (!538)
+- validation: fix SERVFAIL for DS . query (!544)
+- lib/resolve: don't send unecessary queries to parent zone (!513)
+- iterate: fix validation for zones where parent and child share NS (!543)
+- TLS: improve error handling and documentation (!536, !555, !559)
+
+Improvements
+------------
+- prefill: new module to periodically import root zone into cache
+  (replacement for RFC 7706, !511)
+- network_listen_fd: always create end point for supervisor supplied file descriptor
+- use CPPFLAGS build environment variable if set (!547)
 
 
 Knot Resolver 2.2.0 (2018-03-28)

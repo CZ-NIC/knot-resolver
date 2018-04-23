@@ -356,7 +356,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (!knot_dname_in(zonecut_name, rr->owner)) {
+		if (rr->rclass != KNOT_CLASS_IN || !knot_dname_in(zonecut_name, rr->owner)) {
 			continue;
 		}
 		uint8_t rank = get_initial_rank(rr, qry, false,
@@ -492,7 +492,8 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			const bool type_OK = rr->type == query->stype || type == query->stype
 				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
 				/* TODO: actually handle DNAMEs */
-			if (!type_OK || !knot_dname_is_equal(rr->owner, cname)) {
+			if (rr->rclass != KNOT_CLASS_IN || !type_OK
+			    || !knot_dname_is_equal(rr->owner, cname)) {
 				continue;
 			}
 
