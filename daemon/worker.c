@@ -2290,13 +2290,16 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		/* Message was assembled, clear temporary. */
 		session->buffering = NULL;
 		session->msg_hdr_idx = 0;
+		const struct sockaddr *addr = NULL;
+		knot_pkt_t *pkt = pkt_buf;
 		if (session->outgoing) {
+			addr = &session->peer.ip;
 			assert ((task->pending_count == 1) && (task->pending[0] == session->handle));
 			task->pending_count = 0;
 			session_del_tasks(session, task);
 		}
 		/* Parse the packet and start resolving complete query */
-		int ret = parse_packet(pkt_buf);
+		int ret = parse_packet(pkt);
 		if (ret == 0) {
 			if (session->outgoing) {
 				/* To prevent slow lorris attack restart watchdog only after
@@ -2308,25 +2311,43 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			} else {
 				/* Start only new queries,
 				 * not subrequests that are already pending */
-				ret = request_start(task->ctx, pkt_buf);
-				assert(ret == 0);
-				if (ret == 0) {
-					ret = qr_task_register(task, session);
+				ret = request_start(task->ctx, pkt);
+				if (ret != 0) {
+					/* Allocation of answer buffer has failed.
+					 * We can't notify client about failure,
+					 * so just end the task processing. */
+					qr_task_complete(task);
+					goto next_msg;
 				}
-				if (ret == 0) {
-					submitted += 1;
+
+				ret = qr_task_register(task, session);
+				if (ret != 0) {
+					/* Answer buffer has been allocated,
+					 * but task can't be attached to the given
+					 * session due to memory problems.
+					 * Finalize the task, otherwise it becomes orphaned. */
+					knot_pkt_init_response(task->ctx->req.answer, pkt);
+					qr_task_finalize(task, KR_STATE_FAIL);
+					goto next_msg;
 				}
+				submitted += 1;
 				if (task->leading) {
 					assert(false);
 				}
 			}
+		} else if (session->outgoing) {
+			/* Drop malformed packet and retry resolution */
+			pkt = NULL;
+			ret = 0;
 		}
+		/* Only proceed if the message is valid, or it's an invalid response to
+		 * an outbound query which needs to be treated as a timeout. */
 		if (ret == 0) {
-			const struct sockaddr *addr = session->outgoing ? &session->peer.ip : NULL;
 			/* since there can be next dns message, we must to proceed
 			 * even if qr_task_step() returns error */
-			qr_task_step(task, addr, pkt_buf);
+			qr_task_step(task, addr, pkt);
 		}
+next_msg:
 		if (len > 0) {
 			/* TODO: this is simple via iteration; recursion doesn't really help */
 			ret = worker_process_tcp(worker, handle, msg, len);
@@ -2362,8 +2383,11 @@ struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *quer
 	/* Start task */
 	int ret = request_start(ctx, query);
 	if (ret != 0) {
+		/* task is attached to request context,
+		 * so dereference (and deallocate) it first */
+		request_del_tasks(ctx, task);
+		array_clear(ctx->tasks);
 		request_free(ctx);
-		qr_task_unref(task);
 		return NULL;
 	}
 
