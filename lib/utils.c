@@ -53,6 +53,13 @@ static isaac_ctx ISAAC;
 static bool isaac_seeded = false;
 #define SEED_SIZE 256
 
+
+void *mm_malloc(void *ctx, size_t n)
+{
+	(void)ctx;
+	return malloc(n);
+}
+
 /*
  * Macros.
  */
@@ -337,6 +344,18 @@ int kr_inaddr_len(const struct sockaddr *addr)
 	return kr_family_len(addr->sa_family);
 }
 
+int kr_sockaddr_len(const struct sockaddr *addr)
+{
+	if (!addr) {
+		return kr_error(EINVAL);
+	}
+	switch (addr->sa_family) {
+	case AF_INET:  return sizeof(struct sockaddr_in);
+	case AF_INET6: return sizeof(struct sockaddr_in6);
+	default:       return kr_error(EINVAL);
+	}
+}
+
 uint16_t kr_inaddr_port(const struct sockaddr *addr)
 {
 	if (!addr) {
@@ -562,57 +581,35 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 	return ret;
 }
 
-int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank)
+int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
+	     uint16_t type, uint16_t additional)
 {
 	if (!key || !owner) {
 		return kr_error(EINVAL);
 	}
-	key[0] = (rank << 2) | 0x01; /* Must be non-zero */
-	uint8_t *key_buf = (uint8_t *)key + 1;
-	int ret = knot_dname_to_wire(key_buf, owner, KNOT_DNAME_MAXLEN);
+	uint8_t *key_buf = (uint8_t *)key;
+	int ret = u16tostr(key_buf, class);
+	if (ret <= 0) {
+		return ret;
+	}
+	key_buf += ret;
+	ret = knot_dname_to_wire(key_buf, owner, KNOT_DNAME_MAXLEN);
 	if (ret <= 0) {
 		return ret;
 	}
 	knot_dname_to_lower(key_buf);
 	key_buf += ret - 1;
-	/* Must convert to string, as the key must not contain 0x00 */
 	ret = u16tostr(key_buf, type);
+	if (ret <= 0) {
+		return ret;
+	}
+	key_buf += ret;
+	ret = u16tostr(key_buf, additional);
+	if (ret <= 0) {
+		return ret;
+	}
 	key_buf[ret] = '\0';
 	return (char *)&key_buf[ret] - key;
-}
-
-int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *pool)
-{
-	if (!stash || !rr) {
-		return kr_error(EINVAL);
-	}
-
-	/* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
-	char key[KR_RRKEY_LEN];
-	uint8_t extra_flags = 0;
-	uint16_t rrtype = kr_rrset_type_maysig(rr);
-	/* Stash RRSIGs in a special cache, flag them and set type to its covering RR.
-	 * This way it the stash won't merge RRSIGs together. */
-	if (rr->type == KNOT_RRTYPE_RRSIG) {
-		extra_flags |= KEY_FLAG_RRSIG;
-	}
-	int ret = kr_rrkey(key, rr->owner, rrtype, rank);
-	if (ret <= 0) {
-		return kr_error(EILSEQ);
-	}
-	key[0] |= extra_flags;
-
-	/* Check if already exists */
-	knot_rrset_t *stashed = map_get(stash, key);
-	if (!stashed) {
-		stashed = knot_rrset_copy(rr, pool);
-		if (!stashed) {
-			return kr_error(ENOMEM);
-		}
-		return map_set(stash, key, stashed);
-	}
-	/* Merge rdataset */
-	return knot_rdataset_merge(&stashed->rrs, &rr->rrs, pool);
 }
 
 /** Return whether two RRsets match, i.e. would form the same set; see ranked_rr_array_t */

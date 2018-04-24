@@ -440,7 +440,7 @@ static int cdb_clear(knot_db_t *db)
 		return kr_error(errno);
 	}
 	close(ret);
-	/* We aquired lockfile.  Now find whether *.mdb are what we have open now. */
+	/* We acquired lockfile.  Now find whether *.mdb are what we have open now. */
 	struct stat old_stat, new_stat;
 	if (fstat(fd, &new_stat) || stat(mdb_datafile, &old_stat)) {
 		ret = errno;
@@ -536,7 +536,7 @@ static int cdb_writev(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *va
 		/* This is LMDB specific optimisation,
 		 * if caller specifies value with NULL data and non-zero length,
 		 * LMDB will preallocate the entry for caller and leave write
-		 * transaction open, caller is responsible for syncing thus comitting transaction.
+		 * transaction open, caller is responsible for syncing thus committing transaction.
 		 */
 		unsigned mdb_flags = 0;
 		if (val[i].len > 0 && val[i].data == NULL) {

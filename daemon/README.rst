@@ -16,7 +16,7 @@ Configuration
    :depth: 2
    :local:
 
-In it's simplest form it requires just a working directory in which it can set up persistent files like
+In its simplest form the server requires just a working directory in which it can set up persistent files like
 cache and the process state. If you don't provide the working directory by parameter, it is going to make itself
 comfortable in the current working directory.
 
@@ -756,6 +756,16 @@ daemons or manipulated from other processes, making for example synchronised loa
      cache.min_ttl(5)
      5
 
+.. function:: cache.ns_tout([timeout])
+
+  :param timeout: number of milliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
+  :return: current timeout
+
+  Get or set time interval for which a nameserver address will be ignored after determining that it doesn't return (useful) answers.
+  The intention is to avoid waiting if there's little hope; instead, kresd can immediately SERVFAIL or immediately use stale records (with :ref:`serve_stale <mod-serve_stale>` module).
+
+  .. warning:: This settings applies only to the current kresd process.
+
 .. function:: cache.prune([max_count])
 
   :param number max_count:  maximum number of items to be pruned at once (default: 65536)
@@ -1013,6 +1023,8 @@ The watchdog process must notify kresd about active file descriptors, and kresd 
 The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
 
 See ``kresd.systemd(7)`` for details.
+
+.. _enabling-dnssec:
 
 Enabling DNSSEC
 ===============

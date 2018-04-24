@@ -4,6 +4,7 @@ variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
   GIT_SUBMODULE_STRATEGY: recursive
+  GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
   COVERAGE: '1'
 
 stages:
@@ -30,6 +31,22 @@ build:clang:linux:amd64:
   script:
     - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument"
     - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make install CFLAGS=-Werror
+  tags:
+    - docker
+    - linux
+    - amd64
+
+srpm:
+  stage: build
+  allow_failure: true  # don't block testing pipeline in case of failure
+  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  script:
+    - scripts/make-srpm.sh
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - "*.src.rpm"
   tags:
     - docker
     - linux
@@ -115,6 +132,8 @@ doc:
 
 deckard:linux:amd64:
   stage: test
+  except:
+    - schedules  # prevent unstable test from cancelling nightly OBS build
   script:
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
     - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
@@ -199,6 +218,7 @@ respdiff:iter:udp:linux:amd64:
     paths:
       - kresd.log.xz
       - results/*.txt
+      - results/*.svg
       - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
@@ -225,6 +245,7 @@ respdiff:iter:tcp:linux:amd64:
     paths:
       - kresd.log.xz
       - results/*.txt
+      - results/*.svg
       - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
@@ -251,12 +272,51 @@ respdiff:iter:tls:linux:amd64:
     paths:
       - kresd.log.xz
       - results/*.txt
+      - results/*.svg
       - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
     - docker
     - linux
     - amd64
+
+distro:fedora-27:
+  stage: test
+  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  only:
+    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
+  dependencies:
+    - srpm
+  script:
+    - mock --old-chroot -r fedora-27-x86_64 --rebuild *.src.rpm
+  after_script:
+    - mv /var/lib/mock/fedora-27-x86_64/result fedora-27-x86_64
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - fedora-27-x86_64/
+  tags:
+    - privileged  # mock requires additional capabilities (e.g. mount)
+
+distro:epel-7:
+  stage: test
+  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  only:
+    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
+  dependencies:
+    - srpm
+  script:
+    - mock --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm
+  after_script:
+    - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - epel-7-x86_64/
+  tags:
+    - privileged  # mock require additional capabilities (e.g. mount)
 
 # compute coverage for all runs
 coverage:
@@ -294,6 +354,19 @@ pages:
     expire_in: '30 days'
     paths:
       - public
+
+# trigger obs build for master branch
+obs:devel:
+  stage: deploy
+  only:
+    - schedules
+  dependencies: []
+  script:
+    - scripts/make-archive.sh
+    - scripts/make-distrofiles.sh
+    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > /root/.oscrc
+    - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
+    - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
 
 #arm_build:
 #  image: cznic/armhf-ubuntu:16.04

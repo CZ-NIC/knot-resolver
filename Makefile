@@ -16,7 +16,7 @@ lint-lua: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 .PHONY: all install check clean doc info lint
 
 # Dependencies
-KNOT_MINVER := 2.4.0
+KNOT_MINVER := 2.6.4
 $(eval $(call find_lib,libknot,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libdnssec,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libzscanner,$(KNOT_MINVER),yes))
@@ -86,6 +86,7 @@ endif
 info:
 	$(info Target:     Knot DNS Resolver $(VERSION)-$(PLATFORM))
 	$(info Compiler:   $(CC) $(BUILD_CFLAGS))
+	$(info Linker:     $(CCLD) $(BUILD_LDFLAGS))
 	$(info )
 	$(info Variables)
 	$(info ---------)
@@ -171,7 +172,7 @@ endif
 $(DESTDIR)$(MODULEDIR):
 	$(INSTALL) -d $@
 $(DESTDIR)$(ETCDIR):
-	$(INSTALL) -m 0750 -d $@
+	$(INSTALL) -m 0755 -d $@
 
 # Sub-targets
 include contrib/contrib.mk

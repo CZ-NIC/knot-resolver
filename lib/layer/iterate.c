@@ -356,7 +356,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (!knot_dname_in(zonecut_name, rr->owner)) {
+		if (rr->rclass != KNOT_CLASS_IN || !knot_dname_in(zonecut_name, rr->owner)) {
 			continue;
 		}
 		uint8_t rank = get_initial_rank(rr, qry, false,
@@ -382,6 +382,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	}
 
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
+	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 
 #ifdef STRICT_MODE
 	/* AA, terminate resolution chain. */
@@ -389,9 +390,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		return KR_STATE_CONSUME;
 	}
 #else
-
 	/* Work around servers sending back CNAME with different delegation and no AA. */
-	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	if (an->count > 0 && ns->count > 0) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, 0);
 		if (rr->type == KNOT_RRTYPE_CNAME) {
@@ -424,6 +423,19 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		} else if (rr->type == KNOT_RRTYPE_SOA && knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
 			/* SOA below cut in authority indicates different authority, but same NS set. */
 			qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
+		}
+	}
+
+	/* Nameserver is authoritative for both parent side and the child side of the
+	 * delegation may respond with an NS record in the answer section, and still update
+	 * the zone cut (e.g. what a.gtld-servers.net would respond for `com NS`) */
+	if (!ns_record_exists && knot_wire_get_aa(pkt->wire)) {
+		for (unsigned i = 0; i < an->count; ++i) {
+			const knot_rrset_t *rr = knot_pkt_rr(an, i);
+			if (rr->type == KNOT_RRTYPE_NS && knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
+				/* NS below cut in authority indicates different authority, but same NS set. */
+				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
+			}
 		}
 	}
 
@@ -480,7 +492,8 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			const bool type_OK = rr->type == query->stype || type == query->stype
 				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
 				/* TODO: actually handle DNAMEs */
-			if (!type_OK || !knot_dname_is_equal(rr->owner, cname)) {
+			if (rr->rclass != KNOT_CLASS_IN || !type_OK
+			    || !knot_dname_is_equal(rr->owner, cname)) {
 				continue;
 			}
 

@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "lib/generic/map.h"
-#include "lib/generic/pack.h"
-#include "lib/defines.h"
 #include "lib/cache/api.h"
+#include "lib/defines.h"
+#include "lib/generic/pack.h"
+#include "lib/generic/trie.h"
 
 struct kr_rplan;
 struct kr_context;
@@ -32,7 +32,7 @@ struct kr_zonecut {
 	knot_rrset_t* key;  /**< Zone cut DNSKEY. */
 	knot_rrset_t* trust_anchor; /**< Current trust anchor. */
 	struct kr_zonecut *parent; /**< Parent zone cut. */
-	map_t nsset;        /**< Map of nameserver => address_set. */
+	trie_t *nsset;        /**< Map of nameserver => address_set (pack_t). */
 	knot_mm_t *pool;     /**< Memory pool. */
 };
 
@@ -62,11 +62,13 @@ void kr_zonecut_deinit(struct kr_zonecut *cut);
 KR_EXPORT
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name);
 
-/** 
+/**
  * Copy zone cut, including all data. Does not copy keys and trust anchor.
  * @param dst destination zone cut
  * @param src source zone cut
- * @return 0 or an error code
+ * @return 0 or an error code; If it fails with kr_error(ENOMEM),
+ * it may be in a half-filled state, but it's safe to deinit...
+ * @note addresses for names in `src` get replaced and others are left as they were.
  */
 KR_EXPORT
 int kr_zonecut_copy(struct kr_zonecut *dst, const struct kr_zonecut *src);
@@ -150,3 +152,12 @@ KR_EXPORT
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			   const knot_dname_t *name, const struct kr_query *qry,
 			   bool * restrict secured);
+/**
+ * Check if any address is present in the zone cut.
+ *
+ * @param cut zone cut to check
+ * @return true/false
+ */
+KR_EXPORT
+bool kr_zonecut_is_empty(struct kr_zonecut *cut);
+

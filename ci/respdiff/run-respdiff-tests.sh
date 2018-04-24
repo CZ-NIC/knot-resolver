@@ -12,6 +12,7 @@ CONFIG="$(pwd)/ci/respdiff/respdiff-${1}.conf"
 time /var/opt/respdiff/orchestrator.py respdiff.db -c "${CONFIG}"
 time /var/opt/respdiff/msgdiff.py respdiff.db -c "${CONFIG}"
 /var/opt/respdiff/diffsum.py respdiff.db -c "${CONFIG}" > results/respdiff.txt
+/var/opt/respdiff/histogram.py respdiff.db -c "${CONFIG}" -o results/histogram.svg
 : minimize LMDB and log size so they can be effectively archived
 mkdir results/respdiff.db
 mdb_copy -c respdiff.db results/respdiff.db

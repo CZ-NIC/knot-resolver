@@ -37,19 +37,22 @@ static void test_zonecut_params(void **state)
 
 static void test_zonecut_copy(void **state)
 {
-	const knot_dname_t *root = (const uint8_t *)"";
+	const knot_dname_t *n_root = (const uint8_t *)"";
 	struct kr_zonecut cut1, cut2;
-	kr_zonecut_init(&cut1, root, NULL);
-	kr_zonecut_init(&cut2, root, NULL);
+	kr_zonecut_init(&cut1, n_root, NULL);
+	kr_zonecut_init(&cut2, n_root, NULL);
 	/* Insert some values */
-	assert_int_equal(kr_zonecut_add(&cut1, (const uint8_t *)"dead", NULL), 0);
-	assert_int_equal(kr_zonecut_add(&cut1, (const uint8_t *)"beef", NULL), 0);
+	const knot_dname_t
+		*n_1 = (const uint8_t *)"\4dead",
+		*n_2 = (const uint8_t *)"\3bee\1f";
+	assert_int_equal(kr_zonecut_add(&cut1, n_1, NULL), 0);
+	assert_int_equal(kr_zonecut_add(&cut1, n_2, NULL), 0);
 	/* Copy */
 	assert_int_equal(kr_zonecut_copy(&cut2, &cut1), 0);
 	/* Check if exist */
-	assert_non_null(kr_zonecut_find(&cut2, (const uint8_t *)"dead"));
-	assert_non_null(kr_zonecut_find(&cut2, (const uint8_t *)"beef"));
-	assert_null(kr_zonecut_find(&cut2, (const uint8_t *)"corn"));
+	assert_non_null(kr_zonecut_find(&cut2, n_1));
+	assert_non_null(kr_zonecut_find(&cut2, n_2));
+	assert_null(kr_zonecut_find(&cut2, (const uint8_t *)"\5death"));
 	kr_zonecut_deinit(&cut1);
 	kr_zonecut_deinit(&cut2);
 }

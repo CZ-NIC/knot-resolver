@@ -27,11 +27,6 @@
 #define QUERY_PROVIDES(q, name, cls, type) \
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
-void kr_query_set_stale_cb(struct kr_query *qry, kr_stale_cb cb)
-{
-	qry->stale_cb = cb;
-}
-
 inline static unsigned char chars_or(const unsigned char a, const unsigned char b)
 {
 	return a | b;

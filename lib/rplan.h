@@ -53,7 +53,7 @@ struct kr_qflags {
 	bool BADCOOKIE_AGAIN : 1;/**< Query again because bad cookie returned. */
 	bool CNAME : 1;          /**< Query response contains CNAME in answer section. */
 	bool REORDER_RR : 1;     /**< Reorder cached RRs. */
-	bool TRACE : 1;          /**< Log answer with kr_verbose_log(), unless -DNDEBUG. */
+	bool TRACE : 1;          /**< Also log answers if --verbose. */
 	bool NO_0X20 : 1;        /**< Disable query case randomization . */
 	bool DNSSEC_NODS : 1;    /**< DS non-existance is proven */
 	bool DNSSEC_OPTOUT : 1;  /**< Closest encloser proof has optout */
@@ -62,6 +62,7 @@ struct kr_qflags {
 	bool FORWARD : 1;        /**< Forward all queries to upstream; validate answers. */
 	bool DNS64_MARK : 1;     /**< Internal mark for dns64 module. */
 	bool CACHE_TRIED : 1;    /**< Internal to cache module. */
+	bool NO_NS_FOUND : 1;    /**< No valid NS found during last PRODUCE stage. */
 };
 
 /** Combine flags together.  This means set union for simple flags. */
@@ -78,10 +79,6 @@ void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2);
  */
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
-/** Trivial wrapper to set kr_query::stale_cb.
- * For some unknown reason, direct setting via lua doesn't work. */
-KR_EXPORT
-void kr_query_set_stale_cb(struct kr_query *qry, kr_stale_cb cb);
 
 /**
  * Single query representation.
@@ -103,13 +100,14 @@ struct kr_query {
 	                           * query to upstream resolver (milliseconds). */
 	struct timeval timestamp; /**< Real time for TTL+DNSSEC checks (.tv_sec only). */
 	struct kr_zonecut zone_cut;
-	struct kr_nsrep ns;
 	struct kr_layer_pickle *deferred;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
 	struct kr_request *request; /**< Parent resolution request. */
 	kr_stale_cb stale_cb; /**< See the type */
+	/* Beware: this must remain the last, because of lua bindings. */
+	struct kr_nsrep ns;
 };
 
 /** @cond internal Array of queries. */

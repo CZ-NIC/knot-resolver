@@ -121,6 +121,17 @@ static inline void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t pr
 		return realloc(what, size);
 	}
 }
+
+/** Trivial malloc() wrapper. */
+void *mm_malloc(void *ctx, size_t n);
+
+/** Initialize mm with standard malloc+free. */
+static inline void mm_ctx_init(knot_mm_t *mm)
+{
+	mm->ctx = NULL;
+	mm->alloc = mm_malloc;
+	mm->free = free;
+}
 /* @endcond */
 
 /** Return time difference in miliseconds.
@@ -216,9 +227,12 @@ const char *kr_inaddr(const struct sockaddr *addr);
 /** Address family. */
 KR_EXPORT KR_PURE
 int kr_inaddr_family(const struct sockaddr *addr);
-/** Address length for given family. */
+/** Address length for given family, i.e. sizeof(struct in*_addr). */
 KR_EXPORT KR_PURE
 int kr_inaddr_len(const struct sockaddr *addr);
+/** Sockaddr length for given family, i.e. sizeof(struct sockaddr_in*). */
+KR_EXPORT KR_PURE
+int kr_sockaddr_len(const struct sockaddr *addr);
 /** Port. */
 KR_EXPORT KR_PURE
 uint16_t kr_inaddr_port(const struct sockaddr *addr);
@@ -272,23 +286,20 @@ static inline uint8_t KEY_FLAG_RANK(const char *key)
 static inline bool KEY_COVERING_RRSIG(const char *key)
 	{ return ((uint8_t)(key[0])) & KEY_FLAG_RRSIG; }
 
-/* Stash key = {[1] flags, [1-255] owner, [5] type, [1] \x00 } */
-#define KR_RRKEY_LEN (9 + KNOT_DNAME_MAXLEN)
+/* Stash key = {[5] class, [1-255] owner, [5] type, [5] additional, [1] \x00 } */
+#define KR_RRKEY_LEN (16 + KNOT_DNAME_MAXLEN)
 /** Create unique null-terminated string key for RR.
   * @param key Destination buffer for key size, MUST be KR_RRKEY_LEN or larger.
-  * @param owner RR owner domain name.
+  * @param class RR class.
+  * @param owner RR owner name.
   * @param type RR type.
-  * @param rank RR rank (8 bit tag usable for anything).
+  * @param additional flags (for instance can be used for storing covered type
+  *	   when RR type is RRSIG).
   * @return key length if successful or an error
   * */
 KR_EXPORT
-int kr_rrkey(char *key, const knot_dname_t *owner, uint16_t type, uint8_t rank);
-
-/** @internal Merges RRSets with matching owner name and type together.
- * @note RRSIG RRSets are merged according the type covered fields.
- * @return 0 or an error
- */
-int kr_rrmap_add(map_t *stash, const knot_rrset_t *rr, uint8_t rank, knot_mm_t *pool);
+int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
+	     uint16_t type, uint16_t additional);
 
 /** @internal Add RRSet copy to ranked RR array. */
 KR_EXPORT

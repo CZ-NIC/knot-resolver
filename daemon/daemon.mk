@@ -7,6 +7,7 @@ kresd_SOURCES := \
 	daemon/ffimodule.c   \
 	daemon/tls.c         \
 	daemon/tls_ephemeral_credentials.c \
+	daemon/zimport.c     \
 	daemon/main.c
 
 kresd_DIST := daemon/lua/kres.lua daemon/lua/kres-gen.lua \

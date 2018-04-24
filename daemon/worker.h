@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <gnutls/gnutls.h>
+
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
@@ -27,6 +29,8 @@ struct qr_task;
 struct worker_ctx;
 /** Transport session (opaque). */
 struct session;
+/** Zone import context (opaque). */
+struct zone_import_ctx;
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
@@ -88,7 +92,12 @@ void *worker_iohandle_borrow(struct worker_ctx *worker);
 
 void worker_iohandle_release(struct worker_ctx *worker, void *h);
 
+ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
 
+ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
+
+/** Finalize given task */
+int worker_task_finalize(struct qr_task *task, int state);
 
 /** @cond internal */
 
@@ -129,6 +138,7 @@ struct worker_ctx {
 		size_t rconcurrent;
 		size_t udp;
 		size_t tcp;
+		size_t tls;
 		size_t ipv4;
 		size_t ipv6;
 		size_t queries;
@@ -136,13 +146,15 @@ struct worker_ctx {
 		size_t timeout;
 	} stats;
 
+	struct zone_import_ctx* z_import;
 	bool too_many_open;
 	size_t rconcurrent_highwatermark;
-	/* List of active outbound TCP sessions */
+	/** List of active outbound TCP sessions */
 	map_t tcp_connected;
-	/* List of outbound TCP sessions waiting to be accepted */
+	/** List of outbound TCP sessions waiting to be accepted */
 	map_t tcp_waiting;
-	map_t outgoing;
+	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
+	trie_t *subreq_out;
 	mp_freelist_t pool_mp;
 	mp_freelist_t pool_ioreqs;
 	mp_freelist_t pool_sessions;

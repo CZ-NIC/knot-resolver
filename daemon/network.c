@@ -265,23 +265,17 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 	} else {
 		return kr_error(EAFNOSUPPORT);
 	}
-	/* Fetch or create endpoint for this fd */
-	size_t index = 0;
-	endpoint_array_t *ep_array = network_get(net, addr_str, port, &index);
-	if (!ep_array) {
-		struct endpoint *ep = malloc(sizeof(*ep));
-		memset(ep, 0, sizeof(*ep));
-		ep->flags = NET_DOWN;
-		ep->port = port;
-		ret = insert_endpoint(net, addr_str, ep);
-		if (ret != 0) {
-			return ret;
-		}
-		ep_array = network_get(net, addr_str, port, &index);
+
+	/* always create endpoint for supervisor supplied fd
+	 * even if addr+port is not unique */
+	struct endpoint *ep = malloc(sizeof(*ep));
+	memset(ep, 0, sizeof(*ep));
+	ep->flags = NET_DOWN;
+	ep->port = port;
+	ret = insert_endpoint(net, addr_str, ep);
+	if (ret != 0) {
+		return ret;
 	}
-	/* Open fd in found/created endpoint. */
-	struct endpoint *ep = ep_array->at[index];
-	assert(ep != NULL);
 	/* Create a libuv struct for this socket. */
 	return open_endpoint_fd(net, ep, fd, sock_type, use_tls);
 }

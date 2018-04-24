@@ -1,3 +1,78 @@
+Knot Resolver 2.3.0 (2018-04-23)
+================================
+
+Security
+--------
+- fix CVE-2018-1110: denial of service triggered by malformed DNS messages
+  (!550, !558, security!2, security!4)
+- increase resilience against slow lorris attack (security!5)
+
+Bugfixes
+--------
+- validation: fix SERVFAIL in case of CNAME to NXDOMAIN in a single zone (!538)
+- validation: fix SERVFAIL for DS . query (!544)
+- lib/resolve: don't send unecessary queries to parent zone (!513)
+- iterate: fix validation for zones where parent and child share NS (!543)
+- TLS: improve error handling and documentation (!536, !555, !559)
+
+Improvements
+------------
+- prefill: new module to periodically import root zone into cache
+  (replacement for RFC 7706, !511)
+- network_listen_fd: always create end point for supervisor supplied file descriptor
+- use CPPFLAGS build environment variable if set (!547)
+
+
+Knot Resolver 2.2.0 (2018-03-28)
+================================
+
+New features
+------------
+- cache server unavailability to prevent flooding unreachable servers
+  (Please note that caching algorithm needs further optimization
+   and will change in further versions but we need to gather operational
+   experience first.)
+
+Bugfixes
+--------
+- don't magically -D_FORTIFY_SOURCE=2 in some cases
+- allow large responses for outbound over TCP
+- fix crash with RR sets with over 255 records
+
+
+Knot Resolver 2.1.1 (2018-02-23)
+================================
+
+Bugfixes
+--------
+- when iterating, avoid unnecessary queries for NS in insecure parent.
+  This problem worsened in 2.0.0. (#246)
+- prevent UDP packet leaks when using TLS forwarding
+- fix the hints module also on some other systems, e.g. Gentoo.
+
+
+Knot Resolver 2.1.0 (2018-02-16)
+================================
+
+Incompatible changes
+--------------------
+- stats: remove tracking of expiring records (predict uses another way)
+- systemd: re-use a single kresd.socket and kresd-tls.socket
+- ta_sentinel: implement protocol draft-ietf-dnsop-kskroll-sentinel-01
+  (our draft-ietf-dnsop-kskroll-sentinel-00 implementation had inverted logic)
+- libknot: require version 2.6.4 or newer to get bugfixes for DNS-over-TLS
+
+Bugfixes
+--------
+- detect_time_jump module: don't clear cache on suspend-resume (#284)
+- stats module: fix stats.list() returning nothing, regressed in 2.0.0
+- policy.TLS_FORWARD: refusal when configuring with multiple IPs (#306)
+- cache: fix broken refresh of insecure records that were about to expire
+- fix the hints module on some systems, e.g. Fedora (came back on 2.0.0)
+- build with older gnutls (conditionally disable features)
+- fix the predict module to work with insecure records & cleanup code
+
+
 Knot Resolver 2.0.0 (2018-01-31)
 ================================
 
@@ -217,7 +292,7 @@ Improvements
 ------------
 - major feature: support for forwarding with validation (#112).
   The old policy.FORWARD action now does that; the previous non-validating
-  mode is still avaliable as policy.STUB except that also uses caching (#122).
+  mode is still available as policy.STUB except that also uses caching (#122).
 - command line: specify ports via @ but still support # for compatibility
 - policy: recognize 100.64.0.0/10 as local addresses
 - layer/iterate: *do* retry repeatedly if REFUSED, as we can't yet easily
@@ -398,8 +473,8 @@ Bugfixes:
 - Free TCP buffer on cancelled connection.
 - Fix crash in hints module on empty hints file, and fix non-lowercase hints.
 
-Miscelaneous:
--------------
+Miscellaneous:
+--------------
 - It now requires knot >= 2.3.1 to link successfully.
 - The API+ABI for modules changed slightly.
 - New LRU implementation.

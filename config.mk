@@ -1,9 +1,9 @@
 # Project
 MAJOR := 2
-MINOR := 0
+MINOR := 3
 PATCH := 0
 EXTRA :=
-ABIVER := 5
+ABIVER := 7
 BUILDMODE := dynamic
 HARDENING := yes
 
@@ -34,7 +34,7 @@ INSTALL := install
 
 # Flags
 BUILD_LDFLAGS += $(LDFLAGS)
-BUILD_CFLAGS := $(CFLAGS) -std=c99 -D_GNU_SOURCE
+BUILD_CFLAGS := $(CFLAGS) $(CPPFLAGS) -std=c99 -D_GNU_SOURCE
 BUILD_CFLAGS += -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall
 BUILD_CFLAGS += -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
 BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
@@ -42,7 +42,4 @@ BUILD_CFLAGS += -fvisibility=hidden
 
 ifeq (,$(findstring -O,$(CFLAGS)))
 	BUILD_CFLAGS += -O2
-endif
-ifeq (,$(findstring -fsanitize=address,$(CFLAGS)))
-	BUILD_CFLAGS += -D_FORTIFY_SOURCE=2
 endif

@@ -75,24 +75,38 @@ typedef array_t(uint8_t) pack_t;
 /** Zero-initialize the pack. */
 #define pack_init(pack) \
 	array_init(pack)
-/** Free and the pack. */
+
+/** Make the pack empty and free pointed-to memory (plain malloc/free). */
 #define pack_clear(pack) \
 	array_clear(pack)
-/** @internal Clear pack with a callback. */
+
+/** Make the pack empty and free pointed-to memory.
+ * Mempool usage: pass mm_free and a knot_mm_t* . */
 #define pack_clear_mm(pack, free, baton) \
 	array_clear_mm((pack), (free), (baton))
-/** Incrementally reserve objects in the pack. */
+
+/** Reserve space for *additional* objects in the pack (plain malloc/free).
+ * @return 0 if success, <0 on failure */
 #define pack_reserve(pack, objs_count, objs_len) \
 	pack_reserve_mm((pack), (objs_count), (objs_len), array_std_reserve, NULL)
-/** @internal Reservation with a callback. */
+
+/** Reserve space for *additional* objects in the pack.
+ * Mempool usage: pass kr_memreserve and a knot_mm_t* .
+ * @return 0 if success, <0 on failure */
 #define pack_reserve_mm(pack, objs_count, objs_len, reserve, baton) \
 	array_reserve_mm((pack), (pack).len + (sizeof(pack_objlen_t)*(objs_count) + (objs_len)), (reserve), (baton))
-/** Return pointer to first packed object. */
+
+/** Return pointer to first packed object.
+ *
+ * Recommended way to iterate:
+ *   for (uint8_t *it = pack_head(pack); it != pack_tail(pack); it = pack_obj_next(it))
+ */
 #define pack_head(pack) \
-	((pack).len > 0 ? &((pack).at[0]) : NULL)
+	(&(pack).at[0])
+
 /** Return pack end pointer. */
 #define pack_tail(pack) \
-	&((pack).at[(pack).len])
+	(&(pack).at[(pack).len])
 
 /** Return packed object length. */
 static inline pack_objlen_t pack_obj_len(uint8_t *it)
@@ -137,9 +151,13 @@ static inline uint8_t *pack_last(pack_t pack)
   */
 static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
+	if (pack == NULL || obj == NULL) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
 	size_t packed_len = len + sizeof(len);
-	if (pack == NULL || (pack->len + packed_len) > pack->cap) {
-		return -1;
+	if (pack->len + packed_len > pack->cap) {
+		return kr_error(ENOSPC);
 	}
 
 	uint8_t *endp = pack_tail(*pack);
@@ -154,6 +172,10 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
   */
 static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
+		if (pack == NULL || obj == NULL) {
+			assert(false);
+			return NULL;
+		}
 		uint8_t *endp = pack_tail(*pack);
 		uint8_t *it = pack_head(*pack);
 		while (it != endp) {
@@ -171,6 +193,10 @@ static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objl
   */
 static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
+	if (pack == NULL || obj == NULL) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
 	uint8_t *endp = pack_tail(*pack);
 	uint8_t *it = pack_obj_find(pack, obj, len);
 	if (it) {
@@ -180,6 +206,32 @@ static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t l
 		return 0;
 	}
 	return -1;
+}
+
+/** Clone a pack, replacing destination pack; (*dst == NULL) is valid input.
+ * @return kr_error(ENOMEM) on allocation failure. */
+static inline int pack_clone(pack_t **dst, const pack_t *src, knot_mm_t *pool)
+{
+	if (!dst || !src) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
+	/* Get a valid pack_t. */
+	if (!*dst) {
+		*dst = mm_alloc(pool, sizeof(pack_t));
+		if (!*dst) return kr_error(ENOMEM);
+		pack_init(**dst);
+		/* Clone data only if needed */
+		if (src->len == 0) return kr_ok();
+	}
+	/* Replace the contents of the pack_t. */
+	int ret = array_reserve_mm(**dst, src->len, kr_memreserve, pool);
+	if (ret < 0) {
+		return kr_error(ENOMEM);
+	}
+	memcpy((*dst)->at, src->at, src->len);
+	(*dst)->len = src->len;
+	return kr_ok();
 }
 
 #ifdef __cplusplus

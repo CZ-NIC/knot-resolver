@@ -130,7 +130,7 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
 
 /** There may be multiple entries within, so rewind `val` to the one we want.
  *
- * ATM there are multiple types only for the NS ktype - it also accomodates xNAMEs.
+ * ATM there are multiple types only for the NS ktype - it also accommodates xNAMEs.
  * \note `val->len` represents the bound of the whole list, not of a single entry.
  * \note in case of ENOENT, `val` is still rewound to the beginning of the next entry.
  * \return error code
@@ -204,10 +204,13 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 
 /* RRset (de)materialization; implementation in ./entry_rr.c */
 
+/** Size of the RR count field */
+#define KR_CACHE_RR_COUNT_SIZE sizeof(uint16_t)
+
 /** Compute size of dematerialized rdataset.  NULL is accepted as empty set. */
 static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 {
-	return 1/*sizeof(rr_count)*/ + (rds
+	return KR_CACHE_RR_COUNT_SIZE + (rds
 		? knot_rdataset_size(rds) - 4 * rds->rr_count /*TTLs*/
 		: 0);
 }

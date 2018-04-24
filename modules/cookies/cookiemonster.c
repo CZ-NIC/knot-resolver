@@ -355,6 +355,10 @@ int check_request(kr_layer_t *ctx)
 	struct kr_request *req = ctx->req;
 	struct kr_cookie_settings *srvr_sett = &req->ctx->cookie_ctx.srvr;
 
+	if (!srvr_sett->enabled) {
+		return ctx->state;
+	}
+
 	knot_pkt_t *answer = req->answer;
 
 	if (ctx->state & (KR_STATE_DONE | KR_STATE_FAIL)) {

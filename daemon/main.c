@@ -364,7 +364,7 @@ static void help(int argc, char *argv[])
 	       " -K, --keyfile-ro=[path] File with read-only root domain trust anchors, for use with an external updater.\n"
 	       " -m, --moduledir=[path] Override the default module path (" MODULEDIR ").\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
-	       " -q, --quiet            Quiet output, no prompt in interactive mode.\n"
+	       " -q, --quiet            No command prompt in interactive mode.\n"
 	       " -v, --verbose          Run in verbose mode."
 #ifdef NOVERBOSELOG
 	           " (Recompile without -DNOVERBOSELOG to activate.)"

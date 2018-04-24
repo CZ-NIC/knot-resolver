@@ -38,7 +38,8 @@ modules_TARGETS += etcd \
                    priming \
                    serve_stale \
                    detect_time_skew \
-                   detect_time_jump
+                   detect_time_jump \
+                   prefill
 endif
 
 # Make C module

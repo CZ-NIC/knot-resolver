@@ -15,8 +15,6 @@ ahead of time. This is helpful to minimize the perceived latency and keeps the c
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-.. warning:: This module requires 'stats' module to be present and loaded.
-
 .. code-block:: lua
 
 	modules = {
@@ -29,7 +27,9 @@ Example configuration
 Defaults are 15 minutes window, 6 hours period.
 
 .. tip:: Use period 0 to turn off prediction and just do prefetching of expiring records.
-    That works even without the 'stats' module.
+    That works even without the :ref:`stats <mod-stats>` module.
+
+.. note:: Otherwise this module requires :ref:`stats <mod-stats>` module and loads it if not present.
 
 Exported metrics
 ^^^^^^^^^^^^^^^^
@@ -45,7 +45,7 @@ Properties
 ^^^^^^^^^^
 
 .. function:: predict.config({ window = 15, period = 24})
-  
+
   Reconfigure the predictor to given tracking window and period length. Both parameters are optional.
   Window length is in minutes, period is a number of windows that can be kept in memory.
   e.g. if a ``window`` is 15 minutes, a ``period`` of "24" means 6 hours.

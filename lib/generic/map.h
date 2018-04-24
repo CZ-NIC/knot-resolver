@@ -96,7 +96,9 @@ void map_clear(map_t *map);
 	map_walk_prefixed((map), "", (callback), (baton))
 
 /**
- * Calls callback for all strings in map with the given prefix
+ * Calls callback for all strings in map with the given prefix.
+ * Returns value immediately if a callback returns nonzero.
+ *
  * @param map
  * @param prefix   required string prefix (empty => all strings)
  * @param callback callback parameters are (key, value, baton)

@@ -57,6 +57,7 @@ typedef void (*trace_callback_f)(struct kr_request *);
 	struct ranked_rr_array_entry
 	ranked_rr_array_entry_t
 	ranked_rr_array_t
+	trie_t
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan
@@ -80,11 +81,11 @@ genResType "struct knot_rrset" | sed 's/\<owner\>/_owner/'
 ## Some definitions would need too many deps, so shorten them.
 
 genResType "struct kr_nsrep" | sed '/union/,$ d'
-printf "\t/* beware: hidden stub */\n};\n"
+printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 genResType "struct kr_query"
 
-genResType "struct kr_context" | sed '/kr_nsrep_lru_t/,$ d'
+genResType "struct kr_context" | sed '/kr_nsrep_rtt_lru_t/,$ d'
 printf "\tchar _stub[];\n};\n"
 
 ## libknot API
@@ -143,6 +144,7 @@ EOF
 	kr_inaddr
 	kr_inaddr_family
 	kr_inaddr_len
+	kr_sockaddr_len
 	kr_inaddr_port
 	kr_straddr_family
 	kr_straddr_subnet
@@ -152,8 +154,8 @@ EOF
 	kr_ranked_rrarray_add
 	kr_qflags_set
 	kr_qflags_clear
-	kr_query_set_stale_cb
 	kr_zonecut_add
+	kr_zonecut_is_empty
 	kr_zonecut_set
 	kr_now
 # Trust anchors

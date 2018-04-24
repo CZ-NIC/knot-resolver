@@ -35,6 +35,7 @@
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
+#include "daemon/zimport.h"
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "wrkr", fmt)
 
@@ -367,8 +368,12 @@ static void session_close(struct session *session)
 	if (!uv_is_closing((uv_handle_t *)&session->timeout)) {
 		uv_timer_stop(&session->timeout);
 		if (session->tls_client_ctx) {
-			tls_client_close(session->tls_client_ctx);
+			tls_close(&session->tls_client_ctx->c);
 		}
+		if (session->tls_ctx) {
+			tls_close(&session->tls_ctx->c);
+		}
+
 		session->timeout.data = session;
 		uv_close((uv_handle_t *)&session->timeout, on_session_timer_close);
 	}
@@ -480,11 +485,16 @@ static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)
 	}
 }
 
-/** @internal Get key from current outgoing subrequest. */
+/** Create a key for an outgoing subrequest: qname, qclass, qtype.
+ * @param key Destination buffer for key size, MUST be SUBREQ_KEY_LEN or larger.
+ * @return key length if successful or an error
+ */
+static const size_t SUBREQ_KEY_LEN = KR_RRKEY_LEN;
 static int subreq_key(char *dst, knot_pkt_t *pkt)
 {
 	assert(pkt);
-	return kr_rrkey(dst, knot_pkt_qname(pkt), knot_pkt_qtype(pkt), knot_pkt_qclass(pkt));
+	return kr_rrkey(dst, knot_pkt_qclass(pkt), knot_pkt_qname(pkt),
+			knot_pkt_qtype(pkt), knot_pkt_qtype(pkt));
 }
 
 /** Create and initialize a request_ctx (on a fresh mempool).
@@ -816,14 +826,7 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 			if (session->waiting.len > 0) {
 				struct qr_task *t = session->waiting.at[0];
 				int ret = qr_task_send(t, handle, &session->peer.ip, t->pktbuf);
-				if (ret == kr_ok()) {
-					uv_timer_t *timer = &session->timeout;
-					uv_timer_stop(timer);
-					session->timeout.data = session;
-					timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
-				} else {
-					uv_timer_t *timer = &session->timeout;
-					uv_timer_stop(timer);
+				if (ret != kr_ok()) {
 					while (session->waiting.len > 0) {
 						struct qr_task *t = session->waiting.at[0];
 						if (session->outgoing) {
@@ -870,7 +873,7 @@ static void on_send(uv_udp_send_t *req, int status)
 	iorequest_release(worker, req);
 }
 
-static void on_write(uv_write_t *req, int status)
+static void on_task_write(uv_write_t *req, int status)
 {
 	uv_handle_t *handle = (uv_handle_t *)(req->handle);
 	uv_loop_t *loop = handle->loop;
@@ -882,7 +885,88 @@ static void on_write(uv_write_t *req, int status)
 	iorequest_release(worker, req);
 }
 
-static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockaddr *addr, knot_pkt_t *pkt)
+static void on_nontask_write(uv_write_t *req, int status)
+{
+	uv_handle_t *handle = (uv_handle_t *)(req->handle);
+	uv_loop_t *loop = handle->loop;
+	struct worker_ctx *worker = loop->data;
+	assert(worker == get_worker());
+	iorequest_release(worker, req);
+}
+
+ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
+{
+	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
+	const uv_buf_t uv_buf[1] = {
+		{ (char *)buf, len }
+	};
+
+	if (t == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	assert(t->session && t->session->handle &&
+	       t->session->handle->type == UV_TCP);
+
+	VERBOSE_MSG(NULL,"[%s] push %zu <%p>\n",
+		    t->client_side ? "tls_client" : "tls", len, h);
+
+	struct worker_ctx *worker = t->worker;
+	assert(worker);
+
+	void *ioreq = worker_iohandle_borrow(worker);
+	if (!ioreq) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	uv_write_t *write_req = (uv_write_t *)ioreq;
+
+	struct qr_task *task = t->task;
+	uv_write_cb write_cb = on_task_write;
+	if (t->handshake_state == TLS_HS_DONE) {
+		assert(task);
+	} else {
+		task = NULL;
+		write_cb = on_nontask_write;
+	}
+
+	write_req->data = task;
+
+	ssize_t ret = -1;
+	int res = uv_write(write_req, (uv_stream_t *)t->session->handle, uv_buf, 1, write_cb);
+	if (res == 0) {
+		if (task) {
+			qr_task_ref(task); /* Pending ioreq on current task */
+			struct request_ctx *ctx = task->ctx;
+			if (ctx && ctx->source.session &&
+			    t->session->handle != ctx->source.session->handle) {
+				struct sockaddr *addr = &t->session->peer.ip;
+				worker->stats.tls += 1;
+				if (addr->sa_family == AF_INET6)
+					worker->stats.ipv6 += 1;
+				else if (addr->sa_family == AF_INET)
+					worker->stats.ipv4 += 1;
+			}
+		}
+		if (worker->too_many_open &&
+		    worker->stats.rconcurrent <
+			worker->rconcurrent_highwatermark - 10) {
+			worker->too_many_open = false;
+		}
+		ret = len;
+	} else {
+		VERBOSE_MSG(NULL,"[%s] uv_write: %s\n",
+			    t->client_side ? "tls_client" : "tls", uv_strerror(res));
+		iorequest_release(worker, ioreq);
+		errno = EIO;
+	}
+	return ret;
+}
+
+static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
+			struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	if (!handle) {
 		return qr_task_on_send(task, handle, kr_error(EIO));
@@ -893,18 +977,14 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	assert(session->closing == false);
 	if (session->has_tls) {
 		struct kr_request *req = &task->ctx->req;
-		int ret = kr_ok();
-		if (!session->outgoing) {
-			ret = tls_push(task, handle, pkt);
-		} else {
-			ret = kr_resolve_checkout(req, NULL, addr,
-					          SOCK_STREAM, pkt);
+		if (session->outgoing) {
+			int ret = kr_resolve_checkout(req, NULL, addr,
+						      SOCK_STREAM, pkt);
 			if (ret != kr_ok()) {
 				return ret;
 			}
-			ret = tls_client_push(task, handle, pkt);
 		}
-		return qr_task_on_send(task, handle, ret);
+		return tls_push(task, handle, pkt);
 	}
 
 	int ret = 0;
@@ -950,7 +1030,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 			{ (char *)pkt->wire, pkt->size }
 		};
 		write_req->data = task;
-		ret = uv_write(write_req, (uv_stream_t *)handle, buf, 2, &on_write);
+		ret = uv_write(write_req, (uv_stream_t *)handle, buf, 2, &on_task_write);
 	} else {
 		assert(false);
 	}
@@ -994,50 +1074,48 @@ static int session_next_waiting_send(struct session *session)
 		struct qr_task *task = session->waiting.at[0];
 		ret = qr_task_send(task, session->handle, &peer->ip, task->pktbuf);
 	}
-	session->timeout.data = session;
-	timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 	return ret;
 }
 
 static int session_tls_hs_cb(struct session *session, int status)
 {
-	VERBOSE_MSG(NULL, "=> server: '%s' TLS handshake has %s\n",
-		    kr_straddr(&session->peer.ip), status ? "failed" : "completed");
-
 	struct worker_ctx *worker = get_worker();
 	union inaddr *peer = &session->peer;
 	int deletion_res = worker_del_tcp_waiting(worker, &peer->ip);
 
 	if (status) {
-		for (size_t i = 0; i < session->waiting.len; ++i) {
-			struct qr_task *task = session->waiting.at[0];
-			struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
-			kr_nsrep_update_rtt(&qry->ns, &peer->ip, KR_NS_TIMEOUT,
-					    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
-		}
-	} else {
-		if (deletion_res != 0) {
-			/* session isn't in list of waiting queries, *
-			 * something gone wrong */
-			while (session->waiting.len > 0) {
-				struct qr_task *task = session->waiting.at[0];
-				session_del_tasks(session, task);
-				array_del(session->waiting, 0);
-				qr_task_finalize(task, KR_STATE_FAIL);
-				qr_task_unref(task);
-			}
-			assert(session->tasks.len == 0);
-			session_close(session);
-			return kr_ok();
-		}
+		kr_nsrep_update_rtt(NULL, &peer->ip, KR_NS_DEAD,
+				    worker->engine->resolver.cache_rtt,
+				    KR_NS_UPDATE_NORESET);
+		return kr_ok();
+	}
 
-		int ret = session_next_waiting_send(session);
-		if (ret == kr_ok()) {
-			struct worker_ctx *worker = get_worker();
-			union inaddr *peer = &session->peer;
-			int ret = worker_add_tcp_connected(worker, &peer->ip, session);
-			assert(ret == 0);
+	int ret = worker_add_tcp_connected(worker, &peer->ip, session);
+	if (deletion_res == kr_ok() && ret == kr_ok()) {
+		ret = session_next_waiting_send(session);
+	} else {
+		ret = kr_error(EINVAL);
+	}
+
+	if (ret != kr_ok()) {
+		/* Something went wrong.
+		 * Session isn't in the list of waiting sessions,
+		 * or addition to the list of connected sessions failed,
+		 * or write to upstream failed. */
+		while (session->waiting.len > 0) {
+			struct qr_task *task = session->waiting.at[0];
+			session_del_tasks(session, task);
+			array_del(session->waiting, 0);
+			qr_task_finalize(task, KR_STATE_FAIL);
+			qr_task_unref(task);
 		}
+		worker_del_tcp_connected(worker, &peer->ip);
+		assert(session->tasks.len == 0);
+		session_close(session);
+	} else {
+		uv_timer_stop(&session->timeout);
+		session->timeout.data = session;
+		timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 	}
 	return kr_ok();
 }
@@ -1061,9 +1139,7 @@ static void on_connect(uv_connect_t *req, int status)
 	struct worker_ctx *worker = get_worker();
 	uv_stream_t *handle = req->handle;
 	struct session *session = handle->data;
-
 	union inaddr *peer = &session->peer;
-	uv_timer_stop(&session->timeout);
 
 	if (status == UV_ECANCELED) {
 		worker_del_tcp_waiting(worker, &peer->ip);
@@ -1078,6 +1154,8 @@ static void on_connect(uv_connect_t *req, int status)
 		iorequest_release(worker, req);
 		return;
 	}
+
+	uv_timer_stop(&session->timeout);
 
 	if (status != 0) {
 		worker_del_tcp_waiting(worker, &peer->ip);
@@ -1105,6 +1183,8 @@ static void on_connect(uv_connect_t *req, int status)
 				struct qr_task *task = session->waiting.at[0];
 				session_del_tasks(session, task);
 				array_del(session->waiting, 0);
+				ioreq_kill_pending(task);
+				assert(task->pending_count == 0);
 				qr_task_finalize(task, KR_STATE_FAIL);
 				qr_task_unref(task);
 			}
@@ -1141,6 +1221,7 @@ static void on_connect(uv_connect_t *req, int status)
 	if (ret == kr_ok()) {
 		ret = session_next_waiting_send(session);
 		if (ret == kr_ok()) {
+			timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 			worker_add_tcp_connected(worker, &session->peer.ip, session);
 			iorequest_release(worker, req);
 			return;
@@ -1151,6 +1232,8 @@ static void on_connect(uv_connect_t *req, int status)
 		struct qr_task *task = session->waiting.at[0];
 		session_del_tasks(session, task);
 		array_del(session->waiting, 0);
+		ioreq_kill_pending(task);
+		assert(task->pending_count == 0);
 		qr_task_finalize(task, KR_STATE_FAIL);
 		qr_task_unref(task);
 	}
@@ -1180,6 +1263,10 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 		VERBOSE_MSG(qry, "=> connection to '%s' failed\n", addr_str);
 	}
 
+	kr_nsrep_update_rtt(NULL, &peer->ip, KR_NS_DEAD,
+			    worker->engine->resolver.cache_rtt,
+			    KR_NS_UPDATE_NORESET);
+
 	while (session->waiting.len > 0) {
 		struct qr_task *task = session->waiting.at[0];
 		struct request_ctx *ctx = task->ctx;
@@ -1204,7 +1291,6 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 	assert(session->outgoing);
 	uv_timer_stop(timer);
 	struct worker_ctx *worker = get_worker();
-
 	if (session->outgoing) {
 		if (session->has_tls) {
 			worker_del_tcp_waiting(worker, &session->peer.ip);
@@ -1217,6 +1303,8 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 			worker->stats.timeout += 1;
 			array_del(session->waiting, 0);
 			session_del_tasks(session, task);
+			ioreq_kill_pending(task);
+			assert(task->pending_count == 0);
 			qr_task_finalize(task, KR_STATE_FAIL);
 			qr_task_unref(task);
 		}
@@ -1228,6 +1316,8 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 		worker->stats.timeout += 1;
 		assert(task->refs > 1);
 		array_del(session->tasks, 0);
+		ioreq_kill_pending(task);
+		assert(task->pending_count == 0);
 		qr_task_finalize(task, KR_STATE_FAIL);
 		qr_task_unref(task);
 	}
@@ -1260,8 +1350,9 @@ static void on_udp_timeout(uv_timer_t *timer)
 				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
 				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
 			}
-			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_TIMEOUT,
-					    worker->engine->resolver.cache_rtt, KR_NS_UPDATE);
+			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_DEAD,
+					    worker->engine->resolver.cache_rtt,
+					    KR_NS_UPDATE_NORESET);
 		}
 	}
 	task->timeouts += 1;
@@ -1339,11 +1430,12 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 	/* Clear from outgoing table. */
 	if (!task->leading)
 		return;
-	char key[KR_RRKEY_LEN];
-	int ret = subreq_key(key, task->pktbuf);
-	if (ret > 0) {
-		assert(map_get(&task->ctx->worker->outgoing, key) == task);
-		map_del(&task->ctx->worker->outgoing, key);
+	char key[SUBREQ_KEY_LEN];
+	const int klen = subreq_key(key, task->pktbuf);
+	if (klen > 0) {
+		void *val_deleted;
+		int ret = trie_del(task->ctx->worker->subreq_out, key, klen, &val_deleted);
+		assert(ret == KNOT_EOK && val_deleted == task);
 	}
 	/* Notify waiting tasks. */
 	struct kr_query *leader_qry = array_tail(task->ctx->req.rplan.pending);
@@ -1366,33 +1458,42 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 static void subreq_lead(struct qr_task *task)
 {
 	assert(task);
-	char key[KR_RRKEY_LEN];
-	if (subreq_key(key, task->pktbuf) > 0) {
-		assert(map_contains(&task->ctx->worker->outgoing, key) == false);
-		map_set(&task->ctx->worker->outgoing, key, task);
-		task->leading = true;
+	char key[SUBREQ_KEY_LEN];
+	const int klen = subreq_key(key, task->pktbuf);
+	if (klen < 0)
+		return;
+	struct qr_task **tvp = (struct qr_task **)
+		trie_get_ins(task->ctx->worker->subreq_out, key, klen);
+	if (unlikely(!tvp))
+		return; /*ENOMEM*/
+	if (unlikely(*tvp != NULL)) {
+		assert(false);
+		return;
 	}
+	*tvp = task;
+	task->leading = true;
 }
 
 static bool subreq_enqueue(struct qr_task *task)
 {
 	assert(task);
-	char key[KR_RRKEY_LEN];
-	if (subreq_key(key, task->pktbuf) > 0) {
-		struct qr_task *leader = map_get(&task->ctx->worker->outgoing, key);
-		if (leader) {
-			/* Enqueue itself to leader for this subrequest. */
-			int ret = array_reserve_mm(leader->waiting, leader->waiting.len + 1,
-						   kr_memreserve, &leader->ctx->req.pool);
-			if (ret == 0) {
-				array_push(leader->waiting, task);
-				qr_task_ref(task);
-				return true;
-			}
-		}
-	}
-	return false;
+	char key[SUBREQ_KEY_LEN];
+	const int klen = subreq_key(key, task->pktbuf);
+	if (klen < 0)
+		return false;
+	struct qr_task **leader = (struct qr_task **)
+		trie_get_try(task->ctx->worker->subreq_out, key, klen);
+	if (!leader /*ENOMEM*/ || !*leader)
+		return false;
+	/* Enqueue itself to leader for this subrequest. */
+	int ret = array_push_mm((*leader)->waiting, task,
+				kr_memreserve, &(*leader)->ctx->req.pool);
+	if (unlikely(ret < 0)) /*ENOMEM*/
+		return false;
+	qr_task_ref(task);
+	return true;
 }
+
 
 static int qr_task_finalize(struct qr_task *task, int state)
 {
@@ -1403,23 +1504,28 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	struct request_ctx *ctx = task->ctx;
 	kr_resolve_finish(&ctx->req, state);
 	task->finished = true;
-	/* Send back answer */
-	if (ctx->source.session != NULL) {
-		uv_handle_t *handle = ctx->source.session->handle;
-		assert(ctx->source.session->closing == false);
-		assert(handle && handle->data == ctx->source.session);
-		assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
-		(void) qr_task_send(task, handle,
-				    (struct sockaddr *)&ctx->source.addr,
-				    ctx->req.answer);
-		if (handle->type == UV_TCP) {
-			/* Don't try to close source session at least
-			 * retry_interval_for_timeout_timer milliseconds */
-			uv_timer_again(&ctx->source.session->timeout);
-		}
-	} else {
+	if (ctx->source.session == NULL) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
+		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 	}
+
+	/* Send back answer */
+	struct session *source_session = ctx->source.session;
+	uv_handle_t *handle = source_session->handle;
+	assert(source_session->closing == false);
+	assert(handle && handle->data == ctx->source.session);
+	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
+	int res = qr_task_send(task, handle,
+			       (struct sockaddr *)&ctx->source.addr,
+			        ctx->req.answer);
+	if (res != kr_ok()) {
+		(void) qr_task_on_send(task, NULL, kr_error(EIO));
+	} else if (handle->type == UV_TCP) {
+		/* Don't try to close source session at least
+		 * retry_interval_for_timeout_timer milliseconds */
+		uv_timer_again(&ctx->source.session->timeout);
+	}
+
 	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 }
 
@@ -1546,6 +1652,9 @@ static int qr_task_step(struct qr_task *task,
 				subreq_finalize(task, packet_source, packet);
 				return qr_task_finalize(task, KR_STATE_FAIL);
 			}
+			assert(task->pending_count == 0);
+			task->pending[task->pending_count] = session->handle;
+			task->pending_count += 1;
 		} else if ((session = worker_find_tcp_connected(ctx->worker, addr)) != NULL) {
 			/* Connection has been already established */
 			assert(session->outgoing);
@@ -1581,18 +1690,34 @@ static int qr_task_step(struct qr_task *task,
 				if (ret < 0) {
 					session_del_waiting(session, task);
 					session_del_tasks(session, task);
+					while (session->tasks.len != 0) {
+						struct qr_task *t = session->tasks.at[0];
+						qr_task_finalize(t, KR_STATE_FAIL);
+						session_del_tasks(session, t);
+					}
 					subreq_finalize(task, packet_source, packet);
+					session_close(session);
 					return qr_task_finalize(task, KR_STATE_FAIL);
 				}
-				ret = timer_start(session, on_tcp_watchdog_timeout,
-						  KR_CONN_RTT_MAX, 0);
+				if (session->tasks.len == 1) {
+					uv_timer_stop(&session->timeout);
+					ret = timer_start(session, on_tcp_watchdog_timeout,
+							  MAX_TCP_INACTIVITY, 0);
+				}
 				if (ret < 0) {
 					session_del_waiting(session, task);
 					session_del_tasks(session, task);
+					while (session->tasks.len != 0) {
+						struct qr_task *t = session->tasks.at[0];
+						qr_task_finalize(t, KR_STATE_FAIL);
+						session_del_tasks(session, t);
+					}
 					subreq_finalize(task, packet_source, packet);
+					session_close(session);
 					return qr_task_finalize(task, KR_STATE_FAIL);
 				}
 			}
+			assert(task->pending_count == 0);
 			task->pending[task->pending_count] = session->handle;
 			task->pending_count += 1;
 		} else {
@@ -1633,7 +1758,7 @@ static int qr_task_step(struct qr_task *task,
 			struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
 			if (entry) {
 				assert(session->tls_client_ctx == NULL);
-				struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(entry);
+				struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(entry, worker);
 				if (!tls_ctx) {
 					session_del_tasks(session, task);
 					session_del_waiting(session, task);
@@ -1924,8 +2049,14 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 
 		if (session->tls_client_ctx) {
 			/* Avoid gnutls_bye() call */
-			tls_client_set_hs_state(session->tls_client_ctx,
-						TLS_HS_NOT_STARTED);
+			tls_set_hs_state(&session->tls_client_ctx->c,
+					 TLS_HS_NOT_STARTED);
+		}
+
+		if (session->tls_ctx) {
+			/* Avoid gnutls_bye() call */
+			tls_set_hs_state(&session->tls_ctx->c,
+					 TLS_HS_NOT_STARTED);
 		}
 
 		if (session->outgoing && session->buffering) {
@@ -1974,11 +2105,6 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		}
 		session_close(session);
 		return kr_ok();
-	}
-
-	if (session->outgoing) {
-		uv_timer_stop(&session->timeout);
-		timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
 	}
 
 	if (session->bytes_to_skip) {
@@ -2080,6 +2206,16 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			/* FIXME: on high load over one connection, it's likely
 			 * that we will get multiple matches sooner or later (!) */
 			if (task) {
+				/* Make sure we can process maximum packet sizes over TCP for outbound queries.
+				 * Previous packet is allocated with mempool, so there's no need to free it manually. */
+				if (task->pktbuf->max_size < KNOT_WIRE_MAX_PKTSIZE) {
+						knot_mm_t *pool = &task->pktbuf->mm;
+						pkt_buf = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
+						if (!pkt_buf) {
+								return kr_error(ENOMEM);
+						}
+						task->pktbuf = pkt_buf;
+				}
 				knot_pkt_clear(task->pktbuf);
 				assert(task->leading == false);
 			} else	{
@@ -2155,23 +2291,34 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		session->buffering = NULL;
 		session->msg_hdr_idx = 0;
 		if (session->outgoing) {
+			assert ((task->pending_count == 1) && (task->pending[0] == session->handle));
+			task->pending_count = 0;
 			session_del_tasks(session, task);
 		}
 		/* Parse the packet and start resolving complete query */
 		int ret = parse_packet(pkt_buf);
-		if (ret == 0 && !session->outgoing) {
-			/* Start only new queries,
-			 * not subrequests that are already pending */
-			ret = request_start(task->ctx, pkt_buf);
-			assert(ret == 0);
-			if (ret == 0) {
-				ret = qr_task_register(task, session);
-			}
-			if (ret == 0) {
-				submitted += 1;
-			}
-			if (task->leading) {
-				assert(false);
+		if (ret == 0) {
+			if (session->outgoing) {
+				/* To prevent slow lorris attack restart watchdog only after
+				* the whole message was successfully assembled and parsed */
+				if (session->tasks.len > 0 || session->waiting.len > 0) {
+					uv_timer_stop(&session->timeout);
+					timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
+				}
+			} else {
+				/* Start only new queries,
+				 * not subrequests that are already pending */
+				ret = request_start(task->ctx, pkt_buf);
+				assert(ret == 0);
+				if (ret == 0) {
+					ret = qr_task_register(task, session);
+				}
+				if (ret == 0) {
+					submitted += 1;
+				}
+				if (task->leading) {
+					assert(false);
+				}
 			}
 		}
 		if (ret == 0) {
@@ -2242,6 +2389,11 @@ struct kr_request *worker_task_request(struct qr_task *task)
 	return &task->ctx->req;
 }
 
+int worker_task_finalize(struct qr_task *task, int state)
+{
+	return qr_task_finalize(task, state);
+}
+
 void worker_session_close(struct session *session)
 {
 	session_close(session);
@@ -2263,7 +2415,7 @@ static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 	memset(&worker->pkt_pool, 0, sizeof(worker->pkt_pool));
 	worker->pkt_pool.ctx = mp_new (4 * sizeof(knot_pkt_t));
 	worker->pkt_pool.alloc = (knot_mm_alloc_t) mp_alloc;
-	worker->outgoing = map_make(NULL);
+	worker->subreq_out = trie_create(NULL);
 	worker->tcp_connected = map_make(NULL);
 	worker->tcp_waiting = map_make(NULL);
 	worker->tcp_pipeline_max = MAX_PIPELINED;
@@ -2287,9 +2439,14 @@ void worker_reclaim(struct worker_ctx *worker)
 	reclaim_freelist(worker->pool_sessions, struct session, session_free);
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
-	map_clear(&worker->outgoing);
+	trie_free(worker->subreq_out);
+	worker->subreq_out = NULL;
 	map_clear(&worker->tcp_connected);
 	map_clear(&worker->tcp_waiting);
+	if (worker->z_import != NULL) {
+		zi_free(worker->z_import);
+		worker->z_import = NULL;
+	}
 }
 
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,

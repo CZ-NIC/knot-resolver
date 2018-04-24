@@ -84,7 +84,6 @@ struct stat_data {
 	map_t map;
 	struct {
 		namehash_t *frequent;
-		namehash_t *expiring;
 	} queries;
 	struct {
 		addrlist_t q;
@@ -124,10 +123,10 @@ static inline int collect_key(char *key, const knot_dname_t *name, uint16_t type
 {
 	memcpy(key, &type, sizeof(type));
 	int key_len = knot_dname_to_wire((uint8_t *)key + sizeof(type), name, KNOT_DNAME_MAXLEN);
-	if (key_len > 0) {
-		return key_len + sizeof(type);
+	if (key_len < 0) {
+		return kr_error(key_len);
 	}
-	return key_len;
+	return key_len + sizeof(type);
 }
 
 static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_pkt_t *pkt)
@@ -135,19 +134,19 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 	/* Sample key = {[2] type, [1-255] owner} */
 	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
 	for (size_t i = 0; i < rplan->resolved.len; ++i) {
-		/* Sample queries leading to iteration or expiring */
+		/* Sample queries leading to iteration */
 		struct kr_query *qry = rplan->resolved.at[i];
-		if ((qry->flags.CACHED) && !(qry->flags.EXPIRING)) {
+		if (qry->flags.CACHED) {
 			continue;
 		}
-		int key_len = collect_key(key, qry->sname, qry->stype);
-		if (qry->flags.EXPIRING) {
-			unsigned *count = lru_get_new(data->queries.expiring, key, key_len);
-			if (count)
-				*count += 1;
 		/* Consider 1 in N for frequent sampling. */
-		} else if (kr_rand_uint(FREQUENT_PSAMPLE) <= 1) {
-			unsigned *count = lru_get_new(data->queries.frequent, key, key_len);
+		if (kr_rand_uint(FREQUENT_PSAMPLE) <= 1) {
+			int key_len = collect_key(key, qry->sname, qry->stype);
+			if (key_len < 0) {
+				assert(false);
+				continue;
+			}
+			unsigned *count = lru_get_new(data->queries.frequent, key, key_len, NULL);
 			if (count)
 				*count += 1;
 		}
@@ -313,7 +312,7 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 	size_t args_len = args ? strlen(args) : 0;
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		struct const_metric_elm *elm = &const_metrics[i];
-		if (args && strncmp(elm->key, args, args_len) == 0) {
+		if (!args || strncmp(elm->key, args, args_len) == 0) {
 			json_append_member(root, elm->key, json_mknumber(elm->val));
 		}
 	}
@@ -367,19 +366,6 @@ static char* clear_frequent(void *env, struct kr_module *module, const char *arg
 {
 	struct stat_data *data = module->data;
 	lru_reset(data->queries.frequent);
-	return NULL;
-}
-
-static char* dump_expiring(void *env, struct kr_module *module, const char *args)
-{
-	struct stat_data *data = module->data;
-	return dump_list(env, module, args, data->queries.expiring);
-}
-
-static char* clear_expiring(void *env, struct kr_module *module, const char *args)
-{
-	struct stat_data *data = module->data;
-	lru_reset(data->queries.expiring);
 	return NULL;
 }
 
@@ -447,7 +433,6 @@ int stats_init(struct kr_module *module)
 	data->map = map_make(NULL);
 	module->data = data;
 	lru_create(&data->queries.frequent, FREQUENT_COUNT, NULL, NULL);
-	lru_create(&data->queries.expiring, FREQUENT_COUNT, NULL, NULL);
 	/* Initialize ring buffer of recently visited upstreams */
 	array_init(data->upstreams.q);
 	if (array_reserve(data->upstreams.q, UPSTREAMS_COUNT) != 0) {
@@ -467,7 +452,6 @@ int stats_deinit(struct kr_module *module)
 	if (data) {
 		map_clear(&data->map);
 		lru_free(data->queries.frequent);
-		lru_free(data->queries.expiring);
 		array_clear(data->upstreams.q);
 		free(data);
 	}
@@ -483,8 +467,6 @@ struct kr_prop *stats_props(void)
 	    { &stats_list,    "list", "List observed metrics.", },
 	    { &dump_frequent, "frequent", "List most frequent queries.", },
 	    { &clear_frequent,"clear_frequent", "Clear frequent queries log.", },
-	    { &dump_expiring, "expiring", "List expiring records.", },
-	    { &clear_expiring,"clear_expiring", "Clear expiring records log.", },
 	    { &dump_upstreams,  "upstreams", "List recently seen authoritatives.", },
 	    { NULL, NULL, NULL }
 	};

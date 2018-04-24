@@ -26,6 +26,7 @@
 #include "daemon/bindings.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
+#include "daemon/zimport.h"
 
 #define xstr(s) str(s)
 #define str(s) #s
@@ -731,20 +732,30 @@ static int cache_count(lua_State *L)
 	return 0;
 }
 
-/** Return time of last cache clear */
-static int cache_last_clear(lua_State *L)
+/** Return time of last checkpoint, or re-set it if passed `true`. */
+static int cache_checkpoint(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	struct kr_cache *cache = &engine->resolver.cache;
-	lua_newtable(L);
-	lua_pushnumber(L, cache->last_clear_monotime);
-	lua_setfield(L, -2, "monotime");
-	lua_newtable(L);
-	lua_pushnumber(L, cache->last_clear_walltime.tv_sec);
-	lua_setfield(L, -2, "sec");
-	lua_pushnumber(L, cache->last_clear_walltime.tv_usec);
-	lua_setfield(L, -2, "usec");
-	lua_setfield(L, -2, "walltime");
+
+	if (lua_gettop(L) == 0) { /* Return the current value. */
+		lua_newtable(L);
+		lua_pushnumber(L, cache->checkpoint_monotime);
+		lua_setfield(L, -2, "monotime");
+		lua_newtable(L);
+		lua_pushnumber(L, cache->checkpoint_walltime.tv_sec);
+		lua_setfield(L, -2, "sec");
+		lua_pushnumber(L, cache->checkpoint_walltime.tv_usec);
+		lua_setfield(L, -2, "usec");
+		lua_setfield(L, -2, "walltime");
+		return 1;
+	}
+
+	if (lua_gettop(L) != 1 || !lua_isboolean(L, 1) || !lua_toboolean(L, 1)) {
+		format_error(L, "cache.checkpoint() takes no parameters or a true value");
+		lua_error(L);
+	}
+	kr_cache_make_checkpoint(cache);
 	return 1;
 }
 
@@ -1107,13 +1118,130 @@ static int cache_get(lua_State *L)
 	return 1;
 }
 
+/** Set time interval for cleaning rtt cache.
+ * Servers with score >= KR_NS_TIMEOUTED will be cleaned after
+ * this interval ended up, so that they will be able to participate
+ * in NS elections again. */
+static int cache_ns_tout(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_context *ctx = &engine->resolver;
+
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 1) {
+		lua_pushinteger(L, ctx->cache_rtt_tout_retry_interval);
+		return 1;
+	}
+
+	if (!lua_isnumber(L, 1)) {
+		format_error(L, "expected 'cache.ns_tout(interval in ms)'");
+		lua_error(L);
+	}
+
+	lua_Number interval_lua = lua_tonumber(L, 1);
+	if (!(interval_lua >= 0 && interval_lua < UINT_MAX)) {
+		format_error(L, "invalid interval specified, it must be in range > 0, < " xstr(UINT_MAX));
+		lua_error(L);
+	}
+
+	ctx->cache_rtt_tout_retry_interval = interval_lua;
+	lua_pushinteger(L, ctx->cache_rtt_tout_retry_interval);
+	return 1;
+}
+
+/** Zone import completion callback.
+ * Deallocates zone import context. */
+static void cache_zone_import_cb(int state, void *param)
+{
+	assert (param);
+	(void)state;
+	struct worker_ctx *worker = (struct worker_ctx *)param;
+	assert (worker->z_import);
+	zi_free(worker->z_import);
+	worker->z_import = NULL;
+}
+
+/** Import zone from file. */
+static int cache_zone_import(lua_State *L)
+{
+	int ret = -1;
+	char msg[128];
+
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (!worker) {
+		strncpy(msg, "internal error, empty worker pointer", sizeof(msg));
+		goto finish;
+	}
+
+	if (worker->z_import && zi_import_started(worker->z_import)) {
+		strncpy(msg, "import already started", sizeof(msg));
+		goto finish;
+	}
+
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		strncpy(msg, "internal error, empty engine pointer", sizeof(msg));
+		goto finish;
+	}
+	struct kr_cache *cache = &engine->resolver.cache;
+	if (!kr_cache_is_open(cache)) {
+		strncpy(msg, "cache isn't open", sizeof(msg));
+		goto finish;
+	}
+
+	/* Check parameters */
+	int n = lua_gettop(L);
+	if (n < 1 || !lua_isstring(L, 1)) {
+		strncpy(msg, "expected 'cache.zone_import(path to zone file)'", sizeof(msg));
+		goto finish;
+	}
+
+	/* Parse zone file */
+	const char *zone_file = lua_tostring(L, 1);
+
+	const char *default_origin = NULL; /* TODO */
+	uint16_t default_rclass = 1;
+	uint32_t default_ttl = 0;
+
+	if (worker->z_import == NULL) {
+		worker->z_import = zi_allocate(worker, cache_zone_import_cb, worker);
+		if (worker->z_import == NULL) {
+			strncpy(msg, "can't allocate zone import context", sizeof(msg));
+			goto finish;
+		}
+	}
+
+	ret = zi_zone_import(worker->z_import, zone_file, default_origin,
+			     default_rclass, default_ttl);
+
+	lua_newtable(L);
+	if (ret == 0) {
+		strncpy(msg, "zone file successfully parsed, import started", sizeof(msg));
+	} else if (ret == 1) {
+		strncpy(msg, "TA not found", sizeof(msg));
+	} else {
+		strncpy(msg, "error parsing zone file", sizeof(msg));
+	}
+
+finish:
+	msg[sizeof(msg) - 1] = 0;
+	lua_newtable(L);
+	lua_pushstring(L, msg);
+	lua_setfield(L, -2, "msg");
+	lua_pushnumber(L, ret);
+	lua_setfield(L, -2, "code");
+
+	return 1;
+}
+
 int lib_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "backends", cache_backends },
 		{ "count",  cache_count },
 		{ "stats",  cache_stats },
-		{ "last_clear",  cache_last_clear },
+		{ "checkpoint", cache_checkpoint },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
 		{ "prune",  cache_prune },
@@ -1121,6 +1249,8 @@ int lib_cache(lua_State *L)
 		{ "get",    cache_get },
 		{ "max_ttl", cache_max_ttl },
 		{ "min_ttl", cache_min_ttl },
+		{ "ns_tout", cache_ns_tout },
+		{ "zone_import", cache_zone_import },
 		{ NULL, NULL }
 	};
 
@@ -1468,6 +1598,8 @@ static int wrk_stats(lua_State *L)
 	lua_setfield(L, -2, "udp");
 	lua_pushnumber(L, worker->stats.tcp);
 	lua_setfield(L, -2, "tcp");
+	lua_pushnumber(L, worker->stats.tls);
+	lua_setfield(L, -2, "tls");
 	lua_pushnumber(L, worker->stats.ipv6);
 	lua_setfield(L, -2, "ipv6");
 	lua_pushnumber(L, worker->stats.ipv4);

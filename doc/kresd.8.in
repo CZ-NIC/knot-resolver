@@ -24,7 +24,7 @@
 .IR config ]
 .RB [ \-k | \-\-keyfile
 .IR keyfile ]
-.RB [ \-K | \-\-keyfile-ro
+.RB [ \-K | \-\-keyfile\-ro
 .IR keyfile ]
 .RB [ \-m | \-\-moduledir
 .IR path ]
@@ -133,7 +133,7 @@ and warning that you need to to check the key before trusting it will be issued.
 The file contains DNSKEY/DS records in presentation format,
 and is compatible with Unbound and BIND 9 root key files.
 .TP
-.B \-K\fI keyfile\fR, \fB\-\-keyfile-ro=\fI<keyfile>
+.B \-K\fI keyfile\fR, \fB\-\-keyfile\-ro=\fI<keyfile>
 (Discouraged) Static root trust anchors file. The file is not updated by kresd. Use of this option is discouraged because it will break your installation when the trust anchor key changes!
 
 Default: "@KEYFILE_DEFAULT@" (can be empty if your distribution did not provide one)
@@ -149,10 +149,11 @@ and the kernel will load-balance between them on Linux with \fISO_REUSEPORT\fR s
 
 When socket-activated and supervised by systemd or the equivalent, kresd defaults to
 --forks=1, and must not be set to any other value.  If you want multiple concurrent
-processes supervised in this way, they should be supervised independently.
+processes supervised in this way, they should be supervised independently (see
+\fBkresd.systemd(7)\fR).
 .TP
 .B \-q\fR, \fB\-\-quiet
-Daemon will refrain from printing any informative messages, not even a prompt.
+Daemon will refrain from printing the command prompt.
 .TP
 .B \-v\fR, \fB\-\-verbose
 Increase verbosity. If given multiple times, more information is logged.

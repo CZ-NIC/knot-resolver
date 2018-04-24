@@ -212,7 +212,7 @@ int main(int argc, char ** argv)
 	p_err("\nload everything:\t");
 	time_get(&time);
 	for (size_t i = 0, ki = key_count - 1; i < run_count; ++i, --ki) {
-		unsigned *r = lru_get_new(lru, keys[ki].chars, keys[ki].len);
+		unsigned *r = lru_get_new(lru, keys[ki].chars, keys[ki].len, NULL);
 		if (!r || *r == 0)
 			++miss;
 		if (r)

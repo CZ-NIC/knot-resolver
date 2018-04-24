@@ -472,6 +472,26 @@ static int l_tojson(lua_State *L)
 	return 1;
 }
 
+static int l_fromjson(lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_pushliteral(L, "a JSON string is required");
+		lua_error(L);
+	}
+
+	const char *json_str = lua_tostring(L, 1);
+	JsonNode *root_node = json_decode(json_str);
+
+	if (!root_node) {
+		lua_pushliteral(L, "invalid JSON string");
+		lua_error(L);
+	}
+	l_unpack_json(L, root_node);
+	json_delete(root_node);
+
+	return 1;
+}
+
 /** @internal Throw Lua error if expr is false */
 #define expr_checked(expr) \
 	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_rawlen(L, -2) + 1); continue; }
@@ -585,6 +605,7 @@ static int init_resolver(struct engine *engine)
 	engine->resolver.negative_anchors = map_make(NULL);
 	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
+	engine->resolver.cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
 	engine->resolver.opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
 	if (!engine->resolver.opt_rr) {
@@ -593,9 +614,8 @@ static int init_resolver(struct engine *engine)
 	knot_edns_init(engine->resolver.opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
 	/* Use default TLS padding */
 	engine->resolver.tls_padding = -1;
-	/* Set default root hints */
+	/* Empty init; filled via ./lua/config.lua */
 	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
-	kr_zonecut_set_sbelt(&engine->resolver, &engine->resolver.root_hints);
 	/* Open NS rtt + reputation cache */
 	lru_create(&engine->resolver.cache_rtt, LRU_RTT_SIZE, engine->pool, NULL);
 	lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, engine->pool, NULL);
@@ -642,24 +662,13 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "libzscanner_SONAME");
 	lua_pushcfunction(engine->L, l_tojson);
 	lua_setglobal(engine->L, "tojson");
+	lua_pushcfunction(engine->L, l_fromjson);
+	lua_setglobal(engine->L, "fromjson");
 	lua_pushcfunction(engine->L, l_map);
 	lua_setglobal(engine->L, "map");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
-}
-
-static enum lru_apply_do update_stat_item(const char *key, uint len,
-						unsigned *rtt, void *baton)
-{
-	return *rtt > KR_NS_LONG ? LRU_APPLY_DO_EVICT : LRU_APPLY_DO_NOTHING;
-}
-/** @internal Walk RTT table, clearing all entries with bad score
- *    to compensate for intermittent network issues or temporary bad behaviour. */
-static void update_state(uv_timer_t *handle)
-{
-	struct engine *engine = handle->data;
-	lru_apply(engine->resolver.cache_rtt, update_stat_item, NULL);
 }
 
 /**
@@ -859,15 +868,6 @@ int engine_start(struct engine *engine)
 	lua_gc(engine->L, LUA_GCSETPAUSE, 400);
 	lua_gc(engine->L, LUA_GCRESTART, 0);
 
-	/* Set up periodic update function */
-	uv_timer_t *timer = malloc(sizeof(*timer));
-	if (timer) {
-		uv_timer_init(uv_default_loop(), timer);
-		timer->data = engine;
-		engine->updater = timer;
-		uv_timer_start(timer, update_state, CLEANUP_TIMER, CLEANUP_TIMER);
-	}
-
 	return kr_ok();
 }
 
@@ -875,10 +875,6 @@ void engine_stop(struct engine *engine)
 {
 	if (!engine) {
 		return;
-	}
-	if (engine->updater) {
-		uv_timer_stop(engine->updater);
-		uv_close((uv_handle_t *)engine->updater, (uv_close_cb) free);
 	}
 	uv_stop(uv_default_loop());
 }

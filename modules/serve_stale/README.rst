@@ -9,7 +9,7 @@ unable to contact upstream servers.
 By default it allows stale-ness by up to one day,
 after roughly four seconds trying to contact the servers.
 It's quite configurable/flexible; see the beginning of the module source for details.
-See also the RFC draft_ (not fully followed).
+See also the RFC draft_ (not fully followed) and :any:`cache.ns_tout`.
 
 Running
 ^^^^^^^

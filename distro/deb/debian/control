@@ -1,0 +1,141 @@
+Source: knot-resolver
+Section: net
+Priority: optional
+Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
+Uploaders:
+ Tomas Krizek <tomas.krizek@nic.cz>
+Build-Depends-Indep:
+ doxygen,
+ python3-breathe,
+ python3-sphinx,
+ python3-sphinx-rtd-theme,
+Build-Depends:
+ debhelper (>= 9~),
+ dns-root-data,
+ libcmocka-dev (>= 1.0.0),
+ libedit-dev,
+ libgeoip-dev,
+ libgnutls28-dev,
+ libhiredis-dev,
+ libjansson-dev,
+ libknot-dev (>= 2.6.4),
+ liblmdb-dev,
+ libluajit-5.1-dev,
+ libmemcached-dev,
+ libsystemd-dev (>= 227),
+ libuv1-dev,
+ luajit,
+ pkg-config,
+ python3,
+Homepage: https://www.knot-resolver.cz/
+Rules-Requires-Root: no
+
+Package: knot-resolver
+Architecture: any
+Depends:
+ adduser,
+ dns-root-data,
+ libkres7 (= ${binary:Version}),
+ lua-sec,
+ lua-socket,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Recommends:
+ knot-resolver-module-http,
+Description: caching, DNSSEC-validating DNS resolver
+ The Knot DNS Resolver is a caching full resolver implementation
+ written in C and LuaJIT, including both a resolver library and a
+ daemon. Modular architecture of the library keeps the core tiny and
+ efficient, and provides a state-machine like API for
+ extensions. There are three built-in modules - iterator, cache,
+ validator, and many external.
+ .
+ The Lua modules, switchable and shareable cache, and fast FFI
+ bindings makes it great to tap into resolution process, or be used
+ for your recursive DNS service. It's the OpenResty of DNS.
+ .
+ The server adopts a different scaling strategy than the rest of the
+ DNS recursors - no threading, shared-nothing architecture (except
+ MVCC cache that may be shared). You can start and stop additional
+ nodes depending on the contention without downtime.
+
+Package: knot-resolver-module-http
+Architecture: all
+Depends:
+ libjs-bootstrap,
+ libjs-d3,
+ libjs-jquery,
+ lua-http,
+ lua-mmdb,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Breaks:
+ knot-resolver-module-tinyweb (<< 1.1.0~git20160713-1~),
+Description: HTTP/2 module for Knot Resolver
+ The Knot DNS Resolver is a caching full resolver implementation
+ written in C and LuaJIT, including both a resolver library and a
+ daemon. Modular architecture of the library keeps the core tiny and
+ efficient, and provides a state-machine like API for
+ extensions. There are three built-in modules - iterator, cache,
+ validator, and many external.
+ .
+ This package contains HTTP/2 module for local visualization of the
+ resolver cache and queries.
+
+Package: knot-resolver-doc
+Architecture: all
+Section: doc
+Depends:
+ libjs-jquery,
+ libjs-underscore,
+ ${misc:Depends},
+Description: Documentation for Knot Resolver
+ The Knot DNS Resolver is a caching full resolver implementation
+ written in C and LuaJIT, including both a resolver library and a
+ daemon. Modular architecture of the library keeps the core tiny and
+ efficient, and provides a state-machine like API for
+ extensions. There are three built-in modules - iterator, cache,
+ validator, and many external.
+ .
+ This package contains Knot Resolver Documentation.
+
+Package: libkres7
+Architecture: any
+Section: libs
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+Breaks:
+ knot-resolver (<< 1.5.0-5),
+Replaces:
+ knot-resolver (<< 1.5.0-5),
+Description: caching, DNSSEC-validating DNS resolver (shared library)
+ The Knot DNS Resolver is a caching full resolver implementation
+ written in C and LuaJIT, including both a resolver library and a
+ daemon. Modular architecture of the library keeps the core tiny and
+ efficient, and provides a state-machine like API for
+ extensions.
+ .
+ This package contains the libkres shared library used by Knot
+ Resolver.
+
+Package: libkres-dev
+Architecture: any
+Section: libdevel
+Depends:
+ libkres7 (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Breaks:
+ knot-resolver (<< 1.5.0-5),
+Replaces:
+ knot-resolver (<< 1.5.0-5),
+Description: caching, DNSSEC-validating DNS resolver (shared library development files)
+ The Knot DNS Resolver is a caching full resolver implementation
+ written in C and LuaJIT, including both a resolver library and a
+ daemon. Modular architecture of the library keeps the core tiny and
+ efficient, and provides a state-machine like API for
+ extensions.
+ .
+ This package provides development files for use when building against
+ the libkres shared library.

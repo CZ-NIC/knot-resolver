@@ -61,7 +61,7 @@ static void test_insert(void **state)
 	int i;
 
 	for (i = 0; i < dict_size; i++) {
-		int *data = lru_get_new(lru, dict[i], KEY_LEN(dict[i]));
+		int *data = lru_get_new(lru, dict[i], KEY_LEN(dict[i]), NULL);
 		if (!data) {
 			continue;
 		}
@@ -83,7 +83,7 @@ static void test_eviction(void **state)
 	char key[16];
 	for (unsigned i = 0; i < HASH_SIZE; ++i) {
 		test_randstr(key, sizeof(key));
-		int *data = lru_get_new(lru, key, sizeof(key));
+		int *data = lru_get_new(lru, key, sizeof(key), NULL);
 		if (!data) {
 			continue;
 		}

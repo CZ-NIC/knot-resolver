@@ -86,14 +86,6 @@ and include subrequests. The list maximum size is 5000 entries, make diffs if yo
 
 Clear the list of most frequent iterative queries.
 
-.. function:: stats.expiring()
-
-Outputs list of soon-to-expire records as a JSON array.
-The list maximum size is 5000 entries, make diffs if you want to track it over time.
-
-.. function:: stats.clear_expiring()
-
-Clear the list of soon expiring records.
 
 Built-in statistics
 ^^^^^^^^^^^^^^^^^^^

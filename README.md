@@ -18,17 +18,20 @@ It also has strong support for DNS over TCP, notably TCP Fast-Open, query pipeli
 
 ### Packages
 
-Knot Resolver is packaged for
-[Debian](https://packages.debian.org/sid/knot-resolver),
-[Fedora](https://apps.fedoraproject.org/packages/knot-resolver/),
-[Ubuntu](https://packages.ubuntu.com/zesty/knot-resolver),
-[EPEL 7](https://download.fedoraproject.org/pub/epel/7/SRPMS/Packages/k/) (for RHEL 7 or CentOS 7),
-[Homebrew](https://github.com/Homebrew/homebrew-core/blob/master/Formula/knot-resolver.rb) and
-[NixOS/Nixpkgs](https://hydra.nixos.org/search?query=knot-resolver).
-You can also find it as the default DNS resolver in our open-source router [Turris Omnia](https://omnia.turris.cz).
-See the [Knot-resolver homepage](https://www.knot-resolver.cz/download/) for more information.
+The latest stable packages for various distributions are available in our
+[upstream repository](https://build.opensuse.org/package/show/home:CZ-NIC:knot-resolver-latest/knot-resolver).
+Follow the
+[installation instructions](https://software.opensuse.org//download.html?project=home%3ACZ-NIC%3Aknot-resolver-latest&package=knot-resolver)
+to add this repository to your system.
 
-<!-- [openSUSE](https://software.opensuse.org/package/knot-resolver), (it seems to be in a bad shape; vulnerable 1.3.2 ATM) -->
+Knot Resolver is also available from the following distributions' repositories.
+
+* [Fedora and Fedora EPEL](https://apps.fedoraproject.org/packages/knot-resolver)
+* [Debian stable](https://packages.debian.org/stable/knot-resolver),
+  [Debian testing](https://packages.debian.org/testing/knot-resolver),
+  [Debian unstable](https://packages.debian.org/sid/knot-resolver)
+* [Ubuntu](https://packages.ubuntu.com/bionic/knot-resolver)
+* [Arch Linux (AUR)](https://aur.archlinux.org/packages/knot-resolver)
 
 ### Building from sources
 

@@ -55,9 +55,10 @@ else
 		ifeq ($(UNAME),Linux)
 			LDFLAGS += -ldl
 		endif
-		ifeq ($(firstword $(shell $(CC) --version)),gcc)
-			# Otherwise Fedora is making kresd symbols inaccessible for modules?
-			CFLAGS += -rdynamic
+		ifeq (GCC,$(shell $(CC) --version | grep -q -i '\<gcc\>' && echo GCC))
+			# Otherwise Fedora is making kresd symbols inaccessible for modules.
+			# Clang doesn't support this flag, so we hackily detect gcc.
+			BUILD_CFLAGS += -rdynamic
 		endif
 	endif
 endif
@@ -199,7 +200,7 @@ endef
 
 # Find Python package
 define find_pythonpkg
-	HAS_$(1) := $(shell python -c "import $(1)" > /dev/null 2>&1 && echo yes || echo no)
+	HAS_$(1) := $(shell python3 -c "import $(1)" > /dev/null 2>&1 && echo yes || echo no)
 endef
 
 define find_soname
@@ -226,4 +227,4 @@ endif
 endef # find_soname
 
 # Use this on OpenBSD
-#	
+#

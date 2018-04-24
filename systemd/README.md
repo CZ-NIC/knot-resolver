@@ -11,28 +11,18 @@ Usage and Configuration
 
 See kresd.systemd(7) for details.
 
-Manual activation
------------------
+Compatibility with older systemd
+--------------------------------
 
-If you wish to use manual activation without sockets, you have to grant
-the service the capability to bind to well-known ports. You can use a drop-in
-file.
-
-    # /etc/systemd/system/kresd@.service.d/override.conf
-    [Service]
-    AmbientCapabilities=CAP_NET_BIND_SERVICE
+If you're using systemd prior to version 227, use the systemd-compat.conf
+drop-in file to use manual activation. In this case, socket files shouldn't
+be packaged, because they won't be used.
 
 Notes
 -----
 
-*  If you're using systemd prior to version 227, use a drop-in file to change
-   the service type to simple. See drop-in/systemd-compat.conf.
-
-*  Distributors of systems using systemd may wish to place
-   ./90-kresd.preset in /lib/systemd/systemd-preset/90-kresd.preset if
-   they want to delay daemon launch until it is accessed. (see
-   systemd.preset(5)).
-
-*  Symlinks pointing from @1 to the systemd template are not necessary. They
-   are only useful to provide users unfamiliar with kresd instances a hint
-   when using bash completion.
+*  If you're using the upstream systemd unit files, don't forget to also include
+   doc/kresd.systemd.7 manual page in the package.
+*  Distributions using systemd-sysv-generator should mask kresd.service to
+   be consistent with other distributions. Any use of kresd.service instead of
+   kresd@N.service is discouraged to avoid confusing the users.

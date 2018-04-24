@@ -414,9 +414,25 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 		} else if (ret != 0) {
 			VERBOSE_MSG(qry, "<= bogus proof of DS non-existence\n");
 			qry->flags.DNSSEC_BOGUS = true;
-		} else {
+		} else if (proved_name[0] != '\0') { /* don't go to insecure for . DS */
 			VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 			qry->flags.DNSSEC_NODS = true;
+			/* Rank the corresponding nonauth NS as insecure. */
+			for (int i = 0; i < req->auth_selected.len; ++i) {
+				ranked_rr_array_entry_t *ns = req->auth_selected.at[i];
+				if (ns->qry_uid != qry->uid || !ns->rr
+				    || ns->rr->type != KNOT_RRTYPE_NS) {
+					continue;
+				}
+				/* Found the record.  Note: this is slightly fragile
+				 * in case there were more NS records in the packet.
+				 * As it is now, kr_nsec*_ref_to_unsigned consider
+				 * (only) the first NS record in the packet. */
+				if (!kr_rank_test(ns->rank, KR_RANK_AUTH)) { /* sanity */
+					ns->rank = KR_RANK_INSECURE;
+				}
+				break;
+			}
 		}
 		return ret;
 	} else if (qry->flags.FORWARD && qry->parent) {
@@ -673,7 +689,7 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (ctx->state == KR_STATE_YIELD) {
 				/* Already yielded for revalidation.
 				 * It means that trust chain is OK and
-				 * transition to INSECURE hasn't occured.
+				 * transition to INSECURE hasn't occurred.
 				 * Let the validation logic ask about RRSIG. */
 				return KR_STATE_DONE;
 			}
@@ -748,7 +764,8 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
-/** Change ranks of RRs from this single iteration: _INITIAL or _MISSING -> rank_to_set. */
+/** Change ranks of RRs from this single iteration:
+ * _INITIAL or _TRY or _MISSING -> rank_to_set. */
 static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
 {
 	struct kr_request *req	   = ctx->req;
@@ -867,7 +884,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			ctx->state = KR_STATE_DONE;
 		} else if (ctx->state == KR_STATE_YIELD) {
 			/* Transition to unsecure state
-			   was occured during revalidation.
+			   occurred during revalidation.
 			   if state remains YIELD, answer will not be cached.
 			   Let cache layers to work. */
 			ctx->state = KR_STATE_DONE;
@@ -937,9 +954,11 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	/* Validate non-existence proof if not positive answer. */
-	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NXDOMAIN &&
-	    (!qry->flags.FORWARD || !qry->flags.CNAME)) {
+	/* Validate non-existence proof if not positive answer.
+	 * In case of CNAME, iterator scheduled a sibling query for the target,
+	 * so we just drop the negative piece of information and don't try to prove it.
+	 * TODO: not ideal; with aggressive cache we'll at least avoid the extra packet. */
+	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NXDOMAIN && !qry->flags.CNAME) {
 		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
 			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
@@ -962,9 +981,9 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* @todo WTH, this needs API that just tries to find a proof and the caller
 	 * doesn't have to worry about NSEC/NSEC3
-	 * @todo rework this */
-	if (!qry->flags.CACHED && (pkt_rcode == KNOT_RCODE_NOERROR) &&
-	    (!qry->flags.FORWARD || !qry->flags.CNAME)) {
+	 * @todo rework this
+	 * CNAME: same as the NXDOMAIN case above */
+	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NOERROR && !qry->flags.CNAME) {
 		bool no_data = (an->count == 0 && knot_wire_get_aa(pkt->wire));
 		if (no_data) {
 			/* @todo

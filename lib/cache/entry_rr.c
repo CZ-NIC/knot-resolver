@@ -25,11 +25,12 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
 {
 	//const void *data0 = data;
 	assert(data);
-	if (rds && rds->rr_count > 255) {
-		return kr_error(ENOSPC);
+	if (!data) {
+		return kr_error(EINVAL);
 	}
-	const uint8_t rr_count = rds ? rds->rr_count : 0;
-	memcpy(data++, &rr_count, sizeof(rr_count));
+	const uint16_t rr_count = rds ? rds->rr_count : 0;
+	memcpy(data, &rr_count, sizeof(rr_count));
+	data += sizeof(rr_count);
 
 	knot_rdata_t *rd = rds ? rds->data : NULL;
 	for (int i = 0; i < rr_count; ++i, rd = kr_rdataset_next(rd)) {
@@ -53,8 +54,9 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const void * con
 	assert(pool); /* not required, but that's our current usage; guard leaks */
 	const void *d = data; /* iterates over the cache data */
 	{
-		uint8_t rr_count;
-		memcpy(&rr_count, d++, sizeof(rr_count));
+		uint16_t rr_count;
+		memcpy(&rr_count, d, sizeof(rr_count));
+		d += sizeof(rr_count);
 		rds->rr_count = rr_count;
 		if (!rr_count) { /* avoid mm_alloc(pool, 0); etc. */
 			return d - data;
@@ -78,7 +80,7 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const void * con
 		return kr_error(ENOMEM);
 	}
 	/* Construct the output, one "RR" at a time. */
-	d = data + 1/*sizeof(rr_count)*/;
+	d = data + KR_CACHE_RR_COUNT_SIZE;
 	knot_rdata_t *d_out = rds->data; /* iterates over the output being materialized */
 	for (int i = 0; i < rds->rr_count; ++i) {
 		uint16_t len;

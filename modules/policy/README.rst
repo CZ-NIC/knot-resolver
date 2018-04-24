@@ -55,13 +55,25 @@ Also, it is possible to write your own action (i.e. Lua function). It is possibl
 
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Policy `TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in `RFC 7858`_ and `IETF draft dprive-dtls-and-tls-profiles`_.
+Policy `TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in :rfc:`7858` and `IETF draft dprive-dtls-and-tls-profiles`_.
 
 Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
 
 To test this feature you need to either :ref:`configure Knot Resolver as DNS-over-TLS server <tls-server-config>`, or pick some public DNS-over-TLS server. Please see `DNS Privacy Project`_ homepage for list of public servers.
 
 When multiple servers are specified, the one with the lowest round-trip time is used.
+
+CA+hostname authentication
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Traditional PKI authentication requires server to present certificate with specified hostname, which is issued by one of trusted CAs. Example policy is:
+
+.. code-block:: lua
+
+        policy.TLS_FORWARD({
+                {'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}})
+
+- `hostname` must exactly match hostname in server's certificate, i.e. in most cases it must not contain trailing dot (`res.example.com`).
+- `ca_file` must be path to CA certificate (or certificate bundle) in `PEM format`_.
 
 TLS Examples
 ~~~~~~~~~~~~
@@ -82,7 +94,7 @@ TLS Examples
 	  policy.TLS_FORWARD({ -- please note that { here starts list of servers
 		{'192.0.2.1', pin_sha256='Wg=='},
 		-- server must present certificate issued by specified CA and hostname must match
-		{'2001:DB8::d0c', hostname='res.example.', ca_file='/etc/knot-resolver/tlsca.crt'}
+		{'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}
 	})
 
 .. _policy_examples:
@@ -207,9 +219,9 @@ This module is enabled by default because it implements mandatory :rfc:`6761` lo
 .. _`Aho-Corasick`: https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
 .. _`@jgrahamc`: https://github.com/jgrahamc/aho-corasick-lua
 .. _RPZ: https://dnsrpz.info/
+.. _`PEM format`: https://en.wikipedia.org/wiki/Privacy-enhanced_Electronic_Mail
 .. _`Pro DNS and BIND`: http://www.zytrax.com/books/dns/ch7/rpz.html
 .. _`Jan-Piet Mens's post`: http://jpmens.net/2011/04/26/how-to-configure-your-bind-resolvers-to-lie-using-response-policy-zones-rpz/
 .. _`Transport Layer Security`: https://en.wikipedia.org/wiki/Transport_Layer_Security
 .. _`DNS Privacy Project`: https://dnsprivacy.org/
-.. _`RFC 7858`: https://tools.ietf.org/html/rfc7858
 .. _`IETF draft dprive-dtls-and-tls-profiles`: https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles
