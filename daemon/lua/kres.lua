@@ -249,6 +249,57 @@ ffi.metatype( sockaddr_t, {
 	}
 })
 
+-- Parametrized LRU table
+local typed_lru_t = 'struct { $ value_type[1]; struct lru * lru; }'
+
+-- Metatype for LRU
+local lru_metatype = {
+	-- Create a new LRU with given value type
+	-- By default the LRU will have a capacity of 65536 elements
+	-- Note: At the point the parametrized type must be finalized
+	__new = function (ct, max_slots)
+		-- {0} will make sure that the value is coercible to a number
+		local o = ffi.new(ct, {0}, C.lru_create_impl(max_slots or 65536, nil, nil))
+		if o.lru == nil then
+			return
+		end
+		return o
+	end,
+	-- Destructor to clean allocated memory
+	__gc = function (self)
+		assert(self.lru ~= nil)
+		C.lru_free_items_impl(self.lru)
+		C.free(self.lru)
+		self.lru = nil
+	end,
+	__index = {
+		-- Look up key and return reference to current
+		-- Note: The key will be inserted if it doesn't exist
+		get_ref = function (self, key, key_len, allow_insert)
+			local insert = allow_insert and true or false
+			local ptr = C.lru_get_impl(self.lru, key, key_len or #key, ffi.sizeof(self.value_type[0]), insert, nil)
+			if ptr ~= nil then
+				return ffi.cast(self.value_type, ptr)
+			end
+		end,
+		-- Look up key and return current value
+		get = function (self, key, key_len)
+			local ref = self:get_ref(key, key_len, false)
+			if ref then
+				return ref[0]
+			end
+		end,
+		-- Set value for key to given value
+		set = function (self, key, value, key_len)
+			local ref = self:get_ref(key, key_len, true)
+			if ref then
+				ref[0] = value
+				return true
+			end
+		end,
+	},
+}
+
 -- Pretty print for domain name
 local function dname2str(dname)
 	if dname == nil then return end
@@ -799,6 +850,10 @@ kres = {
 	-- Export types
 	rrset = knot_rrset_t,
 	packet = knot_pkt_t,
+	lru = function (max_size, value_type)
+	  local ct = ffi.typeof(typed_lru_t, value_type or ffi.typeof('uint64_t'))
+	  return ffi.metatype(ct, lru_metatype)(max_size)
+	end,
 
 	-- Metatypes.  Beware that any pointer will be cast silently...
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,

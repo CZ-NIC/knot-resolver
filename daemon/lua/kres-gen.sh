@@ -24,6 +24,7 @@ typedef struct knot_dump_style knot_dump_style_t;
 extern const knot_dump_style_t KNOT_DUMP_STYLE_DEFAULT;
 typedef void knot_db_t;
 struct kr_cdb_api {};
+struct lru {};
 "
 
 # The generator doesn't work well with typedefs of functions.
@@ -165,6 +166,9 @@ EOF
 	kr_zonecut_set
 	kr_zonecut_find_nsname
 	kr_now
+	lru_free_items_impl
+	lru_create_impl
+	lru_get_impl
 # Trust anchors
 	kr_ta_get
 	kr_ta_add
