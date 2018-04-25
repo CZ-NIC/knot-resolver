@@ -58,7 +58,8 @@ static const uint16_t CACHE_VERSION = 3;
 
 
 /** @internal Forward declarations of the implementation details */
-static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank);
+static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr,
+			   const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank, map_t *nsec_pmap);
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
@@ -160,7 +161,7 @@ int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const kno
 	if (err <= 0) {
 		return kr_ok();
 	}
-	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank);
+	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL);
 	if (written >= 0) {
 		return kr_ok();
 	}
@@ -752,7 +753,7 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 }
 
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr,
-	                       const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank)
+			   const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank, map_t *nsec_pmap)
 {
 	//FIXME review entry_h
 	assert(stash_rrset_precond(rr, qry) > 0);
@@ -790,9 +791,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 		k->zlf_len = knot_dname_size(signer) - 1;
 		key = key_NSEC1(k, encloser, wild_labels);
 
-		if (likely(check_dname_for_lf(signer, qry))) {
-			//FIXME nsec_pmap
-			//map_set(nsec_pmap, (const char *)signer, NULL);
+		if (nsec_pmap && likely(check_dname_for_lf(signer, qry))) {
+			map_set(nsec_pmap, (const char *)signer, NULL);
 		}
 		break;
 	default:
@@ -914,7 +914,8 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 		break;
 	}
 
-	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec, entry->rank);
+	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
+					entry->rank, nsec_pmap);
 	if (written < 0) {
 		return (int) written;
 	}
