@@ -26,11 +26,9 @@ mod.layer = {
 			for i = 1, section.count do
 				local orig = ffi.C.knot_pkt_rr(section, i - 1)
 				if orig.type == kres.type.A then
-					local rrs = ffi.typeof('knot_rrset_t')()
-					ffi.C.knot_rrset_init_empty(rrs)
+					-- Disable GC, as this object doesn't own either owner or RDATA, it's just a reference
+					local rrs = ffi.gc(kres.rrset(nil, kres.type.AAAA, orig.rclass), nil)
 					rrs._owner = ffi.cast('knot_dname_t *', orig:owner()) -- explicit cast needed here
-					rrs.type = kres.type.AAAA
-					rrs.rclass = orig.rclass
 					for k = 1, orig.rrs.rr_count do
 						local rdata = orig:rdata( k - 1 )
 						ffi.copy(addr_buf, mod.proxy, 16)

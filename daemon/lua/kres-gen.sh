@@ -93,6 +93,7 @@ printf "\tchar _stub[];\n};\n"
 # Utils
 	knot_strerror
 # Domain names
+	knot_dname_copy
 	knot_dname_from_str
 	knot_dname_is_equal
 	knot_dname_is_sub
@@ -104,11 +105,14 @@ printf "\tchar _stub[];\n};\n"
 	knot_rdata_data
 	knot_rdata_array_size
 	knot_rdataset_at
+	knot_rdataset_merge
 	knot_rrset_add_rdata
 	knot_rrset_init_empty
 	knot_rrset_ttl
 	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
+	knot_rrset_size
+	knot_rrsig_type_covered
 	knot_rrsig_sig_expiration
 	knot_rrsig_sig_inception
 # Packet
@@ -117,6 +121,7 @@ printf "\tchar _stub[];\n};\n"
 	knot_pkt_qclass
 	knot_pkt_begin
 	knot_pkt_put_question
+	knot_pkt_put
 	knot_pkt_rr
 	knot_pkt_section
 	knot_pkt_new
@@ -137,6 +142,7 @@ EOF
 	kr_nsrep_set
 # Utils
 	kr_rand_uint
+	kr_make_query
 	kr_pkt_make_auth_header
 	kr_pkt_put
 	kr_pkt_recycle
@@ -157,6 +163,7 @@ EOF
 	kr_zonecut_add
 	kr_zonecut_is_empty
 	kr_zonecut_set
+	kr_zonecut_find_nsname
 	kr_now
 # Trust anchors
 	kr_ta_get
@@ -168,6 +175,9 @@ EOF
 	kr_dnssec_key_revoked
 	kr_dnssec_key_tag
 	kr_dnssec_key_match
+# Cache
+	kr_cache_insert_rr
+	kr_cache_sync
 EOF
 
 printf "]]\n"

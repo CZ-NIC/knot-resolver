@@ -261,34 +261,43 @@ int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t 
     return -1;
 }
 
-int kr_pkt_recycle(knot_pkt_t *pkt)
+static int pkt_recycle(knot_pkt_t *pkt, bool keep_question)
 {
-	pkt->rrset_count = 0;
-	pkt->size = KNOT_WIRE_HEADER_SIZE;
-	pkt->current = KNOT_ANSWER;
-	knot_wire_set_qdcount(pkt->wire, 0);
+	/* The maximum size of a header + query name + (class, type) */
+	uint8_t buf[KNOT_WIRE_HEADER_SIZE + KNOT_DNAME_MAXLEN + 2 * sizeof(uint16_t)];
+
+	/* Save header and the question section */
+	size_t base_size = KNOT_WIRE_HEADER_SIZE;
+	if (keep_question) {
+		base_size += knot_pkt_question_size(pkt);
+	}
+	assert(base_size <= sizeof(buf));
+	memcpy(buf, pkt->wire, base_size);
+
+	/* Clear the packet and its auxiliary structures */
+	knot_pkt_clear(pkt);
+
+	/* Restore header and question section and clear counters */
+	pkt->size = base_size;
+	memcpy(pkt->wire, buf, base_size);
+	knot_wire_set_qdcount(pkt->wire, keep_question);
 	knot_wire_set_ancount(pkt->wire, 0);
 	knot_wire_set_nscount(pkt->wire, 0);
 	knot_wire_set_arcount(pkt->wire, 0);
-	memset(pkt->sections, 0, sizeof(pkt->sections));
+
+	/* Reparse question */
 	knot_pkt_begin(pkt, KNOT_ANSWER);
 	return knot_pkt_parse_question(pkt);
 }
 
+int kr_pkt_recycle(knot_pkt_t *pkt)
+{
+	return pkt_recycle(pkt, false);
+}
+
 int kr_pkt_clear_payload(knot_pkt_t *pkt)
 {
-	pkt->rrset_count = 0;
-	pkt->size = KNOT_WIRE_HEADER_SIZE + pkt->qname_size +
-		    2 * sizeof(uint16_t); /* QTYPE + QCLASS */
-	pkt->parsed = KNOT_WIRE_HEADER_SIZE;
-	pkt->current = KNOT_ANSWER;
-	knot_wire_set_ancount(pkt->wire, 0);
-	knot_wire_set_nscount(pkt->wire, 0);
-	knot_wire_set_arcount(pkt->wire, 0);
-	memset(&pkt->sections[KNOT_ANSWER], 0, sizeof(knot_pktsection_t) *
-	       (KNOT_PKT_SECTIONS - (KNOT_ANSWER + 1)));
-	knot_pkt_begin(pkt, KNOT_ANSWER);
-	return knot_pkt_parse_question(pkt);
+	return pkt_recycle(pkt, knot_wire_get_qdcount(pkt->wire));
 }
 
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,

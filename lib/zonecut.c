@@ -346,10 +346,10 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		unsigned *cached = lru_get_try(ctx->cache_rep,
 				(const char *)ns_name, knot_dname_size(ns_name));
 		unsigned reputation = (cached) ? *cached : 0;
-		if (!(reputation & KR_NS_NOIP4) && !(ctx->options.NO_IPV4)) {
+		if (!(reputation & KR_NS_NOIP4) && !(qry->flags.NO_IPV4)) {
 			fetch_addr(cut, &ctx->cache, ns_name, KNOT_RRTYPE_A, qry);
 		}
-		if (!(reputation & KR_NS_NOIP6) && !(ctx->options.NO_IPV6)) {
+		if (!(reputation & KR_NS_NOIP6) && !(qry->flags.NO_IPV6)) {
 			fetch_addr(cut,  &ctx->cache, ns_name, KNOT_RRTYPE_AAAA, qry);
 		}
 	}

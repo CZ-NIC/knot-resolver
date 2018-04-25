@@ -37,6 +37,13 @@ local function test_context_cache()
 	is(type(c), 'cdata', 'context has a cache object')
 	local s = c.stats
 	same({s.hit, s.miss, s.insert, s.delete}, {0, 0, 0, 0}, 'context cache stats works')
+	-- insert a record into cache
+	local rdata = '\1\2\3\4'
+	local rr = kres.rrset('\3com\0', kres.type.A, kres.class.IN)
+	rr:add_rdata(rdata, #rdata, 66)
+	ok(c:insert(rr, nil, 0, 0), 'cache insertion works')
+	ok(c:sync(), 'cache sync works')
+	same(s.insert, 1, 'cache insertion increments counters')
 end
 
 return {

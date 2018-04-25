@@ -35,7 +35,7 @@ struct kr_prop;
  */
 #define KR_MODULE_EXPORT(module) \
     KR_EXPORT uint32_t module ## _api() { return KR_MODULE_API; }
-#define KR_MODULE_API ((uint32_t) 0x20161108)
+#define KR_MODULE_API ((uint32_t) 0x20180401)
 
 typedef uint32_t (module_api_cb)(void);
 

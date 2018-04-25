@@ -32,4 +32,5 @@ enum {
 int kr_response_classify(const knot_pkt_t *pkt);
 
 /** Make next iterative query. */
+KR_EXPORT
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt);
