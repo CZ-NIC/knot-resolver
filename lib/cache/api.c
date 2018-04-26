@@ -742,11 +742,6 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 		return kr_ok();
 	}
 	if (!check_dname_for_lf(rr->owner, qry)) {
-		WITH_VERBOSE(qry) {
-			auto_free char *owner_str = kr_dname_text(rr->owner);
-			VERBOSE_MSG(qry, "=> skipping zero-containing name %s\n",
-					owner_str);
-		}
 		return kr_ok();
 	}
 	return 1/*proceed*/;
