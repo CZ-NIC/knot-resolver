@@ -144,6 +144,9 @@ KR_CONST static inline bool isletter(unsigned chr)
  */
 static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret)
 {
+	if (secret == 0) {
+		return;
+	}
 	assert(qname);
 	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. */
 	for (int i = 0; i < len; ++i) {
@@ -715,7 +718,6 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 				knot_edns_set_do(pkt->opt_rr);
 				knot_wire_set_cd(pkt->wire);
 			}
-			ret = edns_put(pkt, true);
 		}
 	}
 	return ret;
@@ -1532,14 +1534,6 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	}
 	struct kr_query *qry = array_tail(rplan->pending);
 
-	/* Run the checkout layers and cancel on failure. */
-	int state = request->state;
-	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
-	if (request->state == KR_STATE_FAIL) {
-		request->state = state; /* Restore */
-		return kr_error(ECANCELED);
-	}
-
 #if defined(ENABLE_COOKIES)
 	/* Update DNS cookies in request. */
 	if (type == SOCK_DGRAM) { /* @todo: Add cookies also over TCP? */
@@ -1557,6 +1551,33 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	int ret = query_finalize(request, qry, packet);
 	if (ret != 0) {
 		return kr_error(EINVAL);
+	}
+
+	/* Track changes in minimization secret to enable/disable minimization */
+	uint32_t old_minimization_secret = qry->secret;
+
+	/* Run the checkout layers and cancel on failure.
+	 * The checkout layer doesn't persist the state, so canceled subrequests
+	 * don't affect the resolution or rest of the processing. */
+	int state = request->state;
+	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
+	if (request->state == KR_STATE_FAIL) {
+		request->state = state; /* Restore */
+		return kr_error(ECANCELED);
+	}
+
+	/* Randomize query case (if secret changed) */
+	knot_dname_t *qname = (knot_dname_t *)knot_pkt_qname(packet);
+	if (qry->secret != old_minimization_secret) {
+		randomized_qname_case(qname, qry->secret);
+	}
+
+	/* Write down OPT unless in safemode */
+	if (!(qry->flags.SAFEMODE)) {
+		ret = edns_put(packet, true);
+		if (ret != 0) {
+			return kr_error(EINVAL);
+		}
 	}
 
 	WITH_VERBOSE(qry) {
