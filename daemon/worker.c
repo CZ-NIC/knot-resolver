@@ -991,46 +991,17 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 	struct session *session = handle->data;
 	assert(session->closing == false);
 	if (session->has_tls) {
-		struct kr_request *req = &task->ctx->req;
-		if (session->outgoing) {
-			int ret = kr_resolve_checkout(req, NULL, addr,
-						      SOCK_STREAM, pkt);
-			if (ret != kr_ok()) {
-				return ret;
-			}
-		}
 		return tls_push(task, handle, pkt);
 	}
 
 	int ret = 0;
 	struct request_ctx *ctx = task->ctx;
 	struct worker_ctx *worker = ctx->worker;
-	struct kr_request *req = &ctx->req;
 	void *ioreq = iorequest_borrow(worker);
 	if (!ioreq) {
 		return qr_task_on_send(task, handle, kr_error(ENOMEM));
 	}
-	if (knot_wire_get_qr(pkt->wire) == 0) {
-		/*
-		 * Query must be finalised using destination address before
-		 * sending.
-		 *
-		 * Libuv does not offer a convenient way how to obtain a source
-		 * IP address from a UDP handle that has been initialised using
-		 * uv_udp_init(). The uv_udp_getsockname() fails because of the
-		 * lazy socket initialisation.
-		 *
-		 * @note -- A solution might be opening a separate socket and
-		 * trying to obtain the IP address from it.
-		 */
-		ret = kr_resolve_checkout(req, NULL, addr,
-		                          handle->type == UV_UDP ? SOCK_DGRAM : SOCK_STREAM,
-		                          pkt);
-		if (ret != 0) {
-			iorequest_release(worker, ioreq);
-			return ret;
-		}
-	}
+
 	/* Send using given protocol */
 	if (handle->type == UV_UDP) {
 		uv_udp_send_t *send_req = (uv_udp_send_t *)ioreq;
@@ -1418,6 +1389,11 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		if (!choice) {
 			return ret;
 		}
+		/* Checkout answer before sending it */
+		struct request_ctx *ctx = task->ctx;
+		if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)choice, SOCK_DGRAM, task->pktbuf) != 0) {
+			return ret;
+		}
 		ret = ioreq_spawn(task, SOCK_DGRAM, choice->sin6_family);
 		if (!ret) {
 			return ret;
@@ -1430,6 +1406,9 @@ static uv_handle_t *retransmit(struct qr_task *task)
 				 task->pktbuf) == 0) {
 			task->addrlist_turn = (task->addrlist_turn + 1) %
 					      task->addrlist_count; /* Round robin */
+		} else {
+			/* Didn't create request or message wasn't sent */
+			ret = NULL;
 		}
 	}
 	return ret;
@@ -1649,7 +1628,7 @@ static int qr_task_step(struct qr_task *task,
 		/* Start transmitting */
 		uv_handle_t *handle = retransmit(task);
 		if (handle == NULL) {
-			return qr_task_step(task, NULL, NULL);
+			return qr_task_step(task, (struct sockaddr *)choice, NULL);
 		}
 		/* Check current query NSLIST */
 		struct kr_query *qry = array_tail(req->rplan.pending);
@@ -1680,6 +1659,12 @@ static int qr_task_step(struct qr_task *task,
 		const struct sockaddr *addr =
 			packet_source ? packet_source : task->addrlist;
 		if (addr->sa_family == AF_UNSPEC) {
+			subreq_finalize(task, packet_source, packet);
+			return qr_task_finalize(task, KR_STATE_FAIL);
+		}
+		/* Checkout task before connecting */
+		struct request_ctx *ctx = task->ctx;
+		if (kr_resolve_checkout(req, NULL, (struct sockaddr *)addr, SOCK_STREAM, task->pktbuf) != 0) {
 			subreq_finalize(task, packet_source, packet);
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
