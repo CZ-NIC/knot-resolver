@@ -85,13 +85,8 @@ local function rule()
 		-- If not rewritten, chain action
 		if not changed then return end
 		-- Replace section if renumbering
-		local qname = pkt:qname()
-		local qclass = pkt:qclass()
-		local qtype = pkt:qtype()
-		pkt:recycle()
-		pkt:question(qname, qclass, qtype)
-		for i = 1, ancount do
-			local rr = records[i]
+		pkt:clear_payload()
+		for _, rr in ipairs(records) do
 			-- Strip signatures as rewritten data cannot be validated
 			if rr.type ~= kres.type.RRSIG then
 				pkt:put(rr.owner, rr.ttl, rr.class, rr.type, rr.rdata)
