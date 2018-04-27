@@ -22,9 +22,13 @@ A *filter* selects which queries will be affected by specified *action*. There a
   - applies the action if QNAME matches a `regular expression <http://lua-users.org/wiki/PatternsTutorial>`_
 * ``suffix(action, table)``
   - applies the action if QNAME suffix matches one of suffixes in the table (useful for "is domain in zone" rules),
-  uses `Aho-Corasick`_ string matching algorithm `from CloudFlare <https://github.com/cloudflare/lua-aho-corasick>`_ (BSD 3-clause)
+  uses `Aho-Corasick`_ string matching algorithm `from Cloudflare <https://github.com/cloudflare/lua-aho-corasick>`_ (BSD 3-clause)
 * :any:`policy.suffix_common`
 * ``rpz(default_action, path)``
+* ``query_type(action, table)``
+  - applies the action if QTYPE matches one of the types in the table
+* ``ns_suffix(action, table)``
+  - applies the action if the NS name suffix matches one of suffixes in the table
   - implements a subset of RPZ_ in zonefile format.  See below for details: :any:`policy.rpz`.
 * custom filter function
 

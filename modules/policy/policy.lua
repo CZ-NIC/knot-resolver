@@ -122,8 +122,7 @@ function policy.FORWARD(target)
 	else
 		table.insert(list, addr2sock(target, 53))
 	end
-	return function(state, req)
-		local qry = req:current()
+	return function(state, req, qry)
 		req.options.FORWARD = true
 		req.options.NO_MINIMIZE = true
 		qry.flags.FORWARD = true
@@ -245,8 +244,7 @@ function policy.TLS_FORWARD(target)
 		end
 	end
 
-	return function(state, req)
-		local qry = req:current()
+	return function(state, req, qry)
 		req.options.FORWARD = true
 		req.options.NO_MINIMIZE = true
 		qry.flags.FORWARD = true
@@ -274,8 +272,7 @@ end
 
 -- Set and clear some query flags
 function policy.FLAGS(opts_set, opts_clear)
-	return function(_, req)
-		local qry = req:current()
+	return function(_, _, qry)
 		ffi.C.kr_qflags_set  (qry.flags, kres.mk_qflags(opts_set   or {}))
 		ffi.C.kr_qflags_clear(qry.flags, kres.mk_qflags(opts_clear or {}))
 		return nil -- chain rule
@@ -325,8 +322,7 @@ local dname_rev4_localhost_apex = todname('127.in-addr.arpa');
 -- Answer with locally served minimal 127.in-addr.arpa domain, only having
 -- a PTR record in 1.0.0.127.in-addr.arpa, and with 1.0...0.ip6.arpa. zone.
 -- TODO: much of this would better be left to the hints module (or coordinated).
-local function localhost_reversed(_, req)
-	local qry = req:current()
+local function localhost_reversed(_, req, qry)
 	local answer = req.answer
 
 	-- classify qry.sname:
@@ -388,7 +384,6 @@ function policy.suffix(action, zone_list)
 		if match ~= nil then
 			return action
 		end
-		return nil
 	end
 end
 
@@ -409,7 +404,6 @@ function policy.suffix_common(action, suffix_list, common_suffix)
 				return action
 			end
 		end
-		return nil
 	end
 end
 
@@ -419,7 +413,36 @@ function policy.pattern(action, pattern)
 		if string.find(query:name(), pattern) then
 			return action
 		end
-		return nil
+	end
+end
+
+-- Filter on NS name
+function policy.ns_suffix(action, ns_list)
+	local AC = require('ahocorasick')
+	local tree = AC.create(ns_list)
+	return function(_, query)
+		-- Check if the current NS is set
+		local ns_name = query.ns.name
+		if ns_name == nil then
+			return
+		end
+		-- Normalize and match
+		local dname = kres.dname2wire(ns_name):lower()
+		local match = AC.match(tree, dname, false)
+		if match ~= nil then
+			return action
+		end
+	end
+end
+
+-- Filter query type
+function policy.query_type(action, type_list)
+	return function(_, query)
+		for _, qtype in ipairs(type_list) do
+			if query.stype == qtype then
+				return action
+			end
+		end
 	end
 end
 
@@ -495,44 +518,51 @@ end
 function policy.REFUSE(_, req)
 	local answer = req.answer
 	answer:rcode(kres.rcode.REFUSED)
+	answer:aa(false)
 	answer:ad(false)
 	return kres.DONE
 end
 
-function policy.TC(state, req)
+function policy.TC(_, req)
 	local answer = req.answer
-	if answer.max_size ~= 65535 then
+	answer:ad(false)
+	answer:aa(false)
+	answer:rcode(kres.rcode.REFUSED)
+	return kres.DONE
+end
+
+function policy.TC(_, req)
+	local answer = req.answer
+	if not req.qsource.flags.tcp then
+		answer:aa(false)
+		answer:ad(false)
 		answer:tc(1) -- ^ Only UDP queries
 		answer:ad(false)
 		return kres.DONE
-	else
-		return state
 	end
 end
 
-function policy.QTRACE(_, req)
-	local qry = req:current()
+function policy.QTRACE(_, req, qry)
 	req.options.TRACE = true
 	qry.flags.TRACE = true
-	return -- this allows to continue iterating over policy list
+	-- continue iterating over policy list
 end
 
 -- Evaluate packet in given rules to determine policy action
-function policy.evaluate(rules, req, query, state)
+local function evaluate(rules, req, query, state, ...)
 	for i = 1, #rules do
 		local rule = rules[i]
 		if not rule.suspended then
-			local action = rule.cb(req, query)
-			if action ~= nil then
+			local action = rule.cb(req, query, ...)
+			if action then
 				rule.count = rule.count + 1
-				local next_state = action(state, req)
+				local next_state = action(state, req, query, ...)
 				if next_state then    -- Not a chain rule,
 					return next_state -- stop on first match
 				end
 			end
 		end
 	end
-	return
 end
 
 -- Top-down policy list walk until we hit a match
@@ -543,27 +573,41 @@ end
 policy.layer = {
 	begin = function(state, req)
 		req = kres.request_t(req)
-		return policy.evaluate(policy.rules, req, req:current(), state) or
-		       policy.evaluate(policy.special_names, req, req:current(), state) or
+		return evaluate(policy.rules, req, req:current(), state) or
+		       evaluate(policy.special_names, req, req:current(), state) or
 		       state
+	end,
+	checkout = function (state, req, pkt, addr, stream)
+		req = kres.request_t(req)
+		pkt = kres.pkt_t(pkt)
+		return evaluate(policy.checkout_rules, req, req:current(), state, pkt, addr, stream) or state
 	end,
 	finish = function(state, req)
 		req = kres.request_t(req)
-		return policy.evaluate(policy.postrules, req, req:current(), state) or state
+		return evaluate(policy.finish_rules, req, req:last(), state) or state
 	end
 }
 
 -- Add rule to policy list
-function policy.add(rule, postrule)
+function policy.add(rule, phase)
 	-- Compatibility with 1.0.0 API
 	-- it will be dropped in 1.2.0
 	if rule == policy then
-		rule = postrule
-		postrule = nil
+		rule = phase
+		phase = nil
+	end
+	if phase == true then
+		phase = 'finish'
 	end
 	-- End of compatibility shim
 	local desc = {id=getruleid(), cb=rule, count=0}
-	table.insert(postrule and policy.postrules or policy.rules, desc)
+	if phase == 'checkout' then
+		table.insert(policy.checkout_rules, desc)
+	elseif phase == 'finish' then
+		table.insert(policy.finish_rules, desc)
+	else
+		table.insert(policy.rules, desc)
+	end
 	return desc
 end
 
@@ -581,8 +625,10 @@ end
 -- Delete rule from policy list
 function policy.del(id)
 	if not delrule(policy.rules, id) then
-		if not delrule(policy.postrules, id) then
-			return false
+		if not delrule(policy.checkout_rules, id) then
+			if not delrule(policy.finish_rules, id) then
+				return false
+			end
 		end
 	end
 	return true
@@ -705,7 +751,8 @@ policy.todnames(private_zones)
 
 -- @var Default rules
 policy.rules = {}
-policy.postrules = {}
+policy.checkout_rules = {}
+policy.finish_rules = {}
 policy.special_names = {
 	{
 		cb=policy.suffix_common(policy.DENY_MSG(
