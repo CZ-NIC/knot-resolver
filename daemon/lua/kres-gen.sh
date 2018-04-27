@@ -142,7 +142,6 @@ EOF
 # Utils
 	kr_rand_uint
 	kr_make_query
-	kr_pkt_make_auth_header
 	kr_pkt_put
 	kr_pkt_recycle
 	kr_pkt_clear_payload

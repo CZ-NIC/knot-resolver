@@ -288,7 +288,6 @@ struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
 uint32_t kr_rand_uint(uint32_t);
 int kr_make_query(struct kr_query *, knot_pkt_t *);
-void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
 int kr_pkt_recycle(knot_pkt_t *);
 int kr_pkt_clear_payload(knot_pkt_t *);
