@@ -319,13 +319,6 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 	return knot_pkt_put(pkt, 0, &rr, KNOT_PF_FREE);
 }
 
-void kr_pkt_make_auth_header(knot_pkt_t *pkt)
-{
-	assert(pkt && pkt->wire);
-	knot_wire_clear_ad(pkt->wire);
-	knot_wire_set_aa(pkt->wire);
-}
-
 const char *kr_inaddr(const struct sockaddr *addr)
 {
 	if (!addr) {
