@@ -167,6 +167,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 	struct kr_cdb_opts opts = { cfg->cache_path, cache_size };
 	struct kr_cache krc = { 0 };
 
+open_kr_cache:
+	;
 	int ret = kr_cache_open(&krc, NULL, &opts, NULL);
 	if (ret || krc.db == NULL) {
 		printf("Error opening Resolver cache (%s).\n", kr_strerror(ret));
@@ -189,7 +191,16 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 	}
 
 	size_t real_size = knot_db_lmdb_get_mapsize(db), usage = knot_db_lmdb_get_usage(db);
-	printf("Cache size: %zu, Usage: %zu (%.2lf%%)\n", real_size, usage, (double)usage / real_size * 100.0);
+	double usage_perc = (double)usage / real_size * 100.0;
+	printf("Cache size: %zu, Usage: %zu (%.2lf%%)\n", real_size, usage, usage_perc);
+
+	if (usage_perc > 90.0) {
+		free(db);
+		kr_cache_close(&krc);
+		cache_size += cache_size / 10;
+		opts.maxsize = cache_size;
+		goto open_kr_cache;
+	}
 
 	gc_timer_start(&timer_analyze);
 
