@@ -18,6 +18,9 @@ Firewall rules are declarative and consist of filters and actions. Filters have 
     -- Block all queries with QNAME = example.com
     daf.add 'qname = example.com deny'
 
+    -- Refuse all queries with QTYPE = ANY
+    daf.add 'qtype = ANY refuse'
+
     -- Filters can be combined using AND/OR...
     -- Block all queries with QNAME match regex and coming from given subnet
     daf.add 'qname ~ %w+.example.com AND src = 192.0.2.0/24 deny'
@@ -45,6 +48,21 @@ Firewall rules are declarative and consist of filters and actions. Filters have 
 
     -- Truncate queries based on destination IPs
     daf.add 'dst = 192.0.2.51 truncate'
+
+    -- You can set features on specific zones
+    daf.add 'qname = dnssec-failed.org features -dnssec'
+
+    -- You can also set features used between the resolver and the nameservers
+    -- Each features is prefixed with either '+' to enable, or '-' to disable
+    -- The possible features are:
+    --  -edns .. disables EDNS
+    --  -tcp .. disables TCP
+    --  -0x20 .. disabled QNAME randomization (0x20)
+    --  -minimize .. disabled QNAME minimization
+    --  -throttle .. disables throttling of unresponsive NSs
+    --  -dnssec .. disables DNSSEC
+    --  +permissive .. enabled permissive mode
+    daf.add 'ns = ns1.example.com features -tcp -0x20 +dnssec'
 
     -- Disable a rule
     daf.disable 2
@@ -111,11 +129,11 @@ for testing.
     {}
 
     # Create new rule
-    $ curl -s -X POST -d "src = 127.0.0.1 pass" http://localhost:8053/daf | jq .
+    $ curl -s -X POST -d "src = 127.0.0.1 refuse" http://localhost:8053/daf | jq .
     {
       "count": 0,
       "active": true,
-      "info": "src = 127.0.0.1 pass",
+      "info": "src = 127.0.0.1 refuse",
       "id": 1
     }
 
@@ -128,7 +146,7 @@ for testing.
     {
       "count": 4,
       "active": true,
-      "info": "src = 127.0.0.1 pass",
+      "info": "src = 127.0.0.1 refuse",
       "id": 1
     }
 

@@ -2,9 +2,36 @@
 if not view then modules.load('view') end
 if not policy then modules.load('policy') end
 
+-- Module declaration
+local M = {
+	rules = {},
+	phases = {},
+	actions = {},
+	filters = {},
+}
+
+-- Phases for actions (e.g. when does the action execute)
+-- The default phase is 'begin'
+M.phases = {
+	reroute = 'finish',
+	rewrite = 'finish',
+	features = 'checkout',
+}
+
 -- Actions
-local actions = {
-	pass = 1, deny = 2, drop = 3, tc = 4, truncate = 4,
+M.actions = {
+	deny = function (_)
+		return policy.DENY_MSG()
+	end,
+	drop = function (_)
+		return policy.DROP
+	end,
+	refuse = function (_)
+		return policy.REFUSE
+	end,
+	truncate = function (_)
+		return policy.TC
+	end,
 	forward = function (g)
 		local addrs = {}
 		local tok = g()
@@ -38,16 +65,94 @@ local actions = {
 		end
 		return policy.REROUTE(rules, true)
 	end,
+	features = function (g)
+		local set_flags, clear_flags = {}, {}
+		local allow_tcp = true
+		-- Parse feature flag toggles
+		-- Each feature can be prefixed with a symbol '+' or '-' (enable / disable)
+		-- e.g. -dnssec +tcp .. disable DNSSEC, enable TCP
+		local tok = g()
+		while tok do
+			local sign, o = tok:match '([+-])(%S+)'
+			local enable = (sign ~= '-')
+			if o == '0x20' then
+				table.insert(enable and clear_flags or set_flags, 'NO_0X20')
+			elseif o == 'tcp' then
+				allow_tcp = enable
+			elseif o == 'minimize' then
+				table.insert(enable and clear_flags or set_flags, 'NO_MINIMIZE')
+			elseif o == 'throttle' then
+				table.insert(enable and clear_flags or set_flags, 'NO_THROTTLE')
+			elseif o == 'edns' then
+				table.insert(enable and clear_flags or set_flags, 'SAFEMODE')
+			elseif o == 'dnssec' then
+				-- This is a positive flag, so the the tables are interposed
+				table.insert(enable and set_flags or clear_flags, 'DNSSEC_WANT')
+			elseif o == 'permissive' then
+				-- This is a positive flag, so the the tables are interposed
+				table.insert(enable and set_flags or clear_flags, 'PERMISSIVE')
+			else
+				error('unknown feature: ' .. o)
+			end
+			tok = g()
+		end
+		-- Construct the action
+		local set_flag_action = policy.FLAGS(set_flags, clear_flags)
+		return function(state, req, qry, pkt, _ --[[addr]], is_stream)
+			-- Track whether the minimization or 0x20 flag changes
+			local had_0x20 = qry.flags.NO_0X20
+			local had_minimize = qry.flags.NO_MINIMIZE
+			set_flag_action(state, req, qry)
+			-- Block outgoing TCP if disabled
+			if not allow_tcp and is_stream then
+				return kres.FAIL
+			end
+			-- Update outgoing message
+			if qry.flags.NO_0X20 ~= had_0x20 or
+			   qry.flags.NO_MINIMIZE ~= had_minimize then
+				-- Update 0x20 secret to regenerate the QNAME randomization
+				if qry.flags.NO_0X20 or qry.flags.SAFEMODE then
+					qry.secret = 0
+				else
+					qry.secret = qry.secret + 1
+				end
+				local reserved = pkt.reserved
+				local opt_rr = pkt.opt_rr
+				qry:write(pkt)
+				-- Restore space reservation and OPT
+				pkt.reserved = reserved
+				pkt.opt_rr = opt_rr
+				pkt:begin(kres.section.ADDITIONAL)
+			end
+			return nil
+		end
+	end,
 }
 
 -- Filter rules per column
-local filters = {
+M.filters = {
+	-- Filter on QTYPE
+	qtype = function (g)
+		local op, val = g(), g()
+		local qtype = kres.type[val]
+		if not qtype then
+			error(string.format('invalid query type "%s"', val))
+		end
+		if op == '=' then return policy.query_type(true, {qtype})
+		else error(string.format('invalid operator "%s" on qtype', op)) end
+	end,
 	-- Filter on QNAME (either pattern or suffix match)
 	qname = function (g)
 		local op, val = g(), todname(g())
 		if     op == '~' then return policy.pattern(true, val:sub(2)) -- Skip leading label length
 		elseif op == '=' then return policy.suffix(true, {val})
 		else error(string.format('invalid operator "%s" on qname', op)) end
+	end,
+	-- Filter on NS
+	ns = function (g)
+		local op, val = g(), todname(g())
+		if op == '=' then return policy.ns_suffix(true, {val})
+		else error(string.format('invalid operator "%s" on ns', op)) end
 	end,
 	-- Filter on source address
 	src = function (g)
@@ -65,7 +170,7 @@ local filters = {
 
 local function parse_filter(tok, g, prev)
 	if not tok then error(string.format('expected filter after "%s"', prev)) end
-	local filter = filters[tok:lower()]
+	local filter = M.filters[tok:lower()]
 	if not filter then error(string.format('invalid filter "%s"', tok)) end
 	return filter(g)
 end
@@ -73,7 +178,7 @@ end
 local function parse_rule(g)
 	-- Allow action without filter
 	local tok = g()
-	if not filters[tok:lower()] then
+	if not M.filters[tok:lower()] then
 		return tok, nil
 	end
 	local f = parse_filter(tok, g)
@@ -99,9 +204,11 @@ local function parse_query(g)
 	local ok, actid, filter = pcall(parse_rule, g)
 	if not ok then return nil, actid end
 	actid = actid:lower()
-	if not actions[actid] then return nil, string.format('invalid action "%s"', actid) end
+	if not M.actions[actid] then
+		return nil, string.format('invalid action "%s"', actid)
+	end
 	-- Parse and interpret action
-	local action = actions[actid]
+	local action = M.actions[actid]
 	if type(action) == 'function' then
 		action = action(g)
 	end
@@ -125,11 +232,6 @@ end
 local function rule_info(r)
 	return {info=r.info, id=r.rule.id, active=(r.rule.suspended ~= true), count=r.rule.count}
 end
-
--- Module declaration
-local M = {
-	rules = {}
-}
 
 -- @function Remove a rule
 
@@ -162,12 +264,9 @@ function M.add(rule)
 		end
 	end
 	local desc = {info=rule, policy=p}
-	-- Enforce in policy module, special actions are postrules
-	if id == 'reroute' or id == 'rewrite' then
-		desc.rule = policy.add(p, true)
-	else
-		desc.rule = policy.add(p)
-	end
+	-- Enforce in policy module in given phase
+	local phase = M.phases[id] or 'begin'
+	desc.rule = policy.add(p, phase)
 	table.insert(M.rules, desc)
 	return desc
 end
