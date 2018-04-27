@@ -293,10 +293,10 @@ end
 local dname_localhost = todname('localhost.')
 
 -- Rule for localhost. zone; see RFC6303, sec. 3
-local function localhost(_, req)
-	local qry = req:current()
+local function localhost(_, req, qry)
 	local answer = req.answer
-	ffi.C.kr_pkt_make_auth_header(answer)
+	answer:ad(false)
+	answer:aa(true)
 
 	local is_exact = ffi.C.knot_dname_is_equal(qry.sname, dname_localhost)
 
@@ -353,7 +353,8 @@ local function localhost_reversed(_, req)
 		end
 	end
 
-	ffi.C.kr_pkt_make_auth_header(answer)
+	answer:ad(false)
+	answer:aa(true)
 	answer:rcode(kres.rcode.NOERROR)
 	answer:begin(kres.section.ANSWER)
 	if is_exact and qry.stype == kres.type.PTR then
@@ -471,7 +472,8 @@ function policy.DENY_MSG(msg)
 	return function (_, req)
 		-- Write authority information
 		local answer = req.answer
-		ffi.C.kr_pkt_make_auth_header(answer)
+		answer:ad(false)
+		answer:aa(true)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
 		mkauth_soa(answer, answer:qname())

@@ -216,10 +216,6 @@ KR_EXPORT
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen);
 
-/** Set packet header suitable for authoritative answer. (for policy module) */
-KR_EXPORT
-void kr_pkt_make_auth_header(knot_pkt_t *pkt);
-
 /** Simple storage for IPx address or AF_UNSPEC. */
 union inaddr {
 	struct sockaddr ip;
