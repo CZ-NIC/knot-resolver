@@ -1,4 +1,6 @@
 // standard includes
+#include <inttypes.h>
+#include <limits.h>
 #include <stdio.h>
 #include <time.h>
 #include <sys/stat.h>
@@ -15,7 +17,7 @@
 #include "kr_cache_gc.h"
 
 // TODO remove and use time(NULL) ! this is just for debug with pre-generated cache
-int64_t now = 1523701784;
+int64_t now = 1524301784;
 
 // section: timer
 // TODO replace/move to contrib
@@ -207,6 +209,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 	size_t cache_records = 0, deleted_records = 0;
 	size_t oversize_records = 0, already_gone = 0;;
 	size_t used_space = 0, rw_txn_count = 1;
+	int64_t min_expire = INT64_MAX;
 
 	while (it != NULL) {
 		knot_db_val_t key = { 0 }, val = { 0 };
@@ -222,6 +225,9 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 			struct entry_h *entry = entry_h_consistent(val, *entry_type);
 			int64_t over = entry->time + entry->ttl;
 			over -= now;
+			if (over < min_expire) {
+				min_expire = over;
+			}
 			if (over < 0) {
 				knot_db_val_t *todelete;
 				if ((cfg->temp_keys_space > 0 &&
@@ -242,6 +248,9 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 
 	printf("Cache analyzed in %.2lf secs, %zu records types", gc_timer_end(&timer_analyze), cache_records);
 	rrtypelist_print(&cache_rrtypes);
+	if (min_expire < INT64_MAX) {
+		printf("Minimum expire in %"PRId64" secs\n", min_expire);
+	}
 	printf("%zu records to be deleted using %.2lf MBytes of temporary memory, %zu records skipped due to memory limit.\n",
 	       to_del.size, ((double)used_space / 1048576.0), oversize_records);
 	rrtype_dynarray_free(&cache_rrtypes);
