@@ -1,9 +1,13 @@
 -- Module interface
 local ffi = require('ffi')
-local prefixes = {}
+
+-- Export module interface
+local M = {
+	prefixes = {},
+}
 
 -- Create subnet prefix rule
-local function matchprefix(subnet, addr)
+function M.prefix(subnet, addr)
 	local target = kres.str2ip(addr)
 	if target == nil then error('[renumber] invalid address: '..addr) end
 	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
@@ -17,7 +21,7 @@ local function matchprefix(subnet, addr)
 end
 
 -- Create name match rule
-local function matchname(name, addr)
+function M.name(name, addr)
 	local target = kres.str2ip(addr)
 	if target == nil then error('[renumber] invalid address: '..addr) end
 	local owner = todname(name)
@@ -28,11 +32,11 @@ end
 
 -- Add subnet prefix rewrite rule
 local function add_prefix(subnet, addr)
-	table.insert(prefixes, matchprefix(subnet, addr))
+	table.insert(M.prefixes, M.prefix(subnet, addr))
 end
 
 -- Match IP against given subnet or record owner
-local function match_subnet(subnet, bitlen, addrtype, rr)
+function M.match_subnet(subnet, bitlen, addrtype, rr)
 	local addr = rr.rdata
 	return addrtype == rr.type and
 	       ((bitlen and (#addr >= bitlen / 8) and (ffi.C.kr_bitcmp(subnet, addr, bitlen) == 0)) or subnet == rr.owner)
@@ -45,7 +49,7 @@ local function renumber_record(tbl, rr)
 		local prefix = tbl[i]
 		-- Match record type to address family and record address to given subnet
 		-- If provided, compare record owner to prefix name
-		if match_subnet(prefix[1], prefix[2], prefix[4], rr) then
+		if M.match_subnet(prefix[1], prefix[2], prefix[4], rr) then
 			-- Replace part or whole address
 			local to_copy = prefix[2] or (#prefix[3] * 8)
 			local chunks = to_copy / 8
@@ -61,19 +65,16 @@ local function renumber_record(tbl, rr)
 end
 
 -- Renumber addresses based on config
-local function rule()
+function M.rule(prefixes)
 	return function (state, req)
 		if state == kres.FAIL then return state end
 		req = kres.request_t(req)
 		local pkt = kres.pkt_t(req.answer)
 		-- Only successful answers
 		local records = pkt:section(kres.section.ANSWER)
-		local ancount = #records
-		if ancount == 0 then return state end
 		-- Find renumber candidates
 		local changed = false
-		for i = 1, ancount do
-			local rr = records[i]
+		for i, rr in ipairs(records) do
 			if rr.type == kres.type.A or rr.type == kres.type.AAAA then
 				local new_rr = renumber_record(prefixes, rr)
 				if new_rr ~= nil then
@@ -96,14 +97,6 @@ local function rule()
 	end
 end
 
--- Export module interface
-local M = {
-	prefix = matchprefix,
-	name = matchname,
-	rule = rule,
-	match_subnet = match_subnet,
-}
-
 -- Config
 function M.config (conf)
 	if conf == nil then return end
@@ -115,7 +108,7 @@ end
 
 -- Layers
 M.layer = {
-	finish = rule(),
+	finish = M.rule(M.prefixes),
 }
 
 return M
