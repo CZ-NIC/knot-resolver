@@ -88,10 +88,11 @@ view.layer = {
 		if state == kres.FAIL then return state end
 		req = kres.request_t(req)
 		local match_cb = evaluate(view, req)
-		if match_cb ~= nil then
-			local action = match_cb(req, req:current())
+		if match_cb then
+			local query = req:current()
+			local action = match_cb(req, query)
 			if action then
-				local next_state = action(state, req)
+				local next_state = action(state, req, query)
 				if next_state then    -- Not a chain rule,
 					return next_state -- stop on first match
 				end
