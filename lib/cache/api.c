@@ -404,7 +404,7 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return KR_STATE_DONE;
 	}
 
-	/**** 1b. otherwise, find the longest prefix NS/xNAME (with OK time+rank). [...] */
+	/**** 1b. otherwise, find the longest prefix zone/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;
 	ret = kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
 	if (unlikely(ret)) {
@@ -422,8 +422,9 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	switch (k->type) {
 	case KNOT_RRTYPE_CNAME: {
 		const knot_db_val_t v = el[EL_CNAME];
-		const int32_t new_ttl = get_new_ttl(v.data, qry,
-						    qry->sname, KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
+		assert(v.data && v.len);
+		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
+						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
 		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, v.data,
 					v.data + v.len, new_ttl);
 		/* TODO: ^^ cumbersome code; we also recompute the TTL */
@@ -464,8 +465,8 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret) return ctx->state;
 #endif
 
-	/** Collecting multiple NSEC* + RRSIG records, in preparation for the answer
-	 *  + track the progress */
+	/** Structure for collecting multiple NSEC* + RRSIG records,
+	 * in preparation for the answer, and for tracking the progress. */
 	struct answer ans;
 	memset(&ans, 0, sizeof(ans));
 	ans.mm = &pkt->mm;
@@ -523,7 +524,6 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 				   k->zname, KNOT_RRTYPE_SOA, new_ttl);
 		if (ret) return ctx->state;
 	}
-
 
 	/* Find our target RCODE. */
 	int real_rcode;
@@ -1045,7 +1045,8 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	if (qry->flags.DNSSEC_INSECURE) {
 		qry->flags.DNSSEC_WANT = false;
 	}
-	VERBOSE_MSG(qry, "=> satisfied by exact RR or CNAME: rank 0%.2o, new TTL %d\n",
+	VERBOSE_MSG(qry, "=> satisfied by exact %s: rank 0%.2o, new TTL %d\n",
+			(type == KNOT_RRTYPE_CNAME ? "CNAME" : "RRset"),
 			eh->rank, new_ttl);
 	return kr_ok();
 }
@@ -1192,7 +1193,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 	return ret;
 }
 
-/** Find the longest prefix NS/xNAME (with OK time+rank), starting at k->*.
+/** Find the longest prefix zone/xNAME (with OK time+rank), starting at k->*.
  * We store xNAME at NS type to lower the number of searches.
  * CNAME is only considered for equal name, of course.
  * We also store NSEC* parameters at NS type; probably the latest two will be kept.
