@@ -8,7 +8,7 @@
 
 #include "kr_cache_gc.h"
 
-static int killed = 0;
+volatile static int killed = 0;
 
 static void got_killed(int signum)
 {
