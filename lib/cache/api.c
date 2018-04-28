@@ -15,29 +15,29 @@
  */
 
 #include <assert.h>
-#include <time.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <unistd.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <time.h>
+#include <unistd.h>
 
-#include <libknot/errcode.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
+#include <libknot/errcode.h>
 #include <libknot/rrtype/rrsig.h>
 
-#include "contrib/ucw/lib.h"
 #include "contrib/cleanup.h"
+#include "contrib/ucw/lib.h"
 #include "lib/cache/api.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/defines.h"
-#include "lib/utils.h"
-
 #include "lib/dnssec/ta.h"
+#include "lib/generic/trie.h"
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
+#include "lib/utils.h"
 
 #include "lib/cache/impl.h"
 
@@ -59,7 +59,7 @@ static const uint16_t CACHE_VERSION = 3;
 
 /** @internal Forward declarations of the implementation details */
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr,
-			   const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank, map_t *nsec_pmap);
+			   const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank, trie_t *nsec_pmap);
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
@@ -671,10 +671,10 @@ static int peek_encloser(
 /** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
 static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
-			int *unauth_cnt, map_t *nsec_pmap);
+			int *unauth_cnt, trie_t *nsec_pmap);
 /** Stash a single nsec_p.  \return 0 (errors are ignored). */
-static int stash_nsec_p(const char *key_str, void *nsec_p_v, void *request);
-
+static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
+			struct kr_request *req);
 
 
 int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -696,7 +696,11 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Stash individual records. */
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	int unauth_cnt = 0;
-	map_t nsec_pmap = map_make(&req->pool);
+	trie_t *nsec_pmap = trie_create(&req->pool);
+	if (!nsec_pmap) {
+		assert(!ENOMEM);
+		goto finally;
+	}
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 		ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
@@ -706,7 +710,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				continue;
 				/* TODO: probably safe to break but maybe not worth it */
 			}
-			int ret = stash_rrarray_entry(arr, i, qry, cache, &unauth_cnt, &nsec_pmap);
+			int ret = stash_rrarray_entry(arr, i, qry, cache, &unauth_cnt, nsec_pmap);
 			if (ret) {
 				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
 				goto finally;
@@ -716,7 +720,12 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	map_walk(&nsec_pmap, stash_nsec_p, req);
+	trie_it_t *it;
+	for (it = trie_it_begin(nsec_pmap); !trie_it_finished(it); trie_it_next(it)) {
+		stash_nsec_p((const knot_dname_t *)trie_it_key(it, NULL),
+				(const char *)*trie_it_val(it), req);
+	}
+	trie_it_free(it);
 	/* LATER(optim.): typically we also have corresponding NS record in the list,
 	 * so we might save a cache operation. */
 
@@ -748,10 +757,10 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 }
 
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr,
-			   const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank, map_t *nsec_pmap)
+			   const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank, trie_t *nsec_pmap)
 {
 	//FIXME review entry_h
-	assert(stash_rrset_precond(rr, qry) > 0);
+	assert(stash_rrset_precond(rr, qry) > 0 && nsec_pmap);
 	if (!cache) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
@@ -786,9 +795,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 		k->zlf_len = knot_dname_size(signer) - 1;
 		key = key_NSEC1(k, encloser, wild_labels);
 
-		if (nsec_pmap && likely(check_dname_for_lf(signer, qry))) {
-			map_set(nsec_pmap, (const char *)signer, NULL);
-		}
+		trie_get_ins(nsec_pmap, (const char *)signer, knot_dname_size(signer));
 		break;
 	default:
 		ret = kr_dname_lf(k->buf, encloser, wild_labels);
@@ -880,7 +887,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 
 static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
-			int *unauth_cnt, map_t *nsec_pmap)
+			int *unauth_cnt, trie_t *nsec_pmap)
 {
 	ranked_rr_array_entry_t *entry = arr->at[arr_i];
 	if (entry->cached) {
@@ -929,9 +936,9 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 	return kr_ok();
 }
 
-static int stash_nsec_p(const char *dname, void *nsec_p_v, void *request)
+static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
+			struct kr_request *req)
 {
-	struct kr_request *req = request;
 	const struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;
 	uint32_t valid_until = qry->timestamp.tv_sec + cache->ttl_max;
@@ -941,7 +948,7 @@ static int stash_nsec_p(const char *dname, void *nsec_p_v, void *request)
 	int data_stride = sizeof(valid_until) + nsec_p_rdlen(nsec_p);
 	/* Find what's in the cache. */
 	struct key k_storage, *k = &k_storage;
-	int ret = kr_dname_lf(k->buf, (const knot_dname_t *)dname, false);
+	int ret = kr_dname_lf(k->buf, dname, false);
 	if (ret) return kr_error(ret);
 	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
 	knot_db_val_t val_orig = { NULL, 0 };
