@@ -75,6 +75,7 @@ M.actions = {
 		while tok do
 			local sign, o = tok:match '([+-])(%S+)'
 			local enable = (sign ~= '-')
+			o = o:lower()
 			if o == '0x20' then
 				table.insert(enable and clear_flags or set_flags, 'NO_0X20')
 			elseif o == 'tcp' then
