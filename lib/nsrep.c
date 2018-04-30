@@ -246,7 +246,7 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 	 * Servers on TIMEOUT will not have probed at all.
 	 * Servers with score above KR_NS_LONG will have periodically removed from
 	 * reputation cache, so that kresd can reprobe them. */
-	if (score >= KR_NS_TIMEOUT && !(qry->flags.NO_THROTTLE)) {
+	if (score >= KR_NS_TIMEOUT) {
 		return kr_ok();
 	} else if (score <= ns->score &&
 	   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
