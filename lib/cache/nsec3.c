@@ -21,6 +21,51 @@
 #include "lib/cache/impl.h"
 #include "lib/dnssec/nsec.h"
 
+knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *name, const knot_rdata_t *nsec3param)
+{
+	// XXX are wildcard labels added before hashing??? + FIXME everything
+
+	/* we basically need dname_lf with two bytes added
+	 * on a correct place within the name (the cut) */
+	int ret;
+	const bool ok = k && name
+		&& !(ret = kr_dname_lf(k->buf, k->zname, false));
+	if (!ok) {
+		assert(false);
+		return (knot_db_val_t){ NULL, 0 };
+	}
+
+	uint8_t *begin = k->buf + 1 + k->zlf_len; /* one byte after zone's zero */
+	uint8_t *end = k->buf + 1 + k->buf[0]; /* we don't use the final zero in key,
+						* but move it anyway */
+	if (end < begin) {
+		assert(false);
+		return (knot_db_val_t){ NULL, 0 };
+	}
+	int key_len;
+	if (end > begin) {
+		memmove(begin + 2, begin, end - begin);
+		key_len = k->buf[0] + 1;
+	} else {
+		key_len = k->buf[0] + 2;
+	}
+	/* CACHE_KEY_DEF: key == zone's dname_lf + '\0' + '3' + NSEC3 hash (binary!)
+	 * Iff the latter is empty, there's no zero to cut and thus the key_len difference.
+	 */
+	begin[0] = 0;
+	begin[1] = '3'; /* tag for NSEC3 */
+	k->type = KNOT_RRTYPE_NSEC3;
+
+	/*
+	VERBOSE_MSG(NULL, "<> key_NSEC1; name: ");
+	kr_dname_print(name, add_wildcard ? "*." : "" , " ");
+	kr_log_verbose("(zone name LF length: %d; total key length: %d)\n",
+			k->zlf_len, key_len);
+	*/
+
+	return (knot_db_val_t){ k->buf + 1, key_len };
+}
+
 int nsec3_encloser(struct key *k, struct answer *ans,
 		   const int sname_labels, int *clencl_labels,
 		   knot_db_val_t *cover_low_kwz, knot_db_val_t *cover_hi_kwz,

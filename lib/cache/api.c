@@ -746,8 +746,7 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
-	if (!check_rrtype(rr->type, qry)
-	    || rr->type == KNOT_RRTYPE_NSEC3 /*for now; LATER NSEC3*/) {
+	if (!check_rrtype(rr->type, qry)) {
 		return kr_ok();
 	}
 	if (!check_dname_for_lf(rr->owner, qry)) {
@@ -772,7 +771,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 	if (wild_labels < 0) {
 		return kr_ok();
 	}
-	const knot_dname_t *encloser = rr->owner;
+	const knot_dname_t *encloser = rr->owner; /**< the closest encloser name */
 	for (int i = 0; i < wild_labels; ++i) {
 		encloser = knot_wire_next_label(encloser, NULL);
 	}
@@ -783,8 +782,9 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 	knot_db_val_t key;
 	switch (rr->type) {
 	case KNOT_RRTYPE_NSEC:
+	case KNOT_RRTYPE_NSEC3:
 		if (!kr_rank_test(rank, KR_RANK_SECURE)) {
-			/* Skip any NSECs that aren't validated. */
+			/* Skip any NSEC*s that aren't validated. */
 			return kr_ok();
 		}
 		if (!rr_sigs || !rr_sigs->rrs.rr_count || !rr_sigs->rrs.data) {
@@ -792,10 +792,28 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 			return kr_error(EINVAL);
 		}
 		const knot_dname_t *signer = knot_rrsig_signer_name(&rr_sigs->rrs, 0);
-		k->zlf_len = knot_dname_size(signer) - 1;
-		key = key_NSEC1(k, encloser, wild_labels);
+		const int signer_size = knot_dname_size(signer);
+		k->zlf_len = signer_size - 1;
 
-		trie_get_ins(nsec_pmap, (const char *)signer, knot_dname_size(signer));
+		void **npp = trie_get_ins(nsec_pmap, (const char *)signer, signer_size);
+		assert(npp && ENOMEM);
+		if (rr->type == KNOT_RRTYPE_NSEC) {
+			key = key_NSEC1(k, encloser, wild_labels);
+			break;
+		}
+
+		assert(rr->type == KNOT_RRTYPE_NSEC3);
+		const knot_rdata_t *np_data = knot_rdata_data(rr->rrs.data);
+		const int np_dlen = nsec_p_rdlen(np_data);
+		key = key_NSEC3(k, encloser, /*wild_labels,*/ np_data);
+		if (npp && !*npp) {
+			*npp = mm_alloc(&qry->request->pool, np_dlen);
+			if (!*npp) {
+				assert(!ENOMEM);
+				break;
+			}
+			memcpy(*npp, np_data, np_dlen);
+		}
 		break;
 	default:
 		ret = kr_dname_lf(k->buf, encloser, wild_labels);

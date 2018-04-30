@@ -287,6 +287,11 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 /* NSEC3 stuff.  Implementation in ./nsec3.c */
 
+/** Construct a string key for for NSEC3 predecessor-search.
+ * \note k->zlf_len is assumed to have been correctly set */
+knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *name,
+			const knot_rdata_t *nsec3param);
+
 /** TODO.  See nsec1_encloser(...) */
 int nsec3_encloser(struct key *k, struct answer *ans,
 		   const int sname_labels, int *clencl_labels,
