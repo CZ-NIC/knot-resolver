@@ -805,7 +805,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 		assert(rr->type == KNOT_RRTYPE_NSEC3);
 		const knot_rdata_t *np_data = knot_rdata_data(rr->rrs.data);
 		const int np_dlen = nsec_p_rdlen(np_data);
-		key = key_NSEC3(k, encloser, /*wild_labels,*/ np_data);
+		key = key_NSEC3(k, encloser, nsec_p_hash(np_data));
 		if (npp && !*npp) {
 			*npp = mm_alloc(&qry->request->pool, np_dlen);
 			if (!*npp) {

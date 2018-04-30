@@ -28,6 +28,7 @@
 #include <libknot/dname.h>
 
 #include "contrib/cleanup.h"
+#include "contrib/murmurhash3/murmurhash3.h" /* hash() for nsec_p_hash() */
 #include "lib/cache/cdb_api.h"
 #include "lib/resolve.h"
 
@@ -87,10 +88,11 @@ static inline uint16_t EL2RRTYPE(enum EL i)
 
 static inline int nsec_p_rdlen(const uint8_t *rdata)
 {
-	//TODO: the zero case?
+	//TODO: the zero case? // FIXME security: overflow potential
 	return rdata ? 5 + rdata[4] : 0; /* rfc5155 4.2 and 3.2. */
 }
 static const int NSEC_P_MAXLEN = sizeof(uint32_t) + 5 + 255;
+
 
 /** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
  * (for is_packet the length of data is checked)
@@ -287,10 +289,19 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 /* NSEC3 stuff.  Implementation in ./nsec3.c */
 
-/** Construct a string key for for NSEC3 predecessor-search.
+typedef uint32_t nsec_p_hash_t;
+/** \note We assume it's not opt-out. */
+static inline nsec_p_hash_t nsec_p_hash(const uint8_t *nsec_p)
+{
+	assert(nsec_p);
+	return hash((const char *)nsec_p, nsec_p_rdlen(nsec_p));
+}
+
+
+/** Construct a string key for for NSEC3 predecessor-search, from an NSEC3 name.
  * \note k->zlf_len is assumed to have been correctly set */
-knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *name,
-			const knot_rdata_t *nsec3param);
+knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *nsec3_name,
+			const nsec_p_hash_t nsec_p_hash);
 
 /** TODO.  See nsec1_encloser(...) */
 int nsec3_encloser(struct key *k, struct answer *ans,

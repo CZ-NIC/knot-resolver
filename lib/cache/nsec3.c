@@ -19,51 +19,102 @@
  */
 
 #include "lib/cache/impl.h"
-#include "lib/dnssec/nsec.h"
 
-knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *name, const knot_rdata_t *nsec3param)
+#include "contrib/base32hex.h"
+#include <dnssec/error.h>
+#include <dnssec/nsec.h>
+
+static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
+
+/** Common part: write all but the NSEC3 hash. */
+static knot_db_val_t key_NSEC3_common(struct key *k, const knot_dname_t *zname,
+					const nsec_p_hash_t nsec_p_hash)
 {
-	// XXX are wildcard labels added before hashing??? + FIXME everything
-
-	/* we basically need dname_lf with two bytes added
-	 * on a correct place within the name (the cut) */
 	int ret;
-	const bool ok = k && name
-		&& !(ret = kr_dname_lf(k->buf, k->zname, false));
+	const bool ok = k && zname
+		&& !(ret = kr_dname_lf(k->buf, zname, false));
 	if (!ok) {
 		assert(false);
-		return (knot_db_val_t){ NULL, 0 };
+		return VAL_EMPTY;
 	}
 
-	uint8_t *begin = k->buf + 1 + k->zlf_len; /* one byte after zone's zero */
-	uint8_t *end = k->buf + 1 + k->buf[0]; /* we don't use the final zero in key,
-						* but move it anyway */
-	if (end < begin) {
-		assert(false);
-		return (knot_db_val_t){ NULL, 0 };
-	}
-	int key_len;
-	if (end > begin) {
-		memmove(begin + 2, begin, end - begin);
-		key_len = k->buf[0] + 1;
-	} else {
-		key_len = k->buf[0] + 2;
-	}
-	/* CACHE_KEY_DEF: key == zone's dname_lf + '\0' + '3' + NSEC3 hash (binary!)
-	 * Iff the latter is empty, there's no zero to cut and thus the key_len difference.
+	/* CACHE_KEY_DEF: key == zone's dname_lf + '\0' + '3' + nsec_p hash (4B)
+	 * 			+ NSEC3 hash (20B binary!)
+	 * LATER(optim.) nsec_p hash: perhaps 2B would give a sufficient probability
+	 * of avoiding collisions.
 	 */
+	uint8_t *begin = k->buf + 1 + k->zlf_len; /* one byte after zone's zero */
 	begin[0] = 0;
 	begin[1] = '3'; /* tag for NSEC3 */
 	k->type = KNOT_RRTYPE_NSEC3;
+	memcpy(begin + 2, &nsec_p_hash, sizeof(nsec_p_hash));
+	return (knot_db_val_t){
+		.data = k->buf + 1,
+		.len = begin + 2 + sizeof(nsec_p_hash) - (k->buf + 1),
+	};
+}
 
-	/*
-	VERBOSE_MSG(NULL, "<> key_NSEC1; name: ");
-	kr_dname_print(name, add_wildcard ? "*." : "" , " ");
-	kr_log_verbose("(zone name LF length: %d; total key length: %d)\n",
-			k->zlf_len, key_len);
-	*/
+knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *nsec3_name,
+			const nsec_p_hash_t nsec_p_hash)
+{
+	knot_db_val_t val = key_NSEC3_common(k, nsec3_name /*only zname required*/,
+						nsec_p_hash);
+	if (!val.data) return val;
+	int len = base32hex_decode(nsec3_name + 1, nsec3_name[0], val.data + val.len,
+				   KR_CACHE_KEY_MAXLEN - val.len);
+	if (len != 20) {
+		assert(false); // FIXME: just debug, possible bogus input in real life
+		return VAL_EMPTY;
+	}
+	val.len += len;
+	return val;
+}
 
-	return (knot_db_val_t){ k->buf + 1, key_len };
+/** Construct a string key for for NSEC3 predecessor-search, from an non-NSEC3 name.
+ * \note k->zlf_len and k->zname are assumed to have been correctly set */
+static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
+		const bool add_wildcard,
+		const nsec_p_hash_t nsec_p_hash, const uint8_t *nsec_p)
+{
+	knot_db_val_t val = key_NSEC3_common(k, k->zname, nsec_p_hash);
+	const bool ok = val.data && nsec_p;
+	if (!ok) return VAL_EMPTY;
+
+	/* Make `name` point to correctly wildcarded owner name. */
+	uint8_t buf[KNOT_DNAME_MAXLEN];
+	int name_len;
+	if (add_wildcard) {
+		buf[0] = '\1';
+		buf[1] = '*';
+		name_len = knot_dname_to_wire(buf + 2, name, sizeof(buf) - 2);
+		if (name_len < 0) return VAL_EMPTY; /* wants wildcard but doesn't fit */
+		name = buf;
+	} else {
+		name_len = knot_dname_size(name);
+	}
+	/* Append the NSEC3 hash. */
+	dnssec_nsec3_params_t params;
+	{
+		const dnssec_binary_t rdata = {
+			.size = nsec_p_rdlen(nsec_p),
+			.data = (uint8_t *)/*const-cast*/nsec_p,
+		};
+		int ret = dnssec_nsec3_params_from_rdata(&params, &rdata);
+		if (ret != DNSSEC_EOK) return VAL_EMPTY;
+	}
+	const dnssec_binary_t dname = {
+		.size = knot_dname_size(name),
+		.data = (uint8_t *)/*const-cast*/name,
+	};
+	dnssec_binary_t hash = {
+		.size = KR_CACHE_KEY_MAXLEN - val.len,
+		.data = val.data + val.len,
+	};
+		/* FIXME: vv this requires a patched libdnssec - tries to realloc() */
+	int ret = dnssec_nsec3_hash(&dname, &params, &hash);
+	if (ret != DNSSEC_EOK) return VAL_EMPTY;
+	val.len += hash.size;
+	return val;
 }
 
 int nsec3_encloser(struct key *k, struct answer *ans,
@@ -92,7 +143,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 	/*** One more step but searching for match this time
 	 * - that's the closest (provable) encloser. */
 
-	assert(false);
+	//assert(false);
 	return -ENOSYS;
 }
 
@@ -113,7 +164,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 	/* Handle the two cases: covered and matched. */
 
-	assert(false);
+	//assert(false);
 	return -ENOSYS;
 }
 
