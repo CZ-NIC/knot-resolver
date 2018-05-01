@@ -83,6 +83,49 @@ local function test_builtin_rules()
 	same(rcode, kres.rcode.NXDOMAIN, '0..0.ip6.arpa. returns NXDOMAIN')
 end
 
+local function get_filter(rule)
+	local _, _, filter = daf.compile(rule)
+	return filter or function () return true end
+end
+
+-- test rules parser
+local function test_parser()
+	local a_query = {stype = kres.type.A}
+	local aaaa_query = {stype = kres.type.AAAA}
+	local txt_query = {stype = kres.type.TXT}
+
+	-- invalid rules
+	nok(daf.compile('qname'), 'rejects "qname"')
+	nok(daf.compile('qname '), 'rejects "qname "')
+	nok(daf.compile('qname {'), 'rejects "qname {"')
+	nok(daf.compile('qname {A'), 'rejects "qname {A"')
+	nok(daf.compile('qname A}'), 'rejects "qname A}"')
+	nok(daf.compile('qname @ {A AAAA} deny'), 'rejects "qname @ {A AAAA} deny"')
+	nok(daf.compile('qname ~ {A AAAA} deny'), 'rejects "qname ~ {A AAAA} deny"')
+	nok(daf.compile('qname and'), 'rejects "qname and"')
+	nok(daf.compile('qname A or'), 'rejects "qname A or"')
+
+	local filters = {
+		-- test catch all
+		['deny'] = {true, true, true},
+		-- test explicit operator '='
+		['qtype = A deny'] = {true, nil, nil},
+		-- test implicit operator '='
+		['qtype A deny'] = {true, nil, nil},
+		-- test multiple arguments
+		['qtype { A TXT } deny'] = {true, true, nil},
+		['qtype {A TXT } deny'] = {true, true, nil},
+		['qtype {A TXT} deny'] = {true, true, nil},
+	}
+
+	for filter, e in pairs(filters) do
+		local match = get_filter(filter)
+		same(e[1], match(nil, a_query), 'matches ' .. filter .. ' (A query)')
+		same(e[2], match(nil, txt_query), 'matches ' .. filter .. ' (TXT query)')
+		same(e[3], match(nil, aaaa_query), 'matches ' .. filter .. ' (AAAA query)')
+	end
+end
+
 -- test filters running in begin phase
 local function test_actions()
 	local filters = {
@@ -144,6 +187,7 @@ end
 -- plan tests
 local tests = {
 	test_builtin_rules,
+	test_parser,
 	test_actions,
 	test_features,
 }
