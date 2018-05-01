@@ -1392,9 +1392,11 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		if (!choice) {
 			return ret;
 		}
-		/* Checkout answer before sending it */
+
+		/* Checkout query before sending it */
 		struct request_ctx *ctx = task->ctx;
 		if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)choice, SOCK_DGRAM, task->pktbuf) != 0) {
+			task->addrlist_turn = (task->addrlist_turn + 1) % task->addrlist_count; /* Round robin */
 			return ret;
 		}
 		ret = ioreq_spawn(task, SOCK_DGRAM, choice->sin6_family);
@@ -1414,6 +1416,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 			ret = NULL;
 		}
 	}
+
 	return ret;
 }
 
