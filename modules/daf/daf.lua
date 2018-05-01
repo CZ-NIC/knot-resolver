@@ -133,47 +133,86 @@ M.actions = {
 -- Filter rules per column
 M.filters = {
 	-- Filter on QTYPE
-	qtype = function (g)
-		local op, val = g(), g()
-		local qtype = kres.type[val]
-		if not qtype then
-			error(string.format('invalid query type "%s"', val))
+	qtype = function (op, arg)
+		for i, v in ipairs(arg) do
+			arg[i] = kres.type[v]
+			if not arg[i] then
+				panic('invalid query type "%s"', v)
+			end
 		end
-		if op == '=' then return policy.query_type(true, {qtype})
-		else error(string.format('invalid operator "%s" on qtype', op)) end
+		if op == '=' then return policy.query_type(true, arg)
+		else panic('invalid operator "%s" on qtype', op) end
 	end,
 	-- Filter on QNAME (either pattern or suffix match)
-	qname = function (g)
-		local op, val = g(), todname(g())
-		if     op == '~' then return policy.pattern(true, val:sub(2)) -- Skip leading label length
-		elseif op == '=' then return policy.suffix(true, {val})
-		else error(string.format('invalid operator "%s" on qname', op)) end
+	qname = function (op, arg)
+		if op == '~' then
+			local name = todname(arg[1])
+			if name == nil or #arg ~= 1 then
+				error('operator "~"" on qname must have exactly one domain name as an argument')
+			end
+			return policy.pattern(true, name:sub(2)) -- Skip leading label length
+		elseif op == '=' then
+			return policy.suffix(true, policy.todnames(arg))
+		else
+			panic('invalid operator "%s" on qname', op)
+		end
 	end,
 	-- Filter on NS
-	ns = function (g)
-		local op, val = g(), todname(g())
-		if op == '=' then return policy.ns_suffix(true, {val})
-		else error(string.format('invalid operator "%s" on ns', op)) end
+	ns = function (op, arg)
+		if op == '=' then return policy.ns_suffix(true, policy.todnames(arg))
+		else panic('invalid operator "%s" on ns', op) end
 	end,
 	-- Filter on source address
-	src = function (g)
-		local op = g()
-		if op ~= '=' then error('address supports only "=" operator') end
-		return view.rule_src(true, g())
+	src = function (op, arg)
+		if op ~= '=' or #arg ~= 1 then error('address supports only "=" operator with single argument') end
+		return view.rule_src(true, arg[1])
 	end,
 	-- Filter on destination address
-	dst = function (g)
-		local op = g()
-		if op ~= '=' then error('address supports only "=" operator') end
-		return view.rule_dst(true, g())
+	dst = function (op, arg)
+		if op ~= '=' or #arg ~= 1 then error('address supports only "=" operator with single argument') end
+		return view.rule_dst(true, arg[1])
 	end,
 }
 
+-- Allowed operators
+local operators = {
+	['='] = '=',
+	['~'] = '~',
+}
+
 local function parse_filter(tok, g, prev)
-	if not tok then error(string.format('expected filter after "%s"', prev)) end
+	if not tok then panic('expected filter after "%s"', prev) end
 	local filter = M.filters[tok:lower()]
-	if not filter then error(string.format('invalid filter "%s"', tok)) end
-	return filter(g)
+	if not filter then panic('invalid filter "%s"', tok) end
+	-- Parse operator (if not exists, defaults to equality like nftables)
+	-- e.g. qname = example.com
+	--      qname example.com
+	local op = g()
+	local arg
+	if not operators[op] then
+		arg = op
+		op = '='
+	else
+		arg = g()
+	end
+	if not arg then
+		panic('expected argument after filter "%s %s"', tok, op)
+	end
+	-- Parse argument table
+	-- e.g. src {192.168.1.0 127.0.0.1}
+	local res = {}
+	if arg:find('^[{]') then
+		while arg do
+			table.insert(res, arg:match('[^{}%s]+'))
+			if arg:find('[}]$') then
+				break
+			end
+			arg = g()
+		end
+	else
+		table.insert(res, arg)
+	end
+	return filter(op, res)
 end
 
 local function parse_rule(g)
@@ -203,8 +242,12 @@ end
 
 local function parse_query(g)
 	local ok, actid, filter = pcall(parse_rule, g)
-	if not ok then return nil, actid end
-	actid = actid:lower()
+	if not ok then
+		return nil, actid
+	end
+	if actid then
+		actid = actid:lower()
+	end
 	if not M.actions[actid] then
 		return nil, string.format('invalid action "%s"', actid)
 	end
@@ -219,7 +262,7 @@ end
 -- Compile a rule described by query language
 -- The query language is modelled by iptables/nftables
 -- conj = AND | OR
--- op = IS | NOT | LIKE | IN
+-- op = = | ~
 -- filter = <key> <op> <expr>
 -- rule = <filter> | <filter> <conj> <rule>
 -- action = PASS | DENY | DROP | TC | FORWARD
@@ -234,7 +277,8 @@ local function rule_info(r)
 	return {info=r.info, id=r.rule.id, active=(r.rule.suspended ~= true), count=r.rule.count}
 end
 
--- @function Remove a rule
+-- @function Parse and compile a rule
+M.compile = compile
 
 -- @function Cleanup module
 function M.deinit()
