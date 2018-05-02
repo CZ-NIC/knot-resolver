@@ -123,6 +123,7 @@ function policy.FORWARD(target)
 		table.insert(list, addr2sock(target, 53))
 	end
 	return function(state, req, qry)
+		if not qry then return end
 		req.options.FORWARD = true
 		req.options.NO_MINIMIZE = true
 		qry.flags.FORWARD = true
@@ -245,6 +246,7 @@ function policy.TLS_FORWARD(target)
 	end
 
 	return function(state, req, qry)
+		if not qry then return end
 		req.options.FORWARD = true
 		req.options.NO_MINIMIZE = true
 		qry.flags.FORWARD = true
@@ -273,6 +275,7 @@ end
 -- Set and clear some query flags
 function policy.FLAGS(opts_set, opts_clear)
 	return function(_, _, qry)
+		if not qry then return end
 		ffi.C.kr_qflags_set  (qry.flags, kres.mk_qflags(opts_set   or {}))
 		ffi.C.kr_qflags_clear(qry.flags, kres.mk_qflags(opts_clear or {}))
 		return nil -- chain rule
@@ -477,6 +480,7 @@ function policy.rpz(action, path)
 	local rules = rpz_parse(action, path)
 	collectgarbage()
 	return function(_, query)
+		if not query then return end
 		local label = query:name()
 		local rule = rules[label]
 		while rule == nil and string.len(label) > 0 do
@@ -543,6 +547,7 @@ function policy.TC(_, req)
 end
 
 function policy.QTRACE(_, req, qry)
+	if not qry then return end
 	req.options.TRACE = true
 	qry.flags.TRACE = true
 	-- continue iterating over policy list
