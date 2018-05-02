@@ -1493,7 +1493,6 @@ static void subreq_lead(struct qr_task *task)
 	if (unlikely(!tvp))
 		return; /*ENOMEM*/
 	if (unlikely(*tvp != NULL)) {
-		assert(false);
 		return;
 	}
 	*tvp = task;
