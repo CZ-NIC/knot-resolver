@@ -116,11 +116,29 @@ struct key {
 	uint8_t buf[KR_CACHE_KEY_MAXLEN];
 };
 
+/** Hash of NSEC3 parameters, used as a tag to separate different chains for same zone. */
+typedef uint32_t nsec_p_hash_t;
+static inline nsec_p_hash_t nsec_p_mkHash(const uint8_t *nsec_p)
+{
+	assert(nsec_p && !(KNOT_NSEC3_FLAG_OPT_OUT & nsec_p[1]));
+	return hash((const char *)nsec_p, nsec_p_rdlen(nsec_p));
+}
 static inline size_t key_nwz_off(const struct key *k)
 {
-	/* CACHE_KEY_DEF: zone name lf + 0 '1' + name within zone */
+	/* CACHE_KEY_DEF: zone name lf + 0 ('1' or '3').
+	 * NSEC '1' case continues just with the name within zone. */
 	return k->zlf_len + 2;
 }
+static inline size_t key_nsec3_hash_off(const struct key *k)
+{
+	/* CACHE_KEY_DEF NSEC3: tag (nsec_p_hash_t) + 20 bytes NSEC3 name hash) */
+	return key_nwz_off(k) + sizeof(nsec_p_hash_t);
+}
+/** Hash is always SHA1; I see no plans to standardize anything else.
+ * https://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml#dnssec-nsec3-parameters-3
+ */
+static const int NSEC3_HASH_LEN = 20,
+		 NSEC3_HASH_TXT_LEN = 32;
 
 /** Finish constructing string key for for exact search.
  * It's assumed that kr_dname_lf(k->buf, owner, *) had been ran.
@@ -233,7 +251,7 @@ struct answer {
 enum {
 	AR_ANSWER = 0,	/**< Positive answer record.  It might be wildcard-expanded. */
 	AR_SOA, 	/**< SOA record. */
-	AR_NSEC,	/**< NSEC* covering the SNAME. */
+	AR_NSEC,	/**< NSEC* covering the SNAME (next closer name in NSEC3 case). */
 	AR_WILD,	/**< NSEC* covering or matching the source of synthesis. */
 	AR_CPE, 	/**< NSEC3 matching the closest provable encloser. */
 };
@@ -289,13 +307,6 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 /* NSEC3 stuff.  Implementation in ./nsec3.c */
 
-typedef uint32_t nsec_p_hash_t;
-/** \note We assume it's not opt-out. */
-static inline nsec_p_hash_t nsec_p_hash(const uint8_t *nsec_p)
-{
-	assert(nsec_p);
-	return hash((const char *)nsec_p, nsec_p_rdlen(nsec_p));
-}
 
 
 /** Construct a string key for for NSEC3 predecessor-search, from an NSEC3 name.
@@ -321,4 +332,23 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 /** Shorthand for operations on cache backend */
 #define cache_op(cache, op, ...) (cache)->api->op((cache)->db, ## __VA_ARGS__)
+
+
+
+/** Consistency check, ATM common for NSEC and NSEC3. */
+static inline struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
+{
+	/* ATM it's enough to just extend the checks for exact entries. */
+	const struct entry_h *eh = entry_h_consistent(data, KNOT_RRTYPE_NSEC);
+	bool ok = eh != NULL;
+	ok = ok && !eh->is_packet && !eh->has_optout;
+	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
+}
+
+static inline uint16_t get_uint16(const void *address)
+{
+	uint16_t tmp;
+	memcpy(&tmp, address, sizeof(tmp));
+	return tmp;
+}
 

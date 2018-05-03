@@ -781,8 +781,14 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 	struct key k_storage, *k = &k_storage;
 	knot_db_val_t key;
 	switch (rr->type) {
-	case KNOT_RRTYPE_NSEC:
 	case KNOT_RRTYPE_NSEC3:
+		if (rr->rrs.rr_count != 1
+		    || (KNOT_NSEC3_FLAG_OPT_OUT & knot_nsec3_flags(&rr->rrs, 0))) {
+			/* Skip "suspicious" or opt-out NSEC3 sets. */
+			return kr_ok();
+		}
+		/* fall through */
+	case KNOT_RRTYPE_NSEC:
 		if (!kr_rank_test(rank, KR_RANK_SECURE)) {
 			/* Skip any NSEC*s that aren't validated. */
 			return kr_ok();
@@ -805,7 +811,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 		assert(rr->type == KNOT_RRTYPE_NSEC3);
 		const knot_rdata_t *np_data = knot_rdata_data(rr->rrs.data);
 		const int np_dlen = nsec_p_rdlen(np_data);
-		key = key_NSEC3(k, encloser, nsec_p_hash(np_data));
+		key = key_NSEC3(k, encloser, nsec_p_mkHash(np_data));
 		if (npp && !*npp) {
 			*npp = mm_alloc(&qry->request->pool, np_dlen);
 			if (!*npp) {

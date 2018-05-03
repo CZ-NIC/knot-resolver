@@ -49,4 +49,24 @@ int32_t base32hex_decode(const uint8_t  *in,
                          uint8_t        *out,
                          const uint32_t out_len);
 
+
+/*!
+ * \brief Encodes binary data using Base32hex.
+ *
+ * \note Output data buffer contains Base32hex text string which isn't
+ *       terminated with '\0'!
+ *
+ * \param in		Input binary data.
+ * \param in_len	Length of input data.
+ * \param out		Output data buffer.
+ * \param out_len	Size of output buffer.
+ *
+ * \retval >=0		length of output string.
+ * \retval <0		if error.
+ */
+int32_t base32hex_encode(const uint8_t  *in,
+                         const uint32_t in_len,
+                         uint8_t        *out,
+                         const uint32_t out_len);
+
 /*! @} */

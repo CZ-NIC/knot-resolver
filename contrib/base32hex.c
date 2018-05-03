@@ -205,3 +205,85 @@ int32_t base32hex_decode(const uint8_t  *in,
 
 	return (bin - out);
 }
+
+int32_t base32hex_encode(const uint8_t  *in,
+                         const uint32_t in_len,
+                         uint8_t        *out,
+                         const uint32_t out_len)
+{
+	// Checking inputs.
+	if (in == NULL || out == NULL) {
+		return -1;
+	}
+	if (in_len > MAX_BIN_DATA_LEN || out_len < ((in_len + 4) / 5) * 8) {
+		return -1;
+	}
+
+	uint8_t		rest_len = in_len % 5;
+	const uint8_t	*stop = in + in_len - rest_len;
+	uint8_t		*text = out;
+
+	// Encoding loop takes 5 bytes and creates 8 characters.
+	while (in < stop) {
+		text[0] = base32hex_enc[in[0] >> 3];
+		text[1] = base32hex_enc[(in[0] & 0x07) << 2 | in[1] >> 6];
+		text[2] = base32hex_enc[(in[1] & 0x3E) >> 1];
+		text[3] = base32hex_enc[(in[1] & 0x01) << 4 | in[2] >> 4];
+		text[4] = base32hex_enc[(in[2] & 0x0F) << 1 | in[3] >> 7];
+		text[5] = base32hex_enc[(in[3] & 0x7C) >> 2];
+		text[6] = base32hex_enc[(in[3] & 0x03) << 3 | in[4] >> 5];
+		text[7] = base32hex_enc[in[4] & 0x1F];
+		text += 8;
+		in += 5;
+	}
+
+	// Processing of padding, if any.
+	switch (rest_len) {
+	case 4:
+		text[0] = base32hex_enc[in[0] >> 3];
+		text[1] = base32hex_enc[(in[0] & 0x07) << 2 | in[1] >> 6];
+		text[2] = base32hex_enc[(in[1] & 0x3E) >> 1];
+		text[3] = base32hex_enc[(in[1] & 0x01) << 4 | in[2] >> 4];
+		text[4] = base32hex_enc[(in[2] & 0x0F) << 1 | in[3] >> 7];
+		text[5] = base32hex_enc[(in[3] & 0x7C) >> 2];
+		text[6] = base32hex_enc[(in[3] & 0x03) << 3];
+		text[7] = base32hex_pad;
+		text += 8;
+		break;
+	case 3:
+		text[0] = base32hex_enc[in[0] >> 3];
+		text[1] = base32hex_enc[(in[0] & 0x07) << 2 | in[1] >> 6];
+		text[2] = base32hex_enc[(in[1] & 0x3E) >> 1];
+		text[3] = base32hex_enc[(in[1] & 0x01) << 4 | in[2] >> 4];
+		text[4] = base32hex_enc[(in[2] & 0x0F) << 1];
+		text[5] = base32hex_pad;
+		text[6] = base32hex_pad;
+		text[7] = base32hex_pad;
+		text += 8;
+		break;
+	case 2:
+		text[0] = base32hex_enc[in[0] >> 3];
+		text[1] = base32hex_enc[(in[0] & 0x07) << 2 | in[1] >> 6];
+		text[2] = base32hex_enc[(in[1] & 0x3E) >> 1];
+		text[3] = base32hex_enc[(in[1] & 0x01) << 4];
+		text[4] = base32hex_pad;
+		text[5] = base32hex_pad;
+		text[6] = base32hex_pad;
+		text[7] = base32hex_pad;
+		text += 8;
+		break;
+	case 1:
+		text[0] = base32hex_enc[in[0] >> 3];
+		text[1] = base32hex_enc[(in[0] & 0x07) << 2];
+		text[2] = base32hex_pad;
+		text[3] = base32hex_pad;
+		text[4] = base32hex_pad;
+		text[5] = base32hex_pad;
+		text[6] = base32hex_pad;
+		text[7] = base32hex_pad;
+		text += 8;
+		break;
+	}
+
+	return (text - out);
+}

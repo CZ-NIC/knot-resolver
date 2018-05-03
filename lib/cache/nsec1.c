@@ -26,7 +26,6 @@
 /** Reconstruct a name into a buffer (assuming length at least KNOT_DNAME_MAXLEN). */
 static int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
 		 knot_db_val_t kwz)
-/* TODO: probably move to a place shared with with NSEC3, perhaps with key_NSEC* */
 {
 	/* Reconstruct from key: first the ending, then zone name. */
 	int ret = knot_dname_lf2wire(buf, kwz.len, kwz.data);
@@ -127,14 +126,6 @@ static int kwz_between(knot_db_val_t k1, knot_db_val_t k2, knot_db_val_t k4)
 	}
 }
 
-static struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
-{
-	/* ATM it's enough to just extend the checks for exact entries. */
-	const struct entry_h *eh = entry_h_consistent(data, KNOT_RRTYPE_NSEC);
-	bool ok = eh != NULL;
-	ok = ok && !(eh->is_packet || eh->has_optout);
-	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
-}
 
 /** NSEC1 range search.
  *
@@ -218,7 +209,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	/* it's *full* name ATM */
 	const knot_dname_t *next = eh->data + KR_CACHE_RR_COUNT_SIZE
 				 + 2 /* RDLENGTH from rfc1034 */;
-	if (!eh->data[0]) {
+	if (KR_CACHE_RR_COUNT_SIZE != 2 || get_uint16(eh->data) == 0) {
 		assert(false);
 		return "ERROR";
 		/* TODO: more checks?  Also, `next` computation is kinda messy. */
@@ -296,8 +287,6 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 		return ESKIP;
 	}
 
-	const struct entry_h *nsec_eh = val.data;
-	const void *nsec_eh_bound = val.data + val.len;
 
 	/* Get owner name of the record. */
 	const knot_dname_t *owner;
@@ -311,6 +300,8 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	}
 	/* Basic checks OK -> materialize data. */
 	{
+		const struct entry_h *nsec_eh = val.data;
+		const void *nsec_eh_bound = val.data + val.len;
 		int ret = entry2answer(ans, AR_NSEC, nsec_eh, nsec_eh_bound,
 					owner, KNOT_RRTYPE_NSEC, new_ttl);
 		if (ret) return kr_error(ret);
