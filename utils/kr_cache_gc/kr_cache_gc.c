@@ -18,6 +18,9 @@
 #include "categories.h"
 #include "db.h"
 
+#define MAX_OK_PERCENT_USAGE 80.0
+#define TO_BE_FREED_PERCENT 10.0
+
 // section: timer
 // TODO replace/move to contrib
 
@@ -99,6 +102,7 @@ static void entry_dynarray_deep_free(entry_dynarray_t *d)
 
 typedef struct {
 	size_t categories_sizes[CATEGORIES];
+	size_t records;
 } ctx_compute_categories_t;
 
 int cb_compute_categories(const knot_db_val_t *key, gc_record_info_t *info, void *vctx)
@@ -107,6 +111,7 @@ int cb_compute_categories(const knot_db_val_t *key, gc_record_info_t *info, void
 	category_t cat = kr_gc_categorize(info);
 	(void)key;
 	ctx->categories_sizes[cat] += info->entry_size;
+	ctx->records++;
 	return KNOT_EOK;
 }
 
@@ -148,6 +153,11 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 		return ret;
 	}
 
+	if (db_usage < MAX_OK_PERCENT_USAGE) {
+		kr_gc_cache_close(&kres_db, db);
+		return KNOT_EOK;
+	}
+
 	gc_timer_t timer_analyze = { 0 }, timer_choose = { 0 }, timer_delete = { 0 }, timer_rw_txn = { 0 };
 
 	gc_timer_start(&timer_analyze);
@@ -158,8 +168,22 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 		return ret;
 	}
 
-	category_t limit_category = 50; // TODO fix this computation
-	printf("Cache analyzed in %.2lf secs, limit category is %d.\n", gc_timer_end(&timer_analyze), limit_category);
+	ssize_t amount_tofree = (double)knot_db_lmdb_get_mapsize(db) * TO_BE_FREED_PERCENT / 100.0;
+
+	// debug
+	/*printf("tofree: %zd\n", amount_tofree);
+	for (int i = 0; i < CATEGORIES; i++) {
+		if (cats.categories_sizes[i] > 0) {
+			printf("category %d size %zu\n", i, cats.categories_sizes[i]);
+		}
+	}*/
+
+	category_t limit_category = CATEGORIES;
+	while (limit_category > 0 && amount_tofree > 0) {
+		amount_tofree -= cats.categories_sizes[--limit_category];
+	}
+
+	printf("Cache analyzed in %.2lf secs, %zu records, limit category is %d.\n", gc_timer_end(&timer_analyze), cats.records, limit_category);
 
 	gc_timer_start(&timer_choose);
 	ctx_delete_categories_t to_del = { 0 };
