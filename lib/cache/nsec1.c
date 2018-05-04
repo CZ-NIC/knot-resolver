@@ -23,7 +23,8 @@
 #include "lib/layer/iterate.h"
 
 
-/** Reconstruct a name into a buffer (assuming length at least KNOT_DNAME_MAXLEN). */
+/** Reconstruct a name into a buffer (assuming length at least KNOT_DNAME_MAXLEN).
+ * \return kr_ok() or error code (<0). */
 static int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
 		 knot_db_val_t kwz)
 {

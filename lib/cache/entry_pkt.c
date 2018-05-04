@@ -71,22 +71,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	const bool want_pkt = qry->flags.DNSSEC_BOGUS
 		|| (is_negative && (qry->flags.DNSSEC_INSECURE || !qry->flags.DNSSEC_WANT));
 
-	/* Also stash packets that contain an NSEC3.
-	 * LATER(NSEC3): remove when aggressive NSEC3 works. */
-	bool with_nsec3 = false;
-	if (!want_pkt && qry->flags.DNSSEC_WANT && !qry->flags.DNSSEC_BOGUS
-	    && !qry->flags.DNSSEC_INSECURE) {
-		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
-		for (unsigned k = 0; k < sec->count; ++k) {
-			if (knot_pkt_rr(sec, k)->type == KNOT_RRTYPE_NSEC3) {
-				with_nsec3 = true;
-				VERBOSE_MSG(qry, "NSEC3 found\n");
-				break;
-			}
-		}
-	}
-
-	if (!(want_pkt || with_nsec3) || !knot_wire_get_aa(pkt->wire)
+	if (!(want_pkt || qry->flags.DNSSEC_OPTOUT) || !knot_wire_get_aa(pkt->wire)
 	    || pkt->parsed != pkt->size /* malformed packet; still can't detect KNOT_EFEWDATA */
 	   ) {
 		return;
@@ -108,7 +93,8 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 			kr_rank_set(&rank, KR_RANK_INSECURE);
 		} else if (!qry->flags.DNSSEC_WANT) {
 			/* no TAs at all, leave _RANK_AUTH */
-		} else if (with_nsec3) {
+		} else if (qry->flags.DNSSEC_OPTOUT) {
+			/* FIXME XXX review OPTOUT in this function again! */
 			/* All bad cases should be filtered above,
 			 * at least the same way as pktcache in kresd 1.5.x. */
 			kr_rank_set(&rank, KR_RANK_SECURE);

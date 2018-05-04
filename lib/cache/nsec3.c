@@ -107,6 +107,7 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		/* FIXME: vv this requires a patched libdnssec - tries to realloc() */
 	int ret = dnssec_nsec3_hash(&dname, nsec3_p, &hash);
 	if (ret != DNSSEC_EOK) return VAL_EMPTY;
+	assert(hash.size == NSEC3_HASH_LEN);
 	val.len += hash.size;
 	return val;
 }
@@ -203,8 +204,8 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 		/* TODO: more checks?  Also, `next` computation is kinda messy. */
 	}
 	const uint8_t *hash_next = next_rdata + nsec_p_rdlen(next_rdata)
-				 + sizeof(uint16_t) /* hash length from rfc5155 */;
-	if (get_uint16(hash_next - sizeof(uint16_t)) != NSEC3_HASH_LEN) {
+				 + sizeof(uint8_t) /* hash length from rfc5155 */;
+	if (hash_next[-1] != NSEC3_HASH_LEN) {
 		assert(false); // FIXME: just debug, possible bogus input in real life
 		return "unexpected next hash length";
 	}
@@ -220,16 +221,27 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	return NULL;
 }
 
-static int dname_wire_reconstruct(knot_dname_t *buf, const knot_dname_t *zname,
-				  const uint8_t *hash_low)
+static void nsec3_raw_hash2text(const uint8_t *hash_raw, char *text)
 {
-	int len = base32hex_encode(hash_low, NSEC3_HASH_LEN, buf + 1, KNOT_DNAME_MAXLEN);
+	int len = base32hex_encode(hash_raw, NSEC3_HASH_LEN, (uint8_t *)text,
+				   NSEC3_HASH_TXT_LEN);
+	assert(len == NSEC3_HASH_TXT_LEN);
+	text[NSEC3_HASH_TXT_LEN] = '\0';
+}
+
+/** Reconstruct a name into a buffer (assuming length at least KNOT_DNAME_MAXLEN).
+ * \return kr_ok() or error code (<0). */
+static int dname_wire_reconstruct(knot_dname_t *buf, const knot_dname_t *zname,
+				  const uint8_t *hash_raw)
+{
+	int len = base32hex_encode(hash_raw, NSEC3_HASH_LEN, buf + 1, NSEC3_HASH_TXT_LEN);
 	if (len != NSEC3_HASH_TXT_LEN) {
 		assert(false);
 		return kr_error(EINVAL);
 	}
 	buf[0] = len;
-	return knot_dname_to_wire(buf + 1 + len, zname, KNOT_DNAME_MAXLEN - 1 - len);
+	int ret = knot_dname_to_wire(buf + 1 + len, zname, KNOT_DNAME_MAXLEN - 1 - len);
+	return ret < 0 ? kr_error(ret) : kr_ok();
 }
 
 static void nsec3_hash2text(const knot_dname_t *owner, char *text)
@@ -274,11 +286,23 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 	const knot_dname_t *name = qry->sname;
 	for (int name_labels = sname_labels; name_labels >= zname_labels;
 					--name_labels, name += 1 + name[0]) {
+		/* Optimization: avoid last iteration if pointless. */
+		if (name_labels == zname_labels && last_nxproven_labels != name_labels + 1) {
+			break;
+		}
+
 		/* Find a previous-or-equal NSEC3 in cache covering the name,
 		 * checking TTL etc. */
 		const knot_db_val_t key =
 			key_NSEC3_name(k, name, false, nsec_p_hash, &nsec3_p);
 		if (!key.data) continue;
+		WITH_VERBOSE(qry) {
+			char hash_txt[NSEC3_HASH_TXT_LEN + 1];
+			nsec3_raw_hash2text(key.data + key.len - NSEC3_HASH_LEN, hash_txt);
+				/* CACHE_KEY_DEF ^^ */
+			VERBOSE_MSG(qry, "=> NSEC3: depth %d, hash %s\n",
+					name_labels - zname_labels, hash_txt);
+		}
 		knot_db_val_t val = { NULL, 0 };
 		bool exact_match;
 		uint32_t new_ttl;
@@ -304,17 +328,11 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		}
 
 		/* Get owner name of the record. */
-		const knot_dname_t *owner;
-		knot_dname_t owner_buf[KNOT_DNAME_MAXLEN];
-		if (exact_match) {
-			owner = name;
-		} else {
-			int ret = dname_wire_reconstruct(owner_buf, k->zname, hash_low);
-			if (unlikely(ret)) {
-				assert(false); // FIXME: just debug, possible long zname in real life
-				continue;
-			}
-			owner = owner_buf;
+		knot_dname_t owner[KNOT_DNAME_MAXLEN];
+		int ret = dname_wire_reconstruct(owner, k->zname, hash_low);
+		if (unlikely(ret)) {
+			assert(false); // FIXME: just debug, possible long zname in real life
+			continue;
 		}
 
 		/* Basic checks OK -> materialize data, cleaning any previous
@@ -340,7 +358,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 				char hash_low_txt[NSEC3_HASH_TXT_LEN + 1];
 				nsec3_hash2text(owner, hash_low_txt);
 				VERBOSE_MSG(qry,
-					"=> NSEC3: depth %d covered by: %s -> TODO, new TTL %d\n",
+					"=> NSEC3: depth %d, covered by: %s -> TODO, new TTL %d\n",
 					name_labels - zname_labels, hash_low_txt, new_ttl);
 			}
 			continue;
@@ -376,11 +394,10 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		}
 		/* NXDOMAIN proven *except* for wildcards. */
 		WITH_VERBOSE(qry) {
-			char hash_clencl_txt[NSEC3_HASH_TXT_LEN + 1];
-			nsec3_hash2text(owner, hash_clencl_txt);
+			auto_free char *name_str = kr_dname_text(name);
 			VERBOSE_MSG(qry,
 				"=> NSEC3 encloser: confirmed as %s, new TTL %d\n",
-				hash_clencl_txt, new_ttl);
+				name_str, new_ttl);
 		}
 		*clencl_labels = name_labels;
 		ans->rcode = PKT_NXDOMAIN;
@@ -414,6 +431,10 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	/* Find the NSEC3 in cache (or exit). */
 
 	/* Handle the two cases: covered and matched. */
+
+	/* FIXME XXX */
+	VERBOSE_MSG(qry, "=> NSEC3 wildcard: assumed as nonexistent!\n");
+	return AR_SOA;
 
 	//assert(false);
 	return -ENOSYS;
