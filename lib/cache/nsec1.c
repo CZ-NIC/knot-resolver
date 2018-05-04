@@ -287,7 +287,6 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 		return ESKIP;
 	}
 
-
 	/* Get owner name of the record. */
 	const knot_dname_t *owner;
 	knot_dname_t owner_buf[KNOT_DNAME_MAXLEN];
@@ -312,10 +311,10 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	uint8_t *bm = NULL;
 	uint16_t bm_size = 0;
 	knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
+	assert(bm);
 
 	if (exact_match) {
 		if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) != 0) {
-			assert(bm);
 			VERBOSE_MSG(qry,
 				"=> NSEC sname: match but failed type check\n");
 			return ESKIP;

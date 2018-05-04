@@ -254,30 +254,28 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		return kr_error(EINVAL);
 	}
 
-	// FIXME get *nsec_p - possibly just add to the parameter list
-	const uint8_t *nsec_p = NULL;
-	const nsec_p_hash_t nsec_p_hash = nsec_p_mkHash(nsec_p);
+	const nsec_p_hash_t nsec_p_hash = nsec_p_mkHash(ans->nsec_p);
 	/* Convert NSEC3 params to another format. */
 	dnssec_nsec3_params_t nsec3_p;
 	{
 		const dnssec_binary_t rdata = {
-			.size = nsec_p_rdlen(nsec_p),
-			.data = (uint8_t *)/*const-cast*/nsec_p,
+			.size = nsec_p_rdlen(ans->nsec_p),
+			.data = (uint8_t *)/*const-cast*/ans->nsec_p,
 		};
 		int ret = dnssec_nsec3_params_from_rdata(&nsec3_p, &rdata);
 		if (ret != DNSSEC_EOK) return kr_error(ret);
 	}
 
-	/*** Find and cover the next closer name - cycle: name starting at sname,
-	 * proceeding while longer than zname, shortening by one label on step. */
+	/*** Find the closest encloser - cycle: name starting at sname,
+	 * proceeding while longer than zname, shortening by one label on step.
+	 * We need a pair where a name doesn't exist *and* its parent does. */
 	const int zname_labels = knot_dname_labels(k->zname, NULL);
+	int last_nxproven_labels = -1;
 	const knot_dname_t *name = qry->sname;
-	for (int name_labels = sname_labels; name_labels > zname_labels;
+	for (int name_labels = sname_labels; name_labels >= zname_labels;
 					--name_labels, name += 1 + name[0]) {
-		/*** Find a previous-or-equal NSEC3 in cache covering the name,
-		 * checking TTL etc.
-		 * Exit if match is found (may have NODATA proof if the first iteration),
-		 * break if cover is found. */
+		/* Find a previous-or-equal NSEC3 in cache covering the name,
+		 * checking TTL etc. */
 		const knot_db_val_t key =
 			key_NSEC3_name(k, name, false, nsec_p_hash, &nsec3_p);
 		if (!key.data) continue;
@@ -295,15 +293,15 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 			}
 			continue;
 		}
-		if (exact_match && name_labels != sname_labels) {
-			/* This name exists (checked rank and TTL), so we do not
-			 * continue trying to prove non-existence above this name. */
+		if (exact_match && name_labels != sname_labels
+				&& name_labels + 1 != last_nxproven_labels) {
+			/* This name exists (checked rank and TTL), and it's
+			 * neither of the two interesting cases, so we do not
+			 * keep searching for non-existence above this name. */
 			VERBOSE_MSG(qry,
 				"=> NSEC3 encloser: only found existence of an ancestor\n");
 			return ESKIP;
 		}
-
-		/* FIXME XXX: rethink delegation/ancestor checks */
 
 		/* Get owner name of the record. */
 		const knot_dname_t *owner;
@@ -318,24 +316,45 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 			}
 			owner = owner_buf;
 		}
-		/* Basic checks OK -> materialize data. */
+
+		/* Basic checks OK -> materialize data, cleaning any previous
+		 * records on that answer index (unsuccessful attempts). */
+		const int ans_id = (exact_match && name_labels + 1 == last_nxproven_labels)
+				 ? AR_WILD : AR_NSEC;
 		{
 			const struct entry_h *nsec_eh = val.data;
 			const void *nsec_eh_bound = val.data + val.len;
-			int ret = entry2answer(ans, AR_NSEC, nsec_eh, nsec_eh_bound,
+			memset(&ans->rrsets[ans_id], 0, sizeof(ans->rrsets[ans_id]));
+			int ret = entry2answer(ans, ans_id, nsec_eh, nsec_eh_bound,
 						owner, KNOT_RRTYPE_NSEC3, new_ttl);
 			if (ret) return kr_error(ret);
 		}
-		/* Final checks, split for matching vs. covering our name. */
-		const knot_rrset_t *nsec_rr = ans->rrsets[AR_NSEC].set.rr;
+		if (!exact_match) {
+			/* Non-existence proven, but we don't know if `name`
+			 * is the next closer name.
+			 * Note: we don't need to check for the sname being
+			 * delegated away by this record, as with NSEC3 only
+			 * *exact* match on an ancestor could do that. */
+			last_nxproven_labels = name_labels;
+			WITH_VERBOSE(qry) {
+				char hash_low_txt[NSEC3_HASH_TXT_LEN + 1];
+				nsec3_hash2text(owner, hash_low_txt);
+				VERBOSE_MSG(qry,
+					"=> NSEC3: depth %d covered by: %s -> TODO, new TTL %d\n",
+					name_labels - zname_labels, hash_low_txt, new_ttl);
+			}
+			continue;
+		}
+
+		/* Exactly matched NSEC3: two cases, one after another. */
+		const knot_rrset_t *nsec_rr = ans->rrsets[ans_id].set.rr;
 		uint8_t *bm = NULL;
 		uint16_t bm_size = 0;
 		knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
-		if (exact_match) {
-			assert(name_labels == sname_labels);
+		assert(bm);
+		if (name_labels == sname_labels) {
 			if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype,
 							nsec_rr->owner) != 0) {
-				assert(bm);
 				VERBOSE_MSG(qry,
 					"=> NSEC3 sname: match but failed type check\n");
 				return ESKIP;
@@ -346,33 +365,37 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 				new_ttl);
 			ans->rcode = PKT_NODATA;
 			return kr_ok();
+
 		} /* else */
 
-		/* Inexact match.  First check if name is delegated by that NSEC3. */
-		if (kr_nsec_children_in_zone_check(bm, bm_size) != 0
-		    && knot_dname_matched_labels()) {
+		assert(name_labels + 1 == last_nxproven_labels);
+		if (kr_nsec_children_in_zone_check(bm, bm_size) != 0) {
 			VERBOSE_MSG(qry,
-				"=> NSEC3 sname: covered but delegated (or error)\n");
+				"=> NSEC3 encloser: found but delegated (or error)\n");
 			return ESKIP;
 		}
-
-		/*** One more step but searching for match this time
-		 * - that's the closest (provable) encloser. */
-
-		/* Non-existence proven *except* for wildcards. */
+		/* NXDOMAIN proven *except* for wildcards. */
 		WITH_VERBOSE(qry) {
-			char hash_low_txt[NSEC3_HASH_TXT_LEN + 1];
-			nsec3_hash2text(owner, hash_low_txt);
+			char hash_clencl_txt[NSEC3_HASH_TXT_LEN + 1];
+			nsec3_hash2text(owner, hash_clencl_txt);
 			VERBOSE_MSG(qry,
-				"=> NSEC3 sname: covered by: %s -> TODO, new TTL %d\n",
-				hash_low_txt, new_ttl);
+				"=> NSEC3 encloser: confirmed as %s, new TTL %d\n",
+				hash_clencl_txt, new_ttl);
 		}
+		*clencl_labels = name_labels;
+		ans->rcode = PKT_NXDOMAIN;
+		/* Avoid repeated NSEC3 - remove either if the hashes match.
+		 * This is very unlikely in larger zones: 1/size (per attempt). */
+		if (unlikely(0 == memcmp(ans->rrsets[AR_NSEC].set.rr->owner + 1,
+					 ans->rrsets[AR_WILD].set.rr->owner + 1,
+					 NSEC3_HASH_LEN))) {
+			memset(&ans->rrsets[AR_WILD], 0, sizeof(ans->rrsets[AR_WILD]));
+		}
+		return kr_ok();
 	}
 
-
-
-	//assert(false);
-	return -ENOSYS;
+	/* ran out of options */
+	return ESKIP;
 }
 
 int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,

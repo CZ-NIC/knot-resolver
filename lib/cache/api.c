@@ -334,7 +334,7 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		    const struct kr_query *qry, struct kr_cache *cache);
 
 static int peek_encloser(
-	struct key *k, struct answer *ans, const uint8_t *nsec_p, const int sname_labels,
+	struct key *k, struct answer *ans, const int sname_labels,
 	uint8_t lowest_rank, const struct kr_query *qry, struct kr_cache *cache);
 
 /** function for .produce phase */
@@ -481,10 +481,10 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		memcpy(&stamp, el[i].data, sizeof(stamp));
 		const int32_t remains = stamp - qry->timestamp.tv_sec; /* using SOA serial arith. */
 		if (remains < 0) goto cont;
-		const uint8_t *nsec_p = el[i].len > sizeof(stamp) ?
+		ans.nsec_p = el[i].len > sizeof(stamp) ?
 			el[i].data + sizeof(stamp) : NULL;
 		/**** 2. and 3. inside */
-		ret = peek_encloser(k, &ans, nsec_p, sname_labels,
+		ret = peek_encloser(k, &ans, sname_labels,
 					lowest_rank, qry, cache);
 		if (!ret) break;
 		if (ret < 0) return ctx->state;
@@ -580,11 +580,9 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
  * \return 0: success (may need SOA);  >0: try other nsec_p;  <0: exit cache immediately.
  */
 static int peek_encloser(
-	struct key *k, struct answer *ans, const uint8_t *nsec_p, const int sname_labels,
+	struct key *k, struct answer *ans, const int sname_labels,
 	uint8_t lowest_rank, const struct kr_query *qry, struct kr_cache *cache)
 {
-	ans->nsec_v = nsec_p ? 3 : 1;
-
 	/** Start of NSEC* covering the sname;
 	 * it's part of key - the one within zone (read only) */
 	knot_db_val_t cover_low_kwz = { NULL, 0 };
@@ -597,11 +595,11 @@ static int peek_encloser(
 
 	/**** 2. Find a closest (provable) encloser (of sname). */
 	int clencl_labels = -1;
-	if (!nsec_p) { /* NSEC */
+	if (!ans->nsec_p) { /* NSEC */
 		int ret = nsec1_encloser(k, ans, sname_labels, &clencl_labels,
 					 &cover_low_kwz, &cover_hi_kwz, qry, cache);
 		if (ret) return ret;
-	} else { //XXX NSEC3
+	} else {
 		int ret = nsec3_encloser(k, ans, sname_labels, &clencl_labels,
 					 &cover_low_kwz, &cover_hi_kwz, qry, cache);
 		if (ret) return ret;
@@ -622,14 +620,14 @@ static int peek_encloser(
 	/**** 3. source of synthesis checks, in case sname was covered.
 	 **** 3a. We want to query for NSEC* of source of synthesis (SS) or its
 	 * predecessor, providing us with a proof of its existence or non-existence. */
-	if (sname_covered && !nsec_p) {
+	if (sname_covered && !ans->nsec_p) {
 		int ret = nsec1_src_synth(k, ans, clencl_name,
 					  cover_low_kwz, cover_hi_kwz, qry, cache);
 		if (ret == AR_SOA) return 0;
 		assert(ret <= 0);
 		if (ret) return ret;
 
-	} else if (sname_covered && nsec_p) {
+	} else if (sname_covered && ans->nsec_p) {
 		//XXX NSEC3
 		int ret = nsec3_src_synth(k, ans, clencl_name,
 					  cover_low_kwz, cover_hi_kwz, qry, cache);

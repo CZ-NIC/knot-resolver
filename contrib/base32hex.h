@@ -51,7 +51,7 @@ int32_t base32hex_decode(const uint8_t  *in,
 
 
 /*!
- * \brief Encodes binary data using Base32hex.
+ * \brief Encodes binary data using Base32hex.  Lower case is used!
  *
  * \note Output data buffer contains Base32hex text string which isn't
  *       terminated with '\0'!

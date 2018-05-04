@@ -241,7 +241,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data);
 /** Partially constructed answer when gathering RRsets from cache. */
 struct answer {
 	int rcode;	/**< PKT_NODATA, etc. */
-	uint8_t nsec_v;	/**< 1 or 3; Let's avoid mixing NSEC with NSEC3 in one answer. */
+	const uint8_t *nsec_p;	/**< Let's avoid mixing different NSEC* parameters in one answer. */
 	knot_mm_t *mm;	/**< Allocator for rrsets */
 	struct answer_rrset {
 		ranked_rr_array_entry_t set;	/**< set+rank for the main data */
@@ -251,7 +251,7 @@ struct answer {
 enum {
 	AR_ANSWER = 0,	/**< Positive answer record.  It might be wildcard-expanded. */
 	AR_SOA, 	/**< SOA record. */
-	AR_NSEC,	/**< NSEC* covering the SNAME (next closer name in NSEC3 case). */
+	AR_NSEC,	/**< NSEC* covering or matching the SNAME (next closer name in NSEC3 case). */
 	AR_WILD,	/**< NSEC* covering or matching the source of synthesis. */
 	AR_CPE, 	/**< NSEC3 matching the closest provable encloser. */
 };

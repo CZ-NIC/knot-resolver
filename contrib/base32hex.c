@@ -23,9 +23,9 @@
 #define MAX_BIN_DATA_LEN	((INT32_MAX / 8) * 5)
 
 /*! \brief Base32hex padding character. */
-const uint8_t base32hex_pad = '=';
-/*! \brief Base32hex alphabet. */
-const uint8_t base32hex_enc[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
+static const uint8_t base32hex_pad = '=';
+/*! \brief Base32hex alphabet.  Beware: original code was upper-case. */
+static const uint8_t base32hex_enc[] = "0123456789abcdefghijklmnopqrstuv";
 
 /*! \brief Indicates bad Base32hex character. */
 #define KO	255
@@ -33,7 +33,7 @@ const uint8_t base32hex_enc[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
 #define PD	 32
 
 /*! \brief Transformation and validation table for decoding Base32hex. */
-const uint8_t base32hex_dec[256] = {
+static const uint8_t base32hex_dec[256] = {
 	[  0] = KO, [ 43] = KO, ['V'] = 31, [129] = KO, [172] = KO, [215] = KO,
 	[  1] = KO, [ 44] = KO, ['W'] = KO, [130] = KO, [173] = KO, [216] = KO,
 	[  2] = KO, [ 45] = KO, ['X'] = KO, [131] = KO, [174] = KO, [217] = KO,
