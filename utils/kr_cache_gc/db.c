@@ -3,6 +3,7 @@
 #include <lib/cache/impl.h>
 //#include <lib/defines.h>
 
+#include <time.h>
 #include <sys/stat.h>
 
 struct libknot_lmdb_env
@@ -130,8 +131,7 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 	knot_db_iter_t *it = NULL;
 	const knot_db_api_t *api = knot_db_lmdb_api();
 	gc_record_info_t info = { 0 };
-	// TODO remove and use time(NULL) ! this is just for debug with pre-generated cache
-	int64_t now = 1524301784;
+	int64_t now = time(NULL);
 
 	int ret = api->txn_begin(knot_db, &txn, KNOT_DB_RDONLY);
 	if (ret != KNOT_EOK) {
