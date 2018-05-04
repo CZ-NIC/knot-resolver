@@ -3,7 +3,6 @@
 #include <limits.h>
 #include <stdio.h>
 #include <time.h>
-#include <sys/stat.h>
 
 // libknot includes
 #include <libknot/libknot.h>
@@ -16,8 +15,8 @@
 
 #include "kr_cache_gc.h"
 
-// TODO remove and use time(NULL) ! this is just for debug with pre-generated cache
-int64_t now = 1524301784;
+#include "categories.h"
+#include "db.h"
 
 // section: timer
 // TODO replace/move to contrib
@@ -44,63 +43,6 @@ static unsigned long gc_timer_usecs(gc_timer_t *t)
 	gc_timer_t end = { 0 };
 	(void)clock_gettime(CLOCK_MONOTONIC, &end);
 	return ((end.tv_sec - start->tv_sec) * 1000000UL + (end.tv_nsec - start->tv_nsec) / 1000UL);
-}
-
-// section: function key_consistent
-
-static const uint16_t *key_consistent(knot_db_val_t key)
-{
-	const static uint16_t NSEC1 = KNOT_RRTYPE_NSEC;
-	uint8_t *p = key.data;
-	while(*p != 0) {
-		while(*p++ != 0) {
-			if (p - (uint8_t *)key.data >= key.len) {
-				return NULL;
-			}
-		}
-	}
-	if (p - (uint8_t *)key.data >= key.len) {
-		return NULL;
-	}
-	switch (*++p) {
-	case 'E':
-		return (p + 2 - (uint8_t *)key.data >= key.len ? NULL : (uint16_t *)(p + 1));
-	case '1':
-		return &NSEC1;
-	default:
-		return NULL;
-	}
-}
-
-// section: converting struct lmdb_env from resolver-format to libknot-format
-
-struct libknot_lmdb_env
-{
-	bool shared;
-	unsigned dbi;
-	void *env;
-	knot_mm_t *pool;
-};
-
-struct kres_lmdb_env
-{
-	size_t mapsize;
-	unsigned dbi;
-	void *env;
-	// sub-struct txn ommited
-};
-
-static knot_db_t *knot_db_t_kres2libknot(const knot_db_t *db)
-{
-	const struct kres_lmdb_env *kres_db = db; // this is struct lmdb_env as in resolver/cdb_lmdb.c
-	struct libknot_lmdb_env *libknot_db = malloc(sizeof(*libknot_db));
-	if (libknot_db != NULL) {
-		libknot_db->shared = false;
-		libknot_db->pool = NULL;
-		libknot_db->env = kres_db->env;
-		libknot_db->dbi = kres_db->dbi;
-	}
-	return libknot_db;
 }
 
 // section: dbval_copy
@@ -145,126 +87,96 @@ static void rrtypelist_print(rrtype_dynarray_t *arr)
 	printf("\n");
 }
 
-// section: main
-
 dynarray_declare(entry, knot_db_val_t*, DYNARRAY_VISIBILITY_STATIC, 256);
 dynarray_define(entry, knot_db_val_t*, DYNARRAY_VISIBILITY_STATIC);
+static void entry_dynarray_deep_free(entry_dynarray_t *d)
+{
+	dynarray_foreach(entry, knot_db_val_t*, i, *d) {
+		free(*i);
+	}
+	entry_dynarray_free(d);
+}
 
+typedef struct {
+	size_t categories_sizes[CATEGORIES];
+} ctx_compute_categories_t;
+
+int cb_compute_categories(const knot_db_val_t *key, gc_record_info_t *info, void *vctx)
+{
+	ctx_compute_categories_t *ctx = vctx;
+	category_t cat = kr_gc_categorize(info);
+	(void)key;
+	ctx->categories_sizes[cat] += info->entry_size;
+	return KNOT_EOK;
+}
+
+typedef struct {
+	category_t limit_category;
+	entry_dynarray_t to_delete;
+	size_t cfg_temp_keys_space;
+	size_t used_space;
+	size_t oversize_records;
+} ctx_delete_categories_t;
+
+int cb_delete_categories(const knot_db_val_t *key, gc_record_info_t *info, void *vctx)
+{
+	ctx_delete_categories_t *ctx = vctx;
+	category_t cat = kr_gc_categorize(info);
+	if (cat >= ctx->limit_category) {
+		knot_db_val_t *todelete = dbval_copy(key);
+		size_t used = ctx->used_space + key->len + sizeof(*key);
+		if ((ctx->cfg_temp_keys_space > 0 &&
+		     used > ctx->cfg_temp_keys_space) ||
+		    todelete == NULL) {
+			ctx->oversize_records++;
+		} else {
+			entry_dynarray_add(&ctx->to_delete, &todelete);
+			ctx->used_space = used;
+		}
+	}
+	return KNOT_EOK;
+}
 
 int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 {
-	char cache_data[strlen(cfg->cache_path) + 10];
-	snprintf(cache_data, sizeof(cache_data), "%s/data.mdb", cfg->cache_path);
+	struct kr_cache kres_db = { 0 };
+	knot_db_t *db = NULL;
+	double db_usage;
 
-	struct stat st = { 0 };
-	if (stat(cfg->cache_path, &st) || !(st.st_mode & S_IFDIR) || stat(cache_data, &st)) {
-		printf("Error: %s does not exist or is not a LMDB.\n", cfg->cache_path);
-		return -ENOENT;
+	int ret = kr_gc_cache_open(cfg->cache_path, &kres_db, &db, &db_usage);
+	if (ret) {
+		return ret;
 	}
 
-	size_t cache_size = st.st_size;
+	gc_timer_t timer_analyze = { 0 }, timer_choose = { 0 }, timer_delete = { 0 }, timer_rw_txn = { 0 };
 
-	struct kr_cdb_opts opts = { cfg->cache_path, cache_size };
-	struct kr_cache krc = { 0 };
-
-open_kr_cache:
-	;
-	int ret = kr_cache_open(&krc, NULL, &opts, NULL);
-	if (ret || krc.db == NULL) {
-		printf("Error opening Resolver cache (%s).\n", kr_strerror(ret));
-		return -EINVAL;
+	gc_timer_start(&timer_analyze);
+	ctx_compute_categories_t cats = { 0 };
+	ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
+	if (ret != KNOT_EOK) {
+		kr_gc_cache_close(&kres_db, db);
+		return ret;
 	}
 
-	entry_dynarray_t to_del = { 0 };
-	rrtype_dynarray_t cache_rrtypes = { 0 };
+	category_t limit_category = 50; // TODO fix this computation
+	printf("Cache analyzed in %.2lf secs, limit category is %d.\n", gc_timer_end(&timer_analyze), limit_category);
 
-	gc_timer_t timer_analyze = { 0 }, timer_delete = { 0 }, timer_rw_txn = { 0 };
+	gc_timer_start(&timer_choose);
+	ctx_delete_categories_t to_del = { 0 };
+	to_del.cfg_temp_keys_space = cfg->temp_keys_space;
+	to_del.limit_category = limit_category;
+	ret = kr_gc_cache_iter(db, cb_delete_categories, &to_del);
+	if (ret != KNOT_EOK) {
+		entry_dynarray_deep_free(&to_del.to_delete);
+		kr_gc_cache_close(&kres_db, db);
+		return ret;
+	}
+	printf("%zu records to be deleted using %.2lf MBytes of temporary memory, %zu records skipped due to memory limit.\n",
+	       to_del.to_delete.size, ((double)to_del.used_space / 1048576.0), to_del.oversize_records);
 
 	const knot_db_api_t *api = knot_db_lmdb_api();
 	knot_db_txn_t txn = { 0 };
-	knot_db_iter_t *it = NULL;
-	knot_db_t *db = knot_db_t_kres2libknot(krc.db);
-	if (db == NULL) {
-		printf("Out of memory.\n");
-		ret = KNOT_ENOMEM;
-		goto fail;
-	}
-
-	size_t real_size = knot_db_lmdb_get_mapsize(db), usage = knot_db_lmdb_get_usage(db);
-	double usage_perc = (double)usage / real_size * 100.0;
-	printf("Cache size: %zu, Usage: %zu (%.2lf%%)\n", real_size, usage, usage_perc);
-
-	if (usage_perc > 90.0) {
-		free(db);
-		kr_cache_close(&krc);
-		cache_size += cache_size / 10;
-		opts.maxsize = cache_size;
-		goto open_kr_cache;
-	}
-
-	gc_timer_start(&timer_analyze);
-
-	ret = api->txn_begin(db, &txn, KNOT_DB_RDONLY);
-	if (ret != KNOT_EOK) {
-		printf("Error starting DB transaction (%s).\n", knot_strerror(ret));
-		goto fail;
-	}
-
-	it = api->iter_begin(&txn, KNOT_DB_FIRST);
-	if (it == NULL) {
-		printf("Error iterating DB.\n");
-		ret = KNOT_ERROR;
-		goto fail;
-	}
-
-	size_t cache_records = 0, deleted_records = 0;
-	size_t oversize_records = 0, already_gone = 0;;
-	size_t used_space = 0, rw_txn_count = 1;
-	int64_t min_expire = INT64_MAX;
-
-	while (it != NULL) {
-		knot_db_val_t key = { 0 }, val = { 0 };
-		if ((ret = api->iter_key(it, &key)) != KNOT_EOK ||
-		    (ret = api->iter_val(it, &val)) != KNOT_EOK) {
-			printf("Warning: skipping a key due to error (%s).\n", knot_strerror(ret));
-		}
-		const uint16_t *entry_type = ret == KNOT_EOK ? key_consistent(key) : NULL;
-		if (entry_type != NULL) {
-			cache_records++;
-			rrtypelist_add(&cache_rrtypes, *entry_type);
-
-			struct entry_h *entry = entry_h_consistent(val, *entry_type);
-			int64_t over = entry->time + entry->ttl;
-			over -= now;
-			if (over < min_expire) {
-				min_expire = over;
-			}
-			if (over < 0) {
-				knot_db_val_t *todelete;
-				if ((cfg->temp_keys_space > 0 &&
-				     used_space + key.len + sizeof(key) > cfg->temp_keys_space) ||
-				    (todelete = dbval_copy(&key)) == NULL) {
-					oversize_records++;
-				} else {
-					used_space += todelete->len + sizeof(*todelete);
-					entry_dynarray_add(&to_del, &todelete);
-				}
-			}
-		}
-
-		it = api->iter_next(it);
-	}
-
-	api->txn_abort(&txn);
-
-	printf("Cache analyzed in %.2lf secs, %zu records types", gc_timer_end(&timer_analyze), cache_records);
-	rrtypelist_print(&cache_rrtypes);
-	if (min_expire < INT64_MAX) {
-		printf("Minimum expire in %"PRId64" secs\n", min_expire);
-	}
-	printf("%zu records to be deleted using %.2lf MBytes of temporary memory, %zu records skipped due to memory limit.\n",
-	       to_del.size, ((double)used_space / 1048576.0), oversize_records);
-	rrtype_dynarray_free(&cache_rrtypes);
+	size_t deleted_records = 0, already_gone = 0, rw_txn_count = 0;
 
 	gc_timer_start(&timer_delete);
 	gc_timer_start(&timer_rw_txn);
@@ -272,16 +184,18 @@ open_kr_cache:
 
 	ret = api->txn_begin(db, &txn, 0);
 	if (ret != KNOT_EOK) {
-		printf("Error starting DB transaction (%s).\n", knot_strerror(ret));
-		goto fail;
+		printf("Error starting R/W DB transaction (%s).\n", knot_strerror(ret));
+		entry_dynarray_deep_free(&to_del.to_delete);
+		kr_gc_cache_close(&kres_db, db);
+		return ret;
 	}
 
-	dynarray_foreach(entry, knot_db_val_t*, i, to_del) {
+	dynarray_foreach(entry, knot_db_val_t*, i, to_del.to_delete) {
 		ret = api->del(&txn, *i);
 		switch (ret) {
 		case KNOT_EOK:
 			deleted_records++;
-			const uint16_t *entry_type = ret == KNOT_EOK ? key_consistent(**i) : NULL;
+			const uint16_t *entry_type = ret == KNOT_EOK ? kr_gc_key_consistent(**i) : NULL;
 			assert(entry_type != NULL);
 			rrtypelist_add(&deleted_rrtypes, *entry_type);
 			break;
@@ -304,33 +218,21 @@ open_kr_cache:
 				ret = api->txn_begin(db, &txn, 0);
 			}
 			if (ret != KNOT_EOK) {
-				printf("Error restarting DB transaction (%s)\n", knot_strerror(ret));
-				goto fail;
+				break;
 			}
 		}
 	}
 
 	printf("Deleted %zu records (%zu already gone) types", deleted_records, already_gone);
 	rrtypelist_print(&deleted_rrtypes);
-	printf("It took %.2lf secs, %zu transactions \n", gc_timer_end(&timer_delete), rw_txn_count);
+	printf("It took %.2lf secs, %zu transactions (%s)\n", gc_timer_end(&timer_delete), rw_txn_count, knot_strerror(ret));
 
 	ret = api->txn_commit(&txn);
-	txn.txn = NULL;
 
-fail:
 	rrtype_dynarray_free(&deleted_rrtypes);
-	dynarray_foreach(entry, knot_db_val_t*, i, to_del) {
-		free(*i);
-	}
-	entry_dynarray_free(&to_del);
+	entry_dynarray_deep_free(&to_del.to_delete);
 
-	api->iter_finish(it);
-	if (txn.txn) {
-		api->txn_abort(&txn);
-	}
-
-	free(db);
-	kr_cache_close(&krc);
+	kr_gc_cache_close(&kres_db, db);
 
 	return ret;
 }
