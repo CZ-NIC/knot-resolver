@@ -41,6 +41,9 @@ kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) \
               $(libzscanner_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS) \
               $(gnutls_LIBS)
 
+# Enable symbols from kresd to be callable by modules
+kresd_LDFLAGS += -rdynamic
+
 # Enable systemd
 ifeq ($(HAS_libsystemd), yes)
 kresd_CFLAGS += -DHAS_SYSTEMD
