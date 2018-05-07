@@ -99,7 +99,7 @@ static const int NSEC_P_MAXLEN = sizeof(uint32_t) + 5 + 255;
  */
 struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type);
 
-struct entry_apex * entry_apex_consistent(knot_db_val_t data);
+struct entry_apex * entry_apex_consistent(knot_db_val_t val);
 
 // TODO
 #define KR_CACHE_KEY_MAXLEN (KNOT_DNAME_MAXLEN + 100)

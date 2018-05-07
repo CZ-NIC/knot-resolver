@@ -334,7 +334,7 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		    const struct kr_query *qry, struct kr_cache *cache);
 
 static int peek_encloser(
-	struct key *k, struct answer *ans, const int sname_labels,
+	struct key *k, struct answer *ans, int sname_labels,
 	uint8_t lowest_rank, const struct kr_query *qry, struct kr_cache *cache);
 
 /** function for .produce phase */

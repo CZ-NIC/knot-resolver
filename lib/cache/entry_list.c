@@ -22,7 +22,7 @@
 #include "lib/utils.h"
 
 
-static int entry_h_len(const knot_db_val_t val);
+static int entry_h_len(knot_db_val_t val);
 
 
 void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
