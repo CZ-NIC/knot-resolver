@@ -26,6 +26,7 @@
 
 #include <dnssec/error.h>
 #include <dnssec/nsec.h>
+#include <libknot/rrtype/nsec3.h>
 
 static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 
@@ -287,6 +288,10 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 	/*** Find the closest encloser - cycle: name starting at sname,
 	 * proceeding while longer than zname, shortening by one label on step.
 	 * We need a pair where a name doesn't exist *and* its parent does. */
+		/* LATER(optim.): perhaps iterate in the other order - that
+		 * should help significantly against deep queries where we have
+		 * a shallow proof in the cache.  We can also optimize by using
+		 * only exact search unless we had a match in the previous iteration. */
 	const int zname_labels = knot_dname_labels(k->zname, NULL);
 	int last_nxproven_labels = -1;
 	const knot_dname_t *name = qry->sname;
@@ -372,7 +377,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		const knot_rrset_t *nsec_rr = ans->rrsets[ans_id].set.rr;
 		uint8_t *bm = NULL;
 		uint16_t bm_size = 0;
-		knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
+		knot_nsec3_bitmap(&nsec_rr->rrs, 0, &bm, &bm_size);
 		assert(bm);
 		if (name_labels == sname_labels) {
 			if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype,
