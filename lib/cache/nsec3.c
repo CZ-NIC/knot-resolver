@@ -292,12 +292,6 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 	const knot_dname_t *name = qry->sname;
 	for (int name_labels = sname_labels; name_labels >= zname_labels;
 					--name_labels, name += 1 + name[0]) {
-		/* Optimization: avoid last iteration if pointless. */
-		if (name_labels == zname_labels
-		    && last_nxproven_labels != name_labels + 1) {
-			break;
-		}
-
 		/* Find a previous-or-equal NSEC3 in cache covering the name,
 		 * checking TTL etc. */
 		const knot_db_val_t key =
@@ -306,7 +300,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		WITH_VERBOSE(qry) {
 			char hash_txt[NSEC3_HASH_TXT_LEN + 1];
 			key_NSEC3_hash2text(key, hash_txt);
-			VERBOSE_MSG(qry, "=> NSEC3: depth %d, hash %s\n",
+			VERBOSE_MSG(qry, "=> NSEC3 depth %d: hash %s\n",
 					name_labels - zname_labels, hash_txt);
 		}
 		knot_db_val_t val = { NULL, 0 };
@@ -331,6 +325,11 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 			VERBOSE_MSG(qry,
 				"=> NSEC3 encloser: only found existence of an ancestor\n");
 			return ESKIP;
+		}
+		/* Optimization: avoid the rest of the last iteration if pointless. */
+		if (!exact_match && name_labels == zname_labels
+		    && last_nxproven_labels != name_labels + 1) {
+			break;
 		}
 
 		/* Basic checks OK -> materialize data, cleaning any previous
@@ -363,7 +362,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 				char hash_low_txt[NSEC3_HASH_TXT_LEN + 1];
 				nsec3_hash2text(owner, hash_low_txt);
 				VERBOSE_MSG(qry,
-					"=> NSEC3: depth %d, covered by: %s -> TODO, new TTL %d\n",
+					"=> NSEC3 depth %d: covered by %s -> TODO, new TTL %d\n",
 					name_labels - zname_labels, hash_low_txt, new_ttl);
 			}
 			continue;
@@ -485,7 +484,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 			char hash_low_txt[NSEC3_HASH_TXT_LEN + 1];
 			nsec3_hash2text(owner, hash_low_txt);
 			VERBOSE_MSG(qry,
-				"=> NSEC3 wildcard: covered by: %s -> TODO, new TTL %d\n",
+				"=> NSEC3 wildcard: covered by %s -> TODO, new TTL %d\n",
 				hash_low_txt, new_ttl);
 		}
 		return AR_SOA;
