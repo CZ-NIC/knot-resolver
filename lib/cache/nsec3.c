@@ -221,8 +221,13 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	return NULL;
 }
 
-static void nsec3_raw_hash2text(const uint8_t *hash_raw, char *text)
+/** Extract textual representation of NSEC3 hash from a cache key.
+ * \param text must have length at least NSEC3_HASH_TXT_LEN+1 (will get 0-terminated). */
+static void key_NSEC3_hash2text(const knot_db_val_t key, char *text)
 {
+	assert(key.data && key.len > NSEC3_HASH_LEN);
+	const uint8_t *hash_raw = key.data + key.len - NSEC3_HASH_LEN;
+			/* CACHE_KEY_DEF ^^ */
 	int len = base32hex_encode(hash_raw, NSEC3_HASH_LEN, (uint8_t *)text,
 				   NSEC3_HASH_TXT_LEN);
 	assert(len == NSEC3_HASH_TXT_LEN);
@@ -255,6 +260,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		   const int sname_labels, int *clencl_labels,
 		   knot_db_val_t *cover_low_kwz, knot_db_val_t *cover_hi_kwz,
 		   const struct kr_query *qry, struct kr_cache *cache)
+	/* TODO: cleanup params */
 {
 	static const int ESKIP = ABS(ENOENT);
 	/* Basic sanity check. */
@@ -287,7 +293,8 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 	for (int name_labels = sname_labels; name_labels >= zname_labels;
 					--name_labels, name += 1 + name[0]) {
 		/* Optimization: avoid last iteration if pointless. */
-		if (name_labels == zname_labels && last_nxproven_labels != name_labels + 1) {
+		if (name_labels == zname_labels
+		    && last_nxproven_labels != name_labels + 1) {
 			break;
 		}
 
@@ -298,8 +305,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		if (!key.data) continue;
 		WITH_VERBOSE(qry) {
 			char hash_txt[NSEC3_HASH_TXT_LEN + 1];
-			nsec3_raw_hash2text(key.data + key.len - NSEC3_HASH_LEN, hash_txt);
-				/* CACHE_KEY_DEF ^^ */
+			key_NSEC3_hash2text(key, hash_txt);
 			VERBOSE_MSG(qry, "=> NSEC3: depth %d, hash %s\n",
 					name_labels - zname_labels, hash_txt);
 		}
@@ -327,18 +333,16 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 			return ESKIP;
 		}
 
-		/* Get owner name of the record. */
+		/* Basic checks OK -> materialize data, cleaning any previous
+		 * records on that answer index (unsuccessful attempts). */
 		knot_dname_t owner[KNOT_DNAME_MAXLEN];
 		int ret = dname_wire_reconstruct(owner, k->zname, hash_low);
 		if (unlikely(ret)) {
 			assert(false); // FIXME: just debug, possible long zname in real life
 			continue;
 		}
-
-		/* Basic checks OK -> materialize data, cleaning any previous
-		 * records on that answer index (unsuccessful attempts). */
 		const int ans_id = (exact_match && name_labels + 1 == last_nxproven_labels)
-				 ? AR_WILD : AR_NSEC;
+				 ? AR_CPE : AR_NSEC;
 		{
 			const struct entry_h *nsec_eh = val.data;
 			const void *nsec_eh_bound = val.data + val.len;
@@ -347,6 +351,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 						owner, KNOT_RRTYPE_NSEC3, new_ttl);
 			if (ret) return kr_error(ret);
 		}
+
 		if (!exact_match) {
 			/* Non-existence proven, but we don't know if `name`
 			 * is the next closer name.
@@ -404,9 +409,10 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		/* Avoid repeated NSEC3 - remove either if the hashes match.
 		 * This is very unlikely in larger zones: 1/size (per attempt). */
 		if (unlikely(0 == memcmp(ans->rrsets[AR_NSEC].set.rr->owner + 1,
-					 ans->rrsets[AR_WILD].set.rr->owner + 1,
+					 ans->rrsets[AR_CPE ].set.rr->owner + 1,
 					 NSEC3_HASH_LEN))) {
-			memset(&ans->rrsets[AR_WILD], 0, sizeof(ans->rrsets[AR_WILD]));
+			memset(&ans->rrsets[AR_CPE], 0, sizeof(ans->rrsets[AR_CPE]));
+			/* LATER(optim.): perhaps check this earlier and avoid some work? */
 		}
 		return kr_ok();
 	}
@@ -418,23 +424,81 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
 		    const struct kr_query *qry, struct kr_cache *cache)
+	/* TODO: cleanup params */
 {
-	/* Construct key for the source of synthesis.
-	 *
-	 * It's possible that all that follows in this function might be
-	 * completely the same as for NSEC -> probably some code sharing. */
+	/* TODO: deduplicate this code block, *including* the recomputation. */
+	const nsec_p_hash_t nsec_p_hash = nsec_p_mkHash(ans->nsec_p);
+	/* Convert NSEC3 params to another format. */
+	dnssec_nsec3_params_t nsec3_p;
+	{
+		const dnssec_binary_t rdata = {
+			.size = nsec_p_rdlen(ans->nsec_p),
+			.data = (uint8_t *)/*const-cast*/ans->nsec_p,
+		};
+		int ret = dnssec_nsec3_params_from_rdata(&nsec3_p, &rdata);
+		if (ret != DNSSEC_EOK) return kr_error(ret);
+	}
 
-	/* Check if our covering NSEC3 also covers/matches SS (and exit).
-	 * That's unlikely except in tiny zones, but we want to avoid
-	 * duplicities in answer anyway. */
+	/* Find a previous-or-equal NSEC3 in cache covering or matching
+	 * the source of synthesis, checking TTL etc. */
+	const knot_db_val_t key =
+		key_NSEC3_name(k, clencl_name, true, nsec_p_hash, &nsec3_p);
+	if (!key.data) return kr_error(1);
+	WITH_VERBOSE(qry) {
+		char hash_txt[NSEC3_HASH_TXT_LEN + 1];
+		key_NSEC3_hash2text(key, hash_txt);
+		VERBOSE_MSG(qry, "=> NSEC3 wildcard: hash %s\n", hash_txt);
+	}
+	knot_db_val_t val = { NULL, 0 };
+	bool exact_match;
+	uint32_t new_ttl;
+	const uint8_t *hash_low;
+	const char *err = find_leq_NSEC3(cache, qry, key, k, &val,
+					 &exact_match, &hash_low, &new_ttl);
+	if (err) {
+		VERBOSE_MSG(qry, "=> NSEC3 wildcard: %s\n", err);
+		return kr_ok();
+	}
+
+	/* FIXME: avoid duplicities in answer. */
+
+	/* Basic checks OK -> materialize the data (speculatively). */
+	knot_dname_t owner[KNOT_DNAME_MAXLEN];
+	{
+		int ret = dname_wire_reconstruct(owner, k->zname, hash_low);
+		if (unlikely(ret)) {
+			assert(false); // FIXME: just debug, possible long zname in real life
+			return kr_ok();
+		}
+		const struct entry_h *nsec_eh = val.data;
+		const void *nsec_eh_bound = val.data + val.len;
+		ret = entry2answer(ans, AR_WILD, nsec_eh, nsec_eh_bound,
+				   owner, KNOT_RRTYPE_NSEC3, new_ttl);
+		if (ret) return kr_error(ret);
+	}
+
+	//const knot_rrset_t *nsec_rr = ans->rrsets[AR_WILD].set.rr;
+
+	if (!exact_match) {
+		/* The record proves wildcard non-existence. */
+		WITH_VERBOSE(qry) {
+			char hash_low_txt[NSEC3_HASH_TXT_LEN + 1];
+			nsec3_hash2text(owner, hash_low_txt);
+			VERBOSE_MSG(qry,
+				"=> NSEC3 wildcard: covered by: %s -> TODO, new TTL %d\n",
+				hash_low_txt, new_ttl);
+		}
+		return AR_SOA;
+	}
+
 
 	/* Find the NSEC3 in cache (or exit). */
 
 	/* Handle the two cases: covered and matched. */
 
 	/* FIXME XXX */
-	VERBOSE_MSG(qry, "=> NSEC3 wildcard: assumed as nonexistent!\n");
-	return AR_SOA;
+	VERBOSE_MSG(qry, "=> NSEC3 wildcard: failed!\n");
+	return kr_ok();
 
 	//assert(false);
 	return -ENOSYS;
