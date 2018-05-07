@@ -595,6 +595,7 @@ static int peek_encloser(
 
 	/**** 2. Find a closest (provable) encloser (of sname). */
 	int clencl_labels = -1;
+	bool clencl_is_tentative = false;
 	if (!ans->nsec_p) { /* NSEC */
 		int ret = nsec1_encloser(k, ans, sname_labels, &clencl_labels,
 					 &cover_low_kwz, &cover_hi_kwz, qry, cache);
@@ -602,7 +603,9 @@ static int peek_encloser(
 	} else {
 		int ret = nsec3_encloser(k, ans, sname_labels, &clencl_labels,
 					 &cover_low_kwz, &cover_hi_kwz, qry, cache);
-		if (ret) return ret;
+		clencl_is_tentative = ret == ABS(ENOENT) && clencl_labels >= 0;
+		/* ^^ Last chance: *positive* wildcard record under this clencl. */
+		if (ret && !clencl_is_tentative) return ret;
 	}
 
 	/* We should have either a match or a cover at this point. */
@@ -610,37 +613,36 @@ static int peek_encloser(
 		assert(false);
 		return kr_error(EINVAL);
 	}
-	const bool sname_covered = ans->rcode == PKT_NXDOMAIN;
+	const bool ncloser_covered = ans->rcode == PKT_NXDOMAIN;
 
 	/** Name of the closest (provable) encloser. */
 	const knot_dname_t *clencl_name = qry->sname;
 	for (int l = sname_labels; l > clencl_labels; --l)
 		clencl_name = knot_wire_next_label(clencl_name, NULL);
 
-	/**** 3. source of synthesis checks, in case sname was covered.
+	/**** 3. source of synthesis checks, in case the next closer name was covered.
 	 **** 3a. We want to query for NSEC* of source of synthesis (SS) or its
 	 * predecessor, providing us with a proof of its existence or non-existence. */
-	if (sname_covered && !ans->nsec_p) {
+	if (ncloser_covered && !ans->nsec_p) {
 		int ret = nsec1_src_synth(k, ans, clencl_name,
 					  cover_low_kwz, cover_hi_kwz, qry, cache);
 		if (ret == AR_SOA) return 0;
 		assert(ret <= 0);
 		if (ret) return ret;
 
-	} else if (sname_covered && ans->nsec_p) {
-		//XXX NSEC3
+	} else if (ncloser_covered && ans->nsec_p && !clencl_is_tentative) {
 		int ret = nsec3_src_synth(k, ans, clencl_name,
 					  cover_low_kwz, cover_hi_kwz, qry, cache);
 		if (ret == AR_SOA) return 0;
 		assert(ret <= 0);
 		if (ret) return ret;
 
-	} /* else (!sname_covered) so no wildcard checks needed,
+	} /* else (!ncloser_covered) so no wildcard checks needed,
 	   * as we proved that sname exists. */
 
-	/**** 3b. find wildcarded answer, if sname was covered
+	/**** 3b. find wildcarded answer, if next closer name was covered
 	 * and we don't have a full proof yet.  (common for NSEC*) */
-	if (!sname_covered)
+	if (!ncloser_covered)
 		return kr_ok(); /* decrease indentation */
 	/* Construct key for exact qry->stype + source of synthesis. */
 	int ret = kr_dname_lf(k->buf, clencl_name, true);
@@ -1168,7 +1170,7 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	/* Add the RR into the answer. */
 	const void *eh_bound = val.data + val.len;
 	ret = entry2answer(ans, AR_ANSWER, eh, eh_bound, qry->sname, type, new_ttl);
-	VERBOSE_MSG(qry, "=> NSEC wildcard: answer expanded, ret = %d, new TTL %d\n",
+	VERBOSE_MSG(qry, "=> wildcard: answer expanded, ret = %d, new TTL %d\n",
 			ret, (int)new_ttl);
 	if (ret) return kr_error(ret);
 	ans->rcode = PKT_NOERROR;

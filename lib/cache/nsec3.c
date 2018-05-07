@@ -421,7 +421,14 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		return kr_ok();
 	}
 
-	/* ran out of options */
+	/* We've ran out of options. */
+	if (last_nxproven_labels > 0) {
+		/* We didn't manage to prove existence of the closest encloser,
+		 * meaning the only chance left is a *positive* wildcard record. */
+		*clencl_labels = last_nxproven_labels - 1;
+		ans->rcode = PKT_NXDOMAIN;
+		/* FIXME: review */
+	}
 	return ESKIP;
 }
 
@@ -496,15 +503,8 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	}
 
 
-	/* Find the NSEC3 in cache (or exit). */
-
-	/* Handle the two cases: covered and matched. */
-
 	/* FIXME XXX */
 	VERBOSE_MSG(qry, "=> NSEC3 wildcard: failed!\n");
 	return kr_ok();
-
-	//assert(false);
-	return -ENOSYS;
 }
 
