@@ -168,10 +168,7 @@ local function config_zone(zone_cfg)
 
 	if not zone_cfg.ca_file then
 		error('[prefill] option ca_file must point '
-			.. 'to a directory with CA certificates in PEM format')
-	else
-		local _, dir_obj = lfs.dir(zone_cfg.ca_file)
-		dir_obj:close()
+			.. 'to a file with CA certificate(s) in PEM format')
 	end
 	rz_ca_file = zone_cfg.ca_file
 
