@@ -230,6 +230,8 @@ Environment
    internal hostname, or the system's POSIX hostname (see
    gethostname(2)) if kresd's internal hostname is unset.
 
+   This affects ephemeral certificates for kresd serving DNS over TLS.
+
 .. function:: moduledir([dir])
 
    :return: Modules directory.
@@ -718,7 +720,10 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.max_ttl([ttl])
 
-  :param number ttl: maximum cache TTL (default: 6 days)
+  :param number ttl: maximum cache TTL in seconds (default: 6 days)
+
+  .. KR_CACHE_DEFAULT_TTL_MAX ^^
+
   :return: current maximum TTL
 
   Get or set maximum cache TTL.
@@ -738,7 +743,10 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.min_ttl([ttl])
 
-  :param number ttl: minimum cache TTL (default: 0)
+  :param number ttl: minimum cache TTL in seconds (default: 5 seconds)
+
+  .. KR_CACHE_DEFAULT_TTL_MIN ^^
+
   :return: current maximum TTL
 
   Get or set minimum cache TTL. Any entry inserted into cache with TTL lower than minimal will be overriden to minimum TTL. Forcing TTL higher than specified violates DNS standards, use with care.

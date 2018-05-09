@@ -108,12 +108,23 @@ Policy examples
 	policy.add(policy.pattern(policy.PASS, '\4www[0-9]\6badboy\2cz'))
 	-- Block all names below badboy.cz
 	policy.add(policy.suffix(policy.DENY, {todname('badboy.cz.')}))
+
 	-- Custom rule
-	policy.add(function (req, query)
-		if query:qname():find('%d.%d.%d.224\7in-addr\4arpa') then
-			return policy.DENY
+	local ffi = require('ffi')
+	local function genRR (state, req)
+		local answer = req.answer
+		local qry = req:current()
+		if qry.stype ~= kres.type.A then
+			return state
 		end
-	end)
+		ffi.C.kr_pkt_make_auth_header(answer)
+		answer:rcode(kres.rcode.NOERROR)
+		answer:begin(kres.section.ANSWER)
+		answer:put(qry.sname, 900, answer:qclass(), kres.type.A, '\192\168\1\3')
+		return kres.DONE
+	end
+	policy.add(policy.suffix(genRR, { todname('my.example.cz.') }))
+
 	-- Disallow ANY queries
 	policy.add(function (req, query)
 		if query.stype == kres.type.ANY then
