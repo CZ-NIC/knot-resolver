@@ -1520,6 +1520,18 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			        ctx->req.answer);
 	if (res != kr_ok()) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
+		/* Since source session is erroneous detach all tasks. */
+		while (source_session->tasks.len > 0) {
+			struct qr_task *t = source_session->tasks.at[0];
+			struct request_ctx *c = t->ctx;
+			assert(c->source.session == source_session);
+			c->source.session = NULL;
+			/* Don't finalize them as there can be other tasks
+			 * waiting for answer to this particular task.
+			 * (ie. task->leading is true) */
+			session_del_tasks(source_session, t);
+		}
+		session_close(source_session);
 	} else if (handle->type == UV_TCP) {
 		/* Don't try to close source session at least
 		 * retry_interval_for_timeout_timer milliseconds */
