@@ -160,6 +160,12 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	if (addr->sa_family == AF_UNSPEC) {
 		return;
 	}
+	if (s->outgoing) {
+		assert(s->peer.ip.sa_family != AF_UNSPEC);
+		if (kr_sockaddr_cmp(&s->peer.ip, addr) != 0) {
+			return;
+		}
+	}
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, &worker->pkt_pool);
 	if (query) {
 		query->max_size = KNOT_WIRE_MAX_PKTSIZE;
