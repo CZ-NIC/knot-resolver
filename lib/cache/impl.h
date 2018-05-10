@@ -197,7 +197,7 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list);
 
 /** Stash the packet into cache (if suitable, etc.) */
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
-		const struct kr_request *req);
+		const struct kr_request *req, bool has_optout);
 
 /** Try answering from packet cache, given an entry_h.
  *

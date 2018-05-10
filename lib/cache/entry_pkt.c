@@ -61,9 +61,8 @@ static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 }
 
 
-
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
-		const struct kr_request *req)
+		const struct kr_request *req, const bool has_optout)
 {
 	/* In some cases, stash also the packet. */
 	const bool is_negative = kr_response_classify(pkt)
@@ -71,7 +70,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	const bool want_pkt = qry->flags.DNSSEC_BOGUS
 		|| (is_negative && (qry->flags.DNSSEC_INSECURE || !qry->flags.DNSSEC_WANT));
 
-	if (!(want_pkt || qry->flags.DNSSEC_OPTOUT) || !knot_wire_get_aa(pkt->wire)
+	if (!(want_pkt || has_optout) || !knot_wire_get_aa(pkt->wire)
 	    || pkt->parsed != pkt->size /* malformed packet; still can't detect KNOT_EFEWDATA */
 	   ) {
 		return;
@@ -93,7 +92,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 			kr_rank_set(&rank, KR_RANK_INSECURE);
 		} else if (!qry->flags.DNSSEC_WANT) {
 			/* no TAs at all, leave _RANK_AUTH */
-		} else if (qry->flags.DNSSEC_OPTOUT) {
+		} else if (has_optout) {
 			/* FIXME XXX review OPTOUT in this function again! */
 			/* All bad cases should be filtered above,
 			 * at least the same way as pktcache in kresd 1.5.x. */

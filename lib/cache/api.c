@@ -57,9 +57,11 @@ static const uint16_t CACHE_VERSION = 3;
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
 
 
-/** @internal Forward declarations of the implementation details */
-static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr,
-			   const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank, trie_t *nsec_pmap);
+/** @internal Forward declarations of the implementation details
+ * \param optout[out] Set *optout = true; when encountering an opt-out NSEC3 (optional). */
+static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
+		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
+		uint8_t rank, trie_t *nsec_pmap, bool *has_optout);
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
@@ -161,7 +163,7 @@ int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const kno
 	if (err <= 0) {
 		return kr_ok();
 	}
-	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL);
+	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL, NULL);
 	if (written >= 0) {
 		return kr_ok();
 	}
@@ -684,7 +686,7 @@ static int peek_encloser(
 /** It's simply inside of cycle taken out to decrease indentation.  \return error code. */
 static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
-			int *unauth_cnt, trie_t *nsec_pmap);
+			int *unauth_cnt, trie_t *nsec_pmap, bool *has_optout);
 /** Stash a single nsec_p.  \return 0 (errors are ignored). */
 static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 			struct kr_request *req);
@@ -714,6 +716,9 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(!ENOMEM);
 		goto finally;
 	}
+	bool has_optout = false;
+		/* ^^ DNSSEC_OPTOUT is not fired in cases like `com. A`,
+		 * but currently we don't stash separate NSEC3 proving that. */
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 		ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
@@ -723,7 +728,8 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 				continue;
 				/* TODO: probably safe to break but maybe not worth it */
 			}
-			int ret = stash_rrarray_entry(arr, i, qry, cache, &unauth_cnt, nsec_pmap);
+			int ret = stash_rrarray_entry(arr, i, qry, cache, &unauth_cnt,
+							nsec_pmap, &has_optout);
 			if (ret) {
 				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
 				goto finally;
@@ -742,7 +748,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* LATER(optim.): typically we also have corresponding NS record in the list,
 	 * so we might save a cache operation. */
 
-	stash_pkt(pkt, qry, req);
+	stash_pkt(pkt, qry, req, has_optout);
 
 finally:
 	if (unauth_cnt) {
@@ -768,8 +774,9 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 	return 1/*proceed*/;
 }
 
-static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, const knot_rrset_t *rr,
-			   const knot_rrset_t *rr_sigs, uint32_t timestamp, uint8_t rank, trie_t *nsec_pmap)
+static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
+		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
+		uint8_t rank, trie_t *nsec_pmap, bool *has_optout)
 {
 	//FIXME review entry_h
 	assert(stash_rrset_precond(rr, qry) > 0 && nsec_pmap);
@@ -795,9 +802,10 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 	knot_db_val_t key;
 	switch (rr->type) {
 	case KNOT_RRTYPE_NSEC3:
-		if (rr->rrs.rr_count != 1
-		    || (KNOT_NSEC3_FLAG_OPT_OUT & knot_nsec3_flags(&rr->rrs, 0))) {
-			/* Skip "suspicious" or opt-out NSEC3 sets. */
+		/* Skip "suspicious" or opt-out NSEC3 sets. */
+		if (rr->rrs.rr_count != 1) return kr_ok();
+		if (KNOT_NSEC3_FLAG_OPT_OUT & knot_nsec3_flags(&rr->rrs, 0)) {
+			if (has_optout) *has_optout = true;
 			return kr_ok();
 		}
 		/* fall through */
@@ -924,7 +932,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry, c
 
 static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 			const struct kr_query *qry, struct kr_cache *cache,
-			int *unauth_cnt, trie_t *nsec_pmap)
+			int *unauth_cnt, trie_t *nsec_pmap, bool *has_optout)
 {
 	ranked_rr_array_entry_t *entry = arr->at[arr_i];
 	if (entry->cached) {
@@ -954,7 +962,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 	}
 
 	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
-					entry->rank, nsec_pmap);
+					entry->rank, nsec_pmap, has_optout);
 	if (written < 0) {
 		return (int) written;
 	}
