@@ -99,14 +99,28 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		.size = knot_dname_size(name),
 		.data = (uint8_t *)/*const-cast*/name,
 	};
+
+	#if 0 // LATER(optim.): this requires a patched libdnssec - tries to realloc()
 	dnssec_binary_t hash = {
 		.size = KR_CACHE_KEY_MAXLEN - val.len,
 		.data = val.data + val.len,
 	};
-		/* FIXME: vv this requires a patched libdnssec - tries to realloc() */
 	int ret = dnssec_nsec3_hash(&dname, &nsec_p->libknot, &hash);
 	if (ret != DNSSEC_EOK) return VAL_EMPTY;
 	assert(hash.size == NSEC3_HASH_LEN);
+
+	#else
+	dnssec_binary_t hash = { .size = 0, .data = NULL };
+	int ret = dnssec_nsec3_hash(&dname, &nsec_p->libknot, &hash);
+	if (ret != DNSSEC_EOK) return VAL_EMPTY;
+	if (hash.size != NSEC3_HASH_LEN || !hash.data) {
+		assert(false);
+		return VAL_EMPTY;
+	}
+	memcpy(val.data + val.len, hash.data, NSEC3_HASH_LEN);
+	free(hash.data);
+	#endif
+
 	val.len += hash.size;
 	return val;
 }
