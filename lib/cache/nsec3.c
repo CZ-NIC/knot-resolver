@@ -65,7 +65,6 @@ knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *nsec3_name,
 	int len = base32hex_decode(nsec3_name + 1, nsec3_name[0], val.data + val.len,
 				   KR_CACHE_KEY_MAXLEN - val.len);
 	if (len != NSEC3_HASH_LEN) {
-		assert(false); // FIXME: just debug, possible bogus input in real life
 		return VAL_EMPTY;
 	}
 	val.len += len;
@@ -219,7 +218,6 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	const uint8_t *hash_next = next_rdata + nsec_p_rdlen(next_rdata)
 				 + sizeof(uint8_t) /* hash length from rfc5155 */;
 	if (hash_next[-1] != NSEC3_HASH_LEN) {
-		assert(false); // FIXME: just debug, possible bogus input in real life
 		return "unexpected next hash length";
 	}
 	/* B. do the actual range check. */
@@ -338,10 +336,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		 * records on that answer index (unsuccessful attempts). */
 		knot_dname_t owner[KNOT_DNAME_MAXLEN];
 		int ret = dname_wire_reconstruct(owner, k->zname, hash_low);
-		if (unlikely(ret)) {
-			assert(false); // FIXME: just debug, possible long zname in real life
-			continue;
-		}
+		if (unlikely(ret)) continue;
 		const int ans_id = (exact_match && name_labels + 1 == last_nxproven_labels)
 				 ? AR_CPE : AR_NSEC;
 		{
@@ -461,10 +456,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	knot_dname_t owner[KNOT_DNAME_MAXLEN];
 	{
 		int ret = dname_wire_reconstruct(owner, k->zname, hash_low);
-		if (unlikely(ret)) {
-			assert(false); // FIXME: just debug, possible long zname in real life
-			return kr_ok();
-		}
+		if (unlikely(ret)) return kr_ok();
 		const struct entry_h *nsec_eh = val.data;
 		const void *nsec_eh_bound = val.data + val.len;
 		ret = entry2answer(ans, AR_WILD, nsec_eh, nsec_eh_bound,
