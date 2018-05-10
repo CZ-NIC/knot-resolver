@@ -160,12 +160,13 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *gl
 		const knot_rdata_t *rdata = rr->rrs.data;
 		const void *addr = knot_rdata_data(rdata);
 		const int addr_len = knot_rdata_rdlen(rdata);
-		char name_str[KNOT_DNAME_MAXLEN];
+		char name_str[KR_DNAME_STR_MAXLEN];
 		char addr_str[INET6_ADDRSTRLEN];
 		WITH_VERBOSE(query) {
 			const int af = (addr_len == sizeof(struct in_addr)) ?
 				       AF_INET : AF_INET6;
 			knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
+			name_str[sizeof(name_str) - 1] = 0;
 			inet_ntop(af, addr, addr_str, sizeof(addr_str));
 		}
 		if (!(query->flags.ALLOW_LOCAL) &&
@@ -878,9 +879,8 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	knot_wire_set_id(pkt->wire, query->id);
 	pkt->parsed = pkt->size;
 	WITH_VERBOSE(query) {
-		char name_str[KNOT_DNAME_MAXLEN], type_str[16];
-		knot_dname_to_str(name_str, query->sname, sizeof(name_str));
-		knot_rrtype_to_string(query->stype, type_str, sizeof(type_str));
+		KR_DNAME_GET_STR(name_str, query->sname);
+		KR_RRTYPE_GET_STR(type_str, query->stype);
 		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %u\n",
 			    name_str, type_str, query->parent ? query->parent->id : 0);
 	}

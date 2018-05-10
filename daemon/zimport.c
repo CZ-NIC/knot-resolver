@@ -473,8 +473,8 @@ static void zi_zone_process(uv_timer_t* handle)
 	/* At the moment import of root zone only is supported.
 	 * Check the name of the parsed zone.
 	 * TODO - implement importing of arbitrary zone. */
-	char zone_name_str[KNOT_DNAME_MAXLEN];
-	knot_dname_to_str(zone_name_str, z_import->origin, sizeof(zone_name_str));
+	KR_DNAME_GET_STR(zone_name_str, z_import->origin);
+
 	if (strcmp(".", zone_name_str) != 0) {
 		kr_log_error("[zimport] unexpected zone name `%s` (root zone expected), fail\n",
 			     zone_name_str);
@@ -513,9 +513,9 @@ static void zi_zone_process(uv_timer_t* handle)
 
 	/* Import DNSKEY at first step. If any validation problems will appear,
 	 * cancel import of whole zone. */
-	char qname_str[KNOT_DNAME_MAXLEN], type_str[16];
-	knot_dname_to_str(qname_str, rr->owner, sizeof(qname_str));
-	knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
+	KR_DNAME_GET_STR(qname_str, rr->owner);
+	KR_RRTYPE_GET_STR(type_str, rr->type);
+
 	VERBOSE_MSG(NULL, "importing: qname: '%s' type: '%s'\n",
 		    qname_str, type_str);
 
@@ -535,8 +535,8 @@ static void zi_zone_process(uv_timer_t* handle)
 			continue;
 		}
 
-		knot_dname_to_str(qname_str, rr->owner, sizeof(qname_str));
-		knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
+		KR_DNAME_GET_STR(qname_str, rr->owner);
+		KR_RRTYPE_GET_STR(type_str, rr->type);
 		VERBOSE_MSG(NULL, "importing: qname: '%s' type: '%s'\n",
 			    qname_str, type_str);
 		int res = zi_rrset_import(z_import, rr);
@@ -567,8 +567,8 @@ static void zi_zone_process(uv_timer_t* handle)
 			continue;
 		}
 
-		knot_dname_to_str(qname_str, rr->owner, sizeof(qname_str));
-		knot_rrtype_to_string(rr->type, type_str, sizeof(type_str));
+		KR_DNAME_GET_STR(qname_str, rr->owner);
+		KR_RRTYPE_GET_STR(type_str, rr->type);
 		VERBOSE_MSG(NULL, "importing: qname: '%s' type: '%s'\n",
 			    qname_str, type_str);
 		res = zi_rrset_import(z_import, rr);
@@ -769,8 +769,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 		} else {
 			/* For now - fail.
 			 * TODO - query DS and continue after answer had been obtained. */
-			char zone_name_str[KNOT_DNAME_MAXLEN];
-			knot_dname_to_str(zone_name_str, z_import->origin, sizeof(zone_name_str));
+			KR_DNAME_GET_STR(zone_name_str, z_import->origin);
 			kr_log_error("[zimport] no TA found for `%s`, fail\n", zone_name_str);
 			ret = 1;
 		}

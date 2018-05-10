@@ -230,9 +230,8 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	qry->stype = type;
 
 	WITH_VERBOSE(qry) {
-	char name_str[KNOT_DNAME_MAXLEN], type_str[16];
-	knot_dname_to_str(name_str, name, sizeof(name_str));
-	knot_rrtype_to_string(type, type_str, sizeof(type_str));
+	KR_DNAME_GET_STR(name_str, name);
+	KR_RRTYPE_GET_STR(type_str, type);
 	VERBOSE_MSG(parent, "plan '%s' type '%s'\n", name_str, type_str);
 	}
 	return qry;

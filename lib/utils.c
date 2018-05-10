@@ -882,9 +882,7 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	static const char * snames[] = {
 		";; ANSWER SECTION", ";; AUTHORITY SECTION", ";; ADDITIONAL SECTION"
 	};
-	char rrtype[32];
 	char flags[32];
-	char qname[KNOT_DNAME_MAXLEN];
 	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
 	uint8_t pkt_opcode = knot_wire_get_opcode(pkt->wire);
 	const char *rcode_str = "Unknown";
@@ -918,8 +916,8 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	}
 
 	if (qdcount == 1) {
-		knot_dname_to_str(qname, knot_pkt_qname(pkt), KNOT_DNAME_MAXLEN);
-		knot_rrtype_to_string(knot_pkt_qtype(pkt), rrtype, sizeof(rrtype));
+		KR_DNAME_GET_STR(qname, knot_pkt_qname(pkt));
+		KR_RRTYPE_GET_STR(rrtype, knot_pkt_qtype(pkt));
 		ptr = mp_printf_append(mp, ptr, ";; QUESTION SECTION\n%s\t\t%s\n", qname, rrtype);
 	} else if (qdcount > 1) {
 		ptr = mp_printf_append(mp, ptr, ";; Warning: unsupported QDCOUNT %hu\n", qdcount);
