@@ -24,8 +24,6 @@
 #include "lib/dnssec/nsec.h"
 #include "lib/layer/iterate.h"
 
-#include <dnssec/error.h>
-#include <dnssec/nsec.h>
 #include <libknot/rrtype/nsec3.h>
 
 static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
@@ -77,12 +75,12 @@ knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *nsec3_name,
 /** Construct a string key for for NSEC3 predecessor-search, from an non-NSEC3 name.
  * \note k->zlf_len and k->zname are assumed to have been correctly set */
 static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
-		const bool add_wildcard,
-		const nsec_p_hash_t nsec_p_hash, const dnssec_nsec3_params_t *nsec3_p)
+		const bool add_wildcard, const struct nsec_p *nsec_p)
 {
-	knot_db_val_t val = key_NSEC3_common(k, k->zname, nsec_p_hash);
-	const bool ok = val.data && nsec3_p;
+	bool ok = k && name && nsec_p && nsec_p->raw;
 	if (!ok) return VAL_EMPTY;
+	knot_db_val_t val = key_NSEC3_common(k, k->zname, nsec_p->hash);
+	if (!val.data) return val;
 
 	/* Make `name` point to correctly wildcarded owner name. */
 	uint8_t buf[KNOT_DNAME_MAXLEN];
@@ -106,7 +104,7 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		.data = val.data + val.len,
 	};
 		/* FIXME: vv this requires a patched libdnssec - tries to realloc() */
-	int ret = dnssec_nsec3_hash(&dname, nsec3_p, &hash);
+	int ret = dnssec_nsec3_hash(&dname, &nsec_p->libknot, &hash);
 	if (ret != DNSSEC_EOK) return VAL_EMPTY;
 	assert(hash.size == NSEC3_HASH_LEN);
 	val.len += hash.size;
@@ -259,30 +257,16 @@ static void nsec3_hash2text(const knot_dname_t *owner, char *text)
 
 int nsec3_encloser(struct key *k, struct answer *ans,
 		   const int sname_labels, int *clencl_labels,
-		   knot_db_val_t *cover_low_kwz, knot_db_val_t *cover_hi_kwz,
 		   const struct kr_query *qry, struct kr_cache *cache)
 	/* TODO: cleanup params */
 {
 	static const int ESKIP = ABS(ENOENT);
 	/* Basic sanity check. */
 	const bool ok = k && k->zname && ans && clencl_labels
-			&& cover_low_kwz && cover_hi_kwz
 			&& qry && cache;
 	if (!ok) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
-	}
-
-	const nsec_p_hash_t nsec_p_hash = nsec_p_mkHash(ans->nsec_p);
-	/* Convert NSEC3 params to another format. */
-	dnssec_nsec3_params_t nsec3_p;
-	{
-		const dnssec_binary_t rdata = {
-			.size = nsec_p_rdlen(ans->nsec_p),
-			.data = (uint8_t *)/*const-cast*/ans->nsec_p,
-		};
-		int ret = dnssec_nsec3_params_from_rdata(&nsec3_p, &rdata);
-		if (ret != DNSSEC_EOK) return kr_error(ret);
 	}
 
 	/*** Find the closest encloser - cycle: name starting at sname,
@@ -299,8 +283,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 					--name_labels, name += 1 + name[0]) {
 		/* Find a previous-or-equal NSEC3 in cache covering the name,
 		 * checking TTL etc. */
-		const knot_db_val_t key =
-			key_NSEC3_name(k, name, false, nsec_p_hash, &nsec3_p);
+		const knot_db_val_t key = key_NSEC3_name(k, name, false, &ans->nsec_p);
 		if (!key.data) continue;
 		WITH_VERBOSE(qry) {
 			char hash_txt[NSEC3_HASH_TXT_LEN + 1];
@@ -411,7 +394,9 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		*clencl_labels = name_labels;
 		ans->rcode = PKT_NXDOMAIN;
 		/* Avoid repeated NSEC3 - remove either if the hashes match.
-		 * This is very unlikely in larger zones: 1/size (per attempt). */
+		 * This is very unlikely in larger zones: 1/size (per attempt).
+		 * Well, deduplication would happen anyway when the answer
+		 * from cache is read by kresd (internally). */
 		if (unlikely(0 == memcmp(ans->rrsets[AR_NSEC].set.rr->owner + 1,
 					 ans->rrsets[AR_CPE ].set.rr->owner + 1,
 					 NSEC3_HASH_LEN))) {
@@ -433,27 +418,12 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 }
 
 int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
-		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
 		    const struct kr_query *qry, struct kr_cache *cache)
 	/* TODO: cleanup params */
 {
-	/* TODO: deduplicate this code block, *including* the recomputation. */
-	const nsec_p_hash_t nsec_p_hash = nsec_p_mkHash(ans->nsec_p);
-	/* Convert NSEC3 params to another format. */
-	dnssec_nsec3_params_t nsec3_p;
-	{
-		const dnssec_binary_t rdata = {
-			.size = nsec_p_rdlen(ans->nsec_p),
-			.data = (uint8_t *)/*const-cast*/ans->nsec_p,
-		};
-		int ret = dnssec_nsec3_params_from_rdata(&nsec3_p, &rdata);
-		if (ret != DNSSEC_EOK) return kr_error(ret);
-	}
-
 	/* Find a previous-or-equal NSEC3 in cache covering or matching
 	 * the source of synthesis, checking TTL etc. */
-	const knot_db_val_t key =
-		key_NSEC3_name(k, clencl_name, true, nsec_p_hash, &nsec3_p);
+	const knot_db_val_t key = key_NSEC3_name(k, clencl_name, true, &ans->nsec_p);
 	if (!key.data) return kr_error(1);
 	WITH_VERBOSE(qry) {
 		char hash_txt[NSEC3_HASH_TXT_LEN + 1];
@@ -471,7 +441,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		return kr_ok();
 	}
 
-	/* FIXME: avoid duplicities in answer. */
+	/* LATER(optim.): avoid duplicities in answer. */
 
 	/* Basic checks OK -> materialize the data (speculatively). */
 	knot_dname_t owner[KNOT_DNAME_MAXLEN];
@@ -487,8 +457,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 				   owner, KNOT_RRTYPE_NSEC3, new_ttl);
 		if (ret) return kr_error(ret);
 	}
-
-	//const knot_rrset_t *nsec_rr = ans->rrsets[AR_WILD].set.rr;
+	const knot_rrset_t *nsec_rr = ans->rrsets[AR_WILD].set.rr;
 
 	if (!exact_match) {
 		/* The record proves wildcard non-existence. */
@@ -502,9 +471,24 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		return AR_SOA;
 	}
 
+	/* The wildcard exists.  Find if it's NODATA - check type bitmap. */
+	uint8_t *bm = NULL;
+	uint16_t bm_size;
+	knot_nsec3_bitmap(&nsec_rr->rrs, 0, &bm, &bm_size);
+	assert(bm);
+	if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) == 0) {
+		/* NODATA proven; just need to add SOA+RRSIG later */
+		VERBOSE_MSG(qry, "=> NSEC3 wildcard: match proved NODATA, new TTL %d\n",
+				 new_ttl);
+		ans->rcode = PKT_NODATA;
+		return AR_SOA;
 
-	/* FIXME XXX */
-	VERBOSE_MSG(qry, "=> NSEC3 wildcard: failed!\n");
+	} /* else */
+	/* The data probably exists -> don't add this NSEC3
+	 * and (later) try to find the real wildcard data */
+	VERBOSE_MSG(qry, "=> NSEC3 wildcard: should exist (or error)\n");
+	ans->rcode = PKT_NOERROR;
+	memset(&ans->rrsets[AR_WILD], 0, sizeof(ans->rrsets[AR_WILD]));
 	return kr_ok();
 }
 

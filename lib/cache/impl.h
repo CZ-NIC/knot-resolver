@@ -23,6 +23,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <dnssec/error.h>
+#include <dnssec/nsec.h>
 #include <libknot/consts.h>
 #include <libknot/db/db.h>
 #include <libknot/dname.h>
@@ -238,11 +240,18 @@ static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 /** Dematerialize a rdataset. */
 int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data);
 
+/** NSEC* parameters; almost nothing is meaningful for NSEC. */
+struct nsec_p {
+	const uint8_t *raw; /**< Pointer to raw NSEC3 parameters; NULL for NSEC. */
+	nsec_p_hash_t hash; /**< Hash of `raw`, used for cache keys. */
+	dnssec_nsec3_params_t libknot; /**< Format for libknot; owns malloced memory! */
+};
+
 /** Partially constructed answer when gathering RRsets from cache. */
 struct answer {
-	int rcode;	/**< PKT_NODATA, etc. */
-	const uint8_t *nsec_p;	/**< Let's avoid mixing different NSEC* parameters in one answer. */
-	knot_mm_t *mm;	/**< Allocator for rrsets */
+	int rcode;		/**< PKT_NODATA, etc. */
+	struct nsec_p nsec_p;	/**< Don't mix different NSEC* parameters in one answer. */
+	knot_mm_t *mm;		/**< Allocator for rrsets */
 	struct answer_rrset {
 		ranked_rr_array_entry_t set;	/**< set+rank for the main data */
 		knot_rdataset_t sig_rds;	/**< RRSIG data, if any */
@@ -317,12 +326,10 @@ knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *nsec3_name,
 /** TODO.  See nsec1_encloser(...) */
 int nsec3_encloser(struct key *k, struct answer *ans,
 		   const int sname_labels, int *clencl_labels,
-		   knot_db_val_t *cover_low_kwz, knot_db_val_t *cover_hi_kwz,
 		   const struct kr_query *qry, struct kr_cache *cache);
 
 /** TODO.  See nsec1_src_synth(...) */
 int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
-		    knot_db_val_t cover_low_kwz, knot_db_val_t cover_hi_kwz,
 		    const struct kr_query *qry, struct kr_cache *cache);
 
 

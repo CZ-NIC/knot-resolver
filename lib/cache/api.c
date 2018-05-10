@@ -182,17 +182,6 @@ int kr_cache_clear(struct kr_cache *cache)
 	return ret;
 }
 
-
-
-struct nsec_p {
-	struct {
-		uint8_t salt_len;
-		uint8_t alg;
-		uint16_t iters;
-	} s;
-	uint8_t *salt;
-};
-
 /* When going stricter, BEWARE of breaking entry_h_consistent_NSEC() */
 struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type)
 {
@@ -238,7 +227,7 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 	}
 	int32_t res = entry->ttl - diff;
 	if (res < 0 && owner && qry && qry->stale_cb) {
-		/* Stale-serving decision.  FIXME: modularize or make configurable, etc. */
+		/* Stale-serving decision, delegated to a callback. */
 		int res_stale = qry->stale_cb(res, owner, type, qry);
 		if (res_stale >= 0)
 			return res_stale;
@@ -368,6 +357,27 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return ret;
 }
 
+static int nsec_p_init(struct nsec_p *nsec_p, const uint8_t *nsec_p_raw)
+{
+	nsec_p->raw = nsec_p_raw;
+	if (!nsec_p_raw) return kr_ok();
+	nsec_p->hash = nsec_p_mkHash(nsec_p->raw);
+	/* Convert NSEC3 params to another format. */
+	const dnssec_binary_t rdata = {
+		.size = nsec_p_rdlen(nsec_p->raw),
+		.data = (uint8_t *)/*const-cast*/nsec_p->raw,
+	};
+	int ret = dnssec_nsec3_params_from_rdata(&nsec_p->libknot, &rdata);
+	return ret == DNSSEC_EOK ? kr_ok() : kr_error(ret);
+}
+
+static void nsec_p_cleanup(struct nsec_p *nsec_p)
+{
+	dnssec_binary_free(&nsec_p->libknot.salt);
+	/* We don't really need to clear it, but it's not large. (`salt` zeroed above) */
+	memset(nsec_p, 0, sizeof(*nsec_p));
+}
+
 /**
  * \note we don't transition to KR_STATE_FAIL even in case of "unexpected errors".
  */
@@ -481,11 +491,15 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		memcpy(&stamp, el[i].data, sizeof(stamp));
 		const int32_t remains = stamp - qry->timestamp.tv_sec; /* using SOA serial arith. */
 		if (remains < 0) goto cont;
-		ans.nsec_p = el[i].len > sizeof(stamp) ?
-			el[i].data + sizeof(stamp) : NULL;
+		{
+			const uint8_t *nsec_p_raw = el[i].len > sizeof(stamp)
+					? el[i].data + sizeof(stamp) : NULL;
+			nsec_p_init(&ans.nsec_p, nsec_p_raw);
+		}
 		/**** 2. and 3. inside */
 		ret = peek_encloser(k, &ans, sname_labels,
 					lowest_rank, qry, cache);
+		nsec_p_cleanup(&ans.nsec_p);
 		if (!ret) break;
 		if (ret < 0) return ctx->state;
 	cont:
@@ -596,13 +610,13 @@ static int peek_encloser(
 	/**** 2. Find a closest (provable) encloser (of sname). */
 	int clencl_labels = -1;
 	bool clencl_is_tentative = false;
-	if (!ans->nsec_p) { /* NSEC */
+	if (!ans->nsec_p.raw) { /* NSEC */
 		int ret = nsec1_encloser(k, ans, sname_labels, &clencl_labels,
 					 &cover_low_kwz, &cover_hi_kwz, qry, cache);
 		if (ret) return ret;
 	} else {
 		int ret = nsec3_encloser(k, ans, sname_labels, &clencl_labels,
-					 &cover_low_kwz, &cover_hi_kwz, qry, cache);
+					 qry, cache);
 		clencl_is_tentative = ret == ABS(ENOENT) && clencl_labels >= 0;
 		/* ^^ Last chance: *positive* wildcard record under this clencl. */
 		if (ret && !clencl_is_tentative) return ret;
@@ -623,16 +637,15 @@ static int peek_encloser(
 	/**** 3. source of synthesis checks, in case the next closer name was covered.
 	 **** 3a. We want to query for NSEC* of source of synthesis (SS) or its
 	 * predecessor, providing us with a proof of its existence or non-existence. */
-	if (ncloser_covered && !ans->nsec_p) {
+	if (ncloser_covered && !ans->nsec_p.raw) {
 		int ret = nsec1_src_synth(k, ans, clencl_name,
 					  cover_low_kwz, cover_hi_kwz, qry, cache);
 		if (ret == AR_SOA) return 0;
 		assert(ret <= 0);
 		if (ret) return ret;
 
-	} else if (ncloser_covered && ans->nsec_p && !clencl_is_tentative) {
-		int ret = nsec3_src_synth(k, ans, clencl_name,
-					  cover_low_kwz, cover_hi_kwz, qry, cache);
+	} else if (ncloser_covered && ans->nsec_p.raw && !clencl_is_tentative) {
+		int ret = nsec3_src_synth(k, ans, clencl_name, qry, cache);
 		if (ret == AR_SOA) return 0;
 		assert(ret <= 0);
 		if (ret) return ret;
@@ -1126,7 +1139,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 }
 
 
-/** Try to satisfy via wildcard.  See the single call site. */
+/** Try to satisfy via wildcard (positively).  See the single call site. */
 static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    const uint16_t type, const uint8_t lowest_rank,
 		    const struct kr_query *qry, struct kr_cache *cache)
