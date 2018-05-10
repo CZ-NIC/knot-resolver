@@ -67,8 +67,9 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	/* In some cases, stash also the packet. */
 	const bool is_negative = kr_response_classify(pkt)
 				& (PKT_NODATA|PKT_NXDOMAIN);
-	const bool want_pkt = qry->flags.DNSSEC_BOGUS
-		|| (is_negative && (qry->flags.DNSSEC_INSECURE || !qry->flags.DNSSEC_WANT));
+	const struct kr_qflags * const qf = &qry->flags;
+	const bool want_pkt = qf->DNSSEC_BOGUS
+		|| (is_negative && (qf->DNSSEC_INSECURE || !qf->DNSSEC_WANT));
 
 	if (!(want_pkt || has_optout) || !knot_wire_get_aa(pkt->wire)
 	    || pkt->parsed != pkt->size /* malformed packet; still can't detect KNOT_EFEWDATA */
@@ -80,17 +81,17 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	 * forwarding, make the rank bad; otherwise it depends on flags.
 	 * TODO: probably make validator attempt validation even with +cd. */
 	uint8_t rank = KR_RANK_AUTH;
-	const bool risky_vldr = is_negative && qry->flags.FORWARD && qry->flags.CNAME;
+	const bool risky_vldr = is_negative && qf->FORWARD && qf->CNAME;
 		/* ^^ CNAME'ed NXDOMAIN answer in forwarding mode can contain
 		 * unvalidated records; original commit: d6e22f476. */
-	if (knot_wire_get_cd(req->answer->wire) || qry->flags.STUB || risky_vldr) {
+	if (knot_wire_get_cd(req->answer->wire) || qf->STUB || risky_vldr) {
 		kr_rank_set(&rank, KR_RANK_OMIT);
 	} else {
-		if (qry->flags.DNSSEC_BOGUS) {
+		if (qf->DNSSEC_BOGUS) {
 			kr_rank_set(&rank, KR_RANK_BOGUS);
-		} else if (qry->flags.DNSSEC_INSECURE) {
+		} else if (qf->DNSSEC_INSECURE) {
 			kr_rank_set(&rank, KR_RANK_INSECURE);
-		} else if (!qry->flags.DNSSEC_WANT) {
+		} else if (!qf->DNSSEC_WANT) {
 			/* no TAs at all, leave _RANK_AUTH */
 		} else if (has_optout) {
 			/* FIXME XXX review OPTOUT in this function again! */
@@ -106,7 +107,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	// LATER: nothing exists under NXDOMAIN.  Implement that (optionally)?
 #if 0
 	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN
-	 /* && !qry->flags.DNSSEC_INSECURE */ ) {
+	 /* && !qf->DNSSEC_INSECURE */ ) {
 		pkt_type = KNOT_RRTYPE_NS;
 	}
 #endif
@@ -140,7 +141,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	eh->ttl  = MAX(MIN(packet_ttl(pkt, is_negative), cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;
 	eh->is_packet = true;
-	eh->has_optout = qry->flags.DNSSEC_OPTOUT;
+	eh->has_optout = qf->DNSSEC_OPTOUT;
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
 	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
 
