@@ -35,6 +35,7 @@ static void print_help()
 	printf(" -m <rw_txn_duration(usecs)>\n");
 	printf(" -w <wait_next_rw_txn(usecs)>\n");
 	printf(" -t <temporary_memory(MBytes)>\n");
+	printf(" -n (= dry run)\n");
 }
 
 int main(int argc, char *argv[])
@@ -50,7 +51,7 @@ int main(int argc, char *argv[])
 	kr_cache_gc_cfg_t cfg = { 0 };
 
 	int o;
-	while ((o = getopt(argc, argv, "hc:d:l:m:w:t:")) != -1) {
+	while ((o = getopt(argc, argv, "hnc:d:l:m:w:t:")) != -1) {
 		switch (o) {
 		case 'c':
 			cfg.cache_path = optarg;
@@ -74,6 +75,9 @@ int main(int argc, char *argv[])
 			cfg.temp_keys_space *= 1048576;
 			break;
 #undef get_nonneg_optarg
+		case 'n':
+			cfg.dry_run = true;
+			break;
 		case ':':
 		case '?':
 		case 'h':
