@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -20,6 +21,8 @@ typedef struct {
         size_t rw_txn_items;             // maximum number of deleted records per RW transaction (0 = unlimited)
         unsigned long rw_txn_duration;   // maximum duration of RW transaction in usecs (0 = unlimited)
         unsigned long rw_txn_delay;      // waiting time between two RW transactions in usecs
+
+        bool dry_run;
 } kr_cache_gc_cfg_t;
 
 
