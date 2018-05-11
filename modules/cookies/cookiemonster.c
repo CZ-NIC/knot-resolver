@@ -258,11 +258,7 @@ int check_response(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return KR_STATE_FAIL;
 	}
 
-#if KNOT_VERSION_HEX >= ((2 << 16) | (4 << 8)) // just renamed function since 2.4.0
 	uint16_t rcode = knot_pkt_ext_rcode(pkt);
-#else
-	uint16_t rcode = knot_pkt_get_ext_rcode(pkt);
-#endif
 	if (rcode == KNOT_RCODE_BADCOOKIE) {
 		struct kr_query *next = NULL;
 		if (!(qry->flags.BADCOOKIE_AGAIN)) {

@@ -536,12 +536,7 @@ static int answer_padding(struct kr_request *request)
 	int32_t pad_bytes = -1;
 
 	if (padding == -1) { /* use the default padding policy from libknot */
-#if KNOT_VERSION_HEX < ((2 << 16) | (4 << 8) | 3)
-		/* no knot_edns_default_padding_size available in libknot */
-		padding = KR_DEFAULT_TLS_PADDING;
-#else
 		pad_bytes =  knot_edns_default_padding_size(answer, opt_rr);
-#endif
 	}
 	if (padding >= 2) {
 		int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
@@ -1145,8 +1140,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		qry->flags.DNSSEC_WANT = true;
 		want_secured = true;
 		WITH_VERBOSE(qry) {
-		char qname_str[KNOT_DNAME_MAXLEN];
-		knot_dname_to_str(qname_str, wanted_name, sizeof(qname_str));
+		KR_DNAME_GET_STR(qname_str, wanted_name);
 		VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
 		}
 	}
@@ -1224,8 +1218,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 			qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
 
 			WITH_VERBOSE(qry) {
-			char qname_str[KNOT_DNAME_MAXLEN];
-			knot_dname_to_str(qname_str, ta_rr->owner, sizeof(qname_str));
+			KR_DNAME_GET_STR(qname_str, ta_rr->owner);
 			VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
 			}
 		}
@@ -1563,10 +1556,13 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	}
 
 	WITH_VERBOSE(qry) {
-	char qname_str[KNOT_DNAME_MAXLEN], zonecut_str[KNOT_DNAME_MAXLEN], ns_str[INET6_ADDRSTRLEN], type_str[16];
-	knot_dname_to_str(qname_str, knot_pkt_qname(packet), sizeof(qname_str));
-	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
-	knot_rrtype_to_string(knot_pkt_qtype(packet), type_str, sizeof(type_str));
+
+	char ns_str[INET6_ADDRSTRLEN];
+
+	KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
+	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
+	KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
+
 	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
 		struct sockaddr *addr = &qry->ns.addr[i].ip;
 		if (addr->sa_family == AF_UNSPEC) {

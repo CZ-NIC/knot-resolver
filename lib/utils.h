@@ -82,6 +82,15 @@ bool kr_log_trace(const struct kr_query *query, const char *source, const char *
 #define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_trace_enabled(query), false))
 #define kr_log_verbose if(VERBOSE_STATUS) kr_log_verbose
 
+#define KR_DNAME_GET_STR(dname_str, dname) \
+	char dname_str[KR_DNAME_STR_MAXLEN]; \
+	knot_dname_to_str(dname_str, (dname), sizeof(dname_str)); \
+	dname_str[sizeof(dname_str) - 1] = 0;
+
+#define KR_RRTYPE_GET_STR(rrtype_str, rrtype) \
+	char rrtype_str[KR_RRTYPE_STR_MAXLEN]; \
+	knot_rrtype_to_string((rrtype), rrtype_str, sizeof(rrtype_str)); \
+	rrtype_str[sizeof(rrtype_str) - 1] = 0;
 
 /* C11 compatibility, but without any implementation so far. */
 #ifndef static_assert

@@ -33,6 +33,15 @@ typedef struct {
 	uint16_t pos;
 	uint16_t count;
 } knot_pktsection_t;
+struct knot_compr {
+	uint8_t *wire;
+	knot_rrinfo_t *rrinfo;
+	struct {
+		uint16_t pos;
+		uint8_t labels;
+	} suffix;
+};
+typedef struct knot_compr knot_compr_t;
 struct knot_pkt {
 	uint8_t *wire;
 	size_t size;
@@ -54,7 +63,7 @@ struct knot_pkt {
 	knot_rrinfo_t *rr_info;
 	knot_rrset_t *rr;
 	knot_mm_t mm;
-	char _stub[]; /* TMP: do NOT replace yet (changed in libknot-2.6.0) */
+	knot_compr_t compr;
 };
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {

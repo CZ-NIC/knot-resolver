@@ -257,41 +257,6 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	return vctx->result;
 }
 
-/* Fallbacks: implemented in newer libdnssec.
- * Note: changing some from true to false is NOT enough to fully remove the support. */
-#if KNOT_VERSION_HEX < ((2 << 16) | (6 << 8) | 0)
-	static bool dnssec_algorithm_key_support(dnssec_key_algorithm_t algo)
-	{
-		switch (algo) {
-		case DNSSEC_KEY_ALGORITHM_DSA_SHA1:
-		case DNSSEC_KEY_ALGORITHM_DSA_SHA1_NSEC3:
-		case DNSSEC_KEY_ALGORITHM_RSA_SHA1:
-		case DNSSEC_KEY_ALGORITHM_RSA_SHA1_NSEC3:
-		case DNSSEC_KEY_ALGORITHM_RSA_SHA256:
-		case DNSSEC_KEY_ALGORITHM_RSA_SHA512:
-		case DNSSEC_KEY_ALGORITHM_ECDSA_P256_SHA256:
-		case DNSSEC_KEY_ALGORITHM_ECDSA_P384_SHA384:
-			return true;
-		//case DNSSEC_KEY_ALGORITHM_ED25519:
-		//case DNSSEC_KEY_ALGORITHM_ED448:
-		default:
-			return false;
-		}
-	}
-
-	static bool dnssec_algorithm_digest_support(dnssec_key_digest_t algo)
-	{
-		switch (algo) {
-		case DNSSEC_KEY_DIGEST_SHA1:
-		case DNSSEC_KEY_DIGEST_SHA256:
-		case DNSSEC_KEY_DIGEST_SHA384:
-			return true;
-		default:
-			return false;
-		};
-	}
-#endif
-
 static bool kr_ds_algo_support(const knot_rrset_t *ta)
 {
 	for (uint16_t i = 0; i < ta->rrs.rr_count; ++i) {

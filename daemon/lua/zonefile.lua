@@ -169,7 +169,6 @@ ffi.metatype( zs_scanner_t, {
 			return ffi.string(libzscanner.zs_strerror(zs.error.code))
 		end,
 		current_comment = function(zs)
-			if not @LIBZSCANNER_COMMENTS@ then return nil end -- support in libzscanner
 			if zs.buffer_length > 0 then
 				return ffi.string(zs.buffer, zs.buffer_length - 1)
 			else
