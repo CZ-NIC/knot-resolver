@@ -326,11 +326,11 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 static enum lru_apply_do dump_value(const char *key, uint len, unsigned *val, void *baton)
 {
 	uint16_t key_type = 0;
-	char key_name[KNOT_DNAME_MAXLEN], type_str[16];
 	/* Extract query name, type and counter */
 	memcpy(&key_type, key, sizeof(key_type));
-	knot_dname_to_str(key_name, (uint8_t *)key + sizeof(key_type), sizeof(key_name));
-	knot_rrtype_to_string(key_type, type_str, sizeof(type_str));
+	KR_DNAME_GET_STR(key_name, (uint8_t *)key + sizeof(key_type));
+	KR_RRTYPE_GET_STR(type_str, key_type);
+
 	/* Convert to JSON object */
 	JsonNode *json_val = json_mkobject();
 	json_append_member(json_val, "count", json_mknumber(*val));

@@ -512,11 +512,7 @@ static char* pack_hints(struct kr_zonecut *hints) {
 	JsonNode *root_node = json_mkobject();
 	trie_it_t *it;
 	for (it = trie_it_begin(hints->nsset); !trie_it_finished(it); trie_it_next(it)) {
-		char nsname_str[KNOT_DNAME_MAXLEN] = {'\0'};
-		knot_dname_to_str(nsname_str,
-					/* here we trust that it's a correct dname */
-					(const knot_dname_t *)trie_it_key(it, NULL),
-					sizeof(nsname_str));
+		KR_DNAME_GET_STR(nsname_str, (const knot_dname_t *)trie_it_key(it, NULL));
 		JsonNode *addr_list = pack_addrs((pack_t *)*trie_it_val(it));
 		if (!addr_list) goto error;
 		json_append_member(root_node, nsname_str, addr_list);
