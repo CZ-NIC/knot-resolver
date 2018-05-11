@@ -153,7 +153,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 		return ret;
 	}
 
-	if (db_usage < MAX_OK_PERCENT_USAGE) {
+	if (cfg->dry_run || db_usage < MAX_OK_PERCENT_USAGE) {
 		kr_gc_cache_close(&kres_db, db);
 		return KNOT_EOK;
 	}
