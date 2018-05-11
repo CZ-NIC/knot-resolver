@@ -16,6 +16,11 @@ static bool rrtype_is_infrastructure(uint16_t r)
 	}
 }
 
+static int get_random(int to)
+{
+	return rand() % to;
+}
+
 // TODO this is just an example, make this more clever
 category_t kr_gc_categorize(gc_record_info_t *info)
 {
@@ -23,25 +28,26 @@ category_t kr_gc_categorize(gc_record_info_t *info)
 
 	switch (info->no_labels) {
 	case 0:
-		return 1;
+		res = 5;
+		break;
 	case 1:
-		return 2;
+		res = 10;
+		break;
 	case 2:
-		return (rrtype_is_infrastructure(info->rrtype) ? 3 : 20);
+		res = (rrtype_is_infrastructure(info->rrtype) ? 15 : 20);
+		break;
 	}
 
 	if (info->entry_size > 300) {
-		return 90;
+		res += 30;
 	}
 
 	if (rrtype_is_infrastructure(info->rrtype)) {
 		if (info->expires_in > 0) {
-			res = 30;
-		} else {
-			res = 45;
+			res = res > 40 ? 40 : res;
 		}
 	}
 
-	return res;
+	return res + get_random(5);
 }
 
