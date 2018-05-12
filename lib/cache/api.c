@@ -129,6 +129,11 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	/* Check cache ABI version */
 	kr_cache_make_checkpoint(cache);
 	(void) assert_right_version(cache);
+	/* Create LRU cache for packets */
+	cache->pkt_cache = lru_create_impl(KR_CACHE_DEFAULT_LRU_SIZE, mm, NULL);
+	if (cache->pkt_cache == NULL) {
+		return kr_error(ENOMEM);
+	}
 	return 0;
 }
 
@@ -140,6 +145,8 @@ void kr_cache_close(struct kr_cache *cache)
 	if (cache_isvalid(cache)) {
 		cache_op(cache, close);
 		cache->db = NULL;
+		lru_free_impl(cache->pkt_cache);
+		cache->pkt_cache = NULL;
 	}
 }
 
@@ -379,11 +386,16 @@ static int cache_peek_real(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const uint8_t lowest_rank = get_lowest_rank(req, qry);
 
 	/** 1. find the name or the closest (available) zone, not considering wildcards
-	 *  1a. exact name+type match (can be negative answer in insecure zones)
+	 *  1a. exact name+type match in packet cache (LRU)
+	 *  1b. exact name+type match (can be negative answer in insecure zones)
 	 */
 	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
 	knot_db_val_t val = { NULL, 0 };
-	ret = cache_op(cache, read, &key, &val, 1);
+	ret = find_from_pkt_cache(req, &key, &val, lowest_rank);
+	if (ret != 0) {
+		ret = cache_op(cache, read, &key, &val, 1);
+	}
+
 	if (!ret) {
 		/* found an entry: test conditions, materialize into pkt, etc. */
 		ret = found_exact_hit(ctx, pkt, val, lowest_rank);

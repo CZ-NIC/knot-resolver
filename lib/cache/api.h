@@ -19,8 +19,10 @@
 #include <libknot/consts.h>
 #include <libknot/rrset.h>
 #include <sys/time.h>
+
 #include "lib/cache/cdb_api.h"
 #include "lib/defines.h"
+#include "lib/generic/lru.h"
 #include "contrib/ucw/config.h" /*uint*/
 
 /** When knot_pkt is passed from cache without ->wire, this is the ->size. */
@@ -52,6 +54,8 @@ struct kr_cache
 	/* A pair of stamps for detection of real-time shifts during runtime. */
 	struct timeval checkpoint_walltime; /**< Wall time on the last check-point. */
 	uint64_t checkpoint_monotime; /**< Monotonic milliseconds on the last check-point. */
+
+	struct lru *pkt_cache;  /**< LRU cache for packets */
 };
 
 /**

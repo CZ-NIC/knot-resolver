@@ -139,17 +139,20 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 
 	/* For now we stash the full packet byte-exactly as it came from upstream. */
 	const uint16_t pkt_size = pkt->size;
-	knot_db_val_t val_new_entry = {
-		.data = NULL,
-		.len = offsetof(struct entry_h, data) + sizeof(pkt_size) + pkt->size,
-	};
+	const size_t entry_len = offsetof(struct entry_h, data) + sizeof(pkt_size) + pkt_size;
+
 	/* Prepare raw memory for the new entry and fill it. */
 	struct kr_cache *cache = &req->ctx->cache;
-	ret = entry_h_splice(&val_new_entry, rank, key, k->type, pkt_type,
-				owner, qry, cache, qry->timestamp.tv_sec);
-	if (ret) return; /* some aren't really errors */
-	assert(val_new_entry.data);
-	struct entry_h *eh = val_new_entry.data;
+	if (cache->pkt_cache == NULL) {
+		return;
+	}
+
+	struct entry_h *eh = lru_get_impl(cache->pkt_cache, key.data, (uint)key.len, (uint)entry_len, true, NULL);
+	if (eh == NULL) {
+		return;
+	}
+
+	memset(eh, 0, offsetof(struct entry_h, data));
 	eh->time = qry->timestamp.tv_sec;
 	eh->ttl  = MAX(MIN(packet_ttl(pkt, is_negative), cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;
@@ -162,10 +165,38 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 		auto_free char *type_str = kr_rrtype_text(pkt_type),
 			*owner_str = kr_dname_text(owner);
 		VERBOSE_MSG(qry, "=> stashed packet: rank 0%.2o, TTL %d, "
-				"%s %s (%d B)\n",
+				"%s %s (%zu B)\n",
 				eh->rank, eh->ttl,
-				type_str, owner_str, (int)val_new_entry.len);
+				type_str, owner_str, entry_len);
 	}
+}
+
+int find_from_pkt_cache(struct kr_request *req, knot_db_val_t *key, knot_db_val_t *val, uint8_t lowest_rank)
+{
+	struct kr_query *qry = req->current_query;
+	struct kr_cache *cache = &req->ctx->cache;
+	if (cache->pkt_cache == NULL) {
+		return kr_error(EINVAL);
+	}
+
+	/* Only check if key-value exists in LRU, don't insert */
+	struct entry_h *eh = lru_get_impl(cache->pkt_cache, key->data, (uint)key->len, 0, false, NULL);
+	if (eh == NULL) {
+		return kr_error(ENOENT);
+	}
+
+	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype, qry->timestamp.tv_sec);
+	if (new_ttl < 0 || eh->rank < lowest_rank) {
+		return kr_error(ENOENT);
+	}
+
+	/* Calculate value size */
+	uint16_t pkt_len;
+	memcpy(&pkt_len, eh->data, sizeof(pkt_len));
+
+	val->data = eh;
+	val->len = offsetof(struct entry_h, data) + sizeof(pkt_len) + pkt_len;
+	return kr_ok();
 }
 
 

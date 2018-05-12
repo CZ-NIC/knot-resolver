@@ -137,6 +137,9 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 
+/** Try to find answer from packet cache.
+ */
+int find_from_pkt_cache(struct kr_request *req, knot_db_val_t *key, knot_db_val_t *val, uint8_t lowest_rank);
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
 static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
