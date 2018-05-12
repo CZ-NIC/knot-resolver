@@ -133,7 +133,7 @@ int entry_h_splice(
 	/* Find the whole entry-set and the particular entry within. */
 	knot_db_val_t val_orig_all = VAL_EMPTY, val_orig_entry = VAL_EMPTY;
 	const struct entry_h *eh_orig = NULL;
-	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
+	if (!kr_rank_test(rank, KR_RANK_SECURE) || (ktype == KNOT_RRTYPE_NS || ktype == KNOT_RRTYPE_SOA)) {
 		int ret = cache_op(cache, read, &key, &val_orig_all, 1);
 		if (ret) val_orig_all = VAL_EMPTY;
 		val_orig_entry = val_orig_all;
@@ -157,7 +157,7 @@ int entry_h_splice(
 			<= val_orig_all.data + val_orig_all.len);
 	}
 
-	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
+	if (eh_orig) {
 		/* If equal rank was accepted, spoofing a *single* answer would be
 		 * enough to e.g. override NS record in AUTHORITY section.
 		 * This way they would have to hit the first answer
@@ -170,8 +170,8 @@ int entry_h_splice(
 			WITH_VERBOSE(qry) {
 				auto_free char *type_str = kr_rrtype_text(type),
 					*owner_str = kr_dname_text(owner);
-				VERBOSE_MSG(qry, "=> not overwriting %s %s\n",
-						type_str, owner_str);
+				VERBOSE_MSG(qry, "=> not overwriting %s %s, rank 0%.2o, remaining TTL %d\n",
+						type_str, owner_str, eh_orig->rank, old_ttl);
 			}
 			return kr_error(EEXIST);
 		}
