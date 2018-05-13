@@ -748,3 +748,72 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 	return ret;
 }
 
+int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name,
+		    uint16_t type)
+{
+	if (!cache_isvalid(cache)) {
+		return kr_error(EINVAL);
+	}
+	if (!cache->api->remove) {
+		return kr_error(ENOSYS);
+	}
+	struct key k_storage, *k = &k_storage;
+	int ret = kr_dname_lf(k->buf, name, false);
+	if (ret) return kr_error(ret);
+
+	knot_db_val_t key = key_exact_type(k, type);
+	return cache_op(cache, remove, &key, 1);
+}
+
+int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
+		   knot_db_val_t *keys, int max)
+{
+	if (!cache_isvalid(cache)) {
+		return kr_error(EINVAL);
+	}
+	if (!cache->api->match) {
+		return kr_error(ENOSYS);
+	}
+
+	struct key k_storage, *k = &k_storage;
+
+	int ret = kr_dname_lf(k->buf, name, false);
+	if (ret) return kr_error(ret);
+
+	// use a mock type
+	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_A);
+	key.len -= sizeof((char)('E')) + sizeof(uint16_t);
+	return cache_op(cache, match, &key, keys, max);
+}
+
+int kr_unpack_cache_key(knot_db_val_t *key, knot_dname_t *buf, uint16_t *type)
+{
+	if (key == NULL || buf == NULL) {
+		return kr_error(EINVAL);
+	}
+
+	int len = -1;
+	const void *endp;
+	for (endp = key->data + 1;
+	     endp < key->data + key->len; endp++) {
+		if (*(const char *)(endp-1) == '\0' &&
+		    (*(const char *)endp == 'E')) {
+			len = endp - key->data - 1;
+			break;
+		}
+	}
+
+	if (len == -1 || len > KNOT_DNAME_MAXLEN) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = knot_dname_lf2wire(buf, len, key->data);
+	if (ret < 0) {
+		return kr_error(ret);
+	}
+
+	// jump over "\0 E/1"
+	memcpy(type, key->data + len + 2, sizeof(uint16_t));
+
+	return kr_ok();
+}

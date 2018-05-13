@@ -1066,18 +1066,9 @@ static int cache_close(lua_State *L)
 	return 1;
 }
 
-#if 0
 /** @internal Prefix walk. */
 static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_t *results, int maxresults)
 {
-	/* Decode parameters */
-	uint8_t namespace = 'R';
-	char *extra = strchr(args, ' ');
-	if (extra != NULL) {
-		extra[0] = '\0';
-		namespace = extra[1];
-	}
-
 	/* Convert to domain name */
 	uint8_t buf[KNOT_DNAME_MAXLEN];
 	if (!knot_dname_from_str(buf, args, sizeof(buf))) {
@@ -1085,7 +1076,7 @@ static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_
 	}
 
 	/* Start prefix search */
-	int ret = kr_cache_match(cache, namespace, buf, results, maxresults);
+	int ret = kr_cache_match(cache, buf, results, maxresults);
 	kr_cache_sync(cache);
 	return ret;
 }
@@ -1120,7 +1111,6 @@ static int cache_remove_prefix(struct kr_cache *cache, const char *args)
 	}
 	return ret;
 }
-#endif
 
 /** Prune expired/invalid records. */
 static int cache_prune(lua_State *L)
@@ -1170,7 +1160,7 @@ static int cache_clear(lua_State *L)
 
 	/* Clear a sub-tree in cache. */
 	if (args && strlen(args) > 0) {
-		int ret = kr_error(ENOSYS); // FIXME cache_remove_prefix(cache, args);
+		int ret = cache_remove_prefix(cache, args);
 		if (ret < 0) {
 			format_error(L, kr_strerror(ret));
 			lua_error(L);
@@ -1197,28 +1187,19 @@ static int cache_clear(lua_State *L)
 /** @internal Dump cache key into table on Lua stack. */
 static void cache_dump_key(lua_State *L, knot_db_val_t *key)
 {
-	char buf[KNOT_DNAME_MAXLEN];
-	/* Extract type */
-	uint16_t type = 0;
-	const char *endp = (const char *)key->data + key->len - sizeof(uint16_t);
-	memcpy(&type, endp, sizeof(uint16_t));
-	endp -= 1;
-	/* Extract domain name */
-	char *dst = buf;
-	const char *scan = endp - 1;
-	while (scan > (const char *)key->data) {
-		if (*scan == '\0') {
-			const size_t lblen = endp - scan - 1;
-			memcpy(dst, scan + 1, lblen);
-			dst += lblen;
-			*dst++ = '.';
-			endp = scan;
-		}
-		--scan;
+	knot_dname_t dname[KNOT_DNAME_MAXLEN];
+	char name[KNOT_DNAME_MAXLEN];
+	uint16_t type;
+
+	int ret = kr_unpack_cache_key(key, dname, &type);
+	if (ret < 0) {
+		return;
 	}
-	memcpy(dst, scan + 1, endp - scan);
+
+	knot_dname_to_str(name, dname, sizeof(dname));
+
 	/* If name typemap doesn't exist yet, create it */
-	lua_getfield(L, -1, buf);
+	lua_getfield(L, -1, name);
 	if (lua_isnil(L, -1)) {
 		lua_pop(L, 1);
 		lua_newtable(L);
@@ -1229,7 +1210,7 @@ static void cache_dump_key(lua_State *L, knot_db_val_t *key)
 	lua_pushboolean(L, true);
 	lua_setfield(L, -2, type_buf);
 	/* Set name typemap */
-	lua_setfield(L, -2, buf);
+	lua_setfield(L, -2, name);
 }
 
 /** Query cached records. */
@@ -1249,9 +1230,9 @@ static int cache_get(lua_State *L)
 	}
 
 	/* Retrieve set of keys */
-	//const char *args = lua_tostring(L, 1);
+	const char *args = lua_tostring(L, 1);
 	static knot_db_val_t result_set[100];
-	int ret = kr_error(ENOSYS); // FIXME cache_prefixed(cache, args, result_set, 100);
+	int ret = cache_prefixed(cache, args, result_set, 100);
 	if (ret < 0) {
 		format_error(L, kr_strerror(ret));
 		lua_error(L);
