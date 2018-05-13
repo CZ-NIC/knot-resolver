@@ -572,12 +572,6 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 		return ret;
 	}
 
-	/* Turn wildcard into prefix scan. */
-	const uint8_t *endp = (const uint8_t *)key->data + (key->len - 2);
-	if (key->len > 2 && endp[0] == '*' && endp[1] == '\0') {
-		key->len -= 2; /* Skip '*' label */
-	}
-
 	MDB_cursor *cur = NULL;
 	ret = mdb_cursor_open(txn, env->dbi, &cur);
 	if (ret != 0) {
