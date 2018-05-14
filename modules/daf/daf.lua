@@ -293,7 +293,8 @@ end
 function M.add(rule)
 	-- Ignore duplicates
 	for _, r in ipairs(M.rules) do
-		if r.info == rule then return r end
+		-- send a hint to the caller for duplicated rules
+		if r.info == rule then return r, true end
 	end
 	local id, action, filter = compile(rule)
 	if not id then error(action) end
@@ -318,10 +319,10 @@ end
 
 -- @function Remove a rule
 function M.del(id)
-	for _, r in ipairs(M.rules) do
+	for i, r in ipairs(M.rules) do
 		if r.rule.id == id then
 			policy.del(id)
-			table.remove(M.rules, id)
+			table.remove(M.rules, i)
 			return true
 		end
 	end
