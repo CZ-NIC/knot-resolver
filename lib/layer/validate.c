@@ -420,13 +420,17 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 			/* Rank the corresponding nonauth NS as insecure. */
 			for (int i = 0; i < req->auth_selected.len; ++i) {
 				ranked_rr_array_entry_t *ns = req->auth_selected.at[i];
-				if (ns->qry_uid != qry->uid || !ns->rr
+				if (ns->qry_uid != qry->uid
+				    || !ns->rr
 				    || ns->rr->type != KNOT_RRTYPE_NS) {
+					continue;
+				}
+				if (!referral && !knot_dname_is_equal(qry->sname, ns->rr->owner)) {
 					continue;
 				}
 				/* Found the record.  Note: this is slightly fragile
 				 * in case there were more NS records in the packet.
-				 * As it is now, kr_nsec*_ref_to_unsigned consider
+				 * As it is now for referrals, kr_nsec*_ref_to_unsigned consider
 				 * (only) the first NS record in the packet. */
 				if (!kr_rank_test(ns->rank, KR_RANK_AUTH)) { /* sanity */
 					ns->rank = KR_RANK_INSECURE;
