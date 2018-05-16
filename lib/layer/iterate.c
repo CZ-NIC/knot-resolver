@@ -650,17 +650,28 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *query = req->current_query;
 
-	/* Response for minimized QNAME.
+	/* Response for minimized QNAME.  Note that current iterator's minimization
+	 * is only able ask one label below a zone cut.
 	 * NODATA   => may be empty non-terminal, retry (found zone cut)
-	 * NOERROR  => found zone cut, retry
+	 * NOERROR  => found zone cut, retry, except the case described below
 	 * NXDOMAIN => parent is zone cut, retry as a workaround for bad authoritatives
 	 */
-	bool is_final = (query->parent == NULL);
-	int pkt_class = kr_response_classify(pkt);
-	if (!knot_dname_is_equal(knot_pkt_qname(pkt), query->sname) &&
+	const bool is_final = (query->parent == NULL);
+	const int pkt_class = kr_response_classify(pkt);
+	const knot_dname_t * pkt_qname = knot_pkt_qname(pkt);
+	if (!knot_dname_is_equal(pkt_qname, query->sname) &&
 	    (pkt_class & (PKT_NOERROR|PKT_NXDOMAIN|PKT_REFUSED|PKT_NODATA))) {
-		VERBOSE_MSG("<= found cut, retrying with non-minimized name\n");
-		query->flags.NO_MINIMIZE = true;
+		/* Check for parent server that is authoritative for child zone,
+		 * several CCTLDs where the SLD and TLD have the same name servers */
+		const knot_pktsection_t *ans = knot_pkt_section(pkt, KNOT_ANSWER);
+		if ((pkt_class & (PKT_NOERROR)) && ans->count > 0 &&
+		     knot_dname_is_equal(pkt_qname, query->zone_cut.name)) {
+			VERBOSE_MSG("<= continuing with qname minimization\n")
+		} else {
+			/* fall back to disabling minimization */
+			VERBOSE_MSG("<= retrying with non-minimized name\n");
+			query->flags.NO_MINIMIZE = true;
+		}
 		return KR_STATE_CONSUME;
 	}
 
