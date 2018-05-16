@@ -165,8 +165,15 @@ KR_EXPORT void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
 		if (g->hashes[i] == khash_top) {
 			it = g->items[i];
 			if (likely(it && it->key_len == key_len
-					&& (key_len == 0 || memcmp(it->data, key, key_len) == 0)))
-				goto found; // to reduce huge nesting depth
+					&& (key_len == 0 || memcmp(it->data, key, key_len) == 0))) {
+				/* Found a key, but trying to insert a value larger than available
+				 * space in the allocated slot, so the entry must be resized to fit. */
+				if (unlikely(do_insert && val_len > it->val_len)) {
+					goto insert;
+				} else {
+					goto found; // to reduce huge nesting depth	
+				}
+			}
 		}
 	}
 	// key not found; first try an empty/counted-out place to insert
