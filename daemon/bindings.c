@@ -642,6 +642,48 @@ static int net_tls_padding(lua_State *L)
 	return 1;
 }
 
+/* Configure client-side TLS session ticket key generation.
+ *
+ * note  Don't call from CLI when there are forked kresd instances as it
+ *       will break synchronous ticket key regeneration.
+ *
+ * Expected parameters from lua
+ * salt  salt string used for session ticket key generation.
+ *       It's guaranteed that all forked kresd instances
+ *       with same salt string will always use the same session ticket key
+ *       without additional synchronization.
+ *       If salt string is empty, kresd won't use session tickets at server side
+ *       and therefore won't support session resumption.
+ */
+
+static int net_tls_sticket_key_salt_string(lua_State *L)
+{
+
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_pushstring(L, "net.tls_client_sticket takes one parameter: (\"salt string\")");
+		lua_error(L);
+	}
+
+	struct engine *engine = engine_luaget(L);
+	struct network *net = &engine->net;
+	const char *salt = lua_tostring(L, 1);
+	size_t salt_len = strlen(salt);
+	if (net->tls_session_ticket_ctx != NULL) {
+		tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
+		net->tls_session_ticket_ctx = NULL;
+	}
+	if (salt_len) {
+		net->tls_session_ticket_ctx = tls_session_ticket_ctx_create(net->loop, salt, salt_len);
+		if (net->tls_session_ticket_ctx == NULL) {
+			lua_pushstring(L, "net.tls_client_sticket - can't create session ticket context");
+			lua_error(L);
+		}
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 static int net_outgoing(lua_State *L, int family)
 {
 	struct worker_ctx *worker = wrk_luaget(L);
@@ -712,6 +754,7 @@ int lib_net(lua_State *L)
 		{ "tls_server",   net_tls },
 		{ "tls_client",   net_tls_client },
 		{ "tls_padding",  net_tls_padding },
+		{ "tls_sticket_salt_string", net_tls_sticket_key_salt_string },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
 		{ NULL, NULL }

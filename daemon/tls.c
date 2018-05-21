@@ -45,10 +45,114 @@
 #define DEBUG_MSG(fmt...)
 #endif
 
+#if GNUTLS_VERSION_NUMBER >= 0x030400
+#define tls_memset gnutls_memset
+#else
+#define tls_memset memset
+#endif
+
+#if GNUTLS_VERSION_NUMBER >= 0x030407
+#define SESSION_TICKET_KEYGEN_HASH GNUTLS_DIG_SHA3_512
+#else
+#define SESSION_TICKET_KEYGEN_HASH GNUTLS_DIG_SHA512
+#endif
+
+#define TLS_SESSION_TICKET_KEY_REGENERATION_INTERVAL 3600000
+
 static char const server_logstring[] = "tls";
 static char const client_logstring[] = "tls_client";
 
 static int client_verify_certificate(gnutls_session_t tls_session);
+
+/* FIXME: review session_ticket_key* again before merge! */
+/** Value from gnutls:lib/ext/session_ticket.c
+ * Beware: changing this needs to change the hashing implementation. */
+#define SESSION_KEY_SIZE 64
+
+/** Fields are internal to session_ticket_key_* functions. */
+struct session_ticket_key {
+	char key[SESSION_KEY_SIZE];
+	uint16_t hash_len;
+	char hash_data[];
+};
+
+struct tls_session_ticket_ctx {
+	size_t epoch;
+	uv_timer_t key_timer;
+	struct session_ticket_key *key;
+};
+
+/** Check invariants, based on gnutls version. */
+static bool session_ticket_key_invariants(void)
+{
+	static int result = 0;
+	if (result) return result > 0;
+	bool ok = true;
+	/* SHA3-512 output size may never change, but let's check it anyway :-) */
+	ok = ok && gnutls_hash_get_len(SESSION_TICKET_KEYGEN_HASH) == SESSION_KEY_SIZE;
+	/* The ticket key size might change in a different gnutls version. */
+	gnutls_datum_t key = { 0, 0 };
+	ok = ok && gnutls_session_ticket_key_generate(&key) == 0
+		&& key.size == SESSION_KEY_SIZE;
+	free(key.data);
+	result = ok ? 1 : -1;
+	return ok;
+}
+
+/** Create the internal structures and copy the salt. Beware: salt must be kept secure. */
+static struct session_ticket_key * session_ticket_key_create(const char *salt, size_t salt_len)
+{
+	const size_t hash_len = sizeof(size_t) + salt_len;
+	if (!salt || !salt_len || hash_len > UINT16_MAX || hash_len < salt_len) {
+		assert(!EINVAL);
+		return NULL;
+		/* reasonable salt_len is best enforced in config API */
+	}
+	if (!session_ticket_key_invariants()) {
+		assert(!EFAULT);
+		return NULL;
+	}
+	struct session_ticket_key *key =
+		malloc(offsetof(struct session_ticket_key, hash_data) + hash_len);
+	if (!key) return NULL;
+	key->hash_len = hash_len;
+	memcpy(key->hash_data + sizeof(size_t), salt, salt_len);
+	return key;
+}
+
+/** Recompute the session ticket key, deterministically from epoch and salt. */
+static int session_ticket_key_recompute(struct session_ticket_key *key, size_t epoch)
+{
+	if (!key || key->hash_len <= sizeof(size_t)) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+	memcpy(key->hash_data, &epoch, sizeof(size_t));
+		/* TODO: ^^ support mixing endians? */
+	int ret = gnutls_hash_fast(SESSION_TICKET_KEYGEN_HASH, key->hash_data,
+				   key->hash_len, key->key);
+	return ret == 0 ? kr_ok() : kr_error(ret);
+}
+
+/** Return reference to a key in the format suitable for gnutls. */
+static inline gnutls_datum_t session_ticket_key_get(struct session_ticket_key *key)
+{
+	assert(key);
+	return (gnutls_datum_t){
+		.size = SESSION_KEY_SIZE,
+		.data = (unsigned char *)key,
+	};
+}
+
+/** Free all resources of the key (securely). */
+static void session_ticket_key_destroy(struct session_ticket_key *key)
+{
+	assert(key);
+	tls_memset(key, 0, offsetof(struct session_ticket_key, hash_data)
+				+ key->hash_len);
+	free(key);
+}
+
 
 /**
  * Set mandatory security settings from
@@ -160,6 +264,13 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 	gnutls_transport_set_pull_function(tls->c.tls_session, kres_gnutls_pull);
 	gnutls_transport_set_push_function(tls->c.tls_session, worker_gnutls_push);
 	gnutls_transport_set_ptr(tls->c.tls_session, tls);
+
+	if (net->tls_session_ticket_ctx != NULL) {
+		assert(net->tls_session_ticket_ctx->key);
+		gnutls_datum_t session_ticket_key = session_ticket_key_get(net->tls_session_ticket_ctx->key);
+		gnutls_session_ticket_enable_server(tls->c.tls_session, &session_ticket_key);
+	}
+
 	return tls;
 }
 
@@ -578,6 +689,10 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 		gnutls_certificate_free_credentials(entry->credentials);
 	}
 
+	if (entry->session_data.data) {
+		gnutls_free(entry->session_data.data);
+	}
+
 	free(entry);
 
 	return 0;
@@ -927,6 +1042,12 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
 	ctx->session = session;
 
+	struct tls_client_paramlist_entry *tls_params = client_ctx->params;
+	if (tls_params->session_data.data != NULL) {
+		gnutls_session_set_data(ctx->tls_session, tls_params->session_data.data,
+					tls_params->session_data.size);
+	}
+
 	int ret = gnutls_handshake(ctx->tls_session);
 	if (ret == GNUTLS_E_SUCCESS) {
 		return kr_ok();
@@ -952,7 +1073,7 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state)
 }
 
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      const struct tls_client_paramlist_entry *entry,
+			      struct tls_client_paramlist_entry *entry,
 			      struct session *session)
 {
 	if (!ctx) {
@@ -961,6 +1082,77 @@ int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
 	ctx->params = entry;
 	ctx->c.session = session;
 	return kr_ok();
+}
+
+static void session_ticket_timer_callback(uv_timer_t *timer)
+{
+	struct tls_session_ticket_ctx *ctx = (struct tls_session_ticket_ctx *)timer->data;
+	struct session_ticket_key *key = ctx->key;
+	assert(key);
+	ctx->epoch += 1;
+	session_ticket_key_recompute(key, ctx->epoch);
+	kr_log_verbose("[tls] TLS session ticket key regeneration\n");
+	uv_timer_again(&ctx->key_timer);
+}
+
+struct tls_session_ticket_ctx* tls_session_ticket_ctx_create(uv_loop_t *loop,
+							     const char *salt,
+							     size_t salt_len)
+{
+	assert(loop && salt && salt_len);
+
+	struct tls_session_ticket_ctx *ctx = malloc(sizeof(struct tls_session_ticket_ctx));
+	if (ctx == NULL) {
+		return NULL;
+	}
+
+	struct session_ticket_key *key = session_ticket_key_create(salt, salt_len);
+	if (key == NULL) {
+		free(ctx);
+		return NULL;
+	}
+
+	if (uv_timer_init(loop, &ctx->key_timer) != 0) {
+		session_ticket_key_destroy(key);
+		free(ctx);
+		return NULL;
+	}
+
+	ctx->key_timer.data = ctx;
+	int res = uv_timer_start(&ctx->key_timer, session_ticket_timer_callback,
+				 TLS_SESSION_TICKET_KEY_REGENERATION_INTERVAL,
+				 TLS_SESSION_TICKET_KEY_REGENERATION_INTERVAL);
+
+	if (res != 0) {
+		session_ticket_key_destroy(key);
+		free(ctx);
+		return NULL;
+	}
+
+	ctx->key = key;
+	ctx->epoch = 0;
+
+	session_ticket_timer_callback(&ctx->key_timer);
+
+	return ctx;
+}
+
+void tls_session_ticket_ctx_destroy(struct tls_session_ticket_ctx *ctx)
+{
+	if (ctx == NULL) {
+		return;
+	}
+
+	if (ctx->key != NULL) {
+		session_ticket_key_destroy(ctx->key);
+		ctx->key = NULL;
+	}
+
+	ctx->epoch = 0;
+	ctx->key_timer.data = NULL;
+	uv_timer_stop(&ctx->key_timer);
+
+	free(ctx);
 }
 
 #undef DEBUG_MSG
