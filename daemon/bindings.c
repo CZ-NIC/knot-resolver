@@ -660,7 +660,7 @@ static int net_tls_sticket_key_salt_string(lua_State *L)
 {
 
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "net.tls_client_sticket takes one parameter: (\"salt string\")");
+		lua_pushstring(L, "net.tls_sticket_salt_string takes one parameter: (\"salt string\")");
 		lua_error(L);
 	}
 
@@ -675,11 +675,80 @@ static int net_tls_sticket_key_salt_string(lua_State *L)
 	if (salt_len) {
 		net->tls_session_ticket_ctx = tls_session_ticket_ctx_create(net->loop, salt, salt_len);
 		if (net->tls_session_ticket_ctx == NULL) {
-			lua_pushstring(L, "net.tls_client_sticket - can't create session ticket context");
+			lua_pushstring(L, "net.tls_sticket_salt_string - can't create session ticket context");
 			lua_error(L);
 		}
 	}
 
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/* Configure client-side TLS session ticket key generation.
+ *
+ * note  Don't call from CLI when there are forked kresd instances as it
+ *       will break synchronous ticket key regeneration.
+ *
+ * Expected parameters from lua
+ * file  text file containing salt string.
+ *       If file is empty, resolver won't use session tickets at server side
+ *       and therefore won't support session resumption.
+ */
+
+static int net_tls_sticket_key_salt_file(lua_State *L)
+{
+
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_pushstring(L, "net.tls_sticket_salt_file takes one parameter: (\"file name\")");
+		lua_error(L);
+	}
+
+	struct engine *engine = engine_luaget(L);
+	struct network *net = &engine->net;
+
+	const char *file_name = lua_tostring(L, 1);
+	if (strlen(file_name) == 0) {
+		lua_pushstring(L, "net.tls_sticket_salt_file - empty file name");
+		lua_error(L);
+	}
+
+	FILE *fp = fopen(file_name, "r");
+	if (fp == NULL) {
+		lua_pushstring(L, "net.tls_sticket_salt_file - can't open file '");
+		lua_pushstring(L, file_name);
+		lua_pushstring(L, "' (");
+		lua_pushstring(L, strerror(errno));
+		lua_pushstring(L, ")");
+		lua_concat(L, 5);
+		lua_error(L);
+	}
+
+	char *salt = NULL;
+	size_t salt_buf_len = 0;
+	/* getline() also reads newline characters, if any. */
+	ssize_t salt_len = getline(&salt, &salt_buf_len, fp);
+	if (salt_len < 0) {
+		lua_pushstring(L, "net.tls_sticket_salt_file - error reading from '");
+		lua_pushstring(L, file_name);
+		lua_pushstring(L, "' (");
+		lua_pushstring(L, strerror(errno));
+		lua_pushstring(L, ")");
+		lua_concat(L, 5);
+		lua_error(L);
+	}
+	if (net->tls_session_ticket_ctx != NULL) {
+		tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
+		net->tls_session_ticket_ctx = NULL;
+	}
+	if (salt_len > 0) {
+		net->tls_session_ticket_ctx = tls_session_ticket_ctx_create(net->loop, salt, salt_len);
+		if (net->tls_session_ticket_ctx == NULL) {
+			lua_pushstring(L, "net.tls_sticket_salt_file - can't create session ticket context");
+			lua_error(L);
+		}
+	}
+	free(salt);
+	fclose(fp);
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -755,6 +824,7 @@ int lib_net(lua_State *L)
 		{ "tls_client",   net_tls_client },
 		{ "tls_padding",  net_tls_padding },
 		{ "tls_sticket_salt_string", net_tls_sticket_key_salt_string },
+		{ "tls_sticket_salt_file", net_tls_sticket_key_salt_file },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
 		{ NULL, NULL }
