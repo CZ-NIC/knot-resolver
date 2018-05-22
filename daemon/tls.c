@@ -631,6 +631,16 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 			} else if (array_push(entry->ca_files, value) < 0) {
 				free ((void *)value);
 				ret = kr_error(ENOMEM);
+			} else if (strcmp(ca_file, "system ca store") == 0) {
+				int res = gnutls_certificate_set_x509_system_trust (entry->credentials);
+				if (res <= 0) {
+					kr_log_error("[tls_client] failed to import certs from system store (%s)\n",
+						     gnutls_strerror_name(res));
+					/* value will be freed at cleanup */
+					ret = kr_error(EINVAL);
+				} else {
+					kr_log_verbose("[tls_client] imported %d certs from system store\n", res);
+				}
 			} else {
 				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
 										 GNUTLS_X509_FMT_PEM);
