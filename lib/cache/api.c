@@ -801,17 +801,37 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name,
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
+	if (!cache->api->match) {
+		return kr_error(ENOSYS);
+	}
 	if (!cache->api->remove) {
 		return kr_error(ENOSYS);
 	}
 
 	struct key k_storage, *k = &k_storage;
-
 	int ret = kr_dname_lf(k->buf, name, false);
-	if (ret) return kr_error(ret);
+	if (ret) {
+		return kr_error(ret);
+	}
 
 	knot_db_val_t key = key_exact_type(k, type, NULL, 0);
-	return cache_op(cache, remove, &key, 1);
+
+	static knot_db_val_t keys[256];
+	int total = 0;
+	for (;;) {
+		ret = cache_op(cache, match, &key, keys,
+			       sizeof(keys) / sizeof(knot_db_val_t));
+		if (ret < 0) {
+			return kr_error(ret);
+		}
+		if (ret == 0) {
+			break;
+		}
+
+		total += ret;
+		cache_op(cache, remove, keys, ret);
+	}
+	return total;
 }
 
 int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
@@ -831,7 +851,12 @@ int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
 
 	// use a mock type
 	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_A, NULL, 0);
-	key.len -= sizeof((char)('E')) + sizeof(uint16_t);
+	key.len = (size_t)(k->buf[0]);
+
+	// no prefix match for root
+	if (key.len == 0) {
+		key.len = 1;
+	}
 
 	return cache_op(cache, match, &key, keys, max);
 }
