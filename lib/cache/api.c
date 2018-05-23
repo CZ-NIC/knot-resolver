@@ -540,7 +540,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			scope = NULL;
 			scope_len = 0;
 		}
-		
+
 		key = key_exact_type(k, rr->type, scope, scope_len);
 	}
 
@@ -828,8 +828,25 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name,
 			break;
 		}
 
+		// make the pointer point to duplicated data since the
+		// position in db view might be invalid after open in
+		// RW mode
+		for (int i = 0; i < ret; ++i) {
+			void *dst = malloc(keys[i].len);
+			if (!dst) {
+				return kr_error(ENOMEM);
+			}
+			memcpy(dst, keys[i].data, keys[i].len);
+			keys[i].data = dst;
+		}
+
 		total += ret;
 		cache_op(cache, remove, keys, ret);
+
+		for (int i = 0; i < ret; ++i) {
+			free(keys[i].data);
+		}
+
 	}
 	return total;
 }
@@ -885,6 +902,10 @@ int kr_unpack_cache_key(knot_db_val_t *key, knot_dname_t *buf, uint16_t *type)
 	int ret = knot_dname_lf2wire(buf, len, key->data);
 	if (ret < 0) {
 		return kr_error(ret);
+	}
+
+	if (len + 2 + sizeof(uint16_t) > key->len) {
+		return kr_error(EINVAL);
 	}
 
 	// jump over "\0 E/1"

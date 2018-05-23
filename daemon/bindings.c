@@ -1120,15 +1120,29 @@ static int cache_clear(lua_State *L)
 	}
 
 	/* Check parameters */
-	const char *args = NULL;
+	const char *name = NULL;
+	uint16_t type = 0;
 	int n = lua_gettop(L);
 	if (n >= 1 && lua_isstring(L, 1)) {
-		args = lua_tostring(L, 1);
+		name = lua_tostring(L, 1);
 	}
+	if (n >= 2 && lua_isnumber(L, 2)) {
+		type = lua_tonumber(L, 2);
+	}
+	if (name && strlen(name) > 0) {
+		int ret;
+		if (type == 0) {
+			ret = cache_remove_prefix(cache, name);
+		} else {
+			uint8_t buf[KNOT_DNAME_MAXLEN];
+			if (!knot_dname_from_str(buf, name, sizeof(buf))) {
+				ret = kr_error(EINVAL);
+			} else {
+				ret = kr_cache_remove(cache, buf, type);
+				kr_cache_sync(cache);
+			}
+		}
 
-	/* Clear a sub-tree in cache. */
-	if (args && strlen(args) > 0) {
-		int ret = cache_remove_prefix(cache, args);
 		if (ret < 0) {
 			format_error(L, kr_strerror(ret));
 			lua_error(L);

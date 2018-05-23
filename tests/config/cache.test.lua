@@ -46,9 +46,34 @@ local function test_context_cache()
 	same(s.insert, 1, 'cache insertion increments counters')
 end
 
+-- test cache CRUD operations
+local function test_cache_ops()
+	local c = kres.context().cache
+
+	local rr = kres.rrset('\3com\0', kres.type.A, kres.class.IN)
+	rr:add_rdata('\1\2\3\4', 4, 30)
+	ok(c:insert(rr, nil, 0, 0), 'cache insertion works')
+
+	rr = kres.rrset('\3com\0', kres.type.AAAA, kres.class.IN)
+	rr:add_rdata('\1', 1, 30)
+	ok(c:insert(rr, nil, 0, 0), 'cache insertion works')
+
+	local r = cache.get('com')
+	ok(r['com.'] and r['com.'].A and r['com.'].AAAA, 'cache match works')
+
+	local n = cache.clear('com', kres.type.A)
+	r = cache.get('com')
+	ok(n == 1 and not r['com.'].A, 'cache delete for single rr works')
+
+	local n = cache.clear('com')
+	local s, r = pcall(cache.get, 'com')
+	ok(n == 1 and not s, 'cache delete for domain prefix works')
+end
+
 return {
 	test_properties,
 	test_stats,
 	test_resize,
 	test_context_cache,
+	test_cache_ops,
 }
