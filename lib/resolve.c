@@ -637,15 +637,12 @@ static int answer_finalize(struct kr_request *request, int state)
 		return answer_fail(request);
 	}
 	/* Write EDNS information */
-	int ret = 0;
 	if (answer->opt_rr) {
 		if (request->has_tls) {
 			if (answer_padding(request) != kr_ok()) {
 				return answer_fail(request);
 			}
 		}
-		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		ret = edns_put(answer);
 	}
 
 	if (!last) secure = false; /*< should be no-op, mostly documentation */
@@ -680,7 +677,7 @@ static int answer_finalize(struct kr_request *request, int state)
 		knot_wire_clear_ad(answer->wire);
 	}
 
-	return ret;
+	return kr_ok();
 }
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
@@ -1627,9 +1624,10 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	if (answer_finalize(request, state) != 0) {
 		state = KR_STATE_FAIL;
 	}
+
 	/* Error during procesing, internal failure */
+	knot_pkt_t *answer = request->answer;
 	if (state != KR_STATE_DONE) {
-		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
@@ -1637,6 +1635,14 @@ int kr_resolve_finish(struct kr_request *request, int state)
 
 	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
+
+	/* Write EDNS to wire */
+	int ret = edns_put(answer);
+	if (ret != 0) {
+		knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
+		state = KR_STATE_FAIL;
+		request->state = state;
+	}
 
 	struct kr_query *last = kr_rplan_last(rplan);
 	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
