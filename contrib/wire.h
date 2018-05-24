@@ -27,7 +27,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__gnu_hurd__) || \
+    (defined(__FreeBSD_kernel__) && defined(__GLIBC__))
 #       include <endian.h>
 #  ifndef be64toh
 #       include <arpa/inet.h>
