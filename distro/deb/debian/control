@@ -16,17 +16,13 @@ Build-Depends:
  libedit-dev,
  libgeoip-dev,
  libgnutls28-dev,
- libhiredis-dev,
- libjansson-dev,
  libknot-dev (>= 2.6.4),
  liblmdb-dev,
  libluajit-5.1-dev,
- libmemcached-dev,
- libsystemd-dev (>= 227),
+ libsystemd-dev (>= 227) [linux-any],
  libuv1-dev,
  luajit,
  pkg-config,
- python3,
 Homepage: https://www.knot-resolver.cz/
 Rules-Requires-Root: no
 
