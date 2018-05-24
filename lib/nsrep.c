@@ -83,8 +83,9 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 #undef ADDR_SET
 
 static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
-			      struct kr_qflags opts, unsigned score, uint8_t *addr[])
+			      struct kr_query *qry, unsigned score, uint8_t *addr[])
 {
+	struct kr_qflags *opts = &qry->flags;
 	kr_nsrep_rtt_lru_t *rtt_cache = ctx->cache_rtt;
 	kr_nsrep_rtt_lru_entry_t *rtt_cache_entry_ptr[KR_NSREP_MAXADDR] = { NULL, };
 	assert (KR_NSREP_MAXADDR >= 2);
@@ -100,10 +101,10 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		bool is_valid = false;
 		/* Check if the address isn't disabled. */
 		if (len == sizeof(struct in6_addr)) {
-			is_valid = !(opts.NO_IPV6);
+			is_valid = !(opts->NO_IPV6);
 			favour = FAVOUR_IPV6;
 		} else if (len == sizeof(struct in_addr)) {
-			is_valid = !(opts.NO_IPV4);
+			is_valid = !(opts->NO_IPV4);
 		} else {
 			assert(!EINVAL);
 			is_valid = false;
@@ -187,7 +188,7 @@ get_next_iterator :
 		/* rtt_cache_entry_ptr[i] points to "timeouted" rtt cache entry.
 		 * The period of the ban on participation in elections has expired. */
 
-		if (VERBOSE_STATUS) {
+		WITH_VERBOSE(qry) {
 			void *val = pack_obj_val(addr[i]);
 			size_t len = pack_obj_len(addr[i]);
 			char sa_str[INET6_ADDRSTRLEN];
@@ -240,7 +241,7 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 			}
 		}
 	} else {
-		score = eval_addr_set(addr_set, ctx, qry->flags, score, addr_choice);
+		score = eval_addr_set(addr_set, ctx, qry, score, addr_choice);
 	}
 
 	/* Probabilistic bee foraging strategy (naive).
@@ -366,7 +367,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 	}
 	/* Evaluate addr list */
 	uint8_t *addr_choice[KR_NSREP_MAXADDR] = { NULL, };
-	unsigned score = eval_addr_set(addr_set, ctx, qry->flags, ns->score, addr_choice);
+	unsigned score = eval_addr_set(addr_set, ctx, qry, ns->score, addr_choice);
 	update_nsrep_set(ns, ns->name, addr_choice, score);
 	return kr_ok();
 }

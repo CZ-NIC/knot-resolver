@@ -1640,7 +1640,7 @@ static int qr_task_step(struct qr_task *task,
 		size_t timeout = qry->ns.score;
 		if (timeout > KR_NS_GLUED) {
 			/* We don't have information about variance in RTT, expect +10ms */
-			timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
+			timeout = MIN(qry->ns.score + 10, 2*KR_CONN_RETRY);
 		} else {
 			timeout = KR_CONN_RETRY;
 		}
