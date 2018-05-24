@@ -9,7 +9,7 @@ filters and ACLs, sort of like ISC BIND views.
 
 There are two identification mechanisms:
 
-* ``subnet``
+* ``addr``
   - identifies the client based on his subnet
 * ``tsig``
   - identifies the client based on a TSIG key
