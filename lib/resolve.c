@@ -882,7 +882,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 		unsigned rtt = kr_now() - qry->timestamp_mono;
 		unsigned score = is_timeout ? KR_NS_TIMEOUT : (KR_NS_LONG - 1);
 		if (score < rtt) {
-			score = rtt;
+			score = MIN(rtt, KR_NS_TIMEOUT);
 		}
 		kr_nsrep_update_rtt(&qry->ns, src, score, ctx->cache_rtt, KR_NS_UPDATE);
 		WITH_VERBOSE(qry) {
