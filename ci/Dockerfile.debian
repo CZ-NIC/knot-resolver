@@ -23,6 +23,7 @@ RUN apt-get install -y -qqq python3-pip wget augeas-tools
 RUN pip3 install --upgrade pip
 RUN pip3 install pylint
 RUN pip3 install pep8
+RUN pip3 install pytest-xdist
 
 # C dependencies for python-augeas
 RUN apt-get install -y -qqq libaugeas-dev libffi-dev
