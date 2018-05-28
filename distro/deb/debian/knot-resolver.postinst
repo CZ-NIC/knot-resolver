@@ -19,4 +19,12 @@ if [ "$1" = "triggered" ]; then
     exit 0
 fi
 
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
+    if [ -d /run/systemd/system ]; then
+        systemctl try-restart 'kresd@*.service' || true
+    else
+        invoke-rc.d kresd try-restart || true
+    fi
+fi
+
 #DEBHELPER#
