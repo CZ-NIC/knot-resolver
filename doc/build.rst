@@ -14,18 +14,15 @@ to see how you can build it from sources (or package it), or use official `Docke
 Platform considerations
 -----------------------
 
-.. csv-table::
-   :header: "Project", "Platforms", "Compatibility notes"
+Knot-resolver is written for UNIX-like systems, mainly in C99.
+Portable I/O is provided by libuv_.
+Some 64-bit systems with LuaJIT 2.1 may be affected by
+`a problem <https://github.com/LuaJIT/LuaJIT/blob/v2.1/doc/status.html#L100>`_
+-- Linux on x86_64 is unaffected but `Linux on aarch64 is
+<https://gitlab.labs.nic.cz/knot/knot-resolver/issues/216>`_.
 
-   "``daemon``", "UNIX-like [#]_", "C99, libuv_ provides portable I/O"
-   "``library``", "UNIX-like", "MSVC_ not supported, needs MinGW_"
-   "``modules``", "*varies*", ""
-   "``tests/unit``", "*equivalent to library*", ""
-   "``tests/integration``", "UNIX-like", "Depends on library injection (see [2]_)"
-
-.. [#] Known to be running (not exclusively) on FreeBSD, Linux and OS X.
-
-.. Windows status??? Modules are not supported yet, as the PE/DLL loading is different. Library injection is working with ELF *(or Mach-O flat namespace)* only.
+Windows systems might theoretically work without large changes,
+but it's most likely broken and currently not planned to be supported.
 
 Requirements
 ------------
@@ -36,12 +33,13 @@ The following is a list of software required to build Knot DNS Resolver from sou
    :header: "Requirement", "Required by", "Notes"
 
    "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
-   "C compiler", "*all*", "*(build only)* [#]_"
+   "C and C++ compiler", "*all*", "*(build only)* [#]_"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "hexdump or xxd", "``daemon``", "*(build only)*"
-   "libknot_ 2.4.0+", "*all*", "Knot DNS library (requires autotools, GnuTLS and Jansson)."
+   "libknot_ 2.6.4+", "*all*", "Knot DNS libraries - requires autotools, GnuTLS, ..."
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
    "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
+   "lmdb", "``daemon``", "If missing, a static version is embedded."
 
 There are also *optional* packages that enable specific functionality in Knot DNS Resolver, they are useful mainly for developers to build documentation and tests.
 
@@ -51,9 +49,6 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "`lua-http`_", "``modules/http``", "HTTP/2 client/server for Lua."
    "luasocket_", "``trust anchors, modules/stats``", "Sockets for Lua."
    "luasec_", "``trust anchors``", "TLS for Lua."
-   "libmemcached_", "``modules/memcached``", "To build memcached backend module."
-   "hiredis_", "``modules/redis``", "To build redis backend module."
-   "Go_ 1.5+", "``modules``", "Build modules written in Go."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this HTML/PDF documentation."
@@ -65,6 +60,10 @@ There are also *optional* packages that enable specific functionality in Knot DN
    "luacheck_", "``lint-lua``", "Syntax and static analysis checker for Lua."
    "`clang-tidy`_", "``lint-c``", "Syntax and static analysis checker for C."
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
+
+.. "libmemcached_", "``modules/memcached``", "To build memcached backend module."
+   "hiredis_", "``modules/redis``", "To build redis backend module."
+   "Go_ 1.5+", "``modules``", "Build modules written in Go."
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
