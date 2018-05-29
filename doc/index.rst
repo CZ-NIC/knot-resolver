@@ -2,9 +2,9 @@
 Knot DNS Resolver
 #################
 
-The Knot DNS Resolver is a minimalistic caching resolver implementation.
-The project provides both a resolver library and a small daemon.
-Modular architecture of the library keeps the core tiny and efficient, and provides a state-machine like API for extensions.
+Knot Resolver is a minimalistic implementation of a caching validating DNS resolver.
+Modular architecture keeps the core tiny and efficient,
+and it provides a state-machine like API for extensions.
 
 .. toctree::
    :maxdepth: 2

@@ -997,9 +997,9 @@ specified worker count and process rank.
    Return current worker ID (starting from `0` up to `worker.count - 1`)
 
 
-.. envvar:: pid (number)
+.. envvar:: worker.pid
 
-   Current worker process PID.
+   Current worker process PID (number).
 
 
 .. function:: worker.stats()

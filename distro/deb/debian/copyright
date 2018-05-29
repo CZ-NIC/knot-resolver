@@ -3,7 +3,7 @@ Upstream-Name: knot-resolver
 Source: https://www.knot-resolver.cz/
 
 Files: *
-Copyright: 2015 CZ.NIC
+Copyright: 2015-2018 CZ.NIC
 License: GPL-3.0+
 
 Files: contrib/ccan/asprintf/*
@@ -40,7 +40,7 @@ License: BSD-3-clause
 
 Files: contrib/murmurhash3/*
 Copyright: Austin Appleby
-License: public-domain
+License: CC0-1.0
 
 Files: debian/missing-sources/dygraph-combined.js
  modules/http/static/dygraph-combined.js
@@ -440,3 +440,14 @@ License: OpenLDAP
  holders.
  .
  OpenLDAP is a registered trademark of the OpenLDAP Foundation.
+
+License: CC0-1.0
+ This work is licensed under the "Creative Commons Zero" license.
+ .
+ On debian systems, a copy of the Creative Commons Zero license may be
+ found at /usr/share/common-licenses/CC0-1.0.
+
+License: public-domain
+ This work has been released into the public domain.  The map
+ implementation builds off of prior public domain work from Dan
+ Bernstein (qhasm) and Adam Langley (critbit).

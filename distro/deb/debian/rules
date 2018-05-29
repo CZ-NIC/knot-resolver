@@ -42,9 +42,8 @@ override_dh_auto_build-indep:
 	cd doc && sphinx-build -b html -D html_theme=nature . html
 
 override_dh_auto_install-arch:
-	dh_auto_install --destdir=debian/tmp -- V=1
-	rm debian/tmp/etc/knot-resolver/icann-ca.pem
-	rm debian/tmp/etc/knot-resolver/root.hints
+	dh_auto_install --destdir=debian/tmp -- V=1 KEYFILE_DEFAULT=/usr/share/dns/root.key
+	rm -f debian/tmp/etc/knot-resolver/root.hints debian/tmp/etc/knot-resolver/icann-ca.pem
 
 override_dh_auto_install-indep:
 # install just the http/2 module

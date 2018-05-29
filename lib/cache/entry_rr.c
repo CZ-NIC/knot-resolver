@@ -21,7 +21,7 @@
 
 #include "lib/cache/impl.h"
 
-int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
+int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 {
 	//const void *data0 = data;
 	assert(data);
@@ -47,12 +47,12 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data)
 /** Materialize a knot_rdataset_t from cache with given TTL.
  * Return the number of bytes consumed or an error code.
  */
-static int rdataset_materialize(knot_rdataset_t * restrict rds, const void * const data,
-		const void *data_bound, uint32_t ttl, knot_mm_t *pool)
+static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
+		const uint8_t *data_bound, uint32_t ttl, knot_mm_t *pool)
 {
 	assert(rds && data && data_bound && data_bound > data && !rds->data);
 	assert(pool); /* not required, but that's our current usage; guard leaks */
-	const void *d = data; /* iterates over the cache data */
+	const uint8_t *d = data; /* iterates over the cache data */
 	{
 		uint16_t rr_count;
 		memcpy(&rr_count, d, sizeof(rr_count));
