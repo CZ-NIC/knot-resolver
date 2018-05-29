@@ -58,7 +58,8 @@ static const uint16_t CACHE_VERSION = 4;
  * \param optout[out] Set *optout = true; when encountering an opt-out NSEC3 (optional). */
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
-		uint8_t rank, trie_t *nsec_pmap, bool *has_optout);
+		uint8_t rank, trie_t *nsec_pmap, bool *has_optout,
+		const uint8_t *scope, int scope_len_bits);
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
@@ -161,7 +162,7 @@ int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const kno
 	if (err <= 0) {
 		return kr_ok();
 	}
-	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL, NULL);
+	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL, NULL, scope, scope_len_bits);
 		/* Zone's NSEC* parames aren't updated, but that's probably OK
 		 * for kr_cache_insert_rr() */
 	if (written >= 0) {
@@ -451,7 +452,8 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
-		uint8_t rank, trie_t *nsec_pmap, bool *has_optout)
+		uint8_t rank, trie_t *nsec_pmap, bool *has_optout,
+		const uint8_t *scope, int scope_len)
 {
 	assert(stash_rrset_precond(rr, qry) > 0);
 	if (!cache) {
@@ -528,18 +530,15 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			return kr_error(ret);
 		}
 		/* Scope the record if authoritative, and scopeable type */
-		const uint8_t *scope = NULL;
-		int scope_len = 0;
-		if (qry) {
-			struct kr_request *req = qry->request;
-			/* Exclude infrastructure service requests (e.g. A/AAAA for an NS set)
-			 * and exclude non-authoritative data (records from other sections)
-			 */
-			if (!qry->parent && kr_rank_test(rank, KR_RANK_AUTH) && is_scopable_type(rr->type)) {
-				scope = req->cache_scope;
-				scope_len = req->cache_scope_len_bits;
-				used_scope_len = scope_len;
-			}
+		if ((!qry || !qry->parent) && kr_rank_test(rank, KR_RANK_AUTH) && is_scopable_type(rr->type)) {
+			used_scope_len = scope_len;
+		} else {
+			/*
+			* Exclude infrastructure service requests (e.g. A/AAAA for an NS set)
+			* and exclude non-authoritative data (records from other sections)
+			*/
+			scope = NULL;
+			scope_len = 0;
 		}
 		
 		key = key_exact_type(k, rr->type, scope, scope_len);
@@ -640,8 +639,9 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 		break;
 	}
 
+	struct kr_request *req = qry->request;
 	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
-					entry->rank, nsec_pmap, has_optout);
+					entry->rank, nsec_pmap, has_optout, req->cache_scope, req->cache_scope_len_bits);
 	if (written < 0) {
 		kr_log_error("[%5hu][cach] stash failed, ret = %d\n", qry->id, ret);
 		return (int) written;
