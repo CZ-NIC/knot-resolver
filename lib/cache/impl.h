@@ -168,7 +168,7 @@ static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 }
 
 /** Dematerialize a rdataset. */
-int rdataset_dematerialize(const knot_rdataset_t *rds, void * restrict data);
+int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data);
 
 /** Partially constructed answer when gathering RRsets from cache. */
 struct answer {
