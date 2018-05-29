@@ -271,7 +271,7 @@ enum {
  * \return error code.  They are all bad conditions and "guarded" by assert.
  */
 int entry2answer(struct answer *ans, int id,
-		const struct entry_h *eh, const void *eh_bound,
+		const struct entry_h *eh, const uint8_t *eh_bound,
 		const knot_dname_t *owner, uint16_t type, uint32_t new_ttl);
 
 
@@ -357,5 +357,11 @@ static inline uint16_t get_uint16(const void *address)
 	uint16_t tmp;
 	memcpy(&tmp, address, sizeof(tmp));
 	return tmp;
+}
+
+/** Useful pattern, especially as void-pointer arithmetic isn't standard-compliant. */
+static inline uint8_t * knot_db_val_bound(knot_db_val_t val)
+{
+	return (uint8_t *)val.data + val.len;
 }
 

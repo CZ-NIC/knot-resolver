@@ -62,8 +62,8 @@ knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *nsec3_name,
 	knot_db_val_t val = key_NSEC3_common(k, nsec3_name /*only zname required*/,
 						nsec_p_hash);
 	if (!val.data) return val;
-	int len = base32hex_decode(nsec3_name + 1, nsec3_name[0], val.data + val.len,
-				   KR_CACHE_KEY_MAXLEN - val.len);
+	int len = base32hex_decode(nsec3_name + 1, nsec3_name[0],
+			knot_db_val_bound(val), KR_CACHE_KEY_MAXLEN - val.len);
 	if (len != NSEC3_HASH_LEN) {
 		return VAL_EMPTY;
 	}
@@ -116,7 +116,7 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		assert(false);
 		return VAL_EMPTY;
 	}
-	memcpy(val.data + val.len, hash.data, NSEC3_HASH_LEN);
+	memcpy(knot_db_val_bound(val), hash.data, NSEC3_HASH_LEN);
 	free(hash.data);
 	#endif
 
@@ -191,7 +191,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 		*new_ttl = new_ttl_;
 	}
 	if (hash_low) {
-		*hash_low = key_found.data + hash_off;
+		*hash_low = (uint8_t *)key_found.data + hash_off;
 	}
 	if (is_exact) {
 		/* Nothing else to do. */
@@ -221,11 +221,11 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 		return "unexpected next hash length";
 	}
 	/* B. do the actual range check. */
-	const uint8_t * const hash_searched = key.data + hash_off;
+	const uint8_t * const hash_searched = (uint8_t *)key.data + hash_off;
 	bool covers = /* we know for sure that the low end is before the searched name */
 		nsec3_hash_ordered(hash_searched, hash_next)
 		/* and the wrap-around case */
-		|| nsec3_hash_ordered(hash_next, key_found.data + hash_off);
+		|| nsec3_hash_ordered(hash_next, (const uint8_t *)key_found.data + hash_off);
 	if (!covers) {
 		return "range search miss (!covers)";
 	}
@@ -237,7 +237,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 static void key_NSEC3_hash2text(const knot_db_val_t key, char *text)
 {
 	assert(key.data && key.len > NSEC3_HASH_LEN);
-	const uint8_t *hash_raw = key.data + key.len - NSEC3_HASH_LEN;
+	const uint8_t *hash_raw = knot_db_val_bound(key) - NSEC3_HASH_LEN;
 			/* CACHE_KEY_DEF ^^ */
 	int len = base32hex_encode(hash_raw, NSEC3_HASH_LEN, (uint8_t *)text,
 				   NSEC3_HASH_TXT_LEN);
@@ -341,9 +341,8 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 				 ? AR_CPE : AR_NSEC;
 		{
 			const struct entry_h *nsec_eh = val.data;
-			const void *nsec_eh_bound = val.data + val.len;
 			memset(&ans->rrsets[ans_id], 0, sizeof(ans->rrsets[ans_id]));
-			int ret = entry2answer(ans, ans_id, nsec_eh, nsec_eh_bound,
+			int ret = entry2answer(ans, ans_id, nsec_eh, knot_db_val_bound(val),
 						owner, KNOT_RRTYPE_NSEC3, new_ttl);
 			if (ret) return kr_error(ret);
 		}
@@ -458,8 +457,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		int ret = dname_wire_reconstruct(owner, k->zname, hash_low);
 		if (unlikely(ret)) return kr_ok();
 		const struct entry_h *nsec_eh = val.data;
-		const void *nsec_eh_bound = val.data + val.len;
-		ret = entry2answer(ans, AR_WILD, nsec_eh, nsec_eh_bound,
+		ret = entry2answer(ans, AR_WILD, nsec_eh, knot_db_val_bound(val),
 				   owner, KNOT_RRTYPE_NSEC3, new_ttl);
 		if (ret) return kr_error(ret);
 	}

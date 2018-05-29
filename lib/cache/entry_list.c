@@ -61,7 +61,7 @@ int entry_list_parse(const knot_db_val_t val, entry_list_t list)
 		return kr_error(EILSEQ);
 	}
 	const uint8_t *it = ea->data,
-		*it_bound = val.data + val.len;
+		*it_bound = knot_db_val_bound(val);
 	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i) {
 		if (it > it_bound) {
 			return kr_error(EILSEQ);
@@ -126,8 +126,8 @@ static int entry_h_len(const knot_db_val_t val)
 	const bool ok = val.data && ((ssize_t)val.len) > 0;
 	if (!ok) return kr_error(EINVAL);
 	const struct entry_h *eh = val.data;
-	const void *d = eh->data; /* iterates over the data in entry */
-	const void *data_bound = val.data + val.len;
+	const uint8_t *d = eh->data; /* iterates over the data in entry */
+	const uint8_t *data_bound = knot_db_val_bound(val);
 	if (d >= data_bound) return kr_error(EILSEQ);
 	if (!eh->is_packet) { /* Positive RRset + its RRsig set (may be empty). */
 		int sets = 2;
@@ -150,7 +150,7 @@ static int entry_h_len(const knot_db_val_t val)
 		d += 2 + len;
 	}
 	if (d > data_bound) return kr_error(EILSEQ);
-	return d - val.data;
+	return d - (uint8_t *)val.data;
 }
 
 struct entry_apex * entry_apex_consistent(knot_db_val_t val)
@@ -287,7 +287,8 @@ int entry_h_splice(
 	ret = cache_write_or_clear(cache, &key, &val, qry);
 	if (ret) return kr_error(ret);
 	memcpy(val.data, buf, val.len); /* we also copy the "empty" space, but well... */
-	val_new_entry->data = val.data + (el[i_type].data - buf);
+	val_new_entry->data = (uint8_t *)val.data
+			    + ((uint8_t *)el[i_type].data - (uint8_t *)buf);
 	return kr_ok();
 }
 

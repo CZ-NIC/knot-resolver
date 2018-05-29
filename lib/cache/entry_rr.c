@@ -104,7 +104,7 @@ int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
 
 
 int entry2answer(struct answer *ans, int id,
-		const struct entry_h *eh, const void *eh_bound,
+		const struct entry_h *eh, const uint8_t *eh_bound,
 		const knot_dname_t *owner, uint16_t type, uint32_t new_ttl)
 {
 	/* We assume it's zeroed.  Do basic sanity check. */

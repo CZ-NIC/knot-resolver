@@ -438,7 +438,7 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
 						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
 		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, v.data,
-					v.data + v.len, new_ttl);
+					knot_db_val_bound(v), new_ttl);
 		/* TODO: ^^ cumbersome code; we also recompute the TTL */
 		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
 		}
@@ -495,7 +495,7 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (remains < 0) goto cont;
 		{
 			const uint8_t *nsec_p_raw = el[i].len > sizeof(stamp)
-					? el[i].data + sizeof(stamp) : NULL;
+					? (uint8_t *)el[i].data + sizeof(stamp) : NULL;
 			nsec_p_init(&ans.nsec_p, nsec_p_raw);
 		}
 		/**** 2. and 3. inside */
@@ -535,8 +535,7 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return ctx->state;
 		}
 		/* Add the SOA into the answer. */
-		void *eh_data_bound = val.data + val.len;
-		ret = entry2answer(&ans, AR_SOA, eh, eh_data_bound,
+		ret = entry2answer(&ans, AR_SOA, eh, knot_db_val_bound(val),
 				   k->zname, KNOT_RRTYPE_SOA, new_ttl);
 		if (ret) return ctx->state;
 	}
@@ -901,8 +900,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		struct answer ans;
 		memset(&ans, 0, sizeof(ans));
 		ans.mm = &qry->request->pool;
-		ret = entry2answer(&ans, AR_ANSWER, eh,
-				   val_new_entry.data + val_new_entry.len,
+		ret = entry2answer(&ans, AR_ANSWER, eh, knot_db_val_bound(val_new_entry),
 				   rr->owner, rr->type, 0);
 		/*
 		VERBOSE_MSG(qry, "=> sanity: written %d and read %d\n",
@@ -1017,7 +1015,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		int i_replace = ENTRY_APEX_NSECS_CNT - 1;
 		for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i) {
 			if (el[i].len != data_stride) continue;
-			if (nsec_p && memcmp(nsec_p, el[i].data + sizeof(uint32_t),
+			if (nsec_p && memcmp(nsec_p, (uint8_t *)el[i].data + sizeof(uint32_t),
 						data_stride - sizeof(uint32_t)) != 0) {
 				continue;
 			}
@@ -1049,7 +1047,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	/* Prepare the new data chunk */
 	memcpy(el[0].data, &valid_until, sizeof(valid_until));
 	if (nsec_p) {
-		memcpy(el[0].data + sizeof(valid_until), nsec_p,
+		memcpy((uint8_t *)el[0].data + sizeof(valid_until), nsec_p,
 			data_stride - sizeof(valid_until));
 	}
 	/* Write it all to the cache */
@@ -1135,7 +1133,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		return kr_error(ENOENT);
 	}
 
-	const void *eh_bound = val.data + val.len;
+	const uint8_t *eh_bound = knot_db_val_bound(val);
 	if (eh->is_packet) {
 		/* Note: we answer here immediately, even if it's (theoretically)
 		 * possible that we could generate a higher-security negative proof.
@@ -1189,8 +1187,8 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		return -ABS(ESTALE);
 	}
 	/* Add the RR into the answer. */
-	const void *eh_bound = val.data + val.len;
-	ret = entry2answer(ans, AR_ANSWER, eh, eh_bound, qry->sname, type, new_ttl);
+	ret = entry2answer(ans, AR_ANSWER, eh, knot_db_val_bound(val),
+			   qry->sname, type, new_ttl);
 	VERBOSE_MSG(qry, "=> wildcard: answer expanded, ret = %d, new TTL %d\n",
 			ret, (int)new_ttl);
 	if (ret) return kr_error(ret);
@@ -1226,7 +1224,7 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 		.ttl  = eh->ttl,
 		.rank = eh->rank,
 		.raw_data = val.data,
-		.raw_bound = val.data + val.len,
+		.raw_bound = knot_db_val_bound(val),
 	};
 	return kr_ok();
 }
