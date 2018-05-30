@@ -442,8 +442,8 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			WITH_VERBOSE(qry) {
 				auto_free char *label_str = kr_dname_text(label);
 				VERBOSE_MSG(qry,
-					"found cut: %s (rank 0%.2o return codes: DS %d, DNSKEY %d)\n",
-					label_str, rank, ret_ds, ret_dnskey);
+					"found cut: %s (return codes: DS %d, DNSKEY %d)\n",
+					label_str, ret_ds, ret_dnskey);
 			}
 			return kr_ok();
 		}
