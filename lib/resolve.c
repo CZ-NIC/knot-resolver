@@ -225,12 +225,10 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		 * even if cut name is covered by TA. */
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
-		VERBOSE_MSG(qry, "=> going insecure because parent query is insecure\n");
 	} else if (kr_ta_covers_qry(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
 		qry->flags.DNSSEC_WANT = true;
 	} else {
 		qry->flags.DNSSEC_WANT = false;
-		VERBOSE_MSG(qry, "=> going insecure because there's no covering TA\n");
 	}
 
 	struct kr_zonecut cut_found;
