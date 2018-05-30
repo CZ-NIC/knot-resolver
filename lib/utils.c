@@ -713,7 +713,6 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		/* Found the entry to merge with.  Check consistency and merge. */
 		bool ok = stashed->rank == rank && !stashed->cached;
 		if (!ok) {
-			assert(false);
 			return kr_error(EEXIST);
 		}
 		/* It may happen that an RRset is first considered useful
