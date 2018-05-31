@@ -11,6 +11,7 @@ else
 		http = {
 			port = 0, -- Select random port
 			cert = false,
+			endpoints = { ['/test'] = {'text/custom', function () return 'hello' end} },
 		}
 	}
 
@@ -35,6 +36,11 @@ else
 		same(code, 200, 'static page return 200 OK')
 		ok(#body > 0, 'static page has non-empty body')
 		same(mime, 'text/html', 'static page has text/html content type')
+		-- custom endpoint
+		code, body, mime = http_get(uri .. '/test')
+		same(code, 200, 'custom page return 200 OK')
+		same(body, 'hello', 'custom page has non-empty body')
+		same(mime, 'text/custom', 'custom page has custom content type')
 		-- non-existent page
 		code = http_get(uri .. '/badpage')
 		same(code, 404, 'non-existent page returns 404')

@@ -1540,6 +1540,7 @@ static int wrk_resolve(lua_State *L)
 	}
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 	knot_wire_set_rd(pkt->wire);
+	knot_wire_set_ad(pkt->wire);
 
 	/* Add OPT RR */
 	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
