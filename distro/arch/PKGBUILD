@@ -11,9 +11,18 @@ license=('GPL3')
 backup=('etc/knot-resolver/kresd.conf')
 options=(debug strip)
 install=install
-depends=('libuv' 'knot>=2.6.4' 'luajit' 'cmocka' 'lua51-sec' 'lua51-socket' 'hiredis' 'libmemcached' 'libsystemd')
+depends=('cmocka'
+	 'gnutls'
+         'knot>=2.6.4'
+	 'libedit'
+	 'libsystemd'
+         'libuv'
+	 'lmdb'
+	 'lua51-sec'
+	 'lua51-socket'
+	 'luajit')
 source=("knot-resolver_${pkgver}.orig.tar.xz"
-	"kresd.conf"
+        "kresd.conf"
 	"root.keys")
 
 _makevars="PREFIX=/usr SBINDIR=/usr/bin LIBDIR=/usr/lib INCLUDEDIR=/usr/include ETCDIR=/etc/knot-resolver V=1"
