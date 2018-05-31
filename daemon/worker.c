@@ -531,6 +531,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 
 	struct kr_request *req = &ctx->req;
 	req->pool = pool;
+	req->vars_ref = LUA_NOREF;
 
 	/* Remember query source addr */
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {
@@ -614,6 +615,20 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 static void request_free(struct request_ctx *ctx)
 {
 	struct worker_ctx *worker = ctx->worker;
+	/* Dereference any Lua vars table if exists */
+	if (ctx->req.vars_ref != LUA_NOREF) {
+		lua_State *L = worker->engine->L;
+		/* Get worker variables table */
+		lua_rawgeti(L, LUA_REGISTRYINDEX, worker->vars_table_ref);
+		/* Get next free element (position 0) and store it under current reference (forming a list) */
+		lua_rawgeti(L, -1, 0);
+		lua_rawseti(L, -2, ctx->req.vars_ref);
+		/* Set current reference as the next free element */
+		lua_pushinteger(L, ctx->req.vars_ref);
+		lua_rawseti(L, -2, 0);
+		lua_pop(L, 1);
+		ctx->req.vars_ref = LUA_NOREF;
+	}
 	/* Return mempool to ring or free it if it's full */
 	pool_release(worker, ctx->req.pool.ctx);
 	/* @note The 'task' is invalidated from now on. */
@@ -2523,6 +2538,11 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 	lua_setfield(engine->L, -2, "pid");
 	lua_pushnumber(engine->L, worker_count);
 	lua_setfield(engine->L, -2, "count");
+	/* Register table for worker per-request variables */
+	lua_newtable(engine->L);
+	lua_setfield(engine->L, -2, "vars");
+	lua_getfield(engine->L, -1, "vars");
+	worker->vars_table_ref = luaL_ref(engine->L, LUA_REGISTRYINDEX);
 	lua_pop(engine->L, 1);
 	return worker;
 }
