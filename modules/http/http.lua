@@ -283,7 +283,9 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 			crtfile = 'self.crt'
 			keyfile = 'self.key'
 			ephemeral = true
-		else error('certificate provided, but missing key') end
+		elseif not keyfile then
+			error('certificate provided, but missing key')
+		end
 		-- Read or create self-signed x509 certificate
 		local f = io.open(crtfile, 'r')
 		if f then
