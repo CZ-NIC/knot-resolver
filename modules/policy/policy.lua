@@ -282,12 +282,16 @@ function policy.FLAGS(opts_set, opts_clear)
 	end
 end
 
+-- Synthesized SOA RDATA for blocked answers
+local blocked_soa_rdata = '\6nobody\7invalid\0\0\0\0\1\0\0\14\16\0\0\4\176\0\9\58\128\0\0\42\48'
+local blocked_soa_rdata_mname = '\6nobody\7invalid\0' .. blocked_soa_rdata
+
+-- Synthesize SOA for blocked answers
 local function mkauth_soa(answer, dname, mname)
-	if mname == nil then
-		mname = dname
+	if mname then
+		return answer:put(dname, 10800, answer:qclass(), kres.type.SOA, mname .. blocked_soa_rdata)
 	end
-	return answer:put(dname, 10800, answer:qclass(), kres.type.SOA,
-		mname .. '\6nobody\7invalid\0\0\0\0\1\0\0\14\16\0\0\4\176\0\9\58\128\0\0\42\48')
+	return answer:put(dname, 10800, answer:qclass(), kres.type.SOA, blocked_soa_rdata_mname)
 end
 
 local dname_localhost = todname('localhost.')
@@ -492,23 +496,25 @@ function policy.rpz(action, path)
 end
 
 function policy.DENY_MSG(msg)
-	if msg and (type(msg) ~= 'string' or #msg >= 255) then
-		error('DENY_MSG: optional msg must be string shorter than 256 characters')
-        end
+	local msg_wire
+	if msg then
+		if (type(msg) ~= 'string' or #msg >= 255) then
+			error('DENY_MSG: optional msg must be string shorter than 256 characters')
+		end
+		msg_wire = string.char(#msg) .. msg
+	end
 
-	return function (_, req)
+	return function (_, req, qry)
 		-- Write authority information
 		local answer = req.answer
 		answer:ad(false)
 		answer:aa(true)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
-		mkauth_soa(answer, answer:qname())
-		if msg then
+		mkauth_soa(answer, qry.sname)
+		if msg_wire then
 			answer:begin(kres.section.ADDITIONAL)
-			answer:put('\11explanation\7invalid', 10800, answer:qclass(), kres.type.TXT,
-				   string.char(#msg) .. msg)
-
+			answer:put('\11explanation\7invalid', 10800, answer:qclass(), kres.type.TXT, msg_wire)
 		end
 		return kres.DONE
 	end
@@ -554,14 +560,14 @@ function policy.QTRACE(_, req, qry)
 end
 
 -- Evaluate packet in given rules to determine policy action
-local function evaluate(rules, req, query, state, ...)
+local function evaluate(rules, req, query, state, pkt, addr, stream)
 	for i = 1, #rules do
 		local rule = rules[i]
 		if not rule.suspended then
-			local action = rule.cb(req, query, ...)
+			local action = rule.cb(req, query, state, pkt, addr, stream)
 			if action then
 				rule.count = rule.count + 1
-				local next_state = action(state, req, query, ...)
+				local next_state = action(state, req, query, pkt, addr, stream)
 				if next_state then    -- Not a chain rule,
 					return next_state -- stop on first match
 				end
