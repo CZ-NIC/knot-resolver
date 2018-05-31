@@ -241,6 +241,7 @@ local timeval_t = ffi.typeof('struct timeval')
 local addr_buf = ffi.new('char[16]')
 local str_addr_buf = ffi.new('char[46 + 1 + 6 + 1]') -- IPv6 + #port + \0
 local str_addr_buf_len = ffi.sizeof(str_addr_buf)
+local sockaddr_pt = ffi.typeof('struct sockaddr *')
 local sockaddr_t = ffi.typeof('struct sockaddr')
 ffi.metatype( sockaddr_t, {
 	__index = {
@@ -463,6 +464,7 @@ ffi.metatype( knot_rrset_t, {
 })
 
 -- Destructor for packet accepts pointer to pointer
+local knot_pkt_pt = ffi.typeof('knot_pkt_t *')
 local knot_pkt_t = ffi.typeof('knot_pkt_t')
 
 -- Helpers for reading/writing 16-bit numbers from packet wire
@@ -726,13 +728,15 @@ ffi.metatype( kr_query_t, {
 		end,
 	},
 })
+
 -- Metatype for request
+local kr_request_pt = ffi.typeof('struct kr_request *')
 local kr_request_t = ffi.typeof('struct kr_request')
 ffi.metatype( kr_request_t, {
 	__index = {
 		current = function(req)
 			assert(ffi.istype(kr_request_t, req))
-			if req.current_query == nil then return nil end
+			if req.current_query == nil then return end
 			return req.current_query
 		end,
 		-- Return last query on the resolution plan
@@ -745,14 +749,14 @@ ffi.metatype( kr_request_t, {
 		resolved = function(req)
 			assert(ffi.istype(kr_request_t, req))
 			local qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))
-			if qry == nil then return nil end
+			if qry == nil then return end
 			return qry
 		end,
 		-- returns first resolved sub query for a request
 		first_resolved = function(req)
 			assert(ffi.istype(kr_request_t, req))
 			local rplan = C.kr_resolve_plan(req)
-			if not rplan or rplan.resolved.len < 1 then return nil end
+			if not rplan or rplan.resolved.len < 1 then return end
 			return rplan.resolved.at[0]
 		end,
 		push = function(req, qname, qtype, qclass, flags, parent)
@@ -815,7 +819,7 @@ ffi.metatype(ranked_rr_array_t, {
 	end,
 	__index = {
 		get = function (self, i)
-			if i < 0 or i > self.len then return nil end
+			if i < 0 or i > self.len then return end
 			return self.at[i][0]
 		end,
 	}
@@ -921,9 +925,9 @@ kres = {
 	end,
 
 	-- Metatypes.  Beware that any pointer will be cast silently...
-	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,
-	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,
-	sockaddr_t = function (udata) return ffi.cast('struct sockaddr *', udata) end,
+	pkt_t = function (udata) return ffi.cast(knot_pkt_pt, udata) end,
+	request_t = function (udata) return ffi.cast(kr_request_pt, udata) end,
+	sockaddr_t = function (udata) return ffi.cast(sockaddr_pt, udata) end,
 
 	-- Global API functions
 	-- Convert a lua string to a lower-case wire format (inside GC-ed ffi.string).
@@ -941,7 +945,7 @@ kres = {
 	str2ip = function (ip)
 		local family = C.kr_straddr_family(ip)
 		local ret = C.inet_pton(family, ip, addr_buf)
-		if ret ~= 1 then return nil end
+		if ret ~= 1 then return end
 		return ffi.string(addr_buf, C.kr_family_len(family))
 	end,
 	context = function () return ffi.cast('struct kr_context *', __engine) end,
