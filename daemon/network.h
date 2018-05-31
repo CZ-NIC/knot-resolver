@@ -42,6 +42,7 @@ struct endpoint {
 typedef array_t(struct endpoint*) endpoint_array_t;
 /* @endcond */
 
+struct tls_session_ticket_ctx;
 struct network {
 	uv_loop_t *loop;
 	map_t endpoints;

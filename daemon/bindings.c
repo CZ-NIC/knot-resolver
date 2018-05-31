@@ -642,113 +642,96 @@ static int net_tls_padding(lua_State *L)
 	return 1;
 }
 
-/* Configure client-side TLS session ticket key generation.
- *
- * note  Don't call from CLI when there are forked kresd instances as it
- *       will break synchronous ticket key regeneration.
- *
- * Expected parameters from lua
- * salt  salt string used for session ticket key generation.
- *       It's guaranteed that all forked kresd instances
- *       with same salt string will always use the same session ticket key
- *       without additional synchronization.
- *       If salt string is empty, kresd won't use session tickets at server side
- *       and therefore won't support session resumption.
- */
+/** Shorter salt can't contain much entropy. */
+#define net_tls_sticket_MIN_SECRET_LEN 32
 
-static int net_tls_sticket_key_salt_string(lua_State *L)
+static int net_tls_sticket_secret_string(lua_State *L)
 {
+	struct network *net = &engine_luaget(L)->net;
 
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "net.tls_sticket_salt_string takes one parameter: (\"salt string\")");
-		lua_error(L);
-	}
+	size_t secret_len;
+	const char *secret;
 
-	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
-	const char *salt = lua_tostring(L, 1);
-	size_t salt_len = strlen(salt);
-	if (net->tls_session_ticket_ctx != NULL) {
-		tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
-		net->tls_session_ticket_ctx = NULL;
-	}
-	if (salt_len) {
-		net->tls_session_ticket_ctx = tls_session_ticket_ctx_create(net->loop, salt, salt_len);
-		if (net->tls_session_ticket_ctx == NULL) {
-			lua_pushstring(L, "net.tls_sticket_salt_string - can't create session ticket context");
+	if (lua_gettop(L) == 0) {
+		/* Zero-length secret, implying random key. */
+		secret_len = 0;
+		secret = NULL;
+	} else {
+		if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+			lua_pushstring(L,
+				"net.tls_sticket_secret takes one parameter: (\"secret string\")");
 			lua_error(L);
 		}
+		secret = lua_tolstring(L, 1, &secret_len);
+		if (secret_len < net_tls_sticket_MIN_SECRET_LEN || !secret) {
+			lua_pushstring(L, "net.tls_sticket_secret - the secret is shorter than "
+						xstr(net_tls_sticket_MIN_SECRET_LEN) " bytes");
+			lua_error(L);
+		}
+	}
+
+	tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
+	net->tls_session_ticket_ctx =
+		tls_session_ticket_ctx_create(net->loop, secret, secret_len);
+	if (net->tls_session_ticket_ctx == NULL) {
+		lua_pushstring(L,
+			"net.tls_sticket_secret_string - can't create session ticket context");
+		lua_error(L);
 	}
 
 	lua_pushboolean(L, true);
 	return 1;
 }
 
-/* Configure client-side TLS session ticket key generation.
- *
- * note  Don't call from CLI when there are forked kresd instances as it
- *       will break synchronous ticket key regeneration.
- *
- * Expected parameters from lua
- * file  text file containing salt string.
- *       If file is empty, resolver won't use session tickets at server side
- *       and therefore won't support session resumption.
- */
-
-static int net_tls_sticket_key_salt_file(lua_State *L)
+static int net_tls_sticket_secret_file(lua_State *L)
 {
-
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "net.tls_sticket_salt_file takes one parameter: (\"file name\")");
+		lua_pushstring(L,
+			"net.tls_sticket_secret_file takes one parameter: (\"file name\")");
 		lua_error(L);
 	}
 
-	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
-
 	const char *file_name = lua_tostring(L, 1);
 	if (strlen(file_name) == 0) {
-		lua_pushstring(L, "net.tls_sticket_salt_file - empty file name");
+		lua_pushstring(L, "net.tls_sticket_secret_file - empty file name");
 		lua_error(L);
 	}
 
 	FILE *fp = fopen(file_name, "r");
 	if (fp == NULL) {
-		lua_pushstring(L, "net.tls_sticket_salt_file - can't open file '");
-		lua_pushstring(L, file_name);
-		lua_pushstring(L, "' (");
-		lua_pushstring(L, strerror(errno));
-		lua_pushstring(L, ")");
-		lua_concat(L, 5);
+		lua_pushfstring(L, "net.tls_sticket_secret_file - can't open file '%s': %s",
+				file_name, strerror(errno));
 		lua_error(L);
 	}
 
-	char *salt = NULL;
-	size_t salt_buf_len = 0;
-	/* getline() also reads newline characters, if any. */
-	ssize_t salt_len = getline(&salt, &salt_buf_len, fp);
-	if (salt_len < 0) {
-		lua_pushstring(L, "net.tls_sticket_salt_file - error reading from '");
-		lua_pushstring(L, file_name);
-		lua_pushstring(L, "' (");
-		lua_pushstring(L, strerror(errno));
-		lua_pushstring(L, ")");
-		lua_concat(L, 5);
+	char secret_buf[TLS_SESSION_TICKET_SECRET_MAX_LEN];
+	const size_t secret_len = fread(secret_buf, 1, sizeof(secret_buf), fp);
+	int err = ferror(fp);
+	if (err) {
+		lua_pushfstring(L,
+			"net.tls_sticket_secret_file - error reading from file '%s': %s",
+			file_name, strerror(err));
 		lua_error(L);
 	}
-	if (net->tls_session_ticket_ctx != NULL) {
-		tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
-		net->tls_session_ticket_ctx = NULL;
+	if (secret_len < net_tls_sticket_MIN_SECRET_LEN) {
+		lua_pushfstring(L,
+			"net.tls_sticket_secret_file - file '%s' is shorter than "
+				xstr(net_tls_sticket_MIN_SECRET_LEN) " bytes",
+			file_name);
+		lua_error(L);
 	}
-	if (salt_len > 0) {
-		net->tls_session_ticket_ctx = tls_session_ticket_ctx_create(net->loop, salt, salt_len);
-		if (net->tls_session_ticket_ctx == NULL) {
-			lua_pushstring(L, "net.tls_sticket_salt_file - can't create session ticket context");
-			lua_error(L);
-		}
-	}
-	free(salt);
 	fclose(fp);
+
+	struct network *net = &engine_luaget(L)->net;
+
+	tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
+	net->tls_session_ticket_ctx =
+		tls_session_ticket_ctx_create(net->loop, secret_buf, secret_len);
+	if (net->tls_session_ticket_ctx == NULL) {
+		lua_pushstring(L,
+			"net.tls_sticket_secret_file - can't create session ticket context");
+		lua_error(L);
+	}
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -823,8 +806,8 @@ int lib_net(lua_State *L)
 		{ "tls_server",   net_tls },
 		{ "tls_client",   net_tls_client },
 		{ "tls_padding",  net_tls_padding },
-		{ "tls_sticket_salt_string", net_tls_sticket_key_salt_string },
-		{ "tls_sticket_salt_file", net_tls_sticket_key_salt_file },
+		{ "tls_sticket_secret", net_tls_sticket_secret_string },
+		{ "tls_sticket_secret_file", net_tls_sticket_secret_file },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
 		{ NULL, NULL }
