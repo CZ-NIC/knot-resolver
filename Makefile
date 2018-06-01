@@ -165,10 +165,13 @@ endif
 endif
 
 # Check if it has nettle to support DNS cookies
-ifeq ($(HAS_nettle), yes)
-BUILD_CFLAGS += -DENABLE_COOKIES
-ENABLE_COOKIES := yes
-endif
+
+# temporarily turn off cookies
+#ifeq ($(HAS_nettle), yes)
+#BUILD_CFLAGS += -DENABLE_COOKIES
+#ENABLE_COOKIES := yes
+#endif
+ENABLE_COOKIES := no
 
 # Installation directories
 $(DESTDIR)$(MODULEDIR):
