@@ -9,6 +9,7 @@ Incompatible changes
 - only knot >= 2.7.1 is supported, which brings also larger API changes;
   in case you wrote custom modules, please consult:
   https://knot-resolver.readthedocs.io/en/latest/lib.html#incompatible-changes-since-3-0-0
+- cookies are disabled for now (RFC 7873), they need more work
 
 Improvements
 ------------
