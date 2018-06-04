@@ -1,10 +1,10 @@
 debian/init-d-script usr/lib/knot-resolver/
 debian/kresd.conf etc/knot-resolver/
 etc/knot-resolver/config.* /usr/share/doc/knot-resolver/examples/
-systemd/kresd-control@.socket lib/systemd/system/
-systemd/kresd-tls.socket lib/systemd/system/
-systemd/kresd.socket lib/systemd/system/
-systemd/kresd@.service lib/systemd/system/
+distro/common/systemd/kresd-control@.socket lib/systemd/system/
+distro/common/systemd/kresd-tls.socket lib/systemd/system/
+distro/common/systemd/kresd.socket lib/systemd/system/
+distro/common/systemd/kresd@.service lib/systemd/system/
 distro/common/tmpfiles/knot-resolver.conf usr/lib/tmpfiles.d/
 usr/lib/knot-resolver/*.so
 usr/lib/knot-resolver/daf.lua

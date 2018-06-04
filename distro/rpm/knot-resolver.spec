@@ -138,19 +138,19 @@ install -m 0664 -p %SOURCE3 %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
 
 # install systemd units and doc
 mkdir -p %{buildroot}%{_unitdir}
-install -m 0644 -p %{repodir}/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
 mkdir -p %{buildroot}%{_mandir}/man7
 install -m 0644 -p %{repodir}/distro/common/systemd/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
 
 %if 0%{?rhel}
 # no socket activation for CentOS 7 (requires systemd.227)
 mkdir -p %{buildroot}%{_unitdir}/kresd@.service.d
-install -m 0644 -p %{repodir}/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
+install -m 0644 -p %{repodir}/distro/common/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
 %endif
 %if 0%{?fedora}
-install -m 0644 -p %{repodir}/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
-install -m 0644 -p %{repodir}/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
-install -m 0644 -p %{repodir}/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
 %endif
 
 # install tmpfiles.d
