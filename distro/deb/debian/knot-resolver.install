@@ -5,7 +5,7 @@ systemd/kresd-control@.socket lib/systemd/system/
 systemd/kresd-tls.socket lib/systemd/system/
 systemd/kresd.socket lib/systemd/system/
 systemd/kresd@.service lib/systemd/system/
-systemd/tmpfiles/knot-resolver.conf usr/lib/tmpfiles.d/
+distro/common/tmpfiles/knot-resolver.conf usr/lib/tmpfiles.d/
 usr/lib/knot-resolver/*.so
 usr/lib/knot-resolver/daf.lua
 usr/lib/knot-resolver/daf/

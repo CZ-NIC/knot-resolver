@@ -155,7 +155,7 @@ install -m 0644 -p %{repodir}/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/k
 
 # install tmpfiles.d
 mkdir -p %{buildroot}%{_tmpfilesdir}
-install -m 0644 -p %{repodir}/systemd/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
+install -m 0644 -p %{repodir}/distro/common/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
 mkdir -p %{buildroot}%{_rundir}
 install -m 0750 -d %{buildroot}%{_rundir}/knot-resolver
 
