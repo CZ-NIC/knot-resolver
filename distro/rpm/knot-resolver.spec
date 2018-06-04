@@ -140,7 +140,7 @@ install -m 0664 -p %SOURCE3 %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
 mkdir -p %{buildroot}%{_unitdir}
 install -m 0644 -p %{repodir}/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
 mkdir -p %{buildroot}%{_mandir}/man7
-install -m 0644 -p %{repodir}/doc/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
 
 %if 0%{?rhel}
 # no socket activation for CentOS 7 (requires systemd.227)

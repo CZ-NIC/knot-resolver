@@ -49,7 +49,7 @@ package() {
 	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/systemd/kresd-control@.socket" "${pkgdir}/usr/lib/systemd/system/kresd-control@.socket"
 	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/systemd/kresd-tls.socket" "${pkgdir}/usr/lib/systemd/system/kresd-tls.socket"
 	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/systemd/kresd@.service" "${pkgdir}/usr/lib/systemd/system/kresd@.service"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/doc/kresd.systemd.7" "${pkgdir}/usr/share/man/man7/kresd.systemd.7"
+	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/systemd/kresd.systemd.7" "${pkgdir}/usr/share/man/man7/kresd.systemd.7"
 	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/tmpfiles/knot-resolver.conf" "${pkgdir}/usr/lib/tmpfiles.d/knot-resolver.conf"
 	install -dm 0775 "${pkgdir}/etc/knot-resolver"
 	install -Dm 0644 "${srcdir}/kresd.conf" "${pkgdir}/etc/knot-resolver/kresd.conf"
