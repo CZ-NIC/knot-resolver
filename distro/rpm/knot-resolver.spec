@@ -139,6 +139,9 @@ install -m 0664 -p %SOURCE3 %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
 # install systemd units and doc
 mkdir -p %{buildroot}%{_unitdir}
 install -m 0644 -p %{repodir}/distro/common/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.target %{buildroot}%{_unitdir}/kresd.target
+install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
+ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.target
 mkdir -p %{buildroot}%{_mandir}/man7
 install -m 0644 -p %{repodir}/distro/common/systemd/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
 
@@ -213,6 +216,8 @@ fi
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/knot-resolver
 %{_unitdir}/kresd*.service
+%{_unitdir}/kresd.target
+%{_unitdir}/multi-user.target.wants/kresd.target
 %if 0%{?rhel}
 %{_unitdir}/kresd@.service.d/override.conf
 %endif

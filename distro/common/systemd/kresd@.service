@@ -14,4 +14,4 @@ Sockets=kresd-tls.socket
 Sockets=kresd-control@%i.socket
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=kresd.target
