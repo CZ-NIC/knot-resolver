@@ -34,6 +34,7 @@ An *action* is function which modifies DNS query. There are several actions avai
 * ``DENY`` - reply NXDOMAIN authoritatively
 * ``DENY_MSG(msg)`` - reply NXDOMAIN authoritatively and add explanatory message to additional section
 * ``DROP`` - terminate query resolution and return SERVFAIL to the requestor
+* ``REFUSE`` - terminate query resolution and return REFUSED to the requestor
 * ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
 * ``FORWARD(ip)`` - resolve a query via forwarding to an IP while validating and caching locally;
 * ``TLS_FORWARD({{ip, authentication}})`` - resolve a query via TLS connection forwarding to an IP while validating and caching locally;
