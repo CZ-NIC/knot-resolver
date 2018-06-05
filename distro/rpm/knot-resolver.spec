@@ -174,7 +174,7 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot DNS Resolver" knot-resolver
 
 %post
-%systemd_post kresd@*.service
+%systemd_post 'kresd@*.service'
 /sbin/ldconfig
 
 # TODO: can be removed when Fedora 27 is no longer supported and migration is no longer necessary
@@ -200,10 +200,11 @@ if [ -d "/run/kresd" ]; then
 fi
 
 %preun
-%systemd_preun kresd@*.service
+%systemd_preun 'kresd@*.service' kresd.target kresd.socket kresd-tls.socket
 
 %postun
-%systemd_postun_with_restart kresd@*.service
+# NOTE: this doesn't restart the services on CentOS 7
+%systemd_postun_with_restart 'kresd@*.service'
 /sbin/ldconfig
 
 %files
