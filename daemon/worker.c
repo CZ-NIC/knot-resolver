@@ -63,7 +63,6 @@ struct qr_task
 	qr_tasklist_t waiting;
 	uv_handle_t *pending[MAX_PENDING];
 	uint16_t pending_count;
-	uint16_t addrlist_count;
 	uint16_t addrlist_turn;
 	uint16_t timeouts;
 	uint16_t iter_count;
@@ -1349,8 +1348,11 @@ static void on_udp_timeout(uv_timer_t *timer)
 	if (task->leading && task->pending_count > 0) {
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
 		struct sockaddr_in6 *addrlist = (struct sockaddr_in6 *)task->addrlist;
-		for (uint16_t i = 0; i < MIN(task->pending_count, task->addrlist_count); ++i) {
+		for (uint16_t i = 0; i < MIN(task->pending_count, KR_NSREP_MAXADDR); ++i) {
 			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
+			if (choice->sa_family == AF_UNSPEC) {
+				break;
+			}
 			WITH_VERBOSE(qry) {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
@@ -1384,18 +1386,33 @@ static void on_session_idle_timeout(uv_timer_t *timer)
 static uv_handle_t *retransmit(struct qr_task *task)
 {
 	uv_handle_t *ret = NULL;
-	if (task && task->addrlist && task->addrlist_count > 0) {
-		struct sockaddr_in6 *choice = &((struct sockaddr_in6 *)task->addrlist)[task->addrlist_turn];
-		if (!choice) {
+	if (task && task->addrlist) {
+		/* Select next available address from the list */
+		struct sockaddr_in6 *choice = NULL;
+		for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
+			choice = &((struct sockaddr_in6 *)task->addrlist)[(task->addrlist_turn + i) % KR_NSREP_MAXADDR];
+			if (choice->sin6_family != AF_UNSPEC) {
+				break;
+			}
+		}
+
+		/* Check if a valid address exists */
+		if (choice == NULL) {
 			return ret;
 		}
 
 		/* Checkout query before sending it */
 		struct request_ctx *ctx = task->ctx;
 		if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)choice, SOCK_DGRAM, task->pktbuf) != 0) {
-			task->addrlist_turn = (task->addrlist_turn + 1) % task->addrlist_count; /* Round robin */
+			task->addrlist_turn += 1;
 			return ret;
 		}
+
+		/* Check that the selected address is still valid */
+		if (choice->sin6_family != AF_INET && choice->sin6_family != AF_INET6) {
+			return ret;
+		}
+
 		ret = ioreq_spawn(task, SOCK_DGRAM, choice->sin6_family);
 		if (!ret) {
 			return ret;
@@ -1406,8 +1423,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		memcpy(&session->peer, addr, sizeof(session->peer));
 		if (qr_task_send(task, ret, (struct sockaddr *)choice,
 				 task->pktbuf) == 0) {
-			task->addrlist_turn = (task->addrlist_turn + 1) %
-					      task->addrlist_count; /* Round robin */
+			task->addrlist_turn += 1;
 		} else {
 			/* Didn't create request or message wasn't sent */
 			ret = NULL;
@@ -1580,7 +1596,6 @@ static int qr_task_step(struct qr_task *task,
 	struct worker_ctx *worker = ctx->worker;
 	int sock_type = -1;
 	task->addrlist = NULL;
-	task->addrlist_count = 0;
 	task->addrlist_turn = 0;
 	req->has_tls = (ctx->source.session && ctx->source.session->has_tls);
 
@@ -1613,13 +1628,6 @@ static int qr_task_step(struct qr_task *task,
 		return qr_task_step(task, NULL, NULL);
 	}
 
-	/* Count available address choices */
-	struct sockaddr_in6 *choice = (struct sockaddr_in6 *)task->addrlist;
-	for (size_t i = 0; i < KR_NSREP_MAXADDR && choice->sin6_family != AF_UNSPEC; ++i) {
-		task->addrlist_count += 1;
-		choice += 1;
-	}
-
 	/* Start fast retransmit with UDP, otherwise connect. */
 	int ret = 0;
 	if (sock_type == SOCK_DGRAM) {
@@ -1630,7 +1638,7 @@ static int qr_task_step(struct qr_task *task,
 		/* Start transmitting */
 		uv_handle_t *handle = retransmit(task);
 		if (handle == NULL) {
-			return qr_task_step(task, (struct sockaddr *)choice, NULL);
+			return qr_task_step(task, task->addrlist, NULL);
 		}
 		/* Check current query NSLIST */
 		struct kr_query *qry = array_tail(req->rplan.pending);
@@ -1667,6 +1675,11 @@ static int qr_task_step(struct qr_task *task,
 		/* Checkout task before connecting */
 		struct request_ctx *ctx = task->ctx;
 		if (kr_resolve_checkout(req, NULL, (struct sockaddr *)addr, SOCK_STREAM, task->pktbuf) != 0) {
+			subreq_finalize(task, packet_source, packet);
+			return qr_task_finalize(task, KR_STATE_FAIL);
+		}
+		/* CHeck that the selected address is still valid */
+		if (addr->sa_family != AF_INET && addr->sa_family != AF_INET6) {
 			subreq_finalize(task, packet_source, packet);
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
