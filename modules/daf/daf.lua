@@ -16,6 +16,7 @@ M.phases = {
 	reroute = 'finish',
 	rewrite = 'finish',
 	features = 'checkout',
+	nsset = 'checkout',
 }
 
 -- Actions
@@ -35,10 +36,35 @@ M.actions = {
 	forward = function (g)
 		local addrs = {}
 		local tok = g()
-		for addr in string.gmatch(tok, '[^,]+') do
-			table.insert(addrs, addr)
+		while tok do
+			for addr in string.gmatch(tok, '[^,]+') do
+				table.insert(addrs, addr)
+			end
+			tok = g()
 		end
 		return policy.FORWARD(addrs)
+	end,
+	forward_insecure = function (g)
+		local addrs = {}
+		local tok = g()
+		while tok do
+			for addr in string.gmatch(tok, '[^,]+') do
+				table.insert(addrs, addr)
+			end
+			tok = g()
+		end
+		return policy.STUB(addrs)
+	end,
+	nsset = function (g)
+		local addrs = {}
+		local tok = g()
+		while tok do
+			for addr in string.gmatch(tok, '[^,]+') do
+				table.insert(addrs, addr)
+			end
+			tok = g()
+		end
+		return policy.NSSET(addrs)
 	end,
 	mirror = function (g)
 		return policy.MIRROR(g())

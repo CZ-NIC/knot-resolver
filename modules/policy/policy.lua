@@ -81,12 +81,10 @@ end
 
 -- Override the list of nameservers (forwarders)
 local function set_nslist(qry, list)
-	for i, ns in ipairs(list) do
+	local ns_count = #list
+	for i = 1, 4 do
+		local ns = (i <= ns_count) and list[i] or nil
 		assert(ffi.C.kr_nsrep_set(qry, i - 1, ns) == 0);
-	end
-	-- If less than maximum NSs, insert guard to terminate the list
-	if #list < 4 then
-		assert(ffi.C.kr_nsrep_set(qry, #list, nil) == 0);
 	end
 end
 
@@ -130,6 +128,30 @@ function policy.FORWARD(target)
 		qry.flags.ALWAYS_CUT = false
 		qry.flags.NO_MINIMIZE = true
 		qry.flags.AWAIT_CUT = true
+		set_nslist(qry, list)
+		return state
+	end
+end
+
+-- Set NS set for given request
+function policy.NSSET(target)
+	local list = {}
+	if type(target) == 'table' then
+		for _, v in pairs(target) do
+			table.insert(list, addr2sock(v, 53))
+			assert(#list <= 4, 'at most 4 NS targets are supported')
+		end
+	else
+		table.insert(list, addr2sock(target, 53))
+	end
+	return function(state, req, qry)
+		if not qry then return end
+		local vars = req:vars()
+		-- Make sure the NS set is updated only once for each query
+		if vars.policy_nsset_set == qry then
+			return
+		end
+		vars.policy_nsset_set = qry
 		set_nslist(qry, list)
 		return state
 	end
