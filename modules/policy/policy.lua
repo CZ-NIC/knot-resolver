@@ -170,16 +170,16 @@ local function tls_forward_target_authtype(idx, target)
 		return 'pin_sha256'
 	elseif (target.insecure and not (target.ca_file or target.hostname or target.pin_sha256)) then
 		return 'insecure'
-	elseif (target.ca_file and target.hostname and not (target.insecure or target.pin_sha256)) then
-		if not (is_nonempty_string_or_table(target.hostname)
-			and is_nonempty_string_or_table(target.ca_file)) then
+	elseif (target.hostname and not (target.insecure or target.pin_sha256)) then
+		if not (is_nonempty_string_or_table(target.hostname)) then
 			error('TLS_FORWARD target authentication is invalid at position '
-			      .. idx .. '; hostname and ca_file must be string or list of strings')
+			      .. idx .. '; hostname must be string or list of strings')
 		end
+		-- if target.ca_file is empty, system CA will be used
 		return 'cert'
 	else
 		error('TLS_FORWARD authentication options at position ' .. idx
-		      .. ' are invalid; specify one of: pin_sha256 / hostname+ca_file / insecure')
+		      .. ' are invalid; specify one of: pin_sha256 / hostname [+ca_file] / insecure')
 	end
 end
 
@@ -238,7 +238,6 @@ function policy.TLS_FORWARD(target)
 			assert(#pins[sockaddr_lua] > 0)
 			net.tls_client(config.string_addr, pins[sockaddr_lua])
 		elseif config.auth_type == 'cert' then
-			assert(#ca_files[sockaddr_lua] > 0)
 			assert(#hostnames[sockaddr_lua] > 0)
 			net.tls_client(config.string_addr, ca_files[sockaddr_lua], hostnames[sockaddr_lua])
 		else
