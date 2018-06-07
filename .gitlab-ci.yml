@@ -307,7 +307,7 @@ distro:epel-7:
   dependencies:
     - srpm
   script:
-    - mock --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm
+    - mock --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
   after_script:
     - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
   artifacts:
