@@ -59,7 +59,9 @@ static int kres_gnutls_set_priority(gnutls_session_t session) {
 	static const char * const priorities =
 		"NORMAL:" /* GnuTLS defaults */
 		"-VERS-TLS1.0:-VERS-TLS1.1:" /* TLS 1.2 and higher */
-		"-COMP-ALL:+COMP-NULL"; /* no compression*/
+		 /* Some distros by default allow features that are considered
+		  * too insecure nowadays, so let's disable them explicitly. */
+		"-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
 	const char *errpos = NULL;
 	int err = gnutls_priority_set_direct(session, priorities, &errpos);
 	if (err != GNUTLS_E_SUCCESS) {

@@ -307,6 +307,10 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		timeout += KR_CONN_RTT_MAX * 3;
 		if (!session->tls_ctx) {
 			session->tls_ctx = tls_new(master->loop->data);
+			if (!session->tls_ctx) {
+				worker_session_close(session);
+				return;
+			}
 			session->tls_ctx->c.session = session;
 			session->tls_ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
 		}
