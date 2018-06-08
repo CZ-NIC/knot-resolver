@@ -34,6 +34,7 @@ An *action* is function which modifies DNS query. There are several actions avai
 * ``DENY`` - reply NXDOMAIN authoritatively
 * ``DENY_MSG(msg)`` - reply NXDOMAIN authoritatively and add explanatory message to additional section
 * ``DROP`` - terminate query resolution and return SERVFAIL to the requestor
+* ``REFUSE`` - terminate query resolution and return REFUSED to the requestor
 * ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
 * ``FORWARD(ip)`` - resolve a query via forwarding to an IP while validating and caching locally;
 * ``TLS_FORWARD({{ip, authentication}})`` - resolve a query via TLS connection forwarding to an IP while validating and caching locally;
@@ -70,10 +71,11 @@ Traditional PKI authentication requires server to present certificate with speci
 .. code-block:: lua
 
         policy.TLS_FORWARD({
-                {'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}})
+                {'2001:DB8::d0c', hostname='res.example.com'}})
 
 - `hostname` must exactly match hostname in server's certificate, i.e. in most cases it must not contain trailing dot (`res.example.com`).
-- `ca_file` must be path to CA certificate (or certificate bundle) in `PEM format`_.
+- System CA certificate store will be used if no `ca_file` option is specified.
+- Optional `ca_file` option can specify path to CA certificate (or certificate bundle) in `PEM format`_.
 
 TLS Examples
 ~~~~~~~~~~~~
@@ -86,6 +88,8 @@ TLS Examples
 	-- for brevity, other TLS examples omit policy.add(policy.all())
 	-- single server authenticated using its certificate pin_sha256
 	  policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})  -- pin_sha256 is base64-encoded
+	-- single server authenticated using hostname and system-wide CA certificates
+	  policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}})
 	-- single server using non-standard port
 	  policy.TLS_FORWARD({{'192.0.2.1@443', pin_sha256='YQ=='}})  -- use @ or # to specify port
 	-- single server with multiple valid pins (e.g. anycast)

@@ -57,6 +57,13 @@ typedef enum tls_client_hs_state {
 
 typedef int (*tls_handshake_cb) (struct session *session, int status);
 
+typedef enum tls_client_param {
+	TLS_CLIENT_PARAM_NONE = 0,
+	TLS_CLIENT_PARAM_PIN,
+	TLS_CLIENT_PARAM_HOSTNAME,
+	TLS_CLIENT_PARAM_CA,
+} tls_client_param_t;
+
 struct tls_common_ctx {
 	bool client_side;
 	gnutls_session_t tls_session;
@@ -134,10 +141,13 @@ tls_hs_state_t tls_get_hs_state(const struct tls_common_ctx *ctx);
 /*! Set TLS handshake state. */
 int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
 
-/*! Set TLS authentication parameters for given address. */
+/*! Set TLS authentication parameters for given address.
+ * Note: hostnames must be imported before ca files,
+ *       otherwise ca files will not be imported at all.
+ */
 int tls_client_params_set(map_t *tls_client_paramlist,
 			  const char *addr, uint16_t port,
-			  const char *ca_file, const char *hostname, const char *pin);
+			  const char *param, tls_client_param_t param_type);
 
 /*! Free TLS authentication parameters. */
 int tls_client_params_free(map_t *tls_client_paramlist);

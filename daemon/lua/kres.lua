@@ -702,6 +702,13 @@ ffi.metatype( kr_request_t, {
 			if req.current_query == nil then return nil end
 			return req.current_query
 		end,
+		-- Return last query on the resolution plan
+		last = function(req)
+			assert(ffi.istype(kr_request_t, req))
+			local query = C.kr_rplan_last(C.kr_resolve_plan(req))
+			if query == nil then return end
+			return query
+		end,
 		resolved = function(req)
 			assert(ffi.istype(kr_request_t, req))
 			local qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))
@@ -728,6 +735,31 @@ ffi.metatype( kr_request_t, {
 		pop = function(req, qry)
 			assert(ffi.istype(kr_request_t, req))
 			return C.kr_rplan_pop(C.kr_resolve_plan(req), qry)
+		end,
+		-- Return per-request variable table
+		-- The request can store anything in this Lua table and it will be freed
+		-- when the request is closed, it doesn't have to worry about contents.
+		vars = function (req)
+			assert(ffi.istype(kr_request_t, req))
+			-- Return variable if it's already stored
+			local var = worker.vars[req.vars_ref]
+			if var then
+				return var
+			end
+			-- Either take a slot number from freelist
+			-- or find a first free slot (expand the table)
+			local ref = worker.vars[0]
+			if ref then
+				worker.vars[0] = worker.vars[ref]
+			else
+				ref = #worker.vars + 1
+			end
+			-- Create new variables table
+			var = {}
+			worker.vars[ref] = var
+			-- Save reference in the request
+			req.vars_ref = ref
+			return var
 		end,
 	},
 })

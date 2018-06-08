@@ -101,6 +101,9 @@ number.  To enable 3 concurrent daemons:
 
 .B Using system-kresd.slice
 
+The following commands may not work with older systemd (e.g. on CentOS 7).
+See notes for more info.
+
 The easiest way to view the status of systemd-supervised \fBkresd\fR
 instances is to use the \fIsystem-kresd.slice\fR:
 
@@ -150,6 +153,12 @@ If your distribution doesn't use socket-based activation, you can configure the
 network interfaces for \fBkresd\fR in \fI/etc/knot-resolver/kresd.conf\fR.  The
 service can be started or enabled in the same way as in the examples below, but
 it doesn't have any sockets associated with it.
+
+.IP * 2
+Controlling the service with \fIsystem-kresd.slice\fR requires newer systemd.
+It may not work in some distributions, notably CentOS 7. To control multiple
+kresd instances, use \fIkresd@*.service\fR or \fIBrace Expansion\fR mentioned
+below.
 
 .SH "EXAMPLES"
 
@@ -203,7 +212,7 @@ To enable multiple concurrent daemons, for example 16:
 To start all enabled daemons:
 .nf
 .RS
-.B systemctl start 'kresd@*.service'
+.B systemctl start --all 'kresd@*.service'
 .RE
 .fi
 

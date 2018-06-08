@@ -178,6 +178,7 @@ struct kr_request {
 	int has_tls;
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
+	int vars_ref;
 	knot_mm_t pool;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
@@ -281,6 +282,7 @@ knot_mm_t *kr_resolve_pool(struct kr_request *);
 struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_dname_t *, uint16_t, uint16_t);
 int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
+struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
 uint32_t kr_rand_uint(uint32_t);
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt);

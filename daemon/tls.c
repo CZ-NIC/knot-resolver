@@ -583,11 +583,21 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 
 int tls_client_params_set(map_t *tls_client_paramlist,
 			  const char *addr, uint16_t port,
-			  const char *ca_file, const char *hostname, const char *pin)
+			  const char *param, tls_client_param_t param_type)
 {
 	if (!tls_client_paramlist || !addr) {
 		return kr_error(EINVAL);
 	}
+
+	/* TLS_CLIENT_PARAM_CA can be empty */
+	if (param_type == TLS_CLIENT_PARAM_HOSTNAME ||
+	    param_type == TLS_CLIENT_PARAM_PIN) {
+		if (param == NULL || param[0] == 0) {
+			return kr_error(EINVAL);
+		}
+	}
+
+	/* Parameters are OK */
 
 	char key[INET6_ADDRSTRLEN + 6];
 	size_t keylen = sizeof(key);
@@ -615,40 +625,9 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 	}
 
 	int ret = kr_ok();
-	if (ca_file && ca_file[0] != 0) {
-		bool already_exists = false;
-		for (size_t i = 0; i < entry->ca_files.len; ++i) {
-			if (strcmp(entry->ca_files.at[i], ca_file) == 0) {
-				kr_log_error("[tls_client] error: ca file '%s'for address '%s' already was set, ignoring\n", ca_file, key);
-				already_exists = true;
-				break;
-			}
-		}
-		if (!already_exists) {
-			const char *value = strdup(ca_file);
-			if (!value) {
-				ret = kr_error(ENOMEM);
-			} else if (array_push(entry->ca_files, value) < 0) {
-				free ((void *)value);
-				ret = kr_error(ENOMEM);
-			} else {
-				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
-										 GNUTLS_X509_FMT_PEM);
-				if (res <= 0) {
-					kr_log_error("[tls_client] failed to import certificate file '%s' (%s)\n",
-						     value, gnutls_strerror_name(res));
-					/* value will be freed at cleanup */
-					ret = kr_error(EINVAL);
-				} else {
-					kr_log_verbose("[tls_client] imported %d certs from file '%s'\n",
-							res, value);
 
-				}
-			}
-		}
-	}
-
-	if ((ret == kr_ok()) && hostname && hostname[0] != 0) {
+	if (param_type == TLS_CLIENT_PARAM_HOSTNAME) {
+		const char *hostname = param;
 		bool already_exists = false;
 		for (size_t i = 0; i < entry->hostnames.len; ++i) {
 			if (strcmp(entry->hostnames.at[i], hostname) == 0) {
@@ -666,9 +645,59 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 				ret = kr_error(ENOMEM);
 			}
 		}
-	}
+	} else if (param_type == TLS_CLIENT_PARAM_CA) {
+		/* Import ca files only when hostname is already set */
+		if (entry->hostnames.len == 0) {
+			return kr_error(ENOENT);
+		}
+		const char *ca_file = param;
+		bool already_exists = false;
+		for (size_t i = 0; i < entry->ca_files.len; ++i) {
+			const char *imported_ca = entry->ca_files.at[i];
+			if (imported_ca[0] == 0 && (ca_file == NULL || ca_file[0] == 0)) {
+				kr_log_error("[tls_client] error: system ca for address '%s' already was set, ignoring\n", key);
+				already_exists = true;
+				break;
+			} else if (strcmp(imported_ca, ca_file) == 0) {
+				kr_log_error("[tls_client] error: ca file '%s' for address '%s' already was set, ignoring\n", ca_file, key);
+				already_exists = true;
+				break;
+			}
+		}
+		if (!already_exists) {
+			const char *value = strdup(ca_file != NULL ? ca_file : "");
+			if (!value) {
+				ret = kr_error(ENOMEM);
+			} else if (array_push(entry->ca_files, value) < 0) {
+				free ((void *)value);
+				ret = kr_error(ENOMEM);
+			} else if (value[0] == 0) {
+				int res = gnutls_certificate_set_x509_system_trust (entry->credentials);
+				if (res <= 0) {
+					kr_log_error("[tls_client] failed to import certs from system store (%s)\n",
+						     gnutls_strerror_name(res));
+					/* value will be freed at cleanup */
+					ret = kr_error(EINVAL);
+				} else {
+					kr_log_verbose("[tls_client] imported %d certs from system store\n", res);
+				}
+			} else {
+				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
+										 GNUTLS_X509_FMT_PEM);
+				if (res <= 0) {
+					kr_log_error("[tls_client] failed to import certificate file '%s' (%s)\n",
+						     value, gnutls_strerror_name(res));
+					/* value will be freed at cleanup */
+					ret = kr_error(EINVAL);
+				} else {
+					kr_log_verbose("[tls_client] imported %d certs from file '%s'\n",
+							res, value);
 
-	if ((ret == kr_ok()) && pin && pin[0] != 0) {
+				}
+			}
+		}
+	} else if (param_type == TLS_CLIENT_PARAM_PIN) {
+		const char *pin = param;
 		for (size_t i = 0; i < entry->pins.len; ++i) {
 			if (strcmp(entry->pins.at[i], pin) == 0) {
 				kr_log_error("[tls_client] warning: pin '%s' for address '%s' already was set, ignoring\n", pin, key);

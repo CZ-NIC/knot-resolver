@@ -478,7 +478,7 @@ static int net_tls_client(lua_State *L)
 
 	const char *full_addr = NULL;
 	bool pin_exists = false;
-	bool ca_file_exists = false;
+	bool hostname_exists = false;
 	if ((lua_gettop(L) == 1) && lua_isstring(L, 1)) {
 		full_addr = lua_tostring(L, 1);
 	} else if ((lua_gettop(L) == 2) && lua_isstring(L, 1) && lua_istable(L, 2)) {
@@ -486,12 +486,12 @@ static int net_tls_client(lua_State *L)
 		pin_exists = true;
 	} else if ((lua_gettop(L) == 3) && lua_isstring(L, 1) && lua_istable(L, 2)) {
 		full_addr = lua_tostring(L, 1);
-		ca_file_exists = true;
+		hostname_exists = true;
 	} else if ((lua_gettop(L) == 4) && lua_isstring(L, 1) &&
 		    lua_istable(L, 2) && lua_istable(L, 3)) {
 		full_addr = lua_tostring(L, 1);
 		pin_exists = true;
-		ca_file_exists = true;
+		hostname_exists = true;
 	} else {
 		format_error(L, "net.tls_client takes one parameter (\"address\"), two parameters (\"address\",\"pin\"), three parameters (\"address\", \"ca_file\", \"hostname\") or four ones: (\"address\", \"pin\", \"ca_file\", \"hostname\")");
 		lua_error(L);
@@ -508,9 +508,10 @@ static int net_tls_client(lua_State *L)
 		port = 853;
 	}
 
-	if (!pin_exists && !ca_file_exists) {
+	if (!pin_exists && !hostname_exists) {
 		int r = tls_client_params_set(&net->tls_client_params,
-					      addr, port, NULL, NULL, NULL);
+					      addr, port, NULL,
+					      TLS_CLIENT_PARAM_NONE);
 		if (r != 0) {
 			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
@@ -528,7 +529,8 @@ static int net_tls_client(lua_State *L)
 			/* pin now at index -1, key at index -2*/
 			const char *pin = lua_tostring(L, -1);
 			int r = tls_client_params_set(&net->tls_client_params,
-						      addr, port, NULL, NULL, pin);
+						      addr, port, pin,
+						      TLS_CLIENT_PARAM_PIN);
 			if (r != 0) {
 				lua_pushstring(L, kr_strerror(r));
 				lua_error(L);
@@ -539,7 +541,7 @@ static int net_tls_client(lua_State *L)
 
 	int ca_table_index = 2;
 	int hostname_table_index = 3;
-	if (ca_file_exists) {
+	if (hostname_exists) {
 		if (pin_exists) {
 			ca_table_index = 3;
 			hostname_table_index = 4;
@@ -549,12 +551,14 @@ static int net_tls_client(lua_State *L)
 		return 1;
 	}
 
-	/* iterate over ca filenames */
+	/* iterate over hostnames,
+	 * it must be done before iterating over ca filenames */
 	lua_pushnil(L);
-	while (lua_next(L, ca_table_index)) {
-		const char *ca_file = lua_tostring(L, -1);
+	while (lua_next(L, hostname_table_index)) {
+		const char *hostname = lua_tostring(L, -1);
 		int r = tls_client_params_set(&net->tls_client_params,
-					      addr, port, ca_file, NULL, NULL);
+					      addr, port, hostname,
+					      TLS_CLIENT_PARAM_HOSTNAME);
 		if (r != 0) {
 			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
@@ -563,18 +567,32 @@ static int net_tls_client(lua_State *L)
 		lua_pop(L, 1);
 	}
 
-	/* iterate over hostnames */
+	/* iterate over ca filenames */
 	lua_pushnil(L);
-	while (lua_next(L, hostname_table_index)) {
-		const char *hostname = lua_tostring(L, -1);
+	size_t num_of_ca_files = 0;
+	while (lua_next(L, ca_table_index)) {
+		const char *ca_file = lua_tostring(L, -1);
 		int r = tls_client_params_set(&net->tls_client_params,
-					      addr, port, NULL, hostname, NULL);
+					      addr, port, ca_file,
+					      TLS_CLIENT_PARAM_CA);
 		if (r != 0) {
 			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
 		}
+		num_of_ca_files += 1;
 		/* removes 'value'; keeps 'key' for next iteration */
 		lua_pop(L, 1);
+	}
+
+	if (num_of_ca_files == 0) {
+		/* No ca files were explicitly configured, so use system CA */
+		int r = tls_client_params_set(&net->tls_client_params,
+					      addr, port, NULL,
+					      TLS_CLIENT_PARAM_CA);
+		if (r != 0) {
+			lua_pushstring(L, kr_strerror(r));
+			lua_error(L);
+		}
 	}
 
 	lua_pushboolean(L, true);
@@ -1540,6 +1558,7 @@ static int wrk_resolve(lua_State *L)
 	}
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 	knot_wire_set_rd(pkt->wire);
+	knot_wire_set_ad(pkt->wire);
 
 	/* Add OPT RR */
 	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);

@@ -16,9 +16,9 @@ Source0:        knot-resolver_%{version}.orig.tar.xz
 # LuaJIT only on these arches
 %if 0%{?rhel}
 # RHEL 7 does not have aarch64 LuaJIT
-ExclusiveArch: %{ix86} x86_64
+ExclusiveArch:	%{ix86} x86_64
 %else
-ExclusiveArch: %{arm} aarch64 %{ix86} x86_64
+ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
 %endif
 
 Source2:        kresd.conf
@@ -29,49 +29,47 @@ Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
 # Export with --armor using command from https://fedoraproject.org/wiki/PackagingDrafts:GPGSignatures
 # Don't forget to update %%prep section when adding/removing keys
-Source100:     gpgkey-B6006460B60A80E782062449E747DF1F9575A3AA.gpg.asc
-Source101:     gpgkey-BE26EBB9CBE059B3910CA35BCE8DD6A1A50A21E4.gpg.asc
-Source102:     gpgkey-4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869.gpg.asc
+Source100:	gpgkey-B6006460B60A80E782062449E747DF1F9575A3AA.gpg.asc
+Source101:	gpgkey-BE26EBB9CBE059B3910CA35BCE8DD6A1A50A21E4.gpg.asc
+Source102:	gpgkey-4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869.gpg.asc
 BuildRequires:  gnupg2
 %endif
 
+BuildRequires:  pkgconfig(cmocka)
+BuildRequires:  pkgconfig(gnutls)
+BuildRequires:  pkgconfig(libedit)
 BuildRequires:  pkgconfig(libknot) >= 2.6.4
 BuildRequires:  pkgconfig(libzscanner) >= 2.4.2
 BuildRequires:  pkgconfig(libdnssec) >= 2.3.1
+BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
+BuildRequires:  pkgconfig(systemd)
 
-BuildRequires:  pkgconfig(libedit)
-BuildRequires:  pkgconfig(libmemcached) >= 1.0
-BuildRequires:  pkgconfig(hiredis)
-BuildRequires:  pkgconfig(libsystemd)
-
-BuildRequires:  pkgconfig(cmocka)
-
-BuildRequires:  systemd
+%if 0%{?rhel}
+BuildRequires:  lmdb-devel
+# Lua 5.1 version of the libraries have different package names
+Requires:       lua-socket
+Requires:       lua-sec
+%else
+BuildRequires:  pkgconfig(lmdb)
+Requires:       lua-socket-compat
+Requires:       lua-sec-compat
+%endif
 
 %if 0%{?fedora}
 # dependencies for doc package; disable in EPEL (missing fonts)
 # https://bugzilla.redhat.com/show_bug.cgi?id=1492884
 BuildRequires:  doxygen
-BuildRequires:  python2-breathe
-BuildRequires:  python2-sphinx
-BuildRequires:  python2-sphinx_rtd_theme
+BuildRequires:  python3-breathe
+BuildRequires:  python3-sphinx
+BuildRequires:  python3-sphinx_rtd_theme
 %endif
 
-# Lua 5.1 version of the libraries have different package names
-%if 0%{?rhel}
-Requires:       lua-socket
-Requires:       lua-sec
-%else
-Requires:       lua-socket-compat
-Requires:       lua-sec-compat
-%endif
-
-Requires(pre): shadow-utils
-Requires(post): systemd
-Requires(preun): systemd
-Requires(postun): systemd
+Requires(pre):		shadow-utils
+Requires(post):		systemd
+Requires(preun):	systemd
+Requires(postun):	systemd
 
 %description
 The Knot DNS Resolver is a caching full resolver implementation written in C
@@ -174,7 +172,7 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot DNS Resolver" knot-resolver
 
 %post
-%systemd_post system-kresd.slice
+%systemd_post kresd@*.service
 /sbin/ldconfig
 
 # TODO: can be removed when Fedora 27 is no longer supported and migration is no longer necessary
@@ -200,10 +198,10 @@ if [ -d "/run/kresd" ]; then
 fi
 
 %preun
-%systemd_preun system-kresd.slice
+%systemd_preun kresd@*.service
 
 %postun
-%systemd_postun_with_restart system-kresd.slice
+%systemd_postun_with_restart kresd@*.service
 /sbin/ldconfig
 
 %files

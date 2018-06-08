@@ -565,7 +565,7 @@ static int l_trampoline(lua_State *L)
 	const char *args = NULL;
 	auto_free char *cleanup_args = NULL;
 	if (lua_gettop(L) > 0) {
-		if (lua_istable(L, 1)) {
+		if (lua_istable(L, 1) || lua_isboolean(L, 1)) {
 			cleanup_args = l_pack_json(L, 1);
 			args = cleanup_args;
 		} else {

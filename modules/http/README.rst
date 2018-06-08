@@ -31,6 +31,7 @@ for starters?
 			geoip = 'GeoLite2-City.mmdb' -- Optional, see
 			-- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
 			-- and install mmdblua library
+			endpoints = {},
 		}
 	}
 
@@ -108,6 +109,30 @@ You can use it out of the box:
 	latency_count 2.000000
 	latency_sum 11.000000
 
+You can namespace the metrics in configuration, using `http.prometheus.namespace` attribute:
+
+.. code-block:: lua
+
+	http = {
+		host = 'localhost',
+	}
+
+	-- Set Prometheus namespace
+	http.prometheus.namespace = 'resolver_'
+
+You can also add custom metrics or rewrite existing metrics before they are returned to Prometheus client.
+
+.. code-block:: lua
+
+	http = {
+		host = 'localhost',
+	}
+
+	-- Add an arbitrary metric to Prometheus
+	http.prometheus.finalize = function (metrics)
+		table.insert(metrics, 'build_info{version="1.2.3"} 1')
+	end
+
 Tracing requests
 ^^^^^^^^^^^^^^^^
 
@@ -142,7 +167,7 @@ In order to register a new service, simply add it to the table:
 
 .. code-block:: lua
 
-	http.endpoints['/health'] = {'application/json',
+	local on_health = {'application/json',
 	function (h, stream)
 		-- API call, return a JSON table
 		return {state = 'up', uptime = 0}
@@ -158,6 +183,12 @@ In order to register a new service, simply add it to the table:
 		-- Finalize the WebSocket
 		ws:close()
 	end}
+	-- Load module
+	modules = {
+		http = {
+			endpoints = { ['/health'] = on_health }
+		}
+	}
 
 Then you can query the API endpoint, or tail the WebSocket using curl.
 
@@ -200,7 +231,7 @@ the HTTP response code or send headers and body yourself.
 	local value = 42
 
 	-- Expose the service
-	http.endpoints['/service'] = {'application/json',
+	local service = {'application/json',
 	function (h, stream)
 		-- Get request method and deal with it properly
 		local m = h:get(':method')
@@ -221,6 +252,12 @@ the HTTP response code or send headers and body yourself.
 			return 405, 'Cannot do that'
 		end
 	end}
+	-- Load the module
+	modules = {
+		http = {
+			endpoints = { ['/service'] = service }
+		}
+	}
 
 In some cases you might need to send back your own headers instead of default provided by HTTP handler,
 you can do this, but then you have to return ``false`` to notify handler that it shouldn't try to generate

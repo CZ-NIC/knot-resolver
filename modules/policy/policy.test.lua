@@ -39,7 +39,7 @@ local function test_tls_forward()
 		}}}), 'TLS_FORWARD with table of pins')
 
 	-- ok(policy.TLS_FORWARD({{'::1', hostname='test.', ca_file='/tmp/ca.crt'}}), 'TLS_FORWARD with hostname + CA cert')
-	boom(policy.TLS_FORWARD, {{{'::1', hostname='test.'}}}, 'TLS_FORWARD with just hostname')
+	ok(policy.TLS_FORWARD({{'::1', hostname='test.'}}), 'TLS_FORWARD with just hostname (use system CA store)')
 	boom(policy.TLS_FORWARD, {{{'::1', ca_file='/tmp/ca.crt'}}}, 'TLS_FORWARD with just CA cert')
 	boom(policy.TLS_FORWARD, {{{'::1', hostname='', ca_file='/tmp/ca.crt'}}}, 'TLS_FORWARD with empty hostname + CA cert')
 	boom(policy.TLS_FORWARD, {{{'::1', hostname='test.', ca_file='/dev/a_file_which_surely_does_NOT_exist!'}}},
