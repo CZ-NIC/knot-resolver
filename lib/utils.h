@@ -168,6 +168,7 @@ struct ranked_rr_array_entry {
 	bool yielded : 1;
 	bool to_wire : 1; /**< whether to be put into the answer */
 	bool expiring : 1; /**< low remaining TTL; see is_expiring; only used in cache ATM */
+	uint8_t flags : 4; /**< Alignment of the full u8 (can be used for other flags) */
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
