@@ -25,7 +25,7 @@
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 			   uint8_t lowest_rank);
 static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
-			struct kr_query *qry, bool only_NS, bool is_DS);
+			struct kr_query *qry, bool only_NS, bool is_DS, uint8_t rank_min);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
@@ -184,7 +184,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 	entry_list_t el;
-	ret = closest_NS(cache, k, el, qry, false, qry->stype == KNOT_RRTYPE_DS);
+	ret = closest_NS(cache, k, el, qry, false, qry->stype == KNOT_RRTYPE_DS, lowest_rank);
 	if (ret) {
 		assert(ret == kr_error(ENOENT));
 		if (ret != kr_error(ENOENT) || !el[0].len) {
@@ -599,7 +599,7 @@ int kr_cache_closest_apex(struct kr_cache *cache, const knot_dname_t *name, bool
 		return kr_error(ret);
 	entry_list_t el_;
 	k->zname = name;
-	ret = closest_NS(cache, k, el_, NULL, true, is_DS);
+	ret = closest_NS(cache, k, el_, NULL, true, is_DS, KR_RANK_INITIAL | KR_RANK_AUTH);
 	if (ret && ret != -abs(ENOENT))
 		return ret;
 	*apex = knot_dname_copy(k->zname, NULL);
@@ -625,7 +625,7 @@ static int check_NS_entry(struct key *k, knot_db_val_t entry, int i,
  * \return error code
  */
 static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
-			struct kr_query *qry, const bool only_NS, const bool is_DS)
+			struct kr_query *qry, bool only_NS, bool is_DS, uint8_t rank_min)
 {
 	/* get the current timestamp */
 	const uint8_t *cache_scope = NULL;
