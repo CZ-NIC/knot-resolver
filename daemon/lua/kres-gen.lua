@@ -140,6 +140,7 @@ struct ranked_rr_array_entry {
 	_Bool yielded : 1;
 	_Bool to_wire : 1;
 	_Bool expiring : 1;
+	uint8_t flags : 4;
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
