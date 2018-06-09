@@ -476,7 +476,6 @@ static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_req
 static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, const knot_dname_t **cname_ret)
 {
 	struct kr_query *query = req->current_query;
-	assert(!(query->flags.STUB));
 	/* Process answer type */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	const knot_dname_t *cname = NULL;
@@ -530,8 +529,15 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 					return state;
 				}
 			}
-			uint8_t rank = get_initial_rank(rr, query, true,
-					query->flags.FORWARD || referral);
+			uint8_t rank = 0;
+			if (query->flags.STUB) {
+				/* KR_RANK_AUTH: we don't have the records directly from
+				 * an authoritative source, but we do trust the server and it's
+				 * supposed to only send us authoritative records. */
+				rank = KR_RANK_OMIT | KR_RANK_AUTH;
+			} else {
+				rank = get_initial_rank(rr, query, true, query->flags.FORWARD || referral);
+			}
 			state = kr_ranked_rrarray_add(&req->answ_selected, rr,
 						      rank, to_wire, query->uid, &req->pool);
 			if (state != kr_ok()) {
@@ -646,6 +652,77 @@ static int process_final(knot_pkt_t *pkt, struct kr_request *req,
 	return kr_ok();
 }
 
+static int process_cname_chain(knot_pkt_t *pkt, struct kr_request *req, struct kr_query *query, const knot_dname_t *cname)
+{
+	const bool is_final = (query->parent == NULL);
+	int state = KR_STATE_DONE;
+
+	/* Check if target record has been already copied */
+	query->flags.CNAME = true;
+	if (is_final) {
+		state = process_final(pkt, req, cname);
+		if (state != kr_ok()) {
+			VERBOSE_MSG("<= processing final response failed\n");
+			return state;
+		}
+	} else if ((query->flags.FORWARD) &&
+		   ((query->stype == KNOT_RRTYPE_DS) ||
+		    (query->stype == KNOT_RRTYPE_NS))) {
+		/* CNAME'ed answer for DS or NS subquery.
+		 * Treat it as proof of zonecut nonexistance. */
+		return KR_STATE_DONE;
+	}
+	VERBOSE_MSG("<= cname chain, following\n");
+	/* Check if the same query was followed in the same CNAME chain. */
+	for (const struct kr_query *q = query->cname_parent; q != NULL;
+			q = q->cname_parent) {
+		if (q->sclass == query->sclass &&
+		    q->stype == query->stype   &&
+		    knot_dname_is_equal(q->sname, cname)) {
+			VERBOSE_MSG("<= cname chain loop\n");
+			return KR_STATE_FAIL;
+		}
+	}
+	struct kr_query *next = kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
+	if (!next) {
+		return KR_STATE_FAIL;
+	}
+	next->flags.AWAIT_CUT = true;
+
+	/* Copy transitive flags from original query to CNAME followup. */
+	next->flags.TRACE = query->flags.TRACE;
+	next->flags.ALWAYS_CUT = query->flags.ALWAYS_CUT;
+	next->flags.NO_THROTTLE = query->flags.NO_THROTTLE;
+
+	if (query->flags.FORWARD) {
+		next->forward_flags.CNAME = true;
+		if (query->parent == NULL) {
+			state = kr_nsrep_copy_set(&next->ns, &query->ns);
+			if (state != kr_ok()) {
+				return KR_STATE_FAIL;
+			}
+		}
+	}
+	next->cname_parent = query;
+	/* Want DNSSEC if and only if it's posible to secure
+	 * this name (i.e. iff it is covered by a TA) */
+	if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
+		next->flags.DNSSEC_WANT = true;
+	} else {
+		next->flags.DNSSEC_WANT = false;
+	}
+	if (!(query->flags.FORWARD) ||
+	    (query->flags.DNSSEC_WEXPAND)) {
+		state = pick_authority(pkt, req, false);
+		if (state != kr_ok()) {
+			return KR_STATE_FAIL;
+		}
+	}
+
+	return KR_STATE_DONE;
+}
+
+
 static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *query = req->current_query;
@@ -656,7 +733,6 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	 * NOERROR  => found zone cut, retry, except the case described below
 	 * NXDOMAIN => parent is zone cut, retry as a workaround for bad authoritatives
 	 */
-	const bool is_final = (query->parent == NULL);
 	const int pkt_class = kr_response_classify(pkt);
 	const knot_dname_t * pkt_qname = knot_pkt_qname(pkt);
 	if (!knot_dname_is_equal(pkt_qname, query->sname) &&
@@ -696,66 +772,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	query->flags.RESOLVED = true;
 	/* Follow canonical name as next SNAME. */
 	if (!knot_dname_is_equal(cname, query->sname)) {
-		/* Check if target record has been already copied */
-		query->flags.CNAME = true;
-		if (is_final) {
-			state = process_final(pkt, req, cname);
-			if (state != kr_ok()) {
-				return state;
-			}
-		} else if ((query->flags.FORWARD) &&
-			   ((query->stype == KNOT_RRTYPE_DS) ||
-			    (query->stype == KNOT_RRTYPE_NS))) {
-			/* CNAME'ed answer for DS or NS subquery.
-			 * Treat it as proof of zonecut nonexistance. */
-			return KR_STATE_DONE;
-		}
-		VERBOSE_MSG("<= cname chain, following\n");
-		/* Check if the same query was followed in the same CNAME chain. */
-		for (const struct kr_query *q = query->cname_parent; q != NULL;
-				q = q->cname_parent) {
-			if (q->sclass == query->sclass &&
-			    q->stype == query->stype   &&
-			    knot_dname_is_equal(q->sname, cname)) {
-				VERBOSE_MSG("<= cname chain loop\n");
-				return KR_STATE_FAIL;
-			}
-		}
-		struct kr_query *next = kr_rplan_push(&req->rplan, query->parent, cname, query->sclass, query->stype);
-		if (!next) {
-			return KR_STATE_FAIL;
-		}
-		next->flags.AWAIT_CUT = true;
-
-		/* Copy transitive flags from original query to CNAME followup. */
-		next->flags.TRACE = query->flags.TRACE;
-		next->flags.ALWAYS_CUT = query->flags.ALWAYS_CUT;
-		next->flags.NO_THROTTLE = query->flags.NO_THROTTLE;
-
-		if (query->flags.FORWARD) {
-			next->forward_flags.CNAME = true;
-			if (query->parent == NULL) {
-				state = kr_nsrep_copy_set(&next->ns, &query->ns);
-				if (state != kr_ok()) {
-					return KR_STATE_FAIL;
-				}
-			}
-		}
-		next->cname_parent = query;
-		/* Want DNSSEC if and only if it's posible to secure
-		 * this name (i.e. iff it is covered by a TA) */
-		if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
-			next->flags.DNSSEC_WANT = true;
-		} else {
-			next->flags.DNSSEC_WANT = false;
-		}
-		if (!(query->flags.FORWARD) ||
-		    (query->flags.DNSSEC_WEXPAND)) {
-			state = pick_authority(pkt, req, false);
-			if (state != kr_ok()) {
-				return KR_STATE_FAIL;
-			}
-		}
+		return process_cname_chain(pkt, req, query, cname);
 	} else if (!query->parent) {
 		/* Answer for initial query */
 		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
@@ -824,6 +841,20 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 	int err = pick_authority(pkt, req, to_wire);
 	if (err != kr_ok()) {
 		return KR_STATE_FAIL;
+	}
+
+	/* Unroll CNAME to check if it's fully resolved. */
+	const knot_dname_t *cname = NULL;
+	err = unroll_cname(pkt, req, false, &cname);
+	if (err != kr_ok()) {
+		VERBOSE_MSG("<= unrolling CNAME failed\n");
+		return KR_STATE_FAIL;
+	}
+
+	/* Follow canonical name as next SNAME. */
+	if (!knot_dname_is_equal(cname, query->sname)) {
+		VERBOSE_MSG("<= processing CNAME chain\n");
+		return process_cname_chain(pkt, req, query, cname);
 	}
 
 	finalize_answer(pkt, query, req);

@@ -24,7 +24,7 @@
 
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 			   uint8_t lowest_rank);
-static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el);
+static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el, uint8_t rank_min);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
@@ -154,7 +154,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 	entry_list_t el;
-	ret = closest_NS(ctx, k, el);
+	ret = closest_NS(ctx, k, el, lowest_rank);
 	if (ret) {
 		assert(ret == kr_error(ENOENT));
 		if (ret != kr_error(ENOENT) || !el[0].len) {
@@ -558,7 +558,7 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
  * Found type is returned via k->type; the values are returned in el.
  * \return error code
  */
-static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
+static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el, uint8_t rank_min)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
@@ -566,7 +566,6 @@ static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
 
 	int zlf_len = k->buf[0];
 
-	uint8_t rank_min = KR_RANK_INSECURE | KR_RANK_AUTH;
 	// LATER(optim): if stype is NS, we check the same value again
 	bool exact_match = true;
 	bool need_zero = true;

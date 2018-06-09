@@ -325,6 +325,7 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type, const uint8_t 
 
 /** The inside for cache_peek(); implementation separated to ./peek.c */
 int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt);
+
 /** function for .produce phase */
 int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
@@ -748,7 +749,6 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	return kr_ok();
 }
 
-
 static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
 {
@@ -780,6 +780,7 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 	};
 	return kr_ok();
 }
+
 int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
 {	/* Just wrap with extra verbose logging. */
