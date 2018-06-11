@@ -159,18 +159,18 @@ static inline bool is_scopable_type(uint16_t type)
  *       .. 1   terminator \x00
  *
  *  The E tag has additional information:
- *       .. t   type in text (e.g AAAA, t = 1 .. 9 (as of now))
+ *       .. 2   type in wireformat (e.g AAAA = [0 28])
  *       .. s   cache scope (e.g. [192 168 1], s = 0 .. 16)
  */
-int cache_key_write_scope(struct key *k, size_t off, const uint8_t *scope, int scope_len_bits);
+int cache_key_write_scope(struct key *k, size_t off, const kr_cache_scope_t *scope);
 
 /** Finish constructing string key for for exact search.
  * It's assumed that kr_dname_lf(k->buf, owner, *) had been ran.
  */
-knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type, const uint8_t *scope, int scope_len_bits);
+knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type, const kr_cache_scope_t *scope);
 
 /** Like key_exact_type_maypkt but with extra checks if used for RRs only. */
-static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type, const uint8_t *scope, int scope_len_bits)
+static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type, const kr_cache_scope_t *scope)
 {
 	switch (type) {
 	/* Sanity check: forbidden types represented in other way(s). */
@@ -179,7 +179,7 @@ static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type, const u
 		assert(false);
 		return (knot_db_val_t){ NULL, 0 };
 	}
-	return key_exact_type_maypkt(k, type, scope, scope_len_bits);
+	return key_exact_type_maypkt(k, type, scope);
 }
 
 

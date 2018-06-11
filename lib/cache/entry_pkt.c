@@ -114,7 +114,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 		assert(owner == NULL);
 		return;
 	}
-	key = key_exact_type_maypkt(k, pkt_type, NULL, 0);
+	key = key_exact_type_maypkt(k, pkt_type, NULL);
 
 	/* For now we stash the full packet byte-exactly as it came from upstream. */
 	const uint16_t pkt_size = pkt->size;

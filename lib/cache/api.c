@@ -59,7 +59,7 @@ static const uint16_t CACHE_VERSION = 5;
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
 		uint8_t rank, trie_t *nsec_pmap, bool *has_optout,
-		const uint8_t *scope, int scope_len_bits);
+		kr_cache_scope_t *scope);
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
@@ -157,13 +157,13 @@ int kr_cache_sync(struct kr_cache *cache)
 }
 
 int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const knot_rrset_t *rrsig,
-                       uint8_t rank, uint32_t timestamp, const uint8_t *scope, int scope_len_bits)
+                       uint8_t rank, uint32_t timestamp, kr_cache_scope_t *scope)
 {
 	int err = stash_rrset_precond(rr, NULL);
 	if (err <= 0) {
 		return kr_ok();
 	}
-	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL, NULL, scope, scope_len_bits);
+	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL, NULL, scope);
 		/* Zone's NSEC* parames aren't updated, but that's probably OK
 		 * for kr_cache_insert_rr() */
 	if (written >= 0) {
@@ -269,29 +269,56 @@ static bool check_rrtype(uint16_t type, const struct kr_query *qry/*logging*/)
 	return ret;
 }
 
-int cache_key_write_scope(struct key *k, size_t off, const uint8_t *scope, int scope_len_bits)
+/** Helper to convert IANA address family codes to address lengths. */
+static int iana_family_to_length(int iana_family)
 {
-	const int scope_len_bytes = (scope_len_bits + 7) / 8;
-	if (!k || !scope || off + scope_len_bytes + 1 > KR_CACHE_KEY_MAXLEN) {
+	switch (iana_family) {
+	case KNOT_ADDR_FAMILY_IPV4:
+		return 4;
+	case KNOT_ADDR_FAMILY_IPV6:
+		return 16;
+	default:
+		return 0;
+	}
+}
+
+int cache_key_write_scope(struct key *k, size_t off, const kr_cache_scope_t *scope)
+{
+	if (!scope || scope->family == AF_UNSPEC) {
+		return 0;
+	}
+
+	int address_length = iana_family_to_length(scope->family);
+	if (!k || address_length <= 0 || off + address_length + 1 > KR_CACHE_KEY_MAXLEN) {
 		return kr_error(EINVAL);
 	}
 
 	/* Write scope at current offset */
-	memmove(k->buf + off, scope, scope_len_bytes);
+	const int scope_len_bytes = (scope->scope_len + 7) / 8;
+	memmove(k->buf + off, scope->address, scope_len_bytes);
+	memset(k->buf + off + scope_len_bytes, 0, address_length - scope_len_bytes);
+	/* Mask bits in the last byte if the scope length isn't divisible by 8
+	 * e.g. 11111100/5 -> 11111000, it will shift right and left with zero extension.
+	 * This is necessary for correct LEQ search when the bitmask does not end on the whole byte boundary.
+	 */
+	const size_t shift = (scope_len_bytes * 8) - scope->scope_len;
+	if (shift != 0) {
+		const size_t last_byte_off = off + scope_len_bytes - 1;
+		k->buf[last_byte_off] = (k->buf[last_byte_off] >> shift) << shift;
+	}
 
-	/* Write a terminal byte to distinguish 'no scope' from 'global scope' */
-	k->buf[off + scope_len_bytes] = '\0';
+	/* Always write bitlength byte to distinguish 'not scoped' from 'global scope' */
+	k->buf[off + address_length] = scope->scope_len;
 
-	return scope_len_bytes + 1;
+	return address_length + 1;
 }
 
 /** Like key_exact_type() but omits a couple checks not holding for pkt cache. */
-knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type, const uint8_t *scope, int scope_len_bits)
+knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type, const kr_cache_scope_t *scope)
 {
 	assert(check_rrtype(type, NULL));
 	if (!is_scopable_type(type)) {
 		scope = NULL;
-		scope_len_bits = 0;
 	}
 
 	switch (type) {
@@ -315,7 +342,7 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type, const uint8_t 
 	k->type = type;
 	off += sizeof(type);
 
-	int ret = cache_key_write_scope(k, off, scope, scope_len_bits);
+	int ret = cache_key_write_scope(k, off, scope);
 	if (ret > 0) {
 		off += ret;
 	}
@@ -455,7 +482,7 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
 		uint8_t rank, trie_t *nsec_pmap, bool *has_optout,
-		const uint8_t *scope, int scope_len)
+		kr_cache_scope_t *scope)
 {
 	assert(stash_rrset_precond(rr, qry) > 0);
 	if (!cache) {
@@ -476,7 +503,6 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 
 	/* Construct the key under which RRs will be stored,
 	 * and add corresponding nsec_pmap item (if necessary). */
-	int used_scope_len = -1;
 	struct key k_storage, *k = &k_storage;
 	knot_db_val_t key;
 	switch (rr->type) {
@@ -530,19 +556,16 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			assert(!ret);
 			return kr_error(ret);
 		}
-		/* Scope the record if authoritative, and scopeable type */
-		if ((!qry || !qry->parent) && kr_rank_test(rank, KR_RANK_AUTH) && is_scopable_type(rr->type)) {
-			used_scope_len = scope_len;
-		} else {
-			/*
-			* Exclude infrastructure service requests (e.g. A/AAAA for an NS set)
-			* and exclude non-authoritative data (records from other sections)
-			*/
+		/*
+		 * Scope the record if it's authoritative rank, and scopeable type.
+		 * Exclude infrastructure service requests (e.g. A/AAAA for an NS set)
+		 * and exclude non-authoritative data (records from other sections)
+		 */
+		if ((qry && qry->parent) || !kr_rank_test(rank, KR_RANK_AUTH) || !is_scopable_type(rr->type)) {
 			scope = NULL;
-			scope_len = 0;
 		}
-		
-		key = key_exact_type(k, rr->type, scope, scope_len);
+
+		key = key_exact_type(k, rr->type, scope);
 	}
 
 	/* Compute materialized sizes of the new data. */
@@ -603,7 +626,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			*encl_str = kr_dname_text(encloser);
 		VERBOSE_MSG(qry, "=> stashed %s%s %s, rank 0%.2o, scoped: %d "
 			"%d B total, incl. %d RRSIGs\n",
-			(wild_labels ? "*." : ""), encl_str, type_str, rank, used_scope_len,
+			(wild_labels ? "*." : ""), encl_str, type_str, rank,
+			scope ? (int)scope->scope_len : 0,
 			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.count : 0)
 			);
 	} }
@@ -647,7 +671,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 
 	struct kr_request *req = qry->request;
 	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
-					entry->rank, nsec_pmap, has_optout, req->cache_scope, req->cache_scope_len_bits);
+					entry->rank, nsec_pmap, has_optout, &req->cache_scope);
 	if (written < 0) {
 		kr_log_error("[%5hu][cach] stash failed, ret = %d\n", qry->id, ret);
 		return (int) written;
@@ -688,13 +712,14 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	struct key k_storage, *k = &k_storage;
 	int ret = kr_dname_lf(k->buf, dname, false);
 	if (ret) return kr_error(ret);
-	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS, NULL, 0);
+	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS, NULL);
 	knot_db_val_t val_orig = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val_orig, 1);
 	if (ret && ret != -ABS(ENOENT)) {
 		VERBOSE_MSG(qry, "=> EL read failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
+
 	/* Prepare new entry_list_t so we can just write at el[0]. */
 	entry_list_t el;
 	int log_refresh_by = 0;
@@ -775,7 +800,7 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 	int ret = kr_dname_lf(k->buf, name, false);
 	if (ret) return kr_error(ret);
 
-	knot_db_val_t key = key_exact_type(k, type, NULL, 0);
+	knot_db_val_t key = key_exact_type(k, type, NULL);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (!ret) ret = entry_h_seek(&val, type);
@@ -823,7 +848,7 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t t
 	int ret = kr_dname_lf(k->buf, name, false);
 	if (ret) return kr_error(ret);
 
-	knot_db_val_t key = key_exact_type(k, type, NULL, 0);
+	knot_db_val_t key = key_exact_type(k, type, NULL);
 	return cache_op(cache, remove, &key, 1);
 }
 
@@ -843,7 +868,7 @@ int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
 	if (ret) return kr_error(ret);
 
 	// use a mock type
-	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_A, NULL, 0);
+	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_A, NULL);
 	/* CACHE_KEY_DEF */
 	key.len -= sizeof(uint16_t); /* the type */
 	if (!exact_name) {
