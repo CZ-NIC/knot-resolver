@@ -85,14 +85,59 @@ static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_que
 /**
  * Return cache scope as a hexstring.
  */
-static char *cache_scope_hex(const uint8_t *scope, int scope_len_bits)
+static char *cache_scope_hex(kr_cache_scope_t *scope)
 {
-	const int len = (scope_len_bits + 7) / 8;
+	if (!scope || scope->family == AF_UNSPEC) {
+		return NULL;
+	}
+
+	const int len = (scope->scope_len + 7) / 8;
 	char *hex_str = calloc(1, len * 2 + 1);
 	for (int i = 0; i < len; ++i) {
-		snprintf(hex_str + (i * 2), 3, "%02x", scope[i]);
+		snprintf(hex_str + (i * 2), 3, "%02x", scope->address[i]);
 	}
+
 	return hex_str;
+}
+
+static inline size_t cache_key_scope_off(struct key *k)
+{
+	/* Seek past the name [terminator, tag] + u16 type */
+	return (k->buf[0] + (2 * sizeof(uint8_t)) + sizeof(uint16_t));
+
+}
+
+/**
+ * Seek scope from the cache key.
+ * Note: see cache_key_write_scope documentation for key format reference.
+ */
+static int cache_key_read_scope(knot_db_val_t key, size_t off, const uint8_t **scope, uint8_t *scope_len)
+{
+	/* Check if there's at least bitlength byte */
+	if (key.len == 0 || off >= key.len) {
+		return kr_error(ENOENT);
+	}
+	/* Set pointer and retrieve bitlength */
+	const uint8_t *base = (const uint8_t *)key.data;
+	scope[0] = base + off;
+	scope_len[0] = base[key.len - 1];
+	return kr_ok();
+}
+
+/* Check that one scoped key covers another one (they're not necessarily equal) */
+static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_key, size_t key_length, const kr_cache_scope_t *scope)
+{
+	/* Check that the key part (without the scope) matches to make sure the keys differ only in scope. */
+	if (found_key.len == wanted_key.len && memcmp(found_key.data, wanted_key.data, key_length) == 0) {
+		/* Parse the scope from cached key and check that it covers the requested scope */
+		uint8_t found_scope_len = 0;
+		const uint8_t *found_scope = NULL;
+		if (cache_key_read_scope(found_key, key_length, &found_scope, &found_scope_len) == 0 &&
+			kr_bitcmp((const char *)found_scope, (const char *)scope->address, found_scope_len) == 0) {
+				return kr_ok();
+		}
+	}
+	return kr_error(ENOENT);
 }
 
 /** Almost whole .produce phase for the cache module.
@@ -115,16 +160,19 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/**** 1. find the name or the closest (available) zone, not considering wildcards
 	 **** 1a. exact name+type match (can be negative answer in insecure zones) */
-	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype, req->cache_scope, req->cache_scope_len_bits);
+	kr_cache_scope_t *scope = &req->cache_scope;
+	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype, scope);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	/*  If the name is expected to be scope, but there's no scoped result in cache,
-	 *  check global scope, as the name may not be scoped by server. */
-	if (req->cache_scope != NULL && ret && ret == -abs(ENOENT)) {
-		/* Retry using global scope */
-		VERBOSE_MSG(qry, "=> searching global scope /0\n");
-		key = key_exact_type_maypkt(k, qry->stype, req->cache_scope, 0);
-		ret = cache_op(cache, read, &key, &val, 1);
+	 *  check closest scope, as the name may not be scoped by server. */
+	if (ret && ret == -abs(ENOENT) && scope->family != AF_UNSPEC && is_scopable_type(qry->stype)) {
+		knot_db_val_t wanted_key = key;
+		VERBOSE_MSG(qry, "=> searching closest scope for /%d\n", scope->scope_len);
+		int err = cache_op(cache, read_leq, &key, &val);
+		if (err >= 0) {
+			ret = cache_key_match_scope(wanted_key, key, cache_key_scope_off(k), scope);
+		}
 	}
 	if (!ret) {
 		/* found an entry: test conditions, materialize into pkt, etc. */
@@ -135,12 +183,6 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(false);
 		return ctx->state;
 	} else if (!ret) {
-		WITH_VERBOSE(qry) {
-			if (req->cache_scope && is_scopable_type(qry->stype)) {
-				auto_free char *hex_str = cache_scope_hex(req->cache_scope, req->cache_scope_len_bits);
-				VERBOSE_MSG(qry, "=> found exact match in scope %s/%d\n", hex_str, req->cache_scope_len_bits);
-			}
-		}
 		cache->stats.hit += 1;
 		return KR_STATE_DONE;
 	}
@@ -247,7 +289,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/* Assuming k->buf still starts with zone's prefix,
 		 * look up the SOA in cache. */
 		k->buf[0] = k->zlf_len;
-		key = key_exact_type(k, KNOT_RRTYPE_SOA, NULL, 0);
+		key = key_exact_type(k, KNOT_RRTYPE_SOA, NULL);
 		knot_db_val_t val = { NULL, 0 };
 		ret = cache_op(cache, read, &key, &val, 1);
 		const struct entry_h *eh;
@@ -450,11 +492,11 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	}
 	WITH_VERBOSE(qry) {
 		auto_free char *scope_hex = NULL;
-		if (req->cache_scope && is_scopable_type(type)) {
-			scope_hex = cache_scope_hex(req->cache_scope, req->cache_scope_len_bits);
+		if (req->cache_scope.family != AF_UNSPEC && is_scopable_type(type)) {
+			scope_hex = cache_scope_hex(&req->cache_scope);
 		}
 		VERBOSE_MSG(qry, "=> satisfied by exact RR or CNAME: rank 0%.2o, new TTL %d, scope %s/%d\n",
-				eh->rank, new_ttl, scope_hex ? scope_hex : "", scope_hex ? req->cache_scope_len_bits : 0);
+				eh->rank, new_ttl, scope_hex ? scope_hex : "", req->cache_scope.scope_len);
 	}
 	return kr_ok();
 }
@@ -507,7 +549,7 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		    const uint16_t type, const uint8_t lowest_rank,
 		    const struct kr_query *qry, struct kr_cache *cache)
 {
-	knot_db_val_t key = key_exact_type(k, type, NULL, 0);
+	knot_db_val_t key = key_exact_type(k, type, NULL);
 	/* Find the record. */
 	knot_db_val_t val = { NULL, 0 };
 	int ret = cache_op(cache, read, &key, &val, 1);
@@ -576,13 +618,16 @@ static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el, uint8_t r
 		 * The CNAME is going to get rewritten to NS key, but it will be scoped if possible.
 		 */
 		const uint16_t find_type = exact_match ? KNOT_RRTYPE_CNAME : KNOT_RRTYPE_NS;
-		knot_db_val_t key = key_exact_type(k, find_type, req->cache_scope, req->cache_scope_len_bits);
+		knot_db_val_t key = key_exact_type(k, find_type, &req->cache_scope);
 		knot_db_val_t val;
 		int ret = cache_op(cache, read, &key, &val, 1);
 		/* Try in global scope if scoped, but no immediate match found */
-		if (exact_match && req->cache_scope != NULL && ret == -abs(ENOENT)) {
-			key = key_exact_type_maypkt(k, KNOT_RRTYPE_NS, req->cache_scope, 0);
-			ret = cache_op(cache, read, &key, &val, 1);
+		if (exact_match && ret == -abs(ENOENT) && req->cache_scope.family != AF_UNSPEC) {
+			knot_db_val_t wanted_key = key;
+			int err = cache_op(cache, read_leq, &key, &val);
+			if (err >= 0) {
+				ret = cache_key_match_scope(wanted_key, key, cache_key_scope_off(k), &req->cache_scope);
+			}
 		}
 		if (ret == -abs(ENOENT)) goto next_label;
 		if (ret) {

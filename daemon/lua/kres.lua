@@ -808,7 +808,7 @@ ffi.metatype(ranked_rr_array_t, {
 local kr_cache_t = ffi.typeof('struct kr_cache')
 ffi.metatype( kr_cache_t, {
 	__index = {
-		insert = function (self, rr, rrsig, rank, timestamp, scope, scope_bits)
+		insert = function (self, rr, rrsig, rank, timestamp, scope)
 			assert(ffi.istype(kr_cache_t, self))
 			assert(ffi.istype(knot_rrset_t, rr), 'RR must be a rrset type')
 			assert(not rrsig or ffi.istype(knot_rrset_t, rrsig), 'RRSIG must be nil or of the rrset type')
@@ -819,7 +819,7 @@ ffi.metatype( kr_cache_t, {
 				timestamp = tonumber(now.tv_sec)
 			end
 			-- Insert record into cache
-			local ret = C.kr_cache_insert_rr(self, rr, rrsig, tonumber(rank or 0), timestamp, scope, scope_bits or 0)
+			local ret = C.kr_cache_insert_rr(self, rr, rrsig, tonumber(rank or 0), timestamp, scope)
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,

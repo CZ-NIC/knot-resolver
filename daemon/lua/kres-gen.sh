@@ -57,6 +57,8 @@ typedef void (*trace_callback_f)(struct kr_request *);
 	# generics
 	map_t
 	# libkres
+	struct kr_cache_scope
+	kr_cache_scope_t
 	struct kr_qflags
 	rr_array_t
 	struct ranked_rr_array_entry

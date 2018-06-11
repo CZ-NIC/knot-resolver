@@ -77,6 +77,12 @@ typedef struct {
 	void *root;
 	struct knot_mm *pool;
 } map_t;
+struct kr_cache_scope {
+	uint8_t family;
+	uint8_t scope_len;
+	uint8_t address[16];
+};
+typedef struct kr_cache_scope kr_cache_scope_t;
 struct kr_qflags {
 	_Bool NO_MINIMIZE : 1;
 	_Bool NO_THROTTLE : 1;
@@ -188,8 +194,7 @@ struct kr_request {
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
 	int vars_ref;
-	int cache_scope_len_bits;
-	const uint8_t *cache_scope;
+	kr_cache_scope_t cache_scope;
 	knot_mm_t pool;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
@@ -341,6 +346,6 @@ _Bool kr_dnssec_key_ksk(const uint8_t *);
 _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);
-int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t, const uint8_t *, int);
+int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t, const kr_cache_scope_t *);
 int kr_cache_sync(struct kr_cache *);
 ]]
