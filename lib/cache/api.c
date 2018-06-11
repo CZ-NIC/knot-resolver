@@ -51,7 +51,7 @@
 
 
 /** Cache version */
-static const uint16_t CACHE_VERSION = 3;
+static const uint16_t CACHE_VERSION = 4;
 /** Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
@@ -527,7 +527,8 @@ static int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return ctx->state;
 		}
 		/* Check if the record is OK. */
-		int32_t new_ttl = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_SOA, qry->timestamp.tv_sec);
+		int32_t new_ttl = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_SOA,
+						qry->timestamp.tv_sec);
 		if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 			VERBOSE_MSG(qry, "=> SOA unfit %s: rank 0%.2o, new TTL %d\n",
 					(eh->is_packet ? "packet" : "RR"),
@@ -1122,7 +1123,8 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	}
 	VERBOSE_MSG(qry, "=> FEH consistent OK \n");
 
-	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype, qry->timestamp.tv_sec);
+	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype,
+					qry->timestamp.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
 		/* Positive record with stale TTL or bad rank.
 		 * LATER(optim.): It's unlikely that we find a negative one,
@@ -1310,7 +1312,8 @@ static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
 				assert(false);
 				goto next_label;
 			}
-			int32_t new_ttl = get_new_ttl(eh, qry, k->zname, type, qry->timestamp.tv_sec);
+			int32_t new_ttl = get_new_ttl(eh, qry, k->zname, type,
+							qry->timestamp.tv_sec);
 			if (new_ttl < 0
 			    /* Not interested in negative or bogus. */
 			    || eh->is_packet

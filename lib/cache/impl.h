@@ -34,16 +34,20 @@
 #include "lib/cache/cdb_api.h"
 #include "lib/resolve.h"
 
-/** Cache entry header
+/* Cache entry values - binary layout.
+ *
+ * It depends on type which is recognizable by the key.
+ * Code depending on the meaning of the key is marked by CACHE_KEY_DEF.
  *
  * 'E' entry (exact hit):
- *	- ktype == NS: entry_apex and multiple chained entry_h, based on has_* : 1 flags;
+ *	- ktype == NS: entry_apex and multiple chained entry_h, based on has_* flags;
  *	- is_packet: uint16_t length, otherwise opaque and handled by ./entry_pkt.c
  *	- otherwise RRset + its RRSIG set (possibly empty).
- * '1' entry (NSEC1)
- *	- contents is the same as for exact hit for NSEC
+ * '1' or '3' entry (NSEC or NSEC3)
+ *	- contents is the same as for exact hit
  *	- flags don't make sense there
- * */
+ */
+
 struct entry_h {
 	uint32_t time;	/**< The time of inception. */
 	uint32_t ttl;	/**< TTL at inception moment.  Assuming it fits into int32_t ATM. */
@@ -52,16 +56,103 @@ struct entry_h {
 	bool has_optout : 1;	/**< Only for packets with NSEC3. */
 	uint8_t data[];
 };
+struct entry_apex;
+
+/** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
+ * (for is_packet the length of data is checked)
+ */
+struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type);
+
+struct entry_apex * entry_apex_consistent(knot_db_val_t val);
+
+/** Consistency check, ATM common for NSEC and NSEC3. */
+static inline struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
+{
+	/* ATM it's enough to just extend the checks for exact entries. */
+	const struct entry_h *eh = entry_h_consistent(data, KNOT_RRTYPE_NSEC);
+	bool ok = eh != NULL;
+	ok = ok && !eh->is_packet && !eh->has_optout;
+	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
+}
+
+
+/* nsec_p* - NSEC* chain parameters */
+
+static inline int nsec_p_rdlen(const uint8_t *rdata)
+{
+	//TODO: the zero case? // FIXME security: overflow potential
+	return rdata ? 5 + rdata[4] : 0; /* rfc5155 4.2 and 3.2. */
+}
+static const int NSEC_P_MAXLEN = sizeof(uint32_t) + 5 + 255; // TODO: remove??
+
+/** Hash of NSEC3 parameters, used as a tag to separate different chains for same zone. */
+typedef uint32_t nsec_p_hash_t;
+static inline nsec_p_hash_t nsec_p_mkHash(const uint8_t *nsec_p)
+{
+	assert(nsec_p && !(KNOT_NSEC3_FLAG_OPT_OUT & nsec_p[1]));
+	return hash((const char *)nsec_p, nsec_p_rdlen(nsec_p));
+}
+
+/** NSEC* parameters for the chain. */
+struct nsec_p {
+	const uint8_t *raw; /**< Pointer to raw NSEC3 parameters; NULL for NSEC. */
+	nsec_p_hash_t hash; /**< Hash of `raw`, used for cache keys. */
+	dnssec_nsec3_params_t libknot; /**< Format for libknot; owns malloced memory! */
+};
+
+
+
+/** LATER(optim.): this is overshot, but struct key usage should be cheap ATM. */
+#define KR_CACHE_KEY_MAXLEN (KNOT_DNAME_MAXLEN + 100) /* CACHE_KEY_DEF */
+
+struct key {
+	const knot_dname_t *zname; /**< current zone name (points within qry->sname) */
+	uint8_t zlf_len; /**< length of current zone's lookup format */
+
+	/** Corresponding key type; e.g. NS for CNAME.
+	 * Note: NSEC type is ambiguous (exact and range key). */
+	uint16_t type;
+	/** The key data start at buf+1, and buf[0] contains some length.
+	 * For details see key_exact* and key_NSEC* functions. */
+	uint8_t buf[KR_CACHE_KEY_MAXLEN];
+};
+
+static inline size_t key_nwz_off(const struct key *k)
+{
+	/* CACHE_KEY_DEF: zone name lf + 0 ('1' or '3').
+	 * NSEC '1' case continues just with the name within zone. */
+	return k->zlf_len + 2;
+}
+static inline size_t key_nsec3_hash_off(const struct key *k)
+{
+	/* CACHE_KEY_DEF NSEC3: tag (nsec_p_hash_t) + 20 bytes NSEC3 name hash) */
+	return key_nwz_off(k) + sizeof(nsec_p_hash_t);
+}
+/** Hash is always SHA1; I see no plans to standardize anything else.
+ * https://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml#dnssec-nsec3-parameters-3
+ */
+static const int NSEC3_HASH_LEN = 20,
+		 NSEC3_HASH_TXT_LEN = 32;
+
+/** Finish constructing string key for for exact search.
+ * It's assumed that kr_dname_lf(k->buf, owner, *) had been ran.
+ */
+knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
+
+
+
+/* entry_h chaining; implementation in ./entry_list.c */
 
 enum { ENTRY_APEX_NSECS_CNT = 2 };
 
+/** Header of 'E' entry with ktype == NS.  Inside is private to ./entry_list.c */
 struct entry_apex {
 	/* ENTRY_H_FLAGS */
 	bool has_ns : 1;
 	bool has_cname : 1;
 	bool has_dname : 1;
 
-	uint8_t pad_;
+	uint8_t pad_; /**< Weird: 1 byte + 2 bytes + x bytes; let's do 2+2+x. */
 	int8_t nsecs[ENTRY_APEX_NSECS_CNT]; /**< values:  0: none, 1: NSEC, 3: NSEC3 */
 	uint8_t data[];
 	/* XXX: if not first, stamp of last being the first?
@@ -87,68 +178,6 @@ static inline uint16_t EL2RRTYPE(enum EL i)
 	default:	assert(false);  return 0;
 	}
 }
-
-static inline int nsec_p_rdlen(const uint8_t *rdata)
-{
-	//TODO: the zero case? // FIXME security: overflow potential
-	return rdata ? 5 + rdata[4] : 0; /* rfc5155 4.2 and 3.2. */
-}
-static const int NSEC_P_MAXLEN = sizeof(uint32_t) + 5 + 255;
-
-
-/** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
- * (for is_packet the length of data is checked)
- */
-struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type);
-
-struct entry_apex * entry_apex_consistent(knot_db_val_t val);
-
-// TODO
-#define KR_CACHE_KEY_MAXLEN (KNOT_DNAME_MAXLEN + 100)
-
-struct key {
-	const knot_dname_t *zname; /**< current zone name (points within qry->sname) */
-	uint8_t zlf_len; /**< length of current zone's lookup format */
-
-	/** Corresponding key type; e.g. NS for CNAME.
-	 * Note: NSEC type is ambiguous (exact and range key). */
-	uint16_t type;
-	/** The key data start at buf+1, and buf[0] contains some length.
-	 * For details see key_exact* and key_NSEC* functions. */
-	uint8_t buf[KR_CACHE_KEY_MAXLEN];
-};
-
-/** Hash of NSEC3 parameters, used as a tag to separate different chains for same zone. */
-typedef uint32_t nsec_p_hash_t;
-static inline nsec_p_hash_t nsec_p_mkHash(const uint8_t *nsec_p)
-{
-	assert(nsec_p && !(KNOT_NSEC3_FLAG_OPT_OUT & nsec_p[1]));
-	return hash((const char *)nsec_p, nsec_p_rdlen(nsec_p));
-}
-static inline size_t key_nwz_off(const struct key *k)
-{
-	/* CACHE_KEY_DEF: zone name lf + 0 ('1' or '3').
-	 * NSEC '1' case continues just with the name within zone. */
-	return k->zlf_len + 2;
-}
-static inline size_t key_nsec3_hash_off(const struct key *k)
-{
-	/* CACHE_KEY_DEF NSEC3: tag (nsec_p_hash_t) + 20 bytes NSEC3 name hash) */
-	return key_nwz_off(k) + sizeof(nsec_p_hash_t);
-}
-/** Hash is always SHA1; I see no plans to standardize anything else.
- * https://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml#dnssec-nsec3-parameters-3
- */
-static const int NSEC3_HASH_LEN = 20,
-		 NSEC3_HASH_TXT_LEN = 32;
-
-/** Finish constructing string key for for exact search.
- * It's assumed that kr_dname_lf(k->buf, owner, *) had been ran.
- */
-knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
-
-
-/* entry_h chaining; implementation in ./entry_list.c */
 
 /** There may be multiple entries within, so rewind `val` to the one we want.
  *
@@ -193,6 +222,7 @@ static inline int entry_list_serial_size(const entry_list_t list)
 void entry_list_memcpy(struct entry_apex *ea, entry_list_t list);
 
 
+
 /* Packet caching; implementation in ./entry_pkt.c */
 
 /** Stash the packet into cache (if suitable, etc.) */
@@ -218,11 +248,12 @@ static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
 /** Returns signed result so you can inspect how much stale the RR is.
  *
  * @param owner name for stale-serving decisions.  You may pass NULL to disable stale.
- * FIXME: NSEC uses zone name ATM.
+ * @note: NSEC* uses zone name ATM; for NSEC3 the owner may not even be knowable.
  * @param type for stale-serving.
  */
 int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
                     const knot_dname_t *owner, uint16_t type, uint32_t now);
+
 
 /* RRset (de)materialization; implementation in ./entry_rr.c */
 
@@ -232,20 +263,14 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 /** Compute size of dematerialized rdataset.  NULL is accepted as empty set. */
 static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 {
-	return KR_CACHE_RR_COUNT_SIZE + (rds
-		? knot_rdataset_size(rds) - 4 * rds->rr_count /*TTLs*/
-		: 0);
+	return KR_CACHE_RR_COUNT_SIZE + (rds == NULL ? 0
+		: knot_rdataset_size(rds) - 4 * rds->rr_count /*TTLs*/);
 }
 
 /** Dematerialize a rdataset. */
 int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data);
 
-/** NSEC* parameters; almost nothing is meaningful for NSEC. */
-struct nsec_p {
-	const uint8_t *raw; /**< Pointer to raw NSEC3 parameters; NULL for NSEC. */
-	nsec_p_hash_t hash; /**< Hash of `raw`, used for cache keys. */
-	dnssec_nsec3_params_t libknot; /**< Format for libknot; owns malloced memory! */
-};
+
 
 /** Partially constructed answer when gathering RRsets from cache. */
 struct answer {
@@ -258,11 +283,11 @@ struct answer {
 	} rrsets[1+1+3]; /**< see AR_ANSWER and friends; only required records are filled */
 };
 enum {
-	AR_ANSWER = 0,	/**< Positive answer record.  It might be wildcard-expanded. */
-	AR_SOA, 	/**< SOA record. */
-	AR_NSEC,	/**< NSEC* covering or matching the SNAME (next closer name in NSEC3 case). */
-	AR_WILD,	/**< NSEC* covering or matching the source of synthesis. */
-	AR_CPE, 	/**< NSEC3 matching the closest provable encloser. */
+	AR_ANSWER = 0, /**< Positive answer record.  It might be wildcard-expanded. */
+	AR_SOA,  /**< SOA record. */
+	AR_NSEC, /**< NSEC* covering or matching the SNAME (next closer name in NSEC3 case). */
+	AR_WILD, /**< NSEC* covering or matching the source of synthesis. */
+	AR_CPE,  /**< NSEC3 matching the closest provable encloser. */
 };
 
 /** Materialize RRset + RRSIGs into ans->rrsets[id].
@@ -316,8 +341,6 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 /* NSEC3 stuff.  Implementation in ./nsec3.c */
 
-
-
 /** Construct a string key for for NSEC3 predecessor-search, from an NSEC3 name.
  * \note k->zlf_len is assumed to have been correctly set */
 knot_db_val_t key_NSEC3(struct key *k, const knot_dname_t *nsec3_name,
@@ -333,24 +356,12 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		    const struct kr_query *qry, struct kr_cache *cache);
 
 
+
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "cach",  fmt)
-
-
 
 /** Shorthand for operations on cache backend */
 #define cache_op(cache, op, ...) (cache)->api->op((cache)->db, ## __VA_ARGS__)
 
-
-
-/** Consistency check, ATM common for NSEC and NSEC3. */
-static inline struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
-{
-	/* ATM it's enough to just extend the checks for exact entries. */
-	const struct entry_h *eh = entry_h_consistent(data, KNOT_RRTYPE_NSEC);
-	bool ok = eh != NULL;
-	ok = ok && !eh->is_packet && !eh->has_optout;
-	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
-}
 
 static inline uint16_t get_uint16(const void *address)
 {

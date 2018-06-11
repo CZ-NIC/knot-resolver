@@ -133,7 +133,7 @@ static inline bool nsec3_hash_ordered(const uint8_t *h1, const uint8_t *h2)
 /** NSEC3 range search.
  *
  * \param key Pass output of key_NSEC3(k, ...)
- * \param value[out] The raw data of the NSEC cache record (optional; consistency checked).
+ * \param value[out] The raw data of the NSEC3 cache record (optional; consistency checked).
  * \param exact_match[out] Whether the key was matched exactly or just covered (optional).
  * \param hash_low[out] Output the low end hash of covering NSEC3, pointing within DB (optional).
  * \param new_ttl[out] New TTL of the NSEC3 (optional).
@@ -179,9 +179,9 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 		 * in case we searched before the very first one in the zone. */
 		return "range search found inconsistent entry";
 	}
-	/* FIXME(stale): passing just zone name instead of owner, as we don't
-	 * have it reconstructed at this point. */
-	int32_t new_ttl_ = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_NSEC3, qry->timestamp.tv_sec);
+	/* Passing just zone name instead of owner. */
+	int32_t new_ttl_ = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_NSEC3,
+					qry->timestamp.tv_sec);
 	if (new_ttl_ < 0 || !kr_rank_test_noassert(eh->rank, KR_RANK_SECURE)) {
 		return "range search found stale or insecure entry";
 		/* TODO: remove the stale record *and* retry,
