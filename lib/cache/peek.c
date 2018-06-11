@@ -129,10 +129,15 @@ static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_k
 {
 	/* Check that the key part (without the scope) matches to make sure the keys differ only in scope. */
 	if (found_key.len == wanted_key.len && memcmp(found_key.data, wanted_key.data, key_length) == 0) {
-		/* Parse the scope from cached key and check that it covers the requested scope */
+		/*
+		 * Parse the scope from cached key and check that it covers the requested scope
+		 * 1. The found scope must be wider or equal: e.g. 192.168.0/24 can't cover 192.168/16
+		 * 2. The found scope must cover the requested scope: e.g. 127/8 can't cover 192.168/16
+		 */
 		uint8_t found_scope_len = 0;
 		const uint8_t *found_scope = NULL;
 		if (cache_key_read_scope(found_key, key_length, &found_scope, &found_scope_len) == 0 &&
+			found_scope_len <= scope->scope_len &&
 			kr_bitcmp((const char *)found_scope, (const char *)scope->address, found_scope_len) == 0) {
 				return kr_ok();
 		}
