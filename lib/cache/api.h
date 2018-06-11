@@ -54,6 +54,21 @@ struct kr_cache
 	uint64_t checkpoint_monotime; /**< Monotonic milliseconds on the last check-point. */
 };
 
+/*
+ * Reuse ECS semantics for cache scoping - the scope is defined as network prefix.
+ * \see draft-ietf-dnsop-edns-client-subnet
+ */
+struct kr_cache_scope {
+	/*! \brief FAMILY */
+	uint8_t family;
+	/*! \brief SCOPE PREFIX-LENGTH */
+	uint8_t scope_len;
+	/*! \brief ADDRESS */
+	uint8_t address[KNOT_EDNS_CLIENT_SUBNET_ADDRESS_MAXLEN];
+};
+
+typedef struct kr_cache_scope kr_cache_scope_t;
+
 /**
  * Open/create cache with provided storage options.
  * @param cache cache structure to be initialized
@@ -100,12 +115,11 @@ static inline void kr_cache_make_checkpoint(struct kr_cache *cache)
  * @param rank rank of the data
  * @param timestamp current time
  * @param scope scope of the record
- * @param scope_len_bits scope of the record in bits
  * @return 0 or an errcode
  */
 KR_EXPORT
 int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const knot_rrset_t *rrsig,
-                       uint8_t rank, uint32_t timestamp, const uint8_t *scope, int scope_len_bits);
+                       uint8_t rank, uint32_t timestamp, kr_cache_scope_t *scope);
 
 /**
  * Clear all items from the cache.
