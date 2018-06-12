@@ -139,6 +139,18 @@ static const int NSEC3_HASH_LEN = 20,
  */
 knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type);
 
+/** Like key_exact_type_maypkt but with extra checks if used for RRs only. */
+static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type)
+{
+	switch (type) {
+	/* Sanity check: forbidden types represented in other way(s). */
+	case KNOT_RRTYPE_NSEC:
+	case KNOT_RRTYPE_NSEC3:
+		assert(false);
+		return (knot_db_val_t){ NULL, 0 };
+	}
+	return key_exact_type_maypkt(k, type);
+}
 
 
 /* entry_h chaining; implementation in ./entry_list.c */
