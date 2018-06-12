@@ -121,22 +121,16 @@ enum kr_rank {
 /** Check that a rank value is valid.  Meant for assertions. */
 bool kr_rank_check(uint8_t rank) KR_PURE;
 
-/** kr_rank_test() except that `rank` may be rubbish (don't assert that). */
-static inline bool kr_rank_test_noassert(uint8_t rank, uint8_t kr_flag)
+/** Test the presence of any flag/state in a rank, i.e. including KR_RANK_AUTH. */
+static inline bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
 {
-	assert(kr_rank_check(kr_flag));
+	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
 	if (kr_flag == KR_RANK_AUTH) {
 		return rank & KR_RANK_AUTH;
 	}
 	assert(!(kr_flag & KR_RANK_AUTH));
 	/* The rest are exclusive values - exactly one has to be set. */
 	return (rank & ~KR_RANK_AUTH) == kr_flag;
-}
-/** Test the presence of any flag/state in a rank, i.e. including KR_RANK_AUTH. */
-static inline bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
-{
-	assert(kr_rank_check(rank));
-	return kr_rank_test_noassert(rank, kr_flag);
 }
 
 /** Set the rank state. The _AUTH flag is kept as it was. */

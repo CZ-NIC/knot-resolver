@@ -204,16 +204,11 @@ struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type)
 	}
 
 	bool ok = true;
-	ok = ok && (!kr_rank_test_noassert(eh->rank, KR_RANK_BOGUS)
+	ok = ok && kr_rank_check(eh->rank);
+	ok = ok && (!kr_rank_test(eh->rank, KR_RANK_BOGUS)
 		    || eh->is_packet);
 	ok = ok && (eh->is_packet || !eh->has_optout);
 
-	/* doesn't hold, because of temporary NSEC3 packet caching
-	if (eh->is_packet)
-		ok = ok && !kr_rank_test(eh->rank, KR_RANK_SECURE);
-	*/
-
-	//LATER: rank sanity
 	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
 }
 

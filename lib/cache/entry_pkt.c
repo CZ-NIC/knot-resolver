@@ -68,11 +68,12 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	const bool is_negative = kr_response_classify(pkt)
 				& (PKT_NODATA|PKT_NXDOMAIN);
 	const struct kr_qflags * const qf = &qry->flags;
-	const bool want_pkt = qf->DNSSEC_BOGUS
-		|| (is_negative && (qf->DNSSEC_INSECURE || !qf->DNSSEC_WANT));
+	const bool want_negative = qf->DNSSEC_INSECURE || !qf->DNSSEC_WANT || has_optout;
+	const bool want_pkt = qf->DNSSEC_BOGUS /*< useful for +cd answers */
+				|| (is_negative && want_negative);
 
-	if (!(want_pkt || has_optout) || !knot_wire_get_aa(pkt->wire)
-	    || pkt->parsed != pkt->size /* malformed packet; still can't detect KNOT_EFEWDATA */
+	if (!want_pkt || !knot_wire_get_aa(pkt->wire)
+	    || pkt->parsed != pkt->size /*< malformed packet; still can't detect KNOT_EFEWDATA */
 	   ) {
 		return;
 	}
@@ -94,7 +95,6 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 		} else if (!qf->DNSSEC_WANT) {
 			/* no TAs at all, leave _RANK_AUTH */
 		} else if (has_optout) {
-			/* FIXME XXX review OPTOUT in this function again! */
 			/* All bad cases should be filtered above,
 			 * at least the same way as pktcache in kresd 1.5.x. */
 			kr_rank_set(&rank, KR_RANK_SECURE);

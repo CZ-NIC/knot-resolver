@@ -53,7 +53,7 @@ struct entry_h {
 	uint32_t ttl;	/**< TTL at inception moment.  Assuming it fits into int32_t ATM. */
 	uint8_t  rank : 6;	/**< See enum kr_rank */
 	bool is_packet : 1;	/**< Negative-answer packet for insecure/bogus name. */
-	bool has_optout : 1;	/**< Only for packets with NSEC3. */
+	bool has_optout : 1;	/**< Only for packets; persisted DNSSEC_OPTOUT. */
 	uint8_t data[];
 };
 struct entry_apex;
@@ -237,7 +237,8 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list);
 
 /* Packet caching; implementation in ./entry_pkt.c */
 
-/** Stash the packet into cache (if suitable, etc.) */
+/** Stash the packet into cache (if suitable, etc.)
+ * \param has_optout whether the packet contains an opt-out NSEC3 */
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 		const struct kr_request *req, bool has_optout);
 
