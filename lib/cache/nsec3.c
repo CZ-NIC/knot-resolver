@@ -133,6 +133,7 @@ static inline bool nsec3_hash_ordered(const uint8_t *h1, const uint8_t *h2)
 /** NSEC3 range search.
  *
  * \param key Pass output of key_NSEC3(k, ...)
+ * \param nsec_p Restrict to this NSEC3 parameter-set.
  * \param value[out] The raw data of the NSEC3 cache record (optional; consistency checked).
  * \param exact_match[out] Whether the key was matched exactly or just covered (optional).
  * \param hash_low[out] Output the low end hash of covering NSEC3, pointing within DB (optional).
@@ -141,9 +142,9 @@ static inline bool nsec3_hash_ordered(const uint8_t *h1, const uint8_t *h2)
  * \note The function itself does *no* bitmap checks, e.g. RFC 6840 sec. 4.
  */
 static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query *qry,
-			const knot_db_val_t key, const struct key *k, knot_db_val_t *value,
-			bool *exact_match, const uint8_t **hash_low,
-			uint32_t *new_ttl)
+		const knot_db_val_t key, const struct key *k, const struct nsec_p *nsec_p,
+		knot_db_val_t *value, bool *exact_match, const uint8_t **hash_low,
+		uint32_t *new_ttl)
 {
 	/* Do the cache operation. */
 	const size_t hash_off = key_nsec3_hash_off(k);
@@ -199,23 +200,26 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	}
 	/* The NSEC3 starts strictly before our target name;
 	 * now check that it still belongs into that zone and chain. */
+	const knot_rdata_t *nsec_p_raw = eh->data + KR_CACHE_RR_COUNT_SIZE
+					+ 2 /* RDLENGTH from rfc1034 */;
+	const int nsec_p_len = nsec_p_rdlen(nsec_p_raw);
 	const bool same_chain = key_found.len == hash_off + NSEC3_HASH_LEN
 		/* CACHE_KEY_DEF */
-		&& memcmp(key.data, key_found.data, hash_off) == 0;
-		/* FIXME: just probabilistic; also compare the nsec parameters exactly! */
+		&& memcmp(key.data, key_found.data, hash_off) == 0
+		/* exact comparison of NSEC3 parameters */
+		&& nsec_p_len == nsec_p_rdlen(nsec_p->raw)
+		&& memcmp(nsec_p_raw, nsec_p->raw, nsec_p_len) == 0;
 	if (!same_chain) {
 		return "range search miss (!same_chain)";
 	}
 	/* We know it starts before sname, so let's check the other end.
 	 * A. find the next hash and check its length. */
-	const uint8_t *next_rdata = eh->data + KR_CACHE_RR_COUNT_SIZE
-				  + 2 /* RDLENGTH from rfc1034 */;
 	if (KR_CACHE_RR_COUNT_SIZE != 2 || get_uint16(eh->data) == 0) {
 		assert(false);
 		return "ERROR";
 		/* TODO: more checks?  Also, `next` computation is kinda messy. */
 	}
-	const uint8_t *hash_next = next_rdata + nsec_p_rdlen(next_rdata)
+	const uint8_t *hash_next = nsec_p_raw + nsec_p_len
 				 + sizeof(uint8_t) /* hash length from rfc5155 */;
 	if (hash_next[-1] != NSEC3_HASH_LEN) {
 		return "unexpected next hash length";
@@ -307,7 +311,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		bool exact_match;
 		uint32_t new_ttl;
 		const uint8_t *hash_low;
-		const char *err = find_leq_NSEC3(cache, qry, key, k, &val,
+		const char *err = find_leq_NSEC3(cache, qry, key, k, &ans->nsec_p, &val,
 						 &exact_match, &hash_low, &new_ttl);
 		if (err) {
 			WITH_VERBOSE(qry) {
@@ -442,7 +446,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	bool exact_match;
 	uint32_t new_ttl;
 	const uint8_t *hash_low;
-	const char *err = find_leq_NSEC3(cache, qry, key, k, &val,
+	const char *err = find_leq_NSEC3(cache, qry, key, k, &ans->nsec_p, &val,
 					 &exact_match, &hash_low, &new_ttl);
 	if (err) {
 		VERBOSE_MSG(qry, "=> NSEC3 wildcard: %s\n", err);
