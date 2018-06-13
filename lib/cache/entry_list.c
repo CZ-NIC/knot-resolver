@@ -50,8 +50,8 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
 
 int entry_list_parse(const knot_db_val_t val, entry_list_t list)
 {
-	if (!list) {
-		//FIXME allow empty val?
+	const bool ok = val.data && val.len && list;
+	if (!ok) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
