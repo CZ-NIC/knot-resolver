@@ -143,9 +143,10 @@ static int tst_key_update(tst_ctx_t *ctx, time_t epoch, bool force_update)
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
+	/* documented limitation: time_t and endianess must match
+	 * on instances sharing a secret */
 	if (!force_update && memcmp(ctx->hash_data, &epoch, sizeof(epoch)) == 0) {
 		return kr_ok(); /* we are up to date */
-		/* TODO: support mixing endians? */
 	}
 	memcpy(ctx->hash_data, &epoch, sizeof(epoch));
 

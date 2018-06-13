@@ -505,13 +505,16 @@ TLS server configuration
 
    If you provide the same secret to multiple instances, they will be able to resume
    each other's sessions *without* any further communication between them.
-   For good security, the secret must have enough entropy to be hard to guess,
-   and it should still be occasionally rotated manually (and securely forgotten),
+   This synchronization works only among instances having the same endianess
+   and time_t structure and size (`sizeof(time_t)`).
+
+   **For good security** the secret must have enough entropy to be hard to guess,
+   and it should still be occasionally rotated manually and securely forgotten,
    to reduce the scope of privacy leak in case the
    `secret leaks eventually <https://en.wikipedia.org/wiki/Forward_secrecy>`_.
 
-   .. warning:: setting the secret is probably too risky with TLS <= 1.2.
-      At this moment no gnutls stable release even supports TLS 1.3.
+   .. warning:: **Setting the secret is probably too risky with TLS <= 1.2**.
+      At this moment no GnuTLS stable release even supports TLS 1.3.
       Therefore setting the secrets should be considered experimental for now.
 
 .. function:: net.tls_sticket_secret_file([string with path to a file containing pre-shared secret])
