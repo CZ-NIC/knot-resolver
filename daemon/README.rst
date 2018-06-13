@@ -515,7 +515,8 @@ TLS server configuration
 
    .. warning:: **Setting the secret is probably too risky with TLS <= 1.2**.
       At this moment no GnuTLS stable release even supports TLS 1.3.
-      Therefore setting the secrets should be considered experimental for now.
+      Therefore setting the secrets should be considered experimental for now
+      and might not be available on your system.
 
 .. function:: net.tls_sticket_secret_file([string with path to a file containing pre-shared secret])
 

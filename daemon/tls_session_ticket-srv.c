@@ -37,10 +37,12 @@
 #define SESSION_KEY_SIZE 64
 
 /** Compile-time support for setting the secret. */
+/* This is not secure with TLS <= 1.2 but TLS 1.3 and secure configuration
+ * is not available in GnuTLS yet. See https://gitlab.com/gnutls/gnutls/issues/477
 #ifndef TLS_SESSION_RESUMPTION_SYNC
-	/* Probably not much sense having it with gnutls < 3.6. */
-	#define TLS_SESSION_RESUMPTION_SYNC (GNUTLS_VERSION_NUMBER >= 0x030600)
+	#define TLS_SESSION_RESUMPTION_SYNC (GNUTLS_VERSION_NUMBER >= 0x030603)
 #endif
+*/
 
 #if GNUTLS_VERSION_NUMBER < 0x030400
 	/* It's of little use anyway.  We may get the secret through lua,
@@ -48,7 +50,7 @@
 	#define gnutls_memset memset
 #endif
 
-#if GNUTLS_VERSION_NUMBER >= 0x030407
+#ifdef GNUTLS_DIG_SHA3_512
 	#define TST_HASH GNUTLS_DIG_SHA3_512
 #else
 	#define TST_HASH abort()
@@ -99,7 +101,7 @@ static tst_ctx_t * tst_key_create(const char *secret, size_t secret_len, uv_loop
 	}
 	#if !TLS_SESSION_RESUMPTION_SYNC
 		if (secret_len) {
-			kr_log_error("[tls] session ticket: secrets not enabled (compile-time)\n");
+			kr_log_error("[tls] session ticket: secrets were not enabled at compile-time (your GnuTLS version is not supported)\n");
 			return NULL; /* ENOTSUP */
 		}
 	#endif
