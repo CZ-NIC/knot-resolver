@@ -210,15 +210,16 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	}
 
 	/* Finishing touches. TODO: perhaps factor out */
-	qry->flags.EXPIRING = is_expiring(eh->ttl, new_ttl);
-	qry->flags.CACHED = true;
-	qry->flags.NO_MINIMIZE = true;
-	qry->flags.DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
-	qry->flags.DNSSEC_BOGUS = kr_rank_test(eh->rank, KR_RANK_BOGUS);
-	if (qry->flags.DNSSEC_INSECURE || qry->flags.DNSSEC_BOGUS) {
-		qry->flags.DNSSEC_WANT = false;
+	struct kr_qflags * const qf = &qry->flags;
+	qf->EXPIRING = is_expiring(eh->ttl, new_ttl);
+	qf->CACHED = true;
+	qf->NO_MINIMIZE = true;
+	qf->DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
+	qf->DNSSEC_BOGUS = kr_rank_test(eh->rank, KR_RANK_BOGUS);
+	if (qf->DNSSEC_INSECURE || qf->DNSSEC_BOGUS) {
+		qf->DNSSEC_WANT = false;
 	}
-	qry->flags.DNSSEC_OPTOUT = eh->has_optout;
+	qf->DNSSEC_OPTOUT = eh->has_optout;
 	VERBOSE_MSG(qry, "=> satisfied by exact packet: rank 0%.2o, new TTL %d\n",
 			eh->rank, new_ttl);
 	return kr_ok();

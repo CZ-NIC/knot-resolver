@@ -285,10 +285,12 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 				? "+" : "-");
 	}
 	kr_log_verbose("\n");
+
 	/* Finishing touches. */
-	qry->flags.EXPIRING = expiring;
-	qry->flags.CACHED = true;
-	qry->flags.NO_MINIMIZE = true;
+	struct kr_qflags * const qf = &qry->flags;
+	qf->EXPIRING = expiring;
+	qf->CACHED = true;
+	qf->NO_MINIMIZE = true;
 
 	return KR_STATE_DONE;
 }
@@ -409,13 +411,15 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	/* Put links to the materialized data into the pkt. */
 	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER], eh->rank);
 	CHECK_RET(ret);
+
 	/* Finishing touches. */
-	qry->flags.EXPIRING = is_expiring(eh->ttl, new_ttl);
-	qry->flags.CACHED = true;
-	qry->flags.NO_MINIMIZE = true;
-	qry->flags.DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
-	if (qry->flags.DNSSEC_INSECURE) {
-		qry->flags.DNSSEC_WANT = false;
+	struct kr_qflags * const qf = &qry->flags;
+	qf->EXPIRING = is_expiring(eh->ttl, new_ttl);
+	qf->CACHED = true;
+	qf->NO_MINIMIZE = true;
+	qf->DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
+	if (qf->DNSSEC_INSECURE) {
+		qf->DNSSEC_WANT = false;
 	}
 	VERBOSE_MSG(qry, "=> satisfied by exact %s: rank 0%.2o, new TTL %d\n",
 			(type == KNOT_RRTYPE_CNAME ? "CNAME" : "RRset"),
