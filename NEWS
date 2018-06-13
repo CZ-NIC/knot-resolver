@@ -2,6 +2,10 @@ Security
 --------
 - fix a rare case of zones incorrectly dowgraded to insecure status
 
+New features
+------------
+- TLS session resumption (RFC 5077), both server and client (!585, #105)
+
 Bugfixes
 --------
 - avoid turning off qname minimization in some cases, e.g. co.uk. (#339)
