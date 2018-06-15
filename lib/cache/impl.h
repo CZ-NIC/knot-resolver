@@ -157,7 +157,12 @@ static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 
 enum { ENTRY_APEX_NSECS_CNT = 2 };
 
-/** Header of 'E' entry with ktype == NS.  Inside is private to ./entry_list.c */
+/** Header of 'E' entry with ktype == NS.  Inside is private to ./entry_list.c
+ *
+ * We store xNAME at NS type to lower the number of searches in closest_NS().
+ * CNAME is only considered for equal name, of course.
+ * We also store NSEC* parameters at NS type.
+ */
 struct entry_apex {
 	/* ENTRY_H_FLAGS */
 	bool has_ns : 1;

@@ -524,12 +524,9 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 }
 
 /** Find the longest prefix zone/xNAME (with OK time+rank), starting at k->*.
- * We store xNAME at NS type to lower the number of searches.
- * CNAME is only considered for equal name, of course.
- * We also store NSEC* parameters at NS type; probably the latest two will be kept.
- * Found type is returned via k->type.
  *
- * \return raw entry from cache (for NS) or rewound entry (xNAME) FIXME
+ * Found type is returned via k->type; the values are returned in el.
+ * \return error code
  */
 static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
 {

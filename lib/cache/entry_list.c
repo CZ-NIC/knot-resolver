@@ -239,6 +239,7 @@ int entry_h_splice(
 			eh_orig = entry_h_consistent(val, type);
 		}
 	} else {
+		/* We want to fully overwrite the entry, so don't even read it. */
 		memset(el, 0, sizeof(el));
 	}
 

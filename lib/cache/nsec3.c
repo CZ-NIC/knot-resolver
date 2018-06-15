@@ -274,7 +274,6 @@ static void nsec3_hash2text(const knot_dname_t *owner, char *text)
 int nsec3_encloser(struct key *k, struct answer *ans,
 		   const int sname_labels, int *clencl_labels,
 		   const struct kr_query *qry, struct kr_cache *cache)
-	/* TODO: cleanup params */
 {
 	static const int ESKIP = ABS(ENOENT);
 	/* Basic sanity check. */
@@ -431,7 +430,6 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 
 int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    const struct kr_query *qry, struct kr_cache *cache)
-	/* TODO: cleanup params */
 {
 	/* Find a previous-or-equal NSEC3 in cache covering or matching
 	 * the source of synthesis, checking TTL etc. */

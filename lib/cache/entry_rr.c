@@ -109,9 +109,9 @@ int entry2answer(struct answer *ans, int id,
 {
 	/* We assume it's zeroed.  Do basic sanity check. */
 	if (ans->rrsets[id].set.rr || ans->rrsets[id].sig_rds.data
-	  /*  || (type == KNOT_RRTYPE_NSEC && ans->nsec_v != 1)
-	    || (type == KNOT_RRTYPE_NSEC3 && ans->nsec_v != 3)
-	   */ )
+	    || (type == KNOT_RRTYPE_NSEC  &&  ans->nsec_p.raw)
+	    || (type == KNOT_RRTYPE_NSEC3 && !ans->nsec_p.raw)
+	   )
 	{
 		assert(false);
 		return kr_error(EINVAL);
@@ -129,21 +129,20 @@ int entry2answer(struct answer *ans, int id,
 	ans->rrsets[id].set.rank = eh->rank;
 	ans->rrsets[id].set.expiring = is_expiring(eh->ttl, new_ttl);
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet. */
-	bool want_rrsigs = true; // TODO
+	bool want_rrsigs = true; /* LATER(optim.): might be omitted in some cases. */
 	if (want_rrsigs) {
 		ret = rdataset_materialize(&ans->rrsets[id].sig_rds, eh->data + data_off,
 					   eh_bound, new_ttl, ans->mm);
 		if (ret < 0) goto fail;
-
-		// TODO
-		#if 0
-		/* sanity check: we consumed exactly all data */
-		int unused_bytes = eh_bound - (void *)eh->data - data_off - ret;
-		if (ktype != KNOT_RRTYPE_NS && unused_bytes) {
-			/* ^^ it doesn't have to hold in multi-RRset entries; LATER: more checks? */
-			VERBOSE_MSG(qry, "BAD?  Unused bytes: %d\n", unused_bytes);
+		/* Sanity check: we consumed exactly all data. */
+		int unused_bytes = eh_bound - (uint8_t *)eh->data - data_off - ret;
+		if (unused_bytes) {
+			kr_log_error("[cach] entry2answer ERROR: unused bytes: %d\n",
+					unused_bytes);
+			assert(!EILSEQ);
+			ret = kr_error(EILSEQ);
+			goto fail; /* to be on the safe side */
 		}
-		#endif
 	}
 	return kr_ok();
 fail:
