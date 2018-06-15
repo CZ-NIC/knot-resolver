@@ -1,6 +1,5 @@
 -- Load dependent modules
 if not view then modules.load('view') end
-if not policy then modules.load('policy') end
 
 -- Module declaration
 local M = {
@@ -17,6 +16,7 @@ M.phases = {
 	rewrite = 'finish',
 	features = 'checkout',
 	nsset = 'checkout',
+	deny = {'begin', 'produce'},
 }
 
 -- Actions
