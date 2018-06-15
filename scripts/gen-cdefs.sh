@@ -53,6 +53,8 @@ grep -v '^#\|^$' | while read -r ident; do
 				;;
 		esac
 	fi
+	# LuaJIT FFI blows up on "uint" type
+	output="$(echo "$output" | sed 's/\buint\b/unsigned int/g')"
 
 	# abort on empty output
 	if [ -z "$(echo "$output" | tr -d "\n;")" ]; then
