@@ -107,7 +107,6 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (!ret) {
-		VERBOSE_MSG(qry, "=> read OK\n");
 		/* found an entry: test conditions, materialize into pkt, etc. */
 		ret = found_exact_hit(ctx, pkt, val, lowest_rank);
 	}
@@ -438,7 +437,6 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 
 	int ret = entry_h_seek(&val, qry->stype);
 	if (ret) return ret;
-	VERBOSE_MSG(qry, "=> FEH seek OK \n");
 	const struct entry_h *eh = entry_h_consistent(val, qry->stype);
 	if (!eh) {
 		assert(false);
@@ -446,7 +444,6 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		// LATER: recovery in case of error, perhaps via removing the entry?
 		// LATER(optim): pehaps optimize the zone cut search
 	}
-	VERBOSE_MSG(qry, "=> FEH consistent OK \n");
 
 	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype,
 					qry->timestamp.tv_sec);

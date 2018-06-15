@@ -550,9 +550,9 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 				|| rr->type == KNOT_RRTYPE_NS) {
 		auto_free char *type_str = kr_rrtype_text(rr->type),
 			*encl_str = kr_dname_text(encloser);
-		VERBOSE_MSG(qry, "=> stashed rank: 0%.2o, %s %s%s "
-			"(%d B total, incl. %d RRSIGs)\n",
-			rank, type_str, (wild_labels ? "*." : ""), encl_str,
+		VERBOSE_MSG(qry, "=> stashed %s%s %s, rank 0%.2o, "
+			"%d B total, incl. %d RRSIGs\n",
+			(wild_labels ? "*." : ""), encl_str, type_str, rank,
 			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.rr_count : 0)
 			);
 	} }
@@ -569,6 +569,9 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 		return kr_ok();
 	}
 	const knot_rrset_t *rr = entry->rr;
+	if (rr->type == KNOT_RRTYPE_RRSIG) {
+		return kr_ok(); /* reduce verbose logging from the following call */
+	}
 	int ret = stash_rrset_precond(rr, qry);
 	if (ret <= 0) {
 		return ret;
