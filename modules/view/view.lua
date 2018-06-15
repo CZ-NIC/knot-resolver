@@ -92,7 +92,7 @@ view.layer = {
 			local query = req:current()
 			local action = match_cb(req, query)
 			if action then
-				local next_state = action(state, req, query)
+				local next_state = action(state, req, query, req.answer)
 				if next_state then    -- Not a chain rule,
 					return next_state -- stop on first match
 				end

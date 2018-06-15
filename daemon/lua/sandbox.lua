@@ -317,7 +317,7 @@ end
 -- Load embedded modules
 trust_anchors = require('trust_anchors')
 modules.load('ta_signal_query')
-modules.load('policy')
+modules.load('policy < cache')
 modules.load('priming')
 modules.load('detect_time_skew')
 modules.load('detect_time_jump')
