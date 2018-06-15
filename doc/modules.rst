@@ -15,6 +15,7 @@ Knot DNS Resolver modules
 .. include:: ../modules/predict/README.rst
 .. include:: ../modules/http/README.rst
 .. include:: ../modules/daf/README.rst
+.. include:: ../modules/rebinding/README.rst
 .. include:: ../modules/graphite/README.rst
 .. .. include:: ../modules/memcached/README.rst
 .. .. include:: ../modules/redis/README.rst
