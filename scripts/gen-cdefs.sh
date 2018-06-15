@@ -1,4 +1,5 @@
-#!/bin/sh -e
+#!/bin/bash
+set -o pipefail -o errexit
 
 if [ "$2" != types ] && [ "$2" != functions ]; then
 	echo "Usage: $0 libkres (types|functions)" >&2

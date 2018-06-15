@@ -1,4 +1,5 @@
-#!/bin/sh -e
+#!/bin/bash
+set -o pipefail -o errexit
 
 ### Dev's guide
 #

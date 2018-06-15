@@ -1,3 +1,5 @@
+SHELL=/bin/bash -o pipefail -o errexit
+
 include config.mk
 include platform.mk
 
