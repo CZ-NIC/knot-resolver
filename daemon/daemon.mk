@@ -7,6 +7,7 @@ kresd_SOURCES := \
 	daemon/ffimodule.c   \
 	daemon/tls.c         \
 	daemon/tls_ephemeral_credentials.c \
+	daemon/tls_session_ticket-srv.c \
 	daemon/zimport.c     \
 	daemon/main.c
 

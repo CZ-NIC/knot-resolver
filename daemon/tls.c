@@ -19,21 +19,21 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <gnutls/gnutls.h>
-#include <gnutls/x509.h>
 #include <gnutls/abstract.h>
 #include <gnutls/crypto.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <assert.h>
 #include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 #include <uv.h>
 
-#include <contrib/ucw/lib.h>
+#include <assert.h>
+#include <errno.h>
+#include <stdlib.h>
+
+#include "contrib/ucw/lib.h"
 #include "contrib/base64.h"
-#include "daemon/worker.h"
-#include "daemon/tls.h"
 #include "daemon/io.h"
+#include "daemon/tls.h"
+#include "daemon/worker.h"
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
 #define GNUTLS_PIN_MIN_VERSION  0x030400
@@ -160,6 +160,12 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 	gnutls_transport_set_pull_function(tls->c.tls_session, kres_gnutls_pull);
 	gnutls_transport_set_push_function(tls->c.tls_session, worker_gnutls_push);
 	gnutls_transport_set_ptr(tls->c.tls_session, tls);
+
+	if (net->tls_session_ticket_ctx) {
+		tls_session_ticket_enable(net->tls_session_ticket_ctx,
+					  tls->c.tls_session);
+	}
+
 	return tls;
 }
 
@@ -578,6 +584,10 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 		gnutls_certificate_free_credentials(entry->credentials);
 	}
 
+	if (entry->session_data.data) {
+		gnutls_free(entry->session_data.data);
+	}
+
 	free(entry);
 
 	return 0;
@@ -927,6 +937,12 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
 	ctx->session = session;
 
+	struct tls_client_paramlist_entry *tls_params = client_ctx->params;
+	if (tls_params->session_data.data != NULL) {
+		gnutls_session_set_data(ctx->tls_session, tls_params->session_data.data,
+					tls_params->session_data.size);
+	}
+
 	int ret = gnutls_handshake(ctx->tls_session);
 	if (ret == GNUTLS_E_SUCCESS) {
 		return kr_ok();
@@ -952,7 +968,7 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state)
 }
 
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      const struct tls_client_paramlist_entry *entry,
+			      struct tls_client_paramlist_entry *entry,
 			      struct session *session)
 {
 	if (!ctx) {
