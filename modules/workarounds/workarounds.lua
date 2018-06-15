@@ -1,6 +1,3 @@
--- Load dependent module
-if not policy then modules.load('policy') end
-
 local M = {} -- the module
 
 function M.config()
