@@ -80,7 +80,7 @@ static inline struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
 
 static inline int nsec_p_rdlen(const uint8_t *rdata)
 {
-	//TODO: the zero case?
+	//TODO: do we really need the zero case?
 	return rdata ? 5 + rdata[4] : 0; /* rfc5155 4.2 and 3.2. */
 }
 static const int NSEC_P_MAXLEN = sizeof(uint32_t) + 5 + 255; // TODO: remove??
@@ -178,7 +178,8 @@ enum EL {
 	EL_DNAME,
 	EL_LENGTH
 };
-/** Note: arrays are passed "by reference" to functions (in C99). */
+/** Decompressed entry_apex.  It's an array of unparsed entry_h references.
+ * Note: arrays are passed "by reference" to functions (in C99). */
 typedef knot_db_val_t entry_list_t[EL_LENGTH];
 
 static inline uint16_t EL2RRTYPE(enum EL i)

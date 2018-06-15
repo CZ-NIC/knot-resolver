@@ -162,6 +162,8 @@ int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const kno
 		return kr_ok();
 	}
 	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL, NULL);
+		/* Zone's NSEC* parames aren't updated, but that's probably OK
+		 * for kr_cache_insert_rr() */
 	if (written >= 0) {
 		return kr_ok();
 	}
@@ -421,8 +423,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
 		uint8_t rank, trie_t *nsec_pmap, bool *has_optout)
 {
-	//FIXME review entry_h
-	assert(stash_rrset_precond(rr, qry) > 0 && nsec_pmap);
+	assert(stash_rrset_precond(rr, qry) > 0);
 	if (!cache) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
@@ -437,9 +438,10 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	for (int i = 0; i < wild_labels; ++i) {
 		encloser = knot_wire_next_label(encloser, NULL);
 	}
-
 	int ret = 0;
-	/* Construct the key under which RRs will be stored. */
+
+	/* Construct the key under which RRs will be stored,
+	 * and add corresponding nsec_pmap item (if necessary). */
 	struct key k_storage, *k = &k_storage;
 	knot_db_val_t key;
 	switch (rr->type) {
@@ -464,8 +466,9 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const int signer_size = knot_dname_size(signer);
 		k->zlf_len = signer_size - 1;
 
-		void **npp = trie_get_ins(nsec_pmap, (const char *)signer, signer_size);
-		assert(npp && ENOMEM);
+		void **npp = nsec_pmap == NULL ? NULL
+			: trie_get_ins(nsec_pmap, (const char *)signer, signer_size);
+		assert(!nsec_pmap || (npp && ENOMEM));
 		if (rr->type == KNOT_RRTYPE_NSEC) {
 			key = key_NSEC1(k, encloser, wild_labels);
 			break;
@@ -542,27 +545,9 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	/* Update metrics */
 	cache->stats.insert += 1;
 
-	{
-	#ifndef NDEBUG
-		struct answer ans;
-		memset(&ans, 0, sizeof(ans));
-		ans.mm = &qry->request->pool;
-		ret = entry2answer(&ans, AR_ANSWER, eh, knot_db_val_bound(val_new_entry),
-				   rr->owner, rr->type, 0);
-		/*
-		VERBOSE_MSG(qry, "=> sanity: written %d and read %d\n",
-				(int)val_new_entry.len, ret);
-		assert(ret == val_new_entry.len);
-		*/
-	#endif
-	}
-
-	WITH_VERBOSE(qry) {
-		/* Reduce verbosity. */
-		if (!kr_rank_test(rank, KR_RANK_AUTH)
-		    && rr->type != KNOT_RRTYPE_NS) {
-			return (ssize_t) val_new_entry.len;
-		}
+	/* Verbose-log some not-too-common cases. */
+	WITH_VERBOSE(qry) { if (kr_rank_test(rank, KR_RANK_AUTH)
+				|| rr->type == KNOT_RRTYPE_NS) {
 		auto_free char *type_str = kr_rrtype_text(rr->type),
 			*encl_str = kr_dname_text(encloser);
 		VERBOSE_MSG(qry, "=> stashed rank: 0%.2o, %s %s%s "
@@ -570,7 +555,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			rank, type_str, (wild_labels ? "*." : ""), encl_str,
 			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.rr_count : 0)
 			);
-	}
+	} }
 
 	return (ssize_t) val_new_entry.len;
 }
@@ -680,7 +665,8 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 			log_refresh_by = ttl_extended_by;
 			break;
 		}
-		/* Shift the other indices: move the first `i` blocks by one position. */
+		/* Shift the other indices: move the first `i_replace` blocks
+		 * by one position. */
 		if (i_replace) {
 			memmove(&el[1], &el[0], sizeof(el[0]) * i_replace);
 		}
