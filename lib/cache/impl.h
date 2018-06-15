@@ -80,7 +80,7 @@ static inline struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
 
 static inline int nsec_p_rdlen(const uint8_t *rdata)
 {
-	//TODO: the zero case? // FIXME security: overflow potential
+	//TODO: the zero case?
 	return rdata ? 5 + rdata[4] : 0; /* rfc5155 4.2 and 3.2. */
 }
 static const int NSEC_P_MAXLEN = sizeof(uint32_t) + 5 + 255; // TODO: remove??

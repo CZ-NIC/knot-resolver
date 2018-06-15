@@ -473,7 +473,10 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 
 		assert(rr->type == KNOT_RRTYPE_NSEC3);
 		const knot_rdata_t *np_data = knot_rdata_data(rr->rrs.data);
+		const int rdlen = knot_rdata_rdlen(rr->rrs.data);
+		if (rdlen <= 4) return kr_error(EILSEQ); /*< data from outside; less trust */
 		const int np_dlen = nsec_p_rdlen(np_data);
+		if (np_dlen > rdlen) return kr_error(EILSEQ);
 		key = key_NSEC3(k, encloser, nsec_p_mkHash(np_data));
 		if (npp && !*npp) {
 			*npp = mm_alloc(&qry->request->pool, np_dlen);
@@ -606,6 +609,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
 					entry->rank, nsec_pmap, has_optout);
 	if (written < 0) {
+		kr_log_error("[%5hu][cach] stash failed, ret = %d\n", qry->id, ret);
 		return (int) written;
 	}
 
