@@ -246,7 +246,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	assert((ssize_t)(kwz_hi.len) >= 0);
 	/* 2. do the actual range check. */
 	const knot_db_val_t kwz_sname = {
-		.data = (void *)(k->buf + 1 + nwz_off),
+		.data = (void *)/*const-cast*/(k->buf + 1 + nwz_off),
 		.len = k->buf[0] - k->zlf_len,
 	};
 	assert((ssize_t)(kwz_sname.len) >= 0);
@@ -431,10 +431,10 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 			return kr_ok();
 		}
 		/* Materialize the record into answer (speculatively). */
-		const struct entry_h *nsec_eh = val.data;
 		knot_dname_t owner[KNOT_DNAME_MAXLEN];
 		int ret = dname_wire_reconstruct(owner, k, wild_low_kwz);
 		if (ret) return kr_error(ret);
+		const struct entry_h *nsec_eh = val.data;
 		ret = entry2answer(ans, AR_WILD, nsec_eh, knot_db_val_bound(val),
 				   owner, KNOT_RRTYPE_NSEC, new_ttl);
 		if (ret) return kr_error(ret);
