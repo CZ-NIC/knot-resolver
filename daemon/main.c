@@ -416,7 +416,9 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 
 	/* Notify supervisor. */
 #ifdef HAS_SYSTEMD
-	sd_notify(0, "READY=1");
+	if (leader) {
+		sd_notify(0, "READY=1");
+	}
 #endif
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
@@ -610,14 +612,13 @@ int main(int argc, char **argv)
 		int fd = SD_LISTEN_FDS_START + i;
 		/* when run under systemd supervision, do not use interactive mode */
 		args.interactive = false;
-		if (args.forks != 1) {
-			kr_log_error("[system] when run under systemd-style supervision, "
-				     "use single-process only (bad: --forks=%d).\n", args.forks);
-			free_sd_socket_names(socket_names, sd_nsocks);
-			return EXIT_FAILURE;
-		}
+
 		if (!strcasecmp("control",socket_names[i])) {
-			args.control_fd = fd;
+			/* only use activated control socket on single
+			 * process mode for now. */
+			if (args.forks == 1) {
+				args.control_fd = fd;
+			}
 		} else if (!strcasecmp("tls",socket_names[i])) {
 			array_push(args.tls_fd_set, fd);
 		} else {
