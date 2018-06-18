@@ -380,13 +380,15 @@ static int wildcard_match_check(const knot_pkt_t *pkt, const knot_pktsection_t *
 		if (!knot_dname_is_wildcard(rrset->owner)) {
 			continue;
 		}
-		int wcard_labels = knot_dname_labels(rrset->owner, NULL);
-		int common_labels = knot_dname_matched_labels(rrset->owner, sname);
-		int rrsig_labels = coverign_rrsig_labels(rrset, sec);
-		if (wcard_labels < 1 ||
-		    common_labels != wcard_labels - 1 ||
-		    common_labels != rrsig_labels) {
-			continue;
+		if (!knot_dname_is_equal(rrset->owner, sname)) {
+			int wcard_labels = knot_dname_labels(rrset->owner, NULL);
+			int common_labels = knot_dname_matched_labels(rrset->owner, sname);
+			int rrsig_labels = coverign_rrsig_labels(rrset, sec);
+			if (wcard_labels < 1 ||
+			    common_labels != wcard_labels - 1 ||
+			    common_labels != rrsig_labels) {
+				continue;
+			}
 		}
 		int ret = no_data_response_check_rrtype(&flags, rrset, stype);
 		if (ret != 0) {
