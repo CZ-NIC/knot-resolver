@@ -707,7 +707,7 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 * to prove transition to INSECURE. */
 			const uint16_t qtype = knot_pkt_qtype(pkt);
 			const knot_dname_t *qname = knot_pkt_qname(pkt);
-			if (qtype == KNOT_RRTYPE_NS &&
+			if (qtype != KNOT_RRTYPE_DS &&
 			    knot_dname_is_sub(qname, qry->zone_cut.name)) {
 				/* Server is authoritative
 				 * for both parent and child,
