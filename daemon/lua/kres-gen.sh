@@ -172,6 +172,7 @@ EOF
 	lru_free_items_impl
 	lru_create_impl
 	lru_get_impl
+	mm_realloc
 # Trust anchors
 	kr_ta_get
 	kr_ta_add
