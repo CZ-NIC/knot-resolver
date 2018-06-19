@@ -635,7 +635,7 @@ function policy.add(rule, phase)
 	-- End of compatibility shim
 	local desc = {id=getruleid(), cb=rule, count=0}
 	if type(phase) ~= 'table' then
-		phase = {phase}
+		phase = {phase or 'begin'}
 	end
 	-- Allow multiple phases for the same rule
 	for _, p in ipairs(phase) do
