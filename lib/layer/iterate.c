@@ -938,6 +938,36 @@ static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_que
 #endif
 }
 
+static int resolve_notimpl(knot_pkt_t *pkt, struct kr_request *req, struct kr_query *qry)
+{
+	if (qry->stype == KNOT_RRTYPE_RRSIG && qry->parent != NULL) {
+		/* RRSIG subquery have got NOTIMPL.
+		 * Possible scenario - same NS is autoritative for child and parent,
+		 * but child isn't signed.
+		 * We got delegation to parent,
+		 * then NS responded as NS for child zone.
+		 * Answer contained record been requested, but no RRSIGs,
+		 * Validator issued RRSIG query then. If qname is zone name,
+		 * we can get NOTIMPL. Ask for DS to find out security status.
+		 * TODO - maybe it would be better to do this in validator, when
+		 * RRSIG revalidation occurs.
+		 */
+		struct kr_rplan *rplan = &req->rplan;
+		struct kr_query *next = kr_rplan_push(rplan, qry->parent, qry->sname,
+						qry->sclass, KNOT_RRTYPE_DS);
+		if (!next) {
+			return KR_STATE_FAIL;
+		}
+		kr_zonecut_set(&next->zone_cut, qry->parent->zone_cut.name);
+		kr_zonecut_copy(&next->zone_cut, &qry->parent->zone_cut);
+		kr_zonecut_copy_trust(&next->zone_cut, &qry->parent->zone_cut);
+		next->flags.DNSSEC_WANT = true;
+		qry->flags.RESOLVED = true;
+		return KR_STATE_DONE;
+	}
+	return resolve_badmsg(pkt, req, qry);
+}
+
 /** Resolve input query or continue resolution with followups.
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
@@ -1021,9 +1051,11 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 	case KNOT_RCODE_FORMERR:
-	case KNOT_RCODE_NOTIMPL:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_badmsg(pkt, req, query);
+	case KNOT_RCODE_NOTIMPL:
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		return resolve_notimpl(pkt, req, query);
 	default:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_error(pkt, req);
