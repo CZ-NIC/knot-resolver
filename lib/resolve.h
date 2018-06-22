@@ -211,6 +211,16 @@ struct kr_request {
 	rr_array_t additional;
 	bool answ_validated; /**< internal to validator; beware of caching, etc. */
 	bool auth_validated; /**< see answ_validated ^^ ; TODO */
+
+	/** Overall rank for the request.
+	 *
+	 * Values from kr_rank, currently just KR_RANK_SECURE and _INITIAL.
+	 * Only read this in finish phase and after validator, please.
+	 * Meaning of _SECURE: all RRs in answer+authority are _SECURE,
+	 *   including any negative results implied (NXDOMAIN, NODATA).
+	 */
+	uint8_t rank;
+
 	struct kr_rplan rplan;
 	int has_tls;
 	trace_log_f trace_log; /**< Logging tracepoint */

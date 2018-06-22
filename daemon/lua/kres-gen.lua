@@ -174,6 +174,7 @@ struct kr_request {
 	rr_array_t additional;
 	_Bool answ_validated;
 	_Bool auth_validated;
+	uint8_t rank;
 	struct kr_rplan rplan;
 	int has_tls;
 	trace_log_f trace_log;
