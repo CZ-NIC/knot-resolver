@@ -27,7 +27,6 @@
 #include <libknot/rrset.h>
 #include <libknot/rrtype/rrsig.h>
 #include <lua.h>
-#include "lib/generic/map.h"
 #include "lib/generic/array.h"
 #include "lib/defines.h"
 

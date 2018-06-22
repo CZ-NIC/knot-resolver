@@ -6,6 +6,8 @@ libkres_SOURCES := \
 	lib/cache/entry_rr.c \
 	lib/cache/knot_pkt.c \
 	lib/cache/nsec1.c \
+	lib/cache/nsec3.c \
+	lib/cache/peek.c \
 	lib/dnssec.c \
 	lib/dnssec/nsec.c \
 	lib/dnssec/nsec3.c \

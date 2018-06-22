@@ -22,6 +22,102 @@
 #include "lib/utils.h"
 
 
+static int entry_h_len(knot_db_val_t val);
+
+
+void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
+{
+	assert(ea);
+	memset(ea, 0, offsetof(struct entry_apex, data));
+	ea->has_ns	= list[EL_NS	].len;
+	ea->has_cname	= list[EL_CNAME	].len;
+	ea->has_dname	= list[EL_DNAME	].len;
+	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i) {
+		ea->nsecs[i] =   list[i].len == 0 ? 0 :
+				(list[i].len == 4 ? 1 : 3);
+	}
+	uint8_t *it = ea->data;
+	for (int i = 0; i < EL_LENGTH; ++i) {
+		if (list[i].data) {
+			memcpy(it, list[i].data, list[i].len);
+			/* LATER(optim.): coalesce consecutive writes? */
+		} else {
+			list[i].data = it;
+		}
+		it += list[i].len;
+	}
+}
+
+int entry_list_parse(const knot_db_val_t val, entry_list_t list)
+{
+	const bool ok = val.data && val.len && list;
+	if (!ok) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+	/* Parse the apex itself (nsec parameters). */
+	const struct entry_apex *ea = entry_apex_consistent(val);
+	if (!ea) {
+		return kr_error(EILSEQ);
+	}
+	const uint8_t *it = ea->data,
+		*it_bound = knot_db_val_bound(val);
+	for (int i = 0; i < ENTRY_APEX_NSECS_CNT; ++i) {
+		if (it > it_bound) {
+			return kr_error(EILSEQ);
+		}
+		list[i].data = (void *)it;
+		switch (ea->nsecs[i]) {
+		case 0:
+			list[i].len = 0;
+			break;
+		case 1:
+			list[i].len = sizeof(uint32_t); /* just timestamp */
+			break;
+		case 3: { /* timestamp + NSEC3PARAM wire */
+			if (it + sizeof(uint32_t) + 4 > it_bound) {
+				return kr_error(EILSEQ);
+			}
+			list[i].len = sizeof(uint32_t)
+				+ nsec_p_rdlen(it + sizeof(uint32_t));
+			break;
+			}
+		default:
+			return kr_error(EILSEQ);
+		};
+		it += list[i].len;
+	}
+	/* Parse every entry_h. */
+	for (int i = ENTRY_APEX_NSECS_CNT; i < EL_LENGTH; ++i) {
+		list[i].data = (void *)it;
+		bool has_type;
+		switch (i) {
+		case EL_NS:	has_type = ea->has_ns;		break;
+		case EL_CNAME:	has_type = ea->has_cname;	break;
+		case EL_DNAME:	has_type = ea->has_dname;	break;
+		default: assert(false); return kr_error(EINVAL); /* something very bad */
+		}
+		if (!has_type) {
+			list[i].len = 0;
+			continue;
+		}
+		if (it >= it_bound) {
+			assert(!EILSEQ);
+			return kr_error(EILSEQ);
+		}
+		const int len = entry_h_len(
+			(knot_db_val_t){ .data = (void *)it, .len = it_bound - it });
+		if (len < 0) {
+			assert(false);
+			return kr_error(len);
+		}
+		list[i].len = len;
+		it += len;
+	}
+	assert(it == it_bound);
+	return kr_ok();
+}
+
 /** Given a valid entry header, find its length (i.e. offset of the next entry).
  * \param val The beginning of the data and the bound (read only).
  */
@@ -30,8 +126,8 @@ static int entry_h_len(const knot_db_val_t val)
 	const bool ok = val.data && ((ssize_t)val.len) > 0;
 	if (!ok) return kr_error(EINVAL);
 	const struct entry_h *eh = val.data;
-	const void *d = eh->data; /* iterates over the data in entry */
-	const void *data_bound = val.data + val.len;
+	const uint8_t *d = eh->data; /* iterates over the data in entry */
+	const uint8_t *data_bound = knot_db_val_bound(val);
 	if (d >= data_bound) return kr_error(EILSEQ);
 	if (!eh->is_packet) { /* Positive RRset + its RRsig set (may be empty). */
 		int sets = 2;
@@ -54,65 +150,53 @@ static int entry_h_len(const knot_db_val_t val)
 		d += 2 + len;
 	}
 	if (d > data_bound) return kr_error(EILSEQ);
-	return d - val.data;
+	return d - (uint8_t *)val.data;
+}
+
+struct entry_apex * entry_apex_consistent(knot_db_val_t val)
+{
+	//XXX: check lengths, etc.
+	return val.data;
 }
 
 /* See the header file. */
 int entry_h_seek(knot_db_val_t *val, uint16_t type)
 {
-	uint16_t ktype;
+	int i = -1;
 	switch (type) {
-	case KNOT_RRTYPE_NS:
-	case KNOT_RRTYPE_CNAME:
-	case KNOT_RRTYPE_DNAME:
-		ktype = KNOT_RRTYPE_NS;
-		break;
-	default:
-		ktype = type;
-	}
-	if (ktype != KNOT_RRTYPE_NS) {
-		return kr_ok();
-	}
-	const struct entry_h *eh = entry_h_consistent(*val, ktype);
-	if (!eh) {
-		return kr_error(EILSEQ);
+	case KNOT_RRTYPE_NS:	i = EL_NS;	break;
+	case KNOT_RRTYPE_CNAME:	i = EL_CNAME;	break;
+	case KNOT_RRTYPE_DNAME:	i = EL_DNAME;	break;
+	default:		return kr_ok();
 	}
 
-	bool present;
-	switch (type) {
-	case KNOT_RRTYPE_NS:
-		present = eh->has_ns;
-		break;
-	case KNOT_RRTYPE_CNAME:
-		present = eh->has_cname;
-		break;
-	case KNOT_RRTYPE_DNAME:
-		present = eh->has_dname;
-		break;
-	default:
-		return kr_error(EINVAL);
-	}
-	/* count how many entries to skip */
-	int to_skip = 0;
-	switch (type) {
-	case KNOT_RRTYPE_DNAME:
-		to_skip += eh->has_cname;
-	case KNOT_RRTYPE_CNAME:
-		to_skip += eh->has_ns;
-	case KNOT_RRTYPE_NS:
-		break;
-	}
-	/* advance `val` and `eh` */
-	while (to_skip-- > 0) {
-		int len = entry_h_len(*val);
-		if (len < 0 || len > val->len) {
-			return kr_error(len < 0 ? len : EILSEQ);
-			// LATER: recovery, perhaps via removing the entry?
+	entry_list_t el;
+	int ret = entry_list_parse(*val, el);
+	if (ret) return ret;
+	*val = el[i];
+	return val->len ? kr_ok() : kr_error(ENOENT);
+}
+
+static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key,
+				knot_db_val_t *val, const struct kr_query *qry)
+{
+	int ret = cache_op(cache, write, key, val, 1);
+	if (!ret) return kr_ok();
+	/* Clear cache if overfull.  It's nontrivial to do better with LMDB.
+	 * LATER: some garbage-collection mechanism. */
+	if (ret == kr_error(ENOSPC)) {
+		ret = kr_cache_clear(cache);
+		const char *msg = "[cache] clearing because overfull, ret = %d\n";
+		if (ret) {
+			kr_log_error(msg, ret);
+		} else {
+			kr_log_info(msg, ret);
+			ret = kr_error(ENOSPC);
 		}
-		val->data += len;
-		val->len -= len;
+		return ret;
 	}
-	return present ? kr_ok() : kr_error(ENOENT);
+	VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
+	return kr_error(ret ? ret : ENOSPC);
 }
 
 
@@ -123,38 +207,40 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp)
 {
-	static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
+	//TODO: another review, perhaps incuding the API
 	const bool ok = val_new_entry && val_new_entry->len > 0;
 	if (!ok) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 
-	/* Find the whole entry-set and the particular entry within. */
-	knot_db_val_t val_orig_all = VAL_EMPTY, val_orig_entry = VAL_EMPTY;
+	int i_type;
+	switch (type) {
+	case KNOT_RRTYPE_NS:	i_type = EL_NS;		break;
+	case KNOT_RRTYPE_CNAME:	i_type = EL_CNAME;	break;
+	case KNOT_RRTYPE_DNAME:	i_type = EL_DNAME;	break;
+	default:		i_type = 0;
+	}
+
+	/* Get eh_orig (original entry), and also el list if multi-entry case. */
 	const struct entry_h *eh_orig = NULL;
+	entry_list_t el;
+	int ret = -1;
 	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
-		int ret = cache_op(cache, read, &key, &val_orig_all, 1);
-		if (ret) val_orig_all = VAL_EMPTY;
-		val_orig_entry = val_orig_all;
-		switch (entry_h_seek(&val_orig_entry, type)) {
-		case 0:
-			ret = entry_h_len(val_orig_entry);
-			if (ret >= 0) {
-				val_orig_entry.len = ret;
-				eh_orig = entry_h_consistent(val_orig_entry, ktype);
-				if (eh_orig) {
-					break;
-				}
-			} /* otherwise fall through */
-		default:
-			val_orig_entry = val_orig_all = VAL_EMPTY;
-		case -ENOENT:
-			val_orig_entry.len = 0;
-			break;
-		};
-		assert(val_orig_entry.data + val_orig_entry.len
-			<= val_orig_all.data + val_orig_all.len);
+		knot_db_val_t val;
+		ret = cache_op(cache, read, &key, &val, 1);
+		if (i_type) {
+			if (!ret) ret = entry_list_parse(val, el);
+			if (ret) memset(el, 0, sizeof(el));
+			val = el[i_type];
+		}
+		/* val is on the entry, in either case (or error) */
+		if (!ret) {
+			eh_orig = entry_h_consistent(val, type);
+		}
+	} else {
+		/* We want to fully overwrite the entry, so don't even read it. */
+		memset(el, 0, sizeof(el));
 	}
 
 	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
@@ -177,88 +263,33 @@ int entry_h_splice(
 		}
 	}
 
-	/* LATER: enable really having multiple entries. */
-	val_orig_all = val_orig_entry = VAL_EMPTY;
-
-	/* Obtain new storage from cache.
-	 * Note: this does NOT invalidate val_orig_all.data.
-	 * FIX ME LATER: possibly wrong, as transaction may be switched RO->RW
-	 * (conditioned on allowing multiple entries above) */
-	ssize_t storage_size = val_orig_all.len - val_orig_entry.len
-				+ val_new_entry->len;
-	assert(storage_size > 0);
-	knot_db_val_t val = { .len = storage_size, .data = NULL };
-	int ret = cache_op(cache, write, &key, &val, 1);
-	if (ret || !val.data || !val.len) {
-		/* Clear cache if overfull.  It's nontrivial to do better with LMDB.
-		 * LATER: some garbage-collection mechanism. */
-		if (ret == kr_error(ENOSPC)) {
-			ret = kr_cache_clear(cache);
-			const char *msg = "[cache] clearing because overfull, ret = %d\n";
-			if (ret) {
-				kr_log_error(msg, ret);
-			} else {
-				kr_log_info(msg, ret);
-				ret = kr_error(ENOSPC);
-			}
-			return ret;
-		}
-		assert(ret); /* otherwise "succeeding" but `val` is bad */
-		VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
-		return kr_error(ret ? ret : ENOSPC);
+	if (!i_type) {
+		/* The non-list types are trivial now. */
+		return cache_write_or_clear(cache, &key, val_new_entry, qry);
 	}
-
-	/* Write original data before entry, if any. */
-	const ssize_t len_before = val_orig_entry.data - val_orig_all.data;
-	assert(len_before >= 0);
-	if (len_before) {
-		assert(ktype == KNOT_RRTYPE_NS);
-		memcpy(val.data, val_orig_all.data, len_before);
-	}
-	/* Write original data after entry, if any. */
-	const ssize_t len_after = val_orig_all.len - len_before - val_orig_entry.len;
-	assert(len_after >= 0);
-	assert(len_before + val_orig_entry.len + len_after == val_orig_all.len
-		&& len_before + val_new_entry->len + len_after == storage_size);
-	if (len_after) {
-		assert(ktype == KNOT_RRTYPE_NS);
-		memcpy(val.data + len_before + val_new_entry->len,
-			val_orig_entry.data + val_orig_entry.len, len_after);
-	}
-
-	val_new_entry->data = val.data + len_before;
-	{
-		struct entry_h *eh = val_new_entry->data;
-		memset(eh, 0, offsetof(struct entry_h, data));
-		/* In case (len_before == 0 && ktype == KNOT_RRTYPE_NS) the *eh
-		 * set below would be uninitialized and the caller wouldn't be able
-		 * to do it after return, as that would overwrite what we do below. */
-	}
-	/* The multi-entry type needs adjusting the flags. */
-	if (ktype == KNOT_RRTYPE_NS) {
-		struct entry_h *eh = val.data;
-		if (val_orig_all.len) {
-			const struct entry_h *eh0 = val_orig_all.data;
-			/* ENTRY_H_FLAGS */
-			eh->nsec1_pos = eh0->nsec1_pos;
-			eh->nsec3_cnt = eh0->nsec3_cnt;
-			eh->has_ns    = eh0->has_ns;
-			eh->has_cname = eh0->has_cname;
-			eh->has_dname = eh0->has_dname;
-			eh->has_optout = eh0->has_optout;
-		}
-		/* we just added/replaced some type */
-		switch (type) {
-		case KNOT_RRTYPE_NS:
-			eh->has_ns = true;  break;
-		case KNOT_RRTYPE_CNAME:
-			eh->has_cname = true;  break;
-		case KNOT_RRTYPE_DNAME:
-			eh->has_dname = true;  break;
-		default:
-			assert(false);
-		}
-	}
+	/* Now we're in trouble.  In some cases, parts of data to be written
+	 * is an lmdb entry that may be invalidated by our write request.
+	 * (lmdb does even in-place updates!) Therefore we copy all into a buffer.
+	 * (We don't bother deallocating from the mempool.)
+	 * LATER(optim.): do this only when neccessary, or perhaps another approach.
+	 * This is also complicated by the fact that the val_new_entry part
+	 * is to be written *afterwards* by the caller.
+	 */
+	el[i_type] = (knot_db_val_t){
+		.len = val_new_entry->len,
+		.data = NULL, /* perhaps unclear in the entry_h_splice() API */
+	};
+	knot_db_val_t val = {
+		.len = entry_list_serial_size(el),
+		.data = NULL,
+	};
+	void *buf = mm_alloc(&qry->request->pool, val.len);
+	entry_list_memcpy(buf, el);
+	ret = cache_write_or_clear(cache, &key, &val, qry);
+	if (ret) return kr_error(ret);
+	memcpy(val.data, buf, val.len); /* we also copy the "empty" space, but well... */
+	val_new_entry->data = (uint8_t *)val.data
+			    + ((uint8_t *)el[i_type].data - (uint8_t *)buf);
 	return kr_ok();
 }
 

@@ -22,7 +22,6 @@
 #include <limits.h>
 
 #include "lib/defines.h"
-#include "lib/generic/map.h"
 #include "lib/generic/lru.h"
 
 struct kr_query;
