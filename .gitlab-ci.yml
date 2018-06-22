@@ -89,10 +89,13 @@ lint:clang-scan-build:
 test:linux:amd64:
   stage: test
   script:
-    - make -k check
+    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
+    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
+    - git clean -xdf
+    - make install CFLAGS=-Werror
+    - MAKEFLAGS="--jobs $(nproc)" make -k check
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c COVERAGE_STAGE=gcov-check
-  dependencies:
-    - build:linux:amd64
+  dependencies: []
   artifacts:
     expire_in: 1 hour
     paths:
@@ -105,10 +108,13 @@ test:linux:amd64:
 installcheck:linux:amd64:
   stage: test
   script:
+    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
+    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
+    - git clean -xdf
+    - make install CFLAGS=-Werror
     - MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck
-  dependencies:
-    - build:linux:amd64
+  dependencies: []
   artifacts:
     expire_in: 1 hour
     paths:
