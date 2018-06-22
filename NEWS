@@ -10,6 +10,7 @@ New features
 Bugfixes
 --------
 - avoid turning off qname minimization in some cases, e.g. co.uk. (#339)
+- fix validation of explicit wildcard queries (#274)
 
 
 Knot Resolver 2.3.0 (2018-04-23)

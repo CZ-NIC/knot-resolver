@@ -27,6 +27,13 @@ static void test_pack_std(void **state)
 	pack_init(pack);
 	assert_int_equal(pack.len, 0);
 
+	/* Test that iterator on empty pack works */
+	assert_null(pack_head(pack));
+	assert_null(pack_tail(pack));
+	assert_null(pack_obj_find(&pack, U8(""), 1));
+	assert_int_equal(pack_obj_len(pack_head(pack)), 0);
+	assert_int_equal(pack_obj_del(&pack, U8(""), 1), -1);
+
 	/* Push/delete without reservation. */
 	assert_int_not_equal(pack_obj_push(&pack, U8(""), 1), 0);
 	assert_int_not_equal(pack_obj_del(&pack, U8(""), 1), 0);

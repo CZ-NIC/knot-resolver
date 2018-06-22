@@ -1,17 +1,21 @@
 -- check prerequisites
-local supports_http = pcall(require, 'http') and pcall(require, 'http.request')
-if not supports_http then
+local has_http = pcall(require, 'http') and pcall(require, 'http.request')
+if not has_http then
 	pass('skipping http module test because its not installed')
 	done()
 else
 	local request = require('http.request')
+	local endpoints = require('http').endpoints
+
+	-- custom endpoints
+	endpoints['/test'] = {'text/custom', function () return 'hello' end}
 
 	-- setup resolver
 	modules = {
 		http = {
 			port = 0, -- Select random port
 			cert = false,
-			endpoints = { ['/test'] = {'text/custom', function () return 'hello' end} },
+			endpoints = endpoints,
 		}
 	}
 
