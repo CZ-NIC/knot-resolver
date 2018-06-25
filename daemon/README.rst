@@ -596,6 +596,9 @@ Trust anchors and DNSSEC
       [1] => bad.boy
       [2] => example.com
 
+   .. warning:: If you set NTA on a name that is not a zone cut,
+      it may not always affect names not separated from the NTA by a zone cut.
+
 .. function:: trust_anchors.add(rr_string)
 
    :param string rr_string: DS/DNSKEY records in presentation format (e.g. ``. 3600 IN DS 19036 8 2 49AAC11...``)

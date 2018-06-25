@@ -44,7 +44,7 @@ struct kr_qflags {
 				  * i.e. knot_wire_set_cd(request->answer->wire). */
 	bool DNSSEC_BOGUS : 1;   /**< Query response is DNSSEC bogus. */
 	bool DNSSEC_INSECURE : 1;/**< Query response is DNSSEC insecure. */
-	bool DNSSEC_CD : 1;      /**< CD bit in query */
+	bool DNSSEC_CD : 1;      /**< Instruction to set CD bit in request. */
 	bool STUB : 1;           /**< Stub resolution, accept received answer as solved. */
 	bool ALWAYS_CUT : 1;     /**< Always recover zone cut (even if cached). */
 	bool DNSSEC_WEXPAND : 1; /**< Query response has wildcard expansion. */
