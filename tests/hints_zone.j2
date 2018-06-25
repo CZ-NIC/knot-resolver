@@ -1,0 +1,9 @@
+;       This file holds the information on root name servers needed to
+;       initialize cache of Internet domain name servers
+
+.                        3600000      NS    K.ROOT-SERVERS.NET.
+{% if ':' in ROOT_ADDR %}
+K.ROOT-SERVERS.NET.      3600000      AAAA  {{ROOT_ADDR}}
+{% else %}
+K.ROOT-SERVERS.NET.      3600000      A     {{ROOT_ADDR}}
+{% endif %}
