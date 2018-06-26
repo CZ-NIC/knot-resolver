@@ -793,6 +793,37 @@ static int net_outgoing(lua_State *L, int family)
 static int net_outgoing_v4(lua_State *L) { return net_outgoing(L, AF_INET); }
 static int net_outgoing_v6(lua_State *L) { return net_outgoing(L, AF_INET6); }
 
+static int net_tcp_in_idle(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct network *net = &engine->net;
+
+	/* Only return current idle timeout. */
+	if (lua_gettop(L) == 0) {
+		lua_pushnumber(L, net->tcp.in_idle_timeout);
+		return 1;
+	}
+
+	if ((lua_gettop(L) != 1)) {
+		lua_pushstring(L, "net.tcp_in_idle takes one parameter: (\"idle timeout\")");
+		lua_error(L);
+	}
+
+	if (lua_isnumber(L, 1)) {
+		int idle_timeout = lua_tointeger(L, 1);
+		if (idle_timeout <= 0) {
+			lua_pushstring(L, "net.tcp_in_idle parameter has to be positive number");
+			lua_error(L);
+		}
+		net->tcp.in_idle_timeout = idle_timeout;
+	} else {
+		lua_pushstring(L, "net.tcp_in_idle parameter has to be positive number");
+		lua_error(L);
+	}
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -810,6 +841,7 @@ int lib_net(lua_State *L)
 		{ "tls_sticket_secret_file", net_tls_sticket_secret_file },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
+		{ "tcp_in_idle",  net_tcp_in_idle },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
