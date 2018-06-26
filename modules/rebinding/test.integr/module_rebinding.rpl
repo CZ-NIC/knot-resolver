@@ -1,0 +1,833 @@
+; config options
+;	target-fetch-policy: "0 0 0 0 0"
+;	module-config: "iterator"
+;	name: "."
+	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
+CONFIG_END
+
+SCENARIO_BEGIN Test protection from DNS rebinding
+
+; K.ROOT-SERVERS.NET.
+RANGE_BEGIN 0 1000
+	ADDRESS 193.0.14.129
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+. IN NS
+SECTION ANSWER
+. IN NS	K.ROOT-SERVERS.NET.
+SECTION ADDITIONAL
+K.ROOT-SERVERS.NET.	IN	A	193.0.14.129
+ENTRY_END
+
+; net.
+ENTRY_BEGIN
+MATCH opcode qname
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+net. IN NS
+SECTION AUTHORITY
+.	IN SOA	. . 0 0 0 0 0
+ENTRY_END
+
+; root-servers.net.
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+root-servers.net. IN NS
+SECTION ANSWER
+root-servers.net.	IN NS	k.root-servers.net.
+SECTION ADDITIONAL
+k.root-servers.net.	IN 	A	193.0.14.129
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qname
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+root-servers.net. IN A
+SECTION AUTHORITY
+root-servers.net.	IN	SOA	. . 0 0 0 0 0
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+k.root-servers.net.	IN 	A
+SECTION ANSWER
+k.root-servers.net.	IN 	A	193.0.14.129
+SECTION ADDITIONAL
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+k.root-servers.net.	IN 	AAAA
+SECTION AUTHORITY
+root-servers.net.	IN	SOA	. . 0 0 0 0 0
+ENTRY_END
+
+; gtld-servers.net.
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+gtld-servers.net. IN NS
+SECTION ANSWER
+gtld-servers.net.	IN NS	a.gtld-servers.net.
+SECTION ADDITIONAL
+a.gtld-servers.net.	IN 	A	192.5.6.30
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qname
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+gtld-servers.net. IN A
+SECTION AUTHORITY
+gtld-servers.net.	IN	SOA	. . 0 0 0 0 0
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+a.gtld-servers.net.	IN 	A
+SECTION ANSWER
+a.gtld-servers.net.	IN 	A	192.5.6.30
+SECTION ADDITIONAL
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+a.gtld-servers.net.	IN 	AAAA
+SECTION AUTHORITY
+gtld-servers.net.	IN	SOA	. . 0 0 0 0 0
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+com. IN A
+SECTION AUTHORITY
+com.	IN NS	a.gtld-servers.net.
+SECTION ADDITIONAL
+a.gtld-servers.net.	IN 	A	192.5.6.30
+ENTRY_END
+RANGE_END
+
+; a.gtld-servers.net.
+RANGE_BEGIN 0 1000
+	ADDRESS 192.5.6.30
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+com. IN NS
+SECTION ANSWER
+com.	IN NS	a.gtld-servers.net.
+SECTION ADDITIONAL
+a.gtld-servers.net.	IN 	A	192.5.6.30
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+example.com. IN A
+SECTION AUTHORITY
+example.com.	IN NS	ns.example.com.
+SECTION ADDITIONAL
+ns.example.com.		IN 	A	1.2.3.4
+ENTRY_END
+
+; NS with address pointing into a private range must not be followed
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+attacker.com. IN A
+SECTION AUTHORITY
+attacker.com.	IN NS	ns.attacker.com.
+SECTION ADDITIONAL
+ns.attacker.com.		IN 	A	192.168.3.5
+ENTRY_END
+RANGE_END
+
+; ns.attacker.com.
+RANGE_BEGIN 0 1000
+	ADDRESS 19.168.3.5
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attacker.com. IN NS
+SECTION ANSWER
+attacker.com.	IN NS	ns.attacker.com.
+SECTION ADDITIONAL
+ns.attacker.com.		IN 	A	192.168.3.5
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+www.attacker.com. IN A
+SECTION ANSWER
+www.attacker.com. IN A	192.0.2.55
+ENTRY_END
+RANGE_END
+
+
+; ns.example.com.
+RANGE_BEGIN 0 1000
+	ADDRESS 1.2.3.4
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+example.com. IN NS
+SECTION ANSWER
+example.com.	IN NS	ns.example.com.
+SECTION ADDITIONAL
+ns.example.com.		IN 	A	1.2.3.4
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+www.example.com. IN A
+SECTION ANSWER
+www.example.com. IN A	192.0.2.40
+ENTRY_END
+
+; blacklisted IP addresses
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4-0-0-0-0.example.com. IN A
+SECTION ANSWER
+attack-ipv4-0-0-0-0.example.com. IN A	0.0.0.0
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4over6-0-0-0-0.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv4over6-0-0-0-0.example.com. IN AAAA	::ffff:0.0.0.0
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4-10-1-2-3.example.com. IN A
+SECTION ANSWER
+attack-ipv4-10-1-2-3.example.com. IN A	10.1.2.3
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4over6-10-2-3-4.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv4over6-10-2-3-4.example.com. IN AAAA	::ffff:10.2.3.4
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4-100-127-255-254.example.com. IN A
+SECTION ANSWER
+attack-ipv4-100-127-255-254.example.com. IN A	100.127.255.254
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4over6-100-127-255-255.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv4over6-100-127-255-255.example.com. IN AAAA	::ffff:100.127.255.255
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4-127-0-0-1.example.com. IN A
+SECTION ANSWER
+attack-ipv4-127-0-0-1.example.com. IN A	127.0.0.1
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4over6-127-0-0-1.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv4over6-127-0-0-1.example.com. IN AAAA	::ffff:127.0.0.1
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4-169-254-255-255.example.com. IN A
+SECTION ANSWER
+attack-ipv4-169-254-255-255.example.com. IN A	169.254.255.255
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4over6-169-254-0-0.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv4over6-169-254-0-0.example.com. IN AAAA	::ffff:169.254.0.0
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4-172-16-0-0.example.com. IN A
+SECTION ANSWER
+attack-ipv4-172-16-0-0.example.com. IN A	172.16.0.0
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4over6-172-31-255-255.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv4over6-172-31-255-255.example.com. IN AAAA	::ffff:172.31.255.255
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4-192-168-3-8.example.com. IN A
+SECTION ANSWER
+attack-ipv4-192-168-3-8.example.com. IN A	192.168.3.8
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv4over6-192-168-254-210.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv4over6-192-168-254-210.example.com. IN AAAA	::ffff:192.168.254.210
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv6-.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv6-.example.com. IN AAAA	::
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv6-1.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv6-1.example.com. IN AAAA	::1
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv6-fc00.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv6-fc00.example.com. IN AAAA	fc00::
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attack-ipv6-fe80.example.com. IN AAAA
+SECTION ANSWER
+attack-ipv6-fe80.example.com. IN AAAA	fe80::
+ENTRY_END
+
+RANGE_END
+
+STEP 11 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+www.example.com. IN A
+ENTRY_END
+
+; recursion happens here, no blacklisted IP address is present
+STEP 12 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+www.example.com. IN A
+SECTION ANSWER
+www.example.com. IN A	192.0.2.40
+;SECTION AUTHORITY
+;example.com.	IN NS	ns.example.com.
+;SECTION ADDITIONAL
+;ns.example.com.		IN 	A	1.2.3.4
+ENTRY_END
+
+; test that 0.0.0.0 is blacklisted
+STEP 201 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4-0-0-0-0.example.com. IN A
+ENTRY_END
+
+STEP 202 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4-0-0-0-0.example.com. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that ::ffff:0.0.0.0 is blacklisted
+STEP 211 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4over6-0-0-0-0.example.com. IN AAAA
+ENTRY_END
+
+STEP 212 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4over6-0-0-0-0.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that 10.1.2.3 is blacklisted
+STEP 221 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4-10-1-2-3.example.com. IN A
+ENTRY_END
+
+STEP 222 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4-10-1-2-3.example.com. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that ::ffff:10.2.3.4 is blacklisted
+STEP 231 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4over6-10-2-3-4.example.com. IN AAAA
+ENTRY_END
+
+STEP 232 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4over6-10-2-3-4.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that 100.127.255.254 is blacklisted
+STEP 241 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4-100-127-255-254.example.com. IN A
+ENTRY_END
+
+STEP 242 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4-100-127-255-254.example.com. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that ::ffff:100.127.255.255 is blacklisted
+STEP 251 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4over6-100-127-255-255.example.com. IN AAAA
+ENTRY_END
+
+STEP 252 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4over6-100-127-255-255.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that 127.0.0.1 is blacklisted
+STEP 261 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4-127-0-0-1.example.com. IN A
+ENTRY_END
+
+STEP 262 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4-127-0-0-1.example.com. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that ::ffff:127.0.0.1 is blacklisted
+STEP 271 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4over6-127-0-0-1.example.com. IN AAAA
+ENTRY_END
+
+STEP 272 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4over6-127-0-0-1.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that 169.254.255.255 is blacklisted
+STEP 281 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4-169-254-255-255.example.com. IN A
+ENTRY_END
+
+STEP 282 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4-169-254-255-255.example.com. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that ::ffff:169.254.0.0 is blacklisted
+STEP 291 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4over6-169-254-0-0.example.com. IN AAAA
+ENTRY_END
+
+STEP 292 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4over6-169-254-0-0.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that 172.16.0.0 is blacklisted
+STEP 301 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4-172-16-0-0.example.com. IN A
+ENTRY_END
+
+STEP 302 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4-172-16-0-0.example.com. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that ::ffff:172.31.255.255 is blacklisted
+STEP 311 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4over6-172-31-255-255.example.com. IN AAAA
+ENTRY_END
+
+STEP 312 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4over6-172-31-255-255.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that 192.168.3.8 is blacklisted
+STEP 321 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4-192-168-3-8.example.com. IN A
+ENTRY_END
+
+STEP 322 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4-192-168-3-8.example.com. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that ::ffff:192.168.254.210 is blacklisted
+STEP 331 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv4over6-192-168-254-210.example.com. IN AAAA
+ENTRY_END
+
+STEP 332 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv4over6-192-168-254-210.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that :: is blacklisted
+STEP 341 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv6-.example.com. IN AAAA
+ENTRY_END
+
+STEP 342 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv6-.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that ::1 is blacklisted
+STEP 351 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv6-1.example.com. IN AAAA
+ENTRY_END
+
+STEP 352 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv6-1.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that fc00:: is blacklisted
+STEP 361 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv6-fc00.example.com. IN AAAA
+ENTRY_END
+
+STEP 362 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv6-fc00.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+; test that fe80:: is blacklisted
+STEP 371 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+attack-ipv6-fe80.example.com. IN AAAA
+ENTRY_END
+
+STEP 372 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+attack-ipv6-fe80.example.com. IN AAAA
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+STEP 401 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+www.example.com. IN A
+ENTRY_END
+
+; it still works if no blacklisted IP address is present
+STEP 402 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+www.example.com. IN A
+SECTION ANSWER
+www.example.com. IN A	192.0.2.40
+ENTRY_END
+
+STEP 501 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+www.attacker.com. IN A
+ENTRY_END
+
+; NS for attacker.com. has IP address from private range, it must fail
+STEP 502 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer authority
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+www.attacker.com. IN A
+SECTION ANSWER
+SECTION AUTHORITY
+SECTION ADDITIONAL
+explanation.invalid.	TXT	"blocked by DNS rebinding protection"
+ENTRY_END
+
+SCENARIO_END

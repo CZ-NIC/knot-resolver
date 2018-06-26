@@ -29,6 +29,7 @@ modules_TARGETS += etcd \
                    view \
                    predict \
                    dns64 \
+                   rebinding \
                    renumber \
                    http \
                    daf \

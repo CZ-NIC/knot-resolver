@@ -18,8 +18,11 @@ stages:
 build:linux:amd64:
   stage: build
   script:
-    - make -k all CFLAGS=-Werror
-    - make install CFLAGS=-Werror
+    - rm daemon/lua/kres-gen.lua
+    - make -k all CFLAGS="-Werror -ggdb"
+    - STATUS="$(git status --untracked-files=normal --porcelain)"
+    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
+    - make install CFLAGS="-Werror -ggdb"
   artifacts:
     untracked: true
   tags:
@@ -31,8 +34,11 @@ build:clang:linux:amd64:
   stage: build
   image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
   script:
-    - CXX=clang++-5.0 CC=clang-5.0 make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument"
-    - CXX=clang++-5.0 CC=clang-5.0 make install CFLAGS=-Werror
+    - rm daemon/lua/kres-gen.lua
+    - CXX=clang++-5.0 CC=clang-5.0 make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
+    - STATUS="$(git status --untracked-files=normal --porcelain)"
+    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
+    - CXX=clang++-5.0 CC=clang-5.0 make install "CFLAGS=-Werror -ggdb"
   tags:
     - docker
     - linux
@@ -141,7 +147,7 @@ deckard:linux:amd64:
   except:
     - schedules  # prevent unstable test from cancelling nightly OBS build
   script:
-    - MAKEFLAGS="--jobs $(nproc)" DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
+    - MAKEFLAGS="--jobs $(nproc)" DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make --keep-going check-integration
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
   dependencies:
     - build:linux:amd64

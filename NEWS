@@ -6,6 +6,7 @@ New features
 ------------
 - TLS session resumption (RFC 5077), both server and client (!585, #105)
 - aggressive caching for NSEC3 zones
+- optional protection from DNS Rebinding attack (module rebinding)
 
 Bugfixes
 --------

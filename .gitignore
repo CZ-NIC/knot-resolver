@@ -67,3 +67,4 @@ libkres.amalg.c
 /modules/version/version.lua
 /tags
 /coverage
+/coverage.stats

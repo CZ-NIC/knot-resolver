@@ -106,6 +106,7 @@ local M = {
 	prefix = matchprefix,
 	name = matchname,
 	rule = rule,
+	match_subnet = match_subnet,
 }
 
 -- Config

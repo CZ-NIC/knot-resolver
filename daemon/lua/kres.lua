@@ -239,6 +239,8 @@ local timeval_t = ffi.typeof('struct timeval')
 
 -- Metatype for sockaddr
 local addr_buf = ffi.new('char[16]')
+local str_addr_buf = ffi.new('char[46 + 1 + 6 + 1]') -- IPv6 + #port + \0
+local str_addr_buf_len = ffi.sizeof(str_addr_buf)
 local sockaddr_t = ffi.typeof('struct sockaddr')
 ffi.metatype( sockaddr_t, {
 	__index = {
@@ -246,7 +248,17 @@ ffi.metatype( sockaddr_t, {
 		ip = function (sa) return C.kr_inaddr(sa) end,
 		family = function (sa) return C.kr_inaddr_family(sa) end,
 		port = function (sa) return C.kr_inaddr_port(sa) end,
-	}
+	},
+	__tostring = function(sa)
+		assert(ffi.istype(sockaddr_t, sa))
+		local len = ffi.new('size_t[1]', str_addr_buf_len)
+		local ret = C.kr_inaddr_str(sa, str_addr_buf, len)
+		if ret ~= 0 then
+			error('kr_inaddr_str failed: ' .. tostring(ret))
+		end
+		return ffi.string(str_addr_buf)
+	end,
+
 })
 
 -- Parametrized LRU table
@@ -890,6 +902,7 @@ kres = {
 	-- Metatypes.  Beware that any pointer will be cast silently...
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,
 	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,
+	sockaddr_t = function (udata) return ffi.cast('struct sockaddr *', udata) end,
 	-- Global API functions
 	str2dname = function(name)
 		if type(name) ~= 'string' then return end

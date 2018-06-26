@@ -1,4 +1,5 @@
-#!/bin/sh -e
+#!/bin/bash
+set -o pipefail -o errexit
 
 ### Dev's guide
 #
@@ -154,6 +155,7 @@ EOF
 	kr_inaddr
 	kr_inaddr_family
 	kr_inaddr_len
+	kr_inaddr_str
 	kr_sockaddr_len
 	kr_inaddr_port
 	kr_straddr_family
@@ -167,7 +169,6 @@ EOF
 	kr_zonecut_add
 	kr_zonecut_is_empty
 	kr_zonecut_set
-	kr_zonecut_find_nsname
 	kr_now
 	lru_free_items_impl
 	lru_create_impl

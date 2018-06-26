@@ -22,6 +22,7 @@ usr/lib/knot-resolver/predict.lua
 usr/lib/knot-resolver/prefill.lua
 usr/lib/knot-resolver/priming.lua
 usr/lib/knot-resolver/prometheus.lua
+usr/lib/knot-resolver/rebinding.lua
 usr/lib/knot-resolver/renumber.lua
 usr/lib/knot-resolver/serve_stale.lua
 usr/lib/knot-resolver/ta_sentinel.lua
