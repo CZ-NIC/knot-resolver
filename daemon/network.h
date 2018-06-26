@@ -55,6 +55,7 @@ struct network {
 	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
 	struct net_tcp_param tcp;
     int tcp_backlog;
+	struct net_tcp_param tcp;
 };
 
 void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog);

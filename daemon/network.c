@@ -56,6 +56,7 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 			tls_session_ticket_ctx_create(loop, NULL, 0);
 		net->tcp.in_idle_timeout = 10000;
 		net->tcp_backlog = tcp_backlog;
+		net->tcp.in_idle_timeout = 10000;
 	}
 }
 
