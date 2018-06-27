@@ -119,6 +119,9 @@ rm -v scripts/bootstrap-depends.sh
 make doc
 %endif
 
+%check
+make %{?_smp_mflags} check
+
 %install
 %make_install %{build_flags}
 
@@ -162,10 +165,6 @@ install -m 0750 -d %{buildroot}%{_localstatedir}/cache/knot-resolver
 
 # remove module with unsatisfied dependencies
 rm -r %{buildroot}%{_libdir}/kdns_modules/{http,http.lua}
-
-%check
-# check-config requires installed version of kresd, do not attempt to run that
-LD_PRELOAD=lib/libkres.so make check-unit %{build_flags} LDFLAGS="%{__global_ldflags} -ldl"
 
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
