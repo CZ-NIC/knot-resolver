@@ -22,7 +22,8 @@ endif
 
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
-modules_TARGETS += etcd \
+modules_TARGETS += bogus_log \
+		   etcd \
                    ta_sentinel \
                    graphite \
                    policy \
