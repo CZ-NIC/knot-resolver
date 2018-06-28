@@ -13,6 +13,7 @@ Bugfixes
 --------
 - avoid turning off qname minimization in some cases, e.g. co.uk. (#339)
 - fix validation of explicit wildcard queries (#274)
+- dns64 module: more properties from the RFC implemented (incl. bug #375)
 
 Improvements
 ------------
