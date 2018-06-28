@@ -5,13 +5,6 @@ bench_BIN := \
 bench_DEPEND := $(libkres)
 bench_LIBS :=  $(libkres_TARGET) $(libkres_LIBS)
 
-# Platform-specific library injection
-ifeq ($(PLATFORM),Darwin)
-	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH="$(DYLD_LIBRARY_PATH):$(abspath lib)"
-else
-	preload_syms := LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):$(abspath lib)"
-endif
-
 # Make bench binaries
 define make_bench
 $(1)_CFLAGS := -fPIE
