@@ -1,3 +1,10 @@
+# Platform-specific library injection
+ifeq ($(PLATFORM),Darwin)
+	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH="$(abspath lib):$(DYLD_LIBRARY_PATH)"
+else
+	preload_syms := LD_LIBRARY_PATH="$(abspath lib):$(LD_LIBRARY_PATH)"
+endif
+
 # Unit tests
 ifeq ($(HAS_cmocka), yes)
 include tests/unit.mk

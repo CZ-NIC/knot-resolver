@@ -30,7 +30,7 @@ $(1)_LIBS := $(tests_LIBS)
 $(1)_DEPEND := $(tests_DEPEND)
 $(call make_bin,$(1),tests)
 $(1): $$($(1))
-	@$(shell ./scripts/coverage_env.sh "$(TOPSRCDIR)" "$(COVERAGE_STATSDIR)/tests_unit" "$(1)") $(preload_syms) $(DEBUGGER) $$<
+	$(shell ./scripts/coverage_env.sh "$(TOPSRCDIR)" "$(COVERAGE_STATSDIR)/tests_unit" "$(1)") $(preload_syms) $(DEBUGGER) $$<
 .PHONY: $(1)
 endef
 

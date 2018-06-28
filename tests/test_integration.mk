@@ -8,13 +8,6 @@ SUBMODULES_DIRTY := $(shell git submodule status --recursive | cut -c 1 | grep -
 REAL_PREFIX=$(realpath $(PREFIX))
 REAL_CURDIR=$(realpath $(CURDIR))
 
-# Platform-specific library injection
-ifeq ($(PLATFORM),Darwin)
-	preload_syms := DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_LIBRARY_PATH="$(abspath $(LIBDIR)):$(DYLD_LIBRARY_PATH)"
-else
-	preload_syms := LD_LIBRARY_PATH="$(abspath $(LIBDIR)):$(LD_LIBRARY_PATH)"
-endif
-
 # Integration tests from Deckard repo
 deckard_DIR := $(TOPSRCDIR)/tests/deckard
 

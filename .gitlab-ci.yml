@@ -98,7 +98,7 @@ test:linux:amd64:
     # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
     # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
     - git clean -xdf
-    - make install CFLAGS=-Werror
+    - make CFLAGS=-Werror
     - MAKEFLAGS="--jobs $(nproc)" make -k check
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c COVERAGE_STAGE=gcov-check
   dependencies: []
@@ -147,7 +147,7 @@ deckard:linux:amd64:
   except:
     - schedules  # prevent unstable test from cancelling nightly OBS build
   script:
-    - MAKEFLAGS="--jobs $(nproc)" DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make --keep-going check-integration
+    - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
   dependencies:
     - build:linux:amd64
