@@ -26,6 +26,7 @@ luacov.*.out
 _obj
 /.build-depend
 /autom4te.cache/*
+/bench/bench_lru
 /config.log
 /config.h
 /config.status
