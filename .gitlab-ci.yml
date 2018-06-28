@@ -147,7 +147,7 @@ deckard:linux:amd64:
   except:
     - schedules  # prevent unstable test from cancelling nightly OBS build
   script:
-    - MAKEFLAGS="--jobs $(nproc)" DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make --keep-going check-integration
+    - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
   dependencies:
     - build:linux:amd64
