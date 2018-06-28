@@ -31,7 +31,8 @@ struct kr_qflags {
 	bool NO_IPV6 : 1;        /**< Disable IPv6 */
 	bool NO_IPV4 : 1;        /**< Disable IPv4 */
 	bool TCP : 1;            /**< Use TCP for this query. */
-	bool RESOLVED : 1;       /**< Query is resolved. */
+	bool RESOLVED : 1;       /**< Query is resolved.  Note that kr_query gets
+				  *   RESOLVED before following a CNAME chain; see .CNAME. */
 	bool AWAIT_IPV4 : 1;     /**< Query is waiting for A address. */
 	bool AWAIT_IPV6 : 1;     /**< Query is waiting for AAAA address. */
 	bool AWAIT_CUT : 1;      /**< Query is waiting for zone cut lookup */
