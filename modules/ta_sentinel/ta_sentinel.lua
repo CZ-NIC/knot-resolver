@@ -13,9 +13,7 @@ function M.layer.finish(state, req, pkt)
 		return state end -- an internal query, exit
 
 	local kpkt = kres.pkt_t(pkt)
-	local matching = ((kpkt:qtype() == kres.type.A  or  kpkt:qtype() == kres.type.AAAA)
-					  and  kpkt:qclass() == kres.class.IN)
-	if not matching then
+	if not (kpkt:qtype() == kres.type.A or kpkt:qtype() == kres.type.AAAA) then
 		return state end
 
 	-- fast filter by the length of the first label
