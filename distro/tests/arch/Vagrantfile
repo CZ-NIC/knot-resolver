@@ -7,8 +7,8 @@ Vagrant.configure(2) do |config|
     config.vm.box = "archlinux/archlinux"
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
-    config.vm.define "arch"  do |arch|
-        arch.vm.provision "ansible" do |ansible|
+    config.vm.define "arch_knot-resolver"  do |machine|
+        machine.vm.provision "ansible" do |ansible|
             ansible.playbook = "../knot-resolver-test.yaml"
         end
     end
