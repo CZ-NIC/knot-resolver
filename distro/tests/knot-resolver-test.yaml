@@ -14,7 +14,7 @@
       Archlinux: bind-tools
     configure_obs_repo:
       Fedora: |
-        dnf config-manager --add-repo https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/Fedora_27/home:CZ-NIC:{{ item }}.repo
+        dnf config-manager --add-repo https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/Fedora_{{ ansible_distribution_major_version }}/home:CZ-NIC:{{ item }}.repo
       CentOS: |
         yum install -y wget &&
         wget -i wget https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/CentOS_7_EPEL/home:CZ-NIC:{{ item }}.repo -O /etc/yum.repos.d/home:CZ-NIC:{{ item }}.repo
@@ -24,8 +24,8 @@
         apt-key add - < Release.key &&
         apt-get update
       Ubuntu: |
-        echo 'deb http://download.opensuse.org/repositories/home:/CZ-NIC:/{{ item }}/xUbuntu_16.04/ /' > /etc/apt/sources.list.d/{{ item }}.list &&
-        wget -nv https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/xUbuntu_16.04/Release.key -O Release.key &&
+        echo 'deb http://download.opensuse.org/repositories/home:/CZ-NIC:/{{ item }}/xUbuntu_{{ ansible_distribution_version }}/ /' > /etc/apt/sources.list.d/{{ item }}.list &&
+        wget -nv https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/xUbuntu_{{ ansible_distribution_version }}/Release.key -O Release.key &&
         apt-key add - < Release.key &&
         apt-get update
     show_package_version:
@@ -65,7 +65,7 @@
     - name: configure OBS repository
       shell: "{{ configure_obs_repo[ansible_distribution] }}"
       with_items: "{{ repos }}"
-      when: ansible_distribution != 'Archlinux'
+      when: ansible_distribution_file_variety != 'Archlinux'
 
     - block:
         - name: configure OBS repository (Arch)
@@ -80,7 +80,7 @@
           with_items: "{{ repos }}"
         - name: sync repos (Arch)
           shell: pacman -Syu --noconfirm
-      when: ansible_distribution == 'Archlinux'
+      when: ansible_distribution_file_variety == 'Archlinux'
 
     - name: install knot-resolver
       package:
