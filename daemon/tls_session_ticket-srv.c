@@ -240,6 +240,10 @@ tst_ctx_t * tls_session_ticket_ctx_create(uv_loop_t *loop, const char *secret,
 					  size_t secret_len)
 {
 	assert(loop && (!secret_len || secret));
+	#if GNUTLS_VERSION_NUMBER < 0x030500
+		/* We would need different SESSION_KEY_SIZE; avoid assert. */
+		return NULL;
+	#endif
 	tst_ctx_t *ctx = tst_key_create(secret, secret_len, loop);
 	if (ctx) {
 		tst_key_check(&ctx->timer, true);
