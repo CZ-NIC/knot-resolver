@@ -115,6 +115,8 @@ struct key {
 	/** The key data start at buf+1, and buf[0] contains some length.
 	 * For details see key_exact* and key_NSEC* functions. */
 	uint8_t buf[KR_CACHE_KEY_MAXLEN];
+	/* LATER(opt.): ^^ probably change the anchoring, so that kr_dname_lf()
+	 * doesn't need to move data after knot_dname_lf(). */
 };
 
 static inline size_t key_nwz_off(const struct key *k)
