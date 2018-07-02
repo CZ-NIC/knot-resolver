@@ -91,6 +91,7 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 			pkt->rr[pkt->rrset_count] = (knot_rrset_t){
 				.owner = knot_dname_copy(rrset->set.rr->owner, &pkt->mm),
 					/* ^^ well, another copy isn't really needed */
+				.ttl = rrset->set.rr->ttl,
 				.type = KNOT_RRTYPE_RRSIG,
 				.rclass = KNOT_CLASS_IN,
 				.rrs = *rdss[i],

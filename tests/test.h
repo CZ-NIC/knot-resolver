@@ -112,10 +112,10 @@ static inline void test_random_rr(knot_rrset_t *rr, uint32_t ttl)
 	/* Create payload */
 	tmp_buf[0] = num;
 	test_randstr((char *)(tmp_buf + 1), tmp_buf[0] + 1);
-	knot_rdata_init(rdata_buf, num + 1, tmp_buf, ttl);
+	knot_rdata_init(rdata_buf, num + 1, tmp_buf);
 
 	/* Assign static buffers. */
-	knot_rrset_init(rr, owner_buf, KNOT_RRTYPE_TXT, KNOT_CLASS_IN);
+	knot_rrset_init(rr, owner_buf, KNOT_RRTYPE_TXT, KNOT_CLASS_IN, ttl);
 	rr->rrs.rr_count = 1;
 	rr->rrs.data = rdata_buf;
 }
