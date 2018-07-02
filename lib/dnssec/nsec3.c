@@ -17,9 +17,9 @@
 #include <assert.h>
 #include <string.h>
 
-#include <dnssec/binary.h>
-#include <dnssec/error.h>
-#include <dnssec/nsec.h>
+#include <libdnssec/binary.h>
+#include <libdnssec/error.h>
+#include <libdnssec/nsec.h>
 #include <libknot/descriptor.h>
 #include <contrib/base32hex.h>
 #include <libknot/rrset.h>

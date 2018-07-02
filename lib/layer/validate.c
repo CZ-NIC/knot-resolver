@@ -24,7 +24,7 @@
 #include <libknot/packet/wire.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
-#include <dnssec/error.h>
+#include <libdnssec/error.h>
 
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"

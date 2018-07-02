@@ -49,7 +49,7 @@
 #include <uv.h>
 #include <ucw/mempool.h>
 #include <libknot/rrset.h>
-#include <zscanner/scanner.h>
+#include <libzscanner/scanner.h>
 
 #include "lib/utils.h"
 #include "lib/dnssec/ta.h"

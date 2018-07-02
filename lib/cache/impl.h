@@ -23,8 +23,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <dnssec/error.h>
-#include <dnssec/nsec.h>
+#include <libdnssec/error.h>
+#include <libdnssec/nsec.h>
 #include <libknot/consts.h>
 #include <libknot/db/db.h>
 #include <libknot/dname.h>

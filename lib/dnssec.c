@@ -15,11 +15,11 @@
  */
 
 #include <assert.h>
-#include <dnssec/binary.h>
-#include <dnssec/crypto.h>
-#include <dnssec/error.h>
-#include <dnssec/key.h>
-#include <dnssec/sign.h>
+#include <libdnssec/binary.h>
+#include <libdnssec/crypto.h>
+#include <libdnssec/error.h>
+#include <libdnssec/key.h>
+#include <libdnssec/sign.h>
 #include <libknot/descriptor.h>
 #include <libknot/packet/wire.h>
 #include <libknot/rdataset.h>
