@@ -184,17 +184,15 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 		return kr_ok();
 	}
 	/* Check for duplicates */
-	uint16_t rdlen = knot_rdata_rdlen(rdata);
-	uint8_t *raw_addr = knot_rdata_data(rdata);
-	if (pack_obj_find(*pack, raw_addr, rdlen)) {
+	if (pack_obj_find(*pack, rdata->data, rdata->len)) {
 		return kr_ok();
 	}
 	/* Push new address */
-	int ret = pack_reserve_mm(**pack, 1, rdlen, kr_memreserve, cut->pool);
+	int ret = pack_reserve_mm(**pack, 1, rdata->len, kr_memreserve, cut->pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}
-	return pack_obj_push(*pack, raw_addr, rdlen);
+	return pack_obj_push(*pack, rdata->data, rdata->len);
 }
 
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
@@ -211,7 +209,7 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	}
 	/* Remove address from the pack. */
 	if (rdata) {
-		ret = pack_obj_del(pack, knot_rdata_data(rdata), knot_rdata_rdlen(rdata));
+		ret = pack_obj_del(pack, rdata->data, rdata->len);
 	}
 	/* No servers left, remove NS from the set. */
 	if (pack->len == 0) {
