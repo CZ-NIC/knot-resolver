@@ -38,8 +38,7 @@ static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 			if (is_negative) {
 				/* Use SOA minimum TTL for negative answers. */
 				if (rr->type == KNOT_RRTYPE_SOA) {
-					return MIN(knot_rrset_ttl(rr),
-						   knot_soa_minimum(&rr->rrs));
+					return MIN(rr->ttl, knot_soa_minimum(&rr->rrs));
 				} else {
 					continue; /* Use SOA only for negative answers. */
 				}
@@ -47,13 +46,7 @@ static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 			if (knot_rrtype_is_metatype(rr->type)) {
 				continue; /* Skip metatypes. */
 			}
-			/* Find minimum TTL in the record set */
-			knot_rdata_t *rd = rr->rrs.data;
-			for (uint16_t j = 0; j < rr->rrs.rr_count; ++j) {
-				has_ttl = true;
-				ttl = MIN(ttl, knot_rdata_ttl(rd));
-				rd = kr_rdataset_next(rd);
-			}
+			ttl = MIN(ttl, rr->ttl);
 		}
 	}
 	/* If no valid TTL present, go with zero (will get clamped to minimum). */
@@ -200,12 +193,8 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
-			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
-			knot_rdata_t *rd = rr->rrs.data;
-			for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
-				knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
-				rd = kr_rdataset_next(rd);
-			}
+			knot_rrset_t *rrs = /*const-cast*/(knot_rrset_t *)knot_pkt_rr(sec, k);
+			rrs->ttl -= drift; // ^^ FIXME??
 		}
 	}
 
