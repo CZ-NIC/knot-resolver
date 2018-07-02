@@ -181,7 +181,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	if (key == NULL) {
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, key_pos);
 		int ret = kr_dnssec_key_from_rdata(&created_key, keys->owner,
-			                       knot_rdata_data(krr), knot_rdata_rdlen(krr));
+						   krr->data, krr->len);
 		if (ret != 0) {
 			vctx->result = ret;
 			return vctx->result;
@@ -292,14 +292,14 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 	 */
 	for (uint16_t i = 0; i < keys->rrs.rr_count; ++i) {
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
+		/* LATER(optim.): more efficient way to iterate than _at() */
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
-		const uint8_t *key_data = knot_rdata_data(krr);
-		if (!kr_dnssec_key_zsk(key_data) || kr_dnssec_key_revoked(key_data)) {
+		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data)) {
 			continue;
 		}
 		
 		struct dseckey *key = NULL;
-		if (kr_dnssec_key_from_rdata(&key, keys->owner, key_data, knot_rdata_rdlen(krr)) != 0) {
+		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->data, krr->len) != 0) {
 			continue;
 		}
 		if (kr_authenticate_referral(ta, (dnssec_key_t *) key) != 0) {

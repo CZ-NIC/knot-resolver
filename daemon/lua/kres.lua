@@ -373,7 +373,7 @@ ffi.metatype( knot_rrset_t, {
 		rdata = function(rr, i)
 			assert(ffi.istype(knot_rrset_t, rr))
 			local rdata = knot.knot_rdataset_at(rr.rrs, i)
-			return ffi.string(knot.knot_rdata_data(rdata), knot.knot_rdata_rdlen(rdata))
+			return ffi.string(rdata.data, rdata.len)
 		end,
 		get = function(rr, i)
 			assert(ffi.istype(knot_rrset_t, rr))
