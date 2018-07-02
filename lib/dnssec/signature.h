@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <dnssec/key.h>
+#include <libdnssec/key.h>
 #include <libknot/rrset.h>
 
 /**

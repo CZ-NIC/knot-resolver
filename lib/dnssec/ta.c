@@ -19,8 +19,8 @@
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
 #include <libknot/packet/wire.h>
-#include <dnssec/key.h>
-#include <dnssec/error.h>
+#include <libdnssec/key.h>
+#include <libdnssec/error.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/ta.h"

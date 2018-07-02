@@ -22,7 +22,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <sys/param.h>
-#include <zscanner/scanner.h>
+#include <libzscanner/scanner.h>
 
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
