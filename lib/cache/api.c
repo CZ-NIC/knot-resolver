@@ -514,17 +514,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	if (ret) return kr_ok(); /* some aren't really errors */
 	assert(val_new_entry.data);
 
-	/* Compute TTL, just in case they weren't equal. */
-	uint32_t ttl = -1;
-	const knot_rdataset_t *rdatasets[] = { &rr->rrs, rds_sigs, NULL };
-	for (int j = 0; rdatasets[j]; ++j) {
-		knot_rdata_t *rd = rdatasets[j]->data;
-		assert(rdatasets[j]->rr_count);
-		for (uint16_t l = 0; l < rdatasets[j]->rr_count; ++l) {
-			ttl = MIN(ttl, knot_rdata_ttl(rd));
-			rd = kr_rdataset_next(rd);
-		}
-	} /* TODO: consider expirations of RRSIGs as well, just in case. */
+	const uint32_t ttl = rr->ttl;
+	/* FIXME: consider TTLs and expirations of RRSIGs as well, just in case. */
 
 	/* Write the entry itself. */
 	struct entry_h *eh = val_new_entry.data;

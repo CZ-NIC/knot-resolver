@@ -112,7 +112,6 @@ printf "\tchar _stub[];\n};\n"
 	knot_rdataset_merge
 	knot_rrset_add_rdata
 	knot_rrset_init_empty
-	knot_rrset_ttl
 	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
 	knot_rrset_size

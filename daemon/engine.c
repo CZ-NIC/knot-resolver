@@ -357,7 +357,7 @@ static void roothints_add(zs_scanner_t *zs)
 	}
 	if (zs->r_type == KNOT_RRTYPE_A || zs->r_type == KNOT_RRTYPE_AAAA) {
 		knot_rdata_t rdata[RDATA_ARR_MAX];
-		knot_rdata_init(rdata, zs->r_data_length, zs->r_data, zs->r_ttl);
+		knot_rdata_init(rdata, zs->r_data_length, zs->r_data);
 		kr_zonecut_add(hints, zs->r_owner, rdata);
 	}
 }
