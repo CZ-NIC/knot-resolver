@@ -15,6 +15,7 @@
  */
 
 #include <assert.h>
+#include <stdlib.h>
 
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
@@ -22,7 +23,7 @@
 #include <libknot/rrset.h>
 #include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
-#include <dnssec/error.h>
+#include <libdnssec/error.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"

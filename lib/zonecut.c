@@ -18,7 +18,6 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/packet/wire.h>
 #include <libknot/descriptor.h>
-#include <libknot/rrtype/aaaa.h>
 
 #include "lib/zonecut.h"
 #include "lib/rplan.h"

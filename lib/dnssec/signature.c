@@ -18,9 +18,9 @@
 #include <assert.h>
 #include <string.h>
 
-#include <dnssec/error.h>
-#include <dnssec/key.h>
-#include <dnssec/sign.h>
+#include <libdnssec/error.h>
+#include <libdnssec/key.h>
+#include <libdnssec/sign.h>
 #include <libknot/descriptor.h>
 #include <libknot/packet/rrset-wire.h>
 #include <libknot/packet/wire.h>
