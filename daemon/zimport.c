@@ -628,13 +628,13 @@ static int zi_record_store(zs_scanner_t *s)
 	zone_import_ctx_t *z_import = (zone_import_ctx_t *)s->process.data;
 
 	knot_rrset_t *new_rr = knot_rrset_new(s->r_owner, s->r_type, s->r_class,
-					      &z_import->pool);
+					      s->r_ttl, &z_import->pool);
 	if (!new_rr) {
 		kr_log_error("[zscanner] line %lu: error creating rrset\n", s->line_counter);
 		return -1;
 	}
 	int res = knot_rrset_add_rdata(new_rr, s->r_data, s->r_data_length,
-				       s->r_ttl, &z_import->pool);
+				       &z_import->pool);
 	if (res != KNOT_EOK) {
 		kr_log_error("[zscanner] line %lu: error adding rdata to rrset\n", s->line_counter);
 		return -1;

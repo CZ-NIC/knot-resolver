@@ -443,7 +443,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 	assert(nsec_rr);
 	const uint32_t new_ttl_log =
-		kr_verbose_status ? knot_rrset_ttl(nsec_rr) : -1;
+		kr_verbose_status ? nsec_rr->ttl : -1;
 	uint8_t *bm = NULL;
 	uint16_t bm_size;
 	knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);

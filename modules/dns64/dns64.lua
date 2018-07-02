@@ -29,13 +29,13 @@ M.layer = {
 				local orig = ffi.C.knot_pkt_rr(section, i - 1)
 				if orig.type == kres.type.A then
 					-- Disable GC, as this object doesn't own either owner or RDATA, it's just a reference
-					local rrs = ffi.gc(kres.rrset(nil, kres.type.AAAA, orig.rclass), nil)
+					local rrs = ffi.gc(kres.rrset(nil, kres.type.AAAA, orig.rclass, orig:ttl()), nil)
 					rrs._owner = ffi.cast('knot_dname_t *', orig:owner()) -- explicit cast needed here
 					for k = 1, orig.rrs.rr_count do
 						local rdata = orig:rdata( k - 1 )
 						ffi.copy(addr_buf, M.proxy, 16)
 						ffi.copy(addr_buf + 12, rdata, 4)
-						ffi.C.knot_rrset_add_rdata(rrs, ffi.string(addr_buf, 16), 16, orig:ttl(), req.pool)
+						ffi.C.knot_rrset_add_rdata(rrs, ffi.string(addr_buf, 16), 16, req.pool)
 					end
 					-- All referred memory is copied within the function,
 					-- so it doesn't matter that lua GCs our variables.
