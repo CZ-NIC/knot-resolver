@@ -47,10 +47,8 @@ RUN luarocks install luacheck
 
 # respdiff for kresd CI
 RUN pip3 install dnspython python-augeas
-RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/resolver-benchmarking.git /tmp/resolver-benchmarking
-RUN mv /tmp/resolver-benchmarking/response_differences/respdiff /var/opt/respdiff
-RUN pip3 install -r /tmp/resolver-benchmarking/requirements.txt
-RUN rm -rf /tmp/resolver-benchmarking
+RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/respdiff /var/opt/respdiff
+RUN pip3 install -r /var/opt/respdiff/requirements.txt
 
 # Unbound for respdiff
 RUN apt-get install unbound unbound-anchor -y -qqq
