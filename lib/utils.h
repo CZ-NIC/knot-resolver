@@ -184,8 +184,6 @@ typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 
 /** @internal RDATA array maximum size. */
 #define RDATA_ARR_MAX (UINT16_MAX + sizeof(uint64_t))
-/** @internal Next RDATA shortcut. */
-#define kr_rdataset_next(rd) (rd + knot_rdata_array_size(knot_rdata_rdlen(rd)))
 
 /** Concatenate N strings. */
 KR_EXPORT
