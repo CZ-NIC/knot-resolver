@@ -138,24 +138,27 @@ install -m 0664 -p %SOURCE3 %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
 
 # install systemd units and doc
 mkdir -p %{buildroot}%{_unitdir}
-install -m 0644 -p %{repodir}/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.target %{buildroot}%{_unitdir}/kresd.target
+install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
+ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.target
 mkdir -p %{buildroot}%{_mandir}/man7
-install -m 0644 -p %{repodir}/doc/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
 
 %if 0%{?rhel}
 # no socket activation for CentOS 7 (requires systemd.227)
 mkdir -p %{buildroot}%{_unitdir}/kresd@.service.d
-install -m 0644 -p %{repodir}/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
+install -m 0644 -p %{repodir}/distro/common/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
 %endif
 %if 0%{?fedora}
-install -m 0644 -p %{repodir}/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
-install -m 0644 -p %{repodir}/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
-install -m 0644 -p %{repodir}/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
 %endif
 
 # install tmpfiles.d
 mkdir -p %{buildroot}%{_tmpfilesdir}
-install -m 0644 -p %{repodir}/systemd/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
+install -m 0644 -p %{repodir}/distro/common/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
 mkdir -p %{buildroot}%{_rundir}
 install -m 0750 -d %{buildroot}%{_rundir}/knot-resolver
 
@@ -171,7 +174,7 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot DNS Resolver" knot-resolver
 
 %post
-%systemd_post kresd@*.service
+%systemd_post 'kresd@*.service'
 /sbin/ldconfig
 
 # TODO: can be removed when Fedora 27 is no longer supported and migration is no longer necessary
@@ -197,10 +200,11 @@ if [ -d "/run/kresd" ]; then
 fi
 
 %preun
-%systemd_preun kresd@*.service
+%systemd_preun 'kresd@*.service' kresd.target kresd.socket kresd-tls.socket
 
 %postun
-%systemd_postun_with_restart kresd@*.service
+# NOTE: this doesn't restart the services on CentOS 7
+%systemd_postun_with_restart 'kresd@*.service'
 /sbin/ldconfig
 
 %files
@@ -213,6 +217,8 @@ fi
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/knot-resolver
 %{_unitdir}/kresd*.service
+%{_unitdir}/kresd.target
+%{_unitdir}/multi-user.target.wants/kresd.target
 %if 0%{?rhel}
 %{_unitdir}/kresd@.service.d/override.conf
 %endif
