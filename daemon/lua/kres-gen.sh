@@ -105,8 +105,6 @@ printf "\tchar _stub[];\n};\n"
 	knot_dname_size
 	knot_dname_to_str
 # Resource records
-	knot_rdata_rdlen
-	knot_rdata_data
 	knot_rdata_array_size
 	knot_rdataset_at
 	knot_rdataset_merge

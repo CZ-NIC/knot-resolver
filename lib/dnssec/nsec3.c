@@ -55,9 +55,9 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 	const size_t SALT_OFFSET = 5; /* First 5 octets contain { Alg, Flags, Iterations, Salt length } */
 	dnssec_binary_t rdata = {
 		.size = SALT_OFFSET + (size_t) knot_nsec3_salt_length(&nsec3->rrs, 0),
-		.data = knot_rdata_data(rr),
+		.data = /*const-cast*/(uint8_t *)rr->data,
 	};
-	if (rdata.size > knot_rdata_rdlen(rr))
+	if (rdata.size > rr->len)
 		return kr_error(EMSGSIZE);
 
 	int ret = dnssec_nsec3_params_from_rdata(params, &rdata);

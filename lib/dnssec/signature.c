@@ -67,8 +67,8 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 	knot_rdata_t *rd = ref->rrs.data;
 	for (uint16_t i = 0; i < ref->rrs.rr_count; ++i) {
 		dnssec_binary_t ds_rdata = {
-			.size = knot_rdata_rdlen(rd),
-			.data = knot_rdata_data(rd)
+			.size = rd->len,
+			.data = rd->data
 		};
 		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(&ref->rrs, i));
 		if (ret == 0) { /* Found a good DS */
@@ -287,10 +287,9 @@ int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
 	}
 
 	uint32_t orig_ttl = knot_rrsig_original_ttl(&rrsigs->rrs, pos);
-	const knot_rdata_t *rr_data = knot_rdataset_at(&rrsigs->rrs, pos);
-	uint8_t *rdata = knot_rdata_data(rr_data);
+	const knot_rdata_t *rd = knot_rdataset_at(&rrsigs->rrs, pos);
 
-	if (sign_ctx_add_data(sign_ctx, rdata, covered, orig_ttl, trim_labels) != 0) {
+	if (sign_ctx_add_data(sign_ctx, rd->data, covered, orig_ttl, trim_labels) != 0) {
 		ret = kr_error(ENOMEM);
 		goto fail;
 	}

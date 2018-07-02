@@ -254,8 +254,6 @@ _Bool knot_dname_is_sub(const knot_dname_t *, const knot_dname_t *);
 int knot_dname_labels(const uint8_t *, const uint8_t *);
 int knot_dname_size(const knot_dname_t *);
 char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
-uint16_t knot_rdata_rdlen(const knot_rdata_t *);
-uint8_t *knot_rdata_data(const knot_rdata_t *);
 size_t knot_rdata_array_size(uint16_t);
 knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, size_t);
 int knot_rdataset_merge(knot_rdataset_t *, const knot_rdataset_t *, knot_mm_t *);
