@@ -1872,16 +1872,17 @@ static int parse_packet(knot_pkt_t *query)
 
 	/* Parse query packet. */
 	int ret = knot_pkt_parse(query, 0);
-	if (ret != KNOT_EOK) {
-		return kr_error(EPROTO); /* Ignore malformed query. */
+	if (ret == KNOT_ETRAIL) {
+		/* Extra data after message end. */
+		ret = kr_error(EMSGSIZE);
+	} else if (ret != KNOT_EOK) {
+		/* Malformed query. */
+		ret = kr_error(EPROTO);
+	} else {
+		ret = kr_ok();
 	}
 
-	/* Check if at least header is parsed. */
-	if (query->parsed < query->size) {
-		return kr_error(EMSGSIZE);
-	}
-
-	return kr_ok();
+	return ret;
 }
 
 static struct qr_task* find_task(const struct session *session, uint16_t msg_id)
@@ -1918,7 +1919,7 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 	 * or resume if this is subrequest */
 	struct qr_task *task = NULL;
 	if (!session->outgoing) { /* request from a client */
-		/* Ignore badly formed queries or responses. */
+		/* Ignore badly formed queries. */
 		if (!query || ret != 0 || knot_wire_get_qr(query->wire)) {
 			if (query) worker->stats.dropped += 1;
 			return kr_error(EILSEQ);
@@ -1941,6 +1942,11 @@ int worker_submit(struct worker_ctx *worker, uv_handle_t *handle,
 		}
 		addr = NULL;
 	} else if (query) { /* response from upstream */
+		if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
+		    !knot_wire_get_qr(query->wire)) {
+			/* Ignore badly formed responses. */
+			return kr_error(EILSEQ);
+		}
 		task = find_task(session, knot_wire_get_id(query->wire));
 		if (task == NULL) {
 			return kr_error(ENOENT);

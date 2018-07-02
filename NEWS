@@ -1,6 +1,6 @@
 Incompatible changes
 --------------------
-- minimal libknot version is now 2.6.7 to pull in latest fixes
+- minimal libknot version is now 2.6.7 to pull in latest fixes (#366)
 
 Security
 --------
