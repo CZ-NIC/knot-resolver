@@ -34,10 +34,10 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 
 	knot_rdata_t *rd = rds ? rds->data : NULL;
 	for (int i = 0; i < rr_count; ++i, rd = kr_rdataset_next(rd)) {
-		const uint16_t len = knot_rdata_rdlen(rd);
+		const uint16_t len = rd->len;
 		memcpy(data, &len, sizeof(len));
 		data += sizeof(len);
-		memcpy(data, knot_rdata_data(rd), len);
+		memcpy(data, rd->data, len);
 		data += len;
 	}
 	//return data - data0;
