@@ -475,19 +475,18 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		}
 
 		assert(rr->type == KNOT_RRTYPE_NSEC3);
-		const knot_rdata_t *np_data = knot_rdata_data(rr->rrs.data);
-		const int rdlen = knot_rdata_rdlen(rr->rrs.data);
-		if (rdlen <= 4) return kr_error(EILSEQ); /*< data from outside; less trust */
-		const int np_dlen = nsec_p_rdlen(np_data);
-		if (np_dlen > rdlen) return kr_error(EILSEQ);
-		key = key_NSEC3(k, encloser, nsec_p_mkHash(np_data));
+		const knot_rdata_t * const rdata = rr->rrs.data;
+		if (rdata->len <= 4) return kr_error(EILSEQ); /*< data from outside; less trust */
+		const int np_dlen = nsec_p_rdlen(rdata->data);
+		if (np_dlen > rdata->len) return kr_error(EILSEQ);
+		key = key_NSEC3(k, encloser, nsec_p_mkHash(rdata->data));
 		if (npp && !*npp) {
 			*npp = mm_alloc(&qry->request->pool, np_dlen);
 			if (!*npp) {
 				assert(!ENOMEM);
 				break;
 			}
-			memcpy(*npp, np_data, np_dlen);
+			memcpy(*npp, rdata->data, np_dlen);
 		}
 		break;
 	default:

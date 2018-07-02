@@ -1,6 +1,5 @@
 -- Module interface
 local ffi = require('ffi')
-local knot = ffi.load(libknot_SONAME)
 
 local priming = {}
 priming.retry_time = 10 * sec -- retry time when priming fail
@@ -51,9 +50,7 @@ local function address_callback(pkt, req)
 			local rr = section[i]
 			if rr.type == kres.type.A or rr.type == kres.type.AAAA then
 				for k = 0, rr.rrs.rr_count-1 do
-					local rdata = knot.knot_rdataset_at(rr.rrs, k)
-					rdata = ffi.string(rdata, knot.knot_rdata_array_size(knot.knot_rdata_rdlen(rdata)))
-					table.insert(internal.nsset[rr:owner()], rdata)
+					table.insert(internal.nsset[rr:owner()], rr.rrs:rdata(k))
 				end
 			end
 		end
