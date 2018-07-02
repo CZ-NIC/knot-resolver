@@ -361,7 +361,7 @@ ffi.metatype( knot_rrset_t, {
 		end,
 		ttl = function(rr)
 			assert(ffi.istype(knot_rrset_t, rr))
-			return tonumber(knot.knot_rrset_ttl(rr))
+			return tonumber(rr.ttl)
 		end,
 		class = function(rr, val)
 			assert(ffi.istype(knot_rrset_t, rr))
@@ -419,9 +419,10 @@ ffi.metatype( knot_rrset_t, {
 			return tonumber(rr.rrs.rr_count)
 		end,
 		-- Add binary RDATA to the RR set
-		add_rdata = function (rr, rdata, rdlen, ttl)
+		add_rdata = function (rr, rdata, rdlen, no_ttl)
 			assert(ffi.istype(knot_rrset_t, rr))
-			local ret = knot.knot_rrset_add_rdata(rr, rdata, tonumber(rdlen), tonumber(ttl or 0), nil)
+			assert(no_ttl == nil, 'add_rdata() can not accept TTL anymore')
+			local ret = knot.knot_rrset_add_rdata(rr, rdata, tonumber(rdlen), nil)
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
@@ -834,8 +835,8 @@ local function rr2str(rr, style)
 	-- Construct a single-RR temporary set while minimizing copying.
 	local ret
 	do
-		local rrs = knot_rrset_t(rr.owner, rr.type, kres.class.IN)
-		rrs:add_rdata(rr.rdata, #rr.rdata, rr.ttl)
+		local rrs = knot_rrset_t(rr.owner, rr.type, kres.class.IN, rr.ttl)
+		rrs:add_rdata(rr.rdata, #rr.rdata)
 		ret = rrs:txt_dump(style)
 	end
 
