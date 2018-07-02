@@ -242,7 +242,7 @@ static void test_materialize(void **state)
 
 	global_rr.owner = NULL;
 	knot_rrset_init(&output_rr, NULL, 0, 0);
-	kr_cache_materialize(&output_rr, &global_rr, 0, 0, &global_mm);
+	kr_cache_materialize(&output_rr, &global_rr, 0, &global_mm);
 	res_cmp_ok_empty = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_HEADER);
 	res_cmp_fail_empty = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_WHOLE);
 	knot_rrset_clear(&output_rr, &global_mm);
@@ -252,14 +252,14 @@ static void test_materialize(void **state)
 
 	knot_rrset_init(&output_rr, NULL, 0, 0);
 	will_return (knot_rdataset_gather, 0);
-	kr_cache_materialize(&output_rr, &global_rr, 0, 0, &global_mm);
+	kr_cache_materialize(&output_rr, &global_rr, 0, &global_mm);
 	res_cmp_ok = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_WHOLE);
 	knot_rrset_clear(&output_rr, &global_mm);
 	assert_true(res_cmp_ok);
 
 	knot_rrset_init(&output_rr, NULL, 0, 0);
 	will_return (knot_rdataset_gather, KNOT_ENOMEM);
-	kr_cache_materialize(&output_rr, &global_rr, 0, 0, &global_mm);
+	kr_cache_materialize(&output_rr, &global_rr, 0, &global_mm);
 	res_cmp_fail = knot_rrset_equal(&global_rr, &output_rr, KNOT_RRSET_COMPARE_WHOLE);
 	knot_rrset_clear(&output_rr, &global_mm);
 	assert_false(res_cmp_fail);

@@ -298,8 +298,9 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache,
 	}
 
 	knot_rrset_t cached_rr;
-	knot_rrset_init(&cached_rr, /*const-cast*/(knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
-	if (kr_cache_materialize(&cached_rr.rrs, &peek, new_ttl, cut->pool) < 0) {
+	knot_rrset_init(&cached_rr, /*const-cast*/(knot_dname_t *)ns, rrtype,
+			KNOT_CLASS_IN, new_ttl);
+	if (kr_cache_materialize(&cached_rr.rrs, &peek, cut->pool) < 0) {
 		return;
 	}
 	knot_rdata_t *rd = cached_rr.rrs.data;
@@ -331,7 +332,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 	}
 	/* Materialize the rdataset temporarily, for simplicity. */
 	knot_rdataset_t ns_rds = { 0, NULL };
-	ret = kr_cache_materialize(&ns_rds, &peek, new_ttl, cut->pool);
+	ret = kr_cache_materialize(&ns_rds, &peek, cut->pool);
 	if (ret < 0) {
 		return ret;
 	}
@@ -393,8 +394,9 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 		*rr = NULL;
 		return kr_error(ENOMEM);
 	}
-	knot_rrset_init(*rr, /*const-cast*/(knot_dname_t *)owner, type, KNOT_CLASS_IN);
-	ret = kr_cache_materialize(&(*rr)->rrs, &peek, new_ttl, pool);
+	knot_rrset_init(*rr, /*const-cast*/(knot_dname_t *)owner, type,
+			KNOT_CLASS_IN, new_ttl);
+	ret = kr_cache_materialize(&(*rr)->rrs, &peek, pool);
 	if (ret < 0) {
 		knot_rrset_free(rr, pool);
 		return ret;
