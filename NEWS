@@ -1,3 +1,6 @@
+Knot Resolver 2.4.0 (2018-07-03)
+================================
+
 Incompatible changes
 --------------------
 - minimal libknot version is now 2.6.7 to pull in latest fixes (#366)
