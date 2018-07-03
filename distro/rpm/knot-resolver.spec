@@ -38,7 +38,7 @@ BuildRequires:  gnupg2
 BuildRequires:  pkgconfig(cmocka)
 BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libedit)
-BuildRequires:  pkgconfig(libknot) >= 2.6.4
+BuildRequires:  pkgconfig(libknot) >= 2.6.7
 BuildRequires:  pkgconfig(libzscanner) >= 2.4.2
 BuildRequires:  pkgconfig(libdnssec) >= 2.3.1
 BuildRequires:  pkgconfig(libsystemd)
