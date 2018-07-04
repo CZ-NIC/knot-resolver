@@ -149,7 +149,7 @@ int entry2answer(struct answer *ans, int id,
 fail:
 	assert(/*false*/!ret);
 	/* Cleanup the item that we might've (partially) written to. */
-	knot_rrset_free(&ans->rrsets[id].set.rr, ans->mm);
+	knot_rrset_free(ans->rrsets[id].set.rr, ans->mm);
 	knot_rdataset_clear(&ans->rrsets[id].sig_rds, ans->mm);
 	memset(&ans->rrsets[id], 0, sizeof(ans->rrsets[id]));
 	return kr_error(ret);
