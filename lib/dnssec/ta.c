@@ -88,7 +88,7 @@ static int insert_ta(map_t *trust_anchors, const knot_dname_t *name,
 	}
 	/* Merge-in new key data */
 	if (!ta_rr || (rdlen > 0 && knot_rrset_add_rdata(ta_rr, rdata, rdlen, NULL) != 0)) {
-		knot_rrset_free(&ta_rr, NULL);
+		knot_rrset_free(ta_rr, NULL);
 		return kr_error(ENOMEM);
 	}
 	if(VERBOSE_STATUS) {
@@ -161,7 +161,7 @@ static int del_record(const char *k, void *v, void *ext)
 {
 	knot_rrset_t *ta_rr = v;
 	if (ta_rr) {
-		knot_rrset_free(&ta_rr, NULL);
+		knot_rrset_free(ta_rr, NULL);
 	}
 	return 0;
 }

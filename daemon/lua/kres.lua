@@ -456,11 +456,6 @@ ffi.metatype( knot_rrset_t, {
 
 -- Destructor for packet accepts pointer to pointer
 local knot_pkt_t = ffi.typeof('knot_pkt_t')
-local packet_ptr = ffi.new('knot_pkt_t *[1]')
-local function pkt_free(pkt)
-	packet_ptr[0] = pkt
-	knot.knot_pkt_free(packet_ptr)
-end
 
 -- Helpers for reading/writing 16-bit numbers from packet wire
 local function pkt_u16(pkt, off, val)
@@ -546,7 +541,7 @@ ffi.metatype( knot_pkt_t, {
 			pkt.parsed = 0
 		end
 
-		return ffi.gc(pkt[0], pkt_free)
+		return ffi.gc(pkt[0], knot.knot_pkt_free)
 	end,
 	__tostring = function(pkt)
 		return pkt:tostring()
