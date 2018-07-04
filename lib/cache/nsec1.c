@@ -505,7 +505,8 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	ret = kr_ok();
 clean_wild:
 	if (arw->set.rr) { /* we may have matched AR_NSEC */
-		knot_rrset_free(&arw->set.rr, ans->mm);
+		knot_rrset_free(arw->set.rr, ans->mm);
+		arw->set.rr = NULL;
 		knot_rdataset_clear(&arw->sig_rds, ans->mm);
 	}
 	return ret;

@@ -90,11 +90,9 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 	if (cut->nsset) {
 		trie_apply(cut->nsset, free_addr_set_cb, cut->pool);
 		trie_free(cut->nsset);
-		cut->nsset = NULL;
 	}
-	knot_rrset_free(&cut->key, cut->pool);
-	knot_rrset_free(&cut->trust_anchor, cut->pool);
-	cut->name = NULL;
+	knot_rrset_free(cut->key, cut->pool);
+	knot_rrset_free(cut->trust_anchor, cut->pool);
 }
 
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
@@ -153,14 +151,14 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
 	if (src->trust_anchor) {
 		ta_copy = knot_rrset_copy(src->trust_anchor, dst->pool);
 		if (!ta_copy) {
-			knot_rrset_free(&key_copy, dst->pool);
+			knot_rrset_free(key_copy, dst->pool);
 			return kr_error(ENOMEM);
 		}
 	}
 
-	knot_rrset_free(&dst->key, dst->pool);
+	knot_rrset_free(dst->key, dst->pool);
 	dst->key = key_copy;
-	knot_rrset_free(&dst->trust_anchor, dst->pool);
+	knot_rrset_free(dst->trust_anchor, dst->pool);
 	dst->trust_anchor = ta_copy;
 
 	return kr_ok();
@@ -381,7 +379,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 		return kr_error(ESTALE);
 	}
 	/* materialize a new RRset */
-	knot_rrset_free(rr, pool);
+	knot_rrset_free(*rr, pool);
 	*rr = mm_alloc(pool, sizeof(knot_rrset_t));
 	if (*rr == NULL) {
 		return kr_error(ENOMEM);
@@ -396,7 +394,8 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 			KNOT_CLASS_IN, new_ttl);
 	ret = kr_cache_materialize(&(*rr)->rrs, &peek, pool);
 	if (ret < 0) {
-		knot_rrset_free(rr, pool);
+		knot_rrset_free(*rr, pool);
+		*rr = NULL;
 		return ret;
 	}
 
