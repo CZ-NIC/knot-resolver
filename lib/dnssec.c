@@ -235,7 +235,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 					ret = kr_nsec_wildcard_answer_response_check(pkt, KNOT_AUTHORITY, covered->owner);
 				} else {
 					ret = kr_nsec3_wildcard_answer_response_check(pkt, KNOT_AUTHORITY, covered->owner, trim_labels - 1);
-					if (ret == kr_error(DNSSEC_OUT_OF_RANGE)) {
+					if (ret == kr_error(KNOT_ERANGE)) {
 						ret = 0;
 						vctx->flags |= KR_DNSSEC_VFLG_OPTOUT;
 					}
