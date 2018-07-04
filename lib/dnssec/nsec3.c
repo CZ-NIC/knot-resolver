@@ -461,7 +461,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
  * @param section_id Packet section to be processed.
  * @param encloser   Closest (provable) encloser domain name.
  * @return           0 or error code:
- *                   DNSSEC_OUT_OF_RANGE - NSEC3 RR (that covers a wildcard)
+ *                   KNOT_ERANGE - NSEC3 RR (that covers a wildcard)
  *                   has been found, but has opt-out flag set;
  *                   otherwise - error.
  */
@@ -494,7 +494,7 @@ static int covers_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section_
 		}
 		if (flags & FLG_NAME_COVERED) {
 			return has_optout(rrset) ?
-			       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
+			       kr_error(KNOT_ERANGE) : kr_ok();
 		}
 	}
 
@@ -521,7 +521,7 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
 	 * NSEC3 for wildcard has been found and optout flag is not set.
 	 * Now check if NSEC3 that covers next closer name has opt-out. */
 	return has_optout(covering_next_nsec3) ?
-	       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
+	       kr_error(KNOT_ERANGE) : kr_ok();
 }
 
 /**
@@ -613,7 +613,7 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 		}
 		if (flags & FLG_NAME_COVERED) {
 			return has_optout(rrset) ?
-			       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
+			       kr_error(KNOT_ERANGE) : kr_ok();
 		}
 	}
 
@@ -651,7 +651,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 			 * in the packet can be properly signed,
 			 * AD bit must not be set due to rfc5155 9.2.
 			 * Return appropriate code to the caller */
-			ret = kr_error(DNSSEC_OUT_OF_RANGE);
+			ret = kr_error(KNOT_ERANGE);
 		}
 		return ret;
 	}
@@ -668,7 +668,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 		 * Denial of existence can not be proven.
 		 * Set error code to proceed unsecure.
 		 */
-		ret = kr_error(DNSSEC_OUT_OF_RANGE);
+		ret = kr_error(KNOT_ERANGE);
 	}
 
 	return ret;
@@ -745,7 +745,7 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		}
 
 		if (has_optout(covering_next_nsec3)) {
-			return kr_error(DNSSEC_OUT_OF_RANGE);
+			return kr_error(KNOT_ERANGE);
 		} else {
 			return kr_error(EINVAL);
 		}
