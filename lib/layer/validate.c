@@ -395,7 +395,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 				/* No-data answer, QTYPE is DS, rfc5155 8.6 */
 				ret = kr_nsec3_no_data(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
 			}
-			if (ret == kr_error(DNSSEC_OUT_OF_RANGE)) {
+			if (ret == kr_error(KNOT_ERANGE)) {
 				/* Not bogus, going insecure due to optout */
 				ret = 0;
 			}
@@ -982,7 +982,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		} else {
 			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}
-		if (has_nsec3 && (ret == kr_error(DNSSEC_OUT_OF_RANGE))) {
+		if (has_nsec3 && (ret == kr_error(KNOT_ERANGE))) {
 			/* NXDOMAIN proof is OK,
 			 * but NSEC3 that covers next closer name
 			 * (or wildcard at next closer name) has opt-out flag.
@@ -1013,7 +1013,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 				ret = kr_nsec3_no_data(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			}
 			if (ret != 0) {
-				if (has_nsec3 && (ret == kr_error(DNSSEC_OUT_OF_RANGE))) {
+				if (has_nsec3 && (ret == kr_error(KNOT_ERANGE))) {
 					VERBOSE_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
 					qry->flags.DNSSEC_OPTOUT = true;
 					/* Could not return from here,
