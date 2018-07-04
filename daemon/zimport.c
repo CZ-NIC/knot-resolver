@@ -325,7 +325,7 @@ static knot_pkt_t *zi_query_create(zone_import_ctx_t *z_import, knot_rrset_t *rr
 	knot_wire_set_id(query->wire, msgid);
 	int err = knot_pkt_parse(query, 0);
 	if (err != KNOT_EOK) {
-		knot_pkt_free(&query);
+		knot_pkt_free(query);
 		return NULL;
 	}
 
@@ -354,7 +354,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	/* Create "pseudo answer". */
 	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
 	if (!answer) {
-		knot_pkt_free(&query);
+		knot_pkt_free(query);
 		return -1;
 	}
 	knot_pkt_put_question(answer, dname, rrclass, rrtype);
@@ -369,8 +369,8 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	 * resolving - qr_task & request_ctx. */
 	struct qr_task *task = worker_resolve_start(worker, query, options);
 	if (!task) {
-		knot_pkt_free(&query);
-		knot_pkt_free(&answer);
+		knot_pkt_free(query);
+		knot_pkt_free(answer);
 		return -1;
 	}
 
@@ -443,8 +443,8 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 
 cleanup:
 
-	knot_pkt_free(&query);
-	knot_pkt_free(&answer);
+	knot_pkt_free(query);
+	knot_pkt_free(answer);
 	worker_task_finalize(task, state);
 	return state == (is_referral ? KR_STATE_PRODUCE : KR_STATE_DONE) ? 0 : -1;
 }
