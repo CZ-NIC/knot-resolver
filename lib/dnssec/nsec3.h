@@ -36,7 +36,7 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
  * @param sname        Name to be checked.
  * @param trim_to_next Number of labels to remove to obtain next closer name.
  * @return             0 or error code:
- *                     DNSSEC_OUT_OF_RANGE - NSEC3 RR that covers a wildcard
+ *                     KNOT_ERANGE - NSEC3 RR that covers a wildcard
  *                     has been found, but has opt-out flag set;
  *                     otherwise - error.
  */
@@ -53,7 +53,7 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
  * @return           0 or error code:
  *                   DNSSEC_NOT_FOUND - neither ds nor nsec records
  *                   were not found.
- *                   DNSSEC_OUT_OF_RANGE - denial of existence can't be proven
+ *                   KNOT_ERANGE - denial of existence can't be proven
  *                   due to opt-out, otherwise - bogus.
  */
 int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
@@ -64,7 +64,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
  * @note 	     No RRSIGs are validated.
  * @param pkt        Packet structure to be processed.
  * @return           0 or error code:
- *                   DNSSEC_OUT_OF_RANGE - denial of existence can't be proven
+ *                   KNOT_ERANGE - denial of existence can't be proven
  *                   due to opt-out.
  *                   EEXIST - ds record was found.
  *                   EINVAL - bogus.
