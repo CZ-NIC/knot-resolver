@@ -1659,7 +1659,7 @@ static int wrk_resolve(lua_State *L)
 	/* Add OPT RR */
 	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
 	if (!pkt->opt_rr) {
-		knot_pkt_free(&pkt);
+		knot_pkt_free(pkt);
 		return kr_error(ENOMEM);
 	}
 	if (options->DNSSEC_WANT) {
@@ -1673,8 +1673,8 @@ static int wrk_resolve(lua_State *L)
 	/* Create task and start with a first question */
 	struct qr_task *task = worker_resolve_start(worker, pkt, *options);
 	if (!task) {
-		knot_rrset_free(&pkt->opt_rr, NULL);
-		knot_pkt_free(&pkt);
+		knot_rrset_free(pkt->opt_rr, NULL);
+		knot_pkt_free(pkt);
 		lua_pushstring(L, "couldn't create a resolution request");
 		lua_error(L);
 	}
@@ -1689,8 +1689,8 @@ static int wrk_resolve(lua_State *L)
 	/* Start execution */
 	int ret = worker_resolve_exec(task, pkt);
 	lua_pushboolean(L, ret == 0);
-	knot_rrset_free(&pkt->opt_rr, NULL);
-	knot_pkt_free(&pkt);
+	knot_rrset_free(pkt->opt_rr, NULL);
+	knot_pkt_free(pkt);
 	return 1;
 }
 
