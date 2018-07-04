@@ -221,7 +221,8 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			int ret = knot_rdataset_merge(&qry->zone_cut.key->rrs,
 			                              &rr->rrs, qry->zone_cut.pool);
 			if (ret != 0) {
-				knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+				knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
+				qry->zone_cut.key = NULL;
 				return ret;
 			}
 			updated_key = true;
@@ -245,7 +246,8 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 		};
 		int ret = kr_dnskeys_trusted(&vctx, qry->zone_cut.trust_anchor);
 		if (ret != 0) {
-			knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
+			qry->zone_cut.key = NULL;
 			return ret;
 		}
 
@@ -279,7 +281,7 @@ static knot_rrset_t *update_ds(struct kr_zonecut *cut, const knot_pktsection_t *
 			}
 		}
 		if (ret != 0) {
-			knot_rrset_free(&new_ds, cut->pool);
+			knot_rrset_free(new_ds, cut->pool);
 			return NULL;
 		}
 	}
