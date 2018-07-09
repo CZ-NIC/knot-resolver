@@ -26,6 +26,22 @@
 #define MAX_TLS_PADDING KR_EDNS_PAYLOAD
 #define TLS_MAX_UNCORK_RETRIES 100
 
+/* rfc 5476, 7.3 - handshake Protocol overview
+ * https://tools.ietf.org/html/rfc5246#page-33
+ * Message flow for a full handshake (only mandatory messages)
+ * ClientHello           -------->
+                                        ServerHello
+                         <--------      ServerHelloDone
+   ClientKeyExchange
+   Finished              -------->
+                         <--------      Finished
+ *
+ * See also https://blog.cloudflare.com/keyless-ssl-the-nitty-gritty-technical-details/
+ * So it takes 2 RTT.
+ * As we use session tickets, there are additional messages, add one RTT mode.
+ */
+ #define TLS_MAX_HANDSHAKE_TIME (KR_CONN_RTT_MAX * 3)
+
 struct tls_ctx_t;
 struct tls_client_ctx_t;
 struct tls_credentials {

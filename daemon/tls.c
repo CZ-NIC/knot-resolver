@@ -305,11 +305,22 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	}
 
 	int submitted = 0;
+	bool is_retrying = false;
+	uint64_t retrying_start = 0;
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->tls_session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
 		if (count == GNUTLS_E_AGAIN) {
 			break;    /* No data available */
-		} else if (count == GNUTLS_E_INTERRUPTED) {
+		} else if (count == GNUTLS_E_INTERRUPTED ||
+			   count == GNUTLS_E_REHANDSHAKE) {
+			if (!is_retrying) {
+				is_retrying = true;
+				retrying_start = kr_now();
+			}
+			uint64_t elapsed = kr_now() - retrying_start;
+			if (elapsed > TLS_MAX_HANDSHAKE_TIME) {
+				return kr_error(EIO);
+			}
 			continue; /* Try reading again */
 		} else if (count < 0) {
 			kr_log_verbose("[%s] gnutls_record_recv failed: %s (%zd)\n",
