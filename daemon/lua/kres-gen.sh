@@ -46,13 +46,22 @@ typedef void (*trace_callback_f)(struct kr_request *);
 	knot_dname_t
 	knot_rdata_t
 	knot_rdataset_t
-	struct knot_rdataset
-	knot_rrset_t
+EOF
+
+genResType() {
+	echo "$1" | ./scripts/gen-cdefs.sh libkres types
+}
+
+# No simple way to fixup this rename in ./kres.lua AFAIK.
+genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
+
+./scripts/gen-cdefs.sh libkres types <<-EOF
+	knot_pkt_t
+	knot_edns_options_t
 	knot_pktsection_t
 	struct knot_compr
 	knot_compr_t
 	struct knot_pkt
-	knot_pkt_t
 	# generics
 	map_t
 	# libkres
@@ -73,14 +82,10 @@ EOF
 printf "
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
+
+void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
+			uint16_t type, uint16_t rclass, uint32_t ttl);
 "
-
-genResType() {
-	echo "$1" | ./scripts/gen-cdefs.sh libkres types
-}
-
-# No simple way to fixup this rename in ./kres.lua AFAIK.
-genResType "struct knot_rrset" | sed 's/\<owner\>/_owner/'
 
 ## Some definitions would need too many deps, so shorten them.
 
@@ -105,26 +110,16 @@ printf "\tchar _stub[];\n};\n"
 	knot_dname_size
 	knot_dname_to_str
 # Resource records
-	knot_rdata_array_size
 	knot_rdataset_at
 	knot_rdataset_merge
 	knot_rrset_add_rdata
-	knot_rrset_init_empty
 	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
 	knot_rrset_size
-	knot_rrsig_type_covered
-	knot_rrsig_sig_expiration
-	knot_rrsig_sig_inception
 # Packet
-	knot_pkt_qname
-	knot_pkt_qtype
-	knot_pkt_qclass
 	knot_pkt_begin
 	knot_pkt_put_question
-	knot_pkt_put
-	knot_pkt_rr
-	knot_pkt_section
+	knot_pkt_put_rotate
 	knot_pkt_new
 	knot_pkt_free
 	knot_pkt_parse
@@ -149,6 +144,10 @@ EOF
 	kr_pkt_put
 	kr_pkt_recycle
 	kr_pkt_clear_payload
+	kr_pkt_qclass
+	kr_pkt_qtype
+	kr_rrsig_sig_inception
+	kr_rrsig_sig_expiration
 	kr_inaddr
 	kr_inaddr_family
 	kr_inaddr_len
