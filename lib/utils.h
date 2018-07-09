@@ -436,3 +436,11 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 	dst[0] = len;
 	return KNOT_EOK;
 };
+
+/* Trivial non-inline wrappers, to be used in lua. */
+KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
+				uint16_t type, uint16_t rclass, uint32_t ttl);
+KR_EXPORT uint16_t kr_pkt_qclass(const knot_pkt_t *pkt);
+KR_EXPORT uint16_t kr_pkt_qtype(const knot_pkt_t *pkt);
+KR_EXPORT uint32_t kr_rrsig_sig_inception(const knot_rdataset_t *rrs, size_t pos);
+KR_EXPORT uint32_t kr_rrsig_sig_expiration(const knot_rdataset_t *rrs, size_t pos);
