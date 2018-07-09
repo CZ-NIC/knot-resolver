@@ -22,15 +22,28 @@ typedef struct {
 	uint16_t compress_ptr[16];
 } knot_rrinfo_t;
 typedef unsigned char knot_dname_t;
-typedef unsigned char knot_rdata_t;
-typedef struct knot_rdataset knot_rdataset_t;
-struct knot_rdataset {
+typedef struct {
+	uint16_t len;
+	uint8_t data[];
+} knot_rdata_t;
+typedef struct {
 	uint16_t rr_count;
 	knot_rdata_t *data;
-};
-typedef struct knot_rrset knot_rrset_t;
+} knot_rdataset_t;
 typedef struct {
-	struct knot_pkt *pkt;
+	knot_dname_t *_owner;
+	uint32_t _ttl;
+	uint16_t type;
+	uint16_t rclass;
+	knot_rdataset_t rrs;
+	void *additional;
+} knot_rrset_t;
+typedef struct knot_pkt knot_pkt_t;
+typedef struct {
+	uint8_t *ptr[15];
+} knot_edns_options_t;
+typedef struct {
+	knot_pkt_t *pkt;
 	uint16_t pos;
 	uint16_t count;
 } knot_pktsection_t;
@@ -54,6 +67,7 @@ struct knot_pkt {
 	uint16_t flags;
 	knot_rrset_t *opt_rr;
 	knot_rrset_t *tsig_rr;
+	knot_edns_options_t *edns_opts;
 	struct {
 		uint8_t *pos;
 		size_t len;
@@ -66,7 +80,6 @@ struct knot_pkt {
 	knot_mm_t mm;
 	knot_compr_t compr;
 };
-typedef struct knot_pkt knot_pkt_t;
 typedef struct {
 	void *root;
 	struct knot_mm *pool;
@@ -201,13 +214,9 @@ struct kr_cache {
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
-struct knot_rrset {
-	knot_dname_t *_owner;
-	uint16_t type;
-	uint16_t rclass;
-	knot_rdataset_t rrs;
-	void *additional;
-};
+
+void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
+			uint16_t type, uint16_t rclass, uint32_t ttl);
 struct kr_nsrep {
 	unsigned int score;
 	unsigned int reputation;
@@ -251,31 +260,20 @@ knot_dname_t *knot_dname_copy(const knot_dname_t *, knot_mm_t *);
 knot_dname_t *knot_dname_from_str(uint8_t *, const char *, size_t);
 _Bool knot_dname_is_equal(const knot_dname_t *, const knot_dname_t *);
 _Bool knot_dname_is_sub(const knot_dname_t *, const knot_dname_t *);
-int knot_dname_labels(const uint8_t *, const uint8_t *);
-int knot_dname_size(const knot_dname_t *);
+size_t knot_dname_labels(const uint8_t *, const uint8_t *);
+size_t knot_dname_size(const knot_dname_t *);
 char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
-size_t knot_rdata_array_size(uint16_t);
-knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, size_t);
+knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, uint16_t);
 int knot_rdataset_merge(knot_rdataset_t *, const knot_rdataset_t *, knot_mm_t *);
-int knot_rrset_add_rdata(knot_rrset_t *, const uint8_t *, const uint16_t, const uint32_t, knot_mm_t *);
-void knot_rrset_init_empty(knot_rrset_t *);
-uint32_t knot_rrset_ttl(const knot_rrset_t *);
+int knot_rrset_add_rdata(knot_rrset_t *, const uint8_t *, uint16_t, knot_mm_t *);
 int knot_rrset_txt_dump(const knot_rrset_t *, char **, size_t *, const knot_dump_style_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
 size_t knot_rrset_size(const knot_rrset_t *);
-uint16_t knot_rrsig_type_covered(const knot_rdataset_t *, size_t);
-uint32_t knot_rrsig_sig_expiration(const knot_rdataset_t *, size_t);
-uint32_t knot_rrsig_sig_inception(const knot_rdataset_t *, size_t);
-const knot_dname_t *knot_pkt_qname(const knot_pkt_t *);
-uint16_t knot_pkt_qtype(const knot_pkt_t *);
-uint16_t knot_pkt_qclass(const knot_pkt_t *);
 int knot_pkt_begin(knot_pkt_t *, knot_section_t);
 int knot_pkt_put_question(knot_pkt_t *, const knot_dname_t *, uint16_t, uint16_t);
-int knot_pkt_put(knot_pkt_t *, uint16_t, const knot_rrset_t *, uint16_t);
-const knot_rrset_t *knot_pkt_rr(const knot_pktsection_t *, uint16_t);
-const knot_pktsection_t *knot_pkt_section(const knot_pkt_t *, knot_section_t);
+int knot_pkt_put_rotate(knot_pkt_t *, uint16_t, const knot_rrset_t *, uint16_t, uint16_t);
 knot_pkt_t *knot_pkt_new(void *, uint16_t, knot_mm_t *);
-void knot_pkt_free(knot_pkt_t **);
+void knot_pkt_free(knot_pkt_t *);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
 struct kr_rplan *kr_resolve_plan(struct kr_request *);
 knot_mm_t *kr_resolve_pool(struct kr_request *);
@@ -290,6 +288,10 @@ void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
 int kr_pkt_recycle(knot_pkt_t *);
 int kr_pkt_clear_payload(knot_pkt_t *);
+uint16_t kr_pkt_qclass(const knot_pkt_t *);
+uint16_t kr_pkt_qtype(const knot_pkt_t *);
+uint32_t kr_rrsig_sig_inception(const knot_rdataset_t *, size_t);
+uint32_t kr_rrsig_sig_expiration(const knot_rdataset_t *, size_t);
 const char *kr_inaddr(const struct sockaddr *);
 int kr_inaddr_family(const struct sockaddr *);
 int kr_inaddr_len(const struct sockaddr *);

@@ -1010,3 +1010,26 @@ finish:
 	++d;
 	return d - dst;
 }
+
+void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
+			uint16_t type, uint16_t rclass, uint32_t ttl)
+{
+	assert(rrset);
+	knot_rrset_init(rrset, owner, type, rclass, ttl);
+}
+uint16_t kr_pkt_qclass(const knot_pkt_t *pkt)
+{
+	return knot_pkt_qclass(pkt);
+}
+uint16_t kr_pkt_qtype(const knot_pkt_t *pkt)
+{
+	return knot_pkt_qtype(pkt);
+}
+uint32_t kr_rrsig_sig_inception(const knot_rdataset_t *rrs, size_t pos)
+{
+	return knot_rrsig_sig_inception(rrs, pos);
+}
+uint32_t kr_rrsig_sig_expiration(const knot_rdataset_t *rrs, size_t pos)
+{
+	return knot_rrsig_sig_expiration(rrs, pos);
+}

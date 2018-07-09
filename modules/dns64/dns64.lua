@@ -24,9 +24,9 @@ M.layer = {
 		-- Synthetic AAAA from marked A responses
 		local answer = pkt:section(kres.section.ANSWER)
 		if qry.flags.DNS64_MARK then -- Marked request
-			local section = ffi.C.knot_pkt_section(pkt, kres.section.ANSWER)
+			local section = pkt.sections[section_id]
 			for i = 1, section.count do
-				local orig = ffi.C.knot_pkt_rr(section, i - 1)
+				local orig = kres.knot_pkt_rr(section, i - 1)
 				if orig.type == kres.type.A then
 					-- Disable GC, as this object doesn't own either owner or RDATA, it's just a reference
 					local rrs = ffi.gc(kres.rrset(nil, kres.type.AAAA, orig.rclass, orig:ttl()), nil)

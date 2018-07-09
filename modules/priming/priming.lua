@@ -90,7 +90,7 @@ local function priming_callback(pkt, req)
 			internal.to_resolve = internal.to_resolve + 2 * rr.rrs.rr_count
 			for k = 0, rr.rrs.rr_count-1 do
 				local nsname_text = rr:tostring(k)
-				local nsname_wire = rr:rdata(k)
+				local nsname_wire = rr:rdata(k) -- FIXME: something is wrong
 				internal.nsset[nsname_wire] = {}
 				resolve(nsname_text, kres.type.A, kres.class.IN, 0, address_callback)
 				resolve(nsname_text, kres.type.AAAA, kres.class.IN, 0, address_callback)
