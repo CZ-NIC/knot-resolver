@@ -340,12 +340,13 @@ local knot_rrset_pt = ffi.typeof('knot_rrset_t *')
 local knot_rrset_t = ffi.typeof('knot_rrset_t')
 ffi.metatype( knot_rrset_t, {
 	-- Create a new empty RR set object with an allocated owner and a destructor
-	__new = function (ct, owner, rrtype, rrclass)
+	__new = function (ct, owner, rrtype, rrclass, ttl)
 		local rr = ffi.new(ct)
-		knot.knot_rrset_init_empty(rr)
-		rr._owner = owner and knot.knot_dname_copy(owner, nil)
-		rr.type = rrtype or 0
-		rr.rclass = rrclass or const_class.IN
+		C.kr_rrset_init(rr,
+			owner and knot.knot_dname_copy(owner, nil),
+			rrtype or 0,
+			rrclass or const_class.IN,
+			ttl or 0)
 		return ffi.gc(rr, rrset_free)
 	end,
 	-- beware: `owner` and `rdata` are typed as a plain lua strings
@@ -361,7 +362,7 @@ ffi.metatype( knot_rrset_t, {
 		end,
 		ttl = function(rr)
 			assert(ffi.istype(knot_rrset_t, rr))
-			return tonumber(rr.ttl)
+			return tonumber(rr._ttl)
 		end,
 		class = function(rr, val)
 			assert(ffi.istype(knot_rrset_t, rr))
@@ -477,14 +478,19 @@ local function pkt_bit(pkt, byteoff, bitmask, val)
 	return (bit.band(pkt.wire[byteoff], bitmask) ~= 0)
 end
 
+local function knot_pkt_rr(section, i)
+	assert(section and ffi.istype('knot_pktsection_t', section))
+	return section.pkt.rr + section.pos + i;
+end
+
 -- Helpers for converting packet to text
 local function section_tostring(pkt, section_id)
 	local data = {}
-	local section = knot.knot_pkt_section(pkt, section_id)
+	local section = pkt.sections[section_id]
 	if section.count > 0 then
 		table.insert(data, string.format('\n;; %s\n', const_section_str[section_id]))
 		for j = 0, section.count - 1 do
-			local rrset = knot.knot_pkt_rr(section, j)
+			local rrset = knot_pkt_rr(section, j)
 			local rrtype = rrset.type
 			if rrtype ~= const_type.OPT and rrtype ~= const_type.TSIG then
 				table.insert(data, rrset:txt_dump())
@@ -581,23 +587,24 @@ ffi.metatype( knot_pkt_t, {
 		-- Question
 		qname = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
-			local qname = knot.knot_pkt_qname(pkt)
-			return dname2wire(qname)
+			-- inlined knot_pkt_qname(), basically
+			if pkt == nil or pkt.qname_size == 0 then return nil end
+			return ffi.string(pkt.wire + 12, pkt.qname_size)
 		end,
 		qclass = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
-			return knot.knot_pkt_qclass(pkt)
+			return C.kr_pkt_qclass(pkt)
 		end,
 		qtype  = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
-			return knot.knot_pkt_qtype(pkt)
+			return C.kr_pkt_qtype(pkt)
 		end,
 		rrsets = function (pkt, section_id)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local records = {}
-			local section = knot.knot_pkt_section(pkt, section_id)
+			local section = pkt.sections[section_id]
 			for i = 1, section.count do
-				local rrset = knot.knot_pkt_rr(section, i - 1)
+				local rrset = knot_pkt_rr(section, i - 1)
 				table.insert(records, ffi.cast(knot_rrset_pt, rrset))
 			end
 			return records
@@ -605,9 +612,9 @@ ffi.metatype( knot_pkt_t, {
 		section = function (pkt, section_id)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local records = {}
-			local section = knot.knot_pkt_section(pkt, section_id)
+			local section = pkt.sections[section_id]
 			for i = 1, section.count do
-				local rrset = knot.knot_pkt_rr(section, i - 1)
+				local rrset = knot_pkt_rr(section, i - 1)
 				for k = 1, rrset:rdcount() do
 					table.insert(records, rrset:get(k - 1))
 				end
@@ -633,7 +640,7 @@ ffi.metatype( knot_pkt_t, {
 		put_rr = function (pkt, rr)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			assert(ffi.istype(knot_rrset_t, rr))
-			local ret = C.knot_pkt_put(pkt, 0, rr, 0)
+			local ret = C.knot_pkt_put_rotate(pkt, 0, rr, 0, 0)
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
@@ -915,6 +922,8 @@ kres = {
 		return ffi.string(addr_buf, C.kr_family_len(family))
 	end,
 	context = function () return ffi.cast('struct kr_context *', __engine) end,
+
+	knot_pkt_rr = knot_pkt_rr,
 }
 
 return kres
