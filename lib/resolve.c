@@ -538,7 +538,7 @@ static int answer_padding(struct kr_request *request)
 	int32_t pad_bytes = -1;
 
 	if (padding == -1) { /* use the default padding policy from libknot */
-		pad_bytes =  knot_edns_default_padding_size(answer, opt_rr);
+		pad_bytes =  knot_pkt_default_padding_size(answer, opt_rr);
 	}
 	if (padding >= 2) {
 		int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
@@ -751,7 +751,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	} else if (cookie_ctx && cookie_ctx->srvr.enabled &&
 		   knot_wire_get_qdcount(packet->wire) == 0 &&
 		   knot_pkt_has_edns(packet) &&
-		   knot_edns_has_option(packet->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
+		   knot_pkt_edns_option(packet, KNOT_EDNS_OPTION_COOKIE)) {
 		/* Plan empty query only for cookies. */
 		qry = kr_rplan_push_empty(rplan, NULL);
 	}
