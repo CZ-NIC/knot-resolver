@@ -366,7 +366,10 @@ end
 
 -- @function Init module
 function M.init()
-	worker.coroutine(prometheus.init)
+	-- collect and merge metrics only on leader
+	if worker.id == 0 then
+		worker.coroutine(prometheus.init)
+	end
 end
 
 -- @function Cleanup module
