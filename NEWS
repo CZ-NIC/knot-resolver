@@ -13,6 +13,11 @@ Module API changes
 - kr_request::qsource.tcp renamed to ::qsource.flags.tcp
 - kr_request::has_tls renamed to ::qsource.flags.tls
 
+Bugfixes
+--------
+- http module: only run prometheus in parent process if using --forks=N,
+  as the submodule collects metrics from all sub-processes as well.
+
 
 Knot Resolver 3.1.0 (2018-11-02)
 ================================
