@@ -2401,6 +2401,8 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			/* Drop malformed packet and retry resolution */
 			pkt = NULL;
 			ret = 0;
+		} else {
+			qr_task_complete(task);
 		}
 		/* Only proceed if the message is valid, or it's an invalid response to
 		 * an outbound query which needs to be treated as a timeout. */
