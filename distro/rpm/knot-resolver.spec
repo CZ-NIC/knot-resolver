@@ -35,6 +35,7 @@ Source102:	gpgkey-4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869.gpg.asc
 BuildRequires:  gnupg2
 %endif
 
+BuildRequires:  gcc-c++
 BuildRequires:  pkgconfig(cmocka)
 BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libedit)
