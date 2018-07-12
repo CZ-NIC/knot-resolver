@@ -37,6 +37,6 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key);
  * @param trim_labels Number of the leftmost labels to be removed and replaced with '*.'.
  * @return            0 if signature valid, error code else.
  */
-int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
+int kr_check_signature(const knot_rdata_t *rrsig,
                        const dnssec_key_t *key, const knot_rrset_t *covered,
                        int trim_labels);

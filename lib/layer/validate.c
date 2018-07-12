@@ -104,7 +104,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 		}
 
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
-			const knot_dname_t *signer_name = knot_rrsig_signer_name(&rr->rrs, 0);
+			const knot_dname_t *signer_name = knot_rrsig_signer_name(rr->rrs.rdata);
 			if (!knot_dname_is_equal(vctx->zone_name, signer_name)) {
 				kr_rank_set(&entry->rank, KR_RANK_MISMATCH);
 				vctx->err_cnt += 1;
@@ -464,7 +464,7 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
 			continue;
 		}
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
-			return knot_rrsig_signer_name(&rr->rrs, 0);
+			return knot_rrsig_signer_name(rr->rrs.rdata);
 		}
 	}
 	return NULL;
@@ -567,7 +567,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 
 	const knot_rrset_t *rr = invalid_entry->rr;
 	if (kr_rank_test(invalid_entry->rank, KR_RANK_MISMATCH)) {
-		const knot_dname_t *signer_name = knot_rrsig_signer_name(&rr->rrs, 0);
+		const knot_dname_t *signer_name = knot_rrsig_signer_name(rr->rrs.rdata);
 		if (knot_dname_is_sub(signer_name, qry->zone_cut.name)) {
 			qry->zone_cut.name = knot_dname_copy(signer_name, &req->pool);
 			qry->flags.AWAIT_CUT = true;
@@ -828,8 +828,10 @@ static void check_wildcard(kr_layer_t *ctx)
 
 			int owner_labels = knot_dname_labels(rrsigs->owner, NULL);
 
-			for (int k = 0; k < rrsigs->rrs.count; ++k) {
-				if (knot_rrsig_labels(&rrsigs->rrs, k) != owner_labels) {
+			knot_rdata_t *rdata_k = rrsigs->rrs.rdata;
+			for (int k = 0; k < rrsigs->rrs.count;
+					++k, rdata_k = knot_rdataset_next(rdata_k)) {
+				if (knot_rrsig_labels(rdata_k) != owner_labels) {
 					qry->flags.DNSSEC_WEXPAND = true;
 				}
 			}

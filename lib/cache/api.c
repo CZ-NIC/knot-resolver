@@ -430,7 +430,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	}
 
 	const int wild_labels = rr_sigs == NULL ? 0 :
-	       knot_dname_labels(rr->owner, NULL) - knot_rrsig_labels(&rr_sigs->rrs, 0);
+	       knot_dname_labels(rr->owner, NULL) - knot_rrsig_labels(rr_sigs->rrs.rdata);
 	if (wild_labels < 0) {
 		return kr_ok();
 	}
@@ -448,7 +448,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	case KNOT_RRTYPE_NSEC3:
 		/* Skip "suspicious" or opt-out NSEC3 sets. */
 		if (rr->rrs.count != 1) return kr_ok();
-		if (KNOT_NSEC3_FLAG_OPT_OUT & knot_nsec3_flags(&rr->rrs, 0)) {
+		if (KNOT_NSEC3_FLAG_OPT_OUT & knot_nsec3_flags(rr->rrs.rdata)) {
 			if (has_optout) *has_optout = true;
 			return kr_ok();
 		}
@@ -462,7 +462,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			assert(!EINVAL);
 			return kr_error(EINVAL);
 		}
-		const knot_dname_t *signer = knot_rrsig_signer_name(&rr_sigs->rrs, 0);
+		const knot_dname_t *signer = knot_rrsig_signer_name(rr_sigs->rrs.rdata);
 		const int signer_size = knot_dname_size(signer);
 		k->zlf_len = signer_size - 1;
 
@@ -590,7 +590,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 		ranked_rr_array_entry_t *e = arr->at[j];
 		bool ok = e->qry_uid == qry->uid && !e->cached
 			&& e->rr->type == KNOT_RRTYPE_RRSIG
-			&& knot_rrsig_type_covered(&e->rr->rrs, 0) == rr->type
+			&& knot_rrsig_type_covered(e->rr->rrs.rdata) == rr->type
 			&& knot_dname_is_equal(rr->owner, e->rr->owner);
 		if (!ok) continue;
 		entry_rrsigs = e;
