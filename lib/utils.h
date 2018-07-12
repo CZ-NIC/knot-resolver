@@ -368,7 +368,7 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 	assert(rr && rr->rrs.count && rr->rrs.rdata);
 	uint16_t type = rr->type;
 	if (type == KNOT_RRTYPE_RRSIG)
-		type = knot_rrsig_type_covered(&rr->rrs, 0);
+		type = knot_rrsig_type_covered(rr->rrs.rdata);
 	return type;
 }
 
@@ -442,5 +442,5 @@ KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 				uint16_t type, uint16_t rclass, uint32_t ttl);
 KR_EXPORT uint16_t kr_pkt_qclass(const knot_pkt_t *pkt);
 KR_EXPORT uint16_t kr_pkt_qtype(const knot_pkt_t *pkt);
-KR_EXPORT uint32_t kr_rrsig_sig_inception(const knot_rdataset_t *rrs, size_t pos);
-KR_EXPORT uint32_t kr_rrsig_sig_expiration(const knot_rdataset_t *rrs, size_t pos);
+KR_EXPORT uint32_t kr_rrsig_sig_inception(const knot_rdata_t *rdata);
+KR_EXPORT uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata);
