@@ -294,9 +294,9 @@ static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 static inline int rdataset_dematerialized_size(const uint8_t *data)
 {
 	knot_rdataset_t rds;
-	memcpy(&rds.rr_count, data, sizeof(rds.rr_count));
-	rds.data = (knot_rdata_t *)(data + sizeof(rds.rr_count));
-	return sizeof(rds.rr_count) + knot_rdataset_size(&rds);
+	memcpy(&rds.count, data, sizeof(rds.count));
+	rds.rdata = (knot_rdata_t *)(data + sizeof(rds.count));
+	return sizeof(rds.count) + knot_rdataset_size(&rds);
 }
 
 /** Serialize an rdataset. */

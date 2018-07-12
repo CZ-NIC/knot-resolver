@@ -117,7 +117,7 @@ static inline void test_random_rr(knot_rrset_t *rr, uint32_t ttl)
 
 	/* Assign static buffers. */
 	knot_rrset_init(rr, owner_buf, KNOT_RRTYPE_TXT, KNOT_CLASS_IN, ttl);
-	rr->rrs.rr_count = 1;
-	rr->rrs.data = rdata;
+	rr->rrs.count = 1;
+	rr->rrs.rdata = rdata;
 }
 

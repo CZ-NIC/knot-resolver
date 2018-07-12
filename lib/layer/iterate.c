@@ -157,7 +157,7 @@ static bool is_valid_addr(const uint8_t *addr, size_t len)
 static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *glue_cnt)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
-		const knot_rdata_t *rdata = rr->rrs.data;
+		const knot_rdata_t *rdata = rr->rrs.rdata;
 		char name_str[KR_DNAME_STR_MAXLEN];
 		char addr_str[INET6_ADDRSTRLEN];
 		WITH_VERBOSE(query) {
@@ -286,7 +286,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	}
 
 	/* Fetch glue for each NS */
-	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
+	for (unsigned i = 0; i < rr->rrs.count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
 		/* Glue is mandatory for NS below zone */
 		if (knot_dname_in(rr->owner, ns_name) && !has_glue(pkt, ns_name)) {
