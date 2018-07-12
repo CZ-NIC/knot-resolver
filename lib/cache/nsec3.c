@@ -200,7 +200,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	}
 	/* The NSEC3 starts strictly before our target name;
 	 * now check that it still belongs into that zone and chain. */
-	const knot_rdata_t *nsec_p_raw = eh->data + KR_CACHE_RR_COUNT_SIZE
+	const uint8_t *nsec_p_raw = eh->data + KR_CACHE_RR_COUNT_SIZE
 					+ 2 /* RDLENGTH from rfc1034 */;
 	const int nsec_p_len = nsec_p_rdlen(nsec_p_raw);
 	const bool same_chain = key_found.len == hash_off + NSEC3_HASH_LEN

@@ -54,6 +54,7 @@ struct entry_h {
 	uint8_t  rank : 6;	/**< See enum kr_rank */
 	bool is_packet : 1;	/**< Negative-answer packet for insecure/bogus name. */
 	bool has_optout : 1;	/**< Only for packets; persisted DNSSEC_OPTOUT. */
+	uint8_t _pad;		/**< We need even alignment for data now. */
 	uint8_t data[];
 };
 struct entry_apex;
@@ -224,11 +225,16 @@ int entry_h_splice(
 /** Parse an entry_apex into individual items.  @return error code. */
 int entry_list_parse(const knot_db_val_t val, entry_list_t list);
 
+static inline size_t to_even(size_t n)
+{
+	return n + (n & 1);
+}
+
 static inline int entry_list_serial_size(const entry_list_t list)
 {
 	int size = offsetof(struct entry_apex, data);
 	for (int i = 0; i < EL_LENGTH; ++i) {
-		size += list[i].len;
+		size += to_even(list[i].len);
 	}
 	return size;
 }
@@ -279,16 +285,22 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 /** Size of the RR count field */
 #define KR_CACHE_RR_COUNT_SIZE sizeof(uint16_t)
 
-/** Compute size of dematerialized rdataset.  NULL is accepted as empty set. */
+/** Compute size of serialized rdataset.  NULL is accepted as empty set. */
 static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 {
-	return KR_CACHE_RR_COUNT_SIZE + (rds == NULL ? 0
-		: knot_rdataset_size(rds) - 4 * rds->rr_count /*TTLs*/);
+	return KR_CACHE_RR_COUNT_SIZE + (rds == NULL ? 0 : knot_rdataset_size(rds));
 }
 
-/** Dematerialize a rdataset. */
-int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data);
+static inline int rdataset_dematerialized_size(const uint8_t *data)
+{
+	knot_rdataset_t rds;
+	memcpy(&rds.rr_count, data, sizeof(rds.rr_count));
+	rds.data = (knot_rdata_t *)(data + sizeof(rds.rr_count));
+	return sizeof(rds.rr_count) + knot_rdataset_size(&rds);
+}
 
+/** Serialize an rdataset. */
+int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data);
 
 
 /** Partially constructed answer when gathering RRsets from cache. */
