@@ -395,9 +395,8 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
 		 * does not really exist (authoritatively in this zone,
 		 * even in case of opt-out).
 		 */
-		uint8_t *bm = NULL;
-		uint16_t bm_size;
-		knot_nsec3_bitmap(&rrset->rrs, 0, &bm, &bm_size);
+		const uint8_t *bm = knot_nsec3_bitmap(rrset->rrs.rdata);
+		uint16_t bm_size = knot_nsec3_bitmap_len(rrset->rrs.rdata);
 		if (kr_nsec_children_in_zone_check(bm, bm_size) != 0) {
 			continue; /* no fatal errors from bad RRs */
 		}
@@ -551,9 +550,8 @@ static int nodata_find(const knot_pkt_t *pkt, knot_section_t section_id,
 			/* LATER(optim.): we repeatedly recompute the hash of `name` */
 		}
 
-		uint8_t *bm = NULL;
-		uint16_t bm_size;
-		knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
+		const uint8_t *bm = knot_nsec3_bitmap(nsec3->rrs.rdata);
+		uint16_t bm_size = knot_nsec3_bitmap_len(nsec3->rrs.rdata);
 		if (kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec3->owner) == kr_ok()) {
 			return kr_ok();
 		}
@@ -706,9 +704,8 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 				continue;
 			}
 
-			uint8_t *bm = NULL;
-			uint16_t bm_size = 0;
-			knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
+			const uint8_t *bm = knot_nsec3_bitmap(nsec3->rrs.rdata);
+			uint16_t bm_size = knot_nsec3_bitmap_len(nsec3->rrs.rdata);
 			if (!bm) {
 				return kr_error(EINVAL);
 			}
@@ -767,9 +764,8 @@ int kr_nsec3_matches_name_and_type(const knot_rrset_t *nsec3,
 	if (ret) {
 		return kr_error(ret);
 	}
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec3_bitmap(nsec3->rrs.rdata);
+	uint16_t bm_size = knot_nsec3_bitmap_len(nsec3->rrs.rdata);
 	if (!bm) {
 		return kr_error(EINVAL);
 	}
