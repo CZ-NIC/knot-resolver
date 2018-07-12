@@ -64,11 +64,11 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 
 	/* Try all possible DS records */
 	int ret = 0;
-	knot_rdata_t *rd = ref->rrs.data;
-	for (uint16_t i = 0; i < ref->rrs.rr_count; ++i) {
+	knot_rdata_t *rd = ref->rrs.rdata;
+	for (uint16_t i = 0; i < ref->rrs.count; ++i) {
 		dnssec_binary_t ds_rdata = {
 			.size = rd->len,
-			.data = rd->data
+			.data = rd->rdata
 		};
 		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(&ref->rrs, i));
 		if (ret == 0) { /* Found a good DS */
@@ -206,7 +206,7 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 	 * for each RR in covered.
 	 */
 	uint8_t *beginp = wire_buffer;
-	for (uint16_t i = 0; i < covered->rrs.rr_count; ++i) {
+	for (uint16_t i = 0; i < covered->rrs.count; ++i) {
 		/* RR(i) = name | type | class | OrigTTL | RDATA length | RDATA */
 		for (int j = 0; j < trim_labels; ++j) {
 			assert(beginp[0]);

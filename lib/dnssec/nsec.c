@@ -240,7 +240,7 @@ static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection
 			continue;
 		}
 
-		for (uint16_t j = 0; j < rrset->rrs.rr_count; ++j) {
+		for (uint16_t j = 0; j < rrset->rrs.count; ++j) {
 			if (knot_rrsig_type_covered(&rrset->rrs, j) != KNOT_RRTYPE_NSEC) {
 				continue;
 			}

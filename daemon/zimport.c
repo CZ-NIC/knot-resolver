@@ -289,7 +289,7 @@ static int zi_put_glue(zone_import_ctx_t *z_import, knot_pkt_t *pkt,
 			     knot_rrset_t *rr)
 {
 	int err = 0;
-	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
+	for (uint16_t i = 0; i < rr->rrs.count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
 		err = zi_rrset_find_put(z_import, pkt, ns_name,
 					rr->rclass, KNOT_RRTYPE_A, 0);

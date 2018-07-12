@@ -24,7 +24,7 @@ local function check_time_callback(pkt, req)
 	for i = 1, #section do
 		local rr = section[i]
 		if rr.type == kres.type.RRSIG then
-			for k = 0, rr.rrs.rr_count - 1 do
+			for k = 0, rr.rrs.count - 1 do
 				seen_rrsigs = seen_rrsigs + 1
 				inception = ffi.C.kr_rrsig_sig_inception(rr.rrs, k)
 				expiration = ffi.C.kr_rrsig_sig_expiration(rr.rrs, k)
