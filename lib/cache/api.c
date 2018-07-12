@@ -49,7 +49,7 @@
 
 
 /** Cache version */
-static const uint16_t CACHE_VERSION = 4;
+static const uint16_t CACHE_VERSION = 5;
 /** Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
@@ -501,6 +501,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	/* Compute materialized sizes of the new data. */
 	const knot_rdataset_t *rds_sigs = rr_sigs ? &rr_sigs->rrs : NULL;
 	const int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
+	assert(rr_ssize == to_even(rr_ssize));
 	knot_db_val_t val_new_entry = {
 		.data = NULL,
 		.len = offsetof(struct entry_h, data) + rr_ssize
@@ -532,6 +533,19 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		assert(false);
 	}
 	assert(entry_h_consistent(val_new_entry, rr->type));
+
+	#if 0 /* Occasionally useful when debugging some kinds of changes. */
+	{
+	kr_cache_sync(cache);
+	knot_db_val_t val = { NULL, 0 };
+	ret = cache_op(cache, read, &key, &val, 1);
+	if (ret != kr_error(ENOENT)) { // ENOENT might happen in some edge case, I guess
+		assert(!ret);
+		entry_list_t el;
+		entry_list_parse(val, el);
+	}
+	}
+	#endif
 
 	/* Update metrics */
 	cache->stats.insert += 1;

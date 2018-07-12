@@ -23,23 +23,24 @@
 
 int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 {
-	//const void *data0 = data;
-	assert(data);
+	/* FIXME: either give up on even alignment and thus direct usability
+	 * of rdatasets as they are in lmdb, or align inside cdb_* functions
+	 * (request sizes one byte longer and shift iff on an odd address). */
+	//if ((size_t)data & 1) VERBOSE_MSG(NULL, "dematerialize: odd address\n");
+	const uint8_t *data0 = data;
 	if (!data) {
+		assert(data);
 		return kr_error(EINVAL);
 	}
 	const uint16_t rr_count = rds ? rds->rr_count : 0;
 	memcpy(data, &rr_count, sizeof(rr_count));
 	data += sizeof(rr_count);
-
-	knot_rdata_t *rd = rds ? rds->data : NULL;
-	for (int i = 0; i < rr_count; ++i, rd = kr_rdataset_next(rd)) {
-		const uint16_t len = rd->len;
-		memcpy(data, &len, sizeof(len));
-		data += sizeof(len);
-		memcpy(data, rd->data, len);
-		data += len;
+	if (rr_count) {
+		size_t size = knot_rdataset_size(rds);
+		memcpy(data, rds->data, size);
+		data += size;
 	}
+	VERBOSE_MSG(NULL, "dematerialized to %d B\n", (int)(data - data0));
 	//return data - data0;
 	return kr_ok();
 }
@@ -50,8 +51,8 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
 				const uint8_t *data_bound, knot_mm_t *pool)
 {
-	/* FIXME: rdataset_t and cache's rdataset have the same binary format now */
-	assert(rds && data && data_bound && data_bound > data && !rds->data);
+	assert(rds && data && data_bound && data_bound > data && !rds->data
+		/*&& !((size_t)data & 1)*/);
 	assert(pool); /* not required, but that's our current usage; guard leaks */
 	const uint8_t *d = data; /* iterates over the cache data */
 	{
@@ -64,35 +65,23 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * 
 		}
 	}
 	/* First sum up the sizes for wire format length. */
-	size_t rdata_len_sum = 0;
-	for (int i = 0; i < rds->rr_count; ++i) {
-		if (d + 2 > data_bound) {
-			VERBOSE_MSG(NULL, "materialize: EILSEQ!\n");
-			return kr_error(EILSEQ);
-		}
-		uint16_t len;
-		memcpy(&len, d, sizeof(len));
-		d += sizeof(len) + len;
-		rdata_len_sum += len;
+	const knot_rdataset_t rds_tmp = {
+		.rr_count = rds->rr_count,
+		.data = (knot_rdata_t *)d,
+	};
+	size_t rds_size = knot_rdataset_size(&rds_tmp); /* TODO: we might overrun here already,
+							but we need to trust cache anyway...*/
+	if (d + rds_size > data_bound) {
+		VERBOSE_MSG(NULL, "materialize: EILSEQ!\n");
+		return kr_error(EILSEQ);
 	}
-	/* Each item in knot_rdataset_t needs rdlength (2B) + rdata */
-	rds->data = mm_alloc(pool, rdata_len_sum + (size_t)rds->rr_count * 2);
+	rds->data = mm_alloc(pool, rds_size);
 	if (!rds->data) {
 		return kr_error(ENOMEM);
 	}
-	/* Construct the output, one "RR" at a time. */
-	d = data + KR_CACHE_RR_COUNT_SIZE;
-	knot_rdata_t *d_out = rds->data; /* iterates over the output being materialized */
-	for (int i = 0; i < rds->rr_count; ++i) {
-		uint16_t len;
-		memcpy(&len, d, sizeof(len));
-		d += sizeof(len);
-		knot_rdata_init(d_out, len, d);
-		d += len;
-		//d_out = kr_rdataset_next(d_out);
-		d_out += 2 + len; /* rdlen + rdata */
-	}
-	//VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
+	memcpy(rds->data, d, rds_size);
+	d += rds_size;
+	VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
 	return d - data;
 }
 
