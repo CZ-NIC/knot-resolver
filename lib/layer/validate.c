@@ -828,7 +828,7 @@ static void check_wildcard(kr_layer_t *ctx)
 
 			int owner_labels = knot_dname_labels(rrsigs->owner, NULL);
 
-			for (int k = 0; k < rrsigs->rrs.rr_count; ++k) {
+			for (int k = 0; k < rrsigs->rrs.count; ++k) {
 				if (knot_rrsig_labels(&rrsigs->rrs, k) != owner_labels) {
 					qry->flags.DNSSEC_WEXPAND = true;
 				}

@@ -299,8 +299,8 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache,
 	if (kr_cache_materialize(&cached_rr.rrs, &peek, cut->pool) < 0) {
 		return;
 	}
-	knot_rdata_t *rd = cached_rr.rrs.data;
-	for (uint16_t i = 0; i < cached_rr.rrs.rr_count; ++i) {
+	knot_rdata_t *rd = cached_rr.rrs.rdata;
+	for (uint16_t i = 0; i < cached_rr.rrs.count; ++i) {
 		(void) kr_zonecut_add(cut, ns, rd);
 		rd = knot_rdataset_next(rd);
 	}
@@ -335,7 +335,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 
 	/* Insert name servers for this zone cut, addresses will be looked up
 	 * on-demand (either from cache or iteratively) */
-	for (unsigned i = 0; i < ns_rds.rr_count; ++i) {
+	for (unsigned i = 0; i < ns_rds.count; ++i) {
 		const knot_dname_t *ns_name = knot_ns_name(&ns_rds, i);
 		(void) kr_zonecut_add(cut, ns_name, NULL);
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
