@@ -286,8 +286,10 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	}
 
 	/* Fetch glue for each NS */
-	for (unsigned i = 0; i < rr->rrs.count; ++i) {
-		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
+	knot_rdata_t *rdata_i = rr->rrs.rdata;
+	for (unsigned i = 0; i < rr->rrs.count;
+			++i, rdata_i = knot_rdataset_next(rdata_i)) {
+		const knot_dname_t *ns_name = knot_ns_name(rdata_i);
 		/* Glue is mandatory for NS below zone */
 		if (knot_dname_in(rr->owner, ns_name) && !has_glue(pkt, ns_name)) {
 			const char *msg =
@@ -504,7 +506,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			}
 
 			if (rr->type == KNOT_RRTYPE_RRSIG) {
-				int rrsig_labels = knot_rrsig_labels(&rr->rrs, 0);
+				int rrsig_labels = knot_rrsig_labels(rr->rrs.rdata);
 				if (rrsig_labels > cname_labels) {
 					/* clearly wrong RRSIG, don't pick it.
 					 * don't fail immediately,
@@ -541,7 +543,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				continue;
 			}
 			cname_chain_len += 1;
-			pending_cname = knot_cname_name(&rr->rrs);
+			pending_cname = knot_cname_name(rr->rrs.rdata);
 			if (!pending_cname) {
 				break;
 			}
