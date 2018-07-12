@@ -44,7 +44,7 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
 		} else {
 			list[i].data = it;
 		}
-		it += list[i].len;
+		it += to_even(list[i].len);
 	}
 }
 
@@ -85,7 +85,7 @@ int entry_list_parse(const knot_db_val_t val, entry_list_t list)
 		default:
 			return kr_error(EILSEQ);
 		};
-		it += list[i].len;
+		it += to_even(list[i].len);
 	}
 	/* Parse every entry_h. */
 	for (int i = ENTRY_APEX_NSECS_CNT; i < EL_LENGTH; ++i) {
@@ -112,7 +112,7 @@ int entry_list_parse(const knot_db_val_t val, entry_list_t list)
 			return kr_error(len);
 		}
 		list[i].len = len;
-		it += len;
+		it += to_even(len);
 	}
 	assert(it == it_bound);
 	return kr_ok();
@@ -132,24 +132,22 @@ static int entry_h_len(const knot_db_val_t val)
 	if (!eh->is_packet) { /* Positive RRset + its RRsig set (may be empty). */
 		int sets = 2;
 		while (sets-- > 0) {
-			if (d + 2 > data_bound) return kr_error(EILSEQ);
-			uint16_t rr_count;
-			memcpy(&rr_count, d, sizeof(rr_count));
-			d += sizeof(rr_count);
-			for (int i = 0; i < rr_count; ++i) {
-				if (d + 2 > data_bound) return kr_error(EILSEQ);
-				uint16_t len;
-				memcpy(&len, d, sizeof(len));
-				d += 2 + len;
+			d += rdataset_dematerialized_size(d);
+			if (d > data_bound) {
+				assert(!EILSEQ);
+				return kr_error(EILSEQ);
 			}
 		}
 	} else { /* A "packet" (opaque ATM). */
-		if (d + 2 > data_bound) return kr_error(EILSEQ);
 		uint16_t len;
+		if (d + sizeof(len) > data_bound) return kr_error(EILSEQ);
 		memcpy(&len, d, sizeof(len));
-		d += 2 + len;
+		d += 2 + to_even(len);
 	}
-	if (d > data_bound) return kr_error(EILSEQ);
+	if (d > data_bound) {
+		assert(!EILSEQ);
+		return kr_error(EILSEQ);
+	}
 	return d - (uint8_t *)val.data;
 }
 
