@@ -68,7 +68,7 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 	for (uint16_t i = 0; i < ref->rrs.count; ++i) {
 		dnssec_binary_t ds_rdata = {
 			.size = rd->len,
-			.data = rd->rdata
+			.data = rd->data
 		};
 		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(&ref->rrs, i));
 		if (ret == 0) { /* Found a good DS */

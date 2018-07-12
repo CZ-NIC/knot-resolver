@@ -294,12 +294,12 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
 		/* LATER(optim.): more efficient way to iterate than _at() */
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
-		if (!kr_dnssec_key_zsk(krr->rdata) || kr_dnssec_key_revoked(krr->rdata)) {
+		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data)) {
 			continue;
 		}
 		
 		struct dseckey *key = NULL;
-		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->rdata, krr->len) != 0) {
+		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->data, krr->len) != 0) {
 			continue;
 		}
 		if (kr_authenticate_referral(ta, (dnssec_key_t *) key) != 0) {
