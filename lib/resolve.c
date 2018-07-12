@@ -411,7 +411,7 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 	}
 
 	size_t len = knot_rrset_size(pkt->opt_rr);
-	int16_t rr_removed = pkt->opt_rr->rrs.rr_count;
+	int16_t rr_removed = pkt->opt_rr->rrs.count;
 	/* Decrease rrset counters. */
 	pkt->rrset_count -= 1;
 	pkt->sections[pkt->current].count -= 1;

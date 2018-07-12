@@ -51,7 +51,7 @@ local function address_callback(pkt, req)
 		for i = 1, #section do
 			local rr = section[i]
 			if rr.type == kres.type.A or rr.type == kres.type.AAAA then
-				for k = 0, rr.rrs.rr_count-1 do
+				for k = 0, rr.rrs.count-1 do
 					table.insert(internal.nsset[rr:owner()], rr:rdata(k))
 				end
 			end
@@ -89,8 +89,8 @@ local function priming_callback(pkt, req)
 		local rr = section[i]
 		if rr.type == kres.type.NS then
 			internal.min_ttl = math.min(internal.min_ttl, rr:ttl())
-			internal.to_resolve = internal.to_resolve + 2 * rr.rrs.rr_count
-			for k = 0, rr.rrs.rr_count-1 do
+			internal.to_resolve = internal.to_resolve + 2 * rr.rrs.count
+			for k = 0, rr.rrs.count-1 do
 				local nsname_text = rr:tostring(k)
 				local nsname_wire = rr:rdata(k) -- FIXME: something is wrong
 				internal.nsset[nsname_wire] = {}

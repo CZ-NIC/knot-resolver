@@ -447,7 +447,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	switch (rr->type) {
 	case KNOT_RRTYPE_NSEC3:
 		/* Skip "suspicious" or opt-out NSEC3 sets. */
-		if (rr->rrs.rr_count != 1) return kr_ok();
+		if (rr->rrs.count != 1) return kr_ok();
 		if (KNOT_NSEC3_FLAG_OPT_OUT & knot_nsec3_flags(&rr->rrs, 0)) {
 			if (has_optout) *has_optout = true;
 			return kr_ok();
@@ -458,7 +458,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			/* Skip any NSEC*s that aren't validated. */
 			return kr_ok();
 		}
-		if (!rr_sigs || !rr_sigs->rrs.rr_count || !rr_sigs->rrs.data) {
+		if (!rr_sigs || !rr_sigs->rrs.count || !rr_sigs->rrs.rdata) {
 			assert(!EINVAL);
 			return kr_error(EINVAL);
 		}
@@ -475,7 +475,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		}
 
 		assert(rr->type == KNOT_RRTYPE_NSEC3);
-		const knot_rdata_t * const rdata = rr->rrs.data;
+		const knot_rdata_t * const rdata = rr->rrs.rdata;
 		if (rdata->len <= 4) return kr_error(EILSEQ); /*< data from outside; less trust */
 		const int np_dlen = nsec_p_rdlen(rdata->data);
 		if (np_dlen > rdata->len) return kr_error(EILSEQ);
@@ -557,7 +557,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		VERBOSE_MSG(qry, "=> stashed %s%s %s, rank 0%.2o, "
 			"%d B total, incl. %d RRSIGs\n",
 			(wild_labels ? "*." : ""), encl_str, type_str, rank,
-			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.rr_count : 0)
+			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.count : 0)
 			);
 	} }
 

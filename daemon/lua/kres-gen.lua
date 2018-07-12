@@ -27,8 +27,8 @@ typedef struct {
 	uint8_t data[];
 } knot_rdata_t;
 typedef struct {
-	uint16_t rr_count;
-	knot_rdata_t *data;
+	uint16_t count;
+	knot_rdata_t *rdata;
 } knot_rdataset_t;
 typedef struct {
 	knot_dname_t *_owner;
