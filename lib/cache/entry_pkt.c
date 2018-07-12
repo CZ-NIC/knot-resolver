@@ -38,7 +38,7 @@ static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 			if (is_negative) {
 				/* Use SOA minimum TTL for negative answers. */
 				if (rr->type == KNOT_RRTYPE_SOA) {
-					return MIN(rr->ttl, knot_soa_minimum(&rr->rrs));
+					return MIN(rr->ttl, knot_soa_minimum(rr->rrs.rdata));
 				} else {
 					continue; /* Use SOA only for negative answers. */
 				}
