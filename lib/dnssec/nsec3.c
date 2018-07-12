@@ -54,7 +54,7 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 	/* Every NSEC3 RR contains data from NSEC3PARAMS. */
 	const size_t SALT_OFFSET = 5; /* First 5 octets contain { Alg, Flags, Iterations, Salt length } */
 	dnssec_binary_t rdata = {
-		.size = SALT_OFFSET + (size_t) knot_nsec3_salt_length(&nsec3->rrs, 0),
+		.size = SALT_OFFSET + (size_t)knot_nsec3_salt_len(nsec3->rrs.rdata),
 		.data = /*const-cast*/(uint8_t *)rr->data,
 	};
 	if (rdata.size > rr->len)
@@ -218,9 +218,8 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 		goto fail;
 	}
 
-	uint8_t next_size = 0;
-	uint8_t *next_hash = NULL;
-	knot_nsec3_next_hashed(&nsec3->rrs, 0, &next_hash, &next_size);
+	uint8_t next_size = knot_nsec3_next_len(nsec3->rrs.rdata);
+	const uint8_t *next_hash = knot_nsec3_next(nsec3->rrs.rdata);
 
 	if ((next_size > 0) && (owner_hash.size == next_size) && (name_hash.size == next_size)) {
 		/* All hash lengths must be same. */
@@ -252,7 +251,7 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 		if (covered) {
 			*flags |= FLG_NAME_COVERED;
 
-			uint8_t nsec3_flags = knot_nsec3_flags(&nsec3->rrs, 0);
+			uint8_t nsec3_flags = knot_nsec3_flags(nsec3->rrs.rdata);
 			if (nsec3_flags & ~OPT_OUT_BIT) {
 				/* RFC5155 3.1.2 */
 				ret = kr_error(EINVAL);
@@ -285,7 +284,7 @@ static bool has_optout(const knot_rrset_t *nsec3)
 		return false;
 	}
 
-	uint8_t nsec3_flags = knot_nsec3_flags(&nsec3->rrs, 0);
+	uint8_t nsec3_flags = knot_nsec3_flags(nsec3->rrs.rdata);
 	if (nsec3_flags & ~OPT_OUT_BIT) {
 		/* RFC5155 3.1.2 */
 		return false;

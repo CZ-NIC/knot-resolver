@@ -341,7 +341,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	/* NXDOMAIN proven *except* for wildcards. */
 	WITH_VERBOSE(qry) {
 		auto_free char *owner_str = kr_dname_text(nsec_rr->owner),
-			  *next_str = kr_dname_text(knot_nsec_next(&nsec_rr->rrs));
+			  *next_str = kr_dname_text(knot_nsec_next(nsec_rr->rrs.rdata));
 		VERBOSE_MSG(qry, "=> NSEC sname: covered by: %s -> %s, new TTL %d\n",
 				owner_str, next_str, new_ttl);
 	}
@@ -356,7 +356,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	 * LATER(optim.): it might be faster to use the LFs we already have.
 	 */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
-	int ret = knot_dname_to_wire(next, knot_nsec_next(&nsec_rr->rrs), sizeof(next));
+	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec_rr->rrs.rdata), sizeof(next));
 	if (ret < 0) {
 		assert(!ret);
 		return kr_error(ret);
@@ -470,7 +470,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		/* We have a record proving wildcard non-existence. */
 		WITH_VERBOSE(qry) {
 			auto_free char *owner_str = kr_dname_text(nsec_rr->owner),
-				  *next_str = kr_dname_text(knot_nsec_next(&nsec_rr->rrs));
+				*next_str = kr_dname_text(knot_nsec_next(nsec_rr->rrs.rdata));
 			VERBOSE_MSG(qry, "=> NSEC wildcard: covered by: %s -> %s, new TTL %d\n",
 					owner_str, next_str, new_ttl_log);
 		}

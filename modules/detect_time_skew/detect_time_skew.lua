@@ -5,6 +5,8 @@ local knot = ffi.load(libknot_SONAME)
 local mod = {}
 local event_id = nil
 
+local knot_rdata_pt = ffi.typeof('knot_rdata_t *');
+
 -- Resolve callback
 -- Check time validity of RRSIGs in priming query
 -- luacheck: no unused args
@@ -26,8 +28,9 @@ local function check_time_callback(pkt, req)
 		if rr.type == kres.type.RRSIG then
 			for k = 0, rr.rrs.count - 1 do
 				seen_rrsigs = seen_rrsigs + 1
-				inception = ffi.C.kr_rrsig_sig_inception(rr.rrs, k)
-				expiration = ffi.C.kr_rrsig_sig_expiration(rr.rrs, k)
+				local rdata = ffi.cast(knot_rdata_pt, rr:rdata(k));
+				inception = ffi.C.kr_rrsig_sig_inception(rdata)
+				expiration = ffi.C.kr_rrsig_sig_expiration(rdata)
 				if now > expiration then
 					-- possitive value = in the future
 					time_diff = now - expiration

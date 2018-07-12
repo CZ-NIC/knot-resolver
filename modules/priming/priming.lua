@@ -13,7 +13,7 @@ internal.to_resolve = 0 -- number of pending queries to A or AAAA
 internal.prime = {} -- function triggering priming query
 internal.event = nil -- stores event id
 
-local knot_rdata_t_p = ffi.typeof('knot_rdata_t *');
+local knot_rdata_pt = ffi.typeof('knot_rdata_t *');
 
 -- Copy hints from nsset table to resolver engine
 -- These addresses replace root hints loaded by default from file.
@@ -24,7 +24,7 @@ local function publish_hints(nsset)
 	ffi.C.kr_zonecut_set(roothints, kres.str2dname("."))
 	for dname, addresses in pairs(nsset) do
 		for _, rdata_addr in pairs(addresses) do
-			ffi.C.kr_zonecut_add(roothints, dname, ffi.cast(knot_rdata_t_p, rdata_addr))
+			ffi.C.kr_zonecut_add(roothints, dname, ffi.cast(knot_rdata_pt, rdata_addr))
 		end
 	end
 end
