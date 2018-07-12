@@ -103,7 +103,7 @@ function M.layer.consume(state, req, pkt)
 	qry.flags.RESOLVED = 1  -- stop iteration
 	qry.flags.CACHED = 1  -- do not cache
 	refuse(req)
-	log('[' .. string.format('%5d', qry.id) .. '][rebinding] '
+	log('['  .. string.format('%d', req.id) .. '][' .. string.format('%d', qry.id) .. '][rebinding] '
 	    .. 'blocking blacklisted IP \'' .. kres.rr2str(bad_rr)
 	    .. '\' received from IP ' .. tostring(kres.sockaddr_t(req.upstream.addr)))
 	return kres.FAIL

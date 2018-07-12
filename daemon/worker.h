@@ -161,6 +161,7 @@ struct worker_ctx {
 	mp_freelist_t pool_sessions;
 	mp_freelist_t pool_iohandles;
 	knot_mm_t pkt_pool;
+	int last_req_id;
 };
 
 /* @internal Union of some libuv handles for freelist.

@@ -227,6 +227,7 @@ struct kr_request {
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
+	uint32_t id;  /**< Used for logging purposes. */
 };
 
 /** Initializer for an array of *_selected. */
