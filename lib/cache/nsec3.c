@@ -369,9 +369,8 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 
 		/* Exactly matched NSEC3: two cases, one after another. */
 		const knot_rrset_t *nsec_rr = ans->rrsets[ans_id].set.rr;
-		uint8_t *bm = NULL;
-		uint16_t bm_size = 0;
-		knot_nsec3_bitmap(&nsec_rr->rrs, 0, &bm, &bm_size);
+		const uint8_t *bm = knot_nsec3_bitmap(nsec_rr->rrs.rdata);
+		uint16_t bm_size = knot_nsec3_bitmap_len(nsec_rr->rrs.rdata);
 		assert(bm);
 		if (name_labels == sname_labels) {
 			if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype,
@@ -478,9 +477,8 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	}
 
 	/* The wildcard exists.  Find if it's NODATA - check type bitmap. */
-	uint8_t *bm = NULL;
-	uint16_t bm_size;
-	knot_nsec3_bitmap(&nsec_rr->rrs, 0, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec3_bitmap(nsec_rr->rrs.rdata);
+	uint16_t bm_size = knot_nsec3_bitmap_len(nsec_rr->rrs.rdata);
 	assert(bm);
 	if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) == 0) {
 		/* NODATA proven; just need to add SOA+RRSIG later */

@@ -314,9 +314,8 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 
 	/* Final checks, split for matching vs. covering our sname. */
 	const knot_rrset_t *nsec_rr = ans->rrsets[AR_NSEC].set.rr;
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
 	assert(bm);
 
 	if (exact_match) {
@@ -389,9 +388,8 @@ static bool nonexistence_ok(int cmp, const knot_rrset_t *rrs)
 	if (cmp != 2) {
 		return false;
 	}
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec_bitmap(&rrs->rrs, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec_bitmap(rrs->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(rrs->rrs.rdata);
 	return kr_nsec_children_in_zone_check(bm, bm_size) != 0;
 }
 
@@ -447,9 +445,8 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	assert(nsec_rr);
 	const uint32_t new_ttl_log =
 		kr_verbose_status ? nsec_rr->ttl : -1;
-	uint8_t *bm = NULL;
-	uint16_t bm_size;
-	knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
 	int ret;
 	struct answer_rrset * const arw = &ans->rrsets[AR_WILD];
 	if (!bm) {
