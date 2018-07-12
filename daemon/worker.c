@@ -529,9 +529,11 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	}
 	ctx->source.session = session;
 
+	worker->last_req_id += 1;
 	struct kr_request *req = &ctx->req;
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
+	req->id = worker->last_req_id;
 
 	/* Remember query source addr */
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {

@@ -121,7 +121,7 @@ int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, knot_mm_t 
 	rplan->request = request;
 	array_init(rplan->pending);
 	array_init(rplan->resolved);
-	rplan->next_uid = 0;
+	rplan->next_uid = 1;
 	return KNOT_EOK;
 }
 
