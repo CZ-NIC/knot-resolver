@@ -141,7 +141,7 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *cover
 		return kr_error(EINVAL);
 	}
 
-	for (unsigned i = 0; i < vctx->keys->rrs.rr_count; ++i) {
+	for (unsigned i = 0; i < vctx->keys->rrs.count; ++i) {
 		int ret = kr_rrset_validate_with_key(vctx, covered, i, NULL);
 		if (ret == 0) {
 			return ret;
@@ -181,7 +181,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	if (key == NULL) {
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, key_pos);
 		int ret = kr_dnssec_key_from_rdata(&created_key, keys->owner,
-						   krr->data, krr->len);
+						   krr->rdata, krr->len);
 		if (ret != 0) {
 			vctx->result = ret;
 			return vctx->result;
@@ -204,7 +204,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 		if ((covered->rclass != rrsig->rclass) || !knot_dname_is_equal(covered->owner, rrsig->owner)) {
 			continue;
 		}
-		for (uint16_t j = 0; j < rrsig->rrs.rr_count; ++j) {
+		for (uint16_t j = 0; j < rrsig->rrs.count; ++j) {
 			int val_flgs = 0;
 			int trim_labels = 0;
 			if (knot_rrsig_type_covered(&rrsig->rrs, j) != covered->type) {
@@ -259,7 +259,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 
 static bool kr_ds_algo_support(const knot_rrset_t *ta)
 {
-	for (uint16_t i = 0; i < ta->rrs.rr_count; ++i) {
+	for (uint16_t i = 0; i < ta->rrs.count; ++i) {
 		if (dnssec_algorithm_digest_support(knot_ds_digest_type(&ta->rrs, i))
 		    && dnssec_algorithm_key_support(knot_ds_alg(&ta->rrs, i))) {
 			return true;
@@ -273,7 +273,7 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 	const knot_pkt_t *pkt         = vctx->pkt;
 	const knot_rrset_t *keys      = vctx->keys;
 
-	const bool ok = pkt && keys && ta && ta->rrs.rr_count && ta->rrs.data
+	const bool ok = pkt && keys && ta && ta->rrs.count && ta->rrs.rdata
 			&& ta->type == KNOT_RRTYPE_DS;
 	if (!ok) {
 		assert(false);
@@ -290,16 +290,16 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 	 * The supplied DS record has been authenticated.
 	 * It has been validated or is part of a configured trust anchor.
 	 */
-	for (uint16_t i = 0; i < keys->rrs.rr_count; ++i) {
+	for (uint16_t i = 0; i < keys->rrs.count; ++i) {
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
 		/* LATER(optim.): more efficient way to iterate than _at() */
 		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
-		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data)) {
+		if (!kr_dnssec_key_zsk(krr->rdata) || kr_dnssec_key_revoked(krr->rdata)) {
 			continue;
 		}
 		
 		struct dseckey *key = NULL;
-		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->data, krr->len) != 0) {
+		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->rdata, krr->len) != 0) {
 			continue;
 		}
 		if (kr_authenticate_referral(ta, (dnssec_key_t *) key) != 0) {
