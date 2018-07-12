@@ -60,20 +60,15 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 	}
 
 	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
-#if KNOT_VERSION_HEX < ((2 << 16) | (7 << 8) | 0)
-	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
-#else
 	/* We have to lower-case it with libknot >= 2.7; see also RFC 6840 5.1. */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
-	int ret = knot_dname_to_wire(next, knot_nsec_next(&nsec->rrs), sizeof(next));
-	if (ret >= 0) {
-		ret = knot_dname_to_lower(next);
-	}
+	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec->rrs.rdata), sizeof(next));
 	if (ret < 0) {
 		assert(!ret);
 		return kr_error(ret);
 	}
-#endif
+	knot_dname_to_lower(next);
+
 	const bool is_last_nsec = knot_dname_cmp(nsec->owner, next) >= 0;
 	const bool in_range = is_last_nsec || knot_dname_cmp(sname, next) < 0;
 	if (!in_range) {
@@ -209,15 +204,17 @@ static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection
 			continue;
 		}
 
-		for (uint16_t j = 0; j < rrset->rrs.count; ++j) {
-			if (knot_rrsig_type_covered(&rrset->rrs, j) != KNOT_RRTYPE_NSEC) {
+		knot_rdata_t *rdata_j = rrset->rrs.rdata;
+		for (uint16_t j = 0; j < rrset->rrs.count;
+				++j, rdata_j = knot_rdataset_next(rdata_j)) {
+			if (knot_rrsig_type_covered(rdata_j) != KNOT_RRTYPE_NSEC) {
 				continue;
 			}
 
 			if (ret < 0) {
-				ret = knot_rrsig_labels(&rrset->rrs, j);
+				ret = knot_rrsig_labels(rdata_j);
 			} else {
-				if (ret != knot_rrsig_labels(&rrset->rrs, j)) {
+				if (ret != knot_rrsig_labels(rdata_j)) {
 					return kr_error(EINVAL);
 				}
 			}

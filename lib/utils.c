@@ -659,8 +659,8 @@ static inline bool rrsets_match(const knot_rrset_t *rr1, const knot_rrset_t *rr2
 {
 	bool match = rr1->type == rr2->type && rr1->rclass == rr2->rclass;
 	if (match && rr2->type == KNOT_RRTYPE_RRSIG) {
-		match = match && knot_rrsig_type_covered(&rr1->rrs, 0)
-				  == knot_rrsig_type_covered(&rr2->rrs, 0);
+		match = match && knot_rrsig_type_covered(rr1->rrs.rdata)
+				  == knot_rrsig_type_covered(rr2->rrs.rdata);
 	}
 	match = match && knot_dname_is_equal(rr1->owner, rr2->owner);
 	return match;
@@ -1025,11 +1025,11 @@ uint16_t kr_pkt_qtype(const knot_pkt_t *pkt)
 {
 	return knot_pkt_qtype(pkt);
 }
-uint32_t kr_rrsig_sig_inception(const knot_rdataset_t *rrs, size_t pos)
+uint32_t kr_rrsig_sig_inception(const knot_rdata_t *rdata)
 {
-	return knot_rrsig_sig_inception(rrs, pos);
+	return knot_rrsig_sig_inception(rdata);
 }
-uint32_t kr_rrsig_sig_expiration(const knot_rdataset_t *rrs, size_t pos)
+uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata)
 {
-	return knot_rrsig_sig_expiration(rrs, pos);
+	return knot_rrsig_sig_expiration(rdata);
 }
