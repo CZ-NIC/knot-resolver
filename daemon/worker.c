@@ -2244,65 +2244,89 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		}
 
 		/* get task */
+		task = find_task(session, msg_id);
+		bool ignore_task = false;
 		if (!session->outgoing) {
-			/* This is a new query, create a new task that we can use
-			 * to buffer incoming message until it's complete. */
-			struct sockaddr *addr = &(session->peer.ip);
-			assert(addr->sa_family != AF_UNSPEC);
-			struct request_ctx *ctx = request_create(worker,
-								 (uv_handle_t *)handle,
-								 addr);
-			if (!ctx) {
-				return kr_error(ENOMEM);
-			}
-			task = qr_task_create(ctx);
-			if (!task) {
-				request_free(ctx);
-				return kr_error(ENOMEM);
-			}
-		} else {
-			/* Start of response from upstream.
-			 * The session task list must contain a task
-			 * with the same msg id. */
-			task = find_task(session, msg_id);
-			/* FIXME: on high load over one connection, it's likely
-			 * that we will get multiple matches sooner or later (!) */
 			if (task) {
-				/* Make sure we can process maximum packet sizes over TCP for outbound queries.
-				 * Previous packet is allocated with mempool, so there's no need to free it manually. */
-				if (task->pktbuf->max_size < KNOT_WIRE_MAX_PKTSIZE) {
-						knot_mm_t *pool = &task->pktbuf->mm;
-						pkt_buf = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
-						if (!pkt_buf) {
-								return kr_error(ENOMEM);
-						}
-						task->pktbuf = pkt_buf;
+				/* This is a new query, but
+				 * session task list already contains a task
+				 * with the same msg id.
+				 * This is the violation of rfc6677 6.2.1 -
+				 * When sending multiple queries over a TCP connection,
+				 * clients MUST NOT reuse the DNS Message ID of an
+				 * in-flight query on that connection in order to avoid
+				 * Message ID collisions.
+				 * Ignore.
+				 */
+				ignore_task = true;
+			} else {
+				/* create a new task that we can use
+				 * to buffer incoming message until it's complete. */
+				struct sockaddr *addr = &(session->peer.ip);
+				assert(addr->sa_family != AF_UNSPEC);
+				struct request_ctx *ctx = request_create(worker,
+									 (uv_handle_t *)handle,
+									 addr);
+				if (!ctx) {
+					return kr_error(ENOMEM);
 				}
-				knot_pkt_clear(task->pktbuf);
-				assert(task->leading == false);
-			} else	{
-				session->bytes_to_skip = msg_size - 2;
-				ssize_t min_len = MIN(session->bytes_to_skip, len);
-				len -= min_len;
-				msg += min_len;
-				session->bytes_to_skip -= min_len;
-				if (len < 0 || session->bytes_to_skip < 0) {
-					/* Something gone wrong.
-					 * Better kill the connection */
-					return kr_error(EILSEQ);
+				task = qr_task_create(ctx);
+				if (!task) {
+					request_free(ctx);
+					return kr_error(ENOMEM);
 				}
-				if (len == 0) {
-					return submitted;
+			}
+		} else if (task) {
+			/* Start of response from upstream. */
+
+			/* FIXME: for now kresd violates rfc6677 6.2.1 -
+			 * When sending multiple queries over a TCP connection,
+			 * clients MUST NOT reuse the DNS Message ID of an
+			 * in-flight query on that connection in order to avoid
+			 * Message ID collisions.
+			 * It doesn't lead to resolution failure, but it must be fixed,
+			 */
+
+			/* Make sure we can process maximum packet sizes over TCP for outbound queries.
+			 * Previous packet is allocated with mempool, so there's no need to free it manually. */
+			if (task->pktbuf->max_size < KNOT_WIRE_MAX_PKTSIZE) {
+				knot_mm_t *pool = &task->pktbuf->mm;
+				pkt_buf = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
+				if (!pkt_buf) {
+					return kr_error(ENOMEM);
 				}
-				assert(session->bytes_to_skip == 0);
-				int ret = worker_process_tcp(worker, handle, msg, len);
-				if (ret < 0) {
-					submitted = ret;
-				} else {
-					submitted += ret;
-				}
+				task->pktbuf = pkt_buf;
+			}
+			knot_pkt_clear(task->pktbuf);
+			assert(task->leading == false);
+		} else	{
+			/* Start of response from upstream and corresponding
+			 * task wasn't found in session task list. */
+			ignore_task = true;
+		}
+
+		if (ignore_task) {
+			session->bytes_to_skip = msg_size - 2;
+			ssize_t min_len = MIN(session->bytes_to_skip, len);
+			len -= min_len;
+			msg += min_len;
+			session->bytes_to_skip -= min_len;
+			if (len < 0 || session->bytes_to_skip < 0) {
+				/* Something gone wrong.
+				 * Better kill the connection */
+				return kr_error(EILSEQ);
+			}
+			if (len == 0) {
 				return submitted;
 			}
+			assert(session->bytes_to_skip == 0);
+			int ret = worker_process_tcp(worker, handle, msg, len);
+			if (ret < 0) {
+				submitted = ret;
+			} else {
+				submitted += ret;
+			}
+			return submitted;
 		}
 
 		pkt_buf = task->pktbuf;
