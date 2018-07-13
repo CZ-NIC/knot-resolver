@@ -158,11 +158,17 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *gl
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
 		const knot_rdata_t *rdata = rr->rrs.rdata;
+		const int a_len = rr->type == KNOT_RRTYPE_A
+			? sizeof(struct in_addr) : sizeof(struct in6_addr);
+		if (a_len != rdata->len) {
+			QVERBOSE_MSG(query, "<= ignoring invalid glue, length %d != %d\n",
+					(int)rdata->len, a_len);
+			return KR_STATE_FAIL;
+		}
 		char name_str[KR_DNAME_STR_MAXLEN];
 		char addr_str[INET6_ADDRSTRLEN];
 		WITH_VERBOSE(query) {
-			const int af = (rdata->len == sizeof(struct in_addr)) ?
-				       AF_INET : AF_INET6;
+			const int af = (rr->type == KNOT_RRTYPE_A) ? AF_INET : AF_INET6;
 			knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
 			name_str[sizeof(name_str) - 1] = 0;
 			inet_ntop(af, rdata->data, addr_str, sizeof(addr_str));
