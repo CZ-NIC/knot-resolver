@@ -167,8 +167,16 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
 int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
 {
 	if (!cut || !ns || !cut->nsset) {
+		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
+	/* Disabled; add_reverse_pair() misuses this for domain name in rdata. */
+	if (false && rdata && rdata->len != sizeof(struct in_addr)
+		  && rdata->len != sizeof(struct in6_addr)) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+
 	/* Get a pack_t for the ns. */
 	pack_t **pack = (pack_t **)trie_get_ins(cut->nsset, (const char *)ns, knot_dname_size(ns));
 	if (!pack) return kr_error(ENOMEM);
