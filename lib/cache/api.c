@@ -29,6 +29,7 @@
 
 #include "contrib/cleanup.h"
 #include "contrib/ucw/lib.h"
+#include "contrib/ucw/mempool.h"
 #include "lib/cache/api.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/defines.h"
@@ -162,9 +163,25 @@ int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const kno
 	if (err <= 0) {
 		return kr_ok();
 	}
-	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL, NULL, scope);
-		/* Zone's NSEC* parames aren't updated, but that's probably OK
-		 * for kr_cache_insert_rr() */
+
+	/* Create a context for the cache write, as it requires memory context. */
+	struct kr_request request = {
+		.pool = {
+			.ctx = mp_new(64),
+			.alloc = (knot_mm_alloc_t) mp_alloc
+		}
+	};
+	struct kr_query query = {
+		.request = &request,
+	};
+
+	ssize_t written = stash_rrset(cache, &query, rr, rrsig, timestamp, rank, NULL, NULL, scope);
+
+	/* Release the memory pool */
+	mp_delete (request.pool.ctx);
+
+	/* Zone's NSEC* parames aren't updated, but that's probably OK
+	 * for kr_cache_insert_rr() */
 	if (written >= 0) {
 		return kr_ok();
 	}
