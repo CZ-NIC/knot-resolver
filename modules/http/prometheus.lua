@@ -164,6 +164,7 @@ M.deinit = snapshot_end
 M.endpoints = {
 	['/stats']     = {'application/json', getstats, stream_stats},
 	['/frequent']  = {'application/json', function () return stats.frequent() end},
+	['/upstreams'] = {'application/json', function () return stats.upstreams() end},
 	['/metrics']   = {'text/plain; version=0.0.4', serve_prometheus},
 }
 
