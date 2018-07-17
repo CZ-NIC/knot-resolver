@@ -56,6 +56,8 @@
 	X(answer,total) X(answer,noerror) X(answer,nodata) X(answer,nxdomain) X(answer,servfail) \
 	X(answer,cached) X(answer,1ms) X(answer,10ms) X(answer,50ms) X(answer,100ms) \
 	X(answer,250ms) X(answer,500ms) X(answer,1000ms) X(answer,1500ms) X(answer,slow) \
+	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
+	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
 	X(const,end)
 
@@ -222,7 +224,40 @@ static int collect(kr_layer_t *ctx)
 			stat_const_add(data, metric_answer_cached, 1);
 		}
 	}
+
+	/* Keep stats of all response header flags */
+	if (param->answer->flags & 0x0010) { /* AA */
+			stat_const_add(data, metric_answer_aa, 1);
+	}
+	if (param->answer->flags & 0x0020) { /* TC */
+		stat_const_add(data, metric_answer_tc, 1);
+	}
+	if (param->answer->flags & 0x0040) { /* RD */
+		stat_const_add(data, metric_answer_rd, 1);
+	}
+	if (param->answer->flags & 0x0080) { /* RA */
+		stat_const_add(data, metric_answer_ra, 1);
+	}
+	if (param->answer->flags & 0x0200) { /* AD */
+		stat_const_add(data, metric_answer_ad, 1);
+	}
+	if (param->answer->flags & 0x0400) { /* CD */
+		stat_const_add(data, metric_answer_cd, 1);
+	}
+
+	/* EDNS0 stats */
+	if (knot_pkt_has_edns(param->answer)) {
+		stat_const_add(data, metric_answer_edns0, 1);
+		if (knot_pkt_has_dnssec(param->answer)) {
+			stat_const_add(data, metric_answer_do, 1);
+		}
+	}
+
 	/* Query parameters and transport mode */
+	/*
+		DEPRECATED
+		use new names metric_answer_edns0 and metric_answer_do
+	*/
 	if (knot_pkt_has_edns(param->answer)) {
 		stat_const_add(data, metric_query_edns, 1);
 		if (knot_pkt_has_dnssec(param->answer)) {
