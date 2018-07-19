@@ -453,3 +453,4 @@ KR_EXPORT uint16_t kr_pkt_qclass(const knot_pkt_t *pkt);
 KR_EXPORT uint16_t kr_pkt_qtype(const knot_pkt_t *pkt);
 KR_EXPORT uint32_t kr_rrsig_sig_inception(const knot_rdata_t *rdata);
 KR_EXPORT uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata);
+KR_EXPORT uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata);
