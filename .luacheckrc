@@ -53,6 +53,7 @@ new_globals = {
 	'stats',
 	'http',
 	'trust_anchors',
+	'bogus_log',
 }
 
 -- Luacheck < 0.18 doesn't support new_read_globals
