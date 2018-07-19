@@ -435,10 +435,11 @@ ffi.metatype( knot_rrset_t, {
 			return true
 		end,
 		-- Return type covered by this RRSIG
-		type_covered = function(rr, pos)
-			assert(ffi.istype(knot_rrset_t, rr))
+		type_covered = function(rr, i)
+			i = i or 0
+			assert(ffi.istype(knot_rrset_t, rr) and i >= 0 and i < rr:rdcount())
 			if rr.type ~= const_type.RRSIG then return end
-			return tonumber(knot.knot_rrsig_type_covered(rr.rrs, pos or 0))
+			return tonumber(C.kr_rrsig_type_covered(knot.knot_rdataset_at(rr.rrs, i)))
 		end,
 		-- Check whether a RRSIG is covering current RR set
 		is_covered_by = function(rr, rrsig)
