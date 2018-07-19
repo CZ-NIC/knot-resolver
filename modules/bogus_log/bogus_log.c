@@ -115,9 +115,7 @@ int stats_deinit(struct kr_module *module)
 {
 	struct stat_data *data = module->data;
 	if (data) {
-		map_clear(&data->map);
-		lru_free(data->queries.frequent);
-		array_clear(data->upstreams.q);
+		lru_free(data->frequent);
 		free(data);
 	}
 	return kr_ok();
