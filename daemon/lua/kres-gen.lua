@@ -324,4 +324,98 @@ int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);
 int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t);
 int kr_cache_sync(struct kr_cache *);
+typedef struct {
+	uint8_t bitmap[32];
+	uint8_t length;
+} zs_win_t;
+typedef struct {
+	uint8_t excl_flag;
+	uint16_t addr_family;
+	uint8_t prefix_length;
+} zs_apl_t;
+typedef struct {
+	uint32_t d1;
+	uint32_t d2;
+	uint32_t m1;
+	uint32_t m2;
+	uint32_t s1;
+	uint32_t s2;
+	uint32_t alt;
+	uint64_t siz;
+	uint64_t hp;
+	uint64_t vp;
+	int8_t lat_sign;
+	int8_t long_sign;
+	int8_t alt_sign;
+} zs_loc_t;
+typedef enum {ZS_STATE_NONE, ZS_STATE_DATA, ZS_STATE_ERROR, ZS_STATE_INCLUDE, ZS_STATE_EOF, ZS_STATE_STOP} zs_state_t;
+typedef struct zs_scanner zs_scanner_t;
+struct zs_scanner {
+	int cs;
+	int top;
+	int stack[16];
+	_Bool multiline;
+	uint64_t number64;
+	uint64_t number64_tmp;
+	uint32_t decimals;
+	uint32_t decimal_counter;
+	uint32_t item_length;
+	uint32_t item_length_position;
+	uint8_t *item_length_location;
+	uint32_t buffer_length;
+	uint8_t buffer[65535];
+	char include_filename[65535];
+	char *path;
+	zs_win_t windows[256];
+	int16_t last_window;
+	zs_apl_t apl;
+	zs_loc_t loc;
+	uint8_t addr[16];
+	_Bool long_string;
+	uint8_t *dname;
+	uint32_t *dname_length;
+	uint32_t dname_tmp_length;
+	uint32_t r_data_tail;
+	uint32_t zone_origin_length;
+	uint8_t zone_origin[318];
+	uint16_t default_class;
+	uint32_t default_ttl;
+	zs_state_t state;
+	struct {
+		_Bool automatic;
+		void (*record)(zs_scanner_t *);
+		void (*error)(zs_scanner_t *);
+		void *data;
+	} process;
+	struct {
+		const char *start;
+		const char *current;
+		const char *end;
+		_Bool eof;
+		_Bool mmaped;
+	} input;
+	struct {
+		char *name;
+		int descriptor;
+	} file;
+	struct {
+		int code;
+		uint64_t counter;
+		_Bool fatal;
+	} error;
+	uint64_t line_counter;
+	uint32_t r_owner_length;
+	uint8_t r_owner[318];
+	uint16_t r_class;
+	uint32_t r_ttl;
+	uint16_t r_type;
+	uint32_t r_data_length;
+	uint8_t r_data[65535];
+};
+void zs_deinit(zs_scanner_t *);
+int zs_init(zs_scanner_t *, const char *, const uint16_t, const uint32_t);
+int zs_parse_record(zs_scanner_t *);
+int zs_set_input_file(zs_scanner_t *, const char *);
+int zs_set_input_string(zs_scanner_t *, const char *, size_t);
+const char *zs_strerror(const int);
 ]]
