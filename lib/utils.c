@@ -1033,3 +1033,7 @@ uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata)
 {
 	return knot_rrsig_sig_expiration(rdata);
 }
+uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata)
+{
+	return knot_rrsig_type_covered(rdata);
+}
