@@ -34,20 +34,23 @@ if [ -z "$library" ]; then
 	exit 1
 fi
 
-GDB="gdb -n -quiet -batch -symbols=$library"
+# Let's use an array to hold command-line arguments, to simplify quoting.
+GDB=(gdb)
+GDB+=(-n -quiet -batch "-symbols=$library")
+GDB+=(-iex "set width unlimited" -iex "set max-value-size unlimited")
 
 grep -v '^#\|^$' | while read -r ident; do
 	if [ "$2" = functions ]; then
-		output="$($GDB -iex "set width unlimited" --ex "info functions ^$ident\$" \
+		output="$("${GDB[@]}" --ex "info functions ^$ident\$" \
 				| sed '0,/^All functions/ d; /^File .*:$/ d')"
 	else # types
 		case "$ident" in
 			struct\ *|union\ *|enum\ *)
-				output="$($GDB -iex "set width unlimited" --ex "ptype $ident" \
+				output="$("${GDB[@]}" --ex "ptype $ident" \
 						| sed '0,/^type = /s/^type = /\n/; $ s/$/;/')"
 				;;
 			*)
-				output="$($GDB -iex "set width unlimited" --ex "info types ^$ident\$" \
+				output="$("${GDB[@]}" --ex "info types ^$ident\$" \
 						| sed -e '0,/^File .*:$/ d' -e '/^File .*:$/,$ d')"
 						# we need to stop early to remove ^^ multiple matches
 				;;
