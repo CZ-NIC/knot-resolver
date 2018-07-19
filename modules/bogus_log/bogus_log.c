@@ -5,6 +5,7 @@
 
 #include <libknot/packet/pkt.h>
 #include <libknot/dname.h>
+#include <ccan/json/json.h>
 #include <contrib/cleanup.h>
 
 #include "daemon/engine.h"
