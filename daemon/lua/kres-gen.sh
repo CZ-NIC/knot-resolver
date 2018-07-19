@@ -148,6 +148,7 @@ EOF
 	kr_pkt_qtype
 	kr_rrsig_sig_inception
 	kr_rrsig_sig_expiration
+	kr_rrsig_type_covered
 	kr_inaddr
 	kr_inaddr_family
 	kr_inaddr_len
