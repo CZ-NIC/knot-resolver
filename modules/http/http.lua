@@ -1,5 +1,6 @@
 -- Load dependent modules
 if not stats then modules.load('stats') end
+if not bogus_log then modules.load('bogus_log') end
 
 -- This is a module that does the heavy lifting to provide an HTTP/2 enabled
 -- server that supports TLS by default and provides endpoint for other modules
