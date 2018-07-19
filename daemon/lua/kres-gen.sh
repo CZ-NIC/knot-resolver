@@ -185,6 +185,24 @@ EOF
 	kr_cache_sync
 EOF
 
+
+## libzscanner API for ./zonefile.lua
+./scripts/gen-cdefs.sh libzscanner types <<-EOF
+	zs_win_t
+	zs_apl_t
+	zs_loc_t
+	zs_state_t
+	zs_scanner_t
+	struct zs_scanner
+EOF
+./scripts/gen-cdefs.sh libzscanner functions <<-EOF
+	zs_init
+	zs_deinit
+	zs_set_input_string
+	zs_set_input_file
+	zs_parse_record
+EOF
+
 printf "]]\n"
 
 exit 0
