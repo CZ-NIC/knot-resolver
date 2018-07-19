@@ -165,6 +165,7 @@ M.endpoints = {
 	['/stats']     = {'application/json', getstats, stream_stats},
 	['/frequent']  = {'application/json', function () return stats.frequent() end},
 	['/upstreams'] = {'application/json', function () return stats.upstreams() end},
+	['/bogus']     = {'application/json', function () return bogus_log.frequent() end},
 	['/metrics']   = {'text/plain; version=0.0.4', serve_prometheus},
 }
 
