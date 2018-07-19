@@ -349,7 +349,7 @@ ffi.metatype( knot_rrset_t, {
 			ttl or 0)
 		return ffi.gc(rr, rrset_free)
 	end,
-	-- beware: `owner` and `rdata` are typed as a plain lua strings
+	-- BEWARE: `owner` and `rdata` are typed as a plain lua strings
 	--         and not the real types they represent.
 	__tostring = function(rr)
 		assert(ffi.istype(knot_rrset_t, rr))
@@ -371,13 +371,17 @@ ffi.metatype( knot_rrset_t, {
 			end
 			return tonumber(rr.rclass)
 		end,
+		rdata_pt = function(rr, i)
+			assert(ffi.istype(knot_rrset_t, rr) and i >= 0 and i < rr:rdcount())
+			return knot.knot_rdataset_at(rr.rrs, i)
+		end,
 		rdata = function(rr, i)
 			assert(ffi.istype(knot_rrset_t, rr))
-			local rdata = knot.knot_rdataset_at(rr.rrs, i)
-			return ffi.string(rdata.data, rdata.len)
+			local rd = rr:rdata_pt(i)
+			return ffi.string(rd.data, rd.len)
 		end,
 		get = function(rr, i)
-			assert(ffi.istype(knot_rrset_t, rr))
+			assert(ffi.istype(knot_rrset_t, rr) and i >= 0 and i < rr:rdcount())
 			return {owner = rr:owner(),
 			        ttl = rr:ttl(),
 			        class = tonumber(rr.rclass),
@@ -385,7 +389,8 @@ ffi.metatype( knot_rrset_t, {
 			        rdata = rr:rdata(i)}
 		end,
 		tostring = function(rr, i)
-			assert(ffi.istype(knot_rrset_t, rr))
+			assert(ffi.istype(knot_rrset_t, rr)
+					and (i == nil or (i >= 0 and i < rr:rdcount())) )
 			if rr:rdcount() > 0 then
 				local ret
 				if i ~= nil then
@@ -479,14 +484,17 @@ local function pkt_bit(pkt, byteoff, bitmask, val)
 end
 
 local function knot_pkt_rr(section, i)
-	assert(section and ffi.istype('knot_pktsection_t', section))
-	return section.pkt.rr + section.pos + i;
+	assert(section and ffi.istype('knot_pktsection_t', section)
+			and i >= 0 and i < section.count)
+	local ret = section.pkt.rr + section.pos + i
+	assert(ffi.istype(knot_rrset_pt, ret))
+	return ret
 end
 
 -- Helpers for converting packet to text
 local function section_tostring(pkt, section_id)
 	local data = {}
-	local section = pkt.sections[section_id]
+	local section = pkt.sections + section_id
 	if section.count > 0 then
 		table.insert(data, string.format('\n;; %s\n', const_section_str[section_id]))
 		for j = 0, section.count - 1 do
@@ -602,17 +610,17 @@ ffi.metatype( knot_pkt_t, {
 		rrsets = function (pkt, section_id)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local records = {}
-			local section = pkt.sections[section_id]
+			local section = pkt.sections + section_id
 			for i = 1, section.count do
 				local rrset = knot_pkt_rr(section, i - 1)
-				table.insert(records, ffi.cast(knot_rrset_pt, rrset))
+				table.insert(records, rrset)
 			end
 			return records
 		end,
 		section = function (pkt, section_id)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local records = {}
-			local section = pkt.sections[section_id]
+			local section = pkt.sections + section_id
 			for i = 1, section.count do
 				local rrset = knot_pkt_rr(section, i - 1)
 				for k = 1, rrset:rdcount() do
