@@ -79,15 +79,15 @@ function M.layer.consume(state, req, pkt)
 			local rank = neg_rank
 			if orig.rank < rank then rank = orig.rank end
 			-- Disable GC, as this object doesn't own owner or RDATA, it's just a reference
-			local rrs = ffi.gc(kres.rrset(nil, kres.type.AAAA, orig.rr.rclass), nil)
-			rrs._owner = ffi.cast('knot_dname_t *', orig.rr:owner()) -- explicit cast needed here
-			for k = 1, orig.rr.rrs.rr_count do
+			local ttl = orig.rr:ttl()
+			if ttl > max_ttl then ttl = max_ttl end
+			local rrs = ffi.gc(kres.rrset(nil, kres.type.AAAA, orig.rr.rclass, ttl), nil)
+			rrs._owner = orig.rr._owner
+			for k = 1, orig.rr.rrs.count do
 				local rdata = orig.rr:rdata( k - 1 )
 				ffi.copy(addr_buf, M.proxy, 12)
 				ffi.copy(addr_buf + 12, rdata, 4)
-				local ttl = orig.rr:ttl()
-				if ttl > max_ttl then ttl = max_ttl end
-				ffi.C.knot_rrset_add_rdata(rrs, ffi.string(addr_buf, 16), 16, ttl, req.pool)
+				ffi.C.knot_rrset_add_rdata(rrs, ffi.string(addr_buf, 16), 16, req.pool)
 			end
 			ffi.C.kr_ranked_rrarray_add(
 				req.answ_selected,
