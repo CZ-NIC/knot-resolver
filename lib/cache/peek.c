@@ -36,11 +36,12 @@ static int peek_encloser(
 	uint8_t lowest_rank, const struct kr_query *qry, struct kr_cache *cache);
 
 
-static int nsec_p_init(struct nsec_p *nsec_p, const uint8_t *nsec_p_raw)
+static int nsec_p_init(struct nsec_p *nsec_p, const uint8_t *nsec_p_raw, bool with_knot)
 {
 	nsec_p->raw = nsec_p_raw;
 	if (!nsec_p_raw) return kr_ok();
 	nsec_p->hash = nsec_p_mkHash(nsec_p->raw);
+	if (!with_knot) return kr_ok();
 	/* Convert NSEC3 params to another format. */
 	const dnssec_binary_t rdata = {
 		.size = nsec_p_rdlen(nsec_p->raw),
@@ -225,13 +226,11 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* We have to try proving from NSEC*. */
+	auto_free char *log_zname = NULL;
 	WITH_VERBOSE(qry) {
-		auto_free char *zname_str = kr_dname_text(k->zname);
+		log_zname = kr_dname_text(k->zname);
 		if (!el[0].len) {
-			VERBOSE_MSG(qry, "=> no NSEC* cached for zone: %s\n", zname_str);
-		} else {
-			VERBOSE_MSG(qry, "=> trying zone: %s (first %s)\n", zname_str,
-					(el[0].len == 4 ? "NSEC" : "NSEC3"));
+			VERBOSE_MSG(qry, "=> no NSEC* cached for zone: %s\n", log_zname);
 		}
 	}
 
@@ -269,12 +268,22 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		uint32_t stamp;
 		memcpy(&stamp, el[i].data, sizeof(stamp));
 		const int32_t remains = stamp - qry->timestamp.tv_sec; /* using SOA serial arith. */
-		if (remains < 0) goto cont;
-		{
+		if (remains >= 0 || VERBOSE_STATUS) {
 			const uint8_t *nsec_p_raw = el[i].len > sizeof(stamp)
 					? (uint8_t *)el[i].data + sizeof(stamp) : NULL;
-			nsec_p_init(&ans.nsec_p, nsec_p_raw);
+			nsec_p_init(&ans.nsec_p, nsec_p_raw, remains >= 0);
 		}
+		if (remains < 0) {
+			VERBOSE_MSG(qry, "=> skipping zone: %s, %s, hash %x;"
+				"outdated TTL %d\n",
+				log_zname, (ans.nsec_p.raw ? "NSEC3" : "NSEC"),
+				(unsigned)ans.nsec_p.hash, (int)remains);
+			/* no need for nsec_p_cleanup() in this case */
+			goto cont;
+		}
+		VERBOSE_MSG(qry, "=> trying zone: %s, %s, hash %x\n",
+				log_zname, (ans.nsec_p.raw ? "NSEC3" : "NSEC"),
+				(unsigned)ans.nsec_p.hash);
 		/**** 2. and 3. inside */
 		ret = peek_encloser(k, &ans, sname_labels,
 					lowest_rank, qry, cache);
