@@ -625,6 +625,13 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	static const int32_t ttl_margin = 3600;
 	const uint8_t *nsec_p = (const uint8_t *)nsec_p_v;
 	int data_stride = sizeof(valid_until) + nsec_p_rdlen(nsec_p);
+
+	unsigned int log_hash = 0xFeeeFeee; /* this type is simpler for printf args */
+	auto_free char *log_dname = NULL;
+	WITH_VERBOSE(qry) {
+		log_hash = nsec_p_v ? nsec_p_mkHash((const uint8_t *)nsec_p_v) : 0;
+		log_dname = kr_dname_text(dname);
+	}
 	/* Find what's in the cache. */
 	struct key k_storage, *k = &k_storage;
 	int ret = kr_dname_lf(k->buf, dname, false);
@@ -660,8 +667,9 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 			memcpy(&valid_orig, el[i].data, sizeof(valid_orig));
 			const int32_t ttl_extended_by = valid_until - valid_orig;
 			if (ttl_extended_by < ttl_margin) {
-				VERBOSE_MSG(qry, "=> nsec_p stash skipped (extra TTL: %d)\n",
-						ttl_extended_by);
+				VERBOSE_MSG(qry,
+					"=> nsec_p stash for %s skipped (extra TTL: %d, hash: %x)\n",
+					log_dname, ttl_extended_by, log_hash);
 				return kr_ok();
 			}
 			i_replace = i;
@@ -694,9 +702,11 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		return kr_ok();
 	}
 	if (log_refresh_by) {
-		VERBOSE_MSG(qry, "=> nsec_p stashed (refresh by %d)\n", log_refresh_by);
+		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (refresh by %d, hash: %x)\n",
+				log_dname, log_refresh_by, log_hash);
 	} else {
-		VERBOSE_MSG(qry, "=> nsec_p stashed (new)\n");
+		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (new, hash: %x)\n",
+				log_dname, log_hash);
 	}
 	return kr_ok();
 }
