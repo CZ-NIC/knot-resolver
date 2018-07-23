@@ -823,23 +823,13 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.prune([max_count])
 
-  :param number max_count:  maximum number of items to be pruned at once (default: 65536)
-  :return: ``{ pruned: int }``
-
-  Prune expired/invalid records.
+  Not implemented (anymore).
 
 .. function:: cache.get([domain])
 
-  :return: list of matching records in cache
+  :return: list of records in cache matching the prefix
 
-  Fetches matching records from cache. The **domain** can either be:
-
-  - a domain name (e.g. ``"domain.cz"``)
-  - a wildcard (e.g. ``"*.domain.cz"``)
-
-  The domain name fetches all records matching this name, while the wildcard matches all records at or below that name.
-
-  You can also use a special namespace ``"P"`` to purge NODATA/NXDOMAIN matching this name (e.g. ``"domain.cz P"``).
+  The count is limited.  Validated NSEC* records are not considered.
 
   .. note:: This is equivalent to ``cache['domain']`` getter.
 
@@ -847,25 +837,34 @@ daemons or manipulated from other processes, making for example synchronised loa
 
   .. code-block:: lua
 
-     -- Query cache for 'domain.cz'
-     cache['domain.cz']
-     -- Query cache for all records at/below 'insecure.net'
-     cache['*.insecure.net']
+     -- Query cache for 'nic.cz'
+     cache['nic.cz']
+
+     [nic.cz.] => {
+         [DNSKEY] => true
+         [SOA] => true
+         [AAAA] => true
+         [NS] => true
+         [A] => true
+         [DS] => true
+     }
+     [c.ns.nic.cz.] => {
+         [A] => true
+         [AAAA] => true
+     }
 
 .. function:: cache.clear([domain])
 
   :return: ``bool``
 
-  Purge cache records. If the domain isn't provided, whole cache is purged. See *cache.get()* documentation for subtree matching policy.
+  Purge cache records.  If the domain isn't provided, whole cache is purged.
 
   Examples:
 
   .. code-block:: lua
 
-     -- Clear records at/below 'bad.cz'
-     cache.clear('*.bad.cz')
-     -- Clear packet cache
-     cache.clear('*. P')
+     -- Clear records at and below 'bad.cz'
+     cache.clear('bad.cz')
      -- Clear whole cache
      cache.clear()
 
