@@ -571,6 +571,7 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 		return ret;
 	}
 
+	/* LATER(optim.): use txn_curs_get() instead, to save resources. */
 	MDB_cursor *cur = NULL;
 	ret = mdb_cursor_open(txn, env->dbi, &cur);
 	if (ret != 0) {
