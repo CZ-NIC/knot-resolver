@@ -478,7 +478,7 @@ static int net_tls_client(lua_State *L)
 
 	const char *full_addr = NULL;
 	bool pin_exists = false;
-	bool ca_file_exists = false;
+	bool hostname_exists = false;
 	if ((lua_gettop(L) == 1) && lua_isstring(L, 1)) {
 		full_addr = lua_tostring(L, 1);
 	} else if ((lua_gettop(L) == 2) && lua_isstring(L, 1) && lua_istable(L, 2)) {
@@ -486,12 +486,12 @@ static int net_tls_client(lua_State *L)
 		pin_exists = true;
 	} else if ((lua_gettop(L) == 3) && lua_isstring(L, 1) && lua_istable(L, 2)) {
 		full_addr = lua_tostring(L, 1);
-		ca_file_exists = true;
+		hostname_exists = true;
 	} else if ((lua_gettop(L) == 4) && lua_isstring(L, 1) &&
 		    lua_istable(L, 2) && lua_istable(L, 3)) {
 		full_addr = lua_tostring(L, 1);
 		pin_exists = true;
-		ca_file_exists = true;
+		hostname_exists = true;
 	} else {
 		format_error(L, "net.tls_client takes one parameter (\"address\"), two parameters (\"address\",\"pin\"), three parameters (\"address\", \"ca_file\", \"hostname\") or four ones: (\"address\", \"pin\", \"ca_file\", \"hostname\")");
 		lua_error(L);
@@ -508,9 +508,10 @@ static int net_tls_client(lua_State *L)
 		port = 853;
 	}
 
-	if (!pin_exists && !ca_file_exists) {
+	if (!pin_exists && !hostname_exists) {
 		int r = tls_client_params_set(&net->tls_client_params,
-					      addr, port, NULL, NULL, NULL);
+					      addr, port, NULL,
+					      TLS_CLIENT_PARAM_NONE);
 		if (r != 0) {
 			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
@@ -528,7 +529,8 @@ static int net_tls_client(lua_State *L)
 			/* pin now at index -1, key at index -2*/
 			const char *pin = lua_tostring(L, -1);
 			int r = tls_client_params_set(&net->tls_client_params,
-						      addr, port, NULL, NULL, pin);
+						      addr, port, pin,
+						      TLS_CLIENT_PARAM_PIN);
 			if (r != 0) {
 				lua_pushstring(L, kr_strerror(r));
 				lua_error(L);
@@ -539,7 +541,7 @@ static int net_tls_client(lua_State *L)
 
 	int ca_table_index = 2;
 	int hostname_table_index = 3;
-	if (ca_file_exists) {
+	if (hostname_exists) {
 		if (pin_exists) {
 			ca_table_index = 3;
 			hostname_table_index = 4;
@@ -549,12 +551,14 @@ static int net_tls_client(lua_State *L)
 		return 1;
 	}
 
-	/* iterate over ca filenames */
+	/* iterate over hostnames,
+	 * it must be done before iterating over ca filenames */
 	lua_pushnil(L);
-	while (lua_next(L, ca_table_index)) {
-		const char *ca_file = lua_tostring(L, -1);
+	while (lua_next(L, hostname_table_index)) {
+		const char *hostname = lua_tostring(L, -1);
 		int r = tls_client_params_set(&net->tls_client_params,
-					      addr, port, ca_file, NULL, NULL);
+					      addr, port, hostname,
+					      TLS_CLIENT_PARAM_HOSTNAME);
 		if (r != 0) {
 			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
@@ -563,18 +567,32 @@ static int net_tls_client(lua_State *L)
 		lua_pop(L, 1);
 	}
 
-	/* iterate over hostnames */
+	/* iterate over ca filenames */
 	lua_pushnil(L);
-	while (lua_next(L, hostname_table_index)) {
-		const char *hostname = lua_tostring(L, -1);
+	size_t num_of_ca_files = 0;
+	while (lua_next(L, ca_table_index)) {
+		const char *ca_file = lua_tostring(L, -1);
 		int r = tls_client_params_set(&net->tls_client_params,
-					      addr, port, NULL, hostname, NULL);
+					      addr, port, ca_file,
+					      TLS_CLIENT_PARAM_CA);
 		if (r != 0) {
 			lua_pushstring(L, kr_strerror(r));
 			lua_error(L);
 		}
+		num_of_ca_files += 1;
 		/* removes 'value'; keeps 'key' for next iteration */
 		lua_pop(L, 1);
+	}
+
+	if (num_of_ca_files == 0) {
+		/* No ca files were explicitly configured, so use system CA */
+		int r = tls_client_params_set(&net->tls_client_params,
+					      addr, port, NULL,
+					      TLS_CLIENT_PARAM_CA);
+		if (r != 0) {
+			lua_pushstring(L, kr_strerror(r));
+			lua_error(L);
+		}
 	}
 
 	lua_pushboolean(L, true);
@@ -618,6 +636,100 @@ static int net_tls_padding(lua_State *L)
 		engine->resolver.tls_padding = padding;
 	} else {
 		lua_pushstring(L, "net.tls_padding parameter has to be true, false, or a number between <0, " xstr(MAX_TLS_PADDING) ">");
+		lua_error(L);
+	}
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/** Shorter salt can't contain much entropy. */
+#define net_tls_sticket_MIN_SECRET_LEN 32
+
+static int net_tls_sticket_secret_string(lua_State *L)
+{
+	struct network *net = &engine_luaget(L)->net;
+
+	size_t secret_len;
+	const char *secret;
+
+	if (lua_gettop(L) == 0) {
+		/* Zero-length secret, implying random key. */
+		secret_len = 0;
+		secret = NULL;
+	} else {
+		if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+			lua_pushstring(L,
+				"net.tls_sticket_secret takes one parameter: (\"secret string\")");
+			lua_error(L);
+		}
+		secret = lua_tolstring(L, 1, &secret_len);
+		if (secret_len < net_tls_sticket_MIN_SECRET_LEN || !secret) {
+			lua_pushstring(L, "net.tls_sticket_secret - the secret is shorter than "
+						xstr(net_tls_sticket_MIN_SECRET_LEN) " bytes");
+			lua_error(L);
+		}
+	}
+
+	tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
+	net->tls_session_ticket_ctx =
+		tls_session_ticket_ctx_create(net->loop, secret, secret_len);
+	if (net->tls_session_ticket_ctx == NULL) {
+		lua_pushstring(L,
+			"net.tls_sticket_secret_string - can't create session ticket context");
+		lua_error(L);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+static int net_tls_sticket_secret_file(lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_pushstring(L,
+			"net.tls_sticket_secret_file takes one parameter: (\"file name\")");
+		lua_error(L);
+	}
+
+	const char *file_name = lua_tostring(L, 1);
+	if (strlen(file_name) == 0) {
+		lua_pushstring(L, "net.tls_sticket_secret_file - empty file name");
+		lua_error(L);
+	}
+
+	FILE *fp = fopen(file_name, "r");
+	if (fp == NULL) {
+		lua_pushfstring(L, "net.tls_sticket_secret_file - can't open file '%s': %s",
+				file_name, strerror(errno));
+		lua_error(L);
+	}
+
+	char secret_buf[TLS_SESSION_TICKET_SECRET_MAX_LEN];
+	const size_t secret_len = fread(secret_buf, 1, sizeof(secret_buf), fp);
+	int err = ferror(fp);
+	if (err) {
+		lua_pushfstring(L,
+			"net.tls_sticket_secret_file - error reading from file '%s': %s",
+			file_name, strerror(err));
+		lua_error(L);
+	}
+	if (secret_len < net_tls_sticket_MIN_SECRET_LEN) {
+		lua_pushfstring(L,
+			"net.tls_sticket_secret_file - file '%s' is shorter than "
+				xstr(net_tls_sticket_MIN_SECRET_LEN) " bytes",
+			file_name);
+		lua_error(L);
+	}
+	fclose(fp);
+
+	struct network *net = &engine_luaget(L)->net;
+
+	tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
+	net->tls_session_ticket_ctx =
+		tls_session_ticket_ctx_create(net->loop, secret_buf, secret_len);
+	if (net->tls_session_ticket_ctx == NULL) {
+		lua_pushstring(L,
+			"net.tls_sticket_secret_file - can't create session ticket context");
 		lua_error(L);
 	}
 	lua_pushboolean(L, true);
@@ -681,6 +793,37 @@ static int net_outgoing(lua_State *L, int family)
 static int net_outgoing_v4(lua_State *L) { return net_outgoing(L, AF_INET); }
 static int net_outgoing_v6(lua_State *L) { return net_outgoing(L, AF_INET6); }
 
+static int net_tcp_in_idle(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct network *net = &engine->net;
+
+	/* Only return current idle timeout. */
+	if (lua_gettop(L) == 0) {
+		lua_pushnumber(L, net->tcp.in_idle_timeout);
+		return 1;
+	}
+
+	if ((lua_gettop(L) != 1)) {
+		lua_pushstring(L, "net.tcp_in_idle takes one parameter: (\"idle timeout\")");
+		lua_error(L);
+	}
+
+	if (lua_isnumber(L, 1)) {
+		int idle_timeout = lua_tointeger(L, 1);
+		if (idle_timeout <= 0) {
+			lua_pushstring(L, "net.tcp_in_idle parameter has to be positive number");
+			lua_error(L);
+		}
+		net->tcp.in_idle_timeout = idle_timeout;
+	} else {
+		lua_pushstring(L, "net.tcp_in_idle parameter has to be positive number");
+		lua_error(L);
+	}
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -694,8 +837,11 @@ int lib_net(lua_State *L)
 		{ "tls_server",   net_tls },
 		{ "tls_client",   net_tls_client },
 		{ "tls_padding",  net_tls_padding },
+		{ "tls_sticket_secret", net_tls_sticket_secret_string },
+		{ "tls_sticket_secret_file", net_tls_sticket_secret_file },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
+		{ "tcp_in_idle",  net_tcp_in_idle },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
@@ -1521,6 +1667,7 @@ static int wrk_resolve(lua_State *L)
 	}
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 	knot_wire_set_rd(pkt->wire);
+	knot_wire_set_ad(pkt->wire);
 
 	/* Add OPT RR */
 	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);

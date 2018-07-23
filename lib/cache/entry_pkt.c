@@ -61,33 +61,19 @@ static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 }
 
 
-
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
-		const struct kr_request *req)
+		const struct kr_request *req, const bool has_optout)
 {
 	/* In some cases, stash also the packet. */
 	const bool is_negative = kr_response_classify(pkt)
 				& (PKT_NODATA|PKT_NXDOMAIN);
-	const bool want_pkt = qry->flags.DNSSEC_BOGUS
-		|| (is_negative && (qry->flags.DNSSEC_INSECURE || !qry->flags.DNSSEC_WANT));
+	const struct kr_qflags * const qf = &qry->flags;
+	const bool want_negative = qf->DNSSEC_INSECURE || !qf->DNSSEC_WANT || has_optout;
+	const bool want_pkt = qf->DNSSEC_BOGUS /*< useful for +cd answers */
+				|| (is_negative && want_negative);
 
-	/* Also stash packets that contain an NSEC3.
-	 * LATER(NSEC3): remove when aggressive NSEC3 works. */
-	bool with_nsec3 = false;
-	if (!want_pkt && qry->flags.DNSSEC_WANT && !qry->flags.DNSSEC_BOGUS
-	    && !qry->flags.DNSSEC_INSECURE) {
-		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
-		for (unsigned k = 0; k < sec->count; ++k) {
-			if (knot_pkt_rr(sec, k)->type == KNOT_RRTYPE_NSEC3) {
-				with_nsec3 = true;
-				VERBOSE_MSG(qry, "NSEC3 found\n");
-				break;
-			}
-		}
-	}
-
-	if (!(want_pkt || with_nsec3) || !knot_wire_get_aa(pkt->wire)
-	    || pkt->parsed != pkt->size /* malformed packet; still can't detect KNOT_EFEWDATA */
+	if (!want_pkt || !knot_wire_get_aa(pkt->wire)
+	    || pkt->parsed != pkt->size /*< malformed packet; still can't detect KNOT_EFEWDATA */
 	   ) {
 		return;
 	}
@@ -96,19 +82,19 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	 * forwarding, make the rank bad; otherwise it depends on flags.
 	 * TODO: probably make validator attempt validation even with +cd. */
 	uint8_t rank = KR_RANK_AUTH;
-	const bool risky_vldr = is_negative && qry->flags.FORWARD && qry->flags.CNAME;
+	const bool risky_vldr = is_negative && qf->FORWARD && qf->CNAME;
 		/* ^^ CNAME'ed NXDOMAIN answer in forwarding mode can contain
 		 * unvalidated records; original commit: d6e22f476. */
-	if (knot_wire_get_cd(req->answer->wire) || qry->flags.STUB || risky_vldr) {
+	if (knot_wire_get_cd(req->answer->wire) || qf->STUB || risky_vldr) {
 		kr_rank_set(&rank, KR_RANK_OMIT);
 	} else {
-		if (qry->flags.DNSSEC_BOGUS) {
+		if (qf->DNSSEC_BOGUS) {
 			kr_rank_set(&rank, KR_RANK_BOGUS);
-		} else if (qry->flags.DNSSEC_INSECURE) {
+		} else if (qf->DNSSEC_INSECURE) {
 			kr_rank_set(&rank, KR_RANK_INSECURE);
-		} else if (!qry->flags.DNSSEC_WANT) {
+		} else if (!qf->DNSSEC_WANT) {
 			/* no TAs at all, leave _RANK_AUTH */
-		} else if (with_nsec3) {
+		} else if (has_optout) {
 			/* All bad cases should be filtered above,
 			 * at least the same way as pktcache in kresd 1.5.x. */
 			kr_rank_set(&rank, KR_RANK_SECURE);
@@ -121,7 +107,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	// LATER: nothing exists under NXDOMAIN.  Implement that (optionally)?
 #if 0
 	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN
-	 /* && !qry->flags.DNSSEC_INSECURE */ ) {
+	 /* && !qf->DNSSEC_INSECURE */ ) {
 		pkt_type = KNOT_RRTYPE_NS;
 	}
 #endif
@@ -150,11 +136,12 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	if (ret) return; /* some aren't really errors */
 	assert(val_new_entry.data);
 	struct entry_h *eh = val_new_entry.data;
+	memset(eh, 0, offsetof(struct entry_h, data));
 	eh->time = qry->timestamp.tv_sec;
 	eh->ttl  = MAX(MIN(packet_ttl(pkt, is_negative), cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;
 	eh->is_packet = true;
-	eh->has_optout = qry->flags.DNSSEC_OPTOUT;
+	eh->has_optout = qf->DNSSEC_OPTOUT;
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
 	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
 
@@ -223,15 +210,16 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	}
 
 	/* Finishing touches. TODO: perhaps factor out */
-	qry->flags.EXPIRING = is_expiring(eh->ttl, new_ttl);
-	qry->flags.CACHED = true;
-	qry->flags.NO_MINIMIZE = true;
-	qry->flags.DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
-	qry->flags.DNSSEC_BOGUS = kr_rank_test(eh->rank, KR_RANK_BOGUS);
-	if (qry->flags.DNSSEC_INSECURE || qry->flags.DNSSEC_BOGUS) {
-		qry->flags.DNSSEC_WANT = false;
+	struct kr_qflags * const qf = &qry->flags;
+	qf->EXPIRING = is_expiring(eh->ttl, new_ttl);
+	qf->CACHED = true;
+	qf->NO_MINIMIZE = true;
+	qf->DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
+	qf->DNSSEC_BOGUS = kr_rank_test(eh->rank, KR_RANK_BOGUS);
+	if (qf->DNSSEC_INSECURE || qf->DNSSEC_BOGUS) {
+		qf->DNSSEC_WANT = false;
 	}
-	qry->flags.DNSSEC_OPTOUT = eh->has_optout;
+	qf->DNSSEC_OPTOUT = eh->has_optout;
 	VERBOSE_MSG(qry, "=> satisfied by exact packet: rank 0%.2o, new TTL %d\n",
 			eh->rank, new_ttl);
 	return kr_ok();

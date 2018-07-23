@@ -16,9 +16,9 @@ Source0:        knot-resolver_%{version}.orig.tar.xz
 # LuaJIT only on these arches
 %if 0%{?rhel}
 # RHEL 7 does not have aarch64 LuaJIT
-ExclusiveArch: %{ix86} x86_64
+ExclusiveArch:	%{ix86} x86_64
 %else
-ExclusiveArch: %{arm} aarch64 %{ix86} x86_64
+ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
 %endif
 
 Source2:        kresd.conf
@@ -29,49 +29,49 @@ Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
 # Export with --armor using command from https://fedoraproject.org/wiki/PackagingDrafts:GPGSignatures
 # Don't forget to update %%prep section when adding/removing keys
-Source100:     gpgkey-B6006460B60A80E782062449E747DF1F9575A3AA.gpg.asc
-Source101:     gpgkey-BE26EBB9CBE059B3910CA35BCE8DD6A1A50A21E4.gpg.asc
-Source102:     gpgkey-4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869.gpg.asc
+Source100:	gpgkey-B6006460B60A80E782062449E747DF1F9575A3AA.gpg.asc
+Source101:	gpgkey-BE26EBB9CBE059B3910CA35BCE8DD6A1A50A21E4.gpg.asc
+Source102:	gpgkey-4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869.gpg.asc
 BuildRequires:  gnupg2
 %endif
 
-BuildRequires:  pkgconfig(libknot) >= 2.6.4
+BuildRequires:  gcc
+BuildRequires:  gcc-c++
+BuildRequires:  pkgconfig(cmocka)
+BuildRequires:  pkgconfig(gnutls)
+BuildRequires:  pkgconfig(libedit)
+BuildRequires:  pkgconfig(libknot) >= 2.6.7
 BuildRequires:  pkgconfig(libzscanner) >= 2.4.2
 BuildRequires:  pkgconfig(libdnssec) >= 2.3.1
+BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
+BuildRequires:  pkgconfig(systemd)
 
-BuildRequires:  pkgconfig(libedit)
-BuildRequires:  pkgconfig(libmemcached) >= 1.0
-BuildRequires:  pkgconfig(hiredis)
-BuildRequires:  pkgconfig(libsystemd)
-
-BuildRequires:  pkgconfig(cmocka)
-
-BuildRequires:  systemd
+%if 0%{?rhel}
+BuildRequires:  lmdb-devel
+# Lua 5.1 version of the libraries have different package names
+Requires:       lua-socket
+Requires:       lua-sec
+%else
+BuildRequires:  pkgconfig(lmdb)
+Requires:       lua-socket-compat
+Requires:       lua-sec-compat
+%endif
 
 %if 0%{?fedora}
 # dependencies for doc package; disable in EPEL (missing fonts)
 # https://bugzilla.redhat.com/show_bug.cgi?id=1492884
 BuildRequires:  doxygen
-BuildRequires:  python2-breathe
-BuildRequires:  python2-sphinx
-BuildRequires:  python2-sphinx_rtd_theme
+BuildRequires:  python3-breathe
+BuildRequires:  python3-sphinx
+BuildRequires:  python3-sphinx_rtd_theme
 %endif
 
-# Lua 5.1 version of the libraries have different package names
-%if 0%{?rhel}
-Requires:       lua-socket
-Requires:       lua-sec
-%else
-Requires:       lua-socket-compat
-Requires:       lua-sec-compat
-%endif
-
-Requires(pre): shadow-utils
-Requires(post): systemd
-Requires(preun): systemd
-Requires(postun): systemd
+Requires(pre):		shadow-utils
+Requires(post):		systemd
+Requires(preun):	systemd
+Requires(postun):	systemd
 
 %description
 The Knot DNS Resolver is a caching full resolver implementation written in C
@@ -121,6 +121,9 @@ rm -v scripts/bootstrap-depends.sh
 make doc
 %endif
 
+%check
+make %{?_smp_mflags} check
+
 %install
 %make_install %{build_flags}
 
@@ -137,24 +140,27 @@ install -m 0664 -p %SOURCE3 %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
 
 # install systemd units and doc
 mkdir -p %{buildroot}%{_unitdir}
-install -m 0644 -p %{repodir}/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.target %{buildroot}%{_unitdir}/kresd.target
+install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
+ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.target
 mkdir -p %{buildroot}%{_mandir}/man7
-install -m 0644 -p %{repodir}/doc/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
 
 %if 0%{?rhel}
 # no socket activation for CentOS 7 (requires systemd.227)
 mkdir -p %{buildroot}%{_unitdir}/kresd@.service.d
-install -m 0644 -p %{repodir}/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
+install -m 0644 -p %{repodir}/distro/common/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
 %endif
 %if 0%{?fedora}
-install -m 0644 -p %{repodir}/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
-install -m 0644 -p %{repodir}/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
-install -m 0644 -p %{repodir}/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
+install -m 0644 -p %{repodir}/distro/common/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
 %endif
 
 # install tmpfiles.d
 mkdir -p %{buildroot}%{_tmpfilesdir}
-install -m 0644 -p %{repodir}/systemd/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
+install -m 0644 -p %{repodir}/distro/common/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
 mkdir -p %{buildroot}%{_rundir}
 install -m 0750 -d %{buildroot}%{_rundir}/knot-resolver
 
@@ -165,16 +171,12 @@ install -m 0750 -d %{buildroot}%{_localstatedir}/cache/knot-resolver
 # remove module with unsatisfied dependencies
 rm -r %{buildroot}%{_libdir}/kdns_modules/{http,http.lua}
 
-%check
-# check-config requires installed version of kresd, do not attempt to run that
-LD_PRELOAD=lib/libkres.so make check-unit %{build_flags} LDFLAGS="%{__global_ldflags} -ldl"
-
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot DNS Resolver" knot-resolver
 
 %post
-%systemd_post system-kresd.slice
+%systemd_post 'kresd@*.service'
 /sbin/ldconfig
 
 # TODO: can be removed when Fedora 27 is no longer supported and migration is no longer necessary
@@ -200,10 +202,11 @@ if [ -d "/run/kresd" ]; then
 fi
 
 %preun
-%systemd_preun system-kresd.slice
+%systemd_preun 'kresd@*.service' kresd.target kresd.socket kresd-tls.socket
 
 %postun
-%systemd_postun_with_restart system-kresd.slice
+# NOTE: this doesn't restart the services on CentOS 7
+%systemd_postun_with_restart 'kresd@*.service'
 /sbin/ldconfig
 
 %files
@@ -216,6 +219,8 @@ fi
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/knot-resolver
 %{_unitdir}/kresd*.service
+%{_unitdir}/kresd.target
+%{_unitdir}/multi-user.target.wants/kresd.target
 %if 0%{?rhel}
 %{_unitdir}/kresd@.service.d/override.conf
 %endif

@@ -1,3 +1,5 @@
+SHELL=/bin/bash -o pipefail -o errexit
+
 include config.mk
 include platform.mk
 
@@ -16,7 +18,7 @@ lint-lua: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 .PHONY: all install check clean doc info lint
 
 # Dependencies
-KNOT_MINVER := 2.6.4
+KNOT_MINVER := 2.6.7
 $(eval $(call find_lib,libknot,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libdnssec,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libzscanner,$(KNOT_MINVER),yes))

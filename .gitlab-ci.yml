@@ -6,6 +6,8 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
   GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
   COVERAGE: '1'
+  PREFIX: $CI_PROJECT_DIR/.local
+  LD_LIBRARY_PATH: $CI_PROJECT_DIR/.local/lib
 
 stages:
   - build
@@ -16,8 +18,11 @@ stages:
 build:linux:amd64:
   stage: build
   script:
-    - PREFIX=$(pwd)/.local make -k all CFLAGS=-Werror
-    - PREFIX=$(pwd)/.local make install CFLAGS=-Werror
+    - rm daemon/lua/kres-gen.lua
+    - make -k all CFLAGS="-Werror -ggdb"
+    - STATUS="$(git status --untracked-files=normal --porcelain)"
+    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
+    - make install CFLAGS="-Werror -ggdb"
   artifacts:
     untracked: true
   tags:
@@ -29,8 +34,11 @@ build:clang:linux:amd64:
   stage: build
   image: $CI_REGISTRY/knot/knot-resolver/ci:debian-unstable  # newer Debian for newer Clang
   script:
-    - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument"
-    - CXX=clang++-5.0 CC=clang-5.0 PREFIX=$(pwd)/.local make install CFLAGS=-Werror
+    - rm daemon/lua/kres-gen.lua
+    - CXX=clang++-5.0 CC=clang-5.0 make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
+    - STATUS="$(git status --untracked-files=normal --porcelain)"
+    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
+    - CXX=clang++-5.0 CC=clang-5.0 make install "CFLAGS=-Werror -ggdb"
   tags:
     - docker
     - linux
@@ -87,10 +95,13 @@ lint:clang-scan-build:
 test:linux:amd64:
   stage: test
   script:
-    - PREFIX=$(pwd)/.local make -k check
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c COVERAGE_STAGE=gcov-check
-  dependencies:
-    - build:linux:amd64
+    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
+    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
+    - git clean -xdf
+    - make CFLAGS=-Werror
+    - MAKEFLAGS="--jobs $(nproc)" make -k check
+    - MAKEFLAGS="--jobs $(nproc)" make coverage-c COVERAGE_STAGE=gcov-check
+  dependencies: []
   artifacts:
     expire_in: 1 hour
     paths:
@@ -103,10 +114,13 @@ test:linux:amd64:
 installcheck:linux:amd64:
   stage: test
   script:
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck
-  dependencies:
-    - build:linux:amd64
+    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
+    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
+    - git clean -xdf
+    - make install CFLAGS=-Werror
+    - MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
+    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck
+  dependencies: []
   artifacts:
     expire_in: 1 hour
     paths:
@@ -128,15 +142,13 @@ doc:
   tags:
     - docker
 
-
-
 deckard:linux:amd64:
   stage: test
   except:
     - schedules  # prevent unstable test from cancelling nightly OBS build
   script:
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc) --keep-going" make check-integration
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
+    - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
+    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -151,7 +163,7 @@ deckard:linux:amd64:
 installcheck:valgrind:linux:amd64:
   stage: test
   script:
-    - DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" PREFIX=$(pwd)/.local make -k installcheck
+    - DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k installcheck
   dependencies:
     - build:linux:amd64
   tags:
@@ -163,9 +175,6 @@ installcheck:valgrind:linux:amd64:
 #deckard:linux:amd64:valgrind:
 #  stage: test
 #  script:
-#    - export PREFIX=$(pwd)/.local
-#    - export LD_LIBRARY_PATH=$PREFIX/lib
-#    - export TMPDIR=$(pwd)
 #    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
 #    - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd -f 1" MAKEFLAGS="-j $(nproc) --keep-going" make
 #  artifacts:
@@ -183,8 +192,10 @@ installcheck:valgrind:linux:amd64:
 
 test:linux:amd64:valgrind:
   stage: test
+  variables:
+    TMPDIR: $CI_PROJECT_DIR
   script:
-    - TMPDIR=$(pwd) PREFIX=$(pwd)/.local DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
+    - DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
   dependencies:
     - build:linux:amd64
   tags:
@@ -203,13 +214,13 @@ respdiff:iter:udp:linux:amd64:
   script:
     - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
     - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
-    - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
+    - ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh udp
     - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 0.8 %'
-    - grep -q '^target disagrees.*0\.[0-7][0-9] %' results/respdiff.txt
+    - echo 'test if mismatch rate < 1.0 %'
+    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp
+    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -230,13 +241,13 @@ respdiff:iter:tcp:linux:amd64:
   stage: test
   script:
     - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tcp" --export)
-    - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
+    - ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh tcp
     - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 0.8 %'
-    - grep -q '^target disagrees.*0\.[0-7][0-9] %' results/respdiff.txt
+    - echo 'test if mismatch rate < 1.0 %'
+    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp
+    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -257,13 +268,13 @@ respdiff:iter:tls:linux:amd64:
   stage: test
   script:
     - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tls" --export)
-    - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
+    - ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh tls
     - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 0.8 %'
-    - grep -q '^target disagrees.*0\.[0-7][0-9] %' results/respdiff.txt
+    - echo 'test if mismatch rate < 1.0 %'
+    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
-    - PREFIX=$(pwd)/.local MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls
+    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -307,7 +318,7 @@ distro:epel-7:
   dependencies:
     - srpm
   script:
-    - mock --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm
+    - mock --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
   after_script:
     - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
   artifacts:
@@ -322,7 +333,7 @@ distro:epel-7:
 coverage:
   stage: coverage
   script:
-    - PREFIX=$(pwd)/.local make coverage
+    - make coverage
   artifacts:
     expire_in: '1 week'
     paths:

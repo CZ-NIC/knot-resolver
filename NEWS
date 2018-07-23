@@ -1,3 +1,45 @@
+Improvements
+------------
+- cache: NSEC3 negative cache even without NS record (#384)
+  This might be considered a regression fix (since 2.4.0).
+
+
+Knot Resolver 2.4.0 (2018-07-03)
+================================
+
+Incompatible changes
+--------------------
+- minimal libknot version is now 2.6.7 to pull in latest fixes (#366)
+
+Security
+--------
+- fix a rare case of zones incorrectly dowgraded to insecure status (!576)
+
+New features
+------------
+- TLS session resumption (RFC 5077), both server and client (!585, #105)
+  (disabled when compiling with gnutls < 3.5)
+- TLS_FORWARD policy uses system CA certificate store by default (!568)
+- aggressive caching for NSEC3 zones (!600)
+- optional protection from DNS Rebinding attack (module rebinding, !608)
+- module bogus_log to log DNSSEC bogus queries without verbose logging (!613)
+
+Bugfixes
+--------
+- prefill: fix ability to read certificate bundle (!578)
+- avoid turning off qname minimization in some cases, e.g. co.uk. (#339)
+- fix validation of explicit wildcard queries (#274)
+- dns64 module: more properties from the RFC implemented (incl. bug #375)
+
+Improvements
+------------
+- systemd: multiple enabled kresd instances can now be started using kresd.target
+- ta_sentinel: switch to version 14 of the RFC draft (!596)
+- support for glibc systems with a non-Linux kernel (!588)
+- support per-request variables for Lua modules (!533)
+- support custom HTTP endpoints for Lua modules (!527)
+
+
 Knot Resolver 2.3.0 (2018-04-23)
 ================================
 
@@ -6,6 +48,10 @@ Security
 - fix CVE-2018-1110: denial of service triggered by malformed DNS messages
   (!550, !558, security!2, security!4)
 - increase resilience against slow lorris attack (security!5)
+
+New features
+------------
+- new policy.REFUSE to reply REFUSED to clients
 
 Bugfixes
 --------

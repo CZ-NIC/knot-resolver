@@ -1,8 +1,8 @@
 Tracking upstream sources in git
 --------------------------------
 
-This debian package is tracked in git at
-https://anonscm.debian.org/git/pkg-dns/knot-resolver.git, which
+This debian package is tracked in the git "debian/master" branch at
+https://salsa.debian.org/dns-team/knot-resolver, which
 includes the commits from the upstream git repository at
 https://gitlab.labs.nic.cz/knot/knot-resolver.git.  When importing
 upstream tarballs, make sure you've fetched from the upstream repo
@@ -11,7 +11,9 @@ upstream-vcs-tag from debian/gbp.conf to link upstream git history
 with new package history.
 
 See Joey Hess's thoughts about why tracking upstream git history is
-useful: https://joeyh.name/blog/entry/upstream_git_repositories/
+useful: https://joeyh.name/blog/entry/upstream_git_repositories/, as
+well as DEP-14 for the branch-naming scheme:
+http://dep.debian.net/deps/dep14/
 
 Rebuilding epoch.js and epoch.css
 ---------------------------------
@@ -65,4 +67,4 @@ sass -t compact sass/epoch.scss > dist/css/epoch.css
 sass -t compressed sass/epoch.scss > dist/css/epoch.min.css
 EOF
 
- -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>, Sun, 12 Nov 2017 12:52:39 +0800
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>, Thu, 22 Feb 2018 13:25:27 -0800

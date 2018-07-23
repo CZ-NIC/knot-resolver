@@ -1,0 +1,24 @@
+; config options
+	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
+CONFIG_END
+
+SCENARIO_BEGIN Test refuse policy
+
+STEP 10 QUERY
+ENTRY_BEGIN
+REPLY RD AD
+SECTION QUESTION
+www.refuse.example.com. IN A
+ENTRY_END
+
+STEP 20 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all answer
+; AD must not be set in the answer
+REPLY QR RD RA REFUSED
+SECTION QUESTION
+www.refuse.example.com. IN A
+SECTION ANSWER
+ENTRY_END
+
+SCENARIO_END

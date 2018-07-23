@@ -147,17 +147,9 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 				if (cur_addr_score >= rtt_cache_entry_score[i]) {
 					continue;
 				}
-				/* Shake down previous contenders */
-				for (size_t j = KR_NSREP_MAXADDR - 1; j > i; --j) {
-					addr[j] = addr[j - 1];
-					rtt_cache_entry_ptr[j] = rtt_cache_entry_ptr[ j - 1];
-					rtt_cache_entry_score[j] = rtt_cache_entry_score[j - 1];
-				}
-				addr[i] = it;
-				rtt_cache_entry_score[i] = cur_addr_score;
-				rtt_cache_entry_ptr[i] = cached;
-				break;
-			} else if (cur_addr_score < rtt_cache_entry_score[i] + favour) {
+			}
+			if (cur_addr_score >= KR_NS_TIMEOUT
+			    || cur_addr_score < rtt_cache_entry_score[i] + favour) {
 				/* Shake down previous contenders */
 				for (size_t j = KR_NSREP_MAXADDR - 1; j > i; --j) {
 					addr[j] = addr[j - 1];

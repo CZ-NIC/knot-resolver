@@ -1,4 +1,5 @@
-#!/bin/sh -e
+#!/bin/bash
+set -o pipefail -o errexit
 
 if [ "$2" != types ] && [ "$2" != functions ]; then
 	echo "Usage: $0 libkres (types|functions)" >&2
@@ -52,6 +53,8 @@ grep -v '^#\|^$' | while read -r ident; do
 				;;
 		esac
 	fi
+	# LuaJIT FFI blows up on "uint" type
+	output="$(echo "$output" | sed 's/\buint\b/unsigned int/g')"
 
 	# abort on empty output
 	if [ -z "$(echo "$output" | tr -d "\n;")" ]; then

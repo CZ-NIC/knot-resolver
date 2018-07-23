@@ -122,6 +122,7 @@ struct worker_ctx {
 	uv_loop_t *loop;
 	int id;
 	int count;
+	int vars_table_ref;
 	unsigned tcp_pipeline_max;
 
 	/** Addresses to bind for outgoing connections or AF_UNSPEC. */

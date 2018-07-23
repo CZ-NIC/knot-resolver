@@ -42,11 +42,18 @@ struct endpoint {
 typedef array_t(struct endpoint*) endpoint_array_t;
 /* @endcond */
 
+struct net_tcp_param {
+	uint64_t in_idle_timeout;
+};
+
+struct tls_session_ticket_ctx;
 struct network {
 	uv_loop_t *loop;
 	map_t endpoints;
 	struct tls_credentials *tls_credentials;
 	map_t tls_client_params;
+	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
+	struct net_tcp_param tcp;
 };
 
 void network_init(struct network *net, uv_loop_t *loop);

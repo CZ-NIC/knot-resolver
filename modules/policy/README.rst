@@ -22,7 +22,7 @@ A *filter* selects which queries will be affected by specified *action*. There a
   - applies the action if QNAME suffix matches one of suffixes in the table (useful for "is domain in zone" rules),
   uses `Aho-Corasick`_ string matching algorithm `from CloudFlare <https://github.com/cloudflare/lua-aho-corasick>`_ (BSD 3-clause)
 * :any:`policy.suffix_common`
-* ``rpz``
+* ``rpz(default_action, path)``
   - implements a subset of RPZ_ in zonefile format.  See below for details: :any:`policy.rpz`.
 * custom filter function
 
@@ -34,6 +34,7 @@ An *action* is function which modifies DNS query. There are several actions avai
 * ``DENY`` - reply NXDOMAIN authoritatively
 * ``DENY_MSG(msg)`` - reply NXDOMAIN authoritatively and add explanatory message to additional section
 * ``DROP`` - terminate query resolution and return SERVFAIL to the requestor
+* ``REFUSE`` - terminate query resolution and return REFUSED to the requestor
 * ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
 * ``FORWARD(ip)`` - resolve a query via forwarding to an IP while validating and caching locally;
 * ``TLS_FORWARD({{ip, authentication}})`` - resolve a query via TLS connection forwarding to an IP while validating and caching locally;
@@ -70,10 +71,11 @@ Traditional PKI authentication requires server to present certificate with speci
 .. code-block:: lua
 
         policy.TLS_FORWARD({
-                {'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}})
+                {'2001:DB8::d0c', hostname='res.example.com'}})
 
 - `hostname` must exactly match hostname in server's certificate, i.e. in most cases it must not contain trailing dot (`res.example.com`).
-- `ca_file` must be path to CA certificate (or certificate bundle) in `PEM format`_.
+- System CA certificate store will be used if no `ca_file` option is specified.
+- Optional `ca_file` option can specify path to CA certificate (or certificate bundle) in `PEM format`_.
 
 TLS Examples
 ~~~~~~~~~~~~
@@ -86,6 +88,8 @@ TLS Examples
 	-- for brevity, other TLS examples omit policy.add(policy.all())
 	-- single server authenticated using its certificate pin_sha256
 	  policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})  -- pin_sha256 is base64-encoded
+	-- single server authenticated using hostname and system-wide CA certificates
+	  policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}})
 	-- single server using non-standard port
 	  policy.TLS_FORWARD({{'192.0.2.1@443', pin_sha256='YQ=='}})  -- use @ or # to specify port
 	-- single server with multiple valid pins (e.g. anycast)
@@ -182,9 +186,9 @@ Most properties (actions, filters) are described above.
   Like suffix match, but you can also provide a common suffix of all matches for faster processing (nil otherwise).
   This function is faster for small suffix tables (in the order of "hundreds").
 
-.. function:: policy.rpz(action, path[, format])
+.. function:: policy.rpz(action, path)
 
-  :param action: the default action for match in the zone (e.g. RH-value `.`)
+  :param action: the default action for match in the zone; typically you want ``policy.DENY``
   :param path: path to zone file | database
 
   Enforce RPZ_ rules. This can be used in conjunction with published blocklist feeds.
@@ -194,12 +198,15 @@ Most properties (actions, filters) are described above.
   .. csv-table::
    :header: "Policy Action", "RH Value", "Support"
 
-   "NXDOMAIN", "``.``", "**yes**"
-   "NODATA", "``*.``", "*partial*, implemented as NXDOMAIN"
-   "Unchanged", "``rpz-passthru.``", "**yes**"
-   "Nothing", "``rpz-drop.``", "**yes**"
-   "Truncated", "``rpz-tcp-only.``", "**yes**"
+   "``action`` is used", "``.``", "**yes**, if ``action`` is ``DENY``"
+   "``action`` is used ", "``*.``", "*partial* [#]_"
+   "``policy.PASS``", "``rpz-passthru.``", "**yes**"
+   "``policy.DROP``", "``rpz-drop.``", "**yes**"
+   "``policy.TC``", "``rpz-tcp-only.``", "**yes**"
    "Modified", "anything", "no"
+
+  .. [#] The specification for ``*.`` wants a ``NODATA`` answer.
+    For now, ``policy.DENY`` action doing ``NXDOMAIN`` is typically used instead.
 
   .. csv-table::
    :header: "Policy Trigger", "Support"

@@ -1,16 +1,21 @@
 -- check prerequisites
-local supports_http = pcall(require, 'http') and pcall(require, 'http.request')
-if not supports_http then
+local has_http = pcall(require, 'http') and pcall(require, 'http.request')
+if not has_http then
 	pass('skipping http module test because its not installed')
 	done()
 else
 	local request = require('http.request')
+	local endpoints = require('http').endpoints
+
+	-- custom endpoints
+	endpoints['/test'] = {'text/custom', function () return 'hello' end}
 
 	-- setup resolver
 	modules = {
 		http = {
 			port = 0, -- Select random port
 			cert = false,
+			endpoints = endpoints,
 		}
 	}
 
@@ -35,6 +40,11 @@ else
 		same(code, 200, 'static page return 200 OK')
 		ok(#body > 0, 'static page has non-empty body')
 		same(mime, 'text/html', 'static page has text/html content type')
+		-- custom endpoint
+		code, body, mime = http_get(uri .. '/test')
+		same(code, 200, 'custom page return 200 OK')
+		same(body, 'hello', 'custom page has non-empty body')
+		same(mime, 'text/custom', 'custom page has custom content type')
 		-- non-existent page
 		code = http_get(uri .. '/badpage')
 		same(code, 404, 'non-existent page returns 404')

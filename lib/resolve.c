@@ -222,10 +222,12 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		 * even if cut name is covered by TA. */
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
+		VERBOSE_MSG(qry, "=> going insecure because parent query is insecure\n");
 	} else if (kr_ta_covers_qry(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
 		qry->flags.DNSSEC_WANT = true;
 	} else {
 		qry->flags.DNSSEC_WANT = false;
+		VERBOSE_MSG(qry, "=> going insecure because there's no covering TA\n");
 	}
 
 	struct kr_zonecut cut_found;
@@ -592,8 +594,8 @@ static int answer_finalize(struct kr_request *request, int state)
 	/* AD flag.  We can only change `secure` from true to false.
 	 * Be conservative.  Primary approach: check ranks of all RRs in wire.
 	 * Only "negative answers" need special handling. */
-	bool secure = (last != NULL); /* suspicious otherwise */
-	VERBOSE_MSG(NULL, "AD: secure (start)\n");
+	bool secure = last != NULL && state == KR_STATE_DONE /*< suspicious otherwise */
+		&& knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG;
 	if (last && (last->flags.STUB)) {
 		secure = false; /* don't trust forwarding for now */
 	}
@@ -616,7 +618,6 @@ static int answer_finalize(struct kr_request *request, int state)
 		}
 	}
 
-	VERBOSE_MSG(NULL, "AD: secure (between ANS and AUTH)\n");
 	/* Write authority records. */
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
@@ -641,33 +642,36 @@ static int answer_finalize(struct kr_request *request, int state)
 		ret = edns_put(answer);
 	}
 
+	if (!last) secure = false; /*< should be no-op, mostly documentation */
 	/* AD: "negative answers" need more handling. */
-	if (last && secure) {
-		VERBOSE_MSG(NULL, "AD: secure (1)\n");
-		if (kr_response_classify(answer) != PKT_NOERROR
-		    /* Additionally check for CNAME chains that "end in NODATA",
-		     * as those would also be PKT_NOERROR. */
-		    || (answ_all_cnames && knot_pkt_qtype(answer) != KNOT_RRTYPE_CNAME))
-		{
-			secure = secure && last->flags.DNSSEC_WANT
-				&& !last->flags.DNSSEC_BOGUS && !last->flags.DNSSEC_INSECURE;
-		}
-	}
-	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
-	if (!secure || state != KR_STATE_DONE
-	    || knot_pkt_qtype(answer) == KNOT_RRTYPE_RRSIG) {
-		knot_wire_clear_ad(answer->wire);
+	if (kr_response_classify(answer) != PKT_NOERROR
+	    /* Additionally check for CNAME chains that "end in NODATA",
+	     * as those would also be PKT_NOERROR. */
+	    || (answ_all_cnames && knot_pkt_qtype(answer) != KNOT_RRTYPE_CNAME)) {
+
+		secure = secure && last->flags.DNSSEC_WANT
+			&& !last->flags.DNSSEC_BOGUS && !last->flags.DNSSEC_INSECURE;
 	}
 
-	if (last) {
+	if (secure) {
 		struct kr_query *cname_parent = last->cname_parent;
 		while (cname_parent != NULL) {
 			if (cname_parent->flags.DNSSEC_OPTOUT) {
-				knot_wire_clear_ad(answer->wire);
+				secure = false;
 				break;
 			}
 			cname_parent = cname_parent->cname_parent;
 		}
+	}
+
+	/* No detailed analysis ATM, just _SECURE or not.
+	 * LATER: request->rank might better be computed in validator's finish phase. */
+	VERBOSE_MSG(NULL, "  AD: request%s classified as SECURE\n", secure ? "" : " NOT");
+	request->rank = secure ? KR_RANK_SECURE : KR_RANK_INITIAL;
+
+	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
+	if (!secure) {
+		knot_wire_clear_ad(answer->wire);
 	}
 
 	return ret;
@@ -722,6 +726,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	array_init(request->add_selected);
 	request->answ_validated = false;
 	request->auth_validated = false;
+	request->rank = KR_RANK_INITIAL;
 	request->trace_log = NULL;
 	request->trace_finish = NULL;
 

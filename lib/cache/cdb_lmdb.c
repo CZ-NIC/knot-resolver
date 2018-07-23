@@ -73,7 +73,6 @@ static int lmdb_error(int error)
 		return kr_error(ENOSPC);
 	default:
 		kr_log_error("[cache] LMDB error: %s\n", mdb_strerror(error));
-		assert(false);
 		return kr_error(error);
 	}
 }

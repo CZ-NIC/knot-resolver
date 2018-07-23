@@ -41,6 +41,7 @@
 struct hints_data {
 	struct kr_zonecut hints;
 	struct kr_zonecut reverse_hints;
+	bool use_nodata;
 };
 
 /** Useful for returning from module properties. */
@@ -52,17 +53,22 @@ static char * bool2jsonstr(bool val)
 	return result;
 }
 
-static int put_answer(knot_pkt_t *pkt, knot_rrset_t *rr)
+static int put_answer(knot_pkt_t *pkt, struct kr_query *qry, knot_rrset_t *rr, bool use_nodata)
 {
 	int ret = 0;
-	if (!knot_rrset_empty(rr)) {
+	if (!knot_rrset_empty(rr) || use_nodata) {
 		/* Update packet question */
 		if (!knot_dname_is_equal(knot_pkt_qname(pkt), rr->owner)) {
 			kr_pkt_recycle(pkt);
-			knot_pkt_put_question(pkt, rr->owner, rr->rclass, rr->type);
+			knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
 		}
-		/* Append to packet */
-		ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, rr, KNOT_PF_FREE);
+		if (!knot_rrset_empty(rr)) {
+			/* Append to packet */
+			ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, rr, KNOT_PF_FREE);
+		} else {
+			/* Return empty answer if name exists, but type doesn't match */
+			knot_wire_set_aa(pkt->wire);
+		}
 	} else {
 		ret = kr_error(ENOENT);
 	}
@@ -73,7 +79,7 @@ static int put_answer(knot_pkt_t *pkt, knot_rrset_t *rr)
 	return ret;
 }
 
-static int satisfy_reverse(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_query *qry)
+static int satisfy_reverse(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_query *qry, bool use_nodata)
 {
 	/* Find a matching name */
 	pack_t *addr_set = kr_zonecut_find(hints, qry->sname);
@@ -92,10 +98,10 @@ static int satisfy_reverse(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 		knot_rrset_add_rdata(&rr, addr_val, len, 0, &pkt->mm);
 	}
 
-	return put_answer(pkt, &rr);
+	return put_answer(pkt, qry, &rr, use_nodata);
 }
 
-static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_query *qry)
+static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_query *qry, bool use_nodata)
 {
 	/* Find a matching name */
 	pack_t *addr_set = kr_zonecut_find(hints, qry->sname);
@@ -121,7 +127,7 @@ static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 		addr = pack_obj_next(addr);
 	}
 
-	return put_answer(pkt, &rr);
+	return put_answer(pkt, qry, &rr, use_nodata);
 }
 
 static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -141,11 +147,11 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	switch(qry->stype) {
 	case KNOT_RRTYPE_A:
 	case KNOT_RRTYPE_AAAA: /* Find forward record hints */
-		if (satisfy_forward(&data->hints, pkt, qry) != 0)
+		if (satisfy_forward(&data->hints, pkt, qry, data->use_nodata) != 0)
 			return ctx->state;
 		break;
 	case KNOT_RRTYPE_PTR: /* Find PTR record */
-		if (satisfy_reverse(&data->reverse_hints, pkt, qry) != 0)
+		if (satisfy_reverse(&data->reverse_hints, pkt, qry, data->use_nodata) != 0)
 			return ctx->state;
 		break;
 	default:
@@ -570,6 +576,22 @@ static char* hint_root_file(void *env, struct kr_module *module, const char *arg
 	return strdup(err_msg ? err_msg : "");
 }
 
+static char* hint_use_nodata(void *env, struct kr_module *module, const char *args)
+{
+	struct hints_data *data = module->data;
+	if (!args) {
+		return NULL;
+	}
+
+	JsonNode *root_node = json_decode(args);
+	if (!root_node || root_node->tag != JSON_BOOL) {
+		return bool2jsonstr(false);
+	}
+
+	data->use_nodata = root_node->bool_;
+	return bool2jsonstr(true);
+}
+
 /*
  * Module implementation.
  */
@@ -656,6 +678,7 @@ struct kr_prop *hints_props(void)
 	    { &hint_add_hosts, "add_hosts", "Load a file with hosts-like formatting and add contents into hints.", },
 	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
 	    { &hint_root_file, "root_file", "Replace root hints set from a zonefile.", },
+	    { &hint_use_nodata, "use_nodata", "Synthesise NODATA if name matches, but type doesn't.", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;

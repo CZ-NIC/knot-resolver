@@ -15,6 +15,7 @@ Knot DNS Resolver modules
 .. include:: ../modules/predict/README.rst
 .. include:: ../modules/http/README.rst
 .. include:: ../modules/daf/README.rst
+.. include:: ../modules/rebinding/README.rst
 .. include:: ../modules/graphite/README.rst
 .. .. include:: ../modules/memcached/README.rst
 .. .. include:: ../modules/redis/README.rst
@@ -22,7 +23,7 @@ Knot DNS Resolver modules
 .. include:: ../modules/dns64/README.rst
 .. include:: ../modules/renumber/README.rst
 .. include:: ../modules/cookies/README.rst
-.. include:: ../modules/version/README.rst
+.. include:: ../modules/bogus_log/README.rst
 .. include:: ../modules/workarounds/README.rst
 .. include:: ../modules/dnstap/README.rst
 .. include:: ../modules/ta_signal_query/README.rst

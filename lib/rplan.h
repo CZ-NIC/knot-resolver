@@ -31,7 +31,8 @@ struct kr_qflags {
 	bool NO_IPV6 : 1;        /**< Disable IPv6 */
 	bool NO_IPV4 : 1;        /**< Disable IPv4 */
 	bool TCP : 1;            /**< Use TCP for this query. */
-	bool RESOLVED : 1;       /**< Query is resolved. */
+	bool RESOLVED : 1;       /**< Query is resolved.  Note that kr_query gets
+				  *   RESOLVED before following a CNAME chain; see .CNAME. */
 	bool AWAIT_IPV4 : 1;     /**< Query is waiting for A address. */
 	bool AWAIT_IPV6 : 1;     /**< Query is waiting for AAAA address. */
 	bool AWAIT_CUT : 1;      /**< Query is waiting for zone cut lookup */
@@ -44,7 +45,7 @@ struct kr_qflags {
 				  * i.e. knot_wire_set_cd(request->answer->wire). */
 	bool DNSSEC_BOGUS : 1;   /**< Query response is DNSSEC bogus. */
 	bool DNSSEC_INSECURE : 1;/**< Query response is DNSSEC insecure. */
-	bool DNSSEC_CD : 1;      /**< CD bit in query */
+	bool DNSSEC_CD : 1;      /**< Instruction to set CD bit in request. */
 	bool STUB : 1;           /**< Stub resolution, accept received answer as solved. */
 	bool ALWAYS_CUT : 1;     /**< Always recover zone cut (even if cached). */
 	bool DNSSEC_WEXPAND : 1; /**< Query response has wildcard expansion. */

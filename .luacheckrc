@@ -3,6 +3,7 @@ new_read_globals = {
 	'help',
 	'quit',
 	'hostname',
+	'package_version',
 	'moduledir',
 	'user',
 	'verbose',
@@ -51,6 +52,7 @@ new_globals = {
 	'view',
 	'stats',
 	'http',
+	'trust_anchors',
 }
 
 -- Luacheck < 0.18 doesn't support new_read_globals

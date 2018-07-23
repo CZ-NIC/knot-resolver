@@ -23,10 +23,10 @@
 #include "lib/layer/iterate.h"
 
 
-/** Reconstruct a name into a buffer (assuming length at least KNOT_DNAME_MAXLEN). */
+/** Reconstruct a name into a buffer (assuming length at least KNOT_DNAME_MAXLEN).
+ * \return kr_ok() or error code (<0). */
 static int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
 		 knot_db_val_t kwz)
-/* TODO: probably move to a place shared with with NSEC3, perhaps with key_NSEC* */
 {
 	/* Reconstruct from key: first the ending, then zone name. */
 	int ret = knot_dname_lf2wire(buf, kwz.len, kwz.data);
@@ -127,15 +127,6 @@ static int kwz_between(knot_db_val_t k1, knot_db_val_t k2, knot_db_val_t k4)
 	}
 }
 
-static struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
-{
-	/* ATM it's enough to just extend the checks for exact entries. */
-	const struct entry_h *eh = entry_h_consistent(data, KNOT_RRTYPE_NSEC);
-	bool ok = eh != NULL;
-	ok = ok && !(eh->is_packet || eh->has_ns || eh->has_cname || eh->has_dname
-		     || eh->has_optout);
-	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
-}
 
 /** NSEC1 range search.
  *
@@ -185,9 +176,10 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		 * in case we searched before the very first one in the zone. */
 		return "range search found inconsistent entry";
 	}
-	/* FIXME(stale): passing just zone name instead of owner, as we don't
+	/* Passing just zone name instead of owner, as we don't
 	 * have it reconstructed at this point. */
-	int32_t new_ttl_ = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_NSEC, qry->timestamp.tv_sec);
+	int32_t new_ttl_ = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_NSEC,
+					qry->timestamp.tv_sec);
 	if (new_ttl_ < 0 || !kr_rank_test(eh->rank, KR_RANK_SECURE)) {
 		return "range search found stale or insecure entry";
 		/* TODO: remove the stale record *and* retry,
@@ -198,7 +190,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	}
 	if (kwz_low) {
 		*kwz_low = (knot_db_val_t){
-			.data = key_nsec.data + nwz_off,
+			.data = (uint8_t *)key_nsec.data + nwz_off,
 			.len = key_nsec.len - nwz_off,
 		};	/* CACHE_KEY_DEF */
 	}
@@ -219,7 +211,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	/* it's *full* name ATM */
 	const knot_dname_t *next = eh->data + KR_CACHE_RR_COUNT_SIZE
 				 + 2 /* RDLENGTH from rfc1034 */;
-	if (!eh->data[0]) {
+	if (KR_CACHE_RR_COUNT_SIZE != 2 || get_uint16(eh->data) == 0) {
 		assert(false);
 		return "ERROR";
 		/* TODO: more checks?  Also, `next` computation is kinda messy. */
@@ -254,7 +246,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	assert((ssize_t)(kwz_hi.len) >= 0);
 	/* 2. do the actual range check. */
 	const knot_db_val_t kwz_sname = {
-		.data = (void *)k->buf + 1 + nwz_off,
+		.data = (void *)/*const-cast*/(k->buf + 1 + nwz_off),
 		.len = k->buf[0] - k->zlf_len,
 	};
 	assert((ssize_t)(kwz_sname.len) >= 0);
@@ -297,9 +289,6 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 		return ESKIP;
 	}
 
-	const struct entry_h *nsec_eh = val.data;
-	const void *nsec_eh_bound = val.data + val.len;
-
 	/* Get owner name of the record. */
 	const knot_dname_t *owner;
 	knot_dname_t owner_buf[KNOT_DNAME_MAXLEN];
@@ -312,7 +301,8 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	}
 	/* Basic checks OK -> materialize data. */
 	{
-		int ret = entry2answer(ans, AR_NSEC, nsec_eh, nsec_eh_bound,
+		const struct entry_h *nsec_eh = val.data;
+		int ret = entry2answer(ans, AR_NSEC, nsec_eh, knot_db_val_bound(val),
 					owner, KNOT_RRTYPE_NSEC, new_ttl);
 		if (ret) return kr_error(ret);
 	}
@@ -322,10 +312,10 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	uint8_t *bm = NULL;
 	uint16_t bm_size = 0;
 	knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
+	assert(bm);
 
 	if (exact_match) {
 		if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) != 0) {
-			assert(bm);
 			VERBOSE_MSG(qry,
 				"=> NSEC sname: match but failed type check\n");
 			return ESKIP;
@@ -415,7 +405,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	}
 	/* Check if our sname-covering NSEC also covers/matches SS. */
 	knot_db_val_t kwz = {
-		.data = key.data + nwz_off,
+		.data = (uint8_t *)key.data + nwz_off,
 		.len = key.len - nwz_off,
 	};
 	assert((ssize_t)(kwz.len) >= 0);
@@ -441,12 +431,11 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 			return kr_ok();
 		}
 		/* Materialize the record into answer (speculatively). */
-		const struct entry_h *nsec_eh = val.data;
-		const void *nsec_eh_bound = val.data + val.len;
 		knot_dname_t owner[KNOT_DNAME_MAXLEN];
 		int ret = dname_wire_reconstruct(owner, k, wild_low_kwz);
 		if (ret) return kr_error(ret);
-		ret = entry2answer(ans, AR_WILD, nsec_eh, nsec_eh_bound,
+		const struct entry_h *nsec_eh = val.data;
+		ret = entry2answer(ans, AR_WILD, nsec_eh, knot_db_val_bound(val),
 				   owner, KNOT_RRTYPE_NSEC, new_ttl);
 		if (ret) return kr_error(ret);
 		nsec_rr = ans->rrsets[AR_WILD].set.rr;

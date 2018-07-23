@@ -301,18 +301,27 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
+	const struct worker_ctx *worker = (struct worker_ctx *)master->loop->data;
+	const struct engine *engine = worker->engine;
+	const struct network *net = &engine->net;
+	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
+
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;
 	session->has_tls = tls;
 	if (tls) {
 		timeout += KR_CONN_RTT_MAX * 3;
 		if (!session->tls_ctx) {
 			session->tls_ctx = tls_new(master->loop->data);
+			if (!session->tls_ctx) {
+				worker_session_close(session);
+				return;
+			}
 			session->tls_ctx->c.session = session;
 			session->tls_ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
 		}
 	}
 	uv_timer_t *timer = &session->timeout;
-	uv_timer_start(timer, tcp_timeout_trigger, timeout, timeout);
+	uv_timer_start(timer, tcp_timeout_trigger, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
 }
 

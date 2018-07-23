@@ -1,25 +1,20 @@
-FROM debian:stable
+FROM debian:unstable
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 
 WORKDIR /root
 CMD ["/bin/bash"]
-
-RUN echo "deb http://ftp.debian.org/debian stretch-backports main" >> /etc/apt/sources.list
 
 # generic cleanup
 RUN apt-get update -qq
 RUN apt-get upgrade -y -qqq
 
 # Knot and Knot Resolver dependecies
-RUN apt-get -t stretch-backports install -y git
-RUN apt-get install -y -qqq make cmake pkg-config build-essential bsdmainutils libtool autoconf make pkg-config liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev pkg-config libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http
-# documentation dependecies
-RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
+RUN apt-get install -y -qqq make cmake pkg-config git build-essential bsdmainutils libtool autoconf make pkg-config liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev pkg-config libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http
 
 # Python packags required for Deckard CI
 # Python: grab latest versions from PyPi
 # (dnspython and Augeas binding in Debian packages are slow and buggy)
-RUN apt-get install -y -qqq python3-pip wget augeas-tools
+RUN apt-get install -y -qqq python3-pip wget
 RUN pip3 install --upgrade pip
 RUN pip3 install pylint
 RUN pip3 install pep8
@@ -51,24 +46,16 @@ RUN apt-get install luarocks -y -qqq
 RUN luarocks install luacheck
 
 # respdiff for kresd CI
-RUN apt-get install lmdb-utils -y -qqq
 RUN pip3 install dnspython python-augeas
-RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/resolver-benchmarking.git /tmp/resolver-benchmarking
-RUN mv /tmp/resolver-benchmarking/response_differences/respdiff /var/opt/respdiff
-RUN pip3 install -r /tmp/resolver-benchmarking/requirements.txt
-RUN rm -rf /tmp/resolver-benchmarking
-
-# Python static analysis for respdiff
-RUN pip3 install mypy
-RUN pip3 install flake8
+RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/respdiff /var/opt/respdiff
+RUN pip3 install -r /var/opt/respdiff/requirements.txt
 
 # Unbound for respdiff
 RUN apt-get install unbound unbound-anchor -y -qqq
-RUN printf "server:\n interface: 127.0.0.1@53535\n use-syslog: yes\n do-ip6: no\nremote-control:\n control-enable: no\n" >> /etc/unbound/unbound.conf
+RUN printf "server:\n interface: 127.0.0.1@53535\n use-syslog: yes\nremote-control:\n control-enable: no\n" >> /etc/unbound/unbound.conf
 
 # BIND for respdiff
 RUN apt-get install bind9 -y -qqq
-RUN printf '\nOPTIONS="-4 $OPTIONS"' >> /etc/default/bind9
 RUN printf 'options {\n directory "/var/cache/bind";\n listen-on port 53533 { 127.0.0.1; };\n listen-on-v6 port 53533 { ::1; };\n};\n' > /etc/bind/named.conf.options
 
 # PowerDNS Recursor for Deckard CI
@@ -81,5 +68,5 @@ RUN luarocks install luacov
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
 
-# OpenBuildService CLI tool
-RUN apt-get install -y osc
+# clang for kresd CI
+RUN apt-get install -y -qqq clang-5.0 clang-tools-5.0 clang-tidy-5.0

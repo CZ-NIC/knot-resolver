@@ -70,6 +70,7 @@ static int l_help(lua_State *L)
 		"help()\n    show this help\n"
 		"quit()\n    quit\n"
 		"hostname()\n    hostname\n"
+		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
 		"verbose(true|false)\n    toggle verbose mode\n"
 		"option(opt[, new_val])\n    get/set server option\n"
@@ -206,6 +207,13 @@ static int l_hostname(lua_State *L)
 	}
 
 	lua_pushstring(L, engine_get_hostname(engine));	
+	return 1;
+}
+
+/** Return server package version. */
+static int l_package_version(lua_State *L)
+{
+	lua_pushliteral(L, PACKAGE_VERSION);
 	return 1;
 }
 
@@ -565,7 +573,7 @@ static int l_trampoline(lua_State *L)
 	const char *args = NULL;
 	auto_free char *cleanup_args = NULL;
 	if (lua_gettop(L) > 0) {
-		if (lua_istable(L, 1)) {
+		if (lua_istable(L, 1) || lua_isboolean(L, 1)) {
 			cleanup_args = l_pack_json(L, 1);
 			args = cleanup_args;
 		} else {
@@ -646,6 +654,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "quit");
 	lua_pushcfunction(engine->L, l_hostname);
 	lua_setglobal(engine->L, "hostname");
+	lua_pushcfunction(engine->L, l_package_version);
+	lua_setglobal(engine->L, "package_version");
 	lua_pushcfunction(engine->L, l_moduledir);
 	lua_setglobal(engine->L, "moduledir");
 	lua_pushcfunction(engine->L, l_verbose);
