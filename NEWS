@@ -1,3 +1,9 @@
+Improvements
+------------
+- cache: NSEC3 negative cache even without NS record (#384)
+  This might be considered a regression fix (since 2.4.0).
+
+
 Knot Resolver 2.4.0 (2018-07-03)
 ================================
 
