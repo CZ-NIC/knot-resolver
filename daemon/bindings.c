@@ -1097,25 +1097,28 @@ static int cache_remove_prefix(struct kr_cache *cache, const char *args)
 	if (!cache || !cache->api || !cache->api->remove) {
 		return kr_error(ENOSYS);
 	}
-	static knot_db_val_t result_set[1000];
+	knot_db_val_t result_set[1000];
 	int ret = cache_prefixed(cache, args, result_set, 1000);
 	if (ret < 0) {
 		return ret;
 	}
 	/* Duplicate result set as we're going to remove it
 	 * which will invalidate result set. */
-	for (int i = 0; i < ret; ++i) {
+	int i;
+	for (i = 0; i < ret; ++i) {
 		void *dst = malloc(result_set[i].len);
 		if (!dst) {
-			return kr_error(ENOMEM);
+			ret = kr_error(ENOMEM);
+			goto cleanup;
 		}
 		memcpy(dst, result_set[i].data, result_set[i].len);
 		result_set[i].data = dst;
 	}
 	cache->api->remove(cache->db, result_set, ret);
 	kr_cache_sync(cache);
+cleanup:
 	/* Free keys */
-	for (int i = 0; i < ret; ++i) {
+	while (--i >= 0) {
 		free(result_set[i].data);
 	}
 	return ret;
@@ -1186,10 +1189,10 @@ static int cache_clear(lua_State *L)
 }
 
 /** @internal Dump cache key into table on Lua stack. */
-static void cache_dump_key(lua_State *L, knot_db_val_t *key)
+static void cache_dump_key(lua_State *L, knot_db_val_t key)
 {
 	knot_dname_t dname[KNOT_DNAME_MAXLEN];
-	char name[KNOT_DNAME_MAXLEN];
+	char name[KNOT_DNAME_TXT_MAXLEN];
 	uint16_t type;
 
 	int ret = kr_unpack_cache_key(key, dname, &type);
@@ -1197,7 +1200,9 @@ static void cache_dump_key(lua_State *L, knot_db_val_t *key)
 		return;
 	}
 
-	knot_dname_to_str(name, dname, sizeof(dname));
+	ret = !knot_dname_to_str(name, dname, sizeof(name));
+	assert(!ret);
+	if (ret) return;
 
 	/* If name typemap doesn't exist yet, create it */
 	lua_getfield(L, -1, name);
@@ -1206,7 +1211,7 @@ static void cache_dump_key(lua_State *L, knot_db_val_t *key)
 		lua_newtable(L);
 	}
 	/* Append to typemap */
-	char type_buf[16] = { '\0' };
+	char type_buf[KR_RRTYPE_STR_MAXLEN] = { '\0' };
 	knot_rrtype_to_string(type, type_buf, sizeof(type_buf));
 	lua_pushboolean(L, true);
 	lua_setfield(L, -2, type_buf);
@@ -1214,7 +1219,7 @@ static void cache_dump_key(lua_State *L, knot_db_val_t *key)
 	lua_setfield(L, -2, name);
 }
 
-/** Query cached records. */
+/** Query cached records.  TODO: fix caveats in ./README.rst documentation? */
 static int cache_get(lua_State *L)
 {
 	//struct kr_cache *cache = cache_assert_open(L); // to be fixed soon
@@ -1228,7 +1233,7 @@ static int cache_get(lua_State *L)
 
 	/* Retrieve set of keys */
 	const char *args = lua_tostring(L, 1);
-	static knot_db_val_t result_set[100];
+	knot_db_val_t result_set[100];
 	int ret = cache_prefixed(cache, args, result_set, 100);
 	if (ret < 0) {
 		format_error(L, kr_strerror(ret));
@@ -1237,7 +1242,7 @@ static int cache_get(lua_State *L)
 	/* Format output */
 	lua_newtable(L);
 	for (int i = 0; i < ret; ++i) {
-		cache_dump_key(L, &result_set[i]);
+		cache_dump_key(L, result_set[i]);
 	}
 	return 1;
 }

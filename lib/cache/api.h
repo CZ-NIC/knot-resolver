@@ -143,10 +143,11 @@ int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
  * @param name dname
  * @param type rr type
  * @return 0 or an errcode
+ * @note only "exact hits" are considered ATM, moreover xNAME records
+ * 	are "hidden" as NS. (see comments in struct entry_h)
  */
 KR_EXPORT
-int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name,
-		    uint16_t type);
+int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t type);
 
 /**
  * Get keys matching a dname lf prefix
@@ -154,6 +155,8 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name,
  * @param name dname
  * @param keys matched keys
  * @return result count or an errcode
+ * @note the cache keys are matched by prefix, i.e. it very much depends
+ * 	on their structure; CACHE_KEY_DEF.
  */
 KR_EXPORT
 int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
@@ -165,6 +168,8 @@ int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
  * @param buf output buffer of domain name in dname format
  * @param type output for type
  * @return length of dname or an errcode
+ * @note only "exact hits" are considered ATM, moreover xNAME records
+ * 	are "hidden" as NS. (see comments in struct entry_h)
  */
 KR_EXPORT
-int kr_unpack_cache_key(knot_db_val_t *key, knot_dname_t *buf, uint16_t *type);
+int kr_unpack_cache_key(knot_db_val_t key, knot_dname_t *buf, uint16_t *type);
