@@ -748,8 +748,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 	return ret;
 }
 
-int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name,
-		    uint16_t type)
+int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t type)
 {
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
@@ -782,23 +781,24 @@ int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
 
 	// use a mock type
 	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_A);
-	key.len -= sizeof((char)('E')) + sizeof(uint16_t);
+	key.len -= 2 /* '\0' 'E' */ + sizeof(uint16_t); /* CACHE_KEY_DEF */
+	if (name[0] == '\0') ++key.len; /* the root name is special ATM */
 	return cache_op(cache, match, &key, keys, max);
 }
 
-int kr_unpack_cache_key(knot_db_val_t *key, knot_dname_t *buf, uint16_t *type)
+int kr_unpack_cache_key(knot_db_val_t key, knot_dname_t *buf, uint16_t *type)
 {
-	if (key == NULL || buf == NULL) {
+	if (key.data == NULL || buf == NULL || type == NULL) {
 		return kr_error(EINVAL);
 	}
 
 	int len = -1;
-	const void *endp;
-	for (endp = key->data + 1;
-	     endp < key->data + key->len; endp++) {
-		if (*(const char *)(endp-1) == '\0' &&
-		    (*(const char *)endp == 'E')) {
-			len = endp - key->data - 1;
+	const char *tag, *key_data = key.data;
+	for (tag = key_data + 1; tag < key_data + key.len; ++tag) {
+		/* CACHE_KEY_DEF */
+		if (tag[-1] == '\0' && (tag == key_data + 1 || tag[-2] == '\0')) {
+			if (tag[0] != 'E') return kr_error(EINVAL);
+			len = tag - 1 - key_data;
 			break;
 		}
 	}
@@ -807,13 +807,13 @@ int kr_unpack_cache_key(knot_db_val_t *key, knot_dname_t *buf, uint16_t *type)
 		return kr_error(EINVAL);
 	}
 
-	int ret = knot_dname_lf2wire(buf, len, key->data);
+	int ret = knot_dname_lf2wire(buf, len, key.data);
 	if (ret < 0) {
 		return kr_error(ret);
 	}
 
-	// jump over "\0 E/1"
-	memcpy(type, key->data + len + 2, sizeof(uint16_t));
+	/* CACHE_KEY_DEF: jump over "\0 E/1" */
+	memcpy(type, tag + 1, sizeof(uint16_t));
 
 	return kr_ok();
 }
