@@ -37,14 +37,15 @@
 /* Cache entry values - binary layout.
  *
  * It depends on type which is recognizable by the key.
- * Code depending on the meaning of the key is marked by CACHE_KEY_DEF.
+ * Code depending on the contents of the key is marked by CACHE_KEY_DEF.
  *
  * 'E' entry (exact hit):
- *	- ktype == NS: entry_apex and multiple chained entry_h, based on has_* flags;
- *	- is_packet: uint16_t length, otherwise opaque and handled by ./entry_pkt.c
- *	- otherwise RRset + its RRSIG set (possibly empty).
+ *	- ktype == NS: struct entry_apex - multiple types inside (NS and xNAME);
+ *	- ktype != NS: struct entry_h
+ *	    * is_packet: uint16_t length, the rest is opaque and handled by ./entry_pkt.c
+ *	    * otherwise RRset + its RRSIG set (possibly empty).
  * '1' or '3' entry (NSEC or NSEC3)
- *	- contents is the same as for exact hit
+ *	- struct entry_h, contents is the same as for exact hit
  *	- flags don't make sense there
  */
 

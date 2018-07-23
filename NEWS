@@ -49,6 +49,9 @@ Bugfixes
   This fixes lower hit rate in NSEC3 zones (since 2.4.0).
 - minor TCP and TLS fixes (!623, !624, !626)
 
+Improvements
+------------
+- lua: resurrect cache.get('name') and cache.clear('name'), with caveats
 
 Knot Resolver 2.4.0 (2018-07-03)
 ================================

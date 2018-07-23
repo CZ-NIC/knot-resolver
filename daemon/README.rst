@@ -823,23 +823,20 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.prune([max_count])
 
-  :param number max_count:  maximum number of items to be pruned at once (default: 65536)
-  :return: ``{ pruned: int }``
-
-  Prune expired/invalid records.
+  Not implemented (anymore).
 
 .. function:: cache.get([domain])
 
-  :return: list of matching records in cache
+  :return: table of records in cache matching the prefix
 
-  Fetches matching records from cache. The **domain** can either be:
+  .. error:: **Caveats:**
 
-  - a domain name (e.g. ``"domain.cz"``)
-  - a wildcard (e.g. ``"*.domain.cz"``)
-
-  The domain name fetches all records matching this name, while the wildcard matches all records at or below that name.
-
-  You can also use a special namespace ``"P"`` to purge NODATA/NXDOMAIN matching this name (e.g. ``"domain.cz P"``).
+    - the count of scanned keys is limited by 100,
+      so for large subtrees you may be getting just some prefix
+      (exact name matches go first);
+    - validated NSEC and NSEC3 records are not put into the table;
+    - CNAME and DNAME types are printed as NS;
+    - outdated records and unvalidated non-existence records are still output as ``true``.
 
   .. note:: This is equivalent to ``cache['domain']`` getter.
 
@@ -847,27 +844,50 @@ daemons or manipulated from other processes, making for example synchronised loa
 
   .. code-block:: lua
 
-     -- Query cache for 'domain.cz'
-     cache['domain.cz']
-     -- Query cache for all records at/below 'insecure.net'
-     cache['*.insecure.net']
+     -- Query cache for 'nic.cz'
+     cache['nic.cz']
+
+     [nic.cz.] => {
+         [DNSKEY] => true
+         [SOA] => true
+         [AAAA] => true
+         [NS] => true
+         [A] => true
+         [DS] => true
+     }
+     [c.ns.nic.cz.] => {
+         [A] => true
+         [AAAA] => true
+     }
 
 .. function:: cache.clear([domain])
 
-  :return: ``bool``
+  :return: ``bool`` or ``int``
 
-  Purge cache records. If the domain isn't provided, whole cache is purged. See *cache.get()* documentation for subtree matching policy.
+  Purge cache records.
+  If the domain isn't provided, whole cache is purged and ``bool`` is returned (denoting success).
+
+  If you provide a name, only records in that subtree are purged,
+  and the number of removed records is returned.
 
   Examples:
 
   .. code-block:: lua
 
-     -- Clear records at/below 'bad.cz'
-     cache.clear('*.bad.cz')
-     -- Clear packet cache
-     cache.clear('*. P')
+     -- Clear records at and below 'bad.cz'
+     cache.clear('bad.cz')
      -- Clear whole cache
      cache.clear()
+
+  .. attention:: In case you provide a name:
+
+     - The number of removed records is limited to 1000.
+       The purpose is not to block the resolver for long; if you need larger purges,
+       you may e.g. repeat the command with a 1ms timer until it returns a lower value.
+     - To minimize surprises, you may prefer to specify names that have NS/SOA records,
+       e.g. ``example.com``.  Details: validated NSEC and NSEC3 records
+       (which are used for aggressive non-existence proofs)
+       will be removed only for zones whose **apex** is at or below the specified name.
 
 
 Timers and events
