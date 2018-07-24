@@ -709,11 +709,11 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 			if (!bm) {
 				return kr_error(EINVAL);
 			}
-			if (kr_nsec_bitmap_contains_type(bm, bm_size,
+			if (dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_NS) &&
-			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+			    !dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_DS) &&
-			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+			    !dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_SOA)) {
 				/* Satisfies rfc5155, 8.9. paragraph 2 */
 				return kr_ok();
@@ -769,7 +769,7 @@ int kr_nsec3_matches_name_and_type(const knot_rrset_t *nsec3,
 	if (!bm) {
 		return kr_error(EINVAL);
 	}
-	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
 		return kr_ok();
 	} else {
 		return kr_error(ENOENT);
