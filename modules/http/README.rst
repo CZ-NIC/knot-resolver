@@ -62,8 +62,8 @@ If you want to provide your own certificate and key, you're welcome to do so:
 		key  = 'mykey.key',
 	}
 
-The format of both certificate and key is expected to be PEM, e.g. equivallent to
-the outputs of following: 
+The format of both certificate and key is expected to be PEM, e.g. equivalent to
+the outputs of following:
 
 .. code-block:: bash
 
@@ -82,7 +82,7 @@ The HTTP module has several built-in services to use.
  "``/stats``", "Statistics/metrics", "Exported metrics in JSON."
  "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_"
  "``/feed``", "Most frequent queries", "List of most frequent queries in JSON."
-  "``/trace/:name/:type``", "Tracking", "Trace resolution of the query and return the verbose logs."
+ "``/trace/:name/:type``", "Tracking", "Trace resolution of the query and return the verbose logs."
 
 Enabling Prometheus metrics endpoint
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -137,7 +137,7 @@ The basic mode allows you to resolve a query and trace verbose logs (and message
 
 .. code-block:: bash
 
-   $ curl http://localhost:8053/trace/e.root-servers.net
+   $ curl https://localhost:8053/trace/e.root-servers.net
    [ 8138] [iter] 'e.root-servers.net.' type 'A' created outbound query, parent id 0
    [ 8138] [ rc ] => rank: 020, lowest 020, e.root-servers.net. A
    [ 8138] [ rc ] => satisfied from cache
@@ -190,7 +190,7 @@ Then you can query the API endpoint, or tail the WebSocket using curl.
 
 .. code-block:: bash
 
-	$ curl -k http://localhost:8053/health
+	$ curl -k https://localhost:8053/health
 	{"state":"up","uptime":0}
 	$ curl -k -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: localhost:8053/health"  -H "Sec-Websocket-Key: nope" -H "Sec-Websocket-Version: 13" https://localhost:8053/health
 	HTTP/1.1 101 Switching Protocols
