@@ -310,7 +310,7 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache,
 	knot_rdata_t *rd = cached_rr.rrs.rdata;
 	for (uint16_t i = 0; i < cached_rr.rrs.count; ++i) {
 		(void) kr_zonecut_add(cut, ns, rd);
-		rd = kr_rdataset_next(rd);
+		rd = knot_rdataset_next(rd);
 	}
 }
 

@@ -74,7 +74,7 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 		if (ret == 0) { /* Found a good DS */
 			return kr_ok();
 		}
-		rd = kr_rdataset_next(rd);
+		rd = knot_rdataset_next(rd);
 	}
 
 	return kr_error(ret);
