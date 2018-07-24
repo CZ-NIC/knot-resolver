@@ -212,6 +212,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	kr_log_verbose("[tls] session ticket: epoch %"PRIu64
 			", scheduling rotation check in %"PRIu64" ms\n",
 			(uint64_t)epoch, remain_ms);
+	++remain_ms; /*< We don't want to wake up half a millisecond before the epoch! */
 	err = uv_timer_start(timer, &tst_timer_callback, remain_ms, 0);
 	if (err) {
 		assert(false);
