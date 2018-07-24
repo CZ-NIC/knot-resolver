@@ -19,15 +19,6 @@
 #include <libknot/packet/pkt.h>
 
 /**
- * Check whether bitmap contains given type.
- * @param bm      Bitmap from NSEC or NSEC3.
- * @param bm_size Bitmap size.
- * @param type    RR type to search for.
- * @return        True if bitmap contains type.
- */
-bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t type);
-
-/**
  * Check bitmap that child names are contained in the same zone.
  * @note see RFC6840 4.1.
  * @param bm      Bitmap from NSEC or NSEC3.
