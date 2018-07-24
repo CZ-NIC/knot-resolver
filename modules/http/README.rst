@@ -42,15 +42,18 @@ Now you can reach the web services and APIs, done!
 	$ curl -k https://localhost:8053
 	$ curl -k https://localhost:8053/stats
 
-It is possible to disable HTTPS altogether by passing ``cert = false`` option.
+It is possible to disable HTTPS altogether by passing ``tls = false`` option.
 While it's not recommended, it could be fine for localhost tests as, for example,
 Safari doesn't allow WebSockets over HTTPS with a self-signed certificate.
 Major drawback is that current browsers won't do HTTP/2 over insecure connection.
 
+Alternatively you can disable unecrypted HTTP and enforce HTTPS by passing
+``tls = true`` option.
+
 .. code-block:: lua
 
 	http = {
-		cert = false,
+		tls = true,
 	}
 
 If you want to provide your own certificate and key, you're welcome to do so:

@@ -274,32 +274,32 @@ end
 -- @function Listen on given HTTP(s) host
 function M.add_interface(conf)
 	local crt, key, ephemeral
-	if conf.crtfile ~= false then
-		-- Check if the cert file exists
-		if not conf.crtfile then
-			conf.crtfile = 'self.crt'
-			conf.keyfile = 'self.key'
+	if conf.tls ~= false then
+		-- Check if a cert file was specified
+		if not conf.cert then
+			conf.cert = 'self.crt'
+			conf.key = 'self.key'
 			ephemeral = true
-		elseif not conf.keyfile then
+		elseif not conf.key then
 			error('certificate provided, but missing key')
 		end
 		-- Read or create self-signed x509 certificate
-		local f = io.open(conf.crtfile, 'r')
+		local f = io.open(conf.cert, 'r')
 		if f then
 			crt = assert(x509.new(f:read('*all')))
 			f:close()
 			-- Continue reading key file
 			if crt then
-				f = io.open(conf.keyfile, 'r')
+				f = io.open(conf.key, 'r')
 				key = assert(pkey.new(f:read('*all')))
 				f:close()
 			end
 		elseif ephemeral then
-			crt, key = updatecert(conf.crtfile, conf.keyfile)
+			crt, key = updatecert(conf.cert, conf.key)
 		end
 		-- Check loaded certificate
 		if not crt or not key then
-			panic('failed to load certificate "%s"', conf.crtfile)
+			panic('failed to load certificate "%s"', conf.cert)
 		end
 	end
 	-- Compose server handler
@@ -320,6 +320,7 @@ function M.add_interface(conf)
 		reuseport = reuseport,
 		client_timeout = conf.client_timeout or 5,
 		ctx = crt and tlscontext(crt, key),
+		tls = conf.tls,
 		onstream = routes,
 		-- Log errors, but do not throw
 		onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
@@ -346,7 +347,7 @@ function M.add_interface(conf)
 		expiry = math.max(0, expiry - (os.time() - 3 * 24 * 3600))
 		event.after(expiry, function ()
 			log('[http] refreshed ephemeral certificate')
-			crt, key = updatecert(conf.crtfile, conf.keyfile)
+			crt, key = updatecert(conf.cert, conf.key)
 			s.ctx = tlscontext(crt, key)
 		end)
 	end
@@ -358,8 +359,8 @@ function M.interface(host, port, endpoints, crtfile, keyfile)
 		host = host,
 		port = port,
 		endpoints = endpoints,
-		crtfile = crtfile,
-		keyfile = keyfile,
+		cert = crtfile,
+		key = keyfile,
 	}
 end
 
