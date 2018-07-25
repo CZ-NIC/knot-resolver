@@ -779,7 +779,7 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t t
 }
 
 int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
-		   knot_db_val_t *keys, int max)
+		   bool exact_name, knot_db_val_t keyval[][2], int maxcount)
 {
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
@@ -795,9 +795,13 @@ int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
 
 	// use a mock type
 	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_A);
-	key.len -= 2 /* '\0' 'E' */ + sizeof(uint16_t); /* CACHE_KEY_DEF */
-	if (name[0] == '\0') ++key.len; /* the root name is special ATM */
-	return cache_op(cache, match, &key, keys, max);
+	/* CACHE_KEY_DEF */
+	key.len -= sizeof(uint16_t); /* the type */
+	if (!exact_name) {
+		key.len -= 2; /* '\0' 'E' */
+		if (name[0] == '\0') ++key.len; /* the root name is special ATM */
+	}
+	return cache_op(cache, match, &key, keyval, maxcount);
 }
 
 int kr_unpack_cache_key(knot_db_val_t key, knot_dname_t *buf, uint16_t *type)
@@ -831,3 +835,39 @@ int kr_unpack_cache_key(knot_db_val_t key, knot_dname_t *buf, uint16_t *type)
 
 	return kr_ok();
 }
+
+
+int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
+			    bool exact_name, int maxcount)
+{
+	if (!cache_isvalid(cache)) {
+		return kr_error(EINVAL);
+	}
+
+	knot_db_val_t keyval[maxcount][2], keys[maxcount];
+	int ret = kr_cache_match(cache, name, exact_name, keyval, maxcount);
+	if (ret < 0) {
+		return ret;
+	}
+	const int count = ret;
+	/* Duplicate the key strings, as deletion may invalidate the pointers. */
+	int i;
+	for (i = 0; i < count; ++i) {
+		keys[i].len = keyval[i][0].len;
+		keys[i].data = malloc(keys[i].len);
+		if (!keys[i].data) {
+			ret = kr_error(ENOMEM);
+			goto cleanup;
+		}
+		memcpy(keys[i].data, keyval[i][0].data, keys[i].len);
+	}
+	ret = cache->api->remove(cache->db, keys, count);
+cleanup:
+	kr_cache_sync(cache); /* Sync even after just kr_cache_match(). */
+	/* Free keys */
+	while (--i >= 0) {
+		free(keys[i].data);
+	}
+	return ret ? ret : count;
+}
+
