@@ -97,7 +97,6 @@ The HTTP module has several built-in services to use.
 
  "``/stats``", "Statistics/metrics", "Exported metrics in JSON."
  "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_"
- "``/feed``", "Most frequent queries", "List of most frequent queries in JSON."
  "``/trace/:name/:type``", "Tracking", "Trace resolution of the query and return the verbose logs."
 
 Enabling Prometheus metrics endpoint
