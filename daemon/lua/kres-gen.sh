@@ -183,6 +183,8 @@ EOF
 # Cache
 	kr_cache_insert_rr
 	kr_cache_sync
+	kr_cache_remove
+	kr_cache_remove_subtree
 EOF
 
 

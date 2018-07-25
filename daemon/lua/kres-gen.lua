@@ -322,7 +322,10 @@ _Bool kr_dnssec_key_ksk(const uint8_t *);
 _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);
+int kr_cache_closest_apex(struct kr_cache *, const knot_dname_t *, _Bool);
 int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t);
+int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
+int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
 int kr_cache_sync(struct kr_cache *);
 typedef struct {
 	uint8_t bitmap[32];
