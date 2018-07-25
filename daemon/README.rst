@@ -860,34 +860,42 @@ daemons or manipulated from other processes, making for example synchronised loa
          [AAAA] => true
      }
 
-.. function:: cache.clear([domain])
-
-  :return: ``bool`` or ``int``
+.. function:: cache.clear([name], [exact_name], [rr_type], [maxcount], [callback])
 
   Purge cache records.
-  If the domain isn't provided, whole cache is purged and ``bool`` is returned (denoting success).
 
-  If you provide a name, only records in that subtree are purged,
-  and the number of removed records is returned.
+  :return: ``bool`` (success of removing all in one go)
+
+  :param string name: if the name isn't provided, whole cache is purged
+        (and any other parameters are disregarded).
+        Otherwise only records in that subtree are removed.
+  :param bool exact_name: if set to ``true``, only records with *the same* name are removed.
+  :param kres.type rr_type: you may additionally specify the type to remove,
+        but that is only supported with ``exact_name == true``.
+  :param integer maxcount: the number of records to remove at one go, default: 100.
+        The purpose is not to block the resolver for long;
+        the ``callback`` parameter by default handles this by asynchronous repetition.
+  :param function callback: custom code to handle result of the underlying C call.
+        As the first parameter it gets the return code from :func:`kr_cache_remove_subtree()`,
+        and the following parameters are copies of those passed to `cache.clear()`.
+        The default callback repeats the command after one millisecond (if successful).
 
   Examples:
 
   .. code-block:: lua
 
-     -- Clear records at and below 'bad.cz'
-     cache.clear('bad.cz')
      -- Clear whole cache
      cache.clear()
+     -- Clear records at and below 'bad.cz'
+     cache.clear('bad.cz')
 
-  .. attention:: In case you provide a name:
+  .. attention::
 
-     - The number of removed records is limited to 1000.
-       The purpose is not to block the resolver for long; if you need larger purges,
-       you may e.g. repeat the command with a 1ms timer until it returns a lower value.
-     - To minimize surprises, you may prefer to specify names that have NS/SOA records,
-       e.g. ``example.com``.  Details: validated NSEC and NSEC3 records
-       (which are used for aggressive non-existence proofs)
-       will be removed only for zones whose **apex** is at or below the specified name.
+     To minimize surprises with partial cache removal,
+     you may prefer to specify names that have NS/SOA records,
+     e.g. ``example.com``.  Details: validated NSEC and NSEC3 records
+     (which are used for aggressive non-existence proofs)
+     will be removed only for zones whose **apex** is at or below the specified name.
 
 
 Timers and events
