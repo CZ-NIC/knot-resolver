@@ -499,7 +499,8 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
 				/* TODO: actually handle DNAMEs */
 			if (rr->rclass != KNOT_CLASS_IN || !type_OK
-			    || !knot_dname_is_equal(rr->owner, cname)) {
+			    || !knot_dname_is_equal(rr->owner, cname)
+			    || !knot_dname_in(query->zone_cut.name, rr->owner)) {
 				continue;
 			}
 
@@ -571,7 +572,14 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			cname = pending_cname;
 			break;
 		}
-		/* try to unroll cname only within current zone */
+		/* Information outside bailiwick is not trusted. */
+		if (!knot_dname_in(query->zone_cut.name, pending_cname)) {
+			cname = pending_cname;
+			break;
+		}
+		/* The validator still can't handle multiple zones in one answer,
+		 * so we only follow if a single label is replaced.
+		 * TODO: this still isn't 100%, as the target may have a NS+DS. */
 		const int pending_labels = knot_dname_labels(pending_cname, NULL);
 		if (pending_labels != cname_labels) {
 			cname = pending_cname;
