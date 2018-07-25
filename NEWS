@@ -1,7 +1,7 @@
 Bugfixes
 --------
 - TLS session resumption: avoid bad scheduling of rotation (#385)
-
+- HTTP module: fix a regression in 2.4.0 which broke custom certs (!632)
 
 Knot Resolver 2.4.0 (2018-07-03)
 ================================
