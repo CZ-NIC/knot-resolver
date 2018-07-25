@@ -1,9 +1,7 @@
 Bugfixes
 --------
 - TLS session resumption: avoid bad scheduling of rotation (#385)
-
-Bugfixes
---------
+- HTTP module: fix a regression in 2.4.0 which broke custom certs (!632)
 - cache: NSEC3 negative cache even without NS record (#384)
   This fixes lower hit rate in NSEC3 zones (since 2.4.0).
 
