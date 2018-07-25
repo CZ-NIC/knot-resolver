@@ -4,7 +4,7 @@ HTTP/2 services
 ---------------
 
 This is a module that does the heavy lifting to provide an HTTP/2 enabled
-server that supports TLS by default and provides endpoint for other modules
+server that provides endpoint for other modules
 in order to enable them to export restful APIs and websocket streams.
 One example is statistics module that can stream live metrics on the website,
 or publish metrics on request for Prometheus scraper.
@@ -12,14 +12,21 @@ or publish metrics on request for Prometheus scraper.
 The server allows other modules to either use default endpoint that provides
 built-in webpage, restful APIs and websocket streams, or create new endpoints.
 
+By default the server provides plain HTTP and TLS on the same port. See below
+if you want to use only one of these.
+
+.. warning:: This module provides access to various API endpoints
+             and must not be directly exposed to untrusted parties.
+             Use `reverse-proxy`_ like Apache_ or Nginx_ if you need to
+             authenticate API clients.
+
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
 By default, the web interface starts HTTPS/2 on port 8053 using an ephemeral
 certificate that is valid for 90 days and is automatically renewed. It is of
-course self-signed, so you should use your own judgement before exposing it
-to the outside world. Why not use something like `Let's Encrypt <https://letsencrypt.org>`_
-for starters?
+course self-signed. Why not use something like
+`Let's Encrypt <https://letsencrypt.org>`_?
 
 .. code-block:: lua
 
@@ -42,12 +49,10 @@ Now you can reach the web services and APIs, done!
 	$ curl -k https://localhost:8053
 	$ curl -k https://localhost:8053/stats
 
-It is possible to disable HTTPS altogether by passing ``tls = false`` option.
-While it's not recommended, it could be fine for localhost tests as, for example,
-Safari doesn't allow WebSockets over HTTPS with a self-signed certificate.
-Major drawback is that current browsers won't do HTTP/2 over insecure connection.
 
-Alternatively you can disable unecrypted HTTP and enforce HTTPS by passing
+Configuring TLS
+^^^^^^^^^^^^^^^
+You can disable unecrypted HTTP and enforce HTTPS by passing
 ``tls = true`` option.
 
 .. code-block:: lua
@@ -73,6 +78,14 @@ the outputs of following:
 	openssl ecparam -genkey -name prime256v1 -out mykey.key
 	openssl req -new -key mykey.key -out csr.pem
 	openssl req -x509 -days 90 -key mykey.key -in csr.pem -out mycert.crt
+
+It is also possible to disable HTTPS altogether by passing ``tls = false`` option.
+Plain HTTP gets handy if you want to use `reverse-proxy`_ like Apache_ or Nginx_
+for authentication to API etc.
+(Unencrypted HTTP could be fine for localhost tests as, for example,
+Safari doesn't allow WebSockets over HTTPS with a self-signed certificate.
+Major drawback is that current browsers won't do HTTP/2 over insecure connection.)
+
 
 Built-in services
 ^^^^^^^^^^^^^^^^^
@@ -328,3 +341,6 @@ Dependencies
        $ gzip -d GeoLite2-City.mmdb.gz
 
 .. _Prometheus: https://prometheus.io
+.. _reverse-proxy: https://en.wikipedia.org/wiki/Reverse_proxy
+.. _Apache: https://httpd.apache.org/docs/2.4/howto/reverse_proxy.html
+.. _Nginx: https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/
