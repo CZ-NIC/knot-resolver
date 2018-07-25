@@ -157,6 +157,44 @@ setmetatable(modules, {
 	end
 })
 
+
+cache.clear = function (name, exact_name, rr_type, maxcount, callback)
+	if name == nil then return cache.clear_everything() end
+	-- Check parameters, in order, and set defaults if missing.
+	local dname = kres.str2dname(name)
+	if not dname then error('cache.clear(): incorrect name passed') end
+	if exact_name == nil then exact_name = false end
+	if type(exact_name) ~= 'boolean'
+		then error('cache.clear(): incorrect exact_name passed') end
+	if rr_type ~= nil then
+		-- Special case, without any subtree searching.
+		if not exact_name
+			then error('cache.clear(): specifying rr_type only supported with exact_name') end
+		if maxcount or callback
+			then error('cache.clear(): maxcount and callback parameters not supported with rr_type') end
+		local ret = ffi.C.kr_cache_remove(kres.context().cache, dname, rr_type)
+		if ret ~= 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
+		return true
+	end
+	if maxcount == nil then maxcount = 100 end
+	if type(maxcount) ~= 'number' or maxcount <= 0
+		then error('cache.clear(): maxcount has to be a positive integer') end
+	-- Default callback function: repeat after 1ms
+	if callback == nil then callback =
+		function (ret, name, exact_name, rr_type, maxcount, callback)
+			if ret < 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
+			if (ret < maxcount) then return true end
+			event.after(1, function ()
+					cache.clear(name, exact_name, rr_type, maxcount, callback)
+				end)
+			return false
+		end
+	end
+
+	-- Do the C call and callback.
+	local ret = ffi.C.kr_cache_remove_subtree(kres.context().cache, dname, exact_name, maxcount)
+	return callback(ret, name, exact_name, rr_type, maxcount, callback)
+end
 -- Syntactic sugar for cache
 -- `cache[x] -> cache.get(x)`
 -- `cache.{size|storage} = value`

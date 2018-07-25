@@ -153,14 +153,23 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t t
  * Get keys matching a dname lf prefix
  * @param cache cache structure
  * @param name dname
- * @param keys matched keys
+ * @param exact_name whether to only consider exact name matches
+ * @param keyval matched key-value pairs
+ * @param maxcount limit on the number of returned key-value pairs
  * @return result count or an errcode
  * @note the cache keys are matched by prefix, i.e. it very much depends
  * 	on their structure; CACHE_KEY_DEF.
  */
 KR_EXPORT
 int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
-		   knot_db_val_t *keys, int max);
+		   bool exact_name, knot_db_val_t keyval[][2], int maxcount);
+
+/**
+ * Remove a subtree in cache.  It's like _match but removing them instead of returning.
+ */
+KR_EXPORT
+int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
+			    bool exact_name, int maxcount);
 
 /**
  * Unpack dname and type from db key
