@@ -58,11 +58,12 @@ Properties
   :param string pair:  ``hostname address`` i.e. ``"localhost 127.0.0.1"``
   :return: ``{ result: bool }``
 
-  Add a hostname - address pair hint.
+  Add a hostname--address pair hint.
 
   .. note::
 
-    If multiple addresses have been added for a name, all are returned in a forward query.
+    If multiple addresses have been added for a name (in separate ``hints.set()`` commands),
+    all are returned in a forward query.
     If multiple names have been added to an address, the last one defined is returned
     in a corresponding PTR query.
 
@@ -72,12 +73,6 @@ Properties
   :return: ``{ result: bool }``
 
   Remove a hostname - address pair hint.  If address is omitted, all addresses for the given name are deleted.
-
-.. function:: hints.root()
-
-  :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
-
-  .. tip:: If no parameters are passed, returns current root hints set.
 
 .. function:: hints.root_file(path)
 
@@ -89,6 +84,8 @@ Properties
   :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
 
   Replace current root hints and return the current table of root hints.
+
+  .. tip:: If no parameters are passed, it only returns current root hints set without changing anything.
 
   Example:
 
