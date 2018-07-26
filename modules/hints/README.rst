@@ -73,12 +73,6 @@ Properties
 
   Remove a hostname - address pair hint.  If address is omitted, all addresses for the given name are deleted.
 
-.. function:: hints.root()
-
-  :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
-
-  .. tip:: If no parameters are passed, returns current root hints set.
-
 .. function:: hints.root_file(path)
 
   Replace current root hints from a zonefile.  If the path is omitted, the compiled-in path is used, i.e. the root hints are reset to the default.
@@ -89,6 +83,8 @@ Properties
   :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
 
   Replace current root hints and return the current table of root hints.
+
+  .. tip:: If no parameters are passed, it only returns current root hints set without changing anything.
 
   Example:
 
