@@ -1,5 +1,6 @@
 FROM debian:unstable
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
+ARG KNOT_BRANCH=master
 
 WORKDIR /root
 CMD ["/bin/bash"]
@@ -13,11 +14,11 @@ RUN apt-get install -y -qqq make cmake pkg-config git build-essential bsdmainuti
 
 # build and install latest version of Knot DNS
 # (kresd depends on libknot and libdnssec)
-RUN git clone --depth=1 --branch=2.6 https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
+RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
 WORKDIR /tmp/knot
 RUN pwd
 RUN autoreconf -if
-RUN ./configure
+RUN ./configure --prefix=/usr
 RUN make
 RUN make install
 RUN ldconfig
