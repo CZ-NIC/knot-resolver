@@ -805,6 +805,49 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 	return client_paramlist_entry_free(entry);
 }
 
+struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
+			  const struct sockaddr *addr)
+{
+	/* Opportunistic upgrade from port 53 -> 853 */
+	if (kr_inaddr_port(addr) != KR_DNS_PORT) {
+		return NULL;
+	}
+
+	static char key[INET6_ADDRSTRLEN + 6];
+	size_t keylen = sizeof(key);
+	if (kr_inaddr_str(addr, key, &keylen) != 0) {
+		return NULL;
+	}
+
+	/* Rewrite 053 -> 853 */
+	strcpy(key + keylen - 3, "853");
+
+	return map_get(tls_client_paramlist, key);
+}
+
+int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port)
+{
+	if (!tls_client_paramlist || !addr) {
+		return kr_error(EINVAL);
+	}
+
+	/* Parameters are OK */
+
+	char key[INET6_ADDRSTRLEN + 6];
+	size_t keylen = sizeof(key);
+	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
+		return kr_error(EINVAL);
+	}
+
+	struct tls_client_paramlist_entry *entry = map_get(tls_client_paramlist, key);
+	if (entry != NULL) {
+		client_paramlist_entry_clear(NULL, (void *)entry, NULL);
+		map_del(tls_client_paramlist, key);
+	}
+	
+	return kr_ok();
+}
+
 int tls_client_params_set(map_t *tls_client_paramlist,
 			  const char *addr, uint16_t port,
 			  const char *param, tls_client_param_t param_type)

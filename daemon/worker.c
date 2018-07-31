@@ -1401,6 +1401,22 @@ static int qr_task_step(struct qr_task *task,
 		choice += 1;
 	}
 
+	/* Upgrade to TLS if the upstream address is configured as DoT capable. */
+	struct engine *engine = ctx->worker->engine;
+	struct network *net = &engine->net;
+	const struct sockaddr *addr = packet_source ? packet_source : task->addrlist;
+	struct tls_client_paramlist_entry *tls_entry = NULL;
+	if (kr_inaddr_port(task->addrlist) == KR_DNS_PORT) {
+		tls_entry = tls_client_try_upgrade(&net->tls_client_params, task->addrlist);
+		if (tls_entry != NULL) {
+			kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
+			sock_type = SOCK_STREAM;
+		}
+	} else if (sock_type == SOCK_STREAM) {
+		const char *key = tcpsess_key(addr);
+		tls_entry = map_get(&net->tls_client_params, key);
+	}
+
 	int ret = 0;
 	if (sock_type == SOCK_DGRAM) {
 		/* Start fast retransmit with UDP. */
