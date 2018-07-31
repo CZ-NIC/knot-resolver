@@ -15,6 +15,17 @@ stages:
   - coverage
   - deploy
 
+respdiff_test:  &respdiff_test
+  stage: build  # TODO
+  script:
+    - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py $(git rev-parse --short HEAD)  # TODO clean/re-use?
+  tags:
+    - respdiff
+
+respdiff_test2: *respdiff_test
+
+respdiff_test3: *respdiff_test
+
 build:linux:amd64:
   stage: build
   script:
