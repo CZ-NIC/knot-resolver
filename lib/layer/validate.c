@@ -775,8 +775,12 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /** Change ranks of RRs from this single iteration:
- * _INITIAL or _TRY or _MISSING -> rank_to_set. */
-static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
+ * _INITIAL or _TRY or _MISSING -> rank_to_set.
+ *
+ * Optionally do this only in a `bailiwick` (if not NULL).
+ * Iterator shouldn't have selected such records, but we check to be sure. */
+static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set,
+			 const knot_dname_t *bailiwick)
 {
 	struct kr_request *req	   = ctx->req;
 	struct kr_query *qry	   = req->current_query;
@@ -786,6 +790,9 @@ static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
 		for (size_t j = 0; j < arr->len; ++j) {
 			ranked_rr_array_entry_t *entry = arr->at[j];
 			if (entry->qry_uid != qry->uid) {
+				continue;
+			}
+			if (bailiwick && !knot_dname_in(bailiwick, entry->rr->owner)) {
 				continue;
 			}
 			if (kr_rank_test(entry->rank, KR_RANK_INITIAL)
@@ -863,7 +870,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Pass-through if user doesn't want secure answer or stub. */
 	/* @todo: Validating stub resolver mode. */
 	if (qry->flags.STUB) {
-		rank_records(ctx, KR_RANK_OMIT);
+		rank_records(ctx, KR_RANK_OMIT, NULL);
 		return ctx->state;
 	}
 	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
@@ -884,7 +891,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags.DNSSEC_WANT)) {
 		const bool is_insec = qry->flags.CACHED && qry->flags.DNSSEC_INSECURE;
 		if ((qry->flags.DNSSEC_INSECURE)) {
-			rank_records(ctx, KR_RANK_INSECURE);
+			rank_records(ctx, KR_RANK_INSECURE, qry->zone_cut.name);
 		}
 		if (is_insec && qry->parent != NULL) {
 			/* We have got insecure answer from cache.
@@ -906,7 +913,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (knot_wire_get_cd(req->answer->wire)) {
 		check_wildcard(ctx);
 		wildcard_adjust_to_wire(req, qry);
-		rank_records(ctx, KR_RANK_OMIT);
+		rank_records(ctx, KR_RANK_OMIT, NULL);
 		return ctx->state;
 	}
 	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */
@@ -954,7 +961,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			/* ^ the message is a bit imprecise to avoid being too verbose */
 			qry->flags.DNSSEC_WANT = false;
 			qry->flags.DNSSEC_INSECURE = true;
-			rank_records(ctx, KR_RANK_INSECURE);
+			rank_records(ctx, KR_RANK_INSECURE, qry->zone_cut.name);
 			mark_insecure_parents(qry);
 			return KR_STATE_DONE;
 		} else if (ret != 0) {
