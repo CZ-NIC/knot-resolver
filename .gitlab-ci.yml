@@ -12,6 +12,7 @@ variables:
 stages:
   - build
   - test
+  - respdiff
   - coverage
   - deploy
 
@@ -207,6 +208,83 @@ test:linux:amd64:valgrind:
     expire_in: 1 week
     paths:
       - tmpdeckard*
+
+
+.respdiff:  &respdiff
+  stage: build  # TODO
+  script:
+    - export TESTDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-gitlab/$RESPDIFF_TEST"
+    - echo $TESTDIR
+    - >
+      sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
+      -p $PRIORITY
+      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
+      "$(git rev-parse --short HEAD)" -l gitlab --clean -t $RESPDIFF_TEST)
+    - cp -vt . $TESTDIR/*.{txt,json,svg}
+    - grep -q "^target disagrees.*$TARGET_DISAGREES %" $TESTDIR/*_report.diffrepro.txt
+  artifacts:
+    paths:
+      - '*.txt'
+      - '*.json'
+      - '*.svg'
+  tags:
+    - respdiff
+
+respdiff:top10k:
+  <<: *respdiff
+  variables:
+    RESPDIFF_TEST: top10k.iter.udp.j128
+    PRIORITY: 6
+    TARGET_DISAGREES: 0\.0[0-9]
+
+#respdiff:fwd-tls6-kresd.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j128
+#    PRIORITY: 6
+#    TARGET_DISAGREES: 0\.0[0-9]
+#
+#respdiff:fwd-udp6-kresd.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
+#    PRIORITY: 5
+#    TARGET_DISAGREES: 0\.[0-1][0-9]
+#
+#respdiff:iter.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.iter.udp6.j384
+#    PRIORITY: 5
+#    TARGET_DISAGREES: 0\.[0-8][0-9]
+#
+#respdiff:iter.tls6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.iter.tls6.j384
+#    PRIORITY: 5
+#    TARGET_DISAGREES: 0\.[0-8][0-9]
+#
+#respdiff:fwd-udp6-unbound.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j384
+#    PRIORITY: 5
+#    TARGET_DISAGREES: 0\.0[0-9]
+#
+#respdiff:fwd-udp6-unbound.tcp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j384
+#    PRIORITY: 5
+#    TARGET_DISAGREES: 0\.0[0-9]
+#
+#respdiff:fwd-udp6-unbound.tls6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j384
+#    PRIORITY: 5
+#    TARGET_DISAGREES: 0\.0[0-9]
 
 
 respdiff:iter:udp:linux:amd64:
