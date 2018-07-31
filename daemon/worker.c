@@ -1098,6 +1098,17 @@ static int session_tls_hs_cb(struct session *session, int status)
 		}
 	}
 
+	/* Reset the query start time to exclude connection establishment time,
+	 * otherwise server would appear slower on every reconnect / TCP retry.
+	 * The sessions support query multiplexing and keepalive, so the connection time
+	 * is amortized over multiple queries.
+	 */
+	for (size_t i = 0; i < session->waiting.len; ++i) {
+		struct qr_task *task = session->waiting.at[i];
+		struct kr_query *query = kr_rplan_last(kr_resolve_plan(&task->ctx->req));
+		query->timestamp_mono = kr_now();
+	}
+
 	ret = worker_add_tcp_connected(worker, &peer->ip, session);
 	if (deletion_res == kr_ok() && ret == kr_ok()) {
 		ret = session_next_waiting_send(session);
