@@ -195,7 +195,7 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		pkt->rr[i].additional = rr_rank;
 	}
 
-	/* Adjust TTL in records.  We know that no RR has expired yet. */
+	/* Adjust TTL in each record. */
 	const uint32_t drift = eh->ttl - new_ttl;
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
@@ -203,7 +203,17 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
 			knot_rdata_t *rd = rr->rrs.data;
 			for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
-				knot_rdata_set_ttl(rd, knot_rdata_ttl(rd) - drift);
+				/* We need to be careful:
+				 * due to enforcing minimum TTL on packet,
+				 * some records may be below that value.
+				 * We keep those records at TTL 0. */
+				uint32_t ttl = knot_rdata_ttl(rd);
+				if (drift <= ttl) {
+					ttl -= drift;
+				} else {
+					ttl = 0;
+				}
+				knot_rdata_set_ttl(rd, ttl);
 				rd = kr_rdataset_next(rd);
 			}
 		}
