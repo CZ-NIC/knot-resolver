@@ -15,6 +15,59 @@ stages:
   - coverage
   - deploy
 
+.respdiff:  &respdiff
+  stage: build  # TODO
+  script:
+    - >
+      sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
+      -p $PRIORITY
+      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
+      "$(git rev-parse --short HEAD)" -l gitlab --clean -t $RESPDIFF_TEST)
+  tags:
+    - respdiff
+
+respdiff:shortlist.fwd-tls6-kresd.udp6.j128:
+  <<: *respdiff
+  variables:
+    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j128
+    PRIORITY: 6
+
+respdiff:shortlist.fwd-udp6-kresd.udp6.j384:
+  <<: *respdiff
+  variables:
+    RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
+    PRIORITY: 5
+
+respdiff:shortlist.iter.udp6.j384:
+  <<: *respdiff
+  variables:
+    RESPDIFF_TEST: shortlist.iter.udp6.j384
+    PRIORITY: 5
+
+respdiff:shortlist.iter.tls6.j384:
+  <<: *respdiff
+  variables:
+    RESPDIFF_TEST: shortlist.iter.tls6.j384
+    PRIORITY: 5
+
+respdiff:shortlist.fwd-udp6-unbound.udp6.j384:
+  <<: *respdiff
+  variables:
+    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j384
+    PRIORITY: 5
+
+respdiff:shortlist.fwd-udp6-unbound.tcp6.j384:
+  <<: *respdiff
+  variables:
+    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j384
+    PRIORITY: 5
+
+respdiff:shortlist.fwd-udp6-unbound.tls6.j384:
+  <<: *respdiff
+  variables:
+    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j384
+    PRIORITY: 5
+
 build:linux:amd64:
   stage: build
   script:
