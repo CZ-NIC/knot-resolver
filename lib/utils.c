@@ -421,6 +421,18 @@ uint16_t kr_inaddr_port(const struct sockaddr *addr)
 	}
 }
 
+void kr_inaddr_set_port(struct sockaddr *addr, uint16_t port)
+{
+	if (!addr) {
+		return;
+	}
+	switch (addr->sa_family) {
+	case AF_INET:  ((struct sockaddr_in *)addr)->sin_port = htons(port);
+	case AF_INET6: ((struct sockaddr_in6 *)addr)->sin6_port = htons(port);
+	default: break;
+	}
+}
+
 int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen)
 {
 	int ret = kr_ok();

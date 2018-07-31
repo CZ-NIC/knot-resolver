@@ -158,6 +158,15 @@ tls_hs_state_t tls_get_hs_state(const struct tls_common_ctx *ctx);
 /*! Set TLS handshake state. */
 int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
 
+/*! Find TLS parameters for given address. Attempt opportunistic upgrade for port 53 to 853,
+ *  if the address is configured with a working DoT on port 853.
+ */
+struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
+			  const struct sockaddr *addr);
+
+/*! Clear (remove) TLS parameters for given address. */
+int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port);
+
 /*! Set TLS authentication parameters for given address.
  * Note: hostnames must be imported before ca files,
  *       otherwise ca files will not be imported at all.
