@@ -1642,6 +1642,22 @@ static int qr_task_step(struct qr_task *task,
 		return qr_task_step(task, NULL, NULL);
 	}
 
+	/* Upgrade to TLS if the upstream address is configured as DoT capable. */
+	struct engine *engine = ctx->worker->engine;
+	struct network *net = &engine->net;
+	const struct sockaddr *addr = packet_source ? packet_source : task->addrlist;
+	struct tls_client_paramlist_entry *tls_entry = NULL;
+	if (kr_inaddr_port(task->addrlist) == KR_DNS_PORT) {
+		tls_entry = tls_client_try_upgrade(&net->tls_client_params, task->addrlist);
+		if (tls_entry != NULL) {
+			kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
+			sock_type = SOCK_STREAM;
+		}
+	} else if (sock_type == SOCK_STREAM) {
+		const char *key = tcpsess_key(addr);
+		tls_entry = map_get(&net->tls_client_params, key);
+	}
+
 	/* Start fast retransmit with UDP, otherwise connect. */
 	int ret = 0;
 	if (sock_type == SOCK_DGRAM) {
@@ -1680,8 +1696,6 @@ static int qr_task_step(struct qr_task *task,
 		}
 	} else {
 		assert (sock_type == SOCK_STREAM);
-		const struct sockaddr *addr =
-			packet_source ? packet_source : task->addrlist;
 		if (addr->sa_family == AF_UNSPEC) {
 			subreq_finalize(task, packet_source, packet);
 			return qr_task_finalize(task, KR_STATE_FAIL);
@@ -1819,13 +1833,9 @@ static int qr_task_step(struct qr_task *task,
 			}
 
 			/* Check if there must be TLS */
-			struct engine *engine = ctx->worker->engine;
-			struct network *net = &engine->net;
-			const char *key = tcpsess_key(addr);
-			struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
-			if (entry) {
+			if (tls_entry) {
 				assert(session->tls_client_ctx == NULL);
-				struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(entry, worker);
+				struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(tls_entry, worker);
 				if (!tls_ctx) {
 					session_del_tasks(session, task);
 					session_del_waiting(session, task);
@@ -1834,7 +1844,7 @@ static int qr_task_step(struct qr_task *task,
 					subreq_finalize(task, packet_source, packet);
 					return qr_task_step(task, NULL, NULL);
 				}
-				tls_client_ctx_set_params(tls_ctx, entry, session);
+				tls_client_ctx_set_params(tls_ctx, tls_entry, session);
 				session->tls_client_ctx = tls_ctx;
 				session->has_tls = true;
 			}
@@ -1857,7 +1867,7 @@ static int qr_task_step(struct qr_task *task,
 			WITH_VERBOSE (qry) {
 				char addr_str[INET6_ADDRSTRLEN];
 				inet_ntop(session->peer.ip.sa_family, kr_inaddr(&session->peer.ip), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "=> connecting to: '%s'\n", addr_str);
+				VERBOSE_MSG(qry, "=> connecting to: '%s:%d'\n", addr_str, kr_inaddr_port(&session->peer.ip));
 			}
 
 			if (uv_tcp_connect(conn, (uv_tcp_t *)client,
