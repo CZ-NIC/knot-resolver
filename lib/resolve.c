@@ -1588,26 +1588,21 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 
 	WITH_VERBOSE(qry) {
 
-	char ns_str[INET6_ADDRSTRLEN];
-
 	KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
 
-	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		struct sockaddr *addr = &qry->ns.addr[i].ip;
-		if (addr->sa_family == AF_UNSPEC) {
-			break;
-		}
-		if (!kr_inaddr_equal(dst, addr)) {
-			continue;
-		}
-		inet_ntop(addr->sa_family, kr_inaddr(&qry->ns.addr[i].ip), ns_str, sizeof(ns_str));
+	if (dst != NULL && dst->sa_family != AF_UNSPEC) {
+		char ns_str[INET6_ADDRSTRLEN];
+		inet_ntop(dst->sa_family, kr_inaddr(dst), ns_str, sizeof(ns_str));
 		VERBOSE_MSG(qry,
 			"=> querying: '%s' score: %u zone cut: '%s' qname: '%s' qtype: '%s' proto: '%s'\n",
 			ns_str, qry->ns.score, zonecut_str, qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
-		break;
-	}}
+	} else {
+		VERBOSE_MSG(qry, "=> could not select upstream address in checkout");
+	}
+
+	}
 
 	return kr_ok();
 }
