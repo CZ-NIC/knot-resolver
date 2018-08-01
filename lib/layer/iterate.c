@@ -439,7 +439,9 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	if (!ns_record_exists && knot_wire_get_aa(pkt->wire)) {
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
-			if (rr->type == KNOT_RRTYPE_NS && knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
+			if (rr->type == KNOT_RRTYPE_NS &&
+			    knot_dname_is_sub(rr->owner, qry->zone_cut.name) &&
+			    knot_dname_in(rr->owner, qry->sname)) {
 				/* NS below cut in authority indicates different authority, but same NS set. */
 				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 			}
