@@ -1,4 +1,1 @@
-Clang in Debian stable is old so we have separate image with Clang.
-This Dockerfile should be the same as ci/Dockerfile, with two differences:
-- FROM points to debian:unstable
-- last step adds Clang and its analysis tools
+Docker image based on debian-unstable specifically for newer Clang.
