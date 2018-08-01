@@ -316,7 +316,8 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock
 
 #define ELECT_INIT(ns, ctx_) do { \
 	(ns)->ctx = (ctx_); \
-	(ns)->addr[0].ip.sa_family = AF_UNSPEC; \
+	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) \
+		{ (ns)->addr[i].ip.sa_family = AF_UNSPEC; } \
 	(ns)->reputation = 0; \
 	(ns)->score = KR_NS_MAX_SCORE + 1; \
 } while (0)

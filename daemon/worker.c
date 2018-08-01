@@ -1411,7 +1411,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		}
 
 		/* Check if a valid address exists */
-		if (choice == NULL) {
+		if (choice == NULL || choice->sin6_family == AF_UNSPEC) {
 			return ret;
 		}
 
@@ -1424,6 +1424,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 
 		/* Check that the selected address is still valid */
 		if (choice->sin6_family != AF_INET && choice->sin6_family != AF_INET6) {
+			task->addrlist_turn += 1;
 			return ret;
 		}
 
