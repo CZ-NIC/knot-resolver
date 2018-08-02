@@ -1003,7 +1003,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	if (qry->parent != NULL &&
 	    !(qry->forward_flags.CNAME) &&
 	    !(qry->flags.DNS64_MARK) &&
-	    knot_dname_in(qry->parent->zone_cut.name, qry->zone_cut.name)) {
+	    knot_dname_in_bailiwick(qry->zone_cut.name, qry->parent->zone_cut.name) >= 0) {
 		return KR_STATE_PRODUCE;
 	}
 
@@ -1298,7 +1298,8 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	 * (and need glue from parent), or DS refetch. */
 	if (qry->parent) {
 		const knot_dname_t *parent = qry->parent->zone_cut.name;
-		if (parent[0] != '\0' && knot_dname_in(parent, qry->sname)) {
+		if (parent[0] != '\0'
+		    && knot_dname_in_bailiwick(qry->sname, parent) >= 0) {
 			requested_name = knot_wire_next_label(parent, NULL);
 		}
 	} else if ((qry->stype == KNOT_RRTYPE_DS) && (qry->sname[0] != '\0')) {
