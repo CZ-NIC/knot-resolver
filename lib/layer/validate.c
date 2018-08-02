@@ -207,7 +207,8 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 	const knot_pktsection_t *an = knot_pkt_section(answer, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-		if ((rr->type != KNOT_RRTYPE_DNSKEY) || !knot_dname_in(qry->zone_cut.name, rr->owner)) {
+		if (rr->type != KNOT_RRTYPE_DNSKEY
+		    || knot_dname_in_bailiwick(rr->owner, qry->zone_cut.name) < 0) {
 			continue;
 		}
 		/* Merge with zone cut (or replace ancestor key). */
@@ -493,7 +494,7 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 	struct kr_zonecut *cut = &qry->zone_cut;
 	const knot_dname_t *cut_name_start = qry->zone_cut.name;
 	bool use_cut = true;
-	if (!knot_dname_in(cut_name_start, rr->owner)) {
+	if (knot_dname_in_bailiwick(rr->owner, cut_name_start) < 0) {
 		int zone_labels = knot_dname_labels(qry->zone_cut.name, NULL);
 		int matched_labels = knot_dname_matched_labels(qry->zone_cut.name, rr->owner);
 		int skip_labels = zone_labels - matched_labels;
