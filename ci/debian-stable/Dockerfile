@@ -1,5 +1,6 @@
 FROM debian:stable
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
+ARG KNOT_BRANCH=master
 
 WORKDIR /root
 CMD ["/bin/bash"]
@@ -12,7 +13,7 @@ RUN apt-get upgrade -y -qqq
 
 # Knot and Knot Resolver dependecies
 RUN apt-get -t stretch-backports install -y git
-RUN apt-get install -y -qqq make cmake pkg-config build-essential bsdmainutils libtool autoconf make pkg-config liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev pkg-config libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http
+RUN apt-get install -y -qqq make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
@@ -33,11 +34,11 @@ RUN pip3 install -r /tmp/deckard-req.txt
 
 # build and install latest version of Knot DNS
 # (kresd depends on libknot and libdnssec)
-RUN git clone --depth=1 --branch=2.6 https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
+RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
 WORKDIR /tmp/knot
 RUN pwd
 RUN autoreconf -if
-RUN ./configure
+RUN ./configure --prefix=/usr
 RUN make
 RUN make install
 RUN ldconfig
@@ -53,7 +54,6 @@ RUN luarocks install luacheck
 
 # respdiff for kresd CI
 RUN apt-get install lmdb-utils -y -qqq
-RUN pip3 install dnspython python-augeas
 RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/respdiff /var/opt/respdiff
 RUN pip3 install -r /var/opt/respdiff/requirements.txt
 

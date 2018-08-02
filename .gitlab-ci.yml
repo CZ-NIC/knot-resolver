@@ -217,8 +217,8 @@ respdiff:iter:udp:linux:amd64:
     - ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh udp
     - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 0.8 %'
-    - grep -q '^target disagrees.*0\.[0-7][0-9] %' results/respdiff.txt
+    - echo 'test if mismatch rate < 1.0 %'
+    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp
   dependencies:
@@ -244,8 +244,8 @@ respdiff:iter:tcp:linux:amd64:
     - ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh tcp
     - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 0.8 %'
-    - grep -q '^target disagrees.*0\.[0-7][0-9] %' results/respdiff.txt
+    - echo 'test if mismatch rate < 1.0 %'
+    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp
   dependencies:
@@ -271,8 +271,8 @@ respdiff:iter:tls:linux:amd64:
     - ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh tls
     - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 0.8 %'
-    - grep -q '^target disagrees.*0\.[0-7][0-9] %' results/respdiff.txt
+    - echo 'test if mismatch rate < 1.0 %'
+    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
     - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls
   dependencies:

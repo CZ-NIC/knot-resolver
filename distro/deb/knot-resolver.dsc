@@ -19,7 +19,7 @@ Build-Depends:
  libedit-dev,
  libgeoip-dev,
  libgnutls28-dev,
- libknot-dev (>= 2.6.4),
+ libknot-dev (>= 2.6.7),
  liblmdb-dev,
  libluajit-5.1-dev,
  libsystemd-dev (>= 227),

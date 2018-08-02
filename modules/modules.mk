@@ -35,7 +35,6 @@ modules_TARGETS += bogus_log \
                    http \
                    daf \
                    workarounds \
-                   version \
                    ta_signal_query \
                    priming \
                    serve_stale \

@@ -193,8 +193,16 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
-			knot_rrset_t *rrs = /*const-cast*/(knot_rrset_t *)knot_pkt_rr(sec, k);
-			rrs->ttl -= drift; // ^^ FIXME??
+			knot_rrset_t *rrs = // vv FIXME??
+				/*const-cast*/(knot_rrset_t *)knot_pkt_rr(sec, k);
+			/* We need to be careful: due to enforcing minimum TTL
+			 * on packet, some records may be below that value.
+			 * We keep those records at TTL 0. */
+			if (rrs->ttl >= drift) {
+				rrs->ttl -= drift;
+			} else {
+				rrs->ttl = 0;
+			}
 		}
 	}
 

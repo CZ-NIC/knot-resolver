@@ -1,23 +1,55 @@
+Knot Resolver 2.4.1 (2018-08-02)
+================================
+
 Security
 --------
-- fix a rare case of zones incorrectly dowgraded to insecure status
+- fix CVE-2018-10920: Improper input validation bug in DNS resolver component
+  (security!7, security!9)
+
+Bugfixes
+--------
+- cache: fix TTL overflow in packet due to min_ttl (#388, security!8)
+- TLS session resumption: avoid bad scheduling of rotation (#385)
+- HTTP module: fix a regression in 2.4.0 which broke custom certs (!632)
+- cache: NSEC3 negative cache even without NS record (#384)
+  This fixes lower hit rate in NSEC3 zones (since 2.4.0).
+- minor TCP and TLS fixes (!623, !624, !626)
+
+
+Knot Resolver 2.4.0 (2018-07-03)
+================================
+
+Incompatible changes
+--------------------
+- minimal libknot version is now 2.6.7 to pull in latest fixes (#366)
+
+Security
+--------
+- fix a rare case of zones incorrectly dowgraded to insecure status (!576)
 
 New features
 ------------
 - TLS session resumption (RFC 5077), both server and client (!585, #105)
   (disabled when compiling with gnutls < 3.5)
-- aggressive caching for NSEC3 zones
-- optional protection from DNS Rebinding attack (module rebinding)
+- TLS_FORWARD policy uses system CA certificate store by default (!568)
+- aggressive caching for NSEC3 zones (!600)
+- optional protection from DNS Rebinding attack (module rebinding, !608)
+- module bogus_log to log DNSSEC bogus queries without verbose logging (!613)
 
 Bugfixes
 --------
+- prefill: fix ability to read certificate bundle (!578)
 - avoid turning off qname minimization in some cases, e.g. co.uk. (#339)
 - fix validation of explicit wildcard queries (#274)
 - dns64 module: more properties from the RFC implemented (incl. bug #375)
 
 Improvements
 ------------
-- ta_sentinel: switch to version 14 of the RFC draft (e.g. new label names)
+- systemd: multiple enabled kresd instances can now be started using kresd.target
+- ta_sentinel: switch to version 14 of the RFC draft (!596)
+- support for glibc systems with a non-Linux kernel (!588)
+- support per-request variables for Lua modules (!533)
+- support custom HTTP endpoints for Lua modules (!527)
 
 
 Knot Resolver 2.3.0 (2018-04-23)
