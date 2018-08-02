@@ -173,7 +173,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 
 	/* It's just caller's approximation that the RR is in that particular zone.
 	 * We MUST guard against attempts of zones signing out-of-bailiwick records. */
-	if (!knot_dname_in(zone_name, covered->owner)) {
+	if (knot_dname_in_bailiwick(covered->owner, zone_name) < 0) {
 		vctx->result = kr_error(ENOENT);
 		return vctx->result;
 	}
