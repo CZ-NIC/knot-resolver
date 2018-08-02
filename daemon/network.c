@@ -54,6 +54,7 @@ void network_init(struct network *net, uv_loop_t *loop)
 		net->tls_client_params = map_make(NULL);
 		net->tls_session_ticket_ctx = /* unsync. random, by default */
 			tls_session_ticket_ctx_create(loop, NULL, 0);
+		net->tcp.in_idle_timeout = 10000;
 	}
 }
 
@@ -112,6 +113,7 @@ void network_deinit(struct network *net)
 		tls_client_params_free(&net->tls_client_params);
 		net->tls_credentials = NULL;
 		tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
+		net->tcp.in_idle_timeout = 0;
 	}
 }
 

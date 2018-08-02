@@ -1,4 +1,4 @@
-.TH "kresd.systemd" "7" "2018-01-30" "CZ.NIC" "Knot DNS Resolver Systemd Units"
+.TH "kresd.systemd" "7" "2018-06-04" "CZ.NIC" "Knot DNS Resolver Systemd Units"
 .\"
 .\" kresd.systemd.7 -- man page for systemd units for kresd
 .\"
@@ -17,6 +17,7 @@ kresd@.service
 kresd.socket
 kresd-tls.socket
 kresd-control@.socket
+kresd.target
 system-kresd.slice
 .fi
 
@@ -99,7 +100,7 @@ number.  To enable 3 concurrent daemons:
 .RE
 .fi
 
-.B Using system-kresd.slice
+.B Using system-kresd.slice and kresd.target
 
 The following commands may not work with older systemd (e.g. on CentOS 7).
 See notes for more info.
@@ -129,13 +130,11 @@ Or you can use it to stop kresd altogether (e.g. during package removal):
 .RE
 .fi
 
-Note that \fBsystemctl start system-kresd.slice\fR does not
-automatically start the sockets or the daemons, though.  To ensure
-that all enabled daemons are started and running, do:
+To start all enabled kresd daemons, use the provided \fIkresd.target\fR:
 
 .nf
 .RS 4n
-.B systemctl start --all 'kresd@*.service'
+.B systemctl start kresd.target
 .RE
 .fi
 
@@ -212,7 +211,7 @@ To enable multiple concurrent daemons, for example 16:
 To start all enabled daemons:
 .nf
 .RS
-.B systemctl start --all 'kresd@*.service'
+.B systemctl start kresd.target
 .RE
 .fi
 

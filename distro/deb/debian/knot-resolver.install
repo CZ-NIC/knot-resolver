@@ -1,11 +1,12 @@
 debian/init-d-script usr/lib/knot-resolver/
 debian/kresd.conf etc/knot-resolver/
 etc/knot-resolver/config.* /usr/share/doc/knot-resolver/examples/
-systemd/kresd-control@.socket lib/systemd/system/
-systemd/kresd-tls.socket lib/systemd/system/
-systemd/kresd.socket lib/systemd/system/
-systemd/kresd@.service lib/systemd/system/
-systemd/tmpfiles/knot-resolver.conf usr/lib/tmpfiles.d/
+distro/common/systemd/kresd-control@.socket lib/systemd/system/
+distro/common/systemd/kresd-tls.socket lib/systemd/system/
+distro/common/systemd/kresd.socket lib/systemd/system/
+distro/common/systemd/kresd@.service lib/systemd/system/
+distro/common/systemd/kresd.target lib/systemd/system/
+distro/common/tmpfiles/knot-resolver.conf usr/lib/tmpfiles.d/
 usr/lib/knot-resolver/*.so
 usr/lib/knot-resolver/daf.lua
 usr/lib/knot-resolver/daf/
@@ -28,7 +29,6 @@ usr/lib/knot-resolver/serve_stale.lua
 usr/lib/knot-resolver/ta_sentinel.lua
 usr/lib/knot-resolver/ta_signal_query.lua
 usr/lib/knot-resolver/trust_anchors.lua
-usr/lib/knot-resolver/version.lua
 usr/lib/knot-resolver/view.lua
 usr/lib/knot-resolver/workarounds.lua
 usr/lib/knot-resolver/zonefile.lua
