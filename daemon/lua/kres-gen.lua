@@ -258,8 +258,8 @@ struct kr_context {
 const char *knot_strerror(int);
 knot_dname_t *knot_dname_copy(const knot_dname_t *, knot_mm_t *);
 knot_dname_t *knot_dname_from_str(uint8_t *, const char *, size_t);
+int knot_dname_in_bailiwick(const knot_dname_t *, const knot_dname_t *);
 _Bool knot_dname_is_equal(const knot_dname_t *, const knot_dname_t *);
-_Bool knot_dname_is_sub(const knot_dname_t *, const knot_dname_t *);
 size_t knot_dname_labels(const uint8_t *, const uint8_t *);
 size_t knot_dname_size(const knot_dname_t *);
 char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
