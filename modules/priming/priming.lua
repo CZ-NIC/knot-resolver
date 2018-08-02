@@ -1,6 +1,5 @@
 -- Module interface
 local ffi = require('ffi')
-local knot = ffi.load(libknot_SONAME)
 
 local priming = {}
 priming.retry_time = 10 * sec -- retry time when priming fail
