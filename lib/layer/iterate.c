@@ -98,7 +98,8 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	const knot_pktsection_t *ns = knot_pkt_section(answer, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (rr->type == KNOT_RRTYPE_SOA && knot_dname_in(query->zone_cut.name, rr->owner)) {
+		if (rr->type == KNOT_RRTYPE_SOA
+		    && knot_dname_in_bailiwick(rr->owner, query->zone_cut.name) >= 0) {
 			return true;
 		}
 	}
@@ -260,8 +261,9 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	/* New authority MUST be at/below the authority of the current cut;
 	 * also qname must be below new authority;
 	 * otherwise it's a possible cache injection attempt. */
-	if (!knot_dname_in(current_cut, rr->owner) ||
-	    !knot_dname_in(rr->owner, qry->sname)) {
+	const bool ok = knot_dname_in_bailiwick(rr->owner, current_cut) >= 0
+		     && knot_dname_in_bailiwick(qry->sname, rr->owner)  >= 0;
+	if (!ok) {
 		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
 #ifdef STRICT_MODE
 		return KR_STATE_FAIL;
@@ -297,7 +299,8 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 			++i, rdata_i = knot_rdataset_next(rdata_i)) {
 		const knot_dname_t *ns_name = knot_ns_name(rdata_i);
 		/* Glue is mandatory for NS below zone */
-		if (knot_dname_in(rr->owner, ns_name) && !has_glue(pkt, ns_name)) {
+		if (knot_dname_in_bailiwick(ns_name, rr->owner) >= 0
+		    && !has_glue(pkt, ns_name)) {
 			const char *msg =
 				"<= authority: missing mandatory glue, skipping NS";
 			WITH_VERBOSE(qry) {
@@ -310,13 +313,14 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		assert(!ret); (void)ret;
 
 		/* Choose when to use glue records. */
-		bool in_bailiwick = knot_dname_in(current_cut, ns_name);
+		const bool in_bailiwick =
+			knot_dname_in_bailiwick(ns_name, current_cut) >= 0;
 		bool do_fetch;
 		if (qry->flags.PERMISSIVE) {
 			do_fetch = true;
 		} else if (qry->flags.STRICT) {
 			/* Strict mode uses only mandatory glue. */
-			do_fetch = knot_dname_in(cut->name, ns_name);
+			do_fetch = knot_dname_in_bailiwick(ns_name, cut->name) >= 0;
 		} else {
 			/* Normal mode uses in-bailiwick glue. */
 			do_fetch = in_bailiwick;
@@ -369,7 +373,8 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (rr->rclass != KNOT_CLASS_IN || !knot_dname_in(zonecut_name, rr->owner)) {
+		if (rr->rclass != KNOT_CLASS_IN
+		    || knot_dname_in_bailiwick(rr->owner, zonecut_name) < 0) {
 			continue;
 		}
 		uint8_t rank = get_initial_rank(rr, qry, false,
