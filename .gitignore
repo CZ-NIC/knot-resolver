@@ -65,6 +65,7 @@ kresd.amalg.c
 libkres.amalg.c
 /doc/kresd.8
 /libkres.pc
+/modules/version/version.lua
 /tags
 /coverage
 /coverage.stats
