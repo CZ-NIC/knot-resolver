@@ -78,7 +78,7 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 	 * sname might be under delegation from owner and thus
 	 * not in the zone of this NSEC at all.
 	 */
-	if (!knot_dname_is_sub(sname, nsec->owner)) {
+	if (knot_dname_in_bailiwick(sname, nsec->owner) <= 0) {
 		return kr_ok();
 	}
 	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
