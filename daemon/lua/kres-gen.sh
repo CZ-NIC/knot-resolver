@@ -104,8 +104,8 @@ printf "\tchar _stub[];\n};\n"
 # Domain names
 	knot_dname_copy
 	knot_dname_from_str
+	knot_dname_in_bailiwick
 	knot_dname_is_equal
-	knot_dname_is_sub
 	knot_dname_labels
 	knot_dname_size
 	knot_dname_to_str

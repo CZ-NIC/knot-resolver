@@ -333,7 +333,7 @@ local function localhost_reversed(_, req)
 	local is_exact   -- exact dname for localhost
 	local is_apex    -- apex of a locally-served localhost zone
 	local is_nonterm -- empty non-terminal name
-	if ffi.C.knot_dname_is_sub(qry.sname, todname('ip6.arpa.')) then
+	if ffi.C.knot_dname_in_bailiwick(qry.sname, todname('ip6.arpa.')) > 0 then
 		-- exact ::1 query (relying on the calling rule)
 		is_exact = true
 		is_apex = true
@@ -349,7 +349,7 @@ local function localhost_reversed(_, req)
 		else
 			is_exact = false
 			is_apex = false
-			is_nonterm = ffi.C.knot_dname_is_sub(dname_rev4_localhost, qry.sname)
+			is_nonterm = ffi.C.knot_dname_in_bailiwick(dname_rev4_localhost, qry.sname) > 0
 		end
 	end
 
