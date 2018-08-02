@@ -29,6 +29,7 @@ usr/lib/knot-resolver/serve_stale.lua
 usr/lib/knot-resolver/ta_sentinel.lua
 usr/lib/knot-resolver/ta_signal_query.lua
 usr/lib/knot-resolver/trust_anchors.lua
+usr/lib/knot-resolver/version.lua
 usr/lib/knot-resolver/view.lua
 usr/lib/knot-resolver/workarounds.lua
 usr/lib/knot-resolver/zonefile.lua
