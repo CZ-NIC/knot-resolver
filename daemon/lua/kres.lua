@@ -597,7 +597,7 @@ ffi.metatype( knot_pkt_t, {
 		qname = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			-- inlined knot_pkt_qname(), basically
-			if not pkt or not pkt.qname_size then return nil end
+			if pkt == nil or pkt.qname_size == 0 then return nil end
 			return ffi.string(pkt.wire + 12, pkt.qname_size)
 		end,
 		qclass = function(pkt)
