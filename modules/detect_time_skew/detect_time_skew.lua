@@ -1,6 +1,5 @@
 -- Module interface
 local ffi = require('ffi')
-local knot = ffi.load(libknot_SONAME)
 
 local mod = {}
 local event_id = nil
