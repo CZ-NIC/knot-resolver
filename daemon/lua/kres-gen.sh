@@ -196,11 +196,12 @@ EOF
 	struct zs_scanner
 EOF
 ./scripts/gen-cdefs.sh libzscanner functions <<-EOF
-	zs_init
 	zs_deinit
-	zs_set_input_string
-	zs_set_input_file
+	zs_init
 	zs_parse_record
+	zs_set_input_file
+	zs_set_input_string
+	zs_strerror
 EOF
 
 printf "]]\n"

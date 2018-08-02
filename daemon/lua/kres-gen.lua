@@ -412,9 +412,10 @@ struct zs_scanner {
 	uint32_t r_data_length;
 	uint8_t r_data[65535];
 };
-int zs_init(zs_scanner_t *, const char *, const uint16_t, const uint32_t);
 void zs_deinit(zs_scanner_t *);
-int zs_set_input_string(zs_scanner_t *, const char *, size_t);
-int zs_set_input_file(zs_scanner_t *, const char *);
+int zs_init(zs_scanner_t *, const char *, const uint16_t, const uint32_t);
 int zs_parse_record(zs_scanner_t *);
+int zs_set_input_file(zs_scanner_t *, const char *);
+int zs_set_input_string(zs_scanner_t *, const char *, size_t);
+const char *zs_strerror(const int);
 ]]
