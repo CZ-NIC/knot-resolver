@@ -37,7 +37,7 @@ local function test_rrset_functions()
 	same(rr_text:gsub('%s+', ' '), 'com. 1 TXT "hello"', 'rrset to text works')
 	same(kres.dname2str(todname('com.')), 'com.', 'domain name conversion works')
 	-- test creating rrset
-	rr = kres.rrset(todname('com.'), kres.type.A, kres.class.IN)
+	rr = kres.rrset(todname('com.'), kres.type.A, kres.class.IN, 66)
 	ok(ffi.istype(kres.rrset, rr), 'created an empty RR')
 	same(rr:owner(), '\3com\0', 'created RR has correct owner')
 	same(rr:class(), kres.class.IN, 'created RR has correct class')
@@ -46,21 +46,21 @@ local function test_rrset_functions()
 	same(rr.type, kres.type.A, 'created RR has correct type')
 	-- test adding rdata
 	same(rr:wire_size(), 0, 'empty RR wire size is zero')
-	ok(rr:add_rdata('\1\2\3\4', 4, 66), 'adding RDATA works')
+	ok(rr:add_rdata('\1\2\3\4', 4), 'adding RDATA works')
 	same(rr:wire_size(), 5 + 4 + 4 + 2 + 4, 'RR wire size works after adding RDATA')
 	-- test conversion to text
 	local expect = 'com.                	66	A	1.2.3.4\n'
 	same(rr:txt_dump(), expect, 'RR to text works')
 	-- create a dummy rrsig
-	local rrsig = kres.rrset(todname('com.'), kres.type.RRSIG, kres.class.IN)
-	rrsig:add_rdata('\0\1', 2, 0)
+	local rrsig = kres.rrset(todname('com.'), kres.type.RRSIG, kres.class.IN, 0)
+	rrsig:add_rdata('\0\1', 2)
 	same(rr:rdcount(), 1, 'add_rdata really added RDATA')
 	-- check rrsig matching
 	same(rr.type, rrsig:type_covered(), 'rrsig type covered matches covered RR type')
 	ok(rr:is_covered_by(rrsig), 'rrsig is covering a record')
 	-- test rrset merging
-	local copy = kres.rrset(rr:owner(), rr.type)
-	ok(copy:add_rdata('\4\3\2\1', 4, 66), 'adding second RDATA works')
+	local copy = kres.rrset(rr:owner(), rr.type, kres.class.IN, 66)
+	ok(copy:add_rdata('\4\3\2\1', 4), 'adding second RDATA works')
 	ok(rr:merge_rdata(copy), 'merge_rdata works')
 	same(rr:rdcount(), 2, 'RDATA count is correct after merge_rdata')
 	expect = 'com.                	66	A	1.2.3.4\n' ..

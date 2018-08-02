@@ -425,8 +425,9 @@ ffi.metatype( knot_rrset_t, {
 			return tonumber(rr.rrs.count)
 		end,
 		-- Add binary RDATA to the RR set
-		add_rdata = function (rr, rdata, rdlen)
+		add_rdata = function (rr, rdata, rdlen, no_ttl)
 			assert(ffi.istype(knot_rrset_t, rr))
+			assert(no_ttl == nil, 'add_rdata() can not accept TTL anymore')
 			local ret = knot.knot_rrset_add_rdata(rr, rdata, tonumber(rdlen), nil)
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
