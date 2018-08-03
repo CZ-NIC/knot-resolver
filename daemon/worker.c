@@ -1184,7 +1184,7 @@ static void on_connect(uv_connect_t *req, int status)
 			array_del(session->waiting, 0);
 			assert(task->refs > 1);
 			qr_task_unref(task);
-			qr_task_step(task, NULL, NULL);
+			qr_task_step(task, &peer->ip, NULL);
 		}
 		assert(session->tasks.len == 0);
 		iorequest_release(worker, req);
@@ -1247,8 +1247,12 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 	}
 
+	/* Either handshake or sending data has failed */
 	while (session->waiting.len > 0) {
 		struct qr_task *task = session->waiting.at[0];
+		worker->stats.handshake_errors += 1;
+		/* Notify resolver of the outgoing query timeout, as there's no further step */
+		kr_resolve_consume(&task->ctx->req, &session->peer.ip, NULL);
 		session_del_tasks(session, task);
 		array_del(session->waiting, 0);
 		ioreq_kill_pending(task);
@@ -1296,7 +1300,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 		array_del(session->waiting, 0);
 		assert(task->refs > 1);
 		qr_task_unref(task);
-		qr_task_step(task, NULL, NULL);
+		qr_task_step(task, &peer->ip, NULL);
 	}
 
 	assert (session->tasks.len == 0);
@@ -1320,6 +1324,8 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 			struct qr_task *task = session->waiting.at[0];
 			task->timeouts += 1;
 			worker->stats.timeout += 1;
+			/* Notify resolver of the outgoing query timeout, as there's no further step */
+			kr_resolve_consume(&task->ctx->req, &session->peer.ip, NULL);
 			array_del(session->waiting, 0);
 			session_del_tasks(session, task);
 			ioreq_kill_pending(task);
@@ -1365,7 +1371,7 @@ static void on_udp_timeout(uv_timer_t *timer)
 		for (uint16_t i = 0; i < MIN(task->pending_count, KR_NSREP_MAXADDR); ++i) {
 			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
 			if (choice->sa_family == AF_UNSPEC) {
-				break;
+				continue;
 			}
 			WITH_VERBOSE(qry) {
 				char addr_str[INET6_ADDRSTRLEN];
@@ -1379,7 +1385,7 @@ static void on_udp_timeout(uv_timer_t *timer)
 	}
 	task->timeouts += 1;
 	worker->stats.timeout += 1;
-	qr_task_step(task, NULL, NULL);
+	qr_task_step(task, &session->peer.ip, NULL);
 }
 
 static void on_session_idle_timeout(uv_timer_t *timer)
@@ -1879,7 +1885,7 @@ static int qr_task_step(struct qr_task *task,
 				worker_del_tcp_waiting(ctx->worker, addr);
 				iorequest_release(ctx->worker, conn);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_step(task, NULL, NULL);
+				return qr_task_step(task, &session->peer.ip, NULL);
 			}
 		}
 	}

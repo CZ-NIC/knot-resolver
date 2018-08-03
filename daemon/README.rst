@@ -476,6 +476,27 @@ For when listening on ``localhost`` just doesn't cut it.
    Get/set the IPv4 address used to perform queries.  There is also ``net.outgoing_v6`` for IPv6.
    The default is ``nil``, which lets the OS choose any address.
 
+.. function:: net.tcp_in_idle([milliseconds])
+
+   Set TCP idle connection timeout in milliseconds. This is the limit for how long the connections to upstreams are kept open when idle. Default is 10000.
+
+   .. code-block:: lua
+
+      > net.tcp_in_idle()
+      10000
+      > net.tcp_in_idle(5000)
+      true
+
+.. function:: net.tls_handshake_timeout([milliseconds])
+
+   Set TLS handshake timeout in milliseconds. It should be set to accomodate 2-3 roundtrips to upstreams for TLS1.2. Default is 6000.
+
+   .. code-block:: lua
+
+      > net.tls_handshake_timeout()
+      6000
+      > net.tls_handshake_timeout(2000)
+      true
 
 .. _tls-server-config:
 
