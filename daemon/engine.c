@@ -1020,6 +1020,7 @@ struct engine *engine_luaget(lua_State *L)
 {
 	lua_getglobal(L, "__engine");
 	struct engine *engine = lua_touserdata(L, -1);
+	if (!engine) luaL_error(L, "internal error, empty engine pointer");
 	lua_pop(L, 1);
 	return engine;
 }
