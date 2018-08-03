@@ -145,6 +145,7 @@ struct worker_ctx {
 		size_t queries;
 		size_t dropped;
 		size_t timeout;
+		size_t handshake_errors;
 	} stats;
 
 	struct zone_import_ctx* z_import;

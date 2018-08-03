@@ -90,6 +90,46 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 	return transfer;
 }
 
+/** Perform TLS handshake and handle error codes according to the documentation.
+  * See See https://gnutls.org/manual/html_node/TLS-handshake.html#TLS-handshake
+  * The function returns kr_ok() or success or non fatal error, kr_error(EAGAIN) on blocking, or kr_error(EIO) on fatal error.
+  */
+static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_cb) {
+	struct session *session = ctx->session;
+	const char *logstring = ctx->client_side ? client_logstring : server_logstring;
+
+	int err = gnutls_handshake(ctx->tls_session);
+	if (err == GNUTLS_E_SUCCESS) {
+		/* Handshake finished, return success */
+		ctx->handshake_state = TLS_HS_DONE;
+		kr_log_verbose("[%s] TLS handshake with %s has completed\n",
+			       logstring,  kr_straddr(&session->peer.ip));
+		if (handshake_cb) {
+			handshake_cb(session, 0);
+		}
+	} else if (err == GNUTLS_E_AGAIN) {
+		return kr_error(EAGAIN);
+	} else if (gnutls_error_is_fatal(err)) {
+		/* Fatal errors, return error as it's not recoverable */
+		kr_log_verbose("[%s] gnutls_handshake failed: %s (%d)\n",
+			     logstring,
+		             gnutls_strerror_name(err), err);
+		if (handshake_cb) {
+			handshake_cb(session, -1);
+		}
+		return kr_error(EIO);
+	} else if (err == GNUTLS_E_WARNING_ALERT_RECEIVED) {
+		/* Handle warning when in verbose mode */
+		const char *alert_name = gnutls_alert_get_name(gnutls_alert_get(ctx->tls_session));
+		if (alert_name != NULL) {
+			kr_log_verbose("[%s] TLS alert from %s received: %s\n",
+				       logstring, kr_straddr(&session->peer.ip), alert_name);
+		}
+	}
+	return kr_ok();
+}
+
+
 struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 {
 	assert(worker != NULL);
@@ -281,58 +321,48 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	tls_p->nread = nread >= 0 ? nread : 0;
 	tls_p->consumed = 0;
 
-	/* Ensure TLS handshake is performed before receiving data. */
-	while (tls_p->handshake_state == TLS_HS_IN_PROGRESS) {
-		int err = gnutls_handshake(tls_p->tls_session);
-		if (err == GNUTLS_E_SUCCESS) {
-			tls_p->handshake_state = TLS_HS_DONE;
-			kr_log_verbose("[%s] TLS handshake with %s has completed\n",
-				       logstring,  kr_straddr(&session->peer.ip));
-			if (tls_p->handshake_cb) {
-				tls_p->handshake_cb(tls_p->session, 0);
-			}
-		} else if (err == GNUTLS_E_AGAIN) {
-			return 0;
-		} else if (gnutls_error_is_fatal(err)) {
-			kr_log_verbose("[%s] gnutls_handshake failed: %s (%d)\n",
-				     logstring,
-			             gnutls_strerror_name(err), err);
-			if (tls_p->handshake_cb) {
-				tls_p->handshake_cb(tls_p->session, -1);
-			}
-			return kr_error(err);
+	/* Ensure TLS handshake is performed before receiving data.
+	 * See https://www.gnutls.org/manual/html_node/TLS-handshake.html */
+	while (tls_p->handshake_state <= TLS_HS_IN_PROGRESS) {
+		int err = tls_handshake(tls_p, tls_p->handshake_cb);
+		if (err == kr_error(EAGAIN)) {
+			return 0; /* Wait for more data */
+		} else if (err != kr_ok()) {
+			return err;
 		}
 	}
 
+	/* See https://gnutls.org/manual/html_node/Data-transfer-and-termination.html#Data-transfer-and-termination */
 	int submitted = 0;
 	bool is_retrying = false;
 	uint64_t retrying_start = 0;
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->tls_session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
 		if (count == GNUTLS_E_AGAIN) {
-			break;    /* No data available */
-		} else if (count == GNUTLS_E_INTERRUPTED ||
-			   count == GNUTLS_E_REHANDSHAKE) {
-			if (!is_retrying) {
-				is_retrying = true;
-				retrying_start = kr_now();
-			}
-			uint64_t elapsed = kr_now() - retrying_start;
-			if (elapsed > TLS_MAX_HANDSHAKE_TIME) {
-				return kr_error(EIO);
-			}
-			continue; /* Try reading again */
+			break; /* No data available */
 		} else if (count < 0) {
+			/* Retry on non-fatal errors (alerts, rehandshake) */
+			if (!gnutls_error_is_fatal(count)) {
+				if (!is_retrying) {
+					is_retrying = true;
+					retrying_start = kr_now();
+				}
+				uint64_t elapsed = kr_now() - retrying_start;
+				if (elapsed < TLS_MAX_HANDSHAKE_TIME) {
+					continue; /* Try reading again */
+				}
+			}
 			kr_log_verbose("[%s] gnutls_record_recv failed: %s (%zd)\n",
 				     logstring, gnutls_strerror_name(count), count);
-			return kr_error(EIO);
+			/* Propagate errors to lower layer */
+			count = kr_error(EIO);
 		}
 		DEBUG_MSG("[%s] submitting %zd data to worker\n", logstring, count);
 		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
 		if (ret < 0) {
 			return ret;
 		}
-		if (count == 0) {
+		if (count <= 0) {
 			break;
 		}
 		submitted += ret;
@@ -983,7 +1013,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 	struct tls_common_ctx *ctx = &client_ctx->c;
 
 	gnutls_session_set_ptr(ctx->tls_session, client_ctx);
-	gnutls_handshake_set_timeout(ctx->tls_session, KR_CONN_RTT_MAX * 3);
+	gnutls_handshake_set_timeout(ctx->tls_session, ctx->worker->engine->net.tcp.tls_handshake_timeout);
 	session->tls_client_ctx = client_ctx;
 	ctx->handshake_cb = handshake_cb;
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
@@ -995,14 +1025,15 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 					tls_params->session_data.size);
 	}
 
-	int ret = gnutls_handshake(ctx->tls_session);
-	if (ret == GNUTLS_E_SUCCESS) {
-		return kr_ok();
-	} else if (gnutls_error_is_fatal(ret) != 0) {
-		kr_log_verbose("[tls_client] handshake failed (%s)\n", gnutls_strerror(ret));
-		return kr_error(ECONNABORTED);
+	/* See https://www.gnutls.org/manual/html_node/Asynchronous-operation.html */
+	while (ctx->handshake_state <= TLS_HS_IN_PROGRESS) {
+		/* Don't pass the handshake callback as the connection isn't registered yet. */
+		int ret = tls_handshake(ctx, NULL);
+		if (ret != kr_ok()) {
+			return ret;
+		}
 	}
-	return kr_error(EAGAIN);
+	return kr_ok();
 }
 
 tls_hs_state_t tls_get_hs_state(const struct tls_common_ctx *ctx)

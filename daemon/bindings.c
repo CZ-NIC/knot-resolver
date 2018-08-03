@@ -833,35 +833,51 @@ static int net_outgoing(lua_State *L, int family)
 static int net_outgoing_v4(lua_State *L) { return net_outgoing(L, AF_INET); }
 static int net_outgoing_v6(lua_State *L) { return net_outgoing(L, AF_INET6); }
 
-static int net_tcp_in_idle(lua_State *L)
+static int net_update_timeout(lua_State *L, uint64_t *timeout, const char *name)
 {
-	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
-
 	/* Only return current idle timeout. */
 	if (lua_gettop(L) == 0) {
-		lua_pushnumber(L, net->tcp.in_idle_timeout);
+		lua_pushnumber(L, *timeout);
 		return 1;
 	}
 
 	if ((lua_gettop(L) != 1)) {
-		lua_pushstring(L, "net.tcp_in_idle takes one parameter: (\"idle timeout\")");
+		lua_pushstring(L, name);
+		lua_pushstring(L, " takes one parameter: (\"idle timeout\")");
 		lua_error(L);
 	}
 
 	if (lua_isnumber(L, 1)) {
 		int idle_timeout = lua_tointeger(L, 1);
 		if (idle_timeout <= 0) {
-			lua_pushstring(L, "net.tcp_in_idle parameter has to be positive number");
+			lua_pushstring(L, name);
+			lua_pushstring(L, " parameter has to be positive number");
 			lua_error(L);
 		}
-		net->tcp.in_idle_timeout = idle_timeout;
+		*timeout = idle_timeout;
 	} else {
-		lua_pushstring(L, "net.tcp_in_idle parameter has to be positive number");
+		lua_pushstring(L, name);
+		lua_pushstring(L, " parameter has to be positive number");
 		lua_error(L);
 	}
 	lua_pushboolean(L, true);
 	return 1;
+}
+
+static int net_tcp_in_idle(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct network *net = &engine->net;
+
+	return net_update_timeout(L, &net->tcp.in_idle_timeout, "net.tcp_in_idle");
+}
+
+static int net_tls_handshake_timeout(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct network *net = &engine->net;
+
+	return net_update_timeout(L, &net->tcp.tls_handshake_timeout, "net.tls_handshake_timeout");
 }
 
 int lib_net(lua_State *L)
@@ -883,6 +899,7 @@ int lib_net(lua_State *L)
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
 		{ "tcp_in_idle",  net_tcp_in_idle },
+		{ "tls_handshake_timeout",  net_tls_handshake_timeout },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
@@ -1733,6 +1750,8 @@ static int wrk_stats(lua_State *L)
 	lua_setfield(L, -2, "dropped");
 	lua_pushnumber(L, worker->stats.timeout);
 	lua_setfield(L, -2, "timeout");
+	lua_pushnumber(L, worker->stats.handshake_errors);
+	lua_setfield(L, -2, "handshake_errors");
 	/* Add subset of rusage that represents counters. */
 	uv_rusage_t rusage;
 	if (uv_getrusage(&rusage) == 0) {
