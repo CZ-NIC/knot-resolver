@@ -63,7 +63,8 @@ static int put_answer(knot_pkt_t *pkt, struct kr_query *qry, knot_rrset_t *rr, b
 		}
 		if (!knot_rrset_empty(rr)) {
 			/* Append to packet */
-			ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, rr, KNOT_PF_FREE);
+			ret = knot_pkt_put_rotate(pkt, KNOT_COMPR_HINT_QNAME, rr,
+						  qry->reorder, KNOT_PF_FREE);
 		} else {
 			/* Return empty answer if name exists, but type doesn't match */
 			knot_wire_set_aa(pkt->wire);

@@ -271,8 +271,8 @@ Environment
    :param boolean value: New value for the option *(optional)*
    :return: The (new) value of the option
 
-   If set, resolver will vary the order of resource records within RR-sets
-   every time when answered from cache.  It is disabled by default.
+   If set, resolver will vary the order of resource records within RR-sets.
+   It is disabled by default.
 
 .. function:: user(name, [group])
 
