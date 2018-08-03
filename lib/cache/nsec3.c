@@ -90,12 +90,13 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		name_len = knot_dname_to_wire(buf + 2, name, sizeof(buf) - 2);
 		if (name_len < 0) return VAL_EMPTY; /* wants wildcard but doesn't fit */
 		name = buf;
+		name_len += 2;
 	} else {
 		name_len = knot_dname_size(name);
 	}
 	/* Append the NSEC3 hash. */
 	const dnssec_binary_t dname = {
-		.size = knot_dname_size(name),
+		.size = name_len,
 		.data = (uint8_t *)/*const-cast*/name,
 	};
 
