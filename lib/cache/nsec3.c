@@ -83,15 +83,12 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 
 	/* Make `name` point to correctly wildcarded owner name. */
 	uint8_t buf[KNOT_DNAME_MAXLEN];
-	int name_len;
 	if (add_wildcard) {
 		buf[0] = '\1';
 		buf[1] = '*';
-		name_len = knot_dname_to_wire(buf + 2, name, sizeof(buf) - 2);
-		if (name_len < 0) return VAL_EMPTY; /* wants wildcard but doesn't fit */
+		int err = knot_dname_to_wire(buf + 2, name, sizeof(buf) - 2);
+		if (err < 0) return VAL_EMPTY; /* wants wildcard but doesn't fit */
 		name = buf;
-	} else {
-		name_len = knot_dname_size(name);
 	}
 	/* Append the NSEC3 hash. */
 	const dnssec_binary_t dname = {
