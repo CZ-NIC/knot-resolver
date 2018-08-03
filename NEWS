@@ -4,6 +4,11 @@ Incompatible changes
   Note that by default cache is open *after* reading the configuration,
   and older versions were silently doing nothing.
 
+Improvements
+------------
+- reorder_RR() implementation is brought back
+
+
 Knot Resolver 2.4.1 (2018-08-02)
 ================================
 
