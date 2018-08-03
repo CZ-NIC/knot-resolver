@@ -646,10 +646,10 @@ ffi.metatype( knot_pkt_t, {
 		end,
 		-- Put an RR set in the packet
 		-- Note: the packet doesn't take ownership of the RR set
-		put_rr = function (pkt, rr)
+		put_rr = function (pkt, rr, rotate, flags)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			assert(ffi.istype(knot_rrset_t, rr))
-			local ret = C.knot_pkt_put_rotate(pkt, 0, rr, 0, 0)
+			local ret = C.knot_pkt_put_rotate(pkt, 0, rr, rotate or 0, flags or 0)
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
