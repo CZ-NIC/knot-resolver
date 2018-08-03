@@ -1158,7 +1158,8 @@ static int cache_clear(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	struct kr_cache *cache = &engine->resolver.cache;
 	if (!kr_cache_is_open(cache)) {
-		return 0;
+		format_error(L, "cache.clear(): no cache is open yet");
+		lua_error(L);
 	}
 
 	/* Check parameters */
