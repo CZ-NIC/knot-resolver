@@ -466,10 +466,10 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 }
 
 /** @return error code, ignoring if forced to truncate the packet. */
-static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
+static int write_extra_records(const rr_array_t *arr, uint16_t reorder, knot_pkt_t *answer)
 {
 	for (size_t i = 0; i < arr->len; ++i) {
-		int err = knot_pkt_put(answer, 0, arr->at[i], 0);
+		int err = knot_pkt_put_rotate(answer, 0, arr->at[i], reorder, 0);
 		if (err != KNOT_EOK) {
 			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
 		}
@@ -483,8 +483,8 @@ static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
  * @param all_cname optionally output if all written RRs are CNAMEs and RRSIGs of CNAMEs
  * @return error code, ignoring if forced to truncate the packet.
  */
-static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *answer,
-				      bool *all_secure, bool *all_cname)
+static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reorder,
+				      knot_pkt_t *answer, bool *all_secure, bool *all_cname)
 {
 	const bool has_dnssec = knot_pkt_has_dnssec(answer);
 	bool all_sec = true;
@@ -502,7 +502,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *
 				continue;
 			}
 		}
-		err = knot_pkt_put(answer, 0, rr, 0);
+		err = knot_pkt_put_rotate(answer, 0, rr, reorder, 0);
 		if (err != KNOT_EOK) {
 			if (err == KNOT_ESPACE) {
 				err = kr_ok();
@@ -604,6 +604,7 @@ static int answer_finalize(struct kr_request *request, int state)
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
+	const uint16_t reorder = last ? last->reorder : 0;
 	bool answ_all_cnames = false/*arbitrary*/;
 	if (request->answ_selected.len > 0) {
 		assert(answer->current <= KNOT_ANSWER);
@@ -611,8 +612,8 @@ static int answer_finalize(struct kr_request *request, int state)
 		if (answer->current < KNOT_ANSWER) {
 			knot_pkt_begin(answer, KNOT_ANSWER);
 		}
-		if (write_extra_ranked_records(&request->answ_selected, answer,
-						&secure, &answ_all_cnames))
+		if (write_extra_ranked_records(&request->answ_selected, reorder,
+						answer, &secure, &answ_all_cnames))
 		{
 			return answer_fail(request);
 		}
@@ -622,12 +623,13 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	if (write_extra_ranked_records(&request->auth_selected, answer, &secure, NULL)) {
+	if (write_extra_ranked_records(&request->auth_selected, reorder,
+	    answer, &secure, NULL)) {
 		return answer_fail(request);
 	}
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
-	if (write_extra_records(&request->additional, answer)) {
+	if (write_extra_records(&request->additional, reorder, answer)) {
 		return answer_fail(request);
 	}
 	/* Write EDNS information */
