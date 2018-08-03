@@ -1,3 +1,9 @@
+Incompatible changes
+--------------------
+- cache: fail lua cache operations if it isn't open (!639)
+  Note that by default cache is open *after* reading the configuration.
+
+
 Knot Resolver 2.4.1 (2018-08-02)
 ================================
 
