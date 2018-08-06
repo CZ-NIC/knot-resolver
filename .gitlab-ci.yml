@@ -35,6 +35,7 @@ build:linux:amd64:
 deckard:linux:amd64:
   stage: test
   when: manual
+  allow_failure: false
   variables:
     TMPDIR: $CI_PROJECT_DIR
   except:
