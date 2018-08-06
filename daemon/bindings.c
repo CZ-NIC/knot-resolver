@@ -1075,6 +1075,7 @@ static int cache_close(lua_State *L)
 	return 1;
 }
 
+#if 0
 /** @internal Prefix walk. */
 static int cache_prefixed(struct kr_cache *cache, const char *prefix, bool exact_name,
 			  knot_db_val_t keyval[][2], int maxcount)
@@ -1087,6 +1088,7 @@ static int cache_prefixed(struct kr_cache *cache, const char *prefix, bool exact
 	/* Start prefix search */
 	return kr_cache_match(cache, buf, exact_name, keyval, maxcount);
 }
+#endif
 
 /** Prune expired/invalid records. */
 static int cache_prune(lua_State *L)
@@ -1134,6 +1136,7 @@ static int cache_clear_everything(lua_State *L)
 	return 1;
 }
 
+#if 0
 /** @internal Dump cache key into table on Lua stack. */
 static void cache_dump(lua_State *L, knot_db_val_t keyval[])
 {
@@ -1191,6 +1194,14 @@ static int cache_get(lua_State *L)
 		cache_dump(L, keyval[i]);
 	}
 	return 1;
+}
+#endif
+static int cache_get(lua_State *L)
+{
+	int ret = kr_error(ENOSYS);
+	format_error(L, kr_strerror(ret));
+	lua_error(L);
+	return ret;
 }
 
 /** Set time interval for cleaning rtt cache.
