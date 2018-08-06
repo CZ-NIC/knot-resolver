@@ -152,7 +152,8 @@ deckard:linux:amd64:
   script:
     - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
   # these errors are side-effect of Git way of handling file timestamps
-    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)'
+  #  temporarily disabled
+  #  - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)'
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -430,18 +431,18 @@ coverage:
     - amd64
 
 # publish coverage only for master branch
-pages:
-  stage: deploy
-  only:
-    - master
-  dependencies:
-    - coverage
-  script:
-    - mv coverage/ public/
-  artifacts:
-    expire_in: '30 days'
-    paths:
-      - public
+#pages:
+#  stage: deploy
+#  only:
+#    - master
+#  dependencies:
+#    - coverage
+#  script:
+#    - mv coverage/ public/
+#  artifacts:
+#    expire_in: '30 days'
+#    paths:
+#      - public
 
 # trigger obs build for master branch
 obs:devel:
