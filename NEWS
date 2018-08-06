@@ -1,3 +1,6 @@
+Knot Resolver 2.x.0 (2018-0M-DD)
+================================
+
 Incompatible changes
 --------------------
 - cache: fail lua cache operations if it isn't open (!639)
