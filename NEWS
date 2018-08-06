@@ -1,3 +1,8 @@
+Incompatible changes
+--------------------
+- cache: fail lua cache operations if it isn't open (!639)
+  Note that by default cache is open *after* reading the configuration,
+  and older versions were silently doing nothing.
 
 Improvements
 ------------

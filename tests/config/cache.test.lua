@@ -13,10 +13,15 @@ local function test_properties()
 	is(cache.min_ttl(), 1, 'stored minimum TTL')
 end
 
--- test if the stats work with reopening the cache
+-- test if the stats work with reopening the cache and operations fail with closed cache
 local function test_stats()
 	ok(cache.close(), 'cache can be closed')
 	boom(cache.open, {100 * MB, 'invalid://'}, 'cache cannot be opened with invalid backend')
+
+	boom(cache.clear, {}, '.clear() does not work on closed cache')
+	boom(cache.count, {}, '.count() does not work on closed cache')
+	boom(cache.get, { 'key' }, '.get(...) does not work on closed cache')
+
 	ok(cache.open(100 * MB), 'cache can be reopened')
 	local s = cache.stats()
 	is(type(s), 'table', 'stats returns a table')
