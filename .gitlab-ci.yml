@@ -1,4 +1,4 @@
-image: $CI_REGISTRY/knot/knot-resolver/ci/debian-stable:knot-master
+image: $CI_REGISTRY/knot/knot-resolver/ci/debian-stable:knot-2.7
 
 variables:
   DEBIAN_FRONTEND: noninteractive
@@ -32,7 +32,7 @@ build:linux:amd64:
 
 build:clang:linux:amd64:
   stage: build
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-master  # newer Debian for newer Clang
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   script:
     - rm daemon/lua/kres-gen.lua
     - CXX=clang++-5.0 CC=clang-5.0 make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
@@ -70,7 +70,7 @@ lint:lua:
 
 lint:c:
   stage: test
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-master  # newer Debian for newer Clang
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
     - make lint-c CLANG_TIDY="clang-tidy-5.0 -quiet"
@@ -80,7 +80,7 @@ lint:c:
 lint:clang-scan-build:
   allow_failure: true  # for now it is just informative
   stage: test
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-master  # newer Debian for newer Clang
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
     - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="/usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
