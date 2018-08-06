@@ -277,4 +277,38 @@ As described in the layers, you can not only retrieve information about current 
 .. _libknot:  https://gitlab.labs.nic.cz/knot/knot-dns/tree/master/src/libknot
 .. _bindings: https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/daemon/lua/kres.lua
 
+
+Significant Lua API changes
+---------------------------
+
+Incompatible changes since 3.0.0
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the main ``kres.*`` lua binding, there was only change in struct knot_rrset_t:
+
+- constructor now accepts TTL as additional parameter (defaulting to zero)
+- add_rdata() doesn't accept TTL anymore (and will throw an error if passed)
+
+In case you used knot_* functions and structures bound to lua:
+
+- knot_dname_is_sub(a, b): knot_dname_in_bailiwick(a, b) > 0
+- knot_rdata_rdlen(): knot_rdataset_at().len
+- knot_rdata_data(): knot_rdataset_at().data
+- knot_rdata_array_size(): offsetof(struct knot_data_t, data) + knot_rdataset_at().len
+- struct knot_rdataset: field names were renamed to .count and .rdata
+- some functions got inlined from headers, but you can use their kr_* clones:
+  kr_rrsig_sig_inception(), kr_rrsig_sig_expiration(), kr_rrsig_type_covered().
+  Note that these functions now accept knot_rdata_t* instead of a pair
+  knot_rdataset_t* and size_t - you can use knot_rdataset_at() for that.
+
+- knot_rrset_add_rdata() doesn't take TTL parameter anymore
+- knot_rrset_init_empty() was inlined, but in lua you can use the constructor
+- knot_rrset_ttl() was inlined, but in lua you can use :ttl() method instead
+
+- knot_pkt_qname(), _qtype(), _qclass(), _rr(), _section() were inlined,
+  but in lua you can use methods instead, e.g. myPacket:qname()
+- knot_pkt_free() takes knot_pkt_t* instead of knot_pkt_t**, but from lua
+  you probably didn't want to use that; constructor ensures garbage collection.
+
+
 .. |---| unicode:: U+02014 .. em dash
