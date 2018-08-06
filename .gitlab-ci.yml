@@ -215,6 +215,8 @@ test:linux:amd64:valgrind:
   dependencies: []
   only:
     - branches@knot/knot-resolver  # do not trigger job for forks
+  except:
+    - master
   script:
     - export TESTDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-gitlab/$RESPDIFF_TEST"
     - >
