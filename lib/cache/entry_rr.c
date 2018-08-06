@@ -40,7 +40,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 		memcpy(data, rds->rdata, size);
 		data += size;
 	}
-	VERBOSE_MSG(NULL, "dematerialized to %d B\n", (int)(data - data0));
+	//VERBOSE_MSG(NULL, "dematerialized to %d B\n", (int)(data - data0));
 	//return data - data0;
 	return kr_ok();
 }
@@ -81,7 +81,7 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * 
 	}
 	memcpy(rds->rdata, d, rds_size);
 	d += rds_size;
-	VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
+	//VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
 	return d - data;
 }
 
