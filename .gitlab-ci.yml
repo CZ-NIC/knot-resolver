@@ -5,7 +5,6 @@ variables:
   LC_ALL: C.UTF-8
   GIT_SUBMODULE_STRATEGY: recursive
   GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
-  COVERAGE: '1'
   PREFIX: $CI_PROJECT_DIR/.local
   LD_LIBRARY_PATH: $CI_PROJECT_DIR/.local/lib
 
@@ -101,7 +100,7 @@ test:linux:amd64:
     - git clean -xdf
     - make CFLAGS=-Werror
     - MAKEFLAGS="--jobs $(nproc)" make -k check
-    - MAKEFLAGS="--jobs $(nproc)" make coverage-c COVERAGE_STAGE=gcov-check
+    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c COVERAGE_STAGE=gcov-check || echo "code coverage skipped"
   dependencies: []
   artifacts:
     expire_in: 1 hour
@@ -120,7 +119,7 @@ installcheck:linux:amd64:
     - git clean -xdf
     - make install CFLAGS=-Werror
     - MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
-    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck
+    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck || echo "code coverage skipped"
   dependencies: []
   artifacts:
     expire_in: 1 hour
@@ -152,7 +151,7 @@ deckard:linux:amd64:
   script:
     - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
   # these errors are side-effect of Git way of handling file timestamps
-    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)'
+    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -297,7 +296,7 @@ respdiff:iter:udp:linux:amd64:
     - echo 'test if mismatch rate < 1.0 %'
     - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp
+    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -324,7 +323,8 @@ respdiff:iter:tcp:linux:amd64:
     - echo 'test if mismatch rate < 1.0 %'
     - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp
+    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
+
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -351,7 +351,7 @@ respdiff:iter:tls:linux:amd64:
     - echo 'test if mismatch rate < 1.0 %'
     - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
     - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls
+    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
     - build:linux:amd64
   artifacts:
@@ -406,9 +406,12 @@ distro:epel-7:
   tags:
     - privileged  # mock require additional capabilities (e.g. mount)
 
-# compute coverage for all runs
+# compute coverage for runs with COVERAGE=1
 coverage:
   stage: coverage
+  only:
+    variables:
+      - $COVERAGE == "1"
   script:
     - make coverage
   artifacts:
@@ -433,7 +436,10 @@ coverage:
 pages:
   stage: deploy
   only:
-    - master
+   refs:
+    - master@knot/knot-resolver
+   variables:
+     - $COVERAGE == "1"
   dependencies:
     - coverage
   script:
