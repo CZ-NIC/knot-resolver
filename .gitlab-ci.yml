@@ -151,7 +151,8 @@ deckard:linux:amd64:
     - schedules  # prevent unstable test from cancelling nightly OBS build
   script:
     - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
-    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard
+  # these errors are side-effect of Git way of handling file timestamps
+    - MAKEFLAGS="--jobs $(nproc)" make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)'
   dependencies:
     - build:linux:amd64
   artifacts:
