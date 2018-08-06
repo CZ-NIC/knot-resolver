@@ -23,7 +23,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Knot DNS Resolver'
-copyright = u'2014-2017 CZ.NIC labs'
+copyright = u'2014-2018 CZ.NIC labs'
 version = { k[0][0]: k[0][1] for k in filter(None, [re.findall(r'(MAJOR|MINOR|PATCH) := ([0-9]+)',line) for line in open('../config.mk')])}
 version = '%s.%s.%s' % (version['MAJOR'], version['MINOR'], version['PATCH'])
 release = version
