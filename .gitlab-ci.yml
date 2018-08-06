@@ -19,7 +19,7 @@ build:linux:amd64:
   stage: build
   script:
     - rm daemon/lua/kres-gen.lua
-    - make -k all CFLAGS="-Werror -ggdb"
+    - make -k all CFLAGS="-ggdb"
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
     - make install CFLAGS="-Werror -ggdb"
