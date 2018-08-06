@@ -145,6 +145,8 @@ doc:
 
 deckard:linux:amd64:
   stage: test
+  variables:
+    TMPDIR: $CI_PROJECT_DIR
   except:
     - schedules  # prevent unstable test from cancelling nightly OBS build
   script:
@@ -153,9 +155,10 @@ deckard:linux:amd64:
   dependencies:
     - build:linux:amd64
   artifacts:
-    expire_in: 1 hour
     paths:
       - ./*.info
+      - tmpdeckard*
+    expire_in: 1 week
   tags:
     - docker
     - linux
@@ -203,12 +206,6 @@ test:linux:amd64:valgrind:
     - docker
     - linux
     - amd64
-  artifacts:
-    when: on_failure
-    expire_in: 1 week
-    paths:
-      - tmpdeckard*
-
 
 .respdiff:  &respdiff
   stage: respdiff
