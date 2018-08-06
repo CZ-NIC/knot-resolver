@@ -1,0 +1,6 @@
+*************
+Release notes
+*************
+
+.. include:: ../NEWS
+
