@@ -299,7 +299,12 @@ distro:fedora-27:
   dependencies:
     - srpm
   script:
-    - mock --old-chroot -r fedora-27-x86_64 --rebuild *.src.rpm
+    # TODO remove once Knot DNS 2.7 packages are available from official distro repos
+    - curl -Lo knot-devel-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/367e753a5c72421667e46a7dd7aa1434/knot-devel-2.7.0-1.1.x86_64.rpm
+    - curl -Lo knot-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/cefbd41fdbe94223f4efbe23a96cb422/knot-2.7.0-1.1.x86_64.rpm
+    - curl -Lo knot-libs-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/4236bcb094c0e87687c2e2d5578a4073/knot-libs-2.7.0-1.1.x86_64.rpm
+    - mock --init --old-chroot -i knot-2.7.0-1.1.x86_64.rpm -i knot-libs-2.7.0-1.1.x86_64.rpm -i knot-devel-2.7.0-1.1.x86_64.rpm -r fedora-27-x86_64
+    - mock --no-clean --old-chroot -r fedora-27-x86_64 --rebuild *.src.rpm
   after_script:
     - mv /var/lib/mock/fedora-27-x86_64/result fedora-27-x86_64
   artifacts:
@@ -318,7 +323,12 @@ distro:epel-7:
   dependencies:
     - srpm
   script:
-    - mock --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
+    # TODO remove once Knot DNS 2.7 packages are available from official distro repos
+    - curl -Lo knot-devel-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/3db20cd3dd0fdc8242f62d629d1abb63/knot-devel-2.7.0-1.1.x86_64.rpm
+    - curl -Lo knot-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/0a3ca9f3cc1be9e72b4de73ae0e29bef/knot-2.7.0-1.1.x86_64.rpm
+    - curl -Lo knot-libs-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/11ecf4602a10c46eb9a6e2c50d7c48e1/knot-libs-2.7.0-1.1.x86_64.rpm
+    - mock --init --dnf --old-chroot -i knot-2.7.0-1.1.x86_64.rpm -i knot-libs-2.7.0-1.1.x86_64.rpm -i knot-devel-2.7.0-1.1.x86_64.rpm -r epel-7-x86_64
+    - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
   after_script:
     - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
   artifacts:
