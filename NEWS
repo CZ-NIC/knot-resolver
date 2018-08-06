@@ -105,8 +105,8 @@ New features
 ------------
 - cache server unavailability to prevent flooding unreachable servers
   (Please note that caching algorithm needs further optimization
-   and will change in further versions but we need to gather operational
-   experience first.)
+  and will change in further versions but we need to gather operational
+  experience first.)
 
 Bugfixes
 --------
@@ -271,7 +271,7 @@ Regressions
 	<= bad keys, broken trust chain
 - make check
 - a few Deckard tests are broken, probably due to some problems above
-+ unknown ones?
+- also unknown ones?
 
 
 
