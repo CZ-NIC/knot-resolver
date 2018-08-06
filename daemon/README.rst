@@ -827,6 +827,10 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.get([domain])
 
+  This function is not implemented at this moment.
+  We plan to re-introduce it soon, probably with a slightly different API.
+
+..
   :return: table of records in cache matching the prefix
 
   .. error:: **Caveats:**
