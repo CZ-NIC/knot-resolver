@@ -18,7 +18,7 @@ lint-lua: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 .PHONY: all install check clean doc info lint
 
 # Dependencies
-KNOT_MINVER := 2.6.7
+KNOT_MINVER := 2.7.0
 $(eval $(call find_lib,libknot,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libdnssec,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libzscanner,$(KNOT_MINVER),yes))
@@ -122,7 +122,7 @@ info:
 #	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
 	$(info [$(HAS_libsystemd)] systemd (daemon))
-	$(info [$(HAS_nettle)] nettle (modules/cookies))
+#	$(info [$(HAS_nettle)] nettle (modules/cookies))
 	$(info [$(HAS_ltn12)] Lua socket ltn12 (trust anchor bootstrapping))
 	$(info [$(HAS_ssl.https)] Lua ssl.https (trust anchor bootstrapping))
 	$(info [$(HAS_libedit)] libedit (client))
