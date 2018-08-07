@@ -491,7 +491,10 @@ pages:
 obs:devel:
   stage: deploy
   only:
-    - schedules
+    variables:
+      - $OBS_BUILD == "1"
+    refs:
+      - nightly@knot/knot-resolver
   dependencies: []
   script:
     - scripts/make-archive.sh
