@@ -216,7 +216,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Try the NSEC* parameters in order, until success.
 	 * Let's not mix different parameters for NSEC* RRs in a single proof. */
 	for (int i = 0; ;) {
-		int32_t log_new_ttl;
+		int32_t log_new_ttl = -123456789; /* visually recognizable value */
 		ret = nsec_p_ttl(el[i], qry, &log_new_ttl);
 		if (!ret || VERBOSE_STATUS) {
 			nsec_p_init(&ans.nsec_p, el[i], !ret);
@@ -645,7 +645,7 @@ static int check_NS_entry(const knot_db_val_t entry, const int i, const bool exa
 	uint16_t type;
 	if (i < ENTRY_APEX_NSECS_CNT) {
 		type = KNOT_RRTYPE_NS;
-		int32_t log_new_ttl;
+		int32_t log_new_ttl = -123456789; /* visually recognizable value */
 		const int err = nsec_p_ttl(entry, qry, &log_new_ttl);
 		if (err) {
 			VERBOSE_MSG(qry,
