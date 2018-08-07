@@ -245,7 +245,7 @@ static void key_NSEC3_hash2text(const knot_db_val_t key, char *text)
 			/* CACHE_KEY_DEF ^^ */
 	int len = base32hex_encode(hash_raw, NSEC3_HASH_LEN, (uint8_t *)text,
 				   NSEC3_HASH_TXT_LEN);
-	assert(len == NSEC3_HASH_TXT_LEN);
+	assert(len == NSEC3_HASH_TXT_LEN); (void)len;
 	text[NSEC3_HASH_TXT_LEN] = '\0';
 }
 
