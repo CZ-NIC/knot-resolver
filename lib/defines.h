@@ -78,6 +78,9 @@ static inline int KR_COLD kr_error(int x) {
 #define KR_EDNS_PAYLOAD 4096 /* Default UDP payload (max unfragmented UDP is 1452B) */
 #define KR_CACHE_DEFAULT_TTL_MIN (5) /* avoid bursts of queries */
 #define KR_CACHE_DEFAULT_TTL_MAX (6 * 24 * 3600) /* 6 days, like the root NS TTL */
+#ifndef KR_CACHE_EXPIRING_THRESHOLD
+#define KR_CACHE_EXPIRING_THRESHOLD 1 /* When decayed TTL is in its last N%, it's considered expiring. */
+#endif
 
 #define KR_DNAME_STR_MAXLEN (KNOT_DNAME_TXT_MAXLEN + 1)
 #define KR_RRTYPE_STR_MAXLEN (16 + 1)

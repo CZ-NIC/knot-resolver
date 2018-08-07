@@ -282,10 +282,13 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
-static inline bool is_expiring(uint32_t orig_ttl, uint32_t new_ttl)
+static inline bool is_expiring(uint32_t orig_ttl, uint32_t decayed_ttl)
 {
-	int64_t nttl = new_ttl; /* avoid potential over/under-flow */
-	return 100 * (nttl - 5) < orig_ttl;
+	if (decayed_ttl < 5) {
+		return true;
+	}
+
+	return decayed_ttl <= (orig_ttl * KR_CACHE_EXPIRING_THRESHOLD) / 100;
 }
 
 /** Returns signed result so you can inspect how much stale the RR is.
