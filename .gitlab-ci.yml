@@ -242,6 +242,7 @@ test:linux:amd64:valgrind:
   except:
     - master@knot/knot-resolver
   script:
+    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || exit 0
     - export TESTDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-gitlab/$RESPDIFF_TEST"
     - >
       sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
