@@ -27,7 +27,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 	 * of rdatasets as they are in lmdb, or align inside cdb_* functions
 	 * (request sizes one byte longer and shift iff on an odd address). */
 	//if ((size_t)data & 1) VERBOSE_MSG(NULL, "dematerialize: odd address\n");
-	const uint8_t *data0 = data;
+	//const uint8_t *data0 = data;
 	if (!data) {
 		assert(data);
 		return kr_error(EINVAL);
