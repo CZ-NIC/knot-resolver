@@ -82,3 +82,6 @@ RUN apt-get install -y -qqq luajit
 
 # OpenBuildService CLI tool
 RUN apt-get install -y osc
+
+# curl (API)
+RUN apt-get install -y curl
