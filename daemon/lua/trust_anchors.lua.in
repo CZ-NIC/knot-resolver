@@ -218,7 +218,8 @@ end
 -- Write keyset to a file.  States and timers are stored in comments.
 local function keyset_write(keyset)
 	if not keyset.filename then return false end -- not to be persisted
-	local file = assert(io.open(keyset.filename .. '.lock', 'w'))
+	local fname_tmp = keyset.filename .. '.lock.' .. tostring(worker.pid);
+	local file = assert(io.open(fname_tmp, 'w'))
 	for i = 1, #keyset do
 		local ta = keyset[i]
 		ta.comment = ' ' .. ta.state .. ':' .. (ta.timer or '')
@@ -230,8 +231,7 @@ local function keyset_write(keyset)
 		file:write(rr_str)
 	end
 	file:close()
-	os.rename(keyset.filename .. '.lock', keyset.filename)
-	-- TODO: IO error handling
+	assert(os.rename(fname_tmp, keyset.filename))
 end
 
 -- Search the values of a table and return the corrseponding key (or nil).
