@@ -188,7 +188,7 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		pkt->rr[i].additional = rr_rank;
 	}
 
-	/* Adjust TTL in records.  We know that no RR has expired yet. */
+	/* Adjust TTL in each record. */
 	const uint32_t drift = eh->ttl - new_ttl;
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
