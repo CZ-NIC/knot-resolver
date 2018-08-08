@@ -588,7 +588,8 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		}
 		/* The validator still can't handle multiple zones in one answer,
 		 * so we only follow if a single label is replaced.
-		 * TODO: this still isn't 100%, as the target may have a NS+DS. */
+		 * TODO: this still isn't 100%, as the target might have a NS+DS,
+		 * possibly leading to a SERVFAIL for the in-bailiwick name. */
 		const int pending_labels = knot_dname_labels(pending_cname, NULL);
 		if (pending_labels != cname_labels) {
 			cname = pending_cname;
