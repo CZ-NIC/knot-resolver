@@ -1713,6 +1713,10 @@ static int wrk_stats(lua_State *L)
 	lua_newtable(L);
 	lua_pushnumber(L, worker->stats.concurrent);
 	lua_setfield(L, -2, "concurrent");
+	lua_pushnumber(L, worker->stats.rconcurrent);
+	lua_setfield(L, -2, "concurrent_requests");
+	lua_pushnumber(L, worker->too_many_open);
+	lua_setfield(L, -2, "too_many_open");
 	lua_pushnumber(L, worker->stats.udp);
 	lua_setfield(L, -2, "udp");
 	lua_pushnumber(L, worker->stats.tcp);
