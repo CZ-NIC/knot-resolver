@@ -334,28 +334,30 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 
 	/* See https://gnutls.org/manual/html_node/Data-transfer-and-termination.html#Data-transfer-and-termination */
 	int submitted = 0;
-	bool is_retrying = false;
 	uint64_t retrying_start = 0;
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->tls_session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
 		if (count == GNUTLS_E_AGAIN) {
 			break; /* No data available */
-		} else if (count < 0) {
-			/* Retry on non-fatal errors (alerts, rehandshake) */
-			if (!gnutls_error_is_fatal(count)) {
-				if (!is_retrying) {
-					is_retrying = true;
-					retrying_start = kr_now();
-				}
-				uint64_t elapsed = kr_now() - retrying_start;
-				if (elapsed < TLS_MAX_HANDSHAKE_TIME) {
-					continue; /* Try reading again */
+		} else if (count == GNUTLS_E_INTERRUPTED) {
+			continue;
+		} else if (count == GNUTLS_E_REHANDSHAKE) {
+			/* See https://www.gnutls.org/manual/html_node/Re_002dauthentication.html */
+			tls_set_hs_state(tls_p, TLS_HS_IN_PROGRESS);
+			while (tls_p->handshake_state <= TLS_HS_IN_PROGRESS) {
+				int err = tls_handshake(tls_p, tls_p->handshake_cb);
+				if (err == kr_error(EAGAIN)) {
+					break;
+				} else if (err != kr_ok()) {
+					return err;
 				}
 			}
+			/* Wait for more data */
+			break;
+		} else if (count < 0) {
 			kr_log_verbose("[%s] gnutls_record_recv failed: %s (%zd)\n",
 				     logstring, gnutls_strerror_name(count), count);
-			/* Propagate errors to lower layer */
-			count = kr_error(EIO);
+			return kr_error(EIO);
 		}
 		DEBUG_MSG("[%s] submitting %zd data to worker\n", logstring, count);
 		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
