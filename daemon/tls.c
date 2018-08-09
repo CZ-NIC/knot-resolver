@@ -590,9 +590,9 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 	free(tls_credentials);
 }
 
-static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
+static int client_paramlist_entry_free(struct tls_client_paramlist_entry *entry)
 {
-	struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)v;
+	DEBUG_MSG("freeing TLS parameters %p\n", entry);
 
 	while (entry->ca_files.len > 0) {
 		if (entry->ca_files.at[0] != NULL) {
@@ -632,6 +632,32 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 	return 0;
 }
 
+static void client_paramlist_entry_ref(struct tls_client_paramlist_entry *entry)
+{
+	if (entry != NULL) {
+		entry->refs += 1;
+	}
+}
+
+static void client_paramlist_entry_unref(struct tls_client_paramlist_entry *entry)
+{
+	if (entry != NULL) {
+		assert(entry->refs > 0);
+		entry->refs -= 1;
+
+		/* Last reference frees the object */
+		if (entry->refs == 0) {
+			client_paramlist_entry_free(entry);
+		}
+	}
+}
+
+static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
+{
+	struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)v;
+	return client_paramlist_entry_free(entry);
+}
+
 struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
 			  const struct sockaddr *addr)
 {
@@ -668,7 +694,7 @@ int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint1
 
 	struct tls_client_paramlist_entry *entry = map_get(tls_client_paramlist, key);
 	if (entry != NULL) {
-		client_paramlist_entry_clear(NULL, (void *)entry, NULL);
+		client_paramlist_entry_unref(entry);
 		map_del(tls_client_paramlist, key);
 	}
 	
@@ -716,6 +742,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 			return kr_error(ENOMEM);
 		}
 		gnutls_certificate_set_verify_function(entry->credentials, client_verify_certificate);
+		client_paramlist_entry_ref(entry);
 	}
 
 	int ret = kr_ok();
@@ -815,7 +842,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 	}
 
 	if ((ret != kr_ok()) && is_first_entry) {
-		client_paramlist_entry_clear(NULL, (void *)entry, NULL);
+		client_paramlist_entry_unref(entry);
 	}
 
 	return ret;
@@ -950,7 +977,7 @@ skip_pins:
 	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 
-struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_entry *entry,
+struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *entry,
 					    struct worker_ctx *worker)
 {
 	struct tls_client_ctx_t *ctx = calloc(1, sizeof (struct tls_client_ctx_t));
@@ -969,6 +996,11 @@ struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_en
 		tls_client_ctx_free(ctx);
 		return NULL;
 	}
+
+	/* Must take a reference on parameters as the credentials are owned by it
+	 * and must not be freed while the session is active. */
+	client_paramlist_entry_ref(entry);
+	ctx->params = entry;
 
 	ret = gnutls_credentials_set(ctx->c.tls_session, GNUTLS_CRD_CERTIFICATE,
 	                             entry->credentials);
@@ -996,6 +1028,9 @@ void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
 		gnutls_deinit(ctx->c.tls_session);
 		ctx->c.tls_session = NULL;
 	}
+
+	/* Must decrease the refcount for referenced parameters */
+	client_paramlist_entry_unref(ctx->params);
 
 	free (ctx);
 }
@@ -1050,14 +1085,11 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state)
 	return kr_ok();
 }
 
-int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      struct tls_client_paramlist_entry *entry,
-			      struct session *session)
+int tls_client_ctx_set_session(struct tls_client_ctx_t *ctx, struct session *session)
 {
 	if (!ctx) {
 		return kr_error(EINVAL);
 	}
-	ctx->params = entry;
 	ctx->c.session = session;
 	return kr_ok();
 }
