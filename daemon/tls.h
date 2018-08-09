@@ -59,6 +59,7 @@ struct tls_client_paramlist_entry {
 	array_t(const char *) pins;
 	gnutls_certificate_credentials_t credentials;
 	gnutls_datum_t session_data;
+	uint32_t refs;
 };
 
 struct worker_ctx;
@@ -179,7 +180,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 int tls_client_params_free(map_t *tls_client_paramlist);
 
 /*! Allocate new client TLS context */
-struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_entry *entry,
+struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *entry,
 					    struct worker_ctx *worker);
 
 /*! Free client TLS context */
@@ -189,9 +190,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 			     struct session *session,
 			     tls_handshake_cb handshake_cb);
 
-int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      struct tls_client_paramlist_entry *entry,
-			      struct session *session);
+int tls_client_ctx_set_session(struct tls_client_ctx_t *ctx, struct session *session);
 
 
 /* Session tickets, server side.  Implementation in ./tls_session_ticket-srv.c */
