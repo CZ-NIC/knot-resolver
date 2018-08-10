@@ -29,6 +29,12 @@ Vagrantfile):
 or
 
 ```
+./test-distro.sh testing debian9
+```
+
+or
+
+```
 ./test-distro.sh latest debian9
 ```
 
