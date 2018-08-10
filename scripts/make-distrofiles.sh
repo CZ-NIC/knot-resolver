@@ -27,7 +27,7 @@ if [[ $(echo "${version}" | grep '^[[:alnum:].]$') -ne 0 ]]; then
 fi
 
 # Fill in VERSION field in distribution specific files
-files="distro/rpm/${package}.spec distro/deb/debian/changelog distro/arch/PKGBUILD"
+files="distro/rpm/${package}.spec distro/deb/changelog distro/arch/PKGBUILD"
 for file in ${files}; do
 	sed -i "s/__VERSION__/${version}/g" "${file}"
 done
@@ -40,7 +40,7 @@ ln -s "${pkgname}.tar.xz" "${debname}.tar.xz"
 # Prepare clean debian-specific directory
 tar -xf "${debname}.tar.xz"
 pushd "${pkgname}" > /dev/null
-cp -arL ../distro/deb/debian .
+cp -arL ../distro/deb debian
 
 # Optionally remove symbols file
 if [ "$withsymbols" = false ]; then
