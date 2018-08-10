@@ -12,10 +12,13 @@ case "$repo" in
 	devel)
 		echo -e '  - knot-resolver-devel' >> repos.yaml
 		;;
+	testing)
+		echo -e '  - knot-resolver-testing' > repos.yaml
+		;;
 	latest)
 		;;
 	*)
-		echo "Unknown repo, choose devel|latest"
+		echo "Unknown repo, choose devel|latest|testing"
 		exit 1
 		;;
 esac
