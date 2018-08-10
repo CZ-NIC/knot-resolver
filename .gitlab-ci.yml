@@ -53,7 +53,7 @@ srpm:
   except:
     - master@knot/knot-resolver
   allow_failure: true  # don't block testing pipeline in case of failure
-  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
   script:
     - scripts/make-srpm.sh
   artifacts:
@@ -405,7 +405,7 @@ distro:fedora-27:
   stage: test
   except:
     - master@knot/knot-resolver
-  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
   only:
     - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
   dependencies:
@@ -426,7 +426,7 @@ distro:epel-7:
   stage: test
   except:
     - master@knot/knot-resolver
-  image: $CI_REGISTRY/knot/knot-resolver/ci:fedora-27
+  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
   only:
     - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
   dependencies:
