@@ -1,4 +1,5 @@
-#!/bin/bash -e
+#!/bin/bash
+set -o errexit -o nounset -o xtrace
 
 # Run with -s to include *.symbols files.
 
