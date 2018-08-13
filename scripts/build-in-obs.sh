@@ -8,7 +8,7 @@
 project=home:CZ-NIC:$1
 package=knot-resolver
 
-if ! [[ "$1" == *-devel ]]; then
+if ! [[ "$1" == *-devel || "$1" == *-testing ]]; then
 	read -p "Pushing to '$project', are you sure? [y/N]: " yn
 	case $yn in
 		[Yy]* ) break;;
