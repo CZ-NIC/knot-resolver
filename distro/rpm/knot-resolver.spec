@@ -21,9 +21,6 @@ ExclusiveArch:	%{ix86} x86_64
 ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
 %endif
 
-Source2:        kresd.conf
-Source3:        root.keys
-
 %if 0%{GPG_CHECK}
 Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
@@ -135,8 +132,8 @@ chmod 0644 %{buildroot}%{_pkgdocdir}/config.*
 # install configuration files
 mkdir -p %{buildroot}%{_sysconfdir}
 install -m 0755 -d %{buildroot}%{_sysconfdir}/knot-resolver
-install -m 0644 -p %SOURCE2 %{buildroot}%{_sysconfdir}/knot-resolver/kresd.conf
-install -m 0664 -p %SOURCE3 %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
+install -m 0644 -p %{repodir}/distro/common/kresd.conf %{buildroot}%{_sysconfdir}/knot-resolver/kresd.conf
+install -m 0664 -p %{repodir}/distro/common/root.keys %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
 
 # install systemd units and doc
 mkdir -p %{buildroot}%{_unitdir}

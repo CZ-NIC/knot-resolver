@@ -19,11 +19,9 @@ fi
 osc co "${project}" "${package}"
 pushd "${project}/${package}"
 osc del * ||:
-cp ../../*.tar.xz ./
+cp -L ../../*.orig.tar.xz ../../*.debian.tar.xz ../../*.dsc ./
 cp -rL ../../distro/rpm/* ./
 cp -rL ../../distro/arch/* ./
-cp ../../distro/deb/*.debian.tar.xz ./
-cp "../../distro/deb/${package}.dsc" ./
 osc addremove
 osc ci -n
 popd
