@@ -1307,8 +1307,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 
 	while (session->waiting.len > 0) {
 		struct qr_task *task = session->waiting.at[0];
-		struct request_ctx *ctx = task->ctx;
-		assert(ctx);
+		assert(task->ctx);
 		task->timeouts += 1;
 		worker->stats.timeout += 1;
 		session_del_tasks(session, task);
@@ -1367,9 +1366,7 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 static void on_udp_timeout(uv_timer_t *timer)
 {
 	struct session *session = timer->data;
-
-	uv_handle_t *handle = session->handle;
-	assert(handle->data == session);
+	assert(session->handle->data == session);
 
 	uv_timer_stop(timer);
 	assert(session->tasks.len == 1);
@@ -1479,7 +1476,7 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 	if (klen > 0) {
 		void *val_deleted;
 		int ret = trie_del(task->ctx->worker->subreq_out, key, klen, &val_deleted);
-		assert(ret == KNOT_EOK && val_deleted == task);
+		assert(ret == KNOT_EOK && val_deleted == task); (void)ret;
 	}
 	/* Notify waiting tasks. */
 	struct kr_query *leader_qry = array_tail(task->ctx->req.rplan.pending);
@@ -1993,21 +1990,20 @@ static int worker_add_tcp_connected(struct worker_ctx *worker,
 				    const struct sockaddr* addr,
 				    struct session *session)
 {
+#ifndef NDEBUG
 	assert(addr);
 	const char *key = tcpsess_key(addr);
 	assert(key);
 	assert(map_contains(&worker->tcp_connected, key) == 0);
+#endif
 	return map_add_tcp_session(&worker->tcp_connected, addr, session);
 }
 
 static int worker_del_tcp_connected(struct worker_ctx *worker,
 				    const struct sockaddr* addr)
 {
-	assert(addr);
-	const char *key = tcpsess_key(addr);
-	assert(key);
-	int ret = map_del_tcp_session(&worker->tcp_connected, addr);
-	return ret;
+	assert(addr && tcpsess_key(addr));
+	return map_del_tcp_session(&worker->tcp_connected, addr);
 }
 
 static struct session* worker_find_tcp_connected(struct worker_ctx *worker,
@@ -2020,22 +2016,20 @@ static int worker_add_tcp_waiting(struct worker_ctx *worker,
 				  const struct sockaddr* addr,
 				  struct session *session)
 {
+#ifndef NDEBUG
 	assert(addr);
 	const char *key = tcpsess_key(addr);
 	assert(key);
 	assert(map_contains(&worker->tcp_waiting, key) == 0);
-	int ret = map_add_tcp_session(&worker->tcp_waiting, addr, session);
-	return ret;
+#endif
+	return map_add_tcp_session(&worker->tcp_waiting, addr, session);
 }
 
 static int worker_del_tcp_waiting(struct worker_ctx *worker,
 				  const struct sockaddr* addr)
 {
-	assert(addr);
-	const char *key = tcpsess_key(addr);
-	assert(key);
-	int ret = map_del_tcp_session(&worker->tcp_waiting, addr);
-	return ret;
+	assert(addr && tcpsess_key(addr));
+	return map_del_tcp_session(&worker->tcp_waiting, addr);
 }
 
 static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
