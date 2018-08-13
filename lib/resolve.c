@@ -350,7 +350,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 			qry->flags.NO_MINIMIZE = true;
 			qry->flags.AWAIT_IPV6 = false;
 			qry->flags.AWAIT_IPV4 = false;
-			VERBOSE_MSG(qry, "=> circular dependepcy, retrying with non-minimized name\n");
+			VERBOSE_MSG(qry, "=> circular dependency, retrying with non-minimized name\n");
 		} else {
 			qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
 			kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
