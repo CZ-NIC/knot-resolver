@@ -823,7 +823,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.prune([max_count])
 
-  Not implemented (anymore).
+  Not implemented (anymore).  This functionality is planned to be superseded by a garbage-collecting process.
 
 .. function:: cache.get([domain])
 
