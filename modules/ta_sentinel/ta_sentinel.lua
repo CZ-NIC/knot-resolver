@@ -51,12 +51,27 @@ function M.layer.finish(state, req, pkt)
 	end
 
 	local found = false
-	for keyidx = 1, #trust_anchors.keysets['\0'] do
-		local key = trust_anchors.keysets['\0'][keyidx]
-		if keytag == key.key_tag then
-			found = (key.state == "Valid")
-			if verbose() then
-				log('[ta_sentinel] found keytag ' .. keytag .. ', key state ' .. key.state)
+	local ds_set = ffi.C.kr_ta_get(kres.context().trust_anchors, '\0')
+	if ds_set ~= nil then
+		for i = 0, ds_set:rdcount() - 1 do
+			-- Find the key tag in rdata and compare
+			-- https://tools.ietf.org/html/rfc4034#section-5.1
+			local rdata = ds_set:rdata_pt(i)
+			local tag = rdata.data[0] * 256 + rdata.data[1]
+			if tag == keytag then
+				found = true
+			end
+		end
+	end
+	if verbose() then
+		log('[ta_sentinel] matching trusted TA found: ' .. tostring(found))
+		if not found then -- print matching TAs in *other* states than Valid
+			for i = 1, #(trust_anchors.keysets['\0'] or {}) do
+				local key = trust_anchors.keysets['\0'][i]
+				if key.key_tag == keytag and key.state ~= 'Valid' then
+					log('[ta_sentinel] matching UNtrusted TA found in state: '
+						.. key.state)
+				end
 			end
 		end
 	end
