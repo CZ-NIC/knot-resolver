@@ -1367,7 +1367,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	} else {
 		/* Caller is interested in always tracking a zone cut, even if the answer is cached
 		 * this is normally not required, and incurrs another cache lookups for cached answer. */
-		if (qry->flags.ALWAYS_CUT && !(qry->flags.STUB)) {
+		if (qry->flags.ALWAYS_CUT && !(qry->flags.STUB) && !(qry->flags.KEEP_CUT)) {
 			switch(zone_cut_check(request, qry, packet)) {
 			case KR_STATE_FAIL: return KR_STATE_FAIL;
 			case KR_STATE_DONE: return KR_STATE_PRODUCE;
@@ -1404,7 +1404,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	}
 
 	/* Update zone cut, spawn new subrequests. */
-	if (!(qry->flags.STUB)) {
+	if (!(qry->flags.STUB) && !(qry->flags.KEEP_CUT)) {
 		int state = zone_cut_check(request, qry, packet);
 		switch(state) {
 		case KR_STATE_FAIL: return KR_STATE_FAIL;
