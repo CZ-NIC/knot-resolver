@@ -18,7 +18,6 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/packet/wire.h>
 #include <libknot/descriptor.h>
-#include <libknot/rrtype/aaaa.h>
 
 #include "lib/zonecut.h"
 #include "lib/rplan.h"
@@ -91,11 +90,9 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 	if (cut->nsset) {
 		trie_apply(cut->nsset, free_addr_set_cb, cut->pool);
 		trie_free(cut->nsset);
-		cut->nsset = NULL;
 	}
-	knot_rrset_free(&cut->key, cut->pool);
-	knot_rrset_free(&cut->trust_anchor, cut->pool);
-	cut->name = NULL;
+	knot_rrset_free(cut->key, cut->pool);
+	knot_rrset_free(cut->trust_anchor, cut->pool);
 }
 
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
@@ -154,14 +151,14 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
 	if (src->trust_anchor) {
 		ta_copy = knot_rrset_copy(src->trust_anchor, dst->pool);
 		if (!ta_copy) {
-			knot_rrset_free(&key_copy, dst->pool);
+			knot_rrset_free(key_copy, dst->pool);
 			return kr_error(ENOMEM);
 		}
 	}
 
-	knot_rrset_free(&dst->key, dst->pool);
+	knot_rrset_free(dst->key, dst->pool);
 	dst->key = key_copy;
-	knot_rrset_free(&dst->trust_anchor, dst->pool);
+	knot_rrset_free(dst->trust_anchor, dst->pool);
 	dst->trust_anchor = ta_copy;
 
 	return kr_ok();
@@ -170,8 +167,16 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
 int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
 {
 	if (!cut || !ns || !cut->nsset) {
+		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
+	/* Disabled; add_reverse_pair() misuses this for domain name in rdata. */
+	if (false && rdata && rdata->len != sizeof(struct in_addr)
+		  && rdata->len != sizeof(struct in6_addr)) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+
 	/* Get a pack_t for the ns. */
 	pack_t **pack = (pack_t **)trie_get_ins(cut->nsset, (const char *)ns, knot_dname_size(ns));
 	if (!pack) return kr_error(ENOMEM);
@@ -185,17 +190,15 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 		return kr_ok();
 	}
 	/* Check for duplicates */
-	uint16_t rdlen = knot_rdata_rdlen(rdata);
-	uint8_t *raw_addr = knot_rdata_data(rdata);
-	if (pack_obj_find(*pack, raw_addr, rdlen)) {
+	if (pack_obj_find(*pack, rdata->data, rdata->len)) {
 		return kr_ok();
 	}
 	/* Push new address */
-	int ret = pack_reserve_mm(**pack, 1, rdlen, kr_memreserve, cut->pool);
+	int ret = pack_reserve_mm(**pack, 1, rdata->len, kr_memreserve, cut->pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}
-	return pack_obj_push(*pack, raw_addr, rdlen);
+	return pack_obj_push(*pack, rdata->data, rdata->len);
 }
 
 int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
@@ -212,7 +215,7 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 	}
 	/* Remove address from the pack. */
 	if (rdata) {
-		ret = pack_obj_del(pack, knot_rdata_data(rdata), knot_rdata_rdlen(rdata));
+		ret = pack_obj_del(pack, rdata->data, rdata->len);
 	}
 	/* No servers left, remove NS from the set. */
 	if (pack->len == 0) {
@@ -299,14 +302,15 @@ static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache,
 	}
 
 	knot_rrset_t cached_rr;
-	knot_rrset_init(&cached_rr, /*const-cast*/(knot_dname_t *)ns, rrtype, KNOT_CLASS_IN);
-	if (kr_cache_materialize(&cached_rr.rrs, &peek, new_ttl, cut->pool) < 0) {
+	knot_rrset_init(&cached_rr, /*const-cast*/(knot_dname_t *)ns, rrtype,
+			KNOT_CLASS_IN, new_ttl);
+	if (kr_cache_materialize(&cached_rr.rrs, &peek, cut->pool) < 0) {
 		return;
 	}
-	knot_rdata_t *rd = cached_rr.rrs.data;
-	for (uint16_t i = 0; i < cached_rr.rrs.rr_count; ++i) {
+	knot_rdata_t *rd = cached_rr.rrs.rdata;
+	for (uint16_t i = 0; i < cached_rr.rrs.count; ++i) {
 		(void) kr_zonecut_add(cut, ns, rd);
-		rd = kr_rdataset_next(rd);
+		rd = knot_rdataset_next(rd);
 	}
 }
 
@@ -332,15 +336,17 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 	}
 	/* Materialize the rdataset temporarily, for simplicity. */
 	knot_rdataset_t ns_rds = { 0, NULL };
-	ret = kr_cache_materialize(&ns_rds, &peek, new_ttl, cut->pool);
+	ret = kr_cache_materialize(&ns_rds, &peek, cut->pool);
 	if (ret < 0) {
 		return ret;
 	}
 
 	/* Insert name servers for this zone cut, addresses will be looked up
 	 * on-demand (either from cache or iteratively) */
-	for (unsigned i = 0; i < ns_rds.rr_count; ++i) {
-		const knot_dname_t *ns_name = knot_ns_name(&ns_rds, i);
+	knot_rdata_t *rdata_i = ns_rds.rdata;
+	for (unsigned i = 0; i < ns_rds.count;
+			++i, rdata_i = knot_rdataset_next(rdata_i)) {
+		const knot_dname_t *ns_name = knot_ns_name(rdata_i);
 		(void) kr_zonecut_add(cut, ns_name, NULL);
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
 		unsigned *cached = lru_get_try(ctx->cache_rep,
@@ -383,7 +389,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 		return kr_error(ESTALE);
 	}
 	/* materialize a new RRset */
-	knot_rrset_free(rr, pool);
+	knot_rrset_free(*rr, pool);
 	*rr = mm_alloc(pool, sizeof(knot_rrset_t));
 	if (*rr == NULL) {
 		return kr_error(ENOMEM);
@@ -394,10 +400,12 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 		*rr = NULL;
 		return kr_error(ENOMEM);
 	}
-	knot_rrset_init(*rr, /*const-cast*/(knot_dname_t *)owner, type, KNOT_CLASS_IN);
-	ret = kr_cache_materialize(&(*rr)->rrs, &peek, new_ttl, pool);
+	knot_rrset_init(*rr, /*const-cast*/(knot_dname_t *)owner, type,
+			KNOT_CLASS_IN, new_ttl);
+	ret = kr_cache_materialize(&(*rr)->rrs, &peek, pool);
 	if (ret < 0) {
-		knot_rrset_free(rr, pool);
+		knot_rrset_free(*rr, pool);
+		*rr = NULL;
 		return ret;
 	}
 

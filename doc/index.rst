@@ -1,6 +1,6 @@
-#################
-Knot DNS Resolver
-#################
+#############
+Knot Resolver
+#############
 
 Knot Resolver is a minimalistic implementation of a caching validating DNS resolver.
 Modular architecture keeps the core tiny and efficient,
@@ -14,6 +14,7 @@ and it provides a state-machine like API for extensions.
    build
    lib
    modules_api
+   NEWS
 
 
 Indices and tables

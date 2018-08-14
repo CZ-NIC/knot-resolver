@@ -27,7 +27,7 @@ but it's most likely broken and currently not planned to be supported.
 Requirements
 ------------
 
-The following is a list of software required to build Knot DNS Resolver from sources.
+The following is a list of software required to build Knot Resolver from sources.
 
 .. csv-table::
    :header: "Requirement", "Required by", "Notes"
@@ -41,7 +41,7 @@ The following is a list of software required to build Knot DNS Resolver from sou
    "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
    "lmdb", "``daemon``", "If missing, a static version is embedded."
 
-There are also *optional* packages that enable specific functionality in Knot DNS Resolver, they are useful mainly for developers to build documentation and tests.
+There are also *optional* packages that enable specific functionality in Knot Resolver, they are useful mainly for developers to build documentation and tests.
 
 .. csv-table::
    :header: "Optional", "Needed for", "Notes"
@@ -116,7 +116,7 @@ Initialize git submodules first.
 
     $ git submodule update --init --recursive
 
-The Knot DNS Resolver depends on the the Knot DNS library, recent version of libuv_, and LuaJIT_.
+The Knot Resolver depends on the the Knot DNS library, recent version of libuv_, and LuaJIT_.
 
 .. code-block:: bash
 
@@ -151,7 +151,7 @@ Alternatively you can build only specific parts of the project, i.e. ``library``
 Building with security compiler flags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Knot DNS Resolver enables certain `security compile-time flags <https://wiki.debian.org/Hardening#Notes_on_Memory_Corruption_Mitigation_Methods>`_ that do not affect performance.
+Knot Resolver enables certain `security compile-time flags <https://wiki.debian.org/Hardening#Notes_on_Memory_Corruption_Mitigation_Methods>`_ that do not affect performance.
 You can add more flags to the build by appending them to `CFLAGS` variable, e.g. ``make CFLAGS="-fstack-protector"``.
 
   .. csv-table::

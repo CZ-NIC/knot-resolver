@@ -209,12 +209,12 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	/* We know it starts before sname, so let's check the other end.
 	 * 1. construct the key for the next name - kwz_hi. */
 	/* it's *full* name ATM */
-	const knot_dname_t *next = eh->data + KR_CACHE_RR_COUNT_SIZE
-				 + 2 /* RDLENGTH from rfc1034 */;
+	const knot_rdata_t *next = (const knot_rdata_t *)
+				(eh->data + KR_CACHE_RR_COUNT_SIZE);
 	if (KR_CACHE_RR_COUNT_SIZE != 2 || get_uint16(eh->data) == 0) {
 		assert(false);
 		return "ERROR";
-		/* TODO: more checks?  Also, `next` computation is kinda messy. */
+		/* TODO: more checks? */
 	}
 	/*
 	WITH_VERBOSE {
@@ -228,13 +228,18 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		assert(false);
 		return "EINVAL";
 	}
-	ret = kr_dname_lf(chs, next, false);
-#if KNOT_VERSION_HEX >= ((2 << 16) | (7 << 8) | 0)
-	/* We have to lower-case it with libknot >= 2.7; see also RFC 6840 5.1. */
-	if (!ret) {
-		ret = knot_dname_to_lower(next);
+	{
+		/* Lower-case chs; see also RFC 6840 5.1.
+		 * LATER(optim.): we do lots of copying etc. */
+		knot_dname_t lower_buf[KNOT_DNAME_MAXLEN];
+		ret = knot_dname_to_wire(lower_buf, next->data,
+					 MIN(next->len, KNOT_DNAME_MAXLEN));
+		if (ret < 0) { /* _ESPACE */
+			return "range search found record with incorrect contents";
+		}
+		knot_dname_to_lower(lower_buf);
+		ret = kr_dname_lf(chs, lower_buf, false);
 	}
-#endif
 	if (ret) {
 		assert(false);
 		return "ERROR";
@@ -309,9 +314,8 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 
 	/* Final checks, split for matching vs. covering our sname. */
 	const knot_rrset_t *nsec_rr = ans->rrsets[AR_NSEC].set.rr;
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
 	assert(bm);
 
 	if (exact_match) {
@@ -337,7 +341,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	/* NXDOMAIN proven *except* for wildcards. */
 	WITH_VERBOSE(qry) {
 		auto_free char *owner_str = kr_dname_text(nsec_rr->owner),
-			  *next_str = kr_dname_text(knot_nsec_next(&nsec_rr->rrs));
+			  *next_str = kr_dname_text(knot_nsec_next(nsec_rr->rrs.rdata));
 		VERBOSE_MSG(qry, "=> NSEC sname: covered by: %s -> %s, new TTL %d\n",
 				owner_str, next_str, new_ttl);
 	}
@@ -352,14 +356,12 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	 * LATER(optim.): it might be faster to use the LFs we already have.
 	 */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
-	int ret = knot_dname_to_wire(next, knot_nsec_next(&nsec_rr->rrs), sizeof(next));
-	if (ret >= 0) {
-		ret = knot_dname_to_lower(next);
-	}
+	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec_rr->rrs.rdata), sizeof(next));
 	if (ret < 0) {
 		assert(!ret);
 		return kr_error(ret);
 	}
+	knot_dname_to_lower(next);
 	*clencl_labels = MAX(
 		nsec_matched,
 		knot_dname_matched_labels(qry->sname, next)
@@ -386,9 +388,8 @@ static bool nonexistence_ok(int cmp, const knot_rrset_t *rrs)
 	if (cmp != 2) {
 		return false;
 	}
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec_bitmap(&rrs->rrs, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec_bitmap(rrs->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(rrs->rrs.rdata);
 	return kr_nsec_children_in_zone_check(bm, bm_size) != 0;
 }
 
@@ -443,10 +444,9 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 	assert(nsec_rr);
 	const uint32_t new_ttl_log =
-		kr_verbose_status ? knot_rrset_ttl(nsec_rr) : -1;
-	uint8_t *bm = NULL;
-	uint16_t bm_size;
-	knot_nsec_bitmap(&nsec_rr->rrs, &bm, &bm_size);
+		kr_verbose_status ? nsec_rr->ttl : -1;
+	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
 	int ret;
 	struct answer_rrset * const arw = &ans->rrsets[AR_WILD];
 	if (!bm) {
@@ -470,7 +470,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		/* We have a record proving wildcard non-existence. */
 		WITH_VERBOSE(qry) {
 			auto_free char *owner_str = kr_dname_text(nsec_rr->owner),
-				  *next_str = kr_dname_text(knot_nsec_next(&nsec_rr->rrs));
+				*next_str = kr_dname_text(knot_nsec_next(nsec_rr->rrs.rdata));
 			VERBOSE_MSG(qry, "=> NSEC wildcard: covered by: %s -> %s, new TTL %d\n",
 					owner_str, next_str, new_ttl_log);
 		}
@@ -502,7 +502,8 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	ret = kr_ok();
 clean_wild:
 	if (arw->set.rr) { /* we may have matched AR_NSEC */
-		knot_rrset_free(&arw->set.rr, ans->mm);
+		knot_rrset_free(arw->set.rr, ans->mm);
+		arw->set.rr = NULL;
 		knot_rdataset_clear(&arw->sig_rds, ans->mm);
 	}
 	return ret;

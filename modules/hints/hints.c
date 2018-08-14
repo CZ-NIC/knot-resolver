@@ -23,7 +23,6 @@
 
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
-#include <libknot/rrtype/aaaa.h>
 #include <ccan/json/json.h>
 #include <ucw/mempool.h>
 #include <contrib/cleanup.h>
@@ -64,7 +63,8 @@ static int put_answer(knot_pkt_t *pkt, struct kr_query *qry, knot_rrset_t *rr, b
 		}
 		if (!knot_rrset_empty(rr)) {
 			/* Append to packet */
-			ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, rr, KNOT_PF_FREE);
+			ret = knot_pkt_put_rotate(pkt, KNOT_COMPR_HINT_QNAME, rr,
+						  qry->reorder, KNOT_PF_FREE);
 		} else {
 			/* Return empty answer if name exists, but type doesn't match */
 			knot_wire_set_aa(pkt->wire);
@@ -88,14 +88,14 @@ static int satisfy_reverse(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 	}
 	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
 	knot_rrset_t rr;
-	knot_rrset_init(&rr, qname, KNOT_RRTYPE_PTR, KNOT_CLASS_IN);
+	knot_rrset_init(&rr, qname, KNOT_RRTYPE_PTR, KNOT_CLASS_IN, 0);
 
 	/* Append address records from hints */
 	uint8_t *addr = pack_last(*addr_set);
 	if (addr != NULL) {
 		size_t len = pack_obj_len(addr);
 		void *addr_val = pack_obj_val(addr);
-		knot_rrset_add_rdata(&rr, addr_val, len, 0, &pkt->mm);
+		knot_rrset_add_rdata(&rr, addr_val, len, &pkt->mm);
 	}
 
 	return put_answer(pkt, qry, &rr, use_nodata);
@@ -110,7 +110,7 @@ static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 	}
 	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
 	knot_rrset_t rr;
-	knot_rrset_init(&rr, qname, qry->stype, qry->sclass);
+	knot_rrset_init(&rr, qname, qry->stype, qry->sclass, 0);
 	size_t family_len = sizeof(struct in_addr);
 	if (rr.type == KNOT_RRTYPE_AAAA) {
 		family_len = sizeof(struct in6_addr);
@@ -122,7 +122,7 @@ static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 		size_t len = pack_obj_len(addr);
 		void *addr_val = pack_obj_val(addr);
 		if (len == family_len) {
-			knot_rrset_add_rdata(&rr, addr_val, len, 0, &pkt->mm);
+			knot_rrset_add_rdata(&rr, addr_val, len, &pkt->mm);
 		}
 		addr = pack_obj_next(addr);
 	}
@@ -191,7 +191,7 @@ static const knot_rdata_t * addr2rdata(const char *addr) {
 	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
 	size_t addr_len = kr_inaddr_len((struct sockaddr *)&ss);
 	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr((struct sockaddr *)&ss);
-	knot_rdata_init(rdata_arr, addr_len, raw_addr, 0);
+	knot_rdata_init(rdata_arr, addr_len, raw_addr);
 	return rdata_arr;
 }
 
@@ -254,10 +254,7 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 	if (!knot_dname_from_str(key, name, sizeof(key))) {
 		return kr_error(EINVAL);
 	}
-	int ret = knot_dname_to_lower(key);
-	if (ret) {
-		return ret;
-	}
+	knot_dname_to_lower(key);
 	const knot_rdata_t *rdata = addr2rdata(addr);
 	if (!rdata) {
 		return kr_error(EINVAL);
@@ -281,7 +278,7 @@ static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const ch
 
 	/* Build RDATA */
 	knot_rdata_t rdata[RDATA_ARR_MAX];
-	knot_rdata_init(rdata, knot_dname_size(ptr_name), ptr_name, 0);
+	knot_rdata_init(rdata, knot_dname_size(ptr_name), ptr_name);
 
 	return kr_zonecut_add(hints, key, rdata);
 }
@@ -298,7 +295,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 		return kr_error(EINVAL);
 	}
 	knot_rdata_t ptr_rdata[RDATA_ARR_MAX];
-	knot_rdata_init(ptr_rdata, knot_dname_size(key), key, 0);
+	knot_rdata_init(ptr_rdata, knot_dname_size(key), key);
 
         if (addr) {
 		/* Remove the pair. */

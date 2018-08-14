@@ -547,7 +547,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 			args->quiet = true;
 			break;
 		case 'V':
-			kr_log_info("%s, version %s\n", "Knot DNS Resolver", PACKAGE_VERSION);
+			kr_log_info("%s, version %s\n", "Knot Resolver", PACKAGE_VERSION);
 			return EXIT_SUCCESS;
 		case 'h':
 		case '?':

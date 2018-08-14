@@ -36,11 +36,17 @@ static int peek_encloser(
 	uint8_t lowest_rank, const struct kr_query *qry, struct kr_cache *cache);
 
 
-static int nsec_p_init(struct nsec_p *nsec_p, const uint8_t *nsec_p_raw)
+static int nsec_p_init(struct nsec_p *nsec_p, knot_db_val_t nsec_p_entry, bool with_knot)
 {
-	nsec_p->raw = nsec_p_raw;
-	if (!nsec_p_raw) return kr_ok();
+	const size_t stamp_len = sizeof(uint32_t);
+	if (nsec_p_entry.len <= stamp_len) { /* plain NSEC if equal */
+		nsec_p->raw = NULL;
+		nsec_p->hash = 0;
+		return kr_ok();
+	}
+	nsec_p->raw = (uint8_t *)nsec_p_entry.data + stamp_len;
 	nsec_p->hash = nsec_p_mkHash(nsec_p->raw);
+	if (!with_knot) return kr_ok();
 	/* Convert NSEC3 params to another format. */
 	const dnssec_binary_t rdata = {
 		.size = nsec_p_rdlen(nsec_p->raw),
@@ -55,6 +61,29 @@ static void nsec_p_cleanup(struct nsec_p *nsec_p)
 	dnssec_binary_free(&nsec_p->libknot.salt);
 	/* We don't really need to clear it, but it's not large. (`salt` zeroed above) */
 	memset(nsec_p, 0, sizeof(*nsec_p));
+}
+
+/** Compute new TTL for nsec_p entry, using SOA serial arith.
+ * \param new_ttl (optionally) write the new TTL (even if negative)
+ * \return error code, e.g. kr_error(ESTALE) */
+static int nsec_p_ttl(knot_db_val_t entry, const struct kr_query *qry, int32_t *new_ttl)
+{
+	if (!entry.data || !qry) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+	uint32_t stamp;
+	if (!entry.len) {
+		return kr_error(ENOENT);
+	}
+	if (entry.len < sizeof(stamp)) {
+		assert(!EILSEQ);
+		return kr_error(EILSEQ);
+	}
+	memcpy(&stamp, entry.data, sizeof(stamp));
+	int32_t newttl = stamp - qry->timestamp.tv_sec;
+	if (new_ttl) *new_ttl = newttl;
+	return newttl < 0 ? kr_error(ESTALE) : kr_ok();
 }
 
 static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry)
@@ -150,13 +179,11 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* We have to try proving from NSEC*. */
+	auto_free char *log_zname = NULL;
 	WITH_VERBOSE(qry) {
-		auto_free char *zname_str = kr_dname_text(k->zname);
+		log_zname = kr_dname_text(k->zname);
 		if (!el[0].len) {
-			VERBOSE_MSG(qry, "=> no NSEC* cached for zone: %s\n", zname_str);
-		} else {
-			VERBOSE_MSG(qry, "=> trying zone: %s (first %s)\n", zname_str,
-					(el[0].len == 4 ? "NSEC" : "NSEC3"));
+			VERBOSE_MSG(qry, "=> no NSEC* cached for zone: %s\n", log_zname);
 		}
 	}
 
@@ -189,17 +216,22 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Try the NSEC* parameters in order, until success.
 	 * Let's not mix different parameters for NSEC* RRs in a single proof. */
 	for (int i = 0; ;) {
-		if (!el[i].len) goto cont;
-		/* OK iff the stamp is in future */
-		uint32_t stamp;
-		memcpy(&stamp, el[i].data, sizeof(stamp));
-		const int32_t remains = stamp - qry->timestamp.tv_sec; /* using SOA serial arith. */
-		if (remains < 0) goto cont;
-		{
-			const uint8_t *nsec_p_raw = el[i].len > sizeof(stamp)
-					? (uint8_t *)el[i].data + sizeof(stamp) : NULL;
-			nsec_p_init(&ans.nsec_p, nsec_p_raw);
+		int32_t log_new_ttl = -123456789; /* visually recognizable value */
+		ret = nsec_p_ttl(el[i], qry, &log_new_ttl);
+		if (!ret || VERBOSE_STATUS) {
+			nsec_p_init(&ans.nsec_p, el[i], !ret);
 		}
+		if (ret) {
+			VERBOSE_MSG(qry, "=> skipping zone: %s, %s, hash %x;"
+				"new TTL %d, ret %d\n",
+				log_zname, (ans.nsec_p.raw ? "NSEC3" : "NSEC"),
+				(unsigned)ans.nsec_p.hash, (int)log_new_ttl, ret);
+			/* no need for nsec_p_cleanup() in this case */
+			goto cont;
+		}
+		VERBOSE_MSG(qry, "=> trying zone: %s, %s, hash %x\n",
+				log_zname, (ans.nsec_p.raw ? "NSEC3" : "NSEC"),
+				(unsigned)ans.nsec_p.hash);
 		/**** 2. and 3. inside */
 		ret = peek_encloser(k, &ans, sname_labels,
 					lowest_rank, qry, cache);
@@ -520,9 +552,15 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	return kr_ok();
 }
 
+/** \internal for closest_NS.  Check suitability of a single entry, setting k->type if OK.
+ * \return error code, negative iff whole list should be skipped. */
+static int check_NS_entry(knot_db_val_t entry, int i, bool exact_match,
+			  const struct kr_query *qry, struct key *k);
+
 /** Find the longest prefix zone/xNAME (with OK time+rank), starting at k->*.
  *
  * Found type is returned via k->type; the values are returned in el.
+ * \note we use k->type = KNOT_RRTYPE_NS also for the nsec_p result.
  * \return error code
  */
 static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
@@ -533,7 +571,6 @@ static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
 
 	int zlf_len = k->buf[0];
 
-	uint8_t rank_min = KR_RANK_INSECURE | KR_RANK_AUTH;
 	// LATER(optim): if stype is NS, we check the same value again
 	bool exact_match = true;
 	bool need_zero = true;
@@ -560,55 +597,14 @@ static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
 		need_zero = false;
 		/* More types are possible; try in order.
 		 * For non-fatal failures just "continue;" to try the next type. */
-		for (int i = ENTRY_APEX_NSECS_CNT; i < EL_LENGTH; ++i) {
-			if (!el[i].len
-				/* On a zone cut we want DS from the parent zone. */
-				|| (i == EL_NS && exact_match && qry->stype == KNOT_RRTYPE_DS)
-				/* CNAME is interesting only if we
-				 * directly hit the name that was asked.
-				 * Note that we want it even in the DS case. */
-				|| (i == EL_CNAME && !exact_match)
-				/* DNAME is interesting only if we did NOT
-				 * directly hit the name that was asked. */
-				|| (i == EL_DNAME && exact_match)
-			   ) {
-				continue;
+		for (int i = 0; i < EL_LENGTH; ++i) {
+			ret = check_NS_entry(el[i], i, exact_match, qry, k);
+			if (ret < 0) goto next_label; else
+			if (!ret) {
+				/* We found our match. */
+				k->zlf_len = zlf_len;
+				return kr_ok();
 			}
-				/* ^^ LATER(optim.): not having NS but having
-				 * non-timeouted nsec_p is also OK for a zone cut. */
-			/* Find the entry for the type, check positivity, TTL */
-			const uint16_t type = EL2RRTYPE(i);
-			const struct entry_h *eh = entry_h_consistent(el[i], type);
-			if (!eh) {
-				VERBOSE_MSG(qry, "=> EH seek ret: %d\n", ret);
-				assert(false);
-				goto next_label;
-			}
-			int32_t new_ttl = get_new_ttl(eh, qry, k->zname, type,
-							qry->timestamp.tv_sec);
-			if (new_ttl < 0
-			    /* Not interested in negative or bogus. */
-			    || eh->is_packet
-			    /* For NS any kr_rank is accepted,
-			     * as insecure or even nonauth is OK */
-			    || (type != KNOT_RRTYPE_NS && eh->rank < rank_min)) {
-
-				WITH_VERBOSE(qry) {
-					auto_free char *type_str =
-						kr_rrtype_text(type);
-					const char *packet_str =
-						eh->is_packet ? "packet" : "RR";
-					VERBOSE_MSG(qry, "=> skipping unfit %s %s: "
-						"rank 0%.2o, new TTL %d\n",
-						type_str, packet_str,
-						eh->rank, new_ttl);
-				}
-				continue;
-			}
-			/* We found our match. */
-			k->type = type;
-			k->zlf_len = zlf_len;
-			return kr_ok();
 		}
 
 	next_label:
@@ -626,5 +622,64 @@ static int closest_NS(kr_layer_t *ctx, struct key *k, entry_list_t el)
 		k->zname += (k->zname[0] + 1);
 		k->buf[zlf_len + 1] = 0;
 	} while (true);
+}
+
+static int check_NS_entry(const knot_db_val_t entry, const int i, const bool exact_match,
+			  const struct kr_query *qry, struct key *k)
+{
+	const int ESKIP = ABS(ENOENT);
+	if (!entry.len
+		/* On a zone cut we want DS from the parent zone. */
+		|| (i <= EL_NS && exact_match && qry->stype == KNOT_RRTYPE_DS)
+		/* CNAME is interesting only if we
+		 * directly hit the name that was asked.
+		 * Note that we want it even in the DS case. */
+		|| (i == EL_CNAME && !exact_match)
+		/* DNAME is interesting only if we did NOT
+		 * directly hit the name that was asked. */
+		|| (i == EL_DNAME && exact_match)
+	   ) {
+		return ESKIP;
+	}
+
+	uint16_t type;
+	if (i < ENTRY_APEX_NSECS_CNT) {
+		type = KNOT_RRTYPE_NS;
+		int32_t log_new_ttl = -123456789; /* visually recognizable value */
+		const int err = nsec_p_ttl(entry, qry, &log_new_ttl);
+		if (err) {
+			VERBOSE_MSG(qry,
+				"=> skipping unfit nsec_p: new TTL %d, error %d\n",
+				(int)log_new_ttl, err);
+			return ESKIP;
+		}
+	} else {
+		type = EL2RRTYPE(i);
+		/* Find the entry for the type, check positivity, TTL */
+		const struct entry_h *eh = entry_h_consistent(entry, type);
+		if (!eh) {
+			VERBOSE_MSG(qry, "=> EH not consistent\n");
+			assert(false);
+			return kr_error(EILSEQ);
+		}
+		const int32_t log_new_ttl = get_new_ttl(eh, qry, k->zname, type,
+							qry->timestamp.tv_sec);
+		const uint8_t rank_min = KR_RANK_INSECURE | KR_RANK_AUTH;
+		const bool ok = /* For NS any kr_rank is accepted,
+				 * as insecure or even nonauth is OK */
+				(type == KNOT_RRTYPE_NS || eh->rank >= rank_min)
+				/* Not interested in negative bogus or outdated RRs. */
+				&& !eh->is_packet && log_new_ttl >= 0;
+		WITH_VERBOSE(qry) { if (!ok) {
+			auto_free char *type_str = kr_rrtype_text(type);
+			const char *packet_str = eh->is_packet ? "packet" : "RR";
+			VERBOSE_MSG(qry,
+				"=> skipping unfit %s %s: rank 0%.2o, new TTL %d\n",
+				type_str, packet_str, eh->rank, (int)log_new_ttl);
+		} }
+		if (!ok) return ESKIP;
+	}
+	k->type = type;
+	return kr_ok();
 }
 

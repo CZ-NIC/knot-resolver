@@ -44,11 +44,12 @@
  * been received from network.
  */
 
+#include <inttypes.h> /* PRIu64 */
 #include <stdlib.h>
 #include <uv.h>
 #include <ucw/mempool.h>
 #include <libknot/rrset.h>
-#include <zscanner/scanner.h>
+#include <libzscanner/scanner.h>
 
 #include "lib/utils.h"
 #include "lib/dnssec/ta.h"
@@ -289,8 +290,10 @@ static int zi_put_glue(zone_import_ctx_t *z_import, knot_pkt_t *pkt,
 			     knot_rrset_t *rr)
 {
 	int err = 0;
-	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
-		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
+	knot_rdata_t *rdata_i = rr->rrs.rdata;
+	for (uint16_t i = 0; i < rr->rrs.count;
+			++i, rdata_i = knot_rdataset_next(rdata_i)) {
+		const knot_dname_t *ns_name = knot_ns_name(rdata_i);
 		err = zi_rrset_find_put(z_import, pkt, ns_name,
 					rr->rclass, KNOT_RRTYPE_A, 0);
 		if (err < 0) {
@@ -324,7 +327,7 @@ static knot_pkt_t *zi_query_create(zone_import_ctx_t *z_import, knot_rrset_t *rr
 	knot_wire_set_id(query->wire, msgid);
 	int err = knot_pkt_parse(query, 0);
 	if (err != KNOT_EOK) {
-		knot_pkt_free(&query);
+		knot_pkt_free(query);
 		return NULL;
 	}
 
@@ -353,7 +356,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	/* Create "pseudo answer". */
 	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
 	if (!answer) {
-		knot_pkt_free(&query);
+		knot_pkt_free(query);
 		return -1;
 	}
 	knot_pkt_put_question(answer, dname, rrclass, rrtype);
@@ -368,8 +371,8 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	 * resolving - qr_task & request_ctx. */
 	struct qr_task *task = worker_resolve_start(worker, query, options);
 	if (!task) {
-		knot_pkt_free(&query);
-		knot_pkt_free(&answer);
+		knot_pkt_free(query);
+		knot_pkt_free(answer);
 		return -1;
 	}
 
@@ -442,8 +445,8 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 
 cleanup:
 
-	knot_pkt_free(&query);
-	knot_pkt_free(&answer);
+	knot_pkt_free(query);
+	knot_pkt_free(answer);
 	worker_task_finalize(task, state);
 	return state == (is_referral ? KR_STATE_PRODUCE : KR_STATE_DONE) ? 0 : -1;
 }
@@ -584,7 +587,8 @@ static void zi_zone_process(uv_timer_t* handle)
 	uint64_t elapsed = kr_now() - z_import->start_timestamp;
 	elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
 
-	VERBOSE_MSG(NULL, "finished in %lu ms; zone: `%s`; ns: %zd; other: %zd; failed: %zd\n",
+	VERBOSE_MSG(NULL, "finished in %"PRIu64" ms; zone: `%s`; ns: %zd"
+		    "; other: %zd; failed: %zd\n",
 		    elapsed, zone_name_str, ns_imported, other_imported, failed);
 
 finish:
@@ -616,27 +620,32 @@ static int zi_record_store(zs_scanner_t *s)
 {
 	if (s->r_data_length > UINT16_MAX) {
 		/* Due to knot_rrset_add_rdata(..., const uint16_t size, ...); */
-		kr_log_error("[zscanner] line %lu: rdata is too long\n", s->line_counter);
+		kr_log_error("[zscanner] line %"PRIu64": rdata is too long\n",
+				s->line_counter);
 		return -1;
 	}
 
 	if (knot_dname_size(s->r_owner) != strlen((const char *)(s->r_owner)) + 1) {
-		kr_log_error("[zscanner] line %lu: owner name contains zero byte, skip\n", s->line_counter);
+		kr_log_error("[zscanner] line %"PRIu64
+				": owner name contains zero byte, skip\n",
+				s->line_counter);
 		return 0;
 	}
 
 	zone_import_ctx_t *z_import = (zone_import_ctx_t *)s->process.data;
 
 	knot_rrset_t *new_rr = knot_rrset_new(s->r_owner, s->r_type, s->r_class,
-					      &z_import->pool);
+					      s->r_ttl, &z_import->pool);
 	if (!new_rr) {
-		kr_log_error("[zscanner] line %lu: error creating rrset\n", s->line_counter);
+		kr_log_error("[zscanner] line %"PRIu64": error creating rrset\n",
+				s->line_counter);
 		return -1;
 	}
 	int res = knot_rrset_add_rdata(new_rr, s->r_data, s->r_data_length,
-				       s->r_ttl, &z_import->pool);
+				       &z_import->pool);
 	if (res != KNOT_EOK) {
-		kr_log_error("[zscanner] line %lu: error adding rdata to rrset\n", s->line_counter);
+		kr_log_error("[zscanner] line %"PRIu64": error adding rdata to rrset\n",
+				s->line_counter);
 		return -1;
 	}
 
@@ -649,7 +658,8 @@ static int zi_record_store(zs_scanner_t *s)
 	res = kr_rrkey(key, new_rr->rclass, new_rr->owner, new_rr->type,
 		       additional_key_field);
 	if (res <= 0) {
-		kr_log_error("[zscanner] line %lu: error constructing rrkey\n", s->line_counter);
+		kr_log_error("[zscanner] line %"PRIu64": error constructing rrkey\n",
+				s->line_counter);
 		return -1;
 	}
 
@@ -661,7 +671,8 @@ static int zi_record_store(zs_scanner_t *s)
 		res = map_set(&z_import->rrset_indexed, key, new_rr);
 	}
 	if (res != 0) {
-		kr_log_error("[zscanner] line %lu: error saving parsed rrset\n", s->line_counter);
+		kr_log_error("[zscanner] line %"PRIu64": error saving parsed rrset\n",
+				s->line_counter);
 		return -1;
 	}
 
@@ -682,24 +693,29 @@ static int zi_state_parsing(zs_scanner_t *s)
 				z_import->origin = knot_dname_copy(s->zone_origin,
 								  &z_import->pool);
 			} else if (!knot_dname_is_equal(z_import->origin, s->zone_origin)) {
-				kr_log_error("[zscanner] line: %lu: zone origin changed unexpectedly\n",
+				kr_log_error("[zscanner] line: %"PRIu64
+					     ": zone origin changed unexpectedly\n",
 					     s->line_counter);
 				return -1;
 			}
 			break;
 		case ZS_STATE_ERROR:
-			kr_log_error("[zscanner] line: %lu: parse error; code: %i ('%s')\n",
-				     s->line_counter, s->error.code, zs_strerror(s->error.code));
+			kr_log_error("[zscanner] line: %"PRIu64
+				     ": parse error; code: %i ('%s')\n",
+				     s->line_counter, s->error.code,
+				     zs_strerror(s->error.code));
 			return -1;
 		case ZS_STATE_INCLUDE:
-			kr_log_error("[zscanner] line: %lu: INCLUDE is not supported\n",
+			kr_log_error("[zscanner] line: %"PRIu64
+				     ": INCLUDE is not supported\n",
 				     s->line_counter);
 			return -1;
 		case ZS_STATE_EOF:
 		case ZS_STATE_STOP:
 			return (s->error.counter == 0) ? 0 : -1;
 		default:
-			kr_log_error("[zscanner] line: %lu: unexpected parse state: %i\n",
+			kr_log_error("[zscanner] line: %"PRIu64
+				     ": unexpected parse state: %i\n",
 				     s->line_counter, s->state);
 			return -1;
 		}
@@ -785,7 +801,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 		return ret;
 	}
 
-	VERBOSE_MSG(NULL, "[zscanner] finished in %lu ms; zone file `%s`\n",
+	VERBOSE_MSG(NULL, "[zscanner] finished in %"PRIu64" ms; zone file `%s`\n",
 			    elapsed, zone_file);
 	map_walk(&z_import->rrset_indexed, zi_mapwalk_preprocess, z_import);
 

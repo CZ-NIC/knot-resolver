@@ -42,7 +42,7 @@ coverage-lua: $(LUA_INFOS_OUT) luacov.empty_stats.out
 
 coverage:
 	@$(LCOV) $(addprefix --add-tracefile ,$(wildcard $(COVERAGE_STAGE)*.info)) --output-file coverage.info
-	@$(GENHTML) --no-function-coverage --no-branch-coverage -q -o coverage -p '$(realpath $(CURDIR))' -t 'Knot DNS Resolver $(VERSION)-$(PLATFORM) coverage report' --legend coverage.info
+	@$(GENHTML) --no-function-coverage --no-branch-coverage -q -o coverage -p '$(realpath $(CURDIR))' -t 'Knot Resolver $(VERSION)-$(PLATFORM) coverage report' --legend coverage.info
 
 coverage-clean:
 	@$(RM) -rf '$(COVERAGE_STATSDIR)'

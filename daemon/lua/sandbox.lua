@@ -201,7 +201,7 @@ end
 setmetatable(cache, {
 	__index = function (t, k)
 		local res = rawget(t, k)
-		if res and not rawget(t, 'current_size') then return res end
+		if not res and not rawget(t, 'current_size') then return res end
 		-- Beware: t.get returns empty table on failure to find.
 		-- That would be confusing here (breaking kresc), so return nil instead.
 		res = t.get(k)

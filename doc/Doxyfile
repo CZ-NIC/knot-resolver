@@ -1,4 +1,4 @@
-PROJECT_NAME      = Knot DNS Resolver library
+PROJECT_NAME      = Knot Resolver library
 GENERATE_HTML     = NO
 GENERATE_XML      = YES
 GENERATE_LATEX    = NO

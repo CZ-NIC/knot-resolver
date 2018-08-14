@@ -22,7 +22,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <sys/param.h>
-#include <zscanner/scanner.h>
+#include <libzscanner/scanner.h>
 
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
@@ -357,7 +357,7 @@ static void roothints_add(zs_scanner_t *zs)
 	}
 	if (zs->r_type == KNOT_RRTYPE_A || zs->r_type == KNOT_RRTYPE_AAAA) {
 		knot_rdata_t rdata[RDATA_ARR_MAX];
-		knot_rdata_init(rdata, zs->r_data_length, zs->r_data, zs->r_ttl);
+		knot_rdata_init(rdata, zs->r_data_length, zs->r_data);
 		kr_zonecut_add(hints, zs->r_owner, rdata);
 	}
 }
@@ -1020,6 +1020,7 @@ struct engine *engine_luaget(lua_State *L)
 {
 	lua_getglobal(L, "__engine");
 	struct engine *engine = lua_touserdata(L, -1);
+	if (!engine) luaL_error(L, "internal error, empty engine pointer");
 	lua_pop(L, 1);
 	return engine;
 }

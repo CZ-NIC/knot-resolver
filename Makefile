@@ -18,7 +18,7 @@ lint-lua: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 .PHONY: all install check clean doc info lint
 
 # Dependencies
-KNOT_MINVER := 2.6.7
+KNOT_MINVER := 2.7.1
 $(eval $(call find_lib,libknot,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libdnssec,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libzscanner,$(KNOT_MINVER),yes))
@@ -86,7 +86,7 @@ endif
 
 # Overview
 info:
-	$(info Target:     Knot DNS Resolver $(VERSION)-$(PLATFORM))
+	$(info Target:     Knot Resolver $(VERSION)-$(PLATFORM))
 	$(info Compiler:   $(CC) $(BUILD_CFLAGS))
 	$(info Linker:     $(CCLD) $(BUILD_LDFLAGS))
 	$(info )
@@ -122,7 +122,7 @@ info:
 #	$(info [$(HAS_hiredis)] hiredis (modules/redis))
 	$(info [$(HAS_cmocka)] cmocka (tests/unit))
 	$(info [$(HAS_libsystemd)] systemd (daemon))
-	$(info [$(HAS_nettle)] nettle (modules/cookies))
+#	$(info [$(HAS_nettle)] nettle (modules/cookies))
 	$(info [$(HAS_ltn12)] Lua socket ltn12 (trust anchor bootstrapping))
 	$(info [$(HAS_ssl.https)] Lua ssl.https (trust anchor bootstrapping))
 	$(info [$(HAS_libedit)] libedit (client))
@@ -165,10 +165,13 @@ endif
 endif
 
 # Check if it has nettle to support DNS cookies
-ifeq ($(HAS_nettle), yes)
-BUILD_CFLAGS += -DENABLE_COOKIES
-ENABLE_COOKIES := yes
-endif
+
+# temporarily turn off cookies
+#ifeq ($(HAS_nettle), yes)
+#BUILD_CFLAGS += -DENABLE_COOKIES
+#ENABLE_COOKIES := yes
+#endif
+ENABLE_COOKIES := no
 
 # Installation directories
 $(DESTDIR)$(MODULEDIR):

@@ -24,7 +24,7 @@
 #include <libknot/packet/wire.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
-#include <dnssec/error.h>
+#include <libdnssec/error.h>
 
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
@@ -104,7 +104,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 		}
 
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
-			const knot_dname_t *signer_name = knot_rrsig_signer_name(&rr->rrs, 0);
+			const knot_dname_t *signer_name = knot_rrsig_signer_name(rr->rrs.rdata);
 			if (!knot_dname_is_equal(vctx->zone_name, signer_name)) {
 				kr_rank_set(&entry->rank, KR_RANK_MISMATCH);
 				vctx->err_cnt += 1;
@@ -207,7 +207,8 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 	const knot_pktsection_t *an = knot_pkt_section(answer, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, i);
-		if ((rr->type != KNOT_RRTYPE_DNSKEY) || !knot_dname_in(qry->zone_cut.name, rr->owner)) {
+		if (rr->type != KNOT_RRTYPE_DNSKEY
+		    || knot_dname_in_bailiwick(rr->owner, qry->zone_cut.name) < 0) {
 			continue;
 		}
 		/* Merge with zone cut (or replace ancestor key). */
@@ -221,7 +222,8 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			int ret = knot_rdataset_merge(&qry->zone_cut.key->rrs,
 			                              &rr->rrs, qry->zone_cut.pool);
 			if (ret != 0) {
-				knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+				knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
+				qry->zone_cut.key = NULL;
 				return ret;
 			}
 			updated_key = true;
@@ -245,7 +247,8 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 		};
 		int ret = kr_dnskeys_trusted(&vctx, qry->zone_cut.trust_anchor);
 		if (ret != 0) {
-			knot_rrset_free(&qry->zone_cut.key, qry->zone_cut.pool);
+			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
+			qry->zone_cut.key = NULL;
 			return ret;
 		}
 
@@ -279,7 +282,7 @@ static knot_rrset_t *update_ds(struct kr_zonecut *cut, const knot_pktsection_t *
 			}
 		}
 		if (ret != 0) {
-			knot_rrset_free(&new_ds, cut->pool);
+			knot_rrset_free(new_ds, cut->pool);
 			return NULL;
 		}
 	}
@@ -395,7 +398,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 				/* No-data answer, QTYPE is DS, rfc5155 8.6 */
 				ret = kr_nsec3_no_data(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
 			}
-			if (ret == kr_error(DNSSEC_OUT_OF_RANGE)) {
+			if (ret == kr_error(KNOT_ERANGE)) {
 				/* Not bogus, going insecure due to optout */
 				ret = 0;
 			}
@@ -462,7 +465,7 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
 			continue;
 		}
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
-			return knot_rrsig_signer_name(&rr->rrs, 0);
+			return knot_rrsig_signer_name(rr->rrs.rdata);
 		}
 	}
 	return NULL;
@@ -491,7 +494,7 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 	struct kr_zonecut *cut = &qry->zone_cut;
 	const knot_dname_t *cut_name_start = qry->zone_cut.name;
 	bool use_cut = true;
-	if (!knot_dname_in(cut_name_start, rr->owner)) {
+	if (knot_dname_in_bailiwick(rr->owner, cut_name_start) < 0) {
 		int zone_labels = knot_dname_labels(qry->zone_cut.name, NULL);
 		int matched_labels = knot_dname_matched_labels(qry->zone_cut.name, rr->owner);
 		int skip_labels = zone_labels - matched_labels;
@@ -565,8 +568,8 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 
 	const knot_rrset_t *rr = invalid_entry->rr;
 	if (kr_rank_test(invalid_entry->rank, KR_RANK_MISMATCH)) {
-		const knot_dname_t *signer_name = knot_rrsig_signer_name(&rr->rrs, 0);
-		if (knot_dname_is_sub(signer_name, qry->zone_cut.name)) {
+		const knot_dname_t *signer_name = knot_rrsig_signer_name(rr->rrs.rdata);
+		if (knot_dname_in_bailiwick(signer_name, qry->zone_cut.name) > 0) {
 			qry->zone_cut.name = knot_dname_copy(signer_name, &req->pool);
 			qry->flags.AWAIT_CUT = true;
 		} else if (!knot_dname_is_equal(signer_name, qry->zone_cut.name)) {
@@ -708,13 +711,13 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 			const uint16_t qtype = knot_pkt_qtype(pkt);
 			const knot_dname_t *qname = knot_pkt_qname(pkt);
 			if (qtype == KNOT_RRTYPE_NS &&
-			    knot_dname_is_sub(qname, qry->zone_cut.name)) {
+			    knot_dname_in_bailiwick(qname, qry->zone_cut.name) > 0) {
 				/* Server is authoritative
 				 * for both parent and child,
 				 * and child zone is not signed. */
 				qry->zone_cut.name = knot_dname_copy(qname, &req->pool);
 			}
-		} else if (knot_dname_is_sub(signer, qry->zone_cut.name)) {
+		} else if (knot_dname_in_bailiwick(signer, qry->zone_cut.name) > 0) {
 			if (!(qry->flags.FORWARD)) {
 				/* Key signer is below current cut, advance and refetch keys. */
 				qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
@@ -775,8 +778,12 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /** Change ranks of RRs from this single iteration:
- * _INITIAL or _TRY or _MISSING -> rank_to_set. */
-static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
+ * _INITIAL or _TRY or _MISSING -> rank_to_set.
+ *
+ * Optionally do this only in a `bailiwick` (if not NULL).
+ * Iterator shouldn't have selected such records, but we check to be sure. */
+static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set,
+			 const knot_dname_t *bailiwick)
 {
 	struct kr_request *req	   = ctx->req;
 	struct kr_query *qry	   = req->current_query;
@@ -786,6 +793,10 @@ static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set)
 		for (size_t j = 0; j < arr->len; ++j) {
 			ranked_rr_array_entry_t *entry = arr->at[j];
 			if (entry->qry_uid != qry->uid) {
+				continue;
+			}
+			if (bailiwick && knot_dname_in_bailiwick(entry->rr->owner,
+								 bailiwick) < 0) {
 				continue;
 			}
 			if (kr_rank_test(entry->rank, KR_RANK_INITIAL)
@@ -819,8 +830,10 @@ static void check_wildcard(kr_layer_t *ctx)
 
 			int owner_labels = knot_dname_labels(rrsigs->owner, NULL);
 
-			for (int k = 0; k < rrsigs->rrs.rr_count; ++k) {
-				if (knot_rrsig_labels(&rrsigs->rrs, k) != owner_labels) {
+			knot_rdata_t *rdata_k = rrsigs->rrs.rdata;
+			for (int k = 0; k < rrsigs->rrs.count;
+					++k, rdata_k = knot_rdataset_next(rdata_k)) {
+				if (knot_rrsig_labels(rdata_k) != owner_labels) {
 					qry->flags.DNSSEC_WEXPAND = true;
 				}
 			}
@@ -863,7 +876,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Pass-through if user doesn't want secure answer or stub. */
 	/* @todo: Validating stub resolver mode. */
 	if (qry->flags.STUB) {
-		rank_records(ctx, KR_RANK_OMIT);
+		rank_records(ctx, KR_RANK_OMIT, NULL);
 		return ctx->state;
 	}
 	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
@@ -884,7 +897,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags.DNSSEC_WANT)) {
 		const bool is_insec = qry->flags.CACHED && qry->flags.DNSSEC_INSECURE;
 		if ((qry->flags.DNSSEC_INSECURE)) {
-			rank_records(ctx, KR_RANK_INSECURE);
+			rank_records(ctx, KR_RANK_INSECURE, qry->zone_cut.name);
 		}
 		if (is_insec && qry->parent != NULL) {
 			/* We have got insecure answer from cache.
@@ -906,7 +919,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (knot_wire_get_cd(req->answer->wire)) {
 		check_wildcard(ctx);
 		wildcard_adjust_to_wire(req, qry);
-		rank_records(ctx, KR_RANK_OMIT);
+		rank_records(ctx, KR_RANK_OMIT, NULL);
 		return ctx->state;
 	}
 	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */
@@ -954,7 +967,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			/* ^ the message is a bit imprecise to avoid being too verbose */
 			qry->flags.DNSSEC_WANT = false;
 			qry->flags.DNSSEC_INSECURE = true;
-			rank_records(ctx, KR_RANK_INSECURE);
+			rank_records(ctx, KR_RANK_INSECURE, qry->zone_cut.name);
 			mark_insecure_parents(qry);
 			return KR_STATE_DONE;
 		} else if (ret != 0) {
@@ -975,7 +988,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		} else {
 			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}
-		if (has_nsec3 && (ret == kr_error(DNSSEC_OUT_OF_RANGE))) {
+		if (has_nsec3 && (ret == kr_error(KNOT_ERANGE))) {
 			/* NXDOMAIN proof is OK,
 			 * but NSEC3 that covers next closer name
 			 * (or wildcard at next closer name) has opt-out flag.
@@ -1006,7 +1019,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 				ret = kr_nsec3_no_data(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			}
 			if (ret != 0) {
-				if (has_nsec3 && (ret == kr_error(DNSSEC_OUT_OF_RANGE))) {
+				if (has_nsec3 && (ret == kr_error(KNOT_ERANGE))) {
 					VERBOSE_MSG(qry, "<= can't prove NODATA due to optout, going insecure\n");
 					qry->flags.DNSSEC_OPTOUT = true;
 					/* Could not return from here,

@@ -184,8 +184,6 @@ typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 
 /** @internal RDATA array maximum size. */
 #define RDATA_ARR_MAX (UINT16_MAX + sizeof(uint64_t))
-/** @internal Next RDATA shortcut. */
-#define kr_rdataset_next(rd) (rd + knot_rdata_array_size(knot_rdata_rdlen(rd)))
 
 /** Concatenate N strings. */
 KR_EXPORT
@@ -367,10 +365,10 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 /** Return the (covered) type of an nonempty RRset. */
 static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 {
-	assert(rr && rr->rrs.rr_count && rr->rrs.data);
+	assert(rr && rr->rrs.count && rr->rrs.rdata);
 	uint16_t type = rr->type;
 	if (type == KNOT_RRTYPE_RRSIG)
-		type = knot_rrsig_type_covered(&rr->rrs, 0);
+		type = knot_rrsig_type_covered(rr->rrs.rdata);
 	return type;
 }
 
@@ -420,12 +418,14 @@ int knot_dname_lf2wire(knot_dname_t *dst, uint8_t len, const uint8_t *lf);
  */
 static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wildcard)
 {
-	int ret = knot_dname_lf(dst, src, NULL);
-	if (ret)
-		return ret;
-	int len = dst[0];
-	if (len == 1)
-		len = 0;
+	knot_dname_storage_t right_aligned_dst;
+	uint8_t *right_aligned_dname_start = knot_dname_lf(src, right_aligned_dst);
+	if (!right_aligned_dname_start) {
+		return kr_error(EINVAL);
+	}
+	int len = right_aligned_dname_start[0];
+	assert(right_aligned_dname_start + 1 + len - KNOT_DNAME_MAXLEN == right_aligned_dst);
+	memcpy(dst + 1, right_aligned_dname_start + 1, len);
 	if (add_wildcard) {
 		if (len + 2 > KNOT_DNAME_MAXLEN)
 			return kr_error(ENOSPC);
@@ -436,3 +436,12 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 	dst[0] = len;
 	return KNOT_EOK;
 };
+
+/* Trivial non-inline wrappers, to be used in lua. */
+KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
+				uint16_t type, uint16_t rclass, uint32_t ttl);
+KR_EXPORT uint16_t kr_pkt_qclass(const knot_pkt_t *pkt);
+KR_EXPORT uint16_t kr_pkt_qtype(const knot_pkt_t *pkt);
+KR_EXPORT uint32_t kr_rrsig_sig_inception(const knot_rdata_t *rdata);
+KR_EXPORT uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata);
+KR_EXPORT uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata);

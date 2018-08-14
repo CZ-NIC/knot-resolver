@@ -156,7 +156,7 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 		size_t addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
 		/* @warning _NOT_ thread-safe */
 		static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
-		knot_rdata_init(rdata_arr, addr_len, (const uint8_t *)addr, 0);
+		knot_rdata_init(rdata_arr, addr_len, (const uint8_t *)addr);
 		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata_arr);
 	} else {
 		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
@@ -350,7 +350,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 			qry->flags.NO_MINIMIZE = true;
 			qry->flags.AWAIT_IPV6 = false;
 			qry->flags.AWAIT_IPV4 = false;
-			VERBOSE_MSG(qry, "=> circular dependepcy, retrying with non-minimized name\n");
+			VERBOSE_MSG(qry, "=> circular dependency, retrying with non-minimized name\n");
 		} else {
 			qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
 			kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
@@ -411,7 +411,7 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 	}
 
 	size_t len = knot_rrset_size(pkt->opt_rr);
-	int16_t rr_removed = pkt->opt_rr->rrs.rr_count;
+	int16_t rr_removed = pkt->opt_rr->rrs.count;
 	/* Decrease rrset counters. */
 	pkt->rrset_count -= 1;
 	pkt->sections[pkt->current].count -= 1;
@@ -466,10 +466,10 @@ static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_reque
 }
 
 /** @return error code, ignoring if forced to truncate the packet. */
-static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
+static int write_extra_records(const rr_array_t *arr, uint16_t reorder, knot_pkt_t *answer)
 {
 	for (size_t i = 0; i < arr->len; ++i) {
-		int err = knot_pkt_put(answer, 0, arr->at[i], 0);
+		int err = knot_pkt_put_rotate(answer, 0, arr->at[i], reorder, 0);
 		if (err != KNOT_EOK) {
 			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
 		}
@@ -483,8 +483,8 @@ static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
  * @param all_cname optionally output if all written RRs are CNAMEs and RRSIGs of CNAMEs
  * @return error code, ignoring if forced to truncate the packet.
  */
-static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *answer,
-				      bool *all_secure, bool *all_cname)
+static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reorder,
+				      knot_pkt_t *answer, bool *all_secure, bool *all_cname)
 {
 	const bool has_dnssec = knot_pkt_has_dnssec(answer);
 	bool all_sec = true;
@@ -502,7 +502,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *
 				continue;
 			}
 		}
-		err = knot_pkt_put(answer, 0, rr, 0);
+		err = knot_pkt_put_rotate(answer, 0, rr, reorder, 0);
 		if (err != KNOT_EOK) {
 			if (err == KNOT_ESPACE) {
 				err = kr_ok();
@@ -538,7 +538,7 @@ static int answer_padding(struct kr_request *request)
 	int32_t pad_bytes = -1;
 
 	if (padding == -1) { /* use the default padding policy from libknot */
-		pad_bytes =  knot_edns_default_padding_size(answer, opt_rr);
+		pad_bytes =  knot_pkt_default_padding_size(answer, opt_rr);
 	}
 	if (padding >= 2) {
 		int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
@@ -604,6 +604,7 @@ static int answer_finalize(struct kr_request *request, int state)
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
+	const uint16_t reorder = last ? last->reorder : 0;
 	bool answ_all_cnames = false/*arbitrary*/;
 	if (request->answ_selected.len > 0) {
 		assert(answer->current <= KNOT_ANSWER);
@@ -611,8 +612,8 @@ static int answer_finalize(struct kr_request *request, int state)
 		if (answer->current < KNOT_ANSWER) {
 			knot_pkt_begin(answer, KNOT_ANSWER);
 		}
-		if (write_extra_ranked_records(&request->answ_selected, answer,
-						&secure, &answ_all_cnames))
+		if (write_extra_ranked_records(&request->answ_selected, reorder,
+						answer, &secure, &answ_all_cnames))
 		{
 			return answer_fail(request);
 		}
@@ -622,12 +623,13 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	if (write_extra_ranked_records(&request->auth_selected, answer, &secure, NULL)) {
+	if (write_extra_ranked_records(&request->auth_selected, reorder,
+	    answer, &secure, NULL)) {
 		return answer_fail(request);
 	}
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
-	if (write_extra_records(&request->additional, answer)) {
+	if (write_extra_records(&request->additional, reorder, answer)) {
 		return answer_fail(request);
 	}
 	/* Write EDNS information */
@@ -751,7 +753,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	} else if (cookie_ctx && cookie_ctx->srvr.enabled &&
 		   knot_wire_get_qdcount(packet->wire) == 0 &&
 		   knot_pkt_has_edns(packet) &&
-		   knot_edns_has_option(packet->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
+		   knot_pkt_edns_option(packet, KNOT_EDNS_OPTION_COOKIE)) {
 		/* Plan empty query only for cookies. */
 		qry = kr_rplan_push_empty(rplan, NULL);
 	}
@@ -1003,7 +1005,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	if (qry->parent != NULL &&
 	    !(qry->forward_flags.CNAME) &&
 	    !(qry->flags.DNS64_MARK) &&
-	    knot_dname_in(qry->parent->zone_cut.name, qry->zone_cut.name)) {
+	    knot_dname_in_bailiwick(qry->zone_cut.name, qry->parent->zone_cut.name) >= 0) {
 		return KR_STATE_PRODUCE;
 	}
 
@@ -1298,7 +1300,8 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	 * (and need glue from parent), or DS refetch. */
 	if (qry->parent) {
 		const knot_dname_t *parent = qry->parent->zone_cut.name;
-		if (parent[0] != '\0' && knot_dname_in(parent, qry->sname)) {
+		if (parent[0] != '\0'
+		    && knot_dname_in_bailiwick(qry->sname, parent) >= 0) {
 			requested_name = knot_wire_next_label(parent, NULL);
 		}
 	} else if ((qry->stype == KNOT_RRTYPE_DS) && (qry->sname[0] != '\0')) {

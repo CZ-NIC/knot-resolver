@@ -21,9 +21,6 @@ ExclusiveArch:	%{ix86} x86_64
 ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
 %endif
 
-Source2:        kresd.conf
-Source3:        root.keys
-
 %if 0%{GPG_CHECK}
 Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
@@ -74,7 +71,7 @@ Requires(preun):	systemd
 Requires(postun):	systemd
 
 %description
-The Knot DNS Resolver is a caching full resolver implementation written in C
+The Knot Resolver is a caching full resolver implementation written in C
 and LuaJIT, including both a resolver library and a daemon. Modular
 architecture of the library keeps the core tiny and efficient, and provides
 a state-machine like API for extensions.
@@ -84,20 +81,20 @@ To start using it, start a single kresd instance:
 $ systemctl start kresd@1.service
 
 %package devel
-Summary:        Development headers for Knot DNS Resolver
+Summary:        Development headers for Knot Resolver
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %description devel
-The package contains development headers for Knot DNS Resolver.
+The package contains development headers for Knot Resolver.
 
 %if 0%{?fedora}
 %package doc
-Summary:        Documentation for Knot DNS Resolver
+Summary:        Documentation for Knot Resolver
 BuildArch:      noarch
 Requires:       %{name} = %{version}-%{release}
 
 %description doc
-Documentation for Knot DNS Resolver
+Documentation for Knot Resolver
 %endif
 
 %prep
@@ -135,8 +132,8 @@ chmod 0644 %{buildroot}%{_pkgdocdir}/config.*
 # install configuration files
 mkdir -p %{buildroot}%{_sysconfdir}
 install -m 0755 -d %{buildroot}%{_sysconfdir}/knot-resolver
-install -m 0644 -p %SOURCE2 %{buildroot}%{_sysconfdir}/knot-resolver/kresd.conf
-install -m 0664 -p %SOURCE3 %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
+install -m 0644 -p %{repodir}/distro/common/kresd.conf %{buildroot}%{_sysconfdir}/knot-resolver/kresd.conf
+install -m 0664 -p %{repodir}/distro/common/root.keys %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
 
 # install systemd units and doc
 mkdir -p %{buildroot}%{_unitdir}
@@ -173,7 +170,7 @@ rm -r %{buildroot}%{_libdir}/kdns_modules/{http,http.lua}
 
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
-getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot DNS Resolver" knot-resolver
+getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post
 %systemd_post 'kresd@*.service'

@@ -13,14 +13,14 @@ fi
 # Required-Stop:     $remote_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Knot DNS Resolver
-# Description:       Knot DNS Resolver
+# Short-Description: Knot Resolver
+# Description:       Knot Resolver
 ### END INIT INFO
 
 # Author: Ondřej Surý <ondrej@debian.org>
 
 NAME=kresd
-DESC="Knot DNS Resolver"
+DESC="Knot Resolver"
 DAEMON=/usr/sbin/kresd
 START_ARGS="--background --make-pidfile"
 

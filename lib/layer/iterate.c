@@ -98,7 +98,8 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	const knot_pktsection_t *ns = knot_pkt_section(answer, KNOT_AUTHORITY);
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (rr->type == KNOT_RRTYPE_SOA && knot_dname_in(query->zone_cut.name, rr->owner)) {
+		if (rr->type == KNOT_RRTYPE_SOA
+		    && knot_dname_in_bailiwick(rr->owner, query->zone_cut.name) >= 0) {
 			return true;
 		}
 	}
@@ -157,20 +158,24 @@ static bool is_valid_addr(const uint8_t *addr, size_t len)
 static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *glue_cnt)
 {
 	if (rr->type == KNOT_RRTYPE_A || rr->type == KNOT_RRTYPE_AAAA) {
-		const knot_rdata_t *rdata = rr->rrs.data;
-		const void *addr = knot_rdata_data(rdata);
-		const int addr_len = knot_rdata_rdlen(rdata);
+		const knot_rdata_t *rdata = rr->rrs.rdata;
+		const int a_len = rr->type == KNOT_RRTYPE_A
+			? sizeof(struct in_addr) : sizeof(struct in6_addr);
+		if (a_len != rdata->len) {
+			QVERBOSE_MSG(query, "<= ignoring invalid glue, length %d != %d\n",
+					(int)rdata->len, a_len);
+			return KR_STATE_FAIL;
+		}
 		char name_str[KR_DNAME_STR_MAXLEN];
 		char addr_str[INET6_ADDRSTRLEN];
 		WITH_VERBOSE(query) {
-			const int af = (addr_len == sizeof(struct in_addr)) ?
-				       AF_INET : AF_INET6;
+			const int af = (rr->type == KNOT_RRTYPE_A) ? AF_INET : AF_INET6;
 			knot_dname_to_str(name_str, rr->owner, sizeof(name_str));
 			name_str[sizeof(name_str) - 1] = 0;
-			inet_ntop(af, addr, addr_str, sizeof(addr_str));
+			inet_ntop(af, rdata->data, addr_str, sizeof(addr_str));
 		}
 		if (!(query->flags.ALLOW_LOCAL) &&
-			!is_valid_addr(addr, addr_len)) {
+			!is_valid_addr(rdata->data, rdata->len)) {
 			QVERBOSE_MSG(query, "<= ignoring invalid glue for "
 				     "'%s': '%s'\n", name_str, addr_str);
 			return KR_STATE_CONSUME; /* Ignore invalid addresses */
@@ -256,8 +261,9 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	/* New authority MUST be at/below the authority of the current cut;
 	 * also qname must be below new authority;
 	 * otherwise it's a possible cache injection attempt. */
-	if (!knot_dname_in(current_cut, rr->owner) ||
-	    !knot_dname_in(rr->owner, qry->sname)) {
+	const bool ok = knot_dname_in_bailiwick(rr->owner, current_cut) >= 0
+		     && knot_dname_in_bailiwick(qry->sname, rr->owner)  >= 0;
+	if (!ok) {
 		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
 #ifdef STRICT_MODE
 		return KR_STATE_FAIL;
@@ -288,10 +294,13 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	}
 
 	/* Fetch glue for each NS */
-	for (unsigned i = 0; i < rr->rrs.rr_count; ++i) {
-		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
+	knot_rdata_t *rdata_i = rr->rrs.rdata;
+	for (unsigned i = 0; i < rr->rrs.count;
+			++i, rdata_i = knot_rdataset_next(rdata_i)) {
+		const knot_dname_t *ns_name = knot_ns_name(rdata_i);
 		/* Glue is mandatory for NS below zone */
-		if (knot_dname_in(rr->owner, ns_name) && !has_glue(pkt, ns_name)) {
+		if (knot_dname_in_bailiwick(ns_name, rr->owner) >= 0
+		    && !has_glue(pkt, ns_name)) {
 			const char *msg =
 				"<= authority: missing mandatory glue, skipping NS";
 			WITH_VERBOSE(qry) {
@@ -304,13 +313,14 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		assert(!ret); (void)ret;
 
 		/* Choose when to use glue records. */
-		bool in_bailiwick = knot_dname_in(current_cut, ns_name);
+		const bool in_bailiwick =
+			knot_dname_in_bailiwick(ns_name, current_cut) >= 0;
 		bool do_fetch;
 		if (qry->flags.PERMISSIVE) {
 			do_fetch = true;
 		} else if (qry->flags.STRICT) {
 			/* Strict mode uses only mandatory glue. */
-			do_fetch = knot_dname_in(cut->name, ns_name);
+			do_fetch = knot_dname_in_bailiwick(ns_name, cut->name) >= 0;
 		} else {
 			/* Normal mode uses in-bailiwick glue. */
 			do_fetch = in_bailiwick;
@@ -363,7 +373,8 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
-		if (rr->rclass != KNOT_CLASS_IN || !knot_dname_in(zonecut_name, rr->owner)) {
+		if (rr->rclass != KNOT_CLASS_IN
+		    || knot_dname_in_bailiwick(rr->owner, zonecut_name) < 0) {
 			continue;
 		}
 		uint8_t rank = get_initial_rank(rr, qry, false,
@@ -427,8 +438,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			case KR_STATE_FAIL: return state; break;
 			default:              /* continue */ break;
 			}
-		} else if (rr->type == KNOT_RRTYPE_SOA && knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
-			/* SOA below cut in authority indicates different authority, but same NS set. */
+		} else if (rr->type == KNOT_RRTYPE_SOA
+			   && knot_dname_in_bailiwick(rr->owner, qry->zone_cut.name) > 0) {
+			/* SOA below cut in authority indicates different authority,
+			 * but same NS set. */
 			qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 		}
 	}
@@ -439,8 +452,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	if (!ns_record_exists && knot_wire_get_aa(pkt->wire)) {
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
-			if (rr->type == KNOT_RRTYPE_NS && knot_dname_is_sub(rr->owner, qry->zone_cut.name)) {
-				/* NS below cut in authority indicates different authority, but same NS set. */
+			if (rr->type == KNOT_RRTYPE_NS
+			    && knot_dname_in_bailiwick(rr->owner, qry->zone_cut.name) > 0) {
+				/* NS below cut in authority indicates different authority,
+				 * but same NS set. */
 				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 			}
 		}
@@ -500,12 +515,13 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
 				/* TODO: actually handle DNAMEs */
 			if (rr->rclass != KNOT_CLASS_IN || !type_OK
-			    || !knot_dname_is_equal(rr->owner, cname)) {
+			    || !knot_dname_is_equal(rr->owner, cname)
+			    || knot_dname_in_bailiwick(rr->owner, query->zone_cut.name) < 0) {
 				continue;
 			}
 
 			if (rr->type == KNOT_RRTYPE_RRSIG) {
-				int rrsig_labels = knot_rrsig_labels(&rr->rrs, 0);
+				int rrsig_labels = knot_rrsig_labels(rr->rrs.rdata);
 				if (rrsig_labels > cname_labels) {
 					/* clearly wrong RRSIG, don't pick it.
 					 * don't fail immediately,
@@ -542,7 +558,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				continue;
 			}
 			cname_chain_len += 1;
-			pending_cname = knot_cname_name(&rr->rrs);
+			pending_cname = knot_cname_name(rr->rrs.rdata);
 			if (!pending_cname) {
 				break;
 			}
@@ -565,7 +581,15 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			cname = pending_cname;
 			break;
 		}
-		/* try to unroll cname only within current zone */
+		/* Information outside bailiwick is not trusted. */
+		if (knot_dname_in_bailiwick(pending_cname, query->zone_cut.name) < 0) {
+			cname = pending_cname;
+			break;
+		}
+		/* The validator still can't handle multiple zones in one answer,
+		 * so we only follow if a single label is replaced.
+		 * TODO: this still isn't 100%, as the target might have a NS+DS,
+		 * possibly leading to a SERVFAIL for the in-bailiwick name. */
 		const int pending_labels = knot_dname_labels(pending_cname, NULL);
 		if (pending_labels != cname_labels) {
 			cname = pending_cname;

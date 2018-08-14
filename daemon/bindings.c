@@ -848,6 +848,21 @@ int lib_net(lua_State *L)
 	return 1;
 }
 
+
+
+/** @internal return cache, or throw lua error if not open */
+struct kr_cache * cache_assert_open(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_cache *cache = &engine->resolver.cache;
+	assert(cache);
+	if (!cache || !kr_cache_is_open(cache)) {
+		format_error(L, "no cache is open yet, use cache.open() or cache.size, etc.");
+		lua_error(L);
+	}
+	return cache;
+}
+
 /** Return available cached backends. */
 static int cache_backends(lua_State *L)
 {
@@ -865,12 +880,10 @@ static int cache_backends(lua_State *L)
 /** Return number of cached records. */
 static int cache_count(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	const struct kr_cdb_api *api = engine->resolver.cache.api;
+	struct kr_cache *cache = cache_assert_open(L);
 
-	struct kr_cache *cache = &engine->resolver.cache;
-	int count = api->count(cache->db);
-	if (kr_cache_is_open(cache) && count >= 0) {
+	int count = cache->api->count(cache->db);
+	if (count >= 0) {
 		/* First key is a version counter, omit it if nonempty. */
 		lua_pushinteger(L, count ? count - 1 : 0);
 		return 1;
@@ -881,8 +894,7 @@ static int cache_count(lua_State *L)
 /** Return time of last checkpoint, or re-set it if passed `true`. */
 static int cache_checkpoint(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
+	struct kr_cache *cache = cache_assert_open(L);
 
 	if (lua_gettop(L) == 0) { /* Return the current value. */
 		lua_newtable(L);
@@ -908,8 +920,7 @@ static int cache_checkpoint(lua_State *L)
 /** Return cache statistics. */
 static int cache_stats(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
+	struct kr_cache *cache = cache_assert_open(L);
 	lua_newtable(L);
 	lua_pushnumber(L, cache->stats.hit);
 	lua_setfield(L, -2, "hit");
@@ -943,8 +954,7 @@ static const struct kr_cdb_api *cache_select(struct engine *engine, const char *
 
 static int cache_max_ttl(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
+	struct kr_cache *cache = cache_assert_open(L);
 
 	int n = lua_gettop(L);
 	if (n > 0) {
@@ -967,8 +977,7 @@ static int cache_max_ttl(lua_State *L)
 
 static int cache_min_ttl(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
+	struct kr_cache *cache = cache_assert_open(L);
 
 	int n = lua_gettop(L);
 	if (n > 0) {
@@ -1082,12 +1091,7 @@ static int cache_prefixed(struct kr_cache *cache, const char *prefix, bool exact
 /** Prune expired/invalid records. */
 static int cache_prune(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
-	if (!kr_cache_is_open(cache)) {
-		return 0;
-	}
-
+	struct kr_cache *cache = cache_assert_open(L);
 	/* Check parameters */
 	int prune_max = UINT16_MAX;
 	int n = lua_gettop(L);
@@ -1112,11 +1116,7 @@ static int cache_prune(lua_State *L)
 /** Clear everything. */
 static int cache_clear_everything(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
-	if (!kr_cache_is_open(cache)) {
-		return 0;
-	}
+	struct kr_cache *cache = cache_assert_open(L);
 
 	/* Clear records and packets. */
 	int ret = kr_cache_clear(cache);
@@ -1126,6 +1126,7 @@ static int cache_clear_everything(lua_State *L)
 	}
 
 	/* Clear reputation tables */
+	struct engine *engine = engine_luaget(L);
 	lru_reset(engine->resolver.cache_rtt);
 	lru_reset(engine->resolver.cache_rep);
 	lru_reset(engine->resolver.cache_cookie);
@@ -1167,11 +1168,7 @@ static void cache_dump(lua_State *L, knot_db_val_t keyval[])
 /** Query cached records.  TODO: fix caveats in ./README.rst documentation? */
 static int cache_get(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
-	if (!kr_cache_is_open(cache)) {
-		return 0;
-	}
+	//struct kr_cache *cache = cache_assert_open(L); // to be fixed soon
 
 	/* Check parameters */
 	int n = lua_gettop(L);
@@ -1257,16 +1254,7 @@ static int cache_zone_import(lua_State *L)
 		goto finish;
 	}
 
-	struct engine *engine = engine_luaget(L);
-	if (!engine) {
-		strncpy(msg, "internal error, empty engine pointer", sizeof(msg));
-		goto finish;
-	}
-	struct kr_cache *cache = &engine->resolver.cache;
-	if (!kr_cache_is_open(cache)) {
-		strncpy(msg, "cache isn't open", sizeof(msg));
-		goto finish;
-	}
+	(void)cache_assert_open(L); /* just check it in advance */
 
 	/* Check parameters */
 	int n = lua_gettop(L);
@@ -1623,7 +1611,7 @@ static int wrk_resolve(lua_State *L)
 	/* Add OPT RR */
 	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
 	if (!pkt->opt_rr) {
-		knot_pkt_free(&pkt);
+		knot_pkt_free(pkt);
 		return kr_error(ENOMEM);
 	}
 	if (options->DNSSEC_WANT) {
@@ -1637,8 +1625,8 @@ static int wrk_resolve(lua_State *L)
 	/* Create task and start with a first question */
 	struct qr_task *task = worker_resolve_start(worker, pkt, *options);
 	if (!task) {
-		knot_rrset_free(&pkt->opt_rr, NULL);
-		knot_pkt_free(&pkt);
+		knot_rrset_free(pkt->opt_rr, NULL);
+		knot_pkt_free(pkt);
 		lua_pushstring(L, "couldn't create a resolution request");
 		lua_error(L);
 	}
@@ -1653,8 +1641,8 @@ static int wrk_resolve(lua_State *L)
 	/* Start execution */
 	int ret = worker_resolve_exec(task, pkt);
 	lua_pushboolean(L, ret == 0);
-	knot_rrset_free(&pkt->opt_rr, NULL);
-	knot_pkt_free(&pkt);
+	knot_rrset_free(pkt->opt_rr, NULL);
+	knot_pkt_free(pkt);
 	return 1;
 }
 

@@ -1,5 +1,5 @@
 ************************
-Knot DNS Resolver daemon
+Knot Resolver daemon
 ************************
 
 The server is in the `daemon` directory, it works out of the box without any configuration.
@@ -87,7 +87,7 @@ This is useful if you're writing a module with a layer, that evaluates an answer
          If not, you can read the `Learn Lua in 15 minutes`_ for a syntax overview. Spending just a few minutes
          will allow you to break from static configuration, write more efficient configuration with iteration, and
          leverage events and hooks. Lua is heavily used for scripting in applications ranging from embedded to game engines,
-         but in DNS world notably in `PowerDNS Recursor`_. Knot DNS Resolver does not simply use Lua modules, but it is
+         but in DNS world notably in `PowerDNS Recursor`_. Knot Resolver does not simply use Lua modules, but it is
          the heart of the daemon for everything from configuration, internal events and user interaction.
 
 Dynamic configuration
@@ -271,8 +271,8 @@ Environment
    :param boolean value: New value for the option *(optional)*
    :return: The (new) value of the option
 
-   If set, resolver will vary the order of resource records within RR-sets
-   every time when answered from cache.  It is disabled by default.
+   If set, resolver will vary the order of resource records within RR-sets.
+   It is disabled by default.
 
 .. function:: user(name, [group])
 
@@ -666,7 +666,7 @@ The daemon provides an interface for dynamic loading of :ref:`daemon modules <mo
 Cache configuration
 ^^^^^^^^^^^^^^^^^^^
 
-The default cache in Knot DNS Resolver is persistent with LMDB backend, this means that the daemon doesn't lose
+The default cache in Knot Resolver is persistent with LMDB backend, this means that the daemon doesn't lose
 the cached data on restart or crash to avoid cold-starts. The cache may be reused between cache
 daemons or manipulated from other processes, making for example synchronised load-balanced recursors possible.
 

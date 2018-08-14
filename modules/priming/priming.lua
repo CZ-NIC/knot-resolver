@@ -1,6 +1,5 @@
 -- Module interface
 local ffi = require('ffi')
-local knot = ffi.load(libknot_SONAME)
 
 local priming = {}
 priming.retry_time = 10 * sec -- retry time when priming fail
@@ -20,9 +19,9 @@ local function publish_hints(nsset)
 	local roothints = kres.context().root_hints
 	-- reset zone cut and clear address list
 	ffi.C.kr_zonecut_set(roothints, kres.str2dname("."))
-	for dname, addresses in pairs(nsset) do
-		for _, rdata_addr in pairs(addresses) do
-			ffi.C.kr_zonecut_add(roothints, dname, rdata_addr)
+	for dname, addrsets in pairs(nsset) do
+		for i = 0, addrsets:rdcount() - 1 do
+			ffi.C.kr_zonecut_add(roothints, dname, addrsets:rdata_pt(i))
 		end
 	end
 end
@@ -30,8 +29,8 @@ end
 -- Count A and AAAA addresses in nsset
 local function count_addresses(nsset)
 	local count = 0
-	for _, addresses in pairs(nsset) do
-		count = count + #addresses
+	for _, addrset in pairs(nsset) do
+		count = count + addrset:rdcount()
 	end
 	return count
 end
@@ -48,13 +47,16 @@ local function address_callback(pkt, req)
 	else
 		local section = pkt:rrsets(kres.section.ANSWER)
 		for i = 1, #section do
-			local rr = section[i]
-			if rr.type == kres.type.A or rr.type == kres.type.AAAA then
-				for k = 0, rr.rrs.rr_count-1 do
-					local rdata = knot.knot_rdataset_at(rr.rrs, k)
-					rdata = ffi.string(rdata, knot.knot_rdata_array_size(knot.knot_rdata_rdlen(rdata)))
-					table.insert(internal.nsset[rr:owner()], rdata)
+			local rrset_new = section[i]
+			if rrset_new.type == kres.type.A or rrset_new.type == kres.type.AAAA then
+				local owner = rrset_new:owner()
+				local rrset_comb = internal.nsset[owner]
+				if rrset_comb == nil then
+					rrset_comb = kres.rrset(nil, rrset_new.type)
+					internal.nsset[owner] = rrset_comb
 				end
+				assert(ffi.istype(kres.rrset, rrset_new))
+				rrset_comb:merge_rdata(rrset_new)
 			end
 		end
 	end
@@ -90,11 +92,9 @@ local function priming_callback(pkt, req)
 		local rr = section[i]
 		if rr.type == kres.type.NS then
 			internal.min_ttl = math.min(internal.min_ttl, rr:ttl())
-			internal.to_resolve = internal.to_resolve + 2 * rr.rrs.rr_count
-			for k = 0, rr.rrs.rr_count-1 do
+			internal.to_resolve = internal.to_resolve + 2 * rr.rrs.count
+			for k = 0, rr.rrs.count-1 do
 				local nsname_text = rr:tostring(k)
-				local nsname_wire = rr:rdata(k)
-				internal.nsset[nsname_wire] = {}
 				resolve(nsname_text, kres.type.A, kres.class.IN, 0, address_callback)
 				resolve(nsname_text, kres.type.AAAA, kres.class.IN, 0, address_callback)
 			end

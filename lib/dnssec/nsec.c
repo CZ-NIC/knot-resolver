@@ -15,6 +15,7 @@
  */
 
 #include <assert.h>
+#include <stdlib.h>
 
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
@@ -22,43 +23,12 @@
 #include <libknot/rrset.h>
 #include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
-#include <dnssec/error.h>
+#include <libdnssec/error.h>
+#include <libdnssec/nsec.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
 
-bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t type)
-{
-	if (!bm || bm_size == 0) {
-		assert(bm);
-		return false;
-	}
-
-	const uint8_t type_hi = (type >> 8);
-	const uint8_t type_lo = (type & 0xff);
-	const uint8_t bitmap_idx = (type_lo >> 3);
-	const uint8_t bitmap_bit_mask = 1 << (7 - (type_lo & 0x07));
-
-	size_t bm_pos = 0;
-	while (bm_pos + 3 <= bm_size) {
-		uint8_t win = bm[bm_pos++];
-		uint8_t win_size = bm[bm_pos++];
-		/* Check remaining window length. */
-		if (win_size < 1 || bm_pos + win_size > bm_size)
-			return false;
-		/* Check that we have a correct window. */
-		if (win == type_hi) {
-			if (bitmap_idx < win_size) {
-				return bm[bm_pos + bitmap_idx] & bitmap_bit_mask;
-			}
-			return false;
-		} else {
-			bm_pos += win_size;
-		}
-	}
-
-	return false;
-}
 
 int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 {
@@ -66,9 +36,9 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 		return kr_error(EINVAL);
 	}
 	const bool parent_side =
-		kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_DNAME)
-		|| (kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_NS)
-		    && !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)
+		dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_DNAME)
+		|| (dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_NS)
+		    && !dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA)
 		);
 	return parent_side ? abs(ENOENT) : kr_ok();
 	/* LATER: after refactoring, probably also check if signer name equals owner,
@@ -90,20 +60,15 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 	}
 
 	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
-#if KNOT_VERSION_HEX < ((2 << 16) | (7 << 8) | 0)
-	const knot_dname_t *next = knot_nsec_next(&nsec->rrs);
-#else
 	/* We have to lower-case it with libknot >= 2.7; see also RFC 6840 5.1. */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
-	int ret = knot_dname_to_wire(next, knot_nsec_next(&nsec->rrs), sizeof(next));
-	if (ret >= 0) {
-		ret = knot_dname_to_lower(next);
-	}
+	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec->rrs.rdata), sizeof(next));
 	if (ret < 0) {
 		assert(!ret);
 		return kr_error(ret);
 	}
-#endif
+	knot_dname_to_lower(next);
+
 	const bool is_last_nsec = knot_dname_cmp(nsec->owner, next) >= 0;
 	const bool in_range = is_last_nsec || knot_dname_cmp(sname, next) < 0;
 	if (!in_range) {
@@ -113,12 +78,12 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 	 * sname might be under delegation from owner and thus
 	 * not in the zone of this NSEC at all.
 	 */
-	if (!knot_dname_is_sub(sname, nsec->owner)) {
+	if (knot_dname_in_bailiwick(sname, nsec->owner) <= 0) {
 		return kr_ok();
 	}
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
+
 	return kr_nsec_children_in_zone_check(bm, bm_size);
 }
 
@@ -239,15 +204,17 @@ static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection
 			continue;
 		}
 
-		for (uint16_t j = 0; j < rrset->rrs.rr_count; ++j) {
-			if (knot_rrsig_type_covered(&rrset->rrs, j) != KNOT_RRTYPE_NSEC) {
+		knot_rdata_t *rdata_j = rrset->rrs.rdata;
+		for (uint16_t j = 0; j < rrset->rrs.count;
+				++j, rdata_j = knot_rdataset_next(rdata_j)) {
+			if (knot_rrsig_type_covered(rdata_j) != KNOT_RRTYPE_NSEC) {
 				continue;
 			}
 
 			if (ret < 0) {
-				ret = knot_rrsig_labels(&rrset->rrs, j);
+				ret = knot_rrsig_labels(rdata_j);
 			} else {
-				if (ret != knot_rrsig_labels(&rrset->rrs, j)) {
+				if (ret != knot_rrsig_labels(rdata_j)) {
 					return kr_error(EINVAL);
 				}
 			}
@@ -264,12 +231,12 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 	if (!bm || !owner) {
 		return kr_error(EINVAL);
 	}
-	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
 		return NO_PROOF;
 	}
 
 	if (type != KNOT_RRTYPE_CNAME
-	    && kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_CNAME)) {
+	    && dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_CNAME)) {
 		return NO_PROOF;
 	}
 	/* Special behavior around zone cuts. */
@@ -281,7 +248,7 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 		 * See RFC4035 5.2, next-to-last paragraph.
 		 * This doesn't apply for root DS as it doesn't exist in DNS hierarchy.
 		 */
-		if (owner[0] != '\0' && kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
+		if (owner[0] != '\0' && dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA)) {
 			return NO_PROOF;
 		}
 		break;
@@ -293,8 +260,8 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 	default:
 		/* Parent-side delegation record isn't authoritative for non-DS;
 		 * see RFC6840 4.1. */
-		if (kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_NS)
-		    && !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
+		if (dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_NS)
+		    && !dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA)) {
 			return NO_PROOF;
 		}
 		/* LATER(opt): perhaps short-circuit test if we repeat it here. */
@@ -317,9 +284,8 @@ static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
 {
 	assert(flags && nsec);
 
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
 	int ret = kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec->owner);
 	if (ret == kr_ok()) {
 		*flags |= FLG_NOEXIST_RRTYPE;
@@ -489,8 +455,6 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
 {
 	int nsec_found = 0;
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	if (!sec) {
 		return kr_error(EINVAL);
@@ -520,15 +484,16 @@ int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
 				continue;
 			}
 			nsec_found = 1;
-			knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+			const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
+			uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
 			if (!bm) {
 				return kr_error(EINVAL);
 			}
-			if (kr_nsec_bitmap_contains_type(bm, bm_size,
+			if (dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_NS) &&
-			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+			    !dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_DS) &&
-			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+			    !dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_SOA)) {
 				/* rfc4035, 5.2 */
 				return kr_ok();
@@ -562,13 +527,12 @@ int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
 	if (!knot_dname_is_equal(nsec->owner, name)) {
 		return kr_error(ENOENT);
 	}
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec_bitmap(&nsec->rrs, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
+	uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
 	if (!bm) {
 		return kr_error(EINVAL);
 	}
-	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
 		return kr_ok();
 	} else {
 		return kr_error(ENOENT);

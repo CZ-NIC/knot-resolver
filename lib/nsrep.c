@@ -102,8 +102,11 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		if (len == sizeof(struct in6_addr)) {
 			is_valid = !(opts.NO_IPV6);
 			favour = FAVOUR_IPV6;
-		} else {
+		} else if (len == sizeof(struct in_addr)) {
 			is_valid = !(opts.NO_IPV4);
+		} else {
+			assert(!EINVAL);
+			is_valid = false;
 		}
 
 		if (!is_valid) {

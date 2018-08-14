@@ -308,12 +308,12 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 	}
 	/* Create empty RR */
 	knot_rrset_t rr;
-	knot_rrset_init(&rr, knot_dname_copy(name, &pkt->mm), rtype, rclass);
+	knot_rrset_init(&rr, knot_dname_copy(name, &pkt->mm), rtype, rclass, ttl);
 	/* Create RDATA
 	 * @warning _NOT_ thread safe.
 	 */
 	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
-	knot_rdata_init(rdata_arr, rdlen, rdata, ttl);
+	knot_rdata_init(rdata_arr, rdlen, rdata);
 	knot_rdataset_add(&rr.rrs, rdata_arr, &pkt->mm);
 	/* Append RR */
 	return knot_pkt_put(pkt, 0, &rr, KNOT_PF_FREE);
@@ -659,8 +659,8 @@ static inline bool rrsets_match(const knot_rrset_t *rr1, const knot_rrset_t *rr2
 {
 	bool match = rr1->type == rr2->type && rr1->rclass == rr2->rclass;
 	if (match && rr2->type == KNOT_RRTYPE_RRSIG) {
-		match = match && knot_rrsig_type_covered(&rr1->rrs, 0)
-				  == knot_rrsig_type_covered(&rr2->rrs, 0);
+		match = match && knot_rrsig_type_covered(rr1->rrs.rdata)
+				  == knot_rrsig_type_covered(rr2->rrs.rdata);
 	}
 	match = match && knot_dname_is_equal(rr1->owner, rr2->owner);
 	return match;
@@ -1009,4 +1009,31 @@ finish:
 	*d = 0; /* the final zero */
 	++d;
 	return d - dst;
+}
+
+void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
+			uint16_t type, uint16_t rclass, uint32_t ttl)
+{
+	assert(rrset);
+	knot_rrset_init(rrset, owner, type, rclass, ttl);
+}
+uint16_t kr_pkt_qclass(const knot_pkt_t *pkt)
+{
+	return knot_pkt_qclass(pkt);
+}
+uint16_t kr_pkt_qtype(const knot_pkt_t *pkt)
+{
+	return knot_pkt_qtype(pkt);
+}
+uint32_t kr_rrsig_sig_inception(const knot_rdata_t *rdata)
+{
+	return knot_rrsig_sig_inception(rdata);
+}
+uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata)
+{
+	return knot_rrsig_sig_expiration(rdata);
+}
+uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata)
+{
+	return knot_rrsig_type_covered(rdata);
 }

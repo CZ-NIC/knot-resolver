@@ -22,15 +22,28 @@ typedef struct {
 	uint16_t compress_ptr[16];
 } knot_rrinfo_t;
 typedef unsigned char knot_dname_t;
-typedef unsigned char knot_rdata_t;
-typedef struct knot_rdataset knot_rdataset_t;
-struct knot_rdataset {
-	uint16_t rr_count;
-	knot_rdata_t *data;
-};
-typedef struct knot_rrset knot_rrset_t;
 typedef struct {
-	struct knot_pkt *pkt;
+	uint16_t len;
+	uint8_t data[];
+} knot_rdata_t;
+typedef struct {
+	uint16_t count;
+	knot_rdata_t *rdata;
+} knot_rdataset_t;
+typedef struct {
+	knot_dname_t *_owner;
+	uint32_t _ttl;
+	uint16_t type;
+	uint16_t rclass;
+	knot_rdataset_t rrs;
+	void *additional;
+} knot_rrset_t;
+typedef struct knot_pkt knot_pkt_t;
+typedef struct {
+	uint8_t *ptr[15];
+} knot_edns_options_t;
+typedef struct {
+	knot_pkt_t *pkt;
 	uint16_t pos;
 	uint16_t count;
 } knot_pktsection_t;
@@ -54,6 +67,7 @@ struct knot_pkt {
 	uint16_t flags;
 	knot_rrset_t *opt_rr;
 	knot_rrset_t *tsig_rr;
+	knot_edns_options_t *edns_opts;
 	struct {
 		uint8_t *pos;
 		size_t len;
@@ -66,7 +80,6 @@ struct knot_pkt {
 	knot_mm_t mm;
 	knot_compr_t compr;
 };
-typedef struct knot_pkt knot_pkt_t;
 typedef struct {
 	void *root;
 	struct knot_mm *pool;
@@ -201,13 +214,9 @@ struct kr_cache {
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
-struct knot_rrset {
-	knot_dname_t *_owner;
-	uint16_t type;
-	uint16_t rclass;
-	knot_rdataset_t rrs;
-	void *additional;
-};
+
+void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
+			uint16_t type, uint16_t rclass, uint32_t ttl);
 struct kr_nsrep {
 	unsigned int score;
 	unsigned int reputation;
@@ -249,35 +258,22 @@ struct kr_context {
 const char *knot_strerror(int);
 knot_dname_t *knot_dname_copy(const knot_dname_t *, knot_mm_t *);
 knot_dname_t *knot_dname_from_str(uint8_t *, const char *, size_t);
+int knot_dname_in_bailiwick(const knot_dname_t *, const knot_dname_t *);
 _Bool knot_dname_is_equal(const knot_dname_t *, const knot_dname_t *);
-_Bool knot_dname_is_sub(const knot_dname_t *, const knot_dname_t *);
-int knot_dname_labels(const uint8_t *, const uint8_t *);
-int knot_dname_size(const knot_dname_t *);
+size_t knot_dname_labels(const uint8_t *, const uint8_t *);
+size_t knot_dname_size(const knot_dname_t *);
 char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
-uint16_t knot_rdata_rdlen(const knot_rdata_t *);
-uint8_t *knot_rdata_data(const knot_rdata_t *);
-size_t knot_rdata_array_size(uint16_t);
-knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, size_t);
+knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, uint16_t);
 int knot_rdataset_merge(knot_rdataset_t *, const knot_rdataset_t *, knot_mm_t *);
-int knot_rrset_add_rdata(knot_rrset_t *, const uint8_t *, const uint16_t, const uint32_t, knot_mm_t *);
-void knot_rrset_init_empty(knot_rrset_t *);
-uint32_t knot_rrset_ttl(const knot_rrset_t *);
+int knot_rrset_add_rdata(knot_rrset_t *, const uint8_t *, uint16_t, knot_mm_t *);
 int knot_rrset_txt_dump(const knot_rrset_t *, char **, size_t *, const knot_dump_style_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
 size_t knot_rrset_size(const knot_rrset_t *);
-uint16_t knot_rrsig_type_covered(const knot_rdataset_t *, size_t);
-uint32_t knot_rrsig_sig_expiration(const knot_rdataset_t *, size_t);
-uint32_t knot_rrsig_sig_inception(const knot_rdataset_t *, size_t);
-const knot_dname_t *knot_pkt_qname(const knot_pkt_t *);
-uint16_t knot_pkt_qtype(const knot_pkt_t *);
-uint16_t knot_pkt_qclass(const knot_pkt_t *);
 int knot_pkt_begin(knot_pkt_t *, knot_section_t);
 int knot_pkt_put_question(knot_pkt_t *, const knot_dname_t *, uint16_t, uint16_t);
-int knot_pkt_put(knot_pkt_t *, uint16_t, const knot_rrset_t *, uint16_t);
-const knot_rrset_t *knot_pkt_rr(const knot_pktsection_t *, uint16_t);
-const knot_pktsection_t *knot_pkt_section(const knot_pkt_t *, knot_section_t);
+int knot_pkt_put_rotate(knot_pkt_t *, uint16_t, const knot_rrset_t *, uint16_t, uint16_t);
 knot_pkt_t *knot_pkt_new(void *, uint16_t, knot_mm_t *);
-void knot_pkt_free(knot_pkt_t **);
+void knot_pkt_free(knot_pkt_t *);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
 struct kr_rplan *kr_resolve_plan(struct kr_request *);
 knot_mm_t *kr_resolve_pool(struct kr_request *);
@@ -292,6 +288,11 @@ void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
 int kr_pkt_recycle(knot_pkt_t *);
 int kr_pkt_clear_payload(knot_pkt_t *);
+uint16_t kr_pkt_qclass(const knot_pkt_t *);
+uint16_t kr_pkt_qtype(const knot_pkt_t *);
+uint32_t kr_rrsig_sig_inception(const knot_rdata_t *);
+uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *);
+uint16_t kr_rrsig_type_covered(const knot_rdata_t *);
 const char *kr_inaddr(const struct sockaddr *);
 int kr_inaddr_family(const struct sockaddr *);
 int kr_inaddr_len(const struct sockaddr *);
@@ -325,4 +326,98 @@ int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset
 int kr_cache_sync(struct kr_cache *);
 int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
+typedef struct {
+	uint8_t bitmap[32];
+	uint8_t length;
+} zs_win_t;
+typedef struct {
+	uint8_t excl_flag;
+	uint16_t addr_family;
+	uint8_t prefix_length;
+} zs_apl_t;
+typedef struct {
+	uint32_t d1;
+	uint32_t d2;
+	uint32_t m1;
+	uint32_t m2;
+	uint32_t s1;
+	uint32_t s2;
+	uint32_t alt;
+	uint64_t siz;
+	uint64_t hp;
+	uint64_t vp;
+	int8_t lat_sign;
+	int8_t long_sign;
+	int8_t alt_sign;
+} zs_loc_t;
+typedef enum {ZS_STATE_NONE, ZS_STATE_DATA, ZS_STATE_ERROR, ZS_STATE_INCLUDE, ZS_STATE_EOF, ZS_STATE_STOP} zs_state_t;
+typedef struct zs_scanner zs_scanner_t;
+struct zs_scanner {
+	int cs;
+	int top;
+	int stack[16];
+	_Bool multiline;
+	uint64_t number64;
+	uint64_t number64_tmp;
+	uint32_t decimals;
+	uint32_t decimal_counter;
+	uint32_t item_length;
+	uint32_t item_length_position;
+	uint8_t *item_length_location;
+	uint32_t buffer_length;
+	uint8_t buffer[65535];
+	char include_filename[65535];
+	char *path;
+	zs_win_t windows[256];
+	int16_t last_window;
+	zs_apl_t apl;
+	zs_loc_t loc;
+	uint8_t addr[16];
+	_Bool long_string;
+	uint8_t *dname;
+	uint32_t *dname_length;
+	uint32_t dname_tmp_length;
+	uint32_t r_data_tail;
+	uint32_t zone_origin_length;
+	uint8_t zone_origin[318];
+	uint16_t default_class;
+	uint32_t default_ttl;
+	zs_state_t state;
+	struct {
+		_Bool automatic;
+		void (*record)(zs_scanner_t *);
+		void (*error)(zs_scanner_t *);
+		void *data;
+	} process;
+	struct {
+		const char *start;
+		const char *current;
+		const char *end;
+		_Bool eof;
+		_Bool mmaped;
+	} input;
+	struct {
+		char *name;
+		int descriptor;
+	} file;
+	struct {
+		int code;
+		uint64_t counter;
+		_Bool fatal;
+	} error;
+	uint64_t line_counter;
+	uint32_t r_owner_length;
+	uint8_t r_owner[318];
+	uint16_t r_class;
+	uint32_t r_ttl;
+	uint16_t r_type;
+	uint32_t r_data_length;
+	uint8_t r_data[65535];
+};
+void zs_deinit(zs_scanner_t *);
+int zs_init(zs_scanner_t *, const char *, const uint16_t, const uint32_t);
+int zs_parse_record(zs_scanner_t *);
+int zs_set_input_file(zs_scanner_t *, const char *);
+int zs_set_input_string(zs_scanner_t *, const char *, size_t);
+const char *zs_strerror(const int);
 ]]

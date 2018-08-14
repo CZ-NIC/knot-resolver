@@ -19,8 +19,8 @@
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
 #include <libknot/packet/wire.h>
-#include <dnssec/key.h>
-#include <dnssec/error.h>
+#include <libdnssec/key.h>
+#include <libdnssec/error.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/ta.h"
@@ -83,12 +83,12 @@ static int insert_ta(map_t *trust_anchors, const knot_dname_t *name,
 	bool is_new_key = false;
 	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, name);
 	if (!ta_rr) {
-		ta_rr = knot_rrset_new(name, KNOT_RRTYPE_DS, KNOT_CLASS_IN, NULL);
+		ta_rr = knot_rrset_new(name, KNOT_RRTYPE_DS, KNOT_CLASS_IN, ttl, NULL);
 		is_new_key = true;
 	}
 	/* Merge-in new key data */
-	if (!ta_rr || (rdlen > 0 && knot_rrset_add_rdata(ta_rr, rdata, rdlen, ttl, NULL) != 0)) {
-		knot_rrset_free(&ta_rr, NULL);
+	if (!ta_rr || (rdlen > 0 && knot_rrset_add_rdata(ta_rr, rdata, rdlen, NULL) != 0)) {
+		knot_rrset_free(ta_rr, NULL);
 		return kr_error(ENOMEM);
 	}
 	if(VERBOSE_STATUS) {
@@ -161,7 +161,7 @@ static int del_record(const char *k, void *v, void *ext)
 {
 	knot_rrset_t *ta_rr = v;
 	if (ta_rr) {
-		knot_rrset_free(&ta_rr, NULL);
+		knot_rrset_free(ta_rr, NULL);
 	}
 	return 0;
 }

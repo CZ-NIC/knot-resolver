@@ -134,7 +134,7 @@ int32_t kr_cache_ttl(const struct kr_cache_p *peek, const struct kr_query *qry,
 /*TODO: reorder*/
 KR_EXPORT
 int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
-			 uint32_t new_ttl, knot_mm_t *pool);
+			 knot_mm_t *pool);
 
 
 /**

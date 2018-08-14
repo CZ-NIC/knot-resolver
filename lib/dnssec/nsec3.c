@@ -17,9 +17,9 @@
 #include <assert.h>
 #include <string.h>
 
-#include <dnssec/binary.h>
-#include <dnssec/error.h>
-#include <dnssec/nsec.h>
+#include <libdnssec/binary.h>
+#include <libdnssec/error.h>
+#include <libdnssec/nsec.h>
 #include <libknot/descriptor.h>
 #include <contrib/base32hex.h>
 #include <libknot/rrset.h>
@@ -54,10 +54,10 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 	/* Every NSEC3 RR contains data from NSEC3PARAMS. */
 	const size_t SALT_OFFSET = 5; /* First 5 octets contain { Alg, Flags, Iterations, Salt length } */
 	dnssec_binary_t rdata = {
-		.size = SALT_OFFSET + (size_t) knot_nsec3_salt_length(&nsec3->rrs, 0),
-		.data = knot_rdata_data(rr),
+		.size = SALT_OFFSET + (size_t)knot_nsec3_salt_len(nsec3->rrs.rdata),
+		.data = /*const-cast*/(uint8_t *)rr->data,
 	};
-	if (rdata.size > knot_rdata_rdlen(rr))
+	if (rdata.size > rr->len)
 		return kr_error(EMSGSIZE);
 
 	int ret = dnssec_nsec3_params_from_rdata(params, &rdata);
@@ -218,9 +218,8 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 		goto fail;
 	}
 
-	uint8_t next_size = 0;
-	uint8_t *next_hash = NULL;
-	knot_nsec3_next_hashed(&nsec3->rrs, 0, &next_hash, &next_size);
+	uint8_t next_size = knot_nsec3_next_len(nsec3->rrs.rdata);
+	const uint8_t *next_hash = knot_nsec3_next(nsec3->rrs.rdata);
 
 	if ((next_size > 0) && (owner_hash.size == next_size) && (name_hash.size == next_size)) {
 		/* All hash lengths must be same. */
@@ -252,7 +251,7 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 		if (covered) {
 			*flags |= FLG_NAME_COVERED;
 
-			uint8_t nsec3_flags = knot_nsec3_flags(&nsec3->rrs, 0);
+			uint8_t nsec3_flags = knot_nsec3_flags(nsec3->rrs.rdata);
 			if (nsec3_flags & ~OPT_OUT_BIT) {
 				/* RFC5155 3.1.2 */
 				ret = kr_error(EINVAL);
@@ -285,7 +284,7 @@ static bool has_optout(const knot_rrset_t *nsec3)
 		return false;
 	}
 
-	uint8_t nsec3_flags = knot_nsec3_flags(&nsec3->rrs, 0);
+	uint8_t nsec3_flags = knot_nsec3_flags(nsec3->rrs.rdata);
 	if (nsec3_flags & ~OPT_OUT_BIT) {
 		/* RFC5155 3.1.2 */
 		return false;
@@ -395,9 +394,8 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
 		 * does not really exist (authoritatively in this zone,
 		 * even in case of opt-out).
 		 */
-		uint8_t *bm = NULL;
-		uint16_t bm_size;
-		knot_nsec3_bitmap(&rrset->rrs, 0, &bm, &bm_size);
+		const uint8_t *bm = knot_nsec3_bitmap(rrset->rrs.rdata);
+		uint16_t bm_size = knot_nsec3_bitmap_len(rrset->rrs.rdata);
 		if (kr_nsec_children_in_zone_check(bm, bm_size) != 0) {
 			continue; /* no fatal errors from bad RRs */
 		}
@@ -461,7 +459,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
  * @param section_id Packet section to be processed.
  * @param encloser   Closest (provable) encloser domain name.
  * @return           0 or error code:
- *                   DNSSEC_OUT_OF_RANGE - NSEC3 RR (that covers a wildcard)
+ *                   KNOT_ERANGE - NSEC3 RR (that covers a wildcard)
  *                   has been found, but has opt-out flag set;
  *                   otherwise - error.
  */
@@ -494,7 +492,7 @@ static int covers_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section_
 		}
 		if (flags & FLG_NAME_COVERED) {
 			return has_optout(rrset) ?
-			       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
+			       kr_error(KNOT_ERANGE) : kr_ok();
 		}
 	}
 
@@ -521,7 +519,7 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
 	 * NSEC3 for wildcard has been found and optout flag is not set.
 	 * Now check if NSEC3 that covers next closer name has opt-out. */
 	return has_optout(covering_next_nsec3) ?
-	       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
+	       kr_error(KNOT_ERANGE) : kr_ok();
 }
 
 /**
@@ -551,9 +549,8 @@ static int nodata_find(const knot_pkt_t *pkt, knot_section_t section_id,
 			/* LATER(optim.): we repeatedly recompute the hash of `name` */
 		}
 
-		uint8_t *bm = NULL;
-		uint16_t bm_size;
-		knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
+		const uint8_t *bm = knot_nsec3_bitmap(nsec3->rrs.rdata);
+		uint16_t bm_size = knot_nsec3_bitmap_len(nsec3->rrs.rdata);
 		if (kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec3->owner) == kr_ok()) {
 			return kr_ok();
 		}
@@ -613,7 +610,7 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 		}
 		if (flags & FLG_NAME_COVERED) {
 			return has_optout(rrset) ?
-			       kr_error(DNSSEC_OUT_OF_RANGE) : kr_ok();
+			       kr_error(KNOT_ERANGE) : kr_ok();
 		}
 	}
 
@@ -651,7 +648,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 			 * in the packet can be properly signed,
 			 * AD bit must not be set due to rfc5155 9.2.
 			 * Return appropriate code to the caller */
-			ret = kr_error(DNSSEC_OUT_OF_RANGE);
+			ret = kr_error(KNOT_ERANGE);
 		}
 		return ret;
 	}
@@ -668,7 +665,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 		 * Denial of existence can not be proven.
 		 * Set error code to proceed unsecure.
 		 */
-		ret = kr_error(DNSSEC_OUT_OF_RANGE);
+		ret = kr_error(KNOT_ERANGE);
 	}
 
 	return ret;
@@ -706,17 +703,16 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 				continue;
 			}
 
-			uint8_t *bm = NULL;
-			uint16_t bm_size = 0;
-			knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
+			const uint8_t *bm = knot_nsec3_bitmap(nsec3->rrs.rdata);
+			uint16_t bm_size = knot_nsec3_bitmap_len(nsec3->rrs.rdata);
 			if (!bm) {
 				return kr_error(EINVAL);
 			}
-			if (kr_nsec_bitmap_contains_type(bm, bm_size,
+			if (dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_NS) &&
-			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+			    !dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_DS) &&
-			    !kr_nsec_bitmap_contains_type(bm, bm_size,
+			    !dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_SOA)) {
 				/* Satisfies rfc5155, 8.9. paragraph 2 */
 				return kr_ok();
@@ -745,7 +741,7 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		}
 
 		if (has_optout(covering_next_nsec3)) {
-			return kr_error(DNSSEC_OUT_OF_RANGE);
+			return kr_error(KNOT_ERANGE);
 		} else {
 			return kr_error(EINVAL);
 		}
@@ -767,13 +763,12 @@ int kr_nsec3_matches_name_and_type(const knot_rrset_t *nsec3,
 	if (ret) {
 		return kr_error(ret);
 	}
-	uint8_t *bm = NULL;
-	uint16_t bm_size = 0;
-	knot_nsec3_bitmap(&nsec3->rrs, 0, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec3_bitmap(nsec3->rrs.rdata);
+	uint16_t bm_size = knot_nsec3_bitmap_len(nsec3->rrs.rdata);
 	if (!bm) {
 		return kr_error(EINVAL);
 	}
-	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
+	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
 		return kr_ok();
 	} else {
 		return kr_error(ENOENT);

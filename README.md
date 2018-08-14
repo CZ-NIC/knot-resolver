@@ -1,11 +1,11 @@
-# Knot DNS Resolver
+# Knot Resolver
 
 [![Build Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/master/pipeline.svg?x)](https://gitlab.labs.nic.cz/knot/knot-resolver/commits/master)
 [![Coverage Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/master/coverage.svg?x)](https://knot.pages.labs.nic.cz/knot-resolver/)
 [![Coverity](https://img.shields.io/coverity/scan/3912.svg)](https://scan.coverity.com/projects/3912)
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
-Knot DNS Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
+Knot Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
 a state-machine like API for extensions. There are three modules built-in - *iterator*, *validator*, *cache*, and a few more are loaded by default. Most of the [rich features](https://knot-resolver.readthedocs.io/en/latest/modules.html) are written in Lua(JIT) and C. Batteries are included, but optional.
 
 The LuaJIT modules, support DNS privacy and DNSSEC, and persistent cache with low memory footprint make it a great personal DNS resolver or a research tool to tap into DNS data. TL;DR it's the [OpenResty][openresty] of DNS.
@@ -35,7 +35,7 @@ Knot Resolver is also available from the following distributions' repositories.
 
 ### Building from sources
 
-Knot DNS Resolver mainly [depends][depends] on Knot DNS libraries, [LuaJIT][luajit] and [libuv][libuv].
+Knot Resolver mainly [depends][depends] on Knot DNS libraries, [LuaJIT][luajit] and [libuv][libuv].
 See the [Building project][depends] documentation page for more information.
 
 ### Docker image
@@ -47,6 +47,7 @@ $ docker run -it cznic/knot-resolver
 ```
 
 See the build page [hub.docker.com/r/cznic/knot-resolver](https://hub.docker.com/r/cznic/knot-resolver/) for more information and options.
+The images are meant as an easy way to try knot-resolver, and they're not designed for production use.
 
 ### Running
 
