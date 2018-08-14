@@ -1,7 +1,7 @@
 # Knot DNS Resolver
 
-[![Build Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/master/pipeline.svg?x)](https://gitlab.labs.nic.cz/knot/knot-resolver/commits/master)
-[![Coverage Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/master/coverage.svg?x)](https://knot.pages.labs.nic.cz/knot-resolver/)
+[![Build Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.labs.nic.cz/knot/knot-resolver/commits/nightly)
+[![Coverage Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://knot.pages.labs.nic.cz/knot-resolver/)
 [![Coverity](https://img.shields.io/coverity/scan/3912.svg)](https://scan.coverity.com/projects/3912)
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
