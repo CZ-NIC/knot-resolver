@@ -833,3 +833,9 @@ trie_val_t* trie_it_val(trie_it_t *it)
 	assert(!isbranch(t));
 	return &t->leaf.val;
 }
+
+bool trie_empty(trie_t *tbl)
+{
+	assert(tbl);
+	return (tbl->weight == 0);
+}

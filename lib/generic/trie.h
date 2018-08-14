@@ -129,3 +129,6 @@ const char* trie_it_key(trie_it_t *it, size_t *len);
 /*! \brief Return pointer to the value of the current element (writable). */
 KR_EXPORT
 trie_val_t* trie_it_val(trie_it_t *it);
+
+KR_EXPORT
+bool trie_empty(trie_t *tbl);
