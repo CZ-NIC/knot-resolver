@@ -104,6 +104,11 @@ local function test_parser()
 	nok(daf.compile('qname ~ {A AAAA} deny'), 'rejects "qname ~ {A AAAA} deny"')
 	nok(daf.compile('qname and'), 'rejects "qname and"')
 	nok(daf.compile('qname A or'), 'rejects "qname A or"')
+	nok(daf.compile('src ~ 192.0.2.0'), 'src only support =')
+
+	-- valid rules
+	ok(daf.compile('src = 192.0.2.0/24 deny'), 'filter on CIDR')
+	ok(daf.compile('dst { 192.0.2.0/32 192.0.2.1 } deny'), 'filter on multiple addresses')
 
 	local filters = {
 		-- test catch all
