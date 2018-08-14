@@ -1,7 +1,7 @@
 Document: knot-resolver
-Title: Knot DNS Resolver documentation
+Title: Knot Resolver documentation
 Author: CZ.NIC labs
-Abstract: Documentation for the Knot DNS resolver,
+Abstract: Documentation for the Knot Resolver,
  including building from source, using the library,
  and configuration and operation of the daemon.
 Section: Network/Communication
