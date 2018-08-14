@@ -1,6 +1,6 @@
-*************************
-Knot DNS Resolver library
-*************************
+*********************
+Knot Resolver library
+*********************
 
 Requirements
 ============

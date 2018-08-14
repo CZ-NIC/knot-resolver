@@ -1,8 +1,8 @@
 .. _modules-implemented:
 
-*************************
-Knot DNS Resolver modules
-*************************
+*********************
+Knot Resolver modules
+*********************
 
 .. contents::
    :depth: 1
