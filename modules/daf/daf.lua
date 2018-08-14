@@ -190,13 +190,37 @@ M.filters = {
 	end,
 	-- Filter on source address
 	src = function (op, arg)
-		if op ~= '=' or #arg ~= 1 then error('address supports only "=" operator with single argument') end
-		return view.rule_src(true, arg[1])
+		if op ~= '=' or #arg == 0 then
+			error('address supports only "=" operator with one or more arguments')
+		end
+
+		local f
+		for _, v in ipairs(arg) do
+			local fa, fb = f, view.rule_src(true, v)
+			if f == nil then
+				f = fb
+			else
+				f = function (req, qry) return fa(req, qry) or fb(req, qry) end
+			end
+		end
+		return f
 	end,
 	-- Filter on destination address
 	dst = function (op, arg)
-		if op ~= '=' or #arg ~= 1 then error('address supports only "=" operator with single argument') end
-		return view.rule_dst(true, arg[1])
+		if op ~= '=' or #arg == 0 then
+			error('address supports only "=" operator with one or more arguments')
+		end
+
+		local f
+		for _, v in ipairs(arg) do
+			local fa, fb = f, view.rule_dst(true, v)
+			if f == nil then
+				f = fb
+			else
+				f = function (req, qry) return fa(req, qry) or fb(req, qry) end
+			end
+		end
+		return f
 	end,
 }
 
