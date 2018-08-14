@@ -22,6 +22,7 @@ Incompatible changes
 Bugfixes
 --------
 - fix multi-process race condition in trust anchor maintenance (!643)
+- ta_sentinel: also consider static trust anchors not managed via RFC 5011
 
 Improvements
 ------------
