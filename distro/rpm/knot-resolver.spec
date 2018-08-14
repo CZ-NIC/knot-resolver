@@ -71,7 +71,7 @@ Requires(preun):	systemd
 Requires(postun):	systemd
 
 %description
-The Knot DNS Resolver is a caching full resolver implementation written in C
+The Knot Resolver is a caching full resolver implementation written in C
 and LuaJIT, including both a resolver library and a daemon. Modular
 architecture of the library keeps the core tiny and efficient, and provides
 a state-machine like API for extensions.
@@ -81,20 +81,20 @@ To start using it, start a single kresd instance:
 $ systemctl start kresd@1.service
 
 %package devel
-Summary:        Development headers for Knot DNS Resolver
+Summary:        Development headers for Knot Resolver
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %description devel
-The package contains development headers for Knot DNS Resolver.
+The package contains development headers for Knot Resolver.
 
 %if 0%{?fedora}
 %package doc
-Summary:        Documentation for Knot DNS Resolver
+Summary:        Documentation for Knot Resolver
 BuildArch:      noarch
 Requires:       %{name} = %{version}-%{release}
 
 %description doc
-Documentation for Knot DNS Resolver
+Documentation for Knot Resolver
 %endif
 
 %prep
@@ -170,7 +170,7 @@ rm -r %{buildroot}%{_libdir}/kdns_modules/{http,http.lua}
 
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
-getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot DNS Resolver" knot-resolver
+getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post
 %systemd_post 'kresd@*.service'

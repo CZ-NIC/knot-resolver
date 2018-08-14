@@ -39,7 +39,7 @@ Depends:
 Recommends:
  knot-resolver-module-http,
 Description: caching, DNSSEC-validating DNS resolver
- The Knot DNS Resolver is a caching full resolver implementation
+ The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
  daemon. Modular architecture of the library keeps the core tiny and
  efficient, and provides a state-machine like API for
@@ -68,7 +68,7 @@ Depends:
 Breaks:
  knot-resolver-module-tinyweb (<< 1.1.0~git20160713-1~),
 Description: HTTP/2 module for Knot Resolver
- The Knot DNS Resolver is a caching full resolver implementation
+ The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
  daemon. Modular architecture of the library keeps the core tiny and
  efficient, and provides a state-machine like API for
@@ -86,7 +86,7 @@ Depends:
  libjs-underscore,
  ${misc:Depends},
 Description: Documentation for Knot Resolver
- The Knot DNS Resolver is a caching full resolver implementation
+ The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
  daemon. Modular architecture of the library keeps the core tiny and
  efficient, and provides a state-machine like API for
@@ -106,7 +106,7 @@ Breaks:
 Replaces:
  knot-resolver (<< 1.5.0-5),
 Description: caching, DNSSEC-validating DNS resolver (shared library)
- The Knot DNS Resolver is a caching full resolver implementation
+ The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
  daemon. Modular architecture of the library keeps the core tiny and
  efficient, and provides a state-machine like API for
@@ -127,7 +127,7 @@ Breaks:
 Replaces:
  knot-resolver (<< 1.5.0-5),
 Description: caching, DNSSEC-validating DNS resolver (shared library development files)
- The Knot DNS Resolver is a caching full resolver implementation
+ The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
  daemon. Modular architecture of the library keeps the core tiny and
  efficient, and provides a state-machine like API for

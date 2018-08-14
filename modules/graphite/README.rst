@@ -3,7 +3,7 @@
 Graphite module
 ---------------
 
-The module sends statistics over the Graphite_ protocol to either Graphite_, Metronome_, InfluxDB_ or any compatible storage. This allows powerful visualization over metrics collected by Knot DNS Resolver. 
+The module sends statistics over the Graphite_ protocol to either Graphite_, Metronome_, InfluxDB_ or any compatible storage. This allows powerful visualization over metrics collected by Knot Resolver.
 
 .. tip:: The Graphite server is challenging to get up and running, InfluxDB_ combined with Grafana_ are much easier, and provide richer set of options and available front-ends. Metronome_ by PowerDNS alternatively provides a mini-graphite server for much simpler setups.
 
