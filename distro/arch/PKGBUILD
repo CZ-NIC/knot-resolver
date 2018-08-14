@@ -13,7 +13,7 @@ options=(debug strip)
 install=install
 depends=('cmocka'
          'gnutls'
-         'knot>=2.6.7'
+         'knot>=2.7.1'
          'libedit'
          'libsystemd'
          'libuv'
