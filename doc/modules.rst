@@ -22,7 +22,7 @@ Knot Resolver modules
 .. include:: ../modules/etcd/README.rst
 .. include:: ../modules/dns64/README.rst
 .. include:: ../modules/renumber/README.rst
-.. include:: ../modules/cookies/README.rst
+.. .. include:: ../modules/cookies/README.rst
 .. include:: ../modules/bogus_log/README.rst
 .. include:: ../modules/workarounds/README.rst
 .. include:: ../modules/dnstap/README.rst
