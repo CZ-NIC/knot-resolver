@@ -514,6 +514,27 @@ obs:devel:
     - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
     - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
 
+pkg:debian:symbols:libkres:
+  variables:
+    LIB_NAME: libkres
+    LIB_ABI: 8
+  stage: deploy
+  #only:
+  #  variables:
+  #    - $OBS_BUILD == "1"
+  #  refs:
+  #    - nightly@knot/knot-resolver
+  except:
+    - master@knot/knot-resolver
+  script:
+    - ln -s distro/deb debian
+    - sed -i "s/__VERSION__/99/g" distro/deb/changelog
+    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIB_ABI -P. -p$LIB_NAME$LIB_ABI
+  allow_failure: true
+  dependencies:
+    - build:linux:amd64
+
+
 # copy snapshot of current master to nightly branch for further processing
 # (this is workaround for missing complex conditions for job limits in Gitlab)
 nightly:copy:
