@@ -90,12 +90,13 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		name_len = knot_dname_to_wire(buf + 2, name, sizeof(buf) - 2);
 		if (name_len < 0) return VAL_EMPTY; /* wants wildcard but doesn't fit */
 		name = buf;
+		name_len += 2;
 	} else {
 		name_len = knot_dname_size(name);
 	}
 	/* Append the NSEC3 hash. */
 	const dnssec_binary_t dname = {
-		.size = knot_dname_size(name),
+		.size = name_len,
 		.data = (uint8_t *)/*const-cast*/name,
 	};
 
@@ -200,7 +201,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	}
 	/* The NSEC3 starts strictly before our target name;
 	 * now check that it still belongs into that zone and chain. */
-	const knot_rdata_t *nsec_p_raw = eh->data + KR_CACHE_RR_COUNT_SIZE
+	const uint8_t *nsec_p_raw = eh->data + KR_CACHE_RR_COUNT_SIZE
 					+ 2 /* RDLENGTH from rfc1034 */;
 	const int nsec_p_len = nsec_p_rdlen(nsec_p_raw);
 	const bool same_chain = key_found.len == hash_off + NSEC3_HASH_LEN
@@ -369,9 +370,8 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 
 		/* Exactly matched NSEC3: two cases, one after another. */
 		const knot_rrset_t *nsec_rr = ans->rrsets[ans_id].set.rr;
-		uint8_t *bm = NULL;
-		uint16_t bm_size = 0;
-		knot_nsec3_bitmap(&nsec_rr->rrs, 0, &bm, &bm_size);
+		const uint8_t *bm = knot_nsec3_bitmap(nsec_rr->rrs.rdata);
+		uint16_t bm_size = knot_nsec3_bitmap_len(nsec_rr->rrs.rdata);
 		assert(bm);
 		if (name_labels == sname_labels) {
 			if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype,
@@ -478,9 +478,8 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	}
 
 	/* The wildcard exists.  Find if it's NODATA - check type bitmap. */
-	uint8_t *bm = NULL;
-	uint16_t bm_size;
-	knot_nsec3_bitmap(&nsec_rr->rrs, 0, &bm, &bm_size);
+	const uint8_t *bm = knot_nsec3_bitmap(nsec_rr->rrs.rdata);
+	uint16_t bm_size = knot_nsec3_bitmap_len(nsec_rr->rrs.rdata);
 	assert(bm);
 	if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) == 0) {
 		/* NODATA proven; just need to add SOA+RRSIG later */

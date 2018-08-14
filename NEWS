@@ -1,8 +1,33 @@
+Knot Resolver 3.0.0 (2018-08-DD)
+================================
+
 Incompatible changes
 --------------------
-- cache: fail lua cache operations if it isn't open (!639)
-  Note that by default cache is open *after* reading the configuration,
-  and older versions were silently doing nothing.
+- cache: fail lua operations if cache isn't open yet (!639)
+  By default cache is opened *after* reading the configuration,
+  and older versions were silently ignoring cache operations.
+  Valid configuration must open cache using `cache.open()` or `cache.size =`
+  before executing cache operations like `cache.clear()`.
+- libknot >= 2.7.1 is required, which brings also larger API changes
+- in case you wrote custom Lua modules, please consult
+  https://knot-resolver.readthedocs.io/en/latest/lib.html#incompatible-changes-since-3-0-0
+- in case you wrote custom C modules, please see compile against
+  Knot DNS 2.7 and adjust your module according to messages from C compiler
+- DNS cookie module (RFC 7873) is not available in this release,
+  it will be later reworked to reflect development in IEFT dnsop working group
+- version module was permanently removed because it was not really used by users;
+  if you want to receive notifications abou new releases please subscribe to
+  https://lists.nic.cz/cgi-bin/mailman/listinfo/knot-resolver-announce
+
+Bugfixes
+--------
+- fix multi-process race condition in trust anchor maintenance (!643)
+
+Improvements
+------------
+- reorder_RR() implementation is brought back
+- bring in performace improvements provided by libknot 2.7
+
 
 Knot Resolver 2.4.1 (2018-08-02)
 ================================
@@ -94,8 +119,8 @@ New features
 ------------
 - cache server unavailability to prevent flooding unreachable servers
   (Please note that caching algorithm needs further optimization
-   and will change in further versions but we need to gather operational
-   experience first.)
+  and will change in further versions but we need to gather operational
+  experience first.)
 
 Bugfixes
 --------
@@ -260,7 +285,7 @@ Regressions
 	<= bad keys, broken trust chain
 - make check
 - a few Deckard tests are broken, probably due to some problems above
-+ unknown ones?
+- also unknown ones?
 
 
 

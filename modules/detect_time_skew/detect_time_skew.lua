@@ -1,6 +1,5 @@
 -- Module interface
 local ffi = require('ffi')
-local knot = ffi.load(libknot_SONAME)
 
 local mod = {}
 local event_id = nil
@@ -23,11 +22,13 @@ local function check_time_callback(pkt, req)
 	local expiration = 0
 	for i = 1, #section do
 		local rr = section[i]
+		assert(rr.type)
 		if rr.type == kres.type.RRSIG then
-			for k = 0, rr.rrs.rr_count - 1 do
+			for k = 0, rr.rrs.count - 1 do
 				seen_rrsigs = seen_rrsigs + 1
-				inception = knot.knot_rrsig_sig_inception(rr.rrs, k)
-				expiration = knot.knot_rrsig_sig_expiration(rr.rrs, k)
+				local rdata = rr:rdata_pt(k)
+				inception = ffi.C.kr_rrsig_sig_inception(rdata)
+				expiration = ffi.C.kr_rrsig_sig_expiration(rdata)
 				if now > expiration then
 					-- possitive value = in the future
 					time_diff = now - expiration

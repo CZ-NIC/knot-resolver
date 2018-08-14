@@ -49,7 +49,7 @@
 #include <uv.h>
 #include <ucw/mempool.h>
 #include <libknot/rrset.h>
-#include <zscanner/scanner.h>
+#include <libzscanner/scanner.h>
 
 #include "lib/utils.h"
 #include "lib/dnssec/ta.h"
@@ -290,8 +290,10 @@ static int zi_put_glue(zone_import_ctx_t *z_import, knot_pkt_t *pkt,
 			     knot_rrset_t *rr)
 {
 	int err = 0;
-	for (uint16_t i = 0; i < rr->rrs.rr_count; ++i) {
-		const knot_dname_t *ns_name = knot_ns_name(&rr->rrs, i);
+	knot_rdata_t *rdata_i = rr->rrs.rdata;
+	for (uint16_t i = 0; i < rr->rrs.count;
+			++i, rdata_i = knot_rdataset_next(rdata_i)) {
+		const knot_dname_t *ns_name = knot_ns_name(rdata_i);
 		err = zi_rrset_find_put(z_import, pkt, ns_name,
 					rr->rclass, KNOT_RRTYPE_A, 0);
 		if (err < 0) {
@@ -325,7 +327,7 @@ static knot_pkt_t *zi_query_create(zone_import_ctx_t *z_import, knot_rrset_t *rr
 	knot_wire_set_id(query->wire, msgid);
 	int err = knot_pkt_parse(query, 0);
 	if (err != KNOT_EOK) {
-		knot_pkt_free(&query);
+		knot_pkt_free(query);
 		return NULL;
 	}
 
@@ -354,7 +356,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	/* Create "pseudo answer". */
 	knot_pkt_t *answer = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
 	if (!answer) {
-		knot_pkt_free(&query);
+		knot_pkt_free(query);
 		return -1;
 	}
 	knot_pkt_put_question(answer, dname, rrclass, rrtype);
@@ -369,8 +371,8 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	 * resolving - qr_task & request_ctx. */
 	struct qr_task *task = worker_resolve_start(worker, query, options);
 	if (!task) {
-		knot_pkt_free(&query);
-		knot_pkt_free(&answer);
+		knot_pkt_free(query);
+		knot_pkt_free(answer);
 		return -1;
 	}
 
@@ -443,8 +445,8 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 
 cleanup:
 
-	knot_pkt_free(&query);
-	knot_pkt_free(&answer);
+	knot_pkt_free(query);
+	knot_pkt_free(answer);
 	worker_task_finalize(task, state);
 	return state == (is_referral ? KR_STATE_PRODUCE : KR_STATE_DONE) ? 0 : -1;
 }
@@ -633,14 +635,14 @@ static int zi_record_store(zs_scanner_t *s)
 	zone_import_ctx_t *z_import = (zone_import_ctx_t *)s->process.data;
 
 	knot_rrset_t *new_rr = knot_rrset_new(s->r_owner, s->r_type, s->r_class,
-					      &z_import->pool);
+					      s->r_ttl, &z_import->pool);
 	if (!new_rr) {
 		kr_log_error("[zscanner] line %"PRIu64": error creating rrset\n",
 				s->line_counter);
 		return -1;
 	}
 	int res = knot_rrset_add_rdata(new_rr, s->r_data, s->r_data_length,
-				       s->r_ttl, &z_import->pool);
+				       &z_import->pool);
 	if (res != KNOT_EOK) {
 		kr_log_error("[zscanner] line %"PRIu64": error adding rdata to rrset\n",
 				s->line_counter);

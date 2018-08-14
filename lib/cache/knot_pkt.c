@@ -71,13 +71,13 @@ static int pkt_alloc_space(knot_pkt_t *pkt, int count)
 int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 {
 	/* allocate space, to be sure */
-	int rrset_cnt = (rrset->set.rr->rrs.rr_count > 0) + (rrset->sig_rds.rr_count > 0);
+	int rrset_cnt = (rrset->set.rr->rrs.count > 0) + (rrset->sig_rds.count > 0);
 	int ret = pkt_alloc_space(pkt, rrset_cnt);
 	if (ret) return kr_error(ret);
 	/* write both sets */
 	const knot_rdataset_t *rdss[2] = { &rrset->set.rr->rrs, &rrset->sig_rds };
 	for (int i = 0; i < rrset_cnt; ++i) {
-		assert(rdss[i]->rr_count);
+		assert(rdss[i]->count);
 		/* allocate rank */
 		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
 		if (!rr_rank) return kr_error(ENOMEM);
@@ -91,6 +91,7 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 			pkt->rr[pkt->rrset_count] = (knot_rrset_t){
 				.owner = knot_dname_copy(rrset->set.rr->owner, &pkt->mm),
 					/* ^^ well, another copy isn't really needed */
+				.ttl = rrset->set.rr->ttl,
 				.type = KNOT_RRTYPE_RRSIG,
 				.rclass = KNOT_CLASS_IN,
 				.rrs = *rdss[i],

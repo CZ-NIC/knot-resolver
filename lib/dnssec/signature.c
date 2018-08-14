@@ -18,9 +18,9 @@
 #include <assert.h>
 #include <string.h>
 
-#include <dnssec/error.h>
-#include <dnssec/key.h>
-#include <dnssec/sign.h>
+#include <libdnssec/error.h>
+#include <libdnssec/key.h>
+#include <libdnssec/sign.h>
 #include <libknot/descriptor.h>
 #include <libknot/packet/rrset-wire.h>
 #include <libknot/packet/wire.h>
@@ -64,17 +64,17 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 
 	/* Try all possible DS records */
 	int ret = 0;
-	knot_rdata_t *rd = ref->rrs.data;
-	for (uint16_t i = 0; i < ref->rrs.rr_count; ++i) {
+	knot_rdata_t *rd = ref->rrs.rdata;
+	for (uint16_t i = 0; i < ref->rrs.count; ++i) {
 		dnssec_binary_t ds_rdata = {
-			.size = knot_rdata_rdlen(rd),
-			.data = knot_rdata_data(rd)
+			.size = rd->len,
+			.data = rd->data
 		};
-		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(&ref->rrs, i));
+		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(rd));
 		if (ret == 0) { /* Found a good DS */
 			return kr_ok();
 		}
-		rd = kr_rdataset_next(rd);
+		rd = knot_rdataset_next(rd);
 	}
 
 	return kr_error(ret);
@@ -206,7 +206,7 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 	 * for each RR in covered.
 	 */
 	uint8_t *beginp = wire_buffer;
-	for (uint16_t i = 0; i < covered->rrs.rr_count; ++i) {
+	for (uint16_t i = 0; i < covered->rrs.count; ++i) {
 		/* RR(i) = name | type | class | OrigTTL | RDATA length | RDATA */
 		for (int j = 0; j < trim_labels; ++j) {
 			assert(beginp[0]);
@@ -263,19 +263,20 @@ static int sign_ctx_add_data(dnssec_sign_ctx_t *ctx, const uint8_t *rrsig_rdata,
 	return sign_ctx_add_records(ctx, covered, orig_ttl, trim_labels);
 }
 
-int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
+int kr_check_signature(const knot_rdata_t *rrsig,
                        const dnssec_key_t *key, const knot_rrset_t *covered,
                        int trim_labels)
 {
-	if (!rrsigs || !key || !dnssec_key_can_verify(key)) {
+	if (!rrsig || !key || !dnssec_key_can_verify(key)) {
 		return kr_error(EINVAL);
 	}
 
 	int ret = 0;
 	dnssec_sign_ctx_t *sign_ctx = NULL;
-	dnssec_binary_t signature = { 0, NULL };
-
-	knot_rrsig_signature(&rrsigs->rrs, pos, &signature.data, &signature.size);
+	dnssec_binary_t signature = {
+		.data = /*const-cast*/(uint8_t*)knot_rrsig_signature(rrsig),
+		.size = knot_rrsig_signature_len(rrsig),
+	};
 	if (!signature.data || !signature.size) {
 		ret = kr_error(EINVAL);
 		goto fail;
@@ -286,11 +287,9 @@ int kr_check_signature(const knot_rrset_t *rrsigs, size_t pos,
 		goto fail;
 	}
 
-	uint32_t orig_ttl = knot_rrsig_original_ttl(&rrsigs->rrs, pos);
-	const knot_rdata_t *rr_data = knot_rdataset_at(&rrsigs->rrs, pos);
-	uint8_t *rdata = knot_rdata_data(rr_data);
+	uint32_t orig_ttl = knot_rrsig_original_ttl(rrsig);
 
-	if (sign_ctx_add_data(sign_ctx, rdata, covered, orig_ttl, trim_labels) != 0) {
+	if (sign_ctx_add_data(sign_ctx, rrsig->data, covered, orig_ttl, trim_labels) != 0) {
 		ret = kr_error(ENOMEM);
 		goto fail;
 	}

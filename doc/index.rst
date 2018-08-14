@@ -14,6 +14,7 @@ and it provides a state-machine like API for extensions.
    build
    lib
    modules_api
+   NEWS
 
 
 Indices and tables
