@@ -131,7 +131,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 KR_EXPORT
 int32_t kr_cache_ttl(const struct kr_cache_p *peek, const struct kr_query *qry,
 		     const knot_dname_t *name, uint16_t type);
-/*TODO: reorder*/
+
 KR_EXPORT
 int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
 			 knot_mm_t *pool);
@@ -143,8 +143,8 @@ int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
  * @param name dname
  * @param type rr type
  * @return 0 or an errcode
- * @note only "exact hits" are considered ATM, moreover xNAME records
- * 	are "hidden" as NS. (see comments in struct entry_h)
+ * @note only "exact hits" are considered ATM, and
+ * 	some other information may be removed alongside.
  */
 KR_EXPORT
 int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t type);
@@ -170,6 +170,15 @@ int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
 KR_EXPORT
 int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
 			    bool exact_name, int maxcount);
+
+/**
+ * Find the closest cached zone apex for a name (in cache).
+ * @param is_DS start searching one name higher
+ * @return the number of labels to remove from the name, or negative error code
+ * @note timestamp is found by a syscall, and stale-serving is not considered
+ */
+KR_EXPORT
+int kr_cache_closest_apex(struct kr_cache *cache, const knot_dname_t *name, bool is_DS);
 
 /**
  * Unpack dname and type from db key
