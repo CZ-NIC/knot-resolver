@@ -334,7 +334,6 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 
 	/* See https://gnutls.org/manual/html_node/Data-transfer-and-termination.html#Data-transfer-and-termination */
 	int submitted = 0;
-	uint64_t retrying_start = 0;
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->tls_session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
 		if (count == GNUTLS_E_AGAIN) {
