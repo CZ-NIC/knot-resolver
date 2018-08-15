@@ -173,7 +173,7 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 		if maxcount or callback
 			then error('cache.clear(): maxcount and callback parameters not supported with rr_type') end
 		local ret = ffi.C.kr_cache_remove(kres.context().cache, dname, rr_type)
-		if ret ~= 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
+		if ret < 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
 		return true
 	end
 	if maxcount == nil then maxcount = 100 end

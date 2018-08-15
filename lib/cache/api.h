@@ -142,7 +142,7 @@ int kr_cache_materialize(knot_rdataset_t *dst, const struct kr_cache_p *ref,
  * @param cache cache structure
  * @param name dname
  * @param type rr type
- * @return 0 or an errcode
+ * @return number of deleted records, or negative error code
  * @note only "exact hits" are considered ATM, and
  * 	some other information may be removed alongside.
  */
