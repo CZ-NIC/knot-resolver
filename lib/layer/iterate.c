@@ -1068,8 +1068,8 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	} else if (knot_wire_get_tc(pkt->wire)) {
 		VERBOSE_MSG("<= truncated response, failover to TCP\n");
 		if (query) {
-			/* Fail if already on TCP. */
-			if (query->flags.TCP) {
+			/* Fail if already on TCP or doesn't support TCP. */
+			if (query->flags.TCP || (query->ns.reputation & KR_NS_NOTCP)) {
 				VERBOSE_MSG("<= TC=1 with TCP, bailing out\n");
 				return resolve_error(pkt, req);
 			}
