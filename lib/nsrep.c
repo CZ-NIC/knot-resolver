@@ -342,7 +342,8 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 	}
 	trie_it_free(it);
 
-	if (qry->ns.score <= KR_NS_MAX_SCORE && qry->ns.score >= KR_NS_LONG) {
+	if (qry->ns.score <= KR_NS_MAX_SCORE && qry->ns.score >= KR_NS_LONG
+		&& !(qry->ns.reputation & KR_NS_NOTCP)) {
 		/* This is a low-reliability probe,
 		 * go with TCP to get ICMP reachability check. */
 		qry->flags.TCP = true;

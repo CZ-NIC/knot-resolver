@@ -919,7 +919,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	}
 	bool tried_tcp = (qry->flags.TCP);
 	if (!packet || packet->size == 0) {
-		if (tried_tcp) {
+		if (tried_tcp || (qry->ns.reputation & KR_NS_NOTCP)) {
 			request->state = KR_STATE_FAIL;
 		} else {
 			qry->flags.TCP = true;
