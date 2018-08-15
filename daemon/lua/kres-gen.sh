@@ -181,10 +181,11 @@ EOF
 	kr_dnssec_key_tag
 	kr_dnssec_key_match
 # Cache
+	kr_cache_closest_apex
 	kr_cache_insert_rr
-	kr_cache_sync
 	kr_cache_remove
 	kr_cache_remove_subtree
+	kr_cache_sync
 EOF
 
 
