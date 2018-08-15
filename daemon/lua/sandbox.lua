@@ -166,34 +166,61 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 	if exact_name == nil then exact_name = false end
 	if type(exact_name) ~= 'boolean'
 		then error('cache.clear(): incorrect exact_name passed') end
+
+	local cach = kres.context().cache;
+	local err_list = {}
+	local err_str = ''
+	local apex_dist = ffi.C.kr_cache_closest_apex(cach, dname, false)
+	if apex_dist < 0 then error(ffi.string(ffi.C.knot_strerror(apex_dist))) end
+	if apex_dist > 0 then
+		table.insert(err_list, 'not_apex')
+		err_str = err_str .. 'Negative proofs not cleared, call clear again '
+					.. tostring(apex_dist) .. ' label(s) higher.\n'
+	end
+
 	if rr_type ~= nil then
 		-- Special case, without any subtree searching.
 		if not exact_name
 			then error('cache.clear(): specifying rr_type only supported with exact_name') end
 		if maxcount or callback
 			then error('cache.clear(): maxcount and callback parameters not supported with rr_type') end
-		local ret = ffi.C.kr_cache_remove(kres.context().cache, dname, rr_type)
+		local ret = ffi.C.kr_cache_remove(cach, dname, rr_type)
 		if ret < 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
 		return true
 	end
+
 	if maxcount == nil then maxcount = 100 end
 	if type(maxcount) ~= 'number' or maxcount <= 0
 		then error('cache.clear(): maxcount has to be a positive integer') end
+
+	-- Do the C call, and add maxcount warning.
+	local ret = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, maxcount)
+	if ret == maxcount then
+		table.insert(err_list, 'count_limit')
+		err_str = err_str .. 'Limit of ' .. tostring(maxcount)
+				.. ' entries reached'
+		if callback == nil then
+			err_str = err_str .. '; the default callback will continue asynchronously.\n'
+		else
+			err_str = err_str .. '.\n'
+		end
+	end
+
 	-- Default callback function: repeat after 1ms
 	if callback == nil then callback =
-		function (ret, name, exact_name, rr_type, maxcount, callback)
-			if ret < 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
-			if (ret < maxcount) then return true end
+		function (cbret, cbname, cbexact_name, cbrr_type, cbmaxcount, cbself)
+			if cbret < 0 then error(ffi.string(ffi.C.knot_strerror(cbret))) end
+			if (cbret < cbmaxcount) then return true end
 			event.after(1, function ()
-					cache.clear(name, exact_name, rr_type, maxcount, callback)
+					cache.clear(cbname, cbexact_name, cbrr_type, cbmaxcount, cbself)
 				end)
 			return false
 		end
 	end
+	local cbret = callback(ret, name, exact_name, rr_type, maxcount, callback)
 
-	-- Do the C call and callback.
-	local ret = ffi.C.kr_cache_remove_subtree(kres.context().cache, dname, exact_name, maxcount)
-	return callback(ret, name, exact_name, rr_type, maxcount, callback)
+	if #err_list == 0 then err_list = nil; err_str = nil; end;
+	return cbret, err_list, err_str
 end
 -- Syntactic sugar for cache
 -- `cache[x] -> cache.get(x)`
