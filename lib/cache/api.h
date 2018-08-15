@@ -166,6 +166,7 @@ int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
 
 /**
  * Remove a subtree in cache.  It's like _match but removing them instead of returning.
+ * @return number of deleted entries or an errcode
  */
 KR_EXPORT
 int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
