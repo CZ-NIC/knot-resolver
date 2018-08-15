@@ -924,7 +924,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		}
 	} else {
 		/* Packet cleared, derandomize QNAME. */
-		knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(packet);
+		knot_dname_t *qname_raw = knot_pkt_qname(packet);
 		if (qname_raw && qry->secret != 0) {
 			randomized_qname_case(qname_raw, qry->secret);
 		}
@@ -1474,7 +1474,7 @@ ns_election:
 	/* Randomize query case (if not in safemode or turned off) */
 	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)
 			? 0 : kr_rand_uint(0);
-	knot_dname_t *qname_raw = (knot_dname_t *)knot_pkt_qname(packet);
+	knot_dname_t *qname_raw = knot_pkt_qname(packet);
 	randomized_qname_case(qname_raw, qry->secret);
 
 	/*
