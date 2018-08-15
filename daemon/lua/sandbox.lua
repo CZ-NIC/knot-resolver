@@ -168,14 +168,12 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 		then error('cache.clear(): incorrect exact_name passed') end
 
 	local cach = kres.context().cache;
-	local err_list = {}
-	local err_str = ''
+	local errors = {}
 	local apex_dist = ffi.C.kr_cache_closest_apex(cach, dname, false)
 	if apex_dist < 0 then error(ffi.string(ffi.C.knot_strerror(apex_dist))) end
 	if apex_dist > 0 then
-		table.insert(err_list, 'not_apex')
-		err_str = err_str .. 'Negative proofs not cleared, call clear again '
-					.. tostring(apex_dist) .. ' label(s) higher.\n'
+		errors.not_apex = 'Negative proofs not cleared, call clear again '
+						.. tostring(apex_dist) .. ' label(s) higher.'
 	end
 
 	if rr_type ~= nil then
@@ -196,14 +194,12 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 	-- Do the C call, and add maxcount warning.
 	local ret = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, maxcount)
 	if ret == maxcount then
-		table.insert(err_list, 'count_limit')
-		err_str = err_str .. 'Limit of ' .. tostring(maxcount)
-				.. ' entries reached'
+		local msg_extra = ''
 		if callback == nil then
-			err_str = err_str .. '; the default callback will continue asynchronously.\n'
-		else
-			err_str = err_str .. '.\n'
+			msg_extra = '; the default callback will continue asynchronously'
 		end
+		errors.count_limit = 'Limit of ' .. tostring(maxcount) .. ' entries reached'
+							.. msg_extra .. '.'
 	end
 
 	-- Default callback function: repeat after 1ms
@@ -217,10 +213,8 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 			return false
 		end
 	end
-	local cbret = callback(ret, name, exact_name, rr_type, maxcount, callback)
-
-	if #err_list == 0 then err_list = nil; err_str = nil; end;
-	return cbret, err_list, err_str
+	errors.ret = callback(ret, name, exact_name, rr_type, maxcount, callback)
+	return errors
 end
 -- Syntactic sugar for cache
 -- `cache[x] -> cache.get(x)`
@@ -342,7 +336,7 @@ function table_print (tt, indent, done)
 			if c >= 0x20 and c < 0x7f then table.insert(bytes, string.char(c))
 			else                           table.insert(bytes, '\\'..tostring(c))
 			end
-			if i > 50 then table.insert(bytes, '...') break end
+			if i > 70 then table.insert(bytes, '...') break end
 		end
 		return table.concat(bytes)
 	end
