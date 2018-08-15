@@ -552,14 +552,19 @@ static int cdb_remove(knot_db_t *db, knot_db_val_t keys[], int maxcount)
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
 	int ret = txn_get(env, &txn, false);
+	int deleted = 0;
 
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
 		MDB_val _key = val_knot2mdb(keys[i]);
 		MDB_val val = { 0, NULL };
 		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, &val));
+		if (ret == kr_ok())
+			deleted++;
+		else if (ret == KNOT_ENOENT)
+			ret = kr_ok();  /* skip over non-existing entries */
 	}
 
-	return ret;
+	return ret < 0 ? ret : deleted;
 }
 
 static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t keyval[][2], int maxcount)
