@@ -168,14 +168,17 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 		then error('cache.clear(): incorrect exact_name passed') end
 
 	local cach = kres.context().cache;
-	local err_list = {}
-	local err_str = ''
-	local apex_dist = ffi.C.kr_cache_closest_apex(cach, dname, false)
-	if apex_dist < 0 then error(ffi.string(ffi.C.knot_strerror(apex_dist))) end
-	if apex_dist > 0 then
-		table.insert(err_list, 'not_apex')
-		err_str = err_str .. 'Negative proofs not cleared, call clear again '
-					.. tostring(apex_dist) .. ' label(s) higher.\n'
+	local errors = {}
+	-- Apex warning.  If the caller passes a custom callback,
+	-- we assume they are advanced enough not to need the check.
+	-- The point is to avoid repeating the check in each callback iteration.
+	if callback == nil then
+		local apex_dist = ffi.C.kr_cache_closest_apex(cach, dname, false)
+		if apex_dist < 0 then error(ffi.string(ffi.C.knot_strerror(apex_dist))) end
+		if apex_dist > 0 then
+			errors.not_apex = 'Negative proofs not cleared, call clear again '
+							.. tostring(apex_dist) .. ' label(s) higher.'
+		end
 	end
 
 	if rr_type ~= nil then
@@ -194,33 +197,28 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 		then error('cache.clear(): maxcount has to be a positive integer') end
 
 	-- Do the C call, and add maxcount warning.
-	local ret = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, maxcount)
-	if ret == maxcount then
-		table.insert(err_list, 'count_limit')
-		err_str = err_str .. 'Limit of ' .. tostring(maxcount)
-				.. ' entries reached'
+	errors.count = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, maxcount)
+	if errors.count == maxcount then
+		local msg_extra = ''
 		if callback == nil then
-			err_str = err_str .. '; the default callback will continue asynchronously.\n'
-		else
-			err_str = err_str .. '.\n'
+			msg_extra = '; the default callback will continue asynchronously'
 		end
+		errors.count_limit = 'Limit of ' .. tostring(maxcount) .. ' entries reached'
+							.. msg_extra .. '.'
 	end
 
 	-- Default callback function: repeat after 1ms
 	if callback == nil then callback =
-		function (cbret, cbname, cbexact_name, cbrr_type, cbmaxcount, cbself)
-			if cbret < 0 then error(ffi.string(ffi.C.knot_strerror(cbret))) end
-			if (cbret < cbmaxcount) then return true end
+		function (cberrors, cbname, cbexact_name, cbrr_type, cbmaxcount, cbself)
+			if errors.count < 0 then error(ffi.string(ffi.C.knot_strerror(errors.count))) end
+			if (errors.count ~= cbmaxcount) then return end
 			event.after(1, function ()
 					cache.clear(cbname, cbexact_name, cbrr_type, cbmaxcount, cbself)
 				end)
-			return false
 		end
 	end
-	local cbret = callback(ret, name, exact_name, rr_type, maxcount, callback)
-
-	if #err_list == 0 then err_list = nil; err_str = nil; end;
-	return cbret, err_list, err_str
+	callback(errors, name, exact_name, rr_type, maxcount, callback)
+	return errors
 end
 -- Syntactic sugar for cache
 -- `cache[x] -> cache.get(x)`
@@ -342,7 +340,7 @@ function table_print (tt, indent, done)
 			if c >= 0x20 and c < 0x7f then table.insert(bytes, string.char(c))
 			else                           table.insert(bytes, '\\'..tostring(c))
 			end
-			if i > 50 then table.insert(bytes, '...') break end
+			if i > 70 then table.insert(bytes, '...') break end
 		end
 		return table.concat(bytes)
 	end
