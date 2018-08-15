@@ -1062,6 +1062,20 @@ static int session_next_waiting_send(struct session *session)
 	return ret;
 }
 
+static struct kr_query *session_current_query(struct session *session)
+{
+	if (session->waiting.len == 0) {
+		return NULL;
+	}
+
+	struct qr_task *task = session->waiting.at[0];
+	if (task->ctx->req.rplan.pending.len == 0) {
+		return NULL;
+	}
+
+	return array_tail(task->ctx->req.rplan.pending);
+}
+
 static int session_tls_hs_cb(struct session *session, int status)
 {
 	struct worker_ctx *worker = get_worker();
@@ -1069,10 +1083,14 @@ static int session_tls_hs_cb(struct session *session, int status)
 	int deletion_res = worker_del_tcp_waiting(worker, &peer->ip);
 	int ret = kr_ok();
 
-	if (status) {
-		kr_nsrep_update_rtt(NULL, &peer->ip, KR_NS_DEAD,
-				    worker->engine->resolver.cache_rtt,
-				    KR_NS_UPDATE_NORESET);
+	struct kr_query *qry = session_current_query(session);
+	if (status != 0) {
+		struct kr_context *ctx = &worker->engine->resolver;
+		/* Flag TCP as unsupported status */
+		qry->ns.reputation |= KR_NS_NOTCP;
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+		/* Penalize servers unresponsive over TCP */
+		kr_nsrep_update_rtt(&qry->ns, &peer->ip, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
 		return ret;
 	}
 
@@ -1139,20 +1157,6 @@ static int session_tls_hs_cb(struct session *session, int status)
 	return kr_ok();
 }
 
-static struct kr_query *session_current_query(struct session *session)
-{
-	if (session->waiting.len == 0) {
-		return NULL;
-	}
-
-	struct qr_task *task = session->waiting.at[0];
-	if (task->ctx->req.rplan.pending.len == 0) {
-		return NULL;
-	}
-
-	return array_tail(task->ctx->req.rplan.pending);
-}
-
 static void on_connect(uv_connect_t *req, int status)
 {
 	struct worker_ctx *worker = get_worker();
@@ -1176,7 +1180,18 @@ static void on_connect(uv_connect_t *req, int status)
 
 	uv_timer_stop(&session->timeout);
 
+	struct kr_query *qry = session_current_query(session);
 	if (status != 0) {
+		struct kr_context *ctx = &worker->engine->resolver;
+		WITH_VERBOSE (qry) {
+			char addr_str[INET6_ADDRSTRLEN];
+			inet_ntop(session->peer.ip.sa_family, kr_inaddr(&session->peer.ip),
+				  addr_str, sizeof(addr_str));
+			VERBOSE_MSG(qry, "=> failed to connect to '%s'\n", addr_str);
+		}
+		/* Flag TCP as unsupported status */
+		qry->ns.reputation |= KR_NS_NOTCP;
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 		worker_del_tcp_waiting(worker, &peer->ip);
 		while (session->waiting.len > 0) {
 			struct qr_task *task = session->waiting.at[0];
@@ -1214,7 +1229,6 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 	}
 
-	struct kr_query *qry = session_current_query(session);
 	WITH_VERBOSE (qry) {
 		char addr_str[INET6_ADDRSTRLEN];
 		inet_ntop(session->peer.ip.sa_family, kr_inaddr(&session->peer.ip),
@@ -1224,6 +1238,13 @@ static void on_connect(uv_connect_t *req, int status)
 
 	session->connected = true;
 	session->handle = (uv_handle_t *)handle;
+
+	/* Flag TCP as supported */
+	if (qry->ns.reputation & KR_NS_NOTCP) {
+		struct kr_context *ctx = &worker->engine->resolver;
+		qry->ns.reputation &= ~KR_NS_NOTCP;
+		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+	}
 
 	int ret = kr_ok();
 	if (session->has_tls) {
