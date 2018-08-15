@@ -775,7 +775,13 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t t
 	if (ret) return kr_error(ret);
 
 	knot_db_val_t key = key_exact_type(k, type);
-	return cache_op(cache, remove, &key, 1);
+	ret = cache_op(cache, remove, &key, 1);
+	switch (ret) {
+		case 0: return 1;
+		case -ABS(ENOENT): return 0;
+		default: return ret;
+	}
+
 }
 
 int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
