@@ -775,13 +775,7 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t t
 	if (ret) return kr_error(ret);
 
 	knot_db_val_t key = key_exact_type(k, type);
-	ret = cache_op(cache, remove, &key, 1);
-	switch (ret) {
-		case 0: return 1;
-		case -ABS(ENOENT): return 0;
-		default: return ret;
-	}
-
+	return cache_op(cache, remove, &key, 1);
 }
 
 int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
@@ -852,8 +846,8 @@ int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
 
 	knot_db_val_t keyval[maxcount][2], keys[maxcount];
 	int ret = kr_cache_match(cache, name, exact_name, keyval, maxcount);
-	if (ret < 0) {
-		return ret;
+	if (ret <= 0) { /* ENOENT -> nothing to remove */
+		return (ret == KNOT_ENOENT) ? 0 : ret;
 	}
 	const int count = ret;
 	/* Duplicate the key strings, as deletion may invalidate the pointers. */
@@ -874,6 +868,6 @@ cleanup:
 	while (--i >= 0) {
 		free(keys[i].data);
 	}
-	return ret ? ret : count;
+	return ret;
 }
 
