@@ -864,7 +864,7 @@ daemons or manipulated from other processes, making for example synchronised loa
          [AAAA] => true
      }
 
-.. function:: cache.clear([name], [exact_name], [rr_type], [maxcount], [callback])
+.. function:: cache.clear([name], [exact_name], [rr_type], [chunk_size], [callback])
 
   Purge cache records.
 
@@ -873,16 +873,17 @@ daemons or manipulated from other processes, making for example synchronised loa
   :param string name: if the name isn't provided, whole cache is purged
         (and any other parameters are disregarded).
         Otherwise only records in that subtree are removed.
-  :param bool exact_name: if set to ``true``, only records with *the same* name are removed.
+  :param bool exact_name: if set to ``true``, only records with *the same* name are removed;
+                          default: false.
   :param kres.type rr_type: you may additionally specify the type to remove,
-        but that is only supported with ``exact_name == true``.
-  :param integer maxcount: the number of records to remove at one go, default: 100.
-        The purpose is not to block the resolver for long;
-        the ``callback`` parameter by default handles this by asynchronous repetition.
+        but that is only supported with ``exact_name == true``; default: nil;
+  :param integer chunk_size: the number of records to remove at one go; default: 100.
+        The purpose is not to block the resolver for long.
+        The default ``callback`` repeats the command after one millisecond
+        until all matching data are cleared.
   :param function callback: custom code to handle result of the underlying C call.
         As the first parameter it gets the return code from :func:`kr_cache_remove_subtree()`,
         and the following parameters are copies of those passed to `cache.clear()`.
-        The default callback repeats the command after one millisecond (if successful).
 
   Examples:
 
