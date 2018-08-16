@@ -173,11 +173,16 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 	-- we assume they are advanced enough not to need the check.
 	-- The point is to avoid repeating the check in each callback iteration.
 	if callback == nil then
-		local apex_dist = ffi.C.kr_cache_closest_apex(cach, dname, false)
-		if apex_dist < 0 then error(ffi.string(ffi.C.knot_strerror(apex_dist))) end
-		if apex_dist > 0 then
-			errors.not_apex = 'Negative proofs not cleared, call clear again '
-							.. tostring(apex_dist) .. ' label(s) higher.'
+		local names = ffi.new('knot_dname_t *[1]')  -- C: dname **names
+		local ret = ffi.C.kr_cache_closest_apex(cach, dname, false, names)
+		if ret < 0 then
+			error(ffi.string(ffi.C.knot_strerror(ret))) end
+		ffi.gc(names[0], ffi.C.free)
+		local apex = kres.dname2str(names[0])
+		if apex ~= name then
+			errors.not_apex = 'to clear proofs of non-existence call '
+				.. 'cache.clear(\'' .. tostring(apex) ..'\')'
+			errors.subtree = apex
 		end
 	end
 
@@ -340,7 +345,7 @@ function table_print (tt, indent, done)
 			if c >= 0x20 and c < 0x7f then table.insert(bytes, string.char(c))
 			else                           table.insert(bytes, '\\'..tostring(c))
 			end
-			if i > 70 then table.insert(bytes, '...') break end
+			if i > 80 then table.insert(bytes, '...') break end
 		end
 		return table.concat(bytes)
 	end
