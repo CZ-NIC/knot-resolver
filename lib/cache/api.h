@@ -179,7 +179,8 @@ int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
  * @note timestamp is found by a syscall, and stale-serving is not considered
  */
 KR_EXPORT
-int kr_cache_closest_apex(struct kr_cache *cache, const knot_dname_t *name, bool is_DS);
+int kr_cache_closest_apex(struct kr_cache *cache, const knot_dname_t *name, bool is_DS,
+			  const knot_dname_t **apex);
 
 /**
  * Unpack dname and type from db key
