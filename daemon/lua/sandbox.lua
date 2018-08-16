@@ -226,6 +226,8 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
 				event.after(1, function ()
 						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself)
 					end)
+			else
+				log('[cache] asynchonous clear finished: ' .. table_print(cberrors))
 			end
 			return cberrors
 		end
