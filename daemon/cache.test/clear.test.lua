@@ -63,10 +63,10 @@ env.KRESD_NO_LISTEN = true
 local function finish_import()
 	worker.sleep(0.2)  -- zimport is delayed by 100 ms from function call
 	-- sanity checks - cache must be filled in
-	ok(cache.count() > 0, true, 'zone import worked: cache is not empty')
-	check_answer('zone import worked',
+	ok(cache.count() > 0, 'cache is not empty after import')
+	check_answer('root apex is cache',
 	  	     '.', kres.type.NS, kres.rcode.NOERROR)
-	check_answer('zone import worked',
+	check_answer('deep subdomain is in cache',
 		     'a.b.subtree1.', kres.type.AAAA, kres.rcode.NOERROR)
 
 end
@@ -116,14 +116,40 @@ local function test_subtree()
 
 end
 
+local function test_callback()
+	local test_name = '20r.subtree2.'
+	local test_maxcount = 1
+	local test_exactname = true
+	local test_rrtype = nil
+	local test_maxcount = 1
+	local function check_callback(ret, name, exact_name, rr_type, maxcount, callback)
+		same(ret, 1, 'callback received correct # of removed records')
+		same(test_name, name, 'callback received subtree name')
+		same(test_exactname, exact_name, 'callback received exact_name')
+		same(test_rrtype, rrtype, 'callback received rr_type')
+		same(test_maxcount, maxcount, 'callback received maxcount')
+		same(check_callback, callback, 'callback received reference to itself')
+		return 666
+	end
+	same(cache.clear(test_name, test_exactname, test_rrtype, test_maxcount, check_callback),
+	     666, 'callback was executed')
+end
 
 local function test_subtree_limit()
+	same(cache.clear('subtree2.'), false,
+	     'too big subtree flush must be detected by default callback')
+	-- previous clear must not remove everything in one go
+	-- so second call should fail with limit exceeded as well
 	same(cache.clear('subtree2.', false, nil, 1), false,
-	     'too big subtree flush must be detected')
-	worker.sleep(1)
-	print('woken up')
-	same(cache.clear('subtree2.', false, nil, 1, nil), false,
-	     'too big subtree flush must be detected')
+	     'count limit must be respected')
+	-- callbacks are running in background so we can now wait
+	-- and later verify that everything was removed
+	-- 200 RRs, 101 was removed in first two calls
+	-- so the rest should be removed in single invocation of callback
+	-- hopefully the machine is not too slow ...
+	worker.sleep(0.25)
+	same(cache.clear('subtree2.', false, nil, 1), true,
+	     'everything must be flushed by now')
 
 end
 
@@ -132,6 +158,7 @@ return {
 	finish_import,
 	test_exact_match_qtype,
 	test_exact_match_qname,
+	test_callback,
 	test_subtree,
 	test_subtree_limit,
 }
