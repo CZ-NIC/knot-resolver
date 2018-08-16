@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <gnutls/gnutls.h>
+#include <openssl/ssl.h>
 
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
@@ -31,6 +31,8 @@ struct worker_ctx;
 struct session;
 /** Zone import context (opaque). */
 struct zone_import_ctx;
+/** TLS context (opaque). */
+struct tls_common_ctx;
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
@@ -92,9 +94,9 @@ void *worker_iohandle_borrow(struct worker_ctx *worker);
 
 void worker_iohandle_release(struct worker_ctx *worker, void *h);
 
-ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
+ssize_t worker_tls_push(struct tls_common_ctx *t, const void *buf, size_t len);
 
-ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
+ssize_t worker_tls_client_push(struct tls_common_ctx *t, const void *buf, size_t len);
 
 /** Finalize given task */
 int worker_task_finalize(struct qr_task *task, int state);

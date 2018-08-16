@@ -20,6 +20,7 @@
 #include "daemon/worker.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
+#include <openssl/crypto.h>
 
 /* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
 #if defined(UV_VERSION_HEX)
@@ -55,6 +56,8 @@ void network_init(struct network *net, uv_loop_t *loop)
 		net->tls_session_ticket_ctx = /* unsync. random, by default */
 			tls_session_ticket_ctx_create(loop, NULL, 0);
 		net->tcp.in_idle_timeout = 10000;
+		CRYPTO_library_init();
+		net->ssl_ctx = SSL_CTX_new(TLS_method());
 	}
 }
 
@@ -114,6 +117,7 @@ void network_deinit(struct network *net)
 		net->tls_credentials = NULL;
 		tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
 		net->tcp.in_idle_timeout = 0;
+		SSL_CTX_free(net->ssl_ctx);
 	}
 }
 
@@ -248,7 +252,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 	/* Extract local address and socket type. */
 	int sock_type = SOCK_DGRAM;
 	socklen_t len = sizeof(sock_type);
-	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);	
+	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);
 	if (ret != 0) {
 		return kr_error(EBADF);
 	}

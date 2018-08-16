@@ -1,28 +1,28 @@
 /*
  * Copyright (C) 2016 American Civil Liberties Union (ACLU)
  * Copyright (C) 2016-2017 CZ.NIC, z.s.p.o.
- * 
+ *
  * Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
- * 
+ *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free
  * Software Foundation, either version 3 of the License, or (at your option)
  * any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include <sys/file.h>
 #include <unistd.h>
-#include <gnutls/gnutls.h>
-#include <gnutls/x509.h>
-#include <gnutls/crypto.h>
+#include <openssl/ssl.h>
+#include <openssl/rand.h>
+#include <openssl/x509v3.h>
 
 #include "daemon/worker.h"
 #include "daemon/tls.h"
@@ -63,11 +63,9 @@ static void _lock_unlock(lock *lock, const char *fname)
 	}
 }
 
-static gnutls_x509_privkey_t get_ephemeral_privkey ()
+static EVP_PKEY *get_ephemeral_privkey ()
 {
-	gnutls_x509_privkey_t privkey = NULL;
-	int err;
-	gnutls_datum_t data = { .data = NULL, .size = 0 };
+	EVP_PKEY *privkey = NULL;
 	lock lock;
 	int datafd = -1;
 
@@ -78,10 +76,10 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 		kr_log_error("[tls] unable to lock lockfile " EPHEMERAL_PRIVKEY_FILENAME ".lock\n");
 		goto done;
 	}
-	
-	if ((err = gnutls_x509_privkey_init (&privkey)) < 0) {
-		kr_log_error("[tls] gnutls_x509_privkey_init() failed: %d (%s)\n",
-			     err, gnutls_strerror_name(err));
+
+	privkey = EVP_PKEY_new();
+	if (privkey == NULL) {
+		kr_log_error("[tls] EVP_PKEY_new() failed");
 		goto done;
 	}
 
@@ -91,130 +89,144 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 	datafd = open(EPHEMERAL_PRIVKEY_FILENAME, O_RDONLY);
 	if (datafd != -1) {
 		struct stat stat;
-		ssize_t bytes_read;
 		if (fstat(datafd, &stat)) {
 			kr_log_error("[tls] unable to stat ephemeral private key " EPHEMERAL_PRIVKEY_FILENAME "\n");
 			goto bad_data;
 		}
-		data.data = gnutls_malloc(stat.st_size);
-		if (data.data == NULL) {
-			kr_log_error("[tls] unable to allocate memory for reading ephemeral private key\n");
-			goto bad_data;
-		}
-		data.size = stat.st_size;
-		bytes_read = read(datafd, data.data, stat.st_size);
-		if (bytes_read != stat.st_size) {
-			kr_log_error("[tls] unable to read ephemeral private key\n");
-			goto bad_data;
-		}
-		if ((err = gnutls_x509_privkey_import (privkey, &data, GNUTLS_X509_FMT_PEM)) < 0) {
-			kr_log_error("[tls] gnutls_x509_privkey_import() failed: %d (%s)\n",
-				     err, gnutls_strerror_name(err));
+		FILE *datastream = fdopen(datafd, "r");
+		if (PEM_read_PrivateKey(datastream, &privkey, NULL, NULL)) {
+			fclose(datastream);
+			goto done;
+		} else {
+			kr_log_error("[tls] PEM_read_PrivateKey() failed\n");
+			fclose(datastream);
 			/* goto bad_data; */
+		}
+
 		bad_data:
 			close(datafd);
 			datafd = -1;
-		}
-		if (data.data != NULL) {
-			gnutls_free(data.data);
-			data.data = NULL;
-		}
 	}
 	if (datafd == -1) {
 		/* if loading failed, then generate ... */
-#if GNUTLS_VERSION_NUMBER >= 0x030500
-		if ((err = gnutls_x509_privkey_generate(privkey, GNUTLS_PK_ECDSA, GNUTLS_CURVE_TO_BITS(GNUTLS_ECC_CURVE_SECP256R1), 0)) < 0) {
-#else
-		if ((err = gnutls_x509_privkey_generate(privkey, GNUTLS_PK_RSA, gnutls_sec_param_to_pk_bits(GNUTLS_PK_RSA, GNUTLS_SEC_PARAM_MEDIUM), 0)) < 0) {
-#endif
-			kr_log_error("[tls] gnutls_x509_privkey_init() failed: %d (%s)\n",
-				     err, gnutls_strerror_name(err));
-			gnutls_x509_privkey_deinit(privkey);
+		EC_KEY * eckey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+
+		if (eckey == NULL) {
+			kr_log_error("[tls] EC_KEY_new() failed\n");
+			EVP_PKEY_free(privkey);
 			goto done;
 		}
+
+		if (!EC_KEY_generate_key_fips(eckey)) {
+			kr_log_error("[tls] EC_KEY_generate_key_fips() failed\n");
+			EC_KEY_free(eckey);
+			EVP_PKEY_free(privkey);
+			goto done;
+		}
+
+		if (!EVP_PKEY_assign_EC_KEY(privkey, eckey)) {
+			kr_log_error("[tls] EC_PKEY_assign_EC_KEY() failed\n");
+			EC_KEY_free(eckey);
+			EVP_PKEY_free(privkey);
+			goto done;
+		}
+
 		/* ... and save */
 		kr_log_info("[tls] Stashing ephemeral private key in " EPHEMERAL_PRIVKEY_FILENAME "\n");
-		if ((err = gnutls_x509_privkey_export2(privkey, GNUTLS_X509_FMT_PEM, &data)) < 0) {
-			kr_log_error("[tls] gnutls_x509_privkey_export2() failed: %d (%s), not storing\n",
-				     err, gnutls_strerror_name(err));
-		} else {
-			datafd = open(EPHEMERAL_PRIVKEY_FILENAME, O_WRONLY|O_CREAT, 0600);
-			if (datafd == -1) {
-				kr_log_error("[tls] failed to open " EPHEMERAL_PRIVKEY_FILENAME " to store the ephemeral key\n");
-			} else {
-				ssize_t bytes_written;
-				bytes_written = write(datafd, data.data, data.size);
-				if (bytes_written != data.size)
-					kr_log_error("[tls] failed to write %d octets to " EPHEMERAL_PRIVKEY_FILENAME " (%ld written)\n",
-						     data.size, bytes_written);
-			}
+		FILE *datastream = fopen(EPHEMERAL_PRIVKEY_FILENAME, "w");
+		/* not encrypted on disk! */
+		if (!PEM_write_PrivateKey(datastream, privkey, NULL, NULL, 0, 0, NULL)) {
+			kr_log_error("[tls] PEM_write_PrivateKey failed, not storing\n");
 		}
+		fclose(datastream);
 	}
- done:
+done:
 	_lock_unlock(&lock, EPHEMERAL_PRIVKEY_FILENAME ".lock");
 	if (datafd != -1) {
 		close(datafd);
 	}
-	if (data.data != NULL) {
-		gnutls_free(data.data);
-	}
 	return privkey;
 }
 
-static gnutls_x509_crt_t get_ephemeral_cert(gnutls_x509_privkey_t privkey, const char *servicename, time_t invalid_before, time_t valid_until)
+static X509 *get_ephemeral_cert(EVP_PKEY *pkey, char *servicename, time_t invalid_before, time_t valid_until)
 {
-	gnutls_x509_crt_t cert = NULL;
-	int err;
+	X509 *cert = X509_new();
+	int success;
 	/* need a random buffer of bytes */
 	uint8_t serial[16];
-	gnutls_rnd(GNUTLS_RND_NONCE, serial, sizeof(serial));
+	RAND_bytes(serial, sizeof(serial));
 	/* clear the left-most bit to avoid signedness confusion: */
 	serial[0] &= 0x8f;
-	size_t namelen = strlen(servicename);
+	ASN1_TIME *asn1_invalid_before = ASN1_TIME_new();
+	ASN1_TIME *asn1_valid_until = ASN1_TIME_new();
+	ASN1_INTEGER *asn1_serial = ASN1_INTEGER_new();
+	BIGNUM *bn_serial = BN_new();
+	GENERAL_NAME *gen_san = GENERAL_NAME_new();
+	GENERAL_NAMES *gens_san = sk_GENERAL_NAME_new_null();
+	ASN1_IA5STRING *ia5_san = ASN1_IA5STRING_new();
+	X509_NAME *x509_dn = X509_NAME_new();
 
-#define gtx(fn, ...)							\
-	if ((err = fn ( __VA_ARGS__ )) != GNUTLS_E_SUCCESS) {		\
-		kr_log_error("[tls] " #fn "() failed: %d (%s)\n",	\
-			     err, gnutls_strerror_name(err));		\
-		goto bad; }
+	ASN1_TIME_set(asn1_valid_until, valid_until);
+	ASN1_TIME_set(asn1_invalid_before, invalid_before);
+	BN_bin2bn(serial, sizeof(serial), bn_serial);
+	BN_to_ASN1_INTEGER(bn_serial, asn1_serial);
 
-	gtx(gnutls_x509_crt_init, &cert);
-	gtx(gnutls_x509_crt_set_activation_time, cert, invalid_before);
-	gtx(gnutls_x509_crt_set_ca_status, cert, 0);
-	gtx(gnutls_x509_crt_set_expiration_time, cert, valid_until);
-	gtx(gnutls_x509_crt_set_key, cert, privkey);
-	gtx(gnutls_x509_crt_set_key_purpose_oid, cert, GNUTLS_KP_TLS_WWW_CLIENT, 0);
-	gtx(gnutls_x509_crt_set_key_purpose_oid, cert, GNUTLS_KP_TLS_WWW_SERVER, 0);
-	gtx(gnutls_x509_crt_set_key_usage, cert, GNUTLS_KEY_DIGITAL_SIGNATURE);
-	gtx(gnutls_x509_crt_set_serial, cert, serial, sizeof(serial));
-	gtx(gnutls_x509_crt_set_subject_alt_name, cert, GNUTLS_SAN_DNSNAME, servicename, namelen, GNUTLS_FSAN_SET);
-	gtx(gnutls_x509_crt_set_dn_by_oid,cert, GNUTLS_OID_X520_COMMON_NAME, 0, servicename, namelen);
-	gtx(gnutls_x509_crt_set_version, cert, 3);
-	gtx(gnutls_x509_crt_sign2,cert, cert, privkey, GNUTLS_DIG_SHA256, 0); /* self-sign, since it doesn't look like we can just stub-sign */
+	assert(cert && asn1_invalid_before && asn1_valid_until && asn1_serial && bn_serial && gen_san && gens_san && ia5_san && x509_dn);
+
+#define gtx(fn, ...)							  \
+	if (!(success = fn ( __VA_ARGS__ ))) {		  \
+		kr_log_error("[tls] " #fn "() failed\n"); \
+		goto done; }
+
+	gtx(X509_set_notBefore, cert, asn1_invalid_before);
+	cert->ex_flags &= ~EXFLAG_CA;
+	gtx(X509_set_notAfter, cert, asn1_valid_until);
+	gtx(X509_set_pubkey, cert, pkey);
+	cert->ex_flags |= EXFLAG_XKUSAGE;
+	cert->ex_xkusage |= X509_PURPOSE_SSL_CLIENT;
+	cert->ex_xkusage |= X509_PURPOSE_SSL_SERVER;
+	cert->ex_flags |= EXFLAG_KUSAGE;
+	cert->ex_kusage |= KU_DIGITAL_SIGNATURE;
+	gtx(X509_set_serialNumber, cert, asn1_serial);
+	gtx(ASN1_STRING_set, ia5_san, servicename, -1);
+	GENERAL_NAME_set0_value(gen_san, GEN_DNS, ia5_san);
+	gtx(sk_GENERAL_NAME_push, gens_san, gen_san);
+	gtx(X509_add1_ext_i2d, cert, NID_subject_alt_name, gens_san, 0, 0);
+	gtx(X509_NAME_add_entry_by_NID, x509_dn, NID_commonName, MBSTRING_ASC, (unsigned char *)servicename, -1, -1, 0);
+	gtx(X509_set_subject_name, cert, x509_dn);
+	gtx(X509_set_version, cert, 3);
+	gtx(X509_sign, cert, pkey, EVP_sha256()); /* self-sign, since it doesn't look like we can just stub-sign */
 #undef gtx
 
-	return cert;
-bad:
-	gnutls_x509_crt_deinit(cert);
+done:
+	ASN1_TIME_free(asn1_invalid_before);
+	ASN1_TIME_free(asn1_valid_until);
+	ASN1_INTEGER_free(asn1_serial);
+	BN_free(bn_serial);
+	X509_NAME_free(x509_dn);
+	GENERAL_NAMES_free(gens_san);
+
+	if (success) {
+		return cert;
+	}
+
+	ASN1_IA5STRING_free(ia5_san);
+	GENERAL_NAME_free(gen_san);
+	X509_free(cert);
 	return NULL;
 }
 
-struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
+struct tls_credentials *tls_get_ephemeral_credentials(struct engine *engine)
 {
 	struct tls_credentials *creds = NULL;
-	gnutls_x509_privkey_t privkey = NULL;
-	gnutls_x509_crt_t cert = NULL;
-	int err;
+	EVP_PKEY *privkey = NULL;
+	X509 *cert = NULL;
 	time_t now = time(NULL);
 
 	creds = calloc(1, sizeof(*creds));
 	if (!creds) {
 		kr_log_error("[tls] failed to allocate memory for ephemeral credentials\n");
 		return NULL;
-	}
-	if ((err = gnutls_certificate_allocate_credentials(&(creds->credentials))) < 0) {
-		kr_log_error("[tls] failed to allocate memory for ephemeral credentials\n");
-		goto failure;
 	}
 
 	creds->valid_until = now + EPHEMERAL_CERT_EXPIRATION_SECONDS;
@@ -225,23 +237,29 @@ struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
 			kr_log_error("[tls] failed to allocate memory for ephemeral credentials\n");
 			goto failure;
 		}
-	}		
+	}
 	if ((privkey = get_ephemeral_privkey()) == NULL) {
+		kr_log_error("[tls] get_ephemeral_privkey() failed\n");
 		goto failure;
 	}
 	if ((cert = get_ephemeral_cert(privkey, creds->ephemeral_servicename, now - 60*15, creds->valid_until)) == NULL) {
+		kr_log_error("[tls] get_ephemeral_cert() failed\n");
 		goto failure;
 	}
-	if ((err = gnutls_certificate_set_x509_key(creds->credentials, &cert, 1, privkey)) < 0) {
-		kr_log_error("[tls] failed to set up ephemeral credentials\n");
+
+	STACK_OF(X509) *chain = sk_X509_new_null();
+	if (sk_X509_push(chain, cert) < 1) {
+		kr_log_error("[tls] failed to push certificate to certificate stack\n");
 		goto failure;
 	}
-	gnutls_x509_privkey_deinit(privkey);
-	gnutls_x509_crt_deinit(cert);
+
+	creds->tls_key = privkey;
+	creds->tls_cert_chain = chain;
+
 	return creds;
  failure:
-	gnutls_x509_privkey_deinit(privkey);
-	gnutls_x509_crt_deinit(cert);
+	EVP_PKEY_free(privkey);
+	X509_free(cert);
 	tls_credentials_free(creds);
 	return NULL;
 }

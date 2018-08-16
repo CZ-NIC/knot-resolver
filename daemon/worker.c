@@ -27,7 +27,7 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <gnutls/gnutls.h>
+#include <openssl/ssl.h>
 #include "lib/utils.h"
 #include "lib/layer.h"
 #include "daemon/worker.h"
@@ -909,9 +909,8 @@ static void on_nontask_write(uv_write_t *req, int status)
 	iorequest_release(worker, req);
 }
 
-ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
+ssize_t worker_tls_push(struct tls_common_ctx *t, const void *buf, size_t len)
 {
-	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
 	const uv_buf_t uv_buf[1] = {
 		{ (char *)buf, len }
 	};
@@ -925,7 +924,7 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 	       t->session->handle->type == UV_TCP);
 
 	VERBOSE_MSG(NULL,"[%s] push %zu <%p>\n",
-		    t->client_side ? "tls_client" : "tls", len, h);
+		    t->client_side ? "tls_client" : "tls", len, t);
 
 	struct worker_ctx *worker = t->worker;
 	assert(worker);
@@ -1109,23 +1108,18 @@ static int session_tls_hs_cb(struct session *session, int status)
 	/* handshake was completed successfully */
 	struct tls_client_ctx_t *tls_client_ctx = session->tls_client_ctx;
 	struct tls_client_paramlist_entry *tls_params = tls_client_ctx->params;
-	gnutls_session_t tls_session = tls_client_ctx->c.tls_session;
-	if (gnutls_session_is_resumed(tls_session) != 0) {
+	SSL *tls_session = tls_client_ctx->c.tls_session;
+	if (SSL_session_reused(tls_session)) {
 		kr_log_verbose("[tls_client] TLS session has resumed\n");
 	} else {
 		kr_log_verbose("[tls_client] TLS session has not resumed\n");
 		/* session wasn't resumed, delete old session data ... */
-		if (tls_params->session_data.data != NULL) {
-			gnutls_free(tls_params->session_data.data);
-			tls_params->session_data.data = NULL;
-			tls_params->session_data.size = 0;
+		if (tls_params->session_data != NULL) {
+			SSL_SESSION_free(tls_params->session_data);
+			tls_params->session_data = NULL;
 		}
 		/* ... and get the new session data */
-		gnutls_datum_t tls_session_data = { NULL, 0 };
-		ret = gnutls_session_get_data2(tls_session, &tls_session_data);
-		if (ret == 0) {
-			tls_params->session_data = tls_session_data;
-		}
+		tls_params->session_data = SSL_get_session(tls_session);
 	}
 
 	ret = worker_add_tcp_connected(worker, &peer->ip, session);
@@ -2104,13 +2098,13 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 		session->connected = false;
 
 		if (session->tls_client_ctx) {
-			/* Avoid gnutls_bye() call */
+			/* Avoid SSL_shutdown() call */
 			tls_set_hs_state(&session->tls_client_ctx->c,
 					 TLS_HS_NOT_STARTED);
 		}
 
 		if (session->tls_ctx) {
-			/* Avoid gnutls_bye() call */
+			/* Avoid SSL_shutdown() call */
 			tls_set_hs_state(&session->tls_ctx->c,
 					 TLS_HS_NOT_STARTED);
 		}

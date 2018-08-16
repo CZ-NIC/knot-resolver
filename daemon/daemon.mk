@@ -37,10 +37,13 @@ kresd_CFLAGS := -fPIE \
 		-DROOTHINTS=\"$(ROOTHINTS)\" \
 		-DLIBEXT=\"$(LIBEXT)\" \
 		-DLUA_HAS_SETFUNCS="$(LUA_HAS_SETFUNCS)"
+
+boringssl_LIBS := -Lboringssl/build/ssl -lssl -Lboringssl/build/crypto -lcrypto
+
 kresd_DEPEND := $(libkres) $(contrib)
 kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) \
               $(libzscanner_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS) \
-              $(gnutls_LIBS)
+              $(boringssl_LIBS)
 
 # Enable systemd
 ifeq ($(HAS_libsystemd), yes)

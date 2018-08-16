@@ -18,6 +18,7 @@
 
 #include <uv.h>
 #include <stdbool.h>
+#include <openssl/ssl.h>
 
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
@@ -54,6 +55,7 @@ struct network {
 	map_t tls_client_params;
 	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
 	struct net_tcp_param tcp;
+	SSL_CTX *ssl_ctx;
 };
 
 void network_init(struct network *net, uv_loop_t *loop);

@@ -18,7 +18,7 @@
 
 #include <uv.h>
 #include <libknot/packet/pkt.h>
-#include <gnutls/gnutls.h>
+#include <openssl/ssl.h>
 #include "lib/generic/array.h"
 #include "daemon/worker.h"
 

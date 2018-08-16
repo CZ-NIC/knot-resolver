@@ -153,9 +153,8 @@ ifeq ($(HAS_gnutls),no)
 	$(error gnutls required)
 endif
 
-
 BUILD_CFLAGS += $(libknot_CFLAGS) $(libuv_CFLAGS) $(nettle_CFLAGS) $(cmocka_CFLAGS) $(lua_CFLAGS) $(libdnssec_CFLAGS) $(libsystemd_CFLAGS)
-BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3)
+BUILD_CFLAGS += $(addprefix -I,$(wildcard contrib/ccan/*) contrib/murmurhash3 boringssl/include)
 
 # Work around luajit on OS X
 ifeq ($(PLATFORM), Darwin)

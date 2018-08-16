@@ -21,8 +21,8 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <gnutls/gnutls.h>
-#include <gnutls/crypto.h>
+#include <openssl/ssl.h>
+#include <openssl/rand.h>
 #include <uv.h>
 
 #include "lib/utils.h"
@@ -32,29 +32,20 @@
 /** The number of seconds between synchronized rotation of TLS session ticket key. */
 #define TST_KEY_LIFETIME 4096
 
-/** Value from gnutls:lib/ext/session_ticket.c
+/** Value from boringssl:ssl/ssl_lib.cc
  * Beware: changing this needs to change the hashing implementation. */
-#define SESSION_KEY_SIZE 64
+#define SESSION_KEY_SIZE 48
 
-/** Compile-time support for setting the secret. */
-/* This is not secure with TLS <= 1.2 but TLS 1.3 and secure configuration
- * is not available in GnuTLS yet. See https://gitlab.com/gnutls/gnutls/issues/477
+/** Compile-time support for setting the secret.
+ * This breaks perfect forward secrecy with TLS <= 1.2, but it is secure with TLS 1.3.
+ * Hence session ticket keys are rotated frequently.
 #ifndef TLS_SESSION_RESUMPTION_SYNC
-	#define TLS_SESSION_RESUMPTION_SYNC (GNUTLS_VERSION_NUMBER >= 0x030603)
+	#define TLS_SESSION_RESUMPTION_SYNC 1
 #endif
 */
 
-#if GNUTLS_VERSION_NUMBER < 0x030400
-	/* It's of little use anyway.  We may get the secret through lua,
-	 * which creates a copy outside of our control. */
-	#define gnutls_memset memset
-#endif
-
-#ifdef GNUTLS_DIG_SHA3_512
-	#define TST_HASH GNUTLS_DIG_SHA3_512
-#else
-	#define TST_HASH abort()
-#endif
+#define TST_HASH_LC sha384
+#define TST_HASH_UC SHA384
 
 /** Fields are internal to tst_key_* functions. */
 typedef struct tls_session_ticket_ctx {
@@ -66,21 +57,16 @@ typedef struct tls_session_ticket_ctx {
 				 *   it's `time_t epoch` and then the secret string */
 } tst_ctx_t;
 
-/** Check invariants, based on gnutls version. */
+/** Check invariants, based on boringssl version. */
 static bool tst_key_invariants(void)
 {
 	static int result = 0; /*< cache for multiple invocations */
 	if (result) return result > 0;
 	bool ok = true;
 	#if TLS_SESSION_RESUMPTION_SYNC
-		/* SHA3-512 output size may never change, but let's check it anyway :-) */
-		ok = ok && gnutls_hash_get_len(TST_HASH) == SESSION_KEY_SIZE;
+		/* SHA-384 output size may never change, but let's check it anyway :-) */
+		ok = ok && TST_HASH_UC_DIGEST_LENGTH == SESSION_KEY_SIZE;
 	#endif
-	/* The ticket key size might change in a different gnutls version. */
-	gnutls_datum_t key = { 0, 0 };
-	ok = ok && gnutls_session_ticket_key_generate(&key) == 0
-		&& key.size == SESSION_KEY_SIZE;
-	free(key.data);
 	result = ok ? 1 : -1;
 	return ok;
 }
@@ -101,7 +87,7 @@ static tst_ctx_t * tst_key_create(const char *secret, size_t secret_len, uv_loop
 	}
 	#if !TLS_SESSION_RESUMPTION_SYNC
 		if (secret_len) {
-			kr_log_error("[tls] session ticket: secrets were not enabled at compile-time (your GnuTLS version is not supported)\n");
+			kr_log_error("[tls] session ticket: secrets were not enabled at compile-time\n");
 			return NULL; /* ENOTSUP */
 		}
 	#endif
@@ -125,16 +111,11 @@ static tst_ctx_t * tst_key_create(const char *secret, size_t secret_len, uv_loop
 /** Random variant of secret rotation: generate into key_tmp and copy. */
 static int tst_key_get_random(tst_ctx_t *ctx)
 {
-	gnutls_datum_t key_tmp = { NULL, 0 };
-	int err = gnutls_session_ticket_key_generate(&key_tmp);
-	if (err) return kr_error(err);
-	if (key_tmp.size != SESSION_KEY_SIZE) {
-		assert(!EFAULT);
+	assert(ctx);
+	if (!RAND_bytes(ctx->key, SESSION_KEY_SIZE)) {
+		kr_log_error("[tls] could not generate random tst key\n");
 		return kr_error(EFAULT);
 	}
-	memcpy(ctx->key, key_tmp.data, SESSION_KEY_SIZE);
-	gnutls_memset(key_tmp.data, 0, SESSION_KEY_SIZE);
-	free(key_tmp.data);
 	return kr_ok();
 }
 
@@ -160,9 +141,8 @@ static int tst_key_update(tst_ctx_t *ctx, time_t epoch, bool force_update)
 		assert(false);
 		return kr_error(ENOTSUP);
 	#else
-		int err = gnutls_hash_fast(TST_HASH, ctx->hash_data,
-					   ctx->hash_len, ctx->key);
-		return err == 0 ? kr_ok() : kr_error(err);
+		int success = EVP_Digest(ctx->hash_data, ctx->hash_len, ctx->key, NULL, EVP_TST_HASH_LC(), NULL);
+		return success == 0 ? kr_ok() : kr_error(err);
 	#endif
 }
 
@@ -172,7 +152,7 @@ static void tst_key_destroy(uv_handle_t *timer)
 	assert(timer);
 	tst_ctx_t *ctx = timer->data;
 	assert(ctx);
-	gnutls_memset(ctx, 0, offsetof(tst_ctx_t, hash_data) + ctx->hash_len);
+	OPENSSL_cleanse(ctx, offsetof(tst_ctx_t, hash_data) + ctx->hash_len);
 	free(ctx);
 }
 
@@ -196,8 +176,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	uv_update_time(timer->loop); /* to have sync. between real and mono time */
 	const time_t epoch = now.tv_sec / TST_KEY_LIFETIME;
 	/* Update the key; new sessions will fetch it from the location.
-	 * Old ones hopefully can't get broken by that; documentation
-	 * for gnutls_session_ticket_enable_server() doesn't say. */
+	 * Old ones hopefully can't get broken by that. */
 	int err = tst_key_update(stst, epoch, force_update);
 	if (err) {
 		assert(err != kr_error(EINVAL));
@@ -222,17 +201,12 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 
 /* Implementation for prototypes from ./tls.h */
 
-void tls_session_ticket_enable(struct tls_session_ticket_ctx *ctx, gnutls_session_t session)
+void tls_session_ticket_enable(struct tls_session_ticket_ctx *ctx, SSL_CTX *ssl_ctx)
 {
-	assert(ctx && session);
-	const gnutls_datum_t gd = {
-		.size = SESSION_KEY_SIZE,
-		.data = ctx->key,
-	};
-	int err = gnutls_session_ticket_enable_server(session, &gd);
-	if (err) {
-		kr_log_error("[tls] failed to enable session tickets: %s (%d)\n",
-				gnutls_strerror_name(err), err);
+	/* Session tickets are enabled by default. */
+	assert(ctx && ssl_ctx);
+	if (!SSL_CTX_set_tlsext_ticket_keys(ssl_ctx, ctx->key, SESSION_KEY_SIZE)) {
+		kr_log_error("[tls] failed to set session ticket key\n");
 		/* but continue without tickets */
 	}
 }
@@ -241,10 +215,6 @@ tst_ctx_t * tls_session_ticket_ctx_create(uv_loop_t *loop, const char *secret,
 					  size_t secret_len)
 {
 	assert(loop && (!secret_len || secret));
-	#if GNUTLS_VERSION_NUMBER < 0x030500
-		/* We would need different SESSION_KEY_SIZE; avoid assert. */
-		return NULL;
-	#endif
 	tst_ctx_t *ctx = tst_key_create(secret, secret_len, loop);
 	if (ctx) {
 		tst_key_check(&ctx->timer, true);

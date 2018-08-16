@@ -244,7 +244,7 @@ static int net_listen(lua_State *L)
 		tls = table_get_flag(L, 3, "tls", tls);
 	}
 	int flags = tls ? (NET_TCP|NET_TLS) : (NET_TCP|NET_UDP);
-	
+
 	/* Now focus on the first argument. */
 	lua_pop(L, n - 1);
 	int res = net_listen_addrs(L, port, flags);
@@ -378,9 +378,9 @@ static int net_tls(lua_State *L)
 			return 0;
 		}
 		lua_newtable(L);
-		lua_pushstring(L, net->tls_credentials->tls_cert);
+		lua_pushstring(L, net->tls_credentials->tls_cert_file);
 		lua_setfield(L, -2, "cert_file");
-		lua_pushstring(L, net->tls_credentials->tls_key);
+		lua_pushstring(L, net->tls_credentials->tls_key_file);
 		lua_setfield(L, -2, "key_file");
 		return 1;
 	}
@@ -509,7 +509,7 @@ static int net_tls_client(lua_State *L)
 	}
 
 	if (!pin_exists && !hostname_exists) {
-		int r = tls_client_params_set(&net->tls_client_params,
+		int r = tls_client_params_set(net->ssl_ctx, &net->tls_client_params,
 					      addr, port, NULL,
 					      TLS_CLIENT_PARAM_NONE);
 		if (r != 0) {
@@ -528,7 +528,7 @@ static int net_tls_client(lua_State *L)
 		while (lua_next(L, 2)) {  /* pin table is in stack at index 2 */
 			/* pin now at index -1, key at index -2*/
 			const char *pin = lua_tostring(L, -1);
-			int r = tls_client_params_set(&net->tls_client_params,
+			int r = tls_client_params_set(net->ssl_ctx, &net->tls_client_params,
 						      addr, port, pin,
 						      TLS_CLIENT_PARAM_PIN);
 			if (r != 0) {
@@ -556,7 +556,7 @@ static int net_tls_client(lua_State *L)
 	lua_pushnil(L);
 	while (lua_next(L, hostname_table_index)) {
 		const char *hostname = lua_tostring(L, -1);
-		int r = tls_client_params_set(&net->tls_client_params,
+		int r = tls_client_params_set(net->ssl_ctx, &net->tls_client_params,
 					      addr, port, hostname,
 					      TLS_CLIENT_PARAM_HOSTNAME);
 		if (r != 0) {
@@ -572,7 +572,7 @@ static int net_tls_client(lua_State *L)
 	size_t num_of_ca_files = 0;
 	while (lua_next(L, ca_table_index)) {
 		const char *ca_file = lua_tostring(L, -1);
-		int r = tls_client_params_set(&net->tls_client_params,
+		int r = tls_client_params_set(net->ssl_ctx, &net->tls_client_params,
 					      addr, port, ca_file,
 					      TLS_CLIENT_PARAM_CA);
 		if (r != 0) {
@@ -586,7 +586,7 @@ static int net_tls_client(lua_State *L)
 
 	if (num_of_ca_files == 0) {
 		/* No ca files were explicitly configured, so use system CA */
-		int r = tls_client_params_set(&net->tls_client_params,
+		int r = tls_client_params_set(net->ssl_ctx, &net->tls_client_params,
 					      addr, port, NULL,
 					      TLS_CLIENT_PARAM_CA);
 		if (r != 0) {

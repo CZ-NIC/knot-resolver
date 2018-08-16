@@ -17,7 +17,7 @@
 #pragma once
 
 #include <uv.h>
-#include <gnutls/gnutls.h>
+#include <openssl/ssl.h>
 #include <libknot/packet/pkt.h>
 #include "lib/defines.h"
 #include "lib/generic/array.h"
@@ -46,9 +46,10 @@ struct tls_ctx_t;
 struct tls_client_ctx_t;
 struct tls_credentials {
 	int count;
-	char *tls_cert;
-	char *tls_key;
-	gnutls_certificate_credentials_t credentials;
+	char *tls_cert_file;
+	char *tls_key_file;
+	STACK_OF(X509) *tls_cert_chain;
+	EVP_PKEY *tls_key;
 	time_t valid_until;
 	char *ephemeral_servicename;
 };
@@ -57,12 +58,14 @@ struct tls_client_paramlist_entry {
 	array_t(const char *) ca_files;
 	array_t(const char *) hostnames;
 	array_t(const char *) pins;
-	gnutls_certificate_credentials_t credentials;
-	gnutls_datum_t session_data;
+	STACK_OF(X509) *tls_cert_chain;
+	EVP_PKEY *tls_key;
+	SSL_SESSION *session_data;
 };
 
 struct worker_ctx;
 struct qr_task;
+struct session;
 
 typedef enum tls_client_hs_state {
 	TLS_HS_NOT_STARTED = 0,
@@ -83,13 +86,15 @@ typedef enum tls_client_param {
 
 struct tls_common_ctx {
 	bool client_side;
-	gnutls_session_t tls_session;
+	SSL *tls_session;
 	tls_hs_state_t handshake_state;
 	struct session *session;
 	/* for reading from the network */
 	const uint8_t *buf;
 	ssize_t nread;
 	ssize_t consumed;
+	BIO *read_bio;
+	BIO *write_bio;
 	uint8_t recv_buf[4096];
 	tls_handshake_cb handshake_cb;
 	struct worker_ctx *worker;
@@ -117,16 +122,16 @@ struct tls_client_ctx_t {
 };
 
 /*! Create an empty TLS context in query context */
-struct tls_ctx_t* tls_new(struct worker_ctx *worker);
+struct tls_ctx_t *tls_new(struct worker_ctx *worker);
 
-/*! Close a TLS context (call gnutls_bye()) */
+/*! Close a TLS context (call SSL_shutdown()) */
 void tls_close(struct tls_common_ctx *ctx);
 
 /*! Release a TLS context */
-void tls_free(struct tls_ctx_t* tls);
+void tls_free(struct tls_ctx_t *tls);
 
 /*! Push new data to TLS context for sending */
-int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
+int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt);
 
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
@@ -162,7 +167,7 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
  * Note: hostnames must be imported before ca files,
  *       otherwise ca files will not be imported at all.
  */
-int tls_client_params_set(map_t *tls_client_paramlist,
+int tls_client_params_set(SSL_CTX *ssl_ctx, map_t *tls_client_paramlist,
 			  const char *addr, uint16_t port,
 			  const char *param, tls_client_param_t param_type);
 
@@ -206,7 +211,7 @@ struct tls_session_ticket_ctx * tls_session_ticket_ctx_create(
 		uv_loop_t *loop, const char *secret, size_t secret_len);
 
 /*! Try to enable session tickets for a server session. */
-void tls_session_ticket_enable(struct tls_session_ticket_ctx *ctx, gnutls_session_t session);
+void tls_session_ticket_enable(struct tls_session_ticket_ctx *ctx, SSL_CTX *ssl_ctx);
 
 /*! Free all resources of the session ticket context.  NULL is accepted as well. */
 void tls_session_ticket_ctx_destroy(struct tls_session_ticket_ctx *ctx);
