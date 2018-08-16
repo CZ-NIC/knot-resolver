@@ -28,6 +28,17 @@ endif
 bindings-install: $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 	$(INSTALL) -m 0644 $(kresd_DIST) $(DESTDIR)$(MODULEDIR)
 
+# BoringSSL
+.PHONY: boringssl boringssl-clean
+
+boringssl:
+	mkdir -p boringssl/build
+	cmake -Bboringssl/build -Hboringssl
+	make -C boringssl/build
+
+boringssl-clean:
+	@$(RM) -r boringssl/build
+
 LUA_HAS_SETFUNCS := \
 	$(shell pkg-config luajit --atleast-version=2.1.0-beta3 && echo 1 || echo 0)
 
@@ -40,7 +51,7 @@ kresd_CFLAGS := -fPIE \
 
 boringssl_LIBS := -Lboringssl/build/ssl -lssl -Lboringssl/build/crypto -lcrypto
 
-kresd_DEPEND := $(libkres) $(contrib)
+kresd_DEPEND := $(libkres) $(contrib) boringssl
 kresd_LIBS := $(libkres_TARGET) $(contrib_TARGET) $(libknot_LIBS) \
               $(libzscanner_LIBS) $(libdnssec_LIBS) $(libuv_LIBS) $(lua_LIBS) \
               $(boringssl_LIBS)
@@ -66,7 +77,7 @@ ifneq ($(SED),)
 	$(INSTALL) -d -m 0755 $(DESTDIR)$(MANDIR)/man8/
 	$(INSTALL) -m 0644 doc/kresd.8 $(DESTDIR)$(MANDIR)/man8/
 endif
-daemon-clean: kresd-clean
+daemon-clean: kresd-clean boringssl-clean
 	@$(RM) daemon/lua/*.inc daemon/lua/trust_anchors.lua
 
 daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in

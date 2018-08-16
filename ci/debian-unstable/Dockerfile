@@ -12,6 +12,9 @@ RUN apt-get upgrade -y -qqq
 # Knot and Knot Resolver dependecies
 RUN apt-get install -y -qqq make cmake pkg-config git build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http
 
+# Go and Perl dependencies for BoringSSL
+RUN apt-get install -y -qqq golang perl
+
 # build and install latest version of Knot DNS
 # (kresd depends on libknot and libdnssec)
 RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot

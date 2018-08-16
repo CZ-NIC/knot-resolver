@@ -17,6 +17,9 @@ RUN apt-get install -y -qqq make cmake pkg-config build-essential bsdmainutils l
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
+# Go and Perl dependencies for BoringSSL
+RUN apt-get install -y -qqq golang perl
+
 # Python packags required for Deckard CI
 # Python: grab latest versions from PyPi
 # (dnspython and Augeas binding in Debian packages are slow and buggy)
