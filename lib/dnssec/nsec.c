@@ -24,11 +24,42 @@
 #include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
 #include <libdnssec/error.h>
-#include <libdnssec/nsec.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
 
+bool kr_nsec_bitmap_contains_type(const uint8_t *bm, uint16_t bm_size, uint16_t type)
+{
+	if (!bm || bm_size == 0) {
+		assert(bm);
+		return false;
+	}
+
+	const uint8_t type_hi = (type >> 8);
+	const uint8_t type_lo = (type & 0xff);
+	const uint8_t bitmap_idx = (type_lo >> 3);
+	const uint8_t bitmap_bit_mask = 1 << (7 - (type_lo & 0x07));
+
+	size_t bm_pos = 0;
+	while (bm_pos + 3 <= bm_size) {
+		uint8_t win = bm[bm_pos++];
+		uint8_t win_size = bm[bm_pos++];
+		/* Check remaining window length. */
+		if (win_size < 1 || bm_pos + win_size > bm_size)
+			return false;
+		/* Check that we have a correct window. */
+		if (win == type_hi) {
+			if (bitmap_idx < win_size) {
+				return bm[bm_pos + bitmap_idx] & bitmap_bit_mask;
+			}
+			return false;
+		} else {
+			bm_pos += win_size;
+		}
+	}
+
+	return false;
+}
 
 int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 {
@@ -36,9 +67,9 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 		return kr_error(EINVAL);
 	}
 	const bool parent_side =
-		dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_DNAME)
-		|| (dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_NS)
-		    && !dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA)
+		kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_DNAME)
+		|| (kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_NS)
+		    && !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)
 		);
 	return parent_side ? abs(ENOENT) : kr_ok();
 	/* LATER: after refactoring, probably also check if signer name equals owner,
@@ -231,12 +262,12 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 	if (!bm || !owner) {
 		return kr_error(EINVAL);
 	}
-	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
+	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
 		return NO_PROOF;
 	}
 
 	if (type != KNOT_RRTYPE_CNAME
-	    && dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_CNAME)) {
+	    && kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_CNAME)) {
 		return NO_PROOF;
 	}
 	/* Special behavior around zone cuts. */
@@ -248,7 +279,7 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 		 * See RFC4035 5.2, next-to-last paragraph.
 		 * This doesn't apply for root DS as it doesn't exist in DNS hierarchy.
 		 */
-		if (owner[0] != '\0' && dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA)) {
+		if (owner[0] != '\0' && kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
 			return NO_PROOF;
 		}
 		break;
@@ -260,8 +291,8 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 	default:
 		/* Parent-side delegation record isn't authoritative for non-DS;
 		 * see RFC6840 4.1. */
-		if (dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_NS)
-		    && !dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA)) {
+		if (kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_NS)
+		    && !kr_nsec_bitmap_contains_type(bm, bm_size, KNOT_RRTYPE_SOA)) {
 			return NO_PROOF;
 		}
 		/* LATER(opt): perhaps short-circuit test if we repeat it here. */
@@ -489,11 +520,11 @@ int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
 			if (!bm) {
 				return kr_error(EINVAL);
 			}
-			if (dnssec_nsec_bitmap_contains(bm, bm_size,
+			if (kr_nsec_bitmap_contains_type(bm, bm_size,
 							  KNOT_RRTYPE_NS) &&
-			    !dnssec_nsec_bitmap_contains(bm, bm_size,
+			    !kr_nsec_bitmap_contains_type(bm, bm_size,
 							  KNOT_RRTYPE_DS) &&
-			    !dnssec_nsec_bitmap_contains(bm, bm_size,
+			    !kr_nsec_bitmap_contains_type(bm, bm_size,
 							  KNOT_RRTYPE_SOA)) {
 				/* rfc4035, 5.2 */
 				return kr_ok();
@@ -532,7 +563,7 @@ int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
 	if (!bm) {
 		return kr_error(EINVAL);
 	}
-	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
+	if (kr_nsec_bitmap_contains_type(bm, bm_size, type)) {
 		return kr_ok();
 	} else {
 		return kr_error(ENOENT);
