@@ -26,3 +26,6 @@ bench: $(foreach bench,$(bench_BIN),bench/$(bench))
 	$(preload_syms) ./bench/bench_lru 23 bench/bench_lru_set1.tsv - 16384 # fill ~ 4
 	$(preload_syms) ./bench/bench_lru 23 bench/bench_lru_set1.tsv - 8192  # fill ~ 8
 	$(preload_syms) ./bench/bench_lru 23 bench/bench_lru_set1.tsv - 4096  # fill ~ 16
+	@echo "" >&2
+	@echo "Test TLS connection performance" >&2
+	./bench/bench_tls.sh
