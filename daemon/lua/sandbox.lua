@@ -158,7 +158,7 @@ setmetatable(modules, {
 })
 
 
-cache.clear = function (name, exact_name, rr_type, maxcount, callback)
+cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
 	if name == nil then return cache.clear_everything() end
 	-- Check parameters, in order, and set defaults if missing.
 	local dname = kres.str2dname(name)
@@ -190,39 +190,39 @@ cache.clear = function (name, exact_name, rr_type, maxcount, callback)
 		-- Special case, without any subtree searching.
 		if not exact_name
 			then error('cache.clear(): specifying rr_type only supported with exact_name') end
-		if maxcount or callback
-			then error('cache.clear(): maxcount and callback parameters not supported with rr_type') end
+		if chunk_size or callback
+			then error('cache.clear(): chunk_size and callback parameters not supported with rr_type') end
 		local ret = ffi.C.kr_cache_remove(cach, dname, rr_type)
 		if ret < 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
 		return true
 	end
 
-	if maxcount == nil then maxcount = 100 end
-	if type(maxcount) ~= 'number' or maxcount <= 0
-		then error('cache.clear(): maxcount has to be a positive integer') end
+	if chunk_size == nil then chunk_size = 100 end
+	if type(chunk_size) ~= 'number' or chunk_size <= 0
+		then error('cache.clear(): chunk_size has to be a positive integer') end
 
-	-- Do the C call, and add maxcount warning.
-	errors.count = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, maxcount)
-	if errors.count == maxcount then
+	-- Do the C call, and add chunk_size warning.
+	errors.count = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, chunk_size)
+	if errors.count == chunk_size then
 		local msg_extra = ''
 		if callback == nil then
 			msg_extra = '; the default callback will continue asynchronously'
 		end
-		errors.count_limit = 'Limit of ' .. tostring(maxcount) .. ' entries reached'
-							.. msg_extra .. '.'
+		errors.chunk_limit = 'chunk size limit of ' .. tostring(chunk_size)
+				     .. ' entries reached' .. msg_extra
 	end
 
 	-- Default callback function: repeat after 1ms
 	if callback == nil then callback =
-		function (cberrors, cbname, cbexact_name, cbrr_type, cbmaxcount, cbself)
+		function (cberrors, cbname, cbexact_name, cbrr_type, cbchunk_size, cbself)
 			if errors.count < 0 then error(ffi.string(ffi.C.knot_strerror(errors.count))) end
-			if (errors.count ~= cbmaxcount) then return end
+			if (errors.count ~= cbchunk_size) then return end
 			event.after(1, function ()
-					cache.clear(cbname, cbexact_name, cbrr_type, cbmaxcount, cbself)
+					cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself)
 				end)
 		end
 	end
-	callback(errors, name, exact_name, rr_type, maxcount, callback)
+	callback(errors, name, exact_name, rr_type, chunk_size, callback)
 	return errors
 end
 -- Syntactic sugar for cache
