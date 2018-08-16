@@ -194,7 +194,7 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
 			then error('cache.clear(): chunk_size and callback parameters not supported with rr_type') end
 		local ret = ffi.C.kr_cache_remove(cach, dname, rr_type)
 		if ret < 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
-		return true
+		return {count = 1}
 	end
 
 	if chunk_size == nil then chunk_size = 100 end
