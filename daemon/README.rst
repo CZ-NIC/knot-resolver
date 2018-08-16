@@ -866,9 +866,22 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.clear([name], [exact_name], [rr_type], [chunk_size], [callback])
 
-  Purge cache records.
+     Purge cache records matching specified criteria. There are two specifics:
 
-  :return: ``bool`` (success of removing all in one go)
+     * To reliably remove **negative** cache entries you need to clear subtree with the whole zone. E.g. to clear negative cache entries for (formerly non-existing) record `www.example.com. A` you need to flush whole subtree starting at zone apex, e.g. `example.com.` [#]_.
+     * This operation is an asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Result is indicated return value. You can use custom callback to wait for operation to finish.
+
+  :rtype: table
+  :return: ``count`` field is always present, other fields are optional.
+
+  =========== ===========
+  Key         Description
+  =========== ===========
+  count       number of items removed from cache by this call
+  not_apex    indicates that cleared subtree is not cached as zone apex; proofs of non-existence were not removed
+  subtree     hint where zone apex lies (this is guess from cache content, might not be accurate)
+  chunk_limit indicates that more than ``chunk_size`` needs to be cleared, clearing will continue in callback
+  =========== ===========
 
   :param string name: if the name isn't provided, whole cache is purged
         (and any other parameters are disregarded).
@@ -902,6 +915,7 @@ daemons or manipulated from other processes, making for example synchronised loa
      (which are used for aggressive non-existence proofs)
      will be removed only for zones whose **apex** is at or below the specified name.
 
+.. [#] This is a consequence of DNSSEC negative cache which relies on proofs of non-existence on various owner nodes. It is impossible to efficiently flush part of DNS zones signed with NSEC3.
 
 Timers and events
 ^^^^^^^^^^^^^^^^^
