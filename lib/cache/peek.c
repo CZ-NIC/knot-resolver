@@ -553,20 +553,26 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	return kr_ok();
 }
 
-int kr_cache_closest_apex(struct kr_cache *cache, const knot_dname_t *name, bool is_DS)
+int kr_cache_closest_apex(struct kr_cache *cache, const knot_dname_t *name, bool is_DS,
+			  knot_dname_t ** apex)
 {
-	if (!cache || !name) {
+	if (!cache || !cache->db || !name || !apex || *apex) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 	struct key k_storage, *k = &k_storage;
 	int ret = kr_dname_lf(k->buf, name, false);
-	if (ret) return kr_error(ret);
+	if (ret)
+		return kr_error(ret);
 	entry_list_t el_;
 	k->zname = name;
 	ret = closest_NS(cache, k, el_, NULL, true, is_DS);
-	if (ret && ret != -abs(ENOENT)) return ret;
-	return knot_dname_labels(name, NULL) - knot_dname_labels(k->zname, NULL);
+	if (ret && ret != -abs(ENOENT))
+		return ret;
+	*apex = knot_dname_copy(k->zname, NULL);
+	if (!*apex)
+		return kr_error(ENOMEM);
+	return kr_ok();
 }
 
 /** \internal for closest_NS.  Check suitability of a single entry, setting k->type if OK.
