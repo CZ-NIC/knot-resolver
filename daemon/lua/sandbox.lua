@@ -216,14 +216,15 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
 	if callback == nil then callback =
 		function (cberrors, cbname, cbexact_name, cbrr_type, cbchunk_size, cbself)
 			if errors.count < 0 then error(ffi.string(ffi.C.knot_strerror(errors.count))) end
-			if (errors.count ~= cbchunk_size) then return end
-			event.after(1, function ()
-					cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself)
-				end)
+			if (errors.count == cbchunk_size) then
+				event.after(1, function ()
+						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself)
+					end)
+			end
+			return cberrors
 		end
 	end
-	callback(errors, name, exact_name, rr_type, chunk_size, callback)
-	return errors
+	return callback(errors, name, exact_name, rr_type, chunk_size, callback)
 end
 -- Syntactic sugar for cache
 -- `cache[x] -> cache.get(x)`
