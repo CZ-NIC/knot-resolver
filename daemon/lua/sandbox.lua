@@ -159,7 +159,13 @@ setmetatable(modules, {
 
 
 cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
-	if name == nil then return cache.clear_everything() end
+	if name == nil then  -- keep same output format as for 'standard' clear
+		local total_count = cache.count()
+		if not cache.clear_everything() then
+			error('unable to clear everything')
+		end
+		return {count = total_count}
+	end
 	-- Check parameters, in order, and set defaults if missing.
 	local dname = kres.str2dname(name)
 	if not dname then error('cache.clear(): incorrect name passed') end
