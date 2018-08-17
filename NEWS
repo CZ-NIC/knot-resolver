@@ -28,9 +28,11 @@ Improvements
 ------------
 - reorder_RR() implementation is brought back
 - bring in performace improvements provided by libknot 2.7
+- cache.clear() has a new, more powerful API
+- cache documentation was improved
 - old name "Knot DNS Resolver" is replaced by unambiguous "Knot Resolver"
   to prevent confusion with "Knot DNS" authoritative server
-- lua: resurrect cache.clear('name')
+
 
 Knot Resolver 2.4.1 (2018-08-02)
 ================================
