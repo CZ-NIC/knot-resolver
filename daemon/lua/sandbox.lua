@@ -157,6 +157,88 @@ setmetatable(modules, {
 	end
 })
 
+
+cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)
+	if name == nil or (name == '.' and not exact_name) then
+		-- keep same output format as for 'standard' clear
+		local total_count = cache.count()
+		if not cache.clear_everything() then
+			error('unable to clear everything')
+		end
+		return {count = total_count}
+	end
+	-- Check parameters, in order, and set defaults if missing.
+	local dname = kres.str2dname(name)
+	if not dname then error('cache.clear(): incorrect name passed') end
+	if exact_name == nil then exact_name = false end
+	if type(exact_name) ~= 'boolean'
+		then error('cache.clear(): incorrect exact_name passed') end
+
+	local cach = kres.context().cache;
+	local rettable = {}
+	-- Apex warning.  If the caller passes a custom callback,
+	-- we assume they are advanced enough not to need the check.
+	-- The point is to avoid repeating the check in each callback iteration.
+	if callback == nil then
+		local names = ffi.new('knot_dname_t *[1]')  -- C: dname **names
+		local ret = ffi.C.kr_cache_closest_apex(cach, dname, false, names)
+		if ret < 0 then
+			error(ffi.string(ffi.C.knot_strerror(ret))) end
+		ffi.gc(names[0], ffi.C.free)
+		local apex = kres.dname2str(names[0])
+		if apex ~= name then
+			rettable.not_apex = 'to clear proofs of non-existence call '
+				.. 'cache.clear(\'' .. tostring(apex) ..'\')'
+			rettable.subtree = apex
+		end
+	end
+
+	if rr_type ~= nil then
+		-- Special case, without any subtree searching.
+		if not exact_name
+			then error('cache.clear(): specifying rr_type only supported with exact_name') end
+		if chunk_size or callback
+			then error('cache.clear(): chunk_size and callback parameters not supported with rr_type') end
+		local ret = ffi.C.kr_cache_remove(cach, dname, rr_type)
+		if ret < 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
+		return {count = 1}
+	end
+
+	if chunk_size == nil then chunk_size = 100 end
+	if type(chunk_size) ~= 'number' or chunk_size <= 0
+		then error('cache.clear(): chunk_size has to be a positive integer') end
+
+	-- Do the C call, and add chunk_size warning.
+	rettable.count = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, chunk_size)
+	if rettable.count == chunk_size then
+		local msg_extra = ''
+		if callback == nil then
+			msg_extra = '; the default callback will continue asynchronously'
+		end
+		rettable.chunk_limit = 'chunk size limit reached' .. msg_extra
+	end
+
+	-- Default callback function: repeat after 1ms
+	if callback == nil then callback =
+		function (cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbprev_state, cbrettable)
+			if cbrettable.count < 0 then error(ffi.string(ffi.C.knot_strerror(cbrettable.count))) end
+			if cbprev_state == nil then cbprev_state = { round = 0 } end
+			if type(cbprev_state) ~= 'table'
+				then error('cache.clear() callback: incorrect prev_state passed') end
+			cbrettable.round = cbprev_state.round + 1
+			if (cbrettable.count == cbchunk_size) then
+				event.after(1, function ()
+						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbrettable)
+					end)
+			elseif cbrettable.round > 1 then
+				log('[cache] asynchonous cache.clear(\'' .. cbname .. '\', '
+				    .. tostring(cbexact_name) .. ') finished')
+			end
+			return cbrettable
+		end
+	end
+	return callback(name, exact_name, rr_type, chunk_size, callback, prev_state, rettable)
+end
 -- Syntactic sugar for cache
 -- `cache[x] -> cache.get(x)`
 -- `cache.{size|storage} = value`
@@ -277,7 +359,7 @@ function table_print (tt, indent, done)
 			if c >= 0x20 and c < 0x7f then table.insert(bytes, string.char(c))
 			else                           table.insert(bytes, '\\'..tostring(c))
 			end
-			if i > 50 then table.insert(bytes, '...') break end
+			if i > 80 then table.insert(bytes, '...') break end
 		end
 		return table.concat(bytes)
 	end

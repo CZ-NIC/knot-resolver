@@ -547,22 +547,27 @@ static int cdb_writev(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *va
 	return ret;
 }
 
-static int cdb_remove(knot_db_t *db, knot_db_val_t *key, int maxcount)
+static int cdb_remove(knot_db_t *db, knot_db_val_t keys[], int maxcount)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
 	int ret = txn_get(env, &txn, false);
+	int deleted = 0;
 
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
-		MDB_val _key = val_knot2mdb(key[i]);
+		MDB_val _key = val_knot2mdb(keys[i]);
 		MDB_val val = { 0, NULL };
 		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, &val));
+		if (ret == kr_ok())
+			deleted++;
+		else if (ret == KNOT_ENOENT)
+			ret = kr_ok();  /* skip over non-existing entries */
 	}
 
-	return ret;
+	return ret < 0 ? ret : deleted;
 }
 
-static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int maxcount)
+static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t keyval[][2], int maxcount)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
@@ -571,12 +576,7 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 		return ret;
 	}
 
-	/* Turn wildcard into prefix scan. */
-	const uint8_t *endp = (const uint8_t *)key->data + (key->len - 2);
-	if (key->len > 2 && endp[0] == '*' && endp[1] == '\0') {
-		key->len -= 2; /* Skip '*' label */
-	}
-
+	/* LATER(optim.): use txn_curs_get() instead, to save resources. */
 	MDB_cursor *cur = NULL;
 	ret = mdb_cursor_open(txn, env->dbi, &cur);
 	if (ret != 0) {
@@ -599,7 +599,8 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t *val, int 
 		}
 		/* Add to result set */
 		if (results < maxcount) {
-			val[results] = val_mdb2knot(cur_key);
+			keyval[results][0] = val_mdb2knot(cur_key);
+			keyval[results][1] = val_mdb2knot(cur_val);
 			++results;
 		} else {
 			break;

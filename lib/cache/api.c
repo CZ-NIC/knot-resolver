@@ -73,8 +73,9 @@ static inline int cache_clear(struct kr_cache *cache)
 /** @internal Open cache db transaction and check internal data version. */
 static int assert_right_version(struct kr_cache *cache)
 {
-	/* Check cache ABI version */
-	uint8_t key_str[] = "\x00\x00V"; /* CACHE_KEY_DEF; zero-term. but we don't care */
+	/* Check cache ABI version. */
+	/* CACHE_KEY_DEF: to avoid collisions with kr_cache_match(). */
+	uint8_t key_str[4] = "VERS";
 	knot_db_val_t key = { .data = key_str, .len = sizeof(key_str) };
 	knot_db_val_t val = { NULL, 0 };
 	int ret = cache_op(cache, read, &key, &val, 1);
@@ -758,6 +759,115 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 				(ret == kr_error(ENOENT) ? "miss" : "error"));
 		VERBOSE_MSG(NULL, "_peek_exact: %s %s %s (ret: %d)",
 				type_str, name_str, result_str, ret);
+	}
+	return ret;
+}
+
+int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t type)
+{
+	if (!cache_isvalid(cache)) {
+		return kr_error(EINVAL);
+	}
+	if (!cache->api->remove) {
+		return kr_error(ENOSYS);
+	}
+	struct key k_storage, *k = &k_storage;
+	int ret = kr_dname_lf(k->buf, name, false);
+	if (ret) return kr_error(ret);
+
+	knot_db_val_t key = key_exact_type(k, type);
+	return cache_op(cache, remove, &key, 1);
+}
+
+int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
+		   bool exact_name, knot_db_val_t keyval[][2], int maxcount)
+{
+	if (!cache_isvalid(cache)) {
+		return kr_error(EINVAL);
+	}
+	if (!cache->api->match) {
+		return kr_error(ENOSYS);
+	}
+
+	struct key k_storage, *k = &k_storage;
+
+	int ret = kr_dname_lf(k->buf, name, false);
+	if (ret) return kr_error(ret);
+
+	// use a mock type
+	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_A);
+	/* CACHE_KEY_DEF */
+	key.len -= sizeof(uint16_t); /* the type */
+	if (!exact_name) {
+		key.len -= 2; /* '\0' 'E' */
+		if (name[0] == '\0') ++key.len; /* the root name is special ATM */
+	}
+	return cache_op(cache, match, &key, keyval, maxcount);
+}
+
+int kr_unpack_cache_key(knot_db_val_t key, knot_dname_t *buf, uint16_t *type)
+{
+	if (key.data == NULL || buf == NULL || type == NULL) {
+		return kr_error(EINVAL);
+	}
+
+	int len = -1;
+	const char *tag, *key_data = key.data;
+	for (tag = key_data + 1; tag < key_data + key.len; ++tag) {
+		/* CACHE_KEY_DEF */
+		if (tag[-1] == '\0' && (tag == key_data + 1 || tag[-2] == '\0')) {
+			if (tag[0] != 'E') return kr_error(EINVAL);
+			len = tag - 1 - key_data;
+			break;
+		}
+	}
+
+	if (len == -1 || len > KNOT_DNAME_MAXLEN) {
+		return kr_error(EINVAL);
+	}
+
+	int ret = knot_dname_lf2wire(buf, len, key.data);
+	if (ret < 0) {
+		return kr_error(ret);
+	}
+
+	/* CACHE_KEY_DEF: jump over "\0 E/1" */
+	memcpy(type, tag + 1, sizeof(uint16_t));
+
+	return kr_ok();
+}
+
+
+int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
+			    bool exact_name, int maxcount)
+{
+	if (!cache_isvalid(cache)) {
+		return kr_error(EINVAL);
+	}
+
+	knot_db_val_t keyval[maxcount][2], keys[maxcount];
+	int ret = kr_cache_match(cache, name, exact_name, keyval, maxcount);
+	if (ret <= 0) { /* ENOENT -> nothing to remove */
+		return (ret == KNOT_ENOENT) ? 0 : ret;
+	}
+	const int count = ret;
+	/* Duplicate the key strings, as deletion may invalidate the pointers. */
+	int i;
+	for (i = 0; i < count; ++i) {
+		keys[i].len = keyval[i][0].len;
+		keys[i].data = malloc(keys[i].len);
+		if (!keys[i].data) {
+			ret = kr_error(ENOMEM);
+			goto cleanup;
+		}
+		memcpy(keys[i].data, keyval[i][0].data, keys[i].len);
+	}
+	ret = cache->api->remove(cache->db, keys, count);
+cleanup:
+	kr_cache_sync(cache); /* Sync even after just kr_cache_match(). */
+	/* Free keys */
+	while (--i >= 0) {
+		free(keys[i].data);
 	}
 	return ret;
 }

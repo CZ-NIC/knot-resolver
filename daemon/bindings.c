@@ -1077,57 +1077,16 @@ static int cache_close(lua_State *L)
 
 #if 0
 /** @internal Prefix walk. */
-static int cache_prefixed(struct kr_cache *cache, const char *args, knot_db_val_t *results, int maxresults)
+static int cache_prefixed(struct kr_cache *cache, const char *prefix, bool exact_name,
+			  knot_db_val_t keyval[][2], int maxcount)
 {
-	/* Decode parameters */
-	uint8_t namespace = 'R';
-	char *extra = strchr(args, ' ');
-	if (extra != NULL) {
-		extra[0] = '\0';
-		namespace = extra[1];
-	}
-
 	/* Convert to domain name */
 	uint8_t buf[KNOT_DNAME_MAXLEN];
-	if (!knot_dname_from_str(buf, args, sizeof(buf))) {
+	if (!knot_dname_from_str(buf, prefix, sizeof(buf))) {
 		return kr_error(EINVAL);
 	}
-
 	/* Start prefix search */
-	int ret = kr_cache_match(cache, namespace, buf, results, maxresults);
-	kr_cache_sync(cache);
-	return ret;
-}
-
-/** @internal Delete iterated key. */
-static int cache_remove_prefix(struct kr_cache *cache, const char *args)
-{
-	/* Check if we can remove */
-	if (!cache || !cache->api || !cache->api->remove) {
-		return kr_error(ENOSYS);
-	}
-	static knot_db_val_t result_set[1000];
-	int ret = cache_prefixed(cache, args, result_set, 1000);
-	if (ret < 0) {
-		return ret;
-	}
-	/* Duplicate result set as we're going to remove it
-	 * which will invalidate result set. */
-	for (int i = 0; i < ret; ++i) {
-		void *dst = malloc(result_set[i].len);
-		if (!dst) {
-			return kr_error(ENOMEM);
-		}
-		memcpy(dst, result_set[i].data, result_set[i].len);
-		result_set[i].data = dst;
-	}
-	cache->api->remove(cache->db, result_set, ret);
-	kr_cache_sync(cache);
-	/* Free keys */
-	for (int i = 0; i < ret; ++i) {
-		free(result_set[i].data);
-	}
-	return ret;
+	return kr_cache_match(cache, buf, exact_name, keyval, maxcount);
 }
 #endif
 
@@ -1156,30 +1115,12 @@ static int cache_prune(lua_State *L)
 	return 1;
 }
 
-/** Clear all records. */
-static int cache_clear(lua_State *L)
+/** Clear everything. */
+static int cache_clear_everything(lua_State *L)
 {
 	struct kr_cache *cache = cache_assert_open(L);
 
-	/* Check parameters */
-	const char *args = NULL;
-	int n = lua_gettop(L);
-	if (n >= 1 && lua_isstring(L, 1)) {
-		args = lua_tostring(L, 1);
-	}
-
-	/* Clear a sub-tree in cache. */
-	if (args && strlen(args) > 0) {
-		int ret = kr_error(ENOSYS); // FIXME cache_remove_prefix(cache, args);
-		if (ret < 0) {
-			format_error(L, kr_strerror(ret));
-			lua_error(L);
-		}
-		lua_pushinteger(L, ret);
-		return 1;
-	}
-
-	/* Clear cache. */
+	/* Clear records and packets. */
 	int ret = kr_cache_clear(cache);
 	if (ret < 0) {
 		format_error(L, kr_strerror(ret));
@@ -1195,45 +1136,39 @@ static int cache_clear(lua_State *L)
 	return 1;
 }
 
+#if 0
 /** @internal Dump cache key into table on Lua stack. */
-static void cache_dump_key(lua_State *L, knot_db_val_t *key)
+static void cache_dump(lua_State *L, knot_db_val_t keyval[])
 {
-	char buf[KNOT_DNAME_MAXLEN];
-	/* Extract type */
-	uint16_t type = 0;
-	const char *endp = (const char *)key->data + key->len - sizeof(uint16_t);
-	memcpy(&type, endp, sizeof(uint16_t));
-	endp -= 1;
-	/* Extract domain name */
-	char *dst = buf;
-	const char *scan = endp - 1;
-	while (scan > (const char *)key->data) {
-		if (*scan == '\0') {
-			const size_t lblen = endp - scan - 1;
-			memcpy(dst, scan + 1, lblen);
-			dst += lblen;
-			*dst++ = '.';
-			endp = scan;
-		}
-		--scan;
+	knot_dname_t dname[KNOT_DNAME_MAXLEN];
+	char name[KNOT_DNAME_TXT_MAXLEN];
+	uint16_t type;
+
+	int ret = kr_unpack_cache_key(keyval[0], dname, &type);
+	if (ret < 0) {
+		return;
 	}
-	memcpy(dst, scan + 1, endp - scan);
+
+	ret = !knot_dname_to_str(name, dname, sizeof(name));
+	assert(!ret);
+	if (ret) return;
+
 	/* If name typemap doesn't exist yet, create it */
-	lua_getfield(L, -1, buf);
+	lua_getfield(L, -1, name);
 	if (lua_isnil(L, -1)) {
 		lua_pop(L, 1);
 		lua_newtable(L);
 	}
 	/* Append to typemap */
-	char type_buf[16] = { '\0' };
+	char type_buf[KR_RRTYPE_STR_MAXLEN] = { '\0' };
 	knot_rrtype_to_string(type, type_buf, sizeof(type_buf));
 	lua_pushboolean(L, true);
 	lua_setfield(L, -2, type_buf);
 	/* Set name typemap */
-	lua_setfield(L, -2, buf);
+	lua_setfield(L, -2, name);
 }
 
-/** Query cached records. */
+/** Query cached records.  TODO: fix caveats in ./README.rst documentation? */
 static int cache_get(lua_State *L)
 {
 	//struct kr_cache *cache = cache_assert_open(L); // to be fixed soon
@@ -1246,9 +1181,9 @@ static int cache_get(lua_State *L)
 	}
 
 	/* Retrieve set of keys */
-	//const char *args = lua_tostring(L, 1);
-	static knot_db_val_t result_set[100];
-	int ret = kr_error(ENOSYS); // FIXME cache_prefixed(cache, args, result_set, 100);
+	const char *prefix = lua_tostring(L, 1);
+	knot_db_val_t keyval[100][2];
+	int ret = cache_prefixed(cache, prefix, false/*FIXME*/, keyval, 100);
 	if (ret < 0) {
 		format_error(L, kr_strerror(ret));
 		lua_error(L);
@@ -1256,9 +1191,17 @@ static int cache_get(lua_State *L)
 	/* Format output */
 	lua_newtable(L);
 	for (int i = 0; i < ret; ++i) {
-		cache_dump_key(L, &result_set[i]);
+		cache_dump(L, keyval[i]);
 	}
 	return 1;
+}
+#endif
+static int cache_get(lua_State *L)
+{
+	int ret = kr_error(ENOSYS);
+	format_error(L, kr_strerror(ret));
+	lua_error(L);
+	return ret;
 }
 
 /** Set time interval for cleaning rtt cache.
@@ -1379,8 +1322,8 @@ int lib_cache(lua_State *L)
 		{ "open",   cache_open },
 		{ "close",  cache_close },
 		{ "prune",  cache_prune },
-		{ "clear",  cache_clear },
-		{ "get",    cache_get },
+		{ "clear_everything", cache_clear_everything },
+		{ "get",     cache_get },
 		{ "max_ttl", cache_max_ttl },
 		{ "min_ttl", cache_min_ttl },
 		{ "ns_tout", cache_ns_tout },
