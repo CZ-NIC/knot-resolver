@@ -173,6 +173,14 @@ local function test_apex()
 end
 
 local function test_root()
+	check_answer('root apex is still in cache',
+                     '.', kres.type.NS, kres.rcode.NOERROR)
+	res = cache.clear('.', true)
+	check_answer('root apex is in no longer cache',
+                     '.', kres.type.NS, kres.rcode.SERVFAIL)
+	check_answer('some other item is still in cache',
+                     '16r.subtree2.', kres.type.A, kres.rcode.NOERROR)
+
 	local prev_count = cache.count()
 	res = cache.clear('.')
 	is(res.count, prev_count, 'full clear reports correct number of entries')
