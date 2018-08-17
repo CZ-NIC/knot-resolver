@@ -216,7 +216,7 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	if (!handle) {
 		return NULL;
 	}
-	io_create(worker->loop, handle, socktype);
+	io_create(worker->loop, handle, socktype, family);
 
 	/* Bind to outgoing address, according to IP v4/v6. */
 	union inaddr *addr;
@@ -899,98 +899,11 @@ static void on_task_write(uv_write_t *req, int status)
 	iorequest_release(worker, req);
 }
 
-static void on_nontask_write(uv_write_t *req, int status)
-{
-	uv_handle_t *handle = (uv_handle_t *)(req->handle);
-	uv_loop_t *loop = handle->loop;
-	struct worker_ctx *worker = loop->data;
-	assert(worker == get_worker());
-	iorequest_release(worker, req);
-}
-
-ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
-{
-	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
-	const uv_buf_t uv_buf[1] = {
-		{ (char *)buf, len }
-	};
-
-	if (t == NULL) {
-		errno = EFAULT;
-		return -1;
-	}
-
-	assert(t->session && t->session->handle &&
-	       t->session->handle->type == UV_TCP);
-
-	VERBOSE_MSG(NULL,"[%s] push %zu <%p>\n",
-		    t->client_side ? "tls_client" : "tls", len, h);
-
-	struct worker_ctx *worker = t->worker;
-	assert(worker);
-
-	void *ioreq = worker_iohandle_borrow(worker);
-	if (!ioreq) {
-		errno = EFAULT;
-		return -1;
-	}
-
-	uv_write_t *write_req = (uv_write_t *)ioreq;
-
-	struct qr_task *task = t->task;
-	uv_write_cb write_cb = on_task_write;
-	if (t->handshake_state == TLS_HS_DONE) {
-		assert(task);
-	} else {
-		task = NULL;
-		write_cb = on_nontask_write;
-	}
-
-	write_req->data = task;
-
-	ssize_t ret = -1;
-	int res = uv_write(write_req, (uv_stream_t *)t->session->handle, uv_buf, 1, write_cb);
-	if (res == 0) {
-		if (task) {
-			qr_task_ref(task); /* Pending ioreq on current task */
-			struct request_ctx *ctx = task->ctx;
-			if (ctx && ctx->source.session &&
-			    t->session->handle != ctx->source.session->handle) {
-				struct sockaddr *addr = &t->session->peer.ip;
-				worker->stats.tls += 1;
-				if (addr->sa_family == AF_INET6)
-					worker->stats.ipv6 += 1;
-				else if (addr->sa_family == AF_INET)
-					worker->stats.ipv4 += 1;
-			}
-		}
-		if (worker->too_many_open &&
-		    worker->stats.rconcurrent <
-			worker->rconcurrent_highwatermark - 10) {
-			worker->too_many_open = false;
-		}
-		ret = len;
-	} else {
-		VERBOSE_MSG(NULL,"[%s] uv_write: %s\n",
-			    t->client_side ? "tls_client" : "tls", uv_strerror(res));
-		iorequest_release(worker, ioreq);
-		errno = EIO;
-	}
-	return ret;
-}
-
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 			struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	if (!handle) {
 		return qr_task_on_send(task, handle, kr_error(EIO));
-	}
-
-	/* Synchronous push to TLS context, bypassing event loop. */
-	struct session *session = handle->data;
-	assert(session->closing == false);
-	if (session->has_tls) {
-		return tls_push(task, handle, pkt);
 	}
 
 	int ret = 0;
@@ -1000,9 +913,17 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 	if (!ioreq) {
 		return qr_task_on_send(task, handle, kr_error(ENOMEM));
 	}
+	/* Pending ioreq on current task */
+	qr_task_ref(task);
 
 	/* Send using given protocol */
-	if (handle->type == UV_UDP) {
+	struct session *session = handle->data;
+	assert(session->closing == false);
+	if (session->has_tls) {
+		uv_write_t *write_req = (uv_write_t *)ioreq;
+		write_req->data = task;
+		ret = tls_write(write_req, handle, pkt, &on_task_write);
+	} else if (handle->type == UV_UDP) {
 		uv_udp_send_t *send_req = (uv_udp_send_t *)ioreq;
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->data = task;
@@ -1021,7 +942,6 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 	}
 
 	if (ret == 0) {
-		qr_task_ref(task); /* Pending ioreq on current task */
 		if (worker->too_many_open &&
 		    worker->stats.rconcurrent <
 			worker->rconcurrent_highwatermark - 10) {
@@ -1029,6 +949,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 		}
 	} else {
 		iorequest_release(worker, ioreq);
+		qr_task_unref(task);
 		if (ret == UV_EMFILE) {
 			worker->too_many_open = true;
 			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
@@ -1039,15 +960,19 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 	if (ctx->source.session &&
 	    handle != ctx->source.session->handle &&
 	    addr) {
-		if (handle->type == UV_UDP)
+		if (session->has_tls)
+			worker->stats.tls += 1;
+		else if (handle->type == UV_UDP)
 			worker->stats.udp += 1;
 		else
 			worker->stats.tcp += 1;
+
 		if (addr->sa_family == AF_INET6)
 			worker->stats.ipv6 += 1;
 		else if (addr->sa_family == AF_INET)
 			worker->stats.ipv4 += 1;
 	}
+
 	return ret;
 }
 
@@ -1586,6 +1511,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 	}
 
+	/* Reference task as the callback handler can close it */
+	qr_task_ref(task);
+
 	/* Send back answer */
 	struct session *source_session = ctx->source.session;
 	uv_handle_t *handle = source_session->handle;
@@ -1609,11 +1537,13 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			session_del_tasks(source_session, t);
 		}
 		session_close(source_session);
-	} else if (handle->type == UV_TCP) {
+	} else if (handle->type == UV_TCP && ctx->source.session) {
 		/* Don't try to close source session at least
 		 * retry_interval_for_timeout_timer milliseconds */
 		uv_timer_again(&ctx->source.session->timeout);
 	}
+
+	qr_task_unref(task);
 
 	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 }
@@ -1670,12 +1600,15 @@ static int qr_task_step(struct qr_task *task,
 	/* Upgrade to TLS if the upstream address is configured as DoT capable. */
 	struct engine *engine = ctx->worker->engine;
 	struct network *net = &engine->net;
-	const struct sockaddr *addr = packet_source ? packet_source : task->addrlist;
 	struct tls_client_paramlist_entry *tls_entry = NULL;
-	if (kr_inaddr_port(task->addrlist) == KR_DNS_PORT) {
-		tls_entry = tls_client_try_upgrade(&net->tls_client_params, task->addrlist);
+	/* SOCK_STREAM is likely a retry over TCP, so the resolver should use
+	 * the same address that failed over UDP instead of selecting a new one. */
+	const bool retry_address = (packet_source && sock_type == SOCK_STREAM);
+	const struct sockaddr *addr = retry_address ? packet_source : task->addrlist;
+	if (kr_inaddr_port(addr) == KR_DNS_PORT) {
+		tls_entry = tls_client_try_upgrade(&net->tls_client_params, addr);
 		if (tls_entry != NULL) {
-			kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
+			kr_inaddr_set_port((struct sockaddr *)addr, KR_DNS_TLS_PORT);
 			sock_type = SOCK_STREAM;
 		}
 	} else if (sock_type == SOCK_STREAM) {
@@ -1693,7 +1626,7 @@ static int qr_task_step(struct qr_task *task,
 		/* Start transmitting */
 		uv_handle_t *handle = retransmit(task);
 		if (handle == NULL) {
-			return qr_task_step(task, task->addrlist, NULL);
+			return qr_task_step(task, addr, NULL);
 		}
 		/* Check current query NSLIST */
 		struct kr_query *qry = array_tail(req->rplan.pending);
@@ -1731,11 +1664,13 @@ static int qr_task_step(struct qr_task *task,
 			subreq_finalize(task, packet_source, packet);
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
-		/* CHeck that the selected address is still valid */
+
+		/* Check that the selected address is still valid */
 		if (addr->sa_family != AF_INET && addr->sa_family != AF_INET6) {
 			subreq_finalize(task, packet_source, packet);
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
+
 		struct session* session = NULL;
 		if ((session = worker_find_tcp_waiting(ctx->worker, addr)) != NULL) {
 			assert(session->outgoing);
@@ -1859,6 +1794,7 @@ static int qr_task_step(struct qr_task *task,
 
 			/* Check if there must be TLS */
 			if (tls_entry) {
+				assert(kr_inaddr_port(addr) != KR_DNS_PORT);
 				assert(session->tls_client_ctx == NULL);
 				struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(tls_entry, worker);
 				if (!tls_ctx) {

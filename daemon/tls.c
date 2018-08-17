@@ -90,6 +90,110 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 	return transfer;
 }
 
+static void on_write_complete(uv_write_t *req, int status)
+{
+	assert(req->data != NULL);
+	free(req->data);
+	free(req);
+}
+
+static bool stream_queue_is_empty(uv_stream_t *handle)
+{
+#if UV_VERSION_HEX >= 0x011900
+	return uv_stream_get_write_queue_size(handle) == 0;
+#else
+	/* Assume best case */
+	return true;
+#endif
+}
+
+static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * iov, int iovcnt)
+{
+	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
+
+	if (t == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (iovcnt == 0) {
+		return 0;
+	}
+
+	assert(t->session && t->session->handle &&
+	       t->session->handle->type == UV_TCP);
+	uv_stream_t *handle = (uv_stream_t *)t->session->handle;
+
+	/*
+	 * This is a little bit complicated. There are two different writes:
+	 * 1. Immediate, these don't need to own the buffered data and return immediately
+	 * 2. Asynchronous, these need to own the buffers until the write completes
+	 * In order to avoid copying the buffer, an immediate write is tried first if possible.
+	 * If it isn't possible to write the data without queueing, an asynchronous write
+	 * is created (with copied buffered data).
+	 */
+	
+	size_t total_len = 0;
+	uv_buf_t uv_buf[iovcnt];
+	for (int i = 0; i < iovcnt; ++i) {
+		uv_buf[i].base = iov[i].iov_base;
+		uv_buf[i].len = iov[i].iov_len;
+		total_len += iov[i].iov_len;
+	}
+
+	/* Try to perform the immediate write first to avoid copy */
+	int ret = 0;
+	if (stream_queue_is_empty(handle)) {
+		ret = uv_try_write(handle, uv_buf, iovcnt);
+		DEBUG_MSG("[%s] push %zu <%p> = %d\n",
+		    t->client_side ? "tls_client" : "tls", total_len, h, ret);
+		if (ret >= 0 || ret != UV_EAGAIN) {
+			return ret;
+		}
+	}
+
+	/* Fallback when the queue is full, and it's not possible to do an immediate write */
+	char *buf = malloc(total_len);
+	if (buf != NULL) {
+		/* Copy the buffer into owned memory */
+		size_t off = 0;
+		for (int i = 0; i < iovcnt; ++i) {
+			memcpy(buf + off, uv_buf[i].base, uv_buf[i].len);
+			off += uv_buf[i].len;
+		}
+		uv_buf[0].base = buf;
+		uv_buf[0].len = total_len;
+
+		/* Create an asynchronous write request */
+		uv_write_t *write_req = calloc(1, sizeof(uv_write_t));
+		if (write_req != NULL) {
+			write_req->data = buf;
+		} else {
+			free(buf);
+			errno = ENOMEM;
+			ret = -1;
+		}
+
+		/* Perform an asynchronous write with a callback */
+		if (uv_write(write_req, handle, uv_buf, 1, on_write_complete) == 0) {
+			ret = total_len;
+		} else {
+			free(buf);
+			free(write_req);
+			errno = EIO;
+			ret = -1;
+		}
+	} else {
+		errno = ENOMEM;
+		ret = -1;
+	}
+
+	DEBUG_MSG("[%s] queued %zu <%p> = %d\n",
+	    t->client_side ? "tls_client" : "tls", total_len, h, ret);
+
+	return ret;
+}
+
 /** Perform TLS handshake and handle error codes according to the documentation.
   * See See https://gnutls.org/manual/html_node/TLS-handshake.html#TLS-handshake
   * The function returns kr_ok() or success or non fatal error, kr_error(EAGAIN) on blocking, or kr_error(EIO) on fatal error.
@@ -198,7 +302,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 	tls->c.client_side = false;
 
 	gnutls_transport_set_pull_function(tls->c.tls_session, kres_gnutls_pull);
-	gnutls_transport_set_push_function(tls->c.tls_session, worker_gnutls_push);
+	gnutls_transport_set_vec_push_function(tls->c.tls_session, kres_gnutls_vec_push);
 	gnutls_transport_set_ptr(tls->c.tls_session, tls);
 
 	if (net->tls_session_ticket_ctx) {
@@ -242,7 +346,7 @@ void tls_free(struct tls_ctx_t *tls)
 	free(tls);
 }
 
-int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
+int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb cb)
 {
 	if (!pkt || !handle || !handle->data) {
 		return kr_error(EINVAL);
@@ -259,8 +363,6 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 	const char *logstring = tls_ctx->client_side ? client_logstring : server_logstring;
 	gnutls_session_t tls_session = tls_ctx->tls_session;
 
-	tls_ctx->task = task;
-
 	gnutls_record_cork(tls_session);
 	ssize_t count = 0;
 	if ((count = gnutls_record_send(tls_session, &pkt_size, sizeof(pkt_size)) < 0) ||
@@ -270,36 +372,24 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 		return kr_error(EIO);
 	}
 
-	ssize_t submitted = 0;
-	ssize_t retries = 0;
-	do {
-		count = gnutls_record_uncork(tls_session, 0);
-		if (count < 0) {
-			if (gnutls_error_is_fatal(count)) {
-				kr_log_error("[%s] gnutls_record_uncork failed: %s (%zd)\n",
-				             logstring, gnutls_strerror_name(count), count);
-				return kr_error(EIO);
-			}
-			if (++retries > TLS_MAX_UNCORK_RETRIES) {
-				kr_log_error("[%s] gnutls_record_uncork: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
-				             logstring, retries, gnutls_strerror_name(count), count);
-				return kr_error(EIO);
-			}
-		} else if (count != 0) {
-			submitted += count;
-			retries = 0;
-		} else if (gnutls_record_check_corked(tls_session) != 0) {
-			if (++retries > TLS_MAX_UNCORK_RETRIES) {
-				kr_log_error("[%s] gnutls_record_uncork: too many retries (%zd)\n",
-				             logstring, retries);
-				return kr_error(EIO);
-			}
-		} else if (submitted != sizeof(pkt_size) + pkt->size) {
-			kr_log_error("[%s] gnutls_record_uncork didn't send all data(%zd of %zd)\n",
-			             logstring, submitted, sizeof(pkt_size) + pkt->size);
-			return kr_error(EIO);
-		}
-	} while (submitted != sizeof(pkt_size) + pkt->size);
+	const ssize_t submitted = sizeof(pkt_size) + pkt->size;
+
+	int ret = gnutls_record_uncork(tls_session, GNUTLS_RECORD_WAIT);
+	if (gnutls_error_is_fatal(ret)) {
+		kr_log_error("[%s] gnutls_record_uncork failed: %s (%d)\n",
+		             logstring, gnutls_strerror_name(ret), ret);
+		return kr_error(EIO);
+	}
+
+	if (ret != submitted) {
+		kr_log_error("[%s] gnutls_record_uncork didn't send all data (%d of %zd)\n",
+		             logstring, ret, submitted);
+		return kr_error(EIO);
+	}
+
+	/* The data is now accepted in gnutls internal buffers, the message can be treated as sent */
+	req->handle = (uv_stream_t *)handle;
+	cb(req, 0);
 
 	return kr_ok();
 }
@@ -986,7 +1076,7 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 		return NULL;
 	}
 
-	int ret = gnutls_init(&ctx->c.tls_session, GNUTLS_CLIENT | GNUTLS_NONBLOCK);
+	int ret = gnutls_init(&ctx->c.tls_session, GNUTLS_CLIENT | GNUTLS_NONBLOCK | GNUTLS_ENABLE_FALSE_START);
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
@@ -1014,7 +1104,7 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 	ctx->c.client_side = true;
 
 	gnutls_transport_set_pull_function(ctx->c.tls_session, kres_gnutls_pull);
-	gnutls_transport_set_push_function(ctx->c.tls_session, worker_gnutls_push);
+	gnutls_transport_set_vec_push_function(ctx->c.tls_session, kres_gnutls_vec_push);
 	gnutls_transport_set_ptr(ctx->c.tls_session, ctx);
 	return ctx;
 }

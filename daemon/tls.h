@@ -42,6 +42,9 @@
  */
  #define TLS_MAX_HANDSHAKE_TIME (KR_CONN_RTT_MAX * 3)
 
+/** Transport session (opaque). */
+struct session;
+
 struct tls_ctx_t;
 struct tls_client_ctx_t;
 struct tls_credentials {
@@ -94,7 +97,6 @@ struct tls_common_ctx {
 	uint8_t recv_buf[4096];
 	tls_handshake_cb handshake_cb;
 	struct worker_ctx *worker;
-	struct qr_task *task;
 };
 
 struct tls_ctx_t {
@@ -127,7 +129,7 @@ void tls_close(struct tls_common_ctx *ctx);
 void tls_free(struct tls_ctx_t* tls);
 
 /*! Push new data to TLS context for sending */
-int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
+int tls_write(uv_write_t *req, uv_handle_t* handle, knot_pkt_t * pkt, uv_write_cb cb);
 
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
