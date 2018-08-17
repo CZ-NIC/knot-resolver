@@ -864,56 +864,62 @@ daemons or manipulated from other processes, making for example synchronised loa
          [AAAA] => true
      }
 
-.. function:: cache.clear([name], [exact_name], [rr_type], [chunk_size], [callback])
+.. function:: cache.clear([name], [exact_name], [rr_type], [chunk_size], [callback], [prev_state])
 
      Purge cache records matching specified criteria. There are two specifics:
 
      * To reliably remove **negative** cache entries you need to clear subtree with the whole zone. E.g. to clear negative cache entries for (formerly non-existing) record `www.example.com. A` you need to flush whole subtree starting at zone apex, e.g. `example.com.` [#]_.
-     * This operation is an asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Result is indicated return value. You can use custom callback to wait for operation to finish.
+     * This operation is an asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
 
-  :rtype: table
-  :return: ``count`` field is always present, other fields are optional.
-
-  =========== ===========
-  Key         Description
-  =========== ===========
-  count       number of items removed from cache by this call
-  not_apex    indicates that cleared subtree is not cached as zone apex; proofs of non-existence were not removed
-  subtree     hint where zone apex lies (this is guess from cache content, might not be accurate)
-  chunk_limit indicates that more than ``chunk_size`` needs to be cleared, clearing will continue in callback
-  =========== ===========
-
-  :param string name: if the name isn't provided, whole cache is purged
+  :param string name: subtree to purge; if the name isn't provided, whole cache is purged
         (and any other parameters are disregarded).
-        Otherwise only records in that subtree are removed.
   :param bool exact_name: if set to ``true``, only records with *the same* name are removed;
                           default: false.
   :param kres.type rr_type: you may additionally specify the type to remove,
-        but that is only supported with ``exact_name == true``; default: nil;
-  :param integer chunk_size: the number of records to remove at one go; default: 100.
+        but that is only supported with ``exact_name == true``; default: nil.
+  :param integer chunk_size: the number of records to remove in one round; default: 100.
         The purpose is not to block the resolver for long.
         The default ``callback`` repeats the command after one millisecond
         until all matching data are cleared.
-  :param function callback: custom code to handle result of the underlying C call.
-        As the first parameter it gets the return code from :func:`kr_cache_remove_subtree()`,
-        and the following parameters are copies of those passed to `cache.clear()`.
+  :param function callback: a custom code to handle result of the underlying C call.
+        Its parameters are copies of those passed to `cache.clear()` with one additional
+        parameter ``rettable`` containing table with return value from current call.
+        ``count`` field contains a return code from :func:`kr_cache_remove_subtree()`.
+  :param table prev_state: return value from previous run (can be used by callback)
+
+  :rtype: table
+  :return: ``count`` key is always present. Other keys are optional and their presense indicate special conditions.
+
+   * **count** *(integer)* - number of items removed from cache by this call (can be 0 if no entry matched criteria)
+   * **not_apex** - cleared subtree is not cached as zone apex; proofs of non-existence were not removed
+   * **subtree** *(string)* - hint where zone apex lies (this is estimation from cache content and might not be accurate)
+   * **chunk_limit** - more than ``chunk_size`` items needs to be cleared, clearing will continue asynchonously
+
 
   Examples:
 
   .. code-block:: lua
 
      -- Clear whole cache
-     cache.clear()
-     -- Clear records at and below 'bad.cz'
-     cache.clear('bad.cz')
+     > cache.clear()
+     [count] => 76
 
-  .. attention::
+     -- Clear records at and below 'com.'
+     > cache.clear('com.')
+     [chunk_limit] => chunk size limit reached; the default callback will continue asynchronously
+     [not_apex] => to clear proofs of non-existence call cache.clear('com.')
+     [count] => 100
+     [round] => 1
+     [subtree] => com.
+     > worker.sleep(0.1)
+     [cache] asynchonous cache.clear('com', false) finished
 
-     To minimize surprises with partial cache removal,
-     you may prefer to specify names that have NS/SOA records,
-     e.g. ``example.com``.  Details: validated NSEC and NSEC3 records
-     (which are used for aggressive non-existence proofs)
-     will be removed only for zones whose **apex** is at or below the specified name.
+     -- Clear only 'www.example.com.'
+     > cache.clear('www.example.com.', true)
+     [round] => 1
+     [count] => 1
+     [not_apex] => to clear proofs of non-existence call cache.clear('example.com.')
+     [subtree] => example.com.
 
 .. [#] This is a consequence of DNSSEC negative cache which relies on proofs of non-existence on various owner nodes. It is impossible to efficiently flush part of DNS zones signed with NSEC3.
 

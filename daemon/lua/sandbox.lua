@@ -158,7 +158,7 @@ setmetatable(modules, {
 })
 
 
-cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
+cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)
 	if name == nil then  -- keep same output format as for 'standard' clear
 		local total_count = cache.count()
 		if not cache.clear_everything() then
@@ -174,7 +174,7 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
 		then error('cache.clear(): incorrect exact_name passed') end
 
 	local cach = kres.context().cache;
-	local errors = {}
+	local rettable = {}
 	-- Apex warning.  If the caller passes a custom callback,
 	-- we assume they are advanced enough not to need the check.
 	-- The point is to avoid repeating the check in each callback iteration.
@@ -186,9 +186,9 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
 		ffi.gc(names[0], ffi.C.free)
 		local apex = kres.dname2str(names[0])
 		if apex ~= name then
-			errors.not_apex = 'to clear proofs of non-existence call '
+			rettable.not_apex = 'to clear proofs of non-existence call '
 				.. 'cache.clear(\'' .. tostring(apex) ..'\')'
-			errors.subtree = apex
+			rettable.subtree = apex
 		end
 	end
 
@@ -208,31 +208,35 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback)
 		then error('cache.clear(): chunk_size has to be a positive integer') end
 
 	-- Do the C call, and add chunk_size warning.
-	errors.count = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, chunk_size)
-	if errors.count == chunk_size then
+	rettable.count = ffi.C.kr_cache_remove_subtree(cach, dname, exact_name, chunk_size)
+	if rettable.count == chunk_size then
 		local msg_extra = ''
 		if callback == nil then
 			msg_extra = '; the default callback will continue asynchronously'
 		end
-		errors.chunk_limit = 'chunk size limit of ' .. tostring(chunk_size)
-				     .. ' entries reached' .. msg_extra
+		rettable.chunk_limit = 'chunk size limit reached' .. msg_extra
 	end
 
 	-- Default callback function: repeat after 1ms
 	if callback == nil then callback =
-		function (cberrors, cbname, cbexact_name, cbrr_type, cbchunk_size, cbself)
-			if errors.count < 0 then error(ffi.string(ffi.C.knot_strerror(errors.count))) end
-			if (errors.count == cbchunk_size) then
+		function (cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbprev_state, cbrettable)
+			if cbrettable.count < 0 then error(ffi.string(ffi.C.knot_strerror(cbrettable.count))) end
+			if cbprev_state == nil then cbprev_state = { round = 0 } end
+			if type(cbprev_state) ~= 'table'
+				then error('cache.clear() callback: incorrect prev_state passed') end
+			cbrettable.round = cbprev_state.round + 1
+			if (cbrettable.count == cbchunk_size) then
 				event.after(1, function ()
-						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself)
+						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbrettable)
 					end)
-			else
-				log('[cache] asynchonous clear finished: ' .. table_print(cberrors))
+			elseif cbrettable.round > 1 then
+				log('[cache] asynchonous cache.clear(\'' .. cbname .. '\', '
+				    .. tostring(cbexact_name) .. ') finished')
 			end
-			return cberrors
+			return cbrettable
 		end
 	end
-	return callback(errors, name, exact_name, rr_type, chunk_size, callback)
+	return callback(name, exact_name, rr_type, chunk_size, callback, prev_state, rettable)
 end
 -- Syntactic sugar for cache
 -- `cache[x] -> cache.get(x)`
