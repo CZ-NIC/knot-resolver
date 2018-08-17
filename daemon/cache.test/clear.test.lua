@@ -173,6 +173,13 @@ local function test_apex()
 		     'a.b.subtree1.', kres.type.NULL, kres.rcode.SERVFAIL)
 end
 
+local function test_root()
+	local prev_count = cache.count()
+	res = cache.clear('.')
+	is(res.count, prev_count, 'full clear reports correct number of entries')
+	is(cache.count(), 0, 'clearing root clears everything')
+end
+
 local function test_complete_flush()
 	local prev_count = cache.count()
 	res = cache.clear()
@@ -189,6 +196,8 @@ return {
 	test_subtree,
 	test_subtree_limit,
 	test_apex,
+	import_zone,
+	test_root,
 	import_zone,
 	test_complete_flush,
 }
