@@ -61,10 +61,6 @@ There are also *optional* packages that enable specific functionality in Knot Re
    "`clang-tidy`_", "``lint-c``", "Syntax and static analysis checker for C."
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
-.. "libmemcached_", "``modules/memcached``", "To build memcached backend module."
-   "hiredis_", "``modules/redis``", "To build redis backend module."
-   "Go_ 1.5+", "``modules``", "Build modules written in Go."
-
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
 .. [#] libuv 1.7 brings SO_REUSEPORT support that is needed for multiple forks. libuv < 1.7 can be still used, but only in single-process mode. Use :ref:`different method <daemon-reuseport>` for load balancing.
@@ -92,7 +88,7 @@ Most of the dependencies can be resolved from packages, here's an overview for s
    # integration tests
    sudo dnf install cmake git python-dns python-jinja2
    # optional features
-   sudo dnf install golang hiredis-devel libmemcached-devel lua-sec-compat lua-socket-compat systemd-devel
+   sudo dnf install lua-sec-compat lua-socket-compat systemd-devel
    # docs
    sudo dnf install doxygen python-breathe python-sphinx
 
@@ -304,8 +300,6 @@ You can hack on the container by changing the container entrypoint to shell like
 .. _Lua: https://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
 .. _Go: https://golang.org
-.. _libmemcached: http://libmemcached.org/libMemcached.html
-.. _hiredis: https://github.com/redis/hiredis
 .. _geoip: https://github.com/abh/geoip
 .. _Doxygen: https://www.stack.nl/~dimitri/doxygen/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
