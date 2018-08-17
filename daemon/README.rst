@@ -129,52 +129,67 @@ to download cache from parent, to avoid cold-cache start.
 	local http = require('socket.http')
 	local ltn12 = require('ltn12')
 
+        local cache_size = 100*MB
+        local cache_path = '/var/cache/knot-resolver'
+        cache.open(cache_size, 'lmdb://' .. cache_path)
 	if cache.count() == 0 then
+                cache.close()
 		-- download cache from parent
 		http.request {
-			url = 'http://parent/cache.mdb',
-			sink = ltn12.sink.file(io.open('cache.mdb', 'w'))
+			url = 'http://parent/data.mdb',
+			sink = ltn12.sink.file(io.open(cache_path .. '/data.mdb', 'w'))
 		}
 		-- reopen cache with 100M limit
-		cache.size = 100*MB
+                cache.open(cache_size, 'lmdb://' .. cache_path)
 	end
 
 Asynchronous events
 ^^^^^^^^^^^^^^^^^^^
 
 Lua supports a concept called closures_, this is extremely useful for scripting actions upon various events,
-say for example - prune the cache within minute after loading, publish statistics each 5 minutes and so on.
-Here's an example of an anonymous function with :func:`event.recurrent()`:
-
-.. code-block:: lua
-
-	-- every 5 minutes
-	event.recurrent(5 * minute, function()
-		cache.prune()
-	end)
+say for example - publish statistics each minute and so on.
+Here's an example of an anonymous function with :func:`event.recurrent()`.
 
 Note that each scheduled event is identified by a number valid for the duration of the event,
-you may cancel it at any time. You can do this with anonymous functions, if you accept the event
-as a parameter, but it's not very useful as you don't have any *non-global* way to keep persistent variables.
+you may use it to cancel the event at any time.
 
 .. code-block:: lua
 
-	-- make a closure, encapsulating counter
-	function pruner()
-		local i = 0
-		-- pruning function
-		return function(e)
-			cache.prune()
-			-- cancel event on 5th attempt
-			i = i + 1
-			if i == 5 then
-				event.cancel(e)
-			fi
-		end
-	end
+        modules.load('stats')
 
-	-- make recurrent event that will cancel after 5 times
-	event.recurrent(5 * minute, pruner())
+	-- log statistics every second
+	local stat_id = event.recurrent(1 * second, function(evid)
+            log(table_print(stats.list()))
+	end)
+
+        -- stop printing statistics after first minute
+        event.after(1 * minute, function(evid)
+                event.cancel(stat_id)
+        end)
+
+If you need to persist state between events, encapsulate even handle in closure function which will provide persistent variable (called ``previous``):
+
+.. code-block:: lua
+
+        modules.load('stats')
+
+	-- make a closure, encapsulating counter
+        function speed_monitor()
+                local previous = stats.list()
+                -- monitoring function
+                return function(evid)
+                        local now = stats.list()
+                        local total_increment = now['answer.total'] - previous['answer.total']
+                        local slow_increment = now['answer.slow'] - previous['answer.slow']
+                        if slow_increment / total_increment > 0.05 then
+                                log('WARNING! More than 5 %% of queries was slow!')
+                        end
+                        previous = now  -- store current value in closure
+                 end
+        end
+
+        -- monitor every minute
+        local monitor_id = event.recurrent(1 * minute, speed_monitor())
 
 Another type of actionable event is activity on a file descriptor. This allows you to embed other
 event loops or monitor open files and then fire a callback when an activity is detected.
@@ -670,7 +685,25 @@ The default cache in Knot Resolver is persistent with LMDB backend, this means t
 the cached data on restart or crash to avoid cold-starts. The cache may be reused between cache
 daemons or manipulated from other processes, making for example synchronised load-balanced recursors possible.
 
-.. envvar:: cache.size (number)
+.. function:: cache.open(max_size[, config_uri])
+
+   :param number max_size: Maximum cache size in bytes.
+   :return: ``true`` if cache was opened
+
+   Open cache with a size limit. The cache will be reopened if already open.
+   Note that the max_size cannot be lowered, only increased due to how cache is implemented.
+
+   .. tip:: Use ``kB, MB, GB`` constants as a multiplier, e.g. ``100*MB``.
+
+   As of now, the built-in backend with URI ``lmdb://`` allows you to change the cache directory.
+
+   Example:
+
+   .. code-block:: lua
+
+      cache.open(100 * MB, 'lmdb:///var/cache/knot-resolver')
+
+.. envvar:: cache.size
 
    Set the cache maximum size in bytes. Note that this is only a hint to the backend,
    which may or may not respect it. See :func:`cache.open()`.
@@ -679,7 +712,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 	cache.size = 100 * MB -- equivalent to `cache.open(100 * MB)`
 
-.. envvar:: cache.current_size (number)
+.. envvar:: cache.current_size
 
    Get the maximum size in bytes.
 
@@ -687,7 +720,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 	print(cache.current_size)
 
-.. envvar:: cache.storage (string)
+.. envvar:: cache.storage
 
    Set the cache storage backend configuration, see :func:`cache.backends()` for
    more information. If the new storage configuration is invalid, it is not set.
@@ -696,7 +729,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 	cache.storage = 'lmdb://.'
 
-.. envvar:: cache.current_storage (string)
+.. envvar:: cache.current_storage
 
    Get the storage backend configuration.
 
@@ -718,43 +751,21 @@ daemons or manipulated from other processes, making for example synchronised loa
 
    	[lmdb://] => true
 
-.. function:: cache.stats()
-
-   :return: table of cache counters
-
-  The cache collects counters on various operations (hits, misses, transactions, ...). This function call returns a table of
-  cache counters that can be used for calculating statistics.
-
-.. function:: cache.open(max_size[, config_uri])
-
-   :param number max_size: Maximum cache size in bytes.
-   :return: boolean
-
-   Open cache with size limit. The cache will be reopened if already open.
-   Note that the max_size cannot be lowered, only increased due to how cache is implemented.
-
-   .. tip:: Use ``kB, MB, GB`` constants as a multiplier, e.g. ``100*MB``.
-
-   The cache supports runtime-changeable backends, see :func:`cache.backends()` for mor information and
-   default. Refer to specific documentation of specific backends for configuration string syntax.
-
-   - ``lmdb://``
-
-   As of now it only allows you to change the cache directory, e.g. ``lmdb:///tmp/cachedir``.
-
 .. function:: cache.count()
 
-   :return: Number of entries in the cache or nil on error.
+   :return: Number of entries in the cache. Meaning of the number is an implementation detail and is subject of change.
 
 .. function:: cache.close()
 
-   :return: boolean
+   :return: ``true`` if cache was closed
 
    Close the cache.
 
-   .. note:: This may or may not clear the cache, depending on the used backend. See :func:`cache.clear()`.
+   .. note:: This may or may not clear the cache, depending on the cache backend.
 
 .. function:: cache.stats()
+
+  .. warning:: Cache statistics are being reworked. Do not rely on current behavior.
 
    Return table of statistics, note that this tracks all operations over cache, not just which
    queries were answered from cache or not.
@@ -813,7 +824,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.ns_tout([timeout])
 
-  :param timeout: number of milliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
+  :param number timeout: NS retry interval in miliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
   :return: current timeout
 
   Get or set time interval for which a nameserver address will be ignored after determining that it doesn't return (useful) answers.
@@ -821,55 +832,17 @@ daemons or manipulated from other processes, making for example synchronised loa
 
   .. warning:: This settings applies only to the current kresd process.
 
-.. function:: cache.prune([max_count])
-
-  Not implemented (anymore).  This functionality is planned to be superseded by a garbage-collecting process.
-
 .. function:: cache.get([domain])
 
   This function is not implemented at this moment.
   We plan to re-introduce it soon, probably with a slightly different API.
-
-..
-  :return: table of records in cache matching the prefix
-
-  .. error:: **Caveats:**
-
-    - the count of scanned keys is limited by 100,
-      so for large subtrees you may be getting just some prefix
-      (exact name matches go first);
-    - validated NSEC and NSEC3 records are not put into the table;
-    - CNAME and DNAME types are printed as NS;
-    - outdated records and unvalidated non-existence records are still output as ``true``.
-
-  .. note:: This is equivalent to ``cache['domain']`` getter.
-
-  Examples:
-
-  .. code-block:: lua
-
-     -- Query cache for 'nic.cz'
-     cache['nic.cz']
-
-     [nic.cz.] => {
-         [DNSKEY] => true
-         [SOA] => true
-         [AAAA] => true
-         [NS] => true
-         [A] => true
-         [DS] => true
-     }
-     [c.ns.nic.cz.] => {
-         [A] => true
-         [AAAA] => true
-     }
 
 .. function:: cache.clear([name], [exact_name], [rr_type], [chunk_size], [callback], [prev_state])
 
      Purge cache records matching specified criteria. There are two specifics:
 
      * To reliably remove **negative** cache entries you need to clear subtree with the whole zone. E.g. to clear negative cache entries for (formerly non-existing) record `www.example.com. A` you need to flush whole subtree starting at zone apex, e.g. `example.com.` [#]_.
-     * This operation is an asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
+     * This operation is asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
 
   :param string name: subtree to purge; if the name isn't provided, whole cache is purged
         (and any other parameters are disregarded).
@@ -891,7 +864,7 @@ daemons or manipulated from other processes, making for example synchronised loa
   :return: ``count`` key is always present. Other keys are optional and their presense indicate special conditions.
 
    * **count** *(integer)* - number of items removed from cache by this call (can be 0 if no entry matched criteria)
-   * **not_apex** - cleared subtree is not cached as zone apex; proofs of non-existence were not removed
+   * **not_apex** - cleared subtree is not cached as zone apex; proofs of non-existence were probably not removed
    * **subtree** *(string)* - hint where zone apex lies (this is estimation from cache content and might not be accurate)
    * **chunk_limit** - more than ``chunk_size`` items needs to be cleared, clearing will continue asynchonously
 
