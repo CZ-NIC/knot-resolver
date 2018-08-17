@@ -33,6 +33,7 @@ Improvements
 - old name "Knot DNS Resolver" is replaced by unambiguous "Knot Resolver"
   to prevent confusion with "Knot DNS" authoritative server
 
+
 Knot Resolver 2.4.1 (2018-08-02)
 ================================
 
