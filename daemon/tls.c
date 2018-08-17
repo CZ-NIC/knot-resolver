@@ -198,7 +198,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 	tls->c.client_side = false;
 
 	gnutls_transport_set_pull_function(tls->c.tls_session, kres_gnutls_pull);
-	gnutls_transport_set_push_function(tls->c.tls_session, worker_gnutls_push);
+	gnutls_transport_set_vec_push_function(tls->c.tls_session, worker_gnutls_push);
 	gnutls_transport_set_ptr(tls->c.tls_session, tls);
 
 	if (net->tls_session_ticket_ctx) {
@@ -242,7 +242,7 @@ void tls_free(struct tls_ctx_t *tls)
 	free(tls);
 }
 
-int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
+int tls_write(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 {
 	if (!pkt || !handle || !handle->data) {
 		return kr_error(EINVAL);
@@ -270,36 +270,21 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 		return kr_error(EIO);
 	}
 
-	ssize_t submitted = 0;
-	ssize_t retries = 0;
-	do {
-		count = gnutls_record_uncork(tls_session, 0);
-		if (count < 0) {
-			if (gnutls_error_is_fatal(count)) {
-				kr_log_error("[%s] gnutls_record_uncork failed: %s (%zd)\n",
-				             logstring, gnutls_strerror_name(count), count);
-				return kr_error(EIO);
-			}
-			if (++retries > TLS_MAX_UNCORK_RETRIES) {
-				kr_log_error("[%s] gnutls_record_uncork: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
-				             logstring, retries, gnutls_strerror_name(count), count);
-				return kr_error(EIO);
-			}
-		} else if (count != 0) {
-			submitted += count;
-			retries = 0;
-		} else if (gnutls_record_check_corked(tls_session) != 0) {
-			if (++retries > TLS_MAX_UNCORK_RETRIES) {
-				kr_log_error("[%s] gnutls_record_uncork: too many retries (%zd)\n",
-				             logstring, retries);
-				return kr_error(EIO);
-			}
-		} else if (submitted != sizeof(pkt_size) + pkt->size) {
-			kr_log_error("[%s] gnutls_record_uncork didn't send all data(%zd of %zd)\n",
-			             logstring, submitted, sizeof(pkt_size) + pkt->size);
-			return kr_error(EIO);
-		}
-	} while (submitted != sizeof(pkt_size) + pkt->size);
+	const ssize_t submitted = sizeof(pkt_size) + pkt->size;
+
+	int ret = gnutls_record_uncork(tls_session, GNUTLS_RECORD_WAIT);
+	if (gnutls_error_is_fatal(ret)) {
+		kr_log_error("[%s] gnutls_record_uncork failed: %s (%d)\n",
+		             logstring, gnutls_strerror_name(ret), ret);
+		return kr_error(EIO);
+	}
+
+	if (ret != submitted) {
+		kr_log_error("[%s] gnutls_record_uncork didn't send all data (%d of %zd)\n",
+		             logstring, ret, submitted);
+		return kr_error(EIO);
+	}
+
 
 	return kr_ok();
 }
@@ -1014,7 +999,7 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 	ctx->c.client_side = true;
 
 	gnutls_transport_set_pull_function(ctx->c.tls_session, kres_gnutls_pull);
-	gnutls_transport_set_push_function(ctx->c.tls_session, worker_gnutls_push);
+	gnutls_transport_set_vec_push_function(ctx->c.tls_session, worker_gnutls_push);
 	gnutls_transport_set_ptr(ctx->c.tls_session, ctx);
 	return ctx;
 }

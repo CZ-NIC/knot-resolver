@@ -127,7 +127,7 @@ void tls_close(struct tls_common_ctx *ctx);
 void tls_free(struct tls_ctx_t* tls);
 
 /*! Push new data to TLS context for sending */
-int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
+int tls_write(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
 
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
