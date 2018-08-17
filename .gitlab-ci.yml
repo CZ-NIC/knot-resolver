@@ -288,7 +288,6 @@ respdiff:iter.tls6:
     RESPDIFF_TEST: shortlist.iter.tls6.j384
     PRIORITY: 5
     TARGET_DISAGREES: 0\.[0-8][0-9]
-  allow_failure: true  # frequent failures due to diffrepro issues; remove once resolved
 
 respdiff:fwd-udp6-unbound.udp6:
   <<: *respdiff
