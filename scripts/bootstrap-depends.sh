@@ -19,10 +19,6 @@ GNUTLS_TAG="3.6.1"
 GNUTLS_URL="ftp://ftp.gnutls.org/gcrypt/gnutls/v3.6/gnutls-${GNUTLS_TAG}.tar.xz"
 LUA_VER="2.1.0-beta3"
 LUA_URL="https://github.com/LuaJIT/LuaJIT.git"
-HIREDIS_TAG="v0.13.3"
-HIREDIS_URL="https://github.com/redis/hiredis.git"
-LIBMEMCACHED_TAG="1.0.18"
-LIBMEMCACHED_URL="https://launchpad.net/libmemcached/1.0/${LIBMEMCACHED_TAG}/+download/libmemcached-${LIBMEMCACHED_TAG}.tar.gz"
 PROTOBUF_VER="2.6.1"
 PROTOBUF_URL="https://github.com/google/protobuf/archive/v${PROTOBUF_VER}.tar.gz"
 PROTOBUFC_VER="1.2.1"
@@ -129,7 +125,7 @@ function pkg {
 # travis-specific
 if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	brew update
-	for p in makedepend hiredis libmemcached protobuf-c cmocka jansson gnutls \
+	for p in makedepend protobuf-c cmocka jansson gnutls \
 			luajit libuv python3 libyaml augeas; do
 		echo "BEGIN $p";
 		brew install "$p" || brew upgrade "$p" # install fails on installed packages
@@ -141,8 +137,6 @@ if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
 	pip install --user --upgrade pip || true
 	pip install --user ${PIP_PKGS} || true
 	rm ${HOME}/.cache/pip/log/debug.log || true
-	pkg hiredis ${HIREDIS_URL} ${HIREDIS_TAG} include/hiredis/hiredis.h install PREFIX=${PREFIX}
-	pkg libmemcached ${LIBMEMCACHED_URL} ${LIBMEMCACHED_TAG} include/libmemcached/memcached.h
 	pkg cmocka ${CMOCKA_URL} ${CMOCKA_TAG} include/cmocka.h
 	pkg protobuf ${PROTOBUF_URL} ${PROTOBUF_VER} lib/pkgconfig/protobuf.pc
 	pkg protobuf-c ${PROTOBUFC_URL} ${PROTOBUFC_VER} include/protobuf-c/protobuf-c.h

@@ -11,15 +11,6 @@ ifeq ($(ENABLE_DNSTAP),yes)
 modules_TARGETS += dnstap
 endif
 
-# Memcached
-ifeq ($(HAS_libmemcached),yes)
-#modules_TARGETS += memcached
-endif
-# Redis
-ifeq ($(HAS_hiredis),yes)
-#modules_TARGETS += redis
-endif
-
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
 modules_TARGETS += bogus_log \
