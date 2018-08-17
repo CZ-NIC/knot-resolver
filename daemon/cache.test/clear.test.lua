@@ -26,9 +26,9 @@ assert(net.interfaces() ~= nil)
 -- Self-checks on loaded stuff
 assert(#modules.list() > 0)
 -- Self-check timers
-ev = event.recurrent(1 * sec, function (ev) return 1 end)
+ev = event.recurrent(1 * sec, function () return 1 end)
 event.cancel(ev)
-ev = event.after(0, function (ev) return 1 end)
+ev = event.after(0, function () return 1 end)
 
 
 -- import fake root zone
@@ -62,7 +62,7 @@ local function import_zone()
 	-- sanity checks - cache must be filled in
 	ok(cache.count() > 0, 'cache is not empty after import')
 	check_answer('root apex is cache',
-	  	     '.', kres.type.NS, kres.rcode.NOERROR)
+                     '.', kres.type.NS, kres.rcode.NOERROR)
 	check_answer('deep subdomain is in cache',
 		     'a.b.subtree1.', kres.type.AAAA, kres.rcode.NOERROR)
 
@@ -120,23 +120,22 @@ end
 
 local function test_callback()
 	local test_name = '20r.subtree2.'
-	local test_maxcount = 1
 	local test_exactname = true
 	local test_rrtype = nil
-	local test_maxcount = 1
+	local test_chunksize = 1
 	local test_prev_state = { works = true }
 	local function check_callback(name, exact_name, rr_type, chunk_size, callback, prev_state, errors)
 		is(errors.count, 1, 'callback received correct # of removed records')
 		is(test_name, name, 'callback received subtree name')
 		is(test_exactname, exact_name, 'callback received exact_name')
-		is(test_rrtype, rrtype, 'callback received rr_type')
-		is(test_chunksize, chunksize, 'callback received maxcount')
+		is(test_rrtype, rr_type, 'callback received rr_type')
+		is(test_chunksize, chunk_size, 'callback received chunk_size')
 		is(check_callback, callback, 'callback received reference to itself')
 		is(type(errors), 'table', 'callback received table of errors')
 		same(test_prev_state, prev_state, 'callback received previous state')
 		return 666
 	end
-	same(cache.clear(test_name, test_exactname, test_rrtype, test_maxcount, check_callback, test_prev_state),
+	same(cache.clear(test_name, test_exactname, test_rrtype, test_chunksize, check_callback, test_prev_state),
 	     666, 'first callback return value is passed to cache.clear() caller')
 	local cnt_before_wait = cache.count()
 	worker.sleep(0.2)
