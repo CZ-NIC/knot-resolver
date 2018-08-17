@@ -42,6 +42,9 @@
  */
  #define TLS_MAX_HANDSHAKE_TIME (KR_CONN_RTT_MAX * 3)
 
+/** Transport session (opaque). */
+struct session;
+
 struct tls_ctx_t;
 struct tls_client_ctx_t;
 struct tls_credentials {
@@ -59,6 +62,7 @@ struct tls_client_paramlist_entry {
 	array_t(const char *) pins;
 	gnutls_certificate_credentials_t credentials;
 	gnutls_datum_t session_data;
+	uint32_t refs;
 };
 
 struct worker_ctx;
@@ -93,7 +97,6 @@ struct tls_common_ctx {
 	uint8_t recv_buf[4096];
 	tls_handshake_cb handshake_cb;
 	struct worker_ctx *worker;
-	struct qr_task *task;
 };
 
 struct tls_ctx_t {
@@ -126,7 +129,7 @@ void tls_close(struct tls_common_ctx *ctx);
 void tls_free(struct tls_ctx_t* tls);
 
 /*! Push new data to TLS context for sending */
-int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
+int tls_write(uv_write_t *req, uv_handle_t* handle, knot_pkt_t * pkt, uv_write_cb cb);
 
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
@@ -158,6 +161,15 @@ tls_hs_state_t tls_get_hs_state(const struct tls_common_ctx *ctx);
 /*! Set TLS handshake state. */
 int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
 
+/*! Find TLS parameters for given address. Attempt opportunistic upgrade for port 53 to 853,
+ *  if the address is configured with a working DoT on port 853.
+ */
+struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
+			  const struct sockaddr *addr);
+
+/*! Clear (remove) TLS parameters for given address. */
+int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port);
+
 /*! Set TLS authentication parameters for given address.
  * Note: hostnames must be imported before ca files,
  *       otherwise ca files will not be imported at all.
@@ -170,7 +182,7 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 int tls_client_params_free(map_t *tls_client_paramlist);
 
 /*! Allocate new client TLS context */
-struct tls_client_ctx_t *tls_client_ctx_new(const struct tls_client_paramlist_entry *entry,
+struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *entry,
 					    struct worker_ctx *worker);
 
 /*! Free client TLS context */
@@ -180,9 +192,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 			     struct session *session,
 			     tls_handshake_cb handshake_cb);
 
-int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      struct tls_client_paramlist_entry *entry,
-			      struct session *session);
+int tls_client_ctx_set_session(struct tls_client_ctx_t *ctx, struct session *session);
 
 
 /* Session tickets, server side.  Implementation in ./tls_session_ticket-srv.c */
