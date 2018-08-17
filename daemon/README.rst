@@ -842,7 +842,7 @@ daemons or manipulated from other processes, making for example synchronised loa
      Purge cache records matching specified criteria. There are two specifics:
 
      * To reliably remove **negative** cache entries you need to clear subtree with the whole zone. E.g. to clear negative cache entries for (formerly non-existing) record `www.example.com. A` you need to flush whole subtree starting at zone apex, e.g. `example.com.` [#]_.
-     * This operation is an asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
+     * This operation is asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
 
   :param string name: subtree to purge; if the name isn't provided, whole cache is purged
         (and any other parameters are disregarded).
@@ -864,7 +864,7 @@ daemons or manipulated from other processes, making for example synchronised loa
   :return: ``count`` key is always present. Other keys are optional and their presense indicate special conditions.
 
    * **count** *(integer)* - number of items removed from cache by this call (can be 0 if no entry matched criteria)
-   * **not_apex** - cleared subtree is not cached as zone apex; proofs of non-existence were not removed
+   * **not_apex** - cleared subtree is not cached as zone apex; proofs of non-existence were probably not removed
    * **subtree** *(string)* - hint where zone apex lies (this is estimation from cache content and might not be accurate)
    * **chunk_limit** - more than ``chunk_size`` items needs to be cleared, clearing will continue asynchonously
 
