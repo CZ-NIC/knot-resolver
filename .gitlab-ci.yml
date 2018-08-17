@@ -249,7 +249,7 @@ test:linux:amd64:valgrind:
       -p $PRIORITY
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
       "$(git rev-parse --short HEAD)" -l gitlab --clean -t $RESPDIFF_TEST
-      --knot-branch 2.6)
+      --knot-branch 2.7)
     - cp -v $TESTDIR/j* ./
     - cat $TESTDIR/*_report.diffrepro.txt
     - grep -q "^target disagrees.*$TARGET_DISAGREES %" $TESTDIR/*_report.diffrepro.txt
@@ -288,7 +288,6 @@ respdiff:iter.tls6:
     RESPDIFF_TEST: shortlist.iter.tls6.j384
     PRIORITY: 5
     TARGET_DISAGREES: 0\.[0-8][0-9]
-  allow_failure: true  # frequent failures due to diffrepro issues; remove once resolved
 
 respdiff:fwd-udp6-unbound.udp6:
   <<: *respdiff
@@ -411,11 +410,11 @@ distro:fedora-27:
   dependencies:
     - srpm
   script:
-    # TODO remove once Knot DNS 2.7 packages are available from official distro repos
-    - curl -Lo knot-devel-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/367e753a5c72421667e46a7dd7aa1434/knot-devel-2.7.0-1.1.x86_64.rpm
-    - curl -Lo knot-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/cefbd41fdbe94223f4efbe23a96cb422/knot-2.7.0-1.1.x86_64.rpm
-    - curl -Lo knot-libs-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/4236bcb094c0e87687c2e2d5578a4073/knot-libs-2.7.0-1.1.x86_64.rpm
-    - mock --init --old-chroot -i knot-2.7.0-1.1.x86_64.rpm -i knot-libs-2.7.0-1.1.x86_64.rpm -i knot-devel-2.7.0-1.1.x86_64.rpm -r fedora-27-x86_64
+    # TODO remove once Knot DNS 2.7.1 packages are available from official distro repos
+    - curl -Lo knot-devel-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/a22685bd0c737be97af11351c099fc2d/knot-devel-2.7.1-1.1.x86_64.rpm
+    - curl -Lo knot-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/ed349a36e8b6aca6fc5fc8fd6eef699a/knot-2.7.1-1.1.x86_64.rpm
+    - curl -Lo knot-libs-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/4960c36e94053a8aaf0f237bb5310b53/knot-libs-2.7.1-1.1.x86_64.rpm
+    - mock --init --old-chroot -i knot-devel-2.7.1-1.1.x86_64.rpm -i knot-2.7.1-1.1.x86_64.rpm -i knot-libs-2.7.1-1.1.x86_64.rpm -r fedora-27-x86_64
     - mock --no-clean --old-chroot -r fedora-27-x86_64 --rebuild *.src.rpm
   after_script:
     - mv /var/lib/mock/fedora-27-x86_64/result fedora-27-x86_64
@@ -438,10 +437,10 @@ distro:epel-7:
     - srpm
   script:
     # TODO remove once Knot DNS 2.7 packages are available from official distro repos
-    - curl -Lo knot-devel-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/3db20cd3dd0fdc8242f62d629d1abb63/knot-devel-2.7.0-1.1.x86_64.rpm
-    - curl -Lo knot-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/0a3ca9f3cc1be9e72b4de73ae0e29bef/knot-2.7.0-1.1.x86_64.rpm
-    - curl -Lo knot-libs-2.7.0-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/11ecf4602a10c46eb9a6e2c50d7c48e1/knot-libs-2.7.0-1.1.x86_64.rpm
-    - mock --init --dnf --old-chroot -i knot-2.7.0-1.1.x86_64.rpm -i knot-libs-2.7.0-1.1.x86_64.rpm -i knot-devel-2.7.0-1.1.x86_64.rpm -r epel-7-x86_64
+    - curl -Lo knot-devel-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/780d01725c2d95f63251d32b5c81d571/knot-devel-2.7.1-1.1.x86_64.rpm
+    - curl -Lo knot-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/6abdad1de5e76b413f3089bce45efbed/knot-2.7.1-1.1.x86_64.rpm
+    - curl -Lo knot-libs-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/e80b25f25e379472530ea5b2ea00fac1/knot-libs-2.7.1-1.1.x86_64.rpm
+    - mock --init --dnf --old-chroot -i knot-devel-2.7.1-1.1.x86_64.rpm -i  knot-2.7.1-1.1.x86_64.rpm -i knot-libs-2.7.1-1.1.x86_64.rpm -r epel-7-x86_64
     - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
   after_script:
     - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
@@ -513,6 +512,27 @@ obs:devel:
     - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > /root/.oscrc
     - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
     - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
+
+pkg:debian:symbols:libkres:
+  variables:
+    LIB_NAME: libkres
+    LIB_ABI: 8
+  stage: deploy
+  only:
+    variables:
+      - $OBS_BUILD == "1"
+    refs:
+      - nightly@knot/knot-resolver
+  except:
+    - master@knot/knot-resolver
+  script:
+    - ln -s distro/deb debian
+    - sed -i "s/__VERSION__/99/g" distro/deb/changelog
+    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIB_ABI -P. -p$LIB_NAME$LIB_ABI
+  allow_failure: true
+  dependencies:
+    - build:linux:amd64
+
 
 # copy snapshot of current master to nightly branch for further processing
 # (this is workaround for missing complex conditions for job limits in Gitlab)
