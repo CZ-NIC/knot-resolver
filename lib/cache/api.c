@@ -73,8 +73,9 @@ static inline int cache_clear(struct kr_cache *cache)
 /** @internal Open cache db transaction and check internal data version. */
 static int assert_right_version(struct kr_cache *cache)
 {
-	/* Check cache ABI version */
-	uint8_t key_str[] = "\x00\x00V"; /* CACHE_KEY_DEF; zero-term. but we don't care */
+	/* Check cache ABI version. */
+	/* CACHE_KEY_DEF: to avoid collisions with kr_cache_match(). */
+	uint8_t key_str[4] = "VERS";
 	knot_db_val_t key = { .data = key_str, .len = sizeof(key_str) };
 	knot_db_val_t val = { NULL, 0 };
 	int ret = cache_op(cache, read, &key, &val, 1);
