@@ -74,10 +74,8 @@ static inline int cache_clear(struct kr_cache *cache)
 static int assert_right_version(struct kr_cache *cache)
 {
 	/* Check cache ABI version. */
-	/* CACHE_KEY_DEF: to avoid collisions with kr_cache_match(),
-	 * these meta-values are as-if in one-character zone "\xFF."
-	 * (That seems very unlikely to ever be in use.) */
-	uint8_t key_str[] = "\xFF\x00\x00V"; /**< zero-term. but we don't care */
+	/* CACHE_KEY_DEF: to avoid collisions with kr_cache_match(). */
+	uint8_t key_str[4] = "VERS";
 	knot_db_val_t key = { .data = key_str, .len = sizeof(key_str) };
 	knot_db_val_t val = { NULL, 0 };
 	int ret = cache_op(cache, read, &key, &val, 1);
