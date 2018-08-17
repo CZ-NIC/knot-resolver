@@ -281,7 +281,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 	memset(client, 0, sizeof(*client));
-	io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM);
+	io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM, 0);
 	if (uv_accept(master, client) != 0) {
 		uv_close((uv_handle_t *)client, io_release);
 		return;
@@ -424,13 +424,13 @@ int tcp_bindfd_tls(uv_tcp_t *handle, int fd, int tcp_backlog)
 	return _tcp_bindfd(handle, fd, tls_accept, tcp_backlog);
 }
 
-void io_create(uv_loop_t *loop, uv_handle_t *handle, int type)
+void io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 {
 	int ret = -1;
 	if (type == SOCK_DGRAM) {
 		ret = uv_udp_init(loop, (uv_udp_t *)handle);
 	} else if (type == SOCK_STREAM) {
-		ret = uv_tcp_init(loop, (uv_tcp_t *)handle);
+		ret = uv_tcp_init_ex(loop, (uv_tcp_t *)handle, family);
 		uv_tcp_nodelay((uv_tcp_t *)handle, 1);
 	}
 	assert(ret == 0);
