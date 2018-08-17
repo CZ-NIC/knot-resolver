@@ -159,7 +159,7 @@ setmetatable(modules, {
 
 
 cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)
-	if name == nil then  -- keep same output format as for 'standard' clear
+	if name == nil or name == '.' then  -- keep same output format as for 'standard' clear
 		local total_count = cache.count()
 		if not cache.clear_everything() then
 			error('unable to clear everything')
