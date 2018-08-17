@@ -124,17 +124,19 @@ local function test_callback()
 	local test_exactname = true
 	local test_rrtype = nil
 	local test_maxcount = 1
-	local function check_callback(errors, name, exact_name, rr_type, chunk_size, callback)
-		is(type(errors), 'table', 'callback received table of errors')
+	local test_prev_state = { works = true }
+	local function check_callback(name, exact_name, rr_type, chunk_size, callback, prev_state, errors)
 		is(errors.count, 1, 'callback received correct # of removed records')
 		is(test_name, name, 'callback received subtree name')
 		is(test_exactname, exact_name, 'callback received exact_name')
 		is(test_rrtype, rrtype, 'callback received rr_type')
 		is(test_chunksize, chunksize, 'callback received maxcount')
 		is(check_callback, callback, 'callback received reference to itself')
+		is(type(errors), 'table', 'callback received table of errors')
+		same(test_prev_state, prev_state, 'callback received previous state')
 		return 666
 	end
-	same(cache.clear(test_name, test_exactname, test_rrtype, test_maxcount, check_callback),
+	same(cache.clear(test_name, test_exactname, test_rrtype, test_maxcount, check_callback, test_prev_state),
 	     666, 'first callback return value is passed to cache.clear() caller')
 	local cnt_before_wait = cache.count()
 	worker.sleep(0.2)
@@ -185,6 +187,7 @@ return {
 	test_exact_match_qtype,
 	test_exact_match_qname,
 	test_callback,
+	import_zone,
 	test_subtree,
 	test_subtree_limit,
 	test_apex,
