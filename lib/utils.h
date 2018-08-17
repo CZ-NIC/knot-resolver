@@ -247,6 +247,9 @@ int kr_sockaddr_cmp(const struct sockaddr *left, const struct sockaddr *right);
 /** Port. */
 KR_EXPORT KR_PURE
 uint16_t kr_inaddr_port(const struct sockaddr *addr);
+/** Set port. */
+KR_EXPORT
+void kr_inaddr_set_port(struct sockaddr *addr, uint16_t port);
 /** String representation for given address as "<addr>#<port>" */
 KR_EXPORT
 int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen);

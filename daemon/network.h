@@ -44,6 +44,7 @@ typedef array_t(struct endpoint*) endpoint_array_t;
 
 struct net_tcp_param {
 	uint64_t in_idle_timeout;
+	uint64_t tls_handshake_timeout;
 };
 
 struct tls_session_ticket_ctx;

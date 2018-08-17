@@ -217,7 +217,15 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	if (!handle) {
 		return NULL;
 	}
-	io_create(worker->loop, handle, socktype);
+	int ret = io_create(worker->loop, handle, socktype, family);
+	if (ret) {
+		if (ret == UV_EMFILE) {
+			worker->too_many_open = true;
+			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
+		}
+		iohandle_release(worker, h);
+		return NULL;
+	}
 
 	/* Bind to outgoing address, according to IP v4/v6. */
 	union inaddr *addr;
@@ -226,7 +234,6 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	} else {
 		addr = (union inaddr *)&worker->out_addr6;
 	}
-	int ret = 0;
 	if (addr->ip.sa_family != AF_UNSPEC) {
 		assert(addr->ip.sa_family == family);
 		if (socktype == SOCK_DGRAM) {
@@ -900,106 +907,11 @@ static void on_task_write(uv_write_t *req, int status)
 	iorequest_release(worker, req);
 }
 
-static void on_nontask_write(uv_write_t *req, int status)
-{
-	uv_handle_t *handle = (uv_handle_t *)(req->handle);
-	uv_loop_t *loop = handle->loop;
-	struct worker_ctx *worker = loop->data;
-	assert(worker == get_worker());
-	iorequest_release(worker, req);
-}
-
-ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
-{
-	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
-	const uv_buf_t uv_buf[1] = {
-		{ (char *)buf, len }
-	};
-
-	if (t == NULL) {
-		errno = EFAULT;
-		return -1;
-	}
-
-	assert(t->session && t->session->handle &&
-	       t->session->handle->type == UV_TCP);
-
-	VERBOSE_MSG(NULL,"[%s] push %zu <%p>\n",
-		    t->client_side ? "tls_client" : "tls", len, h);
-
-	struct worker_ctx *worker = t->worker;
-	assert(worker);
-
-	void *ioreq = worker_iohandle_borrow(worker);
-	if (!ioreq) {
-		errno = EFAULT;
-		return -1;
-	}
-
-	uv_write_t *write_req = (uv_write_t *)ioreq;
-
-	struct qr_task *task = t->task;
-	uv_write_cb write_cb = on_task_write;
-	if (t->handshake_state == TLS_HS_DONE) {
-		assert(task);
-	} else {
-		task = NULL;
-		write_cb = on_nontask_write;
-	}
-
-	write_req->data = task;
-
-	ssize_t ret = -1;
-	int res = uv_write(write_req, (uv_stream_t *)t->session->handle, uv_buf, 1, write_cb);
-	if (res == 0) {
-		if (task) {
-			qr_task_ref(task); /* Pending ioreq on current task */
-			struct request_ctx *ctx = task->ctx;
-			if (ctx && ctx->source.session &&
-			    t->session->handle != ctx->source.session->handle) {
-				struct sockaddr *addr = &t->session->peer.ip;
-				worker->stats.tls += 1;
-				if (addr->sa_family == AF_INET6)
-					worker->stats.ipv6 += 1;
-				else if (addr->sa_family == AF_INET)
-					worker->stats.ipv4 += 1;
-			}
-		}
-		if (worker->too_many_open &&
-		    worker->stats.rconcurrent <
-			worker->rconcurrent_highwatermark - 10) {
-			worker->too_many_open = false;
-		}
-		ret = len;
-	} else {
-		VERBOSE_MSG(NULL,"[%s] uv_write: %s\n",
-			    t->client_side ? "tls_client" : "tls", uv_strerror(res));
-		iorequest_release(worker, ioreq);
-		errno = EIO;
-	}
-	return ret;
-}
-
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 			struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	if (!handle) {
 		return qr_task_on_send(task, handle, kr_error(EIO));
-	}
-
-	/* Synchronous push to TLS context, bypassing event loop. */
-	struct session *session = handle->data;
-	assert(session->closing == false);
-	if (session->has_tls) {
-		struct kr_request *req = &task->ctx->req;
-		if (session->outgoing) {
-			int ret = kr_resolve_checkout(req, NULL, addr,
-						      SOCK_STREAM, pkt);
-			if (ret != kr_ok()) {
-				return ret;
-			}
-		}
-		return tls_push(task, handle, pkt);
 	}
 
 	int ret = 0;
@@ -1031,8 +943,18 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 			return ret;
 		}
 	}
+
+	/* Pending ioreq on current task */
+	qr_task_ref(task);
+
 	/* Send using given protocol */
-	if (handle->type == UV_UDP) {
+	struct session *session = handle->data;
+	assert(session->closing == false);
+	if (session->has_tls) {
+		uv_write_t *write_req = (uv_write_t *)ioreq;
+		write_req->data = task;
+		ret = tls_write(write_req, handle, pkt, &on_task_write);
+	} else if (handle->type == UV_UDP) {
 		uv_udp_send_t *send_req = (uv_udp_send_t *)ioreq;
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->data = task;
@@ -1051,7 +973,6 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 	}
 
 	if (ret == 0) {
-		qr_task_ref(task); /* Pending ioreq on current task */
 		if (worker->too_many_open &&
 		    worker->stats.rconcurrent <
 			worker->rconcurrent_highwatermark - 10) {
@@ -1059,6 +980,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 		}
 	} else {
 		iorequest_release(worker, ioreq);
+		qr_task_unref(task);
 		if (ret == UV_EMFILE) {
 			worker->too_many_open = true;
 			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
@@ -1069,15 +991,19 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 	if (ctx->source.session &&
 	    handle != ctx->source.session->handle &&
 	    addr) {
-		if (handle->type == UV_UDP)
+		if (session->has_tls)
+			worker->stats.tls += 1;
+		else if (handle->type == UV_UDP)
 			worker->stats.udp += 1;
 		else
 			worker->stats.tcp += 1;
+
 		if (addr->sa_family == AF_INET6)
 			worker->stats.ipv6 += 1;
 		else if (addr->sa_family == AF_INET)
 			worker->stats.ipv4 += 1;
 	}
+
 	return ret;
 }
 
@@ -1544,11 +1470,15 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	}
 	struct request_ctx *ctx = task->ctx;
 	kr_resolve_finish(&ctx->req, state);
+
 	task->finished = true;
 	if (ctx->source.session == NULL) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 	}
+
+	/* Reference task as the callback handler can close it */
+	qr_task_ref(task);
 
 	/* Send back answer */
 	struct session *source_session = ctx->source.session;
@@ -1573,11 +1503,13 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			session_del_tasks(source_session, t);
 		}
 		session_close(source_session);
-	} else if (handle->type == UV_TCP) {
+	} else if (handle->type == UV_TCP && ctx->source.session) {
 		/* Don't try to close source session at least
 		 * retry_interval_for_timeout_timer milliseconds */
 		uv_timer_again(&ctx->source.session->timeout);
 	}
+
+	qr_task_unref(task);
 
 	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 }
@@ -1820,7 +1752,7 @@ static int qr_task_step(struct qr_task *task,
 					subreq_finalize(task, packet_source, packet);
 					return qr_task_step(task, NULL, NULL);
 				}
-				tls_client_ctx_set_params(tls_ctx, entry, session);
+				tls_client_ctx_set_session(tls_ctx, session);
 				session->tls_client_ctx = tls_ctx;
 				session->has_tls = true;
 			}
