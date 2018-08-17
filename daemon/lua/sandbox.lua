@@ -219,12 +219,12 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 
 	-- Default callback function: repeat after 1ms
 	if callback == nil then callback =
-		function (cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, prev_state, cbrettable)
-			if cbrettable.count < 0 then error(ffi.string(ffi.C.knot_strerror(errors.count))) end
-			if prev_state == nil then prev_state = { round = 0 } end
-			if type(prev_state) ~= 'table'
+		function (cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbprev_state, cbrettable)
+			if cbrettable.count < 0 then error(ffi.string(ffi.C.knot_strerror(cbrettable.count))) end
+			if cbprev_state == nil then cbprev_state = { round = 0 } end
+			if type(cbprev_state) ~= 'table'
 				then error('cache.clear() callback: incorrect prev_state passed') end
-			cbrettable.round = prev_state.round + 1
+			cbrettable.round = cbprev_state.round + 1
 			if (cbrettable.count == cbchunk_size) then
 				event.after(1, function ()
 						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbrettable)
