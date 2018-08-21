@@ -360,7 +360,7 @@ respdiff:iter:tcp:linux:amd64:
     paths:
       - kresd.log.xz
       - results/*.txt
-      - results/*.svg
+      - results/*.png
       - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
