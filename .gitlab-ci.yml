@@ -245,13 +245,14 @@ test:linux:amd64:valgrind:
     - master@knot/knot-resolver
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || exit 0
-    - export TESTDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-gitlab/$RESPDIFF_TEST"
+    - export LABEL=gl$(date +%s)
+    - export TESTDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL/$RESPDIFF_TEST"
     - >
       sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
       -p $RESPDIFF_PRIORITY
       -c $RESPDIFF_COUNT
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l gitlab --clean -t $RESPDIFF_TEST
+      "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST
       --knot-branch 2.7)
     - cp -v $TESTDIR/j* ./
     - cat $TESTDIR/*_report.diffrepro.txt
