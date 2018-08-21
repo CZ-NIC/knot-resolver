@@ -17,7 +17,7 @@ for i in $(seq $NDIFFREPRO); do
 	time /var/opt/respdiff/diffrepro.py -c "${CONFIG}" respdiff.db
 done
 /var/opt/respdiff/diffsum.py respdiff.db -c "${CONFIG}" > results/respdiff.txt
-/var/opt/respdiff/histogram.py respdiff.db -c "${CONFIG}" -o results/histogram.svg
+/var/opt/respdiff/histogram.py respdiff.db -c "${CONFIG}" -o results/histogram.png
 : minimize LMDB and log size so they can be effectively archived
 mkdir results/respdiff.db
 mdb_copy -c respdiff.db results/respdiff.db
