@@ -862,7 +862,12 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t t
 	if (ret) return kr_error(ret);
 
 	knot_db_val_t key = key_exact_type(k, type, NULL);
-	return cache_op(cache, remove, &key, 1);
+	ret = cache_op(cache, remove, &key, 1);
+
+	/* Commit write transactions, as only one can be open at a time */
+	kr_cache_sync(cache);
+
+	return ret;
 }
 
 int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,
@@ -950,7 +955,8 @@ int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
 	}
 	ret = cache->api->remove(cache->db, keys, count);
 cleanup:
-	kr_cache_sync(cache); /* Sync even after just kr_cache_match(). */
+	/* Commit write transactions, as only one can be open at a time */
+	kr_cache_sync(cache);
 	/* Free keys */
 	while (--i >= 0) {
 		free(keys[i].data);
