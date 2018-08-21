@@ -7,6 +7,8 @@ variables:
   GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
   PREFIX: $CI_PROJECT_DIR/.local
   LD_LIBRARY_PATH: $CI_PROJECT_DIR/.local/lib
+  RESPDIFF_PRIORITY: 5
+  RESPDIFF_COUNT: 1
 
 stages:
   - build
@@ -246,7 +248,8 @@ test:linux:amd64:valgrind:
     - export TESTDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-gitlab/$RESPDIFF_TEST"
     - >
       sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
-      -p $PRIORITY
+      -p $RESPDIFF_PRIORITY
+      -c $RESPDIFF_COUNT
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
       "$(git rev-parse --short HEAD)" -l gitlab --clean -t $RESPDIFF_TEST
       --knot-branch 2.7)
@@ -265,49 +268,43 @@ respdiff:fwd-tls6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j128
-    PRIORITY: 6
+    RESPDIFF_PRIORITY: 6  # slowest test - higher prio
     TARGET_DISAGREES: 0\.0[0-9]
 
 respdiff:fwd-udp6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.[0-1][0-9]
 
 respdiff:iter.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.udp6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.[0-8][0-9]
 
 respdiff:iter.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.tls6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.[0-8][0-9]
 
 respdiff:fwd-udp6-unbound.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.0[0-9]
 
 respdiff:fwd-udp6-unbound.tcp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.0[0-9]
 
 respdiff:fwd-udp6-unbound.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.0[0-9]
 
 
