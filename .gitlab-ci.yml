@@ -246,7 +246,9 @@ test:linux:amd64:valgrind:
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || exit 0
     - export LABEL=gl$(date +%s)
-    - export TESTDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL/$RESPDIFF_TEST"
+    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
+    - export TESTDIR="$COMMITDIR/$RESPDIFF_TEST"
+    - ln -s $COMMITDIR respdiff_commitdir
     - >
       sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
       -p $RESPDIFF_PRIORITY
@@ -254,14 +256,16 @@ test:linux:amd64:valgrind:
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
       "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST
       --knot-branch 2.7)
-    - cp -v $TESTDIR/j* ./
-    - cat $TESTDIR/*_report.diffrepro.txt
-    - grep -q "^target disagrees.*$TARGET_DISAGREES %" $TESTDIR/*_report.diffrepro.txt
+    - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
+  after_script:
+    - 'cp -t . respdiff_commitdir/$RESPDIFF_TEST/j* ||:'
+    - 'cp -t . respdiff_commitdir/*$RESPDIFF_TEST*.png ||:'
   artifacts:
     when: always
     expire_in: 1 week
     paths:
       - ./j*
+      - ./*.png
   tags:
     - respdiff
 
