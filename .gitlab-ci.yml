@@ -254,9 +254,11 @@ test:linux:amd64:valgrind:
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
       "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST
       --knot-branch 2.7)
+    - /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
+  after_script:
     - cp -v $TESTDIR/j* ./
+    - cp -v $TESTDIR/../*$RESPDIFF_TEST* ./
     - cat $TESTDIR/*_report.diffrepro.txt
-    - grep -q "^target disagrees.*$TARGET_DISAGREES %" $TESTDIR/*_report.diffrepro.txt
   artifacts:
     when: always
     expire_in: 1 week
