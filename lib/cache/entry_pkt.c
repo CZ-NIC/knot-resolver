@@ -63,7 +63,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	const struct kr_qflags * const qf = &qry->flags;
 	const bool want_negative = qf->DNSSEC_INSECURE || !qf->DNSSEC_WANT || has_optout;
 	const bool want_pkt = qf->DNSSEC_BOGUS /*< useful for +cd answers */
-				|| (is_negative && want_negative) || qry->stype == KNOT_RRTYPE_RRSIG;
+				|| (is_negative && want_negative);
 
 	if (!want_pkt || !knot_wire_get_aa(pkt->wire)
 	    || pkt->parsed != pkt->size /*< malformed packet; still can't detect KNOT_EFEWDATA */
@@ -91,10 +91,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 			/* All bad cases should be filtered above,
 			 * at least the same way as pktcache in kresd 1.5.x. */
 			kr_rank_set(&rank, KR_RANK_SECURE);
-		} else if (qry->stype == KNOT_RRTYPE_RRSIG) {
-			/* RRSIGs can be at most cached as insecure */
-			kr_rank_set(&rank, KR_RANK_INSECURE);
-		}
+		} else assert(false);
 	}
 
 	const uint16_t pkt_type = knot_pkt_qtype(pkt);

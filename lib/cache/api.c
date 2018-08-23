@@ -277,7 +277,8 @@ static bool check_dname_for_lf(const knot_dname_t *n, const struct kr_query *qry
 /** Return false on types to be ignored.  Meant both for sname and direct cache requests. */
 static bool check_rrtype(uint16_t type, const struct kr_query *qry/*logging*/)
 {
-	const bool ret = !knot_rrtype_is_metatype(type);
+	const bool ret = !knot_rrtype_is_metatype(type)
+			&& type != KNOT_RRTYPE_RRSIG;
 	if (!ret) { WITH_VERBOSE(qry) {
 		auto_free char *type_str = kr_rrtype_text(type);
 		VERBOSE_MSG(qry, "=> skipping RR type %s\n", type_str);
@@ -338,6 +339,9 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type, const kr_cache
 	}
 
 	switch (type) {
+	case KNOT_RRTYPE_RRSIG: /* no RRSIG query caching, at least for now */
+		assert(false);
+		return (knot_db_val_t){ NULL, 0 };
 	/* xNAME lumped into NS. */
 	case KNOT_RRTYPE_CNAME:
 	case KNOT_RRTYPE_DNAME:
