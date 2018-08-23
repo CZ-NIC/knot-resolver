@@ -256,7 +256,7 @@ stages:
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
       "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST
       --knot-branch 2.7)
-    - /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
+    - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
   after_script:
     - echo $RESPDIFF_TEST
     - cp -vt . respdiff_commitdir/$RESPDIFF_TEST/j*
