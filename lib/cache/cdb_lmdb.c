@@ -388,6 +388,7 @@ static int cdb_clear(knot_db_t *db)
 	 * would lead to the instance detaching from the cache of others,
 	 * until they reopened cache explicitly or cleared it for some reason.
 	 */
+#ifndef LMDB_NO_DROP
 	{
 		MDB_txn *txn = NULL;
 		int ret = txn_get(env, &txn, false);
@@ -402,6 +403,7 @@ static int cdb_clear(knot_db_t *db)
 		}
 		kr_log_info("[cache] clearing error, falling back\n");
 	}
+#endif
 
 	/* We are about to switch to a different file, so end all txns, to be sure. */
 	(void) cdb_sync(db);
