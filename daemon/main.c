@@ -63,6 +63,7 @@ struct args {
 	bool interactive;
 	bool quiet;
 	bool tty_binary_output;
+	bool dry_run;
 };
 
 /* lua_pcall helper function */
@@ -365,6 +366,7 @@ static void help(int argc, char *argv[])
 	       " -m, --moduledir=[path] Override the default module path (" MODULEDIR ").\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
+	       " -n, --dry-run          Check configuration and cache state and exit.\n"
 	       " -v, --verbose          Run in verbose mode."
 #ifdef NOVERBOSELOG
 	           " (Recompile without -DNOVERBOSELOG to activate.)"
@@ -472,6 +474,7 @@ static void args_init(struct args *args)
 	array_init(args->fd_set);
 	array_init(args->tls_fd_set);
 	args->moduledir = MODULEDIR;
+	args->dry_run = false;
 	args->control_fd = -1;
 	args->interactive = true;
 	args->quiet = false;
@@ -494,13 +497,14 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"keyfile-ro", required_argument, 0, 'K'},
 		{"forks",      required_argument, 0, 'f'},
 		{"moduledir",  required_argument, 0, 'm'},
+		{"dry-run",          no_argument, 0, 'n'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
 		{"version",          no_argument, 0, 'V'},
 		{"help",             no_argument, 0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:K:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:nK:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -538,6 +542,9 @@ static int parse_args(int argc, char **argv, struct args *args)
 			break;
 		case 'm':
 			args->moduledir = optarg;
+			break;
+		case 'n':
+			args->dry_run = true;
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -753,11 +760,13 @@ int main(int argc, char **argv)
 	}
 
 	/* Run the event loop */
-	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, &args);
-	if (ret != 0) {
-		perror("[system] worker failed");
-		ret = EXIT_FAILURE;
-		goto cleanup;
+	if (!args.dry_run) {
+		ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, &args);
+		if (ret != 0) {
+			perror("[system] worker failed");
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
 	}
 
 cleanup:/* Cleanup. */
