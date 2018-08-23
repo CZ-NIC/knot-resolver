@@ -9,6 +9,7 @@ variables:
   LD_LIBRARY_PATH: $CI_PROJECT_DIR/.local/lib
   RESPDIFF_PRIORITY: 5
   RESPDIFF_COUNT: 1
+  RESPDIFF_FORCE: 0
 
 stages:
   - build
@@ -244,7 +245,7 @@ test:linux:amd64:valgrind:
   except:
     - master@knot/knot-resolver
   script:
-    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || exit 0
+    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
     - export TESTDIR="$COMMITDIR/$RESPDIFF_TEST"
