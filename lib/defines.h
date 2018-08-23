@@ -68,6 +68,12 @@ static inline int KR_COLD kr_error(int x) {
 #ifndef KR_QUERY_NSRETRY_LIMIT
 #define KR_QUERY_NSRETRY_LIMIT 4 /* Maximum number of retries per query. */
 #endif
+#ifndef KR_MIN_NSRTT
+#define KR_MIN_NSRTT 5 /* Minimum NS SRTT cap. */
+#endif
+#ifndef KR_DEFAULT_NSRTT
+#define KR_DEFAULT_NSRTT 250 /* Default/unknown NS SRTT value. */
+#endif
 
 /*
  * Defines.
