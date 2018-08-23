@@ -17,225 +17,225 @@ stages:
   - respdiff
   - deploy
 
-build:linux:amd64:
-  stage: build
-  except:
-    - master@knot/knot-resolver
-  script:
-    - rm daemon/lua/kres-gen.lua
-    - make -k all CFLAGS="-Werror -ggdb"
-    - STATUS="$(git status --untracked-files=normal --porcelain)"
-    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
-    - make install CFLAGS="-Werror -ggdb"
-  artifacts:
-    untracked: true
-  tags:
-    - docker
-    - linux
-    - amd64
-
-build:clang:linux:amd64:
-  stage: build
-  except:
-    - master@knot/knot-resolver
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
-  script:
-    - rm daemon/lua/kres-gen.lua
-    - CXX=clang++-5.0 CC=clang-5.0 make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
-    - STATUS="$(git status --untracked-files=normal --porcelain)"
-    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
-    - CXX=clang++-5.0 CC=clang-5.0 make install "CFLAGS=-Werror -ggdb"
-  tags:
-    - docker
-    - linux
-    - amd64
-
-srpm:
-  stage: build
-  except:
-    - master@knot/knot-resolver
-  allow_failure: true  # don't block testing pipeline in case of failure
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  script:
-    - scripts/make-srpm.sh
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - "*.src.rpm"
-  tags:
-    - docker
-    - linux
-    - amd64
-
-lint:lua:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  dependencies: []  # do not download build artifacts
-  script:
-    - make lint-lua
-  tags:
-    - docker
-
-lint:c:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
-  dependencies: []  # do not download build artifacts
-  script:
-    - make lint-c CLANG_TIDY="clang-tidy-5.0 -quiet"
-  tags:
-    - docker
-
-lint:clang-scan-build:
-  allow_failure: true  # for now it is just informative
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
-  dependencies: []  # do not download build artifacts
-  script:
-    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="/usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
-  artifacts:
-    when: on_failure
-    expire_in: '1 day'
-    paths:
-      - scan-results
-  tags:
-    - docker
-
-test:linux:amd64:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
-    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
-    - git clean -xdf
-    - make CFLAGS=-Werror
-    - MAKEFLAGS="--jobs $(nproc)" make -k check
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c COVERAGE_STAGE=gcov-check || echo "code coverage skipped"
-  dependencies: []
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
-
-installcheck:linux:amd64:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
-    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
-    - git clean -xdf
-    - make install CFLAGS=-Werror
-    - MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck || echo "code coverage skipped"
-  dependencies: []
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
-
-doc:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    - SPHINXFLAGS="-W" make doc
-  dependencies: []
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - ./doc/*
-  tags:
-    - docker
-
-deckard:linux:amd64:
-  stage: test
-  except:
-    refs:
-      - master@knot/knot-resolver
-    variables:
-      # prevent unstable test from cancelling nightly OBS build
-      - $SKIP_DECKARD == "1"
-  variables:
-    TMPDIR: $CI_PROJECT_DIR
-  script:
-    - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
-  # these errors are side-effect of Git way of handling file timestamps
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-  dependencies:
-    - build:linux:amd64
-  artifacts:
-    when: always
-    paths:
-      - ./*.info
-      - tmpdeckard*
-    expire_in: 1 week
-  tags:
-    - docker
-    - linux
-    - amd64
-
-installcheck:valgrind:linux:amd64:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    - DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k installcheck
-  dependencies:
-    - build:linux:amd64
-  tags:
-    - docker
-    - linux
-    - amd64
-
-# temporarily disabled - we need to fix issues first
-#deckard:linux:amd64:valgrind:
-#  stage: test
+#build:linux:amd64:
+#  stage: build
+#  except:
+#    - master@knot/knot-resolver
 #  script:
-#    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
-#    - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd -f 1" MAKEFLAGS="-j $(nproc) --keep-going" make
+#    - rm daemon/lua/kres-gen.lua
+#    - make -k all CFLAGS="-Werror -ggdb"
+#    - STATUS="$(git status --untracked-files=normal --porcelain)"
+#    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
+#    - make install CFLAGS="-Werror -ggdb"
+#  artifacts:
+#    untracked: true
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#build:clang:linux:amd64:
+#  stage: build
+#  except:
+#    - master@knot/knot-resolver
+#  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
+#  script:
+#    - rm daemon/lua/kres-gen.lua
+#    - CXX=clang++-5.0 CC=clang-5.0 make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
+#    - STATUS="$(git status --untracked-files=normal --porcelain)"
+#    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
+#    - CXX=clang++-5.0 CC=clang-5.0 make install "CFLAGS=-Werror -ggdb"
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#srpm:
+#  stage: build
+#  except:
+#    - master@knot/knot-resolver
+#  allow_failure: true  # don't block testing pipeline in case of failure
+#  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
+#  script:
+#    - scripts/make-srpm.sh
+#  artifacts:
+#    when: always
+#    expire_in: '1 week'
+#    paths:
+#      - "*.src.rpm"
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#lint:lua:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  dependencies: []  # do not download build artifacts
+#  script:
+#    - make lint-lua
+#  tags:
+#    - docker
+#
+#lint:c:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
+#  dependencies: []  # do not download build artifacts
+#  script:
+#    - make lint-c CLANG_TIDY="clang-tidy-5.0 -quiet"
+#  tags:
+#    - docker
+#
+#lint:clang-scan-build:
+#  allow_failure: true  # for now it is just informative
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
+#  dependencies: []  # do not download build artifacts
+#  script:
+#    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="/usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
 #  artifacts:
 #    when: on_failure
-#    expire_in: 1 week
+#    expire_in: '1 day'
 #    paths:
+#      - scan-results
+#  tags:
+#    - docker
+#
+#test:linux:amd64:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  script:
+#    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
+#    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
+#    - git clean -xdf
+#    - make CFLAGS=-Werror
+#    - MAKEFLAGS="--jobs $(nproc)" make -k check
+#    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c COVERAGE_STAGE=gcov-check || echo "code coverage skipped"
+#  dependencies: []
+#  artifacts:
+#    expire_in: 1 hour
+#    paths:
+#      - ./*.info
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#installcheck:linux:amd64:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  script:
+#    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
+#    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
+#    - git clean -xdf
+#    - make install CFLAGS=-Werror
+#    - MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
+#    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck || echo "code coverage skipped"
+#  dependencies: []
+#  artifacts:
+#    expire_in: 1 hour
+#    paths:
+#      - ./*.info
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#doc:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  script:
+#    - SPHINXFLAGS="-W" make doc
+#  dependencies: []
+#  artifacts:
+#    expire_in: 1 hour
+#    paths:
+#      - ./doc/*
+#  tags:
+#    - docker
+#
+#deckard:linux:amd64:
+#  stage: test
+#  except:
+#    refs:
+#      - master@knot/knot-resolver
+#    variables:
+#      # prevent unstable test from cancelling nightly OBS build
+#      - $SKIP_DECKARD == "1"
+#  variables:
+#    TMPDIR: $CI_PROJECT_DIR
+#  script:
+#    - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
+#  # these errors are side-effect of Git way of handling file timestamps
+#    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
+#  dependencies:
+#    - build:linux:amd64
+#  artifacts:
+#    when: always
+#    paths:
+#      - ./*.info
 #      - tmpdeckard*
+#    expire_in: 1 week
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#installcheck:valgrind:linux:amd64:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  script:
+#    - DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k installcheck
 #  dependencies:
 #    - build:linux:amd64
 #  tags:
 #    - docker
 #    - linux
 #    - amd64
-
-
-test:linux:amd64:valgrind:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  variables:
-    TMPDIR: $CI_PROJECT_DIR
-  script:
-    - DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
-  dependencies:
-    - build:linux:amd64
-  tags:
-    - docker
-    - linux
-    - amd64
-
+#
+## temporarily disabled - we need to fix issues first
+##deckard:linux:amd64:valgrind:
+##  stage: test
+##  script:
+##    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
+##    - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd -f 1" MAKEFLAGS="-j $(nproc) --keep-going" make
+##  artifacts:
+##    when: on_failure
+##    expire_in: 1 week
+##    paths:
+##      - tmpdeckard*
+##  dependencies:
+##    - build:linux:amd64
+##  tags:
+##    - docker
+##    - linux
+##    - amd64
+#
+#
+#test:linux:amd64:valgrind:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  variables:
+#    TMPDIR: $CI_PROJECT_DIR
+#  script:
+#    - DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
+#  dependencies:
+#    - build:linux:amd64
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
 .respdiff:  &respdiff
   stage: respdiff
   dependencies: []
@@ -269,293 +269,293 @@ test:linux:amd64:valgrind:
       - ./*.png
   tags:
     - respdiff
-
-respdiff:fwd-tls6-kresd.udp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j128
-    RESPDIFF_PRIORITY: 6  # slowest test - higher prio
-    TARGET_DISAGREES: 0\.0[0-9]
-
-respdiff:fwd-udp6-kresd.udp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
-    TARGET_DISAGREES: 0\.[0-1][0-9]
-
+#
+#respdiff:fwd-tls6-kresd.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j128
+#    RESPDIFF_PRIORITY: 6  # slowest test - higher prio
+#    TARGET_DISAGREES: 0\.0[0-9]
+#
+#respdiff:fwd-udp6-kresd.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
+#    TARGET_DISAGREES: 0\.[0-1][0-9]
+#
 respdiff:iter.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.udp6.j384
     TARGET_DISAGREES: 0\.[0-8][0-9]
 
-respdiff:iter.tls6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.iter.tls6.j384
-    TARGET_DISAGREES: 0\.[0-8][0-9]
-
-respdiff:fwd-udp6-unbound.udp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j384
-    TARGET_DISAGREES: 0\.0[0-9]
-
-respdiff:fwd-udp6-unbound.tcp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j384
-    TARGET_DISAGREES: 0\.0[0-9]
-
-respdiff:fwd-udp6-unbound.tls6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j384
-    TARGET_DISAGREES: 0\.0[0-9]
-
-
-respdiff:iter:udp:linux:amd64:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
-    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh udp
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-    - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-  dependencies:
-    - build:linux:amd64
-  artifacts: &small_respdiff_artifacts
-    when: always
-    expire_in: '1 week'
-    paths:
-      - kresd.log.xz
-      - results/*.txt
-      - results/*.png
-      - results/respdiff.db/data.mdb.xz
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
-
-respdiff:iter:tcp:linux:amd64:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tcp" --export)
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh tcp
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-    - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-
-  dependencies:
-    - build:linux:amd64
-  artifacts: *small_respdiff_artifacts
-  tags:
-    - docker
-    - linux
-    - amd64
-
-respdiff:iter:tls:linux:amd64:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tls" --export)
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh tls
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-    - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-  dependencies:
-    - build:linux:amd64
-  artifacts: *small_respdiff_artifacts
-  tags:
-    - docker
-    - linux
-    - amd64
-
-distro:fedora-27:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  only:
-    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
-  dependencies:
-    - srpm
-  script:
-    # TODO remove once Knot DNS 2.7.1 packages are available from official distro repos
-    - curl -Lo knot-devel-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/a22685bd0c737be97af11351c099fc2d/knot-devel-2.7.1-1.1.x86_64.rpm
-    - curl -Lo knot-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/ed349a36e8b6aca6fc5fc8fd6eef699a/knot-2.7.1-1.1.x86_64.rpm
-    - curl -Lo knot-libs-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/4960c36e94053a8aaf0f237bb5310b53/knot-libs-2.7.1-1.1.x86_64.rpm
-    - mock --init --old-chroot -i knot-devel-2.7.1-1.1.x86_64.rpm -i knot-2.7.1-1.1.x86_64.rpm -i knot-libs-2.7.1-1.1.x86_64.rpm -r fedora-27-x86_64
-    - mock --no-clean --old-chroot -r fedora-27-x86_64 --rebuild *.src.rpm
-  after_script:
-    - mv /var/lib/mock/fedora-27-x86_64/result fedora-27-x86_64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - fedora-27-x86_64/
-  tags:
-    - privileged  # mock requires additional capabilities (e.g. mount)
-
-distro:epel-7:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  only:
-    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
-  dependencies:
-    - srpm
-  script:
-    # TODO remove once Knot DNS 2.7 packages are available from official distro repos
-    - curl -Lo knot-devel-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/780d01725c2d95f63251d32b5c81d571/knot-devel-2.7.1-1.1.x86_64.rpm
-    - curl -Lo knot-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/6abdad1de5e76b413f3089bce45efbed/knot-2.7.1-1.1.x86_64.rpm
-    - curl -Lo knot-libs-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/e80b25f25e379472530ea5b2ea00fac1/knot-libs-2.7.1-1.1.x86_64.rpm
-    - mock --init --dnf --old-chroot -i knot-devel-2.7.1-1.1.x86_64.rpm -i  knot-2.7.1-1.1.x86_64.rpm -i knot-libs-2.7.1-1.1.x86_64.rpm -r epel-7-x86_64
-    - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
-  after_script:
-    - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - epel-7-x86_64/
-  tags:
-    - privileged  # mock require additional capabilities (e.g. mount)
-
-# compute coverage for runs with COVERAGE=1
-coverage:
-  stage: coverage
-  except:
-    - master@knot/knot-resolver
-  only:
-    variables:
-      - $COVERAGE == "1"
-  script:
-    - make coverage
-  artifacts:
-    expire_in: '1 week'
-    paths:
-      - coverage
-  coverage: '/lines\.+:\s(\d+.\d+\%)/'
-  dependencies:
-    - build:linux:amd64
-    - test:linux:amd64
-    - installcheck:linux:amd64
-    - deckard:linux:amd64
-    - respdiff:iter:udp:linux:amd64
-    - respdiff:iter:tcp:linux:amd64
-    - respdiff:iter:tls:linux:amd64
-  tags:
-    - docker
-    - linux
-    - amd64
-
-# publish coverage only for master branch
-pages:
-  stage: deploy
-  only:
-    refs:
-      - nightly@knot/knot-resolver
-    variables:
-      - $COVERAGE == "1"
-  dependencies:
-    - coverage
-  script:
-    - mv coverage/ public/
-  artifacts:
-    expire_in: '30 days'
-    paths:
-      - public
-
-# trigger obs build for master branch
-obs:devel:
-  stage: deploy
-  only:
-    variables:
-      - $OBS_BUILD == "1"
-    refs:
-      - nightly@knot/knot-resolver
-  dependencies: []
-  script:
-    - scripts/make-archive.sh
-    - scripts/make-distrofiles.sh
-    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > /root/.oscrc
-    - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
-    - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
-
-pkg:debian:symbols:libkres:
-  variables:
-    LIB_NAME: libkres
-    LIB_ABI: 8
-  stage: deploy
-  only:
-    variables:
-      - $OBS_BUILD == "1"
-    refs:
-      - nightly@knot/knot-resolver
-  except:
-    - master@knot/knot-resolver
-  script:
-    - ln -s distro/deb debian
-    - sed -i "s/__VERSION__/99/g" distro/deb/changelog
-    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIB_ABI -P. -p$LIB_NAME$LIB_ABI
-  allow_failure: true
-  dependencies:
-    - build:linux:amd64
-
-
-# copy snapshot of current master to nightly branch for further processing
-# (this is workaround for missing complex conditions for job limits in Gitlab)
-nightly:copy:
-  stage: deploy
-  only:
-    variables:
-      - $CREATE_NIGHTLY == "1"
-    refs:
-      - master@knot/knot-resolver
-  dependencies: []
-  script:
-    # delete nightly branch
-    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect"'
-    - 'curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly"'
-    # recreate nightly branch from current master
-    - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
-    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
-
-
-#arm_build:
-#  image: cznic/armhf-ubuntu:16.04
-#  stage: build
-#  script:
-#    - make -k all
-#  tags:
-#    - docker
-#    - linux
-#    - arm
-
-#arm_test:
-#  image: armv7/armhf-ubuntu:16.04
+#respdiff:iter.tls6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.iter.tls6.j384
+#    TARGET_DISAGREES: 0\.[0-8][0-9]
+#
+#respdiff:fwd-udp6-unbound.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j384
+#    TARGET_DISAGREES: 0\.0[0-9]
+#
+#respdiff:fwd-udp6-unbound.tcp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j384
+#    TARGET_DISAGREES: 0\.0[0-9]
+#
+#respdiff:fwd-udp6-unbound.tls6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j384
+#    TARGET_DISAGREES: 0\.0[0-9]
+#
+#
+#respdiff:iter:udp:linux:amd64:
 #  stage: test
+#  except:
+#    - master@knot/knot-resolver
 #  script:
-#    - make -k check
+#    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
+#    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
+#    - ./ci/respdiff/start-resolvers.sh
+#    - ./ci/respdiff/run-respdiff-tests.sh udp
+#    - cat results/respdiff.txt
+#    - echo 'test if mismatch rate < 1.0 %'
+#    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+#    - killall --wait kresd
+#    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
+#  dependencies:
+#    - build:linux:amd64
+#  artifacts: &small_respdiff_artifacts
+#    when: always
+#    expire_in: '1 week'
+#    paths:
+#      - kresd.log.xz
+#      - results/*.txt
+#      - results/*.png
+#      - results/respdiff.db/data.mdb.xz
+#      - ./*.info
 #  tags:
 #    - docker
 #    - linux
-#    - arm
+#    - amd64
+#
+#respdiff:iter:tcp:linux:amd64:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  script:
+#    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tcp" --export)
+#    - ./ci/respdiff/start-resolvers.sh
+#    - ./ci/respdiff/run-respdiff-tests.sh tcp
+#    - cat results/respdiff.txt
+#    - echo 'test if mismatch rate < 1.0 %'
+#    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+#    - killall --wait kresd
+#    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
+#
+#  dependencies:
+#    - build:linux:amd64
+#  artifacts: *small_respdiff_artifacts
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#respdiff:iter:tls:linux:amd64:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  script:
+#    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tls" --export)
+#    - ./ci/respdiff/start-resolvers.sh
+#    - ./ci/respdiff/run-respdiff-tests.sh tls
+#    - cat results/respdiff.txt
+#    - echo 'test if mismatch rate < 1.0 %'
+#    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+#    - killall --wait kresd
+#    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
+#  dependencies:
+#    - build:linux:amd64
+#  artifacts: *small_respdiff_artifacts
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#distro:fedora-27:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
+#  only:
+#    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
+#  dependencies:
+#    - srpm
+#  script:
+#    # TODO remove once Knot DNS 2.7.1 packages are available from official distro repos
+#    - curl -Lo knot-devel-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/a22685bd0c737be97af11351c099fc2d/knot-devel-2.7.1-1.1.x86_64.rpm
+#    - curl -Lo knot-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/ed349a36e8b6aca6fc5fc8fd6eef699a/knot-2.7.1-1.1.x86_64.rpm
+#    - curl -Lo knot-libs-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/4960c36e94053a8aaf0f237bb5310b53/knot-libs-2.7.1-1.1.x86_64.rpm
+#    - mock --init --old-chroot -i knot-devel-2.7.1-1.1.x86_64.rpm -i knot-2.7.1-1.1.x86_64.rpm -i knot-libs-2.7.1-1.1.x86_64.rpm -r fedora-27-x86_64
+#    - mock --no-clean --old-chroot -r fedora-27-x86_64 --rebuild *.src.rpm
+#  after_script:
+#    - mv /var/lib/mock/fedora-27-x86_64/result fedora-27-x86_64
+#  artifacts:
+#    when: always
+#    expire_in: '1 week'
+#    paths:
+#      - fedora-27-x86_64/
+#  tags:
+#    - privileged  # mock requires additional capabilities (e.g. mount)
+#
+#distro:epel-7:
+#  stage: test
+#  except:
+#    - master@knot/knot-resolver
+#  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
+#  only:
+#    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
+#  dependencies:
+#    - srpm
+#  script:
+#    # TODO remove once Knot DNS 2.7 packages are available from official distro repos
+#    - curl -Lo knot-devel-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/780d01725c2d95f63251d32b5c81d571/knot-devel-2.7.1-1.1.x86_64.rpm
+#    - curl -Lo knot-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/6abdad1de5e76b413f3089bce45efbed/knot-2.7.1-1.1.x86_64.rpm
+#    - curl -Lo knot-libs-2.7.1-1.1.x86_64.rpm https://gitlab.labs.nic.cz/knot/knot-resolver/uploads/e80b25f25e379472530ea5b2ea00fac1/knot-libs-2.7.1-1.1.x86_64.rpm
+#    - mock --init --dnf --old-chroot -i knot-devel-2.7.1-1.1.x86_64.rpm -i  knot-2.7.1-1.1.x86_64.rpm -i knot-libs-2.7.1-1.1.x86_64.rpm -r epel-7-x86_64
+#    - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
+#  after_script:
+#    - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
+#  artifacts:
+#    when: always
+#    expire_in: '1 week'
+#    paths:
+#      - epel-7-x86_64/
+#  tags:
+#    - privileged  # mock require additional capabilities (e.g. mount)
+#
+## compute coverage for runs with COVERAGE=1
+#coverage:
+#  stage: coverage
+#  except:
+#    - master@knot/knot-resolver
+#  only:
+#    variables:
+#      - $COVERAGE == "1"
+#  script:
+#    - make coverage
+#  artifacts:
+#    expire_in: '1 week'
+#    paths:
+#      - coverage
+#  coverage: '/lines\.+:\s(\d+.\d+\%)/'
+#  dependencies:
+#    - build:linux:amd64
+#    - test:linux:amd64
+#    - installcheck:linux:amd64
+#    - deckard:linux:amd64
+#    - respdiff:iter:udp:linux:amd64
+#    - respdiff:iter:tcp:linux:amd64
+#    - respdiff:iter:tls:linux:amd64
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+## publish coverage only for master branch
+#pages:
+#  stage: deploy
+#  only:
+#    refs:
+#      - nightly@knot/knot-resolver
+#    variables:
+#      - $COVERAGE == "1"
+#  dependencies:
+#    - coverage
+#  script:
+#    - mv coverage/ public/
+#  artifacts:
+#    expire_in: '30 days'
+#    paths:
+#      - public
+#
+## trigger obs build for master branch
+#obs:devel:
+#  stage: deploy
+#  only:
+#    variables:
+#      - $OBS_BUILD == "1"
+#    refs:
+#      - nightly@knot/knot-resolver
+#  dependencies: []
+#  script:
+#    - scripts/make-archive.sh
+#    - scripts/make-distrofiles.sh
+#    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > /root/.oscrc
+#    - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
+#    - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
+#
+#pkg:debian:symbols:libkres:
+#  variables:
+#    LIB_NAME: libkres
+#    LIB_ABI: 8
+#  stage: deploy
+#  only:
+#    variables:
+#      - $OBS_BUILD == "1"
+#    refs:
+#      - nightly@knot/knot-resolver
+#  except:
+#    - master@knot/knot-resolver
+#  script:
+#    - ln -s distro/deb debian
+#    - sed -i "s/__VERSION__/99/g" distro/deb/changelog
+#    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIB_ABI -P. -p$LIB_NAME$LIB_ABI
+#  allow_failure: true
+#  dependencies:
+#    - build:linux:amd64
+#
+#
+## copy snapshot of current master to nightly branch for further processing
+## (this is workaround for missing complex conditions for job limits in Gitlab)
+#nightly:copy:
+#  stage: deploy
+#  only:
+#    variables:
+#      - $CREATE_NIGHTLY == "1"
+#    refs:
+#      - master@knot/knot-resolver
+#  dependencies: []
+#  script:
+#    # delete nightly branch
+#    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect"'
+#    - 'curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly"'
+#    # recreate nightly branch from current master
+#    - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
+#    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
+#
+#
+##arm_build:
+##  image: cznic/armhf-ubuntu:16.04
+##  stage: build
+##  script:
+##    - make -k all
+##  tags:
+##    - docker
+##    - linux
+##    - arm
+#
+##arm_test:
+##  image: armv7/armhf-ubuntu:16.04
+##  stage: test
+##  script:
+##    - make -k check
+##  tags:
+##    - docker
+##    - linux
+##    - arm
