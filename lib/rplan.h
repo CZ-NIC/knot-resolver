@@ -102,7 +102,7 @@ struct kr_query {
 	struct timeval timestamp; /**< Real time for TTL+DNSSEC checks (.tv_sec only). */
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
-	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
+	uint32_t uid; /**< Query iteration number, strictly growing within the kr_rplan. */
 	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
 	struct kr_request *request; /**< Parent resolution request. */
