@@ -204,7 +204,7 @@ struct kr_request {
 		const struct sockaddr *addr;   /**< Current upstream address */
 	} upstream;                        /**< Upstream information, valid only in consume() phase */
 	struct kr_qflags options;
-	int state;
+	int state; /**< one of enum kr_layer_state */
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;
 	ranked_rr_array_t add_selected;
@@ -300,13 +300,9 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
  *
  * @note The structures will be deinitialized, but the assigned memory pool is not going to
  *       be destroyed, as it's owned by caller.
- *
- * @param  request request state
- * @param  state   either DONE or FAIL state
- * @return         DONE
  */
 KR_EXPORT
-int kr_resolve_finish(struct kr_request *request, int state);
+void kr_resolve_finish(struct kr_request *request);
 
 /**
  * Return resolution plan.

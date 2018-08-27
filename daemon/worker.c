@@ -1543,11 +1543,13 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		return 0;
 	}
 	struct request_ctx *ctx = task->ctx;
-	kr_resolve_finish(&ctx->req, state);
+	struct kr_request *req = &ctx->req;
+	req->state = state;
+	kr_resolve_finish(req);
 	task->finished = true;
 	if (ctx->source.session == NULL) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
-		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
+		return req->state == KR_STATE_DONE ? 0 : kr_error(EIO);
 	}
 
 	/* Send back answer */
@@ -1558,7 +1560,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
 	int res = qr_task_send(task, handle,
 			       (struct sockaddr *)&ctx->source.addr,
-			        ctx->req.answer);
+			        req->answer);
 	if (res != kr_ok()) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 		/* Since source session is erroneous detach all tasks. */
@@ -1579,7 +1581,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		uv_timer_again(&ctx->source.session->timeout);
 	}
 
-	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
+	return req->state == KR_STATE_DONE ? 0 : kr_error(EIO);
 }
 
 static int qr_task_step(struct qr_task *task,
