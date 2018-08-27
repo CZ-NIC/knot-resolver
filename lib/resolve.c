@@ -1625,20 +1625,4 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	return KR_STATE_DONE;
 }
 
-struct kr_rplan *kr_resolve_plan(struct kr_request *request)
-{
-	if (request) {
-		return &request->rplan;
-	}
-	return NULL;
-}
-
-knot_mm_t *kr_resolve_pool(struct kr_request *request)
-{
-	if (request) {
-		return &request->pool;
-	}
-	return NULL;
-}
-
 #undef VERBOSE_MSG

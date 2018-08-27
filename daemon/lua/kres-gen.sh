@@ -127,9 +127,6 @@ EOF
 
 ## libkres API
 ./scripts/gen-cdefs.sh libkres functions <<-EOF
-# Resolution request
-	kr_resolve_plan
-	kr_resolve_pool
 # Resolution plan
 	kr_rplan_push
 	kr_rplan_pop
