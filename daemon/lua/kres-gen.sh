@@ -66,7 +66,6 @@ genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 	map_t
 	# libkres
 	struct kr_qflags
-	rr_array_t
 	struct ranked_rr_array_entry
 	ranked_rr_array_entry_t
 	ranked_rr_array_t
