@@ -95,7 +95,6 @@ static int qr_task_step(struct qr_task *task,
 			knot_pkt_t *packet);
 static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 			struct sockaddr *addr, knot_pkt_t *pkt);
-static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
 static int worker_add_tcp_connected(struct worker_ctx *worker,
 				    const struct sockaddr *addr,
@@ -115,7 +114,6 @@ static int session_add_waiting(struct session *session, struct qr_task *task);
 static int session_del_waiting(struct session *session, struct qr_task *task);
 static int session_add_tasks(struct session *session, struct qr_task *task);
 static int session_del_tasks(struct session *session, struct qr_task *task);
-static void session_close(struct session *session);
 static void on_session_idle_timeout(uv_timer_t *timer);
 static int timer_start(struct session *session, uv_timer_cb cb,
 		       uint64_t timeout, uint64_t repeat);
@@ -128,7 +126,7 @@ static inline struct worker_ctx *get_worker(void)
 	return uv_default_loop()->data;
 }
 
-static inline void *iohandle_borrow(struct worker_ctx *worker)
+void *worker_iohandle_borrow(struct worker_ctx *worker)
 {
 	void *h = NULL;
 
@@ -144,7 +142,7 @@ static inline void *iohandle_borrow(struct worker_ctx *worker)
 	return h;
 }
 
-static inline void iohandle_release(struct worker_ctx *worker, void *h)
+void worker_iohandle_release(struct worker_ctx *worker, void *h)
 {
 	assert(h);
 
@@ -154,16 +152,6 @@ static inline void iohandle_release(struct worker_ctx *worker, void *h)
 	} else {
 		free(h);
 	}
-}
-
-void *worker_iohandle_borrow(struct worker_ctx *worker)
-{
-	return iohandle_borrow(worker);
-}
-
-void worker_iohandle_release(struct worker_ctx *worker, void *h)
-{
-	iohandle_release(worker, h);
 }
 
 static inline void *iorequest_borrow(struct worker_ctx *worker)
@@ -212,7 +200,7 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	}
 	/* Create connection for iterative query */
 	struct worker_ctx *worker = task->ctx->worker;
-	void *h = iohandle_borrow(worker);
+	void *h = worker_iohandle_borrow(worker);
 	uv_handle_t *handle = (uv_handle_t *)h;
 	if (!handle) {
 		return NULL;
@@ -246,7 +234,7 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	}
 	if (ret < 0) {
 		io_deinit(handle);
-		iohandle_release(worker, h);
+		worker_iohandle_release(worker, h);
 		return NULL;
 	}
 	/* Connect or issue query datagram */
@@ -263,7 +251,7 @@ static void on_session_close(uv_handle_t *handle)
 	assert(session->handle == handle);
 	session->handle = NULL;
 	io_deinit(handle);
-	iohandle_release(worker, handle);
+	worker_iohandle_release(worker, handle);
 }
 
 static void on_session_timer_close(uv_handle_t *timer)
@@ -288,7 +276,7 @@ static void ioreq_kill_udp(uv_handle_t *req, struct qr_task *task)
 	uv_timer_stop(&session->timeout);
 	session_del_tasks(session, task);
 	assert(session->tasks.len == 0);
-	session_close(session);
+	worker_session_close(session);
 }
 
 static void ioreq_kill_tcp(uv_handle_t *req, struct qr_task *task)
@@ -323,7 +311,7 @@ static void ioreq_kill_tcp(uv_handle_t *req, struct qr_task *task)
 
 	if (res != 0) {
 		/* if any errors, close the session immediately */
-		session_close(session);
+		worker_session_close(session);
 	}
 }
 
@@ -341,7 +329,7 @@ static void ioreq_kill_pending(struct qr_task *task)
 	task->pending_count = 0;
 }
 
-static void session_close(struct session *session)
+void worker_session_close(struct session *session)
 {
 	assert(session->tasks.len == 0 && session->waiting.len == 0);
 
@@ -831,7 +819,7 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 			 * on_send with nonzero status->re-add to waiting->send->etc).*/
 			if (status != 0) {
 				if (session->outgoing) {
-					qr_task_finalize(task, KR_STATE_FAIL);
+					worker_task_finalize(task, KR_STATE_FAIL);
 				} else {
 					assert(task->ctx->source.session == session);
 					task->ctx->source.session = NULL;
@@ -845,7 +833,7 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 					while (session->waiting.len > 0) {
 						struct qr_task *t = session->waiting.at[0];
 						if (session->outgoing) {
-							qr_task_finalize(t, KR_STATE_FAIL);
+							worker_task_finalize(t, KR_STATE_FAIL);
 						} else {
 							assert(t->ctx->source.session == session);
 							t->ctx->source.session = NULL;
@@ -857,14 +845,14 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 					while (session->tasks.len > 0) {
 						struct qr_task *t = session->tasks.at[0];
 						if (session->outgoing) {
-							qr_task_finalize(t, KR_STATE_FAIL);
+							worker_task_finalize(t, KR_STATE_FAIL);
 						} else {
 							assert(t->ctx->source.session == session);
 							t->ctx->source.session = NULL;
 						}
 						session_del_tasks(session, t);
 					}
-					session_close(session);
+					worker_session_close(session);
 					return status;
 				}
 			}
@@ -1144,12 +1132,12 @@ static int session_tls_hs_cb(struct session *session, int status)
 			struct qr_task *task = session->waiting.at[0];
 			session_del_tasks(session, task);
 			array_del(session->waiting, 0);
-			qr_task_finalize(task, KR_STATE_FAIL);
+			worker_task_finalize(task, KR_STATE_FAIL);
 			qr_task_unref(task);
 		}
 		worker_del_tcp_connected(worker, &peer->ip);
 		assert(session->tasks.len == 0);
-		session_close(session);
+		worker_session_close(session);
 	} else {
 		uv_timer_stop(&session->timeout);
 		session->timeout.data = session;
@@ -1207,7 +1195,7 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		assert(session->tasks.len == 0);
 		iorequest_release(worker, req);
-		session_close(session);
+		worker_session_close(session);
 		return;
 	}
 
@@ -1223,12 +1211,12 @@ static void on_connect(uv_connect_t *req, int status)
 				array_del(session->waiting, 0);
 				ioreq_kill_pending(task);
 				assert(task->pending_count == 0);
-				qr_task_finalize(task, KR_STATE_FAIL);
+				worker_task_finalize(task, KR_STATE_FAIL);
 				qr_task_unref(task);
 			}
 			assert(session->tasks.len == 0);
 			iorequest_release(worker, req);
-			session_close(session);
+			worker_session_close(session);
 			return;
 		}
 	}
@@ -1272,14 +1260,14 @@ static void on_connect(uv_connect_t *req, int status)
 		array_del(session->waiting, 0);
 		ioreq_kill_pending(task);
 		assert(task->pending_count == 0);
-		qr_task_finalize(task, KR_STATE_FAIL);
+		worker_task_finalize(task, KR_STATE_FAIL);
 		qr_task_unref(task);
 	}
 
 	assert(session->tasks.len == 0);
 
 	iorequest_release(worker, req);
-	session_close(session);
+	worker_session_close(session);
 }
 
 static void on_tcp_connect_timeout(uv_timer_t *timer)
@@ -1318,7 +1306,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 	}
 
 	assert (session->tasks.len == 0);
-	session_close(session);
+	worker_session_close(session);
 }
 
 static void on_tcp_watchdog_timeout(uv_timer_t *timer)
@@ -1342,7 +1330,7 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 			session_del_tasks(session, task);
 			ioreq_kill_pending(task);
 			assert(task->pending_count == 0);
-			qr_task_finalize(task, KR_STATE_FAIL);
+			worker_task_finalize(task, KR_STATE_FAIL);
 			qr_task_unref(task);
 		}
 	}
@@ -1355,11 +1343,11 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 		array_del(session->tasks, 0);
 		ioreq_kill_pending(task);
 		assert(task->pending_count == 0);
-		qr_task_finalize(task, KR_STATE_FAIL);
+		worker_task_finalize(task, KR_STATE_FAIL);
 		qr_task_unref(task);
 	}
 
-	session_close(session);
+	worker_session_close(session);
 }
 
 /* This is called when I/O timeouts */
@@ -1407,7 +1395,7 @@ static void on_session_idle_timeout(uv_timer_t *timer)
 	 * remove it from connection list and close
 	 */
 	assert(s->tasks.len == 0 && s->waiting.len == 0);
-	session_close(s);
+	worker_session_close(s);
 }
 
 static uv_handle_t *retransmit(struct qr_task *task)
@@ -1536,7 +1524,7 @@ static bool subreq_enqueue(struct qr_task *task)
 }
 
 
-static int qr_task_finalize(struct qr_task *task, int state)
+int worker_task_finalize(struct qr_task *task, int state)
 {
 	assert(task && task->leading == false);
 	if (task->finished) {
@@ -1572,7 +1560,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			 * (ie. task->leading is true) */
 			session_del_tasks(source_session, t);
 		}
-		session_close(source_session);
+		worker_session_close(source_session);
 	} else if (handle->type == UV_TCP) {
 		/* Don't try to close source session at least
 		 * retry_interval_for_timeout_timer milliseconds */
@@ -1611,7 +1599,7 @@ static int qr_task_step(struct qr_task *task,
 		} else if (packet && kr_rplan_empty(rplan)) {
 			/* new query; TODO - make this detection more obvious */
 			kr_resolve_consume(req, packet_source, packet);
-			return qr_task_finalize(task, KR_STATE_FAIL);
+			return worker_task_finalize(task, KR_STATE_FAIL);
 		}
 	}
 
@@ -1621,13 +1609,13 @@ static int qr_task_step(struct qr_task *task,
 					   &sock_type, task->pktbuf);
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT ||
 			     task->timeouts >= KR_TIMEOUT_LIMIT)) {
-			return qr_task_finalize(task, KR_STATE_FAIL);
+			return worker_task_finalize(task, KR_STATE_FAIL);
 		}
 	}
 
 	/* We're done, no more iterations needed */
 	if (state & (KR_STATE_DONE|KR_STATE_FAIL)) {
-		return qr_task_finalize(task, state);
+		return worker_task_finalize(task, state);
 	} else if (!task->addrlist || sock_type < 0) {
 		return qr_task_step(task, NULL, NULL);
 	}
@@ -1673,7 +1661,7 @@ static int qr_task_step(struct qr_task *task,
 		/* Start next step with timeout, fatal if can't start a timer. */
 		if (ret != 0) {
 			subreq_finalize(task, packet_source, packet);
-			return qr_task_finalize(task, KR_STATE_FAIL);
+			return worker_task_finalize(task, KR_STATE_FAIL);
 		}
 	} else {
 		assert (sock_type == SOCK_STREAM);
@@ -1681,14 +1669,14 @@ static int qr_task_step(struct qr_task *task,
 			packet_source ? packet_source : task->addrlist;
 		if (addr->sa_family == AF_UNSPEC) {
 			subreq_finalize(task, packet_source, packet);
-			return qr_task_finalize(task, KR_STATE_FAIL);
+			return worker_task_finalize(task, KR_STATE_FAIL);
 		}
 		struct session* session = NULL;
 		if ((session = worker_find_tcp_waiting(ctx->worker, addr)) != NULL) {
 			assert(session->outgoing);
 			if (session->closing) {
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 			/* There are waiting tasks.
 			 * It means that connection establishing or data sending
@@ -1697,13 +1685,13 @@ static int qr_task_step(struct qr_task *task,
 			ret = session_add_waiting(session, task);
 			if (ret < 0) {
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 			ret = session_add_tasks(session, task);
 			if (ret < 0) {
 				session_del_waiting(session, task);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 			assert(task->pending_count == 0);
 			task->pending[task->pending_count] = session->handle;
@@ -1714,13 +1702,13 @@ static int qr_task_step(struct qr_task *task,
 			if (session->closing) {
 				session_del_tasks(session, task);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 
 			if (session->tasks.len >= worker->tcp_pipeline_max) {
 				session_del_tasks(session, task);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 
 			/* will be removed in qr_task_on_send() */
@@ -1728,14 +1716,14 @@ static int qr_task_step(struct qr_task *task,
 			if (ret < 0) {
 				session_del_tasks(session, task);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 			ret = session_add_tasks(session, task);
 			if (ret < 0) {
 				session_del_waiting(session, task);
 				session_del_tasks(session, task);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 			if (session->waiting.len == 1) {
 				ret = qr_task_send(task, session->handle,
@@ -1745,12 +1733,12 @@ static int qr_task_step(struct qr_task *task,
 					session_del_tasks(session, task);
 					while (session->tasks.len != 0) {
 						struct qr_task *t = session->tasks.at[0];
-						qr_task_finalize(t, KR_STATE_FAIL);
+						worker_task_finalize(t, KR_STATE_FAIL);
 						session_del_tasks(session, t);
 					}
 					subreq_finalize(task, packet_source, packet);
-					session_close(session);
-					return qr_task_finalize(task, KR_STATE_FAIL);
+					worker_session_close(session);
+					return worker_task_finalize(task, KR_STATE_FAIL);
 				}
 				if (session->tasks.len == 1) {
 					uv_timer_stop(&session->timeout);
@@ -1762,12 +1750,12 @@ static int qr_task_step(struct qr_task *task,
 					session_del_tasks(session, task);
 					while (session->tasks.len != 0) {
 						struct qr_task *t = session->tasks.at[0];
-						qr_task_finalize(t, KR_STATE_FAIL);
+						worker_task_finalize(t, KR_STATE_FAIL);
 						session_del_tasks(session, t);
 					}
 					subreq_finalize(task, packet_source, packet);
-					session_close(session);
-					return qr_task_finalize(task, KR_STATE_FAIL);
+					worker_session_close(session);
+					return worker_task_finalize(task, KR_STATE_FAIL);
 				}
 			}
 			assert(task->pending_count == 0);
@@ -1784,7 +1772,7 @@ static int qr_task_step(struct qr_task *task,
 			if (!client) {
 				iorequest_release(ctx->worker, conn);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 			session = client->data;
 			ret = worker_add_tcp_waiting(ctx->worker, addr, session);
@@ -1792,7 +1780,7 @@ static int qr_task_step(struct qr_task *task,
 				session_del_tasks(session, task);
 				iorequest_release(ctx->worker, conn);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 			/* will be removed in qr_task_on_send() */
 			ret = session_add_waiting(session, task);
@@ -1801,7 +1789,7 @@ static int qr_task_step(struct qr_task *task,
 				worker_del_tcp_waiting(ctx->worker, addr);
 				iorequest_release(ctx->worker, conn);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 
 			/* Check if there must be TLS */
@@ -1836,7 +1824,7 @@ static int qr_task_step(struct qr_task *task,
 				worker_del_tcp_waiting(ctx->worker, addr);
 				iorequest_release(ctx->worker, conn);
 				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
+				return worker_task_finalize(task, KR_STATE_FAIL);
 			}
 
 			struct kr_query *qry = session_current_query(session);
@@ -2159,7 +2147,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			}
 			session_del_tasks(session, task);
 		}
-		session_close(session);
+		worker_session_close(session);
 		return kr_ok();
 	}
 
@@ -2213,7 +2201,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			while (session->waiting.len > 0) {
 				struct qr_task *task = session->waiting.at[0];
 				if (session->outgoing) {
-					qr_task_finalize(task, KR_STATE_FAIL);
+					worker_task_finalize(task, KR_STATE_FAIL);
 				} else {
 					assert(task->ctx->source.session == session);
 					task->ctx->source.session = NULL;
@@ -2225,14 +2213,14 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 			while (session->tasks.len > 0) {
 				struct qr_task *task = session->tasks.at[0];
 				if (session->outgoing) {
-					qr_task_finalize(task, KR_STATE_FAIL);
+					worker_task_finalize(task, KR_STATE_FAIL);
 				} else {
 					assert(task->ctx->source.session == session);
 					task->ctx->source.session = NULL;
 				}
 				session_del_tasks(session, task);
 			}
-			session_close(session);
+			worker_session_close(session);
 
 			return kr_ok();
 		}
@@ -2383,7 +2371,7 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 					 * session due to memory problems.
 					 * Finalize the task, otherwise it becomes orphaned. */
 					knot_pkt_init_response(task->ctx->req.answer, pkt);
-					qr_task_finalize(task, KR_STATE_FAIL);
+					worker_task_finalize(task, KR_STATE_FAIL);
 					goto next_msg;
 				}
 				submitted += 1;
@@ -2469,16 +2457,6 @@ struct kr_request *worker_task_request(struct qr_task *task)
 	}
 
 	return &task->ctx->req;
-}
-
-int worker_task_finalize(struct qr_task *task, int state)
-{
-	return qr_task_finalize(task, state);
-}
-
-void worker_session_close(struct session *session)
-{
-	session_close(session);
 }
 
 /** Reserve worker buffers */
