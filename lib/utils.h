@@ -159,7 +159,6 @@ static inline long time_diff(struct timeval *begin, struct timeval *end) {
 /** @cond internal Array types */
 struct kr_context;
 
-typedef array_t(knot_rrset_t *) rr_array_t;
 struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank; /**< enum kr_rank */
