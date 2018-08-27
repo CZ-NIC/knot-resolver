@@ -90,7 +90,9 @@ void *worker_iohandle_borrow(struct worker_ctx *worker);
 
 void worker_iohandle_release(struct worker_ctx *worker, void *h);
 
-/** Finalize given task */
+/** Finalize given task.
+ * @param state new value for struct kr_request::state
+ * @return kr_error(EIO) if final state isn't != KR_STATE_DONE */
 int worker_task_finalize(struct qr_task *task, int state);
 
 /** @cond internal */

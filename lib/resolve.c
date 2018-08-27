@@ -559,8 +559,10 @@ static int answer_padding(struct kr_request *request)
 	return kr_ok();
 }
 
-static int answer_fail(struct kr_request *request)
+/** Create empty SERVFAIL answer with EDNS and transition to KR_STATE_FAIL. */
+static void answer_fail(struct kr_request *request)
 {
+	request->state = KR_STATE_FAIL;
 	knot_pkt_t *answer = request->answer;
 	int ret = kr_pkt_clear_payload(answer);
 	knot_wire_clear_ad(answer->wire);
@@ -572,16 +574,15 @@ static int answer_fail(struct kr_request *request)
 		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
 		ret = edns_put(answer);
 	}
-	return ret;
 }
 
-static int answer_finalize(struct kr_request *request, int state)
+static void answer_finalize(struct kr_request *request)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
 
 	/* Always set SERVFAIL for bogus answers. */
-	if (state == KR_STATE_FAIL && rplan->pending.len > 0) {
+	if (request->state == KR_STATE_FAIL && rplan->pending.len > 0) {
 		struct kr_query *last = array_tail(rplan->pending);
 		if ((last->flags.DNSSEC_WANT) && (last->flags.DNSSEC_BOGUS)) {
 			return answer_fail(request);
@@ -594,7 +595,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	/* AD flag.  We can only change `secure` from true to false.
 	 * Be conservative.  Primary approach: check ranks of all RRs in wire.
 	 * Only "negative answers" need special handling. */
-	bool secure = last != NULL && state == KR_STATE_DONE /*< suspicious otherwise */
+	bool secure = last != NULL && request->state == KR_STATE_DONE /*< suspicious otherwise */
 		&& knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG;
 	if (last && (last->flags.STUB)) {
 		secure = false; /* don't trust forwarding for now */
@@ -675,8 +676,6 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (!secure) {
 		knot_wire_clear_ad(answer->wire);
 	}
-
-	return ret;
 }
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
@@ -1589,24 +1588,21 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	return kr_ok();
 }
 
-int kr_resolve_finish(struct kr_request *request, int state)
+void kr_resolve_finish(struct kr_request *request)
 {
 #ifndef NOVERBOSELOG
 	struct kr_rplan *rplan = &request->rplan;
 #endif
 	/* Finalize answer */
-	if (answer_finalize(request, state) != 0) {
-		state = KR_STATE_FAIL;
-	}
+	answer_finalize(request);
 	/* Error during procesing, internal failure */
-	if (state != KR_STATE_DONE) {
+	if (request->state != KR_STATE_DONE) {
 		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
 
-	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
 
 	struct kr_query *last = kr_rplan_last(rplan);
@@ -1621,8 +1617,6 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	/* Uninstall all tracepoints */
 	request->trace_finish = NULL;
 	request->trace_log = NULL;
-
-	return KR_STATE_DONE;
 }
 
 struct kr_rplan *kr_resolve_plan(struct kr_request *request)
