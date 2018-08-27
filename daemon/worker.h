@@ -94,8 +94,6 @@ void worker_iohandle_release(struct worker_ctx *worker, void *h);
 
 ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
 
-ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
-
 /** Finalize given task */
 int worker_task_finalize(struct qr_task *task, int state);
 
