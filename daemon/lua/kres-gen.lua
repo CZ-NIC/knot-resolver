@@ -121,11 +121,6 @@ struct kr_qflags {
 	_Bool CACHE_TRIED : 1;
 	_Bool NO_NS_FOUND : 1;
 };
-typedef struct {
-	knot_rrset_t **at;
-	size_t len;
-	size_t cap;
-} rr_array_t;
 struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank;
@@ -185,7 +180,6 @@ struct kr_request {
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;
 	ranked_rr_array_t add_selected;
-	rr_array_t additional;
 	_Bool answ_validated;
 	_Bool auth_validated;
 	uint8_t rank;
