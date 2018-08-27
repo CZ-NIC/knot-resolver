@@ -200,7 +200,6 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *gl
 static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, bool in_bailiwick,
 			struct kr_request *req, const struct kr_query *qry, int *glue_cnt)
 {
-	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
@@ -215,7 +214,7 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, bool in_bailiwic
 
 			uint8_t rank = (in_bailiwick && i == KNOT_ANSWER)
 				? (KR_RANK_INITIAL | KR_RANK_AUTH) : KR_RANK_OMIT;
-			(void) kr_ranked_rrarray_add(selected[i], rr, rank,
+			(void)kr_ranked_rrarray_add(kr_request_selected(req, i), rr, rank,
 							false, qry->uid, &req->pool);
 
 			if ((rr->type == KNOT_RRTYPE_A) &&

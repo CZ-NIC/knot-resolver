@@ -228,12 +228,18 @@ struct kr_request {
 	knot_mm_t pool;
 };
 
-/** Initializer for an array of *_selected. */
-#define kr_request_selected(req) { \
-	[KNOT_ANSWER] = &(req)->answ_selected, \
-	[KNOT_AUTHORITY] = &(req)->auth_selected, \
-	[KNOT_ADDITIONAL] = &(req)->add_selected, \
+/** Simple shorthand to access req->*_selected. */
+static inline ranked_rr_array_t *kr_request_selected(struct kr_request *req, knot_section_t sec)
+{
+	switch (sec) {
+	case KNOT_ANSWER:     return &req->answ_selected;
+	case KNOT_AUTHORITY:  return &req->auth_selected;
+	case KNOT_ADDITIONAL: return &req->add_selected;
+	default:
+		assert(!EINVAL);
+		return NULL;
 	}
+}
 
 /**
  * Begin name resolution.

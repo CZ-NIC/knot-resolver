@@ -367,7 +367,6 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 	/* Stash individual records. */
-	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	int unauth_cnt = 0;
 	trie_t *nsec_pmap = trie_create(&req->pool);
 	if (!nsec_pmap) {
@@ -378,7 +377,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/* ^^ DNSSEC_OPTOUT is not fired in cases like `com. A`,
 		 * but currently we don't stash separate NSEC3 proving that. */
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
-		ranked_rr_array_t *arr = selected[psec];
+		ranked_rr_array_t *arr = kr_request_selected(req, psec);
 		/* uncached entries are located at the end */
 		for (ssize_t i = arr->len - 1; i >= 0; --i) {
 			ranked_rr_array_entry_t *entry = arr->at[i];
