@@ -7,6 +7,9 @@ variables:
   GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
   PREFIX: $CI_PROJECT_DIR/.local
   LD_LIBRARY_PATH: $CI_PROJECT_DIR/.local/lib
+  RESPDIFF_PRIORITY: 5
+  RESPDIFF_COUNT: 1
+  RESPDIFF_FORCE: 0
 
 stages:
   - build
@@ -242,22 +245,28 @@ test:linux:amd64:valgrind:
   except:
     - master@knot/knot-resolver
   script:
-    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || exit 0
-    - export TESTDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-gitlab/$RESPDIFF_TEST"
+    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
+    - export LABEL=gl$(date +%s)
+    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
+    - export TESTDIR="$COMMITDIR/$RESPDIFF_TEST"
+    - ln -s $COMMITDIR respdiff_commitdir
     - >
       sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
-      -p $PRIORITY
+      -p $RESPDIFF_PRIORITY
+      -c $RESPDIFF_COUNT
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l gitlab --clean -t $RESPDIFF_TEST
+      "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST
       --knot-branch 2.7)
-    - cp -v $TESTDIR/j* ./
-    - cat $TESTDIR/*_report.diffrepro.txt
-    - grep -q "^target disagrees.*$TARGET_DISAGREES %" $TESTDIR/*_report.diffrepro.txt
+    - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
+  after_script:
+    - 'cp -t . respdiff_commitdir/$RESPDIFF_TEST/j* ||:'
+    - 'cp -t . respdiff_commitdir/*$RESPDIFF_TEST*.png ||:'
   artifacts:
     when: always
     expire_in: 1 week
     paths:
       - ./j*
+      - ./*.png
   tags:
     - respdiff
 
@@ -265,49 +274,43 @@ respdiff:fwd-tls6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j128
-    PRIORITY: 6
+    RESPDIFF_PRIORITY: 6  # slowest test - higher prio
     TARGET_DISAGREES: 0\.0[0-9]
 
 respdiff:fwd-udp6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.[0-1][0-9]
 
 respdiff:iter.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.udp6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.[0-8][0-9]
 
 respdiff:iter.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.tls6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.[0-8][0-9]
 
 respdiff:fwd-udp6-unbound.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.0[0-9]
 
 respdiff:fwd-udp6-unbound.tcp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.0[0-9]
 
 respdiff:fwd-udp6-unbound.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j384
-    PRIORITY: 5
     TARGET_DISAGREES: 0\.0[0-9]
 
 
@@ -327,13 +330,13 @@ respdiff:iter:udp:linux:amd64:
     - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
     - build:linux:amd64
-  artifacts:
+  artifacts: &small_respdiff_artifacts
     when: always
     expire_in: '1 week'
     paths:
       - kresd.log.xz
       - results/*.txt
-      - results/*.svg
+      - results/*.png
       - results/respdiff.db/data.mdb.xz
       - ./*.info
   tags:
@@ -357,15 +360,7 @@ respdiff:iter:tcp:linux:amd64:
 
   dependencies:
     - build:linux:amd64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - kresd.log.xz
-      - results/*.txt
-      - results/*.svg
-      - results/respdiff.db/data.mdb.xz
-      - ./*.info
+  artifacts: *small_respdiff_artifacts
   tags:
     - docker
     - linux
@@ -386,15 +381,7 @@ respdiff:iter:tls:linux:amd64:
     - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
     - build:linux:amd64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - kresd.log.xz
-      - results/*.txt
-      - results/*.svg
-      - results/respdiff.db/data.mdb.xz
-      - ./*.info
+  artifacts: *small_respdiff_artifacts
   tags:
     - docker
     - linux
