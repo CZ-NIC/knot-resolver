@@ -722,43 +722,41 @@ local kr_request_t = ffi.typeof('struct kr_request')
 ffi.metatype( kr_request_t, {
 	__index = {
 		current = function(req)
-			assert(ffi.istype(kr_request_t, req))
-			if req.current_query == nil then return nil end
+			assert(req and ffi.istype(kr_request_t, req))
 			return req.current_query
 		end,
 		-- Return last query on the resolution plan
 		last = function(req)
-			assert(ffi.istype(kr_request_t, req))
-			local query = C.kr_rplan_last(C.kr_resolve_plan(req))
+			assert(req and ffi.istype(kr_request_t, req))
+			local query = C.kr_rplan_last(req.rplan)
 			if query == nil then return end
 			return query
 		end,
 		resolved = function(req)
-			assert(ffi.istype(kr_request_t, req))
-			local qry = C.kr_rplan_resolved(C.kr_resolve_plan(req))
+			assert(req and ffi.istype(kr_request_t, req))
+			local qry = C.kr_rplan_resolved(req.rplan)
 			if qry == nil then return nil end
 			return qry
 		end,
 		-- returns first resolved sub query for a request
 		first_resolved = function(req)
-			assert(ffi.istype(kr_request_t, req))
-			local rplan = C.kr_resolve_plan(req)
+			assert(req and ffi.istype(kr_request_t, req))
+			local rplan = req.rplan
 			if not rplan or rplan.resolved.len < 1 then return nil end
 			return rplan.resolved.at[0]
 		end,
 		push = function(req, qname, qtype, qclass, flags, parent)
-			assert(ffi.istype(kr_request_t, req))
+			assert(req and ffi.istype(kr_request_t, req))
 			flags = kres.mk_qflags(flags) -- compatibility
-			local rplan = C.kr_resolve_plan(req)
-			local qry = C.kr_rplan_push(rplan, parent, qname, qclass, qtype)
+			local qry = C.kr_rplan_push(req.rplan, parent, qname, qclass, qtype)
 			if qry ~= nil and flags ~= nil then
 				C.kr_qflags_set(qry.flags, flags)
 			end
 			return qry
 		end,
 		pop = function(req, qry)
-			assert(ffi.istype(kr_request_t, req))
-			return C.kr_rplan_pop(C.kr_resolve_plan(req), qry)
+			assert(req and ffi.istype(kr_request_t, req))
+			return C.kr_rplan_pop(req.rplan, qry)
 		end,
 		-- Return per-request variable table
 		-- The request can store anything in this Lua table and it will be freed

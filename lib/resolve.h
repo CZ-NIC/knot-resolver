@@ -304,19 +304,3 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 KR_EXPORT
 void kr_resolve_finish(struct kr_request *request);
 
-/**
- * Return resolution plan.
- * @param  request request state
- * @return         pointer to rplan
- */
-KR_EXPORT KR_PURE
-struct kr_rplan *kr_resolve_plan(struct kr_request *request);
-
-/**
- * Return memory pool associated with request.
- * @param  request request state
- * @return         mempool
- */
-KR_EXPORT KR_PURE
-knot_mm_t *kr_resolve_pool(struct kr_request *request);
-
