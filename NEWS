@@ -6,6 +6,12 @@ Bugfixes
 
 - tls_client: fix issue with TLS session resumption (#489)
 
+Module API changes
+------------------
+- kr_request::add_selected is now really put into answer,
+  instead of the "duplicate" ::additional field (#490)
+
+
 Knot Resolver 4.1.0 (2019-07-10)
 ================================
 
