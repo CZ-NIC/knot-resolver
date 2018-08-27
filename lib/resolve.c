@@ -557,9 +557,12 @@ static void answer_fail(struct kr_request *request)
 	knot_wire_clear_aa(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 	if (ret == 0 && answer->opt_rr) {
-		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
-		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
+		/* EDNS in SERVFAIL response is still useful,
+		 * but we just ignore if that fails. */
+		if (knot_pkt_begin(answer, KNOT_ADDITIONAL) != kr_ok()) {
+			return;
+		}
+		answer_padding(request);
 		ret = edns_put(answer);
 	}
 }
@@ -569,11 +572,12 @@ static void answer_finalize(struct kr_request *request)
 	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
 
-	/* Always set SERVFAIL for bogus answers. */
-	if (request->state == KR_STATE_FAIL && rplan->pending.len > 0) {
-		struct kr_query *last = array_tail(rplan->pending);
-		if ((last->flags.DNSSEC_WANT) && (last->flags.DNSSEC_BOGUS)) {
-			return answer_fail(request);
+	if (request->state == KR_STATE_FAIL) {
+		/* Don't allow a "non-failure" RCODE. */
+		switch (knot_wire_get_rcode(answer->wire)) {
+		case KNOT_RCODE_NOERROR:
+		case KNOT_RCODE_NXDOMAIN:
+			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
 
@@ -593,37 +597,26 @@ static void answer_finalize(struct kr_request *request)
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
+	/* Put all standard sections into the packet. */
 	const uint16_t reorder = last ? last->reorder : 0;
 	bool answ_all_cnames = false/*arbitrary*/;
-	if (request->answ_selected.len > 0) {
-		assert(answer->current <= KNOT_ANSWER);
-		/* Write answer records. */
-		if (answer->current < KNOT_ANSWER) {
-			knot_pkt_begin(answer, KNOT_ANSWER);
+	for (knot_section_t sect = KNOT_ANSWER; sect <= KNOT_ADDITIONAL; ++sect) {
+		const ranked_rr_array_t *sel = kr_request_selected(request, sect);
+		if (sel->len == 0) {
+			/* A module might have chosen to write to packet directly. */
+			continue;
 		}
-		if (write_extra_ranked_records(&request->answ_selected, reorder,
-						answer, &secure, &answ_all_cnames))
-		{
+		const bool failed = knot_pkt_begin(answer, sect)
+			|| write_extra_ranked_records(sel, reorder, answer,
+				/* AD flag only considers ANSWER and AUTHORITY. */
+				(sect == KNOT_ADDITIONAL ? NULL : &secure),
+				(sect == KNOT_ANSWER ? &answ_all_cnames : NULL));
+		if (failed) {
 			return answer_fail(request);
 		}
 	}
 
-	/* Write authority records. */
-	if (answer->current < KNOT_AUTHORITY) {
-		knot_pkt_begin(answer, KNOT_AUTHORITY);
-	}
-	if (write_extra_ranked_records(&request->auth_selected, reorder,
-	    answer, &secure, NULL)) {
-		return answer_fail(request);
-	}
-	/* Write additional records. */
-	knot_pkt_begin(answer, KNOT_ADDITIONAL);
-	if (write_extra_ranked_records(&request->add_selected, reorder,
-					answer, NULL, NULL)) {
-		return answer_fail(request);
-	}
 	/* Write EDNS information */
-	int ret = 0;
 	if (answer->opt_rr) {
 		if (request->has_tls) {
 			if (answer_padding(request) != kr_ok()) {
@@ -631,7 +624,9 @@ static void answer_finalize(struct kr_request *request)
 			}
 		}
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		ret = edns_put(answer);
+		if (edns_put(answer) != kr_ok()) {
+			return answer_fail(request);
+		}
 	}
 
 	if (!last) secure = false; /*< should be no-op, mostly documentation */
@@ -1583,14 +1578,6 @@ void kr_resolve_finish(struct kr_request *request)
 #endif
 	/* Finalize answer */
 	answer_finalize(request);
-	/* Error during procesing, internal failure */
-	if (request->state != KR_STATE_DONE) {
-		knot_pkt_t *answer = request->answer;
-		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
-			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
-		}
-	}
-
 	ITERATE_LAYERS(request, NULL, finish);
 
 	struct kr_query *last = kr_rplan_last(rplan);
