@@ -185,7 +185,6 @@ struct kr_request {
 	ranked_rr_array_t answ_selected;
 	ranked_rr_array_t auth_selected;
 	ranked_rr_array_t add_selected;
-	rr_array_t additional;
 	_Bool answ_validated;
 	_Bool auth_validated;
 	uint8_t rank;
