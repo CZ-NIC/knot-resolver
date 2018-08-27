@@ -879,6 +879,31 @@ static bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
 	return false;
 }
 
+/** Call me immediately after iterating over CONSUME layers. */
+static void consume_postproc(struct kr_request *request, const struct kr_query *qry)
+{
+	/* In case a query fails, we don't want its records in the answer,
+	 * but we still put the others.  If a CNAME chain SERVFAILs somewhere,
+	 * the steps that were OK should be put into answer.
+	 *
+	 * There is one specific issue: currently we follow CNAME *before*
+	 * we validate it, because... iterator comes before validator.
+	 * Therefore we also avoid data from all queries that originated
+	 * *after* this query which detected the failure.
+	 * TODO: better approach, probably during work on parallel queries.
+	 */
+	if (request->state != KR_STATE_FAIL) return;
+	for (knot_section_t sect = KNOT_ANSWER; sect <= KNOT_ADDITIONAL; ++sect) {
+		const ranked_rr_array_t *sel = kr_request_selected(request, sect);
+		for (size_t i = 0; i < sel->len; ++i) {
+			ranked_rr_array_entry_t *e = sel->at[i];
+			if (e->qry_uid >= qry->uid) {
+				e->to_wire = false;
+			}
+		}
+	}
+}
+
 int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
@@ -913,11 +938,13 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		request->state = KR_STATE_CONSUME;
 		if (qry->flags.CACHED) {
 			ITERATE_LAYERS(request, qry, consume, packet);
+			consume_postproc(request, qry);
 		} else {
 			/* Fill in source and latency information. */
 			request->upstream.rtt = kr_now() - qry->timestamp_mono;
 			request->upstream.addr = src;
 			ITERATE_LAYERS(request, qry, consume, packet);
+			consume_postproc(request, qry);
 			/* Clear temporary information */
 			request->upstream.addr = NULL;
 			request->upstream.rtt = 0;
@@ -1345,6 +1372,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		set_yield(&request->answ_selected, qry->uid, false);
 		set_yield(&request->auth_selected, qry->uid, false);
 		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
+		consume_postproc(request, qry);
 		if (request->state != KR_STATE_YIELD) {
 			/* No new deferred answers, take the next */
 			qry->deferred = pickle->next;
@@ -1369,6 +1397,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 			qry->secret = 0;
 			request->state = KR_STATE_CONSUME;
 			ITERATE_LAYERS(request, qry, consume, packet);
+			consume_postproc(request, qry);
 		}
 	}
 	switch(request->state) {

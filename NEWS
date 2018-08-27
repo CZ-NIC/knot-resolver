@@ -5,6 +5,10 @@ Improvements
 ------------
 - cache: handle out-of-space SIGBUS slightly better (#197)
 
+Bugfixes
+--------
+- fix partial data sent in SERVFAIL answers (#396)
+
 
 Knot Resolver 3.0.0 (2018-08-20)
 ================================
