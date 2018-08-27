@@ -461,18 +461,6 @@ static int answer_prepare(struct kr_request *req, knot_pkt_t *query)
 	return kr_ok();
 }
 
-/** @return error code, ignoring if forced to truncate the packet. */
-static int write_extra_records(const rr_array_t *arr, uint16_t reorder, knot_pkt_t *answer)
-{
-	for (size_t i = 0; i < arr->len; ++i) {
-		int err = knot_pkt_put_rotate(answer, 0, arr->at[i], reorder, KNOT_PF_NOTRUNC);
-		if (err != KNOT_EOK) {
-			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
-		}
-	}
-	return kr_ok();
-}
-
 /**
  * @param all_secure optionally &&-combine security of written RRs into its value.
  *		     (i.e. if you pass a pointer to false, it will always remain)
@@ -658,7 +646,8 @@ static void answer_finalize(struct kr_request *request)
 	    || write_extra_ranked_records(&request->auth_selected, reorder,
 					answer, &secure, NULL)
 	    || knot_pkt_begin(answer, KNOT_ADDITIONAL)
-	    || write_extra_records(&request->additional, reorder, answer)
+	    || write_extra_ranked_records(&request->add_selected, reorder,
+					answer, NULL/*not relevant to AD*/, NULL)
 	    || answer_append_edns(request)
 	   )
 	{
@@ -737,7 +726,6 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->options = ctx->options;
 	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
-	array_init(request->additional);
 	array_init(request->answ_selected);
 	array_init(request->auth_selected);
 	array_init(request->add_selected);
