@@ -275,43 +275,36 @@ respdiff:fwd-tls6-kresd.udp6:
   variables:
     RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j128
     RESPDIFF_PRIORITY: 6  # slowest test - higher prio
-    TARGET_DISAGREES: 0\.0[0-9]
 
 respdiff:fwd-udp6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
-    TARGET_DISAGREES: 0\.[0-1][0-9]
 
 respdiff:iter.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.udp6.j384
-    TARGET_DISAGREES: 0\.[0-8][0-9]
 
 respdiff:iter.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.tls6.j384
-    TARGET_DISAGREES: 0\.[0-8][0-9]
 
 respdiff:fwd-udp6-unbound.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j384
-    TARGET_DISAGREES: 0\.0[0-9]
+    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j256
 
 respdiff:fwd-udp6-unbound.tcp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j384
-    TARGET_DISAGREES: 0\.0[0-9]
+    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j256
 
 respdiff:fwd-udp6-unbound.tls6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j384
-    TARGET_DISAGREES: 0\.0[0-9]
+    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j256
 
 
 respdiff:iter:udp:linux:amd64:
