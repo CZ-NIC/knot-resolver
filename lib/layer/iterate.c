@@ -454,7 +454,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 			if (rr->type == KNOT_RRTYPE_NS
 			    && knot_dname_in_bailiwick(rr->owner, qry->zone_cut.name) > 0
-			    && knot_dname_in_bailiwick(rr->owner, qry->sname) >= 0) {
+			    && knot_dname_in_bailiwick(rr->owner, knot_pkt_qname(pkt)) >= 0) {
 				/* NS below cut in authority indicates different authority,
 				 * but same NS set. */
 				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
