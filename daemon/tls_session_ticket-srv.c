@@ -50,7 +50,7 @@
 	#define gnutls_memset memset
 #endif
 
-#ifdef GNUTLS_DIG_SHA3_512
+#if GNUTLS_VERSION_NUMBER >= 0x030407
 	#define TST_HASH GNUTLS_DIG_SHA3_512
 #else
 	#define TST_HASH abort()
