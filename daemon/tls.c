@@ -215,53 +215,41 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 	assert (tls_ctx);
 	assert (session->outgoing == tls_ctx->client_side);
 
-	const uint16_t pkt_size = htons(pkt->size);
+	uint8_t *tcp_len_start = (uint8_t *)pkt->wire - 2;
 	const char *logstring = tls_ctx->client_side ? client_logstring : server_logstring;
 	gnutls_session_t tls_session = tls_ctx->tls_session;
-
-	tls_ctx->task = task;
-
-	assert(gnutls_record_check_corked(tls_session) == 0);
-
-	gnutls_record_cork(tls_session);
-	ssize_t count = 0;
-	if ((count = gnutls_record_send(tls_session, &pkt_size, sizeof(pkt_size)) < 0) ||
-	    (count = gnutls_record_send(tls_session, pkt->wire, pkt->size) < 0)) {
-		kr_log_error("[%s] gnutls_record_send failed: %s (%zd)\n",
-			     logstring, gnutls_strerror_name(count), count);
-		return kr_error(EIO);
-	}
-
+	const size_t size_to_send = pkt->size + 2;
 	ssize_t submitted = 0;
 	ssize_t retries = 0;
+
+	tls_ctx->task = task;
+	knot_wire_write_u16(tcp_len_start, pkt->size);
+
 	do {
-		count = gnutls_record_uncork(tls_session, 0);
+		ssize_t count = gnutls_record_send(tls_session, &tcp_len_start[submitted], size_to_send);
 		if (count < 0) {
 			if (gnutls_error_is_fatal(count)) {
-				kr_log_error("[%s] gnutls_record_uncork failed: %s (%zd)\n",
+				kr_log_error("[%s] gnutls_record_send failed: %s (%zd)\n",
 				             logstring, gnutls_strerror_name(count), count);
+				assert(false);
 				return kr_error(EIO);
 			}
 			if (++retries > TLS_MAX_UNCORK_RETRIES) {
-				kr_log_error("[%s] gnutls_record_uncork: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
+				kr_log_error("[%s] gnutls_record_send: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
 				             logstring, retries, gnutls_strerror_name(count), count);
+				assert(false);
 				return kr_error(EIO);
 			}
 		} else if (count != 0) {
 			submitted += count;
 			retries = 0;
-		} else if (gnutls_record_check_corked(tls_session) != 0) {
-			if (++retries > TLS_MAX_UNCORK_RETRIES) {
-				kr_log_error("[%s] gnutls_record_uncork: too many retries (%zd)\n",
-				             logstring, retries);
-				return kr_error(EIO);
-			}
-		} else if (submitted != sizeof(pkt_size) + pkt->size) {
-			kr_log_error("[%s] gnutls_record_uncork didn't send all data(%zd of %zd)\n",
-			             logstring, submitted, sizeof(pkt_size) + pkt->size);
+		} else if (submitted != size_to_send) {
+			kr_log_error("[%s] gnutls_record_send didn't send all data(%zd of %zd)\n",
+			             logstring, submitted, size_to_send);
+			assert(false);
 			return kr_error(EIO);
 		}
-	} while (submitted != sizeof(pkt_size) + pkt->size);
+	} while (submitted != size_to_send);
 
 	return kr_ok();
 }
