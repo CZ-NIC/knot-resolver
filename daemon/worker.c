@@ -62,6 +62,7 @@ struct qr_task
 	knot_pkt_t *pktbuf;
 	qr_tasklist_t waiting;
 	uv_handle_t *pending[MAX_PENDING];
+	void *write_req_buf;
 	uint16_t pending_count;
 	uint16_t addrlist_count;
 	uint16_t addrlist_turn;
@@ -586,7 +587,11 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 	}
 	req->qsource.size = query->size;
 
-	req->answer = knot_pkt_new(NULL, answer_max, &req->pool);
+	/* Wire buffer + placeholder for tcp message length field.
+	 * Placeholder allows to avoid usage of gnutls_record_cork() \ gnutls_record_cork()
+	 * when TLS is used. */
+	char *wire = mm_alloc(&req->pool, answer_max + 2);
+	req->answer = knot_pkt_new(wire + 2, answer_max, &req->pool);
 	if (!req->answer) {
 		return kr_error(ENOMEM);
 	}
@@ -690,8 +695,12 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	}
 	memset(task, 0, sizeof(*task)); /* avoid accidentally unitialized fields */
 
-	/* Create packet buffers for answer and subrequests */
-	knot_pkt_t *pktbuf = knot_pkt_new(NULL, pktbuf_max, &ctx->req.pool);
+	/* Create packet buffers for answer and subrequests.
+	 * Don't forget about placeholder for tcp message length field.
+	 * This allows to avoid usage of gnutls_record_cork() \ gnutls_record_cork()
+	 * when TLS is used. */
+	char *wire = mm_alloc(&ctx->req.pool, pktbuf_max + 2);
+	knot_pkt_t *pktbuf = knot_pkt_new(wire + 2, pktbuf_max, &ctx->req.pool);
 	if (!pktbuf) {
 		mm_free(&ctx->req.pool, task);
 		return NULL;
@@ -895,6 +904,10 @@ static void on_task_write(uv_write_t *req, int status)
 	struct worker_ctx *worker = loop->data;
 	assert(worker == get_worker());
 	struct qr_task *task = req->data;
+	if (task->write_req_buf) {
+		free(task->write_req_buf);
+		task->write_req_buf = NULL;
+	}
 	qr_task_on_send(task, handle, status);
 	qr_task_unref(task);
 	iorequest_release(worker, req);
@@ -904,6 +917,10 @@ static void on_nontask_write(uv_write_t *req, int status)
 {
 	uv_handle_t *handle = (uv_handle_t *)(req->handle);
 	uv_loop_t *loop = handle->loop;
+	if (req->data) {
+		free(req->data);
+		req->data = NULL;
+	}
 	struct worker_ctx *worker = loop->data;
 	assert(worker == get_worker());
 	iorequest_release(worker, req);
@@ -912,8 +929,12 @@ static void on_nontask_write(uv_write_t *req, int status)
 ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
 	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
+
+	void *buf_local = malloc(len);
+	memcpy(buf_local, buf, len);
+
 	const uv_buf_t uv_buf[1] = {
-		{ (char *)buf, len }
+		{ (char *)buf_local, len }
 	};
 
 	if (t == NULL) {
@@ -942,12 +963,13 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 	uv_write_cb write_cb = on_task_write;
 	if (t->handshake_state == TLS_HS_DONE) {
 		assert(task);
+		write_req->data = task;
+		task->write_req_buf = buf_local;
 	} else {
 		task = NULL;
 		write_cb = on_nontask_write;
+		write_req->data = buf_local;
 	}
-
-	write_req->data = task;
 
 	ssize_t ret = -1;
 	int res = uv_write(write_req, (uv_stream_t *)t->session->handle, uv_buf, 1, write_cb);
@@ -2266,7 +2288,12 @@ int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
 				 * Previous packet is allocated with mempool, so there's no need to free it manually. */
 				if (task->pktbuf->max_size < KNOT_WIRE_MAX_PKTSIZE) {
 						knot_mm_t *pool = &task->pktbuf->mm;
-						pkt_buf = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
+						/* Allocate wire buffer + placeholder for tcp message length field.
+						 * Placeholder allows to avoid usage of
+						 * gnutls_record_cork() \ gnutls_record_cork()
+						 * when TLS is used. */
+						char *wire = mm_alloc(pool, KNOT_WIRE_MAX_PKTSIZE + 2);
+						pkt_buf = knot_pkt_new(wire + 2, KNOT_WIRE_MAX_PKTSIZE, pool);
 						if (!pkt_buf) {
 								return kr_error(ENOMEM);
 						}
