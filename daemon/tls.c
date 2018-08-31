@@ -208,6 +208,7 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 		return kr_error(EINVAL);
 	}
 
+	int ret = kr_ok();
 	struct session *session = handle->data;
 	struct tls_common_ctx *tls_ctx = session->outgoing ? &session->tls_client_ctx->c :
 							     &session->tls_ctx->c;
@@ -219,39 +220,24 @@ int tls_push(struct qr_task *task, uv_handle_t *handle, knot_pkt_t *pkt)
 	const char *logstring = tls_ctx->client_side ? client_logstring : server_logstring;
 	gnutls_session_t tls_session = tls_ctx->tls_session;
 	const size_t size_to_send = pkt->size + 2;
-	ssize_t submitted = 0;
-	ssize_t retries = 0;
 
 	tls_ctx->task = task;
 	knot_wire_write_u16(tcp_len_start, pkt->size);
 
-	do {
-		ssize_t count = gnutls_record_send(tls_session, &tcp_len_start[submitted], size_to_send);
-		if (count < 0) {
-			if (gnutls_error_is_fatal(count)) {
-				kr_log_error("[%s] gnutls_record_send failed: %s (%zd)\n",
-				             logstring, gnutls_strerror_name(count), count);
-				assert(false);
-				return kr_error(EIO);
-			}
-			if (++retries > TLS_MAX_UNCORK_RETRIES) {
-				kr_log_error("[%s] gnutls_record_send: too many sequential non-fatal errors (%zd), last error is: %s (%zd)\n",
-				             logstring, retries, gnutls_strerror_name(count), count);
-				assert(false);
-				return kr_error(EIO);
-			}
-		} else if (count != 0) {
-			submitted += count;
-			retries = 0;
-		} else if (submitted != size_to_send) {
-			kr_log_error("[%s] gnutls_record_send didn't send all data(%zd of %zd)\n",
-			             logstring, submitted, size_to_send);
-			assert(false);
-			return kr_error(EIO);
-		}
-	} while (submitted != size_to_send);
+	/* gnutls_record_send() calls worker_gnutls_push() which actually sends data.
+	 * It either sends all the data either sends nothing and returns error. */
+	ssize_t count = gnutls_record_send(tls_session, tcp_len_start, size_to_send);
+	if (count < 0) {
+		kr_log_error("[%s] gnutls_record_send failed: %s (%zd)\n",
+		             logstring, gnutls_strerror_name(count), count);
+		ret = kr_error(EIO);
+	} else if (count != size_to_send) {
+		kr_log_error("[%s] gnutls_record_send didn't send all data (%zd of %zd)\n",
+		             logstring, count, size_to_send);
+		ret = kr_error(EIO);
+	}
 
-	return kr_ok();
+	return ret;
 }
 
 int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread)
