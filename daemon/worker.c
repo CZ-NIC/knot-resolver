@@ -843,25 +843,26 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 				if (ret != kr_ok()) {
 					while (session->waiting.len > 0) {
 						struct qr_task *t = session->waiting.at[0];
+						array_del(session->waiting, 0);
+						session_del_tasks(session, t);
 						if (session->outgoing) {
 							qr_task_finalize(t, KR_STATE_FAIL);
 						} else {
 							assert(t->ctx->source.session == session);
 							t->ctx->source.session = NULL;
 						}
-						array_del(session->waiting, 0);
-						session_del_tasks(session, t);
 						qr_task_unref(t);
 					}
 					while (session->tasks.len > 0) {
 						struct qr_task *t = session->tasks.at[0];
+						array_del(session->tasks, 0);
 						if (session->outgoing) {
 							qr_task_finalize(t, KR_STATE_FAIL);
 						} else {
 							assert(t->ctx->source.session == session);
 							t->ctx->source.session = NULL;
 						}
-						session_del_tasks(session, t);
+						qr_task_unref(t);
 					}
 					session_close(session);
 					return status;
@@ -1733,8 +1734,9 @@ static int qr_task_step(struct qr_task *task,
 					session_del_tasks(session, task);
 					while (session->tasks.len != 0) {
 						struct qr_task *t = session->tasks.at[0];
+						array_del(session->tasks, 0);
 						qr_task_finalize(t, KR_STATE_FAIL);
-						session_del_tasks(session, t);
+						qr_task_unref(t);
 					}
 					subreq_finalize(task, packet_source, packet);
 					session_close(session);
@@ -1750,8 +1752,9 @@ static int qr_task_step(struct qr_task *task,
 					session_del_tasks(session, task);
 					while (session->tasks.len != 0) {
 						struct qr_task *t = session->tasks.at[0];
+						array_del(session->tasks, 0);
 						qr_task_finalize(t, KR_STATE_FAIL);
-						session_del_tasks(session, t);
+						qr_task_unref(t);
 					}
 					subreq_finalize(task, packet_source, packet);
 					session_close(session);
