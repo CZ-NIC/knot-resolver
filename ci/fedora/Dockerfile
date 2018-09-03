@@ -1,4 +1,4 @@
-FROM fedora:27
+FROM fedora:29
 
 WORKDIR "/tmp"
 CMD ["/bin/bash"]
