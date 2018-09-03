@@ -323,7 +323,7 @@ respdiff:iter:udp:linux:amd64:
     - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
     - build:linux:amd64
-  artifacts: &small_respdiff_artifacts
+  artifacts:
     when: always
     expire_in: '1 week'
     paths:
@@ -337,48 +337,6 @@ respdiff:iter:udp:linux:amd64:
     - linux
     - amd64
 
-respdiff:iter:tcp:linux:amd64:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tcp" --export)
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh tcp
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-    - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tcp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-
-  dependencies:
-    - build:linux:amd64
-  artifacts: *small_respdiff_artifacts
-  tags:
-    - docker
-    - linux
-    - amd64
-
-respdiff:iter:tls:linux:amd64:
-  stage: test
-  except:
-    - master@knot/knot-resolver
-  script:
-    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/tls" --export)
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh tls
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-    - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-tls | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-  dependencies:
-    - build:linux:amd64
-  artifacts: *small_respdiff_artifacts
-  tags:
-    - docker
-    - linux
-    - amd64
 
 distro:fedora-27:
   stage: test
@@ -453,8 +411,6 @@ coverage:
     - installcheck:linux:amd64
     - deckard:linux:amd64
     - respdiff:iter:udp:linux:amd64
-    - respdiff:iter:tcp:linux:amd64
-    - respdiff:iter:tls:linux:amd64
   tags:
     - docker
     - linux
