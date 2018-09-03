@@ -31,6 +31,7 @@ function M.layer.finish(state, req, pkt)
 		sentype = false
 		keytag = qname:match('^root%-key%-sentinel%-not%-ta%-(%x+)%.')
 	end
+	if not keytag then return state end
 
 	if kreq.rank ~= ffi.C.KR_RANK_SECURE or kreq.answer:cd() then
 		if verbose() then

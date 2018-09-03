@@ -145,7 +145,9 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 				ssize_t bytes_written;
 				bytes_written = write(datafd, data.data, data.size);
 				if (bytes_written != data.size)
-					kr_log_error("[tls] failed to write %d octets to " EPHEMERAL_PRIVKEY_FILENAME " (%ld written)\n",
+					kr_log_error("[tls] failed to write %d octets to "
+						     EPHEMERAL_PRIVKEY_FILENAME
+						     " (%zd written)\n",
 						     data.size, bytes_written);
 			}
 		}
