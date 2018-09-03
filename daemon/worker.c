@@ -728,6 +728,10 @@ static void qr_task_free(struct qr_task *task)
 
 	assert(ctx);
 
+	if (task->write_req_buf != NULL) {
+		free(task->write_req_buf);
+	}
+
 	/* Process outbound session. */
 	struct session *source_session = ctx->source.session;
 	struct worker_ctx *worker = ctx->worker;
@@ -930,6 +934,10 @@ static void on_nontask_write(uv_write_t *req, int status)
 ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
 	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
+	if (t == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
 
 	void *buf_local = malloc(len);
 	memcpy(buf_local, buf, len);
@@ -937,11 +945,6 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 	const uv_buf_t uv_buf[1] = {
 		{ (char *)buf_local, len }
 	};
-
-	if (t == NULL) {
-		errno = EFAULT;
-		return -1;
-	}
 
 	assert(t->session && t->session->handle &&
 	       t->session->handle->type == UV_TCP);
@@ -955,6 +958,7 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 	void *ioreq = worker_iohandle_borrow(worker);
 	if (!ioreq) {
 		errno = EFAULT;
+		free(buf_local);
 		return -1;
 	}
 
@@ -964,6 +968,9 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 	uv_write_cb write_cb = on_task_write;
 	if (t->handshake_state == TLS_HS_DONE) {
 		assert(task);
+		if (task->write_req_buf != NULL) {
+			free(task->write_req_buf);
+		}
 		write_req->data = task;
 		task->write_req_buf = buf_local;
 	} else {
@@ -998,6 +1005,7 @@ ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len
 		VERBOSE_MSG(NULL,"[%s] uv_write: %s\n",
 			    t->client_side ? "tls_client" : "tls", uv_strerror(res));
 		iorequest_release(worker, ioreq);
+		free(buf_local);
 		errno = EIO;
 	}
 	return ret;
