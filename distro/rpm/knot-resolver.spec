@@ -37,7 +37,7 @@ BuildRequires:  gcc-c++
 BuildRequires:  pkgconfig(cmocka)
 BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libedit)
-BuildRequires:  pkgconfig(libknot) >= 2.7.1
+BuildRequires:  pkgconfig(libknot) >= 2.7.2
 BuildRequires:  pkgconfig(libzscanner) >= 2.4.2
 BuildRequires:  pkgconfig(libdnssec) >= 2.3.1
 BuildRequires:  pkgconfig(libsystemd)
