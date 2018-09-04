@@ -1,6 +1,6 @@
 FROM debian:unstable
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
-ARG KNOT_BRANCH=master
+ARG KNOT_BRANCH=2.7
 
 WORKDIR /root
 CMD ["/bin/bash"]
