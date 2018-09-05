@@ -318,13 +318,14 @@ Environment
       > user('root')
       Operation not permitted
 
-.. function:: resolve(name, type[, class = kres.class.IN, options = {}, finish = nil])
+.. function:: resolve(name, type[, class = kres.class.IN, options = {}, finish = nil, init = nil])
 
    :param string name: Query name (e.g. 'com.')
    :param number type: Query type (e.g. ``kres.type.NS``)
    :param number class: Query class *(optional)* (e.g. ``kres.class.IN``)
-   :param number options: Resolution options (see query flags)
+   :param strings options: Resolution options (see :c:type:`kr_qflags`)
    :param function finish: Callback to be executed when resolution completes (e.g. `function cb (pkt, req) end`). The callback gets a packet containing the final answer and doesn't have to return anything.
+   :param function init: Callback to be executed with the :c:type:`kr_request` before resolution starts.
    :return: boolean
 
    The function can also be executed with a table of arguments instead. This is useful if you'd like to skip some arguments, for example:
