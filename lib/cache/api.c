@@ -641,7 +641,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 				|| rr->type == KNOT_RRTYPE_NS) {
 		auto_free char *type_str = kr_rrtype_text(rr->type),
 			*encl_str = kr_dname_text(encloser);
-		VERBOSE_MSG(qry, "=> stashed %s%s %s, rank 0%.2o, scoped: %d "
+		VERBOSE_MSG(qry, "=> stashed %s%s %s, rank 0%.2o, scoped: %d, "
 			"%d B total, incl. %d RRSIGs\n",
 			(wild_labels ? "*." : ""), encl_str, type_str, rank,
 			scope ? (int)scope->scope_len : 0,
