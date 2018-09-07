@@ -155,7 +155,7 @@ static int cache_key_read_scope(knot_db_val_t key, size_t off, const uint8_t **s
 }
 
 /* Check that one scoped key covers another one (they're not necessarily equal) */
-static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_key, size_t key_length, const kr_cache_scope_t *scope)
+static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_key, size_t key_length, kr_cache_scope_t *scope)
 {
 	/* Check that the key part (without the scope) matches to make sure the keys differ only in scope. */
 	if (found_key.len == wanted_key.len && memcmp(found_key.data, wanted_key.data, key_length) == 0) {
@@ -169,6 +169,8 @@ static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_k
 		if (cache_key_read_scope(found_key, key_length, &found_scope, &found_scope_len) == 0 &&
 			found_scope_len <= scope->scope_len &&
 			kr_bitcmp((const char *)found_scope, (const char *)scope->address, found_scope_len) == 0) {
+				/* Update cache scope for found entry. */
+				scope->scope_len = found_scope_len;
 				return kr_ok();
 		}
 	}
