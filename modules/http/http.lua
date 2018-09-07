@@ -330,6 +330,8 @@ function M.add_interface(conf)
 		path = conf.path,
 		v6only = conf.v6only,
 		unlink = conf.unlink,
+		mode = conf.mode,
+		mask = conf.mask,
 		reuseaddr = conf.reuseaddr,
 		reuseport = reuseport,
 		client_timeout = conf.client_timeout or 5,
