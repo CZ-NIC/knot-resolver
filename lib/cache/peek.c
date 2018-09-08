@@ -203,7 +203,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	ret = cache_op(cache, read, &key, &val, 1);
 	/*  If the name is expected to be scope, but there's no scoped result in cache,
 	 *  check closest scope, as the name may not be scoped by server. */
-	if (ret && ret == -abs(ENOENT) && scope->family != AF_UNSPEC && is_scopable_type(qry->stype)) {
+	if (ret && ret == -abs(ENOENT) && scope->family != AF_UNSPEC && is_scopable_type(qry->stype) && scope->scope_len > 0) {
 		knot_db_val_t wanted_key = key;
 		VERBOSE_MSG(qry, "=> searching closest scope for /%d\n", scope->scope_len);
 		int err = cache_op(cache, read_leq, &key, &val);
@@ -217,7 +217,6 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	if (ret && ret != -abs(ENOENT)) {
 		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
-		assert(false);
 		return ctx->state;
 	} else if (!ret) {
 		cache->stats.hit += 1;
