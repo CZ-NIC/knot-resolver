@@ -49,6 +49,7 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 			req = kres.request_t(req)
 			finish(req.answer, req)
 			finish_cb:free()
+			req.trace_finish = nil
 		end)
 		-- Wrap initialiser to install finish callback
 		init_cb = function (req)

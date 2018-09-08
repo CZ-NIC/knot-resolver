@@ -59,26 +59,26 @@ local function serve_trace(h, _)
 	local answers, authority = {}, {}
 	local cond = condition.new()
 	local waiting, done = false, false
-	local finish_cb = ffi.cast('trace_callback_f', function (req)
-		req = kres.request_t(req)
-		add_selected_records(answers, req.answ_selected)
-		add_selected_records(authority, req.auth_selected)
-		if waiting then
-			cond:signal()
-		end
-		done = true
-	end)
-
-	-- Resolve query and buffer logs into table
 	resolve {
 		name = qname,
 		type = qtype,
-		options = {'TRACE'},
 		init = function (req)
-			req = kres.request_t(req)
 			req.trace_log = buffer_log_cb
-			req.trace_finish = finish_cb
-		end
+		end,
+		finish = function (_, req)
+			add_selected_records(answers, req.answ_selected)
+			add_selected_records(authority, req.auth_selected)
+			if waiting then
+				cond:signal()
+			end
+			done = true
+			-- Uninstall log trace
+			if req.trace_log ~= nil then
+				req.trace_log = nil
+				buffer_log_cb:free()
+			end
+		end,
+		options = {'TRACE'},
 	}
 
 	-- Wait for asynchronous query and free callbacks
@@ -86,9 +86,6 @@ local function serve_trace(h, _)
 		waiting = true
 		cond:wait()
 	end
-
-	buffer_log_cb:free()
-	finish_cb:free()
 
 	-- Build the result
 	local result = table.concat(buffer, '') .. '\n'
