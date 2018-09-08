@@ -207,6 +207,7 @@ struct kr_request {
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
 	int vars_ref;
+	int finalizer_ref;
 	kr_cache_scope_t cache_scope;
 	knot_mm_t pool;
 };

@@ -69,6 +69,9 @@ int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
  */
 struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options);
 
+/** Assign a Lua callback finalizer for given task. */
+void worker_resolve_set_finalizer(struct qr_task *task, int cb_ref);
+
 /**
  * Execute a request with given query.
  * It expects task to be created with \fn worker_resolve_start.

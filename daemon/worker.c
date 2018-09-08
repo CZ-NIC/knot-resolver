@@ -541,6 +541,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	struct kr_request *req = &ctx->req;
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
+	req->finalizer_ref = LUA_NOREF;
 
 	/* Remember query source addr */
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {
@@ -624,6 +625,17 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 static void request_free(struct request_ctx *ctx)
 {
 	struct worker_ctx *worker = ctx->worker;
+	/* Run finalizer if set */
+	if (ctx->req.finalizer_ref != LUA_NOREF) {
+		lua_State *L = worker->engine->L;
+		/* Get the finalizer and arguments */
+		lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->req.finalizer_ref);
+		lua_pushlightuserdata(L, &ctx->req);
+		(void) engine_pcall(L, 1);
+		/* Dereference it */
+		luaL_unref(L, LUA_REGISTRYINDEX, ctx->req.finalizer_ref);
+		ctx->req.finalizer_ref = LUA_NOREF;
+	}
 	/* Dereference any Lua vars table if exists */
 	if (ctx->req.vars_ref != LUA_NOREF) {
 		lua_State *L = worker->engine->L;
@@ -2450,6 +2462,15 @@ struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *quer
 	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
 	kr_qflags_set(&task->ctx->req.options, options);
 	return task;
+}
+
+void worker_resolve_set_finalizer(struct qr_task *task, int cb_ref)
+{
+	if (!task || !task->ctx) {
+		return;
+	}
+
+	task->ctx->req.finalizer_ref = cb_ref;
 }
 
 int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query)

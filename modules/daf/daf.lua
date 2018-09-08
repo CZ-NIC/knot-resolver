@@ -1,6 +1,23 @@
 -- Load dependent modules
 if not view then modules.load('view') end
 
+-- Rebuild query message after 0x20 or minimization changes
+local function rebuild_query(qry, pkt)
+	-- Update 0x20 secret to regenerate the QNAME randomization
+	if qry.flags.NO_0X20 or qry.flags.SAFEMODE then
+		qry.secret = 0
+	else
+		qry.secret = qry.secret + 1
+	end
+	local reserved = pkt.reserved
+	local opt_rr = pkt.opt_rr
+	qry:write(pkt)
+	-- Restore space reservation and OPT
+	pkt.reserved = reserved
+	pkt.opt_rr = opt_rr
+	pkt:begin(kres.section.ADDITIONAL)
+end
+
 -- Module declaration
 local M = {
 	rules = {},
@@ -125,7 +142,7 @@ M.actions = {
 		end
 		-- Construct the action
 		local set_flag_action = policy.FLAGS(set_flags, clear_flags)
-		return function(state, req, qry, pkt, _ --[[addr]], is_stream)
+		return function (state, req, qry, pkt, _ --[[addr]], is_stream)
 			-- Track whether the minimization or 0x20 flag changes
 			local had_0x20 = qry.flags.NO_0X20
 			local had_minimize = qry.flags.NO_MINIMIZE
@@ -137,19 +154,7 @@ M.actions = {
 			-- Update outgoing message
 			if qry.flags.NO_0X20 ~= had_0x20 or
 			   qry.flags.NO_MINIMIZE ~= had_minimize then
-				-- Update 0x20 secret to regenerate the QNAME randomization
-				if qry.flags.NO_0X20 or qry.flags.SAFEMODE then
-					qry.secret = 0
-				else
-					qry.secret = qry.secret + 1
-				end
-				local reserved = pkt.reserved
-				local opt_rr = pkt.opt_rr
-				qry:write(pkt)
-				-- Restore space reservation and OPT
-				pkt.reserved = reserved
-				pkt.opt_rr = opt_rr
-				pkt:begin(kres.section.ADDITIONAL)
+				rebuild_query(qry, pkt)
 			end
 			return nil
 		end

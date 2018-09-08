@@ -3,7 +3,8 @@ local bit = require('bit')
 local condition = require('cqueues.condition')
 
 -- Buffer selected record information to a table
-local function add_selected_records(dst, records)
+local function add_selected_records(records)
+	local dst = {}
 	for _, rec in ipairs(records) do
 		local rank = rec.rank
 		-- Separate the referral chain verified flag
@@ -19,6 +20,7 @@ local function add_selected_records(dst, records)
 			table.insert(dst, row)
 		end
 	end
+	return dst
 end
 
 local function format_selected_records(header, records)
@@ -26,6 +28,21 @@ local function format_selected_records(header, records)
 	return string.format('%s\n%s\n', header, string.rep('-', #header))
 	       .. table.concat(records, '') .. '\n'
 end
+
+-- Log buffer
+local function buffer_log(query, source, msg)
+	local vars = query.request:vars()
+	local message = string.format('[%5s] [%s] %s',
+		query.id, ffi.string(source), ffi.string(msg))
+	if not vars.trace_log  then
+		vars.trace_log = {message}
+	else
+		table.insert(vars.trace_log, message)
+	end
+end
+
+-- Create logging handler callback
+local buffer_log_cb = ffi.cast('trace_log_f', buffer_log)
 
 -- Trace execution of DNS queries
 local function serve_trace(h, _)
@@ -45,18 +62,11 @@ local function serve_trace(h, _)
 		return 400, string.format('unexpected query type: %s', qtype_str)
 	end
 
-	-- Create logging handler callback
-	local buffer = {}
-	local buffer_log_cb = ffi.cast('trace_log_f', function (query, source, msg)
-		local message = string.format('[%5s] [%s] %s',
-			query.id, ffi.string(source), ffi.string(msg))
-		table.insert(buffer, message)
-	end)
+	local result = nil
 
 	-- Wait for the result of the query
 	-- Note: We can't do non-blocking write to stream directly from resolve callbacks
 	-- because they don't run inside cqueue.
-	local answers, authority = {}, {}
 	local cond = condition.new()
 	local waiting, done = false, false
 	resolve {
@@ -66,17 +76,16 @@ local function serve_trace(h, _)
 			req.trace_log = buffer_log_cb
 		end,
 		finish = function (_, req)
-			add_selected_records(answers, req.answ_selected)
-			add_selected_records(authority, req.auth_selected)
+			local vars = req:vars()
+			local answers = add_selected_records(req.answ_selected)
+			local authority = add_selected_records(req.auth_selected)
+			result = table.concat(vars.trace_log or {}, '') .. '\n'
+			               .. format_selected_records('Used records from answer:', answers)
+			               .. format_selected_records('Used records from authority:', authority)
 			if waiting then
 				cond:signal()
 			end
 			done = true
-			-- Uninstall log trace
-			if req.trace_log ~= nil then
-				req.trace_log = nil
-				buffer_log_cb:free()
-			end
 		end,
 		options = {'TRACE'},
 	}
@@ -87,10 +96,6 @@ local function serve_trace(h, _)
 		cond:wait()
 	end
 
-	-- Build the result
-	local result = table.concat(buffer, '') .. '\n'
-	               .. format_selected_records('Used records from answer:', answers)
-	               .. format_selected_records('Used records from authority:', authority)
 	-- Return buffered data
 	if not done then
 		return 504, result

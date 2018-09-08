@@ -522,10 +522,10 @@ local function packet_tostring(pkt)
 		table.concat(flags, ' '), pkt:qdcount(), pkt:ancount(), pkt:nscount(), pkt:arcount())
 	local data = '\n'
 	if pkt.opt_rr ~= nil then
-		data = data..string.format(';; OPT PSEUDOSECTION:\n%s', pkt.opt_rr:tostring())
+		data = data..string.format(';; OPT PSEUDOSECTION:\n%s', pkt.opt_rr:txt_dump())
 	end
 	if pkt.tsig_rr ~= nil then
-		data = data..string.format(';; TSIG PSEUDOSECTION:\n%s', pkt.tsig_rr:tostring())
+		data = data..string.format(';; TSIG PSEUDOSECTION:\n%s', pkt.tsig_rr:txt_dump())
 	end
 	-- Zone transfer answers may omit question
 	if pkt:qdcount() > 0 then

@@ -944,12 +944,7 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	query->id = rnd ^ (rnd >> 16); /* cheap way to strengthen unpredictability */
 	knot_wire_set_id(pkt->wire, query->id);
 	pkt->parsed = pkt->size;
-	WITH_VERBOSE(query) {
-		KR_DNAME_GET_STR(name_str, query->sname);
-		KR_RRTYPE_GET_STR(type_str, query->stype);
-		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %u\n",
-			    name_str, type_str, query->parent ? query->parent->id : 0);
-	}
+
 	return kr_ok();
 }
 
@@ -966,6 +961,13 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = kr_make_query(query, pkt);
 	if (ret != 0) {
 		return KR_STATE_FAIL;
+	}
+
+	WITH_VERBOSE(query) {
+		KR_DNAME_GET_STR(name_str, query->sname);
+		KR_RRTYPE_GET_STR(type_str, query->stype);
+		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %u\n",
+			    name_str, type_str, query->parent ? query->parent->id : 0);
 	}
 
 	query->uid = req->rplan.next_uid;

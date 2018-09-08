@@ -1421,6 +1421,7 @@ static void event_callback(uv_timer_t *timer)
 	/* Retrieve callback and execute */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) timer->data);
 	lua_rawgeti(L, -1, 1);
+	lua_remove(L, -2);
 	lua_pushinteger(L, (intptr_t) timer->data);
 	int ret = execute_callback(L, 1);
 	/* Free callback if not recurrent or an error */
@@ -1439,6 +1440,7 @@ static void event_fdcallback(uv_poll_t* handle, int status, int events)
 	/* Retrieve callback and execute */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) handle->data);
 	lua_rawgeti(L, -1, 1);
+	lua_remove(L, -2);
 	lua_pushinteger(L, (intptr_t) handle->data);
 	lua_pushinteger(L, status);
 	lua_pushinteger(L, events);
@@ -1702,6 +1704,15 @@ static int wrk_resolve(lua_State *L)
 		knot_pkt_free(pkt);
 		lua_pushstring(L, "couldn't create a resolution request");
 		lua_error(L);
+	}
+
+
+	/* Add finalisation callback
+	 * Note: This must be installed before init() is called. */
+	if (lua_isfunction(L, 6)) {
+		lua_pushvalue(L, 6);
+		int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+		worker_resolve_set_finalizer(task, ref);
 	}
 
 	/* Add initialisation callback */

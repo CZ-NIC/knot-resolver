@@ -42,26 +42,24 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 		init = t.init
 	end
 
-	local init_cb, finish_cb = init, nil
+	local init_cb, finish_cb = nil, nil
+	if init then
+		-- Create callback for initialization
+		init_cb = function (req)
+			return init(kres.request_t(req))
+		end
+	end
 	if finish then
 		-- Create callback for finalization
-		finish_cb = ffi.cast('trace_callback_f', function (req)
+		finish_cb = function (req)
 			req = kres.request_t(req)
-			finish(req.answer, req)
-			finish_cb:free()
-			req.trace_finish = nil
-		end)
-		-- Wrap initialiser to install finish callback
-		init_cb = function (req)
-			req = kres.request_t(req)
-			if init then init(req) end
-			req.trace_finish = finish_cb
+			return finish(req.answer, req)
 		end
 	end
 
 	-- Translate options and resolve
 	options = kres.mk_qflags(options)
-	return worker.resolve_unwrapped(qname, qtype, qclass, options, init_cb)
+	return worker.resolve_unwrapped(qname, qtype, qclass, options, init_cb, finish_cb)
 end
 
 resolve = worker.resolve
@@ -425,7 +423,6 @@ if has_cqueues then
 			self.cq:wrap(f)
 		end,
 		loop = function (self)
-			self.on_step = function () self:work() end
 			self.event_fd = event.socket(self.cq:pollfd(), self.on_step)
 		end,
 		close = function (self)
@@ -438,7 +435,9 @@ if has_cqueues then
 
 	-- Implement the coroutine worker with cqueues
 	local function worker_new (name)
-		return setmetatable({name = name, cq = cqueues.new()}, { __index = asynchronous_worker_mt })
+		local worker = setmetatable({name = name, cq = cqueues.new()}, { __index = asynchronous_worker_mt })
+		worker.on_step = function () worker:work() end
+		return worker
 	end
 
 	-- Create a default background worker
@@ -447,7 +446,12 @@ if has_cqueues then
 
 	-- Wrap a function for asynchronous execution
 	function worker.coroutine (f)
-		worker.bg_worker:wrap(f)
+		local inner = cqueues.new()
+		inner:wrap(f)
+		-- Attach the coroutine to the background worker
+		worker.bg_worker:wrap(function()
+			inner:loop()
+		end)
 	end
 else
 	-- Disable asynchronous execution
