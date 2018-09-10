@@ -543,7 +543,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			} else {
 				int cnt_ = 0;
 				state = update_nsaddr(rr, query->parent, &cnt_);
-				if (state == KR_STATE_FAIL) {
+				if (state & KR_STATE_FAIL) {
 					return state;
 				}
 			}
