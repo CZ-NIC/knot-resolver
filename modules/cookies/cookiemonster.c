@@ -423,7 +423,7 @@ int check_request(kr_layer_t *ctx)
 		/* Request has no server cookie. */
 		return_state = invalid_sc_status(return_state, false,
 		                                 ignore_badcookie, req, answer);
-		if (return_state == KR_STATE_FAIL) {
+		if (return_state & KR_STATE_FAIL) {
 			return return_state;
 		}
 		goto answer_add_cookies;
@@ -449,7 +449,7 @@ int check_request(kr_layer_t *ctx)
 		/* Invalid server cookie. */
 		return_state = invalid_sc_status(return_state, true,
 		                                 ignore_badcookie, req, answer);
-		if (return_state == KR_STATE_FAIL) {
+		if (return_state & KR_STATE_FAIL) {
 			return return_state;
 		}
 		goto answer_add_cookies;

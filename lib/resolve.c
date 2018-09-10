@@ -575,7 +575,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	knot_pkt_t *answer = request->answer;
 
 	/* Always set SERVFAIL for bogus answers. */
-	if (state == KR_STATE_FAIL && rplan->pending.len > 0) {
+	if ((state & KR_STATE_FAIL) && rplan->pending.len > 0) {
 		struct kr_query *last = array_tail(rplan->pending);
 		if ((last->flags.DNSSEC_WANT) && (last->flags.DNSSEC_BOGUS)) {
 			return answer_fail(request);
@@ -853,7 +853,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 {
 	struct kr_context *ctx = request->ctx;
 	/* On successful answer, update preference list RTT and penalise timer  */
-	if (request->state != KR_STATE_FAIL) {
+	if (!(request->state & KR_STATE_FAIL)) {
 		/* Update RTT information for preference list */
 		update_nslist_rtt(ctx, qry, src);
 		/* Do not complete NS address resolution on soft-fail. */
@@ -929,7 +929,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		update_nslist_score(request, qry, src, packet);
 	}
 	/* Resolution failed, invalidate current NS. */
-	if (request->state == KR_STATE_FAIL) {
+	if (request->state & KR_STATE_FAIL) {
 		invalidate_ns(rplan, qry);
 		qry->flags.RESOLVED = false;
 	}
@@ -1284,7 +1284,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	int state = KR_STATE_FAIL;
 	do {
 		state = ns_fetch_cut(qry, requested_name, request, packet);
-		if (state == KR_STATE_DONE || state == KR_STATE_FAIL) {
+		if (state == KR_STATE_DONE || (state & KR_STATE_FAIL)) {
 			return state;
 		} else if (state == KR_STATE_CONSUME) {
 			requested_name = knot_wire_next_label(requested_name, NULL);
@@ -1354,7 +1354,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		/* Resolve current query and produce dependent or finish */
 		request->state = KR_STATE_PRODUCE;
 		ITERATE_LAYERS(request, qry, produce, packet);
-		if (request->state != KR_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
+		if (!(request->state & KR_STATE_FAIL) && knot_wire_get_qr(packet->wire)) {
 			/* Produced an answer from cache, consume it. */
 			qry->secret = 0;
 			request->state = KR_STATE_CONSUME;
@@ -1542,7 +1542,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	 * don't affect the resolution or rest of the processing. */
 	int state = request->state;
 	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
-	if (request->state == KR_STATE_FAIL) {
+	if (request->state & KR_STATE_FAIL) {
 		request->state = state; /* Restore */
 		return kr_error(ECANCELED);
 	}
@@ -1592,7 +1592,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 {
 	/* Finalize answer and construct wire-buffer. */
 	ITERATE_LAYERS(request, NULL, answer_finalize);
-	if (request->state == KR_STATE_FAIL) {
+	if (request->state & KR_STATE_FAIL) {
 		state = KR_STATE_FAIL;
 	} else if (answer_finalize(request, state) != 0) {
 		state = KR_STATE_FAIL;
