@@ -147,7 +147,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		ret = uv_try_write(handle, uv_buf, iovcnt);
 		DEBUG_MSG("[%s] push %zu <%p> = %d\n",
 		    t->client_side ? "tls_client" : "tls", total_len, h, ret);
-		if (ret >= 0 || ret != UV_EAGAIN) {
+		if (ret == total_len) {
 			return ret;
 		}
 	}
@@ -155,14 +155,27 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	/* Fallback when the queue is full, and it's not possible to do an immediate write */
 	char *buf = malloc(total_len);
 	if (buf != NULL) {
+		/* Skip data written in the partial write */
+		int to_skip = ret;
 		/* Copy the buffer into owned memory */
 		size_t off = 0;
 		for (int i = 0; i < iovcnt; ++i) {
+			if (to_skip > 0) {
+				/* Ignore current buffer if it's all skipped */
+				if (to_skip >= uv_buf[i].len) {
+					to_skip -= uv_buf[i].len;
+					continue;
+				}
+				/* Skip only part of the buffer */
+				uv_buf[i].base += to_skip;
+				uv_buf[i].len -= to_skip;
+				to_skip = 0;
+			}
 			memcpy(buf + off, uv_buf[i].base, uv_buf[i].len);
 			off += uv_buf[i].len;
 		}
 		uv_buf[0].base = buf;
-		uv_buf[0].len = total_len;
+		uv_buf[0].len = off;
 
 		/* Create an asynchronous write request */
 		uv_write_t *write_req = calloc(1, sizeof(uv_write_t));

@@ -108,17 +108,6 @@ static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
 	}
 }
 
-static uv_stream_t *handle_borrow(uv_loop_t *loop)
-{
-	struct worker_ctx *worker = loop->data;
-	void *req = worker_iohandle_borrow(worker);
-	if (!req) {
-		return NULL;
-	}
-
-	return (uv_stream_t *)req;
-}
-
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	/* Worker has single buffer which is reused for all incoming
@@ -276,23 +265,36 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
-	uv_stream_t *client = handle_borrow(master->loop);
+	struct worker_ctx *worker = (struct worker_ctx *)master->loop->data;
+	uv_stream_t *client = worker_iohandle_borrow(worker);
 	if (!client) {
 		return;
 	}
 	memset(client, 0, sizeof(*client));
-	io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM, 0);
+	int res = io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM, 0);
+	if (res) {
+		if (res == UV_EMFILE) {
+			worker->too_many_open = true;
+			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
+		}
+		worker_iohandle_release(worker, client);
+		return;
+	}
+
+	/* struct session was allocated \ borrowed from memory pool. */
+	struct session *session = client->data;
+	assert(session->outgoing == false);
+
 	if (uv_accept(master, client) != 0) {
-		uv_close((uv_handle_t *)client, io_release);
+		/* close session, close underlying uv handles and
+	     * deallocate (or return to memory pool) memory. */
+		worker_session_close(session);
 		return;
 	}
 
 	/* Set deadlines for TCP connection and start reading.
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
-	struct session *session = client->data;
-	assert(session->outgoing == false);
-
 	struct sockaddr *addr = &(session->peer.ip);
 	int addr_len = sizeof(union inaddr);
 	int ret = uv_tcp_getpeername((uv_tcp_t *)client, addr, &addr_len);
@@ -301,7 +303,6 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
-	const struct worker_ctx *worker = (struct worker_ctx *)master->loop->data;
 	const struct engine *engine = worker->engine;
 	const struct network *net = &engine->net;
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
@@ -424,7 +425,7 @@ int tcp_bindfd_tls(uv_tcp_t *handle, int fd, int tcp_backlog)
 	return _tcp_bindfd(handle, fd, tls_accept, tcp_backlog);
 }
 
-void io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
+int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 {
 	int ret = -1;
 	if (type == SOCK_DGRAM) {
@@ -433,7 +434,11 @@ void io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 		ret = uv_tcp_init_ex(loop, (uv_tcp_t *)handle, family);
 		uv_tcp_nodelay((uv_tcp_t *)handle, 1);
 	}
-	assert(ret == 0);
+
+	if (ret != 0) {
+		return ret;
+	}
+
 	struct worker_ctx *worker = loop->data;
 	struct session *session = session_borrow(worker);
 	assert(session);
@@ -441,6 +446,7 @@ void io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 	handle->data = session;
 	session->timeout.data = session;
 	uv_timer_init(worker->loop, &session->timeout);
+	return ret;
 }
 
 void io_deinit(uv_handle_t *handle)

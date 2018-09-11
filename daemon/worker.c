@@ -216,7 +216,17 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	if (!handle) {
 		return NULL;
 	}
-	io_create(worker->loop, handle, socktype, family);
+
+	int ret = io_create(worker->loop, handle, socktype, family);
+	if (ret) {
+		if (ret == UV_EMFILE) {
+			worker->too_many_open = true;
+			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
+		}
+		iohandle_release(worker, h);
+		return NULL;
+	}
+
 
 	/* Bind to outgoing address, according to IP v4/v6. */
 	union inaddr *addr;
@@ -225,7 +235,7 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	} else {
 		addr = (union inaddr *)&worker->out_addr6;
 	}
-	int ret = 0;
+
 	if (addr->ip.sa_family != AF_UNSPEC) {
 		assert(addr->ip.sa_family == family);
 		if (socktype == SOCK_DGRAM) {
