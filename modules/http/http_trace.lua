@@ -5,6 +5,7 @@ local condition = require('cqueues.condition')
 -- Buffer selected record information to a table
 local function add_selected_records(records)
 	local dst = {}
+	if #records == 0 then return dst end
 	for _, rec in ipairs(records) do
 		local rank = rec.rank
 		-- Separate the referral chain verified flag
@@ -14,10 +15,14 @@ local function add_selected_records(records)
 		end
 		local rank_name = kres.tostring.rank[rank] or tostring(rank)
 		-- Write out each individual RR
-		for rr in tostring(rec.rr):gmatch('[^\n]+\n?') do
-			local row = string.format('cached: %s, rank: %s, record: %s',
-				rec.cached, rank_name:lower(), rr)
-			table.insert(dst, row)
+		local owner = kres.dname2str(rec.rr:owner())
+		local type_name = kres.tostring.type[rec.rr.type]
+		for i = 1, rec.rr:rdcount() do
+			local rd = rec.rr:tostring(i - 1)
+			table.insert(dst,
+				string.format('cached: %s, rank: %s, record: %s %s %d %s\n',
+					tostring(rec.cached), rank_name:lower(), owner, type_name, rec.rr:ttl(), rd)
+			)
 		end
 	end
 	return dst

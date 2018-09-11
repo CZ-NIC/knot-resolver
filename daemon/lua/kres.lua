@@ -407,10 +407,8 @@ ffi.metatype( knot_rrset_t, {
 		txt_dump = function(rr, style)
 			assert(ffi.istype(knot_rrset_t, rr))
 			local bufsize = 1024
-			local dump = ffi.new('char *[1]', C.malloc(bufsize))
-				-- ^ one pointer to a string
-			local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
-
+			local dump = ffi.new('char * [1]', {C.malloc(bufsize)})
+			local size = ffi.new('size_t [1]', {bufsize})
 			local ret = knot.knot_rrset_txt_dump(rr, dump, size,
 							style or knot.KNOT_DUMP_STYLE_DEFAULT)
 			local result = nil
