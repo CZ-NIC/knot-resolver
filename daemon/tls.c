@@ -147,7 +147,15 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		ret = uv_try_write(handle, uv_buf, iovcnt);
 		DEBUG_MSG("[%s] push %zu <%p> = %d\n",
 		    t->client_side ? "tls_client" : "tls", total_len, h, ret);
-		if (ret >= 0 || ret != UV_EAGAIN) {
+		/* from libuv documentation -
+		   uv_try_write will return either:
+		     > 0: number of bytes written (can be less than the supplied buffer size).
+		     < 0: negative error code (UV_EAGAIN is returned if no data can be sent immediately).
+		*/
+		if (ret != UV_EAGAIN) {
+			/* Either we have successful write here or
+			 * error code other then UV_EAGAIN.
+			 * Return. */
 			return ret;
 		}
 	}
@@ -749,26 +757,6 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 	return client_paramlist_entry_free(entry);
 }
 
-struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
-			  const struct sockaddr *addr)
-{
-	/* Opportunistic upgrade from port 53 -> 853 */
-	if (kr_inaddr_port(addr) != KR_DNS_PORT) {
-		return NULL;
-	}
-
-	static char key[INET6_ADDRSTRLEN + 6];
-	size_t keylen = sizeof(key);
-	if (kr_inaddr_str(addr, key, &keylen) != 0) {
-		return NULL;
-	}
-
-	/* Rewrite 053 -> 853 */
-	strcpy(key + keylen - 3, "853");
-
-	return map_get(tls_client_paramlist, key);
-}
-
 int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port)
 {
 	if (!tls_client_paramlist || !addr) {
@@ -1075,8 +1063,12 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 	if (!ctx) {
 		return NULL;
 	}
-
-	int ret = gnutls_init(&ctx->c.tls_session, GNUTLS_CLIENT | GNUTLS_NONBLOCK | GNUTLS_ENABLE_FALSE_START);
+	unsigned int flags = GNUTLS_CLIENT | GNUTLS_NONBLOCK
+#ifdef GNUTLS_ENABLE_FALSE_START
+			     | GNUTLS_ENABLE_FALSE_START
+#endif
+	;
+	int ret = gnutls_init(&ctx->c.tls_session,  flags);
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
