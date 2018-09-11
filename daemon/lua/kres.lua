@@ -323,7 +323,7 @@ end
 
 -- Convert dname pointer to wireformat string
 local function dname2wire(name)
-	if name == nil then return end
+	if name == nil then return nil end
 	return ffi.string(name, knot.knot_dname_size(name))
 end
 
@@ -915,14 +915,19 @@ kres = {
 	pkt_t = function (udata) return ffi.cast('knot_pkt_t *', udata) end,
 	request_t = function (udata) return ffi.cast('struct kr_request *', udata) end,
 	sockaddr_t = function (udata) return ffi.cast('struct sockaddr *', udata) end,
+
 	-- Global API functions
+	-- Convert a lua string to a lower-case wire format (inside GC-ed ffi.string).
 	str2dname = function(name)
 		if type(name) ~= 'string' then return end
 		local dname = ffi.gc(C.knot_dname_from_str(nil, name, 0), C.free)
+		if dname == nil then return nil end
+		ffi.C.knot_dname_to_lower(dname);
 		return dname2wire(dname)
 	end,
 	dname2str = dname2str,
 	dname2wire = dname2wire,
+
 	rr2str = rr2str,
 	str2ip = function (ip)
 		local family = C.kr_straddr_family(ip)

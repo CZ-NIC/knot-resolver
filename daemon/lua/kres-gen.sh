@@ -108,6 +108,7 @@ printf "\tchar _stub[];\n};\n"
 	knot_dname_is_equal
 	knot_dname_labels
 	knot_dname_size
+	knot_dname_to_lower
 	knot_dname_to_str
 # Resource records
 	knot_rdataset_at
