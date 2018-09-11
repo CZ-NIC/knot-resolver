@@ -1521,11 +1521,15 @@ static int event_cancel(lua_State *L)
 		return 1;
 	}
 
-	/* Close the timer */
+	/* Close the handle */
 	lua_rawgeti(L, -1, 2);
-	uv_handle_t *timer = lua_touserdata(L, -1);
-	if (!uv_is_closing(timer)) {
-		uv_close(timer, (uv_close_cb) event_free);
+	uv_handle_t *handle = lua_touserdata(L, -1);
+	if (!uv_is_closing(handle)) {
+		/* Stop the timer */
+		if (handle->type == UV_TIMER) {
+			uv_timer_stop((uv_timer_t *)handle);
+		}
+		uv_close(handle, (uv_close_cb) event_free);
 	}
 	lua_pushboolean(L, true);
 	return 1;
