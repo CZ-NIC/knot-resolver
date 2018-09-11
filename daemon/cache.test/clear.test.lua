@@ -81,7 +81,7 @@ local function test_exact_match_qtype()
 end
 
 local function test_exact_match_qname()
-	res = cache.clear('a.b.subtree1.')
+	res = cache.clear('a.b.SubTree1.')
 	is(res.count, 2, 'single qname can be cleared at once')
 	check_answer('exact match on qname must flush all RRs with the same owner from cache',
 		     'a.b.subtree1.', kres.type.AAAA, kres.rcode.SERVFAIL)
