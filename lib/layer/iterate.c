@@ -909,7 +909,7 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	}
 
 	/* Query built, expect answer. */
-	uint32_t rnd = kr_rand_uint(0);
+	query->id = kr_rand_bytes(2);
 	/* We must respect https://tools.ietf.org/html/rfc7766#section-6.2.1
 	 * -  When sending multiple queries over a TCP connection, clients MUST NOT
 	 *    reuse the DNS Message ID of an in-flight query on that connection.
@@ -918,7 +918,6 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	 * this id can be changed to avoid duplication with query that already was sent
 	 * but didn't receive answer yet.
 	 */
-	query->id = rnd ^ (rnd >> 16); /* cheap way to strengthen unpredictability */
 	knot_wire_set_id(pkt->wire, query->id);
 	pkt->parsed = pkt->size;
 

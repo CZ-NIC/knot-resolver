@@ -54,7 +54,6 @@ libkres.so.8 libkres8 #MINVER#
  kr_pkt_recycle@Base 2.1.0
  kr_qflags_clear@Base 2.1.0
  kr_qflags_set@Base 2.1.0
- kr_rand_uint@Base 2.1.0
  kr_ranked_rrarray_add@Base 2.1.0
  kr_resolve_begin@Base 2.1.0
  kr_resolve_checkout@Base 2.1.0
