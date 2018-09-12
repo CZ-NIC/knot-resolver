@@ -549,7 +549,7 @@ ffi.metatype( knot_pkt_t, {
 			error(string.format('failed to allocate a packet of size %d', size))
 		end
 		if wire == nil then
-			pkt:id(tonumber(C.kr_rand_uint(65536)))
+			pkt:id(tonumber(C.kr_rand_bytes_nonstatic(2)))
 		else
 			assert(size <= #wire)
 			ffi.copy(pkt.wire, wire, size)
