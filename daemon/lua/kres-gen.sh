@@ -138,7 +138,6 @@ EOF
 # Nameservers
 	kr_nsrep_set
 # Utils
-	kr_rand_uint
 	kr_make_query
 	kr_pkt_make_auth_header
 	kr_pkt_put
@@ -146,6 +145,7 @@ EOF
 	kr_pkt_clear_payload
 	kr_pkt_qclass
 	kr_pkt_qtype
+	kr_rand_bytes_nonstatic
 	kr_rrsig_sig_inception
 	kr_rrsig_sig_expiration
 	kr_rrsig_type_covered

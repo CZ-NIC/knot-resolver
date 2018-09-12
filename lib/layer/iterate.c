@@ -909,8 +909,7 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	}
 
 	/* Query built, expect answer. */
-	uint32_t rnd = kr_rand_uint(0);
-	query->id = rnd ^ (rnd >> 16); /* cheap way to strengthen unpredictability */
+	query->id = kr_rand_bytes(2);
 	knot_wire_set_id(pkt->wire, query->id);
 	pkt->parsed = pkt->size;
 	WITH_VERBOSE(query) {

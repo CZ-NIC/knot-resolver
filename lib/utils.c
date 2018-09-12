@@ -22,7 +22,6 @@
 #include <sys/time.h>
 #include <contrib/cleanup.h>
 #include <contrib/ccan/asprintf/asprintf.h>
-#include <ccan/isaac/isaac.h>
 #include <ucw/mempool.h>
 #include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
@@ -47,11 +46,6 @@
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
-
-/** @internal CSPRNG context */
-static isaac_ctx ISAAC;
-static bool isaac_seeded = false;
-#define SEED_SIZE 256
 
 
 void *mm_malloc(void *ctx, size_t n)
@@ -179,67 +173,6 @@ char* kr_strcatdup(unsigned n, ...)
 	}
 
 	return result;
-}
-
-static int seed_file(const char *fname, char *buf, size_t buflen)
-{
-	auto_fclose FILE *fp = fopen(fname, "r");
-	if (!fp) {
-		return kr_error(EINVAL);
-	}
-	/* Disable buffering to conserve randomness but ignore failing to do so. */
-	setvbuf(fp, NULL, _IONBF, 0);
-	do {
-		if (feof(fp)) {
-			return kr_error(ENOENT);
-		}
-		if (ferror(fp)) {
-			return kr_error(ferror(fp));
-		}
-		if (fread(buf, buflen, 1, fp) == 1) { /* read in one chunk for simplicity */
-			return kr_ok();
-		}
-	} while (true);
-	return 0;
-}
-
-static int randseed(char *buf, size_t buflen)
-{
-    /* This is adapted from Tor's crypto_seed_rng() */
-    static const char *filenames[] = {
-        "/dev/srandom", "/dev/urandom", "/dev/random", NULL
-    };
-    for (unsigned i = 0; filenames[i]; ++i) {
-        if (seed_file(filenames[i], buf, buflen) == 0) {
-            return 0;
-        }
-    }
-
-    /* Seed from time, this is not going to be secure. */
-    kr_log_error("failed to obtain randomness, falling back to current time\n");
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    memcpy(buf, &tv, buflen < sizeof(tv) ? buflen : sizeof(tv));
-    return 0;
-}
-
-int kr_rand_reseed(void)
-{
-	uint8_t seed[SEED_SIZE];
-	randseed((char *)seed, sizeof(seed));
-	isaac_reseed(&ISAAC, seed, sizeof(seed));
-	return kr_ok();
-}
-
-uint32_t kr_rand_uint(uint32_t max)
-{
-	if (unlikely(!isaac_seeded)) {
-		kr_rand_reseed();
-		isaac_seeded = true;
-	}
-	return max == 0
-		? isaac_next_uint32(&ISAAC)
-		: isaac_next_uint(&ISAAC, max);
 }
 
 int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
@@ -1049,3 +982,8 @@ uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata)
 {
 	return knot_rrsig_type_covered(rdata);
 }
+uint64_t kr_rand_bytes_nonstatic(int size)
+{
+	return kr_rand_bytes(size);
+}
+

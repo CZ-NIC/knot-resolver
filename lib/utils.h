@@ -22,11 +22,16 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+
+#include <gnutls/gnutls.h>
+#include <gnutls/crypto.h>
+#include <lua.h>
+
 #include <libknot/libknot.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/rrsig.h>
-#include <lua.h>
+
 #include "lib/generic/array.h"
 #include "lib/defines.h"
 
@@ -189,15 +194,36 @@ typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 KR_EXPORT
 char* kr_strcatdup(unsigned n, ...);
 
-/** Reseed CSPRNG context. */
-int kr_rand_reseed(void);
-
-/** Get pseudo-random value between zero and max-1 (inclusive).
- *
- * Passing zero means that any uint32_t should be returned (it's also faster).
- */
-KR_EXPORT
-uint32_t kr_rand_uint(uint32_t max);
+/** Return a few random bytes. */
+static inline uint64_t kr_rand_bytes(int size)
+{
+	/* LATER(optim.): we use this to get one or two bytes typically,
+	 * so it will probably be suitable to wrap the gnutls function
+	 * by a buffer (size to be determined by profiling, perhaps). */
+	uint64_t result;
+	if (size <= 0 || size > sizeof(result)) {
+		kr_log_error("kr_rand_bytes(): EINVAL\n");
+		abort();
+	}
+	uint8_t data[sizeof(result)];
+	int ret = gnutls_rnd(GNUTLS_RND_NONCE, data, size);
+	if (ret) {
+		kr_log_error("gnutls_rnd(): %s\n", gnutls_strerror(ret));
+		abort();
+	}
+	/* I would have liked to dump the random data into a size_t directly,
+	 * but that would work well only on little-endian machines,
+	 * so intsead I hope that the compiler will optimize this out.
+	 * (Tested via reading assembly from usual gcc -O2 setup.)
+	 * Alternatively we could waste more rnd bytes, but that seemed worse. */
+	result = 0;
+	for (int i = 0; i < size; ++ i) {
+		result |= ((size_t)data[i]) << (i * 8);
+	}
+	return result;
+}
+/** non-static variant of kr_rand_bytes() */
+KR_EXPORT uint64_t kr_rand_bytes_nonstatic(int size);
 
 /** Memory reservation routine for knot_mm_t */
 KR_EXPORT

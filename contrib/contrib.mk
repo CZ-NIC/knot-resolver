@@ -1,7 +1,6 @@
 contrib_SOURCES := \
 	contrib/ccan/asprintf/asprintf.c \
 	contrib/ccan/ilog/ilog.c \
-	contrib/ccan/isaac/isaac.c \
 	contrib/ccan/json/json.c \
 	contrib/ucw/mempool.c \
 	contrib/ucw/mempool-fmt.c \
