@@ -184,13 +184,13 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 		local ret = ffi.C.kr_cache_closest_apex(cach, dname, false, apex_array)
 		if ret < 0 then
 			error(ffi.string(ffi.C.knot_strerror(ret))) end
-		ffi.gc(apex_array[0], ffi.C.free)
 		if not ffi.C.knot_dname_is_equal(apex_array[0], dname) then
 			local apex_str = kres.dname2str(apex_array[0])
 			rettable.not_apex = 'to clear proofs of non-existence call '
 				.. 'cache.clear(\'' .. tostring(apex_str) ..'\')'
 			rettable.subtree = apex_str
 		end
+		ffi.C.free(apex_array[0])
 	end
 
 	if rr_type ~= nil then
