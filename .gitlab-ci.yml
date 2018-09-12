@@ -245,17 +245,19 @@ test:linux:amd64:valgrind:
   except:
     - master@knot/knot-resolver
   script:
-    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
+    #- git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
-    - export TESTDIR="$COMMITDIR/$RESPDIFF_TEST"
+    - export TESTDIR="/tmp"
+    - echo -e 'a\nb\nc' > $TESTDIR/j1.0_stderr.txt
+    - touch $TESTDIR/j1.0_report.json
     - ln -s $COMMITDIR respdiff_commitdir
-    - >
-      sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
-      -p $RESPDIFF_PRIORITY
-      -c $RESPDIFF_COUNT
-      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST)
+    #- >
+    #  sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
+    #  -p $RESPDIFF_PRIORITY
+    #  -c $RESPDIFF_COUNT
+    #  $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
+    #  "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST)
     - for f in $TESTDIR/*.json; do test -s "$f" || (cat $TESTDIR/*stderr*; exit 1); done
     - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
   after_script:
