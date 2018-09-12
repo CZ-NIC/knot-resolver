@@ -277,25 +277,34 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 			worker->too_many_open = true;
 			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
 		}
+		/* Since res isn't OK struct session wasn't allocated \ borrowed.
+		 * We must release client handle only.
+		 */
 		worker_iohandle_release(worker, client);
 		return;
 	}
+
+	/* struct session was allocated \ borrowed from memory pool. */
+	struct session *session = client->data;
+	assert(session->outgoing == false);
+
 	if (uv_accept(master, client) != 0) {
-		uv_close((uv_handle_t *)client, io_release);
+		/* close session, close underlying uv handles and
+		 * deallocate (or return to memory pool) memory. */
+		worker_session_close(session);
 		return;
 	}
 
 	/* Set deadlines for TCP connection and start reading.
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
-	struct session *session = client->data;
-	assert(session->outgoing == false);
 
 	struct sockaddr *addr = &(session->peer.ip);
 	int addr_len = sizeof(union inaddr);
 	int ret = uv_tcp_getpeername((uv_tcp_t *)client, addr, &addr_len);
 	if (ret || addr->sa_family == AF_UNSPEC) {
-		worker_iohandle_release(worker, client);
+		/* close session, close underlying uv handles and
+		 * deallocate (or return to memory pool) memory. */
 		worker_session_close(session);
 		return;
 	}
@@ -424,7 +433,7 @@ int tcp_bindfd_tls(uv_tcp_t *handle, int fd)
 
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 {
-	int ret = 0;
+	int ret = -1;
 	if (type == SOCK_DGRAM) {
 		ret = uv_udp_init(loop, (uv_udp_t *)handle);
 	} else if (type == SOCK_STREAM) {
