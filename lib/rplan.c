@@ -179,7 +179,7 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	qry->timestamp_mono = kr_now();
 	qry->creation_time_mono = parent ? parent->creation_time_mono : qry->timestamp_mono;
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
-	qry->reorder = qry->flags.REORDER_RR ? kr_rand_uint(0) : 0;
+	qry->reorder = qry->flags.REORDER_RR ? kr_rand_bytes(sizeof(qry->reorder)) : 0;
 
 	/* When forwarding, keep the nameserver addresses. */
 	if (parent && parent->flags.FORWARD && qry->flags.FORWARD) {
