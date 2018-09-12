@@ -66,6 +66,12 @@ KR_EXPORT
 int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm);
 
 /**
+ * Path to cache file to remove on critical out-of-space error. (do NOT modify it)
+ */
+KR_EXPORT extern
+const char *kr_cache_emergency_file_to_remove;
+
+/**
  * Close persistent cache.
  * @note This doesn't clear the data, just closes the connection to the database.
  * @param cache structure
