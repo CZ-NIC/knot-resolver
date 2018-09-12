@@ -27,7 +27,7 @@ Improvements
 - Dockerfile: rework, basing on Debian instead of Alpine
 - policy.{FORWARD,TLS_FORWARD,STUB}: give advantage to IPv6
   when choosing whom to ask, just as for iteration
-
+- use pseudo-randomness from gnutls instead of internal ISAAC (#233)
 
 Knot Resolver 3.1.0 (2018-11-02)
 ================================
