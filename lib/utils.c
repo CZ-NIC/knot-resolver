@@ -22,7 +22,6 @@
 #include <sys/time.h>
 #include <contrib/cleanup.h>
 #include <contrib/ccan/asprintf/asprintf.h>
-#include <ccan/isaac/isaac.h>
 #include <ucw/mempool.h>
 #include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
@@ -47,11 +46,6 @@
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
-
-/** @internal CSPRNG context */
-static isaac_ctx ISAAC;
-static bool isaac_seeded = false;
-#define SEED_SIZE 256
 
 
 void *mm_malloc(void *ctx, size_t n)
@@ -221,25 +215,6 @@ static int randseed(char *buf, size_t buflen)
     gettimeofday(&tv, NULL);
     memcpy(buf, &tv, buflen < sizeof(tv) ? buflen : sizeof(tv));
     return 0;
-}
-
-int kr_rand_reseed(void)
-{
-	uint8_t seed[SEED_SIZE];
-	randseed((char *)seed, sizeof(seed));
-	isaac_reseed(&ISAAC, seed, sizeof(seed));
-	return kr_ok();
-}
-
-uint32_t kr_rand_uint(uint32_t max)
-{
-	if (unlikely(!isaac_seeded)) {
-		kr_rand_reseed();
-		isaac_seeded = true;
-	}
-	return max == 0
-		? isaac_next_uint32(&ISAAC)
-		: isaac_next_uint(&ISAAC, max);
 }
 
 int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
@@ -1037,3 +1012,8 @@ uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata)
 {
 	return knot_rrsig_type_covered(rdata);
 }
+uint64_t kr_rand_bytes_nonstatic(int size)
+{
+	return kr_rand_bytes(size);
+}
+

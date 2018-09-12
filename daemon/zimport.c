@@ -314,7 +314,7 @@ static knot_pkt_t *zi_query_create(zone_import_ctx_t *z_import, knot_rrset_t *rr
 {
 	knot_mm_t *pool = &z_import->pool;
 
-	uint32_t msgid = kr_rand_uint(0);
+	uint32_t msgid = kr_rand_bytes(2);
 
 	knot_pkt_t *query = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, pool);
 	if (!query) {

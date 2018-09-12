@@ -15,11 +15,6 @@ Files: contrib/ccan/compiler/*
 Copyright: Rusty Russell
 License: CC0
 
-Files: contrib/ccan/isaac/*
-Copyright: Timothy B. Terriberry
-	   Rusty Russell
-License: CC0
-
 Files: tests/config/tapered/*
 Copyright: 2012-2017, Peter Aronoff
 License: BSD-3-clause
