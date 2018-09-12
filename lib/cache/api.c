@@ -130,9 +130,19 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	/* Check cache ABI version */
 	kr_cache_make_checkpoint(cache);
-	(void) assert_right_version(cache);
+	(void)assert_right_version(cache);
+
+	char *fpath;
+	ret = asprintf(&fpath, "%s/data.mdb", opts->path);
+	if (ret > 0) {
+		kr_cache_emergency_file_to_remove = fpath;
+	} else {
+		assert(false); /* non-critical, but still */
+	}
 	return 0;
 }
+
+const char *kr_cache_emergency_file_to_remove = NULL;
 
 
 #define cache_isvalid(cache) ((cache) && (cache)->api && (cache)->db)
@@ -143,6 +153,8 @@ void kr_cache_close(struct kr_cache *cache)
 		cache_op(cache, close);
 		cache->db = NULL;
 	}
+	free(/*const-cast*/(char*)kr_cache_emergency_file_to_remove);
+	kr_cache_emergency_file_to_remove = NULL;
 }
 
 int kr_cache_sync(struct kr_cache *cache)
