@@ -255,8 +255,8 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 	   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
 		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
-	} else if ((kr_rand_uint(100) < 10) &&
-		   (kr_rand_uint(KR_NS_MAX_SCORE) >= score)) {
+	} else if ((kr_rand_bytes(1) <= 256 / 10) &&
+		   (kr_rand_bytes(2) * KR_NS_MAX_SCORE / (1<<16) >= score)) {
 		/* With 10% chance probe server with a probability
 		 * given by its RTT / MAX_RTT. */
 		update_nsrep_set(ns, owner, addr_choice, score);
@@ -504,8 +504,9 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 									kr_family_len(sa->sa_family));
 		if (!rtt_cache_entry) {
 			scores[i] = 1; /* prefer unknown to probe RTT */
-		} else if ((kr_rand_uint(100) < 10) &&
-			   (kr_rand_uint(KR_NS_MAX_SCORE) >= rtt_cache_entry->score)) {
+		} else if ((kr_rand_bytes(1) <= 256 / 10) &&
+			   (kr_rand_bytes(2) * KR_NS_MAX_SCORE / (1<<16)
+				>= rtt_cache_entry->score)) {
 			/* some probability to bump bad ones up for re-probe */
 			scores[i] = 1;
 		} else {
