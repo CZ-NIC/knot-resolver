@@ -1283,3 +1283,4 @@ Example:
 .. _cqueues: https://25thandclement.com/~william/projects/cqueues.html
 .. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
 .. _`systemd socket activation`: http://0pointer.de/blog/projects/socket-activation.html
+
