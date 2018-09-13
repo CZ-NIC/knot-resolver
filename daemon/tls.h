@@ -131,7 +131,7 @@ int tls_push(struct qr_task *task, uv_handle_t* handle, knot_pkt_t * pkt);
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
  */
-int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread);
+ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nread);
 
 /*! Set TLS certificate and key from files. */
 int tls_certificate_set(struct network *net, const char *tls_cert, const char *tls_key);

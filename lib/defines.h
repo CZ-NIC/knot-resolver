@@ -91,8 +91,12 @@ void __asan_poison_memory_region(void const volatile *addr, size_t size);
 void __asan_unpoison_memory_region(void const volatile *addr, size_t size);
 #define kr_asan_poison(addr, size) __asan_poison_memory_region((addr), (size))
 #define kr_asan_unpoison(addr, size) __asan_unpoison_memory_region((addr), (size))
+#define kr_asan_custom_poison(fn, addr) fn ##_poison((addr))
+#define kr_asan_custom_unpoison(fn, addr) fn ##_unpoison((addr))
 #else
 #define kr_asan_poison(addr, size)
 #define kr_asan_unpoison(addr, size)
+#define kr_asan_custom_poison(fn, addr)
+#define kr_asan_custom_unpoison(fn, addr)
 #endif
 /* @endcond */
