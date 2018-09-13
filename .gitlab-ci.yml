@@ -388,6 +388,7 @@ coverage:
   stage: coverage
   except:
     - master
+    - branches@knot/knot-resolver-security
   only:
     variables:
       - $COVERAGE == "1"
