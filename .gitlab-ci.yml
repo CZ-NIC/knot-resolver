@@ -21,7 +21,7 @@ stages:
 build:linux:amd64:
   stage: build
   except:
-    - master@knot/knot-resolver
+    - master
   script:
     - rm daemon/lua/kres-gen.lua
     - make -k all CFLAGS="-Werror -ggdb"
@@ -38,7 +38,7 @@ build:linux:amd64:
 build:clang:linux:amd64:
   stage: build
   except:
-    - master@knot/knot-resolver
+    - master
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   script:
     - rm daemon/lua/kres-gen.lua
@@ -54,7 +54,7 @@ build:clang:linux:amd64:
 srpm:
   stage: build
   except:
-    - master@knot/knot-resolver
+    - master
   allow_failure: true  # don't block testing pipeline in case of failure
   image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
   script:
@@ -72,7 +72,7 @@ srpm:
 lint:lua:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   dependencies: []  # do not download build artifacts
   script:
     - make lint-lua
@@ -82,7 +82,7 @@ lint:lua:
 lint:c:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
@@ -94,7 +94,7 @@ lint:clang-scan-build:
   allow_failure: true  # for now it is just informative
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
@@ -110,7 +110,7 @@ lint:clang-scan-build:
 test:linux:amd64:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   script:
     # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
     # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
@@ -131,7 +131,7 @@ test:linux:amd64:
 installcheck:linux:amd64:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   script:
     # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
     # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
@@ -152,7 +152,7 @@ installcheck:linux:amd64:
 doc:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   script:
     - SPHINXFLAGS="-W" make doc
   dependencies: []
@@ -167,7 +167,7 @@ deckard:linux:amd64:
   stage: test
   except:
     refs:
-      - master@knot/knot-resolver
+      - master
     variables:
       # prevent unstable test from cancelling nightly OBS build
       - $SKIP_DECKARD == "1"
@@ -193,7 +193,7 @@ deckard:linux:amd64:
 installcheck:valgrind:linux:amd64:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   script:
     - DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k installcheck
   dependencies:
@@ -225,7 +225,7 @@ installcheck:valgrind:linux:amd64:
 test:linux:amd64:valgrind:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   variables:
     TMPDIR: $CI_PROJECT_DIR
   script:
@@ -240,10 +240,11 @@ test:linux:amd64:valgrind:
 .respdiff:  &respdiff
   stage: respdiff
   dependencies: []
-  only:
-    - branches@knot/knot-resolver  # do not trigger job for forks
+  only:  # trigger job only in repos under our control
+    - branches@knot/knot-resolver
+    - branches@knot/knot-resolver-security
   except:
-    - master@knot/knot-resolver
+    - master
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
@@ -310,7 +311,7 @@ respdiff:fwd-udp6-unbound.tls6:
 respdiff:iter:udp:linux:amd64:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   script:
     - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
     - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
@@ -341,10 +342,11 @@ respdiff:iter:udp:linux:amd64:
 distro:fedora-29:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  only:
-    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
+  only:  # trigger job only in repos under our control
+    - branches@knot/knot-resolver
+    - branches@knot/knot-resolver-security
   dependencies:
     - srpm
   script:
@@ -362,10 +364,11 @@ distro:fedora-29:
 distro:epel-7:
   stage: test
   except:
-    - master@knot/knot-resolver
+    - master
   image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  only:
-    - branches@knot/knot-resolver  # do not trigger job for forks (no privileged runners)
+  only:  # trigger job only in repos under our control
+    - branches@knot/knot-resolver
+    - branches@knot/knot-resolver-security
   dependencies:
     - srpm
   script:
@@ -384,7 +387,7 @@ distro:epel-7:
 coverage:
   stage: coverage
   except:
-    - master@knot/knot-resolver
+    - master
   only:
     variables:
       - $COVERAGE == "1"
@@ -450,7 +453,7 @@ pkg:debian:symbols:libkres:
     refs:
       - nightly@knot/knot-resolver
   except:
-    - master@knot/knot-resolver
+    - master
   script:
     - ln -s distro/deb debian
     - sed -i "s/__VERSION__/99/g" distro/deb/changelog
