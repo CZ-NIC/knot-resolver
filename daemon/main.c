@@ -305,25 +305,33 @@ static void signal_handler(uv_signal_t *handle, int signum)
 /** SIGBUS -> attempt to remove the overflowing cache file and abort. */
 static void sigbus_handler(int sig, siginfo_t *siginfo, void *ptr)
 {
+	/* We can't safely assume that printf-like functions work, but write() is OK.
+	 * See POSIX for the safe functions, e.g. 2017 version just above this link:
+	 * http://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_04_04
+	 */
+	#define WRITE_ERR(err_charray) \
+		(void)write(STDERR_FILENO, err_charray, sizeof(err_charray))
 	const char msg_typical[] =
-		"SIGBUS received; this is most likely due to filling up the filesystem where cache resides.\n",
-		msg_unknown[] = "SIGBUS received, cause unknown.\n",
+		"\nSIGBUS received; this is most likely due to filling up the filesystem where cache resides.\n",
+		msg_unknown[] = "\nSIGBUS received, cause unknown.\n",
 		msg_deleted[] = "Cache file deleted.\n",
-		msg_del_fail[] = "Cache file deletion failed.\n";
-	/* We can't safely assume that printf-like functions work, but write() is OK. */
+		msg_del_fail[] = "Cache file deletion failed.\n",
+		msg_final[] = "kresd can not recover automatically, exiting.\n";
 	if (siginfo->si_code != BUS_ADRERR) {
-		write(STDERR_FILENO, msg_unknown, sizeof(msg_unknown));
+		WRITE_ERR(msg_unknown);
 		goto end;
 	}
-	write(STDERR_FILENO, msg_typical, sizeof(msg_typical));
+	WRITE_ERR(msg_typical);
 	if (!kr_cache_emergency_file_to_remove) goto end;
 	if (unlink(kr_cache_emergency_file_to_remove)) {
-		write(STDERR_FILENO, msg_del_fail, sizeof(msg_del_fail));
+		WRITE_ERR(msg_del_fail);
 	} else {
-		write(STDERR_FILENO, msg_deleted, sizeof(msg_deleted));
+		WRITE_ERR(msg_deleted);
 	}
 end:
-	exit(128 - sig); /*< regular return from SIGBUS handler can't work */
+	WRITE_ERR(msg_final);
+	_exit(128 - sig); /*< regular return from OS-raised SIGBUS can't work anyway */
+	#undef WRITE_ERR
 }
 
 /** Split away port from the address. */
