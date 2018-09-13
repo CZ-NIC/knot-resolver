@@ -469,7 +469,7 @@ nightly:copy:
     variables:
       - $CREATE_NIGHTLY == "1"
     refs:
-      - master
+      - master@knot/knot-resolver
   dependencies: []
   script:
     # delete nightly branch
