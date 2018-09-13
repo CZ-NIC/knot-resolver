@@ -24,6 +24,7 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
+#include "daemon/session.h"
 
 #define negotiate_bufsize(func, handle, bufsize_want) do { \
     int bufsize = 0; func(handle, &bufsize); \
@@ -48,86 +49,35 @@ static void check_bufsize(uv_handle_t* handle)
 
 #undef negotiate_bufsize
 
-static void session_clear(struct session *s)
+static uv_stream_t *handle_borrow(uv_loop_t *loop)
 {
-	assert(s->tasks.len == 0 && s->waiting.len == 0);
-	array_clear(s->tasks);
-	array_clear(s->waiting);
-	tls_free(s->tls_ctx);
-	tls_client_ctx_free(s->tls_client_ctx);
-	memset(s, 0, sizeof(*s));
-}
+	struct worker_ctx *worker = loop->data;
+	void *req = worker_iohandle_borrow(worker);
+	if (!req) {
+		return NULL;
+	}
 
-void session_free(struct session *s)
-{
-	if (s) {
-		assert(s->tasks.len == 0 && s->waiting.len == 0);
-		session_clear(s);
-		free(s);
-	}
-}
-
-struct session *session_new(void)
-{
-	return calloc(1, sizeof(struct session));
-}
-
-static struct session *session_borrow(struct worker_ctx *worker)
-{
-	struct session *s = NULL;
-	if (worker->pool_sessions.len > 0) {
-		s = array_tail(worker->pool_sessions);
-		array_pop(worker->pool_sessions);
-		kr_asan_unpoison(s, sizeof(*s));
-	} else {
-		s = session_new();
-	}
-	return s;
-}
-
-static void session_release(struct worker_ctx *worker, uv_handle_t *handle)
-{
-	if (!worker || !handle) {
-		return;
-	}
-	struct session *s = handle->data;
-	if (!s) {
-		return;
-	}
-	assert(s->waiting.len == 0 && s->tasks.len == 0);
-	assert(s->buffering == NULL);
-	if (!s->outgoing && handle->type == UV_TCP) {
-		worker_end_tcp(worker, handle); /* to free the buffering task */
-	}
-	if (worker->pool_sessions.len < MP_FREELIST_SIZE) {
-		session_clear(s);
-		array_push(worker->pool_sessions, s);
-		kr_asan_poison(s, sizeof(*s));
-	} else {
-		session_free(s);
-	}
+	return (uv_stream_t *)req;
 }
 
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
-	/* Worker has single buffer which is reused for all incoming
-	 * datagrams / stream reads, the content of the buffer is
+	/* UDP sessions use worker buffer for wire data,
+	 * TCP sessions use session buffer for wire data
+	 * (see session_set_handle()).
+	 * TLS sessions use buffer from TLS context.
+	 * The content of the worker buffer is
 	 * guaranteed to be unchanged only for the duration of
 	 * udp_read() and tcp_read().
 	 */
 	struct session *session = handle->data;
-	uv_loop_t *loop = handle->loop;
-	struct worker_ctx *worker = loop->data;
-	buf->base = (char *)worker->wire_buf;
-	/* Limit TCP stream buffer size to 4K for granularity in batches of incoming queries. */
-	if (handle->type == UV_TCP) {
-		buf->len = MIN(suggested_size, 4096);
-	/* Regular buffer size for subrequests. */
-	} else if (session->outgoing) {
-		buf->len = suggested_size;
-	/* Use recvmmsg() on master sockets if possible. */
+	if (!session_has_tls(session)) {
+		buf->base = (char *) session_wirebuf_get_free_start(session);
+		buf->len = session_wirebuf_get_free_size(session);
 	} else {
-		buf->len = sizeof(worker->wire_buf);
+		struct tls_common_ctx *ctx = session_tls_get_common_ctx(session);
+		buf->base = (char *) ctx->recv_buf;
+		buf->len = sizeof(ctx->recv_buf);
 	}
 }
 
@@ -137,29 +87,30 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 	struct session *s = handle->data;
-	if (s->closing) {
+	if (session_is_closing(s)) {
 		return;
 	}
 	if (nread <= 0) {
 		if (nread < 0) { /* Error response, notify resolver */
-			worker_submit(worker, (uv_handle_t *)handle, NULL, addr);
+			worker_submit(s, NULL);
 		} /* nread == 0 is for freeing buffers, we don't need to do this */
 		return;
 	}
 	if (addr->sa_family == AF_UNSPEC) {
 		return;
 	}
-	if (s->outgoing) {
-		assert(s->peer.ip.sa_family != AF_UNSPEC);
-		if (kr_sockaddr_cmp(&s->peer.ip, addr) != 0) {
+	struct sockaddr *peer = session_get_peer(s);
+	if (session_is_outgoing(s)) {
+		assert(peer->sa_family != AF_UNSPEC);
+		if (kr_sockaddr_cmp(peer, addr) != 0) {
 			return;
 		}
+	} else {
+		memcpy(peer, addr, kr_sockaddr_len(addr));
 	}
-	knot_pkt_t *query = knot_pkt_new(buf->base, nread, &worker->pkt_pool);
-	if (query) {
-		query->max_size = KNOT_WIRE_MAX_PKTSIZE;
-		worker_submit(worker, (uv_handle_t *)handle, query, addr);
-	}
+	ssize_t consumed = session_wirebuf_consume(s, (const uint8_t *)buf->base, nread);
+	assert(consumed == nread);
+	session_wirebuf_process(s);
 	mp_flush(worker->pkt_pool.ctx);
 }
 
@@ -167,11 +118,10 @@ static int udp_bind_finalize(uv_handle_t *handle)
 {
 	check_bufsize(handle);
 	/* Handle is already created, just create context. */
-	struct session *session = session_new();
-	assert(session);
-	session->outgoing = false;
-	session->handle = handle;
-	handle->data = session;
+	struct session *s = session_new();
+	assert(s);
+	session_set_outgoing(s, false);
+	session_set_handle(s, handle);
 	return io_start_read(handle);
 }
 
@@ -203,14 +153,14 @@ int udp_bindfd(uv_udp_t *handle, int fd)
 
 static void tcp_timeout_trigger(uv_timer_t *timer)
 {
-	struct session *session = timer->data;
+	struct session *s = timer->data;
 
-	assert(session->outgoing == false);
-	if (session->tasks.len > 0) {
+	assert(session_is_outgoing(s) == false);
+	if (!session_tasklist_is_empty(s)) {
 		uv_timer_again(timer);
-	} else if (!session->closing) {
+	} else if (!session_is_closing(s)) {
 		uv_timer_stop(timer);
-		worker_session_close(session);
+		session_close(s);
 	}
 }
 
@@ -218,50 +168,78 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
 	uv_loop_t *loop = handle->loop;
 	struct session *s = handle->data;
-	if (s->closing) {
+
+	assert(s && session_get_handle(s) == (uv_handle_t *)handle &&
+	       handle->type == UV_TCP);	
+
+	if (session_is_closing(s)) {
 		return;
 	}
+
 	/* nread might be 0, which does not indicate an error or EOF.
 	 * This is equivalent to EAGAIN or EWOULDBLOCK under read(2). */
 	if (nread == 0) {
 		return;
 	}
-	if (nread == UV_EOF) {
-		nread = 0;
-	}
+
 	struct worker_ctx *worker = loop->data;
-	/* TCP pipelining is rather complicated and requires cooperation from the worker
-	 * so the whole message reassembly and demuxing logic is inside worker */
-	int ret = 0;
-	if (s->has_tls) {
-		ret = tls_process(worker, handle, (const uint8_t *)buf->base, nread);
-	} else {
-		ret = worker_process_tcp(worker, handle, (const uint8_t *)buf->base, nread);
+
+	if (nread < 0 || !buf->base) {
+		if (kr_verbose_status) {
+			struct sockaddr *peer = session_get_peer(s);
+			char peer_str[INET6_ADDRSTRLEN];
+			inet_ntop(peer->sa_family, kr_inaddr(peer),
+				  peer_str, sizeof(peer_str));
+			kr_log_verbose("[io] => connection to '%s' closed by peer (%s)\n", peer_str,
+				       uv_strerror(nread));
+		}
+		worker_end_tcp(s);
+		return;
 	}
+
+	ssize_t consumed = 0;
+	const uint8_t *data = (const uint8_t *)buf->base;
+	ssize_t data_len = nread;
+	if (session_has_tls(s)) {
+		/* buf->base points to start of the tls receive buffer.
+		   Decode data free space in session wire buffer. */
+		consumed = tls_process_input_data(s, (const uint8_t *)buf->base, nread);
+		data = session_wirebuf_get_free_start(s);
+		data_len = consumed;
+	} 
+
+	/* data points to start of the free space in session wire buffer.
+	   Simple increase internal counter. */
+	consumed = session_wirebuf_consume(s, data, data_len);
+	assert(consumed == data_len);
+
+	int ret = session_wirebuf_process(s);
 	if (ret < 0) {
-		worker_end_tcp(worker, (uv_handle_t *)handle);
+		worker_end_tcp(s);
 		/* Exceeded per-connection quota for outstanding requests
 		 * stop reading from stream and close after last message is processed. */
-		if (!s->outgoing && !uv_is_closing((uv_handle_t *)&s->timeout)) {
-			uv_timer_stop(&s->timeout);
-			if (s->tasks.len == 0) {
-				worker_session_close(s);
+		uv_timer_t *t = session_get_timer(s);
+		if (!session_is_outgoing(s) && !uv_is_closing((uv_handle_t *)t)) {
+			uv_timer_stop(t);
+			if (session_tasklist_is_empty(s)) {
+				session_close(s);
 			} else { /* If there are tasks running, defer until they finish. */
-				uv_timer_start(&s->timeout, tcp_timeout_trigger,
+				uv_timer_start(t, tcp_timeout_trigger,
 					       MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 			}
 		}
 	/* Connection spawned at least one request, reset its deadline for next query.
 	 * https://tools.ietf.org/html/rfc7766#section-6.2.3 */
-	} else if (ret > 0 && !s->outgoing && !s->closing) {
-		uv_timer_again(&s->timeout);
+	} else if (ret > 0 && !session_is_outgoing(s) && !session_is_closing(s)) {
+		uv_timer_t *t = session_get_timer(s);
+		uv_timer_again(t);
 	}
 	mp_flush(worker->pkt_pool.ctx);
 }
 
 static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 {
-	if (status != 0) {
+ 	if (status != 0) {
 		return;
 	}
 
@@ -298,37 +276,40 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	/* Set deadlines for TCP connection and start reading.
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
+	struct session *s = client->data;
+	assert(session_is_outgoing(s) == false);
 
-	struct sockaddr *addr = &(session->peer.ip);
-	int addr_len = sizeof(union inaddr);
-	int ret = uv_tcp_getpeername((uv_tcp_t *)client, addr, &addr_len);
-	if (ret || addr->sa_family == AF_UNSPEC) {
-		/* close session, close underlying uv handles and
-		 * deallocate (or return to memory pool) memory. */
-		worker_session_close(session);
+	struct sockaddr *peer = session_get_peer(s);
+	int peer_len = sizeof(union inaddr);
+	int ret = uv_tcp_getpeername((uv_tcp_t *)client, peer, &peer_len);
+	if (ret || peer->sa_family == AF_UNSPEC) {
+		session_close(s);
 		return;
 	}
 
+	struct worker_ctx *worker = (struct worker_ctx *)master->loop->data;
 	const struct engine *engine = worker->engine;
 	const struct network *net = &engine->net;
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
 
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;
-	session->has_tls = tls;
+	session_set_has_tls(s, tls);
 	if (tls) {
 		timeout += TLS_MAX_HANDSHAKE_TIME;
-		if (!session->tls_ctx) {
-			session->tls_ctx = tls_new(master->loop->data);
-			if (!session->tls_ctx) {
-				worker_session_close(session);
+		struct tls_ctx_t *ctx = session_tls_get_server_ctx(s);
+		if (!ctx) {
+			ctx = tls_new(worker);
+			if (!ctx) {
+				session_close(s);
 				return;
 			}
-			session->tls_ctx->c.session = session;
-			session->tls_ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
+			ctx->c.session = s;
+			ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
+			session_tls_set_server_ctx(s, ctx);
 		}
 	}
-	uv_timer_t *timer = &session->timeout;
-	uv_timer_start(timer, tcp_timeout_trigger, timeout, idle_in_timeout);
+	uv_timer_t *t = session_get_timer(s);
+	uv_timer_start(t, tcp_timeout_trigger, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
 }
 
@@ -444,13 +425,12 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 		return ret;
 	}
 	struct worker_ctx *worker = loop->data;
-	struct session *session = session_borrow(worker);
-	assert(session);
-	session->handle = handle;
-	handle->data = session;
-	session->timeout.data = session;
-	uv_timer_init(worker->loop, &session->timeout);
-	return ret;
+	struct session *s = worker_session_borrow(worker);
+	assert(s);
+	session_set_handle(s, handle);
+	uv_timer_t *t = session_get_timer(s);
+	t->data = s;
+	uv_timer_init(worker->loop, t);
 }
 
 void io_deinit(uv_handle_t *handle)
@@ -461,7 +441,7 @@ void io_deinit(uv_handle_t *handle)
 	uv_loop_t *loop = handle->loop;
 	if (loop && loop->data) {
 		struct worker_ctx *worker = loop->data;
-		session_release(worker, handle);
+		worker_session_release(worker, handle);
 	} else {
 		session_free(handle->data);
 	}

@@ -37,30 +37,17 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 /**
  * Process an incoming packet (query from a client or answer from upstream).
  *
- * @param worker the singleton worker
- * @param handle socket through which the request came
- * @param query  the packet, or NULL on an error from the transport layer
- * @param addr   the address from which the packet came (or NULL, possibly, on error)
+ * @param session  session the where packet came from
+ * @param query    the packet, or NULL on an error from the transport layer
  * @return 0 or an error code
  */
-int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query,
-		const struct sockaddr* addr);
-
-/**
- * Process incoming DNS message fragment(s) that arrived over a stream (TCP, TLS).
- *
- * If the fragment contains only a partial message, it is buffered.
- * If the fragment contains a complete query or completes current fragment, execute it.
- * @return the number of newly-completed requests (>=0) or an error code
- */
-int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
-		const uint8_t *msg, ssize_t len);
+int worker_submit(struct session *session, knot_pkt_t *query);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session
  * which may be freely closed afterwards.
  */
-int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
+int worker_end_tcp(struct session *s);
 
 /**
  * Start query resolution with given query.
@@ -83,15 +70,47 @@ struct kr_request *worker_task_request(struct qr_task *task);
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);
 
-/** Closes given session */
-void worker_session_close(struct session *session);
+struct session *worker_session_borrow(struct worker_ctx *worker);
+
+void worker_session_release(struct worker_ctx *worker, uv_handle_t *handle);
 
 void *worker_iohandle_borrow(struct worker_ctx *worker);
 
 void worker_iohandle_release(struct worker_ctx *worker, void *h);
 
+ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
+
+ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
+
+int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
+		     knot_pkt_t *packet);
+
+int worker_task_numrefs(const struct qr_task *task);
+
 /** Finalize given task */
 int worker_task_finalize(struct qr_task *task, int state);
+
+void worker_task_complete(struct qr_task *task);
+
+void worker_task_ref(struct qr_task *task);
+
+void worker_task_unref(struct qr_task *task);
+
+void worker_task_timeout_inc(struct qr_task *task);
+
+int worker_add_tcp_connected(struct worker_ctx *worker,
+			     const struct sockaddr *addr,
+			     struct session *session);
+int worker_del_tcp_connected(struct worker_ctx *worker,
+			     const struct sockaddr *addr);
+
+knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
+
+struct request_ctx *worker_task_get_request(struct qr_task *task);
+
+struct session *worker_request_get_source_session(struct request_ctx *);
+
+void worker_request_set_source_session(struct request_ctx *, struct session *session);
 
 /** @cond internal */
 
@@ -106,9 +125,6 @@ typedef array_t(void *) mp_freelist_t;
 
 /** List of query resolution tasks. */
 typedef array_t(struct qr_task *) qr_tasklist_t;
-
-/** Session list. */
-typedef array_t(struct session *) qr_sessionlist_t;
 
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {

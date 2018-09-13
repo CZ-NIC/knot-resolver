@@ -9,6 +9,7 @@ kresd_SOURCES := \
 	daemon/tls_ephemeral_credentials.c \
 	daemon/tls_session_ticket-srv.c \
 	daemon/zimport.c     \
+	daemon/session.c     \
 	daemon/main.c
 
 kresd_DIST := daemon/lua/kres.lua daemon/lua/kres-gen.lua \
