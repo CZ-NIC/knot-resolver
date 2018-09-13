@@ -17,6 +17,7 @@
 #include <contrib/cleanup.h>
 #include <ccan/json/json.h>
 #include <ccan/asprintf/asprintf.h>
+#include <contrib/backtrace.h>
 #include <uv.h>
 #include <unistd.h>
 #include <grp.h>
@@ -830,8 +831,28 @@ int engine_ipc(struct engine *engine, const char *expr)
 	}
 }
 
+static int lua_panic_handler(lua_State *L) {
+	const char *problem = lua_tostring(L, -1);
+	fprintf(stderr, "%s\n", problem);
+	fprintf(stderr,"Lua stack trace:\n");
+	int level = 1;
+	lua_Debug ar;
+	while (lua_getstack(L, level++, &ar) == 1) {
+		if (lua_getinfo(L, "nSl", &ar) == 0) {
+			break;
+		}
+		fprintf(stderr, "#%d %s (%s), %s:%d\n", level,
+			 ar.name, ar.namewhat,
+			 ar.short_src, ar.currentline);
+	}
+	fprintf(stderr,"C stack trace:\n%s", backtrace());
+	return 1;
+}
+
 int engine_load_sandbox(struct engine *engine)
 {
+	/* Register panic handler */
+	lua_atpanic(engine->L, lua_panic_handler);
 	/* Init environment */
 	static const char sandbox_bytecode[] = {
 		#include "daemon/lua/sandbox.inc"

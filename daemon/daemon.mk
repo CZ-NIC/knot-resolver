@@ -48,6 +48,11 @@ kresd_CFLAGS += -DHAS_SYSTEMD
 kresd_LIBS += $(libsystemd_LIBS)
 endif
 
+# Use libunwind if possible
+ifeq ($(HAS_libunwind), yes)
+kresd_LIBS += $(libunwind_LIBS)
+endif
+
 # Make binary
 $(eval $(call make_sbin,kresd,daemon,yes))
 

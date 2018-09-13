@@ -60,6 +60,7 @@ There are also *optional* packages that enable specific functionality in Knot Re
    "luacheck_", "``lint-lua``", "Syntax and static analysis checker for Lua."
    "`clang-tidy`_", "``lint-c``", "Syntax and static analysis checker for C."
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
+   "libunwind", "``daemon``", "Support printint backtraces on errors."
 
 .. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).

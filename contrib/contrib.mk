@@ -7,7 +7,8 @@ contrib_SOURCES := \
 	contrib/ucw/mempool-fmt.c \
 	contrib/murmurhash3/murmurhash3.c \
 	contrib/base32hex.c \
-	contrib/base64.c
+	contrib/base64.c \
+	contrib/backtrace.c
 contrib_CFLAGS := -fPIC
 contrib_TARGET := $(abspath contrib)/contrib$(AREXT)
 
@@ -18,6 +19,11 @@ contrib_SOURCES += contrib/lmdb/mdb.c \
 contrib_CFLAGS  += -pthread
 contrib_LIBS    += -pthread
 lmdb_CFLAGS     += -I$(abspath contrib/lmdb)
+endif
+
+# Use libunwind if possible
+ifeq ($(HAS_libunwind), yes)
+contrib_CFLAGS += -DENABLE_BACKTRACE
 endif
 
 $(eval $(call make_static,contrib,contrib))
