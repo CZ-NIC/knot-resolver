@@ -10,6 +10,7 @@ variables:
   RESPDIFF_PRIORITY: 5
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
+  RESPERF_FORCE: 0
 
 stages:
   - build
@@ -337,6 +338,53 @@ respdiff:iter:udp:linux:amd64:
     - docker
     - linux
     - amd64
+
+
+.resperf:  &resperf
+  stage: respdiff
+  dependencies: []
+  only:  # trigger job only in repos under our control
+    - branches@knot/knot-resolver
+    - branches@knot/knot-resolver-security
+  except:
+    - master
+  script:
+    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 0
+    - export LABEL=gl$(date +%s)
+    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
+    - export TESTDIR="$COMMITDIR/$RESPERF_TEST"
+    - ln -s $COMMITDIR resperf_commitdir
+    - >
+      sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
+      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
+      "$(git rev-parse --short HEAD)" -l $LABEL --asan -t $RESPERF_TEST)
+    - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
+    - if [[ "$EXITCODE" == "0" ]]; then cat $TESTDIR/j*_resperf.txt; else cat $TESTDIR/j*_kresd.docker.txt; fi
+    - exit $EXITCODE
+  after_script:
+    - 'cp -t . resperf_commitdir/$RESPERF_TEST/j* ||:'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - ./j*
+  tags:
+    - respdiff
+
+resperf:fwd-tls6.udp-asan:
+  <<: *resperf
+  variables:
+    RESPERF_TEST: resperf.fwd-tls6.udp
+
+resperf:fwd-udp6.udp-asan:
+  <<: *resperf
+  variables:
+    RESPERF_TEST: resperf.fwd-udp6.udp
+
+resperf:iter.udp-asan:
+  <<: *resperf
+  variables:
+    RESPERF_TEST: resperf.iter.udp
 
 
 distro:fedora-29:
