@@ -203,7 +203,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		} else {
 			free(buf);
 			errno = ENOMEM;
-			ret = -1;
+			return -1;
 		}
 
 		/* Perform an asynchronous write with a callback */
@@ -779,29 +779,6 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 {
 	struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)v;
 	return client_paramlist_entry_free(entry);
-}
-
-int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port)
-{
-	if (!tls_client_paramlist || !addr) {
-		return kr_error(EINVAL);
-	}
-
-	/* Parameters are OK */
-
-	char key[INET6_ADDRSTRLEN + 6];
-	size_t keylen = sizeof(key);
-	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
-		return kr_error(EINVAL);
-	}
-
-	struct tls_client_paramlist_entry *entry = map_get(tls_client_paramlist, key);
-	if (entry != NULL) {
-		client_paramlist_entry_unref(entry);
-		map_del(tls_client_paramlist, key);
-	}
-
-	return kr_ok();
 }
 
 int tls_client_params_set(map_t *tls_client_paramlist,
