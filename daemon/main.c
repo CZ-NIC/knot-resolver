@@ -15,21 +15,23 @@
  */
 
 #include <arpa/inet.h>
+#include <assert.h>
+#include <getopt.h>
+#include <libgen.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <getopt.h>
-#include <libgen.h>
+#include <unistd.h>
+
 #include <uv.h>
-#include <assert.h>
-#include <contrib/cleanup.h>
-#include <contrib/ucw/mempool.h>
-#include <contrib/ccan/asprintf/asprintf.h>
-#include <libknot/error.h>
 #ifdef HAS_SYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
+#include <libknot/error.h>
 
+#include <contrib/cleanup.h>
+#include <contrib/ucw/mempool.h>
+#include <contrib/ccan/asprintf/asprintf.h>
 #include "lib/defines.h"
 #include "lib/resolve.h"
 #include "lib/dnssec.h"
@@ -298,6 +300,38 @@ static void signal_handler(uv_signal_t *handle, int signum)
 {
 	uv_stop(uv_default_loop());
 	uv_signal_stop(handle);
+}
+
+/** SIGBUS -> attempt to remove the overflowing cache file and abort. */
+static void sigbus_handler(int sig, siginfo_t *siginfo, void *ptr)
+{
+	/* We can't safely assume that printf-like functions work, but write() is OK.
+	 * See POSIX for the safe functions, e.g. 2017 version just above this link:
+	 * http://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_04_04
+	 */
+	#define WRITE_ERR(err_charray) \
+		(void)write(STDERR_FILENO, err_charray, sizeof(err_charray))
+	const char msg_typical[] =
+		"\nSIGBUS received; this is most likely due to filling up the filesystem where cache resides.\n",
+		msg_unknown[] = "\nSIGBUS received, cause unknown.\n",
+		msg_deleted[] = "Cache file deleted.\n",
+		msg_del_fail[] = "Cache file deletion failed.\n",
+		msg_final[] = "kresd can not recover reliably by itself, exiting.\n";
+	if (siginfo->si_code != BUS_ADRERR) {
+		WRITE_ERR(msg_unknown);
+		goto end;
+	}
+	WRITE_ERR(msg_typical);
+	if (!kr_cache_emergency_file_to_remove) goto end;
+	if (unlink(kr_cache_emergency_file_to_remove)) {
+		WRITE_ERR(msg_del_fail);
+	} else {
+		WRITE_ERR(msg_deleted);
+	}
+end:
+	WRITE_ERR(msg_final);
+	_exit(128 - sig); /*< regular return from OS-raised SIGBUS can't work anyway */
+	#undef WRITE_ERR
 }
 
 /** Split away port from the address. */
@@ -700,28 +734,36 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	/* Workaround for https://github.com/libuv/libuv/issues/45
-	 * (Write after ECONNRESET crash.) */
-	if (ret == 0 && signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
-		kr_log_error("[system] can't block SIGPIPE signal: %s\n",
-				strerror(errno));
-		ret = EXIT_FAILURE;
-	}
+	/* Catch some signals. */
 
-	if (ret != 0) {
+	loop = uv_default_loop();
+	uv_signal_t sigint, sigterm;
+	if (true) ret = uv_signal_init(loop, &sigint);
+	if (!ret) ret = uv_signal_init(loop, &sigterm);
+	if (!ret) ret = uv_signal_start(&sigint, signal_handler, SIGINT);
+	if (!ret) ret = uv_signal_start(&sigterm, signal_handler, SIGTERM);
+	/* Block SIGPIPE; see https://github.com/libuv/libuv/issues/45 */
+	if (!ret && signal(SIGPIPE, SIG_IGN) == SIG_ERR) ret = errno;
+	if (!ret) {
+		/* Catching SIGBUS via uv_signal_* can't work; see:
+		 * https://github.com/libuv/libuv/pull/1987 */
+		struct sigaction sa;
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_sigaction = sigbus_handler;
+		sa.sa_flags = SA_SIGINFO;
+		if (sigaction(SIGBUS, &sa, NULL)) {
+			ret = errno;
+		}
+	}
+	if (ret) {
+		kr_log_error("[system] failed to set up signal handlers: %s\n",
+				strerror(abs(errno)));
+		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
 
-	engine_set_moduledir(&engine, args.moduledir);
-	
-	/* Block signals. */
-	loop = uv_default_loop();
-	uv_signal_t sigint, sigterm;
-	uv_signal_init(loop, &sigint);
-	uv_signal_init(loop, &sigterm);
-	uv_signal_start(&sigint, signal_handler, SIGINT);
-	uv_signal_start(&sigterm, signal_handler, SIGTERM);
 	/* Start the scripting engine */
+	engine_set_moduledir(&engine, args.moduledir);
 	worker->loop = loop;
 	loop->data = worker;
 
