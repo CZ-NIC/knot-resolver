@@ -59,8 +59,10 @@ int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr);
 int tcp_bindfd(uv_tcp_t *handle, int fd);
 int tcp_bindfd_tls(uv_tcp_t *handle, int fd);
 
-/** Initialize the handle, incl. ->data = struct session * instance. type = SOCK_* */
-void io_create(uv_loop_t *loop, uv_handle_t *handle, int type);
+/** Initialize the handle, incl. ->data = struct session * instance.
+ * \param type = SOCK_*
+ * \param family = AF_* */
+int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family);
 void io_deinit(uv_handle_t *handle);
 void io_free(uv_handle_t *handle);
 
