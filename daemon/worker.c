@@ -1005,7 +1005,6 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	session_set_connected(session, true);
-	session_set_handle(session,(uv_handle_t *)handle);
 
 	int ret = kr_ok();
 	if (session_has_tls(session)) {
