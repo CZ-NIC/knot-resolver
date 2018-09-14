@@ -230,9 +230,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		}
 	/* Connection spawned at least one request, reset its deadline for next query.
 	 * https://tools.ietf.org/html/rfc7766#section-6.2.3 */
-	} else if (ret > 0 && !session_is_outgoing(s) && !session_is_closing(s)) {
-		uv_timer_t *t = session_get_timer(s);
-		uv_timer_again(t);
+	} else if (ret > 0 && !session_is_closing(s)) {
+		session_timer_restart(s);
 	}
 	mp_flush(worker->pkt_pool.ctx);
 }
