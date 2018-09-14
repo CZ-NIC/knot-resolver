@@ -307,6 +307,8 @@ int session_set_handle(struct session *session, uv_handle_t *h)
 		return kr_error(EINVAL);
 	}
 
+	assert(session->handle == NULL);
+
 	if (h->type == UV_TCP) {
 		uint8_t *wire_buf = malloc(KNOT_WIRE_MAX_PKTSIZE);
 		if (!wire_buf) {
