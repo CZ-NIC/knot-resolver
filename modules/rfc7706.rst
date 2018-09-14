@@ -1,3 +1,3 @@
-Root on lookback (RFC 7706)
+Root on loopback (RFC 7706)
 ---------------------------
 Knot Resolver developers decided that pure implementation of :rfc:`7706` is a bad idea so it is not implemented in the form envisioned by the RFC. You can get the very similar effect without its downsides by combining :ref:`prefill <mod-prefill>` and :ref:`serve_stale <mod-serve_stale>` modules with Aggressive Use of DNSSEC-Validated Cache (:rfc:`8198`) behavior which is enabled automatically together with DNSSEC validation.
