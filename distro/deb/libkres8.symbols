@@ -4,10 +4,14 @@ libkres.so.8 libkres8 #MINVER#
  kr_bitcmp@Base 2.1.0
  kr_cache_clear@Base 2.1.0
  kr_cache_close@Base 2.1.0
+ kr_cache_closest_apex@Base 3.0.0
  kr_cache_insert_rr@Base 3.0.0
+ kr_cache_match@Base 3.0.0
  kr_cache_materialize@Base 2.1.0
  kr_cache_open@Base 2.1.0
  kr_cache_peek_exact@Base 2.1.0
+ kr_cache_remove@Base 3.0.0
+ kr_cache_remove_subtree@Base 3.0.0
  kr_cache_sync@Base 2.1.0
  kr_cache_ttl@Base 2.1.0
  kr_cdb_lmdb@Base 2.1.0
@@ -87,6 +91,7 @@ libkres.so.8 libkres8 #MINVER#
  kr_ta_del@Base 2.1.0
  kr_ta_get@Base 2.1.0
  kr_ta_get_longest_name@Base 2.1.0
+ kr_unpack_cache_key@Base 3.0.0
  kr_verbose_set@Base 2.1.0
  kr_verbose_status@Base 2.1.0
  kr_zonecut_add@Base 2.1.0
