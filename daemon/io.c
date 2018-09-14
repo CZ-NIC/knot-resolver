@@ -271,7 +271,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 	memset(client, 0, sizeof(*client));
-	int res = io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM, 0);
+	int res = io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM, AF_UNSPEC);
 	if (res) {
 		if (res == UV_EMFILE) {
 			worker->too_many_open = true;
