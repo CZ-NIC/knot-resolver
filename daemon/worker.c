@@ -922,15 +922,16 @@ static int session_tls_hs_cb(struct session *session, int status)
 		 * Session isn't in the list of waiting sessions,
 		 * or addition to the list of connected sessions failed,
 		 * or write to upstream failed. */
-		session_waitinglist_finalize(session, KR_STATE_FAIL);
 		worker_del_tcp_connected(worker, peer);
+		session_waitinglist_finalize(session, KR_STATE_FAIL);
 		assert(session_tasklist_is_empty(session));
 		session_close(session);
 	} else {
 		uv_timer_t *t = session_get_timer(session);
 		uv_timer_stop(t);
 		t->data = session;
-		session_timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
+		session_timer_start(session, on_tcp_watchdog_timeout,
+				    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 	}
 	return kr_ok();
 }
@@ -1013,17 +1014,19 @@ static void on_connect(uv_connect_t *req, int status)
 		if (ret == kr_error(EAGAIN)) {
 			iorequest_release(worker, req);
 			session_start_read(session);
-			session_timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
+			session_timer_start(session, on_tcp_watchdog_timeout,
+					    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 			return;
 		}
+	} else {
+		worker_add_tcp_connected(worker, peer, session);
 	}
 
 	if (ret == kr_ok()) {
 		ret = session_next_waiting_send(session);
 		if (ret == kr_ok()) {
-			session_timer_start(session, on_tcp_watchdog_timeout, MAX_TCP_INACTIVITY, 0);
-			struct sockaddr *peer = session_get_peer(session);
-			worker_add_tcp_connected(worker, peer, session);
+			session_timer_start(session, on_tcp_watchdog_timeout,
+					    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 			iorequest_release(worker, req);
 			return;
 		}
@@ -1469,7 +1472,7 @@ static int qr_task_step(struct qr_task *task,
 				if (session_tasklist_get_len(session) == 1) {
 					session_timer_stop(session);
 					ret = session_timer_start(session, on_tcp_watchdog_timeout,
-								  MAX_TCP_INACTIVITY, 0);
+								  MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 				}
 				if (ret < 0) {
 					session_waitinglist_del(session, task);
