@@ -125,7 +125,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	/* Prepare raw memory for the new entry and fill it. */
 	struct kr_cache *cache = &req->ctx->cache;
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, pkt_type,
-				owner, qry, cache, qry->timestamp.tv_sec);
+				owner, qry, cache, qry->timestamp.tv_sec, NULL);
 	if (ret) return; /* some aren't really errors */
 	assert(val_new_entry.data);
 	struct entry_h *eh = val_new_entry.data;

@@ -249,7 +249,8 @@ int entry_h_splice(
 	knot_db_val_t *val_new_entry, uint8_t rank,
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
-	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp);
+	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp,
+	kr_cache_scope_t *scope);
 
 /** Parse an entry_apex into individual items.  @return error code. */
 int entry_list_parse(const knot_db_val_t val, entry_list_t list);

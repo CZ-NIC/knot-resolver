@@ -155,7 +155,8 @@ static int cache_key_read_scope(knot_db_val_t key, size_t off, const uint8_t **s
 }
 
 /* Check that one scoped key covers another one (they're not necessarily equal) */
-static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_key, size_t key_length, kr_cache_scope_t *scope)
+static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_key, size_t key_length,
+                                 kr_cache_scope_t *scope)
 {
 	/* Check that the key part (without the scope) matches to make sure the keys differ only in scope. */
 	if (found_key.len == wanted_key.len && memcmp(found_key.data, wanted_key.data, key_length) == 0) {
@@ -175,6 +176,36 @@ static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_k
 		}
 	}
 	return kr_error(ENOENT);
+}
+
+/* Check if entry is valid and is not expired and return it */
+static const struct entry_h *entry_get_valid(knot_db_val_t val, struct kr_query *qry, uint8_t lowest_rank)
+{
+	if (val.data == NULL || qry == NULL) {
+		return NULL;
+	}
+
+	int ret = entry_h_seek(&val, qry->stype);
+	if (ret != 0) {
+		return NULL;
+	}
+
+	const struct entry_h *eh = entry_h_consistent(val, qry->stype);
+	if (!eh) {
+		return NULL;
+		// LATER: recovery in case of error, perhaps via removing the entry?
+		// LATER(optim): pehaps optimize the zone cut search
+	}
+
+	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype,
+					qry->timestamp.tv_sec);
+	if (new_ttl < 0 || eh->rank < lowest_rank) {
+		VERBOSE_MSG(qry, "=> skipping exact %s: rank 0%.2o (min. 0%.2o), new TTL %d\n",
+				eh->is_packet ? "packet" : "RR", eh->rank, lowest_rank, new_ttl);
+		return NULL;
+	}
+
+	return eh;
 }
 
 /** Almost whole .produce phase for the cache module.
@@ -201,14 +232,40 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype, scope);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
+
+	/* Ignore expired scoped entry, if this isn't done, it would be otherwise impossible
+	 * to cache entry on cache scope changes, as the most specific scope would be retrieved forever. */
+	if (ret == 0 && is_scopable_type(qry->stype) && scope && scope->family != AF_UNSPEC) {
+		if (entry_get_valid(val, qry, lowest_rank) == NULL) {
+			VERBOSE_MSG(qry, "=> hit for scope /%d, but it's expired\n", scope->scope_len);
+			ret = -abs(ENOENT);
+		}
+	}
+
 	/*  If the name is expected to be scope, but there's no scoped result in cache,
 	 *  check closest scope, as the name may not be scoped by server. */
-	if (ret && ret == -abs(ENOENT) && scope->family != AF_UNSPEC && is_scopable_type(qry->stype) && scope->scope_len > 0) {
-		knot_db_val_t wanted_key = key;
+	if (ret == -abs(ENOENT) && is_scopable_type(qry->stype) && scope->family != AF_UNSPEC && scope->scope_len > 0) {
+		/* Widen the scope to find encloser */
+		--scope->scope_len;
+		key = key_exact_type(k, qry->stype, scope);
+
 		VERBOSE_MSG(qry, "=> searching closest scope for /%d\n", scope->scope_len);
+		knot_db_val_t wanted_key = key;
 		int err = cache_op(cache, read_leq, &key, &val);
 		if (err >= 0) {
-			ret = cache_key_match_scope(wanted_key, key, cache_key_scope_off(k), scope);
+			/* Update scope only if the entry is not expired */
+			if (entry_get_valid(val, qry, lowest_rank) != NULL) {
+				ret = cache_key_match_scope(wanted_key, key, cache_key_scope_off(k), scope);
+			} else {
+				ret = -abs(ENOENT);
+			}
+			VERBOSE_MSG(qry, "=> %sclosest scope /%d\n", ret == 0 ? "" : "no ", scope->scope_len);
+		}
+
+		/* Restore cache scope if not found */
+		if (ret != 0) {
+			++scope->scope_len;
+			key = key_exact_type(k, qry->stype, scope);
 		}
 	}
 	if (!ret) {
@@ -225,6 +282,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	cache->stats.miss += 1;
 
 	/**** 1b. otherwise, find the longest prefix zone/xNAME (with OK time+rank). [...] */
+	VERBOSE_MSG(qry, "=> trying to find a CNAME / longest prefix match\n");
 	k->zname = qry->sname;
 	ret = kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
 	if (unlikely(ret)) {
@@ -553,12 +611,10 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	if (ret) return ret;
 	const struct entry_h *eh = entry_h_consistent(val, qry->stype);
 	if (!eh) {
-		assert(false);
 		return kr_error(ENOENT);
 		// LATER: recovery in case of error, perhaps via removing the entry?
 		// LATER(optim): pehaps optimize the zone cut search
 	}
-
 	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype,
 					qry->timestamp.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
@@ -702,12 +758,36 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 		knot_db_val_t key = key_exact_type(k, find_type, cache_scope);
 		knot_db_val_t val;
 		int ret = cache_op(cache, read, &key, &val, 1);
+		/* Ignore expired scoped entry, if this isn't done, it would be otherwise impossible
+		 * to cache entry on cache scope changes, as the most specific scope would be retrieved forever. */
+		if (ret == 0 && is_scopable_type(find_type) && cache_scope && cache_scope->family != AF_UNSPEC) {
+			if (entry_get_valid(val, qry, rank_min) == NULL) {
+				VERBOSE_MSG(qry, "=> closest hit for scope /%d, but it's expired\n", cache_scope->scope_len);
+				ret = -abs(ENOENT);
+			}
+		}
 		/* Try in global scope if scoped, but no immediate match found */
-		if (exact_match && ret == -abs(ENOENT) && cache_scope && cache_scope->family != AF_UNSPEC) {
+		if (exact_match && ret == -abs(ENOENT) && cache_scope && cache_scope->family != AF_UNSPEC && cache_scope->scope_len > 0) {
+			/* Widen the scope to find encloser */
+			--cache_scope->scope_len;
+			key = key_exact_type(k, find_type, cache_scope);
+
 			knot_db_val_t wanted_key = key;
 			int err = cache_op(cache, read_leq, &key, &val);
 			if (err >= 0) {
-				ret = cache_key_match_scope(wanted_key, key, cache_key_scope_off(k), cache_scope);
+				/* Update scope only if the entry is not expired */
+				if (entry_get_valid(val, qry, rank_min) != NULL) {
+					ret = cache_key_match_scope(wanted_key, key, cache_key_scope_off(k), cache_scope);
+				} else {
+					ret = -abs(ENOENT);
+				}
+				VERBOSE_MSG(qry, "=> %sclosest scope /%d\n", ret == 0 ? "" : "no ", cache_scope->scope_len);
+			}
+
+			/* Restore cache scope if not found */
+			if (ret != 0) {
+				++cache_scope->scope_len;
+				key = key_exact_type(k, find_type, cache_scope);
 			}
 		}
 		if (ret == -abs(ENOENT)) goto next_label;

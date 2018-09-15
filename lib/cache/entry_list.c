@@ -203,7 +203,8 @@ int entry_h_splice(
 	knot_db_val_t *val_new_entry, uint8_t rank,
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
-	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp)
+	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp,
+	kr_cache_scope_t *scope)
 {
 	//TODO: another review, perhaps incuding the API
 	const bool ok = val_new_entry && val_new_entry->len > 0;
@@ -254,8 +255,8 @@ int entry_h_splice(
 			WITH_VERBOSE(qry) {
 				auto_free char *type_str = kr_rrtype_text(type),
 					*owner_str = kr_dname_text(owner);
-				VERBOSE_MSG(qry, "=> not overwriting %s %s, rank 0%.2o, remaining TTL %d\n",
-						type_str, owner_str, eh_orig->rank, old_ttl);
+				VERBOSE_MSG(qry, "=> not overwriting %s %s, rank 0%.2o, scoped: %d, remaining TTL %d\n",
+						type_str, owner_str, eh_orig->rank, scope ? scope->scope_len : -1, old_ttl);
 			}
 			return kr_error(EEXIST);
 		}

@@ -597,8 +597,10 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 
 	/* Prepare raw memory for the new entry. */
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
-				rr->owner, qry, cache, timestamp);
-	if (ret) return kr_ok(); /* some aren't really errors */
+				rr->owner, qry, cache, timestamp, scope);
+	if (ret) {
+		return kr_ok(); /* some aren't really errors */
+	}
 	assert(val_new_entry.data);
 
 	const uint32_t ttl = rr->ttl;
@@ -644,7 +646,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		VERBOSE_MSG(qry, "=> stashed %s%s %s, rank 0%.2o, scoped: %d, "
 			"%d B total, incl. %d RRSIGs\n",
 			(wild_labels ? "*." : ""), encl_str, type_str, rank,
-			scope ? (int)scope->scope_len : 0,
+			scope ? (int)scope->scope_len : -1,
 			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.count : 0)
 			);
 	} }
