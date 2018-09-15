@@ -90,12 +90,10 @@ function M.layer.consume(state, req, pkt)
 	if state == kres.FAIL then
 		return state end
 
-	req = kres.request_t(req)
 	local qry = req:current()
 	if qry.flags.CACHED then  -- do not slow down cached queries
 		return state end
 
-	pkt = kres.pkt_t(pkt)
 	local bad_rr = check_pkt(pkt)
 	if not bad_rr then
 		return state end
@@ -105,7 +103,7 @@ function M.layer.consume(state, req, pkt)
 	refuse(req)
 	log('[' .. string.format('%5d', qry.id) .. '][rebinding] '
 	    .. 'blocking blacklisted IP \'' .. kres.rr2str(bad_rr)
-	    .. '\' received from IP ' .. tostring(kres.sockaddr_t(req.upstream.addr)))
+	    .. '\' received from IP ' .. req.upstream.addr:tostring())
 	return kres.FAIL
 end
 

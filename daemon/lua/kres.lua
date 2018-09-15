@@ -249,17 +249,19 @@ ffi.metatype( sockaddr_t, {
 		ip = function (sa) return C.kr_inaddr(sa) end,
 		family = function (sa) return C.kr_inaddr_family(sa) end,
 		port = function (sa) return C.kr_inaddr_port(sa) end,
+		tostring = function(sa)
+			assert(ffi.istype(sockaddr_t, sa))
+			local len = ffi.new('size_t[1]', str_addr_buf_len)
+			local ret = C.kr_inaddr_str(sa, str_addr_buf, len)
+			if ret ~= 0 then
+				error('kr_inaddr_str failed: ' .. tostring(ret))
+			end
+			return ffi.string(str_addr_buf)
+		end,
 	},
 	__tostring = function(sa)
-		assert(ffi.istype(sockaddr_t, sa))
-		local len = ffi.new('size_t[1]', str_addr_buf_len)
-		local ret = C.kr_inaddr_str(sa, str_addr_buf, len)
-		if ret ~= 0 then
-			error('kr_inaddr_str failed: ' .. tostring(ret))
-		end
-		return ffi.string(str_addr_buf)
-	end,
-
+		return sa:tostring()
+	end
 })
 
 -- Parametrized LRU table

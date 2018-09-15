@@ -14,7 +14,6 @@ local function wait_resolve(qname, qtype)
 		name = qname,
 		type = qtype,
 		finish = function (answer, _)
-			answer = kres.pkt_t(answer)
 			rcode = answer:rcode()
 			answers = answer:section(kres.section.ANSWER)
 			-- Signal as completed

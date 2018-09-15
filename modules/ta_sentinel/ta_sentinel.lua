@@ -3,17 +3,14 @@ M.layer = {}
 local ffi = require('ffi')
 
 function M.layer.finish(state, req, pkt)
-	local kreq = kres.request_t(req)
-
 	if bit.band(state, kres.DONE) == 0 then
 		return state end -- not resolved yet, exit
 
-	local qry = kreq:resolved()
+	local qry = req:resolved()
 	if qry.parent ~= nil then
 		return state end -- an internal query, exit
 
-	local kpkt = kres.pkt_t(pkt)
-	if not (kpkt:qtype() == kres.type.A or kpkt:qtype() == kres.type.AAAA) then
+	if not (pkt:qtype() == kres.type.A or pkt:qtype() == kres.type.AAAA) then
 		return state end
 
 	-- fast filter by the length of the first label
@@ -32,7 +29,7 @@ function M.layer.finish(state, req, pkt)
 		keytag = qname:match('^root%-key%-sentinel%-not%-ta%-(%x+)%.')
 	end
 
-	if kreq.rank ~= ffi.C.KR_RANK_SECURE or kreq.answer:cd() then
+	if req.rank ~= ffi.C.KR_RANK_SECURE or req.answer:cd() then
 		if verbose() then
 			log('[ta_sentinel] name+type OK but not AD+CD conditions')
 		end
@@ -77,9 +74,9 @@ function M.layer.finish(state, req, pkt)
 	end
 
 	if sentype ~= found then -- expected key is not there, or unexpected key is there
-		kpkt:clear_payload()
-		kpkt:rcode(kres.rcode.SERVFAIL)
-		kpkt:ad(false)
+		pkt:clear_payload()
+		pkt:rcode(kres.rcode.SERVFAIL)
+		pkt:ad(false)
 	end
 	return state -- do not break resolution process
 end

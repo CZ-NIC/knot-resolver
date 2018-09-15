@@ -18,6 +18,7 @@
 #include <ccan/json/json.h>
 #include <ccan/asprintf/asprintf.h>
 #include <contrib/backtrace.h>
+#include <contrib/lua_utils.h>
 #include <uv.h>
 #include <unistd.h>
 #include <grp.h>
@@ -58,8 +59,8 @@ const size_t CLEANUP_TIMER = 5*60*1000;
 
 /** Register module callback into Lua world. */
 #define REGISTER_MODULE_CALL(L, module, cb, name) do { \
-	lua_pushlightuserdata((L), (module)); \
-	lua_pushlightuserdata((L), (cb)); \
+	luaL_pushvoidpointer((L), (module)); \
+	luaL_pushvoidpointer((L), (cb)); \
 	lua_pushcclosure((L), l_trampoline, 2); \
 	lua_setfield((L), -2, (name)); \
 	} while (0)
@@ -560,8 +561,8 @@ static int l_map(lua_State *L)
 /** Trampoline function for module properties. */
 static int l_trampoline(lua_State *L)
 {
-	struct kr_module *module = lua_touserdata(L, lua_upvalueindex(1));
-	void* callback = lua_touserdata(L, lua_upvalueindex(2));
+	struct kr_module *module = luaL_tocpointer(L, lua_upvalueindex(1));
+	void* callback = luaL_tocpointer(L, lua_upvalueindex(2));
 	struct engine *engine = engine_luaget(L);
 	if (!module) {
 		lua_pushstring(L, "module closure missing upvalue");
@@ -677,7 +678,7 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "fromjson");
 	lua_pushcfunction(engine->L, l_map);
 	lua_setglobal(engine->L, "map");
-	lua_pushlightuserdata(engine->L, engine);
+	luaL_pushvoidpointer(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
 	return kr_ok();
 }
@@ -1040,7 +1041,7 @@ void engine_lualib(struct engine *engine, const char *name, lua_CFunction lib_cb
 struct engine *engine_luaget(lua_State *L)
 {
 	lua_getglobal(L, "__engine");
-	struct engine *engine = lua_touserdata(L, -1);
+	struct engine *engine = luaL_tocpointer(L, -1);
 	if (!engine) luaL_error(L, "internal error, empty engine pointer");
 	lua_pop(L, 1);
 	return engine;

@@ -18,7 +18,6 @@ M.callback = ffi.cast("kr_stale_cb",
 
 M.layer = {
 	produce = function (state, req)
-		req = kres.request_t(req)
 		local qry = req:current()
 		-- Don't do anything for priming, prefetching, etc.
 		-- TODO: not all cases detected ATM.

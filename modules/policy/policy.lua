@@ -600,23 +600,17 @@ end
 -- as a dependency chain, e.g. r1,r2,r3 -> r3(r2(r1(state)))
 policy.layer = {
 	begin = function(state, req)
-		req = kres.request_t(req)
 		return evaluate(policy.rules, req, req:current(), state, req.answer) or
 		       evaluate(policy.special_names, req, req:current(), state, req.answer) or
 		       state
 	end,
 	produce = function(state, req, pkt)
-		req = kres.request_t(req)
-		pkt = kres.pkt_t(pkt)
 		return evaluate(policy.produce_rules, req, req:current(), state, pkt) or state
 	end,
 	checkout = function (state, req, pkt, addr, stream)
-		req = kres.request_t(req)
-		pkt = kres.pkt_t(pkt)
 		return evaluate(policy.checkout_rules, req, req:current(), state, pkt, addr, stream) or state
 	end,
 	finish = function(state, req)
-		req = kres.request_t(req)
 		return evaluate(policy.finish_rules, req, req:last(), state, req.answer) or state
 	end
 }

@@ -21,6 +21,7 @@
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/wire.h>
+#include <contrib/lua_utils.h>
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
 #include <malloc.h>
 #endif
@@ -630,8 +631,13 @@ static void request_free(struct request_ctx *ctx)
 		lua_State *L = worker->engine->L;
 		/* Get the finalizer and arguments */
 		lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->req.finalizer_ref);
-		lua_pushlightuserdata(L, &ctx->req);
-		(void) engine_pcall(L, 1);
+		LUA_CTID_DECLARE(CTID_KR_REQUEST);
+		LUA_CTID_DEFINE(L, CTID_KR_REQUEST, "struct kr_request *");
+		LUA_CTID_DECLARE(CTID_KNOT_PKT);
+		LUA_CTID_DEFINE(L, CTID_KNOT_PKT, "knot_pkt_t *");
+		luaL_pushcpointer(L, ctx->req.answer, CTID_KNOT_PKT);
+		luaL_pushcpointer(L, &ctx->req, CTID_KR_REQUEST);
+		(void) engine_pcall(L, 2);
 		/* Dereference it */
 		luaL_unref(L, LUA_REGISTRYINDEX, ctx->req.finalizer_ref);
 		ctx->req.finalizer_ref = LUA_NOREF;
@@ -2573,7 +2579,7 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 	worker->out_addr4.sin_family = AF_UNSPEC;
 	worker->out_addr6.sin6_family = AF_UNSPEC;
 	/* Register worker in Lua thread */
-	lua_pushlightuserdata(engine->L, worker);
+	luaL_pushvoidpointer(engine->L, worker);
 	lua_setglobal(engine->L, "__worker");
 	lua_getglobal(engine->L, "worker");
 	lua_pushnumber(engine->L, worker_id);

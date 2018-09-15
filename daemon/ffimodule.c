@@ -15,9 +15,10 @@
  */
 
 #include <uv.h>
+#include <contrib/lua_utils.h>
 
-#include "daemon/engine.h"
 #include "daemon/ffimodule.h"
+#include "daemon/engine.h"
 #include "daemon/bindings.h"
 #include "lib/module.h"
 #include "lib/layer.h"
@@ -27,6 +28,10 @@
 #else
 #define l_resume(L, argc) lua_resume((L), (argc))
 #endif
+
+LUA_CTID_DECLARE(CTID_KR_REQUEST);
+LUA_CTID_DECLARE(CTID_KNOT_PKT);
+LUA_CTID_DECLARE(CTID_SOCKADDR);
 
 /** @internal Slots for layer callbacks.
   * Each slot ID corresponds to Lua reference in module API. */
@@ -51,7 +56,7 @@ static inline lua_State *l_ffi_preface(struct kr_module *module, const char *cal
 		lua_pop(L, 1);
 		return NULL;
 	}
-	lua_pushlightuserdata(L, module);
+	luaL_pushvoidpointer(L, module);
 	return L;
 }
 
@@ -151,14 +156,14 @@ static int l_ffi_deinit(struct kr_module *module)
 static int l_ffi_layer_begin(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, begin);
-	lua_pushlightuserdata(L, ctx->req);
+	luaL_pushcpointer(L, ctx->req, CTID_KR_REQUEST);
 	return l_ffi_call(L, 2);
 }
 
 static int l_ffi_layer_reset(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, reset);
-	lua_pushlightuserdata(L, ctx->req);
+	luaL_pushcpointer(L, ctx->req, CTID_KR_REQUEST);
 	return l_ffi_call(L, 2);
 }
 
@@ -166,8 +171,8 @@ static int l_ffi_layer_finish(kr_layer_t *ctx)
 {
 	struct kr_request *req = ctx->req;
 	LAYER_FFI_CALL(ctx, finish);
-	lua_pushlightuserdata(L, req);
-	lua_pushlightuserdata(L, req->answer);
+	luaL_pushcpointer(L, ctx->req, CTID_KR_REQUEST);
+	luaL_pushcpointer(L, req->answer, CTID_KNOT_PKT);
 	return l_ffi_call(L, 3);
 }
 
@@ -177,8 +182,8 @@ static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Already failed, skip */
 	}
 	LAYER_FFI_CALL(ctx, consume);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
+	luaL_pushcpointer(L, ctx->req, CTID_KR_REQUEST);
+	luaL_pushcpointer(L, pkt, CTID_KNOT_PKT);
 	return l_ffi_call(L, 3);
 }
 
@@ -188,8 +193,8 @@ static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Already failed or done, skip */
 	}
 	LAYER_FFI_CALL(ctx, produce);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
+	luaL_pushcpointer(L, ctx->req, CTID_KR_REQUEST);
+	luaL_pushcpointer(L, pkt, CTID_KNOT_PKT);
 	return l_ffi_call(L, 3);
 }
 
@@ -199,9 +204,9 @@ static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockadd
 		return ctx->state; /* Already failed or done, skip */
 	}
 	LAYER_FFI_CALL(ctx, checkout);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
-	lua_pushlightuserdata(L, dst);
+	luaL_pushcpointer(L, ctx->req, CTID_KR_REQUEST);
+	luaL_pushcpointer(L, pkt, CTID_KNOT_PKT);
+	luaL_pushcpointer(L, dst, CTID_SOCKADDR);
 	lua_pushboolean(L, type == SOCK_STREAM);
 	return l_ffi_call(L, 5);
 }
@@ -254,8 +259,12 @@ static const kr_layer_api_t *l_ffi_layer(struct kr_module *module)
 
 int ffimodule_register_lua(struct engine *engine, struct kr_module *module, const char *name)
 {
-	/* Register module in Lua */
 	lua_State *L = engine->L;
+	LUA_CTID_DEFINE(L, CTID_KR_REQUEST, "struct kr_request *");
+	LUA_CTID_DEFINE(L, CTID_KNOT_PKT, "knot_pkt_t *");
+	LUA_CTID_DEFINE(L, CTID_SOCKADDR, "struct sockaddr *");
+
+	/* Register module in Lua */
 	lua_getglobal(L, "require");
 	lua_pushstring(L, name);
 	if (lua_pcall(L, 1, LUA_MULTRET, 0) != 0) {

@@ -86,7 +86,6 @@ end
 view.layer = {
 	begin = function(state, req)
 		if state == kres.FAIL then return state end
-		req = kres.request_t(req)
 		local match_cb = evaluate(view, req)
 		if match_cb then
 			local query = req:current()

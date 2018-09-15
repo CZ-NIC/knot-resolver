@@ -42,24 +42,9 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 		init = t.init
 	end
 
-	local init_cb, finish_cb = nil, nil
-	if init then
-		-- Create callback for initialization
-		init_cb = function (req)
-			return init(kres.request_t(req))
-		end
-	end
-	if finish then
-		-- Create callback for finalization
-		finish_cb = function (req)
-			req = kres.request_t(req)
-			return finish(req.answer, req)
-		end
-	end
-
 	-- Translate options and resolve
 	options = kres.mk_qflags(options)
-	return worker.resolve_unwrapped(qname, qtype, qclass, options, init_cb, finish_cb)
+	return worker.resolve_unwrapped(qname, qtype, qclass, options, init, finish)
 end
 
 resolve = worker.resolve

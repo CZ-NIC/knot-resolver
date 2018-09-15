@@ -40,8 +40,6 @@ end
 -- When all response is processed internal.nsset is published in resolver engine
 -- luacheck: no unused args
 local function address_callback(pkt, req)
-	pkt = kres.pkt_t(pkt)
-	-- req = kres.request_t(req)
 	if pkt:rcode() ~= kres.rcode.NOERROR then
 		warn("[priming] cannot resolve address '%s', type: %d", kres.dname2str(pkt:qname()), pkt:qtype())
 	else
@@ -80,8 +78,6 @@ end
 -- These new queries should be resolved from cache.
 -- luacheck: no unused args
 local function priming_callback(pkt, req)
-	pkt = kres.pkt_t(pkt)
-	-- req = kres.request_t(req)
 	if pkt:rcode() ~= kres.rcode.NOERROR then
 		warn("[priming] cannot resolve '.' NS, next priming query in %d seconds", priming.retry_time / sec)
 		internal.event = event.after(priming.retry_time, internal.prime)

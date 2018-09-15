@@ -16,6 +16,9 @@
 
 #pragma once
 
+struct engine;
+struct kr_module;
+
 /**
  * Register Lua module as a FFI module.
  * This fabricates a standard module interface,

@@ -19,7 +19,6 @@ end
 -- Just listing the *.in-addr.arpa suffixes would be tedious, as there are many.
 M.layer = {
 	produce = function (state, req)
-		req = kres.request_t(req)
 		local qry = req:current()
 		if qry.stype ~= kres.type.PTR
 			or bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0

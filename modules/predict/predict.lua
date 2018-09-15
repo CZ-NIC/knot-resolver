@@ -172,7 +172,6 @@ predict.layer = {
 	-- Prefetch all expiring (sub-)queries immediately after the request finishes.
 	-- Doing that immediately is simplest and avoids creating (new) large bursts of activity.
 	finish = function (_, req)
-		req = kres.request_t(req)
 		local qrys = req.rplan.resolved
 		for i = 0, (tonumber(qrys.len) - 1) do -- size_t doesn't work for some reason
 			local qry = qrys.at[i]

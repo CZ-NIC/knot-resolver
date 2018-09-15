@@ -16,13 +16,11 @@ local function wait_resolve(qname, qtype, proto)
 		name = qname,
 		type = qtype,
 		init = function (req)
-			req = kres.request_t(req)
 			req.qsource.dst_addr = mock_address
 			req.qsource.addr = mock_src_address
 			req.qsource.tcp = proto ~= 'udp'
 		end,
 		finish = function (answer, req)
-			answer = kres.pkt_t(answer)
 			aa = answer:aa()
 			tc = answer:tc()
 			rcode = answer:rcode()

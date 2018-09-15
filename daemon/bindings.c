@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <uv.h>
 #include <contrib/cleanup.h>
+#include <contrib/lua_utils.h>
 #include <libknot/descriptor.h>
 
 #include "lib/cache/api.h"
@@ -58,7 +59,7 @@ static int format_error(lua_State* L, const char *err)
 
 static inline struct worker_ctx *wrk_luaget(lua_State *L) {
 	lua_getglobal(L, "__worker");
-	struct worker_ctx *worker = lua_touserdata(L, -1);
+	struct worker_ctx *worker = luaL_tocpointer(L, -1);
 	lua_pop(L, 1);
 	return worker;
 }
@@ -1475,7 +1476,7 @@ static int event_sched(lua_State *L, unsigned timeout, unsigned repeat)
 	lua_newtable(L);
 	lua_pushvalue(L, 2);
 	lua_rawseti(L, -2, 1);
-	lua_pushlightuserdata(L, timer);
+	luaL_pushvoidpointer(L, timer);
 	lua_rawseti(L, -2, 2);
 	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -1525,7 +1526,7 @@ static int event_cancel(lua_State *L)
 
 	/* Close the handle */
 	lua_rawgeti(L, -1, 2);
-	uv_handle_t *handle = lua_touserdata(L, -1);
+	uv_handle_t *handle = luaL_tocpointer(L, -1);
 	if (!uv_is_closing(handle)) {
 		/* Stop the timer */
 		if (handle->type == UV_TIMER) {
@@ -1554,7 +1555,7 @@ static int event_reschedule(lua_State *L)
 
 	/* Reschedule the timer */
 	lua_rawgeti(L, -1, 2);
-	uv_handle_t *timer = lua_touserdata(L, -1);
+	uv_handle_t *timer = luaL_tocpointer(L, -1);
 	if (!uv_is_closing(timer)) {
 		if (uv_is_active(timer)) {
 			uv_timer_stop((uv_timer_t *)timer);
@@ -1616,7 +1617,7 @@ static int event_fdwatch(lua_State *L)
 	lua_newtable(L);
 	lua_pushvalue(L, 2);
 	lua_rawseti(L, -2, 1);
-	lua_pushlightuserdata(L, handle);
+	luaL_pushvoidpointer(L, handle);
 	lua_rawseti(L, -2, 2);
 	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -1718,7 +1719,9 @@ static int wrk_resolve(lua_State *L)
 	/* Add initialisation callback */
 	if (lua_isfunction(L, 5)) {
 		lua_pushvalue(L, 5);
-		lua_pushlightuserdata(L, worker_task_request(task));
+		LUA_CTID_DECLARE(CTID_KR_REQUEST);
+		LUA_CTID_DEFINE(L, CTID_KR_REQUEST, "struct kr_request *");
+		luaL_pushcpointer(L, worker_task_request(task), CTID_KR_REQUEST);
 		(void) execute_callback(L, 1);
 	}
 

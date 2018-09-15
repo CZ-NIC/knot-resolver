@@ -8,7 +8,8 @@ contrib_SOURCES := \
 	contrib/murmurhash3/murmurhash3.c \
 	contrib/base32hex.c \
 	contrib/base64.c \
-	contrib/backtrace.c
+	contrib/backtrace.c \
+	contrib/lua_utils.c
 contrib_CFLAGS := -fPIC
 contrib_TARGET := $(abspath contrib)/contrib$(AREXT)
 
