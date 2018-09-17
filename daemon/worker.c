@@ -1613,7 +1613,6 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 			request_free(ctx);
 			return kr_error(ENOMEM);
 		}
-		addr = NULL;
 	} else if (query) { /* response from upstream */
 		if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
 		    !knot_wire_get_qr(query->wire)) {
@@ -1625,6 +1624,7 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 			return kr_error(ENOENT);
 		}
 		assert(!session_is_closing(session));
+		addr = session_get_peer(session);
 	}
 	assert(uv_is_closing(session_get_handle(session)) == false);
 
