@@ -225,6 +225,24 @@ static inline uint64_t kr_rand_bytes(int size)
 /** non-static variant of kr_rand_bytes() */
 KR_EXPORT uint64_t kr_rand_bytes_nonstatic(int size);
 
+/** Throw a pseudo-random coin, succeeding approximately with probability nomin/denomin.
+ * - low precision, only one byte of randomness
+ * - the most extreme bias is 1:255
+ * - tip: use !kr_rand_coin() to get the complementary probability
+ */
+static inline bool kr_rand_coin(int nomin, int denomin)
+{
+	if (nomin < 0 || denomin <= 0 || nomin > denomin) {
+		kr_log_error("kr_rand_coin(): EINVAL\n");
+		abort();
+	}
+	/* threshold = how many parts from 256 are a success */
+	int threshold = (nomin * 256 + /*rounding*/ denomin / 2) / denomin;
+	if (threshold == 0) threshold = 1;
+	if (threshold == 256) threshold = 255;
+	return (kr_rand_bytes(1) < threshold);
+}
+
 /** Memory reservation routine for knot_mm_t */
 KR_EXPORT
 int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have);
