@@ -1040,12 +1040,10 @@ static int session_tls_hs_cb(struct session *session, int status)
 	struct kr_query *qry = session_current_query(session);
 	if (status != 0) {
 		struct kr_context *ctx = &worker->engine->resolver;
-		/* Flag TCP as unsupported status */
-		qry->ns.reputation |= KR_NS_NOTCP;
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 		/* Penalize servers unresponsive over TCP */
 		kr_nsrep_update_rtt(&qry->ns, &peer->ip, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
-		return ret;
+		ret = kr_error(EIO);
+		goto cleanup;
 	}
 
 	/* handshake was completed successfully */
@@ -1088,6 +1086,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		ret = kr_error(EINVAL);
 	}
 
+cleanup:
 	if (ret != kr_ok()) {
 		/* Something went wrong.
 		 * Session isn't in the list of waiting sessions,
@@ -1095,6 +1094,8 @@ static int session_tls_hs_cb(struct session *session, int status)
 		 * or write to upstream failed. */
 		while (session->waiting.len > 0) {
 			struct qr_task *task = session->waiting.at[0];
+			/* Notify resolver of the outgoing query timeout, as there's no further step */
+			kr_resolve_consume(&task->ctx->req, &session->peer.ip, NULL);
 			session_del_tasks(session, task);
 			array_del(session->waiting, 0);
 			qr_task_finalize(task, KR_STATE_FAIL);
@@ -1313,6 +1314,10 @@ static void on_tcp_watchdog_timeout(uv_timer_t *timer)
 		struct qr_task *task = session->tasks.at[0];
 		task->timeouts += 1;
 		worker->stats.timeout += 1;
+		if (session->outgoing) {
+			/* Notify resolver of the outgoing query timeout, as there's no further step */
+			kr_resolve_consume(&task->ctx->req, &session->peer.ip, NULL);
+		}
 		assert(task->refs > 1);
 		array_del(session->tasks, 0);
 		ioreq_kill_pending(task);
@@ -2010,7 +2015,9 @@ static int worker_add_tcp_connected(struct worker_ctx *worker,
 	assert(addr);
 	const char *key = tcpsess_key(addr);
 	assert(key);
-	assert(map_contains(&worker->tcp_connected, key) == 0);
+	if(map_contains(&worker->tcp_connected, key) != 0) {
+		return kr_error(EEXIST);
+	}
 #endif
 	return map_add_tcp_session(&worker->tcp_connected, addr, session);
 }
@@ -2036,7 +2043,9 @@ static int worker_add_tcp_waiting(struct worker_ctx *worker,
 	assert(addr);
 	const char *key = tcpsess_key(addr);
 	assert(key);
-	assert(map_contains(&worker->tcp_waiting, key) == 0);
+	if(map_contains(&worker->tcp_waiting, key) != 0) {
+		return kr_error(EEXIST);
+	}
 #endif
 	return map_add_tcp_session(&worker->tcp_waiting, addr, session);
 }
