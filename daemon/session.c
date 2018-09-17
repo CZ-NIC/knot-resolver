@@ -63,26 +63,26 @@ static void on_session_timer_close(uv_handle_t *timer)
 	}
 }
 
-void session_free(struct session *s)
+void session_free(struct session *session)
 {
-	if (s) {
-		assert(s->tasks.len == 0 && s->waiting.len == 0);
-		session_clear(s);
-		free(s);
+	if (session) {
+		assert(session->tasks.len == 0 && session->waiting.len == 0);
+		session_clear(session);
+		free(session);
 	}
 }
 
-void session_clear(struct session *s)
+void session_clear(struct session *session)
 {
-	assert(s->tasks.len == 0 && s->waiting.len == 0);
-	if (s->handle && s->handle->type == UV_TCP) {
-		free(s->wire_buf);
+	assert(session->tasks.len == 0 && session->waiting.len == 0);
+	if (session->handle && session->handle->type == UV_TCP) {
+		free(session->wire_buf);
 	}
-	array_clear(s->tasks);
-	array_clear(s->waiting);
-	tls_free(s->tls_ctx);
-	tls_client_ctx_free(s->tls_client_ctx);
-	memset(s, 0, sizeof(*s));
+	array_clear(session->tasks);
+	array_clear(session->waiting);
+	tls_free(session->tls_ctx);
+	tls_client_ctx_free(session->tls_client_ctx);
+	memset(session, 0, sizeof(*session));
 }
 
 struct session *session_new(void)
@@ -301,30 +301,30 @@ uv_handle_t *session_get_handle(struct session *session)
 	return session->handle;
 }
 
-int session_set_handle(struct session *session, uv_handle_t *h)
+int session_set_handle(struct session *session, uv_handle_t *handle)
 {
-	if (!h) {
+	if (!handle) {
 		return kr_error(EINVAL);
 	}
 
 	assert(session->handle == NULL);
 
-	if (h->type == UV_TCP) {
+	if (handle->type == UV_TCP) {
 		uint8_t *wire_buf = malloc(KNOT_WIRE_MAX_PKTSIZE);
 		if (!wire_buf) {
 			return kr_error(ENOMEM);
 		}
 		session->wire_buf = wire_buf;
 		session->wire_buf_size = KNOT_WIRE_MAX_PKTSIZE;
-	} else if (h->type == UV_UDP) {
-		assert(h->loop->data);
-		struct worker_ctx *worker = h->loop->data;
+	} else if (handle->type == UV_UDP) {
+		assert(handle->loop->data);
+		struct worker_ctx *worker = handle->loop->data;
 		session->wire_buf = worker->wire_buf;
 		session->wire_buf_size = sizeof(worker->wire_buf);
 	}
 	
-	session->handle = h;
-	h->data = session;
+	session->handle = handle;
+	handle->data = session;
 	return kr_ok();
 }
 
