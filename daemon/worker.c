@@ -623,36 +623,6 @@ static void qr_task_free(struct qr_task *task)
 	worker->stats.concurrent -= 1;
 }
 
-/*@ Register new qr_task within session. */
-static int qr_task_register(struct qr_task *task, struct session *session)
-{
-	assert(session_is_outgoing(session) == false &&
-	       session_get_handle(session)->type == UV_TCP);
-
-	int ret = session_tasklist_add(session, task);
-	if (ret < 0) {
-		return kr_error(ENOMEM);
-	}
-
-	struct request_ctx *ctx = task->ctx;
-	assert(ctx && (ctx->source.session == NULL || ctx->source.session == session));
-	ctx->source.session = session;
-	/* Soft-limit on parallel queries, there is no "slow down" RCODE
-	 * that we could use to signalize to client, but we can stop reading,
-	 * an in effect shrink TCP window size. To get more precise throttling,
-	 * we would need to copy remainder of the unread buffer and reassemble
-	 * when resuming reading. This is NYI.  */
-	if (session_tasklist_get_len(session) >= task->ctx->worker->tcp_pipeline_max) {
-		uv_handle_t *handle = session_get_handle(session);
-		if (handle && !session_is_throttled(session) && !session_is_closing(session)) {
-			io_stop_read(handle);
-			session_set_throttled(session, true);
-		}
-	}
-
-	return 0;
-}
-
 static void qr_task_complete(struct qr_task *task)
 {
 	struct request_ctx *ctx = task->ctx;
@@ -1742,12 +1712,6 @@ static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr* addr)
 {
 	return map_find_tcp_session(&worker->tcp_waiting, addr);
-}
-
-/* Return DNS/TCP message size. */
-static int get_msg_size(const uint8_t *msg)
-{
-	return wire_read_u16(msg);
 }
 
 int worker_end_tcp(struct session *session)
