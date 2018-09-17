@@ -29,31 +29,46 @@ local function match_subnet(family, subnet, bitlen, addr)
 	return (family == addr:family()) and (C.kr_bitcmp(subnet, addr:ip(), bitlen) == 0)
 end
 
--- @function Find view for given request
-local function evaluate(_, req)
+-- @function Execute a policy callback (may be nil);
+-- return boolean: whether to continue trying further rules.
+local function execute(state, req, match_cb)
+	if match_cb == nil then return false end
+	local action = match_cb(req, req:current())
+	if action == nil then return false end
+	local next_state = action(state, req)
+	if next_state then    -- Not a chain rule,
+		req.state = next_state
+		return true
+	else
+		return false
+	end
+end
+
+-- @function Try all the rules in order, until a non-chain rule gets executed.
+local function evaluate(state, req)
+	-- Try :tsig first.
 	local client_key = req.qsource.key
 	local match_cb = (client_key ~= nil) and view.key[client_key:owner()] or nil
-	-- Search subnets otherwise
-	if match_cb == nil then
-		if req.qsource.addr ~= nil then
-			for i = 1, #view.src do
-				local pair = view.src[i]
-				if match_subnet(pair[1], pair[2], pair[3], req.qsource.addr) then
-					match_cb = pair[4]
-					break
-				end
+	if execute(state, req, match_cb) then return end
+	-- Then try :addr by the source.
+	if req.qsource.addr ~= nil then
+		for i = 1, #view.src do
+			local pair = view.src[i]
+			if match_subnet(pair[1], pair[2], pair[3], req.qsource.addr) then
+				match_cb = pair[4]
+				if execute(state, req, match_cb) then return end
 			end
-		elseif req.qsource.dst_addr ~= nil then
-			for i = 1, #view.dst do
-				local pair = view.dst[i]
-				if match_subnet(pair[1], pair[2], pair[3], req.qsource.dst_addr) then
-					match_cb = pair[4]
-					break
-				end
+		end
+	-- Finally try :addr by the destination.
+	elseif req.qsource.dst_addr ~= nil then
+		for i = 1, #view.dst do
+			local pair = view.dst[i]
+			if match_subnet(pair[1], pair[2], pair[3], req.qsource.dst_addr) then
+				match_cb = pair[4]
+				if execute(state, req, match_cb) then return end
 			end
 		end
 	end
-	return match_cb
 end
 
 -- @function Return policy based on source address
@@ -87,17 +102,8 @@ view.layer = {
 	begin = function(state, req)
 		if state == kres.FAIL then return state end
 		req = kres.request_t(req)
-		local match_cb = evaluate(view, req)
-		if match_cb ~= nil then
-			local action = match_cb(req, req:current())
-			if action then
-				local next_state = action(state, req)
-				if next_state then    -- Not a chain rule,
-					return next_state -- stop on first match
-				end
-			end
-		end
-		return state
+		evaluate(req)
+		return req.state
 	end
 }
 
