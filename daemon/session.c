@@ -482,8 +482,8 @@ ssize_t session_wirebuf_consume(struct session *session, const uint8_t *data, ss
 
 knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 {
+	session->sflags.wirebuf_error = false;
 	if (session->wire_buf_idx == 0) {
-		session->sflags.wirebuf_error = false;
 		return NULL;
 	}
 	
@@ -491,12 +491,11 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 	uint8_t *msg_start = session->wire_buf;
 	uint16_t msg_size = session->wire_buf_idx;
 	
-	session->sflags.wirebuf_error = true;
 	if (!handle) {
+		session->sflags.wirebuf_error = true;
 		return NULL;
 	} else if (handle->type == UV_TCP) {
 		if (session->wire_buf_idx < 2) {
-			session->sflags.wirebuf_error = false;
 			return NULL;
 		}
 		msg_size = knot_wire_read_u16(session->wire_buf);
@@ -523,20 +522,36 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 	size_t wirebuf_msg_size = session->wire_buf_idx;
 	uint8_t *pkt_msg_start = pkt->wire;
 	size_t pkt_msg_size = pkt->size;
+	if (pkt->tsig_rr) {
+		pkt_msg_size += pkt->tsig_wire.len;
+	}
 
 	session->sflags.wirebuf_error = true;
 	if (!handle) {
 		return kr_error(EINVAL);
-	} else if (handle->type == UV_TCP) {
-		if (session->wire_buf_idx < 2) {
+	} else if (handle->type == UV_UDP) {
+		/* Fast check for UDP */
+		if (wirebuf_msg_start != pkt_msg_start) {
 			return kr_error(EINVAL);
 		}
-		wirebuf_msg_size = knot_wire_read_u16(wirebuf_data_start);
-		wirebuf_msg_start += 2;
-		wirebuf_msg_data_size = wirebuf_msg_size + 2;
+		session->wire_buf_idx = 0;
+		session->sflags.wirebuf_error = false;
+		return kr_ok();
 	}
 
-	if (wirebuf_msg_start != pkt_msg_start || wirebuf_msg_size != pkt_msg_size) {
+	if (session->wire_buf_idx < 2) {
+		return kr_error(EINVAL);
+	}
+	wirebuf_msg_size = knot_wire_read_u16(wirebuf_data_start);
+	wirebuf_msg_start += 2;
+	wirebuf_msg_data_size = wirebuf_msg_size + 2;
+
+	if (wirebuf_msg_start != pkt_msg_start) {
+		return kr_error(EINVAL);
+	}
+
+
+	if (wirebuf_msg_size != pkt_msg_size) {
 		return kr_error(EINVAL);
 	}
 
@@ -610,6 +625,7 @@ int session_wirebuf_process(struct session *session)
 	struct worker_ctx *worker = session_get_handle(session)->loop->data;
 	knot_pkt_t *query = NULL;
 	while (((query = session_produce_packet(session, &worker->pkt_pool)) != NULL) && (ret < 100)) {
+		assert (!session_wirebuf_error(session));
 		worker_submit(session, query);
 		if (session_discard_packet(session, query) < 0) {
 			break;
