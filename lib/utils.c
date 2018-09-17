@@ -956,6 +956,40 @@ finish:
 	return d - dst;
 }
 
+static void rnd_noerror(void *data, uint size)
+{
+	int ret = gnutls_rnd(GNUTLS_RND_NONCE, data, size);
+	if (ret) {
+		kr_log_error("gnutls_rnd(): %s\n", gnutls_strerror(ret));
+		abort();
+	}
+}
+void kr_rnd_buffered(void *data, uint size)
+{
+	/* static circular buffer, from index _begin (inclusive) to _end (exclusive) */
+	static uint8_t buf[512/8]; /* gnutls_rnd() works on blocks of 512 bits (chacha) */
+	static uint buf_begin = sizeof(buf);
+
+	if (unlikely(size > sizeof(buf))) {
+		rnd_noerror(data, size);
+		return;
+	}
+	/* Start with contiguous chunk, possibly until the end of buffer. */
+	const uint size1 = MIN(size, sizeof(buf) - buf_begin);
+	uint8_t *d = data;
+	memcpy(d, buf + buf_begin, size1);
+	if (size1 == size) {
+		buf_begin += size1;
+		return;
+	}
+	d += size1;
+	size -= size1;
+	/* Refill the whole buffer, and finish by another contiguous chunk. */
+	rnd_noerror(buf, sizeof(buf));
+	memcpy(d, buf, size);
+	buf_begin = size;
+}
+
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl)
 {

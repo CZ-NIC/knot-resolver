@@ -194,6 +194,11 @@ typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 KR_EXPORT
 char* kr_strcatdup(unsigned n, ...);
 
+/** You probably want kr_rand_* convenience functions instead.
+ * This is a buffered version of gnutls_rnd(GNUTLS_RND_NONCE, ..) */
+KR_EXPORT
+void kr_rnd_buffered(void *data, unsigned int size);
+
 /** Return a few random bytes. */
 static inline uint64_t kr_rand_bytes(int size)
 {
@@ -206,11 +211,7 @@ static inline uint64_t kr_rand_bytes(int size)
 		abort();
 	}
 	uint8_t data[sizeof(result)];
-	int ret = gnutls_rnd(GNUTLS_RND_NONCE, data, size);
-	if (ret) {
-		kr_log_error("gnutls_rnd(): %s\n", gnutls_strerror(ret));
-		abort();
-	}
+	kr_rnd_buffered(data, size);
 	/* I would have liked to dump the random data into a size_t directly,
 	 * but that would work well only on little-endian machines,
 	 * so intsead I hope that the compiler will optimize this out.
