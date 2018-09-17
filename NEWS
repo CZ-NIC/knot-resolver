@@ -1,6 +1,11 @@
 Knot Resolver 3.x.y (201y-mm-dd)
 ================================
 
+Incompatible changes
+--------------------
+- view module: keep trying rules until a "non-chain" action is executed.
+  This improves consistency with the policy module.
+
 New features
 ------------
 - module edns_keepalive to implement server side of RFC 7828 (#408)
@@ -34,8 +39,7 @@ Knot Resolver 3.1.0 (2018-11-02)
 
 Incompatible changes
 --------------------
-- hints.use_nodata(true) by default; that's what most users want
-- libknot >= 2.7.2 is required
+(??)
 
 Improvements
 ------------
