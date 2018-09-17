@@ -209,8 +209,6 @@ static inline uint64_t kr_rand_bytes(int size)
 	}
 	return result;
 }
-/** non-static variant of kr_rand_bytes() */
-KR_EXPORT uint64_t kr_rand_bytes_nonstatic(int size);
 
 /** Throw a pseudo-random coin, succeeding approximately with probability nomin/denomin.
  * - low precision, only one byte of randomness
