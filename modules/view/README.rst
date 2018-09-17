@@ -23,6 +23,14 @@ You can combine this information with :ref:`policy <mod-policy>` rules.
 This fill force given client subnet to TCP for names in ``example.com``.
 You can combine view selectors with RPZ_ to create personalized filters for example.
 
+.. warning::
+
+	Beware that cache is shared by *all* requests.  For example, it is safe
+	to refuse answer based on who asks the resolver, but trying to serve
+	different data to different clients may result in surprises.
+	Such setups are usually called **split-horizon** or similarly.
+
+
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
