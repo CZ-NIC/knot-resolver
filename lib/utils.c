@@ -1016,8 +1016,4 @@ uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata)
 {
 	return knot_rrsig_type_covered(rdata);
 }
-uint64_t kr_rand_bytes_nonstatic(int size)
-{
-	return kr_rand_bytes(size);
-}
 
