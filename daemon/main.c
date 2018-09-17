@@ -311,6 +311,9 @@ static void sigbus_handler(int sig, siginfo_t *siginfo, void *ptr)
 	 */
 	#define WRITE_ERR(err_charray) \
 		(void)write(STDERR_FILENO, err_charray, sizeof(err_charray))
+	/* Unfortunately, void-cast on the write isn't enough to avoid the warning. */
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wunused-result"
 	const char msg_typical[] =
 		"\nSIGBUS received; this is most likely due to filling up the filesystem where cache resides.\n",
 		msg_unknown[] = "\nSIGBUS received, cause unknown.\n",
@@ -332,6 +335,7 @@ end:
 	WRITE_ERR(msg_final);
 	_exit(128 - sig); /*< regular return from OS-raised SIGBUS can't work anyway */
 	#undef WRITE_ERR
+	#pragma GCC diagnostic pop
 }
 
 /** Split away port from the address. */
