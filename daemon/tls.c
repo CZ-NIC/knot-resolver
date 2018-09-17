@@ -458,8 +458,6 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 
 	/* See https://gnutls.org/manual/html_node/Data-transfer-and-termination.html#Data-transfer-and-termination */
 	ssize_t submitted = 0;
-	bool is_retrying = false;
-	uint64_t retrying_start = 0;
 	uint8_t *wire_buf = session_wirebuf_get_free_start(s);
 	size_t wire_buf_size = session_wirebuf_get_free_size(s);
 	while (true) {
