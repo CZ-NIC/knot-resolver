@@ -27,9 +27,9 @@ struct session;
 /* Allocate new session. */
 struct session *session_new(void);
 /* Clear and free given session. */
-void session_free(struct session *s);
+void session_free(struct session *session);
 /* Clear session. */
-void session_clear(struct session *s);
+void session_clear(struct session *session);
 /** Close session. */
 void session_close(struct session *session);
 /** Start reading from underlying libuv IO handle. */

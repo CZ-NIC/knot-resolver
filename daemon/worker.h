@@ -47,7 +47,7 @@ int worker_submit(struct session *session, knot_pkt_t *query);
  * End current DNS/TCP session, this disassociates pending tasks from this session
  * which may be freely closed afterwards.
  */
-int worker_end_tcp(struct session *s);
+int worker_end_tcp(struct session *session);
 
 /**
  * Start query resolution with given query.
