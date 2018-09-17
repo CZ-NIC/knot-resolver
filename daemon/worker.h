@@ -78,10 +78,6 @@ void *worker_iohandle_borrow(struct worker_ctx *worker);
 
 void worker_iohandle_release(struct worker_ctx *worker, void *h);
 
-ssize_t worker_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
-
-ssize_t worker_gnutls_client_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
-
 int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
 		     knot_pkt_t *packet);
 

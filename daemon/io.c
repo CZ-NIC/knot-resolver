@@ -263,12 +263,12 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 
 	/* struct session was allocated \ borrowed from memory pool. */
 	struct session *session = client->data;
-	assert(session->outgoing == false);
+	assert(session_is_outgoing(session) == false);
 
 	if (uv_accept(master, client) != 0) {
 		/* close session, close underlying uv handles and
 		 * deallocate (or return to memory pool) memory. */
-		worker_session_close(session);
+		session_close(session);
 		return;
 	}
 
@@ -286,7 +286,6 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
-	struct worker_ctx *worker = (struct worker_ctx *)master->loop->data;
 	const struct engine *engine = worker->engine;
 	const struct network *net = &engine->net;
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
@@ -430,6 +429,7 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 	uv_timer_t *t = session_get_timer(s);
 	t->data = s;
 	uv_timer_init(worker->loop, t);
+	return ret;
 }
 
 void io_deinit(uv_handle_t *handle)

@@ -121,9 +121,9 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		return 0;
 	}
 
-	assert(t->session && t->session->handle &&
-	       t->session->handle->type == UV_TCP);
-	uv_stream_t *handle = (uv_stream_t *)t->session->handle;
+	assert(t->session);
+	uv_stream_t *handle = (uv_stream_t *)session_get_handle(t->session);
+	assert(handle && handle->type == UV_TCP);
 
 	/*
 	 * This is a little bit complicated. There are two different writes:
@@ -239,8 +239,9 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 	if (err == GNUTLS_E_SUCCESS) {
 		/* Handshake finished, return success */
 		ctx->handshake_state = TLS_HS_DONE;
+		struct sockaddr *peer = session_get_peer(session);
 		kr_log_verbose("[%s] TLS handshake with %s has completed\n",
-			       logstring,  kr_straddr(&session->peer.ip));
+			       logstring,  kr_straddr(peer));
 		if (handshake_cb) {
 			handshake_cb(session, 0);
 		}
@@ -259,8 +260,9 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 		/* Handle warning when in verbose mode */
 		const char *alert_name = gnutls_alert_get_name(gnutls_alert_get(ctx->tls_session));
 		if (alert_name != NULL) {
+			struct sockaddr *peer = session_get_peer(session);
 			kr_log_verbose("[%s] TLS alert from %s received: %s\n",
-				       logstring, kr_straddr(&session->peer.ip), alert_name);
+				       logstring, kr_straddr(peer), alert_name);
 		}
 	}
 	return kr_ok();
