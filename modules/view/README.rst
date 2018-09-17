@@ -15,6 +15,8 @@ There are two identification mechanisms:
   - identifies the client based on a TSIG key
 
 You can combine this information with :ref:`policy <mod-policy>` rules.
+Just as with policies, the rules for a request get tried until one "non-chain"
+action is executed.
 
 .. code-block:: lua
 
