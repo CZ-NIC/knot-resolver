@@ -1,6 +1,11 @@
 Knot Resolver 3.x.y (2018-mm-dd)
 ================================
 
+Incompatible changes
+--------------------
+- view module: keep trying rules until a "non-chain" action is executed.
+  This improves consistency with the policy module.
+
 Improvements
 ------------
 - cache: handle out-of-space SIGBUS slightly better (#197)
