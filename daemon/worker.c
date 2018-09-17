@@ -801,8 +801,8 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 
 	/* Send using given protocol */
 	struct session *session = handle->data;
-	assert(session->closing == false);
-	if (session->has_tls) {
+	assert(!session_is_closing(session));
+	if (session_has_tls(session)) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
 		ret = tls_write(write_req, handle, pkt, &on_task_write);
@@ -843,7 +843,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle,
 	if (ctx->source.session &&
 	    handle != session_get_handle(ctx->source.session) &&
 	    addr) {
-		if (session->has_tls)
+		if (session_has_tls(session))
 			worker->stats.tls += 1;
 		else if (handle->type == UV_UDP)
 			worker->stats.udp += 1;
