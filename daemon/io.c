@@ -49,17 +49,6 @@ static void check_bufsize(uv_handle_t* handle)
 
 #undef negotiate_bufsize
 
-static uv_stream_t *handle_borrow(uv_loop_t *loop)
-{
-	struct worker_ctx *worker = loop->data;
-	void *req = worker_iohandle_borrow(worker);
-	if (!req) {
-		return NULL;
-	}
-
-	return (uv_stream_t *)req;
-}
-
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	/* UDP sessions use worker buffer for wire data,
