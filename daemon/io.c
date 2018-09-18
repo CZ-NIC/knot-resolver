@@ -100,6 +100,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	ssize_t consumed = session_wirebuf_consume(s, (const uint8_t *)buf->base, nread);
 	assert(consumed == nread);
 	session_wirebuf_process(s);
+	session_wirebuf_discard(s);
 	mp_flush(worker->pkt_pool.ctx);
 }
 
@@ -222,6 +223,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	} else if (ret > 0 && !session_is_closing(s)) {
 		session_timer_restart(s);
 	}
+	session_wirebuf_compress(s);
 	mp_flush(worker->pkt_pool.ctx);
 }
 
