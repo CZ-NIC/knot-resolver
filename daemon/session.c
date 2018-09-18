@@ -24,8 +24,8 @@ struct session {
 	struct tls_ctx_t *tls_ctx;   /**< server side tls-related data. */
 	struct tls_client_ctx_t *tls_client_ctx; /**< client side tls-related data. */
 
-	session_tasklist_t tasks;    /**< list of tasks which assotiated with given session. */
-	session_tasklist_t waiting;  /**< list of tasks been waiting for IO (subset of taska). */
+	session_tasklist_t tasks;    /**< list of tasks associated with this session. */
+	session_tasklist_t waiting;  /**< list of tasks waiting for IO (subset of tasks). */
 
 	uint8_t *wire_buf;           /**< Buffer for DNS message. */
 	ssize_t wire_buf_size;       /**< Buffer size. */
