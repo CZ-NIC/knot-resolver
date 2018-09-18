@@ -691,3 +691,58 @@ int session_wirebuf_process(struct session *session)
 	return ret;
 }
 
+static void on_session_idle_timeout(uv_timer_t *timer)
+{
+	struct session *s = timer->data;
+	assert(s);
+	uv_timer_stop(timer);
+	if (s->sflags.closing) {
+		return;
+	}
+	/* session was not in use during timer timeout
+	 * remove it from connection list and close
+	 */
+	assert(session_is_empty(s));
+	session_close(s);
+}
+
+void session_kill_ioreq(struct session *s, struct qr_task *task)
+{
+	assert(s && s->sflags.outgoing && s->handle);
+	if (s->sflags.closing) {
+		return;
+	}
+	if (s->handle->type == UV_UDP) {
+		uv_timer_stop(&s->timeout);
+		session_tasklist_del(s, task);
+		assert(session_tasklist_is_empty(s));
+		session_close(s);
+		return;
+	}
+	/* TCP-specific code now. */
+	if (s->handle->type != UV_TCP) abort();
+	session_waitinglist_del(s, task);
+	session_tasklist_del(s, task);
+
+	int res = 0;
+
+	const struct sockaddr *peer = &s->peer.ip;
+	if (peer->sa_family != AF_UNSPEC && session_is_empty(s) && !s->sflags.closing) {
+		assert(peer->sa_family == AF_INET || peer->sa_family == AF_INET6);
+		res = 1;
+		if (s->sflags.connected) {
+			/* This is outbound TCP connection which can be reused.
+			* Close it after timeout */
+			s->timeout.data = s;
+			uv_timer_stop(&s->timeout);
+			res = uv_timer_start(&s->timeout, on_session_idle_timeout,
+					     KR_CONN_RTT_MAX, 0);
+		}
+	}
+
+	if (res != 0) {
+		/* if any errors, close the session immediately */
+		session_close(s);
+	}
+}
+
