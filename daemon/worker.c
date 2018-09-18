@@ -107,7 +107,6 @@ static int worker_del_tcp_waiting(struct worker_ctx *worker,
 				  const struct sockaddr *addr);
 static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr *addr);
-static void on_session_idle_timeout(uv_timer_t *timer);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
 static void on_tcp_watchdog_timeout(uv_timer_t *timer);
 
@@ -251,66 +250,10 @@ static uv_handle_t *ioreq_spawn(struct qr_task *task, int socktype, sa_family_t 
 	return handle;
 }
 
-static void ioreq_kill_udp(uv_handle_t *req, struct qr_task *task)
-{
-	assert(req);
-	struct session *s = req->data;
-	assert(session_is_outgoing(s));
-	if (session_is_closing(s)) {
-		return;
-	}
-	uv_timer_t *t = session_get_timer(s);
-	uv_timer_stop(t);
-	session_tasklist_del(s, task);
-	assert(session_tasklist_is_empty(s));
-	session_close(s);
-}
-
-static void ioreq_kill_tcp(uv_handle_t *req, struct qr_task *task)
-{
-	assert(req);
-	struct session *s = req->data;
-	assert(session_is_outgoing(s));
-	if (session_is_closing(s)) {
-		return;
-	}
-
-	session_waitinglist_del(s, task);
-	session_tasklist_del(s, task);
-
-	int res = 0;
-
-	const struct sockaddr *peer = session_get_peer(s);
-	if (peer->sa_family != AF_UNSPEC && session_is_empty(s) && !session_is_closing(s)) {
-		assert(peer->sa_family == AF_INET || peer->sa_family == AF_INET6);
-		res = 1;
-		if (session_is_connected(s)) {
-			/* This is outbound TCP connection which can be reused.
-			* Close it after timeout */
-			uv_timer_t *t = session_get_timer(s);
-			t->data = s;
-			uv_timer_stop(t);
-			res = uv_timer_start(t, on_session_idle_timeout,
-					     KR_CONN_RTT_MAX, 0);
-		}
-	}
-
-	if (res != 0) {
-		/* if any errors, close the session immediately */
-		session_close(s);
-	}
-}
-
 static void ioreq_kill_pending(struct qr_task *task)
 {
 	for (uint16_t i = 0; i < task->pending_count; ++i) {
-		if (task->pending[i]->type == UV_UDP) {
-			ioreq_kill_udp(task->pending[i], task);
-		} else if (task->pending[i]->type == UV_TCP) {
-			ioreq_kill_tcp(task->pending[i], task);
-		} else {
-			assert(false);
-		}
+		session_kill_ioreq(task->pending[i]->data, task);
 	}
 	task->pending_count = 0;
 }
@@ -1114,21 +1057,6 @@ static void on_udp_timeout(uv_timer_t *timer)
 	task->timeouts += 1;
 	worker->stats.timeout += 1;
 	qr_task_step(task, NULL, NULL);
-}
-
-static void on_session_idle_timeout(uv_timer_t *timer)
-{
-	struct session *s = timer->data;
-	assert(s);
-	uv_timer_stop(timer);
-	if (session_is_closing(s)) {
-		return;
-	}
-	/* session was not in use during timer timeout
-	 * remove it from connection list and close
-	 */
-	assert(session_is_empty(s));
-	session_close(s);
 }
 
 static uv_handle_t *retransmit(struct qr_task *task)
