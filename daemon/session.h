@@ -144,3 +144,6 @@ void session_unpoison(struct session *session);
 
 knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm);
 int session_discard_packet(struct session *session, const knot_pkt_t *pkt);
+
+void session_kill_ioreq(struct session *session, struct qr_task *task);
+
