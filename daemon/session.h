@@ -119,16 +119,20 @@ int session_timer_restart(struct session *session);
 /** Stop session timer. */
 int session_timer_stop(struct session *session);
 
-/** Get start of session buffer for wire data. */
+/** Get pointer to the beginning of session wirebuffer. */
 uint8_t *session_wirebuf_get_start(struct session *session);
 /** Get size of session wirebuffer. */
 size_t session_wirebuf_get_size(struct session *session);
 /** Get length of data in the session wirebuffer. */
 size_t session_wirebuf_get_len(struct session *session);
-/** Get start of free space in session wirebuffer. */
+/** Get pointer to the beginning of free space in session wirebuffer. */
 uint8_t *session_wirebuf_get_free_start(struct session *session);
 /** Get amount of free space in session wirebuffer. */
 size_t session_wirebuf_get_free_size(struct session *session);
+/** Discard all data in session wirebuffer. */
+void session_wirebuf_discard(struct session *session);
+/** Move all data to the beginning of the buffer. */
+void session_wirebuf_compress(struct session *session);
 int session_wirebuf_process(struct session *session);
 ssize_t session_wirebuf_consume(struct session *session,
 				const uint8_t *data, ssize_t len);
