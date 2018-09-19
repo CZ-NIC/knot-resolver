@@ -33,8 +33,8 @@ struct session_flags {
 	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
 };
 
-/* Allocate new session. */
-struct session *session_new(void);
+/* Allocate new session for a libuv handle. */
+struct session *session_new(uv_handle_t *handle);
 /* Clear and free given session. */
 void session_free(struct session *session);
 /* Clear session. */
@@ -103,8 +103,6 @@ struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session)
 
 /** Get pointer to underlying libuv handle for IO operations. */
 uv_handle_t *session_get_handle(struct session *session);
-/** Set pointer to libuv handle for IO operations. */
-int session_set_handle(struct session *session, uv_handle_t *handle);
 
 /** Get pointer to session timer handle. */
 uv_timer_t *session_get_timer(struct session *session);
