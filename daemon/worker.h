@@ -127,11 +127,8 @@ struct worker_ctx {
 	struct sockaddr_in out_addr4;
 	struct sockaddr_in6 out_addr6;
 
-#if __linux__
 	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
-#else
-	uint8_t wire_buf[KNOT_WIRE_MAX_PKTSIZE];
-#endif
+
 	struct {
 		size_t concurrent;
 		size_t rconcurrent;
