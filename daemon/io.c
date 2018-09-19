@@ -98,7 +98,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	}
 	ssize_t consumed = session_wirebuf_consume(s, (const uint8_t *)buf->base,
 						   nread);
-	assert(consumed == nread);
+	assert(consumed == nread); (void)consumed;
 	session_wirebuf_process(s);
 	session_wirebuf_discard(s);
 	mp_flush(worker->pkt_pool.ctx);
@@ -234,7 +234,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	}
 
 	struct worker_ctx *worker = (struct worker_ctx *)master->loop->data;
-	uv_stream_t *client = malloc(sizeof(uv_tcp_t));
+	uv_tcp_t *client = malloc(sizeof(uv_tcp_t));
 	if (!client) {
 		return;
 	}
@@ -255,7 +255,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	struct session *session = client->data;
 	assert(session_flags(session)->outgoing == false);
 
-	if (uv_accept(master, client) != 0) {
+	if (uv_accept(master, (uv_stream_t *)client) != 0) {
 		/* close session, close underlying uv handles and
 		 * deallocate (or return to memory pool) memory. */
 		session_close(session);
@@ -270,7 +270,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 
 	struct sockaddr *peer = session_get_peer(s);
 	int peer_len = sizeof(union inaddr);
-	int ret = uv_tcp_getpeername((uv_tcp_t *)client, peer, &peer_len);
+	int ret = uv_tcp_getpeername(client, peer, &peer_len);
 	if (ret || peer->sa_family == AF_UNSPEC) {
 		session_close(s);
 		return;
