@@ -17,6 +17,7 @@
 #pragma once
 
 #include "daemon/engine.h"
+#include "daemon/qr_task.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
 
@@ -25,10 +26,19 @@
 struct qr_task;
 /** Worker state (opaque). */
 struct worker_ctx;
+
+struct request_ctx;
 /** Transport session (opaque). */
 struct session;
 /** Zone import context (opaque). */
 struct zone_import_ctx;
+
+
+/** Get the singleton worker.  TODO: rename to worker_get()? */
+_pure_ static inline struct worker_ctx *get_worker(void)
+{
+	return uv_default_loop()->data;
+}
 
 /** Create and initialize the worker. */
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
@@ -102,11 +112,18 @@ int worker_del_tcp_connected(struct worker_ctx *worker,
 
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
 
-struct request_ctx *worker_task_get_request(struct qr_task *task);
+
+
+
+void worker_request_free(struct request_ctx *ctx);
+
+int worker_request_del_tasks(struct request_ctx *ctx, struct qr_task *task);
 
 struct session *worker_request_get_source_session(struct request_ctx *);
 
 void worker_request_set_source_session(struct request_ctx *, struct session *session);
+
+int worker_request_add_tasks(struct request_ctx *ctx, struct qr_task *task);
 
 /** @cond internal */
 
@@ -119,8 +136,21 @@ void worker_request_set_source_session(struct request_ctx *, struct session *ses
 /** Freelist of available mempools. */
 typedef array_t(void *) mp_freelist_t;
 
-/** List of query resolution tasks. */
-typedef array_t(struct qr_task *) qr_tasklist_t;
+/** Client request state. */
+struct request_ctx
+{
+	struct kr_request req;
+	struct {
+		union inaddr addr;
+		union inaddr dst_addr;
+		/* uv_handle_t *handle; */
+
+		/** NULL if the request didn't come over network. */
+		struct session *session;
+	} source;
+	struct worker_ctx *worker;
+	qr_tasklist_t tasks;
+};
 
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {

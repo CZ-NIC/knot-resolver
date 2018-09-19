@@ -16,9 +16,13 @@
 
 #pragma once
 
-#include <stdbool.h>
-#include <uv.h>
 #include "lib/generic/array.h"
+
+#include <libknot/packet/pkt.h>
+
+#include <uv.h>
+
+#include <stdbool.h>
 
 struct qr_task;
 struct worker_ctx;
