@@ -270,6 +270,14 @@ int session_set_handle(struct session *session, uv_handle_t *handle)
 		session->wire_buf = wire_buf;
 		session->wire_buf_size = KNOT_WIRE_MAX_PKTSIZE;
 	} else if (handle->type == UV_UDP) {
+		/* We use the singleton buffer from worker for all UDP (!)
+		 * libuv documentation doesn't really guarantee this is OK,
+		 * but the implementation for unix systems does not hold
+		 * the buffer (both UDP and TCP) - always makes a NON-blocking
+		 * syscall that fills the buffer and immediately calls
+		 * the callback, whatever the result of the operation.
+		 * We still need to keep in mind to only touch the buffer
+		 * in this callback... */
 		assert(handle->loop->data);
 		struct worker_ctx *worker = handle->loop->data;
 		session->wire_buf = worker->wire_buf;

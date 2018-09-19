@@ -34,7 +34,7 @@
 # endif
 #endif
 #ifndef RECVMMSG_BATCH
-#define RECVMMSG_BATCH 4
+#define RECVMMSG_BATCH 1
 #endif
 #ifndef QUERY_RATE_THRESHOLD
 #define QUERY_RATE_THRESHOLD (2 * MP_FREELIST_SIZE) /**< Nr of parallel queries considered as high rate */

@@ -36,11 +36,12 @@
 
 static void check_bufsize(uv_handle_t* handle)
 {
+	return; /* TODO: resurrect after https://github.com/libuv/libuv/issues/419 */
 	/* We want to buffer at least N waves in advance.
 	 * This is magic presuming we can pull in a whole recvmmsg width in one wave.
 	 * Linux will double this the bufsize wanted.
 	 */
-	const int bufsize_want = RECVMMSG_BATCH * 65535 * 2;
+	const int bufsize_want = 2 * sizeof( ((struct worker_ctx *)NULL)->wire_buf ) ;
 	negotiate_bufsize(uv_recv_buffer_size, handle, bufsize_want);
 	negotiate_bufsize(uv_send_buffer_size, handle, bufsize_want);
 }
