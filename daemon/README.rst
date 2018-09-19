@@ -389,6 +389,13 @@ For when listening on ``localhost`` just doesn't cut it.
             net = { '127.0.0.1', net.eth0, net.eth1.addr[1] }
             net.ipv4 = false
 
+.. warning:: On machines with multiple IP addresses avoid binding to wildcard `0.0.0.0` (see example below). Knot Resolver could answer from different IP in case the ranges overlap and client will probably refuse such a response.
+
+         .. code-block:: lua
+
+            net = { '0.0.0.0' }
+
+
 .. envvar:: net.ipv6 = true|false
 
    :return: boolean (default: true)
