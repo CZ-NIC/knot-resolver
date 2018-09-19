@@ -70,10 +70,6 @@ struct kr_request *worker_task_request(struct qr_task *task);
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);
 
-struct session *worker_session_borrow(struct worker_ctx *worker);
-
-void worker_session_release(struct worker_ctx *worker, uv_handle_t *handle);
-
 int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
 		     knot_pkt_t *packet);
 
@@ -159,7 +155,6 @@ struct worker_ctx {
 	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
 	trie_t *subreq_out;
 	mp_freelist_t pool_mp;
-	mp_freelist_t pool_sessions;
 	knot_mm_t pkt_pool;
 };
 
