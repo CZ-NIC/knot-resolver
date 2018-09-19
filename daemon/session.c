@@ -73,11 +73,6 @@ void session_clear(struct session *session)
 	memset(session, 0, sizeof(*session));
 }
 
-struct session *session_new(void)
-{
-	return calloc(1, sizeof(struct session));
-}
-
 void session_close(struct session *session)
 {
 	assert(session->tasks.len == 0 && session->waiting.len == 0);
@@ -254,18 +249,21 @@ uv_handle_t *session_get_handle(struct session *session)
 	return session->handle;
 }
 
-int session_set_handle(struct session *session, uv_handle_t *handle)
+struct session *session_new(uv_handle_t *handle)
 {
 	if (!handle) {
-		return kr_error(EINVAL);
+		return NULL;
 	}
-
-	assert(session->handle == NULL);
+	struct session *session = calloc(1, sizeof(struct session));
+	if (!session) {
+		return NULL;
+	}
 
 	if (handle->type == UV_TCP) {
 		uint8_t *wire_buf = malloc(KNOT_WIRE_MAX_PKTSIZE);
 		if (!wire_buf) {
-			return kr_error(ENOMEM);
+			free(session);
+			return NULL;
 		}
 		session->wire_buf = wire_buf;
 		session->wire_buf_size = KNOT_WIRE_MAX_PKTSIZE;
@@ -286,7 +284,7 @@ int session_set_handle(struct session *session, uv_handle_t *handle)
 	
 	session->handle = handle;
 	handle->data = session;
-	return kr_ok();
+	return session;
 }
 
 uv_timer_t *session_get_timer(struct session *session)
