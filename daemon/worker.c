@@ -625,20 +625,15 @@ static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status
 
 static void on_send(uv_udp_send_t *req, int status)
 {
-	uv_handle_t *handle = (uv_handle_t *)(req->handle);
-	uv_loop_t *loop = handle->loop;
 	struct qr_task *task = req->data;
-	qr_task_on_send(task, handle, status);
+	qr_task_on_send(task, (uv_handle_t *)(req->handle), status);
 	qr_task_unref(task);
 	free(req);
 }
-// TODO: unify these two
 static void on_task_write(uv_write_t *req, int status)
 {
-	uv_handle_t *handle = (uv_handle_t *)(req->handle);
-	uv_loop_t *loop = handle->loop;
 	struct qr_task *task = req->data;
-	qr_task_on_send(task, handle, status);
+	qr_task_on_send(task, (uv_handle_t *)(req->handle), status);
 	qr_task_unref(task);
 	free(req);
 }
