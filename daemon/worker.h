@@ -109,7 +109,7 @@ void worker_request_set_source_session(struct request_ctx *, struct session *ses
 #define MAX_TCP_INACTIVITY (KR_RESOLVE_TIME_LIMIT + KR_CONN_RTT_MAX)
 
 /** Freelist of available mempools. */
-typedef array_t(void *) mp_freelist_t;
+typedef array_t(struct mempool *) mp_freelist_t;
 
 /** List of query resolution tasks. */
 typedef array_t(struct qr_task *) qr_tasklist_t;
