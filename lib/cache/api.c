@@ -306,9 +306,13 @@ int cache_key_write_scope(struct key *k, size_t off, const kr_cache_scope_t *sco
 	}
 
 	int address_length = iana_family_to_length(scope->family);
-	if (!k || address_length <= 0 || off + address_length + 1 > KR_CACHE_KEY_MAXLEN) {
+	if (!k || address_length <= 0 || off + address_length + 2 > KR_CACHE_KEY_MAXLEN) {
 		return kr_error(EINVAL);
 	}
+
+	/* Write the scope family prefix to prefix overlapping address families */
+	k->buf[off] = scope->family;
+	off = off + 1;
 
 	/* Write scope at current offset */
 	const int scope_len_bytes = (scope->scope_len + 7) / 8;
@@ -327,7 +331,7 @@ int cache_key_write_scope(struct key *k, size_t off, const kr_cache_scope_t *sco
 	/* Always write bitlength byte to distinguish 'not scoped' from 'global scope' */
 	k->buf[off + address_length] = scope->scope_len;
 
-	return address_length + 1;
+	return address_length + 2;
 }
 
 /** Like key_exact_type() but omits a couple checks not holding for pkt cache. */

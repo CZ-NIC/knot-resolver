@@ -143,13 +143,13 @@ static inline size_t cache_key_scope_off(struct key *k)
  */
 static int cache_key_read_scope(knot_db_val_t key, size_t off, const uint8_t **scope, uint8_t *scope_len)
 {
-	/* Check if there's at least bitlength byte */
-	if (key.len == 0 || off >= key.len) {
+	/* Check if there's at least family and bitlength byte */
+	if (off + 1 >= key.len) {
 		return kr_error(ENOENT);
 	}
 	/* Set pointer and retrieve bitlength */
 	const uint8_t *base = (const uint8_t *)key.data;
-	scope[0] = base + off;
+	scope[0] = base + off + 1; /* Skip scope family prefix */
 	scope_len[0] = base[key.len - 1];
 	return kr_ok();
 }
