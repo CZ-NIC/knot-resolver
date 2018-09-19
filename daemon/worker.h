@@ -74,10 +74,6 @@ struct session *worker_session_borrow(struct worker_ctx *worker);
 
 void worker_session_release(struct worker_ctx *worker, uv_handle_t *handle);
 
-void *worker_iohandle_borrow(struct worker_ctx *worker);
-
-void worker_iohandle_release(struct worker_ctx *worker, void *h);
-
 int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
 		     knot_pkt_t *packet);
 
@@ -163,35 +159,9 @@ struct worker_ctx {
 	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
 	trie_t *subreq_out;
 	mp_freelist_t pool_mp;
-	mp_freelist_t pool_ioreqs;
 	mp_freelist_t pool_sessions;
-	mp_freelist_t pool_iohandles;
 	knot_mm_t pkt_pool;
 };
-
-/* @internal Union of some libuv handles for freelist.
- * These have session as their `handle->data` and own it.
- * Subset of uv_any_handle. */
-union uv_handles {
-	uv_handle_t   handle;
-	uv_stream_t   stream;
-	uv_udp_t      udp;
-	uv_tcp_t      tcp;
-	uv_timer_t    timer;
-};
-typedef union uv_any_handle uv_handles_t;
-
-/* @internal Union of derivatives from uv_req_t libuv request handles for freelist.
- * These have only a reference to the task they're operating on.
- * Subset of uv_any_req. */
-union uv_reqs {
-	uv_req_t      req;
-	uv_shutdown_t sdown;
-	uv_write_t    write;
-	uv_connect_t  connect;
-	uv_udp_send_t send;
-};
-typedef union uv_reqs uv_reqs_t;
 
 /** @endcond */
 

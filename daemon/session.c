@@ -35,12 +35,9 @@ struct session {
 
 static void on_session_close(uv_handle_t *handle)
 {
-	uv_loop_t *loop = handle->loop;
-	struct worker_ctx *worker = loop->data;
 	struct session *session = handle->data;
 	assert(session->handle == handle);
-	io_deinit(handle);
-	worker_iohandle_release(worker, handle);
+	io_free(handle);
 }
 
 static void on_session_timer_close(uv_handle_t *timer)

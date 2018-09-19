@@ -34,8 +34,6 @@
 	} \
 } while (0)
 
-void io_release(uv_handle_t *handle);
-
 static void check_bufsize(uv_handle_t* handle)
 {
 	/* We want to buffer at least N waves in advance.
@@ -235,11 +233,10 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	}
 
 	struct worker_ctx *worker = (struct worker_ctx *)master->loop->data;
-	uv_stream_t *client = worker_iohandle_borrow(worker);
+	uv_stream_t *client = malloc(sizeof(uv_tcp_t));
 	if (!client) {
 		return;
 	}
-	memset(client, 0, sizeof(*client));
 	int res = io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM, AF_UNSPEC);
 	if (res) {
 		if (res == UV_EMFILE) {
@@ -249,7 +246,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		/* Since res isn't OK struct session wasn't allocated \ borrowed.
 		 * We must release client handle only.
 		 */
-		worker_iohandle_release(worker, client);
+		free(client);
 		return;
 	}
 
@@ -446,17 +443,6 @@ void io_free(uv_handle_t *handle)
 	}
 	io_deinit(handle);
 	free(handle);
-}
-
-void io_release(uv_handle_t *handle)
-{
-	if (!handle) {
-		return;
-	}
-	uv_loop_t *loop = handle->loop;
-	struct worker_ctx *worker = loop->data;
-	io_deinit(handle);
-	worker_iohandle_release(worker, handle);
 }
 
 int io_start_read(uv_handle_t *handle)
