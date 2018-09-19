@@ -108,10 +108,9 @@ static int udp_bind_finalize(uv_handle_t *handle)
 {
 	check_bufsize(handle);
 	/* Handle is already created, just create context. */
-	struct session *s = session_new();
+	struct session *s = session_new(handle);
 	assert(s);
 	session_flags(s)->outgoing = false;
-	session_set_handle(s, handle);
 	return io_start_read(handle);
 }
 
@@ -412,9 +411,8 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 	if (ret != 0) {
 		return ret;
 	}
-	struct session *s = session_new();
+	struct session *s = session_new(handle);
 	assert(s);
-	session_set_handle(s, handle);
 	uv_timer_t *t = session_get_timer(s);
 	t->data = s;
 	return uv_timer_init(loop, t);
