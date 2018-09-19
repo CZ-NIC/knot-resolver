@@ -108,6 +108,10 @@ void worker_request_set_source_session(struct request_ctx *, struct session *ses
 /** Maximum response time from TCP upstream, milliseconds */
 #define MAX_TCP_INACTIVITY (KR_RESOLVE_TIME_LIMIT + KR_CONN_RTT_MAX)
 
+#ifndef RECVMMSG_BATCH /* see check_bufsize() */
+#define RECVMMSG_BATCH 1
+#endif
+
 /** Freelist of available mempools. */
 typedef array_t(struct mempool *) mp_freelist_t;
 
