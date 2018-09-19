@@ -392,7 +392,7 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 	struct tls_common_ctx *tls_ctx = session_tls_get_common_ctx(s);
 
 	assert (tls_ctx);
-	assert (session_is_outgoing(s) == tls_ctx->client_side);
+	assert (session_flags(s)->outgoing == tls_ctx->client_side);
 
 	const uint16_t pkt_size = htons(pkt->size);
 	const char *logstring = tls_ctx->client_side ? client_logstring : server_logstring;
@@ -1129,7 +1129,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 		return kr_error(EINVAL);
 	}
 
-	assert(session_is_outgoing(session) && session_get_handle(session)->type == UV_TCP);
+	assert(session_flags(session)->outgoing && session_get_handle(session)->type == UV_TCP);
 
 	struct tls_common_ctx *ctx = &client_ctx->c;
 

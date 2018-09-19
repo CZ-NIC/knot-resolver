@@ -59,12 +59,12 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 	 * guaranteed to be unchanged only for the duration of
 	 * udp_read() and tcp_read().
 	 */
-	struct session *session = handle->data;
-	if (!session_has_tls(session)) {
-		buf->base = (char *) session_wirebuf_get_free_start(session);
-		buf->len = session_wirebuf_get_free_size(session);
+	struct session *s = handle->data;
+	if (!session_flags(s)->has_tls) {
+		buf->base = (char *) session_wirebuf_get_free_start(s);
+		buf->len = session_wirebuf_get_free_size(s);
 	} else {
-		struct tls_common_ctx *ctx = session_tls_get_common_ctx(session);
+		struct tls_common_ctx *ctx = session_tls_get_common_ctx(s);
 		buf->base = (char *) ctx->recv_buf;
 		buf->len = sizeof(ctx->recv_buf);
 	}
@@ -76,7 +76,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	uv_loop_t *loop = handle->loop;
 	struct worker_ctx *worker = loop->data;
 	struct session *s = handle->data;
-	if (session_is_closing(s)) {
+	if (session_flags(s)->closing) {
 		return;
 	}
 	if (nread <= 0) {
@@ -89,7 +89,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		return;
 	}
 	struct sockaddr *peer = session_get_peer(s);
-	if (session_is_outgoing(s)) {
+	if (session_flags(s)->outgoing) {
 		assert(peer->sa_family != AF_UNSPEC);
 		if (kr_sockaddr_cmp(peer, addr) != 0) {
 			return;
@@ -97,7 +97,8 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	} else {
 		memcpy(peer, addr, kr_sockaddr_len(addr));
 	}
-	ssize_t consumed = session_wirebuf_consume(s, (const uint8_t *)buf->base, nread);
+	ssize_t consumed = session_wirebuf_consume(s, (const uint8_t *)buf->base,
+						   nread);
 	assert(consumed == nread);
 	session_wirebuf_process(s);
 	session_wirebuf_discard(s);
@@ -110,7 +111,7 @@ static int udp_bind_finalize(uv_handle_t *handle)
 	/* Handle is already created, just create context. */
 	struct session *s = session_new();
 	assert(s);
-	session_set_outgoing(s, false);
+	session_flags(s)->outgoing = false;
 	session_set_handle(s, handle);
 	return io_start_read(handle);
 }
@@ -145,10 +146,10 @@ static void tcp_timeout_trigger(uv_timer_t *timer)
 {
 	struct session *s = timer->data;
 
-	assert(session_is_outgoing(s) == false);
+	assert(!session_flags(s)->outgoing);
 	if (!session_tasklist_is_empty(s)) {
 		uv_timer_again(timer);
-	} else if (!session_is_closing(s)) {
+	} else if (!session_flags(s)->closing) {
 		uv_timer_stop(timer);
 		session_close(s);
 	}
@@ -162,7 +163,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	assert(s && session_get_handle(s) == (uv_handle_t *)handle &&
 	       handle->type == UV_TCP);	
 
-	if (session_is_closing(s)) {
+	if (session_flags(s)->closing) {
 		return;
 	}
 
@@ -190,7 +191,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	ssize_t consumed = 0;
 	const uint8_t *data = (const uint8_t *)buf->base;
 	ssize_t data_len = nread;
-	if (session_has_tls(s)) {
+	if (session_flags(s)->has_tls) {
 		/* buf->base points to start of the tls receive buffer.
 		   Decode data free space in session wire buffer. */
 		consumed = tls_process_input_data(s, (const uint8_t *)buf->base, nread);
@@ -209,7 +210,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		/* Exceeded per-connection quota for outstanding requests
 		 * stop reading from stream and close after last message is processed. */
 		uv_timer_t *t = session_get_timer(s);
-		if (!session_is_outgoing(s) && !uv_is_closing((uv_handle_t *)t)) {
+		if (!session_flags(s)->outgoing && !uv_is_closing((uv_handle_t *)t)) {
 			uv_timer_stop(t);
 			if (session_tasklist_is_empty(s)) {
 				session_close(s);
@@ -220,7 +221,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		}
 	/* Connection spawned at least one request, reset its deadline for next query.
 	 * https://tools.ietf.org/html/rfc7766#section-6.2.3 */
-	} else if (ret > 0 && !session_is_closing(s)) {
+	} else if (ret > 0 && !session_flags(s)->closing) {
 		session_timer_restart(s);
 	}
 	session_wirebuf_compress(s);
@@ -254,7 +255,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 
 	/* struct session was allocated \ borrowed from memory pool. */
 	struct session *session = client->data;
-	assert(session_is_outgoing(session) == false);
+	assert(session_flags(session)->outgoing == false);
 
 	if (uv_accept(master, client) != 0) {
 		/* close session, close underlying uv handles and
@@ -267,7 +268,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
 	struct session *s = client->data;
-	assert(session_is_outgoing(s) == false);
+	assert(session_flags(s)->outgoing == false);
 
 	struct sockaddr *peer = session_get_peer(s);
 	int peer_len = sizeof(union inaddr);
@@ -282,7 +283,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
 
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;
-	session_set_has_tls(s, tls);
+	session_flags(s)->has_tls = tls;
 	if (tls) {
 		timeout += TLS_MAX_HANDSHAKE_TIME;
 		struct tls_ctx_t *ctx = session_tls_get_server_ctx(s);

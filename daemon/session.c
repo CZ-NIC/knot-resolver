@@ -12,16 +12,6 @@
 /** List of tasks. */
 typedef array_t(struct qr_task *) session_tasklist_t;
 
-struct session_flags {
-	bool outgoing : 1;      /**< True: to upstream; false: from a client. */
-	bool throttled : 1;     /**< True: data reading from peer is temporarily stopped. */
-	bool has_tls : 1;       /**< True: given session uses TLS. */
-	bool connected : 1;     /**< True: TCP connection is established. */
-	bool closing : 1;       /**< True: session close sequence is in progress. */
-	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
-};
-
-
 /* Per-session (TCP or UDP) persistent structure,
  * that exists between remote counterpart and a local socket.
  */
@@ -225,44 +215,9 @@ struct qr_task* session_tasklist_find(const struct session *session, uint16_t ms
 	return ret;
 }
 
-bool session_is_outgoing(const struct session *session)
+struct session_flags *session_flags(struct session *session)
 {
-	return session->sflags.outgoing;
-}
-
-void session_set_outgoing(struct session *session, bool outgoing)
-{
-	session->sflags.outgoing = outgoing;
-}
-
-bool session_is_closing(const struct session *session)
-{
-	return session->sflags.closing;
-}
-
-void session_set_closing(struct session *session, bool closing)
-{
-	session->sflags.closing = closing;
-}
-
-bool session_is_connected(const struct session *session)
-{
-	return session->sflags.connected;
-}
-
-void session_set_connected(struct session *session, bool connected)
-{
-	session->sflags.connected = connected;
-}
-
-bool session_is_throttled(const struct session *session)
-{
-	return session->sflags.throttled;
-}
-
-void session_set_throttled(struct session *session, bool throttled)
-{
-	session->sflags.throttled = throttled;
+	return &session->sflags;
 }
 
 struct sockaddr *session_get_peer(struct session *session)

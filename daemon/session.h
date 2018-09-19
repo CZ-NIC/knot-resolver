@@ -24,6 +24,15 @@ struct qr_task;
 struct worker_ctx;
 struct session;
 
+struct session_flags {
+	bool outgoing : 1;      /**< True: to upstream; false: from a client. */
+	bool throttled : 1;     /**< True: data reading from peer is temporarily stopped. */
+	bool has_tls : 1;       /**< True: given session uses TLS. */
+	bool connected : 1;     /**< True: TCP connection is established. */
+	bool closing : 1;       /**< True: session close sequence is in progress. */
+	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
+};
+
 /* Allocate new session. */
 struct session *session_new(void);
 /* Clear and free given session. */
@@ -76,20 +85,8 @@ void session_tasklist_finalize(struct session *session, int status);
 bool session_is_empty(const struct session *session);
 /** Finalize all tasks. */
 void session_tasks_finalize(struct session *session, int status);
-
-/** Operations with flags */
-bool session_is_outgoing(const struct session *session);
-void session_set_outgoing(struct session *session, bool outgoing);
-bool session_is_closing(const struct session *session);
-void session_set_closing(struct session *session, bool closing);
-bool session_is_connected(const struct session *session);
-void session_set_connected(struct session *session, bool connected);
-bool session_is_throttled(const struct session *session);
-void session_set_throttled(struct session *session, bool throttled);
-bool session_has_tls(const struct session *session);
-void session_set_has_tls(struct session *session, bool has_tls);
-bool session_wirebuf_error(struct session *session);
-
+/** Get pointer to session flags */
+struct session_flags *session_flags(struct session *session);
 /** Get peer address. */
 struct sockaddr *session_get_peer(struct session *session);
 /** Get pointer to server-side tls-related data. */
