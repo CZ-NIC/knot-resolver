@@ -1797,17 +1797,19 @@ static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 	return kr_ok();
 }
 
-#define reclaim_freelist(list, type, cb) \
-	for (unsigned i = 0; i < list.len; ++i) { \
-		void *elm = list.at[i]; \
-		kr_asan_unpoison(elm, sizeof(type)); \
-		cb(elm); \
-	} \
-	array_clear(list)
+static inline void reclaim_mp_freelist(mp_freelist_t *list)
+{
+	for (unsigned i = 0; i < list->len; ++i) {
+		struct mempool *e = list->at[i];
+		kr_asan_unpoison(e, sizeof(*e));
+		mp_delete(e);
+	}
+	array_clear(*list);
+}
 
 void worker_reclaim(struct worker_ctx *worker)
 {
-	reclaim_freelist(worker->pool_mp, struct mempool, mp_delete);
+	reclaim_mp_freelist(&worker->pool_mp);
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 	trie_free(worker->subreq_out);
