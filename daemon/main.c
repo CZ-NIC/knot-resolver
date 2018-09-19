@@ -727,20 +727,11 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	uv_loop_t *loop = NULL;
-	/* Bind to passed fds and sockets*/
-	if (bind_fds(&engine.net, &args.fd_set, false) != 0 ||
-	    bind_fds(&engine.net, &args.tls_fd_set, true) != 0 ||
-	    bind_sockets(&engine.net, &args.addr_set, false) != 0 ||
-	    bind_sockets(&engine.net, &args.tls_set, true) != 0
-	) {
-		ret = EXIT_FAILURE;
-		goto cleanup;
-	}
+	uv_loop_t *loop = uv_default_loop();
+	worker->loop = loop;
+	loop->data = worker;
 
 	/* Catch some signals. */
-
-	loop = uv_default_loop();
 	uv_signal_t sigint, sigterm;
 	if (true) ret = uv_signal_init(loop, &sigint);
 	if (!ret) ret = uv_signal_init(loop, &sigterm);
@@ -766,10 +757,18 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	/* Bind to passed fds and sockets*/
+	if (bind_fds(&engine.net, &args.fd_set, false) != 0 ||
+	    bind_fds(&engine.net, &args.tls_fd_set, true) != 0 ||
+	    bind_sockets(&engine.net, &args.addr_set, false) != 0 ||
+	    bind_sockets(&engine.net, &args.tls_set, true) != 0
+	) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
 	/* Start the scripting engine */
 	engine_set_moduledir(&engine, args.moduledir);
-	worker->loop = loop;
-	loop->data = worker;
 
 	if (engine_load_sandbox(&engine) != 0) {
 		ret = EXIT_FAILURE;
