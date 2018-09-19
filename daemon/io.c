@@ -411,14 +411,12 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 	if (ret != 0) {
 		return ret;
 	}
-	struct worker_ctx *worker = loop->data;
-	struct session *s = worker_session_borrow(worker);
+	struct session *s = session_new();
 	assert(s);
 	session_set_handle(s, handle);
 	uv_timer_t *t = session_get_timer(s);
 	t->data = s;
-	uv_timer_init(worker->loop, t);
-	return ret;
+	return uv_timer_init(loop, t);
 }
 
 void io_deinit(uv_handle_t *handle)
@@ -426,21 +424,12 @@ void io_deinit(uv_handle_t *handle)
 	if (!handle) {
 		return;
 	}
-	uv_loop_t *loop = handle->loop;
-	if (loop && loop->data) {
-		struct worker_ctx *worker = loop->data;
-		worker_session_release(worker, handle);
-	} else {
-		session_free(handle->data);
-	}
+	session_free(handle->data);
 	handle->data = NULL;
 }
 
 void io_free(uv_handle_t *handle)
 {
-	if (!handle) {
-		return;
-	}
 	io_deinit(handle);
 	free(handle);
 }

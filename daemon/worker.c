@@ -1759,38 +1759,6 @@ void worker_task_timeout_inc(struct qr_task *task)
 	task->timeouts += 1;
 }
 
-struct session *worker_session_borrow(struct worker_ctx *worker)
-{
-	struct session *s = NULL;
-	if (worker->pool_sessions.len > 0) {
-		s = array_tail(worker->pool_sessions);
-		array_pop(worker->pool_sessions);
-		kr_asan_custom_unpoison(session, s);
-	} else {
-		s = session_new();
-	}
-	return s;
-}
-
-void worker_session_release(struct worker_ctx *worker, uv_handle_t *handle)
-{
-	if (!worker || !handle) {
-		return;
-	}
-	struct session *s = handle->data;
-	if (!s) {
-		return;
-	}
-	assert(session_is_empty(s));
-	if (worker->pool_sessions.len < MP_FREELIST_SIZE) {
-		session_clear(s);
-		array_push(worker->pool_sessions, s);
-		kr_asan_custom_poison(session, s);
-	} else {
-		session_free(s);
-	}
-}
-
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task)
 {
 	return task->pktbuf;
@@ -1815,9 +1783,7 @@ void worker_request_set_source_session(struct request_ctx *ctx, struct session *
 static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 {
 	array_init(worker->pool_mp);
-	array_init(worker->pool_sessions);
-	if (array_reserve(worker->pool_mp, ring_maxlen) ||
-		array_reserve(worker->pool_sessions, ring_maxlen)) {
+	if (array_reserve(worker->pool_mp, ring_maxlen)) {
 		return kr_error(ENOMEM);
 	}
 	memset(&worker->pkt_pool, 0, sizeof(worker->pkt_pool));
@@ -1839,18 +1805,9 @@ static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 	} \
 	array_clear(list)
 
-#define reclaim_freelist_custom(list, type, cb) \
-	for (unsigned i = 0; i < list.len; ++i) { \
-		void *elm = list.at[i]; \
-		kr_asan_custom_unpoison(type, elm); \
-		cb(elm); \
-	} \
-	array_clear(list)
-
 void worker_reclaim(struct worker_ctx *worker)
 {
 	reclaim_freelist(worker->pool_mp, struct mempool, mp_delete);
-	reclaim_freelist_custom(worker->pool_sessions, session, session_free);
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 	trie_free(worker->subreq_out);
