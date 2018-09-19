@@ -1,16 +1,17 @@
 kresd_SOURCES := \
-	daemon/io.c          \
-	daemon/network.c     \
-	daemon/engine.c      \
-	daemon/worker.c      \
 	daemon/bindings.c    \
+	daemon/engine.c      \
 	daemon/ffimodule.c   \
+	daemon/io.c          \
+	daemon/main.c        \
+	daemon/network.c     \
+	daemon/qr_task.c     \
+	daemon/session.c     \
 	daemon/tls.c         \
 	daemon/tls_ephemeral_credentials.c \
-	daemon/tls_session_ticket-srv.c \
-	daemon/zimport.c     \
-	daemon/session.c     \
-	daemon/main.c
+	daemon/tls_session_ticket-srv.c    \
+	daemon/worker.c      \
+	daemon/zimport.c
 
 kresd_DIST := daemon/lua/kres.lua daemon/lua/kres-gen.lua \
               daemon/lua/trust_anchors.lua daemon/lua/zonefile.lua
