@@ -36,7 +36,7 @@ struct session {
 static void on_session_close(uv_handle_t *handle)
 {
 	struct session *session = handle->data;
-	assert(session->handle == handle);
+	assert(session->handle == handle); (void)session;
 	io_free(handle);
 }
 
