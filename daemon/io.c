@@ -204,22 +204,15 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
 	int ret = session_wirebuf_process(s);
 	if (ret < 0) {
+		/* An error has occurred, close the session. */
 		worker_end_tcp(s);
-		/* Exceeded per-connection quota for outstanding requests
-		 * stop reading from stream and close after last message is processed. */
-		uv_timer_t *t = session_get_timer(s);
-		if (!session_flags(s)->outgoing && !uv_is_closing((uv_handle_t *)t)) {
-			uv_timer_stop(t);
-			if (session_tasklist_is_empty(s)) {
-				session_close(s);
-			} else { /* If there are tasks running, defer until they finish. */
-				uv_timer_start(t, tcp_timeout_trigger,
-					       MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
-			}
-		}
-	/* Connection spawned at least one request, reset its deadline for next query.
-	 * https://tools.ietf.org/html/rfc7766#section-6.2.3 */
 	} else if (ret > 0 && !session_flags(s)->closing) {
+		/* Connection spawned at least one request
+		 * or
+		 * valid answer has been received from upstream.
+		 * Reset deadline for next query.
+		 * https://tools.ietf.org/html/rfc7766#section-6.2.3
+		 */
 		session_timer_restart(s);
 	}
 	session_wirebuf_compress(s);
@@ -295,8 +288,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 			session_tls_set_server_ctx(s, ctx);
 		}
 	}
-	uv_timer_t *t = session_get_timer(s);
-	uv_timer_start(t, tcp_timeout_trigger, timeout, idle_in_timeout);
+	session_timer_start(s, tcp_timeout_trigger, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
 }
 
@@ -412,10 +404,10 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 		return ret;
 	}
 	struct session *s = session_new(handle);
-	assert(s);
-	uv_timer_t *t = session_get_timer(s);
-	t->data = s;
-	return uv_timer_init(loop, t);
+	if (s == NULL) {
+		ret = -1;
+	}
+	return ret;
 }
 
 void io_deinit(uv_handle_t *handle)
