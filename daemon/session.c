@@ -281,15 +281,14 @@ struct session *session_new(uv_handle_t *handle)
 		session->wire_buf = worker->wire_buf;
 		session->wire_buf_size = sizeof(worker->wire_buf);
 	}
-	
+
+	uv_timer_init(handle->loop, &session->timeout);
+
 	session->handle = handle;
 	handle->data = session;
-	return session;
-}
+	session->timeout.data = session;
 
-uv_timer_t *session_get_timer(struct session *session)
-{
-	return &session->timeout;
+	return session;
 }
 
 size_t session_tasklist_get_len(const struct session *session)
@@ -472,8 +471,11 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 			return NULL;
 		}
 		msg_size = knot_wire_read_u16(msg_start);
+		if (msg_size >= session->wire_buf_size) {
+			session->sflags.wirebuf_error = true;
+			return NULL;
+		}
 		if (msg_size + 2 > wirebuf_msg_data_size) {
-			session->sflags.wirebuf_error = false;
 			return NULL;
 		}
 		msg_start += 2;
@@ -556,6 +558,7 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 	}
 	session->sflags.wirebuf_error = false;
 	
+	wirebuf_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
 	if (wirebuf_data_size == 0) {
 		session_wirebuf_discard(session);
 	} else if (wirebuf_data_size < KNOT_WIRE_HEADER_SIZE) {
@@ -634,14 +637,22 @@ int session_wirebuf_process(struct session *session)
 		return ret;
 	}
 	struct worker_ctx *worker = session_get_handle(session)->loop->data;
+	size_t wirebuf_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
+	uint32_t max_iterations = (wirebuf_data_size / (KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
 	knot_pkt_t *query = NULL;
-	while (((query = session_produce_packet(session, &worker->pkt_pool)) != NULL) && (ret < 100)) {
+	while (((query = session_produce_packet(session, &worker->pkt_pool)) != NULL) &&
+	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
-		worker_submit(session, query);
+		int res = worker_submit(session, query);
+		if (res != kr_error(EILSEQ)) {
+			/* Packet has been successfully parsed. */
+			ret += 1;
+		}
 		if (session_discard_packet(session, query) < 0) {
+			/* Packet data isn't stored in memory as expected.
+			   something went wrong, normally should not happen. */
 			break;
 		}
-		ret += 1;
 	}
 	if (session_wirebuf_error(session)) {
 		ret = -1;

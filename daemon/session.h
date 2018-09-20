@@ -104,8 +104,6 @@ struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session)
 /** Get pointer to underlying libuv handle for IO operations. */
 uv_handle_t *session_get_handle(struct session *session);
 
-/** Get pointer to session timer handle. */
-uv_timer_t *session_get_timer(struct session *session);
 /** Start session timer. */
 int session_timer_start(struct session *session, uv_timer_cb cb,
 			uint64_t timeout, uint64_t repeat);
