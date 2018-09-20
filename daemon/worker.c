@@ -807,9 +807,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		assert(session_tasklist_is_empty(session));
 		session_close(session);
 	} else {
-		uv_timer_t *t = session_get_timer(session);
-		uv_timer_stop(t);
-		t->data = session;
+		session_timer_stop(session);
 		session_timer_start(session, on_tcp_watchdog_timeout,
 				    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 	}
@@ -850,8 +848,7 @@ static void on_connect(uv_connect_t *req, int status)
 		return;
 	}
 
-	uv_timer_t *t = session_get_timer(session);
-	uv_timer_stop(t);
+	session_timer_stop(session);
 
 	if (status != 0) {
 		worker_del_tcp_waiting(worker, peer);
@@ -1487,7 +1484,8 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 	struct sockaddr *addr = NULL;
 	if (!session_flags(session)->outgoing) { /* request from a client */
 		/* Ignore badly formed queries. */
-		if (!query || ret != 0 || knot_wire_get_qr(query->wire)) {
+		if (!query || (ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
+		     knot_wire_get_qr(query->wire)) {
 			if (query) worker->stats.dropped += 1;
 			return kr_error(EILSEQ);
 		}
