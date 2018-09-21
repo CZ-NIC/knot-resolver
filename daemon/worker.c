@@ -1119,17 +1119,11 @@ static void on_connect(uv_connect_t *req, int status)
 	struct session *session = handle->data;
 	union inaddr *peer = &session->peer;
 
-	if (status == UV_ECANCELED) {
-		worker_del_tcp_waiting(worker, &peer->ip);
-		assert(session->closing && session->waiting.len == 0 && session->tasks.len == 0);
-		iorequest_release(worker, req);
-		return;
-	}
-
-	if (session->closing) {
+	if (status == UV_ECANCELED || session->closing) {
 		worker_del_tcp_waiting(worker, &peer->ip);
 		assert(session->waiting.len == 0 && session->tasks.len == 0);
 		iorequest_release(worker, req);
+		session_close(session);
 		return;
 	}
 
@@ -1170,6 +1164,8 @@ static void on_connect(uv_connect_t *req, int status)
 			 * something gone wrong */
 			while (session->waiting.len > 0) {
 				struct qr_task *task = session->waiting.at[0];
+				/* Notify resolver of the outgoing query timeout, as there's no further step */
+				kr_resolve_consume(&task->ctx->req, &session->peer.ip, NULL);
 				session_del_tasks(session, task);
 				array_del(session->waiting, 0);
 				ioreq_kill_pending(task);
