@@ -19,6 +19,12 @@ array
 .. doxygenfile:: array.h
    :project: libkres
 
+queue
+~~~~~
+
+.. doxygenfile:: queue.h
+   :project: libkres
+
 map
 ~~~
 

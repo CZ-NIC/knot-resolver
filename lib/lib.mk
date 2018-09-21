@@ -15,6 +15,7 @@ libkres_SOURCES := \
 	lib/dnssec/ta.c \
 	lib/generic/lru.c \
 	lib/generic/map.c \
+	lib/generic/queue.c \
 	lib/generic/trie.c \
 	lib/layer/cache.c \
 	lib/layer/iterate.c \
@@ -41,6 +42,7 @@ libkres_HEADERS := \
 	lib/generic/lru.h \
 	lib/generic/map.h \
 	lib/generic/pack.h \
+	lib/generic/queue.h \
 	lib/generic/trie.h \
 	lib/layer.h \
 	lib/layer/iterate.h \
