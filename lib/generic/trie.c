@@ -154,6 +154,13 @@ static uint bitmap_weight(bitmap_t w)
 	return __builtin_popcount(w);
 }
 
+/*! \brief Only keep the lowest bit in the bitmap (least significant -> twigs[0]). */
+static bitmap_t bitmap_lowest_bit(bitmap_t w)
+{
+	assert((w & ~((1 << 17) - 1)) == 0); // using the least-important 17 bits
+	return 1 << __builtin_ctz(w);
+}
+
 /*! \brief Test flags to determine type of this node. */
 static bool isbranch(const node_t *t)
 {
@@ -171,7 +178,7 @@ static bitmap_t nibbit(byte k, uint flags)
 }
 
 /*! \brief Extract a nibble from a key and turn it into a bitmask. */
-static bitmap_t twigbit(node_t *t, const char *key, uint32_t len)
+static bitmap_t twigbit(const node_t *t, const char *key, uint32_t len)
 {
 	assert(isbranch(t));
 	uint i = t->branch.index;
@@ -183,14 +190,14 @@ static bitmap_t twigbit(node_t *t, const char *key, uint32_t len)
 }
 
 /*! \brief Test if a branch node has a child indicated by a bitmask. */
-static bool hastwig(node_t *t, bitmap_t bit)
+static bool hastwig(const node_t *t, bitmap_t bit)
 {
 	assert(isbranch(t));
 	return t->branch.bitmap & bit;
 }
 
 /*! \brief Compute offset of an existing child in a branch node. */
-static uint twigoff(node_t *t, bitmap_t b)
+static uint twigoff(const node_t *t, bitmap_t b)
 {
 	assert(isbranch(t));
 	return bitmap_weight(t->branch.bitmap & (b - 1));
@@ -285,64 +292,108 @@ size_t trie_weight(const trie_t *tbl)
 	return tbl->weight;
 }
 
-trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len)
+struct found {
+	leaf_t *l;	/**< the found leaf (NULL if not found) */
+	branch_t *p;	/**< the leaf's parent (if exists) */
+	bitmap_t b;	/**< bit-mask with a single bit marking l under p */
+};
+/** Search trie for an item with the given key (equality only). */
+static struct found find_equal(trie_t *tbl, const char *key, uint32_t len)
 {
 	assert(tbl);
+	struct found ret0;
+	memset(&ret0, 0, sizeof(ret0));
 	if (!tbl->weight)
-		return NULL;
+		return ret0;
+	/* Current node and parent while descending (returned values basically). */
 	node_t *t = &tbl->root;
-	while (isbranch(t)) {
-		__builtin_prefetch(t->branch.twigs);
-		bitmap_t b = twigbit(t, key, len);
-		if (!hastwig(t, b))
-			return NULL;
-		t = twig(t, twigoff(t, b));
-	}
-	if (key_cmp(key, len, t->leaf.key->chars, t->leaf.key->len) != 0)
-		return NULL;
-	return &t->leaf.val;
-}
-
-int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val)
-{
-	assert(tbl);
-	if (!tbl->weight)
-		return KNOT_ENOENT;
-	node_t *t = &tbl->root; // current and parent node
 	branch_t *p = NULL;
 	bitmap_t b = 0;
 	while (isbranch(t)) {
 		__builtin_prefetch(t->branch.twigs);
 		b = twigbit(t, key, len);
 		if (!hastwig(t, b))
-			return KNOT_ENOENT;
+			return ret0;
 		p = &t->branch;
 		t = twig(t, twigoff(t, b));
 	}
 	if (key_cmp(key, len, t->leaf.key->chars, t->leaf.key->len) != 0)
+		return ret0;
+	return (struct found) {
+		.l = &t->leaf,
+		.p = p,
+		.b = b,
+	};
+}
+/** Find item with the first key (lexicographical order). */
+static struct found find_first(trie_t *tbl)
+{
+	assert(tbl);
+	if (!tbl->weight) {
+		struct found ret0;
+		memset(&ret0, 0, sizeof(ret0));
+		return ret0;
+	}
+	/* Current node and parent while descending (returned values basically). */
+	node_t *t = &tbl->root;
+	branch_t *p = NULL;
+	while (isbranch(t)) {
+		p = &t->branch;
+		t = &p->twigs[0];
+	}
+	return (struct found) {
+		.l = &t->leaf,
+		.p = p,
+		.b = p ? bitmap_lowest_bit(p->bitmap) : 0,
+	};
+}
+
+trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len)
+{
+	struct found found = find_equal(tbl, key, len);
+	return found.l ? &found.l->val : NULL;
+}
+
+trie_val_t* trie_get_first(trie_t *tbl, char **key, uint32_t *len)
+{
+	struct found found = find_first(tbl);
+	if (!found.l)
+		return NULL;
+	if (key)
+		*key = found.l->key->chars;
+	if (len)
+		*len = found.l->key->len;
+	return &found.l->val;
+}
+
+/** Delete the found element (if any) and return value (unless NULL is passed) */
+static int del_found(trie_t *tbl, struct found found, trie_val_t *val)
+{
+	if (!found.l)
 		return KNOT_ENOENT;
-	mm_free(&tbl->mm, t->leaf.key);
+	mm_free(&tbl->mm, found.l->key);
 	if (val != NULL)
-		*val = t->leaf.val; // we return trie_val_t directly when deleting
+		*val = found.l->val; // we return trie_val_t directly when deleting
 	--tbl->weight;
+	branch_t * const p = found.p; // short-hand
 	if (unlikely(!p)) { // whole trie was a single leaf
 		assert(tbl->weight == 0);
 		empty_root(&tbl->root);
 		return KNOT_EOK;
 	}
-	// remove leaf t as child of p
-	int ci = t - p->twigs, // child index via pointer arithmetic
+	// remove leaf t as child of p; get child index via pointer arithmetic
+	int ci = ((union node *)found.l) - p->twigs,
 	    cc = bitmap_weight(p->bitmap); // child count
 	assert(ci >= 0 && ci < cc);
 
 	if (cc == 2) { // collapse binary node p: move the other child to this node
 		node_t *twigs = p->twigs;
-		(*(node_t *)p) = twigs[1 - ci]; // it might be a leaf or branch
+		(*(union node *)p) = twigs[1 - ci]; // it might be a leaf or branch
 		mm_free(&tbl->mm, twigs);
 		return KNOT_EOK;
 	}
 	memmove(p->twigs + ci, p->twigs + ci + 1, sizeof(node_t) * (cc - ci - 1));
-	p->bitmap &= ~b;
+	p->bitmap &= ~found.b;
 	node_t *twigs = mm_realloc(&tbl->mm, p->twigs, sizeof(node_t) * (cc - 1),
 	                           sizeof(node_t) * cc);
 	if (likely(twigs != NULL))
@@ -350,6 +401,30 @@ int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val)
 		/* We can ignore mm_realloc failure, only beware that next time
 		 * the prev_size passed to it wouldn't be correct; TODO? */
 	return KNOT_EOK;
+}
+
+int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val)
+{
+	struct found found = find_equal(tbl, key, len);
+	return del_found(tbl, found, val);
+}
+
+int trie_del_first(trie_t *tbl, char *key, uint32_t *len, trie_val_t *val)
+{
+	struct found found = find_first(tbl);
+	if (!found.l)
+		return KNOT_ENOENT;
+	if (key) {
+		if (!len)
+			return KNOT_EINVAL;
+		if (*len < found.l->key->len)
+			return kr_error(ENOSPC);
+		memcpy(key, found.l->key->chars, *len);
+	}
+	if (len) { // makes sense even with key == NULL
+		*len = found.l->key->len;
+	}
+	return del_found(tbl, found, val);
 }
 
 /*!
