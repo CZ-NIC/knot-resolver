@@ -64,6 +64,11 @@ size_t trie_weight(const trie_t *tbl);
 KR_EXPORT
 trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len);
 
+/*!
+ * \brief Return pointer to the minimum.  Optionally with key and its length. */
+KR_EXPORT
+trie_val_t* trie_get_first(trie_t *tbl, char **key, uint32_t *len);
+
 /*! \brief Search the trie, inserting NULL trie_val_t on failure. */
 KR_EXPORT
 trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len);
@@ -95,6 +100,16 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d);
  */
 KR_EXPORT
 int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val);
+
+/*!
+ * \brief Remove the first item, returning KNOT_EOK on success.
+ *
+ * You may optionally get the key and/or value.
+ * The key is copied, so you need to pass sufficient len,
+ * otherwise kr_error(ENOSPC) is returned.
+ */
+KR_EXPORT
+int trie_del_first(trie_t *tbl, char *key, uint32_t *len, trie_val_t *val);
 
 /*! \brief Create a new iterator pointing to the first element (if any). */
 KR_EXPORT
