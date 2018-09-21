@@ -179,25 +179,25 @@ static int cache_key_match_scope(knot_db_val_t wanted_key, knot_db_val_t found_k
 }
 
 /* Check if entry is valid and is not expired and return it */
-static const struct entry_h *entry_get_valid(knot_db_val_t val, struct kr_query *qry, uint8_t lowest_rank)
+static const struct entry_h *entry_get_valid(knot_db_val_t val, struct kr_query *qry, uint16_t type, uint8_t lowest_rank)
 {
 	if (val.data == NULL || qry == NULL) {
 		return NULL;
 	}
 
-	int ret = entry_h_seek(&val, qry->stype);
+	int ret = entry_h_seek(&val, type);
 	if (ret != 0) {
 		return NULL;
 	}
 
-	const struct entry_h *eh = entry_h_consistent(val, qry->stype);
+	const struct entry_h *eh = entry_h_consistent(val, type);
 	if (!eh) {
 		return NULL;
 		// LATER: recovery in case of error, perhaps via removing the entry?
 		// LATER(optim): pehaps optimize the zone cut search
 	}
 
-	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype,
+	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, type,
 					qry->timestamp.tv_sec);
 	if (new_ttl < 0 || eh->rank < lowest_rank) {
 		VERBOSE_MSG(qry, "=> skipping exact %s: rank 0%.2o (min. 0%.2o), new TTL %d\n",
@@ -236,7 +236,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Ignore expired scoped entry, if this isn't done, it would be otherwise impossible
 	 * to cache entry on cache scope changes, as the most specific scope would be retrieved forever. */
 	if (ret == 0 && is_scopable_type(qry->stype) && scope && scope->family != AF_UNSPEC) {
-		if (entry_get_valid(val, qry, lowest_rank) == NULL) {
+		if (entry_get_valid(val, qry, qry->stype, lowest_rank) == NULL) {
 			VERBOSE_MSG(qry, "=> hit for scope /%d, but it's expired\n", scope->scope_len);
 			ret = -abs(ENOENT);
 		}
@@ -254,7 +254,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		int err = cache_op(cache, read_leq, &key, &val);
 		if (err >= 0) {
 			/* Update scope only if the entry is not expired */
-			if (entry_get_valid(val, qry, lowest_rank) != NULL) {
+			if (entry_get_valid(val, qry, qry->stype, lowest_rank) != NULL) {
 				ret = cache_key_match_scope(wanted_key, key, cache_key_scope_off(k), scope);
 			} else {
 				ret = -abs(ENOENT);
@@ -761,13 +761,13 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 		/* Ignore expired scoped entry, if this isn't done, it would be otherwise impossible
 		 * to cache entry on cache scope changes, as the most specific scope would be retrieved forever. */
 		if (ret == 0 && is_scopable_type(find_type) && cache_scope && cache_scope->family != AF_UNSPEC) {
-			if (entry_get_valid(val, qry, rank_min) == NULL) {
+			if (entry_get_valid(val, qry, find_type, rank_min) == NULL) {
 				VERBOSE_MSG(qry, "=> closest hit for scope /%d, but it's expired\n", cache_scope->scope_len);
 				ret = -abs(ENOENT);
 			}
 		}
 		/* Try in global scope if scoped, but no immediate match found */
-		if (exact_match && ret == -abs(ENOENT) && cache_scope && cache_scope->family != AF_UNSPEC && cache_scope->scope_len > 0) {
+		if (ret == -abs(ENOENT) && is_scopable_type(find_type) && cache_scope && cache_scope->family != AF_UNSPEC && cache_scope->scope_len > 0) {
 			/* Widen the scope to find encloser */
 			--cache_scope->scope_len;
 			key = key_exact_type(k, find_type, cache_scope);
@@ -776,7 +776,7 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 			int err = cache_op(cache, read_leq, &key, &val);
 			if (err >= 0) {
 				/* Update scope only if the entry is not expired */
-				if (entry_get_valid(val, qry, rank_min) != NULL) {
+				if (entry_get_valid(val, qry, find_type, rank_min) != NULL) {
 					ret = cache_key_match_scope(wanted_key, key, cache_key_scope_off(k), cache_scope);
 				} else {
 					ret = -abs(ENOENT);
