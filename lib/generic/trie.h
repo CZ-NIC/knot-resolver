@@ -1,4 +1,4 @@
-/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2017-2018 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ typedef struct trie trie_t;
 /*! \brief Opaque type for holding a QP-trie iterator. */
 typedef struct trie_it trie_it_t;
 
-/*! \brief Create a trie instance. */
+/*! \brief Create a trie instance.  Pass NULL to use malloc+free. */
 KR_EXPORT
 trie_t* trie_create(knot_mm_t *mm);
 
