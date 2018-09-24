@@ -59,7 +59,6 @@ static int kres_gnutls_set_priority(gnutls_session_t session) {
 	static const char * const priorities =
 		"NORMAL:" /* GnuTLS defaults */
 		"-VERS-TLS1.0:-VERS-TLS1.1:" /* TLS 1.2 and higher */
-		"-VERS-TLS1.3:" /* Disable TLS1.3 until the final is implemented */
 		 /* Some distros by default allow features that are considered
 		  * too insecure nowadays, so let's disable them explicitly. */
 		"-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
