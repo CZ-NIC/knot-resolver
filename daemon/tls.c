@@ -292,7 +292,12 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 		return NULL;
 	}
 
-	int err = gnutls_init(&tls->c.tls_session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
+#ifdef GNUTLS_ENABLE_EARLY_START
+	const unsigned flags = GNUTLS_SERVER | GNUTLS_NONBLOCK | GNUTLS_ENABLE_EARLY_START;
+#else
+	const unsigned flags = GNUTLS_SERVER | GNUTLS_NONBLOCK;
+#endif
+	int err = gnutls_init(&tls->c.tls_session, flags);
 	if (err != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] gnutls_init(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
