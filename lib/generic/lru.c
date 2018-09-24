@@ -21,7 +21,15 @@ typedef struct lru_group lru_group_t;
 
 struct lru_item {
 	uint16_t key_len, val_len; /**< Two bytes should be enough for our purposes. */
-	char data[];               /**< Place for both key and value. */
+	char data[];
+	/**< Place for both key and value.
+	 *
+	 * We use "char" to satisfy the C99+ aliasing rules.
+	 * See C99 section 6.5 Expressions, paragraph 7.
+	 * Any type can be accessed through char-pointer,
+	 * so we can use a common struct definition
+	 * for all types being held.
+	 */
 };
 
 /** @internal Compute offset of value in struct lru_item. */
