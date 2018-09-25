@@ -11,6 +11,7 @@ tests_BIN := \
 	test_queue \
 	test_rplan \
 	test_set \
+	test_trie \
 	test_utils \
 	test_zonecut \
 	#test_cache TODO: re-consider how best to test cache
