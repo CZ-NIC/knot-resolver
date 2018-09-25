@@ -3,15 +3,16 @@
 #
 
 tests_BIN := \
-	test_set \
-	test_map \
 	test_array \
-	test_pack \
 	test_lru \
-	test_utils \
+	test_map \
 	test_module \
+	test_pack \
+	test_queue \
+	test_rplan \
+	test_set \
+	test_utils \
 	test_zonecut \
-	test_rplan
 	#test_cache TODO: re-consider how best to test cache
 
 mock_cmodule_CFLAGS := -fPIC
