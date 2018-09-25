@@ -17,8 +17,6 @@
  * @file queue.h
  * @brief A queue, usable for FIFO and LIFO simultaneously.
  *
- * FIXME: unit tests
- *
  * Both the head and tail of the queue can be accessed and pushed to,
  * but only the head can be popped from.
  *
