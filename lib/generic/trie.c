@@ -419,7 +419,7 @@ int trie_del_first(trie_t *tbl, char *key, uint32_t *len, trie_val_t *val)
 			return KNOT_EINVAL;
 		if (*len < found.l->key->len)
 			return kr_error(ENOSPC);
-		memcpy(key, found.l->key->chars, *len);
+		memcpy(key, found.l->key->chars, found.l->key->len);
 	}
 	if (len) { // makes sense even with key == NULL
 		*len = found.l->key->len;
