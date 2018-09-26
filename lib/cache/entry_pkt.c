@@ -208,7 +208,7 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 
 	/* Finishing touches. TODO: perhaps factor out */
 	struct kr_qflags * const qf = &qry->flags;
-	qf->EXPIRING = is_expiring(eh->ttl, new_ttl);
+	qf->EXPIRING = is_expiring(eh->ttl, new_ttl, type);
 	qf->CACHED = true;
 	qf->NO_MINIMIZE = true;
 	qf->DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);

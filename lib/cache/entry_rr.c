@@ -117,7 +117,7 @@ int entry2answer(struct answer *ans, int id,
 	if (ret < 0) goto fail;
 	size_t data_off = ret;
 	ans->rrsets[id].set.rank = eh->rank;
-	ans->rrsets[id].set.expiring = is_expiring(eh->ttl, new_ttl);
+	ans->rrsets[id].set.expiring = is_expiring(eh->ttl, new_ttl, type);
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet. */
 	bool want_rrsigs = true; /* LATER(optim.): might be omitted in some cases. */
 	if (want_rrsigs) {

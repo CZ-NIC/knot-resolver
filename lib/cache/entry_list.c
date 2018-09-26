@@ -250,7 +250,7 @@ int entry_h_splice(
 		 * Stale-serving is NOT considered, but TTL 1 would be considered
 		 * as expiring anyway, ... */
 		int32_t old_ttl = get_new_ttl(eh_orig, qry, NULL, 0, timestamp);
-		if (old_ttl > 0 && !is_expiring(eh_orig->ttl, old_ttl)
+		if (old_ttl > 0 && !is_expiring(eh_orig->ttl, old_ttl, type)
 		    && rank <= eh_orig->rank) {
 			WITH_VERBOSE(qry) {
 				auto_free char *type_str = kr_rrtype_text(type),

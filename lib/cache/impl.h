@@ -292,8 +292,13 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 
 
 /** Record is expiring if it has less than 1% TTL (or less than 5s) */
-static inline bool is_expiring(uint32_t orig_ttl, uint32_t decayed_ttl)
+static inline bool is_expiring(uint32_t orig_ttl, uint32_t decayed_ttl, uint16_t type)
 {
+	/* Avoid updating NS records until they fully expire */
+	if (type == KNOT_RRTYPE_NS) {
+		return false;
+	}
+
 	if (decayed_ttl < 5) {
 		return true;
 	}
