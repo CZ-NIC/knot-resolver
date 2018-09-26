@@ -147,13 +147,27 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		ret = uv_try_write(handle, uv_buf, iovcnt);
 		DEBUG_MSG("[%s] push %zu <%p> = %d\n",
 		    t->client_side ? "tls_client" : "tls", total_len, h, ret);
-		if (ret == total_len) {
+		if ((ret == total_len) || (ret < 0 && ret != UV_EAGAIN)) {
+			/* Either all the data were buffered by libuv or
+			 * uv_try_write() has returned error code other then UV_EAGAIN.
+			 * Return. */
 			return ret;
+		}
+		/* Since we are here expression below is true
+		 * (ret != total_len) && (ret >= 0 || ret == UV_EAGAIN)
+		 * or the same
+		 * (ret != total_len && ret >= 0) || (ret != total_len && ret == UV_EAGAIN)
+		 * i.e. either occurs partial write or UV_EAGAIN.
+		 * Proceed and copy data amount to owned memory and perform async write.
+		 */
+		if (ret == UV_EAGAIN) {
+			/* No data were buffered, so we must buffer all the data. */
+			ret = 0;
 		}
 	}
 
 	/* Fallback when the queue is full, and it's not possible to do an immediate write */
-	char *buf = malloc(total_len);
+	char *buf = malloc(total_len - ret);
 	if (buf != NULL) {
 		/* Skip data written in the partial write */
 		int to_skip = ret;
