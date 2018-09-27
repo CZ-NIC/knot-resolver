@@ -155,7 +155,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		if (kr_sockaddr_cmp(&s->peer.ip, addr) != 0) {
 			return;
 		}
-	} else if (network_check_proxy_enable(&worker->engine->net, (uv_handle_t *)handle)) {
+	} else if (s->proxy_enabled) {
 		if (proxy_protocol_parse((uv_handle_t *)handle, &nread, (uv_buf_t *)buf) != kr_ok()) {
 			nread = 0;
 		}
@@ -169,7 +169,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	mp_flush(worker->pkt_pool.ctx);
 }
 
-static int udp_bind_finalize(uv_handle_t *handle)
+static int udp_bind_finalize(struct network *net, uv_handle_t *handle)
 {
 	check_bufsize(handle);
 	/* Handle is already created, just create context. */
@@ -177,11 +177,12 @@ static int udp_bind_finalize(uv_handle_t *handle)
 	assert(session);
 	session->outgoing = false;
 	session->handle = handle;
+	session->proxy_enabled = network_check_proxy_enable(net, handle);
 	handle->data = session;
 	return io_start_read(handle);
 }
 
-int udp_bind(uv_udp_t *handle, struct sockaddr *addr)
+int udp_bind(struct network *net, uv_udp_t *handle, struct sockaddr *addr)
 {
 	unsigned flags = UV_UDP_REUSEADDR;
 	if (addr->sa_family == AF_INET6) {
@@ -191,10 +192,10 @@ int udp_bind(uv_udp_t *handle, struct sockaddr *addr)
 	if (ret != 0) {
 		return ret;
 	}
-	return udp_bind_finalize((uv_handle_t *)handle);
+	return udp_bind_finalize(net, (uv_handle_t *)handle);
 }
 
-int udp_bindfd(uv_udp_t *handle, int fd)
+int udp_bindfd(struct network *net, uv_udp_t *handle, int fd)
 {
 	if (!handle) {
 		return kr_error(EINVAL);
@@ -204,7 +205,7 @@ int udp_bindfd(uv_udp_t *handle, int fd)
 	if (ret != 0) {
 		return ret;
 	}
-	return udp_bind_finalize((uv_handle_t *)handle);
+	return udp_bind_finalize(net, (uv_handle_t *)handle);
 }
 
 static void tcp_timeout_trigger(uv_timer_t *timer)
@@ -236,8 +237,10 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		nread = 0;
 	}
 
-	if (!s->outgoing && s->proxy_enabled) {
-		if (proxy_protocol_parse((uv_handle_t *)handle, &nread, (uv_buf_t *)buf) != kr_ok()) {
+	if (!s->outgoing && s->proxy_enabled && !s->proxy_parsed) {
+		if (proxy_protocol_parse((uv_handle_t *)handle, &nread, (uv_buf_t *)buf) == kr_ok()) {
+			s->proxy_parsed = true;
+		} else {
 			/* Maybe this packet didn't have a PROXY header or maybe it got
 			 * corrupted or fragmented. Fragmented PROXY headers are not accepted.
 			 * The header should be sent at once according to the specification. */
@@ -339,6 +342,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		}
 	}
 	session->proxy_enabled = network_check_proxy_enable((struct network *)net, (uv_handle_t *)master);
+	session->proxy_parsed = false;
 	uv_timer_t *timer = &session->timeout;
 	uv_timer_start(timer, tcp_timeout_trigger, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);

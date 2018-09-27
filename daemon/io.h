@@ -35,6 +35,7 @@ struct session {
 	bool connected;
 	bool closing;
 	bool proxy_enabled;
+	bool proxy_parsed;
 	union inaddr peer;
 	uv_handle_t *handle;
 	uv_timer_t timeout;
@@ -53,8 +54,8 @@ struct session {
 void session_free(struct session *s);
 struct session *session_new(void);
 
-int udp_bind(uv_udp_t *handle, struct sockaddr *addr);
-int udp_bindfd(uv_udp_t *handle, int fd);
+int udp_bind(struct network *net, uv_udp_t *handle, struct sockaddr *addr);
+int udp_bindfd(struct network *net, uv_udp_t *handle, int fd);
 int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, int tcp_backlog);
 int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr, int tcp_backlog);
 int tcp_bindfd(uv_tcp_t *handle, int fd, int tcp_backlog);

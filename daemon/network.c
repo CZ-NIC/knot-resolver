@@ -153,7 +153,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		}
 		memset(ep->udp, 0, sizeof(*ep->udp));
 		handle_init(udp, net->loop, ep->udp, sa->sa_family); /* can return! */
-		ret = udp_bind(ep->udp, sa);
+		ret = udp_bind(net, ep->udp, sa);
 		if (ret != 0) {
 			return ret;
 		}
@@ -200,7 +200,7 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 			return kr_error(ENOMEM);
 		}
 		uv_udp_init(net->loop, ep->udp);
-		ret = udp_bindfd(ep->udp, fd);
+		ret = udp_bindfd(net, ep->udp, fd);
 		if (ret != 0) {
 			close_handle((uv_handle_t *)ep->udp, false);
 			return ret;
