@@ -18,7 +18,6 @@
 
 #include <stdbool.h>
 #include <uv.h>
-#include "lib/generic/array.h"
 
 struct qr_task;
 struct worker_ctx;
@@ -47,16 +46,14 @@ int session_start_read(struct session *session);
 /** List of tasks been waiting for IO. */
 /** Check if list is empty. */
 bool session_waitinglist_is_empty(const struct session *session);
+/** Add task to the end of the list. */
+int session_waitinglist_push(struct session *session, struct qr_task *task);
 /** Get the first element. */
-struct qr_task *session_waitinglist_get_first(const struct session *session);
+struct qr_task *session_waitinglist_get(const struct session *session);
+/** Get the first element and remove it from the list. */
+struct qr_task *session_waitinglist_pop(struct session *session, bool deref);
 /** Get the list length. */
 size_t session_waitinglist_get_len(const struct session *session);
-/** Add task to the list. */
-int session_waitinglist_add(struct session *session, struct qr_task *task);
-/** Remove task from the list. */
-int session_waitinglist_del(struct session *session, struct qr_task *task);
-/** Remove task from the list by index. */
-int session_waitinglist_del_index(struct session *session, int index);
 /** Retry resolution for each task in the list. */
 void session_waitinglist_retry(struct session *session, bool increase_timeout_cnt);
 /** Finalize all tasks in the list. */
@@ -66,17 +63,19 @@ void session_waitinglist_finalize(struct session *session, int status);
 /** Check if list is empty. */
 bool session_tasklist_is_empty(const struct session *session);
 /** Get the first element. */
-struct qr_task *session_tasklist_get_first(const struct session *session);
+struct qr_task *session_tasklist_get_first(struct session *session);
+/** Get the first element and remove it from the list. */
+struct qr_task *session_tasklist_del_first(struct session *session, bool deref);
 /** Get the list length. */
 size_t session_tasklist_get_len(const struct session *session);
 /** Add task to the list. */
 int session_tasklist_add(struct session *session, struct qr_task *task);
 /** Remove task from the list. */
 int session_tasklist_del(struct session *session, struct qr_task *task);
-/** Remove task from the list by index. */
-int session_tasklist_del_index(struct session *session, int index);
+/** Remove task with given msg_id, session_flags(session)->outgoing must be true. */
+struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16_t msg_id);
 /** Find task with given msg_id */
-struct qr_task* session_tasklist_find(const struct session *session, uint16_t msg_id);
+struct qr_task* session_tasklist_find_msgid(const struct session *session, uint16_t msg_id);
 /** Finalize all tasks in the list. */
 void session_tasklist_finalize(struct session *session, int status);
 
@@ -103,6 +102,7 @@ struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session)
 
 /** Get pointer to underlying libuv handle for IO operations. */
 uv_handle_t *session_get_handle(struct session *session);
+struct session *session_get(uv_handle_t *h);
 
 /** Start session timer. */
 int session_timer_start(struct session *session, uv_timer_cb cb,
@@ -139,4 +139,3 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm);
 int session_discard_packet(struct session *session, const knot_pkt_t *pkt);
 
 void session_kill_ioreq(struct session *s, struct qr_task *task);
-
