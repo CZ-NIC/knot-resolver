@@ -101,6 +101,21 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 		++pkt->rrset_count;
 		++(pkt->sections[pkt->current].count);
 	}
+
+	/* Update answer RR count in the header */
+	uint16_t rdata_count = rrset->set.rr->rrs.count + rrset->sig_rds.count;
+	switch (pkt->current) {
+	case KNOT_ANSWER:
+		knot_wire_set_ancount(pkt->wire, knot_wire_get_ancount(pkt->wire) + rdata_count);
+		break;
+	case KNOT_AUTHORITY:
+		knot_wire_set_nscount(pkt->wire, knot_wire_get_nscount(pkt->wire) + rdata_count);
+		break;
+	case KNOT_ADDITIONAL:
+		knot_wire_set_arcount(pkt->wire, knot_wire_get_arcount(pkt->wire) + rdata_count);
+		break;
+	}
+
 	return kr_ok();
 }
 
