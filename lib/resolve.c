@@ -860,7 +860,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 {
 	struct kr_context *ctx = request->ctx;
 	/* On successful answer, update preference list RTT and penalise timer  */
-	if (request->state != KR_STATE_FAIL) {
+	if (packet != NULL && request->state != KR_STATE_FAIL) {
 		/* Update RTT information for preference list */
 		update_nslist_rtt(ctx, qry, src);
 		/* Do not complete NS address resolution on soft-fail. */
