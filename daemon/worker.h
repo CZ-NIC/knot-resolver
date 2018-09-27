@@ -100,6 +100,9 @@ struct session *worker_request_get_source_session(struct request_ctx *);
 
 void worker_request_set_source_session(struct request_ctx *, struct session *session);
 
+uint16_t worker_task_pkt_get_msgid(struct qr_task *task);
+void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid);
+
 /** @cond internal */
 
 /** Number of request within timeout window. */
