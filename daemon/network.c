@@ -177,15 +177,18 @@ static int open_endpoint(struct network *net, struct endpoint *ep, struct sockad
 		}
 		ep->flags |= NET_TCP;
 	}
+	if (flags & NET_PROXY) {
+		ep->flags |= NET_PROXY;
+	}
 	return ret;
 }
 
 /** Open fd as endpoint. */
-static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, int sock_type, bool use_tls)
+static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, int sock_type, uint32_t flags)
 {
 	int ret = kr_ok();
 	if (sock_type == SOCK_DGRAM) {
-		if (use_tls) {
+		if (flags & NET_TLS) {
 			/* we do not support TLS over UDP */
 			return kr_error(EBADF);
 		}
@@ -203,6 +206,9 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 			return ret;
 		}
 		ep->flags |= NET_UDP;
+		if (flags & NET_PROXY) {
+			ep->flags |= NET_PROXY;
+		}
 		return kr_ok();
 	} else if (sock_type == SOCK_STREAM) {
 		if (ep->tcp) {
@@ -213,7 +219,7 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 			return kr_error(ENOMEM);
 		}
 		uv_tcp_init(net->loop, ep->tcp);
-		if (use_tls) {
+		if (flags & NET_TLS) {
 			ret = tcp_bindfd_tls(ep->tcp, fd, net->tcp_backlog);
 			ep->flags |= NET_TLS;
 		} else {
@@ -224,6 +230,9 @@ static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, in
 			return ret;
 		}
 		ep->flags |= NET_TCP;
+		if (flags & NET_PROXY) {
+			ep->flags |= NET_PROXY;
+		}
 		return kr_ok();
 	}
 	return kr_error(EINVAL);
@@ -245,12 +254,12 @@ static endpoint_array_t *network_get(struct network *net, const char *addr, uint
 	return NULL;
 }
 
-int network_listen_fd(struct network *net, int fd, bool use_tls)
+int network_listen_fd(struct network *net, int fd, uint32_t flags)
 {
 	/* Extract local address and socket type. */
 	int sock_type = SOCK_DGRAM;
 	socklen_t len = sizeof(sock_type);
-	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);	
+	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);
 	if (ret != 0) {
 		return kr_error(EBADF);
 	}
@@ -284,7 +293,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 		return ret;
 	}
 	/* Create a libuv struct for this socket. */
-	return open_endpoint_fd(net, ep, fd, sock_type, use_tls);
+	return open_endpoint_fd(net, ep, fd, sock_type, flags);
 }
 
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags)
@@ -362,4 +371,69 @@ void network_new_hostname(struct network *net, struct engine *engine)
 			kr_log_error("[tls] Failed to update ephemeral X.509 cert with new hostname, using existing one\n");
 		}
 	}
+}
+
+/** @internal Check whether the handle provided in ext has the same protocol,
+ * address and port as an endpoint with the NET_PROXY flag.
+ */
+static int endpoint_check_proxy(const char *key, void *val, void *ext)
+{
+	struct sockaddr_storage addr1, addr2;
+	struct sockaddr_in *addr14 = NULL, *addr24 = NULL;
+	struct sockaddr_in6 *addr16 = NULL, *addr26 = NULL;
+	int sockaddr_size = sizeof(struct sockaddr_storage);
+	uv_handle_type handle_type = ((uv_handle_t *)ext)->type;
+
+	if (handle_type != UV_TCP && handle_type != UV_UDP) {
+		return 0;
+	}
+
+	if ((handle_type == UV_TCP && uv_tcp_getsockname((uv_tcp_t *)ext, (struct sockaddr *)&addr1, &sockaddr_size) != 0) ||
+		(handle_type == UV_UDP && uv_udp_getsockname((uv_udp_t *)ext, (struct sockaddr *)&addr1, &sockaddr_size) != 0)) {
+		return 0;
+	}
+
+	bool ipv6 = sockaddr_size == sizeof(struct sockaddr_in6);
+
+	if (ipv6) {
+		addr16 = (struct sockaddr_in6 *)&addr1;
+	} else {
+		addr14 = (struct sockaddr_in *)&addr1;
+	}
+
+	endpoint_array_t *ep_array = val;
+	for (size_t i = ep_array->len; i--;) {
+		uint32_t flags_required = NET_PROXY;
+		if (handle_type == UV_TCP) {
+			flags_required |= NET_TCP;
+		} else if (handle_type == UV_UDP) {
+			flags_required |= NET_UDP;
+		}
+
+		if ((ep_array->at[i]->flags & flags_required) == flags_required) {
+			if ((handle_type == UV_TCP && uv_tcp_getsockname(ep_array->at[i]->tcp, (struct sockaddr *)&addr2, &sockaddr_size) != 0) ||
+				(handle_type == UV_UDP && uv_udp_getsockname(ep_array->at[i]->udp, (struct sockaddr *)&addr2, &sockaddr_size) != 0)) {
+				return 0;
+			}
+			if (ipv6) {
+				addr26 = (struct sockaddr_in6 *)&addr2;
+				if ((addr16->sin6_port == addr26->sin6_port) &&
+					memcmp(addr16->sin6_addr.s6_addr, addr26->sin6_addr.s6_addr, 16)) {
+					return 1;
+				}
+			} else {
+				addr24 = (struct sockaddr_in *)&addr2;
+				if ((addr14->sin_port == addr24->sin_port) &&
+					(addr14->sin_addr.s_addr == addr24->sin_addr.s_addr)) {
+					return 1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+bool network_check_proxy_enable(struct network *net, uv_handle_t *handle)
+{
+	return map_walk(&net->endpoints, endpoint_check_proxy, handle) == 1;
 }

@@ -25,10 +25,11 @@
 struct engine;
 
 enum endpoint_flag {
-    NET_DOWN = 0 << 0,
-    NET_UDP  = 1 << 0,
-    NET_TCP  = 1 << 1,
-    NET_TLS  = 1 << 2,
+	NET_DOWN  = 0 << 0,
+	NET_UDP   = 1 << 0,
+	NET_TCP   = 1 << 1,
+	NET_TLS   = 1 << 2,
+	NET_PROXY = 1 << 3,
 };
 
 struct endpoint {
@@ -60,9 +61,10 @@ struct network {
 
 void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog);
 void network_deinit(struct network *net);
-int network_listen_fd(struct network *net, int fd, bool use_tls);
+int network_listen_fd(struct network *net, int fd, uint32_t flags);
 int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags);
 int network_close(struct network *net, const char *addr, uint16_t port);
 int network_set_tls_cert(struct network *net, const char *cert);
 int network_set_tls_key(struct network *net, const char *key);
 void network_new_hostname(struct network *net, struct engine *engine);
+bool network_check_proxy_enable(struct network *net, uv_handle_t *handle);

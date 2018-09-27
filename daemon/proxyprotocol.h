@@ -3,12 +3,6 @@
 #include <uv.h>
 
 /**
- * Enable or disable the parsing of the PROXY protocol header.
- * @param status true to enable, false to disable
- */
-void proxy_protocol_set(bool status);
-
-/**
  * Parse v1 and v2 headers of the PROXY protocol defined at
  * https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
  *

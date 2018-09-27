@@ -7,8 +7,6 @@
 #include "daemon/proxyprotocol.h"
 #include "lib/utils.h"
 
-static bool proxy_protocol_enabled = false;
-
 /* Magic first bytes. */
 static const char proxy_protocol_v1sig[6] = "\x50\x52\x4f\x58\x59\x20";
 static const char proxy_protocol_v2sig[12] = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A";
@@ -45,10 +43,6 @@ union proxy_protocol_hdr {
 		} addr;
 	} v2;
 };
-
-void proxy_protocol_set(bool status) {
-	proxy_protocol_enabled = status;
-}
 
 /* Parse the v1 header. */
 ssize_t proxy_protocol_readv1(uv_handle_t *handle, const ssize_t nread, union proxy_protocol_hdr *hdr)
@@ -186,9 +180,6 @@ int proxy_protocol_parse(uv_handle_t *handle, ssize_t *nread, uv_buf_t *buf)
 {
 	ssize_t toskip = 0;
 
-	if (!proxy_protocol_enabled) {
-		return kr_ok();
-	}
 	if (!handle || !buf) {
 		return kr_error(EINVAL);
 	}

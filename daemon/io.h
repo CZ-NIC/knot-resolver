@@ -34,6 +34,7 @@ struct session {
 	bool has_tls;
 	bool connected;
 	bool closing;
+	bool proxy_enabled;
 	union inaddr peer;
 	uv_handle_t *handle;
 	uv_timer_t timeout;

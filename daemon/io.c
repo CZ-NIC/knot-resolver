@@ -155,9 +155,10 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		if (kr_sockaddr_cmp(&s->peer.ip, addr) != 0) {
 			return;
 		}
-	} else if (proxy_protocol_parse((uv_handle_t *)handle, &nread,
-			(uv_buf_t *)buf) != kr_ok()) {
-		return;
+	} else if (network_check_proxy_enable(&worker->engine->net, (uv_handle_t *)handle)) {
+		if (proxy_protocol_parse((uv_handle_t *)handle, &nread, (uv_buf_t *)buf) != kr_ok()) {
+			nread = 0;
+		}
 	}
 
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, &worker->pkt_pool);
@@ -235,12 +236,17 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		nread = 0;
 	}
 
-	if (!s->outgoing && proxy_protocol_parse((uv_handle_t *)handle, &nread,
-			(uv_buf_t *)buf) != kr_ok()) {
-		return;
+	if (!s->outgoing && s->proxy_enabled) {
+		if (proxy_protocol_parse((uv_handle_t *)handle, &nread, (uv_buf_t *)buf) != kr_ok()) {
+			/* Maybe this packet didn't have a PROXY header or maybe it got
+			 * corrupted or fragmented. Fragmented PROXY headers are not accepted.
+			 * The header should be sent at once according to the specification. */
+			nread = 0;
+		}
 	}
 
 	struct worker_ctx *worker = loop->data;
+
 	/* TCP pipelining is rather complicated and requires cooperation from the worker
 	 * so the whole message reassembly and demuxing logic is inside worker */
 	int ret = 0;
@@ -332,6 +338,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 			session->tls_ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
 		}
 	}
+	session->proxy_enabled = network_check_proxy_enable((struct network *)net, (uv_handle_t *)master);
 	uv_timer_t *timer = &session->timeout;
 	uv_timer_start(timer, tcp_timeout_trigger, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
