@@ -3,6 +3,7 @@ kresd_SOURCES := \
 	daemon/network.c     \
 	daemon/engine.c      \
 	daemon/worker.c      \
+	daemon/proxyprotocol.c \
 	daemon/bindings.c    \
 	daemon/ffimodule.c   \
 	daemon/tls.c         \

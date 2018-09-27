@@ -22,6 +22,7 @@
 
 #include "daemon/io.h"
 #include "daemon/network.h"
+#include "daemon/proxyprotocol.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
 
@@ -154,7 +155,11 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		if (kr_sockaddr_cmp(&s->peer.ip, addr) != 0) {
 			return;
 		}
+	} else if (proxy_protocol_parse((uv_handle_t *)handle, &nread,
+			(uv_buf_t *)buf) != kr_ok()) {
+		return;
 	}
+
 	knot_pkt_t *query = knot_pkt_new(buf->base, nread, &worker->pkt_pool);
 	if (query) {
 		query->max_size = KNOT_WIRE_MAX_PKTSIZE;
@@ -229,6 +234,12 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	if (nread == UV_EOF) {
 		nread = 0;
 	}
+
+	if (!s->outgoing && proxy_protocol_parse((uv_handle_t *)handle, &nread,
+			(uv_buf_t *)buf) != kr_ok()) {
+		return;
+	}
+
 	struct worker_ctx *worker = loop->data;
 	/* TCP pipelining is rather complicated and requires cooperation from the worker
 	 * so the whole message reassembly and demuxing logic is inside worker */

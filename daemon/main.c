@@ -38,6 +38,7 @@
 #include "daemon/engine.h"
 #include "daemon/bindings.h"
 #include "daemon/tls.h"
+#include "daemon/proxyprotocol.h"
 #include "lib/dnssec/ta.h"
 
 /* We can fork early on Linux 3.9+ and do SO_REUSEPORT for better performance. */
@@ -365,6 +366,7 @@ static void help(int argc, char *argv[])
 	       " -K, --keyfile-ro=[path] File with read-only root domain trust anchors, for use with an external updater.\n"
 	       " -m, --moduledir=[path] Override the default module path (" MODULEDIR ").\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
+	       " -p, --proxy            Enables PROXY protocol support (default: off).\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
 	       " -n, --dry-run          Check configuration and cache state and exit.\n"
 	       " -v, --verbose          Run in verbose mode."
@@ -498,13 +500,14 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"forks",      required_argument, 0, 'f'},
 		{"moduledir",  required_argument, 0, 'm'},
 		{"dry-run",          no_argument, 0, 'n'},
+		{"proxy",            no_argument, 0, 'p'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
 		{"version",          no_argument, 0, 'V'},
 		{"help",             no_argument, 0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:nK:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:nK:k:pvqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -546,6 +549,9 @@ static int parse_args(int argc, char **argv, struct args *args)
 		case 'n':
 			args->dry_run = true;
 			break;
+		case 'p':
+			proxy_protocol_set(true);
+			break;
 		case 'v':
 			kr_verbose_set(true);
 #ifdef NOVERBOSELOG
@@ -586,7 +592,7 @@ static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
 	return ret;
 }
 
-static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {	
+static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {
 	uint32_t flags = tls ? NET_TCP|NET_TLS : NET_UDP|NET_TCP;
 	int ret = 0;
 	for (size_t i = 0; i < addr_set->len; ++i) {
@@ -594,7 +600,7 @@ static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {
 		const char *addr = set_addr(addr_set->at[i], &port);
 		ret = network_listen(net, addr, (uint16_t)port, flags);
 		if (ret != 0) {
-			kr_log_error("[system] bind to '%s@%d' %s%s\n", 
+			kr_log_error("[system] bind to '%s@%d' %s%s\n",
 				addr, port, tls ? "(TLS) " : "", kr_strerror(ret));
 			break;
 		}
@@ -721,7 +727,7 @@ int main(int argc, char **argv)
 	}
 
 	engine_set_moduledir(&engine, args.moduledir);
-	
+
 	/* Block signals. */
 	loop = uv_default_loop();
 	uv_signal_t sigint, sigterm;
@@ -773,7 +779,7 @@ cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_reclaim(worker);
 	if (loop != NULL) {
-		uv_loop_close(loop);	
+		uv_loop_close(loop);
 	}
 	mp_delete(pool.ctx);
 	array_clear(args.addr_set);
