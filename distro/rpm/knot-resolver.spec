@@ -1,4 +1,5 @@
 %global _hardened_build 1
+%{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}}
 
 %define GPG_CHECK 0
 %define VERSION __VERSION__
@@ -45,27 +46,37 @@ BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  pkgconfig(systemd)
 
+# Distro-dependent dependencies
 %if 0%{?rhel}
 BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-socket
 Requires:       lua-sec
-%else
+Requires(pre):	shadow-utils
+%endif
+%if 0%{?fedora}
 BuildRequires:  pkgconfig(lmdb)
+BuildRequires:  python3-sphinx
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
+Requires(pre):	shadow-utils
+%endif
+%if 0%{?suse_version}
+BuildRequires:  lmdb-devel
+BuildRequires:  python3-Sphinx
+Requires:       lua51-luasocket
+Requires:       lua51-luasec
+Requires(pre):	shadow
 %endif
 
-%if 0%{?fedora}
+%if "x%{?rhel}" == "x"
 # dependencies for doc package; disable in EPEL (missing fonts)
 # https://bugzilla.redhat.com/show_bug.cgi?id=1492884
 BuildRequires:  doxygen
 BuildRequires:  python3-breathe
-BuildRequires:  python3-sphinx
 BuildRequires:  python3-sphinx_rtd_theme
 %endif
 
-Requires(pre):		shadow-utils
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
@@ -87,7 +98,7 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 %description devel
 The package contains development headers for Knot Resolver.
 
-%if 0%{?fedora}
+%if "x%{?rhel}" == "x"
 %package doc
 Summary:        Documentation for Knot Resolver
 BuildArch:      noarch
@@ -110,10 +121,10 @@ rm -v scripts/bootstrap-depends.sh
 
 %build
 %global build_paths PREFIX=%{_prefix} BINDIR=%{_bindir} LIBDIR=%{_libdir} INCLUDEDIR=%{_includedir} ETCDIR=%{_sysconfdir}/knot-resolver
-%global build_flags V=1 CFLAGS="%{optflags}" LDFLAGS="%{__global_ldflags}" %{build_paths} HAS_go=no
+%global build_flags V=1 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" %{build_paths} HAS_go=no
 %make_build %{build_flags}
 
-%if 0%{?fedora}
+%if "x%{?rhel}" == "x"
 # build documentation
 make doc
 %endif
@@ -149,7 +160,7 @@ install -m 0644 -p %{repodir}/distro/common/systemd/kresd.systemd.7 %{buildroot}
 mkdir -p %{buildroot}%{_unitdir}/kresd@.service.d
 install -m 0644 -p %{repodir}/distro/common/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
 %endif
-%if 0%{?fedora}
+%if "x%{?rhel}" == "x"
 install -m 0644 -p %{repodir}/distro/common/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
 install -m 0644 -p %{repodir}/distro/common/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
 install -m 0644 -p %{repodir}/distro/common/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
@@ -221,7 +232,7 @@ fi
 %if 0%{?rhel}
 %{_unitdir}/kresd@.service.d/override.conf
 %endif
-%if 0%{?fedora}
+%if "x%{?rhel}" == "x"
 %{_unitdir}/kresd*.socket
 %endif
 %{_tmpfilesdir}/knot-resolver.conf
@@ -237,7 +248,7 @@ fi
 %{_libdir}/pkgconfig/libkres.pc
 %{_libdir}/libkres.so
 
-%if 0%{?fedora}
+%if "x%{?rhel}" == "x"
 %files doc
 %doc doc/html
 %endif
