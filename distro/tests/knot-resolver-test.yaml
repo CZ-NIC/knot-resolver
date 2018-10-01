@@ -11,6 +11,8 @@
       Ubuntu: dnsutils
       Fedora: bind-utils
       CentOS: bind-utils
+      openSUSE Leap: bind-utils
+      openSUSE Tumbleweed: bind-utils
       Archlinux: bind-tools
     configure_obs_repo:
       Fedora: |
@@ -28,13 +30,20 @@
         wget -nv https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/xUbuntu_{{ ansible_distribution_version }}/Release.key -O Release.key &&
         apt-key add - < Release.key &&
         apt-get update
+      openSUSE Tumbleweed: |
+        zypper addrepo https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/openSUSE_Tumbleweed/home:CZ-NIC:{{ item }}.repo &&
+        zypper --gpg-auto-import-keys refresh
+      openSUSE Leap: |
+        zypper addrepo https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/openSUSE_Leap_15.0/home:CZ-NIC:{{ item }}.repo &&
+        zypper --gpg-auto-import-keys refresh
     show_package_version:
       Archlinux:
         pacman -Qi knot-resolver | grep '^Version'
-      Fedora: |
+      Fedora: &pkg_version_rpm |
         rpm -qi knot-resolver | grep '^Version'
-      CentOS: |
-        rpm -qi knot-resolver | grep '^Version'
+      CentOS: *pkg_version_rpm
+      openSUSE Leap: *pkg_version_rpm
+      openSUSE Tumbleweed: *pkg_version_rpm
       Debian:
         dpkg -s knot-resolver | grep '^Version'
       Ubuntu: |
@@ -49,6 +58,7 @@
       raw: |
         yum install -y python2 python2-dnf libselinux-python || \
         pacman -Sy python2 --noconfirm || \
+        (zypper --gpg-auto-import-keys refresh && zypper install -y python) || \
         (apt-get update && apt-get install -y python) || \
         :
       ignore_errors: true
