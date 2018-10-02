@@ -343,6 +343,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 
 	/* Insert name servers for this zone cut, addresses will be looked up
 	 * on-demand (either from cache or iteratively) */
+	ret = kr_ok();
 	knot_rdata_t *rdata_i = ns_rds.rdata;
 	for (unsigned i = 0; i < ns_rds.count;
 			++i, rdata_i = knot_rdataset_next(rdata_i)) {
@@ -358,10 +359,28 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		if (!(reputation & KR_NS_NOIP6) && !(qry->flags.NO_IPV6)) {
 			fetch_addr(cut,  &ctx->cache, ns_name, KNOT_RRTYPE_AAAA, qry);
 		}
+
+		if (knot_dname_in_bailiwick(ns_name, cut->name)) {
+			pack_t *addrs = kr_zonecut_find(cut, ns_name);
+			if (addrs && addrs->len) continue;
+			/* We have a problem (potentially).  This NS is under
+			 * our desired cut, and we have no usable address for it.
+			 * We'd better try a cut closer to root; otherwise we risk
+			 * getting stuck in a circular dependency.
+			 * Note that other out-of-bailiwick names might not save us,
+			 * as they might form a mutually dependent "cycle", and even
+			 * if we had an address for some of them, our code might
+			 * choose to probe this ns_name, so here we prefer to err
+			 * on the side of carefulness. */
+			trie_apply(cut->nsset, free_addr_set_cb, cut->pool);
+			trie_clear(cut->nsset);
+			ret = kr_error(ENOENT);
+			break;
+		}
 	}
 
 	knot_rdataset_clear(&ns_rds, cut->pool);
-	return kr_ok();
+	return ret;
 }
 
 /**
