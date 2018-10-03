@@ -62,7 +62,6 @@ genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 	struct knot_compr
 	knot_compr_t
 	struct knot_pkt
-	knot_edns_client_subnet_t
 	# generics
 	map_t
 	# libkres
@@ -80,6 +79,11 @@ genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 	struct kr_request
 	enum kr_rank
 	struct kr_cache
+	enum kr_extended_err
+EOF
+
+./scripts/gen-cdefs.sh libknot types <<-EOF
+	knot_edns_client_subnet_t
 EOF
 
 printf "
@@ -130,8 +134,6 @@ printf "\tchar _stub[];\n};\n"
 	knot_pkt_reclaim
 # OPT
 	knot_edns_get_version
-	knot_edns_get_payload
-	knot_edns_has_option
 	knot_edns_get_option
 	knot_edns_add_option
 	knot_edns_client_subnet_size

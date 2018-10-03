@@ -1616,6 +1616,9 @@ static int qr_task_step(struct qr_task *task,
 					   &sock_type, task->pktbuf);
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT ||
 			     task->timeouts >= KR_TIMEOUT_LIMIT)) {
+			struct kr_rplan *rplan = &req->rplan;
+			struct kr_query *qry = kr_rplan_last(rplan);
+			kr_query_set_err(qry, KR_ERR_RETRY);
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
 	}

@@ -342,6 +342,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
 		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 		invalidate_ns(rplan, qry);
+		kr_query_set_err(qry, KR_ERR_UNREACHABLE);
 		return kr_error(EHOSTUNREACH);
 	}
 	struct kr_query *next = qry;
@@ -357,6 +358,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 			kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 			invalidate_ns(rplan, qry);
 			VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
+			kr_query_set_err(qry, KR_ERR_UNREACHABLE);
 			return kr_error(EHOSTUNREACH);
 		}
 	} else {
@@ -917,11 +919,13 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	struct kr_query *qry = array_tail(rplan->pending);
 	/* Check overall resolution time */
 	if (resolution_time_exceeded(qry, kr_now())) {
+		kr_query_set_err(qry, KR_ERR_TIMEOUT);
 		return KR_STATE_FAIL;
 	}
 	bool tried_tcp = (qry->flags.TCP);
 	if (!packet || packet->size == 0) {
 		if (tried_tcp || (qry->ns.reputation & KR_NS_NOTCP)) {
+			kr_query_set_err(qry, KR_ERR_UNREACHABLE);
 			request->state = KR_STATE_FAIL;
 		} else {
 			qry->flags.TCP = true;

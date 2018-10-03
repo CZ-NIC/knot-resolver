@@ -27,6 +27,22 @@
 #define QUERY_PROVIDES(q, name, cls, type) \
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
+void kr_query_set_err(struct kr_query *qry, enum kr_extended_err err)
+{
+	if (!qry) {
+		return;
+	}
+
+	/* err has already been set previously */
+	if (qry->err != KR_ERR_OK) {
+		QRVERBOSE(qry, "ede ", "ignore overriding %d with %d\n", qry->err, err);
+		return;
+	}
+
+	qry->err = (uint16_t)err;
+	QRVERBOSE(qry, "ede ", "query failed with err code %d\n", err);
+}
+
 inline static unsigned char chars_or(const unsigned char a, const unsigned char b)
 {
 	return a | b;

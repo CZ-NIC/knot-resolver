@@ -82,6 +82,25 @@ typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t 
 				const struct kr_query *qry);
 
 /**
+ * A list of Extended DNS Error(EDE) codes.
+ */
+enum kr_extended_err {
+	KR_ERR_OK = 0,
+	KR_ERR_TIMEOUT = 1000, /* request timeout */
+	KR_ERR_UNREACHABLE,    /* NS is not reachable */
+	KR_ERR_RETRY,          /* too many retries */
+	KR_ERR_BLOCKED,        /* blocked by user policy */
+};
+
+
+/** Save an error code into the query.
+ * @param qry the query will hold the error code
+ * @param err the code will be set
+ */
+KR_EXPORT
+void kr_query_set_err(struct kr_query *qry, enum kr_extended_err err);
+
+/**
  * Single query representation.
  */
 struct kr_query {
@@ -107,6 +126,8 @@ struct kr_query {
 	struct kr_query *cname_parent;
 	struct kr_request *request; /**< Parent resolution request. */
 	kr_stale_cb stale_cb; /**< See the type */
+	uint16_t err;
+
 	/* Beware: this must remain the last, because of lua bindings. */
 	struct kr_nsrep ns;
 };

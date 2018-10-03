@@ -81,12 +81,6 @@ struct knot_pkt {
 	knot_compr_t compr;
 };
 typedef struct {
-	uint16_t family;
-	uint8_t source_len;
-	uint8_t scope_len;
-	uint8_t address[16];
-} knot_edns_client_subnet_t;
-typedef struct {
 	void *root;
 	struct knot_mm *pool;
 } map_t;
@@ -226,6 +220,13 @@ struct kr_cache {
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
 };
+enum kr_extended_err {KR_ERR_OK, KR_ERR_TIMEOUT = 1000, KR_ERR_UNREACHABLE, KR_ERR_RETRY, KR_ERR_BLOCKED};
+typedef struct {
+	uint16_t family;
+	uint8_t source_len;
+	uint8_t scope_len;
+	uint8_t address[16];
+} knot_edns_client_subnet_t;
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
@@ -259,6 +260,7 @@ struct kr_query {
 	struct kr_query *cname_parent;
 	struct kr_request *request;
 	kr_stale_cb stale_cb;
+	uint16_t err;
 	struct kr_nsrep ns;
 };
 struct kr_context {
@@ -290,16 +292,15 @@ int knot_pkt_put_rotate(knot_pkt_t *, uint16_t, const knot_rrset_t *, uint16_t, 
 knot_pkt_t *knot_pkt_new(void *, uint16_t, knot_mm_t *);
 void knot_pkt_free(knot_pkt_t *);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
-int knot_pkt_reserve(knot_pkt_t *pkt, uint16_t size);
-int knot_pkt_reclaim(knot_pkt_t *pkt, uint16_t size);
+int knot_pkt_reserve(knot_pkt_t *, uint16_t);
+int knot_pkt_reclaim(knot_pkt_t *, uint16_t);
 uint8_t knot_edns_get_version(const knot_rrset_t *);
-uint16_t knot_edns_get_payload(const knot_rrset_t *);
-bool knot_edns_has_option(const knot_rrset_t *, uint16_t);
 uint8_t *knot_edns_get_option(const knot_rrset_t *, uint16_t);
 int knot_edns_add_option(knot_rrset_t *, uint16_t, uint16_t, const uint8_t *, knot_mm_t *);
 uint16_t knot_edns_client_subnet_size(const knot_edns_client_subnet_t *);
 int knot_edns_client_subnet_write(uint8_t *, uint16_t, const knot_edns_client_subnet_t *);
 int knot_edns_client_subnet_parse(knot_edns_client_subnet_t *, const uint8_t *, uint16_t);
+int knot_edns_client_subnet_set_addr(knot_edns_client_subnet_t *, const struct sockaddr_storage *);
 struct kr_rplan *kr_resolve_plan(struct kr_request *);
 knot_mm_t *kr_resolve_pool(struct kr_request *);
 struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_dname_t *, uint16_t, uint16_t);
@@ -309,7 +310,6 @@ struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
 uint32_t kr_rand_uint(uint32_t);
 int kr_make_query(struct kr_query *, knot_pkt_t *);
-void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
 int kr_pkt_recycle(knot_pkt_t *);
 int kr_pkt_clear_payload(knot_pkt_t *);
@@ -350,9 +350,9 @@ _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);
 int kr_cache_closest_apex(struct kr_cache *, const knot_dname_t *, _Bool, knot_dname_t **);
+int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t, kr_cache_scope_t *);
 int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
-int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t, const kr_cache_scope_t *);
 int kr_cache_sync(struct kr_cache *);
 typedef struct {
 	uint8_t bitmap[32];
