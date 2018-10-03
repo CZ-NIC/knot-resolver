@@ -108,6 +108,11 @@ int session_start_read(struct session *session)
 	return io_start_read(session->handle);
 }
 
+int session_stop_read(struct session *session)
+{
+	return io_stop_read(session->handle);
+}
+
 int session_waitinglist_push(struct session *session, struct qr_task *task)
 {
 	queue_push(session->waiting, task);
@@ -142,7 +147,7 @@ int session_tasklist_add(struct session *session, struct qr_task *task)
 		key = (const char *)&task_msg_id;
 		key_len = sizeof(task_msg_id);
 	} else {
-		key = (const char *)task;
+		key = (const char *)&task;
 		key_len = sizeof(task);
 	}
 	trie_val_t *v = trie_get_ins(t, key, key_len);
@@ -173,7 +178,7 @@ int session_tasklist_del(struct session *session, struct qr_task *task)
 		key = (const char *)&task_msg_id;
 		key_len = sizeof(task_msg_id);
 	} else {
-		key = (const char *)task;
+		key = (const char *)&task;
 		key_len = sizeof(task);
 	}
 	int ret = trie_del(t, key, key_len, &val);
