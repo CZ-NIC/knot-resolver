@@ -409,27 +409,27 @@ distro:fedora-29:
   tags:
     - privileged  # mock requires additional capabilities (e.g. mount)
 
-distro:epel-7:
-  stage: test
-  except:
-    - master
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  only:  # trigger job only in repos under our control
-    - branches@knot/knot-resolver
-    - branches@knot/knot-resolver-security
-  dependencies:
-    - srpm
-  script:
-    - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
-  after_script:
-    - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - epel-7-x86_64/
-  tags:
-    - privileged  # mock require additional capabilities (e.g. mount)
+#distro:epel-7:
+#  stage: test
+#  except:
+#    - master
+#  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
+#  only:  # trigger job only in repos under our control
+#    - branches@knot/knot-resolver
+#    - branches@knot/knot-resolver-security
+#  dependencies:
+#    - srpm
+#  script:
+#    - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
+#  after_script:
+#    - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
+#  artifacts:
+#    when: always
+#    expire_in: '1 week'
+#    paths:
+#      - epel-7-x86_64/
+#  tags:
+#    - privileged  # mock require additional capabilities (e.g. mount)
 
 # compute coverage for runs with COVERAGE=1
 coverage:
