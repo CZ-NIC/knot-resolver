@@ -195,7 +195,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		consumed = tls_process_input_data(s, (const uint8_t *)buf->base, nread);
 		data = session_wirebuf_get_free_start(s);
 		data_len = consumed;
-	} 
+	}
 
 	/* data points to start of the free space in session wire buffer.
 	   Simple increase internal counter. */

@@ -46,6 +46,12 @@
 #define DEBUG_MSG(fmt...)
 #endif
 
+struct async_write_ctx {
+	uv_write_t write_req;
+	struct tls_common_ctx *t;
+	char buf[0];
+};
+
 static char const server_logstring[] = "tls";
 static char const client_logstring[] = "tls_client";
 
@@ -94,18 +100,16 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 static void on_write_complete(uv_write_t *req, int status)
 {
 	assert(req->data != NULL);
+	struct async_write_ctx *async_ctx = (struct async_write_ctx *)req->data;
+	struct tls_common_ctx *t = async_ctx->t;
+	assert(t->write_queue_size);
+	t->write_queue_size -= 1;
 	free(req->data);
-	free(req);
 }
 
-static bool stream_queue_is_empty(uv_stream_t *handle)
+static bool stream_queue_is_empty(struct tls_common_ctx *t)
 {
-#if UV_VERSION_HEX >= 0x011900
-	return uv_stream_get_write_queue_size(handle) == 0;
-#else
-	/* Assume best case */
-	return true;
-#endif
+	return (t->write_queue_size == 0);
 }
 
 static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * iov, int iovcnt)
@@ -144,7 +148,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 
 	/* Try to perform the immediate write first to avoid copy */
 	int ret = 0;
-	if (stream_queue_is_empty(handle)) {
+	if (stream_queue_is_empty(t)) {
 		ret = uv_try_write(handle, uv_buf, iovcnt);
 		DEBUG_MSG("[%s] push %zu <%p> = %d\n",
 		    t->client_side ? "tls_client" : "tls", total_len, h, ret);
@@ -153,10 +157,17 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		     > 0: number of bytes written (can be less than the supplied buffer size).
 		     < 0: negative error code (UV_EAGAIN is returned if no data can be sent immediately).
 		*/
-		if ((ret == total_len) || (ret < 0 && ret != UV_EAGAIN)) {
-			/* Either all the data were buffered by libuv or
-			 * uv_try_write() has returned error code other then UV_EAGAIN.
+		if (ret == total_len) {
+			/* All the data were buffered by libuv.
 			 * Return. */
+			return ret;
+		}
+
+		if (ret < 0 && ret != UV_EAGAIN) {
+			/* uv_try_write() has returned error code other then UV_EAGAIN.
+			 * Return. */
+			ret = -1;
+			errno = EIO;
 			return ret;
 		}
 		/* Since we are here expression below is true
@@ -173,10 +184,14 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	}
 
 	/* Fallback when the queue is full, and it's not possible to do an immediate write */
-	char *buf = malloc(total_len - ret);
-	if (buf != NULL) {
+	char *p = malloc(sizeof(struct async_write_ctx) + total_len - ret);
+	if (p != NULL) {
+		struct async_write_ctx *async_ctx = (struct async_write_ctx *)p;
+		/* Save pointer to session tls context */
+		async_ctx->t = t;
+		char *buf = async_ctx->buf;
 		/* Skip data written in the partial write */
-		int to_skip = ret;
+		size_t to_skip = ret;
 		/* Copy the buffer into owned memory */
 		size_t off = 0;
 		for (int i = 0; i < iovcnt; ++i) {
@@ -198,21 +213,16 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		uv_buf[0].len = off;
 
 		/* Create an asynchronous write request */
-		uv_write_t *write_req = calloc(1, sizeof(uv_write_t));
-		if (write_req != NULL) {
-			write_req->data = buf;
-		} else {
-			free(buf);
-			errno = ENOMEM;
-			return -1;
-		}
+		uv_write_t *write_req = &async_ctx->write_req;
+		memset(write_req, 0, sizeof(uv_write_t));
+		write_req->data = p;
 
 		/* Perform an asynchronous write with a callback */
 		if (uv_write(write_req, handle, uv_buf, 1, on_write_complete) == 0) {
 			ret = total_len;
+			t->write_queue_size += 1;
 		} else {
-			free(buf);
-			free(write_req);
+			free(p);
 			errno = EIO;
 			ret = -1;
 		}
@@ -410,10 +420,14 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 	const ssize_t submitted = sizeof(pkt_size) + pkt->size;
 
 	int ret = gnutls_record_uncork(tls_session, GNUTLS_RECORD_WAIT);
-	if (gnutls_error_is_fatal(ret)) {
-		kr_log_error("[%s] gnutls_record_uncork failed: %s (%d)\n",
-		             logstring, gnutls_strerror_name(ret), ret);
-		return kr_error(EIO);
+	if (ret < 0) {
+		if (!gnutls_error_is_fatal(ret)) {
+			return kr_error(EAGAIN);
+		} else {
+			kr_log_error("[%s] gnutls_record_uncork failed: %s (%d)\n",
+				     logstring, gnutls_strerror_name(ret), ret);
+			return kr_error(EIO);
+		}
 	}
 
 	if (ret != submitted) {

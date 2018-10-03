@@ -488,7 +488,7 @@ static void qr_task_free(struct qr_task *task)
 
 	/* Process source session. */
 	if (s && session_tasklist_get_len(s) < worker->tcp_pipeline_max/2 &&
-	    !session_flags(s)->closing && !session_flags(s)->throttled) {
+	    !session_flags(s)->closing && session_flags(s)->throttled) {
 		uv_handle_t *handle = session_get_handle(s);
 		/* Start reading again if the session is throttled and
 		 * the number of outgoing requests is below watermark. */
@@ -522,12 +522,10 @@ static int qr_task_register(struct qr_task *task, struct session *session)
 	 * an in effect shrink TCP window size. To get more precise throttling,
 	 * we would need to copy remainder of the unread buffer and reassemble
 	 * when resuming reading. This is NYI.  */
-	if (session_tasklist_get_len(session) >= task->ctx->worker->tcp_pipeline_max) {
-		uv_handle_t *handle = session_get_handle(session);
-		if (handle && !session_flags(session)->throttled && !session_flags(session)->closing) {
-			io_stop_read(handle);
-			session_flags(session)->throttled = true;
-		}
+	if (session_tasklist_get_len(session) >= task->ctx->worker->tcp_pipeline_max &&
+	    !session_flags(session)->throttled && !session_flags(session)->closing) {
+		session_stop_read(session);
+		session_flags(session)->throttled = true;
 	}
 
 	return 0;
@@ -555,32 +553,35 @@ static void qr_task_complete(struct qr_task *task)
 /* This is called when we send subrequest / answer */
 static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 {
+
 	if (task->finished) {
 		assert(task->leading == false);
 		qr_task_complete(task);
-		if (!handle || handle->type != UV_TCP) {
-			return status;
-		}
-		struct session* s = handle->data;
-		assert(s);
-		if (!session_flags(s)->outgoing || session_waitinglist_is_empty(s)) {
-			return status;
-		}
 	}
 
-	if (handle) {
-		struct session* s = handle->data;
-		bool outgoing = session_flags(s)->outgoing;
-		if (!outgoing) {
-			struct session* source_s = task->ctx->source.session;
-			if (source_s) {
-				assert (session_get_handle(source_s) == handle);
-			}
-		}
-		if (!session_flags(s)->closing) {
-			io_start_read(handle); /* Start reading new query */
-		}
+	if (!handle || handle->type != UV_TCP) {
+		return status;
 	}
+
+	struct session* s = handle->data;
+	assert(s);
+	if (status != 0) {
+		session_tasklist_del(s, task);
+	}
+
+	if (session_flags(s)->outgoing || session_flags(s)->closing) {
+		return status;
+	}
+
+	struct worker_ctx *worker = task->ctx->worker;
+	if (session_flags(s)->throttled &&
+	    session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
+	   /* Start reading again if the session is throttled and
+	    * the number of outgoing requests is below watermark. */
+		session_start_read(s);
+		session_flags(s)->throttled = false;
+	}
+
 	return status;
 }
 
@@ -629,14 +630,14 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	if (session_flags(session)->outgoing) {
 		size_t try_limit = session_tasklist_get_len(session) + 1;
 		uint16_t msg_id = knot_wire_get_id(pkt->wire);
-		int try_count = 0;
+		size_t try_count = 0;
 		while (session_tasklist_find_msgid(session, msg_id) &&
 		       try_count <= try_limit) {
 			++msg_id;
 			++try_count;
 		}
 		if (try_count > try_limit) {
-			return qr_task_on_send(task, handle, kr_error(EIO));
+			return kr_error(ENOENT);
 		}
 		worker_task_pkt_set_msgid(task, msg_id);
 	}
@@ -867,13 +868,13 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	session_flags(session)->connected = true;
+	session_start_read(session);
 
 	int ret = kr_ok();
 	if (session_flags(session)->has_tls) {
 		struct tls_client_ctx_t *tls_ctx = session_tls_get_client_ctx(session);
 		ret = tls_client_connect_start(tls_ctx, session, session_tls_hs_cb);
 		if (ret == kr_error(EAGAIN)) {
-			session_start_read(session);
 			session_timer_start(session, on_tcp_watchdog_timeout,
 					    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 			return;
@@ -886,7 +887,6 @@ static void on_connect(uv_connect_t *req, int status)
 		ret = qr_task_send(t, session, NULL, NULL);
 		if (ret != 0) {
 			assert(session_tasklist_is_empty(session));
-			assert(false);
 			worker_del_tcp_connected(worker, peer);
 			session_waitinglist_finalize(session, KR_STATE_FAIL);
 			session_close(session);
@@ -894,6 +894,8 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		session_waitinglist_pop(session, true);
 	}
+	session_timer_start(session, on_tcp_watchdog_timeout,
+			    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 }
 
 static void on_tcp_connect_timeout(uv_timer_t *timer)
@@ -1012,6 +1014,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 			task->pending_count += 1;
 			task->addrlist_turn = (task->addrlist_turn + 1) %
 					      task->addrlist_count; /* Round robin */
+			session_start_read(session); /* Start reading answer */
 		}
 	}
 	return ret;
@@ -1180,9 +1183,11 @@ static int qr_task_step(struct qr_task *task,
 		if (worker->stats.rconcurrent <
 			worker->rconcurrent_highwatermark - 10) {
 			worker->too_many_open = false;
-		} else if (packet && kr_rplan_empty(rplan)) {
-			/* new query; TODO - make this detection more obvious */
-			kr_resolve_consume(req, packet_source, packet);
+		} else {
+			if (packet && kr_rplan_empty(rplan)) {
+				/* new query; TODO - make this detection more obvious */
+				kr_resolve_consume(req, packet_source, packet);
+			}
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
 	}
@@ -1292,6 +1297,11 @@ static int qr_task_step(struct qr_task *task,
 					return qr_task_finalize(task, KR_STATE_FAIL);
 				}
 				session_waitinglist_pop(session, true);
+			}
+
+			if (session_tasklist_get_len(session) >= worker->tcp_pipeline_max) {
+				subreq_finalize(task, packet_source, packet);
+				return qr_task_finalize(task, KR_STATE_FAIL);
 			}
 
 			ret = qr_task_send(task, session, NULL, NULL);
@@ -1753,6 +1763,8 @@ void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid)
 {
 	knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
 	knot_wire_set_id(pktbuf->wire, msgid);
+	struct kr_query *q = task_get_last_pending_query(task);
+	q->id = msgid;
 }
 
 /** Reserve worker buffers */
