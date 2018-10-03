@@ -42,6 +42,8 @@ void session_clear(struct session *session);
 void session_close(struct session *session);
 /** Start reading from underlying libuv IO handle. */
 int session_start_read(struct session *session);
+/** Stop reading from underlying libuv IO handle. */
+int session_stop_read(struct session *session);
 
 /** List of tasks been waiting for IO. */
 /** Check if list is empty. */
