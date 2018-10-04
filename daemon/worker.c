@@ -69,7 +69,7 @@ struct request_ctx
 		struct session *session;
 	} source;
 	struct worker_ctx *worker;
-	qr_tasklist_t tasks;
+	struct qr_task *task;
 };
 
 /** Query resolution task. */
@@ -286,7 +286,6 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 
 	/* TODO Relocate pool to struct request */
 	ctx->worker = worker;
-	array_init(ctx->tasks);
 	struct session *s = handle ? handle->data : NULL;
 	if (s) {
 		assert(session_flags(s)->outgoing == false);
@@ -408,34 +407,6 @@ static void request_free(struct request_ctx *ctx)
 	worker->stats.rconcurrent -= 1;
 }
 
-static int request_add_tasks(struct request_ctx *ctx, struct qr_task *task)
-{
-	for (int i = 0; i < ctx->tasks.len; ++i) {
-		if (ctx->tasks.at[i] == task) {
-			return i;
-		}
-	}
-	int ret = array_push(ctx->tasks, task);
-	if (ret >= 0) {
-		qr_task_ref(task);
-	}
-	return ret;
-}
-
-static int request_del_tasks(struct request_ctx *ctx, struct qr_task *task)
-{
-	int ret = kr_error(ENOENT);
-	for (int i = 0; i < ctx->tasks.len; ++i) {
-		if (ctx->tasks.at[i] == task) {
-			array_del(ctx->tasks, i);
-			qr_task_unref(task);
-			ret = kr_ok();
-			break;
-		}
-	}
-	return ret;
-}
-
 static struct qr_task *qr_task_create(struct request_ctx *ctx)
 {
 	/* How much can client handle? */
@@ -465,12 +436,10 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	task->pktbuf = pktbuf;
 	array_init(task->waiting);
 	task->refs = 0;
-	int ret = request_add_tasks(ctx, task);
-	if (ret < 0) {
-		mm_free(&ctx->req.pool, task);
-		mm_free(&ctx->req.pool, pktbuf);
-		return NULL;
-	}
+	assert(ctx->task == NULL);
+	ctx->task = task;
+	/* Make the primary reference to task. */
+	qr_task_ref(task);
 	ctx->worker->stats.concurrent += 1;
 	return task;
 }
@@ -498,8 +467,7 @@ static void qr_task_free(struct qr_task *task)
 		}
 	}
 
-	if (ctx->tasks.len == 0) {
-		array_clear(ctx->tasks);
+	if (ctx->task == NULL) {
 		request_free(ctx);
 	}
 
@@ -547,7 +515,9 @@ static void qr_task_complete(struct qr_task *task)
 	}
 
 	/* Release primary reference to task. */
-	request_del_tasks(ctx, task);
+	assert(ctx->task == task);
+	ctx->task = NULL;
+	qr_task_unref(task);
 }
 
 /* This is called when we send subrequest / answer */
@@ -1668,8 +1638,9 @@ struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *quer
 	if (ret != 0) {
 		/* task is attached to request context,
 		 * so dereference (and deallocate) it first */
-		request_del_tasks(ctx, task);
-		array_clear(ctx->tasks);
+		assert(ctx->task == task);
+		ctx->task = NULL;
+		qr_task_unref(task);
 		request_free(ctx);
 		return NULL;
 	}
