@@ -1,6 +1,10 @@
 Knot Resolver 3.x.y (2018-mm-dd)
 ================================
 
+Incompatible changes
+--------------------
+- hints.use_nodata(true) by default; that's what most users want
+
 Improvements
 ------------
 - cache: handle out-of-space SIGBUS slightly better (#197)

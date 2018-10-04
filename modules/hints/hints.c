@@ -40,7 +40,7 @@
 struct hints_data {
 	struct kr_zonecut hints;
 	struct kr_zonecut reverse_hints;
-	bool use_nodata;
+	bool use_nodata; /**< See hint_use_nodata() description, exposed via lua. */
 };
 
 /** Useful for returning from module properties. */
@@ -627,6 +627,7 @@ int hints_init(struct kr_module *module)
 	}
 	kr_zonecut_init(&data->hints, (const uint8_t *)(""), pool);
 	kr_zonecut_init(&data->reverse_hints, (const uint8_t *)(""), pool);
+	data->use_nodata = true;
 	module->data = data;
 
 	return kr_ok();
@@ -675,7 +676,7 @@ struct kr_prop *hints_props(void)
 	    { &hint_add_hosts, "add_hosts", "Load a file with hosts-like formatting and add contents into hints.", },
 	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
 	    { &hint_root_file, "root_file", "Replace root hints set from a zonefile.", },
-	    { &hint_use_nodata, "use_nodata", "Synthesise NODATA if name matches, but type doesn't.", },
+	    { &hint_use_nodata, "use_nodata", "Synthesise NODATA if name matches, but type doesn't.  True by default.", },
 	    { NULL, NULL, NULL }
 	};
 	return prop_list;
