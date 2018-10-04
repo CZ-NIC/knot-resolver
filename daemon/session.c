@@ -148,7 +148,7 @@ int session_tasklist_add(struct session *session, struct qr_task *task)
 		key_len = sizeof(task_msg_id);
 	} else {
 		key = (const char *)&task;
-		key_len = sizeof(task);
+		key_len = sizeof(char *);
 	}
 	trie_val_t *v = trie_get_ins(t, key, key_len);
 	if (unlikely(!v)) {
@@ -179,7 +179,7 @@ int session_tasklist_del(struct session *session, struct qr_task *task)
 		key_len = sizeof(task_msg_id);
 	} else {
 		key = (const char *)&task;
-		key_len = sizeof(task);
+		key_len = sizeof(char *);
 	}
 	int ret = trie_del(t, key, key_len, &val);
 	if (ret == kr_ok()) {
