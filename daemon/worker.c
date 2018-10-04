@@ -1416,12 +1416,13 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 	/* Parse packet */
 	int ret = parse_packet(query);
 
-	bool is_query = (knot_wire_get_qr(query->wire) == 0);
+	const bool is_query = (knot_wire_get_qr(query->wire) == 0);
+	const bool is_outgoing = session_flags(session)->outgoing;
 	/* Ignore badly formed queries. */
 	if (!query ||
 	    (ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
-	    (is_query == session_flags(session)->outgoing)) {
-		if (query) worker->stats.dropped += 1;
+	    (is_query == is_outgoing)) {
+		if (query && !is_outgoing) worker->stats.dropped += 1;
 		return kr_error(EILSEQ);
 	}
 
@@ -1429,7 +1430,7 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 	 * or resume if this is subrequest */
 	struct qr_task *task = NULL;
 	struct sockaddr *addr = NULL;
-	if (!session_flags(session)->outgoing) { /* request from a client */
+	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx = request_create(worker, handle,
 							 session_get_peer(session));
 		if (!ctx) {
