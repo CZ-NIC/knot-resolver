@@ -121,6 +121,9 @@ trie_it_t* trie_it_begin(trie_t *tbl);
  *
  * Iteration is in ascending lexicographical order.
  * In particular, the empty string would be considered as the very first.
+ *
+ * \note You may not use this function if the trie's key-set has been modified
+ * during the lifetime of the iterator (modifying values only is OK).
  */
 KR_EXPORT
 void trie_it_next(trie_it_t *it);
