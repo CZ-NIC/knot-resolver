@@ -1581,8 +1581,10 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 		}
 		inet_ntop(addr->sa_family, kr_inaddr(&qry->ns.addr[i].ip), ns_str, sizeof(ns_str));
 		VERBOSE_MSG(qry,
-			"=> querying: '%s' score: %u zone cut: '%s' qname: '%s' qtype: '%s' proto: '%s'\n",
-			ns_str, qry->ns.score, zonecut_str, qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
+			"=> id: '%u' querying: '%s' score: %u zone cut: '%s' "
+			"qname: '%s' qtype: '%s' proto: '%s'\n",
+			qry->id, ns_str, qry->ns.score, zonecut_str,
+			qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
 		break;
 	}}
 
