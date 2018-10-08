@@ -910,15 +910,18 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 
 	/* Query built, expect answer. */
 	uint32_t rnd = kr_rand_uint(0);
+	/* We must respect https://tools.ietf.org/html/rfc7766#section-6.2.1
+	 * -  When sending multiple queries over a TCP connection, clients MUST NOT
+	 *    reuse the DNS Message ID of an in-flight query on that connection.
+	 *
+	 * So, if query is going to be sent over TCP connection
+	 * this id can be changed to avoid duplication with query that already was sent
+	 * but didn't receive answer yet.
+	 */
 	query->id = rnd ^ (rnd >> 16); /* cheap way to strengthen unpredictability */
 	knot_wire_set_id(pkt->wire, query->id);
 	pkt->parsed = pkt->size;
-	WITH_VERBOSE(query) {
-		KR_DNAME_GET_STR(name_str, query->sname);
-		KR_RRTYPE_GET_STR(type_str, query->stype);
-		QVERBOSE_MSG(query, "'%s' type '%s' id was assigned, parent id %u\n",
-			    name_str, type_str, query->parent ? query->parent->id : 0);
-	}
+
 	return kr_ok();
 }
 
@@ -935,6 +938,14 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = kr_make_query(query, pkt);
 	if (ret != 0) {
 		return KR_STATE_FAIL;
+	}
+
+	WITH_VERBOSE(query) {
+		KR_DNAME_GET_STR(name_str, query->sname);
+		KR_RRTYPE_GET_STR(type_str, query->stype);
+		QVERBOSE_MSG(query, "'%s' type '%s' new uid was assigned %u, parent uid %u\n",
+			    name_str, type_str, req->rplan.next_uid,
+			    query->parent ? query->parent->uid : 0);
 	}
 
 	query->uid = req->rplan.next_uid;

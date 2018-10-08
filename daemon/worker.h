@@ -160,6 +160,7 @@ struct worker_ctx {
 	trie_t *subreq_out;
 	mp_freelist_t pool_mp;
 	knot_mm_t pkt_pool;
+	unsigned int next_request_uid;
 };
 
 /** @endcond */
