@@ -268,7 +268,8 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
  */
 static struct request_ctx *request_create(struct worker_ctx *worker,
 					  uv_handle_t *handle,
-					  const struct sockaddr *addr)
+					  const struct sockaddr *addr,
+					  uint32_t uid)
 {
 	knot_mm_t pool = {
 		.ctx = pool_borrow(worker),
@@ -295,6 +296,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	struct kr_request *req = &ctx->req;
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
+	req->uid = uid;
 
 	/* Remember query source addr */
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {
@@ -600,7 +602,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		pkt = worker_task_get_pktbuf(task);
 	}
 
-	if (session_flags(session)->outgoing) {
+	if (session_flags(session)->outgoing && handle->type == UV_TCP) {
 		size_t try_limit = session_tasklist_get_len(session) + 1;
 		uint16_t msg_id = knot_wire_get_id(pkt->wire);
 		size_t try_count = 0;
@@ -1432,7 +1434,8 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 	struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx = request_create(worker, handle,
-							 session_get_peer(session));
+							 session_get_peer(session),
+							 knot_wire_get_id(query->wire));
 		if (!ctx) {
 			return kr_error(ENOMEM);
 		}
@@ -1625,7 +1628,8 @@ struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *quer
 		return NULL;
 	}
 
-	struct request_ctx *ctx = request_create(worker, NULL, NULL);
+
+	struct request_ctx *ctx = request_create(worker, NULL, NULL, worker->next_request_uid);
 	if (!ctx) {
 		return NULL;
 	}
@@ -1646,6 +1650,11 @@ struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *quer
 		qr_task_unref(task);
 		request_free(ctx);
 		return NULL;
+	}
+
+	worker->next_request_uid += 1;
+	if (worker->next_request_uid == 0) {
+		worker->next_request_uid = UINT16_MAX + 1;
 	}
 
 	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
@@ -1803,6 +1812,7 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 	worker->id = worker_id;
 	worker->count = worker_count;
 	worker->engine = engine;
+	worker->next_request_uid = UINT16_MAX + 1;
 	worker_reserve(worker, MP_FREELIST_SIZE);
 	worker->out_addr4.sin_family = AF_UNSPEC;
 	worker->out_addr6.sin6_family = AF_UNSPEC;
