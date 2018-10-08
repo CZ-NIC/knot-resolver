@@ -27,7 +27,7 @@
         kr_log_trace(q, cls, fmt, ##  __VA_ARGS__); \
     } else WITH_VERBOSE(q) { \
         unsigned _ind = 0; \
-        uint16_t _id = q ? q->id : 0; \
+        uint16_t _id = q ? q->uid : 0; \
         for (; q; q = q->parent, _ind += 2); \
         kr_log_verbose("[%5hu][%s] %*s" fmt, _id, cls, _ind, "", ##  __VA_ARGS__); \
     } \

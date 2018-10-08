@@ -614,7 +614,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
 					entry->rank, nsec_pmap, has_optout);
 	if (written < 0) {
-		kr_log_error("[%5hu][cach] stash failed, ret = %d\n", qry->id, ret);
+		kr_log_error("[%5i][cach] stash failed, ret = %d\n", qry->uid, ret);
 		return (int) written;
 	}
 

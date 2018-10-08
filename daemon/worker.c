@@ -600,7 +600,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		pkt = worker_task_get_pktbuf(task);
 	}
 
-	if (session_flags(session)->outgoing) {
+	if (session_flags(session)->outgoing && handle->type == UV_TCP) {
 		size_t try_limit = session_tasklist_get_len(session) + 1;
 		uint16_t msg_id = knot_wire_get_id(pkt->wire);
 		size_t try_count = 0;
