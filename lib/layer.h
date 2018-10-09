@@ -30,7 +30,7 @@
         uint32_t _q_uid = q ? q->uid : 0; \
         uint32_t _req_uid = q && q->request ? q->request->uid : 0; \
         for (; q; q = q->parent, _ind += 2); \
-        kr_log_verbose("[%i.%i][%s] %*s" fmt, _req_uid, _q_uid, cls, _ind, "", ##  __VA_ARGS__); \
+        kr_log_verbose("[%05u.%02u][%s] %*s" fmt, _req_uid, _q_uid, cls, _ind, "", ##  __VA_ARGS__); \
     } \
 }
 #else
