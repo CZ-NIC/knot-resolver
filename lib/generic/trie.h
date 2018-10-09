@@ -83,6 +83,7 @@ trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len);
  * \return KNOT_EOK for exact match, 1 for previous, KNOT_ENOENT for not-found,
  *         or KNOT_E*.
  */
+KR_EXPORT
 int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val);
 
 /*!
