@@ -45,6 +45,13 @@ static const char *dict[] = {
 #define KEY_LEN(x) (strlen(x) + 1)
 static const int dict_size = sizeof(dict) / sizeof(const char *);
 
+static void test_init(void **state)
+{
+	trie_t *t = trie_create(NULL);
+	assert_non_null(t);
+	*state = t;
+}
+
 static void test_insert(void **state)
 {
 	trie_t *t = *state;
@@ -118,11 +125,19 @@ static void test_queue(void **state)
 	}
 }
 
-static void test_init(void **state)
+static void test_leq_bug(void **state)
 {
+	/* We use different contents of the trie,
+	 * so that the particular bug would've been triggered. */
 	trie_t *t = trie_create(NULL);
-	assert_non_null(t);
-	*state = t;
+	char key = 'a';
+	trie_get_ins(t, &key, sizeof(key));
+
+	key = 0xff;
+	trie_val_t *val;
+	int ret = trie_get_leq(t, &key, sizeof(key), &val);
+	assert_int_equal(ret, 1);
+	trie_free(t);
 }
 
 static void test_deinit(void **state)
@@ -138,6 +153,7 @@ int main(int argc, char **argv)
 	const UnitTest tests[] = {
 	        group_test_setup(test_init),
 	        unit_test(test_insert),
+		unit_test(test_leq_bug),
 		unit_test(test_missing),
 		unit_test(test_iter),
 		unit_test(test_queue),
