@@ -943,7 +943,7 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	WITH_VERBOSE(query) {
 		KR_DNAME_GET_STR(name_str, query->sname);
 		KR_RRTYPE_GET_STR(type_str, query->stype);
-		QVERBOSE_MSG(query, "'%s' type '%s' new uid was assigned %u, parent uid %u\n",
+		QVERBOSE_MSG(query, "'%s' type '%s' new uid was assigned .%02u, parent uid .%02u\n",
 			    name_str, type_str, req->rplan.next_uid,
 			    query->parent ? query->parent->uid : 0);
 	}
