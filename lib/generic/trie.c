@@ -509,6 +509,8 @@ static inline int ns_longer(nstack_t *ns)
  *  \param info   Set position of the point of first mismatch (in index and flags).
  *  \param first  Set the value of the first non-matching character (from trie),
  *                optionally; end-of-string character has value -256 (that's why it's int).
+ *                Note: the character is converted to *unsigned* char (i.e. 0..255),
+ *                as that's the ordering used in the trie.
  *
  *  \return KNOT_EOK or KNOT_ENOMEM.
  */
@@ -541,7 +543,7 @@ static int ns_find_branch(nstack_t *ns, const char *key, uint32_t len,
 	}
 	info->index = index;
 	if (first)
-		*first = lkey->len > index ? lkey->chars[index] : -256;
+		*first = lkey->len > index ? (unsigned char)lkey->chars[index] : -256;
 	// Find flags: which half-byte has matched.
 	uint flags;
 	if (index == len && len == lkey->len) { // found equivalent key
@@ -697,7 +699,7 @@ int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val)
 	branch_t bp;
 	int un_leaf; // first unmatched character in the leaf
 	ERR_RETURN(ns_find_branch(ns, key, len, &bp, &un_leaf));
-	int un_key = bp.index < len ? key[bp.index] : -256;
+	int un_key = bp.index < len ? (unsigned char)key[bp.index] : -256;
 	node_t *t = ns->stack[ns->len - 1];
 	if (bp.flags == 0) { // found exact match
 		*val = &t->leaf.val;
