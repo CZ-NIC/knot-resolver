@@ -37,9 +37,18 @@
 	queue_pop(q);
 	assert(queue_head(q) == 2);
 	assert(queue_tail(q) == 4);
+
+	// you may iterate
+	typedef queue_it_t(int) queue_it_int_t;
+	for (queue_it_int_t it = queue_it_begin(q); !queue_it_finished(it);
+	     queue_it_next(it)) {
+		++queue_it_val(it);
+	}
+	assert(queue_tail(q) == 5);
+
 	queue_push_head(q, 0);
 	++queue_tail(q);
-	assert(queue_tail(q) == 5);
+	assert(queue_tail(q) == 6);
 	// free it up
 	queue_deinit(q);
 
@@ -104,6 +113,36 @@
 /** @brief Return the number of elements in the queue. */
 #define queue_len(q) \
 	((const size_t)(q).queue.len)
+
+
+/** @brief Type for queue iterator, parametrized by value type.
+ * It's a simple structure that owns no other resources.
+ * You may NOT use it after doing any push or pop (without _begin again). */
+#define queue_it_t(type) \
+	union { \
+		type *pdata_t; /* only the *type* information is used */ \
+		struct queue_it iter; \
+	}
+
+/** @brief Initialize a queue iterator at the head of the queue.
+ * If you use this in assignment (instead of initialization),
+ * you will unfortunately need to add corresponding type-cast in front.
+ * Beware: there's no type-check between queue and iterator! */
+#define queue_it_begin(q) \
+	{ .iter = queue_it_begin_impl(&(q).queue) }
+
+/** @brief Return a "reference" to the current element (it's an L-value) . */
+#define queue_it_val(it) \
+	( *(__typeof__((it).pdata_t)) queue_it_val_impl(&(it).iter) )
+
+/** @brief Test if the iterator has gone past the last element.
+ * If it has, you may not use _val or _next. */
+#define queue_it_finished(it) \
+	queue_it_finished_impl(&(it).iter)
+
+/** @brief Advance the iterator to the next element. */
+#define queue_it_next(it) \
+	queue_it_next_impl(&(it).iter)
 
 
 
@@ -174,6 +213,43 @@ static inline void queue_pop_impl(struct queue *q)
 		++(h->begin);
 	}
 	--(q->len);
+}
+
+
+struct queue_it {
+	struct queue_chunk *chunk;
+	int16_t pos, item_size;
+};
+
+static inline struct queue_it queue_it_begin_impl(struct queue *q)
+{
+	assert(q);
+	return (struct queue_it){
+		.chunk = q->head,
+		.pos = q->head ? q->head->begin : -1,
+		.item_size = q->item_size,
+	};
+}
+
+static inline bool queue_it_finished_impl(struct queue_it *it)
+{
+	return it->chunk == NULL || it->pos >= it->chunk->end;
+}
+
+static inline void * queue_it_val_impl(struct queue_it *it)
+{
+	assert(!queue_it_finished_impl(it));
+	return it->chunk->data + it->pos * it->item_size;
+}
+
+static inline void queue_it_next_impl(struct queue_it *it)
+{
+	assert(!queue_it_finished_impl(it));
+	++(it->pos);
+	if (it->pos < it->chunk->end)
+		return;
+	it->chunk = it->chunk->next;
+	it->pos = it->chunk ? it->chunk->begin : -1;
 }
 
 /** @endcond (internal) */

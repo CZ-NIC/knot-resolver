@@ -19,6 +19,7 @@
 
 /* The main intention is to use queues with pointers, so we test the same-sized int. */
 typedef queue_t(ptrdiff_t) queue_int_t;
+typedef queue_it_t(int) queue_int_it_t;
 
 static void test_int(void **state_)
 {
@@ -39,6 +40,15 @@ static void test_int(void **state_)
 		queue_push_head(q, i);
 	}
 	assert_int_equal(queue_len(q), 3 + 99);
+
+	/* Basic iterator test. */
+	int i = 0;
+	for (queue_int_it_t it = queue_it_begin(q); !queue_it_finished(it);
+	     queue_it_next(it)) {
+		++queue_it_val(it);
+		++i;
+	}
+	assert_int_equal(queue_len(q), i);
 
 	queue_deinit(q);
 	queue_init(q);
