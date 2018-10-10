@@ -315,7 +315,8 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 	/* We first check various exit-conditions and then call the _real function. */
 
-	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || qry->flags.NO_CACHE
+	if (!kr_cache_is_open(&req->ctx->cache)
+	    || ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || qry->flags.NO_CACHE
 	    || (qry->flags.CACHE_TRIED && !qry->stale_cb)
 	    || !check_rrtype(qry->stype, qry) /* LATER: some other behavior for some of these? */
 	    || qry->sclass != KNOT_CLASS_IN) {
@@ -358,7 +359,8 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Note: we cache even in KR_STATE_FAIL.  For example,
 	 * BOGUS answer can go to +cd cache even without +cd request. */
-	if (!qry || qry->flags.CACHED || !check_rrtype(knot_pkt_qtype(pkt), qry)
+	if (!kr_cache_is_open(cache) || !qry
+	    || qry->flags.CACHED || !check_rrtype(knot_pkt_qtype(pkt), qry)
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state;
 	}
