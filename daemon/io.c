@@ -140,16 +140,38 @@ int udp_bindfd(uv_udp_t *handle, int fd)
 	return udp_bind_finalize((uv_handle_t *)handle);
 }
 
-static void tcp_timeout_trigger(uv_timer_t *timer)
+void tcp_timeout_trigger(uv_timer_t *timer)
 {
 	struct session *s = timer->data;
 
-	assert(!session_flags(s)->outgoing);
+	assert(!session_flags(s)->closing);
+	assert(session_waitinglist_is_empty(s));
+
+	struct worker_ctx *worker = timer->loop->data;
+
 	if (!session_tasklist_is_empty(s)) {
-		uv_timer_again(timer);
-	} else if (!session_flags(s)->closing) {
+		int finalized = session_tasklist_finalize_expired(s);
+		worker->stats.timeout += finalized;
+	}
+	if (!session_tasklist_is_empty(s)) {
 		uv_timer_stop(timer);
-		session_close(s);
+		session_timer_start(s, tcp_timeout_trigger,
+				    KR_RESOLVE_TIME_LIMIT / 2,
+				    KR_RESOLVE_TIME_LIMIT / 2);
+	} else {
+		const struct engine *engine = worker->engine;
+		const struct network *net = &engine->net;
+		uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
+		uint64_t last_activity = session_last_input_activity(s);
+		uint64_t idle_time = kr_now() - last_activity;
+		if (idle_time < idle_in_timeout) {
+			idle_in_timeout -= idle_time;
+			uv_timer_stop(timer);
+			session_timer_start(s, tcp_timeout_trigger,
+					    idle_in_timeout, idle_in_timeout);
+		} else {
+			session_close(s);
+		}
 	}
 }
 
@@ -206,14 +228,6 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	if (ret < 0) {
 		/* An error has occurred, close the session. */
 		worker_end_tcp(s);
-	} else if (ret > 0 && !session_flags(s)->closing) {
-		/* Connection spawned at least one request
-		 * or
-		 * valid answer has been received from upstream.
-		 * Reset deadline for next query.
-		 * https://tools.ietf.org/html/rfc7766#section-6.2.3
-		 */
-		session_timer_restart(s);
 	}
 	session_wirebuf_compress(s);
 	mp_flush(worker->pkt_pool.ctx);
