@@ -31,6 +31,7 @@ int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr);
 int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr);
 int tcp_bindfd(uv_tcp_t *handle, int fd);
 int tcp_bindfd_tls(uv_tcp_t *handle, int fd);
+void tcp_timeout_trigger(uv_timer_t *timer);
 
 /** Initialize the handle, incl. ->data = struct session * instance.
  * \param type = SOCK_*
