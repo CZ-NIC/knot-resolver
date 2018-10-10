@@ -109,5 +109,5 @@ Properties
   :param bool toggle: true if enabling NODATA synthesis, false if disabling
   :return: ``{ result: bool }``
 
-  If set to true, NODATA will be synthesised for matching hint name, but mismatching type (e.g. AAAA query when only A hint exists).
+  If set to true (the default), NODATA will be synthesised for matching hint name, but mismatching type (e.g. AAAA query when only A hint exists).
 
