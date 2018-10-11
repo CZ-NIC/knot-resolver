@@ -384,26 +384,21 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 		return kr_error(EINVAL);
 	}
 
-	const char *addr_in = NULL;
-	size_t addr_len = 0;
-	if (addr) { /* Caller provided specific address */
-		if (addr->sa_family == AF_INET) {
-			addr_in = (const char *)&((struct sockaddr_in *)addr)->sin_addr;
-			addr_len = sizeof(struct in_addr);
-		} else if (addr->sa_family == AF_INET6) {
-			addr_in = (const char *)&((struct sockaddr_in6 *)addr)->sin6_addr;
-			addr_len = sizeof(struct in6_addr);
-		} else {
-			assert(false && "kr_nsrep_update_rtt: unexpected address family");
-		}
-	} else if (ns != NULL && ns->addr[0].ip.sa_family != AF_UNSPEC) {
-		addr_in = kr_inaddr(&ns->addr[0].ip);
-		addr_len = kr_inaddr_len(&ns->addr[0].ip);
+	/* Get `addr`, and later its raw string. */
+	if (addr) {
+		/* Caller provided specific address, OK. */
+	} else if (ns != NULL) {
+		addr = &ns->addr[0].ip;
 	} else {
+		assert(false && "kr_nsrep_update_rtt: don't know what address to update");
 		return kr_error(EINVAL);
 	}
-
-	assert(addr_in != NULL && addr_len > 0);
+	const char *addr_in = kr_inaddr(addr);
+	size_t addr_len = kr_inaddr_len(addr);
+	if (!addr_in || addr_len <= 0) {
+		assert(false && "kr_nsrep_update_rtt: incorrect address");
+		return kr_error(EINVAL);
+	}
 
 	bool is_new_entry = false;
 	kr_nsrep_rtt_lru_entry_t  *cur = lru_get_new(cache, addr_in, addr_len,
