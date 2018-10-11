@@ -1228,6 +1228,9 @@ You can add, start and stop processes during runtime based on the load.
 
 .. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, use only one daemon process.
 
+Remote control
+==============
+
 Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
 
 .. code-block:: bash
