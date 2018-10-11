@@ -80,12 +80,12 @@ struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16
 struct qr_task* session_tasklist_find_msgid(const struct session *session, uint16_t msg_id);
 /** Finalize all tasks in the list. */
 void session_tasklist_finalize(struct session *session, int status);
+/** Finalize all expired tasks in the list. */
+int session_tasklist_finalize_expired(struct session *session);
 
 /** Both of task lists (associated & waiting). */
 /** Check if empty. */
 bool session_is_empty(const struct session *session);
-/** Finalize all tasks. */
-void session_tasks_finalize(struct session *session, int status);
 /** Get pointer to session flags */
 struct session_flags *session_flags(struct session *session);
 /** Get peer address. */
@@ -141,3 +141,6 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm);
 int session_discard_packet(struct session *session, const knot_pkt_t *pkt);
 
 void session_kill_ioreq(struct session *s, struct qr_task *task);
+/** Update timestamp */
+void session_touch(struct session *s);
+uint64_t session_last_input_activity(struct session *s);

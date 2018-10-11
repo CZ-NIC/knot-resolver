@@ -102,6 +102,9 @@ void worker_request_set_source_session(struct request_ctx *, struct session *ses
 
 uint16_t worker_task_pkt_get_msgid(struct qr_task *task);
 void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid);
+uint64_t worker_task_creation_time(struct qr_task *task);
+void worker_task_subreq_finalize(struct qr_task *task);
+bool worker_task_finished(struct qr_task *task);
 
 /** @cond internal */
 
