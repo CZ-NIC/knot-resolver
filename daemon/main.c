@@ -55,7 +55,8 @@ struct args {
 	addr_array_t tls_set;
 	fd_array_t fd_set;
 	fd_array_t tls_fd_set;
-	addr_array_t proxy_set;
+	addr_array_t addr_proxy_set;
+	fd_array_t fd_proxy_set;
 	char *keyfile;
 	int keyfile_unmanaged;
 	const char *moduledir;
@@ -476,7 +477,8 @@ static void args_init(struct args *args)
 	array_init(args->tls_set);
 	array_init(args->fd_set);
 	array_init(args->tls_fd_set);
-	array_init(args->proxy_set);
+	array_init(args->addr_proxy_set);
+	array_init(args->fd_proxy_set);
 	args->moduledir = MODULEDIR;
 	args->dry_run = false;
 	args->control_fd = -1;
@@ -490,7 +492,7 @@ static void args_init(struct args *args)
 static int parse_args(int argc, char **argv, struct args *args)
 {
 	/* Long options. */
-	int c = 0, li = 0;
+	int c = 0, li = 0, fd = 0;
 	struct option opts[] = {
 		{"addr",       required_argument, 0, 'a'},
 		{"tls",        required_argument, 0, 't'},
@@ -525,7 +527,12 @@ static int parse_args(int argc, char **argv, struct args *args)
 			array_push(args->tls_fd_set, strtol(optarg, NULL, 10));
 			break;
 		case 'p':
-			array_push(args->proxy_set, optarg);
+			fd = strtol(optarg, NULL, 10);
+			if (fd > 0) {
+				array_push(args->fd_proxy_set, fd);
+			} else {
+				array_push(args->addr_proxy_set, optarg);
+			}
 			break;
 		case 'c':
 			args->config = optarg;
@@ -581,14 +588,13 @@ static int parse_args(int argc, char **argv, struct args *args)
 	return -1;
 }
 
-static int bind_fds(struct network *net, fd_array_t *fd_set, addr_array_t *proxy_set, bool tls) {
+static int bind_fds(struct network *net, fd_array_t *fd_set, fd_array_t *fd_proxy_set, bool tls) {
 	uint32_t flags = tls ? NET_TLS : 0;
 	int ret = 0;
 	for (size_t i = 0; i < fd_set->len; ++i) {
 		bool proxy = false;
-		for (size_t j = 0; !proxy && j < proxy_set->len; ++j) {
-			int proxy_fd = strtol(proxy_set->at[j], NULL, 10);
-			if (fd_set->at[i] == proxy_fd) {
+		for (size_t j = 0; !proxy && j < fd_proxy_set->len; ++j) {
+			if (fd_set->at[i] == fd_proxy_set->at[j]) {
 				proxy = true;
 			}
 		}
@@ -603,17 +609,17 @@ static int bind_fds(struct network *net, fd_array_t *fd_set, addr_array_t *proxy
 	return ret;
 }
 
-static int bind_sockets(struct network *net, addr_array_t *addr_set, addr_array_t *proxy_set, bool tls) {
+static int bind_sockets(struct network *net, addr_array_t *addr_set, addr_array_t *addr_proxy_set, bool tls) {
 	uint32_t flags = tls ? NET_TCP|NET_TLS : NET_UDP|NET_TCP;
+	int port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
 	int ret = 0;
 	for (size_t i = 0; i < addr_set->len; ++i) {
 		bool proxy = false;
-		for (size_t j = 0; !proxy && j < proxy_set->len; ++j) {
-			if (strcmp(addr_set->at[i], proxy_set->at[j]) == 0) {
+		for (size_t j = 0; !proxy && j < addr_proxy_set->len; ++j) {
+			if (strcmp(addr_set->at[i], addr_proxy_set->at[j]) == 0) {
 				proxy = true;
 			}
 		}
-		int port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
 		const char *addr = set_addr(addr_set->at[i], &port);
 		ret = network_listen(net, addr, (uint16_t)port, proxy ? (flags|NET_PROXY) : flags);
 		if (ret != 0) {
@@ -657,7 +663,7 @@ int main(int argc, char **argv)
 
 		char *suffix = strrchr(socket_names[i], '_');
 		if (suffix && !strncasecmp("_proxy",suffix,6)) {
-			array_push(args.proxy_set, fd);
+			array_push(args.fd_proxy_set, fd);
 		}
 	}
 	free_sd_socket_names(socket_names, sd_nsocks);
@@ -727,10 +733,10 @@ int main(int argc, char **argv)
 
 	uv_loop_t *loop = NULL;
 	/* Bind to passed fds and sockets*/
-	if (bind_fds(&engine.net, &args.fd_set, &args.proxy_set, false) != 0 ||
-	    bind_fds(&engine.net, &args.tls_fd_set, &args.proxy_set, true) != 0 ||
-	    bind_sockets(&engine.net, &args.addr_set, &args.proxy_set, false) != 0 ||
-	    bind_sockets(&engine.net, &args.tls_set, &args.proxy_set, true) != 0
+	if (bind_fds(&engine.net, &args.fd_set, &args.fd_proxy_set, false) != 0 ||
+	    bind_fds(&engine.net, &args.tls_fd_set, &args.fd_proxy_set, true) != 0 ||
+	    bind_sockets(&engine.net, &args.addr_set, &args.addr_proxy_set, false) != 0 ||
+	    bind_sockets(&engine.net, &args.tls_set, &args.addr_proxy_set, true) != 0
 	) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
@@ -806,7 +812,7 @@ cleanup:/* Cleanup. */
 	mp_delete(pool.ctx);
 	array_clear(args.addr_set);
 	array_clear(args.tls_set);
-	array_clear(args.proxy_set);
+	array_clear(args.addr_proxy_set);
 	kr_crypto_cleanup();
 	return ret;
 }
