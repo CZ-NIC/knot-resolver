@@ -14,21 +14,22 @@
  * that exists between remote counterpart and a local socket.
  */
 struct session {
-	struct session_flags sflags; /**< miscellaneous flags. */
-	union inaddr peer;           /**< address of peer; is not set for client's UDP sessions. */
-	uv_handle_t *handle;         /**< libuv handle for IO operations. */
-	uv_timer_t timeout;          /**< libuv handle for timer. */
+	struct session_flags sflags;  /**< miscellaneous flags. */
+	union inaddr peer;            /**< address of peer; is not set for client's UDP sessions. */
+	uv_handle_t *handle;          /**< libuv handle for IO operations. */
+	uv_timer_t timeout;           /**< libuv handle for timer. */
 
-	struct tls_ctx_t *tls_ctx;   /**< server side tls-related data. */
+	struct tls_ctx_t *tls_ctx;    /**< server side tls-related data. */
 	struct tls_client_ctx_t *tls_client_ctx; /**< client side tls-related data. */
 
-	trie_t *tasks;               /**< list of tasks assotiated with given session. */
+	trie_t *tasks;                /**< list of tasks assotiated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
 
-	uint8_t *wire_buf;           /**< Buffer for DNS message. */
-	ssize_t wire_buf_size;       /**< Buffer size. */
-	ssize_t wire_buf_start_idx;  /**< Data start offset in wire_buf. */
-	ssize_t wire_buf_end_idx;    /**< Data end offset in wire_buf. */
+	uint8_t *wire_buf;            /**< Buffer for DNS message. */
+	ssize_t wire_buf_size;        /**< Buffer size. */
+	ssize_t wire_buf_start_idx;   /**< Data start offset in wire_buf. */
+	ssize_t wire_buf_end_idx;     /**< Data end offset in wire_buf. */
+	uint64_t last_input_activity; /**< Either creatoion time or time of peer's last activity */
 };
 
 static void on_session_close(uv_handle_t *handle)
@@ -160,7 +161,7 @@ int session_tasklist_add(struct session *session, struct qr_task *task)
 		worker_task_ref(task);
 	} else if (*v != task) {
 		assert(false);
-		return kr_error(ENOMEM);
+		return kr_error(EINVAL);
 	}
 	return kr_ok();
 }
@@ -216,9 +217,10 @@ struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16
 	trie_val_t val;
 	int res = trie_del(t, key, key_len, &val);
 	if (res == kr_ok()) {
-		ret = val;
-		assert(worker_task_numrefs(ret) > 1);
-		worker_task_unref(ret);
+		if (worker_task_numrefs(val) > 1) {
+			ret = val;
+		}
+		worker_task_unref(val);
 	}
 	return ret;
 }
@@ -322,6 +324,7 @@ struct session *session_new(uv_handle_t *handle)
 	session->handle = handle;
 	handle->data = session;
 	session->timeout.data = session;
+	session_touch(session);
 
 	return session;
 }
@@ -366,12 +369,11 @@ void session_waitinglist_retry(struct session *session, bool increase_timeout_cn
 {
 	while (!session_waitinglist_is_empty(session)) {
 		struct qr_task *task = session_waitinglist_pop(session, false);
-		assert(worker_task_numrefs(task) > 1);
 		if (increase_timeout_cnt) {
 			worker_task_timeout_inc(task);
 		}
-		worker_task_unref(task);
 		worker_task_step(task, NULL, NULL);
+		worker_task_unref(task);
 	}
 }
 
@@ -379,13 +381,7 @@ void session_waitinglist_finalize(struct session *session, int status)
 {
 	while (!session_waitinglist_is_empty(session)) {
 		struct qr_task *t = session_waitinglist_pop(session, false);
-		if (session->sflags.outgoing) {
-			worker_task_finalize(t, status);
-		} else {
-			struct request_ctx *ctx = worker_task_get_request(t);
-			assert(worker_request_get_source_session(ctx) == session);
-			worker_request_set_source_session(ctx, NULL);
-		}
+		worker_task_finalize(t, status);
 		worker_task_unref(t);
 	}
 }
@@ -395,21 +391,62 @@ void session_tasklist_finalize(struct session *session, int status)
 	while (session_tasklist_get_len(session) > 0) {
 		struct qr_task *t = session_tasklist_del_first(session, false);
 		assert(worker_task_numrefs(t) > 0);
-		if (session->sflags.outgoing) {
-			worker_task_finalize(t, status);
-		} else {
-			struct request_ctx *ctx = worker_task_get_request(t);
-			assert(worker_request_get_source_session(ctx) == session);
-			worker_request_set_source_session(ctx, NULL);
-		}
+		worker_task_finalize(t, status);
 		worker_task_unref(t);
 	}
 }
 
-void session_tasks_finalize(struct session *session, int status)
+int session_tasklist_finalize_expired(struct session *session)
 {
-	session_waitinglist_finalize(session, status);
-	session_tasklist_finalize(session, status);
+	int ret = 0;
+	queue_t(struct qr_task *) q;
+	uint64_t now = kr_now();
+	trie_t *t = session->tasks;
+	trie_it_t *it;
+	queue_init(q);
+	for (it = trie_it_begin(t); !trie_it_finished(it); trie_it_next(it)) {
+		trie_val_t *v = trie_it_val(it);
+		struct qr_task *task = (struct qr_task *)*v;
+		if ((now - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
+			queue_push(q, task);
+			worker_task_ref(task);
+		}
+	}
+	trie_it_free(it);
+
+	struct qr_task *task = NULL;
+	uint16_t msg_id = 0;
+	char *key = (char *)&task;
+	int32_t keylen = sizeof(struct qr_task *);
+	if (session->sflags.outgoing) {
+		key = (char *)&msg_id;
+		keylen = sizeof(msg_id);
+	}
+	while (queue_len(q) > 0) {
+		task = queue_head(q);
+		if (session->sflags.outgoing) {
+			knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
+			msg_id = knot_wire_get_id(pktbuf->wire);
+		}
+		int res = trie_del(t, key, keylen, NULL);
+		if (!worker_task_finished(task)) {
+			/* task->pending_count must be zero,
+			 * but there are can be followers,
+			 * so run worker_task_subreq_finalize() to ensure retrying
+			 * for all the followers. */
+			worker_task_subreq_finalize(task);
+			worker_task_finalize(task, KR_STATE_FAIL);
+		}
+		if (res == KNOT_EOK) {
+			worker_task_unref(task);
+		}
+		queue_pop(q);
+		worker_task_unref(task);
+		++ret;
+	}
+
+	queue_deinit(q);
+	return ret;
 }
 
 int session_timer_start(struct session *session, uv_timer_cb cb,
@@ -673,55 +710,30 @@ int session_wirebuf_process(struct session *session)
 	return ret;
 }
 
-static void on_session_idle_timeout(uv_timer_t *timer)
-{
-	struct session *s = timer->data;
-	assert(s);
-	uv_timer_stop(timer);
-	if (s->sflags.closing) {
-		return;
-	}
-	/* session was not in use during timer timeout
-	 * remove it from connection list and close
-	 */
-	assert(session_is_empty(s));
-	session_close(s);
-}
-
 void session_kill_ioreq(struct session *s, struct qr_task *task)
 {
-	assert(s && s->sflags.outgoing && s->handle);
+	if (!s) {
+		return;
+	}
+	assert(s->sflags.outgoing && s->handle);
 	if (s->sflags.closing) {
 		return;
 	}
+	session_tasklist_del(s, task);
 	if (s->handle->type == UV_UDP) {
-		uv_timer_stop(&s->timeout);
-		session_tasklist_del(s, task);
 		assert(session_tasklist_is_empty(s));
 		session_close(s);
 		return;
 	}
-	/* TCP-specific code now. */
-	if (s->handle->type != UV_TCP) abort();
+}
 
-	int res = 0;
+/** Update timestamp */
+void session_touch(struct session *s)
+{
+	s->last_input_activity = kr_now();
+}
 
-	const struct sockaddr *peer = &s->peer.ip;
-	if (peer->sa_family != AF_UNSPEC && session_is_empty(s) && !s->sflags.closing) {
-		assert(peer->sa_family == AF_INET || peer->sa_family == AF_INET6);
-		res = 1;
-		if (s->sflags.connected) {
-			/* This is outbound TCP connection which can be reused.
-			* Close it after timeout */
-			s->timeout.data = s;
-			uv_timer_stop(&s->timeout);
-			res = uv_timer_start(&s->timeout, on_session_idle_timeout,
-					     KR_CONN_RTT_MAX, 0);
-		}
-	}
-
-	if (res != 0) {
-		/* if any errors, close the session immediately */
-		session_close(s);
-	}
+uint64_t session_last_input_activity(struct session *s)
+{
+	return s->last_input_activity;
 }
