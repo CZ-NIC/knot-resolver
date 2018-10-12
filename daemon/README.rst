@@ -1102,6 +1102,9 @@ specified worker count and process rank.
 
 	print(worker.stats().concurrent)
 
+
+.. _daemon-supervised:
+
 Running supervised
 ==================
 
@@ -1201,6 +1204,27 @@ To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a sing
    $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 -v &
 
 
+Control sockets
+===============
+
+Unless ran manually, knot-resolver is typically started in non-interactive mode.
+The mode gets triggered by using the ``-f`` command-line parameter or by passing sockets from systemd.
+You can attach to the the consoles for each process; by default they are in ``rundir/tty/$PID``,
+but packaging often places them in ``/run/knot-resolver/control*``.
+
+.. code-block:: bash
+
+	$ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
+	> cache.count()
+	53
+
+The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
+Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
+
+This is also a way to enumerate and test running instances, the list of files in ``tty`` corresponds to the list
+of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
+
+
 Scaling out
 ===========
 
@@ -1228,21 +1252,6 @@ You can add, start and stop processes during runtime based on the load.
 
 .. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, use only one daemon process.
 
-Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
-
-.. code-block:: bash
-
-	$ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
-	> cache.count()
-	53
-
-The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
-Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
-
-This is also a way to enumerate and test running instances, the list of files in ``tty`` corresponds to the list
-of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
-
-.. _daemon-supervised:
 
 Using CLI tools
 ===============
