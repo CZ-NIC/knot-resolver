@@ -78,13 +78,12 @@ struct qr_task
 	struct request_ctx *ctx;
 	knot_pkt_t *pktbuf;
 	qr_tasklist_t waiting;
-	uv_handle_t *pending[MAX_PENDING];
+	struct session *pending[MAX_PENDING];
 	uint16_t pending_count;
 	uint16_t addrlist_count;
 	uint16_t addrlist_turn;
 	uint16_t timeouts;
 	uint16_t iter_count;
-	uint16_t bytes_remaining;
 	struct sockaddr *addrlist;
 	uint32_t refs;
 	bool finished : 1;
@@ -192,7 +191,7 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker, int socktype, sa_fami
 static void ioreq_kill_pending(struct qr_task *task)
 {
 	for (uint16_t i = 0; i < task->pending_count; ++i) {
-		session_kill_ioreq(task->pending[i]->data, task);
+		session_kill_ioreq(task->pending[i], task);
 	}
 	task->pending_count = 0;
 }
@@ -945,7 +944,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 			session_close(session);
 			ret = NULL;
 		} else {
-			task->pending[task->pending_count] = session_get_handle(session);
+			task->pending[task->pending_count] = session;
 			task->pending_count += 1;
 			task->addrlist_turn = (task->addrlist_turn + 1) %
 					      task->addrlist_count; /* Round robin */
