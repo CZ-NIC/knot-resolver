@@ -16,33 +16,6 @@
 
 #pragma once
 
-/* Magic defaults */
-#ifndef LRU_RTT_SIZE
-#define LRU_RTT_SIZE 65536 /**< NS RTT cache size */
-#endif
-#ifndef LRU_REP_SIZE
-#define LRU_REP_SIZE (LRU_RTT_SIZE / 4) /**< NS reputation cache size */
-#endif
-#ifndef LRU_COOKIES_SIZE
-#define LRU_COOKIES_SIZE LRU_RTT_SIZE /**< DNS cookies cache size. */
-#endif
-#ifndef MP_FREELIST_SIZE
-# ifdef __clang_analyzer__
-#  define MP_FREELIST_SIZE 0
-# else
-#  define MP_FREELIST_SIZE 64 /**< Maximum length of the worker mempool freelist */
-# endif
-#endif
-#ifndef RECVMMSG_BATCH
-#define RECVMMSG_BATCH 4
-#endif
-#ifndef QUERY_RATE_THRESHOLD
-#define QUERY_RATE_THRESHOLD (2 * MP_FREELIST_SIZE) /**< Nr of parallel queries considered as high rate */
-#endif
-#ifndef MAX_PIPELINED
-#define MAX_PIPELINED 100
-#endif
-
 /*
  * @internal These are forward decls to allow building modules with engine but without Lua.
  */

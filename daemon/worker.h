@@ -37,30 +37,17 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 /**
  * Process an incoming packet (query from a client or answer from upstream).
  *
- * @param worker the singleton worker
- * @param handle socket through which the request came
- * @param query  the packet, or NULL on an error from the transport layer
- * @param addr   the address from which the packet came (or NULL, possibly, on error)
+ * @param session  session the where packet came from
+ * @param query    the packet, or NULL on an error from the transport layer
  * @return 0 or an error code
  */
-int worker_submit(struct worker_ctx *worker, uv_handle_t *handle, knot_pkt_t *query,
-		const struct sockaddr* addr);
-
-/**
- * Process incoming DNS message fragment(s) that arrived over a stream (TCP, TLS).
- *
- * If the fragment contains only a partial message, it is buffered.
- * If the fragment contains a complete query or completes current fragment, execute it.
- * @return the number of newly-completed requests (>=0) or an error code
- */
-int worker_process_tcp(struct worker_ctx *worker, uv_stream_t *handle,
-		const uint8_t *msg, ssize_t len);
+int worker_submit(struct session *session, knot_pkt_t *query);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session
  * which may be freely closed afterwards.
  */
-int worker_end_tcp(struct worker_ctx *worker, uv_handle_t *handle);
+int worker_end_tcp(struct session *session);
 
 /**
  * Start query resolution with given query.
@@ -83,15 +70,41 @@ struct kr_request *worker_task_request(struct qr_task *task);
 /** Collect worker mempools */
 void worker_reclaim(struct worker_ctx *worker);
 
-/** Closes given session */
-void worker_session_close(struct session *session);
+int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
+		     knot_pkt_t *packet);
 
-void *worker_iohandle_borrow(struct worker_ctx *worker);
-
-void worker_iohandle_release(struct worker_ctx *worker, void *h);
+int worker_task_numrefs(const struct qr_task *task);
 
 /** Finalize given task */
 int worker_task_finalize(struct qr_task *task, int state);
+
+void worker_task_complete(struct qr_task *task);
+
+void worker_task_ref(struct qr_task *task);
+
+void worker_task_unref(struct qr_task *task);
+
+void worker_task_timeout_inc(struct qr_task *task);
+
+int worker_add_tcp_connected(struct worker_ctx *worker,
+			     const struct sockaddr *addr,
+			     struct session *session);
+int worker_del_tcp_connected(struct worker_ctx *worker,
+			     const struct sockaddr *addr);
+
+knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
+
+struct request_ctx *worker_task_get_request(struct qr_task *task);
+
+struct session *worker_request_get_source_session(struct request_ctx *);
+
+void worker_request_set_source_session(struct request_ctx *, struct session *session);
+
+uint16_t worker_task_pkt_get_msgid(struct qr_task *task);
+void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid);
+uint64_t worker_task_creation_time(struct qr_task *task);
+void worker_task_subreq_finalize(struct qr_task *task);
+bool worker_task_finished(struct qr_task *task);
 
 /** @cond internal */
 
@@ -101,14 +114,15 @@ int worker_task_finalize(struct qr_task *task, int state);
 /** Maximum response time from TCP upstream, milliseconds */
 #define MAX_TCP_INACTIVITY (KR_RESOLVE_TIME_LIMIT + KR_CONN_RTT_MAX)
 
+#ifndef RECVMMSG_BATCH /* see check_bufsize() */
+#define RECVMMSG_BATCH 1
+#endif
+
 /** Freelist of available mempools. */
-typedef array_t(void *) mp_freelist_t;
+typedef array_t(struct mempool *) mp_freelist_t;
 
 /** List of query resolution tasks. */
 typedef array_t(struct qr_task *) qr_tasklist_t;
-
-/** Session list. */
-typedef array_t(struct session *) qr_sessionlist_t;
 
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
@@ -123,11 +137,8 @@ struct worker_ctx {
 	struct sockaddr_in out_addr4;
 	struct sockaddr_in6 out_addr6;
 
-#if __linux__
 	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
-#else
-	uint8_t wire_buf[KNOT_WIRE_MAX_PKTSIZE];
-#endif
+
 	struct {
 		size_t concurrent;
 		size_t rconcurrent;
@@ -151,35 +162,9 @@ struct worker_ctx {
 	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
 	trie_t *subreq_out;
 	mp_freelist_t pool_mp;
-	mp_freelist_t pool_ioreqs;
-	mp_freelist_t pool_sessions;
-	mp_freelist_t pool_iohandles;
 	knot_mm_t pkt_pool;
+	unsigned int next_request_uid;
 };
-
-/* @internal Union of some libuv handles for freelist.
- * These have session as their `handle->data` and own it.
- * Subset of uv_any_handle. */
-union uv_handles {
-	uv_handle_t   handle;
-	uv_stream_t   stream;
-	uv_udp_t      udp;
-	uv_tcp_t      tcp;
-	uv_timer_t    timer;
-};
-typedef union uv_any_handle uv_handles_t;
-
-/* @internal Union of derivatives from uv_req_t libuv request handles for freelist.
- * These have only a reference to the task they're operating on.
- * Subset of uv_any_req. */
-union uv_reqs {
-	uv_req_t      req;
-	uv_shutdown_t sdown;
-	uv_write_t    write;
-	uv_connect_t  connect;
-	uv_udp_send_t send;
-};
-typedef union uv_reqs uv_reqs_t;
 
 /** @endcond */
 

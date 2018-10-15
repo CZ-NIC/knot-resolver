@@ -94,9 +94,10 @@ struct tls_common_ctx {
 	const uint8_t *buf;
 	ssize_t nread;
 	ssize_t consumed;
-	uint8_t recv_buf[4096];
+	uint8_t recv_buf[8192];
 	tls_handshake_cb handshake_cb;
 	struct worker_ctx *worker;
+	size_t write_queue_size;
 };
 
 struct tls_ctx_t {
@@ -134,7 +135,7 @@ int tls_write(uv_write_t *req, uv_handle_t* handle, knot_pkt_t * pkt, uv_write_c
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
  */
-int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread);
+ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nread);
 
 /*! Set TLS certificate and key from files. */
 int tls_certificate_set(struct network *net, const char *tls_cert, const char *tls_key);

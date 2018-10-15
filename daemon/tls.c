@@ -34,6 +34,7 @@
 #include "daemon/io.h"
 #include "daemon/tls.h"
 #include "daemon/worker.h"
+#include "daemon/session.h"
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
 #define GNUTLS_PIN_MIN_VERSION  0x030400
@@ -44,6 +45,12 @@
 #else
 #define DEBUG_MSG(fmt...)
 #endif
+
+struct async_write_ctx {
+	uv_write_t write_req;
+	struct tls_common_ctx *t;
+	char buf[0];
+};
 
 static char const server_logstring[] = "tls";
 static char const client_logstring[] = "tls_client";
@@ -93,18 +100,16 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 static void on_write_complete(uv_write_t *req, int status)
 {
 	assert(req->data != NULL);
+	struct async_write_ctx *async_ctx = (struct async_write_ctx *)req->data;
+	struct tls_common_ctx *t = async_ctx->t;
+	assert(t->write_queue_size);
+	t->write_queue_size -= 1;
 	free(req->data);
-	free(req);
 }
 
-static bool stream_queue_is_empty(uv_stream_t *handle)
+static bool stream_queue_is_empty(struct tls_common_ctx *t)
 {
-#if UV_VERSION_HEX >= 0x011900
-	return uv_stream_get_write_queue_size(handle) == 0;
-#else
-	/* Assume best case */
-	return true;
-#endif
+	return (t->write_queue_size == 0);
 }
 
 static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * iov, int iovcnt)
@@ -120,9 +125,9 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		return 0;
 	}
 
-	assert(t->session && t->session->handle &&
-	       t->session->handle->type == UV_TCP);
-	uv_stream_t *handle = (uv_stream_t *)t->session->handle;
+	assert(t->session);
+	uv_stream_t *handle = (uv_stream_t *)session_get_handle(t->session);
+	assert(handle && handle->type == UV_TCP);
 
 	/*
 	 * This is a little bit complicated. There are two different writes:
@@ -143,7 +148,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 
 	/* Try to perform the immediate write first to avoid copy */
 	int ret = 0;
-	if (stream_queue_is_empty(handle)) {
+	if (stream_queue_is_empty(t)) {
 		ret = uv_try_write(handle, uv_buf, iovcnt);
 		DEBUG_MSG("[%s] push %zu <%p> = %d\n",
 		    t->client_side ? "tls_client" : "tls", total_len, h, ret);
@@ -152,10 +157,17 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		     > 0: number of bytes written (can be less than the supplied buffer size).
 		     < 0: negative error code (UV_EAGAIN is returned if no data can be sent immediately).
 		*/
-		if ((ret == total_len) || (ret < 0 && ret != UV_EAGAIN)) {
-			/* Either all the data were buffered by libuv or
-			 * uv_try_write() has returned error code other then UV_EAGAIN.
+		if (ret == total_len) {
+			/* All the data were buffered by libuv.
 			 * Return. */
+			return ret;
+		}
+
+		if (ret < 0 && ret != UV_EAGAIN) {
+			/* uv_try_write() has returned error code other then UV_EAGAIN.
+			 * Return. */
+			ret = -1;
+			errno = EIO;
 			return ret;
 		}
 		/* Since we are here expression below is true
@@ -172,10 +184,14 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	}
 
 	/* Fallback when the queue is full, and it's not possible to do an immediate write */
-	char *buf = malloc(total_len - ret);
-	if (buf != NULL) {
+	char *p = malloc(sizeof(struct async_write_ctx) + total_len - ret);
+	if (p != NULL) {
+		struct async_write_ctx *async_ctx = (struct async_write_ctx *)p;
+		/* Save pointer to session tls context */
+		async_ctx->t = t;
+		char *buf = async_ctx->buf;
 		/* Skip data written in the partial write */
-		int to_skip = ret;
+		size_t to_skip = ret;
 		/* Copy the buffer into owned memory */
 		size_t off = 0;
 		for (int i = 0; i < iovcnt; ++i) {
@@ -197,21 +213,16 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		uv_buf[0].len = off;
 
 		/* Create an asynchronous write request */
-		uv_write_t *write_req = calloc(1, sizeof(uv_write_t));
-		if (write_req != NULL) {
-			write_req->data = buf;
-		} else {
-			free(buf);
-			errno = ENOMEM;
-			return -1;
-		}
+		uv_write_t *write_req = &async_ctx->write_req;
+		memset(write_req, 0, sizeof(uv_write_t));
+		write_req->data = p;
 
 		/* Perform an asynchronous write with a callback */
 		if (uv_write(write_req, handle, uv_buf, 1, on_write_complete) == 0) {
 			ret = total_len;
+			t->write_queue_size += 1;
 		} else {
-			free(buf);
-			free(write_req);
+			free(p);
 			errno = EIO;
 			ret = -1;
 		}
@@ -238,8 +249,9 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 	if (err == GNUTLS_E_SUCCESS) {
 		/* Handshake finished, return success */
 		ctx->handshake_state = TLS_HS_DONE;
+		struct sockaddr *peer = session_get_peer(session);
 		kr_log_verbose("[%s] TLS handshake with %s has completed\n",
-			       logstring,  kr_straddr(&session->peer.ip));
+			       logstring,  kr_straddr(peer));
 		if (handshake_cb) {
 			handshake_cb(session, 0);
 		}
@@ -258,8 +270,9 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 		/* Handle warning when in verbose mode */
 		const char *alert_name = gnutls_alert_get_name(gnutls_alert_get(ctx->tls_session));
 		if (alert_name != NULL) {
+			struct sockaddr *peer = session_get_peer(session);
 			kr_log_verbose("[%s] TLS alert from %s received: %s\n",
-				       logstring, kr_straddr(&session->peer.ip), alert_name);
+				       logstring, kr_straddr(peer), alert_name);
 		}
 	}
 	return kr_ok();
@@ -354,9 +367,10 @@ void tls_close(struct tls_common_ctx *ctx)
 	assert(ctx->session);
 
 	if (ctx->handshake_state == TLS_HS_DONE) {
+		const struct sockaddr *peer = session_get_peer(ctx->session);
 		kr_log_verbose("[%s] closing tls connection to `%s`\n",
 			       ctx->client_side ? "tls_client" : "tls",
-			       kr_straddr(&ctx->session->peer.ip));
+			       kr_straddr(peer));
 		ctx->handshake_state = TLS_HS_CLOSING;
 		gnutls_bye(ctx->tls_session, GNUTLS_SHUT_RDWR);
 	}
@@ -384,12 +398,11 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 		return kr_error(EINVAL);
 	}
 
-	struct session *session = handle->data;
-	struct tls_common_ctx *tls_ctx = session->outgoing ? &session->tls_client_ctx->c :
-							     &session->tls_ctx->c;
+	struct session *s = handle->data;
+	struct tls_common_ctx *tls_ctx = session_tls_get_common_ctx(s);
 
 	assert (tls_ctx);
-	assert (session->outgoing == tls_ctx->client_side);
+	assert (session_flags(s)->outgoing == tls_ctx->client_side);
 
 	const uint16_t pkt_size = htons(pkt->size);
 	const char *logstring = tls_ctx->client_side ? client_logstring : server_logstring;
@@ -407,10 +420,14 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 	const ssize_t submitted = sizeof(pkt_size) + pkt->size;
 
 	int ret = gnutls_record_uncork(tls_session, GNUTLS_RECORD_WAIT);
-	if (gnutls_error_is_fatal(ret)) {
-		kr_log_error("[%s] gnutls_record_uncork failed: %s (%d)\n",
-		             logstring, gnutls_strerror_name(ret), ret);
-		return kr_error(EIO);
+	if (ret < 0) {
+		if (!gnutls_error_is_fatal(ret)) {
+			return kr_error(EAGAIN);
+		} else {
+			kr_log_error("[%s] gnutls_record_uncork failed: %s (%d)\n",
+				     logstring, gnutls_strerror_name(ret), ret);
+			return kr_error(EIO);
+		}
 	}
 
 	if (ret != submitted) {
@@ -426,17 +443,16 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 	return kr_ok();
 }
 
-int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *buf, ssize_t nread)
+ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nread)
 {
-	struct session *session = handle->data;
-	struct tls_common_ctx *tls_p = session->outgoing ? &session->tls_client_ctx->c :
-							   &session->tls_ctx->c;
+	struct tls_common_ctx *tls_p = session_tls_get_common_ctx(s);
 	if (!tls_p) {
 		return kr_error(ENOSYS);
 	}
 
-	assert(tls_p->session == session);
-
+	assert(tls_p->session == s);
+	assert(tls_p->recv_buf == buf && nread <= sizeof(tls_p->recv_buf));
+	
 	const char *logstring = tls_p->client_side ? client_logstring : server_logstring;
 
 	tls_p->buf = buf;
@@ -455,9 +471,11 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 	}
 
 	/* See https://gnutls.org/manual/html_node/Data-transfer-and-termination.html#Data-transfer-and-termination */
-	int submitted = 0;
+	ssize_t submitted = 0;
+	uint8_t *wire_buf = session_wirebuf_get_free_start(s);
+	size_t wire_buf_size = session_wirebuf_get_free_size(s);
 	while (true) {
-		ssize_t count = gnutls_record_recv(tls_p->tls_session, tls_p->recv_buf, sizeof(tls_p->recv_buf));
+		ssize_t count = gnutls_record_recv(tls_p->tls_session, wire_buf, wire_buf_size);
 		if (count == GNUTLS_E_AGAIN) {
 			break; /* No data available */
 		} else if (count == GNUTLS_E_INTERRUPTED) {
@@ -479,17 +497,15 @@ int tls_process(struct worker_ctx *worker, uv_stream_t *handle, const uint8_t *b
 			kr_log_verbose("[%s] gnutls_record_recv failed: %s (%zd)\n",
 				     logstring, gnutls_strerror_name(count), count);
 			return kr_error(EIO);
-		}
-		DEBUG_MSG("[%s] submitting %zd data to worker\n", logstring, count);
-		int ret = worker_process_tcp(worker, handle, tls_p->recv_buf, count);
-		if (ret < 0) {
-			return ret;
-		}
-		if (count <= 0) {
+		} else if (count == 0) {
 			break;
 		}
-		submitted += ret;
+		DEBUG_MSG("[%s] received %zd data\n", logstring, count);
+		wire_buf += count;
+		wire_buf_size -= count;
+		submitted += count;
 	}
+	assert(tls_p->consumed == tls_p->nread);
 	return submitted;
 }
 
@@ -1127,13 +1143,13 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 		return kr_error(EINVAL);
 	}
 
-	assert(session->outgoing && session->handle->type == UV_TCP);
+	assert(session_flags(session)->outgoing && session_get_handle(session)->type == UV_TCP);
 
 	struct tls_common_ctx *ctx = &client_ctx->c;
 
 	gnutls_session_set_ptr(ctx->tls_session, client_ctx);
 	gnutls_handshake_set_timeout(ctx->tls_session, ctx->worker->engine->net.tcp.tls_handshake_timeout);
-	session->tls_client_ctx = client_ctx;
+	session_tls_set_client_ctx(session, client_ctx);
 	ctx->handshake_cb = handshake_cb;
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
 	ctx->session = session;

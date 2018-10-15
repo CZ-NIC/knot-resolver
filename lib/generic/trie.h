@@ -1,4 +1,4 @@
-/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2017-2018 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ typedef struct trie trie_t;
 /*! \brief Opaque type for holding a QP-trie iterator. */
 typedef struct trie_it trie_it_t;
 
-/*! \brief Create a trie instance. */
+/*! \brief Create a trie instance.  Pass NULL to use malloc+free. */
 KR_EXPORT
 trie_t* trie_create(knot_mm_t *mm);
 
@@ -64,6 +64,11 @@ size_t trie_weight(const trie_t *tbl);
 KR_EXPORT
 trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len);
 
+/*!
+ * \brief Return pointer to the minimum.  Optionally with key and its length. */
+KR_EXPORT
+trie_val_t* trie_get_first(trie_t *tbl, char **key, uint32_t *len);
+
 /*! \brief Search the trie, inserting NULL trie_val_t on failure. */
 KR_EXPORT
 trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len);
@@ -78,6 +83,7 @@ trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len);
  * \return KNOT_EOK for exact match, 1 for previous, KNOT_ENOENT for not-found,
  *         or KNOT_E*.
  */
+KR_EXPORT
 int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val);
 
 /*!
@@ -95,6 +101,16 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d);
  */
 KR_EXPORT
 int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val);
+
+/*!
+ * \brief Remove the first item, returning KNOT_EOK on success.
+ *
+ * You may optionally get the key and/or value.
+ * The key is copied, so you need to pass sufficient len,
+ * otherwise kr_error(ENOSPC) is returned.
+ */
+KR_EXPORT
+int trie_del_first(trie_t *tbl, char *key, uint32_t *len, trie_val_t *val);
 
 /*! \brief Create a new iterator pointing to the first element (if any). */
 KR_EXPORT

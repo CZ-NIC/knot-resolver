@@ -7,6 +7,7 @@ doesn't allow custom allocation scheme. BSD-licensed (or compatible) code is all
 as long as it comes with a test case in `tests/test_generics.c`.
 
 * array_ - a set of simple macros to make working with dynamic arrays easier.
+* queue_ - a FIFO + LIFO queue.
 * map_ - a `Crit-bit tree`_ key-value map implementation (public domain) that comes with tests.
 * set_ - set abstraction implemented on top of ``map`` (unused now).
 * pack_ - length-prefixed list of objects (i.e. array-list).
@@ -17,6 +18,12 @@ array
 ~~~~~
 
 .. doxygenfile:: array.h
+   :project: libkres
+
+queue
+~~~~~
+
+.. doxygenfile:: queue.h
    :project: libkres
 
 map

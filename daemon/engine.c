@@ -33,6 +33,21 @@
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/dnssec/ta.h"
 
+/* Magic defaults for the engine. */
+#ifndef LRU_RTT_SIZE
+#define LRU_RTT_SIZE 65536 /**< NS RTT cache size */
+#endif
+#ifndef LRU_REP_SIZE
+#define LRU_REP_SIZE (LRU_RTT_SIZE / 4) /**< NS reputation cache size */
+#endif
+#ifndef LRU_COOKIES_SIZE
+	#ifdef ENABLE_COOKIES
+	#define LRU_COOKIES_SIZE LRU_RTT_SIZE /**< DNS cookies cache size. */
+	#else
+	#define LRU_COOKIES_SIZE LRU_ASSOC /* simpler than guards everywhere */
+	#endif
+#endif
+
 /** @internal Compatibility wrapper for Lua < 5.2 */
 #if LUA_VERSION_NUM < 502
 #define lua_rawlen(L, obj) lua_objlen((L), (obj))
@@ -608,6 +623,7 @@ static int l_trampoline(lua_State *L)
 
 static int init_resolver(struct engine *engine)
 {
+	/* Note: it had been zored by engine_init(). */
 	/* Open resolution context */
 	engine->resolver.trust_anchors = map_make(NULL);
 	engine->resolver.negative_anchors = map_make(NULL);

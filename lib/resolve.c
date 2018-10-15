@@ -668,7 +668,7 @@ static int answer_finalize(struct kr_request *request, int state)
 
 	/* No detailed analysis ATM, just _SECURE or not.
 	 * LATER: request->rank might better be computed in validator's finish phase. */
-	VERBOSE_MSG(NULL, "  AD: request%s classified as SECURE\n", secure ? "" : " NOT");
+	VERBOSE_MSG(last, "AD: request%s classified as SECURE\n", secure ? "" : " NOT");
 	request->rank = secure ? KR_RANK_SECURE : KR_RANK_INITIAL;
 
 	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
@@ -1581,8 +1581,10 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 		}
 		inet_ntop(addr->sa_family, kr_inaddr(&qry->ns.addr[i].ip), ns_str, sizeof(ns_str));
 		VERBOSE_MSG(qry,
-			"=> querying: '%s' score: %u zone cut: '%s' qname: '%s' qtype: '%s' proto: '%s'\n",
-			ns_str, qry->ns.score, zonecut_str, qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
+			"=> id: '%05u' querying: '%s' score: %u zone cut: '%s' "
+			"qname: '%s' qtype: '%s' proto: '%s'\n",
+			qry->id, ns_str, qry->ns.score, zonecut_str,
+			qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
 		break;
 	}}
 

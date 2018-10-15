@@ -25,39 +25,13 @@
 struct tls_ctx_t;
 struct tls_client_ctx_t;
 
-/* Per-session (TCP or UDP) persistent structure,
- * that exists between remote counterpart and a local socket.
- */
-struct session {
-	bool outgoing; /**< True: to upstream; false: from a client. */
-	bool throttled;
-	bool has_tls;
-	bool connected;
-	bool closing;
-	union inaddr peer;
-	uv_handle_t *handle;
-	uv_timer_t timeout;
-	struct qr_task *buffering; /**< Worker buffers the incomplete TCP query here. */
-	struct tls_ctx_t *tls_ctx;
-	struct tls_client_ctx_t *tls_client_ctx;
-
-	uint8_t msg_hdr[4];  /**< Buffer for DNS message header. */
-	ssize_t msg_hdr_idx; /**< The number of bytes in msg_hdr filled so far. */
-
-	qr_tasklist_t tasks;
-	qr_tasklist_t waiting;
-	ssize_t bytes_to_skip;
-};
-
-void session_free(struct session *s);
-struct session *session_new(void);
-
 int udp_bind(uv_udp_t *handle, struct sockaddr *addr);
 int udp_bindfd(uv_udp_t *handle, int fd);
 int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr);
 int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr);
 int tcp_bindfd(uv_tcp_t *handle, int fd);
 int tcp_bindfd_tls(uv_tcp_t *handle, int fd);
+void tcp_timeout_trigger(uv_timer_t *timer);
 
 /** Initialize the handle, incl. ->data = struct session * instance.
  * \param type = SOCK_*

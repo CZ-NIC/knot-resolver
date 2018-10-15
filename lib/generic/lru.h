@@ -24,32 +24,31 @@
  *  most frequent keys/hashes.  This tracking is done for *more* keys than
  *  those that are actually stored.
  *
- * # Example usage:
- *
+ * Example usage:
  * @code{.c}
  * 	// Define new LRU type
  * 	typedef lru_t(int) lru_int_t;
  *
  * 	// Create LRU
  * 	lru_int_t *lru;
- * 	lru_create(&lru, 5, NULL);
+ * 	lru_create(&lru, 5, NULL, NULL);
  *
  * 	// Insert some values
- * 	int *pi = lru_get_new(lru, "luke", strlen("luke"));
+ * 	int *pi = lru_get_new(lru, "luke", strlen("luke"), NULL);
  * 	if (pi)
  * 		*pi = 42;
- * 	pi = lru_get_new(lru, "leia", strlen("leia"));
+ * 	pi = lru_get_new(lru, "leia", strlen("leia"), NULL);
  * 	if (pi)
  * 		*pi = 24;
  *
  * 	// Retrieve values
- * 	int *ret = lru_get_try(lru, "luke", strlen("luke"));
+ * 	int *ret = lru_get_try(lru, "luke", strlen("luke"), NULL);
  * 	if (!ret) printf("luke dropped out!\n");
  * 	    else  printf("luke's number is %d\n", *ret);
  *
  * 	char *enemies[] = {"goro", "raiden", "subzero", "scorpion"};
  * 	for (int i = 0; i < 4; ++i) {
- * 		int *val = lru_get_new(lru, enemies[i], strlen(enemies[i]));
+ * 		int *val = lru_get_new(lru, enemies[i], strlen(enemies[i]), NULL);
  * 		if (val)
  * 			*val = i;
  * 	}
