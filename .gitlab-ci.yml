@@ -275,8 +275,7 @@ test:linux:amd64:valgrind:
 respdiff:fwd-tls6-kresd.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j128
-    RESPDIFF_PRIORITY: 6  # slowest test - higher prio
+    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j256
 
 respdiff:fwd-udp6-kresd.udp6:
   <<: *respdiff
