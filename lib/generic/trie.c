@@ -438,8 +438,8 @@ typedef struct trie_it {
 	node_t* *stack; /*!< The stack; malloc is used directly instead of mm. */
 	uint32_t len;   /*!< Current length of the stack. */
 	uint32_t alen;  /*!< Allocated/available length of the stack. */
-	/*! \brief Initial storage for \a stack; it should fit in most use cases. */
-	node_t* stack_init[2000 / sizeof(node_t *)];
+	/*! \brief Initial storage for \a stack; it should fit in many use cases. */
+	node_t* stack_init[60];
 } nstack_t;
 
 /*! \brief Create a node stack containing just the root (or empty). */
