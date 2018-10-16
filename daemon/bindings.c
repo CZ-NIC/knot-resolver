@@ -1253,6 +1253,55 @@ static int cache_ns_tout(lua_State *L)
 	return 1;
 }
 
+static int cache_rtt(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_context *ctx = &engine->resolver;
+
+	const char *straddr = lua_tostring(L, 1);
+	if (!straddr) luaL_error(L, "bad address string");
+	struct sockaddr *sa = kr_straddr_socket(straddr, 53);
+	if (!sa) luaL_error(L, "failed to convert address string");
+
+	switch (lua_gettop(L)) {
+	case 1: {
+		kr_nsrep_rtt_lru_entry_t *rtt =
+			lru_get_try(ctx->cache_rtt, kr_inaddr(sa), kr_inaddr_len(sa));
+		free(sa);
+		if (rtt) {
+			lua_pushinteger(L, rtt->score);
+		} else {
+			lua_pushnil(L);
+		}
+		return 1;
+		}
+	case 2: {
+		kr_nsrep_rtt_lru_entry_t *rtt =
+			lru_get_new(ctx->cache_rtt, kr_inaddr(sa), kr_inaddr_len(sa), NULL);
+		free(sa);
+		if (!rtt) {
+			assert(false && "unexpected OOM");
+			lua_pushnil(L);
+			return 1;
+		}
+		int score = lua_isnumber(L, 2) ? lua_tonumber(L, 2) : 0;
+		if (score == -1)
+			score = KR_NS_TIMEOUT;
+		else if (score <= 0)
+			luaL_error(L, "second parameter has to be a positive integer");
+		rtt->score = score;
+		if (score >= KR_NS_TIMEOUT)
+			rtt->tout_timestamp = kr_now();
+		lua_pushinteger(L, rtt->score);
+		return 1;
+		}
+	default:
+		free(sa);
+		luaL_error(L, "bad parameter count");
+		return -1; /* unreachable, but the compiler doesn't know :-/ */
+	}
+}
+
 /** Zone import completion callback.
  * Deallocates zone import context. */
 static void cache_zone_import_cb(int state, void *param)
@@ -1344,6 +1393,7 @@ int lib_cache(lua_State *L)
 		{ "max_ttl", cache_max_ttl },
 		{ "min_ttl", cache_min_ttl },
 		{ "ns_tout", cache_ns_tout },
+		{ "rtt", cache_rtt },
 		{ "zone_import", cache_zone_import },
 		{ NULL, NULL }
 	};

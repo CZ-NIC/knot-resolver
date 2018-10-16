@@ -259,7 +259,8 @@ int kr_straddr_family(const char *addr);
 /** Return address length in given family (struct in*_addr). */
 KR_EXPORT KR_CONST
 int kr_family_len(int family);
-/** Create a sockaddr* from string+port representation (also accepts IPv6 link-local). */
+/** Create a sockaddr* from string+port representation (also accepts IPv6 link-local).
+ * You need to free() the result. */
 KR_EXPORT
 struct sockaddr * kr_straddr_socket(const char *addr, int port);
 /** Parse address and return subnet length (bits).
