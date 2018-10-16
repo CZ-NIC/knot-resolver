@@ -1258,7 +1258,6 @@ static int cache_rtt(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	struct kr_context *ctx = &engine->resolver;
 
-	struct sockaddr_storage sas;
 	const char *straddr = lua_tostring(L, 1);
 	if (!straddr) luaL_error(L, "bad address string");
 	struct sockaddr *sa = kr_straddr_socket(straddr, 53);
