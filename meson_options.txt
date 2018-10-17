@@ -1,0 +1,1 @@
+option('cookies', type: 'boolean', value: false, description: 'Support for DNS Cookies.')
