@@ -1054,18 +1054,6 @@ static int session_tls_hs_cb(struct session *session, int status)
 		kr_log_verbose("[tls_client] TLS session has resumed\n");
 	} else {
 		kr_log_verbose("[tls_client] TLS session has not resumed\n");
-		/* session wasn't resumed, delete old session data ... */
-		if (tls_params->session_data.data != NULL) {
-			gnutls_free(tls_params->session_data.data);
-			tls_params->session_data.data = NULL;
-			tls_params->session_data.size = 0;
-		}
-		/* ... and get the new session data */
-		gnutls_datum_t tls_session_data = { NULL, 0 };
-		ret = gnutls_session_get_data2(tls_session, &tls_session_data);
-		if (ret == 0) {
-			tls_params->session_data = tls_session_data;
-		}
 	}
 
 	/* Reset the query start time to exclude connection establishment time,

@@ -1148,6 +1148,19 @@ void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
 	}
 
 	if (ctx->c.tls_session != NULL) {
+		/* session wasn't resumed, delete old session data ... */
+		if (ctx->params->session_data.data != NULL) {
+			gnutls_free(ctx->params->session_data.data);
+			ctx->params->session_data.data = NULL;
+			ctx->params->session_data.size = 0;
+		}
+		/* ... and get the new session data */
+		gnutls_datum_t tls_session_data = { NULL, 0 };
+		int ret = gnutls_session_get_data2(ctx->c.tls_session, &tls_session_data);
+		if (ret == 0) {
+			ctx->params->session_data = tls_session_data;
+		}
+
 		gnutls_deinit(ctx->c.tls_session);
 		ctx->c.tls_session = NULL;
 	}
