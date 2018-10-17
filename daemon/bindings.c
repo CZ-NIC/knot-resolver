@@ -1288,7 +1288,7 @@ static int cache_rtt(lua_State *L)
 		if (score == -1)
 			score = KR_NS_TIMEOUT;
 		else if (score <= 0)
-			luaL_error(L, "second parameter has to be a positive integer");
+			luaL_error(L, "second parameter has to be a positive integer or -1");
 		rtt->score = score;
 		if (score >= KR_NS_TIMEOUT)
 			rtt->tout_timestamp = kr_now();
@@ -1300,6 +1300,50 @@ static int cache_rtt(lua_State *L)
 		luaL_error(L, "bad parameter count");
 		return -1; /* unreachable, but the compiler doesn't know :-/ */
 	}
+}
+
+static int cache_reput(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	struct kr_context *ctx = &engine->resolver;
+
+	/* Get `ns` and `ns_size`: the dname we're interested in. */
+	const char *ns_str = lua_tostring(L, 1);
+	if (!ns_str) luaL_error(L, "pass NS name string as the first parameter");
+	knot_dname_t ns_buf[KNOT_DNAME_MAXLEN];
+	knot_dname_t *ns_dname = knot_dname_from_str(ns_buf, ns_str, sizeof(ns_buf));
+	if (!ns_dname) luaL_error(L, "failed to convert NS name");
+	knot_dname_to_lower(ns_dname);
+	const int ns_size = knot_dname_size(ns_dname);
+	const char * const ns = (char *)/*sign-cast*/ns_dname;
+
+	unsigned *reput;
+	switch (lua_gettop(L)) {
+	case 1:
+		reput = lru_get_try(ctx->cache_rep, ns, ns_size);
+		break;
+	case 2:
+		reput = lru_get_new(ctx->cache_rep, ns, ns_size, NULL);
+		if (!reput) break;
+		int rep_new = lua_isnumber(L, 2) ? lua_tonumber(L, 2) : -2;
+		if (rep_new == -1)
+			*reput = KR_NS_NOIP4 | KR_NS_NOIP6;
+		else if (rep_new < 0)
+			luaL_error(L, "second parameter has to be a non-negative integer or -1");
+		else
+			*reput = rep_new;
+		break;
+	default:
+		luaL_error(L, "bad parameter count");
+		return -1; /* unreachable, but the compiler doesn't know :-/ */
+	}
+
+	if (reput) {
+		lua_pushinteger(L, *reput);
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
 }
 
 /** Zone import completion callback.
@@ -1393,7 +1437,8 @@ int lib_cache(lua_State *L)
 		{ "max_ttl", cache_max_ttl },
 		{ "min_ttl", cache_min_ttl },
 		{ "ns_tout", cache_ns_tout },
-		{ "rtt", cache_rtt },
+		{ "rtt",     cache_rtt },
+		{ "reput",   cache_reput },
 		{ "zone_import", cache_zone_import },
 		{ NULL, NULL }
 	};
