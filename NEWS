@@ -12,6 +12,7 @@ Improvements
 Bugfixes
 --------
 - cache.clear('name'): fix some edge cases in API (#401)
+- avoid SERVFAILs due to certain kind of NS dependency cycles (#374)
 
 
 Knot Resolver 3.0.0 (2018-08-20)

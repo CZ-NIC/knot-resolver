@@ -29,6 +29,19 @@
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "zcut", fmt)
 
+/** Information for one NS name + address type. */
+typedef enum {
+	AI_UNINITED = 0,
+	AI_REPUT,	/**< Don't use this addrset, due to: cache_rep, NO_IPV6, ...
+			 * cache_rep approximates various problems when fetching the RRset. */
+	AI_CYCLED,	/**< Skipped due to cycle detection; see implementation for details. */
+	AI_LAST_BAD = AI_CYCLED, /** bad states: <= AI_LAST_BAD */
+	AI_UNKNOWN,	/**< Don't know status of this RRset; various reasons. */
+	AI_EMPTY,	/**< No usable address (may mean e.g. just NODATA). */
+	AI_OK,		/**< At least one usable address.
+			 * LATER: we might be interested whether it's only glue. */
+} addrset_info_t;
+
 /* Root hint descriptor. */
 struct hint_info {
 	const knot_dname_t *name;
@@ -287,31 +300,79 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 }
 
 /** Fetch address for zone cut.  Any rank is accepted (i.e. glue as well). */
-static void fetch_addr(struct kr_zonecut *cut, struct kr_cache *cache,
-			const knot_dname_t *ns, uint16_t rrtype,
-			const struct kr_query *qry)
+static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t rrtype,
+				 knot_mm_t *mm_pool, const struct kr_query *qry)
 // LATER(optim.): excessive data copying
 {
+	int rdlen;
+	switch (rrtype) {
+	case KNOT_RRTYPE_A:
+		rdlen = 4;
+		break;
+	case KNOT_RRTYPE_AAAA:
+		rdlen = 16;
+		break;
+	default:
+		assert(!EINVAL);
+		return AI_UNKNOWN;
+	}
+
+	struct kr_context *ctx = qry->request->ctx;
 	struct kr_cache_p peek;
-	if (kr_cache_peek_exact(cache, ns, rrtype, &peek) != 0) {
-		return;
+	if (kr_cache_peek_exact(&ctx->cache, ns, rrtype, &peek) != 0) {
+		return AI_UNKNOWN;
 	}
 	int32_t new_ttl = kr_cache_ttl(&peek, qry, ns, rrtype);
 	if (new_ttl < 0) {
-		return;
+		return AI_UNKNOWN;
 	}
 
 	knot_rrset_t cached_rr;
 	knot_rrset_init(&cached_rr, /*const-cast*/(knot_dname_t *)ns, rrtype,
 			KNOT_CLASS_IN, new_ttl);
-	if (kr_cache_materialize(&cached_rr.rrs, &peek, cut->pool) < 0) {
-		return;
+	if (kr_cache_materialize(&cached_rr.rrs, &peek, mm_pool) < 0) {
+		return AI_UNKNOWN;
 	}
+
+	/* Reserve memory in *addrs.  Implementation detail:
+	 * pack_t cares for lengths, so we don't store those in the data. */
+	const size_t pack_extra_size = knot_rdataset_size(&cached_rr.rrs)
+		- cached_rr.rrs.count * offsetof(knot_rdata_t, len);
+	int ret = pack_reserve_mm(*addrs, cached_rr.rrs.count, pack_extra_size,
+				  kr_memreserve, mm_pool);
+	if (ret) abort(); /* ENOMEM "probably" */
+
+	addrset_info_t result = AI_EMPTY;
 	knot_rdata_t *rd = cached_rr.rrs.rdata;
-	for (uint16_t i = 0; i < cached_rr.rrs.count; ++i) {
-		(void) kr_zonecut_add(cut, ns, rd);
-		rd = knot_rdataset_next(rd);
+	for (uint16_t i = 0; i < cached_rr.rrs.count; ++i, rd = knot_rdataset_next(rd)) {
+		if (unlikely(rd->len != rdlen)) {
+			VERBOSE_MSG(qry, "bad NS address length %d for rrtype %d, skipping\n",
+					(int)rd->len, (int)rrtype);
+			continue;
+		}
+		/* Check RTT cache - whether the IP is usable or not. */
+		kr_nsrep_rtt_lru_entry_t *rtt_e = ctx->cache_rtt
+			? lru_get_try(ctx->cache_rtt, (const char *)rd->data, rd->len)
+			: NULL;
+		const bool unusable = rtt_e && rtt_e->score >= KR_NS_TIMEOUT
+			&& qry->creation_time_mono
+			   < rtt_e->tout_timestamp + ctx->cache_rtt_tout_retry_interval;
+		if (!unusable) {
+			result = AI_OK;
+		}
+
+		ret = pack_obj_push(addrs, rd->data, rd->len);
+		assert(!ret); /* didn't fit because of incorrectly reserved memory */
+		/* LATER: for now we lose quite some information here,
+		 * as keeping it would need substantial changes on other places,
+		 * and it turned out to be premature optimization (most likely).
+		 * We might e.g. skip adding unusable addresses,
+		 * and either keep some rtt information associated
+		 * or even finish up choosing the set to send packets to.
+		 * Overall there's some overlap with nsrep.c functionality.
+		 */
 	}
+	return result;
 }
 
 /** Fetch best NS for zone cut. */
@@ -343,25 +404,73 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 
 	/* Insert name servers for this zone cut, addresses will be looked up
 	 * on-demand (either from cache or iteratively) */
+	bool all_bad = true; /**< All NSs (seen so far) are in a bad state. */
 	knot_rdata_t *rdata_i = ns_rds.rdata;
 	for (unsigned i = 0; i < ns_rds.count;
 			++i, rdata_i = knot_rdataset_next(rdata_i)) {
 		const knot_dname_t *ns_name = knot_ns_name(rdata_i);
-		(void) kr_zonecut_add(cut, ns_name, NULL);
+		const size_t ns_size = knot_dname_size(ns_name);
+
+		/* Get a new pack within the nsset. */
+		pack_t **pack = (pack_t **)trie_get_ins(cut->nsset,
+					(const char *)ns_name, ns_size);
+		if (!pack) return kr_error(ENOMEM);
+		assert(!*pack); /* not critical, really */
+		*pack = mm_alloc(cut->pool, sizeof(pack_t));
+		if (!*pack) return kr_error(ENOMEM);
+		pack_init(**pack);
+
+		addrset_info_t infos[2];
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
 		unsigned *cached = lru_get_try(ctx->cache_rep,
-				(const char *)ns_name, knot_dname_size(ns_name));
+					(const char *)ns_name, ns_size);
 		unsigned reputation = (cached) ? *cached : 0;
-		if (!(reputation & KR_NS_NOIP4) && !(qry->flags.NO_IPV4)) {
-			fetch_addr(cut, &ctx->cache, ns_name, KNOT_RRTYPE_A, qry);
+		infos[0] = (reputation & KR_NS_NOIP4) || qry->flags.NO_IPV4
+			? AI_REPUT
+			: fetch_addr(*pack, ns_name, KNOT_RRTYPE_A, cut->pool, qry);
+		infos[1] = (reputation & KR_NS_NOIP6) || qry->flags.NO_IPV6
+			? AI_REPUT
+			: fetch_addr(*pack, ns_name, KNOT_RRTYPE_AAAA, cut->pool, qry);
+
+		/* FIXME: deep, perhaps separate into a function (break -> return). */
+		/* AI_CYCLED checks.
+		 * If an ancestor query has its zone cut in the state that
+		 * it's looking for name or address(es) of some NS(s),
+		 * we want to avoid doing so with a NS that lies under its cut.
+		 * Instead we need to consider such names unusable in the cut (for now). */
+		if (infos[0] != AI_UNKNOWN && infos[1] != AI_UNKNOWN) {
+			/* Optimization: the following loop would be pointless. */
+			all_bad = false;
+			continue;
 		}
-		if (!(reputation & KR_NS_NOIP6) && !(qry->flags.NO_IPV6)) {
-			fetch_addr(cut,  &ctx->cache, ns_name, KNOT_RRTYPE_AAAA, qry);
+		for (const struct kr_query *aq = qry; aq->parent; aq = aq->parent) {
+			const struct kr_qflags *aqpf = &aq->parent->flags;
+			if (   (aqpf->AWAIT_CUT  && aq->stype == KNOT_RRTYPE_NS)
+			    || (aqpf->AWAIT_IPV4 && aq->stype == KNOT_RRTYPE_A)
+			    || (aqpf->AWAIT_IPV6 && aq->stype == KNOT_RRTYPE_AAAA)) {
+				if (knot_dname_in_bailiwick(ns_name,
+							aq->parent->zone_cut.name)) {
+					for (int i = 0; i < 2; ++i)
+						if (infos[i] == AI_UNKNOWN)
+							infos[i] = AI_CYCLED;
+					break;
+				}
+			} else {
+				/* This ancestor waits for other reason that
+				 * NS name or address, so we're out of a direct cycle. */
+				break;
+			}
 		}
+		all_bad = all_bad && infos[0] <= AI_LAST_BAD && infos[1] <= AI_LAST_BAD;
 	}
 
+	if (all_bad) { WITH_VERBOSE(qry) {
+		auto_free char *name_txt = kr_dname_text(name);
+		VERBOSE_MSG(qry, "cut %s: all NSs bad, count = %d\n",
+				name_txt, (int)ns_rds.count);
+	} }
 	knot_rdataset_clear(&ns_rds, cut->pool);
-	return kr_ok();
+	return all_bad ? ELOOP : kr_ok();
 }
 
 /**
