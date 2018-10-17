@@ -232,6 +232,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 
 	struct kr_zonecut cut_found;
 	kr_zonecut_init(&cut_found, requested_name, req->rplan.pool);
+	cut_found.with_infos = true;
 	/* Cut that has been found can differs from cut that has been requested.
 	 * So if not already insecured,
 	 * try to fetch ta & keys even if initial cut name not covered by TA */

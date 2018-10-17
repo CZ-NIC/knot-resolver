@@ -175,6 +175,18 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
 	return 0;
 }
 
+/** Push object to the end without initializating it.
+ * @return pointer to the new object */
+static inline uint8_t* pack_obj_push_noinit(pack_t *pack, pack_objlen_t len)
+{
+	if (pack == NULL) abort();
+	size_t packed_len = len + sizeof(len);
+	if (pack->len + packed_len > pack->cap) return NULL; /* tolerate ENOSPC */
+	uint8_t *endp = pack->at + pack->len;
+	pack->len += packed_len;
+	return endp;
+}
+
 /** Returns a pointer to packed object.
   * @return pointer to packed object or NULL
   */

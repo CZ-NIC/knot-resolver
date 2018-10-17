@@ -34,6 +34,7 @@ struct kr_zonecut {
 	struct kr_zonecut *parent; /**< Parent zone cut. */
 	trie_t *nsset;        /**< Map of nameserver => address_set (pack_t). */
 	knot_mm_t *pool;     /**< Memory pool. */
+	bool with_infos; /**< FIXME: pack semantics */
 };
 
 /**
