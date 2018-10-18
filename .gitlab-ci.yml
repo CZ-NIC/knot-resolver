@@ -308,35 +308,6 @@ respdiff:fwd-udp6-unbound.tls6:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j256
 
 
-respdiff:iter:udp:linux:amd64:
-  stage: test
-  except:
-    - master
-  script:
-    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
-    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh udp
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-    - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-  dependencies:
-    - build:linux:amd64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - kresd.log.xz
-      - results/*.txt
-      - results/*.png
-      - results/respdiff.db/data.mdb.xz
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
 
 
 .resperf:  &resperf
@@ -451,7 +422,6 @@ coverage:
     - test:linux:amd64
     - installcheck:linux:amd64
     - deckard:linux:amd64
-    - respdiff:iter:udp:linux:amd64
   tags:
     - docker
     - linux
