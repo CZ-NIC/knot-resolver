@@ -103,13 +103,13 @@ static inline void *mm_alloc(knot_mm_t *mm, size_t size)
 	if (mm) return mm->alloc(mm->ctx, size);
 	else return malloc(size);
 }
-static inline void mm_free(knot_mm_t *mm, void *what)
+static inline void mm_free(knot_mm_t *mm, const void *what)
 {
 	if (mm) {
 		if (mm->free)
-			mm->free(what);
+			mm->free((void *)what);
 	}
-	else free(what);
+	else free((void *)what);
 }
 static inline void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
 {
