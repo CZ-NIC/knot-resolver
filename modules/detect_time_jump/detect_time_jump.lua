@@ -20,6 +20,7 @@ local function check_time()
 		)
 		cache.clear()
 	elseif -jump_backward > mod.threshold then
+		-- On Linux 4.17+ this shouldn't happen anymore: https://lwn.net/Articles/751482/
 		log("Detected forward time jump.  (Suspend-resume, possibly.)")
 		cache.checkpoint(true)
 	end
