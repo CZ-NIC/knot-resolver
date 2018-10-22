@@ -45,7 +45,8 @@ struct session {
 	ssize_t wire_buf_size;        /**< Buffer size. */
 	ssize_t wire_buf_start_idx;   /**< Data start offset in wire_buf. */
 	ssize_t wire_buf_end_idx;     /**< Data end offset in wire_buf. */
-	uint64_t last_input_activity; /**< Either creatoion time or time of peer's last activity */
+	uint64_t last_activity;       /**< Time of last IO activity (if any occurs).
+				       *   Otherwise session creation time. */
 };
 
 static void on_session_close(uv_handle_t *handle)
@@ -746,10 +747,10 @@ void session_kill_ioreq(struct session *s, struct qr_task *task)
 /** Update timestamp */
 void session_touch(struct session *s)
 {
-	s->last_input_activity = kr_now();
+	s->last_activity = kr_now();
 }
 
-uint64_t session_last_input_activity(struct session *s)
+uint64_t session_last_activity(struct session *s)
 {
-	return s->last_input_activity;
+	return s->last_activity;
 }
