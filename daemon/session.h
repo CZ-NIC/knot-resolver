@@ -143,4 +143,6 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt);
 void session_kill_ioreq(struct session *s, struct qr_task *task);
 /** Update timestamp */
 void session_touch(struct session *s);
-uint64_t session_last_input_activity(struct session *s);
+/** Returns either creation time or time of last IO activity if any occurs. */
+/* Used for TCP timeout calculation. */
+uint64_t session_last_activity(struct session *s);

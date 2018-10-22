@@ -655,6 +655,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	}
 
 	if (ret == 0) {
+		session_touch(session);
 		if (session_flags(session)->outgoing) {
 			session_tasklist_add(session, task);
 		}

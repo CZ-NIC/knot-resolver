@@ -169,7 +169,7 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 		const struct engine *engine = worker->engine;
 		const struct network *net = &engine->net;
 		uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
-		uint64_t last_activity = session_last_input_activity(s);
+		uint64_t last_activity = session_last_activity(s);
 		uint64_t idle_time = kr_now() - last_activity;
 		if (idle_time < idle_in_timeout) {
 			idle_in_timeout -= idle_time;
