@@ -11,6 +11,9 @@ variables:
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
+  RESPERF_TCP_PIPELINE: 4096
+  RESPERF_MEMORY_LIMIT: 2G
+  RESPERF_ULIMIT_N: 1048576
 
 stages:
   - build
@@ -356,7 +359,9 @@ respdiff:iter:udp:linux:amd64:
     - >
       sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l $LABEL --asan -t $RESPERF_TEST)
+      "$(git rev-parse --short HEAD)" -l $LABEL --asan -t $RESPERF_TEST
+      --tcp-pipeline $RESPERF_TCP_PIPELINE --ulimit-n $RESPERF_ULIMIT_N
+      --mem-limit $RESPERF_MEMORY_LIMIT)
     - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
     - if [[ "$EXITCODE" == "0" ]]; then cat $TESTDIR/j*_resperf.txt; else cat $TESTDIR/j*_kresd.docker.txt; fi
     - exit $EXITCODE
@@ -375,15 +380,36 @@ resperf:fwd-tls6.udp-asan:
   variables:
     RESPERF_TEST: resperf.fwd-tls6.udp
 
+resperf:fwd-tls6.udp-asan:lowres:
+  <<: *resperf
+  variables:
+    RESPERF_TEST: resperf.fwd-tls6.udp
+    RESPERF_MEMORY_LIMIT: 100M
+    RESPERF_ULIMIT_N: 1024
+
 resperf:fwd-udp6.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.fwd-udp6.udp
 
+resperf:fwd-udp6.udp-asan:lowres:
+  <<: *resperf
+  variables:
+    RESPERF_TEST: resperf.fwd-udp6.udp
+    RESPERF_MEMORY_LIMIT: 100M
+    RESPERF_ULIMIT_N: 1024
+
 resperf:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
+
+resperf:iter.udp-asan:lowres:
+  <<: *resperf
+  variables:
+    RESPERF_TEST: resperf.iter.udp
+    RESPERF_MEMORY_LIMIT: 100M
+    RESPERF_ULIMIT_N: 1024
 
 
 distro:fedora-29:
