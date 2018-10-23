@@ -54,6 +54,14 @@ KR_EXPORT
 void kr_zonecut_deinit(struct kr_zonecut *cut);
 
 /**
+ * Move a zonecut, transferring ownership of any pointed-to memory.
+ * @param to the target - it gets deinit-ed
+ * @param from the source - not modified, but shouldn't be used afterward
+ */
+KR_EXPORT
+void kr_zonecut_move(struct kr_zonecut *to, const struct kr_zonecut *from);
+
+/**
  * Reset zone cut to given name and clear address list.
  * @note This clears the address list even if the name doesn't change. TA and DNSKEY don't change.
  * @param cut  zone cut to be set
