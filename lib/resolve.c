@@ -246,13 +246,13 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	if (ret == kr_error(ENOENT)) {
 		/* No cached cut found, start from SBELT
 		 * and issue priming query. */
+		kr_zonecut_deinit(&cut_found);
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
 		VERBOSE_MSG(qry, "=> using root hints\n");
 		qry->flags.AWAIT_CUT = false;
-		kr_zonecut_deinit(&cut_found);
 		return KR_STATE_DONE;
 	} else if (ret != kr_ok()) {
 		kr_zonecut_deinit(&cut_found);
@@ -295,12 +295,8 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		qry->flags.AWAIT_CUT = false;
 		return KR_STATE_DONE;
 	}
-	/* Copy fetched name */
-	qry->zone_cut.name = knot_dname_copy(cut_found.name, qry->zone_cut.pool);
-	/* Copy fetched address set */
-	kr_zonecut_copy(&qry->zone_cut, &cut_found);
-	/* Copy fetched ta & keys */
-	kr_zonecut_copy_trust(&qry->zone_cut, &cut_found);
+	/* Use the found zone cut. */
+	kr_zonecut_move(&qry->zone_cut, &cut_found);
 	/* Check if there's a non-terminal between target and current cut. */
 	struct kr_cache *cache = &req->ctx->cache;
 	check_empty_nonterms(qry, pkt, cache, qry->timestamp.tv_sec);
