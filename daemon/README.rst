@@ -377,8 +377,12 @@ Environment
          2.1.1
 
 
+.. _network-configuration:
+
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
+
+.. note:: When using systemd with socket support to run kresd, refer to :ref:`Network configuration with sockets <network-configuration-sockets>` instead.
 
 For when listening on ``localhost`` just doesn't cut it.
 
@@ -1105,16 +1109,96 @@ specified worker count and process rank.
 
 .. _daemon-supervised:
 
-Running supervised
-==================
+Systemd integration
+===================
 
 Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to the resolver daemon. If the resolver terminates or is killed, the sockets remain open and no queries are dropped.
 
-The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. You should have a look at `real process managers`_.
+The daemon can be managed with systemd units. Use of systemd sockets and `socket activation`_ is supported for most distributions. For complete documentation, see manual page ``kresd.systemd(7)``.
 
-The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
+Single instance
+---------------
 
-See ``kresd.systemd(7)`` for details.
+To start the resolver you can use the ``kresd@1.service`` service. By default, the resolver only binds to local interfaces.
+
+.. code-block:: bash
+
+   $ systemctl start kresd@1.service
+   $ systemctl enable kresd@1.service
+
+.. _network-configuration-sockets:
+
+Network configuration with sockets
+----------------------------------
+
+.. note:: The following section doesn't apply to CentOS 7. Refer to :ref:`Network configuration <network-configuration>` instead.
+
+If your distribution is using ``kresd.socket`` and ``kresd-tls.socket``, network interfaces are configured with drop-in files for these sockets. To configure kresd to listen on public interface, create a drop-in file:
+
+.. code-block:: bash
+
+   $ systemctl edit kresd.socket
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd.socket.d/override.conf
+   [Socket]
+   ListenDatagram=192.0.2.115:53
+   ListenStream=192.0.2.115:53
+
+The TLS socket is configured similarly:
+
+.. code-block:: bash
+
+   $ systemctl edit kresd-tls.socket
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd-tls.socket.d/override.conf
+   [Socket]
+   ListenStream=192.0.2.115:853
+
+.. _kresd-socket-override-port:
+
+Override default kresd.socket port
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The default port can also be overriden by using an empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be useful if you want to use the Knot DNS with the `dnsproxy module`_ to have both resolver and authoritative server running on the same machine.
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd.socket.d/override.conf
+   [Socket]
+   ListenDatagram=
+   ListenStream=
+   ListenDatagram=127.0.0.1:53000
+   ListenStream=127.0.0.1:53000
+   ListenDatagram=[::1]:53000
+   ListenStream=[::1]:53000
+
+.. _systemd-multiple-instances:
+
+Multiple instances
+------------------
+
+It is possible to spawn multiple independent systemd-controlled kresd processes, which share the same socket. This is the recommended way to scale up and utilize multiple CPU cores. All the instances share the same cache and systemd socket.
+
+To run multiple daemons, use a different numeric identifier for the instance, for example:
+
+.. code-block:: bash
+
+   $ systemctl start kresd@1.service
+   $ systemctl start kresd@2.service
+   $ systemctl start kresd@3.service
+   $ systemctl start kresd@4.service
+
+With the use of brace expansion, the equivalent command looks like:
+
+.. code-block:: bash
+
+   $ systemctl start kresd@{1..4}.service
+
+For more details, see ``kresd.systemd(7)``.
 
 .. _enabling-dnssec:
 
@@ -1209,14 +1293,15 @@ Control sockets
 
 Unless ran manually, knot-resolver is typically started in non-interactive mode.
 The mode gets triggered by using the ``-f`` command-line parameter or by passing sockets from systemd.
-You can attach to the the consoles for each process; by default they are in ``rundir/tty/$PID``,
-but packaging often places them in ``/run/knot-resolver/control*``.
+You can attach to the the consoles for each process; by default they are in ``rundir/tty/$PID``.
+
+.. note:: When running kresd with systemd, you can find the location of the socket(s) using ``systemctl status kresd-control@*.socket``. Typically, these are in ``/run/knot-resolver/control@*``.
 
 .. code-block:: bash
 
-	$ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
-	> cache.count()
-	53
+   $ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
+   > cache.count()
+   53
 
 The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
 Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
@@ -1227,6 +1312,8 @@ of running processes, and you can test the process for liveliness by connecting 
 
 Scaling out
 ===========
+
+.. note:: The recommended way to scale out and use multiple cores is to use :ref:`Multiple instances <systemd-multiple-instances>` when running kresd under systemd.
 
 The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
 Multiple processes can serve different addresses, but still share the same working directory and cache.
@@ -1298,4 +1385,5 @@ Example:
 .. _luasocket: https://luarocks.org/modules/luarocks/luasocket
 .. _cqueues: https://25thandclement.com/~william/projects/cqueues.html
 .. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
-.. _`systemd socket activation`: http://0pointer.de/blog/projects/socket-activation.html
+.. _`socket activation`: http://0pointer.de/blog/projects/socket-activation.html
+.. _`dnsproxy module`: https://www.knot-dns.cz/docs/2.7/html/modules.html#dnsproxy-tiny-dns-proxy
