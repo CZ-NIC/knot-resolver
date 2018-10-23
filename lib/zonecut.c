@@ -95,6 +95,13 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 	knot_rrset_free(cut->trust_anchor, cut->pool);
 }
 
+void kr_zonecut_move(struct kr_zonecut *to, const struct kr_zonecut *from)
+{
+	if (!to || !from) abort();
+	kr_zonecut_deinit(to);
+	memcpy(to, from, sizeof(*to));
+}
+
 void kr_zonecut_set(struct kr_zonecut *cut, const knot_dname_t *name)
 {
 	if (!cut || !name) {
