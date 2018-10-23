@@ -695,7 +695,7 @@ Cache configuration
 
 The default cache in Knot Resolver is persistent with LMDB backend, this means that the daemon doesn't lose
 the cached data on restart or crash to avoid cold-starts. The cache may be reused between cache
-daemons or manipulated from other processes, making for example synchronised load-balanced recursors possible.
+daemons or manipulated from other processes, making for example synchronized load-balanced recursors possible.
 
 .. function:: cache.open(max_size[, config_uri])
 
@@ -819,7 +819,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
   :return: current maximum TTL
 
-  Get or set minimum cache TTL. Any entry inserted into cache with TTL lower than minimal will be overriden to minimum TTL. Forcing TTL higher than specified violates DNS standards, use with care.
+  Get or set minimum cache TTL. Any entry inserted into cache with TTL lower than minimal will be overridden to minimum TTL. Forcing TTL higher than specified violates DNS standards, use with care.
 
   .. note:: The `ttl` value must be in range `<0, max_ttl)`.
 
@@ -836,7 +836,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.ns_tout([timeout])
 
-  :param number timeout: NS retry interval in miliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
+  :param number timeout: NS retry interval in milliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
   :return: current timeout
 
   Get or set time interval for which a nameserver address will be ignored after determining that it doesn't return (useful) answers.
@@ -854,7 +854,7 @@ daemons or manipulated from other processes, making for example synchronised loa
      Purge cache records matching specified criteria. There are two specifics:
 
      * To reliably remove **negative** cache entries you need to clear subtree with the whole zone. E.g. to clear negative cache entries for (formerly non-existing) record `www.example.com. A` you need to flush whole subtree starting at zone apex, e.g. `example.com.` [#]_.
-     * This operation is asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
+     * This operation is asynchronous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
 
   :param string name: subtree to purge; if the name isn't provided, whole cache is purged
         (and any other parameters are disregarded).
@@ -873,12 +873,12 @@ daemons or manipulated from other processes, making for example synchronised loa
   :param table prev_state: return value from previous run (can be used by callback)
 
   :rtype: table
-  :return: ``count`` key is always present. Other keys are optional and their presense indicate special conditions.
+  :return: ``count`` key is always present. Other keys are optional and their presence indicate special conditions.
 
    * **count** *(integer)* - number of items removed from cache by this call (can be 0 if no entry matched criteria)
    * **not_apex** - cleared subtree is not cached as zone apex; proofs of non-existence were probably not removed
    * **subtree** *(string)* - hint where zone apex lies (this is estimation from cache content and might not be accurate)
-   * **chunk_limit** - more than ``chunk_size`` items needs to be cleared, clearing will continue asynchonously
+   * **chunk_limit** - more than ``chunk_size`` items needs to be cleared, clearing will continue asynchronously
 
 
   Examples:
@@ -1005,7 +1005,7 @@ The `event` package provides a very basic mean for non-blocking execution - it a
 
 .. function:: worker.coroutine(function)
 
-   Start a new coroutine with given function (closure). The function can do I/O or run timers without blocking the main thread. See cqueues_ for documentation of possible operations and synchronisation primitives. The main limitation is that you can't wait for a finish of a coroutine from processing layers, because it's not currently possible to suspend and resume execution of processing layers.
+   Start a new coroutine with given function (closure). The function can do I/O or run timers without blocking the main thread. See cqueues_ for documentation of possible operations and synchronization primitives. The main limitation is that you can't wait for a finish of a coroutine from processing layers, because it's not currently possible to suspend and resume execution of processing layers.
 
    Example:
 
@@ -1254,7 +1254,7 @@ The root anchors bootstrap may fail for various reasons, in this case you need t
 
 You've just enabled DNSSEC!
 
-.. note:: Bootstrapping and automatic update need write access to keyfile direcory. If you want to manage root anchors manually you should use ``trust_anchors.add_file('root.keys', true)``.
+.. note:: Bootstrapping and automatic update need write access to keyfile directory. If you want to manage root anchors manually you should use ``trust_anchors.add_file('root.keys', true)``.
 
 CLI interface
 =============
