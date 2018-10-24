@@ -79,11 +79,69 @@ static void test_straddr(void **state)
 	assert_int_not_equal(test_bitcmp(ip6_sub, ip6_out, 4), 0);
 }
 
+static void test_edns_append(void **state)
+{
+	uint8_t *source_option[KNOT_EDNS_MAX_OPTION_CODE];
+	int source_option_len[KNOT_EDNS_MAX_OPTION_CODE];
+	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_WIRE_MAX_PKTSIZE, NULL);
+	knot_rrset_t *opt_rr = mm_alloc(NULL, sizeof(knot_rrset_t));
+	knot_edns_init(opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, NULL);
+	pkt->opt_rr = opt_rr;
+
+	for (uint16_t i = 0; i < KNOT_EDNS_MAX_OPTION_CODE; ++i) {
+		if (i == KNOT_EDNS_OPTION_TCP_KEEPALIVE) {
+			source_option[i] = NULL;
+			source_option_len[i] = 0;
+			continue;
+		}
+		int opt_len = kr_rand_uint(16);
+		if (opt_len == 0) {
+			opt_len = 16;
+		}
+		uint8_t *opt_buf = malloc(opt_len);
+		assert_non_null(opt_buf);
+		knot_rrset_t *opt_rr_new = mm_alloc(NULL, sizeof(knot_rrset_t));
+		assert_non_null(opt_rr_new);
+
+		for (int j = 0; j < opt_len; ++j) {
+			opt_buf[j] = kr_rand_uint(255);
+		}
+
+		source_option[i] = opt_buf;
+		source_option_len[i] = opt_len;
+
+		knot_edns_init(opt_rr_new, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, NULL);
+		knot_edns_add_option(opt_rr_new, i, opt_len, opt_buf, NULL);
+		kr_edns_append(opt_rr, opt_rr_new->rrs.rdata, NULL);
+		knot_rrset_free(opt_rr_new, NULL);
+	}
+
+	knot_edns_options_t *options;
+	knot_edns_get_options(opt_rr, &options, NULL);
+
+	for (uint16_t i = 0; i < KNOT_EDNS_MAX_OPTION_CODE; ++i) {
+		uint8_t *opt = knot_edns_get_option(opt_rr,  i);
+		if (source_option[i] == NULL) {
+			assert_null(opt);
+			continue;
+		}
+		int opt_len = knot_edns_opt_get_length(opt);
+		assert_int_equal(opt_len, source_option_len[i]);
+		assert_int_equal(memcmp(&opt[4], source_option[i], opt_len), 0);
+		free(source_option[i]);
+	}
+
+	mm_free(NULL, options);
+	knot_rrset_free(opt_rr, NULL);
+	knot_pkt_free(pkt);
+}
+
 int main(void)
 {
 	const UnitTest tests[] = {
 		unit_test(test_strcatdup),
 		unit_test(test_straddr),
+		unit_test(test_edns_append)
 	};
 
 	return run_tests(tests);

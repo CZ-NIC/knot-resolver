@@ -440,6 +440,19 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 	return KNOT_EOK;
 };
 
+/*!
+ * \brief Append buffer with new EDNS options to existing opt_rr.
+ *
+ * \param opt   OPT RR structure to add the data to.
+ * \param data  Buffer with edns options to be added.
+ * \param mm    Memory context.
+ *
+ * \return 0 - success
+ *         kr_error(ENOMEM) - out-of-memory
+ *         kr_error(ENOSPC) - resulting buffer would be too long
+ */
+KR_EXPORT int kr_edns_append(knot_rrset_t *opt, knot_rdata_t *data, knot_mm_t *mm);
+
 /* Trivial non-inline wrappers, to be used in lua. */
 KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 				uint16_t type, uint16_t rclass, uint32_t ttl);
