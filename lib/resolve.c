@@ -424,9 +424,16 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 	return knot_pkt_reserve(pkt, len);
 }
 
-static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
+static int edns_create(knot_pkt_t *pkt, knot_rrset_t *additional, struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
+	if (additional) {
+		int ret = kr_edns_append(pkt->opt_rr, additional->rrs.rdata, &pkt->mm);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
 #if defined(ENABLE_COOKIES)
 	if (req->ctx->cookie_ctx.clnt.enabled ||
@@ -448,12 +455,16 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 
 static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_request *req)
 {
+	/* There may be some edns options (like tcp-keeelalive) prepared by daemon.
+	 * knot_pkt_init_response() is going to clear opt_rr field,
+	 * so we must to save it. */
+	knot_rrset_t *daemon_edns_opts = answer->opt_rr;
 	if (knot_pkt_init_response(answer, query) != 0) {
 		return kr_error(ENOMEM); /* Failed to initialize answer */
 	}
 	/* Handle EDNS in the query */
 	if (knot_pkt_has_edns(query)) {
-		int ret = edns_create(answer, query, req);
+		int ret = edns_create(answer, daemon_edns_opts, req);
 		if (ret != 0){
 			return ret;
 		}
@@ -687,7 +698,7 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 		/* Remove any EDNS records from any previous iteration. */
 		ret = edns_erase_and_reserve(pkt);
 		if (ret == 0) {
-			ret = edns_create(pkt, request->answer, request);
+			ret = edns_create(pkt, NULL, request);
 		}
 		if (ret == 0) {
 			/* Stub resolution (ask for +rd and +do) */
