@@ -361,6 +361,34 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 	/* Remember query source EDNS data */
 	if (query->opt_rr) {
 		req->qsource.opt = knot_rrset_copy(query->opt_rr, &req->pool);
+		/* Client may explicitly ask to keep
+		 * connection alive after getting answer.
+		 * Although rfc7828 doesn't require us to send
+		 * this edns option back to the client
+		 * (https://tools.ietf.org/html/rfc7828#section-3.3.2
+		 * states "MAY include") we are going to do it.
+		 */
+		if (knot_edns_get_option(query->opt_rr,
+					 KNOT_EDNS_OPTION_TCP_KEEPALIVE)) {
+			knot_mm_t *pool = &req->answer->mm;
+			knot_rrset_t *opt_rr = mm_alloc(pool, sizeof(knot_rrset_t));
+			if (!opt_rr) {
+				return kr_error(ENOMEM);
+			}
+			struct engine *engine = ctx->worker->engine;
+			struct network *net = &engine->net;
+			uint64_t timeout = net->tcp.in_idle_timeout / 100;
+			if (timeout > UINT16_MAX) {
+				timeout = UINT16_MAX;
+			}
+			uint16_t ka_size = knot_edns_keepalive_size(timeout);
+			uint8_t ka_buf[ka_size];
+			knot_edns_keepalive_write(ka_buf, ka_size, timeout);
+			knot_edns_init(opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, pool);
+			knot_edns_add_option(opt_rr, KNOT_EDNS_OPTION_TCP_KEEPALIVE,
+					     ka_size, ka_buf, pool);
+			req->answer->opt_rr = opt_rr;
+		}
 	}
 	/* Start resolution */
 	struct worker_ctx *worker = ctx->worker;
