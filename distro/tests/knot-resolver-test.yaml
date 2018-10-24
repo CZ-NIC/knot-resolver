@@ -49,7 +49,7 @@
       raw: |
         yum install -y python2 python2-dnf libselinux-python || \
         pacman -Sy python2 --noconfirm || \
-        apt-get install -y python || \
+        (apt-get update && apt-get install -y python) || \
         :
       ignore_errors: true
     - name: gather facts
