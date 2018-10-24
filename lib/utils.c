@@ -1023,6 +1023,36 @@ finish:
 	return d - dst;
 }
 
+int kr_edns_append(knot_rrset_t *opt, knot_rdata_t *data, knot_mm_t *mm)
+{
+	assert(opt->rrs.count == 1);
+
+	uint8_t *old_data = opt->rrs.rdata->data;
+	uint16_t old_data_len = opt->rrs.rdata->len;
+
+	/* construct new RDATA */
+	uint32_t new_data_len = old_data_len + data->len;
+	if (new_data_len > UINT16_MAX) {
+		return kr_error(ENOSPC);
+	}
+
+	knot_rdata_t *new_data = mm_alloc(mm, offsetof(knot_rdata_t, data) + new_data_len);
+	if (!new_data) {
+		return kr_error(ENOMEM);
+	}
+
+	/* concatenate two RDATA's */
+	memcpy(new_data->data, old_data, old_data_len);
+	memcpy(new_data->data + old_data_len, data->data, data->len);
+	new_data->len = new_data_len;
+
+	/* free old RDATA */
+	mm_free(mm, opt->rrs.rdata);
+
+	opt->rrs.rdata = new_data;
+	return kr_ok();
+}
+
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl)
 {
