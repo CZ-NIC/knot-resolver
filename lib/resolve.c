@@ -426,7 +426,13 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 
 static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
+	knot_rrset_t *pkt_opt_rr = pkt->opt_rr;
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
+	/* There may by keepalive edns option from daemon. */
+	if (pkt_opt_rr != NULL) {
+		kr_edns_append(pkt->opt_rr, pkt_opt_rr->rrs.rdata, &pkt->mm);
+	}
+
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
 #if defined(ENABLE_COOKIES)
 	if (req->ctx->cookie_ctx.clnt.enabled ||
