@@ -1,0 +1,16 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+
+Vagrant.configure(2) do |config|
+
+    config.vm.box = "generic/ubuntu1810"
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+
+    config.vm.define "ubuntu1810_knot-resolver"  do |machine|
+        machine.vm.provision "ansible" do |ansible|
+            ansible.playbook = "../knot-resolver-test.yaml"
+        end
+    end
+
+end
