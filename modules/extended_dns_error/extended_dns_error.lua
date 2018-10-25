@@ -34,11 +34,19 @@ end
 -- module layer hooks
 M.layer = {
 	finish = function(state, req)
+		req = kres.request_t(req)
 		local qry = req:last()
 
 		if not qry or qry.err == ffi.C.KR_ERR_OK then
 			return state
 		end
+
+		-- only enable on DoT/DoH requests
+		if not ((req.qsource.tcp and req.qsource.dst_addr:port() == 853) or
+			req:vars().request_doh_host) then
+			return state
+		end
+
 
 		local pkt = req.answer
 
