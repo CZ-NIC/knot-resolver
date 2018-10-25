@@ -1610,6 +1610,14 @@ int kr_resolve_finish(struct kr_request *request, int state)
 #ifndef NOVERBOSELOG
 	struct kr_rplan *rplan = &request->rplan;
 #endif
+
+	request->state = state;
+	ITERATE_LAYERS(request, NULL, finish);
+
+	if (request->state == KR_STATE_FAIL) {
+		state = KR_STATE_FAIL;
+	}
+
 	/* Finalize answer */
 	if (answer_finalize(request, state) != 0) {
 		state = KR_STATE_FAIL;
@@ -1621,9 +1629,6 @@ int kr_resolve_finish(struct kr_request *request, int state)
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
-
-	request->state = state;
-	ITERATE_LAYERS(request, NULL, finish);
 
 	struct kr_query *last = kr_rplan_last(rplan);
 	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
