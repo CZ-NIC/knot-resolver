@@ -22,6 +22,7 @@ Knot Resolver modules
 .. include:: ../modules/renumber/README.rst
 .. .. include:: ../modules/cookies/README.rst
 .. include:: ../modules/bogus_log/README.rst
+.. include:: ../modules/nsid/README.rst
 .. include:: ../modules/workarounds/README.rst
 .. include:: ../modules/dnstap/README.rst
 .. include:: ../modules/ta_signal_query/README.rst
