@@ -11,7 +11,7 @@
 
 
 static int nsid_finish(kr_layer_t *ctx) {
-	const struct kr_request *req = ctx->req;
+	struct kr_request *req = ctx->req;
 	const knot_pkt_t* answer = req->answer;
 	const struct kr_module *module = ctx->api->data;
 	const struct kr_rplan *rplan = &req->rplan;
@@ -37,7 +37,7 @@ static int nsid_finish(kr_layer_t *ctx) {
 	if (req->answer->opt_rr == NULL)
 		return ctx->state;
 
-	if (knot_edns_add_option(req->answer->opt_rr, KNOT_EDNS_OPTION_NSID, 4, "test", &req->pool) != KNOT_EOK) {
+	if (knot_edns_add_option(req->answer->opt_rr, KNOT_EDNS_OPTION_NSID, 4, (uint8_t *)"test", &req->pool) != KNOT_EOK) {
 		/* something went wrong and there is no way to salvage content of OPT RRset */
 		knot_rrset_clear(req->answer->opt_rr, &req->pool);
 	}
