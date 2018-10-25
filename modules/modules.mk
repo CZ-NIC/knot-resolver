@@ -14,6 +14,7 @@ endif
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
 modules_TARGETS += bogus_log \
+		   nsid \
 		   etcd \
                    ta_sentinel \
                    graphite \
