@@ -1278,7 +1278,7 @@ of running processes, and you can test the process for liveliness by connecting 
 Utilizing multiple CPUs
 =======================
 
-The server can run in multiple independent processing, all sharing the same socket and cache. These processes can be started or stopped during runtime based on the load.
+The server can run in multiple independent processes, all sharing the same socket and cache. These processes can be started or stopped during runtime based on the load.
 
 **Using systemd**
 
