@@ -555,6 +555,8 @@ configured in the config file.
       > net.tcp_pipeline(50)
       50
 
+   .. warning:: Please note that too large limit may have negative impact on performance and can lead to increased number of SERVFAIL answers.
+
 .. function:: net.outgoing_v4([string address])
 
    Get/set the IPv4 address used to perform queries.  There is also ``net.outgoing_v6`` for IPv6.
