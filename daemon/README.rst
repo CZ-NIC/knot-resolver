@@ -9,6 +9,14 @@ The server is in the `daemon` directory, it works out of the box without any con
    $ kresd -h # Get help
    $ kresd -a ::1
 
+If you're using our packages, they also provide systemd integration. To start the resolver under systemd, you can use the ``kresd@1.service`` service. By default, the resolver only binds to local interfaces.
+
+.. code-block:: bash
+
+   $ man kresd.systemd  # Help for systemd integration configuration
+   $ systemctl start kresd@1.service
+
+
 Configuration
 =============
 
@@ -382,9 +390,58 @@ Environment
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-.. note:: When using systemd with socket support to run kresd, refer to :ref:`Network configuration with sockets <network-configuration-sockets>` instead.
-
 For when listening on ``localhost`` just doesn't cut it.
+
+**Systemd socket configuration**
+
+If you're using our packages with systemd with sockets support (not supported
+on CentOS 7), network interfaces are configured using systemd drop-in files for
+``kresd.socket`` and ``kresd-tls.socket``.
+
+To configure kresd to listen on public interface, create a drop-in file:
+
+.. code-block:: bash
+
+   $ systemctl edit kresd.socket
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd.socket.d/override.conf
+   [Socket]
+   ListenDatagram=192.0.2.115:53
+   ListenStream=192.0.2.115:53
+
+.. _kresd-socket-override-port:
+
+The default port can also be overriden by using an empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be useful if you want to use the Knot DNS with the `dnsproxy module`_ to have both resolver and authoritative server running on the same machine.
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd.socket.d/override.conf
+   [Socket]
+   ListenDatagram=
+   ListenStream=
+   ListenDatagram=127.0.0.1:53000
+   ListenStream=127.0.0.1:53000
+   ListenDatagram=[::1]:53000
+   ListenStream=[::1]:53000
+
+The ``kresd-tls.socket`` can also be configured to listen for TLS connections.
+
+.. code-block:: bash
+
+   $ systemctl edit kresd-tls.socket
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd-tls.socket.d/override.conf
+   [Socket]
+   ListenStream=192.0.2.115:853
+
+**Daemon network configuration**
+
+If you don't use systemd with sockets to run kresd, network interfaces are
+configured in the config file.
 
 .. tip:: Use declarative interface for network.
 
@@ -1106,100 +1163,6 @@ specified worker count and process rank.
 
 	print(worker.stats().concurrent)
 
-
-.. _daemon-supervised:
-
-Systemd integration
-===================
-
-Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to the resolver daemon. If the resolver terminates or is killed, the sockets remain open and no queries are dropped.
-
-The daemon can be managed with systemd units. Use of systemd sockets and `socket activation`_ is supported for most distributions. For complete documentation, see manual page ``kresd.systemd(7)``.
-
-Single instance
----------------
-
-To start the resolver you can use the ``kresd@1.service`` service. By default, the resolver only binds to local interfaces.
-
-.. code-block:: bash
-
-   $ systemctl start kresd@1.service
-   $ systemctl enable kresd@1.service
-
-.. _network-configuration-sockets:
-
-Network configuration with sockets
-----------------------------------
-
-.. note:: The following section doesn't apply to CentOS 7. Refer to :ref:`Network configuration <network-configuration>` instead.
-
-If your distribution is using ``kresd.socket`` and ``kresd-tls.socket``, network interfaces are configured with drop-in files for these sockets. To configure kresd to listen on public interface, create a drop-in file:
-
-.. code-block:: bash
-
-   $ systemctl edit kresd.socket
-
-.. code-block:: none
-
-   # /etc/systemd/system/kresd.socket.d/override.conf
-   [Socket]
-   ListenDatagram=192.0.2.115:53
-   ListenStream=192.0.2.115:53
-
-The TLS socket is configured similarly:
-
-.. code-block:: bash
-
-   $ systemctl edit kresd-tls.socket
-
-.. code-block:: none
-
-   # /etc/systemd/system/kresd-tls.socket.d/override.conf
-   [Socket]
-   ListenStream=192.0.2.115:853
-
-.. _kresd-socket-override-port:
-
-Override default kresd.socket port
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The default port can also be overriden by using an empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be useful if you want to use the Knot DNS with the `dnsproxy module`_ to have both resolver and authoritative server running on the same machine.
-
-.. code-block:: none
-
-   # /etc/systemd/system/kresd.socket.d/override.conf
-   [Socket]
-   ListenDatagram=
-   ListenStream=
-   ListenDatagram=127.0.0.1:53000
-   ListenStream=127.0.0.1:53000
-   ListenDatagram=[::1]:53000
-   ListenStream=[::1]:53000
-
-.. _systemd-multiple-instances:
-
-Multiple instances
-------------------
-
-It is possible to spawn multiple independent systemd-controlled kresd processes, which share the same socket. This is the recommended way to scale up and utilize multiple CPU cores. All the instances share the same cache and systemd socket.
-
-To run multiple daemons, use a different numeric identifier for the instance, for example:
-
-.. code-block:: bash
-
-   $ systemctl start kresd@1.service
-   $ systemctl start kresd@2.service
-   $ systemctl start kresd@3.service
-   $ systemctl start kresd@4.service
-
-With the use of brace expansion, the equivalent command looks like:
-
-.. code-block:: bash
-
-   $ systemctl start kresd@{1..4}.service
-
-For more details, see ``kresd.systemd(7)``.
-
 .. _enabling-dnssec:
 
 Enabling DNSSEC
@@ -1310,14 +1273,32 @@ This is also a way to enumerate and test running instances, the list of files in
 of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
 
 
-Scaling out
-===========
+Utilizing multiple CPUs
+=======================
 
-.. note:: The recommended way to scale out and use multiple cores is to use :ref:`Multiple instances <systemd-multiple-instances>` when running kresd under systemd.
+The server can run in multiple independent processing, all sharing the same socket and cache. These processes can be started or stopped during runtime based on the load.
 
-The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
-Multiple processes can serve different addresses, but still share the same working directory and cache.
-You can add, start and stop processes during runtime based on the load.
+**Using systemd**
+
+To run multiple daemons using systemd, use a different numeric identifier for
+the instance, for example:
+
+.. code-block:: bash
+
+   $ systemctl start kresd@1.service
+   $ systemctl start kresd@2.service
+   $ systemctl start kresd@3.service
+   $ systemctl start kresd@4.service
+
+With the use of brace expansion, the equivalent command looks like:
+
+.. code-block:: bash
+
+   $ systemctl start kresd@{1..4}.service
+
+For more details, see ``kresd.systemd(7)``.
+
+**Daemon only**
 
 .. code-block:: bash
 
