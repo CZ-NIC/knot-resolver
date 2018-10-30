@@ -70,6 +70,7 @@ struct kr_module {
  * @param env pointer to the lua engine, i.e. struct engine *env (TODO: explicit type)
  * @param input parameter (NULL if missing/nil on lua level)
  * @return a free-form JSON output (malloc-ated)
+ * @note see l_trampoline() implementation for details about the input/output conversion.
  */
 typedef char *(kr_prop_cb)(void *env, struct kr_module *self, const char *input);
 
