@@ -147,6 +147,7 @@ EOF
 	kr_pkt_clear_payload
 	kr_pkt_qclass
 	kr_pkt_qtype
+	kr_pkt_text
 	kr_rnd_buffered
 	kr_rrsig_sig_inception
 	kr_rrsig_sig_expiration
