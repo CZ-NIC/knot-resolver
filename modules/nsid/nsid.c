@@ -6,6 +6,7 @@
 #include <libknot/packet/pkt.h>
 #include <contrib/cleanup.h>
 #include <ccan/json/json.h>
+#include <lauxlib.h>
 
 #include "daemon/engine.h"
 #include "lib/layer.h"
@@ -73,17 +74,6 @@ const kr_layer_api_t *nsid_layer(struct kr_module *module)
 	return &_layer;
 }
 
-static int copy_string(const JsonNode *node, char **val) {
-	if (!node || !node->key)
-		return kr_error(EINVAL);
-	if (node->tag != JSON_STRING)
-		return kr_error(EINVAL);
-	*val = strdup(node->string_);
-	if (*val == NULL)
-		return kr_error(ENOMEM);
-	return kr_ok();
-}
-
 KR_EXPORT
 int nsid_init(struct kr_module *module) {
 	struct nsid_config *config = malloc(sizeof(struct nsid_config));
@@ -96,31 +86,40 @@ int nsid_init(struct kr_module *module) {
 	return kr_ok();
 }
 
-KR_EXPORT
-int nsid_config(struct kr_module *module, const char *conf)
+static char* nsid_name(void *env, struct kr_module *module, const char *args)
 {
+	struct engine *engine = env;
 	struct nsid_config *config = module->data;
-	int ret;
-	if (!conf || strlen(conf) < 1) {
-		kr_log_error("[nsid] config is missing, "
-			     "provide { name = 'NSID value' }\n");
-		return kr_error(EINVAL);
-	}
-	JsonNode *root_node = json_decode(conf);
-	if (!root_node) {
-		kr_log_error("[nsid] error parsing JSON\n");
-		return kr_error(EINVAL);
+	if (args) {  /* set */
+		/* API is not binary safe, we need to fix this one day */
+		size_t arg_len = strlen(args);
+		uint8_t *arg_copy = malloc(arg_len + 1);
+		if (arg_copy == NULL)
+			luaL_error(engine->L, "[nsid] error while allocating new NSID value\n");
+		memcpy(arg_copy, args, arg_len);
+		arg_copy[arg_len] = '\0';  /* for output */
+
+		if (config->local_nsid != NULL)
+			free(config->local_nsid);
+		config->local_nsid = arg_copy;
+		config->local_nsid_len = arg_len;
 	}
 
-	JsonNode *node = json_find_member(root_node, "name");
-	if (!node || (ret = copy_string(node, (char **)&config->local_nsid)) == kr_ok()) {
-		kr_log_error("[nsid] required configuration 'name' "
-			     "is missing in module config\n");
-	} else {
-		config->local_nsid_len = strlen((const char *)config->local_nsid);
-	}
-	json_delete(root_node);
-	return ret;
+	/* get */
+	if (config->local_nsid != NULL)
+		return json_encode_string((char *)config->local_nsid);
+	else
+		return NULL;
+}
+
+KR_EXPORT
+struct kr_prop *nsid_props(void)
+{
+	static struct kr_prop prop_list[] = {
+	    { &nsid_name, "name", "Get or set local NSID value" },
+	    { NULL, NULL, NULL }
+	};
+	return prop_list;
 }
 
 KR_EXPORT
