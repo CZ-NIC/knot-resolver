@@ -82,6 +82,8 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 
 #undef ADDR_SET
 
+/**
+ * \param addr_set pack with one IP address per element */
 static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 			      struct kr_qflags opts, unsigned score, uint8_t *addr[])
 {
@@ -165,7 +167,7 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 				break;
 			}
 		}
-get_next_iterator :
+	get_next_iterator:
 		it = pack_obj_next(it);
 	}
 
@@ -326,6 +328,7 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock
 int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 {
 	if (!qry || !ctx) {
+		//assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 
@@ -354,6 +357,7 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 {
 	if (!qry || !ctx) {
+		//assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 
