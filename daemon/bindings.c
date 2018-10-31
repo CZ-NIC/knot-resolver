@@ -1222,7 +1222,7 @@ static int cache_get(lua_State *L)
 }
 
 /** Set time interval for cleaning rtt cache.
- * Servers with score >= KR_NS_TIMEOUTED will be cleaned after
+ * Servers with score >= KR_NS_TIMEOUT will be cleaned after
  * this interval ended up, so that they will be able to participate
  * in NS elections again. */
 static int cache_ns_tout(lua_State *L)
