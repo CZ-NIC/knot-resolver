@@ -14,18 +14,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <libknot/descriptor.h>
-#include <libknot/rrtype/rdname.h>
-#include <libknot/packet/wire.h>
-#include <libknot/descriptor.h>
-
 #include "lib/zonecut.h"
-#include "lib/rplan.h"
+
 #include "contrib/cleanup.h"
 #include "lib/defines.h"
+#include "lib/generic/pack.h"
 #include "lib/layer.h"
 #include "lib/resolve.h"
-#include "lib/generic/pack.h"
+#include "lib/rplan.h"
+
+#include <libknot/descriptor.h>
+#include <libknot/packet/wire.h>
+#include <libknot/rrtype/rdname.h>
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "zcut", fmt)
 
@@ -42,14 +42,6 @@ typedef enum {
 			 * LATER: we might be interested whether it's only glue. */
 } addrset_info_t;
 
-/* Root hint descriptor. */
-struct hint_info {
-	const knot_dname_t *name;
-	size_t len;
-	const uint8_t *addr;
-};
-
-#define U8(x) (const uint8_t *)(x)
 
 static void update_cut_name(struct kr_zonecut *cut, const knot_dname_t *name)
 {
@@ -67,11 +59,9 @@ int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, knot_mm_t 
 		return kr_error(EINVAL);
 	}
 
+	memset(cut, 0, sizeof(*cut));
 	cut->name = knot_dname_copy(name, pool);
 	cut->pool = pool;
-	cut->key  = NULL;
-	cut->trust_anchor = NULL;
-	cut->parent = NULL;
 	cut->nsset = trie_create(pool);
 	return cut->name && cut->nsset ? kr_ok() : kr_error(ENOMEM);
 }
@@ -294,7 +284,8 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 	trie_apply(cut->nsset, free_addr_set_cb, cut->pool);
 	trie_clear(cut->nsset);
 
-	update_cut_name(cut, U8(""));
+	const uint8_t *const dname_root = (const uint8_t *)/*sign-cast*/("");
+	update_cut_name(cut, dname_root);
 	/* Copy root hints from resolution context. */
 	return kr_zonecut_copy(cut, &ctx->root_hints);
 }
@@ -525,22 +516,27 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			   const knot_dname_t *name, const struct kr_query *qry,
 			   bool * restrict secured)
 {
-	//VERBOSE_MSG(qry, "_find_cached\n");
 	if (!ctx || !cut || !name) {
+		//assert(false);
 		return kr_error(EINVAL);
 	}
+	/* I'm not sure whether the caller always passes a clean state;
+	 * mixing doesn't seem to make sense in any case, so let's clear it.
+	 * We don't bother freeing the packs, as they're on mempool. */
+	trie_clear(cut->nsset);
 	/* Copy name as it may overlap with cut name that is to be replaced. */
 	knot_dname_t *qname = knot_dname_copy(name, cut->pool);
 	if (!qname) {
 		return kr_error(ENOMEM);
 	}
-	/* Start at QNAME parent. */
+	/* Start at QNAME. */
 	const knot_dname_t *label = qname;
 	while (true) {
 		/* Fetch NS first and see if it's insecure. */
 		uint8_t rank = 0;
 		const bool is_root = (label[0] == '\0');
-		if (fetch_ns(ctx, cut, label, qry, &rank) == 0) {
+		int ret = fetch_ns(ctx, cut, label, qry, &rank);
+		if (ret == 0) {
 			/* Flag as insecure if cached as this */
 			if (kr_rank_test(rank, KR_RANK_INSECURE)) {
 				*secured = false;
@@ -563,7 +559,8 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 					label_str, rank, ret_ds, ret_dnskey);
 			}
 			return kr_ok();
-		}
+		} /* else */
+
 		/* Subtract label from QNAME. */
 		if (!is_root) {
 			label = knot_wire_next_label(label, NULL);
