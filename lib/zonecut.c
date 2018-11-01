@@ -354,7 +354,8 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 			++usable_cnt;
 		}
 
-		pack_obj_push(addrs, rd->data, rd->len);
+		ret = pack_obj_push(addrs, rd->data, rd->len);
+		assert(!ret); /* didn't fit because of incorrectly reserved memory */
 		/* LATER: for now we lose quite some information here,
 		 * as keeping it would need substantial changes on other places,
 		 * and it turned out to be premature optimization (most likely).
