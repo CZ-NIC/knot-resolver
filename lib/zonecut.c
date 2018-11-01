@@ -333,6 +333,7 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 				  kr_memreserve, mm_pool);
 	if (ret) abort(); /* ENOMEM "probably" */
 
+	int usable_cnt = 0;
 	addrset_info_t result = AI_EMPTY;
 	knot_rdata_t *rd = cached_rr.rrs.rdata;
 	for (uint16_t i = 0; i < cached_rr.rrs.count; ++i, rd = knot_rdataset_next(rd)) {
@@ -350,6 +351,7 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 			   < rtt_e->tout_timestamp + ctx->cache_rtt_tout_retry_interval;
 		if (!unusable) {
 			result = AI_OK;
+			++usable_cnt;
 		}
 
 		pack_obj_push(addrs, rd->data, rd->len);
@@ -361,6 +363,10 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 		 * or even finish up choosing the set to send packets to.
 		 * Overall there's some overlap with nsrep.c functionality.
 		 */
+	}
+	if (usable_cnt != cached_rr.rrs.count) {
+		VERBOSE_MSG(qry, "usable NS addresses: %d/%d\n",
+				usable_cnt, cached_rr.rrs.count);
 	}
 	return result;
 }
@@ -422,7 +428,12 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 			? AI_REPUT
 			: fetch_addr(*pack, ns_name, KNOT_RRTYPE_AAAA, cut->pool, qry);
 
-		/* FIXME: deep, perhaps separate into a function (break -> return). */
+		WITH_VERBOSE(qry) {
+			auto_free char *ns_name_txt = kr_dname_text(ns_name);
+			VERBOSE_MSG(qry, "NS %s infos: %d, %d\n",
+					ns_name_txt, (int)infos[0], (int)infos[1]);
+		}
+
 		/* AI_CYCLED checks.
 		 * If an ancestor query has its zone cut in the state that
 		 * it's looking for name or address(es) of some NS(s),
