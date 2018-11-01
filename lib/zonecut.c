@@ -295,6 +295,19 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 				 knot_mm_t *mm_pool, const struct kr_query *qry)
 // LATER(optim.): excessive data copying
 {
+	int rdlen;
+	switch (rrtype) {
+	case KNOT_RRTYPE_A:
+		rdlen = 4;
+		break;
+	case KNOT_RRTYPE_AAAA:
+		rdlen = 16;
+		break;
+	default:
+		assert(!EINVAL);
+		return AI_UNKNOWN;
+	}
+
 	struct kr_context *ctx = qry->request->ctx;
 	struct kr_cache_p peek;
 	if (kr_cache_peek_exact(&ctx->cache, ns, rrtype, &peek) != 0) {
@@ -323,9 +336,9 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 	addrset_info_t result = AI_EMPTY;
 	knot_rdata_t *rd = cached_rr.rrs.rdata;
 	for (uint16_t i = 0; i < cached_rr.rrs.count; ++i, rd = knot_rdataset_next(rd)) {
-		if (unlikely(rd->len != 4
-			     || (rrtype == KNOT_RRTYPE_AAAA && rd->len != 16))) {
-			VERBOSE_MSG(qry, "bad NS address length %d, skipping\n", (int)rd->len);
+		if (unlikely(rd->len != rdlen)) {
+			VERBOSE_MSG(qry, "bad NS address length %d for rrtype %d, skipping\n",
+					(int)rd->len, (int)rrtype);
 			continue;
 		}
 		/* Check RTT cache - whether the IP is usable or not. */
@@ -415,8 +428,11 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		 * it's looking for name or address(es) of some NS(s),
 		 * we want to avoid doing so with a NS that lies under its cut.
 		 * Instead we need to consider such names unusable in the cut (for now). */
-		if (infos[0] != AI_UNKNOWN && infos[1] != AI_UNKNOWN)
-			continue; /* optimization */
+		if (infos[0] != AI_UNKNOWN && infos[1] != AI_UNKNOWN) {
+			/* Optimization: the following loop would be pointless. */
+			all_bad = false;
+			continue;
+		}
 		for (const struct kr_query *aq = qry; aq->parent; aq = aq->parent) {
 			const struct kr_qflags *aqpf = &aq->parent->flags;
 			if (   (aqpf->AWAIT_CUT  && aq->stype == KNOT_RRTYPE_NS)
@@ -438,9 +454,11 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		all_bad = all_bad && infos[0] <= AI_LAST_BAD && infos[1] <= AI_LAST_BAD;
 	}
 
-	if (all_bad) {
-		VERBOSE_MSG(qry, "all bad, count = %d\n", (int)ns_rds.count);
-	}
+	if (all_bad) { WITH_VERBOSE(qry) {
+		auto_free char *name_txt = kr_dname_text(name);
+		VERBOSE_MSG(qry, "cut %s: all NSs bad, count = %d\n",
+				name_txt, (int)ns_rds.count);
+	} }
 	knot_rdataset_clear(&ns_rds, cut->pool);
 	return all_bad ? ELOOP : kr_ok();
 }
