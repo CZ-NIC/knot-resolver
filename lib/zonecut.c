@@ -532,6 +532,10 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 		//assert(false);
 		return kr_error(EINVAL);
 	}
+	/* I'm not sure whether the caller always passes a clean state;
+	 * mixing doesn't seem to make sense in any case, so let's clear it.
+	 * We don't bother freeing the packs, as they're on mempool. */
+	trie_clear(cut->nsset);
 	/* Copy name as it may overlap with cut name that is to be replaced. */
 	knot_dname_t *qname = knot_dname_copy(name, cut->pool);
 	if (!qname) {
@@ -567,11 +571,8 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 					label_str, rank, ret_ds, ret_dnskey);
 			}
 			return kr_ok();
-		} else {
-			VERBOSE_MSG(qry, "fetch_ns() returned %d\n", ret);
-			/* We don't bother freeing the packs, as they're on mempool. */
-			trie_clear(cut->nsset);
-		}
+		} /* else */
+
 		/* Subtract label from QNAME. */
 		if (!is_root) {
 			label = knot_wire_next_label(label, NULL);
