@@ -1,17 +1,20 @@
-Knot Resolver 3.x.y (2018-mm-dd)
+Knot Resolver 3.1.0 (2018-11-02)
 ================================
 
 Incompatible changes
 --------------------
 - hints.use_nodata(true) by default; that's what most users want
+- libknot >= 2.7.2 is required
 
 Improvements
 ------------
 - cache: handle out-of-space SIGBUS slightly better (#197)
+- daemon: improve TCP timeout handling (!686)
 
 Bugfixes
 --------
 - cache.clear('name'): fix some edge cases in API (#401)
+- fix error handling from TLS writes (!669)
 
 
 Knot Resolver 3.0.0 (2018-08-20)
