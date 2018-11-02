@@ -1,0 +1,16 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+
+Vagrant.configure(2) do |config|
+
+    config.vm.box = "fedora/29-cloud-base"
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+
+    config.vm.define "fedora29_knot-resolver"  do |machine|
+        machine.vm.provision "ansible" do |ansible|
+            ansible.playbook = "../knot-resolver-test.yaml"
+        end
+    end
+
+end
