@@ -106,12 +106,6 @@
         name: "{{ dig_package[ansible_distribution] }}"
         state: present
 
-    - name: update selinux-policy
-      package:
-        name: selinux-policy
-        state: latest
-      when: ansible_distribution in ['RedHat', 'Fedora']
-
     - name: testing block
       block:
         - name: start kresd@1.service
