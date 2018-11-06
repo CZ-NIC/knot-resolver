@@ -1,5 +1,5 @@
 # Intermediate container for Knot DNS build (not persistent)
-FROM debian:stable-slim AS knot-dns-build
+FROM debian:stable AS knot-dns-build
 ARG KNOT_DNS_VERSION=v2.7.2
 
 # Build dependencies
