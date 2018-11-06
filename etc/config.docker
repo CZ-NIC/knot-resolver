@@ -4,9 +4,6 @@
 net.listen('0.0.0.0')
 net.listen('0.0.0.0', 853, {tls=true})
 
--- Auto-maintain root TA
-trust_anchors.file = '/data/root.keys'
-
 -- Load Useful modules
 modules = {
 	'policy',   -- Block queries to local zones/bad sites
