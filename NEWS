@@ -18,6 +18,10 @@ Bugfixes
 - http module: only run prometheus in parent process if using --forks=N,
   as the submodule collects metrics from all sub-processes as well.
 
+Improvements
+------------
+- Dockerfile: rework, basing on Debian instead of Alpine
+
 
 Knot Resolver 3.1.0 (2018-11-02)
 ================================
