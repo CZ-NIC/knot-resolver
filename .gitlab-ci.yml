@@ -129,6 +129,21 @@ test:linux:amd64:
     - linux
     - amd64
 
+
+test:dockerfile:
+  stage: test
+  image: ""
+  except:
+    - master
+  tags:
+    - dind
+  dependencies: []
+  script:
+    - docker build --no-cache .
+  after_script:  # remove dangling images to avoid running out of disk space
+    - docker rmi $(docker images -f "dangling=true" -q)
+
+
 installcheck:linux:amd64:
   stage: test
   except:
