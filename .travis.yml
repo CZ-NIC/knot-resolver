@@ -23,6 +23,9 @@ env:
         - MALLOC_PERTURB_=223
 before_script:
     - echo $CFLAGS
+    - brew update
+    - brew install makedepend cmocka gnutls luajit libuv
+    - brew install knot  # FIXME build knot
     - BOOTSTRAP_CLEANUP=1 ./scripts/bootstrap-depends.sh ${HOME}/.local
     - rvm get stable || true
 script:
