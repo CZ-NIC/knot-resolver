@@ -164,10 +164,10 @@ Replacing part of the DNS tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You may want to resolve most of the DNS namespace by usual means while letting some other resolver solve specific subtrees.
-One problem there comes from DNSSEC, as such data will typically be rejected by validation starting from the ICANN root keys.  If you trust the resolver and your link to it, you can simply use the `STUB` action to avoid validation only for those subtrees.
+Such data would typically be rejected by DNSSEC validation starting from the ICANN root keys.  Therefore, if you trust the resolver and your link to it, you can simply use the ``STUB`` action instead of ``FORWARD`` to avoid validation only for those subtrees.
 
-Another problem comes from caching, as Knot Resolver only keeps a single cache for everything.
-For example, if you add an alternative top-level domain, while using the ICANN root zone for the rest, at some point the cache may obtain records that prove that your top-level domain does not exist, and that records could then be used when the positive records fall out of cache.  There the easiest work-around is to disable reading from cache for those subtrees; the other resolver is often very close anyway.
+Another issue is caused by caching, because Knot Resolver only keeps a single cache for everything.
+For example, if you add an alternative top-level domain while using the ICANN root zone for the rest, at some point the cache may obtain records proving that your top-level domain does not exist, and those records could then be used when the positive records fall out of cache.  The easiest work-around is to disable reading from cache for those subtrees; the other resolver is often very close anyway.
 
 
 .. code-block:: lua
