@@ -53,7 +53,6 @@ COPY . /tmp/knot-resolver
 # Build Knot Resolver
 ARG CFLAGS="-O2 -ftree-vectorize -fstack-protector -g"
 ENV LDFLAGS -Wl,--as-needed
-ENV BUILD_IGNORE libedit-dev
 RUN cd /tmp/knot-resolver && \
 	make && \
 	make install DESTDIR=/tmp/root && \
