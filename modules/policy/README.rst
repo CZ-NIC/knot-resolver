@@ -157,6 +157,26 @@ Policy examples
 	-- Delete rule that we just created
 	policy.del(rule.id)
 
+
+Replacing part of the DNS tree
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You may want to resolve most of the DNS namespace by usual means while letting some other resolver solve specific subtrees.
+Such data would typically be rejected by DNSSEC validation starting from the ICANN root keys.  Therefore, if you trust the resolver and your link to it, you can simply use the ``STUB`` action instead of ``FORWARD`` to avoid validation only for those subtrees.
+
+Another issue is caused by caching, because Knot Resolver only keeps a single cache for everything.
+For example, if you add an alternative top-level domain while using the ICANN root zone for the rest, at some point the cache may obtain records proving that your top-level domain does not exist, and those records could then be used when the positive records fall out of cache.  The easiest work-around is to disable reading from cache for those subtrees; the other resolver is often very close anyway.
+
+
+.. code-block:: lua
+    :caption: Example configuration
+
+    extraTrees = policy.todnames({'libre', 'null'})
+    -- Beware: the rule order is important, as STUB is not a chain action.
+    policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}),   extraTrees))
+    policy.add(policy.suffix(policy.STUB({'2001:db8::1'}), extraTrees))
+
+
 Additional properties
 ^^^^^^^^^^^^^^^^^^^^^
 
