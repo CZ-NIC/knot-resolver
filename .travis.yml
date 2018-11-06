@@ -1,6 +1,12 @@
 language: c
 os:
     - osx
+addons:
+    homebrew:
+        packages:
+            - cmocka
+            - luajit
+            - libuv
 compiler:
     - clang
 notifications:
@@ -15,16 +21,17 @@ matrix:
     fast_finish: true
 env:
     global:
-        - PKG_CONFIG_PATH="${HOME}/.local/lib/pkgconfig"
-        - PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
-        - LD_LIBRARY_PATH="${HOME}/.local/lib"
+        - KNOT_DNS_VERSION=v2.7.2
         - DYLD_LIBRARY_PATH="${HOME}/.local/lib"
         - MALLOC_CHECK_=3
         - MALLOC_PERTURB_=223
 before_script:
-    - echo $CFLAGS
-    - BOOTSTRAP_CLEANUP=1 ./scripts/bootstrap-depends.sh ${HOME}/.local
-    - rvm get stable || true
+    - git clone -b ${KNOT_DNS_VERSION} https://gitlab.labs.nic.cz/knot/knot-dns.git
+    - cd knot-dns
+    - autoreconf -fi
+    - ./configure --disable-static --disable-fastparser --disable-documentation --disable-daemon --disable-utilities --with-lmdb=no
+    - make -j2 install
+    - cd ..
 script:
     - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 install check V=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
     - ./daemon/kresd -h
