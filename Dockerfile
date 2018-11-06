@@ -18,7 +18,7 @@ RUN git clone -b $KNOT_DNS_VERSION --depth=1 https://gitlab.labs.nic.cz/knot/kno
 	cd /tmp/knot-dns && \
 	autoreconf -if && \
 	./configure --disable-static --disable-fastparser --disable-documentation && \
-	make && \
+	make -j4 && \
 	make install && \
 	ldconfig
 
@@ -54,7 +54,7 @@ COPY . /tmp/knot-resolver
 ARG CFLAGS="-O2 -ftree-vectorize -fstack-protector -g"
 ENV LDFLAGS -Wl,--as-needed
 RUN cd /tmp/knot-resolver && \
-	make && \
+	make -j4 && \
 	make install DESTDIR=/tmp/root && \
 	mkdir -p /tmp/root/etc/knot-resolver && \
 	cp ./etc/config.docker /tmp/root/etc/knot-resolver/kresd.conf
