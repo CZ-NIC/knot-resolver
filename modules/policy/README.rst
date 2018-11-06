@@ -7,7 +7,9 @@ This module can block, rewrite, or alter inbound queries based on user-defined p
 
 Each policy *rule* has two parts: a *filter* and an *action*. A *filter* selects which queries will be affected by the policy, and *action* which modifies queries matching the associated filter. Typically a rule is defined as follows: ``filter(action(action parameters), filter parameters)``. For example, a filter can be ``suffix`` which matches queries whose suffix part is in specified set, and one of possible actions is ``DENY``, which denies resolution. These are combined together into ``policy.suffix(policy.DENY, {todname('badguy.example.')})``. The rule is effective when it is added into rule table using ``policy.add()``, please see `Policy examples`_.
 
-By default, if no rule applies to a query, built-in rules for `special-use <https://www.iana.org/assignments/special-use-domain-names/special-use-domain-names.xhtml>`_ and `locally-served <http://www.iana.org/assignments/locally-served-dns-zone>`_ domain names are applied. These built-in rules can be overriden using action ``PASS``, see `Policy examples`_ below.
+This module is enabled by default because it implements mandatory :rfc:`6761` logic.
+When no rule applies to a query, built-in rules for `special-use <https://www.iana.org/assignments/special-use-domain-names/special-use-domain-names.xhtml>`_ and `locally-served <http://www.iana.org/assignments/locally-served-dns-zones>`_ domain names are applied.
+These rules can be overriden by action ``PASS``, see `Policy examples`_ below.  For debugging purposes you can also add ``modules.unload('policy')`` to your config to unload the module.
 
 
 Filters
@@ -250,8 +252,6 @@ Most properties (actions, filters) are described above.
       -- Convert table of names
       policy.todnames({'example.com', 'me.cz'})
       { '\7example\3com\0', '\2me\2cz\0' }
-
-This module is enabled by default because it implements mandatory :rfc:`6761` logic. For debugging purposes you can add ``modules.unload('policy')`` to your config to unload the module.
 
 
 .. _`Aho-Corasick`: https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
