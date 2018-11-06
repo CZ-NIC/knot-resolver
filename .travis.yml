@@ -37,17 +37,4 @@ script:
     - ./daemon/kresd -h
     - ./daemon/kresd -V
     - echo "quit()" | ./daemon/kresd -a 127.0.0.1@53535 .
-    # Deckard should be OK just on Linux
-    # - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 check-integration PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
-after_success:
-    - if test $TRAVIS_OS_NAME = linux; then coveralls -i lib -i daemon -x ".c" --gcov-options '\-lp'; fi
 sudo: false
-cache:
-    directories:
-    - ${HOME}/.local
-    - ${HOME}/.cache/pip
-before_cache:
-    - rm -f ${HOME}/.local/sbin/kresd
-    - rm -f ${HOME}/.local/lib/libkres.*
-    - rm -rf ${HOME}/.local/include/libkres
-    - rm -rf ${HOME}/.local/lib/kdns_modules
