@@ -26,7 +26,6 @@ before_script:
     - brew update
     - brew install makedepend cmocka gnutls luajit libuv
     - brew install knot  # FIXME build knot
-    - BOOTSTRAP_CLEANUP=1 ./scripts/bootstrap-depends.sh ${HOME}/.local
     - rvm get stable || true
 script:
     - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 install check V=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
