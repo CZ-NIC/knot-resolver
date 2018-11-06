@@ -128,7 +128,7 @@ if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
 	for p in makedepend protobuf-c cmocka jansson gnutls \
 			luajit libuv python3 libyaml augeas; do
 		echo "BEGIN $p";
-		brew install "$p" || brew upgrade "$p" # install fails on installed packages
+		brew install "$p" || :
 		echo "END $p";
 	done
 	pip3 install -r "${TRAVIS_BUILD_DIR}/tests/deckard/requirements.txt"
