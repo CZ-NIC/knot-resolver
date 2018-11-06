@@ -24,7 +24,10 @@ env:
 before_script:
     - echo $CFLAGS
     - brew update
-    - brew install makedepend cmocka gnutls luajit libuv
+    - brew install makedepend
+    - brew install cmocka || echo "cmocka already installed"
+    - brew install luajit ||  echo "luajit already installed"
+    - brew install libuv || echo "libuv already installed"
     - brew install knot  # FIXME build knot
     - rvm get stable || true
 script:
