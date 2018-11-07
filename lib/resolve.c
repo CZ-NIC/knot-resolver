@@ -1607,18 +1607,19 @@ int kr_resolve_finish(struct kr_request *request, int state)
 #endif
 
 	/* Finalize answer and construct wire-buffer. */
-	request->state = state;
 	ITERATE_LAYERS(request, NULL, finalize);
-	if (request->state != KR_STATE_DONE) {
+	if (request->state == KR_STATE_FAIL) {
 		state = KR_STATE_FAIL;
 	} else if (answer_finalize(request, state) != 0) {
 		state = KR_STATE_FAIL;
 	}
 
-	/* Error during procesing, internal failure */
+	/* Error during processing, internal failure */
 	if (state != KR_STATE_DONE) {
 		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
+			knot_wire_clear_ad(answer->wire);
+			knot_wire_clear_aa(answer->wire);
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
