@@ -119,7 +119,7 @@ doesn't provide any layer to capture events. The Lua module can however provide 
 	}
 
 There is currently an additional "feature" in comparison to C layer functions:
-the ``consume``, ``produce`` and ``checkout`` functions do not get called at all
+the ``consume``, ``produce`` and ``checkout`` and ``finalize`` functions do not get called at all
 if ``state == kres.FAIL`` (note that ``finish`` does get called nevertheless).
 
 Since the modules are like any other Lua modules, you can interact with them through the CLI and and any interface.

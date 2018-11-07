@@ -196,7 +196,12 @@ struct kr_request {
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
-		bool tcp; /**< true if the request is on tcp; only meaningful if (dst_addr) */
+		struct {
+			bool tcp:1; /**< true if the request is on tcp; only meaningful if (dst_addr). */
+			bool cd:1; /**< true if the source request has cd bit set. */
+			bool rd:1; /**< true if the source request has rd bit set. */
+			bool has_dnssec:1; /**< true if knot_pkt_has_dnssec() has returned true for source request. */
+		} flags;
 		size_t size; /**< query packet size */
 	} qsource;
 	struct {
@@ -228,6 +233,7 @@ struct kr_request {
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
 	unsigned int uid; /** for logging purposes only */
+	void *daemon_context; /** pointer to worker from daemon. Can be used in modules. */
 };
 
 /** Initializer for an array of *_selected. */
