@@ -204,6 +204,17 @@ installcheck:valgrind:linux:amd64:
     - linux
     - amd64
 
+osx:build:
+  stage: test
+  except:
+    - master
+  script:
+    - ci/travis.py ${CI_COMMIT_REF_NAME}
+  dependencies: []
+  tags:
+    - docker
+
+
 # temporarily disabled - we need to fix issues first
 #deckard:linux:amd64:valgrind:
 #  stage: test
