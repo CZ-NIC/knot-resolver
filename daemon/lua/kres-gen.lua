@@ -173,7 +173,12 @@ struct kr_request {
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
-		_Bool tcp;
+		struct {
+			_Bool tcp : 1;
+			_Bool cd : 1;
+			_Bool rd : 1;
+			_Bool has_dnssec : 1;
+		} flags;
 		size_t size;
 	} qsource;
 	struct {
@@ -196,6 +201,7 @@ struct kr_request {
 	int vars_ref;
 	knot_mm_t pool;
 	unsigned int uid;
+	void *daemon_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct kr_cache {

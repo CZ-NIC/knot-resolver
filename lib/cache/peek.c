@@ -91,7 +91,7 @@ static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_que
 {
 	/* TODO: move rank handling into the iterator (DNSSEC_* flags)? */
 	const bool allow_unverified =
-		knot_wire_get_cd(req->answer->wire) || qry->flags.STUB;
+		req->qsource.flags.cd || qry->flags.STUB;
 		/* in stub mode we don't trust RRs anyway ^^ */
 	if (qry->flags.NONAUTH) {
 		return KR_RANK_INITIAL;
