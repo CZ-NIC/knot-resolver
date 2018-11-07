@@ -29,8 +29,8 @@ before_script:
     - autoreconf -fi
     - ./configure --disable-static --disable-fastparser --disable-documentation --disable-daemon --disable-utilities
     #- brew install knot  # FIXME build knot
-    - make -j2
-    - make install
+    - make -j2 install
+    - cd ..
     #- rvm get stable || true
 script:
     - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 install check V=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
