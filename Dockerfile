@@ -17,7 +17,8 @@ RUN apt-get update -qq && \
 RUN git clone -b $KNOT_DNS_VERSION --depth=1 https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot-dns && \
 	cd /tmp/knot-dns && \
 	autoreconf -if && \
-	./configure --disable-static --disable-fastparser --disable-documentation && \
+	./configure --disable-static --disable-fastparser --disable-documentation \
+		--disable-daemon --disable-utilities && \
 	make -j4 && \
 	make install && \
 	ldconfig
