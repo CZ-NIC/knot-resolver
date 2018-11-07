@@ -1,6 +1,12 @@
 language: c
 os:
     - osx
+addons:
+    homebrew:
+        packages:
+            - cmocka
+            - luajit
+            - libuv
 compiler:
     - clang
 notifications:
@@ -20,10 +26,6 @@ env:
         - MALLOC_CHECK_=3
         - MALLOC_PERTURB_=223
 before_script:
-    - brew update
-    - brew install cmocka || echo "cmocka already installed"
-    - brew install luajit ||  echo "luajit already installed"
-    - brew install libuv || echo "libuv already installed"
     - git clone -b ${KNOT_DNS_VERSION} https://gitlab.labs.nic.cz/knot/knot-dns.git
     - cd knot-dns
     - autoreconf -fi
