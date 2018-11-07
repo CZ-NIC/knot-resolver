@@ -165,6 +165,7 @@ struct kr_rplan {
 };
 struct kr_request_qsource_flags {
 	_Bool tcp : 1;
+	_Bool tls : 1;
 };
 struct kr_request {
 	struct kr_context *ctx;
@@ -191,7 +192,6 @@ struct kr_request {
 	_Bool auth_validated;
 	uint8_t rank;
 	struct kr_rplan rplan;
-	int has_tls;
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
 	int vars_ref;

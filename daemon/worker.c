@@ -322,11 +322,13 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 			req->qsource.dst_addr = dst_addr;
 		}
 		req->qsource.flags.tcp = false;
+		req->qsource.flags.tls = false;
 	} else if (handle->type == UV_TCP) {
 		if (uv_tcp_getsockname((uv_tcp_t *)handle, dst_addr, &addr_len) == 0) {
 			req->qsource.dst_addr = dst_addr;
 		}
 		req->qsource.flags.tcp = true;
+		req->qsource.flags.tls = s && session_flags(s)->has_tls;
 	}
 
 	return ctx;
@@ -1354,7 +1356,6 @@ static int qr_task_step(struct qr_task *task,
 	task->addrlist = NULL;
 	task->addrlist_count = 0;
 	task->addrlist_turn = 0;
-	req->has_tls = (ctx->source.session && session_flags(ctx->source.session)->has_tls);
 
 	if (worker->too_many_open) {
 		/* */

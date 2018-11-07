@@ -441,7 +441,7 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 #endif /* defined(ENABLE_COOKIES) */
-	if (req->has_tls) {
+	if (req->qsource.flags.tls) {
 		if (req->ctx->tls_padding == -1)
 			/* FIXME: we do not know how to reserve space for the
 			 * default padding policy, since we can't predict what
@@ -642,7 +642,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	}
 	/* Write EDNS information */
 	if (answer->opt_rr) {
-		if (request->has_tls) {
+		if (request->qsource.flags.tls) {
 			if (answer_padding(request) != kr_ok()) {
 				return answer_fail(request);
 			}

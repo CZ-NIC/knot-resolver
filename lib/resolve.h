@@ -177,7 +177,8 @@ struct kr_context
 /* Kept outside, because kres-gen.lua can't handle this depth
  * (and lines here were too long anyway). */
 struct kr_request_qsource_flags {
-	bool tcp:1; /**< true if the request is on tcp; only meaningful if (dst_addr). */
+	bool tcp:1; /**< true if the request is on TCP (or TLS); only meaningful if (dst_addr). */
+	bool tls:1; /**< true if the request is on TLS; only meaningful if (dst_addr). */
 };
 
 /**
@@ -226,7 +227,6 @@ struct kr_request {
 	uint8_t rank;
 
 	struct kr_rplan rplan;
-	int has_tls;
 	trace_log_f trace_log; /**< Logging tracepoint */
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
