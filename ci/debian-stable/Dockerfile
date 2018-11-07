@@ -61,6 +61,9 @@ RUN pip3 install -r /var/opt/respdiff/requirements.txt
 RUN pip3 install mypy
 RUN pip3 install flake8
 
+# Python requests for CI scripts
+RUN pip3 install requests
+
 # Unbound for respdiff
 RUN apt-get install unbound unbound-anchor -y -qqq
 RUN printf "server:\n interface: 127.0.0.1@53535\n use-syslog: yes\n do-ip6: no\nremote-control:\n control-enable: no\n" >> /etc/unbound/unbound.conf
