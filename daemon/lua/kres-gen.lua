@@ -163,6 +163,12 @@ struct kr_rplan {
 	knot_mm_t *pool;
 	uint32_t next_uid;
 };
+struct kr_request_qsource_flags {
+	_Bool tcp : 1;
+	_Bool cd : 1;
+	_Bool rd : 1;
+	_Bool has_dnssec : 1;
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
@@ -173,12 +179,7 @@ struct kr_request {
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
 		const knot_rrset_t *opt;
-		struct {
-			_Bool tcp : 1;
-			_Bool cd : 1;
-			_Bool rd : 1;
-			_Bool has_dnssec : 1;
-		} flags;
+		struct kr_request_qsource_flags flags;
 		size_t size;
 	} qsource;
 	struct {

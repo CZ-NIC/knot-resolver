@@ -74,6 +74,7 @@ genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan
+	struct kr_request_qsource_flags
 	struct kr_request
 	enum kr_rank
 	struct kr_cache
