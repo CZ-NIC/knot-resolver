@@ -294,6 +294,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
+	req->daemon_context = worker;
 
 	/* Remember query source addr */
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {
@@ -347,25 +348,28 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 				 KNOT_WIRE_MIN_PKTSIZE);
 	}
 	req->qsource.size = query->size;
+	if (knot_pkt_has_tsig(query)) {
+		req->qsource.size += query->tsig_wire.len;
+	}
 
-	req->answer = knot_pkt_new(NULL, answer_max, &req->pool);
-	if (!req->answer) {
+	knot_pkt_t *answer = knot_pkt_new(NULL, answer_max, &req->pool);
+	if (!answer) { /* Failed to allocate answer */
 		return kr_error(ENOMEM);
 	}
 
-	/* Remember query source TSIG key */
-	if (query->tsig_rr) {
-		req->qsource.key = knot_rrset_copy(query->tsig_rr, &req->pool);
+	knot_pkt_t *pkt = knot_pkt_new(NULL, req->qsource.size, &req->pool);
+	if (!pkt) {
+		return kr_error(ENOMEM);
 	}
+	if (knot_pkt_copy(pkt, query) != 0) {
+		return kr_error(ENOMEM);
+	}
+	req->qsource.packet = pkt;
 
-	/* Remember query source EDNS data */
-	if (query->opt_rr) {
-		req->qsource.opt = knot_rrset_copy(query->opt_rr, &req->pool);
-	}
 	/* Start resolution */
 	struct worker_ctx *worker = ctx->worker;
 	struct engine *engine = worker->engine;
-	kr_resolve_begin(req, &engine->resolver, req->answer);
+	kr_resolve_begin(req, &engine->resolver, answer);
 	worker->stats.queries += 1;
 	/* Throttle outbound queries only when high pressure */
 	if (worker->stats.concurrent < QUERY_RATE_THRESHOLD) {
@@ -1063,10 +1067,11 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		return 0;
 	}
 	struct request_ctx *ctx = task->ctx;
+	struct session *source_session = ctx->source.session;
 	kr_resolve_finish(&ctx->req, state);
 
 	task->finished = true;
-	if (ctx->source.session == NULL) {
+	if (source_session == NULL) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 	}
@@ -1075,7 +1080,6 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	qr_task_ref(task);
 
 	/* Send back answer */
-	struct session *source_session = ctx->source.session;
 	assert(!session_flags(source_session)->closing);
 	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
 	int res = qr_task_send(task, source_session,

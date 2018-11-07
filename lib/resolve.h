@@ -189,13 +189,11 @@ struct kr_request {
 	knot_pkt_t *answer;
 	struct kr_query *current_query;    /**< Current evaluated query. */
 	struct {
-		const knot_rrset_t *key;
 		/** Address that originated the request. NULL for internal origin. */
 		const struct sockaddr *addr;
 		/** Address that accepted the request.  NULL for internal origin. */
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
-		const knot_rrset_t *opt;
 		bool tcp; /**< true if the request is on tcp; only meaningful if (dst_addr) */
 		size_t size; /**< query packet size */
 	} qsource;
@@ -228,6 +226,7 @@ struct kr_request {
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
 	unsigned int uid; /** for logging purposes only */
+	void *daemon_context; /** pointer to worker from daemon. Can be used in modules. */
 };
 
 /** Initializer for an array of *_selected. */
