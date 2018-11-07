@@ -35,7 +35,8 @@ static int edns_keepalive_finalize(kr_layer_t *ctx)
 	knot_pkt_t *answer = req->answer;
 	const knot_rrset_t *src_opt = req->qsource.opt;
 	knot_rrset_t *answ_opt = answer->opt_rr;
-	if (src_opt != NULL &&
+	if (req->qsource.flags.tcp &&
+	    src_opt != NULL &&
 	    knot_edns_get_option(src_opt, KNOT_EDNS_OPTION_TCP_KEEPALIVE) &&
 	    answ_opt != NULL) {
 		const struct worker_ctx *worker = (const struct worker_ctx *)req->daemon_context;
