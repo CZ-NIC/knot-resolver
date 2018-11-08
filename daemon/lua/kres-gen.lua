@@ -171,9 +171,11 @@ struct kr_request {
 	knot_pkt_t *answer;
 	struct kr_query *current_query;
 	struct {
+		const knot_rrset_t *key;
 		const struct sockaddr *addr;
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
+		const knot_rrset_t *opt;
 		struct kr_request_qsource_flags flags;
 		size_t size;
 	} qsource;

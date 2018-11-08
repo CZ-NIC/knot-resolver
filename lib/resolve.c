@@ -75,7 +75,11 @@ static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bo
 static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
-	knot_pkt_t *pkt_copy = knot_pkt_new(NULL, pkt->size, &req->pool);
+	size_t pkt_size = pkt->size;
+	if (knot_pkt_has_tsig(pkt)) {
+		pkt_size += pkt->tsig_wire.len;
+	}
+	knot_pkt_t *pkt_copy = knot_pkt_new(NULL, pkt_size, &req->pool);
 	struct kr_layer_pickle *pickle = mm_alloc(&req->pool, sizeof(*pickle));
 	if (pickle && pkt_copy && knot_pkt_copy(pkt_copy, pkt) == 0) {
 		struct kr_query *qry = req->current_query;

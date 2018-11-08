@@ -348,13 +348,16 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 				 KNOT_WIRE_MIN_PKTSIZE);
 	}
 	req->qsource.size = query->size;
+	if (knot_pkt_has_tsig(query)) {
+		req->qsource.size += query->tsig_wire.len;
+	}
 
 	knot_pkt_t *answer = knot_pkt_new(NULL, answer_max, &req->pool);
 	if (!answer) { /* Failed to allocate answer */
 		return kr_error(ENOMEM);
 	}
 
-	knot_pkt_t *pkt = knot_pkt_new(NULL, query->size, &req->pool);
+	knot_pkt_t *pkt = knot_pkt_new(NULL, req->qsource.size, &req->pool);
 	if (!pkt) {
 		return kr_error(ENOMEM);
 	}
@@ -362,7 +365,13 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 		return kr_error(ENOMEM);
 	}
 	req->qsource.packet = pkt;
+	if (pkt->tsig_rr) {
+		req->qsource.key = pkt->tsig_rr;
+	}
 
+	if (pkt->opt_rr) {
+		req->qsource.opt = pkt->opt_rr;
+	}
 	/* Start resolution */
 	struct worker_ctx *worker = ctx->worker;
 	struct engine *engine = worker->engine;
