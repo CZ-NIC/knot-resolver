@@ -365,13 +365,7 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 		return kr_error(ENOMEM);
 	}
 	req->qsource.packet = pkt;
-	if (pkt->tsig_rr) {
-		req->qsource.key = pkt->tsig_rr;
-	}
 
-	if (pkt->opt_rr) {
-		req->qsource.opt = pkt->opt_rr;
-	}
 	/* Start resolution */
 	struct worker_ctx *worker = ctx->worker;
 	struct engine *engine = worker->engine;
