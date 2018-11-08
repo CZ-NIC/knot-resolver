@@ -33,7 +33,7 @@ static int edns_keepalive_finalize(kr_layer_t *ctx)
 {
 	struct kr_request *req = ctx->req;
 	knot_pkt_t *answer = req->answer;
-	const knot_rrset_t *src_opt = req->qsource.opt;
+	const knot_rrset_t *src_opt = req->qsource.packet->opt_rr;
 	knot_rrset_t *answ_opt = answer->opt_rr;
 	if (req->qsource.flags.tcp &&
 	    src_opt != NULL &&

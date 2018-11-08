@@ -178,9 +178,6 @@ struct kr_context
  * (and lines here were too long anyway). */
 struct kr_request_qsource_flags {
 	bool tcp:1; /**< true if the request is on tcp; only meaningful if (dst_addr). */
-	bool cd:1; /**< true if the source request has cd bit set. */
-	bool rd:1; /**< true if the source request has rd bit set. */
-	bool has_dnssec:1; /**< true if knot_pkt_has_dnssec() has returned true for source request. */
 };
 
 /**
@@ -198,13 +195,11 @@ struct kr_request {
 	knot_pkt_t *answer;
 	struct kr_query *current_query;    /**< Current evaluated query. */
 	struct {
-		const knot_rrset_t *key;
 		/** Address that originated the request. NULL for internal origin. */
 		const struct sockaddr *addr;
 		/** Address that accepted the request.  NULL for internal origin. */
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
-		const knot_rrset_t *opt;
 		struct kr_request_qsource_flags flags; /**< See definition above. */
 		size_t size; /**< query packet size */
 	} qsource;

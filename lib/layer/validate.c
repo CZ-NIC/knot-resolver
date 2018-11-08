@@ -916,7 +916,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Pass-through if CD bit is set. */
-	if (req->qsource.flags.cd) {
+	if (knot_wire_get_cd(req->qsource.packet->wire)) {
 		check_wildcard(ctx);
 		wildcard_adjust_to_wire(req, qry);
 		rank_records(ctx, KR_RANK_OMIT, NULL);

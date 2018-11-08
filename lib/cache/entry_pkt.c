@@ -78,7 +78,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	const bool risky_vldr = is_negative && qf->FORWARD && qf->CNAME;
 		/* ^^ CNAME'ed NXDOMAIN answer in forwarding mode can contain
 		 * unvalidated records; original commit: d6e22f476. */
-	if (req->qsource.flags.cd || qf->STUB || risky_vldr) {
+	if (knot_wire_get_cd(req->qsource.packet->wire) || qf->STUB || risky_vldr) {
 		kr_rank_set(&rank, KR_RANK_OMIT);
 	} else {
 		if (qf->DNSSEC_BOGUS) {

@@ -354,15 +354,15 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 		return kr_error(ENOMEM);
 	}
 
-	/* Remember query source TSIG key */
-	if (query->tsig_rr) {
-		req->qsource.key = knot_rrset_copy(query->tsig_rr, &req->pool);
+	knot_pkt_t *pkt = knot_pkt_new(NULL, query->size, &req->pool);
+	if (!pkt) {
+		return kr_error(ENOMEM);
 	}
+	if (knot_pkt_copy(pkt, query) != 0) {
+		return kr_error(ENOMEM);
+	}
+	req->qsource.packet = pkt;
 
-	/* Remember query source EDNS data */
-	if (query->opt_rr) {
-		req->qsource.opt = knot_rrset_copy(query->opt_rr, &req->pool);
-	}
 	/* Start resolution */
 	struct worker_ctx *worker = ctx->worker;
 	struct engine *engine = worker->engine;
