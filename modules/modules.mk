@@ -17,6 +17,7 @@ modules_TARGETS += bogus_log \
 		   nsid \
 		   etcd \
                    ta_sentinel \
+                   dot \
                    graphite \
                    policy \
                    view \
