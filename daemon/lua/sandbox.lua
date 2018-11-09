@@ -323,6 +323,7 @@ modules.load('detect_time_skew')
 modules.load('detect_time_jump')
 modules.load('ta_sentinel')
 modules.load('edns_keepalive')
+modules.load('dot')
 
 -- Interactive command evaluation
 function eval_cmd(line, raw)
