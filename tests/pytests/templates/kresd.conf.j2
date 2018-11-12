@@ -1,0 +1,16 @@
+verbose(true)
+{% if kresd.ip %}
+net.listen('{{ kresd.ip }}', {{ kresd.port }})
+net.listen('{{ kresd.ip }}', {{ kresd.tls_port }}, {tls = true})
+{% endif %}
+{% if kresd.ip6 %}
+net.listen('{{ kresd.ip6 }}', {{ kresd.port }})
+net.listen('{{ kresd.ip6 }}', {{ kresd.tls_port }}, {tls = true})
+{% endif %}
+net.ipv4=true
+net.ipv6=false
+net.tcp_pipeline(65535)
+--net.tls("./certs/tt.cert.pem", "./certs/tt.key.pem")
+modules.unload("ta_signal_query")
+modules.unload("priming")
+modules.unload("detect_time_skew")
