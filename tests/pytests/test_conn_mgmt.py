@@ -81,6 +81,8 @@ def test_prefix_longer_than_message(kresd_sock):
     datalen = len(data) + 16
     buf = struct.pack("!H", datalen) + data
 
+    # TODO check the removal of sendall + sleep(2) was safe
+
     for _ in range(15):
         try:
             kresd_sock.sendall(buf)
