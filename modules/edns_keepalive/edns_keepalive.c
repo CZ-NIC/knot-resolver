@@ -27,7 +27,6 @@
 #include "lib/layer.h"
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "edns_ka",  fmt)
-#define ERR_MSG(fmt, ...) kr_log_error("[     ][edns_ka] " fmt, ## __VA_ARGS__)
 
 static int edns_keepalive_finalize(kr_layer_t *ctx)
 {
@@ -66,7 +65,7 @@ KR_EXPORT
 const kr_layer_api_t *edns_keepalive_layer(struct kr_module *module)
 {
 	static kr_layer_api_t _layer = {
-		.finalize = &edns_keepalive_finalize,
+		.answer_finalize = &edns_keepalive_finalize,
 	};
 	/* Store module reference */
 	_layer.data = module;

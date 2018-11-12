@@ -84,8 +84,9 @@ struct kr_layer_api {
 	 * don't affect the resolution or rest of the processing. */
 	int (*checkout)(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type);
 
-	/** Finalises the answer. Can be used for manipulations with EDNS and so on.*/
-	int (*finalize)(kr_layer_t *ctx);
+	/** Finalises the answer.
+	 * Last chance to affect what will get into the answer, including EDNS.*/
+	int (*answer_finalize)(kr_layer_t *ctx);
 
 	/** The module can store anything in here. */
 	void *data;

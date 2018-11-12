@@ -99,7 +99,7 @@ static int reset_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int finish_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int produce_yield(kr_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
 static int checkout_yield(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type) { return kr_ok(); }
-static int finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
+static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 
 /** @internal Macro for iterating module layers. */
 #define RESUME_LAYERS(from, r, qry, func, ...) \
@@ -1608,7 +1608,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 #endif
 
 	/* Finalize answer and construct wire-buffer. */
-	ITERATE_LAYERS(request, NULL, finalize);
+	ITERATE_LAYERS(request, NULL, answer_finalize);
 	if (request->state == KR_STATE_FAIL) {
 		state = KR_STATE_FAIL;
 	} else if (answer_finalize(request, state) != 0) {
