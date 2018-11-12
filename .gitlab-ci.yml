@@ -280,6 +280,20 @@ pytests:lint:
     - linux
     - amd64
 
+pytests:run:
+  stage: test
+  dependencies:
+    - build:linux:amd64
+  except:
+    - master
+  script:
+    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run.sh
+  tags:
+    - docker
+    - linux
+    - amd64
+
+
 .respdiff:  &respdiff
   stage: respdiff
   dependencies: []
