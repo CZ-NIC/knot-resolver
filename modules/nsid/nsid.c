@@ -38,8 +38,9 @@ static int nsid_finish(kr_layer_t *ctx) {
 	/* Check violation of https://tools.ietf.org/html/rfc5001#section-2.1:
 	 * The resolver MUST NOT include any NSID payload data in the query */
 	if (knot_edns_opt_get_length(req_nsid) != 0)
-		kr_log_verbose("[%05u][nsid] FORMERR: NSID option in query "
+		kr_log_verbose("[%05u.  ][nsid] FORMERR: NSID option in query "
 			       "must not contain payload, continuing\n", req->uid);
+		/* FIXME: actually change RCODE in answer to FORMERR? */
 
 	/* Sanity check, answer should have EDNS as well but who knows ... */
 	if (req->answer->opt_rr == NULL)
@@ -49,7 +50,7 @@ static int nsid_finish(kr_layer_t *ctx) {
 				 config->local_nsid_len, config->local_nsid,
 				 &req->pool) != KNOT_EOK) {
 		/* something went wrong and there is no way to salvage content of OPT RRset */
-		kr_log_verbose("[%05u][nsid] unable to add NSID option\n", req->uid);
+		kr_log_verbose("[%05u.  ][nsid] unable to add NSID option\n", req->uid);
 		knot_rrset_clear(req->answer->opt_rr, &req->pool);
 	}
 
@@ -68,11 +69,9 @@ const kr_layer_api_t *nsid_layer(struct kr_module *module)
 
 KR_EXPORT
 int nsid_init(struct kr_module *module) {
-	struct nsid_config *config = malloc(sizeof(struct nsid_config));
+	struct nsid_config *config = calloc(1, sizeof(struct nsid_config));
 	if (config == NULL)
 		return kr_error(ENOMEM);
-	config->local_nsid = NULL;
-	config->local_nsid_len = 0;
 
 	module->data = config;
 	return kr_ok();
@@ -84,17 +83,12 @@ static char* nsid_name(void *env, struct kr_module *module, const char *args)
 	struct nsid_config *config = module->data;
 	if (args) {  /* set */
 		/* API is not binary safe, we need to fix this one day */
-		size_t arg_len = strlen(args);
-		uint8_t *arg_copy = malloc(arg_len + 1);
+		uint8_t *arg_copy = (uint8_t *)strdup(args);
 		if (arg_copy == NULL)
 			luaL_error(engine->L, "[nsid] error while allocating new NSID value\n");
-		memcpy(arg_copy, args, arg_len);
-		arg_copy[arg_len] = '\0';  /* for output */
-
-		if (config->local_nsid != NULL)
-			free(config->local_nsid);
+		free(config->local_nsid);
 		config->local_nsid = arg_copy;
-		config->local_nsid_len = arg_len;
+		config->local_nsid_len = strlen(args);
 	}
 
 	/* get */
@@ -118,9 +112,9 @@ KR_EXPORT
 int nsid_deinit(struct kr_module *module) {
 	struct nsid_config *config = module->data;
 	if (config != NULL) {
-		if (config->local_nsid != NULL)
-			free(config->local_nsid);
-		free(module->data);
+		free(config->local_nsid);
+		free(config);
+		module->data = NULL;
 	}
 	return kr_ok();
 }
