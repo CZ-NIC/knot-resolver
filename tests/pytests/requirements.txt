@@ -1,0 +1,3 @@
+dnspython
+jinja2
+pytest
