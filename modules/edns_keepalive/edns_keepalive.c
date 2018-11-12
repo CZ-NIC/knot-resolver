@@ -26,37 +26,38 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "edns_ka",  fmt)
-
 static int edns_keepalive_finalize(kr_layer_t *ctx)
 {
 	struct kr_request *req = ctx->req;
 	knot_pkt_t *answer = req->answer;
 	const knot_rrset_t *src_opt = req->qsource.packet->opt_rr;
 	knot_rrset_t *answ_opt = answer->opt_rr;
-	if (req->qsource.flags.tcp &&
-	    src_opt != NULL &&
-	    knot_edns_get_option(src_opt, KNOT_EDNS_OPTION_TCP_KEEPALIVE) &&
-	    answ_opt != NULL) {
-		const struct worker_ctx *worker = (const struct worker_ctx *)req->daemon_context;
-		assert (worker);
-		const struct engine *engine = worker->engine;
-		const struct network *net = &engine->net;
-		uint64_t timeout = net->tcp.in_idle_timeout / 100;
-		if (timeout > UINT16_MAX) {
-			timeout = UINT16_MAX;
-		}
-		knot_mm_t *pool = &answer->mm;
-		uint16_t ka_size = knot_edns_keepalive_size(timeout);
-		uint8_t ka_buf[ka_size];
-		int ret = knot_edns_keepalive_write(ka_buf, ka_size, timeout);
-		if (ret == KNOT_EOK) {
-			ret = knot_edns_add_option(answ_opt, KNOT_EDNS_OPTION_TCP_KEEPALIVE,
-						   ka_size, ka_buf, pool);
-		}
-		if (ret != KNOT_EOK) {
-			ctx->state = KR_STATE_FAIL;
-		}
+
+	const bool ka_want =
+		req->qsource.flags.tcp &&
+		src_opt != NULL &&
+		knot_edns_get_option(src_opt, KNOT_EDNS_OPTION_TCP_KEEPALIVE) &&
+		answ_opt != NULL;
+	if (!ka_want) {
+		return ctx->state;
+	}
+	const struct worker_ctx *worker = (const struct worker_ctx *)req->daemon_context;
+	assert(worker);
+	const struct network *net = &worker->engine->net;
+	uint64_t timeout = net->tcp.in_idle_timeout / 100;
+	if (timeout > UINT16_MAX) {
+		timeout = UINT16_MAX;
+	}
+	knot_mm_t *pool = &answer->mm;
+	uint16_t ka_size = knot_edns_keepalive_size(timeout);
+	uint8_t ka_buf[ka_size];
+	int ret = knot_edns_keepalive_write(ka_buf, ka_size, timeout);
+	if (ret == KNOT_EOK) {
+		ret = knot_edns_add_option(answ_opt, KNOT_EDNS_OPTION_TCP_KEEPALIVE,
+					   ka_size, ka_buf, pool);
+	}
+	if (ret != KNOT_EOK) {
+		ctx->state = KR_STATE_FAIL;
 	}
 	return ctx->state;
 }
@@ -74,4 +75,3 @@ const kr_layer_api_t *edns_keepalive_layer(struct kr_module *module)
 
 KR_MODULE_EXPORT(edns_keepalive);
 
-#undef VERBOSE_MSG
