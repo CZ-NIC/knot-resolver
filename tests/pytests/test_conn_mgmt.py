@@ -67,3 +67,26 @@ def test_prefix_shorter_than_header(kresd_sock):
             time.sleep(1)
     else:
         assert False, "kresd didn't close connection"
+
+
+def test_prefix_longer_than_message(kresd_sock):
+    """
+    Test prefixes message by the value, which is greater then the length of the
+    whole message and sequentially sends it over TCP connection.
+
+    Expected: TCP connection must be closed after net.tcp_in_idle milliseconds
+    """
+    msg = dns.message.make_query('localhost.', dns.rdatatype.A, dns.rdataclass.IN)
+    data = msg.to_wire()
+    datalen = len(data) + 16
+    buf = struct.pack("!H", datalen) + data
+
+    for _ in range(15):
+        try:
+            kresd_sock.sendall(buf)
+        except BrokenPipeError:
+            break
+        else:
+            time.sleep(1)
+    else:
+        assert False, "kresd didn't close the connection"
