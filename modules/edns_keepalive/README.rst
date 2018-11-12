@@ -1,9 +1,12 @@
 .. _mod-edns_keepalive:
 
-Support for EDNS keepalive option on server side.
-------------
+EDNS keepalive
+--------------
 
-This is a module providing support for EDNS keepalive option on server side.
-If keepalive option is present in query, always reply with timeout value
-from daemon, which is configurable via config.
+The ``edns_keepalive`` module implements :rfc:`7828` for *clients* connecting to Knot Resolver via TCP and TLS.
+Note that client connections are timed-out the same way *regardless* of them sending the EDNS option;
+the module just allows clients to discover the timeout.
+
+When connecting to servers, Knot Resolver does not send this EDNS option.
+It still attempts to reuse established connections intelligently.
 
