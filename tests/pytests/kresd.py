@@ -54,19 +54,22 @@ class Kresd(ContextDecorator):
     def __init__(self, workdir, port, tls_port, ip=None, ip6=None):
         if ip is None and ip6 is None:
             raise ValueError("IPv4 or IPv6 must be specified!")
-        self.workdir = workdir
+        self.workdir = str(workdir)
         self.port = port
         self.tls_port = tls_port
         self.ip = ip
         self.ip6 = ip6
         self.process = None
         self.sockets = []
-        self.logfile_path = os.path.join(self.workdir, 'kresd.log')
         self.logfile = None
 
     @property
     def config_path(self):
-        return os.path.join(self.workdir, 'kresd.conf')
+        return str(os.path.join(self.workdir, 'kresd.conf'))
+
+    @property
+    def logfile_path(self):
+        return str(os.path.join(self.workdir, 'kresd.log'))
 
     def __enter__(self):
         create_file_from_template(KRESD_CONF_TEMPLATE, self.config_path, {'kresd': self})
