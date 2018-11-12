@@ -90,3 +90,31 @@ def test_prefix_longer_than_message(kresd_sock):
             time.sleep(1)
     else:
         assert False, "kresd didn't close the connection"
+
+
+def test_prefix_cuts_message(kresd_sock):
+    """
+    Test prefixes message by value, which is greater than the
+    length of DNS message header but less than length of the whole DNS message
+    and sequentially sends it over TCP connection.
+
+    Expected: TCP connection must be closed after approx. 13 seconds after establishing.
+    13 s is a sum of two timeouts
+    1) 3 seconds is a result of TCP_DEFER_ACCEPT server socket option
+    2) 10 second is a default kresd idle timeout for tcp connection (net.tcp_in_idle())
+    """
+    msg = dns.message.make_query('localhost.', dns.rdatatype.A, dns.rdataclass.IN)
+    data = msg.to_wire()
+    datalen = 14  # DNS Header size plus 2
+    assert datalen < len(data)
+    buf = struct.pack("!H", datalen) + data
+
+    for _ in range(15):
+        try:
+            kresd_sock.sendall(buf)
+        except BrokenPipeError:
+            break
+        else:
+            time.sleep(1)
+    else:
+        assert False, "kresd didn't close the connection"
