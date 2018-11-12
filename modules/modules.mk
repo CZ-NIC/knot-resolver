@@ -31,7 +31,8 @@ modules_TARGETS += bogus_log \
                    serve_stale \
                    detect_time_skew \
                    detect_time_jump \
-                   prefill
+                   prefill \
+                   edns_keepalive
 endif
 
 # Make C module
