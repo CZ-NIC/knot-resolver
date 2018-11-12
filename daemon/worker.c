@@ -321,12 +321,12 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		if (uv_udp_getsockname((uv_udp_t *)handle, dst_addr, &addr_len) == 0) {
 			req->qsource.dst_addr = dst_addr;
 		}
-		req->qsource.tcp = false;
+		req->qsource.flags.tcp = false;
 	} else if (handle->type == UV_TCP) {
 		if (uv_tcp_getsockname((uv_tcp_t *)handle, dst_addr, &addr_len) == 0) {
 			req->qsource.dst_addr = dst_addr;
 		}
-		req->qsource.tcp = true;
+		req->qsource.flags.tcp = true;
 	}
 
 	return ctx;

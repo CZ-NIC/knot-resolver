@@ -174,6 +174,12 @@ struct kr_context
 	knot_mm_t *pool;
 };
 
+/* Kept outside, because kres-gen.lua can't handle this depth
+ * (and lines here were too long anyway). */
+struct kr_request_qsource_flags {
+	bool tcp:1; /**< true if the request is on tcp; only meaningful if (dst_addr). */
+};
+
 /**
  * Name resolution request.
  *
@@ -194,7 +200,7 @@ struct kr_request {
 		/** Address that accepted the request.  NULL for internal origin. */
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
-		bool tcp; /**< true if the request is on tcp; only meaningful if (dst_addr) */
+		struct kr_request_qsource_flags flags; /**< See definition above. */
 		size_t size; /**< query packet size */
 	} qsource;
 	struct {
