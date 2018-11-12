@@ -210,7 +210,7 @@ static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockadd
 
 static int l_ffi_layer_answer_finalize(kr_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, reset);
+	LAYER_FFI_CALL(ctx, answer_finalize);
 	lua_pushlightuserdata(L, ctx->req);
 	return l_ffi_call(L, 2);
 }
