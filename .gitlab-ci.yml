@@ -268,6 +268,18 @@ test:linux:amd64:valgrind:
     - linux
     - amd64
 
+pytests:lint:
+  stage: test
+  dependencies: []
+  except:
+    - master
+  script:
+    - ./ci/pytests/lint.sh
+  tags:
+    - docker
+    - linux
+    - amd64
+
 .respdiff:  &respdiff
   stage: respdiff
   dependencies: []
