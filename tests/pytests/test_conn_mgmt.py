@@ -118,3 +118,41 @@ def test_prefix_cuts_message(kresd_sock):
             time.sleep(1)
     else:
         assert False, "kresd didn't close the connection"
+
+
+def test_prefix_cut_message_after_ok(kresd_sock):
+    """
+    At first test send normal DNS message. Then, it sequentially sends DNS message
+    with incorrect prefix, which is greater than the length of DNS message header,
+    but less than length of the whole DNS message.
+
+    Expected: TCP connection is closed after a timeout period.
+    """
+    NORMAL_MSG_ID = 1
+    CUT_MSG_ID = 2
+    buf_normal = utils.get_msgbuf('localhost.', dns.rdatatype.A, NORMAL_MSG_ID)
+
+    msg = dns.message.make_query('localhost.', dns.rdatatype.A, dns.rdataclass.IN)
+    msg.id = CUT_MSG_ID
+    data = msg.to_wire()
+    datalen = 14  # DNS Header size plus 2
+    assert datalen < len(data)
+    buf_cut = struct.pack("!H", datalen) + data
+
+    kresd_sock.sendall(buf_normal)
+    kresd_sock.sendall(buf_cut)
+
+    msg_answer = utils.receive_parse_answer(kresd_sock)
+    assert msg_answer.id == NORMAL_MSG_ID
+
+    for _ in range(12):
+        try:
+            kresd_sock.sendall(buf_cut)
+        except BrokenPipeError:
+            break
+        except ConnectionResetError:
+            break
+        else:
+            time.sleep(1)
+    else:
+        assert False, "kresd didn't close the connection"
