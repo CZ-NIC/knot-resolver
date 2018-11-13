@@ -5,10 +5,6 @@ import dns
 import dns.message
 
 
-def random_msgid():
-    return random.randint(1, 65535)
-
-
 def receive_answer(sock):
     answer_total_len = 0
     data = sock.recv(2)
@@ -39,15 +35,15 @@ def receive_parse_answer(sock):
 
 
 def prepare_wire(
-        msgid=None,
         qname='localhost.',
         qtype=dns.rdatatype.A,
-        qclass=dns.rdataclass.IN):
+        qclass=dns.rdataclass.IN,
+        msgid=None):
     """Utility function to generate DNS wire format message"""
     msg = dns.message.make_query(qname, qtype, qclass)
     if msgid is not None:
         msg.id = msgid
-    return msg.to_wire()
+    return msg.to_wire(), msg.id
 
 
 def prepare_buffer(wire, datalen=None):
@@ -58,22 +54,16 @@ def prepare_buffer(wire, datalen=None):
     return struct.pack("!H", datalen) + wire
 
 
-def get_msgbuf(qname, qtype, msgid):
-    # TODO remove/refactor in favor of prepare_wire, prepare_buffer
-    msg = dns.message.make_query(qname, qtype, dns.rdataclass.IN)
-    msg.id = msgid
-    data = msg.to_wire()
-    datalen = len(data)
-    buf = struct.pack("!H", datalen) + data
-    return buf
+def get_msgbuff(qname='localhost.', qtype=dns.rdatatype.A, msgid=None):
+    wire, msgid = prepare_wire(qname, qtype, msgid=msgid)
+    buff = prepare_buffer(wire)
+    return buff, msgid
 
 
 def get_garbage(length):
-    return bytearray(random.getrandbits(8) for _ in range(length))
+    return bytes(random.getrandbits(8) for _ in range(length))
 
 
 def get_prefixed_garbage(length):
     data = get_garbage(length)
-    datalen = len(data)
-    buf = struct.pack("!H", datalen) + data
-    return buf
+    return prepare_buffer(data)
