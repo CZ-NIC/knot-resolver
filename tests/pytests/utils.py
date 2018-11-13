@@ -2,6 +2,7 @@ import struct
 import random
 
 import dns
+import dns.message
 
 
 def random_msgid():
@@ -37,7 +38,28 @@ def receive_parse_answer(sock):
     return msg_answer
 
 
+def prepare_wire(
+        msgid=None,
+        qname='localhost.',
+        qtype=dns.rdatatype.A,
+        qclass=dns.rdataclass.IN):
+    """Utility function to generate DNS wire format message"""
+    msg = dns.message.make_query(qname, qtype, qclass)
+    if msgid is not None:
+        msg.id = msgid
+    return msg.to_wire()
+
+
+def prepare_buffer(wire, datalen=None):
+    """Utility function to prepare TCP buffer from DNS message in wire format"""
+    assert isinstance(wire, bytes)
+    if datalen is None:
+        datalen = len(wire)
+    return struct.pack("!H", datalen) + wire
+
+
 def get_msgbuf(qname, qtype, msgid):
+    # TODO remove/refactor in favor of prepare_wire, prepare_buffer
     msg = dns.message.make_query(qname, qtype, dns.rdataclass.IN)
     msg.id = msgid
     data = msg.to_wire()
