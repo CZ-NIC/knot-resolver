@@ -4,6 +4,7 @@ import time
 
 import dns
 import dns.message
+import pytest
 
 import utils
 
@@ -156,3 +157,33 @@ def test_prefix_cut_message_after_ok(kresd_sock):
             time.sleep(1)
     else:
         assert False, "kresd didn't close the connection"
+
+
+def test_prefix_trailing_garbage(kresd_sock):
+    """
+    Test repeatedly sends correct message with garbage after the message's end.
+    Message is prefixed by the length that includes garbage length.
+
+    Expected: TCP connection must not be closed until all the queries have been sent
+    """
+    msg = dns.message.make_query('localhost.', dns.rdatatype.A, dns.rdataclass.IN)
+    msg.id = 1
+
+    for _ in range(10):
+        msg.id += 1
+        data = msg.to_wire() + b'garbage'
+        data_len = len(data)
+        buf = struct.pack("!H", data_len) + data
+        try:
+            kresd_sock.sendall(buf)
+        except BrokenPipeError:
+            raise pytest.fail("kresd closed the connection")
+
+        try:
+            msg_answer = utils.receive_parse_answer(kresd_sock)
+        except BrokenPipeError:
+            raise pytest.fail("kresd closed the connection")
+        else:
+            assert msg_answer.id == msg.id
+
+        time.sleep(0.1)
