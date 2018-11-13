@@ -32,3 +32,4 @@ Knot Resolver modules
 .. include:: ../modules/rfc7706.rst
 .. include:: ../modules/prefill/README.rst
 .. include:: ../modules/serve_stale/README.rst
+.. include:: ../modules/edns_keepalive/README.rst
