@@ -6,7 +6,6 @@ import ssl
 import subprocess
 import time
 
-import dns
 import jinja2
 import pytest
 
@@ -43,9 +42,8 @@ def make_ssl_context():
 
 
 def ping_alive(sock):
-    msgid = utils.random_msgid()
-    buf = utils.get_msgbuf('localhost.', dns.rdatatype.A, msgid)
-    sock.sendall(buf)
+    buff, msgid = utils.get_msgbuff()
+    sock.sendall(buff)
     answer = utils.receive_parse_answer(sock)
     return answer.id == msgid
 
