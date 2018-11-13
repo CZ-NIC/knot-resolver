@@ -30,3 +30,6 @@ def test_pipelining(kresd_sock):
 
     msg_answer = utils.receive_parse_answer(kresd_sock)
     assert msg_answer.id == msgid2
+
+    msg_answer = utils.receive_parse_answer(kresd_sock)
+    assert msg_answer.id == msgid1
