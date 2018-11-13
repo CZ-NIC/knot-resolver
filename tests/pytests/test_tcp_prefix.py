@@ -47,7 +47,7 @@ def send_incorrect_repeatedly(sock, buff, delay=1):
 
 def test_less_than_header(kresd_sock):
     """Prefix is less than the length of the DNS message header."""
-    wire = utils.prepare_wire()
+    wire, _ = utils.prepare_wire()
     datalen = 11  # DNS header size minus 1
     buff = utils.prepare_buffer(wire, datalen)
     send_incorrect_repeatedly(kresd_sock, buff)
@@ -55,7 +55,7 @@ def test_less_than_header(kresd_sock):
 
 def test_greater_than_message(kresd_sock):
     """Prefix is greater than the length of the entire DNS message."""
-    wire = utils.prepare_wire()
+    wire, _ = utils.prepare_wire()
     datalen = len(wire) + 16
     buff = utils.prepare_buffer(wire, datalen)
     send_incorrect_repeatedly(kresd_sock, buff)
@@ -64,7 +64,7 @@ def test_greater_than_message(kresd_sock):
 def test_cuts_message(kresd_sock):
     """Prefix is greater than the length of the DNS message header, but shorter than
     the entire DNS message."""
-    wire = utils.prepare_wire()
+    wire, _ = utils.prepare_wire()
     datalen = 14  # DNS Header size plus 2
     assert datalen < len(wire)
     buff = utils.prepare_buffer(wire, datalen)
@@ -75,11 +75,10 @@ def test_cuts_message_after_ok(kresd_sock):
     """First, normal DNS message is sent. Afterwards, message with incorrect prefix
     (greater than header, less than entire message) is sent. First message must be
     answered, then the connection should be closed after timeout."""
-    normal_msg_id = 1
-    normal_wire = utils.prepare_wire(normal_msg_id)
+    normal_wire, normal_msgid = utils.prepare_wire(msgid=1)
     normal_buff = utils.prepare_buffer(normal_wire)
 
-    cut_wire = utils.prepare_wire()
+    cut_wire, _ = utils.prepare_wire(msgid=2)
     cut_datalen = 14
     assert cut_datalen < len(cut_wire)
     cut_buff = utils.prepare_buffer(cut_wire, cut_datalen)
@@ -97,8 +96,8 @@ def test_trailing_garbage(kresd_sock):
     """Prefix is correct, but the message has trailing garbage. The connection must
     stay open until all message have been sent and answered."""
     for _ in range(10):
-        msgid = utils.random_msgid()
-        wire = utils.prepare_wire(msgid) + utils.get_garbage(8)
+        wire, msgid = utils.prepare_wire()
+        wire += utils.get_garbage(8)
         buff = utils.prepare_buffer(wire)
 
         kresd_sock.sendall(buff)
