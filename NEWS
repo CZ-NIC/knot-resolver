@@ -1,3 +1,19 @@
+Knot Resolver 3.x.y (201y-mm-dd)
+================================
+
+New features
+------------
+- module edns_keepalive to implement server side of RFC 7828 (#408)
+- module nsid to implement server side of RFC 5001 (#289)
+
+Module API changes
+------------------
+- new layer is added: answer_finalize
+- kr_request keeps ::qsource.packet beyond the begin layer
+- kr_request::qsource.tcp renamed to ::qsource.flags.tcp
+- kr_request::has_tls renamed to ::qsource.flags.tls
+
+
 Knot Resolver 3.1.0 (2018-11-02)
 ================================
 

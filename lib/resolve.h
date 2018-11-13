@@ -174,6 +174,13 @@ struct kr_context
 	knot_mm_t *pool;
 };
 
+/* Kept outside, because kres-gen.lua can't handle this depth
+ * (and lines here were too long anyway). */
+struct kr_request_qsource_flags {
+	bool tcp:1; /**< true if the request is on TCP (or TLS); only meaningful if (dst_addr). */
+	bool tls:1; /**< true if the request is on TLS; only meaningful if (dst_addr). */
+};
+
 /**
  * Name resolution request.
  *
@@ -189,14 +196,12 @@ struct kr_request {
 	knot_pkt_t *answer;
 	struct kr_query *current_query;    /**< Current evaluated query. */
 	struct {
-		const knot_rrset_t *key;
 		/** Address that originated the request. NULL for internal origin. */
 		const struct sockaddr *addr;
 		/** Address that accepted the request.  NULL for internal origin. */
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
-		const knot_rrset_t *opt;
-		bool tcp; /**< true if the request is on tcp; only meaningful if (dst_addr) */
+		struct kr_request_qsource_flags flags; /**< See definition above. */
 		size_t size; /**< query packet size */
 	} qsource;
 	struct {
@@ -222,12 +227,12 @@ struct kr_request {
 	uint8_t rank;
 
 	struct kr_rplan rplan;
-	int has_tls;
 	trace_log_f trace_log; /**< Logging tracepoint */
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
 	unsigned int uid; /** for logging purposes only */
+	void *daemon_context; /** pointer to worker from daemon. Can be used in modules. */
 };
 
 /** Initializer for an array of *_selected. */

@@ -163,17 +163,19 @@ struct kr_rplan {
 	knot_mm_t *pool;
 	uint32_t next_uid;
 };
+struct kr_request_qsource_flags {
+	_Bool tcp : 1;
+	_Bool tls : 1;
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
 	struct kr_query *current_query;
 	struct {
-		const knot_rrset_t *key;
 		const struct sockaddr *addr;
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
-		const knot_rrset_t *opt;
-		_Bool tcp;
+		struct kr_request_qsource_flags flags;
 		size_t size;
 	} qsource;
 	struct {
@@ -190,12 +192,12 @@ struct kr_request {
 	_Bool auth_validated;
 	uint8_t rank;
 	struct kr_rplan rplan;
-	int has_tls;
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
 	int vars_ref;
 	knot_mm_t pool;
 	unsigned int uid;
+	void *daemon_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct kr_cache {
