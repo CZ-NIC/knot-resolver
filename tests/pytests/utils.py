@@ -33,7 +33,7 @@ def receive_parse_answer(sock):
     data_answer = receive_answer(sock)
 
     if data_answer is None:
-        raise RuntimeError("Kresd closed connection")
+        raise BrokenPipeError("kresd closed connection")
 
     msg_answer = dns.message.from_wire(data_answer, one_rr_per_rrset=True)
     return msg_answer
