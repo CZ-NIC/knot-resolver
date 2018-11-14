@@ -41,13 +41,6 @@ def make_ssl_context():
     return context
 
 
-def ping_alive(sock):
-    buff, msgid = utils.get_msgbuff()
-    sock.sendall(buff)
-    answer = utils.receive_parse_answer(sock)
-    return answer.id == msgid
-
-
 class Kresd(ContextDecorator):
     def __init__(self, workdir, port, tls_port, ip=None, ip6=None):
         if ip is None and ip6 is None:
@@ -110,11 +103,11 @@ class Kresd(ContextDecorator):
     def all_ports_alive(self):
         alive = True
         if self.ip:
-            alive &= ping_alive(self.ip_tcp_socket())
-            alive &= ping_alive(self.ip_tls_socket())
+            alive &= utils.ping_alive(self.ip_tcp_socket())
+            alive &= utils.ping_alive(self.ip_tls_socket())
         if self.ip6:
-            alive &= ping_alive(self.ip6_tcp_socket())
-            alive &= ping_alive(self.ip6_tls_socket())
+            alive &= utils.ping_alive(self.ip6_tcp_socket())
+            alive &= utils.ping_alive(self.ip6_tls_socket())
         return alive
 
     def _wait_for_tcp_port(self, delay=0.1, max_attempts=20):
@@ -127,7 +120,7 @@ class Kresd(ContextDecorator):
                 time.sleep(delay)
                 continue
             else:
-                return ping_alive(sock)
+                return utils.ping_alive(sock)
             finally:
                 sock.close()
         raise RuntimeError("Kresd didn't start in time")

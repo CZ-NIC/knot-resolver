@@ -21,11 +21,6 @@ import pytest
 import utils
 
 
-# default net.tcp_in_idle is 10s, TCP_DEFER_ACCEPT 3s, some extra for
-# Python handling / edge cases
-MAX_TIMEOUT = 16
-
-
 def send_incorrect_repeatedly(sock, buff, delay=1):
     """Utility function to keep sending the buffer until MAX_TIMEOUT is reached.
 
@@ -34,7 +29,7 @@ def send_incorrect_repeatedly(sock, buff, delay=1):
 
     If the connection remains open, test is failed.
     """
-    end_time = time.time() + MAX_TIMEOUT
+    end_time = time.time() + utils.MAX_TIMEOUT
 
     with pytest.raises(BrokenPipeError, message="kresd didn't close connection"):
         while time.time() < end_time:
