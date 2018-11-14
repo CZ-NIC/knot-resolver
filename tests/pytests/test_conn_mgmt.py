@@ -69,3 +69,21 @@ def test_close(kresd_sock):
             utils.ping_alive(kresd_sock)
         except ConnectionResetError:
             pytest.skip('TCP RST')
+
+
+def test_slow_lorris_attack(kresd_sock):
+    """
+    Test simulates slow-lorris attack by sending byte after byte with a delay in between.
+
+    Expected: kresd closes the connection
+    """
+    buff, _ = utils.get_msgbuff()
+
+    with pytest.raises(BrokenPipeError, message="kresd didn't close the connection"):
+        try:
+            for i in range(len(buff)):
+                b = buff[i:i+1]
+                kresd_sock.send(b)
+                time.sleep(1)
+        except ConnectionResetError:
+            pytest.skip('TCP RST')
