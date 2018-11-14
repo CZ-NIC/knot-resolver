@@ -310,25 +310,49 @@ function M.add_interface(conf)
 		warn('[http] the "reuseport" option is disabled and multiple forks are used, ' ..
 			 'port binding will fail on some instances')
 	end
+	-- Check if UNIX socket path is used
+	local addr_str
+	if not conf.path then
+		conf.host = conf.host or 'localhost'
+		conf.port = conf.port or 8053
+		addr_str = string.format('%s@%d', conf.host, conf.port)
+	else
+		if conf.host or conf.port then
+			error('either "path", or "host" and "port" must be provided')
+		end
+		addr_str = conf.path
+	end
 	-- Create TLS context and start listening
 	local s, err = http_server.listen {
 		cq = worker.bg_worker.cq,
-		host = conf.host or 'localhost',
-		port = conf.port or 8053,
+		host = conf.host,
+		port = conf.port,
+		path = conf.path,
 		v6only = conf.v6only,
+		unlink = conf.unlink,
 		reuseaddr = conf.reuseaddr,
 		reuseport = reuseport,
 		client_timeout = conf.client_timeout or 5,
 		ctx = crt and tlscontext(crt, key),
 		tls = conf.tls,
 		onstream = routes,
+		-- Log errors, but do not throw
+		onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
+			local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
+			if err then
+				msg = msg .. ': ' .. tostring(err)
+			end
+			if verbose() then
+				log(msg)
+			end
+		end,
 	}
 	-- Manually call :listen() so that we are bound before calling :localname()
 	if s then
 		err = select(2, s:listen())
 	end
 	if err then
-		panic('failed to listen on %s@%d: %s', conf.host, conf.port, err)
+		panic('failed to listen on %s: %s', addr_str, err)
 	end
 	table.insert(M.servers, s)
 	-- Create certificate renewal timer if ephemeral
@@ -356,7 +380,10 @@ end
 
 -- @function Init module
 function M.init()
-	worker.coroutine(prometheus.init)
+	-- collect and merge metrics only on leader
+	if worker.id == 0 then
+		worker.coroutine(prometheus.init)
+	end
 end
 
 -- @function Cleanup module
