@@ -43,8 +43,9 @@ def kresd(tmpdir):
     tls_port = make_port()
     with Kresd(tmpdir, port, tls_port, ip, ip6) as kresd:
         yield kresd
-        with open(kresd.logfile_path) as log:
-            print(log.read())  # display log for debugging purposes
+        # TODO: add verbose option?
+        # with open(kresd.logfile_path) as log:
+        #     print(log.read())  # display log for debugging purposes
 
 
 @pytest.fixture(params=[
