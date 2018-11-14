@@ -74,8 +74,14 @@ def test_slow_lorris_attack(kresd_sock):
     """
     buff, _ = utils.get_msgbuff()
 
+    time.sleep(3)
+    utils.ping_alive(kresd_sock)  # to reset internal kresd timer
+    end_time = time.time() + utils.MAX_TIMEOUT
+
     with utils.expect_kresd_close():
         for i in range(len(buff)):
             b = buff[i:i+1]
             kresd_sock.send(b)
+            if time.time() > end_time:
+                break
             time.sleep(1)
