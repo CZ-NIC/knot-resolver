@@ -2,8 +2,6 @@
 
 import time
 
-import pytest
-
 import utils
 
 
@@ -64,11 +62,8 @@ def test_close(kresd_sock):
     """
     time.sleep(utils.MAX_TIMEOUT)
 
-    with pytest.raises(BrokenPipeError, message="kresd didn't close the connection"):
-        try:
-            utils.ping_alive(kresd_sock)
-        except ConnectionResetError:
-            pytest.skip('TCP RST')
+    with utils.expect_kresd_close():
+        utils.ping_alive(kresd_sock)
 
 
 def test_slow_lorris_attack(kresd_sock):
@@ -79,11 +74,8 @@ def test_slow_lorris_attack(kresd_sock):
     """
     buff, _ = utils.get_msgbuff()
 
-    with pytest.raises(BrokenPipeError, message="kresd didn't close the connection"):
-        try:
-            for i in range(len(buff)):
-                b = buff[i:i+1]
-                kresd_sock.send(b)
-                time.sleep(1)
-        except ConnectionResetError:
-            pytest.skip('TCP RST')
+    with utils.expect_kresd_close():
+        for i in range(len(buff)):
+            b = buff[i:i+1]
+            kresd_sock.send(b)
+            time.sleep(1)
