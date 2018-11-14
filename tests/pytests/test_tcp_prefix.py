@@ -16,8 +16,6 @@ TCP_DEFER_ACCEPT, ...), kresd should close the connection.
 
 import time
 
-import pytest
-
 import utils
 
 
@@ -31,12 +29,9 @@ def send_incorrect_repeatedly(sock, buff, delay=1):
     """
     end_time = time.time() + utils.MAX_TIMEOUT
 
-    with pytest.raises(BrokenPipeError, message="kresd didn't close connection"):
+    with utils.expect_kresd_close():
         while time.time() < end_time:
-            try:
-                sock.sendall(buff)
-            except ConnectionResetError:
-                pytest.skip("kresd closed connection with TCP RST")
+            sock.sendall(buff)
             time.sleep(delay)
 
 
