@@ -43,7 +43,7 @@ See the [Building project][depends] documentation page for more information.
 This is simple and doesn't require any dependencies or system modifications, just run:
 
 ```
-$ docker run -it cznic/knot-resolver
+$ docker run -Pit cznic/knot-resolver
 ```
 
 See the build page [hub.docker.com/r/cznic/knot-resolver](https://hub.docker.com/r/cznic/knot-resolver/) for more information and options.
