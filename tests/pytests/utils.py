@@ -1,8 +1,10 @@
+from contextlib import contextmanager
 import struct
 import random
 
 import dns
 import dns.message
+import pytest
 
 
 # default net.tcp_in_idle is 10s, TCP_DEFER_ACCEPT 3s, some extra for
@@ -79,3 +81,12 @@ def ping_alive(sock):
     sock.sendall(buff)
     answer = receive_parse_answer(sock)
     return answer.id == msgid
+
+
+@contextmanager
+def expect_kresd_close():
+    with pytest.raises(BrokenPipeError, message="kresd didn't close the connection"):
+        try:
+            yield
+        except ConnectionResetError:
+            pytest.skip("kresd closed connection with TCP RST")
