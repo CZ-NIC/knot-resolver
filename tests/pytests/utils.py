@@ -61,7 +61,7 @@ def get_msgbuff(qname='localhost.', qtype=dns.rdatatype.A, msgid=None):
 
 
 def get_garbage(length):
-    return bytearray(random.getrandbits(8) for _ in range(length))
+    return bytes(random.getrandbits(8) for _ in range(length))
 
 
 def get_prefixed_garbage(length):
