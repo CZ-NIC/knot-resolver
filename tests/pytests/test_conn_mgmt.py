@@ -1,5 +1,6 @@
 """TCP Connection Management tests"""
 
+import struct
 import time
 
 import pytest
@@ -117,3 +118,30 @@ def test_ignore_jumbo_message(kresd_sock):
 
     answer = utils.receive_parse_answer(kresd_sock)
     assert answer.id == msgid2
+
+
+def test_query_flood_close(make_kresd_sock):
+    """
+    Test floods resolver with queries and closes the connection.
+
+    Expected: resolver must not crash
+    """
+    def flood_buffer(msgcount):
+        flood_buff = bytes()
+        msgbuff, _ = utils.get_msgbuff()
+        noid_msgbuff = msgbuff[2:]
+
+        def gen_msg(msgid):
+            return struct.pack("!H", len(msgbuff)) + struct.pack("!H", msgid) + noid_msgbuff
+
+        for i in range(msgcount):
+            flood_buff += gen_msg(i)
+        return flood_buff
+
+    buff = flood_buffer(10000)
+    sock1 = make_kresd_sock()
+    sock1.sendall(buff)
+    sock1.close()
+
+    sock2 = make_kresd_sock()
+    utils.ping_alive(sock2)
