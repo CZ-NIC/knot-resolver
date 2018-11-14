@@ -2,6 +2,8 @@
 
 import time
 
+import pytest
+
 import utils
 
 
@@ -51,3 +53,19 @@ def test_long_lived(kresd_sock):
     while time.time() < end_time:
         time.sleep(3)
         utils.ping_alive(kresd_sock)
+
+
+def test_close(kresd_sock):
+    """
+    Test establishes a TCP connection and pauses (MAX_TIMEOUT) right after establising.
+    Then tries to send DNS message.
+
+    Expected: kresd closes the connection
+    """
+    time.sleep(utils.MAX_TIMEOUT)
+
+    with pytest.raises(BrokenPipeError, message="kresd didn't close the connection"):
+        try:
+            utils.ping_alive(kresd_sock)
+        except ConnectionResetError:
+            pytest.skip('TCP RST')
