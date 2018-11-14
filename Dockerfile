@@ -33,7 +33,7 @@ FROM debian:stable-slim AS runtime
 
 # Install runtime dependencies
 ENV KNOT_DNS_RUNTIME_DEPS libgnutls30
-ENV KNOT_RESOLVER_RUNTIME_DEPS liblmdb0 luajit libluajit-5.1-2 libuv1 lua-sec lua-socket
+ENV KNOT_RESOLVER_RUNTIME_DEPS liblmdb0 luajit libluajit-5.1-2 libuv1 lua-sec lua-socket dns-root-data
 ENV KNOT_RESOLVER_RUNTIME_DEPS_HTTP libjs-bootstrap libjs-d3 libjs-jquery lua-http lua-mmdb
 ENV KNOT_RESOLVER_RUNTIME_DEPS_EXTRA libfstrm0 lua-cqueues
 ENV RUNTIME_DEPS ${KNOT_DNS_RUNTIME_DEPS} ${KNOT_RESOLVER_RUNTIME_DEPS} ${KNOT_RESOLVER_RUNTIME_DEPS_HTTP} ${KNOT_RESOLVER_RUNTIME_DEPS_EXTRA}
@@ -50,11 +50,12 @@ FROM knot-dns-build AS build
 COPY . /tmp/knot-resolver
 
 # Build Knot Resolver
-ARG CFLAGS="-O2 -ftree-vectorize -fstack-protector -g"
+ARG CFLAGS="-O2 -fstack-protector -g"
 ENV LDFLAGS -Wl,--as-needed
 RUN cd /tmp/knot-resolver && \
-	make -j4 && \
-	make install DESTDIR=/tmp/root && \
+	make "-j${nproc}" install DESTDIR=/tmp/root \
+		ROOTHINTS=/usr/share/dns/root.hints \
+		KEYFILE_DEFAULT=/usr/share/dns/root.key && \
 	mkdir -p /tmp/root/etc/knot-resolver && \
 	cp ./etc/config.docker /tmp/root/etc/knot-resolver/kresd.conf
 
