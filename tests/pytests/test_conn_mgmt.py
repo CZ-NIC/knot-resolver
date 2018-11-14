@@ -1,5 +1,7 @@
 """TCP Connection Management tests"""
 
+import time
+
 import utils
 
 
@@ -34,3 +36,18 @@ def test_pipelining(kresd_sock):
 
     msg_answer = utils.receive_parse_answer(kresd_sock)
     assert msg_answer.id == msgid1
+
+
+def test_long_lived(kresd_sock):
+    """
+    Test establishes a TCP connection a sends several queries over it. They are sent
+    seqeuntially, each with a delay, which in total exceeds maximum timeout.
+
+    Expected: kresd must not close the connection
+    """
+    utils.ping_alive(kresd_sock)
+    end_time = time.time() + utils.MAX_TIMEOUT
+
+    while time.time() < end_time:
+        time.sleep(3)
+        utils.ping_alive(kresd_sock)

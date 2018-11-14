@@ -5,6 +5,11 @@ import dns
 import dns.message
 
 
+# default net.tcp_in_idle is 10s, TCP_DEFER_ACCEPT 3s, some extra for
+# Python handling / edge cases
+MAX_TIMEOUT = 16
+
+
 def receive_answer(sock):
     answer_total_len = 0
     data = sock.recv(2)
@@ -67,3 +72,10 @@ def get_garbage(length):
 def get_prefixed_garbage(length):
     data = get_garbage(length)
     return prepare_buffer(data)
+
+
+def ping_alive(sock):
+    buff, msgid = get_msgbuff()
+    sock.sendall(buff)
+    answer = receive_parse_answer(sock)
+    return answer.id == msgid
