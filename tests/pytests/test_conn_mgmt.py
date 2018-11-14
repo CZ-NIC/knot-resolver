@@ -85,3 +85,23 @@ def test_slow_lorris_attack(kresd_sock):
             if time.time() > end_time:
                 break
             time.sleep(1)
+
+
+def test_ignore_jumbo_message(kresd_sock):
+    """
+    Test if kresd correcty ignores bigger queries than 4096 (current maximum size in kresd).
+
+    Expected: jumbo message must be ignored, other queries answered
+    """
+    buff1, msgid1 = utils.get_msgbuff(msgid=1)
+    gbuff = utils.get_prefixed_garbage(65533)
+    kresd_sock.sendall(buff1 + gbuff)
+
+    answer = utils.receive_parse_answer(kresd_sock)
+    assert answer.id == msgid1
+
+    buff2, msgid2 = utils.get_msgbuff(msgid=2)
+    kresd_sock.sendall(buff2)
+
+    answer = utils.receive_parse_answer(kresd_sock)
+    assert answer.id == msgid2
