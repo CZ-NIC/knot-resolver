@@ -54,5 +54,15 @@ def kresd(tmpdir):
     'ip_tls_socket',
     'ip6_tls_socket',
 ])
-def kresd_sock(request, kresd):
-    return getattr(kresd, request.param)()
+def make_kresd_sock(request, kresd):
+    sock_func = getattr(kresd, request.param)
+
+    def _make_kresd_sock():
+        return sock_func()
+
+    return _make_kresd_sock
+
+
+@pytest.fixture
+def kresd_sock(make_kresd_sock):
+    return make_kresd_sock()
