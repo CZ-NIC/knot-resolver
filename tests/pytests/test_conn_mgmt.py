@@ -2,6 +2,8 @@
 
 import time
 
+import pytest
+
 import utils
 
 
@@ -53,29 +55,39 @@ def test_long_lived(kresd_sock):
         utils.ping_alive(kresd_sock)
 
 
-def test_close(kresd_sock):
+@pytest.mark.parametrize('query_before', [
+    True,  # test closing idle connection
+    False  # test closing established connection after handshake
+])
+def test_close(kresd_sock, query_before):
     """
-    Test establishes a TCP connection and pauses (MAX_TIMEOUT) right after establising.
-    Then tries to send DNS message.
+    Test establishes a TCP connection, optionally sends a query and waits for response,
+    and then pauses (MAX_TIMEOUT). Afterwards, another query is sent.
 
     Expected: kresd closes the connection
     """
+    if query_before:
+        utils.ping_alive(kresd_sock)
     time.sleep(utils.MAX_TIMEOUT)
 
     with utils.expect_kresd_close():
         utils.ping_alive(kresd_sock)
 
 
-def test_slow_lorris_attack(kresd_sock):
+@pytest.mark.parametrize('query_before', [
+    True,  # test slow-lorris after sending valid query
+    False  # test slow-lorris right after handshake
+])
+def test_slow_lorris(kresd_sock, query_before):
     """
     Test simulates slow-lorris attack by sending byte after byte with a delay in between.
 
     Expected: kresd closes the connection
     """
-    buff, _ = utils.get_msgbuff()
+    if query_before:
+        utils.ping_alive(kresd_sock)
 
-    time.sleep(3)
-    utils.ping_alive(kresd_sock)  # to reset internal kresd timer
+    buff, _ = utils.get_msgbuff()
     end_time = time.time() + utils.MAX_TIMEOUT
 
     with utils.expect_kresd_close():
