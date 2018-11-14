@@ -77,7 +77,7 @@ class Kresd(ContextDecorator):
             if self.process.returncode is not None:
                 raise RuntimeError("Kresd crashed with returncode: {}".format(
                     self.process.returncode))
-        except RuntimeError:  # pylint: disable=try-except-raise
+        except (RuntimeError, ConnectionError):  # pylint: disable=try-except-raise
             raise
         finally:
             # handle cases where we accidentally attempt to bind to same port
