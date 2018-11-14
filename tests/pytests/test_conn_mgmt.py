@@ -10,8 +10,9 @@ def test_ignore_garbage(kresd_sock):
 
     Expected: garbage must be ignored and the second query must be answered
     """
-    buff, msgid = utils.get_msgbuff()
-    kresd_sock.sendall(buff)
+    msg_buff, msgid = utils.get_msgbuff()
+    garbage_buff = utils.get_prefixed_garbage(1024)
+    kresd_sock.sendall(garbage_buff + msg_buff)
 
     msg_answer = utils.receive_parse_answer(kresd_sock)
     assert msg_answer.id == msgid
