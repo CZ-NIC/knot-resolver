@@ -90,6 +90,9 @@ struct kr_layer_api {
 
 	/** The module can store anything in here. */
 	void *data;
+
+	/** Internal to ./daemon/ffimodule.c. */
+	int cb_slots[];
 };
 
 typedef struct kr_layer_api kr_layer_api_t;
