@@ -393,7 +393,7 @@ static inline char *kr_straddr(const struct sockaddr *addr)
 {
 	assert(addr != NULL);
 	/* We are the sinle-threaded application */
-	static char str[INET6_ADDRSTRLEN + 6];
+	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 	size_t len = sizeof(str);
 	int ret = kr_inaddr_str(addr, str, &len);
 	return ret != kr_ok() || len == 0 ? NULL : str;

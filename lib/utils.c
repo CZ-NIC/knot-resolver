@@ -424,27 +424,24 @@ void kr_inaddr_set_port(struct sockaddr *addr, uint16_t port)
 
 int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen)
 {
-	int ret = kr_ok();
 	if (!addr || !buf || !buflen) {
 		return kr_error(EINVAL);
 	}
 
-	char str[INET6_ADDRSTRLEN + 6];
-	if (!inet_ntop(addr->sa_family, kr_inaddr(addr), str, sizeof(str))) {
+	if (!inet_ntop(addr->sa_family, kr_inaddr(addr), buf, *buflen)) {
 		return kr_error(errno);
 	}
-	int len = strlen(str);
-	str[len] = '#';
-	u16tostr((uint8_t *)&str[len + 1], kr_inaddr_port(addr));
-	len += 6;
-	str[len] = 0;
-	if (len >= *buflen) {
-		ret = kr_error(ENOSPC);
-	} else {
-		memcpy(buf, str, len + 1);
+	const int len = strlen(buf);
+	const int len_need = len + 1 + 5 + 1;
+	if (len_need > *buflen) {
+		*buflen = len_need;
+		return kr_error(ENOSPC);
 	}
-	*buflen = len;
-	return ret;
+	*buflen = len_need;
+	buf[len] = '#';
+	u16tostr((uint8_t *)&buf[len + 1], kr_inaddr_port(addr));
+	buf[len_need - 1] = 0;
+	return kr_ok();
 }
 
 int kr_straddr_family(const char *addr)
