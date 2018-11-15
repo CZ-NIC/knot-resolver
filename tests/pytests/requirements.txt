@@ -1,3 +1,4 @@
 dnspython
 jinja2
 pytest
+pytest-xdist
