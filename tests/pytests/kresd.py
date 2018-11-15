@@ -11,7 +11,9 @@ import pytest
 import utils
 
 
-TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'templates')
+PYTESTS_DIR = os.path.dirname(os.path.realpath(__file__))
+CERTS_DIR = os.path.join(PYTESTS_DIR, 'certs')
+TEMPLATES_DIR = os.path.join(PYTESTS_DIR, 'templates')
 KRESD_CONF_TEMPLATE = 'kresd.conf.j2'
 
 
@@ -26,7 +28,7 @@ def create_file_from_template(template_path, dest, data):
 
 
 class Kresd(ContextDecorator):
-    def __init__(self, workdir, port, tls_port, ip=None, ip6=None):
+    def __init__(self, workdir, port, tls_port, ip=None, ip6=None, certname=None):
         if ip is None and ip6 is None:
             raise ValueError("IPv4 or IPv6 must be specified!")
         self.workdir = str(workdir)
@@ -37,6 +39,13 @@ class Kresd(ContextDecorator):
         self.process = None
         self.sockets = []
         self.logfile = None
+
+        if certname:
+            self.tls_cert_path = os.path.join(CERTS_DIR, certname + '.cert.pem')
+            self.tls_key_path = os.path.join(CERTS_DIR, certname + '.key.pem')
+        else:
+            self.tls_cert_path = None
+            self.tls_key_path = None
 
     @property
     def config_path(self):
