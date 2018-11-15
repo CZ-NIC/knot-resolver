@@ -43,10 +43,10 @@ build:clang:linux:amd64:
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   script:
     - rm daemon/lua/kres-gen.lua
-    - CXX=clang++-5.0 CC=clang-5.0 make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
+    - CXX=clang++ CC=clang make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
-    - CXX=clang++-5.0 CC=clang-5.0 make install "CFLAGS=-Werror -ggdb"
+    - CXX=clang++ CC=clang make install "CFLAGS=-Werror -ggdb"
   tags:
     - docker
     - linux
@@ -87,7 +87,7 @@ lint:c:
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
-    - make lint-c CLANG_TIDY="clang-tidy-5.0 -quiet"
+    - make lint-c CLANG_TIDY="clang-tidy -quiet"
   tags:
     - docker
 
@@ -99,7 +99,7 @@ lint:clang-scan-build:
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
-    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="/usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
+    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
   artifacts:
     when: on_failure
     expire_in: '1 day'
