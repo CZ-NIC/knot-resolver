@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import random
 import socket
 
@@ -27,8 +28,8 @@ def is_port_free(port, ip=None, ip6=None):
     return True
 
 
-@pytest.fixture
-def kresd(tmpdir):
+@contextmanager
+def make_kresd(workdir, certname=None):
     ip = '127.0.0.1'
     ip6 = '::1'
 
@@ -41,11 +42,29 @@ def kresd(tmpdir):
 
     port = make_port()
     tls_port = make_port()
-    with Kresd(tmpdir, port, tls_port, ip, ip6) as kresd:
+    with Kresd(workdir, port, tls_port, ip, ip6, certname) as kresd:
         yield kresd
         # TODO: add verbose option?
         # with open(kresd.logfile_path) as log:
         #     print(log.read())  # display log for debugging purposes
+
+
+@pytest.fixture
+def kresd(tmpdir):
+    with make_kresd(tmpdir) as kresd:
+        yield kresd
+
+
+@pytest.fixture
+def kresd_tt(tmpdir):
+    with make_kresd(tmpdir, 'tt') as kresd:
+        yield kresd
+
+
+@pytest.fixture
+def kresd_tt_expired(tmpdir):
+    with make_kresd(tmpdir, 'tt-expired') as kresd:
+        yield kresd
 
 
 @pytest.fixture(params=[
