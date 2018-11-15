@@ -66,3 +66,11 @@ def make_kresd_sock(request, kresd):
 @pytest.fixture
 def kresd_sock(make_kresd_sock):
     return make_kresd_sock()
+
+
+@pytest.fixture(params=[
+    socket.AF_INET,
+    socket.AF_INET6,
+])
+def sock_family(request):
+    return request.param

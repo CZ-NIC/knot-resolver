@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import ssl
 import struct
 import random
 
@@ -93,3 +94,25 @@ def expect_kresd_close(rst_ok=False):
                 raise BrokenPipeError
             else:
                 pytest.skip("kresd closed connection with TCP RST")
+
+
+def make_ssl_context(insecure=False, verify_location=None):
+    # set TLS v1.2+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+    context.options |= ssl.OP_NO_SSLv2
+    context.options |= ssl.OP_NO_SSLv3
+    context.options |= ssl.OP_NO_TLSv1
+    context.options |= ssl.OP_NO_TLSv1_1
+
+    if insecure:
+        # turn off certificate verification
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    else:
+        context.verify_mode = ssl.CERT_REQUIRED
+        context.check_hostname = True
+
+        if verify_location is not None:
+            context.load_verify_locations(verify_location)
+
+    return context
