@@ -10,7 +10,9 @@ net.listen('{{ kresd.ip6 }}', {{ kresd.tls_port }}, {tls = true})
 net.ipv4=true
 net.ipv6=false
 net.tcp_pipeline(65535)
---net.tls("./certs/tt.cert.pem", "./certs/tt.key.pem")
+{% if kresd.tls_key_path and kresd.tls_cert_path %}
+net.tls("{{ kresd.tls_cert_path }}", "{{ kresd.tls_key_path }}")
+{% endif %}
 modules.unload("ta_signal_query")
 modules.unload("priming")
 modules.unload("detect_time_skew")
