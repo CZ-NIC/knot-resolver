@@ -35,8 +35,10 @@ void tcp_timeout_trigger(uv_timer_t *timer);
 
 /** Initialize the handle, incl. ->data = struct session * instance.
  * \param type = SOCK_*
- * \param family = AF_* */
-int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family);
+ * \param family = AF_*
+ * \param has_tls has meanings only when type is SOCK_STREAM */
+int io_create(uv_loop_t *loop, uv_handle_t *handle, int type,
+	      unsigned family, bool has_tls);
 void io_deinit(uv_handle_t *handle);
 void io_free(uv_handle_t *handle);
 
