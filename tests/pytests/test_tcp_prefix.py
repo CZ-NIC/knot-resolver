@@ -85,7 +85,8 @@ def test_cuts_message_after_ok(kresd_sock):
 def test_trailing_garbage(kresd_sock):
     """Prefix is correct, but the message has trailing garbage. The connection must
     stay open until all message have been sent and answered."""
-    for _ in range(10):
+    for i in range(10):
+        print(i)
         wire, msgid = utils.prepare_wire()
         wire += utils.get_garbage(8)
         buff = utils.prepare_buffer(wire)
@@ -93,5 +94,6 @@ def test_trailing_garbage(kresd_sock):
         kresd_sock.sendall(buff)
         answer = utils.receive_parse_answer(kresd_sock)
         assert answer.id == msgid
+        print("ok")
 
         time.sleep(0.1)
