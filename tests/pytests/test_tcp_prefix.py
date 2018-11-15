@@ -82,7 +82,7 @@ def test_cuts_message_after_ok(kresd_sock):
     send_incorrect_repeatedly(kresd_sock, cut_buff)
 
 
-def test_trailing_garbage(kresd_sock):
+def test_trailing_garbage(kresd_sock):  # TODO test fails in CI
     """Prefix is correct, but the message has trailing garbage. The connection must
     stay open until all message have been sent and answered."""
     for _ in range(10):
