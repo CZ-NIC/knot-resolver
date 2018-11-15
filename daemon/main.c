@@ -475,6 +475,14 @@ static void args_init(struct args *args)
 	args->quiet = false;
 }
 
+static long strtol_10(const char *s)
+{
+	if (!s) abort();
+	/* ^^ This shouldn't ever happen.  When getopt_long() returns an option
+	 * character that has a mandatory parameter, optarg can't be NULL. */
+	return strtol(s, NULL, 10);
+}
+
 /** Process arguments into struct args.
  * @return >=0 if main() should be exited immediately.
  */
@@ -508,17 +516,17 @@ static int parse_args(int argc, char **argv, struct args *args)
 			array_push(args->tls_set, optarg);
 			break;
 		case 'S':
-			array_push(args->fd_set, strtol(optarg, NULL, 10));
+			array_push(args->fd_set, strtol_10(optarg));
 			break;
 		case 'T':
-			array_push(args->tls_fd_set, strtol(optarg, NULL, 10));
+			array_push(args->tls_fd_set, strtol_10(optarg));
 			break;
 		case 'c':
 			args->config = optarg;
 			break;
 		case 'f':
 			args->interactive = false;
-			args->forks = strtol(optarg, NULL, 10);
+			args->forks = strtol_10(optarg);
 			if (args->forks <= 0) {
 				kr_log_error("[system] error '-f' requires a positive"
 						" number, not '%s'\n", optarg);
