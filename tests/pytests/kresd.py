@@ -2,7 +2,6 @@ from contextlib import ContextDecorator
 import os
 import re
 import socket
-import ssl
 import subprocess
 import time
 
@@ -24,21 +23,6 @@ def create_file_from_template(template_path, dest, data):
 
     with open(dest, "w") as fh:
         fh.write(rendered_template)
-
-
-def make_ssl_context():
-    # set TLS v1.2+
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    context.options |= ssl.OP_NO_SSLv2
-    context.options |= ssl.OP_NO_SSLv3
-    context.options |= ssl.OP_NO_TLSv1
-    context.options |= ssl.OP_NO_TLSv1_1
-
-    # turn off certificate verification
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-
-    return context
 
 
 class Kresd(ContextDecorator):
@@ -154,7 +138,7 @@ class Kresd(ContextDecorator):
 
     def _tls_socket(self, family):
         sock, dest = self.stream_socket(family, tls=True)
-        ctx = make_ssl_context()
+        ctx = utils.make_ssl_context(insecure=True)
         ssock = ctx.wrap_socket(sock)
         try:
             ssock.connect(dest)
