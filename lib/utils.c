@@ -437,6 +437,10 @@ int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen)
 	str[len] = '#';
 	u16tostr((uint8_t *)&str[len + 1], kr_inaddr_port(addr));
 	len += 6;
+	if (len < 0) {
+		/* impossible, but avoid scan-build warning */
+		return kr_error(ENOSPC);
+	}
 	str[len] = 0;
 	if (len >= *buflen) {
 		ret = kr_error(ENOSPC);
