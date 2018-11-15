@@ -84,9 +84,12 @@ def ping_alive(sock):
 
 
 @contextmanager
-def expect_kresd_close():
+def expect_kresd_close(rst_ok=False):
     with pytest.raises(BrokenPipeError, message="kresd didn't close the connection"):
         try:
             yield
         except ConnectionResetError:
-            pytest.skip("kresd closed connection with TCP RST")
+            if rst_ok:
+                raise BrokenPipeError
+            else:
+                pytest.skip("kresd closed connection with TCP RST")
