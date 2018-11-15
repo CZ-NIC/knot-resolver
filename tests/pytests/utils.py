@@ -22,11 +22,11 @@ def receive_answer(sock):
     answer_received_len = 0
     data_answer = b''
     while answer_received_len < answer_total_len:
-        data_chunk = sock.recv(2048)
+        data_chunk = sock.recv(answer_total_len - answer_received_len)
         if not data_chunk:
             return None
-        data_answer = data_answer + data_chunk
-        answer_received_len = answer_received_len + len(data_answer)
+        data_answer += data_chunk
+        answer_received_len += len(data_answer)
 
     return data_answer
 
