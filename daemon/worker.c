@@ -131,7 +131,8 @@ static inline struct worker_ctx *get_worker(void)
 
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
-static uv_handle_t *ioreq_spawn(struct worker_ctx *worker, int socktype, sa_family_t family)
+static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
+				int socktype, sa_family_t family, bool has_tls)
 {
 	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
 			&& (family == AF_INET  || family == AF_INET6);
@@ -147,7 +148,7 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker, int socktype, sa_fami
 	if (!handle) {
 		return NULL;
 	}
-	int ret = io_create(worker->loop, handle, socktype, family);
+	int ret = io_create(worker->loop, handle, socktype, family, has_tls);
 	if (ret) {
 		if (ret == UV_EMFILE) {
 			worker->too_many_open = true;
@@ -948,7 +949,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		if (task->pending_count >= MAX_PENDING) {
 			return ret;
 		}
-		ret = ioreq_spawn(task->ctx->worker, SOCK_DGRAM, choice->sin6_family);
+		ret = ioreq_spawn(task->ctx->worker, SOCK_DGRAM, choice->sin6_family, false);
 		if (!ret) {
 			return ret;
 		}
@@ -1209,50 +1210,52 @@ static int tcp_task_existing_connection(struct session *session, struct qr_task 
 	return kr_ok();
 }
 
-static int tcp_task_make_connection(struct session *session, struct qr_task *task,
-				    const struct sockaddr *addr /* , knot_pkt_t *packet */)
+static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr *addr)
 {
 	struct request_ctx *ctx = task->ctx;
 	struct worker_ctx *worker = ctx->worker;
 
+	/* Check if there must be TLS */
+	struct engine *engine = worker->engine;
+	struct network *net = &engine->net;
+	const char *key = tcpsess_key(addr);
+	struct tls_client_ctx_t *tls_ctx = NULL;
+	struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
+	if (entry) {
+		/* Address is configured to be used with TLS.
+		 * We need to allocate auxiliary data structure. */
+		tls_ctx = tls_client_ctx_new(entry, worker);
+		if (!tls_ctx) {
+			return kr_error(EINVAL);
+		}
+	}
+
 	uv_connect_t *conn = malloc(sizeof(uv_connect_t));
 	if (!conn) {
+		tls_client_ctx_free(tls_ctx);
 		return kr_error(EINVAL);
 	}
-	uv_handle_t *client = ioreq_spawn(worker, SOCK_STREAM,
-						  addr->sa_family);
+	bool has_tls = (tls_ctx != NULL);
+	uv_handle_t *client = ioreq_spawn(worker, SOCK_STREAM, addr->sa_family, has_tls);
 	if (!client) {
+		tls_client_ctx_free(tls_ctx);
 		free(conn);
 		return kr_error(EINVAL);
 	}
-	session = client->data;
+	struct session *session = client->data;
+	assert(session_flags(session)->has_tls == has_tls);
+	if (has_tls) {
+		tls_client_ctx_set_session(tls_ctx, session);
+		session_tls_set_client_ctx(session, tls_ctx);
+	}
 
 	/* Add address to the waiting list.
 	 * Now it "is waiting to be connected to." */
 	int ret = worker_add_tcp_waiting(ctx->worker, addr, session);
 	if (ret < 0) {
 		free(conn);
+		session_close(session);
 		return kr_error(EINVAL);
-	}
-
-	/* Check if there must be TLS */
-	struct engine *engine = ctx->worker->engine;
-	struct network *net = &engine->net;
-	const char *key = tcpsess_key(addr);
-	struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
-	if (entry) {
-		/* Address is configured to be used with TLS.
-		 * We need to allocate auxiliary data structure. */
-		assert(session_tls_get_client_ctx(session) == NULL);
-		struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(entry, worker);
-		if (!tls_ctx) {
-			worker_del_tcp_waiting(ctx->worker, addr);
-			free(conn);
-			return kr_error(EINVAL);
-		}
-		tls_client_ctx_set_session(tls_ctx, session);
-		session_tls_set_client_ctx(session, tls_ctx);
-		session_flags(session)->has_tls = true;
 	}
 
 	conn->data = session;
@@ -1266,6 +1269,7 @@ static int tcp_task_make_connection(struct session *session, struct qr_task *tas
 	if (ret != 0) {
 		worker_del_tcp_waiting(ctx->worker, addr);
 		free(conn);
+		session_close(session);
 		return kr_error(EINVAL);
 	}
 
@@ -1280,6 +1284,7 @@ static int tcp_task_make_connection(struct session *session, struct qr_task *tas
 		session_timer_stop(session);
 		worker_del_tcp_waiting(ctx->worker, addr);
 		free(conn);
+		session_close(session);
 		return kr_error(EAGAIN);
 	}
 
@@ -1290,6 +1295,7 @@ static int tcp_task_make_connection(struct session *session, struct qr_task *tas
 		session_timer_stop(session);
 		worker_del_tcp_waiting(ctx->worker, addr);
 		free(conn);
+		session_close(session);
 		return kr_error(EINVAL);
 	}
 
@@ -1322,7 +1328,7 @@ static int tcp_task_step(struct qr_task *task,
 		ret = tcp_task_existing_connection(session, task);
 	} else {
 		/* Make connection. */
-		ret = tcp_task_make_connection(session, task, addr);
+		ret = tcp_task_make_connection(task, addr);
 	}
 
 	if (ret != kr_ok()) {

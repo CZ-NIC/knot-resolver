@@ -26,6 +26,8 @@
 #include "daemon/io.h"
 #include "lib/generic/queue.h"
 
+#define TLS_CHUNK_SIZE (16 * 1024)
+
 /* Per-session (TCP or UDP) persistent structure,
  * that exists between remote counterpart and a local socket.
  */
@@ -301,7 +303,7 @@ struct session *session_get(uv_handle_t *h)
 	return h->data;
 }
 
-struct session *session_new(uv_handle_t *handle)
+struct session *session_new(uv_handle_t *handle, bool has_tls)
 {
 	if (!handle) {
 		return NULL;
@@ -314,13 +316,20 @@ struct session *session_new(uv_handle_t *handle)
 	queue_init(session->waiting);
 	session->tasks = trie_create(NULL);
 	if (handle->type == UV_TCP) {
-		uint8_t *wire_buf = malloc(KNOT_WIRE_MAX_PKTSIZE);
+		size_t wire_buffer_size = KNOT_WIRE_MAX_PKTSIZE;
+		if (has_tls) {
+			/* When decoding large packets,
+			 * gnutls gives the application chunks of size 16 kb each. */
+			wire_buffer_size += TLS_CHUNK_SIZE;
+			session->sflags.has_tls = true;
+		}
+		uint8_t *wire_buf = malloc(wire_buffer_size);
 		if (!wire_buf) {
 			free(session);
 			return NULL;
 		}
 		session->wire_buf = wire_buf;
-		session->wire_buf_size = KNOT_WIRE_MAX_PKTSIZE;
+		session->wire_buf_size = wire_buffer_size;
 	} else if (handle->type == UV_UDP) {
 		/* We use the singleton buffer from worker for all UDP (!)
 		 * libuv documentation doesn't really guarantee this is OK,
@@ -528,13 +537,13 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 	const uv_handle_t *handle = session->handle;
 	uint8_t *msg_start = &session->wire_buf[session->wire_buf_start_idx];
 	ssize_t wirebuf_msg_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
-	uint16_t msg_size = wirebuf_msg_data_size;
+	uint16_t msg_size = 0;
 	
 	if (!handle) {
 		session->sflags.wirebuf_error = true;
 		return NULL;
 	} else if (handle->type == UV_TCP) {
-		if (msg_size < 2) {
+		if (wirebuf_msg_data_size < 2) {
 			return NULL;
 		}
 		msg_size = knot_wire_read_u16(msg_start);
@@ -545,13 +554,21 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 		if (msg_size + 2 > wirebuf_msg_data_size) {
 			return NULL;
 		}
+		if (msg_size == 0) {
+			session->sflags.wirebuf_error = true;
+			return NULL;
+		}
 		msg_start += 2;
+	} else if (wirebuf_msg_data_size < UINT16_MAX) {
+		msg_size = wirebuf_msg_data_size;
+	} else {
+		session->sflags.wirebuf_error = true;
+		return NULL;
 	}
 
+
 	knot_pkt_t *pkt = knot_pkt_new(msg_start, msg_size, mm);
-	if (pkt) {
-		session->sflags.wirebuf_error = false;
-	}
+	session->sflags.wirebuf_error = (pkt == NULL);
 	return pkt;
 }
 
@@ -674,7 +691,7 @@ size_t session_wirebuf_get_len(struct session *session)
 
 size_t session_wirebuf_get_size(struct session *session)
 {
-	return sizeof(session->wire_buf);
+	return session->wire_buf_size;
 }
 
 uint8_t *session_wirebuf_get_free_start(struct session *session)
