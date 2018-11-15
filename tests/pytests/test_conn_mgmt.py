@@ -169,3 +169,24 @@ def test_query_flood_no_recv(make_kresd_sock):
 
     sock2 = make_kresd_sock()
     utils.ping_alive(sock2)  # resolver must stay alive
+
+
+def test_query_flood_garbage(make_kresd_sock):
+    """Flood resolver with correctly prefixed garbage of maximum size."""
+    # TODO - despite the fact that kresd closes TCP connection, it seems to be
+    # error in TCP stream parsing. Kresd closes TCP connection because of
+    # message length in TCP prefix is lesser then length of the fixed message
+    # header, it shouldn't happen.
+
+    gbuff = utils.get_prefixed_garbage(65533)
+    buff = gbuff * 100
+    end_time = time.time() + utils.MAX_TIMEOUT
+    sock1 = make_kresd_sock()
+
+    with utils.expect_kresd_close(rst_ok=True):  # connection must be closed
+        while time.time() < end_time:
+            sock1.sendall(buff)
+            time.sleep(0.5)
+
+    sock2 = make_kresd_sock()
+    utils.ping_alive(sock2)  # resolver must stay alive
