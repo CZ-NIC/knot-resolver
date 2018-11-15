@@ -9,15 +9,15 @@ set -o errexit -o nounset
 # https://bugs.llvm.org/show_bug.cgi?id=3888
 
 # These are disabled for other reasons:
+# alpha.clone.CloneChecker # way too many false positives
+# alpha.core.CastToStruct # we use this pattern too much, hard to avoid in many cases
 # alpha.deadcode.UnreachableCode # false positives/flags sanity checks depending on implementation details
 # alpha.security.MallocOverflow # not smart enough to infer max values from data types
-# alpha.clone.CloneChecker # way too many false positives
 
 ${SCAN_BUILD:-scan-build} \
 -disable-checker  unix.Malloc \
 -enable-checker   alpha.core.BoolAssignment \
 -enable-checker   alpha.core.CallAndMessageUnInitRefArg \
--enable-checker   alpha.core.CastToStruct \
 -enable-checker   alpha.core.CastSize \
 -enable-checker   alpha.core.Conversion \
 -enable-checker   alpha.core.DynamicTypeChecker \
