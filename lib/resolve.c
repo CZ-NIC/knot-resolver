@@ -1035,7 +1035,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
-	const knot_dname_t *wanted_name = qry->sname;
 	const knot_dname_t *start_name = qry->sname;
 	if ((qry->flags.AWAIT_CUT) && !resume) {
 		qry->flags.AWAIT_CUT = false;
@@ -1063,12 +1062,9 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_DONE;
 	}
 
-	bool nods = false;
-	bool ds_req = false;
-	bool ns_req = false;
-	bool ns_exist = true;
-	bool minimized = false;
 	int name_offset = 1;
+	const knot_dname_t *wanted_name;
+	bool nods, ds_req, ns_req, minimized, ns_exist;
 	do {
 		wanted_name = start_name;
 		nods = false;
