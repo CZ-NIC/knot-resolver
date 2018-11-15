@@ -26,6 +26,8 @@
 #include "daemon/io.h"
 #include "lib/generic/queue.h"
 
+#define TLS_CHUNK_SIZE (16 * 1024)
+
 /* Per-session (TCP or UDP) persistent structure,
  * that exists between remote counterpart and a local socket.
  */
@@ -301,7 +303,7 @@ struct session *session_get(uv_handle_t *h)
 	return h->data;
 }
 
-struct session *session_new(uv_handle_t *handle)
+struct session *session_new(uv_handle_t *handle, bool has_tls)
 {
 	if (!handle) {
 		return NULL;
@@ -314,13 +316,20 @@ struct session *session_new(uv_handle_t *handle)
 	queue_init(session->waiting);
 	session->tasks = trie_create(NULL);
 	if (handle->type == UV_TCP) {
-		uint8_t *wire_buf = malloc(KNOT_WIRE_MAX_PKTSIZE);
+		size_t wire_buffer_size = KNOT_WIRE_MAX_PKTSIZE;
+		if (has_tls) {
+			/* When decoding large packets,
+			 * gnutls gives the application chunks of size 16 kb each. */
+			wire_buffer_size += TLS_CHUNK_SIZE;
+			session->sflags.has_tls = true;
+		}
+		uint8_t *wire_buf = malloc(wire_buffer_size);
 		if (!wire_buf) {
 			free(session);
 			return NULL;
 		}
 		session->wire_buf = wire_buf;
-		session->wire_buf_size = KNOT_WIRE_MAX_PKTSIZE;
+		session->wire_buf_size = wire_buffer_size;
 	} else if (handle->type == UV_UDP) {
 		/* We use the singleton buffer from worker for all UDP (!)
 		 * libuv documentation doesn't really guarantee this is OK,
