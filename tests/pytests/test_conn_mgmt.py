@@ -120,24 +120,25 @@ def test_ignore_jumbo_message(kresd_sock):
     assert answer.id == msgid2
 
 
+def flood_buffer(msgcount):
+    flood_buff = bytes()
+    msgbuff, _ = utils.get_msgbuff()
+    noid_msgbuff = msgbuff[2:]
+
+    def gen_msg(msgid):
+        return struct.pack("!H", len(msgbuff)) + struct.pack("!H", msgid) + noid_msgbuff
+
+    for i in range(msgcount):
+        flood_buff += gen_msg(i)
+    return flood_buff
+
+
 def test_query_flood_close(make_kresd_sock):
     """
     Test floods resolver with queries and closes the connection.
 
     Expected: resolver must not crash
     """
-    def flood_buffer(msgcount):
-        flood_buff = bytes()
-        msgbuff, _ = utils.get_msgbuff()
-        noid_msgbuff = msgbuff[2:]
-
-        def gen_msg(msgid):
-            return struct.pack("!H", len(msgbuff)) + struct.pack("!H", msgid) + noid_msgbuff
-
-        for i in range(msgcount):
-            flood_buff += gen_msg(i)
-        return flood_buff
-
     buff = flood_buffer(10000)
     sock1 = make_kresd_sock()
     sock1.sendall(buff)
@@ -145,3 +146,26 @@ def test_query_flood_close(make_kresd_sock):
 
     sock2 = make_kresd_sock()
     utils.ping_alive(sock2)
+
+
+def test_query_flood_no_recv(make_kresd_sock):
+    """Flood resolver with queries but don't read any data."""
+    # A use-case for TCP_USER_TIMEOUT socket option? See RFC 793 and RFC 5482
+
+    # It seems it doesn't works as expected.  libuv doesn't return any error
+    # (neither on uv_write() call, not in the callback) when kresd sends answers,
+    # so kresd can't recognize that client didn't read any answers.  At a certain
+    # point, kresd stops receiving queries from the client (whilst client keep
+    # sending) and closes connection due to timeout.
+
+    buff = flood_buffer(10000)
+    sock1 = make_kresd_sock()
+    end_time = time.time() + utils.MAX_TIMEOUT
+
+    with utils.expect_kresd_close(rst_ok=True):  # connection must be closed
+        while time.time() < end_time:
+            sock1.sendall(buff)
+            time.sleep(0.5)
+
+    sock2 = make_kresd_sock()
+    utils.ping_alive(sock2)  # resolver must stay alive
