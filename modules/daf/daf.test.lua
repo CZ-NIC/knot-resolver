@@ -19,7 +19,7 @@ local function wait_resolve(qname, qtype, proto)
 			req = kres.request_t(req)
 			req.qsource.dst_addr = mock_address
 			req.qsource.addr = mock_src_address
-			req.qsource.tcp = proto ~= 'udp'
+			req.qsource.flags.tcp = proto ~= 'udp'
 		end,
 		finish = function (answer, req)
 			answer = kres.pkt_t(answer)
