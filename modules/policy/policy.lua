@@ -559,7 +559,7 @@ function policy.REFUSE(_, _, qry, answer)
 end
 
 function policy.TC(_, req, _, answer)
-	if not req.qsource.tcp then
+	if not req.qsource.flags.tcp then
 		answer:aa(false)
 		answer:ad(false)
 		answer:qr(true)
