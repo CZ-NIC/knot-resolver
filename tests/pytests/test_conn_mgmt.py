@@ -107,7 +107,7 @@ def test_ignore_jumbo_message(kresd_sock):
     Expected: jumbo message must be ignored, other queries answered
     """
     buff1, msgid1 = utils.get_msgbuff(msgid=1)
-    gbuff = utils.get_prefixed_garbage(65000)  # TODO TLS with 65533 closes connection
+    gbuff = utils.get_prefixed_garbage(65533)
     kresd_sock.sendall(buff1 + gbuff)
 
     answer = utils.receive_parse_answer(kresd_sock)
