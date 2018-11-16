@@ -66,8 +66,10 @@ end
 
 -- Renumber addresses based on config
 function M.rule(prefixes)
-	return function (state, _, _, pkt)
+	return function (state, req)
 		if state == kres.FAIL then return state end
+		req = kres.request_t(req)
+		local pkt = kres.pkt_t(req.answer)
 		-- Only successful answers
 		local records = pkt:section(kres.section.ANSWER)
 		-- Find renumber candidates
