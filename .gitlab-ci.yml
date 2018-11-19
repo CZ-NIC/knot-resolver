@@ -16,7 +16,7 @@ stages:
   - build
   - test
   - coverage
-  - respdiff
+  - extended
   - deploy
 
 build:linux:amd64:
@@ -293,9 +293,22 @@ pytests:run:
     - linux
     - amd64
 
+pytests:extended:
+  stage: extended
+  dependencies:
+    - build:linux:amd64
+  except:
+    - master
+  script:
+    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run-extended.sh
+  tags:
+    - docker
+    - linux
+    - amd64
+
 
 .respdiff:  &respdiff
-  stage: respdiff
+  stage: extended
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
@@ -396,7 +409,7 @@ respdiff:iter:udp:linux:amd64:
 
 
 .resperf:  &resperf
-  stage: respdiff
+  stage: extended
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
