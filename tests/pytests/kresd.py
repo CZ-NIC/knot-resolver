@@ -16,6 +16,7 @@ PYTESTS_DIR = os.path.dirname(os.path.realpath(__file__))
 CERTS_DIR = os.path.join(PYTESTS_DIR, 'certs')
 TEMPLATES_DIR = os.path.join(PYTESTS_DIR, 'templates')
 KRESD_CONF_TEMPLATE = 'kresd.conf.j2'
+KRESD_STARTUP_MSGID = 10005  # special unique ID at the start of the "test" log
 
 
 def create_file_from_template(template_path, dest, data):
@@ -68,6 +69,12 @@ class Kresd(ContextDecorator):
             self._wait_for_tcp_port()  # wait for ports to be up and responding
             if not self.all_ports_alive(msgid=10001):
                 raise RuntimeError("Kresd not listening on all ports")
+
+            # issue special msgid to mark start of test log
+            sock = self.ip_tcp_socket() if self.ip else self.ip6_tcp_socket()
+            utils.ping_alive(sock, close=True, msgid=KRESD_STARTUP_MSGID)
+
+            # sanity check - kresd didn't crash
             self.process.poll()
             if self.process.returncode is not None:
                 raise RuntimeError("Kresd crashed with returncode: {}".format(
@@ -87,7 +94,7 @@ class Kresd(ContextDecorator):
 
     def __exit__(self, exc_type, exc_value, traceback):
         try:
-            if not self.all_ports_alive(msgid=1005):
+            if not self.all_ports_alive(msgid=1006):
                 raise RuntimeError("Kresd crashed")
         finally:
             for sock in self.sockets:
@@ -98,11 +105,11 @@ class Kresd(ContextDecorator):
     def all_ports_alive(self, msgid=10001):
         alive = True
         if self.ip:
-            alive &= utils.ping_alive(self.ip_tcp_socket(), msgid=msgid)
-            alive &= utils.ping_alive(self.ip_tls_socket(), msgid=msgid + 1)
+            alive &= utils.ping_alive(self.ip_tls_socket(), close=True, msgid=msgid)
+            alive &= utils.ping_alive(self.ip_tcp_socket(), close=True, msgid=msgid + 1)
         if self.ip6:
-            alive &= utils.ping_alive(self.ip6_tcp_socket(), msgid=msgid + 2)
-            alive &= utils.ping_alive(self.ip6_tls_socket(), msgid=msgid + 3)
+            alive &= utils.ping_alive(self.ip6_tls_socket(), close=True, msgid=msgid + 2)
+            alive &= utils.ping_alive(self.ip6_tcp_socket(), close=True, msgid=msgid + 3)
         return alive
 
     def _wait_for_tcp_port(self, delay=0.1, max_attempts=20):
@@ -115,7 +122,7 @@ class Kresd(ContextDecorator):
                 time.sleep(delay)
                 continue
             else:
-                return utils.ping_alive(sock, msgid=10000)
+                return utils.ping_alive(sock, close=True, msgid=10000)
             finally:
                 sock.close()
         raise RuntimeError("Kresd didn't start in time")
@@ -203,11 +210,28 @@ def make_port(ip=None, ip6=None):
     raise RuntimeError("No available port found!")
 
 
+KRESD_LOG_STARTUP_MSGID = re.compile(r'^\[{}.*'.format(KRESD_STARTUP_MSGID))
+KRESD_LOG_IO_CLOSE = re.compile(r'^\[io\].*closed by peer.*')
+
+
 @contextmanager
 def make_kresd(workdir, certname=None, ip='127.0.0.1', ip6='::1'):
     port = make_port(ip, ip6)
     tls_port = make_port(ip, ip6)
     with Kresd(workdir, port, tls_port, ip, ip6, certname) as kresd:
         yield kresd
-        with open(kresd.logfile_path) as log:
-            print(log.read())  # display log for debugging purposes
+        with open(kresd.logfile_path) as log:  # display partial log for debugging
+            past_startup_msgid = False
+            past_startup = False
+            for line in log:
+                if past_startup:
+                    line = line.rstrip('\n')
+                    print(line)
+                else:  # find real start of test log (after initial alive-pings)
+                    if not past_startup_msgid:
+                        if re.match(KRESD_LOG_STARTUP_MSGID, line) is not None:
+                            past_startup_msgid = True
+                    else:
+                        if re.match(KRESD_LOG_IO_CLOSE, line) is not None:
+                            past_startup = True
+                            print('\n (... ommiting log start)')
