@@ -18,7 +18,7 @@ import utils
 
 
 # TODO: test often fails in CI, debug and maybe decrease MAX_SOCKETS?
-MAX_SOCKETS = 25000  # upper bound of how many connections to open
+MAX_SOCKETS = 15000  # upper bound of how many connections to open
 MAX_ITERATIONS = 20  # number of iterations to run the test
 
 # we can't use softlimit ifself since kresd already has open sockets,
@@ -67,7 +67,7 @@ def test_conn_flood(tmpdir, sock_func_name):
         print("Start sending data")
         for i in range(MAX_ITERATIONS):
             for s in sockets:
-                utils.ping_alive(s)
+                assert utils.ping_alive(s)
             print("Iteration {} done...".format(i))
 
         print("Close connections")
@@ -77,6 +77,6 @@ def test_conn_flood(tmpdir, sock_func_name):
         # check in kresd is alive
         print("Check upstream is still alive")
         sock = make_sock()
-        utils.ping_alive(sock)
+        assert utils.ping_alive(sock)
 
         print("OK!")
