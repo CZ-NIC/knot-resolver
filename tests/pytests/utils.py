@@ -77,13 +77,22 @@ def get_prefixed_garbage(length):
     return prepare_buffer(data)
 
 
-def ping_alive(sock, msgid=None, close=False):
+def try_ping_alive(sock, msgid=None, close=False):
+    try:
+        ping_alive(sock, msgid)
+    except AssertionError:
+        return False
+    finally:
+        if close:
+            sock.close()
+    return True
+
+
+def ping_alive(sock, msgid=None):
     buff, msgid = get_msgbuff(msgid=msgid)
     sock.sendall(buff)
     answer = receive_parse_answer(sock)
-    if close:
-        sock.close()
-    return answer.id == msgid
+    assert answer.id == msgid
 
 
 @contextmanager
