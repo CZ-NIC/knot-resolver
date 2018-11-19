@@ -22,6 +22,7 @@ MAX_ITERATIONS = 20  # number of iterations to run the test
 RESERVED_NOFILE = 40  # 40 is empirical value
 
 
+# TODO turn off verbose - generates a lot of data
 def test_conn_flood(make_kresd_sock):
     def create_sockets(nsockets):
         buff, _ = utils.get_msgbuff()
