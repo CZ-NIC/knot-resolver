@@ -1,8 +1,11 @@
 """TCP Connection Management tests"""
 
+import socket
 import struct
 import time
 
+import dns
+import dns.message
 import pytest
 
 import utils
@@ -118,6 +121,18 @@ def test_ignore_jumbo_message(kresd_sock):
 
     answer = utils.receive_parse_answer(kresd_sock)
     assert answer.id == msgid2
+
+
+def test_oob(kresd_sock):
+    """TCP out-of-band (urgent) data must not crash resolver."""
+    msg_buff, msgid = utils.get_msgbuff()
+    kresd_sock.sendall(msg_buff, socket.MSG_OOB)
+
+    buf_answer = kresd_sock.recv(1024, socket.MSG_OOB)
+    print(buf_answer)
+    msg_answer = dns.message.from_wire(buf_answer[2:], one_rr_per_rrset=True)
+    # msg_answer = utils.receive_parse_answer(kresd_sock)
+    assert msg_answer.id == msgid
 
 
 def flood_buffer(msgcount):
