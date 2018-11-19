@@ -1,5 +1,6 @@
 """TCP Connection Management tests"""
 
+import socket
 import struct
 import time
 
@@ -118,6 +119,15 @@ def test_ignore_jumbo_message(kresd_sock):
 
     answer = utils.receive_parse_answer(kresd_sock)
     assert answer.id == msgid2
+
+
+def test_oob(kresd_sock):
+    """TCP out-of-band (urgent) data must not crash resolver."""
+    msg_buff, msgid = utils.get_msgbuff()
+    kresd_sock.sendall(msg_buff, socket.MSG_OOB)
+
+    msg_answer = utils.receive_parse_answer(kresd_sock)
+    assert msg_answer.id == msgid
 
 
 def flood_buffer(msgcount):
