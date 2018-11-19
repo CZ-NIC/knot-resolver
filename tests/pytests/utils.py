@@ -77,8 +77,8 @@ def get_prefixed_garbage(length):
     return prepare_buffer(data)
 
 
-def ping_alive(sock):
-    buff, msgid = get_msgbuff()
+def ping_alive(sock, msgid=None):
+    buff, msgid = get_msgbuff(msgid=msgid)
     sock.sendall(buff)
     answer = receive_parse_answer(sock)
     return answer.id == msgid
