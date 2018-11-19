@@ -1,4 +1,4 @@
-verbose(true)
+verbose({{ 'true' if kresd.verbose else 'false' }})
 {% if kresd.ip %}
 net.listen('{{ kresd.ip }}', {{ kresd.port }})
 net.listen('{{ kresd.ip }}', {{ kresd.tls_port }}, {tls = true})
