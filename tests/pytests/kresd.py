@@ -72,7 +72,7 @@ class Kresd(ContextDecorator):
 
             # issue special msgid to mark start of test log
             sock = self.ip_tcp_socket() if self.ip else self.ip6_tcp_socket()
-            utils.ping_alive(sock, close=True, msgid=KRESD_STARTUP_MSGID)
+            assert utils.try_ping_alive(sock, close=True, msgid=KRESD_STARTUP_MSGID)
 
             # sanity check - kresd didn't crash
             self.process.poll()
@@ -105,11 +105,11 @@ class Kresd(ContextDecorator):
     def all_ports_alive(self, msgid=10001):
         alive = True
         if self.ip:
-            alive &= utils.ping_alive(self.ip_tls_socket(), close=True, msgid=msgid)
-            alive &= utils.ping_alive(self.ip_tcp_socket(), close=True, msgid=msgid + 1)
+            alive &= utils.try_ping_alive(self.ip_tls_socket(), close=True, msgid=msgid)
+            alive &= utils.try_ping_alive(self.ip_tcp_socket(), close=True, msgid=msgid + 1)
         if self.ip6:
-            alive &= utils.ping_alive(self.ip6_tls_socket(), close=True, msgid=msgid + 2)
-            alive &= utils.ping_alive(self.ip6_tcp_socket(), close=True, msgid=msgid + 3)
+            alive &= utils.try_ping_alive(self.ip6_tls_socket(), close=True, msgid=msgid + 2)
+            alive &= utils.try_ping_alive(self.ip6_tcp_socket(), close=True, msgid=msgid + 3)
         return alive
 
     def _wait_for_tcp_port(self, delay=0.1, max_attempts=20):
@@ -122,7 +122,7 @@ class Kresd(ContextDecorator):
                 time.sleep(delay)
                 continue
             else:
-                return utils.ping_alive(sock, close=True, msgid=10000)
+                return utils.try_ping_alive(sock, close=True, msgid=10000)
             finally:
                 sock.close()
         raise RuntimeError("Kresd didn't start in time")
