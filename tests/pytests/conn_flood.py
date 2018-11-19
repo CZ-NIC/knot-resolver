@@ -66,8 +66,13 @@ def test_conn_flood(tmpdir, sock_func_name):
 
         print("Start sending data")
         for i in range(MAX_ITERATIONS):
+            print(time.time())
             for s in sockets:
-                utils.ping_alive(s)
+                try:
+                    utils.ping_alive(s)
+                except (RuntimeError, ConnectionError):
+                    print("Error at: {}", time.time())
+                    raise
             print("Iteration {} done...".format(i))
 
         print("Close connections")
