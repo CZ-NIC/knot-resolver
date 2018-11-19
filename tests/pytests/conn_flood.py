@@ -17,6 +17,7 @@ from kresd import Kresd, make_port
 import utils
 
 
+# TODO: test often fails in CI, debug and maybe decrease MAX_SOCKETS?
 MAX_SOCKETS = 25000  # upper bound of how many connections to open
 MAX_ITERATIONS = 20  # number of iterations to run the test
 
