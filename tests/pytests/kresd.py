@@ -29,7 +29,7 @@ def create_file_from_template(template_path, dest, data):
 
 
 class Kresd(ContextDecorator):
-    def __init__(self, workdir, port, tls_port, ip=None, ip6=None, certname=None):
+    def __init__(self, workdir, port, tls_port, ip=None, ip6=None, certname=None, verbose=True):
         if ip is None and ip6 is None:
             raise ValueError("IPv4 or IPv6 must be specified!")
         self.workdir = str(workdir)
@@ -40,6 +40,7 @@ class Kresd(ContextDecorator):
         self.process = None
         self.sockets = []
         self.logfile = None
+        self.verbose = verbose
 
         if certname:
             self.tls_cert_path = os.path.join(CERTS_DIR, certname + '.cert.pem')
@@ -208,6 +209,5 @@ def make_kresd(workdir, certname=None, ip='127.0.0.1', ip6='::1'):
     tls_port = make_port(ip, ip6)
     with Kresd(workdir, port, tls_port, ip, ip6, certname) as kresd:
         yield kresd
-        # TODO: add verbose option?
-        # with open(kresd.logfile_path) as log:
-        #     print(log.read())  # display log for debugging purposes
+        with open(kresd.logfile_path) as log:
+            print(log.read())  # display log for debugging purposes
