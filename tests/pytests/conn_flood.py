@@ -11,6 +11,9 @@ Also, make sure not to use parallel execution (-n).
 import resource
 import time
 
+import pytest
+
+from kresd import Kresd, make_port
 import utils
 
 
@@ -22,8 +25,14 @@ MAX_ITERATIONS = 20  # number of iterations to run the test
 RESERVED_NOFILE = 40  # 40 is empirical value
 
 
-def test_conn_flood(make_kresd_sock):
-    def create_sockets(nsockets):
+@pytest.mark.parametrize('sock_func_name', [
+    'ip_tcp_socket',
+    'ip6_tcp_socket',
+    'ip_tls_socket',
+    'ip6_tls_socket',
+])
+def test_conn_flood(tmpdir, sock_func_name):
+    def create_sockets(make_sock, nsockets):
         buff, _ = utils.get_msgbuff()
         sockets = []
 
@@ -33,7 +42,7 @@ def test_conn_flood(make_kresd_sock):
                 nsock_to_init = min(100, nsockets - len(sockets))
                 if not nsock_to_init:
                     return sockets
-                sockets.extend([make_kresd_sock() for _ in range(nsock_to_init)])
+                sockets.extend([make_sock() for _ in range(nsock_to_init)])
 
             # large number of connections can take a lot of time to open
             # send some valid data to avoid TCP idle timeout for already open sockets
@@ -44,22 +53,29 @@ def test_conn_flood(make_kresd_sock):
     max_num_of_open_files = resource.getrlimit(resource.RLIMIT_NOFILE)[0] - RESERVED_NOFILE
     nsockets = min(max_num_of_open_files, MAX_SOCKETS)
 
-    print("\nEstablishing {} connections".format(nsockets))
-    sockets = create_sockets(nsockets)
+    # create kresd instance with verbose=False
+    ip = '127.0.0.1'
+    ip6 = '::1'
+    port = make_port(ip, ip6)
+    tls_port = make_port(ip, ip6)
+    with Kresd(tmpdir, port, tls_port, ip, ip6, verbose=False) as kresd:
+        print("\nEstablishing {} connections".format(nsockets))
+        make_sock = getattr(kresd, sock_func_name)  # function for creating sockets
+        sockets = create_sockets(make_sock, nsockets)
 
-    print("Start sending data")
-    for i in range(MAX_ITERATIONS):
+        print("Start sending data")
+        for i in range(MAX_ITERATIONS):
+            for s in sockets:
+                utils.ping_alive(s)
+            print("Iteration {} done...".format(i))
+
+        print("Close connections")
         for s in sockets:
-            utils.ping_alive(s)
-        print("Iteration {} done...".format(i))
+            s.close()
 
-    print("Close connections")
-    for s in sockets:
-        s.close()
+        # check in kresd is alive
+        print("Check upstream is still alive")
+        sock = make_sock()
+        utils.ping_alive(sock)
 
-    # check in kresd is alive
-    print("Check upstream is still alive")
-    sock = make_kresd_sock()
-    utils.ping_alive(sock)
-
-    print("OK!")
+        print("OK!")
