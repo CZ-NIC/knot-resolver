@@ -4,6 +4,7 @@ import itertools
 import os
 from socket import AF_INET, AF_INET6
 import ssl
+import sys
 
 import pytest
 
@@ -51,6 +52,8 @@ def test_tls_cert_expired(kresd_tt_expired, sock_family):
         ssock.connect(dest)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 6),
+                    reason="requires python3.6 or higher")
 @pytest.mark.parametrize('sf1, sf2, sf3', itertools.product(
     [AF_INET, AF_INET6], [AF_INET, AF_INET6], [AF_INET, AF_INET6]))
 def test_tls_session_resumption(tmpdir, sf1, sf2, sf3):
