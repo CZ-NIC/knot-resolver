@@ -19,7 +19,7 @@ def test_tls_no_cert(kresd, sock_family):
     ssock = ctx.wrap_socket(sock)
     ssock.connect(dest)
 
-    utils.ping_alive(ssock)
+    assert utils.ping_alive(ssock)
 
 
 def test_tls_selfsigned_cert(kresd_tt, sock_family):
@@ -29,7 +29,7 @@ def test_tls_selfsigned_cert(kresd_tt, sock_family):
     ssock = ctx.wrap_socket(sock, server_hostname='transport-test-server.com')
     ssock.connect(dest)
 
-    utils.ping_alive(ssock)
+    assert utils.ping_alive(ssock)
 
 
 def test_tls_cert_hostname_mismatch(kresd_tt, sock_family):
@@ -69,7 +69,7 @@ def test_tls_session_resumption(tmpdir, sf1, sf2, sf3):
         new_session = ssock.session
         assert new_session.has_ticket
         assert ssock.session_reused == (session is not None)
-        utils.ping_alive(ssock)
+        assert utils.ping_alive(ssock)
         ssock.close()
         return new_session
 

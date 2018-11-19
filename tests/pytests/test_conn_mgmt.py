@@ -54,7 +54,7 @@ def test_long_lived(kresd_sock):
 
     while time.time() < end_time:
         time.sleep(3)
-        utils.ping_alive(kresd_sock)
+        assert utils.ping_alive(kresd_sock)
 
 
 @pytest.mark.parametrize('query_before', [
@@ -140,7 +140,7 @@ def test_oob(kresd, sock_func_name):
 
     # check kresd is alive
     sock2 = make_sock()
-    utils.ping_alive(sock2)
+    assert utils.ping_alive(sock2)
 
 
 def flood_buffer(msgcount):
@@ -168,7 +168,7 @@ def test_query_flood_close(make_kresd_sock):
     sock1.close()
 
     sock2 = make_kresd_sock()
-    utils.ping_alive(sock2)
+    assert utils.ping_alive(sock2)
 
 
 def test_query_flood_no_recv(make_kresd_sock):

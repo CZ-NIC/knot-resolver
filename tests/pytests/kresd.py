@@ -72,7 +72,7 @@ class Kresd(ContextDecorator):
 
             # issue special msgid to mark start of test log
             sock = self.ip_tcp_socket() if self.ip else self.ip6_tcp_socket()
-            utils.ping_alive(sock, close=True, msgid=KRESD_STARTUP_MSGID)
+            assert utils.ping_alive(sock, close=True, msgid=KRESD_STARTUP_MSGID)
 
             # sanity check - kresd didn't crash
             self.process.poll()
