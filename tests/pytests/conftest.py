@@ -69,4 +69,10 @@ def query_before(request):  # whether to send an initial query
 
 def pytest_configure(config):
     # don't let gitlab CI publish sensitive data in pytest html report
-    config._metadata = {}  # pylint: disable=protected-access
+    class CensoredDict(dict):
+        def __setitem__(self, key, value):
+            if key.beginswith('CI') or key.beginswith('GITLAB'):
+                return
+            super().__setitem__(key, value)
+
+    config._metadata = CensoredDict(config._metadata)  # pylint: disable=protected-access
