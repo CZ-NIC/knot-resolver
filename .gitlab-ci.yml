@@ -287,6 +287,7 @@ pytests:run:
   except:
     - master
   script:
+    - pip3 install pytest-html  # TODO add to container and remove
     - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run.sh &> pytests.log.txt
   after_script:
     - tail -1 pytests.log.txt
@@ -295,7 +296,7 @@ pytests:run:
     when: always
     expire_in: 1 week
     paths:
-      - pytest*
+      - pytests*
   tags:
     - docker
     - linux
