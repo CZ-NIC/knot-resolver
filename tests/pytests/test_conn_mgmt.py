@@ -26,23 +26,13 @@ def query_before(request):  # whether to send an initial query
 
 
 @pytest.mark.parametrize('garbage_lengths', [
-    (None,),   # don't send any
     (0,),
     (1,),
     (1024,),
     (65533,),  # max size garbage
-    (0, 0),
-    (0, 1),
     (0, 1024),
-    (0, 65533),
-    (1024, 0),
-    (1024, 1),
-    (1024, 65533),
-    (65533, 0),
-    (65533, 1024),
     (65533, 65533),
     (1024, 1024, 1024),
-    (65533, 65533, 65533),
 ])
 def test_ignore_garbage(kresd_sock, garbage_lengths, single_buffer, query_before):
     """Send chunk of garbage, prefixed by garbage length. It should be ignored."""
