@@ -18,7 +18,7 @@ Tests can be executed with the pytest framework.
 
    $ pytest-3  # sequential, all tests (with exception of few special tests)
    $ pytest-3 test_conn_mgmt.py::test_ignore_garbage   # specific test only
-   $ pytest-3 -s # turn on verbose logs even for successfull tests
+   $ pytest-3 --html pytests.html --self-contained-html  # html report
 
 It's highly recommended to run these tests in parallel, since lot of them
 wait for kresd timeout. This can be don with `python-xdist`:
