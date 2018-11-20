@@ -67,12 +67,10 @@ def query_before(request):  # whether to send an initial query
     return request.param
 
 
-def pytest_configure(config):
-    # don't let gitlab CI publish sensitive data in pytest html report
-    class CensoredDict(dict):
-        def __setitem__(self, key, value):
-            if key.beginswith('CI') or key.beginswith('GITLAB'):
-                return
-            super().__setitem__(key, value)
-
-    config._metadata = CensoredDict(config._metadata)  # pylint: disable=protected-access
+@pytest.mark.optionalhook
+def pytest_metadata(metadata):  # filter potentially sensitive data from GitLab CI
+    for key in metadata.keys():
+        key_lower = key.lower()
+        if 'password' in key_lower or 'token' in key_lower or \
+                key.startswith('ci') or key.startswith('gitlab'):
+            del metadata[key]
