@@ -105,11 +105,22 @@ def test_prefix_cuts_message(kresd_sock, send_query_before):
     send_invalid_repeatedly(kresd_sock, invalid_buff)
 
 
-def test_trailing_garbage(kresd_sock):
+@pytest.mark.parametrize('glength', [
+    0,
+    1,
+    8,
+    1024,
+    4096,  # TODO should be ignored instead
+    20000,  # TODO should be ignored instead
+])
+def test_prefix_trailing_garbage(kresd_sock, glength, query_before):
     """Send messages with trailing garbage (its length included in prefix)."""
+    if query_before:
+        utils.ping_alive(kresd_sock)
+
     for _ in range(10):
         wire, msgid = utils.prepare_wire()
-        wire += utils.get_garbage(8)
+        wire += utils.get_garbage(glength)
         buff = utils.prepare_buffer(wire)
 
         kresd_sock.sendall(buff)
