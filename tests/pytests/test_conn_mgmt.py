@@ -10,12 +10,7 @@ import utils
 
 
 def test_ignore_garbage(kresd_sock):
-    """
-    Send chunk of garbage, correctly prefixed by garbage length. Then, send
-    correct DNS query.
-
-    Expected: garbage must be ignored and the second query must be answered
-    """
+    """Send chunk of garbage, prefixed by garbage length. It should be ignored."""
     msg_buff, msgid = utils.get_msgbuff()
     garbage_buff = utils.get_prefixed_garbage(1024)
     kresd_sock.sendall(garbage_buff + msg_buff)
@@ -25,11 +20,7 @@ def test_ignore_garbage(kresd_sock):
 
 
 def test_pipelining(kresd_sock):
-    """
-    Test sends two queries to kresd - 1000.delay.getdnsapi.net and 1.delay.getdnsapi.net.
-
-    Expected: answer to the second query must come first.
-    """
+    """First query takes longer to resolve - answer to second query should arrive sooner."""
     buff1, msgid1 = utils.get_msgbuff('1000.delay.getdnsapi.net.', msgid=1)
     buff2, msgid2 = utils.get_msgbuff('1.delay.getdnsapi.net.', msgid=2)
     buff = buff1 + buff2
@@ -43,12 +34,7 @@ def test_pipelining(kresd_sock):
 
 
 def test_long_lived(kresd_sock):
-    """
-    Test establishes a TCP connection a sends several queries over it. They are sent
-    seqeuntially, each with a delay, which in total exceeds maximum timeout.
-
-    Expected: kresd must not close the connection
-    """
+    """Establish and keep connection alive for longer than maximum timeout."""
     utils.ping_alive(kresd_sock)
     end_time = time.time() + utils.MAX_TIMEOUT
 
@@ -62,12 +48,7 @@ def test_long_lived(kresd_sock):
     False  # test closing established connection after handshake
 ])
 def test_close(kresd_sock, query_before):
-    """
-    Test establishes a TCP connection, optionally sends a query and waits for response,
-    and then pauses (MAX_TIMEOUT). Afterwards, another query is sent.
-
-    Expected: kresd closes the connection
-    """
+    """Establish a connection and wait for timeout from kresd."""
     if query_before:
         utils.ping_alive(kresd_sock)
     time.sleep(utils.MAX_TIMEOUT)
@@ -81,11 +62,7 @@ def test_close(kresd_sock, query_before):
     False  # test slow-lorris right after handshake
 ])
 def test_slow_lorris(kresd_sock, query_before):
-    """
-    Test simulates slow-lorris attack by sending byte after byte with a delay in between.
-
-    Expected: kresd closes the connection
-    """
+    """Simulate slow-lorris attack by sending byte after byte with delays in between."""
     if query_before:
         utils.ping_alive(kresd_sock)
 
@@ -102,11 +79,7 @@ def test_slow_lorris(kresd_sock, query_before):
 
 
 def test_ignore_jumbo_message(kresd_sock):
-    """
-    Test if kresd correcty ignores bigger queries than 4096 (current maximum size in kresd).
-
-    Expected: jumbo message must be ignored, other queries answered
-    """
+    """Queries bigger than 4096 bytes should be ignored."""
     buff1, msgid1 = utils.get_msgbuff(msgid=1)
     gbuff = utils.get_prefixed_garbage(65533)
     kresd_sock.sendall(buff1 + gbuff)
@@ -157,11 +130,7 @@ def flood_buffer(msgcount):
 
 
 def test_query_flood_close(make_kresd_sock):
-    """
-    Test floods resolver with queries and closes the connection.
-
-    Expected: resolver must not crash
-    """
+    """Flood resolver with queries and close the connection."""
     buff = flood_buffer(10000)
     sock1 = make_kresd_sock()
     sock1.sendall(buff)
@@ -195,7 +164,7 @@ def test_query_flood_no_recv(make_kresd_sock):
 
 
 def test_query_flood_garbage(make_kresd_sock):
-    """Flood resolver with correctly prefixed garbage of maximum size."""
+    """Flood resolver with prefixed garbage of maximum size."""
     # TODO - despite the fact that kresd closes TCP connection, it seems to be
     # error in TCP stream parsing. Kresd closes TCP connection because of
     # message length in TCP prefix is lesser then length of the fixed message
