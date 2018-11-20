@@ -51,6 +51,22 @@ def sock_family(request):
     return request.param
 
 
+@pytest.fixture(params=[
+    True,
+    False
+])
+def single_buffer(request):  # whether to send all data in a single buffer
+    return request.param
+
+
+@pytest.fixture(params=[
+    True,
+    False
+])
+def query_before(request):  # whether to send an initial query
+    return request.param
+
+
 def pytest_configure(config):
     # don't let gitlab CI publish sensitive data in pytest html report
     config._metadata = {}  # pylint: disable=protected-access
