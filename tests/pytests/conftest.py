@@ -49,3 +49,15 @@ def kresd_sock(make_kresd_sock):
 ])
 def sock_family(request):
     return request.param
+
+
+@pytest.mark.optionalhook
+def pytest_metadata(metadata):  # filter potentially sensitive data from GitLab CI
+    keys_to_delete = []
+    for key in metadata.keys():
+        key_lower = key.lower()
+        if 'password' in key_lower or 'token' in key_lower or \
+                key_lower.startswith('ci') or key_lower.startswith('gitlab'):
+            keys_to_delete.append(key)
+    for key in keys_to_delete:
+        del metadata[key]
