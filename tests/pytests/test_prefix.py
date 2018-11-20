@@ -35,7 +35,7 @@ def send_incorrect_repeatedly(sock, buff, delay=1):
             time.sleep(delay)
 
 
-def test_less_than_header(kresd_sock):
+def test_prefix_less_than_header(kresd_sock):
     """Prefix is less than the length of the DNS message header."""
     wire, _ = utils.prepare_wire()
     datalen = 11  # DNS header size minus 1
@@ -43,7 +43,7 @@ def test_less_than_header(kresd_sock):
     send_incorrect_repeatedly(kresd_sock, buff)
 
 
-def test_greater_than_message(kresd_sock):
+def test_prefix_greater_than_message(kresd_sock):
     """Prefix is greater than the length of the entire DNS message."""
     wire, _ = utils.prepare_wire()
     datalen = len(wire) + 16
@@ -51,7 +51,7 @@ def test_greater_than_message(kresd_sock):
     send_incorrect_repeatedly(kresd_sock, buff)
 
 
-def test_cuts_message(kresd_sock):
+def test_prefix_cuts_message(kresd_sock):
     """Prefix is greater than the length of the DNS message header, but shorter than
     the entire DNS message."""
     wire, _ = utils.prepare_wire()
@@ -61,7 +61,7 @@ def test_cuts_message(kresd_sock):
     send_incorrect_repeatedly(kresd_sock, buff)
 
 
-def test_cuts_message_after_ok(kresd_sock):
+def test_prefix_cuts_message_after_ok(kresd_sock):
     """First, normal DNS message is sent. Afterwards, message with incorrect prefix
     (greater than header, less than entire message) is sent. First message must be
     answered, then the connection should be closed after timeout."""
@@ -83,8 +83,7 @@ def test_cuts_message_after_ok(kresd_sock):
 
 
 def test_trailing_garbage(kresd_sock):
-    """Prefix is correct, but the message has trailing garbage. The connection must
-    stay open until all message have been sent and answered."""
+    """Send messages with trailing garbage (its length included in prefix)."""
     for _ in range(10):
         wire, msgid = utils.prepare_wire()
         wire += utils.get_garbage(8)
