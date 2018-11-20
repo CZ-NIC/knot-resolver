@@ -294,7 +294,7 @@ pytests:run:
     - echo "See pytests.html or pytests.log.txt for full report."
   artifacts:
     when: always
-    expire_in: 1 week
+    expire_in: 1 hour  # TODO drop commit
     paths:
       - pytests*
   tags:
