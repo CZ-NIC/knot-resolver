@@ -78,13 +78,19 @@ def test_pipelining(kresd_sock):
     assert msg_answer.id == msgid1
 
 
-def test_long_lived(kresd_sock):
+@pytest.mark.parametrize('duration, delay', [
+    (utils.MAX_TIMEOUT, 0.1),
+    (utils.MAX_TIMEOUT, 3),
+    (utils.MAX_TIMEOUT, 8),
+    (utils.MAX_TIMEOUT + 10, 3),
+])
+def test_long_lived(kresd_sock, duration, delay):
     """Establish and keep connection alive for longer than maximum timeout."""
     utils.ping_alive(kresd_sock)
-    end_time = time.time() + utils.MAX_TIMEOUT
+    end_time = time.time() + duration
 
     while time.time() < end_time:
-        time.sleep(3)
+        time.sleep(delay)
         utils.ping_alive(kresd_sock)
 
 
@@ -98,10 +104,6 @@ def test_close(kresd_sock, query_before):
         utils.ping_alive(kresd_sock)
 
 
-@pytest.mark.parametrize('query_before', [
-    True,  # test slow-lorris after sending valid query
-    False  # test slow-lorris right after handshake
-])
 def test_slow_lorris(kresd_sock, query_before):
     """Simulate slow-lorris attack by sending byte after byte with delays in between."""
     if query_before:
@@ -188,22 +190,34 @@ def test_query_flood_no_recv(make_kresd_sock):
     utils.ping_alive(sock2)  # resolver must stay alive
 
 
-def test_query_flood_garbage(make_kresd_sock):
-    """Flood resolver with prefixed garbage of maximum size."""
+@pytest.mark.parametrize('glength, gcount, delay', [
+    (65533, 100, 0.5),
+    (0, 100000, 0.5),
+    (1024, 1000, 0.5),
+    (65533, 1, 0),
+    (0, 1, 0),
+    (1024, 1, 0),
+])
+def test_query_flood_garbage(make_kresd_sock, glength, gcount, delay, query_before):
+    """Flood resolver with prefixed garbage."""
     # TODO - despite the fact that kresd closes TCP connection, it seems to be
     # error in TCP stream parsing. Kresd closes TCP connection because of
     # message length in TCP prefix is lesser then length of the fixed message
     # header, it shouldn't happen.
 
-    gbuff = utils.get_prefixed_garbage(65533)
-    buff = gbuff * 100
-    end_time = time.time() + utils.MAX_TIMEOUT
     sock1 = make_kresd_sock()
+    if query_before:
+        utils.ping_alive(sock1)
+
+    gbuff = utils.get_prefixed_garbage(glength)
+    buff = gbuff * gcount
+
+    end_time = time.time() + utils.MAX_TIMEOUT
 
     with utils.expect_kresd_close(rst_ok=True):  # connection must be closed
         while time.time() < end_time:
             sock1.sendall(buff)
-            time.sleep(0.5)
+            time.sleep(delay)
 
     sock2 = make_kresd_sock()
     utils.ping_alive(sock2)  # resolver must stay alive
