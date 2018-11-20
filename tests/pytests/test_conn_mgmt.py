@@ -9,14 +9,69 @@ import pytest
 import utils
 
 
-def test_ignore_garbage(kresd_sock):
-    """Send chunk of garbage, prefixed by garbage length. It should be ignored."""
-    msg_buff, msgid = utils.get_msgbuff()
-    garbage_buff = utils.get_prefixed_garbage(1024)
-    kresd_sock.sendall(garbage_buff + msg_buff)
+@pytest.fixture(params=[
+    True,
+    False
+])
+def single_buffer(request):  # whether to send all data in a single buffer
+    return request.param
 
-    msg_answer = utils.receive_parse_answer(kresd_sock)
-    assert msg_answer.id == msgid
+
+@pytest.fixture(params=[
+    True,
+    False
+])
+def query_before(request):  # whether to send an initial query
+    return request.param
+
+
+@pytest.mark.parametrize('garbage_lengths', [
+    (None,),   # don't send any
+    (0,),
+    (1,),
+    (1024,),
+    (65533,),  # max size garbage
+    (0, 0),
+    (0, 1),
+    (0, 1024),
+    (0, 65533),
+    (1024, 0),
+    (1024, 1),
+    (1024, 65533),
+    (65533, 0),
+    (65533, 1024),
+    (65533, 65533),
+    (1024, 1024, 1024),
+    (65533, 65533, 65533),
+])
+def test_ignore_garbage(kresd_sock, garbage_lengths, single_buffer, query_before):
+    """Send chunk of garbage, prefixed by garbage length. It should be ignored."""
+    buff = b''
+    if query_before:  # optionally send initial query
+        msg_buff_before, msgid_before = utils.get_msgbuff()
+        if single_buffer:
+            buff += msg_buff_before
+        else:
+            kresd_sock.sendall(msg_buff_before)
+
+    for glength in garbage_lengths:  # prepare garbage data
+        if glength is None:
+            continue
+        garbage_buff = utils.get_prefixed_garbage(glength)
+        if single_buffer:
+            buff += garbage_buff
+        else:
+            kresd_sock.sendall(garbage_buff)
+
+    msg_buff, msgid = utils.get_msgbuff()  # final query
+    buff += msg_buff
+    kresd_sock.sendall(buff)
+
+    if query_before:
+        answer_before = utils.receive_parse_answer(kresd_sock)
+        assert answer_before.id == msgid_before
+    answer = utils.receive_parse_answer(kresd_sock)
+    assert answer.id == msgid
 
 
 def test_pipelining(kresd_sock):
@@ -43,10 +98,6 @@ def test_long_lived(kresd_sock):
         utils.ping_alive(kresd_sock)
 
 
-@pytest.mark.parametrize('query_before', [
-    True,  # test closing idle connection
-    False  # test closing established connection after handshake
-])
 def test_close(kresd_sock, query_before):
     """Establish a connection and wait for timeout from kresd."""
     if query_before:
@@ -76,22 +127,6 @@ def test_slow_lorris(kresd_sock, query_before):
             if time.time() > end_time:
                 break
             time.sleep(1)
-
-
-def test_ignore_jumbo_message(kresd_sock):
-    """Queries bigger than 4096 bytes should be ignored."""
-    buff1, msgid1 = utils.get_msgbuff(msgid=1)
-    gbuff = utils.get_prefixed_garbage(65533)
-    kresd_sock.sendall(buff1 + gbuff)
-
-    answer = utils.receive_parse_answer(kresd_sock)
-    assert answer.id == msgid1
-
-    buff2, msgid2 = utils.get_msgbuff(msgid=2)
-    kresd_sock.sendall(buff2)
-
-    answer = utils.receive_parse_answer(kresd_sock)
-    assert answer.id == msgid2
 
 
 @pytest.mark.parametrize('sock_func_name', [
