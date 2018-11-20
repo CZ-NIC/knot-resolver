@@ -53,7 +53,7 @@ endif
 $(eval $(call make_sbin,kresd,daemon,yes))
 
 # Targets
-date := $(shell date -r NEWS +%F)
+date := $(shell head -n1 < NEWS | sed 's/.*(\(.*\)).*/\1/' | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$$' || date -u -r NEWS +%F)
 daemon: $(kresd) $(kresd_DIST)
 daemon-install: kresd-install bindings-install
 ifneq ($(SED),)
