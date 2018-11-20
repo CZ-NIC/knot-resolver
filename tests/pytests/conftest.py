@@ -49,3 +49,8 @@ def kresd_sock(make_kresd_sock):
 ])
 def sock_family(request):
     return request.param
+
+
+def pytest_configure(config):
+    # don't let gitlab CI publish sensitive data in pytest html report
+    config._metadata = None  # pylint: disable=protected-access
