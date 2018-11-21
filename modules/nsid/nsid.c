@@ -119,4 +119,4 @@ int nsid_deinit(struct kr_module *module) {
 	return kr_ok();
 }
 
-KR_MODULE_EXPORT(nsid);
+KR_MODULE_EXPORT(nsid)

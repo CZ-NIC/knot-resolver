@@ -35,4 +35,4 @@ const kr_layer_api_t *bogus_log_layer(struct kr_module *module)
 	return &_layer;
 }
 
-KR_MODULE_EXPORT(bogus_log);
+KR_MODULE_EXPORT(bogus_log)

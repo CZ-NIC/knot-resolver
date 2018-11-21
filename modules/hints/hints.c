@@ -682,6 +682,6 @@ struct kr_prop *hints_props(void)
 	return prop_list;
 }
 
-KR_MODULE_EXPORT(hints);
+KR_MODULE_EXPORT(hints)
 
 #undef VERBOSE_MSG

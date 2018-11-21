@@ -97,4 +97,4 @@ struct kr_prop *cookies_props(void)
 	return prop_list;
 }
 
-KR_MODULE_EXPORT(cookies);
+KR_MODULE_EXPORT(cookies)

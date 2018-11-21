@@ -136,7 +136,7 @@ As almost all the functions are optional, the minimal module looks like this:
 
 	#include "lib/module.h"
 	/* Convenience macro to declare module API. */
-	KR_MODULE_EXPORT(mymodule);
+	KR_MODULE_EXPORT(mymodule)
 
 
 Let's define an observer thread for the module as well. It's going to be stub for the sake of brevity,
