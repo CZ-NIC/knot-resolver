@@ -473,6 +473,6 @@ struct kr_prop *stats_props(void)
 	return prop_list;
 }
 
-KR_MODULE_EXPORT(stats);
+KR_MODULE_EXPORT(stats)
 
 #undef VERBOSE_MSG

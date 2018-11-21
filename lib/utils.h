@@ -438,7 +438,7 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 	}
 	dst[0] = len;
 	return KNOT_EOK;
-};
+}
 
 /* Trivial non-inline wrappers, to be used in lua. */
 KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
