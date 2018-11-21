@@ -180,7 +180,7 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *gl
 				     "'%s': '%s'\n", name_str, addr_str);
 			return KR_STATE_CONSUME; /* Ignore invalid addresses */
 		}
-		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata);
+		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata->data, rdata->len);
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
@@ -309,7 +309,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 			}
 			continue;
 		}
-		int ret = kr_zonecut_add(cut, ns_name, NULL);
+		int ret = kr_zonecut_add(cut, ns_name, NULL, 0);
 		assert(!ret); (void)ret;
 
 		/* Choose when to use glue records. */
