@@ -81,6 +81,8 @@ const struct kr_module * kr_module_embedded(const char *name)
 /** Load C module symbols. */
 static int load_sym_c(struct kr_module *module, uint32_t api_required)
 {
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wpedantic" /* casts after load_symbol() */
 	/* Check if it's embedded first */
 	const struct kr_module *embedded = kr_module_embedded(module->name);
 	if (embedded) {
@@ -114,6 +116,7 @@ static int load_sym_c(struct kr_module *module, uint32_t api_required)
 	#undef ML
 
 	return kr_ok();
+	#pragma GCC diagnostic pop
 }
 
 int kr_module_load(struct kr_module *module, const char *name, const char *path)
