@@ -599,6 +599,8 @@ static int l_trampoline(lua_State *L)
 			args = lua_tostring(L, 1);
 		}
 	}
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wpedantic" /* void* vs. function pointer */
 	if (callback == module->config) {
 		module->config(module, args);
 	} else {
@@ -616,6 +618,7 @@ static int l_trampoline(lua_State *L)
 		json_delete(root_node);
 		return 1;
 	}
+	#pragma GCC diagnostic pop
 
 	/* No results */
 	return 0;
@@ -912,6 +915,8 @@ void engine_stop(struct engine *engine)
 /** Register module properties in Lua environment, if any. */
 static int register_properties(struct engine *engine, struct kr_module *module)
 {
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wpedantic" /* casts in lua_pushlightuserdata() */
 	if (!module->config && !module->props) {
 		return kr_ok();
 	}
@@ -927,6 +932,7 @@ static int register_properties(struct engine *engine, struct kr_module *module)
 		}
 	}
 	lua_setglobal(engine->L, module->name);
+	#pragma GCC diagnostic pop
 
 	/* Register module in Lua env */
 	lua_getglobal(engine->L, "modules_register");
