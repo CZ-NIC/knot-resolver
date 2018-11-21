@@ -40,7 +40,7 @@
 #endif
 
 /* Defaults */
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "stat",  fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "stat",  __VA_ARGS__)
 #define FREQUENT_PSAMPLE  10 /* Sampling rate, 1 in N */
 #ifdef LRU_REP_SIZE
  #define FREQUENT_COUNT LRU_REP_SIZE /* Size of frequent tables */

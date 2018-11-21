@@ -54,7 +54,7 @@
 #define MAX_PIPELINED 100
 #endif
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "wrkr", fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "wrkr", __VA_ARGS__)
 
 /** Client request state. */
 struct request_ctx

@@ -34,8 +34,8 @@
 #include "lib/layer.h"
 
 /* Defaults */
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "hint",  fmt)
-#define ERR_MSG(fmt, ...) kr_log_error("[     ][hint] " fmt, ## __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "hint",  __VA_ARGS__)
+#define ERR_MSG(...) kr_log_error("[     ][hint] " __VA_ARGS__)
 
 struct hints_data {
 	struct kr_zonecut hints;

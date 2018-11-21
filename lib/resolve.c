@@ -37,7 +37,7 @@
 #define KNOT_EDNS_OPTION_COOKIE 10
 #endif /* defined(ENABLE_COOKIES) */
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "resl",  fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "resl",  __VA_ARGS__)
 
 bool kr_rank_check(uint8_t rank)
 {
