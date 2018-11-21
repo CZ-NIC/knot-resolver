@@ -29,7 +29,7 @@ static void test_zonecut_params(void **state)
 	kr_zonecut_set(NULL, NULL);
 	kr_zonecut_set(&cut, NULL);
 	/* TODO triggerring inner assert:
-	assert_int_not_equal(kr_zonecut_add(NULL, NULL, NULL), 0);
+	assert_int_not_equal(kr_zonecut_add(NULL, NULL, NULL, 0), 0);
 	*/
 	assert_null((void *)kr_zonecut_find(NULL, NULL));
 	assert_null((void *)kr_zonecut_find(&cut, NULL));
@@ -47,8 +47,8 @@ static void test_zonecut_copy(void **state)
 	const knot_dname_t
 		*n_1 = (const uint8_t *)"\4dead",
 		*n_2 = (const uint8_t *)"\3bee\1f";
-	assert_int_equal(kr_zonecut_add(&cut1, n_1, NULL), 0);
-	assert_int_equal(kr_zonecut_add(&cut1, n_2, NULL), 0);
+	assert_int_equal(kr_zonecut_add(&cut1, n_1, NULL, 0), 0);
+	assert_int_equal(kr_zonecut_add(&cut1, n_2, NULL, 0), 0);
 	/* Copy */
 	assert_int_equal(kr_zonecut_copy(&cut2, &cut1), 0);
 	/* Check if exist */

@@ -182,9 +182,6 @@ typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
 typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 /* @endcond */
 
-/** @internal RDATA array maximum size. */
-#define RDATA_ARR_MAX (UINT16_MAX + sizeof(uint64_t))
-
 /** Concatenate N strings. */
 KR_EXPORT
 char* kr_strcatdup(unsigned n, ...);

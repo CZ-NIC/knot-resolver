@@ -158,11 +158,8 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
 	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
 		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
-		size_t addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
-		/* @warning _NOT_ thread-safe */
-		static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
-		knot_rdata_init(rdata_arr, addr_len, (const uint8_t *)addr);
-		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata_arr);
+		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
+		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
 	} else {
 		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
 	}
