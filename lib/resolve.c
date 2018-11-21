@@ -1031,7 +1031,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
-	const knot_dname_t *wanted_name = qry->sname;
 	const knot_dname_t *start_name = qry->sname;
 	if ((qry->flags.AWAIT_CUT) && !resume) {
 		qry->flags.AWAIT_CUT = false;
@@ -1059,18 +1058,13 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_DONE;
 	}
 
-	bool nods = false;
-	bool ds_req = false;
-	bool ns_req = false;
-	bool ns_exist = true;
-	bool minimized = false;
 	int name_offset = 1;
+	const knot_dname_t *wanted_name;
+	bool nods, ds_req, ns_req, minimized, ns_exist;
 	do {
 		wanted_name = start_name;
-		nods = false;
 		ds_req = false;
 		ns_req = false;
-		minimized = false;
 		ns_exist = true;
 
 		int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
@@ -1089,11 +1083,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			    knot_dname_is_equal(q->sname, wanted_name)) {
 				if (q->stype == KNOT_RRTYPE_DS) {
 					ds_req = true;
-					if (q->flags.DNSSEC_NODS) {
-						nods = true;
-					}
 					if (q->flags.CNAME) {
-						nods = true;
 						ns_exist = false;
 					} else if (!(q->flags.DNSSEC_OPTOUT)) {
 						int ret = kr_dnssec_matches_name_and_type(&request->auth_selected, q->uid,
@@ -1102,7 +1092,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 					}
 				} else {
 					if (q->flags.CNAME) {
-						nods = true;
 						ns_exist = false;
 					}
 					ns_req = true;
@@ -1124,6 +1113,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			return KR_STATE_PRODUCE;
 		}
 
+		/* set `nods` */
 		if ((qry->stype == KNOT_RRTYPE_DS) &&
 	            knot_dname_is_equal(wanted_name, qry->sname)) {
 			nods = true;

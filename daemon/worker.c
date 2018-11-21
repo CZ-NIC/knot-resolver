@@ -300,10 +300,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {
 		ctx->source.addr.ip.sa_family = AF_UNSPEC;
 	} else {
-		size_t addr_len = sizeof(struct sockaddr_in);
-		if (addr->sa_family == AF_INET6)
-			addr_len = sizeof(struct sockaddr_in6);
-		memcpy(&ctx->source.addr.ip, addr, addr_len);
+		memcpy(&ctx->source.addr, addr, kr_sockaddr_len(addr));
 		ctx->req.qsource.addr = &ctx->source.addr.ip;
 	}
 
@@ -1313,7 +1310,7 @@ static int tcp_task_step(struct qr_task *task,
 		subreq_finalize(task, packet_source, packet);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
-	int ret = kr_error(EINVAL);
+	int ret;
 	struct session* session = NULL;
 	if ((session = worker_find_tcp_waiting(ctx->worker, addr)) != NULL) {
 		/* Connection is in the list of waiting connections.
