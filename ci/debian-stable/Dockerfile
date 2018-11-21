@@ -25,6 +25,8 @@ RUN pip3 install --upgrade pip
 RUN pip3 install pylint
 RUN pip3 install pep8
 RUN pip3 install pytest-xdist
+# tests/pytest dependencies
+RUN pip3 install dnspython jinja2 pytest pytest-html pytest-xdist
 
 # C dependencies for python-augeas
 RUN apt-get install -y -qqq libaugeas-dev libffi-dev
