@@ -49,7 +49,7 @@
 struct async_write_ctx {
 	uv_write_t write_req;
 	struct tls_common_ctx *t;
-	char buf[0];
+	char buf[];
 };
 
 static char const server_logstring[] = "tls";
@@ -731,7 +731,7 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 
 static int client_paramlist_entry_free(struct tls_client_paramlist_entry *entry)
 {
-	DEBUG_MSG("freeing TLS parameters %p\n", entry);
+	DEBUG_MSG("freeing TLS parameters %p\n", (void *)entry);
 
 	while (entry->ca_files.len > 0) {
 		if (entry->ca_files.at[0] != NULL) {

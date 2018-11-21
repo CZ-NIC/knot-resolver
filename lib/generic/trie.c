@@ -129,7 +129,7 @@ static inline void empty_root(node_t *root) {
 static void assert_portability(void) {
 #if FLAGS_HACK
 	assert(((union node){ .leaf = {
-			.key = ((void *)NULL) + 1,
+			.key = (tkey_t *)(((uint8_t *)NULL) + 1),
 			.val = NULL
 		} }).branch.flags == 1);
 #endif
