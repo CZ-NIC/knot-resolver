@@ -41,9 +41,9 @@
 
 /** @internal Debugging facility. */
 #ifdef DEBUG
-#define DEBUG_MSG(fmt...) kr_log_verbose("[tls] " fmt)
+#define DEBUG_MSG(...) kr_log_verbose("[tls] " __VA_ARGS__)
 #else
-#define DEBUG_MSG(fmt...)
+#define DEBUG_MSG(...)
 #endif
 
 struct async_write_ctx {

@@ -36,7 +36,7 @@
 #include "lib/defines.h"
 #include "lib/module.h"
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "vldr", fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "vldr", __VA_ARGS__)
 
 #define MAX_REVALIDATION_CNT 2
 

@@ -33,7 +33,7 @@
 #include "lib/rplan.h"
 #include "modules/cookies/cookiemonster.h"
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "cookies",  fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "cookies", __VA_ARGS__)
 
 /**
  * Obtain address from query/response context if if can be obtained.

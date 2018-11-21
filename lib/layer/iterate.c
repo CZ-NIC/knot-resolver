@@ -44,8 +44,8 @@
 #include "lib/module.h"
 #include "lib/dnssec/ta.h"
 
-#define VERBOSE_MSG(fmt...) QRVERBOSE(req->current_query, "iter", fmt)
-#define QVERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "iter", fmt)
+#define VERBOSE_MSG(...) QRVERBOSE(req->current_query, "iter", __VA_ARGS__)
+#define QVERBOSE_MSG(qry, ...) QRVERBOSE(qry, "iter", __VA_ARGS__)
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
