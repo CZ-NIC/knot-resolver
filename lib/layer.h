@@ -21,20 +21,23 @@
 
 #ifndef NOVERBOSELOG
  /** @internal Print a debug message related to resolution. */
- #define QRVERBOSE(query, cls, fmt, ...) { \
-    const struct kr_query *q = (query); \
-    if (kr_log_trace_enabled(q)) { \
-        kr_log_trace(q, cls, fmt, ##  __VA_ARGS__); \
-    } else WITH_VERBOSE(q) { \
-        unsigned _ind = 0; \
-        uint32_t _q_uid = q ? q->uid : 0; \
-        uint32_t _req_uid = q && q->request ? q->request->uid : 0; \
-        for (; q; q = q->parent, _ind += 2); \
-        kr_log_verbose("[%05u.%02u][%s] %*s" fmt, _req_uid, _q_uid, cls, _ind, "", ##  __VA_ARGS__); \
-    } \
+ #define QRVERBOSE(query, cls, ...) { \
+	const struct kr_query *q = (query); \
+	if (kr_log_trace_enabled(q)) { \
+		kr_log_trace(q, cls,  __VA_ARGS__); \
+	} else if (VERBOSE_STATUS) { \
+		unsigned _ind = 0; \
+		uint32_t _q_uid = q ? q->uid : 0; \
+		uint32_t _req_uid = q && q->request ? q->request->uid : 0; \
+		for (; q; q = q->parent, _ind += 2); \
+		/* simplified kr_log_verbose() calls */ \
+		printf("[%05u.%02u][%s] %*s", _req_uid, _q_uid, cls, _ind, ""); \
+		printf(__VA_ARGS__); \
+		fflush(stdout); \
+	} \
 }
 #else
- #define QRVERBOSE(query, cls, fmt, ...)
+ #define QRVERBOSE(query, cls, ...)
 #endif
 
 /** Layer processing states.  Only one value at a time (but see TODO).
