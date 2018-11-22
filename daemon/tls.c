@@ -812,7 +812,7 @@ struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_para
 	}
 
 	/* Rewrite 053 -> 853 */
-	strcpy(key + keylen - 3, "853");
+	memcpy(key + keylen - 4, "853", 3);
 
 	return map_get(tls_client_paramlist, key);
 }

@@ -8,7 +8,6 @@ local C = ffi.C
 local M = {}
 M.layer = {}
 local base32 = {}
-local base64 = {}
 local str = {}
 local AF_INET = 2
 local AF_INET6 = 10
@@ -93,14 +92,14 @@ function M.layer.consume(state, _, pkt)
 						if name == name_add then
               local addrbuf
 							if rr_add.type == kres.type.A then
-								ns_addr = ffi.new("struct sockaddr_in")
+								local ns_addr = ffi.new("struct sockaddr_in")
 								ns_addr.sin_family = AF_INET
 
 								ns_addr.sin_addr.s_addr = rr_add.rdata
 								addrbuf = ffi.new("char[?]", INET_ADDRSTRLEN)
 								C.inet_ntop(AF_INET, ns_addr.sin_addr, addrbuf, INET_ADDRSTRLEN)
 							else
-								ns_addr = ffi.new("struct sockaddr_in6")
+								local ns_addr = ffi.new("struct sockaddr_in6")
 								ns_addr.sin6_family = AF_INET6
 
 								ns_addr.sin6_addr.s6_addr = rr_add.rdata
