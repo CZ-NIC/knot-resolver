@@ -258,6 +258,8 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir) {
 
 	/* Use module path for including Lua scripts */
 	char l_paths[MAXPATHLEN] = { 0 };
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wformat" /* %1$ is not in C standard */
 	/* Save original package.path to package._path */
 	snprintf(l_paths, MAXPATHLEN - 1,
 		 "if package._path == nil then package._path = package.path end\n"
@@ -265,6 +267,7 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir) {
 		 "if package._cpath == nil then package._cpath = package.cpath end\n"
 		 "package.cpath = '%1$s/?%2$s;'..package._cpath\n",
 		 new_moduledir, LIBEXT);
+	#pragma GCC diagnostic pop
 
 	int ret = l_dobytecode(engine->L, l_paths, strlen(l_paths), "");
 	if (ret != 0) {
