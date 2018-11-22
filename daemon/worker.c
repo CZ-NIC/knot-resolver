@@ -1402,19 +1402,20 @@ static int qr_task_step(struct qr_task *task,
 	}
 
 	/* Upgrade to TLS if the upstream address is configured as DoT capable. */
-	struct engine *engine = ctx->worker->engine;
-	struct network *net = &engine->net;
-	const struct sockaddr *addr = packet_source ? packet_source : task->addrlist;
-	struct tls_client_paramlist_entry *tls_entry = NULL;
-	if (kr_inaddr_port(task->addrlist) == KR_DNS_PORT) {
-		tls_entry = tls_client_try_upgrade(&net->tls_client_params, task->addrlist);
+	if (task->addrlist_count > 0 && kr_inaddr_port(task->addrlist) == KR_DNS_PORT) {
+		/* TODO if there are multiple addresses (task->addrlist_count > 1)
+		 * check all of them. */
+		struct engine *engine = worker->engine;
+		struct network *net = &engine->net;
+		struct tls_client_paramlist_entry *tls_entry =
+			tls_client_try_upgrade(&net->tls_client_params, task->addrlist);
 		if (tls_entry != NULL) {
 			kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
+			packet_source = NULL;
 			sock_type = SOCK_STREAM;
+			/* TODO in this case in tcp_task_make_connection() will be performed
+			 * redundant map_get() call. */
 		}
-	} else if (sock_type == SOCK_STREAM) {
-		const char *key = tcpsess_key(addr);
-		tls_entry = map_get(&net->tls_client_params, key);
 	}
 
 	int ret = 0;
