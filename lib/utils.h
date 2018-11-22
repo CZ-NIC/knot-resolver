@@ -59,7 +59,9 @@ void kr_log_verbose(const char *fmt, ...);
 /**
  * @brief Return true if the query has request log handler installed.
  */
-#define kr_log_trace_enabled(query) ((query) && (query)->request && (query)->request->trace_log)
+#define kr_log_trace_enabled(query) (__builtin_expect( \
+	(query) && (query)->request && (query)->request->trace_log, \
+	false))
 
 /**
  * Log a message through the request log handler.
