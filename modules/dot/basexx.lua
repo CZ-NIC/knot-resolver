@@ -2,8 +2,7 @@
 -- util functions
 --------------------------------------------------------------------------------
 
-local function divide_string( str, max, fillChar )
-   fillChar = fillChar or ""
+local function divide_string( str, max )
    local result = {}
 
    local start = 1
@@ -77,7 +76,7 @@ function basexx.to_bit( str )
    return ( str:gsub( '.', function ( c )
                local byte = string.byte( c )
                local bits = {}
-               for i = 1,8 do
+               for _ = 1,8 do
                   table.insert( bits, byte % 2 )
                   byte = math.floor( byte / 2 )
                end
@@ -132,7 +131,7 @@ local function to_basexx( str, alphabet, bits, pad )
 
    local chunks = divide_string( bitString, bits )
    local result = {}
-   for key,value in ipairs( chunks ) do
+   for _,value in ipairs( chunks ) do
       if ( #value < bits ) then
          value = value .. string.rep( '0', bits - #value )
       end
@@ -141,7 +140,7 @@ local function to_basexx( str, alphabet, bits, pad )
    end
 
    table.insert( result, pad )
-   return table.concat( result )   
+   return table.concat( result )
 end
 
 --------------------------------------------------------------------------------
@@ -186,7 +185,7 @@ local base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"..
                        "abcdefghijklmnopqrstuvwxyz"..
                        "0123456789+/"
 local base64PadMap = { "", "==", "=" }
- 
+
 function basexx.from_base64( str, ignore )
    str = ignore_set( str, ignore )
    return from_basexx( str, base64Alphabet, 6 )
@@ -203,7 +202,7 @@ end
 local url64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"..
                       "abcdefghijklmnopqrstuvwxyz"..
                       "0123456789-_"
- 
+
 function basexx.from_url64( str, ignore )
    str = ignore_set( str, ignore )
    return from_basexx( str, url64Alphabet, 6 )
@@ -222,16 +221,16 @@ local function length_error( len, d )
 end
 
 local z85Decoder = { 0x00, 0x44, 0x00, 0x54, 0x53, 0x52, 0x48, 0x00,
-                     0x4B, 0x4C, 0x46, 0x41, 0x00, 0x3F, 0x3E, 0x45, 
-                     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 
-                     0x08, 0x09, 0x40, 0x00, 0x49, 0x42, 0x4A, 0x47, 
-                     0x51, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 
-                     0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 
-                     0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 
-                     0x3B, 0x3C, 0x3D, 0x4D, 0x00, 0x4E, 0x43, 0x00, 
-                     0x00, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 
-                     0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 
-                     0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 
+                     0x4B, 0x4C, 0x46, 0x41, 0x00, 0x3F, 0x3E, 0x45,
+                     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                     0x08, 0x09, 0x40, 0x00, 0x49, 0x42, 0x4A, 0x47,
+                     0x51, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A,
+                     0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32,
+                     0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A,
+                     0x3B, 0x3C, 0x3D, 0x4D, 0x00, 0x4E, 0x43, 0x00,
+                     0x00, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+                     0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+                     0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20,
                      0x21, 0x22, 0x23, 0x4F, 0x00, 0x50, 0x00, 0x00 }
 
 function basexx.from_z85( str, ignore )
