@@ -133,6 +133,23 @@ void kr_log_verbose(const char *fmt, ...)
 	}
 }
 
+void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...)
+{
+	unsigned ind = 0;
+	for (const struct kr_query *q = qry; q; q = q->parent)
+		ind += 2;
+	uint32_t qry_uid = qry ? qry->uid : 0;
+	uint32_t req_uid = qry && qry->request ? qry->request->uid : 0;
+	/* Simplified kr_log_verbose() calls, first prefix then passed fmt...
+	 * Calling it would take about the same amount of code. */
+	printf("[%05u.%02u][%s] %*s", req_uid, qry_uid, cls, ind, "");
+	va_list args;
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	va_end(args);
+	fflush(stdout);
+}
+
 bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...)
 {
 	if (!kr_log_trace_enabled(query)) {

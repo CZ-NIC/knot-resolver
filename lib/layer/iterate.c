@@ -690,7 +690,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		const knot_pktsection_t *ans = knot_pkt_section(pkt, KNOT_ANSWER);
 		if ((pkt_class & (PKT_NOERROR)) && ans->count > 0 &&
 		     knot_dname_is_equal(pkt_qname, query->zone_cut.name)) {
-			VERBOSE_MSG("<= continuing with qname minimization\n")
+			VERBOSE_MSG("<= continuing with qname minimization\n");
 		} else {
 			/* fall back to disabling minimization */
 			VERBOSE_MSG("<= retrying with non-minimized name\n");
