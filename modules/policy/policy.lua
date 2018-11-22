@@ -82,7 +82,8 @@ end
 -- Override the list of nameservers (forwarders)
 local function set_nslist(qry, list)
 	for i, ns in ipairs(list) do
-		assert(ffi.C.kr_nsrep_set(qry, i - 1, ns) == 0);
+		-- kr_nsrep_set() can return kr_error(ENOENT), it's OK
+		ffi.C.kr_nsrep_set(qry, i - 1, ns)
 	end
 	-- If less than maximum NSs, insert guard to terminate the list
 	if #list < 4 then
