@@ -56,6 +56,10 @@ KR_EXPORT bool kr_verbose_set(bool status);
 KR_EXPORT KR_PRINTF(1)
 void kr_log_verbose(const char *fmt, ...);
 
+/** Utility for QRVERBOSE - use that instead. */
+KR_EXPORT KR_PRINTF(3)
+void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...);
+
 /**
  * @brief Return true if the query has request log handler installed.
  */
