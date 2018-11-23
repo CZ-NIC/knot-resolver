@@ -25,10 +25,11 @@ build:linux:amd64:
     - master
   script:
     - rm daemon/lua/kres-gen.lua
-    - make -k all CFLAGS="-Werror -ggdb"
+    - export CFLAGS="-Werror -Wall -Wpedantic -ggdb -std=gnu11"
+    - make -k all
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
-    - make install CFLAGS="-Werror -ggdb"
+    - make install
   artifacts:
     untracked: true
   tags:
