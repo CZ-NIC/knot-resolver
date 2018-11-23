@@ -340,7 +340,8 @@ pytests:extended:
       -p $RESPDIFF_PRIORITY
       -c $RESPDIFF_COUNT
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST)
+      "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST
+      --respdiff-stats /var/tmp/respdiff-jobs/ref_current/*_${RESPDIFF_TEST}_stats.json)
     - for f in $TESTDIR/*.json; do test -s "$f" || (cat $TESTDIR/*stderr*; exit 1); done
     - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
   after_script:
