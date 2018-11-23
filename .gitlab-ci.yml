@@ -52,6 +52,19 @@ build:clang:linux:amd64:
     - linux
     - amd64
 
+lint:pedantic-gcc:
+  stage: build  # TODO: later so it doesn't block the test stage?  (or allow_failure?)
+  dependencies: []  # do not download build artifacts
+  except:
+    - master
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer gcc
+  script:
+    - make -k all CFLAGS="-Werror -Wall -Wpedantic -ggdb -std=gnu11"
+  tags:
+    - docker
+    - linux
+    - amd64
+
 srpm:
   stage: build
   except:
