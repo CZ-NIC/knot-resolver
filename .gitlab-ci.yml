@@ -52,14 +52,19 @@ build:clang:linux:amd64:
     - linux
     - amd64
 
-lint:pedantic-gcc:
+lint:pedantic:
   stage: build  # TODO: later so it doesn't block the test stage?  (or allow_failure?)
   dependencies: []  # do not download build artifacts
   except:
     - master
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer gcc
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer compilers
   script:
-    - make -k all CFLAGS="-Werror -Wall -Wpedantic -ggdb -std=gnu11"
+    - FLAGS="-Werror -Wall -Wpedantic -ggdb -std=gnu11"
+    - make -k all "CFLAGS=$FLAGS"
+    - make clean
+    - make -k all CC=clang CXX=clang++ \
+        CFLAGS="$FLAGS "-Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant"
+
   tags:
     - docker
     - linux
