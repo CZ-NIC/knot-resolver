@@ -12,6 +12,7 @@ backup=('etc/knot-resolver/kresd.conf')
 options=(debug strip)
 install=install
 depends=('cmocka'
+         'dnssec-anchors'
          'gnutls'
          'knot>=2.7.2'
          'libedit'
@@ -23,7 +24,7 @@ depends=('cmocka'
          'luajit')
 source=("knot-resolver_${pkgver}.orig.tar.xz")
 
-_makevars="PREFIX=/usr SBINDIR=/usr/bin LIBDIR=/usr/lib INCLUDEDIR=/usr/include ETCDIR=/etc/knot-resolver V=1"
+_makevars="PREFIX=/usr SBINDIR=/usr/bin LIBDIR=/usr/lib INCLUDEDIR=/usr/include ETCDIR=/etc/knot-resolver KEYFILE_DEFAULT=/etc/trusted-key.key V=1"
 
 sha256sums=('SKIP')
 
@@ -51,6 +52,5 @@ package() {
 	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/systemd/kresd.systemd.7" "${pkgdir}/usr/share/man/man7/kresd.systemd.7"
 	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/tmpfiles/knot-resolver.conf" "${pkgdir}/usr/lib/tmpfiles.d/knot-resolver.conf"
 	install -dm 0775 "${pkgdir}/etc/knot-resolver"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/kresd.conf" "${pkgdir}/etc/knot-resolver/kresd.conf"
-	install -Dm 0664 "${srcdir}/${pkgname}-${pkgver}/distro/common/root.keys" "${pkgdir}/etc/knot-resolver/root.keys"
+	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/kresd.no_ta.conf" "${pkgdir}/etc/knot-resolver/kresd.conf"
 }
