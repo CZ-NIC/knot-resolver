@@ -3,7 +3,7 @@
 	url = https://gitlab.labs.nic.cz/knot/deckard.git
 [submodule "modules/policy/lua-aho-corasick"]
 	path = modules/policy/lua-aho-corasick
-	url = https://github.com/cloudflare/lua-aho-corasick.git
+	url = https://github.com/vcunat/lua-aho-corasick.git # FIXME?
 [submodule "tests/config/tapered"]
 	path = tests/config/tapered
 	url = https://github.com/telemachus/tapered.git
