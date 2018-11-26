@@ -1294,8 +1294,7 @@ static int tcp_task_step(struct qr_task *task,
 	}
 	/* Checkout task before connecting */
 	struct request_ctx *ctx = task->ctx;
-	if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)addr,
-				SOCK_STREAM, task->pktbuf) != 0) {
+	if (kr_resolve_checkout(&ctx->req, NULL, addr, SOCK_STREAM, task->pktbuf) != 0) {
 		subreq_finalize(task, packet_source, packet);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
