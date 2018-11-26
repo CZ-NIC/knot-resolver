@@ -1517,7 +1517,7 @@ static bool outbound_request_update_cookies(struct kr_request *req,
 }
 #endif /* defined(ENABLE_COOKIES) */
 
-int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
+int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
                         struct sockaddr *dst, int type, knot_pkt_t *packet)
 {
 	/* @todo: Update documentation if this function becomes approved. */

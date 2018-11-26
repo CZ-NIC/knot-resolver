@@ -298,7 +298,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
  * @return         kr_ok() or error code
  */
 KR_EXPORT
-int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
+int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
                         struct sockaddr *dst, int type, knot_pkt_t *packet);
 
 /**
