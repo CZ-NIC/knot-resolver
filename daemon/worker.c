@@ -713,8 +713,19 @@ static int session_tls_hs_cb(struct session *session, int status)
 		}
 	}
 
-	ret = worker_add_tcp_connected(worker, peer, session);
-	if (deletion_res == kr_ok() && ret == kr_ok()) {
+	ret = kr_ok();
+	if (deletion_res == kr_ok()) {
+		/* peer was in the waiting list, add to the connected list. */
+		ret = worker_add_tcp_connected(worker, peer, session);
+	} else {
+		/* peer wasn't in the waiting list.
+		 * In this case it must be successful rehandshake.
+		 * Peer must be already in the connected list. */
+		const char *key = tcpsess_key(peer);
+		assert(key);
+		assert(map_contains(&worker->tcp_connected, key) != 0);
+	}
+	if (ret == kr_ok()) {
 		while (!session_waitinglist_is_empty(session)) {
 			struct qr_task *t = session_waitinglist_get(session);
 			ret = qr_task_send(t, session, NULL, NULL);
