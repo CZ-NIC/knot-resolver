@@ -575,7 +575,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 
 	int ret = 0;
 	struct request_ctx *ctx = task->ctx;
-	struct kr_request *req = &ctx->req;
 
 	uv_handle_t *handle = session_get_handle(session);
 	assert(handle && handle->data == session);
@@ -603,27 +602,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			return kr_error(ENOENT);
 		}
 		worker_task_pkt_set_msgid(task, msg_id);
-	}
-
-	if (knot_wire_get_qr(pkt->wire) == 0) {
-		/*
-		 * Query must be finalised using destination address before
-		 * sending.
-		 *
-		 * Libuv does not offer a convenient way how to obtain a source
-		 * IP address from a UDP handle that has been initialised using
-		 * uv_udp_init(). The uv_udp_getsockname() fails because of the
-		 * lazy socket initialisation.
-		 *
-		 * @note -- A solution might be opening a separate socket and
-		 * trying to obtain the IP address from it.
-		 */
-		ret = kr_resolve_checkout(req, NULL, addr,
-		                          is_stream ? SOCK_STREAM : SOCK_DGRAM,
-		                          pkt);
-		if (ret != 0) {
-			return ret;
-		}
 	}
 
 	uv_handle_t *ioreq = malloc(is_stream ? sizeof(uv_write_t) : sizeof(uv_udp_send_t));
@@ -947,7 +925,12 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		if (task->pending_count >= MAX_PENDING) {
 			return ret;
 		}
-		ret = ioreq_spawn(task->ctx->worker, SOCK_DGRAM, choice->sin6_family);
+		/* Checkout answer before sending it */
+		struct request_ctx *ctx = task->ctx;
+		if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)choice, SOCK_DGRAM, task->pktbuf) != 0) {
+			return ret;
+		}
+		ret = ioreq_spawn(ctx->worker, SOCK_DGRAM, choice->sin6_family);
 		if (!ret) {
 			return ret;
 		}
@@ -1299,7 +1282,6 @@ static int tcp_task_step(struct qr_task *task,
 			 const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
 	assert(task->pending_count == 0);
-	struct request_ctx *ctx = task->ctx;
 
 	const struct sockaddr *addr =
 		packet_source ? packet_source : task->addrlist;
@@ -1307,6 +1289,13 @@ static int tcp_task_step(struct qr_task *task,
 		/* Target isn't defined. Finalize task with SERVFAIL.
 		 * Although task->pending_count is zero, there are can be followers,
 		 * so we need to call subreq_finalize() to handle them properly. */
+		subreq_finalize(task, packet_source, packet);
+		return qr_task_finalize(task, KR_STATE_FAIL);
+	}
+	/* Checkout task before connecting */
+	struct request_ctx *ctx = task->ctx;
+	if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)addr,
+				SOCK_STREAM, task->pktbuf) != 0) {
 		subreq_finalize(task, packet_source, packet);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
