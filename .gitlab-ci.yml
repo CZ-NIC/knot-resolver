@@ -92,14 +92,14 @@ lint:c:
     - docker
 
 lint:clang-scan-build:
-  allow_failure: true  # for now it is just informative
   stage: test
   except:
     - master
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
-    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
+    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make || true
+    - test "$(ls scan-results/*/report-*.html | wc -l)" = 7 # we have this many errors ATM :-)
   artifacts:
     when: on_failure
     expire_in: '1 day'
