@@ -23,7 +23,7 @@
 #include "lib/defines.h"
 #include "lib/layer.h"
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "plan",  fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "plan",  __VA_ARGS__)
 #define QUERY_PROVIDES(q, name, cls, type) \
     ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 

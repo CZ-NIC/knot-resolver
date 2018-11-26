@@ -118,7 +118,7 @@
  * === Basic logging functions (see <<log:,Logging>> and <ucw/log.h> for more)
  ***/
 
-#define DBG(x,y...) do { } while(0)
+#define DBG(x, ...) do { } while(0)
 #define DBG_SPOT do { } while(0)
 #define ASSERT(x)
 

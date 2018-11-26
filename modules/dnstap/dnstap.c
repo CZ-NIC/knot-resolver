@@ -378,5 +378,5 @@ const kr_layer_api_t *dnstap_layer(struct kr_module *module) {
 	return &_layer;
 }
 
-KR_MODULE_EXPORT(dnstap);
+KR_MODULE_EXPORT(dnstap)
 

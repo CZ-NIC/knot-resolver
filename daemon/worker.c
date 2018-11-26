@@ -54,7 +54,7 @@
 #define MAX_PIPELINED 100
 #endif
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "wrkr", fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "wrkr", __VA_ARGS__)
 
 /** Client request state. */
 struct request_ctx
@@ -1717,7 +1717,7 @@ int worker_task_finalize(struct qr_task *task, int state)
 
 void worker_task_complete(struct qr_task *task)
 {
-	return qr_task_complete(task);
+	qr_task_complete(task);
 }
 
 void worker_task_ref(struct qr_task *task)

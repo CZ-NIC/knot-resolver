@@ -44,8 +44,8 @@
 #include "lib/module.h"
 #include "lib/dnssec/ta.h"
 
-#define VERBOSE_MSG(fmt...) QRVERBOSE(req->current_query, "iter", fmt)
-#define QVERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "iter", fmt)
+#define VERBOSE_MSG(...) QRVERBOSE(req->current_query, "iter", __VA_ARGS__)
+#define QVERBOSE_MSG(qry, ...) QRVERBOSE(qry, "iter", __VA_ARGS__)
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
@@ -180,7 +180,7 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *gl
 				     "'%s': '%s'\n", name_str, addr_str);
 			return KR_STATE_CONSUME; /* Ignore invalid addresses */
 		}
-		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata);
+		int ret = kr_zonecut_add(&query->zone_cut, rr->owner, rdata->data, rdata->len);
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
@@ -309,7 +309,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 			}
 			continue;
 		}
-		int ret = kr_zonecut_add(cut, ns_name, NULL);
+		int ret = kr_zonecut_add(cut, ns_name, NULL, 0);
 		assert(!ret); (void)ret;
 
 		/* Choose when to use glue records. */
@@ -690,7 +690,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		const knot_pktsection_t *ans = knot_pkt_section(pkt, KNOT_ANSWER);
 		if ((pkt_class & (PKT_NOERROR)) && ans->count > 0 &&
 		     knot_dname_is_equal(pkt_qname, query->zone_cut.name)) {
-			VERBOSE_MSG("<= continuing with qname minimization\n")
+			VERBOSE_MSG("<= continuing with qname minimization\n");
 		} else {
 			/* fall back to disabling minimization */
 			VERBOSE_MSG("<= retrying with non-minimized name\n");

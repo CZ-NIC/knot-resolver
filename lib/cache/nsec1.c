@@ -256,7 +256,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	};
 	assert((ssize_t)(kwz_sname.len) >= 0);
 	bool covers = /* we know for sure that the low end is before kwz_sname */
-		3 == kwz_between((knot_db_val_t){}, kwz_sname, kwz_hi);
+		3 == kwz_between((knot_db_val_t){ NULL, 0 }, kwz_sname, kwz_hi);
 	if (!covers) {
 		return "range search miss (!covers)";
 	}

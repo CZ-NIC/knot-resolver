@@ -18,6 +18,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+/* FIXME: migrate to Knot DNS version of mempools. */
+#pragma GCC diagnostic ignored "-Wpointer-arith"
+
 #define MP_CHUNK_TAIL ALIGN_TO(sizeof(struct mempool_chunk), CPU_STRUCT_ALIGN)
 #define MP_SIZE_MAX (SIZE_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
 

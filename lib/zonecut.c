@@ -27,7 +27,7 @@
 #include <libknot/packet/wire.h>
 #include <libknot/rrtype/rdname.h>
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "zcut", fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "zcut", __VA_ARGS__)
 
 /** Information for one NS name + address type. */
 typedef enum {
@@ -174,15 +174,15 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
 	return kr_ok();
 }
 
-int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
+int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const void *data, int len)
 {
-	if (!cut || !ns || !cut->nsset) {
+	if (!cut || !ns || !cut->nsset || (data && len <= 0)) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 	/* Disabled; add_reverse_pair() misuses this for domain name in rdata. */
-	if (false && rdata && rdata->len != sizeof(struct in_addr)
-		  && rdata->len != sizeof(struct in6_addr)) {
+	if (false && data && len != sizeof(struct in_addr)
+		  && len != sizeof(struct in6_addr)) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
@@ -196,24 +196,24 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 		pack_init(**pack);
 	}
 	/* Insert data (if has any) */
-	if (rdata == NULL) {
+	if (data == NULL) {
 		return kr_ok();
 	}
 	/* Check for duplicates */
-	if (pack_obj_find(*pack, rdata->data, rdata->len)) {
+	if (pack_obj_find(*pack, data, len)) {
 		return kr_ok();
 	}
 	/* Push new address */
-	int ret = pack_reserve_mm(**pack, 1, rdata->len, kr_memreserve, cut->pool);
+	int ret = pack_reserve_mm(**pack, 1, len, kr_memreserve, cut->pool);
 	if (ret != 0) {
 		return kr_error(ENOMEM);
 	}
-	return pack_obj_push(*pack, rdata->data, rdata->len);
+	return pack_obj_push(*pack, data, len);
 }
 
-int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata)
+int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const void *data, int len)
 {
-	if (!cut || !ns) {
+	if (!cut || !ns || (data && len <= 0)) {
 		return kr_error(EINVAL);
 	}
 
@@ -224,8 +224,8 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rd
 		return kr_error(ENOENT);
 	}
 	/* Remove address from the pack. */
-	if (rdata) {
-		ret = pack_obj_del(pack, rdata->data, rdata->len);
+	if (data) {
+		ret = pack_obj_del(pack, data, len);
 	}
 	/* No servers left, remove NS from the set. */
 	if (pack->len == 0) {

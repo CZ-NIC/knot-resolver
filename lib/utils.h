@@ -42,8 +42,8 @@ typedef void (*trace_callback_f)(struct kr_request *request);
 /** @brief Callback for request logging handler. */
 typedef void (*trace_log_f)(const struct kr_query *query, const char *source, const char *msg);
 
-#define kr_log_info(fmt, ...) do { printf((fmt), ## __VA_ARGS__); fflush(stdout); } while(0)
-#define kr_log_error(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__)
+#define kr_log_info(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */
@@ -56,10 +56,16 @@ KR_EXPORT bool kr_verbose_set(bool status);
 KR_EXPORT KR_PRINTF(1)
 void kr_log_verbose(const char *fmt, ...);
 
+/** Utility for QRVERBOSE - use that instead. */
+KR_EXPORT KR_PRINTF(3)
+void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...);
+
 /**
  * @brief Return true if the query has request log handler installed.
  */
-#define kr_log_trace_enabled(query) ((query) && (query)->request && (query)->request->trace_log)
+#define kr_log_trace_enabled(query) (__builtin_expect( \
+	(query) && (query)->request && (query)->request->trace_log, \
+	false))
 
 /**
  * Log a message through the request log handler.
@@ -167,9 +173,6 @@ typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
  */
 typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 /* @endcond */
-
-/** @internal RDATA array maximum size. */
-#define RDATA_ARR_MAX (UINT16_MAX + sizeof(uint64_t))
 
 /** Concatenate N strings. */
 KR_EXPORT
@@ -424,7 +427,7 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 	}
 	dst[0] = len;
 	return KNOT_EOK;
-};
+}
 
 /* Trivial non-inline wrappers, to be used in lua. */
 KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,

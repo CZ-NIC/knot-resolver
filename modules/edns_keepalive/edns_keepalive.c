@@ -73,5 +73,5 @@ const kr_layer_api_t *edns_keepalive_layer(struct kr_module *module)
 	return &_layer;
 }
 
-KR_MODULE_EXPORT(edns_keepalive);
+KR_MODULE_EXPORT(edns_keepalive)
 
