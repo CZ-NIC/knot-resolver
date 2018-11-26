@@ -696,6 +696,15 @@ ffi.metatype( knot_pkt_t, {
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
+		-- Resize packet wire to a new size
+		resize = function (pkt, new_size)
+			assert(ffi.istype(knot_pkt_t, pkt))
+			local ptr = C.mm_realloc(pkt.mm, pkt.wire, new_size, pkt.max_size)
+			if ptr == nil then return end
+			pkt.wire = ptr
+			pkt.max_size = new_size
+			return true
+		end,
 	},
 })
 -- Metatype for query

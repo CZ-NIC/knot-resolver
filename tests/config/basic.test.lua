@@ -99,7 +99,7 @@ local function test_packet_functions()
 	-- Test manipulating sections
 	ok(pkt:begin(kres.section.ANSWER), 'switching sections works')
 	local res, err = pkt:put(nil, 0, 0, 0, '')
-	isnt(res, 'inserting nil entry doesnt work')
+	isnt(res, true, 'inserting nil entry doesnt work')
 	isnt(err.code, 0, 'error code is non-zero')
 	isnt(tostring(res), '', 'inserting nil returns invalid parameter')
 	ok(pkt:put(pkt:qname(), 900, pkt:qclass(), kres.type.A, '\1\2\3\4'), 'adding rrsets works')
@@ -131,13 +131,15 @@ local function test_packet_functions()
 	same(parsed:tostring(), pkt:tostring(), 'parsed packet is equal to source packet')
 
 	-- Test adding RR sets directly
-	local copy = kres.packet(512)
+	local copy = kres.packet(23)
 	copy:question(todname('hello'), kres.class.IN, kres.type.A)
 	copy:begin(kres.section.ANSWER)
 	local rr = kres.rrset(pkt:qname(), kres.type.A, kres.class.IN, 66)
 	rr:add_rdata('\4\3\2\1', 4)
+	ok(not copy:put_rr(rr), 'adding RR sets checks for available space')
+	ok(copy:resize(512), 'resizing packet works')
 	ok(copy:put_rr(rr), 'adding RR sets directly works')
-	ok(copy:recycle())
+	ok(copy:recycle(), 'recycling packet works')
 
 	-- Test recycling of packets
 	-- Clear_payload keeps header + question intact
