@@ -482,6 +482,9 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 			continue;
 		} else if (count == GNUTLS_E_REHANDSHAKE) {
 			/* See https://www.gnutls.org/manual/html_node/Re_002dauthentication.html */
+			struct sockaddr *peer = session_get_peer(s);
+			kr_log_verbose("[%s] TLS rehandshake with %s has started\n",
+				       logstring,  kr_straddr(peer));
 			tls_set_hs_state(tls_p, TLS_HS_IN_PROGRESS);
 			while (tls_p->handshake_state <= TLS_HS_IN_PROGRESS) {
 				int err = tls_handshake(tls_p, tls_p->handshake_cb);
