@@ -32,7 +32,7 @@ hints['{{ name }}'] = '{{ ip }}'
 policy.add(policy.all(
     {% if kresd.forward.proto == 'tls' %}
     policy.TLS_FORWARD({
-        {"{{ kresd.forward.ip }}@{{ kresd.forward.port }}", insecure=true}})
+        {"{{ kresd.forward.ip }}@{{ kresd.forward.port }}", hostname='{{ kresd.forward.hostname}}', ca_file='{{ kresd.forward.ca_file }}'}})
     {% endif %}
 ))
 {% endif %}
