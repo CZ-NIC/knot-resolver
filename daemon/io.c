@@ -222,6 +222,9 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		/* buf->base points to start of the tls receive buffer.
 		   Decode data free space in session wire buffer. */
 		consumed = tls_process_input_data(s, (const uint8_t *)buf->base, nread);
+		if (consumed <= 0) {
+			return;
+		}
 		data = session_wirebuf_get_free_start(s);
 		data_len = consumed;
 	}
