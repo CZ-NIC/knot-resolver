@@ -12,6 +12,7 @@ Make sure to run `make all` in `rehandshake/` to compile the proxy.
 
 import os
 import subprocess
+import time
 
 import pytest
 
@@ -63,5 +64,6 @@ def test_rehandshake(tmpdir):
                 sock2 = kresd.ip_tcp_socket()
                 for hint in hints:
                     resolve_hint(sock2, hint)
+                    time.sleep(1)
         finally:
             proxy.terminate()
