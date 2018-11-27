@@ -1,3 +1,4 @@
+from collections import namedtuple
 from contextlib import ContextDecorator, contextmanager
 import os
 import random
@@ -29,8 +30,13 @@ def create_file_from_template(template_path, dest, data):
         fh.write(rendered_template)
 
 
+Forward = namedtuple('Forward', ['proto', 'ip', 'port'])
+
+
 class Kresd(ContextDecorator):
-    def __init__(self, workdir, port, tls_port, ip=None, ip6=None, certname=None, verbose=True):
+    def __init__(
+            self, workdir, port, tls_port, ip=None, ip6=None, certname=None,
+            verbose=True, hints=None, forward=None):
         if ip is None and ip6 is None:
             raise ValueError("IPv4 or IPv6 must be specified!")
         self.workdir = str(workdir)
@@ -42,6 +48,8 @@ class Kresd(ContextDecorator):
         self.sockets = []
         self.logfile = None
         self.verbose = verbose
+        self.hints = {} if hints is None else hints
+        self.forward = forward
 
         if certname:
             self.tls_cert_path = os.path.join(CERTS_DIR, certname + '.cert.pem')
@@ -215,10 +223,10 @@ KRESD_LOG_IO_CLOSE = re.compile(r'^\[io\].*closed by peer.*')
 
 
 @contextmanager
-def make_kresd(workdir, certname=None, ip='127.0.0.1', ip6='::1'):
+def make_kresd(workdir, certname=None, ip='127.0.0.1', ip6='::1', forward=None, hints=None):
     port = make_port(ip, ip6)
     tls_port = make_port(ip, ip6)
-    with Kresd(workdir, port, tls_port, ip, ip6, certname) as kresd:
+    with Kresd(workdir, port, tls_port, ip, ip6, certname, forward=forward, hints=hints) as kresd:
         yield kresd
         with open(kresd.logfile_path) as log:  # display partial log for debugging
             past_startup_msgid = False
