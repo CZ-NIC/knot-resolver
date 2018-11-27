@@ -30,7 +30,7 @@ def create_file_from_template(template_path, dest, data):
         fh.write(rendered_template)
 
 
-Forward = namedtuple('Forward', ['proto', 'ip', 'port'])
+Forward = namedtuple('Forward', ['proto', 'ip', 'port', 'hostname', 'ca_file'])
 
 
 class Kresd(ContextDecorator):

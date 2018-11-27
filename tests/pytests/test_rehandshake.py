@@ -15,7 +15,7 @@ import subprocess
 
 import pytest
 
-from kresd import Forward, make_kresd, PYTESTS_DIR
+from kresd import CERTS_DIR, Forward, make_kresd, PYTESTS_DIR
 import utils
 
 
@@ -41,13 +41,14 @@ def test_rehandshake(tmpdir):
     workdir = os.path.join(str(tmpdir), 'kresd_fwd_target')
     os.makedirs(workdir)
 
-    with make_kresd(workdir, 'tt', hints=hints, tls_port=53000) as kresd_fwd_target:
+    with make_kresd(workdir, hints=hints, port=53000) as kresd_fwd_target:
         sock = kresd_fwd_target.ip_tls_socket()
         resolve_hint(sock, '0.foo')
 
         # run proxy
         cwd, cmd = os.path.split(REHANDSHAKE_PROXY)
         cmd = './' + cmd
+        ca_file = os.path.join(CERTS_DIR, 'tt.cert.pem')
         try:
             proxy = subprocess.Popen(
                 [cmd], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -55,9 +56,10 @@ def test_rehandshake(tmpdir):
             # run test kresd instance
             workdir2 = os.path.join(str(tmpdir), 'kresd')
             os.makedirs(workdir2)
-            forward = Forward(proto='tls', ip='127.0.0.1', port=54000)
+            forward = Forward(proto='tls', ip='127.0.0.1', port=54000,
+                              hostname='transport-test-server.com', ca_file=ca_file)
             with make_kresd(workdir2, forward=forward) as kresd:
-                sock2 = kresd.ip_tls_socket()
+                sock2 = kresd.ip_tcp_socket()
                 for hint in hints:
                     resolve_hint(sock2, hint)
         finally:
