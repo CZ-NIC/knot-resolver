@@ -88,6 +88,15 @@
             path: /etc/pacman.conf
             state: present
           with_items: "{{ repos }}"
+        - name: set up package mirrors
+          copy:
+            content: |
+              ## Arch Linux repository mirrorlist
+              ## Generated on 2018-11-26
+              ## Czechia
+              Server = http://mirrors.nic.cz/archlinux/$repo/os/$arch
+              Server = http://ftp.fi.muni.cz/pub/linux/arch/$repo/os/$arch
+            dest: /etc/pacman.d/mirrorlist
         - name: sync repos (Arch)
           shell: pacman -Syu --noconfirm
       when: ansible_distribution_file_variety == 'Archlinux'
