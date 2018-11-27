@@ -30,7 +30,7 @@ def create_file_from_template(template_path, dest, data):
         fh.write(rendered_template)
 
 
-Forward = namedtuple('Forward', ['proto', 'ip', 'port'])
+Forward = namedtuple('Forward', ['proto', 'ip', 'port', 'hostname', 'ca_file'])
 
 
 class Kresd(ContextDecorator):
@@ -223,9 +223,11 @@ KRESD_LOG_IO_CLOSE = re.compile(r'^\[io\].*closed by peer.*')
 
 
 @contextmanager
-def make_kresd(workdir, certname=None, ip='127.0.0.1', ip6='::1', forward=None, hints=None):
-    port = make_port(ip, ip6)
-    tls_port = make_port(ip, ip6)
+def make_kresd(
+        workdir, certname=None, ip='127.0.0.1', ip6='::1', forward=None, hints=None,
+        port=None, tls_port=None):
+    port = make_port(ip, ip6) if port is None else port
+    tls_port = make_port(ip, ip6) if tls_port is None else tls_port
     with Kresd(workdir, port, tls_port, ip, ip6, certname, forward=forward, hints=hints) as kresd:
         yield kresd
         with open(kresd.logfile_path) as log:  # display partial log for debugging
