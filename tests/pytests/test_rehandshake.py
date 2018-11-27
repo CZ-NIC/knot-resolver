@@ -49,7 +49,8 @@ def test_rehandshake(tmpdir):
         cwd, cmd = os.path.split(REHANDSHAKE_PROXY)
         cmd = './' + cmd
         try:
-            proxy = subprocess.Popen([cmd], cwd=cwd)
+            proxy = subprocess.Popen(
+                [cmd], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
             # run test kresd instance
             workdir2 = os.path.join(str(tmpdir), 'kresd')
