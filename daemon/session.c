@@ -689,11 +689,6 @@ uint8_t *session_wirebuf_get_start(struct session *session)
 	return session->wire_buf;
 }
 
-size_t session_wirebuf_get_len(struct session *session)
-{
-	return session->wire_buf_end_idx;
-}
-
 size_t session_wirebuf_get_size(struct session *session)
 {
 	return session->wire_buf_size;
