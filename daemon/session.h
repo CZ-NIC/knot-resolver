@@ -32,8 +32,9 @@ struct session_flags {
 	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
 };
 
-/* Allocate new session for a libuv handle. */
-struct session *session_new(uv_handle_t *handle);
+/* Allocate new session for a libuv handle.
+ * If handle->tyoe is UV_UDP, tls parameter will be ignored. */
+struct session *session_new(uv_handle_t *handle, bool has_tls);
 /* Clear and free given session. */
 void session_free(struct session *session);
 /* Clear session. */
@@ -118,8 +119,6 @@ int session_timer_stop(struct session *session);
 uint8_t *session_wirebuf_get_start(struct session *session);
 /** Get size of session wirebuffer. */
 size_t session_wirebuf_get_size(struct session *session);
-/** Get length of data in the session wirebuffer. */
-size_t session_wirebuf_get_len(struct session *session);
 /** Get pointer to the beginning of free space in session wirebuffer. */
 uint8_t *session_wirebuf_get_free_start(struct session *session);
 /** Get amount of free space in session wirebuffer. */

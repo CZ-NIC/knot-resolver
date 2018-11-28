@@ -108,7 +108,7 @@ static int udp_bind_finalize(uv_handle_t *handle)
 {
 	check_bufsize(handle);
 	/* Handle is already created, just create context. */
-	struct session *s = session_new(handle);
+	struct session *s = session_new(handle, false);
 	assert(s);
 	session_flags(s)->outgoing = false;
 	return io_start_read(handle);
@@ -184,9 +184,7 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 
 static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
-	uv_loop_t *loop = handle->loop;
 	struct session *s = handle->data;
-
 	assert(s && session_get_handle(s) == (uv_handle_t *)handle &&
 	       handle->type == UV_TCP);	
 
@@ -199,8 +197,6 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	if (nread == 0) {
 		return;
 	}
-
-	struct worker_ctx *worker = loop->data;
 
 	if (nread < 0 || !buf->base) {
 		if (kr_verbose_status) {
@@ -240,6 +236,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		worker_end_tcp(s);
 	}
 	session_wirebuf_compress(s);
+	struct worker_ctx *worker = handle->loop->data;
 	mp_flush(worker->pkt_pool.ctx);
 }
 
@@ -254,7 +251,8 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	if (!client) {
 		return;
 	}
-	int res = io_create(master->loop, (uv_handle_t *)client, SOCK_STREAM, AF_UNSPEC);
+	int res = io_create(master->loop, (uv_handle_t *)client,
+			    SOCK_STREAM, AF_UNSPEC, tls);
 	if (res) {
 		if (res == UV_EMFILE) {
 			worker->too_many_open = true;
@@ -268,22 +266,20 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	}
 
 	/* struct session was allocated \ borrowed from memory pool. */
-	struct session *session = client->data;
-	assert(session_flags(session)->outgoing == false);
+	struct session *s = client->data;
+	assert(session_flags(s)->outgoing == false);
+	assert(session_flags(s)->has_tls == tls);
 
 	if (uv_accept(master, (uv_stream_t *)client) != 0) {
 		/* close session, close underlying uv handles and
 		 * deallocate (or return to memory pool) memory. */
-		session_close(session);
+		session_close(s);
 		return;
 	}
 
 	/* Set deadlines for TCP connection and start reading.
 	 * It will re-check every half of a request time limit if the connection
 	 * is idle and should be terminated, this is an educated guess. */
-	struct session *s = client->data;
-	assert(session_flags(s)->outgoing == false);
-
 	struct sockaddr *peer = session_get_peer(s);
 	int peer_len = sizeof(union inaddr);
 	int ret = uv_tcp_getpeername(client, peer, &peer_len);
@@ -297,7 +293,6 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
 
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;
-	session_flags(s)->has_tls = tls;
 	if (tls) {
 		timeout += TLS_MAX_HANDSHAKE_TIME;
 		struct tls_ctx_t *ctx = session_tls_get_server_ctx(s);
@@ -415,7 +410,7 @@ int tcp_bindfd_tls(uv_tcp_t *handle, int fd, int tcp_backlog)
 	return _tcp_bindfd(handle, fd, tls_accept, tcp_backlog);
 }
 
-int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
+int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls)
 {
 	int ret = -1;
 	if (type == SOCK_DGRAM) {
@@ -427,7 +422,7 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family)
 	if (ret != 0) {
 		return ret;
 	}
-	struct session *s = session_new(handle);
+	struct session *s = session_new(handle, has_tls);
 	if (s == NULL) {
 		ret = -1;
 	}
