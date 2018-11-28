@@ -11,6 +11,7 @@ Make sure to run `make all` in `rehandshake/` to compile the proxy.
 """
 
 import os
+import re
 import subprocess
 import time
 
@@ -65,5 +66,16 @@ def test_rehandshake(tmpdir):
                 for hint in hints:
                     resolve_hint(sock2, hint)
                     time.sleep(1)
+
+                # verify log
+                n_connecting_to = 0
+                n_rehandshake = 0
+                for line in kresd.partial_log().splitlines():
+                    if re.search(r"connecting to: .*", line) is not None:
+                        n_connecting_to += 1
+                    elif re.search(r"TLS rehandshake .* has started", line) is not None:
+                        n_rehandshake += 1
+                assert n_connecting_to == 0  # shouldn't be present in partial log
+                assert n_rehandshake > 0
         finally:
             proxy.terminate()

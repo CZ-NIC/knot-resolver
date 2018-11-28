@@ -9,7 +9,7 @@
 #include "array.h"
 
 #define TLS_MAX_SEND_RETRIES 100
-
+#define CLIENT_ANSWER_CHUNK_SIZE 8
 struct buf {
 	char buf[16 * 1024];
 	size_t size;
@@ -25,6 +25,7 @@ enum peer_state {
 
 enum handshake_state {
 	TLS_HS_NOT_STARTED = 0,
+	TLS_HS_EXPECTED,
 	TLS_HS_IN_PROGRESS,
 	TLS_HS_DONE,
 	TLS_HS_CLOSING,
@@ -266,40 +267,42 @@ static void write_to_client_cb(uv_write_t *req, int status)
 			return;
 		}
 	}
-	if (proxy->client_pending.len > 0) {
-		struct buf *buf = get_first_client_pending(proxy);
-		fprintf(stdout, "successfully wrote %zi bytes to client, pending len is %zd\n",
-			buf->size, proxy->client_pending.len);
-		remove_first_client_pending(proxy);
-		release_io_buffer(proxy, buf);
-		if (proxy->client_state == STATE_CONNECTED &&
-		    proxy->tls.handshake_state == TLS_HS_DONE) {
-			write_to_client_pending(proxy);
-		}
+	fprintf(stdout, "successfully wrote to client, pending len is %zd\n",
+		proxy->client_pending.len);
+	if (proxy->client_state == STATE_CONNECTED &&
+	    proxy->tls.handshake_state == TLS_HS_DONE) {
+		write_to_client_pending(proxy);
 	}
 }
 
 static void write_to_upstream_cb(uv_write_t *req, int status)
 {
 	struct tls_proxy_ctx *proxy = (struct tls_proxy_ctx *)req->handle->loop->data;
-	free(req);
 	if (status) {
+		free(req);
 		fprintf(stderr, "error writing to upstream: %s\n", uv_strerror(status));
 		clear_upstream_pending(proxy);
 		proxy->upstream_state = STATE_CLOSING_IN_PROGRESS;
 		uv_close((uv_handle_t*)&proxy->upstream, on_upstream_close);
 		return;
 	}
-	fprintf(stdout, "successfully wrote to upstream, pending len is %zd\n", proxy->upstream_pending.len);
-	if (proxy->upstream_pending.len > 0) {
+	if (req->data != NULL) {
+		assert(proxy->upstream_pending.len > 0);
 		struct buf *buf = get_first_upstream_pending(proxy);
+		assert(req->data == (void *)buf->buf);
+		fprintf(stdout, "successfully wrote %zi bytes to upstream, pending len is %zd\n",
+			buf->size, proxy->upstream_pending.len);
 		remove_first_upstream_pending(proxy);
 		release_io_buffer(proxy, buf);
-		if (proxy->upstream_state == STATE_CONNECTED &&
-		    proxy->upstream_pending.len > 0) {
-			write_to_upstream_pending(proxy);
-		}
+	} else {
+		fprintf(stdout, "successfully wrote bytes to upstream, pending len is %zd\n",
+			proxy->upstream_pending.len);
 	}
+	if (proxy->upstream_state == STATE_CONNECTED &&
+	    proxy->upstream_pending.len > 0) {
+		write_to_upstream_pending(proxy);
+	}
+	free(req);
 }
 
 static void on_client_connection(uv_stream_t *server, int status)
@@ -476,6 +479,7 @@ static void push_to_upstream_pending(struct tls_proxy_ctx *proxy, const char *bu
 		memcpy(b->buf, buf, b->size);
 		array_push(proxy->upstream_pending, b);
 		size -= b->size;
+		buf += b->size;
 	}
 }
 
@@ -484,9 +488,13 @@ static void push_to_client_pending(struct tls_proxy_ctx *proxy, const char *buf,
 	while (size > 0) {
 		struct buf *b = borrow_io_buffer(proxy);
 		b->size = size <= sizeof(b->buf) ? size : sizeof(b->buf);
+		if (b->size > CLIENT_ANSWER_CHUNK_SIZE) {
+			b->size = CLIENT_ANSWER_CHUNK_SIZE;
+		}
 		memcpy(b->buf, buf, b->size);
 		array_push(proxy->client_pending, b);
 		size -= b->size;
+		buf += b->size;
 	}
 }
 
@@ -496,6 +504,7 @@ static int write_to_upstream_pending(struct tls_proxy_ctx *proxy)
 	/* TODO avoid allocation */
 	uv_write_t *req = (uv_write_t *) malloc(sizeof(uv_write_t));
 	uv_buf_t wrbuf = uv_buf_init(buf->buf, buf->size);
+	req->data = buf->buf;
 	fprintf(stdout, "writing %zd bytes to upstream\n", buf->size);
 	return uv_write(req, (uv_stream_t *)&proxy->upstream, &wrbuf, 1, write_to_upstream_cb);
 }
@@ -535,6 +544,7 @@ ssize_t proxy_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 		{ data, len }
 	};
 	memcpy(data, buf, len);
+	req->data = data;
 	int res = uv_write(req, (uv_stream_t *)&proxy->client, uv_buf, 1, write_to_client_cb);
 	if (res == 0) {
 		ret = len;
@@ -594,9 +604,16 @@ static int write_to_client_pending(struct tls_proxy_ctx *proxy)
 		}
 	} while (len > 0);
 
+	remove_first_client_pending(proxy);
+	release_io_buffer(proxy, buf);
+
 	fprintf(stdout, "submitted %zd bytes to client\n", submitted);
 	assert (gnutls_safe_renegotiation_status(tls_session) != 0);
 	assert (gnutls_rehandshake(tls_session) == GNUTLS_E_SUCCESS);
+	/* Prevent write-to-client callback from sending next pending chunk.
+	 * At the same time tls_process_from_client() must not call gnutls_handshake()
+	 * as there can be application data in this direction.  */
+	proxy->tls.handshake_state = TLS_HS_EXPECTED;
 	fprintf(stdout, "rehandshake started\n");
 	return submitted;
 }
@@ -613,10 +630,11 @@ static int tls_process_from_upstream(struct tls_proxy_ctx *proxy, const uint8_t 
 		return submitted;
 	}
 
+	bool list_was_empty = (proxy->client_pending.len == 0);
 	push_to_client_pending(proxy, buf, len);
 	submitted = len;
 	if (proxy->tls.handshake_state == TLS_HS_DONE) {
-		if (proxy->client_pending.len == 1) {
+		if (list_was_empty && proxy->client_pending.len > 0) {
 			int ret = write_to_client_pending(proxy);
 			if (ret < 0) {
 				submitted = -1;
