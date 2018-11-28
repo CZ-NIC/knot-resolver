@@ -1607,10 +1607,6 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
-#ifndef NOVERBOSELOG
-	struct kr_rplan *rplan = &request->rplan;
-#endif
-
 	/* Finalize answer and construct wire-buffer. */
 	ITERATE_LAYERS(request, NULL, answer_finalize);
 	if (request->state == KR_STATE_FAIL) {
@@ -1632,9 +1628,12 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
 
+#ifndef NOVERBOSELOG
+	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *last = kr_rplan_last(rplan);
 	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
+#endif
 
 	/* Trace request finish */
 	if (request->trace_finish) {

@@ -18,6 +18,7 @@ Bugfixes
 --------
 - http module: only run prometheus in parent process if using --forks=N,
   as the submodule collects metrics from all sub-processes as well.
+- fix build with -DNOVERBOSELOG (#424)
 
 Improvements
 ------------
