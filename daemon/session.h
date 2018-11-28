@@ -119,8 +119,6 @@ int session_timer_stop(struct session *session);
 uint8_t *session_wirebuf_get_start(struct session *session);
 /** Get size of session wirebuffer. */
 size_t session_wirebuf_get_size(struct session *session);
-/** Get length of data in the session wirebuffer. */
-size_t session_wirebuf_get_len(struct session *session);
 /** Get pointer to the beginning of free space in session wirebuffer. */
 uint8_t *session_wirebuf_get_free_start(struct session *session);
 /** Get amount of free space in session wirebuffer. */

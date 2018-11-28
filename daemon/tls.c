@@ -451,7 +451,12 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 	}
 
 	assert(tls_p->session == s);
-	assert(tls_p->recv_buf == buf && nread <= sizeof(tls_p->recv_buf));
+	const bool ok = tls_p->recv_buf == buf && nread <= sizeof(tls_p->recv_buf);
+	if (!ok) {
+		assert(false);
+		/* don't risk overflowing the buffer if we have a mistake somewhere */
+		return kr_error(EINVAL);
+	}
 	
 	const char *logstring = tls_p->client_side ? client_logstring : server_logstring;
 

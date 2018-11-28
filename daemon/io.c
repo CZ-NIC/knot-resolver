@@ -184,9 +184,7 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 
 static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
-	uv_loop_t *loop = handle->loop;
 	struct session *s = handle->data;
-
 	assert(s && session_get_handle(s) == (uv_handle_t *)handle &&
 	       handle->type == UV_TCP);	
 
@@ -199,8 +197,6 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	if (nread == 0) {
 		return;
 	}
-
-	struct worker_ctx *worker = loop->data;
 
 	if (nread < 0 || !buf->base) {
 		if (kr_verbose_status) {
@@ -240,6 +236,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		worker_end_tcp(s);
 	}
 	session_wirebuf_compress(s);
+	struct worker_ctx *worker = handle->loop->data;
 	mp_flush(worker->pkt_pool.ctx);
 }
 
