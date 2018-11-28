@@ -71,6 +71,7 @@ def test_rehandshake(tmpdir):
                 n_connecting_to = 0
                 n_rehandshake = 0
                 for line in kresd.partial_log():
+                    print(line)
                     if re.search(r"connecting to: .*", line) is not None:
                         n_connecting_to += 1
                     elif re.search(r"TLS rehandshake .* has started", line) is not None:
