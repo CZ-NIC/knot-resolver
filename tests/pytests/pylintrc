@@ -23,6 +23,7 @@ ignore-imports=no
 
 [DESIGN]
 max-parents=10
+max-locals=20
 
 [TYPECHECK]
 ignored-modules=ssl
