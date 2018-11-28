@@ -188,6 +188,23 @@ class Kresd(ContextDecorator):
     def ip6_tls_socket(self):
         return self._tls_socket_with_retry(socket.AF_INET6)
 
+    def partial_log(self):
+        partial_log = '\n (... ommiting log start)\n'
+        with open(self.logfile_path) as log:  # display partial log for debugging
+            past_startup_msgid = False
+            past_startup = False
+            for line in log:
+                if past_startup:
+                    partial_log += line
+                else:  # find real start of test log (after initial alive-pings)
+                    if not past_startup_msgid:
+                        if re.match(KRESD_LOG_STARTUP_MSGID, line) is not None:
+                            past_startup_msgid = True
+                    else:
+                        if re.match(KRESD_LOG_IO_CLOSE, line) is not None:
+                            past_startup = True
+        return partial_log
+
 
 def is_port_free(port, ip=None, ip6=None):
     def check(family, type_, dest):
@@ -230,18 +247,4 @@ def make_kresd(
     tls_port = make_port(ip, ip6) if tls_port is None else tls_port
     with Kresd(workdir, port, tls_port, ip, ip6, certname, forward=forward, hints=hints) as kresd:
         yield kresd
-        with open(kresd.logfile_path) as log:  # display partial log for debugging
-            past_startup_msgid = False
-            past_startup = False
-            for line in log:
-                if past_startup:
-                    line = line.rstrip('\n')
-                    print(line)
-                else:  # find real start of test log (after initial alive-pings)
-                    if not past_startup_msgid:
-                        if re.match(KRESD_LOG_STARTUP_MSGID, line) is not None:
-                            past_startup_msgid = True
-                    else:
-                        if re.match(KRESD_LOG_IO_CLOSE, line) is not None:
-                            past_startup = True
-                            print('\n (... ommiting log start)')
+        print(kresd.partial_log())
