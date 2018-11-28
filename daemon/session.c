@@ -496,6 +496,11 @@ ssize_t session_wirebuf_consume(struct session *session, const uint8_t *data, ss
 		return kr_error(EINVAL);
 	}
 
+	if (len < 0) {
+		/* shouldn't happen */
+		return kr_error(EINVAL);
+	}
+
 	if (session->wire_buf_end_idx + len > session->wire_buf_size) {
 		/* shouldn't happen */
 		return kr_error(EINVAL);
