@@ -28,6 +28,8 @@ net.tls("{{ kresd.tls_cert_path }}", "{{ kresd.tls_key_path }}")
 hints['{{ name }}'] = '{{ ip }}'
 {% endfor %}
 
+policy.add(policy.all(policy.QTRACE))
+
 {% if kresd.forward %}
 policy.add(policy.all(
     {% if kresd.forward.proto == 'tls' %}
@@ -35,6 +37,10 @@ policy.add(policy.all(
         {"{{ kresd.forward.ip }}@{{ kresd.forward.port }}", hostname='{{ kresd.forward.hostname}}', ca_file='{{ kresd.forward.ca_file }}'}})
     {% endif %}
 ))
+{% endif %}
+
+{% if not kresd.dnssec %}
+trust_anchors.keyfile_default = nil
 {% endif %}
 
 modules.unload("ta_signal_query")

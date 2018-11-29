@@ -36,7 +36,7 @@ Forward = namedtuple('Forward', ['proto', 'ip', 'port', 'hostname', 'ca_file'])
 class Kresd(ContextDecorator):
     def __init__(
             self, workdir, port, tls_port, ip=None, ip6=None, certname=None,
-            verbose=True, hints=None, forward=None):
+            verbose=True, hints=None, forward=None, dnssec=True):
         if ip is None and ip6 is None:
             raise ValueError("IPv4 or IPv6 must be specified!")
         self.workdir = str(workdir)
@@ -50,6 +50,7 @@ class Kresd(ContextDecorator):
         self.verbose = verbose
         self.hints = {} if hints is None else hints
         self.forward = forward
+        self.dnssec = dnssec
 
         if certname:
             self.tls_cert_path = os.path.join(CERTS_DIR, certname + '.cert.pem')
@@ -242,9 +243,10 @@ KRESD_LOG_IO_CLOSE = re.compile(r'^\[io\].*closed by peer.*')
 @contextmanager
 def make_kresd(
         workdir, certname=None, ip='127.0.0.1', ip6='::1', forward=None, hints=None,
-        port=None, tls_port=None):
+        port=None, tls_port=None, dnssec=True):
     port = make_port(ip, ip6) if port is None else port
     tls_port = make_port(ip, ip6) if tls_port is None else tls_port
-    with Kresd(workdir, port, tls_port, ip, ip6, certname, forward=forward, hints=hints) as kresd:
+    with Kresd(workdir, port, tls_port, ip, ip6, certname, forward=forward,
+               hints=hints, dnssec=dnssec) as kresd:
         yield kresd
         print(kresd.partial_log())
