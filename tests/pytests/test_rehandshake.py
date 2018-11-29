@@ -15,6 +15,8 @@ import re
 import subprocess
 import time
 
+import dns
+import dns.rcode
 import pytest
 
 from kresd import CERTS_DIR, Forward, make_kresd, PYTESTS_DIR
@@ -32,19 +34,20 @@ def test_rehandshake(tmpdir):
         sock.sendall(buff)
         answer = utils.receive_parse_answer(sock)
         assert answer.id == msgid
-        assert answer.answer[0][0].address == '127.0.0.1'
+        assert answer.rcode() == dns.rcode.NOERROR
+        # assert answer.answer[0][0].address == '127.0.0.1'
+
 
     hints = {
-        '0.foo.': '127.0.0.1',
-        '1.foo.': '127.0.0.1',
-        '2.foo.': '127.0.0.1',
-        '3.foo.': '127.0.0.1',
+        'www.nic.cz': '127.0.0.1',
+        'www.nic.mx': '127.0.0.1',
+        'www.nic.ru': '127.0.0.1',
     }
     # run forward target instance
     workdir = os.path.join(str(tmpdir), 'kresd_fwd_target')
     os.makedirs(workdir)
 
-    with make_kresd(workdir, hints=hints, port=53910) as kresd_fwd_target:
+    with make_kresd(workdir, port=53910) as kresd_fwd_target:
         sock = kresd_fwd_target.ip_tls_socket()
         resolve_hint(sock, '0.foo.')
 
