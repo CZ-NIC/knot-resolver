@@ -37,6 +37,12 @@ policy.add(policy.all(
 ))
 {% endif %}
 
+policy.add(policy.all(policy.QTRACE))
+
+{% if not kresd.dnssec %}
+trust_anchors.keyfile_default = nil
+{% endif %}
+
 modules.unload("ta_signal_query")
 modules.unload("priming")
 modules.unload("detect_time_skew")
