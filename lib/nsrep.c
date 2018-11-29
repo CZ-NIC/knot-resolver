@@ -485,11 +485,6 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 		return kr_error(EINVAL);
 	}
 
-	if (ns->addr[1].ip.sa_family == AF_UNSPEC) {
-		/* We have only one entry here, do nothing */
-		return kr_ok();
-	}
-
 	/* Compute the scores.  Unfortunately there's no space for scores
 	 * along the addresses. */
 	unsigned scores[KR_NSREP_MAXADDR];
