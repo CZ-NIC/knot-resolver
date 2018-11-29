@@ -66,7 +66,7 @@ def test_rehandshake(tmpdir):
                 try:
                     for hint in hints:
                         resolve_hint(sock2, hint)
-                        time.sleep(1)
+                        # time.sleep(1)
                 finally:
                     # verify log
                     n_connecting_to = 0
