@@ -882,9 +882,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	} else if (!(qry->flags.DNSSEC_BOGUS)) {
 		kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt, KR_NS_UPDATE);
 		WITH_VERBOSE(qry) {
-			char addr_str[INET6_ADDRSTRLEN];
-			inet_ntop(src->sa_family, kr_inaddr(src), addr_str, sizeof(addr_str));
-			VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
+			VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", kr_straddr(src));
 		}
 	}
 }
@@ -1429,6 +1427,20 @@ ns_election:
 		kr_nsrep_elect_addr(qry, request->ctx);
 	} else if (qflg.FORWARD || qflg.STUB) {
 		kr_nsrep_sort(&qry->ns, request->ctx->cache_rtt);
+		if (qry->ns.score > KR_NS_TIMEOUT) {
+			if (kr_zonecut_is_empty(&qry->zone_cut)) {
+				VERBOSE_MSG(qry, "=> no NS with an address\n");
+			} else {
+				VERBOSE_MSG(qry, "=> no valid NS left\n");
+			}
+			if (!qry->flags.NO_NS_FOUND) {
+				qry->flags.NO_NS_FOUND = true;
+			} else {
+				ITERATE_LAYERS(request, qry, reset);
+				kr_rplan_pop(rplan, qry);
+			}
+			return KR_STATE_PRODUCE;
+		}
 	} else if (!qry->ns.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
