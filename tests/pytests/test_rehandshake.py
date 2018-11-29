@@ -61,21 +61,24 @@ def test_rehandshake(tmpdir):
             os.makedirs(workdir2)
             forward = Forward(proto='tls', ip='127.0.0.1', port=53921,
                               hostname='transport-test-server.com', ca_file=ca_file)
-            with make_kresd(workdir2, forward=forward) as kresd:
+            with make_kresd(workdir2, forward=forward, dnssec=False) as kresd:
                 sock2 = kresd.ip_tcp_socket()
-                for hint in hints:
-                    resolve_hint(sock2, hint)
-                    time.sleep(1)
-
-                # verify log
-                n_connecting_to = 0
-                n_rehandshake = 0
-                for line in kresd.partial_log().splitlines():
-                    if re.search(r"connecting to: .*", line) is not None:
-                        n_connecting_to += 1
-                    elif re.search(r"TLS rehandshake .* has started", line) is not None:
-                        n_rehandshake += 1
-                assert n_connecting_to == 0  # shouldn't be present in partial log
-                assert n_rehandshake > 0
+                try:
+                    for hint in hints:
+                        resolve_hint(sock2, hint)
+                        time.sleep(1)
+                finally:
+                    # verify log
+                    n_connecting_to = 0
+                    n_rehandshake = 0
+                    partial_log = kresd.partial_log()
+                    print(partial_log)
+                    for line in partial_log.splitlines():
+                        if re.search(r"connecting to: .*", line) is not None:
+                            n_connecting_to += 1
+                        elif re.search(r"TLS rehandshake .* has started", line) is not None:
+                            n_rehandshake += 1
+                    assert n_connecting_to == 0  # shouldn't be present in partial log
+                    assert n_rehandshake > 0
         finally:
             proxy.terminate()
