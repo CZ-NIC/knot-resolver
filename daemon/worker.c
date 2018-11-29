@@ -1331,9 +1331,9 @@ static int tcp_task_step(struct qr_task *task,
 	}
 
 	if (ret != kr_ok()) {
-		subreq_finalize(task, packet_source, packet);
+		subreq_finalize(task, addr, packet);
 		if (ret == kr_error(EAGAIN)) {
-			ret = qr_task_step(task, NULL, NULL);
+			ret = qr_task_step(task, addr, NULL);
 		} else {
 			ret = qr_task_finalize(task, KR_STATE_FAIL);
 		}
