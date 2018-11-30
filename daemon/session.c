@@ -398,7 +398,7 @@ void session_waitinglist_retry(struct session *session, bool increase_timeout_cn
 		if (increase_timeout_cnt) {
 			worker_task_timeout_inc(task);
 		}
-		worker_task_step(task, NULL, NULL);
+		worker_task_step(task, &session->peer.ip, NULL);
 		worker_task_unref(task);
 	}
 }
