@@ -433,7 +433,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 			pipe_ret = uv_pipe_open(&pipe, args->control_fd);
 		} else {
 			(void) mkdir("tty", S_IRWXU|S_IRWXG);
-			sock_file = afmt("tty/%ld", getpid());
+			sock_file = afmt("tty/%ld", (long)getpid());
 			if (sock_file) {
 				pipe_ret = uv_pipe_bind(&pipe, sock_file);
 			}
