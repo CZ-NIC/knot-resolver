@@ -144,6 +144,7 @@ class Kresd(ContextDecorator):
         raise RuntimeError("Unsupported socket family: {}".format(family))
 
     def stream_socket(self, family, tls=False, timeout=20):
+        """Initialize a socket and return it along with the destination without connecting."""
         sock = socket.socket(family, socket.SOCK_STREAM)
         sock.settimeout(timeout)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)

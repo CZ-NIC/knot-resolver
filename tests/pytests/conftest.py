@@ -30,6 +30,7 @@ def kresd_tt_expired(tmpdir):
     'ip6_tls_socket',
 ])
 def make_kresd_sock(request, kresd):
+    """Factory function to create sockets of the same kind."""
     sock_func = getattr(kresd, request.param)
 
     def _make_kresd_sock():

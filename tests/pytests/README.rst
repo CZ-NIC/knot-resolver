@@ -40,6 +40,8 @@ the path to test file directly.
 
    $ pytest-3 conn_flood.py
 
+Note: some tests may fail without an internet connection.
+
 Developer notes
 ---------------
 
