@@ -1059,8 +1059,8 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		}
 
 		DEBUG_MSG("[tls_client] received pin  : %s\n", cert_pin);
-		for (size_t i = 0; i < ctx->params->pins.len; ++i) {
-			const char *pin = ctx->params->pins.at[i];
+		for (size_t j = 0; j < ctx->params->pins.len; ++j) {
+			const char *pin = ctx->params->pins.at[j];
 			bool match = (strcmp(cert_pin, pin) == 0);
 			DEBUG_MSG("[tls_client] configured pin: %s matches? %s\n",
 				  pin, match ? "yes" : "no");

@@ -461,9 +461,9 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 			    || (aqpf->AWAIT_IPV6 && aq->stype == KNOT_RRTYPE_AAAA)) {
 				if (knot_dname_in_bailiwick(ns_name,
 							aq->parent->zone_cut.name)) {
-					for (int i = 0; i < 2; ++i)
-						if (infos[i] == AI_UNKNOWN)
-							infos[i] = AI_CYCLED;
+					for (int j = 0; j < 2; ++j)
+						if (infos[j] == AI_UNKNOWN)
+							infos[j] = AI_CYCLED;
 					break;
 				}
 			} else {

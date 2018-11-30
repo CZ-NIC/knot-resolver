@@ -35,15 +35,15 @@
  * lock based on a filename.  At the moment it's POSIX-only, but it
  * should be abstract enough of an interface to make an implementation
  * for non-posix systems if anyone cares. */
-typedef int lock;
-static bool _lock_is_invalid(lock lock)
+typedef int lock_t;
+static bool _lock_is_invalid(lock_t lock)
 {
 	return lock == -1;
 }
 /* a blocking lock on a given filename */
-static lock _lock_filename(const char *fname)
+static lock_t _lock_filename(const char *fname)
 {
-	lock lockfd = open(fname, O_RDONLY|O_CREAT, 0400);
+	lock_t lockfd = open(fname, O_RDONLY|O_CREAT, 0400);
 	if (lockfd == -1)
 		return lockfd;
 	/* this should be a non-blocking lock */
@@ -53,7 +53,7 @@ static lock _lock_filename(const char *fname)
 	}
 	return lockfd; /* for cleanup later */
 }
-static void _lock_unlock(lock *lock, const char *fname)
+static void _lock_unlock(lock_t *lock, const char *fname)
 {
 	if (lock && !_lock_is_invalid(*lock)) {
 		flock(*lock, LOCK_UN);
@@ -68,7 +68,7 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 	gnutls_x509_privkey_t privkey = NULL;
 	int err;
 	gnutls_datum_t data = { .data = NULL, .size = 0 };
-	lock lock;
+	lock_t lock;
 	int datafd = -1;
 
 	/* Take a lock to ensure that two daemons started concurrently
