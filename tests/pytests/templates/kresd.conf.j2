@@ -16,9 +16,7 @@ net.listen('{{ kresd.ip6 }}', {{ kresd.tls_port }}, {tls = true})
 {% endif %}
 
 net.ipv4=true
-net.ipv6=false
-
-net.tcp_pipeline(65535)
+net.ipv6=true
 
 {% if kresd.tls_key_path and kresd.tls_cert_path %}
 net.tls("{{ kresd.tls_cert_path }}", "{{ kresd.tls_key_path }}")
@@ -27,6 +25,8 @@ net.tls("{{ kresd.tls_cert_path }}", "{{ kresd.tls_key_path }}")
 {% for name, ip in kresd.hints.items() %}
 hints['{{ name }}'] = '{{ ip }}'
 {% endfor %}
+
+policy.add(policy.all(policy.QTRACE))
 
 {% if kresd.forward %}
 policy.add(policy.all(
