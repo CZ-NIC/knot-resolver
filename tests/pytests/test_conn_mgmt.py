@@ -49,7 +49,11 @@ def test_ignore_garbage(kresd_sock, garbage_lengths, single_buffer, query_before
 
 
 def test_pipelining(kresd_sock):
-    """First query takes longer to resolve - answer to second query should arrive sooner."""
+    """
+    First query takes longer to resolve - answer to second query should arrive sooner.
+
+    This test requires internet connection.
+    """
     buff1, msgid1 = utils.get_msgbuff('1000.delay.getdnsapi.net.', msgid=1)
     buff2, msgid2 = utils.get_msgbuff('1.delay.getdnsapi.net.', msgid=2)
     buff = buff1 + buff2
@@ -184,11 +188,6 @@ def test_query_flood_no_recv(make_kresd_sock):
 ])
 def test_query_flood_garbage(make_kresd_sock, glength, gcount, delay, query_before):
     """Flood resolver with prefixed garbage."""
-    # TODO - despite the fact that kresd closes TCP connection, it seems to be
-    # error in TCP stream parsing. Kresd closes TCP connection because of
-    # message length in TCP prefix is lesser then length of the fixed message
-    # header, it shouldn't happen.
-
     sock1 = make_kresd_sock()
     if query_before:
         utils.ping_alive(sock1)
