@@ -501,14 +501,14 @@ static void zi_zone_process(uv_timer_t* handle)
 		goto finish;
 	}
 
-	knot_rrset_t *rr = map_get(&z_import->rrset_indexed, key);
-	if (!rr) {
+	knot_rrset_t *rr_key = map_get(&z_import->rrset_indexed, key);
+	if (!rr_key) {
 		/* DNSKEY MUST be here. If not found - fail. */
 		kr_log_error("[zimport] DNSKEY not found for `%s`, fail\n", zone_name_str);
 		failed = 1;
 		goto finish;
 	}
-	z_import->key = rr;
+	z_import->key = rr_key;
 
 	VERBOSE_MSG(NULL, "started: zone: '%s'\n", zone_name_str);
 
@@ -516,16 +516,16 @@ static void zi_zone_process(uv_timer_t* handle)
 
 	/* Import DNSKEY at first step. If any validation problems will appear,
 	 * cancel import of whole zone. */
-	KR_DNAME_GET_STR(qname_str, rr->owner);
-	KR_RRTYPE_GET_STR(type_str, rr->type);
+	KR_DNAME_GET_STR(kname_str, rr_key->owner);
+	KR_RRTYPE_GET_STR(ktype_str, rr_key->type);
 
-	VERBOSE_MSG(NULL, "importing: qname: '%s' type: '%s'\n",
-		    qname_str, type_str);
+	VERBOSE_MSG(NULL, "importing: name: '%s' type: '%s'\n",
+		    kname_str, ktype_str);
 
-	int res = zi_rrset_import(z_import, rr);
+	int res = zi_rrset_import(z_import, rr_key);
 	if (res != 0) {
 		VERBOSE_MSG(NULL, "import failed: qname: '%s' type: '%s'\n",
-			    qname_str, type_str);
+			    kname_str, ktype_str);
 		failed = 1;
 		goto finish;
 	}
@@ -538,16 +538,16 @@ static void zi_zone_process(uv_timer_t* handle)
 			continue;
 		}
 
-		KR_DNAME_GET_STR(qname_str, rr->owner);
+		KR_DNAME_GET_STR(name_str, rr->owner);
 		KR_RRTYPE_GET_STR(type_str, rr->type);
-		VERBOSE_MSG(NULL, "importing: qname: '%s' type: '%s'\n",
-			    qname_str, type_str);
-		int res = zi_rrset_import(z_import, rr);
-		if (res == 0) {
+		VERBOSE_MSG(NULL, "importing: name: '%s' type: '%s'\n",
+			    name_str, type_str);
+		int ret = zi_rrset_import(z_import, rr);
+		if (ret == 0) {
 			++ns_imported;
 		} else {
-			VERBOSE_MSG(NULL, "import failed: qname: '%s' type: '%s'\n",
-				    qname_str, type_str);
+			VERBOSE_MSG(NULL, "import failed: name: '%s' type: '%s'\n",
+				    name_str, type_str);
 			++failed;
 		}
 		z_import->rrset_sorted.at[i] = NULL;
@@ -570,16 +570,16 @@ static void zi_zone_process(uv_timer_t* handle)
 			continue;
 		}
 
-		KR_DNAME_GET_STR(qname_str, rr->owner);
+		KR_DNAME_GET_STR(name_str, rr->owner);
 		KR_RRTYPE_GET_STR(type_str, rr->type);
-		VERBOSE_MSG(NULL, "importing: qname: '%s' type: '%s'\n",
-			    qname_str, type_str);
+		VERBOSE_MSG(NULL, "importing: name: '%s' type: '%s'\n",
+			    name_str, type_str);
 		res = zi_rrset_import(z_import, rr);
 		if (res == 0) {
 			++other_imported;
 		} else {
-			VERBOSE_MSG(NULL, "import failed: qname: '%s' type: '%s'\n",
-				    qname_str, type_str);
+			VERBOSE_MSG(NULL, "import failed: name: '%s' type: '%s'\n",
+				    name_str, type_str);
 			++failed;
 		}
 	}

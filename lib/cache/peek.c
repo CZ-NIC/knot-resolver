@@ -133,12 +133,14 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/**** 1. find the name or the closest (available) zone, not considering wildcards
 	 **** 1a. exact name+type match (can be negative answer in insecure zones) */
-	knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
-	knot_db_val_t val = { NULL, 0 };
-	ret = cache_op(cache, read, &key, &val, 1);
-	if (!ret) {
-		/* found an entry: test conditions, materialize into pkt, etc. */
-		ret = found_exact_hit(ctx, pkt, val, lowest_rank);
+	{
+		knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
+		knot_db_val_t val = { NULL, 0 };
+		ret = cache_op(cache, read, &key, &val, 1);
+		if (!ret) {
+			/* found an entry: test conditions, materialize into pkt, etc. */
+			ret = found_exact_hit(ctx, pkt, val, lowest_rank);
+		}
 	}
 	if (ret && ret != -abs(ENOENT)) {
 		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
@@ -252,7 +254,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/* Assuming k->buf still starts with zone's prefix,
 		 * look up the SOA in cache. */
 		k->buf[0] = k->zlf_len;
-		key = key_exact_type(k, KNOT_RRTYPE_SOA);
+		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_SOA);
 		knot_db_val_t val = { NULL, 0 };
 		ret = cache_op(cache, read, &key, &val, 1);
 		const struct entry_h *eh;
