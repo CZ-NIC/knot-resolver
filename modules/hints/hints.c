@@ -285,29 +285,29 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 		kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
 		return kr_zonecut_del(&data->hints, key,
 					kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
-	} else {
-		/* Find a matching name */
-		pack_t *addr_set = kr_zonecut_find(&data->hints, key);
-		if (!addr_set || addr_set->len == 0) {
-			return kr_error(ENOENT);
-		}
-
-		/* Remove address records in hints from reverse_hints. */
-		uint8_t *addr = pack_head(*addr_set);
-		while (addr != pack_tail(*addr_set)) {
-			void *addr_val = pack_obj_val(addr);
-			int family = pack_obj_len(addr) == kr_family_len(AF_INET)
-					? AF_INET : AF_INET6;
-			const knot_dname_t *reverse_key = raw_addr2reverse(addr_val, family);
-			if (reverse_key != NULL) {
-				kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
-			}
-			addr = pack_obj_next(addr);
-		}
-		
-		/* Remove the whole name. */
-		return kr_zonecut_del_all(&data->hints, key);
 	}
+	/* We're removing everything for the name;
+	 * first find the name's pack */
+	pack_t *addr_set = kr_zonecut_find(&data->hints, key);
+	if (!addr_set || addr_set->len == 0) {
+		return kr_error(ENOENT);
+	}
+
+	/* Remove address records in hints from reverse_hints. */
+
+	for (uint8_t *a = pack_head(*addr_set); a != pack_tail(*addr_set);
+						a = pack_obj_next(a)) {
+		void *addr_val = pack_obj_val(a);
+		int family = pack_obj_len(a) == kr_family_len(AF_INET)
+				? AF_INET : AF_INET6;
+		const knot_dname_t *reverse_key = raw_addr2reverse(addr_val, family);
+		if (reverse_key != NULL) {
+			kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
+		}
+	}
+
+	/* Remove the whole name. */
+	return kr_zonecut_del_all(&data->hints, key);
 }
 
 static int load_file(struct kr_module *module, const char *path)

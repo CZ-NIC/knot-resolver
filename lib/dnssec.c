@@ -211,14 +211,14 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 			if (knot_rrsig_type_covered(rdata_j) != covered->type) {
 				continue;
 			}
-			int ret = validate_rrsig_rr(&val_flgs, covered_labels, rdata_j,
+			int retv = validate_rrsig_rr(&val_flgs, covered_labels, rdata_j,
 			                      keys->owner, key_rdata, keytag,
 			                      zone_name, timestamp);
-			if (ret == kr_error(EAGAIN)) {
+			if (retv == kr_error(EAGAIN)) {
 				kr_dnssec_key_free(&created_key);
-				vctx->result = ret;
-				return ret;
-			} else if (ret != 0) {
+				vctx->result = retv;
+				return retv;
+			} else if (retv != 0) {
 				continue;
 			}
 			if (val_flgs & FLG_WILDCARD_EXPANSION) {

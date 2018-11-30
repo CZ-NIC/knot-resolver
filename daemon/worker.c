@@ -829,7 +829,6 @@ static void on_connect(uv_connect_t *req, int status)
 	struct qr_task *task = session_waitinglist_get(session);
 	struct kr_query *qry = task_get_last_pending_query(task);
 	WITH_VERBOSE (qry) {
-		struct sockaddr *peer = session_get_peer(session);
 		char peer_str[INET6_ADDRSTRLEN];
 		inet_ntop(peer->sa_family, kr_inaddr(peer), peer_str, sizeof(peer_str));
 		VERBOSE_MSG(qry, "=> connected to '%s'\n", peer_str);
