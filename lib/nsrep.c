@@ -474,12 +474,17 @@ int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src)
 	return kr_ok();
 }
 
-int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
+int kr_nsrep_sort(struct kr_nsrep *ns, struct kr_context *ctx)
 {
-	if (!ns || !rtt_cache) {
+	if (!ns || !ctx) {
 		assert(false);
 		return kr_error(EINVAL);
 	}
+
+	kr_nsrep_rtt_lru_t *rtt_cache = ctx->cache_rtt;
+
+	ns->reputation = 0;
+	ns->score = KR_NS_MAX_SCORE + 1;
 
 	if (ns->addr[0].ip.sa_family == AF_UNSPEC) {
 		return kr_error(EINVAL);
@@ -489,6 +494,7 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 	 * along the addresses. */
 	unsigned scores[KR_NSREP_MAXADDR];
 	int i;
+	bool timeouted_address_is_already_selected = false;
 	for (i = 0; i < KR_NSREP_MAXADDR; ++i) {
 		const struct sockaddr *sa = &ns->addr[i].ip;
 		if (sa->sa_family == AF_UNSPEC) {
@@ -499,10 +505,23 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 									kr_family_len(sa->sa_family));
 		if (!rtt_cache_entry) {
 			scores[i] = 1; /* prefer unknown to probe RTT */
-		} else if ((kr_rand_uint(100) < 10) &&
-			   (kr_rand_uint(KR_NS_MAX_SCORE) >= rtt_cache_entry->score)) {
-			/* some probability to bump bad ones up for re-probe */
-			scores[i] = 1;
+			if (sa->sa_family == AF_INET) {
+				scores[i] += FAVOUR_IPV6;
+			}
+		} else if (rtt_cache_entry->score >= KR_NS_TIMEOUT) {
+			uint64_t now = kr_now();
+			uint64_t elapsed = now - rtt_cache_entry->tout_timestamp;
+			scores[i] = KR_NS_MAX_SCORE + 1;
+			elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
+			if (elapsed > ctx->cache_rtt_tout_retry_interval &&
+			    !timeouted_address_is_already_selected) {
+				scores[i] = 1;
+				if (sa->sa_family == AF_INET) {
+					scores[i] += FAVOUR_IPV6;
+				}
+				rtt_cache_entry->tout_timestamp = now;
+				timeouted_address_is_already_selected = true;
+			}
 		} else {
 			scores[i] = rtt_cache_entry->score;
 			if (sa->sa_family == AF_INET) {
@@ -510,10 +529,8 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 			}
 		}
 		if (VERBOSE_STATUS) {
-			char sa_str[INET6_ADDRSTRLEN];
-			inet_ntop(sa->sa_family, kr_inaddr(sa), sa_str, sizeof(sa_str));
 			kr_log_verbose("[     ][nsre] score %d for %s;\t cached RTT: %d\n",
-					scores[i], sa_str,
+					scores[i], kr_straddr(sa),
 					rtt_cache_entry ? rtt_cache_entry->score : -1);
 		}
 	}
@@ -535,9 +552,10 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 		}
 	}
 
-	/* At least two addresses must be in the address list */
-	assert(count > 0);
-	ns->score = scores[0];
-	ns->reputation = 0;
+	if (count > 0) {
+		ns->score = scores[0];
+		ns->reputation = 0;
+	}
+
 	return kr_ok();
 }

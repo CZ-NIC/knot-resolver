@@ -794,6 +794,10 @@ static void on_connect(uv_connect_t *req, int status)
 	assert(session_flags(session)->outgoing);
 
 	if (status == UV_ECANCELED) {
+		if (kr_verbose_status) {
+			const char *peer_str = kr_straddr(peer);
+			kr_log_verbose( "[wrkr]=> connect to '%s' cancelled\n", peer_str ? peer_str : "");
+		}
 		worker_del_tcp_waiting(worker, peer);
 		assert(session_is_empty(session) && session_flags(session)->closing);
 		return;
@@ -806,6 +810,11 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	if (status != 0) {
+		if (kr_verbose_status) {
+			const char *peer_str = kr_straddr(peer);
+			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s)\n",
+					peer_str ? peer_str : "", uv_strerror(status));
+		}
 		worker_del_tcp_waiting(worker, peer);
 		assert(session_tasklist_is_empty(session));
 		session_waitinglist_retry(session, false);
@@ -826,13 +835,9 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 	}
 
-	struct qr_task *task = session_waitinglist_get(session);
-	struct kr_query *qry = task_get_last_pending_query(task);
-	WITH_VERBOSE (qry) {
-		struct sockaddr *peer = session_get_peer(session);
-		char peer_str[INET6_ADDRSTRLEN];
-		inet_ntop(peer->sa_family, kr_inaddr(peer), peer_str, sizeof(peer_str));
-		VERBOSE_MSG(qry, "=> connected to '%s'\n", peer_str);
+	if (kr_verbose_status) {
+		const char *peer_str = kr_straddr(peer);
+		kr_log_verbose( "[wrkr]=> connected to '%s'\n", peer_str ? peer_str : "");
 	}
 
 	session_flags(session)->connected = true;
@@ -1300,8 +1305,8 @@ static int tcp_task_step(struct qr_task *task,
 {
 	assert(task->pending_count == 0);
 
-	const struct sockaddr *addr =
-		packet_source ? packet_source : task->addrlist;
+	/* target */
+	const struct sockaddr *addr = task->addrlist;
 	if (addr->sa_family == AF_UNSPEC) {
 		/* Target isn't defined. Finalize task with SERVFAIL.
 		 * Although task->pending_count is zero, there are can be followers,

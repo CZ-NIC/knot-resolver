@@ -1423,12 +1423,14 @@ ns_election:
 
 	const struct kr_qflags qflg = qry->flags;
 	const bool retry = qflg.TCP || qflg.BADCOOKIE_AGAIN;
-	bool check_timeouted = false;
 	if (qflg.AWAIT_IPV4 || qflg.AWAIT_IPV6) {
 		kr_nsrep_elect_addr(qry, request->ctx);
 	} else if (qflg.FORWARD || qflg.STUB) {
-		kr_nsrep_sort(&qry->ns, request->ctx->cache_rtt);
-		check_timeouted = true;
+		kr_nsrep_sort(&qry->ns, request->ctx);
+		if (qry->ns.score > KR_NS_MAX_SCORE) {
+			VERBOSE_MSG(qry, "=> no valid NS left\n");
+			return KR_STATE_FAIL;
+		}
 	} else if (!qry->ns.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
@@ -1436,22 +1438,20 @@ ns_election:
 			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
 		}
 		kr_nsrep_elect(qry, request->ctx);
-		check_timeouted = true;
-	}
-
-	if (check_timeouted && qry->ns.score > KR_NS_TIMEOUT) {
-		if (kr_zonecut_is_empty(&qry->zone_cut)) {
-			VERBOSE_MSG(qry, "=> no NS with an address\n");
-		} else {
-			VERBOSE_MSG(qry, "=> no valid NS left\n");
+		if (qry->ns.score > KR_NS_MAX_SCORE) {
+			if (kr_zonecut_is_empty(&qry->zone_cut)) {
+				VERBOSE_MSG(qry, "=> no NS with an address\n");
+			} else {
+				VERBOSE_MSG(qry, "=> no valid NS left\n");
+			}
+			if (!qry->flags.NO_NS_FOUND) {
+				qry->flags.NO_NS_FOUND = true;
+			} else {
+				ITERATE_LAYERS(request, qry, reset);
+				kr_rplan_pop(rplan, qry);
+			}
+			return KR_STATE_PRODUCE;
 		}
-		if (!qry->flags.NO_NS_FOUND) {
-			qry->flags.NO_NS_FOUND = true;
-		} else {
-			ITERATE_LAYERS(request, qry, reset);
-			kr_rplan_pop(rplan, qry);
-		}
-		return KR_STATE_PRODUCE;
 	}
 
 	/* Resolve address records */

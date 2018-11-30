@@ -174,12 +174,14 @@ int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t
 int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src);
 
 /**
- * Sort addresses in the query nsrep list
+ * Sort addresses in the query nsrep list by cached RTT.
+ * if RTT is greater then KR_NS_TIMEOUT, address will placed at the beginning of the
+ * nsrep list once in cache.ns_tout() milliseconds. Otherwise it will be sorted
+ * as if it has cached RTT equal to KR_NS_MAX_SCORE + 1.
  * @param  ns           updated kr_nsrep
- * @param  rtt_cache    RTT LRU cache
+ * @param  ctx          name resolution context.
  * @return              0 or an error code
- * @note   ns reputation is zeroed, as KR_NS_NOIP{4,6} flags are useless
- * 	   in STUB/FORWARD mode.
+ * @note   ns reputation is zeroed and score is set to KR_NS_MAX_SCORE + 1.
  */
 KR_EXPORT
-int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache);
+int kr_nsrep_sort(struct kr_nsrep *ns,  struct kr_context *ctx);
