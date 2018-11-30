@@ -339,8 +339,10 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		/* Basic checks OK -> materialize data, cleaning any previous
 		 * records on that answer index (unsuccessful attempts). */
 		knot_dname_t owner[KNOT_DNAME_MAXLEN];
-		int ret = dname_wire_reconstruct(owner, k->zname, hash_low);
-		if (unlikely(ret)) continue;
+		{
+			int ret = dname_wire_reconstruct(owner, k->zname, hash_low);
+			if (unlikely(ret)) continue;
+		}
 		const int ans_id = (exact_match && name_labels + 1 == last_nxproven_labels)
 				 ? AR_CPE : AR_NSEC;
 		{
