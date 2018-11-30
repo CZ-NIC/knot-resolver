@@ -21,7 +21,7 @@ Tests can be executed with the pytest framework.
    $ pytest-3 --html pytests.html --self-contained-html  # html report
 
 It's highly recommended to run these tests in parallel, since lot of them
-wait for kresd timeout. This can be don with `python-xdist`:
+wait for kresd timeout. This can be done with `python-xdist`:
 
 .. code-block:: bash
 
@@ -32,7 +32,7 @@ each other. However, when using lots of parallel jobs, it is possible an already
 port will be assigned to kresd. These cases will be detected and result in skipped
 tests.
 
-Some tests are ommitted from automatic test collection by default, due to their
+Some tests are omitted from automatic test collection by default, due to their
 resource contraints. These typicially have to be executed separately by providing
 the path to test file directly.
 
