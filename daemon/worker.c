@@ -688,7 +688,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 	if (status) {
 		kr_nsrep_update_rtt(NULL, peer, KR_NS_DEAD,
 				    worker->engine->resolver.cache_rtt,
-				    KR_NS_UPDATE_NORESET);
+				    KR_NS_RESET);
 		return ret;
 	}
 
@@ -812,10 +812,13 @@ static void on_connect(uv_connect_t *req, int status)
 	if (status != 0) {
 		if (kr_verbose_status) {
 			const char *peer_str = kr_straddr(peer);
-			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s)\n",
+			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s), flagged as 'bad'\n",
 					peer_str ? peer_str : "", uv_strerror(status));
 		}
 		worker_del_tcp_waiting(worker, peer);
+		kr_nsrep_update_rtt(NULL, peer, KR_NS_DEAD,
+				    worker->engine->resolver.cache_rtt,
+				    KR_NS_RESET);
 		assert(session_tasklist_is_empty(session));
 		session_waitinglist_retry(session, false);
 		session_close(session);
@@ -890,7 +893,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 
 	kr_nsrep_update_rtt(NULL, peer, KR_NS_DEAD,
 			    worker->engine->resolver.cache_rtt,
-			    KR_NS_UPDATE_NORESET);
+			    KR_NS_RESET);
 
 	worker->stats.timeout += session_waitinglist_get_len(session);
 	session_waitinglist_retry(session, true);
@@ -917,13 +920,12 @@ static void on_udp_timeout(uv_timer_t *timer)
 		for (uint16_t i = 0; i < MIN(task->pending_count, task->addrlist_count); ++i) {
 			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
 			WITH_VERBOSE(qry) {
-				char addr_str[INET6_ADDRSTRLEN];
-				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
+				char *addr_str = kr_straddr(choice);
+				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str ? addr_str : "");
 			}
 			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_DEAD,
 					    worker->engine->resolver.cache_rtt,
-					    KR_NS_UPDATE_NORESET);
+					    KR_NS_RESET);
 		}
 	}
 	task->timeouts += 1;
@@ -1278,11 +1280,20 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	}
 
 	/*  Start connection process to upstream. */
-	if (uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect) != 0) {
+	ret = uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect);
+	if (ret != 0) {
 		session_timer_stop(session);
 		worker_del_tcp_waiting(ctx->worker, addr);
 		free(conn);
 		session_close(session);
+		kr_nsrep_update_rtt(NULL, addr, KR_NS_DEAD,
+				    worker->engine->resolver.cache_rtt,
+				    KR_NS_RESET);
+		WITH_VERBOSE (qry) {
+			const char *peer_str = kr_straddr(peer);
+			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s), flagged as 'bad'\n",
+					peer_str ? peer_str : "", uv_strerror(ret));
+		}
 		return kr_error(EAGAIN);
 	}
 

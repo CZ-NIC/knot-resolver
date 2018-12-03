@@ -878,12 +878,6 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 		} else { /* Penalize SERVFAILs. */
 			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
 		}
-	/* Penalise resolution failures except validation failures. */
-	} else if (!(qry->flags.DNSSEC_BOGUS)) {
-		kr_nsrep_update_rtt(&qry->ns, src, KR_NS_TIMEOUT, ctx->cache_rtt, KR_NS_UPDATE);
-		WITH_VERBOSE(qry) {
-			VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", kr_straddr(src));
-		}
 	}
 }
 
@@ -1428,6 +1422,8 @@ ns_election:
 	} else if (qflg.FORWARD || qflg.STUB) {
 		kr_nsrep_sort(&qry->ns, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
+			/* At the moment all NS have bad reputation.
+			 * But there can be existing connections*/
 			VERBOSE_MSG(qry, "=> no valid NS left\n");
 			return KR_STATE_FAIL;
 		}
@@ -1468,14 +1464,14 @@ ns_election:
 		return KR_STATE_PRODUCE;
 	}
 
-	/* Randomize query case (if not in safemode or turned off) */
+	/* Randomize query case (if not in safe mode or turned off) */
 	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)
 			? 0 : kr_rand_uint(0);
 	knot_dname_t *qname_raw = knot_pkt_qname(packet);
 	randomized_qname_case(qname_raw, qry->secret);
 
 	/*
-	 * Additional query is going to be finalised when calling
+	 * Additional query is going to be finalized when calling
 	 * kr_resolve_checkout().
 	 */
 	qry->timestamp_mono = kr_now();
@@ -1581,8 +1577,6 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 
 	WITH_VERBOSE(qry) {
 
-	char ns_str[INET6_ADDRSTRLEN];
-
 	KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
@@ -1595,12 +1589,13 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		if (!kr_inaddr_equal(dst, addr)) {
 			continue;
 		}
-		inet_ntop(addr->sa_family, kr_inaddr(&qry->ns.addr[i].ip), ns_str, sizeof(ns_str));
+		const char *ns_str = kr_straddr(addr);
 		VERBOSE_MSG(qry,
 			"=> id: '%05u' querying: '%s' score: %u zone cut: '%s' "
 			"qname: '%s' qtype: '%s' proto: '%s'\n",
-			qry->id, ns_str, qry->ns.score, zonecut_str,
+			qry->id, ns_str ? ns_str : "", qry->ns.score, zonecut_str,
 			qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
+
 		break;
 	}}
 

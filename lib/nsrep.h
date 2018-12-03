@@ -31,18 +31,17 @@ struct kr_query;
   * @note RTT is measured in milliseconds.
   */
 enum kr_ns_score {
-	KR_NS_MAX_SCORE = KR_CONN_RTT_MAX,
-	KR_NS_TIMEOUT   = (95 * KR_NS_MAX_SCORE) / 100,
-	KR_NS_LONG      = (3 * KR_NS_TIMEOUT) / 4,
-	KR_NS_UNKNOWN   = KR_NS_TIMEOUT / 2,
-	KR_NS_PENALTY   = 100,
-	KR_NS_GLUED     = 10,
+	KR_NS_MAX_SCORE     = 20 * KR_CONN_RTT_MAX, /* rtt "invalid value" */
+	KR_NS_DEAD          = KR_NS_MAX_SCORE - 1,  /* NS didn't answer via UDP transport,
+						     * TCP connection failed or
+						     * TLS handshake failed */
+	KR_NS_FWD_TIMEOUT   = 10000, /* timeout for upstream recursor  */
+	KR_NS_TIMEOUT       = (95 * KR_CONN_RTT_MAX) / 100, /* timeout for upstream auth */
+	KR_NS_LONG          = (3 * KR_NS_TIMEOUT) / 4,
+	KR_NS_UNKNOWN       = KR_NS_TIMEOUT / 2,
+	KR_NS_PENALTY       = 100,
+	KR_NS_GLUED         = 10
 };
-
-/**
- *  See kr_nsrep_update_rtt()
- */
-#define KR_NS_DEAD (((KR_NS_TIMEOUT * 4) + 3) / 3)
 
 /** If once NS was marked as "timeouted", it won't participate in NS elections
  * at least KR_NS_TIMEOUT_RETRY_INTERVAL milliseconds (now: one minute). */
@@ -144,8 +143,6 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
  * @param  ns           updated NS representation
  * @param  addr         chosen address (NULL for first)
  * @param  score        new score (i.e. RTT), see enum kr_ns_score
- *                      after two calls with score = KR_NS_DEAD and umode = KR_NS_UPDATE
- *                      server will be guaranteed to have score >= KR_NS_TIMEOUT
  * @param  cache        RTT LRU cache
  * @param  umode        update mode (KR_NS_UPDATE or KR_NS_RESET or KR_NS_ADD)
  * @return              0 on success, error code on failure
