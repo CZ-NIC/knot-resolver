@@ -54,6 +54,13 @@ def test_pipelining(kresd_sock):
 
     This test requires internet connection.
     """
+    # initialization (to avoid issues with net.ipv6=true)
+    buff_pre, msgid_pre = utils.get_msgbuff('0.delay.getdnsapi.net.')
+    kresd_sock.sendall(buff_pre)
+    msg_answer = utils.receive_parse_answer(kresd_sock)
+    assert msg_answer.id == msgid_pre
+
+    # test
     buff1, msgid1 = utils.get_msgbuff('1000.delay.getdnsapi.net.', msgid=1)
     buff2, msgid2 = utils.get_msgbuff('1.delay.getdnsapi.net.', msgid=2)
     buff = buff1 + buff2
