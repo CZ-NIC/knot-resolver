@@ -500,7 +500,7 @@ int kr_nsrep_sort(struct kr_nsrep *ns, struct kr_context *ctx)
 			if (sa->sa_family == AF_INET) {
 				scores[i] += FAVOUR_IPV6;
 			}
-		} else if (rtt_cache_entry->score >= KR_NS_TIMEOUT) {
+		} else if (rtt_cache_entry->score >= KR_NS_FWD_TIMEOUT) {
 			uint64_t now = kr_now();
 			uint64_t elapsed = now - rtt_cache_entry->tout_timestamp;
 			scores[i] = KR_NS_MAX_SCORE + 1;
