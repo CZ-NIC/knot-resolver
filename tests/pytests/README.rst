@@ -28,9 +28,7 @@ wait for kresd timeout. This can be done with `python-xdist`:
    $ pytest-3 -n 24  # parallel with 24 jobs
 
 Each test spawns an independent kresd instance, so test failures shouldn't affect
-each other. However, when using lots of parallel jobs, it is possible an already taken
-port will be assigned to kresd. These cases will be detected and result in skipped
-tests.
+each other.
 
 Some tests are omitted from automatic test collection by default, due to their
 resource contraints. These typicially have to be executed separately by providing
