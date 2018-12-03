@@ -17,12 +17,6 @@ def kresd_tt(tmpdir):
         yield kresd
 
 
-@pytest.fixture
-def kresd_tt_expired(tmpdir):
-    with make_kresd(tmpdir, 'tt-expired') as kresd:
-        yield kresd
-
-
 @pytest.fixture(params=[
     'ip_tcp_socket',
     'ip6_tcp_socket',

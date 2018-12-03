@@ -50,5 +50,5 @@ The framework provides a few useful pytest fixtures to simplify this process:
   It expands to 4 values (tests) - IPv4 TCP, IPv6 TCP, IPv4 TLS, IPv6 TLS sockets
 - `make_kresd_sock` is similar to `kresd_sock`, except it's a factory function that
   produces a new connected socket (of the same type) on each call
-- `kresd`, `kresd_tt`, `kresd_tt_expired` are all Kresd instances, already running
-  and initialized with config (with no / valid / expired TLS certificates)
+- `kresd`, `kresd_tt` are all Kresd instances, already running
+  and initialized with config (with no / valid TLS certificates)
