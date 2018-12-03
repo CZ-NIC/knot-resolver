@@ -2,7 +2,7 @@ import socket
 
 import pytest
 
-from kresd import make_kresd
+from kresd import init_portdir, make_kresd
 
 
 @pytest.fixture
@@ -78,3 +78,7 @@ def pytest_metadata(metadata):  # filter potentially sensitive data from GitLab 
             keys_to_delete.append(key)
     for key in keys_to_delete:
         del metadata[key]
+
+
+def pytest_sessionstart(session):  # pylint: disable=unused-argument
+    init_portdir()
