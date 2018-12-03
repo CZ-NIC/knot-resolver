@@ -81,13 +81,20 @@ end
 
 -- Override the list of nameservers (forwarders)
 local function set_nslist(qry, list)
-	for i, ns in ipairs(list) do
+	local ns_i = 0
+	for _, ns in ipairs(list) do
 		-- kr_nsrep_set() can return kr_error(ENOENT), it's OK
-		ffi.C.kr_nsrep_set(qry, i - 1, ns)
+		if ffi.C.kr_nsrep_set(qry, ns_i, ns) == 0 then
+			ns_i = ns_i + 1
+		end
 	end
 	-- If less than maximum NSs, insert guard to terminate the list
-	if #list < 4 then
-		assert(ffi.C.kr_nsrep_set(qry, #list, nil) == 0);
+	if ns_i < 3 then
+		assert(ffi.C.kr_nsrep_set(qry, ns_i, nil) == 0);
+	end
+	if ns_i == 0 then
+		-- would use assert() but don't want to compose the message if not triggered
+		error('no adress in the configured NS set is usable:\n' .. table_print(list, 2))
 	end
 end
 

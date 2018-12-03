@@ -20,6 +20,7 @@ Bugfixes
   as the submodule collects metrics from all sub-processes as well.
 - TLS fixes for corner cases (!714, !700)
 - fix build with -DNOVERBOSELOG (#424)
+- policy.{FORWARD,TLS_FORWARD,STUB}: respect net.ipv{4,6} setting (!710)
 
 Improvements
 ------------
