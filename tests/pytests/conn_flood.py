@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from kresd import Kresd, make_port
+from kresd import Kresd
 import utils
 
 
@@ -54,9 +54,7 @@ def test_conn_flood(tmpdir, sock_func_name):
     # create kresd instance with verbose=False
     ip = '127.0.0.1'
     ip6 = '::1'
-    port = make_port(ip, ip6)
-    tls_port = make_port(ip, ip6)
-    with Kresd(tmpdir, port, tls_port, ip, ip6, verbose=False) as kresd:
+    with Kresd(tmpdir, ip=ip, ip6=ip6, verbose=False) as kresd:
         print("\nEstablishing {} connections".format(nsockets))
         make_sock = getattr(kresd, sock_func_name)  # function for creating sockets
         sockets = create_sockets(make_sock, nsockets)

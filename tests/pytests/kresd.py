@@ -1,14 +1,15 @@
 from collections import namedtuple
 from contextlib import ContextDecorator, contextmanager
 import os
+from pathlib import Path
 import random
 import re
+import shutil
 import socket
 import subprocess
 import time
 
 import jinja2
-import pytest
 
 import utils
 
@@ -18,6 +19,17 @@ CERTS_DIR = os.path.join(PYTESTS_DIR, 'certs')
 TEMPLATES_DIR = os.path.join(PYTESTS_DIR, 'templates')
 KRESD_CONF_TEMPLATE = 'kresd.conf.j2'
 KRESD_STARTUP_MSGID = 10005  # special unique ID at the start of the "test" log
+KRESD_PORTDIR = '/tmp/pytest-kresd-portdir'
+KRESD_TESTPORT_MIN = 10000
+KRESD_TESTPORT_MAX = 49000
+
+
+def init_portdir():
+    try:
+        shutil.rmtree(KRESD_PORTDIR)
+    except FileNotFoundError:
+        pass
+    os.makedirs(KRESD_PORTDIR)
 
 
 def create_file_from_template(template_path, dest, data):
@@ -35,7 +47,7 @@ Forward = namedtuple('Forward', ['proto', 'ip', 'port', 'hostname', 'ca_file'])
 
 class Kresd(ContextDecorator):
     def __init__(
-            self, workdir, port, tls_port, ip=None, ip6=None, certname=None,
+            self, workdir, port=None, tls_port=None, ip=None, ip6=None, certname=None,
             verbose=True, hints=None, forward=None):
         if ip is None and ip6 is None:
             raise ValueError("IPv4 or IPv6 must be specified!")
@@ -67,6 +79,15 @@ class Kresd(ContextDecorator):
         return str(os.path.join(self.workdir, 'kresd.log'))
 
     def __enter__(self):
+        if self.port is not None:
+            take_port(self.port, self.ip, self.ip6)
+        else:
+            self.port = make_port(self.ip, self.ip6)
+        if self.tls_port is not None:
+            take_port(self.tls_port, self.ip, self.ip6)
+        else:
+            self.tls_port = make_port(self.ip, self.ip6)
+
         create_file_from_template(KRESD_CONF_TEMPLATE, self.config_path, {'kresd': self})
         self.logfile = open(self.logfile_path, 'w')
         self.process = subprocess.Popen(
@@ -89,14 +110,6 @@ class Kresd(ContextDecorator):
                     self.process.returncode))
         except (RuntimeError, ConnectionError):  # pylint: disable=try-except-raise
             raise
-        finally:
-            # handle cases where we accidentally attempt to bind to same port
-            # as another test that runs in parallel
-            self.logfile.flush()
-            with open(self.logfile_path) as f:
-                for line in f:
-                    if re.search('Address already in use', line) is not None:
-                        pytest.skip(line)  # mark as skipped instead of failed/error
 
         return self
 
@@ -109,6 +122,7 @@ class Kresd(ContextDecorator):
                 sock.close()
             self.process.terminate()
             self.logfile.close()
+            Path(KRESD_PORTDIR, str(self.port)).unlink()
 
     def all_ports_alive(self, msgid=10001):
         alive = True
@@ -228,11 +242,33 @@ def is_port_free(port, ip=None, ip6=None):
     return True
 
 
+def take_port(port, ip=None, ip6=None):
+    port_path = Path(KRESD_PORTDIR, str(port))
+    try:
+        port_path.touch(exist_ok=False)
+    except FileExistsError:
+        raise ValueError(
+            "Port {} already reserved by system or another kresd instance!".format(port))
+
+    if not is_port_free(port, ip, ip6):
+        # NOTE: The port_path isn't removed, so other instances don't have to attempt to
+        # take the same port again. This has the side effect of leaving many of these
+        # files behind, because when another kresd shuts down and removes its file, the
+        # port still can't be reserved for a while. This shouldn't become an issue unless
+        # we have thousands of tests (and run out of the port range).
+        raise ValueError(
+            "Port {} is reserved by system!".format(port))
+    return port
+
+
 def make_port(ip=None, ip6=None):
     for _ in range(10):  # max attempts
-        port = random.randint(1024, 65535)
-        if is_port_free(port, ip, ip6):
-            return port
+        port = random.randint(KRESD_TESTPORT_MIN, KRESD_TESTPORT_MAX)
+        try:
+            take_port(port, ip, ip6)
+        except ValueError:
+            continue  # port reserved by system / another kresd instance
+        return port
     raise RuntimeError("No available port found!")
 
 
@@ -244,8 +280,6 @@ KRESD_LOG_IO_CLOSE = re.compile(r'^\[io\].*closed by peer.*')
 def make_kresd(
         workdir, certname=None, ip='127.0.0.1', ip6='::1', forward=None, hints=None,
         port=None, tls_port=None):
-    port = make_port(ip, ip6) if port is None else port
-    tls_port = make_port(ip, ip6) if tls_port is None else tls_port
     with Kresd(workdir, port, tls_port, ip, ip6, certname, forward=forward, hints=hints) as kresd:
         yield kresd
         print(kresd.partial_log())
