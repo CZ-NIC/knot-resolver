@@ -338,6 +338,8 @@ int kr_pkt_clear_payload(knot_pkt_t *pkt)
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen)
 {
+	/* LATER(opt.): there's relatively lots of copying, but ATM kr_pkt_put()
+	 * isn't considered to be used in any performance-critical parts (just lua). */
 	if (!pkt || !name)  {
 		return kr_error(EINVAL);
 	}
@@ -345,9 +347,10 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 	knot_rrset_t rr;
 	knot_rrset_init(&rr, knot_dname_copy(name, &pkt->mm), rtype, rclass, ttl);
 	/* Create RDATA */
-	knot_rdata_t *rdata_tmp = mm_malloc(&pkt->mm, offsetof(knot_rdata_t, data) + rdlen);
+	knot_rdata_t *rdata_tmp = mm_alloc(&pkt->mm, offsetof(knot_rdata_t, data) + rdlen);
 	knot_rdata_init(rdata_tmp, rdlen, rdata);
 	knot_rdataset_add(&rr.rrs, rdata_tmp, &pkt->mm);
+	mm_free(&pkt->mm, rdata_tmp); /* we're always on mempool for now, but whatever */
 	/* Append RR */
 	return knot_pkt_put(pkt, 0, &rr, KNOT_PF_FREE);
 }
