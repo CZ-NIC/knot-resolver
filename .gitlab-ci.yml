@@ -16,7 +16,7 @@ stages:
   - build
   - test
   - coverage
-  - respdiff
+  - extended
   - deploy
 
 build:linux:amd64:
@@ -268,8 +268,58 @@ test:linux:amd64:valgrind:
     - linux
     - amd64
 
+pytests:lint:
+  stage: test
+  dependencies: []
+  except:
+    - master
+  script:
+    - ./ci/pytests/lint.sh
+  tags:
+    - docker
+    - linux
+    - amd64
+
+pytests:run:
+  stage: test
+  dependencies:
+    - build:linux:amd64
+  except:
+    - master
+  script:
+    - pushd tests/pytests/rehandshake
+    - make all
+    - popd
+    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run.sh &> pytests.log.txt
+  after_script:
+    - tail -1 pytests.log.txt
+    - echo "See pytests.html or pytests.log.txt for full report."
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - pytest*
+  tags:
+    - docker
+    - linux
+    - amd64
+
+pytests:extended:
+  stage: extended
+  dependencies:
+    - build:linux:amd64
+  except:
+    - master
+  script:
+    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run-extended.sh
+  tags:
+    - docker
+    - linux
+    - amd64
+
+
 .respdiff:  &respdiff
-  stage: respdiff
+  stage: extended
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
@@ -370,7 +420,7 @@ respdiff:iter:udp:linux:amd64:
 
 
 .resperf:  &resperf
-  stage: respdiff
+  stage: extended
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver

@@ -1,0 +1,29 @@
+[MESSAGES CONTROL]
+
+disable=
+    missing-docstring,
+    too-many-arguments,
+    too-many-instance-attributes,
+    fixme,
+    unused-import,  # checked by flake8
+    line-too-long,  # checked by flake8
+    invalid-name,
+    broad-except,
+    bad-continuation,
+    global-statement,
+    no-else-return,
+    redefined-outer-name,  # commonly used with pytest fixtures
+
+
+[SIMILARITIES]
+min-similarity-lines=6
+ignore-comments=yes
+ignore-docstrings=yes
+ignore-imports=no
+
+[DESIGN]
+max-parents=10
+max-locals=20
+
+[TYPECHECK]
+ignored-modules=ssl

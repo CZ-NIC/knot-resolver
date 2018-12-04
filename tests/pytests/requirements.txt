@@ -1,0 +1,5 @@
+dnspython
+jinja2
+pytest
+pytest-html
+pytest-xdist
