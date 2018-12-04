@@ -109,11 +109,11 @@ struct kr_nsrep
 };
 
 /**
- * Set given NS address.
+ * Set given NS address.  (Very low-level access to the list.)
  * @param  qry      updated query
  * @param  index    index of the updated target
  * @param  sock     socket address to use (sockaddr_in or sockaddr_in6 or NULL)
- * @return          0 or an error code
+ * @return          0 or an error code, in particular kr_error(ENOENT) for net.ipvX
  */
 KR_EXPORT
 int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock);

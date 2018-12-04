@@ -280,28 +280,36 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock
 	if (index >= KR_NSREP_MAXADDR) {
 		return kr_error(ENOSPC);
 	}
-	qry->ns.name = (const uint8_t *)"";
-	/* Reset score on first entry */
-	if (index == 0) {
-		qry->ns.score = KR_NS_UNKNOWN;
-		qry->ns.reputation = 0;
-	}
 
 	if (!sock) {
+		qry->ns.name = (const uint8_t *)"";
 		qry->ns.addr[index].ip.sa_family = AF_UNSPEC;
 		return kr_ok();
 	}
 
 	switch (sock->sa_family) {
 	case AF_INET:
+		if (qry->flags.NO_IPV4) {
+			return kr_error(ENOENT);
+		}
 		qry->ns.addr[index].ip4 = *(const struct sockaddr_in *)sock;
 		break;
 	case AF_INET6:
+		if (qry->flags.NO_IPV6) {
+			return kr_error(ENOENT);
+		}
 		qry->ns.addr[index].ip6 = *(const struct sockaddr_in6 *)sock;
 		break;
 	default:
 		qry->ns.addr[index].ip.sa_family = AF_UNSPEC;
 		return kr_error(EINVAL);
+	}
+
+	qry->ns.name = (const uint8_t *)"";
+	/* Reset score on first entry */
+	if (index == 0) {
+		qry->ns.score = KR_NS_UNKNOWN;
+		qry->ns.reputation = 0;
 	}
 
 	/* Retrieve RTT from cache */

@@ -461,13 +461,13 @@ configured in the config file.
 
    :return: boolean (default: true)
 
-   Enable/disable using IPv6 for recursion.
+   Enable/disable using IPv6 for contacting upstream nameservers.
 
 .. envvar:: net.ipv4 = true|false
 
    :return: boolean (default: true)
 
-   Enable/disable using IPv4 for recursion.
+   Enable/disable using IPv4 for contacting upstream nameservers.
 
 .. function:: net.listen(addresses, [port = 53, flags = {tls = (port == 853)}])
 
