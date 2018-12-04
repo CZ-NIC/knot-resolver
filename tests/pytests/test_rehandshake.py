@@ -2,7 +2,7 @@
 
 Test utilizes rehandshake/tls-proxy, which forwards queries to configured
 resolver, but when it sends the response back to the query source, it
-performs a rehandshake after every byte sent.
+performs a rehandshake after every 8 bytes sent.
 
 It is expected the answer will be received by the source kresd instance
 and sent back to the client (this test).
@@ -15,6 +15,8 @@ import re
 import subprocess
 import time
 
+import dns
+import dns.rcode
 import pytest
 
 from kresd import CERTS_DIR, Forward, make_kresd, PYTESTS_DIR
@@ -32,6 +34,7 @@ def test_rehandshake(tmpdir):
         sock.sendall(buff)
         answer = utils.receive_parse_answer(sock)
         assert answer.id == msgid
+        assert answer.rcode() == dns.rcode.NOERROR
         assert answer.answer[0][0].address == '127.0.0.1'
 
     hints = {
@@ -54,7 +57,7 @@ def test_rehandshake(tmpdir):
         ca_file = os.path.join(CERTS_DIR, 'tt.cert.pem')
         try:
             proxy = subprocess.Popen(
-                [cmd], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                [cmd], cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             # run test kresd instance
             workdir2 = os.path.join(str(tmpdir), 'kresd')
@@ -63,19 +66,22 @@ def test_rehandshake(tmpdir):
                               hostname='transport-test-server.com', ca_file=ca_file)
             with make_kresd(workdir2, forward=forward) as kresd:
                 sock2 = kresd.ip_tcp_socket()
-                for hint in hints:
-                    resolve_hint(sock2, hint)
-                    time.sleep(1)
-
-                # verify log
-                n_connecting_to = 0
-                n_rehandshake = 0
-                for line in kresd.partial_log().splitlines():
-                    if re.search(r"connecting to: .*", line) is not None:
-                        n_connecting_to += 1
-                    elif re.search(r"TLS rehandshake .* has started", line) is not None:
-                        n_rehandshake += 1
-                assert n_connecting_to == 0  # shouldn't be present in partial log
-                assert n_rehandshake > 0
+                try:
+                    for hint in hints:
+                        resolve_hint(sock2, hint)
+                        time.sleep(0.1)
+                finally:
+                    # verify log
+                    n_connecting_to = 0
+                    n_rehandshake = 0
+                    partial_log = kresd.partial_log()
+                    print(partial_log)
+                    for line in partial_log.splitlines():
+                        if re.search(r"connecting to: .*", line) is not None:
+                            n_connecting_to += 1
+                        elif re.search(r"TLS rehandshake .* has started", line) is not None:
+                            n_rehandshake += 1
+                    assert n_connecting_to == 0  # shouldn't be present in partial log
+                    assert n_rehandshake > 0
         finally:
             proxy.terminate()
