@@ -91,7 +91,7 @@ class Kresd(ContextDecorator):
         create_file_from_template(KRESD_CONF_TEMPLATE, self.config_path, {'kresd': self})
         self.logfile = open(self.logfile_path, 'w')
         self.process = subprocess.Popen(
-            ['/usr/bin/env', 'kresd', '-c', self.config_path, self.workdir, '-f', '1'],
+            ['kresd', '-c', self.config_path, '-f', '1', self.workdir],
             stdout=self.logfile, env=os.environ.copy())
 
         try:
