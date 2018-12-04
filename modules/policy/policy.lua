@@ -94,7 +94,8 @@ local function set_nslist(qry, list)
 	end
 	if ns_i == 0 then
 		-- would use assert() but don't want to compose the message if not triggered
-		error('no adress in the configured NS set is usable:\n' .. table_print(list, 2))
+		error('no usable address in NS set (check net.ipv4 and '
+		      .. 'net.ipv6 config):\n' .. table_print(list, 2))
 	end
 end
 
