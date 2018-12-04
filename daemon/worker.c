@@ -675,6 +675,15 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	return ret;
 }
 
+static struct kr_query *task_get_last_pending_query(struct qr_task *task)
+{
+	if (!task || task->ctx->req.rplan.pending.len == 0) {
+		return NULL;
+	}
+
+	return array_tail(task->ctx->req.rplan.pending);
+}
+
 static int session_tls_hs_cb(struct session *session, int status)
 {
 	assert(session_flags(session)->outgoing);
@@ -686,9 +695,12 @@ static int session_tls_hs_cb(struct session *session, int status)
 	int ret = kr_ok();
 
 	if (status) {
-		kr_nsrep_update_rtt(NULL, peer, KR_NS_DEAD,
+		struct qr_task *task = session_waitinglist_get(session);
+		struct kr_query *qry = task_get_last_pending_query(task);
+		unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		kr_nsrep_update_rtt(NULL, peer, score,
 				    worker->engine->resolver.cache_rtt,
-				    KR_NS_RESET);
+				    KR_NS_UPDATE_NORESET);
 		return ret;
 	}
 
@@ -756,16 +768,6 @@ static int session_tls_hs_cb(struct session *session, int status)
 	return kr_ok();
 }
 
-
-static struct kr_query *task_get_last_pending_query(struct qr_task *task)
-{
-	if (!task || task->ctx->req.rplan.pending.len == 0) {
-		return NULL;
-	}
-
-	return array_tail(task->ctx->req.rplan.pending);
-}
-
 static int send_waiting(struct session *session)
 {
 	int ret = 0;
@@ -810,15 +812,18 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	if (status != 0) {
-		if (kr_verbose_status) {
+		if (VERBOSE_STATUS) {
 			const char *peer_str = kr_straddr(peer);
 			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s), flagged as 'bad'\n",
 					peer_str ? peer_str : "", uv_strerror(status));
 		}
 		worker_del_tcp_waiting(worker, peer);
-		kr_nsrep_update_rtt(NULL, peer, KR_NS_DEAD,
+		struct qr_task *task = session_waitinglist_get(session);
+		struct kr_query *qry = task_get_last_pending_query(task);
+		unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		kr_nsrep_update_rtt(NULL, peer, score,
 				    worker->engine->resolver.cache_rtt,
-				    KR_NS_RESET);
+				    KR_NS_UPDATE_NORESET);
 		assert(session_tasklist_is_empty(session));
 		session_waitinglist_retry(session, false);
 		session_close(session);
@@ -838,7 +843,7 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 	}
 
-	if (kr_verbose_status) {
+	if (VERBOSE_STATUS) {
 		const char *peer_str = kr_straddr(peer);
 		kr_log_verbose( "[wrkr]=> connected to '%s'\n", peer_str ? peer_str : "");
 	}
@@ -891,9 +896,10 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 		VERBOSE_MSG(qry, "=> connection to '%s' failed\n", peer_str);
 	}
 
-	kr_nsrep_update_rtt(NULL, peer, KR_NS_DEAD,
+	unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+	kr_nsrep_update_rtt(NULL, peer, score,
 			    worker->engine->resolver.cache_rtt,
-			    KR_NS_RESET);
+			    KR_NS_UPDATE_NORESET);
 
 	worker->stats.timeout += session_waitinglist_get_len(session);
 	session_waitinglist_retry(session, true);
@@ -923,9 +929,10 @@ static void on_udp_timeout(uv_timer_t *timer)
 				char *addr_str = kr_straddr(choice);
 				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str ? addr_str : "");
 			}
-			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_DEAD,
+			unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+			kr_nsrep_update_rtt(&qry->ns, choice, score,
 					    worker->engine->resolver.cache_rtt,
-					    KR_NS_RESET);
+					    KR_NS_UPDATE_NORESET);
 		}
 	}
 	task->timeouts += 1;
@@ -1286,9 +1293,10 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		worker_del_tcp_waiting(ctx->worker, addr);
 		free(conn);
 		session_close(session);
-		kr_nsrep_update_rtt(NULL, addr, KR_NS_DEAD,
+		unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		kr_nsrep_update_rtt(NULL, peer, score,
 				    worker->engine->resolver.cache_rtt,
-				    KR_NS_RESET);
+				    KR_NS_UPDATE_NORESET);
 		WITH_VERBOSE (qry) {
 			const char *peer_str = kr_straddr(peer);
 			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s), flagged as 'bad'\n",
