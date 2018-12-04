@@ -80,11 +80,11 @@ class Kresd(ContextDecorator):
 
     def __enter__(self):
         if self.port is not None:
-            take_port(self.port, self.ip, self.ip6)
+            take_port(self.port, self.ip, self.ip6, timeout=120)
         else:
             self.port = make_port(self.ip, self.ip6)
         if self.tls_port is not None:
-            take_port(self.tls_port, self.ip, self.ip6)
+            take_port(self.tls_port, self.ip, self.ip6, timeout=120)
         else:
             self.tls_port = make_port(self.ip, self.ip6)
 
@@ -242,22 +242,29 @@ def is_port_free(port, ip=None, ip6=None):
     return True
 
 
-def take_port(port, ip=None, ip6=None):
+def take_port(port, ip=None, ip6=None, timeout=0):
     port_path = Path(KRESD_PORTDIR, str(port))
+    end_time = time.time() + timeout
     try:
         port_path.touch(exist_ok=False)
     except FileExistsError:
         raise ValueError(
             "Port {} already reserved by system or another kresd instance!".format(port))
 
-    if not is_port_free(port, ip, ip6):
-        # NOTE: The port_path isn't removed, so other instances don't have to attempt to
-        # take the same port again. This has the side effect of leaving many of these
-        # files behind, because when another kresd shuts down and removes its file, the
-        # port still can't be reserved for a while. This shouldn't become an issue unless
-        # we have thousands of tests (and run out of the port range).
-        raise ValueError(
-            "Port {} is reserved by system!".format(port))
+    while True:
+        if is_port_free(port, ip, ip6):
+            # NOTE: The port_path isn't removed, so other instances don't have to attempt to
+            # take the same port again. This has the side effect of leaving many of these
+            # files behind, because when another kresd shuts down and removes its file, the
+            # port still can't be reserved for a while. This shouldn't become an issue unless
+            # we have thousands of tests (and run out of the port range).
+            break
+
+        if time.time() < end_time:
+            time.sleep(5)
+        else:
+            raise ValueError(
+                "Port {} is reserved by system!".format(port))
     return port
 
 
