@@ -987,7 +987,8 @@ static void on_retransmit(uv_timer_t *req)
 	struct qr_task *task = session_tasklist_get_first(session);
 	if (retransmit(task) == NULL) {
 		/* Not possible to spawn request, start timeout timer with remaining deadline. */
-		uint64_t timeout = KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
+		uint64_t timeout = task->ctx->req.options.FORWARD ? KR_NS_FWD_TIMEOUT / 2 :
+				   KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
 		uv_timer_start(req, on_udp_timeout, timeout, 0);
 	} else {
 		uv_timer_start(req, on_retransmit, KR_CONN_RETRY, 0);
