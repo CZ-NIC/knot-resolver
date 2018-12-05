@@ -1,13 +1,52 @@
-Knot Resolver 3.x.y (2018-mm-dd)
+Knot Resolver 3.x.y (201y-mm-dd)
+================================
+
+New features
+------------
+- module edns_keepalive to implement server side of RFC 7828 (#408)
+- module nsid to implement server side of RFC 5001 (#289)
+
+Module API changes
+------------------
+- new layer is added: answer_finalize
+- kr_request keeps ::qsource.packet beyond the begin layer
+- kr_request::qsource.tcp renamed to ::qsource.flags.tcp
+- kr_request::has_tls renamed to ::qsource.flags.tls
+- kr_zonecut_add() and kr_zonecut_del() changed parameters slightly
+
+Bugfixes
+--------
+- http module: only run prometheus in parent process if using --forks=N,
+  as the submodule collects metrics from all sub-processes as well.
+- TLS fixes for corner cases (!714, !700)
+- fix build with -DNOVERBOSELOG (#424)
+- policy.{FORWARD,TLS_FORWARD,STUB}: respect net.ipv{4,6} setting (!710)
+
+Improvements
+------------
+- Dockerfile: rework, basing on Debian instead of Alpine
+- policy.{FORWARD,TLS_FORWARD,STUB}: give advantage to IPv6
+  when choosing whom to ask, just as for iteration
+
+
+Knot Resolver 3.1.0 (2018-11-02)
 ================================
 
 Incompatible changes
 --------------------
 - hints.use_nodata(true) by default; that's what most users want
+- libknot >= 2.7.2 is required
 
 Improvements
 ------------
 - cache: handle out-of-space SIGBUS slightly better (#197)
+- daemon: improve TCP timeout handling (!686)
+
+Bugfixes
+--------
+- cache.clear('name'): fix some edge cases in API (#401)
+- fix error handling from TLS writes (!669)
+- avoid SERVFAILs due to certain kind of NS dependency cycles (#374)
 
 
 Knot Resolver 3.0.0 (2018-08-20)

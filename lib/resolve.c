@@ -37,7 +37,7 @@
 #define KNOT_EDNS_OPTION_COOKIE 10
 #endif /* defined(ENABLE_COOKIES) */
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE((qry), "resl",  fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "resl",  __VA_ARGS__)
 
 bool kr_rank_check(uint8_t rank)
 {
@@ -75,7 +75,11 @@ static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bo
 static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
-	knot_pkt_t *pkt_copy = knot_pkt_new(NULL, pkt->size, &req->pool);
+	size_t pkt_size = pkt->size;
+	if (knot_pkt_has_tsig(pkt)) {
+		pkt_size += pkt->tsig_wire.len;
+	}
+	knot_pkt_t *pkt_copy = knot_pkt_new(NULL, pkt_size, &req->pool);
 	struct kr_layer_pickle *pickle = mm_alloc(&req->pool, sizeof(*pickle));
 	if (pickle && pkt_copy && knot_pkt_copy(pkt_copy, pkt) == 0) {
 		struct kr_query *qry = req->current_query;
@@ -95,6 +99,7 @@ static int reset_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int finish_yield(kr_layer_t *ctx) { return kr_ok(); }
 static int produce_yield(kr_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
 static int checkout_yield(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type) { return kr_ok(); }
+static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 
 /** @internal Macro for iterating module layers. */
 #define RESUME_LAYERS(from, r, qry, func, ...) \
@@ -139,6 +144,9 @@ KR_CONST static inline bool isletter(unsigned chr)
  */
 static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret)
 {
+	if (secret == 0) {
+		return;
+	}
 	assert(qname);
 	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. */
 	for (int i = 0; i < len; ++i) {
@@ -153,11 +161,8 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
 	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
 		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
-		size_t addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
-		/* @warning _NOT_ thread-safe */
-		static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
-		knot_rdata_init(rdata_arr, addr_len, (const uint8_t *)addr);
-		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, rdata_arr);
+		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
+		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
 	} else {
 		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
 	}
@@ -241,13 +246,13 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	if (ret == kr_error(ENOENT)) {
 		/* No cached cut found, start from SBELT
 		 * and issue priming query. */
+		kr_zonecut_deinit(&cut_found);
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
 		VERBOSE_MSG(qry, "=> using root hints\n");
 		qry->flags.AWAIT_CUT = false;
-		kr_zonecut_deinit(&cut_found);
 		return KR_STATE_DONE;
 	} else if (ret != kr_ok()) {
 		kr_zonecut_deinit(&cut_found);
@@ -290,12 +295,8 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		qry->flags.AWAIT_CUT = false;
 		return KR_STATE_DONE;
 	}
-	/* Copy fetched name */
-	qry->zone_cut.name = knot_dname_copy(cut_found.name, qry->zone_cut.pool);
-	/* Copy fetched address set */
-	kr_zonecut_copy(&qry->zone_cut, &cut_found);
-	/* Copy fetched ta & keys */
-	kr_zonecut_copy_trust(&qry->zone_cut, &cut_found);
+	/* Use the found zone cut. */
+	kr_zonecut_move(&qry->zone_cut, &cut_found);
 	/* Check if there's a non-terminal between target and current cut. */
 	struct kr_cache *cache = &req->ctx->cache;
 	check_empty_nonterms(qry, pkt, cache, qry->timestamp.tv_sec);
@@ -381,15 +382,17 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	return ret;
 }
 
-static int edns_put(knot_pkt_t *pkt)
+static int edns_put(knot_pkt_t *pkt, bool reclaim)
 {
 	if (!pkt->opt_rr) {
 		return kr_ok();
 	}
-	/* Reclaim reserved size. */
-	int ret = knot_pkt_reclaim(pkt, knot_edns_wire_size(pkt->opt_rr));
-	if (ret != 0) {
-		return ret;
+	if (reclaim) {
+		/* Reclaim reserved size. */
+		int ret = knot_pkt_reclaim(pkt, knot_edns_wire_size(pkt->opt_rr));
+		if (ret != 0) {
+			return ret;
+		}
 	}
 	/* Write to packet. */
 	assert(pkt->current == KNOT_ADDITIONAL);
@@ -434,7 +437,7 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 #endif /* defined(ENABLE_COOKIES) */
-	if (req->has_tls) {
+	if (req->qsource.flags.tls) {
 		if (req->ctx->tls_padding == -1)
 			/* FIXME: we do not know how to reserve space for the
 			 * default padding policy, since we can't predict what
@@ -446,16 +449,17 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 	return knot_pkt_reserve(pkt, wire_size);
 }
 
-static int answer_prepare(knot_pkt_t *answer, knot_pkt_t *query, struct kr_request *req)
+static int answer_prepare(struct kr_request *req, knot_pkt_t *query)
 {
+	knot_pkt_t *answer = req->answer;
 	if (knot_pkt_init_response(answer, query) != 0) {
 		return kr_error(ENOMEM); /* Failed to initialize answer */
 	}
 	/* Handle EDNS in the query */
 	if (knot_pkt_has_edns(query)) {
-		int ret = edns_create(answer, query, req);
-		if (ret != 0){
-			return ret;
+		answer->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &answer->mm);
+		if (answer->opt_rr == NULL){
+			return kr_error(ENOMEM);
 		}
 		/* Set DO bit if set (DNSSEC requested). */
 		if (knot_pkt_has_dnssec(query)) {
@@ -570,7 +574,7 @@ static int answer_fail(struct kr_request *request)
 		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
-		ret = edns_put(answer);
+		ret = edns_put(answer, false);
 	}
 	return ret;
 }
@@ -633,15 +637,18 @@ static int answer_finalize(struct kr_request *request, int state)
 		return answer_fail(request);
 	}
 	/* Write EDNS information */
-	int ret = 0;
 	if (answer->opt_rr) {
-		if (request->has_tls) {
+		if (request->qsource.flags.tls) {
 			if (answer_padding(request) != kr_ok()) {
 				return answer_fail(request);
 			}
 		}
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		ret = edns_put(answer);
+		int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
+				       answer->opt_rr, KNOT_PF_FREE);
+		if (ret != KNOT_EOK) {
+			return answer_fail(request);
+		}
 	}
 
 	if (!last) secure = false; /*< should be no-op, mostly documentation */
@@ -676,7 +683,7 @@ static int answer_finalize(struct kr_request *request, int state)
 		knot_wire_clear_ad(answer->wire);
 	}
 
-	return ret;
+	return kr_ok();
 }
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
@@ -693,10 +700,10 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 			/* Stub resolution (ask for +rd and +do) */
 			if (qry->flags.STUB) {
 				knot_wire_set_rd(pkt->wire);
-				if (knot_pkt_has_dnssec(request->answer)) {
+				if (knot_pkt_has_dnssec(request->qsource.packet)) {
 					knot_edns_set_do(pkt->opt_rr);
 				}
-				if (knot_wire_get_cd(request->answer->wire)) {
+				if (knot_wire_get_cd(request->qsource.packet->wire)) {
 					knot_wire_set_cd(pkt->wire);
 				}
 			/* Full resolution (ask for +cd and +do) */
@@ -708,7 +715,6 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 				knot_edns_set_do(pkt->opt_rr);
 				knot_wire_set_cd(pkt->wire);
 			}
-			ret = edns_put(pkt);
 		}
 	}
 	return ret;
@@ -743,7 +749,6 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	const knot_dname_t *qname = knot_pkt_qname(packet);
 	uint16_t qclass = knot_pkt_qclass(packet);
 	uint16_t qtype = knot_pkt_qtype(packet);
-	bool cd_is_set = knot_wire_get_cd(packet->wire);
 	struct kr_query *qry = NULL;
 	struct kr_context *ctx = request->ctx;
 	struct kr_cookie_ctx *cookie_ctx = ctx ? &ctx->cookie_ctx : NULL;
@@ -778,16 +783,15 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	knot_wire_set_ra(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
 
-	if (cd_is_set) {
+	assert(request->qsource.packet);
+	if (knot_wire_get_cd(request->qsource.packet->wire)) {
 		knot_wire_set_cd(answer->wire);
 	} else if (qry->flags.DNSSEC_WANT) {
 		knot_wire_set_ad(answer->wire);
 	}
 
 	/* Expect answer, pop if satisfied immediately */
-	request->qsource.packet = packet;
 	ITERATE_LAYERS(request, qry, begin);
-	request->qsource.packet = NULL;
 	if ((request->state & KR_STATE_DONE) != 0) {
 		kr_rplan_pop(rplan, qry);
 	} else if (qname == NULL) {
@@ -903,7 +907,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
-		if (answer_prepare(request->answer, packet, request) != 0) {
+		if (answer_prepare(request, packet) != 0) {
 			return KR_STATE_FAIL;
 		}
 		return resolve_query(request, packet);
@@ -1026,7 +1030,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
-	const knot_dname_t *wanted_name = qry->sname;
 	const knot_dname_t *start_name = qry->sname;
 	if ((qry->flags.AWAIT_CUT) && !resume) {
 		qry->flags.AWAIT_CUT = false;
@@ -1054,18 +1057,13 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_DONE;
 	}
 
-	bool nods = false;
-	bool ds_req = false;
-	bool ns_req = false;
-	bool ns_exist = true;
-	bool minimized = false;
 	int name_offset = 1;
+	const knot_dname_t *wanted_name;
+	bool nods, ds_req, ns_req, minimized, ns_exist;
 	do {
 		wanted_name = start_name;
-		nods = false;
 		ds_req = false;
 		ns_req = false;
-		minimized = false;
 		ns_exist = true;
 
 		int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
@@ -1084,11 +1082,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			    knot_dname_is_equal(q->sname, wanted_name)) {
 				if (q->stype == KNOT_RRTYPE_DS) {
 					ds_req = true;
-					if (q->flags.DNSSEC_NODS) {
-						nods = true;
-					}
 					if (q->flags.CNAME) {
-						nods = true;
 						ns_exist = false;
 					} else if (!(q->flags.DNSSEC_OPTOUT)) {
 						int ret = kr_dnssec_matches_name_and_type(&request->auth_selected, q->uid,
@@ -1097,7 +1091,6 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 					}
 				} else {
 					if (q->flags.CNAME) {
-						nods = true;
 						ns_exist = false;
 					}
 					ns_req = true;
@@ -1119,6 +1112,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 			return KR_STATE_PRODUCE;
 		}
 
+		/* set `nods` */
 		if ((qry->stype == KNOT_RRTYPE_DS) &&
 	            knot_dname_is_equal(wanted_name, qry->sname)) {
 			nods = true;
@@ -1140,9 +1134,9 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 
 	/* Enable DNSSEC if enters a new island of trust. */
 	bool want_secured = (qry->flags.DNSSEC_WANT) &&
-			    !knot_wire_get_cd(request->answer->wire);
+			    !knot_wire_get_cd(request->qsource.packet->wire);
 	if (!(qry->flags.DNSSEC_WANT) &&
-	    !knot_wire_get_cd(request->answer->wire) &&
+	    !knot_wire_get_cd(request->qsource.packet->wire) &&
 	    kr_ta_get(trust_anchors, wanted_name)) {
 		qry->flags.DNSSEC_WANT = true;
 		want_secured = true;
@@ -1213,9 +1207,9 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	/* Enable DNSSEC if entering a new (or different) island of trust,
 	 * and update the TA RRset if required. */
 	bool want_secured = (qry->flags.DNSSEC_WANT) &&
-			    !knot_wire_get_cd(request->answer->wire);
+			    !knot_wire_get_cd(request->qsource.packet->wire);
 	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
-	if (!knot_wire_get_cd(request->answer->wire) && ta_rr) {
+	if (!knot_wire_get_cd(request->qsource.packet->wire) && ta_rr) {
 		qry->flags.DNSSEC_WANT = true;
 		want_secured = true;
 
@@ -1403,7 +1397,8 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	
 
 	/* This query has RD=0 or is ANY, stop here. */
-	if (qry->stype == KNOT_RRTYPE_ANY || !knot_wire_get_rd(request->answer->wire)) {
+	if (qry->stype == KNOT_RRTYPE_ANY ||
+	    !knot_wire_get_rd(request->qsource.packet->wire)) {
 		VERBOSE_MSG(qry, "=> qtype is ANY or RD=0, bail out\n");
 		return KR_STATE_FAIL;
 	}
@@ -1519,7 +1514,7 @@ static bool outbound_request_update_cookies(struct kr_request *req,
 }
 #endif /* defined(ENABLE_COOKIES) */
 
-int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
+int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
                         struct sockaddr *dst, int type, knot_pkt_t *packet)
 {
 	/* @todo: Update documentation if this function becomes approved. */
@@ -1535,14 +1530,6 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 		return kr_error(EINVAL);
 	}
 	struct kr_query *qry = array_tail(rplan->pending);
-
-	/* Run the checkout layers and cancel on failure. */
-	int state = request->state;
-	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
-	if (request->state == KR_STATE_FAIL) {
-		request->state = state; /* Restore */
-		return kr_error(ECANCELED);
-	}
 
 #if defined(ENABLE_COOKIES)
 	/* Update DNS cookies in request. */
@@ -1561,6 +1548,33 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	int ret = query_finalize(request, qry, packet);
 	if (ret != 0) {
 		return kr_error(EINVAL);
+	}
+
+	/* Track changes in minimization secret to enable/disable minimization */
+	uint32_t old_minimization_secret = qry->secret;
+
+	/* Run the checkout layers and cancel on failure.
+	 * The checkout layer doesn't persist the state, so canceled subrequests
+	 * don't affect the resolution or rest of the processing. */
+	int state = request->state;
+	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
+	if (request->state == KR_STATE_FAIL) {
+		request->state = state; /* Restore */
+		return kr_error(ECANCELED);
+	}
+
+	/* Randomize query case (if secret changed) */
+	knot_dname_t *qname = (knot_dname_t *)knot_pkt_qname(packet);
+	if (qry->secret != old_minimization_secret) {
+		randomized_qname_case(qname, qry->secret);
+	}
+
+	/* Write down OPT unless in safemode */
+	if (!(qry->flags.SAFEMODE)) {
+		ret = edns_put(packet, true);
+		if (ret != 0) {
+			return kr_error(EINVAL);
+		}
 	}
 
 	WITH_VERBOSE(qry) {
@@ -1593,17 +1607,20 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
-#ifndef NOVERBOSELOG
-	struct kr_rplan *rplan = &request->rplan;
-#endif
-	/* Finalize answer */
-	if (answer_finalize(request, state) != 0) {
+	/* Finalize answer and construct wire-buffer. */
+	ITERATE_LAYERS(request, NULL, answer_finalize);
+	if (request->state == KR_STATE_FAIL) {
+		state = KR_STATE_FAIL;
+	} else if (answer_finalize(request, state) != 0) {
 		state = KR_STATE_FAIL;
 	}
-	/* Error during procesing, internal failure */
+
+	/* Error during processing, internal failure */
 	if (state != KR_STATE_DONE) {
 		knot_pkt_t *answer = request->answer;
 		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
+			knot_wire_clear_ad(answer->wire);
+			knot_wire_clear_aa(answer->wire);
 			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
@@ -1611,9 +1628,12 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
 
+#ifndef NOVERBOSELOG
+	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *last = kr_rplan_last(rplan);
 	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
+#endif
 
 	/* Trace request finish */
 	if (request->trace_finish) {

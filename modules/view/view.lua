@@ -31,7 +31,7 @@ end
 
 -- @function Find view for given request
 local function evaluate(_, req)
-	local client_key = req.qsource.key
+	local client_key = req.qsource.packet.tsig_rr
 	local match_cb = (client_key ~= nil) and view.key[client_key:owner()] or nil
 	-- Search subnets otherwise
 	if match_cb == nil then

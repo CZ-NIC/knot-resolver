@@ -180,17 +180,17 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 	-- we assume they are advanced enough not to need the check.
 	-- The point is to avoid repeating the check in each callback iteration.
 	if callback == nil then
-		local names = ffi.new('knot_dname_t *[1]')  -- C: dname **names
-		local ret = ffi.C.kr_cache_closest_apex(cach, dname, false, names)
+		local apex_array = ffi.new('knot_dname_t *[1]')  -- C: dname **apex_array
+		local ret = ffi.C.kr_cache_closest_apex(cach, dname, false, apex_array)
 		if ret < 0 then
 			error(ffi.string(ffi.C.knot_strerror(ret))) end
-		ffi.gc(names[0], ffi.C.free)
-		local apex = kres.dname2str(names[0])
-		if apex ~= name then
+		if not ffi.C.knot_dname_is_equal(apex_array[0], dname) then
+			local apex_str = kres.dname2str(apex_array[0])
 			rettable.not_apex = 'to clear proofs of non-existence call '
-				.. 'cache.clear(\'' .. tostring(apex) ..'\')'
-			rettable.subtree = apex
+				.. 'cache.clear(\'' .. tostring(apex_str) ..'\')'
+			rettable.subtree = apex_str
 		end
+		ffi.C.free(apex_array[0])
 	end
 
 	if rr_type ~= nil then
@@ -322,6 +322,7 @@ modules.load('priming')
 modules.load('detect_time_skew')
 modules.load('detect_time_jump')
 modules.load('ta_sentinel')
+modules.load('edns_keepalive')
 
 -- Interactive command evaluation
 function eval_cmd(line, raw)

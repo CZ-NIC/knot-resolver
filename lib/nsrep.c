@@ -82,6 +82,8 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 
 #undef ADDR_SET
 
+/**
+ * \param addr_set pack with one IP address per element */
 static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 			      struct kr_qflags opts, unsigned score, uint8_t *addr[])
 {
@@ -92,8 +94,8 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 	uint64_t now = kr_now();
 
 	/* Name server is better candidate if it has address record. */
-	uint8_t *it = pack_head(*addr_set);
-	while (it != pack_tail(*addr_set)) {
+	for (uint8_t *it = pack_head(*addr_set); it != pack_tail(*addr_set);
+						it = pack_obj_next(it)) {
 		void *val = pack_obj_val(it);
 		size_t len = pack_obj_len(it);
 		unsigned favour = 0;
@@ -110,10 +112,10 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		}
 
 		if (!is_valid) {
-			goto get_next_iterator;
+			continue;
 		}
 
-		/* Get RTT for this address (if known) */
+		/* Get score for the current address. */
 		kr_nsrep_rtt_lru_entry_t *cached = rtt_cache ?
 						   lru_get_try(rtt_cache, val, len) :
 						   NULL;
@@ -165,8 +167,6 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 				break;
 			}
 		}
-get_next_iterator :
-		it = pack_obj_next(it);
 	}
 
 	/* At this point, rtt_cache_entry_ptr contains up to KR_NSREP_MAXADDR
@@ -280,28 +280,36 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock
 	if (index >= KR_NSREP_MAXADDR) {
 		return kr_error(ENOSPC);
 	}
-	qry->ns.name = (const uint8_t *)"";
-	/* Reset score on first entry */
-	if (index == 0) {
-		qry->ns.score = KR_NS_UNKNOWN;
-		qry->ns.reputation = 0;
-	}
 
 	if (!sock) {
+		qry->ns.name = (const uint8_t *)"";
 		qry->ns.addr[index].ip.sa_family = AF_UNSPEC;
 		return kr_ok();
 	}
 
 	switch (sock->sa_family) {
 	case AF_INET:
+		if (qry->flags.NO_IPV4) {
+			return kr_error(ENOENT);
+		}
 		qry->ns.addr[index].ip4 = *(const struct sockaddr_in *)sock;
 		break;
 	case AF_INET6:
+		if (qry->flags.NO_IPV6) {
+			return kr_error(ENOENT);
+		}
 		qry->ns.addr[index].ip6 = *(const struct sockaddr_in6 *)sock;
 		break;
 	default:
 		qry->ns.addr[index].ip.sa_family = AF_UNSPEC;
 		return kr_error(EINVAL);
+	}
+
+	qry->ns.name = (const uint8_t *)"";
+	/* Reset score on first entry */
+	if (index == 0) {
+		qry->ns.score = KR_NS_UNKNOWN;
+		qry->ns.reputation = 0;
 	}
 
 	/* Retrieve RTT from cache */
@@ -326,6 +334,7 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock
 int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 {
 	if (!qry || !ctx) {
+		//assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 
@@ -354,6 +363,7 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 {
 	if (!qry || !ctx) {
+		//assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 
@@ -376,30 +386,25 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 			unsigned score, kr_nsrep_rtt_lru_t *cache, int umode)
 {
-	if (!cache || umode > KR_NS_MAX) {
+	if (!cache || umode > KR_NS_MAX || umode < 0) {
 		return kr_error(EINVAL);
 	}
 
-	const char *addr_in = NULL;
-	size_t addr_len = 0;
-	if (addr) { /* Caller provided specific address */
-		if (addr->sa_family == AF_INET) {
-			addr_in = (const char *)&((struct sockaddr_in *)addr)->sin_addr;
-			addr_len = sizeof(struct in_addr);
-		} else if (addr->sa_family == AF_INET6) {
-			addr_in = (const char *)&((struct sockaddr_in6 *)addr)->sin6_addr;
-			addr_len = sizeof(struct in6_addr);
-		} else {
-			assert(false && "kr_nsrep_update_rtt: unexpected address family");
-		}
-	} else if (ns != NULL && ns->addr[0].ip.sa_family != AF_UNSPEC) {
-		addr_in = kr_inaddr(&ns->addr[0].ip);
-		addr_len = kr_inaddr_len(&ns->addr[0].ip);
+	/* Get `addr`, and later its raw string. */
+	if (addr) {
+		/* Caller provided specific address, OK. */
+	} else if (ns != NULL) {
+		addr = &ns->addr[0].ip;
 	} else {
+		assert(false && "kr_nsrep_update_rtt: don't know what address to update");
 		return kr_error(EINVAL);
 	}
-
-	assert(addr_in != NULL && addr_len > 0);
+	const char *addr_in = kr_inaddr(addr);
+	size_t addr_len = kr_inaddr_len(addr);
+	if (!addr_in || addr_len <= 0) {
+		assert(false && "kr_nsrep_update_rtt: incorrect address");
+		return kr_error(EINVAL);
+	}
 
 	bool is_new_entry = false;
 	kr_nsrep_rtt_lru_entry_t  *cur = lru_get_new(cache, addr_in, addr_len,
@@ -410,15 +415,10 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	if (score <= KR_NS_GLUED) {
 		score = KR_NS_GLUED + 1;
 	}
-	/* First update is always set unless KR_NS_UPDATE_NORESET mode used. */
-	if (is_new_entry) {
-		if (umode == KR_NS_UPDATE_NORESET) {
-			/* Zero initial value. */
-			cur->score = 0;
-		} else {
-			/* Force KR_NS_RESET otherwise. */
-			umode = KR_NS_RESET;
-		}
+	/* If there's nothing to update, we reset it unless KR_NS_UPDATE_NORESET
+	 * mode was requested.  New items are zeroed by LRU automatically. */
+	if (is_new_entry && umode != KR_NS_UPDATE_NORESET) {
+		umode = KR_NS_RESET;
 	}
 	unsigned new_score = 0;
 	/* Update score, by default smooth over last two measurements. */
@@ -429,7 +429,7 @@ int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 	case KR_NS_RESET:  new_score = score; break;
 	case KR_NS_ADD:    new_score = MIN(KR_NS_MAX_SCORE - 1, cur->score + score); break;
 	case KR_NS_MAX:    new_score = MAX(cur->score, score); break;
-	default: break;
+	default:           return kr_error(EINVAL);
 	}
 	/* Score limits */
 	if (new_score > KR_NS_MAX_SCORE) {
@@ -510,6 +510,9 @@ int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache)
 			scores[i] = 1;
 		} else {
 			scores[i] = rtt_cache_entry->score;
+			if (sa->sa_family == AF_INET) {
+				scores[i] += FAVOUR_IPV6;
+			}
 		}
 		if (VERBOSE_STATUS) {
 			char sa_str[INET6_ADDRSTRLEN];

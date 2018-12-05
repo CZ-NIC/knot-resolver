@@ -1222,7 +1222,7 @@ static int cache_get(lua_State *L)
 }
 
 /** Set time interval for cleaning rtt cache.
- * Servers with score >= KR_NS_TIMEOUTED will be cleaned after
+ * Servers with score >= KR_NS_TIMEOUT will be cleaned after
  * this interval ended up, so that they will be able to participate
  * in NS elections again. */
 static int cache_ns_tout(lua_State *L)
@@ -1242,8 +1242,8 @@ static int cache_ns_tout(lua_State *L)
 		lua_error(L);
 	}
 
-	lua_Number interval_lua = lua_tonumber(L, 1);
-	if (!(interval_lua >= 0 && interval_lua < UINT_MAX)) {
+	lua_Integer interval_lua = lua_tointeger(L, 1);
+	if (!(interval_lua > 0 && interval_lua < UINT_MAX)) {
 		format_error(L, "invalid interval specified, it must be in range > 0, < " xstr(UINT_MAX));
 		lua_error(L);
 	}

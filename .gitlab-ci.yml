@@ -16,7 +16,7 @@ stages:
   - build
   - test
   - coverage
-  - respdiff
+  - extended
   - deploy
 
 build:linux:amd64:
@@ -43,10 +43,10 @@ build:clang:linux:amd64:
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   script:
     - rm daemon/lua/kres-gen.lua
-    - CXX=clang++-5.0 CC=clang-5.0 make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
+    - CXX=clang++ CC=clang make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
-    - CXX=clang++-5.0 CC=clang-5.0 make install "CFLAGS=-Werror -ggdb"
+    - CXX=clang++ CC=clang make install "CFLAGS=-Werror -ggdb"
   tags:
     - docker
     - linux
@@ -87,19 +87,19 @@ lint:c:
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
-    - make lint-c CLANG_TIDY="clang-tidy-5.0 -quiet"
+    - make lint-c CLANG_TIDY="clang-tidy -quiet"
   tags:
     - docker
 
 lint:clang-scan-build:
-  allow_failure: true  # for now it is just informative
   stage: test
   except:
     - master
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
-    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="/usr/lib/llvm-5.0/bin/scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make
+    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make || true
+    - test "$(ls scan-results/*/report-*.html | wc -l)" = 7 # we have this many errors ATM :-)
   artifacts:
     when: on_failure
     expire_in: '1 day'
@@ -128,6 +128,25 @@ test:linux:amd64:
     - docker
     - linux
     - amd64
+
+
+docker:build:
+  stage: test
+  image: docker:latest
+  except:
+    - master
+  tags:
+    - dind
+  dependencies: []
+  variables:
+    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
+  script:
+    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
+    - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
+  after_script:  # remove dangling images to avoid running out of disk space
+    - docker rmi ${DOCKER_IMAGE_NAME}
+    - docker rmi $(docker images -f "dangling=true" -q)
+
 
 installcheck:linux:amd64:
   stage: test
@@ -204,6 +223,17 @@ installcheck:valgrind:linux:amd64:
     - linux
     - amd64
 
+osx:build:
+  stage: test
+  except:
+    - master
+  script:
+    - ci/travis.py ${CI_COMMIT_REF_NAME}
+  dependencies: []
+  tags:
+    - docker
+
+
 # temporarily disabled - we need to fix issues first
 #deckard:linux:amd64:valgrind:
 #  stage: test
@@ -238,8 +268,58 @@ test:linux:amd64:valgrind:
     - linux
     - amd64
 
+pytests:lint:
+  stage: test
+  dependencies: []
+  except:
+    - master
+  script:
+    - ./ci/pytests/lint.sh
+  tags:
+    - docker
+    - linux
+    - amd64
+
+pytests:run:
+  stage: test
+  dependencies:
+    - build:linux:amd64
+  except:
+    - master
+  script:
+    - pushd tests/pytests/rehandshake
+    - make all
+    - popd
+    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run.sh &> pytests.log.txt
+  after_script:
+    - tail -1 pytests.log.txt
+    - echo "See pytests.html or pytests.log.txt for full report."
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - pytest*
+  tags:
+    - docker
+    - linux
+    - amd64
+
+pytests:extended:
+  stage: extended
+  dependencies:
+    - build:linux:amd64
+  except:
+    - master
+  script:
+    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run-extended.sh
+  tags:
+    - docker
+    - linux
+    - amd64
+
+
 .respdiff:  &respdiff
-  stage: respdiff
+  stage: extended
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
@@ -340,7 +420,7 @@ respdiff:iter:udp:linux:amd64:
 
 
 .resperf:  &resperf
-  stage: respdiff
+  stage: extended
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver

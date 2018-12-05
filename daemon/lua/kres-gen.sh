@@ -74,6 +74,7 @@ genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan
+	struct kr_request_qsource_flags
 	struct kr_request
 	enum kr_rank
 	struct kr_cache
@@ -108,6 +109,7 @@ printf "\tchar _stub[];\n};\n"
 	knot_dname_is_equal
 	knot_dname_labels
 	knot_dname_size
+	knot_dname_to_lower
 	knot_dname_to_str
 # Resource records
 	knot_rdataset_at
@@ -170,6 +172,7 @@ EOF
 	lru_free_items_impl
 	lru_create_impl
 	lru_get_impl
+	mm_realloc
 # Trust anchors
 	kr_ta_get
 	kr_ta_add

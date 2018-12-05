@@ -53,6 +53,12 @@
 #define lua_rawlen(L, obj) lua_objlen((L), (obj))
 #endif
 
+/**@internal Maximum number of incomplete TCP connections in queue.
+* Default is from Redis and Apache. */
+#ifndef TCP_BACKLOG_DEFAULT
+#define TCP_BACKLOG_DEFAULT 511
+#endif
+
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error (lua_State *L);
 
@@ -252,6 +258,8 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir) {
 
 	/* Use module path for including Lua scripts */
 	char l_paths[MAXPATHLEN] = { 0 };
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wformat" /* %1$ is not in C standard */
 	/* Save original package.path to package._path */
 	snprintf(l_paths, MAXPATHLEN - 1,
 		 "if package._path == nil then package._path = package.path end\n"
@@ -259,6 +267,7 @@ int engine_set_moduledir(struct engine *engine, const char *moduledir) {
 		 "if package._cpath == nil then package._cpath = package.cpath end\n"
 		 "package.cpath = '%1$s/?%2$s;'..package._cpath\n",
 		 new_moduledir, LIBEXT);
+	#pragma GCC diagnostic pop
 
 	int ret = l_dobytecode(engine->L, l_paths, strlen(l_paths), "");
 	if (ret != 0) {
@@ -371,9 +380,7 @@ static void roothints_add(zs_scanner_t *zs)
 		return;
 	}
 	if (zs->r_type == KNOT_RRTYPE_A || zs->r_type == KNOT_RRTYPE_AAAA) {
-		knot_rdata_t rdata[RDATA_ARR_MAX];
-		knot_rdata_init(rdata, zs->r_data_length, zs->r_data);
-		kr_zonecut_add(hints, zs->r_owner, rdata);
+		kr_zonecut_add(hints, zs->r_owner, zs->r_data, zs->r_data_length);
 	}
 }
 const char* engine_hint_root_file(struct kr_context *ctx, const char *file)
@@ -595,6 +602,8 @@ static int l_trampoline(lua_State *L)
 			args = lua_tostring(L, 1);
 		}
 	}
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wpedantic" /* void* vs. function pointer */
 	if (callback == module->config) {
 		module->config(module, args);
 	} else {
@@ -612,6 +621,7 @@ static int l_trampoline(lua_State *L)
 		json_delete(root_node);
 		return 1;
 	}
+	#pragma GCC diagnostic pop
 
 	/* No results */
 	return 0;
@@ -748,7 +758,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 		return ret;
 	}
 	/* Initialize network */
-	network_init(&engine->net, uv_default_loop());
+	network_init(&engine->net, uv_default_loop(), TCP_BACKLOG_DEFAULT);
 
 	return ret;
 }
@@ -908,6 +918,8 @@ void engine_stop(struct engine *engine)
 /** Register module properties in Lua environment, if any. */
 static int register_properties(struct engine *engine, struct kr_module *module)
 {
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wpedantic" /* casts in lua_pushlightuserdata() */
 	if (!module->config && !module->props) {
 		return kr_ok();
 	}
@@ -923,6 +935,7 @@ static int register_properties(struct engine *engine, struct kr_module *module)
 		}
 	}
 	lua_setglobal(engine->L, module->name);
+	#pragma GCC diagnostic pop
 
 	/* Register module in Lua env */
 	lua_getglobal(engine->L, "modules_register");

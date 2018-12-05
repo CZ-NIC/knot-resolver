@@ -120,7 +120,8 @@ doesn't provide any layer to capture events. The Lua module can however provide 
 
 There is currently an additional "feature" in comparison to C layer functions:
 the ``consume``, ``produce`` and ``checkout`` functions do not get called at all
-if ``state == kres.FAIL`` (note that ``finish`` does get called nevertheless).
+if ``state == kres.FAIL``;
+note that ``answer_finalize`` and ``finish`` get called nevertheless.
 
 Since the modules are like any other Lua modules, you can interact with them through the CLI and and any interface.
 
@@ -135,7 +136,7 @@ As almost all the functions are optional, the minimal module looks like this:
 
 	#include "lib/module.h"
 	/* Convenience macro to declare module API. */
-	KR_MODULE_EXPORT(mymodule);
+	KR_MODULE_EXPORT(mymodule)
 
 
 Let's define an observer thread for the module as well. It's going to be stub for the sake of brevity,

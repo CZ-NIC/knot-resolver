@@ -54,7 +54,7 @@
 #define MAX_PIPELINED 100
 #endif
 
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "wrkr", fmt)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "wrkr", __VA_ARGS__)
 
 /** Client request state. */
 struct request_ctx
@@ -131,7 +131,8 @@ static inline struct worker_ctx *get_worker(void)
 
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
-static uv_handle_t *ioreq_spawn(struct worker_ctx *worker, int socktype, sa_family_t family)
+static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
+				int socktype, sa_family_t family, bool has_tls)
 {
 	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
 			&& (family == AF_INET  || family == AF_INET6);
@@ -147,7 +148,7 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker, int socktype, sa_fami
 	if (!handle) {
 		return NULL;
 	}
-	int ret = io_create(worker->loop, handle, socktype, family);
+	int ret = io_create(worker->loop, handle, socktype, family, has_tls);
 	if (ret) {
 		if (ret == UV_EMFILE) {
 			worker->too_many_open = true;
@@ -294,15 +295,13 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
+	req->daemon_context = worker;
 
 	/* Remember query source addr */
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {
 		ctx->source.addr.ip.sa_family = AF_UNSPEC;
 	} else {
-		size_t addr_len = sizeof(struct sockaddr_in);
-		if (addr->sa_family == AF_INET6)
-			addr_len = sizeof(struct sockaddr_in6);
-		memcpy(&ctx->source.addr.ip, addr, addr_len);
+		memcpy(&ctx->source.addr, addr, kr_sockaddr_len(addr));
 		ctx->req.qsource.addr = &ctx->source.addr.ip;
 	}
 
@@ -320,12 +319,14 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		if (uv_udp_getsockname((uv_udp_t *)handle, dst_addr, &addr_len) == 0) {
 			req->qsource.dst_addr = dst_addr;
 		}
-		req->qsource.tcp = false;
+		req->qsource.flags.tcp = false;
+		req->qsource.flags.tls = false;
 	} else if (handle->type == UV_TCP) {
 		if (uv_tcp_getsockname((uv_tcp_t *)handle, dst_addr, &addr_len) == 0) {
 			req->qsource.dst_addr = dst_addr;
 		}
-		req->qsource.tcp = true;
+		req->qsource.flags.tcp = true;
+		req->qsource.flags.tls = s && session_flags(s)->has_tls;
 	}
 
 	return ctx;
@@ -347,25 +348,30 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 				 KNOT_WIRE_MIN_PKTSIZE);
 	}
 	req->qsource.size = query->size;
+	if (knot_pkt_has_tsig(query)) {
+		req->qsource.size += query->tsig_wire.len;
+	}
 
-	req->answer = knot_pkt_new(NULL, answer_max, &req->pool);
-	if (!req->answer) {
+	knot_pkt_t *answer = knot_pkt_new(NULL, answer_max, &req->pool);
+	if (!answer) { /* Failed to allocate answer */
 		return kr_error(ENOMEM);
 	}
 
-	/* Remember query source TSIG key */
-	if (query->tsig_rr) {
-		req->qsource.key = knot_rrset_copy(query->tsig_rr, &req->pool);
+	knot_pkt_t *pkt = knot_pkt_new(NULL, req->qsource.size, &req->pool);
+	if (!pkt) {
+		return kr_error(ENOMEM);
 	}
 
-	/* Remember query source EDNS data */
-	if (query->opt_rr) {
-		req->qsource.opt = knot_rrset_copy(query->opt_rr, &req->pool);
+	int ret = knot_pkt_copy(pkt, query);
+	if (ret != KNOT_EOK && ret != KNOT_ETRAIL) {
+		return kr_error(ENOMEM);
 	}
+	req->qsource.packet = pkt;
+
 	/* Start resolution */
 	struct worker_ctx *worker = ctx->worker;
 	struct engine *engine = worker->engine;
-	kr_resolve_begin(req, &engine->resolver, req->answer);
+	kr_resolve_begin(req, &engine->resolver, answer);
 	worker->stats.queries += 1;
 	/* Throttle outbound queries only when high pressure */
 	if (worker->stats.concurrent < QUERY_RATE_THRESHOLD) {
@@ -570,7 +576,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 
 	int ret = 0;
 	struct request_ctx *ctx = task->ctx;
-	struct kr_request *req = &ctx->req;
 
 	uv_handle_t *handle = session_get_handle(session);
 	assert(handle && handle->data == session);
@@ -598,27 +603,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			return kr_error(ENOENT);
 		}
 		worker_task_pkt_set_msgid(task, msg_id);
-	}
-
-	if (knot_wire_get_qr(pkt->wire) == 0) {
-		/*
-		 * Query must be finalised using destination address before
-		 * sending.
-		 *
-		 * Libuv does not offer a convenient way how to obtain a source
-		 * IP address from a UDP handle that has been initialised using
-		 * uv_udp_init(). The uv_udp_getsockname() fails because of the
-		 * lazy socket initialisation.
-		 *
-		 * @note -- A solution might be opening a separate socket and
-		 * trying to obtain the IP address from it.
-		 */
-		ret = kr_resolve_checkout(req, NULL, addr,
-		                          is_stream ? SOCK_STREAM : SOCK_DGRAM,
-		                          pkt);
-		if (ret != 0) {
-			return ret;
-		}
 	}
 
 	uv_handle_t *ioreq = malloc(is_stream ? sizeof(uv_write_t) : sizeof(uv_udp_send_t));
@@ -730,8 +714,19 @@ static int session_tls_hs_cb(struct session *session, int status)
 		}
 	}
 
-	ret = worker_add_tcp_connected(worker, peer, session);
-	if (deletion_res == kr_ok() && ret == kr_ok()) {
+	ret = kr_ok();
+	if (deletion_res == kr_ok()) {
+		/* peer was in the waiting list, add to the connected list. */
+		ret = worker_add_tcp_connected(worker, peer, session);
+	} else {
+		/* peer wasn't in the waiting list.
+		 * In this case it must be successful rehandshake.
+		 * Peer must be already in the connected list. */
+		const char *key = tcpsess_key(peer);
+		assert(key);
+		assert(map_contains(&worker->tcp_connected, key) != 0);
+	}
+	if (ret == kr_ok()) {
 		while (!session_waitinglist_is_empty(session)) {
 			struct qr_task *t = session_waitinglist_get(session);
 			ret = qr_task_send(t, session, NULL, NULL);
@@ -771,6 +766,22 @@ static struct kr_query *task_get_last_pending_query(struct qr_task *task)
 	return array_tail(task->ctx->req.rplan.pending);
 }
 
+static int send_waiting(struct session *session)
+{
+	int ret = 0;
+	while (!session_waitinglist_is_empty(session)) {
+		struct qr_task *t = session_waitinglist_get(session);
+		ret = qr_task_send(t, session, NULL, NULL);
+		if (ret != 0) {
+			session_waitinglist_finalize(session, KR_STATE_FAIL);
+			session_tasklist_finalize(session, KR_STATE_FAIL);
+			session_close(session);
+			break;
+		}
+		session_waitinglist_pop(session, true);
+	}
+	return ret;
+}
 
 static void on_connect(uv_connect_t *req, int status)
 {
@@ -840,18 +851,13 @@ static void on_connect(uv_connect_t *req, int status)
 	} else {
 		worker_add_tcp_connected(worker, peer, session);
 	}
-	while (!session_waitinglist_is_empty(session)) {
-		struct qr_task *t = session_waitinglist_get(session);
-		ret = qr_task_send(t, session, NULL, NULL);
-		if (ret != 0) {
-			worker_del_tcp_connected(worker, peer);
-			session_waitinglist_finalize(session, KR_STATE_FAIL);
-			session_tasklist_finalize(session, KR_STATE_FAIL);
-			session_close(session);
-			return;
-		}
-		session_waitinglist_pop(session, true);
+
+	ret = send_waiting(session);
+	if (ret != 0) {
+		worker_del_tcp_connected(worker, peer);
+		return;
 	}
+
 	session_timer_stop(session);
 	session_timer_start(session, tcp_timeout_trigger,
 			    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
@@ -931,7 +937,12 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		if (task->pending_count >= MAX_PENDING) {
 			return ret;
 		}
-		ret = ioreq_spawn(task->ctx->worker, SOCK_DGRAM, choice->sin6_family);
+		/* Checkout answer before sending it */
+		struct request_ctx *ctx = task->ctx;
+		if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)choice, SOCK_DGRAM, task->pktbuf) != 0) {
+			return ret;
+		}
+		ret = ioreq_spawn(ctx->worker, SOCK_DGRAM, choice->sin6_family, false);
 		if (!ret) {
 			return ret;
 		}
@@ -1052,10 +1063,11 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		return 0;
 	}
 	struct request_ctx *ctx = task->ctx;
+	struct session *source_session = ctx->source.session;
 	kr_resolve_finish(&ctx->req, state);
 
 	task->finished = true;
-	if (ctx->source.session == NULL) {
+	if (source_session == NULL) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 	}
@@ -1064,7 +1076,6 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	qr_task_ref(task);
 
 	/* Send back answer */
-	struct session *source_session = ctx->source.session;
 	assert(!session_flags(source_session)->closing);
 	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
 	int res = qr_task_send(task, source_session,
@@ -1091,6 +1102,246 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 }
 
+static int udp_task_step(struct qr_task *task,
+			 const struct sockaddr *packet_source, knot_pkt_t *packet)
+{
+	struct request_ctx *ctx = task->ctx;
+	struct kr_request *req = &ctx->req;
+
+	/* If there is already outgoing query, enqueue to it. */
+	if (subreq_enqueue(task)) {
+		return kr_ok(); /* Will be notified when outgoing query finishes. */
+	}
+	/* Start transmitting */
+	uv_handle_t *handle = retransmit(task);
+	if (handle == NULL) {
+		subreq_finalize(task, packet_source, packet);
+		return qr_task_finalize(task, KR_STATE_FAIL);
+	}
+	/* Check current query NSLIST */
+	struct kr_query *qry = array_tail(req->rplan.pending);
+	assert(qry != NULL);
+	/* Retransmit at default interval, or more frequently if the mean
+	 * RTT of the server is better. If the server is glued, use default rate. */
+	size_t timeout = qry->ns.score;
+	if (timeout > KR_NS_GLUED) {
+		/* We don't have information about variance in RTT, expect +10ms */
+		timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
+	} else {
+		timeout = KR_CONN_RETRY;
+	}
+	/* Announce and start subrequest.
+	 * @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
+	 */
+	subreq_lead(task);
+	struct session *session = handle->data;
+	assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
+	int ret = session_timer_start(session, on_retransmit, timeout, 0);
+	/* Start next step with timeout, fatal if can't start a timer. */
+	if (ret != 0) {
+		subreq_finalize(task, packet_source, packet);
+		return qr_task_finalize(task, KR_STATE_FAIL);
+	}
+	return kr_ok();
+}
+
+static int tcp_task_waiting_connection(struct session *session, struct qr_task *task)
+{
+	assert(session_flags(session)->outgoing);
+	if (session_flags(session)->closing) {
+		/* Something went wrong. Better answer with KR_STATE_FAIL.
+		 * TODO: normally should not happen,
+		 * consider possibility to transform this into
+		 * assert(!session_flags(session)->closing). */
+		return kr_error(EINVAL);
+	}
+	/* Add task to the end of list of waiting tasks.
+	 * It will be notified in on_connect() or qr_task_on_send(). */
+	int ret = session_waitinglist_push(session, task);
+	if (ret < 0) {
+		return kr_error(EINVAL);
+	}
+	return kr_ok();
+}
+
+static int tcp_task_existing_connection(struct session *session, struct qr_task *task)
+{
+	assert(session_flags(session)->outgoing);
+	struct request_ctx *ctx = task->ctx;
+	struct worker_ctx *worker = ctx->worker;
+
+	if (session_flags(session)->closing) {
+		/* Something went wrong. Better answer with KR_STATE_FAIL.
+		 * TODO: normally should not happen,
+		 * consider possibility to transform this into
+		 * assert(!session_flags(session)->closing). */
+		return kr_error(EINVAL);
+	}
+
+	/* If there are any unsent queries, send it first. */
+	int ret = send_waiting(session);
+	if (ret != 0) {
+		return kr_error(EINVAL);
+	}
+
+	/* No unsent queries at that point. */
+	if (session_tasklist_get_len(session) >= worker->tcp_pipeline_max) {
+		/* Too many outstanding queries, answer with SERFVAIL, */
+		return kr_error(EINVAL);
+	}
+
+	/* Send query to upstream. */
+	ret = qr_task_send(task, session, NULL, NULL);
+	if (ret != 0) {
+		/* Error, finalize task with SERVFAIL and
+		 * close connection to upstream. */
+		session_tasklist_finalize(session, KR_STATE_FAIL);
+		session_close(session);
+		return kr_error(EINVAL);
+	}
+
+	return kr_ok();
+}
+
+static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr *addr)
+{
+	struct request_ctx *ctx = task->ctx;
+	struct worker_ctx *worker = ctx->worker;
+
+	/* Check if there must be TLS */
+	struct engine *engine = worker->engine;
+	struct network *net = &engine->net;
+	const char *key = tcpsess_key(addr);
+	struct tls_client_ctx_t *tls_ctx = NULL;
+	struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
+	if (entry) {
+		/* Address is configured to be used with TLS.
+		 * We need to allocate auxiliary data structure. */
+		tls_ctx = tls_client_ctx_new(entry, worker);
+		if (!tls_ctx) {
+			return kr_error(EINVAL);
+		}
+	}
+
+	uv_connect_t *conn = malloc(sizeof(uv_connect_t));
+	if (!conn) {
+		tls_client_ctx_free(tls_ctx);
+		return kr_error(EINVAL);
+	}
+	bool has_tls = (tls_ctx != NULL);
+	uv_handle_t *client = ioreq_spawn(worker, SOCK_STREAM, addr->sa_family, has_tls);
+	if (!client) {
+		tls_client_ctx_free(tls_ctx);
+		free(conn);
+		return kr_error(EINVAL);
+	}
+	struct session *session = client->data;
+	assert(session_flags(session)->has_tls == has_tls);
+	if (has_tls) {
+		tls_client_ctx_set_session(tls_ctx, session);
+		session_tls_set_client_ctx(session, tls_ctx);
+	}
+
+	/* Add address to the waiting list.
+	 * Now it "is waiting to be connected to." */
+	int ret = worker_add_tcp_waiting(ctx->worker, addr, session);
+	if (ret < 0) {
+		free(conn);
+		session_close(session);
+		return kr_error(EINVAL);
+	}
+
+	conn->data = session;
+	/*  Store peer address for the session. */
+	struct sockaddr *peer = session_get_peer(session);
+	memcpy(peer, addr, kr_sockaddr_len(addr));
+
+	/*  Start watchdog to catch eventual connection timeout. */
+	ret = session_timer_start(session, on_tcp_connect_timeout,
+				  KR_CONN_RTT_MAX, 0);
+	if (ret != 0) {
+		worker_del_tcp_waiting(ctx->worker, addr);
+		free(conn);
+		session_close(session);
+		return kr_error(EINVAL);
+	}
+
+	struct kr_query *qry = task_get_last_pending_query(task);
+	WITH_VERBOSE (qry) {
+		const char *peer_str = kr_straddr(peer);
+		VERBOSE_MSG(qry, "=> connecting to: '%s'\n", peer_str ? peer_str : "");
+	}
+
+	/*  Start connection process to upstream. */
+	if (uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect) != 0) {
+		session_timer_stop(session);
+		worker_del_tcp_waiting(ctx->worker, addr);
+		free(conn);
+		session_close(session);
+		return kr_error(EAGAIN);
+	}
+
+	/* Add task to the end of list of waiting tasks.
+	 * Will be notified either in on_connect() or in qr_task_on_send(). */
+	ret = session_waitinglist_push(session, task);
+	if (ret < 0) {
+		session_timer_stop(session);
+		worker_del_tcp_waiting(ctx->worker, addr);
+		free(conn);
+		session_close(session);
+		return kr_error(EINVAL);
+	}
+
+	return kr_ok();
+}
+
+static int tcp_task_step(struct qr_task *task,
+			 const struct sockaddr *packet_source, knot_pkt_t *packet)
+{
+	assert(task->pending_count == 0);
+
+	const struct sockaddr *addr =
+		packet_source ? packet_source : task->addrlist;
+	if (addr->sa_family == AF_UNSPEC) {
+		/* Target isn't defined. Finalize task with SERVFAIL.
+		 * Although task->pending_count is zero, there are can be followers,
+		 * so we need to call subreq_finalize() to handle them properly. */
+		subreq_finalize(task, packet_source, packet);
+		return qr_task_finalize(task, KR_STATE_FAIL);
+	}
+	/* Checkout task before connecting */
+	struct request_ctx *ctx = task->ctx;
+	if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)addr,
+				SOCK_STREAM, task->pktbuf) != 0) {
+		subreq_finalize(task, packet_source, packet);
+		return qr_task_finalize(task, KR_STATE_FAIL);
+	}
+	int ret;
+	struct session* session = NULL;
+	if ((session = worker_find_tcp_waiting(ctx->worker, addr)) != NULL) {
+		/* Connection is in the list of waiting connections.
+		 * It means that connection establishing is coming right now. */
+		ret = tcp_task_waiting_connection(session, task);
+	} else if ((session = worker_find_tcp_connected(ctx->worker, addr)) != NULL) {
+		/* Connection has been already established. */
+		ret = tcp_task_existing_connection(session, task);
+	} else {
+		/* Make connection. */
+		ret = tcp_task_make_connection(task, addr);
+	}
+
+	if (ret != kr_ok()) {
+		subreq_finalize(task, packet_source, packet);
+		if (ret == kr_error(EAGAIN)) {
+			ret = qr_task_step(task, NULL, NULL);
+		} else {
+			ret = qr_task_finalize(task, KR_STATE_FAIL);
+		}
+	}
+
+	return ret;
+}
+
 static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
@@ -1110,9 +1361,9 @@ static int qr_task_step(struct qr_task *task,
 	task->addrlist = NULL;
 	task->addrlist_count = 0;
 	task->addrlist_turn = 0;
-	req->has_tls = (ctx->source.session && session_flags(ctx->source.session)->has_tls);
 
 	if (worker->too_many_open) {
+		/* */
 		struct kr_rplan *rplan = &req->rplan;
 		if (worker->stats.rconcurrent <
 			worker->rconcurrent_highwatermark - 10) {
@@ -1150,180 +1401,16 @@ static int qr_task_step(struct qr_task *task,
 		choice += 1;
 	}
 
-	/* Start fast retransmit with UDP, otherwise connect. */
 	int ret = 0;
 	if (sock_type == SOCK_DGRAM) {
-		/* If there is already outgoing query, enqueue to it. */
-		if (subreq_enqueue(task)) {
-			return kr_ok(); /* Will be notified when outgoing query finishes. */
-		}
-		/* Start transmitting */
-		uv_handle_t *handle = retransmit(task);
-		if (handle == NULL) {
-			subreq_finalize(task, packet_source, packet);
-			return qr_task_finalize(task, KR_STATE_FAIL);
-		}
-		/* Check current query NSLIST */
-		struct kr_query *qry = array_tail(req->rplan.pending);
-		assert(qry != NULL);
-		/* Retransmit at default interval, or more frequently if the mean
-		 * RTT of the server is better. If the server is glued, use default rate. */
-		size_t timeout = qry->ns.score;
-		if (timeout > KR_NS_GLUED) {
-			/* We don't have information about variance in RTT, expect +10ms */
-			timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
-		} else {
-			timeout = KR_CONN_RETRY;
-		}
-		/* Announce and start subrequest.
-		 * @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
-		 */
-		subreq_lead(task);
-		struct session *session = handle->data;
-		assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
-		ret = session_timer_start(session, on_retransmit, timeout, 0);
-		/* Start next step with timeout, fatal if can't start a timer. */
-		if (ret != 0) {
-			subreq_finalize(task, packet_source, packet);
-			return qr_task_finalize(task, KR_STATE_FAIL);
-		}
+		/* Start fast retransmit with UDP. */
+		ret = udp_task_step(task, packet_source, packet);
 	} else {
+		/* TCP. Connect to upstream or send the query if connection already exists. */
 		assert (sock_type == SOCK_STREAM);
-		assert(task->pending_count == 0);
-		const struct sockaddr *addr =
-			packet_source ? packet_source : task->addrlist;
-		if (addr->sa_family == AF_UNSPEC) {
-			/* task->pending_count is zero, but there are can be followers */
-			subreq_finalize(task, packet_source, packet);
-			return qr_task_finalize(task, KR_STATE_FAIL);
-		}
-		struct session* session = NULL;
-		if ((session = worker_find_tcp_waiting(ctx->worker, addr)) != NULL) {
-			assert(session_flags(session)->outgoing);
-			if (session_flags(session)->closing) {
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-			/* Connection is in the list of waiting connections.
-			 * It means that connection establishing is coming right now.
-			 * Add task to the end of list of waiting tasks..
-			 * It will be notified in on_connect() or qr_task_on_send(). */
-			ret = session_waitinglist_push(session, task);
-			if (ret < 0) {
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-		} else if ((session = worker_find_tcp_connected(ctx->worker, addr)) != NULL) {
-			/* Connection has been already established */
-			assert(session_flags(session)->outgoing);
-			if (session_flags(session)->closing) {
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-
-			while (!session_waitinglist_is_empty(session)) {
-				struct qr_task *t = session_waitinglist_get(session);
-				ret = qr_task_send(t, session, NULL, NULL);
-				if (ret != 0) {
-					session_waitinglist_finalize(session, KR_STATE_FAIL);
-					session_tasklist_finalize(session, KR_STATE_FAIL);
-					subreq_finalize(task, packet_source, packet);
-					session_close(session);
-					return qr_task_finalize(task, KR_STATE_FAIL);
-				}
-				session_waitinglist_pop(session, true);
-			}
-
-			if (session_tasklist_get_len(session) >= worker->tcp_pipeline_max) {
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-
-			ret = qr_task_send(task, session, NULL, NULL);
-			if (ret != 0 /* && ret != kr_error(EMFILE) */) {
-				session_tasklist_finalize(session, KR_STATE_FAIL);
-				subreq_finalize(task, packet_source, packet);
-				session_close(session);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-		} else {
-			/* Make connection */
-			uv_connect_t *conn = malloc(sizeof(uv_connect_t));
-			if (!conn) {
-				return qr_task_step(task, NULL, NULL);
-			}
-			uv_handle_t *client = ioreq_spawn(worker, sock_type,
-							  addr->sa_family);
-			if (!client) {
-				free(conn);
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-			session = client->data;
-			ret = worker_add_tcp_waiting(ctx->worker, addr, session);
-			if (ret < 0) {
-				free(conn);
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-
-			/* Check if there must be TLS */
-			struct engine *engine = ctx->worker->engine;
-			struct network *net = &engine->net;
-			const char *key = tcpsess_key(addr);
-			struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
-			if (entry) {
-				assert(session_tls_get_client_ctx(session) == NULL);
-				struct tls_client_ctx_t *tls_ctx = tls_client_ctx_new(entry, worker);
-				if (!tls_ctx) {
-					worker_del_tcp_waiting(ctx->worker, addr);
-					free(conn);
-					subreq_finalize(task, packet_source, packet);
-					return qr_task_step(task, NULL, NULL);
-				}
-				tls_client_ctx_set_session(tls_ctx, session);
-				session_tls_set_client_ctx(session, tls_ctx);
-				session_flags(session)->has_tls = true;
-			}
-
-			conn->data = session;
-			struct sockaddr *peer = session_get_peer(session);
-			memcpy(peer, addr, kr_sockaddr_len(addr));
-
-			ret = session_timer_start(session, on_tcp_connect_timeout,
-						  KR_CONN_RTT_MAX, 0);
-			if (ret != 0) {
-				worker_del_tcp_waiting(ctx->worker, addr);
-				free(conn);
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-
-			struct kr_query *qry = task_get_last_pending_query(task);
-			WITH_VERBOSE (qry) {
-				char peer_str[INET6_ADDRSTRLEN];
-				inet_ntop(peer->sa_family, kr_inaddr(peer), peer_str, sizeof(peer_str));
-				VERBOSE_MSG(qry, "=> connecting to: '%s'\n", peer_str);
-			}
-
-			if (uv_tcp_connect(conn, (uv_tcp_t *)client,
-					   addr , on_connect) != 0) {
-				session_timer_stop(session);
-				worker_del_tcp_waiting(ctx->worker, addr);
-				free(conn);
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_step(task, NULL, NULL);
-			}
-
-			/* will be removed in on_connect() or qr_task_on_send() */
-			ret = session_waitinglist_push(session, task);
-			if (ret < 0) {
-				subreq_finalize(task, packet_source, packet);
-				return qr_task_finalize(task, KR_STATE_FAIL);
-			}
-		}
+		ret = tcp_task_step(task, packet_source, packet);
 	}
-	return kr_ok();
+	return ret;
 }
 
 static int parse_packet(knot_pkt_t *query)
@@ -1647,7 +1734,7 @@ int worker_task_finalize(struct qr_task *task, int state)
 
 void worker_task_complete(struct qr_task *task)
 {
-	return qr_task_complete(task);
+	qr_task_complete(task);
 }
 
 void worker_task_ref(struct qr_task *task)

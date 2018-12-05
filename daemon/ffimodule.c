@@ -37,7 +37,8 @@ enum {
 	SLOT_consume,
 	SLOT_produce,
 	SLOT_checkout,
-	SLOT_count
+	SLOT_answer_finalize,
+	SLOT_count /* dummy, must be the last */
 };
 #define SLOT_size sizeof(int)
 
@@ -106,13 +107,6 @@ static int l_ffi_init(struct kr_module *module)
 	return l_ffi_call(L, 1);
 }
 
-/** @internal Unregister layer callback reference from registry. */
-#define LAYER_UNREGISTER(L, api, name) do { \
-	int *cb_slot = (int *)((char *)api + sizeof(kr_layer_api_t)); \
-	if (cb_slot[SLOT_ ## name] > 0) \
-		luaL_unref(L, LUA_REGISTRYINDEX, cb_slot[SLOT_ ## name]); \
-} while(0)
-
 static int l_ffi_deinit(struct kr_module *module)
 {
 	/* Deinit the module in Lua (if possible) */
@@ -121,31 +115,31 @@ static int l_ffi_deinit(struct kr_module *module)
 	if (l_ffi_preface(module, "deinit")) {
 		ret = l_ffi_call(L, 1);
 	}
+	module->lib = NULL;
 	/* Free the layer API wrapper (unconst it) */
 	kr_layer_api_t* api = module->data;
-	if (api) {
-		LAYER_UNREGISTER(L, api, begin);
-		LAYER_UNREGISTER(L, api, finish);
-		LAYER_UNREGISTER(L, api, consume);
-		LAYER_UNREGISTER(L, api, produce);
-		LAYER_UNREGISTER(L, api, checkout);
-		LAYER_UNREGISTER(L, api, reset);
-		free(api);
+	if (!api) {
+		return ret;
 	}
-	module->lib = NULL;
+	/* Unregister layer callback references from registry. */
+	for (int si = 0; si < SLOT_count; ++si) {
+		if (api->cb_slots[si] > 0) {
+			luaL_unref(L, LUA_REGISTRYINDEX, api->cb_slots[si]);
+		}
+	}
+	free(api);
 	return ret;
 }
-#undef LAYER_UNREGISTER
 
 /** @internal Helper for retrieving layer Lua function by name. */
-#define LAYER_FFI_CALL(ctx, slot) \
-	int *cb_slot = (int *)((char *)(ctx)->api + sizeof(kr_layer_api_t)); \
-	if (cb_slot[SLOT_ ## slot] <= 0) { \
+#define LAYER_FFI_CALL(ctx, slot_name) \
+	const int *cb_slot = (ctx)->api->cb_slots + SLOT_ ## slot_name; \
+	if (*cb_slot <= 0) { \
 		return ctx->state; \
 	} \
 	struct kr_module *module = (ctx)->api->data; \
 	lua_State *L = module->lib; \
-	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot[SLOT_ ## slot]); \
+	lua_rawgeti(L, LUA_REGISTRYINDEX, *cb_slot); \
 	lua_pushnumber(L, ctx->state)
 
 static int l_ffi_layer_begin(kr_layer_t *ctx)
@@ -205,16 +199,23 @@ static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockadd
 	lua_pushboolean(L, type == SOCK_STREAM);
 	return l_ffi_call(L, 5);
 }
+
+static int l_ffi_layer_answer_finalize(kr_layer_t *ctx)
+{
+	LAYER_FFI_CALL(ctx, answer_finalize);
+	lua_pushlightuserdata(L, ctx->req);
+	return l_ffi_call(L, 2);
+}
 #undef LAYER_FFI_CALL
 
 /** @internal Conditionally register layer trampoline
   * @warning Expects 'module.layer' to be on top of Lua stack. */
 #define LAYER_REGISTER(L, api, name) do { \
-	int *cb_slot = (int *)((char *)api + sizeof(kr_layer_api_t)); \
+	int *cb_slot = (api)->cb_slots + SLOT_ ## name; \
 	lua_getfield((L), -1, #name); \
 	if (!lua_isnil((L), -1)) { \
 		(api)->name = l_ffi_layer_ ## name; \
-		cb_slot[SLOT_ ## name] = luaL_ref((L), LUA_REGISTRYINDEX); \
+		*cb_slot = luaL_ref((L), LUA_REGISTRYINDEX); \
 	} else { \
 		lua_pop((L), 1); \
 	} \
@@ -225,7 +226,8 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 {
 	/* Fabricate layer API wrapping the Lua functions
 	 * reserve slots after it for references to Lua callbacks. */
-	const size_t api_length = sizeof(kr_layer_api_t) + (SLOT_count * SLOT_size);
+	const size_t api_length = offsetof(kr_layer_api_t, cb_slots)
+				+ (SLOT_count * SLOT_size);
 	kr_layer_api_t *api = malloc(api_length);
 	if (api) {
 		memset(api, 0, api_length);
@@ -234,6 +236,7 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 		LAYER_REGISTER(L, api, consume);
 		LAYER_REGISTER(L, api, produce);
 		LAYER_REGISTER(L, api, checkout);
+		LAYER_REGISTER(L, api, answer_finalize);
 		LAYER_REGISTER(L, api, reset);
 		/* Begin is always set, as it initializes layer baton. */
 		api->begin = l_ffi_layer_begin;

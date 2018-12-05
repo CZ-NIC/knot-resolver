@@ -121,7 +121,7 @@ static int dnstap_log(kr_layer_t *ctx) {
 	}
 
 	if (req->qsource.dst_addr) {
-		if (req->qsource.tcp) {
+		if (req->qsource.flags.tcp) {
 			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__TCP;
 		} else {
 			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__UDP;
@@ -378,5 +378,5 @@ const kr_layer_api_t *dnstap_layer(struct kr_module *module) {
 	return &_layer;
 }
 
-KR_MODULE_EXPORT(dnstap);
+KR_MODULE_EXPORT(dnstap)
 

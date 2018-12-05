@@ -34,8 +34,8 @@
 #include "lib/layer.h"
 
 /* Defaults */
-#define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "hint",  fmt)
-#define ERR_MSG(fmt, ...) kr_log_error("[     ][hint] " fmt, ## __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "hint",  __VA_ARGS__)
+#define ERR_MSG(...) kr_log_error("[     ][hint] " __VA_ARGS__)
 
 struct hints_data {
 	struct kr_zonecut hints;
@@ -167,32 +167,16 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
-static int parse_addr_str(struct sockaddr_storage *sa, const char *addr)
+static int parse_addr_str(union inaddr *sa, const char *addr)
 {
 	int family = strchr(addr, ':') ? AF_INET6 : AF_INET;
-	memset(sa, 0, sizeof(struct sockaddr_storage));
-	sa->ss_family = family;
-	char *addr_bytes = (char *)kr_inaddr((struct sockaddr *)sa);
+	memset(sa, 0, sizeof(*sa));
+	sa->ip.sa_family = family;
+	char *addr_bytes = (/*const*/char *)kr_inaddr(&sa->ip);
 	if (inet_pton(family, addr, addr_bytes) < 1) {
 		return kr_error(EILSEQ);
 	}
 	return 0;
-}
-
-/** @warning _NOT_ thread-safe; returns a pointer to static data! */
-static const knot_rdata_t * addr2rdata(const char *addr) {
-	/* Parse address string */
-	struct sockaddr_storage ss;
-	if (parse_addr_str(&ss, addr) != 0) {
-		return NULL;
-	}
-
-	/* Build RDATA */
-	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
-	size_t addr_len = kr_inaddr_len((struct sockaddr *)&ss);
-	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr((struct sockaddr *)&ss);
-	knot_rdata_init(rdata_arr, addr_len, raw_addr);
-	return rdata_arr;
 }
 
 /** @warning _NOT_ thread-safe; returns a pointer to static data! */
@@ -233,18 +217,15 @@ static const knot_dname_t * raw_addr2reverse(const uint8_t *raw_addr, int family
 	return dname;
 }
 
-/** @warning _NOT_ thread-safe; returns a pointer to static data! */
 static const knot_dname_t * addr2reverse(const char *addr)
 {
 	/* Parse address string */
-	struct sockaddr_storage ss;
-	if (parse_addr_str(&ss, addr) != 0) {
+	union inaddr ia;
+	if (parse_addr_str(&ia, addr) != 0) {
 		return NULL;
 	}
-	const struct sockaddr *sa = (const struct sockaddr *)&ss;
-	const uint8_t *raw_addr = (const uint8_t *)kr_inaddr(sa);
-	int family = kr_inaddr_family(sa);
-	return raw_addr2reverse(raw_addr, family);
+	return raw_addr2reverse((const /*sign*/uint8_t *)kr_inaddr(&ia.ip),
+				kr_inaddr_family(&ia.ip));
 }
 
 static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr)
@@ -255,12 +236,13 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 		return kr_error(EINVAL);
 	}
 	knot_dname_to_lower(key);
-	const knot_rdata_t *rdata = addr2rdata(addr);
-	if (!rdata) {
+
+	union inaddr ia;
+	if (parse_addr_str(&ia, addr) != 0) {
 		return kr_error(EINVAL);
 	}
 
-	return kr_zonecut_add(hints, key, rdata);
+	return kr_zonecut_add(hints, key, kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
 }
 
 static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const char *addr)
@@ -276,11 +258,7 @@ static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const ch
 		return kr_error(EINVAL);
 	}
 
-	/* Build RDATA */
-	knot_rdata_t rdata[RDATA_ARR_MAX];
-	knot_rdata_init(rdata, knot_dname_size(ptr_name), ptr_name);
-
-	return kr_zonecut_add(hints, key, rdata);
+	return kr_zonecut_add(hints, key, ptr_name, knot_dname_size(ptr_name));
 }
 
 /** For a given name, remove either one address or all of them (if == NULL).
@@ -294,18 +272,19 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 	if (!knot_dname_from_str(key, name, sizeof(key))) {
 		return kr_error(EINVAL);
 	}
-	knot_rdata_t ptr_rdata[RDATA_ARR_MAX];
-	knot_rdata_init(ptr_rdata, knot_dname_size(key), key);
+	int key_len = knot_dname_size(key);
 
         if (addr) {
 		/* Remove the pair. */
-		const knot_rdata_t *rdata = addr2rdata(addr);
-		if (!rdata) {
+		union inaddr ia;
+		if (parse_addr_str(&ia, addr) != 0) {
 			return kr_error(EINVAL);
 		}
+
 		const knot_dname_t *reverse_key = addr2reverse(addr);
-		kr_zonecut_del(&data->reverse_hints, reverse_key, ptr_rdata);
-		return kr_zonecut_del(&data->hints, key, rdata);
+		kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
+		return kr_zonecut_del(&data->hints, key,
+					kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
 	} else {
 		/* Find a matching name */
 		pack_t *addr_set = kr_zonecut_find(&data->hints, key);
@@ -321,7 +300,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 					? AF_INET : AF_INET6;
 			const knot_dname_t *reverse_key = raw_addr2reverse(addr_val, family);
 			if (reverse_key != NULL) {
-				kr_zonecut_del(&data->reverse_hints, reverse_key, ptr_rdata);
+				kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
 			}
 			addr = pack_obj_next(addr);
 		}
@@ -682,6 +661,6 @@ struct kr_prop *hints_props(void)
 	return prop_list;
 }
 
-KR_MODULE_EXPORT(hints);
+KR_MODULE_EXPORT(hints)
 
 #undef VERBOSE_MSG

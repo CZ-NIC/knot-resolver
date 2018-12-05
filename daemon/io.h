@@ -27,16 +27,18 @@ struct tls_client_ctx_t;
 
 int udp_bind(uv_udp_t *handle, struct sockaddr *addr);
 int udp_bindfd(uv_udp_t *handle, int fd);
-int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr);
-int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr);
-int tcp_bindfd(uv_tcp_t *handle, int fd);
-int tcp_bindfd_tls(uv_tcp_t *handle, int fd);
+int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, int tcp_backlog);
+int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr, int tcp_backlog);
+int tcp_bindfd(uv_tcp_t *handle, int fd, int tcp_backlog);
+int tcp_bindfd_tls(uv_tcp_t *handle, int fd, int tcp_backlog);
 void tcp_timeout_trigger(uv_timer_t *timer);
 
 /** Initialize the handle, incl. ->data = struct session * instance.
  * \param type = SOCK_*
- * \param family = AF_* */
-int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family);
+ * \param family = AF_*
+ * \param has_tls has meanings only when type is SOCK_STREAM */
+int io_create(uv_loop_t *loop, uv_handle_t *handle, int type,
+	      unsigned family, bool has_tls);
 void io_deinit(uv_handle_t *handle);
 void io_free(uv_handle_t *handle);
 

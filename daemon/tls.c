@@ -41,15 +41,15 @@
 
 /** @internal Debugging facility. */
 #ifdef DEBUG
-#define DEBUG_MSG(fmt...) kr_log_verbose("[tls] " fmt)
+#define DEBUG_MSG(...) kr_log_verbose("[tls] " __VA_ARGS__)
 #else
-#define DEBUG_MSG(fmt...)
+#define DEBUG_MSG(...)
 #endif
 
 struct async_write_ctx {
 	uv_write_t write_req;
 	struct tls_common_ctx *t;
-	char buf[0];
+	char buf[];
 };
 
 static char const server_logstring[] = "tls";
@@ -451,7 +451,12 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 	}
 
 	assert(tls_p->session == s);
-	assert(tls_p->recv_buf == buf && nread <= sizeof(tls_p->recv_buf));
+	const bool ok = tls_p->recv_buf == buf && nread <= sizeof(tls_p->recv_buf);
+	if (!ok) {
+		assert(false);
+		/* don't risk overflowing the buffer if we have a mistake somewhere */
+		return kr_error(EINVAL);
+	}
 	
 	const char *logstring = tls_p->client_side ? client_logstring : server_logstring;
 
@@ -482,6 +487,9 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 			continue;
 		} else if (count == GNUTLS_E_REHANDSHAKE) {
 			/* See https://www.gnutls.org/manual/html_node/Re_002dauthentication.html */
+			struct sockaddr *peer = session_get_peer(s);
+			kr_log_verbose("[%s] TLS rehandshake with %s has started\n",
+				       logstring,  kr_straddr(peer));
 			tls_set_hs_state(tls_p, TLS_HS_IN_PROGRESS);
 			while (tls_p->handshake_state <= TLS_HS_IN_PROGRESS) {
 				int err = tls_handshake(tls_p, tls_p->handshake_cb);
@@ -731,7 +739,7 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 
 static int client_paramlist_entry_free(struct tls_client_paramlist_entry *entry)
 {
-	DEBUG_MSG("freeing TLS parameters %p\n", entry);
+	DEBUG_MSG("freeing TLS parameters %p\n", (void *)entry);
 
 	while (entry->ca_files.len > 0) {
 		if (entry->ca_files.at[0] != NULL) {

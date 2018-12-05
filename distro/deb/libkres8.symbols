@@ -4,10 +4,15 @@ libkres.so.8 libkres8 #MINVER#
  kr_bitcmp@Base 2.1.0
  kr_cache_clear@Base 2.1.0
  kr_cache_close@Base 2.1.0
+ kr_cache_closest_apex@Base 3.1.0
+ kr_cache_emergency_file_to_remove@Base 3.1.0
  kr_cache_insert_rr@Base 3.0.0
+ kr_cache_match@Base 3.1.0
  kr_cache_materialize@Base 2.1.0
  kr_cache_open@Base 2.1.0
  kr_cache_peek_exact@Base 2.1.0
+ kr_cache_remove@Base 3.1.0
+ kr_cache_remove_subtree@Base 3.1.0
  kr_cache_sync@Base 2.1.0
  kr_cache_ttl@Base 2.1.0
  kr_cdb_lmdb@Base 2.1.0
@@ -24,6 +29,7 @@ libkres.so.8 libkres8 #MINVER#
  kr_inaddr_family@Base 2.1.0
  kr_inaddr_len@Base 2.1.0
  kr_inaddr_port@Base 2.1.0
+ kr_inaddr_set_port@Base 3.1.0
  kr_inaddr_str@Base 2.1.0
  kr_log_trace@Base 2.1.0
  kr_log_verbose@Base 2.1.0
@@ -87,6 +93,7 @@ libkres.so.8 libkres8 #MINVER#
  kr_ta_del@Base 2.1.0
  kr_ta_get@Base 2.1.0
  kr_ta_get_longest_name@Base 2.1.0
+ kr_unpack_cache_key@Base 3.1.0
  kr_verbose_set@Base 2.1.0
  kr_verbose_status@Base 2.1.0
  kr_zonecut_add@Base 2.1.0
@@ -111,11 +118,18 @@ libkres.so.8 libkres8 #MINVER#
  map_get@Base 2.1.0
  map_set@Base 2.1.0
  map_walk_prefixed@Base 2.1.0
+ queue_deinit_impl@Base 3.1.0
+ queue_init_impl@Base 3.1.0
+ queue_push_head_impl@Base 3.1.0
+ queue_push_impl@Base 3.1.0
  trie_clear@Base 3.0.0
  trie_create@Base 3.0.0
  trie_del@Base 3.0.0
+ trie_del_first@Base 3.1.0
  trie_free@Base 3.0.0
+ trie_get_first@Base 3.1.0
  trie_get_ins@Base 3.0.0
+ trie_get_leq@Base 3.1.0
  trie_get_try@Base 3.0.0
  trie_it_begin@Base 3.0.0
  trie_it_finished@Base 3.0.0

@@ -9,6 +9,14 @@ The server is in the `daemon` directory, it works out of the box without any con
    $ kresd -h # Get help
    $ kresd -a ::1
 
+If you're using our packages, they also provide systemd integration. To start the resolver under systemd, you can use the ``kresd@1.service`` service. By default, the resolver only binds to local interfaces.
+
+.. code-block:: bash
+
+   $ man kresd.systemd  # Help for systemd integration configuration
+   $ systemctl start kresd@1.service
+
+
 Configuration
 =============
 
@@ -377,10 +385,63 @@ Environment
          2.1.1
 
 
+.. _network-configuration:
+
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
 For when listening on ``localhost`` just doesn't cut it.
+
+**Systemd socket configuration**
+
+If you're using our packages with systemd with sockets support (not supported
+on CentOS 7), network interfaces are configured using systemd drop-in files for
+``kresd.socket`` and ``kresd-tls.socket``.
+
+To configure kresd to listen on public interface, create a drop-in file:
+
+.. code-block:: bash
+
+   $ systemctl edit kresd.socket
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd.socket.d/override.conf
+   [Socket]
+   ListenDatagram=192.0.2.115:53
+   ListenStream=192.0.2.115:53
+
+.. _kresd-socket-override-port:
+
+The default port can also be overriden by using an empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be useful if you want to use the Knot DNS with the `dnsproxy module`_ to have both resolver and authoritative server running on the same machine.
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd.socket.d/override.conf
+   [Socket]
+   ListenDatagram=
+   ListenStream=
+   ListenDatagram=127.0.0.1:53000
+   ListenStream=127.0.0.1:53000
+   ListenDatagram=[::1]:53000
+   ListenStream=[::1]:53000
+
+The ``kresd-tls.socket`` can also be configured to listen for TLS connections.
+
+.. code-block:: bash
+
+   $ systemctl edit kresd-tls.socket
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd-tls.socket.d/override.conf
+   [Socket]
+   ListenStream=192.0.2.115:853
+
+**Daemon network configuration**
+
+If you don't use systemd with sockets to run kresd, network interfaces are
+configured in the config file.
 
 .. tip:: Use declarative interface for network.
 
@@ -400,13 +461,13 @@ For when listening on ``localhost`` just doesn't cut it.
 
    :return: boolean (default: true)
 
-   Enable/disable using IPv6 for recursion.
+   Enable/disable using IPv6 for contacting upstream nameservers.
 
 .. envvar:: net.ipv4 = true|false
 
    :return: boolean (default: true)
 
-   Enable/disable using IPv4 for recursion.
+   Enable/disable using IPv4 for contacting upstream nameservers.
 
 .. function:: net.listen(addresses, [port = 53, flags = {tls = (port == 853)}])
 
@@ -493,6 +554,8 @@ For when listening on ``localhost`` just doesn't cut it.
       100
       > net.tcp_pipeline(50)
       50
+
+   .. warning:: Please note that too large limit may have negative impact on performance and can lead to increased number of SERVFAIL answers.
 
 .. function:: net.outgoing_v4([string address])
 
@@ -691,7 +754,7 @@ Cache configuration
 
 The default cache in Knot Resolver is persistent with LMDB backend, this means that the daemon doesn't lose
 the cached data on restart or crash to avoid cold-starts. The cache may be reused between cache
-daemons or manipulated from other processes, making for example synchronised load-balanced recursors possible.
+daemons or manipulated from other processes, making for example synchronized load-balanced recursors possible.
 
 .. function:: cache.open(max_size[, config_uri])
 
@@ -815,7 +878,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
   :return: current maximum TTL
 
-  Get or set minimum cache TTL. Any entry inserted into cache with TTL lower than minimal will be overriden to minimum TTL. Forcing TTL higher than specified violates DNS standards, use with care.
+  Get or set minimum cache TTL. Any entry inserted into cache with TTL lower than minimal will be overridden to minimum TTL. Forcing TTL higher than specified violates DNS standards, use with care.
 
   .. note:: The `ttl` value must be in range `<0, max_ttl)`.
 
@@ -832,7 +895,7 @@ daemons or manipulated from other processes, making for example synchronised loa
 
 .. function:: cache.ns_tout([timeout])
 
-  :param number timeout: NS retry interval in miliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
+  :param number timeout: NS retry interval in milliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
   :return: current timeout
 
   Get or set time interval for which a nameserver address will be ignored after determining that it doesn't return (useful) answers.
@@ -850,7 +913,7 @@ daemons or manipulated from other processes, making for example synchronised loa
      Purge cache records matching specified criteria. There are two specifics:
 
      * To reliably remove **negative** cache entries you need to clear subtree with the whole zone. E.g. to clear negative cache entries for (formerly non-existing) record `www.example.com. A` you need to flush whole subtree starting at zone apex, e.g. `example.com.` [#]_.
-     * This operation is asynchonous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
+     * This operation is asynchronous and might not be yet finished when call to ``cache.clear()`` function returns. Return value indicates if clearing continues asynchronously or not.
 
   :param string name: subtree to purge; if the name isn't provided, whole cache is purged
         (and any other parameters are disregarded).
@@ -869,12 +932,12 @@ daemons or manipulated from other processes, making for example synchronised loa
   :param table prev_state: return value from previous run (can be used by callback)
 
   :rtype: table
-  :return: ``count`` key is always present. Other keys are optional and their presense indicate special conditions.
+  :return: ``count`` key is always present. Other keys are optional and their presence indicate special conditions.
 
    * **count** *(integer)* - number of items removed from cache by this call (can be 0 if no entry matched criteria)
    * **not_apex** - cleared subtree is not cached as zone apex; proofs of non-existence were probably not removed
    * **subtree** *(string)* - hint where zone apex lies (this is estimation from cache content and might not be accurate)
-   * **chunk_limit** - more than ``chunk_size`` items needs to be cleared, clearing will continue asynchonously
+   * **chunk_limit** - more than ``chunk_size`` items needs to be cleared, clearing will continue asynchronously
 
 
   Examples:
@@ -1001,7 +1064,7 @@ The `event` package provides a very basic mean for non-blocking execution - it a
 
 .. function:: worker.coroutine(function)
 
-   Start a new coroutine with given function (closure). The function can do I/O or run timers without blocking the main thread. See cqueues_ for documentation of possible operations and synchronisation primitives. The main limitation is that you can't wait for a finish of a coroutine from processing layers, because it's not currently possible to suspend and resume execution of processing layers.
+   Start a new coroutine with given function (closure). The function can do I/O or run timers without blocking the main thread. See cqueues_ for documentation of possible operations and synchronization primitives. The main limitation is that you can't wait for a finish of a coroutine from processing layers, because it's not currently possible to suspend and resume execution of processing layers.
 
    Example:
 
@@ -1102,17 +1165,6 @@ specified worker count and process rank.
 
 	print(worker.stats().concurrent)
 
-Running supervised
-==================
-
-Knot Resolver can run under a supervisor to allow for graceful restarts, watchdog process and socket activation. This way the supervisor binds to sockets and lends them to the resolver daemon. If the resolver terminates or is killed, the sockets remain open and no queries are dropped.
-
-The watchdog process must notify kresd about active file descriptors, and kresd will automatically determine the socket type and bound address, thus it will appear as any other address. You should have a look at `real process managers`_.
-
-The daemon also supports `systemd socket activation`_, it is automatically detected and requires no configuration on users's side.
-
-See ``kresd.systemd(7)`` for details.
-
 .. _enabling-dnssec:
 
 Enabling DNSSEC
@@ -1167,7 +1219,7 @@ The root anchors bootstrap may fail for various reasons, in this case you need t
 
 You've just enabled DNSSEC!
 
-.. note:: Bootstrapping and automatic update need write access to keyfile direcory. If you want to manage root anchors manually you should use ``trust_anchors.add_file('root.keys', true)``.
+.. note:: Bootstrapping and automatic update need write access to keyfile directory. If you want to manage root anchors manually you should use ``trust_anchors.add_file('root.keys', true)``.
 
 CLI interface
 =============
@@ -1201,12 +1253,54 @@ To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a sing
    $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 -v &
 
 
-Scaling out
-===========
+Control sockets
+===============
 
-The server can clone itself into multiple processes upon startup, this enables you to scale it on multiple cores.
-Multiple processes can serve different addresses, but still share the same working directory and cache.
-You can add, start and stop processes during runtime based on the load.
+Unless ran manually, knot-resolver is typically started in non-interactive mode.
+The mode gets triggered by using the ``-f`` command-line parameter or by passing sockets from systemd.
+You can attach to the the consoles for each process; by default they are in ``rundir/tty/$PID``.
+
+.. note:: When running kresd with systemd, you can find the location of the socket(s) using ``systemctl status kresd-control@*.socket``. Typically, these are in ``/run/knot-resolver/control@*``.
+
+.. code-block:: bash
+
+   $ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
+   > cache.count()
+   53
+
+The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
+Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
+
+This is also a way to enumerate and test running instances, the list of files in ``tty`` corresponds to the list
+of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
+
+
+Utilizing multiple CPUs
+=======================
+
+The server can run in multiple independent processes, all sharing the same socket and cache. These processes can be started or stopped during runtime based on the load.
+
+**Using systemd**
+
+To run multiple daemons using systemd, use a different numeric identifier for
+the instance, for example:
+
+.. code-block:: bash
+
+   $ systemctl start kresd@1.service
+   $ systemctl start kresd@2.service
+   $ systemctl start kresd@3.service
+   $ systemctl start kresd@4.service
+
+With the use of brace expansion, the equivalent command looks like:
+
+.. code-block:: bash
+
+   $ systemctl start kresd@{1..4}.service
+
+For more details, see ``kresd.systemd(7)``.
+
+**Daemon only**
 
 .. code-block:: bash
 
@@ -1228,21 +1322,6 @@ You can add, start and stop processes during runtime based on the load.
 
 .. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, use only one daemon process.
 
-Notice the absence of an interactive CLI. You can attach to the the consoles for each process, they are in ``rundir/tty/PID``.
-
-.. code-block:: bash
-
-	$ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
-	> cache.count()
-	53
-
-The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
-Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
-
-This is also a way to enumerate and test running instances, the list of files in ``tty`` corresponds to the list
-of running processes, and you can test the process for liveliness by connecting to the UNIX socket.
-
-.. _daemon-supervised:
 
 Using CLI tools
 ===============
@@ -1289,4 +1368,5 @@ Example:
 .. _luasocket: https://luarocks.org/modules/luarocks/luasocket
 .. _cqueues: https://25thandclement.com/~william/projects/cqueues.html
 .. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
-.. _`systemd socket activation`: http://0pointer.de/blog/projects/socket-activation.html
+.. _`socket activation`: http://0pointer.de/blog/projects/socket-activation.html
+.. _`dnsproxy module`: https://www.knot-dns.cz/docs/2.7/html/modules.html#dnsproxy-tiny-dns-proxy

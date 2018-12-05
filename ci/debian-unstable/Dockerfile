@@ -39,5 +39,5 @@ RUN luarocks install luacov
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
 
-# clang for kresd CI
-RUN apt-get install -y -qqq clang-5.0 clang-tools-5.0 clang-tidy-5.0
+# clang for kresd CI, version updated as debian updates it
+RUN apt-get install -y -qqq clang clang-tools clang-tidy

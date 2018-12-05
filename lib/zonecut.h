@@ -54,6 +54,14 @@ KR_EXPORT
 void kr_zonecut_deinit(struct kr_zonecut *cut);
 
 /**
+ * Move a zonecut, transferring ownership of any pointed-to memory.
+ * @param to the target - it gets deinit-ed
+ * @param from the source - not modified, but shouldn't be used afterward
+ */
+KR_EXPORT
+void kr_zonecut_move(struct kr_zonecut *to, const struct kr_zonecut *from);
+
+/**
  * Reset zone cut to given name and clear address list.
  * @note This clears the address list even if the name doesn't change. TA and DNSKEY don't change.
  * @param cut  zone cut to be set
@@ -90,21 +98,23 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src);
  *
  * @param cut    zone cut to be populated
  * @param ns     nameserver name
- * @param rdata  nameserver address (as rdata)
+ * @param data   typically knot_rdata_t::data
+ * @param len    typically knot_rdata_t::len
  * @return 0 or error code
  */
 KR_EXPORT
-int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
+int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const void *data, int len);
 
 /**
  * Delete nameserver/address pair from the zone cut.
  * @param  cut
  * @param  ns    name server name
- * @param  rdata name server address
+ * @param  data  typically knot_rdata_t::data
+ * @param  len   typically knot_rdata_t::len
  * @return       0 or error code
  */
 KR_EXPORT
-int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const knot_rdata_t *rdata);
+int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const void *data, int len);
 
 /**
  * Delete all addresses associated with the given name.

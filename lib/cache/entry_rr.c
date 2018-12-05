@@ -41,7 +41,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 		data += size;
 	}
 	//VERBOSE_MSG(NULL, "dematerialized to %d B\n", (int)(data - data0));
-	//return data - data0;
+	(void)data;
 	return kr_ok();
 }
 

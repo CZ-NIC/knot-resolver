@@ -233,17 +233,6 @@ Optional dependencies may be disabled as well using ``HAS_x=yes|no`` variable.
    Try ``LD_LIBRARY_PATH`` on Linux/BSD, and ``DYLD_FALLBACK_LIBRARY_PATH`` on OS X.
    Otherwise you need to add the locations to linker search path.
 
-Several dependencies may not be in the packages yet, the script pulls and installs all dependencies in a chroot.
-You can avoid rebuilding dependencies by specifying `BUILD_IGNORE` variable, see the Dockerfile_ for example.
-Usually you only really need to rebuild libknot_.
-
-.. code-block:: bash
-
-   $ export FAKEROOT="${HOME}/.local"
-   $ export PKG_CONFIG_PATH="${FAKEROOT}/lib/pkgconfig"
-   $ export BUILD_IGNORE="..." # Ignore installed dependencies
-   $ ./scripts/bootstrap-depends.sh ${FAKEROOT}
-
 Building extras
 ~~~~~~~~~~~~~~~
 

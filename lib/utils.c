@@ -53,6 +53,24 @@ static isaac_ctx ISAAC;
 static bool isaac_seeded = false;
 #define SEED_SIZE 256
 
+void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
+{
+	if (mm) {
+		void *p = mm->alloc(mm->ctx, size);
+		if (p == NULL) {
+			return NULL;
+		} else {
+			if (what) {
+				memcpy(p, what,
+				       prev_size < size ? prev_size : size);
+			}
+			mm_free(mm, what);
+			return p;
+		}
+	} else {
+		return realloc(what, size);
+	}
+}
 
 void *mm_malloc(void *ctx, size_t n)
 {
@@ -113,6 +131,23 @@ void kr_log_verbose(const char *fmt, ...)
 		va_end(args);
 		fflush(stdout);
 	}
+}
+
+void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...)
+{
+	unsigned ind = 0;
+	for (const struct kr_query *q = qry; q; q = q->parent)
+		ind += 2;
+	uint32_t qry_uid = qry ? qry->uid : 0;
+	uint32_t req_uid = qry && qry->request ? qry->request->uid : 0;
+	/* Simplified kr_log_verbose() calls, first prefix then passed fmt...
+	 * Calling it would take about the same amount of code. */
+	printf("[%05u.%02u][%s] %*s", req_uid, qry_uid, cls, ind, "");
+	va_list args;
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	va_end(args);
+	fflush(stdout);
 }
 
 bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...)
@@ -303,18 +338,19 @@ int kr_pkt_clear_payload(knot_pkt_t *pkt)
 int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
                uint16_t rclass, uint16_t rtype, const uint8_t *rdata, uint16_t rdlen)
 {
+	/* LATER(opt.): there's relatively lots of copying, but ATM kr_pkt_put()
+	 * isn't considered to be used in any performance-critical parts (just lua). */
 	if (!pkt || !name)  {
 		return kr_error(EINVAL);
 	}
 	/* Create empty RR */
 	knot_rrset_t rr;
 	knot_rrset_init(&rr, knot_dname_copy(name, &pkt->mm), rtype, rclass, ttl);
-	/* Create RDATA
-	 * @warning _NOT_ thread safe.
-	 */
-	static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
-	knot_rdata_init(rdata_arr, rdlen, rdata);
-	knot_rdataset_add(&rr.rrs, rdata_arr, &pkt->mm);
+	/* Create RDATA */
+	knot_rdata_t *rdata_tmp = mm_alloc(&pkt->mm, offsetof(knot_rdata_t, data) + rdlen);
+	knot_rdata_init(rdata_tmp, rdlen, rdata);
+	knot_rdataset_add(&rr.rrs, rdata_tmp, &pkt->mm);
+	mm_free(&pkt->mm, rdata_tmp); /* we're always on mempool for now, but whatever */
 	/* Append RR */
 	return knot_pkt_put(pkt, 0, &rr, KNOT_PF_FREE);
 }
@@ -424,27 +460,24 @@ void kr_inaddr_set_port(struct sockaddr *addr, uint16_t port)
 
 int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen)
 {
-	int ret = kr_ok();
 	if (!addr || !buf || !buflen) {
 		return kr_error(EINVAL);
 	}
 
-	char str[INET6_ADDRSTRLEN + 6];
-	if (!inet_ntop(addr->sa_family, kr_inaddr(addr), str, sizeof(str))) {
+	if (!inet_ntop(addr->sa_family, kr_inaddr(addr), buf, *buflen)) {
 		return kr_error(errno);
 	}
-	int len = strlen(str);
-	str[len] = '#';
-	u16tostr((uint8_t *)&str[len + 1], kr_inaddr_port(addr));
-	len += 6;
-	str[len] = 0;
-	if (len >= *buflen) {
-		ret = kr_error(ENOSPC);
-	} else {
-		memcpy(buf, str, len + 1);
+	const int len = strlen(buf);
+	const int len_need = len + 1 + 5 + 1;
+	if (len_need > *buflen) {
+		*buflen = len_need;
+		return kr_error(ENOSPC);
 	}
-	*buflen = len;
-	return ret;
+	*buflen = len_need;
+	buf[len] = '#';
+	u16tostr((uint8_t *)&buf[len + 1], kr_inaddr_port(addr));
+	buf[len_need - 1] = 0;
+	return kr_ok();
 }
 
 int kr_straddr_family(const char *addr)

@@ -163,17 +163,19 @@ struct kr_rplan {
 	knot_mm_t *pool;
 	uint32_t next_uid;
 };
+struct kr_request_qsource_flags {
+	_Bool tcp : 1;
+	_Bool tls : 1;
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
 	struct kr_query *current_query;
 	struct {
-		const knot_rrset_t *key;
 		const struct sockaddr *addr;
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
-		const knot_rrset_t *opt;
-		_Bool tcp;
+		struct kr_request_qsource_flags flags;
 		size_t size;
 	} qsource;
 	struct {
@@ -190,12 +192,12 @@ struct kr_request {
 	_Bool auth_validated;
 	uint8_t rank;
 	struct kr_rplan rplan;
-	int has_tls;
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
 	int vars_ref;
 	knot_mm_t pool;
 	unsigned int uid;
+	void *daemon_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct kr_cache {
@@ -263,6 +265,7 @@ int knot_dname_in_bailiwick(const knot_dname_t *, const knot_dname_t *);
 _Bool knot_dname_is_equal(const knot_dname_t *, const knot_dname_t *);
 size_t knot_dname_labels(const uint8_t *, const uint8_t *);
 size_t knot_dname_size(const knot_dname_t *);
+void knot_dname_to_lower(knot_dname_t *);
 char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
 knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, uint16_t);
 int knot_rdataset_merge(knot_rdataset_t *, const knot_rdataset_t *, knot_mm_t *);
@@ -308,13 +311,14 @@ struct sockaddr *kr_straddr_socket(const char *, int);
 int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
 void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
-int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const knot_rdata_t *);
+int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const void *, int);
 _Bool kr_zonecut_is_empty(struct kr_zonecut *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
 uint64_t kr_now();
 void lru_free_items_impl(struct lru *);
 struct lru *lru_create_impl(unsigned int, knot_mm_t *, knot_mm_t *);
 void *lru_get_impl(struct lru *, const char *, unsigned int, unsigned int, _Bool, _Bool *);
+void *mm_realloc(knot_mm_t *, void *, size_t, size_t);
 knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
 int kr_ta_add(map_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t *, uint16_t);
 int kr_ta_del(map_t *, const knot_dname_t *);

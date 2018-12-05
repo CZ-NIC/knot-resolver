@@ -42,8 +42,8 @@ typedef void (*trace_callback_f)(struct kr_request *request);
 /** @brief Callback for request logging handler. */
 typedef void (*trace_log_f)(const struct kr_query *query, const char *source, const char *msg);
 
-#define kr_log_info(fmt, ...) do { printf((fmt), ## __VA_ARGS__); fflush(stdout); } while(0)
-#define kr_log_error(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__)
+#define kr_log_info(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */
@@ -56,10 +56,16 @@ KR_EXPORT bool kr_verbose_set(bool status);
 KR_EXPORT KR_PRINTF(1)
 void kr_log_verbose(const char *fmt, ...);
 
+/** Utility for QRVERBOSE - use that instead. */
+KR_EXPORT KR_PRINTF(3)
+void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...);
+
 /**
  * @brief Return true if the query has request log handler installed.
  */
-#define kr_log_trace_enabled(query) ((query) && (query)->request && (query)->request->trace_log)
+#define kr_log_trace_enabled(query) (__builtin_expect( \
+	(query) && (query)->request && (query)->request->trace_log, \
+	false))
 
 /**
  * Log a message through the request log handler.
@@ -103,32 +109,18 @@ static inline void *mm_alloc(knot_mm_t *mm, size_t size)
 	if (mm) return mm->alloc(mm->ctx, size);
 	else return malloc(size);
 }
-static inline void mm_free(knot_mm_t *mm, void *what)
+static inline void mm_free(knot_mm_t *mm, const void *what)
 {
 	if (mm) {
 		if (mm->free)
-			mm->free(what);
+			mm->free((void *)what);
 	}
-	else free(what);
+	else free((void *)what);
 }
-static inline void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
-{
-	if (mm) {
-		void *p = mm->alloc(mm->ctx, size);
-		if (p == NULL) {
-			return NULL;
-		} else {
-			if (what) {
-				memcpy(p, what,
-				       prev_size < size ? prev_size : size);
-			}
-			mm_free(mm, what);
-			return p;
-		}
-	} else {
-		return realloc(what, size);
-	}
-}
+
+/** Realloc implementation using memory context. */
+KR_EXPORT
+void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size);
 
 /** Trivial malloc() wrapper. */
 void *mm_malloc(void *ctx, size_t n);
@@ -181,9 +173,6 @@ typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
  */
 typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 /* @endcond */
-
-/** @internal RDATA array maximum size. */
-#define RDATA_ARR_MAX (UINT16_MAX + sizeof(uint64_t))
 
 /** Concatenate N strings. */
 KR_EXPORT
@@ -394,7 +383,7 @@ static inline char *kr_straddr(const struct sockaddr *addr)
 {
 	assert(addr != NULL);
 	/* We are the sinle-threaded application */
-	static char str[INET6_ADDRSTRLEN + 6];
+	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 	size_t len = sizeof(str);
 	int ret = kr_inaddr_str(addr, str, &len);
 	return ret != kr_ok() || len == 0 ? NULL : str;
@@ -439,7 +428,7 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 	}
 	dst[0] = len;
 	return KNOT_EOK;
-};
+}
 
 /* Trivial non-inline wrappers, to be used in lua. */
 KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,

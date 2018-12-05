@@ -25,7 +25,7 @@ KR_EXPORT void queue_init_impl(struct queue *q, size_t item_size)
 	/* Take 128 B (two x86 cache lines), except a small margin
 	 * that the allocator can use for its overhead.
 	 * Normally (64-bit pointers) this means 16 B header + 13*8 B data. */
-	q->chunk_cap = ( ((ssize_t)128) - offsetof(struct queue_chunk, data)
+	q->chunk_cap = (128 - offsetof(struct queue_chunk, data)
 			- sizeof(size_t)
 			) / item_size;
 	if (!q->chunk_cap) q->chunk_cap = 1; /* item_size big enough by itself */

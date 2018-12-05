@@ -14,6 +14,9 @@
 #include <stdio.h>
 #include <string.h>
 
+/* FIXME: migrate to Knot DNS version of mempools. */
+#pragma GCC diagnostic ignored "-Wpointer-arith"
+
 static char *
 mp_vprintf_at(struct mempool *mp, size_t ofs, const char *fmt, va_list args)
 {

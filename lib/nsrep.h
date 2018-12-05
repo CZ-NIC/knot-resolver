@@ -36,7 +36,7 @@ enum kr_ns_score {
 	KR_NS_LONG      = (3 * KR_NS_TIMEOUT) / 4,
 	KR_NS_UNKNOWN   = KR_NS_TIMEOUT / 2,
 	KR_NS_PENALTY   = 100,
-	KR_NS_GLUED     = 10
+	KR_NS_GLUED     = 10,
 };
 
 /**
@@ -109,11 +109,11 @@ struct kr_nsrep
 };
 
 /**
- * Set given NS address.
+ * Set given NS address.  (Very low-level access to the list.)
  * @param  qry      updated query
  * @param  index    index of the updated target
  * @param  sock     socket address to use (sockaddr_in or sockaddr_in6 or NULL)
- * @return          0 or an error code
+ * @return          0 or an error code, in particular kr_error(ENOENT) for net.ipvX
  */
 KR_EXPORT
 int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock);
@@ -145,7 +145,7 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
  * @param  addr         chosen address (NULL for first)
  * @param  score        new score (i.e. RTT), see enum kr_ns_score
  *                      after two calls with score = KR_NS_DEAD and umode = KR_NS_UPDATE
- *                      server will be guaranteed to have KR_NS_TIMEOUTED score
+ *                      server will be guaranteed to have score >= KR_NS_TIMEOUT
  * @param  cache        RTT LRU cache
  * @param  umode        update mode (KR_NS_UPDATE or KR_NS_RESET or KR_NS_ADD)
  * @return              0 on success, error code on failure
