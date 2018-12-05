@@ -880,6 +880,66 @@ static int net_tls_handshake_timeout(lua_State *L)
 	return net_update_timeout(L, &net->tcp.tls_handshake_timeout, "net.tls_handshake_timeout");
 }
 
+static int net_bpf_set(lua_State *L)
+{
+	int ret;
+	struct engine *engine = engine_luaget(L);
+	struct network *net = &engine->net;
+
+	if (lua_gettop(L) != 1 || lua_type(L, 1) != LUA_TINTEGER) {
+		format_error(L, "net.bpf_set(fd) takes one parameter: the open file descriptor of a loaded BPF program");
+		lua_error(L);
+		return 0;
+	}
+
+#if __linux__
+
+	int progfd = lua_tointeger(L, 1);
+
+	if (!network_set_bpf(net, progfd)) {
+		char errmsg[256] = {};
+		snprintf(errmsg, sizeof(errmsg), "failed to attach BPF program to some networks: %s", strerror(errno));
+		format_error(L, errmsg);
+		lua_error(L);
+		return 0;
+	}
+
+	lua_pushboolean(L, 1);
+	return 1;
+
+#endif
+
+	format_error(L, "BPF is not supported on this operating system");
+	lua_error(L);
+	return 0;
+}
+
+static int net_bpf_clear(lua_State *L)
+{
+	int ret;
+	struct engine *engine = engine_luaget(L);
+	struct network *net = &engine->net;
+
+	if (lua_gettop(L) != 0) {
+		format_error(L, "net.bpf_clear() does not take any parameters");
+		lua_error(L);
+		return 0;
+	}
+
+#if __linux__
+
+	network_clear_bpf(net);
+
+	lua_pushboolean(L, 1);
+	return 1;
+
+#endif
+
+	format_error(L, "BPF is not supported on this operating system");
+	lua_error(L);
+	return 0;
+}
+
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -900,6 +960,8 @@ int lib_net(lua_State *L)
 		{ "outgoing_v6",  net_outgoing_v6 },
 		{ "tcp_in_idle",  net_tcp_in_idle },
 		{ "tls_handshake_timeout",  net_tls_handshake_timeout },
+		{ "bpf_set",      net_bpf_set },
+		{ "bpf_clear",    net_bpf_clear },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);
