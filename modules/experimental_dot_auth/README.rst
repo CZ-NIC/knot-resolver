@@ -1,18 +1,12 @@
-.. _mod-dot:
+.. _mod-experimental_dot_auth:
 
-DNS-over-TLS (DoT) Auto-discovery
----------------------------------
+Experimental DNS-over-TLS (DoT) Auto-discovery
+----------------------------------------------
 
 DoT module enables automatic discovery of authoritative servers' SPKI
 fingerprint via the use of magic NS names. It is very similar to `dnscurve`_ mechanism.
 
-.. warning:: This module is experimental.
-
-Requirements
-^^^^^^^^^^^^
-
-At the time of this writting, this module is to be built on top of the
-`cloudflare`_ branch of knot-resolver.
+.. warning:: This module is experimental and can be changed or removed at any time. Use at own risk, security properties were not tested!
 
 How it works
 ^^^^^^^^^^^^
@@ -73,15 +67,14 @@ To enable the module, add this stanza to your config:
 .. code-block:: lua
 
 	-- Load the module
-	modules.load('dot')
+	modules.load('experimental_dot_auth')
 
 Caveats
 ^^^^^^^
 
 The module relies on seeing the reply of the NS query and as such will not work
-if knot-resolver use its cache. You may need to delete the cache before starting ``kresd`` to work around this.
+if Knot Resolver use its cache. You may need to delete the cache before starting ``kresd`` to work around this.
 
 The module also assumes that the NS query answer will return both the NS targets in the Authority section as well as the glue records in the Additional section.
 
 .. _dnscurve: https://dnscurve.org/
-.. _cloudflare: https://gitlab.labs.nic.cz/knot/knot-resolver/tree/cloudflare
