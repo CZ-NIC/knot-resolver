@@ -599,6 +599,46 @@ static int net_tls_client(lua_State *L)
 	return 1;
 }
 
+static int net_tls_client_clear(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+
+	struct network *net = &engine->net;
+	if (!net) {
+		return 0;
+	}
+
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		format_error(L, "net.tls_client_clear() requires one parameter (\"address\")");
+		lua_error(L);
+	}
+
+	const char *full_addr = lua_tostring(L, 1);
+
+	char addr[INET6_ADDRSTRLEN];
+	uint16_t port = 0;
+	if (kr_straddr_split(full_addr, addr, sizeof(addr), &port) != kr_ok()) {
+		format_error(L, "invalid IP address");
+		lua_error(L);
+	}
+
+	if (port == 0) {
+		port = 853;
+	}
+
+	int r = tls_client_params_clear(&net->tls_client_params, addr, port);
+	if (r != 0) {
+		lua_pushstring(L, kr_strerror(r));
+		lua_error(L);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 static int net_tls_padding(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
@@ -852,6 +892,7 @@ int lib_net(lua_State *L)
 		{ "tls",          net_tls },
 		{ "tls_server",   net_tls },
 		{ "tls_client",   net_tls_client },
+		{ "tls_client_clear", net_tls_client_clear },
 		{ "tls_padding",  net_tls_padding },
 		{ "tls_sticket_secret", net_tls_sticket_secret_string },
 		{ "tls_sticket_secret_file", net_tls_sticket_secret_file },
