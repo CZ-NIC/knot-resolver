@@ -32,7 +32,8 @@ struct kr_query;
   */
 enum kr_ns_score {
 	KR_NS_MAX_SCORE     = 20 * KR_CONN_RTT_MAX, /* max possible value */
-	KR_NS_FWD_TIMEOUT   = 10000, /* timeout for upstream recursor  */
+	KR_NS_FWD_TIMEOUT   = (95 * 10000) / 100, /* timeout for upstream recursor,
+						   * 95 percents from max resolution time */
 	KR_NS_TIMEOUT       = (95 * KR_CONN_RTT_MAX) / 100, /* timeout for upstream auth */
 	KR_NS_LONG          = (3 * KR_NS_TIMEOUT) / 4,
 	KR_NS_UNKNOWN       = KR_NS_TIMEOUT / 2,

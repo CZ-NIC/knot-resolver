@@ -987,7 +987,8 @@ static void on_retransmit(uv_timer_t *req)
 	struct qr_task *task = session_tasklist_get_first(session);
 	if (retransmit(task) == NULL) {
 		/* Not possible to spawn request, start timeout timer with remaining deadline. */
-		uint64_t timeout = KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
+		uint64_t timeout = task->ctx->req.options.FORWARD ? KR_NS_FWD_TIMEOUT / 2 :
+				   KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
 		uv_timer_start(req, on_udp_timeout, timeout, 0);
 	} else {
 		uv_timer_start(req, on_retransmit, KR_CONN_RETRY, 0);
@@ -1134,11 +1135,13 @@ static int udp_task_step(struct qr_task *task,
 	struct kr_query *qry = array_tail(req->rplan.pending);
 	assert(qry != NULL);
 	/* Retransmit at default interval, or more frequently if the mean
-	 * RTT of the server is better. If the server is glued, use default rate. */
-	size_t timeout = qry->ns.score;
-	if (timeout > KR_NS_GLUED) {
-		/* We don't have information about variance in RTT, expect +10ms */
-		timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
+	 * RTT of the server is better. If the server is glued, use default rate.
+	 * We don't have information about variance in RTT, so expect + 10ms */
+	size_t timeout = qry->ns.score + 10;
+	if (qry->ns.score > KR_NS_GLUED) {
+		if (!qry->flags.FORWARD) {
+			timeout = MIN(timeout, KR_CONN_RETRY);
+		}
 	} else {
 		timeout = KR_CONN_RETRY;
 	}
