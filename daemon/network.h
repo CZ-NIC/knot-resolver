@@ -66,3 +66,5 @@ int network_close(struct network *net, const char *addr, uint16_t port);
 int network_set_tls_cert(struct network *net, const char *cert);
 int network_set_tls_key(struct network *net, const char *key);
 void network_new_hostname(struct network *net, struct engine *engine);
+bool network_set_bpf(struct network *net, int bpf_fd);
+void network_clear_bpf(struct network *net);

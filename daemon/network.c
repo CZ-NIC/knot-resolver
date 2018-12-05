@@ -363,3 +363,58 @@ void network_new_hostname(struct network *net, struct engine *engine)
 		}
 	}
 }
+
+static int set_bpf_cb(const char *key, void *val, void *ext)
+{
+	endpoint_array_t *endpoints = (endpoint_array_t *)val;
+	assert(endpoints != NULL);
+	int *bpffd = (int *)ext;
+	assert(bpffd != NULL);
+
+	for (size_t i = 0; i < endpoints->len; i++) {
+		struct endpoint *endpoint = (struct endpoint *)endpoints->at[i];
+		uv_os_fd_t sockfd = -1;
+		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
+		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
+		assert(sockfd != -1);
+
+		if (setsockopt(sockfd, SOL_SOCKET, SO_ATTACH_BPF, bpffd, sizeof(int)) != 0) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+bool network_set_bpf(struct network *net, int bpf_fd)
+{
+	if (!map_walk(&net->endpoints, set_bpf_cb, &bpf_fd)) {
+		network_clear_bpf(net);
+		return 0;
+	}
+
+	return 1;
+}
+
+static int clear_bpf_cb(const char *key, void *val, void *ext)
+{
+	endpoint_array_t *endpoints = (endpoint_array_t *)val;
+	assert(endpoints != NULL);
+
+	for (size_t i = 0; i < endpoints->len; i++) {
+		struct endpoint *endpoint = (struct endpoint *)endpoints->at[i];
+		uv_os_fd_t sockfd = -1;
+		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
+		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
+		assert(sockfd != -1);
+
+		setsockopt(sockfd, SOL_SOCKET, SO_DETACH_BPF, NULL, 0);
+	}
+
+	return 1;
+}
+
+void network_clear_bpf(struct network *net)
+{
+	assert(map_walk(&net->endpoints, clear_bpf_cb, NULL));
+}
