@@ -567,6 +567,21 @@ configured in the config file.
 
 TLS server configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^
+.. note:: Installations using systemd should be configured using systemd-specific procedures
+          described in manual page ``kresd.systemd(7)``.
+
+DNS-over-TLS server (:rfc:`7858`) can be enabled using ``{tls = true}`` parameter
+in :c:func:`net.listen()` function call. For example:
+
+.. code-block:: lua
+
+      > net.listen("::", 53)  -- plain UDP+TCP on port 53 (standard DNS)
+      > net.listen("::", 853, {tls = true})  -- DNS-over-TLS on port 853 (standard DoT)
+      > net.listen("::", 443, {tls = true})  -- DNS-over-TLS on port 443 (non-standard)
+
+By default an self-signed certificate will be generated. For serious deployments
+it is strongly recommended to provide TLS certificates signed by a trusted CA
+using :c:func:`net.tls()`.
 
 .. function:: net.tls([cert_path], [key_path])
 
@@ -577,10 +592,8 @@ TLS server configuration
    .. code-block:: lua
 
       > net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
-      > net.tls()
+      > net.tls()  -- print configured paths
       ("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
-      > net.listen("::", 853)
-      > net.listen("::", 443, {tls = true})
 
 .. function:: net.tls_padding([true | false])
 
