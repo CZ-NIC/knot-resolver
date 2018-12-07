@@ -48,8 +48,8 @@ enum kr_ns_score {
 #define KR_NS_FWD_DEAD (((KR_NS_FWD_TIMEOUT * 4) + 3) / 3)
 
 /** If once NS was marked as "timeouted", it won't participate in NS elections
- * at least KR_NS_TIMEOUT_RETRY_INTERVAL milliseconds (now: one minute). */
-#define KR_NS_TIMEOUT_RETRY_INTERVAL 60000
+ * at least KR_NS_TIMEOUT_RETRY_INTERVAL milliseconds (now: one second). */
+#define KR_NS_TIMEOUT_RETRY_INTERVAL 1000
 
 /**
  * NS QoS flags.
