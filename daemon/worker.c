@@ -1375,6 +1375,10 @@ static int qr_task_step(struct qr_task *task,
 
 	/* Close pending I/O requests */
 	subreq_finalize(task, packet_source, packet);
+	if ((kr_now() - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
+		return qr_task_finalize(task, KR_STATE_FAIL);
+	}
+
 	/* Consume input and produce next query */
 	struct request_ctx *ctx = task->ctx;
 	assert(ctx);
