@@ -356,11 +356,9 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 		const bool unusable = rtt_e && rtt_e->score >= KR_NS_TIMEOUT
 			&& qry->creation_time_mono
 			   < rtt_e->tout_timestamp + ctx->cache_rtt_tout_retry_interval;
-		if (!unusable) {
-			result = AI_OK;
-			++usable_cnt;
-		}
-
+		if (unusable) continue;
+		result = AI_OK;
+		++usable_cnt;
 		ret = pack_obj_push(addrs, rd->data, rd->len);
 		assert(!ret); /* didn't fit because of incorrectly reserved memory */
 		/* LATER: for now we lose quite some information here,
@@ -372,11 +370,44 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 		 * Overall there's some overlap with nsrep.c functionality.
 		 */
 	}
-	if (usable_cnt != cached_rr.rrs.count) {
-		VERBOSE_MSG(qry, "usable NS addresses: %d/%d\n",
-				usable_cnt, cached_rr.rrs.count);
-	}
+	if (usable_cnt != cached_rr.rrs.count) { WITH_VERBOSE(qry) {
+		auto_free char *name_txt = kr_dname_text(ns);
+		auto_free char *type_txt = kr_rrtype_text(rrtype);
+		VERBOSE_MSG(qry, "%d/%d usable NS addresses for %s %s\n",
+				usable_cnt, cached_rr.rrs.count, name_txt, type_txt);
+	} }
 	return result;
+}
+
+/** AI_CYCLED checks, private for fetch_ns().
+ *
+ * If an ancestor query has its zone cut in the state that
+ * it's looking for name or address(es) of some NS(s),
+ * we want to avoid doing so with a NS that lies under its cut.
+ * Instead we need to consider such names unusable in the cut (for now).
+ */
+static void ns_check_cycled(addrset_info_t *infos, const knot_dname_t *ns_name,
+				const struct kr_query *qry)
+{
+	if (infos[0] != AI_UNKNOWN && infos[1] != AI_UNKNOWN)
+		return; /*< optimizing condition */
+	for (const struct kr_query *aq = qry; aq->parent; aq = aq->parent) {
+		const struct kr_qflags *aqpf = &aq->parent->flags;
+		if (   (aqpf->AWAIT_CUT  && aq->stype == KNOT_RRTYPE_NS)
+		    || (aqpf->AWAIT_IPV4 && aq->stype == KNOT_RRTYPE_A)
+		    || (aqpf->AWAIT_IPV6 && aq->stype == KNOT_RRTYPE_AAAA)) {
+			if (knot_dname_in_bailiwick(ns_name, aq->parent->zone_cut.name)) {
+				for (int i = 0; i < 2; ++i)
+					if (infos[i] == AI_UNKNOWN)
+						infos[i] = AI_CYCLED;
+				return;
+			}
+		} else {
+			/* This ancestor waits for other reason that
+			 * NS name or address, so we're out of a direct cycle. */
+			return;
+		}
+	}
 }
 
 /** Fetch best NS for zone cut. */
@@ -416,13 +447,9 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		const size_t ns_size = knot_dname_size(ns_name);
 
 		/* Get a new pack within the nsset. */
-		pack_t **pack = (pack_t **)trie_get_ins(cut->nsset,
-					(const char *)ns_name, ns_size);
+		pack_t *pack = mm_alloc(cut->pool, sizeof(pack_t));
 		if (!pack) return kr_error(ENOMEM);
-		assert(!*pack); /* not critical, really */
-		*pack = mm_alloc(cut->pool, sizeof(pack_t));
-		if (!*pack) return kr_error(ENOMEM);
-		pack_init(**pack);
+		pack_init(*pack);
 
 		addrset_info_t infos[2];
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
@@ -431,11 +458,12 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		unsigned reputation = (cached) ? *cached : 0;
 		infos[0] = (reputation & KR_NS_NOIP4) || qry->flags.NO_IPV4
 			? AI_REPUT
-			: fetch_addr(*pack, ns_name, KNOT_RRTYPE_A, cut->pool, qry);
+			: fetch_addr(pack, ns_name, KNOT_RRTYPE_A, cut->pool, qry);
 		infos[1] = (reputation & KR_NS_NOIP6) || qry->flags.NO_IPV6
 			? AI_REPUT
-			: fetch_addr(*pack, ns_name, KNOT_RRTYPE_AAAA, cut->pool, qry);
+			: fetch_addr(pack, ns_name, KNOT_RRTYPE_AAAA, cut->pool, qry);
 
+		ns_check_cycled(infos, ns_name, qry);
 		#if 0 /* rather unlikely to be useful unless changing some zcut code */
 		WITH_VERBOSE(qry) {
 			auto_free char *ns_name_txt = kr_dname_text(ns_name);
@@ -443,36 +471,21 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 					ns_name_txt, (int)infos[0], (int)infos[1]);
 		}
 		#endif
-
-		/* AI_CYCLED checks.
-		 * If an ancestor query has its zone cut in the state that
-		 * it's looking for name or address(es) of some NS(s),
-		 * we want to avoid doing so with a NS that lies under its cut.
-		 * Instead we need to consider such names unusable in the cut (for now). */
-		if (infos[0] != AI_UNKNOWN && infos[1] != AI_UNKNOWN) {
-			/* Optimization: the following loop would be pointless. */
-			all_bad = false;
+		if (infos[0] <= AI_LAST_BAD && infos[1] <= AI_LAST_BAD) {
+			free_addr_set(pack, cut->pool);
 			continue;
 		}
-		for (const struct kr_query *aq = qry; aq->parent; aq = aq->parent) {
-			const struct kr_qflags *aqpf = &aq->parent->flags;
-			if (   (aqpf->AWAIT_CUT  && aq->stype == KNOT_RRTYPE_NS)
-			    || (aqpf->AWAIT_IPV4 && aq->stype == KNOT_RRTYPE_A)
-			    || (aqpf->AWAIT_IPV6 && aq->stype == KNOT_RRTYPE_AAAA)) {
-				if (knot_dname_in_bailiwick(ns_name,
-							aq->parent->zone_cut.name)) {
-					for (int i = 0; i < 2; ++i)
-						if (infos[i] == AI_UNKNOWN)
-							infos[i] = AI_CYCLED;
-					break;
-				}
-			} else {
-				/* This ancestor waits for other reason that
-				 * NS name or address, so we're out of a direct cycle. */
-				break;
-			}
+		/* This NS name appears to be (partially) usable, so extend the nsset. */
+		all_bad = false;
+
+		pack_t **pack_pt = (pack_t **)
+			trie_get_ins(cut->nsset, (const char *)ns_name, ns_size);
+		if (!pack_pt) {
+			free_addr_set(pack, cut->pool);
+			return kr_error(ENOMEM);
 		}
-		all_bad = all_bad && infos[0] <= AI_LAST_BAD && infos[1] <= AI_LAST_BAD;
+		assert(!*pack_pt); /* not critical, really */
+		*pack_pt = pack;
 	}
 
 	if (all_bad) { WITH_VERBOSE(qry) {
