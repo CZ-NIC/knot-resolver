@@ -177,6 +177,10 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 			session_timer_start(s, tcp_timeout_trigger,
 					    idle_in_timeout, idle_in_timeout);
 		} else {
+			struct sockaddr *peer = session_get_peer(s);
+			char *peer_str = kr_straddr(peer);
+			kr_log_verbose("[io] => closing connection to '%s'\n",
+				       peer_str ? peer_str : "");
 			session_close(s);
 		}
 	}
@@ -201,10 +205,9 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	if (nread < 0 || !buf->base) {
 		if (kr_verbose_status) {
 			struct sockaddr *peer = session_get_peer(s);
-			char peer_str[INET6_ADDRSTRLEN];
-			inet_ntop(peer->sa_family, kr_inaddr(peer),
-				  peer_str, sizeof(peer_str));
-			kr_log_verbose("[io] => connection to '%s' closed by peer (%s)\n", peer_str,
+			char *peer_str = kr_straddr(peer);
+			kr_log_verbose("[io] => connection to '%s' closed by peer (%s)\n",
+				       peer_str ? peer_str : "",
 				       uv_strerror(nread));
 		}
 		worker_end_tcp(s);
