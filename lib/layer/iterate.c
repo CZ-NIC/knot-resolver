@@ -540,6 +540,9 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				/* if not referral, mark record to be written to final answer */
 				to_wire = !referral;
 			} else {
+				/* FIXME: maybe this works due to us only starting
+				 * A/AAAA subqueries for one's zone cut NSs,
+				 * but it's just extremely ugly. */
 				int cnt_ = 0;
 				state = update_nsaddr(rr, query->parent, &cnt_);
 				if (state == KR_STATE_FAIL) {
