@@ -344,29 +344,14 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}
-	struct kr_query *next = qry;
-	if (knot_dname_is_equal(qry->ns.name, qry->sname) &&
-	    qry->stype == next_type) {
-		if (!(qry->flags.NO_MINIMIZE)) {
-			qry->flags.NO_MINIMIZE = true;
-			qry->flags.AWAIT_IPV6 = false;
-			qry->flags.AWAIT_IPV4 = false;
-			VERBOSE_MSG(qry, "=> circular dependency, retrying with non-minimized name\n");
-		} else {
-			qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
-			kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
-			invalidate_ns(rplan, qry);
-			VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
-			return kr_error(EHOSTUNREACH);
-		}
-	} else {
-		/* Push new query to the resolution plan */
-		next = kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
-		if (!next) {
-			return kr_error(ENOMEM);
-		}
-		next->flags.NONAUTH = true;
+	/* Push new query to the resolution plan */
+	struct kr_query *next =
+		kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
+	if (!next) {
+		return kr_error(ENOMEM);
 	}
+	next->flags.NONAUTH = true;
+
 	/* At the root level with no NS addresses, add SBELT subrequest. */
 	int ret = 0;
 	if (qry->zone_cut.name[0] == '\0') {
