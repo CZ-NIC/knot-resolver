@@ -187,12 +187,35 @@ local function test_features()
 	end
 end
 
+local function test_boolean_filters()
+	daf.filters.f = function(_, arg)
+		return arg[1] == 'true' and true or false
+	end
+	local desc
+
+	desc = daf.add('f true and qname = foo deny')
+	ok(desc ~= nil, 'true filter')
+	daf.del(desc.rule.id)
+
+	ok(daf.add('f false and qname = foo deny') == nil, 'false filter')
+
+	desc = daf.add('f true or f false and qname = foo deny')
+	ok(desc ~= nil, 'true or false filter')
+	daf.del(desc.rule.id)
+
+	desc = daf.add('f true and f false and qname = foo deny')
+	ok(desc == nil, 'true and false filter')
+
+	daf.filters.f = nil
+end
+
 -- plan tests
 local tests = {
 	test_builtin_rules,
 	test_parser,
 	test_actions,
 	test_features,
+	test_boolean_filters,
 }
 
 return tests

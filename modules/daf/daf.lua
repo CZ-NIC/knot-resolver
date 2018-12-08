@@ -283,10 +283,22 @@ local function parse_rule(g)
 	while tok do
 		if tok:lower() == 'and' then
 			local fa, fb = f, parse_filter(g(), g, tok)
-			f = function (req, qry) return fa(req, qry) and fb(req, qry) end
+			if type(fa) == 'boolean' then
+				f = fa and fb
+			elseif type(fb) == 'boolean' then
+				f = fb and fa
+			else
+				f = function (req, qry) return fa(req, qry) and fb(req, qry) end
+			end
 		elseif tok:lower() == 'or' then
 			local fa, fb = f, parse_filter(g(), g, tok)
-			f = function (req, qry) return fa(req, qry) or fb(req, qry) end
+			if type(fa) == 'boolean' then
+				f = fa and true or fb
+			elseif type(fb) == 'boolean' then
+				f = fb and true or fa
+			else
+				f = function (req, qry) return fa(req, qry) or fb(req, qry) end
+			end
 		else
 			break
 		end
@@ -355,7 +367,9 @@ function M.add(rule)
 	if not id then error(action) end
 	-- Combine filter and action into policy
 	local p
-	if filter then
+	if filter == false then
+		return
+	elseif type(filter) == 'function' then
 		p = function (req, qry)
 			return filter(req, qry) and action
 		end
