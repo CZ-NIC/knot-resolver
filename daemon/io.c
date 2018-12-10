@@ -181,6 +181,10 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 			char *peer_str = kr_straddr(peer);
 			kr_log_verbose("[io] => closing connection to '%s'\n",
 				       peer_str ? peer_str : "");
+			if (session_flags(s)->outgoing) {
+				worker_del_tcp_waiting(worker, peer);
+				worker_del_tcp_connected(worker, peer);
+			}
 			session_close(s);
 		}
 	}
