@@ -102,12 +102,6 @@ void session_close(struct session *session)
 	uv_handle_t *handle = session->handle;
 	io_stop_read(handle);
 	session->sflags.closing = true;
-	if (session->peer.ip.sa_family != AF_UNSPEC && handle->type == UV_TCP) {
-		struct worker_ctx *worker = handle->loop->data;
-		struct sockaddr *peer = &session->peer.ip;
-		worker_del_tcp_connected(worker, peer);
-		session->sflags.connected = false;
-	}
 
 	if (!uv_is_closing((uv_handle_t *)&session->timeout)) {
 		uv_timer_stop(&session->timeout);
