@@ -461,6 +461,9 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	if (sock_file) {
 		unlink(sock_file);
 	}
+	uv_close((uv_handle_t *)&pipe, NULL);
+	/* TODO: we don't properly clean up the loop;
+	 * there's apparently still something keeping it alive. */
 	return kr_ok();
 }
 
