@@ -1,7 +1,11 @@
 {% raw %}
 modules.load('view')
-view:tsig('\8testkey1\0', policy.suffix(policy.DENY,{"\3com\0"}))
-view:tsig('\7testkey\0', policy.suffix(policy.FORWARD('1.2.3.4'),{"\2cz\0"}))
+print(table_print(modules.list()))
+
+view:tsig('\8testkey1\0', policy.suffix(policy.DENY_MSG("TSIG key testkey1 matched com"),{"\3com\0"}))
+view:tsig('\8testkey1\0', policy.suffix(policy.DENY_MSG("TSIG key testkey1 matched net"),{"\3net\0"}))
+view:tsig('\7testkey\0', policy.suffix(policy.DENY_MSG("TSIG key testkey matched example"),{"\7example\0"}))
+policy.add(policy.all(policy.FORWARD('1.2.3.4')))
 
 -- Disable RFC8145 signaling, scenario doesn't provide expected answers
 if ta_signal_query then
