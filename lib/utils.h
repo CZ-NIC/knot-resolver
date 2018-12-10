@@ -189,7 +189,7 @@ KR_EXPORT
 void kr_rnd_buffered(void *data, unsigned int size);
 
 /** Return a few random bytes. */
-static inline uint64_t kr_rand_bytes(int size)
+static inline uint64_t kr_rand_bytes(unsigned int size)
 {
 	/* LATER(optim.): we use this to get one or two bytes typically,
 	 * so it will probably be suitable to wrap the gnutls function
@@ -207,7 +207,7 @@ static inline uint64_t kr_rand_bytes(int size)
 	 * (Tested via reading assembly from usual gcc -O2 setup.)
 	 * Alternatively we could waste more rnd bytes, but that seemed worse. */
 	result = 0;
-	for (int i = 0; i < size; ++ i) {
+	for (unsigned int i = 0; i < size; ++ i) {
 		result |= ((size_t)data[i]) << (i * 8);
 	}
 	return result;
@@ -218,14 +218,17 @@ static inline uint64_t kr_rand_bytes(int size)
  * - the most extreme bias is 1:255
  * - tip: use !kr_rand_coin() to get the complementary probability
  */
-static inline bool kr_rand_coin(int nomin, int denomin)
+static inline bool kr_rand_coin(unsigned int nomin, unsigned int denomin)
 {
-	if (nomin < 0 || denomin <= 0 || nomin > denomin) {
-		kr_log_error("kr_rand_coin(): EINVAL\n");
-		abort();
-	}
+	/* This function might be called with non-constant values
+	 * so we try to handle odd corner cases instead of crash. */
+	if (nomin >= denomin)
+		return true;
+	else if (nomin <= 0)
+		return false;
+
 	/* threshold = how many parts from 256 are a success */
-	int threshold = (nomin * 256 + /*rounding*/ denomin / 2) / denomin;
+	unsigned int threshold = (nomin * 256 + /*rounding*/ denomin / 2) / denomin;
 	if (threshold == 0) threshold = 1;
 	if (threshold == 256) threshold = 255;
 	return (kr_rand_bytes(1) < threshold);
