@@ -31,22 +31,25 @@ struct kr_query;
   * @note RTT is measured in milliseconds.
   */
 enum kr_ns_score {
-	KR_NS_MAX_SCORE = KR_CONN_RTT_MAX,
-	KR_NS_TIMEOUT   = (95 * KR_NS_MAX_SCORE) / 100,
-	KR_NS_LONG      = (3 * KR_NS_TIMEOUT) / 4,
-	KR_NS_UNKNOWN   = KR_NS_TIMEOUT / 2,
-	KR_NS_PENALTY   = 100,
-	KR_NS_GLUED     = 10,
+	KR_NS_MAX_SCORE     = 20 * KR_CONN_RTT_MAX, /* max possible value */
+	KR_NS_FWD_TIMEOUT   = (95 * 10000) / 100, /* timeout for upstream recursor,
+						   * 95 percents from max resolution time */
+	KR_NS_TIMEOUT       = (95 * KR_CONN_RTT_MAX) / 100, /* timeout for upstream auth */
+	KR_NS_LONG          = (3 * KR_NS_TIMEOUT) / 4,
+	KR_NS_UNKNOWN       = KR_NS_TIMEOUT / 2,
+	KR_NS_PENALTY       = 100,
+	KR_NS_GLUED         = 10
 };
 
 /**
  *  See kr_nsrep_update_rtt()
  */
 #define KR_NS_DEAD (((KR_NS_TIMEOUT * 4) + 3) / 3)
+#define KR_NS_FWD_DEAD (((KR_NS_FWD_TIMEOUT * 4) + 3) / 3)
 
 /** If once NS was marked as "timeouted", it won't participate in NS elections
- * at least KR_NS_TIMEOUT_RETRY_INTERVAL milliseconds (now: one minute). */
-#define KR_NS_TIMEOUT_RETRY_INTERVAL 60000
+ * at least KR_NS_TIMEOUT_RETRY_INTERVAL milliseconds (now: one second). */
+#define KR_NS_TIMEOUT_RETRY_INTERVAL 1000
 
 /**
  * NS QoS flags.
@@ -144,8 +147,6 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx);
  * @param  ns           updated NS representation
  * @param  addr         chosen address (NULL for first)
  * @param  score        new score (i.e. RTT), see enum kr_ns_score
- *                      after two calls with score = KR_NS_DEAD and umode = KR_NS_UPDATE
- *                      server will be guaranteed to have score >= KR_NS_TIMEOUT
  * @param  cache        RTT LRU cache
  * @param  umode        update mode (KR_NS_UPDATE or KR_NS_RESET or KR_NS_ADD)
  * @return              0 on success, error code on failure
@@ -174,12 +175,14 @@ int kr_nsrep_update_rep(struct kr_nsrep *ns, unsigned reputation, kr_nsrep_lru_t
 int kr_nsrep_copy_set(struct kr_nsrep *dst, const struct kr_nsrep *src);
 
 /**
- * Sort addresses in the query nsrep list
+ * Sort addresses in the query nsrep list by cached RTT.
+ * if RTT is greater then KR_NS_TIMEOUT, address will placed at the beginning of the
+ * nsrep list once in cache.ns_tout() milliseconds. Otherwise it will be sorted
+ * as if it has cached RTT equal to KR_NS_MAX_SCORE + 1.
  * @param  ns           updated kr_nsrep
- * @param  rtt_cache    RTT LRU cache
+ * @param  ctx          name resolution context.
  * @return              0 or an error code
- * @note   ns reputation is zeroed, as KR_NS_NOIP{4,6} flags are useless
- * 	   in STUB/FORWARD mode.
+ * @note   ns reputation is zeroed and score is set to KR_NS_MAX_SCORE + 1.
  */
 KR_EXPORT
-int kr_nsrep_sort(struct kr_nsrep *ns, kr_nsrep_rtt_lru_t *rtt_cache);
+int kr_nsrep_sort(struct kr_nsrep *ns,  struct kr_context *ctx);

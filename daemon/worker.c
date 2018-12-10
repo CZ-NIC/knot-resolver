@@ -675,6 +675,15 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	return ret;
 }
 
+static struct kr_query *task_get_last_pending_query(struct qr_task *task)
+{
+	if (!task || task->ctx->req.rplan.pending.len == 0) {
+		return NULL;
+	}
+
+	return array_tail(task->ctx->req.rplan.pending);
+}
+
 static int session_tls_hs_cb(struct session *session, int status)
 {
 	assert(session_flags(session)->outgoing);
@@ -686,7 +695,9 @@ static int session_tls_hs_cb(struct session *session, int status)
 	int ret = kr_ok();
 
 	if (status) {
-		kr_nsrep_update_rtt(NULL, peer, KR_NS_DEAD,
+		struct qr_task *task = session_waitinglist_get(session);
+		unsigned score = task->ctx->req.options.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		kr_nsrep_update_rtt(NULL, peer, score,
 				    worker->engine->resolver.cache_rtt,
 				    KR_NS_UPDATE_NORESET);
 		return ret;
@@ -756,16 +767,6 @@ static int session_tls_hs_cb(struct session *session, int status)
 	return kr_ok();
 }
 
-
-static struct kr_query *task_get_last_pending_query(struct qr_task *task)
-{
-	if (!task || task->ctx->req.rplan.pending.len == 0) {
-		return NULL;
-	}
-
-	return array_tail(task->ctx->req.rplan.pending);
-}
-
 static int send_waiting(struct session *session)
 {
 	int ret = 0;
@@ -794,6 +795,10 @@ static void on_connect(uv_connect_t *req, int status)
 	assert(session_flags(session)->outgoing);
 
 	if (status == UV_ECANCELED) {
+		if (kr_verbose_status) {
+			const char *peer_str = kr_straddr(peer);
+			kr_log_verbose( "[wrkr]=> connect to '%s' cancelled\n", peer_str ? peer_str : "");
+		}
 		worker_del_tcp_waiting(worker, peer);
 		assert(session_is_empty(session) && session_flags(session)->closing);
 		return;
@@ -806,7 +811,17 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	if (status != 0) {
+		if (VERBOSE_STATUS) {
+			const char *peer_str = kr_straddr(peer);
+			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s), flagged as 'bad'\n",
+					peer_str ? peer_str : "", uv_strerror(status));
+		}
 		worker_del_tcp_waiting(worker, peer);
+		struct qr_task *task = session_waitinglist_get(session);
+		unsigned score = task->ctx->req.options.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		kr_nsrep_update_rtt(NULL, peer, score,
+				    worker->engine->resolver.cache_rtt,
+				    KR_NS_UPDATE_NORESET);
 		assert(session_tasklist_is_empty(session));
 		session_waitinglist_retry(session, false);
 		session_close(session);
@@ -826,13 +841,9 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 	}
 
-	struct qr_task *task = session_waitinglist_get(session);
-	struct kr_query *qry = task_get_last_pending_query(task);
-	WITH_VERBOSE (qry) {
-		struct sockaddr *peer = session_get_peer(session);
-		char peer_str[INET6_ADDRSTRLEN];
-		inet_ntop(peer->sa_family, kr_inaddr(peer), peer_str, sizeof(peer_str));
-		VERBOSE_MSG(qry, "=> connected to '%s'\n", peer_str);
+	if (VERBOSE_STATUS) {
+		const char *peer_str = kr_straddr(peer);
+		kr_log_verbose( "[wrkr]=> connected to '%s'\n", peer_str ? peer_str : "");
 	}
 
 	session_flags(session)->connected = true;
@@ -883,7 +894,8 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 		VERBOSE_MSG(qry, "=> connection to '%s' failed\n", peer_str);
 	}
 
-	kr_nsrep_update_rtt(NULL, peer, KR_NS_DEAD,
+	unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+	kr_nsrep_update_rtt(NULL, peer, score,
 			    worker->engine->resolver.cache_rtt,
 			    KR_NS_UPDATE_NORESET);
 
@@ -912,11 +924,11 @@ static void on_udp_timeout(uv_timer_t *timer)
 		for (uint16_t i = 0; i < MIN(task->pending_count, task->addrlist_count); ++i) {
 			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
 			WITH_VERBOSE(qry) {
-				char addr_str[INET6_ADDRSTRLEN];
-				inet_ntop(choice->sa_family, kr_inaddr(choice), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str);
+				char *addr_str = kr_straddr(choice);
+				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str ? addr_str : "");
 			}
-			kr_nsrep_update_rtt(&qry->ns, choice, KR_NS_DEAD,
+			unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+			kr_nsrep_update_rtt(&qry->ns, choice, score,
 					    worker->engine->resolver.cache_rtt,
 					    KR_NS_UPDATE_NORESET);
 		}
@@ -975,7 +987,8 @@ static void on_retransmit(uv_timer_t *req)
 	struct qr_task *task = session_tasklist_get_first(session);
 	if (retransmit(task) == NULL) {
 		/* Not possible to spawn request, start timeout timer with remaining deadline. */
-		uint64_t timeout = KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
+		uint64_t timeout = task->ctx->req.options.FORWARD ? KR_NS_FWD_TIMEOUT / 2 :
+				   KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
 		uv_timer_start(req, on_udp_timeout, timeout, 0);
 	} else {
 		uv_timer_start(req, on_retransmit, KR_CONN_RETRY, 0);
@@ -1273,11 +1286,21 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	}
 
 	/*  Start connection process to upstream. */
-	if (uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect) != 0) {
+	ret = uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect);
+	if (ret != 0) {
 		session_timer_stop(session);
 		worker_del_tcp_waiting(ctx->worker, addr);
 		free(conn);
 		session_close(session);
+		unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		kr_nsrep_update_rtt(NULL, peer, score,
+				    worker->engine->resolver.cache_rtt,
+				    KR_NS_UPDATE_NORESET);
+		WITH_VERBOSE (qry) {
+			const char *peer_str = kr_straddr(peer);
+			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s), flagged as 'bad'\n",
+					peer_str ? peer_str : "", uv_strerror(ret));
+		}
 		return kr_error(EAGAIN);
 	}
 
@@ -1300,8 +1323,8 @@ static int tcp_task_step(struct qr_task *task,
 {
 	assert(task->pending_count == 0);
 
-	const struct sockaddr *addr =
-		packet_source ? packet_source : task->addrlist;
+	/* target */
+	const struct sockaddr *addr = task->addrlist;
 	if (addr->sa_family == AF_UNSPEC) {
 		/* Target isn't defined. Finalize task with SERVFAIL.
 		 * Although task->pending_count is zero, there are can be followers,
@@ -1331,9 +1354,9 @@ static int tcp_task_step(struct qr_task *task,
 	}
 
 	if (ret != kr_ok()) {
-		subreq_finalize(task, packet_source, packet);
+		subreq_finalize(task, addr, packet);
 		if (ret == kr_error(EAGAIN)) {
-			ret = qr_task_step(task, NULL, NULL);
+			ret = qr_task_step(task, addr, NULL);
 		} else {
 			ret = qr_task_finalize(task, KR_STATE_FAIL);
 		}
@@ -1352,6 +1375,10 @@ static int qr_task_step(struct qr_task *task,
 
 	/* Close pending I/O requests */
 	subreq_finalize(task, packet_source, packet);
+	if ((kr_now() - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
+		return qr_task_finalize(task, KR_STATE_FAIL);
+	}
+
 	/* Consume input and produce next query */
 	struct request_ctx *ctx = task->ctx;
 	assert(ctx);

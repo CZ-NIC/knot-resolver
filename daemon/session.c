@@ -102,7 +102,7 @@ void session_close(struct session *session)
 	uv_handle_t *handle = session->handle;
 	io_stop_read(handle);
 	session->sflags.closing = true;
-	if (session->peer.ip.sa_family != AF_UNSPEC) {
+	if (session->peer.ip.sa_family != AF_UNSPEC && handle->type == UV_TCP) {
 		struct worker_ctx *worker = handle->loop->data;
 		struct sockaddr *peer = &session->peer.ip;
 		worker_del_tcp_connected(worker, peer);
@@ -398,7 +398,7 @@ void session_waitinglist_retry(struct session *session, bool increase_timeout_cn
 		if (increase_timeout_cnt) {
 			worker_task_timeout_inc(task);
 		}
-		worker_task_step(task, NULL, NULL);
+		worker_task_step(task, &session->peer.ip, NULL);
 		worker_task_unref(task);
 	}
 }
