@@ -41,19 +41,29 @@ stages:
 build:linux:amd64:
   <<: *build
 
-build:clang:linux:amd64:
-  <<: *build
-  variables:
-    CFLAGS: -Werror -Wno-error=unused-command-line-argument -ggdb
-    CXX: clang++
-    CC: clang
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
-  artifacts:
 
 build:asan:linux:amd64:
   <<: *build
   variables:
     CFLAGS: -Werror -ggdb3 -O0 -fsanitize=address -fno-omit-frame-pointer
+
+lint:pedantic:
+  stage: test  # could be in build already, but let's not block the test stage if this fails
+  dependencies: []  # do not download build artifacts
+  except:
+    - master
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer compilers
+  variables:
+    CFLAGS: -Werror -Wall -Wpedantic -ggdb -std=gnu11
+  script:
+    - make -k all
+    - make clean
+    - make -k all CC=clang CXX=clang++ \
+        CFLAGS="$CFLAGS -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant"
+  tags:
+    - docker
+    - linux
+    - amd64
 
 srpm:
   stage: build
