@@ -1,0 +1,67 @@
+; config options
+	stub-addr: 1.2.3.4
+	query-minimization: off
+CONFIG_END
+
+SCENARIO_BEGIN view:addr test
+
+RANGE_BEGIN 0 110
+	ADDRESS 1.2.3.4
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+example.cz. IN A
+SECTION ANSWER
+example.cz. IN A 5.6.7.8
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+example.com. IN A
+SECTION ANSWER
+example.com. IN A 21.22.23.24
+ENTRY_END
+RANGE_END
+
+; allowed by view 
+STEP 10 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+example.cz. IN A
+ENTRY_END
+
+STEP 20 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH flags rcode question answer
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+example.cz. IN A
+SECTION ANSWER
+example.cz. IN A 5.6.7.8
+ENTRY_END
+
+; blocked by view
+; NXDOMAIN expected
+STEP 30 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+example.com. IN A
+ENTRY_END
+
+STEP 40 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH flags rcode question answer
+REPLY QR RD RA AA NXDOMAIN
+SECTION QUESTION
+example.com. IN A
+SECTION ANSWER
+ENTRY_END
+
+SCENARIO_END
