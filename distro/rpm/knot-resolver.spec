@@ -33,6 +33,7 @@ Source102:	gpgkey-4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869.gpg.asc
 BuildRequires:  gnupg2
 %endif
 
+BuildRequires:  doxygen
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
 BuildRequires:  pkgconfig(cmocka)
@@ -49,6 +50,10 @@ BuildRequires:  pkgconfig(systemd)
 # Distro-dependent dependencies
 %if 0%{?rhel}
 BuildRequires:  lmdb-devel
+BuildRequires:  python2-sphinx
+BuildRequires:  python2-breathe
+BuildRequires:  python2-sphinx_rtd_theme
+BuildRequires:  fontawesome-fonts-web >= 4.1.0-2
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-socket
 Requires:       lua-sec
@@ -57,6 +62,8 @@ Requires(pre):	shadow-utils
 %if 0%{?fedora}
 BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
+BuildRequires:  python3-breathe
+BuildRequires:  python3-sphinx_rtd_theme
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
 Requires(pre):	shadow-utils
@@ -64,17 +71,11 @@ Requires(pre):	shadow-utils
 %if 0%{?suse_version}
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
+BuildRequires:  python3-breathe
+BuildRequires:  python3-sphinx_rtd_theme
 Requires:       lua51-luasocket
 Requires:       lua51-luasec
 Requires(pre):	shadow
-%endif
-
-%if "x%{?rhel}" == "x"
-# dependencies for doc package; disable in EPEL (missing fonts)
-# https://bugzilla.redhat.com/show_bug.cgi?id=1492884
-BuildRequires:  doxygen
-BuildRequires:  python3-breathe
-BuildRequires:  python3-sphinx_rtd_theme
 %endif
 
 Requires(post):		systemd
@@ -98,7 +99,6 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 %description devel
 The package contains development headers for Knot Resolver.
 
-%if "x%{?rhel}" == "x"
 %package doc
 Summary:        Documentation for Knot Resolver
 BuildArch:      noarch
@@ -106,7 +106,6 @@ Requires:       %{name} = %{version}-%{release}
 
 %description doc
 Documentation for Knot Resolver
-%endif
 
 %prep
 %if 0%{GPG_CHECK}
@@ -122,10 +121,8 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 %global build_flags V=1 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" %{build_paths} HAS_go=no
 %make_build %{build_flags}
 
-%if "x%{?rhel}" == "x"
 # build documentation
 make doc
-%endif
 
 %check
 make %{?_smp_mflags} check
@@ -246,10 +243,8 @@ fi
 %{_libdir}/pkgconfig/libkres.pc
 %{_libdir}/libkres.so
 
-%if "x%{?rhel}" == "x"
 %files doc
 %doc doc/html
-%endif
 
 %changelog
 * Fri Feb 16 2018 Tomas Krizek <tomas.krizek@nic.cz> - 2.1.0-1
