@@ -34,8 +34,8 @@ INSTALL := install
 
 # Flags
 BUILD_LDFLAGS += $(LDFLAGS)
-BUILD_CFLAGS := $(CFLAGS) $(CPPFLAGS) -std=c99 -D_GNU_SOURCE
-BUILD_CFLAGS += -Wno-unused -Wtype-limits -Wformat -Wformat-security -Wall
+BUILD_CFLAGS := -std=c99 -D_GNU_SOURCE $(CFLAGS) $(CPPFLAGS)
+BUILD_CFLAGS += -Wtype-limits -Wformat -Wformat-security -Wshadow -Wall
 BUILD_CFLAGS += -I$(abspath .) -I$(abspath lib/generic) -I$(abspath contrib)
 BUILD_CFLAGS += -DPACKAGE_VERSION="\"$(VERSION)\"" -DPREFIX="\"$(PREFIX)\"" -DMODULEDIR="\"$(MODULEDIR)\""
 BUILD_CFLAGS += -fvisibility=hidden
