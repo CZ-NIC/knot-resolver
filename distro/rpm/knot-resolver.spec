@@ -185,28 +185,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %systemd_post 'kresd@*.service'
 /sbin/ldconfig
 
-# TODO: can be removed when Fedora 27 is no longer supported and migration is no longer necessary
-# Migration script
-if [ -f "/etc/kresd/config" ]; then
-    echo -e '\n\n---------------------------------------------------------'
-    echo '    WARNING: Migrating to knot-resolver 2.0'
-    echo -e '---------------------------------------------------------\n'
-    echo 'Please check your configuration still works, it has been moved to'
-    echo '/etc/knot-resolver/kresd.conf'
-    echo -e "\nTo start or enable the service, please use 'kresd@1.service', e.g.:"
-    echo -e '  # systemctl start kresd@1.service\n\n'
-    systemctl stop kresd.service kresd{,-tls,-control}.socket &>/dev/null ||:
-    cp -r /etc/kresd/* /etc/knot-resolver/
-    mv /etc/knot-resolver/config /etc/knot-resolver/kresd.conf
-    chown -R root:knot-resolver /etc/knot-resolver
-    sed -i 's#/etc/kresd#/etc/knot-resolver#' /etc/knot-resolver/kresd.conf
-fi
-if [ -d "/run/kresd" ]; then
-    rm -f /run/kresd/control
-    mv /run/kresd/* /var/cache/knot-resolver/ &>/dev/null
-    chown -R knot-resolver:knot-resolver /var/cache/knot-resolver
-fi
-
 %preun
 %systemd_preun 'kresd@*.service' kresd.target kresd.socket kresd-tls.socket
 
