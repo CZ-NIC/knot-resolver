@@ -414,8 +414,24 @@ static void help(int argc, char *argv[])
 	       " [rundir]             Path to the working directory (default: .)\n");
 }
 
+/** \return exit code for main()  */
 static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader, struct args *args)
 {
+	/* Only some kinds of stdin work with uv_pipe_t.
+	 * Otherwise we would abort() from libuv e.g. with </dev/null */
+	if (args->interactive) switch (uv_guess_handle(0)) {
+	case UV_TTY:		/* standard terminal */
+	case UV_NAMED_PIPE:	/* echo 'quit()' | kresd ... */
+		break;
+	default:
+		kr_log_error(
+			"[system] error: standard input is not a terminal or pipe; "
+			"use '-f 1' if you want non-interactive mode.  "
+			"Commands can be simply added to your configuration file or sent over the tty/$PID control socket.\n"
+			);
+		return 1;
+	}
+
 	/* Control sockets or TTY */
 	auto_free char *sock_file = NULL;
 	uv_pipe_t pipe;
@@ -461,7 +477,8 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	if (sock_file) {
 		unlink(sock_file);
 	}
-	return kr_ok();
+	uv_close((uv_handle_t *)&pipe, NULL); /* Seems OK even on the stopped loop. */
+	return 0;
 }
 
 #ifdef HAS_SYSTEMD
@@ -806,11 +823,6 @@ int main(int argc, char **argv)
 
 	/* Run the event loop */
 	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, &args);
-	if (ret != 0) {
-		perror("[system] worker failed");
-		ret = EXIT_FAILURE;
-		goto cleanup;
-	}
 
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);
