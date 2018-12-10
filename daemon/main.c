@@ -421,6 +421,8 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	 * Otherwise we would abort() from libuv e.g. with </dev/null */
 	if (args->interactive) switch (uv_guess_handle(0)) {
 	case UV_TTY:		/* standard terminal */
+		/* TODO: it has worked OK so far, but we'd better use uv_tty_*
+		 * for this case instead of uv_pipe_*. */
 	case UV_NAMED_PIPE:	/* echo 'quit()' | kresd ... */
 		break;
 	default:
