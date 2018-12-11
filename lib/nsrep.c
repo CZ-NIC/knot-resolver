@@ -508,7 +508,17 @@ int kr_nsrep_sort(struct kr_nsrep *ns, struct kr_context *ctx)
 			if (sa->sa_family == AF_INET) {
 				scores[i] += FAVOUR_IPV6;
 			}
-		} else if (rtt_cache_entry->score >= KR_NS_FWD_TIMEOUT) {
+		} else if (rtt_cache_entry->score < KR_NS_FWD_TIMEOUT) {
+			/* some probability to bump bad ones up for re-probe */
+			scores[i] = rtt_cache_entry->score;
+			/* The lower the rtt, the more likely it will be selected. */
+			if (!kr_rand_coin(rtt_cache_entry->score, KR_NS_FWD_TIMEOUT)) {
+				scores[i] = 1;
+			}
+			if (sa->sa_family == AF_INET) {
+				scores[i] += FAVOUR_IPV6;
+			}
+		} else {
 			uint64_t now = kr_now();
 			uint64_t elapsed = now - rtt_cache_entry->tout_timestamp;
 			scores[i] = KR_NS_MAX_SCORE + 1;
@@ -521,11 +531,6 @@ int kr_nsrep_sort(struct kr_nsrep *ns, struct kr_context *ctx)
 				}
 				rtt_cache_entry->tout_timestamp = now;
 				timeouted_address_is_already_selected = true;
-			}
-		} else {
-			scores[i] = rtt_cache_entry->score;
-			if (sa->sa_family == AF_INET) {
-				scores[i] += FAVOUR_IPV6;
 			}
 		}
 		if (VERBOSE_STATUS) {
