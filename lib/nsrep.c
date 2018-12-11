@@ -505,18 +505,12 @@ int kr_nsrep_sort(struct kr_nsrep *ns, struct kr_context *ctx)
 									kr_family_len(sa->sa_family));
 		if (!rtt_cache_entry) {
 			scores[i] = 1; /* prefer unknown to probe RTT */
-			if (sa->sa_family == AF_INET) {
-				scores[i] += FAVOUR_IPV6;
-			}
 		} else if (rtt_cache_entry->score < KR_NS_FWD_TIMEOUT) {
 			/* some probability to bump bad ones up for re-probe */
 			scores[i] = rtt_cache_entry->score;
 			/* The lower the rtt, the more likely it will be selected. */
 			if (!kr_rand_coin(rtt_cache_entry->score, KR_NS_FWD_TIMEOUT)) {
 				scores[i] = 1;
-			}
-			if (sa->sa_family == AF_INET) {
-				scores[i] += FAVOUR_IPV6;
 			}
 		} else {
 			uint64_t now = kr_now();
@@ -526,13 +520,16 @@ int kr_nsrep_sort(struct kr_nsrep *ns, struct kr_context *ctx)
 			if (elapsed > ctx->cache_rtt_tout_retry_interval &&
 			    !timeouted_address_is_already_selected) {
 				scores[i] = 1;
-				if (sa->sa_family == AF_INET) {
-					scores[i] += FAVOUR_IPV6;
-				}
 				rtt_cache_entry->tout_timestamp = now;
 				timeouted_address_is_already_selected = true;
 			}
 		}
+
+		/* Give advantage to IPv6. */
+		if (scores[i] <= KR_NS_MAX_SCORE && sa->sa_family == AF_INET) {
+			scores[i] += FAVOUR_IPV6;
+		}
+
 		if (VERBOSE_STATUS) {
 			kr_log_verbose("[     ][nsre] score %d for %s;\t cached RTT: %d\n",
 					scores[i], kr_straddr(sa),
