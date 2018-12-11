@@ -21,5 +21,21 @@ Example of error message logged by this module:
 
 .. _DNSViz: http://dnsviz.net/
 
+List of most frequent queries which fail as DNSSEC bogus can be obtained at run-time:
+
+.. code-block:: lua
+
+      > bogus_log.frequent()
+      [1] => {
+          [type] => DNSKEY
+          [count] => 1
+          [name] => dnssec-failed.org.
+      }
+      [2] => {
+          [type] => DNSKEY
+          [count] => 13
+          [name] => rhybar.cz.
+      }
+
 Please note that in future this module might be replaced
 with some other way to log this information.

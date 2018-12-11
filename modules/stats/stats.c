@@ -23,6 +23,7 @@
  */
 
 #include <libknot/packet/pkt.h>
+#include <libknot/packet/wire.h>
 #include <libknot/descriptor.h>
 #include <ccan/json/json.h>
 #include <contrib/cleanup.h>
@@ -56,6 +57,8 @@
 	X(answer,total) X(answer,noerror) X(answer,nodata) X(answer,nxdomain) X(answer,servfail) \
 	X(answer,cached) X(answer,1ms) X(answer,10ms) X(answer,50ms) X(answer,100ms) \
 	X(answer,250ms) X(answer,500ms) X(answer,1000ms) X(answer,1500ms) X(answer,slow) \
+	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
+	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
 	X(const,end)
 
@@ -219,17 +222,30 @@ static int collect(kr_layer_t *ctx)
 		}
 		/* Observe the final query. */
 		struct kr_query *last = kr_rplan_last(rplan);
-		if (last->flags.CACHED) {
-			stat_const_add(data, metric_answer_cached, 1);
-		}
+		stat_const_add(data, metric_answer_cached, last->flags.CACHED);
 	}
+
+	/* Keep stats of all response header flags;
+	 * these don't return bool, so that's why we use !! */
+	stat_const_add(data, metric_answer_aa, !!knot_wire_get_aa(param->answer->wire));
+	stat_const_add(data, metric_answer_tc, !!knot_wire_get_tc(param->answer->wire));
+	stat_const_add(data, metric_answer_rd, !!knot_wire_get_rd(param->answer->wire));
+	stat_const_add(data, metric_answer_ra, !!knot_wire_get_ra(param->answer->wire));
+	stat_const_add(data, metric_answer_ad, !!knot_wire_get_ad(param->answer->wire));
+	stat_const_add(data, metric_answer_cd, !!knot_wire_get_cd(param->answer->wire));
+
+	/* EDNS0 stats */
+	stat_const_add(data, metric_answer_edns0, knot_pkt_has_edns(param->answer));
+	stat_const_add(data, metric_answer_do, knot_pkt_has_dnssec(param->answer));
+
 	/* Query parameters and transport mode */
-	if (knot_pkt_has_edns(param->answer)) {
-		stat_const_add(data, metric_query_edns, 1);
-		if (knot_pkt_has_dnssec(param->answer)) {
-			stat_const_add(data, metric_query_dnssec, 1);
-		}
-	}
+	/*
+		DEPRECATED
+		use new names metric_answer_edns0 and metric_answer_do
+	*/
+	stat_const_add(data, metric_query_edns, knot_pkt_has_edns(param->answer));
+	stat_const_add(data, metric_query_dnssec, knot_pkt_has_dnssec(param->answer));
+
 	return ctx->state;
 }
 
@@ -241,7 +257,11 @@ static int collect(kr_layer_t *ctx)
  */
 static char* stats_set(void *env, struct kr_module *module, const char *args)
 {
+	if (args == NULL)
+		return NULL;
+
 	struct stat_data *data = module->data;
+
 	auto_free char *pair = strdup(args);
 	char *val = strchr(pair, ' ');
 	if (val) {
@@ -267,6 +287,9 @@ static char* stats_set(void *env, struct kr_module *module, const char *args)
  */
 static char* stats_get(void *env, struct kr_module *module, const char *args)
 {
+	if (args == NULL)
+		return NULL;
+
 	struct stat_data *data = module->data;
 
 	/* Expecting CHAR_BIT to be 8, this is a safe bet */

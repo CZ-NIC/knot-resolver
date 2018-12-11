@@ -58,6 +58,16 @@ else
 		same(code, 200, '/metrics page return 200 OK')
 		ok(#body > 0, '/metrics page has non-empty body')
 		same(mime, 'text/plain; version=0.0.4', '/metrics page has correct content type')
+		-- /metrics serves frequent
+		code, body, mime = http_get(uri .. '/frequent')
+		same(code, 200, '/frequent page return 200 OK')
+		ok(#body > 0, '/frequent page has non-empty body')
+		same(mime, 'application/json', '/frequent page has correct content type')
+		-- /metrics serves bogus
+		code, body, mime = http_get(uri .. '/bogus')
+		same(code, 200, '/bogus page return 200 OK')
+		ok(#body > 0, '/bogus page has non-empty body')
+		same(mime, 'application/json', '/bogus page has correct content type')
 		-- /trace serves trace log for requests
 		code, body, mime = http_get(uri .. '/trace/localhost/A')
 		same(code, 200, '/trace page return 200 OK')

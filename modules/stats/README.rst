@@ -90,20 +90,74 @@ Clear the list of most frequent iterative queries.
 Built-in statistics
 ^^^^^^^^^^^^^^^^^^^
 
-* ``answer.total`` - total number of answered queries
-* ``answer.cached`` - number of queries answered from cache
-* ``answer.noerror`` - number of **NOERROR** answers
-* ``answer.nodata`` - number of **NOERROR**, but empty answers
-* ``answer.nxdomain`` - number of **NXDOMAIN** answers
-* ``answer.servfail`` - number of **SERVFAIL** answers
-* ``answer.1ms`` - number of answers completed in 1ms
-* ``answer.10ms`` - number of answers completed in 10ms
-* ``answer.50ms`` - number of answers completed in 50ms
-* ``answer.100ms`` - number of answers completed in 100ms
-* ``answer.250ms`` - number of answers completed in 250ms
-* ``answer.500ms`` - number of answers completed in 500ms
-* ``answer.1000ms`` - number of answers completed in 1000ms
-* ``answer.1500ms`` - number of answers completed in 1500ms
-* ``answer.slow`` - number of answers that took more than 1500ms
-* ``query.edns`` - number of queries with EDNS
-* ``query.dnssec`` - number of queries with DNSSEC DO=1
+Built-in counters keep track of number of queries and answers matching specific criteria.
+
++----------------------------------------------------+
+| **Global answer counters**                         |
++-----------------+----------------------------------+
+| answer.total    | total number of answered queries |
++-----------------+----------------------------------+
+| answer.cached   | queries answered from cache      |
++-----------------+----------------------------------+
+
++-----------------+----------------------------------+
+| **Answers categorized by RCODE**                   |
++-----------------+----------------------------------+
+| answer.noerror  | NOERROR answers                  |
++-----------------+----------------------------------+
+| answer.nodata   | NOERROR, but empty answers       |
++-----------------+----------------------------------+
+| answer.nxdomain | NXDOMAIN answers                 |
++-----------------+----------------------------------+
+| answer.servfail | SERVFAIL answers                 |
++-----------------+----------------------------------+
+
++-----------------+----------------------------------+
+| **Answer latency**                                 |
++-----------------+----------------------------------+
+| answer.1ms      | completed in 1ms                 |
++-----------------+----------------------------------+
+| answer.10ms     | completed in 10ms                |
++-----------------+----------------------------------+
+| answer.50ms     | completed in 50ms                |
++-----------------+----------------------------------+
+| answer.100ms    | completed in 100ms               |
++-----------------+----------------------------------+
+| answer.250ms    | completed in 250ms               |
++-----------------+----------------------------------+
+| answer.500ms    | completed in 500ms               |
++-----------------+----------------------------------+
+| answer.1000ms   | completed in 1000ms              |
++-----------------+----------------------------------+
+| answer.1500ms   | completed in 1500ms              |
++-----------------+----------------------------------+
+| answer.slow     | completed in more than 1500ms    |
++-----------------+----------------------------------+
+
++-----------------+----------------------------------+
+| **Answer flags**                                   |
++-----------------+----------------------------------+
+| answer.aa       | authoritative answer             |
++-----------------+----------------------------------+
+| answer.tc       | truncated answer                 |
++-----------------+----------------------------------+
+| answer.ra       | recursion available              |
++-----------------+----------------------------------+
+| answer.rd       | recursion desired (in answer!)   |
++-----------------+----------------------------------+
+| answer.ad       | authentic data (DNSSEC)          |
++-----------------+----------------------------------+
+| answer.cd       | checking disabled (DNSSEC)       |
++-----------------+----------------------------------+
+| answer.do       | DNSSEC answer OK                 |
++-----------------+----------------------------------+
+| answer.edns0    | EDNS0 present                    |
++-----------------+----------------------------------+
+
++-----------------+----------------------------------+
+| **Query flags**                                    |
++-----------------+----------------------------------+
+| query.edns      | queries with EDNS present        |
++-----------------+----------------------------------+
+| query.dnssec    | queries with DNSSEC DO=1         |
++-----------------+----------------------------------+

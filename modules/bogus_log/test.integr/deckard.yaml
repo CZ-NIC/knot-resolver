@@ -1,0 +1,13 @@
+programs:
+- name: kresd
+  binary: kresd
+  additional:
+    - -f
+    - "1"
+  templates:
+    - modules/bogus_log/test.integr/kresd_config.j2
+    - tests/hints_zone.j2
+  configs:
+    - config
+    - hints
+noclean: True
