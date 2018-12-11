@@ -366,6 +366,7 @@ void network_new_hostname(struct network *net, struct engine *engine)
 
 static int set_bpf_cb(const char *key, void *val, void *ext)
 {
+#ifdef SO_ATTACH_BPF
 	endpoint_array_t *endpoints = (endpoint_array_t *)val;
 	assert(endpoints != NULL);
 	int *bpffd = (int *)ext;
@@ -382,7 +383,10 @@ static int set_bpf_cb(const char *key, void *val, void *ext)
 			return 0;
 		}
 	}
-
+#else
+	kr_log_error("[network] SO_ATTACH_BPF socket option doesn't supported\n");
+	return 0;
+#endif
 	return 1;
 }
 
@@ -398,6 +402,7 @@ bool network_set_bpf(struct network *net, int bpf_fd)
 
 static int clear_bpf_cb(const char *key, void *val, void *ext)
 {
+#ifdef SO_DETACH_BPF
 	endpoint_array_t *endpoints = (endpoint_array_t *)val;
 	assert(endpoints != NULL);
 
@@ -410,7 +415,9 @@ static int clear_bpf_cb(const char *key, void *val, void *ext)
 
 		setsockopt(sockfd, SOL_SOCKET, SO_DETACH_BPF, NULL, 0);
 	}
-
+#else
+	kr_log_error("[network] SO_DETACH_BPF socket option doesn't supported\n");
+#endif
 	return 1;
 }
 
