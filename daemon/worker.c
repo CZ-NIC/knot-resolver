@@ -117,8 +117,6 @@ static struct session* worker_find_tcp_connected(struct worker_ctx *worker,
 static int worker_add_tcp_waiting(struct worker_ctx *worker,
 				  const struct sockaddr *addr,
 				  struct session *session);
-static int worker_del_tcp_waiting(struct worker_ctx *worker,
-				  const struct sockaddr *addr);
 static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr *addr);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
@@ -752,8 +750,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 
 	if (ret != kr_ok()) {
 		/* Something went wrong.
-		 * Session isn't in the list of waiting sessions,
-		 * or addition to the list of connected sessions failed,
+		 * Either addition to the list of connected sessions
 		 * or write to upstream failed. */
 		worker_del_tcp_connected(worker, peer);
 		session_waitinglist_finalize(session, KR_STATE_FAIL);
@@ -774,8 +771,11 @@ static int send_waiting(struct session *session)
 		struct qr_task *t = session_waitinglist_get(session);
 		ret = qr_task_send(t, session, NULL, NULL);
 		if (ret != 0) {
+			struct worker_ctx *worker = t->ctx->worker;
+			struct sockaddr *peer = session_get_peer(session);
 			session_waitinglist_finalize(session, KR_STATE_FAIL);
 			session_tasklist_finalize(session, KR_STATE_FAIL);
+			worker_del_tcp_connected(worker, peer);
 			session_close(session);
 			break;
 		}
@@ -865,7 +865,6 @@ static void on_connect(uv_connect_t *req, int status)
 
 	ret = send_waiting(session);
 	if (ret != 0) {
-		worker_del_tcp_connected(worker, peer);
 		return;
 	}
 
@@ -1209,6 +1208,7 @@ static int tcp_task_existing_connection(struct session *session, struct qr_task 
 		/* Error, finalize task with SERVFAIL and
 		 * close connection to upstream. */
 		session_tasklist_finalize(session, KR_STATE_FAIL);
+		worker_del_tcp_connected(worker, session_get_peer(session));
 		session_close(session);
 		return kr_error(EINVAL);
 	}
@@ -1620,8 +1620,8 @@ static int worker_add_tcp_waiting(struct worker_ctx *worker,
 	return map_add_tcp_session(&worker->tcp_waiting, addr, session);
 }
 
-static int worker_del_tcp_waiting(struct worker_ctx *worker,
-				  const struct sockaddr* addr)
+int worker_del_tcp_waiting(struct worker_ctx *worker,
+			   const struct sockaddr* addr)
 {
 	assert(addr && tcpsess_key(addr));
 	return map_del_tcp_session(&worker->tcp_waiting, addr);
@@ -1645,6 +1645,7 @@ int worker_end_tcp(struct session *session)
 	struct worker_ctx *worker = handle->loop->data;
 	struct sockaddr *peer = session_get_peer(session);
 
+	worker_del_tcp_waiting(worker, peer);
 	worker_del_tcp_connected(worker, peer);
 	session_flags(session)->connected = false;
 

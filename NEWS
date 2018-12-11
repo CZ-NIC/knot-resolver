@@ -18,7 +18,7 @@ Bugfixes
 --------
 - http module: only run prometheus in parent process if using --forks=N,
   as the submodule collects metrics from all sub-processes as well.
-- TLS fixes for corner cases (!714, !700)
+- TLS fixes for corner cases (!700, !714, !721)
 - fix build with -DNOVERBOSELOG (#424)
 - policy.{FORWARD,TLS_FORWARD,STUB}: respect net.ipv{4,6} setting (!710)
 

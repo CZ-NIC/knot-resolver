@@ -91,7 +91,8 @@ int worker_add_tcp_connected(struct worker_ctx *worker,
 			     struct session *session);
 int worker_del_tcp_connected(struct worker_ctx *worker,
 			     const struct sockaddr *addr);
-
+int worker_del_tcp_waiting(struct worker_ctx *worker,
+			   const struct sockaddr* addr);
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
 
 struct request_ctx *worker_task_get_request(struct qr_task *task);
