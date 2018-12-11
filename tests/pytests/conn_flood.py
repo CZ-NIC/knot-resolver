@@ -17,7 +17,7 @@ from kresd import Kresd
 import utils
 
 
-MAX_SOCKETS = 15000  # upper bound of how many connections to open
+MAX_SOCKETS = 20000  # upper bound of how many connections to open
 MAX_ITERATIONS = 20  # number of iterations to run the test
 
 # we can't use softlimit ifself since kresd already has open sockets,
@@ -36,17 +36,23 @@ def test_conn_flood(tmpdir, sock_func_name):
         sockets = []
         next_ping = time.time() + 5  # less than tcp idle timeout
         while True:
+            additional_sockets = 0
             while time.time() < next_ping:
                 nsock_to_init = min(100, nsockets - len(sockets))
                 if not nsock_to_init:
                     return sockets
                 sockets.extend([make_sock() for _ in range(nsock_to_init)])
+                additional_sockets += nsock_to_init
 
             # large number of connections can take a lot of time to open
             # send some valid data to avoid TCP idle timeout for already open sockets
             next_ping = time.time() + 5
             for s in sockets:
                 utils.ping_alive(s)
+
+            # break when no more than 10% additional sockets are created
+            if additional_sockets / len(sockets) < 0.1:
+                return sockets
 
     max_num_of_open_files = resource.getrlimit(resource.RLIMIT_NOFILE)[0] - RESERVED_NOFILE
     nsockets = min(max_num_of_open_files, MAX_SOCKETS)
@@ -55,9 +61,9 @@ def test_conn_flood(tmpdir, sock_func_name):
     ip = '127.0.0.1'
     ip6 = '::1'
     with Kresd(tmpdir, ip=ip, ip6=ip6, verbose=False) as kresd:
-        print("\nEstablishing {} connections".format(nsockets))
         make_sock = getattr(kresd, sock_func_name)  # function for creating sockets
         sockets = create_sockets(make_sock, nsockets)
+        print("\nEstablished {} connections".format(len(sockets)))
 
         print("Start sending data")
         for i in range(MAX_ITERATIONS):
