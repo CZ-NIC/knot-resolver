@@ -886,7 +886,7 @@ static int net_bpf_set(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	struct network *net = &engine->net;
 
-	if (lua_gettop(L) != 1 || lua_type(L, 1) != LUA_TINTEGER) {
+	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1)) {
 		format_error(L, "net.bpf_set(fd) takes one parameter: the open file descriptor of a loaded BPF program");
 		lua_error(L);
 		return 0;
@@ -895,6 +895,13 @@ static int net_bpf_set(lua_State *L)
 #if __linux__
 
 	int progfd = lua_tointeger(L, 1);
+	if (progfd == 0) {
+		/* conversion error despite that fact
+		 * that lua_isnumber(L, 1) has returned true.
+		 * Real or stdin? */
+		lua_error(L);
+		return 0;
+	}
 	lua_pop(L, 1);
 
 	if (!network_set_bpf(net, progfd)) {
