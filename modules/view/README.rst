@@ -15,8 +15,6 @@ There are two identification mechanisms:
   - identifies the client based on a TSIG key
 
 You can combine this information with :ref:`policy <mod-policy>` rules.
-Just as with policies, the rules for a request get tried until one "non-chain"
-action is executed.
 
 .. code-block:: lua
 
@@ -52,6 +50,24 @@ Example configuration
 	view:addr('10.0.0.0/8', policy.all(policy.FORWARD('2001:DB8::1')))
 	-- Drop everything that hasn't matched
 	view:addr('0.0.0.0/0', function (req, qry) return policy.DROP end)
+
+
+Rule order
+^^^^^^^^^^
+
+The current implementation is best understood as three separate rule chains:
+vanilla ``policy.add``, ``view:tsig`` and ``view:addr``.
+For each request the rules in these chains get tried one by one until a "non-chain" action gets executed.
+It's possible to configure ``policy.add`` rules to execute after ``view:*`` rules,
+but by default ``policy`` module acts before ``view`` module due to ``policy`` being loaded by default.
+
+If you want to intermingle universal rules with ``view:addr``, you may simply wrap the universal rules:
+
+.. code-block:: lua
+
+    view:addr('0.0.0.0/0', policy.<rule>) -- and
+    view:addr('::0/0',     policy.<rule>)
+
 
 Properties
 ^^^^^^^^^^
