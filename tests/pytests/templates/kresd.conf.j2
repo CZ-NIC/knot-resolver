@@ -37,6 +37,10 @@ policy.add(policy.all(
 ))
 {% endif %}
 
+{% if kresd.policy_test_pass %}
+policy.add(policy.suffix(policy.PASS, {todname('test.')}))
+{% endif %}
+
 modules.unload("ta_signal_query")
 modules.unload("priming")
 modules.unload("detect_time_skew")
