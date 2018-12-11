@@ -5,6 +5,8 @@ New features
 ------------
 - module edns_keepalive to implement server side of RFC 7828 (#408)
 - module nsid to implement server side of RFC 5001 (#289)
+- module bogus_log provides .frequent() table (!629)
+- module stats collects flags from answer messages (!629)
 
 Module API changes
 ------------------
