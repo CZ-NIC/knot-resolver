@@ -1466,7 +1466,7 @@ ns_election:
 
 	/* Randomize query case (if not in safe mode or turned off) */
 	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)
-			? 0 : kr_rand_uint(0);
+			? 0 : kr_rand_bytes(sizeof(qry->secret));
 	knot_dname_t *qname_raw = knot_pkt_qname(packet);
 	randomized_qname_case(qname_raw, qry->secret);
 

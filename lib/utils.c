@@ -22,7 +22,6 @@
 #include <sys/time.h>
 #include <contrib/cleanup.h>
 #include <contrib/ccan/asprintf/asprintf.h>
-#include <ccan/isaac/isaac.h>
 #include <ucw/mempool.h>
 #include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
@@ -47,11 +46,6 @@
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
-
-/** @internal CSPRNG context */
-static isaac_ctx ISAAC;
-static bool isaac_seeded = false;
-#define SEED_SIZE 256
 
 void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
 {
@@ -214,67 +208,6 @@ char* kr_strcatdup(unsigned n, ...)
 	}
 
 	return result;
-}
-
-static int seed_file(const char *fname, char *buf, size_t buflen)
-{
-	auto_fclose FILE *fp = fopen(fname, "r");
-	if (!fp) {
-		return kr_error(EINVAL);
-	}
-	/* Disable buffering to conserve randomness but ignore failing to do so. */
-	setvbuf(fp, NULL, _IONBF, 0);
-	do {
-		if (feof(fp)) {
-			return kr_error(ENOENT);
-		}
-		if (ferror(fp)) {
-			return kr_error(ferror(fp));
-		}
-		if (fread(buf, buflen, 1, fp) == 1) { /* read in one chunk for simplicity */
-			return kr_ok();
-		}
-	} while (true);
-	return 0;
-}
-
-static int randseed(char *buf, size_t buflen)
-{
-    /* This is adapted from Tor's crypto_seed_rng() */
-    static const char *filenames[] = {
-        "/dev/srandom", "/dev/urandom", "/dev/random", NULL
-    };
-    for (unsigned i = 0; filenames[i]; ++i) {
-        if (seed_file(filenames[i], buf, buflen) == 0) {
-            return 0;
-        }
-    }
-
-    /* Seed from time, this is not going to be secure. */
-    kr_log_error("failed to obtain randomness, falling back to current time\n");
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    memcpy(buf, &tv, buflen < sizeof(tv) ? buflen : sizeof(tv));
-    return 0;
-}
-
-int kr_rand_reseed(void)
-{
-	uint8_t seed[SEED_SIZE];
-	randseed((char *)seed, sizeof(seed));
-	isaac_reseed(&ISAAC, seed, sizeof(seed));
-	return kr_ok();
-}
-
-uint32_t kr_rand_uint(uint32_t max)
-{
-	if (unlikely(!isaac_seeded)) {
-		kr_rand_reseed();
-		isaac_seeded = true;
-	}
-	return max == 0
-		? isaac_next_uint32(&ISAAC)
-		: isaac_next_uint(&ISAAC, max);
 }
 
 int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
@@ -1056,6 +989,40 @@ finish:
 	return d - dst;
 }
 
+static void rnd_noerror(void *data, uint size)
+{
+	int ret = gnutls_rnd(GNUTLS_RND_NONCE, data, size);
+	if (ret) {
+		kr_log_error("gnutls_rnd(): %s\n", gnutls_strerror(ret));
+		abort();
+	}
+}
+void kr_rnd_buffered(void *data, uint size)
+{
+	/* static circular buffer, from index _begin (inclusive) to _end (exclusive) */
+	static uint8_t buf[512/8]; /* gnutls_rnd() works on blocks of 512 bits (chacha) */
+	static uint buf_begin = sizeof(buf);
+
+	if (unlikely(size > sizeof(buf))) {
+		rnd_noerror(data, size);
+		return;
+	}
+	/* Start with contiguous chunk, possibly until the end of buffer. */
+	const uint size1 = MIN(size, sizeof(buf) - buf_begin);
+	uint8_t *d = data;
+	memcpy(d, buf + buf_begin, size1);
+	if (size1 == size) {
+		buf_begin += size1;
+		return;
+	}
+	d += size1;
+	size -= size1;
+	/* Refill the whole buffer, and finish by another contiguous chunk. */
+	rnd_noerror(buf, sizeof(buf));
+	memcpy(d, buf, size);
+	buf_begin = size;
+}
+
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl)
 {
@@ -1082,3 +1049,4 @@ uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata)
 {
 	return knot_rrsig_type_covered(rdata);
 }
+

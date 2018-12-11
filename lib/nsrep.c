@@ -255,8 +255,8 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 	   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
 		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
-	} else if ((kr_rand_uint(100) < 10) &&
-		   (kr_rand_uint(KR_NS_MAX_SCORE) >= score)) {
+	} else if (kr_rand_coin(1, 10) &&
+		   !kr_rand_coin(score, KR_NS_MAX_SCORE)) {
 		/* With 10% chance probe server with a probability
 		 * given by its RTT / MAX_RTT. */
 		update_nsrep_set(ns, owner, addr_choice, score);
