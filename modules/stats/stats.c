@@ -222,50 +222,30 @@ static int collect(kr_layer_t *ctx)
 		}
 		/* Observe the final query. */
 		struct kr_query *last = kr_rplan_last(rplan);
-		if (last->flags.CACHED) {
-			stat_const_add(data, metric_answer_cached, 1);
-		}
+		stat_const_add(data, metric_answer_cached, last->flags.CACHED);
 	}
 
-	/* Keep stats of all response header flags */
-	if (knot_wire_get_aa(param->answer->wire)) {
-		stat_const_add(data, metric_answer_aa, 1);
-	}
-	if (knot_wire_get_tc(param->answer->wire)) {
-		stat_const_add(data, metric_answer_tc, 1);
-	}
-	if (knot_wire_get_rd(param->answer->wire)) {
-		stat_const_add(data, metric_answer_rd, 1);
-	}
-	if (knot_wire_get_ra(param->answer->wire)) {
-		stat_const_add(data, metric_answer_ra, 1);
-	}
-	if (knot_wire_get_ad(param->answer->wire)) {
-		stat_const_add(data, metric_answer_ad, 1);
-	}
-	if (knot_wire_get_cd(param->answer->wire)) {
-		stat_const_add(data, metric_answer_cd, 1);
-	}
+	/* Keep stats of all response header flags;
+	 * these don't return bool, so that's why we use !! */
+	stat_const_add(data, metric_answer_aa, !!knot_wire_get_aa(param->answer->wire));
+	stat_const_add(data, metric_answer_tc, !!knot_wire_get_tc(param->answer->wire));
+	stat_const_add(data, metric_answer_rd, !!knot_wire_get_rd(param->answer->wire));
+	stat_const_add(data, metric_answer_ra, !!knot_wire_get_ra(param->answer->wire));
+	stat_const_add(data, metric_answer_ad, !!knot_wire_get_ad(param->answer->wire));
+	stat_const_add(data, metric_answer_cd, !!knot_wire_get_cd(param->answer->wire));
 
 	/* EDNS0 stats */
-	if (knot_pkt_has_edns(param->answer)) {
-		stat_const_add(data, metric_answer_edns0, 1);
-		if (knot_pkt_has_dnssec(param->answer)) {
-			stat_const_add(data, metric_answer_do, 1);
-		}
-	}
+	stat_const_add(data, metric_answer_edns0, knot_pkt_has_edns(param->answer));
+	stat_const_add(data, metric_answer_do, knot_pkt_has_dnssec(param->answer));
 
 	/* Query parameters and transport mode */
 	/*
 		DEPRECATED
 		use new names metric_answer_edns0 and metric_answer_do
 	*/
-	if (knot_pkt_has_edns(param->answer)) {
-		stat_const_add(data, metric_query_edns, 1);
-		if (knot_pkt_has_dnssec(param->answer)) {
-			stat_const_add(data, metric_query_dnssec, 1);
-		}
-	}
+	stat_const_add(data, metric_query_edns, knot_pkt_has_edns(param->answer));
+	stat_const_add(data, metric_query_dnssec, knot_pkt_has_dnssec(param->answer));
+
 	return ctx->state;
 }
 
