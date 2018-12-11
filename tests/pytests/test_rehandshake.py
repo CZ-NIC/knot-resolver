@@ -12,63 +12,40 @@ Make sure to run `make all` in `rehandshake/` to compile the proxy.
 
 import os
 import re
-import subprocess
 import time
 
-import dns
-import dns.rcode
 import pytest
 
-from kresd import CERTS_DIR, Forward, make_kresd, PYTESTS_DIR
-import utils
+from kresd import Forward, make_kresd, PYTESTS_DIR
+import proxyutils
 
 
-REHANDSHAKE_PROXY = os.path.join(PYTESTS_DIR, 'rehandshake', 'tlsproxy')
+PROXY_PATH = os.path.join(PYTESTS_DIR, 'rehandshake', 'tlsproxy')
 
 
-@pytest.mark.skipif(not os.path.exists(REHANDSHAKE_PROXY),
-                    reason="tlsproxy not found (did you compile it?)")
-def test_rehandshake(tmpdir):
-    def resolve_hint(sock, qname):
-        buff, msgid = utils.get_msgbuff(qname)
-        sock.sendall(buff)
-        answer = utils.receive_parse_answer(sock)
-        assert answer.id == msgid
-        assert answer.rcode() == dns.rcode.NOERROR
-        assert answer.answer[0][0].address == '127.0.0.1'
-
-    hints = {
-        '0.foo.': '127.0.0.1',
-        '1.foo.': '127.0.0.1',
-        '2.foo.': '127.0.0.1',
-        '3.foo.': '127.0.0.1',
-    }
+@pytest.mark.skipif(not os.path.exists(PROXY_PATH),
+                    reason="{} not found (did you compile it?)".format(PROXY_PATH))
+def test_proxy_rehandshake(tmpdir):
     # run forward target instance
     workdir = os.path.join(str(tmpdir), 'kresd_fwd_target')
     os.makedirs(workdir)
 
-    with make_kresd(workdir, hints=hints, port=53910) as kresd_fwd_target:
+    with make_kresd(workdir, hints=proxyutils.HINTS, port=53910) as kresd_fwd_target:
         sock = kresd_fwd_target.ip_tls_socket()
-        resolve_hint(sock, '0.foo.')
+        proxyutils.resolve_hint(sock, list(proxyutils.HINTS.keys())[0])
 
-        # run proxy
-        cwd, cmd = os.path.split(REHANDSHAKE_PROXY)
-        cmd = './' + cmd
-        ca_file = os.path.join(CERTS_DIR, 'tt.cert.pem')
-        try:
-            proxy = subprocess.Popen(
-                [cmd], cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
+        with proxyutils.proxy(PROXY_PATH):
             # run test kresd instance
             workdir2 = os.path.join(str(tmpdir), 'kresd')
             os.makedirs(workdir2)
-            forward = Forward(proto='tls', ip='127.0.0.1', port=53921,
-                              hostname='transport-test-server.com', ca_file=ca_file)
+            forward = Forward(
+                proto='tls', ip='127.0.0.1', port=53921,
+                hostname='transport-test-server.com', ca_file=proxyutils.PROXY_CA_FILE)
             with make_kresd(workdir2, forward=forward) as kresd:
                 sock2 = kresd.ip_tcp_socket()
                 try:
-                    for hint in hints:
-                        resolve_hint(sock2, hint)
+                    for hint in proxyutils.HINTS:
+                        proxyutils.resolve_hint(sock2, hint)
                         time.sleep(0.1)
                 finally:
                     # verify log
@@ -83,5 +60,3 @@ def test_rehandshake(tmpdir):
                             n_rehandshake += 1
                     assert n_connecting_to == 0  # shouldn't be present in partial log
                     assert n_rehandshake > 0
-        finally:
-            proxy.terminate()
