@@ -23,6 +23,7 @@
  */
 
 #include <libknot/packet/pkt.h>
+#include <libknot/packet/wire.h>
 #include <libknot/descriptor.h>
 #include <ccan/json/json.h>
 #include <contrib/cleanup.h>
@@ -226,22 +227,22 @@ static int collect(kr_layer_t *ctx)
 	}
 
 	/* Keep stats of all response header flags */
-	if (param->answer->flags & 0x0010) { /* AA */
-			stat_const_add(data, metric_answer_aa, 1);
+	if (knot_wire_get_aa(param->answer->wire)) {
+		stat_const_add(data, metric_answer_aa, 1);
 	}
-	if (param->answer->flags & 0x0020) { /* TC */
+	if (knot_wire_get_tc(param->answer->wire)) {
 		stat_const_add(data, metric_answer_tc, 1);
 	}
-	if (param->answer->flags & 0x0040) { /* RD */
+	if (knot_wire_get_rd(param->answer->wire)) {
 		stat_const_add(data, metric_answer_rd, 1);
 	}
-	if (param->answer->flags & 0x0080) { /* RA */
+	if (knot_wire_get_ra(param->answer->wire)) {
 		stat_const_add(data, metric_answer_ra, 1);
 	}
-	if (param->answer->flags & 0x0200) { /* AD */
+	if (knot_wire_get_ad(param->answer->wire)) {
 		stat_const_add(data, metric_answer_ad, 1);
 	}
-	if (param->answer->flags & 0x0400) { /* CD */
+	if (knot_wire_get_cd(param->answer->wire)) {
 		stat_const_add(data, metric_answer_cd, 1);
 	}
 
