@@ -19,16 +19,18 @@ stages:
   - extended
   - deploy
 
-build:linux:amd64:
+.build: &build
+  variables:
+    CFLAGS: -Werror -ggdb
   stage: build
   except:
     - master
   script:
     - rm daemon/lua/kres-gen.lua
-    - make -k all CFLAGS="-Werror -ggdb"
+    - make -k all
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
-    - make install CFLAGS="-Werror -ggdb"
+    - make install
   artifacts:
     untracked: true
   tags:
@@ -36,21 +38,22 @@ build:linux:amd64:
     - linux
     - amd64
 
+build:linux:amd64:
+  <<: *build
+
 build:clang:linux:amd64:
-  stage: build
-  except:
-    - master
+  <<: *build
+  variables:
+    CFLAGS: -Werror -Wno-error=unused-command-line-argument -ggdb
+    CXX: clang++
+    CC: clang
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-2.7  # newer Debian for newer Clang
-  script:
-    - rm daemon/lua/kres-gen.lua
-    - CXX=clang++ CC=clang make -k all "CFLAGS=-Werror -Wno-error=unused-command-line-argument -ggdb"
-    - STATUS="$(git status --untracked-files=normal --porcelain)"
-    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
-    - CXX=clang++ CC=clang make install "CFLAGS=-Werror -ggdb"
-  tags:
-    - docker
-    - linux
-    - amd64
+  artifacts:
+
+build:asan:linux:amd64:
+  <<: *build
+  variables:
+    CFLAGS: -Werror -ggdb3 -O0 -fsanitize=address -fno-omit-frame-pointer
 
 srpm:
   stage: build
@@ -283,7 +286,7 @@ pytests:lint:
 pytests:run:
   stage: test
   dependencies:
-    - build:linux:amd64
+    - build:asan:linux:amd64
   except:
     - master
   script:
@@ -310,7 +313,7 @@ pytests:run:
 pytests:extended:
   stage: extended
   dependencies:
-    - build:linux:amd64
+    - build:asan:linux:amd64
   except:
     - master
   script:
