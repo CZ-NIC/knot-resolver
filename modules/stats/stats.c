@@ -277,7 +277,11 @@ static int collect(kr_layer_t *ctx)
  */
 static char* stats_set(void *env, struct kr_module *module, const char *args)
 {
+	if (args == NULL)
+		return NULL;
+
 	struct stat_data *data = module->data;
+
 	auto_free char *pair = strdup(args);
 	char *val = strchr(pair, ' ');
 	if (val) {
@@ -303,6 +307,9 @@ static char* stats_set(void *env, struct kr_module *module, const char *args)
  */
 static char* stats_get(void *env, struct kr_module *module, const char *args)
 {
+	if (args == NULL)
+		return NULL;
+
 	struct stat_data *data = module->data;
 
 	/* Expecting CHAR_BIT to be 8, this is a safe bet */
