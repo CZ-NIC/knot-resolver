@@ -694,7 +694,8 @@ static int session_tls_hs_cb(struct session *session, int status)
 
 	if (status) {
 		struct qr_task *task = session_waitinglist_get(session);
-		unsigned score = task->ctx->req.options.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		struct kr_qflags *options = &task->ctx->req.options;
+		unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
 		kr_nsrep_update_rtt(NULL, peer, score,
 				    worker->engine->resolver.cache_rtt,
 				    KR_NS_UPDATE_NORESET);
@@ -818,7 +819,8 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		worker_del_tcp_waiting(worker, peer);
 		struct qr_task *task = session_waitinglist_get(session);
-		unsigned score = task->ctx->req.options.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		struct kr_qflags *options = &task->ctx->req.options;
+		unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
 		kr_nsrep_update_rtt(NULL, peer, score,
 				    worker->engine->resolver.cache_rtt,
 				    KR_NS_UPDATE_NORESET);
@@ -893,7 +895,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 		VERBOSE_MSG(qry, "=> connection to '%s' failed\n", peer_str);
 	}
 
-	unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+	unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
 	kr_nsrep_update_rtt(NULL, peer, score,
 			    worker->engine->resolver.cache_rtt,
 			    KR_NS_UPDATE_NORESET);
@@ -926,7 +928,7 @@ static void on_udp_timeout(uv_timer_t *timer)
 				char *addr_str = kr_straddr(choice);
 				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str ? addr_str : "");
 			}
-			unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+			unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
 			kr_nsrep_update_rtt(&qry->ns, choice, score,
 					    worker->engine->resolver.cache_rtt,
 					    KR_NS_UPDATE_NORESET);
@@ -986,7 +988,8 @@ static void on_retransmit(uv_timer_t *req)
 	struct qr_task *task = session_tasklist_get_first(session);
 	if (retransmit(task) == NULL) {
 		/* Not possible to spawn request, start timeout timer with remaining deadline. */
-		uint64_t timeout = task->ctx->req.options.FORWARD ? KR_NS_FWD_TIMEOUT / 2 :
+		struct kr_qflags *options = &task->ctx->req.options;
+		uint64_t timeout = options->FORWARD || options->STUB ? KR_NS_FWD_TIMEOUT / 2 :
 				   KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
 		uv_timer_start(req, on_udp_timeout, timeout, 0);
 	} else {
@@ -1292,7 +1295,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		worker_del_tcp_waiting(ctx->worker, addr);
 		free(conn);
 		session_close(session);
-		unsigned score = qry->flags.FORWARD ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
 		kr_nsrep_update_rtt(NULL, peer, score,
 				    worker->engine->resolver.cache_rtt,
 				    KR_NS_UPDATE_NORESET);
