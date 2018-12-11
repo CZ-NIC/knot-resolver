@@ -4,14 +4,18 @@ local C = ffi.C
 
 -- Module declaration
 local view = {
-	key = {},
+	key = {}, -- map from :owner() to list of policy rules
 	src = {},
 	dst = {},
 }
 
 -- @function View based on TSIG key name.
-function view.tsig(_, tsig, rules)
-	view.key[tsig] = rules
+function view.tsig(_, tsig, rule)
+	if view.key[tsig] == nil then
+		view.key[tsig] = { rule }
+	else
+		table.insert(view.key[tsig], rule)
+	end
 end
 
 -- @function View based on source IP subnet.
@@ -46,16 +50,18 @@ end
 
 -- @function Try all the rules in order, until a non-chain rule gets executed.
 local function evaluate(state, req)
-	-- Try :tsig first.
+	-- Try :tsig rules first.
 	local client_key = req.qsource.packet.tsig_rr
-	local match_cb = (client_key ~= nil) and view.key[client_key:owner()] or nil
-	if execute(state, req, match_cb) then return end
+	local match_cbs = (client_key ~= nil) and view.key[client_key:owner()] or {}
+	for _, match_cb in ipairs(match_cbs) do
+		if execute(state, req, match_cb) then return end
+	end
 	-- Then try :addr by the source.
 	if req.qsource.addr ~= nil then
 		for i = 1, #view.src do
 			local pair = view.src[i]
 			if match_subnet(pair[1], pair[2], pair[3], req.qsource.addr) then
-				match_cb = pair[4]
+				local match_cb = pair[4]
 				if execute(state, req, match_cb) then return end
 			end
 		end
@@ -64,7 +70,7 @@ local function evaluate(state, req)
 		for i = 1, #view.dst do
 			local pair = view.dst[i]
 			if match_subnet(pair[1], pair[2], pair[3], req.qsource.dst_addr) then
-				match_cb = pair[4]
+				local match_cb = pair[4]
 				if execute(state, req, match_cb) then return end
 			end
 		end
