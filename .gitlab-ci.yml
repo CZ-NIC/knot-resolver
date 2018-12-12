@@ -44,7 +44,7 @@ build:asan:linux:amd64:
     CFLAGS: -Werror -ggdb3 -O0 -fsanitize=address -fno-omit-frame-pointer
 
 pytests:extended:
-  stage: build
+  stage: test
   dependencies:
     - build:asan:linux:amd64
   except:
