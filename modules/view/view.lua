@@ -106,7 +106,9 @@ end
 -- @function Module layers
 view.layer = {
 	begin = function(state, req)
-		if state == kres.FAIL then return state end
+		-- Don't act on "resolved" cases.
+		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
+
 		req = kres.request_t(req)
 		evaluate(state, req)
 		return req.state
