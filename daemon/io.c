@@ -145,7 +145,6 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 	struct session *s = timer->data;
 
 	assert(!session_flags(s)->closing);
-	assert(session_waitinglist_is_empty(s));
 
 	struct worker_ctx *worker = timer->loop->data;
 
@@ -166,6 +165,17 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 				    KR_RESOLVE_TIME_LIMIT / 2,
 				    KR_RESOLVE_TIME_LIMIT / 2);
 	} else {
+		/* Normally it should not happen,
+		 * but better to check if there anything in this list. */
+		while (!session_waitinglist_is_empty(s)) {
+			struct qr_task *t = session_waitinglist_pop(s, false);
+			worker_task_finalize(t, KR_STATE_FAIL);
+			worker_task_unref(t);
+			worker->stats.timeout += 1;
+			if (session_flags(s)->closing) {
+				return;
+			}
+		}
 		const struct engine *engine = worker->engine;
 		const struct network *net = &engine->net;
 		uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
