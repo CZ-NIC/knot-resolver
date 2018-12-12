@@ -406,7 +406,7 @@ respdiff:iter:udp:linux:amd64:
     - killall --wait kresd
     - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
-    - build:linux:amd64
+    - build:asan:linux:amd64
   artifacts:
     when: always
     expire_in: '1 week'
