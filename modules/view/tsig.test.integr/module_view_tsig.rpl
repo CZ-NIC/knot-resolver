@@ -2,7 +2,7 @@
 	stub-addr: 1.2.3.4
 CONFIG_END
 
-SCENARIO_BEGIN view:addr test
+SCENARIO_BEGIN view:tsig test
 
 RANGE_BEGIN 0 110
 	ADDRESS 1.2.3.4
@@ -16,15 +16,6 @@ SECTION ANSWER
 example.cz. IN A 5.6.7.8
 ENTRY_END
 
-ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
-REPLY QR RD RA NOERROR
-SECTION QUESTION
-example.com. IN A
-SECTION ANSWER
-example.com. IN A 21.22.23.24
-ENTRY_END
 RANGE_END
 
 RANGE_BEGIN 0 110
@@ -40,7 +31,7 @@ example.net. IN A 6.6.6.6
 ENTRY_END
 RANGE_END
 
-; allowed by view 
+; policy fallback (no view matched, policy is behind view module)
 STEP 10 QUERY
 ENTRY_BEGIN
 REPLY RD
@@ -59,7 +50,7 @@ SECTION ANSWER
 example.cz. IN A 5.6.7.8
 ENTRY_END
 
-; blocked by view
+; blocked by view:tsig testkey1 + inner policy.suffix com
 ; NXDOMAIN expected
 STEP 30 QUERY
 ENTRY_BEGIN
@@ -69,17 +60,19 @@ SECTION QUESTION
 example.com. IN A
 ENTRY_END
 
-STEP 40 CHECK_ANSWER
+STEP 31 CHECK_ANSWER
 ENTRY_BEGIN
-MATCH flags rcode question answer
+MATCH opcode question rcode additional
 REPLY QR RD RA AA NXDOMAIN
 SECTION QUESTION
 example.com. IN A
-SECTION ANSWER
+SECTION ADDITIONAL
+explanation.invalid. 10800 IN TXT "TSIG key testkey1 matched com"
 ENTRY_END
 
-; policy fallback - outside view
-STEP 50 QUERY
+; blocked by view:tsig testkey1 + inner policy.suffix net
+; second view rule gets executed if policy in preceding view rule did not match
+STEP 32 QUERY
 ENTRY_BEGIN
 REPLY RD
 TSIG testkey1 +Cdjlkef9ZTSeixERZ433Q==
@@ -87,13 +80,34 @@ SECTION QUESTION
 example.net. IN A
 ENTRY_END
 
-STEP 51 CHECK_ANSWER
+STEP 33 CHECK_ANSWER
 ENTRY_BEGIN
-MATCH flags rcode question answer
+MATCH opcode question rcode additional
 REPLY QR RD RA AA NXDOMAIN
 SECTION QUESTION
 example.net. IN A
+SECTION ADDITIONAL
+explanation.invalid. 10800 IN TXT "TSIG key testkey1 matched net"
 ENTRY_END
 
+; blocked by view:tsig testkey + inner policy.suffix example (different key)
+; third view rule gets executed if policy in preceding view rule did not match
+STEP 34 QUERY
+ENTRY_BEGIN
+REPLY RD
+TSIG testkey +Cdjlkef9ZTSeixERZ433Q==
+SECTION QUESTION
+example. IN A
+ENTRY_END
+
+STEP 35 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH opcode question rcode additional
+REPLY QR RD RA AA NXDOMAIN
+SECTION QUESTION
+example. IN A
+SECTION ADDITIONAL
+explanation.invalid. 10800 IN TXT "TSIG key testkey matched example"
+ENTRY_END
 
 SCENARIO_END
