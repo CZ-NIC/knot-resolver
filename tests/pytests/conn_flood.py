@@ -41,6 +41,7 @@ def test_conn_flood(tmpdir, sock_func_name):
                 if not nsock_to_init:
                     return sockets
                 sockets.extend([make_sock() for _ in range(nsock_to_init)])
+            print(len(sockets))
 
             # large number of connections can take a lot of time to open
             # send some valid data to avoid TCP idle timeout for already open sockets
