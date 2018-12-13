@@ -17,15 +17,6 @@ SECTION ANSWER
 example.cz. IN A 5.6.7.8
 ENTRY_END
 
-ENTRY_BEGIN
-MATCH opcode qtype qname
-ADJUST copy_id
-REPLY QR RD RA NOERROR
-SECTION QUESTION
-example.com. IN A
-SECTION ANSWER
-example.com. IN A 21.22.23.24
-ENTRY_END
 RANGE_END
 
 ; policy module loaded before view module must take precedence before view
