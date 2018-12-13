@@ -171,9 +171,9 @@ For example, if you add an alternative top-level domain while using the ICANN ro
 
 
 .. code-block:: lua
-    :caption: Example configuration
+    :caption: Example configuration: graft DNS sub-trees ``faketldtest``, ``sld.example``, and ``internal.example.com`` into existing namespace
 
-    extraTrees = policy.todnames({'libre', 'null'})
+    extraTrees = policy.todnames({'faketldtest', 'sld.example', 'internal.example.com'})
     -- Beware: the rule order is important, as STUB is not a chain action.
     policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}),   extraTrees))
     policy.add(policy.suffix(policy.STUB({'2001:db8::1'}), extraTrees))
