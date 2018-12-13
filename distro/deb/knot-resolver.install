@@ -8,12 +8,14 @@ distro/common/systemd/kresd@.service lib/systemd/system/
 distro/common/systemd/kresd.target lib/systemd/system/
 distro/common/tmpfiles/knot-resolver.conf usr/lib/tmpfiles.d/
 usr/lib/knot-resolver/*.so
+usr/lib/knot-resolver/basexx.lua
 usr/lib/knot-resolver/daf.lua
 usr/lib/knot-resolver/daf/
 usr/lib/knot-resolver/detect_time_jump.lua
 usr/lib/knot-resolver/detect_time_skew.lua
 usr/lib/knot-resolver/dns64.lua
 usr/lib/knot-resolver/etcd.lua
+usr/lib/knot-resolver/experimental_dot_auth.lua
 usr/lib/knot-resolver/graphite.lua
 usr/lib/knot-resolver/http_trace.lua
 usr/lib/knot-resolver/kres-gen.lua
