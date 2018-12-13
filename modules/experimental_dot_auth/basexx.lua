@@ -25,8 +25,7 @@
 -- util functions
 --------------------------------------------------------------------------------
 
-local function divide_string( str, max, fillChar )
-   fillChar = fillChar or ""
+local function divide_string( str, max )
    local result = {}
 
    local start = 1
@@ -100,7 +99,7 @@ function basexx.to_bit( str )
    return ( str:gsub( '.', function ( c )
                local byte = string.byte( c )
                local bits = {}
-               for i = 1,8 do
+               for _ = 1,8 do
                   table.insert( bits, byte % 2 )
                   byte = math.floor( byte / 2 )
                end
@@ -155,7 +154,7 @@ local function to_basexx( str, alphabet, bits, pad )
 
    local chunks = divide_string( bitString, bits )
    local result = {}
-   for key,value in ipairs( chunks ) do
+   for _,value in ipairs( chunks ) do
       if ( #value < bits ) then
          value = value .. string.rep( '0', bits - #value )
       end
