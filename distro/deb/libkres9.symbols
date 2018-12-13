@@ -1,4 +1,4 @@
-libkres.so.8 libkres8 #MINVER#
+libkres.so.9 libkres9 #MINVER#
  cache_api@Base 2.1.0
  iterate_api@Base 2.1.0
  kr_bitcmp@Base 2.1.0
