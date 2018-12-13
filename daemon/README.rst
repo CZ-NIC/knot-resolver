@@ -667,6 +667,11 @@ Trust anchors and DNSSEC
 
       [ ta ] key: 19036 state: Valid
 
+.. envvar:: trust_anchors.keyfile_default = KEYFILE_DEFAULT
+
+   Set by ``KEYFILE_DEFAULT`` during compilation (by default ``nil``). This can be explicitly
+   set to ``nil`` to override the value set during compilation in order to disable DNSSEC.
+
 .. envvar:: trust_anchors.hold_down_time = 30 * day
 
    :return: int (default: 30 * day)
