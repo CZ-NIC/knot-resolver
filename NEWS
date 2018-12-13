@@ -19,7 +19,7 @@ Module API changes
 - kr_request keeps ::qsource.packet beyond the begin layer
 - kr_request::qsource.tcp renamed to ::qsource.flags.tcp
 - kr_request::has_tls renamed to ::qsource.flags.tls
-- kr_zonecut_add() and kr_zonecut_del() changed parameters slightly
+- kr_zonecut_add(), kr_zonecut_del() and kr_nsrep_sort() changed parameters slightly
 
 Bugfixes
 --------
