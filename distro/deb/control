@@ -32,6 +32,7 @@ Depends:
  adduser,
  dns-root-data,
  libkres8 (= ${binary:Version}),
+ lua-basexx,
  lua-sec,
  lua-socket,
  ${misc:Depends},
