@@ -136,7 +136,7 @@ int session_waitinglist_push(struct session *session, struct qr_task *task)
 
 struct qr_task *session_waitinglist_get(const struct session *session)
 {
-	return queue_head(session->waiting);
+	return (queue_len(session->waiting) > 0) ? (queue_head(session->waiting)) : NULL;
 }
 
 struct qr_task *session_waitinglist_pop(struct session *session, bool deref)
