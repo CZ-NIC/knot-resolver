@@ -253,7 +253,9 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 		kr_log_verbose("[%s] TLS handshake with %s has completed\n",
 			       logstring,  kr_straddr(peer));
 		if (handshake_cb) {
-			handshake_cb(session, 0);
+			if (handshake_cb(session, 0) != kr_ok()) {
+				return kr_error(EIO);
+			}
 		}
 	} else if (err == GNUTLS_E_AGAIN) {
 		return kr_error(EAGAIN);

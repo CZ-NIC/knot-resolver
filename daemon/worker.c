@@ -694,11 +694,25 @@ static int session_tls_hs_cb(struct session *session, int status)
 
 	if (status) {
 		struct qr_task *task = session_waitinglist_get(session);
-		struct kr_qflags *options = &task->ctx->req.options;
-		unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-		kr_nsrep_update_rtt(NULL, peer, score,
-				    worker->engine->resolver.cache_rtt,
-				    KR_NS_UPDATE_NORESET);
+		if (task) {
+			struct kr_qflags *options = &task->ctx->req.options;
+			unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+			kr_nsrep_update_rtt(NULL, peer, score,
+					    worker->engine->resolver.cache_rtt,
+					    KR_NS_UPDATE_NORESET);
+		}
+#ifndef NDEBUG
+		else {
+			/* Task isn't in the list of tasks
+			 * waiting for connection to upstream.
+			 * So that it MUST be unsuccessful rehandshake.
+			 * Check it. */
+			assert(deletion_res != 0);
+			const char *key = tcpsess_key(peer);
+			assert(key);
+			assert(map_contains(&worker->tcp_connected, key) != 0);
+		}
+#endif
 		return ret;
 	}
 
