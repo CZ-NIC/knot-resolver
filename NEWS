@@ -28,6 +28,8 @@ Bugfixes
 - TLS fixes for corner cases (!700, !714, !716, !721)
 - fix build with -DNOVERBOSELOG (#424)
 - policy.{FORWARD,TLS_FORWARD,STUB}: respect net.ipv{4,6} setting (!710)
+- avoid SERVFAILs due to certain kind of NS dependency cycles, again
+  (#374) this time seen as 'circular dependency' in verbose logs
 
 Improvements
 ------------
