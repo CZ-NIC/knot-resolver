@@ -14,8 +14,7 @@ trust_anchors.file = 'root.keys'
 
 -- Load Useful modules
 modules = {
-	'policy',   -- Block queries to local zones/bad sites
-	'hints',    -- Load /etc/hosts and allow custom root hints
+	'hints > iterate', -- Load /etc/hosts and allow custom root hints
 	'stats',    -- Track internal statistics
 	'predict',  -- Prefetch expiring/frequent records
 }
