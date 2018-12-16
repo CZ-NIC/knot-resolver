@@ -20,8 +20,7 @@ cache.size = 100 * GB
 
 -- Load Useful modules
 modules = {
-	'policy',   -- Block queries to local zones/bad sites
-	'hints',    -- Load /etc/hosts and allow custom root hints
+	'hints > iterate', -- Load /etc/hosts and allow custom root hints
 	'stats',    -- Track internal statistics
 	graphite = { -- Send statistics to local InfluxDB
 		-- `worker.id` allows us to keep per-fork statistics
@@ -29,7 +28,6 @@ modules = {
 		-- Address of the Graphite/InfluxDB server
 		host = '192.168.1.2',
 	},
-	'redis',   -- Allow to use Redis as a cache backend
 }
 
 -- Use local root server copy for performance reasons
@@ -40,5 +38,3 @@ hints.root({
 -- Apply RPZ for all clients, default rule is DENY
 policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
 
--- Optional: use Redis/Memcached as a cache backend which may be distributed between nodes
--- cache.storage = 'redis://127.0.0.1:6398'
