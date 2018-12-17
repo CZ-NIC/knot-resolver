@@ -5,7 +5,9 @@ Query policies
 
 This module can block, rewrite, or alter inbound queries based on user-defined policies.
 
-Each policy *rule* has two parts: a *filter* and an *action*. A *filter* selects which queries will be affected by the policy, and *action* which modifies queries matching the associated filter. Typically a rule is defined as follows: ``filter(action(action parameters), filter parameters)``. For example, a filter can be ``suffix`` which matches queries whose suffix part is in specified set, and one of possible actions is ``DENY``, which denies resolution. These are combined together into ``policy.suffix(policy.DENY, {todname('badguy.example.')})``. The rule is effective when it is added into rule table using ``policy.add()``, please see `Policy examples`_.
+Each policy *rule* has two parts: a *filter* and an *action*. A *filter* selects which queries will be affected by the policy, and *action* which modifies queries matching the associated filter.
+
+Typically a rule is defined as follows: ``filter(action(action parameters), filter parameters)``. For example, a filter can be ``suffix`` which matches queries whose suffix part is in specified set, and one of possible actions is ``DENY``, which denies resolution. These are combined together into ``policy.suffix(policy.DENY, {todname('badguy.example.')})``. The rule is effective when it is added into rule table using ``policy.add()``, please see `Policy examples`_.
 
 This module is enabled by default because it implements mandatory :rfc:`6761` logic.
 When no rule applies to a query, built-in rules for `special-use <https://www.iana.org/assignments/special-use-domain-names/special-use-domain-names.xhtml>`_ and `locally-served <http://www.iana.org/assignments/locally-served-dns-zones>`_ domain names are applied.
@@ -28,9 +30,17 @@ A *filter* selects which queries will be affected by specified *action*. There a
   - implements a subset of RPZ_ in zonefile format.  See below for details: :any:`policy.rpz`.
 * custom filter function
 
+.. _mod-policy-actions:
+
 Actions
 ^^^^^^^
-An *action* is function which modifies DNS query. There are several actions available in the ``policy.`` table:
+An *action* is function which modifies DNS query, and is either of type *chain* or *non-chain*. So-called *chain* actions modify the query and allow other rules to evaluate and modify the same query. *Non-chain* actions have opposite behavior, i.e. modify the query and stop rule processing.
+
+Resolver comes with several actions available in the ``policy.`` table:
+
+**Non-chain actions**
+
+Following actions stop the policy matching on the query, i.e. other rules are not evaluated once rule with following actions matches:
 
 * ``PASS`` - let the query pass through; it's useful to make exceptions before wider rules
 * ``DENY`` - reply NXDOMAIN authoritatively
@@ -43,12 +53,17 @@ An *action* is function which modifies DNS query. There are several actions avai
   the parameter can be a single IP (string) or a lua list of up to four IPs.
 * ``STUB(ip)`` - similar to ``FORWARD(ip)`` but *without* attempting DNSSEC validation.
   Each request may be either answered from cache or simply sent to one of the IPs with proxying back the answer.
-* ``MIRROR(ip)`` - mirror query to given IP and continue solving it (useful for partial snooping); it's a chain action
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
-* ``QTRACE`` - pretty-print DNS response packets into the log for the query and its sub-queries.  It's useful for debugging weird DNS servers.  It's a chain action.
-* ``FLAGS(set, clear)`` - set and/or clear some flags for the query.  There can be multiple flags to set/clear.  You can just pass a single flag name (string) or a set of names.  It's a chain action.
 
-Most actions stop the policy matching on the query, but "chain actions" allow to keep trying to match other rules, until a non-chain action is triggered.
+
+**Chain actions**
+
+Following actions allow to keep trying to match other rules, until a non-chain action is triggered:
+
+* ``MIRROR(ip)`` - mirror query to given IP and continue solving it (useful for partial snooping).
+* ``QTRACE`` - pretty-print DNS response packets into the log for the query and its sub-queries.  It's useful for debugging weird DNS servers.
+* ``FLAGS(set, clear)`` - set and/or clear some flags for the query.  There can be multiple flags to set/clear.  You can just pass a single flag name (string) or a set of names.
+
 
 Also, it is possible to write your own action (i.e. Lua function). It is possible to implement complex heuristics, e.g. to deflect `Slow drip DNS attacks <https://secure64.com/water-torture-slow-drip-dns-ddos-attack>`_ or gray-list resolution of misbehaving zones.
 
