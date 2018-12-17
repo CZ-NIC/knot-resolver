@@ -4,31 +4,31 @@ Views and ACLs
 --------------
 
 The :ref:`policy <mod-policy>` module implements policies for global query matching, e.g. solves "how to react to certain query".
-This module combines it with query source matching, e.g. "who asked the query". This allows you to create personalized blacklists,
-filters and ACLs, sort of like ISC BIND views.
+This module combines it with query source matching, e.g. "who asked the query". This allows you to create personalized blacklists, filters and ACLs.
 
 There are two identification mechanisms:
 
 * ``addr``
   - identifies the client based on his subnet
 * ``tsig``
-  - identifies the client based on a TSIG key
+  - identifies the client based on a TSIG key name (only for testing purposes, TSIG signature is not verified!)
 
-You can combine this information with :ref:`policy <mod-policy>` rules.
+View module allows you to combine query source information with :ref:`policy <mod-policy>` rules.
 
 .. code-block:: lua
 
-	view:addr('10.0.0.1', policy.suffix(policy.TC, {'\7example\3com'}))
+	view:addr('10.0.0.1', policy.suffix(policy.TC, policy.todnames({'example.com'})))
 
-This fill force given client subnet to TCP for names in ``example.com``.
+This example will force given client to TCP for names in ``example.com`` subtree.
 You can combine view selectors with RPZ_ to create personalized filters for example.
 
 .. warning::
 
 	Beware that cache is shared by *all* requests.  For example, it is safe
 	to refuse answer based on who asks the resolver, but trying to serve
-	different data to different clients may result in surprises.
-	Such setups are usually called **split-horizon** or similarly.
+	different data to different clients will result in unexpected behavior.
+	Setups like **split-horizon** which depend on isolated DNS caches
+        are explicitly not supported.
 
 
 Example configuration
@@ -37,19 +37,19 @@ Example configuration
 .. code-block:: lua
 
 	-- Load modules
-	modules = { 'policy', 'view' }
+	modules = { 'view' }
 	-- Whitelist queries identified by TSIG key
-	view:tsig('\5mykey', function (req, qry) return policy.PASS end)
+	view:tsig('\5mykey', policy.all(policy.PASS))
 	-- Block local clients (ACL like)
-	view:addr('127.0.0.1', function (req, qry) return policy.DENY end))
+	view:addr('127.0.0.1', policy.all(policy.DENY))
 	-- Drop queries with suffix match for remote client
-	view:addr('10.0.0.0/8', policy.suffix(policy.DROP, {'\3xxx'}))
+	view:addr('10.0.0.0/8', policy.suffix(policy.DROP, policy.todnames({'xxx'})))
 	-- RPZ for subset of clients
 	view:addr('192.168.1.0/24', policy.rpz(policy.PASS, 'whitelist.rpz'))
-	-- Forward all queries from given subnet to proxy
-	view:addr('10.0.0.0/8', policy.all(policy.FORWARD('2001:DB8::1')))
+	-- Do not try this - it will pollute cache and surprise you!
+	-- view:addr('10.0.0.0/8', policy.all(policy.FORWARD('2001:DB8::1')))
 	-- Drop everything that hasn't matched
-	view:addr('0.0.0.0/0', function (req, qry) return policy.DROP end)
+	view:addr('0.0.0.0/0', policy.all(policy.DROP))
 
 
 Rule order
@@ -57,11 +57,9 @@ Rule order
 
 The current implementation is best understood as three separate rule chains:
 vanilla ``policy.add``, ``view:tsig`` and ``view:addr``.
-For each request the rules in these chains get tried one by one until a "non-chain" action gets executed.
-It's possible to configure ``policy.add`` rules to execute after ``view:*`` rules,
-but by default ``policy`` module acts before ``view`` module due to ``policy`` being loaded by default.
+For each request the rules in these chains get tried one by one until a :ref:`non-chain policy action <mod-policy-actions>` gets executed.
 
-If you want to intermingle universal rules with ``view:addr``, you may simply wrap the universal rules:
+By default :ref:`policy module <mod-policy>` acts before ``view`` module due to ``policy`` being loaded by default. If you want to intermingle universal rules with ``view:addr``, you may simply wrap the universal policy rules in view closure like this:
 
 .. code-block:: lua
 
