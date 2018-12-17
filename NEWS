@@ -1,10 +1,5 @@
-Knot Resolver 3.x.y (201y-mm-dd)
+Knot Resolver 3.2.0 (2018-12-17)
 ================================
-
-Incompatible changes
---------------------
-- view module: keep trying rules until a "non-chain" action is executed.
-  This improves consistency with the policy module.
 
 New features
 ------------
@@ -12,14 +7,8 @@ New features
 - module nsid to implement server side of RFC 5001 (#289)
 - module bogus_log provides .frequent() table (!629)
 - module stats collects flags from answer messages (!629)
-
-Module API changes
-------------------
-- new layer is added: answer_finalize
-- kr_request keeps ::qsource.packet beyond the begin layer
-- kr_request::qsource.tcp renamed to ::qsource.flags.tcp
-- kr_request::has_tls renamed to ::qsource.flags.tls
-- kr_zonecut_add() and kr_zonecut_del() changed parameters slightly
+- module view supports multiple rules with identical address/TSIG specification
+  and keeps trying rules until a "non-chain" action is executed
 
 Bugfixes
 --------
@@ -38,6 +27,15 @@ Improvements
   when choosing whom to ask, just as for iteration
 - use pseudo-randomness from gnutls instead of internal ISAAC (#233)
 - tune the way we deal with non-responsive servers (!716, !723)
+- documentation clarifies interaction between policy and view modules (!678, !730)
+
+Module API changes
+------------------
+- new layer is added: answer_finalize
+- kr_request keeps ::qsource.packet beyond the begin layer
+- kr_request::qsource.tcp renamed to ::qsource.flags.tcp
+- kr_request::has_tls renamed to ::qsource.flags.tls
+- kr_zonecut_add() and kr_zonecut_del() changed parameters slightly
 
 
 Knot Resolver 3.1.0 (2018-11-02)
