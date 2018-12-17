@@ -373,6 +373,87 @@ void network_new_hostname(struct network *net, struct engine *engine)
 	}
 }
 
+static int set_bpf_cb(const char *key, void *val, void *ext)
+{
+#ifdef SO_ATTACH_BPF
+	endpoint_array_t *endpoints = (endpoint_array_t *)val;
+	assert(endpoints != NULL);
+	int *bpffd = (int *)ext;
+	assert(bpffd != NULL);
+
+	for (size_t i = 0; i < endpoints->len; i++) {
+		struct endpoint *endpoint = (struct endpoint *)endpoints->at[i];
+		uv_os_fd_t sockfd = -1;
+		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
+		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
+		assert(sockfd != -1);
+
+		if (setsockopt(sockfd, SOL_SOCKET, SO_ATTACH_BPF, bpffd, sizeof(int)) != 0) {
+			return 1; /* return error (and stop iterating over net->endpoints) */
+		}
+	}
+#else
+	kr_log_error("[network] SO_ATTACH_BPF socket option doesn't supported\n");
+	(void)key; (void)val; (void)ext;
+	return 1;
+#endif
+	return 0; /* OK */
+}
+
+int network_set_bpf(struct network *net, int bpf_fd)
+{
+#ifdef SO_ATTACH_BPF
+	if (map_walk(&net->endpoints, set_bpf_cb, &bpf_fd) != 0) {
+		/* set_bpf_cb() has returned error. */
+		network_clear_bpf(net);
+		return 0;
+	}
+#else
+	kr_log_error("[network] SO_ATTACH_BPF socket option doesn't supported\n");
+	(void)net;
+	(void)bpf_fd;
+	return 0;
+#endif
+	return 1;
+}
+
+static int clear_bpf_cb(const char *key, void *val, void *ext)
+{
+#ifdef SO_DETACH_BPF
+	endpoint_array_t *endpoints = (endpoint_array_t *)val;
+	assert(endpoints != NULL);
+
+	for (size_t i = 0; i < endpoints->len; i++) {
+		struct endpoint *endpoint = (struct endpoint *)endpoints->at[i];
+		uv_os_fd_t sockfd = -1;
+		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
+		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
+		assert(sockfd != -1);
+
+		if (setsockopt(sockfd, SOL_SOCKET, SO_DETACH_BPF, NULL, 0) != 0) {
+			kr_log_error("[network] failed to clear SO_DETACH_BPF socket option\n");
+		}
+		/* Proceed even if setsockopt() failed,
+		 * as we want to process all opened sockets. */
+	}
+#else
+	kr_log_error("[network] SO_DETACH_BPF socket option doesn't supported\n");
+	(void)key; (void)val; (void)ext;
+	return 1;
+#endif
+	return 0;
+}
+
+void network_clear_bpf(struct network *net)
+{
+#ifdef SO_DETACH_BPF
+	map_walk(&net->endpoints, clear_bpf_cb, NULL);
+#else
+	kr_log_error("[network] SO_DETACH_BPF socket option doesn't supported\n");
+	(void)net;
+#endif
+}
+
 /** @internal Check whether the handle provided in ext has the same protocol,
  * address and port as an endpoint with the NET_PROXY flag.
  */
