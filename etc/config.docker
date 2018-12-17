@@ -9,13 +9,12 @@ trust_anchors.file = '/etc/knot-resolver/root.keys'
 
 -- Load Useful modules
 modules = {
-	'policy',   -- Block queries to local zones/bad sites
 	'stats',    -- Track internal statistics
 	-- Load HTTP module with defaults
-        http = {
-                host = '0.0.0.0',
-                port = 8053,
-        }
+	http = {
+		host = '0.0.0.0',
+		port = 8053,
+	},
 }
 
 -- Smaller cache size

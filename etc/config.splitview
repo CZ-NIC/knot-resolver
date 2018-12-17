@@ -12,8 +12,7 @@ trust_anchors.file = 'root.keys'
 
 -- Load Useful modules
 modules = {
-	'policy',   -- Block queries to local zones/bad sites
-	'hints',    -- Load /etc/hosts and allow custom root hints
+	'hints > iterate', -- Load /etc/hosts and allow custom root hints
 	'stats',    -- Track internal statistics
 	graphite = { -- Send statistics to local InfluxDB
 		-- `worker.id` allows us to keep per-fork statistics
