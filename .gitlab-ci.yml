@@ -576,7 +576,7 @@ obs:devel:
 pkg:debian:symbols:libkres:
   variables:
     LIB_NAME: libkres
-    LIB_ABI: 8
+    LIB_ABI: 9
   stage: deploy
   only:
     variables:

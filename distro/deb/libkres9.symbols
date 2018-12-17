@@ -1,4 +1,4 @@
-libkres.so.8 libkres8 #MINVER#
+libkres.so.9 libkres9 #MINVER#
  cache_api@Base 2.1.0
  iterate_api@Base 2.1.0
  kr_bitcmp@Base 2.1.0
@@ -31,6 +31,7 @@ libkres.so.8 libkres8 #MINVER#
  kr_inaddr_port@Base 2.1.0
  kr_inaddr_set_port@Base 3.1.0
  kr_inaddr_str@Base 2.1.0
+ kr_log_qverbose_impl@Base 3.2.0
  kr_log_trace@Base 2.1.0
  kr_log_verbose@Base 2.1.0
  kr_make_query@Base 3.0.0
@@ -43,7 +44,7 @@ libkres.so.8 libkres8 #MINVER#
  kr_nsrep_elect@Base 2.1.0
  kr_nsrep_elect_addr@Base 2.1.0
  kr_nsrep_set@Base 2.1.0
- kr_nsrep_sort@Base 2.1.0
+ kr_nsrep_sort@Base 3.2.0
  kr_nsrep_update_rep@Base 2.1.0
  kr_nsrep_update_rtt@Base 2.1.0
  kr_pkt_clear_payload@Base 2.1.0
@@ -62,6 +63,7 @@ libkres.so.8 libkres8 #MINVER#
  kr_resolve_plan@Base 2.1.0
  kr_resolve_pool@Base 2.1.0
  kr_resolve_produce@Base 2.1.0
+ kr_rnd_buffered@Base 3.2.0
  kr_rplan_deinit@Base 2.1.0
  kr_rplan_empty@Base 2.1.0
  kr_rplan_find_resolved@Base 2.1.0
@@ -95,16 +97,17 @@ libkres.so.8 libkres8 #MINVER#
  kr_unpack_cache_key@Base 3.1.0
  kr_verbose_set@Base 2.1.0
  kr_verbose_status@Base 2.1.0
- kr_zonecut_add@Base 2.1.0
+ kr_zonecut_add@Base 3.2.0
  kr_zonecut_copy@Base 2.1.0
  kr_zonecut_copy_trust@Base 2.1.0
  kr_zonecut_deinit@Base 2.1.0
- kr_zonecut_del@Base 2.1.0
+ kr_zonecut_del@Base 3.2.0
  kr_zonecut_del_all@Base 2.1.0
  kr_zonecut_find@Base 2.1.0
  kr_zonecut_find_cached@Base 2.1.0
  kr_zonecut_init@Base 2.1.0
  kr_zonecut_is_empty@Base 3.0.0
+ kr_zonecut_move@Base 3.2.0
  kr_zonecut_set@Base 2.1.0
  kr_zonecut_set_sbelt@Base 2.1.0
  lru_apply_impl@Base 2.1.0
@@ -117,6 +120,7 @@ libkres.so.8 libkres8 #MINVER#
  map_get@Base 2.1.0
  map_set@Base 2.1.0
  map_walk_prefixed@Base 2.1.0
+ mm_realloc@Base 3.2.0
  queue_deinit_impl@Base 3.1.0
  queue_init_impl@Base 3.1.0
  queue_push_head_impl@Base 3.1.0

@@ -3,7 +3,7 @@ MAJOR := 3
 MINOR := 1
 PATCH := 0
 EXTRA ?=
-ABIVER := 8
+ABIVER := 9
 BUILDMODE := dynamic
 HARDENING := yes
 

@@ -1,4 +1,4 @@
 doc/kresd.8
 libkres.pc
 lib/libkres.a
-lib/libkres.so.8
+lib/libkres.so.9

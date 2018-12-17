@@ -12,3 +12,10 @@ $ docker login registry.labs.nic.cz
 $ docker push registry.labs.nic.cz/knot/knot-resolver/ci/debian-stable:knot-$KNOT_BRANCH
 $ docker push registry.labs.nic.cz/knot/knot-resolver/ci/debian-unstable:knot-$KNOT_BRANCH
 ```
+
+* fedora
+
+```
+$ docker build -t registry.labs.nic.cz/knot/knot-resolver/ci/fedora fedora
+$ docker push registry.labs.nic.cz/knot/knot-resolver/ci/fedora
+```

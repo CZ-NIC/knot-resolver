@@ -2,7 +2,6 @@
 
 [![Build Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.labs.nic.cz/knot/knot-resolver/commits/nightly)
 [![Coverage Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://knot.pages.labs.nic.cz/knot-resolver/)
-[![Coverity](https://img.shields.io/coverity/scan/3912.svg)](https://scan.coverity.com/projects/3912)
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
 Knot Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
