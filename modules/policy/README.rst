@@ -154,8 +154,12 @@ Policy examples
 	end)
 	-- Enforce local RPZ
 	policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
-	-- Forward all queries below 'company.se' to given resolver
+	-- Forward all queries below 'company.se' to given resolver;
+	-- beware: typically this won't work due to DNSSEC - see "Replacing part..." below
 	policy.add(policy.suffix(policy.FORWARD('192.168.1.1'), {todname('company.se')}))
+	-- Forward reverse queries about the 192.168.1.1/24 space to .1 port 5353
+	-- and do it directly without attempts to validate DNSSEC etc.
+	policy.add(policy.suffix(policy.STUB('192.168.1.1@5353'), {todname('1.168.192.in-addr.arpa')}))
 	-- Forward all queries matching pattern
 	policy.add(policy.pattern(policy.FORWARD('2001:DB8::1'), '\4bad[0-9]\2cz'))
 	-- Forward all queries (to public resolvers https://www.nic.cz/odvr)
