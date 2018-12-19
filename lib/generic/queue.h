@@ -98,19 +98,22 @@
 #define queue_push_head(q, data) \
 	*((__typeof__((q).pdata_t)) queue_push_head_impl(&(q).queue)) = data
 
-/** @brief Remove the element at the head. */
+/** @brief Remove the element at the head.
+ * The queue must not be empty. */
 #define queue_pop(q) \
 	queue_pop_impl(&(q).queue)
 
-/** @brief Return a "reference" to the element at the head (it's an L-value) . */
+/** @brief Return a "reference" to the element at the head (it's an L-value).
+ * The queue must not be empty. */
 #define queue_head(q) \
 	( *(__typeof__((q).pdata_t)) queue_head_impl(&(q).queue) )
 
-/** @brief Return a "reference" to the element at the tail (it's an L-value) . */
+/** @brief Return a "reference" to the element at the tail (it's an L-value).
+ * The queue must not be empty. */
 #define queue_tail(q) \
 	( *(__typeof__((q).pdata_t)) queue_tail_impl(&(q).queue) )
 
-/** @brief Return the number of elements in the queue. */
+/** @brief Return the number of elements in the queue (very efficient). */
 #define queue_len(q) \
 	((const size_t)(q).queue.len)
 
