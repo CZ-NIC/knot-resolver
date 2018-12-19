@@ -809,16 +809,6 @@ static void on_connect(uv_connect_t *req, int status)
 
 	assert(session_flags(session)->outgoing);
 
-	if (status == UV_ECANCELED) {
-		if (kr_verbose_status) {
-			const char *peer_str = kr_straddr(peer);
-			kr_log_verbose( "[wrkr]=> connect to '%s' cancelled\n", peer_str ? peer_str : "");
-		}
-		worker_del_tcp_waiting(worker, peer);
-		assert(session_is_empty(session) && session_flags(session)->closing);
-		return;
-	}
-
 	if (session_flags(session)->closing) {
 		worker_del_tcp_waiting(worker, peer);
 		assert(session_is_empty(session));
@@ -833,11 +823,16 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		worker_del_tcp_waiting(worker, peer);
 		struct qr_task *task = session_waitinglist_get(session);
-		struct kr_qflags *options = &task->ctx->req.options;
-		unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-		kr_nsrep_update_rtt(NULL, peer, score,
-				    worker->engine->resolver.cache_rtt,
-				    KR_NS_UPDATE_NORESET);
+		if (task && status != UV_ETIMEDOUT) {
+			/* Penalize upstream.
+			 * In case of UV_ETIMEDOUT upstream has been
+			 * already penalized in on_tcp_connect_timeout() */
+			struct kr_qflags *options = &task->ctx->req.options;
+			unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+			kr_nsrep_update_rtt(NULL, peer, score,
+					    worker->engine->resolver.cache_rtt,
+					    KR_NS_UPDATE_NORESET);
+		}
 		assert(session_tasklist_is_empty(session));
 		session_waitinglist_retry(session, false);
 		session_close(session);
@@ -902,11 +897,19 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 	worker_del_tcp_waiting(worker, peer);
 
 	struct qr_task *task = session_waitinglist_get(session);
+	if (!task) {
+		/* Normally shouldn't happen. */
+		const char *peer_str = kr_straddr(peer);
+		VERBOSE_MSG(NULL, "=> connection to '%s' failed (internal timeout), empty waitinglist\n",
+			    peer_str ? peer_str : "");
+		return;
+	}
+
 	struct kr_query *qry = task_get_last_pending_query(task);
 	WITH_VERBOSE (qry) {
-		char peer_str[INET6_ADDRSTRLEN];
-		inet_ntop(peer->sa_family, kr_inaddr(peer), peer_str, sizeof(peer_str));
-		VERBOSE_MSG(qry, "=> connection to '%s' failed\n", peer_str);
+		const char *peer_str = kr_straddr(peer);
+		VERBOSE_MSG(qry, "=> connection to '%s' failed (internal timeout)\n",
+			    peer_str ? peer_str : "");
 	}
 
 	unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
@@ -917,7 +920,9 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 	worker->stats.timeout += session_waitinglist_get_len(session);
 	session_waitinglist_retry(session, true);
 	assert (session_tasklist_is_empty(session));
-	session_close(session);
+
+	/* on_connect() with erroneous status must be called.
+	 * session will be closed in this callback. */
 }
 
 /* This is called when I/O timeouts */
