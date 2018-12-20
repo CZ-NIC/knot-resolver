@@ -1,6 +1,7 @@
 var colours = ["#081d58", "#253494", "#225ea8", "#1d91c0", "#41b6c4", "#7fcdbb", "#c7e9b4", "#edf8b1", "#edf8b1"];
 var latency = ["slow", "1500ms", "1000ms", "500ms", "250ms", "100ms", "50ms", "10ms", "1ms"];
 var Socket = "MozWebSocket" in window ? MozWebSocket : WebSocket;
+let isGraphPaused = false;
 
 $(function() {
 	/* Helper functions */
@@ -177,8 +178,10 @@ $(function() {
 		if (data.length > 1000) {
 			data.shift();
 		}
-		if (!buffer) {
-			graph.updateOptions( { 'file': data } );
+		if ( !buffer ) {
+			if ( !isGraphPaused ) {
+				graph.updateOptions( { 'file': data } );
+			}
 		}
 	}
 
@@ -349,4 +352,15 @@ $(function() {
 			pushMetrics(data.stats, data.time);
 		}
 	};
+
+	chartElement.addEventListener( 'mouseover', ( event ) =>
+	{
+		isGraphPaused = true;
+	}, false );
+
+	chartElement.addEventListener( 'mouseout', ( event ) =>
+	{
+		isGraphPaused = false;
+	}, false );
+
 });
