@@ -123,7 +123,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			WITH_VERBOSE(qry) {
 				auto_free char *name_text = kr_dname_text(rr->owner);
 				auto_free char *type_text = kr_rrtype_text(rr->type);
-				VERBOSE_MSG(qry, ">< failed to validate but skipping: %s %s\n", name_text, type_text);
+				VERBOSE_MSG(qry, ">< failed to validate non-authoritative data but continuing: %s %s\n", name_text, type_text);
 			}
 			vctx->result = kr_ok();
 			kr_rank_set(&entry->rank, KR_RANK_TRY);
