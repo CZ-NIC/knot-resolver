@@ -65,7 +65,7 @@ $(function() {
 		'worker.usertime':   [16, 'CPU (user)', null, 'Workers'],
 		'worker.systime':    [17, 'CPU (sys)', null, 'Workers'],
 	};
-	
+
 	/* Render latency metrics as sort of a heatmap */
 	var series = {};
 	for (var i in latency) {
@@ -81,7 +81,7 @@ $(function() {
 		labels.push(metrics[key][1]);
 		visibility.push(false);
 	}
-	
+
 	/* Define how graph looks like. */
 	const graphContainer = $('#stats');
     const graph = new Dygraph(
@@ -223,7 +223,7 @@ $(function() {
 			}
 			/* Update bubble parameters */
 			if (!(key in found.name)) {
-				found.name.push(key);	
+				found.name.push(key);
 			}
 			found.rtt = (found.rtt + avg) / 2.0;
 			found.fillKey = colorBracket(found.rtt);
@@ -256,19 +256,19 @@ $(function() {
 			const stimeRate = updateRate(next.systime, data.last.systime, dt);
 			cell.eq(1).find('span').text(utimeRate + '% / ' + stimeRate + '%');
 			/* Update sparkline graph */
-			data.data.push([new Date(timestamp * 1000), utimeRate, stimeRate]);
+			data.data.push([new Date(timestamp * 1000), Number(utimeRate), Number(stimeRate)]);
 			if (data.data.length > 60) {
 				data.data.shift();
 			}
 			if (!buffer) {
-				data.graph.updateOptions( { 'file': data.data } );	
+				data.graph.updateOptions( { 'file': data.data } );
 			}
 		}
 		/* Update other fields */
 		if (!buffer) {
 			cell.eq(2).text(formatNumber(next.rss) + 'B');
 			cell.eq(3).text(next.pagefaults);
-			cell.eq(4).text('Healthy').addClass('text-success');	
+			cell.eq(4).text('Healthy').addClass('text-success');
 		}
 	}
 
