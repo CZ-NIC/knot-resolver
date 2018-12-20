@@ -58,6 +58,16 @@ struct kr_rrset_validation_ctx {
 	uint32_t flags;			/*!< Output - Flags. */
 	uint32_t err_cnt;		/*!< Output - Number of validation failures. */
 	int result;			/*!< Output - 0 or error code. */
+	struct {
+		unsigned int matching_name_type;	/*!< Name + type matches */
+		unsigned int expired;
+		unsigned int notyet;
+		unsigned int signer_invalid;		/*!< Signer is not zone apex */
+		unsigned int labels_invalid;		/*!< Number of labels in RRSIG */
+		unsigned int key_invalid;		/*!< Algorithm/keytag/key owner */
+		unsigned int crypto_invalid;
+		unsigned int nsec_invalid;
+	} rrs_counters;	/*!< Error counters for single RRset validation. */
 };
 
 typedef struct kr_rrset_validation_ctx kr_rrset_validation_ctx_t;
