@@ -35,5 +35,9 @@ body {
 }
 
 .spark-legend {
-  display: inline-block; 
+  display: inline-block;
+}
+
+.dygraph-legend {
+  text-align: right;
 }
