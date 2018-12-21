@@ -29,7 +29,6 @@
 #include <libknot/rrtype/rrsig.h>
 #include <libknot/rrset-dump.h>
 #include <libknot/version.h>
-#include <uv.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
@@ -438,7 +437,8 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port)
 	switch (kr_straddr_family(addr)) {
 	case AF_INET: {
 		struct sockaddr_in *res = malloc(sizeof(*res));
-		if (uv_ip4_addr(addr, port, res) >= 0) {
+		if (inet_pton(AF_INET, addr, res) >= 0) {
+			res->sin_port = port;
 			return (struct sockaddr *)res;
 		} else {
 			free(res);
@@ -447,7 +447,8 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port)
 	}
 	case AF_INET6: {
 		struct sockaddr_in6 *res = malloc(sizeof(*res));
-		if (uv_ip6_addr(addr, port, res) >= 0) {
+		if (inet_pton(AF_INET6, addr, res) >= 0) {
+			res->sin6_port = port;
 			return (struct sockaddr *)res;
 		} else {
 			free(res);
@@ -943,10 +944,53 @@ char *kr_rrset_text(const knot_rrset_t *rr)
 	return buf;
 }
 
+#if defined(CLOCK_MONOTONIC)
+#include <time.h>
+
 uint64_t kr_now()
 {
-	return uv_now(uv_default_loop());
+	struct timespec tp;
+	int ret = clock_gettime(CLOCK_MONOTONIC, &tp);
+	if (ret < 0) {
+		return 0;
+	}
+
+	return ((uint64_t) tp.tv_sec * 1000) + tp.tv_nsec / 1000000;
 }
+
+#elif defined(__APPLE__)
+#include <mach/clock.h>
+#include <mach/mach.h>
+
+uint64_t kr_now()
+{
+	clock_serv_t cclock;
+	mach_timespec_t tp;
+
+	host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock);
+	int ret = clock_get_time(cclock, &tp);
+	mach_port_deallocate(mach_task_self(), cclock);
+
+	if (ret < 0) {
+		return 0;
+	}
+
+	return ((uint64_t) tp.tv_sec * 1000) + tp.tv_nsec / 1000000;
+}
+
+#else
+#warning Monotonic clock not implemented on the platform
+uint64_t kr_now()
+{
+	struct timeval tv;
+	int ret = gettimeofday(&tv, NULL);
+	if (ret < 0) {
+		return 0;
+	}
+
+	return ((uint64_t) tv.tv_sec * 1000) + tv.tv_usec / 1000;
+}
+#endif
 
 int knot_dname_lf2wire(knot_dname_t * const dst, uint8_t len, const uint8_t *lf)
 {
