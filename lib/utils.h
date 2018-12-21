@@ -25,7 +25,6 @@
 
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
-#include <lua.h>
 
 #include <libknot/libknot.h>
 #include <libknot/packet/pkt.h>
@@ -409,17 +408,6 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 	if (type == KNOT_RRTYPE_RRSIG)
 		type = knot_rrsig_type_covered(rr->rrs.rdata);
 	return type;
-}
-
-/** Printf onto the lua stack, avoiding additional copy (thin wrapper). */
-KR_PRINTF(2)
-static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	const char *ret = lua_pushvfstring(L, fmt, args);
-	va_end(args);
-	return ret;
 }
 
 /** @internal Return string representation of addr.
