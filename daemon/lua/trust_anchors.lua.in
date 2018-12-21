@@ -476,6 +476,9 @@ update = function (keyset, new_keys, is_initial)
 	if keyset_publish(keyset) == 0 then
 		-- TODO: try to rebootstrap if for root?
 		return false
+	elseif verbose() then
+		log('[ ta ] refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
+		    .. trust_anchors.summary(keyset.owner))
 	end
 
 	return true
@@ -544,10 +547,36 @@ local add_file = function (path, unmanaged)
 	-- Parse new keys, refresh eventually
 	if keyset_publish(keyset) == 0 then
 		-- TODO: try to rebootstrap if for root?
+	elseif verbose() then
+		log('[ ta ] installed trust anchors for domain ' .. owner_str .. ' are:\n'
+		    .. trust_anchors.summary(owner))
 	end
 	refresh_plan(keyset, 10 * sec, false)
 end
 
+local function ta_str(owner)
+	local owner_str = kres.dname2str(owner) .. ' '
+	local msg = ''
+	for _, nta in pairs(trust_anchors.insecure) do
+		if owner == kres.str2dname(nta) then
+			msg = owner_str .. 'is negative trust anchor\n'
+		end
+	end
+	if not trust_anchors.keysets[owner] then
+		if #msg > 0 then  -- it is normal that NTA does not have explicit TA
+			return msg
+		else
+			return owner_str .. 'has no explicit trust anchors\n'
+		end
+	end
+	if #msg > 0 then
+		msg = msg .. 'WARNING! negative trust anchor also has an explicit TA\n'
+	end
+	for idx, ta in ipairs(trust_anchors.keysets[owner]) do
+		msg = msg .. kres.rr2str(ta) .. '\n'
+	end
+	return msg
+end
 
 -- TA store management, for user docs see ../README.rst
 trust_anchors = {
@@ -578,7 +607,9 @@ trust_anchors = {
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
 	add = function (keystr)
-		return trustanchor(keystr)
+		local ret = trustanchor(keystr)
+		if verbose() then log(trust_anchors.summary()) end
+		return ret
 	end,
 	-- Negative TA management
 	set_insecure = function (list)
@@ -590,6 +621,31 @@ trust_anchors = {
 			C.kr_ta_add(store, dname, kres.type.DS, 0, nil, 0)
 		end
 		trust_anchors.insecure = list
+	end,
+	summary = function (owner)
+		if owner then  -- single domain
+			return ta_str(owner)
+		end
+
+		-- all domains
+		local msg = ''
+		local ta_count = 0
+		local seen = {}
+		for _, nta_str in pairs(trust_anchors.insecure) do
+			owner = kres.str2dname(nta_str)
+			seen[owner] = true
+			msg = msg .. ta_str(owner)
+		end
+		for owner, _ in pairs(trust_anchors.keysets) do
+			if not seen[owner] then
+				ta_count = ta_count + 1
+				msg = msg .. ta_str(owner)
+			end
+		end
+		if ta_count == 0 then
+			msg = msg .. 'No valid trust anchors, DNSSEC validation is disabled\n'
+		end
+		return msg
 	end,
 }
 

@@ -728,6 +728,10 @@ Trust anchors and DNSSEC
 
       > trust_anchors.add('. 3600 IN DS 19036 8 2 49AAC11...')
 
+.. function:: trust_anchors.summary()
+
+   Return string with summary of configured DNSSEC trust anchors, including negative TAs.
+
 Modules configuration
 ^^^^^^^^^^^^^^^^^^^^^
 

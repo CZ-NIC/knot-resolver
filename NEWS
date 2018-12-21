@@ -5,6 +5,12 @@ Bugfixes
 --------
 - policy.TLS_FORWARD: fix problems with gnutls 3.3 (#438)
 
+Improvements
+------------
+- dnssec validation failures contain more verbose reasoning (!735)
+- new function trust_anchors.summary() describes state of DNSSEC TAs (!737),
+  and logs new state of trust anchors after start up and automatic changes
+
 
 Knot Resolver 3.2.0 (2018-12-17)
 ================================
