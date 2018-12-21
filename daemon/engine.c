@@ -73,6 +73,17 @@ const size_t CLEANUP_TIMER = 5*60*1000;
 #define l_dosandboxfile(L, filename) \
 	(luaL_loadfile((L), (filename)) || engine_pcall((L), 0))
 
+/** Printf onto the lua stack, avoiding additional copy (thin wrapper). */
+KR_PRINTF(2)
+static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	const char *ret = lua_pushvfstring(L, fmt, args);
+	va_end(args);
+	return ret;
+}
+
 /*
  * Global bindings.
  */
