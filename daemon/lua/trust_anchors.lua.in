@@ -582,6 +582,7 @@ trust_anchors = {
 	end,
 	-- Negative TA management
 	set_insecure = function (list)
+		assert(type(list) == 'table', 'parameter must be list of domain names (e.g. {"a.test", "b.example"})')
 		local store = kres.context().negative_anchors
 		C.kr_ta_clear(store)
 		for i = 1, #list do
