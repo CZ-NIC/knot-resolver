@@ -77,6 +77,23 @@ static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
 	return section_has_type(knot_pkt_section(pkt, KNOT_ADDITIONAL), type);
 }
 
+static void log_bogus_rrsig(kr_rrset_validation_ctx_t *vctx, const struct kr_query *qry,
+			    const knot_rrset_t *rr, const char *msg) {
+	WITH_VERBOSE(qry) {
+		auto_free char *name_text = kr_dname_text(rr->owner);
+		auto_free char *type_text = kr_rrtype_text(rr->type);
+		VERBOSE_MSG(qry, ">< %s: %s %s "
+			    "(%u matching RRSIGs, %u expired, %u not yet valid, "
+			    "%u invalid signer, %u invalid label count, %u invalid key, "
+			    "%u invalid crypto, %u invalid NSEC)\n",
+			    msg, name_text, type_text, vctx->rrs_counters.matching_name_type,
+			    vctx->rrs_counters.expired, vctx->rrs_counters.notyet,
+			    vctx->rrs_counters.signer_invalid, vctx->rrs_counters.labels_invalid,
+			    vctx->rrs_counters.key_invalid, vctx->rrs_counters.crypto_invalid,
+			    vctx->rrs_counters.nsec_invalid);
+	}
+}
+
 static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_query *qry,
 			    knot_mm_t *pool)
 {
@@ -120,11 +137,8 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
 
 		} else if (kr_rank_test(rank_orig, KR_RANK_TRY)) {
-			WITH_VERBOSE(qry) {
-				auto_free char *name_text = kr_dname_text(rr->owner);
-				auto_free char *type_text = kr_rrtype_text(rr->type);
-				VERBOSE_MSG(qry, ">< failed to validate but skipping: %s %s\n", name_text, type_text);
-			}
+			log_bogus_rrsig(vctx, qry, rr,
+					"failed to validate non-authoritative data but continuing");
 			vctx->result = kr_ok();
 			kr_rank_set(&entry->rank, KR_RANK_TRY);
 			/* ^^ BOGUS would be more accurate, but it might change
@@ -135,10 +149,11 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			/* no RRSIGs found */
 			kr_rank_set(&entry->rank, KR_RANK_MISSING);
 			vctx->err_cnt += 1;
-
+			log_bogus_rrsig(vctx, qry, rr, "no valid RRSIGs found");
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
 			vctx->err_cnt += 1;
+			log_bogus_rrsig(vctx, qry, rr, "bogus signatures");
 		}
 	}
 	return kr_ok();
@@ -247,6 +262,10 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 		};
 		int ret = kr_dnskeys_trusted(&vctx, qry->zone_cut.trust_anchor);
 		if (ret != 0) {
+			if (ret != kr_error(DNSSEC_INVALID_DS_ALGORITHM) &&
+			    ret != kr_error(EAGAIN)) {
+				log_bogus_rrsig(&vctx, qry, qry->zone_cut.key, "bogus key");
+			}
 			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
 			qry->zone_cut.key = NULL;
 			return ret;
@@ -583,11 +602,6 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		VERBOSE_MSG(qry, ">< cut changed (new signer), needs revalidation\n");
 		ret = KR_STATE_YIELD;
 	} else if (kr_rank_test(invalid_entry->rank, KR_RANK_MISSING)) {
-		WITH_VERBOSE(qry) {
-			auto_free char *name_text = kr_dname_text(invalid_entry->rr->owner);
-			auto_free char *type_text = kr_rrtype_text(invalid_entry->rr->type);
-			VERBOSE_MSG(qry, ">< no valid RRSIGs found for %s %s\n", name_text, type_text);
-		}
 		ret = rrsig_not_found(ctx, rr);
 	} else if (!kr_rank_test(invalid_entry->rank, KR_RANK_SECURE)) {
 		qry->flags.DNSSEC_BOGUS = true;
