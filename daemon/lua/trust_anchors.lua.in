@@ -32,9 +32,10 @@ local function bootstrap(url, ca)
 	end
 	local rr = ''
 	-- Parse root trust anchor, one digest at a time, converting to a zone-file-style string.
-	string.gsub(xml, "<KeyDigest[^>]*>(.-)</KeyDigest>", function (xml1)
+	string.gsub(xml, "<KeyDigest([^>]*)>(.-)</KeyDigest>", function (attrs, inside)
 		local fields = {}
-		string.gsub(xml1, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
+		string.gsub(attrs, "([%w]+)=\"([^\"]*)\"", function (k, v) fields[k] = v end)
+		string.gsub(inside, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
 		rr = rr .. '\n' .. string.format('. 0 IN DS %s %s %s %s',
 			fields.KeyTag, fields.Algorithm, fields.DigestType, fields.Digest)
 	end)
