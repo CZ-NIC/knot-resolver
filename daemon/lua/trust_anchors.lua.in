@@ -531,7 +531,9 @@ local add_file = function (path, unmanaged)
 	local owner = keyset[1].owner
 	for _, ta in ipairs(keyset) do
 		if ta.owner ~= owner then
-			panic("[ ta ] ERROR: mixed owner names found in '%s'", path)
+			panic("[ ta ] ERROR: mixed owner names found in file '%s'! " ..
+			      "Do not mix %s and %s TAs in single file",
+			      path, kres.dname2str(ta.owner), kres.dname2str(owner))
 		end
 	end
 	keyset.owner = owner
