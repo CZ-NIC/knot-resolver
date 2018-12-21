@@ -305,6 +305,10 @@ local function keyset_publish(keyset)
 			end
 		end
 	end
+	if count == 0 then
+		warn('[ ta ] ERROR: no anchors are trusted for ' ..
+		     kres.dname2str(keyset.owner) .. ' !')
+	end
 	return count
 end
 
@@ -359,8 +363,6 @@ update = function (keyset, new_keys, is_initial)
 
 	-- Start using the new TAs.
 	if keyset_publish(keyset) == 0 then
-		warn('[ ta ] WARNING: no anchors for ' .. kres.dname2str(keyset.owner)
-			.. ' are trusted!')
 		-- TODO: try to rebootstrap if for root?
 		return false
 	end
@@ -430,8 +432,7 @@ local add_file = function (path, unmanaged)
 
 	-- Parse new keys, refresh eventually
 	if keyset_publish(keyset) == 0 then
-		warn('[ ta ] ERROR: anchors are trusted for ' .. owner_str .. ' !')
-		-- TODO: try to rebootstrap?
+		-- TODO: try to rebootstrap if for root?
 	end
 	refresh_plan(keyset, 10 * sec, false)
 end
