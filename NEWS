@@ -1,3 +1,13 @@
+Knot Resolver X.Y.Z (201A-BB-CC)
+================================
+
+Improvements
+------------
+- dnssec validation failures contain more verbose reasoning (!735)
+- new function trust_anchor.summary() describes state of DNSSEC TAs,
+  and logs new state of trust anchors after start up and automatic changes
+
+
 Knot Resolver 3.2.0 (2018-12-17)
 ================================
 
