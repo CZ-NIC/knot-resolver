@@ -1,3 +1,8 @@
+-- Load the module
+local ffi = require 'ffi'
+local kres = require('kres')
+local C = ffi.C
+
 local trust_anchors -- the public pseudo-module, exported as global variable
 
 -- Fetch over HTTPS with peert cert checked
@@ -19,6 +24,75 @@ local function https_fetch(url, ca)
 	return resp[1]
 end
 
+local function keydigest_is_valid(valid_from, valid_until)
+	local format =            '%Y-%m-%dT%H:%M:%S%Z'
+	local time_now = os.date('!%Y-%m-%dT%H:%M:%S+00:00')  -- ! forces UTC
+	local time_diff = ffi.new('double[1]')
+	local err = ffi.C.kr_strptime_diff(format, time_now, valid_from, time_diff)
+	assert(err == nil,
+	       string.format('failed to process "validFrom" constraint: %s', err))
+	local from_ok = time_diff[0] > 0
+
+	-- optional attribute
+	local until_ok = true
+	if valid_until then
+		err = ffi.C.kr_strptime_diff(format, time_now, valid_until, time_diff)
+		assert(err == nil,
+		       string.format('failed to process "validUntil" constraint: %s', err))
+		until_ok = time_diff[0] < 0
+	end
+	return from_ok and until_ok
+end
+
+local function parse_xml_keydigest(attrs, inside, output)
+	local fields = {}
+	local _, n = string.gsub(attrs, "([%w]+)=\"([^\"]*)\"", function (k, v) fields[k] = v end)
+	assert(n >= 1,
+		string.format('cannot parse XML attributes from "%s"', attrs))
+	assert(fields['validFrom'],
+		string.format('mandatory KeyDigest XML attribute validFrom ' ..
+		'not found in "%s"', attrs))
+
+	_, n = string.gsub(inside, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
+	assert(n >= 1,
+		string.format('error parsing KeyDigest XML elements from "%s"',
+			      inside))
+	local mandatory_elements = {'KeyTag', 'Algorithm', 'DigestType', 'Digest'}
+	for _, key in ipairs(mandatory_elements) do
+		assert(fields[key],
+			string.format('mandatory element %s is missing in "%s"',
+				      key, inside))
+	end
+	assert(n == 4, string.format('found %d elements but expected 4 in %s', n, inside))
+	table.insert(output, fields)  -- append to list of parsed keydigests
+end
+
+local function generate_ds(keydigests)
+	local rrset = ''
+	for _, fields in ipairs(keydigests) do
+		local rr = string.format(
+			'. 0 IN DS %s %s %s %s',
+			fields.KeyTag, fields.Algorithm, fields.DigestType, fields.Digest)
+		if keydigest_is_valid(fields['validFrom'], fields['validUntil']) then
+			rrset = rrset .. '\n' .. rr
+		else
+			log('[ ta ] skipping trust anchor "%s" ' ..
+			    'because it is outside of validity range', rr)
+		end
+	end
+	return rrset
+end
+
+local function assert_str_match(str, pattern, expected)
+	local count = 0
+	for _ in string.gmatch(str, pattern) do
+		count = count + 1
+	end
+	assert(count == expected,
+	       string.format('expected %d occurences of "%s" but got %d in "%s"',
+			     expected, pattern, count, str))
+end
+
 -- Fetch root anchors in XML over HTTPS, returning a zone-file-style string
 -- or false in case of error, and a message.
 local function bootstrap(url, ca)
@@ -30,29 +104,29 @@ local function bootstrap(url, ca)
 	if not xml then
 		return false, string.format('[ ta ] fetch of "%s" failed: %s', url, err)
 	end
-	local rr = ''
+
+	-- we support only minimal subset of https://tools.ietf.org/html/rfc7958
+	assert_str_match(xml, '<?xml version="1%.0" encoding="UTF%-8"%?>', 1)
+	assert_str_match(xml, '<TrustAnchor ', 1)
+	assert_str_match(xml, '<Zone>.</Zone>', 1)
+	assert_str_match(xml, '</TrustAnchor>', 1)
+
 	-- Parse root trust anchor, one digest at a time, converting to a zone-file-style string.
-	string.gsub(xml, "<KeyDigest[^>]*>(.-)</KeyDigest>", function (xml1)
-		local fields = {}
-		string.gsub(xml1, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
-		rr = rr .. '\n' .. string.format('. 0 IN DS %s %s %s %s',
-			fields.KeyTag, fields.Algorithm, fields.DigestType, fields.Digest)
+	local keydigests = {}
+	string.gsub(xml, "<KeyDigest([^>]*)>(.-)</KeyDigest>", function(attrs, inside)
+		parse_xml_keydigest(attrs, inside, keydigests)
 	end)
-	if rr == '' then
-		return false, string.format('[ ta ] failed to get any record from "%s"', url)
+	local rrset = generate_ds(keydigests)
+	if rrset == '' then
+		return false, string.format('[ ta ] no valid trust anchors found at "%s"', url)
 	end
 	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
 			 .. '       You SHOULD verify them manually against original source:\n'
 			 .. '       https://www.iana.org/dnssec/files\n'
 			 .. '[ ta ] Current root trust anchors are:'
-			 .. rr
-	return rr, msg
+			 .. rrset
+	return rrset, msg
 end
-
--- Load the module
-local ffi = require 'ffi'
-local kres = require('kres')
-local C = ffi.C
 
 -- RFC5011 state table
 local key_state = {
