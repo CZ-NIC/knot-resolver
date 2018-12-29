@@ -25,7 +25,6 @@
 
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
-#include <lua.h>
 
 #include <libknot/libknot.h>
 #include <libknot/packet/pkt.h>
