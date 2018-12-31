@@ -481,6 +481,10 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 	ssize_t submitted = 0;
 	uint8_t *wire_buf = session_wirebuf_get_free_start(s);
 	size_t wire_buf_size = session_wirebuf_get_free_size(s);
+	if (wire_buf_size < nread) {
+		/* session buffer is overflow */
+		return kr_error(ENOSPC);
+	}
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->tls_session, wire_buf, wire_buf_size);
 		if (count == GNUTLS_E_AGAIN) {
@@ -514,8 +518,18 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 		wire_buf += count;
 		wire_buf_size -= count;
 		submitted += count;
+		if (wire_buf_size == 0 && tls_p->consumed != tls_p->nread) {
+			/* session buffer is full
+			 * whereas not all the data were consumed */
+			return kr_error(ENOSPC);
+		}
 	}
-	assert(tls_p->consumed == tls_p->nread);
+	/* Here all data must be consumed. */
+	if (tls_p->consumed != tls_p->nread) {
+		/* Something went wrong, better return error. */
+		assert(false);
+		return kr_error(ENOSPC);
+	}
 	return submitted;
 }
 

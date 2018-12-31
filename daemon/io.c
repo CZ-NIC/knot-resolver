@@ -235,7 +235,17 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		/* buf->base points to start of the tls receive buffer.
 		   Decode data free space in session wire buffer. */
 		consumed = tls_process_input_data(s, (const uint8_t *)buf->base, nread);
-		if (consumed <= 0) {
+		if (consumed < 0) {
+			if (kr_verbose_status) {
+				struct sockaddr *peer = session_get_peer(s);
+				char *peer_str = kr_straddr(peer);
+				kr_log_verbose("[io] => connection to '%s': "
+					       "error processing TLS data, close\n",
+					       peer_str ? peer_str : "");
+			}
+			worker_end_tcp(s);
+			return;
+		} else if (consumed == 0) {
 			return;
 		}
 		data = session_wirebuf_get_free_start(s);
