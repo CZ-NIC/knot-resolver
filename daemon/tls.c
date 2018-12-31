@@ -493,16 +493,21 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 			kr_log_verbose("[%s] TLS rehandshake with %s has started\n",
 				       logstring,  kr_straddr(peer));
 			tls_set_hs_state(tls_p, TLS_HS_IN_PROGRESS);
+			int err = kr_ok();
 			while (tls_p->handshake_state <= TLS_HS_IN_PROGRESS) {
-				int err = tls_handshake(tls_p, tls_p->handshake_cb);
+				err = tls_handshake(tls_p, tls_p->handshake_cb);
 				if (err == kr_error(EAGAIN)) {
 					break;
 				} else if (err != kr_ok()) {
 					return err;
 				}
 			}
-			/* Wait for more data */
-			break;
+			if (err == kr_error(EAGAIN)) {
+				/* pull function is out of data */
+				break;
+			}
+			/* There are can be data available, check it. */
+			continue;
 		} else if (count < 0) {
 			kr_log_verbose("[%s] gnutls_record_recv failed: %s (%zd)\n",
 				     logstring, gnutls_strerror_name(count), count);
@@ -514,8 +519,21 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 		wire_buf += count;
 		wire_buf_size -= count;
 		submitted += count;
+		if (wire_buf_size == 0 && tls_p->consumed != tls_p->nread) {
+			/* session buffer is full
+			 * whereas not all the data were consumed */
+			return kr_error(ENOSPC);
+		}
 	}
-	assert(tls_p->consumed == tls_p->nread);
+	/* Here all data must be consumed. */
+	if (tls_p->consumed != tls_p->nread) {
+		/* Something went wrong, better return error.
+		 * This is most probably due to gnutls_record_recv() did not
+		 * consume all available network data by calling kres_gnutls_pull().
+		 * TODO assess the need for buffering of data amount.
+		 */
+		return kr_error(ENOSPC);
+	}
 	return submitted;
 }
 

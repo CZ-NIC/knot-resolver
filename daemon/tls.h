@@ -94,7 +94,7 @@ struct tls_common_ctx {
 	const uint8_t *buf;
 	ssize_t nread;
 	ssize_t consumed;
-	uint8_t recv_buf[8192];
+	uint8_t recv_buf[16384];
 	tls_handshake_cb handshake_cb;
 	struct worker_ctx *worker;
 	size_t write_queue_size;
