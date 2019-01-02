@@ -625,7 +625,7 @@ using :c:func:`net.tls()`.
    `secret leaks eventually <https://en.wikipedia.org/wiki/Forward_secrecy>`_.
 
    .. warning:: **Setting the secret is probably too risky with TLS <= 1.2**.
-      At this moment no GnuTLS stable release even supports TLS 1.3.
+      GnuTLS stable release supports TLS 1.3 since 3.6.3 (summer 2018).
       Therefore setting the secrets should be considered experimental for now
       and might not be available on your system.
 
