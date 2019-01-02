@@ -476,6 +476,7 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
  * \param format[in] format for strptime
  * \param diff[out] result from C difftime(time1, time0)
  */
+KR_EXPORT
 const char *kr_strptime_diff(const char *format, const char *time1_str,
 		             const char *time0_str, double *diff);
 
