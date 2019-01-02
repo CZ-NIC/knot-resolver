@@ -58,6 +58,8 @@ grep -v '^#\|^$' | while read -r ident; do
 	fi
 	# LuaJIT FFI blows up on "uint" type
 	output="$(echo "$output" | sed 's/\buint\b/unsigned int/g')"
+	# GDB 8.2+ added source line prefix to output
+	output="$(echo "$output" | sed 's/^[0-9]\+:[[:space:]]*//g')"
 
 	# abort on empty output
 	if [ -z "$(echo "$output" | tr -d "\n;")" ]; then
