@@ -19,6 +19,51 @@ local function https_fetch(url, ca)
 	return resp[1]
 end
 
+local function check_keydigest_validity(attrs)
+	--local err = ffi.C.kr_strptime_diff(strptime_format, )
+end
+
+local function parse_xml_keydigest(attrs, inside, output)
+	local fields = {}
+	local mandatory_elements = {'KeyTag', 'Algorithm', 'DigestType', 'Digest'}
+	_, n = string.gsub(attrs, "([%w]+)=\"([^\"]*)\"", function (k, v) fields[k] = v end)
+	if n < 1 then
+		error('cannot parse XML attributes from "%s"', attrs)
+	elseif fields['validFrom'] == nil then
+		error('mandatory XML attribute validFrom not found in "%s"', attrs)
+	end
+
+	_, n = string.gsub(inside, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
+	if n < 1 then
+		error('error parsing XML elements from "%s"', inside)
+	end
+	for _, key in ipairs(mandatory_elements) do
+		if fields[key] == nil then
+			error('mandatory element %s is missing in "%s"', key, inside)
+		end
+	end
+	table.insert(output, fields)  -- append to list of parsed keydigests
+end
+
+local function generate_ds(keydigests)
+	local rrset = ''
+	for _, fields in ipairs(keydigests) do
+		rrset = rrset .. '\n' .. string.format('. 0 IN DS %s %s %s %s',
+			fields.KeyTag, fields.Algorithm, fields.DigestType, fields.Digest)
+	end
+	return rrset
+end
+
+local function assert_str_match(str, pattern, expected)
+	local count = 0
+	for _ in string.gmatch(str, pattern) do
+		count = count + 1
+	end
+	assert(count == expected,
+	       string.format('expected "%d" occurences of "%s" in "%s"',
+	       		     expected, pattern, str))
+end
+
 -- Fetch root anchors in XML over HTTPS, returning a zone-file-style string
 -- or false in case of error, and a message.
 local function bootstrap(url, ca)
@@ -26,28 +71,54 @@ local function bootstrap(url, ca)
 	-- @todo ICANN certificate is verified against current CA
 	--       this is not ideal, as it should rather verify .xml signature which
 	--       is signed by ICANN long-lived cert, but luasec has no PKCS7
-	local xml, err = https_fetch(url, ca)
+	--local xml, err = https_fetch(url, ca)
+	local xml = [[
+<?xml version="1.0" encoding="UTF-8"?>
+<TrustAnchor id="380DC50D-484E-40D0-A3AE-68F2B18F61C7" source="http://data.iana.org/root-anchors/root-anchors.xml">
+<Zone>.</Zone>
+<KeyDigest id="Kjqmt7v" validFrom="2010-07-15T00:00:00+00:00" validUntil="2019-01-11T00:00:00+00:00">
+<KeyTag>19036</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5</Digest>
+</KeyDigest>
+<KeyDigest id="Klajeyz" validFrom="2017-02-02T00:00:00+00:00">
+<KeyTag>20326</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D</Digest>
+</KeyDigest>
+</TrustAnchor>
+
+	]]
+
 	if not xml then
 		return false, string.format('[ ta ] fetch of "%s" failed: %s', url, err)
 	end
-	local rr = ''
+
+	-- we support only minimal subset of https://tools.ietf.org/html/rfc7958
+	assert_str_match(xml, '<TrustAnchor ', 1)
+	assert_str_match(xml, '<Zone>', 1)
+	assert_str_match(xml, '</TrustAnchor>', 1)
+
+	local strptime_format =   '%Y-%m-%dT%H:%M:%S%Z'
+	local time_now = os.date('!%Y-%m-%dT%H:%M:%S+00:00')  -- ! forces UTC
+	local keydigests = {}
 	-- Parse root trust anchor, one digest at a time, converting to a zone-file-style string.
-	string.gsub(xml, "<KeyDigest([^>]*)>(.-)</KeyDigest>", function (attrs, inside)
-		local fields = {}
-		string.gsub(attrs, "([%w]+)=\"([^\"]*)\"", function (k, v) fields[k] = v end)
-		string.gsub(inside, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
-		rr = rr .. '\n' .. string.format('. 0 IN DS %s %s %s %s',
-			fields.KeyTag, fields.Algorithm, fields.DigestType, fields.Digest)
+	string.gsub(xml, "<KeyDigest([^>]*)>(.-)</KeyDigest>", function(attrs, inside)
+		parse_xml_keydigest(attrs, inside, keydigests)
 	end)
-	if rr == '' then
+	print(table_print(keydigests))
+	rrset = generate_ds(keydigests)
+	if rrset == '' then
 		return false, string.format('[ ta ] failed to get any record from "%s"', url)
 	end
 	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
 			 .. '       You SHOULD verify them manually against original source:\n'
 			 .. '       https://www.iana.org/dnssec/files\n'
 			 .. '[ ta ] Current root trust anchors are:'
-			 .. rr
-	return rr, msg
+			 .. rrset
+	return rrset, msg
 end
 
 -- Load the module
