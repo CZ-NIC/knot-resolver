@@ -79,11 +79,44 @@ static void test_straddr(void **state)
 	assert_int_not_equal(test_bitcmp(ip6_sub, ip6_out, 4), 0);
 }
 
+static void test_strptime_diff(void **state)
+{
+	char *format = "%Y-%m-%dT%H:%M:%S";
+	const char *errmsg = NULL;
+	double output;
+
+	errmsg = kr_strptime_diff(format,
+		"2019-01-09T12:06:04",
+		"2019-01-09T12:06:04", &output);
+	assert_true(errmsg == NULL);
+	/* double type -> equality is not reliable */
+	assert_true(output > -0.01 && output < 0.01);
+
+	errmsg = kr_strptime_diff(format,
+		"2019-01-09T12:06:04",
+		"2019-01-09T11:06:04", &output);
+	assert_true(errmsg == NULL);
+	/* double type -> equality is not reliable */
+	assert_true(output > -3600.01 && output < 3600.01);
+
+	/* invalid inputs */
+	errmsg = kr_strptime_diff(format,
+		"2019-01-09T25:06:04",
+		"2019-01-09T11:06:04", &output);
+	assert_true(errmsg != NULL);
+
+	errmsg = kr_strptime_diff("fail",
+		"2019-01-09T23:06:04",
+		"2019-01-09T11:06:04", &output);
+	assert_true(errmsg != NULL);
+}
+
 int main(void)
 {
 	const UnitTest tests[] = {
 		unit_test(test_strcatdup),
 		unit_test(test_straddr),
+		unit_test(test_strptime_diff),
 	};
 
 	return run_tests(tests);
