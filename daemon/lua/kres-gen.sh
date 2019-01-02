@@ -169,6 +169,7 @@ EOF
 	kr_zonecut_is_empty
 	kr_zonecut_set
 	kr_now
+	kr_strptime_diff
 	lru_free_items_impl
 	lru_create_impl
 	lru_get_impl

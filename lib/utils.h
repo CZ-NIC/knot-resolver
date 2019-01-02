@@ -471,6 +471,15 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 	return KNOT_EOK;
 }
 
+/**
+ * Difference between two calendar times specified as strings.
+ * \param format[in] format for strptime
+ * \param diff[out] result from C difftime(time1, time0)
+ */
+KR_EXPORT
+const char *kr_strptime_diff(const char *format, const char *time1_str,
+		             const char *time0_str, double *diff);
+
 /* Trivial non-inline wrappers, to be used in lua. */
 KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 				uint16_t type, uint16_t rclass, uint32_t ttl);
