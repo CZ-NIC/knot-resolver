@@ -109,6 +109,8 @@ class Kresd(ContextDecorator):
                 raise RuntimeError("Kresd crashed with returncode: {}".format(
                     self.process.returncode))
         except (RuntimeError, ConnectionError):  # pylint: disable=try-except-raise
+            with open(self.logfile_path) as log:  # print log for debugging
+                print(log.read())
             raise
 
         return self
