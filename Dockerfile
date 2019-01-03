@@ -62,7 +62,8 @@ RUN cd /tmp/knot-resolver && \
 
 # Final container
 FROM runtime
-MAINTAINER Knot Resolver team <knot-resolver-users@lists.nic.cz>
+LABEL cz.knot-resolver.vendor="CZ.NIC"
+LABEL maintainer="knot-resolver-users@lists.nic.cz"
 
 # Export DNS over UDP & TCP, DNS-over-TLS, web interface
 EXPOSE 53/UDP 53/TCP 853/TCP 8053/TCP
