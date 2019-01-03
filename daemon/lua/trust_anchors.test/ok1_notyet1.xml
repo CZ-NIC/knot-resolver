@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrustAnchor id="507B39D5-049E-467C-9E9A-F5BE597C9DDA" source="https://localhost/ok1_notyet1.xml">
+<Zone>.</Zone>
+<KeyDigest id="1" validFrom="2010-07-15T00:00:00+00:00">
+<KeyTag>1</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>1111111111111111111111111111111111111111111111111111111111111111</Digest>
+</KeyDigest>
+<KeyDigest id="2" validFrom="2050-12-31T23:59:59+00:00">
+<KeyTag>2</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF</Digest>
+</KeyDigest>
+</TrustAnchor>
