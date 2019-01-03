@@ -1165,6 +1165,7 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 	ctx->c.worker = worker;
 	ctx->c.client_side = true;
 
+
 	gnutls_transport_set_pull_function(ctx->c.tls_session, kres_gnutls_pull);
 	gnutls_transport_set_vec_push_function(ctx->c.tls_session, kres_gnutls_vec_push);
 	gnutls_transport_set_ptr(ctx->c.tls_session, ctx);
@@ -1188,6 +1189,20 @@ void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
 	free (ctx);
 }
 
+int  tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)
+{
+	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
+	assert(t != NULL);
+	ssize_t	avail = t->nread - t->consumed;
+	DEBUG_MSG("[%s] timeout check: available: %zu\n",
+		  t->client_side ? "tls_client" : "tls", avail);
+	if (t->nread <= t->consumed) {
+		errno = EAGAIN;
+		return -1;
+	}
+	return avail;
+}
+
 int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 			     struct session *session,
 			     tls_handshake_cb handshake_cb)
@@ -1202,6 +1217,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 
 	gnutls_session_set_ptr(ctx->tls_session, client_ctx);
 	gnutls_handshake_set_timeout(ctx->tls_session, ctx->worker->engine->net.tcp.tls_handshake_timeout);
+	gnutls_transport_set_pull_timeout_function(ctx->tls_session, tls_pull_timeout_func);
 	session_tls_set_client_ctx(session, client_ctx);
 	ctx->handshake_cb = handshake_cb;
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
@@ -1215,8 +1231,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 
 	/* See https://www.gnutls.org/manual/html_node/Asynchronous-operation.html */
 	while (ctx->handshake_state <= TLS_HS_IN_PROGRESS) {
-		/* Don't pass the handshake callback as the connection isn't registered yet. */
-		int ret = tls_handshake(ctx, NULL);
+		int ret = tls_handshake(ctx, handshake_cb);
 		if (ret != kr_ok()) {
 			return ret;
 		}
