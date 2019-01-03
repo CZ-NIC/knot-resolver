@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrustAnchor id="9DCE46E1-FC78-48E1-81B5-94E328790BB5" source="https://localhost/err_multi_ta.xml">
+<Zone>.</Zone>
+<KeyDigest id="1" validFrom="2000-02-02T00:00:00+00:00">
+<KeyTag>2</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>1111111111111111111111111111111111111111111111111111111111111111</Digest>
+</KeyDigest>
+</TrustAnchor>
+<TrustAnchor id="9DCE46E1-FC78-48E1-81B5-94E328790BB5" source="https://localhost/err_multi_ta.xml">
+<Zone>test.</Zone>
+<KeyDigest id="2" validFrom="2000-02-02T00:00:00+00:00">
+<KeyTag>2</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>1111111111111111111111111111111111111111111111111111111111111111</Digest>
+</KeyDigest>
+</TrustAnchor>

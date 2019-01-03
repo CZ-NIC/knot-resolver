@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrustAnchor id="EDEDAA08-D2A0-421E-81DC-AF11F5A0CDCD" source="https://localhost/ok0_badtimes.xml">
+<Zone>.</Zone>
+<KeyDigest id="E" validFrom="2000-01-01T00:00:00+00:00" validUntil="2000-01-01T00:00:00+00:00">
+<KeyTag>1</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE</Digest>
+</KeyDigest>
+<KeyDigest id="F" validFrom="2001-01-01T00:00:00+00:00" validUntil="2001-01-01T00:00:00+00:00">
+<KeyTag>2</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF</Digest>
+</KeyDigest>
+</TrustAnchor>
