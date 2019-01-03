@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrustAnchor id="1DECEB91-0591-44A1-95CF-1788337514B8" source="https://localhost/ok2.xml">
+<Zone>.</Zone>
+<KeyDigest id="K1" validFrom="2010-07-15T00:00:00+00:00">
+<KeyTag>1</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>1111111111111111111111111111111111111111111111111111111111111111</Digest>
+</KeyDigest>
+<KeyDigest id="K2" validFrom="2011-02-02T00:00:00+00:00">
+<KeyTag>2</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>2222222222222222222222222222222222222222222222222222222222222222</Digest>
+</KeyDigest>
+</TrustAnchor>
