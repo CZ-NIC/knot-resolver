@@ -70,6 +70,12 @@ local function parse_xml_keydigest(attrs, inside, output)
 	assert(fields['validFrom'],
 		string.format('mandatory KeyDigest XML attribute validFrom ' ..
 		'not found in "%s"', attrs))
+	local valid_attrs = {id = true, validFrom = true, validUntil = true}
+	for key, _ in pairs(fields) do
+		assert(valid_attrs[key],
+		       string.format('unsupported KeyDigest attribute "%s" found in "%s"',
+				     key, attrs))
+	end
 
 	_, n = string.gsub(inside, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
 	assert(n >= 1,
