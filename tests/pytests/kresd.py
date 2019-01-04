@@ -96,6 +96,8 @@ class Kresd(ContextDecorator):
 
         try:
             self._wait_for_tcp_port()  # wait for ports to be up and responding
+            ports_debug = subprocess.run(['ss', '-n', '-a', '-t', '-u', '-p'], capture_output=True, text=True)
+            print(ports_debug.stdout)
             if not self.all_ports_alive(msgid=10001):
                 raise RuntimeError("Kresd not listening on all ports")
 
@@ -210,16 +212,17 @@ class Kresd(ContextDecorator):
         with open(self.logfile_path) as log:  # display partial log for debugging
             past_startup_msgid = False
             past_startup = False
-            for line in log:
-                if past_startup:
-                    partial_log += line
-                else:  # find real start of test log (after initial alive-pings)
-                    if not past_startup_msgid:
-                        if re.match(KRESD_LOG_STARTUP_MSGID, line) is not None:
-                            past_startup_msgid = True
-                    else:
-                        if re.match(KRESD_LOG_IO_CLOSE, line) is not None:
-                            past_startup = True
+            partial_log = log.read()
+            # for line in log:
+            #     if past_startup:
+            #         partial_log += line
+            #     else:  # find real start of test log (after initial alive-pings)
+            #         if not past_startup_msgid:
+            #             if re.match(KRESD_LOG_STARTUP_MSGID, line) is not None:
+            #                 past_startup_msgid = True
+            #         else:
+            #             if re.match(KRESD_LOG_IO_CLOSE, line) is not None:
+            #                 past_startup = True
         return partial_log
 
 
