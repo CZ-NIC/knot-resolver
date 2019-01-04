@@ -136,14 +136,21 @@ class Kresd(ContextDecorator):
             alive &= utils.try_ping_alive(self.ip6_tls_socket(), close=True, msgid=msgid + 3)
         return alive
 
-    def _wait_for_tcp_port(self, delay=0.1, max_attempts=50):
+    def _wait_for_tcp_port(self, max_delay=10, delay_step=0.2):
         family = socket.AF_INET if self.ip else socket.AF_INET6
-        for _ in range(max_attempts):
+        i = 0
+        end_time = time.time() + max_delay
+
+        while time.time() < end_time:
+            # use exponential backoff algorhitm to choose next delay
+            delay = random.randrange(0, i * delay_step, delay_step)
+            time.sleep(delay)
+            i += 1
+
             try:
                 sock, dest = self.stream_socket(family, timeout=5)
                 sock.connect(dest)
             except ConnectionRefusedError:
-                time.sleep(delay)
                 continue
             else:
                 return utils.try_ping_alive(sock, close=True, msgid=10000)
