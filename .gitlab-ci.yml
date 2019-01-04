@@ -88,6 +88,3 @@ pytests:run1:  *pytests
 pytests:run2:  *pytests
 pytests:run3:  *pytests
 pytests:run4:  *pytests
-pytests:run5:  *pytests
-pytests:run6:  *pytests
-pytests:run7:  *pytests
