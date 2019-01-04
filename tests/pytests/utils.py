@@ -100,7 +100,7 @@ def ping_alive(sock, msgid=None):
 def expect_kresd_close(rst_ok=False):
     with pytest.raises(BrokenPipeError, message="kresd didn't close the connection"):
         try:
-            time.sleep(0.05)  # give kresd time to close connection with TCP FIN
+            time.sleep(0.2)  # give kresd time to close connection with TCP FIN
             yield
         except ConnectionResetError:
             if rst_ok:
