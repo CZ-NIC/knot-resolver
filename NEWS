@@ -1,3 +1,11 @@
+Knot Resolver 3.X.Y (2019-0m-dd)
+================================
+
+Bugfixes
+--------
+- policy.TLS_FORWARD: fix problems with gnutls 3.3
+
+
 Knot Resolver 3.2.0 (2018-12-17)
 ================================
 
