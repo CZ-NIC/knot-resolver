@@ -154,7 +154,10 @@ class Kresd(ContextDecorator):
             except ConnectionRefusedError:
                 continue
             else:
-                return utils.try_ping_alive(sock, close=True, msgid=10000)
+                try:
+                    return utils.try_ping_alive(sock, close=True, msgid=10000)
+                except socket.timeout:
+                    continue
             finally:
                 sock.close()
         raise RuntimeError("Kresd didn't start in time")
