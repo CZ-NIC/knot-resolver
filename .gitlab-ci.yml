@@ -62,7 +62,7 @@ pytests:run:  &pytests
     - echo "See pytests.html or pytests.log.txt for full report."
   artifacts:
     when: always
-    expire_in: 1 week
+    expire_in: 1 hour
     paths:
       - pytest*
   tags:
