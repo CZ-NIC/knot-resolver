@@ -15,6 +15,11 @@ variables:
 stages:
   - build
   - test
+  - test1
+  - test2
+  - test3
+  - test4
+  - test5
   - coverage
   - extended
   - deploy
@@ -46,48 +51,59 @@ build:asan:linux:amd64:
   variables:
     CFLAGS: -Werror -ggdb3 -O0 -fsanitize=address -fno-omit-frame-pointer
 
-pytests:run:  &pytests
+
+pytests:extended: &pytests
   stage: test
   dependencies:
     - build:asan:linux:amd64
   except:
     - master
   script:
-    - pushd tests/pytests/rehandshake
-    - make all
-    - popd
-    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run.sh &> pytests.log.txt
-  after_script:
-    - tail -1 pytests.log.txt
-    - echo "See pytests.html or pytests.log.txt for full report."
-  artifacts:
-    when: always
-    expire_in: 1 week
-    paths:
-      - pytest*
-  tags:
-    - docker
-    - linux
-    - amd64
-
-pytests:extended:
-  stage: extended
-  dependencies:
-    - build:asan:linux:amd64
-  except:
-    - master
-  script:
     - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run-extended.sh
+  artifacts:
+    expire_in: '1 hour'
   tags:
     - docker
     - linux
     - amd64
 
 
-pytests:run1:  *pytests
-pytests:run2:  *pytests
-pytests:run3:  *pytests
-pytests:run4:  *pytests
-pytests:run5:  *pytests
-pytests:run6:  *pytests
-pytests:run7:  *pytests
+pytests:run1:
+  <<: *pytests
+  stage: test1
+
+pytests:run2:
+  <<: *pytests
+  stage: test2
+
+pytests:run3:
+  <<: *pytests
+  stage: test3
+
+pytests:run4:
+  <<: *pytests
+  stage: test4
+
+pytests:run5:
+  <<: *pytests
+  stage: test4
+
+pytests:run6:
+  <<: *pytests
+  stage: test5
+
+pytests:run7:
+  <<: *pytests
+  stage: test5
+
+pytests:run8:
+  <<: *pytests
+  stage: test6
+
+pytests:run9:
+  <<: *pytests
+  stage: test6
+
+pytests:run10:
+  <<: *pytests
+  stage: test6
