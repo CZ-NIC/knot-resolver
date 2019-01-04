@@ -131,11 +131,11 @@ class Kresd(ContextDecorator):
     def all_ports_alive(self, msgid=10001):
         alive = True
         if self.ip:
-            alive &= utils.try_ping_alive(self.ip_tls_socket(), close=True, msgid=msgid)
-            alive &= utils.try_ping_alive(self.ip_tcp_socket(), close=True, msgid=msgid + 1)
+            alive &= utils.try_ping_alive(self.ip_tcp_socket(), close=True, msgid=msgid)
+            alive &= utils.try_ping_alive(self.ip_tls_socket(), close=True, msgid=msgid + 1)
         if self.ip6:
-            alive &= utils.try_ping_alive(self.ip6_tls_socket(), close=True, msgid=msgid + 2)
-            alive &= utils.try_ping_alive(self.ip6_tcp_socket(), close=True, msgid=msgid + 3)
+            alive &= utils.try_ping_alive(self.ip6_tcp_socket(), close=True, msgid=msgid + 2)
+            alive &= utils.try_ping_alive(self.ip6_tls_socket(), close=True, msgid=msgid + 3)
         return alive
 
     def _wait_for_tcp_port(self, delay=0.1, max_attempts=20):
