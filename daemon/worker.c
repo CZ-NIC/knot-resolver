@@ -207,7 +207,7 @@ static void mp_poison(struct mempool *mp, bool poison)
 		kr_asan_unpoison(mp, sizeof(*mp));
 	}
 	struct mempool_chunk *chunk = mp->state.last[0];
-	void *chunk_off = (void *)chunk - chunk->size;
+	void *chunk_off = (uint8_t *)chunk - chunk->size;
 	if (poison) {
 		kr_asan_poison(chunk_off, chunk->size);
 	} else {
