@@ -20,6 +20,7 @@ stages:
   - test3
   - test4
   - test5
+  - test6
   - coverage
   - extended
   - deploy
@@ -60,6 +61,8 @@ pytests:extended: &pytests
     - master
   script:
     - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run-extended.sh
+  artifacts:
+    expire_in: '1 hour'
   tags:
     - docker
     - linux
