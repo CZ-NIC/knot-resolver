@@ -20,8 +20,8 @@ TEMPLATES_DIR = os.path.join(PYTESTS_DIR, 'templates')
 KRESD_CONF_TEMPLATE = 'kresd.conf.j2'
 KRESD_STARTUP_MSGID = 10005  # special unique ID at the start of the "test" log
 KRESD_PORTDIR = '/tmp/pytest-kresd-portdir'
-KRESD_TESTPORT_MIN = 10000
-KRESD_TESTPORT_MAX = 49000
+KRESD_TESTPORT_MIN = 1024
+KRESD_TESTPORT_MAX = 32768  # avoid overlap with docker ephemeral port range
 
 
 def init_portdir():
