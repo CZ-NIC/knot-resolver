@@ -17,8 +17,8 @@ from kresd import Kresd
 import utils
 
 
-MAX_SOCKETS = 20000  # upper bound of how many connections to open
-MAX_ITERATIONS = 20  # number of iterations to run the test
+MAX_SOCKETS = 10000  # upper bound of how many connections to open
+MAX_ITERATIONS = 10  # number of iterations to run the test
 
 # we can't use softlimit ifself since kresd already has open sockets,
 # so use lesser value
@@ -50,8 +50,8 @@ def test_conn_flood(tmpdir, sock_func_name):
             for s in sockets:
                 utils.ping_alive(s)
 
-            # break when no more than 10% additional sockets are created
-            if additional_sockets / len(sockets) < 0.1:
+            # break when no more than 20% additional sockets are created
+            if additional_sockets / len(sockets) < 0.2:
                 return sockets
 
     max_num_of_open_files = resource.getrlimit(resource.RLIMIT_NOFILE)[0] - RESERVED_NOFILE
