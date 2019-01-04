@@ -21,7 +21,7 @@ stages:
 
 .build: &build
   variables:
-    CFLAGS: -Werror -ggdb
+    CFLAGS: -ggdb
   stage: build
   except:
     - master
@@ -45,7 +45,7 @@ build:linux:amd64:
 build:asan:linux:amd64:
   <<: *build
   variables:
-    CFLAGS: -Werror -ggdb3 -O0 -fsanitize=address -fno-omit-frame-pointer
+    CFLAGS: -ggdb3 -O0 -fsanitize=address -fno-omit-frame-pointer
 
 lint:pedantic:
   stage: test  # could be in build already, but let's not block the test stage if this fails
@@ -129,7 +129,7 @@ test:linux:amd64:
     # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
     # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
     - git clean -xdf
-    - make CFLAGS=-Werror
+    - make
     - MAKEFLAGS="--jobs $(nproc)" make -k check
     - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c COVERAGE_STAGE=gcov-check || echo "code coverage skipped"
   dependencies: []
@@ -169,7 +169,7 @@ installcheck:linux:amd64:
     # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
     # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
     - git clean -xdf
-    - make install CFLAGS=-Werror
+    - make install
     - MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
     - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck || echo "code coverage skipped"
   dependencies: []
