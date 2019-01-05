@@ -29,7 +29,7 @@ function print_help()
 	   .. 'Docker will map ports 53, 853, and 8053 to some other numbers, see\n'
 	   .. '$ docker ps\n'
 	   .. '(column PORTS)\n'
-	   .. '80   -> DNS protocol over UDP and TCP\n'
+	   .. '53   -> DNS protocol over UDP and TCP\n'
 	   .. '853  -> DNS-over-TLS protocol\n'
 	   .. '8053 -> web interface\n'
 	   .. '\n'
