@@ -430,7 +430,7 @@ local add_file = function (path, unmanaged)
 
 	-- Parse new keys, refresh eventually
 	if keyset_publish(keyset) == 0 then
-		warn('[ ta ] ERROR: anchors are trusted for ' .. owner_str .. ' !')
+		warn('[ ta ] ERROR: no anchors are trusted for ' .. owner_str .. ' !')
 		-- TODO: try to rebootstrap?
 	end
 	refresh_plan(keyset, 10 * sec, false)
