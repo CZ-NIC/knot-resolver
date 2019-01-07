@@ -23,6 +23,7 @@
 #include <libdnssec/error.h>
 
 #include "lib/defines.h"
+#include "lib/dnssec.h"
 #include "lib/dnssec/ta.h"
 #include "lib/resolve.h"
 #include "lib/utils.h"
@@ -51,29 +52,34 @@ static int dnskey2ds(dnssec_binary_t *dst, const knot_dname_t *owner, const uint
 {
 	dnssec_key_t *key = NULL;
 	int ret = dnssec_key_new(&key);
-	if (ret != DNSSEC_EOK) {
-		return kr_error(ENOMEM);
-	}
+	if (ret) goto cleanup;
 	/* Create DS from DNSKEY and reinsert */
 	const dnssec_binary_t key_data = { .size = rdlen, .data = (uint8_t *)rdata };
 	ret = dnssec_key_set_rdata(key, &key_data);
-	if (ret == DNSSEC_EOK) {
-		/* Accept only KSK (257) to TA store */
-		if (dnssec_key_get_flags(key) == 257)  {
-			ret = dnssec_key_set_dname(key, owner);
-		} else {
-			ret = DNSSEC_EINVAL;
-		}
-		if (ret == DNSSEC_EOK) {
-			ret = dnssec_key_create_ds(key, DNSSEC_KEY_DIGEST_SHA256, dst);
-		}
+	if (ret) goto cleanup;
+	/* Accept only keys with Zone and SEP flags that aren't revoked,
+	 * as a precaution.  RFC 5011 also utilizes these flags.
+	 * TODO: kr_dnssec_key_* names are confusing. */
+	const bool flags_ok = kr_dnssec_key_zsk(rdata) && !kr_dnssec_key_revoked(rdata);
+	if (!flags_ok) {
+		auto_free char *owner_str = kr_dname_text(owner);
+		kr_log_error("[ ta ] refusing to trust %s DNSKEY because of flags %d\n",
+			owner_str, dnssec_key_get_flags(key));
+		ret = kr_error(EILSEQ);
+		goto cleanup;
+	} else if (!kr_dnssec_key_ksk(rdata)) {
+		auto_free char *owner_str = kr_dname_text(owner);
+		int flags = dnssec_key_get_flags(key);
+		kr_log_info("[ ta ] warning: %s DNSKEY is missing the SEP bit; "
+			"flags %d instead of %d\n",
+			owner_str, flags, flags + 1/*a little ugly*/);
 	}
+	ret = dnssec_key_set_dname(key, owner);
+	if (ret) goto cleanup;
+	ret = dnssec_key_create_ds(key, DNSSEC_KEY_DIGEST_SHA256, dst);
+cleanup:
 	dnssec_key_free(key);
-	/* Pick some sane error code */
-	if (ret != DNSSEC_EOK) {
-		return kr_error(ENOMEM);
-	}
-	return kr_ok();
+	return kr_error(ret);
 }
 
 /* @internal Insert new TA to trust anchor set, rdata MUST be of DS type. */
