@@ -281,9 +281,14 @@ uint16_t kr_inaddr_port(const struct sockaddr *addr);
 /** Set port. */
 KR_EXPORT
 void kr_inaddr_set_port(struct sockaddr *addr, uint16_t port);
-/** String representation for given address as "<addr>#<port>" */
+
+/** Write string representation for given address as "<addr>#<port>".
+ * \param[in]     addr   the raw address
+ * \param[out]    buf    the buffer for output string
+ * \param[in,out] buflen the available(in) and utilized(out) length, including \0 */
 KR_EXPORT
 int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen);
+
 /** Return address type for string. */
 KR_EXPORT KR_PURE
 int kr_straddr_family(const char *addr);
