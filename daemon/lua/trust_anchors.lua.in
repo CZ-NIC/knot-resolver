@@ -549,7 +549,7 @@ local add_file = function (path, unmanaged)
 	-- Parse new keys, refresh eventually
 	if keyset_publish(keyset) == 0 then
 		-- TODO: try to rebootstrap if for root?
-		path = path -- no-op to silence luacheck complaining about empty if-branch
+		keyset = keyset -- no-op to silence luacheck complaining about empty if-branch
 	elseif verbose() then
 		log('[ ta ] installed trust anchors for domain ' .. owner_str .. ' are:\n'
 		    .. trust_anchors.summary(owner))
@@ -635,7 +635,7 @@ trust_anchors = {
 		local ta_count = 0
 		local seen = {}
 		for _, nta_str in pairs(trust_anchors.insecure) do
-			owner = kres.str2dname(nta_str)
+			local owner = kres.str2dname(nta_str)
 			seen[owner] = true
 			msg = msg .. ta_str(owner)
 		end
