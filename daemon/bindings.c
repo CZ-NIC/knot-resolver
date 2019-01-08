@@ -904,7 +904,7 @@ static int net_bpf_set(lua_State *L)
 	lua_pop(L, 1);
 
 	if (network_set_bpf(net, progfd) == 0) {
-		char errmsg[256] = {};
+		char errmsg[256] = { 0 };
 		snprintf(errmsg, sizeof(errmsg), "failed to attach BPF program to some networks: %s", strerror(errno));
 		format_error(L, errmsg);
 		lua_error(L);

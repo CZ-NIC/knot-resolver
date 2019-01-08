@@ -42,13 +42,15 @@ static void test_int(void **state_)
 	assert_int_equal(queue_len(q), 3 + 99);
 
 	/* Basic iterator test. */
-	int i = 0;
-	for (queue_int_it_t it = queue_it_begin(q); !queue_it_finished(it);
-	     queue_it_next(it)) {
-		++queue_it_val(it);
-		++i;
+	{
+		int i = 0;
+		for (queue_int_it_t it = queue_it_begin(q); !queue_it_finished(it);
+		     queue_it_next(it)) {
+			++queue_it_val(it);
+			++i;
+		}
+		assert_int_equal(queue_len(q), i);
 	}
-	assert_int_equal(queue_len(q), i);
 
 	queue_deinit(q);
 	queue_init(q);

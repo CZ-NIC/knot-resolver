@@ -26,12 +26,12 @@
 #if (__linux__ && SO_REUSEPORT)
   #define handle_init(type, loop, handle, family) do { \
 	uv_ ## type ## _init_ex((loop), (handle), (family)); \
-	uv_os_fd_t fd = 0; \
-	if (uv_fileno((uv_handle_t *)(handle), &fd) == 0) { \
-		int on = 1; \
-		int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)); \
-		if (ret) { \
-			return ret; \
+	uv_os_fd_t hi_fd = 0; \
+	if (uv_fileno((uv_handle_t *)(handle), &hi_fd) == 0) { \
+		int hi_on = 1; \
+		int hi_ret = setsockopt(hi_fd, SOL_SOCKET, SO_REUSEPORT, &hi_on, sizeof(hi_on)); \
+		if (hi_ret) { \
+			return hi_ret; \
 		} \
 	} \
   } while (0)

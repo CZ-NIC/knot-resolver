@@ -418,16 +418,16 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
 			next_closer = knot_wire_next_label(next_closer, NULL);
 		}
 		for (unsigned j = 0; j < sec->count; ++j) {
-			const knot_rrset_t *rrset = knot_pkt_rr(sec, j);
-			if (rrset->type != KNOT_RRTYPE_NSEC3) {
+			const knot_rrset_t *rrset_j = knot_pkt_rr(sec, j);
+			if (rrset_j->type != KNOT_RRTYPE_NSEC3) {
 				continue;
 			}
-			ret = covers_name(&flags, rrset, next_closer);
+			ret = covers_name(&flags, rrset_j, next_closer);
 			if (ret != 0) {
 				return ret;
 			}
 			if (flags & FLG_NAME_COVERED) {
-				covering = rrset;
+				covering = rrset_j;
 				break;
 			}
 		}

@@ -147,4 +147,4 @@ struct kr_prop *bogus_log_props(void)
 	return prop_list;
 }
 
-KR_MODULE_EXPORT(bogus_log);
+KR_MODULE_EXPORT(bogus_log)
