@@ -20,8 +20,8 @@ TEMPLATES_DIR = os.path.join(PYTESTS_DIR, 'templates')
 KRESD_CONF_TEMPLATE = 'kresd.conf.j2'
 KRESD_STARTUP_MSGID = 10005  # special unique ID at the start of the "test" log
 KRESD_PORTDIR = '/tmp/pytest-kresd-portdir'
-KRESD_TESTPORT_MIN = 10000
-KRESD_TESTPORT_MAX = 49000
+KRESD_TESTPORT_MIN = 1024
+KRESD_TESTPORT_MAX = 32768  # avoid overlap with docker ephemeral port range
 
 
 def init_portdir():
@@ -109,6 +109,8 @@ class Kresd(ContextDecorator):
                 raise RuntimeError("Kresd crashed with returncode: {}".format(
                     self.process.returncode))
         except (RuntimeError, ConnectionError):  # pylint: disable=try-except-raise
+            with open(self.logfile_path) as log:  # print log for debugging
+                print(log.read())
             raise
 
         return self
@@ -127,24 +129,35 @@ class Kresd(ContextDecorator):
     def all_ports_alive(self, msgid=10001):
         alive = True
         if self.ip:
-            alive &= utils.try_ping_alive(self.ip_tls_socket(), close=True, msgid=msgid)
-            alive &= utils.try_ping_alive(self.ip_tcp_socket(), close=True, msgid=msgid + 1)
+            alive &= utils.try_ping_alive(self.ip_tcp_socket(), close=True, msgid=msgid)
+            alive &= utils.try_ping_alive(self.ip_tls_socket(), close=True, msgid=msgid + 1)
         if self.ip6:
-            alive &= utils.try_ping_alive(self.ip6_tls_socket(), close=True, msgid=msgid + 2)
-            alive &= utils.try_ping_alive(self.ip6_tcp_socket(), close=True, msgid=msgid + 3)
+            alive &= utils.try_ping_alive(self.ip6_tcp_socket(), close=True, msgid=msgid + 2)
+            alive &= utils.try_ping_alive(self.ip6_tls_socket(), close=True, msgid=msgid + 3)
         return alive
 
-    def _wait_for_tcp_port(self, delay=0.1, max_attempts=20):
+    def _wait_for_tcp_port(self, max_delay=10, delay_step=0.2):
         family = socket.AF_INET if self.ip else socket.AF_INET6
-        for _ in range(max_attempts):
+        i = 0
+        end_time = time.time() + max_delay
+
+        while time.time() < end_time:
+            i += 1
+
+            # use exponential backoff algorhitm to choose next delay
+            rand_delay = random.randrange(0, i)
+            time.sleep(rand_delay * delay_step)
+
             try:
-                sock, dest = self.stream_socket(family, timeout=3)
+                sock, dest = self.stream_socket(family, timeout=5)
                 sock.connect(dest)
             except ConnectionRefusedError:
-                time.sleep(delay)
                 continue
             else:
-                return utils.try_ping_alive(sock, close=True, msgid=10000)
+                try:
+                    return utils.try_ping_alive(sock, close=True, msgid=10000)
+                except socket.timeout:
+                    continue
             finally:
                 sock.close()
         raise RuntimeError("Kresd didn't start in time")

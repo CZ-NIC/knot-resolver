@@ -61,7 +61,7 @@ def test_pipelining(kresd_sock):
     assert msg_answer.id == msgid_pre
 
     # test
-    buff1, msgid1 = utils.get_msgbuff('1000.delay.getdnsapi.net.', msgid=1)
+    buff1, msgid1 = utils.get_msgbuff('1500.delay.getdnsapi.net.', msgid=1)
     buff2, msgid2 = utils.get_msgbuff('1.delay.getdnsapi.net.', msgid=2)
     buff = buff1 + buff2
     kresd_sock.sendall(buff)
@@ -76,7 +76,7 @@ def test_pipelining(kresd_sock):
 @pytest.mark.parametrize('duration, delay', [
     (utils.MAX_TIMEOUT, 0.1),
     (utils.MAX_TIMEOUT, 3),
-    (utils.MAX_TIMEOUT, 8),
+    (utils.MAX_TIMEOUT, 7),
     (utils.MAX_TIMEOUT + 10, 3),
 ])
 def test_long_lived(kresd_sock, duration, delay):
