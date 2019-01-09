@@ -963,6 +963,7 @@ const char *kr_strptime_diff(const char *format, const char *time1_str,
 	char *err = strptime(time1_str, format, &time1_tm);
 	if (err == NULL || err != time1_str + strlen(time1_str))
 		return "strptime failed for time1";
+	time1_tm.tm_isdst = -1; /* determine if DST is active or not */
 	time1_u = mktime(&time1_tm);
 	if (time1_u == (time_t)-1)
 		return "mktime failed for time1";
@@ -970,6 +971,7 @@ const char *kr_strptime_diff(const char *format, const char *time1_str,
 	err = strptime(time0_str, format, &time0_tm);
 	if (err == NULL || err != time0_str + strlen(time0_str))
 		return "strptime failed for time0";
+	time0_tm.tm_isdst = -1; /* determine if DST is active or not */
 	time0_u = mktime(&time0_tm);
 	if (time0_u == (time_t)-1)
 		return "mktime failed for time0";
