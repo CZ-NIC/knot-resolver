@@ -561,10 +561,12 @@ static char* hint_use_nodata(void *env, struct kr_module *module, const char *ar
 
 	JsonNode *root_node = json_decode(args);
 	if (!root_node || root_node->tag != JSON_BOOL) {
+		json_delete(root_node);
 		return bool2jsonstr(false);
 	}
 
 	data->use_nodata = root_node->bool_;
+	json_delete(root_node);
 	return bool2jsonstr(true);
 }
 
