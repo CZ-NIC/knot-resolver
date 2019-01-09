@@ -199,7 +199,7 @@ function M.add_interface(conf)
 end
 
 -- init
-files = {
+local files = {
 	'ok0_badtimes.xml',
 	'ok1.xml',
 	'ok1_expired1.xml',
@@ -215,16 +215,9 @@ files = {
 	'unsupp_xml_v11.xml'
 }
 
--- assumption: this server is executed using luajit webserv.lua or similar
--- we attempt to find static files in directory where webserv.lua resides
-if string.find(arg[0], '/') then
-	prefix = string.gsub(arg[0], '(.*/).*', '%1')
-else
-	prefix = ''
-end
 -- Export static pages specified at command line
 for _, name in ipairs(files) do
-	local fd = io.open(prefix .. name)
+	local fd = io.open(name)
 	assert(fd, string.format('unable to open file "%s"', name))
 	M.endpoints['/' .. name] = { 'text/xml', fd:read('*a') }
 	fd:close()
