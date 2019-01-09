@@ -58,7 +58,7 @@ struct tls_proxy_ctx {
 	struct sockaddr_storage server_addr;
 	struct sockaddr_storage upstream_addr;
 	struct sockaddr_storage client_addr;
-	
+
 	int server_state;
 	int client_state;
 	int upstream_state;
@@ -68,7 +68,7 @@ struct tls_proxy_ctx {
 	array_t(struct buf *) buffer_pool;
 	array_t(struct buf *) upstream_pending;
 	array_t(struct buf *) client_pending;
-	
+
 	char io_buf[0xFFFF];
 	struct tls_ctx tls;
 };
@@ -374,9 +374,9 @@ static void on_client_connection(uv_stream_t *server, int status)
 			     err, uv_strerror(err));
 		return;
 	}
-	
+
 	fprintf(stdout, "incoming connection from %s\n", ip_straddr(addr));
-	
+
 	uv_read_start((uv_stream_t*)&proxy->client, alloc_uv_buffer, read_from_client_cb);
 
 	const char *errpos = NULL;
@@ -590,6 +590,7 @@ static int write_to_client_pending(struct tls_proxy_ctx *proxy)
 
 	gnutls_session_t tls_session = proxy->tls.session;
 	assert(proxy->tls.handshake_state != TLS_HS_IN_PROGRESS);
+    assert(gnutls_record_check_corked(tls_session) == 0);
 
 	char *data = buf->buf;
 	size_t len = buf->size;
@@ -648,6 +649,7 @@ static int tls_process_from_upstream(struct tls_proxy_ctx *proxy, const uint8_t 
 
 	fprintf(stdout, "pushing %zd bytes to client\n", len);
 
+    assert(gnutls_record_check_corked(tls_session) == 0);
 	ssize_t submitted = 0;
 	if (proxy->client_state != STATE_CONNECTED) {
 		return submitted;
@@ -742,7 +744,7 @@ int tls_process_from_client(struct tls_proxy_ctx *proxy, const uint8_t *buf, ssi
 			}
 		} else if (proxy->upstream_state == STATE_NOT_CONNECTED) {
 			/* TODO avoid allocation */
-			uv_tcp_init(proxy->loop, &proxy->upstream);	
+			uv_tcp_init(proxy->loop, &proxy->upstream);
 			uv_connect_t *conn = (uv_connect_t *) malloc(sizeof(uv_connect_t));
 			proxy->upstream_state = STATE_CONNECT_IN_PROGRESS;
 			fprintf(stdout, "connecting to %s\n",
@@ -764,7 +766,7 @@ struct tls_proxy_ctx *tls_proxy_allocate()
 }
 
 int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
-{	
+{
 	const char *server_addr = a->local_addr;
 	int server_port = a->local_port;
 	const char *upstream_addr = a->upstream;
@@ -798,7 +800,7 @@ int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
 	proxy->upstream_state = STATE_NOT_CONNECTED;
 
 	proxy->loop->data = proxy;
-	
+
 	int err = 0;
 	if (gnutls_references == 0) {
 		err = gnutls_global_init();
@@ -809,7 +811,7 @@ int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
 		}
 	}
 	gnutls_references += 1;
-	
+
 	err = gnutls_certificate_allocate_credentials(&proxy->tls.credentials);
 	if (err != GNUTLS_E_SUCCESS) {
 		fprintf(stderr, "gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
@@ -841,7 +843,7 @@ int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
 		return -1;
 	}
 
-	
+
 	proxy->tls.handshake_state = TLS_HS_NOT_STARTED;
 	return 0;
 }
@@ -858,7 +860,7 @@ void tls_proxy_free(struct tls_proxy_ctx *proxy)
         gnutls_priority_deinit(proxy->tls.priority_cache);
 	/* TODO correctly close all the uv_tcp_t */
 	free(proxy);
-	
+
 	gnutls_references -= 1;
 	if (gnutls_references == 0) {
 		gnutls_global_deinit();
@@ -866,7 +868,7 @@ void tls_proxy_free(struct tls_proxy_ctx *proxy)
 }
 
 int tls_proxy_start_listen(struct tls_proxy_ctx *proxy)
-{	
+{
 	uv_tcp_bind(&proxy->server, (const struct sockaddr*)&proxy->server_addr, 0);
 	int ret = uv_listen((uv_stream_t*)&proxy->server, 128, on_client_connection);
 	if (ret == 0) {

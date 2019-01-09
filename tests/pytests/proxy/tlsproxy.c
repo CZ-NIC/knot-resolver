@@ -5,6 +5,9 @@
 #include <errno.h>
 #include <string.h>
 #include <gnutls/gnutls.h>
+#include <signal.h>
+#include <errno.h>
+#include <string.h>
 #include "tls-proxy.h"
 
 static char default_local_addr[] = "127.0.0.1";
@@ -110,10 +113,6 @@ int main(int argc, char **argv)
 			help(argv, &args);
 			return -1;
 		}
-	}
-	if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
-		fprintf(stderr, "failed to set up SIGPIPE handler to ignore(%s)\n",
-				strerror(errno));
 	}
 	struct tls_proxy_ctx *proxy = tls_proxy_allocate();
 	if (!proxy) {

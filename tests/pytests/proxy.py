@@ -49,7 +49,7 @@ class Proxy(ContextDecorator):
         args.append('--local')
         args.append(self.local_ip)
         if self.local_port is not None:
-            args.append('-lport')
+            args.append('--lport')
             args.append(str(self.local_port))
         args.append('--upstream')
         args.append(self.upstream_ip)
@@ -60,8 +60,7 @@ class Proxy(ContextDecorator):
 
     def __enter__(self):
         if not os.path.exists(self.PATH):
-            pytest.skip(
-                reason="proxy executable '{}' not found (did you compile it?)".format(self.PATH))
+            pytest.skip("proxy executable '{}' not found (did you compile it?)".format(self.PATH))
 
         cwd, cmd = os.path.split(self.PATH)
         cmd = './' + cmd
