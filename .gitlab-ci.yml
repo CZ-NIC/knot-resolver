@@ -303,7 +303,7 @@ pytests:run:
   except:
     - master
   script:
-    - pushd tests/pytests/rehandshake
+    - pushd tests/pytests/proxy
     - make all
     - popd
     - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run.sh &> pytests.log.txt
