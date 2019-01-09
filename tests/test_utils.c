@@ -81,33 +81,33 @@ static void test_straddr(void **state)
 
 static void test_strptime_diff(void **state)
 {
-	char *format = "%Y-%m-%dT%H:%M:%S%Z";
+	char *format = "%Y-%m-%dT%H:%M:%S";
 	const char *errmsg = NULL;
 	double output;
 
 	errmsg = kr_strptime_diff(format,
-		"2019-01-09T12:06:04+01:00",
-		"2019-01-09T12:06:04+01:00", &output);
+		"2019-01-09T12:06:04",
+		"2019-01-09T12:06:04", &output);
 	assert_true(errmsg == NULL);
 	/* double type -> equality is not reliable */
 	assert_true(output > -0.01 && output < 0.01);
 
 	errmsg = kr_strptime_diff(format,
-		"2019-01-09T12:06:04+00:00",
-		"2019-01-09T11:06:04+00:00", &output);
+		"2019-01-09T12:06:04",
+		"2019-01-09T11:06:04", &output);
 	assert_true(errmsg == NULL);
 	/* double type -> equality is not reliable */
 	assert_true(output > -3600.01 && output < 3600.01);
 
 	/* invalid inputs */
 	errmsg = kr_strptime_diff(format,
-		"2019-01-09T25:06:04+00:00",
-		"2019-01-09T11:06:04+00:00", &output);
+		"2019-01-09T25:06:04",
+		"2019-01-09T11:06:04", &output);
 	assert_true(errmsg != NULL);
 
 	errmsg = kr_strptime_diff("fail",
-		"2019-01-09T23:06:04+00:00",
-		"2019-01-09T11:06:04+00:00", &output);
+		"2019-01-09T23:06:04",
+		"2019-01-09T11:06:04", &output);
 	assert_true(errmsg != NULL);
 }
 
