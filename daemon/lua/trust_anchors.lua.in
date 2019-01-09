@@ -24,11 +24,25 @@ local function https_fetch(url, ca)
 	return resp[1]
 end
 
+-- remove UTC timezone specification if present or throw error
+local function time2utc(orig_timespec)
+	local removals = 0
+	local patterns = {'[+-]00:00$', 'Z$'}
+	for _, pattern in ipairs(patterns) do
+		timespec, removals = string.gsub(orig_timespec, pattern, '')
+		if removals == 1 then
+			return timespec
+		end
+	end
+	error(string.format('unsupported time specification: %s', orig_timespec))
+end
+
 local function keydigest_is_valid(valid_from, valid_until)
-	local format =            '%Y-%m-%dT%H:%M:%S%Z'
-	local time_now = os.date('!%Y-%m-%dT%H:%M:%S+00:00')  -- ! forces UTC
+	local format =            '%Y-%m-%dT%H:%M:%S'
+	local time_now = os.date('!%Y-%m-%dT%H:%M:%S')  -- ! forces UTC
 	local time_diff = ffi.new('double[1]')
-	local err = ffi.C.kr_strptime_diff(format, time_now, valid_from, time_diff)
+	local err = ffi.C.kr_strptime_diff(
+		format, time_now, time2utc(valid_from), time_diff)
 	if (err ~= nil) then
 	       error(string.format('failed to process "validFrom" constraint: %s',
 				   ffi.string(err)))
@@ -38,7 +52,8 @@ local function keydigest_is_valid(valid_from, valid_until)
 	-- optional attribute
 	local until_ok = true
 	if valid_until then
-		err = ffi.C.kr_strptime_diff(format, time_now, valid_until, time_diff)
+		err = ffi.C.kr_strptime_diff(
+			format, time_now, time2utc(valid_until), time_diff)
 		if (err ~= nil) then
 			error(string.format('failed to process "validUntil" constraint: %s',
 					    ffi.string(err)))
