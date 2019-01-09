@@ -1,9 +1,18 @@
-Knot Resolver 3.X.Y (2019-0m-dd)
+Knot Resolver 3.2.1 (2019-01-10)
 ================================
 
 Bugfixes
 --------
-- policy.TLS_FORWARD: fix problems with gnutls 3.3 (#438)
+- trust_anchors: respect validity time range during TA bootstrap (!748)
+- fix TLS rehandshake handling (!739)
+- make TLS_FORWARD compatible with GnuTLS 3.3 (!741)
+- special thanks to Grigorii Demidov for his long-term work on Knot Resolver!
+
+Improvements
+------------
+- improve handling of timeouted outgouing TCP connections (!734)
+- trust_anchors: check syntax of public keys in DNSKEY RRs (!748)
+- validator: clarify message about bogus non-authoritative data (!735)
 
 
 Knot Resolver 3.2.0 (2018-12-17)
