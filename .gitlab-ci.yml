@@ -300,7 +300,7 @@ pytests:run:
   except:
     - master
   script:
-    - pushd tests/pytests/rehandshake && make all && popd
+    - pushd tests/pytests/proxy && make all && popd
     - pushd tests/pytests/random_close && make all && popd
     - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run.sh &> pytests.log.txt
   after_script:
