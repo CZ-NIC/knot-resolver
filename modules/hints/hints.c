@@ -565,6 +565,7 @@ static char* hint_use_nodata(void *env, struct kr_module *module, const char *ar
 	}
 
 	data->use_nodata = root_node->bool_;
+	json_delete(root_node);
 	return bool2jsonstr(true);
 }
 
