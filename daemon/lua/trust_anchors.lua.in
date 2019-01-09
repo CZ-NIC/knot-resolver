@@ -26,10 +26,9 @@ end
 
 -- remove UTC timezone specification if present or throw error
 local function time2utc(orig_timespec)
-	local removals = 0
 	local patterns = {'[+-]00:00$', 'Z$'}
 	for _, pattern in ipairs(patterns) do
-		timespec, removals = string.gsub(orig_timespec, pattern, '')
+		local timespec, removals = string.gsub(orig_timespec, pattern, '')
 		if removals == 1 then
 			return timespec
 		end
