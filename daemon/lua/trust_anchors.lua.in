@@ -146,14 +146,14 @@ local key_state = {
 
 -- Find key in current keyset
 local function ta_find(keyset, rr)
-	local rr_keytag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
-	assert(rr_keytag >= 0 and rr_keytag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(rr), ffi.string(C.knot_strerror(rr_keytag))))
+	local rr_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
+	assert(rr_tag >= 0 and rr_tag <= 65535, string.format('invalid RR: %s: %s',
+	       kres.rr2str(rr), ffi.string(C.knot_strerror(rr_tag))))
 	for i, ta in ipairs(keyset) do
 		-- Match key owner and content
-		local ta_keytag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
-		assert(ta_keytag >= 0 and ta_keytag <= 65535, string.format('invalid RR: %s: %s',
-		       kres.rr2str(ta), ffi.string(C.knot_strerror(ta_keytag))))
+		local ta_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
+		assert(ta_tag >= 0 and ta_tag <= 65535, string.format('invalid RR: %s: %s',
+		       kres.rr2str(ta), ffi.string(C.knot_strerror(ta_tag))))
 		if ta.owner == rr.owner then
 			if ta.type == rr.type then
 				if rr.type == kres.type.DNSKEY then
@@ -165,7 +165,7 @@ local function ta_find(keyset, rr)
 				end
 			-- DNSKEY superseding DS, inexact match
 			elseif rr.type == kres.type.DNSKEY and ta.type == kres.type.DS then
-				if ta.key_tag == rr_keytag then
+				if ta.key_tag == rr_tag then
 					keyset[i] = rr -- Replace current DS
 					rr.state = ta.state
 					rr.key_tag = ta.key_tag
@@ -190,9 +190,9 @@ local function ta_present(keyset, rr, hold_down_time, force_valid)
 	-- Find the key in current key set and check its status
 	local now = os.time()
 	local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
-	local key_keytag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
-	assert(key_keytag >= 0 and key_keytag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(rr), ffi.string(C.knot_strerror(key_keytag))))
+	local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
+	assert(key_tag >= 0 and key_tag <= 65535, string.format('invalid RR: %s: %s',
+	       kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
 	local ta = ta_find(keyset, rr)
 	if ta then
 		-- Key reappears (KeyPres)
@@ -218,11 +218,11 @@ local function ta_present(keyset, rr, hold_down_time, force_valid)
 			ta.timer = nil
 		end
 		if rr.state ~= key_state.Valid or verbose() then
-			log('[ ta ] key: '..key_keytag..' state: '..ta.state)
+			log('[ ta ] key: ' .. key_tag .. ' state: '..ta.state)
 		end
 		return true
 	elseif not key_revoked then -- First time seen (NewKey)
-		rr.key_tag = key_keytag
+		rr.key_tag = key_tag
 		if force_valid then
 			rr.state = key_state.Valid
 		else
@@ -230,7 +230,7 @@ local function ta_present(keyset, rr, hold_down_time, force_valid)
 			rr.timer = now + hold_down_time
 		end
 		if rr.state ~= key_state.Valid or verbose() then
-			log('[ ta ] key: '..key_tag..' state: '..rr.state)
+			log('[ ta ] key: ' .. key_tag .. ' state: '..rr.state)
 		end
 		table.insert(keyset, rr)
 		return true
@@ -243,8 +243,8 @@ local function ta_missing(ta, hold_down_time)
 	-- Key is removed (KeyRem)
 	local keep_ta = true
 	local key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
-	assert(key_keytag >= 0 and key_keytag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(ta), ffi.string(C.knot_strerror(key_keytag))))
+	assert(key_tag >= 0 and key_tag <= 65535, string.format('invalid RR: %s: %s',
+	       kres.rr2str(ta), ffi.string(C.knot_strerror(key_tag))))
 	if ta.state == key_state.Valid then
 		ta.state = key_state.Missing
 		ta.timer = os.time() + hold_down_time
