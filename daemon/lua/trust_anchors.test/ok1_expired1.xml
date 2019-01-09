@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrustAnchor id="68463155-A857-4C7E-BCA6-2F6CC2EAC1BE" source="https://localhost/ok1_expired1.xml">
+<Zone>.</Zone>
+<KeyDigest id="F" validFrom="1990-01-01T00:00:00+00:00" validUntil="2000-01-01T00:00:00+00:00">
+<KeyTag>1</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF</Digest>
+</KeyDigest>
+<KeyDigest id="1" validFrom="2000-01-01T00:00:00+00:00">
+<KeyTag>2</KeyTag>
+<Algorithm>8</Algorithm>
+<DigestType>2</DigestType>
+<Digest>1111111111111111111111111111111111111111111111111111111111111111</Digest>
+</KeyDigest>
+</TrustAnchor>

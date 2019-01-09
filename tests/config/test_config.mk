@@ -7,6 +7,7 @@
 
 tests_config := \
 	$(wildcard daemon/*/*.test.lua) \
+	$(wildcard daemon/*/*/*.test.lua) \
 	$(wildcard modules/*/*.test.lua) \
 	$(wildcard modules/*/*/*.test.lua) \
 	$(wildcard tests/config/*.test.lua) \
