@@ -225,7 +225,7 @@ end
 
 local server = M.add_interface({
 	host = 'localhost',
-	port = 8053,
+	port = 8080,
 	tls = true,
 	cert = 'x509/server.pem',
 	key = 'x509/server-key.pem'
