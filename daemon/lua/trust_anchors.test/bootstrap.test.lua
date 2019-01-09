@@ -81,7 +81,7 @@ end
 -- it does not get written until refresh fetches DNSKEY from network
 -- (and bypassing network using policy bypasses also validation
 -- so it does not test anything)
-local function test_ok_xml(testname, testdesc, nkeys)
+local function test_ok_xml(testname, testdesc)
 	return function()
 		trust_anchors.bootstrap_url = host .. testname .. '.xml'
 		same(trust_anchors.add_file(testname .. '.keys'), nil, testdesc)
