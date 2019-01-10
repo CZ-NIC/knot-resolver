@@ -453,14 +453,44 @@ local function rpz_parse(action, path)
 			print(string.format('[ rpz ] %s:%d: unsupported policy action', path, tonumber(parser.line_counter)))
 		end
 	end
+	collectgarbage()
 	return rules
 end
 
+local function get_dir_and_file(path)
+  local dir, file = string.match(path, "(.*)/([^/]+)")
+
+  -- If regex doesn't match then path must be the file directly (i.e. doesn't contain '/')
+  -- This assumes that the file exists (rpz_parse() would fail if it doesn't)
+  if not dir and not file then
+    dir = '.'
+    file = path
+  end
+
+  return dir, file
+end
+
 -- RPZ policy set
--- Create RPZ from zone file
+-- Create RPZ from zone file, watch the file for changes and reload on change
 function policy.rpz(action, path)
 	local rules = rpz_parse(action, path)
-	collectgarbage()
+
+	local notify = require('cqueues.notify')
+  local dir, file = get_dir_and_file(path)
+  local watcher = notify.opendir(dir)
+  watcher:add(file, notify.MODIFY)
+
+  worker.coroutine(function ()
+    for flags, name in watcher:changes() do
+      -- Limit to changes on file we're interested if
+      -- Watcher will also fire for changes to the directory itself
+      if name == file then
+        -- If the file changes then reparse and replace the existing ruleset
+        rules = rpz_parse(action, path)
+      end
+    end
+  end)
+
 	return function(_, query)
 		local label = query:name()
 		local rule = rules[label]
