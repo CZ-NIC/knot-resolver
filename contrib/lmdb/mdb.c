@@ -1,3 +1,4 @@
+#pragma GCC diagnostic ignored "-Wshadow"
 /** @file mdb.c
  *	@brief Lightning memory-mapped database library
  *
