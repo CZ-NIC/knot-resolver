@@ -481,7 +481,7 @@ function policy.rpz(action, path)
   watcher:add(file, notify.MODIFY)
 
   worker.coroutine(function ()
-    for flags, name in watcher:changes() do
+    for _, name in watcher:changes() do
       -- Limit to changes on file we're interested if
       -- Watcher will also fire for changes to the directory itself
       if name == file then
