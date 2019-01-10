@@ -24,9 +24,9 @@ case "$repo" in
 esac
 
 cd "$distro"
-vagrant destroy &>/dev/null
+vagrant destroy -f &>/dev/null
 vagrant up
 ret=$?
-vagrant destroy &>/dev/null
+vagrant destroy -f &>/dev/null
 exit $ret
 

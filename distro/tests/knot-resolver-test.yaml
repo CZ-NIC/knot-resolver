@@ -5,7 +5,6 @@
   become: true
 
   vars:
-    ansible_python_interpreter: /usr/bin/python2
     dig_package:
       Debian: dnsutils
       Ubuntu: dnsutils
@@ -51,16 +50,12 @@
   vars_files:
     - repos.yaml
 
-  # HACK: Ansible requires Python 2, but it's not installed by default in all distros
   gather_facts: false
   pre_tasks:
-    - name: install python and deps for ansible modules
+    - name: install python3 (Arch)
       raw: |
-        yum install -y python2 python2-dnf libselinux-python || \
-        pacman -Sy python2 --noconfirm || \
-        (zypper --gpg-auto-import-keys refresh && zypper install -y python) || \
-        (apt-get update && apt-get install -y python) || \
-        :
+        (pacman-key --init && pacman-key --populate archlinux && \
+         pacman -Sy python3 --noconfirm) || :
       ignore_errors: true
     - name: gather facts
       setup:
@@ -74,6 +69,8 @@
 
     - name: configure OBS repository
       shell: "{{ configure_obs_repo[ansible_distribution] }}"
+      args:
+        warn: false
       with_items: "{{ repos }}"
       when: ansible_distribution_file_variety != 'Archlinux'
 
@@ -101,6 +98,8 @@
             dest: /etc/pacman.d/mirrorlist
         - name: sync repos (Arch)
           shell: pacman -Syu --noconfirm
+          args:
+            warn: false
       when: ansible_distribution_file_variety == 'Archlinux'
 
     - name: install knot-resolver
@@ -110,6 +109,8 @@
 
     - name: get installed package version
       shell: "{{ show_package_version[ansible_distribution] }}"
+      args:
+        warn: false
       register: package_version
 
     - name: install dig

@@ -4,12 +4,15 @@
 
 Vagrant.configure(2) do |config|
 
-    config.vm.box = "fedora/29-cloud-base"
+    config.vm.box = "generic/fedora29"
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
     config.vm.define "fedora29_knot-resolver"  do |machine|
         machine.vm.provision "ansible" do |ansible|
             ansible.playbook = "../knot-resolver-test.yaml"
+            ansible.extra_vars = {
+                ansible_python_interpreter: "/usr/bin/python3"
+            }
         end
     end
 
