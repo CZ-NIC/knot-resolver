@@ -546,14 +546,14 @@ local add_file = function (path, unmanaged)
 	end
 	trust_anchors.keysets[owner] = keyset
 
-	-- Parse new keys, refresh eventually
+	-- Replace the TA store used for validation
 	if keyset_publish(keyset) ~= 0 and verbose() then
 		log('[ ta ] installed trust anchors for domain ' .. owner_str .. ' are:\n'
 		    .. trust_anchors.summary(owner))
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
 
-	refresh_plan(keyset, 10 * sec, false)
+	if not unmanaged then refresh_plan(keyset, 10 * sec, false) end
 end
 
 local function ta_str(owner)
