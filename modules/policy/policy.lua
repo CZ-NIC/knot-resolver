@@ -477,7 +477,7 @@ function policy.rpz(action, path)
 	local rules = rpz_parse(action, path)
 
 	local notify = require('cqueues.notify')
-	local notify = require('bit32')
+	local bit32 = require('bit32')
 	local dir, file = get_dir_and_file(path)
 	local watcher = notify.opendir(dir)
 	watcher:add(file, bit32.bxor(notify.CREATE, notify.MODIFY))
