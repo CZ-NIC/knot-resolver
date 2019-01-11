@@ -450,13 +450,14 @@ local function rpz_parse(action, path)
 		rules[name] = action_map[name_action]
 		-- Warn when NYI
 		if #name > 1 and not action_map[name_action] then
-			print(string.format('[ rpz ] %s:%d: unsupported policy action', path, tonumber(parser.line_counter)))
+			log('[poli] RPZ %s:%d: unsupported policy action', path, tonumber(parser.line_counter))
 		end
 	end
 	collectgarbage()
 	return rules
 end
 
+-- Split path into dirname and basename (like the shell utilities)
 local function get_dir_and_file(path)
 	local dir, file = string.match(path, "(.*)/([^/]+)")
 
@@ -475,7 +476,7 @@ end
 function policy.rpz(action, path, watch)
 	local rules = rpz_parse(action, path)
 
-	if watch then
+	if watch or true then
 		local has_notify, notify  = pcall(require, 'cqueues.notify')
 		if has_notify then
 			local bit = require('bit')
@@ -490,11 +491,16 @@ function policy.rpz(action, path, watch)
 					-- Watcher will also fire for changes to the directory itself
 					if name == file then
 						-- If the file changes then reparse and replace the existing ruleset
+						if verbose() then
+							log('[poli] RPZ reloading: ' .. name)
+						end
 						rules = rpz_parse(action, path)
 					end
 				end
 			end)
-		else
+		elseif watch then -- explicitly requested and failed
+			error('[poli] lua-cqueues required to watch and reload RPZ file')
+		elseif verbose() then
 			log('[poli] lua-cqueues required to watch and reload RPZ file, continuing without watching')
 		end
 	end

@@ -59,7 +59,7 @@ BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
-Requires:       lua-cqueues
+Requires:       lua-cqueues-compat
 Requires(pre):	shadow-utils
 %endif
 %if 0%{?suse_version}

@@ -11,6 +11,8 @@ Bugfixes
 Improvements
 ------------
 - hints module: allow configuring the TTL and change default from 0 to 5s
+- policy module: policy.rpz() will watch the file for changes by default
+- packaging: lua cqueues added to default dependencies where available
 
 
 Knot Resolver 3.2.1 (2019-01-10)
