@@ -472,33 +472,35 @@ local function get_dir_and_file(path)
 end
 
 -- RPZ policy set
--- Create RPZ from zone file, watch the file for changes and reload on change
-function policy.rpz(action, path)
+-- Create RPZ from zone file and optionally watch the file for changes
+function policy.rpz(action, path, watch)
 	local rules = rpz_parse(action, path)
 
-	local has_notify, notify  = pcall(require, 'cqueues.notify')
-	if has_notify then
-		local bit = require('bit')
+	if watch then
+		local has_notify, notify  = pcall(require, 'cqueues.notify')
+		if has_notify then
+			local bit = require('bit')
 
-		local dir, file = get_dir_and_file(path)
-		local watcher = notify.opendir(dir)
-		watcher:add(file, bit.bxor(notify.CREATE, notify.MODIFY))
+			local dir, file = get_dir_and_file(path)
+			local watcher = notify.opendir(dir)
+			watcher:add(file, bit.bxor(notify.CREATE, notify.MODIFY))
 
-		worker.coroutine(function ()
-			for _, name in watcher:changes() do
-				-- Limit to changes on file we're interested in
-				-- Watcher will also fire for changes to the directory itself
-				if name == file then
-					-- If the file changes then reparse and replace the existing ruleset
-					if verbose() then
-						log('[poli] RPZ reloading: ' .. name)
+			worker.coroutine(function ()
+				for _, name in watcher:changes() do
+					-- Limit to changes on file we're interested in
+					-- Watcher will also fire for changes to the directory itself
+					if name == file then
+						-- If the file changes then reparse and replace the existing ruleset
+						if verbose() then
+							log('[poli] RPZ reloading: ' .. name)
+						end
+						rules = rpz_parse(action, path)
 					end
-					rules = rpz_parse(action, path)
 				end
-			end
-		end)
-	else
-		log('[poli] lua-cqueues required to watch and reload RPZ file, continuing without watching')
+			end)
+		else
+			log('[poli] lua-cqueues required to watch and reload RPZ file, continuing without watching')
+		end
 	end
 
 	return function(_, query)
