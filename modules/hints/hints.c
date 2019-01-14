@@ -33,6 +33,8 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 
+#include <inttypes.h>
+
 /* Defaults */
 #define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "hint",  __VA_ARGS__)
 #define ERR_MSG(...) kr_log_error("[     ][hint] " __VA_ARGS__)
@@ -41,6 +43,7 @@ struct hints_data {
 	struct kr_zonecut hints;
 	struct kr_zonecut reverse_hints;
 	bool use_nodata; /**< See hint_use_nodata() description, exposed via lua. */
+	uint32_t ttl;    /**< TTL used for the hints, exposed via lua. */
 };
 
 /** Useful for returning from module properties. */
@@ -79,16 +82,17 @@ static int put_answer(knot_pkt_t *pkt, struct kr_query *qry, knot_rrset_t *rr, b
 	return ret;
 }
 
-static int satisfy_reverse(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_query *qry, bool use_nodata)
+static int satisfy_reverse(/*const*/ struct hints_data *data,
+			   knot_pkt_t *pkt, struct kr_query *qry)
 {
 	/* Find a matching name */
-	pack_t *addr_set = kr_zonecut_find(hints, qry->sname);
+	pack_t *addr_set = kr_zonecut_find(&data->reverse_hints, qry->sname);
 	if (!addr_set || addr_set->len == 0) {
 		return kr_error(ENOENT);
 	}
 	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
 	knot_rrset_t rr;
-	knot_rrset_init(&rr, qname, KNOT_RRTYPE_PTR, KNOT_CLASS_IN, 0);
+	knot_rrset_init(&rr, qname, KNOT_RRTYPE_PTR, KNOT_CLASS_IN, data->ttl);
 
 	/* Append address records from hints */
 	uint8_t *addr = pack_last(*addr_set);
@@ -98,19 +102,20 @@ static int satisfy_reverse(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 		knot_rrset_add_rdata(&rr, addr_val, len, &pkt->mm);
 	}
 
-	return put_answer(pkt, qry, &rr, use_nodata);
+	return put_answer(pkt, qry, &rr, data->use_nodata);
 }
 
-static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_query *qry, bool use_nodata)
+static int satisfy_forward(/*const*/ struct hints_data *data,
+			   knot_pkt_t *pkt, struct kr_query *qry)
 {
 	/* Find a matching name */
-	pack_t *addr_set = kr_zonecut_find(hints, qry->sname);
+	pack_t *addr_set = kr_zonecut_find(&data->hints, qry->sname);
 	if (!addr_set || addr_set->len == 0) {
 		return kr_error(ENOENT);
 	}
 	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
 	knot_rrset_t rr;
-	knot_rrset_init(&rr, qname, qry->stype, qry->sclass, 0);
+	knot_rrset_init(&rr, qname, qry->stype, qry->sclass, data->ttl);
 	size_t family_len = sizeof(struct in_addr);
 	if (rr.type == KNOT_RRTYPE_AAAA) {
 		family_len = sizeof(struct in6_addr);
@@ -127,7 +132,7 @@ static int satisfy_forward(struct kr_zonecut *hints, knot_pkt_t *pkt, struct kr_
 		addr = pack_obj_next(addr);
 	}
 
-	return put_answer(pkt, qry, &rr, use_nodata);
+	return put_answer(pkt, qry, &rr, data->use_nodata);
 }
 
 static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -147,11 +152,11 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	switch(qry->stype) {
 	case KNOT_RRTYPE_A:
 	case KNOT_RRTYPE_AAAA: /* Find forward record hints */
-		if (satisfy_forward(&data->hints, pkt, qry, data->use_nodata) != 0)
+		if (satisfy_forward(data, pkt, qry) != 0)
 			return ctx->state;
 		break;
 	case KNOT_RRTYPE_PTR: /* Find PTR record */
-		if (satisfy_reverse(&data->reverse_hints, pkt, qry, data->use_nodata) != 0)
+		if (satisfy_reverse(data, pkt, qry) != 0)
 			return ctx->state;
 		break;
 	default:
@@ -570,6 +575,29 @@ static char* hint_use_nodata(void *env, struct kr_module *module, const char *ar
 	return bool2jsonstr(true);
 }
 
+static char* hint_ttl(void *env, struct kr_module *module, const char *args)
+{
+	struct hints_data *data = module->data;
+
+	/* Do no change on nonsense TTL values. */
+	JsonNode *root_node = args ? json_decode(args) : NULL;
+	if (root_node && root_node->tag == JSON_NUMBER) {
+		double ttl_d = root_node->number_;
+		uint32_t ttl = ttl_d;
+		if (ttl_d >= 0 && abs(ttl_d - ttl) < 1) {
+			data->ttl = ttl;
+		}
+	}
+	json_delete(root_node);
+
+	/* Always return the current TTL setting.  Plain number is valid JSON. */
+	char *result = NULL;
+	if (-1 == asprintf(&result, "%"PRIu32, data->ttl)) {
+		result = NULL;
+	}
+	return result;
+}
+
 /*
  * Module implementation.
  */
@@ -609,6 +637,7 @@ int hints_init(struct kr_module *module)
 	kr_zonecut_init(&data->hints, (const uint8_t *)(""), pool);
 	kr_zonecut_init(&data->reverse_hints, (const uint8_t *)(""), pool);
 	data->use_nodata = true;
+	data->ttl = 0;
 	module->data = data;
 
 	return kr_ok();
@@ -654,6 +683,7 @@ struct kr_prop *hints_props(void)
 	    { &hint_set,    "set", "Set {name, address} hint.", },
 	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
 	    { &hint_get,    "get", "Retrieve hint for given name.", },
+	    { &hint_ttl,    "ttl", "Set/get TTL used for the hints.", },
 	    { &hint_add_hosts, "add_hosts", "Load a file with hosts-like formatting and add contents into hints.", },
 	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
 	    { &hint_root_file, "root_file", "Replace root hints set from a zonefile.", },
