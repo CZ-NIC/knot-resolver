@@ -123,7 +123,10 @@ typedef array_t(struct kr_query *) kr_qarray_t;
  * It also keeps a notion of current zone cut.
  */
 struct kr_rplan {
-	kr_qarray_t pending;        /**< List of pending queries. */
+	kr_qarray_t pending;        /**< List of pending queries.
+					Beware: order is significant ATM,
+					as the last is the next one to solve,
+					and there may be inter-dependent. */
 	kr_qarray_t resolved;       /**< List of resolved queries. */
 	struct kr_request *request; /**< Parent resolution request. */
 	knot_mm_t *pool;            /**< Temporary memory pool. */

@@ -253,7 +253,12 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 	/* Find the query, it will likely be on top */
 	for (size_t i = rplan->pending.len; i > 0; i--) {
 		if (rplan->pending.at[i - 1] == qry) {
-			array_del(rplan->pending, i - 1);
+			/* Delete i-1 element by *sliding* the rest,
+			 * contrary to array_del() */
+			for (size_t j = i; j < rplan->pending.len; ++j)
+				rplan->pending.at[j - 1] = rplan->pending.at[j];
+			array_pop(rplan->pending);
+
 			array_push(rplan->resolved, qry);
 			break;
 		}
