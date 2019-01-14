@@ -34,6 +34,7 @@
 #include "lib/layer.h"
 
 #include <inttypes.h>
+#include <math.h>
 
 /* Defaults */
 #define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "hint",  __VA_ARGS__)
@@ -579,12 +580,12 @@ static char* hint_ttl(void *env, struct kr_module *module, const char *args)
 {
 	struct hints_data *data = module->data;
 
-	/* Do no change on nonsense TTL values. */
+	/* Do no change on nonsense TTL values (incl. suspicious floats). */
 	JsonNode *root_node = args ? json_decode(args) : NULL;
 	if (root_node && root_node->tag == JSON_NUMBER) {
 		double ttl_d = root_node->number_;
-		uint32_t ttl = ttl_d;
-		if (ttl_d >= 0 && abs(ttl_d - ttl) < 1) {
+		uint32_t ttl = round(ttl_d);
+		if (ttl_d >= 0 && fabs(ttl_d - ttl) * 64 < 1) {
 			data->ttl = ttl;
 		}
 	}
