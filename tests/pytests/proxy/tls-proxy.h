@@ -12,8 +12,10 @@ struct args {
 
 	bool rehandshake;
 	bool close_connection;
+	bool accept_only;
 
 	uint64_t close_timeout;
+	uint32_t max_conn_sequence;
 
 	const char *cert_file;
 	const char *key_file;

@@ -22,12 +22,19 @@ void help(char *argv[], struct args *a)
 	       " -d, --uport=[port]     Upstream port (default: %u).\n"
 	       " -t, --cert=[path]      Path to certificate file (default: %s).\n"
 	       " -k, --key=[path]       Path to key file (default: %s).\n"
-	       " -c, --close=[N]        Close connection to client after every N ms (default: no).\n"
-	       " -r, --rehandshake      Do TLS rehandshake after every 8 bytes sent to client (default: no).\n",
+	       " -c, --close=[N]        Close connection to client after\n"
+	       "                        every N ms (default: %li).\n"
+	       " -f, --fail=[N]         Delay every Nth incoming connection by 10 sec,\n"
+	       "                        0 disables delaying (default: 0).\n"
+	       " -r, --rehandshake      Do TLS rehandshake after every 8 bytes\n"
+	       "                        sent to the client (default: no).\n"
+	       " -a, --acceptonly       Accept incoming connections, but don't\n"
+	       "                        connect to upstream (default: no).\n"
+	       ,
 	       a->local_addr, a->local_port,
 	       a->upstream, a->upstream_port,
-	       a->cert_file, a->key_file
-	);
+	       a->cert_file, a->key_file,
+	       a->close_timeout);
 }
 
 void init_args(struct args *a)
@@ -40,6 +47,8 @@ void init_args(struct args *a)
 	a->key_file = default_key_path;
 	a->rehandshake = false;
 	a->close_connection = false;
+	a->close_timeout = 1000;
+	a->max_conn_sequence = 0; /* disabled */
 }
 
 int main(int argc, char **argv)
@@ -54,12 +63,14 @@ int main(int argc, char **argv)
 		{"cert",        required_argument, 0, 't'},
 		{"key",         required_argument, 0, 'k'},
 		{"close",       required_argument, 0, 'c'},
+		{"fail",        required_argument, 0, 'f'},
 		{"rehandshake", no_argument, 0, 'r'},
+		{"acceptonly",  no_argument, 0, 'a'},
 		{0, 0, 0, 0}
 	};
 	struct args args;
 	init_args(&args);
-	while ((c = getopt_long(argc, argv, "l:p:u:d:t:k:c:r", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "l:p:u:d:t:k:c:f:ra", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'l':
@@ -102,8 +113,21 @@ int main(int argc, char **argv)
 			args.close_connection = true;
 			args.close_timeout = li_value;
 			break;
+		case 'f':
+			li_value = strtol(optarg, NULL, 10);
+			if (li_value <= 0 || li_value > UINT32_MAX) {
+				printf("error: '-f' requires a positive"
+						" number less or equal to %i, not '%s'\n",
+					        UINT32_MAX, optarg);
+				return -1;
+			}
+			args.max_conn_sequence = (uint32_t)li_value;
+			break;
 		case 'r':
 			args.rehandshake = true;
+			break;
+		case 'a':
+			args.accept_only = true;
 			break;
 		default:
 			init_args(&args);
@@ -130,14 +154,19 @@ int main(int argc, char **argv)
 		fprintf(stderr, "error starting listen, error code: %i\n", res);
 		return res;
 	}
-	fprintf(stdout, "Listen on               %s#%u\n"
-			"Upstream is expected on %s#%u\n"
-			"Rehandshake             %s\n"
-			"Close                   %s\n",
+	fprintf(stdout, "Listen on                     %s#%u\n"
+			"Upstream is expected on       %s#%u\n"
+			"Rehandshake                   %s\n"
+			"Close                         %s\n"
+			"Refuse incoming connections   every %ith%s\n"
+			"Only accept, don't forward    %s\n",
 			args.local_addr, args.local_port,
 			args.upstream, args.upstream_port,
 			args.rehandshake ? "yes" : "no",
-			args.close_connection ? "yes" : "no");
+			args.close_connection ? "yes" : "no",
+			args.max_conn_sequence, args.max_conn_sequence ? "" : " (disabled)",
+			args.accept_only ? "yes" : "no"
+		);
 	res = tls_proxy_run(proxy);
 	tls_proxy_free(proxy);
 	return res;
