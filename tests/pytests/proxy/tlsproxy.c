@@ -46,6 +46,7 @@ void init_args(struct args *a)
 	a->cert_file = default_cert_path;
 	a->key_file = default_key_path;
 	a->rehandshake = false;
+	a->accept_only = false;
 	a->close_connection = false;
 	a->close_timeout = 1000;
 	a->max_conn_sequence = 0; /* disabled */
