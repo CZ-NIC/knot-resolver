@@ -161,7 +161,7 @@ class Kresd(ContextDecorator):
                     continue
             finally:
                 sock.close()
-        raise RuntimeError("Kresd didn't start in time")
+        raise RuntimeError("Kresd didn't start in time {}".format(dest))
 
     def socket_dest(self, family, tls=False):
         port = self.tls_port if tls else self.port
