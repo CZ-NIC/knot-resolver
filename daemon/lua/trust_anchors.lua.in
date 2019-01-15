@@ -321,20 +321,25 @@ active_refresh = function (keyset, pkt, is_initial)
 	return math.max(hour, min_ttl)
 end
 
+-- Update ta.comment and return decorated line representing the RR
+-- This is meant to be in zone-file format.
+local function ta_rr_str(ta)
+	ta.comment = ' ' .. ta.state .. ':' .. (ta.timer or '')
+				.. ' ; KeyTag:' .. ta.key_tag -- the tag is just for humans
+	local rr_str = kres.rr2str(ta) .. '\n'
+	if ta.state ~= key_state.Valid and ta.state ~= key_state.Missing then
+		rr_str = '; '..rr_str -- Invalidate key string (for older kresd versions)
+	end
+	return rr_str
+end
+
 -- Write keyset to a file.  States and timers are stored in comments.
 local function keyset_write(keyset)
 	if not keyset.filename then return false end -- not to be persisted
 	local fname_tmp = keyset.filename .. '.lock.' .. tostring(worker.pid);
 	local file = assert(io.open(fname_tmp, 'w'))
 	for i = 1, #keyset do
-		local ta = keyset[i]
-		ta.comment = ' ' .. ta.state .. ':' .. (ta.timer or '')
-					.. ' ; KeyTag:' .. ta.key_tag -- the tag is just for humans
-		local rr_str = kres.rr2str(ta) .. '\n'
-		if ta.state ~= key_state.Valid and ta.state ~= key_state.Missing then
-			rr_str = '; '..rr_str -- Invalidate key string (for older kresd versions)
-		end
-		file:write(rr_str)
+		file:write(ta_rr_str(keyset[i]))
 	end
 	file:close()
 	assert(os.rename(fname_tmp, keyset.filename))
@@ -575,7 +580,7 @@ local function ta_str(owner)
 		msg = msg .. 'WARNING! negative trust anchor also has an explicit TA\n'
 	end
 	for _, ta in ipairs(trust_anchors.keysets[owner]) do
-		msg = msg .. kres.rr2str(ta) .. '\n'
+		msg = msg .. ta_rr_str(ta)
 	end
 	return msg
 end
@@ -608,6 +613,8 @@ trust_anchors = {
 	config = add_file,
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
+	-- FIXME: this function won't update the .keysets,
+	-- so it won't e.g. be shown by .summary() - confusing.
 	add = function (keystr)
 		local ret = trustanchor(keystr)
 		if verbose() then log(trust_anchors.summary()) end
@@ -624,6 +631,8 @@ trust_anchors = {
 		end
 		trust_anchors.insecure = list
 	end,
+	-- Return textual representation of all TAs (incl. negative)
+	-- It's meant for human consumption.
 	summary = function (single_owner)
 		if single_owner then  -- single domain
 			return ta_str(single_owner)
