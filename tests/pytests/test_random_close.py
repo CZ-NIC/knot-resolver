@@ -34,7 +34,7 @@ def rsa_cannon(sock, duration, domain='test.', qps=QPS):
 
 
 def test_proxy_random_close(tmpdir):
-    proxy = TLSProxy(close=1)
+    proxy = TLSProxy(close=1000)
 
     kresd_tls_client_kwargs = {
         'verbose': False,
