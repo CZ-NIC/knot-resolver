@@ -45,6 +45,7 @@ void init_args(struct args *a)
 	a->upstream_port = 53000;
 	a->cert_file = default_cert_path;
 	a->key_file = default_key_path;
+	a->accept_only = false;
 	a->rehandshake = false;
 	a->close_connection = false;
 	a->close_timeout = 1000;
@@ -156,12 +157,15 @@ int main(int argc, char **argv)
 	}
 	fprintf(stdout, "Listen on                     %s#%u\n"
 			"Upstream is expected on       %s#%u\n"
+			"Certificate:                  %s\n"
+			"Key:                          %s\n"
 			"Rehandshake                   %s\n"
 			"Close                         %s\n"
 			"Refuse incoming connections   every %ith%s\n"
 			"Only accept, don't forward    %s\n",
 			args.local_addr, args.local_port,
 			args.upstream, args.upstream_port,
+			args.cert_file, args.key_file,
 			args.rehandshake ? "yes" : "no",
 			args.close_connection ? "yes" : "no",
 			args.max_conn_sequence, args.max_conn_sequence ? "" : " (disabled)",
