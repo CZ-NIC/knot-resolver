@@ -158,7 +158,10 @@ end
 
 function predict.config(config)
 	-- Reconfigure
-	if type(config) ~= 'table' then return end
+	config = config or {}
+	if type(config) ~= 'table' then
+		error('[predict] configuration must be a table or nil')
+	end
 	if config.window then predict.window = config.window end
 	if config.period then predict.period = config.period end
 	-- Load dependent modules
