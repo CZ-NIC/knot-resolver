@@ -85,6 +85,12 @@ static void on_upstream_close(uv_handle_t *handle);
 
 static int gnutls_references = 0;
 
+static const char * const priorities =
+	"NORMAL:" /* GnuTLS defaults */
+	"-VERS-TLS1.0:-VERS-TLS1.1:-VERS-TLS1.3:" /* TLS 1.2 only */
+	"-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
+
+
 static struct tls_proxy_ctx *get_proxy(struct peer *peer)
 {
 	return (struct tls_proxy_ctx *)peer->handle.loop->data;
@@ -386,6 +392,11 @@ static void accept_connection_from_client(uv_stream_t *server)
 	if (err != GNUTLS_E_SUCCESS) {
 		fprintf(stdout, "[client] gnutls_priority_set() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
+	}
+	err = gnutls_priority_set_direct(tls->session, priorities, &errpos);
+	if (err != GNUTLS_E_SUCCESS) {
+		fprintf(stdout, "[client] setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
+			priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
 	}
 	err = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE, proxy->tls_credentials);
 	if (err != GNUTLS_E_SUCCESS) {
