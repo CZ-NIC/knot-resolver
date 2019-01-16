@@ -34,5 +34,5 @@ def test_proxy_rehandshake(tmpdir):
                     n_connecting_to += 1
                 elif re.search(r"TLS rehandshake .* has started", line) is not None:
                     n_rehandshake += 1
-            assert n_connecting_to == 0  # shouldn't be present in partial log
+            assert n_connecting_to == 1  # should connect exactly once
             assert n_rehandshake > 0
