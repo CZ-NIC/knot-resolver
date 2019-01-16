@@ -326,7 +326,11 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 		return NULL;
 	}
 
-	int err = gnutls_init(&tls->c.tls_session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
+	unsigned int gnutls_flags = GNUTLS_SERVER | GNUTLS_NONBLOCK;
+	#if GNUTLS_VERSION_NUMBER >= 0x030605
+		gnutls_flags |= (GNUTLS_AUTO_REAUTH | GNUTLS_POST_HANDSHAKE_AUTH);
+	#endif
+	int err = gnutls_init(&tls->c.tls_session, gnutls_flags);
 	if (err != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls] gnutls_init(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
