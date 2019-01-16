@@ -760,8 +760,11 @@ int tls_process_from_client(struct peer *client, const uint8_t *buf, ssize_t nre
 		} else if (count == GNUTLS_E_REHANDSHAKE) {
 			tls->handshake_state = TLS_HS_IN_PROGRESS;
 			ret = tls_process_handshake(client);
-			if (ret < 0) {
+			if (ret < 0) { /* Critical error */
 				return ret;
+			}
+			if (ret == 0) { /* Non fatal, most likely GNUTLS_E_AGAIN */
+				break;
 			}
 			continue;
 		} else if (count < 0) {
