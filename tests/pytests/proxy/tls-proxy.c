@@ -30,6 +30,7 @@ enum peer_state {
 enum handshake_state {
 	TLS_HS_NOT_STARTED = 0,
 	TLS_HS_EXPECTED,
+	TLS_HS_REAUTH_EXPECTED,
 	TLS_HS_IN_PROGRESS,
 	TLS_HS_DONE,
 	TLS_HS_CLOSING,
@@ -85,11 +86,15 @@ static void on_upstream_close(uv_handle_t *handle);
 
 static int gnutls_references = 0;
 
-static const char * const priorities =
+static const char * const tlsv12_priorities =
 	"NORMAL:" /* GnuTLS defaults */
-	"-VERS-TLS1.0:-VERS-TLS1.1:-VERS-TLS1.3:" /* TLS 1.2 only */
+	"-VERS-TLS1.0:-VERS-TLS1.1:+VERS-TLS1.2:-VERS-TLS1.3:" /* TLS 1.2 only */
 	"-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
 
+static const char * const tlsv13_priorities =
+	"NORMAL:" /* GnuTLS defaults */
+	"-VERS-TLS1.0:-VERS-TLS1.1:-VERS-TLS1.2:+VERS-TLS1.3:" /* TLS 1.3 only */
+	"-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
 
 static struct tls_proxy_ctx *get_proxy(struct peer *peer)
 {
@@ -133,7 +138,7 @@ static int ip_addr_str(const struct sockaddr *addr, char *buf, size_t *buflen)
 	}
 	int len = strlen(str);
 	str[len] = '#';
-	snprintf(&str[len + 1], 6, "%uh", ip_addr_port(addr));
+	snprintf(&str[len + 1], 6, "%hu", ip_addr_port(addr));
 	len += 6;
 	str[len] = 0;
 	if (len >= *buflen) {
@@ -383,7 +388,13 @@ static void accept_connection_from_client(uv_stream_t *server)
 
 	client->tls = tls;
 	const char *errpos = NULL;
-	err = gnutls_init(&tls->session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
+	unsigned int gnutls_flags = GNUTLS_SERVER | GNUTLS_NONBLOCK;
+#if GNUTLS_VERSION_NUMBER >= 0x030604
+	if (proxy->a->tls_13) {
+		gnutls_flags |= GNUTLS_POST_HANDSHAKE_AUTH;
+	}
+#endif
+	err = gnutls_init(&tls->session, gnutls_flags);
 	if (err != GNUTLS_E_SUCCESS) {
 		fprintf(stdout, "[client] gnutls_init() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
@@ -393,17 +404,24 @@ static void accept_connection_from_client(uv_stream_t *server)
 		fprintf(stdout, "[client] gnutls_priority_set() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 	}
-	err = gnutls_priority_set_direct(tls->session, priorities, &errpos);
+
+	const char *direct_priorities = proxy->a->tls_13 ? tlsv13_priorities : tlsv12_priorities;
+	err = gnutls_priority_set_direct(tls->session, direct_priorities, &errpos);
 	if (err != GNUTLS_E_SUCCESS) {
 		fprintf(stdout, "[client] setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
-			priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
+			direct_priorities, errpos - direct_priorities, errpos,
+			gnutls_strerror_name(err), err);
 	}
 	err = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE, proxy->tls_credentials);
 	if (err != GNUTLS_E_SUCCESS) {
 		fprintf(stdout, "[client] gnutls_credentials_set() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 	}
-	gnutls_certificate_server_set_request(tls->session, GNUTLS_CERT_IGNORE);
+	if (proxy->a->tls_13) {
+		gnutls_certificate_server_set_request(tls->session, GNUTLS_CERT_REQUEST);
+	} else  {
+		gnutls_certificate_server_set_request(tls->session, GNUTLS_CERT_IGNORE);
+	}
 	gnutls_handshake_set_timeout(tls->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
 	gnutls_transport_set_pull_function(tls->session, proxy_gnutls_pull);
 	gnutls_transport_set_push_function(tls->session, proxy_gnutls_push);
@@ -679,13 +697,53 @@ static int write_to_client_pending(struct peer *client)
 
 	fprintf(stdout, "[client] submitted %zd bytes\n", submitted);
 	if (proxy->a->rehandshake) {
+		int err = GNUTLS_E_SUCCESS;
+#if GNUTLS_VERSION_NUMBER >= 0x030604
+		if (proxy->a->tls_13) {
+			int flags = gnutls_session_get_flags(tls_session);
+			if ((flags & GNUTLS_SFLAGS_POST_HANDSHAKE_AUTH) == 0) {
+				/* Client doesn't support post-handshake re-authentication,
+				 * nothing to test here */
+				fprintf(stdout, "[client] GNUTLS_SFLAGS_POST_HANDSHAKE_AUTH flag not detected\n");
+				assert(false);
+			}
+			err = gnutls_reauth(tls_session, 0);
+			if (err != GNUTLS_E_INTERRUPTED &&
+			    err != GNUTLS_E_AGAIN &&
+			    err != GNUTLS_E_GOT_APPLICATION_DATA) {
+				fprintf(stdout, "[client] gnutls_reauth() failed: %s (%i)\n",
+					gnutls_strerror_name(err), err);
+			} else {
+				fprintf(stdout, "[client] post-handshake authentication initiated\n");
+			}
+			client->tls->handshake_state = TLS_HS_REAUTH_EXPECTED;
+		} else {
+			assert (gnutls_safe_renegotiation_status(tls_session) != 0);
+			err = gnutls_rehandshake(tls_session);
+			if (err != GNUTLS_E_SUCCESS) {
+				fprintf(stdout, "[client] gnutls_rehandshake() failed: %s (%i)\n",
+					gnutls_strerror_name(err), err);
+				assert(false);
+			} else {
+				fprintf(stdout, "[client] rehandshake started\n");
+			}
+			client->tls->handshake_state = TLS_HS_EXPECTED;
+		}
+#else
 		assert (gnutls_safe_renegotiation_status(tls_session) != 0);
-		assert (gnutls_rehandshake(tls_session) == GNUTLS_E_SUCCESS);
+		err = gnutls_rehandshake(tls_session);
+		if (err != GNUTLS_E_SUCCESS) {
+			fprintf(stdout, "[client] gnutls_rehandshake() failed: %s (%i)\n",
+				gnutls_strerror_name(err), err);
+			assert(false);
+		} else {
+			fprintf(stdout, "[client] rehandshake started\n");
+		}
 		/* Prevent write-to-client callback from sending next pending chunk.
 		* At the same time tls_process_from_client() must not call gnutls_handshake()
 		* as there can be application data in this direction.  */
 		client->tls->handshake_state = TLS_HS_EXPECTED;
-		fprintf(stdout, "[client] rehandshake started\n");
+#endif
 	}
 	return submitted;
 }
@@ -746,6 +804,41 @@ int tls_process_handshake(struct peer *peer)
 	return ret;
 }
 
+#if GNUTLS_VERSION_NUMBER >= 0x030604
+int tls_process_reauth(struct peer *peer)
+{
+	struct tls_ctx *tls = peer->tls;
+	int ret = 1;
+	while (tls->handshake_state == TLS_HS_REAUTH_EXPECTED) {
+		fprintf(stdout, "[tls] TLS re-authentication in progress...\n");
+		int err = gnutls_reauth(tls->session, 0);
+		if (err == GNUTLS_E_SUCCESS) {
+			tls->handshake_state = TLS_HS_DONE;
+			fprintf(stdout, "[tls] TLS re-authentication has completed\n");
+			ret = 1;
+			if (peer->pending_buf.len != 0) {
+				write_to_client_pending(peer);
+			}
+		} else if (err != GNUTLS_E_INTERRUPTED &&
+			   err != GNUTLS_E_AGAIN &&
+			   err != GNUTLS_E_GOT_APPLICATION_DATA) {
+				/* these are listed as nonfatal errors there
+				 * https://www.gnutls.org/manual/gnutls.html#gnutls_005freauth  */
+				fprintf(stdout, "[tls] gnutls_reauth failed: %s (%d)\n",
+				gnutls_strerror_name(err), err);
+			ret = -1;
+			break;
+		} else {
+			fprintf(stdout, "[tls] gnutls_reauth nonfatal error: %s (%d)\n",
+				gnutls_strerror_name(err), err);
+			ret = 0;
+			break;
+		}
+	}
+	return ret;
+}
+#endif
+
 int tls_process_from_client(struct peer *client, const uint8_t *buf, ssize_t nread)
 {
 	struct tls_ctx *tls = client->tls;
@@ -756,7 +849,12 @@ int tls_process_from_client(struct peer *client, const uint8_t *buf, ssize_t nre
 
 	fprintf(stdout, "[client] tls_process: reading %zd bytes from client\n", nread);
 
-	int ret = tls_process_handshake(client);
+	int ret = 0;
+	if (tls->handshake_state == TLS_HS_REAUTH_EXPECTED) {
+		ret = tls_process_reauth(client);
+	} else {
+		ret = tls_process_handshake(client);
+	}
 	if (ret <= 0) {
 		return ret;
 	}
@@ -778,9 +876,25 @@ int tls_process_from_client(struct peer *client, const uint8_t *buf, ssize_t nre
 				break;
 			}
 			continue;
-		} else if (count < 0) {
+		}
+#if GNUTLS_VERSION_NUMBER >= 0x030604
+		else if (count == GNUTLS_E_REAUTH_REQUEST) {
+			assert(false);
+			tls->handshake_state = TLS_HS_IN_PROGRESS;
+			ret = tls_process_reauth(client);
+			if (ret < 0) { /* Critical error */
+				return ret;
+			}
+			if (ret == 0) { /* Non fatal, most likely GNUTLS_E_AGAIN */
+				break;
+			}
+			continue;
+		}
+#endif
+		else if (count < 0) {
 			fprintf(stdout, "[client] gnutls_record_recv failed: %s (%zd)\n",
 				gnutls_strerror_name(count), count);
+			assert(false);
 			return -1;
 		} else if (count == 0) {
 			break;
