@@ -4,6 +4,7 @@ local condition = require('cqueues.condition')
 modules = { 'hints', 'dns64' }
 hints['dns64.example'] = '192.168.1.1'
 hints.use_nodata(true) -- Respond NODATA to AAAA query
+hints.ttl(60)
 dns64.config('fe80::21b:77ff:0:0')
 
 -- helper to wait for query resolution
@@ -37,7 +38,7 @@ local function test_builtin_rules()
 	local rcode, answers = wait_resolve('dns64.example', kres.type.AAAA)
 	same(rcode, kres.rcode.NOERROR, 'dns64.example returns NOERROR')
 	same(#answers, 1, 'dns64.example synthesised answer')
-	local expect = {'dns64.example.', '0', 'AAAA', 'fe80::21b:77ff:c0a8:101'}
+	local expect = {'dns64.example.', '60', 'AAAA', 'fe80::21b:77ff:c0a8:101'}
 	if #answers > 0 then
 		local rr = {kres.rr2str(answers[1]):match('(%S+)%s+(%S+)%s+(%S+)%s+(%S+)')}
 		same(rr, expect, 'dns64.example synthesised correct AAAA record')
