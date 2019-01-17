@@ -8,6 +8,10 @@ Bugfixes
   that were loaded as unmanaged trust anchors (!753)
 - trust_anchors.add(): include these TAs in .summary() (!753)
 
+Improvements
+------------
+- hints module: allow configuring the TTL and change default from 0 to 5s
+
 
 Knot Resolver 3.2.1 (2019-01-10)
 ================================
