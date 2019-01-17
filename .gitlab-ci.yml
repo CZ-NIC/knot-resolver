@@ -41,11 +41,31 @@ stages:
 build:linux:amd64:
   <<: *build
 
-
 build:asan:linux:amd64:
   <<: *build
   variables:
     CFLAGS: -ggdb3 -O0 -fsanitize=address -fno-omit-frame-pointer
+
+build:turris:omnia:
+  image: $CI_REGISTRY/knot/knot-resolver/ci/turris:omnia
+  stage: build
+  except:
+    - master
+  script:
+    - sed -i "s/__VERSION__/$CI_COMMIT_SHA/" distro/turris/Makefile
+    - cp -r distro/turris /tmp/turris/package/knot-resolver
+    - pushd /tmp/turris
+    - export PATH=$PATH:$PWD/staging_dir/toolchain-*/bin
+    - USE_CCACHE=n make CC=arm-openwrt-linux-gcc CXX=arm-openwrt-linux-g++ LD=arm-openwrt-linux-ld -C $PWD V=s
+    - popd
+    - cp /tmp/turris/bin/mvebu-musl/packages/base/*.ipk ./
+  artifacts:
+    paths:
+      - "*.ipk"
+  tags:
+    - docker
+    - linux
+    - amd64
 
 lint:pedantic:
   stage: test  # could be in build already, but let's not block the test stage if this fails
