@@ -46,6 +46,7 @@ struct hints_data {
 	bool use_nodata; /**< See hint_use_nodata() description, exposed via lua. */
 	uint32_t ttl;    /**< TTL used for the hints, exposed via lua. */
 };
+static const uint32_t HINTS_TTL_DEFAULT = 5;
 
 /** Useful for returning from module properties. */
 static char * bool2jsonstr(bool val)
@@ -638,7 +639,7 @@ int hints_init(struct kr_module *module)
 	kr_zonecut_init(&data->hints, (const uint8_t *)(""), pool);
 	kr_zonecut_init(&data->reverse_hints, (const uint8_t *)(""), pool);
 	data->use_nodata = true;
-	data->ttl = 0;
+	data->ttl = HINTS_TTL_DEFAULT;
 	module->data = data;
 
 	return kr_ok();
