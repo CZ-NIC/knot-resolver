@@ -30,6 +30,8 @@ void help(char *argv[], struct args *a)
 	       "                        sent to the client (default: no).\n"
 	       " -a, --acceptonly       Accept incoming connections, but don't\n"
 	       "                        connect to upstream (default: no).\n"
+	       " -v, --tls13            Force use of TLSv1.3. If not turned on,\n"
+	       "                        TLSv1.2 will be used (default: no).\n"
 	       ,
 	       a->local_addr, a->local_port,
 	       a->upstream, a->upstream_port,
@@ -47,6 +49,7 @@ void init_args(struct args *a)
 	a->key_file = default_key_path;
 	a->rehandshake = false;
 	a->accept_only = false;
+	a->tls_13 = false;
 	a->close_connection = false;
 	a->close_timeout = 1000;
 	a->max_conn_sequence = 0; /* disabled */
@@ -67,11 +70,14 @@ int main(int argc, char **argv)
 		{"fail",        required_argument, 0, 'f'},
 		{"rehandshake", no_argument, 0, 'r'},
 		{"acceptonly",  no_argument, 0, 'a'},
+#if GNUTLS_VERSION_NUMBER >= 0x030604
+		{"tls13",       no_argument, 0, 'v'},
+#endif
 		{0, 0, 0, 0}
 	};
 	struct args args;
 	init_args(&args);
-	while ((c = getopt_long(argc, argv, "l:p:u:d:t:k:c:f:ra", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "l:p:u:d:t:k:c:f:rav", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'l':
@@ -130,6 +136,11 @@ int main(int argc, char **argv)
 		case 'a':
 			args.accept_only = true;
 			break;
+		case 'v':
+#if GNUTLS_VERSION_NUMBER >= 0x030604
+			args.tls_13 = true;
+#endif
+			break;
 		default:
 			init_args(&args);
 			help(argv, &args);
@@ -157,16 +168,26 @@ int main(int argc, char **argv)
 	}
 	fprintf(stdout, "Listen on                     %s#%u\n"
 			"Upstream is expected on       %s#%u\n"
+			"Certificate file              %s\n"
+			"Key file                      %s\n"
 			"Rehandshake                   %s\n"
 			"Close                         %s\n"
 			"Refuse incoming connections   every %ith%s\n"
-			"Only accept, don't forward    %s\n",
+			"Only accept, don't forward    %s\n"
+			"Force TLSv1.3                 %s\n"
+		        ,
 			args.local_addr, args.local_port,
 			args.upstream, args.upstream_port,
+			args.cert_file, args.key_file,
 			args.rehandshake ? "yes" : "no",
 			args.close_connection ? "yes" : "no",
 			args.max_conn_sequence, args.max_conn_sequence ? "" : " (disabled)",
-			args.accept_only ? "yes" : "no"
+			args.accept_only ? "yes" : "no",
+#if GNUTLS_VERSION_NUMBER >= 0x030604
+			args.tls_13 ? "yes" : "no"
+#else
+			"Not supported"
+#endif
 		);
 	res = tls_proxy_run(proxy);
 	tls_proxy_free(proxy);
