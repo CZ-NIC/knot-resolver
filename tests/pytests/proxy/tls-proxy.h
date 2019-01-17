@@ -13,6 +13,7 @@ struct args {
 	bool rehandshake;
 	bool close_connection;
 	bool accept_only;
+	bool tls_13;
 
 	uint64_t close_timeout;
 	uint32_t max_conn_sequence;
