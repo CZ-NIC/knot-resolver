@@ -1,4 +1,6 @@
-#!/bin/sh -e
+#!/bin/bash
+set -o errexit -o nounset -o xtrace
+
 # Create a distribution tarball, like 'make dist' from autotools.
 cd "$(git rev-parse --show-toplevel)"
 ver=$(git describe | sed 's/^v//' | sed 's/-/\./g')
