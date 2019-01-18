@@ -52,8 +52,10 @@ build:turris:omnia:
   except:
     - master
   script:
-    - sed -i "s/__VERSION__/$CI_COMMIT_SHA/" distro/turris/Makefile
+    - ./scripts/make-archive.sh
+    - ./scripts/make-distrofiles.sh
     - cp -r distro/turris /tmp/turris/package/knot-resolver
+    - cp knot-resolver*.tar.xz /tmp/turris/package/knot-resolver/
     - pushd /tmp/turris
     - export PATH=$PATH:$PWD/staging_dir/toolchain-*/bin
     - USE_CCACHE=n make CC=arm-openwrt-linux-gcc CXX=arm-openwrt-linux-g++ LD=arm-openwrt-linux-ld -C $PWD V=s
