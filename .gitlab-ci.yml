@@ -64,6 +64,7 @@ build:turris:omnia:
   artifacts:
     paths:
       - "*.ipk"
+      - "*.tar.xz"
   tags:
     - docker
     - linux
