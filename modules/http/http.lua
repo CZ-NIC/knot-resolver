@@ -275,7 +275,7 @@ end
 -- @function Listen on given HTTP(s) host
 function M.add_interface(conf)
 	local crt, key, ephemeral
-	if conf.tls ~= false then
+	if conf.tls == true then
 		-- Check if a cert file was specified
 		if not conf.cert then
 			conf.cert = 'self.crt'
