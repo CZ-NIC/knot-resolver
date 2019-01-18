@@ -11,7 +11,7 @@ variables:
   RESPERF_FORCE: 0
   KNOT_VERSION: 2.7
 
-image: $CI_REGISTRY/knot/knot-resolver/ci/debian-stable:knot-$KNOT_VERSION
+image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
 stages:
   - build
@@ -163,6 +163,8 @@ docker:build:
 
 
 installcheck:linux:amd64:
+  # TODO use debian-buster once lua packet resize issue is resolved
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-stable:knot-$KNOT_VERSION
   stage: test
   except:
     - master
