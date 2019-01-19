@@ -37,7 +37,6 @@ new_read_globals = {
 	'option',
 	'env',
 	'kres',
-	'trustanchor',
 	'libknot_SONAME',
 	'libzscanner_SONAME',
 	'table_print',
