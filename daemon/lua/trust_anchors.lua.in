@@ -541,11 +541,8 @@ local add_file = function (path, unmanaged)
 			error(msg)
 		end
 		print(msg)
-		trustanchor(tas)
+		trust_anchors.add(tas)
 		-- Fetch DNSKEY immediately
-		if not trust_anchors.keysets['\0'] then
-			trust_anchors.keysets['\0'] = { owner = '\0' }
-		end
 		local keyset = trust_anchors.keysets['\0']
 		keyset.filename = path
 		if keyset.refresh_ev then event.cancel(keyset.refresh_ev) end
