@@ -372,18 +372,32 @@ local function keyset_parse_comments(tas, default_state)
 	return tas
 end
 
--- Read keyset from a file.  (This includes the key states and timers.)
-local function keyset_read(path)
+-- Read keyset from a file xor a string.  (This includes the key states and timers.)
+local function keyset_read(path, string)
+	if (path == nil) == (string == nil) then -- exactly one of them must be nil
+		return nil, "internal ERROR: incorrect call to TA's keyset_read"
+	end
 	-- First load the regular entries, trusting them.
 	local zonefile = require('zonefile')
-	local tas, err = zonefile.file(path)
+	local tas, err
+	if path ~= nil then
+		tas, err = zonefile.file(path)
+	else
+		tas, err = zonefile.string(string)
+	end
 	if not tas then
 		return tas, err
 	end
 	keyset_parse_comments(tas, key_state.Valid)
 
 	-- The untrusted keys are commented out but important to load.
-	for line in io.lines(path) do
+	local line_iter
+	if path ~= nil then
+		line_iter = io.lines(path)
+	else
+		line_iter = string.gmatch(string, "[^\n]+")
+	end
+	for line in line_iter do
 		if line:sub(1, 2) == '; ' then
 			-- Ignore the line if it fails to parse including recognized .state.
 			local l_set = zonefile.string(line:sub(3))
@@ -396,6 +410,7 @@ local function keyset_read(path)
 		end
 	end
 
+	-- Fill tas[*].key_tag
 	for _, ta in pairs(tas) do
 		local ta_keytag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 		if not (ta_keytag >= 0 and ta_keytag <= 65535) then
@@ -404,6 +419,20 @@ local function keyset_read(path)
 		end
 		ta.key_tag = ta_keytag
 	end
+
+	-- Fill tas.owner
+	if not tas[1] then
+		return nil, "empty TA set"
+	end
+	local owner = tas[1].owner
+	for _, ta in ipairs(tas) do
+		if ta.owner ~= owner then
+			return nil, string.format("do not mix %s and %s TAs in single file/string",
+							kres.dname2str(ta.owner), kres.dname2str(owner))
+		end
+	end
+	tas.owner = owner
+
 	return tas
 end
 
@@ -529,20 +558,8 @@ local add_file = function (path, unmanaged)
 		panic("[ ta ] ERROR: failed to read anchors from '%s' (%s)", path, err)
 	end
 	if not unmanaged then keyset.filename = path end
-	if not keyset[1] then
-		panic("[ ta ] ERROR: failed to read anchors from '%s'", path)
-	end
-	if not unmanaged then keyset.filename = path end
-	local owner = keyset[1].owner
-	for _, ta in ipairs(keyset) do
-		if ta.owner ~= owner then
-			panic("[ ta ] ERROR: mixed owner names found in file '%s'! " ..
-			      "Do not mix %s and %s TAs in single file",
-			      path, kres.dname2str(ta.owner), kres.dname2str(owner))
-		end
-	end
-	keyset.owner = owner
 
+	local owner = keyset.owner
 	local owner_str = kres.dname2str(owner)
 	if trust_anchors.keysets[owner] then
 		warn('[ ta ] warning: overriding previously set trust anchors for ' .. owner_str)
@@ -590,7 +607,8 @@ trust_anchors = {
 	-- [internal] table indexed by dname;
 	--  each item is a list of RRs and additionally contains:
 	--   - owner - that dname (for simplicity)
-	--   - [optional] filename in which to persist the state
+	--   - [optional] filename in which to persist the state,
+	--     implying unmanaged TA if nil
 	--   - [optional] overrides for global defaults of
 	--     hold_down_time, refresh_time, keep_removed
 	-- The RR tables also contain some additional TA-specific fields.
