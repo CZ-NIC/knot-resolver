@@ -437,16 +437,20 @@ local function keyset_read(path, string)
 end
 
 -- Replace current TAs for given owner by the "trusted" ones from passed keyset.
--- Return the number of trusted keys for the owner.
+-- Return true iff no TA errored out and at least one is in VALID state.
 local function keyset_publish(keyset)
 	local store = kres.context().trust_anchors
 	local count = 0
+	local has_error = false
 	C.kr_ta_del(store, keyset.owner)
 	for _, ta in ipairs(keyset) do
 		-- Key MAY be used as a TA only in these two states (RFC5011, 4.2)
 		if ta.state == key_state.Valid or ta.state == key_state.Missing then
 			if C.kr_ta_add(store, ta.owner, ta.type, ta.ttl, ta.rdata, #ta.rdata) == 0 then
 				count = count + 1
+			else
+				ta.state = 'ERROR'
+				has_error = true
 			end
 		end
 	end
@@ -454,7 +458,7 @@ local function keyset_publish(keyset)
 		warn('[ ta ] ERROR: no anchors are trusted for ' ..
 		     kres.dname2str(keyset.owner) .. ' !')
 	end
-	return count
+	return count > 0 and not has_error
 end
 
 
@@ -507,7 +511,7 @@ update = function (keyset, new_keys, is_initial)
 	keyset_write(keyset)
 
 	-- Start using the new TAs.
-	if keyset_publish(keyset) == 0 then
+	if not keyset_publish(keyset) then
 		-- TODO: try to rebootstrap if for root?
 		return false
 	elseif verbose() then
@@ -569,7 +573,7 @@ local add_file = function (path, unmanaged)
 	trust_anchors.keysets[owner] = keyset
 
 	-- Replace the TA store used for validation
-	if keyset_publish(keyset) ~= 0 and verbose() then
+	if keyset_publish(keyset) and verbose() then
 		log('[ ta ] installed trust anchors for domain ' .. owner_str .. ' are:\n'
 		    .. trust_anchors.summary(owner))
 	end
@@ -631,13 +635,37 @@ trust_anchors = {
 	config = add_file,
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
-	-- FIXME: this function won't update the .keysets,
-	-- so it won't e.g. be shown by .summary() - confusing.
 	add = function (keystr)
-		local ret = trustanchor(keystr)
-		if verbose() then log(trust_anchors.summary()) end
-		return ret
+		local keyset, err = keyset_read(nil, keystr)
+		if keyset ~= nil then
+			local owner = keyset.owner
+			local owner_str = kres.dname2str(owner)
+			local keyset_orig = trust_anchors.keysets[owner]
+			-- Set up trust_anchors.keysets[owner]
+			if keyset_orig then
+				warn('[ ta ] warning: extending previously set trust anchors for '
+						.. owner_str)
+				for _, ta in ipairs(keyset) do
+					table.insert(keyset_orig, ta)
+				end
+				-- we might also add more warning if it's managed, i.e. has .filename,
+				-- as the next update would overwrite this additional TA
+			else
+				trust_anchors.keysets[owner] = keyset
+			end
+			-- Replace the TA store used for validation
+			if not keyset_publish(keyset) then
+				err = "when publishing the TA set"
+				-- trust_anchors.keysets[owner] was already updated to the
+				-- (partially) failing state, but I'm not sure how much to improve this
+			end
+		end
+		if verbose() or err then log('New TA state:\n' .. trust_anchors.summary()) end
+		if err then
+			panic('[ ta ] .add() failed: ' .. err)
+		end
 	end,
+
 	-- Negative TA management
 	set_insecure = function (list)
 		assert(type(list) == 'table', 'parameter must be list of domain names (e.g. {"a.test", "b.example"})')

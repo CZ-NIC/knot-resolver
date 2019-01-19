@@ -13,7 +13,6 @@ local function test_revoked_key()
 		.. 'vN9dlzEheX7ICJBBtuA6G3LQpzW5hOA2hzCTMjJPJ8LbqF6dsV6DoBQzgul0sGIcGOYl7O'
 		.. 'yQdXfZ57relSQageu+ipAdTTJ25AsRTAoub8ONGcLmqrAmRLKBP1dfwhYB4N7knNnulqQxA+Uk1ihz0='
 	boom(trust_anchors.add, { '. 3600 DNSKEY 385 3 8 ' .. key_crypto }, 'refuse revoked key')
-	same(#trust_anchors.keysets, 0, 'no keysets')
 	same(ffi.C.kr_ta_get(ta_c, '\0') == nil, true, 'no TA for root is used')
 	-- Test that we don't have another problem in the key
 	trust_anchors.add('. 3600 DNSKEY 257 3 8 ' .. key_crypto)
