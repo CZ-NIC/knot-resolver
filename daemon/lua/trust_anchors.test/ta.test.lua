@@ -20,6 +20,7 @@ local function test_revoked_key()
 	local root_ta = ffi.C.kr_ta_get(ta_c, '\0')
 	same(root_ta == nil, false, 'we got non-NULL TA RRset')
 	same(root_ta.rrs.count, 1, 'the root TA set contains one RR')
+	same(#trust_anchors.keysets, 1, 'one keyset')
 end
 
 

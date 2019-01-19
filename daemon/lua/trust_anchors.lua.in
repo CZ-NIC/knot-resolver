@@ -631,13 +631,31 @@ trust_anchors = {
 	config = add_file,
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
-	-- FIXME: this function won't update the .keysets,
-	-- so it won't e.g. be shown by .summary() - confusing.
 	add = function (keystr)
-		local ret = trustanchor(keystr)
-		if verbose() then log(trust_anchors.summary()) end
-		return ret
+		local keyset, err = keyset_read(nil, keystr)
+		if keyset ~= nil then
+			local owner = keyset.owner
+			local owner_str = kres.dname2str(owner)
+			local keyset_orig = trust_anchors.keysets[owner]
+			-- Set up trust_anchors.keysets[owner]
+			if keyset_orig then
+				warn('[ ta ] warning: extending previously set trust anchors for '
+						.. owner_str)
+				for _, ta in ipairs(keyset) do
+					table.insert(keyset_orig, ta)
+				end
+				-- we might also add more warning if it's managed, i.e. has .filename,
+				-- as the next update would overwrite this additional TA
+			else
+				trust_anchors.keysets[owner] = keyset
+			end
+			-- Replace the TA store used for validation
+			keyset_publish(keyset)
+		end
+		if verbose() then log('New TA state:\n' .. trust_anchors.summary()) end
+		return err
 	end,
+
 	-- Negative TA management
 	set_insecure = function (list)
 		assert(type(list) == 'table', 'parameter must be list of domain names (e.g. {"a.test", "b.example"})')
