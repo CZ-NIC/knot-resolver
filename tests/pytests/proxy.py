@@ -89,7 +89,8 @@ class TLSProxy(Proxy):
                 upstream_port: Optional[int] = None,
                 certname: Optional[str] = 'tt',
                 close: Optional[int] = None,
-                rehandshake: bool = False
+                rehandshake: bool = False,
+                force_tls13: bool = False
             ) -> None:
         super().__init__(local_ip, local_port, upstream_ip, upstream_port)
         if certname is not None:
@@ -100,6 +101,7 @@ class TLSProxy(Proxy):
             self.key_path = None
         self.close = close
         self.rehandshake = rehandshake
+        self.force_tls13 = force_tls13
 
     def get_args(self):
         args = super().get_args()
@@ -114,6 +116,8 @@ class TLSProxy(Proxy):
             args.append(str(self.close))
         if self.rehandshake:
             args.append('--rehandshake')
+        if self.force_tls13:
+            args.append('--tls13')
         return args
 
 

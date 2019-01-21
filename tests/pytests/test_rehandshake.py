@@ -11,12 +11,12 @@ and sent back to the client (this test).
 import re
 import time
 
+import pytest
+
 from proxy import HINTS, kresd_tls_client, resolve_hint, TLSProxy
 
 
-def test_proxy_rehandshake(tmpdir):
-    proxy = TLSProxy(rehandshake=True)
-
+def verify_rehandshake(tmpdir, proxy):
     with kresd_tls_client(str(tmpdir), proxy) as kresd:
         sock2 = kresd.ip_tcp_socket()
         try:
@@ -36,3 +36,16 @@ def test_proxy_rehandshake(tmpdir):
                     n_rehandshake += 1
             assert n_connecting_to == 1  # should connect exactly once
             assert n_rehandshake > 0
+
+
+def test_proxy_rehandshake_tls12(tmpdir):
+    proxy = TLSProxy(rehandshake=True)
+    verify_rehandshake(tmpdir, proxy)
+
+
+# TODO fix TLS v1.3 proxy / kresd rehandshake
+@pytest.mark.xfail(
+    reason="TLS 1.3 rehandshake isn't properly supported either in tlsproxy or in kresd")
+def test_proxy_rehandshake_tls13(tmpdir):
+    proxy = TLSProxy(rehandshake=True, force_tls13=True)
+    verify_rehandshake(tmpdir, proxy)
