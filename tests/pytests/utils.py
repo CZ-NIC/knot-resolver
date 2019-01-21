@@ -109,13 +109,17 @@ def expect_kresd_close(rst_ok=False):
                 pytest.skip("kresd closed connection with TCP RST")
 
 
-def make_ssl_context(insecure=False, verify_location=None):
+def make_ssl_context(insecure=False, verify_location=None, extra_options=None):
     # set TLS v1.2+
     context = ssl.SSLContext(ssl.PROTOCOL_TLS)
     context.options |= ssl.OP_NO_SSLv2
     context.options |= ssl.OP_NO_SSLv3
     context.options |= ssl.OP_NO_TLSv1
     context.options |= ssl.OP_NO_TLSv1_1
+
+    if extra_options is not None:
+        for option in extra_options:
+            context.options |= option
 
     if insecure:
         # turn off certificate verification
