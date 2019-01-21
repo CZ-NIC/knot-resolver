@@ -51,6 +51,10 @@ def test_tls_session_resumption(tmpdir, sf1, sf2, sf3):
     # TODO ensure that session can't be resumed after session ticket key regeneration
     # at the first kresd instance
 
+    # NOTE TLS 1.3 is intentionally disabled for session resumption tests,
+    # becuase python's SSLSocket.session isn't compatible with TLS 1.3
+    # https://docs.python.org/3/library/ssl.html?highlight=ssl%20ticket#tls-1-3
+
     def connect(kresd, ctx, sf, session=None):
         sock, dest = kresd.stream_socket(sf, tls=True)
         ssock = ctx.wrap_socket(
@@ -67,7 +71,8 @@ def test_tls_session_resumption(tmpdir, sf1, sf2, sf3):
     os.makedirs(workdir)
 
     with make_kresd(workdir, 'tt') as kresd:
-        ctx = utils.make_ssl_context(verify_location=kresd.tls_cert_path)
+        ctx = utils.make_ssl_context(
+            verify_location=kresd.tls_cert_path, extra_options=[ssl.OP_NO_TLSv1_3])
         session = connect(kresd, ctx, sf1)  # initial conn
         connect(kresd, ctx, sf2, session)  # resume session on the same instance
 
