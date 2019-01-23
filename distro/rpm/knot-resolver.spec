@@ -183,7 +183,11 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 
 %post
 %systemd_post 'kresd@*.service'
+%if 0%{?fedora}
+# https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
+%else
 /sbin/ldconfig
+%endif
 
 %preun
 %systemd_preun 'kresd@*.service' kresd.target kresd.socket kresd-tls.socket
@@ -191,7 +195,11 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %postun
 # NOTE: this doesn't restart the services on CentOS 7
 %systemd_postun_with_restart 'kresd@*.service'
+%if 0%{?fedora}
+# https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
+%else
 /sbin/ldconfig
+%endif
 
 %files
 %license COPYING
