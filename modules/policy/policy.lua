@@ -247,7 +247,7 @@ function policy.TLS_FORWARD(target)
 			assert(#pins[sockaddr_lua] > 0)
 			net.tls_client(config.string_addr, pins[sockaddr_lua])
 		elseif config.auth_type == 'cert' then
-			assert(#hostnames[sockaddr_lua] > 0)
+			assert(#hostnames[sockaddr_lua] > 0) -- but we don't support > 1 anymore
 			net.tls_client(config.string_addr, ca_files[sockaddr_lua], hostnames[sockaddr_lua])
 		else
 			assert(false, 'unsupported auth_type')
