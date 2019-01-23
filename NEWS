@@ -1,6 +1,10 @@
 Knot Resolver 3.x.y (2019-0m-dd)
 ================================
 
+Improvements
+------------
+- policy.TLS_FORWARD: if hostname is configured, send it on wire (!759)
+
 Bugfixes
 --------
 - predict module: load stats module if config didn't specify period (!755)
