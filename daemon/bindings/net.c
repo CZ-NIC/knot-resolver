@@ -290,13 +290,10 @@ static int print_tls_param(const char *key, void *val, void *data)
 	}
 	lua_setfield(L, -2, "ca_files");
 
-	lua_createtable(L, entry->hostnames.len, 0);
-	for (size_t i = 0; i < entry->hostnames.len; ++i) {
-		lua_pushnumber(L, i + 1);
-		lua_pushstring(L, entry->hostnames.at[i]);
-		lua_settable(L, -3);
+	if (entry->hostname) {
+		lua_pushstring(L, entry->hostname);
+		lua_setfield(L, -2, "hostname");
 	}
-	lua_setfield(L, -2, "hostnames");
 
 	lua_setfield(L, -2, key);
 
@@ -311,9 +308,6 @@ static int print_tls_client_params(lua_State *L)
 	}
 	struct network *net = &engine->net;
 	if (!net) {
-		return 0;
-	}
-	if (net->tls_client_params.root == 0 ) {
 		return 0;
 	}
 	lua_newtable(L);
