@@ -35,10 +35,9 @@ course self-signed. Why not use something like
 		http = {
 			host = 'localhost', -- Default: 'localhost'
 			port = 8053,        -- Default: 8053
-			geoip = 'GeoLite2-City.mmdb' -- Optional, see
+			geoip = 'GeoLite2-City.mmdb', -- Optional, see
 			-- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
 			-- and install mmdblua library
-			endpoints = {},
 		}
 	}
 
