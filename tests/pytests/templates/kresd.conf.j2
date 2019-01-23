@@ -1,6 +1,6 @@
 modules = {
-    'policy',
-    'hints > iterate',
+    'hints > policy',
+    'policy > iterate',
 }
 
 verbose({{ 'true' if kresd.verbose else 'false' }})
@@ -22,6 +22,7 @@ net.ipv6=true
 net.tls("{{ kresd.tls_cert_path }}", "{{ kresd.tls_key_path }}")
 {% endif %}
 
+hints['localhost.'] = '127.0.0.1'
 {% for name, ip in kresd.hints.items() %}
 hints['{{ name }}'] = '{{ ip }}'
 {% endfor %}
@@ -37,6 +38,12 @@ policy.add(policy.all(
 ))
 {% endif %}
 
+{% if kresd.policy_test_pass %}
+policy.add(policy.suffix(policy.PASS, {todname('test.')}))
+{% endif %}
+
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
 modules.unload("ta_signal_query")
 modules.unload("priming")
 modules.unload("detect_time_skew")
