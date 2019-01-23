@@ -1,5 +1,5 @@
 -- setup resolver
-modules = { 'predict', 'stats' }
+modules = { 'predict' }
 
 -- mock global functions
 local resolve_count = 0
