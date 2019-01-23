@@ -428,13 +428,10 @@ static int print_tls_param(const char *key, void *val, void *data)
 	}
 	lua_setfield(L, -2, "ca_files");
 
-	lua_createtable(L, entry->hostnames.len, 0);
-	for (size_t i = 0; i < entry->hostnames.len; ++i) {
-		lua_pushnumber(L, i + 1);
-		lua_pushstring(L, entry->hostnames.at[i]);
-		lua_settable(L, -3);
+	if (entry->hostname) {
+		lua_pushstring(L, entry->hostname);
+		lua_setfield(L, -2, "hostname");
 	}
-	lua_setfield(L, -2, "hostnames");
 
 	lua_setfield(L, -2, key);
 
