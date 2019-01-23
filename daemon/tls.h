@@ -58,7 +58,7 @@ struct tls_credentials {
 
 struct tls_client_paramlist_entry {
 	array_t(const char *) ca_files;
-	array_t(const char *) hostnames;
+	const char *hostname; /**< Server name for SNI and certificate check. */
 	array_t(const char *) pins;
 	gnutls_certificate_credentials_t credentials;
 	gnutls_datum_t session_data;
@@ -172,7 +172,7 @@ struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_para
 int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port);
 
 /*! Set TLS authentication parameters for given address.
- * Note: hostnames must be imported before ca files,
+ * Note: hostname must be set before ca files,
  *       otherwise ca files will not be imported at all.
  */
 int tls_client_params_set(map_t *tls_client_paramlist,
