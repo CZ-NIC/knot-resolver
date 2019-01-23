@@ -108,6 +108,13 @@ bool kr_log_trace(const struct kr_query *query, const char *source, const char *
 #endif
 
 /** @cond Memory alloc routines */
+
+/** Readability: avoid const-casts in code. */
+static inline void free_const(const void *what)
+{
+	free((void *)what);
+}
+
 static inline void *mm_alloc(knot_mm_t *mm, size_t size)
 {
 	if (mm) return mm->alloc(mm->ctx, size);
@@ -119,7 +126,7 @@ static inline void mm_free(knot_mm_t *mm, const void *what)
 		if (mm->free)
 			mm->free((void *)what);
 	}
-	else free((void *)what);
+	else free_const(what);
 }
 
 /** Realloc implementation using memory context. */

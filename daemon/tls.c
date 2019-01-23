@@ -761,29 +761,16 @@ static int client_paramlist_entry_free(struct tls_client_paramlist_entry *entry)
 {
 	DEBUG_MSG("freeing TLS parameters %p\n", (void *)entry);
 
-	while (entry->ca_files.len > 0) {
-		if (entry->ca_files.at[0] != NULL) {
-			free((void *)entry->ca_files.at[0]);
-		}
-		array_del(entry->ca_files, 0);
+	for (int i = 0; i < entry->ca_files.len; ++i) {
+		free_const(entry->ca_files.at[i]);
 	}
-
-	while (entry->hostnames.len > 0) {
-		if (entry->hostnames.at[0] != NULL) {
-			free((void *)entry->hostnames.at[0]);
-		}
-		array_del(entry->hostnames, 0);
-	}
-
-	while (entry->pins.len > 0) {
-		if (entry->pins.at[0] != NULL) {
-			free((void *)entry->pins.at[0]);
-		}
-		array_del(entry->pins, 0);
-	}
-
 	array_clear(entry->ca_files);
-	array_clear(entry->hostnames);
+
+	free_const(entry->hostname);
+
+	for (int i = 0; i < entry->pins.len; ++i) {
+		free_const(entry->pins.at[i]);
+	}
 	array_clear(entry->pins);
 
 	if (entry->credentials) {
@@ -889,8 +876,8 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 	char key[INET6_ADDRSTRLEN + 6];
 	size_t keylen = sizeof(key);
 	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
-		kr_log_error("[tls_client] warning: '%s' is not a valid ip address, ignoring\n", addr);
-		return kr_ok();
+		kr_log_error("[tls_client] warning: '%s' is not a valid ip address\n", addr);
+		return kr_error(EINVAL);
 	}
 
 	bool is_first_entry = false;
@@ -915,27 +902,21 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 	int ret = kr_ok();
 
 	if (param_type == TLS_CLIENT_PARAM_HOSTNAME) {
-		const char *hostname = param;
-		bool already_exists = false;
-		for (size_t i = 0; i < entry->hostnames.len; ++i) {
-			if (strcmp(entry->hostnames.at[i], hostname) == 0) {
-				kr_log_error("[tls_client] error: hostname '%s' for address '%s' already was set, ignoring\n", hostname, key);
-				already_exists = true;
-				break;
-			}
+		if (entry->hostname && strcasecmp(entry->hostname, param)) {
+			kr_log_error("[tls_client] error: hostname collision for address"
+					" '%s': '%s' '%s'\n",
+					key, entry->hostname, param);
+			return kr_error(EINVAL);
 		}
-		if (!already_exists) {
-			const char *value = strdup(hostname);
-			if (!value) {
-				ret = kr_error(ENOMEM);
-			} else if (array_push(entry->hostnames, value) < 0) {
-				free ((void *)value);
-				ret = kr_error(ENOMEM);
+		if (!entry->hostname) {
+			entry->hostname = strdup(param);
+			if (!entry->hostname) {
+				return kr_error(ENOMEM);
 			}
 		}
 	} else if (param_type == TLS_CLIENT_PARAM_CA) {
 		/* Import ca files only when hostname is already set */
-		if (entry->hostnames.len == 0) {
+		if (!entry->hostname) {
 			return kr_error(ENOENT);
 		}
 		const char *ca_file = param;
@@ -999,6 +980,8 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 			free ((void *)value);
 			ret = kr_error(ENOMEM);
 		}
+	} else {
+		assert(param_type == TLS_CLIENT_PARAM_NONE);
 	}
 
 	if ((ret == kr_ok()) && is_first_entry) {
@@ -1106,21 +1089,16 @@ skip_pins:
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
-	if (ctx->params->hostnames.len == 0) {
-		DEBUG_MSG("[tls_client] empty hostname list\n");
+	if (!ctx->params->hostname) {
+		DEBUG_MSG("[tls_client] no hostname set\n");
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
-	int ret;
 	unsigned int status;
-	for (size_t i = 0; i < ctx->params->hostnames.len; ++i) {
-		ret = gnutls_certificate_verify_peers3(
-				ctx->c.tls_session,
-				ctx->params->hostnames.at[i],
-				&status);
-		if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
-			return GNUTLS_E_SUCCESS;
-		}
+	int ret = gnutls_certificate_verify_peers3(
+			ctx->c.tls_session, ctx->params->hostname, &status);
+	if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
+		return GNUTLS_E_SUCCESS;
 	}
 
 	if (ret == GNUTLS_E_SUCCESS) {
@@ -1175,6 +1153,10 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 
 	ret = gnutls_credentials_set(ctx->c.tls_session, GNUTLS_CRD_CERTIFICATE,
 	                             entry->credentials);
+	if (ret == GNUTLS_E_SUCCESS && entry->hostname) {
+		ret = gnutls_server_name_set(ctx->c.tls_session, GNUTLS_NAME_DNS,
+					entry->hostname, strlen(entry->hostname));
+	}
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
