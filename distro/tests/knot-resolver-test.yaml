@@ -102,6 +102,11 @@
             warn: false
       when: ansible_distribution_file_variety == 'Archlinux'
 
+    - name: install dig
+      package:
+        name: "{{ dig_package[ansible_distribution] }}"
+        state: present
+
     - name: install knot-resolver
       package:
         name: knot-resolver
@@ -112,11 +117,6 @@
       args:
         warn: false
       register: package_version
-
-    - name: install dig
-      package:
-        name: "{{ dig_package[ansible_distribution] }}"
-        state: present
 
     - name: testing block
       block:
