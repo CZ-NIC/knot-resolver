@@ -451,9 +451,6 @@ static int print_tls_client_params(lua_State *L)
 	if (!net) {
 		return 0;
 	}
-	if (net->tls_client_params.root == 0 ) {
-		return 0;
-	}
 	lua_newtable(L);
 	map_walk(&net->tls_client_params, print_tls_param, (void *)L);
 	return 1;
