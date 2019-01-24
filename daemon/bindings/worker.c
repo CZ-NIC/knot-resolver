@@ -18,29 +18,6 @@
 
 #include "daemon/worker.h"
 
-#include <string.h>
-
-int format_error(lua_State* L, const char *err)
-{
-	lua_Debug d;
-	lua_getstack(L, 1, &d);
-	/* error message prefix */
-	lua_getinfo(L, "Sln", &d);
-	if (strncmp(d.short_src, "[", 1) != 0) {
-		lua_pushstring(L, d.short_src);
-		lua_pushstring(L, ":");
-		lua_pushnumber(L, d.currentline);
-		lua_pushstring(L, ": error: ");
-		lua_concat(L, 4);
-	} else {
-		lua_pushstring(L, "error: ");
-	}
-	/* error message */
-	lua_pushstring(L, err);
-	lua_concat(L,  2);
-	return 1;
-}
-
 
 static int wrk_resolve(lua_State *L)
 {
@@ -176,7 +153,7 @@ static int wrk_stats(lua_State *L)
 	return 1;
 }
 
-int lib_worker(lua_State *L)
+int kr_bindings_worker(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "resolve_unwrapped",  wrk_resolve },
