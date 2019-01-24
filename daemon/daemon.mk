@@ -1,6 +1,7 @@
 kresd_SOURCES := \
 	daemon/bindings/cache.c   \
 	daemon/bindings/event.c   \
+	daemon/bindings/impl.c    \
 	daemon/bindings/modules.c \
 	daemon/bindings/net.c     \
 	daemon/bindings/worker.c  \
