@@ -1,0 +1,24 @@
+contrib_src = [
+  'ccan/asprintf/asprintf.c',
+  'ccan/ilog/ilog.c',
+  'ccan/json/json.c',
+  'ucw/mempool.c',
+  'ucw/mempool-fmt.c',
+  'murmurhash3/murmurhash3.c',
+  'base32hex.c',
+  'base64.c'
+]
+
+contrib_inc = include_directories('.')
+
+contrib_lib = static_library(
+  'contrib',
+  contrib_src,
+  include_directories: contrib_inc,
+  dependencies: libknot, # errcode.h
+)
+
+contrib_dep = declare_dependency(
+  include_directories: contrib_inc,
+  link_with: contrib_lib,
+)
