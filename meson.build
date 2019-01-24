@@ -89,10 +89,6 @@ subdir('lib')
 subdir('client')
 subdir('daemon')
 
-
-## kresd
-
-
 # TODO install man
 
 ## modules

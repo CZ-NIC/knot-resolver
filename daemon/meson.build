@@ -23,7 +23,7 @@ embed_lua = generator(
 kresd_lua = embed_lua.process(
   'lua/sandbox.lua',
   'lua/config.lua',
-  preserve_path_from: meson.current_source_dir(),  # TODO is this necessary?
+  preserve_path_from: meson.source_root(),
 )
 
 
