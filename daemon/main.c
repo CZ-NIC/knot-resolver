@@ -38,7 +38,6 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/engine.h"
-#include "daemon/bindings.h"
 #include "daemon/tls.h"
 #include "lib/dnssec/ta.h"
 
