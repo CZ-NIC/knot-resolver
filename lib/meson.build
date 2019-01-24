@@ -64,7 +64,6 @@ libkres_lib = library('kres',
   dependencies: [
     contrib_dep,
     libuv,
-    luajit,
     lmdb,
     libknot,
     libdnssec,
