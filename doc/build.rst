@@ -36,10 +36,11 @@ The following is a list of software required to build Knot Resolver from sources
    "C and C++ compiler", "*all*", "*(build only)* [#]_"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "hexdump or xxd", "``daemon``", "*(build only)*"
-   "libknot_ 2.7.2+", "*all*", "Knot DNS libraries - requires autotools, GnuTLS, ..."
+   "libknot_ 2.7.6+", "*all*", "Knot DNS libraries"
    "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
-   "libuv_ 1.7+", "``daemon``", "Multiplatform I/O and services (libuv_ 1.0 with limitations [#]_)."
-   "lmdb", "``daemon``", "If missing, a static version is embedded."
+   "libuv_ 1.7+", "*all*", "Multiplatform I/O and services."
+   "lmdb", "*all*", ""
+   "GnuTLS", "*all*", ""
 
 There are also *optional* packages that enable specific functionality in Knot Resolver, they are useful mainly for developers to build documentation and tests.
 
