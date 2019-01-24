@@ -40,7 +40,7 @@
 #define STRINGIFY_INT(s) #s
 
 /** @internal Prefix error with file:line
- * Implementation lumped into ./worker.c */
+ * Implementation in ./impl.c */
 int KR_COLD format_error(lua_State* L, const char *err);
 
 static inline struct worker_ctx *wrk_luaget(lua_State *L) {
