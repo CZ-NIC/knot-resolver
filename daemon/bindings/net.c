@@ -822,7 +822,7 @@ static int net_bpf_clear(lua_State *L)
 	return 0;
 }
 
-int lib_net(lua_State *L)
+int kr_bindings_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "list",         net_list },

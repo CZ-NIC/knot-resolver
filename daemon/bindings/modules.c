@@ -85,7 +85,7 @@ static int mod_unload(lua_State *L)
 	return 1;
 }
 
-int lib_modules(lua_State *L)
+int kr_bindings_modules(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "list",   mod_list },

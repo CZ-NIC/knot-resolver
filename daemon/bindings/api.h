@@ -18,9 +18,7 @@
 
 #include <lua.h>
 
-int lib_cache   (lua_State *L);
-int lib_event   (lua_State *L);
-int lib_modules (lua_State *L);
-int lib_net     (lua_State *L);
-int lib_worker  (lua_State *L);
+/** Make all the bindings accessible from the lua state,
+ * .i.e. define those lua tables. */
+void kr_bindings_register(lua_State *L);
 

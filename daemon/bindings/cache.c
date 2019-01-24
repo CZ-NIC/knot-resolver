@@ -483,7 +483,7 @@ finish:
 	return 1;
 }
 
-int lib_cache(lua_State *L)
+int kr_bindings_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "backends", cache_backends },
