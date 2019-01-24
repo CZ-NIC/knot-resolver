@@ -237,7 +237,7 @@ static int event_fdwatch(lua_State *L)
 	return 1;
 }
 
-int lib_event(lua_State *L)
+int kr_bindings_event(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "after",      event_after },

@@ -981,18 +981,6 @@ int engine_unregister(struct engine *engine, const char *name)
 	return kr_error(ENOENT);
 }
 
-void engine_lualib(struct engine *engine, const char *name, lua_CFunction lib_cb)
-{
-	if (engine != NULL) {
-#if LUA_VERSION_NUM >= 502
-		luaL_requiref(engine->L, name, lib_cb, 1);
-		lua_pop(engine->L, 1);
-#else
-		lib_cb(engine->L);
-#endif
-	}
-}
-
 struct engine *engine_luaget(lua_State *L)
 {
 	lua_getglobal(L, "__engine");
