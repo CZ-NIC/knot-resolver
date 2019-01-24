@@ -1,9 +1,13 @@
 kresd_SOURCES := \
+	daemon/bindings/cache.c   \
+	daemon/bindings/event.c   \
+	daemon/bindings/modules.c \
+	daemon/bindings/net.c     \
+	daemon/bindings/worker.c  \
 	daemon/io.c          \
 	daemon/network.c     \
 	daemon/engine.c      \
 	daemon/worker.c      \
-	daemon/bindings.c    \
 	daemon/ffimodule.c   \
 	daemon/tls.c         \
 	daemon/tls_ephemeral_credentials.c \
