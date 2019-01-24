@@ -24,8 +24,11 @@
 #include <sys/param.h>
 #include <libzscanner/scanner.h>
 
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+
 #include "daemon/engine.h"
-#include "daemon/bindings.h"
 #include "daemon/ffimodule.h"
 #include "lib/nsrep.h"
 #include "lib/cache/api.h"
