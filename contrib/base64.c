@@ -14,7 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "contrib/base64.h"
+#include "base64.h"
 #include "libknot/errcode.h"
 
 #include <stdlib.h>
