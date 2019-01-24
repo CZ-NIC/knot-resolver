@@ -129,32 +129,7 @@ if host_machine.system() == 'darwin'
 endif
 
 
-## contrib
-
-contrib_src = [
-  'contrib/ccan/asprintf/asprintf.c',
-  'contrib/ccan/ilog/ilog.c',
-  'contrib/ccan/json/json.c',
-  'contrib/ucw/mempool.c',
-  'contrib/ucw/mempool-fmt.c',
-  'contrib/murmurhash3/murmurhash3.c',
-  'contrib/base32hex.c',
-  'contrib/base64.c'
-]
-
-contrib_inc = include_directories('contrib')
-
-contrib_lib = static_library(
-  'contrib',
-  contrib_src,
-  include_directories: contrib_inc,
-  dependencies: libknot, # errcode.h
-)
-
-contrib_dep = declare_dependency(
-  include_directories: contrib_inc,
-  link_with: contrib_lib,
-)
+subdir('contrib')
 
 ### libkres
 
