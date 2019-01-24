@@ -131,26 +131,8 @@ endif
 
 subdir('contrib')
 subdir('lib')
+subdir('client')
 
-## kresc
-
-kresc_sources = [
-  'client/kresc.c',
-]
-
-# TODO move /usr/sbin to /usr/bin?
-kresc = executable(
-  'kresc',
-  kresc_sources,
-  include_directories: include_directories('client'),
-  dependencies: [
-    contrib_dep,
-    libkres_dep,
-    libedit,
-  ],
-  install: true,
-  install_dir: 'sbin',
-)
 
 ## kresd
 
