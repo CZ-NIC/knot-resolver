@@ -16,6 +16,7 @@
 
 #include <uv.h>
 #include <lua.h>
+#include <lauxlib.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
 #include <contrib/ucw/lib.h>
@@ -31,7 +32,7 @@
 #include "lib/utils.h"
 #include "lib/layer.h"
 #include "daemon/worker.h"
-#include "daemon/bindings.h"
+#include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
