@@ -15,10 +15,11 @@
  */
 
 #include <uv.h>
+#include <lua.h>
+#include <lauxlib.h>
 
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
-#include "daemon/bindings.h"
 #include "lib/module.h"
 #include "lib/layer.h"
 
