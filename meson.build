@@ -57,12 +57,6 @@ if not lua_ssl_https
   warning('lua: ssl.https not found')
 endif
 
-# TODO why isn't libedit required instead?
-libedit = dependency('libedit', required: false)
-if not libedit.found()
-  libedit = meson.get_compiler('c').find_library('edit')
-endif
-
 
 # Variables
 
