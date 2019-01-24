@@ -10,7 +10,7 @@ libkres_soversion = 9
 modules_dir = join_paths(get_option('libdir'), 'kdns_modules')
 
 
-# Dependencies
+# Project-wide dependencies
 
 knot_version = '>=2.7.6'
 libknot = dependency('libknot', version: knot_version)

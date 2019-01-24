@@ -18,7 +18,7 @@ lint-lua: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 .PHONY: all install check clean doc info lint
 
 # Dependencies
-KNOT_MINVER := 2.7.2
+KNOT_MINVER := 2.7.6
 $(eval $(call find_lib,libknot,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libdnssec,$(KNOT_MINVER),yes))
 $(eval $(call find_lib,libzscanner,$(KNOT_MINVER),yes))

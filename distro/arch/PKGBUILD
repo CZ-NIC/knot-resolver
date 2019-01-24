@@ -14,7 +14,7 @@ install=install
 depends=('cmocka'
          'dnssec-anchors'
          'gnutls'
-         'knot>=2.7.2'
+         'knot>=2.7.6'
          'libedit'
          'libsystemd'
          'libuv'
