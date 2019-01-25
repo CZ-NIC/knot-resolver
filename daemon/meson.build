@@ -13,29 +13,17 @@ kresd_sources = [
   'zimport.c',
 ]
 
-embed_lua = generator(
-  find_program('../scripts/embed-lua.sh'),
-  arguments: ['@INPUT@'],
-  output: '@BASENAME@.inc',
-  capture: true,
-)
-
-kresd_lua = embed_lua.process(
-  'lua/sandbox.lua',
-  'lua/config.lua',
-  preserve_path_from: meson.source_root(),
-)
-
-
-luajit_has_setfuncs = run_command(
-  'pkg-config', ['luajit', '--atleast-version', '2.1.0-beta3']
-  ).returncode() == 0 ? '1' : '0'
 
 lib_suffix = '.so'
 # TODO seek&destroy LIBEXT
 if host_machine.system() == 'darwin'
   lib_suffix = '.dylib'
 endif
+
+luajit_has_setfuncs = run_command(
+  'pkg-config', ['luajit', '--atleast-version', '2.1.0-beta3']
+  ).returncode() == 0 ? '1' : '0'
+
 
 # daemon CFLAGS
 c_args = [
@@ -80,6 +68,9 @@ libsystemd = dependency('libsystemd', version: '>=227', required: false)
 if libsystemd.found()
   c_args += ['-DHAS_SYSTEMD']
 endif
+
+
+subdir('lua')
 
 
 # build
