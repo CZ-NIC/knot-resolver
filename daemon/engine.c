@@ -27,6 +27,7 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include "daemon/bindings/impl.h"
 
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
@@ -61,9 +62,6 @@
 #ifndef TCP_BACKLOG_DEFAULT
 #define TCP_BACKLOG_DEFAULT 511
 #endif
-
-/** @internal Annotate for static checkers. */
-KR_NORETURN int lua_error (lua_State *L);
 
 /* Cleanup engine state every 5 minutes */
 const size_t CLEANUP_TIMER = 5*60*1000;
@@ -133,31 +131,25 @@ static bool update_privileges(int uid, int gid)
 static int l_setuser(lua_State *L)
 {
 	int n = lua_gettop(L);
-	if (n < 1 || !lua_isstring(L, 1)) {
-		lua_pushliteral(L, "user(user[, group)");
-		lua_error(L);
-	}
+	if (n < 1 || !lua_isstring(L, 1))
+		lua_error_p(L, "user(user[, group])");
+
 	/* Fetch UID/GID based on string identifiers. */
 	struct passwd *user_pw = getpwnam(lua_tostring(L, 1));
-	if (!user_pw) {
-		lua_pushliteral(L, "invalid user name");
-		lua_error(L);
-	}
+	if (!user_pw)
+		lua_error_p(L, "invalid user name");
 	int uid = user_pw->pw_uid;
 	int gid = getgid();
 	if (n > 1 && lua_isstring(L, 2)) {
 		struct group *group_pw = getgrnam(lua_tostring(L, 2));
-		if (!group_pw) {
-			lua_pushliteral(L, "invalid group name");
-			lua_error(L);
-		}
+		if (!group_pw)
+			lua_error_p(L, "invalid group name");
 		gid = group_pw->gr_gid;
 	}
 	/* Drop privileges */
 	bool ret = update_privileges(uid, gid);
 	if (!ret) {
-		lua_pushstring(L, strerror(errno));
-		lua_error(L);
+		lua_error_maybe(L, errno);
 	}
 	lua_pushboolean(L, ret);
 	return 1;
@@ -220,17 +212,13 @@ static int l_hostname(lua_State *L)
 		lua_pushstring(L, engine_get_hostname(engine));
 		return 1;
 	}
-	if ((lua_gettop(L) != 1) || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "hostname takes at most one parameter: (\"fqdn\")");
-		lua_error(L);
-	}
+	if ((lua_gettop(L) != 1) || !lua_isstring(L, 1))
+		lua_error_p(L, "hostname takes at most one parameter: (\"fqdn\")");
 
-	if (engine_set_hostname(engine, lua_tostring(L, 1)) != 0) {
-		lua_pushstring(L, "setting hostname failed");
-		lua_error(L);
-	}
+	if (engine_set_hostname(engine, lua_tostring(L, 1)) != 0)
+		lua_error_p(L, "setting hostname failed");
 
-	lua_pushstring(L, engine_get_hostname(engine));	
+	lua_pushstring(L, engine_get_hostname(engine));
 	return 1;
 }
 
@@ -288,15 +276,11 @@ static int l_moduledir(lua_State *L)
 		lua_pushstring(L, engine_get_moduledir(engine));
 		return 1;
 	}
-	if ((lua_gettop(L) != 1) || !lua_isstring(L, 1)) {
-		lua_pushstring(L, "moduledir takes at most one parameter: (\"directory\")");
-		lua_error(L);
-	}
+	if ((lua_gettop(L) != 1) || !lua_isstring(L, 1))
+		lua_error_p(L, "moduledir takes at most one parameter: (\"directory\")");
 
-	if (engine_set_moduledir(engine, lua_tostring(L, 1)) != 0) {
-		lua_pushstring(L, "setting moduledir failed");
-		lua_error(L);
-	}
+	if (engine_set_moduledir(engine, lua_tostring(L, 1)) != 0)
+		lua_error_p(L, "setting moduledir failed");
 
 	lua_pushstring(L, engine_get_moduledir(engine));
 	return 1;
@@ -323,10 +307,8 @@ static int l_trustanchor(lua_State *L)
 	/* If disabling, parse the owner string only. */
 	if (!enable) {
 		knot_dname_t *owner = knot_dname_from_str(NULL, anchor, KNOT_DNAME_MAXLEN);
-		if (!owner) {
-			lua_pushstring(L, "invalid trust anchor owner");
-			lua_error(L);
-		}
+		if (!owner)
+			lua_error_p(L, "invalid trust anchor owner");
 		lua_pushboolean(L, kr_ta_del(&engine->resolver.trust_anchors, owner) == 0);
 		free(owner);
 		return 1;
@@ -336,8 +318,7 @@ static int l_trustanchor(lua_State *L)
 	zs_scanner_t *zs = malloc(sizeof(*zs));
 	if (!zs || zs_init(zs, ".", 1, 0) != 0) {
 		free(zs);
-		lua_pushstring(L, "not enough memory");
-		lua_error(L);
+		lua_error_maybe(L, ENOMEM);
 	}
 	zs_set_processing(zs, ta_add, NULL, &engine->resolver.trust_anchors);
 	bool ok = zs_set_input_string(zs, anchor, strlen(anchor)) == 0
@@ -347,10 +328,8 @@ static int l_trustanchor(lua_State *L)
 	zs_deinit(zs);
 	free(zs);
 	/* Report errors */
-	if (!ok) {
-		lua_pushstring(L, "failed to process trust anchor RR");
-		lua_error(L);
-	}
+	if (!ok)
+		lua_error_p(L, "failed to process trust anchor RR");
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -367,8 +346,7 @@ static int l_hint_root_file(lua_State *L)
 		if (!file) {
 			file = ROOTHINTS;
 		}
-		lua_push_printf(L, "error when opening '%s': %s", file, err);
-		lua_error(L);
+		lua_error_p(L, "error when opening '%s': %s", file, err);
 	} else {
 		lua_pushboolean(L, true);
 		return 1;
@@ -507,18 +485,14 @@ static int l_tojson(lua_State *L)
 
 static int l_fromjson(lua_State *L)
 {
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_pushliteral(L, "a JSON string is required");
-		lua_error(L);
-	}
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
+		lua_error_p(L, "a JSON string is required");
 
 	const char *json_str = lua_tostring(L, 1);
 	JsonNode *root_node = json_decode(json_str);
 
-	if (!root_node) {
-		lua_pushliteral(L, "invalid JSON string");
-		lua_error(L);
-	}
+	if (!root_node)
+		lua_error_p(L, "invalid JSON string");
 	l_unpack_json(L, root_node);
 	json_delete(root_node);
 
@@ -531,10 +505,8 @@ static int l_fromjson(lua_State *L)
 
 static int l_map(lua_State *L)
 {
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_pushliteral(L, "map('string with a lua expression')");
-		lua_error(L);
-	}
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
+		lua_error_p(L, "map('string with a lua expression')");
 
 	struct engine *engine = engine_luaget(L);
 	const char *cmd = lua_tostring(L, 1);
@@ -587,10 +559,8 @@ static int l_trampoline(lua_State *L)
 	struct kr_module *module = lua_touserdata(L, lua_upvalueindex(1));
 	void* callback = lua_touserdata(L, lua_upvalueindex(2));
 	struct engine *engine = engine_luaget(L);
-	if (!module) {
-		lua_pushstring(L, "module closure missing upvalue");
-		lua_error(L);
-	}
+	if (!module)
+		lua_error_p(L, "module closure missing upvalue");
 
 	/* Now we only have property callback or config,
 	 * if we expand the callables, we might need a callback_type.
