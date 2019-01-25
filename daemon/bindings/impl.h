@@ -42,6 +42,8 @@
 /** @internal Prefix error with file:line
  * Implementation in ./impl.c */
 int KR_COLD format_error(lua_State* L, const char *err);
+/** @internal Annotate for static checkers. */
+KR_NORETURN int lua_error(lua_State *L);
 
 static inline struct worker_ctx *wrk_luaget(lua_State *L) {
 	lua_getglobal(L, "__worker");

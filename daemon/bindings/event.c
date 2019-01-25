@@ -18,6 +18,7 @@
 
 #include "daemon/worker.h"
 
+#include <unistd.h>
 #include <uv.h>
 
 static void event_free(uv_timer_t *timer)
