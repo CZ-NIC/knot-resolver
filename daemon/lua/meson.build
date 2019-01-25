@@ -1,19 +1,18 @@
-lua_modules_daemon = [
-  'kres',
-  'kres-gen',
-  'zonefile',
+lua_sources_daemon = [
+  'kres.lua',
+  'kres-gen.lua',
+  # trust_anchors.lua.in handled separately
+  'zonefile.lua',
 ]
 
 # install lua modules
-foreach mod : lua_modules_daemon
+foreach mod : lua_sources_daemon
   install_data(
-    join_paths(mod + '.lua'),
+    join_paths(mod),
     install_dir: modules_dir,
   )
 endforeach
 
-
-# trust_anchors.lua
 configure_file(
   input: 'trust_anchors.lua.in',
   output: 'trust_anchors.lua',
@@ -22,8 +21,9 @@ configure_file(
 )
 
 
+# embed lua to daemon
 if get_option('daemon')
-  # dependencies for embedding lua
+  # dependencies
   xxd = find_program('xxd', required: false)
   if not xxd.found()
     hexdump = find_program('hexdump')
