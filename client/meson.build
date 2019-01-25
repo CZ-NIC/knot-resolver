@@ -2,25 +2,17 @@ kresc_src = [
   'kresc.c',
 ]
 
+if get_option('client')
 
-# client dependencies
-skip_client = false
-
-libedit = dependency('libedit', required: false)
-if not libedit.found()
-  # TODO why call find_library? osx workaround?
-  libedit = meson.get_compiler('c').find_library('edit', required: false)
+  # client dependencies
+  libedit = dependency('libedit', required: false)
   if not libedit.found()
-    skip_client = true
-    message('kresc client: libedit not found')
+    # TODO why call find_library? osx workaround?
+    libedit = meson.get_compiler('c').find_library('edit')
   endif
-endif
 
 
-# build
-if skip_client
-  warning('kresc client: skipping build')
-else
+  # build
   kresc = executable(
     'kresc',
     kresc_src,
