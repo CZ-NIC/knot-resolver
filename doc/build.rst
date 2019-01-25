@@ -168,6 +168,8 @@ Building for packages
 
 The build system supports DESTDIR_
 
+TODO no longer support, use meson --prefix instead (DESTDIR will cause invalid path to modules)
+
 .. Our amalgamation has fallen into an unmaintained state and probably doesn't work.
 .. and `amalgamated builds <https://www.sqlite.org/amalgamation.html>`_.
 
