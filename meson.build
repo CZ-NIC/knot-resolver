@@ -6,8 +6,13 @@ project(
 )
 
 libkres_soversion = 9
-# TODO change modules_dir to sensible lua(jit) default
-modules_dir = join_paths(get_option('libdir'), 'kdns_modules')
+if get_option('modules_dir') == ''
+  modules_dir = join_paths(
+    get_option('prefix'), get_option('libdir'), 'knot-resolver')
+else
+  modules_dir = get_option('modules_dir')
+endif
+message('modules_dir: ' + modules_dir)
 
 
 # Project-wide dependencies
