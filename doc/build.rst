@@ -188,6 +188,8 @@ Default paths
 The default installation follows FHS with several custom paths for configuration and modules.
 All paths are prefixed with ``PREFIX`` variable by default if not specified otherwise.
 
+TODO: rewrite/update entire section
+
   .. csv-table::
    :header: "Component", "Variable", "Default", "Notes"
 
