@@ -27,10 +27,8 @@ struct kr_cache * cache_assert_open(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	struct kr_cache *cache = &engine->resolver.cache;
 	assert(cache);
-	if (!cache || !kr_cache_is_open(cache)) {
-		format_error(L, "no cache is open yet, use cache.open() or cache.size, etc.");
-		lua_error(L);
-	}
+	if (!cache || !kr_cache_is_open(cache))
+		lua_error_p(L, "no cache is open yet, use cache.open() or cache.size, etc.");
 	return cache;
 }
 
@@ -80,10 +78,9 @@ static int cache_checkpoint(lua_State *L)
 		return 1;
 	}
 
-	if (lua_gettop(L) != 1 || !lua_isboolean(L, 1) || !lua_toboolean(L, 1)) {
-		format_error(L, "cache.checkpoint() takes no parameters or a true value");
-		lua_error(L);
-	}
+	if (lua_gettop(L) != 1 || !lua_isboolean(L, 1) || !lua_toboolean(L, 1))
+		lua_error_p(L, "cache.checkpoint() takes no parameters or a true value");
+
 	kr_cache_make_checkpoint(cache);
 	return 1;
 }
@@ -129,15 +126,14 @@ static int cache_max_ttl(lua_State *L)
 
 	int n = lua_gettop(L);
 	if (n > 0) {
-		if (!lua_isnumber(L, 1)) {
-			format_error(L, "expected 'max_ttl(number ttl)'");
-			lua_error(L);
-		}
+		if (!lua_isnumber(L, 1))
+			lua_error_p(L, "expected 'max_ttl(number ttl)'");
 		uint32_t min = cache->ttl_min;
 		int64_t ttl = lua_tonumber(L, 1);
 		if (ttl < 0 || ttl < min || ttl > UINT32_MAX) {
-			format_error(L, "max_ttl must be larger than minimum TTL, and in range <1, " STR(UINT32_MAX) ">'");
-			lua_error(L);
+			lua_error_p(L,
+				"max_ttl must be larger than minimum TTL, and in range <1, "
+				STR(UINT32_MAX) ">'");
 		}
 		cache->ttl_max = ttl;
 	}
@@ -152,15 +148,14 @@ static int cache_min_ttl(lua_State *L)
 
 	int n = lua_gettop(L);
 	if (n > 0) {
-		if (!lua_isnumber(L, 1)) {
-			format_error(L, "expected 'min_ttl(number ttl)'");
-			lua_error(L);
-		}
+		if (!lua_isnumber(L, 1))
+			lua_error_p(L, "expected 'min_ttl(number ttl)'");
 		uint32_t max = cache->ttl_max;
 		int64_t ttl = lua_tonumber(L, 1);
 		if (ttl < 0 || ttl > max || ttl > UINT32_MAX) {
-			format_error(L, "min_ttl must be smaller than maximum TTL, and in range <0, " STR(UINT32_MAX) ">'");
-			lua_error(L);
+			lua_error_p(L,
+				"min_ttl must be smaller than maximum TTL, and in range <0, "
+				STR(UINT32_MAX) ">'");
 		}
 		cache->ttl_min = ttl;
 	}
@@ -173,28 +168,24 @@ static int cache_open(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 1 || !lua_isnumber(L, 1)) {
-		format_error(L, "expected 'open(number max_size, string config = \"\")'");
-		lua_error(L);
-	}
+	if (n < 1 || !lua_isnumber(L, 1))
+		lua_error_p(L, "expected 'open(number max_size, string config = \"\")'");
 
 	/* Select cache storage backend */
 	struct engine *engine = engine_luaget(L);
 
 	lua_Number csize_lua = lua_tonumber(L, 1);
 	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
-		format_error(L, "invalid cache size specified, it must be in range <8192, " STR(SIZE_MAX)  ">");
-		lua_error(L);
+		lua_error_p(L, "invalid cache size specified, it must be in range <8192, "
+				STR(SIZE_MAX)  ">");
 	}
 	size_t cache_size = csize_lua;
 
 	const char *conf = n > 1 ? lua_tostring(L, 2) : NULL;
 	const char *uri = conf;
 	const struct kr_cdb_api *api = cache_select(engine, &conf);
-	if (!api) {
-		format_error(L, "unsupported cache backend");
-		lua_error(L);
-	}
+	if (!api)
+		lua_error_p(L, "unsupported cache backend");
 
 	/* Close if already open */
 	kr_cache_close(&engine->resolver.cache);
@@ -268,20 +259,15 @@ static int cache_prune(lua_State *L)
 	/* Check parameters */
 	int prune_max = UINT16_MAX;
 	int n = lua_gettop(L);
-	if (n >= 1 && lua_isnumber(L, 1)) {
+	if (n >= 1 && lua_isnumber(L, 1))
 		prune_max = lua_tointeger(L, 1);
-	}
 
 	/* Check if API supports pruning. */
 	int ret = kr_error(ENOSYS);
-	if (cache->api->prune) {
+	if (cache->api->prune)
 		ret = cache->api->prune(cache->db, prune_max);
-	}
 	/* Commit and format result. */
-	if (ret < 0) {
-		format_error(L, kr_strerror(ret));
-		lua_error(L);
-	}
+	lua_error_maybe(L, ret);
 	lua_pushinteger(L, ret);
 	return 1;
 }
@@ -293,10 +279,7 @@ static int cache_clear_everything(lua_State *L)
 
 	/* Clear records and packets. */
 	int ret = kr_cache_clear(cache);
-	if (ret < 0) {
-		format_error(L, kr_strerror(ret));
-		lua_error(L);
-	}
+	lua_error_maybe(L, ret);
 
 	/* Clear reputation tables */
 	struct engine *engine = engine_luaget(L);
@@ -346,19 +329,14 @@ static int cache_get(lua_State *L)
 
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected 'cache.get(string key)'");
-		lua_error(L);
-	}
+	if (n < 1 || !lua_isstring(L, 1))
+		lua_error_p(L, "expected 'cache.get(string key)'");
 
 	/* Retrieve set of keys */
 	const char *prefix = lua_tostring(L, 1);
 	knot_db_val_t keyval[100][2];
 	int ret = cache_prefixed(cache, prefix, false/*FIXME*/, keyval, 100);
-	if (ret < 0) {
-		format_error(L, kr_strerror(ret));
-		lua_error(L);
-	}
+	lua_error_maybe(L, ret);
 	/* Format output */
 	lua_newtable(L);
 	for (int i = 0; i < ret; ++i) {
@@ -369,10 +347,8 @@ static int cache_get(lua_State *L)
 #endif
 static int cache_get(lua_State *L)
 {
-	int ret = kr_error(ENOSYS);
-	format_error(L, kr_strerror(ret));
-	lua_error(L);
-	return ret;
+	lua_error_maybe(L, ENOSYS);
+	return kr_error(ENOSYS); /* doesn't happen */
 }
 
 /** Set time interval for cleaning rtt cache.
@@ -391,15 +367,13 @@ static int cache_ns_tout(lua_State *L)
 		return 1;
 	}
 
-	if (!lua_isnumber(L, 1)) {
-		format_error(L, "expected 'cache.ns_tout(interval in ms)'");
-		lua_error(L);
-	}
+	if (!lua_isnumber(L, 1))
+		lua_error_p(L, "expected 'cache.ns_tout(interval in ms)'");
 
 	lua_Integer interval_lua = lua_tointeger(L, 1);
 	if (!(interval_lua > 0 && interval_lua < UINT_MAX)) {
-		format_error(L, "invalid interval specified, it must be in range > 0, < " STR(UINT_MAX));
-		lua_error(L);
+		lua_error_p(L, "invalid interval specified, it must be in range > 0, < "
+				STR(UINT_MAX));
 	}
 
 	ctx->cache_rtt_tout_retry_interval = interval_lua;

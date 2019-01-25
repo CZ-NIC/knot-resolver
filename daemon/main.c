@@ -23,6 +23,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <lua.h>
 #include <uv.h>
 #ifdef HAS_SYSTEMD
 #include <systemd/sd-daemon.h>

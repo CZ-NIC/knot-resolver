@@ -27,17 +27,13 @@ static int wrk_resolve(lua_State *L)
 	}
 
 	uint8_t dname[KNOT_DNAME_MAXLEN];
-	if (!knot_dname_from_str(dname, lua_tostring(L, 1), sizeof(dname))) {
-		lua_pushstring(L, "invalid qname");
-		lua_error(L);
-	};
+	if (!knot_dname_from_str(dname, lua_tostring(L, 1), sizeof(dname)))
+		lua_error_p(L, "invalid qname");
 
 	/* Check class and type */
 	uint16_t rrtype = lua_tointeger(L, 2);
-	if (!lua_isnumber(L, 2)) {
-		lua_pushstring(L, "invalid RR type");
-		lua_error(L);
-	}
+	if (!lua_isnumber(L, 2))
+		lua_error_p(L, "invalid RR type");
 
 	uint16_t rrclass = lua_tointeger(L, 3);
 	if (!lua_isnumber(L, 3)) { /* Default class is IN */
@@ -46,17 +42,13 @@ static int wrk_resolve(lua_State *L)
 
 	/* Add query options */
 	const struct kr_qflags *options = lua_topointer(L, 4);
-	if (!options) { /* but we rely on the lua wrapper when dereferencing non-NULL */
-		lua_pushstring(L, "invalid options");
-		lua_error(L);
-	}
+	if (!options) /* but we rely on the lua wrapper when dereferencing non-NULL */
+		lua_error_p(L, "invalid options");
 
 	/* Create query packet */
 	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
-	if (!pkt) {
-		lua_pushstring(L, kr_strerror(ENOMEM));
-		lua_error(L);
-	}
+	if (!pkt)
+		lua_error_maybe(L, ENOMEM);
 	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
 	knot_wire_set_rd(pkt->wire);
 	knot_wire_set_ad(pkt->wire);
@@ -65,7 +57,7 @@ static int wrk_resolve(lua_State *L)
 	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
 	if (!pkt->opt_rr) {
 		knot_pkt_free(pkt);
-		return kr_error(ENOMEM);
+		lua_error_maybe(L, ENOMEM);
 	}
 	if (options->DNSSEC_WANT) {
 		knot_edns_set_do(pkt->opt_rr);
@@ -80,8 +72,7 @@ static int wrk_resolve(lua_State *L)
 	if (!task) {
 		knot_rrset_free(pkt->opt_rr, NULL);
 		knot_pkt_free(pkt);
-		lua_pushstring(L, "couldn't create a resolution request");
-		lua_error(L);
+		lua_error_p(L, "couldn't create a resolution request");
 	}
 
 	/* Add initialisation callback */
