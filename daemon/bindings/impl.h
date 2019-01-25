@@ -39,11 +39,18 @@
 #define STR(s) STRINGIFY_INT(s)
 #define STRINGIFY_INT(s) #s
 
-/** @internal Prefix error with file:line
- * Implementation in ./impl.c */
-int KR_COLD format_error(lua_State* L, const char *err);
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error(lua_State *L);
+
+/** Throw a formatted lua error.  It doesn't return. */
+KR_PRINTF(2) KR_NORETURN KR_COLD
+void lua_error_p(lua_State *L, const char *fmt, ...);
+
+/** Shortcut for common case. */
+static inline void lua_error_maybe(lua_State *L, int err)
+{
+	if (err) lua_error_p(L, "%s", kr_strerror(err));
+}
 
 static inline struct worker_ctx *wrk_luaget(lua_State *L) {
 	lua_getglobal(L, "__worker");
