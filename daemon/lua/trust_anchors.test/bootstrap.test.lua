@@ -59,7 +59,7 @@ local function wait_for_webserver()
 end
 
 local host = 'https://localhost:8080/'
--- avoid interference with configured KEYFILE_DEFAULT
+-- avoid interference with configured keyfile_default
 trust_anchors.keyfile_default = nil
 
 local function test_err_cert()
