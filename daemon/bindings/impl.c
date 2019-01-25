@@ -44,11 +44,11 @@ void kr_bindings_register(lua_State *L)
 	lualib(L, "worker",  kr_bindings_worker);
 }
 
-int format_error(lua_State* L, const char *err)
+void lua_error_p(lua_State *L, const char *fmt, ...)
 {
+	/* Push a string describing location in the "parent" lua function. */
 	lua_Debug d;
 	lua_getstack(L, 1, &d);
-	/* error message prefix */
 	lua_getinfo(L, "Sln", &d);
 	if (strncmp(d.short_src, "[", 1) != 0) {
 		lua_pushstring(L, d.short_src);
@@ -59,9 +59,13 @@ int format_error(lua_State* L, const char *err)
 	} else {
 		lua_pushstring(L, "error: ");
 	}
-	/* error message */
-	lua_pushstring(L, err);
+	/* Push formatted custom message. */
+	va_list args;
+	va_start(args, fmt);
+	lua_pushvfstring(L, fmt, args);
+	va_end(args);
+	/* Concatenate the two and throw a lua error. */
 	lua_concat(L,  2);
-	return 1;
+	lua_error(L);
 }
 
