@@ -98,6 +98,7 @@ subdir('contrib')
 subdir('lib')
 subdir('client')
 subdir('daemon')
+subdir('modules')
 
 # TODO install man
 
@@ -149,35 +150,6 @@ subdir('daemon')
 
 
 # install
-
-## install lua modules
-lua_modules = [
-  'daf',
-  'detect_time_jump',
-  'detect_time_skew',
-  'dns64',
-  'etcd',
-  'graphite',
-  'http',
-  'policy',
-  'predict',
-  'prefill',
-  'priming',
-  'rebinding',
-  'renumber',
-  'serve_stale',
-  'ta_sentinel',
-  'ta_signal_query',
-  'view',
-  'workarounds',
-]
-
-foreach mod : lua_modules
-  install_data(
-    join_paths('modules', mod, mod + '.lua'),
-    install_dir: modules_dir,
-  )
-endforeach
 
 
 install_data(
