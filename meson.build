@@ -6,6 +6,7 @@ project(
 )
 
 libkres_soversion = 9
+
 if get_option('modules_dir') == ''
   modules_dir = join_paths(
     get_option('prefix'), get_option('libdir'), 'knot-resolver')
@@ -13,6 +14,8 @@ else
   modules_dir = get_option('modules_dir')
 endif
 message('modules_dir: ' + modules_dir)
+
+etc_dir = join_paths(get_option('prefix'), get_option('sysconfdir'), 'knot-resolver')
 
 
 # Project-wide dependencies
@@ -183,4 +186,4 @@ install_data(
 
 # etc
 
-install_data(sources: 'etc/root.hints', install_dir: get_option('sysconfdir'))
+install_data(sources: 'etc/root.hints', install_dir: etc_dir)
