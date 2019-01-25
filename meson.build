@@ -1,5 +1,6 @@
 project(
-  'knot-resolver', 'c',
+  'knot-resolver',
+  ['c', 'cpp'],
   license: 'GPLv3+',
   version: '3.2.1',  # TODO dev version from git
   default_options: ['c_std=c99'],  # TODO why not c11?
