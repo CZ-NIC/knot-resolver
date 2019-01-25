@@ -169,12 +169,6 @@ foreach mod : lua_modules
   )
 endforeach
 
-foreach mod : lua_modules_daemon
-  install_data(
-    join_paths('daemon', 'lua', mod + '.lua'),
-    install_dir: modules_dir,
-  )
-endforeach
 
 install_data(
   'modules/daf/daf.js',
