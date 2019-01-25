@@ -1,18 +1,8 @@
 lua_modules_daemon = [
   'kres',
   'kres-gen',
-  'trust_anchors',
   'zonefile',
 ]
-
-
-# trust_anchors.lua
-configure_file(
-  input: 'trust_anchors.lua.in',
-  output: 'trust_anchors.lua',
-  configuration: config
-)
-
 
 # install lua modules
 foreach mod : lua_modules_daemon
@@ -21,6 +11,15 @@ foreach mod : lua_modules_daemon
     install_dir: modules_dir,
   )
 endforeach
+
+
+# trust_anchors.lua
+configure_file(
+  input: 'trust_anchors.lua.in',
+  output: 'trust_anchors.lua',
+  configuration: config,
+  install_dir: modules_dir,
+)
 
 
 if get_option('daemon')
