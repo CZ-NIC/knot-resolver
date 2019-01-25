@@ -10,7 +10,7 @@ lua_sources = [
   'http/http.lua',  # TODO http
   'http/http_trace.lua',
   'http/prometheus.lua',
-  'policy/policy.lua',  # TODO policy
+  'policy/policy.lua',
   'predict/predict.lua',
   'prefill/prefill.lua',
   'priming/priming.lua',
@@ -25,6 +25,7 @@ lua_sources = [
 
 
 subdir('daf')
+subdir('policy')
 
 
 # TODO c modules
