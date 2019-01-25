@@ -14,6 +14,9 @@ kresd_sources = [
 ]
 
 
+subdir('lua')
+
+
 lib_suffix = '.so'
 # TODO seek&destroy LIBEXT
 if host_machine.system() == 'darwin'
@@ -42,41 +45,18 @@ if host_machine.system() == 'darwin'
 endif
 
 
-# daemon dependencies
-skip_daemon = false
+if get_option('daemon')
+  # daemon dependencies
+  luajit = dependency('luajit')
 
-luajit = dependency('luajit', required: false)
-if not luajit.found()
-  skip_daemon = true
-  message('kresd daemon: luajit not found')
-endif
-
-xxd = find_program('xxd', required: false)
-if not xxd.found()
-  hexdump = find_program('hexdump', required: false)
-  if not hexdump.found()
-    skip_daemon = true
-    message('kresd daemon: neither xxd nor hexdump found')
+  # optional dependencies
+  ## systemd socket activation
+  libsystemd = dependency('libsystemd', version: '>=227', required: false)
+  if libsystemd.found()
+    c_args += ['-DHAS_SYSTEMD']
   endif
-endif
 
-
-# optional dependencies
-
-## systemd socket activation
-libsystemd = dependency('libsystemd', version: '>=227', required: false)
-if libsystemd.found()
-  c_args += ['-DHAS_SYSTEMD']
-endif
-
-
-subdir('lua')
-
-
-# build
-if skip_daemon
-  warning('kresd daemon: skipping build')
-else
+  # build
   kresd = executable(
     'kresd',
     kresd_sources, kresd_lua,

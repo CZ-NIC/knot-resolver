@@ -122,18 +122,18 @@ subdir('daemon')
 #  name_prefix: '',
 #)
 
-library(
-  'stats',
-  ['modules/stats/stats.c'],
-  dependencies: [
-    contrib_dep,
-    libkres_dep,
-    luajit,
-  ],
-  install: true,
-  install_dir: modules_dir,
-  name_prefix: '',
-)
+#library(
+#  'stats',
+#  ['modules/stats/stats.c'],
+#  dependencies: [
+#    contrib_dep,
+#    libkres_dep,
+#    luajit,
+#  ],
+#  install: true,
+#  install_dir: modules_dir,
+#  name_prefix: '',
+#)
 
 # TODO: dnstap
 
