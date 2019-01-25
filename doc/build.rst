@@ -195,12 +195,12 @@ All paths are prefixed with ``PREFIX`` variable by default if not specified othe
    "daemon",  "``SBINDIR``", "``$(PREFIX)/sbin``", ""
    "configuration", "``ETCDIR``", "``$(PREFIX)/etc/knot-resolver``", "Configuration file, templates."
    "modules", "``MODULEDIR``", "``$(LIBDIR)/kdns_modules``", "Runtime directory for loading dynamic modules [#]_."
-   "trust anchor file", "``KEYFILE_DEFAULT``", "*(none)*", "Path to read-only trust anchor file, which is used as fallback when no other file is specified. [#]_"
+   "trust anchor file", "``keyfile_default``", "*(none)*", "Path to read-only trust anchor file, which is used as fallback when no other file is specified. [#]_"
    "work directory", "", "the current directory", "Run directory for daemon. (Only relevant during run time, not e.g. during installation.)"
 
 .. [#] The ``libkres.pc`` is installed in ``$(LIBDIR)/pkgconfig``.
 .. [#] The default moduledir can be changed with `-m` option to `kresd` daemon or by calling `moduledir()` function from lua.
-.. [#] If no other trust anchor is specified by user, the compiled-in path ``KEYFILE_DEFAULT`` must contain a valid trust anchor. This is typically used by distributions which provide DNSSEC root trust anchors as part of distribution package. Users can disable the built-in trust anchor by adding ``trust_anchors.keyfile_default = nil`` to their configuration.
+.. [#] If no other trust anchor is specified by user, the compiled-in path ``keyfile_default`` must contain a valid trust anchor. This is typically used by distributions which provide DNSSEC root trust anchors as part of distribution package. Users can disable the built-in trust anchor by adding ``trust_anchors.keyfile_default = nil`` to their configuration.
 
 .. note:: Each module is self-contained and may install additional bundled files within ``$(MODULEDIR)/$(modulename)``. These files should be read-only, non-executable.
 

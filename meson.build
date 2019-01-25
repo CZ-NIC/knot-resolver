@@ -17,6 +17,8 @@ message('modules_dir: ' + modules_dir)
 
 etc_dir = join_paths(get_option('prefix'), get_option('sysconfdir'), 'knot-resolver')
 
+config = configuration_data()
+config.set('keyfile_default', get_option('keyfile_default'))
 
 # Project-wide dependencies
 
