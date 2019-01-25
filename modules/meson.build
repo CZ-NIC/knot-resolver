@@ -1,5 +1,5 @@
 lua_sources = [
-  'daf/daf.lua',  # TODO copy js
+  'daf/daf.lua',
   'detect_time_jump/detect_time_jump.lua',
   'detect_time_skew/detect_time_skew.lua',
   'dns64/dns64.lua',
@@ -23,8 +23,12 @@ lua_sources = [
   'workarounds/workarounds.lua',
 ]
 
-# TODO subdir
+
+subdir('daf')
+
+
 # TODO c modules
+
 
 # install lua modules
 foreach mod : lua_sources
