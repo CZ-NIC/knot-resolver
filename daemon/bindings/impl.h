@@ -49,7 +49,7 @@ void lua_error_p(lua_State *L, const char *fmt, ...);
 /** Shortcut for common case. */
 static inline void lua_error_maybe(lua_State *L, int err)
 {
-	if (err) lua_error_p(L, "%s", kr_strerror(errno));
+	if (err) lua_error_p(L, "%s", kr_strerror(err));
 }
 
 static inline struct worker_ctx *wrk_luaget(lua_State *L) {
