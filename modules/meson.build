@@ -25,6 +25,7 @@ lua_sources = [
 
 
 subdir('daf')
+subdir('policy')
 
 
 # TODO c modules
