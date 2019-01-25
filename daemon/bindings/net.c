@@ -74,11 +74,8 @@ static int net_listen_addrs(lua_State *L, int port, int flags)
 	}
 
 	/* Last case: table where all entries are added recursively. */
-	if (!lua_istable(L, -1)) {
-		format_error(L, "bad type for address");
-		lua_error(L);
-		return 0;
-	}
+	if (!lua_istable(L, -1))
+		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
 		if (net_listen_addrs(L, port, flags) == 0)
@@ -105,9 +102,9 @@ static int net_listen(lua_State *L)
 	/* Check parameters */
 	int n = lua_gettop(L);
 	if (n < 1 || n > 3) {
-		format_error(L, "expected one to three arguments; usage:\n"
-			     "net.listen(addressses, [port = " STR(KR_DNS_PORT) ", flags = {tls = (port == " STR(KR_DNS_TLS_PORT) ")}])\n");
-		lua_error(L);
+		lua_error_p(L, "expected one to three arguments; usage:\n"
+				"net.listen(addressses, [port = " STR(KR_DNS_PORT)
+				", flags = {tls = (port == " STR(KR_DNS_TLS_PORT) ")}])\n");
 	}
 
 	int port = KR_DNS_PORT;
@@ -133,10 +130,8 @@ static int net_close(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2) {
-		format_error(L, "expected 'close(string addr, number port)'");
-		lua_error(L);
-	}
+	if (n < 2)
+		lua_error_p(L, "expected 'close(string addr, number port)'");
 
 	/* Open resolution context cache */
 	struct engine *engine = engine_luaget(L);
@@ -207,10 +202,8 @@ static int net_bufsize(lua_State *L)
 		return 1;
 	}
 	int bufsize = lua_tointeger(L, 1);
-	if (bufsize < 512 || bufsize > UINT16_MAX) {
-		format_error(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
-		lua_error(L);
-	}
+	if (bufsize < 512 || bufsize > UINT16_MAX)
+		lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
 	knot_edns_set_payload(opt_rr, (uint16_t) bufsize);
 	return 0;
 }
@@ -227,10 +220,8 @@ static int net_pipeline(lua_State *L)
 		return 1;
 	}
 	int len = lua_tointeger(L, 1);
-	if (len < 0 || len > UINT16_MAX) {
-		format_error(L, "tcp_pipeline must be within <0, " STR(UINT16_MAX) ">");
-		lua_error(L);
-	}
+	if (len < 0 || len > UINT16_MAX)
+		lua_error_p(L, "tcp_pipeline must be within <0, " STR(UINT16_MAX) ">");
 	worker->tcp_pipeline_max = len;
 	lua_pushnumber(L, len);
 	return 1;
@@ -261,16 +252,11 @@ static int net_tls(lua_State *L)
 		return 1;
 	}
 
-	if ((lua_gettop(L) != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2)) {
-		lua_pushstring(L, "net.tls takes two parameters: (\"cert_file\", \"key_file\")");
-		lua_error(L);
-	}
+	if ((lua_gettop(L) != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2))
+		lua_error_p(L, "net.tls takes two parameters: (\"cert_file\", \"key_file\")");
 
 	int r = tls_certificate_set(net, lua_tostring(L, 1), lua_tostring(L, 2));
-	if (r != 0) {
-		lua_pushstring(L, kr_strerror(r));
-		lua_error(L);
-	}
+	lua_error_maybe(L, r);
 
 	lua_pushboolean(L, true);
 	return 1;
@@ -369,27 +355,24 @@ static int net_tls_client(lua_State *L)
 		pin_exists = true;
 		hostname_exists = true;
 	} else {
-		format_error(L, "net.tls_client takes one parameter (\"address\"), two parameters (\"address\",\"pin\"), three parameters (\"address\", \"ca_file\", \"hostname\") or four ones: (\"address\", \"pin\", \"ca_file\", \"hostname\")");
-		lua_error(L);
+		lua_error_p(L,
+			"net.tls_client takes one parameter (\"address\"),"
+			" two parameters (\"address\",\"pin\"),"
+			" three parameters (\"address\", \"ca_file\", \"hostname\")"
+			" or four ones: (\"address\", \"pin\", \"ca_file\", \"hostname\")");
 	}
 
 	char buf[INET6_ADDRSTRLEN + 1];
 	uint16_t port = 853;
 	const char *addr = kr_straddr_split(full_addr, buf, &port);
-	if (!addr) {
-		format_error(L, "invalid IP address");
-		lua_error(L);
-	}
+	if (!addr)
+		lua_error_p(L, "invalid IP address");
 
 	if (!pin_exists && !hostname_exists) {
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, NULL,
 					      TLS_CLIENT_PARAM_NONE);
-		if (r != 0) {
-			lua_pushstring(L, kr_strerror(r));
-			lua_error(L);
-		}
-
+		lua_error_maybe(L, r);
 		lua_pushboolean(L, true);
 		return 1;
 	}
@@ -404,10 +387,7 @@ static int net_tls_client(lua_State *L)
 			int r = tls_client_params_set(&net->tls_client_params,
 						      addr, port, pin,
 						      TLS_CLIENT_PARAM_PIN);
-			if (r != 0) {
-				lua_pushstring(L, kr_strerror(r));
-				lua_error(L);
-			}
+			lua_error_maybe(L, r);
 			lua_pop(L, 1);
 		}
 	}
@@ -432,10 +412,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, hostname,
 					      TLS_CLIENT_PARAM_HOSTNAME);
-		if (r != 0) {
-			lua_pushstring(L, kr_strerror(r));
-			lua_error(L);
-		}
+		lua_error_maybe(L, r);
 		/* removes 'value'; keeps 'key' for next iteration */
 		lua_pop(L, 1);
 	}
@@ -448,10 +425,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, ca_file,
 					      TLS_CLIENT_PARAM_CA);
-		if (r != 0) {
-			lua_pushstring(L, kr_strerror(r));
-			lua_error(L);
-		}
+		lua_error_maybe(L, r);
 		num_of_ca_files += 1;
 		/* removes 'value'; keeps 'key' for next iteration */
 		lua_pop(L, 1);
@@ -462,10 +436,7 @@ static int net_tls_client(lua_State *L)
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, NULL,
 					      TLS_CLIENT_PARAM_CA);
-		if (r != 0) {
-			lua_pushstring(L, kr_strerror(r));
-			lua_error(L);
-		}
+		lua_error_maybe(L, r);
 	}
 
 	lua_pushboolean(L, true);
@@ -475,36 +446,26 @@ static int net_tls_client(lua_State *L)
 static int net_tls_client_clear(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	if (!engine) {
+	if (!engine)
 		return 0;
-	}
 
 	struct network *net = &engine->net;
-	if (!net) {
+	if (!net)
 		return 0;
-	}
 
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		format_error(L, "net.tls_client_clear() requires one parameter (\"address\")");
-		lua_error(L);
-	}
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
+		lua_error_p(L, "net.tls_client_clear() requires one parameter (\"address\")");
 
 	const char *full_addr = lua_tostring(L, 1);
 
 	char buf[INET6_ADDRSTRLEN + 1];
 	uint16_t port = 853;
 	const char *addr = kr_straddr_split(full_addr, buf, &port);
-	if (!addr) {
-		format_error(L, "invalid IP address");
-		lua_error(L);
-	}
+	if (!addr)
+		lua_error_p(L, "invalid IP address");
 
 	int r = tls_client_params_clear(&net->tls_client_params, addr, port);
-	if (r != 0) {
-		lua_pushstring(L, kr_strerror(r));
-		lua_error(L);
-	}
-
+	lua_error_maybe(L, r);
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -526,10 +487,10 @@ static int net_tls_padding(lua_State *L)
 		return 1;
 	}
 
-	if ((lua_gettop(L) != 1)) {
-		lua_pushstring(L, "net.tls_padding takes one parameter: (\"padding\")");
-		lua_error(L);
-	}
+	const char *errstr = "net.tls_padding parameter has to be true, false,"
+				" or a number between <0, " STR(MAX_TLS_PADDING) ">";
+	if ((lua_gettop(L) != 1))
+		lua_error_p(L, "net.tls_padding takes one parameter: (\"padding\")");
 	if (lua_isboolean(L, 1)) {
 		bool x = lua_toboolean(L, 1);
 		if (x) {
@@ -539,14 +500,11 @@ static int net_tls_padding(lua_State *L)
 		}
 	} else if (lua_isnumber(L, 1)) {
 		int padding = lua_tointeger(L, 1);
-		if ((padding < 0) || (padding > MAX_TLS_PADDING)) {
-			lua_pushstring(L, "net.tls_padding parameter has to be true, false, or a number between <0, " STR(MAX_TLS_PADDING) ">");
-			lua_error(L);
-		}
+		if ((padding < 0) || (padding > MAX_TLS_PADDING))
+			lua_error_p(L, "%s", errstr);
 		engine->resolver.tls_padding = padding;
 	} else {
-		lua_pushstring(L, "net.tls_padding parameter has to be true, false, or a number between <0, " STR(MAX_TLS_PADDING) ">");
-		lua_error(L);
+		lua_error_p(L, "%s", errstr);
 	}
 	lua_pushboolean(L, true);
 	return 1;
@@ -568,15 +526,13 @@ static int net_tls_sticket_secret_string(lua_State *L)
 		secret = NULL;
 	} else {
 		if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-			lua_pushstring(L,
+			lua_error_p(L,
 				"net.tls_sticket_secret takes one parameter: (\"secret string\")");
-			lua_error(L);
 		}
 		secret = lua_tolstring(L, 1, &secret_len);
 		if (secret_len < net_tls_sticket_MIN_SECRET_LEN || !secret) {
-			lua_pushstring(L, "net.tls_sticket_secret - the secret is shorter than "
-						STR(net_tls_sticket_MIN_SECRET_LEN) " bytes");
-			lua_error(L);
+			lua_error_p(L, "net.tls_sticket_secret - the secret is shorter than "
+					STR(net_tls_sticket_MIN_SECRET_LEN) " bytes");
 		}
 	}
 
@@ -584,9 +540,8 @@ static int net_tls_sticket_secret_string(lua_State *L)
 	net->tls_session_ticket_ctx =
 		tls_session_ticket_ctx_create(net->loop, secret, secret_len);
 	if (net->tls_session_ticket_ctx == NULL) {
-		lua_pushstring(L,
+		lua_error_p(L,
 			"net.tls_sticket_secret_string - can't create session ticket context");
-		lua_error(L);
 	}
 
 	lua_pushboolean(L, true);
@@ -596,39 +551,33 @@ static int net_tls_sticket_secret_string(lua_State *L)
 static int net_tls_sticket_secret_file(lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_pushstring(L,
+		lua_error_p(L,
 			"net.tls_sticket_secret_file takes one parameter: (\"file name\")");
-		lua_error(L);
 	}
 
 	const char *file_name = lua_tostring(L, 1);
-	if (strlen(file_name) == 0) {
-		lua_pushstring(L, "net.tls_sticket_secret_file - empty file name");
-		lua_error(L);
-	}
+	if (strlen(file_name) == 0)
+		lua_error_p(L, "net.tls_sticket_secret_file - empty file name");
 
 	FILE *fp = fopen(file_name, "r");
 	if (fp == NULL) {
-		lua_pushfstring(L, "net.tls_sticket_secret_file - can't open file '%s': %s",
+		lua_error_p(L, "net.tls_sticket_secret_file - can't open file '%s': %s",
 				file_name, strerror(errno));
-		lua_error(L);
 	}
 
 	char secret_buf[TLS_SESSION_TICKET_SECRET_MAX_LEN];
 	const size_t secret_len = fread(secret_buf, 1, sizeof(secret_buf), fp);
 	int err = ferror(fp);
 	if (err) {
-		lua_pushfstring(L,
+		lua_error_p(L,
 			"net.tls_sticket_secret_file - error reading from file '%s': %s",
 			file_name, strerror(err));
-		lua_error(L);
 	}
 	if (secret_len < net_tls_sticket_MIN_SECRET_LEN) {
-		lua_pushfstring(L,
+		lua_error_p(L,
 			"net.tls_sticket_secret_file - file '%s' is shorter than "
 				STR(net_tls_sticket_MIN_SECRET_LEN) " bytes",
 			file_name);
-		lua_error(L);
 	}
 	fclose(fp);
 
@@ -638,9 +587,8 @@ static int net_tls_sticket_secret_file(lua_State *L)
 	net->tls_session_ticket_ctx =
 		tls_session_ticket_ctx_create(net->loop, secret_buf, secret_len);
 	if (net->tls_session_ticket_ctx == NULL) {
-		lua_pushstring(L,
+		lua_error_p(L,
 			"net.tls_sticket_secret_file - can't create session ticket context");
-		lua_error(L);
 	}
 	lua_pushboolean(L, true);
 	return 1;
@@ -662,7 +610,7 @@ static int net_outgoing(lua_State *L, int family)
 		}
 		if (addr->ip.sa_family != family) {
 			assert(false);
-			lua_error(L);
+			lua_error_p(L, "bad address family");
 		}
 		char addr_buf[INET6_ADDRSTRLEN];
 		int err;
@@ -670,16 +618,13 @@ static int net_outgoing(lua_State *L, int family)
 			err = uv_ip4_name(&addr->ip4, addr_buf, sizeof(addr_buf));
 		else
 			err = uv_ip6_name(&addr->ip6, addr_buf, sizeof(addr_buf));
-		if (err)
-			lua_error(L);
+		lua_error_maybe(L, err);
 		lua_pushstring(L, addr_buf);
 		return 1;
 	}
 
-	if ((lua_gettop(L) != 1) || (!lua_isstring(L, 1) && !lua_isnil(L, 1))) {
-		format_error(L, "net.outgoing_vX takes one address string parameter or nil");
-		lua_error(L);
-	}
+	if ((lua_gettop(L) != 1) || (!lua_isstring(L, 1) && !lua_isnil(L, 1)))
+		lua_error_p(L, "net.outgoing_vX takes one address string parameter or nil");
 
 	if (lua_isnil(L, 1)) {
 		addr->ip.sa_family = AF_UNSPEC;
@@ -692,10 +637,8 @@ static int net_outgoing(lua_State *L, int family)
 		err = uv_ip4_addr(addr_str, 0, &addr->ip4);
 	else
 		err = uv_ip6_addr(addr_str, 0, &addr->ip6);
-	if (err) {
-		format_error(L, "net.outgoing_vX: failed to parse the address");
-		lua_error(L);
-	}
+	if (err)
+		lua_error_p(L, "net.outgoing_vX: failed to parse the address");
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -711,24 +654,16 @@ static int net_update_timeout(lua_State *L, uint64_t *timeout, const char *name)
 		return 1;
 	}
 
-	if ((lua_gettop(L) != 1)) {
-		lua_pushstring(L, name);
-		lua_pushstring(L, " takes one parameter: (\"idle timeout\")");
-		lua_error(L);
-	}
+	if ((lua_gettop(L) != 1))
+		lua_error_p(L, "%s takes one parameter: (\"idle timeout\")", name);
 
 	if (lua_isnumber(L, 1)) {
 		int idle_timeout = lua_tointeger(L, 1);
-		if (idle_timeout <= 0) {
-			lua_pushstring(L, name);
-			lua_pushstring(L, " parameter has to be positive number");
-			lua_error(L);
-		}
+		if (idle_timeout <= 0)
+			lua_error_p(L, "%s parameter has to be positive number", name);
 		*timeout = idle_timeout;
 	} else {
-		lua_pushstring(L, name);
-		lua_pushstring(L, " parameter has to be positive number");
-		lua_error(L);
+		lua_error_p(L, "%s parameter has to be positive number", name);
 	}
 	lua_pushboolean(L, true);
 	return 1;
@@ -756,9 +691,8 @@ static int net_bpf_set(lua_State *L)
 	struct network *net = &engine->net;
 
 	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1)) {
-		format_error(L, "net.bpf_set(fd) takes one parameter: the open file descriptor of a loaded BPF program");
-		lua_error(L);
-		return 0;
+		lua_error_p(L, "net.bpf_set(fd) takes one parameter:"
+				" the open file descriptor of a loaded BPF program");
 	}
 
 #if __linux__
@@ -768,27 +702,20 @@ static int net_bpf_set(lua_State *L)
 		/* conversion error despite that fact
 		 * that lua_isnumber(L, 1) has returned true.
 		 * Real or stdin? */
-		lua_error(L);
-		return 0;
+		lua_error_p(L, "failed to convert parameter");
 	}
 	lua_pop(L, 1);
 
 	if (network_set_bpf(net, progfd) == 0) {
-		char errmsg[256] = { 0 };
-		snprintf(errmsg, sizeof(errmsg), "failed to attach BPF program to some networks: %s", strerror(errno));
-		format_error(L, errmsg);
-		lua_error(L);
-		return 0;
+		lua_error_p(L, "failed to attach BPF program to some networks: %s",
+				kr_strerror(errno));
 	}
 
 	lua_pushboolean(L, 1);
 	return 1;
 
 #endif
-
-	format_error(L, "BPF is not supported on this operating system");
-	lua_error(L);
-	return 0;
+	lua_error_p(L, "BPF is not supported on this operating system");
 }
 
 static int net_bpf_clear(lua_State *L)
@@ -796,11 +723,8 @@ static int net_bpf_clear(lua_State *L)
 	struct engine *engine = engine_luaget(L);
 	struct network *net = &engine->net;
 
-	if (lua_gettop(L) != 0) {
-		format_error(L, "net.bpf_clear() does not take any parameters");
-		lua_error(L);
-		return 0;
-	}
+	if (lua_gettop(L) != 0)
+		lua_error_p(L, "net.bpf_clear() does not take any parameters");
 
 #if __linux__
 
@@ -810,10 +734,7 @@ static int net_bpf_clear(lua_State *L)
 	return 1;
 
 #endif
-
-	format_error(L, "BPF is not supported on this operating system");
-	lua_error(L);
-	return 0;
+	lua_error_p(L, "BPF is not supported on this operating system");
 }
 
 int kr_bindings_net(lua_State *L)
