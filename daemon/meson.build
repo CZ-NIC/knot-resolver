@@ -45,9 +45,6 @@ endif
 
 
 if get_option('daemon')
-  # daemon dependencies
-  luajit = dependency('luajit')
-
   # optional dependencies
   ## systemd socket activation
   libsystemd = dependency('libsystemd', version: '>=227', required: false)
