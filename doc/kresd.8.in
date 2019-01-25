@@ -136,7 +136,7 @@ and is compatible with Unbound and BIND 9 root key files.
 .B \-K\fI keyfile\fR, \fB\-\-keyfile\-ro=\fI<keyfile>
 (Discouraged) Static root trust anchors file. The file is not updated by kresd. Use of this option is discouraged because it will break your installation when the trust anchor key changes!
 
-Default: "@KEYFILE_DEFAULT@" (can be empty if your distribution did not provide one)
+Default: "@keyfile_default@" (can be empty if your distribution did not provide one)
 .TP
 .B \-m\fI path\fR, \fB\-\-moduledir=\fI<path>
 Override the directory that is searched for modules.  Default: @MODULEDIR@
