@@ -15,10 +15,10 @@ else
 endif
 message('modules_dir: ' + modules_dir)
 
-etc_dir = join_paths(get_option('prefix'), get_option('sysconfdir'), 'knot-resolver')
-
 config = configuration_data()
 config.set('keyfile_default', get_option('keyfile_default'))
+config.set('etc_dir',
+  join_paths(get_option('prefix'), get_option('sysconfdir'), 'knot-resolver'))
 
 # Project-wide dependencies
 
@@ -188,4 +188,4 @@ install_data(
 
 # etc
 
-install_data(sources: 'etc/root.hints', install_dir: etc_dir)
+install_data(sources: 'etc/root.hints', install_dir: config.get('etc_dir'))

@@ -622,7 +622,7 @@ trust_anchors = {
 	keep_removed = 0,
 
 	bootstrap_url = 'https://data.iana.org/root-anchors/root-anchors.xml',
-	bootstrap_ca = '@ETCDIR@/icann-ca.pem',
+	bootstrap_ca = '@etc_dir@/icann-ca.pem',
 	-- change empty string to nil
 	keyfile_default = ('@keyfile_default@' ~= '' and '@keyfile_default@') or nil,
 
