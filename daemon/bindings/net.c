@@ -373,15 +373,12 @@ static int net_tls_client(lua_State *L)
 		lua_error(L);
 	}
 
-	char addr[INET6_ADDRSTRLEN];
-	uint16_t port = 0;
-	if (kr_straddr_split(full_addr, addr, sizeof(addr), &port) != kr_ok()) {
+	char buf[INET6_ADDRSTRLEN + 1];
+	uint16_t port = 853;
+	const char *addr = kr_straddr_split(full_addr, buf, &port);
+	if (!addr) {
 		format_error(L, "invalid IP address");
 		lua_error(L);
-	}
-
-	if (port == 0) {
-		port = 853;
 	}
 
 	if (!pin_exists && !hostname_exists) {
@@ -494,15 +491,12 @@ static int net_tls_client_clear(lua_State *L)
 
 	const char *full_addr = lua_tostring(L, 1);
 
-	char addr[INET6_ADDRSTRLEN];
-	uint16_t port = 0;
-	if (kr_straddr_split(full_addr, addr, sizeof(addr), &port) != kr_ok()) {
+	char buf[INET6_ADDRSTRLEN + 1];
+	uint16_t port = 853;
+	const char *addr = kr_straddr_split(full_addr, buf, &port);
+	if (!addr) {
 		format_error(L, "invalid IP address");
 		lua_error(L);
-	}
-
-	if (port == 0) {
-		port = 853;
 	}
 
 	int r = tls_client_params_clear(&net->tls_client_params, addr, port);
