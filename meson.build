@@ -29,6 +29,8 @@ libzscanner = dependency('libzscanner', version: knot_version)
 libuv = dependency('libuv', version: '>=1.7')
 lmdb = dependency('lmdb')
 gnutls = dependency('gnutls')
+luajit = dependency('luajit')
+
 
 # Optional dependencies
 
