@@ -35,15 +35,12 @@ static int mod_load(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n != 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected 'load(string name)'");
-		lua_error(L);
-	}
+	if (n != 1 || !lua_isstring(L, 1))
+		lua_error_p(L, "expected 'load(string name)'");
 	/* Parse precedence declaration */
 	char *declaration = strdup(lua_tostring(L, 1));
-	if (!declaration) {
+	if (!declaration)
 		return kr_error(ENOMEM);
-	}
 	const char *name = strtok(declaration, " ");
 	const char *precedence = strtok(NULL, " ");
 	const char *ref = strtok(NULL, " ");
@@ -53,11 +50,10 @@ static int mod_load(lua_State *L)
 	free(declaration);
 	if (ret != 0) {
 		if (ret == kr_error(EIDRM)) {
-			format_error(L, "referenced module not found");
+			lua_error_p(L, "referenced module not found");
 		} else {
-			format_error(L, kr_strerror(ret));
+			lua_error_maybe(L, ret);
 		}
-		lua_error(L);
 	}
 
 	lua_pushboolean(L, 1);
@@ -69,17 +65,12 @@ static int mod_unload(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n != 1 || !lua_isstring(L, 1)) {
-		format_error(L, "expected 'unload(string name)'");
-		lua_error(L);
-	}
+	if (n != 1 || !lua_isstring(L, 1))
+		lua_error_p(L, "expected 'unload(string name)'");
 	/* Unload engine module */
 	struct engine *engine = engine_luaget(L);
 	int ret = engine_unregister(engine, lua_tostring(L, 1));
-	if (ret != 0) {
-		format_error(L, kr_strerror(ret));
-		lua_error(L);
-	}
+	lua_error_maybe(L, ret);
 
 	lua_pushboolean(L, 1);
 	return 1;
