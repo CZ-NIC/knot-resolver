@@ -1,9 +1,17 @@
 lua_modules_daemon = [
   'kres',
   'kres-gen',
-  #'trust_anchors',  # TODO
+  'trust_anchors',
   'zonefile',
 ]
+
+
+# trust_anchors.lua
+configure_file(
+  input: 'trust_anchors.lua.in',
+  output: 'trust_anchors.lua',
+  configuration: config
+)
 
 
 # install lua modules
