@@ -137,6 +137,10 @@ library(
 
 # TODO: dnstap
 
+
+# install
+
+## install lua modules
 lua_modules = [
   'daf',
   'detect_time_jump',
@@ -161,6 +165,13 @@ lua_modules = [
 foreach mod : lua_modules
   install_data(
     join_paths('modules', mod, mod + '.lua'),
+    install_dir: modules_dir,
+  )
+endforeach
+
+foreach mod : lua_modules_daemon
+  install_data(
+    join_paths('daemon', 'lua', mod + '.lua'),
     install_dir: modules_dir,
   )
 endforeach
