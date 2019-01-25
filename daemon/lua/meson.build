@@ -6,6 +6,15 @@ lua_modules_daemon = [
 ]
 
 
+# install lua modules
+foreach mod : lua_modules_daemon
+  install_data(
+    join_paths(mod + '.lua'),
+    install_dir: modules_dir,
+  )
+endforeach
+
+
 if get_option('daemon')
   # dependencies for embedding lua
   xxd = find_program('xxd', required: false)
