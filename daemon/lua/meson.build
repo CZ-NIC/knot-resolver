@@ -7,7 +7,7 @@ lua_modules_daemon = [
 
 
 # trust_anchors.lua
-configuration_file(
+configure_file(
   input: 'trust_anchors.lua.in',
   output: 'trust_anchors.lua',
   configuration: config
