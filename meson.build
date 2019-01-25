@@ -152,10 +152,6 @@ subdir('modules')
 # install
 
 
-install_data(
-  'modules/daf/daf.js',
-  install_dir: join_paths(modules_dir, 'daf'),
-)
 
 
 # etc
