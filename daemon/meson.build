@@ -31,7 +31,7 @@ luajit_has_setfuncs = run_command(
 # daemon CFLAGS
 c_args = [
   '-fPIE',  # TODO pie=true since 0.49.0
-  '-DROOTHINTS="@0@/root.hints"'.format(etc_dir),
+  '-DROOTHINTS="@0@/root.hints"'.format(config.get('etc_dir')),
   '-DLIBEXT="@0@"'.format(lib_suffix),
   '-Dlibzscanner_SONAME="@0@"'.format(libzscanner.get_pkgconfig_variable('soname')),
   '-Dlibknot_SONAME="@0@"'.format(libknot.get_pkgconfig_variable('soname')),
