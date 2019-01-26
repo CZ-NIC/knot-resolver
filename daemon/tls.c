@@ -757,8 +757,17 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 	free(tls_credentials);
 }
 
-static int client_paramlist_entry_free(struct tls_client_paramlist_entry *entry)
+
+
+
+
+static void client_param_unref(struct tls_client_paramlist_entry *entry)
 {
+	if (!entry) return;
+	assert(entry->refs); /* Well, we'd only leak memory. */
+	--(entry->refs);
+	if (entry->refs) return;
+
 	DEBUG_MSG("freeing TLS parameters %p\n", (void *)entry);
 
 	for (int i = 0; i < entry->ca_files.len; ++i) {
@@ -782,8 +791,97 @@ static int client_paramlist_entry_free(struct tls_client_paramlist_entry *entry)
 	}
 
 	free(entry);
-
+}
+static int param_free(void **param, void *null)
+{
+	assert(param && *param);
+	client_param_unref(*param);
 	return 0;
+}
+void tls_client_params_free(tls_client_params_t *params)
+{
+	if (!params) return;
+	trie_apply(params, param_free, NULL);
+}
+
+static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
+{
+	switch (addr->ip.sa_family) {
+	case AF_INET:
+		memcpy(key, &addr->ip4.sin_port, sizeof(addr->ip4.sin_port));
+		memcpy(key + sizeof(addr->ip4.sin_port), &addr->ip4.sin_addr,
+			sizeof(addr->ip4.sin_addr));
+		*len = sizeof(addr->ip4.sin_port) + sizeof(addr->ip4.sin_addr);
+		return true;
+	case AF_INET6:
+		memcpy(key, &addr->ip6.sin6_port, sizeof(addr->ip6.sin6_port));
+		memcpy(key + sizeof(addr->ip6.sin6_port), &addr->ip6.sin6_addr,
+			sizeof(addr->ip6.sin6_addr));
+		*len = sizeof(addr->ip6.sin6_port) + sizeof(addr->ip6.sin6_addr);
+		return true;
+	default:
+		assert(!EINVAL);
+		return false;
+	}
+}
+struct tls_client_paramlist_entry * tls_client_param_get(
+	tls_client_params_t **params, const union inaddr *addr, bool alloc_new)
+{
+	assert(params && addr);
+	/* We accept NULL for empty map; ensure the map exists if needed. */
+	if (!*params) {
+		if (!alloc_new) return NULL;
+		*params = trie_create(NULL);
+		if (!*params) {
+			assert(!ENOMEM);
+			return NULL;
+		}
+	}
+	/* Construct the key. */
+	char key[sizeof(addr->ip6.sin6_port) + sizeof(addr->ip6.sin6_addr)];
+	uint32_t len;
+	if (!construct_key(addr, &len, key))
+		return NULL;
+	/* Get the entry. */
+	void **pe = (alloc_new ? trie_get_ins : trie_get_try)(*params, key, len);
+	if (!pe) {
+		assert(!alloc_new);
+		return NULL;
+	}
+	if (*pe) return *pe;
+	/* Create the missing entry. */
+	assert(alloc_new);
+	struct tls_client_paramlist_entry *e = *pe = calloc(1, sizeof(*e));
+	if (!e) {
+		assert(!ENOMEM);
+		return NULL;
+	}
+	/* Note: those array_t don't need further initialization. */
+	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
+	if (ret != GNUTLS_E_SUCCESS) {
+		kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
+			     gnutls_strerror_name(ret));
+		free(e);
+		ret = trie_del(*params, key, len, NULL);
+		assert(ret == KNOT_EOK);
+		return NULL;
+	}
+	gnutls_certificate_set_verify_function(e->credentials, client_verify_certificate);
+	return e;
+}
+
+int tls_client_param_remove(tls_client_params_t *params, const union inaddr *addr)
+{
+	char key[sizeof(addr->ip6.sin6_port) + sizeof(addr->ip6.sin6_addr)];
+	uint32_t len;
+	if (!construct_key(addr, &len, key))
+		return kr_error(EINVAL);
+	trie_val_t param_ptr;
+	int ret = trie_del(params, key, len, &param_ptr);
+	if (ret)
+		return kr_error(ret);
+	client_param_unref(param_ptr);
+	return kr_ok();
 }
 
 static void client_paramlist_entry_ref(struct tls_client_paramlist_entry *entry)
@@ -793,23 +891,16 @@ static void client_paramlist_entry_ref(struct tls_client_paramlist_entry *entry)
 	}
 }
 
-static void client_paramlist_entry_unref(struct tls_client_paramlist_entry *entry)
-{
-	if (entry != NULL) {
-		assert(entry->refs > 0);
-		entry->refs -= 1;
 
-		/* Last reference frees the object */
-		if (entry->refs == 0) {
-			client_paramlist_entry_free(entry);
-		}
-	}
-}
+
+
+
+
 
 static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 {
-	struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)v;
-	return client_paramlist_entry_free(entry);
+	//struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)v;
+	return 0;//client_paramlist_entry_free(entry);
 }
 
 struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
@@ -855,7 +946,13 @@ int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint1
 	return kr_ok();
 }
 
-int tls_client_params_set(map_t *tls_client_paramlist,
+typedef enum tls_client_param {
+       TLS_CLIENT_PARAM_NONE = 0,
+       TLS_CLIENT_PARAM_PIN,
+       TLS_CLIENT_PARAM_HOSTNAME,
+       TLS_CLIENT_PARAM_CA,
+} tls_client_param_t;
+int tls_client_params_set_ORIG(map_t *tls_client_paramlist,
 			  const char *addr, uint16_t port,
 			  const char *param, tls_client_param_t param_type)
 {
@@ -992,13 +1089,13 @@ int tls_client_params_set(map_t *tls_client_paramlist,
 	}
 
 	if ((ret != kr_ok()) && is_first_entry) {
-		client_paramlist_entry_unref(entry);
+		//client_paramlist_entry_unref(entry);
 	}
 
 	return ret;
 }
 
-int tls_client_params_free(map_t *tls_client_paramlist)
+int tls_client_params_free_ORIG(map_t *tls_client_paramlist)
 {
 	if (!tls_client_paramlist) {
 		return kr_error(EINVAL);
@@ -1156,6 +1253,9 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 	if (ret == GNUTLS_E_SUCCESS && entry->hostname) {
 		ret = gnutls_server_name_set(ctx->c.tls_session, GNUTLS_NAME_DNS,
 					entry->hostname, strlen(entry->hostname));
+		kr_log_info("TLS client: set hostname, ret = %d\n", ret);
+	} else if (!entry->hostname) {
+		kr_log_info("TLS client: no hostname\n");
 	}
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
@@ -1183,7 +1283,7 @@ void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
 	}
 
 	/* Must decrease the refcount for referenced parameters */
-	client_paramlist_entry_unref(ctx->params);
+	//client_paramlist_entry_unref(ctx->params);
 
 	free (ctx);
 }

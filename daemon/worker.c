@@ -1299,10 +1299,11 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	struct worker_ctx *worker = ctx->worker;
 
 	/* Check if there must be TLS */
-	struct engine *engine = worker->engine;
-	struct network *net = &engine->net;
-	const char *key = tcpsess_key(addr);
 	struct tls_client_ctx_t *tls_ctx = NULL;
+//FIXME: perhaps delegate to a function?
+#if 0
+	struct network *net = &worker->engine->net;
+	const char *key = tcpsess_key(addr);
 	struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
 	if (entry) {
 		/* Address is configured to be used with TLS.
@@ -1312,6 +1313,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 			return kr_error(EINVAL);
 		}
 	}
+#endif
 
 	uv_connect_t *conn = malloc(sizeof(uv_connect_t));
 	if (!conn) {
@@ -1505,6 +1507,8 @@ static int qr_task_step(struct qr_task *task,
 		choice += 1;
 	}
 
+//FIXME
+#if 0
 	/* Upgrade to TLS if the upstream address is configured as DoT capable. */
 	if (task->addrlist_count > 0 && kr_inaddr_port(task->addrlist) == KR_DNS_PORT) {
 		/* TODO if there are multiple addresses (task->addrlist_count > 1)
@@ -1521,6 +1525,7 @@ static int qr_task_step(struct qr_task *task,
 			 * redundant map_get() call. */
 		}
 	}
+#endif
 
 	int ret = 0;
 	if (sock_type == SOCK_DGRAM) {

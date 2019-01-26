@@ -171,13 +171,13 @@ end
 
 -- Check for allowed authentication types and return type for the current target
 local function tls_forward_target_authtype(idx, target)
-	if (target.pin_sha256 and not (target.ca_file or target.hostname or target.insecure)) then
+	if (target.pin_sha256 and not (target.ca_file or target.insecure)) then
 		if not is_nonempty_string_or_table(target.pin_sha256) then
 			error('TLS_FORWARD target authentication is invalid at position '
 			      .. idx .. '; pin_sha256 must be string or list of strings')
 		end
 		return 'pin_sha256'
-	elseif (target.insecure and not (target.ca_file or target.hostname or target.pin_sha256)) then
+	elseif (target.insecure and not (target.ca_file or target.pin_sha256)) then
 		return 'insecure'
 	elseif (target.hostname and not (target.insecure or target.pin_sha256)) then
 		if not (is_nonempty_string_or_table(target.hostname)) then
@@ -203,8 +203,41 @@ local function tls_forward_target_check_syntax(idx, list_entry)
 	end
 end
 
+function policy.TLS_FORWARD(targets)
+	if type(targets) ~= 'table' or #targets < 1 then
+		error('TLS_FORWARD argument must be a non-empty table')
+	elseif #targets > 4 then
+		error('TLS_FORWARD supports at most four targets (in a single call)')
+	end
+
+	local nslist = {} -- to persist in closure of the returned function
+	for idx, target in pairs(targets) do
+		if type(target) ~= 'table' or type(target[1]) ~= 'string' then
+			error('TLS_FORWARD argument number %1 must be a table starting with an address')
+		end
+		local sockaddr_c = addr2sock(target[1], 853)
+		table.insert(nslist, sockaddr_c)
+		-- checks with error() calls inside
+		net.tls_client(target)
+	end
+
+	return function(state, req)
+		local qry = req:current()
+		req.options.FORWARD = true
+		req.options.NO_MINIMIZE = true
+		qry.flags.FORWARD = true
+		qry.flags.ALWAYS_CUT = false
+		qry.flags.NO_MINIMIZE = true
+		qry.flags.AWAIT_CUT = true
+		req.options.TCP = true
+		qry.flags.TCP = true
+		set_nslist(qry, nslist)
+		return state
+	end
+end
+
 -- Forward request and all subrequests to upstream over TLS; validate answers
-function policy.TLS_FORWARD(target)
+function policy.TLS_FORWARD_OLD(target)
 	local sockaddr_c_list = {}
 	local sockaddr_config = {}  -- items: { string_addr=<addr string>, auth_type=<auth type> }
 	local ca_files = {}

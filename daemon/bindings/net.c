@@ -262,7 +262,7 @@ static int net_tls(lua_State *L)
 	return 1;
 }
 
-static int print_tls_param(const char *key, void *val, void *data)
+int print_tls_param(const char *key, void *val, void *data)
 {
 	if (!val) {
 		return 0;
@@ -300,6 +300,7 @@ static int print_tls_param(const char *key, void *val, void *data)
 	return 0;
 }
 
+#if 0
 static int print_tls_client_params(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
@@ -314,9 +315,9 @@ static int print_tls_client_params(lua_State *L)
 	map_walk(&net->tls_client_params, print_tls_param, (void *)L);
 	return 1;
 }
+#endif
 
-
-static int net_tls_client(lua_State *L)
+int net_tls_client_ORIG(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	if (!engine) {
@@ -329,7 +330,8 @@ static int net_tls_client(lua_State *L)
 
 	/* Only return current credentials. */
 	if (lua_gettop(L) == 0) {
-		return print_tls_client_params(L);
+		//return print_tls_client_params(L);
+		return 1; //FIXME?
 	}
 
 	const char *full_addr = NULL;
@@ -363,10 +365,18 @@ static int net_tls_client(lua_State *L)
 		lua_error_p(L, "invalid IP address");
 
 	if (!pin_exists && !hostname_exists) {
+		/*
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, NULL,
 					      TLS_CLIENT_PARAM_NONE);
+		*/
+		int r = ENOSYS;
 		lua_error_maybe(L, r);
+		if (r != 0) {
+			lua_pushstring(L, kr_strerror(r));
+			lua_error(L);
+		}
+
 		lua_pushboolean(L, true);
 		return 1;
 	}
@@ -377,11 +387,18 @@ static int net_tls_client(lua_State *L)
 		lua_pushnil(L); /* first key */
 		while (lua_next(L, 2)) {  /* pin table is in stack at index 2 */
 			/* pin now at index -1, key at index -2*/
+			/*
 			const char *pin = lua_tostring(L, -1);
 			int r = tls_client_params_set(&net->tls_client_params,
 						      addr, port, pin,
 						      TLS_CLIENT_PARAM_PIN);
+			*/
+			int r = ENOSYS;
 			lua_error_maybe(L, r);
+			if (r != 0) {
+				lua_pushstring(L, kr_strerror(r));
+				lua_error(L);
+			}
 			lua_pop(L, 1);
 		}
 	}
@@ -402,11 +419,18 @@ static int net_tls_client(lua_State *L)
 	 * it must be done before iterating over ca filenames */
 	lua_pushnil(L);
 	while (lua_next(L, hostname_table_index)) {
+		/*
 		const char *hostname = lua_tostring(L, -1);
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, hostname,
 					      TLS_CLIENT_PARAM_HOSTNAME);
+		*/
+		int r = ENOSYS;
 		lua_error_maybe(L, r);
+		if (r != 0) {
+			lua_pushstring(L, kr_strerror(r));
+			lua_error(L);
+		}
 		/* removes 'value'; keeps 'key' for next iteration */
 		lua_pop(L, 1);
 	}
@@ -415,11 +439,18 @@ static int net_tls_client(lua_State *L)
 	lua_pushnil(L);
 	size_t num_of_ca_files = 0;
 	while (lua_next(L, ca_table_index)) {
+		/*
 		const char *ca_file = lua_tostring(L, -1);
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, ca_file,
 					      TLS_CLIENT_PARAM_CA);
+		*/
+		int r = ENOSYS;
 		lua_error_maybe(L, r);
+		if (r != 0) {
+			lua_pushstring(L, kr_strerror(r));
+			lua_error(L);
+		}
 		num_of_ca_files += 1;
 		/* removes 'value'; keeps 'key' for next iteration */
 		lua_pop(L, 1);
@@ -427,17 +458,24 @@ static int net_tls_client(lua_State *L)
 
 	if (num_of_ca_files == 0) {
 		/* No ca files were explicitly configured, so use system CA */
+		/*
 		int r = tls_client_params_set(&net->tls_client_params,
 					      addr, port, NULL,
 					      TLS_CLIENT_PARAM_CA);
+		*/
+		int r = ENOSYS;
 		lua_error_maybe(L, r);
+		if (r != 0) {
+			lua_pushstring(L, kr_strerror(r));
+			lua_error(L);
+		}
 	}
 
 	lua_pushboolean(L, true);
 	return 1;
 }
 
-static int net_tls_client_clear(lua_State *L)
+int net_tls_client_clear_ORIG(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	if (!engine)
@@ -458,11 +496,139 @@ static int net_tls_client_clear(lua_State *L)
 	if (!addr)
 		lua_error_p(L, "invalid IP address");
 
-	int r = tls_client_params_clear(&net->tls_client_params, addr, port);
+	//int r = tls_client_params_clear(&net->tls_client_params, addr, port);
+	int r = ENOSYS;
 	lua_error_maybe(L, r);
 	lua_pushboolean(L, true);
 	return 1;
 }
+
+/** If the value at the top of the stack isn't a table, make it a single-element list. */
+static void lua_listify(lua_State *L)
+{
+	if (lua_istable(L, -1))
+		return;
+	lua_createtable(L, 1, 0);
+	lua_insert(L, lua_gettop(L) - 1); /* swap the top two stack elements */
+	lua_pushinteger(L, 1);
+	lua_insert(L, lua_gettop(L) - 1); /* swap the top two stack elements */
+	lua_settable(L, -3);
+}
+
+static int net_tls_client(lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_istable(L, 1))
+		lua_error_maybe(L, EINVAL);
+
+	/* Parse address and port. */
+	lua_pushinteger(L, 1);
+	lua_gettable(L, 1);
+	const char *addr_str = lua_tostring(L, -1);
+	if (!addr_str)
+		lua_error_p(L, "address is not a string");
+	char buf[INET6_ADDRSTRLEN + 1];
+	uint16_t port = 853;
+	addr_str = kr_straddr_split(addr_str, buf, &port);
+	/* Get pointer to param entry. */
+	const union inaddr *ia = (const union inaddr *)kr_straddr_socket(addr_str, port);
+	if (!ia)
+		lua_error_p(L, "address could not be converted");
+	struct network *net = &engine_luaget(L)->net;
+	struct tls_client_paramlist_entry *e =
+		tls_client_param_get(&net->tls_client_params, ia, true);
+	if (!e) {
+		free_const(ia);
+		lua_error_p(L, "error when searching tls_client_params");
+	}
+	if (e->refs) {
+		kr_log_info("[tls_client]"
+			" warning: attempt to re-define TLS authentication parameters for"
+			" %s; we change nothing\n", addr_str);
+		free_const(ia);
+		/* TODO: something better?  E.g. pass silently
+		 * if the set of authentication parameters is equal? */
+		return 0;
+	}
+	e->refs = 1;
+	#define ERROR(...) do { \
+		tls_client_param_remove(net->tls_client_params, ia); \
+		free_const(ia); \
+		lua_error_p(L, __VA_ARGS__); \
+	} while (false)
+
+	/* Fill the entry; first hostname - always accepted. */
+	lua_getfield(L, 1, "hostname");
+	if (!lua_isnil(L, -1)) {
+		const char *hn = lua_tostring(L, -1);
+		if (!hn)
+			ERROR("invalid hostname");
+		e->hostname = strdup(hn);
+		if (!e->hostname)
+			ERROR("%s", kr_strerror(ENOMEM));
+	}
+	lua_pop(L, 1);
+
+	/* Now CA paths. */
+	lua_getfield(L, 1, "ca_file");
+	if (!lua_isnil(L, -1)) {
+		if (!e->hostname)
+			ERROR("missing hostname but specifying ca_file");
+		lua_listify(L);
+		if (array_reserve(e->ca_files, lua_objlen(L, -1)) != 0)
+			ERROR("%s", kr_strerror(ENOMEM));
+		/* iterate over table
+		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
+		lua_pushnil(L);
+		while (lua_next(L, -2)) {
+			const char *ca_file = lua_tostring(L, -1);
+			if (!ca_file)
+				ERROR("ca_file is not a string");
+			ca_file = strdup(ca_file);
+			if (!ca_file || array_push(e->ca_files, ca_file))
+				ERROR("%s", kr_strerror(ENOMEM));
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+
+	/* Now pins. */
+	lua_getfield(L, 1, "pin_sha256");
+	if (!lua_isnil(L, -1)) {
+		lua_listify(L);
+		if (array_reserve(e->pins, lua_objlen(L, -1)) != 0)
+			ERROR("%s", kr_strerror(ENOMEM));
+		/* iterate over table
+		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
+		lua_pushnil(L);
+		while (lua_next(L, -2)) {
+			const char *pin = lua_tostring(L, -1);
+			if (!pin)
+				ERROR("pin_sha256 is not a string");
+			pin = strdup(pin);
+			if (!pin || array_push(e->pins, pin))
+				ERROR("%s", kr_strerror(ENOMEM));
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+
+	/* Checks around the "insecure" field. */
+	lua_getfield(L, 1, "insecure");
+	if (lua_isnil(L, -1)) {
+		if (!e->hostname && !e->pins.len)
+			ERROR("no way to authenticate and not set as insecure");
+	} else if (lua_isboolean(L, -1) && lua_toboolean(L, -1)) {
+		e->insecure = true;
+		if (e->ca_files.len || e->pins.len)
+			ERROR("set as insecure and provided authentication config");
+	} else {
+		ERROR("incorrect value in the 'insecure' field");
+	}
+
+	return 0;
+	#undef ERROR
+}
+
 
 static int net_tls_padding(lua_State *L)
 {
@@ -743,7 +909,7 @@ int kr_bindings_net(lua_State *L)
 		{ "tls",          net_tls },
 		{ "tls_server",   net_tls },
 		{ "tls_client",   net_tls_client },
-		{ "tls_client_clear", net_tls_client_clear },
+		//{ "tls_client_clear", net_tls_client_clear },
 		{ "tls_padding",  net_tls_padding },
 		{ "tls_sticket_secret", net_tls_sticket_secret_string },
 		{ "tls_sticket_secret_file", net_tls_sticket_secret_file },
