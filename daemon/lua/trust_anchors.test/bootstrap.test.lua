@@ -50,9 +50,9 @@ end
 local function wait_for_webserver()
 	local starttime = os.time()
 	local connected = false
-	while not connected and os.difftime(os.time(), starttime) < 5 do
+	while not connected and os.difftime(os.time(), starttime) < 10 do
 		local con = socket.connect("localhost", 8080)
-		connected, msg = pcall(con.connect, con, 5)
+		connected, msg = pcall(con.connect, con, 3)
 		cqueues.sleep (0.3)
 	end
 	assert(connected, string.format('unable to connect to web server: %s', msg))
