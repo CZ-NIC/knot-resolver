@@ -299,59 +299,6 @@ static int l_moduledir(lua_State *L)
 	return 1;
 }
 
-/** @internal for l_trustanchor: */
-static void ta_add(zs_scanner_t *zs)
-{
-	map_t *ta = zs->process.data;
-	if (!ta)
-		return;
-	if (kr_ta_add(ta, zs->r_owner, zs->r_type, zs->r_ttl, zs->r_data, zs->r_data_length))
-		zs->process.data = NULL; /* error signalling */
-}
-/** Enable/disable trust anchor. */
-static int l_trustanchor(lua_State *L)
-{
-	struct engine *engine = engine_luaget(L);
-	const char *anchor = lua_tostring(L, 1);
-	bool enable = lua_isboolean(L, 2) ? lua_toboolean(L, 2) : true;
-	if (!anchor || strlen(anchor) == 0) {
-		return 0;
-	}
-	/* If disabling, parse the owner string only. */
-	if (!enable) {
-		knot_dname_t *owner = knot_dname_from_str(NULL, anchor, KNOT_DNAME_MAXLEN);
-		if (!owner) {
-			lua_pushstring(L, "invalid trust anchor owner");
-			lua_error(L);
-		}
-		lua_pushboolean(L, kr_ta_del(&engine->resolver.trust_anchors, owner) == 0);
-		free(owner);
-		return 1;
-	}
-
-	/* Parse the record */
-	zs_scanner_t *zs = malloc(sizeof(*zs));
-	if (!zs || zs_init(zs, ".", 1, 0) != 0) {
-		free(zs);
-		lua_pushstring(L, "not enough memory");
-		lua_error(L);
-	}
-	zs_set_processing(zs, ta_add, NULL, &engine->resolver.trust_anchors);
-	bool ok = zs_set_input_string(zs, anchor, strlen(anchor)) == 0
-		&& zs_parse_all(zs) == 0;
-	ok = ok && zs->process.data; /* reset to NULL on error in ta_add */
-
-	zs_deinit(zs);
-	free(zs);
-	/* Report errors */
-	if (!ok) {
-		lua_pushstring(L, "failed to process trust anchor RR");
-		lua_error(L);
-	}
-	lua_pushboolean(L, true);
-	return 1;
-}
-
 /** Load root hints from zonefile. */
 static int l_hint_root_file(lua_State *L)
 {
@@ -688,8 +635,6 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "verbose");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
-	lua_pushcfunction(engine->L, l_trustanchor);
-	lua_setglobal(engine->L, "trustanchor");
 	lua_pushcfunction(engine->L, l_hint_root_file);
 	lua_setglobal(engine->L, "_hint_root_file");
 	lua_pushliteral(engine->L, libknot_SONAME);

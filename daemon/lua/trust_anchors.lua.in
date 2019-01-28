@@ -321,20 +321,25 @@ active_refresh = function (keyset, pkt, is_initial)
 	return math.max(hour, min_ttl)
 end
 
+-- Update ta.comment and return decorated line representing the RR
+-- This is meant to be in zone-file format.
+local function ta_rr_str(ta)
+	ta.comment = ' ' .. ta.state .. ':' .. (ta.timer or '')
+				.. ' ; KeyTag:' .. ta.key_tag -- the tag is just for humans
+	local rr_str = kres.rr2str(ta) .. '\n'
+	if ta.state ~= key_state.Valid and ta.state ~= key_state.Missing then
+		rr_str = '; '..rr_str -- Invalidate key string (for older kresd versions)
+	end
+	return rr_str
+end
+
 -- Write keyset to a file.  States and timers are stored in comments.
 local function keyset_write(keyset)
 	if not keyset.filename then return false end -- not to be persisted
 	local fname_tmp = keyset.filename .. '.lock.' .. tostring(worker.pid);
 	local file = assert(io.open(fname_tmp, 'w'))
 	for i = 1, #keyset do
-		local ta = keyset[i]
-		ta.comment = ' ' .. ta.state .. ':' .. (ta.timer or '')
-					.. ' ; KeyTag:' .. ta.key_tag -- the tag is just for humans
-		local rr_str = kres.rr2str(ta) .. '\n'
-		if ta.state ~= key_state.Valid and ta.state ~= key_state.Missing then
-			rr_str = '; '..rr_str -- Invalidate key string (for older kresd versions)
-		end
-		file:write(rr_str)
+		file:write(ta_rr_str(keyset[i]))
 	end
 	file:close()
 	assert(os.rename(fname_tmp, keyset.filename))
@@ -367,18 +372,32 @@ local function keyset_parse_comments(tas, default_state)
 	return tas
 end
 
--- Read keyset from a file.  (This includes the key states and timers.)
-local function keyset_read(path)
+-- Read keyset from a file xor a string.  (This includes the key states and timers.)
+local function keyset_read(path, string)
+	if (path == nil) == (string == nil) then -- exactly one of them must be nil
+		return nil, "internal ERROR: incorrect call to TA's keyset_read"
+	end
 	-- First load the regular entries, trusting them.
 	local zonefile = require('zonefile')
-	local tas, err = zonefile.file(path)
+	local tas, err
+	if path ~= nil then
+		tas, err = zonefile.file(path)
+	else
+		tas, err = zonefile.string(string)
+	end
 	if not tas then
 		return tas, err
 	end
 	keyset_parse_comments(tas, key_state.Valid)
 
 	-- The untrusted keys are commented out but important to load.
-	for line in io.lines(path) do
+	local line_iter
+	if path ~= nil then
+		line_iter = io.lines(path)
+	else
+		line_iter = string.gmatch(string, "[^\n]+")
+	end
+	for line in line_iter do
 		if line:sub(1, 2) == '; ' then
 			-- Ignore the line if it fails to parse including recognized .state.
 			local l_set = zonefile.string(line:sub(3))
@@ -391,6 +410,7 @@ local function keyset_read(path)
 		end
 	end
 
+	-- Fill tas[*].key_tag
 	for _, ta in pairs(tas) do
 		local ta_keytag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 		if not (ta_keytag >= 0 and ta_keytag <= 65535) then
@@ -399,20 +419,38 @@ local function keyset_read(path)
 		end
 		ta.key_tag = ta_keytag
 	end
+
+	-- Fill tas.owner
+	if not tas[1] then
+		return nil, "empty TA set"
+	end
+	local owner = tas[1].owner
+	for _, ta in ipairs(tas) do
+		if ta.owner ~= owner then
+			return nil, string.format("do not mix %s and %s TAs in single file/string",
+							kres.dname2str(ta.owner), kres.dname2str(owner))
+		end
+	end
+	tas.owner = owner
+
 	return tas
 end
 
 -- Replace current TAs for given owner by the "trusted" ones from passed keyset.
--- Return the number of trusted keys for the owner.
+-- Return true iff no TA errored out and at least one is in VALID state.
 local function keyset_publish(keyset)
 	local store = kres.context().trust_anchors
 	local count = 0
+	local has_error = false
 	C.kr_ta_del(store, keyset.owner)
 	for _, ta in ipairs(keyset) do
 		-- Key MAY be used as a TA only in these two states (RFC5011, 4.2)
 		if ta.state == key_state.Valid or ta.state == key_state.Missing then
 			if C.kr_ta_add(store, ta.owner, ta.type, ta.ttl, ta.rdata, #ta.rdata) == 0 then
 				count = count + 1
+			else
+				ta.state = 'ERROR'
+				has_error = true
 			end
 		end
 	end
@@ -420,7 +458,7 @@ local function keyset_publish(keyset)
 		warn('[ ta ] ERROR: no anchors are trusted for ' ..
 		     kres.dname2str(keyset.owner) .. ' !')
 	end
-	return count
+	return count > 0 and not has_error
 end
 
 
@@ -473,7 +511,7 @@ update = function (keyset, new_keys, is_initial)
 	keyset_write(keyset)
 
 	-- Start using the new TAs.
-	if keyset_publish(keyset) == 0 then
+	if not keyset_publish(keyset) then
 		-- TODO: try to rebootstrap if for root?
 		return false
 	elseif verbose() then
@@ -503,11 +541,8 @@ local add_file = function (path, unmanaged)
 			error(msg)
 		end
 		print(msg)
-		trustanchor(tas)
+		trust_anchors.add(tas)
 		-- Fetch DNSKEY immediately
-		if not trust_anchors.keysets['\0'] then
-			trust_anchors.keysets['\0'] = { owner = '\0' }
-		end
 		local keyset = trust_anchors.keysets['\0']
 		keyset.filename = path
 		if keyset.refresh_ev then event.cancel(keyset.refresh_ev) end
@@ -524,20 +559,8 @@ local add_file = function (path, unmanaged)
 		panic("[ ta ] ERROR: failed to read anchors from '%s' (%s)", path, err)
 	end
 	if not unmanaged then keyset.filename = path end
-	if not keyset[1] then
-		panic("[ ta ] ERROR: failed to read anchors from '%s'", path)
-	end
-	if not unmanaged then keyset.filename = path end
-	local owner = keyset[1].owner
-	for _, ta in ipairs(keyset) do
-		if ta.owner ~= owner then
-			panic("[ ta ] ERROR: mixed owner names found in file '%s'! " ..
-			      "Do not mix %s and %s TAs in single file",
-			      path, kres.dname2str(ta.owner), kres.dname2str(owner))
-		end
-	end
-	keyset.owner = owner
 
+	local owner = keyset.owner
 	local owner_str = kres.dname2str(owner)
 	if trust_anchors.keysets[owner] then
 		warn('[ ta ] warning: overriding previously set trust anchors for ' .. owner_str)
@@ -546,14 +569,14 @@ local add_file = function (path, unmanaged)
 	end
 	trust_anchors.keysets[owner] = keyset
 
-	-- Parse new keys, refresh eventually
-	if keyset_publish(keyset) ~= 0 and verbose() then
+	-- Replace the TA store used for validation
+	if keyset_publish(keyset) and verbose() then
 		log('[ ta ] installed trust anchors for domain ' .. owner_str .. ' are:\n'
 		    .. trust_anchors.summary(owner))
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
 
-	refresh_plan(keyset, 10 * sec, false)
+	if not unmanaged then refresh_plan(keyset, 10 * sec, false) end
 end
 
 local function ta_str(owner)
@@ -575,7 +598,7 @@ local function ta_str(owner)
 		msg = msg .. 'WARNING! negative trust anchor also has an explicit TA\n'
 	end
 	for _, ta in ipairs(trust_anchors.keysets[owner]) do
-		msg = msg .. kres.rr2str(ta) .. '\n'
+		msg = msg .. ta_rr_str(ta)
 	end
 	return msg
 end
@@ -585,7 +608,8 @@ trust_anchors = {
 	-- [internal] table indexed by dname;
 	--  each item is a list of RRs and additionally contains:
 	--   - owner - that dname (for simplicity)
-	--   - [optional] filename in which to persist the state
+	--   - [optional] filename in which to persist the state,
+	--     implying unmanaged TA if nil
 	--   - [optional] overrides for global defaults of
 	--     hold_down_time, refresh_time, keep_removed
 	-- The RR tables also contain some additional TA-specific fields.
@@ -609,10 +633,36 @@ trust_anchors = {
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
 	add = function (keystr)
-		local ret = trustanchor(keystr)
-		if verbose() then log(trust_anchors.summary()) end
-		return ret
+		local keyset, err = keyset_read(nil, keystr)
+		if keyset ~= nil then
+			local owner = keyset.owner
+			local owner_str = kres.dname2str(owner)
+			local keyset_orig = trust_anchors.keysets[owner]
+			-- Set up trust_anchors.keysets[owner]
+			if keyset_orig then
+				warn('[ ta ] warning: extending previously set trust anchors for '
+						.. owner_str)
+				for _, ta in ipairs(keyset) do
+					table.insert(keyset_orig, ta)
+				end
+				-- we might also add more warning if it's managed, i.e. has .filename,
+				-- as the next update would overwrite this additional TA
+			else
+				trust_anchors.keysets[owner] = keyset
+			end
+			-- Replace the TA store used for validation
+			if not keyset_publish(keyset) then
+				err = "when publishing the TA set"
+				-- trust_anchors.keysets[owner] was already updated to the
+				-- (partially) failing state, but I'm not sure how much to improve this
+			end
+		end
+		if verbose() or err then log('New TA state:\n' .. trust_anchors.summary()) end
+		if err then
+			panic('[ ta ] .add() failed: ' .. err)
+		end
 	end,
+
 	-- Negative TA management
 	set_insecure = function (list)
 		assert(type(list) == 'table', 'parameter must be list of domain names (e.g. {"a.test", "b.example"})')
@@ -624,6 +674,8 @@ trust_anchors = {
 		end
 		trust_anchors.insecure = list
 	end,
+	-- Return textual representation of all TAs (incl. negative)
+	-- It's meant for human consumption.
 	summary = function (single_owner)
 		if single_owner then  -- single domain
 			return ta_str(single_owner)

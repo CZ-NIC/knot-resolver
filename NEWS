@@ -4,6 +4,9 @@ Knot Resolver 3.x.y (2019-0m-dd)
 Bugfixes
 --------
 - predict module: load stats module if config didn't specify period (!755)
+- trust_anchors: don't do 5011-style updates on anchors from files
+  that were loaded as unmanaged trust anchors (!753)
+- trust_anchors.add(): include these TAs in .summary() (!753)
 
 
 Knot Resolver 3.2.1 (2019-01-10)
