@@ -36,8 +36,17 @@
 #endif
 
 /** Useful to stringify #defines into error strings. */
-#define STR(s) STRINGIFY_INT(s)
-#define STRINGIFY_INT(s) #s
+#define STR(s) STRINGIFY_TOKEN(s)
+#define STRINGIFY_TOKEN(s) #s
+
+
+/** Check lua table at the top of the stack for allowed keys.
+ * \param keys NULL-terminated array of 0-terminated strings
+ * \return NULL if passed or the offending string (pushed on top of lua stack)
+ * \note Future work: if non-NULL is returned, there's extra stuff on the lua stack.
+ * \note Brute-force complexity: table length * summed length of keys.
+ */
+const char * lua_table_checkindices(lua_State *L, const char *keys[]);
 
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error(lua_State *L);

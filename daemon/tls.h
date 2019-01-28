@@ -59,9 +59,9 @@ struct tls_credentials {
 
 /** TLS authentication parameters for a single address-port pair. */
 struct tls_client_paramlist_entry {
-	array_t(const char *) ca_files; /**< Paths to certificate files. */
+	array_t(const char *) ca_files; /**< Paths to certificate files. TODO: not needed? */
 	const char *hostname; /**< Server name for SNI and certificate check. */
-	array_t(const char *) pins; /**< Certificate pins. */
+	array_t(const uint8_t *) pins; /**< Certificate pins. */
 	gnutls_certificate_credentials_t credentials;
 	gnutls_datum_t session_data;
 	uint32_t refs; /**< Reference count; consider TLS sessions in progress. */
@@ -69,6 +69,16 @@ struct tls_client_paramlist_entry {
 };
 /** Holds configuration for TLS authentication for all potential servers. */
 typedef trie_t tls_client_params_t;
+
+#define TLS_SHA256_RAW_LEN 32 /* gnutls_hash_get_len(GNUTLS_DIG_SHA256) */
+/** Required buffer length for pin_sha256, including the zero terminator. */
+#define TLS_SHA256_BASE64_BUFLEN (((TLS_SHA256_RAW_LEN * 8 + 4) / 6) + 3 + 1)
+
+#if GNUTLS_VERSION_NUMBER >= GNUTLS_PIN_MIN_VERSION
+	#define TLS_CAN_USE_PINS 1
+#else
+	#define TLS_CAN_USE_PINS 0
+#endif
 
 /** Get pointer to TLS auth params, optionally creating a new one.
  * ->refs isn't touched, and that's how you know you got a new one. */
