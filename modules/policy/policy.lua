@@ -210,14 +210,26 @@ function policy.TLS_FORWARD(targets)
 		error('TLS_FORWARD supports at most four targets (in a single call)')
 	end
 
+	local sockaddr_c_set = {}
 	local nslist = {} -- to persist in closure of the returned function
 	for idx, target in pairs(targets) do
 		if type(target) ~= 'table' or type(target[1]) ~= 'string' then
-			error('TLS_FORWARD argument number %1 must be a table starting with an address')
+			error('TLS_FORWARD argument number %1 must be a table starting with an address',
+					idx)
 		end
+		-- Note: some functions have checks with error() calls inside.
 		local sockaddr_c = addr2sock(target[1], 853)
+
+		-- Refuse repeated addresses in the same set.
+		local sockaddr_lua = ffi.string(sockaddr_c, ffi.C.kr_sockaddr_len(sockaddr_c))
+		if sockaddr_c_set[sockaddr_lua] then
+			error('TLS_FORWARD configuration cannot declare two configs for IP address '
+					.. target[1])
+		else
+			sockaddr_c_set[sockaddr_lua] = true;
+		end
+
 		table.insert(nslist, sockaddr_c)
-		-- checks with error() calls inside
 		net.tls_client(target)
 	end
 

@@ -548,31 +548,42 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
   DNS-over-TLS OOB key-pins: https://tools.ietf.org/html/rfc7858#appendix-A
   HPKP pin reference:        https://tools.ietf.org/html/rfc7469#appendix-A
 */
-#define PINLEN  (((32) * 8 + 4)/6) + 3 + 1
 
-/* out must be at least PINLEN octets long */
-static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len)
+/* FIXME */
+static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len, bool raw)
 {
-	int err;
-	gnutls_pubkey_t key;
-	gnutls_datum_t datum = { .size = 0 };
-
-	if ((err = gnutls_pubkey_init(&key)) != GNUTLS_E_SUCCESS) {
-		return err;
+	if (raw && outchar_len < TLS_SHA256_RAW_LEN) {
+		assert(false);
+		return kr_error(ENOSPC);
+		/* With !raw we have check inside base64_encode. */
 	}
+	gnutls_pubkey_t key;
+	int err = gnutls_pubkey_init(&key);
+	if (err != GNUTLS_E_SUCCESS) return err;
 
-	if ((err = gnutls_pubkey_import_x509(key, crt, 0)) != GNUTLS_E_SUCCESS) {
-		goto leave;
-	} else {
-		if ((err = gnutls_pubkey_export2(key, GNUTLS_X509_FMT_DER, &datum)) != GNUTLS_E_SUCCESS) {
+	err = gnutls_pubkey_import_x509(key, crt, 0);
+	if (err != GNUTLS_E_SUCCESS) goto leave;
+
+	gnutls_datum_t datum = { .size = 0 };
+	err = gnutls_pubkey_export2(key, GNUTLS_X509_FMT_DER, &datum);
+	if (err != GNUTLS_E_SUCCESS) goto leave;
+
+	{
+		char raw_pin[TLS_SHA256_RAW_LEN]; /* TMP buffer if raw == false */
+		err = gnutls_hash_fast(GNUTLS_DIG_SHA256, datum.data, datum.size,
+					(raw ? outchar : raw_pin));
+		if (err != GNUTLS_E_SUCCESS || raw/*success*/)
 			goto leave;
-		} else {
-			uint8_t raw_pin[32];
-			if ((err = gnutls_hash_fast(GNUTLS_DIG_SHA256, datum.data, datum.size, raw_pin)) != GNUTLS_E_SUCCESS) {
-				goto leave;
-			} else {
-				base64_encode(raw_pin, sizeof(raw_pin), (uint8_t *)outchar, outchar_len);
-			}
+		/* Convert to non-raw. */
+		err = base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
+				    (uint8_t *)outchar, outchar_len);
+		if (err >= 0 && err < outchar_len) {
+			err = GNUTLS_E_SUCCESS;
+			outchar[err] = '\0'; /* base64_decode() doesn't do it */
+		} else if (err >= 0) {
+			err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
+			outchar[outchar_len - 1] = '\0';
+			assert(false);
 		}
 	}
 leave:
@@ -584,23 +595,27 @@ leave:
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 {
 	for (int index = 0;; index++) {
-		int err;
 		gnutls_x509_crt_t *certs = NULL;
 		unsigned int cert_count = 0;
-
-		if ((err = gnutls_certificate_get_x509_crt(tls_credentials->credentials, index, &certs, &cert_count)) != GNUTLS_E_SUCCESS) {
+		int err = gnutls_certificate_get_x509_crt(tls_credentials->credentials,
+							index, &certs, &cert_count);
+		if (err != GNUTLS_E_SUCCESS) {
 			if (err != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
-				kr_log_error("[tls] could not get X.509 certificates (%d) %s\n", err, gnutls_strerror_name(err));
+				kr_log_error("[tls] could not get X.509 certificates (%d) %s\n",
+						err, gnutls_strerror_name(err));
 			}
 			return;
 		}
 
 		for (int i = 0; i < cert_count; i++) {
-			char pin[PINLEN] = { 0 };
-			if ((err = get_oob_key_pin(certs[i], pin, sizeof(pin))) != GNUTLS_E_SUCCESS) {
-				kr_log_error("[tls] could not calculate RFC 7858 OOB key-pin from cert %d (%d) %s\n", i, err, gnutls_strerror_name(err));
+			char pin[TLS_SHA256_BASE64_BUFLEN] = { 0 };
+			err = get_oob_key_pin(certs[i], pin, sizeof(pin), false);
+			if (err != GNUTLS_E_SUCCESS) {
+				kr_log_error("[tls] could not calculate RFC 7858 OOB key-pin from cert %d (%d) %s\n",
+						i, err, gnutls_strerror_name(err));
 			} else {
-				kr_log_info("[tls] RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n", i, pin);
+				kr_log_info("[tls] RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n",
+						i, pin);
 			}
 			gnutls_x509_crt_deinit(certs[i]);
 		}
@@ -1065,7 +1080,7 @@ int tls_client_params_set_ORIG(map_t *tls_client_paramlist,
 	} else if (param_type == TLS_CLIENT_PARAM_PIN) {
 		const char *pin = param;
 		for (size_t i = 0; i < entry->pins.len; ++i) {
-			if (strcmp(entry->pins.at[i], pin) == 0) {
+			if (strcmp((const char *)(entry->pins.at[i]), pin) == 0) {
 				kr_log_error("[tls_client] warning: pin '%s' for address '%s' already was set, ignoring\n", pin, key);
 				return kr_ok();
 			}
@@ -1130,7 +1145,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
-#if GNUTLS_VERSION_NUMBER >= GNUTLS_PIN_MIN_VERSION
+#if TLS_CAN_USE_PINS
 	if (ctx->params->pins.len == 0) {
 		DEBUG_MSG("[tls_client] skipping certificate PIN check\n");
 		goto skip_pins;
@@ -1149,32 +1164,39 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 			return ret;
 		}
 
-		char cert_pin[PINLEN] = { 0 };
-		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin));
-
+		char cert_pin[TLS_SHA256_BASE64_BUFLEN];
+	#ifdef DEBUG
+		/* DEBUG: additionally compute and print the base64 pin.
+		 * Not very efficient, but that's OK for DEBUG. */
+		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), false);
+		if (ret == GNUTLS_E_SUCCESS) {
+			DEBUG_MSG("[tls_client] received pin: %s\n", cert_pin);
+		} else {
+			DEBUG_MSG("[tls_client] failed to convert received pin\n");
+			/* Now we hope that `ret` below can't differ. */
+		}
+	#endif
+		/* Get raw pin and compare.
+		 * (We don't use the whole TLS_SHA256_BASE64_BUFLEN.) */
+		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), true);
 		gnutls_x509_crt_deinit(cert);
-
 		if (ret != GNUTLS_E_SUCCESS) {
 			return ret;
 		}
-
-		DEBUG_MSG("[tls_client] received pin  : %s\n", cert_pin);
 		for (size_t j = 0; j < ctx->params->pins.len; ++j) {
-			const char *pin = ctx->params->pins.at[j];
-			bool match = (strcmp(cert_pin, pin) == 0);
-			DEBUG_MSG("[tls_client] configured pin: %s matches? %s\n",
-				  pin, match ? "yes" : "no");
-			if (match) {
-				return GNUTLS_E_SUCCESS;
-			}
+			const uint8_t *pin = ctx->params->pins.at[j];
+			if (memcmp(cert_pin, pin, TLS_SHA256_RAW_LEN) != 0)
+				continue; /* mismatch */
+			DEBUG_MSG("[tls_client] matched a configured pin no. %zd\n", j);
+			return GNUTLS_E_SUCCESS;
 		}
+		DEBUG_MSG("[tls_client] none of %zd configured pin(s) matched\n",
+				ctx->params->pins.len);
 	}
-
-	/* pins were set, but no one was not matched */
-	kr_log_error("[tls_client] certificate PIN check failed\n");
-#else
+#else /* TLS_CAN_USE_PINS */
 	if (ctx->params->pins.len != 0) {
-		kr_log_error("[tls_client] newer gnutls is required to use PIN check\n");
+		kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");
+		assert(false);
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 #endif

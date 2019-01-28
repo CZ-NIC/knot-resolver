@@ -48,13 +48,13 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 * ``DROP`` - terminate query resolution and return SERVFAIL to the requestor
 * ``REFUSE`` - terminate query resolution and return REFUSED to the requestor
 * ``TC`` - set TC=1 if the request came through UDP, forcing client to retry with TCP
-* ``FORWARD(ip)`` - resolve a query via forwarding to an IP while validating and caching locally;
-* ``TLS_FORWARD({{ip, authentication}})`` - resolve a query via TLS connection forwarding to an IP while validating and caching locally;
-  the parameter can be a single IP (string) or a lua list of up to four IPs.
+* ``FORWARD(ip)`` - resolve a query via forwarding to an IP while validating and caching locally
+* ``TLS_FORWARD({{ip, authentication}})`` - resolve a query via TLS connection forwarding to an IP while validating and caching locally
 * ``STUB(ip)`` - similar to ``FORWARD(ip)`` but *without* attempting DNSSEC validation.
   Each request may be either answered from cache or simply sent to one of the IPs with proxying back the answer.
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
 
+``FORWARD``, ``TLS_FORWARD`` and ``STUB`` support up to four IP addresses "in a single call".
 
 **Chain actions**
 
@@ -90,9 +90,16 @@ Traditional PKI authentication requires server to present certificate with speci
         policy.TLS_FORWARD({
                 {'2001:DB8::d0c', hostname='res.example.com'}})
 
-- `hostname` must exactly match hostname in server's certificate, i.e. in most cases it must not contain trailing dot (`res.example.com`).
-- System CA certificate store will be used if no `ca_file` option is specified.
-- Optional `ca_file` option can specify path to CA certificate (or certificate bundle) in `PEM format`_.
+- ``hostname`` must exactly match hostname in server's certificate, i.e. in most cases it must not contain a trailing dot (`res.example.com`).  It will also be sent to the server as SNI_.
+- ``ca_file`` optionally contains a path to a CA certificate (or certificate bundle) in `PEM format`_.
+  If you omit that, the system CA certificate store will be used instead (usually sufficient).
+  A list of paths is also accepted, but all of them must be valid PEMs.
+
+Key-pinned authentication
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Instead of CAs, you can specify hashes of accepted certificates in ``pin_sha256``.
+They are in the usual format -- base64 from sha256.
+You may still add ``hostname`` if you want SNI_ to be sent.
 
 TLS Examples
 ~~~~~~~~~~~~
@@ -282,3 +289,4 @@ Most properties (actions, filters) are described above.
 .. _`Transport Layer Security`: https://en.wikipedia.org/wiki/Transport_Layer_Security
 .. _`DNS Privacy Project`: https://dnsprivacy.org/
 .. _`IETF draft dprive-dtls-and-tls-profiles`: https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles
+.. _SNI: https://en.wikipedia.org/wiki/Server_Name_Indication
