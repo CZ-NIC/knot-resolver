@@ -413,7 +413,23 @@ To configure kresd to listen on public interface, create a drop-in file:
 
 .. _kresd-socket-override-port:
 
-The default port can also be overriden by using an empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be useful if you want to use the Knot DNS with the `dnsproxy module`_ to have both resolver and authoritative server running on the same machine.
+The default locahost interface/port can also be removed/overriden by using an
+empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be used when
+you want to configure kresd to listen on all IPv4/IPv6 network interfaces (if
+you've disabled IPv6 support in kernel, use ``0.0.0.0`` instead of ``[::]`` ).
+
+.. code-block:: none
+
+   # /etc/systemd/system/kresd.socket.d/override.conf
+   [Socket]
+   ListenDatagram=
+   ListenStream=
+   ListenDatagram=[::]:53
+   ListenStream=[::]:53
+
+It can also be useful if you want to use the Knot DNS with the `dnsproxy
+module`_ to have both resolver and authoritative server running on the same
+machine.
 
 .. code-block:: none
 
@@ -426,7 +442,8 @@ The default port can also be overriden by using an empty ``ListenDatagram=`` or 
    ListenDatagram=[::1]:53000
    ListenStream=[::1]:53000
 
-The ``kresd-tls.socket`` can also be configured to listen for TLS connections.
+The ``kresd-tls.socket`` can also be configured in the same way to listen for
+TLS connections.
 
 .. code-block:: bash
 

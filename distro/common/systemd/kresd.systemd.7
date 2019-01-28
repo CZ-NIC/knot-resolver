@@ -1,4 +1,4 @@
-.TH "kresd.systemd" "7" "2018-06-04" "CZ.NIC" "Knot Resolver Systemd Units"
+.TH "kresd.systemd" "7" "2019-01-28" "CZ.NIC" "Knot Resolver Systemd Units"
 .\"
 .\" kresd.systemd.7 -- man page for systemd units for kresd
 .\"
@@ -80,6 +80,27 @@ ListenStream=192.0.2.115:53
 # /etc/systemd/system/kresd-tls.socket.d/override.conf
 [Socket]
 ListenStream=192.0.2.115:853
+.RE
+.fi
+
+To configure \fBkresd\fR to listen on all IPv4 and IPv6 interfaces, you can
+remove the default localhost address by using an empty \fIListenDatagram=\fR,
+\fIListenStream=\fR directive and then bind to the [::] address. If you've
+disabled IPv6 support in kernel, use the 0.0.0.0 address instead.
+
+.nf
+.RS 4n
+# /etc/systemd/system/kresd.socket.d/override.conf
+[Socket]
+ListenDatagram=
+ListenStream=
+ListenDatagram=[::]:53
+ListenStream=[::]:53
+
+# /etc/systemd/system/kresd-tls.socket.d/override.conf
+[Socket]
+ListenStream=
+ListenStream=[::]:853
 .RE
 .fi
 
