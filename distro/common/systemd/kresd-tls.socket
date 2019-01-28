@@ -6,6 +6,7 @@ Before=sockets.target
 
 [Socket]
 FreeBind=true
+BindIPv6Only=both
 FileDescriptorName=tls
 ListenStream=[::1]:853
 ListenStream=127.0.0.1:853
