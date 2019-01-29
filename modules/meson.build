@@ -28,6 +28,7 @@ subdir('bogus_log')
 subdir('daf')
 subdir('edns_keepalive')
 subdir('hints')
+subdir('nsid')
 subdir('policy')
 
 
