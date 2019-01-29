@@ -40,8 +40,10 @@ Example configuration
 	modules = { 'view' }
 	-- Whitelist queries identified by TSIG key
 	view:tsig('\5mykey', policy.all(policy.PASS))
-	-- Block local clients (ACL like)
+	-- Block local IPv4 clients (ACL like)
 	view:addr('127.0.0.1', policy.all(policy.DENY))
+	-- Block local IPv6 clients (ACL like)
+	view:addr('::1', policy.all(policy.DENY))
 	-- Drop queries with suffix match for remote client
 	view:addr('10.0.0.0/8', policy.suffix(policy.DROP, policy.todnames({'xxx'})))
 	-- RPZ for subset of clients
