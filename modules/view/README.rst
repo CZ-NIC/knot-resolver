@@ -53,6 +53,11 @@ Example configuration
 	-- Drop everything that hasn't matched
 	view:addr('0.0.0.0/0', policy.all(policy.DROP))
 
+.. note:: When using systemd socket activation, it's possible to bind to IPv6
+   socket that also handles IPv4 connections via v4-mapped-on-v6 addresses.
+   With this setup, using IPv4 syntax in ``view:addr()`` is currently not
+   supported.  Instead, you can use the v4-mapped-on-v6 syntax, e.g.
+   ``::ffff:127.0.0.0/104`` instead of ``127.0.0.0/8``.
 
 Rule order
 ^^^^^^^^^^
@@ -76,14 +81,14 @@ Properties
 
   :param subnet: client subnet, i.e. ``10.0.0.1``
   :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
-  
+
   Apply rule to clients in given subnet.
 
 .. function:: view:tsig(key, rule)
 
   :param key: client TSIG key domain name, i.e. ``\5mykey``
   :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
-  
+
   Apply rule to clients with given TSIG key.
 
   .. warning:: This just selects rule based on the key name, it doesn't verify the key or signature yet.
