@@ -90,7 +90,6 @@ add_global_arguments(
 )
 
 
-
 subdir('contrib')
 subdir('lib')
 subdir('client')
@@ -99,57 +98,7 @@ subdir('modules')
 
 # TODO install man
 
-## modules
-
-
-#library(
-#  'bogus_log',
-#  ['modules/bogus_log/bogus_log.c'],
-#  dependencies: [
-#    contrib_dep,
-#    libkres_dep,
-#    libknot,
-#    luajit,
-#    libuv,
-#  ],
-#  install: true,
-#  install_dir: modules_dir,
-#  name_prefix: '',
-#)
-
-#library(
-#  'hints',
-#  ['modules/hints/hints.c'],
-#  dependencies: [
-#    contrib_dep,
-#    libkres_dep,
-#    luajit,
-#  ],
-#  install: true,
-#  install_dir: modules_dir,
-#  name_prefix: '',
-#)
-
-#library(
-#  'stats',
-#  ['modules/stats/stats.c'],
-#  dependencies: [
-#    contrib_dep,
-#    libkres_dep,
-#    luajit,
-#  ],
-#  install: true,
-#  install_dir: modules_dir,
-#  name_prefix: '',
-#)
-
-# TODO: dnstap
-
-
 # install
-
-
-
 
 # etc
 
