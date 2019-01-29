@@ -1,4 +1,4 @@
-kresd_sources = [
+kresd_src = [
   'bindings.c',
   'engine.c',
   'ffimodule.c',
@@ -62,7 +62,7 @@ if get_option('daemon')
   # build
   kresd = executable(
     'kresd',
-    kresd_sources, kresd_lua,
+    kresd_src, kresd_lua,
     dependencies: [
       contrib_dep,
       libkres_dep,
