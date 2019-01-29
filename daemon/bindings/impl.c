@@ -71,6 +71,7 @@ void kr_bindings_register(lua_State *L)
 void lua_error_p(lua_State *L, const char *fmt, ...)
 {
 	/* Push a string describing location in the "parent" lua function. */
+	/* FIXME: print more of the stack trace? */
 	lua_Debug d;
 	lua_getstack(L, 1, &d);
 	lua_getinfo(L, "Sln", &d);
