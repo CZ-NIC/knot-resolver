@@ -27,6 +27,7 @@ lua_sources = [
 subdir('bogus_log')
 subdir('daf')
 subdir('edns_keepalive')
+subdir('hints')
 subdir('policy')
 
 
