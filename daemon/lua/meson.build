@@ -1,4 +1,4 @@
-lua_sources_daemon = [
+lua_src_daemon = [
   'kres.lua',
   'kres-gen.lua',
   # trust_anchors.lua.in handled separately
@@ -6,9 +6,9 @@ lua_sources_daemon = [
 ]
 
 # install lua modules
-foreach mod : lua_sources_daemon
+foreach mod : lua_src_daemon
   install_data(
-    join_paths(mod),
+    mod,
     install_dir: modules_dir,
   )
 endforeach
