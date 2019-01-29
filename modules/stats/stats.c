@@ -16,7 +16,7 @@
 
 /**
  * @file stats.c
- * @brief Storage for various counters and metrics from query resolution. 
+ * @brief Storage for various counters and metrics from query resolution.
  *
  * You can either reuse this module to compute statistics or store custom metrics
  * in it via the extensions.
@@ -46,7 +46,7 @@
 #ifdef LRU_REP_SIZE
  #define FREQUENT_COUNT LRU_REP_SIZE /* Size of frequent tables */
 #else
- #define FREQUENT_COUNT  5000 /* Size of frequent tables */ 
+ #define FREQUENT_COUNT  5000 /* Size of frequent tables */
 #endif
 #ifndef UPSTREAMS_COUNT
  #define UPSTREAMS_COUNT  512 /* Size of recent upstreams */
