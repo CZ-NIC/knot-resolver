@@ -27,6 +27,7 @@ lua_src = [
 subdir('bogus_log')
 # cookies module is not currently used
 subdir('daf')
+subdir('dnstap')
 subdir('edns_keepalive')
 subdir('hints')
 subdir('nsid')
