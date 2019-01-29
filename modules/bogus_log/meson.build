@@ -2,7 +2,7 @@ bogus_log_src = [
   'bogus_log.c',
 ]
 
-bogus_log_mod = library(
+bogus_log_mod = shared_module(
   'bogus_log',
   bogus_log_src,
   dependencies: [
