@@ -8,18 +8,14 @@ lua_ac_src = [
 lua_ac_lib = library(
   'ahocorasick',
   lua_ac_src,
-  name_prefix: '',
   dependencies: luajit,
-  install: true,
-  install_dir: modules_dir,
   cpp_args: [
     '-O3',
     '-fvisibility=hidden',
     '-Wall',
     '-fPIC',
   ],
-  link_args: [
-    '-shared',
-    #'-Wl,-soname=ahocorasick.so',  # TODO what does this do, is it needed?
-  ],
+  name_prefix: '',
+  install: true,
+  install_dir: modules_dir,
 )
