@@ -30,6 +30,7 @@ link_args_c_mods = [  # TODO test on mac
 ]
 
 
+subdir('bogus_log')
 subdir('daf')
 subdir('edns_keepalive')
 subdir('policy')
