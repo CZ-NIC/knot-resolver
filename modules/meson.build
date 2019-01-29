@@ -24,12 +24,6 @@ lua_sources = [
 ]
 
 
-link_args_c_mods = [  # TODO test on mac
-  '-Wl,-undefined',
-  '-Wl,dynamic_lookup',
-]
-
-
 subdir('bogus_log')
 subdir('daf')
 subdir('edns_keepalive')
