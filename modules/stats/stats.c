@@ -28,6 +28,7 @@
 #include <ccan/json/json.h>
 #include <contrib/cleanup.h>
 #include <arpa/inet.h>
+#include <lua.h>
 
 #include "lib/layer/iterate.h"
 #include "lib/rplan.h"
