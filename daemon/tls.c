@@ -582,9 +582,9 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 			err = GNUTLS_E_SUCCESS;
 			outchar[err] = '\0'; /* base64_decode() doesn't do it */
 		} else if (err >= 0) {
+			assert(false);
 			err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
 			outchar[outchar_len - 1] = '\0';
-			assert(false);
 		}
 	}
 leave:
@@ -873,7 +873,10 @@ struct tls_client_paramlist_entry * tls_client_param_get(
 		assert(!ENOMEM);
 		return NULL;
 	}
-	/* Note: those array_t don't need further initialization. */
+	/* Note: those array_t don't need further initialization after calloc(),
+	 * but apparently clang scan-build doesn't agree. */
+	array_init(e->ca_files);
+	array_init(e->pins);
 	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
 	if (ret != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
