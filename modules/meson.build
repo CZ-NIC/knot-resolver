@@ -30,6 +30,7 @@ subdir('edns_keepalive')
 subdir('hints')
 subdir('nsid')
 subdir('policy')
+subdir('stats')
 
 
 # TODO c modules
