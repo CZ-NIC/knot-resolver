@@ -83,8 +83,8 @@ typedef trie_t tls_client_params_t;
 /** Get pointer to TLS auth params, optionally creating a new one.
  * ->refs isn't touched, and that's how you know you got a new one. */
 struct tls_client_paramlist_entry * tls_client_param_get(
-	tls_client_params_t **params, const union inaddr *addr, bool alloc_new);
-int tls_client_param_remove(tls_client_params_t *params, const union inaddr *addr);
+	tls_client_params_t **params, const struct sockaddr *addr, bool alloc_new);
+int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr);
 /** Free TLS authentication parameters. */
 void tls_client_params_free(tls_client_params_t *params);
 
