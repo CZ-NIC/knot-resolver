@@ -1300,11 +1300,9 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 
 	/* Check if there must be TLS */
 	struct tls_client_ctx_t *tls_ctx = NULL;
-//FIXME: perhaps delegate to a function?
-#if 0
 	struct network *net = &worker->engine->net;
-	const char *key = tcpsess_key(addr);
-	struct tls_client_paramlist_entry *entry = map_get(&net->tls_client_params, key);
+	struct tls_client_paramlist_entry *entry =
+		tls_client_param_get(&net->tls_client_params, addr, false);
 	if (entry) {
 		/* Address is configured to be used with TLS.
 		 * We need to allocate auxiliary data structure. */
@@ -1313,7 +1311,6 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 			return kr_error(EINVAL);
 		}
 	}
-#endif
 
 	uv_connect_t *conn = malloc(sizeof(uv_connect_t));
 	if (!conn) {
@@ -1336,7 +1333,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 
 	/* Add address to the waiting list.
 	 * Now it "is waiting to be connected to." */
-	int ret = worker_add_tcp_waiting(ctx->worker, addr, session);
+	int ret = worker_add_tcp_waiting(worker, addr, session);
 	if (ret < 0) {
 		free(conn);
 		session_close(session);
@@ -1352,7 +1349,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	ret = session_timer_start(session, on_tcp_connect_timeout,
 				  KR_CONN_RTT_MAX, 0);
 	if (ret != 0) {
-		worker_del_tcp_waiting(ctx->worker, addr);
+		worker_del_tcp_waiting(worker, addr);
 		free(conn);
 		session_close(session);
 		return kr_error(EINVAL);
@@ -1368,7 +1365,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	ret = uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect);
 	if (ret != 0) {
 		session_timer_stop(session);
-		worker_del_tcp_waiting(ctx->worker, addr);
+		worker_del_tcp_waiting(worker, addr);
 		free(conn);
 		session_close(session);
 		unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
@@ -1388,7 +1385,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	ret = session_waitinglist_push(session, task);
 	if (ret < 0) {
 		session_timer_stop(session);
-		worker_del_tcp_waiting(ctx->worker, addr);
+		worker_del_tcp_waiting(worker, addr);
 		free(conn);
 		session_close(session);
 		return kr_error(EINVAL);
@@ -1507,25 +1504,24 @@ static int qr_task_step(struct qr_task *task,
 		choice += 1;
 	}
 
-//FIXME
-#if 0
 	/* Upgrade to TLS if the upstream address is configured as DoT capable. */
 	if (task->addrlist_count > 0 && kr_inaddr_port(task->addrlist) == KR_DNS_PORT) {
 		/* TODO if there are multiple addresses (task->addrlist_count > 1)
 		 * check all of them. */
-		struct engine *engine = worker->engine;
-		struct network *net = &engine->net;
+		struct network *net = &worker->engine->net;
+		kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
 		struct tls_client_paramlist_entry *tls_entry =
-			tls_client_try_upgrade(&net->tls_client_params, task->addrlist);
-		if (tls_entry != NULL) {
-			kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
+			tls_client_param_get(&net->tls_client_params, task->addrlist, false);
+		if (tls_entry) {
 			packet_source = NULL;
 			sock_type = SOCK_STREAM;
 			/* TODO in this case in tcp_task_make_connection() will be performed
 			 * redundant map_get() call. */
+		} else {
+			/* The function is fairly cheap, so we just change there and back. */
+			kr_inaddr_set_port(task->addrlist, KR_DNS_PORT);
 		}
 	}
-#endif
 
 	int ret = 0;
 	if (sock_type == SOCK_DGRAM) {

@@ -549,7 +549,10 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
   HPKP pin reference:        https://tools.ietf.org/html/rfc7469#appendix-A
 */
 
-/* FIXME */
+/* Compute pin_sha256 for the certificate.
+ * It may be in raw format - just TLS_SHA256_RAW_LEN bytes without termination,
+ * or it may be a base64 0-terminated string requiring up to
+ * TLS_SHA256_BASE64_BUFLEN bytes. */
 static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len, bool raw)
 {
 	if (raw && outchar_len < TLS_SHA256_RAW_LEN) {
@@ -840,7 +843,7 @@ static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
 	}
 }
 struct tls_client_paramlist_entry * tls_client_param_get(
-	tls_client_params_t **params, const union inaddr *addr, bool alloc_new)
+	tls_client_params_t **params, const struct sockaddr *addr, bool alloc_new)
 {
 	assert(params && addr);
 	/* We accept NULL for empty map; ensure the map exists if needed. */
@@ -853,9 +856,10 @@ struct tls_client_paramlist_entry * tls_client_param_get(
 		}
 	}
 	/* Construct the key. */
-	char key[sizeof(addr->ip6.sin6_port) + sizeof(addr->ip6.sin6_addr)];
+	const union inaddr *ia = (const union inaddr *)addr;
+	char key[sizeof(ia->ip6.sin6_port) + sizeof(ia->ip6.sin6_addr)];
 	uint32_t len;
-	if (!construct_key(addr, &len, key))
+	if (!construct_key(ia, &len, key))
 		return NULL;
 	/* Get the entry. */
 	void **pe = (alloc_new ? trie_get_ins : trie_get_try)(*params, key, len);
@@ -885,11 +889,12 @@ struct tls_client_paramlist_entry * tls_client_param_get(
 	return e;
 }
 
-int tls_client_param_remove(tls_client_params_t *params, const union inaddr *addr)
+int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr)
 {
-	char key[sizeof(addr->ip6.sin6_port) + sizeof(addr->ip6.sin6_addr)];
+	const union inaddr *ia = (const union inaddr *)addr;
+	char key[sizeof(ia->ip6.sin6_port) + sizeof(ia->ip6.sin6_addr)];
 	uint32_t len;
-	if (!construct_key(addr, &len, key))
+	if (!construct_key(ia, &len, key))
 		return kr_error(EINVAL);
 	trie_val_t param_ptr;
 	int ret = trie_del(params, key, len, &param_ptr);
@@ -906,228 +911,12 @@ static void client_paramlist_entry_ref(struct tls_client_paramlist_entry *entry)
 	}
 }
 
-
-
-
-
-
-
-static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
-{
-	//struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)v;
-	return 0;//client_paramlist_entry_free(entry);
-}
-
-struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
-			  const struct sockaddr *addr)
-{
-	/* Opportunistic upgrade from port 53 -> 853 */
-	if (kr_inaddr_port(addr) != KR_DNS_PORT) {
-		return NULL;
-	}
-
-	static char key[INET6_ADDRSTRLEN + 6];
-	size_t keylen = sizeof(key);
-	if (kr_inaddr_str(addr, key, &keylen) != 0) {
-		return NULL;
-	}
-
-	/* Rewrite 053 -> 853 */
-	memcpy(key + keylen - 4, "853", 3);
-
-	return map_get(tls_client_paramlist, key);
-}
-
-int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port)
-{
-	if (!tls_client_paramlist || !addr) {
-		return kr_error(EINVAL);
-	}
-
-	/* Parameters are OK */
-
-	char key[INET6_ADDRSTRLEN + 6];
-	size_t keylen = sizeof(key);
-	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
-		return kr_error(EINVAL);
-	}
-
-	struct tls_client_paramlist_entry *entry = map_get(tls_client_paramlist, key);
-	if (entry != NULL) {
-		client_paramlist_entry_clear(NULL, (void *)entry, NULL);
-		map_del(tls_client_paramlist, key);
-	}
-	
-	return kr_ok();
-}
-
-typedef enum tls_client_param {
-       TLS_CLIENT_PARAM_NONE = 0,
-       TLS_CLIENT_PARAM_PIN,
-       TLS_CLIENT_PARAM_HOSTNAME,
-       TLS_CLIENT_PARAM_CA,
-} tls_client_param_t;
-int tls_client_params_set_ORIG(map_t *tls_client_paramlist,
-			  const char *addr, uint16_t port,
-			  const char *param, tls_client_param_t param_type)
-{
-	if (!tls_client_paramlist || !addr) {
-		return kr_error(EINVAL);
-	}
-
-	/* TLS_CLIENT_PARAM_CA can be empty */
-	if (param_type == TLS_CLIENT_PARAM_HOSTNAME ||
-	    param_type == TLS_CLIENT_PARAM_PIN) {
-		if (param == NULL || param[0] == 0) {
-			return kr_error(EINVAL);
-		}
-	}
-
-	/* Parameters are OK */
-
-	char key[INET6_ADDRSTRLEN + 6];
-	size_t keylen = sizeof(key);
-	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
-		kr_log_error("[tls_client] warning: '%s' is not a valid ip address\n", addr);
-		return kr_error(EINVAL);
-	}
-
-	bool is_first_entry = false;
-	struct tls_client_paramlist_entry *entry = map_get(tls_client_paramlist, key);
-	if (entry == NULL) {
-		entry = calloc(1, sizeof(struct tls_client_paramlist_entry));
-		if (entry == NULL) {
-			return kr_error(ENOMEM);
-		}
-		is_first_entry  = true;
-		int ret = gnutls_certificate_allocate_credentials(&entry->credentials);
-		if (ret != GNUTLS_E_SUCCESS) {
-			free(entry);
-			kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
-				     gnutls_strerror_name(ret));
-			return kr_error(ENOMEM);
-		}
-		gnutls_certificate_set_verify_function(entry->credentials, client_verify_certificate);
-		client_paramlist_entry_ref(entry);
-	}
-
-	int ret = kr_ok();
-
-	if (param_type == TLS_CLIENT_PARAM_HOSTNAME) {
-		if (entry->hostname && strcasecmp(entry->hostname, param)) {
-			kr_log_error("[tls_client] error: hostname collision for address"
-					" '%s': '%s' '%s'\n",
-					key, entry->hostname, param);
-			return kr_error(EINVAL);
-		}
-		if (!entry->hostname) {
-			entry->hostname = strdup(param);
-			if (!entry->hostname) {
-				return kr_error(ENOMEM);
-			}
-		}
-	} else if (param_type == TLS_CLIENT_PARAM_CA) {
-		/* Import ca files only when hostname is already set */
-		if (!entry->hostname) {
-			return kr_error(ENOENT);
-		}
-		const char *ca_file = param;
-		bool already_exists = false;
-		for (size_t i = 0; i < entry->ca_files.len; ++i) {
-			const char *imported_ca = entry->ca_files.at[i];
-			if (imported_ca[0] == 0 && (ca_file == NULL || ca_file[0] == 0)) {
-				kr_log_error("[tls_client] error: system ca for address '%s' already was set, ignoring\n", key);
-				already_exists = true;
-				break;
-			} else if (strcmp(imported_ca, ca_file) == 0) {
-				kr_log_error("[tls_client] error: ca file '%s' for address '%s' already was set, ignoring\n", ca_file, key);
-				already_exists = true;
-				break;
-			}
-		}
-		if (!already_exists) {
-			const char *value = strdup(ca_file != NULL ? ca_file : "");
-			if (!value) {
-				ret = kr_error(ENOMEM);
-			} else if (array_push(entry->ca_files, value) < 0) {
-				free ((void *)value);
-				ret = kr_error(ENOMEM);
-			} else if (value[0] == 0) {
-				int res = gnutls_certificate_set_x509_system_trust (entry->credentials);
-				if (res <= 0) {
-					kr_log_error("[tls_client] failed to import certs from system store (%s)\n",
-						     gnutls_strerror_name(res));
-					/* value will be freed at cleanup */
-					ret = kr_error(EINVAL);
-				} else {
-					kr_log_verbose("[tls_client] imported %d certs from system store\n", res);
-				}
-			} else {
-				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
-										 GNUTLS_X509_FMT_PEM);
-				if (res <= 0) {
-					kr_log_error("[tls_client] failed to import certificate file '%s' (%s)\n",
-						     value, gnutls_strerror_name(res));
-					/* value will be freed at cleanup */
-					ret = kr_error(EINVAL);
-				} else {
-					kr_log_verbose("[tls_client] imported %d certs from file '%s'\n",
-							res, value);
-
-				}
-			}
-		}
-	} else if (param_type == TLS_CLIENT_PARAM_PIN) {
-		const char *pin = param;
-		for (size_t i = 0; i < entry->pins.len; ++i) {
-			if (strcmp((const char *)(entry->pins.at[i]), pin) == 0) {
-				kr_log_error("[tls_client] warning: pin '%s' for address '%s' already was set, ignoring\n", pin, key);
-				return kr_ok();
-			}
-		}
-		const void *value = strdup(pin);
-		if (!value) {
-			ret = kr_error(ENOMEM);
-		} else if (array_push(entry->pins, value) < 0) {
-			free ((void *)value);
-			ret = kr_error(ENOMEM);
-		}
-	} else {
-		assert(param_type == TLS_CLIENT_PARAM_NONE);
-	}
-
-	if ((ret == kr_ok()) && is_first_entry) {
-		bool fail = (map_set(tls_client_paramlist, key, entry) != 0);
-		if (fail) {
-			ret = kr_error(ENOMEM);
-		}
-	}
-
-	if ((ret != kr_ok()) && is_first_entry) {
-		//client_paramlist_entry_unref(entry);
-	}
-
-	return ret;
-}
-
-int tls_client_params_free_ORIG(map_t *tls_client_paramlist)
-{
-	if (!tls_client_paramlist) {
-		return kr_error(EINVAL);
-	}
-
-	map_walk(tls_client_paramlist, client_paramlist_entry_clear, NULL);
-	map_clear(tls_client_paramlist);
-
-	return kr_ok();
-}
-
 static int client_verify_certificate(gnutls_session_t tls_session)
 {
 	struct tls_client_ctx_t *ctx = gnutls_session_get_ptr(tls_session);
 	assert(ctx->params != NULL);
 
-	if (ctx->params->pins.len == 0 && ctx->params->ca_files.len == 0) {
+	if (ctx->params->insecure) {
 		return GNUTLS_E_SUCCESS;
 	}
 
@@ -1147,7 +936,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 
 #if TLS_CAN_USE_PINS
 	if (ctx->params->pins.len == 0) {
-		DEBUG_MSG("[tls_client] skipping certificate PIN check\n");
+		DEBUG_MSG("[tls_client] configured to authenticate via CA\n");
 		goto skip_pins;
 	}
 
@@ -1164,20 +953,22 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 			return ret;
 		}
 
-		char cert_pin[TLS_SHA256_BASE64_BUFLEN];
 	#ifdef DEBUG
-		/* DEBUG: additionally compute and print the base64 pin.
-		 * Not very efficient, but that's OK for DEBUG. */
-		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), false);
-		if (ret == GNUTLS_E_SUCCESS) {
-			DEBUG_MSG("[tls_client] received pin: %s\n", cert_pin);
-		} else {
-			DEBUG_MSG("[tls_client] failed to convert received pin\n");
-			/* Now we hope that `ret` below can't differ. */
+		if (VERBOSE_STATUS) {
+			char pin_base64[TLS_SHA256_BASE64_BUFLEN];
+			/* DEBUG: additionally compute and print the base64 pin.
+			 * Not very efficient, but that's OK for DEBUG. */
+			ret = get_oob_key_pin(cert, pin_base64, sizeof(pin_base64), false);
+			if (ret == GNUTLS_E_SUCCESS) {
+				DEBUG_MSG("[tls_client] received pin: %s\n", pin_base64);
+			} else {
+				DEBUG_MSG("[tls_client] failed to convert received pin\n");
+				/* Now we hope that `ret` below can't differ. */
+			}
 		}
 	#endif
-		/* Get raw pin and compare.
-		 * (We don't use the whole TLS_SHA256_BASE64_BUFLEN.) */
+		char cert_pin[TLS_SHA256_RAW_LEN];
+		/* Get raw pin and compare. */
 		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), true);
 		gnutls_x509_crt_deinit(cert);
 		if (ret != GNUTLS_E_SUCCESS) {
@@ -1193,6 +984,11 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		DEBUG_MSG("[tls_client] none of %zd configured pin(s) matched\n",
 				ctx->params->pins.len);
 	}
+
+	kr_log_error("[tls_client] no pin matched: %d pins * %d certificates\n",
+			(int)ctx->params->pins.len, cert_list_size);
+	return GNUTLS_E_CERTIFICATE_ERROR;
+
 #else /* TLS_CAN_USE_PINS */
 	if (ctx->params->pins.len != 0) {
 		kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");
@@ -1203,13 +999,9 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 
 skip_pins:
 
-	if (ctx->params->ca_files.len == 0) {
-		DEBUG_MSG("[tls_client] empty CA files list\n");
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-
 	if (!ctx->params->hostname) {
-		DEBUG_MSG("[tls_client] no hostname set\n");
+		kr_log_error("[tls_client] internal config inconsistency: no hostname set\n");
+		assert(false);
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
@@ -1275,9 +1067,9 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 	if (ret == GNUTLS_E_SUCCESS && entry->hostname) {
 		ret = gnutls_server_name_set(ctx->c.tls_session, GNUTLS_NAME_DNS,
 					entry->hostname, strlen(entry->hostname));
-		kr_log_info("TLS client: set hostname, ret = %d\n", ret);
+		kr_log_verbose("[tls_client] set hostname, ret = %d\n", ret);
 	} else if (!entry->hostname) {
-		kr_log_info("TLS client: no hostname\n");
+		kr_log_verbose("[tls_client] no hostname\n");
 	}
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
@@ -1305,7 +1097,7 @@ void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
 	}
 
 	/* Must decrease the refcount for referenced parameters */
-	//client_paramlist_entry_unref(ctx->params);
+	client_param_unref(ctx->params);
 
 	free (ctx);
 }

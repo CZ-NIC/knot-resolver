@@ -48,6 +48,19 @@
  */
 const char * lua_table_checkindices(lua_State *L, const char *keys[]);
 
+/** If the value at the top of the stack isn't a table, make it a single-element list. */
+static inline void lua_listify(lua_State *L)
+{
+	if (lua_istable(L, -1))
+		return;
+	lua_createtable(L, 1, 0);
+	lua_insert(L, lua_gettop(L) - 1); /* swap the top two stack elements */
+	lua_pushinteger(L, 1);
+	lua_insert(L, lua_gettop(L) - 1); /* swap the top two stack elements */
+	lua_settable(L, -3);
+}
+
+
 /** @internal Annotate for static checkers. */
 KR_NORETURN int lua_error(lua_State *L);
 
