@@ -582,9 +582,9 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 			err = GNUTLS_E_SUCCESS;
 			outchar[err] = '\0'; /* base64_decode() doesn't do it */
 		} else if (err >= 0) {
+			assert(false);
 			err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
 			outchar[outchar_len - 1] = '\0';
-			assert(false);
 		}
 	}
 leave:

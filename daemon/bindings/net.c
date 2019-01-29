@@ -457,6 +457,8 @@ static int net_tls_client(lua_State *L)
 	/* Now pins. */
 	lua_getfield(L, 1, "pin_sha256");
 	if (!lua_isnil(L, -1)) {
+		if (has_ca_file)
+			ERROR("mixing pin_sha256 with ca_file is not supported");
 		lua_listify(L);
 		if (array_reserve(e->pins, lua_objlen(L, -1)) != 0)
 			ERROR("%s", kr_strerror(ENOMEM));
