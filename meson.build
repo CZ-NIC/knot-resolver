@@ -89,12 +89,6 @@ add_global_arguments(
   language: 'c',
 )
 
-add_global_link_arguments(
-  '-ldl',
-  '-lm',
-  '-Wl,--export-dynamic',
-  language: 'c',
-)
 
 
 subdir('contrib')
