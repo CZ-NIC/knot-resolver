@@ -74,7 +74,7 @@ typedef trie_t tls_client_params_t;
 /** Required buffer length for pin_sha256, including the zero terminator. */
 #define TLS_SHA256_BASE64_BUFLEN (((TLS_SHA256_RAW_LEN * 8 + 4) / 6) + 3 + 1)
 
-#if GNUTLS_VERSION_NUMBER >= GNUTLS_PIN_MIN_VERSION
+#if GNUTLS_VERSION_NUMBER >= 0x030400
 	#define TLS_CAN_USE_PINS 1
 #else
 	#define TLS_CAN_USE_PINS 0

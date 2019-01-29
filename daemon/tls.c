@@ -37,7 +37,6 @@
 #include "daemon/session.h"
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
-#define GNUTLS_PIN_MIN_VERSION  0x030400
 
 /** @internal Debugging facility. */
 #ifdef DEBUG
@@ -537,8 +536,7 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 	return submitted;
 }
 
-#if GNUTLS_VERSION_NUMBER >= GNUTLS_PIN_MIN_VERSION
-
+#if TLS_CAN_USE_PINS
 /*
   DNS-over-TLS Out of band key-pinned authentication profile uses the
   same form of pins as HPKP:
@@ -564,10 +562,10 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	int err = gnutls_pubkey_init(&key);
 	if (err != GNUTLS_E_SUCCESS) return err;
 
+	gnutls_datum_t datum = { .data = NULL, .size = 0 };
 	err = gnutls_pubkey_import_x509(key, crt, 0);
 	if (err != GNUTLS_E_SUCCESS) goto leave;
 
-	gnutls_datum_t datum = { .size = 0 };
 	err = gnutls_pubkey_export2(key, GNUTLS_X509_FMT_DER, &datum);
 	if (err != GNUTLS_E_SUCCESS) goto leave;
 
