@@ -24,7 +24,14 @@ lua_sources = [
 ]
 
 
+link_args_c_mods = [  # TODO test on mac
+  '-Wl,-undefined',
+  '-Wl,dynamic_lookup',
+]
+
+
 subdir('daf')
+subdir('edns_keepalive')
 subdir('policy')
 
 
