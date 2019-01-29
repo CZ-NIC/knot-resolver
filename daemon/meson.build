@@ -38,6 +38,13 @@ c_args = [
   '-DLUA_HAS_SETFUNCS=@0@'.format(luajit_has_setfuncs),
 ]
 
+# TODO are these LDFLAGS needed?
+#link_args = [
+#  '-ldl',
+#  '-lm',
+#]
+
+
 if host_machine.system() == 'darwin'
   # luajit workaround for OS X  https://luajit.org/install.html#embed
   c_args += ['-pagezero_size', '10000', '-image_base', '100000000']
@@ -67,6 +74,7 @@ if get_option('daemon')
       gnutls,
       libsystemd,
     ],
+    export_dynamic: true,
     c_args: c_args,
     install: true,
     install_dir: 'sbin',
