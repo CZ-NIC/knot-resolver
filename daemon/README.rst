@@ -427,6 +427,11 @@ you've disabled IPv6 support in kernel, use ``0.0.0.0`` instead of ``[::]`` ).
    ListenDatagram=[::]:53
    ListenStream=[::]:53
 
+.. note:: Using IPv6 to bind to IPv4 interfaces is currently not compatible
+   with IPv4 syntax in ``view:addr()`` when using the ``view`` module. For
+   possible workarounds, see
+   https://gitlab.labs.nic.cz/knot/knot-resolver/issues/445
+
 It can also be useful if you want to use the Knot DNS with the `dnsproxy
 module`_ to have both resolver and authoritative server running on the same
 machine.

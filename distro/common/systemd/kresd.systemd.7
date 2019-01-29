@@ -104,6 +104,11 @@ ListenStream=[::]:853
 .RE
 .fi
 
+Please note that using IPv6 to bind to IPv4 interfaces is currently not
+compatible with IPv4 syntax in \fIview:addr()\fR when using the view module.
+For possible workarounds, see
+https://gitlab.labs.nic.cz/knot/knot-resolver/issues/445
+
 For more detailed socket configuration, see \fBsystemd.socket\fR(5).
 
 .B Concurrent daemons
