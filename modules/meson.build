@@ -1,4 +1,4 @@
-lua_sources = [
+lua_src = [
   'daf/daf.lua',
   'detect_time_jump/detect_time_jump.lua',
   'detect_time_skew/detect_time_skew.lua',
@@ -25,6 +25,7 @@ lua_sources = [
 
 
 subdir('bogus_log')
+# cookies module is not currently used
 subdir('daf')
 subdir('edns_keepalive')
 subdir('hints')
@@ -33,13 +34,10 @@ subdir('policy')
 subdir('stats')
 
 
-# TODO c modules
-
-
 # install lua modules
-foreach mod : lua_sources
+foreach mod : lua_src
   install_data(
-    join_paths(mod),
+    mod,
     install_dir: modules_dir,
   )
 endforeach
