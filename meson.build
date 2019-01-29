@@ -48,11 +48,6 @@ endif
 cmocka = dependency('cmocka', required: false)
 socket_wrapper = dependency('socket_wrapper', required: false)
 
-## dnstap
-libprotobuf_c = dependency('libprotobuf-c', version: '>=1', required: false)
-libfstrm = dependency('libfstrm', version: '>=0.2', required: false)
-protoc_c = find_program('protoc-c', required: false)
-
 ## coverage
 lcov = find_program('lcov', required: false)
 luacov = find_program('luacov', required: false)
