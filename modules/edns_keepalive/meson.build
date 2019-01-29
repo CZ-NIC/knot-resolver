@@ -2,7 +2,7 @@ edns_keepalive_src = [
   'edns_keepalive.c',
 ]
 
-edns_keepalive_mod = library(
+edns_keepalive_mod = shared_module(
   'edns_keepalive',
   edns_keepalive_src,
   dependencies: [
