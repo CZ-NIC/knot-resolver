@@ -7,7 +7,7 @@ lua_src = [
   'experimental_dot_auth/experimental_dot_auth.lua',
   'experimental_dot_auth/basexx.lua',
   'graphite/graphite.lua',
-  'http/http.lua',  # TODO http
+  'http/http.lua',
   'http/http_trace.lua',
   'http/prometheus.lua',
   'policy/policy.lua',
@@ -30,6 +30,7 @@ subdir('daf')
 subdir('dnstap')
 subdir('edns_keepalive')
 subdir('hints')
+subdir('http')
 subdir('nsid')
 subdir('policy')
 subdir('stats')
