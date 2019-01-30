@@ -421,12 +421,9 @@ static int net_tls_client(lua_State *L)
 		if (!e->hostname)
 			ERROR("missing hostname but specifying ca_file");
 		lua_listify(L);
-		/* TODO: clang scan-build confused by something around array_push()?*/
-		array_init(e->ca_files);
-		/*
-		if (array_reserve(e->ca_files, lua_objlen(L, -1)) != 0)
+		array_init(e->ca_files); /*< placate apparently confused scan-build */
+		if (array_reserve(e->ca_files, lua_objlen(L, -1)) != 0) /*< optim. */
 			ERROR("%s", kr_strerror(ENOMEM));
-		*/
 		/* Iterate over table at the top of the stack.
 		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
 		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
@@ -452,8 +449,10 @@ static int net_tls_client(lua_State *L)
 				ERROR("%s", kr_strerror(ENOMEM));
 		}
 		/* Sort the strings for easier comparison later. */
-		qsort(&e->ca_files.at[0], e->ca_files.len,
-			sizeof(e->ca_files.at[0]), strcmp_p);
+		if (e->ca_files.len) {
+			qsort(&e->ca_files.at[0], e->ca_files.len,
+				sizeof(e->ca_files.at[0]), strcmp_p);
+		}
 	}
 	lua_pop(L, 1);
 
@@ -463,12 +462,9 @@ static int net_tls_client(lua_State *L)
 		if (has_ca_file)
 			ERROR("mixing pin_sha256 with ca_file is not supported");
 		lua_listify(L);
-		/* TODO: clang scan-build confused by something around array_push()?*/
-		array_init(e->pins);
-		/*
-		if (array_reserve(e->pins, lua_objlen(L, -1)) != 0)
+		array_init(e->pins); /*< placate apparently confused scan-build */
+		if (array_reserve(e->pins, lua_objlen(L, -1)) != 0) /*< optim. */
 			ERROR("%s", kr_strerror(ENOMEM));
-		*/
 		/* Iterate over table at the top of the stack. */
 		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
 			const char *pin = lua_tostring(L, -1);
@@ -494,7 +490,10 @@ static int net_tls_client(lua_State *L)
 			}
 		}
 		/* Sort the raw strings for easier comparison later. */
-		qsort(&e->pins.at[0], e->pins.len, sizeof(e->pins.at[0]), cmp_sha256);
+		if (e->pins.len) {
+			qsort(&e->pins.at[0], e->pins.len,
+				sizeof(e->pins.at[0]), cmp_sha256);
+		}
 	}
 	lua_pop(L, 1);
 
