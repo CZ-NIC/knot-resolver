@@ -59,11 +59,11 @@ luacov = find_program('luacov', required: false)
 
 add_global_arguments(
   '-D_GNU_SOURCE',
-#  '-Wtype-limits',
-#  '-Wformat',
-#  '-Wformat-security',
-#  '-Wshadow',
-#  '-Wall',
+  '-Wtype-limits',
+  '-Wformat',
+  '-Wformat-security',
+  '-Wshadow',
+  '-Wall',
   '-DPACKAGE_VERSION="@0@"'.format(meson.project_version()),
   '-DPREFIX="@0@"'.format(get_option('prefix')),
   '-DMODULEDIR="@0@"'.format(modules_dir),
