@@ -145,6 +145,13 @@ static inline void mm_ctx_init(knot_mm_t *mm)
 }
 /* @endcond */
 
+/** A strcmp() variant directly usable for qsort() on an array of strings. */
+static inline int strcmp_p(const void *p1, const void *p2)
+{
+	return strcmp(*(char * const *)p1, *(char * const *)p2);
+}
+
+
 /** Return time difference in miliseconds.
   * @note based on the _BSD_SOURCE timersub() macro */
 static inline long time_diff(struct timeval *begin, struct timeval *end) {

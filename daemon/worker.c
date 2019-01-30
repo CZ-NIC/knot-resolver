@@ -719,7 +719,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 
 	/* handshake was completed successfully */
 	struct tls_client_ctx_t *tls_client_ctx = session_tls_get_client_ctx(session);
-	struct tls_client_paramlist_entry *tls_params = tls_client_ctx->params;
+	tls_client_param_t *tls_params = tls_client_ctx->params;
 	gnutls_session_t tls_session = tls_client_ctx->c.tls_session;
 	if (gnutls_session_is_resumed(tls_session) != 0) {
 		kr_log_verbose("[tls_client] TLS session has resumed\n");
@@ -1301,8 +1301,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	/* Check if there must be TLS */
 	struct tls_client_ctx_t *tls_ctx = NULL;
 	struct network *net = &worker->engine->net;
-	struct tls_client_paramlist_entry *entry =
-		tls_client_param_get(&net->tls_client_params, addr, false);
+	tls_client_param_t *entry = tls_client_param_get(net->tls_client_params, addr);
 	if (entry) {
 		/* Address is configured to be used with TLS.
 		 * We need to allocate auxiliary data structure. */
@@ -1510,8 +1509,8 @@ static int qr_task_step(struct qr_task *task,
 		 * check all of them. */
 		struct network *net = &worker->engine->net;
 		kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
-		struct tls_client_paramlist_entry *tls_entry =
-			tls_client_param_get(&net->tls_client_params, task->addrlist, false);
+		tls_client_param_t *tls_entry =
+			tls_client_param_get(net->tls_client_params, task->addrlist);
 		if (tls_entry) {
 			packet_source = NULL;
 			sock_type = SOCK_STREAM;

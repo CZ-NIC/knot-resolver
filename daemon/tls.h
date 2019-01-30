@@ -58,15 +58,15 @@ struct tls_credentials {
 };
 
 /** TLS authentication parameters for a single address-port pair. */
-struct tls_client_paramlist_entry {
-	array_t(const char *) ca_files; /**< Paths to certificate files. TODO: not needed? */
-	const char *hostname; /**< Server name for SNI and certificate check. */
-	array_t(const uint8_t *) pins; /**< Certificate pins. */
-	gnutls_certificate_credentials_t credentials;
-	gnutls_datum_t session_data;
+typedef struct tls_client_param {
 	uint32_t refs; /**< Reference count; consider TLS sessions in progress. */
-	bool insecure; /**< Use no authentication: TODO: heed this field. */
-};
+	bool insecure; /**< Use no authentication. */
+	const char *hostname; /**< Server name for SNI and certificate check, lowercased.  */
+	array_t(const char *) ca_files; /**< Paths to certificate files; not really used. */
+	array_t(const uint8_t *) pins; /**< Certificate pins as raw unterminated strings.*/
+	gnutls_certificate_credentials_t credentials; /**< CA creds. in gnutls format.  */
+	gnutls_datum_t session_data; /**< Session-resumption data gets stored here.    */
+} tls_client_param_t;
 /** Holds configuration for TLS authentication for all potential servers. */
 typedef trie_t tls_client_params_t;
 
@@ -80,10 +80,24 @@ typedef trie_t tls_client_params_t;
 	#define TLS_CAN_USE_PINS 0
 #endif
 
-/** Get pointer to TLS auth params, optionally creating a new one.
- * ->refs isn't touched, and that's how you know you got a new one. */
-struct tls_client_paramlist_entry * tls_client_param_get(
-	tls_client_params_t **params, const struct sockaddr *addr, bool alloc_new);
+/** Get a pointer-to-pointer to TLS auth params.
+ * If it didn't exist, it returns NULL (if !do_insert) or pointer to NULL. */
+tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
+				const struct sockaddr *addr, bool do_insert);
+
+/** Get a pointer to TLS auth params or NULL. */
+static inline tls_client_param_t *
+	tls_client_param_get(tls_client_params_t *params, const struct sockaddr *addr)
+{
+	tls_client_param_t **pe = tls_client_param_getptr(&params, addr, false);
+	return pe ? *pe : NULL;
+}
+
+/** Allocate and initialize the structure (with ->ref = 1). */
+tls_client_param_t * tls_client_param_new();
+/** Reference-counted free(); any inside data is freed alongside. */
+void tls_client_param_unref(tls_client_param_t *entry);
+
 int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr);
 /** Free TLS authentication parameters. */
 void tls_client_params_free(tls_client_params_t *params);
@@ -136,7 +150,7 @@ struct tls_client_ctx_t {
 	 * this field must be always at first position
 	 */
 	struct tls_common_ctx c;
-	struct tls_client_paramlist_entry *params;
+	tls_client_param_t *params;
 };
 
 /*! Create an empty TLS context in query context */
@@ -183,7 +197,7 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
 
 
 /*! Allocate new client TLS context */
-struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *entry,
+struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
 					    struct worker_ctx *worker);
 
 /*! Free client TLS context */

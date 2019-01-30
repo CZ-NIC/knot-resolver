@@ -777,7 +777,7 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 
 
 
-static void client_param_unref(struct tls_client_paramlist_entry *entry)
+void tls_client_param_unref(tls_client_param_t *entry)
 {
 	if (!entry) return;
 	assert(entry->refs); /* Well, we'd only leak memory. */
@@ -811,13 +811,33 @@ static void client_param_unref(struct tls_client_paramlist_entry *entry)
 static int param_free(void **param, void *null)
 {
 	assert(param && *param);
-	client_param_unref(*param);
+	tls_client_param_unref(*param);
 	return 0;
 }
 void tls_client_params_free(tls_client_params_t *params)
 {
 	if (!params) return;
 	trie_apply(params, param_free, NULL);
+}
+
+tls_client_param_t * tls_client_param_new()
+{
+	tls_client_param_t *e = calloc(1, sizeof(*e));
+	if (!e) {
+		assert(!ENOMEM);
+		return NULL;
+	}
+	/* Note: those array_t don't need further initialization. */
+	e->refs = 1;
+	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
+	if (ret != GNUTLS_E_SUCCESS) {
+		kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
+			     gnutls_strerror_name(ret));
+		free(e);
+		return NULL;
+	}
+	gnutls_certificate_set_verify_function(e->credentials, client_verify_certificate);
+	return e;
 }
 
 static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
@@ -840,8 +860,8 @@ static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
 		return false;
 	}
 }
-struct tls_client_paramlist_entry * tls_client_param_get(
-	tls_client_params_t **params, const struct sockaddr *addr, bool alloc_new)
+tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
+				const struct sockaddr *addr, bool alloc_new)
 {
 	assert(params && addr);
 	/* We accept NULL for empty map; ensure the map exists if needed. */
@@ -860,31 +880,8 @@ struct tls_client_paramlist_entry * tls_client_param_get(
 	if (!construct_key(ia, &len, key))
 		return NULL;
 	/* Get the entry. */
-	void **pe = (alloc_new ? trie_get_ins : trie_get_try)(*params, key, len);
-	if (!pe) {
-		assert(!alloc_new);
-		return NULL;
-	}
-	if (*pe) return *pe;
-	/* Create the missing entry. */
-	assert(alloc_new);
-	struct tls_client_paramlist_entry *e = *pe = calloc(1, sizeof(*e));
-	if (!e) {
-		assert(!ENOMEM);
-		return NULL;
-	}
-	/* Note: those array_t don't need further initialization. */
-	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
-	if (ret != GNUTLS_E_SUCCESS) {
-		kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
-			     gnutls_strerror_name(ret));
-		free(e);
-		ret = trie_del(*params, key, len, NULL);
-		assert(ret == KNOT_EOK);
-		return NULL;
-	}
-	gnutls_certificate_set_verify_function(e->credentials, client_verify_certificate);
-	return e;
+	return (tls_client_param_t **)
+		(alloc_new ? trie_get_ins : trie_get_try)(*params, key, len);
 }
 
 int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr)
@@ -898,11 +895,11 @@ int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *
 	int ret = trie_del(params, key, len, &param_ptr);
 	if (ret)
 		return kr_error(ret);
-	client_param_unref(param_ptr);
+	tls_client_param_unref(param_ptr);
 	return kr_ok();
 }
 
-static void client_paramlist_entry_ref(struct tls_client_paramlist_entry *entry)
+static void client_paramlist_entry_ref(tls_client_param_t *entry)
 {
 	if (entry != NULL) {
 		entry->refs += 1;
@@ -1031,7 +1028,7 @@ skip_pins:
 	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 
-struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *entry,
+struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
 					    struct worker_ctx *worker)
 {
 	struct tls_client_ctx_t *ctx = calloc(1, sizeof (struct tls_client_ctx_t));
@@ -1095,7 +1092,7 @@ void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
 	}
 
 	/* Must decrease the refcount for referenced parameters */
-	client_param_unref(ctx->params);
+	tls_client_param_unref(ctx->params);
 
 	free (ctx);
 }
@@ -1134,7 +1131,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
 	ctx->session = session;
 
-	struct tls_client_paramlist_entry *tls_params = client_ctx->params;
+	tls_client_param_t *tls_params = client_ctx->params;
 	if (tls_params->session_data.data != NULL) {
 		gnutls_session_set_data(ctx->tls_session, tls_params->session_data.data,
 					tls_params->session_data.size);
