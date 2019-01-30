@@ -1,4 +1,5 @@
 option('client', type : 'boolean', value : true, description: 'kresc client binary')
 option('daemon', type: 'boolean', value: true, description: 'kresd daemon binary')
+option('doc', type: 'boolean', value: false, description: 'html documentation')
 option('modules_dir', type: 'string', description: 'path to kres modules directory')
 option('keyfile_default', type: 'string', description: 'path to trust anchors file')
