@@ -405,9 +405,12 @@ static int net_tls_client(lua_State *L)
 		if (!hn_str || !knot_dname_from_str(dname, hn_str, sizeof(dname)))
 			ERROR("invalid hostname");
 		knot_dname_to_lower(dname);
-		e->hostname = knot_dname_to_str_alloc(dname);
-		if (!e->hostname)
+		char *h = knot_dname_to_str_alloc(dname);
+		if (!h)
 			ERROR("%s", kr_strerror(ENOMEM));
+		/* Strip the final dot produced by knot_dname_*() */
+		h[strlen(h) - 1] = '\0';
+		e->hostname = h;
 	}
 	lua_pop(L, 1);
 

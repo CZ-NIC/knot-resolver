@@ -90,7 +90,7 @@ Traditional PKI authentication requires server to present certificate with speci
         policy.TLS_FORWARD({
                 {'2001:DB8::d0c', hostname='res.example.com'}})
 
-- ``hostname`` must exactly match hostname in server's certificate, i.e. in most cases it must not contain a trailing dot (`res.example.com`).  It will also be sent to the server as SNI_.
+- ``hostname`` must be a valid domain name matching server's certificate.  It will also be sent to the server as SNI_.
 - ``ca_file`` optionally contains a path to a CA certificate (or certificate bundle) in `PEM format`_.
   If you omit that, the system CA certificate store will be used instead (usually sufficient).
   A list of paths is also accepted, but all of them must be valid PEMs.
@@ -99,7 +99,7 @@ Key-pinned authentication
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Instead of CAs, you can specify hashes of accepted certificates in ``pin_sha256``.
 They are in the usual format -- base64 from sha256.
-You may still add ``hostname`` if you want SNI_ to be sent.
+You may still specify ``hostname`` if you want SNI_ to be sent.
 
 TLS Examples
 ~~~~~~~~~~~~
