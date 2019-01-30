@@ -21,15 +21,6 @@ luajit = dependency('luajit')
 
 # Optional dependencies
 
-## documentation
-doxygen = find_program('doxygen', required: false)
-sphinx_build = find_program('sphinx-build', required: false)
-python_breathe = run_command(
-  'python3', ['-c', 'import breathe']).returncode() == 0
-if not python_breathe
-  warning('python: breathe not found')
-endif
-
 ## tests
 cmocka = dependency('cmocka', required: false)
 socket_wrapper = dependency('socket_wrapper', required: false)
@@ -84,6 +75,7 @@ subdir('daemon')
 subdir('modules')
 
 
-# install data
+# documentation, install, tests
 # TODO install man
+subdir('doc')
 subdir('etc')
