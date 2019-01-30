@@ -39,12 +39,22 @@
 #define STR(s) STRINGIFY_TOKEN(s)
 #define STRINGIFY_TOKEN(s) #s
 
-/** @internal Annotate for static checkers. */
-KR_NORETURN int lua_error(lua_State *L);
-
-/** Throw a formatted lua error.  It doesn't return. */
+/** Throw a formatted lua error.
+ *
+ * The message will get prefixed by "ERROR: " and supplemented by stack trace.
+ * \return never!  It calls lua_error().
+ *
+ * Example:
+	ERROR: not a valid pin_sha256: 'a1Z/3ek=', raw length 5 instead of 32
+	stack traceback:
+		[C]: in function 'tls_client'
+		/PathToPREFIX/lib/kdns_modules/policy.lua:175: in function 'TLS_FORWARD'
+		/PathToConfig.lua:46: in main chunk
+ */
 KR_PRINTF(2) KR_NORETURN KR_COLD
 void lua_error_p(lua_State *L, const char *fmt, ...);
+/** @internal Annotate for static checkers. */
+KR_NORETURN int lua_error(lua_State *L);
 
 /** Shortcut for common case. */
 static inline void lua_error_maybe(lua_State *L, int err)

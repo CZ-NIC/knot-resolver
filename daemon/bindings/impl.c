@@ -15,6 +15,7 @@
  */
 
 #include <lua.h>
+#include <lauxlib.h>
 #include <string.h>
 
 /* Each of these just creates the correspondingly named lua table of functions. */
@@ -46,26 +47,21 @@ void kr_bindings_register(lua_State *L)
 
 void lua_error_p(lua_State *L, const char *fmt, ...)
 {
-	/* Push a string describing location in the "parent" lua function. */
-	lua_Debug d;
-	lua_getstack(L, 1, &d);
-	lua_getinfo(L, "Sln", &d);
-	if (strncmp(d.short_src, "[", 1) != 0) {
-		lua_pushstring(L, d.short_src);
-		lua_pushstring(L, ":");
-		lua_pushnumber(L, d.currentline);
-		lua_pushstring(L, ": error: ");
-		lua_concat(L, 4);
-	} else {
-		lua_pushstring(L, "error: ");
+	/* Push formatted custom message, prepended with "ERROR: ". */
+	lua_pushliteral(L, "ERROR: ");
+	{
+		va_list args;
+		va_start(args, fmt);
+		lua_pushvfstring(L, fmt, args);
+		va_end(args);
 	}
-	/* Push formatted custom message. */
-	va_list args;
-	va_start(args, fmt);
-	lua_pushvfstring(L, fmt, args);
-	va_end(args);
-	/* Concatenate the two and throw a lua error. */
-	lua_concat(L,  2);
+	lua_concat(L, 2);
+	/* Add a stack trace and throw the result as a lua error. */
+	luaL_traceback(L, L, lua_tostring(L, -1), 0);
 	lua_error(L);
+	/* TODO: we might construct a little more friendly trace by using luaL_where().
+	 * In particular, in case the error happens in a function that was called
+	 * directly from a config file (the most common case), there isn't much need
+	 * to format the trace in this heavy way. */
 }
 
