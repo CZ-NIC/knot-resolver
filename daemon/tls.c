@@ -861,12 +861,12 @@ static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
 	}
 }
 tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
-				const struct sockaddr *addr, bool alloc_new)
+				const struct sockaddr *addr, bool do_insert)
 {
 	assert(params && addr);
 	/* We accept NULL for empty map; ensure the map exists if needed. */
 	if (!*params) {
-		if (!alloc_new) return NULL;
+		if (!do_insert) return NULL;
 		*params = trie_create(NULL);
 		if (!*params) {
 			assert(!ENOMEM);
@@ -881,7 +881,7 @@ tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
 		return NULL;
 	/* Get the entry. */
 	return (tls_client_param_t **)
-		(alloc_new ? trie_get_ins : trie_get_try)(*params, key, len);
+		(do_insert ? trie_get_ins : trie_get_try)(*params, key, len);
 }
 
 int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr)
