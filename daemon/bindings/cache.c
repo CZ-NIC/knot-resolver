@@ -129,7 +129,7 @@ static int cache_max_ttl(lua_State *L)
 		if (!lua_isnumber(L, 1))
 			lua_error_p(L, "expected 'max_ttl(number ttl)'");
 		uint32_t min = cache->ttl_min;
-		int64_t ttl = lua_tonumber(L, 1);
+		int64_t ttl = lua_tointeger(L, 1);
 		if (ttl < 0 || ttl < min || ttl > UINT32_MAX) {
 			lua_error_p(L,
 				"max_ttl must be larger than minimum TTL, and in range <1, "
@@ -151,7 +151,7 @@ static int cache_min_ttl(lua_State *L)
 		if (!lua_isnumber(L, 1))
 			lua_error_p(L, "expected 'min_ttl(number ttl)'");
 		uint32_t max = cache->ttl_max;
-		int64_t ttl = lua_tonumber(L, 1);
+		int64_t ttl = lua_tointeger(L, 1);
 		if (ttl < 0 || ttl > max || ttl > UINT32_MAX) {
 			lua_error_p(L,
 				"min_ttl must be smaller than maximum TTL, and in range <0, "
@@ -174,7 +174,7 @@ static int cache_open(lua_State *L)
 	/* Select cache storage backend */
 	struct engine *engine = engine_luaget(L);
 
-	lua_Number csize_lua = lua_tonumber(L, 1);
+	lua_Number csize_lua = lua_tointeger(L, 1);
 	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
 		lua_error_p(L, "invalid cache size specified, it must be in range <8192, "
 				STR(SIZE_MAX)  ">");
