@@ -104,7 +104,7 @@ static int event_after(lua_State *L)
 	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2))
 		lua_error_p(L, "expected 'after(number timeout, function)'");
 
-	return event_sched(L, lua_tonumber(L, 1), 0);
+	return event_sched(L, lua_tointeger(L, 1), 0);
 }
 
 static int event_recurrent(lua_State *L)
@@ -114,7 +114,7 @@ static int event_recurrent(lua_State *L)
 	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2))
 		lua_error_p(L, "expected 'recurrent(number interval, function)'");
 
-	return event_sched(L, 0, lua_tonumber(L, 1));
+	return event_sched(L, 0, lua_tointeger(L, 1));
 }
 
 static int event_cancel(lua_State *L)
@@ -183,7 +183,7 @@ static int event_fdwatch(lua_State *L)
 		lua_error_p(L, "out of memory");
 
 	/* Start timer with the reference */
-	int sock = lua_tonumber(L, 1);
+	int sock = lua_tointeger(L, 1);
 	uv_loop_t *loop = uv_default_loop();
 #if defined(__APPLE__) || defined(__FreeBSD__)
 	/* libuv is buggy and fails to create poller for
