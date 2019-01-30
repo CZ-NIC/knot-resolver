@@ -31,7 +31,7 @@ else
   dnstap_mod = shared_module(
     'dnstap',
     dnstap_src,
-    dnstap_pb,
+    dnstap_pb[1],
     dependencies: [
       contrib_dep,
       libkres_dep,
