@@ -627,6 +627,17 @@ pkg:debian:symbols:libkres:
   dependencies:
     - build:linux:amd64
 
+root.hints:
+  stage: deploy
+  only:
+    variables:
+      - $OBS_BUILD == "1"
+    refs:
+      - nightly@knot/knot-resolver
+  allow_failure: true
+  script:
+    - scripts/update-root-hints.sh
+
 
 # copy snapshot of current master to nightly branch for further processing
 # (this is workaround for missing complex conditions for job limits in Gitlab)
