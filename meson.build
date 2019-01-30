@@ -52,19 +52,6 @@ socket_wrapper = dependency('socket_wrapper', required: false)
 lcov = find_program('lcov', required: false)
 luacov = find_program('luacov', required: false)
 
-## lua socket
-lua_ltn12 = run_command(
-  'luajit', ['-l', 'ltn12', '-e', 'os.exit(0)']).returncode() == 0
-if not lua_ltn12
-  warning('lua: ltn12 not found')
-endif
-
-lua_ssl_https = run_command(
-  'luajit', ['-l', 'ssl.https', '-e', 'os.exit(0)']).returncode() == 0
-if not lua_ssl_https
-  warning('lua: ssl.https not found')
-endif
-
 
 # Variables
 
