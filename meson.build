@@ -6,20 +6,6 @@ project(
   default_options: ['c_std=c99'],  # TODO why not c11?
 )
 
-libkres_soversion = 9
-
-if get_option('modules_dir') == ''
-  modules_dir = join_paths(
-    get_option('prefix'), get_option('libdir'), 'knot-resolver')
-else
-  modules_dir = get_option('modules_dir')
-endif
-message('modules_dir: ' + modules_dir)
-
-config = configuration_data()
-config.set('keyfile_default', get_option('keyfile_default'))
-config.set('etc_dir',
-  join_paths(get_option('prefix'), get_option('sysconfdir'), 'knot-resolver'))
 
 # Project-wide dependencies
 
@@ -55,6 +41,24 @@ luacov = find_program('luacov', required: false)
 
 # Variables
 
+libkres_soversion = 9
+
+if get_option('modules_dir') == ''
+  modules_dir = join_paths(
+    get_option('prefix'), get_option('libdir'), 'knot-resolver')
+else
+  modules_dir = get_option('modules_dir')
+endif
+message('modules_dir: ' + modules_dir)
+
+data_dir = join_paths(get_option('prefix'), get_option('datadir'), 'knot-resolver')
+doc_dir = join_paths(get_option('prefix'), get_option('datadir'), 'doc', 'knot-resolver')
+etc_dir = join_paths(get_option('prefix'), get_option('sysconfdir'), 'knot-resolver')
+
+config = configuration_data()
+config.set('keyfile_default', get_option('keyfile_default'))
+config.set('etc_dir', etc_dir)
+
 # TODO @DATE@. @VERSION@, ...
 
 add_global_arguments(
@@ -72,16 +76,14 @@ add_global_arguments(
 )
 
 
+# compile
 subdir('contrib')
 subdir('lib')
 subdir('client')
 subdir('daemon')
 subdir('modules')
 
+
+# install data
 # TODO install man
-
-# install
-
-# etc
-
-install_data(sources: 'etc/root.hints', install_dir: config.get('etc_dir'))
+subdir('etc')
