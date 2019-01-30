@@ -23,8 +23,8 @@ local function test_tls_forward()
 	ok(policy.TLS_FORWARD({{'100:dead::3', insecure=true},
 			       {'100:beef::3', insecure=true}
 			   }), 'TLS_FORWARD with different IPv6 addresses is allowed')
-	ok(policy.TLS_FORWARD({{'127.0.0.5', insecure=true},
-			       {'127.0.0.6', insecure=true}
+	ok(policy.TLS_FORWARD({{'127.0.0.1', insecure=true},
+			       {'127.0.0.2', insecure=true}
 		           }), 'TLS_FORWARD with different IPv4 addresses is allowed')
 
 	boom(policy.TLS_FORWARD, {{{'::1', pin_sha256=''}}}, 'TLS_FORWARD with empty pin_sha256')
@@ -37,21 +37,21 @@ local function test_tls_forward()
 			{'::1', pin_sha256='g1PpXsxqPchz2tH6w9kcvVXqzQ0QclhInFP2+VWOqic='}
 		}), 'TLS_FORWARD with base64 pin_sha256')
 	ok(policy.TLS_FORWARD({
-		{'127.0.0.8', pin_sha256={
+		{'::1', pin_sha256={
 			'ev1xcdU++dY9BlcX0QoKeaUftvXQvNIz/PCss1Z/3ek=',
 			'SgnqTFcvYduWX7+VUnlNFT1gwSNvQdZakH7blChIRbM=',
 			'bd161VN6aMSSdRN/TSDP6HZOHdaqcIvISlyFB9xLbGg=',
 		}}}), 'TLS_FORWARD with a table of pins')
 
 	-- ok(policy.TLS_FORWARD({{'::1', hostname='test.', ca_file='/tmp/ca.crt'}}), 'TLS_FORWARD with hostname + CA cert')
-	ok(policy.TLS_FORWARD({{'127.0.1.1', hostname='test.'}}),
+	ok(policy.TLS_FORWARD({{'::1', hostname='test.'}}),
 		'TLS_FORWARD with just hostname (use system CA store)')
-	boom(policy.TLS_FORWARD, {{{'127.0.1.2', ca_file='/tmp/ca.crt'}}},
+	boom(policy.TLS_FORWARD, {{{'::1', ca_file='/tmp/ca.crt'}}},
 		'TLS_FORWARD with just CA cert')
-	boom(policy.TLS_FORWARD, {{{'127.0.1.3', hostname='', ca_file='/tmp/ca.crt'}}},
+	boom(policy.TLS_FORWARD, {{{'::1', hostname='', ca_file='/tmp/ca.crt'}}},
 		'TLS_FORWARD with empty hostname + CA cert')
 	boom(policy.TLS_FORWARD, {
-			{{'127.0.1.4', hostname='test.', ca_file='/dev/a_file_which_surely_does_NOT_exist!'}}
+			{{'::1', hostname='test.', ca_file='/dev/a_file_which_surely_does_NOT_exist!'}}
 		}, 'TLS_FORWARD with hostname + unreadable CA cert')
 
 end
