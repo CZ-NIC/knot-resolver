@@ -425,8 +425,10 @@ static int net_tls_client(lua_State *L)
 		if (!e->hostname)
 			ERROR("missing hostname but specifying ca_file");
 		lua_listify(L);
+		/* clang scan-build confused by this?
 		if (array_reserve(e->ca_files, lua_objlen(L, -1)) != 0)
 			ERROR("%s", kr_strerror(ENOMEM));
+		*/
 		/* Iterate over table at the top of the stack.
 		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
 		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
@@ -460,8 +462,10 @@ static int net_tls_client(lua_State *L)
 		if (has_ca_file)
 			ERROR("mixing pin_sha256 with ca_file is not supported");
 		lua_listify(L);
+		/* clang scan-build confused by this?
 		if (array_reserve(e->pins, lua_objlen(L, -1)) != 0)
 			ERROR("%s", kr_strerror(ENOMEM));
+		*/
 		/* Iterate over table at the top of the stack. */
 		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
 			const char *pin = lua_tostring(L, -1);
