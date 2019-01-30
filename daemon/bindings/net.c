@@ -421,7 +421,9 @@ static int net_tls_client(lua_State *L)
 		if (!e->hostname)
 			ERROR("missing hostname but specifying ca_file");
 		lua_listify(L);
-		/* TODO: clang scan-build confused by something around array_push()?
+		/* TODO: clang scan-build confused by something around array_push()?*/
+		array_init(e->ca_files);
+		/*
 		if (array_reserve(e->ca_files, lua_objlen(L, -1)) != 0)
 			ERROR("%s", kr_strerror(ENOMEM));
 		*/
@@ -461,7 +463,9 @@ static int net_tls_client(lua_State *L)
 		if (has_ca_file)
 			ERROR("mixing pin_sha256 with ca_file is not supported");
 		lua_listify(L);
-		/* clang scan-build confused by this?
+		/* TODO: clang scan-build confused by something around array_push()?*/
+		array_init(e->pins);
+		/*
 		if (array_reserve(e->pins, lua_objlen(L, -1)) != 0)
 			ERROR("%s", kr_strerror(ENOMEM));
 		*/
