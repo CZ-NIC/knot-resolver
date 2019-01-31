@@ -1,1 +1,2 @@
+subdir('config')
 subdir('unit')
