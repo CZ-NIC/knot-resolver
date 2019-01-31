@@ -22,7 +22,6 @@ luajit = dependency('luajit')
 # Optional dependencies
 
 ## tests
-cmocka = dependency('cmocka', required: false)
 socket_wrapper = dependency('socket_wrapper', required: false)
 
 ## coverage
@@ -73,6 +72,10 @@ subdir('lib')
 subdir('client')
 subdir('daemon')
 subdir('modules')
+
+
+# tests
+subdir('tests')
 
 
 # documentation, install, tests
