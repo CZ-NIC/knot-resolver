@@ -65,6 +65,8 @@ add_global_arguments(
   language: 'c',
 )
 
+unit_tests = []  # list of [test_name, files(test)]
+
 
 # compile
 subdir('contrib')

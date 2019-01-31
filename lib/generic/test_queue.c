@@ -14,7 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "tests/test.h"
+#include "tests/unit/test.h"
 #include "lib/generic/queue.h"
 
 /* The main intention is to use queues with pointers, so we test the same-sized int. */
