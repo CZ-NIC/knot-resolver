@@ -393,11 +393,20 @@ void kr_inaddr_set_port(struct sockaddr *addr, uint16_t port)
 
 int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen)
 {
-	if (!addr || !buf || !buflen) {
+	if (!addr) {
+		return kr_error(EINVAL);
+	}
+	return kr_ntop_str(addr->sa_family, kr_inaddr(addr), kr_inaddr_port(addr),
+			   buf, buflen);
+}
+
+int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *buflen)
+{
+	if (!src || !buf || !buflen) {
 		return kr_error(EINVAL);
 	}
 
-	if (!inet_ntop(addr->sa_family, kr_inaddr(addr), buf, *buflen)) {
+	if (!inet_ntop(family, src, buf, *buflen)) {
 		return kr_error(errno);
 	}
 	const int len = strlen(buf);
@@ -408,7 +417,7 @@ int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen)
 	}
 	*buflen = len_need;
 	buf[len] = '#';
-	u16tostr((uint8_t *)&buf[len + 1], kr_inaddr_port(addr));
+	u16tostr((uint8_t *)&buf[len + 1], port);
 	buf[len_need - 1] = 0;
 	return kr_ok();
 }
