@@ -16,7 +16,7 @@
 
 #include <netinet/in.h>
 
-#include "tests/test.h"
+#include "tests/unit/test.h"
 #include "lib/zonecut.h"
 
 static void test_zonecut_params(void **state)

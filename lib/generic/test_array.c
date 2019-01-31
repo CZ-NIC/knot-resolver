@@ -14,7 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "tests/test.h"
+#include "tests/unit/test.h"
 #include "lib/generic/array.h"
 
 knot_mm_t global_mm;
