@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "tests/test.h"
+#include "tests/unit/test.h"
 #include "lib/generic/set.h"
 #include "lib/utils.h"
 

@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <contrib/cleanup.h>
 
-#include "tests/test.h"
+#include "tests/unit/test.h"
 #include "lib/utils.h"
 
 static void test_strcatdup(void **state)
