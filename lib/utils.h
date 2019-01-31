@@ -145,6 +145,13 @@ static inline void mm_ctx_init(knot_mm_t *mm)
 }
 /* @endcond */
 
+/** A strcmp() variant directly usable for qsort() on an array of strings. */
+static inline int strcmp_p(const void *p1, const void *p2)
+{
+	return strcmp(*(char * const *)p1, *(char * const *)p2);
+}
+
+
 /** Return time difference in miliseconds.
   * @note based on the _BSD_SOURCE timersub() macro */
 static inline long time_diff(struct timeval *begin, struct timeval *end) {
@@ -295,6 +302,26 @@ void kr_inaddr_set_port(struct sockaddr *addr, uint16_t port);
 KR_EXPORT
 int kr_inaddr_str(const struct sockaddr *addr, char *buf, size_t *buflen);
 
+/** Write string representation for given address as "<addr>#<port>".
+ * It's the same as kr_inaddr_str(), but the input address is input in native format
+ * like for inet_ntop() (4 or 16 bytes) and port must be separate parameter.  */
+KR_EXPORT
+int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *buflen);
+
+/** @internal Create string representation addr#port.
+ *  @return pointer to static string
+ */
+static inline char *kr_straddr(const struct sockaddr *addr)
+{
+	assert(addr != NULL);
+	/* We are the sinle-threaded application */
+	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
+	size_t len = sizeof(str);
+	int ret = kr_inaddr_str(addr, str, &len);
+	return ret != kr_ok() || len == 0 ? NULL : str;
+}
+
+
 /** Return address type for string. */
 KR_EXPORT KR_PURE
 int kr_straddr_family(const char *addr);
@@ -415,19 +442,6 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 	if (type == KNOT_RRTYPE_RRSIG)
 		type = knot_rrsig_type_covered(rr->rrs.rdata);
 	return type;
-}
-
-/** @internal Return string representation of addr.
- *  @note return pointer to static string
- */
-static inline char *kr_straddr(const struct sockaddr *addr)
-{
-	assert(addr != NULL);
-	/* We are the sinle-threaded application */
-	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
-	size_t len = sizeof(str);
-	int ret = kr_inaddr_str(addr, str, &len);
-	return ret != kr_ok() || len == 0 ? NULL : str;
 }
 
 /** The current time in monotonic milliseconds.

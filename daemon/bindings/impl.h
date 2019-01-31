@@ -39,6 +39,28 @@
 #define STR(s) STRINGIFY_TOKEN(s)
 #define STRINGIFY_TOKEN(s) #s
 
+
+/** Check lua table at the top of the stack for allowed keys.
+ * \param keys NULL-terminated array of 0-terminated strings
+ * \return NULL if passed or the offending string (pushed on top of lua stack)
+ * \note Future work: if non-NULL is returned, there's extra stuff on the lua stack.
+ * \note Brute-force complexity: table length * summed length of keys.
+ */
+const char * lua_table_checkindices(lua_State *L, const char *keys[]);
+
+/** If the value at the top of the stack isn't a table, make it a single-element list. */
+static inline void lua_listify(lua_State *L)
+{
+	if (lua_istable(L, -1))
+		return;
+	lua_createtable(L, 1, 0);
+	lua_insert(L, lua_gettop(L) - 1); /* swap the top two stack elements */
+	lua_pushinteger(L, 1);
+	lua_insert(L, lua_gettop(L) - 1); /* swap the top two stack elements */
+	lua_settable(L, -3);
+}
+
+
 /** Throw a formatted lua error.
  *
  * The message will get prefixed by "ERROR: " and supplemented by stack trace.
