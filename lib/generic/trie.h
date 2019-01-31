@@ -92,6 +92,7 @@ int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val);
  * \param d Parameter passed as the second argument to f().
  * \return First nonzero from f() or zero (i.e. KNOT_EOK).
  */
+KR_EXPORT
 int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d);
 
 /*!
