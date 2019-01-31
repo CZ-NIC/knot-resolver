@@ -57,18 +57,6 @@ struct tls_credentials {
 	char *ephemeral_servicename;
 };
 
-/** TLS authentication parameters for a single address-port pair. */
-typedef struct tls_client_param {
-	uint32_t refs; /**< Reference count; consider TLS sessions in progress. */
-	bool insecure; /**< Use no authentication. */
-	const char *hostname; /**< Server name for SNI and certificate check, lowercased.  */
-	array_t(const char *) ca_files; /**< Paths to certificate files; not really used. */
-	array_t(const uint8_t *) pins; /**< Certificate pins as raw unterminated strings.*/
-	gnutls_certificate_credentials_t credentials; /**< CA creds. in gnutls format.  */
-	gnutls_datum_t session_data; /**< Session-resumption data gets stored here.    */
-} tls_client_param_t;
-/** Holds configuration for TLS authentication for all potential servers. */
-typedef trie_t tls_client_params_t;
 
 #define TLS_SHA256_RAW_LEN 32 /* gnutls_hash_get_len(GNUTLS_DIG_SHA256) */
 /** Required buffer length for pin_sha256, including the zero terminator. */
@@ -79,6 +67,21 @@ typedef trie_t tls_client_params_t;
 #else
 	#define TLS_CAN_USE_PINS 0
 #endif
+
+
+/** TLS authentication parameters for a single address-port pair. */
+typedef struct {
+	uint32_t refs; /**< Reference count; consider TLS sessions in progress. */
+	bool insecure; /**< Use no authentication. */
+	const char *hostname; /**< Server name for SNI and certificate check, lowercased.  */
+	array_t(const char *) ca_files; /**< Paths to certificate files; not really used. */
+	array_t(const uint8_t *) pins; /**< Certificate pins as raw unterminated strings.*/
+	gnutls_certificate_credentials_t credentials; /**< CA creds. in gnutls format.  */
+	gnutls_datum_t session_data; /**< Session-resumption data gets stored here.    */
+} tls_client_param_t;
+/** Holds configuration for TLS authentication for all potential servers.
+ * Special case: NULL pointer also means empty. */
+typedef trie_t tls_client_params_t;
 
 /** Get a pointer-to-pointer to TLS auth params.
  * If it didn't exist, it returns NULL (if !do_insert) or pointer to NULL. */
@@ -101,6 +104,7 @@ void tls_client_param_unref(tls_client_param_t *entry);
 int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr);
 /** Free TLS authentication parameters. */
 void tls_client_params_free(tls_client_params_t *params);
+
 
 struct worker_ctx;
 struct qr_task;
@@ -150,7 +154,7 @@ struct tls_client_ctx_t {
 	 * this field must be always at first position
 	 */
 	struct tls_common_ctx c;
-	tls_client_param_t *params;
+	tls_client_param_t *params; /**< It's reference-counted. */
 };
 
 /*! Create an empty TLS context in query context */

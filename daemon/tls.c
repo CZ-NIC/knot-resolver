@@ -550,7 +550,8 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 /* Compute pin_sha256 for the certificate.
  * It may be in raw format - just TLS_SHA256_RAW_LEN bytes without termination,
  * or it may be a base64 0-terminated string requiring up to
- * TLS_SHA256_BASE64_BUFLEN bytes. */
+ * TLS_SHA256_BASE64_BUFLEN bytes.
+ * \return error code */
 static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len, bool raw)
 {
 	if (raw && outchar_len < TLS_SHA256_RAW_LEN) {
@@ -773,10 +774,6 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 	free(tls_credentials);
 }
 
-
-
-
-
 void tls_client_param_unref(tls_client_param_t *entry)
 {
 	if (!entry) return;
@@ -897,13 +894,6 @@ int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *
 		return kr_error(ret);
 	tls_client_param_unref(param_ptr);
 	return kr_ok();
-}
-
-static void client_paramlist_entry_ref(tls_client_param_t *entry)
-{
-	if (entry != NULL) {
-		entry->refs += 1;
-	}
 }
 
 static int client_verify_certificate(gnutls_session_t tls_session)
@@ -1054,7 +1044,7 @@ struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
 
 	/* Must take a reference on parameters as the credentials are owned by it
 	 * and must not be freed while the session is active. */
-	client_paramlist_entry_ref(entry);
+	++(entry->refs);
 	ctx->params = entry;
 
 	ret = gnutls_credentials_set(ctx->c.tls_session, GNUTLS_CRD_CERTIFICATE,

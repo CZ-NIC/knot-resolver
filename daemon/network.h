@@ -50,7 +50,6 @@ struct net_tcp_param {
 	uint64_t tls_handshake_timeout;
 };
 
-struct tls_session_ticket_ctx;
 struct network {
 	uv_loop_t *loop;
 	map_t endpoints;
