@@ -5,6 +5,10 @@ lua_src_daemon = [
   'zonefile.lua',
 ]
 
+config_tests += [
+  # TODO bootstrap
+]
+
 # install lua modules
 foreach mod : lua_src_daemon
   install_data(
