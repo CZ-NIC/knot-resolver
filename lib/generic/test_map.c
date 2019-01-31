@@ -19,12 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "tests/test.h"
-#include "lib/generic/lru.h"
-
-typedef lru_t(int) lru_int_t;
-#define HASH_SIZE 1024
-#define KEY_LEN(x) (strlen(x) + 1)
+#include "tests/unit/test.h"
+#include "lib/generic/map.h"
 
 /*
  * Sample dictionary
@@ -54,58 +50,69 @@ static const char *dict[] = {
 	"misencourage", "toparchia", "lurchingly", "apocatastasis"
 };
 
+/* Insertions */
 static void test_insert(void **state)
 {
-	lru_int_t *lru = *state;
+	map_t *tree = *state;
 	int dict_size = sizeof(dict) / sizeof(const char *);
 	int i;
 
 	for (i = 0; i < dict_size; i++) {
-		int *data = lru_get_new(lru, dict[i], KEY_LEN(dict[i]), NULL);
-		if (!data) {
-			continue;
-		}
-		*data = i;
-		assert_true(*lru_get_try(lru, dict[i], KEY_LEN(dict[i])) == i);
+		assert_int_equal(map_set(tree, dict[i], (void *)dict[i]), 0);
 	}
 }
 
-static void test_missing(void **state)
+/* Searching */
+static void test_get(void **state)
 {
-	lru_int_t *lru = *state;
-	const char *notin = "not in lru";
-	assert_true(lru_get_try(lru, notin, KEY_LEN(notin)) == NULL);
+	map_t *tree = *state;
+	char *in;
+	const char *notin = "not in tree";
+
+	in = malloc(strlen(dict[23])+1);
+	strcpy(in, dict[23]);
+
+	assert_true(map_get(tree, in) == dict[23]);
+	assert_true(map_get(tree, notin) == NULL);
+	assert_true(map_get(tree, "") == NULL);
+	in[strlen(in)/2] = '\0';
+	assert_true(map_get(tree, in) == NULL);
+
+	free(in);
 }
 
-static void test_eviction(void **state)
+/* Deletion */
+static void test_delete(void **state)
 {
-	lru_int_t *lru = *state;
-	char key[16];
-	for (unsigned i = 0; i < HASH_SIZE; ++i) {
-		test_randstr(key, sizeof(key));
-		int *data = lru_get_new(lru, key, sizeof(key), NULL);
-		if (!data) {
-			continue;
-		}
-		*data = i;
-		if (*lru_get_try(lru, key, sizeof(key)) != i) {
-			assert_true(0);
-		}
-	}
+	map_t *tree = *state;
+	assert_int_equal(map_del(tree, dict[91]), 0);
+	assert_false(map_contains(tree, dict[91]));
+	assert_int_equal(map_del(tree, "most likely not in tree"), 1);
+}
+
+/* Test null value existence */
+static void test_null_value(void **state)
+{
+	map_t *tree = *state;
+	char *key = "foo";
+
+	assert_int_equal(map_set(tree, key, (void *)0), 0);
+	assert_true(map_contains(tree, key));
+	assert_int_equal(map_del(tree, key), 0);
 }
 
 static void test_init(void **state)
 {
-	lru_int_t *lru;
-	lru_create(&lru, HASH_SIZE, NULL, NULL);
-	assert_non_null(lru);
-	*state = lru;
+	static map_t tree;
+	tree = map_make(NULL);
+	*state = &tree;
+	assert_non_null(*state);
 }
 
 static void test_deinit(void **state)
 {
-	lru_int_t *lru = *state;
-	lru_free(lru);
+	map_t *tree = *state;
+	map_clear(tree);
 }
 
 /* Program entry point */
@@ -114,8 +121,9 @@ int main(int argc, char **argv)
 	const UnitTest tests[] = {
 	        group_test_setup(test_init),
 	        unit_test(test_insert),
-		unit_test(test_missing),
-		unit_test(test_eviction),
+		unit_test(test_get),
+		unit_test(test_delete),
+		unit_test(test_null_value),
 	        group_test_teardown(test_deinit)
 	};
 

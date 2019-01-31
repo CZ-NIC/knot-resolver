@@ -55,6 +55,20 @@ libkres_headers = [
   'zonecut.h',
 ]
 
+unit_tests += [
+  ['array', files('generic/test_array.c')],
+  ['lru', files('generic/test_lru.c')],
+  ['map', files('generic/test_map.c')],
+  ['pack', files('generic/test_pack.c')],
+  ['queue', files('generic/test_queue.c')],
+  ['set', files('generic/test_set.c')],
+  ['trie', files('generic/test_trie.c')],
+  ['module', files('test_module.c')],
+  ['rplan', files('test_rplan.c')],
+  ['utils', files('test_utils.c')],
+  ['zonecut', files('test_zonecut.c')],
+]
+
 libkres_inc = include_directories('..')
 
 libkres_lib = library('kres',
@@ -78,7 +92,6 @@ libkres_dep = declare_dependency(
   link_with: libkres_lib
 )
 
-# TODO what dir structure does it create?
 install_headers(
   libkres_headers,
   subdir: 'libkres',

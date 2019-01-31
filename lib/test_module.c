@@ -14,7 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "tests/test.h"
+#include "tests/unit/test.h"
 #include "lib/module.h"
 
 static void test_module_params(void **state)
@@ -35,7 +35,7 @@ static void test_module_builtin(void **state)
 static void test_module_c(void **state)
 {
 	struct kr_module module;
-	assert_int_equal(kr_module_load(&module, "mock_cmodule", "tests"), 0);
+	assert_int_equal(kr_module_load(&module, "mock_cmodule", "tests/unit"), 0);
 	kr_module_unload(&module);
 }
 

@@ -19,7 +19,7 @@
 #include <dlfcn.h>
 #include <ucw/mempool.h>
 
-#include "tests/test.h"
+#include "tests/unit/test.h"
 #include "lib/cache.h"
 #include "lib/cache/cdb_lmdb.h"
 
@@ -50,7 +50,7 @@ int knot_rdataset_gather(knot_rdataset_t *dst, knot_rdata_t **src, uint16_t coun
 	if (original_knot_rdataset_gather == NULL) {
 		original_knot_rdataset_gather = dlsym(RTLD_NEXT,"knot_rdataset_gather");
 		assert_non_null (original_knot_rdataset_gather);
-	}	
+	}
 	err = original_knot_rdataset_gather(dst, src, count, mm);
 	if (err_mock != 0)
 	    err = err_mock;
