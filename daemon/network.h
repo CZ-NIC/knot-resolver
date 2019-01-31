@@ -16,11 +16,14 @@
 
 #pragma once
 
-#include <uv.h>
-#include <stdbool.h>
+#include "daemon/tls.h"
 
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
+
+#include <uv.h>
+#include <stdbool.h>
+
 
 struct engine;
 
@@ -47,12 +50,11 @@ struct net_tcp_param {
 	uint64_t tls_handshake_timeout;
 };
 
-struct tls_session_ticket_ctx;
 struct network {
 	uv_loop_t *loop;
 	map_t endpoints;
 	struct tls_credentials *tls_credentials;
-	map_t tls_client_params; /**< Use tls_client_params_*() functions. */
+	tls_client_params_t *tls_client_params; /**< Use tls_client_params_*() functions. */
 	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
 	struct net_tcp_param tcp;
 	int tcp_backlog;

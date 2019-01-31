@@ -18,6 +18,30 @@
 #include <lauxlib.h>
 #include <string.h>
 
+
+const char * lua_table_checkindices(lua_State *L, const char *keys[])
+{
+	/* Iterate over table at the top of the stack.
+	 * http://www.lua.org/manual/5.1/manual.html#lua_next */
+	for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
+		lua_pop(L, 1); /* we don't need the value */
+		/* We need to copy the key, as _tostring() confuses _next().
+		 * https://www.lua.org/manual/5.1/manual.html#lua_tolstring */
+		lua_pushvalue(L, -1);
+		const char *key = lua_tostring(L, -1);
+		if (!key)
+			return "<NON-STRING_INDEX>";
+		for (const char **k = keys; ; ++k) {
+			if (*k == NULL)
+				return key;
+			if (strcmp(*k, key) == 0)
+				break;
+		}
+	}
+	return NULL;
+}
+
+
 /* Each of these just creates the correspondingly named lua table of functions. */
 int kr_bindings_cache   (lua_State *L); /* ./cache.c   */
 int kr_bindings_event   (lua_State *L); /* ./event.c   */
