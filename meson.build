@@ -65,7 +65,18 @@ add_global_arguments(
   language: 'c',
 )
 
-unit_tests = []  # list of [test_name, files(test)]
+
+# List of tests
+# These lists are added to from subdir() and finally used in tests/*
+
+unit_tests = [
+  # [test_name, files(test)]
+]
+
+config_tests = [
+  # [name, files(test)]  # or
+  # [name, files(test), [arg1, arg2], should_fail]
+]
 
 
 # compile
