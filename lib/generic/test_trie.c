@@ -15,7 +15,7 @@
  */
 
 #include "lib/generic/trie.h"
-#include "tests/test.h"
+#include "tests/unit/test.h"
 
 static const char *dict[] = {
 	"catagmatic", "prevaricator", "statoscope", "workhand", "benzamide",
