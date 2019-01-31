@@ -23,6 +23,16 @@ lua_src = [
   'workarounds/workarounds.lua',
 ]
 
+config_tests += [
+  ['predict', files('predict/predict.test.lua')],
+  ['http', files('http/http.test.lua')],
+  # TODO http/test_tls
+  ['policy', files('policy/policy.test.lua')],
+  # TODO hints
+  ['nsid', files('nsid/nsid.test.lua')],
+  ['dns64', files('dns64/dns64.test.lua')],
+]
+
 
 subdir('bogus_log')
 # cookies module is not currently used
