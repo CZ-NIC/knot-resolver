@@ -3,6 +3,7 @@ config_tests = [
   ['cache', files('cache.test.lua')],
   ['lru', files('lru.test.lua')],
   ['tls', files('tls.test.lua')],
+  ['worker', files('worker.test.lua')],
 ]
 
 if get_option('daemon')
