@@ -14,6 +14,11 @@ kresd_src = [
 ]
 
 
+config_tests += [
+  # TODO cache
+]
+
+
 subdir('lua')
 
 
