@@ -6,7 +6,7 @@ lua_src_daemon = [
 ]
 
 config_tests += [
-  # TODO bootstrap
+  ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
 ]
 
 # install lua modules
