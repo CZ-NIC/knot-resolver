@@ -21,16 +21,16 @@ boom(trust_anchors.add_file, {'nonwriteable/root.keys', false},
 boom(trust_anchors.add_file, {'nonexist.keys', true},
      "Nonexist unmanaged trust anchor file")
 
-trust_anchors.add_file('../../../../tests/config/keyfile/root2.keys', true)
-trust_anchors.add_file('../../../../tests/config/keyfile/root1.keys', true)
+trust_anchors.add_file('root2.keys', true)
+trust_anchors.add_file('root1.keys', true)
 is(warn_msg[overriding_msg], 1, "Warning message when override trust anchors")
 
 is(trust_anchors.keysets['\0'][1].key_tag, 19036,
-   "Loaded KeyTag from ../../../../tests/config/keyfile/root1.keys")
+   "Loaded KeyTag from root1.keys")
 
 local function test_loading_from_cmdline()
 	is(trust_anchors.keysets['\0'][1].key_tag , 20326,
-	   "Loaded KeyTag from cmdline file keyfile/root2.keys")
+	   "Loaded KeyTag from cmdline file root2.keys")
 	is(warn_msg[overriding_msg], 2, "Warning message when override trust anchors")
 end
 
