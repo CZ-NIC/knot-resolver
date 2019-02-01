@@ -15,7 +15,7 @@ kresd_src = [
 
 
 config_tests += [
-  # TODO cache
+  ['cache.clear', files('cache.test/clear.test.lua')],
 ]
 
 
