@@ -49,8 +49,8 @@ if get_option('daemon')
 	'KRESD_EXEC=@0@'.format(kresd_install_path),
       ],
       suite: [
-	'config',
 	'postinstall',
+	'config',
       ],
       should_fail: conftest_should_fail,
     )
