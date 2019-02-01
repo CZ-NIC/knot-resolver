@@ -22,6 +22,6 @@ if get_option('client')
       libedit,
     ],
     install: true,
-    install_dir: 'sbin',
+    install_dir: get_option('sbindir'),
   )
 endif
