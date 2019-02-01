@@ -25,10 +25,10 @@ lua_src = [
 
 config_tests += [
   ['predict', files('predict/predict.test.lua')],
-  ['http', files('http/http.test.lua')],
-  # TODO http/test_tls
+  ['http', files('http/http.test.lua')],  # TODO organize
+  ['http.tls', files('http/test_tls/tls.test.lua')],
   ['policy', files('policy/policy.test.lua')],
-  # TODO hints
+  ['hints', files('hints/tests/hints.test.lua')],
   ['nsid', files('nsid/nsid.test.lua')],
   ['dns64', files('dns64/dns64.test.lua')],
 ]
