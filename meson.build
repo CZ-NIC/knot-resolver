@@ -4,6 +4,7 @@ project(
   license: 'GPLv3+',
   version: '3.2.1',  # TODO dev version from git
   default_options: ['c_std=c99'],  # TODO why not c11?
+  meson_version: '>=0.47.0',
 )
 
 
