@@ -205,20 +205,27 @@ int session_tasklist_del(struct session *session, struct qr_task *task)
 
 struct qr_task *session_tasklist_get_first(struct session *session)
 {
-	trie_val_t *val = trie_get_first(session->tasks, NULL, NULL);
-	return val ? (struct qr_task *) *val : NULL;
+	if (trie_weight(session->tasks) == 0)
+		return NULL;
+	/* LATER(optim.): not ideal to use heap for this. */
+	trie_it_t *it = trie_it_begin(session->tasks);
+	struct qr_task *val = *trie_it_val(it);
+	trie_it_free(it);
+	return val;
 }
 
 struct qr_task *session_tasklist_del_first(struct session *session, bool deref)
 {
-	trie_val_t val = NULL;
-	int res = trie_del_first(session->tasks, NULL, NULL, &val);
-	if (res != kr_ok()) {
-		val = NULL;
-	} else if (deref) {
+	if (trie_weight(session->tasks) == 0)
+		return NULL;
+	/* LATER(optim.): not ideal to use heap for this. */
+	trie_it_t *it = trie_it_begin(session->tasks);
+	struct qr_task *val = *trie_it_val(it);
+	trie_it_del(it);
+	trie_it_free(it);
+	if (deref)
 		worker_task_unref(val);
-	}
-	return (struct qr_task *)val;
+	return val;
 }
 struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16_t msg_id)
 {

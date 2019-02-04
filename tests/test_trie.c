@@ -105,15 +105,19 @@ static void test_queue(void **state)
 	trie_t *t = *state;
 	// remove all the elements in ascending order
 	for (int i = 0; i < dict_size; ++i) {
-		char *key;
-		uint32_t len;
-		trie_val_t *data = trie_get_first(t, &key, &len);
+		//trie_val_t *data = trie_get_first(t, &key, &len);
+		trie_it_t *it = trie_it_begin(t);
+		size_t len;
+		const char* key = trie_it_key(it, &len);
+		trie_val_t *data = trie_it_val(it);
+
 		assert_non_null(key);
 		assert_int_equal(len, KEY_LEN(key));
 		assert_non_null(data);
 		ptrdiff_t key_i = *data - NULL;
 		assert_string_equal(key, dict[key_i]);
 
+		/*
 		len = 30;
 		char key_buf[len];
 		ptrdiff_t key_i_new;
@@ -122,6 +126,9 @@ static void test_queue(void **state)
 		assert_int_equal(KEY_LEN(key_buf), len);
 		assert_int_equal(key_i, key_i_new);
 		assert_string_equal(dict[key_i], key_buf);
+		*/
+		trie_it_del(it);
+		trie_it_free(it);
 	}
 }
 
