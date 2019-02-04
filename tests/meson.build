@@ -6,7 +6,7 @@ if get_option('extra_tests')
   py3_deps = []
 
   subdir('pytests')
-  #subdir('integration')
+  subdir('integration')
 
   foreach py3_dep : py3_deps
     py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[0]))
