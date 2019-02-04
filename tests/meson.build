@@ -1,4 +1,9 @@
 subdir('config')
 subdir('unit')
-subdir('pytests')
-#subdir('integration')
+
+if get_option('extra_tests')
+  python3 = find_program('python3')
+
+  subdir('pytests')
+  #subdir('integration')
+endif
