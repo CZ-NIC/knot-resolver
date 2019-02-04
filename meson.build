@@ -22,9 +22,6 @@ luajit = dependency('luajit')
 
 # Optional dependencies
 
-## tests
-socket_wrapper = dependency('socket_wrapper', required: false)
-
 ## coverage
 lcov = find_program('lcov', required: false)
 luacov = find_program('luacov', required: false)
