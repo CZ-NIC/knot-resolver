@@ -98,7 +98,7 @@ def ping_alive(sock, msgid=None):
 
 @contextmanager
 def expect_kresd_close(rst_ok=False):
-    with pytest.raises(BrokenPipeError, message="kresd didn't close the connection"):
+    with pytest.raises(BrokenPipeError):
         try:
             time.sleep(0.2)  # give kresd time to close connection with TCP FIN
             yield
@@ -107,6 +107,7 @@ def expect_kresd_close(rst_ok=False):
                 raise BrokenPipeError
             else:
                 pytest.skip("kresd closed connection with TCP RST")
+        pytest.fail("kresd didn't close the connection")
 
 
 def make_ssl_context(insecure=False, verify_location=None, extra_options=None):
