@@ -19,7 +19,7 @@ trap finish EXIT
 cp -a "${TEST_DIR}/"* "${TMP_RUNDIR}/"
 cd "${TMP_RUNDIR}"
 
-test -x "${KRESD_EXEC}" || (echo "${KRESD_EXEC} not executable!"; exit 77)
+which kresd || (echo "kresd not executable!"; exit 77)
 trap ERR  # get actual kresd error code from now on
 
-${KRESD_EXEC} "$@"
+kresd "$@"
