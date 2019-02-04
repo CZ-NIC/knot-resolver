@@ -7,7 +7,7 @@ import dns
 import dns.rcode
 import pytest
 
-from kresd import CERTS_DIR, Forward, Kresd, make_kresd, make_port, PYTESTS_DIR
+from kresd import CERTS_DIR, Forward, Kresd, make_kresd, make_port
 import utils
 
 
@@ -29,7 +29,7 @@ def resolve_hint(sock, qname):
 
 
 class Proxy(ContextDecorator):
-    PATH = ''
+    EXECUTABLE = ''
 
     def __init__(
                 self,
@@ -59,16 +59,15 @@ class Proxy(ContextDecorator):
         return args
 
     def __enter__(self):
-        if not os.path.exists(self.PATH):
-            pytest.skip("proxy executable '{}' not found (did you compile it?)".format(self.PATH))
-
-        cwd, cmd = os.path.split(self.PATH)
-        cmd = './' + cmd
-        args = [cmd] + self.get_args()
+        args = [self.EXECUTABLE] + self.get_args()
         print(' '.join(args))
 
-        self.proxy = subprocess.Popen(
-            args, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            self.proxy = subprocess.Popen(
+                args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError:
+            pytest.skip("proxy '{}' failed to run (did you compile it?)"
+                        .format(self.EXECUTABLE))
 
         return self
 
@@ -79,8 +78,7 @@ class Proxy(ContextDecorator):
 
 
 class TLSProxy(Proxy):
-    PATH = os.environ.get('TLSPROXY_EXEC', os.path.join(
-        PYTESTS_DIR, '../../build/tests/pytests/tlsproxy'))
+    EXECUTABLE = 'tlsproxy'
 
     def __init__(
                 self,
