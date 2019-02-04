@@ -19,3 +19,8 @@ lua_ac_lib = library(
   install: true,
   install_dir: modules_dir,
 )
+
+integr_tests += [
+  ['policy.noipv6', join_paths(meson.current_source_dir(), 'noipv6.test.integr')],
+  ['policy.noipvx', join_paths(meson.current_source_dir(), 'noipvx.test.integr')],
+]
