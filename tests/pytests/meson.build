@@ -3,6 +3,8 @@ tlsproxy_src = [
   'proxy/tls-proxy.c',
 ]
 
+# compile tlsproxy
+# TODO fix or silence compilation warnings
 tlsproxy = executable(
   'tlsproxy',
   tlsproxy_src,
@@ -11,11 +13,24 @@ tlsproxy = executable(
     libuv,
     gnutls,
   ],
-  build_by_default: false,
 )
 
+# pytests dependencies
+pytest = find_program('pytest')
 
-pytest = find_program('pytest', required: false)
+# python 3 dependencies
+pytest_py3_deps = [
+  ['jinja2', 'jinja2'],
+  ['dnspython', 'dns'],
+  ['pytest-html', 'pytest_html'],
+  ['pytest-xdist', 'xdist'],
+]
+foreach py3_dep : pytest_py3_deps
+  py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[1]))
+  if py3_import.returncode() != 0
+    error('missing pytests dependency: python3 @0@'.format(py3_dep[0]))
+  endif
+endforeach
 
 pytests_env = environment()
 pytests_env.prepend('PATH', kresd_install_path)
