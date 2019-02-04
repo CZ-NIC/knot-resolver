@@ -34,6 +34,7 @@ config_tests += [
 ]
 
 
+# TODO cleanup modules (lua_src)
 subdir('bogus_log')
 # cookies module is not currently used
 subdir('daf')
@@ -44,6 +45,7 @@ subdir('http')
 subdir('nsid')
 subdir('policy')
 subdir('stats')
+subdir('view')
 
 
 # install lua modules
