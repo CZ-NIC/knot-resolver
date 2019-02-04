@@ -1,5 +1,5 @@
-[submodule "tests/deckard"]
-	path = tests/deckard
+[submodule "tests/integration/deckard"]
+	path = tests/integration/deckard
 	url = https://gitlab.labs.nic.cz/knot/deckard.git
 [submodule "modules/policy/lua-aho-corasick"]
 	path = modules/policy/lua-aho-corasick
