@@ -24,6 +24,13 @@ config_tests += [
 
 
 run_configtest = find_program('../../scripts/test-config.sh')
+
+# environment variables for test
+conftest_env = environment()
+conftest_env.prepend('PATH', kresd_install_path)
+conftest_env.set('KRESD_NO_LISTEN', '1')
+conftest_env.set('SOURCE_PATH', meson.current_source_dir())
+
 foreach config_test : config_tests
   # kresd arguments
   conftest_args = [
@@ -37,16 +44,13 @@ foreach config_test : config_tests
   # kresd return code check
   conftest_should_fail = config_test.length() >= 4 ? config_test[3] : false
 
+  conftest_env.set(
+    'TEST_FILE', '@0@/@1@'.format(meson.source_root(), config_test[1][0]))
   test(
     'config.' + config_test[0],
     run_configtest,
     args: conftest_args,
-    env: [
-      'KRESD_NO_LISTEN=1',
-      'SOURCE_PATH=@0@'.format(meson.current_source_dir()),
-      'TEST_FILE=@0@/@1@'.format(meson.source_root(), config_test[1][0]),
-      'KRESD_EXEC=@0@'.format(kresd_install_path),
-    ],
+    env: conftest_env,
     suite: [
       'postinstall',
       'config',
