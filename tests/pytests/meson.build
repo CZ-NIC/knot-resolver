@@ -19,7 +19,8 @@ pytest = find_program('pytest', required: false)
 test(
   'pytests.basic',
   pytest,
-  is_parallel: false
+  is_parallel: false,
+  timeout: 180,
   args: [
     '--html', 'pytests.basic.html',
     '--self-contained-html',
@@ -35,4 +36,5 @@ test(
     'postinstall',
     'pytests',
   ],
+  depends: tlsproxy,
 )
