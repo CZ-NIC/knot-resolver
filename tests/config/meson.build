@@ -23,36 +23,34 @@ config_tests += [
 ]
 
 
-if get_option('daemon')
-  run_configtest = find_program('../../scripts/test-config.sh')
-  foreach config_test : config_tests
-    # kresd arguments
-    conftest_args = [
-      '-c', files('test.cfg'),
-      '-f', '1',
-    ]
-    if config_test.length() >= 3
-      conftest_args += config_test[2]
-    endif
+run_configtest = find_program('../../scripts/test-config.sh')
+foreach config_test : config_tests
+  # kresd arguments
+  conftest_args = [
+    '-c', files('test.cfg'),
+    '-f', '1',
+  ]
+  if config_test.length() >= 3
+    conftest_args += config_test[2]
+  endif
 
-    # kresd return code check
-    conftest_should_fail = config_test.length() >= 4 ? config_test[3] : false
+  # kresd return code check
+  conftest_should_fail = config_test.length() >= 4 ? config_test[3] : false
 
-    test(
-      'config.' + config_test[0],
-      run_configtest,
-      args: conftest_args,
-      env: [
-	'KRESD_NO_LISTEN=1',
-	'SOURCE_PATH=@0@'.format(meson.current_source_dir()),
-	'TEST_FILE=@0@/@1@'.format(meson.source_root(), config_test[1][0]),
-	'KRESD_EXEC=@0@'.format(kresd_install_path),
-      ],
-      suite: [
-	'postinstall',
-	'config',
-      ],
-      should_fail: conftest_should_fail,
-    )
-  endforeach
-endif
+  test(
+    'config.' + config_test[0],
+    run_configtest,
+    args: conftest_args,
+    env: [
+      'KRESD_NO_LISTEN=1',
+      'SOURCE_PATH=@0@'.format(meson.current_source_dir()),
+      'TEST_FILE=@0@/@1@'.format(meson.source_root(), config_test[1][0]),
+      'KRESD_EXEC=@0@'.format(kresd_install_path),
+    ],
+    suite: [
+      'postinstall',
+      'config',
+    ],
+    should_fail: conftest_should_fail,
+  )
+endforeach
