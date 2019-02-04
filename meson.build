@@ -76,6 +76,10 @@ config_tests = [
   # [name, files(test), [arg1, arg2], should_fail]
 ]
 
+integr_tests = [
+  # [name, test_dir_relative_to_src_root]
+]
+
 
 # compile
 subdir('contrib')
