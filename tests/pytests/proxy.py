@@ -79,7 +79,8 @@ class Proxy(ContextDecorator):
 
 
 class TLSProxy(Proxy):
-    PATH = os.path.join(PYTESTS_DIR, 'proxy', 'tlsproxy')
+    PATH = os.environ.get('TLSPROXY_EXEC', os.path.join(
+        PYTESTS_DIR, '../../build/tests/pytests/tlsproxy'))
 
     def __init__(
                 self,
