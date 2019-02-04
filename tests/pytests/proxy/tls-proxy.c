@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <gnutls/gnutls.h>
 #include <uv.h>
-#include "array.h"
+#include "lib/generic/array.h"
 #include "tls-proxy.h"
 
 #define TLS_MAX_SEND_RETRIES 100
@@ -382,7 +382,7 @@ static void accept_connection_from_client(uv_stream_t *server)
 		return;
 	}
 	memcpy(&upstream->addr, &proxy->upstream_addr, sizeof(struct sockaddr_storage));
-	
+
 	struct tls_ctx *tls = calloc(1, sizeof(struct tls_ctx));
 	tls->handshake_state = TLS_HS_NOT_STARTED;
 
@@ -922,7 +922,7 @@ struct tls_proxy_ctx *tls_proxy_allocate()
 }
 
 int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
-{	
+{
 	const char *server_addr = a->local_addr;
 	int server_port = a->local_port;
 	const char *upstream_addr = a->upstream;
@@ -952,7 +952,7 @@ int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
 	proxy->conn_sequence = 0;
 
 	proxy->loop->data = proxy;
-	
+
 	int err = 0;
 	if (gnutls_references == 0) {
 		err = gnutls_global_init();
@@ -963,7 +963,7 @@ int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
 		}
 	}
 	gnutls_references += 1;
-	
+
 	err = gnutls_certificate_allocate_credentials(&proxy->tls_credentials);
 	if (err != GNUTLS_E_SUCCESS) {
 		fprintf(stdout, "[proxy] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
@@ -1016,7 +1016,7 @@ void tls_proxy_free(struct tls_proxy_ctx *proxy)
 	gnutls_certificate_free_credentials(proxy->tls_credentials);
         gnutls_priority_deinit(proxy->tls_priority_cache);
 	free(proxy);
-	
+
 	gnutls_references -= 1;
 	if (gnutls_references == 0) {
 		gnutls_global_deinit();
@@ -1024,7 +1024,7 @@ void tls_proxy_free(struct tls_proxy_ctx *proxy)
 }
 
 int tls_proxy_start_listen(struct tls_proxy_ctx *proxy)
-{	
+{
 	uv_tcp_bind(&proxy->server.handle, (const struct sockaddr*)&proxy->server.addr, 0);
 	int ret = uv_listen((uv_stream_t*)&proxy->server.handle, 128, on_client_connection);
 	return ret;
