@@ -17,6 +17,10 @@ tlsproxy = executable(
 
 pytest = find_program('pytest', required: false)
 
+pytests_env = environment()
+pytests_env.prepend('PATH', kresd_install_path)
+pytests_env.prepend('PATH', meson.current_build_dir())  # for tlsproxy
+
 test(
   'pytests.basic',
   pytest,
@@ -27,10 +31,7 @@ test(
     '-n', '24',
     meson.current_source_dir(),
   ],
-  env: [
-    'KRESD_EXEC=@0@'.format(kresd_install_path),
-    'TLSPROXY_EXEC=@0@'.format(join_paths(meson.current_build_dir(), 'tlsproxy')),
-  ],
+  env: pytests_env,
   suite: [
     'postinstall',
     'pytests',
@@ -48,9 +49,7 @@ test(
     '--capture=no',
     '@0@'.format(join_paths(meson.current_source_dir(), 'conn_flood.py')),
   ],
-  env: [
-    'KRESD_EXEC=@0@'.format(kresd_install_path),
-  ],
+  env: pytests_env,
   suite: [
     'postinstall',
     'pytests',
