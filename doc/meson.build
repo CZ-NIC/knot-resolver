@@ -2,7 +2,15 @@ if get_option('doc')
   # doc dependencies
   doxygen = find_program('doxygen')
   sphinx_build = find_program('sphinx-build')
-  # python-breathe is also required, but not auto detected because python 2/3
+
+  python_breathe = run_command('python3', '-c', 'import breathe')
+  if python_breathe.returncode() != 0
+    # some distros might use python2 sphinx
+    python_breathe = run_command('python2', '-c', 'import breathe')
+    if python_breathe.returncode() != 0
+      error('missing doc dependency: python breathe')
+    endif
+  endif
 
   # create doxygen in source dir
   doc_doxyxml = custom_target(
