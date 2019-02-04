@@ -32,7 +32,7 @@
  * - key lengths are limited by 2^32-1 ATM
  *
  * XXX EDITORS: trie.{h,c} are synced from
- * https://gitlab.labs.nic.cz/knot/knot-dns src/contrib/qp-trie tree 5a07850389039
+ * https://gitlab.labs.nic.cz/knot/knot-dns src/contrib/qp-trie tree 0193b76f03
  * only with tiny adjustments, mostly #includes and KR_EXPORT.
  */
 

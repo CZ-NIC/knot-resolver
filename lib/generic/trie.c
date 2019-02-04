@@ -538,7 +538,7 @@ static void ns_init(nstack_t *ns, trie_t *tbl)
 static inline trie_t * ns_gettrie(nstack_t *ns)
 {
 	assert(ns && ns->stack && ns->stack[0]);
-	return (struct trie *)&ns->stack[0];
+	return (struct trie *)ns->stack[0];
 }
 
 /*! \brief Free inside of the stack, i.e. not the passed pointer itself. */
