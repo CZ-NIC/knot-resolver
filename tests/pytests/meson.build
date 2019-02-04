@@ -19,18 +19,13 @@ tlsproxy = executable(
 pytest = find_program('pytest')
 
 # python 3 dependencies
-pytest_py3_deps = [
-  ['jinja2', 'jinja2'],
-  ['dnspython', 'dns'],
-  ['pytest-html', 'pytest_html'],
-  ['pytest-xdist', 'xdist'],
+py3_deps += [
+  ['jinja2', 'jinja2 (for pytests)'],
+  ['dns', 'dnspython (for pytests)'],
+  ['pytest', 'pytest (for pytests)'],
+  ['pytest_html', 'pytest-html (for pytests)'],
+  ['xdist', 'pytest-xdist (for pytests)'],
 ]
-foreach py3_dep : pytest_py3_deps
-  py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[1]))
-  if py3_import.returncode() != 0
-    error('missing pytests dependency: python3 @0@'.format(py3_dep[0]))
-  endif
-endforeach
 
 pytests_env = environment()
 pytests_env.prepend('PATH', kresd_install_path)
