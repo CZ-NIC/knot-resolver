@@ -16,11 +16,10 @@ tlsproxy = executable(
 
 
 pytest = find_program('pytest', required: false)
+
 test(
   'pytests.basic',
   pytest,
-  is_parallel: false,
-  timeout: 180,
   args: [
     '--html', 'pytests.basic.html',
     '--self-contained-html',
@@ -36,5 +35,26 @@ test(
     'postinstall',
     'pytests',
   ],
+  is_parallel: false,
+  timeout: 180,
   depends: tlsproxy,
+)
+
+test(
+  'pytests.extended',
+  pytest,
+  args: [
+    '-ra',
+    '--capture=no',
+    '@0@'.format(join_paths(meson.current_source_dir(), 'conn_flood.py')),
+  ],
+  env: [
+    'KRESD_EXEC=@0@'.format(kresd_install_path),
+  ],
+  suite: [
+    'postinstall',
+    'pytests',
+  ],
+  is_parallel: false,
+  timeout: 240,
 )
