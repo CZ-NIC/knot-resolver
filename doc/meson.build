@@ -1,7 +1,7 @@
 # documentation
 
 if get_option('doc')  # doxygen + html docs
-  # doc dependencies
+  message('--- doc dependencies ---')
   doxygen = find_program('doxygen')
   sphinx_build = find_program('sphinx-build')
 
@@ -13,6 +13,7 @@ if get_option('doc')  # doxygen + html docs
       error('missing doc dependency: python breathe')
     endif
   endif
+  message('------------------------')
 
   # create doxygen in source dir
   doc_doxyxml = custom_target(
