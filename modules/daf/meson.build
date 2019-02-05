@@ -1,3 +1,9 @@
+# LUA module: daf
+
+lua_src += [
+  files('daf.lua'),
+]
+
 # install daf.js
 install_data(
   'daf.js',

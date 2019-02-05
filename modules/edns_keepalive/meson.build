@@ -1,3 +1,5 @@
+# C module: edns_keepalive
+
 edns_keepalive_src = [
   'edns_keepalive.c',
 ]
