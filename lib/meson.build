@@ -1,3 +1,5 @@
+# libkres
+
 libkres_src = [
   'cache/api.c',
   'cache/cdb_lmdb.c',

@@ -1,3 +1,5 @@
+# tests: integration (using deckard)
+
 # deckard dependencies
 cmake = find_program('cmake')  # for libswrapper
 git = find_program('git')

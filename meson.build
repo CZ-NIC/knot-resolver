@@ -3,7 +3,7 @@ project(
   ['c', 'cpp'],
   license: 'GPLv3+',
   version: '3.2.1',  # TODO dev version from git
-  default_options: ['c_std=c99'],  # TODO why not c11?
+  default_options: ['c_std=c99'],
   meson_version: '>=0.47.0',
 )
 
@@ -20,11 +20,9 @@ gnutls = dependency('gnutls')
 luajit = dependency('luajit')
 
 
-# Optional dependencies
-
-## coverage
-lcov = find_program('lcov', required: false)
-luacov = find_program('luacov', required: false)
+# TODO coverage
+#lcov = find_program('lcov', required: false)
+#luacov = find_program('luacov', required: false)
 
 
 # Variables
@@ -37,7 +35,6 @@ if get_option('modules_dir') == ''
 else
   modules_dir = get_option('modules_dir')
 endif
-message('modules_dir: ' + modules_dir)
 
 data_dir = join_paths(get_option('prefix'), get_option('datadir'), 'knot-resolver')
 doc_dir = join_paths(get_option('prefix'), get_option('datadir'), 'doc', 'knot-resolver')
@@ -63,6 +60,10 @@ add_global_arguments(
   language: 'c',
 )
 
+# List of lua modules to be installed to modules_dir
+lua_src = [
+  # files(module.lua)
+]
 
 # List of tests
 # These lists are added to from subdir() and finally used in tests/*
@@ -81,19 +82,28 @@ integr_tests = [
 ]
 
 
+# NOTE order of subdir includes is significant
 # compile
 subdir('contrib')
 subdir('lib')
-subdir('client')
 subdir('daemon')
 subdir('modules')
+
+if get_option('client')
+  subdir('client')
+endif
 
 
 # tests
 subdir('tests')
 
 
-# documentation, install, tests
+# documentation, examples
 # TODO install man
 subdir('doc')
 subdir('etc')
+
+
+# TODO message summary?
+message('modules_dir: ' + modules_dir)
+message(kresd_install_path)

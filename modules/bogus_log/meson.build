@@ -1,3 +1,5 @@
+# C module: bogus_log
+
 bogus_log_src = [
   'bogus_log.c',
 ]
