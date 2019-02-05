@@ -1,3 +1,5 @@
+# C module: hints
+
 hints_src = [
   'hints.c',
 ]
