@@ -1,4 +1,6 @@
-if get_option('doc')
+# documentation
+
+if get_option('doc')  # doxygen + html docs
   # doc dependencies
   doxygen = find_program('doxygen')
   sphinx_build = find_program('sphinx-build')

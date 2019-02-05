@@ -1,3 +1,5 @@
+# C module: nsid
+
 nsid_src = [
   'nsid.c',
 ]
