@@ -1,3 +1,5 @@
+# etc
+
 example_configs = [
   'config.cluster',
   'config.docker',
