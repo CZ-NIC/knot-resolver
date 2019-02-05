@@ -1,3 +1,5 @@
+# daemon
+
 kresd_src = [
   'bindings.c',
   'engine.c',
@@ -13,11 +15,9 @@ kresd_src = [
   'zimport.c',
 ]
 
-
 config_tests += [
   ['cache.clear', files('cache.test/clear.test.lua')],
 ]
-
 
 subdir('lua')
 
@@ -35,7 +35,7 @@ luajit_has_setfuncs = run_command(
 
 # daemon CFLAGS
 c_args = [
-  '-fPIE',  # TODO pie=true since 0.49.0
+  '-fPIE',  # NOTE this triggers warning, but is needed for compatibility with meson 0.47.0
   '-DROOTHINTS="@0@/root.hints"'.format(config.get('etc_dir')),
   '-DLIBEXT="@0@"'.format(lib_suffix),
   '-Dlibzscanner_SONAME="@0@"'.format(libzscanner.get_pkgconfig_variable('soname')),
@@ -43,13 +43,8 @@ c_args = [
   '-DLUA_HAS_SETFUNCS=@0@'.format(luajit_has_setfuncs),
 ]
 
-# TODO are these LDFLAGS needed?
-#link_args = [
-#  '-ldl',
-#  '-lm',
-#]
 
-
+# TODO test build on osx
 if host_machine.system() == 'darwin'
   # luajit workaround for OS X  https://luajit.org/install.html#embed
   c_args += ['-pagezero_size', '10000', '-image_base', '100000000']
@@ -57,8 +52,7 @@ endif
 
 
 if get_option('daemon')
-  # optional dependencies
-  ## systemd socket activation
+  # optional systemd socket activation
   libsystemd = dependency('libsystemd', version: '>=227', required: false)
   if libsystemd.found()
     c_args += ['-DHAS_SYSTEMD']
@@ -85,7 +79,6 @@ if get_option('daemon')
     install_dir: get_option('sbindir'),
   )
 
-  kresd_install_path = join_paths(
+  kresd_install_path = join_paths(  # path used in tests
     get_option('prefix'), get_option('sbindir'))
-  message(kresd_install_path)
 endif

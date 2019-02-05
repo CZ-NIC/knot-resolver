@@ -1,3 +1,5 @@
+# C module: stats
+
 stats_src = [
   'stats.c',
 ]
