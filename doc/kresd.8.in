@@ -1,15 +1,15 @@
-.TH "kresd" "8" "@DATE@" "CZ.NIC" "Knot Resolver @VERSION@"
+.TH "kresd" "8" "@date@" "CZ.NIC" "Knot Resolver @version@"
 .\"
 .\" kresd.8 -- kresd daemon manpage
 .\"
-.\" Copyright (c) 2016, CZ.NIC. All rights reserved.
+.\" Copyright (c) 2019, CZ.NIC. All rights reserved.
 .\"
 .\" See COPYING for the license.
 .\"
 .\"
 .SH "NAME"
 .B kresd
-\- Knot @VERSION@ full caching resolver.
+\- full caching Knot Resolver @version@.
 .SH "SYNOPSIS"
 .B kresd
 .RB [ \-a | \-\-addr
@@ -139,7 +139,7 @@ and is compatible with Unbound and BIND 9 root key files.
 Default: "@keyfile_default@" (can be empty if your distribution did not provide one)
 .TP
 .B \-m\fI path\fR, \fB\-\-moduledir=\fI<path>
-Override the directory that is searched for modules.  Default: @MODULEDIR@
+Override the directory that is searched for modules.  Default: @modules_dir@
 .TP
 .B \-f\fI N\fR, \fB\-\-forks=\fI<N>
 With this option, the daemon is started in non-interactive mode and instead creates a
@@ -165,8 +165,7 @@ Show short commandline option help.
 .B \-V
 Show the version.
 .SH "SEE ALSO"
-\fIkresd.systemd(7)\fR,
-\fIhttps://knot-resolver.readthedocs.io\fR
+@man_seealso_systemd@@man_seealso_htmldoc@\fIhttps://knot-resolver.readthedocs.io/en/@doc_version@/\fR
 .SH "AUTHORS"
 .B kresd
 developers are mentioned in the AUTHORS file in the distribution.
