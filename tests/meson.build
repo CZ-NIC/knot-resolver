@@ -1,7 +1,16 @@
+# tests
+
+message('--- unit test dependencies ---')
+cmocka = dependency('cmocka', required: false)
+if cmocka.found()
+  subdir('unit')
+endif
+message('------------------------------')
+
 subdir('config')
-subdir('unit')
 
 if get_option('extra_tests')
+  message('--- extra_tests dependencies ---')
   python3 = find_program('python3')
   py3_deps = []
 
@@ -14,5 +23,6 @@ if get_option('extra_tests')
       error('missing python3 dependency: @0@'.format(py3_dep[1]))
     endif
   endforeach
+  message('--------------------------------')
 
 endif

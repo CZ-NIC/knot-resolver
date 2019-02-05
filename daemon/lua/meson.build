@@ -23,14 +23,16 @@ configure_file(
 
 # embed lua to daemon
 if get_option('daemon')
-  # dependencies
+  message('--- required kresd dependencies ---')
   xxd = find_program('xxd', required: false)
   if not xxd.found()
     hexdump = find_program('hexdump')
   endif
+  embed_lua = find_program('../../scripts/embed-lua.sh')
+  message('--------------------------------------')
 
   embed_lua = generator(
-    find_program('../../scripts/embed-lua.sh'),
+    embed_lua,
     arguments: ['@INPUT@'],
     output: '@BASENAME@.inc',
     capture: true,
