@@ -52,7 +52,7 @@ message('--- optional kresd dependencies ---')
 libsystemd = dependency('libsystemd', version: '>=227', required: false)
 if libsystemd.found()
   c_args += ['-DHAS_SYSTEMD']
-  config.set('man_seealso_systemd', '\fIkresd.systemd(7)\fR,')
+  config.set('man_seealso_systemd', '\\fIkresd.systemd(7)\\fR,')
 endif
 message('-----------------------------------')
 
