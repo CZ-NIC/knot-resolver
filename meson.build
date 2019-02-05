@@ -2,7 +2,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '3.2.1',  # TODO dev version from git
+  version: '3.2.1',
   default_options: ['c_std=c99'],
   meson_version: '>=0.47.0',
 )
@@ -42,9 +42,18 @@ etc_dir = join_paths(get_option('prefix'), get_option('sysconfdir'), 'knot-resol
 
 config = configuration_data()
 config.set('keyfile_default', get_option('keyfile_default'))
+config.set('modules_dir', etc_dir)
 config.set('etc_dir', etc_dir)
+config.set('man_seealso_systemd', '')
+config.set('date', run_command('scripts/get-date.sh', check: true).stdout().strip())
+config.set('version', run_command(
+  'scripts/get-version.sh', meson.project_version(), check: true).stdout().strip())
+if meson.project_version() == config.get('version')
+  config.set('doc_version', 'v@0@'.format(config.get('version')))
+else
+  config.set('doc_version', 'latest')
+endif
 
-# TODO @DATE@. @VERSION@, ...
 
 add_global_arguments(
   '-D_GNU_SOURCE',
@@ -107,3 +116,5 @@ subdir('etc')
 # TODO message summary?
 message('modules_dir: ' + modules_dir)
 message(kresd_install_path)
+message('version: @0@'.format(config.get('version')))
+message('date: @0@'.format(config.get('date')))
