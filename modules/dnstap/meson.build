@@ -5,15 +5,15 @@ dnstap_src = [
 ]
 
 ## dnstap dependencies
+message('--- dnstap module dependencies ---')
 libprotobuf_c = dependency('libprotobuf-c', version: '>=1', required: false)
 libfstrm = dependency('libfstrm', version: '>=0.2', required: false)
 protoc_c = find_program('protoc-c', required: false)
+message('----------------------------------')
 
 
 # build dnstap if deps are found
-if not libprotobuf_c.found() or not libfstrm.found() or not protoc_c.found()
-  message('dnstap module: skipping build')
-else
+if libprotobuf_c.found() and libfstrm.found() and protoc_c.found()
   # generate protobuf-c sources using protoc-c
   dnstap_pb = custom_target(
     'dnstap_pb',
