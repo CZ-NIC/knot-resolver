@@ -1,4 +1,4 @@
-# Unit tests
+# tests: unit
 
 # dependency
 cmocka = dependency('cmocka', required: false)
@@ -24,7 +24,7 @@ if cmocka.found()
   # executables with tests
   foreach unit_test : unit_tests
     exec_test = executable(
-      unit_test[0],
+      'unit.' + unit_test[0],
       unit_test[1],
       dependencies: [
 	contrib_dep,
