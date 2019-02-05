@@ -1,3 +1,5 @@
+# tests: pytests
+
 tlsproxy_src = [
   'proxy/tlsproxy.c',
   'proxy/tls-proxy.c',
@@ -15,9 +17,6 @@ tlsproxy = executable(
   ],
 )
 
-# pytests dependencies
-pytest = find_program('pytest')
-
 # python 3 dependencies
 py3_deps += [
   ['jinja2', 'jinja2 (for pytests)'],
@@ -33,8 +32,9 @@ pytests_env.prepend('PATH', meson.current_build_dir())  # for tlsproxy
 
 test(
   'pytests.basic',
-  pytest,
+  python3,
   args: [
+    '-m', 'pytest',
     '--html', 'pytests.basic.html',
     '--self-contained-html',
     '-d',
@@ -53,8 +53,9 @@ test(
 
 test(
   'pytests.extended',
-  pytest,
+  python3,
   args: [
+    '-m', 'pytest',
     '-ra',
     '--capture=no',
     '@0@'.format(join_paths(meson.current_source_dir(), 'conn_flood.py')),
