@@ -1,3 +1,5 @@
+# contrib
+
 contrib_src = [
   'ccan/asprintf/asprintf.c',
   'ccan/ilog/ilog.c',
@@ -15,7 +17,7 @@ contrib_lib = static_library(
   'contrib',
   contrib_src,
   include_directories: contrib_inc,
-  dependencies: libknot, # errcode.h
+  dependencies: libknot,
 )
 
 contrib_dep = declare_dependency(

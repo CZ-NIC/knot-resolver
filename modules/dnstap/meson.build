@@ -1,3 +1,5 @@
+# C module: dnstap
+
 dnstap_src = [
   'dnstap.c',
 ]
