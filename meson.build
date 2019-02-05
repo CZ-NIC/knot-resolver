@@ -8,8 +8,7 @@ project(
 )
 
 
-# Project-wide dependencies
-
+message('--- required dependencies ---')
 knot_version = '>=2.7.6'
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
@@ -18,6 +17,7 @@ libuv = dependency('libuv', version: '>=1.7')
 lmdb = dependency('lmdb')
 gnutls = dependency('gnutls')
 luajit = dependency('luajit')
+message('------------------------------')
 
 
 # TODO coverage
@@ -65,7 +65,7 @@ lua_src = [
   # files(module.lua)
 ]
 
-# List of tests
+# Lists of tests
 # These lists are added to from subdir() and finally used in tests/*
 
 unit_tests = [
