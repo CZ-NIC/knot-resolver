@@ -19,8 +19,6 @@ config_tests += [
   ['cache.clear', files('cache.test/clear.test.lua')],
 ]
 
-subdir('lua')
-
 
 lib_suffix = '.so'
 # TODO seek&destroy LIBEXT
@@ -32,7 +30,6 @@ luajit_has_setfuncs = run_command(
   'pkg-config', ['luajit', '--atleast-version', '2.1.0-beta3']
   ).returncode() == 0 ? '1' : '0'
 
-
 # daemon CFLAGS
 c_args = [
   '-fPIE',  # NOTE this triggers warning, but is needed for compatibility with meson 0.47.0
@@ -43,7 +40,6 @@ c_args = [
   '-DLUA_HAS_SETFUNCS=@0@'.format(luajit_has_setfuncs),
 ]
 
-
 # TODO test build on osx
 if host_machine.system() == 'darwin'
   # luajit workaround for OS X  https://luajit.org/install.html#embed
@@ -51,13 +47,20 @@ if host_machine.system() == 'darwin'
 endif
 
 
-if get_option('daemon')
-  # optional systemd socket activation
-  libsystemd = dependency('libsystemd', version: '>=227', required: false)
-  if libsystemd.found()
-    c_args += ['-DHAS_SYSTEMD']
-  endif
+# optional systemd socket activation
+message('--- optional kresd dependencies ---')
+libsystemd = dependency('libsystemd', version: '>=227', required: false)
+if libsystemd.found()
+  c_args += ['-DHAS_SYSTEMD']
+  config.set('man_seealso_systemd', '\fIkresd.systemd(7)\fR,')
+endif
+message('-----------------------------------')
 
+
+subdir('lua')
+
+
+if get_option('daemon')
   # build
   kresd = executable(
     'kresd',
