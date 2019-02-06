@@ -9,11 +9,12 @@ modules = {
 }
 
 -- See kresd.systemd(7) about configuring network interfaces when using systemd
--- Listen on localhost (default)
--- net = { '127.0.0.1', '::1' }
 
--- Enable DNSSEC validation
-trust_anchors.file = '/etc/knot-resolver/root.keys'
+-- To disable DNSSEC validation, uncomment the following line (not recommended)
+-- trust_anchors.keyfile_default = nil
+
+-- Auto-manage DNSSEC trust anchors (RFC 5011)
+trust_anchors.file = '@etc_dir@/root.keys'
 
 -- Cache size
 cache.size = 100 * MB
