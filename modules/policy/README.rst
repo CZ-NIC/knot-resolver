@@ -227,10 +227,11 @@ Most properties (actions, filters) are described above.
   Like suffix match, but you can also provide a common suffix of all matches for faster processing (nil otherwise).
   This function is faster for small suffix tables (in the order of "hundreds").
 
-.. function:: policy.rpz(action, path)
+.. function:: policy.rpz(action, path, watch)
 
   :param action: the default action for match in the zone; typically you want ``policy.DENY``
   :param path: path to zone file | database
+  :param watch: boolean, if not false, the file will be reparsed and the ruleset reloaded on file change
 
   Enforce RPZ_ rules. This can be used in conjunction with published blocklist feeds.
   The RPZ_ operation is well described in this `Jan-Piet Mens's post`_,

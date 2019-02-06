@@ -450,17 +450,61 @@ local function rpz_parse(action, path)
 		rules[name] = action_map[name_action]
 		-- Warn when NYI
 		if #name > 1 and not action_map[name_action] then
-			print(string.format('[ rpz ] %s:%d: unsupported policy action', path, tonumber(parser.line_counter)))
+			log('[poli] RPZ %s:%d: unsupported policy action', path, tonumber(parser.line_counter))
 		end
 	end
+	collectgarbage()
 	return rules
 end
 
+-- Split path into dirname and basename (like the shell utilities)
+local function get_dir_and_file(path)
+	local dir, file = string.match(path, "(.*)/([^/]+)")
+
+	-- If regex doesn't match then path must be the file directly (i.e. doesn't contain '/')
+	-- This assumes that the file exists (rpz_parse() would fail if it doesn't)
+	if not dir and not file then
+		dir = '.'
+		file = path
+	end
+
+	return dir, file
+end
+
 -- RPZ policy set
--- Create RPZ from zone file
-function policy.rpz(action, path)
+-- Create RPZ from zone file and optionally watch the file for changes
+function policy.rpz(action, path, watch)
 	local rules = rpz_parse(action, path)
-	collectgarbage()
+
+	if watch or true then
+		local has_notify, notify  = pcall(require, 'cqueues.notify')
+		if has_notify then
+			local bit = require('bit')
+
+			local dir, file = get_dir_and_file(path)
+			local watcher = notify.opendir(dir)
+			watcher:add(file, bit.bxor(notify.CREATE, notify.MODIFY))
+
+			worker.coroutine(function ()
+				for _, name in watcher:changes() do
+					-- Limit to changes on file we're interested in
+					-- Watcher will also fire for changes to the directory itself
+					if name == file then
+						-- If the file changes then reparse and replace the existing ruleset
+						if verbose() then
+							log('[poli] RPZ reloading: ' .. name)
+						end
+						rules = rpz_parse(action, path)
+					end
+				end
+			end)
+		elseif watch then -- explicitly requested and failed
+			error('[poli] lua-cqueues required to watch and reload RPZ file')
+		elseif verbose() then
+			log('[poli] lua-cqueues required to watch and reload RPZ file, continuing without watching')
+		end
+	end
+
 	return function(_, query)
 		local label = query:name()
 		local rule = rules[label]
