@@ -24,6 +24,8 @@ message('------------------------------')
 #lcov = find_program('lcov', required: false)
 #luacov = find_program('luacov', required: false)
 
+# TODO lint
+
 
 # Variables
 
@@ -45,14 +47,8 @@ config.set('keyfile_default', get_option('keyfile_default'))
 config.set('modules_dir', etc_dir)
 config.set('etc_dir', etc_dir)
 config.set('man_seealso_systemd', '')
+config.set('version', meson.project_version())
 config.set('date', run_command('scripts/get-date.sh', check: true).stdout().strip())
-config.set('version', run_command(
-  'scripts/get-version.sh', meson.project_version(), check: true).stdout().strip())
-if meson.project_version() == config.get('version')
-  config.set('doc_version', 'v@0@'.format(config.get('version')))
-else
-  config.set('doc_version', 'latest')
-endif
 
 
 add_global_arguments(
@@ -89,6 +85,20 @@ config_tests = [
 integr_tests = [
   # [name, test_dir_relative_to_src_root]
 ]
+
+
+# NOTE "dist" target is explicitly not supported for two reasons
+#   1) we use meson test to run integration / postinstall tests
+#   2) we want custom version number, not the hard-coded string in project()
+# Use "archive" target instead
+run_target(
+  'archive',
+  output: 'archive',
+  command: [
+    'scripts/make-archive.sh',
+    meson.project_version(),
+  ],
+)
 
 
 # NOTE order of subdir includes is significant
