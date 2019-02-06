@@ -18,6 +18,7 @@
 *.so
 *.so.*
 *.swp
+*.tar.xz
 *~
 .deps
 .dirstamp
