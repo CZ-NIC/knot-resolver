@@ -18,5 +18,12 @@ of new keys. This is of particular interest for the DNS root zone in the event
 of key and/or algorithm rollovers that rely on :rfc:`5011` to automatically
 update a validating DNS resolver’s trust anchor.
 
+.. attention::
+   Experience from root zone KSK rollover in 2018 shows that this mechanism
+   by itself is not sufficient to reliably measure acceptance of the new key.
+   Nevertheless, some DNS researchers found it is useful in combination
+   with other data so we left it enabled for now. This default might change
+   once more information is available.
+
 This module is enabled by default. You may use ``modules.unload('ta_signal_query')``
 in your configuration.
