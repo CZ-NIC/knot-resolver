@@ -45,7 +45,7 @@ endif
 
 ## Trust anchors
 managed_ta = get_option('managed_ta').enabled()
-kefyile_default = get_option('keyfile_default')
+keyfile_default = get_option('keyfile_default')
 if keyfile_default == ''
   keyfile_default = join_paths(etc_dir, 'root.keys')
   install_root_keys = true
@@ -54,7 +54,7 @@ else
   install_root_keys = false
   if managed_ta
     warning('Using managed_ta along with keyfile_default. Ensure '
-	    'keyfile_default will be writable by kresd.')
+	    + 'keyfile_default will be writable by kresd.')
   endif
 endif
 
@@ -82,6 +82,7 @@ if systemd != 'disabled'
   endif
   message('---------------------------')
 endif
+# TODO systemd_user_mode
 
 ## Configuration (for *.in files)
 config = configuration_data()
@@ -138,7 +139,6 @@ integr_tests = [
 # Use "archive" target instead
 run_target(
   'archive',
-  output: 'archive',
   command: [
     'scripts/make-archive.sh',
     meson.project_version(),
@@ -170,6 +170,5 @@ subdir('etc')
 
 # TODO message summary?
 message('modules_dir: ' + modules_dir)
-message(kresd_install_path)
 message('version: @0@'.format(config.get('version')))
 message('date: @0@'.format(config.get('date')))
