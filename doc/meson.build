@@ -1,12 +1,22 @@
 # documentation
 
 # man page
-configure_file(
+man_config = configuration_data()
+man_config.set('version', meson.project_version())
+man_config.set('date', run_command('scripts/get-date.sh', check: true)
+man_config.set('keyfile_default', keyfile_default)
+man_config.set('modules_dir', modules_dir)
+
+# TODO use correct systemd man page
+man_config.set('man_seealso_systemd', '')
+#man_config.set('man_seealso_systemd', '\\fIkresd.systemd(7)\\fR, ')
+
+man_kresd = configure_file(
   input: 'kresd.8.in',
   output: 'kresd.8',
-  configuration: config,
-  install_dir: join_paths(prefix, get_option('mandir'), 'man8')
+  configuration: man_config,
 )
+install_man(man_kresd)
 
 
 if get_option('doc')  # doxygen + html docs
