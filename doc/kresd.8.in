@@ -165,7 +165,7 @@ Show short commandline option help.
 .B \-V
 Show the version.
 .SH "SEE ALSO"
-@man_seealso_systemd@@man_seealso_htmldoc@\fIhttps://knot-resolver.readthedocs.io/en/v@version@/\fR
+@man_seealso_systemd@\fIhttps://knot-resolver.readthedocs.io/en/v@version@/\fR
 .SH "AUTHORS"
 .B kresd
 developers are mentioned in the AUTHORS file in the distribution.
