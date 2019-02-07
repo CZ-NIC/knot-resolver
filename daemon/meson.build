@@ -83,5 +83,5 @@ if get_option('daemon')
   )
 
   kresd_install_path = join_paths(  # path used in tests
-    get_option('prefix'), get_option('sbindir'))
+    prefix, get_option('sbindir'))
 endif
