@@ -7,8 +7,9 @@ option(
 
 option(
   'managed_ta',
-  type: 'boolean',
-  description: 'auto manage DNSSEC trust anchors',
+  type: 'feature',
+  value: 'auto',
+  description: 'auto-manage DNSSEC trust anchors (RFC 5011)',
 )
 
 option(
