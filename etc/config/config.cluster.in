@@ -1,18 +1,11 @@
+-- vim:syntax=lua:set ts=4 sw=4:
 -- Config file example useable for larger resolver farms
 -- In this case cache should be made as large as possible, and prefetching turned off
 -- as the resolver is busy most of the time.
 -- Alternative is using `etcd` as a configuration backend.
--- Refer to manual: https://knot-resolver.readthedocs.io/en/latest/daemon.html#configuration
-
--- Listen on localhost and external interface
-net = { '127.0.0.1', '::1', '192.168.1.1' }
-
--- Drop root privileges
-user('knot-resolver', 'knot-resolver')
-
--- Auto-maintain root TA
-trust_anchors.file = 'root.keys'
-
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/daemon.html#configuration
+@config_defaults@
+@config_managed_ta@
 -- Large cache size, so we don't need to flush ever
 -- This can be larger than available RAM, least frequently accessed
 -- records will be paged out as long as there's enough disk space to back it
@@ -32,9 +25,8 @@ modules = {
 
 -- Use local root server copy for performance reasons
 hints.root({
-  ['j.root-servers.net.'] = { '192.168.1.4', '2001:503:c27::2:30', '192.58.128.30' }
+	['j.root-servers.net.'] = { '192.168.1.4', '2001:503:c27::2:30', '192.58.128.30' }
 })
 
 -- Apply RPZ for all clients, default rule is DENY
 policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
-
