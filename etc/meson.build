@@ -1,9 +1,16 @@
 # etc
 
 etc_files = [
-  'icann-ca.pem',
   'root.hints',
 ]
+
+if managed_ta
+  etc_files += ['icann-ca.pem']
+endif
+
+if install_root_keys
+  etc_files += ['root.keys']
+endif
 
 
 subdir('config')
