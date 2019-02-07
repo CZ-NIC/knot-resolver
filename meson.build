@@ -29,19 +29,35 @@ message('------------------------------')
 
 # Variables
 libkres_soversion = 9
+
+## Paths
 prefix = get_option('prefix')
-
-if get_option('modules_dir') == ''
-  modules_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
-else
-  modules_dir = get_option('modules_dir')
-endif
-
 data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
 doc_dir = join_paths(prefix, get_option('datadir'), 'doc', 'knot-resolver')
 etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
 sbin_dir = join_paths(prefix, get_option('sbindir'))
 
+modules_dir = get_option('modules_dir')
+if modules_dir == ''
+  modules_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
+endif
+
+## Trust anchors
+managed_ta = get_option('managed_ta').enabled()
+kefyile_default = get_option('keyfile_default')
+if keyfile_default == ''
+  keyfile_default = join_paths(etc_dir, 'root.keys')
+  install_root_keys = true
+  managed_ta = managed_ta or get_option('managed_ta').auto()
+else
+  install_root_keys = false
+  if managed_ta
+    warning('Using managed_ta along with keyfile_default. Ensure '
+	    'keyfile_default will be writable by kresd.')
+  endif
+endif
+
+## Configuration (for *.in files)
 config = configuration_data()
 config.set('keyfile_default', get_option('keyfile_default'))
 config.set('modules_dir', etc_dir)
