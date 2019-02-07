@@ -1214,6 +1214,9 @@ specified worker count and process rank.
 Enabling DNSSEC
 ===============
 
+TODO - change section to disabling DNSSEC
+-- trust_anchors.keyfile_default = nil
+
 The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
 To enable it, you need to provide trusted root keys. Bootstrapping of the keys is automated, and kresd fetches root trust anchors set `over a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_ from IANA. From there, it can perform :rfc:`5011` automatic updates for you.
 

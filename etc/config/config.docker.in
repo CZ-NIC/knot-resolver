@@ -1,11 +1,10 @@
--- Refer to manual: https://knot-resolver.readthedocs.io/en/latest/daemon.html#configuration
+-- vim:syntax=lua:set ts=4 sw=4:
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/daemon.html#configuration
 
 -- Listen on all interfaces (localhost would not work in Docker)
 net.listen('0.0.0.0')
 net.listen('0.0.0.0', 853, {tls=true})
-
--- Auto-maintain root TA
-trust_anchors.file = '/etc/knot-resolver/root.keys'
+@config_managed_ta@
 
 -- Load Useful modules
 modules = {
