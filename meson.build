@@ -29,6 +29,7 @@ message('------------------------------')
 
 # Variables
 libkres_soversion = 9
+kresd_c_args = []
 
 ## Paths
 prefix = get_option('prefix')
@@ -57,16 +58,40 @@ else
   endif
 endif
 
+## Systemd
+systemd = get_option('systemd')
+if systemd != 'disabled'
+  message('--- systemd integration ---')
+  libsystemd = dependency('libsystemd', version: '>=227', required: systemd == 'enabled')
+  if libsystemd.found()
+    systemd = 'enabled'  # with socket activation
+  else
+    libsystemd = dependency('libsystemd', required: systemd == 'nosocket')
+    if libsystemd.found()
+      systemd = 'nosocket'  # without socket activation
+    else
+      systemd = 'disabled'  # without systemd
+    endif
+  endif
+  if systemd != 'disabled'
+    kresd_c_args += ['-DHAS_SYSTEMD']
+  endif
+  message('---------------------------')
+endif
+
 ## Configuration (for *.in files)
 config = configuration_data()
 config.set('keyfile_default', get_option('keyfile_default'))
 config.set('modules_dir', etc_dir)
 config.set('etc_dir', etc_dir)
-config.set('man_seealso_systemd', '')
 config.set('version', meson.project_version())
 config.set('date', run_command('scripts/get-date.sh', check: true).stdout().strip())
 
+# TODO use correct systemd man page
+config.set('man_seealso_systemd', '')
+#config.set('man_seealso_systemd', '\\fIkresd.systemd(7)\\fR, ')
 
+# TODO use var instead
 add_global_arguments(
   '-D_GNU_SOURCE',
   '-Wtype-limits',
