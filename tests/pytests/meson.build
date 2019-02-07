@@ -27,7 +27,7 @@ py3_deps += [
 ]
 
 pytests_env = environment()
-pytests_env.prepend('PATH', kresd_install_path)
+pytests_env.prepend('PATH', sbin_dir)
 pytests_env.prepend('PATH', meson.current_build_dir())  # for tlsproxy
 
 test(
