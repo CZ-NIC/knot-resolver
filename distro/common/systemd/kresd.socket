@@ -6,6 +6,7 @@ Before=sockets.target
 
 [Socket]
 FreeBind=true
+BindIPv6Only=both
 ListenDatagram=[::1]:53
 ListenStream=[::1]:53
 ListenDatagram=127.0.0.1:53
