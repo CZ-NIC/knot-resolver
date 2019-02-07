@@ -29,7 +29,6 @@ message('------------------------------')
 
 # Variables
 libkres_soversion = 9
-kresd_c_args = []
 
 ## Paths
 prefix = get_option('prefix')
@@ -63,26 +62,27 @@ user = get_option('user')
 group = get_option('group')
 
 ## Systemd
-systemd = get_option('systemd')
-if systemd != 'disabled'
+opt_systemd = get_option('systemd')
+systemd = false
+systemd_socket = false
+if opt_systemd != 'disabled'
   message('--- systemd integration ---')
-  libsystemd = dependency('libsystemd', version: '>=227', required: systemd == 'enabled')
+  libsystemd = dependency('libsystemd', version: '>=227',
+			  required: opt_systemd == 'enabled')
   if libsystemd.found()
-    systemd = 'enabled'  # with socket activation
+    systemd = true
+    systemd_socket = true
   else
     libsystemd = dependency('libsystemd', required: systemd == 'nosocket')
     if libsystemd.found()
-      systemd = 'nosocket'  # without socket activation
-    else
-      systemd = 'disabled'  # without systemd
+      systemd = true
+      systemd_socket = false
     endif
-  endif
-  if systemd != 'disabled'
-    kresd_c_args += ['-DHAS_SYSTEMD']
   endif
   message('---------------------------')
 endif
 # TODO systemd_user_mode
+systemd_user_mode = false
 
 # TODO use var instead
 add_global_arguments(
@@ -140,10 +140,7 @@ subdir('contrib')
 subdir('lib')
 subdir('daemon')
 subdir('modules')
-
-if get_option('client')
-  subdir('client')
-endif
+subdir('client')
 
 
 # tests
@@ -156,7 +153,47 @@ subdir('doc')
 subdir('etc')
 
 
-# TODO message summary?
-message('modules_dir: ' + modules_dir)
-message('version: @0@'.format(config.get('version')))
-message('date: @0@'.format(config.get('date')))
+# summary message
+# NOTE: ternary operator in format() not supported
+# https://github.com/mesonbuild/meson/issues/2404
+summary_managed_ta = managed_ta ? 'enabled' : 'disabled'
+summary_systemd = systemd ? 'enabled' : 'disabled'
+summary_systemd_socket = systemd_socket ? 'enabled' : 'disabled'
+summary_systemd_user_mode = systemd_user_mode ? 'enabled' : 'disabled'
+summary_build_client = build_client ? 'enabled' : 'disabled'
+summary_build_daemon = build_daemon ? 'enabled' : 'disabled'
+summary_build_doc = build_doc ? 'enabled' : 'disabled'
+summary_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
+summary_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
+message('''
+
+======================= SUMMARY =======================
+
+  paths
+    prefix:             @0@'''.format(prefix) + '''
+    modules_dir:        @0@'''.format(modules_dir) + '''
+
+  trust_anchors
+    keyfile_default:    @0@'''.format(keyfile_default) + '''
+    managed_ta:         @0@'''.format(summary_managed_ta) + '''
+
+  systemd:              @0@'''.format(summary_systemd) + '''
+    socket activation:  @0@'''.format(summary_systemd_socket) + '''
+    user mode:          @0@'''.format(summary_systemd_user_mode) + '''
+
+  components
+    client:             @0@'''.format(summary_build_client) + '''
+    daemon:             @0@'''.format(summary_build_daemon) + '''
+    doc:                @0@'''.format(summary_build_doc) + '''
+    extra_tests:        @0@'''.format(summary_build_extra_tests) + '''
+    unit_tests:         @0@'''.format(summary_build_unit_tests) + '''
+
+  additional
+    user:               @0@'''.format(user) + '''
+    group:              @0@'''.format(group) + '''
+    install_kresd_conf: @0@'''.format(get_option('install_kresd_conf')) + '''
+    version:            @0@'''.format(meson.project_version()) + '''
+
+=======================================================
+
+''')
