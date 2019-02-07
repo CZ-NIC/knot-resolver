@@ -28,19 +28,18 @@ message('------------------------------')
 
 
 # Variables
-
 libkres_soversion = 9
+prefix = get_option('prefix')
 
 if get_option('modules_dir') == ''
-  modules_dir = join_paths(
-    get_option('prefix'), get_option('libdir'), 'knot-resolver')
+  modules_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
 else
   modules_dir = get_option('modules_dir')
 endif
 
-data_dir = join_paths(get_option('prefix'), get_option('datadir'), 'knot-resolver')
-doc_dir = join_paths(get_option('prefix'), get_option('datadir'), 'doc', 'knot-resolver')
-etc_dir = join_paths(get_option('prefix'), get_option('sysconfdir'), 'knot-resolver')
+data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
+doc_dir = join_paths(prefix, get_option('datadir'), 'doc', 'knot-resolver')
+etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
 
 config = configuration_data()
 config.set('keyfile_default', get_option('keyfile_default'))
@@ -59,7 +58,7 @@ add_global_arguments(
   '-Wshadow',
   '-Wall',
   '-DPACKAGE_VERSION="@0@"'.format(meson.project_version()),
-  '-DPREFIX="@0@"'.format(get_option('prefix')),
+  '-DPREFIX="@0@"'.format(prefix),
   '-DMODULEDIR="@0@"'.format(modules_dir),
   '-fvisibility=hidden',
   language: 'c',
