@@ -58,6 +58,10 @@ else
   endif
 endif
 
+## User/Group
+user = get_option('user')
+group = get_option('group')
+
 ## Systemd
 systemd = get_option('systemd')
 if systemd != 'disabled'
