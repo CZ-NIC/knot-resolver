@@ -31,14 +31,18 @@ luajit_has_setfuncs = run_command(
   ).returncode() == 0 ? '1' : '0'
 
 # daemon CFLAGS
-kresd_c_args += [
+kresd_c_args = [
   '-fPIE',  # NOTE this triggers warning, but is needed for compatibility with meson 0.47.0
-  '-DROOTHINTS="@0@/root.hints"'.format(config.get('etc_dir')),
+  '-DROOTHINTS="@0@/root.hints"'.format(etc_dir),
   '-DLIBEXT="@0@"'.format(lib_suffix),
   '-Dlibzscanner_SONAME="@0@"'.format(libzscanner.get_pkgconfig_variable('soname')),
   '-Dlibknot_SONAME="@0@"'.format(libknot.get_pkgconfig_variable('soname')),
   '-DLUA_HAS_SETFUNCS=@0@'.format(luajit_has_setfuncs),
 ]
+
+if systemd
+  kresd_c_args += ['-DHAS_SYSTEMD']
+endif
 
 # TODO test build on osx
 if host_machine.system() == 'darwin'
@@ -50,8 +54,7 @@ endif
 subdir('lua')
 
 
-if get_option('daemon')
-  # build
+if build_daemon
   kresd = executable(
     'kresd',
     kresd_src, kresd_lua,
