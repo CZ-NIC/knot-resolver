@@ -16,6 +16,7 @@
 
 #include <uv.h>
 #include <lua.h>
+#include <lauxlib.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
 #include <contrib/ucw/lib.h>
@@ -31,7 +32,7 @@
 #include "lib/utils.h"
 #include "lib/layer.h"
 #include "daemon/worker.h"
-#include "daemon/bindings.h"
+#include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
@@ -1968,12 +1969,8 @@ void worker_reclaim(struct worker_ctx *worker)
 struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 		int worker_id, int worker_count)
 {
-	/* Load bindings */
-	engine_lualib(engine, "modules", lib_modules);
-	engine_lualib(engine, "net",     lib_net);
-	engine_lualib(engine, "cache",   lib_cache);
-	engine_lualib(engine, "event",   lib_event);
-	engine_lualib(engine, "worker",  lib_worker);
+	assert(engine && engine->L);
+	kr_bindings_register(engine->L);
 
 	/* Create main worker. */
 	struct worker_ctx *worker = mm_alloc(pool, sizeof(*worker));
