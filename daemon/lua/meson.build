@@ -21,16 +21,26 @@ config_tests += [
 ]
 
 
-# embed lua to daemon
-if get_option('daemon')
-  message('--- required kresd dependencies ---')
+# daemon dependencies
+build_daemon = false
+if not get_option('daemon').disabled()
+  message('--- daemon dependencies ---')
   xxd = find_program('xxd', required: false)
-  if not xxd.found()
-    hexdump = find_program('hexdump')
+  if xxd.found()
+    build_daemon = true
+  else
+    # fallback
+    hexdump = find_program('hexdump', required: get_option('daemon'))
+    if hexdump.found()
+      build_daemon = true
+    endif
   endif
   embed_lua = find_program('../../scripts/embed-lua.sh')
   message('--------------------------------------')
+endif
 
+# embed lua to daemon
+if build_daemon
   embed_lua = generator(
     embed_lua,
     arguments: ['@INPUT@'],
