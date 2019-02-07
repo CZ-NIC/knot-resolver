@@ -1,6 +1,90 @@
-option('client', type : 'boolean', value : true, description: 'kresc client binary')
-option('daemon', type: 'boolean', value: true, description: 'kresd daemon binary')
-option('doc', type: 'boolean', value: false, description: 'html documentation')
-option('extra_tests', type: 'boolean', value: false, description: 'integration tests with extra dependencies')
-option('modules_dir', type: 'string', description: 'path to kres modules directory')
-option('keyfile_default', type: 'string', description: 'path to trust anchors file')
+# Configuration options
+option(
+  'keyfile_default',
+  type: 'string',
+  description: 'built-in default path to trust anchors file',
+)
+
+option(
+  'managed_ta',
+  type: 'boolean',
+  description: 'auto manage DNSSEC trust anchors',
+)
+
+option(
+  'install_kresd_conf',
+  type: 'boolean',
+  value: false,
+  description: 'creates kresd.conf in config directory',
+)
+
+option(
+  'modules_dir',
+  type: 'string',
+  description: 'path to kres modules directory',
+)
+
+option(
+  'user',
+  type: 'string',
+  value: 'knot-resolver',
+  description: 'user which is used for kresd',
+)
+
+option(
+  'group',
+  type: 'string',
+  value: 'knot-resolver',
+  description: 'group which is used for kresd',
+)
+
+## Systemd integration
+option(
+  'systemd',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'nosocket',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'create systemd unit files',
+)
+
+option(
+  'systemd_user_mode',
+  type: 'boolean',
+  value: false,
+  description: 'use systemd user mode (for debug/testing)',
+)
+
+
+# Component options
+option(
+  'client',
+  type: 'boolean',
+  value: true,
+  description: 'build kresc client binary'
+)
+
+option(
+  'daemon',
+  type: 'boolean',
+  value: true,
+  description: 'build kresd daemon binary'
+)
+
+option(
+  'doc',
+  type: 'boolean',
+  value: false,
+  description: 'build html documentation'
+)
+
+option(
+  'extra_tests',
+  type: 'boolean',
+  value: false,
+  description: 'integration tests with extra dependencies'
+)
