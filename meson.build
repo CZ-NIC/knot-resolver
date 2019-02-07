@@ -84,18 +84,6 @@ if systemd != 'disabled'
 endif
 # TODO systemd_user_mode
 
-## Configuration (for *.in files)
-config = configuration_data()
-config.set('keyfile_default', get_option('keyfile_default'))
-config.set('modules_dir', etc_dir)
-config.set('etc_dir', etc_dir)
-config.set('version', meson.project_version())
-config.set('date', run_command('scripts/get-date.sh', check: true).stdout().strip())
-
-# TODO use correct systemd man page
-config.set('man_seealso_systemd', '')
-#config.set('man_seealso_systemd', '\\fIkresd.systemd(7)\\fR, ')
-
 # TODO use var instead
 add_global_arguments(
   '-D_GNU_SOURCE',
