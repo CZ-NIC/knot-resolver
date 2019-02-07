@@ -3,7 +3,7 @@
 # man page
 man_config = configuration_data()
 man_config.set('version', meson.project_version())
-man_config.set('date', run_command('scripts/get-date.sh', check: true)
+man_config.set('date', run_command('../scripts/get-date.sh', check: true).stdout())
 man_config.set('keyfile_default', keyfile_default)
 man_config.set('modules_dir', modules_dir)
 
@@ -19,7 +19,8 @@ man_kresd = configure_file(
 install_man(man_kresd)
 
 
-if get_option('doc')  # doxygen + html docs
+build_doc = get_option('doc').enabled()  # NOTE 'auto' unsupported
+if build_doc  # doxygen + html docs
   message('--- doc dependencies ---')
   doxygen = find_program('doxygen')
   sphinx_build = find_program('sphinx-build')
