@@ -31,7 +31,7 @@ luajit_has_setfuncs = run_command(
   ).returncode() == 0 ? '1' : '0'
 
 # daemon CFLAGS
-c_args = [
+kresd_c_args += [
   '-fPIE',  # NOTE this triggers warning, but is needed for compatibility with meson 0.47.0
   '-DROOTHINTS="@0@/root.hints"'.format(config.get('etc_dir')),
   '-DLIBEXT="@0@"'.format(lib_suffix),
@@ -43,18 +43,8 @@ c_args = [
 # TODO test build on osx
 if host_machine.system() == 'darwin'
   # luajit workaround for OS X  https://luajit.org/install.html#embed
-  c_args += ['-pagezero_size', '10000', '-image_base', '100000000']
+  kresd_c_args += ['-pagezero_size', '10000', '-image_base', '100000000']
 endif
-
-
-# optional systemd socket activation
-message('--- optional kresd dependencies ---')
-libsystemd = dependency('libsystemd', version: '>=227', required: false)
-if libsystemd.found()
-  c_args += ['-DHAS_SYSTEMD']
-  config.set('man_seealso_systemd', '\\fIkresd.systemd(7)\\fR, ')
-endif
-message('-----------------------------------')
 
 
 subdir('lua')
@@ -77,7 +67,7 @@ if get_option('daemon')
       libsystemd,
     ],
     export_dynamic: true,
-    c_args: c_args,
+    c_args: kresd_c_args,
     install: true,
     install_dir: get_option('sbindir'),
   )
