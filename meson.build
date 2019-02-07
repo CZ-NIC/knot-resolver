@@ -165,6 +165,7 @@ summary_build_daemon = build_daemon ? 'enabled' : 'disabled'
 summary_build_doc = build_doc ? 'enabled' : 'disabled'
 summary_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 summary_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
+summary_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 message('''
 
 ======================= SUMMARY =======================
@@ -191,7 +192,7 @@ message('''
   additional
     user:               @0@'''.format(user) + '''
     group:              @0@'''.format(group) + '''
-    install_kresd_conf: @0@'''.format(get_option('install_kresd_conf')) + '''
+    install_kresd_conf: @0@'''.format(summary_install_kresd_conf) + '''
     version:            @0@'''.format(meson.project_version()) + '''
 
 =======================================================
