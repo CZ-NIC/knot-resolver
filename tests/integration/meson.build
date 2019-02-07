@@ -30,7 +30,7 @@ deckard_contrib = custom_target(
 )
 
 deckard_env = environment()
-deckard_env.prepend('PATH', kresd_install_path)
+deckard_env.prepend('PATH', sbin_dir)
 
 deckard_kresd_run = find_program('deckard/kresd_run.sh')
 test(

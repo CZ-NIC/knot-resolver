@@ -40,6 +40,7 @@ endif
 data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
 doc_dir = join_paths(prefix, get_option('datadir'), 'doc', 'knot-resolver')
 etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
+sbin_dir = join_paths(prefix, get_option('sbindir'))
 
 config = configuration_data()
 config.set('keyfile_default', get_option('keyfile_default'))
