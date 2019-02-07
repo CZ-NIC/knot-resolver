@@ -5,7 +5,7 @@ configure_file(
   input: 'kresd.8.in',
   output: 'kresd.8',
   configuration: config,
-  install_dir: join_paths(get_option('prefix'), get_option('mandir'), 'man8')
+  install_dir: join_paths(prefix, get_option('mandir'), 'man8')
 )
 
 
