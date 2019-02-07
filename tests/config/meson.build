@@ -27,7 +27,7 @@ run_configtest = find_program('../../scripts/test-config.sh')
 
 # environment variables for test
 conftest_env = environment()
-conftest_env.prepend('PATH', kresd_install_path)
+conftest_env.prepend('PATH', sbin_dir)
 conftest_env.set('KRESD_NO_LISTEN', '1')
 conftest_env.set('SOURCE_PATH', meson.current_source_dir())
 
