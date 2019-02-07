@@ -55,8 +55,8 @@ option(
 
 option(
   'systemd_user_mode',
-  type: 'boolean',
-  value: false,
+  type: 'feature',
+  value: 'disabled',
   description: 'use systemd user mode (for debug/testing)',
 )
 
@@ -64,28 +64,35 @@ option(
 # Component options
 option(
   'client',
-  type: 'boolean',
-  value: true,
+  type: 'feature',
+  value: 'auto',
   description: 'build kresc client binary'
 )
 
 option(
   'daemon',
-  type: 'boolean',
-  value: true,
+  type: 'feature',
+  value: 'enabled',
   description: 'build kresd daemon binary'
 )
 
 option(
   'doc',
-  type: 'boolean',
-  value: false,
+  type: 'feature',
+  value: 'disabled',
   description: 'build html documentation'
 )
 
 option(
   'extra_tests',
-  type: 'boolean',
-  value: false,
+  type: 'feature',
+  value: 'disabled',
   description: 'integration tests with extra dependencies'
+)
+
+option(
+  'unit_tests',
+  type: 'feature',
+  value: 'auto',
+  description: 'cmocka unit tests'
 )
