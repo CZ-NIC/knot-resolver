@@ -1,7 +1,7 @@
 # etc: config examples
 
 # Config snippets (build-dependant)
-if true  # TODO systemd.nosocket, systemd=no
+if systemd_socket
   config_defaults = '''
 -- Network interface configuration: see kresd.systemd(7)'''
 else
@@ -10,10 +10,10 @@ else
 -- net = { '127.0.0.1', '::1', '192.0.2.1' }
 
 -- Drop root privileges
-user('knot-resolver', 'knot-resolver')'''  # TODO user, group
+user('@0@', '@1@')'''.format(user, group)
 endif
 
-if true  # TODO managed_ta = false
+if managed_ta
   config_managed_ta = '''
 -- Auto-manage DNSSEC trust anchors (RFC 5011)
 trust_anchors.file = '@0@/root.keys'
@@ -23,18 +23,28 @@ else
 endif
 
 
+# Configure and install config examples
 example_configs = [
-  'config.cluster.in',
-  'config.docker.in',
-  'config.isp.in',
-  'config.personal.in',
-  'config.splitview.in',
+  'config.cluster',
+  'config.docker',
+  'config.isp',
+  'config.personal',
+  'config.splitview',
 ]
 
-# TODO kresd.conf
+conf_config = configuration_data()
+conf_config.set('config_defaults', config_defaults)
+conf_config.set('config_managed_ta', config_managed_ta)
 
-# TODO configure, install
-#install_data(
-#  sources: example_configs,
-#  install_dir: join_paths(doc_dir, 'examples'),
-#)
+examples_dir = join_paths(doc_dir, 'examples')
+
+foreach config_filename : example_configs
+  configure_file(
+    input: config_filename + '.in',
+    output: config_filename,
+    install_dir: examples_dir,
+  )
+endforeach
+
+# Install kresd.conf
+# TODO kresd.conf
