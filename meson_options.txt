@@ -14,8 +14,8 @@ option(
 
 option(
   'install_kresd_conf',
-  type: 'boolean',
-  value: false,
+  type: 'feature',
+  value: 'auto',
   description: 'creates kresd.conf in config directory',
 )
 
