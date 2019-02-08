@@ -1,0 +1,8 @@
+[Unit]
+Description=Knot Resolver daemons
+Documentation=man:kresd.systemd.nosocket(7)
+Documentation=man:kresd(8)
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target
