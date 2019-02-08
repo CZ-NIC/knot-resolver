@@ -7,7 +7,7 @@ PartOf=kresd@%i.service
 
 [Socket]
 Service=kresd@%i.service
-ListenStream=/run/knot-resolver/control@%i
+ListenStream=@run_dir@/control@%i
 FileDescriptorName=control
 SocketMode=0660
 Slice=system-kresd.slice
