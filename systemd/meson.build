@@ -58,7 +58,21 @@ if systemd_socket
     install_dir: systemd_tmpfiles_dir,
   )
 
-  # TODO example drop-ins
+  ## example drop-ins
+  install_data(
+    sources: [
+      'kresd.socket.d/all-interfaces.conf',
+      'kresd.socket.d/specific-interfaces.conf',
+    ],
+    install_dir: join_paths(examples_dir, 'kresd.socket.d'),
+  )
+  install_data(
+    sources: [
+      'kresd-tls.socket.d/all-interfaces.conf',
+      'kresd-tls.socket.d/specific-interfaces.conf',
+    ],
+    install_dir: join_paths(examples_dir, 'kresd-tls.socket.d'),
+  )
 else
   subdir('nosocket')
 endif
