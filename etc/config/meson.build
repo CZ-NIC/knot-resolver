@@ -36,8 +36,6 @@ conf_config = configuration_data()
 conf_config.set('config_defaults', config_defaults)
 conf_config.set('config_managed_ta', config_managed_ta)
 
-examples_dir = join_paths(doc_dir, 'examples')
-
 foreach config_filename : example_configs
   configure_file(
     input: config_filename + '.in',
