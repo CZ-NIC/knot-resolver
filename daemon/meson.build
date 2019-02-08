@@ -1,7 +1,12 @@
 # daemon
 
 kresd_src = [
-  'bindings.c',
+  'bindings/cache.c',
+  'bindings/event.c',
+  'bindings/impl.c',
+  'bindings/modules.c',
+  'bindings/net.c',
+  'bindings/worker.c',
   'engine.c',
   'ffimodule.c',
   'io.c',
