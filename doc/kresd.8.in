@@ -9,7 +9,7 @@
 .\"
 .SH "NAME"
 .B kresd
-\- full caching Knot Resolver @version@.
+\- full caching DNSSEC-enabled Knot Resolver @version@.
 .SH "SYNOPSIS"
 .B kresd
 .RB [ \-a | \-\-addr
