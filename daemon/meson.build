@@ -40,8 +40,20 @@ kresd_c_args = [
   '-DLUA_HAS_SETFUNCS=@0@'.format(luajit_has_setfuncs),
 ]
 
+kresd_deps = [
+  contrib_dep,
+  libkres_dep,
+  libknot,
+  libzscanner,
+  libdnssec,
+  libuv,
+  luajit,
+  gnutls,
+]
+
 if systemd
-  kresd_c_args += ['-DHAS_SYSTEMD']
+  kresd_c_args += '-DHAS_SYSTEMD'
+  kresd_deps += libsystemd
 endif
 
 # TODO test build on osx
@@ -58,17 +70,7 @@ if build_daemon
   kresd = executable(
     'kresd',
     kresd_src, kresd_lua,
-    dependencies: [
-      contrib_dep,
-      libkres_dep,
-      libknot,
-      libzscanner,
-      libdnssec,
-      libuv,
-      luajit,
-      gnutls,
-      libsystemd,
-    ],
+    dependencies: kresd_deps,
     export_dynamic: true,
     c_args: kresd_c_args,
     install: true,
