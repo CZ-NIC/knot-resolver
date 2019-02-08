@@ -36,6 +36,10 @@ data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
 doc_dir = join_paths(prefix, get_option('datadir'), 'doc', 'knot-resolver')
 etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
 sbin_dir = join_paths(prefix, get_option('sbindir'))
+systemd_cache_dir = ''
+run_dir = ''
+systemd_unit_dir = ''
+systemd_tmpfiles_dir = ''
 
 modules_dir = get_option('modules_dir')
 if modules_dir == ''
@@ -152,6 +156,11 @@ subdir('tests')
 subdir('doc')
 subdir('etc')
 
+# systemd integration
+if systemd
+  subdir('systemd')
+endif
+
 
 # summary message
 # NOTE: ternary operator in format() not supported
@@ -181,6 +190,8 @@ message('''
   systemd:              @0@'''.format(summary_systemd) + '''
     socket activation:  @0@'''.format(summary_systemd_socket) + '''
     user mode:          @0@'''.format(summary_systemd_user_mode) + '''
+    cache_dir:          @0@'''.format(systemd_cache_dir) + '''
+    run_dir:            @0@'''.format(run_dir) + '''
 
   components
     client:             @0@'''.format(summary_build_client) + '''
