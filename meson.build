@@ -55,7 +55,7 @@ if keyfile_default == ''
   managed_ta = managed_ta or get_option('managed_ta').auto()
 else
   install_root_keys = false
-  if managed_ta
+  if managed_ta  # TODO does this make sense? hardcoded path is in configs
     warning('Using managed_ta along with keyfile_default. Ensure '
 	    + 'keyfile_default will be writable by kresd.')
   endif
