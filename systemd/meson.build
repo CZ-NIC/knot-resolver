@@ -20,7 +20,7 @@ systemd_config.set('run_dir', run_dir)
 # TODO Restart=on-abnormal
 
 if systemd_socket
-  # unit files
+  ## unit files
   kresd_service = configure_file(
     input: 'kresd@.service.in',
     output: 'kresd@.service',
@@ -33,7 +33,6 @@ if systemd_socket
     configuration: systemd_config,
     install_dir: systemd_unit_dir,
   )
-
   install_data(
     sources: [
       'kresd.socket',
@@ -43,9 +42,15 @@ if systemd_socket
     install_dir: systemd_unit_dir,
   )
 
-  install_man('kresd.systemd.7')  # TODO amend man page + configure
+  ## man page
+  kresd_systemd_man = configure_file(
+    input: 'kresd.systemd.7.in',
+    output: 'kresd.systemd.7',
+    configuration: man_config,
+  )
+  install_man(kresd_systemd_man)
 
-  # tmpfiles
+  ## tmpfiles
   tmpfiles = configure_file(
     input: 'tmpfiles.d/knot-resolver.conf.in',
     output: 'knot-resolver.conf',
