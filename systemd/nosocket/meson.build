@@ -13,7 +13,13 @@ install_data(
   install_dir: systemd_unit_dir,
 )
 
-install_man('kresd.systemd.nosocket.7')  # TODO amend man page + configure
+## man page
+kresd_systemd_man = configure_file(
+  input: 'kresd.systemd.nosocket.7.in',
+  output: 'kresd.systemd.nosocket.7',
+  configuration: man_config,
+)
+install_man(kresd_systemd_man)
 
 # tmpfiles
 tmpfiles = configure_file(
