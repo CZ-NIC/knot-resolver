@@ -5,9 +5,9 @@ Documentation=man:kresd(8)
 
 [Service]
 Type=notify
-WorkingDirectory=/var/cache/knot-resolver
-ExecStart=/usr/sbin/kresd --config=/etc/knot-resolver/kresd.conf
-User=knot-resolver
+WorkingDirectory=@systemd_cache_dir@
+ExecStart=@sbin_dir@/kresd --config=@etc_dir@/kresd.conf
+User=@user@
 Restart=on-failure
 Sockets=kresd.socket
 Sockets=kresd-tls.socket
