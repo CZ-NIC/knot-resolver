@@ -34,6 +34,7 @@ libkres_soversion = 9
 prefix = get_option('prefix')
 data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
 doc_dir = join_paths(prefix, get_option('datadir'), 'doc', 'knot-resolver')
+examples_dir = join_paths(doc_dir, 'examples')
 etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
 sbin_dir = join_paths(prefix, get_option('sbindir'))
 systemd_cache_dir = ''
