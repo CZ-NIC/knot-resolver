@@ -191,7 +191,7 @@ end
 -- Rewrite records in packet
 function policy.REROUTE(tbl, names)
 	-- Import renumbering rules
-	local ren = require('renumber')
+	local ren = require('kres_modules.renumber')
 	local prefixes = {}
 	for from, to in pairs(tbl) do
 		table.insert(prefixes, names and ren.name(from, to) or ren.prefix(from, to))
@@ -308,7 +308,7 @@ end
 
 -- Requests which QNAME matches given zone list (i.e. suffix match)
 function policy.suffix(action, zone_list)
-	local AC = require('ahocorasick')
+	local AC = require('kres_modules.ahocorasick')
 	local tree = AC.create(zone_list)
 	return function(_, query)
 		local match = AC.match(tree, query:name(), false)
