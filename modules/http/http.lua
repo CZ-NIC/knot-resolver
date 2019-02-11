@@ -94,14 +94,14 @@ for _, pg in ipairs(pages) do
 end
 
 -- Export built-in prometheus interface
-local prometheus = require('prometheus')
+local prometheus = require('kres_modules.prometheus')
 for k, v in pairs(prometheus.endpoints) do
 	M.endpoints[k] = v
 end
 M.prometheus = prometheus
 
 -- Export built-in trace interface
-local http_trace = require('http_trace')
+local http_trace = require('kres_modules.http_trace')
 for k, v in pairs(http_trace.endpoints) do
 	M.endpoints[k] = v
 end
