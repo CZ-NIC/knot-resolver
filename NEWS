@@ -14,6 +14,10 @@ Improvements
 - policy module: policy.rpz() will watch the file for changes by default
 - packaging: lua cqueues added to default dependencies where available
 
+Module API changes
+------------------
+- kr_straddr_split() changed API a bit (compiler will catch that)
+
 
 Knot Resolver 3.2.1 (2019-01-10)
 ================================

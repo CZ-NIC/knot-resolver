@@ -308,6 +308,7 @@ int kr_straddr_subnet(void *dst, const char *addr);
  * 		length > MIN(strlen(addr), INET6_ADDRSTRLEN + 1)
  * \param port[out] written in case it's specified in addr
  * \return pointer to address without port (zero-terminated string)
+ * \note Typically you follow this by kr_straddr_socket().
  */
 KR_EXPORT
 const char * kr_straddr_split(const char *addr, char *buf, uint16_t *port);
