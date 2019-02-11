@@ -126,11 +126,11 @@ static int cache_max_ttl(lua_State *L)
 
 	int n = lua_gettop(L);
 	if (n > 0) {
-		if (!lua_isnumber(L, 1))
+		if (!lua_isnumber(L, 1) || n > 1)
 			lua_error_p(L, "expected 'max_ttl(number ttl)'");
 		uint32_t min = cache->ttl_min;
 		int64_t ttl = lua_tointeger(L, 1);
-		if (ttl < 0 || ttl < min || ttl > UINT32_MAX) {
+		if (ttl < 1 || ttl < min || ttl > UINT32_MAX) {
 			lua_error_p(L,
 				"max_ttl must be larger than minimum TTL, and in range <1, "
 				STR(UINT32_MAX) ">'");

@@ -489,8 +489,8 @@ static int net_tls_padding(lua_State *L)
 
 	const char *errstr = "net.tls_padding parameter has to be true, false,"
 				" or a number between <0, " STR(MAX_TLS_PADDING) ">";
-	if ((lua_gettop(L) != 1))
-		lua_error_p(L, "net.tls_padding takes one parameter: (\"padding\")");
+	if (lua_gettop(L) != 1)
+		lua_error_p(L, "%s", errstr);
 	if (lua_isboolean(L, 1)) {
 		bool x = lua_toboolean(L, 1);
 		if (x) {
