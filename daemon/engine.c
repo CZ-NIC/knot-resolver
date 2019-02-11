@@ -783,7 +783,7 @@ int engine_ipc(struct engine *engine, const char *expr)
 int engine_load_sandbox(struct engine *engine)
 {
 	/* Init environment */
-    int ret = l_dosandboxfile(engine->L, "sandbox.lua");
+    int ret = l_dosandboxfile(engine->L, LIBDIR "/sandbox.lua");
 	if (ret != 0) {
 		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
@@ -806,7 +806,7 @@ int engine_loadconf(struct engine *engine, const char *config_path)
 int engine_load_defaults(struct engine *engine)
 {
 	/* Load defaults */
-	int ret = l_dosandboxfile(engine->L, "config.lua");
+	int ret = l_dosandboxfile(engine->L, LIBDIR "/config.lua");
 	if (ret != 0) {
 		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
