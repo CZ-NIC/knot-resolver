@@ -41,16 +41,13 @@ data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
 doc_dir = join_paths(prefix, get_option('datadir'), 'doc', 'knot-resolver')
 examples_dir = join_paths(doc_dir, 'examples')
 etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
+lib_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
+modules_dir = join_paths(lib_dir, 'kres_modules')
 sbin_dir = join_paths(prefix, get_option('sbindir'))
 systemd_work_dir = ''
 run_dir = ''
 systemd_unit_dir = ''
 systemd_tmpfiles_dir = ''
-
-modules_dir = get_option('modules_dir')
-if modules_dir == ''
-  modules_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
-endif
 
 ## Trust anchors
 managed_ta = get_option('managed_ta').enabled()
@@ -137,7 +134,7 @@ run_target(
 # kresconfig.h
 conf_data = configuration_data()
 conf_data.set_quoted('PACKAGE_VERSION', meson.project_version())
-conf_data.set_quoted('MODULEDIR', modules_dir)
+conf_data.set_quoted('LIBDIR', lib_dir)
 conf_data.set_quoted('ROOTHINTS', '@0@/root.hints'.format(etc_dir))  # TODO allow custom ROOTHINTS with build option?
 conf_data.set_quoted('LIBEXT', libext)
 conf_data.set_quoted('libzscanner_SONAME',
@@ -197,7 +194,9 @@ message('''
 
   paths
     prefix:             @0@'''.format(prefix) + '''
-    modules_dir:        @0@'''.format(modules_dir) + '''
+    lib_dir:            @0@'''.format(lib_dir) + '''
+    etc_dir:            @0@'''.format(etc_dir) + '''
+    sbin_dir:           @0@'''.format(sbin_dir) + '''
 
   trust_anchors
     keyfile_default:    @0@'''.format(keyfile_default) + '''

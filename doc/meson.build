@@ -5,7 +5,6 @@ man_config = configuration_data()
 man_config.set('version', meson.project_version())
 man_config.set('date', run_command('../scripts/get-date.sh', check: true).stdout())
 man_config.set('keyfile_default', keyfile_default)
-man_config.set('modules_dir', modules_dir)
 
 # TODO use correct systemd man page
 man_config.set('man_seealso_systemd', '')
