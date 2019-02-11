@@ -13,15 +13,6 @@ else
 user('@0@', '@1@')'''.format(user, group)
 endif
 
-if managed_ta
-  config_managed_ta = '''
--- Auto-manage DNSSEC trust anchors (RFC 5011)
-trust_anchors.file = '@0@/root.keys'
-'''.format(etc_dir)
-else
-  config_managed_ta = ''
-endif
-
 
 # Configure and install config examples
 example_configs = [
