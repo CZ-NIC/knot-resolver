@@ -30,6 +30,11 @@ message('------------------------------')
 # Variables
 libkres_soversion = 9
 
+libext = '.so'
+if host_machine.system() == 'darwin'
+  libext = '.dylib'
+endif
+
 ## Paths
 prefix = get_option('prefix')
 data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
@@ -56,7 +61,7 @@ if keyfile_default == ''
   managed_ta = managed_ta or get_option('managed_ta').auto()
 else
   install_root_keys = false
-  if managed_ta  # TODO does this make sense? hardcoded path is in configs
+  if managed_ta
     warning('Using managed_ta along with keyfile_default. Ensure '
 	    + 'keyfile_default directory will be writable by kresd.')
   endif
@@ -95,9 +100,6 @@ add_global_arguments(
   '-Wformat-security',
   '-Wshadow',
   '-Wall',
-  '-DPACKAGE_VERSION="@0@"'.format(meson.project_version()),
-  '-DPREFIX="@0@"'.format(prefix),
-  '-DMODULEDIR="@0@"'.format(modules_dir),
   '-fvisibility=hidden',
   language: 'c',
 )
@@ -132,6 +134,29 @@ run_target(
 )
 
 
+# kresconfig.h
+conf_data = configuration_data()
+conf_data.set_quoted('PACKAGE_VERSION', meson.project_version())
+conf_data.set_quoted('MODULEDIR', modules_dir)
+conf_data.set_quoted('ROOTHINTS', '@0@/root.hints'.format(etc_dir))  # TODO allow custom ROOTHINTS with build option?
+conf_data.set_quoted('LIBEXT', libext)
+conf_data.set_quoted('libzscanner_SONAME',
+  (libzscanner.get_pkgconfig_variable('soname'))
+conf_data.set_quoted('libknot_SONAME',
+  (libknot.get_pkgconfig_variable('soname'))
+conf_data.set('HAS_SYSTEMD', systemd)
+
+kresconfig = configure_file(
+  output: 'kresconfig.h',
+  configuration: conf_data,
+)
+
+kresconfig_dep = declare_dependency(
+  sources: kresconfig,
+  include_directories: include_directories('.'),
+)
+
+
 # NOTE order of subdir includes is significant
 # compile
 subdir('contrib')
@@ -146,7 +171,6 @@ subdir('tests')
 
 
 # documentation, examples
-# TODO install man
 subdir('doc')
 subdir('etc')
 
