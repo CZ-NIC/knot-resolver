@@ -53,13 +53,6 @@ option(
   description: 'create systemd unit files',
 )
 
-option(
-  'systemd_user_mode',
-  type: 'feature',
-  value: 'disabled',
-  description: 'use systemd user mode (for debug/testing)',
-)
-
 
 # Component options
 option(
