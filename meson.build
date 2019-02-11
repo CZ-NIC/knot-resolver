@@ -168,7 +168,6 @@ summary_managed_ta = managed_ta ? 'enabled' : 'disabled'
 summary_systemd = systemd ? 'enabled' : 'disabled'
 summary_systemd_socket = systemd_socket ? 'enabled' : 'disabled'
 summary_build_client = build_client ? 'enabled' : 'disabled'
-summary_build_daemon = build_daemon ? 'enabled' : 'disabled'
 summary_build_doc = build_doc ? 'enabled' : 'disabled'
 summary_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 summary_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
@@ -189,9 +188,8 @@ message('''
     socket activation:  @0@'''.format(summary_systemd_socket) + '''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
 
-  components
+  optional components
     client:             @0@'''.format(summary_build_client) + '''
-    daemon:             @0@'''.format(summary_build_daemon) + '''
     doc:                @0@'''.format(summary_build_doc) + '''
     extra_tests:        @0@'''.format(summary_build_extra_tests) + '''
     unit_tests:         @0@'''.format(summary_build_unit_tests) + '''
