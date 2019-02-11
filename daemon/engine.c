@@ -782,10 +782,8 @@ int engine_ipc(struct engine *engine, const char *expr)
 int engine_load_sandbox(struct engine *engine)
 {
 	/* Init environment */
-	static const char sandbox_bytecode[] = {
-		#include "daemon/lua/sandbox.inc"
-	};
-	if (l_dobytecode(engine->L, sandbox_bytecode, sizeof(sandbox_bytecode), "init") != 0) {
+    int ret = l_dosandboxfile(engine->L, "sandbox.lua");
+	if (ret != 0) {
 		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
@@ -807,10 +805,7 @@ int engine_loadconf(struct engine *engine, const char *config_path)
 int engine_load_defaults(struct engine *engine)
 {
 	/* Load defaults */
-	static const char config_bytecode[] = {
-		#include "daemon/lua/config.inc"
-	};
-	int ret = l_dobytecode(engine->L, config_bytecode, sizeof(config_bytecode), "config");
+	int ret = l_dosandboxfile(engine->L, "config.lua");
 	if (ret != 0) {
 		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
