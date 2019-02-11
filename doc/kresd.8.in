@@ -26,8 +26,6 @@
 .IR keyfile ]
 .RB [ \-K | \-\-keyfile\-ro
 .IR keyfile ]
-.RB [ \-m | \-\-moduledir
-.IR path ]
 .RB [ \-f | \-\-forks
 .IR N ]
 .RB [ \-q | \-\-quiet ]
@@ -137,9 +135,6 @@ and is compatible with Unbound and BIND 9 root key files.
 (Discouraged) Static root trust anchors file. The file is not updated by kresd. Use of this option is discouraged because it will break your installation when the trust anchor key changes!
 
 Default: "@keyfile_default@" (can be empty if your distribution did not provide one)
-.TP
-.B \-m\fI path\fR, \fB\-\-moduledir=\fI<path>
-Override the directory that is searched for modules.  Default: @modules_dir@
 .TP
 .B \-f\fI N\fR, \fB\-\-forks=\fI<N>
 With this option, the daemon is started in non-interactive mode and instead creates a
