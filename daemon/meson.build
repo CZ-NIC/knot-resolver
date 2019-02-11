@@ -32,7 +32,7 @@ kresd_c_args = [
 
 kresd_deps = [
   contrib_dep,
-  kresconfig_dep,,
+  kresconfig_dep,
   libkres_dep,
   libknot,
   libzscanner,
@@ -52,7 +52,7 @@ subdir('lua')
 
 kresd = executable(
   'kresd',
-  kresd_src, kresd_lua,
+  kresd_src,
   dependencies: kresd_deps,
   export_dynamic: true,
   c_args: kresd_c_args,
