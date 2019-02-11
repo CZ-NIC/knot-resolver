@@ -3,6 +3,7 @@
 ta_config = configuration_data()
 ta_config.set('keyfile_default', keyfile_default)
 ta_config.set('etc_dir', etc_dir)
+ta_config.set('managed_ta', managed_ta)
 trust_anchors = configure_file(
   input: 'trust_anchors.lua.in',
   output: 'trust_anchors.lua',
@@ -48,9 +49,14 @@ if build_daemon
     capture: true,
   )
 
+  config_lua = configure_file(
+    input: 'config.lua.in',
+    output: 'config.lua',
+    configuration: ta_config,
+  )
   kresd_lua = embed_lua.process(
     'sandbox.lua',
-    'config.lua',
+    config_lua,
     preserve_path_from: meson.source_root(),
   )
 endif

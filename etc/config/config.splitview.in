@@ -2,7 +2,10 @@
 -- Config file with split-view for internal zone
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/daemon.html#configuration
 @config_defaults@
-@config_managed_ta@
+
+--- To disable DNSSEC validation, uncomment the following line (not recommended)
+--- trust_anchors.keyfile_default = nil
+
 -- Load Useful modules
 modules = {
 	'hints > iterate', -- Load /etc/hosts and allow custom root hints
