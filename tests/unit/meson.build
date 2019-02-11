@@ -5,7 +5,7 @@ mock_cmodule_src = [
   'mock_cmodule.c',
 ]
 
-mock_cmodule_lib = library(
+mock_cmodule_lib = shared_library(
   'mock_cmodule',
   mock_cmodule_src,
   name_prefix: '',
