@@ -1,7 +1,10 @@
 -- vim:syntax=lua:set ts=4 sw=4:
 -- Refer to manual: http://knot-resolver.readthedocs.org/en/stable/daemon.html#configuration
 @config_defaults@
-@config_managed_ta@
+
+--- To disable DNSSEC validation, uncomment the following line (not recommended)
+--- trust_anchors.keyfile_default = nil
+
 -- Load useful modules
 modules = {
 	'hints > iterate',  -- Load /etc/hosts and allow custom root hints
