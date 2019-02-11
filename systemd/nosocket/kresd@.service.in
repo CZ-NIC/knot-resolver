@@ -5,7 +5,7 @@ Documentation=man:kresd(8)
 
 [Service]
 Type=simple
-WorkingDirectory=@systemd_cache_dir@
+WorkingDirectory=@systemd_work_dir@
 ExecStart=@sbin_dir@/kresd --config=@etc_dir@/kresd.conf --forks=1
 Restart=on-failure
 
