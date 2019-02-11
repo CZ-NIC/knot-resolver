@@ -5,7 +5,7 @@ Documentation=man:kresd(8)
 
 [Service]
 Type=notify
-WorkingDirectory=@systemd_cache_dir@
+WorkingDirectory=@systemd_work_dir@
 ExecStart=@sbin_dir@/kresd --config=@etc_dir@/kresd.conf
 User=@user@
 Restart=on-failure
