@@ -102,11 +102,6 @@ add_global_arguments(
   language: 'c',
 )
 
-# List of lua modules to be installed to modules_dir
-lua_src = [
-  # files(module.lua)
-]
-
 # Lists of tests
 # These lists are added to from subdir() and finally used in tests/*
 
