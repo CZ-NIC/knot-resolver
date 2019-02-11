@@ -61,24 +61,16 @@ if systemd
   kresd_deps += libsystemd
 endif
 
-# TODO test build on osx
-if host_machine.system() == 'darwin'
-  # luajit workaround for OS X  https://luajit.org/install.html#embed
-  kresd_c_args += ['-pagezero_size', '10000', '-image_base', '100000000']
-endif
-
 
 subdir('lua')
 
 
-if build_daemon
-  kresd = executable(
-    'kresd',
-    kresd_src, kresd_lua,
-    dependencies: kresd_deps,
-    export_dynamic: true,
-    c_args: kresd_c_args,
-    install: true,
-    install_dir: get_option('sbindir'),
-  )
-endif
+kresd = executable(
+  'kresd',
+  kresd_src, kresd_lua,
+  dependencies: kresd_deps,
+  export_dynamic: true,
+  c_args: kresd_c_args,
+  install: true,
+  install_dir: get_option('sbindir'),
+)
