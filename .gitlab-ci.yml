@@ -612,7 +612,7 @@ pkg:debian:symbols:libkres:
     LIB_NAME: libkres
     LIB_ABI: 9
   stage: deploy
-  only:
+  only:  # TODO run this pre-release only
     variables:
       - $OBS_BUILD == "1"
     refs:
