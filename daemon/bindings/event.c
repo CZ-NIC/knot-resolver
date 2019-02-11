@@ -71,10 +71,8 @@ static void event_fdcallback(uv_poll_t* handle, int status, int events)
 static int event_sched(lua_State *L, unsigned timeout, unsigned repeat)
 {
 	uv_timer_t *timer = malloc(sizeof(*timer));
-	if (!timer) {
-		format_error(L, "out of memory");
-		lua_error(L);
-	}
+	if (!timer)
+		lua_error_p(L, "out of memory");
 
 	/* Start timer with the reference */
 	uv_loop_t *loop = uv_default_loop();
@@ -82,8 +80,7 @@ static int event_sched(lua_State *L, unsigned timeout, unsigned repeat)
 	int ret = uv_timer_start(timer, event_callback, timeout, repeat);
 	if (ret != 0) {
 		free(timer);
-		format_error(L, "couldn't start the event");
-		lua_error(L);
+		lua_error_p(L, "couldn't start the event");
 	}
 
 	/* Save callback and timer in registry */
@@ -104,32 +101,27 @@ static int event_after(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2)) {
-		format_error(L, "expected 'after(number timeout, function)'");
-		lua_error(L);
-	}
+	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2))
+		lua_error_p(L, "expected 'after(number timeout, function)'");
 
-	return event_sched(L, lua_tonumber(L, 1), 0);
+	return event_sched(L, lua_tointeger(L, 1), 0);
 }
 
 static int event_recurrent(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2)) {
-		format_error(L, "expected 'recurrent(number interval, function)'");
-		lua_error(L);
-	}
-	return event_sched(L, 0, lua_tonumber(L, 1));
+	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2))
+		lua_error_p(L, "expected 'recurrent(number interval, function)'");
+
+	return event_sched(L, 0, lua_tointeger(L, 1));
 }
 
 static int event_cancel(lua_State *L)
 {
 	int n = lua_gettop(L);
-	if (n < 1 || !lua_isnumber(L, 1)) {
-		format_error(L, "expected 'cancel(number event)'");
-		lua_error(L);
-	}
+	if (n < 1 || !lua_isnumber(L, 1))
+		lua_error_p(L, "expected 'cancel(number event)'");
 
 	/* Fetch event if it exists */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
@@ -151,10 +143,8 @@ static int event_cancel(lua_State *L)
 static int event_reschedule(lua_State *L)
 {
 	int n = lua_gettop(L);
-	if (n < 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
-		format_error(L, "expected 'reschedule(number event, number timeout)'");
-		lua_error(L);
-	}
+	if (n < 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
+		lua_error_p(L, "expected 'reschedule(number event, number timeout)'");
 
 	/* Fetch event if it exists */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
@@ -185,19 +175,15 @@ static int event_fdwatch(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2)) {
-		format_error(L, "expected 'socket(number fd, function)'");
-		lua_error(L);
-	}
+	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2))
+		lua_error_p(L, "expected 'socket(number fd, function)'");
 
 	uv_poll_t *handle = malloc(sizeof(*handle));
-	if (!handle) {
-		format_error(L, "out of memory");
-		lua_error(L);
-	}
+	if (!handle)
+		lua_error_p(L, "out of memory");
 
 	/* Start timer with the reference */
-	int sock = lua_tonumber(L, 1);
+	int sock = lua_tointeger(L, 1);
 	uv_loop_t *loop = uv_default_loop();
 #if defined(__APPLE__) || defined(__FreeBSD__)
 	/* libuv is buggy and fails to create poller for
@@ -219,8 +205,7 @@ static int event_fdwatch(lua_State *L)
 	}
 	if (ret != 0) {
 		free(handle);
-		format_error(L, "couldn't start event poller");
-		lua_error(L);
+		lua_error_p(L, "couldn't start event poller");
 	}
 
 	/* Save callback and timer in registry */

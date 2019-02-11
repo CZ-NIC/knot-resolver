@@ -23,6 +23,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <lua.h>
 #include <uv.h>
 #ifdef HAS_SYSTEMD
 #include <systemd/sd-daemon.h>
@@ -337,20 +338,6 @@ end:
 	#pragma GCC diagnostic pop
 }
 
-/** Split away port from the address. */
-static const char *set_addr(char *addr, int *port)
-{
-	char *p = strchr(addr, '@');
-	if (!p) {
-		p = strchr(addr, '#');
-	}
-	if (p) {
-		*port = strtol(p + 1, NULL, 10);
-		*p = '\0';
-	}
-
-	return addr;
-}
 
 /*
  * Server operation.
@@ -641,20 +628,21 @@ static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
 	return ret;
 }
 
-static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {	
+static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {
 	uint32_t flags = tls ? NET_TCP|NET_TLS : NET_UDP|NET_TCP;
-	int ret = 0;
 	for (size_t i = 0; i < addr_set->len; ++i) {
-		int port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
-		const char *addr = set_addr(addr_set->at[i], &port);
-		ret = network_listen(net, addr, (uint16_t)port, flags);
+		uint16_t port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
+		char buf[INET6_ADDRSTRLEN + 1];
+		const char *addr = kr_straddr_split(addr_set->at[i], buf, &port);
+		/* NULL will result into kr_strerror(EINVAL) -> correct. */
+		int ret = network_listen(net, addr, (uint16_t)port, flags);
 		if (ret != 0) {
-			kr_log_error("[system] bind to '%s@%d' %s%s\n", 
+			kr_log_error("[system] bind to '%s@%d' %s%s\n",
 				addr, port, tls ? "(TLS) " : "", kr_strerror(ret));
-			break;
+			return ret;
 		}
 	}
-	return ret;
+	return kr_ok();
 }
 
 int main(int argc, char **argv)

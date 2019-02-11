@@ -25,7 +25,6 @@
 
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
-#include <lua.h>
 
 #include <libknot/libknot.h>
 #include <libknot/packet/pkt.h>
@@ -303,16 +302,17 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port);
 KR_EXPORT
 int kr_straddr_subnet(void *dst, const char *addr);
 
-/** Splits ip address specified as "addr@port" or "addr#port" into addr and port
-  * and performs validation.
-  * @note if #port part isn't present, then port will be set to 0.
-  *       buf and\or port can be set to NULL.
-  * @return kr_error(EINVAL) - addr part doesn't contains valid ip address or
-  *                            #port part is out-of-range (either < 0 either > UINT16_MAX)
-  *         kr_error(ENOSP)  - buflen is too small
-  */
+/** Splits ip address specified as "addr@port" or "addr#port" into addr and port.
+ * \param addr zero-terminated input
+ * \param buf buffer in case we need to copy the address;
+ * 		length > MIN(strlen(addr), INET6_ADDRSTRLEN + 1)
+ * \param port[out] written in case it's specified in addr
+ * \return pointer to address without port (zero-terminated string)
+ * \note Typically you follow this by kr_straddr_socket().
+ */
 KR_EXPORT
-int kr_straddr_split(const char *addr, char *buf, size_t buflen, uint16_t *port);
+const char * kr_straddr_split(const char *addr, char *buf, uint16_t *port);
+
 /** Formats ip address and port in "addr#port" format.
   * and performs validation.
   * @note Port always formatted as five-character string with leading zeros.
@@ -409,17 +409,6 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 	if (type == KNOT_RRTYPE_RRSIG)
 		type = knot_rrsig_type_covered(rr->rrs.rdata);
 	return type;
-}
-
-/** Printf onto the lua stack, avoiding additional copy (thin wrapper). */
-KR_PRINTF(2)
-static inline const char *lua_push_printf(lua_State *L, const char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	const char *ret = lua_pushvfstring(L, fmt, args);
-	va_end(args);
-	return ret;
 }
 
 /** @internal Return string representation of addr.

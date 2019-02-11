@@ -91,7 +91,7 @@ static inline int l_ffi_call(lua_State *L, int argc)
 		return kr_error(EIO);
 	}
 	if (lua_isnumber(L, -1)) { /* Return code */
-		status = lua_tonumber(L, -1);
+		status = lua_tointeger(L, -1);
 	} else if (lua_isthread(L, -1)) { /* Continuations */
 		status = l_ffi_defer(lua_tothread(L, -1));
 	}
