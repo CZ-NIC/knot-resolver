@@ -1,7 +1,6 @@
 # systemd
 
 ## paths
-# TODO user mode; prefix==/usr/local
 systemd_work_dir = join_paths(
   prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
 run_dir = join_paths('/run', 'knot-resolver')
