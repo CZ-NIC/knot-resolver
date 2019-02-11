@@ -1,62 +1,33 @@
-# daemon: lua modules + embed
-
-ta_config = configuration_data()
-ta_config.set('keyfile_default', keyfile_default)
-ta_config.set('etc_dir', etc_dir)
-ta_config.set('managed_ta', managed_ta)
-trust_anchors = configure_file(
-  input: 'trust_anchors.lua.in',
-  output: 'trust_anchors.lua',
-  configuration: ta_config,
-)
-
-lua_src += [
-  files('kres.lua'),
-  files('kres-gen.lua'),
-  trust_anchors,
-  files('zonefile.lua'),
-]
+# daemon: lua modules
 
 config_tests += [
   ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
 ]
 
+ta_config = configuration_data()
+ta_config.set('keyfile_default', keyfile_default)
+ta_config.set('etc_dir', etc_dir)
+ta_config.set('managed_ta', managed_ta)
 
-# daemon dependencies
-build_daemon = false
-if not get_option('daemon').disabled()
-  message('--- daemon dependencies ---')
-  xxd = find_program('xxd', required: false)
-  if xxd.found()
-    build_daemon = true
-  else
-    # fallback
-    hexdump = find_program('hexdump', required: get_option('daemon'))
-    if hexdump.found()
-      build_daemon = true
-    endif
-  endif
-  embed_lua = find_program('../../scripts/embed-lua.sh')
-  message('--------------------------------------')
-endif
+trust_anchors = configure_file(
+  input: 'trust_anchors.lua.in',
+  output: 'trust_anchors.lua',
+  configuration: ta_config,
+)
+config_lua = configure_file(
+  input: 'config.lua.in',
+  output: 'config.lua',
+  configuration: ta_config,
+)
 
-# embed lua to daemon
-if build_daemon
-  embed_lua = generator(
-    embed_lua,
-    arguments: ['@INPUT@'],
-    output: '@BASENAME@.inc',
-    capture: true,
-  )
-
-  config_lua = configure_file(
-    input: 'config.lua.in',
-    output: 'config.lua',
-    configuration: ta_config,
-  )
-  kresd_lua = embed_lua.process(
-    'sandbox.lua',
+# install daemon lua sources
+install_data([
     config_lua,
-    preserve_path_from: meson.source_root(),
-  )
-endif
+    files('kres.lua'),
+    files('kres-gen.lua'),
+    files('sandbox.lua'),
+    trust_anchors,
+    files('zonefile.lua'),
+  ],
+  install_dir: modules_dir,
+)
