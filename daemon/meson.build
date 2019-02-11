@@ -25,11 +25,6 @@ config_tests += [
 ]
 
 
-# daemon CFLAGS
-kresd_c_args = [
-  '-fPIE',  # NOTE this triggers warning, but is needed for compatibility with meson 0.47.0
-]
-
 kresd_deps = [
   contrib_dep,
   kresconfig_dep,
@@ -55,7 +50,6 @@ kresd = executable(
   kresd_src,
   dependencies: kresd_deps,
   export_dynamic: true,
-  c_args: kresd_c_args,
   install: true,
   install_dir: get_option('sbindir'),
 )
