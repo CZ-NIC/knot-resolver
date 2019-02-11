@@ -1,6 +1,6 @@
 # LUA module: daf
 
-lua_src += [
+lua_mod_src += [
   files('daf.lua'),
 ]
 

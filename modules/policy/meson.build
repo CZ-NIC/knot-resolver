@@ -1,6 +1,6 @@
 # LUA module: policy
 
-lua_src += [
+lua_mod_src += [
   files('policy.lua'),
 ]
 
