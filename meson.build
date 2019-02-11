@@ -86,8 +86,6 @@ if opt_systemd != 'disabled'
   endif
   message('---------------------------')
 endif
-# TODO systemd_user_mode
-systemd_user_mode = false
 
 # TODO use var instead
 add_global_arguments(
@@ -169,7 +167,6 @@ endif
 summary_managed_ta = managed_ta ? 'enabled' : 'disabled'
 summary_systemd = systemd ? 'enabled' : 'disabled'
 summary_systemd_socket = systemd_socket ? 'enabled' : 'disabled'
-summary_systemd_user_mode = systemd_user_mode ? 'enabled' : 'disabled'
 summary_build_client = build_client ? 'enabled' : 'disabled'
 summary_build_daemon = build_daemon ? 'enabled' : 'disabled'
 summary_build_doc = build_doc ? 'enabled' : 'disabled'
@@ -190,9 +187,7 @@ message('''
 
   systemd:              @0@'''.format(summary_systemd) + '''
     socket activation:  @0@'''.format(summary_systemd_socket) + '''
-    user mode:          @0@'''.format(summary_systemd_user_mode) + '''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
-    run_dir:            @0@'''.format(run_dir) + '''
 
   components
     client:             @0@'''.format(summary_build_client) + '''
