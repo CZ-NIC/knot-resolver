@@ -25,7 +25,6 @@ example_configs = [
 
 conf_config = configuration_data()
 conf_config.set('config_defaults', config_defaults)
-conf_config.set('config_managed_ta', config_managed_ta)
 
 foreach config_filename : example_configs
   configure_file(
