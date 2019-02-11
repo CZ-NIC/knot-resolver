@@ -1,6 +1,6 @@
 # LUA module: http
 
-lua_src += [
+lua_mod_src += [
   files('http.lua'),
   files('http_trace.lua'),
   files('prometheus.lua'),
