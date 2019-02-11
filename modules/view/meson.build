@@ -1,6 +1,6 @@
 # LUA module: view
 
-lua_src += [
+lua_mod_src += [
   files('view.lua'),
 ]
 
