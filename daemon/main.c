@@ -23,6 +23,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "kresconfig.h"
+
 #include <lua.h>
 #include <uv.h>
 #ifdef HAS_SYSTEMD
@@ -33,7 +35,6 @@
 #include <contrib/cleanup.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/ccan/asprintf/asprintf.h>
-#include "kresconfig.h"
 #include "lib/defines.h"
 #include "lib/resolve.h"
 #include "lib/dnssec.h"
