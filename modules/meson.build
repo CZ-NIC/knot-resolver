@@ -45,6 +45,6 @@ subdir('view')
 foreach mod : lua_mod_src
   install_data(
     mod,
-    install_dir: modules_dir,
+    install_dir: join_path(modules_dir, 'kres_modules'),
   )
 endforeach
