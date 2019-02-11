@@ -1,8 +1,8 @@
 # systemd
 
 ## paths
-# TODO user mode
-systemd_cache_dir = join_paths(
+# TODO user mode; prefix==/usr/local
+systemd_work_dir = join_paths(
   prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
 run_dir = join_paths('/run', 'knot-resolver')
 systemd_unit_dir = join_paths(prefix, get_option('libdir'), 'systemd', 'system')
@@ -12,7 +12,7 @@ systemd_tmpfiles_dir = join_paths(prefix, get_option('libdir'), 'tmpfiles.d')
 systemd_config = configuration_data()
 systemd_config.set('user', user)
 systemd_config.set('group', group)
-systemd_config.set('systemd_cache_dir', systemd_cache_dir)
+systemd_config.set('systemd_work_dir', systemd_work_dir)
 systemd_config.set('sbin_dir', sbin_dir)
 systemd_config.set('etc_dir', etc_dir)
 systemd_config.set('run_dir', run_dir)
