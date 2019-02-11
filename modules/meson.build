@@ -1,6 +1,6 @@
 # modules
 
-lua_src += [  # add lua modules without separate meson.build
+lua_mod_src = [  # add lua modules without separate meson.build
   files('detect_time_jump/detect_time_jump.lua'),
   files('detect_time_skew/detect_time_skew.lua'),
   files('dns64/dns64.lua'),
@@ -42,7 +42,7 @@ subdir('view')
 
 
 # install lua modules
-foreach mod : lua_src
+foreach mod : lua_mod_src
   install_data(
     mod,
     install_dir: modules_dir,
