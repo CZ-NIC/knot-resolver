@@ -21,7 +21,7 @@ lua_ac_src = [
   'lua-aho-corasick/ac_slow.cxx',
 ]
 
-lua_ac_lib = library(
+lua_ac_lib = shared_library(
   'ahocorasick',
   lua_ac_src,
   dependencies: luajit,
@@ -33,5 +33,5 @@ lua_ac_lib = library(
   ],
   name_prefix: '',
   install: true,
-  install_dir: modules_dir,
+  install_dir: lib_dir,
 )
