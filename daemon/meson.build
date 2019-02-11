@@ -25,28 +25,14 @@ config_tests += [
 ]
 
 
-lib_suffix = '.so'
-# TODO seek&destroy LIBEXT
-if host_machine.system() == 'darwin'
-  lib_suffix = '.dylib'
-endif
-
-luajit_has_setfuncs = run_command(
-  'pkg-config', ['luajit', '--atleast-version', '2.1.0-beta3']
-  ).returncode() == 0 ? '1' : '0'
-
 # daemon CFLAGS
 kresd_c_args = [
   '-fPIE',  # NOTE this triggers warning, but is needed for compatibility with meson 0.47.0
-  '-DROOTHINTS="@0@/root.hints"'.format(etc_dir),
-  '-DLIBEXT="@0@"'.format(lib_suffix),
-  '-Dlibzscanner_SONAME="@0@"'.format(libzscanner.get_pkgconfig_variable('soname')),
-  '-Dlibknot_SONAME="@0@"'.format(libknot.get_pkgconfig_variable('soname')),
-  '-DLUA_HAS_SETFUNCS=@0@'.format(luajit_has_setfuncs),
 ]
 
 kresd_deps = [
   contrib_dep,
+  kresconfig_dep,,
   libkres_dep,
   libknot,
   libzscanner,
@@ -57,7 +43,6 @@ kresd_deps = [
 ]
 
 if systemd
-  kresd_c_args += '-DHAS_SYSTEMD'
   kresd_deps += libsystemd
 endif
 
