@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <contrib/cleanup.h>
 
+#include "kresconfig.h"
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "lib/module.h"
@@ -32,15 +33,6 @@ static const struct kr_module embedded_modules[] = {
 	{ "validate", NULL, NULL, NULL, validate_layer, NULL, NULL, NULL },
 	{ "cache",    NULL, NULL, NULL, cache_layer,    NULL, NULL, NULL },
 };
-
-/** Library extension. */
-#if defined(__APPLE__)
- #define LIBEXT ".dylib"
-#elif _WIN32
- #define LIBEXT ".dll"
-#else
- #define LIBEXT ".so"
-#endif
 
 
 /** Load prefixed symbol. */
