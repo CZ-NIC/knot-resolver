@@ -20,12 +20,6 @@ option(
 )
 
 option(
-  'modules_dir',
-  type: 'string',
-  description: 'path to kres modules directory',
-)
-
-option(
   'user',
   type: 'string',
   value: 'knot-resolver',
@@ -60,13 +54,6 @@ option(
   type: 'feature',
   value: 'auto',
   description: 'build kresc client binary'
-)
-
-option(
-  'daemon',
-  type: 'feature',
-  value: 'enabled',
-  description: 'build kresd daemon binary'
 )
 
 option(

@@ -29,5 +29,5 @@ install_data([
     trust_anchors,
     files('zonefile.lua'),
   ],
-  install_dir: modules_dir,
+  install_dir: lib_dir,
 )
