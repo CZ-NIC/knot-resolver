@@ -389,7 +389,7 @@ end
 
 -- Requests which QNAME matches given zone list (i.e. suffix match)
 function policy.suffix(action, zone_list)
-	local AC = require('kres_modules.ahocorasick')
+	local AC = require('ahocorasick')
 	local tree = AC.create(zone_list)
 	return function(_, query)
 		local match = AC.match(tree, query:name(), false)
