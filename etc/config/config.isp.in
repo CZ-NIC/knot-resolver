@@ -2,7 +2,10 @@
 -- Config file example useable for multi-user ISP resolver
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/daemon.html#configuration
 @config_defaults@
-@config_managed_ta@
+
+--- To disable DNSSEC validation, uncomment the following line (not recommended)
+--- trust_anchors.keyfile_default = nil
+
 -- Large cache size, so we don't need to flush often
 -- This can be larger than available RAM, least frequently accessed
 -- records will be paged out
