@@ -29,6 +29,7 @@
 #include <lauxlib.h>
 #include "daemon/bindings/impl.h"
 
+#include "kresconfig.h"
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
 #include "lib/nsrep.h"
