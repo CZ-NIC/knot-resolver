@@ -138,9 +138,9 @@ conf_data.set_quoted('LIBDIR', lib_dir)
 conf_data.set_quoted('ROOTHINTS', '@0@/root.hints'.format(etc_dir))  # TODO allow custom ROOTHINTS with build option?
 conf_data.set_quoted('LIBEXT', libext)
 conf_data.set_quoted('libzscanner_SONAME',
-  (libzscanner.get_pkgconfig_variable('soname'))
+  libzscanner.get_pkgconfig_variable('soname'))
 conf_data.set_quoted('libknot_SONAME',
-  (libknot.get_pkgconfig_variable('soname'))
+  libknot.get_pkgconfig_variable('soname'))
 conf_data.set('HAS_SYSTEMD', systemd)
 
 kresconfig = configure_file(
