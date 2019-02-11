@@ -4,7 +4,9 @@
 -- Listen on all interfaces (localhost would not work in Docker)
 net.listen('0.0.0.0')
 net.listen('0.0.0.0', 853, {tls=true})
-@config_managed_ta@
+
+--- To disable DNSSEC validation, uncomment the following line (not recommended)
+--- trust_anchors.keyfile_default = nil
 
 -- Load Useful modules
 modules = {
