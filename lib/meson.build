@@ -79,6 +79,7 @@ libkres_lib = library('kres',
   include_directories: libkres_inc,
   dependencies: [
     contrib_dep,
+    kresconfig_dep,
     libuv,
     lmdb,
     libknot,

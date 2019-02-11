@@ -33,6 +33,7 @@
 #include <contrib/cleanup.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/ccan/asprintf/asprintf.h>
+#include "kresconfig.h"
 #include "lib/defines.h"
 #include "lib/resolve.h"
 #include "lib/dnssec.h"
@@ -817,7 +818,7 @@ cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_reclaim(worker);
 	if (loop != NULL) {
-		uv_loop_close(loop);	
+		uv_loop_close(loop);
 	}
 	mp_delete(pool.ctx);
 	array_clear(args.addr_set);
