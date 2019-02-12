@@ -88,7 +88,8 @@ if opt_systemd != 'disabled'
     systemd = true
     systemd_socket = opt_systemd != 'nosocket'
   else
-    libsystemd = dependency('libsystemd', required: systemd == 'nosocket')
+    libsystemd = dependency('libsystemd', version: '>=214',
+			    required: opt_systemd == 'nosocket')
     if libsystemd.found()
       systemd = true
       systemd_socket = false
