@@ -37,7 +37,6 @@ struct engine {
     knot_mm_t *pool;
     char *hostname;
     struct lua_State *L;
-    char *moduledir;
 };
 
 int engine_init(struct engine *engine, knot_mm_t *pool);
@@ -72,10 +71,6 @@ struct engine *engine_luaget(struct lua_State *L);
 /** Set/get the per engine hostname */
 char *engine_get_hostname(struct engine *engine);
 int engine_set_hostname(struct engine *engine, const char *hostname);
-
-/** Set/get the per engine moduledir */
-char *engine_get_moduledir(struct engine *engine);
-int engine_set_moduledir(struct engine *engine, const char *moduledir);
 
 /** Load root hints from a zonefile (or config-time default if NULL).
  *
