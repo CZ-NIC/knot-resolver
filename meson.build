@@ -63,6 +63,15 @@ else
   endif
 endif
 
+## Root hints
+root_hints = join_paths(etc_dir, get_option('root_hints'))
+if keyfile_default == join_paths(etc_dir, 'root.hints')
+  install_root_hints = true
+else
+  install_root_hints = false
+endif
+
+
 ## User/Group
 user = get_option('user')
 group = get_option('group')
@@ -132,7 +141,7 @@ run_target(
 conf_data = configuration_data()
 conf_data.set_quoted('PACKAGE_VERSION', meson.project_version())
 conf_data.set_quoted('LIBDIR', lib_dir)
-conf_data.set_quoted('ROOTHINTS', '@0@/root.hints'.format(etc_dir))
+conf_data.set_quoted('ROOTHINTS', root_hints)
 conf_data.set_quoted('LIBEXT', libext)
 conf_data.set_quoted('libzscanner_SONAME',
   libzscanner.get_pkgconfig_variable('soname'))
@@ -192,8 +201,9 @@ message('''
   paths
     prefix:             @0@'''.format(prefix) + '''
     lib_dir:            @0@'''.format(lib_dir) + '''
-    etc_dir:            @0@'''.format(etc_dir) + '''
     sbin_dir:           @0@'''.format(sbin_dir) + '''
+    etc_dir:            @0@'''.format(etc_dir) + '''
+    root.hints:         @0@'''.format(root_hints) + '''
 
   trust_anchors
     keyfile_default:    @0@'''.format(keyfile_default) + '''
