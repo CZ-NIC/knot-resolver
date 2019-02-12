@@ -19,14 +19,28 @@ build_doc = get_option('doc').enabled()  # NOTE 'auto' unsupported
 if build_doc  # doxygen + html docs
   message('--- doc dependencies ---')
   doxygen = find_program('doxygen')
-  sphinx_build = find_program('sphinx-build')
+  sphinx_build = find_program('sphinx-build-3', required: false)
+  if not sphinx_build.found()
+    sphinx_build = find_program('sphinx-build')
+  endif
 
+  # python dependencies: breathe, sphinx_rtd_theme
   python_breathe = run_command('python3', '-c', 'import breathe')
   if python_breathe.returncode() != 0
     # some distros might use python2 sphinx
     python_breathe = run_command('python2', '-c', 'import breathe')
     if python_breathe.returncode() != 0
       error('missing doc dependency: python breathe')
+    else
+      python_sphinx_rtd_theme = run_command('python2', '-c', 'import sphinx_rtd_theme')
+      if python_sphinx_rtd_theme.returncode() != 0
+	error('missing doc dependency: python sphinx_rtd_theme')
+      endif
+    endif
+  else
+    python_sphinx_rtd_theme = run_command('python3', '-c', 'import sphinx_rtd_theme')
+    if python_sphinx_rtd_theme.returncode() != 0
+      error('missing doc dependency: python sphinx_rtd_theme')
     endif
   endif
   message('------------------------')
