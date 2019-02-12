@@ -781,8 +781,6 @@ int main(int argc, char **argv)
 	}
 
 	/* Start the scripting engine */
-	engine_set_moduledir(&engine, LIBDIR);
-
 	if (engine_load_sandbox(&engine) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
