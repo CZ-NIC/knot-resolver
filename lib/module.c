@@ -30,7 +30,9 @@ const kr_layer_api_t *cache_layer(struct kr_module *module);
 static const struct kr_module embedded_modules[] = {
 	{ "iterate",  NULL, NULL, NULL, iterate_layer,  NULL, NULL, NULL },
 	{ "validate", NULL, NULL, NULL, validate_layer, NULL, NULL, NULL },
+#ifndef LIBRARY_ONLY
 	{ "cache",    NULL, NULL, NULL, cache_layer,    NULL, NULL, NULL },
+#endif
 };
 
 /** Library extension. */

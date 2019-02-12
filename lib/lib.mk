@@ -1,13 +1,4 @@
 libkres_SOURCES := \
-	lib/cache/api.c \
-	lib/cache/cdb_lmdb.c \
-	lib/cache/entry_list.c \
-	lib/cache/entry_pkt.c \
-	lib/cache/entry_rr.c \
-	lib/cache/knot_pkt.c \
-	lib/cache/nsec1.c \
-	lib/cache/nsec3.c \
-	lib/cache/peek.c \
 	lib/dnssec.c \
 	lib/dnssec/nsec.c \
 	lib/dnssec/nsec3.c \
@@ -17,7 +8,6 @@ libkres_SOURCES := \
 	lib/generic/map.c \
 	lib/generic/queue.c \
 	lib/generic/trie.c \
-	lib/layer/cache.c \
 	lib/layer/iterate.c \
 	lib/layer/validate.c \
 	lib/module.c \
@@ -29,9 +19,6 @@ libkres_SOURCES := \
 
 libkres_HEADERS := \
 	lib/cache/api.h \
-	lib/cache/cdb_api.h \
-	lib/cache/cdb_lmdb.h \
-	lib/cache/impl.h \
 	lib/defines.h \
 	lib/dnssec.h \
 	lib/dnssec/nsec.h \
@@ -55,9 +42,34 @@ libkres_HEADERS := \
 
 # Dependencies
 libkres_DEPEND := $(contrib)
-libkres_CFLAGS := -fPIC $(lmdb_CFLAGS)
-libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(lmdb_LIBS) $(gnutls_LIBS)
+libkres_CFLAGS := -fPIC
+libkres_LIBS := $(contrib_TARGET) $(libknot_LIBS) $(libdnssec_LIBS) $(gnutls_LIBS)
 libkres_TARGET := -L$(abspath lib) -lkres
+
+ifneq ($(LIBRARY_ONLY), yes)
+libkres_SOURCES += \
+	lib/layer/cache.c \
+	lib/cache/api.c \
+	lib/cache/cdb_lmdb.c \
+	lib/cache/entry_list.c \
+	lib/cache/entry_pkt.c \
+	lib/cache/entry_rr.c \
+	lib/cache/knot_pkt.c \
+	lib/cache/nsec1.c \
+	lib/cache/nsec3.c \
+	lib/cache/peek.c
+
+libkres_HEADERS += \
+	lib/cache/cdb_api.h \
+	lib/cache/cdb_lmdb.h \
+	lib/cache/impl.h
+
+libkres_CFLAGS += $(lmdb_CFLAGS)
+libkres_LIBS += $(lmdb_LIBS)
+else
+libkres_CFLAGS += -DLIBRARY_ONLY
+endif
+
 
 ifeq ($(ENABLE_COOKIES),yes)
 libkres_SOURCES += \
