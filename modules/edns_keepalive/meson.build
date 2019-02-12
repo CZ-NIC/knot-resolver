@@ -13,6 +13,7 @@ edns_keepalive_mod = shared_module(
     libknot,
   ],
   name_prefix: '',
+  c_args: c_args,
   install: true,
   install_dir: modules_dir,
 )
