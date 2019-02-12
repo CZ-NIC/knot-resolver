@@ -95,6 +95,9 @@ if opt_systemd != 'disabled'
       systemd_socket = false
     endif
   endif
+  if systemd
+    pkgconf_systemd = dependency('systemd')
+  endif
   message('---------------------------')
 endif
 
