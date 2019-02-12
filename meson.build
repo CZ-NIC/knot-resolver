@@ -133,7 +133,7 @@ run_target(
 conf_data = configuration_data()
 conf_data.set_quoted('PACKAGE_VERSION', meson.project_version())
 conf_data.set_quoted('LIBDIR', lib_dir)
-conf_data.set_quoted('ROOTHINTS', '@0@/root.hints'.format(etc_dir))  # TODO allow custom ROOTHINTS with build option?
+conf_data.set_quoted('ROOTHINTS', '@0@/root.hints'.format(etc_dir))
 conf_data.set_quoted('LIBEXT', libext)
 conf_data.set_quoted('libzscanner_SONAME',
   libzscanner.get_pkgconfig_variable('soname'))
