@@ -255,14 +255,6 @@ Environment
 
    This affects ephemeral certificates for kresd serving DNS over TLS.
 
-.. function:: moduledir([dir])
-
-   :return: Modules directory.
-
-   If called with a parameter, it will change kresd's directory for
-   looking up the dynamic modules.  If called without a parameter, it
-   will return kresd's modules directory.
-
 .. function:: verbose(true | false)
 
    :return: Toggle verbose logging.

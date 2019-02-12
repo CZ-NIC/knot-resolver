@@ -230,63 +230,6 @@ static int l_package_version(lua_State *L)
 	return 1;
 }
 
-char *engine_get_moduledir(struct engine *engine) {
-	return engine->moduledir;
-}
-
-int engine_set_moduledir(struct engine *engine, const char *moduledir) {
-	if (!engine || !moduledir) {
-		return kr_error(EINVAL);
-	}
-
-	char *new_moduledir = strdup(moduledir);
-	if (!new_moduledir) {
-		return kr_error(ENOMEM);
-	}
-	if (engine->moduledir) {
-		free(engine->moduledir);
-	}
-	engine->moduledir = new_moduledir;
-
-	/* Use module path for including Lua scripts */
-	char l_paths[MAXPATHLEN] = { 0 };
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wformat" /* %1$ is not in C standard */
-	/* Save original package.path to package._path */
-	snprintf(l_paths, MAXPATHLEN - 1,
-		 "if package._path == nil then package._path = package.path end\n"
-		 "package.path = '%1$s/?.lua;%1$s/?/init.lua;'..package._path\n"
-		 "if package._cpath == nil then package._cpath = package.cpath end\n"
-		 "package.cpath = '%1$s/?%2$s;'..package._cpath\n",
-		 new_moduledir, LIBEXT);
-	#pragma GCC diagnostic pop
-
-	int ret = l_dobytecode(engine->L, l_paths, strlen(l_paths), "");
-	if (ret != 0) {
-		lua_pop(engine->L, 1);
-		return ret;
-	}
-	return 0;
-}
-
-/** Return hostname. */
-static int l_moduledir(lua_State *L)
-{
-	struct engine *engine = engine_luaget(L);
-	if (lua_gettop(L) == 0) {
-		lua_pushstring(L, engine_get_moduledir(engine));
-		return 1;
-	}
-	if ((lua_gettop(L) != 1) || !lua_isstring(L, 1))
-		lua_error_p(L, "moduledir takes at most one parameter: (\"directory\")");
-
-	if (engine_set_moduledir(engine, lua_tostring(L, 1)) != 0)
-		lua_error_p(L, "setting moduledir failed");
-
-	lua_pushstring(L, engine_get_moduledir(engine));
-	return 1;
-}
-
 /** Load root hints from zonefile. */
 static int l_hint_root_file(lua_State *L)
 {
@@ -608,8 +551,6 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "hostname");
 	lua_pushcfunction(engine->L, l_package_version);
 	lua_setglobal(engine->L, "package_version");
-	lua_pushcfunction(engine->L, l_moduledir);
-	lua_setglobal(engine->L, "moduledir");
 	lua_pushcfunction(engine->L, l_verbose);
 	lua_setglobal(engine->L, "verbose");
 	lua_pushcfunction(engine->L, l_setuser);
@@ -659,6 +600,33 @@ static void init_measurement(struct engine *engine)
 	free(snippet);
 }
 
+int init_lua(struct engine *engine) {
+	if (!engine) {
+		return kr_error(EINVAL);
+	}
+
+	/* Use libdir path for including Lua scripts */
+	char l_paths[MAXPATHLEN] = { 0 };
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wformat" /* %1$ is not in C standard */
+	/* Save original package.path to package._path */
+	snprintf(l_paths, MAXPATHLEN - 1,
+		 "if package._path == nil then package._path = package.path end\n"
+		 "package.path = '%1$s/?.lua;%1$s/?/init.lua;'..package._path\n"
+		 "if package._cpath == nil then package._cpath = package.cpath end\n"
+		 "package.cpath = '%1$s/?%2$s;'..package._cpath\n",
+		 LIBDIR, LIBEXT);
+	#pragma GCC diagnostic pop
+
+	int ret = l_dobytecode(engine->L, l_paths, strlen(l_paths), "");
+	if (ret != 0) {
+		lua_pop(engine->L, 1);
+		return ret;
+	}
+	return 0;
+}
+
+
 int engine_init(struct engine *engine, knot_mm_t *pool)
 {
 	if (engine == NULL) {
@@ -683,6 +651,13 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 	}
 	/* Initialize network */
 	network_init(&engine->net, uv_default_loop(), TCP_BACKLOG_DEFAULT);
+
+	/* Initialize lua */
+	ret = init_lua(engine);
+	if (ret != 0) {
+		engine_deinit(engine);
+		return ret;
+	}
 
 	return ret;
 }
@@ -737,7 +712,6 @@ void engine_deinit(struct engine *engine)
 	kr_ta_clear(&engine->resolver.trust_anchors);
 	kr_ta_clear(&engine->resolver.negative_anchors);
 	free(engine->hostname);
-	free(engine->moduledir);
 }
 
 int engine_pcall(lua_State *L, int argc)
