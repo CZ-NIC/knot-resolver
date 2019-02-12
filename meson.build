@@ -51,16 +51,15 @@ systemd_tmpfiles_dir = ''
 
 ## Trust anchors
 managed_ta = get_option('managed_ta').enabled()
-keyfile_default = get_option('keyfile_default')
-if keyfile_default == ''
-  keyfile_default = join_paths(etc_dir, 'root.keys')
+keyfile_default = join_paths(etc_dir, get_option('keyfile_default'))
+if keyfile_default == join_paths(etc_dir, 'root.keys')
   install_root_keys = true
   managed_ta = managed_ta or get_option('managed_ta').auto()
 else
   install_root_keys = false
   if managed_ta
-    warning('Using managed_ta along with keyfile_default. Ensure '
-	    + 'keyfile_default directory will be writable by kresd.')
+    warning('Using managed_ta along with non-standard keyfile_default. ' +
+	    'Ensure keyfile_default directory will be writable by kresd.')
   endif
 endif
 
