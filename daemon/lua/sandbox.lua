@@ -316,13 +316,13 @@ end
 
 -- Load embedded modules
 trust_anchors = require('trust_anchors')
-modules.load('kres_modules.ta_signal_query')
-modules.load('kres_modules.policy')
-modules.load('kres_modules.priming')
-modules.load('kres_modules.detect_time_skew')
-modules.load('kres_modules.detect_time_jump')
-modules.load('kres_modules.ta_sentinel')
-modules.load('kres_modules.edns_keepalive')
+modules.load('ta_signal_query')
+modules.load('policy')
+modules.load('priming')
+modules.load('detect_time_skew')
+modules.load('detect_time_jump')
+modules.load('ta_sentinel')
+modules.load('edns_keepalive')
 
 -- Interactive command evaluation
 function eval_cmd(line, raw)
