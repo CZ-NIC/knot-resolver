@@ -1,7 +1,16 @@
 # LUA module: http
 
+lua_http_config = configuration_data()
+lua_http_config.set('modules_dir', modules_dir)
+
+lua_http = configure_file(
+  input: 'http.lua.in',
+  output: 'http.lua',
+  configuration: lua_http_config,
+)
+
 lua_mod_src += [
-  files('http.lua'),
+  lua_http,
   files('http_trace.lua'),
   files('prometheus.lua'),
 ]
