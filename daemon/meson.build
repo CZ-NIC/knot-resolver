@@ -50,6 +50,7 @@ kresd = executable(
   kresd_src,
   dependencies: kresd_deps,
   export_dynamic: true,
+  c_args: c_args,
   install: true,
   install_dir: get_option('sbindir'),
 )
