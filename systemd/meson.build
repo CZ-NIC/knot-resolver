@@ -4,8 +4,8 @@
 systemd_work_dir = join_paths(
   prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
 run_dir = join_paths('/run', 'knot-resolver')
-systemd_unit_dir = join_paths(lib_dir, 'systemd', 'system')
-systemd_tmpfiles_dir = join_paths(lib_dir, 'tmpfiles.d')
+systemd_unit_dir = pkgconf_systemd.get_pkgconfig_variable('systemdsystemunitdir')
+systemd_tmpfiles_dir = pkgconf_systemd.get_pkgconfig_variable('tmpfilesdir')
 
 ## configuration
 systemd_config = configuration_data()
