@@ -13,6 +13,12 @@ integr_tests += [
   ['policy.noipvx', join_paths(meson.current_source_dir(), 'noipvx.test.integr')],
 ]
 
+# check git submodules were initialized
+lua_ac_submodule = run_command(['test', '-r',
+  '@0@/lua-aho-corasick/ac_fast.cxx'.format(meson.current_source_dir())])
+if lua_ac_submodule.returncode() != 0
+  error('run "git submodule update --init --recursive" to initialize git submodules')
+endif
 
 # compile bundled lua-aho-corasick lib
 lua_ac_src = [
