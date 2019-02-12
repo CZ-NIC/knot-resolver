@@ -14,6 +14,13 @@ option(
 )
 
 option(
+  'root_hints',
+  type: 'string',
+  value: 'root.hints',
+  description: 'built-in path to root.hints file',
+)
+
+option(
   'install_kresd_conf',
   type: 'feature',
   value: 'auto',
