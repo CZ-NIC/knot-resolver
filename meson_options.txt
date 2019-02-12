@@ -2,7 +2,8 @@
 option(
   'keyfile_default',
   type: 'string',
-  description: 'built-in default path to DNSSEC trust anchors file',
+  value: 'root.keys',
+  description: 'built-in path to DNSSEC trust anchors file',
 )
 
 option(
