@@ -27,12 +27,11 @@ lua_ac_src = [
   'lua-aho-corasick/ac_slow.cxx',
 ]
 
-lua_ac_lib = shared_library(
+lua_ac_lib = shared_module(
   'ahocorasick',
   lua_ac_src,
   dependencies: luajit,
   cpp_args: [
-    '-O3',
     '-fvisibility=hidden',
     '-Wall',
     '-fPIC',
