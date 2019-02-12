@@ -89,8 +89,7 @@ if opt_systemd != 'disabled'
   message('---------------------------')
 endif
 
-# TODO use var instead
-add_global_arguments(
+c_args = [
   '-D_GNU_SOURCE',
   '-Wtype-limits',
   '-Wformat',
@@ -98,8 +97,7 @@ add_global_arguments(
   '-Wshadow',
   '-Wall',
   '-fvisibility=hidden',
-  language: 'c',
-)
+]
 
 # Lists of tests
 # These lists are added to from subdir() and finally used in tests/*
