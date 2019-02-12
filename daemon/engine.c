@@ -902,7 +902,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		return kr_error(ENOMEM);
 	}
 	module->data = engine;
-	int ret = kr_module_load(module, name, engine->moduledir);
+	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
 	/* Load Lua module if not a binary */
 	if (ret == kr_error(ENOENT)) {
 		ret = ffimodule_register_lua(engine, module, name);
