@@ -6,7 +6,6 @@ tlsproxy_src = [
 ]
 
 # compile tlsproxy
-# TODO fix or silence compilation warnings
 tlsproxy = executable(
   'tlsproxy',
   tlsproxy_src,
@@ -15,6 +14,7 @@ tlsproxy = executable(
     libuv,
     gnutls,
   ],
+  c_args: c_args,
 )
 
 # python 3 dependencies
