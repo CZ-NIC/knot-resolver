@@ -17,7 +17,7 @@ endif
 # Configure and install config examples
 example_configs = [
   'config.cluster',
-  'config.docker',  # TODO should it be installed?
+  'config.docker',
   'config.isp',
   'config.personal',
   'config.splitview',
