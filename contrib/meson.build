@@ -18,7 +18,6 @@ contrib_lib = static_library(
   contrib_src,
   include_directories: contrib_inc,
   dependencies: libknot,
-  c_args: c_args,
 )
 
 contrib_dep = declare_dependency(

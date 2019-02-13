@@ -41,7 +41,6 @@ if libprotobuf_c.found() and libfstrm.found() and protoc_c.found()
       libprotobuf_c,
     ],
     name_prefix: '',
-    c_args: c_args,
     install: true,
     install_dir: modules_dir,
   )
