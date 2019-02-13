@@ -137,37 +137,23 @@ build roots with different build configurations at the same time.
 Build options
 ~~~~~~~~~~~~~
 
-It's possible to customize build options with ``-Doption=value`` when creating
+It's possible to change the compilation with build options. These are useful to
+packagers or developers who wish to customize the daemon behaviour, run
+extended test suites etc.  By default, these are all set to sensible values.
+
+For complete list of build options create a build directory and run:
+
+.. code-block:: bash
+
+   $ meson build_info
+   $ meson configure build_info
+
+To customize project build option, use ``-Doption=value`` when creating
 a build directory:
 
 .. code-block:: bash
 
    $ meson build_doc -Ddoc=enabled
-
-Build options are mostly useful for packagers or developers who wish to
-customize the daemon behaviour, run extended test suites etc.  By default,
-these are all set to sensible values. Our build system supports the following
-options:
-
-.. csv-table::
-   :header: "Option", "Value", "Description"
-
-   "``keyfile_default``", "*string*", "built-in path to DNSSEC trust anchors
-   file"
-   "``managed_ta``", "*feature*", "auto-manage DNSSEC trust anchors (RFC 5011)"
-   "``root_hints``", "*string*", "built-in path to root.hints file"
-   "``install_kresd_conf``", "*feature*", "install default config file"
-   "``verbose_log``", "*feature*", "support verbose logging"
-   "``user``", "*string*", "user which is used for running kresd"
-   "``group``", "*string*", "group which is used for running kresd"
-   "``systemd_unit_files``", "``disabled``/``enabled``/``nosocket``", "installs
-   systemd unit files"
-   "``client``", "*feature*", "build kresc client binary"
-   "``doc``", "*feature*", "build html documentation"
-   "``extra_tests``", "*feature*", "integration tests with extra dependencies"
-   "``unit_tests``", "*feature*", "cmocka unit tests"
-
-*feature* can be either ``auto``, ``enabled`` or ``disabled``.
 
 Running tests
 ~~~~~~~~~~~~~
