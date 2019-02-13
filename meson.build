@@ -71,6 +71,9 @@ else
   install_root_hints = false
 endif
 
+## Verbose log
+opt_verbose_log = get_option('verbose_log')
+verbose_log = opt_verbose_log.enabled() or opt_verbose_log.auto()
 
 ## User/Group
 user = get_option('user')
@@ -84,7 +87,6 @@ if systemd_unit_files == 'enabled' and not libsystemd.found()
   error('systemd_unit_files=enabled requires libsystemd >= 227')
 endif
 message('---------------------------')
-
 
 ## Compiler args
 c_args = [
@@ -138,6 +140,7 @@ conf_data.set_quoted('libzscanner_SONAME',
 conf_data.set_quoted('libknot_SONAME',
   libknot.get_pkgconfig_variable('soname'))
 conf_data.set('HAS_SYSTEMD', libsystemd.found())
+conf_data.set('NOVERBOSELOG' not verbose_log)
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
