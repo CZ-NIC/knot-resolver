@@ -178,34 +178,38 @@ above), use:
 Packagers
 ~~~~~~~~~
 
+Recommended switches for ``meson build_pkg``:
 
+* ``--buildtype=release`` turns on optimalizations, turns off asserts (override
+  with ``-Db_ndebug=false`` if desired)
+* ``--unity=on`` faster builds, see `Unity builds
+  <https://mesonbuild.com/Unity-builds.html>`_
+* ``--prefix=/usr`` to customize
+  prefix, other directories can be set in a similar fashion, see ``meson setup
+  --help``
+* ``-Dsystemd_unit_files=enabled`` for systemd unit files with socket activation
+  support. Alternately, for systemd < 227, use ``nosocket``. If you need to
+  customize unit files, use drop-in files.
+* ``-Ddoc=enabled`` for offline html documentation
+* ``-Dclient=enabled`` to force build of kresc
+* ``-Dunit_tests=enabled`` to force build of unit tests
 
-.. code-block:: bash
+If the target distro has externally managed DNSSEC trust anchors or root hints:
 
-   $ make PREFIX="/usr/local"
-   $ make install PREFIX="/usr/local"
+* ``-Dkeyfile_default=/usr/share/dns/root.key``
+* ``-Droot_hints=/usr/share/dns/root.hints``
 
-.. note:: Always build with ``PREFIX`` if you want to install, as it is hardcoded in the executable for module search path.
-    Production code should be compiled with ``-DNDEBUG``.
-    If you build the binary with ``-DNOVERBOSELOG``, it won't be possible to turn on verbose logging; we advise packagers against using that flag.
+In case you want to have automatically managed DNSSEC trust anchors instead,
+set the following and make sure both ``root.keys`` (check default
+``keyfile_default`` path in summary) and its parent directory will be writable
+by kresd process.
 
-.. note:: If you build with ``PREFIX``, you may need to also set the ``LDFLAGS`` for the libraries:
-
-.. code-block:: bash
-
-   make LDFLAGS="-Wl,-rpath=/usr/local/lib" PREFIX="/usr/local"
-
-Alternatively you can build only specific parts of the project, i.e. ``library``.
-
-.. code-block:: bash
-
-   $ make lib
-   $ make lib-install
-
-.. note:: Documentation is not built by default, run ``make doc`` to build it.
+* ``-Dmanaged_ta=enabled``
 
 Building with security compiler flags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 
 Knot Resolver enables certain `security compile-time flags <https://wiki.debian.org/Hardening#Notes_on_Memory_Corruption_Mitigation_Methods>`_ that do not affect performance.
 You can add more flags to the build by appending them to `CFLAGS` variable, e.g. ``make CFLAGS="-fstack-protector"``.
