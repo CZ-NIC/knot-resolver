@@ -4,8 +4,8 @@
 systemd_work_dir = join_paths(
   prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
 run_dir = join_paths('/run', 'knot-resolver')
-systemd_unit_dir = pkgconf_systemd.get_pkgconfig_variable('systemdsystemunitdir')
-systemd_tmpfiles_dir = pkgconf_systemd.get_pkgconfig_variable('tmpfilesdir')
+systemd_unit_dir = join_paths(prefix, 'lib', 'systemd', 'system')
+systemd_tmpfiles_dir = join_paths(prefix, 'lib', 'tmpfiles.d')
 
 ## configuration
 systemd_config = configuration_data()
@@ -16,9 +16,7 @@ systemd_config.set('sbin_dir', sbin_dir)
 systemd_config.set('etc_dir', etc_dir)
 systemd_config.set('run_dir', run_dir)
 
-# TODO Restart=on-abnormal
-
-if systemd_socket
+if systemd_unit_files == 'enabled'
   ## unit files
   kresd_service = configure_file(
     input: 'kresd@.service.in',
@@ -72,6 +70,6 @@ if systemd_socket
     ],
     install_dir: join_paths(examples_dir, 'kresd-tls.socket.d'),
   )
-else
+else if systemd_unit_files == 'nosocket'
   subdir('nosocket')
 endif
