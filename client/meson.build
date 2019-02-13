@@ -31,7 +31,6 @@ if build_client
       libkres_dep,
       libedit,
     ],
-    c_args: c_args,
     install: true,
     install_dir: get_option('sbindir'),
   )
