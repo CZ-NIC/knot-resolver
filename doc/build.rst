@@ -157,6 +157,7 @@ options:
    "``managed_ta``", "*feature*", "auto-manage DNSSEC trust anchors (RFC 5011)"
    "``root_hints``", "*string*", "built-in path to root.hints file"
    "``install_kresd_conf``", "*feature*", "install default config file"
+   "``verbose_log``", "*feature*", "support verbose logging"
    "``user``", "*string*", "user which is used for running kresd"
    "``group``", "*string*", "group which is used for running kresd"
    "``systemd_unit_files``", "``disabled``/``enabled``/``nosocket``", "installs
