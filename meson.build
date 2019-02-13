@@ -139,7 +139,7 @@ conf_data.set_quoted('libzscanner_SONAME',
 conf_data.set_quoted('libknot_SONAME',
   libknot.get_pkgconfig_variable('soname'))
 conf_data.set('HAS_SYSTEMD', libsystemd.found())
-conf_data.set('NOVERBOSELOG' not verbose_log)
+conf_data.set('NOVERBOSELOG', not verbose_log)
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
