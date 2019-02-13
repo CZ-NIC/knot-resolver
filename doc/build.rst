@@ -1,18 +1,8 @@
-Building project
-================
+Building from sources
+=====================
 
-Installing from packages
-------------------------
-
-The resolver is packaged for Debian, Fedora+EPEL, Ubuntu, Docker, NixOS/NixPkgs, FreeBSD, HomeBrew, and Turris Omnia.
-Some of these are maintained directly by the knot-resolver team.
-
-Refer to `project page <https://www.knot-resolver.cz/download>`_ for information about
-installing from packages. If packages are not available for your OS, see following sections
-to see how you can build it from sources (or package it), or use official `Docker images`_.
-
-Platform considerations
------------------------
+.. note:: Latest up-to-date packages for various distribution can be obtained
+   from `<https://knot-resolver.cz/download/>`_
 
 Knot-resolver is written for UNIX-like systems, mainly in C99.
 Portable I/O is provided by libuv_.
@@ -21,28 +11,35 @@ Some 64-bit systems with LuaJIT 2.1 may be affected by
 -- Linux on x86_64 is unaffected but `Linux on aarch64 is
 <https://gitlab.labs.nic.cz/knot/knot-resolver/issues/216>`_.
 
-Windows systems might theoretically work without large changes,
-but it's most likely broken and currently not planned to be supported.
+.. code-block:: bash
 
-Requirements
+   $ git clone --recursive https://gitlab.labs.nic.cz/knot/knot-resolver.git
+
+Dependencies
 ------------
 
-The following is a list of software required to build Knot Resolver from sources.
+.. warning:: Section *Dependencies* is not up-to-date. Also, individual modules
+   might have additional build or runtime dependencies.
+
+The following is a list of dependencies needed to build and run Knot Resolver.
+
 
 .. csv-table::
    :header: "Requirement", "Required by", "Notes"
 
-   "`GNU Make`_ 3.80+", "*all*", "*(build only)*"
+   "ninja", "*all*", "*(build_only)*"
+   "meson >= 0.47", "*all*", "*(build only)* [#]_"
    "C and C++ compiler", "*all*", "*(build only)* [#]_"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
-   "hexdump or xxd", "``daemon``", "*(build only)*"
    "libknot_ 2.7.6+", "*all*", "Knot DNS libraries"
-   "LuaJIT_ 2.0+", "``daemon``", "Embedded scripting language."
+   "LuaJIT_ 2.0+", "*all*", "Embedded scripting language."
    "libuv_ 1.7+", "*all*", "Multiplatform I/O and services."
-   "lmdb", "*all*", ""
-   "GnuTLS", "*all*", ""
+   "lmdb", "*all*", "Memory-mapped database for cache"
+   "GnuTLS", "*all*", "TLS"
 
-There are also *optional* packages that enable specific functionality in Knot Resolver, they are useful mainly for developers to build documentation and tests.
+There are also *optional* packages that enable specific functionality in Knot
+Resolver, they are useful mainly for developers to build documentation and
+tests.
 
 .. csv-table::
    :header: "Optional", "Needed for", "Notes"
@@ -52,26 +49,40 @@ There are also *optional* packages that enable specific functionality in Knot Re
    "luasec_", "``trust anchors``", "TLS for Lua."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
-   "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this HTML/PDF documentation."
+   "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this
+   HTML/PDF documentation."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
-   "libsystemd_", "``daemon``", "Systemd socket activation support."
-   "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for dnstap_."
+   "libsystemd_ >= 227", "``daemon``", "Systemd socket activation support."
+   "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for
+   dnstap_."
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
-   "libfstrm_ 0.2+", "``modules/dnstap``", "Frame Streams data transport protocol."
+   "libfstrm_ 0.2+", "``modules/dnstap``", "Frame Streams data transport
+   protocol."
    "luacheck_", "``lint-lua``", "Syntax and static analysis checker for Lua."
    "`clang-tidy`_", "``lint-c``", "Syntax and static analysis checker for C."
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
-.. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for dependency file generation. GCC, Clang and ICC are supported.
-.. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS`` to configure dependencies manually (i.e. ``libknot_CFLAGS`` and ``libknot_LIBS``).
-.. [#] libuv 1.7 brings SO_REUSEPORT support that is needed for multiple forks. libuv < 1.7 can be still used, but only in single-process mode. Use :ref:`different method <daemon-reuseport>` for load balancing.
+.. [#] If ``meson >= 0.47`` isn't available for your distro, check backports
+   repository oor use python pip to install it.
+.. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for
+   dependency file generation. GCC, Clang and ICC are supported.
+.. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS``
+   to configure dependencies manually (i.e. ``libknot_CFLAGS`` and
+   ``libknot_LIBS``).
+.. [#] libuv 1.7 brings SO_REUSEPORT support that is needed for multiple forks.
+   libuv < 1.7 can be still used, but only in single-process mode. Use
+   :ref:`different method <daemon-reuseport>` for load balancing.
 
 Packaged dependencies
 ~~~~~~~~~~~~~~~~~~~~~
 
-Most of the dependencies can be resolved from packages, here's an overview for several platforms.
+.. note:: TODO mention home:CZ-NIC:knot-reslver-build here
 
-* **Debian** (since *sid*) - current stable doesn't have libknot and libuv, which must be installed from sources.
+Most of the dependencies can be resolved from packages, here's an overview for
+several platforms.
+
+* **Debian** (since *sid*) - current stable doesn't have libknot and libuv,
+  which must be installed from sources.
 
 .. code-block:: bash
 
@@ -94,32 +105,93 @@ Most of the dependencies can be resolved from packages, here's an overview for s
    sudo dnf install doxygen python-breathe python-sphinx
 
 * **RHEL/CentOS** - unknown.
-* **openSUSE** - there is an `experimental package <https://build.opensuse.org/package/show/server:dns/knot-resolver>`_.
-* **FreeBSD** - when installing from ports, all dependencies will install automatically, corresponding to the selected options.
+* **openSUSE** - there is an `experimental package
+  <https://build.opensuse.org/package/show/server:dns/knot-resolver>`_.
+* **FreeBSD** - when installing from ports, all dependencies will install
+  automatically, corresponding to the selected options.
 * **NetBSD** - unknown.
 * **OpenBSD** - unknown.
-* **Mac OS X** - the dependencies can be found through `Homebrew <http://brew.sh/>`_.
+* **Mac OS X** - the dependencies can be found through `Homebrew
+  <http://brew.sh/>`_.
 
 .. code-block:: bash
 
    brew install pkg-config libuv luajit cmocka
 
-Building from sources
----------------------
+Compilation
+-----------
 
-Initialize git submodules first.
-
-.. code-block:: bash
-
-    $ git submodule update --init --recursive
-
-The Knot Resolver depends on the the Knot DNS library, recent version of libuv_, and LuaJIT_.
+When installing into custom prefix during development / testing, using static
+library is recommended to avoid issues with loading a shared library.
 
 .. code-block:: bash
 
-   $ make info # See what's missing
+   $ meson build_dev --prefix=/tmp/kr --default-library=static
+   $ ninja -C build_dev
+   $ ninja install -C build_dev
 
-When you have all the dependencies ready, you can build and install.
+Meson performs the build in the specified directory (``build_dev/`` in this
+case) and doesn't pollute the source tree.  This allows you to have multiple
+build roots with different build configurations at the same time.
+
+Build options
+~~~~~~~~~~~~~
+
+It's possible to customize build options with ``-Doption=value`` when creating
+a build directory:
+
+.. code-block:: bash
+
+   $ meson build_doc -Ddoc=enabled
+
+Build options are mostly useful for packagers or developers who wish to
+customize the daemon behaviour, run extended test suites etc.  By default,
+these are all set to sensible values. Our build system supports the following
+options:
+
+.. csv-table::
+   :header: "Option", "Value", "Description"
+
+   "``keyfile_default``", "*string*", "built-in path to DNSSEC trust anchors
+   file"
+   "``managed_ta``", "*feature*", "auto-manage DNSSEC trust anchors (RFC 5011)"
+   "``root_hints``", "*string*", "built-in path to root.hints file"
+   "``install_kresd_conf``", "*feature*", "install default config file"
+   "``user``", "*string*", "user which is used for running kresd"
+   "``group``", "*string*", "group which is used for running kresd"
+   "``systemd_unit_files``", "``disabled``/``enabled``/``nosocket``", "installs
+   systemd unit files"
+   "``client``", "*feature*", "build kresc client binary"
+   "``doc``", "*feature*", "build html documentation"
+   "``extra_tests``", "*feature*", "integration tests with extra dependencies"
+   "``unit_tests``", "*feature*", "cmocka unit tests"
+
+*feature* can be either ``auto``, ``enabled`` or ``disabled``.
+
+Running tests
+~~~~~~~~~~~~~
+
+To run in-tree tests:
+
+.. code-block:: bash
+
+   $ ninja -C build_dev
+   $ meson test --no-suite postinstall -C build_dev
+
+More comprehensive tests require you to install kresd before running the test
+suite.  To run all available tests (also see ``extra_tests`` build option
+above), use:
+
+.. code-block:: bash
+
+   $ ninja -C build_dev
+   $ ninja install -C build_dev
+   $ meson test -C build_dev
+
+Packagers
+~~~~~~~~~
+
+
 
 .. code-block:: bash
 
