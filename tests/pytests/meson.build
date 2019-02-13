@@ -14,7 +14,6 @@ tlsproxy = executable(
     libuv,
     gnutls,
   ],
-  c_args: c_args,
 )
 
 # python 3 dependencies
