@@ -87,7 +87,6 @@ libkres_lib = library('kres',
     gnutls,
     luajit,
   ],
-  c_args: c_args,
   install: true,
 )
 
