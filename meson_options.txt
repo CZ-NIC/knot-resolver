@@ -31,14 +31,14 @@ option(
   'user',
   type: 'string',
   value: 'knot-resolver',
-  description: 'user which is used for kresd',
+  description: 'user which is used for running kresd',
 )
 
 option(
   'group',
   type: 'string',
   value: 'knot-resolver',
-  description: 'group which is used for kresd',
+  description: 'group which is used for running kresd',
 )
 
 ## Systemd
@@ -51,7 +51,7 @@ option(
     'nosocket',
   ],
   value: 'disabled',
-  description: 'install systemd unit files',
+  description: 'installs systemd unit files',
 )
 
 
