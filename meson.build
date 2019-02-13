@@ -89,15 +89,14 @@ endif
 message('---------------------------')
 
 ## Compiler args
-c_args = [
+add_project_arguments([
   '-D_GNU_SOURCE',
-  '-Wtype-limits',
-  '-Wformat',
   '-Wformat-security',
+  '-Wtype-limits',
   '-Wshadow',
   '-Wall',
   '-fvisibility=hidden',
-]
+])
 
 # Lists of tests
 # These lists are added to from subdir() and finally used in tests/*
