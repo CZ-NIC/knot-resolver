@@ -41,18 +41,17 @@ option(
   description: 'group which is used for kresd',
 )
 
-## Systemd integration
+## Systemd
 option(
-  'systemd',
+  'systemd_unit_files',
   type: 'combo',
   choices: [
-    'auto',
+    'disabled',
     'enabled',
     'nosocket',
-    'disabled',
   ],
-  value: 'auto',
-  description: 'create systemd unit files',
+  value: 'disabled',
+  description: 'install systemd unit files',
 )
 
 
