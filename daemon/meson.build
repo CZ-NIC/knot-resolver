@@ -35,11 +35,8 @@ kresd_deps = [
   libuv,
   luajit,
   gnutls,
+  libsystemd,
 ]
-
-if systemd
-  kresd_deps += libsystemd
-endif
 
 
 subdir('lua')

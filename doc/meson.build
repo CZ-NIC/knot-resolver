@@ -5,7 +5,8 @@ man_config = configuration_data()
 man_config.set('version', meson.project_version())
 man_config.set('date', run_command('../scripts/get-date.sh', check: true).stdout())
 man_config.set('keyfile_default', keyfile_default)
-man_config.set('man_seealso_systemd', systemd ? '\\fIkresd.systemd(7)\\fR, ' : '')
+man_config.set('man_seealso_systemd',
+  libsystemd.found() ? '\\fIkresd.systemd(7)\\fR, ' : '')
 
 man_kresd = configure_file(
   input: 'kresd.8.in',
