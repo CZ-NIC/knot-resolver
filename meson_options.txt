@@ -28,6 +28,13 @@ option(
 )
 
 option(
+  'verbose_log',
+  type: 'feature',
+  value: 'enabled',
+  description: 'support verbose logging',
+)
+
+option(
   'user',
   type: 'string',
   value: 'knot-resolver',
