@@ -77,30 +77,16 @@ user = get_option('user')
 group = get_option('group')
 
 ## Systemd
-opt_systemd = get_option('systemd')
-systemd = false
-systemd_socket = false
-if opt_systemd != 'disabled'
-  message('--- systemd integration ---')
-  libsystemd = dependency('libsystemd', version: '>=227',
-			  required: opt_systemd == 'enabled')
-  if libsystemd.found()
-    systemd = true
-    systemd_socket = opt_systemd != 'nosocket'
-  else
-    libsystemd = dependency('libsystemd', version: '>=214',
-			    required: opt_systemd == 'nosocket')
-    if libsystemd.found()
-      systemd = true
-      systemd_socket = false
-    endif
-  endif
-  if systemd
-    pkgconf_systemd = dependency('systemd')
-  endif
-  message('---------------------------')
+message('--- systemd socket activation ---')
+libsystemd = dependency('libsystemd', version: '>=227', required: false)
+systemd_unit_files = get_option('systemd_unit_files')
+if systemd_unit_files == 'enabled' and not libsystemd.found()
+  error('systemd_unit_files=enabled requires libsystemd >= 227')
 endif
+message('---------------------------')
 
+
+## Compiler args
 c_args = [
   '-D_GNU_SOURCE',
   '-Wtype-limits',
@@ -151,7 +137,7 @@ conf_data.set_quoted('libzscanner_SONAME',
   libzscanner.get_pkgconfig_variable('soname'))
 conf_data.set_quoted('libknot_SONAME',
   libknot.get_pkgconfig_variable('soname'))
-conf_data.set('HAS_SYSTEMD', systemd)
+conf_data.set('HAS_SYSTEMD', libsystemd.found())
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
@@ -182,7 +168,7 @@ subdir('doc')
 subdir('etc')
 
 # systemd integration
-if systemd
+if systemd_unit_files != 'disabled'
   subdir('systemd')
 endif
 
@@ -191,8 +177,7 @@ endif
 # NOTE: ternary operator in format() not supported
 # https://github.com/mesonbuild/meson/issues/2404
 summary_managed_ta = managed_ta ? 'enabled' : 'disabled'
-summary_systemd = systemd ? 'enabled' : 'disabled'
-summary_systemd_socket = systemd_socket ? 'enabled' : 'disabled'
+summary_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
 summary_build_client = build_client ? 'enabled' : 'disabled'
 summary_build_doc = build_doc ? 'enabled' : 'disabled'
 summary_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
@@ -213,8 +198,9 @@ message('''
     keyfile_default:    @0@'''.format(keyfile_default) + '''
     managed_ta:         @0@'''.format(summary_managed_ta) + '''
 
-  systemd:              @0@'''.format(summary_systemd) + '''
+  systemd:
     socket activation:  @0@'''.format(summary_systemd_socket) + '''
+    unit_files:         @0@'''.format(systemd_unit_files) + '''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
 
   optional components
