@@ -27,7 +27,6 @@ foreach unit_test : unit_tests
       cmocka,
       lmdb,
     ],
-    c_args: c_args,
   )
   test(
     'unit.' + unit_test[0],
