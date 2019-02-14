@@ -64,6 +64,13 @@ option(
 
 # Component options
 option(
+  'bench',
+  type: 'feature',
+  value: 'disabled',
+  description: 'build benchmarks'
+)
+
+option(
   'client',
   type: 'feature',
   value: 'auto',
