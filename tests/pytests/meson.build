@@ -1,11 +1,19 @@
 # tests: pytests
 
+# python 3 dependencies
+py3_deps += [
+  ['jinja2', 'jinja2 (for pytests)'],
+  ['dns', 'dnspython (for pytests)'],
+  ['pytest', 'pytest (for pytests)'],
+  ['pytest_html', 'pytest-html (for pytests)'],
+  ['xdist', 'pytest-xdist (for pytests)'],
+]
+
+# compile tlsproxy
 tlsproxy_src = [
   'proxy/tlsproxy.c',
   'proxy/tls-proxy.c',
 ]
-
-# compile tlsproxy
 tlsproxy = executable(
   'tlsproxy',
   tlsproxy_src,
@@ -16,54 +24,45 @@ tlsproxy = executable(
   ],
 )
 
-# python 3 dependencies
-py3_deps += [
-  ['jinja2', 'jinja2 (for pytests)'],
-  ['dns', 'dnspython (for pytests)'],
-  ['pytest', 'pytest (for pytests)'],
-  ['pytest_html', 'pytest-html (for pytests)'],
-  ['xdist', 'pytest-xdist (for pytests)'],
-]
-
+# path to kresd and tlsproxy
 pytests_env = environment()
-pytests_env.prepend('PATH', sbin_dir)
-pytests_env.prepend('PATH', meson.current_build_dir())  # for tlsproxy
+pytests_env.prepend('PATH', sbin_dir, meson.current_build_dir())
 
 test(
-  'pytests.basic',
+  'pytests.parallel',
   python3,
   args: [
     '-m', 'pytest',
-    '--html', 'pytests.basic.html',
-    '--self-contained-html',
     '-d',
     '-n', '24',
-    meson.current_source_dir(),
+    '-v',
   ],
   env: pytests_env,
   suite: [
     'postinstall',
     'pytests',
   ],
+  workdir: meson.current_source_dir(),
   is_parallel: false,
   timeout: 180,
   depends: tlsproxy,
 )
 
 test(
-  'pytests.extended',
+  'pytests.single',
   python3,
   args: [
     '-m', 'pytest',
     '-ra',
     '--capture=no',
-    '@0@'.format(join_paths(meson.current_source_dir(), 'conn_flood.py')),
+    'conn_flood.py',
   ],
   env: pytests_env,
   suite: [
     'postinstall',
     'pytests',
   ],
+  workdir: meson.current_source_dir(),
   is_parallel: false,
   timeout: 240,
 )
