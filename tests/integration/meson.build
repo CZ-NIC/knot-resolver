@@ -26,7 +26,6 @@ deckard_contrib = custom_target(
     '@0@'.format(join_paths(meson.current_source_dir(), 'deckard')),
   ],
   output: 'deckard_contrib',
-  build_always_stale: true,
 )
 
 deckard_env = environment()

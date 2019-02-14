@@ -5,6 +5,9 @@ view:addr('127.0.0.0/24', policy.suffix(policy.DENY_MSG("addr 127.0.0.0/24 match
 view:addr('127.0.0.0/24', policy.suffix(policy.DENY_MSG("addr 127.0.0.0/24 matched net"),{"\3net\0"}))
 policy.add(policy.all(policy.FORWARD('1.2.3.4')))
 
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
+
 -- Disable RFC8145 signaling, scenario doesn't provide expected answers
 if ta_signal_query then
         modules.unload('ta_signal_query')
