@@ -116,10 +116,11 @@ integr_tests = [
 ]
 
 
-# NOTE "dist" target is explicitly not supported for two reasons
-#   1) we use meson test to run integration / postinstall tests
-#   2) we want custom version number, not the hard-coded string in project()
-# Use "archive" target instead
+# Tarball
+## NOTE "dist" target is explicitly not supported for two reasons
+##   1) we use meson test to run integration / postinstall tests
+##   2) we want custom version number, not the hard-coded string in project()
+## Use "archive" target instead
 run_target(
   'archive',
   command: [
@@ -153,30 +154,33 @@ kresconfig_dep = declare_dependency(
 )
 
 
-# NOTE order of subdir includes is significant
-# compile
+# Compile
+## Dependencies first
 subdir('contrib')
 subdir('lib')
+
+## Remaining code
+subdir('client')
 subdir('daemon')
 subdir('modules')
-subdir('client')
 
 
-# tests
+# Tests
 subdir('tests')
 
 
-# documentation, examples
+# Documentation & configs
 subdir('doc')
 subdir('etc')
 
-# systemd integration
+
+# Systemd unit files
 if systemd_unit_files != 'disabled'
   subdir('systemd')
 endif
 
 
-# summary message
+# Summary message
 # NOTE: ternary operator in format() not supported
 # https://github.com/mesonbuild/meson/issues/2404
 summary_managed_ta = managed_ta ? 'enabled' : 'disabled'
@@ -216,7 +220,6 @@ message('''
     user:               @0@'''.format(user) + '''
     group:              @0@'''.format(group) + '''
     install_kresd_conf: @0@'''.format(summary_install_kresd_conf) + '''
-    version:            @0@'''.format(meson.project_version()) + '''
 
 =======================================================
 
