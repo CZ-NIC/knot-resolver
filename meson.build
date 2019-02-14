@@ -163,6 +163,9 @@ subdir('lib')
 subdir('client')
 subdir('daemon')
 subdir('modules')
+if get_option('bench').enabled()
+  subdir('bench')
+endif
 
 
 # Tests
