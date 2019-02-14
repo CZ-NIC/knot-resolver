@@ -650,7 +650,7 @@ static void init_measurement(struct engine *engine)
 		"})\n"
 		"jit.off()\n", statspath
 	);
-	assert(ret > 0);
+	assert(ret > 0); (void)ret;
 
 	ret = luaL_loadstring(engine->L, snippet);
 	assert(ret == 0);
