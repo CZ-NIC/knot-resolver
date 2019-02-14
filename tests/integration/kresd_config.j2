@@ -2,6 +2,9 @@ net = { '{{SELF_ADDR}}' }
 -- hints.root({['k.root-servers.net'] = '{{ROOT_ADDR}}'})
 _hint_root_file('hints')
 
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
+
 cache.size = 2*MB
 
 
