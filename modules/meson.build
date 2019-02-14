@@ -26,6 +26,12 @@ config_tests += [
   ['dns64', files('dns64/dns64.test.lua')],
 ]
 
+integr_tests += [
+  ['bogus_log', join_paths(meson.current_source_dir(), 'bogus_log', 'test.integr')],
+  ['rebinding', join_paths(meson.current_source_dir(), 'rebinding', 'test.integr')],
+  ['serve_stale', join_paths(meson.current_source_dir(), 'serve_stale', 'test.integr')],
+]
+
 
 # handle more complex C/LUA modules separately
 subdir('bogus_log')
