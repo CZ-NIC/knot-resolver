@@ -22,6 +22,9 @@ if detect_time_skew then
         modules.unload('detect_time_skew')
 end
 
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
+
 _hint_root_file('hints')
 cache.size = 2*MB
 verbose(true)
