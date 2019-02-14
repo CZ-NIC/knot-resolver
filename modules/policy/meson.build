@@ -9,6 +9,7 @@ config_tests += [
 ]
 
 integr_tests += [
+  ['policy', join_paths(meson.current_source_dir(), 'test.integr')],
   ['policy.noipv6', join_paths(meson.current_source_dir(), 'noipv6.test.integr')],
   ['policy.noipvx', join_paths(meson.current_source_dir(), 'noipvx.test.integr')],
 ]
