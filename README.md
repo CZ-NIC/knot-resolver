@@ -45,7 +45,6 @@ This is simple and doesn't require any dependencies or system modifications, jus
 $ docker run -Pit cznic/knot-resolver
 ```
 
-See the build page [hub.docker.com/r/cznic/knot-resolver](https://hub.docker.com/r/cznic/knot-resolver/) for more information and options.
 The images are meant as an easy way to try knot-resolver, and they're not designed for production use.
 
 ### Running
