@@ -33,6 +33,10 @@ typedef kr_nsrep_lru_t lru_bench_t;
 	} while (0)
 #define p_err(...) fprintf(stderr, __VA_ARGS__)
 
+#ifndef LRU_RTT_SIZE
+#define LRU_RTT_SIZE 65536 /**< NS RTT cache size */
+#endif
+
 static int die(const char *cause)
 {
 	fprintf(stderr, "%s: %s\n", cause, strerror(errno));
