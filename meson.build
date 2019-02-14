@@ -65,7 +65,7 @@ endif
 
 ## Root hints
 root_hints = join_paths(etc_dir, get_option('root_hints'))
-if keyfile_default == join_paths(etc_dir, 'root.hints')
+if root_hints == join_paths(etc_dir, 'root.hints')
   install_root_hints = true
 else
   install_root_hints = false
