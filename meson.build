@@ -71,11 +71,9 @@ else
   install_root_hints = false
 endif
 
-## Verbose log
+## Additional options
 opt_verbose_log = get_option('verbose_log')
 verbose_log = opt_verbose_log.enabled() or opt_verbose_log.auto()
-
-## User/Group
 user = get_option('user')
 group = get_option('group')
 
@@ -114,20 +112,6 @@ config_tests = [
 integr_tests = [
   # [name, test_dir_relative_to_src_root]
 ]
-
-
-# Tarball
-## NOTE "dist" target is explicitly not supported for two reasons
-##   1) we use meson test to run integration / postinstall tests
-##   2) we want custom version number, not the hard-coded string in project()
-## Use "archive" target instead
-run_target(
-  'archive',
-  command: [
-    'scripts/make-archive.sh',
-    meson.project_version(),
-  ],
-)
 
 
 # kresconfig.h
@@ -186,13 +170,13 @@ endif
 # Summary message
 # NOTE: ternary operator in format() not supported
 # https://github.com/mesonbuild/meson/issues/2404
-summary_managed_ta = managed_ta ? 'enabled' : 'disabled'
-summary_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
-summary_build_client = build_client ? 'enabled' : 'disabled'
-summary_build_doc = build_doc ? 'enabled' : 'disabled'
-summary_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
-summary_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
-summary_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
+s_managed_ta = managed_ta ? 'enabled' : 'disabled'
+s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
+s_build_client = build_client ? 'enabled' : 'disabled'
+s_build_doc = build_doc ? 'enabled' : 'disabled'
+s_build_postinstall_tests = build_postinstall_tests ? 'enabled' : 'disabled'
+s_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
+s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 message('''
 
 ======================= SUMMARY =======================
@@ -206,23 +190,23 @@ message('''
 
   trust_anchors
     keyfile_default:    @0@'''.format(keyfile_default) + '''
-    managed_ta:         @0@'''.format(summary_managed_ta) + '''
+    managed_ta:         @0@'''.format(s_managed_ta) + '''
 
   systemd:
-    socket activation:  @0@'''.format(summary_systemd_socket) + '''
+    socket activation:  @0@'''.format(s_systemd_socket) + '''
     unit_files:         @0@'''.format(systemd_unit_files) + '''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
 
   optional components
-    client:             @0@'''.format(summary_build_client) + '''
-    doc:                @0@'''.format(summary_build_doc) + '''
-    extra_tests:        @0@'''.format(summary_build_extra_tests) + '''
-    unit_tests:         @0@'''.format(summary_build_unit_tests) + '''
+    client:             @0@'''.format(s_build_client) + '''
+    doc:                @0@'''.format(s_build_doc) + '''
+    unit_tests:         @0@'''.format(s_build_unit_tests) + '''
+    postinstall_tests:  @0@'''.format(s_build_postinstall_tests) + '''
 
   additional
     user:               @0@'''.format(user) + '''
     group:              @0@'''.format(group) + '''
-    install_kresd_conf: @0@'''.format(summary_install_kresd_conf) + '''
+    install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
 
 =======================================================
 
