@@ -11,46 +11,55 @@ license=('GPL3')
 backup=('etc/knot-resolver/kresd.conf')
 options=(debug strip)
 install=install
-depends=('cmocka'
-         'dnssec-anchors'
-         'gnutls'
-         'knot>=2.7.6'
-         'libedit'
-         'libsystemd'
-         'libuv'
-         'lmdb'
-         'lua51-sec'
-         'lua51-socket'
-         'luajit')
-source=("knot-resolver_${pkgver}.orig.tar.xz")
+depends=(
+    'dnssec-anchors'
+    'gnutls'
+    'knot>=2.7.6'
+    'libedit'
+    'libuv'
+    'lmdb'
+    'lua51-sec'
+    'lua51-socket'
+    'luajit'
+    'systemd'
+)
+makedepends=(
+    'cmocka'
+    'doxygen'
+    'meson'
+    'python-sphinx'
+    'python-breathe'
+    'systemd-libs'
+)
 
-_makevars="PREFIX=/usr SBINDIR=/usr/bin LIBDIR=/usr/lib INCLUDEDIR=/usr/include ETCDIR=/etc/knot-resolver KEYFILE_DEFAULT=/etc/trusted-key.key V=1"
+source=("knot-resolver_${pkgver}.orig.tar.xz")
 
 sha256sums=('SKIP')
 
 build() {
-	cd "${srcdir}/${pkgname}-${pkgver}"
-	make ${_makevars}
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    meson build_arch \
+        --buildtype=release \
+        --prefix=/usr \
+        --sbindir=bin \
+        -Dkeyfile_default=/etc/trusted-key.key \
+        -Dsystemd_unit_files=enabled \
+        -Dclient=enabled \
+        -Dinstall_kresd_conf=enabled \
+        -Dunit_tests=enabled
+    ninja -C build_arch
 }
 
 check() {
-	cd "${srcdir}/${pkgname}-${pkgver}"
-	make check-unit ${_makevars}
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    meson test -C build_arch
 }
 
 package() {
-	cd "${srcdir}/${pkgname}-${pkgver}"
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    DESTDIR=${pkgdir} ninja -C build_arch install
 
-	make ${_makevars} DESTDIR="${pkgdir}" install
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/systemd/kresd.socket" "${pkgdir}/usr/lib/systemd/system/kresd.socket"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/systemd/kresd-control@.socket" "${pkgdir}/usr/lib/systemd/system/kresd-control@.socket"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/systemd/kresd-tls.socket" "${pkgdir}/usr/lib/systemd/system/kresd-tls.socket"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/systemd/kresd@.service" "${pkgdir}/usr/lib/systemd/system/kresd@.service"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/systemd/kresd.target" "${pkgdir}/usr/lib/systemd/system/kresd.target"
-	install -dm 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
-	ln -s ../kresd.target "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants/kresd.target"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/systemd/kresd.systemd.7" "${pkgdir}/usr/share/man/man7/kresd.systemd.7"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/tmpfiles/knot-resolver.conf" "${pkgdir}/usr/lib/tmpfiles.d/knot-resolver.conf"
-	install -dm 0775 "${pkgdir}/etc/knot-resolver"
-	install -Dm 0644 "${srcdir}/${pkgname}-${pkgver}/distro/common/kresd.no_ta.conf" "${pkgdir}/etc/knot-resolver/kresd.conf"
+    # add kresd.target to multi-user.target.wants to support enabling kresd services
+    install -dm 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
+    ln -s ../kresd.target "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants/kresd.target"
 }
