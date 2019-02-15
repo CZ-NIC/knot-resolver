@@ -65,6 +65,7 @@ if build_doc  # doxygen + html docs
       sphinx_build,
       '-W',
       '-b', 'html',
+      '-d', '.doctrees',
       meson.current_source_dir(),
       '@OUTPUT@',
     ],
