@@ -67,33 +67,33 @@ option(
   'bench',
   type: 'feature',
   value: 'disabled',
-  description: 'build benchmarks'
+  description: 'build benchmarks',
 )
 
 option(
   'client',
   type: 'feature',
   value: 'auto',
-  description: 'build kresc client binary'
+  description: 'build kresc client binary',
 )
 
 option(
   'doc',
   type: 'feature',
   value: 'disabled',
-  description: 'build html documentation'
+  description: 'build html documentation',
 )
 
 option(
-  'extra_tests',
+  'postinstall_tests',
   type: 'feature',
   value: 'disabled',
-  description: 'integration tests with extra dependencies'
+  description: 'postinstall tests with extra dependencies',
 )
 
 option(
   'unit_tests',
   type: 'feature',
   value: 'auto',
-  description: 'cmocka unit tests'
+  description: 'cmocka unit tests',
 )
