@@ -166,7 +166,7 @@ To run in-tree tests:
    $ meson test --no-suite postinstall -C build_dev
 
 More comprehensive tests require you to install kresd before running the test
-suite.  To run all available tests (also see ``extra_tests`` build option),
+suite.  To run all available tests (see ``postinstall_tests`` build option),
 use:
 
 .. code-block:: bash
