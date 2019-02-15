@@ -1,5 +1,6 @@
 # tests
 
+## unit tests
 build_unit_tests = false
 if not get_option('unit_tests').disabled()
   message('--- unit_tests dependencies ---')
@@ -11,11 +12,13 @@ if not get_option('unit_tests').disabled()
   message('-------------------------------')
 endif
 
-subdir('config')
 
-build_extra_tests = get_option('extra_tests').enabled()  # NOTE 'auto' not supported
-if build_extra_tests
-  message('--- extra_tests dependencies ---')
+## postinstall tests
+build_postinstall_tests = get_option('postinstall_tests').enabled()
+if build_postinstall_tests
+  subdir('config')
+
+  message('--- postinstall_tests dependencies ---')
   python3 = find_program('python3')
   py3_deps = []
 
