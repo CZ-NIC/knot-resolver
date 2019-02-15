@@ -14,6 +14,8 @@ TIMESTAMP=$(date -u +'%s' 2>/dev/null)
 
 # modify and commit meson.build
 sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1\2.$TIMESTAMP.$GIT_HASH\3/" meson.build
+
+: changed version in meson.build, changes must be commited to git
 git add meson.build
 git commit -m 'DROP: devel version archive'
 
