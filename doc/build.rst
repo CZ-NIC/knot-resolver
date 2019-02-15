@@ -155,44 +155,99 @@ a build directory:
 
    $ meson build_doc -Ddoc=enabled
 
-Running tests
-~~~~~~~~~~~~~
+Customizing compiler flags
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To run in-tree tests:
+If you'd like to use custom compiler flags, see meson's `built-in options
+<https://mesonbuild.com/Builtin-options.html>`_. You might be interested in
+``c_args``, ``c_link_args``. For hardening, it's also possible to use
+``b_pie``.
+
+For complete control over builds flags, use ``--buildtype=plain``.
+
+Tests
+-----
+
+The following command runs all tests. By default, only unit tests are enabled.
 
 .. code-block:: bash
 
    $ ninja -C build_dev
-   $ meson test --no-suite postinstall -C build_dev
-
-More comprehensive tests require you to install kresd before running the test
-suite.  To run all available tests (see ``postinstall_tests`` build option),
-use:
-
-.. code-block:: bash
-
-   $ ninja -C build_dev
-   $ ninja install -C build_dev
    $ meson test -C build_dev
 
-Packagers
-~~~~~~~~~
+More comprehensive tests require you to install kresd before running the test
+suite. To run all available tests, use ``-Dpostinstall_tests=enabled`` build
+option.
 
-Recommended switches for ``meson build_pkg``:
+.. code-block:: bash
+
+   $ ninja -C build_test
+   $ ninja install -C build_test
+   $ meson test -C build_test
+
+It's also possible to run only specific test suite or a test.
+
+.. code-block:: bash
+
+   $ meson test -C build_test --help
+   $ meson test -C build_test --list
+   $ meson test -C build_test --no-suite postinstall
+   $ meson test -C build_test integration.serve_stale
+
+Tarball
+-------
+
+Released tarballs are available from `<https://knot-resolver.cz/download/>`_
+
+To make a release tarball from git, use the follwing command. The
+
+.. code-block:: bash
+
+   $ ninja -C build_dev dist
+
+It's also possible to make a development snapshot tarball:
+
+.. code-block:: bash
+
+   $ ./scripts/make-dev-archive.sh
+
+Packaging
+---------
+
+Recommended build options for packagers:
 
 * ``--buildtype=release`` turns on optimalizations, turns off asserts (override
   with ``-Db_ndebug=false`` if desired)
-* ``--unity=on`` faster builds, see `Unity builds
-  <https://mesonbuild.com/Unity-builds.html>`_
 * ``--prefix=/usr`` to customize
   prefix, other directories can be set in a similar fashion, see ``meson setup
   --help``
-* ``-Dsystemd_unit_files=enabled`` for systemd unit files with socket activation
-  support. Alternately, for systemd < 227, use ``nosocket``. If you need to
-  customize unit files, use drop-in files.
 * ``-Ddoc=enabled`` for offline html documentation
 * ``-Dclient=enabled`` to force build of kresc
 * ``-Dunit_tests=enabled`` to force build of unit tests
+
+Systemd
+~~~~~~~
+
+It's recommended to use the upstream system unit files. If any customizations
+are required, drop-in files should be used, instead of patching/changing the
+unit files themselves.
+
+Depending on your systemd version, choose the appropriate build option:
+
+* ``-Dsystemd_unit_files=enabled`` (recommended) installs unit files with
+  systemd socket activation support. Requires systemd >=227.
+* ``-Dsystemd_unit_files=nosocket`` for systemd <227. Unit files won't use
+  socket activation.
+
+To support enabling services after boot, you must also link ``kresd.target`` to
+``multi-user.target.wants``:
+
+.. code-block:: bash
+
+   ln -s ../kresd.target /usr/lib/systemd/system/multi-user.target.wants/kresd.target
+
+Trust anchors
+~~~~~~~~~~~~~
 
 If the target distro has externally managed DNSSEC trust anchors or root hints:
 
@@ -205,14 +260,6 @@ set the following and make sure both ``root.keys`` (check default
 by kresd process.
 
 * ``-Dmanaged_ta=enabled``
-
-Customizing compiler flags
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you'd like to use custom compiler flags, see meson's `built-in options
-<https://mesonbuild.com/Builtin-options.html>`_. You might be interested in
-``c_args``, ``c_link_args``. For hardening, it's also possible to use
-``b_pie``.
 
 Docker image
 ------------
