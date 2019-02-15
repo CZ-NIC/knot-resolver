@@ -156,8 +156,8 @@ function policy.TLS_FORWARD(targets)
 	local nslist = {} -- to persist in closure of the returned function
 	for idx, target in pairs(targets) do
 		if type(target) ~= 'table' or type(target[1]) ~= 'string' then
-			error('TLS_FORWARD argument number %1 must be a table starting with an address',
-					idx)
+			error(string.format('TLS_FORWARD configuration at position ' ..
+			'%d must be a table starting with an IP address', idx))
 		end
 		-- Note: some functions have checks with error() calls inside.
 		local sockaddr_c = addr2sock(target[1], 853)

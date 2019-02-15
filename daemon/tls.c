@@ -572,23 +572,21 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	err = gnutls_pubkey_export2(key, GNUTLS_X509_FMT_DER, &datum);
 	if (err != GNUTLS_E_SUCCESS) goto leave;
 
-	{
-		char raw_pin[TLS_SHA256_RAW_LEN]; /* TMP buffer if raw == false */
-		err = gnutls_hash_fast(GNUTLS_DIG_SHA256, datum.data, datum.size,
-					(raw ? outchar : raw_pin));
-		if (err != GNUTLS_E_SUCCESS || raw/*success*/)
-			goto leave;
-		/* Convert to non-raw. */
-		err = base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
-				    (uint8_t *)outchar, outchar_len);
-		if (err >= 0 && err < outchar_len) {
-			err = GNUTLS_E_SUCCESS;
-			outchar[err] = '\0'; /* base64_decode() doesn't do it */
-		} else if (err >= 0) {
-			assert(false);
-			err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
-			outchar[outchar_len - 1] = '\0';
-		}
+	char raw_pin[TLS_SHA256_RAW_LEN]; /* TMP buffer if raw == false */
+	err = gnutls_hash_fast(GNUTLS_DIG_SHA256, datum.data, datum.size,
+				(raw ? outchar : raw_pin));
+	if (err != GNUTLS_E_SUCCESS || raw/*success*/)
+		goto leave;
+	/* Convert to non-raw. */
+	err = base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
+			    (uint8_t *)outchar, outchar_len);
+	if (err >= 0 && err < outchar_len) {
+		err = GNUTLS_E_SUCCESS;
+		outchar[err] = '\0'; /* base64_encode() doesn't do it */
+	} else if (err >= 0) {
+		assert(false);
+		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
+		outchar[outchar_len - 1] = '\0';
 	}
 leave:
 	gnutls_free(datum.data);
