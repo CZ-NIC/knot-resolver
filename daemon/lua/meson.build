@@ -7,7 +7,7 @@ config_tests += [
 ta_config = configuration_data()
 ta_config.set('keyfile_default', keyfile_default)
 ta_config.set('etc_dir', etc_dir)
-ta_config.set('managed_ta', managed_ta)
+ta_config.set('unmanaged', managed_ta ? 'false' : 'true')
 
 trust_anchors = configure_file(
   input: 'trust_anchors.lua.in',
