@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
 
-import sys, os, re, subprocess
+import os
+import re
+import subprocess
 
 import sphinx_rtd_theme
 
 # -- General configuration -----------------------------------------------------
 
 if os.environ.get('READTHEDOCS', None) == 'True':
-  subprocess.call('doxygen')
+    subprocess.call('doxygen')
 
 # Add any Sphinx extension module names here, as strings.
 extensions = ['sphinx.ext.todo', 'sphinx.ext.viewcode', 'breathe']
 
 # Breathe configuration
-breathe_projects = { "libkres": "doxyxml" }
+breathe_projects = {"libkres": "doxyxml"}
 breathe_default_project = "libkres"
-breathe_domain_by_extension = {"h" : "c"}
+breathe_domain_by_extension = {"h": "c"}
 
 # The suffix of source filenames.
 source_suffix = '.rst'
@@ -23,9 +25,12 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Knot Resolver'
-copyright = u'2014-2018 CZ.NIC labs'
-version = { k[0][0]: k[0][1] for k in filter(None, [re.findall(r'(MAJOR|MINOR|PATCH) := ([0-9]+)',line) for line in open('../config.mk')])}
-version = '%s.%s.%s' % (version['MAJOR'], version['MINOR'], version['PATCH'])
+copyright = u'2014-2019 CZ.NIC labs'
+with open('../meson.build') as f:
+    for line in f:
+        match = re.match(r"\s*version\s*:\s*'([^']+)'.*", line)
+        if match is not None:
+            version = match.groups()[0]
 release = version
 
 # List of patterns, relative to source directory, that match files and
@@ -68,4 +73,3 @@ man_pages = [
     ('index', 'libkres', u'libkres documentation',
      [u'CZ.NIC Labs'], 1)
 ]
-
