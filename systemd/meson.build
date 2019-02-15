@@ -70,6 +70,6 @@ if systemd_unit_files == 'enabled'
     ],
     install_dir: join_paths(examples_dir, 'kresd-tls.socket.d'),
   )
-else if systemd_unit_files == 'nosocket'
+elif systemd_unit_files == 'nosocket'
   subdir('nosocket')
 endif
