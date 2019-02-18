@@ -155,15 +155,18 @@ a build directory:
 
    $ meson build_doc -Ddoc=enabled
 
+.. _build-custom-flags:
+
 Customizing compiler flags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you'd like to use custom compiler flags, see meson's `built-in options
 <https://mesonbuild.com/Builtin-options.html>`_. You might be interested in
 ``c_args``, ``c_link_args``. For hardening, it's also possible to use
-``b_pie``.
+``b_pie``.  All of these flags are set using the ``-Doption=value`` syntax when
+initilizing the build directory.
 
-For complete control over builds flags, use ``--buildtype=plain``.
+To prevent meson from passing its own build flags, use ``--buildtype=plain``.
 
 Tests
 -----
@@ -216,12 +219,12 @@ Packaging
 
 Recommended build options for packagers:
 
-* ``--buildtype=release`` turns on optimalizations, turns off asserts (override
-  with ``-Db_ndebug=false`` if desired)
+* ``--buildtype=release`` for default flags (optimalization, asserts, ...). For complete control over flags, use ``plain`` and see :ref:`build-custom-flags`.
 * ``--prefix=/usr`` to customize
   prefix, other directories can be set in a similar fashion, see ``meson setup
   --help``
 * ``-Ddoc=enabled`` for offline html documentation
+* ``-Dinstall_kresd_conf=enabled`` to install default config file
 * ``-Dclient=enabled`` to force build of kresc
 * ``-Dunit_tests=enabled`` to force build of unit tests
 
