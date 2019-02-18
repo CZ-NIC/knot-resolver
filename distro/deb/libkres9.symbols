@@ -87,6 +87,7 @@ libkres.so.9 libkres9 #MINVER#
  kr_straddr_split@Base 2.1.0
  kr_straddr_subnet@Base 2.1.0
  kr_strcatdup@Base 2.1.0
+ kr_strptime_diff@Base 99
  kr_ta_add@Base 2.1.0
  kr_ta_clear@Base 2.1.0
  kr_ta_covers@Base 2.1.0
