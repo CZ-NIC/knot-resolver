@@ -166,6 +166,16 @@ if systemd_unit_files != 'disabled'
   subdir('systemd')
 endif
 
+# Additional files
+install_data(
+  sources: [
+    'AUTHORS',
+    'COPYING',
+    'NEWS',
+  ],
+  install_dir: doc_dir,
+)
+
 
 # Summary message
 # NOTE: ternary operator in format() not supported
